@@ -113,6 +113,8 @@ V10_MATCH_CLOCK_RECORD_CAP = V10_FIRST_POSITIVE_RECORD_CAP
 V10_MATCH_CLOCK_REJOIN_FRAME = 300
 V10_ORDERED_LINEAGE_BYTE_CAP = 64 * 1024 * 1024
 V10_ORDERED_LINEAGE_RECORD_CAP = 12000
+V10_ORDERED_LINEAGE_V2_BYTE_CAP = 128 * 1024 * 1024
+V10_ORDERED_LINEAGE_V2_RECORD_CAP = 24000
 V10_BROWSER_EXPORT_RECORD_CAP = 8192
 V10_MANUAL_UNLOAD_FAILURES = (
     "whole-session final CSS was not entered",
@@ -1646,6 +1648,7 @@ POSITIVE_EXPECTATION_SCHEMA = "melee-web-v10-first-positive-match-frame-expectat
 CLOCK60_EXPECTATION_SCHEMA = "melee-web-v10-first-match-clock-ge60-expectations"
 MATCH_CLOCK_EXPECTATION_SCHEMA = "melee-web-v10-first-match-clock-boundary-expectations"
 ORDERED_CLOCK_LINEAGE_SCHEMA = "melee-web-v10-ordered-match-clock-lineage-v1"
+ORDERED_CLOCK_LINEAGE_V2_SCHEMA = "melee-web-v10-ordered-match-clock-lineage-v2"
 ORDERED_CLOCK_LINEAGE_EXPECTATION_SCHEMA = "melee-web-v10-first-match-clock-ordered-lineage-expectations"
 ORDERED_CLOCK_ANCHORS = ("clock1", "clock60")
 ORDERED_CLOCK_TARGET = "target"
@@ -1659,6 +1662,28 @@ ORDERED_CLOCK_PREFIX_FIELDS = frozenset({
 MAX_ORDERED_CLOCK_LINEAGE_CHECKPOINTS = 16
 MAX_ORDERED_CLOCK_LINEAGE_DEPTH = 8
 MAX_ORDERED_CLOCK_LINEAGE_AUDIT_VALIDATIONS = 32
+
+
+def _ordered_clock_lineage_limits(lineage: Any) -> tuple[int, int]:
+    """Return this node's validated source limits, preserving v1 defaults."""
+    base_fields = {"schema", "checkpoints", "runner_packet", "supporting_expectations"}
+    if not isinstance(lineage, dict):
+        raise ComparisonError("ordered clock-lineage expectations schema is malformed")
+    if lineage.get("schema") == ORDERED_CLOCK_LINEAGE_SCHEMA:
+        if set(lineage) != base_fields:
+            raise ComparisonError("ordered clock-lineage expectations schema is malformed")
+        return V10_ORDERED_LINEAGE_BYTE_CAP, V10_ORDERED_LINEAGE_RECORD_CAP
+    if lineage.get("schema") != ORDERED_CLOCK_LINEAGE_V2_SCHEMA or \
+            set(lineage) != base_fields | {"source_limits"}:
+        raise ComparisonError("ordered clock-lineage expectations schema is unsupported")
+    limits = lineage.get("source_limits")
+    if not isinstance(limits, dict) or set(limits) != {"max_bytes", "max_records"}:
+        raise ComparisonError("ordered clock-lineage v2 source limits are malformed")
+    max_bytes = _int(limits.get("max_bytes"), "ordered clock-lineage max_bytes",
+                     1, V10_ORDERED_LINEAGE_V2_BYTE_CAP)
+    max_records = _int(limits.get("max_records"), "ordered clock-lineage max_records",
+                       1, V10_ORDERED_LINEAGE_V2_RECORD_CAP)
+    return max_bytes, max_records
 
 
 def _ordered_audit_checkpoint_status_key(checkpoint: Mapping[str, Any],
@@ -1698,11 +1723,7 @@ def _validate_ordered_clock_lineage_expectations(source: Mapping[str, Any],
                                                  recipe: Mapping[str, Any]
                                                  ) -> list[dict[str, Any]]:
     lineage = source.get("ordered_clock_lineage")
-    if (not isinstance(lineage, dict) or
-            lineage.get("schema") != ORDERED_CLOCK_LINEAGE_SCHEMA or
-            set(lineage) != {"schema", "checkpoints", "runner_packet",
-                             "supporting_expectations"}):
-        raise ComparisonError("ordered clock-lineage expectations schema is malformed")
+    byte_cap, record_cap = _ordered_clock_lineage_limits(lineage)
     checkpoints = lineage.get("checkpoints")
     if (not isinstance(checkpoints, list) or len(checkpoints) < 3 or
             len(checkpoints) > MAX_ORDERED_CLOCK_LINEAGE_CHECKPOINTS):
@@ -1733,10 +1754,10 @@ def _validate_ordered_clock_lineage_expectations(source: Mapping[str, Any],
         if not isinstance(prefix, dict) or set(prefix) != ORDERED_CLOCK_PREFIX_FIELDS:
             raise ComparisonError(f"ordered clock-lineage {label} prefix fields are malformed")
         _int(prefix.get("bytes_read"), f"ordered clock-lineage {label} prefix bytes",
-             1, V10_ORDERED_LINEAGE_BYTE_CAP)
+             1, byte_cap)
         records = _int(prefix.get("records_read"),
                        f"ordered clock-lineage {label} prefix records",
-                       1, V10_ORDERED_LINEAGE_RECORD_CAP)
+                       1, record_cap)
         last_sequence = _int(prefix.get("last_source_sequence"),
                              f"ordered clock-lineage {label} last source sequence",
                              1, (1 << 64) - 1)
@@ -1793,8 +1814,8 @@ def _validate_ordered_clock_lineage_expectations(source: Mapping[str, Any],
                      "ordered clock-lineage target threshold",
                      normalized[-2]["tuple"]["match_frame"] + 1, MAX_UINT32)
     if (normalized[-1]["tuple"]["match_frame"] != threshold or
-            normalized[-1]["tuple"]["source_sequence"] + 1 > V10_ORDERED_LINEAGE_RECORD_CAP or
-            normalized[-1]["prefix"]["bytes_read"] > V10_ORDERED_LINEAGE_BYTE_CAP or
+            normalized[-1]["tuple"]["source_sequence"] + 1 > record_cap or
+            normalized[-1]["prefix"]["bytes_read"] > byte_cap or
             normalized[-1]["tuple"]["browser_cursor"] > recipe.get("frame_count", 0)):
         raise ComparisonError("ordered clock-lineage terminal target exceeds its frozen bounds")
     for name, identity in (("runner packet", lineage.get("runner_packet")),):
@@ -1935,6 +1956,9 @@ def _load_expectations(path: Path, selected: Mapping[str, Path], *,
             raise ComparisonError("clock-60 expectations contain an invalid first-match target")
     if scope in {V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
                  V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE}:
+        ordered_limits = (_ordered_clock_lineage_limits(
+            source.get("ordered_clock_lineage"))
+            if scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE else None)
         target = source.get("match_clock_boundary")
         required_target_fields = {
             "target_match_frame_at_least", "match_index", "source_tick",
@@ -1952,8 +1976,8 @@ def _load_expectations(path: Path, selected: Mapping[str, Path], *,
                  (1 << 64) - 1 if field in {"source_sequence", "pad_consume_sequence"}
                  else MAX_UINT32)
         clock60 = source["clock60_boundary"]
-        record_cap = (V10_ORDERED_LINEAGE_RECORD_CAP
-                      if scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE
+        record_cap = (ordered_limits[1]
+                      if ordered_limits is not None
                       else V10_MATCH_CLOCK_RECORD_CAP)
         if (target["match_index"] != 0 or target["match_frame"] != threshold or
                 target["source_tick"] <= clock60["source_tick"] or
@@ -2551,6 +2575,10 @@ def _validate_match_clock_boundary_audit(path: Path, packet: Mapping[str, Any],
         raise ComparisonError("ordered clock validation lacks its validated clock-1/60 audits")
     expected_source = packet["source"]
     expected = expected_source["match_clock_boundary_audit"]
+    ordered_byte_cap, ordered_record_cap = (
+        _ordered_clock_lineage_limits(expected_source.get("ordered_clock_lineage"))
+        if ordered_lineage else
+        (V10_ORDERED_LINEAGE_BYTE_CAP, V10_ORDERED_LINEAGE_RECORD_CAP))
     audit, digest, size = _read_json_sidecar(
         path, "match-clock source audit", max_bytes=8 * 1024 * 1024)
     _verify_expected_file(expected, path, digest, size, "match-clock source audit")
@@ -2662,9 +2690,9 @@ def _validate_match_clock_boundary_audit(path: Path, packet: Mapping[str, Any],
             target["browser_cursor"] != target["timeline_frame_index"] + 1 or
             target["browser_cursor"] > recipe.frame_count):
         raise ComparisonError("frozen match-clock target does not align with the complete MWRC timeline")
-    prefix_byte_cap = (V10_ORDERED_LINEAGE_BYTE_CAP if ordered_lineage
+    prefix_byte_cap = (ordered_byte_cap if ordered_lineage
                        else V10_PREFIX_BYTE_CAP)
-    prefix_record_cap = (V10_ORDERED_LINEAGE_RECORD_CAP if ordered_lineage
+    prefix_record_cap = (ordered_record_cap if ordered_lineage
                          else V10_MATCH_CLOCK_RECORD_CAP)
     prefix_bytes = _int(prefix.get("bytes_read"), "match-clock audit prefix bytes",
                         1, prefix_byte_cap)
@@ -2722,10 +2750,16 @@ def _validate_match_clock_boundary_audit(path: Path, packet: Mapping[str, Any],
                 _lineage_boundary_from_observation({**positive_boundary,
                     "source_tick_seq": positive_observed.get("source_prefix", {}).get("last_source_sequence")})
                 != ordered_checkpoints[0]["tuple"] or
-                _lineage_prefix_from_observation(positive_observed) != ordered_checkpoints[0]["prefix"] or
+                _lineage_prefix_from_observation(
+                    positive_observed, byte_cap=ordered_byte_cap,
+                    record_cap=ordered_record_cap) != ordered_checkpoints[0]["prefix"] or
                 _lineage_boundary_from_observation(clock60_boundary) != ordered_checkpoints[1]["tuple"] or
-                _lineage_prefix_from_observation(clock60_observed) != ordered_checkpoints[1]["prefix"] or
-                _lineage_prefix_from_observation(observed) != ordered_checkpoints[-1]["prefix"]):
+                _lineage_prefix_from_observation(
+                    clock60_observed, byte_cap=ordered_byte_cap,
+                    record_cap=ordered_record_cap) != ordered_checkpoints[1]["prefix"] or
+                _lineage_prefix_from_observation(
+                    observed, byte_cap=ordered_byte_cap,
+                    record_cap=ordered_record_cap) != ordered_checkpoints[-1]["prefix"]):
             raise ComparisonError("ordered match-clock audit prefixes differ from validated checkpoint audits")
     if ordered_lineage or threshold > V10_MATCH_CLOCK_REJOIN_FRAME:
         limits = audit.get("limits")
@@ -2853,15 +2887,18 @@ def _lineage_boundary_from_observation(observation: Mapping[str, Any], *,
     return value
 
 
-def _lineage_prefix_from_observation(observation: Mapping[str, Any]) -> dict[str, Any]:
+def _lineage_prefix_from_observation(
+        observation: Mapping[str, Any], *,
+        byte_cap: int = V10_ORDERED_LINEAGE_BYTE_CAP,
+        record_cap: int = V10_ORDERED_LINEAGE_RECORD_CAP) -> dict[str, Any]:
     prefix = observation.get("source_prefix")
     if not isinstance(prefix, dict):
         raise ComparisonError("ordered clock-lineage audit lacks a source-prefix identity")
     value = {field: prefix.get(field) for field in ORDERED_CLOCK_PREFIX_FIELDS}
     for field in ("bytes_read", "records_read", "last_source_sequence"):
         _int(value[field], f"ordered clock-lineage prefix {field}", 1,
-             V10_ORDERED_LINEAGE_RECORD_CAP if field == "records_read" else
-             V10_ORDERED_LINEAGE_BYTE_CAP if field == "bytes_read" else (1 << 64) - 1)
+             record_cap if field == "records_read" else
+             byte_cap if field == "bytes_read" else (1 << 64) - 1)
     if (not isinstance(value["sha256"], str) or
             re.fullmatch(r"[0-9a-f]{64}", value["sha256"]) is None):
         raise ComparisonError("ordered clock-lineage source-prefix hash is malformed")
@@ -2989,9 +3026,9 @@ def _validate_ordered_clock_audit_lineage(audit: Mapping[str, Any],
             source_trace.get("recorded_full_sha256") !=
             expected_source["trace"]["recorded_full_sha256"]):
         raise ComparisonError("ordered clock runner packet binds a different original trace")
+    byte_cap, record_cap = _ordered_clock_lineage_limits(lineage)
     limits = runner.get("caps")
-    if limits != {"max_bytes": V10_ORDERED_LINEAGE_BYTE_CAP,
-                  "max_records": V10_ORDERED_LINEAGE_RECORD_CAP}:
+    if limits != {"max_bytes": byte_cap, "max_records": record_cap}:
         raise ComparisonError("ordered clock runner packet caps differ from this bounded scope")
     target_packet = runner.get("target")
     if (not isinstance(target_packet, dict) or
@@ -3129,7 +3166,9 @@ def _validate_ordered_clock_audit_lineage(audit: Mapping[str, Any],
         if not isinstance(nested_observed, dict):
             raise ComparisonError(f"ordered {label} audit lacks its target observation")
         if (_lineage_boundary_from_observation(nested_observed) != checkpoint["tuple"] or
-                _lineage_prefix_from_observation(nested_audit["observed"]) != checkpoint["prefix"]):
+                _lineage_prefix_from_observation(
+                    nested_audit["observed"], byte_cap=byte_cap,
+                    record_cap=record_cap) != checkpoint["prefix"]):
             raise ComparisonError(f"ordered {label} audit differs from its frozen checkpoint")
 
     expected_positive_audit = lineage["checkpoints"][0]["audit"]
@@ -3997,6 +4036,7 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
     records = None
     stats: ObserverStreamStats | None = None
     packet_sha: str | None = None
+    ordered_source_limits: tuple[int, int] | None = None
     source_identity: dict[str, Any] | None = None
     browser_identity: dict[str, Any] | None = None
     source_stat_before: dict[str, int] | None = None
@@ -4031,6 +4071,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
         if match_clock_scope or ordered_lineage_scope:
             selected["match_clock_boundary_audit"] = match_clock_boundary_audit_path
         packet, packet_sha = _load_expectations(expectations_path, selected, scope=scope)
+        if ordered_lineage_scope:
+            ordered_source_limits = _ordered_clock_lineage_limits(
+                packet["source"].get("ordered_clock_lineage"))
         result["expectations"] = {"path": str(expectations_path), "sha256": packet_sha}
         result["selected_input_identities"] = {
             "source": packet["source"],
@@ -4146,9 +4189,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
         stats = ObserverStreamStats()
         records = iter_records(
             reference_path,
-            max_bytes=(V10_ORDERED_LINEAGE_BYTE_CAP if ordered_lineage_scope
+            max_bytes=(ordered_source_limits[0] if ordered_lineage_scope
                        else V10_PREFIX_BYTE_CAP),
-            max_records=(V10_ORDERED_LINEAGE_RECORD_CAP if ordered_lineage_scope else
+            max_records=(ordered_source_limits[1] if ordered_lineage_scope else
                          V10_MATCH_CLOCK_RECORD_CAP if clock_lineage_scope else
                          V10_FIRST_POSITIVE_RECORD_CAP if positive_scope
                          else V10_PREFIX_RECORD_CAP), stats=stats)
