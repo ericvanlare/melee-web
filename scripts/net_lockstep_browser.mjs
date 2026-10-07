@@ -120,7 +120,7 @@ const scriptHash = scriptBytes ? sha256(scriptBytes) : null;
 const deadline = Date.now() + timeoutMs;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const childDirectory = role => path.join(output, role);
-async function captureAccountedCss(role, expectedCursor) {
+async function captureAccountedCss(role, expectedCursor, expectedBlocker = 'complete') {
   const filename = path.join(childDirectory(role), 'accounted-css.png');
   await instances[role].screenshot(filename);
   const bytes = await fs.readFile(filename);
@@ -128,12 +128,14 @@ async function captureAccountedCss(role, expectedCursor) {
   const [native, status] = await Promise.all([instances[role].native(), instances[role].status()]);
   if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
       graphics.cross_origin_isolated !== true || graphics.webgpu_adapter !== true ||
-      native.phase !== 1 || status.cursor !== expectedCursor || status.blocker !== 'complete')
+      native.phase !== 1 || status.cursor !== expectedCursor || status.blocker !== expectedBlocker ||
+      (expectedBlocker === 'terminal' && status.terminal.kind !== TERMINAL.disconnect))
     throw Error(`${role} CSS accounting capture did not retain its rendered final cursor ${expectedCursor}`);
   instanceRows[role].accounted_css = {source_cursor: status.cursor, phase: native.phase,
     screenshot: 'accounted-css.png', bytes: bytes.length, sha256: sha256(bytes),
     gpu: graphics, source_steps_and_draws: instanceRows[role].source_accounting,
-    scope: 'CSS at the completed prefix; source counters exclude preparation-only draws'};
+    blocker: status.blocker,
+    scope: 'CSS at the held source prefix; source counters exclude preparation-only draws'};
 }
 // Match melee_web_net_fnv1a64 over already-native PADStatus bytes; this does not
 // convert JavaScript Gamepad state into the protocol's PAD record layout.
@@ -1116,6 +1118,8 @@ async function run() {
     if (localWebRtc) {
       for (const role of ['alpha', 'beta']) {
         const row = instanceRows[role], ownership = peers[role].checksumOwnership;
+        row.final_status = await instances[role].status();
+        row.final_native = await instances[role].native();
         if (row.records !== disconnectAt || row.scene_runs.some(frame => frame.scene !== 1) ||
             pairResults.terminal_hold.peers[role].cursor_after !== disconnectAt ||
             pairResults.terminal_hold.peers[role].pushed_after !== disconnectAt ||
@@ -1126,6 +1130,7 @@ async function run() {
             ownership.active_native_records_submitted_before_export +
               ownership.post_terminal_native_evidence_records !== row.records)
           throw Error(`${role} WebRTC disconnect native evidence is incomplete`);
+        await captureAccountedCss(role, disconnectAt, 'terminal');
       }
       const left = await fs.readFile(path.join(childDirectory('alpha'), 'checksums.bin'));
       const right = await fs.readFile(path.join(childDirectory('beta'), 'checksums.bin'));
