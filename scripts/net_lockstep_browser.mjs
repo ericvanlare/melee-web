@@ -11,6 +11,7 @@ import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {createRoomId} from './net_lockstep_websocket_relay.mjs';
 import {parseArgs} from 'node:util';
+import {validateLockstepBrowserMode} from './net_lockstep_browser_modes.mjs';
 import {loadBrowserTools} from './browser_tools.mjs';
 import {startRoomRelayRuntime} from './net_room_relay_runtime_owner.mjs';
 import {classifyRoute, collapseConsecutiveScenes, expectedFullSceneOrder, validateFullRoute} from './net_determinism_contract.mjs';
@@ -67,28 +68,9 @@ if (!values.url || !values.disc || !values.out || !values.seed || (!inputSamplin
   throw Error('Required: --url runtime.html --disc DISC [--script route1.mwni] --seed U32 --out NEW_DIR');
 if (inputSampling && values.script)
   throw Error('The input-sampling scenario captures browser-local input and does not accept --script');
-if (!['probe', 'positive', 'flip', 'disconnect', 'input-sampling'].includes(values.scenario))
-  throw Error('--scenario must be probe, positive, flip, disconnect, or input-sampling');
 const scenario = values.scenario;
-if (!['node', 'browser'].includes(values['peer-owner'])) throw Error('--peer-owner must be node or browser');
-const browserOwned = values['peer-owner'] === 'browser';
-const peerTransport = values['peer-transport'] ??
-  (browserOwned || values['relay-url'] ? 'relay' : 'tcp-loopback');
-if (values['peer-transport'] !== undefined && !['relay', 'webrtc'].includes(peerTransport))
-  throw Error('--peer-transport must be relay or webrtc');
-if (!browserOwned && values['peer-transport'] !== undefined)
-  throw Error('--peer-transport applies only to browser-owned peers');
-const localWebRtc = peerTransport === 'webrtc';
-const roomWorkerSignaling = values['webrtc-signaling'] === 'room-worker';
-if (!['memory', 'room-worker'].includes(values['webrtc-signaling']))
-  throw Error('--webrtc-signaling must be memory or room-worker');
-if (!localWebRtc && values['webrtc-signaling'] !== 'memory')
-  throw Error('--webrtc-signaling applies only to the local WebRTC transport');
-if (browserOwned && !localWebRtc && !values['relay-url']) throw Error('Browser-owned relay peers require --relay-url');
-if (localWebRtc && (!browserOwned || !inputSampling))
-  throw Error('The local WebRTC endpoint is scoped to browser-owned input-sampling');
-if (inputSampling && !browserOwned)
-  throw Error('The input-sampling scenario requires --peer-owner browser');
+const {browserOwned, peerTransport, localWebRtc, roomWorkerSignaling} =
+  validateLockstepBrowserMode(values);
 const url = new URL(values.url);
 if (!['http:', 'https:'].includes(url.protocol) || !url.pathname.endsWith('/runtime.html'))
   throw Error('A real HTTP development runtime.html URL is required');
