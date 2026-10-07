@@ -8,15 +8,17 @@
  * changes, and every failure writes the report before the browser closes.
  */
 import fs from 'node:fs/promises';
-import {createReadStream} from 'node:fs';
+import {closeSync, createReadStream, fsyncSync, openSync, writeSync} from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {parseArgs} from 'node:util';
+import {fileURLToPath} from 'node:url';
 import {loadBrowserTools, browserLaunchOptions} from '../scripts/browser_tools.mjs';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {finalizeSessionCapture, validateRuntimeDataAbort, boundedCaptureOperation,
-  retainFirstCaptureError} from './whole_session_capture_result.mjs';
+  retainFirstCaptureError, FIRST_REPLAY_BOUNDARY_MARKER_NAMES, parseFirstReplayBoundaryMarker,
+  FIRST_REPLAY_BOUNDARY_MARKER_PREFIX, inspectFirstReplayBoundaryMarkers} from './whole_session_capture_result.mjs';
 import {parseRngDrawProbe, validateRngDrawProbeRows} from './rng_draw_probe.mjs';
 import {NATURAL_PAUSE_PROTOCOL, STOPPED_SCENE_PAIR_PROTOCOL, resolveCaptureMode,
   validateNaturalPauseManifest, validateStoppedScenePairManifest, naturalPauseRuntimeUrl,
@@ -50,6 +52,9 @@ const {values, tokens} = parseArgs({tokens: true, options: {
   'cpu-observations': {type: 'boolean', default: false},
   'rng-draw-probe-range': {type: 'string'},
   'rng-draw-probe-cursors': {type: 'string'},
+  'first-replay-callback-probe': {type: 'boolean', default: false},
+  'expected-frame0': {type: 'string'},
+  'artifact-root': {type: 'string'},
 }});
 
 function integer(name, minimum, maximum) {
@@ -118,28 +123,47 @@ if (diagnostic && requestedStopAfter !== null && requestedStopAfter !== stopAfte
 const resumeTimingPauses = diagnostic ? false : values['resume-timing-pauses'];
 if (diagnostic && values['resume-timing-pauses']) throw Error('Performance diagnosis cannot resume a timing pause');
 const captureCpuObservations = diagnostic ? false : values['cpu-observations'];
+const firstReplayCallbackProbe = values['first-replay-callback-probe'];
+const expectedFrame0Path = values['expected-frame0'] ? path.resolve(values['expected-frame0']) : null;
+const probeTimeoutMs = 10000;
 const rngDrawProbe = parseRngDrawProbe({range: values['rng-draw-probe-range'],
   cursors: values['rng-draw-probe-cursors']});
 if (diagnostic && (values['cpu-observations'] || rngDrawProbe))
   throw Error('Performance diagnosis does not enable CPU-prefix or RNG observers');
+if (firstReplayCallbackProbe && (diagnostic || !expectedFrame0Path || stopAfter || resumeTimingPauses ||
+    captureCpuObservations || rngDrawProbe))
+  throw Error('--first-replay-callback-probe requires --expected-frame0 and cannot be combined with prefix, resume, CPU, or RNG probes');
+if (!firstReplayCallbackProbe && (expectedFrame0Path || values['artifact-root']))
+  throw Error('--expected-frame0 and --artifact-root require --first-replay-callback-probe');
 const runtimeDataUrl = new URL('gameplay_menu_browser.data', url).href;
 const output = path.resolve(values.out);
 const observationTimeoutMs = diagnostic ? diagnosticProtocol.observation_timeout_ms : Math.min(phaseTimeoutMs, 5000);
-const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data']]
+const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data'], expectedFrame0Path]
   .filter(Boolean).map(value => path.resolve(value));
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const artifactRoot = path.resolve(values['artifact-root'] || path.join(repoRoot, 'build/browser-release'));
+let markerFd = null;
 
 await fs.mkdir(output, {recursive: false});
+if (firstReplayCallbackProbe) {
+  markerFd = openSync(path.join(output, 'boundary-markers.jsonl'), 'wx');
+  fsyncSync(markerFd);
+}
 const report = {
   schema: 'melee-web-headless-whole-session-replay-v1',
-  scope: stoppedScenePair ? 'One bounded paired stopped-scene screenshot timing check; image presence does not establish visible gameplay' :
+  scope: firstReplayCallbackProbe ? 'Single headless first-replay-callback boundary observation; not a complete replay or GPU-cause finding' :
+    stoppedScenePair ? 'One bounded paired stopped-scene screenshot timing check; image presence does not establish visible gameplay' :
     diagnostic ? 'One bounded headless natural-pause performance diagnosis; no admission, pixel, PCM, foreground, or physical-input claim' :
-    'Single headless browser MWRC v8/v9 diagnostic; no pixel, PCM, performance, or admission claim',
+    'Single headless browser MWRC v8/v9/v10 diagnostic; no pixel, PCM, performance, or admission claim',
   result: 'fail',
   url: values.url,
   mode: captureMode.mode,
   ...(diagnostic ? {diagnostic_manifest: {path: diagnosticManifestPath, sha256: diagnosticManifestSha256}} : {}),
   ...(diagnostic ? {diagnostic_protocol: diagnosticProtocol,
     diagnostic_kind: stoppedScenePair ? 'paired_stopped_scene_screenshots' : 'natural_pause'} : {}),
+  probe: firstReplayCallbackProbe ? 'first-replay-callback-boundary' : null,
+  probe_timeout_ms: firstReplayCallbackProbe ? probeTimeoutMs : null,
+  probe_timeout_scope: firstReplayCallbackProbe ? 'replay launch to durable callback-tail marker' : null,
   phase_timeout_ms: phaseTimeoutMs,
   replay_timeout_ms: replayTimeoutMs,
   observation_timeout_ms: observationTimeoutMs,
@@ -161,6 +185,13 @@ const report = {
 let browser;
 let page;
 let driver;
+let browserCdp;
+let pageCdp;
+const boundaryMarkers = [];
+const boundaryMarkerErrors = [];
+let resolveBoundaryPause;
+const boundaryPauseMarker = new Promise(resolve => { resolveBoundaryPause = resolve; });
+let probeRecipeExpectedFrame0 = null;
 let currentPhase = 'startup';
 let lastSnapshotKey = '';
 let lastCssStateKey = '';
@@ -236,6 +267,56 @@ async function releaseArtifactMap(buildDirectory, baseUrl) {
     map[name] = {bytes, sha256};
   }
   return map;
+}
+
+function persistBoundaryConsoleEvent(params) {
+  const text = params.args?.length === 1 && params.args[0]?.type === 'string'
+    ? params.args[0].value : null;
+  if (typeof text !== 'string' || !text.startsWith(FIRST_REPLAY_BOUNDARY_MARKER_PREFIX)) return;
+  const receivedAt = new Date().toISOString();
+  try {
+    const marker = parseFirstReplayBoundaryMarker(text);
+    if (!marker) return;
+    const row = {...marker, cdp_timestamp: params.timestamp ?? null,
+      received_at_utc: receivedAt, marker_text: text};
+    boundaryMarkers.push(row);
+    writeSync(markerFd, JSON.stringify(row) + '\n');
+    fsyncSync(markerFd);
+    if (marker.marker === 'first_replay_callback_tail_returned') resolveBoundaryPause(row);
+  } catch (error) {
+    const row = {parse_error: String(error?.message || error),
+      cdp_timestamp: params.timestamp ?? null, received_at_utc: receivedAt,
+      marker_text: text};
+    boundaryMarkerErrors.push(row.parse_error);
+    writeSync(markerFd, JSON.stringify(row) + '\n');
+    fsyncSync(markerFd);
+  }
+}
+
+async function browserArtifactInventory() {
+  const inventoryPath = path.join(repoRoot, 'tools/browser_build_artifacts.json');
+  const names = JSON.parse(await fs.readFile(inventoryPath, 'utf8'));
+  if (!Array.isArray(names) || names.length !== 32 || new Set(names).size !== 32)
+    throw Error('The reviewed browser artifact inventory must contain exactly 32 unique files');
+  const rows = await Promise.all(names.map(async name => {
+    const localPath = path.resolve(artifactRoot, name);
+    if (!localPath.startsWith(artifactRoot + path.sep))
+      throw Error(`Browser artifact path escaped its build directory: ${name}`);
+    const local = await statInput(localPath);
+    const response = await fetch(new URL(name, url), {cache: 'no-store',
+      signal: AbortSignal.timeout(8000)});
+    if (!response.ok) throw Error(`Served browser artifact ${name} returned HTTP ${response.status}`);
+    const hash = createHash('sha256');
+    let servedBytes = 0;
+    for await (const chunk of response.body) { servedBytes += chunk.length; hash.update(chunk); }
+    const servedSha256 = hash.digest('hex');
+    return {name, local_bytes: local.bytes, local_sha256: local.sha256,
+      served_bytes: servedBytes, served_sha256: servedSha256,
+      equal: local.bytes === servedBytes && local.sha256 === servedSha256};
+  }));
+  const mismatches = rows.filter(row => !row.equal).map(row => row.name);
+  return {path: 'tools/browser_build_artifacts.json', artifact_root: artifactRoot,
+    count: rows.length, rows, mismatches, equal: mismatches.length === 0};
 }
 
 function firstError(kind, message, details = null) {
@@ -418,6 +499,159 @@ async function phase(name, task, timeoutMs = phaseTimeoutMs, observationInterval
   }
 }
 
+async function firstReplayCallbackPhase() {
+  currentPhase = 'first-replay-callback-probe';
+  const row = {name: currentPhase, started_at: new Date().toISOString(),
+    timeout_ms: probeTimeoutMs, result: 'fail', observation_polling: false};
+  report.phases.push(row);
+  const launchedAt = Date.now();
+  report.replay_launch_started_at = new Date(launchedAt).toISOString();
+  try {
+    await boundedCaptureOperation(page.locator('#retail-replay-start').click({timeout: probeTimeoutMs}),
+      probeTimeoutMs, 'first replay launch and callback');
+    const remainingMs = probeTimeoutMs - (Date.now() - launchedAt);
+    if (remainingMs <= 0) throw Error('First replay callback exceeded its 10000 ms bound');
+    const callbackMarker = await boundedCaptureOperation(boundaryPauseMarker, remainingMs,
+      'first replay callback tail marker');
+    report.replay_callback_tail_marker = callbackMarker;
+    report.replay_callback_elapsed_ms = Date.now() - launchedAt;
+    if (report.replay_callback_elapsed_ms > probeTimeoutMs)
+      throw Error(`First replay callback exceeded its ${probeTimeoutMs} ms bound`);
+    report.boundary_marker_validation = inspectFirstReplayBoundaryMarkers(boundaryMarkers);
+    const nativeStateTimeout = Math.min(1000, probeTimeoutMs - (Date.now() - launchedAt));
+    if (nativeStateTimeout <= 0) throw Error('First replay callback exceeded its 10000 ms bound before native snapshot');
+    const nativeState = await boundedCaptureOperation(page.evaluate(() => {
+      const module = globalThis.Module;
+      const text = (window.retailRun?.rows || []).find(value => {
+        try { const row = JSON.parse(value); return row.record === 'session_frame' && row.index === 0; }
+        catch { return false; }
+      }) || null;
+      const call = name => typeof module?.[name] === 'function' ? module[name]() : null;
+      return {native_running: call('_melee_web_native_menu_running'),
+        source_cursor: call('_melee_web_native_menu_replay_cursor'),
+        source_phase: call('_melee_web_native_menu_phase'), frame0_text: text,
+        replay_memory_prepared: window.retailRun?.memory?.prepared ?? null,
+        replay_observe: window.retailRun?.observe ?? null,
+        replay_whole_session: window.retailRun?.wholeSession ?? null};
+    }), nativeStateTimeout, 'post-callback native state and frame-zero observation');
+    report.post_callback_native_state = {...nativeState, frame0_text: undefined};
+    if (typeof nativeState.frame0_text === 'string') {
+      const frame0 = JSON.parse(nativeState.frame0_text);
+      await write('browser-frame0.json', frame0);
+      const expected = probeRecipeExpectedFrame0;
+      const comparedFields = ['record', 'scene', 'index', 'supplied_inputs', 'rng', 'pad_state_hex'];
+      const mismatches = comparedFields.filter(field =>
+        JSON.stringify(frame0[field]) !== JSON.stringify(expected[field]));
+      report.frame0_comparison = {
+        equal: mismatches.length === 0,
+        compared_fields: comparedFields,
+        mismatches,
+        actual_pad_state_hex_sha256: typeof frame0.pad_state_hex === 'string'
+          ? createHash('sha256').update(frame0.pad_state_hex).digest('hex') : null,
+      };
+    } else report.frame0_comparison = {equal: false, mismatches: ['frame-zero record missing']};
+    const pauseReturned = [...boundaryMarkers].reverse().find(marker => marker.marker === 'native_pause_returned');
+    const cursorAtPause = pauseReturned?.values[2] ?? null;
+    report.callback_cursor_consistency = {
+      marker_cursor: cursorAtPause,
+      post_callback_cursor: nativeState.source_cursor,
+      equal: Number.isSafeInteger(cursorAtPause) && nativeState.source_cursor === cursorAtPause,
+    };
+    try {
+      const screenshotTimeout = Math.min(750, probeTimeoutMs - (Date.now() - launchedAt));
+      if (screenshotTimeout <= 0) throw Error('First replay callback exceeded its 10000 ms bound before screenshot');
+      await boundedCaptureOperation(page.screenshot({path: path.join(output, 'first-callback.png'),
+        fullPage: false}), screenshotTimeout, 'paused first-callback screenshot');
+      report.screenshot = {path: path.join(output, 'first-callback.png'), captured: true};
+    } catch (error) { report.screenshot_error = String(error?.message || error); }
+    if (boundaryMarkerErrors.length || !report.boundary_marker_validation.complete ||
+        nativeState.native_running !== 0 || nativeState.source_phase !== 1 ||
+        nativeState.replay_observe !== true || nativeState.replay_whole_session !== true ||
+        !Number.isSafeInteger(nativeState.replay_memory_prepared?.wasm_heap_bytes) ||
+        nativeState.replay_memory_prepared.wasm_heap_bytes <= 0 ||
+        typeof nativeState.replay_memory_prepared?.source_session_owned !== 'boolean' ||
+        !report.frame0_comparison.equal || !report.callback_cursor_consistency.equal) {
+      const problems = [
+        ...boundaryMarkerErrors.map(value => `marker collector: ${value}`),
+        ...(report.boundary_marker_validation.errors || []),
+        ...(nativeState.native_running !== 0 ? ['native running state is not zero'] : []),
+        ...(nativeState.source_phase !== 1 ? ['native phase is not CSS'] : []),
+        ...(!Number.isSafeInteger(nativeState.replay_memory_prepared?.wasm_heap_bytes) ||
+          nativeState.replay_memory_prepared.wasm_heap_bytes <= 0 ||
+          typeof nativeState.replay_memory_prepared?.source_session_owned !== 'boolean'
+          ? ['native memory snapshot did not return its typed fields'] : []),
+        ...(!report.frame0_comparison.equal ? ['frame-zero fields differ from native reducer'] : []),
+        ...(!report.callback_cursor_consistency.equal ? ['native cursor differs from durable pause marker'] : []),
+      ];
+      throw Error(`First callback validation failed: ${problems.join('; ')}`);
+    }
+    row.result = 'pass';
+  } catch (error) {
+    firstError(currentPhase, error.message || error,
+      report.boundary_marker_validation || {last_marker: boundaryMarkers.at(-1) || null});
+    report.failure = String(error.stack || error);
+    report.boundary_marker_validation ||= inspectFirstReplayBoundaryMarkers(boundaryMarkers);
+    report.replay_callback_elapsed_ms = Date.now() - launchedAt;
+    if (!report.replay_callback_tail_marker)
+      report.post_callback_native_state = 'unknown; no durable returned pause marker';
+  } finally {
+    row.elapsed_ms = Date.now() - launchedAt;
+    report.boundary_markers_received = boundaryMarkers.length;
+    report.boundary_marker_errors = boundaryMarkerErrors;
+    await write('report.json', report);
+  }
+}
+
+async function finalizeFirstReplayCallbackProbe() {
+  try { driver?.dispose(); } catch (error) { report.close_error = String(error?.message || error); }
+  try {
+    if (pageCdp) await boundedCaptureOperation(pageCdp.detach(), 500, 'owned page CDP detach');
+  } catch (error) { report.cdp_detach_error = String(error?.message || error); }
+  try {
+    if (browser) await boundedCaptureOperation(browser.close(), 1500, 'owned browser close');
+  } catch (error) { report.close_error = String(error?.message || error); }
+  if (report.artifact_inventory_pre) {
+    try {
+      report.artifact_inventory_post = await boundedCaptureOperation(
+        browserArtifactInventory(), 5000, 'post-capture 32-file served/local inventory');
+      const pre = report.artifact_inventory_pre.rows;
+      const post = report.artifact_inventory_post.rows;
+      report.artifact_inventory_identity = {
+        equal: JSON.stringify(pre.map(row => [row.name, row.local_bytes, row.local_sha256,
+          row.served_bytes, row.served_sha256])) === JSON.stringify(post.map(row => [row.name,
+          row.local_bytes, row.local_sha256, row.served_bytes, row.served_sha256])),
+        count: post.length,
+      };
+    } catch (error) { report.artifact_inventory_post_error = String(error?.message || error); }
+  }
+  report.boundary_markers_received = boundaryMarkers.length;
+  report.boundary_marker_errors = boundaryMarkerErrors;
+  report.boundary_marker_validation ||= inspectFirstReplayBoundaryMarkers(boundaryMarkers);
+  report.browser_errors = pageErrors.slice(0, 256);
+  const failures = [];
+  if (!report.phases.some(row => row.name === 'first-replay-callback-probe' && row.result === 'pass'))
+    failures.push('First replay callback did not return a validated pause boundary');
+  if (report.first_error || report.failure || report.browser_errors.length)
+    failures.push('A fatal browser or harness diagnostic was recorded');
+  if (!report.artifact_inventory_pre?.equal || !report.artifact_inventory_post?.equal ||
+      !report.artifact_inventory_identity?.equal)
+    failures.push('The 32-file local/served browser artifact inventory changed or failed');
+  if (report.close_error || report.cdp_detach_error)
+    failures.push('Owned browser/CDP cleanup did not settle within its bound');
+  report.finalization_failures = failures;
+  report.result = failures.length ? 'fail' : 'pass';
+  if (markerFd !== null) {
+    try { fsyncSync(markerFd); closeSync(markerFd); } catch (error) {
+      report.marker_file_close_error = String(error?.message || error);
+      report.result = 'fail';
+    }
+    markerFd = null;
+  }
+  await write('report.json', report);
+  if (report.failure || report.result !== 'pass')
+    await write('failure.txt', report.failure || report.finalization_failures.join('\n') + '\n');
+}
+
 try {
   report.inputs = {disc: await statInput(diagnostic ? path.resolve(values.disc) : values.disc),
     recipe: await statInput(diagnostic ? path.resolve(values.recipe) : values.recipe)};
@@ -452,6 +686,7 @@ try {
     report.inputs.runtime_data = {path: path.join(diagnosticManifest.build.directory, name), ...identity};
   } else if (values['runtime-data'])
     report.inputs.runtime_data = await statInput(values['runtime-data']);
+  if (expectedFrame0Path) report.inputs.expected_frame0 = await statInput(expectedFrame0Path);
   if (values.manifest) {
     report.inputs.manifest = await statInput(values.manifest);
     const manifestText = await fs.readFile(values.manifest, 'utf8');
@@ -465,9 +700,9 @@ try {
     version: recipeBytes.readUInt32BE(4), seed: recipeBytes.readUInt32BE(8),
     frames: recipeBytes.readUInt32BE(12), bytes: recipeBytes.length,
   };
-  if (![8, 9].includes(report.recipe_header.version) ||
+  if (![8, 9, 10].includes(report.recipe_header.version) ||
       report.recipe_header.frames < 1 || report.recipe_header.frames > 108000)
-    throw Error('Whole-session replay requires a valid MWRC v8/v9 frame count');
+    throw Error('Whole-session replay requires a valid MWRC v8/v9/v10 frame count');
   if (diagnostic && (report.recipe_header.version !== diagnosticManifest.inputs.recipe.header.version ||
       report.recipe_header.seed !== diagnosticManifest.inputs.recipe.header.seed ||
       report.recipe_header.frames !== diagnosticManifest.inputs.recipe.header.frames ||
@@ -477,6 +712,35 @@ try {
     throw Error('RNG draw probe cursor must be inside the source recipe frame count');
   if (captureCpuObservations && report.recipe_header.version !== 9)
     throw Error('--cpu-observations is restricted to MWRC v9 second-match diagnostics');
+  if (firstReplayCallbackProbe) {
+    const expectedRecipeSha256 = 'cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b';
+    if (report.recipe_header.version !== 10 || report.recipe_header.seed !== 3336171383 ||
+        report.recipe_header.frames !== 50394 || report.inputs.recipe.sha256 !== expectedRecipeSha256)
+      throw Error('First-replay-callback probe requires the exact frozen MWRC v10 recipe, seed, and frame count');
+    if (!report.inputs.runtime_data)
+      throw Error('First-replay-callback probe requires the bound runtime-data file for loaded-byte verification');
+    const expectedEvidence = JSON.parse(await fs.readFile(expectedFrame0Path, 'utf8'));
+    probeRecipeExpectedFrame0 = expectedEvidence.records?.frame_zero;
+    if (!probeRecipeExpectedFrame0 || probeRecipeExpectedFrame0.record !== 'session_frame' ||
+        probeRecipeExpectedFrame0.scene !== 1 || probeRecipeExpectedFrame0.index !== 0 ||
+        probeRecipeExpectedFrame0.rng !== 3336171383 ||
+        typeof probeRecipeExpectedFrame0.pad_state_hex !== 'string' ||
+        probeRecipeExpectedFrame0.pad_state_hex.length !== 1644)
+      throw Error('Expected native reducer evidence is missing its full CSS frame-zero record');
+    report.expected_native_frame0 = {
+      evidence_path: expectedFrame0Path,
+      evidence_sha256: report.inputs.expected_frame0.sha256,
+      record_sha256: createHash('sha256').update(JSON.stringify(probeRecipeExpectedFrame0)).digest('hex'),
+      scene: probeRecipeExpectedFrame0.scene, index: probeRecipeExpectedFrame0.index,
+      rng: probeRecipeExpectedFrame0.rng,
+      supplied_inputs: probeRecipeExpectedFrame0.supplied_inputs,
+      pad_state_hex_characters: probeRecipeExpectedFrame0.pad_state_hex.length,
+      pad_state_hex_sha256: createHash('sha256').update(probeRecipeExpectedFrame0.pad_state_hex).digest('hex'),
+    };
+    report.artifact_inventory_pre = await browserArtifactInventory();
+    if (!report.artifact_inventory_pre.equal)
+      throw Error(`Local and served browser artifact inventory differs before capture: ${report.artifact_inventory_pre.mismatches.join(', ')}`);
+  }
   const cpuObservationRowLimit = report.recipe_header.frames;
   report.cpu_observation_row_limit = cpuObservationRowLimit;
   browserTools ||= await loadBrowserTools(values.playwright);
@@ -488,6 +752,7 @@ try {
       viewport: {width: diagnosticProtocol.viewport_width,
       height: diagnosticProtocol.viewport_height},
       deviceScaleFactor: diagnosticProtocol.device_scale_factor} : {})};
+  if (firstReplayCallbackProbe) browserOptions.args = [...(browserOptions.args || []), '--enable-automation'];
   if (diagnostic) {
     const chromeVersionOutput = execFileSync(browserPath, ['--version'], {encoding: 'utf8'}).trim();
     const chromeVersion = chromeVersionOutput.match(/\d+(?:\.\d+){2,3}/)?.[0] ?? null;
@@ -525,10 +790,37 @@ try {
     // block the renderer and outlive the strict external owner deadline.
     await write('report.json', report);
   }
+  if (!diagnostic) {
+  browserCdp = await browser.newBrowserCDPSession();
+  try {
+    report.browser_process_info = (await browserCdp.send('SystemInfo.getProcessInfo')).processInfo;
+    if (!Array.isArray(report.browser_process_info) || !report.browser_process_info.length)
+      throw Error('Owned Chrome CDP process inventory is unavailable');
+    await write('report.json', report);
+    if (firstReplayCallbackProbe) {
+      report.browser.command_line = (await browserCdp.send('Browser.getBrowserCommandLine')).arguments || [];
+      report.browser_system_info = await browserCdp.send('SystemInfo.getInfo');
+      await write('report.json', report);
+    }
+  } finally { await browserCdp.detach(); browserCdp = null; }
+
+  }
   page = diagnostic ? (browserContext.pages()[0] || await browserContext.newPage()) :
     await browser.newPage({viewport: {width: 900, height: 700}, deviceScaleFactor: 1});
+  if (firstReplayCallbackProbe) {
+    pageCdp = await page.context().newCDPSession(page);
+    pageCdp.on('Runtime.consoleAPICalled', params => {
+      try { persistBoundaryConsoleEvent(params); }
+      catch (error) { boundaryMarkerErrors.push(String(error?.message || error)); }
+    });
+    await pageCdp.send('Runtime.enable');
+    report.browser.cdp_runtime_listener = {installed: true, runtime_enabled: true,
+      attached_before_navigation: true};
+    report.boundary_marker_artifact = path.join(output, 'boundary-markers.jsonl');
+    await write('report.json', report);
+  }
   await page.addInitScript(({cpuObservationRowLimit, captureCpuObservations,
-    rngDrawProbeSelection}) => {
+    rngDrawProbeSelection, boundaryProbeEnabled, boundaryMarkerPrefix, boundaryMarkerNames}) => {
     window.__meleeNativeRuntimeReady = false;
     const module = globalThis.Module || {};
     module.onRuntimeInitialized = () => { window.__meleeNativeRuntimeReady = true; };
@@ -545,6 +837,17 @@ try {
     window.__meleeSourceOwnerTrace = [];
     window.__meleeSourceAllocationTrace = [];
     window.__meleeSourceAllocationTraceTotal = 0;
+    if (boundaryProbeEnabled) {
+      const allowed = new Set(boundaryMarkerNames);
+      const probe = {enabled: true, sequence: 0, mark(name, a=0, b=0, c=0) {
+        if (!allowed.has(name)) return;
+        const values = [a, b, c].map(value => Number.isSafeInteger(value) ? value : 0);
+        const marker = {sequence: ++probe.sequence, marker: name,
+          page_timestamp_ms: performance.now(), values};
+        console.log(boundaryMarkerPrefix + JSON.stringify(marker));
+      }};
+      window.__meleeReplayBoundaryProbe = probe;
+    }
     window.meleeCpuObservation = text => {
       if (window.__cpuPrefixRows.length >= cpuObservationRowLimit) throw Error('CPU prefix diagnostic exceeded source recipe frame bound');
       window.__cpuPrefixRows.push(text);
@@ -567,7 +870,10 @@ try {
       window.__rngDrawProbeRows.push(text);
     };
   }, {cpuObservationRowLimit, captureCpuObservations,
-    rngDrawProbeSelection: rngDrawProbe});
+    rngDrawProbeSelection: rngDrawProbe,
+    boundaryProbeEnabled: firstReplayCallbackProbe,
+    boundaryMarkerPrefix: FIRST_REPLAY_BOUNDARY_MARKER_PREFIX,
+    boundaryMarkerNames: FIRST_REPLAY_BOUNDARY_MARKER_NAMES});
   page.setDefaultTimeout(phaseTimeoutMs);
   page.setDefaultNavigationTimeout(phaseTimeoutMs);
   page.on('pageerror', error => { const row = {kind: 'pageerror', message: error.stack || error.message}; pageErrors.push(row); firstError(row.kind, row.message); });
@@ -681,7 +987,8 @@ try {
     report.trace_configuration = naturalPauseTraceSettings.trace;
     report.trace_started_at_utc = new Date().toISOString();
   }
-  await phase('whole-session-replay', async () => {
+  if (firstReplayCallbackProbe) await firstReplayCallbackPhase();
+  else await phase('whole-session-replay', async () => {
     const replayStartedAt = Date.now();
     let lastProgressWriteAt = 0;
     await page.locator('#retail-replay-start').click();
@@ -794,6 +1101,8 @@ try {
   firstError(currentPhase, error.message || error, report.last_successful_snapshot ?? null);
   report.failure = String(error.stack || error);
 } finally {
+  if (firstReplayCallbackProbe) await finalizeFirstReplayCallbackProbe();
+  else {
   if (diagnostic) {
     if (pageObservationTimedOut) {
       report.natural_pause_terminal ||= {outcome: 'observation_timeout', source_cursor: null,
@@ -1198,10 +1507,13 @@ try {
   } else finalizeSessionCapture(report);
   await write('report.json', report);
   if (report.failure) await write('failure.txt', report.failure + '\n');
+  }
 }
 
 if (diagnostic) {
   if (report.result !== 'captured' || process.exitCode) process.exitCode = 1;
   else console.log(`captured: ${report.natural_pause_terminal?.outcome || 'unknown'}; diagnosis only`);
 } else if (report.result !== 'pass') process.exitCode = 1;
+else if (firstReplayCallbackProbe)
+  console.log(`pass: first replay callback returned at cursor ${report.post_callback_native_state?.source_cursor}; ${report.boundary_markers_received} durable markers; no full-session or GPU-cause claim`);
 else console.log(`pass: ${report.recipe_header.frames} frames; source cursor and phase diagnostics retained`);

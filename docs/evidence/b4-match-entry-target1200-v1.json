@@ -1,0 +1,474 @@
+{
+  "external_evidence_sha256": {
+    "browser_report_sha256": "9b370cc8e74259bc9fe75dc5c489b5dc2feeee141fc287fb86780280d48844bc",
+    "capture_report_sha256": "9e876b7b19387ed8b5c6f47068f4806d778e6c8826744b864e106eaebe3878ad",
+    "full_python_suite_log_sha256": "fa810a95e4ffea02e7c5ac26ab8937dbd05128bbadf1fa715caf200a62bba765",
+    "inventory_config_v2_sha256": "bcebe8c49bcda203221f6490c43bdc121328539c0e41a13789fbe6c605b76277",
+    "inventory_wrapper_sha256": "06de15d7c49017c726b4f7b24bc5921bb9342a2e14e75a2110c9362a435dbfb2",
+    "lane_acquisition_receipt_sha256": "c168e995a48de31409802d717fbe265feca57a5db462265f2baa2734c21a1a87",
+    "lane_release_receipt_sha256": "8defd89021d433649ee9ce8036774c896b1fe6ee8f9181f214354e4a19a00f0b",
+    "launch_environment_v1_sha256": "1f677a5f5dfef32f9ea80f631ed1c69fc8b53bf4017806228d34426839bd3041",
+    "launch_review_packet_v2_sha256": "ecbc554ed0b08cc98cc080b9e6a18fc5be15def510885d0d84b62cc130b1bd54",
+    "owner_report_sha256": "da8775c3c9c76eb06185037ae631462e31e7b32e023f6c5b05f707f78638eaca",
+    "post_inventory_sha256": "e90ad29d92a233c109184493aa336d1affd84d30847a0d8cadb55a01f2b82db1",
+    "pre_inventory_sha256": "67b0ec92d5494002851e0e720ed3ed21e303b8e7e485f60938657bf77fd5ed3a",
+    "private_capture_summary_sha256": "23013f3947ff07f808eca81dd9597be744dd46750a53fd90b99984d8d7499fb5",
+    "producer_source_manifest_v1_sha256": "0530b1f94c315a7ede5e4b94915b14230bd64742902d11d8acab175de5a3500a",
+    "root_launch_review_v2_sha256": "a7de0c30bfda3f5f493814d7c6512364746d45b2513703bd96b8ad8f72b98f47",
+    "runtime_build_log_sha256": "aab36c1f41f31bdb355970603da998173f62fa10088b51c069dedd36bb16e4fd",
+    "source_jsonl_sha256": "d92198e02c5a3618881fa6406e74718c0301e2f6815df80ba061a53aa7e70867",
+    "tool_manifest_v2_sha256": "81f10338a435a640220b4ad4fdcba725aada2d1af047cd725fe0ac8c2bfebe0e",
+    "wrapper_report_sha256": "51151967135e328c2d69dd654c82c50b44adc9a61c13f271a5ab07273767cdc0"
+  },
+  "incomplete_result": {
+    "browser_errors": [],
+    "browser_report_failures": [
+      "whole-session final CSS was not entered",
+      "Manual unload stopped the replay",
+      "incomplete input timeline",
+      "source tick/draw count mismatch"
+    ],
+    "capture_exit_code": 1,
+    "expected": true,
+    "first_error": {
+      "kind": "whole-session-replay",
+      "message": "Browser replay report failed: [\"whole-session final CSS was not entered\",\"Manual unload stopped the replay\",\"incomplete input timeline\",\"source tick/draw count mismatch\"]",
+      "phase": "whole-session-replay"
+    },
+    "first_error_at_ms": 25029.419999837875,
+    "first_error_status_after_target_unload": "Native menus unloaded.",
+    "runtime_error": null,
+    "wrapper_exit_code": 1
+  },
+  "input": {
+    "disc_bytes": 1449165376,
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "raw_game_assets_included": false,
+    "recipe_bytes": 2241622,
+    "recipe_format_version": 10,
+    "recipe_sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b",
+    "seed": 3336171383,
+    "source_frame_count": 50394
+  },
+  "inventory_and_cleanup": {
+    "browser_processes_remaining": [],
+    "capture_process_group_absent": true,
+    "cdp_attribution_complete": true,
+    "cleanup_elapsed_ms": 148,
+    "cleanup_passed": true,
+    "inventory_wrapper_pass": true,
+    "lane_marker_released": true,
+    "port_18796_free_after_cleanup": true,
+    "post_artifact_count": 32,
+    "post_inventory_result": "pass",
+    "pre_artifact_count": 32,
+    "pre_inventory_result": "pass",
+    "process_observation_passed": true,
+    "server_process_group_absent": true
+  },
+  "not_claimed": [
+    "original-state agreement",
+    "whole-session acceptance",
+    "gameplay behavior beyond match entry",
+    "pixels",
+    "PCM",
+    "performance",
+    "foreground timing",
+    "GPU cause",
+    "competitive accuracy"
+  ],
+  "observation": {
+    "comparison": "not_run",
+    "exported_indexed_session_frames": 1209,
+    "exported_match_frame_values": [
+      0
+    ],
+    "exported_match_rows": 25,
+    "exported_source_metrics": {
+      "sourceDraws": 1209,
+      "sourceFrames": 1209,
+      "sourceSteps": 1209
+    },
+    "final_scene": null,
+    "last_live_snapshot": {
+      "at_ms": 24731.734999895096,
+      "focused": true,
+      "hidden": false,
+      "phase": 7,
+      "running": 1,
+      "source_cursor": 1206,
+      "status": "Original Donkey Kong vs Bowser vs Ness vs Peach match on Final Destination"
+    },
+    "match_entry_event": {
+      "declared_setup": {
+        "damage_ratio_bits": "3f800000",
+        "disable_pausing": false,
+        "game_speed_bits": "3f800000",
+        "is_stock": true,
+        "is_teams": false,
+        "item_frequency": -1,
+        "item_mask_hex": "ffffffffffffffff",
+        "match_kind": 1,
+        "players": [
+          {
+            "character_kind": 1,
+            "costume": 0,
+            "cpu_kind": 4,
+            "cpu_level": 9,
+            "player_type": 1,
+            "port": 1,
+            "rumble_enabled": false,
+            "stocks": 4
+          },
+          {
+            "character_kind": 5,
+            "costume": 1,
+            "cpu_kind": 4,
+            "cpu_level": 9,
+            "player_type": 1,
+            "port": 2,
+            "rumble_enabled": false,
+            "stocks": 4
+          },
+          {
+            "character_kind": 11,
+            "costume": 2,
+            "cpu_kind": 4,
+            "cpu_level": 9,
+            "player_type": 1,
+            "port": 3,
+            "rumble_enabled": false,
+            "stocks": 4
+          },
+          {
+            "character_kind": 12,
+            "costume": 3,
+            "cpu_kind": 4,
+            "cpu_level": 9,
+            "player_type": 1,
+            "port": 4,
+            "rumble_enabled": false,
+            "stocks": 4
+          }
+        ],
+        "stage": 32,
+        "time_limit_seconds": 0,
+        "timer_counts_up": false,
+        "timer_enabled": false
+      },
+      "match_frame": 0,
+      "present": true
+    },
+    "observed_cursor": 1206,
+    "ordered_scene_spans": [
+      {
+        "first_index": 0,
+        "last_index": 936,
+        "record_count": 937,
+        "scene": "CSS",
+        "scene_id": 1
+      },
+      {
+        "first_index": 937,
+        "last_index": 1183,
+        "record_count": 247,
+        "scene": "SSS",
+        "scene_id": 2
+      },
+      {
+        "first_index": 1184,
+        "last_index": 1208,
+        "record_count": 25,
+        "scene": "match",
+        "scene_id": 3
+      }
+    ],
+    "pixels": "not_compared",
+    "record_kinds": {
+      "session_frame": 1209,
+      "session_match_enter_complete": 1
+    },
+    "requested_cursor": 1200,
+    "result": "incomplete",
+    "source_match_complete": false,
+    "whole_session_state_equality_claimed": false
+  },
+  "private_locations_omitted": true,
+  "private_run": {
+    "run_id": "b4-match-entry-current-release-20261006-f6d938f2",
+    "summary_schema": "melee-web-b4-target1200-capture-summary-v1",
+    "summary_sha256": "23013f3947ff07f808eca81dd9597be744dd46750a53fd90b99984d8d7499fb5"
+  },
+  "producer": {
+    "artifact_count": 32,
+    "artifacts": [
+      {
+        "bytes": 18698,
+        "name": "action-sweep.mjs",
+        "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+      },
+      {
+        "bytes": 2040,
+        "name": "audio-ring.mjs",
+        "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+      },
+      {
+        "bytes": 1517,
+        "name": "audio-worklet.js",
+        "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+      },
+      {
+        "bytes": 19263,
+        "name": "controller-input.mjs",
+        "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+      },
+      {
+        "bytes": 5240,
+        "name": "controller-panel.css",
+        "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+      },
+      {
+        "bytes": 36847,
+        "name": "controller-panel.mjs",
+        "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+      },
+      {
+        "bytes": 3482,
+        "name": "controller-settings.css",
+        "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+      },
+      {
+        "bytes": 18680,
+        "name": "controller-settings.mjs",
+        "sha256": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f"
+      },
+      {
+        "bytes": 18780,
+        "name": "diagnostics-schema.mjs",
+        "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+      },
+      {
+        "bytes": 2876,
+        "name": "diagnostics-settings.mjs",
+        "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+      },
+      {
+        "bytes": 15255,
+        "name": "disc-image.mjs",
+        "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+      },
+      {
+        "bytes": 7552,
+        "name": "disc-session.mjs",
+        "sha256": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2"
+      },
+      {
+        "bytes": 4043,
+        "name": "dsp-coefficients.mjs",
+        "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+      },
+      {
+        "bytes": 3674112,
+        "name": "gameplay_menu_browser.data",
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      {
+        "bytes": 299681,
+        "name": "gameplay_menu_browser.js",
+        "sha256": "fd0faf2d6bb5630abc218ac7b27136578d69822973f12f0ccca47b49667e051f"
+      },
+      {
+        "bytes": 15722576,
+        "name": "gameplay_menu_browser.wasm",
+        "sha256": "3eb2d82f360bb077d961120ab23a59977e0fbdb7bffb31c9642699cfcef770b8"
+      },
+      {
+        "bytes": 21958,
+        "name": "hitch-capture.mjs",
+        "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+      },
+      {
+        "bytes": 10679,
+        "name": "match-flow.mjs",
+        "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+      },
+      {
+        "bytes": 8566,
+        "name": "match-menu.mjs",
+        "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+      },
+      {
+        "bytes": 50699,
+        "name": "melee-runtime.mjs",
+        "sha256": "0fdd584a8636e821eb08b2a3232ec05d7c3ce0c33e43e5e640a16e0809709013"
+      },
+      {
+        "bytes": 1043,
+        "name": "net-timing-pause.mjs",
+        "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"
+      },
+      {
+        "bytes": 935,
+        "name": "prototype-keyboard-layouts.mjs",
+        "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+      },
+      {
+        "bytes": 17029,
+        "name": "runtime-assets.mjs",
+        "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190"
+      },
+      {
+        "bytes": 5451,
+        "name": "runtime-audio-assets.mjs",
+        "sha256": "033bf0bd4caa6c744ebead3dd7091bec8496b5f8d2039d60a3cdf9d398a7f05c"
+      },
+      {
+        "bytes": 7660,
+        "name": "runtime-audio.mjs",
+        "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+      },
+      {
+        "bytes": 16143,
+        "name": "runtime-cache.js",
+        "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+      },
+      {
+        "bytes": 60714,
+        "name": "runtime-development.mjs",
+        "sha256": "258dde2991c34f06f89c2e5ec3800aa8a1fad185949f807d3c3f8412e93f0e24"
+      },
+      {
+        "bytes": 51514,
+        "name": "runtime-diagnostics-delivery.mjs",
+        "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+      },
+      {
+        "bytes": 85702,
+        "name": "runtime-diagnostics.mjs",
+        "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+      },
+      {
+        "bytes": 5205,
+        "name": "runtime.html",
+        "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+      },
+      {
+        "bytes": 6381,
+        "name": "touch-controls.css",
+        "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+      },
+      {
+        "bytes": 13954,
+        "name": "touch-controls.mjs",
+        "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+      }
+    ],
+    "build_command": "python3 scripts/build.py --target runtime --configuration Release",
+    "build_exit_code": 0,
+    "build_log_sha256": "aab36c1f41f31bdb355970603da998173f62fa10088b51c069dedd36bb16e4fd",
+    "configuration": "Release",
+    "default_off_gates": {
+      "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+      "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+      "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+      "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+      "MELEE_WEB_RESULTS_RENDERED_TRACE": "OFF",
+      "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+      "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF",
+      "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF"
+    },
+    "local_and_served_inventory_matched_frozen_before_and_after": true,
+    "target": "runtime"
+  },
+  "protocol": {
+    "first_callback_probe": false,
+    "http_request_timeout_ms": 5000,
+    "mode": "state (default)",
+    "one_run_only": true,
+    "owner_cleanup_reserve_ms": 45000,
+    "owner_overall_timeout_ms": 300000,
+    "phase_timeout_ms": 18000,
+    "poll_ms": 250,
+    "recipe_spans": [
+      {
+        "first_frame": 0,
+        "last_frame": 936,
+        "scene": "CSS"
+      },
+      {
+        "first_frame": 937,
+        "last_frame": 1183,
+        "scene": "SSS"
+      },
+      {
+        "first_frame": 1184,
+        "last_frame": 16289,
+        "scene": "match"
+      }
+    ],
+    "replay_timeout_ms": 90000,
+    "requested_cursor": 1200,
+    "resume_timing_pauses": false,
+    "scope": "Ordinary progress/first match-entry diagnostic only; no original-state equality, complete-session acceptance, pixel/PCM/timing/performance/admission claim.",
+    "stop_on_first_error": true
+  },
+  "related_evidence": [
+    "../status/2026-10-06-b4-css-observer-repair-prefix.md",
+    "../status/2026-10-06-b4-first-replay-callback.md"
+  ],
+  "schema": "melee-web-b4-target1200-match-entry-evidence-v1",
+  "scope": "One ordinary MWRC v10 state-mode replay stopped at the requested target boundary or first observed failure. Match-entry evidence only; no active-gameplay, source-state equality, whole-session, pixels, PCM, performance, foreground timing, GPU-cause, or admission claim.",
+  "source": {
+    "base_main": "e706a364f29c9279467b6e0540c628f9e6bbd16c",
+    "branch": "codex/b4-css-observer-repair-prefix-20261006",
+    "capture_head": "63b833be6a2865ef99c7555fc3de04572057d115",
+    "capture_tree": "007f32dedaf2b9b86a87b607587698c7d383a347",
+    "repository": "melee-web",
+    "source_clean_at_build_capture": true,
+    "source_manifest_sha256": "0530b1f94c315a7ede5e4b94915b14230bd64742902d11d8acab175de5a3500a"
+  },
+  "tools": {
+    "browser": {
+      "audio_processing_disabled": false,
+      "explicit_environment_override_names": [
+        "CHROME_BIN",
+        "MELEE_BROWSER_PATH",
+        "MELEE_PLAYWRIGHT_DIR",
+        "NODE_OPTIONS",
+        "PLAYWRIGHT_BROWSERS_PATH",
+        "TMPDIR"
+      ],
+      "first_callback_probe": false,
+      "headless": true,
+      "observation_timeout_ms": 5000,
+      "other_capture_related_overrides_found": "none in current process environment scan",
+      "resume_timing_pauses": false,
+      "speaker_output_muted": true,
+      "temporary_profile_root": "fresh owned mode-0700 directory on verified external NVMe; kept empty and preserved",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36"
+    },
+    "launch_environment_sha256": "1f677a5f5dfef32f9ea80f631ed1c69fc8b53bf4017806228d34426839bd3041",
+    "tool_manifest_sha256": "81f10338a435a640220b4ad4fdcba725aada2d1af047cd725fe0ac8c2bfebe0e",
+    "versions": {
+      "chrome": "Google Chrome 154.0.8037.98",
+      "cmake": "cmake version 3.31.6",
+      "emscripten": "6.0.9",
+      "git": "git version 2.50.1 (Apple Git-155)",
+      "ninja": "1.13.0.git.kitware.jobserver-pipe-1",
+      "node": "v24.19.0",
+      "playwright": "1.62.1",
+      "python": "3.12.13 (main, Jul 23 2026, 14:33:47) [Clang 22.1.3 ]"
+    }
+  },
+  "validation": {
+    "full_python_suite": {
+      "log_sha256": "fa810a95e4ffea02e7c5ac26ab8937dbd05128bbadf1fa715caf200a62bba765",
+      "result": "pass",
+      "skipped": 142,
+      "tests": 1941
+    },
+    "release_runtime_build": "pass"
+  }
+}

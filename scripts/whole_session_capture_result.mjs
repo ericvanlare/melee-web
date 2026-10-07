@@ -3,6 +3,171 @@ export const REQUIRED_SESSION_DOWNLOADS = Object.freeze([
   'retail-port.jsonl', 'retail-browser-report.json',
 ]);
 
+export const FIRST_REPLAY_BOUNDARY_MARKER_PREFIX = 'MELEE_WEB_FIRST_REPLAY_CALLBACK_V1 ';
+const REPLAY_BOUNDARY_PREFIX = FIRST_REPLAY_BOUNDARY_MARKER_PREFIX;
+const REPLAY_BOUNDARY_PAIR_BASES = Object.freeze([
+  'header_emit', 'header_onLog', 'menu_replay_started_dispatch',
+  'menu_replay_started_js', 'native_memory_snapshot', 'css_tick',
+  'session_frame_emit', 'session_frame_onLog', 'frame0_emit', 'frame0_onLog',
+  'ordinary_audio_boundary', 'ordinary_audio_tick', 'source_frames_finish',
+  'aurora_begin_frame', 'css_host_draw', 'aurora_end_frame',
+  'first_replay_callback_tail', 'native_pause',
+]);
+export const FIRST_REPLAY_BOUNDARY_MARKER_NAMES = Object.freeze(
+  REPLAY_BOUNDARY_PAIR_BASES.flatMap(base => [`${base}_begin`, `${base}_returned`]));
+const REPLAY_BOUNDARY_MARKER_NAME_SET = new Set(FIRST_REPLAY_BOUNDARY_MARKER_NAMES);
+const REQUIRED_REPLAY_BOUNDARY_PAIRS = Object.freeze([
+  'header_emit', 'header_onLog', 'menu_replay_started_dispatch',
+  'menu_replay_started_js', 'native_memory_snapshot', 'css_tick',
+  'session_frame_emit', 'session_frame_onLog', 'frame0_emit', 'frame0_onLog',
+  'ordinary_audio_boundary', 'source_frames_finish', 'aurora_begin_frame',
+  'css_host_draw', 'aurora_end_frame', 'first_replay_callback_tail', 'native_pause',
+]);
+
+export function parseFirstReplayBoundaryMarker(text) {
+  if (typeof text !== 'string' || !text.startsWith(REPLAY_BOUNDARY_PREFIX)) return null;
+  let marker;
+  try { marker = JSON.parse(text.slice(REPLAY_BOUNDARY_PREFIX.length)); }
+  catch (error) { throw Error(`Malformed first-replay-callback marker JSON: ${error.message}`); }
+  if (!marker || !Number.isSafeInteger(marker.sequence) || marker.sequence < 1 ||
+      !REPLAY_BOUNDARY_MARKER_NAME_SET.has(marker.marker) ||
+      !Number.isFinite(marker.page_timestamp_ms) || !Array.isArray(marker.values) ||
+      marker.values.length !== 3 || marker.values.some(value => !Number.isSafeInteger(value)))
+    throw Error('Malformed first-replay-callback marker fields');
+  return marker;
+}
+
+export function inspectFirstReplayBoundaryMarkers(markers) {
+  const errors = [];
+  const open = [];
+  const pairCounts = Object.fromEntries(REPLAY_BOUNDARY_PAIR_BASES.map(base => [base, 0]));
+  const returnedAt = {};
+  for (let index = 0; index < markers.length; index++) {
+    const row = markers[index];
+    if (row.sequence !== index + 1)
+      errors.push(`Marker sequence gap at receipt ${index + 1}: observed ${row.sequence}`);
+    const isBegin = row.marker.endsWith('_begin');
+    const isReturned = row.marker.endsWith('_returned');
+    if (!isBegin && !isReturned) continue;
+    const base = row.marker.replace(/_(?:begin|returned)$/, '');
+    if (isBegin) open.push({base, marker: row.marker, sequence: row.sequence});
+    else if (open.at(-1)?.base === base) {
+      open.pop();
+      pairCounts[base]++;
+      returnedAt[base] ??= row.sequence;
+    } else errors.push(`Unexpected ${row.marker} at sequence ${row.sequence}`);
+  }
+  for (const base of REQUIRED_REPLAY_BOUNDARY_PAIRS) {
+    if (!pairCounts[base]) errors.push(`Required marker pair did not return: ${base}`);
+  }
+  const pause = [...markers].reverse().find(row => row.marker === 'native_pause_returned');
+  if (pause?.values[0] !== 0) errors.push('Native pause did not report running=0');
+  const firstSequence = name => markers.find(row => row.marker === name)?.sequence ?? null;
+  const sourceOrder = [
+    ['css_tick_returned', 'session_frame_emit_begin'],
+    ['frame0_emit_returned', 'ordinary_audio_boundary_begin'],
+    ['ordinary_audio_boundary_returned', 'source_frames_finish_begin'],
+    ['source_frames_finish_returned', 'first_replay_callback_tail_begin'],
+    ['first_replay_callback_tail_begin', 'native_pause_begin'],
+  ];
+  for (const [before, after] of sourceOrder) {
+    const beforeSequence = firstSequence(before), afterSequence = firstSequence(after);
+    if (beforeSequence === null || afterSequence === null || beforeSequence >= afterSequence)
+      errors.push(`Source boundary order differs: ${before} must precede ${after}`);
+  }
+  const callbackTail = [...markers].reverse().find(row => row.marker === 'first_replay_callback_tail_begin');
+  if (!callbackTail || callbackTail.values[0] < 1 || callbackTail.values[1] < 1)
+    errors.push('First replay callback did not report at least one source step and source draw');
+  const cssTick = markers.find(row => row.marker === 'css_tick_begin');
+  if (!cssTick || cssTick.values[1] !== 0 || cssTick.values[2] !== 1)
+    errors.push('First replay callback did not begin at the CSS cursor-zero boundary');
+  const frameZero = markers.find(row => row.marker === 'frame0_emit_begin');
+  if (!frameZero || frameZero.values[0] !== 0 || frameZero.values[1] !== 1)
+    errors.push('Frame-zero diagnostic did not identify CSS cursor zero');
+  const drawStageNames = [
+    'aurora_begin_frame_begin', 'aurora_begin_frame_returned',
+    'css_host_draw_begin', 'css_host_draw_returned',
+    'aurora_end_frame_begin', 'aurora_end_frame_returned',
+  ];
+  const drawRows = new Map();
+  for (const row of markers) {
+    if (!drawStageNames.includes(row.marker)) continue;
+    const index = row.values[0];
+    const draw = drawRows.get(index) || {};
+    if (draw[row.marker]) errors.push(`Duplicate ${row.marker} for source draw ${index}`);
+    else draw[row.marker] = row;
+    drawRows.set(index, draw);
+  }
+  const sourceDrawBoundaries = [...drawRows.entries()].sort(([a], [b]) => a - b)
+    .map(([index, draw]) => ({index, markers: Object.fromEntries(drawStageNames
+      .filter(name => draw[name]).map(name => [name, draw[name].sequence]))}));
+  for (let index = 0; index < sourceDrawBoundaries.length; index++) {
+    const row = sourceDrawBoundaries[index];
+    const draw = drawRows.get(row.index);
+    if (row.index !== index) errors.push(`Source draw index gap: expected ${index}, observed ${row.index}`);
+    const required = ['aurora_begin_frame_begin', 'aurora_begin_frame_returned',
+      'aurora_end_frame_begin', 'aurora_end_frame_returned'];
+    if (index === 0) required.push('css_host_draw_begin', 'css_host_draw_returned');
+    for (const name of required) if (!draw[name])
+      errors.push(`Source draw ${row.index} is missing ${name}`);
+    const ordered = ['aurora_begin_frame_begin', 'aurora_begin_frame_returned',
+      'css_host_draw_begin', 'css_host_draw_returned', 'aurora_end_frame_begin',
+      'aurora_end_frame_returned'].filter(name => draw[name]);
+    for (let stage = 1; stage < ordered.length; stage++) {
+      if (draw[ordered[stage - 1]].sequence >= draw[ordered[stage]].sequence)
+        errors.push(`Source draw ${row.index} boundary order differs at ${ordered[stage]}`);
+    }
+    if (draw.aurora_begin_frame_returned?.values[2] !== 1)
+      errors.push(`Source draw ${row.index} did not enter aurora_begin_frame`);
+    if (draw.css_host_draw_returned && draw.css_host_draw_returned.values[1] !== 1)
+      errors.push(`CSS host draw ${row.index} did not report a completed draw`);
+    if (draw.aurora_end_frame_returned &&
+        (draw.aurora_end_frame_returned.values[1] !== row.index ||
+         draw.aurora_end_frame_returned.values[2] !== 1))
+      errors.push(`Source draw ${row.index} counters do not match its returned boundary`);
+  }
+  const finish = markers.find(row => row.marker === 'source_frames_finish_returned');
+  const finishBegin = markers.find(row => row.marker === 'source_frames_finish_begin');
+  const tailReturn = markers.find(row => row.marker === 'first_replay_callback_tail_returned');
+  if (!finish || !finishBegin || !callbackTail ||
+      finish.values[0] !== callbackTail.values[0] ||
+      finish.values[1] !== callbackTail.values[1] ||
+      finish.values[2] !== callbackTail.values[2])
+    errors.push('SourceFrameSequence finish and callback-tail counters differ');
+  if (finish && finish.values[1] !== sourceDrawBoundaries.length)
+    errors.push('SourceFrameSequence draw count differs from observed draw boundaries');
+  if (pause && finish && (pause.values[1] !== finish.values[0] || pause.values[2] !== finish.values[2]))
+    errors.push('Native pause counters differ from completed source-frame counters');
+  if (finishBegin && finish) {
+    const drawsBeforeFinish = sourceDrawBoundaries.filter(row =>
+      drawRows.get(row.index).aurora_end_frame_returned?.sequence < finishBegin.sequence).length;
+    if (finishBegin.values[0] !== finish.values[0] || finishBegin.values[2] !== finish.values[2] ||
+        finishBegin.values[1] !== drawsBeforeFinish)
+      errors.push('SourceFrameSequence finish-start counters do not match prior source steps/draws/cursor');
+    if (sourceDrawBoundaries.some(row =>
+      drawRows.get(row.index).aurora_end_frame_returned?.sequence >= finish.sequence))
+      errors.push('A source draw returned after SourceFrameSequence finish');
+  }
+  if (tailReturn && callbackTail && (tailReturn.values[0] !== callbackTail.values[0] ||
+      tailReturn.values[1] !== callbackTail.values[1] || tailReturn.values[2] !== 0))
+    errors.push('Callback tail returned with changed counters or non-paused state');
+  return {
+    complete: errors.length === 0 && open.length === 0,
+    errors,
+    pair_counts: pairCounts,
+    returned_at: returnedAt,
+    first_unmatched_marker: open[0] || null,
+    deepest_unmatched_marker: open.at(-1) || null,
+    first_missing_pair: REQUIRED_REPLAY_BOUNDARY_PAIRS.find(base => !pairCounts[base]) || null,
+    callback_source_steps: finish?.values[0] ?? null,
+    callback_source_draws: finish?.values[1] ?? null,
+    replay_cursor_at_pause: pause?.values[2] ?? null,
+    css_tick_markers: markers.filter(row => row.marker === 'css_tick_begin').length,
+    source_draw_boundaries: sourceDrawBoundaries,
+    native_pause_running: pause?.values[0] ?? null,
+  };
+}
+
 export function validateRuntimeDataAbort(evidence) {
   if (!evidence || typeof evidence !== 'object') return false;
   const positive = value => Number.isSafeInteger(value) && value > 0;

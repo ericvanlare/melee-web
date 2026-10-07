@@ -1,0 +1,159 @@
+{
+  "schema": "melee-web-b4-first-replay-callback-evidence-v1",
+  "scope": "One headless original-CSS callback for one exact MWRC v10 recipe, paired with a prior bounded native one-tick reducer. No full-session, retail, pixel, PCM, GPU-cause, foreground-timing, or performance claim.",
+  "private_locations_omitted": true,
+  "producer": {
+    "source_head": "190d150fd2148ccdfcb10d834538e91eb6f2c92b",
+    "source_tree": "6717247d64e5273f02103ada24072c25085c6923",
+    "base_main": "707c2ab354c52fb927b80ba85f20efd3f1e9f583",
+    "clean_at_build_and_capture": true,
+    "build": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime --configuration Release",
+      "exit_code": 0,
+      "log_sha256": "69a1525a8e565d816089e03b679c3f5ba165f00268432516cc19a266949f0ccf",
+      "all_32_artifact_manifest_sha256": "30f8d2541d59d597f6de064c1c640cb17d6cb768169eac6add12b3aac64b60eb",
+      "artifacts": {
+        "gameplay_menu_browser.js": {
+          "bytes": 299681,
+          "sha256": "fd0faf2d6bb5630abc218ac7b27136578d69822973f12f0ccca47b49667e051f"
+        },
+        "gameplay_menu_browser.wasm": {
+          "bytes": 15722515,
+          "sha256": "930adb1228f41f055c2b07f374c7ae0e9308e2beee1875de79b471bf55c99975"
+        },
+        "gameplay_menu_browser.data": {
+          "bytes": 3674112,
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+        },
+        "runtime-development.mjs": {
+          "bytes": 58285,
+          "sha256": "b41d0e2ff2fcce8695a8e2ce99bf0d5053ec43020d5fa4cd246f493bb9d4ac28"
+        }
+      }
+    }
+  },
+  "input": {
+    "recipe_format_version": 10,
+    "recipe_sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b",
+    "seed": 3336171383,
+    "source_frame_count": 50394,
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "raw_game_assets_included": false
+  },
+  "native_reducer": {
+    "source_head": "572ac78578c0bfc3f0e8f337ebc29c3b7e4d286b",
+    "result_sha256": "04b0eb10b1720af8775e5a7a53b7fe7617fc1874b8969a13aba4402b711f1a92",
+    "fixture_file_count": 76,
+    "authored_fixture_closure_sha256": "1863e254bf88e490bb999b2678405f0dab5b14c82f005fd16e1f24c8fc19950a",
+    "recipe_sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b",
+    "exit_code": 0,
+    "source_steps": 1,
+    "source_draws": 0,
+    "frame_zero_diagnostic_sha256": "568e97a867a158ece66ab2ac78a4acdd38636ddb96ad1937bffd987152adaed8",
+    "frame_zero_pad_history_sha256": "f3d40bdf39ba8121d351cd87aedfb807426cffe296ce4b46dd8b114b5d8ae64e",
+    "comparison": "No retail comparison; native reducer output supplies a bounded frame-zero reference."
+  },
+  "browser_probe": {
+    "preflight_sha256": "61ae24d45f40302abae5324f0ee20976e4b13ac48bb1f7bb5663ecd7f8a776bf",
+    "authorization_sha256": "86093eb9e9f59d520d3cc7dfca7dab576706d5648f749017181863c18d24e031",
+    "result_sha256": "989530db8b839d762b2e6880db7212e8d7facca8ddc895cbba2fc3c043f72b65",
+    "capture_report_sha256": "a0d049d56532c7c6034e21d782a5f2694e5a8a25443dc4ca6e1e7ffde6519ab3",
+    "marker_stream_sha256": "e1d91cd7a199018fb88097a96c3469e338008eae91c349dc2712522756dda0f9",
+    "screenshot_sha256": "1c08e2faa0922310e11df3a90a4c2086bfd26e644da0013c5000eaf1feb416ee",
+    "owner_report_sha256": "0ed53efc18f8632bcb75949f7d02474469c2977494f3a003bf68f471bc2608ca",
+    "postflight_sha256": "db420e044c5f11bc50b530bab36e21dd6cc3a139699eb406514808a39ccb03d6",
+    "browser": "Headless installed Chrome 154.0.8037.98; Playwright 1.62.1; Node 24.19.0.",
+    "full_32_file_local_served_inventory_equal_before_and_after": true,
+    "loaded_data_bytes": 3674112,
+    "loaded_data_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+    "durable_markers": {
+      "count": 36,
+      "all_begin_return_pairs_complete": true,
+      "first_marker": "header_emit_begin",
+      "first_page_timestamp_ms": 3561.0149998664856,
+      "last_marker": "first_replay_callback_tail_returned",
+      "last_page_timestamp_ms": 3579.6749999523163,
+      "first_to_last_page_timestamp_span_ms": 18.66000008583069,
+      "timestamp_scope": "Page timestamp span between the first and last marker endpoints, including the instrumented marker path; not callback execution time or performance evidence."
+    },
+    "outcome": {
+      "capture_runner_exit_code": 0,
+      "owner_exit_code": 0,
+      "first_error": null,
+      "source_steps": 1,
+      "source_draws": 1,
+      "css_ticks": 1,
+      "native_running_after_pause": 0,
+      "native_phase_after_pause": 1,
+      "native_source_cursor_after_pause": 1,
+      "terminal_cursor_known": true,
+      "callback_tail_marker_returned": true,
+      "frame_zero_compared_fields": [
+        "record",
+        "scene",
+        "index",
+        "supplied_inputs",
+        "rng",
+        "pad_state_hex"
+      ],
+      "frame_zero_equal_to_native_reducer": true,
+      "pad_history_sha256": "f3d40bdf39ba8121d351cd87aedfb807426cffe296ce4b46dd8b114b5d8ae64e",
+      "runner_reported_launch_click_to_tail_wall_ms": 414,
+      "launch_to_tail_scope": "Host-side elapsed time around the replay-launch click and durable callback-tail marker receipt. Not native callback execution time.",
+      "screenshot_shows_original_css": true,
+      "gpu_cause_claim": false
+    },
+    "ownership": {
+      "owner_elapsed_ms": 5392,
+      "cleanup_elapsed_ms": 149,
+      "browser_process_identities_absent": true,
+      "cdp_process_attribution_passed": true,
+      "capture_process_group_absent": true,
+      "server_process_group_absent": true,
+      "cleanup_passed": true
+    }
+  },
+  "comparison_with_prior_failed_prefix": {
+    "source_head": "add492cf4722c48a62812f7c975c1b1b42d5f5c2",
+    "base_main": "73d3c4c35731faf1a36ee909bfd7e3e764c02e49",
+    "result_sha256": "89cf6f66fc3ecf7e78ad08d1e1cb5bf944f10b9b5b667199d276608a0d3a4ea9",
+    "capture_report_sha256": "01634e6525f53ae2da4f8e2d3be69a8b24c4fc38af6a4774fedf452c40372927",
+    "build_receipt_sha256": "903efd31df93efd2e05020f2b4ab4075d2ec98c353852be63feb8fac8ea0683c",
+    "recipe_disc_and_loaded_data_hashes_match_current_probe": true,
+    "chrome_and_playwright_versions_match_current_probe": true,
+    "node_version": "22.23.2 (current probe: 24.19.0)",
+    "run_mode": "Polled whole-session prefix toward cursor target 10 every 250 ms; current run waits for the durable first-callback tail marker and pauses at cursor 1.",
+    "owner_budget": "255 seconds total with 45 seconds for cleanup (current run: 95 seconds total with 5 seconds for cleanup).",
+    "last_successful_observation": {
+      "native_phase": 1,
+      "native_running": 1,
+      "source_cursor": 0,
+      "terminal_source_cursor": "unknown",
+      "runtime_error": null
+    },
+    "cleanup": "OS-owned browser/process groups were absent, but CDP inventory was empty, so strict attribution cleanup failed.",
+    "runtime_artifacts": {
+      "gameplay_menu_browser.js_sha256": "e232955d8df4d9e67bbe4aeabec7b1909e4c132ba3a47f67860465c9aec866c1",
+      "gameplay_menu_browser.wasm_sha256": "b91ac09b238a8083bb7bbc635147fd7dd7f93812007293d8eea770ee5fce23a2",
+      "gameplay_menu_browser.data_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+    },
+    "interpretation": "Current v10 recipe-support patch range-diffs as equivalent to the prior add492 patch. The current base also includes main changes #174 and #176, and the current runner adds durable markers, early CDP attribution, and callback-tail pause. The current one-callback result does not establish that the prior full-replay stall is fixed."
+  },
+  "test_and_fix_scope": {
+    "full_suite_source_head": "f904e987d19a43ea382974ae09d116d75c67391d",
+    "full_suite_command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+    "full_suite_tests": 1930,
+    "full_suite_skipped": 141,
+    "full_suite_failures": 1,
+    "full_suite_failure_receipt_sha256": "ae08ba79c32e1a04df6b91a6bce05e4d4e7eb62ea846013ff4fd48b4e207fd60",
+    "failure": "test_async_start_failure_and_manual_pause_boundaries: Node VM fixture lacks window; onLog threw ReferenceError.",
+    "fix_commit": "190d150fd2148ccdfcb10d834538e91eb6f2c92b",
+    "fix": "Changed probe lookup from window.__meleeReplayBoundaryProbe to globalThis.__meleeReplayBoundaryProbe; fixture unchanged.",
+    "focused_lifecycle_exit_code": 0,
+    "focused_lifecycle_log_sha256": "33d532cfef813748a69af55d2d0a905a9617904a72a3379c4f6f6a91b253dbb7",
+    "focused_marker_protocol_exit_code": 0,
+    "focused_marker_protocol_log_sha256": "69acef731c17264879f0595ca4fd32119a9e49880be921fdb834c00480541b7e",
+    "full_suite_rerun_after_fix": false,
+    "final_ci_required": true
+  }
+}

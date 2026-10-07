@@ -10,6 +10,7 @@
 #include "gameplay_match_rules.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_audio_stream.h"
+#include "gameplay_retail_recipe.hpp"
 #include "native_menu_fighter_input.h"
 #include "native_menu_stage_input.h"
 #include <melee/ft/forward.h>
@@ -39,10 +40,12 @@ extern HSD_RumbleData HSD_Rumble_804C22E0[4];
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
+#include <vector>
 extern "C" int melee_web_vs_mode_begin(void);
 extern "C" int melee_web_vs_mode_end(void);
 extern "C" int melee_web_vs_mode_select_state(int);
@@ -203,6 +206,127 @@ public:
   output<<"}\n";output.flush();
  }
 };
+
+void replay_start_marker(const char* marker, int value = -1) {
+    std::cout << "{\"record\":\"b4_replay_start_marker\",\"marker\":\""
+              << marker << "\"";
+    if (value >= 0) std::cout << ",\"value\":" << value;
+    std::cout << "}\n" << std::flush;
+}
+
+void run_v10_css_replay_start_prefix(const melee_web::RuntimeFiles& files,
+                                     const char* recipe_path,
+                                     TransitionTrace& trace) {
+    std::ifstream input(recipe_path, std::ios::binary);
+    if (!input)
+        throw std::runtime_error("Cannot open the exact MWRC v10 reducer recipe");
+    const std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(input)),
+                                     std::istreambuf_iterator<char>());
+    auto recipe = melee_web::read_retail_replay(bytes);
+    check(recipe.version == melee_web::kRetailReplayFighterVersion &&
+              recipe.seed == 3336171383U && recipe.frames.size() == 50394 &&
+              bytes.size() == 2241622 && recipe.initial_css && recipe.initial_input &&
+              recipe.match_setups.size() == melee_web::kRetailReplayMaxMatchSetups &&
+              !recipe.spans.empty() &&
+              recipe.spans.front().scene == melee_web::kRetailReplayCss &&
+              recipe.spans.front().first_frame == 0,
+          "Reducer input is not the complete frozen MWRC v10 CSS-first recipe");
+    replay_start_marker("full_v10_recipe_verified");
+
+    char error[256]{};
+    auto* host = melee_web_menu_host_create(error, sizeof(error));
+    check(host != nullptr, error);
+    std::unique_ptr<melee_web::GameplayMenuWorld> world;
+    bool host_entered = false;
+    auto best_effort_teardown = [&]() noexcept {
+        if (host && host_entered) {
+            char cleanup_error[256]{};
+            (void)melee_web_menu_host_leave(host, 1, cleanup_error,
+                                            sizeof(cleanup_error));
+            host_entered = false;
+        }
+        if (world) {
+            try { world->verify_immutable_archives(); } catch (...) {}
+            try { world->close(); } catch (...) {}
+            world.reset();
+        }
+        if (host) {
+            char cleanup_error[256]{};
+            (void)melee_web_menu_host_destroy(host, cleanup_error,
+                                             sizeof(cleanup_error));
+            host = nullptr;
+        }
+    };
+
+    try {
+        world = std::make_unique<melee_web::GameplayMenuWorld>(files);
+        check(melee_web_menu_host_apply_replay_context(
+                  host, recipe.seed, recipe.pad_bytes.data(),
+                  recipe.initial_css->css_data.data(),
+                  recipe.initial_css->ko_counts.data(),
+                  recipe.initial_css->game_rules.data(),
+                  recipe.initial_css->save_data.data(), error, sizeof(error)),
+              error);
+        replay_start_marker("fresh_css_enter_begin");
+        check(melee_web_menu_host_enter(host, world->audio(), error,
+                                        sizeof(error)), error);
+        host_entered = true;
+        check(melee_web_menu_host_source_scene(host) ==
+                  MELEE_WEB_MENU_HOST_SCENE_CSS,
+              "Fresh reducer owner did not enter original CSS");
+        trace.begin_run(0);
+        trace.event("fresh_css_enter_complete", world->audio());
+        replay_start_marker("fresh_css_enter_complete");
+
+        replay_start_marker("retail_replay_session_initial_begin");
+        melee_web::retail_replay_session_initial(recipe);
+        std::cout << std::flush;
+        replay_start_marker("retail_replay_session_initial_returned");
+
+        float pcm[1068]{};
+        unsigned audio_phase = 0;
+        replay_start_marker("original_css_host_tick_begin");
+        const int tick_result = melee_web_menu_host_tick(
+            host, recipe.frames[0].pads.data(), error, sizeof(error));
+        check(tick_result == 1 || tick_result == 3, error);
+        trace.event("original_css_host_tick_returned", world->audio());
+        replay_start_marker("original_css_host_tick_returned", tick_result);
+
+        replay_start_marker("retail_replay_frame_css_begin");
+        melee_web::retail_replay_frame(recipe, 0,
+                                       melee_web::kRetailReplayCss);
+        std::cout << std::flush;
+        replay_start_marker("retail_replay_frame_css_returned");
+
+        replay_start_marker("ordinary_audio_boundary_begin");
+        audio_phase += 32000;
+        const unsigned samples = audio_phase / 60;
+        audio_phase %= 60;
+        check(melee_web_audio_render(world->audio(), pcm, samples, error,
+                                     sizeof(error)), error);
+        trace.event("ordinary_audio_boundary_returned", world->audio());
+        replay_start_marker("ordinary_audio_boundary_returned",
+                            static_cast<int>(samples));
+
+        replay_start_marker("source_teardown_begin");
+        check(melee_web_menu_host_leave(host, 1, error, sizeof(error)), error);
+        host_entered = false;
+        world->verify_immutable_archives();
+        world->close();
+        world.reset();
+        check(melee_web_menu_host_destroy(host, error, sizeof(error)), error);
+        host = nullptr;
+        replay_start_marker("source_teardown_returned");
+        std::cout << "{\"record\":\"b4_replay_start_prefix\","
+                     "\"result\":\"bounded_one_frame_returned\","
+                     "\"recipe_version\":10,\"recipe_frames\":50394,"
+                     "\"source_frames_consumed\":1,\"draws\":0,"
+                     "\"full_session_comparison\":false}\n" << std::flush;
+    } catch (...) {
+        best_effort_teardown();
+        throw;
+    }
+}
 
 void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
 {
@@ -1084,11 +1208,12 @@ void run_stadium_c1a_selection_smoke(const melee_web::RuntimeFiles& files)
 #endif
 }
 int main(int argc,char** argv){try{
- if(argc<3||argc>7)throw std::runtime_error("Expected menu/audio directories, optional stage kind, transition trace path, source revision and input recipe");
+ if(argc<3||argc>8)throw std::runtime_error("Expected menu/audio directories, optional stage kind, transition trace path, source revision and input recipe");
  const int stage_kind=argc>=4?std::stoi(argv[3]):St_Kind_Last;
  const char* trace_path=argc>=5?argv[4]:nullptr;
  const char* source_revision=argc>=6?argv[5]:nullptr;
- const char* input_recipe=argc==7?argv[6]:nullptr;
+ const char* input_recipe=argc>=7?argv[6]:nullptr;
+ const char* replay_recipe_path=argc==8?argv[7]:nullptr;
  const bool retail_fd_recipe=input_recipe&&std::string(input_recipe)=="retail-stock-fd-v1";
  const bool results_mario_recipe=input_recipe&&std::string(input_recipe)=="results-mario-v1";
  const bool link_css_unload_recipe=input_recipe&&std::string(input_recipe)=="link-css-unload-v1";
@@ -1096,6 +1221,8 @@ int main(int argc,char** argv){try{
  const bool opening_movie_preload_recipe=input_recipe&&std::string(input_recipe)=="opening-movie-preload-v1";
  const bool trophy_baseline_recipe=input_recipe&&std::string(input_recipe)=="trophy-baseline-v1";
  const bool sound_settings_recipe=input_recipe&&std::string(input_recipe)=="main-settings-sound-v1";
+ const bool v10_css_replay_start_recipe=input_recipe&&
+     std::string(input_recipe)=="whole-session-css-replay-start-v10-v1";
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  const bool stadium_c1a_recipe=input_recipe&&std::string(input_recipe)=="stadium-c1a-v1";
 #else
@@ -1103,16 +1230,22 @@ int main(int argc,char** argv){try{
 #endif
  if(input_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
-    !sound_settings_recipe&&!stadium_c1a_recipe)
+    !sound_settings_recipe&&!stadium_c1a_recipe&&!v10_css_replay_start_recipe)
     throw std::runtime_error("Unknown transition input recipe");
- if((retail_fd_recipe||results_mario_recipe)&&stage_kind!=St_Kind_Last)
+ if(v10_css_replay_start_recipe&&
+    (argc!=8||!replay_recipe_path||!trace_path||!source_revision))
+   throw std::runtime_error("MWRC v10 CSS replay-start reducer requires trace, source revision and exact recipe path");
+ if(!v10_css_replay_start_recipe&&argc==8)
+   throw std::runtime_error("Only the MWRC v10 CSS replay-start reducer accepts an exact recipe path");
+ if((retail_fd_recipe||results_mario_recipe||v10_css_replay_start_recipe)&&
+    stage_kind!=St_Kind_Last)
    throw std::runtime_error("Explicit FD recipes require Final Destination");
  if(stadium_c1a_recipe&&stage_kind!=St_Kind_PStadium)
    throw std::runtime_error("C1a recipe requires source StKind 3");
  TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
  std::vector<std::string> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"};
- if(stadium_c1a_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
+ if(stadium_c1a_recipe||v10_css_replay_start_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
     trophy_baseline_recipe||sound_settings_recipe)
   keys=melee_web::menu_asset_names();
  for(const auto& key:melee_web::menu_asset_names())
@@ -1132,6 +1265,13 @@ int main(int argc,char** argv){try{
  char session_error[256]{};
  check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
  const auto session_allocation=melee_web_gameplay_allocation();
+ if(v10_css_replay_start_recipe){
+  run_v10_css_replay_start_prefix(files,replay_recipe_path,trace);
+  check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
+  std::cout<<"MWRC v10 original CSS replay-start prefix returned after one recorded source tick; "
+              "no draw or full-session comparison\n";
+  return 0;
+ }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  if(stadium_c1a_recipe){
   run_stadium_c1a_selection_smoke(files);
