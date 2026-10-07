@@ -2180,14 +2180,31 @@ def _validate_v10_manual_unload(wrapper: Mapping[str, Any],
     target_time: float | None = None
     unload_time: float | None = None
     unload_started = False
-    for row in snapshots:
+    for snapshot_index, row in enumerate(snapshots):
         if not isinstance(row, dict):
             raise ComparisonError("browser capture snapshot list contains a malformed row")
         if "source_cursor" not in row or "runtime_error" not in row:
             raise ComparisonError("browser capture snapshot lacks its cursor or runtime-error field")
         at_ms = row.get("at_ms")
-        if (type(at_ms) not in (int, float) or not math.isfinite(at_ms) or at_ms < last_time):
+        if type(at_ms) not in (int, float) or not math.isfinite(at_ms):
             raise ComparisonError("browser capture snapshots lack finite ordered observation times")
+        if at_ms < last_time:
+            # phase() snapshots before page.goto and after it returns. The
+            # initial document and the loaded document have separate origins
+            # for snapshot()'s performance.now(); all later times stay ordered.
+            phases = wrapper.get("phases")
+            navigation_pair = snapshots[:2]
+            if (snapshot_index != 1 or
+                    navigation_pair[0].get("reason") != "phase-start:http-load" or
+                    row.get("reason") != "phase-end:http-load" or
+                    not isinstance(phases, list) or not phases or
+                    not isinstance(phases[0], dict) or
+                    phases[0].get("name") != "http-load" or
+                    phases[0].get("result") != "pass" or
+                    any(any(item.get(field, object()) is not None for field in
+                            ("source_cursor", "phase", "running", "replay_report", "runtime_error")) or
+                        item.get("replay_downloads") != [] for item in navigation_pair)):
+                raise ComparisonError("browser capture snapshots lack finite ordered observation times")
         last_time = at_ms
         cursor = row["source_cursor"]
         if cursor is None:

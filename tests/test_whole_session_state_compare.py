@@ -1426,6 +1426,63 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             self.assertFalse(runtime_path.exists(), "recorded identity needs no runtime package")
 
             good_wrapper = copy.deepcopy(wrapper)
+            navigation_wrapper = copy.deepcopy(good_wrapper)
+            navigation_wrapper["phases"] = [{"name": "http-load", "result": "pass"}]
+            navigation_start = navigation_wrapper["snapshots"][0]
+            navigation_start.update(reason="phase-start:http-load", at_ms=64)
+            navigation_end = {**navigation_start, "reason": "phase-end:http-load",
+                              "at_ms": 56.24000000953674}
+            navigation_wrapper["snapshots"].insert(1, navigation_end)
+            navigation_wrapper["snapshots"][2]["at_ms"] = 70
+            wrapper = copy.deepcopy(navigation_wrapper)
+            write_capture()
+            _validate_v10_browser_provenance(
+                capture_path, producer_path, browser_report_path, trace_path,
+                recipe_path, recipe_sha, recipe, packet)
+
+            navigation_mutations = []
+            for index in (0, 1):
+                navigation_mutations.append((f"wrong navigation reason {index}",
+                                             ("snapshot", index, "reason", "phase-poll:http-load")))
+                for field, value in (("source_cursor", 0), ("phase", 0), ("running", 0),
+                                     ("replay_report", {}), ("runtime_error", "failure"),
+                                     ("replay_downloads", ["retail-port.jsonl"])):
+                    navigation_mutations.append((f"available navigation {index}.{field}",
+                                                 ("snapshot", index, field, value)))
+            for index in range(5):
+                for value in (True, float("inf"), float("nan")):
+                    navigation_mutations.append((f"invalid navigation timestamp {index}={value!r}",
+                                                 ("snapshot", index, "at_ms", value)))
+            navigation_mutations.extend([
+                ("missing phase manifest", ("wrapper", "phases", None)),
+                ("failed navigation phase", ("wrapper", "phases", [{"name": "http-load", "result": "fail"}])),
+                ("wrong first phase", ("wrapper", "phases", [{"name": "runtime-ready", "result": "pass"}])),
+                ("later live reversal", ("snapshot", 3, "at_ms", 69)),
+                ("later export reversal", ("snapshot", 4, "at_ms", 99)),
+                ("late navigation pair", ("late_pair",)),
+                ("later unavailable reversal", ("later_unavailable",)),
+            ])
+            for label, mutation in navigation_mutations:
+                with self.subTest(navigation_time=label):
+                    wrapper = copy.deepcopy(navigation_wrapper)
+                    if mutation[0] == "snapshot":
+                        _, index, field, value = mutation
+                        wrapper["snapshots"][index][field] = value
+                    elif mutation[0] == "wrapper":
+                        wrapper[mutation[1]] = mutation[2]
+                    elif mutation[0] == "late_pair":
+                        wrapper["snapshots"].insert(0, {**navigation_start, "at_ms": 60,
+                                                       "reason": "unclassified"})
+                    else:
+                        wrapper["snapshots"].insert(2, {**navigation_end, "at_ms": 55,
+                                                       "reason": "phase-start:runtime-ready"})
+                    write_capture()
+                    with self.assertRaises(ComparisonError):
+                        _validate_v10_browser_provenance(
+                            capture_path, producer_path, browser_report_path, trace_path,
+                            recipe_path, recipe_sha, recipe, packet)
+            wrapper = copy.deepcopy(good_wrapper)
+            write_capture()
             mutations = []
             bad_values = {
                 "requestCount": 2, "responseCount": 0, "failureCount": 2,
