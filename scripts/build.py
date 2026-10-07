@@ -39,6 +39,7 @@ TRACE_TARGETS = (
     "gameplay_stage_fountain_trace",
     "gameplay_stage_old_yoshi_trace",
     "gameplay_pikachu_articles_trace",
+    "pokemon_stadium_c0_trace",
 )
 
 # Keep the target closure in one place so callers that need to configure once

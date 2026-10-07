@@ -34,7 +34,8 @@ class AssetCheckManifestTests(unittest.TestCase):
         manifest = self.write_manifest({
             "checks": [
                 {"path": "ordinary.dat", "symbol": "fixture_joint"},
-                {"path": "stage.usd", "stage_entry": 3, "opaque": True},
+                {"path": "stage.usd", "stage_entry": 3, "opaque": True,
+                 "resolve_null_externals": True},
                 {"path": "ordinary.dat", "stage_entry": 0, "opaque": False},
             ]
         })
@@ -44,7 +45,8 @@ class AssetCheckManifestTests(unittest.TestCase):
         resolved_root = self.root.resolve()
         self.assertEqual(checks, [
             {"path": resolved_root / "ordinary.dat", "symbol": "fixture_joint"},
-            {"path": resolved_root / "stage.usd", "stage_entry": 3, "opaque": True},
+            {"path": resolved_root / "stage.usd", "stage_entry": 3, "opaque": True,
+             "resolve_null_externals": True},
             {"path": resolved_root / "ordinary.dat", "stage_entry": 0, "opaque": False},
         ])
 
@@ -58,6 +60,7 @@ class AssetCheckManifestTests(unittest.TestCase):
             {"checks": [{"path": "ordinary.dat", "stage_entry": None}]},
             {"checks": [{"path": "ordinary.dat", "stage_entry": True}]},
             {"checks": [{"path": "ordinary.dat", "stage_entry": 0, "opaque": "yes"}]},
+            {"checks": [{"path": "ordinary.dat", "resolve_null_externals": "yes"}]},
             {"checks": [{"path": "ordinary.dat", "opaque": True}]},
         ]
         for value in invalid_values:
@@ -74,7 +77,8 @@ class AssetCheckManifestTests(unittest.TestCase):
     def test_manifest_rows_compile_once_and_preserve_parser_failures(self):
         checks = [
             {"path": self.root / "ordinary.dat", "symbol": "fixture_joint"},
-            {"path": self.root / "stage.usd", "stage_entry": 3, "opaque": True},
+            {"path": self.root / "stage.usd", "stage_entry": 3, "opaque": True,
+             "resolve_null_externals": True},
         ]
         records = [
             {"root": "fixture_joint", "status": "rejected"},
@@ -103,14 +107,16 @@ class AssetCheckManifestTests(unittest.TestCase):
         self.assertEqual(calls[1][0][1:], [str(self.root / "ordinary.dat"),
                                             "--symbol", "fixture_joint"])
         self.assertEqual(calls[2][0][1:], [str(self.root / "stage.usd"),
-                                            "--stage-entry", "3", "--opaque"])
+                                            "--stage-entry", "3", "--opaque",
+                                            "--resolve-null-externals"])
         self.assertTrue(all("shell" not in kwargs for _, kwargs in calls))
         emitted = [json.loads(line) for line in output.getvalue().splitlines()]
         self.assertEqual([record["file"] for record in emitted],
                          [str(self.root / "ordinary.dat"), str(self.root / "stage.usd")])
         self.assertEqual([record["status"] for record in emitted], ["rejected", "accepted"])
         self.assertEqual(emitted[0]["selection"], {"symbol": "fixture_joint"})
-        self.assertEqual(emitted[1]["selection"], {"stage_entry": 3, "opaque": True})
+        self.assertEqual(emitted[1]["selection"], {"stage_entry": 3, "opaque": True,
+                                                    "resolve_null_externals": True})
 
     def test_missing_input_is_actionable_without_compiling(self):
         checks = [{"path": self.root / "missing.dat"}]

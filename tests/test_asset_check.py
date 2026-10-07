@@ -60,6 +60,20 @@ def stage_fixture(translucent=False):
             + struct.pack(">4I", 64, 0, 512, len(b"fixture_joint\0")) + names)
 
 
+def stage_fixture_with_external():
+    value = bytearray(stage_fixture())
+    data_size = struct.unpack_from(">I", value, 4)[0]
+    relocation_count = struct.unpack_from(">I", value, 8)[0]
+    public_count = struct.unpack_from(">I", value, 12)[0]
+    names_start = 32 + data_size + relocation_count * 4 + public_count * 8
+    names = bytes(value[names_start:])
+    struct.pack_into(">II", value, 32 + 608, 612, 0xFFFFFFFF)
+    value = value[:names_start] + struct.pack(">II", 608, len(names)) + names + b"fixture_external\0"
+    struct.pack_into(">I", value, 0, len(value))
+    struct.pack_into(">I", value, 16, 1)
+    return bytes(value)
+
+
 class AssetCheckTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -81,6 +95,8 @@ class AssetCheckTests(unittest.TestCase):
         cls.ordinary.write_bytes(stage_fixture())
         cls.mixed = cls.directory / "mixed.dat"
         cls.mixed.write_bytes(stage_fixture(translucent=True))
+        cls.external = cls.directory / "external.dat"
+        cls.external.write_bytes(stage_fixture_with_external())
 
     def check_file(self, path, *args, expected=0):
         result = subprocess.run([str(self.binary), str(path), *args], capture_output=True,
@@ -105,6 +121,30 @@ class AssetCheckTests(unittest.TestCase):
                           record["joint_offset"]), (0, 512, 560, 64))
         self.assertEqual(record["services_unapplied"], ["animation flags"])
         self.assertEqual(record["omitted_meshes"], 0)
+
+    def test_external_links_require_an_explicit_source_null_resolution_policy(self):
+        strict = self.check_file(self.external, "--stage-entry", "0", expected=1)[0]
+        self.assertEqual((strict["scope"], strict["status"]), ("archive", "rejected"))
+        self.assertIn("external links are unsupported", strict["reason"])
+        resolved = self.check_file(self.external, "--stage-entry", "0",
+                                   "--resolve-null-externals")[0]
+        self.assertEqual((resolved["status"], resolved["external_policy"],
+                          resolved["meshes"]), ("accepted", "resolve_null", 1))
+        self.assertEqual(resolved["externals"], [{"name": "fixture_external",
+                                                  "slots": [608, 612]}])
+
+    def test_resolve_null_still_rejects_malformed_external_chains(self):
+        valid = bytearray(self.external.read_bytes())
+        for name, next_slot in (("cycle", 608), ("out_of_range", 640)):
+            with self.subTest(name=name):
+                malformed = bytearray(valid)
+                struct.pack_into(">I", malformed, 32 + 612, next_slot)
+                path = self.directory / f"{name}.dat"
+                path.write_bytes(malformed)
+                record = self.check_file(path, "--stage-entry", "0",
+                                         "--resolve-null-externals", expected=1)[0]
+                self.assertEqual(record["status"], "rejected")
+                self.assertTrue(record.get("reason"))
 
     def test_opaque_is_explicit_and_reports_omitted_translucency(self):
         all_pass = self.check_file(self.mixed, "--stage-entry", "0", expected=1)[0]

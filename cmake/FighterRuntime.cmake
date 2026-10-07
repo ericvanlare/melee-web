@@ -157,6 +157,17 @@ target_link_options(fighter_runtime_probe PRIVATE -sENVIRONMENT=node -sNODERAWFS
   -sSAFE_HEAP=1 -sSTACK_SIZE=8388608 -Wl,--error-limit=0)
 set_target_properties(fighter_runtime_probe PROPERTIES SUFFIX ".js")
 
+# Real-data Stadium checkpoint 0 structural trace. It owns fresh checked DAT
+# parsers but does not register or enable a runtime stage profile.
+add_executable(pokemon_stadium_c0_trace EXCLUDE_FROM_ALL
+  tests/pokemon_stadium_c0_trace.cpp tests/pokemon_stadium_ground_snapshot.c)
+target_link_libraries(pokemon_stadium_c0_trace PRIVATE fighter_asset_runtime)
+target_compile_options(pokemon_stadium_c0_trace PRIVATE -ffp-contract=off)
+target_link_options(pokemon_stadium_c0_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1
+  -sSTACK_SIZE=8388608)
+set_target_properties(pokemon_stadium_c0_trace PROPERTIES SUFFIX ".js")
+
 add_executable(gameplay_effect_banks_trace EXCLUDE_FROM_ALL tests/gameplay_effect_banks_trace.cpp
   src/dat_effect_banks.cpp src/native_dat.cpp src/dat_archive.cpp
   src/dat_effect_entries.cpp src/dat_native_animation.cpp src/dat_native_joint.cpp

@@ -30,8 +30,12 @@ authoritative and are reproduced, not repaired.
   transformation names carry `.dat` and are never localized. The stage archive
   is one of five localized stage archives on the disc, with Corneria,
   Home-Run Contest, Onett and Venom. The two variants are byte-identical before
-  `SIS_GrPStadiumData` (data offset `0x13ca80`) and share every public name,
-  extern and relocation there; only the screen text differs. The runtime
+  `SIS_GrPStadiumData` (data offset `0x13ca80`) and share every public name
+  and extern name/slot. Public offsets and
+  relocation slots before that root match. Localized text and glyph data move
+  the trailing `quake_model_set` public offset and its 37 relocation slots by
+  7,520 bytes in the Japanese archive; whole-archive metadata offsets are
+  therefore unequal. The runtime
   archive is **`GrPs.usd`**. The world loader resolves English
   (`src/gameplay_world.cpp:79-98`), but the source request is made by the
   source predicate, so checkpoint 1 must assert that the source asks for
@@ -129,10 +133,27 @@ registration order is map 1, map 5, then map 2 (`grpstadium.c:163-184,
 202-228, 302-340`). Profile values: `required_map_ids = {0, 1, 2, 5}`,
 `entry_count = 10`. Every `on_init` consumes animation slot 0 only, through
 `grAnime_801C8138(gobj, map_id, 0)`, so the animation consumer counts are ten
-explicit ones. Authored table lengths, as counted by the decode tool up to the first
-unrelocated word (the profile uses the consumer count above, not these):
-entries 1, 2, 3, 4, 5 and 9 have one material-animation slot; entry 6 has one joint slot; entries 7 and 8 have one
-joint and one material slot; no entry has shape animation. Map 1 also calls
+explicit ones. The structural archive trace records local, external, and absent
+states per descriptor slot. Its authored ownership matrix is cross-provider:
+GrPs.usd locally provides one material-animation table for maps 1, 2, and 5;
+GrPs1.dat and GrPs2.dat provide the fire and grass material-animation tables
+for maps 3 and 4; GrPs4.dat provides map 6's joint plus one joint-animation
+table; and GrPs3.dat provides maps 7 and 8's joints and their one-element joint
+and material-animation tables, plus map 9's joint and one material-animation
+table. No map has a shape-animation table. Non-owner archives retain the exact
+named external identity and descriptor slot. The provider is identified by the
+exact hashed archive and its `map_head` row's local relocated slot and target
+bounds; each present local animation list has one entry. None of the 32 local
+descriptor targets in these six DATs has a public symbol at the exact target
+offset. In particular, the imported symbol name is not treated as a provider
+public symbol. `lbArchive_InitializeDAT` calls `HSD_ArchiveLocateExtern` with a
+null address, which clears each imported slot; `grDatFiles_801C6330` selects the
+resident archive whose `map_head` row has a local joint. The C0 trace records
+these source and archive facts without executing runtime owner selection.
+`ResolveNull` makes external optional pointers null while preserving external
+metadata, so a null local optional does not mean the authored slot is absent.
+Map 0's joint slot is local in each of the five English archives and is checked
+as a bounded 64-byte target. Map 1 also calls
 `grAnime_801C77FC(gobj, 0, 7)`. Case 4 freezes the outgoing map with
 `grAnime_801C7A04(xE4, 0, 7, 0.0f)`. The per-entry `animation_flags` (`x28`)
 slots exist in every archive, including for externally owned entries.
@@ -156,7 +177,7 @@ Other public roots of GrPs.usd (data offset, span to next root):
   `quake_model_set` `0x161388` (model plus four authored animations and a
   terminator, which satisfies the existing world check at
   `src/gameplay_world.cpp:515-523`).
-- `yakumono_param` `0x3db68` (0x70; layout under Data bounds).
+- `yakumono_param` `0x3db68` (public-symbol interval `0x70`; the next referenced target begins at `+0x54`, as detailed under Data bounds).
 - `GrdPStadiumBG_OVDummy_mat6962_GrdPStadiumDummy_0_image_desc` `0x89cc`: a 16×16
   I4 dummy descriptor referenced exactly once, from `0x8a30`.
 - `SIS_GrPStadiumData` `0x13ca80`: a 22-entry `u8*` string table.
@@ -501,10 +522,13 @@ rules flag `x5_3` is set and mode 8 is focused on Jigglypuff, Sing gains
 
 `yakumono_param` is the source struct at `grpstadium.c:41-65`: seven `int`s,
 `u8 r, g, b`, one padding byte, ten `u32`s and five `s16`s. It consumes 0x52
-bytes (`sizeof` 0x54) of a 0x70-byte root. The 0x52-0x6F tail is non-zero and
-opaque; copy only the consumed prefix, as the Fountain decoder does
-(`src/gameplay_stage_fountain.c`). There are no relocations in the root, and
-the values are identical in all six archives:
+bytes; the source ABI size is 0x54, including two trailing padding bytes. In
+GrPs.usd the next referenced target begins at `+0x54`, and the relocation at
+`ALDYakuAll + 4` points to it. The next public symbol is at `+0x70`, which
+defines a public-symbol interval rather than object ownership. Thus bytes
+`+0x52..+0x53` are ABI padding and `+0x54..+0x6f` is a separate referenced
+region, not an opaque yakumono tail. The source struct contains no relocations.
+The values are identical in all six archives:
 
 | Field | Value | Use |
 | --- | --- | --- |

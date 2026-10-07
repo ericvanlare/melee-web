@@ -25,7 +25,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 
 
-_CHECK_FIELDS = frozenset(("path", "symbol", "stage_entry", "opaque"))
+_CHECK_FIELDS = frozenset(("path", "symbol", "stage_entry", "opaque",
+                           "resolve_null_externals"))
 
 
 def unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -86,6 +87,9 @@ def parse_checks(value: Any, base_dir: Path | str) -> list[dict[str, Any]]:
             raise ValueError(f"manifest check {row_number} opaque must be a boolean")
         if opaque and stage_entry is None:
             raise ValueError(f"manifest check {row_number} opaque requires stage_entry")
+        resolve_null_externals = row.get("resolve_null_externals", False)
+        if not isinstance(resolve_null_externals, bool):
+            raise ValueError(f"manifest check {row_number} resolve_null_externals must be a boolean")
 
         check: dict[str, Any] = {"path": (input_path if input_path.is_absolute()
                                            else base / input_path).resolve()}
@@ -95,6 +99,8 @@ def parse_checks(value: Any, base_dir: Path | str) -> list[dict[str, Any]]:
             check["stage_entry"] = stage_entry
         if "opaque" in row:
             check["opaque"] = opaque
+        if "resolve_null_externals" in row:
+            check["resolve_null_externals"] = resolve_null_externals
         checks.append(check)
     return checks
 
@@ -139,6 +145,8 @@ def _run_one_check(binary: Path, check: dict[str, Any]) -> int:
         command += ["--stage-entry", str(check["stage_entry"])]
     if check.get("opaque", False):
         command.append("--opaque")
+    if check.get("resolve_null_externals", False):
+        command.append("--resolve-null-externals")
     result = subprocess.run(command, capture_output=True, timeout=60)
     if result.returncode not in (0, 1):
         sys.stderr.buffer.write(result.stderr)
@@ -190,13 +198,16 @@ def main():
     parser.add_argument("--symbol", help="check only this exact public model symbol")
     parser.add_argument("--stage-entry", type=int, help="check this zero-based map_head entry")
     parser.add_argument("--opaque", action="store_true", help="select a stage entry's opaque pass")
+    parser.add_argument("--resolve-null-externals", action="store_true",
+                        help="mirror validated external-link null resolution used by the source DAT loader")
     args = parser.parse_args()
 
     if args.manifest is not None:
         if args.paths:
             parser.error("--manifest cannot be combined with positional paths")
-        if args.symbol is not None or args.stage_entry is not None or args.opaque:
-            parser.error("--manifest rows specify symbol, stage-entry and opaque selections")
+        if (args.symbol is not None or args.stage_entry is not None or args.opaque or
+                args.resolve_null_externals):
+            parser.error("--manifest rows specify all parser selections")
         try:
             checks = load_manifest(args.manifest)
             validate_check_paths(checks)
@@ -226,6 +237,8 @@ def main():
                 check["stage_entry"] = args.stage_entry
             if args.opaque:
                 check["opaque"] = True
+            if args.resolve_null_externals:
+                check["resolve_null_externals"] = True
             checks.append(check)
     try:
         return run_checks(checks)

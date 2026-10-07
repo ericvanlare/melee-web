@@ -131,6 +131,19 @@ class DiscImage:
         return bytes(output)
 
     def files(self) -> dict[str, DiscFile]:
+        return {
+            path: entry
+            for path, (_index, entry) in self.indexed_files().items()
+        }
+
+    def indexed_files(self) -> dict[str, tuple[int, DiscFile]]:
+        """Return files with their observed zero-based FST entry indices.
+
+        ``files()`` remains the compatibility API for callers that only need
+        paths and byte ranges. Evidence that cites a disc's FST index must use
+        this method so the index comes from the parsed table, not a copied
+        expectation.
+        """
         if self._fst_offset < 0x440 or not 12 <= self._fst_size <= MAX_FST_SIZE:
             raise DiscFormatError("invalid or oversized filesystem table")
         fst = self.read(self._fst_offset, self._fst_size)
@@ -158,7 +171,7 @@ class DiscImage:
 
         # Each active directory supplies its exclusive end index and parent id.
         stack: list[tuple[int, int, str]] = [(count, 0, "")]
-        result: dict[str, DiscFile] = {}
+        result: dict[str, tuple[int, DiscFile]] = {}
         seen: set[str] = set()
         for index in range(1, count):
             while index >= stack[-1][0]:
@@ -178,7 +191,7 @@ class DiscImage:
                 stack.append((second, index, path))
             else:
                 self._check_range(first, second)
-                result[path] = DiscFile(path, first, second)
+                result[path] = (index, DiscFile(path, first, second))
         return result
 
 
