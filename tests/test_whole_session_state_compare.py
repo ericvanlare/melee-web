@@ -20,7 +20,8 @@ from whole_session_replay import (  # noqa: E402
 )
 from whole_session_state_compare import (  # noqa: E402
     BrowserReader, Comparator, SourceCollector, _browser_completion_ok, _is_match_field,
-    _fighter_entities, _snapshot_values, _state_from_payload, _validate_browser_report,
+    _browser_report, _fighter_entities, _snapshot_values, _state_from_payload,
+    _validate_browser_report,
     ComparisonError, CONTEXT_HEADER, CONTEXT_BYTES, MWRC_HEADER, PAD_STATE_BYTES,
     MWRC_V10_VERSION, PRIMARY_STATIC_ENTITY_PROFILE, Recipe, SPAN, V10_DEFAULT_OFF_GATES,
     V10_FIGHTER_ROSTER, V10_FIRST_SETUP_TICK0_SCOPE, V10_PREFIX_BYTE_CAP,
@@ -1196,6 +1197,26 @@ class WholeSessionStateCompareTests(unittest.TestCase):
         report["final_scene"] = None
         _validate_browser_report(report, recipe_sha="r", trace_sha="t", frame_count=1)
         self.assertFalse(_browser_completion_ok(report))
+
+    def test_legacy_browser_report_reader_keeps_unbounded_text_and_duplicate_key_behavior(self):
+        class TextOnlyPath:
+            def __init__(self, text):
+                self.text = text
+                self.encoding = None
+
+            def read_text(self, *, encoding):
+                self.encoding = encoding
+                return self.text
+
+            def stat(self):
+                raise AssertionError("legacy browser report loading must not add a size/stat cap")
+
+        path = TextOnlyPath('{"complete":true}')
+        self.assertEqual(_browser_report(path), {"complete": True})
+        self.assertEqual(path.encoding, "utf-8")
+        with self.assertRaisesRegex(ComparisonError, "duplicate JSON key"):
+            _browser_report(TextOnlyPath('{"complete":true,"complete":false}'))
+        self.assertIsNone(_browser_report(None))
 
 
 if __name__ == "__main__":

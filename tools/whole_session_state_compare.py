@@ -1322,7 +1322,12 @@ def _read_json_sidecar(path: Path, context: str, *, max_bytes: int = 16 * 1024 *
 def _browser_report(path: Path | None) -> dict[str, Any] | None:
     if path is None:
         return None
-    value, _, _ = _read_json_sidecar(path, "browser report")
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_reject_duplicate_keys)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ComparisonError) as error:
+        raise ComparisonError(f"browser report cannot be read: {error}") from error
+    if not isinstance(value, dict):
+        raise ComparisonError("browser report must be an object")
     return value
 
 
