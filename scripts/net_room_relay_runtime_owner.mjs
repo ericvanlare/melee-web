@@ -95,7 +95,9 @@ export async function startRoomRelayRuntime({diagnostic = () => {}, evidenceDir 
     throw Error('Direct Worker scratch requires the real checkout work directory');
   const scratch = await mkdtemp(path.join(workRoot, 'a3-room-relay-direct-'));
   const persist = path.join(scratch, 'state');
-  await mkdir(persist);
+  const resourceTmp = path.join(scratch, 'resource-tmp');
+  const runtimeTmp = path.join(scratch, 'runtime-tmp');
+  await Promise.all([mkdir(persist), mkdir(resourceTmp), mkdir(runtimeTmp)]);
   const port = await freePort();
   const inspectorPort = await freePort();
   const runtimeScript = path.join(ROOT, 'scripts/net_room_relay_direct_runtime.mjs');
@@ -108,6 +110,7 @@ export async function startRoomRelayRuntime({diagnostic = () => {}, evidenceDir 
     adapter: sha256(await readFile(path.join(ROOT, 'scripts/net_lockstep_websocket_relay.mjs'))),
     protocol: sha256(await readFile(path.join(ROOT, 'scripts/net_lockstep_protocol.mjs'))),
     directRuntime: sha256(await readFile(runtimeScript)),
+    miniflareOptionsBuilder: sha256(await readFile(path.join(ROOT, 'scripts/net_room_relay_miniflare_options.mjs'))),
     dependenciesLock: sha256(await readFile(path.join(ROOT, 'dependencies.lock.json'))),
     ownerModule: sha256(await readFile(fileURLToPath(import.meta.url))),
     wranglerPackage: sha256(await readFile(WRANGLER_PACKAGE)),
@@ -119,9 +122,13 @@ export async function startRoomRelayRuntime({diagnostic = () => {}, evidenceDir 
     MELEE_ROOM_RELAY_CONFIG: configPath,
     MELEE_ROOM_RELAY_WRANGLER_CLI: wranglerCli,
     MELEE_ROOM_RELAY_MINIFLARE_ENTRY: miniflareEntry,
+    MELEE_ROOM_RELAY_SCRATCH: scratch,
     MELEE_ROOM_RELAY_PERSIST: persist,
+    MELEE_ROOM_RELAY_RESOURCE_TMP: resourceTmp,
+    MELEE_ROOM_RELAY_RUNTIME_TMP: runtimeTmp,
     MELEE_ROOM_RELAY_PORT: String(port),
     MELEE_ROOM_RELAY_INSPECTOR_PORT: String(inspectorPort),
+    TMPDIR: runtimeTmp,
   };
   for (const key of ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY', 'CLOUDFLARE_EMAIL', 'CLOUDFLARE_ACCOUNT_ID'])
     delete env[key];
@@ -189,12 +196,16 @@ export async function startRoomRelayRuntime({diagnostic = () => {}, evidenceDir 
           /Uncaught Error|Network connection lost|exception outcome/i.test(String(row.log?.message || ''))));
       const stderrErrors = /\bERROR\b|Uncaught Error|Network connection lost|exception outcome/i.test(stderr);
       const ready = records.some(row => row.event === 'direct-miniflare-ready');
-      const disposed = records.some(row => row.event === 'dispose-complete');
+      const readyRecord = records.find(row => row.event === 'direct-miniflare-ready');
+      const disposeRecord = records.find(row => row.event === 'dispose-complete');
+      const disposed = Boolean(disposeRecord);
+      const ownedTempPathsClean = disposeRecord?.runtimeTmpEmpty === true &&
+        disposeRecord?.resourceTmpEmpty === true;
       const fallbackUsed = cleanupEvents.some(row => row.event.startsWith('fallback-') ||
         row.event.startsWith('cleanup-sigkill'));
       const runtimeClean = ready && disposed && exit?.code === 0 && !exit?.signal && processClose && !alive &&
         !fallbackUsed && !runtimeErrors.length && !structuredErrors.length && !stderrErrors &&
-        !cleanupEvents.some(row => row.error);
+        ownedTempPathsClean && !cleanupEvents.some(row => row.error);
       const summary = {
         passed: Boolean(passed && runtimeClean),
         producer,
@@ -206,9 +217,13 @@ export async function startRoomRelayRuntime({diagnostic = () => {}, evidenceDir 
           node: process.version, wrangler: wrangler.version, miniflare: miniflare.version, workerd: workerd.version,
         },
         ports: {worker: port, inspector: inspectorPort},
-        paths: {worker: 'online/relay/worker.mjs', config: 'online/relay/wrangler.jsonc'},
+        paths: {worker: 'online/relay/worker.mjs', config: 'online/relay/wrangler.jsonc',
+          ownerScratch: scratch, resourcePersistencePath: persist,
+          resourceTmpPath: resourceTmp, nodeTmpPath: runtimeTmp},
         hashes,
-        ready, disposed, runtimeErrors, structuredErrors, stderrErrors,
+        ready, disposed, effectiveOptions: readyRecord?.effectiveOptions || null,
+        runtimeTmpDirectories: readyRecord?.runtimeTemporaryDirectories || [],
+        ownedTempPathsClean, runtimeErrors, structuredErrors, stderrErrors,
         exit, processClose, groupAlive: alive, fallbackUsed, cleanupEvents, runtimeRecords: records, stderr,
       };
       await writeFile(path.join(scratch, 'receipt.json'), JSON.stringify(summary, null, 2) + '\n');

@@ -1,0 +1,252 @@
+{
+  "schema": "melee-web-a3-browser-owned-handshake-integration-v1",
+  "issue": 201,
+  "scope": "One local browser alpha / Node beta hello and neutral-prefix observer probe through the actual Worker, plus repository full-suite and Release runtime build validation. Component evidence only.",
+  "evidence_labels": [
+    "Source identified",
+    "Browser exercised",
+    "Compiled"
+  ],
+  "producer": {
+    "repository": "melee-web",
+    "branch": "codex/a3-browser-handshake-probe-20261007",
+    "commit": "179aaea1ae857ebb31b3f9dccc1b53da160a5054",
+    "tree": "f1075f417ca82a934a61a15eee9ebe7524789d0b",
+    "git_worktree_clean_before_validation": true,
+    "git_worktree_clean_after_validation_before_docs": true,
+    "a2_protocol_source_changed": false
+  },
+  "source_hashes": {
+    "portableCore": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+    "nodeFacade": "9a6886adc3cca97ab8433bd1a3662abc7418ba640b4bf435ef212f613fc52e5f",
+    "websocketEndpoint": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5",
+    "runtimeOwner": "9ba5fafdcc7955646959362228e5cc07a19c7f99be11543fbd56f670a30ddb68",
+    "directRuntime": "e7e77746b7a1f7857bea1818c96df9e4246f0bcb77eed6fc63383e498d6df2b5",
+    "miniflareOptions": "4c9ea6e34c679034c285ca4b634ef9dd196c781528970b4b5c05aa2f07f0f7b3",
+    "worker": "850b0f1dbb5f8c48c997a9d46405644ef2a36b6795e6b7fac5bbacd2005cb709",
+    "workerConfig": "bb6478a7d663ce4b54349e631baa02c85eaf35d6daf32ba5188e89f531595846",
+    "dependenciesLock": "b51fcde84db09641e4936339af970d74e97c71043ce6f6efee0c70e09211b385",
+    "browserTools": "737a8ef5807edba0009487877e1b65badc3a8bb4d07ff9fcd445a7b8bef40c81",
+    "captureOwner": "6b4c8130bb3f3ae353d6e7a5a8a0987dc6408486bfab421a089da981b5a3f122",
+    "serve": "32734f1515420190408c565b66d9e907331e1d3c711307d4ff61ec810ad1eea4",
+    "coordinator": "1da962a805ef6192fe0242fbca42c99e985f84f94b93698131c48dd65c52d454",
+    "prePortableFixture": "fe94ab2e0e3d92a28a48f030b35ff840d7734c851296398b1c07fc310f7ea5dd"
+  },
+  "served_hashes": {
+    "net_lockstep_core.mjs": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+    "net_lockstep_websocket_relay.mjs": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5",
+    "probe.html": "d8ecaf0b474f876c0984722b9d6bd47aa507fd48334e7d92004c7378513e7c39"
+  },
+  "tools": {
+    "node": "v24.19.0",
+    "node_sha256": "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1",
+    "python": "Python 3.12.13",
+    "python_sha256": "f64cf6322e4f20cd0458aab89c0d332895817bb8f243b943109b6a957582fd5d",
+    "playwright": "1.62.1",
+    "playwright_package_sha256": "1c81f5164706880a4cbdd0b87581f15fcf4f11f732e86b12179dada5e7915664",
+    "chrome_bundle_version": "154.0.8037.98",
+    "chrome_executable_sha256": "ccffd5c5fe77ba3212e07c2c69091f8048b73c396b4647ecaa150e1e01a04954",
+    "wrangler": "4.131.1",
+    "miniflare": "5.20260911.0-alpha",
+    "workerd": "1.20260911.1",
+    "wrangler_package_sha256": "f8c0028333405b155b088117dda5181e7b2927d74e558ac9baae0fcdda05dfa8",
+    "miniflare_package_sha256": "2c26f1ea6dfda3c29f80ae2cb78f96d1ca38dfdf530b0e51f6f66dac1823b765",
+    "workerd_package_sha256": "065d0b712ed53706c846b553029a0384c017a60b64eee33772b02c2272b959fa"
+  },
+  "historical_failure": {
+    "kind": "r4 browser-owned handshake failure; preserved unchanged",
+    "private_run_id": "issue201-browser-owned-handshake-probe-20261007-r4",
+    "producer_commit": "e69d052495d4d2e326371098ee3d4b9c9c957b91",
+    "producer_tree": "e23651b55181b33777f08a2c7d33619e590f868f",
+    "packet_sha256": "75277821b17b95f272ce394e1b5aad64f190d92e61975fb4b75df2cc2de4af20",
+    "result_sha256": "ce94eec600e02775739341c7fce0219bf647c868445969984ef016de8d85a107",
+    "cleanup_review_sha256": "d6d822d55923a7674a903010bcfa43025bf14f17e82f01e09e2967a87f905e61",
+    "root_failure_review_sha256": "55f1fef158c0cc303d7153daefaeeced94c7fb8b358ffd44dc8c25ffb1ad374e",
+    "observed": "Browser WebSocket handshake returned HTTP 403 before READY/hello. The pinned Miniflare V4 conversion used unsupported vars configuration; the owned Miniflare temp path also landed under the browser TMPDIR. Failure and cleanup evidence remain retained.",
+    "classification": "failure; not a handshake pass and not retried from r4"
+  },
+  "separate_origin_upgrade_reducer": {
+    "private_run_id": "issue201-origin-options-producer-20261007-0jJUzC",
+    "producer_commit": "179aaea1ae857ebb31b3f9dccc1b53da160a5054",
+    "producer_tree": "f1075f417ca82a934a61a15eee9ebe7524789d0b",
+    "result_sha256": "3ec50aa0a476a51d0e3d50cb1d5c8e1328cc55461dd4bd4b2c2ee7c380d3d363",
+    "test_output_sha256": "dc34ee717c2dde2c9f19789864e83170d05f49f0bc42f437f571cf3a32ef06af",
+    "configured_origin_status": 101,
+    "untrusted_origin_status": 403,
+    "scope": "HTTP/WebSocket upgrade acceptance only; raw 101 fixture destroys the socket; no WebSocket close-lifecycle claim.",
+    "worker_disposal_passed": true
+  },
+  "browser_handshake_probe": {
+    "private_run_id": "issue201-browser-owned-handshake-probe-20261007-r5",
+    "packet_sha256": "9550c5e41462f02827da85a53204ceae41deef772a8e9ac283c751f4fcd9c8c1",
+    "manifest_sha256": "763a3c58567640d5a0451b71a4b4ac53a634760b5dfd56bc79dc2771b906428b",
+    "result_sha256": "bc49016118318631b9d3081e0c61fc11ab2d1302ca85ffdb7380eaf7b1e89c78",
+    "owner_report_sha256": "31b801b7aae2805c0e34f132722f87d47abdbd63a2c3f1e2c84217fa0c5114b8",
+    "postflight_verification_sha256": "010a663fcc9c27bc45fe8a09b95376afeda019ffc8f31ed6ba897c33a6a93a17",
+    "lane_release_sha256": "b453f14e200822d7b842851c6819f348c696d0e8501de7c1bd931177ec58486d",
+    "artifact_index_sha256": "df950219b7f2601a3257df1467928097f7fac1ac0e9d62a946f3e3feecf59f84",
+    "outcome": "pass",
+    "transport": "browser-owned alpha WebSocket and Node beta WebSocket through loopback HTTP fixture and actual Worker loaded by direct Miniflare; Wrangler proxy excluded",
+    "agreement_sha256": "04e0100de1e0f847136cb6148aa1615b7dc528175edb0e34a37b82fb15d09519",
+    "roles": {
+      "browser": "alpha",
+      "node": "beta"
+    },
+    "hello_messages_each": 1,
+    "ready_each": true,
+    "frame_observer_batches_each": 1,
+    "frames_emitted_each": 2,
+    "native_frames_executed_each": 0,
+    "input_calls_each": 0,
+    "checksum_calls_each": 0,
+    "disconnects": {
+      "alpha": {
+        "kind": "disconnect",
+        "reason": "4001: peer disconnected"
+      },
+      "beta": {
+        "kind": "disconnect",
+        "reason": "1000: client closed"
+      }
+    },
+    "endpoint_errors": 0,
+    "unexpected_terminal_before_intentional_close": false,
+    "raw_websocket_wasClean_observed": false,
+    "cleanup": {
+      "owner_result": "pass",
+      "capture_exit_code": 0,
+      "cdp_processes": 7,
+      "os_browser_identities": 8,
+      "cdp_attribution_complete": true,
+      "all_owned_browser_identities_absent_without_signals": true,
+      "capture_group_absent": true,
+      "http_group_absent": true,
+      "http_owner_sigterm_expected": true,
+      "profile_absent": true,
+      "external_tmp_empty_after_browser_and_worker_close": true,
+      "worker_disposed_exit0": true,
+      "worker_owned_temp_paths_clean": true,
+      "worker_group_absent": true,
+      "fallback_used": false,
+      "worker_runtime_errors": 0,
+      "cleanup_errors": 0,
+      "ports_free": true,
+      "lane_marker_released": true
+    },
+    "artifacts": {
+      "capture_result": {
+        "file": "capture/result.json",
+        "sha256": "bc49016118318631b9d3081e0c61fc11ab2d1302ca85ffdb7380eaf7b1e89c78"
+      },
+      "owner_log": {
+        "file": "capture-owner.log",
+        "sha256": "d01cc91881cafcb120dda32396caf93160978b8fbc1e42f6660211d9f236dc5a"
+      },
+      "process_trace": {
+        "file": "process-trace.jsonl",
+        "sha256": "90e7ca8cbb506c754d2823f5da85cadbc53247f21b81cce06c224f798a6cff3f"
+      },
+      "http_server_log": {
+        "file": "http-server.log",
+        "sha256": "8e94b85927acf7caff6f630f3514e5bd79dc2c6d3287c462a03bedb0786d332c"
+      },
+      "readiness_screenshot": {
+        "file": "capture/browser-alpha-ready.png",
+        "sha256": "ba5e34261f29ea449c613c1b0ecb492123e4331e42bbe7e3d0179d09c78ebadb"
+      },
+      "worker_runtime_receipt": {
+        "file": "direct-miniflare-a3-room-relay-direct-30icB5.receipt.json",
+        "sha256": "b2956c0d49cdca3d6f82479cea9380f3b93656f3ffeb73036a4631d7af10930e"
+      }
+    }
+  },
+  "integration_validation": {
+    "private_run_id": "issue201-integration-179aaea-20261007-050539-bf824622",
+    "full_python_suite": {
+      "argv": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "result": "passed",
+      "tests_total": 1979,
+      "passed": 1834,
+      "skipped": 145,
+      "duration_seconds": 344.847,
+      "log_file": "full-python-suite.log",
+      "log_sha256": "9a88004b0b1fc7dade32f57195003e32df7c68e45a962f51ce7c8d57c2cab60f",
+      "summary_file": "full-python-suite-summary.json",
+      "summary_sha256": "7e647e5fb792b7eb64f08c024c79de62d634f2be7ca2e471bc0e873063534238"
+    },
+    "focused_node_coverage_in_full_suite": {
+      "python_test": "test_net_lockstep_contracts.NetLockstepContractTests.test_observer_protocol_and_route_contracts",
+      "node_runtime": "SDK Node v24.19.0 via scripts.check_gameplay.node_runtime()",
+      "test_files": [
+        "net_lockstep_observers.test.mjs",
+        "net_source_accounting.test.mjs",
+        "net_lockstep_core.test.mjs",
+        "net_lockstep_protocol.test.mjs",
+        "net_lockstep_transport.test.mjs",
+        "net_room_relay_worker.test.mjs",
+        "net_lockstep_browser_handshake_probe.test.mjs",
+        "net_determinism_browser.test.mjs"
+      ],
+      "actual_worker_packages_present": true,
+      "worker_tests_not_dependency_skipped": true,
+      "separate_repeat": "not run because full discovery invoked these focused suites with pinned runtime packages present"
+    },
+    "release_runtime_build": {
+      "argv": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime --configuration Release",
+      "result": "passed",
+      "exit_code": 0,
+      "default_jobs_argument": "omitted",
+      "public_runtime_off": true,
+      "audio_preview_runtime_off": true,
+      "pipeline_provenance_off": true,
+      "selective_pipelines_off": true,
+      "bootstrap_state_off": true,
+      "stadium_diagnostic_off": true,
+      "aurora_diagnostics_off": true,
+      "log_file": "release-runtime-build.log",
+      "log_sha256": "0b29bbc9c50ee65f54d20c5907c2673f473ed037ff56151d41cbabe59f206437",
+      "summary_file": "release-runtime-build-summary.json",
+      "summary_sha256": "2ac24cb4b73f2f117ef22989c42b5de6fc8547ab6517c430acef5dc12511120f",
+      "build_directory": "build/browser-release",
+      "artifacts": {
+        "build/browser-release/gameplay_menu_browser.js": {
+          "bytes": 299682,
+          "sha256": "6a3f8ebb5039151a31983b2226e2208b90ba67f6cd82e9439dc4c4d3a4e16782"
+        },
+        "build/browser-release/gameplay_menu_browser.wasm": {
+          "bytes": 15738629,
+          "sha256": "4b1fd895d99280e04d683c28197923741c43121787abc3d7ae42d0a93ad08458"
+        },
+        "build/browser-release/gameplay_menu_browser.data": {
+          "bytes": 3674112,
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+        },
+        "build/browser-release/runtime.html": {
+          "bytes": 5205,
+          "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+        },
+        "build/browser-release/runtime-cache.js": {
+          "bytes": 16143,
+          "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+        },
+        "build/browser-release/index.html": {
+          "bytes": 989,
+          "sha256": "17ff1aaaca4b02adf4cbe39a939d9790be10a1548279fb2920ac97fc9451fe63"
+        },
+        "build/browser-release/native-menu.html": {
+          "bytes": 435,
+          "sha256": "ca8570797b54659376c0a725e78a92e61e65d599265deeec4b6f907ac38ce0c7"
+        }
+      }
+    }
+  },
+  "limitations": [
+    "This is a local browser/Node component handshake and observer-prefix probe, not an Internet or two-machine session.",
+    "The observer emitted two neutral source frames per peer, but native_frames_executed was zero; no native gameplay was executed.",
+    "Raw WebSocket CloseEvent.wasClean was not observed.",
+    "The Release native runtime was compiled but not run in a browser by this integration validation.",
+    "No full original CSS/SSS/gameplay/Results/CSS route, whole-session acceptance, physical input, audio, visual equivalence, performance, WebRTC, rollback, deployment, paid provisioning, account/DNS/secret change, or competitive acceptance was tested.",
+    "Wrangler proxy startup/close failures remain a separate unresolved path; the successful probe loads the actual Worker through direct Miniflare.",
+    "H1/#116 pause diagnosis and #84 foreground/sustained acceptance remain open; broader online-play work remains open under issue #158."
+  ]
+}
