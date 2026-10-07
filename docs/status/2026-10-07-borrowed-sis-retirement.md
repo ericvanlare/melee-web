@@ -34,7 +34,11 @@ negative process deliberately retains its failed world and live owners until
 exit; that establishes refusal behavior, not normal cleanup or accepted leaking.
 
 Fresh smaller probe linkage, focused lifecycle/ABI controls, full suite and
-current-main Release build pass. The Release runtime was not executed. The
+current-main Release build pass. After comparator-only PR #198 merged, all
+four owned commits rebased with unchanged patches; the new base passed the ABI
+checks, full suite and Release build. Earlier
+validation remains bound to its original producer in the receipt. The Release
+runtime was not executed. The
 read-only 128-byte diagnostic layout retains its ABI version with schema `GPB2`
 for the borrowed slot/descriptor and shutdown phases; nonquiescent capture is
 refused. The earlier `GPBS` receipt remains historical.
