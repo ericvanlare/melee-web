@@ -1,0 +1,13 @@
+# H1 stopped-scene pair with bounded owner lease
+
+**Source identified / Compiled / Browser exercised**. The [portable receipt](../evidence/h1-stopped-scene-pair-v1.json) records one headless Release run retained in the private external run `h1-stopped-evidence-lease-20261007-20261006-200355-9a8301c2`.
+
+The run used the exact retained MWRC v8 recipe and Melee USA Rev 2 disc with the default two frame slots, no injected load or stall, and no automatic resume. Its 32 local Release artifact identities and independent HTTP response identities matched the frozen manifest before and after capture. The loaded `.data` identity also matched its expected byte count and SHA-256. The browser used installed headless Chrome 154.0.8037.98 with a fresh profile, which was removed after owned-process cleanup.
+
+Replay reached a positive-match callback at source frame 21 and cursor 1603. The harness explicitly paused the source and received a fresh reason-5 acknowledgement, then acquired the 30-second stopped-evidence lease for the same replay owner, token and cursor. It captured the first image before trace finalization, completed the bounded Chrome trace and GPU query, then captured the second image. The lease and existing replay owner finished normally after about 2.9 seconds.
+
+Both image boundaries retained cursor 1603 and `source_running=0`. The callback interval from row 1683 inclusive through row 1823 exclusive contains 140 rows, zero source steps and zero source draws. The callback table exported 1,824 rows with no drops or capture errors; the retained timing ring contains 1,800 rows. The runtime incident recorder reported no qualifying runtime incident. Five reason-7 entries were normal renderer settling, followed by the harness's single reason-5 manual pause. This was a controlled stopped-image target, not a natural timing-pause reproduction.
+
+Independent visual review found the same four-Mario Final Destination scene and HUD in both screenshots, with the existing magenta geometry. The audio-queue UI state differed, so no exact-pixel equivalence is claimed. The harness keeps `visible_gameplay_observed` as `not_assessed`; the human image review is separate from that protocol-validity field.
+
+This confirms that the new lease preserved the stopped cursor through trace and callback exports in this run. The earlier lease-less attempt remains retained and incomplete: its 700 ms no-progress watchdog reset the cursor during export, so the delayed image refused the mismatched cursor. Neither result identifies the natural timing-pause cause. The original CSS → SSS → four-stock Mario/Final Destination → Results → CSS route, timing and performance acceptance, foreground timing, physical input and audio fidelity remain open.

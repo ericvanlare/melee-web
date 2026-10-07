@@ -1,6 +1,8 @@
 # H1 stopped-image diagnostic ownership during export
 
-**Source identified / Browser exercised** (retained historical runs only).
+**Source identified / Browser exercised**. This entry preserves the earlier
+ownership evidence; the later lease run is recorded in the [stopped-scene pair
+follow-up](2026-10-07-h1-stopped-scene-pair.md).
 The [portable lifecycle receipt](../evidence/h1-stopped-owner-lifecycle-v1.json)
 reduces the retained callback table of the [older black stopped-canvas run](2026-10-06-h1-clean-prefix-visual-followup.md).
 It adds lifecycle evidence without changing that historical receipt.
@@ -21,14 +23,15 @@ correctly refused cursor zero. The pair remains incomplete. The immediate image
 was independently observed to show the four Mario fighters, Final Destination
 and HUD with existing magenta geometry; there is no pixel equivalence claim.
 
-A development-only ownership lease now bounds stopped-pair evidence collection
-to 30 seconds. It is acquired synchronously with a fresh checked native pause,
+A development-only ownership lease bounds stopped-pair evidence collection to
+30 seconds. It is acquired synchronously with a fresh checked native pause,
 bound to the replay owner, token and cursor, and suppresses only the stopped
 replay watchdog. Faults, overflow, wall-time, expiry, resumed source, cursor
 changes and preparation re-entry still finish explicitly. Success and export
 failure join the existing replay owner's teardown. Actual-handler tests cover
-these boundaries and unchanged ordinary stopped-replay behavior. No browser or
-build has exercised the lease yet.
+these boundaries and unchanged ordinary stopped-replay behavior. At the time
+this entry was first recorded, the lease had not yet been exercised by a
+browser; the later bounded browser run is in the linked follow-up.
 
 H1 natural-pause explanation, performance admission, the complete supported
 route, original pixels, foreground timing, physical input and PCM remain open.

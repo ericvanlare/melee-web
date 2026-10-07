@@ -1,0 +1,562 @@
+{
+  "between_image_interval": {
+    "callback_rows": 140,
+    "cursor_unchanged": true,
+    "end_callback_row_exclusive": 1823,
+    "first_callback_row_inclusive": 1683,
+    "no_source_advance_verified": true,
+    "source_draws": 0,
+    "source_running_zero_at_all_image_boundaries": true,
+    "source_steps": 0
+  },
+  "environment": {
+    "audio_processing_disabled": false,
+    "browser": "Google Chrome headless 154.0.8037.98",
+    "browser_executable_sha256": "ccffd5c5fe77ba3212e07c2c69091f8048b73c396b4647ecaa150e1e01a04954",
+    "fresh_profile": true,
+    "host_audio_muted": true,
+    "playwright_version": "1.62.1",
+    "profile_removed_after_owned_cleanup": true
+  },
+  "evidence_labels": [
+    "Source identified",
+    "Compiled",
+    "Browser exercised"
+  ],
+  "historical_context": {
+    "preserved_incomplete_lease_less_pair_run": "h1-stable-pause-pair-20261007-20261006-194542-672d8e85",
+    "preserved_incomplete_pair_report_sha256": "fcda400825ecf293faa4498a0260832259ea8b95b4f87d4af6b03ffccc8a9cb8",
+    "prior_failure": "The earlier no-lease pair retained one immediate image; the 700 ms no-progress watchdog reset the cursor during export, so the delayed image refused the mismatched cursor. Its packet remains unchanged."
+  },
+  "images": {
+    "artifacts": [
+      {
+        "bytes": 517397,
+        "capture_window_page_ms": {
+          "completed_before": 31212.900000095367,
+          "started_after": 31143.25
+        },
+        "file": "capture/stopped-scene-immediate.png",
+        "name": "stopped-scene-immediate",
+        "sha256": "2962b6d7c8b4660bb7df305499cf44fe8dd2bdbc93be86b2d62a7932ad1ade65"
+      },
+      {
+        "bytes": 516838,
+        "capture_window_page_ms": {
+          "completed_before": 33480.64499998093,
+          "started_after": 33404.84500002861
+        },
+        "file": "capture/stopped-scene-after-export.png",
+        "name": "stopped-scene-after-export",
+        "sha256": "75b1a1543713c66ed0b5ba9bf2aabca7158aae3e663be52c7ed456508481dfd8"
+      }
+    ],
+    "harness_visible_gameplay_observed": "not_assessed",
+    "human_visual_review": "Independent visual review found the same four-Mario Final Destination scene and HUD in both images, with existing magenta geometry. Audio-queue UI state differed; exact pixel equality is not claimed.",
+    "shared_pinned_stopped_cursor": 1603
+  },
+  "inputs": {
+    "disc": {
+      "bytes": 1449165376,
+      "description": "Super Smash Bros. Melee (USA) (En,Ja) (Rev 2)",
+      "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+    },
+    "recipe": {
+      "bytes": 1877246,
+      "filename": "paired-candidate.mwrc",
+      "format": "MWRC",
+      "frames": 42127,
+      "seed": 3980218793,
+      "sha256": "e1cc93725525e52e7d9be198337e54d103bb1a9b027156252b69f9ed3f975f0e",
+      "version": 8
+    }
+  },
+  "limitations": [
+    "This was a deliberately stopped positive-match prefix, not a natural timing-pause reproduction or cause diagnosis.",
+    "The successful diagnostic flag certifies protocol and artifact completeness; image presence alone does not establish visible gameplay.",
+    "No exact pixel equivalence is claimed.",
+    "Aggregate staging evidence has no one-to-one completion identifiers; discarded fractional pre-guard demand is not inferred.",
+    "This run does not establish full original CSS to SSS to four-stock Mario/Final Destination to Results to CSS acceptance, sustained performance, foreground timing, physical input, or audio fidelity."
+  ],
+  "postflight_and_cleanup": {
+    "browser_context_closed": true,
+    "capture_process_group_absent": true,
+    "owner_cleanup_elapsed_ms": 173,
+    "owner_cleanup_passed": true,
+    "owner_elapsed_ms": 35858,
+    "owner_result": "pass",
+    "port_free_after_cleanup": true,
+    "process_observation_passed": true,
+    "producer_postflight": {
+      "build_artifact_differences": [],
+      "build_artifacts_after": {
+        "action-sweep.mjs": {
+          "bytes": 18698,
+          "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+        },
+        "audio-ring.mjs": {
+          "bytes": 2040,
+          "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+        },
+        "audio-worklet.js": {
+          "bytes": 1517,
+          "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+        },
+        "controller-input.mjs": {
+          "bytes": 19263,
+          "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+        },
+        "controller-panel.css": {
+          "bytes": 5240,
+          "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+        },
+        "controller-panel.mjs": {
+          "bytes": 36847,
+          "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+        },
+        "controller-settings.css": {
+          "bytes": 3482,
+          "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+        },
+        "controller-settings.mjs": {
+          "bytes": 18680,
+          "sha256": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f"
+        },
+        "diagnostics-schema.mjs": {
+          "bytes": 18780,
+          "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+        },
+        "diagnostics-settings.mjs": {
+          "bytes": 2876,
+          "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+        },
+        "disc-image.mjs": {
+          "bytes": 15255,
+          "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+        },
+        "disc-session.mjs": {
+          "bytes": 7552,
+          "sha256": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2"
+        },
+        "dsp-coefficients.mjs": {
+          "bytes": 4043,
+          "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+        },
+        "gameplay_menu_browser.data": {
+          "bytes": 3674112,
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+        },
+        "gameplay_menu_browser.js": {
+          "bytes": 299506,
+          "sha256": "0f3f8bfec2976b33911a6a0e097dd67d2e5967ed6fbe88164565319fd28c3873"
+        },
+        "gameplay_menu_browser.wasm": {
+          "bytes": 15716100,
+          "sha256": "b9ba50404a0ee6d6d750e2340db44265e1fb29f7b960148abd6ea846179f8504"
+        },
+        "hitch-capture.mjs": {
+          "bytes": 21958,
+          "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+        },
+        "match-flow.mjs": {
+          "bytes": 10679,
+          "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+        },
+        "match-menu.mjs": {
+          "bytes": 8566,
+          "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+        },
+        "melee-runtime.mjs": {
+          "bytes": 50136,
+          "sha256": "6d330656905e52820f56af5bf10bd6dfe741e6a2adb5a24c6f708720d45941f8"
+        },
+        "net-timing-pause.mjs": {
+          "bytes": 1043,
+          "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"
+        },
+        "prototype-keyboard-layouts.mjs": {
+          "bytes": 935,
+          "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+        },
+        "runtime-assets.mjs": {
+          "bytes": 17029,
+          "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190"
+        },
+        "runtime-audio-assets.mjs": {
+          "bytes": 3685,
+          "sha256": "2201d9156f3c4902a81a39d4520fc0f684eaeac4c9d4c8c46cb010010697ed3b"
+        },
+        "runtime-audio.mjs": {
+          "bytes": 7660,
+          "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+        },
+        "runtime-cache.js": {
+          "bytes": 16143,
+          "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+        },
+        "runtime-development.mjs": {
+          "bytes": 59094,
+          "sha256": "6987027336030035da9ea55264c43a5c71ef264a6c00737287be9e70e1f7c26b"
+        },
+        "runtime-diagnostics-delivery.mjs": {
+          "bytes": 51514,
+          "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+        },
+        "runtime-diagnostics.mjs": {
+          "bytes": 85702,
+          "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+        },
+        "runtime.html": {
+          "bytes": 5205,
+          "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+        },
+        "touch-controls.css": {
+          "bytes": 6381,
+          "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+        },
+        "touch-controls.mjs": {
+          "bytes": 13954,
+          "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+        }
+      },
+      "build_artifacts_match_manifest": true,
+      "manifest_unchanged": true,
+      "source_unchanged": true
+    },
+    "server_process_group_absent": true,
+    "timing_lane_marker_released": true
+  },
+  "producer": {
+    "all_32_artifacts_have_local_and_independent_http_identity_checks": true,
+    "artifact_count": 32,
+    "artifacts": {
+      "action-sweep.mjs": {
+        "bytes": 18698,
+        "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+      },
+      "audio-ring.mjs": {
+        "bytes": 2040,
+        "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+      },
+      "audio-worklet.js": {
+        "bytes": 1517,
+        "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+      },
+      "controller-input.mjs": {
+        "bytes": 19263,
+        "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+      },
+      "controller-panel.css": {
+        "bytes": 5240,
+        "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+      },
+      "controller-panel.mjs": {
+        "bytes": 36847,
+        "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+      },
+      "controller-settings.css": {
+        "bytes": 3482,
+        "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+      },
+      "controller-settings.mjs": {
+        "bytes": 18680,
+        "sha256": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f"
+      },
+      "diagnostics-schema.mjs": {
+        "bytes": 18780,
+        "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+      },
+      "diagnostics-settings.mjs": {
+        "bytes": 2876,
+        "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+      },
+      "disc-image.mjs": {
+        "bytes": 15255,
+        "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+      },
+      "disc-session.mjs": {
+        "bytes": 7552,
+        "sha256": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2"
+      },
+      "dsp-coefficients.mjs": {
+        "bytes": 4043,
+        "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+      },
+      "gameplay_menu_browser.data": {
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      "gameplay_menu_browser.js": {
+        "bytes": 299506,
+        "sha256": "0f3f8bfec2976b33911a6a0e097dd67d2e5967ed6fbe88164565319fd28c3873"
+      },
+      "gameplay_menu_browser.wasm": {
+        "bytes": 15716100,
+        "sha256": "b9ba50404a0ee6d6d750e2340db44265e1fb29f7b960148abd6ea846179f8504"
+      },
+      "hitch-capture.mjs": {
+        "bytes": 21958,
+        "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+      },
+      "match-flow.mjs": {
+        "bytes": 10679,
+        "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+      },
+      "match-menu.mjs": {
+        "bytes": 8566,
+        "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+      },
+      "melee-runtime.mjs": {
+        "bytes": 50136,
+        "sha256": "6d330656905e52820f56af5bf10bd6dfe741e6a2adb5a24c6f708720d45941f8"
+      },
+      "net-timing-pause.mjs": {
+        "bytes": 1043,
+        "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"
+      },
+      "prototype-keyboard-layouts.mjs": {
+        "bytes": 935,
+        "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+      },
+      "runtime-assets.mjs": {
+        "bytes": 17029,
+        "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190"
+      },
+      "runtime-audio-assets.mjs": {
+        "bytes": 3685,
+        "sha256": "2201d9156f3c4902a81a39d4520fc0f684eaeac4c9d4c8c46cb010010697ed3b"
+      },
+      "runtime-audio.mjs": {
+        "bytes": 7660,
+        "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+      },
+      "runtime-cache.js": {
+        "bytes": 16143,
+        "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+      },
+      "runtime-development.mjs": {
+        "bytes": 59094,
+        "sha256": "6987027336030035da9ea55264c43a5c71ef264a6c00737287be9e70e1f7c26b"
+      },
+      "runtime-diagnostics-delivery.mjs": {
+        "bytes": 51514,
+        "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+      },
+      "runtime-diagnostics.mjs": {
+        "bytes": 85702,
+        "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+      },
+      "runtime.html": {
+        "bytes": 5205,
+        "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+      },
+      "touch-controls.css": {
+        "bytes": 6381,
+        "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+      },
+      "touch-controls.mjs": {
+        "bytes": 13954,
+        "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+      }
+    },
+    "configuration": "Release",
+    "manifest_artifact_map_matches_before_and_after": true,
+    "source_commit": "3470f887c2633e25f2112d76ab25a04ac2713546",
+    "source_tree": "79f7e42e59f65884ffbeb49da911ae3fa0834de1",
+    "target": "runtime"
+  },
+  "protocol": {
+    "auto_resume": false,
+    "byte_hash_option": false,
+    "cache_control": false,
+    "cleanup_reserve_ms": 5000,
+    "frame_slots": 2,
+    "injected_load": false,
+    "injected_stall": false,
+    "mode": "performance",
+    "observation_timeout_ms": 5000,
+    "overall_owner_timeout_ms": 95000,
+    "replay_phase_timeout_ms": 40000,
+    "replay_timeout_ms": 35000,
+    "requested_frame_slots": null,
+    "source_cursor_cap": 1800,
+    "source_cursor_target": 1600,
+    "staging_buffers": 2,
+    "staging_slot_override": false,
+    "stopped_evidence_lease_ms": 30000,
+    "trace_buffer_kib": 131072,
+    "trace_stream_cap_bytes": 268435456
+  },
+  "recorders_and_trace": {
+    "callback_capture": {
+      "capacity": 72000,
+      "dropped": 0,
+      "errors": 0,
+      "retained_ring_rows": 1800,
+      "rows": 1824
+    },
+    "incident_overflow": 0,
+    "incident_rows": [
+      {
+        "reason": 7,
+        "row": 1526,
+        "threshold": 0,
+        "value": 0
+      },
+      {
+        "reason": 7,
+        "row": 1539,
+        "threshold": 0,
+        "value": 0
+      },
+      {
+        "reason": 7,
+        "row": 1548,
+        "threshold": 0,
+        "value": 0
+      },
+      {
+        "reason": 7,
+        "row": 1637,
+        "threshold": 0,
+        "value": 0
+      },
+      {
+        "reason": 7,
+        "row": 1643,
+        "threshold": 0,
+        "value": 0
+      },
+      {
+        "reason": 5,
+        "row": 1683,
+        "threshold": 0,
+        "value": 0
+      }
+    ],
+    "render_environment": {
+      "canvas": {
+        "buffer_height": 480,
+        "buffer_width": 640,
+        "css_height": 648,
+        "css_width": 864
+      },
+      "gpu_status": {
+        "adapter_available": true,
+        "cross_origin_isolated": true,
+        "preferred_canvas_format": "bgra8unorm",
+        "secure_context": true,
+        "webgpu_context_available": true
+      },
+      "viewport": {
+        "device_pixel_ratio": 1,
+        "inner_height": 700,
+        "inner_width": 900,
+        "visual_height": 700,
+        "visual_width": 900
+      }
+    },
+    "runtime_incident_recorder": {
+      "native_trace_incident_count": 6,
+      "qualifying_native_incident_count": 0,
+      "read_api": "createRuntimeDiagnostics().exportRetained()",
+      "reader_flags": {
+        "clock_regression_count": 0,
+        "crypto_unavailable": false,
+        "history_evicted": false,
+        "history_evicted_count": 0,
+        "incident_evicted": false,
+        "incident_evicted_count": 0,
+        "malformed_count": 0,
+        "malformed_record": false,
+        "persistence_failed": false,
+        "persistence_unavailable": false,
+        "quota_exceeded": false,
+        "recent_event_evicted": false,
+        "recent_event_evicted_count": 0,
+        "recovery_timed_out": false,
+        "report_truncated": false,
+        "storage_denied": false,
+        "storage_evicted": false,
+        "storage_evicted_count": 0
+      },
+      "retained_records": [],
+      "scope": "actual locally persisted runtime recorder incidents; reader metadata is not the producer session",
+      "status": "no_qualifying_incident_generated"
+    },
+    "staging_incident_summaries": [],
+    "staging_limit": "Aggregate occupancy/registration/callback counters are retained; no one-to-one staging completion IDs are exposed.",
+    "trace": {
+      "categories": [
+        "toplevel",
+        "devtools.timeline",
+        "blink.user_timing",
+        "v8",
+        "disabled-by-default-v8.cpu_profiler",
+        "renderer.scheduler"
+      ],
+      "complete": true,
+      "compressed_bytes": 4557777,
+      "data_loss": false,
+      "reusable": true,
+      "sha256": "affb8509b9d9893819e46ed901f95a7af3823a3c2f937c39726dde671a469683",
+      "truncated": false
+    }
+  },
+  "result": {
+    "capture_result": "captured",
+    "diagnostic_capture_valid": true,
+    "explicit_pause_reason": 5,
+    "first_error": null,
+    "manual_pause_acknowledged": true,
+    "natural_pause_or_timing_guard_reproduced": false,
+    "source_frame": 21,
+    "source_guard_observation_limit": {
+      "callback_history": "full preceding callback rows from the bounded capture table",
+      "fractional_pre_guard_demand": "not retained by the source hook; not inferred across reset or early-break boundaries",
+      "source_guard_value": "integer triggering_value and threshold from the actual source incident hook",
+      "staging": "aggregate occupancy and registration/callback counters plus peak callback wall duration; no one-to-one completion IDs"
+    },
+    "source_running_at_stop": 0,
+    "source_running_at_trigger": 1,
+    "stopped_cursor": 1603,
+    "stopped_evidence_lease": {
+      "acquired_at_ms": 31142.81500005722,
+      "cursor": 1603,
+      "expires_at_ms": 61142.81500005722,
+      "finish_reason": "Diagnostic stopped-prefix evidence complete",
+      "finished_at_ms": 34023.90499997139,
+      "maximum_duration_ms": 30000,
+      "release_reason": "Diagnostic stopped-prefix evidence complete",
+      "released_at_ms": 34023.81500005722,
+      "token": 1
+    },
+    "terminal_outcome": "paired_screenshot_target",
+    "trigger_cursor": 1603,
+    "validity_scope": "Protocol and artifact completeness only; no image pixel or visible-gameplay interpretation."
+  },
+  "run": {
+    "capture_command_sha256": "76b78c6949247566a3523cc2fc2b5c2f38299108ab1056b62491270dcf96b1e1",
+    "capture_report_sha256": "ea24ff075b07cc49a695a3de0b96fb54bd6ced8dc43395aa2d799dbe1a846e06",
+    "external_run_locator": "h1-stopped-evidence-lease-20261007-20261006-200355-9a8301c2",
+    "launch_result_sha256": "a919b6fdb05814dd5fecc49a3ba59b2af77042184d1ad1db07ca63219467b7b2",
+    "manifest_sha256": "bc32e45cae322c0dc80b63afea05cc5ecd13c383dfabff31bb7ea1aaa817ebba",
+    "owner_report_sha256": "da4af97214510020fc39e0215cc681172e0b23e814300008c87dab9e3f3aa4d1",
+    "preflight_sha256": "bf4de77e640a1d5be0f4d38120965cb38cacc27fab65c83d68c8e547a53c90af",
+    "trace_metadata_sha256": "c52c1bff454cf31f473a5d2cb443240e20edbfa018442206c5f47b4edfbe5922",
+    "trace_sha256": "affb8509b9d9893819e46ed901f95a7af3823a3c2f937c39726dde671a469683"
+  },
+  "runtime_data_identity": {
+    "file_bytes": 3674112,
+    "from_cache": false,
+    "loaded_bytes": 3674112,
+    "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+    "total_bytes": 3674112
+  },
+  "schema": "melee-web-h1-stopped-scene-pair-receipt-v1",
+  "scope": "One headless Release paired stopped-scene screenshot diagnostic, stopped at the first positive-match source callback at or after cursor 1600. The runner explicitly paused before capture; this did not reproduce a natural timing pause.",
+  "source": {
+    "commit": "3470f887c2633e25f2112d76ab25a04ac2713546",
+    "tree": "79f7e42e59f65884ffbeb49da911ae3fa0834de1"
+  }
+}
