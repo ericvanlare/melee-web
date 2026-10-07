@@ -4395,9 +4395,12 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             for label, idx in (("clock300", 2), ("clock500", 3)):
                 descriptor = checkpoints[idx]
                 target_descriptors[label] = (
-                    {"source": {"match_clock_boundary": {
-                        "target_match_frame_at_least": descriptor["tuple"]["match_frame"],
-                        **descriptor["tuple"]}}},
+                    {"schema": MATCH_CLOCK_EXPECTATION_SCHEMA,
+                     "scope": V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
+                     "version": 1,
+                     "source": {"match_clock_boundary": {
+                         "target_match_frame_at_least": descriptor["tuple"]["match_frame"],
+                         **descriptor["tuple"]}}},
                     {"observed": {
                         f"target_clock_ge{descriptor['tuple']['match_frame']}_observed": {
                             "match_index": 0, "source_tick": descriptor["tuple"]["source_tick"],
@@ -4413,7 +4416,12 @@ class WholeSessionStateCompareTests(unittest.TestCase):
                 nested_packet, nested_audit = target_descriptors[checkpoint["label"]]
                 return nested_packet, nested_packet["source"]
 
-            def validate_prior(audit_path, nested_packet, recipe):
+            def validate_prior(audit_path, nested_packet, recipe, *, ordered_lineage,
+                               positive_audit, clock60_audit, _ordered_depth,
+                               _ordered_ancestors, _ordered_validation_count):
+                self.assertFalse(ordered_lineage)
+                self.assertIsNone(positive_audit)
+                self.assertIsNone(clock60_audit)
                 label = "clock300" if str(audit_path).endswith("clock300-audit.json") else "clock500"
                 return target_descriptors[label][1], "d" * 64
 
