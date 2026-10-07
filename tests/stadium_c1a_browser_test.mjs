@@ -86,6 +86,8 @@ const report = {
   local_http_artifacts: {count: 0, before: null, after: null, unchanged: false},
   scenario: {
     armed_before_css_entry: false,
+    controls: null,
+    input_recipe: null,
     original_css_phase: null,
     original_sss_phase: null,
     raw_pad_stage_drive_frames: 0,
@@ -413,6 +415,32 @@ async function main() {
   await timeout(page.goto(`${baseUrl}/runtime.html`, {waitUntil: 'commit', timeout: remaining(30000)}),
     remaining(30000), 'Runtime page navigation');
   await driver.waitForImport();
+  const readControls = () => page.evaluate(() => ({
+    layout: document.querySelector('#keyboard-layout')?.value ?? null,
+    sources: ['#player-one-source', '#player-two-source'].map(selector =>
+      document.querySelector(selector)?.value ?? null),
+    key_bindings: [...document.querySelectorAll('#keyboard-bindings tbody tr')].map(row =>
+      [...row.cells].map(cell => cell.textContent.trim())),
+  }));
+  await page.locator('#controls-open').click();
+  const controlsBefore = await readControls();
+  await page.locator('#keyboard-layout').selectOption('boxx');
+  await page.getByLabel('Player 1 input source', {exact: true}).selectOption('keyboard');
+  await page.getByLabel('Player 2 input source', {exact: true}).selectOption('off');
+  const controlsForRecipe = await readControls();
+  assert.deepEqual({layout: controlsForRecipe.layout, sources: controlsForRecipe.sources},
+    {layout: 'boxx', sources: ['keyboard', 'off']},
+    'C1a must use the established single-player B0XX keyboard Controls recipe');
+  const startKey = controlsForRecipe.key_bindings.find(([action]) => action === 'Start')?.[1];
+  const attackKey = controlsForRecipe.key_bindings.find(([action]) => action === 'Attack')?.[1];
+  assert.equal(startKey, '7', 'The live B0XX Controls table must map source PAD Start to 7');
+  assert.equal(attackKey, 'M', 'The live B0XX Controls table must map source PAD A to M');
+  report.scenario.controls = {initial: controlsBefore, configured: controlsForRecipe};
+  report.scenario.input_recipe = {
+    layout: 'boxx', player1: 'keyboard', player2: 'off',
+    css_to_sss_start_key: startKey, sss_a_confirm_key: attackKey,
+  };
+  await page.locator('#controls-close').click();
   await driver.selectDisc(values.disc);
   await timeout(driver.waitForStart(), Math.min(LIMITS.discImportMs, remaining()), 'Disc import and native prep');
 
@@ -442,9 +470,10 @@ async function main() {
   report.scenario.original_css_phase = await sourceSnapshot('Original CSS native snapshot');
   assert.equal(report.scenario.original_css_phase.phase, 1, 'Original CSS phase did not start');
   assert.equal(report.scenario.original_css_phase.running, 1, 'Original CSS source time did not run');
+  await saveScreenshot('stadium-c1a-original-css');
 
-  await timeout(driver.pressChord(['Enter'], {holdMs: 120, releaseMs: 150}),
-    Math.min(LIMITS.sourceTransitionMs, remaining()), 'Raw-PAD CSS-to-SSS confirmation');
+  await timeout(driver.pressChord([startKey], {holdMs: 120, releaseMs: 150}),
+    Math.min(LIMITS.sourceTransitionMs, remaining()), 'Raw-PAD B0XX CSS-to-SSS Start');
   await timeout(driver.waitForPhase(3), Math.min(LIMITS.sourceTransitionMs, remaining()),
     'Original SSS transition');
   report.scenario.original_sss_phase = await sourceSnapshot('Original SSS native snapshot');
@@ -469,8 +498,9 @@ async function main() {
       Math.min(5000, stageRemaining()), 'Raw-PAD source frame');
   }
   assert.equal(reached, true, 'Bounded raw-PAD input did not reach source Stadium SSS tile');
-  await timeout(driver.pressChord(['Enter'], {holdMs: 120, releaseMs: 150}),
-    Math.min(LIMITS.sourceTransitionMs, remaining()), 'Raw-PAD SSS confirmation');
+  await saveScreenshot('stadium-c1a-sss-stadium-selected');
+  await timeout(driver.pressChord([attackKey.toLowerCase()], {holdMs: 120, releaseMs: 150}),
+    Math.min(LIMITS.sourceTransitionMs, remaining()), 'Raw-PAD B0XX SSS A confirmation');
   await timeout(page.waitForFunction(() => typeof window.__meleeStadiumC1aPayload === 'string' &&
     window.__meleeStadiumC1aPayload.length > 0, null,
   {timeout: Math.min(LIMITS.manifestHandoffMs, remaining())}),
