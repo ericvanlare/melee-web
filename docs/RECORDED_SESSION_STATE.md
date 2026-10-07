@@ -287,6 +287,8 @@ Like the tick-0 scope, a matched first-positive boundary reports
 and `whole_session_equivalent: false`. The CLI exits 1 for that bounded result.
 It does not establish later gameplay or whole-session accuracy. The default
 scope and the existing tick-0 behavior remain unchanged.
+The recorded result and exact boundary are documented in the
+[B4 first-positive entry](status/2026-10-07-b4-v10-first-positive-match-frame.md).
 
 ## Capture command failure gates
 
