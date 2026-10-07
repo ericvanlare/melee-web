@@ -7,7 +7,6 @@
     "branch": "codex/b4-v10-primary-identity-20261006",
     "capture_head": "be3704767f1ff0ec82daec1681b3337495d25724",
     "capture_tree": "7e9402f70e1a1f14ad2fb65c72c6bc6e6b7cc68c",
-    "source_clean_at_build_and_capture": true,
     "changed_paths": [
       {
         "bytes": 34799,
@@ -25,7 +24,11 @@
         "sha256": "37f313dfe16a9bcf1ad633acfb02d78aba1fe06aa3bd3b0b8c6ec29a05a73012"
       }
     ],
-    "source_manifest_sha256": "1817598aa90629ed4c1818276ece0d7a019322cdd24232a4fba935dfec7254b8"
+    "source_manifest_sha256": "1817598aa90629ed4c1818276ece0d7a019322cdd24232a4fba935dfec7254b8",
+    "source_clean_at_capture": true,
+    "build_source_content_matches_capture_producer": true,
+    "validation_completed_before_source_commit": true,
+    "no_executable_content_edits_between_validation_and_commit": true
   },
   "input": {
     "recipe_format_version": 10,
