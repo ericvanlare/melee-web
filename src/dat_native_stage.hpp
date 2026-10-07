@@ -4,8 +4,55 @@
 #include "native_dat.hpp"
 #include "gameplay_stage_map.h"
 #include "gameplay_archive_sections.h"
+#include <cstdint>
 #include <span>
+#include <string_view>
 namespace melee_web {
+struct DatNativeMapExternalReference {
+    uint32_t entry_index;
+    // Pointer-field byte offset within the authored 0x34-byte map entry.
+    uint32_t field_offset;
+    std::string_view symbol;
+};
+enum class DatNativeMapFlagKind { LocalMaterial, ExternalNull, Null };
+struct DatNativeMapFlagExpectation {
+    uint32_t index;
+    DatNativeMapFlagKind kind;
+    uint32_t target_offset;
+    std::string_view symbol;
+};
+
+// A map owner is intentionally weaker than a complete stage profile. Callers
+// must describe the authored entry/animation counts and exactly which rows are
+// resident in this archive; every other row must retain a checked external
+// joint identity under ResolveNull.
+struct DatNativeMapContract {
+    uint32_t entry_count;
+    std::span<const uint8_t> animation_consumer_counts;
+    std::span<const uint32_t> resident_entry_ids;
+    std::span<const DatNativeMapExternalReference> external_references;
+    // Explicit per-row flag consumers preserve map-only auxiliaries while
+    // allowing the complete-stage contract to retain its marker-row behavior.
+    std::span<const uint32_t> animation_flag_entry_ids;
+    // One source-ordered expectation per authored flagged-object table slot.
+    std::span<const DatNativeMapFlagExpectation> flagged_objects;
+};
+
+// Owns only the checked source map graph. It does not publish the map or
+// imply that a complete stage, stage callbacks, or world services exist.
+class DatNativeMap {
+public:
+    DatNativeMap(std::shared_ptr<const DatArchive>, const DatNativeMapContract&);
+    ~DatNativeMap();
+    DatNativeMap(const DatNativeMap&)=delete;
+    DatNativeMap& operator=(const DatNativeMap&)=delete;
+    void* map_head()const noexcept;
+    std::span<const uint32_t> source_light_counts()const noexcept;
+private:
+    struct Storage;
+    std::unique_ptr<Storage> storage_;
+};
+
 // Owns native source-stage map descriptors and every source-selected
 // animation. Does not publish them or imply particle execution is initialized.
 class DatNativeStage {

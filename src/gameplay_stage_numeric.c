@@ -39,7 +39,7 @@ static HSD_Joint* joint(const MeleeWebNativeDat* r,MeleeWebStageMarkers* m,uint3
     if(next!=UINT32_MAX)j->next=joint(r,m,next,depth+1);
     return j;
 }
-MeleeWebStageMarkers* melee_web_stage_markers_decode(const MeleeWebNativeDat* r,uint32_t head){
+MeleeWebStageMarkers* melee_web_stage_markers_decode_structural(const MeleeWebNativeDat* r,uint32_t head){
     if(!r)return NULL;r->region(r->context,head,48);
     const uint32_t reference_count=r->word(r->context,head+4);
     REQUIRE(reference_count>0&&reference_count<=64,
@@ -50,11 +50,21 @@ MeleeWebStageMarkers* melee_web_stage_markers_decode(const MeleeWebNativeDat* r,
     REQUIRE(r->pointer(r->context,root+12,64)==UINT32_MAX,"Marker root has a sibling");
     r->region(r->context,pairs,count*4);
     MeleeWebStageMarkers* m=r->allocate(r->context,1,sizeof(*m));m->root=joint(r,m,root,0);m->pair_count=count;
-    unsigned char seen[261]={0};
     for(unsigned i=0;i<count;i++){
         uint16_t index=r->half(r->context,pairs+i*4),id=r->half(r->context,pairs+i*4+2);
-        REQUIRE(index<m->joint_count&&id<261&&!seen[id],"Invalid or duplicate marker binding");
-        seen[id]=1;m->pairs[i][0]=index;m->pairs[i][1]=id;
+        REQUIRE(index<m->joint_count&&id<261,"Invalid marker binding");
+        m->pairs[i][0]=index;m->pairs[i][1]=id;
+    }
+    return m;
+}
+MeleeWebStageMarkers* melee_web_stage_markers_decode(const MeleeWebNativeDat* r,uint32_t head){
+    MeleeWebStageMarkers* m=melee_web_stage_markers_decode_structural(r,head);
+    if(!r||!m)return m;
+    unsigned char seen[261]={0};
+    for(unsigned i=0;i<m->pair_count;i++){
+        const uint16_t id=m->pairs[i][1];
+        REQUIRE(!seen[id],"Invalid or duplicate marker binding");
+        seen[id]=1;
     }
     /* All versus stages require four authored player starts. Additional marker
      * IDs are stage-specific; Dream Land ends at ID 4 while modern stages may
