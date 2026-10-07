@@ -1,0 +1,905 @@
+{
+  "schema": "melee-web-local-lockstep-source-accounting-v1",
+  "evidence_labels": [
+    "Source identified",
+    "Browser exercised: local loopback"
+  ],
+  "source_commit": "6c5d6c7b8b33c7f72b53ed393c73215e57f58191",
+  "source_tree": "8cde2bf465e73beb98adeaca46dc05cd77f4d9c2",
+  "base_commit": "07164ed109bd62314d8b4291e6ab7af5bd7c699a",
+  "build": {
+    "configuration": "Release",
+    "target": "runtime",
+    "exit_code": 0,
+    "clean_before": true,
+    "clean_after": true,
+    "source_unchanged": true,
+    "outputs": [
+      {
+        "path": "build/browser-release/gameplay_menu_browser.js",
+        "bytes": 299506,
+        "sha256": "0f3f8bfec2976b33911a6a0e097dd67d2e5967ed6fbe88164565319fd28c3873"
+      },
+      {
+        "path": "build/browser-release/gameplay_menu_browser.wasm",
+        "bytes": 15716100,
+        "sha256": "14dc4bb2937184956ae51014fa1dd79f0d9985fbd183cfb39633121cd6f932a4"
+      },
+      {
+        "path": "build/browser-release/gameplay_menu_browser.data",
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      {
+        "path": "build/browser-release/runtime.html",
+        "bytes": 5205,
+        "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+      },
+      {
+        "path": "build/browser-release/runtime-development.mjs",
+        "bytes": 56665,
+        "sha256": "7faecdf82fa101d9c256e4cf9335d780fd1da1c99a58d6c7429bfcfe36d74c7d"
+      },
+      {
+        "path": "build/browser-release/net-timing-pause.mjs",
+        "bytes": 1043,
+        "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"
+      },
+      {
+        "path": "build/browser-release/melee-runtime.mjs",
+        "bytes": 50136,
+        "sha256": "6d330656905e52820f56af5bf10bd6dfe741e6a2adb5a24c6f708720d45941f8"
+      },
+      {
+        "path": "build/browser-release/runtime-diagnostics.mjs",
+        "bytes": 85702,
+        "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+      },
+      {
+        "path": "build/browser-release/runtime-diagnostics-delivery.mjs",
+        "bytes": 51514,
+        "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+      },
+      {
+        "path": "build/browser-release/diagnostics-settings.mjs",
+        "bytes": 2876,
+        "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+      },
+      {
+        "path": "build/browser-release/diagnostics-schema.mjs",
+        "bytes": 18780,
+        "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+      },
+      {
+        "path": "build/browser-release/controller-input.mjs",
+        "bytes": 19263,
+        "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+      },
+      {
+        "path": "build/browser-release/controller-panel.mjs",
+        "bytes": 36847,
+        "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+      },
+      {
+        "path": "build/browser-release/controller-panel.css",
+        "bytes": 5240,
+        "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+      },
+      {
+        "path": "build/browser-release/controller-settings.mjs",
+        "bytes": 18680,
+        "sha256": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f"
+      },
+      {
+        "path": "build/browser-release/controller-settings.css",
+        "bytes": 3482,
+        "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+      },
+      {
+        "path": "build/browser-release/touch-controls.mjs",
+        "bytes": 13954,
+        "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+      },
+      {
+        "path": "build/browser-release/touch-controls.css",
+        "bytes": 6381,
+        "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+      },
+      {
+        "path": "build/browser-release/prototype-keyboard-layouts.mjs",
+        "bytes": 935,
+        "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+      },
+      {
+        "path": "build/browser-release/runtime-cache.js",
+        "bytes": 16143,
+        "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+      },
+      {
+        "path": "build/browser-release/audio-worklet.js",
+        "bytes": 1517,
+        "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+      },
+      {
+        "path": "build/browser-release/audio-ring.mjs",
+        "bytes": 2040,
+        "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+      },
+      {
+        "path": "build/browser-release/disc-image.mjs",
+        "bytes": 15255,
+        "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+      },
+      {
+        "path": "build/browser-release/disc-session.mjs",
+        "bytes": 7552,
+        "sha256": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2"
+      },
+      {
+        "path": "build/browser-release/dsp-coefficients.mjs",
+        "bytes": 4043,
+        "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+      },
+      {
+        "path": "build/browser-release/runtime-assets.mjs",
+        "bytes": 17029,
+        "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190"
+      },
+      {
+        "path": "build/browser-release/runtime-audio-assets.mjs",
+        "bytes": 3685,
+        "sha256": "2201d9156f3c4902a81a39d4520fc0f684eaeac4c9d4c8c46cb010010697ed3b"
+      },
+      {
+        "path": "build/browser-release/runtime-audio.mjs",
+        "bytes": 7660,
+        "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+      },
+      {
+        "path": "build/browser-release/match-flow.mjs",
+        "bytes": 10679,
+        "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+      },
+      {
+        "path": "build/browser-release/match-menu.mjs",
+        "bytes": 8566,
+        "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+      },
+      {
+        "path": "build/browser-release/action-sweep.mjs",
+        "bytes": 18698,
+        "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+      },
+      {
+        "path": "build/browser-release/hitch-capture.mjs",
+        "bytes": 21958,
+        "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+      }
+    ]
+  },
+  "full_suite": {
+    "source_commit": "f4968e7ca036947b20a1cce81b146028e605c4c1",
+    "exit_code": 0,
+    "tests": 1928,
+    "skipped": 141,
+    "scope": "Before the later probe screenshot/GPU evidence addition; that final harness change passed the focused contracts and both real-browser cases. Final PR-head CI is required before merge."
+  },
+  "browser": {
+    "name": "installed headless Chrome",
+    "version": "154.0.8037.98",
+    "playwright": "1.62.1",
+    "speakers": "muted; audio processing retained"
+  },
+  "recipe": {
+    "format": "MWNI v1",
+    "input_frames": 5082,
+    "neutral_prefix": 2,
+    "delay_ticks": 2,
+    "seed": 305419896,
+    "sha256": "007fafb2bfc1c34b81509b8ee073b6250b32ab6d227502be6d4b986ddd8cbb4c"
+  },
+  "observation_contract": {
+    "installed_at": "Native start identity barrier, cursor0, before start confirmation/input publication",
+    "native_fields": [
+      "frame",
+      "valid",
+      "source_steps",
+      "source_draws"
+    ],
+    "capacity_per_peer": 32768,
+    "original_observer_preserved": true,
+    "invalid_missing_duplicate_reordered_overflow_rows_fail": true,
+    "each_callback_steps_equal_draws": true,
+    "scope": "Native input-associated source draws; excludes preparation-only draws, GPU completion, pixels and original-game equivalence"
+  },
+  "results": {
+    "accounting-css-probe-01": {
+      "started_at": "2026-10-07T01:38:37.570Z",
+      "finished_at": "2026-10-07T01:38:43.916Z",
+      "checksum": {
+        "records_each": 8,
+        "streams_identical": true,
+        "sha256": "a1ca04fff4a658ac8542e90e1580b3d456f29dfe31132e1be35fa4a348d1baab"
+      },
+      "peers": {
+        "alpha": {
+          "source_cursor": 8,
+          "source_steps": 8,
+          "source_draws": 8,
+          "callback_count": 29,
+          "first_callback": 31,
+          "last_callback": 59,
+          "callback_ids_contiguous": true,
+          "each_step_drawn": true,
+          "scope": "Source draw completion accounting; no pixel, GPU completion or timing equivalence claim"
+        },
+        "beta": {
+          "source_cursor": 8,
+          "source_steps": 8,
+          "source_draws": 8,
+          "callback_count": 30,
+          "first_callback": 31,
+          "last_callback": 60,
+          "callback_ids_contiguous": true,
+          "each_step_drawn": true,
+          "scope": "Source draw completion accounting; no pixel, GPU completion or timing equivalence claim"
+        }
+      },
+      "server_cleaned_up": true,
+      "local_http_32_before_after_match": true,
+      "screenshots_reviewed": true
+    },
+    "accounting-full-route-01": {
+      "started_at": "2026-10-07T01:39:43.350Z",
+      "finished_at": "2026-10-07T01:41:15.371Z",
+      "checksum": {
+        "records_each": 5084,
+        "streams_identical": true,
+        "sha256": "4ac68c125ef7de127db9ab6c56e3fd40665bd42f02bff7ad8a75519b461d82a0"
+      },
+      "peers": {
+        "alpha": {
+          "source_cursor": 5084,
+          "source_steps": 5084,
+          "source_draws": 5084,
+          "callback_count": 5174,
+          "first_callback": 31,
+          "last_callback": 5204,
+          "callback_ids_contiguous": true,
+          "each_step_drawn": true,
+          "scope": "Source draw completion accounting; no pixel, GPU completion or timing equivalence claim"
+        },
+        "beta": {
+          "source_cursor": 5084,
+          "source_steps": 5084,
+          "source_draws": 5084,
+          "callback_count": 5187,
+          "first_callback": 29,
+          "last_callback": 5215,
+          "callback_ids_contiguous": true,
+          "each_step_drawn": true,
+          "scope": "Source draw completion accounting; no pixel, GPU completion or timing equivalence claim"
+        }
+      },
+      "server_cleaned_up": true,
+      "local_http_32_before_after_match": true,
+      "screenshots_reviewed": true
+    }
+  },
+  "visual_review": {
+    "screenshots_reviewed": 12,
+    "notes": "Original CSS and returned CSS rendered. SSS/Results captures show entry animations at different source cursors. The existing magenta Final Destination rendering symptom remains visible on both peers; tracked separately by issue175. No pixel-equivalence claim."
+  },
+  "prior_terminal_controls": {
+    "receipt": "docs/evidence/local-lockstep-a2-v1.json",
+    "pr": 174,
+    "scope": "Previously observed input-desync and disconnect controls retain their original producer identities; not rerun or relabeled by this observer-only follow-up."
+  },
+  "limitations": [
+    "Internet play and H1 acceptance remain open",
+    "No retail state/PCM or pixel equivalence",
+    "No physical-input, foreground-timing or audible-output acceptance",
+    "Functional harness transport, not a shipped multiplayer UI"
+  ],
+  "artifacts": [
+    {
+      "path": "accounting-css-probe-01-launcher/launcher-result.json",
+      "bytes": 416,
+      "sha256": "c73e0611a59bfb877c825de401f251d062f5eda26c86ae96c5da5f14351b899a"
+    },
+    {
+      "path": "accounting-css-probe-01-launcher/route-command.json",
+      "bytes": 1316,
+      "sha256": "5049d3d40c68f186a7981bfb59e99164693290b50fc8cffa448d3dbdcd652e08"
+    },
+    {
+      "path": "accounting-css-probe-01-launcher/runner.log",
+      "bytes": 96,
+      "sha256": "817c93724f5a54f6bf3e703a5ec0e090c9f92cbabee7b79f75a75a4adf66bb40"
+    },
+    {
+      "path": "accounting-css-probe-01-server/batch-progress.json",
+      "bytes": 25665,
+      "sha256": "f0b38582f632db4702846b23b0f9383477b205590cb51e36e3eeac32ab981952"
+    },
+    {
+      "path": "accounting-css-probe-01-server/batch-result.json",
+      "bytes": 25744,
+      "sha256": "987e8690045b0cf0a3bffc6f18ba6bb7400471f52a65062c55b5b6acfcf510f4"
+    },
+    {
+      "path": "accounting-css-probe-01-server/batch-start.json",
+      "bytes": 12975,
+      "sha256": "6dcd313c16a42b06bad8cb0681f717cd5e442c28b84e4c8f6c585288caba99b1"
+    },
+    {
+      "path": "accounting-css-probe-01-server/server.log",
+      "bytes": 10010,
+      "sha256": "49ca142120b0e50791cba45df39ad980621f0a154f4d2cb55ae40d97fd843186"
+    },
+    {
+      "path": "accounting-css-probe-01/alpha/accounted-css.png",
+      "bytes": 480793,
+      "sha256": "77e448b4bf1674726bb140c4519ebf468b22fd21e4630c3b42fd459b52b652ad"
+    },
+    {
+      "path": "accounting-css-probe-01/alpha/checksums.bin",
+      "bytes": 512,
+      "sha256": "a1ca04fff4a658ac8542e90e1580b3d456f29dfe31132e1be35fa4a348d1baab"
+    },
+    {
+      "path": "accounting-css-probe-01/alpha/instance.json",
+      "bytes": 9890,
+      "sha256": "9c7f4a26713f5fed0d22ed6d6e529c366a970b9646bdd1d09a75494cb0731ad4"
+    },
+    {
+      "path": "accounting-css-probe-01/alpha/source-accounting.json",
+      "bytes": 5664,
+      "sha256": "e2d1743700b02677fae4fcc68da507a28b84f94e25db3266ec624a2f05dd8f52"
+    },
+    {
+      "path": "accounting-css-probe-01/beta/accounted-css.png",
+      "bytes": 480413,
+      "sha256": "47b1eb8eb4586443bce631af64d5ddbbc8163f918408d2c3897528e367994656"
+    },
+    {
+      "path": "accounting-css-probe-01/beta/checksums.bin",
+      "bytes": 512,
+      "sha256": "a1ca04fff4a658ac8542e90e1580b3d456f29dfe31132e1be35fa4a348d1baab"
+    },
+    {
+      "path": "accounting-css-probe-01/beta/instance.json",
+      "bytes": 6233,
+      "sha256": "9aafe08f98d277729785c637124d0359fcb1819a8d52a9466909469b9ef5a929"
+    },
+    {
+      "path": "accounting-css-probe-01/beta/source-accounting.json",
+      "bytes": 5763,
+      "sha256": "95708690e6becfb465f05028c8a57f874278145baa5eff472caccc50ac8e926f"
+    },
+    {
+      "path": "accounting-css-probe-01/run.json",
+      "bytes": 35407,
+      "sha256": "cb431041c68d5bb5bf08a57fc9718b783aaffe6bb34d6af69628b9f1917f7c2a"
+    },
+    {
+      "path": "accounting-full-route-01-launcher/launcher-result.json",
+      "bytes": 416,
+      "sha256": "e237e81e87de61330161dbb518717762a81dda468731a56bb9a8cf5e29884e1b"
+    },
+    {
+      "path": "accounting-full-route-01-launcher/route-command.json",
+      "bytes": 1289,
+      "sha256": "2068d8f8aff06ae82c68fd8745486c052d127a74cf579a8fed835b77b2d0fc0a"
+    },
+    {
+      "path": "accounting-full-route-01-launcher/runner.log",
+      "bytes": 99,
+      "sha256": "30257ca4593a88c1ba9d21b14071444ad96808f99ad90cb49b644ded2398081f"
+    },
+    {
+      "path": "accounting-full-route-01-server/batch-progress.json",
+      "bytes": 25666,
+      "sha256": "167fd0a100a3035e53db1fea4213f8e3b3217ab40812a39775467a98e09e59d0"
+    },
+    {
+      "path": "accounting-full-route-01-server/batch-result.json",
+      "bytes": 25745,
+      "sha256": "03b52655912bfe280d1627d9b6ac5e867b7b5ef560c69902fde2d4f534ab30a5"
+    },
+    {
+      "path": "accounting-full-route-01-server/batch-start.json",
+      "bytes": 12975,
+      "sha256": "f8311ae9146b2537ac209fb8b36302c1cc0efdba5f07b1e0ef2d2ad0f426c094"
+    },
+    {
+      "path": "accounting-full-route-01-server/server.log",
+      "bytes": 10010,
+      "sha256": "271be63fe5c572f1981fd336d3f19cfdba73687ad716e06a6ccdb266ad25993f"
+    },
+    {
+      "path": "accounting-full-route-01/alpha/checksums.bin",
+      "bytes": 325376,
+      "sha256": "4ac68c125ef7de127db9ab6c56e3fd40665bd42f02bff7ad8a75519b461d82a0"
+    },
+    {
+      "path": "accounting-full-route-01/alpha/final.png",
+      "bytes": 452816,
+      "sha256": "c9951cabeddb8486986163689a1ffcad3c455bdd31679dd1c8db94fbce78e92e"
+    },
+    {
+      "path": "accounting-full-route-01/alpha/instance.json",
+      "bytes": 316858,
+      "sha256": "c7daeed04e851d7cdc62d67d6a0c6192accabace7c137b2feb25b068e5adb4d3"
+    },
+    {
+      "path": "accounting-full-route-01/alpha/route-css-start.png",
+      "bytes": 451376,
+      "sha256": "87c5d673f870ec541bbc6c223d965b519ee4388180e916983895c0a1016cb800"
+    },
+    {
+      "path": "accounting-full-route-01/alpha/route-match.png",
+      "bytes": 497194,
+      "sha256": "acbd2e403bc444eff5b9b4fb57ab46c9d4d96878a5b0cca49a9eb4589007fdf5"
+    },
+    {
+      "path": "accounting-full-route-01/alpha/route-results.png",
+      "bytes": 135955,
+      "sha256": "7e2bf5e08a0112c239b8b89ea64e9f8750915ba3db56f43005b3bb5c18e092be"
+    },
+    {
+      "path": "accounting-full-route-01/alpha/route-sss.png",
+      "bytes": 253754,
+      "sha256": "d5f2acbbad64baeddddf730b46e86528370ec481498deee75e0b7a0ee16bcf89"
+    },
+    {
+      "path": "accounting-full-route-01/alpha/source-accounting.json",
+      "bytes": 524927,
+      "sha256": "9604ac1209855a0cb827645a8f45786db0b5529c67d4df309364deda3a359aef"
+    },
+    {
+      "path": "accounting-full-route-01/beta/checksums.bin",
+      "bytes": 325376,
+      "sha256": "4ac68c125ef7de127db9ab6c56e3fd40665bd42f02bff7ad8a75519b461d82a0"
+    },
+    {
+      "path": "accounting-full-route-01/beta/final.png",
+      "bytes": 442986,
+      "sha256": "14088a1ac2e0cab54f5e7827b07ec805234977725209419354f68b9daa6ef225"
+    },
+    {
+      "path": "accounting-full-route-01/beta/instance.json",
+      "bytes": 316761,
+      "sha256": "4b18c5c8e4dedd0f04eacb7aa9af627439873659199990d57d45dcffcbeda752"
+    },
+    {
+      "path": "accounting-full-route-01/beta/route-css-start.png",
+      "bytes": 451393,
+      "sha256": "01a31809eec1f23c827dcccb6ced01f0dca57d31f9a01a6b6c189cd69f72d2c1"
+    },
+    {
+      "path": "accounting-full-route-01/beta/route-match.png",
+      "bytes": 496917,
+      "sha256": "99f706d758aecdc1646f0b2a0c7ee390faf1de7839a060d2e78239e666fb26d7"
+    },
+    {
+      "path": "accounting-full-route-01/beta/route-results.png",
+      "bytes": 135425,
+      "sha256": "7a8eb03784114af7b7aeca6b65e87fee33526b4c98c471d1849bd50b552cc784"
+    },
+    {
+      "path": "accounting-full-route-01/beta/route-sss.png",
+      "bytes": 254082,
+      "sha256": "e65fa8d1747f83bf5f30bcfed490bc735d580453c839828c7bad0231fde520a4"
+    },
+    {
+      "path": "accounting-full-route-01/beta/source-accounting.json",
+      "bytes": 526236,
+      "sha256": "1cf8582ab4734d8c9093152b731f545a95dac3487c31fb4b214dab99cb650f02"
+    },
+    {
+      "path": "accounting-full-route-01/run.json",
+      "bytes": 1515084,
+      "sha256": "b648b18d8ab87e57c59c4f9d576eff6e0cdd0c4ee9710bd6d4860516e9b92e60"
+    },
+    {
+      "path": "full-suite.json",
+      "bytes": 608,
+      "sha256": "fac8987f784534845951ad0f9be344e76ade0cae108379c01cebb67a97216fd0"
+    },
+    {
+      "path": "full-suite.log",
+      "bytes": 350265,
+      "sha256": "019abfeffa190e407ca1cbe0a4951dfa1bd9f2b68c723e98c8dbaecf41b134c0"
+    },
+    {
+      "path": "release-build.json",
+      "bytes": 6272,
+      "sha256": "8fe918e5a9b72f527cf91f30022fc97de8cc808eda6613f92942e23ee4ba429a"
+    },
+    {
+      "path": "release-build.log",
+      "bytes": 12213,
+      "sha256": "ae4bc49e3fec40dd6b354e724144c2547f108fdddf9e96050ee7174e610bcb35"
+    },
+    {
+      "path": "run-css-probe.py",
+      "bytes": 10229,
+      "sha256": "95bd0b434db50373d255c027278cecf25da58ef30c72db874773135c50df6315"
+    },
+    {
+      "path": "run-full-route.py",
+      "bytes": 10212,
+      "sha256": "d4a04f8c64a9be66a80fa1c088ef2f8d6bcfa051267478d5805fd020082773cd"
+    },
+    {
+      "path": "validated-accounting-results.json",
+      "bytes": 2395,
+      "sha256": "6bcf8e3fe9b951138ca59bb71215ebd5def00f87b180821e3670b4dc19002f3c"
+    },
+    {
+      "path": "accounting-flip-01/alpha/checksums.bin",
+      "bytes": 960,
+      "sha256": "947d61c3801355760ad7c6c2b38e5231c17963fbebb2f5d344cd4852a35e4e7c"
+    },
+    {
+      "path": "accounting-flip-01/alpha/failure.png",
+      "bytes": 484163,
+      "sha256": "8c7899229cc65156afb52c987c442281b036e979e01b0d85c7fcbe73b749088d"
+    },
+    {
+      "path": "accounting-flip-01/alpha/instance.json",
+      "bytes": 6974,
+      "sha256": "3d3d6d2a296d0ac0f44794e8724441f1bca8fdb7af80203d38315e151859cb44"
+    },
+    {
+      "path": "accounting-flip-01/alpha/source-accounting.json",
+      "bytes": 5669,
+      "sha256": "9f9120aba00db07b4852ecd0cd524a9f84560db4798a12f0fb4a93052ae39e7f"
+    },
+    {
+      "path": "accounting-flip-01/beta/checksums.bin",
+      "bytes": 960,
+      "sha256": "7f16ae4f08380069183544d2a4c7d0f736d6612c200917a61b5549755a3cea7b"
+    },
+    {
+      "path": "accounting-flip-01/beta/failure.png",
+      "bytes": 484793,
+      "sha256": "2f58c94fdeb3a0f8700ea7ee5be90cde563021b11b78ad0baca5e61fe7455369"
+    },
+    {
+      "path": "accounting-flip-01/beta/instance.json",
+      "bytes": 6973,
+      "sha256": "a0d323a088547c8d0c6f25e138a9b2a47f772e4360ccb49ee1e4fc4a546cb8d7"
+    },
+    {
+      "path": "accounting-flip-01/beta/source-accounting.json",
+      "bytes": 6758,
+      "sha256": "ffe85327773dbdf40f129c824cfb69d0f998fc98264128127f435777c2e2b10a"
+    },
+    {
+      "path": "accounting-flip-01/run.json",
+      "bytes": 24522,
+      "sha256": "bab603065afb3c4c1f6a87d74a868231344207073bc8782576b25bb6c4646f49"
+    },
+    {
+      "path": "accounting-flip-01-launcher/launcher-result.json",
+      "bytes": 419,
+      "sha256": "cd39886fa654bddfd12376b65f12155f106abb59a0a988f7e0354a0e97b72b93"
+    },
+    {
+      "path": "accounting-flip-01-launcher/route-command.json",
+      "bytes": 1310,
+      "sha256": "c87a09a0941780d528aac4b5be8c83ce6d102ef539498109ddffb58b2a146ab1"
+    },
+    {
+      "path": "accounting-flip-01-launcher/runner.log",
+      "bytes": 929,
+      "sha256": "3d2c58c9f681c7b9407176443f5b2b9a69bd82e3c342b870e8ffc5ce752ee340"
+    },
+    {
+      "path": "accounting-negative-controls-01-server/batch-result.json",
+      "bytes": 13287,
+      "sha256": "f203feabf3842c3b5f47ea443946d58d5b6688b4eb2a600076b5890191bc07c6"
+    },
+    {
+      "path": "accounting-negative-controls-01-server/batch-start.json",
+      "bytes": 12976,
+      "sha256": "b356b5b2f5cd077e3178c64947b06e1171dfdf58c6c15602ccf048687bf3a5fb"
+    },
+    {
+      "path": "accounting-negative-controls-01-server/server.log",
+      "bytes": 7453,
+      "sha256": "a221aa04bf02f9cdc2244fec98e1389c34556743c0712454ca1536d2e1bb2e12"
+    },
+    {
+      "path": "accounting-flip-02/alpha/checksums.bin",
+      "bytes": 1024,
+      "sha256": "5c156c5e8690b3d70110edf590da4a791b0c92152ca61f77de08e9e31401fcb0"
+    },
+    {
+      "path": "accounting-flip-02/alpha/instance.json",
+      "bytes": 5920,
+      "sha256": "6b5a66662bb8e5eedf6b38b9685a9a965f73dee1330fee3b950bfbb90b9865b0"
+    },
+    {
+      "path": "accounting-flip-02/alpha/source-accounting.json",
+      "bytes": 5768,
+      "sha256": "a8a783ecf758b3deda0b586cd8455b78fbb76110ab9989d88ef366b61171769a"
+    },
+    {
+      "path": "accounting-flip-02/beta/checksums.bin",
+      "bytes": 1024,
+      "sha256": "d0b340864708f7cd478a3b2cbaec1bd83e3ba63db7cf9972955896d22b4c0120"
+    },
+    {
+      "path": "accounting-flip-02/beta/instance.json",
+      "bytes": 5919,
+      "sha256": "aeb0ad0e9bab200cfba6b4957f14fcbed4276c365dc22a24beea2ead2340ad6e"
+    },
+    {
+      "path": "accounting-flip-02/beta/source-accounting.json",
+      "bytes": 5669,
+      "sha256": "f69aae1b4676825ad1dc711a8033b17e156e6feebace12201fe5fc6cbef785cb"
+    },
+    {
+      "path": "accounting-flip-02/run.json",
+      "bytes": 29721,
+      "sha256": "6eb251bea1f08ee3ff623210182f48f46fe7435aa9ab95239c2e5dc9c0ab2cbb"
+    },
+    {
+      "path": "accounting-flip-02-launcher/launcher-result.json",
+      "bytes": 430,
+      "sha256": "7b3bc133eb87ad2535bf63b02c6dfc6e68329e80db3d86f6ad7a2447f0416fe5"
+    },
+    {
+      "path": "accounting-flip-02-launcher/route-command.json",
+      "bytes": 1310,
+      "sha256": "b31ae6e942102d5e05379fd2447ef039c9a02d5bfe24908342a78078ca9cb740"
+    },
+    {
+      "path": "accounting-flip-02-launcher/runner.log",
+      "bytes": 102,
+      "sha256": "c8db063312a51001d62b9f32238c363e6816d76bd290b15d30412bc8117816ed"
+    },
+    {
+      "path": "accounting-disconnect-02/alpha/checksums.bin",
+      "bytes": 1024,
+      "sha256": "d0b340864708f7cd478a3b2cbaec1bd83e3ba63db7cf9972955896d22b4c0120"
+    },
+    {
+      "path": "accounting-disconnect-02/alpha/instance.json",
+      "bytes": 5752,
+      "sha256": "a59174fd0e4e7e07e68e6ec9bf9e0a45d9935c5fbb42dcd9a04c4e0e385e52ca"
+    },
+    {
+      "path": "accounting-disconnect-02/alpha/source-accounting.json",
+      "bytes": 6266,
+      "sha256": "b97787349cef081fa0901c98e34711f568a0dec744d0c4677ab1a53326e4e422"
+    },
+    {
+      "path": "accounting-disconnect-02/beta/checksums.bin",
+      "bytes": 1024,
+      "sha256": "d0b340864708f7cd478a3b2cbaec1bd83e3ba63db7cf9972955896d22b4c0120"
+    },
+    {
+      "path": "accounting-disconnect-02/beta/instance.json",
+      "bytes": 5751,
+      "sha256": "6902c02f4ce3479e0f28ce1ca00f23587c90c6e0b05bf3081696abf5681ccaf5"
+    },
+    {
+      "path": "accounting-disconnect-02/beta/source-accounting.json",
+      "bytes": 6266,
+      "sha256": "3993dafe68ccd89f8f6255e177b35ef509e173be775e25d95e99c9ad1cd0ac22"
+    },
+    {
+      "path": "accounting-disconnect-02/run.json",
+      "bytes": 29666,
+      "sha256": "54c6f3a16fe44a459c4b16286f7caa3ea1f3505c83786393ac1e2c74eb53f3c5"
+    },
+    {
+      "path": "accounting-disconnect-02-launcher/launcher-result.json",
+      "bytes": 438,
+      "sha256": "2c53dfb8925f8ee2503961c9abf9cfb66e359afc1cf89fb246583c8f7d4ff710"
+    },
+    {
+      "path": "accounting-disconnect-02-launcher/route-command.json",
+      "bytes": 1325,
+      "sha256": "b4417a728d9c4840eb670a5f69660d543641d42564405da01d8c86dbafde849e"
+    },
+    {
+      "path": "accounting-disconnect-02-launcher/runner.log",
+      "bytes": 112,
+      "sha256": "0e2ca8062352f06f23f135c5285575f1d00f08aba148e8adfc098cbcbe932597"
+    },
+    {
+      "path": "accounting-negative-controls-02-server/batch-progress.json",
+      "bytes": 25762,
+      "sha256": "8ae10aadd19788406e511e550736a05f2b8f9d5914151b2451644bb3fa99a8e2"
+    },
+    {
+      "path": "accounting-negative-controls-02-server/batch-result.json",
+      "bytes": 25841,
+      "sha256": "915c41bf2b4b7a04ce433a4f3879a8b028f86f29c3125c2668be668223b4ca00"
+    },
+    {
+      "path": "accounting-negative-controls-02-server/batch-start.json",
+      "bytes": 12976,
+      "sha256": "0047a9e6bc9583fba045350ffa3632d3de74accb32969e1e981db60b62585dec"
+    },
+    {
+      "path": "accounting-negative-controls-02-server/server.log",
+      "bytes": 14688,
+      "sha256": "2cbb54dfa1f4ade7be39941137e9358453c1e67b3fcd6a27a017749edf3d2361"
+    },
+    {
+      "path": "run-negative-controls.py",
+      "bytes": 10538,
+      "sha256": "796631851d6977ed3b0837c21a73cbdaa61e1677d1f33417bf9cab3774b090ad"
+    },
+    {
+      "path": "run-negative-controls-02.py",
+      "bytes": 10811,
+      "sha256": "5202808025631132cacf75273e930db1dc74f726dab5273eafdbb00f49784fa1"
+    }
+  ],
+  "fresh_terminal_controls": {
+    "runner_commit": "3f48bf417ae8335255fa54ac1816f940963086e4",
+    "native_build_commit": "6c5d6c7b8b33c7f72b53ed393c73215e57f58191",
+    "source_difference": "Documentation and a post-drain terminal guard in the browser harness; native and packaged sources unchanged.",
+    "results": [
+      {
+        "run": "accounting-flip-02",
+        "outcome": "expected-desync",
+        "negative_control": {
+          "changed_local_port": 0,
+          "input_tick": 10,
+          "source_tick": 12,
+          "byte": 2,
+          "bit": 0,
+          "detected_at_first_mismatch": true,
+          "channel": 1,
+          "native_checksum_prefix": {
+            "equal_prefix_through_tick": 11,
+            "first_mismatch_tick": 12,
+            "first_mismatch_channel": 1
+          }
+        },
+        "terminal_hold": {
+          "minimum_hold_ms": 120,
+          "peers": {
+            "alpha": {
+              "kind": 1,
+              "tick": 12,
+              "channel": 1,
+              "active": 1,
+              "blocker": "terminal",
+              "cursor_before": 16,
+              "cursor_after": 16,
+              "pushed_before": 20,
+              "pushed_after": 20
+            },
+            "beta": {
+              "kind": 1,
+              "tick": 12,
+              "channel": 1,
+              "active": 1,
+              "blocker": "terminal",
+              "cursor_before": 16,
+              "cursor_after": 16,
+              "pushed_before": 20,
+              "pushed_after": 20
+            }
+          },
+          "no_fallback": true,
+          "window_observed_ms": 125
+        },
+        "accounting": {
+          "alpha": {
+            "source_cursor": 16,
+            "source_steps": 16,
+            "source_draws": 16,
+            "callback_count": 30,
+            "first_callback": 30,
+            "last_callback": 59,
+            "callback_ids_contiguous": true,
+            "each_step_drawn": true,
+            "scope": "Source draw completion accounting; no pixel, GPU completion or timing equivalence claim"
+          },
+          "beta": {
+            "source_cursor": 16,
+            "source_steps": 16,
+            "source_draws": 16,
+            "callback_count": 29,
+            "first_callback": 31,
+            "last_callback": 59,
+            "callback_ids_contiguous": true,
+            "each_step_drawn": true,
+            "scope": "Source draw completion accounting; no pixel, GPU completion or timing equivalence claim"
+          }
+        },
+        "owned_cleanup_complete": true
+      },
+      {
+        "run": "accounting-disconnect-02",
+        "outcome": "expected-disconnect",
+        "negative_control": {
+          "disconnect_at_source_tick": 16,
+          "terminals": {
+            "alpha": {
+              "kind": "disconnect",
+              "reason": "beta: loopback socket closed"
+            },
+            "beta": {
+              "kind": "disconnect",
+              "reason": "beta: loopback socket closed"
+            }
+          },
+          "explicit": true
+        },
+        "terminal_hold": {
+          "minimum_hold_ms": 120,
+          "peers": {
+            "alpha": {
+              "kind": 2,
+              "tick": 0,
+              "channel": 0,
+              "active": 1,
+              "blocker": "terminal",
+              "cursor_before": 16,
+              "cursor_after": 16,
+              "pushed_before": 16,
+              "pushed_after": 16
+            },
+            "beta": {
+              "kind": 2,
+              "tick": 0,
+              "channel": 0,
+              "active": 1,
+              "blocker": "terminal",
+              "cursor_before": 16,
+              "cursor_after": 16,
+              "pushed_before": 16,
+              "pushed_after": 16
+            }
+          },
+          "no_fallback": true,
+          "window_observed_ms": 127
+        },
+        "accounting": {
+          "alpha": {
+            "source_cursor": 16,
+            "source_steps": 16,
+            "source_draws": 16,
+            "callback_count": 35,
+            "first_callback": 30,
+            "last_callback": 64,
+            "callback_ids_contiguous": true,
+            "each_step_drawn": true,
+            "scope": "Source draw completion accounting; no pixel, GPU completion or timing equivalence claim"
+          },
+          "beta": {
+            "source_cursor": 16,
+            "source_steps": 16,
+            "source_draws": 16,
+            "callback_count": 35,
+            "first_callback": 28,
+            "last_callback": 62,
+            "callback_ids_contiguous": true,
+            "each_step_drawn": true,
+            "scope": "Source draw completion accounting; no pixel, GPU completion or timing equivalence claim"
+          }
+        },
+        "owned_cleanup_complete": true
+      }
+    ],
+    "retained_failure": {
+      "runner_commit": "8984c1496d509e12c733c473aac42e784dbbe6d7",
+      "run": "accounting-flip-01",
+      "outcome": "Runner failed after both peers detected expected tick 12/channel 1 desync; asynchronous checksum delivery terminated beta before setNativeProgress. Both peers unloaded, browsers closed, relay and server closed.",
+      "repair": "Recheck both peer terminals immediately after awaiting checksum drain; exit polling before updating native progress.",
+      "postflight_limit": "The failed launcher exited before HTTP postflight; it is not a passing capture."
+    },
+    "local_and_http_artifacts_verified_before_after": 32
+  }
+}

@@ -16,6 +16,7 @@ import {openLoopbackPeerPair} from './net_lockstep_relay.mjs';
 import {LOCKSTEP_DELAY, LockstepPeer, parseNetChecksum, TERMINAL} from './net_lockstep_protocol.mjs';
 import {readyRenderEvent, renderEventSignatures, verifyFirstChecksumMismatch,
   verifyTerminalHold} from './net_lockstep_observers.mjs';
+import {verifyNetSourceAccounting} from './net_source_accounting.mjs';
 
 const HEADER_BYTES = 16;
 const POSITIVE_ROUTE_BOUNDARIES = Object.freeze([
@@ -402,7 +403,7 @@ async function pollRun() {
   let lastProgress = Date.now();
   const lastCursors = {alpha: -1, beta: -1};
   let disconnectInjected = false;
-  while (Date.now() <= deadline) {
+  polling: while (Date.now() <= deadline) {
     if (transportErrors.length)
       throw Error(`Loopback receive callback failed: ${JSON.stringify(transportErrors[0])}`);
     if (peers.alpha.terminal || peers.beta.terminal) break;
@@ -412,6 +413,8 @@ async function pollRun() {
       rows[role] = status;
       if (scenario === 'positive') captureObservedRouteBoundary(role, native.phase);
       await drainChecksums(role, peers[role]);
+      // Checksum delivery can end either peer while the browser drain awaits.
+      if (peers.alpha.terminal || peers.beta.terminal) break polling;
       await peers[role].setNativeProgress(status.cursor);
       if (status.wait_episodes > instanceRows[role].last_wait_episodes) {
         instanceRows[role].last_wait_episodes = status.wait_episodes;
@@ -548,6 +551,9 @@ async function run() {
   await Promise.all(['alpha', 'beta'].map(role => instances[role].importDisc()));
   await Promise.all(['alpha', 'beta'].map(role => instances[role].beginLockstep(seed, sourceTicks)));
   const startRows = await waitForStart();
+  for (const role of ['alpha', 'beta']) {
+    instanceRows[role].source_accounting_start = await instances[role].installSourceAccounting();
+  }
   // Freeze the initial browser load-response set before peerIdentity performs
   // its separate cache-bypassing fetch of the served Wasm artifact.
   const loadedWasm = await Promise.all(['alpha', 'beta'].map(role => instances[role].freezeLoadedWasmIdentity()));
@@ -653,6 +659,15 @@ async function run() {
   }
   stopRouteCaptureWatchers = true;
   await settleRouteBoundaryWatchers();
+  for (const role of ['alpha', 'beta']) {
+    const capture = await instances[role].readSourceAccounting({freeze: true});
+    const bytes = Buffer.from(JSON.stringify(capture, null, 2) + '\n');
+    await fs.writeFile(path.join(childDirectory(role), 'source-accounting.json'), bytes);
+    instanceRows[role].source_accounting_artifact = {name: 'source-accounting.json',
+      bytes: bytes.length, sha256: sha256(bytes)};
+    instanceRows[role].source_accounting = verifyNetSourceAccounting(capture,
+      scenario === 'positive' || scenario === 'probe' ? sourceTicks : capture.final.cursor);
+  }
   pairResults.wait_observations = waitObservations;
   pairResults.transport_errors = transportErrors;
   pairResults.endpoint_errors = {alpha: relay.alpha.errors, beta: relay.beta.errors};
@@ -686,6 +701,21 @@ async function run() {
     pairResults.checksums = {records_each: sourceTicks, streams_identical: true, sha256: sha256(bytesA)};
     if (peers.alpha.inputDuplicates < 1 || peers.alpha.outOfOrderInputs < 1)
       throw Error('Reduced probe did not exercise duplicate and out-of-order remote input');
+    for (const role of ['alpha', 'beta']) {
+      const filename = path.join(childDirectory(role), 'accounted-css.png');
+      await instances[role].screenshot(filename);
+      const bytes = await fs.readFile(filename);
+      const graphics = await instances[role].graphics();
+      const [native, status] = await Promise.all([instances[role].native(), instances[role].status()]);
+      if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
+          graphics.cross_origin_isolated !== true || graphics.webgpu_adapter !== true ||
+          native.phase !== 1 || status.cursor !== sourceTicks || status.blocker !== 'complete')
+        throw Error(`${role} reduced accounting probe did not retain its final rendered CSS boundary`);
+      instanceRows[role].accounted_css = {source_cursor: status.cursor, phase: native.phase,
+        screenshot: 'accounted-css.png', bytes: bytes.length, sha256: sha256(bytes),
+        gpu: graphics, source_steps_and_draws: instanceRows[role].source_accounting,
+        scope: 'CSS at the completed prefix; source counters exclude preparation-only draws'};
+    }
     pairResults.route = {scope: 'CSS-only prefix', status: 'not-full-route', scene: 'CSS'};
     pairResults.outcome = 'complete';
   } else if (scenario === 'positive') {
@@ -759,6 +789,15 @@ try {
   for (const role of ['alpha', 'beta']) {
     const instance = instances?.[role];
     if (instance) {
+      if (instanceRows[role].source_accounting_start && !instanceRows[role].source_accounting_artifact) {
+        try {
+          const capture = await instance.readSourceAccounting({freeze: true});
+          const bytes = Buffer.from(JSON.stringify(capture, null, 2) + '\n');
+          await fs.writeFile(path.join(childDirectory(role), 'source-accounting.json'), bytes);
+          instanceRows[role].source_accounting_artifact = {name: 'source-accounting.json',
+            bytes: bytes.length, sha256: sha256(bytes), incomplete: true};
+        } catch (error) { instanceRows[role].source_accounting_error = String(error.message || error); }
+      }
       try { instanceRows[role].timing_pause_diagnostics = await instance.timingPauseDiagnostics(); } catch {}
       try { await instance.unload(); instanceRows[role].unloaded = true; }
       catch (error) { instanceRows[role].unloaded = false; instanceRows[role].unload_error = String(error.message || error); }
