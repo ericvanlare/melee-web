@@ -1,0 +1,234 @@
+{
+  "schema": "melee-web-pokemon-stadium-screen-roots-v1",
+  "result": "passed_scoped_descriptor_ownership",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "issue": "https://github.com/ericvanlare/melee-web/issues/223",
+  "related_issues": [
+    164,
+    214,
+    216
+  ],
+  "boundary": "Checked borrowed canonical IMAGE and writable SIS public roots; descriptor-only source lookup and map1 traversal, without stage publication or source ticking.",
+  "native_source": {
+    "producer_commit": "bc02190b3e4be7566f34a6fd9cbe1ef06bf5b388",
+    "producer_tree": "b6e2bcc824bc314d0a482a775ea415bf51f58892",
+    "working_tree": "clean",
+    "files_sha256": {
+      "cmake/FighterRuntime.cmake": "9aa5b509d1ea3cda74ae33bc878ae9c4b17fa6bef3da8a4752ea348fe66c1c42",
+      "src/dat_native_stage.cpp": "3cbd102048f86d925b46f59c2d644b0f67a2353a220caa7ba56af1ea4cdc6393",
+      "src/dat_native_stage.hpp": "6f5758f56894a394c16ca13d071356316bfeedc94584830716c98bd8a376c781",
+      "tests/native_menu_host_trace.cpp": "30c8e2bba00b73047b6374687b9988a9399be3934107610cdf40e359383296f6",
+      "tests/stadium_screen_roots_checks.hpp": "c2b7d6c4e72d25fb5ee3f1afc139b1f3394595c10fff552d5bd2a65dca9fab23",
+      "tests/stadium_screen_roots_probe.c": "fc5376fb48d1469eda82d72e9b722acca68d5e3e2bd956f27e52e59d62d7525c",
+      "tests/stadium_screen_roots_probe.h": "d452fa41bafe38cd0802fff7d22e76a550d2c21f84983f3d6b36d77bd71b99a3",
+      "tests/stadium_screen_roots_synthetic.hpp": "0a396fda44b743e179408a1ca1d9d7c1f0088aad8b8a0f1801917da452464e37",
+      "tests/stadium_screen_roots_trace.cpp": "e26d39f095de369aefa5c13d628e1835424b4d4436db940cf475cb5a029bbe19",
+      "tests/test_dat_native_stage.py": "712a84687313a8060de185f6f74ec519ee3beaa448d84e8ae05a3f1a812ba10f",
+      "tests/test_gameplay_native_menus.py": "5fb14a4770655e1685fed5c75c328d6303b8384bf833747ec60d77fac834544f"
+    }
+  },
+  "interface": {
+    "IMAGE": "DatNativeMap::image_descriptor(source_offset) borrows only the existing canonical map texture descriptor; missing graph membership throws; no fallback decode.",
+    "SIS": "DatSis unchanged; existing checked owned writable regions and source aliases reused.",
+    "catalog": "Exactly two required original public names; source HSD_ArchiveGetPublicAddress on explicit opaque typed handle. Catalog borrows owners; lexical handle/catalog teardown precedes map/SIS destruction."
+  },
+  "observed_native": {
+    "dummy_IMAGE": {
+      "source_offset": 35276,
+      "width": 16,
+      "height": 16,
+      "format": "I4",
+      "map_entry": 1,
+      "native_references": 1,
+      "independent_C_traversal": true
+    },
+    "SIS": {
+      "source_offset": 1297024,
+      "source_table_bytes": 88,
+      "slots": 22,
+      "table_slot5_mutated_and_restored": true,
+      "existing_text_region_byte_mutated_and_restored": true,
+      "aliases": "Synthetic fixture proves mutation aliases; retained table writable copies checked without global assignment."
+    },
+    "positive_lifetimes": 2,
+    "negative_controls": "Synthetic missing IMAGE/SIS public roots, out-of-graph IMAGE, foreign-owner IMAGE and malformed SIS; duplicate catalog, live-handle scope close and wrong-scope close refusals. Fatal unknown/released/NULL controls reused from existing focused archive_sections test.",
+    "invariants": [
+      "raw GrPs input",
+      "post-constructor ResolveNull decoded GrPs copy",
+      "save card",
+      "selection",
+      "RNG owner/value",
+      "ticks/generation",
+      "item globals/empty link",
+      "empty stage state"
+    ],
+    "trace": {
+      "records": 1,
+      "source_revision": "bc02190b3e4be7566f34a6fd9cbe1ef06bf5b388",
+      "input_recipe": "stadium-screen-roots-preflight-v1",
+      "profile_limit": "Generic browser-release header is not profile identity; actual cache is Release diagnostic ON."
+    }
+  },
+  "fixture": {
+    "logical_files": 98,
+    "original_union_manifest_sha256": "258233cd7ad22041a65aca34329157272f2248a9985729e7f47b52a21a662ea6",
+    "before_inventory_sha256": "c0f29eb9884c027bd3b935f0566af500c5fdb248c69d8af9385f2b1031a5869b",
+    "all98_after_unchanged": true,
+    "independent_fresh_hash_review": true
+  },
+  "native_build": {
+    "command": "python3 scripts/build.py --trace-target native_menu_host_trace --configuration Release --stadium-c1a-diagnostic",
+    "diagnostic": true,
+    "exit_code": 0,
+    "log_sha256": "3e8eef2009b9e8c2fb268a441fa7eeb0ed17a4bc90123dd1742991b0749a7263",
+    "artifacts": {
+      "native_menu_host_trace.js": {
+        "bytes": 233327,
+        "sha256": "323a770ed45ffd8346df3b7cc8e238b7825b75c0b9b39bf3bdc09f9545f3bb57"
+      },
+      "native_menu_host_trace.wasm": {
+        "bytes": 13791666,
+        "sha256": "c8ed497a8cd2d6f9f300d05a40d650b45c5ca385a58ff06c879b5e53d700cae3"
+      },
+      "CMakeCache.txt": {
+        "bytes": 61252,
+        "sha256": "59b26ab9d7f1414fd337c83e8dc3f009655dad37c38dbd6e7434268b69e7d9e6"
+      },
+      "build.ninja": {
+        "bytes": 5787847,
+        "sha256": "5126ab934e48cdcc9f3a7889b97c7dca3f61191ec66f98b3e37c92bdb6df0315"
+      }
+    }
+  },
+  "native_execution": {
+    "command": [
+      "python3",
+      "scripts/agent_workspace.py",
+      "run",
+      "--",
+      "python3",
+      "tests/test_gameplay_native_menus.py",
+      "NativeMenuSourceTests.test_stadium_screen_roots_owner_preflight",
+      "-v"
+    ],
+    "environment": {
+      "MELEE_MENU_FIXTURE_ROOT": "Exact previously retained 98-file C1 fixture",
+      "MELEE_KEEP_TEST_ARTIFACTS": "1"
+    },
+    "passed_tests": 1,
+    "seconds": 1.054,
+    "artifacts": {
+      "screen-roots-preflight.stderr": {
+        "bytes": 1082,
+        "sha256": "b08f0c2fd56b646768c1781824c42d2c8ac66d11de2a6dda0883e6d117c26767"
+      },
+      "screen-roots-preflight-command.txt": {
+        "bytes": 836,
+        "sha256": "5fe831aa7b9e2a40f6986afb67ef809680f88055a64b3d35df86a9695f4133cc"
+      },
+      "screen-roots-preflight.stdout": {
+        "bytes": 366,
+        "sha256": "f10bd1731f5f709b60b680ab442c0a64bdbbfd3601c22927843df4eccfbbe6b1"
+      },
+      "screen-roots-preflight.jsonl": {
+        "bytes": 267,
+        "sha256": "5757d410404e24d147065e7d98c6ce323d7eb04993bfe99c61f3e9fcd22e652a"
+      }
+    }
+  },
+  "failures": [
+    {
+      "producer": "149d9fef514b3e9c08ef6a65a1e8d0925c3cd531",
+      "boundary": "Initial raw/archive equality guard before map/SIS or synthetic checks",
+      "cause": "ResolveNull clears checked external links in its owned decoded copy; the original test incorrectly compared that copy against raw input.",
+      "correction_producer": "bc02190b3e4be7566f34a6fd9cbe1ef06bf5b388",
+      "correction": "Keep immutable raw-input invariant and add separate post-constructor decoded-copy baseline; production decoder unchanged.",
+      "reduced_tests": 2,
+      "review_sha256": "0b581a8ecdd1903e4dc364865997b32490342b8fc97f4eeb9a89ceaf2828f12c",
+      "raw_log_sha256": "bdb27920b5713eb830675aa4a6668bab8f58e0cd10042d56bd17e5427bd26cd1",
+      "reduced_log_sha256": "584e5b1d1db1e06d5036c6c9b5c1064904ab36ecf8593d052ae4c271814fbdb4",
+      "raw_artifacts_retained": true
+    }
+  ],
+  "synthetic_validation": {
+    "producer": "149d9fef514b3e9c08ef6a65a1e8d0925c3cd531",
+    "source_freeze_sha256": "63e053a4b4d7af788b4e0934036ed6e1757ecf6abd976ada47708dc724e5e597",
+    "focused_tests": 3,
+    "direct_trace_passed": true,
+    "scope": "New canonical map alias/catalog target, existing DatSis bounds/aliases and archive_sections fatal/lifetime tests."
+  },
+  "current_integration_validation": {
+    "producer": "ef2de4ce4d929c112011461f55de4c6e30f439f9",
+    "tree": "190b85df71ceb6c926d3579fb25c11f704d0ce41",
+    "base": "15fd2199abee8cb32c0fa11606521cbfcf823105",
+    "clean": true,
+    "historical_native_producer": "bc02190b3e4be7566f34a6fd9cbe1ef06bf5b388",
+    "all11_source_hashes_identical_to_historical_native": true,
+    "ordinary_release_diagnostic": false,
+    "artifacts": {
+      "gameplay_menu_browser.js": {
+        "bytes": 300352,
+        "sha256": "4e751ebb2467c3a8ee74583b37aa1753f1233c89e496b61458594c16eb262e61"
+      },
+      "gameplay_menu_browser.wasm": {
+        "bytes": 15742171,
+        "sha256": "8179a718756f0bc7e65f5cd96513ba89d1fb77044961571aca13f2d34a572786"
+      },
+      "CMakeCache.txt": {
+        "bytes": 60977,
+        "sha256": "de0c1275f03b2fd5b618fbbe59e3d7d16a251176ad41c68db9939100d6356bdc"
+      },
+      "build.ninja": {
+        "bytes": 5617570,
+        "sha256": "910512122d05b9767db618f0356ed0e02e8759dc1d81780e3aa499006fa1312b"
+      }
+    },
+    "ordinary_runtime_build": {
+      "command": "python3 scripts/build.py --target runtime --configuration Release",
+      "exit_code": 0,
+      "configuration": "Release",
+      "diagnostic": false,
+      "log_sha256": "7d87e6341fa8ef041a3904150c9223bc226d74b57f43a456900097c71b9a0b76"
+    },
+    "full_suite": {
+      "command": "env -u MELEE_MENU_FIXTURE_ROOT -u MELEE_KEEP_TEST_ARTIFACTS python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "tests": 2021,
+      "skipped": 136,
+      "seconds": 366.354,
+      "exit_code": 0,
+      "retained_fixture_repeated": false,
+      "retained_and_e8_tests_skipped_before_native_launch": true,
+      "stdout_sha256": "a956908e849316fadc3c317986ea82a7c7b3aee1bdabb63e4d167fa406d07ec8",
+      "stderr_sha256": "91ea97cce8271bf523331cdc2b02eb2d0f5c6ea682a4656f538d215a17b2d062"
+    },
+    "documentation": {
+      "tests": 5,
+      "result": "pass",
+      "repository_content_tracked_entries": 1918,
+      "repository_content_findings": 0,
+      "diff_check": "pass",
+      "docs_log_sha256": "f59f8e066845d1fc8fcdbc5462cd2656d61dcc792b25020cfc4afb8a0e5a51f6",
+      "content_log_sha256": "464a5ae488d3e2f8c15e96c1a5d0c64b2c909d9230901f05cacb0ee89ea9f598"
+    }
+  },
+  "private_evidence": "Preserved NVMe runs discoverable by stadium-screen-roots-focused, stadium-screen-roots-native-preparation-149d9fe, stadium-screen-roots-native-preparation-bc02190 and stadium-screen-roots-integration prefixes; raw logs, sources and binaries retained.",
+  "unrun": [
+    "E8",
+    "Stage_8022524C",
+    "OnInit",
+    "Ground_801C0800",
+    "source stage object/process/draw/ticks",
+    "global SIS binding",
+    "screen/copy buffers",
+    "browser",
+    "extraction",
+    "deployment",
+    "retail comparison",
+    "performance",
+    "stage admission"
+  ]
+}
