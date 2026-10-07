@@ -391,7 +391,8 @@ assert.equal(success.nativeMainCalled, true);
 assert.equal(success.audioCreated, 0);
 assert.equal(success.diagnosticsSettingsOptions, undefined,
   'Public diagnostics settings use the isolated DOM owner without exposing runtime options');
-assert.equal(success.settingsOptions.disableExtraPorts, true, 'public settings keep developer-only ports disabled');
+assert.deepEqual(success.settingsOptions.initialSources, ['auto', 'auto', 'off', 'off'],
+  'public settings preserve two-player defaults while allowing explicit extra-port choices');
 assert.equal(success.settingsOptions.openButton, success.document.getElementById('controls-open'));
 assert.ok(success.trace.some(row => Array.isArray(row) && row[0] === 'settings-bind'), 'shell binds settings after native startup');
 assert.ok(success.trace.some(row => Array.isArray(row) && row[0] === 'save-settings-bind'), 'save settings bind before a disc can be imported');
