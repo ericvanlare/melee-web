@@ -36,6 +36,8 @@
 #include "native_dat.hpp"
 #include "stadium_c0_native_map_contract.hpp"
 #include "stadium_c1_e8_call_observer.h"
+#include "stadium_c1_item_owner_negative_cases.hpp"
+#include "stadium_c1_item_owner_preflight.hpp"
 #endif
 #include <melee/ft/forward.h>
 #include <melee/gm/forward.h>
@@ -1614,12 +1616,12 @@ void run_stadium_c1_item_state_preflight(
     const std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES>& save_before)
 {
     using namespace melee_web;
-    check(host && reopened_files.contains("ItCo.usd") &&
-              reopened_files.contains("GrPs.usd"),
-          "C1 item-state preflight requires retained ItCo.usd and GrPs.usd inputs");
+    check(host != nullptr, "C1 item-state preflight requires a retained menu host");
+    stadium_c1_item_owner::require_retained_inputs(reopened_files);
 
     const auto& itco_bytes = reopened_files.at("ItCo.usd");
     const auto& grps_bytes = reopened_files.at("GrPs.usd");
+    const std::vector<std::uint8_t> itco_before = itco_bytes;
     const std::vector<std::uint8_t> grps_before = grps_bytes;
     const auto itco_archive = std::make_shared<const DatArchive>(
         itco_bytes, DatExternalPolicy::PreserveUnresolved);
@@ -1645,19 +1647,20 @@ void run_stadium_c1_item_state_preflight(
         const DatItemRegistry source_registry(*itco_archive);
         const auto random_index = static_cast<std::size_t>(
             It_PKind_Random - It_Kind_Kuriboh);
-        check(random_index < source_registry.articles.size() &&
-                  source_registry.articles[random_index].has_value(),
-              "Original Random Pokémon Article root is absent from ItCo.usd");
+        check(random_index < source_registry.articles.size(),
+              "Original Random Pokémon Article index exceeds the source registry");
 
         DatItemRegistryNative registered_articles(itco_archive);
         void* const random_article = registered_articles.articles()[random_index];
-        check(random_article != nullptr,
-              "Original Random Pokémon Article registration is absent");
+        stadium_c1_item_owner::require_random_article(
+            source_registry.articles[random_index], random_article);
         DatItemArticle random_article_owner(
             itco_archive, *source_registry.articles[random_index],
             It_PKind_Random, random_article);
         std::array<void*, 8> script_rows_before{};
         void* random_states = nullptr;
+        stadium_c1_item_owner::require_state_capacity(
+            scripts, random_article_owner.state_count());
         for (std::size_t row = 1; row < scripts.size(); ++row) {
             if (!scripts[row]) continue;
             check(row < random_article_owner.state_count(),
@@ -1678,12 +1681,9 @@ void run_stadium_c1_item_state_preflight(
         const auto color_root = itco_archive->pointer(item_root + 20, 8);
         if (!color_root)
             throw DatError("Original ItCo color-animation root is absent");
-        const auto color_bytes = itco_archive->next_target_offset(*color_root) -
-                                 *color_root;
-        if (color_bytes % 8 || color_bytes / 8 > 256)
-            throw DatError("Original ItCo color-animation extent is invalid");
-        DatColorAnimation color_owner(itco_archive, *color_root,
-                                      color_bytes / 8);
+        const auto color_count = stadium_c1_item_owner::checked_color_row_count(
+            *itco_archive, *color_root);
+        DatColorAnimation color_owner(itco_archive, *color_root, color_count);
         void* const source_item = melee_web_item_public_data_decode(
             public_data_arena.reader(), item_root,
             registered_articles.articles(), MELEE_WEB_ITEM_REGISTRY_COUNT);
@@ -1702,10 +1702,70 @@ void run_stadium_c1_item_state_preflight(
 
         const auto globals_before = stadium_item_runtime_globals();
         const auto source_color_before = source_view.color_rows;
+        if (lifetime == 0) {
+            const MeleeWebGameplayStats negative_stats_before =
+                melee_web_gameplay_stats();
+            const auto* const negative_seed_owner = seed_ptr;
+            check(negative_seed_owner == seed_owner &&
+                      *negative_seed_owner == seed_before,
+                  "C1 item-state negative checks lost the retained RNG snapshot");
+            check(((HSD_GObj**)HSD_GObj_Entities)[9] == nullptr,
+                  "C1 item-state negative checks found an item object");
+
+            stadium_c1_item_owner::run_synthetic_negative_cases(scripts);
+
+            check_stadium_item_runtime_globals(globals_before);
+            MeleeWebStadiumC1ItemPublicDataView source_after_negatives{};
+            check(melee_web_stadium_c1_item_public_data_view(
+                      source_item, &source_after_negatives) &&
+                      source_after_negatives.common_data == source_view.common_data &&
+                      source_after_negatives.common_articles == source_view.common_articles &&
+                      source_after_negatives.character_articles == source_view.character_articles &&
+                      source_after_negatives.pokemon_articles == source_view.pokemon_articles &&
+                      source_after_negatives.bounce_data == source_view.bounce_data &&
+                      source_after_negatives.color_rows == source_color_before,
+                  "Synthetic negatives changed the retained source color/public-data pointers");
+            check(((HSD_GObj**)HSD_GObj_Entities)[9] == nullptr,
+                  "Synthetic negatives created an item object");
+            for (std::size_t row = 1; row < scripts.size(); ++row) {
+                if (!scripts[row]) continue;
+                void* row_table = nullptr;
+                void* script = nullptr;
+                check(melee_web_stadium_c1_random_article_state_row(
+                          random_article, static_cast<std::uint32_t>(row),
+                          &row_table, &script) &&
+                          row_table == random_states &&
+                          script == script_rows_before[row],
+                      "Synthetic negatives changed a retained Random Article state link");
+            }
+            const MeleeWebGameplayStats negative_stats_after =
+                melee_web_gameplay_stats();
+            check(negative_stats_after.generation == negative_stats_before.generation &&
+                      negative_stats_after.ticks == negative_stats_before.ticks &&
+                      negative_stats_after.generation == stats_before.generation &&
+                      negative_stats_after.ticks == stats_before.ticks,
+                  "Synthetic negatives advanced source ticks or changed generation");
+            check(seed_ptr == negative_seed_owner &&
+                      *negative_seed_owner == seed_before,
+                  "Synthetic negatives changed retained source RNG ownership or value");
+            check(itco_bytes == itco_before && grps_bytes == grps_before,
+                  "Synthetic negatives changed immutable retained ItCo/GrPs bytes");
+            std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES>
+                negative_save_after{};
+            char negative_error[256]{};
+            check(melee_web_menu_host_snapshot_card_data(
+                      host, 0, negative_save_after.data(),
+                      negative_save_after.size(), negative_error,
+                      sizeof(negative_error)), negative_error);
+            check(negative_save_after == save_before,
+                  "Synthetic negatives changed the retained source save owner");
+            check_stadium_selection_preserved(host, selected, baseline);
+            check_stadium_preflight_stage_empty();
+        }
         char error[256]{};
         StadiumItemRuntimeEndGuard runtime;
         runtime.runtime = melee_web_item_runtime_prepare_source(
-            source_item, color_owner.table(), color_bytes / 8,
+            source_item, color_owner.table(), color_count,
             error, sizeof(error));
         check(runtime.runtime != nullptr, error);
         const auto globals_active = stadium_item_runtime_globals();
@@ -1740,7 +1800,7 @@ void run_stadium_c1_item_state_preflight(
 
         char competing_error[256]{};
         check(melee_web_item_runtime_prepare_source(
-                  source_item, color_owner.table(), color_bytes / 8,
+                  source_item, color_owner.table(), color_count,
                   competing_error, sizeof(competing_error)) == nullptr &&
                   std::string_view(competing_error).find(
                       "Item startup requires checked data") !=

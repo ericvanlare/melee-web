@@ -4,6 +4,7 @@
 #include "dat_item_registry_native.hpp"
 #include "gameplay_article_data.h"
 #include "gameplay_compat.h"
+#include "stadium_c1_item_owner_negative_cases.hpp"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wwrite-strings"
@@ -13,6 +14,7 @@ extern "C" {
 #pragma GCC diagnostic pop
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
@@ -49,11 +51,19 @@ std::shared_ptr<const DatArchive> read_archive(const char* path)
     return std::make_shared<const DatArchive>(
         std::move(bytes), DatExternalPolicy::PreserveUnresolved);
 }
+
 }
 
 int main(int argc, char** argv)
 {
     try {
+        if (argc == 2 && std::string(argv[1]) == "--synthetic-item-owner-negatives") {
+            std::array<void*, 8> scripts{};
+            int script = 0;
+            scripts[1] = &script;
+            stadium_c1_item_owner::run_synthetic_negative_cases(scripts);
+            return 0;
+        }
         check(argc == 2, "Expected ItCo.usd path");
         const auto archive = read_archive(argv[1]);
         const std::vector<std::uint8_t> source_before(archive->data().begin(),
