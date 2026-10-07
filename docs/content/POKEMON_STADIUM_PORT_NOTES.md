@@ -30,8 +30,12 @@ authoritative and are reproduced, not repaired.
   transformation names carry `.dat` and are never localized. The stage archive
   is one of five localized stage archives on the disc, with Corneria,
   Home-Run Contest, Onett and Venom. The two variants are byte-identical before
-  `SIS_GrPStadiumData` (data offset `0x13ca80`) and share every public name,
-  extern and relocation there; only the screen text differs. The runtime
+  `SIS_GrPStadiumData` (data offset `0x13ca80`) and share every public name
+  and extern name/slot. Public offsets and
+  relocation slots before that root match. Localized text and glyph data move
+  the trailing `quake_model_set` public offset and its 37 relocation slots by
+  7,520 bytes in the Japanese archive; whole-archive metadata offsets are
+  therefore unequal. The runtime
   archive is **`GrPs.usd`**. The world loader resolves English
   (`src/gameplay_world.cpp:79-98`), but the source request is made by the
   source predicate, so checkpoint 1 must assert that the source asks for

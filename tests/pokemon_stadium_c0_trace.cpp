@@ -932,13 +932,57 @@ void report_sis(const ArchiveRecord& english, const ArchiveRecord& japanese)
             jp.external_symbols().begin(), [](const auto& left, const auto& right) {
                 return left.name == right.name && left.slots == right.slots;
             });
+    check(owner.entry_count() == 22 && jp_owner.entry_count() == 22,
+          "Stadium SIS entry counts differ from the authored 22-slot table");
+    check(table_bytes == 88 && jp.next_target_offset(jp_root) - jp_root == 88,
+          "Stadium SIS table byte bounds differ from the authored 88 bytes");
+    check(slot5_bytes == 1 && sis_string_length(jp, jp_root, 5) == 1,
+          "Stadium authored SIS slot 5 is not empty in both languages");
+    check(en_composed == 112 && jp_composed == 66,
+          "Stadium composed SIS title maxima differ from the checked source data");
+    check(root == jp_root && localized_prefix_equal,
+          "Stadium archive bytes before the SIS root differ across languages");
+    check(a.public_symbols().size() == jp.public_symbols().size(),
+          "Stadium localized public symbol counts differ");
+    std::uint32_t shifted_symbols = 0;
+    for (std::size_t i = 0; i < a.public_symbols().size(); ++i) {
+        const auto& left = a.public_symbols()[i];
+        const auto& right = jp.public_symbols()[i];
+        check(left.name == right.name, "Stadium localized public symbol names differ");
+        if (left.data_offset == right.data_offset) continue;
+        check(left.name == "quake_model_set" && left.data_offset > root &&
+                  right.data_offset > jp_root &&
+                  right.data_offset == left.data_offset + 7520,
+              "Stadium localized public offset differs outside the checked quake shift");
+        ++shifted_symbols;
+    }
+    check(shifted_symbols == 1 && jp.data().size() == a.data().size() + 7520,
+          "Stadium localized quake/data-size shift differs from 7520 bytes");
+    check(external_equal, "Stadium localized extern names or slots differ");
+    const auto en_relocations = relocation_offsets(a);
+    const auto jp_relocations = relocation_offsets(jp);
+    check(en_relocations.size() == jp_relocations.size(),
+          "Stadium localized relocation counts differ");
+    std::uint32_t shifted_relocations = 0;
+    for (std::size_t i = 0; i < en_relocations.size(); ++i) {
+        if (en_relocations[i] == jp_relocations[i]) {
+            check(shifted_relocations == 0,
+                  "Stadium equal relocation appears after the shifted quake suffix");
+            continue;
+        }
+        check(en_relocations[i] > root && jp_relocations[i] > jp_root &&
+                  en_relocations[i] >= 1445888 &&
+                  jp_relocations[i] == en_relocations[i] + 7520,
+              "Stadium localized relocation differs outside the checked quake suffix");
+        if (shifted_relocations == 0)
+            check(en_relocations[i] == 1445888,
+                  "Stadium shifted quake suffix starts at an unexpected relocation slot");
+        ++shifted_relocations;
+    }
+    check(shifted_relocations == 37,
+          "Stadium localized quake relocation suffix does not contain 37 slots");
     const bool metadata_equal = symbols_equal && external_equal &&
-        relocation_offsets(a) == relocation_offsets(jp);
-    check(owner.entry_count() == 22 && jp_owner.entry_count() == 22 &&
-              table_bytes == 22 * 4 && slot5_bytes == 1 &&
-              en_composed == 112 && jp_composed == 66 &&
-              localized_prefix_equal && metadata_equal,
-          "Stadium English/Japanese SIS identity, length or prefix contract failed");
+        en_relocations == jp_relocations;
     std::cout << "\"sis\":{\"offset\":" << root << ",\"entry_count\":"
               << owner.entry_count() << ",\"table_bytes\":" << table_bytes
               << ",\"empty_authored_slot5_bytes\":" << slot5_bytes
@@ -948,7 +992,13 @@ void report_sis(const ArchiveRecord& english, const ArchiveRecord& japanese)
     print_u32_array(lengths);
     std::cout << ",\"japanese_string_lengths\":";
     print_u32_array(jp_lengths);
-    std::cout << ",\"localized_prefix_equal\":true,\"metadata_equal\":true";
+    std::cout << ",\"localized_prefix_equal\":true,\"public_names_equal\":true"
+              << ",\"prefix_symbol_offsets_equal\":true,\"prefix_relocations_equal\":true"
+              << ",\"externs_equal\":true,\"metadata_equal\":";
+    print_bool(metadata_equal);
+    std::cout << ",\"quake_offset_shift_bytes\":7520,\"shifted_public_symbols\":"
+              << shifted_symbols << ",\"shifted_quake_relocation_slots\":"
+              << shifted_relocations;
     std::cout << "}";
 }
 
@@ -994,8 +1044,227 @@ int inspect_yakumono_target(const std::filesystem::path& path)
     return 0;
 }
 
+void print_sis_archive_probe(const std::string& name,
+                             const DatArchive& archive,
+                             const DatSis& sis,
+                             std::uint32_t root)
+{
+    std::cout << "{\"name\":";
+    print_json_string(name);
+    std::cout << ",\"data_bytes\":" << archive.data().size()
+              << ",\"root_offset\":" << root
+              << ",\"entry_count\":" << sis.entry_count()
+              << ",\"table_bytes\":"
+              << archive.next_target_offset(root) - root
+              << ",\"font_slots\":[";
+    for (std::uint32_t slot = 0; slot < 2; ++slot) {
+        if (slot) std::cout << ',';
+        const auto target = archive.pointer(root + slot * 4, 1);
+        std::cout << "{\"slot\":" << slot << ",\"target\":";
+        if (target) std::cout << *target;
+        else std::cout << "null";
+        std::cout << '}';
+    }
+    std::cout << "],\"strings\":[";
+    for (std::uint32_t slot = 2; slot < sis.entry_count(); ++slot) {
+        if (slot > 2) std::cout << ',';
+        const auto target = archive.pointer(root + slot * 4, 1);
+        std::cout << "{\"slot\":" << slot << ",\"target\":";
+        if (target) {
+            std::cout << *target << ",\"length_bytes\":"
+                      << sis_string_length(archive, root, slot);
+        } else {
+            std::cout << "null,\"length_bytes\":null";
+        }
+        std::cout << '}';
+    }
+    std::cout << "],\"composed_by_type\":[";
+    bool first = true;
+    for (std::uint32_t type = 8; type <= 12; ++type) {
+        if (!first) std::cout << ',';
+        first = false;
+        const auto prefix = sis_string_length(archive, root, 6);
+        const auto body = sis_string_length(archive, root, type);
+        const auto suffix = sis_string_length(archive, root, 7);
+        std::cout << "{\"type\":" << type
+                  << ",\"slot6_bytes\":" << prefix
+                  << ",\"type_bytes\":" << body
+                  << ",\"slot7_bytes\":" << suffix
+                  << ",\"composed_bytes\":" << prefix + body + suffix - 2
+                  << '}';
+    }
+    std::cout << "]}";
+}
+
+void print_public_symbol_difference(const std::vector<DatPublicSymbol>& left,
+                                   const std::vector<DatPublicSymbol>& right)
+{
+    const auto common = std::min(left.size(), right.size());
+    std::size_t index = 0;
+    while (index < common && left[index].name == right[index].name &&
+           left[index].data_offset == right[index].data_offset)
+        ++index;
+    if (index == common && left.size() == right.size()) {
+        std::cout << "null";
+        return;
+    }
+    std::cout << "{\"index\":" << index << ",\"english\":";
+    if (index < left.size()) {
+        std::cout << "{\"name\":";
+        print_json_string(left[index].name);
+        std::cout << ",\"offset\":" << left[index].data_offset << '}';
+    } else {
+        std::cout << "null";
+    }
+    std::cout << ",\"japanese\":";
+    if (index < right.size()) {
+        std::cout << "{\"name\":";
+        print_json_string(right[index].name);
+        std::cout << ",\"offset\":" << right[index].data_offset << '}';
+    } else {
+        std::cout << "null";
+    }
+    std::cout << '}';
+}
+
+void print_external_symbol_difference(const std::vector<DatExternalSymbol>& left,
+                                     const std::vector<DatExternalSymbol>& right)
+{
+    const auto common = std::min(left.size(), right.size());
+    std::size_t index = 0;
+    while (index < common && left[index].name == right[index].name &&
+           left[index].slots == right[index].slots)
+        ++index;
+    if (index == common && left.size() == right.size()) {
+        std::cout << "null";
+        return;
+    }
+    const auto print_entry = [](const DatExternalSymbol& item) {
+        std::cout << "{\"name\":";
+        print_json_string(item.name);
+        std::cout << ",\"slots\":";
+        print_u32_array(item.slots);
+        std::cout << '}';
+    };
+    std::cout << "{\"index\":" << index << ",\"english\":";
+    if (index < left.size()) print_entry(left[index]);
+    else std::cout << "null";
+    std::cout << ",\"japanese\":";
+    if (index < right.size()) print_entry(right[index]);
+    else std::cout << "null";
+    std::cout << '}';
+}
+
+void print_u32_difference(const std::vector<std::uint32_t>& left,
+                          const std::vector<std::uint32_t>& right)
+{
+    const auto common = std::min(left.size(), right.size());
+    std::size_t index = 0;
+    while (index < common && left[index] == right[index]) ++index;
+    if (index == common && left.size() == right.size()) {
+        std::cout << "null";
+        return;
+    }
+    std::cout << "{\"index\":" << index << ",\"english\":";
+    if (index < left.size()) std::cout << left[index];
+    else std::cout << "null";
+    std::cout << ",\"japanese\":";
+    if (index < right.size()) std::cout << right[index];
+    else std::cout << "null";
+    std::cout << '}';
+}
+
+int run_sis_probe(const std::filesystem::path& directory)
+{
+    const auto english_bytes = read_file(directory / "GrPs.usd");
+    const auto japanese_bytes = read_file(directory / "GrPs.dat");
+    const auto english = std::make_shared<const DatArchive>(
+        english_bytes, DatExternalPolicy::ResolveNull);
+    const auto japanese = std::make_shared<const DatArchive>(
+        japanese_bytes, DatExternalPolicy::ResolveNull);
+    const auto english_root = symbol_offset(*english, "SIS_GrPStadiumData");
+    const auto japanese_root = symbol_offset(*japanese, "SIS_GrPStadiumData");
+    const DatSis english_sis(english, "SIS_GrPStadiumData");
+    const DatSis japanese_sis(japanese, "SIS_GrPStadiumData");
+
+    const auto common_prefix = std::min(english_root, japanese_root);
+    std::uint32_t prefix_difference = 0;
+    while (prefix_difference < common_prefix &&
+           english->data()[prefix_difference] == japanese->data()[prefix_difference])
+        ++prefix_difference;
+    const bool prefix_equal = english_root == japanese_root &&
+                              prefix_difference == common_prefix;
+    const auto print_prefix_difference = [&] {
+        if (prefix_equal) {
+            std::cout << "null";
+            return;
+        }
+        std::cout << "{\"offset\":" << prefix_difference << ",\"english\":";
+        if (prefix_difference < english_root)
+            std::cout << unsigned(english->data()[prefix_difference]);
+        else
+            std::cout << "null";
+        std::cout << ",\"japanese\":";
+        if (prefix_difference < japanese_root)
+            std::cout << unsigned(japanese->data()[prefix_difference]);
+        else
+            std::cout << "null";
+        std::cout << '}';
+    };
+
+    const auto english_relocations = relocation_offsets(*english);
+    const auto japanese_relocations = relocation_offsets(*japanese);
+    const auto& english_symbols = english->public_symbols();
+    const auto& japanese_symbols = japanese->public_symbols();
+    const auto& english_externals = english->external_symbols();
+    const auto& japanese_externals = japanese->external_symbols();
+    const bool symbols_equal = english_symbols.size() == japanese_symbols.size() &&
+        std::equal(english_symbols.begin(), english_symbols.end(),
+            japanese_symbols.begin(), [](const auto& left, const auto& right) {
+                return left.name == right.name && left.data_offset == right.data_offset;
+            });
+    const bool externals_equal = english_externals.size() == japanese_externals.size() &&
+        std::equal(english_externals.begin(), english_externals.end(),
+            japanese_externals.begin(), [](const auto& left, const auto& right) {
+                return left.name == right.name && left.slots == right.slots;
+            });
+    const bool relocations_equal = english_relocations == japanese_relocations;
+
+    std::cout << "{\"probe\":\"sis\",\"scope\":\"bounded DatSis and DatArchive structural comparison; localization equality is reported, not required\","
+              << "\"archives\":[";
+    print_sis_archive_probe("GrPs.usd", *english, english_sis, english_root);
+    std::cout << ',';
+    print_sis_archive_probe("GrPs.dat", *japanese, japanese_sis, japanese_root);
+    std::cout << "],\"prefix_before_sis_root\":{\"english_bytes\":" << english_root
+              << ",\"japanese_bytes\":" << japanese_root
+              << ",\"equal\":" << (prefix_equal ? "true" : "false")
+              << ",\"first_difference\":";
+    print_prefix_difference();
+    std::cout << "},\"metadata\":{\"public_symbols\":{\"english_count\":"
+              << english_symbols.size() << ",\"japanese_count\":"
+              << japanese_symbols.size() << ",\"equal\":"
+              << (symbols_equal ? "true" : "false")
+              << ",\"first_difference\":";
+    print_public_symbol_difference(english_symbols, japanese_symbols);
+    std::cout << "},\"external_symbols\":{\"english_count\":"
+              << english_externals.size() << ",\"japanese_count\":"
+              << japanese_externals.size() << ",\"equal\":"
+              << (externals_equal ? "true" : "false")
+              << ",\"first_difference\":";
+    print_external_symbol_difference(english_externals, japanese_externals);
+    std::cout << "},\"relocations\":{\"english_count\":"
+              << english_relocations.size() << ",\"japanese_count\":"
+              << japanese_relocations.size() << ",\"equal\":"
+              << (relocations_equal ? "true" : "false")
+              << ",\"first_difference\":";
+    print_u32_difference(english_relocations, japanese_relocations);
+    std::cout << "}}}\n";
+    return 0;
+}
+
 int run_probe(std::string_view probe, const std::filesystem::path& path)
 {
+    if (probe == "sis") return run_sis_probe(path);
     if (probe == "animation-slots") {
         constexpr std::array<const char*, 6> names{
             "GrPs.usd", "GrPs.dat", "GrPs1.dat", "GrPs2.dat",
@@ -1112,7 +1381,7 @@ int run_probe(std::string_view probe, const std::filesystem::path& path)
         std::cout << "{\"probe\":\"quake\",\"scope\":\"typed DynamicModel structural decode\",\"models\":1,\"animations\":4,\"terminated\":true}\n";
         return 0;
     }
-    throw std::runtime_error("probe must be one of effects, ground, or quake");
+    throw std::runtime_error("probe must be one of sis, animation-slots, effects, ground, or quake");
 }
 
 } // namespace
