@@ -1,0 +1,518 @@
+{
+  "archives": [
+    {
+      "data_bytes": 1446816,
+      "dummy_image": {
+        "format": 0,
+        "height": 16,
+        "offset": 35276,
+        "reference_count": 1,
+        "width": 16
+      },
+      "entry_count": 10,
+      "external_policy": "resolve_null",
+      "external_slots": 75,
+      "external_symbols": 75,
+      "file_bytes": 1461024,
+      "flagged_objects": 44,
+      "itemdata_is_null": true,
+      "joint_references": 1,
+      "light_override_bounded_rows": 24,
+      "light_override_declared_count": 48,
+      "name": "GrPs.usd",
+      "particle_bank": {
+        "bank": 64,
+        "command_count": 30,
+        "command_root_valid": true,
+        "effect_entries_ready": false,
+        "first_command": 30000,
+        "published": false,
+        "texture_groups": 10,
+        "texture_root_valid": true
+      },
+      "quake_model": {
+        "animations": 4,
+        "models": 1,
+        "terminated_at_4": true
+      },
+      "relocation_count": 1762,
+      "scope": "english-source-base",
+      "shadows": 0,
+      "splines": 0,
+      "stadium_stage_param": {
+        "stkind": 3,
+        "x14": 6
+      },
+      "stage_param_count": 18,
+      "stage_param_ids": [
+        3,
+        72,
+        100,
+        107,
+        115,
+        124,
+        142,
+        143,
+        161,
+        170,
+        172,
+        184,
+        208,
+        240,
+        261,
+        269,
+        274,
+        283
+      ],
+      "stage_scale": 1,
+      "yakumono_abi_size_bytes": 84,
+      "yakumono_consumed_prefix_bytes": 82,
+      "yakumono_next_referenced_target_interval_bytes": 84,
+      "yakumono_public_symbol_interval_bytes": 112
+    },
+    {
+      "collision_binding_count": 1,
+      "data_bytes": 318048,
+      "entry_count": 10,
+      "external_policy": "resolve_null",
+      "external_slots": 91,
+      "external_symbols": 91,
+      "file_bytes": 327617,
+      "flagged_objects": 44,
+      "joint_references": 1,
+      "light_override_bounded_rows": 24,
+      "light_override_declared_count": 48,
+      "name": "GrPs1.dat",
+      "relocation_count": 929,
+      "scope": "transformation-map-head-only",
+      "shadows": 0,
+      "splines": 0,
+      "yakumono_abi_size_bytes": 84,
+      "yakumono_consumed_prefix_bytes": 82,
+      "yakumono_next_referenced_target_interval_bytes": 84,
+      "yakumono_public_symbol_interval_bytes": 112
+    },
+    {
+      "collision_binding_count": 1,
+      "data_bytes": 205504,
+      "entry_count": 10,
+      "external_policy": "resolve_null",
+      "external_slots": 88,
+      "external_symbols": 88,
+      "file_bytes": 213114,
+      "flagged_objects": 44,
+      "joint_references": 1,
+      "light_override_bounded_rows": 24,
+      "light_override_declared_count": 48,
+      "name": "GrPs2.dat",
+      "relocation_count": 530,
+      "scope": "transformation-map-head-only",
+      "shadows": 0,
+      "splines": 0,
+      "yakumono_abi_size_bytes": 84,
+      "yakumono_consumed_prefix_bytes": 82,
+      "yakumono_next_referenced_target_interval_bytes": 84,
+      "yakumono_public_symbol_interval_bytes": 112
+    },
+    {
+      "collision_binding_count": 1,
+      "data_bytes": 288160,
+      "entry_count": 10,
+      "external_policy": "resolve_null",
+      "external_slots": 71,
+      "external_symbols": 71,
+      "file_bytes": 297517,
+      "flagged_objects": 44,
+      "joint_references": 1,
+      "light_override_bounded_rows": 24,
+      "light_override_declared_count": 48,
+      "name": "GrPs3.dat",
+      "relocation_count": 1080,
+      "scope": "transformation-map-head-only",
+      "shadows": 0,
+      "splines": 0,
+      "yakumono_abi_size_bytes": 84,
+      "yakumono_consumed_prefix_bytes": 82,
+      "yakumono_next_referenced_target_interval_bytes": 84,
+      "yakumono_public_symbol_interval_bytes": 112
+    },
+    {
+      "collision_binding_count": 1,
+      "data_bytes": 272864,
+      "entry_count": 10,
+      "external_policy": "resolve_null",
+      "external_slots": 91,
+      "external_symbols": 91,
+      "file_bytes": 282884,
+      "flagged_objects": 44,
+      "joint_references": 1,
+      "light_override_bounded_rows": 24,
+      "light_override_declared_count": 48,
+      "name": "GrPs4.dat",
+      "relocation_count": 1063,
+      "scope": "transformation-map-head-only",
+      "shadows": 0,
+      "splines": 0,
+      "yakumono_abi_size_bytes": 84,
+      "yakumono_consumed_prefix_bytes": 82,
+      "yakumono_next_referenced_target_interval_bytes": 84,
+      "yakumono_public_symbol_interval_bytes": 112
+    }
+  ],
+  "audio_bank": {
+    "base_id": 1453,
+    "first_sample_id": 1453,
+    "last_sample_id": 1454,
+    "sample_count": 2
+  },
+  "audio_source_identity": {
+    "grkind_16_ssm_selection": [
+      48,
+      1,
+      1
+    ],
+    "hps_ids": {
+      "63": "pokesta.hps",
+      "64": "pstadium.hps"
+    },
+    "source": ".deps/melee/src/melee/lb/lbaudio_ax.static.h",
+    "ssm_bank_48": "pstadium.ssm"
+  },
+  "audio_streams": [
+    {
+      "blocks": 36,
+      "channels": 2,
+      "path": "audio/pstadium.hps",
+      "sample_rate": 32000
+    },
+    {
+      "blocks": 55,
+      "channels": 2,
+      "path": "audio/pokesta.hps",
+      "sample_rate": 32000
+    }
+  ],
+  "build_identity": {
+    "emscripten": "6.0.9",
+    "node_version": "v24.19.0"
+  },
+  "exclusions": [
+    "runtime stage registration and admission",
+    "original CSS/SSS selection",
+    "match initialization or stage lifecycle",
+    "asynchronous transformation file service",
+    "GPU output or pixel comparison",
+    "PCM fidelity",
+    "retail trace equivalence",
+    "physical input and live performance"
+  ],
+  "inputs": [
+    {
+      "disc_offset": 1246018600,
+      "fst_entry": 419,
+      "path": "GrPs.usd",
+      "sha256": "aa740cfbbeced294f058449caca8ac0380532521dde06ca4a6dcc03080cf6a6d",
+      "size": 1461024
+    },
+    {
+      "disc_offset": 1287159808,
+      "fst_entry": 418,
+      "path": "GrPs.dat",
+      "sha256": "0b55e7ba6234b882a35edf80d2d6c7f84d9fc887cbd4fe9c85b38ed7c3ea4e18",
+      "size": 1468544
+    },
+    {
+      "disc_offset": 1288634368,
+      "fst_entry": 420,
+      "path": "GrPs1.dat",
+      "sha256": "ea94e509953a024cb72d6c917b9ad3bf9ebc7c6a40d5d091daa613adafdb3ad7",
+      "size": 327617
+    },
+    {
+      "disc_offset": 1288962048,
+      "fst_entry": 421,
+      "path": "GrPs2.dat",
+      "sha256": "0232063e3393ee08cce329207e06bf237059b9585cfba96d2e4ab7274ca26375",
+      "size": 213114
+    },
+    {
+      "disc_offset": 1289191424,
+      "fst_entry": 422,
+      "path": "GrPs3.dat",
+      "sha256": "aa167c82d65d93a7ac85aff513e3a0d02963a12bb50d1d8f76fc73b2e09205a8",
+      "size": 297517
+    },
+    {
+      "disc_offset": 1289519104,
+      "fst_entry": 423,
+      "path": "GrPs4.dat",
+      "sha256": "861a04b08dcaa98f098bdb5c5237e6710e27cbafbb74814005407789cb3bfce9",
+      "size": 282884
+    },
+    {
+      "disc_offset": 1138434240,
+      "fst_entry": 113,
+      "path": "audio/pstadium.hps",
+      "sha256": "66d873dd38973f3cf7e328365f32120648ca6f779ccd849226ff4c19e3c058f4",
+      "size": 2303488
+    },
+    {
+      "disc_offset": 1134852832,
+      "fst_entry": 112,
+      "path": "audio/pokesta.hps",
+      "sha256": "00ff265d45dd8a72ecd1d80f192d3d32457e0990a5c93e699a42aac9e1ec5439",
+      "size": 3581408
+    },
+    {
+      "disc_offset": 1234730240,
+      "fst_entry": 186,
+      "path": "audio/us/pstadium.ssm",
+      "sha256": "3b95045913d27469d87720f94b91e1bce4272e3ebabc743d74d0e8e863d34b25",
+      "size": 101792
+    }
+  ],
+  "japanese_base_parse_scope": "localization metadata, yakumono contract, and SIS comparison only",
+  "machine": "Mac mini, macOS; Node/Wasm structural trace; no browser",
+  "repeated_trace_output_identical": true,
+  "result": "passed",
+  "retained_diagnostics": {
+    "artifacts": [
+      {
+        "bytes": 4808,
+        "filename": "c0-full-attempt-1/receipt.json",
+        "sha256": "fd24b6e0c26e68304d2474ccb4e2852a1b4da9102f14badde4587d32382e9ef0"
+      },
+      {
+        "bytes": 4808,
+        "filename": "c0-full-attempt-2/receipt.json",
+        "sha256": "219018b56ce76c7e763b935ddeaa59cdd8c55f4a0029bfcf92bc6e09b7e9a4e2"
+      },
+      {
+        "bytes": 4808,
+        "filename": "c0-full-attempt-3/receipt.json",
+        "sha256": "6661a766e9bfed1592fbe61f3370ff5c4635ba16507a2c4a592942fd37017cf6"
+      },
+      {
+        "bytes": 5027,
+        "filename": "c0-full-attempt-4/receipt.json",
+        "sha256": "cae48653dbd1d3ccc224783da04f9f56bc9631eb0d27e6891cc22ae8a9e2d886"
+      },
+      {
+        "bytes": 93939,
+        "filename": "c0-full-attempt-4/c0-trace-run-1.json",
+        "sha256": "c0a69f10d7c22c90090e0a2fed07b98bfa1a1cc58e4d8fe5753c772b7c38548d"
+      },
+      {
+        "bytes": 93939,
+        "filename": "c0-full-attempt-4/c0-trace-run-2.json",
+        "sha256": "c0a69f10d7c22c90090e0a2fed07b98bfa1a1cc58e4d8fe5753c772b7c38548d"
+      }
+    ],
+    "corrections": [
+      "Archive external links validate and resolve to null; resident map provider ownership is selected by non-null joint rows, not public symbol-name guesses.",
+      "Localized text/glyph data shifts trailing quake metadata; the trace asserts the observed 7520-byte shift over one public symbol and 37 suffix relocation slots.",
+      "The SIS diagnostic prefix scan was corrected to start at byte zero."
+    ],
+    "full_attempts": [
+      {
+        "attempt": 1,
+        "boundary": "mistaken animation-presence assertion on ResolveNull external slots",
+        "result": "failed"
+      },
+      {
+        "attempt": 2,
+        "boundary": "mistaken requirement for public names on anonymous local map targets",
+        "result": "failed"
+      },
+      {
+        "attempt": 3,
+        "boundary": "mistaken whole-archive localized metadata offset equality",
+        "result": "failed"
+      },
+      {
+        "attempt": 4,
+        "boundary": "two fresh structural trace processes",
+        "result": "passed"
+      }
+    ],
+    "lookup": "External task-run inventory named stadium-c0-c1-20261006; full receipts and raw output remain outside Git. Successful owned extraction was removed.",
+    "reduced_probes": [
+      "six-DAT local/external/absent animation-slot inventory",
+      "anonymous map target and resident provider-row identity",
+      "typed GroundParam/StageParam C snapshot",
+      "effect bank structural decode",
+      "quake DynamicModel structural decode",
+      "SIS lengths, bounded byte prefix, public/extern/relocation differences"
+    ],
+    "run_identifier": "stadium-c0-c1-20261006-153940-5d7f4134"
+  },
+  "schema": "melee-web-pokemon-stadium-c0-v1",
+  "scope": "source-data structural parser evidence only; no runtime or stage admission",
+  "sis": {
+    "empty_authored_slot5_bytes": 1,
+    "english_composed_max": 112,
+    "english_string_lengths": [
+      575,
+      2,
+      46,
+      1,
+      43,
+      41,
+      23,
+      28,
+      30,
+      28,
+      30,
+      43,
+      45,
+      45,
+      45,
+      45,
+      30,
+      24,
+      28,
+      41
+    ],
+    "entry_count": 22,
+    "externs_equal": true,
+    "japanese_composed_max": 66,
+    "japanese_string_lengths": [
+      575,
+      2,
+      58,
+      1,
+      30,
+      21,
+      17,
+      15,
+      15,
+      15,
+      15,
+      18,
+      22,
+      22,
+      22,
+      22,
+      28,
+      24,
+      31,
+      41
+    ],
+    "localized_prefix_equal": true,
+    "metadata_equal": false,
+    "offset": 1297024,
+    "prefix_relocations_equal": true,
+    "prefix_symbol_offsets_equal": true,
+    "public_names_equal": true,
+    "quake_offset_shift_bytes": 7520,
+    "shifted_public_symbols": 1,
+    "shifted_quake_relocation_slots": 37,
+    "table_bytes": 88
+  },
+  "six_archive_yaku_identical": true,
+  "source_identity_after": {
+    "head": "78e6fee0357258cad85f8699adb603439f3a2fa5",
+    "tree": "727660e36c865dcb504778f1f81ded15d0bd9caf",
+    "worktree": "clean"
+  },
+  "source_identity_before": {
+    "head": "78e6fee0357258cad85f8699adb603439f3a2fa5",
+    "tree": "727660e36c865dcb504778f1f81ded15d0bd9caf",
+    "worktree": "clean"
+  },
+  "target": {
+    "javascript_sha256": "11176d19e6d932797eba90ae7d33030c9e06710d5f48f09580c068dc942d8b9a",
+    "name": "pokemon_stadium_c0_trace.js",
+    "wasm_sha256": "e9d0289a90d37a6b35f41bfdf74aaddac5b274845712702ea92cebdc12ba3a3b"
+  },
+  "target_identity_after": {
+    "javascript_sha256": "11176d19e6d932797eba90ae7d33030c9e06710d5f48f09580c068dc942d8b9a",
+    "wasm_sha256": "e9d0289a90d37a6b35f41bfdf74aaddac5b274845712702ea92cebdc12ba3a3b"
+  },
+  "trace_runs": [
+    {
+      "fresh_process": true,
+      "run": 1,
+      "stdout_sha256": "c0a69f10d7c22c90090e0a2fed07b98bfa1a1cc58e4d8fe5753c772b7c38548d"
+    },
+    {
+      "fresh_process": true,
+      "run": 2,
+      "stdout_sha256": "c0a69f10d7c22c90090e0a2fed07b98bfa1a1cc58e4d8fe5753c772b7c38548d"
+    }
+  ],
+  "transform_round_up_32_zero_tails": [
+    {
+      "all_zero": true,
+      "disc_offset": 1288634368,
+      "file_size": 327617,
+      "path": "GrPs1.dat",
+      "rounded_size": 327648,
+      "tail_bytes": 31,
+      "tail_sha256": "fd08be957bda07dc529ad8100df732f9ce12ae3e42bcda6acabe12c02dfd6989"
+    },
+    {
+      "all_zero": true,
+      "disc_offset": 1288962048,
+      "file_size": 213114,
+      "path": "GrPs2.dat",
+      "rounded_size": 213120,
+      "tail_bytes": 6,
+      "tail_sha256": "b0f66adc83641586656866813fd9dd0b8ebb63796075661ba45d1aa8089e1d44"
+    },
+    {
+      "all_zero": true,
+      "disc_offset": 1289191424,
+      "file_size": 297517,
+      "path": "GrPs3.dat",
+      "rounded_size": 297536,
+      "tail_bytes": 19,
+      "tail_sha256": "d6fd62f5ce537d90ea3ea45841b17f34d727bcbc4128748cba14fb87c0ffd9d1"
+    },
+    {
+      "all_zero": true,
+      "disc_offset": 1289519104,
+      "file_size": 282884,
+      "path": "GrPs4.dat",
+      "rounded_size": 282912,
+      "tail_bytes": 28,
+      "tail_sha256": "3addfb141cd7c9c4c6543a82191a3707ac29c7a041217782e61d4d91c691aee8"
+    }
+  ],
+  "transform_yaku_identical": true,
+  "validation": {
+    "affected_target_build": {
+      "command": "python3 scripts/build.py --trace-target pokemon_stadium_c0_trace",
+      "log": {
+        "bytes": 12371,
+        "filename": "c0-sis-final-build.log",
+        "sha256": "c436be1d6b37c3d8b319dbcd6f437919dd15ccbaec518765ee611ebc18513b50"
+      },
+      "result": "passed"
+    },
+    "diff_check": "passed",
+    "documentation_links": "passed",
+    "focused_build_selection_tests": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_selected_trace_build.py -v",
+      "log": {
+        "bytes": 2846,
+        "filename": "c0-sis-focused-tests.log",
+        "sha256": "9c14f6fea204cccb4e428ff8ff7dadbcc3150ba0a1650d2e0f319c1dc27f359d"
+      },
+      "result": "passed",
+      "tests": 10
+    },
+    "full_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "log": {
+        "bytes": 349004,
+        "filename": "c0-full-unittest.log",
+        "sha256": "cb0b12122667355a43d5b99692f379239688fd6bed27ecfe4cbd5d2ab2a359a6"
+      },
+      "result": "passed",
+      "seconds": 345.962,
+      "skipped": 139,
+      "tests": 1921
+    }
+  }
+}
