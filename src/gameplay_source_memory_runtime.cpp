@@ -188,6 +188,43 @@ extern "C" int melee_web_source_memory_healthy(void)
     return !active || healthy;
 }
 
+extern "C" MeleeWebSourceMemoryReadStatus
+melee_web_source_memory_context_read(MeleeWebSourceMemoryContext* out)
+{
+    if (out) *out = {};
+    if (!out) return MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
+    if (!active) return MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE;
+    if (!healthy) return MELEE_WEB_SOURCE_MEMORY_READ_UNHEALTHY;
+    out->source_heap_handle = source_heap_handle;
+    out->world_generation = world_generation;
+    out->allocation_generation_watermark = next_generation;
+    return MELEE_WEB_SOURCE_MEMORY_READ_OK;
+}
+
+extern "C" MeleeWebSourceMemoryReadStatus
+melee_web_source_memory_allocation_read(
+    const void* exact_host_payload, MeleeWebSourceMemoryAllocation* out)
+{
+    if (out) *out = {};
+    if (!out || !exact_host_payload)
+        return MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
+    if (!active) return MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE;
+    if (!healthy) return MELEE_WEB_SOURCE_MEMORY_READ_UNHEALTHY;
+
+    out->source_heap_handle = source_heap_handle;
+    out->world_generation = world_generation;
+    const uintptr_t host = reinterpret_cast<uintptr_t>(exact_host_payload);
+    const auto found = std::find_if(allocations.begin(), allocations.end(),
+        [host](const HostAllocation& allocation) {
+            return allocation.host == host;
+        });
+    if (found == allocations.end()) return MELEE_WEB_SOURCE_MEMORY_READ_OK;
+    out->requested_bytes = found->requested;
+    out->allocation_generation = found->generation;
+    out->live = 1;
+    return MELEE_WEB_SOURCE_MEMORY_READ_OK;
+}
+
 extern "C" int melee_web_source_memory_fighter_acquire(
     void* host_fighter, size_t fighter_bytes,
     MeleeWebSourceFighterAddress* out)

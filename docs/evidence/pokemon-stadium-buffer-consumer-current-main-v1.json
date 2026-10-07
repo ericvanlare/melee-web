@@ -1,0 +1,150 @@
+{
+  "schema": "melee-web-pokemon-stadium-buffer-consumer-current-main-v1",
+  "result": "passed_scoped_integration_validation",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified"
+  ],
+  "boundary": "Current-main integration refresh for the bounded Stadium live-buffer consumer. It validates the rebased source, focused observer controls, full Python suite, and affected ordinary Release targets. The retained diagnostic fixture run remains tied to its earlier producer and was not repeated.",
+  "producer": {
+    "branch": "codex/stadium-buffer-integration-20261007",
+    "commit": "2cf49e665109753640684c20dfc718575438b7ff",
+    "tree": "04619d48c2edc38b71cd492fd48426829ece21e3",
+    "base_main": "1923f737428f213288c46b478c1282239d8a320a",
+    "tracked_worktree_clean_before_validation": true,
+    "dependency_lock_sha256": "b51fcde84db09641e4936339af970d74e97c71043ce6f6efee0c70e09211b385",
+    "rebase": {
+      "old_base": "d8f76001fc93ca593228fe740f70aec6b8f9ee4b",
+      "new_base": "1923f737428f213288c46b478c1282239d8a320a",
+      "pre_rebase_branch_ref": "codex/stadium-buffer-integration-20261007-pre-pr242-67efd2d",
+      "range_diff_artifact": "rebase-range-diff.txt",
+      "range_diff_sha256": "16e194fd1dc06e5815773567ba075f1f391844dd63ae474485d0d1dd036558b1",
+      "six_owned_commit_patches_unchanged": true
+    },
+    "source_inputs": {
+      "patches/melee-gameplay.patch": "5abfcfb67504d95cc57cc3ddfed6cd56c0e55bda552a6d037d19d0c00739db82",
+      "src/gameplay_source_memory_runtime.cpp": "8416b981cf93f3793db11508bbefcd94bc7e9a0a6919bb8e74f3dcbe56bdac71",
+      "src/gameplay_source_memory_runtime.h": "f21beec813c8a3eeb488441083afff70640dbb0d28f86d156df8ccba7ceab5a2",
+      "src/gameplay_source_preload.h": "cb1ee49f0a624d0a06aece29e520ddb13f4e7fa608157874c8e79e9a8846d11c",
+      "tests/stadium_buffer_consumer.hpp": "f83916a12f80ced15e83d39c85ea954f2fb8633d4d4ca3c80a5e38026d98b86a",
+      "tests/stadium_screen_roots_trace.cpp": "e36e043f918f7eaabb178536158a2b409bb394ac5e0c812963ec4ace6068011f",
+      "tests/native_menu_host_trace.cpp": "8e016a509f4b24e7bee4b4c576c9efd1e77bc2e191cfa674f47785e76ce0f996",
+      "tests/gameplay_heap_trace.cpp": "25e350604310ad7b5980b460871ac7364716ddd1a253cc6507ef0175072fa997",
+      "tests/test_gameplay_heap.py": "e261cbf509005253e2995cc67dff379c405bc5b2d9126a855c34bf1d95b8c85f",
+      "tests/test_gameplay_patch_canonical.py": "c16fd92e73592497300a35b746e59cdb18e3ea8c9683ba35de113affd4e59cab",
+      "build/gameplay-source/src/melee/gr/grpstadium.c": "dfd603804f36a8d53fa39a17be444b59df9d6586f887083c6ed40e44fcbeb23d"
+    }
+  },
+  "validation_run": {
+    "run_id": "stadium-issue233-current-main-validation-20261007-1923f737",
+    "pre_run_identity_artifact": "producer-before-suite.json",
+    "pre_run_identity_sha256": "ed4a57aa8ac180a9ceb8068551082102ac59a0abeaa940148dbaf5f5efb9aedc",
+    "full_python_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- env -u MELEE_MENU_FIXTURE_ROOT -u MELEE_KEEP_TEST_ARTIFACTS python3 -m unittest discover -s tests -v",
+      "tests": 2036,
+      "skipped": 132,
+      "elapsed_seconds": 427.656,
+      "exit_code": 0,
+      "stdout_artifact": "full-suite.stdout.log",
+      "stdout_sha256": "6ec0eab7b7903c7c4c963e63bdf0a11b9935910bc168ee039bc1254c5e0cf2b7",
+      "stderr_artifact": "full-suite.stderr.log",
+      "stderr_sha256": "2274bbf6df5fb6c9920f97a96df17162e4ed67f3d9e87caa329c12a70ab65c9c"
+    },
+    "focused_checks": {
+      "source_memory_observer": {
+        "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_gameplay_heap.py -k source_memory_read_observers -v",
+        "tests": 1,
+        "exit_code": 0,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "69b6d8998d0afbfe948b0b727f1c1274ddae66b95d672ab70a53e90086b4728a"
+      },
+      "patch_canonical": {
+        "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_gameplay_patch_canonical.py -v",
+        "tests": 15,
+        "exit_code": 0,
+        "stdout_sha256": "b0b8ba9044f9922c6d3141a948433195c5cd60c40592ae4c30feb1932b67b824",
+        "stderr_sha256": "54c1e4074bd3497601c7a898f17aeb27fef0118476c235e5efbf26432f2797f8"
+      }
+    },
+    "ordinary_release_profile": {
+      "configuration": "Release",
+      "build_directory": "build/browser-release",
+      "platform": "Emscripten wasm32",
+      "all_diagnostic_and_alternate_runtime_options_off": true,
+      "boolean_cache_options_off": [
+        "MELEE_WEB_AUDIO_PREVIEW_RUNTIME",
+        "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC",
+        "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC",
+        "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE",
+        "MELEE_WEB_PIPELINE_PROVENANCE",
+        "MELEE_WEB_PUBLIC_RUNTIME",
+        "MELEE_WEB_RESULTS_RENDERED_TRACE",
+        "MELEE_WEB_SELECTIVE_PIPELINES",
+        "MELEE_WEB_SLIPPI_PROFILE_BROWSER",
+        "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC"
+      ],
+      "cmake_cache_sha256": "de0c1275f03b2fd5b618fbbe59e3d7d16a251176ad41c68db9939100d6356bdc",
+      "build_ninja_sha256": "3066b10d098da57343b358a10405f91c8e8f6afd8be4e5d5b3295c55d0bf635f",
+      "targets": {
+        "gameplay_menu_browser": {
+          "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime --configuration Release",
+          "exit_code": 0,
+          "stdout_artifact": "ordinary-release-runtime.stdout.log",
+          "stdout_sha256": "12877e0560b4ca2d061d6e7e29756ccba079926423d97699c9e13130dc8c524e",
+          "stderr_artifact": "ordinary-release-runtime.stderr.log",
+          "stderr_sha256": "21c6fec15fe4097868f5576455de36b5f8bdc50c0683c3849e8c4ec9eb6ec8fa",
+          "compiled_objects": {
+            "build/browser-release/CMakeFiles/gameplay_runtime.dir/src/gameplay_source_memory_runtime.cpp.o": "21da5736cdeabd4188845ffe4caf1140ba8a6a7fb40ab85d7ab584fe48c95811",
+            "build/browser-release/CMakeFiles/fighter_source_runtime.dir/build/gameplay-source/src/melee/gr/grpstadium.c.o": "c40ab6d44f014d7a3264dedeb402d06a45b6b438b0cada82f2db3de7609d61f8",
+            "build/browser-release/CMakeFiles/gameplay_menu_browser.dir/src/gameplay_menu_browser.cpp.o": "387726e5727785ee552ec296dfbeedab42c7c2e53190d9519499a8795f7cbc00"
+          },
+          "artifacts": {
+            "gameplay_menu_browser.js": {
+              "bytes": 300352,
+              "sha256": "4e751ebb2467c3a8ee74583b37aa1753f1233c89e496b61458594c16eb262e61"
+            },
+            "gameplay_menu_browser.wasm": {
+              "bytes": 15742171,
+              "sha256": "f4104859b45711321ec2c0e1c9c39eb923eec2a868ae79f6565d5d6d022399f3"
+            }
+          },
+          "nonfatal_warnings": "160 existing writable-string warnings from upstream/dependency source"
+        },
+        "native_menu_host_trace": {
+          "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --trace-target native_menu_host_trace --configuration Release",
+          "exit_code": 0,
+          "stdout_artifact": "ordinary-release-native-menu-trace.stdout.log",
+          "stdout_sha256": "c749327a117ca84871bbcf29b0a421b2cb52f5ea4ad07a5804b64e605fa9f546",
+          "stderr_artifact": "ordinary-release-native-menu-trace.stderr.log",
+          "stderr_sha256": "21c6fec15fe4097868f5576455de36b5f8bdc50c0683c3849e8c4ec9eb6ec8fa",
+          "compiled_object": "build/browser-release/CMakeFiles/native_menu_host_trace.dir/tests/native_menu_host_trace.cpp.o",
+          "compiled_object_sha256": "bf47e45d3bcd89be47ecfbb9ccfb788b1ed43ccfeb6f981354d789545c6f2961",
+          "artifacts": {
+            "native_menu_host_trace.js": {
+              "bytes": 232567,
+              "sha256": "a38469b0da5e97b03f9a1d7d6d5b6c9d0dd9a7b697777c26350064430fa0a3f9"
+            },
+            "native_menu_host_trace.wasm": {
+              "bytes": 13584106,
+              "sha256": "e15e58419b95b80817e3341c2988323b9bfd61d822626f5790a0f56b58659299"
+            }
+          },
+          "nonfatal_warnings": "4 writable-string warnings"
+        }
+      }
+    }
+  },
+  "retained_native_evidence": {
+    "prior_receipt": "pokemon-stadium-buffer-consumer-v1.json",
+    "prior_receipt_sha256": "af88ef6c074ac90bf6fcfc5548a801c7804d682624eeecf1a20035ceac7d036e",
+    "prior_run_id": "stadium-buffer-integration-e322-20261007-2206-cf4a",
+    "root_review_sha256": "ee23eefedc4f99856c60bf51bc9db24f0cc189969dbd3b99ea02f5e254db89d4",
+    "fixture_rerun_in_this_validation": false,
+    "producer_and_fixture_inventory_claims_remain_scoped_to_prior_receipt": true
+  },
+  "exclusions": [
+    "No retained 98-file fixture rerun and no original constructor execution in this integration refresh.",
+    "No browser, stage admission, full startup sequence, callbacks, renderer, collision, gameplay ticks, or session-acceptance claim.",
+    "This component is not whole-session acceptance."
+  ]
+}
