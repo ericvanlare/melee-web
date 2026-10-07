@@ -12,8 +12,9 @@ draw-accounting gap in [the earlier A2 run](2026-10-06-local-lockstep-a2.md) and
 The [portable receipt](../evidence/local-lockstep-source-accounting-v1.json) binds
 the clean Release producer and runner `6c5d6c7`, all 32 packaged build files,
 local/HTTP identity checks before and after both runs, callback records,
-checksums, screenshots, logs and cleanup reports. Historical negative controls
-retain the source identities in the earlier receipt.
+checksums, screenshots, logs and cleanup reports. Fresh terminal controls use
+runner `3f48bf4` with the same native producer; the receipt records that source
+difference. Historical controls retain their identities in the earlier receipt.
 
 ## Observation boundary
 
@@ -50,6 +51,17 @@ All twelve probe/full-route screenshots were inspected. The existing magenta
 Final Destination geometry remains visible on both peers and is tracked in
 [#175](https://github.com/ericvanlare/melee-web/issues/175). SSS and Results images
 include their entry animations. This result makes no pixel-fidelity claim.
+
+Fresh input-flip and disconnect controls passed with exact source accounting.
+The flip first differs at delayed source tick 12, channel 1; both native peers
+then hold cursor 16. Disconnect also holds both cursors at 16. Each peer accounts
+for all 16 steps and draws, with no automatic resume or fallback.
+
+The first fresh flip attempt exposed a harness race: checksum delivery reached
+the correct terminal while the browser drain awaited, then the runner tried to
+update the ended peer. That failure is retained. A post-drain terminal check
+fixes the runner; the subsequent flip and disconnect runs passed. Native and
+packaged runtime sources are unchanged.
 
 ## Validation and remaining gates
 
