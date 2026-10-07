@@ -296,119 +296,133 @@ public:
     LocalQueryView() = default;
 };
 
-inline void live_source_consumer_checks() {
+// Caller retains the canonical descriptor owner, IMAGE/SIS catalog and foreign
+// IMAGE owner through this entire immediate-load/query/remove lifetime.
+inline void live_source_consumer_lifetime(
+    HSD_Joint* descriptor, HSD_ImageDesc* image, HSD_ImageDesc* foreign_image,
+    const std::function<void()>& verify = [] {}) {
+    require(image && foreign_image && foreign_image != image,
+            "Live consumer requires canonical and distinct foreign-owner IMAGEs");
+    require_stage_empty();
+    const auto stats_before = melee_web_gameplay_stats();
+    verify();
+    LoadedJointPlan plan = checked_load_plan(descriptor);
+    const BorrowedTextureState borrowed = snapshot_borrowed_textures();
+    require(tobj_toon == nullptr || tobj_toon->imagedesc == nullptr,
+            "Source load would compile a borrowed toon IMAGE");
+    require(tobj_shadows == nullptr || !plan.has_shadow_material,
+            "Source load would compile a borrowed shadow chain");
+
+    const auto runtime_before = runtime_roots_snapshot();
+    const auto classes_before = live_class_counts();
+    const auto pools_before = live_pool_counts();
+    const u32 ids_before = HSD_ObjAllocGetUsing(HSD_IDGetAllocData());
+    const u32 texture_bounds_before = melee_web_texture_bounds_live();
+    for (HSD_Joint* joint : plan.joints)
+        require(HSD_IDGetDataFromTable(
+                    nullptr, static_cast<u32>(reinterpret_cast<std::uintptr_t>(joint)),
+                    nullptr) == nullptr,
+                "Candidate descriptor already has an HSD ID binding");
+
+    verify();
+    LoadedRoot loaded(descriptor);
+    require(loaded.get() != nullptr, "Original HSD_JObjLoadJoint returned null");
+    require(live_class_counts() != classes_before,
+            "Original JObj load did not record live source class ownership");
+    require_borrowed_textures_unchanged(borrowed);
+    require(runtime_roots_snapshot() == runtime_before,
+            "Original JObj load changed entity/process/GX lists or StageInfo");
+    require(melee_web_texture_bounds_live() == texture_bounds_before,
+            "Original JObj load changed texture-bound live count");
+    for (HSD_Joint* joint : plan.joints)
+        require(HSD_IDGetDataFromTable(
+                    nullptr, static_cast<u32>(reinterpret_cast<std::uintptr_t>(joint)),
+                    nullptr) != nullptr,
+                "Original source load omitted a descriptor ID binding");
+
+    verify();
+    LocalQueryView view;
+    view.object.hsd_obj = loaded.get();
+    const auto hit = stadium_screen_live_image_query(&view.object, image, nullptr);
+    auto* material = static_cast<HSD_MObj*>(hit.material);
+    auto* tobj = static_cast<HSD_TObj*>(hit.texture);
+    require(tobj && material && tobj->imagedesc == image,
+            "Original Stadium consumer missed canonical map-1 IMAGE");
+    const auto live_materials =
+        live_materials_for_image(loaded.get(), image, tobj);
+    require(live_materials.size() == 1 && live_materials.front() == material,
+            "Loaded map-1 IMAGE lacks one live owning material");
+
+    HSD_MObj sentinel_storage{};
+    HSD_MObj* sentinel = &sentinel_storage;
+    const auto foreign_miss = stadium_screen_live_image_query(
+        &view.object, foreign_image, sentinel);
+    require(foreign_miss.texture == nullptr && foreign_miss.material == sentinel,
+            "Foreign-owner IMAGE miss changed the material sentinel");
+    HSD_GObj empty_view{};
+    const auto empty_miss = stadium_screen_live_image_query(&empty_view, image, sentinel);
+    require(empty_miss.texture == nullptr && empty_miss.material == sentinel,
+            "Empty-view miss changed the material sentinel");
+
+    verify();
+    view.object.hsd_obj = nullptr;
+    loaded.reset();
+    require_borrowed_textures_unchanged(borrowed);
+    require(runtime_roots_snapshot() == runtime_before,
+            "Original JObj removal changed entity/process/GX lists or StageInfo");
+    require(melee_web_texture_bounds_live() == texture_bounds_before,
+            "Original JObj removal changed texture-bound live count");
+    require(live_class_counts() == classes_before &&
+                live_pool_counts() == pools_before,
+            "Original JObj removal retained live source objects or pool entries");
+    require(HSD_ObjAllocGetUsing(HSD_IDGetAllocData()) == ids_before,
+            "Original JObj removal did not restore ID allocator usage");
+    for (HSD_Joint* joint : plan.joints)
+        require(HSD_IDGetDataFromTable(
+                    nullptr, static_cast<u32>(reinterpret_cast<std::uintptr_t>(joint)),
+                    nullptr) == nullptr,
+                "Original JObj removal retained a descriptor ID binding");
+    require_stage_empty();
+    const auto stats_after = melee_web_gameplay_stats();
+    require(stats_after.generation == stats_before.generation &&
+                stats_after.ticks == stats_before.ticks,
+            "Source consumer query changed runtime generation/ticks");
+    verify();
+}
+
+inline void live_source_consumer_checks(
+    const std::function<void()>& verify = [] {}) {
     using namespace synthetic;
     const auto raw = fixture();
     const auto archive = std::make_shared<const DatArchive>(raw);
     const std::vector<std::uint8_t> decoded_before(archive->data().begin(),
-                                                    archive->data().end());
-    const auto stats_before = melee_web_gameplay_stats();
-    require_stage_empty();
-
+                                                archive->data().end());
+    auto invariants = [&] {
+        require(std::equal(archive->data().begin(), archive->data().end(),
+                           decoded_before.begin()),
+                "Original JObj load/removal changed decoded synthetic archive bytes");
+        verify();
+    };
     for (unsigned lifetime = 0; lifetime < 2; ++lifetime) {
         DatNativeMap map(archive, contract());
         DatSis sis(archive, sis_name);
-        HSD_Joint* descriptor = static_cast<HSD_Joint*>(
+        auto* descriptor = static_cast<HSD_Joint*>(
             stadium_screen_map_entry_joint(map.map_head(), 1));
-        LoadedJointPlan plan = checked_load_plan(descriptor);
-        const BorrowedTextureState borrowed = snapshot_borrowed_textures();
-        require(tobj_toon == nullptr || tobj_toon->imagedesc == nullptr,
-                "Synthetic load would compile a borrowed toon IMAGE");
-        require(tobj_shadows == nullptr || !plan.has_shadow_material,
-                "Synthetic load would compile a borrowed shadow chain");
-
-        const auto runtime_before = runtime_roots_snapshot();
-        const auto classes_before = live_class_counts();
-        const auto pools_before = live_pool_counts();
-        const u32 ids_before = HSD_ObjAllocGetUsing(HSD_IDGetAllocData());
-        const u32 texture_bounds_before = melee_web_texture_bounds_live();
-        for (HSD_Joint* joint : plan.joints)
-            require(HSD_IDGetDataFromTable(
-                        nullptr, static_cast<u32>(reinterpret_cast<std::uintptr_t>(joint)),
-                        nullptr) == nullptr,
-                    "Synthetic candidate descriptor already has an HSD ID binding");
-
         auto* image = static_cast<HSD_ImageDesc*>(map.image_descriptor(0x3a0));
-        require(image != nullptr, "Synthetic map-1 IMAGE accessor returned null");
+        identity(map, 1, image);
         const MeleeWebArchiveSymbol symbols[] = {
             {"GrPs.usd", image_name, image},
             {"GrPs.usd", sis_name, sis.descriptor()},
         };
         Catalog catalog("GrPs.usd", symbols, 2);
         require(stadium_screen_source_public(catalog.handle, image_name) == image &&
-                    stadium_screen_source_public(catalog.handle, sis_name) ==
-                        sis.descriptor(),
+                    stadium_screen_source_public(catalog.handle, sis_name) == sis.descriptor(),
                 "Synthetic typed catalog lost borrowed IMAGE/SIS identity");
         DatNativeMap foreign(archive, contract());
-        auto* foreign_image = static_cast<HSD_ImageDesc*>(
-            foreign.image_descriptor(0x3a0));
-        require(foreign_image && foreign_image != image,
-                "Foreign map did not create a distinct IMAGE identity");
-
-        LoadedRoot loaded(descriptor);
-        require(loaded.get() != nullptr, "Original HSD_JObjLoadJoint returned null");
-        require(live_class_counts() != classes_before,
-                "Original JObj load did not record live source class ownership");
-        require_borrowed_textures_unchanged(borrowed);
-        require(runtime_roots_snapshot() == runtime_before,
-                "Original JObj load changed entity/process/GX lists or StageInfo");
-        require(melee_web_texture_bounds_live() == texture_bounds_before,
-                "Original JObj load changed texture-bound live count");
-        for (HSD_Joint* joint : plan.joints)
-            require(HSD_IDGetDataFromTable(
-                        nullptr, static_cast<u32>(reinterpret_cast<std::uintptr_t>(joint)),
-                        nullptr) != nullptr,
-                    "Original source load omitted a descriptor ID binding");
-
-        LocalQueryView view;
-        view.object.hsd_obj = loaded.get();
-        const auto hit = stadium_screen_live_image_query(&view.object, image, nullptr);
-        auto* material = static_cast<HSD_MObj*>(hit.material);
-        auto* tobj = static_cast<HSD_TObj*>(hit.texture);
-        require(tobj && material && tobj->imagedesc == image,
-                "Original Stadium consumer missed canonical map-1 IMAGE");
-        const auto live_materials =
-            live_materials_for_image(loaded.get(), image, tobj);
-        require(live_materials.size() == 1 && live_materials.front() == material,
-                "Loaded map-1 IMAGE lacks one live owning material");
-
-        HSD_MObj sentinel_storage{};
-        HSD_MObj* sentinel = &sentinel_storage;
-        const auto foreign_miss = stadium_screen_live_image_query(
-            &view.object, foreign_image, sentinel);
-        require(foreign_miss.texture == nullptr && foreign_miss.material == sentinel,
-                "Foreign-owner IMAGE miss changed the material sentinel");
-        HSD_GObj empty_view{};
-        const auto empty_miss = stadium_screen_live_image_query(&empty_view, image, sentinel);
-        require(empty_miss.texture == nullptr && empty_miss.material == sentinel,
-                "Empty-view miss changed the material sentinel");
-
-        view.object.hsd_obj = nullptr;
-        loaded.reset();
-        require_borrowed_textures_unchanged(borrowed);
-        require(runtime_roots_snapshot() == runtime_before,
-                "Original JObj removal changed entity/process/GX lists or StageInfo");
-        require(melee_web_texture_bounds_live() == texture_bounds_before,
-                "Original JObj removal changed texture-bound live count");
-        require(live_class_counts() == classes_before &&
-                    live_pool_counts() == pools_before,
-                "Original JObj removal retained live source objects or pool entries");
-        require(HSD_ObjAllocGetUsing(HSD_IDGetAllocData()) == ids_before,
-                "Original JObj removal did not restore ID allocator usage");
-        for (HSD_Joint* joint : plan.joints)
-            require(HSD_IDGetDataFromTable(
-                        nullptr, static_cast<u32>(reinterpret_cast<std::uintptr_t>(joint)),
-                        nullptr) == nullptr,
-                    "Original JObj removal retained a descriptor ID binding");
-        require(std::equal(archive->data().begin(), archive->data().end(),
-                           decoded_before.begin()),
-                "Original JObj load/removal changed decoded synthetic archive bytes");
-        require_stage_empty();
+        auto* foreign_image = static_cast<HSD_ImageDesc*>(foreign.image_descriptor(0x3a0));
+        live_source_consumer_lifetime(descriptor, image, foreign_image, invariants);
     }
-    const auto stats_after = melee_web_gameplay_stats();
-    require(stats_after.generation == stats_before.generation &&
-                stats_after.ticks == stats_before.ticks,
-            "Source consumer query changed runtime generation/ticks");
+    invariants();
 }
 
 }  // namespace melee_web::test::stadium_screen
