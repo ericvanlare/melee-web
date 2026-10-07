@@ -1394,6 +1394,119 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             self.assertEqual(identity["exported_cursor"], 5)
             self.assertEqual(identity["browser_records_validated"], 7)
             self.assertFalse(identity["runtime_data_recorded_identity"]["freshly_rehashed"])
+
+            # Rebind the sidecar hash after every mutation so the transport gate,
+            # rather than stale fixture identity, rejects the altered evidence.
+            def write_capture():
+                capture_path.write_text(json.dumps(wrapper), encoding="utf-8")
+                expected_files["capture_report"].update(
+                    bytes=capture_path.stat().st_size,
+                    sha256=hashlib.sha256(capture_path.read_bytes()).hexdigest())
+
+            wrapper["url"] = "http://127.0.0.1:8813/runtime.html?diagnostic=1"
+            wrapper["runtime_data_load"] = {
+                "file_bytes": 3, "loaded_bytes": 3, "total_bytes": 3,
+                "sha256": "c" * 64, "from_cache": False,
+            }
+            abort = {
+                "requestCount": 1, "responseCount": 1, "failureCount": 1,
+                "finishedCount": 0, "url": "http://127.0.0.1:8813/gameplay_menu_browser.data",
+                "expectedUrl": "http://127.0.0.1:8813/gameplay_menu_browser.data",
+                "method": "GET", "resourceType": "fetch", "errorText": "net::ERR_ABORTED",
+                "responseStatus": 200, "contentLength": 3, "loadedBytes": 3,
+                "totalBytes": 3, "fileBytes": 3, "expectedBytes": 3,
+                "expectedSha256": "c" * 64, "actualSha256": "c" * 64,
+                "fromCache": False,
+            }
+            wrapper["verified_runtime_data_aborts"] = [abort]
+            write_capture()
+            _validate_v10_browser_provenance(
+                capture_path, producer_path, browser_report_path, trace_path,
+                recipe_path, recipe_sha, recipe, packet)
+            self.assertFalse(runtime_path.exists(), "recorded identity needs no runtime package")
+
+            good_wrapper = copy.deepcopy(wrapper)
+            mutations = []
+            bad_values = {
+                "requestCount": 2, "responseCount": 0, "failureCount": 2,
+                "finishedCount": 1, "url": "http://127.0.0.1:8813/other.data",
+                "expectedUrl": "http://127.0.0.1:8813/other.data", "method": "POST",
+                "resourceType": "xhr", "errorText": "net::ERR_FAILED",
+                "responseStatus": 206, "contentLength": 2, "loadedBytes": 2,
+                "totalBytes": 2, "fileBytes": 2, "expectedBytes": 2,
+                "expectedSha256": "d" * 64, "actualSha256": "d" * 64, "fromCache": True,
+            }
+            for field, value in bad_values.items():
+                mutations.append((field, {**abort, field: value}, None))
+            for field, value in abort.items():
+                if type(value) is int:
+                    for invalid in (bool(value), float(value)):
+                        mutations.append((f"typed {field}={invalid!r}",
+                                          {**abort, field: invalid}, None))
+            mutations.extend([
+                ("missing field", {k: v for k, v in abort.items() if k != "fileBytes"}, None),
+                ("extra field", {**abort, "unrelated": True}, None),
+                ("unrelated row", {"errorText": "net::ERR_ABORTED"}, None),
+                ("null row", None, None),
+            ])
+            for field, value in wrapper["runtime_data_load"].items():
+                mutations.append((f"disconnected load {field}", abort,
+                                  ("runtime_data_load", {**wrapper["runtime_data_load"],
+                                                         field: 0 if type(value) is int else None})))
+            for field in ("url", "runtime_data_load"):
+                mutations.append((f"missing {field}", abort, (field, None)))
+            mutations.append(("different navigation", abort,
+                              ("url", "http://127.0.0.1:8814/runtime.html")))
+            for label, changed_abort, changed_wrapper in mutations:
+                with self.subTest(runtime_abort=label):
+                    wrapper = copy.deepcopy(good_wrapper)
+                    wrapper["verified_runtime_data_aborts"] = [changed_abort]
+                    if changed_wrapper:
+                        wrapper[changed_wrapper[0]] = changed_wrapper[1]
+                    write_capture()
+                    with self.assertRaisesRegex(ComparisonError, "runtime-data abort"):
+                        _validate_v10_browser_provenance(
+                            capture_path, producer_path, browser_report_path, trace_path,
+                            recipe_path, recipe_sha, recipe, packet)
+            for invalid_rows in (None, {}, [abort, abort]):
+                with self.subTest(runtime_abort_list=invalid_rows):
+                    wrapper = copy.deepcopy(good_wrapper)
+                    wrapper["verified_runtime_data_aborts"] = invalid_rows
+                    write_capture()
+                    with self.assertRaisesRegex(ComparisonError, "runtime-data abort"):
+                        _validate_v10_browser_provenance(
+                            capture_path, producer_path, browser_report_path, trace_path,
+                            recipe_path, recipe_sha, recipe, packet)
+
+            # Use the actual browser provenance validator in the comparison
+            # entry point, while mocking only source-side metadata validation.
+            reference_path = root / "unopened.mwro"
+            reference_path.write_bytes(b"unopened synthetic source")
+            packet["source"]["trace"] = {
+                "bytes": reference_path.stat().st_size, "recorded_full_sha256": "b" * 64}
+            packet["recipe"] = {
+                "path": str(recipe_path), "bytes": len(recipe_raw), "sha256": recipe_sha,
+                "version": recipe.version, "frame_count": recipe.frame_count, "seed": recipe.seed}
+            wrapper = copy.deepcopy(good_wrapper)
+            wrapper["verified_runtime_data_aborts"] = [{**abort, "actualSha256": "d" * 64}]
+            write_capture()
+            with (mock.patch("whole_session_state_compare._load_expectations",
+                             return_value=(packet, "f" * 64)),
+                  mock.patch("whole_session_state_compare._validate_v10_source_provenance",
+                             return_value=({}, {}, {}, {})),
+                  mock.patch("whole_session_state_compare.iter_records") as read_source):
+                result = compare_paths(
+                    reference_path, recipe_path, trace_path,
+                    scope=V10_FIRST_SETUP_TICK0_SCOPE, expectations=root / "packet.json",
+                    source_manifest=root / "source-manifest.json",
+                    source_report=root / "source-report.json", source_audit=root / "audit.json",
+                    browser_capture_report=capture_path, browser_producer_manifest=producer_path,
+                    browser_report=browser_report_path)
+            self.assertEqual(result["result"], "invalid")
+            self.assertIn("runtime-data abort", result["error"])
+            read_source.assert_not_called()
+            wrapper = copy.deepcopy(good_wrapper)
+            write_capture()
             with self.assertRaisesRegex(ComparisonError, "requested/observed cursors"):
                 _validate_v10_browser_provenance(
                     capture_path, producer_path, browser_report_path, trace_path,

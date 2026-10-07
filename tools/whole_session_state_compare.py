@@ -25,6 +25,7 @@ import re
 import struct
 import sys
 from typing import Any, Iterable, Mapping
+from urllib.parse import urljoin
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -2078,6 +2079,56 @@ def _validate_v10_browser_export(port_trace_path: Path, recipe: Recipe,
         browser.close()
 
 
+def _validate_v10_runtime_data_aborts(wrapper: Mapping[str, Any]) -> None:
+    """Mirror validateRuntimeDataAbort in scripts/whole_session_capture_result.mjs.
+
+    This validates retained transport evidence, not the abort's causal origin.
+    Runtime input identity has already been bound to the producer and packet;
+    neither the runtime package nor the original trace is opened here.
+    """
+    rows = wrapper.get("verified_runtime_data_aborts")
+    if not isinstance(rows, list) or len(rows) > 1:
+        raise ComparisonError("browser capture runtime-data abort evidence is not empty or singleton")
+    if not rows:
+        return
+    evidence = rows[0]
+    fields = {"requestCount", "responseCount", "failureCount", "finishedCount",
+              "url", "expectedUrl", "method", "resourceType", "errorText",
+              "responseStatus", "contentLength", "loadedBytes", "totalBytes",
+              "fileBytes", "expectedBytes", "expectedSha256", "actualSha256",
+              "fromCache"}
+    if not isinstance(evidence, dict) or set(evidence) != fields:
+        raise ComparisonError("browser capture runtime-data abort evidence fields are malformed")
+    runtime = wrapper.get("inputs", {}).get("runtime_data")
+    actual = wrapper.get("runtime_data_load")
+    navigation_url = wrapper.get("url")
+    if (not isinstance(runtime, dict) or not isinstance(actual, dict) or
+            not isinstance(navigation_url, str) or not navigation_url):
+        raise ComparisonError("browser capture runtime-data abort lacks bound load or navigation identity")
+    expected_url = urljoin(navigation_url, "gameplay_menu_browser.data")
+    expected_bytes = runtime.get("bytes")
+    expected_sha = runtime.get("sha256")
+    integer_values = {"requestCount": 1, "responseCount": 1,
+                      "failureCount": 1, "finishedCount": 0, "responseStatus": 200,
+                      **{name: expected_bytes for name in
+                         ("contentLength", "loadedBytes", "totalBytes", "fileBytes",
+                          "expectedBytes")}}
+    if (type(expected_bytes) is not int or not 0 < expected_bytes <= 2**53 - 1 or
+            not isinstance(expected_sha, str) or
+            re.fullmatch(r"[0-9a-f]{64}", expected_sha) is None or
+            any(type(evidence[name]) is not int or evidence[name] != value
+                for name, value in integer_values.items()) or
+            evidence["url"] != expected_url or evidence["expectedUrl"] != expected_url or
+            evidence["method"] != "GET" or evidence["resourceType"] != "fetch" or
+            evidence["errorText"] != "net::ERR_ABORTED" or
+            evidence["expectedSha256"] != expected_sha or
+            evidence["actualSha256"] != expected_sha or evidence["fromCache"] is not False or
+            any(type(actual.get(name)) is not int or actual[name] != expected_bytes
+                for name in ("loaded_bytes", "total_bytes", "file_bytes")) or
+            actual.get("sha256") != expected_sha or actual.get("from_cache") is not False):
+        raise ComparisonError("browser capture runtime-data abort differs from verified complete-package evidence")
+
+
 def _validate_v10_manual_unload(wrapper: Mapping[str, Any],
                                 browser_report: Mapping[str, Any], *,
                                 required_cursor: int, requested_cursor: int,
@@ -2093,8 +2144,7 @@ def _validate_v10_manual_unload(wrapper: Mapping[str, Any],
             raise ComparisonError(f"browser capture recorded an unrelated {name}")
     if (wrapper.get("browser_errors") != [] or wrapper.get("unexpected_requests") != []):
         raise ComparisonError("browser capture has an unrelated browser or request failure")
-    if wrapper.get("verified_runtime_data_aborts") != []:
-        raise ComparisonError("browser capture has a runtime-data abort")
+    _validate_v10_runtime_data_aborts(wrapper)
     if (browser_report.get("instrumented_timing_resumes") != 0 or
             browser_report.get("errors") not in (None, [])):
         raise ComparisonError("retail browser report has unrelated instrumentation or errors")
