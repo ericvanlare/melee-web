@@ -28,6 +28,7 @@ from whole_session_state_compare import (  # noqa: E402
     V10_FIGHTER_ROSTER, V10_FIRST_SETUP_TICK0_SCOPE, V10_PREFIX_BYTE_CAP,
     V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE, V10_FIRST_POSITIVE_RECORD_CAP,
     V10_FIRST_MATCH_CLOCK_GE60_SCOPE, V10_MATCH_CLOCK_RECORD_CAP,
+    V10_MATCH_CLOCK_REJOIN_FRAME,
     V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE, MATCH_CLOCK_EXPECTATION_SCHEMA,
     V10_BROWSER_PRODUCER_SCHEMA, V10_HISTORICAL_CLOCK300_PRODUCER_SCHEMA,
     V10_PREFIX_RECORD_CAP, V10_RULES_BYTES, WHOLE_SESSION_SCOPE,
@@ -889,6 +890,189 @@ def _clock60_comparison_fixture(directory: Path, *, terminal_match_frame: int = 
         "clock_target": clock_target, "match_clock_target": terminal_target,
         "match_clock_audit": terminal_audit, "match_clock_path": terminal_path,
     }
+
+
+def _attach_clock300_lineage(fixture):
+    """Give a synthetic later-boundary audit its prior clock-300 receipts."""
+    packet = fixture["packet"]
+    source = packet["source"]
+    current_audit = fixture["match_clock_audit"]
+    current_observed = current_audit["observed"]
+    target = fixture["match_clock_target"]
+    if target["target_match_frame_at_least"] <= V10_MATCH_CLOCK_REJOIN_FRAME:
+        raise ValueError("clock-300 lineage requires a later synthetic target")
+
+    prior_tick = 123 + V10_MATCH_CLOCK_REJOIN_FRAME
+    prior_sequence = 11 + 2 * prior_tick
+    prior_timeline_index = 2 + prior_tick
+    prior_boundary = {
+        "target_match_frame_at_least": V10_MATCH_CLOCK_REJOIN_FRAME,
+        "match_index": 0, "source_tick": prior_tick,
+        "source_sequence": prior_sequence,
+        "pad_consume_sequence": prior_sequence - 1,
+        "timeline_frame_index": prior_timeline_index,
+        "browser_cursor": prior_timeline_index + 1,
+        "match_frame": V10_MATCH_CLOCK_REJOIN_FRAME,
+    }
+    prior_prefix_bytes = b"".join(fixture["raw_records"][:prior_sequence + 1])
+    prior_observation = copy.deepcopy(current_observed[
+        f"target_clock_ge{target['target_match_frame_at_least']}_observed"])
+    prior_observation.update({
+        "match_frame": V10_MATCH_CLOCK_REJOIN_FRAME,
+        "source_tick": prior_tick,
+        "source_tick_seq": prior_sequence,
+        "pad_consume_source_sequence": prior_sequence - 1,
+        "timeline_frame_index": prior_timeline_index,
+        "cursor_after_frame": prior_timeline_index + 1,
+        "scene_frame": prior_tick,
+    })
+
+    prior_audit = copy.deepcopy(current_audit)
+    prior_audit.update({
+        "schema": "melee-web-b4-source-clock-ge300-audit-v3",
+        "scope": "source-only-clock-ge300",
+        "status": "first_match_clock_ge300_found",
+        "target_match_frame_at_least": V10_MATCH_CLOCK_REJOIN_FRAME,
+        "checkpoints": {"first_positive_clock1": "pass", "first_clock60": "pass"},
+    })
+    prior_audit["source"]["content_bytes_read"] = len(prior_prefix_bytes)
+    prior_audit["observed"].pop(f"target_clock_ge{target['target_match_frame_at_least']}_observed")
+    prior_audit["observed"].pop("prior_clock300_observed", None)
+    prior_audit["observed"].pop("clock300_rejoined", None)
+    prior_audit["observed"].update({
+        "target_clock_ge300_observed": prior_observation,
+        "source_prefix": {
+            "bytes_read": len(prior_prefix_bytes),
+            "records_read": prior_sequence + 1,
+            "last_source_sequence": prior_sequence,
+            "sha256": hashlib.sha256(prior_prefix_bytes).hexdigest(),
+        },
+        "match_ticks_observed": prior_tick + 1,
+        "timeline_frames_input_ordered_against_recipe": prior_timeline_index + 1,
+    })
+    prior_audit_path = fixture["match_clock_path"].with_name("prior-clock300-audit.json")
+    prior_audit_path.write_text(json.dumps(prior_audit), encoding="utf-8")
+    prior_audit_identity = {
+        "path": str(prior_audit_path), "bytes": prior_audit_path.stat().st_size,
+        "sha256": hashlib.sha256(prior_audit_path.read_bytes()).hexdigest(),
+    }
+
+    prior_packet = copy.deepcopy(packet)
+    prior_packet["source"]["match_clock_boundary"] = prior_boundary
+    prior_packet["source"]["match_clock_boundary_audit"] = prior_audit_identity
+    prior_expectations_path = fixture["packet_path"].with_name("prior-clock300-expectations.json")
+    prior_expectations_path.write_text(json.dumps(prior_packet), encoding="utf-8")
+    prior_expectations_identity = {
+        "path": str(prior_expectations_path), "bytes": prior_expectations_path.stat().st_size,
+        "sha256": hashlib.sha256(prior_expectations_path.read_bytes()).hexdigest(),
+    }
+
+    def boundary_tuple(value):
+        return {
+            "browser_cursor": value["browser_cursor"],
+            "match_frame": value["match_frame"],
+            "match_index": value["match_index"],
+            "pad_consume_sequence": value["pad_consume_sequence"],
+            "source_sequence": value["source_sequence"],
+            "source_tick": value["source_tick"],
+            "timeline_frame_index": value["timeline_frame_index"],
+        }
+
+    positive_prefix = fixture["positive_audit"]["observed"]["source_prefix"]
+    clock60_prefix = fixture["clock_audit"]["observed"]["source_prefix"]
+    prior_prefix = prior_audit["observed"]["source_prefix"]
+    launch_packet = {
+        "schema": f"melee-web-b4-source-clock{target['target_match_frame_at_least']}-launch-v3",
+        "scope": f"source-only-clock-ge{target['target_match_frame_at_least']}",
+        "version": 3,
+        "target_match_frame_ge": target["target_match_frame_at_least"],
+        "target": {"caps": {
+            "max_bytes": V10_PREFIX_BYTE_CAP,
+            "max_records": V10_MATCH_CLOCK_RECORD_CAP,
+        }},
+        "source": {
+            "path": source["trace"]["path"],
+            "capture_id": source["capture_id"],
+            "sequence_id": source["sequence_id"],
+            "trace": {
+                "path": source["trace"]["path"],
+                "bytes": source["trace"]["bytes"],
+                "recorded_full_sha256": source["trace"]["recorded_full_sha256"],
+            },
+            "first_positive_boundary": source["first_positive_boundary"],
+            "clock60_boundary": source["clock60_boundary"],
+            "match_clock_boundary": prior_boundary,
+            "clock300_audit": prior_audit_identity,
+            "accepted_checkpoint_rejoins": [
+                {"tuple": boundary_tuple(source["first_positive_boundary"]),
+                 "fresh_prefix": {**positive_prefix, "hash_basis": "synthetic source prefix"}},
+                {"tuple": boundary_tuple(source["clock60_boundary"]),
+                 "fresh_prefix": {**clock60_prefix, "hash_basis": "synthetic source prefix"}},
+                {"tuple": boundary_tuple(prior_boundary),
+                 "fresh_prefix": {**prior_prefix, "hash_basis": "synthetic source prefix"}},
+            ],
+        },
+    }
+    launch_packet_path = fixture["match_clock_path"].with_name("clock500-launch-packet.json")
+    launch_packet_path.write_text(json.dumps(launch_packet), encoding="utf-8")
+    launch_packet_identity = {
+        "path": str(launch_packet_path), "bytes": launch_packet_path.stat().st_size,
+        "sha256": hashlib.sha256(launch_packet_path.read_bytes()).hexdigest(),
+    }
+
+    current_audit["expectations"] = prior_expectations_identity
+    current_audit["packet"] = launch_packet_identity
+    current_audit["limits"] = {
+        "max_bytes": V10_PREFIX_BYTE_CAP,
+        "max_records": V10_MATCH_CLOCK_RECORD_CAP,
+    }
+    current_observed["clock300_rejoined"] = True
+    current_observed["prior_clock300_observed"] = prior_observation
+    current_audit["checkpoints"] = {
+        "first_positive_clock1": "pass",
+        "first_clock60": "pass",
+        "first_match_clock300": "pass",
+        f"target_clock{target['target_match_frame_at_least']}": "observed_after_rejoins",
+    }
+    current_audit_path = fixture["match_clock_path"]
+    current_audit_path.write_text(json.dumps(current_audit), encoding="utf-8")
+    current_audit_identity = {
+        "path": str(current_audit_path), "bytes": current_audit_path.stat().st_size,
+        "sha256": hashlib.sha256(current_audit_path.read_bytes()).hexdigest(),
+    }
+    source["match_clock_boundary_audit"] = current_audit_identity
+    source["prior_match_clock_boundary"] = prior_boundary
+    source["prior_match_clock_boundary_audit"] = prior_audit_identity
+    source["prior_match_clock_expectations"] = prior_expectations_identity
+    source["match_clock_boundary_source_packet"] = launch_packet_identity
+    fixture["packet_path"].write_text(json.dumps(packet), encoding="utf-8")
+    fixture["prior_packet_path"] = prior_expectations_path
+    fixture["prior_audit_path"] = prior_audit_path
+    fixture["launch_packet_path"] = launch_packet_path
+    fixture["prior_boundary"] = prior_boundary
+    fixture["prior_prefix"] = prior_prefix
+
+
+def _refresh_clock500_packet_chain(fixture, *, audit=None, launch_packet=None):
+    audit = audit or fixture["match_clock_audit"]
+    launch_packet = launch_packet or json.loads(fixture["launch_packet_path"].read_text())
+    launch_packet_path = fixture["launch_packet_path"]
+    launch_packet_path.write_text(json.dumps(launch_packet), encoding="utf-8")
+    launch_identity = {
+        "path": str(launch_packet_path), "bytes": launch_packet_path.stat().st_size,
+        "sha256": hashlib.sha256(launch_packet_path.read_bytes()).hexdigest(),
+    }
+    audit["packet"] = launch_identity
+    audit_path = fixture["match_clock_path"]
+    audit_path.write_text(json.dumps(audit), encoding="utf-8")
+    audit_identity = {
+        "path": str(audit_path), "bytes": audit_path.stat().st_size,
+        "sha256": hashlib.sha256(audit_path.read_bytes()).hexdigest(),
+    }
+    fixture["packet"]["source"]["match_clock_boundary_source_packet"] = launch_identity
+    fixture["packet"]["source"]["match_clock_boundary_audit"] = audit_identity
+    fixture["packet_path"].write_text(json.dumps(fixture["packet"]), encoding="utf-8")
+    return audit, launch_packet
 
 
 def _run_clock60_comparison(fixture, *, raw_overrides=None,
@@ -2758,6 +2942,139 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             self.assertTrue(result["clock60_prefix_rejoin"]["rejoined_before_continuing"])
             self.assertEqual(result["match_clock_boundary"]["match_frame"], 300)
             self.assertEqual(result["match_clock_boundary"]["source_tick"], 423)
+
+    def test_later_match_clock_audit_validates_the_prior_clock300_tuple_prefix_and_audit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = _clock60_comparison_fixture(
+                Path(directory), terminal_match_frame=500)
+            _attach_clock300_lineage(fixture)
+            selected = fixture["selected"]
+            loaded, _ = _load_expectations(
+                fixture["packet_path"],
+                {name: selected[name] for name in (
+                    "reference", "source_manifest", "source_report", "source_audit", "recipe",
+                    "browser_capture_report", "browser_producer_manifest", "browser_report",
+                    "port_trace", "positive_boundary_audit", "clock60_boundary_audit",
+                    "match_clock_boundary_audit")},
+                scope=V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE)
+
+            audit, digest = _validate_match_clock_boundary_audit(
+                selected["match_clock_boundary_audit"], loaded, fixture["recipe"])
+
+            self.assertEqual(digest, fixture["packet"]["source"][
+                "match_clock_boundary_audit"]["sha256"])
+            self.assertEqual(audit["checkpoints"], {
+                "first_positive_clock1": "pass", "first_clock60": "pass",
+                "first_match_clock300": "pass", "target_clock500": "observed_after_rejoins",
+            })
+            self.assertEqual(audit["observed"]["prior_clock300_observed"],
+                             json.loads(fixture["prior_audit_path"].read_text())[
+                                 "observed"]["target_clock_ge300_observed"])
+            self.assertTrue(audit["observed"]["clock300_rejoined"])
+
+            result, yielded, observed_limits = _run_clock60_comparison(fixture)
+            self.assertEqual(observed_limits, {
+                "max_bytes": V10_PREFIX_BYTE_CAP,
+                "max_records": V10_MATCH_CLOCK_RECORD_CAP,
+            })
+            self.assertEqual(yielded[-1], fixture["match_clock_target"]["source_sequence"])
+            self.assertEqual(len(yielded), fixture["match_clock_target"]["source_sequence"] + 1)
+            self.assertEqual(result["boundary_result"], "equivalent")
+            self.assertEqual(result["result"], "incomplete")
+            self.assertFalse(result["complete"])
+            self.assertFalse(result["whole_session_equivalent"])
+            self.assertEqual(result["match_clock_boundary"]["match_frame"], 500)
+
+    def test_later_match_clock_audit_rejects_missing_failed_and_unknown_checkpoints(self):
+        cases = (
+            ("missing-prior", lambda checkpoints: checkpoints.pop("first_match_clock300")),
+            ("failed-prior", lambda checkpoints: checkpoints.__setitem__(
+                "first_match_clock300", "failed")),
+            ("unknown-checkpoint", lambda checkpoints: checkpoints.__setitem__(
+                "clock900", "pass")),
+            ("missing-target", lambda checkpoints: checkpoints.pop("target_clock500")),
+            ("malformed-checkpoints", None),
+        )
+        for name, mutate in cases:
+            with self.subTest(case=name), tempfile.TemporaryDirectory() as directory:
+                fixture = _clock60_comparison_fixture(
+                    Path(directory), terminal_match_frame=500)
+                _attach_clock300_lineage(fixture)
+                if mutate is None:
+                    fixture["match_clock_audit"]["checkpoints"] = ["first-positive", "clock-60"]
+                else:
+                    mutate(fixture["match_clock_audit"]["checkpoints"])
+                _refresh_clock500_packet_chain(fixture)
+                selected = fixture["selected"]
+                loaded, _ = _load_expectations(
+                    fixture["packet_path"],
+                    {name: selected[name] for name in (
+                        "reference", "source_manifest", "source_report", "source_audit", "recipe",
+                        "browser_capture_report", "browser_producer_manifest", "browser_report",
+                        "port_trace", "positive_boundary_audit", "clock60_boundary_audit",
+                        "match_clock_boundary_audit")},
+                    scope=V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE)
+                with self.assertRaisesRegex(ComparisonError, "checkpoint rejoin evidence"):
+                    _validate_match_clock_boundary_audit(
+                        selected["match_clock_boundary_audit"], loaded, fixture["recipe"])
+
+    def test_later_match_clock_audit_rejects_clock300_observation_prefix_and_audit_drift(self):
+        cases = (
+            ("missing-observation", "audit"),
+            ("wrong-observation", "audit"),
+            ("missing-rejoin-flag", "audit"),
+            ("false-rejoin-flag", "audit"),
+            ("missing-audit-identity", "expectations"),
+            ("wrong-prefix", "runner"),
+            ("malformed-runner-trace", "runner"),
+            ("wrong-audit-identity", "runner"),
+        )
+        for name, subject in cases:
+            with self.subTest(case=name), tempfile.TemporaryDirectory() as directory:
+                fixture = _clock60_comparison_fixture(
+                    Path(directory), terminal_match_frame=500)
+                _attach_clock300_lineage(fixture)
+                audit = fixture["match_clock_audit"]
+                launch = json.loads(fixture["launch_packet_path"].read_text())
+                if name == "missing-observation":
+                    audit["observed"].pop("prior_clock300_observed")
+                elif name == "wrong-observation":
+                    audit["observed"]["prior_clock300_observed"]["source_tick_seq"] += 1
+                elif name == "missing-rejoin-flag":
+                    audit["observed"].pop("clock300_rejoined")
+                elif name == "false-rejoin-flag":
+                    audit["observed"]["clock300_rejoined"] = False
+                elif name == "missing-audit-identity":
+                    fixture["packet"]["source"].pop("prior_match_clock_boundary_audit")
+                    fixture["packet_path"].write_text(json.dumps(fixture["packet"]),
+                                                     encoding="utf-8")
+                elif name == "wrong-prefix":
+                    launch["source"]["accepted_checkpoint_rejoins"][2][
+                        "fresh_prefix"]["sha256"] = "0" * 64
+                elif name == "malformed-runner-trace":
+                    launch["source"]["trace"] = []
+                else:
+                    launch["source"]["clock300_audit"]["sha256"] = "0" * 64
+                _refresh_clock500_packet_chain(fixture, audit=audit, launch_packet=launch)
+                selected = fixture["selected"]
+                loaded, _ = _load_expectations(
+                    fixture["packet_path"],
+                    {key: selected[key] for key in (
+                        "reference", "source_manifest", "source_report", "source_audit", "recipe",
+                        "browser_capture_report", "browser_producer_manifest", "browser_report",
+                        "port_trace", "positive_boundary_audit", "clock60_boundary_audit",
+                        "match_clock_boundary_audit")},
+                    scope=V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE)
+                expected_message = (
+                    "exact clock-300 observation" if name in {"missing-observation", "wrong-observation"}
+                    else "exact clock-300 observation" if name in {"missing-rejoin-flag", "false-rejoin-flag"}
+                    else "frozen clock-300 lineage identities" if name == "missing-audit-identity"
+                    else "runner packet trace identity is malformed" if name == "malformed-runner-trace"
+                    else "frozen source lineage" if name == "wrong-audit-identity"
+                    else "clock-300 prefix differs")
+                with self.assertRaisesRegex(ComparisonError, expected_message):
+                    _validate_match_clock_boundary_audit(
+                        selected["match_clock_boundary_audit"], loaded, fixture["recipe"])
 
     def test_match_clock_boundary_hash_mismatches_stop_at_each_checkpoint(self):
         cases = (

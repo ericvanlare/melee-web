@@ -109,6 +109,7 @@ V10_PREFIX_BYTE_CAP = 32 * 1024 * 1024
 V10_PREFIX_RECORD_CAP = 4200
 V10_FIRST_POSITIVE_RECORD_CAP = 8192
 V10_MATCH_CLOCK_RECORD_CAP = V10_FIRST_POSITIVE_RECORD_CAP
+V10_MATCH_CLOCK_REJOIN_FRAME = 300
 V10_BROWSER_EXPORT_RECORD_CAP = 8192
 V10_MANUAL_UNLOAD_FAILURES = (
     "whole-session final CSS was not entered",
@@ -2398,6 +2399,14 @@ def _validate_match_clock_boundary_audit(path: Path, packet: Mapping[str, Any],
                         1, V10_PREFIX_BYTE_CAP)
     prefix_records = _int(prefix.get("records_read"), "match-clock audit prefix records",
                           1, V10_MATCH_CLOCK_RECORD_CAP)
+    expected_checkpoints = {
+        "first_positive_clock1": "pass", "first_clock60": "pass",
+    }
+    if threshold > V10_MATCH_CLOCK_REJOIN_FRAME:
+        expected_checkpoints.update({
+            "first_match_clock300": "pass",
+            f"target_clock{suffix}": "observed_after_rejoins",
+        })
     if (not isinstance(prefix.get("sha256"), str) or
             re.fullmatch(r"[0-9a-f]{64}", prefix["sha256"]) is None or
             _int(prefix.get("last_source_sequence"),
@@ -2418,10 +2427,200 @@ def _validate_match_clock_boundary_audit(path: Path, packet: Mapping[str, Any],
                  "match-clock audit source content bytes read", 1,
                  V10_PREFIX_BYTE_CAP) != prefix_bytes or
             source.get("stream_attempted") is not True or
-            audit.get("checkpoints") != {
-                "first_positive_clock1": "pass", "first_clock60": "pass"}):
+            audit.get("checkpoints") != expected_checkpoints):
         raise ComparisonError("match-clock audit prefix counts or checkpoint rejoin evidence disagree")
+    if threshold > V10_MATCH_CLOCK_REJOIN_FRAME:
+        limits = audit.get("limits")
+        if (not isinstance(limits, dict) or
+                limits.get("max_bytes") != V10_PREFIX_BYTE_CAP or
+                limits.get("max_records") != V10_MATCH_CLOCK_RECORD_CAP):
+            raise ComparisonError("later match-clock audit caps differ from the frozen bounded reader")
+        _validate_clock300_checkpoint_lineage(audit, packet, recipe)
     return audit, digest
+
+
+def _validate_clock300_checkpoint_lineage(audit: Mapping[str, Any],
+                                          packet: Mapping[str, Any],
+                                          recipe: Recipe) -> None:
+    """Validate the standard clock-300 rejoin carried by later bounded audits."""
+    expected_source = packet["source"]
+    prior_boundary = expected_source.get("prior_match_clock_boundary")
+    prior_audit_identity = expected_source.get("prior_match_clock_boundary_audit")
+    prior_expectations_identity = expected_source.get("prior_match_clock_expectations")
+    launch_packet_identity = expected_source.get("match_clock_boundary_source_packet")
+    if not all(isinstance(value, dict) for value in (
+            prior_boundary, prior_audit_identity,
+            prior_expectations_identity, launch_packet_identity)):
+        raise ComparisonError("later match-clock audit lacks its frozen clock-300 lineage identities")
+    for name, identity in (("audit", prior_audit_identity),
+                           ("expectations", prior_expectations_identity),
+                           ("runner packet", launch_packet_identity)):
+        if (not isinstance(identity.get("path"), str) or not identity["path"] or
+                type(identity.get("bytes")) is not int or identity["bytes"] <= 0 or
+                not isinstance(identity.get("sha256"), str) or
+                re.fullmatch(r"[0-9a-f]{64}", identity["sha256"]) is None):
+            raise ComparisonError(f"prior clock-300 {name} identity is malformed")
+    prior_fields = {
+        "target_match_frame_at_least", "match_index", "source_tick", "source_sequence",
+        "pad_consume_sequence", "timeline_frame_index", "browser_cursor", "match_frame",
+    }
+    if set(prior_boundary) != prior_fields:
+        raise ComparisonError("frozen prior clock-300 boundary fields are malformed")
+    for field in prior_fields:
+        _int(prior_boundary[field], f"prior clock-300 boundary {field}",
+             1 if field in {"source_sequence", "browser_cursor", "match_frame",
+                            "target_match_frame_at_least"} else 0,
+             (1 << 64) - 1 if field in {"source_sequence", "pad_consume_sequence"}
+             else MAX_UINT32)
+    if (prior_boundary["target_match_frame_at_least"] != V10_MATCH_CLOCK_REJOIN_FRAME or
+            prior_boundary["match_index"] != 0 or
+            prior_boundary["match_frame"] != V10_MATCH_CLOCK_REJOIN_FRAME or
+            prior_boundary["timeline_frame_index"] + 1 != prior_boundary["browser_cursor"] or
+            prior_boundary["source_sequence"] <= prior_boundary["pad_consume_sequence"]):
+        raise ComparisonError("frozen prior match-clock boundary is not the clock-300 checkpoint")
+
+    prior_expectations_path = Path(prior_expectations_identity.get("path", ""))
+    prior_expectations, prior_expectations_sha, prior_expectations_size = _read_json_sidecar(
+        prior_expectations_path, "prior clock-300 expectations", max_bytes=1024 * 1024)
+    _verify_expected_file(prior_expectations_identity, prior_expectations_path,
+                          prior_expectations_sha, prior_expectations_size,
+                          "prior clock-300 expectations")
+    audit_expectations = audit.get("expectations")
+    if audit_expectations != prior_expectations_identity:
+        raise ComparisonError("later match-clock audit lacks its prior expectations identity")
+    if (prior_expectations.get("schema") != MATCH_CLOCK_EXPECTATION_SCHEMA or
+            prior_expectations.get("scope") != V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE or
+            prior_expectations.get("version") != 1):
+        raise ComparisonError("prior clock-300 expectations schema or scope is unsupported")
+    prior_source = prior_expectations.get("source")
+    if not isinstance(prior_source, dict):
+        raise ComparisonError("prior clock-300 expectations lack source identity")
+    for field in ("capture_id", "sequence_id", "trace", "manifest", "report", "audit",
+                  "positive_boundary_audit", "first_positive_boundary",
+                  "clock60_boundary_audit", "clock60_boundary"):
+        if prior_source.get(field) != expected_source.get(field):
+            raise ComparisonError(f"prior clock-300 source expectations differ at {field}")
+    if prior_expectations.get("recipe") != packet.get("recipe"):
+        raise ComparisonError("prior clock-300 expectations bind a different recipe")
+    if (prior_source.get("match_clock_boundary") != prior_boundary or
+            prior_source.get("match_clock_boundary_audit") != prior_audit_identity):
+        raise ComparisonError("prior clock-300 expectations differ from the frozen boundary/audit")
+
+    prior_files = _expectation_files(prior_expectations)
+    prior_files.update({
+        "clock60_boundary_audit": prior_source.get("clock60_boundary_audit"),
+        "match_clock_boundary_audit": prior_source.get("match_clock_boundary_audit"),
+    })
+    if any(not isinstance(identity, dict) or not isinstance(identity.get("path"), str)
+           for identity in prior_files.values()):
+        raise ComparisonError("prior clock-300 expectations contain incomplete file identities")
+    prior_selected = {name: Path(identity["path"])
+                      for name, identity in prior_files.items()}
+    prior_packet, _ = _load_expectations(
+        prior_expectations_path, prior_selected,
+        scope=V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE)
+    prior_audit, _ = _validate_match_clock_boundary_audit(
+        Path(prior_audit_identity.get("path", "")), prior_packet, recipe)
+    prior_observed = prior_audit["observed"].get(
+        f"target_clock_ge{V10_MATCH_CLOCK_REJOIN_FRAME}_observed")
+    observed = audit.get("observed")
+    if (not isinstance(observed, dict) or observed.get("clock300_rejoined") is not True or
+            not isinstance(prior_observed, dict) or
+            observed.get("prior_clock300_observed") != prior_observed):
+        raise ComparisonError("later match-clock audit did not rejoin the exact clock-300 observation")
+
+    audit_packet_identity = audit.get("packet")
+    if audit_packet_identity != launch_packet_identity:
+        raise ComparisonError("later match-clock audit lacks its frozen runner packet identity")
+    launch_packet_path = Path(launch_packet_identity.get("path", ""))
+    launch_packet, launch_packet_sha, launch_packet_size = _read_json_sidecar(
+        launch_packet_path, "match-clock source audit packet", max_bytes=2 * 1024 * 1024)
+    _verify_expected_file(launch_packet_identity, launch_packet_path,
+                          launch_packet_sha, launch_packet_size,
+                          "match-clock source audit packet")
+    threshold = expected_source["match_clock_boundary"]["target_match_frame_at_least"]
+    if (launch_packet.get("schema") != f"melee-web-b4-source-clock{threshold}-launch-v3" or
+            launch_packet.get("scope") != f"source-only-clock-ge{threshold}" or
+            launch_packet.get("version") != 3 or
+            launch_packet.get("target_match_frame_ge") != threshold):
+        raise ComparisonError("match-clock source audit runner packet schema/target is unsupported")
+    launch_source = launch_packet.get("source")
+    target_limits = launch_packet.get("target")
+    if (not isinstance(launch_source, dict) or not isinstance(target_limits, dict) or
+            target_limits.get("caps") != {
+                "max_bytes": V10_PREFIX_BYTE_CAP,
+                "max_records": V10_MATCH_CLOCK_RECORD_CAP,
+            }):
+        raise ComparisonError("match-clock source audit runner packet lacks source lineage")
+    launch_trace = launch_source.get("trace")
+    if not isinstance(launch_trace, dict):
+        raise ComparisonError("match-clock runner packet trace identity is malformed")
+    if (launch_source.get("capture_id") != expected_source["capture_id"] or
+            launch_source.get("sequence_id") != expected_source["sequence_id"] or
+            launch_source.get("path") != expected_source["trace"]["path"] or
+            launch_trace.get("bytes") != expected_source["trace"]["bytes"] or
+            launch_trace.get("recorded_full_sha256") !=
+            expected_source["trace"]["recorded_full_sha256"] or
+            launch_source.get("clock300_audit") != prior_audit_identity or
+            launch_source.get("match_clock_boundary") != prior_boundary):
+        raise ComparisonError("match-clock runner packet differs from its frozen source lineage")
+
+    accepted = launch_source.get("accepted_checkpoint_rejoins")
+    if not isinstance(accepted, list) or len(accepted) != 3:
+        raise ComparisonError("match-clock runner packet lacks the exact clock-1/60/300 rejoin list")
+    positive_audit, positive_sha = _validate_first_positive_audit(
+        Path(expected_source["positive_boundary_audit"]["path"]), packet, recipe)
+    clock60_audit, _ = _validate_clock60_audit(
+        Path(expected_source["clock60_boundary_audit"]["path"]), packet, recipe, positive_sha)
+    checkpoint_expectations = (
+        (expected_source["first_positive_boundary"],
+         positive_audit["observed"]["source_prefix"], "clock-1"),
+        (expected_source["clock60_boundary"],
+         clock60_audit["observed"]["source_prefix"], "clock-60"),
+        ({key: value for key, value in prior_boundary.items()
+          if key != "target_match_frame_at_least"},
+         prior_audit["observed"]["source_prefix"], "clock-300"),
+    )
+    tuple_keys = {"browser_cursor", "match_frame", "match_index", "pad_consume_sequence",
+                  "source_sequence", "source_tick", "timeline_frame_index"}
+    for index, (expected_tuple, expected_prefix, name) in enumerate(checkpoint_expectations):
+        entry = accepted[index]
+        if not isinstance(entry, dict):
+            raise ComparisonError(f"match-clock runner packet {name} checkpoint is malformed")
+        actual_tuple = entry.get("tuple")
+        if not isinstance(actual_tuple, dict) or set(actual_tuple) != tuple_keys:
+            raise ComparisonError(f"match-clock runner packet {name} tuple fields are malformed")
+        for field, value in actual_tuple.items():
+            _int(value, f"match-clock runner packet {name} tuple {field}",
+                 1 if field in {"source_sequence", "browser_cursor", "match_frame"} else 0,
+                 (1 << 64) - 1 if field in {"source_sequence", "pad_consume_sequence"}
+                 else MAX_UINT32)
+        if _first_difference(expected_tuple, actual_tuple):
+            raise ComparisonError(f"match-clock runner packet {name} tuple differs from its audit")
+        actual_prefix = entry.get("fresh_prefix")
+        if not isinstance(actual_prefix, dict) or set(actual_prefix) != {
+                "bytes_read", "hash_basis", "last_source_sequence", "records_read", "sha256"}:
+            raise ComparisonError(f"match-clock runner packet {name} prefix identity is malformed")
+        if not isinstance(actual_prefix.get("hash_basis"), str) or not actual_prefix["hash_basis"]:
+            raise ComparisonError(f"match-clock runner packet {name} prefix basis is missing")
+        _int(actual_prefix.get("bytes_read"),
+             f"match-clock runner packet {name} prefix bytes", 1, V10_PREFIX_BYTE_CAP)
+        _int(actual_prefix.get("records_read"),
+             f"match-clock runner packet {name} prefix records", 1, V10_MATCH_CLOCK_RECORD_CAP)
+        last_sequence = _int(actual_prefix.get("last_source_sequence"),
+                             f"match-clock runner packet {name} prefix last sequence",
+                             0, (1 << 64) - 1)
+        if (actual_prefix["records_read"] != actual_tuple["source_sequence"] + 1 or
+                last_sequence != actual_tuple["source_sequence"] or
+                not isinstance(actual_prefix.get("sha256"), str) or
+                re.fullmatch(r"[0-9a-f]{64}", actual_prefix["sha256"]) is None):
+            raise ComparisonError(f"match-clock runner packet {name} prefix sequence/hash is malformed")
+        normalized_prefix = {key: actual_prefix[key] for key in (
+            "bytes_read", "last_source_sequence", "records_read", "sha256")}
+        expected_prefix_identity = {key: expected_prefix[key] for key in (
+            "bytes_read", "last_source_sequence", "records_read", "sha256")}
+        if _first_difference(expected_prefix_identity, normalized_prefix):
+            raise ComparisonError(f"match-clock runner packet {name} prefix differs from its audit")
 
 
 def _validate_browser_producer_source(producer: Mapping[str, Any],
