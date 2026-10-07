@@ -365,6 +365,45 @@ still incomplete evidence (`boundary_result: equivalent`, `result: incomplete`,
 `complete: false`, `whole_session_equivalent: false`; CLI exit 1). Whole-session
 default behavior and the existing v8/v9 scopes remain unchanged.
 
+For a v10 comparison with a packet-bound ordered lineage, select
+`--scope v10-first-match-clock-ordered-lineage`. The expectations packet lists
+the accepted clock-1 and clock-60 checkpoints, zero or more strictly ordered
+intermediate checkpoints, and one terminal target. Each entry binds its source
+tuple, source-audit identity and prefix digest; the terminal first-match clock
+must be at least 61 and every consumed prefix is freshly checked before the
+reader advances. The invocation retains the existing source and browser
+provenance arguments and supplies the positive, clock-60 and terminal audits:
+
+```sh
+python3 scripts/compare_whole_session_state.py \
+  --reference "$SESSION_REFERENCE" --recipe "$SESSION_RECIPE" \
+  --port-trace "$SESSION_BROWSER_TRACE" \
+  --browser-report "$SESSION_BROWSER_REPORT" \
+  --scope v10-first-match-clock-ordered-lineage \
+  --expectations "$SESSION_EXPECTATIONS" \
+  --source-manifest "$SESSION_SOURCE_MANIFEST" \
+  --source-report "$SESSION_SOURCE_REPORT" \
+  --source-audit "$SESSION_SOURCE_AUDIT" \
+  --positive-boundary-audit "$SESSION_POSITIVE_AUDIT" \
+  --clock60-boundary-audit "$SESSION_CLOCK60_AUDIT" \
+  --match-clock-boundary-audit "$SESSION_TERMINAL_AUDIT" \
+  --browser-capture-report "$SESSION_BROWSER_CAPTURE_REPORT" \
+  --browser-producer-manifest "$SESSION_BROWSER_PRODUCER_MANIFEST" \
+  --out "$SESSION_COMPARISON_OUT"
+```
+
+This scope uses the dedicated 64 MiB and 12,000-record source caps. CSS/SSS
+rows establish consumed-input order only; declared state comparison begins at
+the match setup. A matching target is still an incomplete prefix result with
+`whole_session_equivalent: false` and CLI exit 1. The default whole-session
+scope and all earlier v8/v9 and v10 scopes keep their existing behavior.
+
+The issue-221 synthetic comparator controls and their limitations are recorded
+in the [scoped comparator entry](status/2026-10-07-b4-v10-ordered-clock-lineage-comparator.md).
+The separate
+[clock-1000 source-only entry](status/2026-10-07-b4-v10-first-match-clock1000-source-only.md)
+records the original-trace observation without a browser comparison.
+
 ## Capture command failure gates
 
 The capture command reports success only after the replay completes, browser

@@ -1,0 +1,228 @@
+{
+  "date": "2026-10-07",
+  "exclusions": [
+    "No browser capture or browser comparison.",
+    "No full-session state-equivalence claim.",
+    "The recorded full-trace SHA-256 was not recomputed; the audit freshly hashed only consumed prefix bytes.",
+    "The audit outcome does not establish later-match, whole-roster, visual, audio, live-timing, or gameplay acceptance."
+  ],
+  "execution": {
+    "elapsed_seconds": 0.9617575001902878,
+    "execution_receipt_sha256": "4780a4aba4f058a4609c3126131499574b8b17fc09e183f5144dd75e260e61a6",
+    "exit_code": 0,
+    "finished_utc": "2026-10-07T17:56:09.973120+00:00",
+    "packet_sha256": "f2fea290c4231b79b8c2c9db070a236cd9a7a976813a5763b8af78248dc2b8e9",
+    "report_sha256": "521e00f57aac27a999619d5adb3aa6fe6fa86e5c4f774b8f211cd002f9bcb632",
+    "runner_sha256": "29a7c6b3f61ffc990357f1ca7a9ff74cb459739364e0e274472a1bd8d0f323bd",
+    "started_utc": "2026-10-07T17:56:09.011031+00:00",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_sha256": "7e08121423b8b77ed3af57dfa029dd3197067375653ee39f25422c9b752ea82f",
+    "timed_out": false,
+    "timeout_seconds": 60,
+    "workspace_head": "accef9e521310add5fb5b7dd7ccf69d43881ee95",
+    "workspace_tree": "cf50dd8e6a187841a1b3cf8f93390012293879d0"
+  },
+  "integration_note": {
+    "full_trace_content_read_for_hash": false,
+    "personal_paths_omitted": true,
+    "source_checkout_at_audit": {
+      "head": "accef9e521310add5fb5b7dd7ccf69d43881ee95",
+      "tree": "cf50dd8e6a187841a1b3cf8f93390012293879d0"
+    },
+    "source_only_run_id": "b4-clock1000-source-audit-proposal-20261007-LdGe1v"
+  },
+  "issue": 218,
+  "limits": {
+    "max_bytes": 67108864,
+    "max_records": 12000,
+    "stop": "first invalid record/join/checkpoint, cap, EOF before target, or first completed target tick"
+  },
+  "ordered_checkpoint_rejoins": [
+    {
+      "fresh_prefix": {
+        "bytes": 10389712,
+        "last_source_sequence": 4735,
+        "records": 4736,
+        "sha256": "24d520abccf98ee109b3cee2ae67767d4363c7e941d688c3534c0cbfdd7cde4a"
+      },
+      "label": "clock1",
+      "rejoined": true,
+      "tuple": {
+        "cursor_after_frame": 1309,
+        "match_frame": 1,
+        "match_index": 0,
+        "pad_consume_source_sequence": 4734,
+        "source_tick": 124,
+        "source_tick_seq": 4735,
+        "timeline_frame_index": 1308
+      }
+    },
+    {
+      "fresh_prefix": {
+        "bytes": 12780628,
+        "last_source_sequence": 5030,
+        "records": 5031,
+        "sha256": "32b763453688c6335b90c9807b71c79d919b85e6e7435a3c2abccd1792f00e77"
+      },
+      "label": "clock60",
+      "rejoined": true,
+      "tuple": {
+        "cursor_after_frame": 1368,
+        "match_frame": 60,
+        "match_index": 0,
+        "pad_consume_source_sequence": 5029,
+        "source_tick": 183,
+        "source_tick_seq": 5030,
+        "timeline_frame_index": 1367
+      }
+    },
+    {
+      "fresh_prefix": {
+        "bytes": 22506388,
+        "last_source_sequence": 6230,
+        "records": 6231,
+        "sha256": "ef9569c32524aa79443a998867c4c418a2cfd8b21719ed24b03fc966ded025ef"
+      },
+      "label": "clock300",
+      "rejoined": true,
+      "tuple": {
+        "cursor_after_frame": 1608,
+        "match_frame": 300,
+        "match_index": 0,
+        "pad_consume_source_sequence": 6229,
+        "source_tick": 423,
+        "source_tick_seq": 6230,
+        "timeline_frame_index": 1607
+      }
+    },
+    {
+      "fresh_prefix": {
+        "bytes": 30611188,
+        "last_source_sequence": 7230,
+        "records": 7231,
+        "sha256": "ec1ceb5c56c87ec35b5dd8cd0d318c85b1917d554871883732de4d2e4f52e7b6"
+      },
+      "label": "clock500",
+      "rejoined": true,
+      "tuple": {
+        "cursor_after_frame": 1808,
+        "match_frame": 500,
+        "match_index": 0,
+        "pad_consume_source_sequence": 7229,
+        "source_tick": 623,
+        "source_tick_seq": 7230,
+        "timeline_frame_index": 1807
+      }
+    }
+  ],
+  "preparation_attempts": [
+    {
+      "attempt": "v1",
+      "error": "ComparisonError: launch packet path differs from the frozen packet",
+      "preflight_sha256": "3ab4dddede57c2da4410c7ebab5862d470e737e53a073b3dbb64bb75f9f3b88f",
+      "source_open_attempts": 0,
+      "status": "preflight_failed_before_source_open"
+    },
+    {
+      "attempt": "v2",
+      "error": "ComparisonError: packet source trace identity differs from accepted expectations",
+      "preflight_sha256": "82605241702ea6c6372f39b599249b2593791b74295bb66ef5fcd0cc6a920381",
+      "source_open_attempts": 0,
+      "status": "preflight_failed_before_source_open"
+    },
+    {
+      "attempt": "v3",
+      "preflight_sha256": "e0422327b14419ce21b7d4ce3fed704217aa6e18492e402b8d46e6353e071116",
+      "source_open_attempts": 0,
+      "status": "metadata_preflight_passed_without_source_open"
+    }
+  ],
+  "result": {
+    "audit_completed": true,
+    "browser_comparison": "not performed; source observations only",
+    "complete": false,
+    "css_sss_input_frames_ordered_through_boundary": 1184,
+    "four_primary_entities_at_target": true,
+    "source_scene_spans": [
+      {
+        "first_frame": 0,
+        "last_frame": 936,
+        "scene": 1
+      },
+      {
+        "first_frame": 937,
+        "last_frame": 1183,
+        "scene": 2
+      },
+      {
+        "first_frame": 1184,
+        "last_frame": 2307,
+        "scene": 3
+      }
+    ],
+    "status": "first_match_clock_ge1000_found",
+    "target": {
+      "cursor_after_frame": 2308,
+      "match_frame": 1000,
+      "match_index": 0,
+      "pad_consume_source_sequence": 9729,
+      "source_tick": 1123,
+      "source_tick_seq": 9730,
+      "timeline_frame_index": 2307
+    },
+    "ticks_observed": {
+      "count": 1124,
+      "first_source_tick": 0,
+      "last_source_tick": 1123
+    },
+    "timeline_frames_input_ordered_through_boundary": 2308,
+    "whole_session_equivalent": false
+  },
+  "review": {
+    "root_identity_review_sha256": "daa371cfaca02e2e929ad2373ec9218c299b7177c10c9ef2563974f690410d8d",
+    "root_result_review_sha256": "f8ce4f2083f477d9c15e8bf07964d7596b7d7a0958ea3e52d04ba493b040494f",
+    "verdict": "source-only result independently reviewed; no browser comparison or whole-session acceptance"
+  },
+  "schema": "melee-web-b4-clock1000-source-only-receipt-v1",
+  "scope": "Source-only observation of the retained original trace through the first match-0 frame with match_frame >= 1000. No browser comparison or full-session acceptance.",
+  "source_identity": {
+    "capture_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "freshly_hashed_consumed_prefix": {
+      "bytes": 50873188,
+      "last_source_sequence": 9730,
+      "records": 9731,
+      "sha256": "7f71d2c8c9529e8171dfab854cd114abb0eef44ca8d59c6f7e96af5495d13cf7"
+    },
+    "full_trace_rehashed_during_audit": false,
+    "previously_recorded_full_trace_sha256": "81f8a0a3c8cac644e86be2e07451a5876be08b60ebb4295290a35c8a187c5580",
+    "provenance": {
+      "audit_bytes_read": 5364736,
+      "audit_records_decoded": 4116,
+      "audit_sha256": "742a9a6b7317651c654620c1f69c87cff4177a8c9e7eea8c34d596e817af43e8",
+      "first_entry_seq": 4088,
+      "first_setup_seq": 4113,
+      "first_setup_source_tick": 247,
+      "first_source_tick_seq": 4115,
+      "full_trace_rehashed": false,
+      "manifest_sha256": "c88f0e2cbd1fd79d28cb9cd554ce1b34ca2b858262d6032a327c08c46b941da7",
+      "recorded_full_trace_sha256": "81f8a0a3c8cac644e86be2e07451a5876be08b60ebb4295290a35c8a187c5580",
+      "source_report_sha256": "88a8ca551d2077f200fbcf4670836357e508fdb503d7b360e8b3b67654911913",
+      "trace_bytes": 2137257881
+    },
+    "sequence_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "source_trace_bytes_recorded": 2137257881,
+    "stat_after": {
+      "bytes": 2137257881,
+      "device": 16777242,
+      "inode": 6599739,
+      "mtime_ns": 1791051579441504716
+    },
+    "stat_before": {
+      "bytes": 2137257881,
+      "device": 16777242,
+      "inode": 6599739,
+      "mtime_ns": 1791051579441504716
+    },
+    "stat_stable": true
+  }
+}

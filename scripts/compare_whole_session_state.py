@@ -23,7 +23,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--scope", choices=("whole-session", "v10-first-setup-tick0",
                                             "v10-first-positive-match-frame",
                                             "v10-first-match-clock-ge60",
-                                            "v10-first-match-clock-boundary"),
+                                            "v10-first-match-clock-boundary",
+                                            "v10-first-match-clock-ordered-lineage"),
                         default="whole-session", help="comparison scope (default: whole-session)")
     parser.add_argument("--expectations", type=Path,
                         help="frozen expectations packet for a bounded v10 prefix scope")

@@ -1,0 +1,123 @@
+{
+  "date": "2026-10-07",
+  "integration_validation": {
+    "current_main_run": {
+      "base_main": "4135b202d60a48e089c002d7417059dac23c7e6c",
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "footer": "Ran 2024 tests in 362.375s; OK (skipped=151).",
+      "log_artifact": "full-unittest-current-main-4135b20.log",
+      "log_sha256": "98f0cfa89014235c10a72eef15e638fced2c0654ec32eb7899c32acb48cf606b",
+      "runtime_build": "not run; changes are Python comparator/CLI/tests and documentation only.",
+      "source_head": "b0893b9a5a56f59a618915ef48f649ab2a51e59e",
+      "source_tree": "ebfa15cd33f19cf84dba64bafc0baa5d68fbb55b",
+      "worktree_state": "Clean at the recorded producer commit, as confirmed by the execution owner."
+    },
+    "preserved_prior_run": {
+      "base_main": "15fd2199abee8cb32c0fa11606521cbfcf823105",
+      "footer": "Ran 2022 tests in 373.215s; OK (skipped=149).",
+      "log_artifact": "full-unittest-discovery.log",
+      "log_sha256": "0fba14dbf7063b0d01147d11786d9ff8f6b1a5377ea0a0162a9e4cd90cd91f80",
+      "note": "Preserved as an intermediate validation before the current-main refresh; not substituted for the current-main run.",
+      "source_head": "a39915e29892cf747f97a81ea6f4dcb19d1b4607",
+      "source_tree": "e5233c5e04f5d4dbfbfa5288cb3cf7318b9dd04d",
+      "worktree_state": "The recorded HEAD/tree identify committed source; five uncommitted documentation drafts were present during this run. Executable and test files were unchanged, as confirmed by the execution owner. No clean-worktree claim is made for this run."
+    },
+    "status": "passed"
+  },
+  "issue": 221,
+  "review": {
+    "correction_chronology": [
+      {
+        "commit": "50f72f9a742ec6d80b13ac7afcb82cfc38914ad1",
+        "finding": "The first ordered-lineage draft fixed exactly five checkpoint labels and used an incorrect terminal minimum of 501; it did not meet the reviewed variable-list contract.",
+        "independent_review_sha256": "53db3473221b95229ec39d8c1575e6fa738a277f6608d0fe349d25c294f62739",
+        "stage": "initial_frozen_candidate"
+      },
+      {
+        "finding": "A surviving intermediate source version retained the 501 floor, and a synthetic clock-520 adjustment bypassed the required terminal-clock regression; several fixture attempts had not reached production stream iteration. These drafts were frozen for review and were not accepted as validation.",
+        "retained_dirty_patch_sha256": "fac3546fdc86cfdd53c2976f52625dd564576103d5caa3fad080235cc2c7a68a",
+        "retained_freeze_manifest_sha256": "94795bf3cfbde3ca43db15aa779caf95324d8767c66a48250fec04ae1f0d6e33",
+        "scope": "Preparation and synthetic-fixture attempts only; no original source stream was read.",
+        "stage": "intermediate_fixture_iteration"
+      },
+      {
+        "commit_before_rebase": "1aa1b79e9dcd596df6463cd68d3597f9b5318822",
+        "correction": "The correction changed the production path to validate a variable ordered descriptor list, retained the prior clock-1/60 checks, and exercised terminal clock 90 with descriptor cardinalities 3, 4, 5 and 6.",
+        "focused_regressions": 81,
+        "focused_result": "passed",
+        "retained_freeze_manifest_sha256": "5a466a84e1ce6c4bea6d8f5de991b13d3acdae5ce3beef09b2ff30e8cc392824",
+        "reviewed_tree_before_rebase": "5c033fc25e6144a3ecd3079e19e63e25614213d6",
+        "root_source_review_sha256": "e5c2b3a89dc1b1ef6480da0a2dfb942c1751a82b3f3ad993f0aeafa2f7f59161",
+        "stage": "reviewed_correction"
+      }
+    ],
+    "coverage": [
+      "Production comparator path with variable ordered descriptors at terminal clock 90 and descriptor cardinalities 3, 4, 5 and 6.",
+      "Fresh-prefix mismatch stops at the first mismatching record before later records are consumed.",
+      "A semantically altered inner checkpoint remains rejected even when the outer runner packet hash is refreshed.",
+      "Legacy whole-session, v8/v9 and existing bounded scopes retain their prior contracts."
+    ],
+    "focused_regressions": 81,
+    "focused_result": "passed",
+    "limitations": [
+      "Synthetic source records and byte accounting; source and browser provenance are fixture data in the focused tests.",
+      "No original MWRO content was read by these focused tests; no browser comparison or capture was run.",
+      "The comparator tests do not claim original-to-browser state agreement."
+    ],
+    "retained_failures": {
+      "corrected_candidate_freeze_manifest_sha256": "5a466a84e1ce6c4bea6d8f5de991b13d3acdae5ce3beef09b2ff30e8cc392824",
+      "first_api_failure": "Missing digest argument in an intermediate reducer test; retained in the private run log.",
+      "first_fixture_failure": "One stale local helper reference in the projection refactor; retained log, while unittest TemporaryDirectory removed the failed fixture directory.",
+      "frozen_dirty_patch_sha256": "fac3546fdc86cfdd53c2976f52625dd564576103d5caa3fad080235cc2c7a68a",
+      "intermediate_dirty_freeze_manifest_sha256": "94795bf3cfbde3ca43db15aa779caf95324d8767c66a48250fec04ae1f0d6e33"
+    },
+    "retained_test_preparation_failures": [
+      {
+        "failure": "An early reducer-focused test call omitted a required digest argument.",
+        "raw_log_sha256": "010dee354d5e1ab82e4bfe3ef6a23d840bda627fb61bf7c6912daa52fd76e07c",
+        "retention": "Raw log and generated fixture directory retained."
+      },
+      {
+        "failure": "A production-path negative test exposed an unreplaced boundary_tuple helper reference (NameError).",
+        "raw_log_sha256": "e1c241b7115416c5c0a7df36e104913f7a1d3186a94c24822df645c8a46ad499",
+        "retention": "Raw log retained; unittest TemporaryDirectory cleanup removed the failed synthetic input directory."
+      }
+    ],
+    "reviewed_logs": 10,
+    "reviewed_sources": 4,
+    "root_source_review_sha256": "e5c2b3a89dc1b1ef6480da0a2dfb942c1751a82b3f3ad993f0aeafa2f7f59161"
+  },
+  "schema": "melee-web-b4-ordered-clock-lineage-synthetic-evidence-v1",
+  "scope": "Synthetic focused validation of the explicit v10 ordered-clock-lineage comparator path.",
+  "source": {
+    "base_main": "4135b202d60a48e089c002d7417059dac23c7e6c",
+    "files": [
+      {
+        "bytes": 4323,
+        "path": "scripts/compare_whole_session_state.py",
+        "sha256": "48b711d12d5defe046b327258ded84e692f22d00b3616eb11b6b0254dfffacb9"
+      },
+      {
+        "bytes": 272071,
+        "path": "tools/whole_session_state_compare.py",
+        "sha256": "e118754923cd4999326e6c048d13e56dfe5070a6c8baaf313c5dd9cf67d2cd7e"
+      },
+      {
+        "bytes": 11907,
+        "path": "tests/test_compare_whole_session_state_cli.py",
+        "sha256": "cb47cfcb31657ecac8d7341241efef80263c38b512bbffdbc2d5e4c7bcd9f0ec"
+      },
+      {
+        "bytes": 263620,
+        "path": "tests/test_whole_session_state_compare.py",
+        "sha256": "9ecabb0187e83a100d0c2319d3b2bc3c354081cd9a37d1e74dd94bf663a4e834"
+      }
+    ],
+    "post_rebase_range_diff": "Both implementation commits remain exact patch matches after rebasing onto current main; the third commit is documentation only.",
+    "range_diff": "Both owned implementation commits compare unchanged (exact patch equivalence) after rebase.",
+    "rebased_head": "621df5202b6f835eb18915241bd80f9a2616baac",
+    "rebased_tree": "56620be563702e0f9665fe189b09dadca7fd13e6",
+    "reviewed_commit_before_rebase": "1aa1b79e9dcd596df6463cd68d3597f9b5318822",
+    "reviewed_tree_before_rebase": "5c033fc25e6144a3ecd3079e19e63e25614213d6"
+  }
+}
