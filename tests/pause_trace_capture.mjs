@@ -37,11 +37,33 @@ export async function installPauseTraceCapture(page,stallSchedule=null){
     const table=new Float64Array(CAP*COLS);
     const ring=new Array(RING);
     const state={columns,cap:CAP,rows:0,dropped:0,ring_size:RING,incidents:[],incident_overflow:0,
+      preparation:{active:false,error:null,sequence:0,source:null},manual_pause_events:0,
       sample:null,errors:0,installed_at_ms:performance.now(),time_origin:performance.timeOrigin,
       stall_schedule:stallSchedule?{...stallSchedule,status:'armed',actual:null,error:null}:null};
     const originalTiming=window.menuRuntimeTiming;
     const originalSample=window.menuDiagnosticSample;
     const originalIncident=window.menuDiagnosticIncident;
+    // Source-emitted lifecycle hooks cover scene construction/arming. A
+    // first-use reason-7 incident covers render-only preparation, whose arm
+    // publishes a profile but may omit menuPreparation/Done.
+    const preparationHooks=['menuPreparation','menuPreparationDone','menuPreparationCanceled',
+      'menuPreparationFailed','menuPreparationProfile'];
+    const preparationHooksPresent=preparationHooks.every(name=>typeof window[name]==='function');
+    for(const name of preparationHooks){
+      const original=window[name];
+      window[name]=function(...args){
+        try{return original?.apply(this,args);}
+        finally{
+          const preparation=state.preparation;
+          preparation.sequence++;preparation.source=name;
+          preparation.active=name==='menuPreparation';
+          preparation.error=name==='menuPreparationFailed'?String(args[0]||'Native preparation failed'):null;
+          if(name==='menuPreparationProfile'&&args[0]?.gpu_completion_ready!==true){
+            preparation.active=true;preparation.error='Native preparation profile lacks GPU completion';
+          }
+        }
+      };
+    }
     window.menuDiagnosticSample=function(...args){
       try{return originalSample?.apply(this,args);}
       finally{state.sample=[args[8],args[18]?1:0,args[1],args[2],args[9],args[10],args[11]];}
@@ -49,10 +71,17 @@ export async function installPauseTraceCapture(page,stallSchedule=null){
     window.menuDiagnosticIncident=function(...args){
       try{return originalIncident?.apply(this,args);}
       finally{
-        if(state.incidents.length<256)state.incidents.push({at_ms:performance.now(),row:state.rows,
-          reason:args[0],value:args[1],threshold:args[2],source_frame:args[3],scene:args[4],
-          clock_owner:args[5]});
-        else state.incident_overflow++;
+        if(args[0]===7){state.preparation.active=true;state.preparation.source='incident_7';
+          state.preparation.error=null;state.preparation.sequence++;}
+        if(args[0]===5)state.manual_pause_events++;
+        const at=performance.now();
+        if(state.incidents.length<256){
+          const incident={at_ms:at,row:state.rows,reason:args[0],value:args[1],
+            threshold:args[2],source_frame:args[3],scene:args[4],clock_owner:args[5]};
+          state.incidents.push(incident);
+          try{performance.mark(`pause-trace-incident-${state.incidents.length}`,{detail:incident});}
+          catch(_){state.errors++;}
+        }else state.incident_overflow++;
       }
     };
     const maybeRunStall=sourceFrame=>{
@@ -121,13 +150,14 @@ export async function installPauseTraceCapture(page,stallSchedule=null){
       timing_hook_present:typeof originalTiming==='function',
       sample_hook_present:typeof originalSample==='function',
       incident_hook_present:typeof originalIncident==='function',
+      preparation_hooks_present:preparationHooksPresent,
       stall_schedule_supported:!!state.stall_schedule};
   },{columns:PAUSE_TRACE_COLUMNS,stallSchedule});
 }
 
-export async function readPauseTraceStatus(page,{readNative=true}={}){
+export async function readPauseTraceStatus(page,{readNative=true,includeLatestCallback=false}={}){
   // Playwright serializes this callback; Node closure bindings do not cross.
-  return page.evaluate(readNative=>{
+  return page.evaluate(({readNative,includeLatestCallback})=>{
     const capture=window.__meleePauseTrace;
     if(!capture)return {status:'not-installed'};
     const module=window.Module;
@@ -137,15 +167,29 @@ export async function readPauseTraceStatus(page,{readNative=true}={}){
     let nativeMessage=null;
     if(readNative)try{const pointer=module?._melee_web_native_menu_message?.();
       if(pointer)nativeMessage=module.UTF8ToString(pointer);}catch(error){nativeMessage={error:String(error?.message||error)};}
-    return {status:'installed',rows:capture.state.rows,dropped:capture.state.dropped,
+    let latestCallback=null;
+    if(includeLatestCallback&&capture.state.rows>0){
+      const names=['source_steps','source_draws','draw_calls','sample_source_frame','sample_replay_cursor'];
+      const width=capture.state.columns.length,row=capture.state.rows-1,base=row*width;
+      const values=Object.fromEntries(names.map(name=>{
+        const column=capture.state.columns.indexOf(name);
+        const value=column<0?NaN:capture.table[base+column];
+        return [name,Number.isFinite(value)?value:null];
+      }));
+      latestCallback={row,...values};
+    }
+    return {status:'installed',at_ms:performance.now(),time_origin:performance.timeOrigin,
+      rows:capture.state.rows,dropped:capture.state.dropped,
       capture_errors:capture.state.errors,stall_schedule:capture.state.stall_schedule,
       incidents:capture.state.incidents.slice(),incident_overflow:capture.state.incident_overflow,
+      preparation:{...capture.state.preparation},manual_pause_events:capture.state.manual_pause_events,
       replay_cursor:call('_melee_web_native_menu_replay_cursor'),source_running:call('_melee_web_native_menu_running'),
+      ...(includeLatestCallback?{latest_callback:latestCallback}:{}),
       phase:call('_melee_web_native_menu_phase'),native_message:nativeMessage,
       runtime_error:status?.dataset.runtimeError||null,
       dialog_error:dialog?document.querySelector('#error')?.textContent?.trim()||'Application error':null,
       replay_report:window.lastRetailReplayReport??null,status_text:status?.textContent||null};
-  },readNative);
+  },{readNative,includeLatestCallback});
 }
 
 /** Atomically mark a timing-table row cursor and page-clock boundary. */
@@ -229,7 +273,7 @@ export async function readPauseTraceCapture(page,reason){
     const audio=window.__meleeWebAudioDiagnostics?.snapshot?.()||null;
     const audioHistory=window.__meleePauseTraceAudioHistory?.slice?.()||null;
     const hitch=window.meleeHitchCapture?.report?.()||null;
-    const marks=performance.getEntriesByType('mark').filter(mark=>mark.name.startsWith('pause-trace-'))
+    const marks=performance.getEntriesByType('mark').filter(mark=>mark.name.startsWith('pause-trace-')||mark.name.startsWith('melee-hitch-'))
       .map(mark=>({name:mark.name,start_time:mark.startTime}));
     return {status:'captured',read_at_ms:performance.now(),time_origin:performance.timeOrigin,
       columns:state.columns,rows,dropped:state.dropped,errors:state.errors,cap:state.cap,

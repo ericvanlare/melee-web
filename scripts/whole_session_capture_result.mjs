@@ -55,3 +55,23 @@ export function finalizeSessionCapture(report) {
   report.result = report.deliberate_prefix_stop ? 'incomplete' : failures.length ? 'fail' : 'pass';
   return report.result === 'pass' ? 0 : 1;
 }
+
+/** Bound an observation without assuming it cancels work in a stuck renderer. */
+export async function boundedCaptureOperation(operation, timeoutMs, label) {
+  let timer;
+  try {
+    return await Promise.race([operation, new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        const error = Error(`${label} exceeded ${timeoutMs} ms`);
+        error.captureOperationTimeout = true;
+        reject(error);
+      }, timeoutMs);
+    })]);
+  } finally { clearTimeout(timer); }
+}
+
+export function retainFirstCaptureError(report, kind, message, phase, details = null) {
+  if (!report.first_error)
+    report.first_error = {kind, message: String(message), phase, details};
+  return report.first_error;
+}

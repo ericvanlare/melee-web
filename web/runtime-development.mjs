@@ -161,6 +161,28 @@ $('save-cache-evidence').onclick=()=>saveEvidence(cacheEvidence).catch(error=>$(
 $('export-render-cache').onclick=async()=>{try{const cacheState=await boundary(()=>Module._melee_web_native_menu_cache_idle());if(cacheState===0)throw Error('Unload before exporting cache');if(cacheState!==1)throw Error('Native cache writes failed; export is unavailable until reload');if(!await Module.saveRuntimeCache?.())throw Error('Cache persistence failed; export was not completed');cacheEvidence=[];const exports=$('cache-exports');for(const old of exports.querySelectorAll('a'))URL.revokeObjectURL(old.href);exports.replaceChildren();for(const name of Module.FS.readdir('/melee-render-cache')){if(name==='.'||name==='..')continue;const bytes=Module.FS.readFile(`/melee-render-cache/${name}`),link=document.createElement('a');link.href=URL.createObjectURL(new Blob([bytes],{type:'application/octet-stream'}));if(name==='pipeline_cache.db'||(name==='pipeline_cache.db-wal'&&bytes.length)){cacheEvidence.push([name.replace('pipeline_cache','render-cache'),bytes]);$('save-cache-evidence').disabled=false;}link.download=`melee-render-${name}`;link.textContent=`Download ${name}`;exports.append(' ',link);}}catch(error){log(`Render cache export: ${error.message||String(error)}`);}};
 // Replay setup/decoding and evidence export stay outside the source clock.
 let retailRun=null,replayLoading=false;
+const STOPPED_EVIDENCE_LEASE_MS=30000;
+let stoppedEvidenceSequence=0;
+// Capture tools own the stopped replay through exports, not only its pause.
+// Acquisition and native reason-5 acknowledgement share one synchronous turn.
+window.menuReplayAcquireStoppedEvidence=(cursor,pauseAndAcknowledge)=>{
+ const run=retailRun;
+ const available=()=>retailRun===run&&run&&!run.observe&&run.baseline&&!run.finishing&&!run.completed&&!run.failure&&!fatal&&!preparationSince&&!run.stoppedEvidence&&!window.meleeHitchCapture?.isInvalid?.();
+ if(!available()||!Number.isSafeInteger(cursor)||cursor<1||Module._melee_web_native_menu_replay_cursor()!==cursor||typeof pauseAndAcknowledge!=='function')throw Error('Stopped evidence requires an available performance replay owner and exact cursor');
+ const pause=pauseAndAcknowledge();
+ if(!available()||pause?.acknowledged!==true||Module._melee_web_native_menu_running()!==0||Module._melee_web_native_menu_replay_cursor()!==cursor)throw Error('Stopped evidence requires a fresh native pause acknowledgement and unchanged owner/cursor');
+ const acquired=performance.now();
+ const lease={token:++stoppedEvidenceSequence,cursor,acquired_at_ms:acquired,expires_at_ms:acquired+STOPPED_EVIDENCE_LEASE_MS,maximum_duration_ms:STOPPED_EVIDENCE_LEASE_MS};
+ run.stoppedEvidence=lease;return{...lease,pause};
+};
+window.menuReplayFinishStoppedEvidence=async(token,reason)=>{
+ const run=retailRun;
+ if(!run||run.stoppedEvidence?.token!==token)throw Error('Stopped evidence lease owner/token is no longer available');
+ run.stoppedEvidence.released_at_ms=performance.now();
+ run.stoppedEvidence.release_reason=reason;
+ await finishRetailReplay(reason);
+ return{...run.stoppedEvidence};
+};
 // Keep read-only diagnostics used by local capture tools after moving out of the inline script.
 Object.defineProperties(window, {
   nativeSourceSteps: {get: () => nativeSourceSteps},
@@ -176,8 +198,11 @@ const replayMemorySnapshot=()=>{
  catch(error){return{available:false,reason:String(error.message||error)};}
 };
 function replayMetrics(run){return{sourceFrames:run.consumed||Module._melee_web_native_menu_replay_cursor(),worstBrowserCallback,sourceSteps:nativeSourceSteps,sourceDraws:nativeSourceDraws,browserCallbacks:activeFrames,worstBrowserCallbackMs:worstFrame,browserCallbackGaps:longFrames,browserLongTasks,browserLongTaskWorstMs:browserLongTaskWorst,nativeCallbacks:nativeTimingFrames,worstNativeCallbackMs:nativeTimingWorst,nativeCallbacksOver33ms:nativeLongFrames,nativeCallbacksOverBudget:nativeOverBudgetFrames,worstNativeCallback:nativeWorstTiming,livePipelinesQueued:livePipelineQueued,livePipelinesCreated:livePipelineCreated,liveTextureUploadBytes:liveTextureUploads,liveStagingUsedBytes,peakStagingUsedBytes,preparationPauses:preparationCount-(run.baseline?.preparations??preparationCount),wasmHeapGrowthBytes:Module.HEAPU8.length-(run.baseline?.heap??Module.HEAPU8.length),focusLost:run.focusLost,firstFocusLoss:run.firstFocusLoss||null};}
-async function finishRetailReplay(reason){
- const run=retailRun;if(!run||run.finishing)return;run.finishing=true;window.meleeHitchCapture?.stop?.();
+function finishRetailReplay(reason){
+ const run=retailRun;if(!run)return Promise.resolve();if(run.finishing)return run.finishPromise;run.finishing=true;
+ if(run.stoppedEvidence){run.stoppedEvidence.finished_at_ms=performance.now();run.stoppedEvidence.finish_reason=reason;}
+ run.finishPromise=(async()=>{
+ window.meleeHitchCapture?.stop?.();
  const metrics=replayMetrics(run),diagnosticCapture=window.meleeHitchCapture?.report?.()||null;run.memory.before_teardown=replayMemorySnapshot();let teardown=false;
  try{teardown=await unloadAndSave();if(!teardown)throw Error(status());}catch(error){reason=reason||error.message;}
  run.memory.after_teardown=replayMemorySnapshot();
@@ -190,9 +215,10 @@ async function finishRetailReplay(reason){
  const failures=[];if(run.wholeSession&&run.finalScene!==1)failures.push('whole-session final CSS was not entered');if(reason)failures.push(reason);if(!teardown)failures.push('teardown incomplete');if(metrics.sourceFrames!==run.frames)failures.push('incomplete input timeline');if(metrics.sourceSteps!==run.frames||metrics.sourceDraws!==(run.expectedDraws??run.frames))failures.push('source tick/draw count mismatch');
  if(diagnosticCaptureInvalid)failures.push('diagnostic capture invalid');if(!run.observe){for(const key of ['browserCallbackGaps','browserLongTasks','nativeCallbacksOver33ms','livePipelinesQueued','livePipelinesCreated','preparationPauses','audioUnderrunFrames','audioOverflowFrames','focusLost'])if(metrics[key])failures.push(key);}
  const sourceMatch=run.sourceMatch||{complete:false,outcome:null,winner:null};
- const report={input_scheduling:['per_tick','startup_clock','recorded_queue'][run.scheduling??0],scheduling_equivalence:'not_evaluated',schema:'melee-web-browser-retail-replay',version:1,recipe_sha256:run.hash,frames:run.frames,mode:run.observe?'state_capture':'performance',complete:teardown&&metrics.sourceFrames===run.frames&&!reason,pass:failures.length===0,failures,performance:run.observe?'not_evaluated':'measured',gold_admitted:false,pixels:'not_compared',source_match:sourceMatch,final_scene:run.finalScene??null,instrumented_timing_resumes:run.timingResumes||0,metrics,diagnostic_capture:diagnosticCapture,diagnostic_page_paint:run.paintControl?.evidence||null,memory:run.memory,preparation:run.preparation,cache:run.cache,user_agent:navigator.userAgent,resolution:[640,480],device_pixel_ratio:devicePixelRatio};
+ const report={input_scheduling:['per_tick','startup_clock','recorded_queue'][run.scheduling??0],scheduling_equivalence:'not_evaluated',schema:'melee-web-browser-retail-replay',version:1,recipe_sha256:run.hash,frames:run.frames,mode:run.observe?'state_capture':'performance',complete:teardown&&metrics.sourceFrames===run.frames&&!reason,pass:failures.length===0,failures,performance:run.observe?'not_evaluated':'measured',gold_admitted:false,pixels:'not_compared',source_match:sourceMatch,final_scene:run.finalScene??null,instrumented_timing_resumes:run.timingResumes||0,metrics,diagnostic_capture:diagnosticCapture,diagnostic_page_paint:run.paintControl?.evidence||null,stopped_evidence_lease:run.stoppedEvidence?{...run.stoppedEvidence}:null,memory:run.memory,preparation:run.preparation,cache:run.cache,user_agent:navigator.userAgent,resolution:[640,480],device_pixel_ratio:devicePixelRatio};
  if(run.observe){const trace=run.rows.join('\n')+'\n';report.trace_sha256=await replayHash(new TextEncoder().encode(trace));replayDownload('retail-port.jsonl',trace);if(run.timerRows.length){const timers=run.timerRows.join('\n')+'\n';report.timer_trace_sha256=await replayHash(new TextEncoder().encode(timers));replayDownload('retail-timer.jsonl',timers);}}
  const text=JSON.stringify(report,null,2);window.lastRetailReplayReport=report;$('retail-replay-report').textContent=text;replayDownload('retail-browser-report.json',text);retailRun=null;$('launch').disabled=fatal||!bundle;$('disc').disabled=fatal||importing;$('pause').disabled=$('unload').disabled=true;syncAudio();
+ })();return run.finishPromise;
 }
 window.menuReplayStarted=(frames,observe,draws=frames,scheduling=0)=>{const run=retailRun;if(!run)throw Error('Missing browser replay owner');if(!Number.isInteger(draws)||draws<1||draws>frames)throw Error('Invalid replay clock draw count');if(![0,1,2].includes(scheduling)||(scheduling===2&&!observe))throw Error('Invalid replay scheduling scope');run.scheduling=scheduling;run.frames=frames;run.expectedDraws=draws;run.observe=observe;run.preparation=latestNativePreparation;run.memory.prepared=replayMemorySnapshot();resetTiming(false);run.baseline={preparations:preparationCount,heap:Module.HEAPU8.length,underruns:Number(latestAudio.underruns||0),overflows:Number(latestAudio.overflows||0)};run.lastProgress=performance.now();};
 window.menuReplayCompleted=(frames,matchComplete,outcome,winner,finalScene)=>{if(retailRun){retailRun.finalScene=finalScene;retailRun.consumed=frames;retailRun.completed=true;retailRun.sourceMatch={complete:!!matchComplete,outcome:Number.isInteger(outcome)?outcome:null,winner:Number.isInteger(winner)?winner:null};setTimeout(()=>finishRetailReplay(null),0);}};
@@ -203,7 +229,15 @@ window.menuReplayPoll=()=>{
  if(window.meleeHitchCapture?.isInvalid?.()){diagnosticCaptureInvalid=true;if(!run.failure)run.failure='Diagnostic hitch capture overflow';}
  const now=performance.now(),cursor=Module._melee_web_native_menu_replay_cursor();
  if(cursor!==run.lastCursor){run.lastCursor=cursor;run.lastProgress=now;}
- if(run.baseline&&now-run.lastProgress>700){const reason=status();if(!Module._melee_web_native_menu_running()&&!preparationSince){
+ const lease=run.stoppedEvidence;
+ if(lease){
+  const invalid=run.failure||(now>=lease.expires_at_ms?'Stopped evidence lease expired':
+   cursor!==lease.cursor?'Stopped evidence cursor changed':
+   Module._melee_web_native_menu_running()!==0?'Stopped evidence source resumed':
+   preparationSince?'Stopped evidence preparation restarted':null);
+  if(invalid){run.failure=invalid;finishRetailReplay(invalid);return;}
+ }
+ if(!lease&&run.baseline&&now-run.lastProgress>700){const reason=status();if(!Module._melee_web_native_menu_running()&&!preparationSince){
   // Diagnostic printf/JSON collection can disrupt scheduling. Only the explicitly
   // instrumented state run may resume; performance mode retains the hard failure.
   if(run.observe&&reason.startsWith('Paused after a timing disruption')){run.timingResumes=(run.timingResumes||0)+1;run.lastProgress=now;boundary(()=>Module._melee_web_native_menu_pause(0));}

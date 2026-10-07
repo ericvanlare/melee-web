@@ -31,6 +31,99 @@ assert(start&&pause&&completion);
  }
 }
 {
+ // Execute production ownership APIs and poll with native source state controlled.
+ const leases=page.slice(page.indexOf('const STOPPED_EVIDENCE_LEASE_MS='),page.indexOf('// Keep read-only diagnostics'));
+ const pollStart=page.indexOf('window.menuReplayPoll=');
+ const poll=page.slice(pollStart,page.indexOf('\n};',pollStart)+3);
+ function stoppedHarness(){
+  const ended=[],nativeCalls=[];
+  let now=100, cursor=1608, running=1, overflow=false;
+  const run={baseline:{},observe:false,wholeSession:true,lastCursor:1608,lastProgress:100,started:0};
+  const scope={window:{meleeHitchCapture:{isInvalid:()=>overflow}},retailRun:run,
+   ready:true,fatal:false,bundle:true,replayLoading:false,preparationSince:0,
+   performance:{now:()=>now},$:()=>({files:[{}]}),status:()=> 'Paused.',
+   Module:{_melee_web_native_menu_replay_cursor:()=>cursor,_melee_web_native_menu_running:()=>running},
+   finishRetailReplay:async reason=>{ended.push(reason);run.finishing=true;},
+   retailReplayWallTimeMs:()=>900000};
+  vm.createContext(scope);vm.runInContext(leases+'\n'+poll,scope);
+  const acquire=()=>scope.window.menuReplayAcquireStoppedEvidence(cursor,()=>{
+   nativeCalls.push('pause');running=0;return{acknowledged:true};});
+  return{scope,run,ended,nativeCalls,acquire,setNow:v=>now=v,setCursor:v=>cursor=v,
+   setRunning:v=>running=v,setOverflow:v=>overflow=v};
+ }
+ const ordinary=stoppedHarness();ordinary.setRunning(0);ordinary.setNow(801);
+ ordinary.scope.window.menuReplayPoll();assert.deepEqual(ordinary.ended,['Paused.']);
+ const held=stoppedHarness(),lease=held.acquire();held.setNow(801);
+ held.scope.window.menuReplayPoll();assert.deepEqual(held.ended,[]);
+ assert.equal(lease.maximum_duration_ms,30000);assert.deepEqual(held.nativeCalls,['pause'],
+  'Holding evidence never resumes, ticks or draws the source');
+ await assert.rejects(()=>held.scope.window.menuReplayFinishStoppedEvidence(lease.token+1,'wrong token'),/owner\/token/);
+ assert.deepEqual(held.ended,[]);
+ await held.scope.window.menuReplayFinishStoppedEvidence(lease.token,'Diagnostic stopped-prefix evidence complete');
+ assert.deepEqual(held.ended,['Diagnostic stopped-prefix evidence complete']);
+ assert.equal(held.run.stoppedEvidence.released_at_ms,801);
+ for(const [label,mutate,expected] of [
+  ['expired',h=>h.setNow(30100),'Stopped evidence lease expired'],
+  ['cursor',h=>h.setCursor(0),'Stopped evidence cursor changed'],
+  ['resumed',h=>h.setRunning(1),'Stopped evidence source resumed'],
+  ['preparation',h=>h.scope.preparationSince=1,'Stopped evidence preparation restarted'],
+  ['runtime failure',h=>h.run.failure='Native fault','Native fault'],
+  ['overflow',h=>h.setOverflow(true),'Diagnostic hitch capture overflow'],
+  ['wall time',h=>h.run.started=-900001,'Replay exceeded bounded wall time'],
+ ]){
+  const h=stoppedHarness();h.acquire();mutate(h);h.scope.window.menuReplayPoll();
+  assert.deepEqual(h.ended,[expected],label);
+ }
+ for(const field of ['finishing','completed','failure','observe']){
+  const h=stoppedHarness();h.run[field]=true;
+  assert.throws(()=>h.acquire(),/available performance replay/);
+  assert.deepEqual(h.nativeCalls,[],'Invalid owner is rejected before native pause');
+ }
+ for(const mutate of [h=>h.scope.preparationSince=1,h=>h.scope.fatal=true,
+   h=>h.setOverflow(true),h=>h.scope.retailRun=null,h=>h.run.baseline=null]){
+  const h=stoppedHarness();mutate(h);assert.throws(()=>h.acquire(),/available performance replay/);
+  assert.deepEqual(h.nativeCalls,[]);
+ }
+ for(const afterPause of [h=>h.setCursor(0),h=>h.setRunning(1),h=>h.scope.retailRun={},
+   h=>h.run.failure='Native preparation failed',h=>h.scope.preparationSince=1]){
+  const h=stoppedHarness();
+  assert.throws(()=>h.scope.window.menuReplayAcquireStoppedEvidence(1608,()=>{
+   h.setRunning(0);afterPause(h);return{acknowledged:true};}),/fresh native pause acknowledgement/);
+  assert.equal(h.run.stoppedEvidence,undefined);
+ }
+ const rejected=stoppedHarness();rejected.setRunning(0);
+ assert.throws(()=>rejected.scope.window.menuReplayAcquireStoppedEvidence(1608,()=>({acknowledged:false})),/fresh native pause acknowledgement/);
+ assert.equal(rejected.run.stoppedEvidence,undefined,'Already stopped alone cannot authorize exports');
+ const duplicate=stoppedHarness();duplicate.acquire();assert.throws(()=>duplicate.acquire(),/available performance replay/);
+ assert.deepEqual(duplicate.nativeCalls,['pause']);
+}
+{
+ // Concurrent cleanup joins the actual asynchronous replay owner teardown.
+ const finish=page.slice(page.indexOf('function finishRetailReplay('),page.indexOf('window.menuReplayStarted='));
+ let releaseUnload,unloads=0;
+ const unloaded=new Promise(resolve=>{releaseUnload=resolve;});
+ const run={memory:{},baseline:{},frames:42127,wholeSession:true,observe:false,
+  stoppedEvidence:{token:1,cursor:1608}};
+ const downloads=[];
+ const scope={window:{},retailRun:run,performance:{now:()=>900},
+  replayMetrics:()=>({sourceFrames:1608,sourceSteps:1608,sourceDraws:1608}),
+  replayMemorySnapshot:()=>({available:true}),unloadAndSave:async()=>{unloads++;return unloaded;},
+  latestAudio:{},diagnosticCaptureInvalid:false,navigator:{userAgent:'test'},devicePixelRatio:1,
+  replayDownload:(name,text)=>downloads.push([name,JSON.parse(text)]),$:()=>({}),
+  syncAudio(){},fatal:false,bundle:true,importing:false};
+ vm.createContext(scope);vm.runInContext(finish,scope);
+ const first=scope.finishRetailReplay('Diagnostic stopped-prefix evidence complete');
+ const joined=scope.finishRetailReplay('second request');
+ assert.equal(first,joined,'All requests await one owner finish promise');
+ assert.equal(unloads,1);assert.equal(downloads.length,0,'Report waits for teardown');
+ releaseUnload(true);await joined;
+ assert.equal(unloads,1);assert.equal(scope.retailRun,null);
+ assert.equal(downloads.length,1);
+ assert.equal(downloads[0][1].stopped_evidence_lease.cursor,1608);
+ assert.equal(downloads[0][1].stopped_evidence_lease.finish_reason,'Diagnostic stopped-prefix evidence complete');
+ assert.equal(downloads[0][1].complete,false,'A diagnostic prefix never becomes complete replay acceptance');
+}
+{
  // Construction can fail before menuReplayStarted publishes a baseline.
  // Its exact error must finish the replay on the next callback, not after
  // the 15-minute watchdog, and teardown must not run reentrantly in Wasm.

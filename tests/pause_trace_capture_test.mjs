@@ -6,10 +6,11 @@ const originalWindow = globalThis.window;
 const originalDocument = globalThis.document;
 try {
   let cursor = 600;
+  const observerOrder = [];
   globalThis.window = {
-    menuRuntimeTiming() {},
+    menuRuntimeTiming() { observerOrder.push('timing-original'); },
     menuDiagnosticSample() {},
-    menuDiagnosticIncident() {},
+    menuDiagnosticIncident() { observerOrder.push('incident-original'); },
     Module: {_melee_web_native_menu_replay_cursor: () => cursor},
   };
   // Reconstruct the function in a separate realm as Playwright does. Calling
@@ -32,7 +33,16 @@ try {
   assert.ok(state.stall_schedule.actual_ms >= 2);
   assert.equal(state.stall_schedule.replay_cursor_after, 600);
   assert.equal(state.errors, 0);
+  assert.equal(observerOrder[0], 'timing-original', 'the existing timing observer runs before capture');
   assert.match(state.stall_schedule.insertion_boundary, /before native callback return/);
+
+  globalThis.window.menuDiagnosticIncident(1, 9, 8, 600, 7, 1);
+  assert.equal(observerOrder.at(-1), 'incident-original', 'the existing incident recorder runs before capture');
+  const markedIncident = state.incidents.at(-1);
+  assert.deepEqual({row: markedIncident.row, value: markedIncident.value, threshold: markedIncident.threshold},
+    {row: 1, value: 9, threshold: 8});
+  assert.equal(globalThis.performance.getEntriesByName('pause-trace-incident-1').at(-1).detail.value, 9,
+    'the User Timing mark retains the original integer guard trigger and threshold');
 
   cursor = 601;
   globalThis.window = {
@@ -83,7 +93,8 @@ try {
   sample[1] = 476;
   globalThis.window.menuDiagnosticSample(...sample);
   cursor = 601;
-  globalThis.window.menuRuntimeTiming({frame: 476, total_ms: 2, preparation_ms: 0});
+  globalThis.window.menuRuntimeTiming({frame: 476, total_ms: 2, preparation_ms: 0,
+    source_steps: 1, source_draws: 1, draw_calls: 410});
   state = globalThis.window.__meleePauseTrace.state;
   const cursorColumn = state.columns.indexOf('sample_replay_cursor');
   assert.ok(cursorColumn >= 0);
@@ -111,6 +122,12 @@ try {
   assert.equal(ready.source_running, 1);
   assert.equal(ready.phase, 2);
   assert.equal(nativeReads, 4, 'default status reads native APIs across serialized boundary');
+  assert.equal(Object.hasOwn(ready, 'latest_callback'), false,
+    'state and other existing callers keep the prior status shape unless they opt in');
+  const sourceReady = await readPauseTraceStatus(page, {readNative: false, includeLatestCallback: true});
+  assert.deepEqual(JSON.parse(JSON.stringify(sourceReady.latest_callback)), {row: 0, source_steps: 1, source_draws: 1,
+    draw_calls: 410, sample_source_frame: 476, sample_replay_cursor: 601},
+  'opt-in source counters are paired with the latest exact replay/source frame boundary');
   nativeReads = 0;
   for (const name of Object.keys(globalThis.window.Module))
     globalThis.window.Module[name] = () => {nativeReads++; throw Error('freed module');};
