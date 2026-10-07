@@ -61,7 +61,7 @@
         "timeline_frame_index": 1607,
         "browser_cursor": 1608
       },
-      "source_only_audit_rejoined_clock300": true,
+      "clock500_source_audit_rejoined_this_checkpoint": true,
       "comparison_validated_audit_tuple_and_prefix_lineage": true,
       "comparison_had_separate_fresh_clock300_hash_guard": false
     },
@@ -216,7 +216,7 @@
     "clock300_lineage": {
       "retained_audit_tuple_and_prefix_validated": true,
       "separate_fresh_comparator_hash_guard": false,
-      "source_only_clock300_audit_had_rejoined": true
+      "clock500_source_audit_had_rejoined_clock300": true
     },
     "scope_counts": {
       "css_sss_input_order_only": 1184,

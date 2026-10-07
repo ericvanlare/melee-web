@@ -2,7 +2,7 @@
 
 **Compiled / Source identified / Retail compared / Browser exercised**
 
-One bounded comparison joined the retained GALE01 revision-2 MWRC v10 source to the retained ordinary state-mode browser capture through the first match-0 `match_frame` at or above 500. The setup and contiguous match ticks through that boundary agreed on the declared state fields. No declared field differed.
+One bounded comparison joined the retained original GALE01 revision-2 source trace, using its v10 input recipe, to the retained ordinary state-mode browser capture through the first match-0 `match_frame` at or above 500. The setup and contiguous match ticks through that boundary agreed on the declared state fields. No declared field differed.
 
 The source-only clock-500 audit had already rejoined the clock-1, clock-60 and clock-300 checkpoints before observing its target. In the later comparator, the clock-1 and clock-60 checkpoints had fresh consumed-prefix hash guards; the retained clock-300 audit, tuple and prefix were validated as lineage, without a separate live clock-300 hash-stop. The full MWRO kept its recorded size and SHA-256 and was not rehashed; its stat stayed stable.
 
