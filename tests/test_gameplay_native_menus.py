@@ -166,6 +166,70 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
             run.stdout,
         )
 
+    def test_stadium_c1_item_state_owner_preflight(self):
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        fixture_root = Path(os.environ.get("MELEE_MENU_FIXTURE_ROOT", ROOT / "assets-local"))
+        if not fixture_root.is_absolute():
+            fixture_root = ROOT / fixture_root
+        menu, game = fixture_root / "native-menus", fixture_root / "next-gate"
+        script = "import {NATIVE_MENU_DISC_FILES} from './web/runtime-assets.mjs'; " \
+                 "console.log(JSON.stringify([...Object.keys(NATIVE_MENU_DISC_FILES), " \
+                 "'dsp_coef.bin', 'sislib_font.bin']))"
+        required = json.loads(subprocess.check_output(
+            [str(node_runtime()), "--input-type=module", "-e", script],
+            cwd=ROOT, text=True))
+        selected = stadium_c1_selected_file_names()
+        required_union = sorted(set(required) | set(selected))
+        self.assertEqual(len(required), 76)
+        self.assertEqual(len(selected), 36)
+        self.assertEqual(len(required_union), 98)
+        self.assertIn("ItCo.usd", required_union)
+        self.assertIn("GrPs.usd", required_union)
+        missing = missing_stadium_fixture_names(menu, game, required_union)
+        if missing:
+            detail = ", ".join(missing[:5])
+            message = (
+                "C1 item-state preflight requires the retained 98-file union"
+                f"; missing {detail}"
+            )
+            if stadium_fixture_campaign_is_explicit():
+                self.fail(message)
+            self.skipTest(message)
+        if not target.is_file():
+            self.skipTest("C1 item-state preflight requires its built host trace")
+        source_revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        trace = self.scratch / "c1-item-state-preflight.jsonl"
+        command = [str(node_runtime()), str(target), str(menu), str(game), "3",
+                   str(trace), source_revision,
+                   "stadium-c1-item-state-preflight-v1"]
+        (self.scratch / "c1-item-state-preflight-command.txt").write_text(
+            " ".join(command) + "\n", encoding="utf-8")
+        try:
+            run = subprocess.run(
+                command, cwd=ROOT, capture_output=True, text=True, timeout=120)
+        except subprocess.TimeoutExpired as failure:
+            (self.scratch / "c1-item-state-preflight.stdout").write_bytes(
+                failure.stdout.encode() if isinstance(failure.stdout, str)
+                else (failure.stdout or b""))
+            (self.scratch / "c1-item-state-preflight.stderr").write_bytes(
+                failure.stderr.encode() if isinstance(failure.stderr, str)
+                else (failure.stderr or b""))
+            raise
+        (self.scratch / "c1-item-state-preflight.stdout").write_text(
+            run.stdout, encoding="utf-8")
+        (self.scratch / "c1-item-state-preflight.stderr").write_text(
+            run.stderr, encoding="utf-8")
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-4000:])
+        self.assertIn(
+            "C1 reopened-context lifecycle and item-state-owner preflight passed; no E8 request",
+            run.stdout,
+        )
+        self.assertIn(
+            "stage publication, or source menu entry",
+            run.stdout,
+        )
+
     def test_stadium_c1_fixture_preflight_detects_missing_selected_file(self):
         target = self.scratch / "synthetic-c1-fixture-preflight"
         menu, game = target / "native-menus", target / "next-gate"

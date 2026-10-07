@@ -19,7 +19,11 @@
 #include "stadium_c1_stage_state_probe.h"
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include "dat_archive.hpp"
+#include "dat_color_animation.hpp"
 #include "dat_effect_banks.hpp"
+#include "dat_item_article.hpp"
+#include "dat_item_registry.hpp"
+#include "dat_item_registry_native.hpp"
 #include "dat_native_stage.hpp"
 #include "dat_scene.hpp"
 #include "dat_stage.hpp"
@@ -27,6 +31,7 @@
 #include "dat_stage_yaku.hpp"
 #include "gameplay_effect_banks.h"
 #include "gameplay_ground_data.h"
+#include "gameplay_item_runtime.h"
 #include "gameplay_stage_map.h"
 #include "native_dat.hpp"
 #include "stadium_c0_native_map_contract.hpp"
@@ -48,6 +53,7 @@ extern "C" {
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include <melee/gr/grdatfiles.h>
 #include <melee/gr/stage.h>
+#include <sysdolphin/baselib/gobj.h>
 #endif
 #include <melee/ty/forward.h>
 #include <melee/ty/toy.h>
@@ -55,6 +61,14 @@ extern "C" {
 extern HSD_Archive* _Toy_sbss_804D6ED0;
 }
 #include <melee/gr/forward.h>
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wwrite-strings"
+extern "C" {
+#include <melee/it/forward.h>
+}
+#pragma GCC diagnostic pop
+#endif
 #include <sysdolphin/baselib/random.h>
 extern "C" {
 #include <melee/lb/lb_013B.h>
@@ -63,6 +77,7 @@ extern HSD_RumbleData HSD_Rumble_804C22E0[4];
 }
 #include <bit>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -74,6 +89,7 @@ extern HSD_RumbleData HSD_Rumble_804C22E0[4];
 #include <sstream>
 #include <set>
 #include <stdexcept>
+#include <string_view>
 #include <vector>
 extern "C" int melee_web_vs_mode_begin(void);
 extern "C" int melee_web_vs_mode_end(void);
@@ -1546,6 +1562,229 @@ void run_stadium_e8_request(
     }
 }
 
+MeleeWebStadiumC1ItemRuntimeGlobalsView stadium_item_runtime_globals()
+{
+    MeleeWebStadiumC1ItemRuntimeGlobalsView view{};
+    check(melee_web_stadium_c1_item_runtime_globals_view(&view),
+          "C1 item-state preflight cannot read source item globals");
+    return view;
+}
+
+void check_stadium_item_runtime_globals(
+    const MeleeWebStadiumC1ItemRuntimeGlobalsView& expected)
+{
+    const auto observed = stadium_item_runtime_globals();
+    check(observed.public_data == expected.public_data &&
+              observed.common_articles == expected.common_articles &&
+              observed.common_data == expected.common_data &&
+              observed.pokemon_articles == expected.pokemon_articles &&
+              observed.character_articles == expected.character_articles &&
+              observed.bounce_data == expected.bounce_data &&
+              observed.color_rows == expected.color_rows,
+          "C1 item-state preflight did not restore item globals");
+}
+
+struct StadiumItemRuntimeEndGuard {
+    MeleeWebItemRuntime* runtime = nullptr;
+
+    void end()
+    {
+        if (!runtime) return;
+        char error[256]{};
+        check(melee_web_item_runtime_end(runtime, error, sizeof(error)), error);
+        runtime = nullptr;
+    }
+
+    ~StadiumItemRuntimeEndGuard()
+    {
+        if (!runtime) return;
+        char error[256]{};
+        if (!melee_web_item_runtime_end(runtime, error, sizeof(error))) {
+            std::cerr << "C1 item-state preflight teardown: " << error << '\n';
+            std::abort();
+        }
+    }
+};
+
+void run_stadium_c1_item_state_preflight(
+    const melee_web::RuntimeFiles& reopened_files,
+    MeleeWebMenuHost* host,
+    const MeleeWebMenuMatchSelection& selected,
+    const std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES>& baseline,
+    const std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES>& save_before)
+{
+    using namespace melee_web;
+    check(host && reopened_files.contains("ItCo.usd") &&
+              reopened_files.contains("GrPs.usd"),
+          "C1 item-state preflight requires retained ItCo.usd and GrPs.usd inputs");
+
+    const auto& itco_bytes = reopened_files.at("ItCo.usd");
+    const auto& grps_bytes = reopened_files.at("GrPs.usd");
+    const std::vector<std::uint8_t> grps_before = grps_bytes;
+    const auto itco_archive = std::make_shared<const DatArchive>(
+        itco_bytes, DatExternalPolicy::PreserveUnresolved);
+    const auto grps_archive = std::make_shared<const DatArchive>(
+        grps_bytes, DatExternalPolicy::ResolveNull);
+    const auto yaku_root = stadium_archive_symbol_offset(
+        *grps_archive, "ALDYakuAll");
+    const DatStageYaku random_yaku(grps_archive, yaku_root);
+    const auto& scripts = random_yaku.scripts();
+
+    const auto* const seed_owner = seed_ptr;
+    check(seed_owner != nullptr,
+          "C1 item-state preflight lost the retained source RNG owner");
+    const std::uint32_t seed_before = *seed_owner;
+    const MeleeWebGameplayStats stats_before = melee_web_gameplay_stats();
+    check(((HSD_GObj**)HSD_GObj_Entities)[9] == nullptr,
+          "C1 item-state preflight found a pre-existing item object");
+    check_stadium_preflight_stage_empty();
+    check_stadium_selection_preserved(host, selected, baseline);
+
+    for (unsigned lifetime = 0; lifetime < 2; ++lifetime) {
+        NativeDatArena public_data_arena(itco_archive);
+        const DatItemRegistry source_registry(*itco_archive);
+        const auto random_index = static_cast<std::size_t>(
+            It_PKind_Random - It_Kind_Kuriboh);
+        check(random_index < source_registry.articles.size() &&
+                  source_registry.articles[random_index].has_value(),
+              "Original Random Pokémon Article root is absent from ItCo.usd");
+
+        DatItemRegistryNative registered_articles(itco_archive);
+        void* const random_article = registered_articles.articles()[random_index];
+        check(random_article != nullptr,
+              "Original Random Pokémon Article registration is absent");
+        DatItemArticle random_article_owner(
+            itco_archive, *source_registry.articles[random_index],
+            It_PKind_Random, random_article);
+        std::array<void*, 8> script_rows_before{};
+        void* random_states = nullptr;
+        for (std::size_t row = 1; row < scripts.size(); ++row) {
+            if (!scripts[row]) continue;
+            check(row < random_article_owner.state_count(),
+                  "ALDYakuAll consumer exceeds the authored Random Article state table");
+            void* row_table = nullptr;
+            check(melee_web_stadium_c1_random_article_state_row(
+                      random_article, static_cast<std::uint32_t>(row), &row_table,
+                      &script_rows_before[row]),
+                  "Random Pokémon Article source state row is unavailable");
+            if (!random_states) random_states = row_table;
+            check(row_table == random_states,
+                  "Random Pokémon Article state rows do not share one source table");
+        }
+        check(random_states != nullptr,
+              "Stadium ALDYakuAll has no checked Random Article state consumers");
+
+        const auto item_root = source_registry.root_offset;
+        const auto color_root = itco_archive->pointer(item_root + 20, 8);
+        if (!color_root)
+            throw DatError("Original ItCo color-animation root is absent");
+        const auto color_bytes = itco_archive->next_target_offset(*color_root) -
+                                 *color_root;
+        if (color_bytes % 8 || color_bytes / 8 > 256)
+            throw DatError("Original ItCo color-animation extent is invalid");
+        DatColorAnimation color_owner(itco_archive, *color_root,
+                                      color_bytes / 8);
+        void* const source_item = melee_web_item_public_data_decode(
+            public_data_arena.reader(), item_root,
+            registered_articles.articles(), MELEE_WEB_ITEM_REGISTRY_COUNT);
+        MeleeWebStadiumC1ItemPublicDataView source_view{};
+        check(melee_web_stadium_c1_item_public_data_view(source_item,
+                                                         &source_view) &&
+                  source_view.common_data != nullptr &&
+                  source_view.common_articles != nullptr &&
+                  source_view.character_articles != nullptr &&
+                  source_view.pokemon_articles != nullptr &&
+                  source_view.bounce_data != nullptr,
+              "Original ItCo public-data root did not retain all Article tables");
+        check(source_view.character_articles ==
+                  static_cast<const void*>(registered_articles.articles()),
+              "ItCo public-data root did not borrow the checked character Article registry");
+
+        const auto globals_before = stadium_item_runtime_globals();
+        const auto source_color_before = source_view.color_rows;
+        char error[256]{};
+        StadiumItemRuntimeEndGuard runtime;
+        runtime.runtime = melee_web_item_runtime_prepare_source(
+            source_item, color_owner.table(), color_bytes / 8,
+            error, sizeof(error));
+        check(runtime.runtime != nullptr, error);
+        const auto globals_active = stadium_item_runtime_globals();
+        MeleeWebStadiumC1ItemPublicDataView source_active{};
+        check(melee_web_stadium_c1_item_public_data_view(source_item,
+                                                         &source_active) &&
+                  globals_active.public_data == source_item &&
+                  globals_active.common_articles == source_active.common_articles &&
+                  globals_active.common_data == source_active.common_data &&
+                  globals_active.pokemon_articles == source_active.pokemon_articles &&
+                  globals_active.character_articles == source_active.character_articles &&
+                  globals_active.character_articles ==
+                      static_cast<const void*>(registered_articles.articles()) &&
+                  ((void**) globals_active.character_articles)[random_index] ==
+                      random_article &&
+                  globals_active.bounce_data == source_active.bounce_data &&
+                  globals_active.color_rows == source_active.color_rows &&
+                  source_active.color_rows != source_color_before,
+              "Prepared item-state globals do not reach the checked Random Article and color rows");
+        for (std::size_t row = 1; row < scripts.size(); ++row) {
+            if (!scripts[row]) continue;
+            void* row_table = nullptr;
+            void* script = nullptr;
+            check(row < random_article_owner.state_count() &&
+                      melee_web_stadium_c1_random_article_state_row(
+                          random_article, static_cast<std::uint32_t>(row),
+                          &row_table, &script) &&
+                      row_table == random_states &&
+                      script == script_rows_before[row],
+                  "Item-state preflight attached a Stadium script before Ground_801C0800");
+        }
+
+        char competing_error[256]{};
+        check(melee_web_item_runtime_prepare_source(
+                  source_item, color_owner.table(), color_bytes / 8,
+                  competing_error, sizeof(competing_error)) == nullptr &&
+                  std::string_view(competing_error).find(
+                      "Item startup requires checked data") !=
+                      std::string_view::npos,
+              "A competing active item-state owner was not refused explicitly");
+        const auto globals_competing = stadium_item_runtime_globals();
+        check(globals_competing.character_articles ==
+                  source_active.character_articles &&
+                  ((void**) globals_competing.character_articles)[random_index] ==
+                      random_article,
+              "Competing item-state owner changed the active Random Article registry");
+        check(((HSD_GObj**)HSD_GObj_Entities)[9] == nullptr,
+              "C1 item-state preflight created an item object");
+
+        runtime.end();
+        check_stadium_item_runtime_globals(globals_before);
+        MeleeWebStadiumC1ItemPublicDataView source_after{};
+        check(melee_web_stadium_c1_item_public_data_view(source_item,
+                                                         &source_after) &&
+                  source_after.color_rows == source_color_before,
+              "Item runtime teardown did not restore the source color pointer before owner destruction");
+        check(((HSD_GObj**)HSD_GObj_Entities)[9] == nullptr,
+              "Item runtime teardown left an item object");
+    }
+
+    const MeleeWebGameplayStats stats_after = melee_web_gameplay_stats();
+    check(stats_after.generation == stats_before.generation &&
+              stats_after.ticks == stats_before.ticks,
+          "C1 item-state preflight advanced the source runtime or changed its generation");
+    check(seed_ptr == seed_owner && *seed_owner == seed_before,
+          "C1 item-state preflight changed retained source RNG ownership or value");
+    check(grps_bytes == grps_before,
+          "C1 item-state preflight changed immutable GrPs.usd input bytes");
+    std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES> save_after{};
+    char error[256]{};
+    check(melee_web_menu_host_snapshot_card_data(
+              host, 0, save_after.data(), save_after.size(), error,
+              sizeof(error)), error);
+    check(save_after == save_before,
+          "C1 item-state preflight changed the retained source save owner");
+    check_stadium_selection_preserved(host, selected, baseline);
+    check_stadium_preflight_stage_empty();
+}
+
 void run_stadium_c1_context_preflight(
     const melee_web::RuntimeFiles& menu_files,
     MeleeWebMenuHost*& host,
@@ -1555,6 +1794,7 @@ void run_stadium_c1_context_preflight(
     const std::filesystem::path& menu_dir,
     const std::filesystem::path& game_dir,
     bool perform_e8_request,
+    bool perform_item_state_preflight,
     TransitionTrace& trace)
 {
     char error[256]{};
@@ -1691,6 +1931,10 @@ void run_stadium_c1_context_preflight(
                   resolved_size == reopened_files.at(toy_name).size(),
               "US Toy alias did not resolve through the reopened RuntimeFiles owner");
         check_stadium_selection_preserved(host, selected, baseline);
+        if (perform_item_state_preflight) {
+            run_stadium_c1_item_state_preflight(
+                reopened_files, host, selected, baseline, save_before);
+        }
         world->verify_immutable_archives();
         check_stadium_preflight_stage_empty();
 
@@ -1721,6 +1965,9 @@ void run_stadium_c1_context_preflight(
         if (perform_e8_request) {
             std::cout << "C1 reopened-context lifecycle preflight and one E8 typed request passed; "
                          "no stage object or source menu entry\n";
+        } else if (perform_item_state_preflight) {
+            std::cout << "C1 reopened-context lifecycle and item-state-owner preflight passed; "
+                         "no E8 request, stage publication, or source menu entry\n";
         } else {
             std::cout << "C1 reopened-context lifecycle preflight passed; no E8 request, "
                          "stage publication, or source menu entry\n";
@@ -1741,6 +1988,7 @@ void run_stadium_c1a_selection_smoke(
     const melee_web::RuntimeFiles& files,
     bool reopened_context_preflight,
     bool e8_request_trace,
+    bool item_state_preflight,
     const std::filesystem::path& menu_dir,
     const std::filesystem::path& game_dir,
     TransitionTrace& trace)
@@ -1863,7 +2111,7 @@ void run_stadium_c1a_selection_smoke(
     if (reopened_context_preflight) {
         run_stadium_c1_context_preflight(
             files, host, world, selected, names, menu_dir, game_dir,
-            e8_request_trace, trace);
+            e8_request_trace, item_state_preflight, trace);
     } else {
         world->verify_immutable_archives();
         world->close();
@@ -1903,17 +2151,21 @@ int main(int argc,char** argv){try{
  const bool stadium_c1a_recipe=input_recipe&&std::string(input_recipe)=="stadium-c1a-v1";
  const bool stadium_c1_context_preflight_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-c1-context-preflight-v1";
+ const bool stadium_c1_item_state_preflight_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-c1-item-state-preflight-v1";
  const bool stadium_e8_request_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-e8-request-v1";
 #else
  const bool stadium_c1a_recipe=false;
  const bool stadium_c1_context_preflight_recipe=false;
+ const bool stadium_c1_item_state_preflight_recipe=false;
  const bool stadium_e8_request_recipe=false;
 #endif
  if(input_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
     !sound_settings_recipe&&!stadium_c1a_recipe&&
-    !stadium_c1_context_preflight_recipe&&!stadium_e8_request_recipe&&
+    !stadium_c1_context_preflight_recipe&&
+    !stadium_c1_item_state_preflight_recipe&&!stadium_e8_request_recipe&&
     !v10_css_replay_start_recipe)
     throw std::runtime_error("Unknown transition input recipe");
  if(v10_css_replay_start_recipe&&
@@ -1925,14 +2177,14 @@ int main(int argc,char** argv){try{
     stage_kind!=St_Kind_Last)
    throw std::runtime_error("Explicit FD recipes require Final Destination");
  if((stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
-     stadium_e8_request_recipe)&&
+     stadium_c1_item_state_preflight_recipe||stadium_e8_request_recipe)&&
     stage_kind!=St_Kind_PStadium)
    throw std::runtime_error("C1a recipes require source StKind 3");
  TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
  std::vector<std::string> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"};
  if(stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
-    stadium_e8_request_recipe||
+    stadium_c1_item_state_preflight_recipe||stadium_e8_request_recipe||
     v10_css_replay_start_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
     trophy_baseline_recipe||sound_settings_recipe)
   keys=melee_web::menu_asset_names();
@@ -1962,10 +2214,12 @@ int main(int argc,char** argv){try{
  }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  if(stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
-    stadium_e8_request_recipe){
+    stadium_c1_item_state_preflight_recipe||stadium_e8_request_recipe){
   run_stadium_c1a_selection_smoke(
-      files, stadium_c1_context_preflight_recipe||stadium_e8_request_recipe,
-      stadium_e8_request_recipe, argv[1], argv[2], trace);
+      files, stadium_c1_context_preflight_recipe||
+          stadium_c1_item_state_preflight_recipe||stadium_e8_request_recipe,
+      stadium_e8_request_recipe, stadium_c1_item_state_preflight_recipe,
+      argv[1], argv[2], trace);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
   return 0;
  }
