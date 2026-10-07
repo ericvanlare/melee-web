@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <iostream>
@@ -51,6 +52,24 @@ archive_with_data(const std::vector<std::uint8_t>& data)
     put_u32(file, 0, static_cast<std::uint32_t>(file.size()));
     put_u32(file, 4, static_cast<std::uint32_t>(data.size()));
     std::copy(data.begin(), data.end(), file.begin() + 0x20);
+    return std::make_shared<DatArchive>(file);
+}
+
+std::shared_ptr<const DatArchive>
+archive_with_public_target(const std::vector<std::uint8_t>& data,
+                           std::uint32_t target)
+{
+    constexpr std::array<std::uint8_t, 5> name = {'n', 'e', 'x', 't', 0};
+    const std::size_t public_table = 0x20 + data.size();
+    std::vector<std::uint8_t> file(public_table + 8 + name.size(), 0);
+    put_u32(file, 0, static_cast<std::uint32_t>(file.size()));
+    put_u32(file, 4, static_cast<std::uint32_t>(data.size()));
+    put_u32(file, 12, 1); // One public target bounds the preceding object.
+    std::copy(data.begin(), data.end(), file.begin() + 0x20);
+    put_u32(file, public_table, target);
+    put_u32(file, public_table + 4, 0); // Name begins immediately after tables.
+    std::copy(name.begin(), name.end(), file.begin() +
+              static_cast<std::ptrdiff_t>(public_table + 8));
     return std::make_shared<DatArchive>(file);
 }
 
@@ -259,9 +278,10 @@ void exact_scalar_abi()
 
 void short_extent_rejected_before_allocation()
 {
-    auto data = source_data();
-    data.resize(0x53);
-    auto archive = archive_with_data(data);
+    auto archive = archive_with_public_target(source_data(), 0x53);
+    check(archive->data().size() == 0x58 &&
+              archive->next_target_offset(0) == 0x53,
+          "short referenced target did not retain later archive bytes");
     NativeDatArena arena(archive);
     GuardedReader guarded(arena.reader(), 0);
     bool rejected = false;
@@ -270,7 +290,7 @@ void short_extent_rejected_before_allocation()
     } catch (const DatError&) {
         rejected = true;
     }
-    check(rejected, "decoder accepted a 0x53-byte source extent");
+    check(rejected, "decoder accepted a source object crossing target +0x53");
     check(guarded.region_calls == 1 && guarded.region_size == 0x54,
           "short extent was not checked against the exact source ABI size");
     check(guarded.allocation_calls == 0,
