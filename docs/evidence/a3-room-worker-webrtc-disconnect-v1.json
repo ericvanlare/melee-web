@@ -1,0 +1,438 @@
+{
+  "schema": "melee-web-a3-room-worker-webrtc-disconnect-v1",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/238",
+  "scope": "Same-host headless recorded CSS disconnect component with browser-owned reliable ordered host-only WebRTC and page-owned signaling through the existing local RoomRelay Worker; one failed capture and one separately authorized repaired capture. Functional evidence only.",
+  "evidence_labels": [
+    "Source identified",
+    "Browser exercised"
+  ],
+  "repaired_source_producer": {
+    "head": "33b8d80ad0f19091ee2dc8aaa4c2abb3edd3d644",
+    "tree": "f4a9e726a85a81f30cacef022afa2958e8fc6319",
+    "base_main": "d8f76001fc93ca593228fe740f70aec6b8f9ee4b",
+    "clean_at_capture_start_and_finish": true
+  },
+  "validation": {
+    "python_suite": {
+      "result": "pass",
+      "tests": 2029,
+      "skipped": 151,
+      "seconds": 407.244,
+      "log_sha256": "22da182b367d55ae68fc78dc0b43f269e889c4f36f96b34dc9cc89a19523ac20"
+    },
+    "focused_contracts": {
+      "result": "pass",
+      "log_sha256": "dea452844b0b6931b924f8df4262ceec69c90a4f20aaa1f81023d7efa377ce8d",
+      "actual_reporter_cases": 3,
+      "actual_failed_report_reproducer_sha256": "cfc191a17428e38755e48bdbab46c693708ffccbae6203581dc96790a8f60b9a",
+      "reproducer_log_sha256": "367e6696009f69ac2e916adeae7b7246c12f371230054347145cb558e9bd428a",
+      "scope": "Actual existing poll action and final report writer generate the injection event, preserve it after close failure, and prevent action when pre-close ACK is missing; actual failed source/report reproducer verifies old omission and repaired export without a browser."
+    },
+    "coordinator_preflight": {
+      "result": "pass",
+      "log_sha256": "5000e1c9db9c82f23eef2057dc4178e1764b49b3aafc1952eca516bdc293861d",
+      "metadata_negative_cases": 23,
+      "diagnostics_negative_cases": 6,
+      "worker_path_cases": 6,
+      "worker_path_log_sha256": "a556e3f58d20a987e10406782787d2d7b01be6966e6fb16017d955ab8dfd628b",
+      "scope": "Actual reporter-produced injection plus synthetic reduced terminal metadata and retained positive artifacts; not extra browser evidence."
+    },
+    "root_source_review_sha256": "d5615454ada5fd9cc31c8605ad4d934d4a1877adb3d3eeb46a9334c69e0bc346",
+    "launch_packet_sha256": "7b068dd3eac0754855bf466152792f0921e981667dc12c34d04f90a95e01270a",
+    "outer_identity_helper_sha256": "748e8f2ba01277488fd6b3b93666de5cf42e0b88d31053bd3f10ef2c6185d1a6",
+    "outer_identity_helper_test_log_sha256": "01a0c7abd7ecca4f8805633badd1e7212808c14869b06dfa27969f2d9b4f896e"
+  },
+  "runtime_build": {
+    "producer_commit": "0d8556e44bf65ca9db4f93fabb44a35b07ca2350",
+    "producer_tree": "8ff5460dcecef41acd25375cbca62e32dbaf9af5",
+    "configuration": "Release",
+    "fresh_native_build_for_issue238": false,
+    "runtime_target_input_delta_to_capture_source": [],
+    "runtime_file_count": 32,
+    "page_peer_module_count": 5,
+    "complete_staged_inventory_count": 37,
+    "all_files_equal_prior_issue235_and_initial_issue238_staging": true,
+    "ordinary_release_optional_flags": {
+      "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+      "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+      "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+      "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+      "MELEE_WEB_RESULTS_RENDERED_TRACE": "OFF",
+      "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+      "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF",
+      "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF"
+    },
+    "staged_manifest_sha256": "0e354d28cbba4a8259b06772e09adbf15ff7bc3c2e756e0fbc23b633a53b3939",
+    "build_to_capture_source_diff_sha256": "653d35fac7527924c0485fd1ac592c4779055fd8e93b6df329b5db33b1486f03",
+    "note": "Harness, observer and test changes reuse exact historical ordinary Release native bytes; not a fresh native build at the repaired source."
+  },
+  "recorded_input": {
+    "recipe_sha256": "007fafb2bfc1c34b81509b8ee073b6250b32ab6d227502be6d4b986ddd8cbb4c",
+    "recipe_bytes": 223624,
+    "recipe_version": 1,
+    "recipe_input_ticks": 5082,
+    "selected_input_slots": 5,
+    "published_input_indices": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "published_input_ticks": 4,
+    "withheld_input_tick": 4,
+    "neutral_source_ticks": 2,
+    "source_capacity_ticks": 7,
+    "consumed_source_ticks": 6,
+    "frame_bytes": 44,
+    "seed": 305419896,
+    "input_delay": 2
+  },
+  "signaling_and_transport": {
+    "browser": "Google Chrome 154.0.8037.98, headless, Playwright 1.62.1",
+    "speaker_muted": true,
+    "audio_processing_disabled": false,
+    "peer_owner": "browser",
+    "raw_sdp_exposed_to_node": false,
+    "signaling": "Page-owned offer and answer through the existing local RoomRelay Worker; Node coordinates lifecycle and recorded input.",
+    "ice_servers": [],
+    "initial_both_connected": true,
+    "initial_reliable_ordered_host_only": true,
+    "final_connection_state": "closed by the deliberate disconnect and cleanup; final-connected acceptance is not claimed",
+    "worker_runtime": "Wrangler 4.131.1, Miniflare 5.20260911.0-alpha, workerd 1.20260911.1"
+  },
+  "repaired_capture": {
+    "outcome": "expected-disconnect",
+    "coordinator_pass": true,
+    "first_error": null,
+    "actual_injection": {
+      "role": "beta",
+      "source_tick": 6,
+      "recorded_at_action": true
+    },
+    "pre_close_observations": {
+      "alpha": {
+        "source_cursor": 6,
+        "pushed": 6,
+        "blocker": "network_wait",
+        "published_inputs": 4,
+        "remote_ack_input": 3,
+        "next_checksum_compare": 4,
+        "observed_before_close": true
+      },
+      "beta": {
+        "source_cursor": 6,
+        "pushed": 6,
+        "blocker": "network_wait",
+        "published_inputs": 4,
+        "remote_ack_input": 3,
+        "next_checksum_compare": 4,
+        "observed_before_close": true
+      }
+    },
+    "terminal_hold": {
+      "minimum_hold_ms": 120,
+      "peers": {
+        "alpha": {
+          "kind": 2,
+          "tick": 0,
+          "channel": 0,
+          "active": 1,
+          "blocker": "terminal",
+          "cursor_before": 6,
+          "cursor_after": 6,
+          "pushed_before": 6,
+          "pushed_after": 6
+        },
+        "beta": {
+          "kind": 2,
+          "tick": 0,
+          "channel": 0,
+          "active": 1,
+          "blocker": "terminal",
+          "cursor_before": 6,
+          "cursor_after": 6,
+          "pushed_before": 6,
+          "pushed_after": 6
+        }
+      },
+      "no_fallback": true,
+      "window_observed_ms": 123
+    },
+    "raw_native_prefix": {
+      "records_each": 6,
+      "indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "record_bytes": 64,
+      "stream_bytes_each": 384,
+      "streams_identical": true,
+      "sha256": "ccf4c7692c50743e9f198524bd4718df1d3866da7f8397b624551200d2a61bb5",
+      "protocol_comparisons": {
+        "alpha": 4,
+        "beta": 4
+      },
+      "scope": "Six raw consumed records are retained separately from the four protocol comparisons; no later checksum receipt is invented."
+    },
+    "peers": {
+      "alpha": {
+        "source_accounting": {
+          "source_cursor": 6,
+          "source_steps": 6,
+          "source_draws": 6,
+          "callback_count": 71,
+          "first_callback": 35,
+          "last_callback": 105,
+          "callback_ids_contiguous": true,
+          "each_step_drawn": true,
+          "scope": "Source draw completion accounting; no pixel, GPU completion or timing equivalence claim"
+        },
+        "source_accounting_artifact_sha256": "33a5e88a4bfaa3defb594c508716df9e0a4134a7803fb118810f2ee978b7b252",
+        "protocol_totals": {
+          "remote_ack_input": 3,
+          "local_input_ticks": 4,
+          "remote_input_ticks": 4,
+          "local_checksum_ticks": 6,
+          "remote_checksum_ticks": 4,
+          "next_checksum_compare": 4,
+          "remote_ack_checksum": 3,
+          "checksum_mismatches": [],
+          "terminal": {
+            "kind": "disconnect",
+            "reason": "WebRTC data channel closed"
+          }
+        },
+        "native_checksum_ownership": {
+          "owner": "browser-page",
+          "export_limit_records": 512,
+          "active_native_records_submitted_before_export": 6,
+          "post_terminal_native_evidence_records": 0
+        },
+        "final_status": {
+          "active": 1,
+          "cursor": 6,
+          "pushed": 6,
+          "blocker": "terminal",
+          "terminal": {
+            "kind": 2,
+            "tick": 0,
+            "channel": 0
+          }
+        },
+        "final_native": {
+          "phase": 1,
+          "running": 1,
+          "message": "Original character select",
+          "error": null,
+          "status": "Local game data loaded."
+        },
+        "held_css": {
+          "phase": 1,
+          "source_cursor": 6,
+          "blocker": "terminal",
+          "png_dimensions": [
+            900,
+            700
+          ],
+          "canvas_dimensions": [
+            640,
+            480
+          ],
+          "bytes": 470106,
+          "sha256": "1e673f70bab08204445c9c18693689f59ecd7a7e43a8e5b69773135ceb23f4df",
+          "gpu_and_isolation": true
+        },
+        "timing_resumes": [],
+        "page_errors": [],
+        "browser_diagnostics": [],
+        "unloaded": true,
+        "browser_closed": true
+      },
+      "beta": {
+        "source_accounting": {
+          "source_cursor": 6,
+          "source_steps": 6,
+          "source_draws": 6,
+          "callback_count": 72,
+          "first_callback": 35,
+          "last_callback": 106,
+          "callback_ids_contiguous": true,
+          "each_step_drawn": true,
+          "scope": "Source draw completion accounting; no pixel, GPU completion or timing equivalence claim"
+        },
+        "source_accounting_artifact_sha256": "602a97ffc7d33731d9dcfe9f97052a8edc3866d8369a3b1497c4f1f149c2550b",
+        "protocol_totals": {
+          "remote_ack_input": 3,
+          "local_input_ticks": 4,
+          "remote_input_ticks": 4,
+          "local_checksum_ticks": 6,
+          "remote_checksum_ticks": 4,
+          "next_checksum_compare": 4,
+          "remote_ack_checksum": 3,
+          "checksum_mismatches": [],
+          "terminal": {
+            "kind": "disconnect",
+            "reason": "WebRTC data channel closed"
+          }
+        },
+        "native_checksum_ownership": {
+          "owner": "browser-page",
+          "export_limit_records": 512,
+          "active_native_records_submitted_before_export": 6,
+          "post_terminal_native_evidence_records": 0
+        },
+        "final_status": {
+          "active": 1,
+          "cursor": 6,
+          "pushed": 6,
+          "blocker": "terminal",
+          "terminal": {
+            "kind": 2,
+            "tick": 0,
+            "channel": 0
+          }
+        },
+        "final_native": {
+          "phase": 1,
+          "running": 1,
+          "message": "Original character select",
+          "error": null,
+          "status": "Local game data loaded."
+        },
+        "held_css": {
+          "phase": 1,
+          "source_cursor": 6,
+          "blocker": "terminal",
+          "png_dimensions": [
+            900,
+            700
+          ],
+          "canvas_dimensions": [
+            640,
+            480
+          ],
+          "bytes": 470340,
+          "sha256": "8815114a86536fd7719d849d3e3aaa77a9cbda6914dfd3ceb0840901e7e7e905",
+          "gpu_and_isolation": true
+        },
+        "timing_resumes": [],
+        "page_errors": [],
+        "browser_diagnostics": [],
+        "unloaded": true,
+        "browser_closed": true
+      }
+    },
+    "endpoint_errors": {
+      "alpha": [],
+      "beta": []
+    },
+    "callback_errors": [],
+    "transport_errors": [],
+    "cleanup_notes": [],
+    "artifact_sha256": {
+      "run_report": "78188cbc6f56cd2757f435b5b41fca4b363bf793bbccbf89fa0788bdf5ce6750",
+      "coordinator_report": "ff28de3dd9a270567febd66e0ee32c0cf7ab716d201241694e3b7ad8ba2ee6a3",
+      "capture_owner_report": "d70400ea61b47352baadb892010556614457a4e2e6024393744d24c6903bd0db",
+      "outer_launch": "8c70c61b5ea68d0578f6cb6a5a9f33dba8ad5daf184ed4d879a158556e43731e",
+      "outer_coordinator": "36f2b36b9e23111d7ed2b3387144df5515c1cdd12d4245d22a416b0538455220",
+      "outer_join_result": "5a053fab3376587573f6a784a4645be60045c83aed2533b94f03cac3a3c168ec",
+      "single_capture_observation": "79c2c05144d07033858130ada22bdbb0b864c3750c036597d1603476763dcc72",
+      "root_independent_result_review": "2c476fb272788f66f34dc3084ae56a807d903f5100aedd64b5509c2f4179f2cb"
+    }
+  },
+  "cleanup": {
+    "outer_identity_complete": true,
+    "outer_wrapper_pid": 47591,
+    "outer_coordinator_pid": 47593,
+    "outer_process_group": 47591,
+    "outer_wrapper_joined": true,
+    "recorded_process_count": 28,
+    "recorded_process_group_count": 7,
+    "all_recorded_processes_and_groups_absent": true,
+    "ports_bindable": [
+      8787,
+      49313,
+      49314
+    ],
+    "worker_owned_paths_absent": true,
+    "chrome_tmp_empty": true,
+    "repaired_capture_profiles_removed": true,
+    "prior_failed_capture_profiles_intentionally_retained": true,
+    "all_37_served_files_equal_local_and_http_before_after": true,
+    "root_independently_reviewed": true,
+    "timing_marker_released_by_root_after_review": true
+  },
+  "retained_failed_capture": {
+    "source_head": "a907d4100ded7bb7e3d83650367f947f0c500607",
+    "source_tree": "44c0fb3c0c49f1a9f4e86f1982598d96fce7086b",
+    "base_main": "5041d6b761ad128217fbb6fafb54f87b3223bf62",
+    "coordinator_pass": false,
+    "browser_runner_outcome": "expected-disconnect",
+    "cause": "Existing injection action wrote instanceRows.injected_disconnect, which the actual finalizer never exported. The strict coordinator required the missing top-level event and failed; its earlier synthetic validator fixture had supplied the field directly. The validator requirement was preserved.",
+    "repair": "Write the actual event on pairResults at the existing action before beta close; actual poll/finalizer tests and old-source/failed-report reproducer cover export and close failure. No terminal or protocol change.",
+    "functional_observations_only": {
+      "pre_close_ack_each": 3,
+      "raw_records_each": 6,
+      "actual_protocol_comparisons": {
+        "alpha": 4,
+        "beta": 4
+      },
+      "held_source_cursor_each": 6,
+      "terminal_hold_ms": 124
+    },
+    "full_suite": {
+      "tests": 2024,
+      "skipped": 151,
+      "seconds": 394.284,
+      "log_sha256": "3491d6dbd5680f3ba4f7eac6a6965de27255b38fa3831a251d9984a5f14363d4"
+    },
+    "run_report_sha256": "e2756001e814eb9601ede533b9bac0b545be6fd050fe44641a2a08557bff2404",
+    "coordinator_report_sha256": "7d0c0e87df96f2cca956f278e7ad9ff8cb822a5ac34c793931cc5c9fb591c051",
+    "root_failed_result_review_sha256": "bc80757c6d8a87f79ea30db15d8ac83367813745cfd5fccd91aa155dcd12701f",
+    "profiles": "Both profiles and all failed artifacts intentionally retained unchanged.",
+    "cleanup": "Root independently verified 27 recorded PIDs and 6 groups absent and 3 ports bindable. Initial launch did not retain exact outer wrapper/coordinator identities; gap remains explicit. The repaired capture used the tested helper to record those identities at launch.",
+    "screenshot_overlay_underrun_frames_each": 107,
+    "status": "Historical failed coordinator result; not relabeled as a pass."
+  },
+  "retained_preparation_failures": {
+    "interrupted_first_suite": {
+      "log_sha256": "a055c058ba33ccc5bbd867641604a09143bc2b9ca8e62007657809e877944fd8",
+      "reason": "Owned suite interrupted before final source preparation completed; not a final-source validation pass."
+    },
+    "first_reporter_test_fixture": {
+      "log_sha256": "477a42d9bf5006ef11b0957570e7a4fe539b4a5446b633408a5ea9296b5e24fd",
+      "fixture_sha256": "d9de3300bc68cae2427a3ce6832df243834303799b6a0e20c1698933a9a831a0",
+      "reason": "Actual poll VM lacked existing LOCKSTEP_DELAY; corrected by importing the actual constant, with no native/runtime change."
+    },
+    "prior_historical_gap": "The issue231 frozen-source-manifest overwrite gap remains in its public receipt; fresh issue238 staging and freezes do not reconstruct that historical evidence.",
+    "public_receipt_mapping": {
+      "report_sha256": "be4e7b3fc62db22195cb1b55c9086601f9c4e38086d44e70d38bddd361553891",
+      "reason": "First documentation writer assumed protocol fields lived in peer_alpha/peer_beta; actual normalized protocol/ownership live in run.peers. Corrected role mapping before public receipt creation; script and failure retained. No browser repeated."
+    }
+  },
+  "observed_limits": {
+    "visual": "Both repaired held CSS screenshots show red geometry at the right roster edge and lower viewport clipping. No pixel equivalence established.",
+    "repaired_screenshot_overlay_underrun_frames_each": 22,
+    "audio": "Audio processing remained enabled with muted speakers. One overlay observation per peer is not a complete/final underrun witness, PCM comparison or uninterrupted/audible-audio acceptance.",
+    "timing": "No timing resumes; exact source accounting and 123 ms terminal observation do not establish foreground timing, latency or performance.",
+    "scope": "CSS disconnect component only; no gameplay/full-route desync or whole-session acceptance."
+  },
+  "exclusions": [
+    "Internet/STUN/TURN/relay fallback/two-machine",
+    "physical or live input",
+    "foreground timing/performance",
+    "pixel/visual fidelity",
+    "continuous or audible audio acceptance",
+    "retail/whole-session equivalence",
+    "general A3 acceptance",
+    "deployment or infrastructure",
+    "desync experiment",
+    "full-route negative acceptance"
+  ]
+}
