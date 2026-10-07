@@ -48,6 +48,7 @@ typedef struct {{ uint32_t tick, scene, base, bytes; uint64_t hash; }} MeleeWebN
 typedef struct MeleeWebMenuHost MeleeWebMenuHost;
 #define MELEE_WEB_NET_CHECKSUM_RING 8192
 #define MELEE_WEB_NET_ARENA_RECORDS 64
+#define MELEE_WEB_NET_PAD_BYTES 11
 static unsigned normal_calls, pattern_calls;
 static int last_pattern = -2;
 static int normal_ok = 1, pattern_ok = 1;
