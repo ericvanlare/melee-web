@@ -1,0 +1,677 @@
+{
+  "schema": "melee-web-pokemon-stadium-c1a-css-sss-preparation-v1",
+  "result": "passed_with_explicit_scope_exclusions",
+  "checkpoint": "C1a selection and exact preparation only; full C1 actual source archive request remains open",
+  "evidence_labels": [
+    "Source identified",
+    "Compiled",
+    "Browser exercised (headless, bounded C1a route)"
+  ],
+  "source": {
+    "revision": "51969480576cf1e6e62538257b90eead2e3a9a9c",
+    "actual_main_at_freeze": "707c2ab354c52fb927b80ba85f20efd3f1e9f583",
+    "merge_base_main": "07164ed109bd62314d8b4291e6ab7af5bd7c699a",
+    "runtime_build_producer_revision": "32f7a43c88bdfce0c181b82af7aaff3e2d30e178",
+    "runtime_sources_unchanged_since_producer": true
+  },
+  "disc": {
+    "name": "Super Smash Bros. Melee (USA) (En,Ja) (Rev 2).ciso",
+    "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "read_only": true
+  },
+  "validation": {
+    "focused_reducer_contract": "passed (5 Node subtests; discoverable Python wrapper)",
+    "full_python_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "result": "passed",
+      "tests": 1938,
+      "skipped": 138,
+      "elapsed_seconds": 347.256,
+      "run_id": "stadium-c1a-final-integration-20261007-20261006-201231-0a4b7751",
+      "log": {
+        "filename": "unittest.log",
+        "sha256": "77150820014c971656804145aac31a2f5a295d31a24f8bc94f7b467255092322"
+      }
+    }
+  },
+  "attempts": [
+    {
+      "run_id": "stadium-c1a-browser-preflight-20261006-20261006-184027-d026a76a",
+      "result": "failed",
+      "boundary": "first CSS-to-SSS attempt",
+      "source_revision": "a0acd8cffd76bd7a538f331b6725966daecfe5fa",
+      "report_sha256": "9e938e1118605cc6fd08387d54941a04aacdffd4bad12e5ca32a2cba05d97d11",
+      "observed": {
+        "css_phase": 1,
+        "css_running": 1,
+        "raw_pad_at_failure": "none",
+        "sss_reached": false,
+        "stage_drive_frames": 0
+      },
+      "failure": {
+        "error": "wait-for-phase-3 timed out after 15000 ms",
+        "cause": "not isolated; no causal attribution"
+      },
+      "screenshot": {
+        "file": "failure-state.png",
+        "sha256": "f8c9714d7e32d61622cb232fd0561e14095db8636559bd78edb79f9c0aeba165"
+      },
+      "cleanup": {
+        "unload": true,
+        "browser": true,
+        "server": true
+      }
+    },
+    {
+      "run_id": "stadium-c1a-browser-recipe2-20261006-20261006-191836-a4906eca",
+      "result": "failed",
+      "boundary": "second CSS-to-SSS attempt",
+      "source_revision": "1018a072b3efe4ade10404c9746eaff7a9a234f0",
+      "report_sha256": "159e0bcca258f76f809ab43cb63669d0ec5c1007c0e4a5313f3eff09a4e79f87",
+      "observed": {
+        "css_phase": 1,
+        "css_running": 1,
+        "raw_pad_at_failure": "none",
+        "sss_reached": false,
+        "stage_drive_frames": 0
+      },
+      "failure": {
+        "error": "wait-for-phase-3 timed out after 15000 ms",
+        "cause": "not isolated; no causal attribution"
+      },
+      "screenshot": {
+        "file": "stadium-c1a-original-css.png",
+        "sha256": "f603daadce7c2d8b41bf483a9bc461ec666c685bd4bab25c02c2e877625c960d"
+      },
+      "cleanup": {
+        "unload": true,
+        "browser": true,
+        "server": true
+      },
+      "controls": {
+        "initial_layout": "two",
+        "configured_layout": "boxx",
+        "start_key": "7"
+      },
+      "http_postflight": {
+        "before_count": 32,
+        "after_count": 0,
+        "after_unavailable_after_server_shutdown": true
+      }
+    },
+    {
+      "run_id": "stadium-c1a-css-sss-reducer-20261006-20261006-201045-7d3f9c2a",
+      "result": "passed",
+      "boundary": "readiness-gated raw Start CSS-to-SSS reducer; no stage selection",
+      "source_revision": "519cb5957ef770ded3c8ace0e2af2894582fc2f5",
+      "producer_revision": "32f7a43c88bdfce0c181b82af7aaff3e2d30e178",
+      "report_sha256": "8cc47ca33a8af1dcf77bb7bbdb844e51e42be09e7c9d04d166ba3c95012a69dd",
+      "preflight_sha256": "e6739458b83fc5399790f6bf264c63406136a5802829373ef48cc5a0edbc9911",
+      "command_sha256": "b60826999b9393a2724d2794ba9e85dcb013f9a1c94cd278e1a8e9083c9501ef",
+      "css_phase": 1,
+      "sss_phase": 3,
+      "running": 1,
+      "readiness": {
+        "input_progressed": true,
+        "source_callback_progressed": true,
+        "readiness_observed": true,
+        "ready_sample_index": 29,
+        "ready_sample": 29,
+        "source_start_cooldown": 0,
+        "source_pending_scene": 0,
+        "source_start_ready": 30,
+        "source_callback_count": 30,
+        "input_sample_count": 2953,
+        "p1": {
+          "source": "keyboard",
+          "err": 0,
+          "buttons": 0,
+          "stick": [
+            0,
+            0
+          ],
+          "cstick": [
+            0,
+            0
+          ],
+          "triggers": [
+            0,
+            0
+          ],
+          "analog": [
+            0,
+            0
+          ],
+          "clamped": {
+            "stick": [
+              0,
+              0
+            ],
+            "cstick": [
+              0,
+              0
+            ],
+            "triggers": [
+              0,
+              0
+            ]
+          }
+        }
+      },
+      "start_key": "7",
+      "start_delivery": {
+        "port": 0,
+        "sample": 2961,
+        "source": "keyboard",
+        "err": 0,
+        "buttons": 4096,
+        "ext_buttons": 0,
+        "stick": [
+          0,
+          0
+        ],
+        "cstick": [
+          0,
+          0
+        ],
+        "triggers": [
+          0,
+          0
+        ],
+        "analog": [
+          0,
+          0
+        ],
+        "clamped": {
+          "stick": [
+            0,
+            0
+          ],
+          "cstick": [
+            0,
+            0
+          ],
+          "triggers": [
+            0,
+            0
+          ]
+        }
+      },
+      "transition": {
+        "elapsed_ms": 299,
+        "sample_count": 1,
+        "stop": "sss-phase-3-running"
+      },
+      "screenshot": {
+        "file": "stadium-c1a-sss-after-start.png",
+        "sha256": "5d6be9e441091c795b9dcce91d3132c3dd1c5cf4b8bed0525209f8c54878e37b"
+      },
+      "packaged_artifacts": {
+        "count": 32,
+        "prepost_unchanged": true
+      },
+      "cleanup": {
+        "unload": true,
+        "observer_cleared": true,
+        "owner_cleanup": true,
+        "cdp_attribution": true
+      }
+    },
+    {
+      "run_id": "stadium-c1a-full-route-20261007-0415640a",
+      "result": "passed",
+      "boundary": "original CSS -> original SSS -> raw-PAD Stadium StKind3 selection -> exact C1a preparation -> recoverable stop before actual source archive request/match admission",
+      "source_revision": "51969480576cf1e6e62538257b90eead2e3a9a9c",
+      "producer_revision": "32f7a43c88bdfce0c181b82af7aaff3e2d30e178",
+      "producer_note": "The retained successful Release producer was reused; no runtime source files changed after producer revision. Independent post-run local hashes and the runner HTTP/local pre/post inventories all match the frozen 32-file producer receipt.",
+      "report_sha256": "ef12e821a1147fbc2da0c04a63eb91f32b31ba0c3d37f385174280b7b047b008",
+      "launch_result_sha256": "5a61768e639933fb370ee6414c5c829ac7b69da1bc7b68ea41e715802d6ab50a",
+      "root_launch_review_sha256": "fd7ab6923fecbd5c1f1813d5df58b020673ee4ae898a6e2b9b17325605cf1903",
+      "preflight_sha256": "1a36593cdc7af0840bc025cb80af66a5b1e810e2402324cc6f8a55f60c2da426",
+      "command_sha256": "0d8358f7dbdb74c12638b9bf2ec19d76b2a14bf720691e6fad97305f567d8b1a",
+      "browser": {
+        "engine": "installed Google Chrome",
+        "version": "154.0.8037.98",
+        "playwright_version": "1.62.1",
+        "headless": true,
+        "speaker_output_muted": true,
+        "audio_processing_disabled": false
+      },
+      "disc": {
+        "revision": "USA Rev. 2",
+        "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+      },
+      "source_base": {
+        "main": "707c2ab354c52fb927b80ba85f20efd3f1e9f583",
+        "merge_base": "07164ed109bd62314d8b4291e6ab7af5bd7c699a",
+        "immediate_parent": "51d2b1490d9dc65208bc07a6d64fd8f439ddc50a"
+      },
+      "css_to_sss": {
+        "css_phase": 1,
+        "sss_phase": 3,
+        "readiness_sample_index": 29,
+        "input_progressed": true,
+        "source_callback_progressed": true,
+        "start_delivery": {
+          "port": 0,
+          "sample": 2949,
+          "source": "keyboard",
+          "err": 0,
+          "buttons": 4096,
+          "ext_buttons": 0,
+          "stick": [
+            0,
+            0
+          ],
+          "cstick": [
+            0,
+            0
+          ],
+          "triggers": [
+            0,
+            0
+          ],
+          "analog": [
+            0,
+            0
+          ],
+          "clamped": {
+            "stick": [
+              0,
+              0
+            ],
+            "cstick": [
+              0,
+              0
+            ],
+            "triggers": [
+              0,
+              0
+            ]
+          }
+        },
+        "transition_elapsed_ms": 300
+      },
+      "selection_preparation": {
+        "raw_sss_stkind": 3,
+        "prepared_stkind": 3,
+        "selection_frames": 20,
+        "manifest_committed": true,
+        "manifest_count": 36,
+        "manifest_names": [
+          "PlCo.dat",
+          "ItCo.usd",
+          "EfCoData.dat",
+          "PdPm.dat",
+          "LbRb.dat",
+          "LbRf.dat",
+          "sislib_font.bin",
+          "IfAll.usd",
+          "IfCoGet.dat",
+          "SdIntro.dat",
+          "GmPause.usd",
+          "LbBf.dat",
+          "TyDatai.usd",
+          "TyDatai.dat",
+          "main.ssm",
+          "nr_select.ssm",
+          "nr_title.ssm",
+          "nr_name.ssm",
+          "pokemon.ssm",
+          "end.ssm",
+          "smash2.sem",
+          "dsp_coef.bin",
+          "PlMr.dat",
+          "PlMrAJ.dat",
+          "PlMrNr.dat",
+          "EfMrData.dat",
+          "mario.ssm",
+          "PlMrYe.dat",
+          "GrPs.usd",
+          "GrPs1.dat",
+          "GrPs2.dat",
+          "GrPs3.dat",
+          "GrPs4.dat",
+          "pstadium.ssm",
+          "pstadium.hps",
+          "pokesta.hps"
+        ],
+        "native_browser_manifest_equal": true,
+        "resolvedname": null,
+        "source_file_service_request_observed": false,
+        "match_constructed": false,
+        "stage_constructed": false,
+        "recoverable_stop": "Pokémon Stadium C1a preparation complete. Source archive request and match/stage lifecycle remain deferred; unload to recover.",
+        "after_unload": {
+          "phase": 0,
+          "running": 0,
+          "observation": null,
+          "error": null,
+          "import_enabled": true
+        }
+      },
+      "gpu": {
+        "cross_origin_isolated": true,
+        "webgpu_api": true,
+        "adapter_available": true,
+        "adapter_info": {
+          "vendor": "apple",
+          "architecture": "metal-3",
+          "device": null,
+          "description": null
+        },
+        "failure": null,
+        "canvas": [
+          640,
+          480
+        ]
+      },
+      "screenshots": [
+        {
+          "file": "stadium-c1a-sss-after-start.png",
+          "sha256": "955746fe066e01e25db6c0b2f3fb564cfd2f870ce0bdfaff458d5b9a25ea2d8b",
+          "visual_review": "Rendered SSS observed; no pixel comparison."
+        },
+        {
+          "file": "stadium-c1a-sss-stadium-selected.png",
+          "sha256": "8ed7ba3f22766497732f4ec6d58168a58ba17b86369b189a55ce36dc2e7ed51d",
+          "visual_review": "Stadium tile highlighted; visible animated label reads BigBlue. No pixel-fidelity claim."
+        },
+        {
+          "file": "stadium-c1a-pre-unload.png",
+          "sha256": "74494a523b91709346371bd545563a3925b1e754a93efca3473dc996236ee0be",
+          "visual_review": "Black capture with Preparing UI; no stage-rendering claim."
+        },
+        {
+          "file": "stadium-c1a-after-unload.png",
+          "sha256": "19c6a9f5c51105515443ae7c953c6f1c87c2633b68f17bb8b4bbb70c486391c5",
+          "visual_review": "Post-unload capture retained."
+        }
+      ],
+      "packaged_artifact_inventory": {
+        "count": 32,
+        "local_hashes_match_producer": true,
+        "http_before": {
+          "count": 32,
+          "all_200_hashes_match": true
+        },
+        "http_after": {
+          "count": 32,
+          "all_200_hashes_match": true
+        },
+        "prepost_unchanged": true,
+        "files": [
+          {
+            "name": "action-sweep.mjs",
+            "bytes": 18698,
+            "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+          },
+          {
+            "name": "audio-ring.mjs",
+            "bytes": 2040,
+            "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+          },
+          {
+            "name": "audio-worklet.js",
+            "bytes": 1517,
+            "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+          },
+          {
+            "name": "controller-input.mjs",
+            "bytes": 19263,
+            "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+          },
+          {
+            "name": "controller-panel.css",
+            "bytes": 5240,
+            "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+          },
+          {
+            "name": "controller-panel.mjs",
+            "bytes": 36847,
+            "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+          },
+          {
+            "name": "controller-settings.css",
+            "bytes": 3482,
+            "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+          },
+          {
+            "name": "controller-settings.mjs",
+            "bytes": 18680,
+            "sha256": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f"
+          },
+          {
+            "name": "diagnostics-schema.mjs",
+            "bytes": 18780,
+            "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+          },
+          {
+            "name": "diagnostics-settings.mjs",
+            "bytes": 2876,
+            "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+          },
+          {
+            "name": "disc-image.mjs",
+            "bytes": 15255,
+            "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+          },
+          {
+            "name": "disc-session.mjs",
+            "bytes": 7552,
+            "sha256": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2"
+          },
+          {
+            "name": "dsp-coefficients.mjs",
+            "bytes": 4043,
+            "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+          },
+          {
+            "name": "gameplay_menu_browser.data",
+            "bytes": 3674112,
+            "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+          },
+          {
+            "name": "gameplay_menu_browser.js",
+            "bytes": 300041,
+            "sha256": "e9a7c009c21d3688a8f539f61b785f910c76d735a95ce2745f22c19b875def68"
+          },
+          {
+            "name": "gameplay_menu_browser.wasm",
+            "bytes": 15731816,
+            "sha256": "c79143dc2367b082a020cc5eb720544ed1e313c0d196eb838c1533c5736bb3a7"
+          },
+          {
+            "name": "hitch-capture.mjs",
+            "bytes": 21958,
+            "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+          },
+          {
+            "name": "match-flow.mjs",
+            "bytes": 10679,
+            "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+          },
+          {
+            "name": "match-menu.mjs",
+            "bytes": 8566,
+            "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+          },
+          {
+            "name": "melee-runtime.mjs",
+            "bytes": 50699,
+            "sha256": "0fdd584a8636e821eb08b2a3232ec05d7c3ce0c33e43e5e640a16e0809709013"
+          },
+          {
+            "name": "net-timing-pause.mjs",
+            "bytes": 1043,
+            "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"
+          },
+          {
+            "name": "prototype-keyboard-layouts.mjs",
+            "bytes": 935,
+            "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+          },
+          {
+            "name": "runtime-assets.mjs",
+            "bytes": 17029,
+            "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190"
+          },
+          {
+            "name": "runtime-audio-assets.mjs",
+            "bytes": 5451,
+            "sha256": "033bf0bd4caa6c744ebead3dd7091bec8496b5f8d2039d60a3cdf9d398a7f05c"
+          },
+          {
+            "name": "runtime-audio.mjs",
+            "bytes": 7660,
+            "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+          },
+          {
+            "name": "runtime-cache.js",
+            "bytes": 16143,
+            "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+          },
+          {
+            "name": "runtime-development.mjs",
+            "bytes": 56665,
+            "sha256": "7faecdf82fa101d9c256e4cf9335d780fd1da1c99a58d6c7429bfcfe36d74c7d"
+          },
+          {
+            "name": "runtime-diagnostics-delivery.mjs",
+            "bytes": 51514,
+            "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+          },
+          {
+            "name": "runtime-diagnostics.mjs",
+            "bytes": 85702,
+            "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+          },
+          {
+            "name": "runtime.html",
+            "bytes": 5205,
+            "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+          },
+          {
+            "name": "touch-controls.css",
+            "bytes": 6381,
+            "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+          },
+          {
+            "name": "touch-controls.mjs",
+            "bytes": 13954,
+            "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+          }
+        ]
+      },
+      "cleanup": {
+        "unload_completed": true,
+        "observation_cleared": true,
+        "context_closed": true,
+        "browser_connection_closed": true,
+        "browser_process_terminated": true,
+        "server_process_terminated": true,
+        "runner_cleanup_failures": [],
+        "owner_process_identities_absent": true,
+        "owner_process_groups_absent": true,
+        "timing_marker": "absent before and after; no marker created because runner requires absence and parent reserved the capture lane",
+        "profile": "fresh in-memory Playwright context; closed"
+      },
+      "exclusions": [
+        "actual GrPs.usd source archive file-service request",
+        "Ground reset/source stage lifecycle",
+        "match construction/admission",
+        "stage callbacks/transformation/collisions/gameplay",
+        "pixel fidelity/rendered stage result",
+        "PCM fidelity",
+        "retail comparison",
+        "physical controller input",
+        "performance admission"
+      ]
+    }
+  ],
+  "retained_artifact_location": "External task-run evidence inventory; run IDs and hashes identify retained records. Absolute machine paths are omitted from this portable receipt.",
+  "postcapture_integration_validation": {
+    "validated_source_revision": "9706e868731d869fc34e63d5f615f15734b9c3cf",
+    "validated_source_tree": "b6e9c0d07cda12872ecab853f49d8efedf6c4b74",
+    "actual_main": "707c2ab354c52fb927b80ba85f20efd3f1e9f583",
+    "merge_base_main": "707c2ab354c52fb927b80ba85f20efd3f1e9f583",
+    "capture_source_revision": "51969480576cf1e6e62538257b90eead2e3a9a9c",
+    "capture_to_integration_delta": [
+      "scripts/net_lockstep_browser.mjs",
+      "scripts/net_session_instance.mjs",
+      "scripts/net_source_accounting.mjs",
+      "tests/net_source_accounting.test.mjs",
+      "tests/test_net_lockstep_contracts.py",
+      "docs/evidence/local-lockstep-source-accounting-v1.json",
+      "docs/status/2026-10-06-local-lockstep-source-accounting.md",
+      "docs/evidence/pokemon-stadium-c1a-css-sss-preparation-v1.json",
+      "docs/status/2026-10-06-pokemon-stadium-c1a-css-sss-preparation.md"
+    ],
+    "browser_rerun_after_rebase": false,
+    "browser_rerun_note": "The retained full-route run remains bound to source revision 51969480576cf1e6e62538257b90eead2e3a9a9c and producer 32f7a43c88bdfce0c181b82af7aaff3e2d30e178. The post-capture integration adds the separate network-accounting change and documentation; the new builds below verify the rebased code but do not replace or extend the retained browser observation.",
+    "run_id": "stadium-c1a-final-integration-20261007-20261006-201231-0a4b7751",
+    "full_suite_log_sha256": "77150820014c971656804145aac31a2f5a295d31a24f8bc94f7b467255092322",
+    "default_runtime_release": {
+      "command": "python3 scripts/build.py --target runtime --configuration Release",
+      "result": "passed",
+      "configuration": "Release",
+      "target": "runtime",
+      "build_directory": "build/browser-release",
+      "cmake_flags": {
+        "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+        "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+        "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF"
+      },
+      "log": {
+        "filename": "build-default-runtime-release.log",
+        "sha256": "6152e6458f4368294cdb943c00eeb3181e35418c4875cf8b5038634ed8e9703e"
+      },
+      "browser_outputs": {
+        "gameplay_menu_browser.js": {
+          "bytes": 299505,
+          "sha256": "f9e1d4492e242947a65f914ee173e22afc69bccb28e1dd5b470008fba5ddc315"
+        },
+        "gameplay_menu_browser.wasm": {
+          "bytes": 15716811,
+          "sha256": "9929ff29816397278bc2f596b2c9a9c78527f68b709e3211e72b276727cac16d"
+        },
+        "gameplay_menu_browser.data": {
+          "bytes": 3674112,
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+        }
+      },
+      "compiler_warnings_reported": true
+    },
+    "c1a_diagnostic_runtime_release": {
+      "command": "python3 scripts/build.py --target runtime --configuration Release --stadium-c1a-diagnostic",
+      "result": "passed",
+      "configuration": "Release",
+      "target": "runtime",
+      "build_directory": "build/browser-stadium-c1a-release",
+      "cmake_flags": {
+        "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+        "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+        "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "ON"
+      },
+      "log": {
+        "filename": "build-c1a-diagnostic-runtime-release.log",
+        "sha256": "992b2ba006ccdbb286df4494fda15dfbad1c06d61e8a7609a605d3a17e01ea9f"
+      },
+      "browser_outputs": {
+        "gameplay_menu_browser.js": {
+          "bytes": 300041,
+          "sha256": "e9a7c009c21d3688a8f539f61b785f910c76d735a95ce2745f22c19b875def68"
+        },
+        "gameplay_menu_browser.wasm": {
+          "bytes": 15731816,
+          "sha256": "b5ad40d4e9596d63ee71c3ee2ceb6573968d1bfb69143370a2e53eb91c43466d"
+        },
+        "gameplay_menu_browser.data": {
+          "bytes": 3674112,
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+        }
+      },
+      "compiler_warnings_reported": true
+    }
+  }
+}
