@@ -1,0 +1,64 @@
+{
+  "date": "2026-10-07",
+  "integration_validation": {
+    "note": "Current-main full unittest discovery is recorded separately after it completes.",
+    "status": "pending"
+  },
+  "issue": 221,
+  "review": {
+    "coverage": [
+      "Production comparator path with variable ordered descriptors at terminal clock 90 and descriptor cardinalities 3, 4, 5 and 6.",
+      "Fresh-prefix mismatch stops at the first mismatching record before later records are consumed.",
+      "A semantically altered inner checkpoint remains rejected even when the outer runner packet hash is refreshed.",
+      "Legacy whole-session, v8/v9 and existing bounded scopes retain their prior contracts."
+    ],
+    "focused_regressions": 81,
+    "focused_result": "passed",
+    "limitations": [
+      "Synthetic source records and byte accounting; source and browser provenance are fixture data in the focused tests.",
+      "No original MWRO content was read by these focused tests; no browser comparison or capture was run.",
+      "The comparator tests do not claim original-to-browser state agreement."
+    ],
+    "retained_failures": {
+      "first_api_failure": "Missing digest argument in an intermediate reducer test; retained in the private run log.",
+      "first_fixture_failure": "One stale local helper reference in the projection refactor; retained log, while unittest TemporaryDirectory removed the failed fixture directory.",
+      "freeze_manifest_sha256": "5a466a84e1ce6c4bea6d8f5de991b13d3acdae5ce3beef09b2ff30e8cc392824",
+      "frozen_dirty_patch_sha256": "fac3546fdc86cfdd53c2976f52625dd564576103d5caa3fad080235cc2c7a68a"
+    },
+    "reviewed_logs": 10,
+    "reviewed_sources": 4,
+    "root_source_review_sha256": "e5c2b3a89dc1b1ef6480da0a2dfb942c1751a82b3f3ad993f0aeafa2f7f59161"
+  },
+  "schema": "melee-web-b4-ordered-clock-lineage-synthetic-evidence-v1",
+  "scope": "Synthetic focused validation of the explicit v10 ordered-clock-lineage comparator path.",
+  "source": {
+    "base_main": "15fd2199abee8cb32c0fa11606521cbfcf823105",
+    "files": [
+      {
+        "bytes": 4323,
+        "path": "scripts/compare_whole_session_state.py",
+        "sha256": "48b711d12d5defe046b327258ded84e692f22d00b3616eb11b6b0254dfffacb9"
+      },
+      {
+        "bytes": 272071,
+        "path": "tools/whole_session_state_compare.py",
+        "sha256": "e118754923cd4999326e6c048d13e56dfe5070a6c8baaf313c5dd9cf67d2cd7e"
+      },
+      {
+        "bytes": 11907,
+        "path": "tests/test_compare_whole_session_state_cli.py",
+        "sha256": "cb47cfcb31657ecac8d7341241efef80263c38b512bbffdbc2d5e4c7bcd9f0ec"
+      },
+      {
+        "bytes": 263620,
+        "path": "tests/test_whole_session_state_compare.py",
+        "sha256": "9ecabb0187e83a100d0c2319d3b2bc3c354081cd9a37d1e74dd94bf663a4e834"
+      }
+    ],
+    "range_diff": "Both owned implementation commits compare unchanged (exact patch equivalence) after rebase.",
+    "rebased_head": "a39915e29892cf747f97a81ea6f4dcb19d1b4607",
+    "rebased_tree": "e5233c5e04f5d4dbfbfa5288cb3cf7318b9dd04d",
+    "reviewed_commit_before_rebase": "1aa1b79e9dcd596df6463cd68d3597f9b5318822",
+    "reviewed_tree_before_rebase": "5c033fc25e6144a3ecd3079e19e63e25614213d6"
+  }
+}
