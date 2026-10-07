@@ -173,6 +173,11 @@ void expect_marker_map_error(const std::vector<uint8_t>& bytes,std::string_view 
 void marker_fixture_trace(){
  const auto original=marker_fixture();
  auto archive=std::make_shared<melee_web::DatArchive>(original);
+ const auto data_section=archive->data();
+ check(data_section.size()==read_be32(original,4)&&data_section.size()<original.size(),
+       "Synthetic DAT data view has its header-declared size and is smaller than the full file");
+ check(std::equal(data_section.begin(),data_section.end(),original.begin()+0x20),
+       "Synthetic DAT data view exactly matches the raw file data-section span");
  {
   melee_web::NativeDatArena arena(archive);
   expect_error([&]{melee_web_stage_markers_decode(arena.reader(),0x100);},
@@ -217,6 +222,7 @@ void marker_fixture_trace(){
 void stadium_map_trace(const char* path){
  auto bytes=read_bytes(path);
  auto archive=std::make_shared<melee_web::DatArchive>(bytes,melee_web::DatExternalPolicy::ResolveNull);
+ const auto original_data_section=std::vector<uint8_t>(archive->data().begin(),archive->data().end());
  melee_web::DatStage metadata(*archive);
  check(metadata.entries.size()==10&&metadata.flagged_object_table.count==44,
        "C0 authored Stadium map row/flag counts");
@@ -274,9 +280,13 @@ void stadium_map_trace(const char* path){
     }
    }
   }
-  const auto retained=archive->data();
-  check(retained.size()==bytes.size()&&std::equal(bytes.begin(),bytes.end(),retained.begin()),
-        "C0 immutable input remains byte-identical");
+  const auto retained_data_section=archive->data();
+  check(retained_data_section.size()==original_data_section.size()&&
+            std::equal(original_data_section.begin(),original_data_section.end(),retained_data_section.begin()),
+        "C0 resolved archive data section remains byte-identical to its pre-owner baseline");
+  const auto retained_file=read_bytes(path);
+  check(retained_file.size()==bytes.size()&&std::equal(bytes.begin(),bytes.end(),retained_file.begin()),
+        "C0 original full archive file remains byte-identical");
  }
 
  // Contract failures are deterministic input-boundary checks and do not
