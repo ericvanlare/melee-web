@@ -408,7 +408,7 @@ try {
     },
     onError(error){log(error.message);$('status').dataset.runtimeError=error.message;},
     onLog(text,isError){
-      const boundaryProbe=window.__meleeReplayBoundaryProbe;
+      const boundaryProbe=globalThis.__meleeReplayBoundaryProbe;
       const probeEnabled=boundaryProbe?.enabled===true;
       let replayHeader=false,sessionFrame=false,frameIndex=-1;
       if(probeEnabled){
