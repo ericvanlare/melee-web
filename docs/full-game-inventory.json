@@ -9,7 +9,7 @@
     "included": [
       "Offline vanilla GALE01 gameplay and presentation, including the source-enumerated fighters, moves, costumes, transformations, partner and boss entities, stages, items, CPU, local multiplayer, VS rules, single-player modes, minigames, events, menus, results, unlocks, trophies, movies, save and memory-card behavior, audio, graphics, input and browser lifecycle",
       "Compiled WebAssembly execution using the pinned original source routines, source identities and disc-derived assets",
-      "The current original CSS to SSS to match to CSS path as a partial integration baseline"
+      "The supported original CSS to SSS to four-stock Mario/Final Destination gameplay to original Results to CSS path as a partial integration baseline; separate bounded CPU9 four-player routes do not establish human four-player acceptance"
     ],
     "excluded": [
       "Netplay, online services and rollback transport",
@@ -20,7 +20,7 @@
     "limitations": [
       "Version 1 decomposes the 26 playable CharacterKind identities and 31 named VS-stage slots. Items, mode-specific entities and service categories still require source-identity decomposition before they can serve as a fine-grained completion list.",
       "Statuses are scoped observations, not percentages. A source path, parser, compile, synthetic scene, short prefix or recorded-queue comparison does not by itself pass browser gameplay, retail equivalence, pixels, PCM, input latency or performance.",
-      "The eight-fighter/four-stage starting baseline and every added development candidate have partial claims only; source integration does not imply complete moves, costumes, CPU, four-player local input, audio, results, save progression or mode coverage.",
+      "The eight-fighter/four-stage starting baseline and each added development candidate have partial claims only; source integration does not imply complete moves, costumes, CPU behavior, human local input, audio fidelity, Results equivalence, save progression or mode coverage. Bounded CPU9 four-player routes do not establish human four-player input or retail/whole-game acceptance.",
       "The fine-grained VS-stage census covers named StKind values from St_Kind_Izumi through St_Kind_Last; Dummy/Test and route, minigame and other mode-only stage slots remain represented by the aggregate stage rows until their callers are decomposed.",
       "STATUS.md remains the changing evidence index. This inventory links stable evidence documents and receipts without copying measurements from STATUS.md.",
       "Missing or untested behavior stays represented as not_integrated or not_evaluated until an owner records the required source, browser and reference gates."
@@ -137,9 +137,12 @@
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
         "docs/FIGHTER_RUNTIME.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/content/REMAINING_FIGHTERS_PORT_NOTES.md",
+        "docs/status/2026-09-30-remaining-fighter-integration-pr-86.md",
+        "docs/evidence/pr86-final-integration-v1.json"
       ],
-      "next_step": "Expand this category into one row per source selectable identity and retain the exact source kind and authored data bounds.",
+      "next_step": "Per-identity rows now exist. Continue checking each CharacterKind/FighterKind mapping, authored data bounds, and unavailable or route-only identities; PR86 covers only a bounded subset and does not establish complete roster admission.",
       "issue": null
     },
     {
@@ -239,8 +242,8 @@
       "id": "fighter-mr-game-and-watch",
       "category": "fighters",
       "title": "Mr. Game & Watch selectable fighter",
-      "implementation": "not_integrated",
-      "acceptance": "not_evaluated",
+      "implementation": "partial",
+      "acceptance": "partial",
       "source_identity": {
         "ckind": "CKIND_GAMEWATCH",
         "ftkind": "FTKIND_GAMEWATCH"
@@ -259,17 +262,20 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/content/REMAINING_FIGHTERS_PORT_NOTES.md",
+        "docs/status/2026-09-30-remaining-fighter-integration-pr-86.md",
+        "docs/evidence/pr86-final-integration-v1.json"
       ],
-      "next_step": "Run the fighter checkpoint for Mr. Game & Watch and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "next_step": "PR86 contains native content traces and rendered Lineup A matches, including the scoped Chef, Fire, Article, and damage/KO/Rebirth checks. Other actions, defense, off-stage recovery, complete browser-versus-original state comparison, and admission remain open.",
       "issue": null
     },
     {
       "id": "fighter-kirby",
       "category": "fighters",
       "title": "Kirby selectable fighter",
-      "implementation": "not_integrated",
-      "acceptance": "not_evaluated",
+      "implementation": "partial",
+      "acceptance": "partial",
       "source_identity": {
         "ckind": "CKIND_KIRBY",
         "ftkind": "FTKIND_KIRBY"
@@ -289,9 +295,12 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/content/REMAINING_FIGHTERS_PORT_NOTES.md",
+        "docs/status/2026-09-30-remaining-fighter-integration-pr-86.md",
+        "docs/evidence/pr86-final-integration-v1.json"
       ],
-      "next_step": "Run the fighter checkpoint for Kirby, then attach copy-ability and costume-specific action receipts.",
+      "next_step": "PR86 traces repeated construction across six costumes and the targeted 25-row non-null donor acquisition/use/loss/reacquisition/teardown matrix. Full donor costume-graph construction, other-donor KO loss, broader actions, particle pixels, browser-versus-original state comparison, and admission remain open.",
       "issue": null
     },
     {
@@ -532,8 +541,8 @@
         "docs/ACCURACY_CONTRACT.md",
         "docs/content/PEACH_PORT_NOTES.md"
       ],
-      "next_step": "Browser frames (checkpoint 4), CSS/SSS round trip, original comparison, pixels/PCM and performance admission; the Toad spore counter and float-aerial interactions need their own evidence.",
-      "issue": null
+      "next_step": "#295's bounded lineup includes Peach; use existing capture inventory and strict comparison tools for a declared interval or retained reduced failure. Original CSS/SSS round-trip, broader move coverage, Toad interactions, original-state comparison, pixel/PCM equivalence, physical input, and performance acceptance remain open.",
+      "issue": 295
     },
     {
       "id": "fighter-pikachu",
@@ -570,8 +579,8 @@
       "id": "fighter-ice-climbers",
       "category": "fighters",
       "title": "Ice Climbers selectable fighter",
-      "implementation": "not_integrated",
-      "acceptance": "not_evaluated",
+      "implementation": "partial",
+      "acceptance": "partial",
       "source_identity": {
         "ckind": "CKIND_POPONANA",
         "ftkind": [
@@ -595,10 +604,13 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/content/REMAINING_FIGHTERS_PORT_NOTES.md",
+        "docs/status/2026-09-30-remaining-fighter-integration-pr-86.md",
+        "docs/evidence/pr86-final-integration-v1.json"
       ],
-      "next_step": "Run paired Popo/Nana construction and partner lifecycle checkpoints before splitting their shared and individual action rows.",
-      "issue": null
+      "next_step": "#295's bounded lineup includes Ice Climbers; reuse existing captures and strict comparison tools, preserve both partner identities, and record the matched interval or reduced failure. PR86 traces paired lifecycles, Belay, sleep, stock loss, and rejoin, but broader partner input/AI, desynchronization, recovery, and multi-player original comparison remain open.",
+      "issue": 295
     },
     {
       "id": "fighter-jigglypuff",
@@ -627,15 +639,15 @@
         "docs/ACCURACY_CONTRACT.md",
         "docs/content/JIGGLYPUFF_PORT_NOTES.md"
       ],
-      "next_step": "Native five-costume lifetimes, crouch variation, five aerial jumps and ground/air special states pass. Original CSS/SSS reaches 31-case cold/warm action sweeps with 12,800 total source frames and zero hard action-window failures. Broaden authored move/costume and fighter/stage interactions, complete ordinary matches, and perform independent original, pixel, PCM and physical-input comparisons before acceptance.",
-      "issue": null
+      "next_step": "#295's bounded lineup includes Jigglypuff; use existing capture inventory and strict comparison tools for a declared interval or retained reduced failure. Current costume, jump, action-sweep, and browser evidence does not establish full original-state comparison, complete interactions, physical input, pixel/PCM equivalence, or performance acceptance.",
+      "issue": 295
     },
     {
       "id": "fighter-samus",
       "category": "fighters",
       "title": "Samus selectable fighter",
-      "implementation": "not_integrated",
-      "acceptance": "not_evaluated",
+      "implementation": "partial",
+      "acceptance": "partial",
       "source_identity": {
         "ckind": "CKIND_SAMUS",
         "ftkind": "FTKIND_SAMUS"
@@ -654,17 +666,20 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/content/REMAINING_FIGHTERS_PORT_NOTES.md",
+        "docs/status/2026-09-30-remaining-fighter-integration-pr-86.md",
+        "docs/evidence/pr86-final-integration-v1.json"
       ],
-      "next_step": "Run the fighter checkpoint for Samus and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "next_step": "PR86 traces native construction and scoped Bomb, grapple capture/throw, and recovery paths; Samus is rendered in Lineup B. Other actions, recovery and damage/KO cases, full browser-versus-original state comparison, pixels, and admission remain open.",
       "issue": null
     },
     {
       "id": "fighter-yoshi",
       "category": "fighters",
       "title": "Yoshi selectable fighter",
-      "implementation": "not_integrated",
-      "acceptance": "not_evaluated",
+      "implementation": "partial",
+      "acceptance": "partial",
       "source_identity": {
         "ckind": "CKIND_YOSHI",
         "ftkind": "FTKIND_YOSHI"
@@ -683,17 +698,20 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/content/REMAINING_FIGHTERS_PORT_NOTES.md",
+        "docs/status/2026-09-30-remaining-fighter-integration-pr-86.md",
+        "docs/evidence/pr86-final-integration-v1.json"
       ],
-      "next_step": "Run the fighter checkpoint for Yoshi and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "next_step": "PR86 traces native capture/release, Egg Throw Article lifetime, and scoped damage/KO paths; Yoshi is rendered in Lineup B. Other specials, the separate item-target Egg Lay branch, broader recovery, full browser-versus-original state comparison, and admission remain open.",
       "issue": null
     },
     {
       "id": "fighter-zelda",
       "category": "fighters",
       "title": "Zelda selectable fighter and transformation owner",
-      "implementation": "not_integrated",
-      "acceptance": "not_evaluated",
+      "implementation": "partial",
+      "acceptance": "partial",
       "source_identity": {
         "ckind": "CKIND_ZELDA",
         "ftkind": "FTKIND_ZELDA"
@@ -713,17 +731,20 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/content/REMAINING_FIGHTERS_PORT_NOTES.md",
+        "docs/status/2026-09-30-remaining-fighter-integration-pr-86.md",
+        "docs/evidence/pr86-final-integration-v1.json"
       ],
-      "next_step": "Run the Zelda/Sheik transformation checkpoint and split each form's costume, action, article, effect and audio rows.",
+      "next_step": "PR86 traces repeated in-match Zelda/Sheik transformations and scoped Farore's Wind paths; Zelda is rendered in Lineup B. Broader actions and recovery, full browser-versus-original state comparison, pixels, and admission remain open.",
       "issue": null
     },
     {
       "id": "fighter-sheik",
       "category": "fighters",
       "title": "Sheik selectable identity and transformation form",
-      "implementation": "not_integrated",
-      "acceptance": "not_evaluated",
+      "implementation": "partial",
+      "acceptance": "partial",
       "source_identity": {
         "ckind": "CKIND_SEAK",
         "ftkind": "FTKIND_SEAK"
@@ -743,10 +764,13 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/content/REMAINING_FIGHTERS_PORT_NOTES.md",
+        "docs/status/2026-09-30-remaining-fighter-integration-pr-86.md",
+        "docs/evidence/pr86-final-integration-v1.json"
       ],
-      "next_step": "Run the Sheik/Zelda transformation checkpoint and split each form's costume, action, article, effect and audio rows.",
-      "issue": null
+      "next_step": "#295's bounded lineup compares Sheik, Jigglypuff, Peach, and Ice Climbers using existing captures and strict comparison tools; retain Sheik/Zelda identity through the declared interval or record a reduced first failure. PR86's browser lineup selects Zelda through the shared CSS icon and does not assert an independently selected Sheik slot; broader actions, recovery, and acceptance remain open.",
+      "issue": 295
     },
     {
       "id": "fighter-falco",
@@ -995,8 +1019,8 @@
       "id": "fighter-transformations-and-copy-abilities",
       "category": "fighters",
       "title": "Transformations and copy abilities",
-      "implementation": "not_integrated",
-      "acceptance": "not_evaluated",
+      "implementation": "partial",
+      "acceptance": "partial",
       "source_refs": [
         "melee/ft/ftdynamics.c",
         "melee/ft/kinds/ftZelda/ftzelda.c",
@@ -1015,17 +1039,20 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/content/REMAINING_FIGHTERS_PORT_NOTES.md",
+        "docs/status/2026-09-30-remaining-fighter-integration-pr-86.md",
+        "docs/evidence/pr86-final-integration-v1.json"
       ],
-      "next_step": "Extract transformation and Kirby copy tables from the pinned source and create one fixture per transition and copied move family.",
+      "next_step": "PR86 covers repeated Zelda/Sheik down-B transitions and targeted acquisition/use/loss/reacquisition/teardown for all 25 non-null Kirby copy rows. Complete the remaining move, interruption, donor-costume, and other-donor loss cases; copied-particle pixels and browser-versus-original transition equivalence remain open.",
       "issue": null
     },
     {
       "id": "fighter-partners-and-companions",
       "category": "fighters",
       "title": "Partner and companion entities",
-      "implementation": "not_integrated",
-      "acceptance": "not_evaluated",
+      "implementation": "partial",
+      "acceptance": "partial",
       "source_refs": [
         "melee/ft/kinds/ftPopo/ftpopo.c",
         "melee/ft/kinds/ftNana/ftnana.c",
@@ -1044,9 +1071,12 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/content/REMAINING_FIGHTERS_PORT_NOTES.md",
+        "docs/status/2026-09-30-remaining-fighter-integration-pr-86.md",
+        "docs/evidence/pr86-final-integration-v1.json"
       ],
-      "next_step": "Inventory every source partner/companion process and add explicit owner, lifetime and input-routing contracts.",
+      "next_step": "PR86 traces Popo/Nana paired creation, Belay separation, sleep, stock loss, rejoin/rebirth, and teardown. Broader partner/companion inventory, ordinary input/AI and desynchronization cases, and a multi-player original comparison remain open.",
       "issue": null
     },
     {
@@ -1121,7 +1151,7 @@
         "docs/evidence/link-young-link-replay-v1.json",
         "docs/evidence/recorded-queue-replay-v1.json"
       ],
-      "next_step": "Use this bounded set as the first integration cohort, then split each fighter into identity, costume, action, article, effect, audio and acceptance rows.",
+      "next_step": "Continue the existing eight-fighter boundary with per-fighter action, ordinary-input, retail-reference, audio, pixel, and performance evidence. Detailed fighter rows already exist; the separate PR86 subset does not close these gates or broaden the accepted cohort.",
       "issue": null
     },
     {
@@ -1151,7 +1181,7 @@
         "docs/ROADMAP.md",
         "docs/DEPENDENCIES.md"
       ],
-      "next_step": "Decompose the StKind/GrKind tables into one feature row per playable and mode-only stage, retaining explicitly unused or route-only source entries.",
+      "next_step": "Per-stage identity rows now exist. Continue checking source table mappings, authored bounds, and unavailable or route-only identities; the rows do not establish callback, gameplay, or original-comparison completion.",
       "issue": null
     },
     {
@@ -1189,8 +1219,8 @@
       "id": "stage-pokemon-stadium",
       "category": "stages",
       "title": "Pokemon Stadium VS stage",
-      "implementation": "not_integrated",
-      "acceptance": "not_evaluated",
+      "implementation": "partial",
+      "acceptance": "partial",
       "source_identity": {
         "stkind": "St_Kind_PStadium",
         "grkind": "Gr_Kind_PStadium"
@@ -1210,10 +1240,22 @@
       ],
       "evidence": [
         "docs/ADDING_STAGES.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/evidence/pokemon-stadium-c0-integration-v1.json",
+        "docs/evidence/pokemon-stadium-c1-e8-request-v1.json",
+        "docs/evidence/pokemon-stadium-c1a-css-sss-preparation-v1.json",
+        "docs/evidence/pokemon-stadium-c2-item-state-owner-v1.json",
+        "docs/evidence/pokemon-stadium-yakumono-scalar-owner-v1.json",
+        "docs/evidence/pokemon-stadium-ground-map1-owner-v1.json",
+        "docs/evidence/pokemon-stadium-live-map1-image-consumer-v1.json",
+        "docs/evidence/pokemon-stadium-screen-roots-v1.json",
+        "docs/evidence/pokemon-stadium-buffer-consumer-v1.json",
+        "docs/evidence/pokemon-stadium-buffer-consumer-current-main-v1.json",
+        "docs/evidence/issue254-profile-map-ownership-v1.json",
+        "docs/evidence/issue254-current-main-refresh-v1.json"
       ],
-      "next_step": "Run the stage checkpoint for Pokemon Stadium and split map, collision, visual, hazard, audio and browser gates.",
-      "issue": null
+      "next_step": "Use #251 for the Stadium C3 idle-lifetime milestone: fold the retained entry/source closure and seven unresolved prerequisite groups into two source-ordered no-draw lives through OnInit/OnLoad/OnStart/Ready/GO, with checked state/RNG, at least 3,500 post-GO ticks each, and full owner retirement/recreation. Existing C0-C2, isolated map-1 Ground/image/buffer owners, and the generic profile-map adapter provide only narrow prerequisite evidence; no full OnInit/OnStart route, gameplay, or stage admission has passed.",
+      "issue": 251
     },
     {
       "id": "stage-peachs-castle",
@@ -2127,15 +2169,15 @@
         "docs/content/YOSHIS_STORY_PORT_NOTES.md",
         "docs/content/DREAM_LAND_PORT_NOTES.md"
       ],
-      "next_step": "Split the four stage rows into stage-specific data, map, callback, collision, article, visual and acceptance features before expanding the stage roster.",
+      "next_step": "Continue stage-specific ordinary-input, original-reference, pixel/PCM, and performance gates for Final Destination, Battlefield, Yoshi's Story, and Dream Land; stage rows already exist. The Yoshi's Story and Dream Land notes record scoped dynamic-service observations, not complete stage acceptance.",
       "issue": null
     },
     {
       "id": "stage-unique-services-and-hazards",
       "category": "stages",
       "title": "Stage-specific movement, hazards, routes and background services",
-      "implementation": "not_integrated",
-      "acceptance": "not_evaluated",
+      "implementation": "partial",
+      "acceptance": "partial",
       "source_refs": [
         "melee/gr/grcastle.c",
         "melee/gr/grpstadium.c",
@@ -2157,9 +2199,17 @@
       "evidence": [
         "docs/ADDING_STAGES.md",
         "docs/CONTENT_CHECKS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/content/YOSHIS_STORY_PORT_NOTES.md",
+        "docs/content/DREAM_LAND_PORT_NOTES.md",
+        "docs/evidence/development-timing-20260919-v1.json",
+        "docs/evidence/pokemon-stadium-c0-integration-v1.json",
+        "docs/evidence/pokemon-stadium-c1-e8-request-v1.json",
+        "docs/evidence/pokemon-stadium-c1a-css-sss-preparation-v1.json",
+        "docs/evidence/pokemon-stadium-c2-item-state-owner-v1.json",
+        "docs/evidence/pokemon-stadium-yakumono-scalar-owner-v1.json"
       ],
-      "next_step": "Enumerate map and scheduler callbacks from each gr source file and assign a lifecycle trace to each unique service family.",
+      "next_step": "Keep this cross-stage row partial. Yoshi's Story has scoped Randall moving-collision and Shy Guy scheduler/item traces; Dream Land crosses its bird, tree, wind, and blink intervals. Stadium C0-C2 stop before stage callbacks/gameplay. Inventory remaining stage-specific service families and retain per-stage transition and original-comparison gaps.",
       "issue": null
     },
     {
@@ -2252,9 +2302,11 @@
       "evidence": [
         "docs/CONTROLLERS.md",
         "docs/CPU_OPPONENTS.md",
-        "docs/REFERENCE_CAPTURE_APP.md"
+        "docs/REFERENCE_CAPTURE_APP.md",
+        "docs/status/2026-10-06-four-player-team-battle.md",
+        "docs/evidence/four-player-team-battle-admission-v1.json"
       ],
-      "next_step": "Add physical and ordinary-input two-, three- and four-human recipes with source PAD boundary and teardown evidence.",
+      "next_step": "The #169 receipt covers natural CPU9 Team 2v2 and ordinary four-Mario routes, not human four-player input. Next use #293 to preserve sparse P1/P3 port identities through input, player/HUD mapping, outcome, Results, and CSS; keep contiguous P1/P2 and four-player Teams as controls. Physical-controller assignment and reconnect acceptance remain separate.",
       "issue": null
     },
     {
@@ -2290,9 +2342,15 @@
         "docs/evidence/vs-rules-items-source-route-v2.json",
         "docs/evidence/vs-team-battle-route-v1.json",
         "docs/evidence/vs-team-battle-retail-boundary-reproducer-v1.json",
-        "docs/evidence/vs-rules-plus-timer-source-route-v1.json"
+        "docs/evidence/vs-rules-plus-timer-source-route-v1.json",
+        "docs/status/2026-10-03-vs-rules-and-items-route-bounded-rules-plus-timer-slice.md",
+        "docs/status/2026-10-03-vs-teams-route-rendered-browser-slice.md",
+        "docs/evidence/vs-team-battle-retail-followup-v1.json",
+        "docs/evidence/vs-team-battle-retail-browser-comparison-v1.json",
+        "docs/status/2026-10-06-four-player-team-battle.md",
+        "docs/evidence/four-player-team-battle-admission-v1.json"
       ],
-      "next_step": "The rendered browser route covers original CSS Teams input, opposing two-player Team Battle setup, Rules Plus one-minute timer handoff, No Contest Results, and retained Rules/Items on CSS return. Retail Teams match comparison remains incomplete because the retained capture driver clicked the CSS Human/CPU toggle bounds; the reduced packet preserves that source boundary and corrected geometry decoder. The enclosing Rules Plus retail capture failed later and remains scoped to its retained first-match prefix. Capture bounded retail team-color/match and remaining Rules Plus options, then continue Training, item-family services, and source GCI persistence with independent original/browser evidence.",
+      "next_step": "Follow the current rules queue: #291 routes tied VS timeouts through original Sudden Death, Results, and CSS with non-tied timeout and elimination controls; #292 then records the exact competitive Rules Plus profile. Current evidence covers source Rules/Items, a bounded Rules Plus timer route, CSS Teams setup, a natural four-player CPU9 Team 2v2 route, and selected Team fields in one fresh retail/browser comparison. That browser comparison covers one match rather than the source capture's three cycles; timer and CSS item-mask representations are excluded. The Rules Plus receipt records a bounded retail first-match prefix and rendered-browser route, but its enclosing three-match retail capture failed during later teardown. Do not treat these routes as full cross-runtime equivalence.",
       "issue": null
     },
     {
@@ -2414,17 +2472,23 @@
         "docs/TRANSITION_EQUIVALENCE.md",
         "docs/CONTROLLERS.md",
         "docs/evidence/vs-rules-items-source-route-v1.json",
-        "docs/evidence/vs-rules-items-source-route-v2.json"
+        "docs/evidence/vs-rules-items-source-route-v2.json",
+        "docs/status/2026-10-03-vs-rules-and-items-route-bounded-rules-plus-timer-slice.md",
+        "docs/status/2026-10-03-vs-teams-route-rendered-browser-slice.md",
+        "docs/evidence/vs-team-battle-retail-followup-v1.json",
+        "docs/evidence/vs-team-battle-retail-browser-comparison-v1.json",
+        "docs/status/2026-10-06-four-player-team-battle.md",
+        "docs/evidence/four-player-team-battle-admission-v1.json"
       ],
-      "next_step": "Extend source and rendered-browser transition receipts beyond the bounded VS Rules/Items path to team/Rules Plus selection, name entry, and remaining original mode menus.",
+      "next_step": "Source and headless routes now cover bounded Rules/Items, Teams, and Rules Plus timer paths, but not complete menu equivalence. Prioritize the #291 Sudden Death transition and #292 competitive Rules Plus route. Name entry and remaining original mode menus follow the competitive roadmap; the three-cycle retail/browser Team comparison, audio, physical-input, and timing gates remain open.",
       "issue": null
     },
     {
       "id": "results-and-match-end-routing",
       "category": "menus",
       "title": "Results screen, standings, rewards and return routing",
-      "implementation": "not_integrated",
-      "acceptance": "not_evaluated",
+      "implementation": "partial",
+      "acceptance": "partial",
       "source_refs": [
         "melee/gm/gmresult.c",
         "melee/gm/gmresultplayer.c",
@@ -2444,9 +2508,18 @@
       ],
       "evidence": [
         "docs/ACCURACY_CONTRACT.md",
-        "docs/ROADMAP.md"
+        "docs/ROADMAP.md",
+        "docs/content/REMAINING_FIGHTERS_PORT_NOTES.md",
+        "docs/status/2026-09-30-remaining-fighter-integration-pr-86.md",
+        "docs/evidence/pr86-final-integration-v1.json",
+        "docs/status/2026-10-08-b4-first-match-results-source.md",
+        "docs/evidence/v10-first-match-results-source-v1.json",
+        "docs/status/2026-10-08-b4-first-match-results-comparison-failure.md",
+        "docs/evidence/v10-first-match-results-comparison-failure-v1.json",
+        "docs/status/2026-10-07-h1-natural-supported-route.md",
+        "docs/evidence/h1-natural-supported-route-v1.json"
       ],
-      "next_step": "Implement and receipt the Results owner and route only after the current match-end boundary remains source-equivalent; draft PR #44 remains a dependency and the tracking issue is #34.",
+      "next_step": "Next #291 covers tied-timeout Sudden Death through original Results and CSS, preserving non-tied timeout and elimination controls. B4 #274 remains parked at its first gameplay divergence after the reconstructed original prefix; this row does not reopen that work. The current B4 browser comparison failed before a Results witness, while its separate source-only receipt records an original Results entry. Keep Results-entry/scalar/input comparison and whole-session acceptance as explicit gaps.",
       "issue": 34
     },
     {
@@ -2759,9 +2832,11 @@
       "evidence": [
         "docs/CONTROLLERS.md",
         "docs/REFERENCE_CAPTURE_APP.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/status/2026-10-06-public-four-port-controls.md",
+        "docs/evidence/public-four-port-controls-v1.json"
       ],
-      "next_step": "Create per-device and per-player-slot input rows with source sampling-boundary receipts, including simultaneous four-player local input.",
+      "next_step": "The #171 public Controls receipt stores four source choices and headlessly exercises four authored Gamepad API devices; it excludes physical controllers, four-human gameplay, and sparse active ports. Next use #293 to test sparse P1/P3 input and source-port mapping against existing contiguous and four-player controls. Physical assignment remains separate under #83.",
       "issue": null
     },
     {
