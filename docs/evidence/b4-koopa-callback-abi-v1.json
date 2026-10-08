@@ -6,6 +6,14 @@
     "Source identified"
   ],
   "focused_fixture_tests": 1,
+  "full_suite": {
+    "exit_code": 0,
+    "producer_head": "300546e72e782440b02ef8804e7577cfea018e12",
+    "producer_tree": "42f2a1a32f7aa58b0df16745fcf8b88b1ed48d33",
+    "seconds": 398.15,
+    "skipped": 153,
+    "tests": 2042
+  },
   "issue": 265,
   "negative_control": {
     "compiled": true,
@@ -34,6 +42,32 @@
     }
   },
   "producer_body": "original ftKp_Init_80132B38(void) remains empty; instrumented only in fixture",
+  "release_build": {
+    "artifact_count": 32,
+    "base_main": "5443482b3019e99e5797380e4f8b432027ff767e",
+    "configuration": "Release",
+    "exit_code": 0,
+    "native_artifacts": [
+      {
+        "bytes": 300352,
+        "name": "gameplay_menu_browser.js",
+        "sha256": "213fd21eea42113a57fef994b3589e002e2c2a4c293ab9a682b69c8698b69c3f"
+      },
+      {
+        "bytes": 15749904,
+        "name": "gameplay_menu_browser.wasm",
+        "sha256": "35b09f8bf7a22095c460bafaf0849e20fb2bb32508c6fd939536a540c5445977"
+      },
+      {
+        "bytes": 3674112,
+        "name": "gameplay_menu_browser.data",
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      }
+    ],
+    "producer_head": "300546e72e782440b02ef8804e7577cfea018e12",
+    "producer_tree": "42f2a1a32f7aa58b0df16745fcf8b88b1ed48d33",
+    "target": "runtime"
+  },
   "retained_failure": "first fixture compile lacked production GET_FIGHTER header; retained privately, then original inline header included",
   "runtime_provider_pointer": "not exported; original browser target remains source/trace inference",
   "schema": "melee-web-b4-koopa-callback-abi-v1",
@@ -54,8 +88,6 @@
     }
   },
   "unrun": [
-    "full suite",
-    "updated Release runtime",
     "browser retry",
     "MWRO comparison"
   ]

@@ -31,6 +31,9 @@ variants then compiled, the expected negative trap was retained, and the
 positive fixture passed. Patch canonicalization checks also passed.
 
 The historical comparator branch and failed browser captures are preserved.
-The retained Release runtime still predates this adapter. The full suite,
-updated Release build, browser retry and original MWRO comparison are unrun;
-this component fixture does not establish stock-decrement or session accuracy.
+The pre-adapter Release inventory was preserved and verified before rebuilding.
+The standard full suite and ordinary Release runtime build passed on the source
+producer identified in the receipt; their counts and build identities live
+there. The PR's later evidence-only update does not change runtime source.
+Browser retry and original MWRO comparison remain unrun. This component fixture
+and compile do not establish stock-decrement or session accuracy.
