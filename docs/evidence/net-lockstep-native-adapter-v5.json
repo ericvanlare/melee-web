@@ -1,0 +1,188 @@
+{
+  "browser_integration": {
+    "capture_observation_path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-integration-20261008-045400-b93/capture-observation-v4.json",
+    "capture_observation_sha256": "a07d1472d5680e47fe2c627c723f0e0ec9ec38498698e2d4548dcac59a74f8ec",
+    "packet_sha256": "94ae34bb12a821cb52e41b3dd7df29ccfcafa990f6f18e282f2f5df744667182",
+    "prior_detailed_receipt": "docs/evidence/net-lockstep-native-adapter-v3.json",
+    "producer": {
+      "base_main": "6645508cd7f09eed4ed5a5d39c5f4e1676734d58",
+      "head": "b93b7bd44bd4199e4dece77d0673d75c6af5d44a",
+      "tree": "5943efb772888345ed3f7175460c23f12f3397bd",
+      "wasm_sha256": "286be8518bf81f90cb3b6c9bd3a8bb62cbd9f43b78d37a8ecec6380162b1b3b1"
+    },
+    "refreshed_release_was_used": false,
+    "result": "Pass for the bounded two-headless-Chrome, local Room Worker/WebRTC A3 native-pump component: eight CSS source ticks, six local and six remote inputs per peer, zero native-local divergences, matching eight-record/512-byte checksum streams, and post-peer-close cursor/steps/draws of eight on both pages. Cleanup was independently reviewed.",
+    "root_review_sha256": "715149780b7a9e21f0cdc45bb009daa696848b35793fdbbe372c8d7ea8b609e5",
+    "scope_limit": "The run does not establish whole-session acceptance, live/keyboard/Gamepad/physical input, retail equivalence, timing/performance, visual/audio fidelity, Internet or two-machine multiplayer. No all-38 HTTP pre/post identity or CDP PID attribution is claimed."
+  },
+  "date": "2026-10-08",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "history": "Earlier failed v2/v3 browser attempts, incomplete suite output, and older 32- and 34-artifact build sets remain preserved and identified by earlier receipts. The v5 analysis explains the refreshed Wasm delta; it does not change the original producer identity of the browser capture.",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/262",
+  "not_claimed": [
+    "A3 browser integration on the refreshed a73 Release Wasm identity",
+    "Runtime-owned product session/progress integration or public UI",
+    "Keyboard, Gamepad, physical or live input validation",
+    "Full supported route, retail equivalence, or whole-session acceptance",
+    "Foreground timing, latency, performance, pixel, PCM, or uninterrupted-audio acceptance",
+    "Internet, STUN/TURN, or two-machine multiplayer",
+    "Generic all-38 HTTP pre/post identity or CDP PID attribution"
+  ],
+  "refreshed_validation": {
+    "focused": {
+      "command": "node --test tests/net_lockstep_native_adapter.test.mjs tests/net_lockstep_browser_peer.test.mjs tests/net_session_instance.test.mjs tests/net_source_accounting.test.mjs",
+      "duration_ms": 88.315,
+      "failed": 0,
+      "log_path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/adapter-focused-v1.log",
+      "log_sha256": "7f473b9d13547ab88f62abc5d721e0b0b39b895a4c94a23e4c004278060e8f6b",
+      "passed": 56,
+      "result": "pass",
+      "skipped": 0,
+      "tests": 56
+    },
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "elapsed_seconds": 383.368,
+      "failures": 0,
+      "log_path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/full-suite-v1.log",
+      "log_sha256": "c6c402832f037c53e19880490be4d390cfc09b9382344ed358626c21aec55ace",
+      "non_skipped_tests_passed": 1897,
+      "result": "pass",
+      "skipped": 153,
+      "summary": "2,050 tests run, 153 skipped, no failures.",
+      "tests": 2050
+    },
+    "ordinary_release": {
+      "all_ten_optional_runtime_flags_off": true,
+      "artifact_catalog_exact_matches_to_preserved_b93": 33,
+      "artifact_count": 34,
+      "build_log_path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/ordinary-release-build-v1.log",
+      "build_log_sha256": "c385284553d3c5e4584b884dba52c55ce6437902f4ef51b0ef0d42a4e386107f",
+      "cmake_cache_sha256": "fd0fbd5a610af974864da67d0fd8b17e7c3ee3a333bd8eeaf35b05b428025ce8",
+      "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime --configuration Release",
+      "configuration": "Release",
+      "nonmatching_artifacts": [
+        {
+          "b93_captured_sha256": "286be8518bf81f90cb3b6c9bd3a8bb62cbd9f43b78d37a8ecec6380162b1b3b1",
+          "b93_preserved_sha256": "286be8518bf81f90cb3b6c9bd3a8bb62cbd9f43b78d37a8ecec6380162b1b3b1",
+          "bytes": 15748425,
+          "exact_b93_match": false,
+          "name": "gameplay_menu_browser.wasm",
+          "path": "/Volumes/AgentStorage/melee-web/checkouts/claude-net-determinism-20261005-181853-90d704ea/build/browser-release/gameplay_menu_browser.wasm",
+          "sha256": "812dd8f20c5b8886b039f95f0689d3b41ff0536db658d6bc11279f2e4bad11ca"
+        }
+      ],
+      "result": "pass",
+      "target": "runtime",
+      "wasm_identity_note": "Executable bytes changed by relocation. The preserved b93 and refreshed a73 Wasm artifacts have equal length but differ in SHA-256 because SDL CMake stamps the project revision into SDL_REVISION. The exact 19-byte literal occurs once in each DATA segment set: SDL-3.4.10-b93b7bd at memory address 225226 and SDL-3.4.10-a73eac5 at 302238. After removing each exact literal, 517 u32le and 27 u24le data pointer fields each shift by -19; replacing the new fields with the old values makes all 4,233 DATA segment payloads byte-for-byte equal. LLVM disassembly reports identical instruction addresses and mnemonics, with 5,124 changed operands: 5,123 address immediates shift by -19 and the remaining i32.const in SDL_InitSubSystem changes from 225226 to 302238. No browser capture used the refreshed Wasm; the successful capture remains attributed only to b93."
+    },
+    "preservation_receipt_path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/pre-refresh-preservation-v1.json",
+    "preservation_receipt_sha256": "a2104b063aad33666f2b7e798ebe7f5a63de41162c4ff018e0f895d2a43c08eb",
+    "receipt_path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/current-main-validation-v3.json",
+    "receipt_sha256": "c3c282e21f3a59aea2169f37ad3ebae629cb63a6373226e7a7783b460558a650"
+  },
+  "schema": "melee-web-issue262-native-adapter-evidence-v5",
+  "scope": "Shared development-only browser ABI adapter for sequential A1 and indexed A3 native lockstep publication, bounded checksum draining, optional progress notifications, and instance-owned joined disposal. Refreshed source/test/build validation is separate from the bounded browser capture, which remains attached only to the earlier b93 producer.",
+  "source": {
+    "base_main": "a7af7d63ce70bb892432d81bcc00b47bca3d1111",
+    "base_main_tree": "14f3cec2205a8d3f93e858da820a9e6f6af4127e",
+    "head": "a73eac585436f9fa7923c3e26489fe219acaa0d3",
+    "owned_commits": [
+      "9210dd9214145d915d0a0e678f57c878c4601446",
+      "1d488069457e270153731b91d4babba107024d31",
+      "99f5e10e5cc0ca3236f981730ae177b7367e4787",
+      "c11cd0ed3e9a7351e6079b66889eb5bfc9d8e366",
+      "b502488005a693a63d62d1ac7a189d5951e8c55e",
+      "a73eac585436f9fa7923c3e26489fe219acaa0d3"
+    ],
+    "ownership": "The shared adapter remains owned by openNetInstance. The peer borrows native calls and progress subscription; peer close unsubscribes and joins work, then instance cleanup disposes the adapter after post-close source accounting can read status.",
+    "previous_capture_producer": "b93b7bd44bd4199e4dece77d0673d75c6af5d44a",
+    "range_diff_path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/owned-range-diff-v1.txt",
+    "range_diff_sha256": "b4ae033a569abe2e917accb5bdc96929ee3b610bc8f1e197b922b9cfb093dce0",
+    "refresh": "All six issue commits map exactly by range-diff from the previously validated b93 branch onto current main a7af7d6. PR #268 changed comparator code/tests and documentation; no issue #262 runtime sources changed.",
+    "tree": "c83769d75a2b5994b342ac441f51d54db00c56b7"
+  },
+  "wasm_delta_analysis": {
+    "all_changed_code_immediate_offsets_and_function_mappings_in_analysis_report": true,
+    "analysis_report_path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/wasm-delta-analysis-v1.json",
+    "analysis_report_sha256": "642b12c28081b52b6e3434a791d4715b0d50b87257626813b5c9cea650570f36",
+    "analysis_script_path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/wasm-delta-analysis.py",
+    "analysis_script_sha256": "7008f9c93f75d33b94723c149033641cd778ba53c10fa16d46a5ddf3ab978ae7",
+    "analysis_text_path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/wasm-delta-analysis-v1.txt",
+    "analysis_text_sha256": "86cf3be65a0a8a07d511c82d0604d444d5b825c427cceb1b603979dc29492887",
+    "build_identity_evidence": {
+      "new_log_contains_revision": true,
+      "new_log_rebuilt_sdl_object": true,
+      "new_log_relinked_sdl_archive": true,
+      "new_release_log": {
+        "bytes": 12252,
+        "path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/ordinary-release-build-v1.log",
+        "sha256": "c385284553d3c5e4584b884dba52c55ce6437902f4ef51b0ef0d42a4e386107f"
+      },
+      "new_revision_log_line": "-- Revision: SDL-3.4.10-a73eac5",
+      "old_log_contains_revision": true,
+      "old_release_log": {
+        "bytes": 12445,
+        "path": "/Volumes/AgentStorage/melee-web/runs/issue262-current-main-preservation-20261007-213243-fe2d958b/ordinary-release-build-v1.log",
+        "sha256": "bd42225abd60ebc7c75746dfeae49926f230749d38c00300e34c70414b7bd017"
+      },
+      "old_revision_log_line": "-- Revision: SDL-3.4.10-b93b7bd"
+    },
+    "changed_code_immediates": 5124,
+    "changed_code_immediates_by_mnemonic": {
+      "i32.const": 5118,
+      "i32.load8_u": 2,
+      "i64.const": 4
+    },
+    "code_section_new_sha256": "d567c6a49852d1b7d81c1fc587aa5c52115d641cf859844abb9add44dd83c3ed",
+    "code_section_old_sha256": "b4686bb7a04a36796d2e87c7006d6281d7559392cd7f071134138a8d6a123a99",
+    "data_metadata_equal": true,
+    "data_pointer_relocations": {
+      "new_minus_old": -19,
+      "u24le": 27,
+      "u32le": 517,
+      "unclassified_bytes": 0
+    },
+    "data_section_new_sha256": "697fcd5136eda3dd7d90e161de2502beeb2e1663edd49846c84f09e5d829f699",
+    "data_section_old_sha256": "4a4af998384587b00440447b03616f49dd34dd5e107842cf0c3f2da90d2096cd",
+    "data_segments": 4233,
+    "function_count": 15524,
+    "instruction_mnemonic_changes": 0,
+    "interpretation": "Executable CODE bytes changed in address immediates. Every disassembled opcode mnemonic and instruction offset is unchanged. Current generated SDL revision literal is the only non-pointer DATA payload content difference: the exact 19-byte old/new literal is removed from its respective data segment, after which all remaining DATA differences are 517 u32le and 27 u24le fields whose encoded values each shift by -19. The 77,012 i32.const delta is the memory address of the moved literal. This explains the Wasm delta; it does not make the refreshed Wasm the producer of the historical browser capture, which remains tied to b93.",
+    "new_function_disassembly": {
+      "bytes": 201373494,
+      "path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/wasm-new-llvm-objdump.txt",
+      "sha256": "7af3e37fe8489fa9bf7879f5b5dc25a2fb0f266ecd5d84327f2b667515c81ef6"
+    },
+    "new_revision_literal": 302238,
+    "new_wasm": {
+      "bytes": 15748425,
+      "path": "/Volumes/AgentStorage/melee-web/checkouts/claude-net-determinism-20261005-181853-90d704ea/build/browser-release/gameplay_menu_browser.wasm",
+      "sha256": "812dd8f20c5b8886b039f95f0689d3b41ff0536db658d6bc11279f2e4bad11ca"
+    },
+    "normalized_data_payloads_equal": true,
+    "old_function_disassembly": {
+      "bytes": 201373496,
+      "path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/wasm-old-llvm-objdump.txt",
+      "sha256": "ca3bdc1b9a79882b205f0b3b89b2856f88568343897dbefbf7f12cb15e4514d7"
+    },
+    "old_revision_literal": 225226,
+    "old_wasm": {
+      "bytes": 15748425,
+      "path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/prior-b93-release/runtime-artifacts/gameplay_menu_browser.wasm",
+      "sha256": "286be8518bf81f90cb3b6c9bd3a8bb62cbd9f43b78d37a8ecec6380162b1b3b1"
+    },
+    "other_sections_equal": true,
+    "raw_function_bodies_with_changed_immediates": 1365,
+    "remaining_data_difference_bytes_after_literal_removal": 567,
+    "revision_header_snapshot": {
+      "bytes": 1273,
+      "path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/SDL_revision-current.h",
+      "sha256": "d70703290ad3733eda210b4339a587e9ca70a9bbbe12e77a65f44de5c61a85f5"
+    }
+  }
+}
