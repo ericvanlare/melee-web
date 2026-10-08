@@ -1734,6 +1734,34 @@ public:
   if(input_recipe)output<<",\"input_recipe\":\""<<input_recipe<<"\"";
   output<<"}\n";
  }
+ void menu_selection(const StartMeleeData& raw,
+                     const MeleeWebMenuMatchSelection& normalized,
+                     const uint8_t pad[MELEE_WEB_PAD_STATE_BYTES]){
+  check(output.is_open(),"Menu selection diagnostic requires retained trace output");
+  auto bytes=[&](const void* data,size_t size){
+   const auto* value=static_cast<const uint8_t*>(data);
+   const char digits[]="0123456789abcdef";
+   output<<'"';for(size_t i=0;i<size;++i)
+    output<<digits[value[i]>>4]<<digits[value[i]&15];output<<'"';
+  };
+  MeleeWebMenuMatchSelection raw_selection{};raw_selection.start=raw;
+  output<<"{\"record\":\"menu_selection_diagnostic\",\"run\":"<<run_
+        <<",\"boundary\":\"closed_original_sss\",\"rng\":"<<normalized.random_seed
+        <<",\"raw\":";write_selection(output,raw_selection);
+  output<<",\"normalized\":";write_selection(output,normalized);
+  output<<",\"source_start_bytes_scope\":\"native ABI including pointers and padding\""
+        <<",\"raw_start_hex\":";bytes(&raw,sizeof(raw));
+  output<<",\"normalized_start_hex\":";bytes(&normalized.start,sizeof(normalized.start));
+  output<<",\"pad_origin\":\"owned closed SSS host bank\",\"pad_hex\":";
+  bytes(pad,MELEE_WEB_PAD_STATE_BYTES);
+  output<<",\"player_count\":"<<normalized.player_count<<",\"compatibility_players\":[";
+  for(unsigned i=0;i<normalized.player_count;++i){if(i)output<<',';
+   const auto& player=normalized.players[i];
+   output<<"{\"controller\":"<<player.controller<<",\"stocks\":"<<player.stocks
+         <<",\"costume\":"<<player.costume<<",\"sub_color\":"<<player.sub_color<<'}';
+  }
+  output<<"]}\n";output.flush();
+ }
  void begin_run(unsigned run){run_=run;index_=0;epochs.clear();}
  void event(const char* name,MeleeWebAudio* audio,const char* route=nullptr,
             const MeleeWebMenuMatchSelection* selection=nullptr,const uint32_t* rng=nullptr){
@@ -3737,6 +3765,8 @@ int main(int argc,char** argv){try{
  const bool opening_movie_preload_recipe=input_recipe&&std::string(input_recipe)=="opening-movie-preload-v1";
  const bool trophy_baseline_recipe=input_recipe&&std::string(input_recipe)=="trophy-baseline-v1";
  const bool sound_settings_recipe=input_recipe&&std::string(input_recipe)=="main-settings-sound-v1";
+ const bool sd_menu_setup_recipe=input_recipe&&
+     std::string(input_recipe)=="sudden-death-menu-setup-control-v1";
  const bool sudden_death_world_recipe=input_recipe&&
      std::string(input_recipe)=="sudden-death-world-control-v1";
  const bool sudden_death_host_recipe=input_recipe&&
@@ -3766,6 +3796,7 @@ int main(int argc,char** argv){try{
  if(input_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
     !sound_settings_recipe&&!sudden_death_host_recipe&&!sudden_death_world_recipe&&
+    !sd_menu_setup_recipe&&
     !stadium_c1a_recipe&&
     !stadium_c1_context_preflight_recipe&&
     !stadium_c1_item_state_preflight_recipe&&!stadium_screen_roots_recipe&&
@@ -3778,7 +3809,7 @@ int main(int argc,char** argv){try{
  if(!v10_css_replay_start_recipe&&argc==8)
    throw std::runtime_error("Only the MWRC v10 CSS replay-start reducer accepts an exact recipe path");
  if((retail_fd_recipe||results_mario_recipe||sudden_death_host_recipe||
-     sudden_death_world_recipe||
+     sudden_death_world_recipe||sd_menu_setup_recipe||
      v10_css_replay_start_recipe)&&
     stage_kind!=St_Kind_Last)
    throw std::runtime_error("Explicit FD recipes require Final Destination");
@@ -3790,7 +3821,7 @@ int main(int argc,char** argv){try{
  TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
  std::vector<std::string> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"};
- if(sudden_death_host_recipe||sudden_death_world_recipe||stadium_c1a_recipe||
+ if(sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe||stadium_c1a_recipe||
     stadium_c1_context_preflight_recipe||
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
@@ -3861,7 +3892,7 @@ int main(int argc,char** argv){try{
   std::cout<<"Native Main Settings Sound source route passed; no browser or retail-route claim\n";
   return 0;
  }
- const unsigned cycle_count=(results_mario_recipe||sudden_death_host_recipe||sudden_death_world_recipe)?1:2;
+ const unsigned cycle_count=(results_mario_recipe||sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe)?1:2;
  for(unsigned cycle=0;cycle<cycle_count;cycle++){
   trace.begin_run(cycle);
   if((retail_fd_recipe||results_mario_recipe)&&cycle==0)*seed_ptr=1840631306u;
@@ -4013,6 +4044,25 @@ int main(int argc,char** argv){try{
   raw_selection.random_seed=selection_rng;
   trace.event("sss_exit_complete",world->audio(),"match",&raw_selection,&selection_rng);
   world->close();world.reset();audio_phase=0;
+  if(sd_menu_setup_recipe){
+   check(melee_web_menu_host_input(host)!=nullptr,
+         "Closed SSS has no retained PAD bank");
+   melee_web_pad_state_apply(melee_web_menu_host_input(host));
+   uint8_t pad[MELEE_WEB_PAD_STATE_BYTES];melee_web_pad_state_capture(pad);
+   trace.menu_selection(raw_start,selection,pad);
+   check(!melee_web_gameplay_generation()&&!melee_web_gameplay_world_exists(),
+         "Menu-only setup retained a world after closed SSS");
+   check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);host=nullptr;
+   check(melee_web_vs_mode_begin(),"Menu-only host cleanup leaked VS lease");
+   check(melee_web_vs_mode_end(),"Menu-only reacquired VS lease did not close");
+   const auto retained=melee_web_gameplay_allocation();
+   check(retained.identity==session_allocation.identity&&
+         retained.generation==session_allocation.generation&&
+         retained.bytes==session_allocation.bytes,
+         "Menu-only teardown changed application arena identity");
+   trace.event("menu_setup_host_cleanup_complete",nullptr);
+   continue;
+  }
   if(sudden_death_host_recipe||sudden_death_world_recipe){
    if(sudden_death_world_recipe){
     check(selection.player_count==2&&selection.start.rules.stkind==St_Kind_Last&&
@@ -4372,7 +4422,12 @@ int main(int argc,char** argv){try{
         "Menu/match teardown replaced the application's retained source arena");
  }
  check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
- if(sudden_death_world_recipe){
+ if(sd_menu_setup_recipe){
+  check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
+  check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
+  trace.event("menu_setup_application_cleanup_complete",nullptr);
+  std::cout<<"Native closed CSS/SSS raw and normalized selection diagnostic with host/VS/application cleanup passed; no tie or SD world\n";
+ }else if(sudden_death_world_recipe){
   check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
   std::cout<<"Native actual SD lifecycle prefix and application session reacquisition passed; "
