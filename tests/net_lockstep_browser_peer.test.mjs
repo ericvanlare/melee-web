@@ -12,13 +12,20 @@ function deferred() {
   return {promise, resolve};
 }
 function harness({terminalFailure = false, confirmFailure = false, sourceTicks = 8,
-  readyGate = null, inputCapture = null} = {}) {
+  readyGate = null, inputCapture = null, dispose = null, endpointCloseGate = null,
+  endpointCloseStarted = null, endpointCloseFailure = null, cleanupOrder = []} = {}) {
   const sent = [], nativeRecords = [], frames = [], terminals = [], pending = new Set(), captureConfigs = [];
   let callbacks, confirmations = 0, pushFailure = false;
   const endpoint = {ready: Promise.resolve(), closed: false, errors: [], transport: {type: 'room-websocket'},
     send: async text => { sent.push(JSON.parse(text)); },
     async drainInbound() { while (pending.size) await Promise.all([...pending]); },
-    async close() { endpoint.closed = true; await callbacks.onDisconnect('alpha', 'closed'); },
+    async close() {
+      cleanupOrder.push('endpoint-close-start'); endpointCloseStarted?.resolve();
+      if (endpointCloseGate) await endpointCloseGate.promise;
+      endpoint.closed = true; await callbacks.onDisconnect('alpha', 'closed');
+      cleanupOrder.push('endpoint-close-end');
+      if (endpointCloseFailure) throw endpointCloseFailure;
+    },
   };
   const controller = createBrowserNativePeer({role: 'alpha', sourceTicks, inputTicks: sourceTicks - 2,
     inputCapture,
@@ -29,6 +36,7 @@ function harness({terminalFailure = false, confirmFailure = false, sourceTicks =
       terminate(...args) { terminals.push(args); if (terminalFailure) throw Error('terminal callback failure'); },
       status: () => ({cursor: nativeRecords.length}),
       drain: max => nativeRecords.splice(0, max),
+      dispose() { cleanupOrder.push('native-dispose'); return dispose?.(); },
     }}, {createEndpoint: options => { callbacks = options; return endpoint; }});
   async function deliver(packet) {
     const result = callbacks.onMessage(typeof packet === 'string' ? packet : JSON.stringify(packet));
@@ -47,7 +55,7 @@ function harness({terminalFailure = false, confirmFailure = false, sourceTicks =
     return Array.from(bytes);
   };
   return {controller, endpoint, sent, nativeRecords, frames, terminals, deliver, ready, record,
-    captureConfigs, setPushFailure(value) { pushFailure = value; },
+    captureConfigs, cleanupOrder, setPushFailure(value) { pushFailure = value; },
     get confirmations() { return confirmations; }};
 }
 
@@ -392,6 +400,28 @@ test('close joins a delayed inbound receive before returning', async () => {
   assert.equal(complete, true);
 });
 
+test('native adapter disposal joins endpoint teardown and aggregates both cleanup failures', async () => {
+  const gate = deferred(), started = deferred(), order = [];
+  const endpointFailure = Error('endpoint teardown failed');
+  const adapterFailure = Error('native adapter disposal failed');
+  const run = harness({endpointCloseGate: gate, endpointCloseStarted: started,
+    endpointCloseFailure: endpointFailure, cleanupOrder: order,
+    dispose() { throw adapterFailure; }});
+  let settled = false;
+  const closing = run.controller.close().finally(() => { settled = true; });
+  await started.promise;
+  assert.equal(settled, false, 'close must remain pending while endpoint work is open');
+  assert.equal(order.includes('native-dispose'), false, 'native scratch stays owned until endpoint teardown joins');
+  gate.resolve();
+  await assert.rejects(closing, error => {
+    assert.equal(error instanceof AggregateError, true);
+    assert(error.errors.includes(endpointFailure));
+    assert(error.errors.includes(adapterFailure));
+    return true;
+  });
+  assert.deepEqual(order, ['endpoint-close-start', 'endpoint-close-end', 'native-dispose']);
+});
+
 test('native start confirmation failure reaches the terminal and remains sticky', async () => {
   const run = harness({confirmFailure: true});
   await run.controller.rpc('start', [{build: 'same'}]);
@@ -435,7 +465,8 @@ test('settled snapshot and close join a receive blocked inside native confirmati
   assert.equal(closeDone, true);
 });
 
-const moduleNames = ['net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs', 'net_lockstep_websocket_relay.mjs'];
+const moduleNames = ['net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs',
+  'net_lockstep_native_adapter.mjs', 'net_lockstep_websocket_relay.mjs'];
 const webrtcModuleNames = [...moduleNames, 'net_lockstep_webrtc.mjs'];
 const roomSignaledWebRtcModuleNames = [...webrtcModuleNames, 'net_lockstep_webrtc_signaling.mjs'];
 const moduleBody = Buffer.from('module bytes');
@@ -456,7 +487,7 @@ test('peer module observer records exact loaded bytes while admitting catalog ru
   observer.observe(response('runtime-development.mjs'));
   for (const name of moduleNames) observer.observe(response(name));
   const rows = await observer.freeze();
-  assert.equal(rows.length, 3);
+  assert.equal(rows.length, 4);
   assert.ok(rows.every(row => row.sha256 === moduleHash && row.bytes === moduleBody.length));
 });
 
@@ -528,7 +559,7 @@ test('module observer fails sticky on bounded events and rechecks late imports a
   observer.observe(response('late-unexpected.mjs'));
   await assert.rejects(observer.freeze(), /Unexpected browser module import/);
   const bounded = moduleObserver();
-  for (let i = 0; i < 5; ++i) bounded.observe(response('runtime-development.mjs'));
+  for (let i = 0; i < 6; ++i) bounded.observe(response('runtime-development.mjs'));
   await assert.rejects(bounded.freeze(), /event bound exceeded/);
 });
 

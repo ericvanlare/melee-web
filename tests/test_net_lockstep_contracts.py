@@ -18,6 +18,7 @@ class NetLockstepContractTests(unittest.TestCase):
             str(ROOT / 'tests/net_lockstep_browser_disconnect_report.test.mjs'),
             str(ROOT / 'tests/net_lockstep_browser_publication.test.mjs'),
             str(ROOT / 'tests/net_source_accounting.test.mjs'),
+            str(ROOT / 'tests/net_lockstep_native_adapter.test.mjs'),
             str(ROOT / 'tests/net_lockstep_core.test.mjs'),
             str(ROOT / 'tests/net_lockstep_browser_peer.test.mjs'),
             str(ROOT / 'tests/net_lockstep_browser_pump.test.mjs'),

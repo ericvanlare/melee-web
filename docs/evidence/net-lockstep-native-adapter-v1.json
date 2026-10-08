@@ -1,0 +1,335 @@
+{
+  "schema": "melee-web-issue262-native-adapter-evidence-v1",
+  "date": "2026-10-07",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/262",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified"
+  ],
+  "scope": "Shared development-only browser ABI adapter for sequential A1 and indexed A3 native lockstep publication, bounded checksum draining, optional progress notification and joined disposal.",
+  "implementation_revision": "cf3e3b573c63209f4c6aafc2139621a85eab8b3d",
+  "source_tree": "03527f2dcd129e20518c5931141ca44ce4111fef",
+  "base_main": "5443482b3019e99e5797380e4f8b432027ff767e",
+  "changed_paths": [
+    "cmake/FighterRuntime.cmake",
+    "scripts/net_lockstep_browser.mjs",
+    "scripts/net_lockstep_browser_peer.mjs",
+    "scripts/net_lockstep_native_adapter.mjs",
+    "scripts/net_session_instance.mjs",
+    "tests/hitch_profile_test.mjs",
+    "tests/net_lockstep_browser_peer.test.mjs",
+    "tests/net_lockstep_native_adapter.test.mjs",
+    "tests/net_session_instance.test.mjs",
+    "tests/net_source_accounting.test.mjs",
+    "tests/test_net_lockstep_contracts.py",
+    "tests/test_web_launch.py",
+    "tools/browser_build_artifacts.json"
+  ],
+  "implementation": {
+    "module": "scripts/net_lockstep_native_adapter.mjs",
+    "owns": [
+      "native ABI scratch allocation",
+      "exact 44-byte frame and 64-byte record handling",
+      "fresh heap views around allocation/native calls",
+      "copied drain records",
+      "optional injected progress subscription",
+      "joined, idempotent disposal"
+    ],
+    "reuse": "A1 sequential push and A3 indexed push share the adapter; browser peer joins queued native work before disposal.",
+    "packaging": "Private ordinary runtime build copies net_lockstep_core.mjs and net_lockstep_native_adapter.mjs beside every openNetInstance consumer, and includes both in the exact 34-file runtime catalog.",
+    "safety_controls": [
+      "real WebAssembly.Memory.grow regression for detached HEAP-backed input",
+      "32-bit Wasm byte-size cap before allocation",
+      "ABI shape, tick/count/port and native result bounds",
+      "unsubscribe, stale callback and disposal failure controls"
+    ]
+  },
+  "review": {
+    "source_review": {
+      "name": "root-issue262-source-review-v1.json",
+      "bytes": 977,
+      "sha256": "6a37309926973880ce559a6709a46042e664b9a4d6cfb5cef4f999bbecbc2e9c",
+      "reviewed_revision": "173fd1f7baeff173632107451fbdf065dfd5d6d2",
+      "result": "source review pass after demonstrated memory-growth repair",
+      "scope": "Shared binary nativeadapter, A1/A3reuse, private runtime staging, progress/disposal ownership. Component tests only; dynamicbrowserimports/native integration pending."
+    },
+    "refreshed_release_review": {
+      "name": "root-release-validation-review-v1.json",
+      "bytes": 6548,
+      "sha256": "d8f09ba070995c9d454f4b69ab300a638c6d66e87626176d7dccc34dc66dee1c",
+      "result": "pass",
+      "source": "cf3e3b573c63209f4c6aafc2139621a85eab8b3d",
+      "tree": "03527f2dcd129e20518c5931141ca44ce4111fef",
+      "base": "5443482b3019e99e5797380e4f8b432027ff767e",
+      "adapter_patch_equal_across_refresh": true,
+      "patch_sha256": "59f1a167b6dadff6049888c9a0ddd173a61432029372e46ab1367696eca5f284"
+    }
+  },
+  "source_validation": {
+    "focused": {
+      "command": "node --test tests/net_lockstep_native_adapter.test.mjs tests/net_lockstep_browser_peer.test.mjs tests/net_session_instance.test.mjs tests/net_source_accounting.test.mjs",
+      "producer_head": "cf3e3b573c63209f4c6aafc2139621a85eab8b3d",
+      "producer_tree": "03527f2dcd129e20518c5931141ca44ce4111fef",
+      "result": "pass",
+      "tests": 55,
+      "skipped": 0,
+      "log": {
+        "name": "adapter-focused-current-main-v1.log",
+        "bytes": 13213,
+        "sha256": "fa7770b0ba1e284a9006895f75e387f4062b25aa0276813a542e6a66baf7d542"
+      }
+    },
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "producer_head": "acfaf4b2f8a4cb53c79bfca8d7d1771bc40773ce",
+      "producer_tree": "a5cacb3ff7d73b5f71c1b2eac2f35c30aca57153",
+      "result": "pass",
+      "tests": 2040,
+      "skipped": 152,
+      "failures": 0,
+      "note": "Ran before refreshing onto PR #264/current main 5443482; this result is attributed only to its recorded acfaf4b producer. Root verified the adapter patch was unchanged across refresh, and the focused suite was rerun on the refreshed source.",
+      "run_receipt": {
+        "name": "full-suite-result-v2.json",
+        "bytes": 992,
+        "sha256": "4fed2c1a5ddbba3bd2c0498f05d2a7533e28f849d99a5c1bd5dfd245e2a3684b"
+      },
+      "log": {
+        "name": "full-suite-v2.log",
+        "bytes": 374580,
+        "sha256": "9a2306123ce934fe87b075eb595f1bb348eb5b87bef820525b49d9dff0c46ccd"
+      }
+    },
+    "retained_failed_suite": {
+      "result": "failed",
+      "failure": "Stale 32-file frozen browser inventory assertion while the runtime catalog contained 34 files. Corrected assertion now requires 34 unique files and both shared modules.",
+      "log": {
+        "name": "full-suite-v1.log",
+        "bytes": 375715,
+        "sha256": "a682c0d477e0392609a5e919a1ccd0ef5ddfdb5634614bb8d90c7aa5ee272cf8"
+      }
+    }
+  },
+  "ordinary_release": {
+    "producer_head": "cf3e3b573c63209f4c6aafc2139621a85eab8b3d",
+    "producer_tree": "03527f2dcd129e20518c5931141ca44ce4111fef",
+    "configuration": "Release",
+    "native_target": "gameplay_menu_browser",
+    "result": "pass",
+    "exit_code": 0,
+    "runtime_artifact_count": 34,
+    "runtime_artifacts": [
+      {
+        "name": "gameplay_menu_browser.js",
+        "bytes": 300352,
+        "sha256": "902ec663d65468d9388bed0cd2ba79954d7f634fac3ac775b65e958b9caf7110"
+      },
+      {
+        "name": "gameplay_menu_browser.wasm",
+        "bytes": 15748425,
+        "sha256": "cc9f956cc91237fe3c551dceac727ce239b88cd3d269a41198c08450cdebf182"
+      },
+      {
+        "name": "gameplay_menu_browser.data",
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      {
+        "name": "runtime.html",
+        "bytes": 5205,
+        "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+      },
+      {
+        "name": "runtime-development.mjs",
+        "bytes": 60714,
+        "sha256": "258dde2991c34f06f89c2e5ec3800aa8a1fad185949f807d3c3f8412e93f0e24"
+      },
+      {
+        "name": "net-timing-pause.mjs",
+        "bytes": 1043,
+        "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"
+      },
+      {
+        "name": "melee-runtime.mjs",
+        "bytes": 50699,
+        "sha256": "0fdd584a8636e821eb08b2a3232ec05d7c3ce0c33e43e5e640a16e0809709013"
+      },
+      {
+        "name": "runtime-diagnostics.mjs",
+        "bytes": 85702,
+        "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+      },
+      {
+        "name": "runtime-diagnostics-delivery.mjs",
+        "bytes": 51514,
+        "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+      },
+      {
+        "name": "diagnostics-settings.mjs",
+        "bytes": 2876,
+        "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+      },
+      {
+        "name": "diagnostics-schema.mjs",
+        "bytes": 18780,
+        "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+      },
+      {
+        "name": "controller-input.mjs",
+        "bytes": 19263,
+        "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+      },
+      {
+        "name": "controller-panel.mjs",
+        "bytes": 36847,
+        "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+      },
+      {
+        "name": "controller-panel.css",
+        "bytes": 5240,
+        "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+      },
+      {
+        "name": "controller-settings.mjs",
+        "bytes": 18680,
+        "sha256": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f"
+      },
+      {
+        "name": "controller-settings.css",
+        "bytes": 3482,
+        "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+      },
+      {
+        "name": "touch-controls.mjs",
+        "bytes": 13954,
+        "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+      },
+      {
+        "name": "touch-controls.css",
+        "bytes": 6381,
+        "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+      },
+      {
+        "name": "prototype-keyboard-layouts.mjs",
+        "bytes": 935,
+        "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+      },
+      {
+        "name": "runtime-cache.js",
+        "bytes": 16143,
+        "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+      },
+      {
+        "name": "audio-worklet.js",
+        "bytes": 1517,
+        "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+      },
+      {
+        "name": "audio-ring.mjs",
+        "bytes": 2040,
+        "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+      },
+      {
+        "name": "disc-image.mjs",
+        "bytes": 15255,
+        "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+      },
+      {
+        "name": "disc-session.mjs",
+        "bytes": 7552,
+        "sha256": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2"
+      },
+      {
+        "name": "dsp-coefficients.mjs",
+        "bytes": 4043,
+        "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+      },
+      {
+        "name": "runtime-assets.mjs",
+        "bytes": 17029,
+        "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190"
+      },
+      {
+        "name": "runtime-audio-assets.mjs",
+        "bytes": 5451,
+        "sha256": "033bf0bd4caa6c744ebead3dd7091bec8496b5f8d2039d60a3cdf9d398a7f05c"
+      },
+      {
+        "name": "runtime-audio.mjs",
+        "bytes": 7660,
+        "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+      },
+      {
+        "name": "match-flow.mjs",
+        "bytes": 10679,
+        "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+      },
+      {
+        "name": "match-menu.mjs",
+        "bytes": 8566,
+        "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+      },
+      {
+        "name": "action-sweep.mjs",
+        "bytes": 18698,
+        "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+      },
+      {
+        "name": "hitch-capture.mjs",
+        "bytes": 21958,
+        "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+      },
+      {
+        "name": "net_lockstep_core.mjs",
+        "bytes": 25527,
+        "sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff"
+      },
+      {
+        "name": "net_lockstep_native_adapter.mjs",
+        "bytes": 8445,
+        "sha256": "4130dce6c6390506b66bfafebace3fe33ac561ce8a873d06956b619fa5f0686a"
+      }
+    ],
+    "optional_flags": [
+      "MELEE_WEB_AUDIO_PREVIEW_RUNTIME:BOOL=OFF",
+      "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC:BOOL=OFF",
+      "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC:BOOL=OFF",
+      "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE:BOOL=OFF",
+      "MELEE_WEB_PIPELINE_PROVENANCE:BOOL=OFF",
+      "MELEE_WEB_PUBLIC_RUNTIME:BOOL=OFF",
+      "MELEE_WEB_RESULTS_RENDERED_TRACE:BOOL=OFF",
+      "MELEE_WEB_SELECTIVE_PIPELINES:BOOL=OFF",
+      "MELEE_WEB_SLIPPI_PROFILE_BROWSER:BOOL=OFF",
+      "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC:BOOL=OFF"
+    ],
+    "cache_sha256": "fd0fbd5a610af974864da67d0fd8b17e7c3ee3a333bd8eeaf35b05b428025ce8",
+    "build_log": {
+      "name": "ordinary-release-build-v2.log",
+      "bytes": 12425,
+      "sha256": "ed91da774a21ddc698cf42369168ea8e229208442f9e4ea3ee01db570ad476d3"
+    },
+    "receipt": {
+      "name": "ordinary-release-build-receipt-v2.json",
+      "bytes": 9861,
+      "sha256": "6359fc61b780736c15a106447dcc2c3bfe9542518e122d7c1bfbee9dfd17874f"
+    },
+    "validation_scope": "Fresh ordinary Release compile/package on refreshed source. It does not establish browser runtime integration."
+  },
+  "browser_integration": {
+    "result": "pending review; no browser launched",
+    "packet_name": "launch-packet-v1.json",
+    "packet_sha256": "d62a905f6fe30230dd8fb96287d545d29dac4f7e09f54bdf5296c3d4c595218a",
+    "capture_output_empty": true,
+    "scope": "One bounded headless A3 native-pump run after exact packet review; eight source ticks, six recorded inputs and two neutral bootstrap ticks.",
+    "claim_limit": "No browser-exercised, product room/session integration, full-route or whole-session acceptance claim."
+  },
+  "not_claimed": [
+    "Public UI or deployment",
+    "Runtime-owned product session lifecycle",
+    "Physical or keyboard input",
+    "Full supported route or retail equivalence",
+    "Timing, latency, performance or foreground acceptance",
+    "Pixel or audio fidelity",
+    "Internet or two-machine multiplayer",
+    "A3 or full-session acceptance"
+  ]
+}

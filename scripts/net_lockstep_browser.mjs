@@ -755,7 +755,8 @@ async function run() {
     route_boundary_captures: [], route_boundary_misses: []};
   const openTimeout = Math.min(180000, deadline - Date.now());
   if (openTimeout <= 0) throw Error('No run deadline remains for browser startup');
-  const peerModuleNames = ['net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs', 'net_lockstep_websocket_relay.mjs',
+  const peerModuleNames = ['net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs',
+    'net_lockstep_native_adapter.mjs', 'net_lockstep_websocket_relay.mjs',
     ...(localWebRtc ? ['net_lockstep_webrtc.mjs'] : []),
     ...(roomWorkerSignaling ? ['net_lockstep_webrtc_signaling.mjs'] : [])];
   const peerModuleHashes = browserOwned ? Object.fromEntries(await Promise.all(peerModuleNames.map(async name =>
