@@ -139,8 +139,7 @@ static inline const MeleeWebStageContent* melee_web_stage_content_rows(size_t* c
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
         /* This row is visible only to source-profile hydration in the private
          * C1 diagnostic build. Ordinary stage-content lookup rejects it. */
-        { St_Kind_PStadium, Gr_Kind_PStadium, "Pokémon Stadium", "GrPs.usd",
-          "pstadium.hps", 64, "pstadium.ssm", 1 },
+        { St_Kind_PStadium, Gr_Kind_PStadium, "Pokémon Stadium", "GrPs.usd", "pstadium.hps", 64, "pstadium.ssm", 1 },
 #endif
     };
     if (count) *count = sizeof(rows) / sizeof(rows[0]);
