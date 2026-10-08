@@ -39,6 +39,12 @@ static const HitCapsule* candidate_hit;
 static const HurtCapsule* geometry_hurt;
 static uint32_t geometry_before[18], geometry_matrix[12], geometry_arguments[3];
 static int geometry_matrix_present, geometry_mode, geometry_cache_before;
+static uint32_t geometry_inner_endpoints[12], geometry_inner_matrix[12];
+static uint32_t geometry_inner_arguments[3], geometry_outer_offsets[6];
+static uintptr_t geometry_bone_identity;
+static unsigned geometry_inner_calls;
+static int geometry_hurt_state, geometry_hit_radius_direct, geometry_bone_idx;
+static int geometry_bone_present, geometry_inner_matrix_present;
 
 
 static uint32_t bits(float value)
@@ -111,7 +117,7 @@ static void retain_overflow(void)
 {
     size_t used=0;
     put(line,sizeof(line),&used,
-        "{\"schema\":\"melee-web-hit-transition-probe\",\"version\":1,\"source_cursor\":%zu,"
+        "{\"schema\":\"melee-web-hit-transition-probe\",\"version\":2,\"source_cursor\":%zu,"
         "\"overflowed\":true,\"hook_counts\":[%u,%u,%u],\"events\":[",
         cursor,calls[0],calls[1],calls[2]);
     for(size_t i=0;i<count;++i)put(line,sizeof(line),&used,"%s%s",i?",":"",rows[i]);
@@ -332,6 +338,12 @@ unsigned melee_web_hit_probe_geometry_begin(const HitCapsule* hit,const HurtCaps
         if(hurt==&receiver->hurt_capsules[i].capsule)hurt_index=(int)i;
     if(hurt_index<0)abort();
     geometry_hurt=hurt;geometry_open=++geometries;
+    geometry_inner_calls=0;geometry_inner_matrix_present=0;
+    geometry_hurt_state=hurt->state;geometry_hit_radius_direct=hit->x43_b1;
+    geometry_bone_identity=(uintptr_t)hurt->bone;geometry_bone_present=hurt->bone!=NULL;
+    geometry_bone_idx=hurt->bone_idx;
+    vec_bits(geometry_outer_offsets,&hurt->a_offset);
+    vec_bits(geometry_outer_offsets+3,&hurt->b_offset);
     vec_bits(geometry_before, &hit->x58);vec_bits(geometry_before+3,&hit->x4C);
     vec_bits(geometry_before+6,&hurt->a_pos);vec_bits(geometry_before+9,&hurt->b_pos);
     vec_bits(geometry_before+12,&hit->hurt_coll_pos);
@@ -344,10 +356,35 @@ unsigned melee_web_hit_probe_geometry_begin(const HitCapsule* hit,const HurtCaps
     geometry_arguments[1]=bits(receiver_scale);geometry_arguments[2]=bits(z);
     return geometry_open;
 }
+void melee_web_hit_probe_geometry_inner(const void* hit_start,const void* hit_end,
+    const void* hurt_start,const void* hurt_end,const void* matrix,float hit_radius,
+    float hurt_radius,float broadphase_scale)
+{
+    if(!geometry_open)return;
+    if(geometry_inner_calls++ || !hit_start || !hit_end || !hurt_start || !hurt_end)abort();
+    vec_bits(geometry_inner_endpoints,(const Vec3*)hit_start);
+    vec_bits(geometry_inner_endpoints+3,(const Vec3*)hit_end);
+    vec_bits(geometry_inner_endpoints+6,(const Vec3*)hurt_start);
+    vec_bits(geometry_inner_endpoints+9,(const Vec3*)hurt_end);
+    geometry_inner_matrix_present=matrix!=NULL;
+    if(matrix)memcpy(geometry_inner_matrix,matrix,sizeof(geometry_inner_matrix));
+    else memset(geometry_inner_matrix,0,sizeof(geometry_inner_matrix));
+    geometry_inner_arguments[0]=bits(hit_radius);
+    geometry_inner_arguments[1]=bits(hurt_radius);
+    geometry_inner_arguments[2]=bits(broadphase_scale);
+}
 void melee_web_hit_probe_geometry_end(unsigned geometry,int result)
 {
     if(!geometry)return;
     if(geometry!=geometry_open||!pair_open||producer_open)abort();
+    const char* inner_skip_reason=NULL;
+    if(geometry_inner_calls==0) {
+        if(geometry_hurt_state==HurtCapsule_Intangible)inner_skip_reason="intangible";
+        else if(geometry_mode!=0)inner_skip_reason="mode_nonzero";
+        else abort();
+    } else if(geometry_inner_calls!=1||geometry_hurt_state==HurtCapsule_Intangible||geometry_mode!=0) {
+        abort();
+    }
     uint32_t after[10];vec_bits(after,&geometry_hurt->a_pos);vec_bits(after+3,&geometry_hurt->b_pos);
     vec_bits(after+6,&candidate_hit->hurt_coll_pos);after[9]=bits(candidate_hit->coll_distance);
     size_t used;char* row=candidate_row("geometry",geometry,&used);
@@ -359,6 +396,29 @@ void melee_web_hit_probe_geometry_end(unsigned geometry,int result)
     bit_array(row,&used,"geometry_after",after,10);
     bit_array(row,&used,"arguments",geometry_arguments,3);
     bit_array(row,&used,"matrix_bits",geometry_matrix,12);
+    put(row,HIT_PROBE_ROW_BYTES,&used,
+        ",\"outer_hurt_state\":%d,\"hit_radius_direct\":%s,\"hurt_bone_present\":%s,\"hurt_bone_idx\":%d,"
+        "\"hurt_bone_pointer\":\"%016llx\"",
+        geometry_hurt_state,geometry_hit_radius_direct?"true":"false",
+        geometry_bone_present?"true":"false",geometry_bone_idx,
+        (unsigned long long)geometry_bone_identity);
+    bit_array(row,&used,"outer_offsets_bits",geometry_outer_offsets,6);
+    put(row,HIT_PROBE_ROW_BYTES,&used,
+        ",\"inner_call_count\":%u,\"inner_skip_reason\":",geometry_inner_calls);
+    if(geometry_inner_calls) {
+        put(row,HIT_PROBE_ROW_BYTES,&used,"null");
+        bit_array(row,&used,"inner_endpoints_bits",geometry_inner_endpoints,12);
+        put(row,HIT_PROBE_ROW_BYTES,&used,",\"inner_matrix_present\":%s",
+            geometry_inner_matrix_present?"true":"false");
+        if(geometry_inner_matrix_present)
+            bit_array(row,&used,"inner_matrix_bits",geometry_inner_matrix,12);
+        else put(row,HIT_PROBE_ROW_BYTES,&used,",\"inner_matrix_bits\":null");
+        bit_array(row,&used,"inner_effective_arguments_bits",geometry_inner_arguments,3);
+    } else {
+        put(row,HIT_PROBE_ROW_BYTES,&used,"\"%s\",\"inner_endpoints_bits\":null,"
+            "\"inner_matrix_present\":false,\"inner_matrix_bits\":null,"
+            "\"inner_effective_arguments_bits\":null",inner_skip_reason);
+    }
     put(row,HIT_PROBE_ROW_BYTES,&used,"}");geometry_open=0;geometry_result=result;geometry_consumed=0;
 }
 unsigned melee_web_hit_probe_producer_begin(Fighter* attacker,const HitCapsule* hit,
@@ -402,7 +462,7 @@ void melee_web_hit_probe_scheduler_return(void)
     put(row,HIT_PROBE_ROW_BYTES,&used,"}");
     used=0;
     put(line,sizeof(line),&used,
-        "{\"schema\":\"melee-web-hit-transition-probe\",\"version\":1,\"source_cursor\":%zu,"
+        "{\"schema\":\"melee-web-hit-transition-probe\",\"version\":2,\"source_cursor\":%zu,"
         "\"overflowed\":false,\"hook_counts\":[%u,%u,%u],\"events\":[",
         cursor,calls[0],calls[1],calls[2]);
     for(size_t i=0;i<count;++i)put(line,sizeof(line),&used,"%s%s",i?",":"",rows[i]);
@@ -433,6 +493,9 @@ unsigned melee_web_hit_probe_geometry_begin(const struct HitCapsule* a,const str
  const void* c,int d,float e,float f,float g)
 {(void)a;(void)b;(void)c;(void)d;(void)e;(void)f;(void)g;return 0;}
 void melee_web_hit_probe_geometry_end(unsigned a,int b){(void)a;(void)b;}
+void melee_web_hit_probe_geometry_inner(const void* a,const void* b,
+ const void* c,const void* d,const void* e,float f,float g,float h)
+{(void)a;(void)b;(void)c;(void)d;(void)e;(void)f;(void)g;(void)h;}
 unsigned melee_web_hit_probe_producer_begin(struct Fighter* a,const struct HitCapsule* b,
  struct Fighter* c,const void* d,size_t e,size_t f)
 {(void)a;(void)b;(void)c;(void)d;(void)e;(void)f;return 0;}

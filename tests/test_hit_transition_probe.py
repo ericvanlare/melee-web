@@ -4,10 +4,13 @@ These fixtures do not execute original gameplay, allocation, RNG draws or graphi
 Owned scratch is external and retained on a failing control.
 """
 import json
+import math
 import os
 from pathlib import Path
 import re
 import shutil
+import signal
+import struct
 import subprocess
 import tempfile
 import unittest
@@ -36,13 +39,15 @@ typedef struct HitVictim {void* victim;unsigned x4;} HitVictim;
 enum {HitCapsule_Disabled=0,HitCapsule_Enabled=1,HurtCapsule_Intangible=2,GA_Ground=0,GA_Air=1,HitElement_Catch=8,ftCo_MS_DamageIce=325};
 typedef struct HSD_GObj { void* user_data; } HSD_GObj;
 typedef struct Vec3 { float x,y,z; } Vec3;
+void HSD_MtxInverse(MtxPtr matrix,Mtx inverse);
+void PSMTXMultVec(Mtx matrix,Vec3* input,Vec3* output);
 enum { FTKIND_KOOPA=5, Gm_PKind_Cpu=1, Gm_PKind_NA=3 };
 typedef struct HitCapsule {
  int state; unsigned element,x4,unk_count; float damage,scale,coll_distance; Vec3 x58,x4C,hurt_coll_pos;
  HitVictim victims_2[12];HSD_GObj* owner;
  unsigned x42_b5,x40_b2,x40_b3,hit_grabbed_victim_only,x43_b2,x43_b1,x40_b0;
 } HitCapsule;
-typedef struct HurtCapsule { int state; unsigned skip_update_pos; Vec3 a_pos,b_pos,a_offset,b_offset;float scale;HSD_JObj* bone;} HurtCapsule;
+typedef struct HurtCapsule { int state; unsigned skip_update_pos; Vec3 a_pos,b_pos,a_offset,b_offset;float scale;HSD_JObj* bone;int bone_idx;} HurtCapsule;
 typedef struct FighterHurtCapsule {HurtCapsule capsule;} FighterHurtCapsule;
 typedef struct Fighter {
  HSD_GObj* gobj; unsigned player_id; int kind,motion_id,anim_id;
@@ -182,11 +187,196 @@ def _actual_function(source, signature):
         pos+=1
     return source[start:pos]+'\n'
 
-class HitCandidateSourceTest(unittest.TestCase):
-    """Actual patched routines; explicitly synthetic ABI and service implementations.
+def _serialized_event_sizes(line):
+    marker='"events":['
+    position=line.index(marker)+len(marker)
+    decoder=json.JSONDecoder()
+    sizes=[]
+    while line[position]!=']':
+        _,end=decoder.raw_decode(line,position)
+        sizes.append(len(line[position:end].encode('utf-8')))
+        position=end
+        if line[position]==',':position+=1
+        else:break
+    return sizes
 
-    The enabled/disabled selector runs compare full fixture state, private logs,
-    service call counts and order. This is not runtime/compiler-ABI validation.
+def _replace_source_once(source, old, new, label):
+    count=source.count(old)
+    if count!=1:raise RuntimeError(f'{label}: expected one source anchor, found {count}')
+    return source.replace(old,new,1)
+
+def _instrument_inner_geometry(inner):
+    """Add read-only snapshots after existing calculations and branches."""
+    source=inner
+    anchors=[
+        ('broadphase_radius = (hurt_radius * broadphase_scale) + hit_radius;',
+         'broadphase_radius = (hurt_radius * broadphase_scale) + hit_radius;\n    MELEE_TRACE_VALUE("broadphase_radius", broadphase_radius);'),
+        ('float bound = hit_start_copy.x + broadphase_radius;',
+         'float bound = hit_start_copy.x + broadphase_radius;\n        MELEE_TRACE_VALUE("x_upper_from_start", bound);'),
+        ('bound = hit_end_x - broadphase_radius;',
+         'bound = hit_end_x - broadphase_radius;\n        MELEE_TRACE_VALUE("x_lower_from_end", bound);'),
+        ('float bound = hit_start_copy.x - broadphase_radius;',
+         'float bound = hit_start_copy.x - broadphase_radius;\n        MELEE_TRACE_VALUE("x_lower_from_start", bound);'),
+        ('bound = hit_end_x + broadphase_radius;',
+         'bound = hit_end_x + broadphase_radius;\n        MELEE_TRACE_VALUE("x_upper_from_end", bound);'),
+        ('float bound = hit_start_y + broadphase_radius;',
+         'float bound = hit_start_y + broadphase_radius;\n        MELEE_TRACE_VALUE("y_upper_from_start", bound);'),
+        ('bound = hit_end->y - broadphase_radius;',
+         'bound = hit_end->y - broadphase_radius;\n        MELEE_TRACE_VALUE("y_lower_from_end", bound);'),
+        ('float bound = hit_start_y - broadphase_radius;',
+         'float bound = hit_start_y - broadphase_radius;\n        MELEE_TRACE_VALUE("y_lower_from_start", bound);'),
+        ('bound = hit_end->y + broadphase_radius;',
+         'bound = hit_end->y + broadphase_radius;\n        MELEE_TRACE_VALUE("y_upper_from_end", bound);'),
+        ('float bound = hit_start_z + broadphase_radius;',
+         'float bound = hit_start_z + broadphase_radius;\n        MELEE_TRACE_VALUE("z_upper_from_start", bound);'),
+        ('bound = hit_end->z - broadphase_radius;',
+         'bound = hit_end->z - broadphase_radius;\n        MELEE_TRACE_VALUE("z_lower_from_end", bound);'),
+        ('float bound = hit_start_z - broadphase_radius;',
+         'float bound = hit_start_z - broadphase_radius;\n        MELEE_TRACE_VALUE("z_lower_from_start", bound);'),
+        ('bound += broadphase_radius;',
+         'bound += broadphase_radius;\n        MELEE_TRACE_VALUE("z_upper_from_end", bound);'),
+        ('closest_denom = (hit_len_sq * hurt_len_sq) - (segment_dot * segment_dot);',
+         'closest_denom = (hit_len_sq * hurt_len_sq) - (segment_dot * segment_dot);\n'
+         '    MELEE_TRACE_VALUE("hit_len_sq", hit_len_sq);\n'
+         '    MELEE_TRACE_VALUE("hurt_len_sq", hurt_len_sq);\n'
+         '    MELEE_TRACE_VALUE("segment_dot", segment_dot);\n'
+         '    MELEE_TRACE_VALUE("hit_start_dot", hit_start_dot);\n'
+         '    MELEE_TRACE_VALUE("hurt_start_dot", hurt_start_dot);\n'
+         '    MELEE_TRACE_VALUE("closest_denom", closest_denom);'),
+        ('if (approximatelyZero(hurt_len_sq)) {',
+         'if (approximatelyZero(hurt_len_sq)) {\n'
+         '        MELEE_TRACE_EVENT("solver_zero_hurt_length");'),
+        ('    } else {\n        if (approximatelyZero(closest_denom)) {',
+         '    } else {\n        MELEE_TRACE_EVENT("solver_nonzero_hurt_length");\n'
+         '        if (approximatelyZero(closest_denom)) {\n'
+         '            MELEE_TRACE_EVENT("solver_parallel_axes");'),
+        ('        } else {\n            hit_param = ((segment_dot * hurt_start_dot) -',
+         '        } else {\n            MELEE_TRACE_EVENT("solver_nonparallel_axes");\n'
+         '            hit_param = ((segment_dot * hurt_start_dot) -'),
+        ('    hit_closest->x = (hit_delta.x * hit_param) + hit_start_copy.x;',
+         '    MELEE_TRACE_VALUE("hit_param", hit_param);\n'
+         '    MELEE_TRACE_VALUE("hurt_param", hurt_param);\n'
+         '    hit_closest->x = (hit_delta.x * hit_param) + hit_start_copy.x;'),
+        ('    axis.x = sqrtf(closest_dist_sq);',
+         '    axis.x = sqrtf(closest_dist_sq);\n'
+         '    MELEE_TRACE_VALUE("closest_dist_sq", closest_dist_sq);\n'
+         '    MELEE_TRACE_VALUE("axis_distance", axis.x);\n'
+         '    MELEE_TRACE_VEC("hit_closest", *hit_closest);\n'
+         '    MELEE_TRACE_VEC("hurt_closest", *hurt_closest);'),
+        ('    HSD_MtxInverse(hurt_mtx, inv_hurt_mtx);',
+         '    HSD_MtxInverse(hurt_mtx, inv_hurt_mtx);\n'
+         '    MELEE_TRACE_MTX("inverse_hurt_matrix", inv_hurt_mtx);'),
+        ('    PSMTXMultVec(inv_hurt_mtx, hit_closest, &hit_start_copy);',
+         '    PSMTXMultVec(inv_hurt_mtx, hit_closest, &hit_start_copy);\n'
+         '    MELEE_TRACE_VEC("hit_closest_local", hit_start_copy);'),
+        ('    PSMTXMultVec(inv_hurt_mtx, hurt_closest, &hit_delta);',
+         '    PSMTXMultVec(inv_hurt_mtx, hurt_closest, &hit_delta);\n'
+         '    MELEE_TRACE_VEC("hurt_closest_local", hit_delta);'),
+        ('    local_dist_sq = sqrtf(local_dist_sq);',
+         '    local_dist_sq = sqrtf(local_dist_sq);\n'
+         '    MELEE_TRACE_VALUE("local_distance", local_dist_sq);'),
+        ('    scaled_hurt_radius = (hurt_radius * axis.x) / local_dist_sq;',
+         '    scaled_hurt_radius = (hurt_radius * axis.x) / local_dist_sq;\n'
+         '    MELEE_TRACE_VALUE("scaled_hurt_radius", scaled_hurt_radius);'),
+        ('    contact_lerp = scaled_hurt_radius / axis.x;',
+         '    contact_lerp = scaled_hurt_radius / axis.x;\n'
+         '    MELEE_TRACE_VALUE("contact_lerp", contact_lerp);'),
+        ('    *out_overlap = allowed_distance - axis.x;',
+         '    *out_overlap = allowed_distance - axis.x;\n'
+         '    MELEE_TRACE_VALUE("allowed_distance", allowed_distance);\n'
+         '    MELEE_TRACE_VALUE("overlap", *out_overlap);'),
+        ('    if (allowed_distance < axis.x) {\n        return false;\n    }\n    return true;',
+         '    MELEE_TRACE_VEC("contact", *out_contact_pos);\n'
+         '    if (allowed_distance < axis.x) {\n'
+         '        MELEE_TRACE_EVENT("distance_reject");\n'
+         '        return false;\n'
+         '    }\n'
+         '    MELEE_TRACE_EVENT("distance_accept");\n'
+         '    return true;'),
+    ]
+    for old,new in anchors:source=_replace_source_once(source,old,new,old[:48])
+    aabb_end=source.index('    // Solve closest points between the two segment axes.')
+    aabb=source[:aabb_end]
+    tail=source[aabb_end:]
+    rejects=aabb.count('return false;')
+    if rejects!=12:raise RuntimeError(f'expected 12 ordered AABB exits, found {rejects}')
+    # Match original exits once; never search text containing inserted exits.
+    original_exits=list(re.finditer('return false;',aabb))
+    for index,match in reversed(list(enumerate(original_exits,1))):
+        replacement=f'MELEE_TRACE_REJECT({index}, bound);\n            return false;'
+        aabb=aabb[:match.start()]+replacement+aabb[match.end():]
+    return aabb+tail
+
+def _captured_geometry_by_key(rows):
+    return {
+        (row['source_cursor'],event['hit_index'],event['hurt_index']):event
+        for row in rows if row.get('source_cursor')==5239
+        for event in row['events'] if event['phase']=='geometry'}
+
+class InnerGeometryGeneratorTest(unittest.TestCase):
+    def test_adjacent_geometry_cannot_overwrite_selected_cursor(self):
+        events=[{'phase':'geometry','hit_index':0,'hurt_index':0,'marker':cursor}
+            for cursor in (5238,5239,5240)]
+        rows=[{'source_cursor':cursor,'events':[event]}
+            for cursor,event in zip((5238,5239,5240),events)]
+        self.assertEqual(_captured_geometry_by_key(rows),{(5239,0,0):events[1]})
+        self.assertEqual(_captured_geometry_by_key([rows[0],rows[2]]),{})
+
+    def test_each_original_return_has_one_ordered_tag(self):
+        lb=(ROOT/'.deps/melee/src/melee/lb/lbcollision.c').read_text()
+        inner=_actual_function(lb,'bool lbColl_80006E58(')
+        generated=_instrument_inner_geometry(inner)
+        boundary='    // Solve closest points between the two segment axes.'
+        original_aabb=inner.split(boundary,1)[0]
+        generated_aabb=generated.split(boundary,1)[0]
+        self.assertEqual(original_aabb.count('return false;'),12)
+        sites=re.findall(r'MELEE_TRACE_REJECT\((\d+), bound\);\s*return false;',
+            generated_aabb)
+        self.assertEqual(sites,[str(i) for i in range(1,13)])
+        self.assertEqual(generated_aabb.count('MELEE_TRACE_REJECT('),12)
+        self.assertEqual(generated_aabb.count('return false;'),12)
+        # Removing standalone diagnostic calls must recover every original
+        # token, including each comparison and return at its original site.
+        stripped=re.sub(r'^\s*MELEE_TRACE_\w+\([^\n]*\);\n','',generated,
+            flags=re.MULTILINE)
+        self.assertEqual(re.sub(r'\s+','',stripped),re.sub(r'\s+','',inner))
+
+def _capture_inner_geometry(capture_path):
+    selected=[]
+    with Path(capture_path).open() as source:
+        for line in source:
+            if not line.strip():continue
+            row=json.loads(line)
+            if row.get('source_cursor')!=5239:continue
+            for event in row.get('events',[]):
+                if event.get('phase')=='geometry':selected.append(event)
+    if len(selected)!=60:raise AssertionError(f'expected 60 geometry events, got {len(selected)}')
+    expected=[(hit,hurt) for hit in range(4) for hurt in range(15)]
+    if [(e.get('hit_index'),e.get('hurt_index')) for e in selected]!=expected:
+        raise AssertionError('captured geometry cursor order differs from authored 4x15 traversal')
+    records=[]
+    for event in selected:
+        endpoints=event.get('inner_endpoints_bits')
+        matrix=event.get('inner_matrix_bits')
+        arguments=event.get('inner_effective_arguments_bits')
+        if event.get('inner_call_count')!=1 or event.get('inner_matrix_present') is not True:
+            raise AssertionError('geometry event lacks exactly one captured actual inner call and matrix')
+        if not (len(endpoints)==12 and len(matrix)==12 and len(arguments)==3):
+            raise AssertionError('captured inner-call operand widths differ from the source signature')
+        bits=endpoints+matrix+arguments
+        if any(not re.fullmatch(r'[0-9a-f]{8}',value) for value in bits):
+            raise AssertionError('captured inner-call operand is not a raw 32-bit float word')
+        result=event.get('result')
+        if result not in (0,1):raise AssertionError(f'invalid captured result: {result!r}')
+        records.append((event['hit_index'],event['hurt_index'],result,bits))
+    return records
+
+class HitCandidateSourceTest(unittest.TestCase):
+    """Patched routine controls plus an isolated captured-inner geometry reducer.
+
+    Selector controls still use explicit synthetic services. The offline reducer
+    has a separate fixture that uses the actual extracted matrix and math bodies.
+    Neither path is runtime/compiler-ABI validation.
     """
     @classmethod
     def setUpClass(cls):
@@ -202,6 +392,7 @@ class HitCandidateSourceTest(unittest.TestCase):
         if applied.returncode:raise RuntimeError('Actual patch application failed; retained '+str(cls.scratch))
         ft=(source_root/'src/melee/ft/ftcoll.c').read_text()
         lb=(source_root/'src/melee/lb/lbcollision.c').read_text()
+        lb_header=(ROOT/'.deps/melee/src/melee/lb/lbcollision.h').read_text()
         header=HEADERS+r"""
 typedef unsigned char u8;typedef int s32;typedef unsigned u32;typedef int FighterKind;typedef int HitCapsuleState;typedef void* UNK_T;
 typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;void *unk_anim0,*hurt1;Vec3 pos;int size_of_xC;float x20;} DmgLogEntry;
@@ -212,6 +403,11 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
             'static inline bool inlineB2(', 'static inline float inlineB3(', 'bool ftColl_80076ED8(')
         bodies='static DmgLogEntry dmg_log0[20];\nstruct DmgLogEntry dmg_log1[20];\nstatic int dmg_log0_idx;\nstatic int dmg_log1_idx;\n'
         bodies+='\n'.join(_actual_function(ft,x) for x in signatures)
+        bodies+=_actual_function(lb_header,'static inline bool approximatelyZero(')
+        bodies+=_actual_function(lb,'float lbColl_80005EBC(')
+        inner=_actual_function(lb,'bool lbColl_80006E58(')
+        inner=inner.replace('bool lbColl_80006E58(','static bool melee_web_actual_inner_body(',1)
+        bodies+=inner
         bodies+=_actual_function(lb,'bool lbColl_8000805C(')
         # Exact admission predicate from the verified whole normal-hurt owner.
         owner=_actual_function(ft,'void ftColl_80078C70(')
@@ -227,19 +423,121 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
         bodies+='\nstatic int actual_admission(Fighter* this_fp,Fighter* victim_fp,HitCapsule* temp_r23,HSD_GObj* this_gobj) {return '+predicate+';}\n'
 
         (cls.scratch/'candidate_source_bodies.inc').write_text(bodies)
+        hook_call=('    melee_web_hit_probe_geometry_inner(hit_start, hit_end, hurt_start, hurt_end,\n'
+            '        hurt_mtx, hit_radius, hurt_radius, broadphase_scale);\n')
+        if bodies.count(hook_call)!=1:raise RuntimeError('Expected one extracted actual inner-helper hook')
+        offline_inner=_actual_function(lb,'bool lbColl_80006E58(')
+        if offline_inner.count(hook_call)!=1:raise RuntimeError('Offline extraction lost the actual inner-helper hook')
+        offline_inner=offline_inner.replace(hook_call,'')
+        offline_inner=offline_inner.replace('bool lbColl_80006E58(',
+            'static bool melee_web_offline_inner(',1)
+
+        hsd_mtx=(ROOT/'.deps/melee/src/sysdolphin/baselib/mtx.c').read_text()
+        epsilon_definitions=re.findall(r'^#define EPSILON [^\n]+$',hsd_mtx,re.MULTILINE)
+        if len(epsilon_definitions)!=1:raise RuntimeError('Expected unique HSD matrix EPSILON definition')
+        epsilon_definition=epsilon_definitions[0]+'\n'
+        hsd_mtx_header=(ROOT/'.deps/melee/src/sysdolphin/baselib/mtx.h').read_text()
+        dolphin_mtx=(ROOT/'.deps/melee/extern/dolphin/src/dolphin/mtx/mtx.c').read_text()
+        ps_math=(ROOT/'src/gameplay_ps_math.c').read_text()
+        offline_helpers='\n'.join((
+            _actual_function(lb_header,'static inline bool approximatelyZero('),
+            _actual_function(lb,'float lbColl_80005EBC('),
+            _actual_function(dolphin_mtx,'void C_MTXIdentity('),
+            _actual_function(dolphin_mtx,'void C_MTXCopy('),
+            _actual_function(hsd_mtx_header,'static inline f32 fabsf_bitwise('),
+            _actual_function(hsd_mtx,'static inline f32 HSD_CalcDeterminantMatrix3x4('),
+            _actual_function(hsd_mtx,'void HSD_MtxInverse('),
+            _actual_function(ps_math,'void melee_web_ps_mtx_mult_vec('),
+        ))
+        offline_plain=offline_helpers+'\n'+offline_inner+'\n'
+
+        inverse_instrumented=_actual_function(hsd_mtx,'void HSD_MtxInverse(')
+        inverse_instrumented=_replace_source_once(inverse_instrumented,
+            'f32 det = HSD_CalcDeterminantMatrix3x4(src);',
+            'f32 det = HSD_CalcDeterminantMatrix3x4(src);\n'
+            '    MELEE_TRACE_VALUE("inverse_determinant", det);',
+            'inverse determinant')
+        inverse_instrumented=_replace_source_once(inverse_instrumented,
+            'if (fabsf_bitwise(det) < EPSILON) {',
+            'if (fabsf_bitwise(det) < EPSILON) {\n'
+            '        MELEE_TRACE_EVENT("inverse_singular_fallback");',
+            'inverse fallback branch')
+        inverse_instrumented=_replace_source_once(inverse_instrumented,
+            'det = 1.0f / det;',
+            'det = 1.0f / det;\n'
+            '    MELEE_TRACE_VALUE("inverse_reciprocal_determinant", det);',
+            'inverse reciprocal determinant')
+        inverse_close=inverse_instrumented.rfind('}')
+        inverse_instrumented=(inverse_instrumented[:inverse_close]+
+            '    MELEE_TRACE_MTX("inverse_result", dest);\n'+inverse_instrumented[inverse_close:])
+
+        multvec_instrumented=_actual_function(ps_math,'void melee_web_ps_mtx_mult_vec(')
+        multvec_instrumented=_replace_source_once(multvec_instrumented,
+            'float even = fmaf(m[row][2], z, m[row][0] * x);',
+            'float even = fmaf(m[row][2], z, m[row][0] * x);\n'
+            '        MELEE_TRACE_VALUE("mult_vec_even", even);',
+            'mult-vector even lane')
+        multvec_instrumented=_replace_source_once(multvec_instrumented,
+            'float odd = fmaf(m[row][3], 1.0f, m[row][1] * y);',
+            'float odd = fmaf(m[row][3], 1.0f, m[row][1] * y);\n'
+            '        MELEE_TRACE_VALUE("mult_vec_odd", odd);',
+            'mult-vector odd lane')
+        multvec_instrumented=_replace_source_once(multvec_instrumented,
+            'result[row] = even + odd;',
+            'result[row] = even + odd;\n'
+            '        MELEE_TRACE_VALUE("mult_vec_result", result[row]);',
+            'mult-vector result')
+        offline_instrumented='\n'.join((
+            _actual_function(lb_header,'static inline bool approximatelyZero('),
+            _actual_function(lb,'float lbColl_80005EBC('),
+            _actual_function(dolphin_mtx,'void C_MTXIdentity('),
+            _actual_function(dolphin_mtx,'void C_MTXCopy('),
+            _actual_function(hsd_mtx_header,'static inline f32 fabsf_bitwise('),
+            _actual_function(hsd_mtx,'static inline f32 HSD_CalcDeterminantMatrix3x4('),
+            inverse_instrumented,
+            multvec_instrumented,
+            _instrument_inner_geometry(offline_inner),
+        ))+'\n'
+        cls.offline_plain_dir=cls.scratch/'offline-unchanged'
+        cls.offline_plain_dir.mkdir()
+        (cls.offline_plain_dir/'offline_source_bodies.inc').write_text(
+            epsilon_definition+offline_plain)
+        cls.offline_instrumented_dir=cls.scratch/'offline-instrumented'
+        cls.offline_instrumented_dir.mkdir()
+        (cls.offline_instrumented_dir/'offline_source_bodies.inc').write_text(
+            epsilon_definition+offline_instrumented)
         cls.candidate_binary=cls.scratch/'actual-candidates'
         compiler=shutil.which('cc') or 'cc'
-        common=[compiler,'-std=c11','-Wall','-Wextra','-Werror','-ffp-contract=off',
-            '-I'+str(cls.scratch),'-I'+str(ROOT/'src')]
+        common=[compiler,'-std=c11','-Wall','-Wextra','-Werror','-ffp-contract=off']
         fixture=str(ROOT/'tests/native_hit_candidate_probe_fixture.c')
         identity=str(cls.scratch/'identity.c')
         probe=str(ROOT/'src/gameplay_hit_transition_probe.c')
-        def compile_fixture(binary,defines,sources,log_name):
-            result=subprocess.run(common+defines+sources+['-o',str(binary)],capture_output=True,text=True)
+        def compile_fixture(binary,defines,sources,log_name,include_dirs=None):
+            include_dirs=include_dirs or (cls.scratch,)
+            include_args=['-I'+str(directory) for directory in include_dirs]
+            result=subprocess.run(common+include_args+['-I'+str(ROOT/'src')]+defines+
+                sources+['-lm','-o',str(binary)],capture_output=True,text=True)
             log=result.stdout+result.stderr
             (cls.scratch/log_name).write_text(log)
             _retain_reducer_evidence(log_name,log,'')
             return result
+        cls.offline_plain_binary=cls.scratch/'offline-inner-unchanged'
+        built=compile_fixture(cls.offline_plain_binary,
+            ['-DMELEE_WEB_HIT_PROBE_OFFLINE_REDUCER=1'],[fixture],
+            'offline-inner-unchanged-compile.log',
+            (cls.offline_plain_dir,cls.scratch))
+        if built.returncode:raise _compile_failure(
+            'Unchanged offline inner-helper compile failed',built,cls.scratch,
+            'offline-inner-unchanged-compile.log')
+        cls.offline_instrumented_binary=cls.scratch/'offline-inner-instrumented'
+        built=compile_fixture(cls.offline_instrumented_binary,
+            ['-DMELEE_WEB_HIT_PROBE_OFFLINE_REDUCER=1',
+             '-DMELEE_WEB_HIT_PROBE_INSTRUMENTED=1'],[fixture],
+            'offline-inner-instrumented-compile.log',
+            (cls.offline_instrumented_dir,cls.scratch))
+        if built.returncode:raise _compile_failure(
+            'Instrumented offline inner-helper compile failed',built,cls.scratch,
+            'offline-inner-instrumented-compile.log')
         built=compile_fixture(cls.candidate_binary,
             ['-DMELEE_WEB_RNG_DRAW_OBSERVER=1','-DMELEE_WEB_HIT_PROBE_SYNTHETIC=1'],
             [probe,fixture,identity],'candidate-compile.log')
@@ -249,6 +547,27 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
         built=compile_fixture(cls.no_observer_binary,[],[probe,fixture,identity],'no-observer-compile.log')
         if built.returncode:raise _compile_failure(
             'No-observer comparison compile failed',built,cls.scratch,'no-observer-compile.log')
+        cls.missing_inner_dir=cls.scratch/'missing-inner-hook'
+        cls.missing_inner_dir.mkdir()
+        (cls.missing_inner_dir/'candidate_source_bodies.inc').write_text(bodies.replace(hook_call,''))
+        cls.missing_inner_binary=cls.scratch/'actual-candidates-missing-inner-hook'
+        built=compile_fixture(cls.missing_inner_binary,
+            ['-DMELEE_WEB_RNG_DRAW_OBSERVER=1','-DMELEE_WEB_HIT_PROBE_SYNTHETIC=1'],
+            [probe,fixture,identity],'missing-inner-compile.log',
+            (cls.missing_inner_dir,cls.scratch))
+        if built.returncode:raise _compile_failure(
+            'Missing-inner fail-closed variant compile failed',built,cls.scratch,'missing-inner-compile.log')
+        cls.duplicate_inner_dir=cls.scratch/'duplicate-inner-hook'
+        cls.duplicate_inner_dir.mkdir()
+        (cls.duplicate_inner_dir/'candidate_source_bodies.inc').write_text(
+            bodies.replace(hook_call,hook_call+hook_call))
+        cls.duplicate_inner_binary=cls.scratch/'actual-candidates-duplicate-inner-hook'
+        built=compile_fixture(cls.duplicate_inner_binary,
+            ['-DMELEE_WEB_RNG_DRAW_OBSERVER=1','-DMELEE_WEB_HIT_PROBE_SYNTHETIC=1'],
+            [probe,fixture,identity],'duplicate-inner-compile.log',
+            (cls.duplicate_inner_dir,cls.scratch))
+        if built.returncode:raise _compile_failure(
+            'Duplicate-inner fail-closed variant compile failed',built,cls.scratch,'duplicate-inner-compile.log')
         cls.adapter_binary=cls.scratch/'fixture-counting-adapter'
         built=compile_fixture(cls.adapter_binary,
             ['-DMELEE_WEB_RNG_DRAW_OBSERVER=1','-DMELEE_WEB_HIT_PROBE_SYNTHETIC=1',
@@ -290,6 +609,174 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
         (self.scratch/(label+'.stdout')).write_text(result.stdout)
         (self.scratch/(label+'.stderr')).write_text(result.stderr)
         return result
+    def test_offline_captured_inner_geometry(self):
+        capture=os.environ.get('MELEE_HIT_INNER_GEOMETRY_CAPTURE')
+        if not capture:self.skipTest('set MELEE_HIT_INNER_GEOMETRY_CAPTURE to a retained cursor-5239 capture')
+        records=_capture_inner_geometry(capture)
+        capture_path=Path(capture)
+        input_path=self.scratch/'inner-geometry-input.tsv'
+        with input_path.open('w') as output:
+            for hit,hurt,result,bits in records:
+                output.write(' '.join([str(5239),str(hit),str(hurt),str(result),*bits])+'\n')
+        evidence=os.environ.get('MELEE_HIT_REDUCER_EVIDENCE_DIR')
+        evidence_dir=Path(evidence) if evidence else None
+        if evidence_dir:
+            evidence_dir.mkdir(parents=True,exist_ok=True)
+            shutil.copy2(input_path,evidence_dir/'inner-geometry-input.tsv')
+            shutil.copy2(capture_path,evidence_dir/'capture-source.jsonl')
+            shutil.copy2(self.offline_plain_dir/'offline_source_bodies.inc',
+                evidence_dir/'offline-unchanged-source.inc')
+            shutil.copy2(self.offline_instrumented_dir/'offline_source_bodies.inc',
+                evidence_dir/'offline-instrumented-source.inc')
+            shutil.copy2(self.offline_plain_binary,evidence_dir/'offline-inner-unchanged')
+            shutil.copy2(self.offline_instrumented_binary,evidence_dir/'offline-inner-instrumented')
+        plain=subprocess.run([str(self.offline_plain_binary),str(input_path)],
+            capture_output=True,text=True)
+        instrumented=subprocess.run([str(self.offline_instrumented_binary),str(input_path)],
+            capture_output=True,text=True)
+        for label,result in (('unchanged',plain),('instrumented',instrumented)):
+            (self.scratch/f'inner-geometry-{label}.stdout').write_text(result.stdout)
+            (self.scratch/f'inner-geometry-{label}.stderr').write_text(result.stderr)
+            if evidence_dir:
+                (evidence_dir/f'inner-geometry-{label}.stdout').write_text(result.stdout)
+                (evidence_dir/f'inner-geometry-{label}.stderr').write_text(result.stderr)
+        self.assertEqual(plain.returncode,0,plain.stderr)
+        self.assertEqual(instrumented.returncode,0,instrumented.stderr)
+        plain_rows=[json.loads(line) for line in plain.stdout.splitlines()]
+        instrumented_rows=[json.loads(line) for line in instrumented.stdout.splitlines()]
+        self.assertEqual(len(plain_rows),60)
+        self.assertEqual(len(instrumented_rows),60)
+        expected_pairs=[(hit,hurt) for hit in range(4) for hurt in range(15)]
+        self.assertEqual([(row['hit_index'],row['hurt_index']) for row in plain_rows],expected_pairs)
+        self.assertEqual(plain_rows,instrumented_rows,
+            'instrumentation changed the source result or written outputs')
+        self.assertEqual([row['captured_result'] for row in plain_rows],[0]*60)
+        self.assertEqual([row['result'] for row in plain_rows],[row['captured_result'] for row in plain_rows],
+            'extracted source result differs from captured inner result')
+
+        sentinel='c640e400'
+        captured_events=_captured_geometry_by_key(
+            map(json.loads,capture_path.read_text().splitlines()))
+        expected_keys={(row['cursor'],row['hit_index'],row['hurt_index']) for row in instrumented_rows}
+        scalar_labels=set(('broadphase_radius hit_len_sq hurt_len_sq segment_dot '
+            'hit_start_dot hurt_start_dot closest_denom hit_param hurt_param closest_dist_sq '
+            'axis_distance inverse_determinant inverse_reciprocal_determinant local_distance '
+            'scaled_hurt_radius contact_lerp allowed_distance overlap mult_vec_even '
+            'mult_vec_odd mult_vec_result').split())
+        bound_labels={axis+'_'+suffix for axis in 'xyz' for suffix in
+            ('upper_from_start','lower_from_end','lower_from_start','upper_from_end')}
+        vector_labels={'hit_closest','hurt_closest','hit_closest_local','hurt_closest_local','contact'}
+        matrix_labels={'inverse_result','inverse_hurt_matrix'}
+        event_labels={'solver_zero_hurt_length','solver_nonzero_hurt_length',
+            'solver_parallel_axes','solver_nonparallel_axes','inverse_singular_fallback',
+            'distance_reject','distance_accept'}
+        widths={label:1 for label in scalar_labels|bound_labels|
+            {f'aabb_reject_{i:02d}' for i in range(1,13)}}
+        widths.update({label:3 for label in vector_labels})
+        widths.update({label:12 for label in matrix_labels})
+        widths.update({label:0 for label in event_labels})
+        trace_rows={}
+        for line in instrumented.stderr.splitlines():
+            fields=line.split()
+            if not fields or fields[0]!='TRACE':continue
+            _,cursor,hit,hurt,sequence,label,*values=fields
+            key=(int(cursor),int(hit),int(hurt))
+            self.assertIn(key,expected_keys,'trace refers to an unknown geometry record')
+            self.assertIn(label,widths,'unknown source trace label')
+            self.assertEqual(len(values),widths[label],f'trace operand width for {label}')
+            events=trace_rows.setdefault(key,[])
+            self.assertEqual(int(sequence),len(events),f'noncontiguous trace sequence for {key}')
+            for value in values:
+                self.assertRegex(value,r'^[0-9a-f]{8}$')
+                self.assertTrue(math.isfinite(struct.unpack('>f',bytes.fromhex(value))[0]),
+                    f'nonfinite trace operand for {key}: {label}')
+            events.append((label,values))
+        self.assertEqual(set(trace_rows),expected_keys)
+        min_gap=None;adjacent=0;fallbacks=0;aabb_rejects=0
+        for row in instrumented_rows:
+            key=(row['cursor'],row['hit_index'],row['hurt_index'])
+            events=trace_rows.get(key,[])
+            labels=[label for label,_ in events]
+            self.assertTrue(events,f'missing instrumented intermediate trace for {key}')
+            # Only the vector helper lane snapshots repeat: three rows for
+            # each of the two calls. All other labels denote one source site.
+            lane_labels={'mult_vec_even','mult_vec_odd','mult_vec_result'}
+            for label in set(labels)-lane_labels:
+                self.assertEqual(labels.count(label),1,f'duplicate trace label for {key}: {label}')
+            reject_labels=[label for label in labels if label.startswith('aabb_reject_') or label=='distance_reject']
+            self.assertEqual(len(reject_labels),1,f'expected exactly one reject tag for {key}')
+            self.assertIn('broadphase_radius',labels)
+            if 'distance_reject' in labels:
+                required={'hit_len_sq','hurt_len_sq','segment_dot','hit_start_dot',
+                    'hurt_start_dot','closest_denom','hit_param','hurt_param',
+                    'closest_dist_sq','axis_distance','hit_closest','hurt_closest',
+                    'inverse_determinant','inverse_reciprocal_determinant','inverse_result',
+                    'inverse_hurt_matrix','hit_closest_local','hurt_closest_local',
+                    'local_distance','scaled_hurt_radius','contact_lerp','allowed_distance',
+                    'overlap','contact','solver_nonzero_hurt_length','solver_parallel_axes'}
+                self.assertTrue(required.issubset(labels),f'missing solver trace labels for {key}: {required-set(labels)}')
+                for label in lane_labels:self.assertEqual(labels.count(label),6)
+            else:
+                self.assertRegex(reject_labels[0],r'^aabb_reject_(0[1-9]|1[0-2])$')
+                self.assertFalse(set(labels)&lane_labels)
+                reject_index=int(reject_labels[0].split('_')[-1])-1
+                reject_axis=reject_index//4
+                endpoint_bits=captured_events[key]['inner_endpoints_bits']
+                expected_bounds=[]
+                for axis in range(reject_axis+1):
+                    start=struct.unpack('>f',bytes.fromhex(endpoint_bits[axis]))[0]
+                    end=struct.unpack('>f',bytes.fromhex(endpoint_bits[3+axis]))[0]
+                    suffixes=('upper_from_start','lower_from_end') if start>end else ('lower_from_start','upper_from_end')
+                    count=2 if axis<reject_axis else reject_index%2+1
+                    expected_bounds.extend('xyz'[axis]+'_'+s for s in suffixes[:count])
+                self.assertEqual([label for label in labels if label in bound_labels],expected_bounds,
+                    f'missing or misplaced AABB operand snapshots for {key}')
+            aabb_rejects+=sum(label.startswith('aabb_reject_') for label in labels)
+            fallbacks+=labels.count('inverse_singular_fallback')
+            if row['result']==0 and 'distance_reject' in labels:
+                values={label:items[0] for label,items in events if items}
+                axis_bits=int(values['axis_distance'],16)
+                allowed_bits=int(values['allowed_distance'],16)
+                self.assertLess(allowed_bits,axis_bits,
+                    f'false result did not take the captured distance-reject branch: {key}')
+                gap=axis_bits-allowed_bits
+                min_gap=gap if min_gap is None else min(min_gap,gap)
+                adjacent+=int(allowed_bits+1==axis_bits)
+            for field in ('hit_closest','hurt_closest','contact'):
+                self.assertEqual(len(row[field]),3)
+            if 'distance_reject' in labels:
+                self.assertNotEqual(row['overlap'],sentinel)
+                self.assertTrue(all(bit!=sentinel for bit in row['contact']))
+                self.assertEqual(row['contact']+[row['overlap']],
+                    captured_events[key]['geometry_after'][6:10],
+                    f'solver written outputs differ from capture for {key}')
+            else:
+                self.assertTrue(any(label.startswith('aabb_reject_') for label in labels),
+                    f'false result had no observed reject branch: {key}')
+                self.assertEqual(row['overlap'],sentinel)
+                self.assertTrue(all(bit==sentinel for bit in row['contact']))
+
+        if evidence_dir:
+            summary={
+                'capture_sha256':__import__('hashlib').sha256(capture_path.read_bytes()).hexdigest(),
+                'capture_source_cursor':5239,
+                'geometry_records':len(records),
+                'captured_results':{'false':60},
+                'source_result_matches_captured':True,
+                'instrumented_result_and_output_bits_match_unchanged':True,
+                'distance_reject_records':sum(
+                    any(label=='distance_reject' for label,_ in trace_rows.get((5239,row['hit_index'],row['hurt_index']),[]))
+                    for row in instrumented_rows),
+                'aabb_reject_count':aabb_rejects,
+                'singular_matrix_fallback_count':fallbacks,
+                'minimum_positive_float_word_gap_axis_minus_allowed':min_gap,
+                'adjacent_positive_float_pairs':adjacent,
+                'diagnostic_limit':'host float sensitivity only; not PPC equivalence or causal attribution',
+                'matrix_closure':'extracted HSD_MtxInverse and determinant; matrix input is row-major captured bits',
+                'vector_closure':'extracted melee_web_ps_mtx_mult_vec with explicit fmaf; -ffp-contract=off',
+            }
+            (evidence_dir/'inner-geometry-reducer-summary.json').write_text(
+                json.dumps(summary,indent=2)+'\n')
     def test_authored_selector_off_completes_all_sixty_geometry_calls(self):
         observed=self.run_reducer_binary(self.candidate_binary,'authored_off','selector-off-observer')
         uninstrumented=self.run_reducer_binary(self.no_observer_binary,'authored_off','selector-off-no-observer')
@@ -333,6 +820,13 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
             self.assertEqual(re.fullmatch(r'[0-9a-f]{8}',event['hit_radius_bits']).group(0),event['hit_radius_bits'])
         geometries=[event for event in events if event['phase']=='geometry']
         self.assertEqual(len(geometries),60)
+        selected_line=next(line for line in result.stdout.splitlines() if '"source_cursor":5239' in line)
+        serialized_sizes=_serialized_event_sizes(selected_line)
+        max_serialized_bytes=max(serialized_sizes)
+        _retain_reducer_evidence('actual-helper-complete-76-max-row-bytes',
+            f'max_serialized_event_bytes={max_serialized_bytes}\nrow_capacity_bytes=2048\n', '')
+        self.assertEqual(len(serialized_sizes),76)
+        self.assertLess(max_serialized_bytes,2048)
         self.assertEqual([(event['hit_index'],event['hurt_index']) for event in geometries],
             [(hit,hurt) for hit in range(4) for hurt in range(15)])
         self.assertTrue(all(event['result']==0 for event in geometries))
@@ -345,8 +839,13 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
                 self.assertTrue(all(re.fullmatch(r'[0-9a-f]{8}',value) for value in event[field]))
             self.assertEqual(event['arguments'],['3f800000','3f800000','80000000'])
             self.assertEqual(event['matrix_bits'],['00000000']*12)
-            self.assertEqual(event['geometry_after'],['3f800000','00000000','00000000','00000000',
-                '40000000','00000000','40000000','40400000','40400000','40000000'])
+            hurt=event['hurt_index']
+            self.assertEqual(event['hurt_bone_idx'],hurt)
+            self.assertEqual(event['geometry_after'],[
+                struct.pack('>f',float(100+hurt)).hex(),
+                '00000000','00000000',
+                struct.pack('>f',float(101+hurt)).hex(),
+                '00000000','00000000','00000000','00000000','00000000','00000000'])
         self.assertEqual((geometries[-1]['hit_index'],geometries[-1]['hurt_index']),(3,14))
         self.assertRegex(result.stderr,r'geometry_calls=60 rows=76 enabled_state_hash=([0-9a-f]{16}) selector_off_state_hash=\1')
         validation=subprocess.run(['node','--input-type=module','-e',
@@ -372,6 +871,73 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
             cwd=ROOT,input=json.dumps(rows),capture_output=True,text=True)
         _retain_reducer_evidence('candidate-header-bound-controls',header_checks.stdout,header_checks.stderr)
         self.assertEqual(header_checks.returncode,0,header_checks.stderr)
+
+    def test_actual_inner_aabb_reject_observer_selector_controls(self):
+        observed=self.run_reducer_binary(self.candidate_binary,'aabb_reject',
+            'actual-inner-aabb-reject-observer')
+        uninstrumented=self.run_reducer_binary(self.no_observer_binary,'aabb_reject',
+            'actual-inner-aabb-reject-no-observer')
+        self.assertEqual(observed.returncode,0,observed.stderr)
+        self.assertEqual(uninstrumented.returncode,0,uninstrumented.stderr)
+        self.assertEqual(uninstrumented.stdout,'')
+        rows=[json.loads(line) for line in observed.stdout.splitlines()]
+        self.assertEqual([row['source_cursor'] for row in rows],[5238,5239,5240])
+        geometry=next(event for event in rows[1]['events'] if event['phase']=='geometry')
+        self.assertEqual(geometry['result'],0)
+        self.assertEqual(geometry['hurt_bone_idx'],0)
+        self.assertEqual(geometry['inner_call_count'],1)
+        self.assertTrue(geometry['inner_matrix_present'])
+        self.assertEqual(geometry['inner_matrix_bits'],[
+            '3f800000','00000000','00000000','00000000',
+            '00000000','3f800000','00000000','00000000',
+            '00000000','00000000','3f800000','00000000'])
+        self.assertEqual(geometry['inner_effective_arguments_bits'],
+            ['40000000','40400000','40400000'])
+        control=re.compile(
+            r'SOURCE_OBSERVATION_CONTROL result=0 log0=0 log1=0 calls=3 ordered=3 '
+            r'geometry_calls=1 matrix_getters=1 matrix_concats=0 inverse_calls=0 vector_calls=0 '
+            r'selector_off_state_hash=([0-9a-f]{16}) selected_state_hash=([0-9a-f]{16}) '
+            r'exact_state_writes=1')
+        observed_control=control.search(observed.stderr)
+        plain_control=control.search(uninstrumented.stderr)
+        self.assertIsNotNone(observed_control,observed.stderr)
+        self.assertIsNotNone(plain_control,uninstrumented.stderr)
+        self.assertEqual(observed_control.groups()[0],observed_control.groups()[1])
+        self.assertEqual(plain_control.groups()[0],plain_control.groups()[1])
+        self.assertEqual(observed_control.groups()[0],plain_control.groups()[0])
+        call_order='SOURCE_OBSERVATION_CALL_ORDER 5,1,3'
+        self.assertIn(call_order,observed.stderr)
+        self.assertIn(call_order,uninstrumented.stderr)
+    def test_actual_inner_remaining_observer_selector_controls(self):
+        for mode in ('zero_distance','nonzero_distance','cache','intangible','mode','matrix'):
+            with self.subTest(mode=mode):
+                observed=self.run_reducer_binary(self.candidate_binary,mode,
+                    'actual-inner-'+mode+'-observer')
+                uninstrumented=self.run_reducer_binary(self.no_observer_binary,mode,
+                    'actual-inner-'+mode+'-no-observer')
+                for result in (observed,uninstrumented):
+                    self.assertEqual(result.returncode,0,result.stderr)
+                    self.assertIn('exact_state_writes=1',result.stderr)
+                    hashes=re.search(r'selector_off_state_hash=([0-9a-f]{16}) '
+                        r'selected_state_hash=([0-9a-f]{16})',result.stderr)
+                    self.assertIsNotNone(hashes,result.stderr)
+                    self.assertEqual(hashes.group(1),hashes.group(2))
+                self.assertEqual(uninstrumented.stdout,'')
+                # The fixture asserts all Fighter/log writes, RNG and service
+                # counts/order exactly; compare its complete diagnostics across binaries.
+                self.assertEqual(observed.stderr,uninstrumented.stderr)
+                rows=[json.loads(line) for line in observed.stdout.splitlines()]
+                validated=subprocess.run(['node','--input-type=module','-e',
+                    "import {parseHitTransitionProbe,validateHitTransitionProbeRows} from './scripts/rng_draw_probe.mjs';"
+                    "let t='';for await(const c of process.stdin)t+=c;"
+                    "if(!validateHitTransitionProbeRows(JSON.parse(t).map(JSON.stringify),"
+                    "parseHitTransitionProbe('5238,5239,5240'),{observedCursor:5240}).complete)"
+                    "throw Error('incomplete actual inner control');"],
+                    cwd=ROOT,input=json.dumps(rows),capture_output=True,text=True)
+                _retain_reducer_evidence('actual-inner-'+mode+'-validation',
+                    validated.stdout,validated.stderr)
+                self.assertEqual(validated.returncode,0,validated.stderr)
+
     def test_authored_candidate_row_77_overflows_at_76_and_retains_all_rows(self):
         result=self.run_reducer_binary(self.candidate_binary,'candidate_overflow','actual-helper-row77-overflow')
         self.assertNotEqual(result.returncode,0,result.stderr)
@@ -470,27 +1036,97 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
         self.assertEqual([(event['hit_index'],event['result']) for event in returns],
             [(0,0),(1,0),(2,0),(3,1)])
     def test_actual_candidate_branches_and_state_equivalence(self):
-        for mode in ('normal','phantom','zero','wrong_pair','intangible','cache','mode','matrix','two_geometry','hurt15','zero_overlap','hit_disabled','catch','flag_zero','air_miss','grab_blocked','eligibility_blocked','phantom_existing','phantom_busy','phantom_invulnerable','normal_invulnerable','normal_armored'):
+        for mode in ('normal','phantom','zero','wrong_pair','intangible','cache','mode','matrix','two_geometry','hurt15','zero_overlap','aabb_reject','zero_distance','nonzero_distance','hit_disabled','catch','flag_zero','air_miss','grab_blocked','eligibility_blocked','phantom_existing','phantom_busy','phantom_invulnerable','normal_invulnerable','normal_armored'):
             with self.subTest(mode=mode):self.candidate_mode(mode)
+
+    def test_version2_records_actual_inner_call_and_explicit_outer_skips(self):
+        for mode in ('aabb_reject','zero_distance','nonzero_distance','cache','matrix'):
+            with self.subTest(mode=mode):
+                row=self.candidate_mode(mode)
+                geometry=next(event for event in row['events'] if event['phase']=='geometry')
+                self.assertEqual(geometry['inner_call_count'],1)
+                self.assertIsNone(geometry['inner_skip_reason'])
+                self.assertEqual(len(geometry['inner_endpoints_bits']),12)
+                self.assertEqual(len(geometry['inner_effective_arguments_bits']),3)
+                self.assertTrue(geometry['inner_matrix_present'])
+                self.assertEqual(len(geometry['inner_matrix_bits']),12)
+                diagnostic=(self.scratch/('candidate-'+mode+'.stderr')).read_text()
+                if mode in ('aabb_reject','zero_distance'):
+                    self.assertIn('inverse_calls=0 vector_calls=0',diagnostic)
+                if mode=='nonzero_distance':
+                    self.assertIn('inverse_calls=1 vector_calls=2',diagnostic)
+                if mode=='cache':self.assertTrue(geometry['cache_before'])
+        for mode,reason in (('intangible','intangible'),('mode','mode_nonzero')):
+            with self.subTest(skip=mode):
+                row=self.candidate_mode(mode)
+                geometry=next(event for event in row['events'] if event['phase']=='geometry')
+                self.assertEqual(geometry['inner_call_count'],0)
+                self.assertEqual(geometry['inner_skip_reason'],reason)
+                self.assertIsNone(geometry['inner_endpoints_bits'])
+                self.assertFalse(geometry['inner_matrix_present'])
+
+    def test_version2_inner_fields_reject_corrupted_artifacts(self):
+        self.candidate_mode('normal')
+        rows=[json.loads(line) for line in
+            (self.scratch/'candidate-normal.stdout').read_text().splitlines()]
+        result=subprocess.run(['node','--input-type=module','-e',
+            "import {parseHitTransitionProbe,validateHitTransitionProbeRows} from './scripts/rng_draw_probe.mjs';"
+            "let t='';for await(const c of process.stdin)t+=c;const base=JSON.parse(t);"
+            "const selection=parseHitTransitionProbe('5238,5239,5240');"
+            "const validate=r=>validateHitTransitionProbeRows(r.map(JSON.stringify),selection,{observedCursor:5240});"
+            "if(!validate(base).complete)throw Error('valid v2 actual rows rejected');"
+            "const changes=[r=>r.events.find(e=>e.phase==='geometry').inner_call_count=2,"
+            "r=>r.events.find(e=>e.phase==='geometry').inner_endpoints_bits.pop(),"
+            "r=>r.events.find(e=>e.phase==='geometry').hurt_bone_present=false,"
+            "r=>r.events.find(e=>e.phase==='geometry').inner_matrix_present=false,"
+            "r=>r.events.find(e=>e.phase==='geometry').hurt_bone_idx=2147483648];"
+            "for(const change of changes){const r=structuredClone(base);const before=JSON.stringify(r);change(r[1]);"
+            "if(JSON.stringify(r)===before)throw Error('corruption mutation did not change the actual row');let failed=false;"
+            "try{validate(r);}catch{failed=true;}"
+            "if(!failed)throw Error('corrupted v2 geometry artifact accepted');}"],
+            cwd=ROOT,input=json.dumps(rows),capture_output=True,text=True)
+        _retain_reducer_evidence('v2-corrupted-artifact-validation',result.stdout,result.stderr)
+        (self.scratch/'v2-corrupted-artifact-validation.log').write_text(result.stdout+result.stderr)
+        self.assertEqual(result.returncode,0,result.stderr)
+
+    def test_actual_inner_hook_missing_or_duplicate_fails_closed(self):
+        for binary,label in ((self.missing_inner_binary,'actual-helper-inner-hook-missing'),
+                             (self.duplicate_inner_binary,'actual-helper-inner-hook-duplicate')):
+            with self.subTest(label=label):
+                result=self.run_reducer_binary(binary,'normal',label)
+                self.assertEqual(result.returncode,-signal.SIGABRT,result.stderr)
+                rows=[json.loads(line) for line in result.stdout.splitlines()]
+                self.assertEqual([row['source_cursor'] for row in rows],[5238])
+                self.assertFalse(rows[0]['overflowed'])
+                self.assertEqual([event['phase'] for event in rows[0]['events']],
+                    ['scheduler_start','scheduler_return'])
+
     def test_candidate_completion_and_authored_bounds_fail_closed(self):
         for mode in ('hurt16','gap','missing_pair','missing_pass','missing_geometry','duplicate_geometry','duplicate_pair','duplicate_pair_return','overflow'):
             with self.subTest(mode=mode):self.candidate_mode(mode,False)
 
     def test_actual_rows_reject_corrupted_candidate_artifacts(self):
-        row=self.candidate_mode('normal')
-        # Actual C output is retained as the base; only one artifact field is corrupted per control.
+        self.candidate_mode('normal')
+        rows=[json.loads(line) for line in
+            (self.scratch/'candidate-normal.stdout').read_text().splitlines()]
+        # Accept the complete actual C output before corrupting one selected artifact field.
         result=subprocess.run(['node','--input-type=module','-e',
-            "import {validateHitTransitionProbeRows} from './scripts/rng_draw_probe.mjs';"
+            "import {parseHitTransitionProbe,validateHitTransitionProbeRows} from './scripts/rng_draw_probe.mjs';"
             "let t='';for await(const c of process.stdin)t+=c;const base=JSON.parse(t);"
+            "const selection=parseHitTransitionProbe('5238,5239,5240');"
+            "const validate=r=>validateHitTransitionProbeRows(r.map(JSON.stringify),selection,{observedCursor:5240});"
+            "if(!validate(base).complete)throw Error('valid actual candidate rows rejected');"
             "const changes=[r=>r.events.find(e=>e.phase==='pair_entry').hurt_length=16,"
             "r=>r.events.find(e=>e.phase==='geometry').geometry_before.pop(),"
             "r=>r.events.find(e=>e.phase==='producer_branch').branch=5,"
             "r=>r.events=r.events.filter(e=>e.phase!=='pair_return'),"
             "r=>r.candidate_pairs++];"
-            "for(const change of changes){const r=structuredClone(base);change(r);let failed=false;"
-            "try{validateHitTransitionProbeRows([JSON.stringify(r)],{selected:[5239]},{observedCursor:5239});}catch{failed=true;}"
+            "for(const change of changes){const r=structuredClone(base);const before=JSON.stringify(r);change(r[1]);"
+            "if(JSON.stringify(r)===before)throw Error('corruption mutation did not change the actual row');let failed=false;"
+            "try{validate(r);}catch{failed=true;}"
             "if(!failed)throw Error('corrupted artifact accepted');}"],
-            cwd=ROOT,input=json.dumps(row),capture_output=True,text=True)
+            cwd=ROOT,input=json.dumps(rows),capture_output=True,text=True)
+        _retain_reducer_evidence('corrupted-artifact-validation',result.stdout,result.stderr)
         (self.scratch/'corrupted-artifact-validation.log').write_text(result.stdout+result.stderr)
         self.assertEqual(result.returncode,0,result.stderr)
 
