@@ -73,6 +73,35 @@ class StadiumOnInitBoundaryTests(unittest.TestCase):
         self.assertGreater(buffer_retire, end.index("melee_web_ground_remove_unmapped(found)"))
         self.assertLess(buffer_retire, end.index("melee_web_ground_remove_camera("))
 
+    def test_source_journal_const_preflight_and_mutable_capture_failure(self):
+        generated = ROOT / "build/gameplay-source/src/melee/gr/grpstadium.c"
+        if not generated.is_file():
+            self.skipTest("The checked generated gameplay source tree is not prepared")
+        source = generated.read_text(encoding="utf-8")
+        signature = source[source.index("static int stadium_owner_capture_matches("):]
+        self.assertIn(
+            "static int stadium_owner_capture_matches(\n    const MeleeWebStadiumDisplayOwner* owner",
+            signature,
+        )
+        capture_matches = function_body(
+            source, "static int stadium_owner_capture_matches("
+        )
+        self.assertIn("stadium_owner_source_journal_matches(", capture_matches)
+        self.assertNotIn("stadium_owner_source_journal_validate(", capture_matches)
+        capture = function_body(
+            source, "int melee_web_stadium_display_owner_capture("
+        )
+        self.assertLess(
+            capture.index("stadium_owner_source_journal_validate("),
+            capture.index("stadium_owner_capture_matches("),
+        )
+        controls = function_body(
+            source, "int melee_web_stadium_source_journal_controls("
+        )
+        self.assertIn("stadium_owner_source_journal_matches(", controls)
+        self.assertIn("melee_web_stadium_display_owner_capture(", controls)
+        self.assertIn("owner.source_journal_failed", controls)
+
     def test_only_guarded_entry_selects_source_ordered_oninit_mode(self):
         source = (ROOT / "src/gameplay_stage_last.c").read_text(encoding="utf-8")
         declaration = source.index("#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)\nMeleeWebStageLast* melee_web_stage_begin_kind_on_init_diagnostic")
@@ -92,6 +121,21 @@ class StadiumOnInitBoundaryTests(unittest.TestCase):
         self.assertIn("melee_web_stage_last_stadium_source_journal_snapshot(", helper)
         self.assertIn("melee_web_stage_last_end(retained_stage_owner", helper)
         self.assertIn("std::_Exit(1)", helper)
+        failure_start = helper.index(
+            "if (retained_stage_owner != nullptr || returned_stage_owner != nullptr ||"
+        )
+        failure_report = helper[failure_start:]
+        failure_exit = failure_report.index("std::_Exit(1)")
+        self.assertLess(
+            failure_report.index("melee_web_stage_last_stadium_source_journal_snapshot("),
+            failure_report.index("failure_source_journal={"),
+        )
+        self.assertLess(failure_report.index("failure_source_journal={"), failure_exit)
+        self.assertIn("failure_journal.count", failure_report)
+        self.assertIn("failure_journal.failed", failure_report)
+        self.assertIn("failure_journal.overflowed", failure_report)
+        self.assertIn("stadium_source_event_kind_name(event.kind)", failure_report)
+        self.assertIn("!on_init_stage_end_succeeded", failure_report)
         self.assertIn("runtime_map_call_order_observed\\\":true", helper)
         self.assertIn("MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ", helper)
         self.assertNotIn("Stage_802251E8(St_Kind_PStadium, NULL);\n            check(melee_web_stage_last", helper)

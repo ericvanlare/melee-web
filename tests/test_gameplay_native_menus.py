@@ -536,7 +536,10 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
             cwd=ROOT, capture_output=True, text=True, timeout=30)
         self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-5000:])
         self.assertIn("Diagnostic Stadium profile/content gate", run.stdout)
-        self.assertIn("wrong-kind/output-owner refusal controls passed", run.stdout)
+        self.assertIn(
+            "C1 source OnInit refusal and synthetic event-journal controls passed; no source initialization invoked",
+            run.stdout,
+        )
         self.assertNotIn("OnInit lifetime", run.stdout)
 
     def test_stadium_source_oninit_one_shot(self):
@@ -615,7 +618,22 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         self.assertEqual(result["source_size_name"], "/GrPs.usd")
         self.assertEqual(result["typed_open_name"], "/GrPs.usd")
         self.assertEqual(result["authored_map_sequence"], [0, 1, 2, 5])
-        self.assertFalse(result["runtime_map_call_order_observed"])
+        self.assertTrue(result["runtime_map_call_order_observed"])
+        source_events = result["runtime_source_events"]
+        self.assertEqual(
+            [event["kind"] for event in source_events],
+            ["stage_e8", "stage_24c", "ground_0800", "stadium_on_init"] +
+            ["map_gobj"] * 4,
+        )
+        self.assertEqual([event["map_id"] for event in source_events[:4]],
+                         [None] * 4)
+        self.assertEqual([event["map_id"] for event in source_events[4:]],
+                         [0, 1, 2, 5])
+        self.assertTrue(all(event["gobj"] is None
+                            for event in source_events[:4]))
+        self.assertTrue(all(isinstance(event["gobj"], int) and
+                            event["gobj"] > 0
+                            for event in source_events[4:]))
         self.assertTrue(result["map_slots_match_owner_record"])
         self.assertGreater(result["map2_buffer_pointer"], 0)
         self.assertIn(result["map2_buffer_origin"],

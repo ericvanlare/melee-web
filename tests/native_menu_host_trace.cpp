@@ -2975,6 +2975,28 @@ void run_stadium_e8_request(
         if (retained_stage_owner != nullptr || returned_stage_owner != nullptr ||
             (perform_on_init && on_init_stage_end_succeeded &&
              !on_init_observation.cleanup_verified)) {
+            if (retained_stage_owner != nullptr &&
+                !on_init_stage_end_succeeded) {
+                MeleeWebStadiumSourceJournal failure_journal{};
+                if (melee_web_stage_last_stadium_source_journal_snapshot(
+                        retained_stage_owner, &failure_journal)) {
+                    std::cerr << "failure_source_journal={count="
+                              << failure_journal.count
+                              << ",failed=" << failure_journal.failed
+                              << ",overflowed=" << failure_journal.overflowed;
+                    for (size_t i = 0; i < failure_journal.count; ++i) {
+                        const auto& event = failure_journal.events[i];
+                        std::cerr << ",event[" << i << "]={kind="
+                                  << stadium_source_event_kind_name(event.kind)
+                                  << ",map_id=" << event.map_id
+                                  << ",gobj="
+                                  << static_cast<const void*>(event.gobj) << '}';
+                    }
+                    std::cerr << "}\n";
+                } else {
+                    std::cerr << "failure_source_journal=snapshot_unavailable\n";
+                }
+            }
             std::cerr << "C1 Stadium OnInit failed while its source owner graph must be retained; stage_owner="
                       << static_cast<const void*>(retained_stage_owner)
                       << " returned_owner="

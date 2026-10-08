@@ -5594,7 +5594,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..192404b5e89227bab1bb611994c81ba4
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..378273ba8e9b134647a5264c778fa9991d13fa05 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..08ed34e1324f43946e5537a4b2029a603d1b6c87 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,15 @@
@@ -5748,7 +5748,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..378273ba8e9b134647a5264c778fa999
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -920,6 +1000,2341 @@ typedef struct TextWrapper {
+@@ -920,6 +1000,2352 @@ typedef struct TextWrapper {
      HSD_Text* win_dynamic_p;
  } TextWrapper;
  
@@ -6597,7 +6597,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..378273ba8e9b134647a5264c778fa999
 +    static const u8 child_links[3] = { 0x13, 0x12, 0x12 };
 +    if (owner->source_journal_failed) return 0;
 +    if (owner->source_journal_armed &&
-+        !stadium_owner_source_journal_validate(
++        !stadium_owner_source_journal_matches(
 +            owner, stage_info.map_gobjs,
 +            ARRAY_SIZE(stage_info.map_gobjs)))
 +        return 0;
@@ -6667,6 +6667,12 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..378273ba8e9b134647a5264c778fa999
 +        return stadium_owner_error(error, error_size,
 +                                   "Stadium display owner cannot capture this OnInit boundary");
 +    owner->capture_attempted = 1;
++    if (owner->source_journal_armed &&
++        !stadium_owner_source_journal_validate(
++            owner, stage_info.map_gobjs,
++            ARRAY_SIZE(stage_info.map_gobjs)))
++        return stadium_owner_error(error, error_size,
++                                   "Original Stadium source-event journal did not match source StageInfo map slots");
 +    if (!stadium_owner_capture_matches(owner, display_ground))
 +        return stadium_owner_error(error, error_size,
 +                                   "Original Stadium display owner journal did not match source SIS and Ground state");
@@ -7790,9 +7796,14 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..378273ba8e9b134647a5264c778fa999
 +    memcpy(wrong_slots, slots, sizeof(slots));
 +    wrong_slots[1] = &wrong_map;
 +    if (owner.source_journal_failed) goto cleanup;
-+    if (stadium_owner_source_journal_validate(
++    MeleeWebStadiumMap2BufferOwner mismatched_capture = { 0 };
++    if (stadium_owner_source_journal_matches(
 +            &owner, wrong_slots, ARRAY_SIZE(wrong_slots)) ||
-+        !owner.source_journal_failed)
++        owner.source_journal_failed ||
++        melee_web_stadium_display_owner_capture(
++            &owner, NULL, &mismatched_capture, NULL, 0) ||
++        !owner.capture_attempted || !owner.source_journal_failed ||
++        mismatched_capture.captured)
 +        goto cleanup;
 +    success = 1;
 +
@@ -8090,7 +8101,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..378273ba8e9b134647a5264c778fa999
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
  {
-@@ -1185,22 +3600,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +3611,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -8132,7 +8143,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..378273ba8e9b134647a5264c778fa999
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +3648,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +3659,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -8154,7 +8165,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..378273ba8e9b134647a5264c778fa999
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +3670,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +3681,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
@@ -8177,7 +8188,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..378273ba8e9b134647a5264c778fa999
      wrapper->flag = false;
      return gobj;
  }
-@@ -1896,6 +4350,9 @@ bool grStadium_801D42B8(void)
+@@ -1896,6 +4361,9 @@ bool grStadium_801D42B8(void)
      if (gp->u.stadium.xC4_b1) {
          return false;
      }
@@ -8187,7 +8198,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..378273ba8e9b134647a5264c778fa999
      gp->u.stadium.xD0 =
          grDatFiles_801C6478(gp->u.stadium.xCC, gp->u.stadium.xC8);
      return true;
-@@ -2093,6 +4550,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2093,6 +4561,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
              gp = GET_GROUND(map_gobj);
              HSD_ASSERT(0x99B, gp);
              gp->u.stadium.xC4_b1 = true;
@@ -8197,7 +8208,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..378273ba8e9b134647a5264c778fa999
              lbFile_80016580(datfiles[var_r29], gp->u.stadium.xCC,
                              &gp->u.stadium.xC8, fn_801D4220, NULL);
              temp_r31->u.stadium.xDC = 1;
-@@ -2221,6 +4681,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2221,6 +4692,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
          if (temp_r31->u.stadium.xDE == 5) {
              temp_r31->u.stadium.xD8 =
                  randi_between_2(yakumono_param->x0, yakumono_param->x4);
