@@ -1053,9 +1053,12 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
         if not target.is_file():
             self.skipTest("Build the reviewed C1 cache/live reducer first")
+        off_flag = "--stadium-cache-live-controls=0"
+        on_flag = "--stadium-cache-live-controls=1"
+        self.assertEqual(len(off_flag), len(on_flag))
         commands = {
-            "off": [str(node_runtime()), str(target), "--stadium-cache-live-controls"],
-            "on": [str(node_runtime()), str(target), "--stadium-cache-live-controls-owner"],
+            "off": [str(node_runtime()), str(target), off_flag],
+            "on": [str(node_runtime()), str(target), on_flag],
         }
         (self.scratch / "cache-live-command.txt").write_text(
             "\n".join(f"{mode}: {' '.join(command)}"

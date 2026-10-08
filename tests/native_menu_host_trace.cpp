@@ -5310,10 +5310,14 @@ int main(int argc,char** argv){try{
    std::cout<<"C1 source OnInit refusal and synthetic event-journal controls passed; no Stadium stage initialization invoked\n";
    return 0;
   }
-  if(argc==2&&std::string_view(argv[1])=="--stadium-cache-live-controls"){
+  if (argc == 2 &&
+      (std::string_view(argv[1]) == "--stadium-cache-live-controls" ||
+       std::string_view(argv[1]) == "--stadium-cache-live-controls=0")) {
    run_stadium_cache_live_control(false);return 0;
   }
-  if(argc==2&&std::string_view(argv[1])=="--stadium-cache-live-controls-owner"){
+  if (argc == 2 &&
+      (std::string_view(argv[1]) == "--stadium-cache-live-controls-owner" ||
+       std::string_view(argv[1]) == "--stadium-cache-live-controls=1")) {
    run_stadium_cache_live_control(true);return 0;
   }
   if(argc==2&&std::string_view(argv[1])=="--stadium-map-light-adoption-controls"){
