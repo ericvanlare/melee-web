@@ -23,6 +23,8 @@ uint32_t melee_web_stadium_c1_stage_state_failures(void);
 /* Observe stage instances and published StageInfo roots while a diagnostic
  * typed map owner occupies the archive slots. */
 uint32_t melee_web_stadium_c1_stage_object_failures(void);
+/* The isolated exchange control requires a fresh source stage/GObj baseline. */
+int melee_web_stadium_c1_yakumono_exchange_baseline_empty(void);
 
 /* Keep the authored Ground/StageInfo layouts inside this C translation unit.
  * The native harness is C++ and these upstream declarations contain C-only
@@ -125,6 +127,13 @@ int melee_web_stadium_c1_stage_info_snapshot_view(
 int melee_web_stadium_c1_stage_info_current_view(
     MeleeWebStadiumC1StageInfoView* view);
 int melee_web_stadium_c1_stage_info_snapshot_restore(
+    MeleeWebStadiumC1StageInfoSnapshot* snapshot, char* error,
+    size_t error_size);
+int melee_web_stadium_c1_stage_info_snapshot_matches(
+    const MeleeWebStadiumC1StageInfoSnapshot* snapshot);
+/* Release an unmodified snapshot without writing it back. On mismatch, keep
+ * the active snapshot allocated so the unexpected state remains inspectable. */
+int melee_web_stadium_c1_stage_info_snapshot_release_unchanged(
     MeleeWebStadiumC1StageInfoSnapshot* snapshot, char* error,
     size_t error_size);
 int melee_web_stadium_c1_stage_info_snapshot_release(

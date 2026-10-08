@@ -62,7 +62,6 @@ extern "C" {
 #include <melee/mn/mnmain.h>
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include <melee/gr/grdatfiles.h>
-#include <melee/gr/ground.h>
 #include <melee/gr/stage.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/objalloc.h>
@@ -130,19 +129,17 @@ std::string stream_name(MeleeWebAudio* audio){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 void run_stadium_yakumono_exchange_control()
 {
-    check(stage_info.yakumono_param == nullptr &&
-              std::all_of(std::begin(stage_info.map_gobjs),
-                          std::end(stage_info.map_gobjs),
-                          [](const auto* gobj) { return gobj == nullptr; }) &&
-              std::all_of(std::begin(stage_info.x280),
-                          std::end(stage_info.x280),
-                          [](const auto* marker) { return marker == nullptr; }) &&
-              HSD_GObj_Entities == nullptr,
+    check(melee_web_stadium_c1_yakumono_exchange_baseline_empty() &&
+              melee_web_stadium_c1_stage_object_failures() ==
+                  MELEE_WEB_STADIUM_C1_STAGE_LIST_UNAVAILABLE,
           "Asset-free exchange control must start before source Ground/GObj construction");
-    std::array<unsigned char, sizeof(StageInfo)> stage_before{};
+    char snapshot_error[160]{};
+    MeleeWebStadiumC1StageInfoSnapshot* const stage_snapshot =
+        melee_web_stadium_c1_stage_info_snapshot_begin(
+            snapshot_error, sizeof(snapshot_error));
+    check(stage_snapshot != nullptr, snapshot_error);
     std::array<unsigned char, sizeof(HSD_GObjLibInitData)> init_before{};
     std::array<unsigned char, sizeof(HSD_GObj_804CE3E4)> dispatch_before{};
-    std::memcpy(stage_before.data(), &stage_info, sizeof(stage_info));
     std::memcpy(init_before.data(), &HSD_GObjLibInitData,
                 sizeof(HSD_GObjLibInitData));
     std::memcpy(dispatch_before.data(), &HSD_GObj_804CE3E4,
@@ -174,8 +171,11 @@ void run_stadium_yakumono_exchange_control()
     check(original == nullptr && previous_b == &a && previous_a == &b &&
               previous_restore == &a && previous_verify == nullptr,
           "Stadium yakumono exchange did not preserve NULL/A/B/A/NULL pointer ownership");
-    check(std::memcmp(stage_before.data(), &stage_info, sizeof(stage_info)) == 0,
-          "Stadium yakumono exchange changed source StageInfo");
+    check(melee_web_stadium_c1_stage_info_snapshot_matches(stage_snapshot),
+          "Stadium yakumono exchange changed byte-exact source StageInfo");
+    check(melee_web_stadium_c1_stage_object_failures() ==
+              MELEE_WEB_STADIUM_C1_STAGE_LIST_UNAVAILABLE,
+          "Stadium yakumono exchange changed source Stage/GObj owner state");
     check(HSD_GObj_Entities == entities_before &&
               HSD_GObj_804D7810 == funcs_before &&
               HSD_GObj_804D7814 == callback_a_before &&
@@ -195,6 +195,9 @@ void run_stadium_yakumono_exchange_control()
               std::memcmp(dispatch_before.data(), &HSD_GObj_804CE3E4,
                           sizeof(HSD_GObj_804CE3E4)) == 0,
           "Stadium yakumono exchange changed original GObj registry/dispatch state");
+    check(melee_web_stadium_c1_stage_info_snapshot_release_unchanged(
+              stage_snapshot, snapshot_error, sizeof(snapshot_error)),
+          snapshot_error);
     std::cout << "Stadium yakumono exchange asset-free control passed; pointer restored and "
                  "source StageInfo/GObj owner state unchanged\n";
 }
