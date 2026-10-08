@@ -15,7 +15,7 @@ class WholeSessionCaptureTests(unittest.TestCase):
             [str(node_runtime()), str(ROOT / 'tests/browser_artifact_inventory_test.mjs')],
             capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('Current 34-file inventory', result.stdout)
+        self.assertIn('Current allowlist inventory', result.stdout)
 
     def test_natural_pause_diagnostic_ownership_and_export_boundaries(self):
         result = subprocess.run(

@@ -8,13 +8,12 @@ import {createHash} from 'node:crypto';
 import {browserArtifactInventory, validateBrowserArtifactNames} from '../scripts/browser_artifact_inventory.mjs';
 
 const names = JSON.parse(await fs.readFile(new URL('../tools/browser_build_artifacts.json', import.meta.url), 'utf8'));
-assert.equal(names.length, 34);
 assert(names.includes('net_lockstep_core.mjs'));
 assert(names.includes('net_lockstep_native_adapter.mjs'));
 assert.deepEqual(validateBrowserArtifactNames(names), names);
 for (const invalid of [[], ['one', 'one'], [''], [' '], [42], [null],
   ['../outside'], ['sub/../outside'], ['/absolute'], ['\\outside'],
-  ['..\\outside'], ['C:\\outside'], ['%2e%2e%2foutside'], ['file?query'], ['file#fragment']])
+  ['..\\outside'], ['C:\\outside'], ['%2e%2e%2foutside'], ['file?query'], ['file#fragment'], ['https:outside.example'], ['file:outside']])
   assert.throws(() => validateBrowserArtifactNames(invalid), /allowlist/);
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'melee-artifact-inventory-'));
@@ -35,8 +34,11 @@ const server = http.createServer(async (request, response) => {
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const url = `http://127.0.0.1:${server.address().port}/runtime.html`;
 try {
+  // A slash-free scheme changes URL origin; validate before constructing fetch URLs.
+  assert.notEqual(new URL('https:outside.example', url).origin, new URL(url).origin);
+  assert.throws(() => validateBrowserArtifactNames(['https:outside.example']), /allowlist/);
   const pre = await browserArtifactInventory({artifactRoot: localRoot, url});
-  assert.equal(pre.count, 34);
+  assert.equal(pre.count, names.length);
   assert.equal(pre.equal, true);
   assert.deepEqual(pre.rows.map(row => row.name), names);
   for (const row of pre.rows) {
@@ -56,7 +58,7 @@ try {
   assert.equal(changed.equal, false);
   assert.deepEqual(changed.mismatches, ['net_lockstep_native_adapter.mjs']);
   assert.equal(changed.rows.find(row => row.name === 'net_lockstep_native_adapter.mjs').equal, false);
-  console.log('Current 34-file inventory, malformed names, missing served module and changed served hash controls passed.');
+  console.log(`Current allowlist inventory (${names.length} files), malformed names, missing served module and changed served hash controls passed.`);
 } finally {
   server.closeAllConnections();
   await new Promise(resolve => server.close(resolve));

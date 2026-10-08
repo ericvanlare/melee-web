@@ -9,7 +9,7 @@ const inventoryFile = new URL('../tools/browser_build_artifacts.json', import.me
 export function validateBrowserArtifactNames(names) {
   if (!Array.isArray(names) || names.length === 0 ||
       names.some(name => typeof name !== 'string' || !name || name !== name.trim() ||
-        name === '.' || name === '..' || /[?#%]/.test(name) || path.posix.basename(name) !== name ||
+        name === '.' || name === '..' || /[:?#%]/.test(name) || path.posix.basename(name) !== name ||
         path.win32.basename(name) !== name || path.posix.isAbsolute(name) ||
         path.win32.isAbsolute(name)) || new Set(names).size !== names.length)
     throw Error('The committed browser artifact allowlist requires nonempty unique file names without path escapes');
