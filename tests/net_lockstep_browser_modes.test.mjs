@@ -5,9 +5,10 @@ import {mkdtemp, readFile, rm} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
-import {buildRuntimeCssSssGamepadSamples, RUNTIME_CSS_SSS_GENERATOR_SHA256,
-  RUNTIME_CSS_SSS_INPUT_TICKS, RUNTIME_CSS_SSS_SOURCE_TICKS,
-  validateLockstepBrowserMode, validateRuntimeCssSssRecipe} from '../scripts/net_lockstep_browser_modes.mjs';
+import {buildRuntimeCssMatchGamepadSamples, buildRuntimeCssSssGamepadSamples,
+  RUNTIME_CSS_MATCH_INPUT_TICKS, RUNTIME_CSS_MATCH_SOURCE_TICKS, RUNTIME_CSS_MATCH_STIMULUS_FRAMES,
+  RUNTIME_CSS_SSS_GENERATOR_SHA256, RUNTIME_CSS_SSS_INPUT_TICKS, RUNTIME_CSS_SSS_SOURCE_TICKS,
+  validateLockstepBrowserMode, validateRuntimeCssMatchRecipe, validateRuntimeCssSssRecipe} from '../scripts/net_lockstep_browser_modes.mjs';
 import {LOCKSTEP_MAX_SOURCE_TICKS} from '../scripts/net_lockstep_core.mjs';
 
 const options = (overrides = {}) => ({scenario: 'positive', 'peer-owner': 'browser',
@@ -33,7 +34,7 @@ test('positive WebRTC cannot pass SDP through the Node memory coordinator', () =
 test('unsupported WebRTC scenarios and owners fail before acquisition', () => {
   for (const scenario of ['probe'])
     assert.throws(() => validateLockstepBrowserMode(options({scenario})),
-      /browser-owned input-sampling, positive, disconnect, flip, native-pump, or runtime-css-sss mode/);
+      /browser-owned input-sampling, positive, disconnect, flip, native-pump, runtime-css-sss, or runtime-css-match mode/);
   assert.throws(() => validateLockstepBrowserMode(options({'peer-owner': 'node'})),
     /applies only to browser-owned peers/);
 });
@@ -144,8 +145,26 @@ test('runtime CSS-to-SSS mode admits only the explicit 520-tick Room Worker fixt
     {'runtime-input-fixture': 'neutral-a-release'}, {script: undefined}, {'script-manifest': undefined},
   ]) assert.throws(() => validateLockstepBrowserMode(runtimeCssSssOptions(overrides)),
     /runtime-css-sss|runtime-input-fixture|Runtime-owned peers/);
-  assert.throws(() => validateLockstepBrowserMode(options({'script-manifest': 'route.json'})), /only to runtime-css-sss/);
+  assert.throws(() => validateLockstepBrowserMode(options({'script-manifest': 'route.json'})), /only to runtime-css-sss or runtime-css-match/);
   assert.throws(() => validateLockstepBrowserMode(runtimeCssSssOptions({scenario: 'positive', 'script-manifest': undefined})), /Runtime-owned peers/);
+});
+
+const runtimeCssMatchOptions = (overrides = {}) => options({scenario: 'runtime-css-match', 'peer-owner': 'runtime',
+  'peer-transport': 'webrtc', 'webrtc-signaling': 'room-worker', 'source-ticks': '520',
+  'runtime-input-fixture': 'css-sss-to-match', script: 'route.mwni', 'script-manifest': 'route.json', ...overrides});
+
+test('runtime CSS-to-match mode admits only the explicit 520-tick Room Worker fixture contract', () => {
+  assert.deepEqual(validateLockstepBrowserMode(runtimeCssMatchOptions()), {browserOwned: true, runtimeOwned: true,
+    peerTransport: 'webrtc', localWebRtc: true, roomWorkerSignaling: true,
+    runtimeInputFixture: true, runtimeInputFixtureName: 'css-sss-to-match'});
+  for (const overrides of [
+    {'source-ticks': '519'}, {'source-ticks': undefined}, {'peer-owner': 'browser'},
+    {'peer-transport': 'relay'}, {'webrtc-signaling': 'memory'}, {'runtime-input-fixture': undefined},
+    {'runtime-input-fixture': 'css-start-to-sss'}, {script: undefined}, {'script-manifest': undefined},
+  ]) assert.throws(() => validateLockstepBrowserMode(runtimeCssMatchOptions(overrides)),
+    /runtime-css-match|runtime-input-fixture|Runtime-owned peers/);
+  assert.throws(() => validateLockstepBrowserMode(options({'script-manifest': 'route.json'})), /only to runtime-css-sss or runtime-css-match/);
+  assert.throws(() => validateLockstepBrowserMode(runtimeCssMatchOptions({scenario: 'positive', 'script-manifest': undefined})), /Runtime-owned peers/);
 });
 
 function runtimeRecipeFixture() {
@@ -161,7 +180,11 @@ function runtimeRecipeFixture() {
   port(1, 0, {stickX: 80, stickY: -40});
   port(2, 1, {stickX: -60, stickY: 20});
   for (let tick = 150; tick <= 152; ++tick) port(tick, 0, {buttons: 0x1000});
-  port(153, 0, {buttons: 0x1000, stickX: 80}); // Outside the selected CSS prefix.
+  for (let tick = 183; tick < 197; ++tick) port(tick, 0, {stickX: 80});
+  for (let tick = 197; tick < 202; ++tick) port(tick, 0, {stickY: 80});
+  for (let tick = 202; tick < 206; ++tick) port(tick, 0, {stickX: -80, stickY: -80});
+  for (let tick = 206; tick < 213; ++tick) port(tick, 0, {stickX: -80});
+  for (let tick = 213; tick < 216; ++tick) port(tick, 0, {buttons: 0x0100});
   const header = Buffer.alloc(16); header.write('MWNI'); header.writeUInt32BE(1, 4);
   header.writeUInt32BE(count, 8); header.writeUInt32BE(0, 12);
   const scriptBytes = Buffer.concat([header, body]);
@@ -224,4 +247,47 @@ test('runtime CSS-to-SSS Gamepad sample builder round-trips only the recipe pref
   assert.throws(() => buildRuntimeCssSssGamepadSamples(nonneutralBetaFirst), /first selected sample for beta must be neutral/);
   assert.throws(() => buildRuntimeCssSssGamepadSamples(invalidPort2), /port 2 is not the canonical no-controller PAD/);
   assert.throws(() => buildRuntimeCssSssGamepadSamples(invalidPort3), /port 3 is not the canonical no-controller PAD/);
+});
+
+test('runtime CSS-to-match recipe validation binds the explicit MWNI manifest and reviewed generator', async () => {
+  const fixture = runtimeRecipeFixture();
+  const generatorBytes = await readFile(new URL('../tools/net_input_script.py', import.meta.url));
+  const identity = validateRuntimeCssMatchRecipe({...fixture, generatorBytes, seed: fixture.manifest.seed});
+  assert.equal(identity.script_sha256, fixture.manifest.script_sha256);
+  assert.equal(identity.frame_count, RUNTIME_CSS_MATCH_INPUT_TICKS);
+  assert.equal(identity.stimulus_frames, RUNTIME_CSS_MATCH_STIMULUS_FRAMES);
+  for (const value of [
+    {...fixture, seed: fixture.manifest.seed + 1},
+    {...fixture, generatorBytes: Buffer.from('unreviewed generator')},
+    {...fixture, manifestBytes: Buffer.from('{bad json')},
+    {...fixture, scriptBytes: Buffer.from(fixture.scriptBytes).subarray(0, -44)},
+  ]) assert.throws(() => validateRuntimeCssMatchRecipe({...value, generatorBytes: value.generatorBytes ?? generatorBytes,
+    seed: value.seed ?? fixture.manifest.seed}));
+});
+
+test('runtime CSS-to-match converts only CSS/SSS recipe frames, maps Start/A and makes the match tail neutral', () => {
+  const {body} = runtimeRecipeFixture();
+  const samples = buildRuntimeCssMatchGamepadSamples(body);
+  assert.equal(samples.alpha.length, RUNTIME_CSS_MATCH_INPUT_TICKS);
+  assert.equal(samples.beta.length, RUNTIME_CSS_MATCH_INPUT_TICKS);
+  assert.deepEqual(samples.alpha[0].bytes, Array(11).fill(0));
+  assert.deepEqual(samples.beta[0].bytes, Array(11).fill(0));
+  assert.equal(samples.alpha[150].bytes[0], 0x10);
+  assert.equal(samples.alpha[150].gamepad.buttons[9].pressed, true);
+  assert.equal(samples.alpha[150].gamepad.buttons[0].pressed, false);
+  assert.deepEqual(samples.alpha[183].bytes.slice(2, 4), [80, 0]);
+  assert.deepEqual(samples.alpha[197].bytes.slice(2, 4), [0, 80]);
+  assert.equal(samples.alpha[213].bytes[1], 0);
+  assert.equal(samples.alpha[213].bytes[0], 0x01);
+  assert.equal(samples.alpha[213].gamepad.buttons[0].pressed, true);
+  assert.equal(samples.alpha[213].gamepad.buttons[9].pressed, false);
+  assert.equal(samples.beta[213].bytes[0], 0);
+  assert.deepEqual(samples.alpha[304].bytes, Array(11).fill(0));
+  assert.deepEqual(samples.alpha[304].gamepad.axes, [0, 0, 0, 0]);
+  const invalidPort2 = Buffer.from(body); invalidPort2[303 * 44 + 22 + 10] = 0;
+  const invalidPort3 = Buffer.from(body); invalidPort3[303 * 44 + 33 + 10] = 0;
+  const unsupportedA = Buffer.from(body); unsupportedA[216 * 44] = 0x10; unsupportedA[216 * 44 + 1] = 0;
+  assert.throws(() => buildRuntimeCssMatchGamepadSamples(invalidPort2), /input 303 port 2 is not the canonical no-controller PAD/);
+  assert.throws(() => buildRuntimeCssMatchGamepadSamples(invalidPort3), /input 303 port 3 is not the canonical no-controller PAD/);
+  assert.throws(() => buildRuntimeCssMatchGamepadSamples(unsupportedA), /input 216 port 0 has unsupported buttons/);
 });

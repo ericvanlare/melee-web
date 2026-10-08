@@ -828,7 +828,7 @@ test('actual consumed-input witness binds every selected sample at the native tw
   assert.throws(() => verify(alpha, beta, exports.subarray(64), exports), /record count/);
   const shifted = structuredClone(alpha); shifted[1][0] = 0; shifted[2][0] = 1;
   assert.throws(() => verify(shifted, beta, exports, exports), /does not match/);
-  assert.equal((source.match(/verifyConsumedInputComponents\(samples.alpha, samples.beta, bytesA, bytesB\)/g) || []).length, 2);
+  assert.equal((source.match(/verifyConsumedInputComponents\(samples.alpha, samples.beta, bytesA, bytesB\)/g) || []).length, 3);
 });
 
 test('runtime CSS-to-SSS witness binds all 518 selected PAD rows to 520 native input checksums', async () => {

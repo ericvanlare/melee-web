@@ -5,11 +5,14 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
-import {classifyRoute, collapseConsecutiveScenes, validateFullRoute} from '../scripts/net_determinism_contract.mjs';
+import {classifyRoute, collapseConsecutiveScenes, validateActiveMatchRoute, validateFullRoute} from '../scripts/net_determinism_contract.mjs';
 
 const scriptPath = fileURLToPath(new URL('../scripts/net_determinism_browser.mjs', import.meta.url));
 const validMatch = {complete: true, rules: {stage: 0x20, player_stocks: [4, 4]},
   players: [{human: true}, {human: true}]};
+const validActiveMatch = {ready: true, paused: false, ending: false, complete: false, frame: 1,
+  rules: {stage: 0x20, player_stocks: [4, 4]},
+  players: [{fighter: 0, human: true, stocks: 4}, {fighter: 0, human: true, stocks: 4}]};
 
 async function withTemp(run) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'melee-net-determinism-cli-'));
@@ -45,6 +48,26 @@ test('prefix workloads are classified without asserting full-route acceptance', 
   assert.throws(() => validateFullRoute([1, 2], validMatch), /scene order mismatch/);
   assert.throws(() => validateFullRoute([1, 2, 3, 4, 1], {...validMatch, players: [{human: true}, {human: false}]}), /two-human/);
   assert.throws(() => validateFullRoute([1, 2, 3, 4, 1], {...validMatch, rules: {...validMatch.rules, stage: 0}}), /Final Destination/);
+});
+
+test('active-match validator requires only the declared CSS/SSS/match prefix and exact live selection', () => {
+  assert.deepEqual(validateActiveMatchRoute([1, 2, 3], validActiveMatch), {
+    scope: 'active-match-prefix', status: 'passed', observed_scenes: [1, 2, 3], active_frame: 1,
+    selection: {stage: 0x20, player_stocks: [4, 4], fighters: [0, 0], humans: [true, true], current_stocks: [4, 4]},
+  });
+  for (const scenes of [[1, 2], [1, 2, 3, 4], [1, 3, 2]])
+    assert.throws(() => validateActiveMatchRoute(scenes, validActiveMatch), /scene order mismatch/);
+  for (const match of [
+    {}, {...validActiveMatch, frame: 0}, {...validActiveMatch, ready: false},
+    {...validActiveMatch, paused: true}, {...validActiveMatch, ending: true},
+    {...validActiveMatch, complete: true}, {...validActiveMatch, observer_error: true},
+    {...validActiveMatch, rules: {...validActiveMatch.rules, stage: 0}},
+    {...validActiveMatch, rules: {...validActiveMatch.rules, player_stocks: [4, 3]}},
+    {...validActiveMatch, players: [{...validActiveMatch.players[0], fighter: 1}, validActiveMatch.players[1]]},
+    {...validActiveMatch, players: [{...validActiveMatch.players[0], human: false}, validActiveMatch.players[1]]},
+    {...validActiveMatch, players: [{...validActiveMatch.players[0], stocks: 3}, validActiveMatch.players[1]]},
+    {...validActiveMatch, players: [validActiveMatch.players[0]]},
+  ]) assert.throws(() => validateActiveMatchRoute([1, 2, 3], match), /did not retain two human Mario/);
 });
 
 test('A2 per-tick checksum scenes collapse only consecutive repeats before route validation', () => {

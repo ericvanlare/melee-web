@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import vm from 'node:vm';
 import {installNetSourceAccounting, readNetSourceAccounting,
-  verifyNetSourceAccounting} from '../scripts/net_source_accounting.mjs';
+  verifyNetSourceAccounting, verifyHeldNetSourceAccounting} from '../scripts/net_source_accounting.mjs';
 import {createNetLockstepNativeAdapter} from '../scripts/net_lockstep_native_adapter.mjs';
 import {PAGE_HELPERS} from '../scripts/net_session_instance.mjs';
 import {readyRenderEvent, verifyAccountedRenderReadiness} from '../scripts/net_lockstep_observers.mjs';
@@ -85,6 +85,76 @@ test('structured readiness rejects missing, stale, wrong-phase and invalid actua
   const older = structuredClone(capture); older.rows = [callback(1, 7), callback(2, 1)];
   older.render_readiness = {...older.render_readiness, frame: 1, source_steps: 7, source_draws: 7};
   assert.throws(() => verifyAccountedRenderReadiness(older, f.window.__net.native(), f.native, 8));
+});
+
+test('held accounting snapshot preserves the active subscriber and keeps final freeze separate', async () => {
+  const f = await renderFixture('source frame: 90 · ready: 1');
+  f.native.terminal = {kind: 0};
+  f.window.__net.native = () => ({phase: 7, running: 1, error: null});
+  let progressCalls = 0;
+  const stop = f.window.__netSourceAccounting.subscribeProgress(() => ++progressCalls);
+  f.window.menuRuntimeTiming(f.row);
+  const observer = f.window.menuRuntimeTiming;
+  const held = await readNetSourceAccounting(f.page, {freeze: false});
+  assert.equal(held.frozen, false);
+  assert.equal(f.window.menuRuntimeTiming, observer);
+  assert.equal(verifyHeldNetSourceAccounting(held, 8).source_draws, 8);
+  const native = f.window.__net.native();
+  assert.equal(verifyAccountedRenderReadiness(held, native, f.native, 8, 7,
+    {heldSnapshot: true}).draw_calls, 297);
+  assert.throws(() => verifyNetSourceAccounting(held, 8), /incomplete/);
+  assert.throws(() => verifyAccountedRenderReadiness(held, native, f.native, 8, 7), /incomplete/);
+  f.window.menuRuntimeTiming(callback(2, 0));
+  assert.equal(progressCalls, 2);
+  assert.equal(held.rows.length, 1, 'read-only snapshot does not grow with subsequent callbacks');
+  stop();
+  const frozen = await readNetSourceAccounting(f.page, {freeze: true});
+  assert.equal(f.window.menuRuntimeTiming, f.original);
+  assert.equal(verifyNetSourceAccounting(frozen, 8).source_draws, 8);
+  assert.equal(verifyAccountedRenderReadiness(frozen, native, f.native, 8, 7).draw_calls, 297);
+  assert.throws(() => verifyHeldNetSourceAccounting(frozen, 8), /snapshot/);
+  assert.throws(() => verifyAccountedRenderReadiness(frozen, native, f.native, 8, 7,
+    {heldSnapshot: true}), /snapshot/);
+});
+
+test('held structured readiness rejects incomplete accounting and a draw outside its exact prefix', async () => {
+  const f = await renderFixture('source frame: 90 · ready: 1');
+  f.native.terminal = {kind: 0};
+  f.window.__net.native = () => ({phase: 7, running: 1, error: null});
+  f.window.menuRuntimeTiming(f.row);
+  const capture = await readNetSourceAccounting(f.page, {freeze: false});
+  const native = f.window.__net.native();
+  const mutations = [
+    ['frozen', c => { c.frozen = true; }],
+    ['missing frozen state', c => { delete c.frozen; }],
+    ['not complete', c => { c.final.blocker = 'network_wait'; }],
+    ['terminal', c => { c.final.terminal.kind = 1; }],
+    ['missing terminal', c => { delete c.final.terminal; }],
+    ['wrong final cursor', c => { c.final.cursor = 7; }],
+    ['missing rows', c => { c.rows = []; }],
+    ['reordered rows', c => { c.rows = [callback(2, 4), callback(1, 4)]; }],
+    ['missing callback', c => { c.rows = [callback(1, 4), callback(3, 4)]; }],
+    ['overflow', c => { c.overflow = 1; }],
+    ['observer error', c => { c.errors.push('observer failed'); }],
+    ['readiness row mismatch', c => { c.render_readiness.source_steps = 7; }],
+    ['draw before exact prefix', c => {
+      c.rows = [callback(1, 4), callback(2, 4)];
+      Object.assign(c.render_readiness, {source_steps: 4, source_draws: 4});
+    }],
+    ['stale draw cursor', c => { c.render_readiness.source_cursor = 7; }],
+    ['preparation', c => { c.render_readiness.preparation_ms = 1; }],
+    ['suppressed', c => { c.render_readiness.draw_suppressed = 1; }],
+    ['zero GPU draws', c => { c.render_readiness.draw_calls = 0; }],
+  ];
+  for (const [label, mutate] of mutations) {
+    const invalid = structuredClone(capture); mutate(invalid);
+    assert.throws(() => verifyAccountedRenderReadiness(invalid, native, f.native, 8, 7,
+      {heldSnapshot: true}), undefined, label);
+  }
+  for (const invalid of [{...native, phase: 3}, {...native, running: 0}, {...native, error: 'native failed'}])
+    assert.throws(() => verifyAccountedRenderReadiness(capture, invalid, f.native, 8, 7, {heldSnapshot: true}));
+  for (const invalid of [{...f.native, active: 0}, {...f.native, cursor: 7}, {...f.native, blocker: 'terminal'}])
+    assert.throws(() => verifyAccountedRenderReadiness(capture, native, invalid, 8, 7, {heldSnapshot: true}));
 });
 
 test('structured getter/4096 overflow failures retain exact rows before waking and preserve error precedence', async () => {
