@@ -1,5 +1,6 @@
 export const LOCKSTEP_VERSION = 1;
 export const LOCKSTEP_DELAY = 2;
+export const LOCKSTEP_MAX_SOURCE_TICKS = 216000;
 export const LOCKSTEP_WINDOW = 32;
 export const LOCKSTEP_MAX_BATCH = 32;
 export const LOCKSTEP_MAX_PENDING_RECEIVE_MESSAGES = 64;
@@ -112,8 +113,8 @@ export class LockstepPeer {
     this.remoteRole = opposite[role];
     this.localPort = portFor[role];
     this.remotePort = portFor[this.remoteRole];
-    this.sourceTicks = integer(sourceTicks, 216000, 'source tick bound');
-    this.inputTicks = integer(inputTicks, 216000, 'input tick bound');
+    this.sourceTicks = integer(sourceTicks, LOCKSTEP_MAX_SOURCE_TICKS, 'source tick bound');
+    this.inputTicks = integer(inputTicks, LOCKSTEP_MAX_SOURCE_TICKS, 'input tick bound');
     if (this.sourceTicks < LOCKSTEP_DELAY || this.inputTicks + LOCKSTEP_DELAY !== this.sourceTicks)
       throw Error('Lockstep input and source tick bounds must differ by the fixed two-tick delay');
     this.pushFrame = pushFrame;

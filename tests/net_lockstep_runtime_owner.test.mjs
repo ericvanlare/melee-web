@@ -8,7 +8,7 @@ import {createBrowserNativePeer} from '../scripts/net_lockstep_browser_peer.mjs'
 import {installRuntimeInputFixtureInPage} from '../scripts/net_session_instance.mjs';
 import {createControllerManager} from '../web/controller-input.mjs';
 import {standardPad} from './controller-fixtures.mjs';
-import {LockstepPeer, parseNetChecksum, lockstepConstants} from '../scripts/net_lockstep_core.mjs';
+import {LockstepPeer, parseNetChecksum, lockstepConstants, LOCKSTEP_MAX_SOURCE_TICKS} from '../scripts/net_lockstep_core.mjs';
 import {createRoomTransport, createRuntimeLockstepSession} from '../scripts/net_lockstep_runtime_owner.mjs';
 
 const turn = () => new Promise(resolve => setImmediate(resolve));
@@ -827,4 +827,256 @@ test('actual consumed-input witness binds every selected sample at the native tw
   const shifted = structuredClone(alpha); shifted[1][0] = 0; shifted[2][0] = 1;
   assert.throws(() => verify(shifted, beta, exports, exports), /does not match/);
   assert.equal((source.match(/verifyConsumedInputComponents\(samples.alpha, samples.beta, bytesA, bytesB\)/g) || []).length, 1);
+});
+
+
+// Synthetic native records; actual runtime owner, live capture, peer and paired protocol core.
+const evidenceRecord = tick => { const row = new Uint8Array(64); new DataView(row.buffer).setUint32(0, tick, true); return Array.from(row); };
+async function budgetIdle() { for (let i = 0; i < 12; ++i) await turn(); }
+function evidenceBudgetFixture({sourceTicks, checksumEvidenceRecords = undefined} = {}) {
+  // Reuse the pump fixture's queued endpoint delivery and canonical native records.
+  const queue = [], records = [], producedRecords = [], remoteRecords = [], disposals = [];
+  let callbacks, cursor = 0, session, drainMutation = null, flushOperation = null, pushGate = null;
+  let terminal = {kind: 0, tick: 0, channel: 0};
+  const adapter = {
+    async pushIndexed(first, bytes) {
+      if (pushGate && first === pushGate.firstTick) {
+        pushGate.entered.resolve(); await pushGate.release.promise; pushGate = null;
+      }
+      for (let offset = 0; offset < bytes.length; offset += 44) {
+        assert.equal(first + offset / 44, cursor);
+        const row = evidenceRecord(cursor++);
+        records.push(row); producedRecords.push(row);
+      }
+      session.onFrame();
+      return true;
+    },
+    configureLocalInputCapture: () => true,
+    confirmStart: async () => true,
+    terminate(kind, tick, channel) { terminal = {kind, tick, channel}; },
+    status: () => ({active: 1, cursor, ring_pending: records.length,
+      blocker: terminal.kind ? 'terminal' : cursor === sourceTicks ? 'complete' : 'network_wait', terminal,
+      start: {recorded: 1, required: 1, capture_failed: false}}),
+    drain(max) {
+      let rows = records.splice(0, max);
+      if (rows.length && drainMutation) { rows = drainMutation(rows); drainMutation = null; }
+      return {count: rows.length, bytes: Uint8Array.from(rows.flat())};
+    },
+    dispose() { disposals.push(cursor); },
+  };
+  const remote = new LockstepPeer({role: 'beta', sourceTicks, inputTicks: sourceTicks - 2,
+    pushFrame: async (first, bytes) => {
+      for (let offset = 0; offset < bytes.length; offset += 44)
+        remoteRecords.push(evidenceRecord(first + offset / 44));
+    }});
+  remote.attach(async text => queue.push(['alpha', text]));
+  async function flush() {
+    if (flushOperation) return flushOperation;
+    flushOperation = (async () => {
+      let work = 0;
+      while (queue.length) {
+        assert(++work < 10000); const [role, text] = queue.shift();
+        if (role === 'alpha') await callbacks.onMessage(text); else await remote.receive(text);
+      }
+    })();
+    try { await flushOperation; } finally { flushOperation = null; }
+  }
+  const endpoint = {ready: Promise.resolve(), closed: false, errors: [], transport: {type: 'synthetic-component'},
+    send: async text => queue.push(['beta', text]), drainInbound: flush,
+    async close() { endpoint.closed = true; }};
+  session = createRuntimeLockstepSession({Module: {}, role: 'alpha', sourceTicks, inputTicks: sourceTicks - 2,
+    url: 'ws://127.0.0.1:8787', roomId: 'r'.repeat(32), timeoutMs: 5000, checksumEvidenceRecords,
+    createAdapter: () => adapter,
+    createTransport(options) {
+      return {createEndpoint(value) { callbacks = value; return endpoint; },
+        start: () => remote.start(options.agreement), async close() { endpoint.closed = true; }};
+    }});
+  return {session, endpoint, producedRecords, remote, remoteRecords, disposals, flush,
+    async start() {
+      const ready = session.start(() => ({build: 'same'})); session.onFrame(); await ready;
+      await waitForEvidence({session, flush}, state => state.peer.checksumConsumer.accepted_records === 2, 'neutral prefix');
+    },
+    mutateNextDrain(callback) { drainMutation = callback; },
+    deferPushAt(firstTick) {
+      pushGate = {firstTick, entered: deferred(), release: deferred()};
+      return pushGate;
+    },
+  };
+}
+
+// Observe authoritative component settlement; event-loop turns do not guarantee
+// an asynchronous native push or the serialized checksum consumer has finished.
+async function evidenceBoundary(promise, label, timeoutMs = 5000) {
+  let timer;
+  try {
+    return await Promise.race([promise, new Promise((resolve, reject) => {
+      timer = setTimeout(() => reject(Error(`Component boundary timed out: ${label}`)), timeoutMs);
+    })]);
+  } finally { clearTimeout(timer); }
+}
+async function waitForEvidence(run, predicate, label) {
+  const deadline = Date.now() + 5000;
+  for (;;) {
+    const state = run.session.snapshot();
+    if (!state.peer.nativePump.wake_queued &&
+        (state.peer.failure || state.peer.protocol.terminal ||
+          (!state.peer.checksumConsumer.pending_batch && predicate(state)))) return state;
+    assert(Date.now() < deadline, `Component evidence did not settle: ${label}`);
+    await evidenceBoundary(run.flush(), label, Math.max(1, deadline - Date.now())); await turn();
+  }
+}
+async function cleanupEvidence(run) {
+  try { await run.session.close({mode: run.session.snapshot().close_mode ?? 'fatal'}); } catch {}
+}
+
+async function feedEvidenceInputs(run, sourceTicks, splitDefault = false) {
+  for (let first = 0; first < sourceTicks - 2;) {
+    const count = splitDefault && first >= 510 ? 1 : Math.min(32, (splitDefault ? 510 : sourceTicks - 2) - first);
+    const entries = Array.from({length: count}, (_, offset) => [first + offset, new Uint8Array(11)]);
+    for (const [tick, pad] of entries)
+      assert.equal(globalThis.__meleeWebNetLocalInputCapture(tick, 0, tick + 1, pad), true);
+    await run.remote.addLocalInputs(entries);
+    await waitForEvidence(run, state => state.peer.checksumConsumer.accepted_records === first + count + 2, 'input batch');
+    first += count;
+    if (run.session.snapshot().peer.failure) break;
+  }
+}
+
+test('actual runtime owner preserves the default 513th-record refusal and first cause through fatal close', async t => {
+  for (const delayed of [false, true]) await t.test(delayed ? 'deferred final native push' : 'ordinary async delivery', async () => {
+    const run = evidenceBudgetFixture({sourceTicks: 513});
+    let gate = null, feeding = null;
+    try {
+      await run.start();
+      if (delayed) gate = run.deferPushAt(512);
+      feeding = feedEvidenceInputs(run, 513, true);
+      if (gate) {
+        await evidenceBoundary(gate.entered.promise, 'deferred final push entered');
+        await budgetIdle(); // Deliberately reproduce the old fixed-turn assumption.
+        const pending = run.session.snapshot();
+        assert.equal(pending.peer.failure, null);
+        assert.equal(pending.checksums.length, 512);
+        t.diagnostic('Deferred final push: twelve turns retain 512 records with no failure; authoritative settlement is still pending');
+        gate.release.resolve();
+      }
+      await feeding;
+      const state = await waitForEvidence(run, () => false, 'default 513 refusal');
+      assert.equal(state.checksum_evidence_records, 512);
+      assert.equal(state.checksums.length, 512);
+      assert.equal(state.peer.checksumConsumer.accepted_records, 512);
+      assert.match(state.peer.failure, /checksum evidence exceeds its bounded page retention/);
+      assert.equal(state.peer.protocol.terminal.reason, 'Runtime lockstep checksum evidence exceeds its bounded page retention');
+      await assert.rejects(run.session.close({mode: 'fatal'}), /session cleanup failed/);
+      assert.equal(run.session.snapshot().peer.failure, state.peer.failure);
+      assert.equal(run.disposals.length, 1);
+    } finally {
+      gate?.release.resolve();
+      try { await feeding; } catch {}
+      await cleanupEvidence(run);
+    }
+  });
+});
+
+test('explicit runtime evidence budget consumes and compares 520 actual paired-core records with immutable evidence and normal close', async () => {
+  const run = evidenceBudgetFixture({sourceTicks: 520, checksumEvidenceRecords: 520});
+  try {
+    await run.start();
+    await feedEvidenceInputs(run, 520);
+    for (const row of run.remoteRecords) await run.remote.addChecksum(Uint8Array.from(row));
+    await run.remote.setNativeProgress(520, {flushFinal: true});
+    const state = await waitForEvidence(run, state => state.peer.protocol.next_checksum_compare === 520 &&
+      state.peer.protocol.remote_ack_checksum === 519, '520 comparison and ACK');
+    assert.equal(state.checksum_evidence_records, 520);
+    assert.equal(state.peer.failure, null);
+    assert.equal(state.checksums.length, 520);
+    assert.equal(state.peer.checksumConsumer.accepted_records, 520);
+    assert.equal(state.peer.checksumConsumer.pending_batch, null);
+    assert.equal(state.peer.protocol.next_checksum_compare, 520);
+    assert.equal(state.peer.protocol.remote_ack_checksum, 519);
+    assert.equal(state.peer.protocol.remote_ack_input, 517);
+    assert.deepEqual(state.checksums, Array.from({length: 520}, (_, tick) => evidenceRecord(tick)));
+    assert.throws(() => { state.checksums[0][0] = 255; }, TypeError);
+    run.producedRecords[0][0] = 255;
+    assert.equal(run.session.snapshot().checksums[0][0], 0);
+    const close = await run.session.close();
+    assert.equal(close.mode, 'normal'); assert.equal(close.native_quiescence, 'verified');
+    assert.equal(run.disposals.length, 1); assert.equal(run.endpoint.closed, true);
+    assert.equal(run.session.snapshot().checksums.length, 520);
+    assert.equal(globalThis.__meleeWebNetLocalInputCapture, null);
+  } finally { await cleanupEvidence(run); }
+});
+
+test('runtime evidence budget and authored source maximum reject before adapter allocation', () => {
+  let allocated = 0;
+  const options = {Module: {}, role: 'alpha', sourceTicks: 520, inputTicks: 518,
+    url: 'ws://127.0.0.1:8787', roomId: 'r'.repeat(32), createAdapter() { ++allocated; }};
+  for (const budget of [null, 0, 512, 519, 521, 520.5, Infinity, NaN])
+    assert.throws(() => createRuntimeLockstepSession({...options, checksumEvidenceRecords: budget}), /budget must equal/);
+  assert.throws(() => createRuntimeLockstepSession({...options, sourceTicks: LOCKSTEP_MAX_SOURCE_TICKS + 1,
+    inputTicks: LOCKSTEP_MAX_SOURCE_TICKS - 1, checksumEvidenceRecords: LOCKSTEP_MAX_SOURCE_TICKS + 1}), /bounds are incompatible/);
+  assert.equal(allocated, 0);
+});
+
+
+test('explicit budget retains actual peer malformed, conflicting duplicate and out-of-range first causes', async t => {
+  for (const [name, mutate, expected] of [
+    ['malformed byte count', rows => [rows[0].slice(1)], /checksum byte count differs/],
+    ['conflicting duplicate', rows => { const row = evidenceRecord(0); row[4] = 1; return [row]; }, /native emitted conflicting checksums/],
+    ['outside declared source bound', rows => [evidenceRecord(520)], /checksum is beyond the source tick bound/],
+  ]) await t.test(name, async () => {
+    const run = evidenceBudgetFixture({sourceTicks: 520, checksumEvidenceRecords: 520});
+    try {
+      await run.start();
+      run.mutateNextDrain(mutate);
+      assert.equal(globalThis.__meleeWebNetLocalInputCapture(0, 0, 1, new Uint8Array(11)), true);
+      await run.remote.addLocalInputs([[0, new Uint8Array(11)]]);
+      const before = await waitForEvidence(run, () => false, 'rejected native record');
+      assert.match(before.peer.protocol.terminal?.reason ?? before.peer.failure ?? '', expected);
+      assert.equal(before.checksums.length, 2, 'Rejected native records never become retained owner evidence');
+      await assert.rejects(run.session.close({mode: 'fatal'}), /session cleanup failed/);
+      const after = run.session.snapshot();
+      assert.equal(after.peer.failure, before.peer.failure);
+      assert.deepEqual(after.peer.protocol.terminal, before.peer.protocol.terminal);
+      assert.equal(run.disposals.length, 1);
+    } finally {
+      await cleanupEvidence(run);
+    }
+  });
+});
+
+test('runtime consumer validates whole canonical batches before immutable retention and refuses cumulative overflow', async () => {
+  let consume;
+  const run = makeSession({peerFactory(options) {
+    consume = options.checksumConsumer;
+    return {waitForReady: async () => {}, rpc: async () => ({protocol: {ready: true}}), close: async () => {},
+      snapshot: () => ({protocol: {ready: true}, nativePump: {native_quiescence: 'verified'}})};
+  }});
+  const started = run.session.start(() => ({build: 'same'})); run.native.state.start.recorded = 1;
+  run.session.onFrame(); await started;
+  const valid = evidenceRecord(0);
+  for (const invalid of [null, [0], valid.slice(1), [...valid.slice(0, 63), 256],
+    [...valid.slice(0, 63), -1], [...valid.slice(0, 63), 0.5], [...valid.slice(0, 63), NaN]]) {
+    assert.throws(() => consume([valid, invalid]), /malformed records/);
+    assert.equal(run.session.snapshot().checksums.length, 0, 'A malformed later row cannot leave partial evidence');
+  }
+  assert.equal(consume(Array.from({length: 512}, () => valid)), true);
+  assert.throws(() => consume([valid]), /bounded page retention/);
+  assert.equal(run.session.snapshot().checksums.length, 512);
+  await run.session.close();
+});
+
+
+test('component assertion failure still closes its live capture owner before another fixture starts', async () => {
+  const run = evidenceBudgetFixture({sourceTicks: 8}), first = Error('deliberate component assertion failure');
+  await assert.rejects(async () => {
+    try { await run.start(); throw first; }
+    finally { await cleanupEvidence(run); }
+  }, error => error === first);
+  assert.equal(run.disposals.length, 1);
+  assert.equal(globalThis.__meleeWebNetLocalInputCapture, null);
+  const next = evidenceBudgetFixture({sourceTicks: 8});
+  try { await next.start(); assert.equal(next.session.snapshot().peer.protocol.ready, true); }
+  finally { await cleanupEvidence(next); }
+  assert.equal(next.disposals.length, 1);
+  assert.equal(globalThis.__meleeWebNetLocalInputCapture, null);
 });

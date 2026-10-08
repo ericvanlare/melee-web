@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import test from 'node:test';
 import vm from 'node:vm';
+import {LOCKSTEP_MAX_SOURCE_TICKS} from '../scripts/net_lockstep_core.mjs';
 import {createDevelopmentLockstepOwner} from '../web/net_lockstep_development_owner.mjs';
 
 const config = Object.freeze({role: 'alpha', roomId: 'r'.repeat(32), timeoutMs: 500,
@@ -34,7 +35,7 @@ function fixture({context = {}, identityPromise = Promise.resolve(identity), sta
     attachNetworkSession(close) { events.push(['attach']); this.close = close; },
     stop(error) { events.push(['stop', error]); },
   };
-  entry = createDevelopmentLockstepOwner({Module: {}, owner, inputDelay: 2, getContext: () => state,
+  entry = createDevelopmentLockstepOwner({Module: {}, owner, inputDelay: 2, sourceTickLimit: LOCKSTEP_MAX_SOURCE_TICKS, getContext: () => state,
     getIdentity: async () => { events.push(['identity']); return identityPromise; },
     createSession(options) { events.push(['create-session', options]); return session; },
     async runNativeStart(options) {
@@ -150,7 +151,7 @@ test('development runtime APIs use the guarded owner and only frame callbacks ad
   const scope = {
     window, developmentHooks: {}, owner, Module, ready: false, fatal: false, bundle: true,
     retailRun: null, replayLoading: false, inputDirty: false,
-    LOCKSTEP_DELAY: 2,
+    LOCKSTEP_DELAY: 2, LOCKSTEP_MAX_SOURCE_TICKS,
     createDevelopmentLockstepOwner,
     createRuntimeLockstepSession(options) {
       ++ownerFactories; events.push(['create-session', options]);
@@ -211,7 +212,7 @@ test('development runtime APIs use the guarded owner and only frame callbacks ad
   assert.equal(window.meleeNetRuntimeLockstepSnapshot().role, 'alpha');
   assert.deepEqual(nativeCalls, [['begin', 17, 8], ['launch']]);
   assert.deepEqual(events.find(row => row[0] === 'create-session')[1], {
-    Module, role: 'alpha', sourceTicks: 8, inputTicks: 6, url: config.url,
+    Module, role: 'alpha', sourceTicks: 8, inputTicks: 6, checksumEvidenceRecords: 8, url: config.url,
     roomId: config.roomId, timeoutMs: config.timeoutMs,
   });
   const agreement = events.find(row => row[0] === 'agreement')[1];
@@ -236,4 +237,18 @@ test('development runtime APIs use the guarded owner and only frame callbacks ad
   assert.equal(events.at(-1)[1], frameFailure, 'frame callback failures enter the shared runtime stop path');
   assert.deepEqual(await window.meleeNetCloseRuntimeLockstep('fatal'), {closed: true});
   assert.equal(events.at(-1)[0], 'session-close');
+});
+
+
+test('development entry rejects the authored maximum before identity or reservation and binds explicit evidence budget', async () => {
+  const run = fixture(); run.entry.configure(config);
+  for (const ticks of [LOCKSTEP_MAX_SOURCE_TICKS + 1, Infinity, 520.5]) {
+    await assert.rejects(run.entry.begin(1, ticks), /source tick bound is invalid/);
+    assert.deepEqual(run.events, []);
+    assert.deepEqual(run.entry.state(), {configured: true, starting: false, used: false, attached: false});
+  }
+  await run.entry.begin(1, 520);
+  const options = run.events.find(row => row[0] === 'create-session')[1];
+  assert.equal(options.checksumEvidenceRecords, 520);
+  assert.equal(options.inputTicks, 518);
 });

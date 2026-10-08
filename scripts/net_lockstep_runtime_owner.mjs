@@ -2,7 +2,7 @@ import {createNetLockstepNativeAdapter} from './net_lockstep_native_adapter.mjs'
 import {BROWSER_CHECKSUM_EXPORT_LIMIT, createBrowserNativePeer} from './net_lockstep_browser_peer.mjs';
 import {createDataChannelEndpoint} from './net_lockstep_webrtc.mjs';
 import {createRoomWebRtcSignaler} from './net_lockstep_webrtc_signaling.mjs';
-import {LOCKSTEP_DELAY, NET_RECORD_BYTES} from './net_lockstep_core.mjs';
+import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS, NET_RECORD_BYTES} from './net_lockstep_core.mjs';
 
 const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]{22,64}$/;
 
@@ -249,13 +249,17 @@ export function createRoomTransport({url, roomId, role, timeoutMs, createEndpoin
 
 /** One runtime-owned native adapter, browser peer, and frame-driven progress subscription. */
 export function createRuntimeLockstepSession({Module, role, sourceTicks, inputTicks, url, roomId,
-  timeoutMs = 5000, createAdapter = createNetLockstepNativeAdapter,
+  timeoutMs = 5000, checksumEvidenceRecords = undefined, createAdapter = createNetLockstepNativeAdapter,
   createPeer = createBrowserNativePeer, createTransport = createRoomTransport} = {}) {
   if (!Module || typeof Module !== 'object') throw Error('Runtime lockstep session requires the loaded native Module');
   if (role !== 'alpha' && role !== 'beta') throw Error('Runtime lockstep role must be alpha or beta');
-  if (!Number.isSafeInteger(sourceTicks) || sourceTicks < LOCKSTEP_DELAY ||
+  if (!Number.isSafeInteger(sourceTicks) || sourceTicks < LOCKSTEP_DELAY || sourceTicks > LOCKSTEP_MAX_SOURCE_TICKS ||
       !Number.isSafeInteger(inputTicks) || inputTicks < 0 || inputTicks + LOCKSTEP_DELAY !== sourceTicks)
     throw Error('Runtime lockstep source and input tick bounds are incompatible');
+  if (checksumEvidenceRecords !== undefined &&
+      (!Number.isSafeInteger(checksumEvidenceRecords) || checksumEvidenceRecords !== sourceTicks))
+    throw Error('Runtime lockstep checksum evidence budget must equal its declared source tick bound');
+  const evidenceLimit = checksumEvidenceRecords ?? BROWSER_CHECKSUM_EXPORT_LIMIT;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) throw Error('Runtime lockstep timeout must be positive');
   if (typeof url !== 'string' || !/^wss?:\/\//.test(url) || typeof roomId !== 'string' || !ROOM_ID_PATTERN.test(roomId))
     throw Error('Runtime lockstep Room URL or room ID is invalid');
@@ -310,8 +314,12 @@ export function createRuntimeLockstepSession({Module, role, sourceTicks, inputTi
     peer = createPeer({role, sourceTicks, inputTicks, timeoutMs, agreement, native,
       inputCapture: {mode: 'live'}, autonomousPump: true,
       checksumConsumer(records) {
-        if (!Array.isArray(records) || checksumRecords.length + records.length > BROWSER_CHECKSUM_EXPORT_LIMIT)
+        if (!Array.isArray(records) || checksumRecords.length + records.length > evidenceLimit)
           throw Error('Runtime lockstep checksum evidence exceeds its bounded page retention');
+        if (records.some(record => (!Array.isArray(record) && !(record instanceof Uint8Array)) ||
+            record.length !== NET_RECORD_BYTES ||
+            Array.from(record).some(byte => !Number.isInteger(byte) || byte < 0 || byte > 255)))
+          throw Error('Runtime lockstep checksum evidence contains malformed records');
         for (const record of records) checksumRecords.push(Object.freeze(Array.from(record)));
         return true;
       }}, {createEndpoint: transport.createEndpoint});
@@ -392,6 +400,7 @@ export function createRuntimeLockstepSession({Module, role, sourceTicks, inputTi
     transport: transportInfo ? {...transportInfo,
       signaling: transport?.signalingSnapshot?.() ?? transportInfo.signaling} : null,
     transport_cleanup: transportCleanup,
+    checksum_evidence_records: evidenceLimit,
     checksums: Object.freeze(checksumRecords.map(record => Object.freeze(record.slice()))),
     failure: failure ? String(failure?.message || failure) : null})});
 }

@@ -6,7 +6,7 @@ import {loadNativeGameDisc, openNativeGameSession} from './runtime-audio-assets.
 import {attemptNetworkTimingPauseResume, evaluateNetworkTimingPause} from './net-timing-pause.mjs';
 import {createRuntimeLockstepSession} from './net_lockstep_runtime_owner.mjs';
 import {createDevelopmentLockstepOwner} from './net_lockstep_development_owner.mjs';
-import {LOCKSTEP_DELAY} from './net_lockstep_core.mjs';
+import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS} from './net_lockstep_core.mjs';
 const developmentHooks = {};
 const markFirstReplayBoundary=(...args)=>{try{window.__meleeReplayBoundaryProbe?.mark?.(...args);}catch{}};
 const RETAIL_REPLAY_LEGACY_MAX_FRAMES = 36000;
@@ -315,7 +315,7 @@ window.meleeNetBeginLockstep=async(seed,maxFrames)=>{
 };
 window.meleeNetConfigureRuntimeLockstep=config=>{
  if(!ready||fatal)throw Error('Runtime lockstep configuration is unavailable');
- if(!runtimeLockstepEntry)runtimeLockstepEntry=createDevelopmentLockstepOwner({Module,owner,inputDelay:LOCKSTEP_DELAY,
+ if(!runtimeLockstepEntry)runtimeLockstepEntry=createDevelopmentLockstepOwner({Module,owner,inputDelay:LOCKSTEP_DELAY,sourceTickLimit:LOCKSTEP_MAX_SOURCE_TICKS,
   getContext:()=>({ready,fatal,bundle,replayActive:!!retailRun||replayLoading,
    ownerState:owner.handle.getState().state,phase:Module._melee_web_native_menu_phase()}),
   getIdentity:()=>window.meleeNetPeerIdentity(),
