@@ -11,7 +11,7 @@ function deferred() {
   const promise = new Promise(done => { resolve = done; });
   return {promise, resolve};
 }
-function harness({terminalFailure = false, confirmFailure = false, sourceTicks = 8,
+function harness({role = 'alpha', terminalFailure = false, confirmFailure = false, sourceTicks = 8,
   readyGate = null, inputCapture = null, dispose = null, endpointCloseGate = null,
   endpointCloseStarted = null, endpointCloseFailure = null, cleanupOrder = []} = {}) {
   const sent = [], nativeRecords = [], frames = [], terminals = [], pending = new Set(), captureConfigs = [];
@@ -22,16 +22,19 @@ function harness({terminalFailure = false, confirmFailure = false, sourceTicks =
     async close() {
       cleanupOrder.push('endpoint-close-start'); endpointCloseStarted?.resolve();
       if (endpointCloseGate) await endpointCloseGate.promise;
-      endpoint.closed = true; await callbacks.onDisconnect('alpha', 'closed');
+      endpoint.closed = true; await callbacks.onDisconnect(role, 'closed');
       cleanupOrder.push('endpoint-close-end');
       if (endpointCloseFailure) throw endpointCloseFailure;
     },
   };
-  const controller = createBrowserNativePeer({role: 'alpha', sourceTicks, inputTicks: sourceTicks - 2,
+  const localPort = role === 'alpha' ? 0 : 1;
+  const remotePort = role === 'alpha' ? 1 : 0;
+  const remoteRole = role === 'alpha' ? 'beta' : 'alpha';
+  const controller = createBrowserNativePeer({role, sourceTicks, inputTicks: sourceTicks - 2,
     inputCapture,
     relayUrl: 'ws://example.test', roomId: 'a'.repeat(32), agreement: {build: 'same'}, native: {
       async pushIndexed(tick, bytes) { if (pushFailure) return false; frames.push({tick, bytes: Array.from(bytes)}); return true; },
-      configureLocalInputCapture(port, ticks) { captureConfigs.push({port, ticks}); return port === 0 && ticks === sourceTicks - 2; },
+      configureLocalInputCapture(port, ticks) { captureConfigs.push({port, ticks}); return port === localPort && ticks === sourceTicks - 2; },
       async confirmStart() { ++confirmations; if (readyGate) await readyGate.promise; return !confirmFailure; },
       terminate(...args) { terminals.push(args); if (terminalFailure) throw Error('terminal callback failure'); },
       status: () => ({cursor: nativeRecords.length}),
@@ -46,7 +49,7 @@ function harness({terminalFailure = false, confirmFailure = false, sourceTicks =
   }
   async function ready() {
     await controller.rpc('start', [{build: 'same'}]);
-    await deliver({type: 'hello', version: 1, role: 'beta', local_port: 1, remote_port: 0, agreement: {build: 'same'}});
+    await deliver({type: 'hello', version: 1, role: remoteRole, local_port: remotePort, remote_port: localPort, agreement: {build: 'same'}});
     await controller.rpc('snapshot');
   }
   const record = tick => {
@@ -55,7 +58,7 @@ function harness({terminalFailure = false, confirmFailure = false, sourceTicks =
     return Array.from(bytes);
   };
   return {controller, endpoint, sent, nativeRecords, frames, terminals, deliver, ready, record,
-    captureConfigs, cleanupOrder, endpointError: error => callbacks.onEndpointError('alpha', error), setPushFailure(value) { pushFailure = value; },
+    captureConfigs, cleanupOrder, endpointError: error => callbacks.onEndpointError(role, error), setPushFailure(value) { pushFailure = value; },
     get confirmations() { return confirmations; }};
 }
 
@@ -161,6 +164,27 @@ test('explicit live input publishes exact native samples without synthetic Gamep
     else delete globalThis.__meleeSyntheticPadState;
     if (priorTransition) Object.defineProperty(globalThis, '__meleeSyntheticPadTransition', priorTransition);
     else delete globalThis.__meleeSyntheticPadTransition;
+  }
+});
+
+test('runtime participant roles capture the existing local PAD port without renumbering', async () => {
+  for (const [role, localPort] of [['alpha', 0], ['beta', 1]]) {
+    const run = harness({role, sourceTicks: 6, inputCapture: {mode: 'live'}});
+    try {
+      await run.ready();
+      assert.deepEqual(run.captureConfigs, [{port: localPort, ticks: 4}],
+        `${role} configures its existing local Player ${localPort + 1} PAD port`);
+      const sample = Uint8Array.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+      assert.equal(globalThis.__meleeWebNetLocalInputCapture(0, localPort, 1, sample), true);
+      const snapshot = await run.controller.rpc('snapshot');
+      const captured = snapshot.localInputCapture.captures[0];
+      assert.equal(captured.local_port, localPort);
+      assert.deepEqual(captured.bytes, Array.from(sample));
+      await run.controller.close();
+    } finally {
+      try { await run.controller.close(); } catch {}
+      delete globalThis.__meleeWebNetLocalInputCapture;
+    }
   }
 });
 

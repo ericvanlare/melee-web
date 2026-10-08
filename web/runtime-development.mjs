@@ -6,6 +6,7 @@ import {loadNativeGameDisc, openNativeGameSession} from './runtime-audio-assets.
 import {attemptNetworkTimingPauseResume, evaluateNetworkTimingPause} from './net-timing-pause.mjs';
 import {createRuntimeLockstepSession} from './net_lockstep_runtime_owner.mjs';
 import {createDevelopmentLockstepOwner} from './net_lockstep_development_owner.mjs';
+import {createRoomInvite, parseRoomInvite} from './net_lockstep_room_invite.mjs';
 import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS} from './net_lockstep_core.mjs';
 const developmentHooks = {};
 const markFirstReplayBoundary=(...args)=>{try{window.__meleeReplayBoundaryProbe?.mark?.(...args);}catch{}};
@@ -31,6 +32,107 @@ let preparationKeepsAudio = false;
 const stop = error => owner.stop(error);
 const $=id=>document.getElementById(id);const startupUrl=new URL(location.href),clearRenderCacheOnLoad=startupUrl.searchParams.get('render-cache')==='clear',hitchCaptureFromUrl=startupUrl.searchParams.get('hitch-capture')==='1',hitchCausalFromUrl=startupUrl.searchParams.get('hitch-causal')==='1',hitchUserTimingFromUrl=startupUrl.searchParams.get('hitch-marks')==='1';if(clearRenderCacheOnLoad){startupUrl.searchParams.delete('render-cache');history.replaceState(null,'',startupUrl);}let ready=false,fatal=false,bundle=false,inputDirty=true,importing=false,uiMessage="";let frameLast=0,perfLastReport=0,activeFrames=0,worstFrame=0,worstBrowserCallback=null,longFrames=0,browserLongTasks=0,browserLongTaskWorst=0;let nativeTimingFrames=0,nativeTimingWorst=0,nativeLongFrames=0,nativeOverBudgetFrames=0,nativeSourceSteps=0,nativeSourceDraws=0,nativeWorstTiming=null,nativeFirstUse=0,nativeFirstUseWorst=0,nativePreviousTiming=null,nativeLastTiming=null,livePipelineQueued=0,livePipelineCreated=0,liveTextureUploads=0,liveStagingUsedBytes=0,peakStagingUsedBytes=0;let constructionCounts={},constructionWorst=0,constructionFirstUseWorst=0,preparationSince=0,preparationLabel="",preparationSequence=0,activePreparation=null,pendingEntryProfile=null,settlingEntryProfile=null,entryProfiles=[],latestNativePreparation=null;let preparationCount=0,preparationWorst=0;let diagnosticCaptureInvalid=false,audioStateAcknowledged=true,audioAckWaiters=[],stockCheckActive=false,latestAudio={queued:0,underruns:0,overflows:0},actionSweepActive=false,actionSweepFocusLost=false,selectionDriveActive=false,sweepAutomaticResumes=0;
 window.meleeHitchCapture=null;let runtimeCacheSyncCapability=null,runtimeCacheSyncDropped=0;const runtimeCacheSyncQueue=[];const reportRuntimeCacheSync=event=>{const capture=window.meleeHitchCapture;if(capture?.observeCacheSync){capture.observeCacheSync(event);return;}if(hitchCausalFromUrl){if(runtimeCacheSyncQueue.length<128)runtimeCacheSyncQueue.push(event);else runtimeCacheSyncDropped++;}};const hitchCaptureLoading=import('./hitch-capture.mjs').then(({createHitchCapture})=>{const capture=createHitchCapture({enabled:hitchCaptureFromUrl,userTiming:hitchUserTimingFromUrl,cacheSyncDiagnostics:hitchCausalFromUrl});window.meleeHitchCapture=capture;if(runtimeCacheSyncCapability)capture.setCacheSyncCapability(runtimeCacheSyncCapability);for(const event of runtimeCacheSyncQueue.splice(0))capture.observeCacheSync(event);if(runtimeCacheSyncDropped)capture.noteCacheSyncLoss(runtimeCacheSyncDropped);const toggle=$('hitch-capture');if(toggle){toggle.checked=hitchCaptureFromUrl;toggle.onchange=()=>{capture.setEnabled(toggle.checked);if(hitchCausalFromUrl)Module?.setRuntimeCacheSyncDiagnostics?.(toggle.checked);};}return capture;}).catch(error=>{window.meleeHitchCaptureLoadError=String(error?.message||error);const toggle=$('hitch-capture');if(toggle)toggle.disabled=true;return null;});window.meleeHitchCaptureLoading=hitchCaptureLoading;
+const LOCKSTEP_ROOM_TIMEOUT_MS=120000;
+let lockstepRoomCanStart=false,lockstepRoomConfigured=false,lockstepRoomStarting=false,lockstepRoomLeaving=false;
+let lockstepRoomArmed=false,lockstepRoomFinished=false,lockstepRoomCloseAttempted=false,lockstepRoomUnloading=false,lockstepRoomRole=null,lockstepRoomTimer=null;
+function lockstepRoomStatus(text){$('lockstep-status').textContent=text;}
+function stopLockstepRoomPolling(){clearInterval(lockstepRoomTimer);lockstepRoomTimer=null;}
+function readLockstepRoomHealth(){
+ try{return {health:window.meleeNetRuntimeLockstepHealth?.()??null,error:null};}
+ catch(error){return {health:null,error};}
+}
+function syncLockstepRoomControls(observedHealth=undefined){
+ const canStart=lockstepRoomCanStart&&ready&&!fatal&&bundle&&!lockstepRoomConfigured&&!lockstepRoomStarting&&!lockstepRoomUnloading;
+ $('lockstep-host').disabled=!canStart;
+ $('lockstep-join').disabled=!canStart;
+ $('lockstep-copy').disabled=!$('lockstep-host-invite').value;
+ let health=observedHealth;
+ if(health===undefined&&lockstepRoomConfigured)health=readLockstepRoomHealth().health;
+ if(health?.armed===true)lockstepRoomArmed=true;
+ $('lockstep-leave').disabled=!lockstepRoomConfigured||lockstepRoomLeaving||lockstepRoomCloseAttempted||lockstepRoomUnloading||
+  !(health?.armed===true||lockstepRoomArmed);
+ $('launch').disabled=!lockstepRoomCanStart||!!retailRun||replayLoading||lockstepRoomConfigured||lockstepRoomStarting||lockstepRoomUnloading;
+}
+function finishLockstepRoomStatus(text,observedHealth=undefined){
+ lockstepRoomFinished=true;stopLockstepRoomPolling();lockstepRoomStatus(text);syncLockstepRoomControls(observedHealth);
+}
+function waitingLockstepRoomStatus(){return lockstepRoomRole==='alpha'
+ ?'Waiting for Player 2. Copy the host invite to the other player.'
+ :'Waiting for Player 1.';}
+function observeLockstepRoom(){
+ if(!lockstepRoomConfigured||lockstepRoomFinished)return;
+ const {health,error}=readLockstepRoomHealth();
+ if(error){finishLockstepRoomStatus(`Error: lockstep health unavailable (${error?.message||String(error)}).`,null);return;}
+ if(health?.armed===true)lockstepRoomArmed=true;
+ syncLockstepRoomControls(health);
+ if(!health){lockstepRoomStatus(`Preparing ${lockstepRoomRole==='alpha'?'Host':'Join'} session.`);return;}
+ const peer=health.peer,protocol=peer?.protocol;
+ const failure=health.failure||peer?.failure;
+ if(failure){finishLockstepRoomStatus(`Error: ${failure}`,health);return;}
+ if(protocol?.terminal){
+  const reason=protocol.terminal.reason||protocol.terminal.kind||'lockstep ended';
+  if(protocol.terminal.kind==='disconnect'||peer?.endpointClosed||peer?.closed)
+   finishLockstepRoomStatus('Disconnected. Route outcome is not assessed.',health);
+  else finishLockstepRoomStatus(`Error: ${reason}`,health);
+  return;
+ }
+ if(peer?.endpointClosed||peer?.closed){finishLockstepRoomStatus('Disconnected. Route outcome is not assessed.',health);return;}
+ if(Number(protocol?.local_checksum_ticks)>=LOCKSTEP_MAX_SOURCE_TICKS){
+  finishLockstepRoomStatus('Session limit reached. Route completion is unverified.',health);return;
+ }
+ if(protocol?.ready===true){lockstepRoomStatus('Connected. Match results are not assessed here.');return;}
+ lockstepRoomStatus(health.armed===true?waitingLockstepRoomStatus():
+  `Preparing ${lockstepRoomRole==='alpha'?'Host':'Join'} session.`);
+}
+function startLockstepRoom(role,invite){
+ if(lockstepRoomConfigured||lockstepRoomStarting)throw Error('This page already owns a lockstep session; reload and import a fresh disc to start another.');
+ if(!lockstepRoomCanStart)throw Error('Import a disc and prepare a fresh runtime before starting a relay room.');
+ lockstepRoomRole=role;lockstepRoomStarting=true;syncLockstepRoomControls();
+ try{
+  window.meleeNetConfigureRuntimeLockstep({role,roomId:invite.roomId,url:invite.url,
+   timeoutMs:LOCKSTEP_ROOM_TIMEOUT_MS,transport:'relay'});
+  lockstepRoomConfigured=true;lockstepRoomFinished=false;lockstepRoomCloseAttempted=false;lockstepRoomArmed=false;
+  lockstepRoomStatus(`Preparing ${role==='alpha'?'Host':'Join'} session.`);
+  stopLockstepRoomPolling();lockstepRoomTimer=setInterval(observeLockstepRoom,1000);
+  Promise.resolve(window.meleeNetBeginLockstep(invite.seed,invite.sourceTicks)).then(()=>{
+   if(!lockstepRoomLeaving)observeLockstepRoom();
+  },error=>{
+   if(!lockstepRoomFinished&&!lockstepRoomCloseAttempted&&!lockstepRoomUnloading)finishLockstepRoomStatus(`Error: ${error?.message||String(error)}`);
+  }).finally(()=>{lockstepRoomStarting=false;syncLockstepRoomControls();});
+ }catch(error){lockstepRoomStarting=false;if(lockstepRoomConfigured)finishLockstepRoomStatus(`Error: ${error?.message||String(error)}`);else{syncLockstepRoomControls();lockstepRoomStatus(`Error: ${error?.message||String(error)}`);}throw error;}
+ syncLockstepRoomControls();
+}
+function showLockstepRoomError(error){lockstepRoomStatus(`Error: ${error?.message||String(error)}`);}
+$('lockstep-host').onclick=()=>{
+ try{
+  const text=createRoomInvite({url:$('lockstep-relay-url').value.trim()});
+  const invite=parseRoomInvite(text);
+  $('lockstep-host-invite').value=text;syncLockstepRoomControls();
+  startLockstepRoom('alpha',invite);
+ }catch(error){showLockstepRoomError(error);}
+};
+$('lockstep-join').onclick=()=>{
+ try{startLockstepRoom('beta',parseRoomInvite($('lockstep-join-invite').value.trim()));}
+ catch(error){showLockstepRoomError(error);}
+};
+$('lockstep-copy').onclick=async()=>{
+ const invite=$('lockstep-host-invite').value;if(!invite)return;
+ try{await navigator.clipboard.writeText(invite);$('lockstep-copy-status').textContent=' Invite copied.';}
+ catch{$('lockstep-host-invite').focus();$('lockstep-host-invite').select();$('lockstep-copy-status').textContent=' Select and copy the invite.';}
+};
+$('lockstep-host-invite').oninput=syncLockstepRoomControls;
+$('lockstep-leave').onclick=async()=>{
+ if(!lockstepRoomConfigured||lockstepRoomLeaving||lockstepRoomCloseAttempted)return;
+ const {health,error}=readLockstepRoomHealth();
+ if(error&&!lockstepRoomArmed){finishLockstepRoomStatus(`Error: lockstep health unavailable (${error?.message||String(error)}); teardown is unconfirmed.`,null);return;}
+ if(health?.armed===true)lockstepRoomArmed=true;
+ if(!lockstepRoomArmed){lockstepRoomStatus('Preparing session. Leave becomes available after the runtime owner is armed.');return;}
+ lockstepRoomLeaving=true;lockstepRoomCloseAttempted=true;stopLockstepRoomPolling();
+ lockstepRoomStatus('Leaving room; teardown is pending.');syncLockstepRoomControls(health);
+ try{await window.meleeNetCloseRuntimeLockstep('normal');lockstepRoomFinished=true;lockstepRoomStatus('Disconnected by your choice. Route outcome is not assessed.');}
+ catch(error){lockstepRoomFinished=true;lockstepRoomStatus(`Error: intentional disconnect teardown was not confirmed (${error?.message||String(error)}).`);}
+ finally{lockstepRoomLeaving=false;syncLockstepRoomControls();}
+};
 // Diagnostic A/B only. Visibility preserves layout and every DOM/counter update;
 // activation and geometry checks happen before native replay entry, outside play.
 function beginReplayPaintControl(){
@@ -405,13 +507,14 @@ $('pause').onclick=()=>{
   const state=owner.handle.getState();
   (state.paused?owner.handle.resume():owner.handle.pause()).catch(error=>log(error.message));
 };
-$('unload').onclick=async()=>{$('status').dataset.runtimeError='';try{
+$('unload').onclick=async()=>{$('status').dataset.runtimeError='';if(lockstepRoomConfigured){lockstepRoomUnloading=true;stopLockstepRoomPolling();lockstepRoomStatus('Runtime unloading; room outcome is not assessed.');syncLockstepRoomControls();}try{
   // A diagnostic replay owns its collected rows until finishRetailReplay
   // exports them. Ordinary owner unload alone would lose a bounded prefix.
   if(retailRun)await finishRetailReplay('Manual unload stopped the replay');
   else await owner.handle.unload();
   stockCheckActive=false;
-}catch(error){log(error.message);$('status').dataset.runtimeError=error.message;}};
+  if(lockstepRoomConfigured){lockstepRoomUnloading=false;lockstepRoomFinished=true;lockstepRoomCloseAttempted=true;lockstepRoomStatus('Runtime unloaded. Room outcome is unverified.');syncLockstepRoomControls();}
+}catch(error){log(error.message);$('status').dataset.runtimeError=error.message;if(lockstepRoomConfigured){lockstepRoomUnloading=false;lockstepRoomFinished=true;lockstepRoomStatus(`Error: runtime unload failed; room teardown is unconfirmed (${error?.message||String(error)}).`);syncLockstepRoomControls();}}};
 controllerSettings = mountControllerSettings({
   container: $('controls-dialog'),
   storage: window.parent === window ? undefined : null,
@@ -433,12 +536,15 @@ try {
     },
     onState(state){
       ready=state.ready;fatal=state.state==='error';bundle=state.bundle;importing=state.state==='importing';uiMessage=state.message;
+      lockstepRoomCanStart=state.canStart;
+      if(fatal&&lockstepRoomConfigured)finishLockstepRoomStatus(`Error: ${state.message||'runtime stopped'}. Room outcome is unverified.`);
       $('status').textContent=state.message;$('status').dataset.phase=state.phase;
       $('disc').disabled=!state.canImport||!!retailRun||replayLoading;
       $('launch').disabled=!state.canStart||!!retailRun||replayLoading;
       $('pause').disabled=!state.canPause;$('unload').disabled=!state.canUnload;
       $('reload-app').disabled=$('reset-render-cache').disabled=!ready;
       controllerSettings.setState(state);
+      syncLockstepRoomControls();
     },
     onError(error){log(error.message);$('status').dataset.runtimeError=error.message;},
     onLog(text,isError){

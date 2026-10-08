@@ -25,6 +25,7 @@ class NetLockstepContractTests(unittest.TestCase):
             str(ROOT / 'tests/net_lockstep_browser_pump.test.mjs'),
             str(ROOT / 'tests/net_lockstep_runtime_owner.test.mjs'),
             str(ROOT / 'tests/net_lockstep_development_owner.test.mjs'),
+            str(ROOT / 'tests/net_lockstep_room_invite.test.mjs'),
             str(ROOT / 'tests/net_lockstep_protocol.test.mjs'),
             str(ROOT / 'tests/net_lockstep_transport.test.mjs'),
             str(ROOT / 'tests/net_lockstep_webrtc.test.mjs'),
