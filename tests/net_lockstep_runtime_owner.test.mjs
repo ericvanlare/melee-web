@@ -3,6 +3,7 @@ import test from 'node:test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import vm from 'node:vm';
+import {createHash} from 'node:crypto';
 import {createBrowserNativePeer} from '../scripts/net_lockstep_browser_peer.mjs';
 import {LockstepPeer} from '../scripts/net_lockstep_core.mjs';
 import {createRoomTransport, createRuntimeLockstepSession} from '../scripts/net_lockstep_runtime_owner.mjs';
@@ -629,4 +630,53 @@ test('actual runtime, native ABI and Room transport await a delayed remote ident
     if (prior) Object.defineProperty(globalThis, 'WebSocket', prior); else delete globalThis.WebSocket;
   }
   });
+});
+
+
+test('actual harness reconstructs the runtime hello lifecycle without changing native identity', async () => {
+  const harness = await fs.readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const owner = await fs.readFile(new URL('../web/net_lockstep_development_owner.mjs', import.meta.url), 'utf8');
+  const source = harness.slice(harness.indexOf('function createAgreement('), harness.indexOf('async function publishAllInputs'));
+  const context = {seed: 305419896, sourceTicks: 8, usedInputs: 6, LOCKSTEP_DELAY: 2,
+    inputSampling: false, runtimeOwned: true};
+  vm.createContext(context); vm.runInContext(source, context);
+  const identity = {wasm: 'a'.repeat(64), disc: {algorithm: 'sha256', dol: 'b'.repeat(64),
+    fst: 'c'.repeat(64), dolSize: 4425184, fstSize: 29993}};
+  const before = {required: 1, recorded: 1, scene: 1, seed: 305419896, frame: 0, confirmed: 0,
+    capture_failed: 0, card: 'f962dd478f0c88aa', pad_history: 'af900bb4021c8716',
+    native_context: '53144b77c1cb4fbc', total: 'a8f1925aa316f1e8', pad: '419eb4f4f4bbee75',
+    scene_state: '3391b05bd2e60036', object_state: 'd0e868a4883380b5', objects: 33, flags: 10};
+  const after = {...before, confirmed: 1};
+  let actualRuntimeBuilder;
+  const capture = owner.slice(owner.indexOf('      const ready = ownedSession.start(nativeStart'), owner.indexOf('      ready.catch'));
+  vm.runInNewContext(capture, {seed: context.seed, sourceTicks: 8, inputDelay: 2, identity,
+    ownedSession: {start(builder) { actualRuntimeBuilder = builder; return Promise.resolve(); }}});
+  const actual = actualRuntimeBuilder(before), expected = context.createAgreement(identity, after);
+  assert.equal(JSON.stringify(expected), JSON.stringify(actual), 'Actual observer reconstructs every field of actual runtime hello');
+  assert.equal(after.confirmed, 1, 'Reconstruction never mutates observed native status');
+  const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+  const actualPeer = new LockstepPeer({role: 'alpha', sourceTicks: 8, inputTicks: 6, pushFrame: async () => true});
+  const sent = []; actualPeer.attach(async text => sent.push(JSON.parse(text))); await actualPeer.start(actual);
+  assert.equal(hash(expected), actualPeer.summary().start_identity_hash);
+  assert.equal(sent[0].agreement.native_start.confirmed, 0);
+  for (const key of Object.keys(after).filter(key => key !== 'confirmed')) {
+    const changed = {...after, [key]: typeof after[key] === 'number' ? after[key] + 1 : after[key] + 'x'};
+    assert.notEqual(hash(context.createAgreement(identity, changed)), actualPeer.summary().start_identity_hash,
+      `Native identity mutation ${key} remains a hash mismatch`);
+  }
+  for (const key of Object.keys(identity.disc)) {
+    const changed = {...identity, disc: {...identity.disc, [key]: typeof identity.disc[key] === 'number'
+      ? identity.disc[key] + 1 : identity.disc[key] + 'x'}};
+    assert.notEqual(hash(context.createAgreement(changed, after)), hash(actual), `Disc identity mutation ${key} remains a mismatch`);
+  }
+  assert.notEqual(hash(context.createAgreement({...identity, wasm: 'd'.repeat(64)}, after)), hash(actual));
+  for (const confirmed of [undefined, null, 0, 2, true, '1'])
+    assert.throws(() => context.createAgreement(identity, {...after, confirmed}), /requires a confirmed native start/);
+  context.runtimeOwned = false; context.inputSampling = true;
+  for (const start of [before, after])
+    assert.equal(context.createAgreement(identity, start).native_start, start, 'Nonruntime observer retains its unchanged native start object');
+  assert.match(harness, /alpha: createAgreement\(identities\[0\], startRows\[0\]\)/);
+  assert.match(harness, /beta: createAgreement\(identities\[1\], startRows\[1\]\)/);
+  assert.match(harness, /peers\[role\]\.agreementHash !== expectedAgreementHashes\[role\]/,
+    'Actual callsite still requires exact agreement hashes for both runtime peers');
 });

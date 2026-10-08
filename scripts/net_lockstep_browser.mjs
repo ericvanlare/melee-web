@@ -480,6 +480,8 @@ async function runtimeOwnerWebRtcState(role) {
 }
 
 function createAgreement(identity, start) {
+  if (runtimeOwned && start?.confirmed !== 1)
+    throw Error('Runtime agreement reconstruction requires a confirmed native start');
   return {
     protocol: 'melee-web-local-lockstep-a2-v1',
     seed, source_ticks: sourceTicks, input_ticks: usedInputs,
@@ -491,7 +493,10 @@ function createAgreement(identity, start) {
       {input_recipe: {sha256: scriptHash, frame_count: inputCount, input_ticks_used: usedInputs}}),
     runtime_wasm_sha256: identity.wasm,
     disc: identity.disc,
-    native_start: start,
+    // Runtime begin joins remote agreement and native confirmation before this
+    // observer runs. Reconstruct the hello's pre-confirmation lifecycle bit
+    // while retaining every captured native identity field in the comparison.
+    native_start: runtimeOwned ? {...start, confirmed: 0} : start,
   };
 }
 
@@ -914,7 +919,10 @@ async function run() {
       compared_to_handshake_fresh_fetch: true,
       fresh_fetch_byte_length: 'not exposed by peerIdentity',
     },
-    ...(runtimeOwned ? {expected_peer_agreement_sha256: expectedAgreementHashes} : {}),
+    ...(runtimeOwned ? {expected_peer_agreement_sha256: expectedAgreementHashes,
+      native_start_lifecycle_reconstruction: {observation: 'post-runtime-begin-confirmation',
+        observed_confirmed: {alpha: startRows[0].confirmed, beta: startRows[1].confirmed},
+        hello_confirmed: 0, other_native_start_fields: 'unchanged'}} : {}),
   };
   peers = {};
   if (runtimeOwned) {
