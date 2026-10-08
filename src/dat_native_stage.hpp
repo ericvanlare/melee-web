@@ -77,6 +77,9 @@ public:
      * map. The view remains valid only for this DatNativeMap's lifetime. */
     const std::vector<MeleeWebMapLightOverride>& light_overrides()const noexcept;
     std::span<const uint32_t> source_light_counts()const noexcept;
+    /* Borrow the exact cached checked animation table used by map LightLists.
+     * Repeated access preserves identity; storage ends with this map owner. */
+    void* light_animation_table(uint32_t source_offset);
 private:
     struct Storage;
     std::unique_ptr<Storage> storage_;

@@ -22,6 +22,7 @@
 #include "dat_color_animation.hpp"
 #include "dat_effect_banks.hpp"
 #include "dat_item_article.hpp"
+#include "dat_lights.hpp"
 #include "dat_item_registry.hpp"
 #include "dat_item_registry_native.hpp"
 #include "dat_native_stage.hpp"
@@ -67,6 +68,9 @@ extern "C" {
 #include <melee/mn/mnmain.h>
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include <melee/gr/grdatfiles.h>
+#include <melee/gr/ground.h>
+void melee_web_ground_load_map_lights(void);
+#include <melee/gr/types.h>
 #include <melee/gr/stage.h>
 #include <melee/ef/eflib.h>
 #include <sysdolphin/baselib/gobj.h>
@@ -2239,6 +2243,85 @@ void run_stadium_effect_runtime_lifecycle_control()
     std::cout << "C1 asset-free original effect prepare/efLib_Init/complete/end passed; no stage callbacks, proc dispatch, or ticks\n";
 }
 
+
+void run_stadium_map_light_adoption_control()
+{
+    char error[256]{};
+    check(melee_web_gameplay_startup(8U * 1024U * 1024U, error, sizeof(error)), error);
+    check(melee_web_native_world_enable(error, sizeof(error)), error);
+    const auto saved_stage_info = stage_info;
+    const auto before = melee_web_gameplay_stats();
+    const int scheduler_before = HSD_GObj_804D783C;
+    const uint32_t gobj_before = HSD_ObjAllocGetUsing(&gobj_alloc_data);
+    const uint32_t proc_before = HSD_ObjAllocGetUsing(&gobjproc_alloc_data);
+    check(!Ground_801C498C() && !stage_info.map_plit,
+          "Map-light reducer requires an unowned source baseline");
+    check(!melee_web_stage_lights_adopt_source(nullptr, error, sizeof(error)) &&
+              std::string_view(error) == "Source map-light adoption has no published descriptor context",
+          "Missing publication did not report its exact adoption condition");
+    for (unsigned cycle = 0; cycle < 2; ++cycle) {
+        MeleeWebStageLightDesc descriptor{};
+        descriptor.flags = 0x20;
+        descriptor.color[0] = descriptor.color[1] = descriptor.color[2] = descriptor.color[3] = 255;
+        auto* context = melee_web_stage_lights_create(&descriptor, 1, error, sizeof(error));
+        check(context != nullptr, error);
+        check(melee_web_stage_lights_set_override(context, 0, 0, 0, error, sizeof(error)), error);
+        check(melee_web_stage_lights_attach(context, error, sizeof(error)), error);
+        // The one synthetic map row has no source callback light flag. Original
+        // Ground therefore selects its authored two-row static fallback list.
+        UnkStageDat_x8_t entry{};
+        UnkStageDat map{};map.unk8 = &entry;map.unkC = 1;
+        auto* publication = melee_web_stage_map_publish(&map, error, sizeof(error));
+        check(publication != nullptr, error);
+        const uint32_t row_count = 1;
+        check(melee_web_stage_lights_set_source_counts(context, &row_count, 1, error, sizeof(error)), error);
+        stage_info.grkind = Gr_Kind_PStadium;stage_info.param = nullptr;
+        melee_web_ground_load_map_lights();
+        HSD_GObj* const owner = Ground_801C498C();
+        check(owner && owner->classifier == HSD_GOBJ_CLASS_GROUND && owner->hsd_obj,
+              "Original Ground did not create its own source light owner");
+        HSD_GObj foreign{};foreign.classifier = HSD_GOBJ_CLASS_GROUND;
+        check(!melee_web_stage_lights_adopt_source(&foreign, error, sizeof(error)) &&
+                  std::string_view(error) == "Source map-light adoption requires Ground's current original owner",
+              "Foreign Ground-class owner was accepted");
+        auto* const published_list = stage_info.map_plit;
+        stage_info.map_plit = nullptr;
+        check(!melee_web_stage_lights_adopt_source(owner, error, sizeof(error)) &&
+                  std::string_view(error) == "Source map-light adoption descriptor publication was replaced",
+              "Replaced descriptor publication was accepted");
+        check(!melee_web_stage_lights_detach(context, error, sizeof(error)),
+              "Detach overwrote a replaced descriptor publication");
+        stage_info.map_plit = published_list;
+        check(melee_web_stage_lights_select_source_entry(0), "Synthetic row selection failed");
+        check(!melee_web_stage_lights_adopt_source(owner, error, sizeof(error)) &&
+                  std::string_view(error) == "Original Ground light chain exceeds its selected DAT entry count",
+              "Wrong authored row bound did not refuse the actual chain");
+        check(melee_web_stage_lights_select_source_entry(-1), "Original static-list bound selection failed");
+        check(melee_web_stage_lights_adopt_source(owner, error, sizeof(error)), error);
+        uint32_t count = 0;uint16_t flags[2]{};uint8_t colors[8]{};
+        check(melee_web_stage_lights_stats(context, &count, flags, colors, 2, error, sizeof(error)) && count == 2,
+              "Adopted original static-list chain differs from its authored bound");
+        check(!melee_web_stage_lights_adopt_source(owner, error, sizeof(error)), "Duplicate adoption succeeded");
+        check(!melee_web_stage_lights_detach(context, error, sizeof(error)), "Live source context detached before retirement");
+        check(!melee_web_stage_lights_destroy(context, error, sizeof(error)), "Live source context destroyed before retirement");
+        check(!melee_web_stage_lights_retire_source(&foreign, error, sizeof(error)), "Foreign owner retirement succeeded");
+        check(melee_web_stage_lights_retire_source(owner, error, sizeof(error)), error);
+        HSD_GObjPLink_80390228(owner);
+        check(!Ground_801C498C(), "Original Ground owner survived its exact teardown");
+        check(melee_web_stage_lights_destroy(context, error, sizeof(error)), error);
+        check(melee_web_stage_map_close(publication, error, sizeof(error)), error);
+        stage_info = saved_stage_info;
+        check(melee_web_gameplay_stats().generation == before.generation &&
+                  melee_web_gameplay_stats().ticks == before.ticks &&
+                  HSD_GObj_804D783C == scheduler_before &&
+                  HSD_ObjAllocGetUsing(&gobj_alloc_data) == gobj_before &&
+                  HSD_ObjAllocGetUsing(&gobjproc_alloc_data) == proc_before,
+              "Map-light reducer advanced scheduling or retained original GObj/proc owners");
+    }
+    check(melee_web_gameplay_shutdown(error, sizeof(error)), error);
+    std::cout << "C1 asset-free original Ground map-light creation/adoption, two retire-before-detach cycles and foreign/replaced/bound refusals passed; no camera, scheduled proc dispatch or source ticks\n";
+}
+
 void run_stadium_sis_allocator_lifecycle_control()
 {
     char error[256]{};
@@ -2554,6 +2637,7 @@ void run_stadium_e8_request(
 
     MeleeWebStadiumC1StageInfoSnapshot* snapshot = nullptr;
     MeleeWebStageMap* stage_map = nullptr;
+    MeleeWebStageLights* light_context = nullptr;
     void* previous_ground_param = nullptr;
     bool ground_param_published = false;
     bool effect_bank_attached = false;
@@ -2634,6 +2718,10 @@ void run_stadium_e8_request(
             ground_param_published = false;
             check(detached_ground_param == ground_data,
                   "Could not restore the prior source GroundParam owner");
+        }
+        if (light_context) {
+            check(melee_web_stage_lights_destroy(light_context, error, sizeof(error)), error);
+            light_context = nullptr;
         }
         if (stage_map) {
             grDatFiles_801C6288();
@@ -2875,6 +2963,34 @@ void run_stadium_e8_request(
                   "OnInit boundary could not snapshot typed ftDevice globals");
         }
 
+        if (perform_on_init) {
+            // Reuse normal gameplay's CPU light context without constructing a
+            // strict full-stage owner. Both animation tables and authored entry
+            // counts borrow the retained structural map's checked storage.
+            const DatLights light_data(*archive, "map_plit", true);
+            light_context = melee_web_stage_lights_create(
+                light_data.lights.data(), light_data.lights.size(), error, sizeof(error));
+            check(light_context != nullptr, error);
+            for (uint32_t i = 0; i < light_data.lights.size(); ++i) {
+                const auto flags = read_dat_light_override(
+                    *archive, light_data.lights[i].source_offset);
+                check(melee_web_stage_lights_set_override(light_context, i,
+                          flags.has_value(), flags.value_or(0), error, sizeof(error)), error);
+                if (light_data.animation_tables[i]) {
+                    void* const table = map_owner->light_animation_table(
+                        *light_data.animation_tables[i]);
+                    check(table == map_owner->light_animation_table(
+                              *light_data.animation_tables[i]),
+                          "Borrowed map light animation table identity changed");
+                    check(melee_web_stage_lights_set_animations(
+                              light_context, i, table, error, sizeof(error)), error);
+                }
+            }
+            check(melee_web_stage_lights_attach(light_context, error, sizeof(error)), error);
+            const auto counts = map_owner->source_light_counts();
+            check(melee_web_stage_lights_set_source_counts(light_context,
+                      counts.data(), counts.size(), error, sizeof(error)), error);
+        }
         check(melee_web_stadium_e8_call_observer_begin(),
               "Could not open the bounded E8 source-call window");
         observer_window_owned = true;
@@ -2954,10 +3070,12 @@ void run_stadium_e8_request(
                   after_view.yakumono_param == yakumono_data &&
                   after_view.quake_model_set == quake->single_model(),
               "Source StageInfo did not retain the checked typed owner pointers");
-        check(after_view.itemdata == before_view.itemdata &&
-                  after_view.map_plit == before_view.map_plit &&
-                  after_view.itemdata == nullptr && after_view.map_plit == nullptr,
-              "E8 request changed the source-authored empty item/light roots");
+        check(after_view.itemdata == nullptr &&
+                  after_view.itemdata == before_view.itemdata &&
+                  after_view.map_plit == (perform_on_init
+                      ? melee_web_stage_lights_descriptors(light_context)
+                      : before_view.map_plit),
+              "E8 request replaced its authored item root or checked light context");
         if (!perform_on_init) {
             check(melee_web_stadium_c1_stage_object_failures() == 0,
                   "E8 request entered stage objects, Ground, item, or light state");
@@ -2967,8 +3085,8 @@ void run_stadium_e8_request(
                 melee_web_stadium_c1_stage_object_failures();
             check((active_failures & MELEE_WEB_STADIUM_C1_STAGE_LIST_UNAVAILABLE) == 0 &&
                       (active_failures & MELEE_WEB_STADIUM_C1_STAGE_ITEMS) == 0 &&
-                      (active_failures & MELEE_WEB_STADIUM_C1_STAGE_LIGHTS) == 0,
-                  "OnInit did not retain a readable map graph with the authored empty item/light roots");
+                      (active_failures & MELEE_WEB_STADIUM_C1_STAGE_LIGHTS) != 0,
+                  "OnInit did not retain a readable map graph and its checked published light context");
             const std::array<int, 4> map_ids{0, 1, 2, 5};
             const std::array<void*, 4> recorded_maps{
                 on_init.map2_owner.map0_ground,
@@ -3100,6 +3218,8 @@ void run_stadium_e8_request(
             check(melee_web_stage_last_end(retained_stage_owner, error,
                                            sizeof(error)), error);
             on_init_stage_end_succeeded = true;
+            check(melee_web_stage_lights_destroy(light_context, error, sizeof(error)), error);
+            light_context = nullptr;
             retained_stage_owner = nullptr;
             returned_stage_owner = nullptr;
             on_init.stats_after_end = melee_web_gameplay_stats();
@@ -3261,7 +3381,8 @@ void run_stadium_e8_request(
                          "\"typed_ground_param\":true,\"ald_yaku_all\":true,"
                          "\"map_ptcl\":true,\"map_texg\":true,"
                          "\"yakumono_param\":true,\"quake_model_set\":true,"
-                         "\"itemdata_null\":true,\"map_plit_null\":true,"
+                         "\"itemdata_null\":true,\"map_plit_context_owned_during_oninit\":true,"
+                         "\"map_plit_null_after_teardown\":true,"
                          "\"stage_info_xA0_observed_only\":"
                       << after_view.xA0
                       << ",\"authored_map_sequence\":[0,1,2,5],"
@@ -4170,6 +4291,9 @@ int main(int argc,char** argv){try{
    run_stadium_effect_runtime_lifecycle_control();
    std::cout<<"C1 source OnInit refusal and synthetic event-journal controls passed; no Stadium stage initialization invoked\n";
    return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-map-light-adoption-controls"){
+   run_stadium_map_light_adoption_control();return 0;
   }
   if(argc==2&&std::string_view(argv[1])=="--stadium-sis-allocator-controls"){
    run_stadium_sis_allocator_lifecycle_control();return 0;

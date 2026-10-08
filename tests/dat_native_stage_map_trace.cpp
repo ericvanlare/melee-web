@@ -22,6 +22,7 @@ extern "C" void* melee_web_test_native_stadium_flag(void*,int);
 extern "C" int melee_web_test_native_marker_pairs(void*,const uint16_t*,int);
 extern "C" int melee_web_test_ground_marker_last_write(void*);
 extern "C" int melee_web_test_native_map_light_identity(void*,void*);
+extern "C" void* melee_web_test_native_map_light_animation_identity(void*,void*);
 static void check(bool c,const char* e){if(!c)throw std::runtime_error(e);}
 namespace {
 using namespace melee_web::test;
@@ -50,9 +51,12 @@ template<class F>void expect_error(F&& operation,std::string_view expected){
 }
 std::vector<uint8_t> marker_fixture(uint32_t node_count=13,bool null_flag=false,
                                     bool external_map_field=false,bool local_flag=false,
-                                    bool external_flag=false,bool light_override=false){
+                                    bool external_flag=false,bool light_override=false,
+                                    bool light_animation=false,bool unterminated_animation=false){
  constexpr uint32_t data_size=0x600,root=0x100,references=0x140,entries=0x160;
  constexpr uint32_t pairs=0x1a0,flagged=0x1c0,tree=0x200;
+ check(!light_animation||light_override,"synthetic animation requires an authored light row");
+ check(!unterminated_animation||light_animation,"synthetic unterminated table requires animation");
  check(!(local_flag&&external_flag),"synthetic flagged slot has one authored kind");
  check(node_count>=13&&tree+node_count*64<=data_size,"synthetic marker tree fits bounded fixture");
  check(!light_override||tree+node_count*64<=0x540,
@@ -67,6 +71,12 @@ std::vector<uint8_t> marker_fixture(uint32_t node_count=13,bool null_flag=false,
   write_be32(data,entries+24,light_table);
   write_be32(data,light_table,light_list);
   write_be32(data,light_list,light);
+  if(light_animation){
+   // The valid table has one relocated descriptor and one authored null word.
+   // Its bad variant starts one word later and ends at the referenced record.
+   const uint32_t table=unterminated_animation?0x584:0x580;
+   write_be32(data,light_list+4,table);write_be32(data,table,0x588);
+  }
   write_be32(data,light_overrides,light);data[light_overrides+4]=0xe0;
  }
  write_be32(data,references,tree);write_be32(data,references+4,pairs);write_be32(data,references+8,8);
@@ -91,6 +101,10 @@ std::vector<uint8_t> marker_fixture(uint32_t node_count=13,bool null_flag=false,
   relocations.push_back(root+24);relocations.push_back(entries+24);
   relocations.push_back(light_table);relocations.push_back(light_list);
   relocations.push_back(light_overrides);
+  if(light_animation){
+   relocations.push_back(light_list+4);
+   relocations.push_back(unterminated_animation?0x584:0x580);
+  }
  }
  if(null_flag||local_flag||external_flag)relocations.push_back(root+40);
  if(local_flag)relocations.push_back(flagged);
@@ -433,7 +447,7 @@ void marker_fixture_trace(){
   expect_error([&]{(void)owner.collision();},
                "Collision public coll_data descriptor is missing");
  }
- auto light_bytes=marker_fixture(13,false,false,false,false,true);
+ auto light_bytes=marker_fixture(13,false,false,false,false,true,true);
  auto light_archive=std::make_shared<melee_web::DatArchive>(light_bytes);
  const std::vector<uint8_t> light_data_before(
      light_archive->data().begin(),light_archive->data().end());
@@ -456,7 +470,7 @@ void marker_fixture_trace(){
            std::count_if(source_symbols.begin(),source_symbols.end(),
                          [](const auto& symbol){return symbol.name=="map_head";})==1,
        "synthetic source catalog retains one exact map_head root identity");
- {
+ for(unsigned lifetime=0;lifetime<2;++lifetime){
   melee_web::DatNativeMap owner(light_archive,marker_contract());
   const auto& overrides=owner.light_overrides();
   check(overrides.size()==1&&overrides[0].descriptor&&
@@ -465,6 +479,17 @@ void marker_fixture_trace(){
   check(melee_web_test_native_map_light_identity(
             owner.map_head(),overrides[0].descriptor),
         "typed override descriptor is the exact light used by its map row");
+  void* const animation_table=owner.light_animation_table(0x580);
+  void* const animation_descriptor=melee_web_test_native_map_light_animation_identity(
+      owner.map_head(),animation_table);
+  check(animation_descriptor&&owner.light_animation_table(0x580)==animation_table&&
+            melee_web_test_native_map_light_animation_identity(
+                owner.map_head(),owner.light_animation_table(0x580))==animation_descriptor,
+        "cached borrowed accessor preserves exact hydrated row table and descriptor identity");
+  expect_error([&]{(void)owner.light_animation_table(0x600);},
+               "DAT range is outside its section");
+  expect_error([&]{(void)owner.light_animation_table(0x581);},
+               "DAT pointer slot is not four-byte aligned");
   check(melee_web_test_native_marker_pairs(owner.map_head(),authored.data(),8)&&
             melee_web_test_ground_marker_last_write(owner.map_head()),
         "typed light publication retains duplicate marker order and last-write semantics");
@@ -490,6 +515,10 @@ void marker_fixture_trace(){
         "live source archive handle retains the map and typed light owners");
   melee_web_archive_sections_release(source_archive);
   check(melee_web_stage_map_close(publication,error,sizeof(error)),error);
+  check(owner.light_animation_table(0x580)==animation_table&&
+            melee_web_test_native_map_light_animation_identity(
+                owner.map_head(),animation_table)==animation_descriptor,
+        "borrowed animation storage remains identical through source catalog close");
   check(owner.light_overrides()[0].descriptor==overrides[0].descriptor&&
             melee_web_test_native_map_light_identity(
                 owner.map_head(),overrides[0].descriptor),
@@ -498,6 +527,9 @@ void marker_fixture_trace(){
  check(std::equal(light_data_before.begin(),light_data_before.end(),
                    light_archive->data().begin(),light_archive->data().end()),
        "typed light identity hydration leaves authored DAT bytes unchanged");
+ expect_marker_map_error(marker_fixture(13,false,false,false,false,true,true,true),
+                         "Native scene pointer table lacks bounded terminator");
+ std::cout<<"Synthetic authored light animation table/accessor identity, two storage lifetimes and bounded offset/terminator refusals passed\n";
  auto bad_pair_index=original;write_be16(bad_pair_index,0x20+0x1a0+4,13);
  expect_marker_map_error(bad_pair_index,"Invalid marker binding");
  auto bad_marker_id=original;write_be16(bad_marker_id,0x20+0x1a0+2,261);

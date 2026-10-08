@@ -527,6 +527,28 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         self.assertEqual(events[0]["event"], "stadium_e8_request_returned")
         self.assertEqual(events[0]["selection"]["rules"]["stage_kind"], 3)
 
+    def test_stadium_map_light_asset_free_adoption_controls(self):
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("Build the reviewed C1 diagnostic map-light adoption control first")
+        command = [str(node_runtime()), str(target), "--stadium-map-light-adoption-controls"]
+        (self.scratch / "map-light-adoption-command.txt").write_text(
+            " ".join(command) + "\n", encoding="utf-8")
+        try:
+            run = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=30)
+        except subprocess.TimeoutExpired as failure:
+            for stream in ("stdout", "stderr"):
+                value = getattr(failure, stream)
+                (self.scratch / ("map-light-adoption." + stream)).write_bytes(
+                    value.encode() if isinstance(value, str) else (value or b""))
+            raise
+        (self.scratch / "map-light-adoption.stdout").write_text(run.stdout, encoding="utf-8")
+        (self.scratch / "map-light-adoption.stderr").write_text(run.stderr, encoding="utf-8")
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-5000:])
+        self.assertIn("C1 asset-free original Ground map-light creation/adoption", run.stdout)
+        self.assertIn("two retire-before-detach cycles and foreign/replaced/bound refusals passed", run.stdout)
+        self.assertIn("no camera, scheduled proc dispatch or source ticks", run.stdout)
+
     def test_stadium_sis_allocator_asset_free_lifecycle_controls(self):
         target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
         if not target.is_file():

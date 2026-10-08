@@ -102,3 +102,15 @@ int melee_web_test_native_map_light_identity(void* pointer,void* descriptor){
  LightList** lights=map->unk8[0].x18;
  return lights&&lights[0]&&lights[0]->desc==descriptor&&lights[1]==NULL;
 }
+
+/* Borrow only the original typed row/table; do not synthesize a second view. */
+void* melee_web_test_native_map_light_animation_identity(void* pointer,void* table){
+ UnkStageDat* map=pointer;
+ if(!map||map->unkC!=1||!map->unk8||!table)return NULL;
+ LightList** lights=map->unk8[0].x18;
+ if(!lights||!lights[0]||lights[1]||lights[0]->anims!=table)return NULL;
+ HSD_LightAnim** anims=lights[0]->anims;
+ if(!anims[0]||anims[1]||anims[0]->next||anims[0]->aobjdesc||
+    anims[0]->position_anim||anims[0]->interest_anim)return NULL;
+ return anims[0];
+}
