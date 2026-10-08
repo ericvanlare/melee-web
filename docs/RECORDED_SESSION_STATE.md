@@ -392,9 +392,11 @@ python3 scripts/compare_whole_session_state.py \
   --out "$SESSION_COMPARISON_OUT"
 ```
 
-This scope uses the dedicated 64 MiB and 12,000-record source caps. CSS/SSS
-rows establish consumed-input order only; declared state comparison begins at
-the match setup. A matching target is still an incomplete prefix result with
+The v1 lineage schema retains the 64 MiB and 12,000-record limits. The explicit
+v2 schema can bind per-node limits up to 128 MiB and 24,000 records; every
+nested prior validates its own limit and prefix. CSS/SSS rows establish
+consumed-input order only; declared state comparison begins at the match setup.
+A matching target is still an incomplete prefix result with
 `whole_session_equivalent: false` and CLI exit 1. The default whole-session
 scope and all earlier v8/v9 and v10 scopes keep their existing behavior.
 
@@ -407,9 +409,12 @@ The separate
 [clock-1000 source-only entry](status/2026-10-07-b4-v10-first-match-clock1000-source-only.md)
 records the original-trace observation without a browser comparison.
 The [clock-1000 comparison entry](status/2026-10-07-b4-v10-first-match-clock1000-comparison.md)
-records the bounded source-to-browser result. Its retained historical v1 source
-audit does not contain `report_write_failed`; that observation remains
-unrecorded and is not inferred from the audit's successful exit.
+records the earlier bounded source-to-browser result. Its retained historical v1
+source audit does not contain `report_write_failed`; that observation remains
+unrecorded and is not inferred from the audit's successful exit. The later
+[clock-2000 comparison entry](status/2026-10-07-b4-v10-first-match-clock2000-comparison.md)
+extends the ordered boundary with its explicitly bound v2 source limits; it also
+remains incomplete and does not change the default whole-session scope.
 
 ## Capture command failure gates
 
