@@ -22,8 +22,9 @@ The scan completed in about 10 seconds within the separately reviewed
 unchanged; the owner completed cleanup and its process group was freshly absent.
 The historical clock and stock caps remain unchanged.
 
-This observes typed source entry into Results. Browser comparison, Results
-scalar/process state, KO/winner cause, pixels, PCM, physical input, live timing,
-performance and full-session acceptance remain unrun. The next proposal pairs
-strict comparison through the complete first match with an actual browser
-Results-owner observation, without treating cursor progress as a transition.
+This observes typed source entry into Results. The subsequent
+[browser capture and strict diagnosis failed](2026-10-08-b4-first-match-results-comparison-failure.md)
+at an earlier gameplay state boundary; no browser Results witness was emitted.
+Results scalar/process state, KO/winner cause, pixels, PCM, physical input,
+live timing, performance and full-session acceptance remain unestablished.
+The source-only result is separate from that failed comparison.

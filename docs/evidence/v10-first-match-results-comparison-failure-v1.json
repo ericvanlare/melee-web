@@ -1,0 +1,736 @@
+{
+  "schema": "melee-web-b4-first-match-results-comparison-failure-receipt-v1",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/274",
+  "related_source_issue": "https://github.com/ericvanlare/melee-web/issues/273",
+  "evidence_label": "Original comparison failed",
+  "scope": "Failed first-match Results browser capture and strict first-divergence diagnosis; not accepted first-match or whole-session agreement.",
+  "source_identity": {
+    "capture_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "sequence_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "trace_bytes": 2137257881,
+    "recorded_full_trace_sha256": "81f8a0a3c8cac644e86be2e07451a5876be08b60ebb4295290a35c8a187c5580",
+    "full_trace_rehashed": false
+  },
+  "recipe_identity": {
+    "bytes": 2241622,
+    "sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b",
+    "version": 10,
+    "frame_count": 50394,
+    "seed": 3336171383
+  },
+  "producers": {
+    "source_only_audit": {
+      "head": "e850046c970fcfb6b72fd17c04852516c9541944",
+      "tree": "33ac515a786e075baafe6c5fddc95630926041e6"
+    },
+    "capture_and_comparator": {
+      "head": "ace9f5d2b50d75ce53e35ed5086b147d33cbbe59",
+      "tree": "681bc30c75faffacba484e53164be04636a16525",
+      "base_main": "e850046c970fcfb6b72fd17c04852516c9541944"
+    },
+    "retained_native": {
+      "head": "d1914d7320e7559ed7e43b0eadf50d55ddd46e6d",
+      "tree": "3db3078be94303a6008b8b18b096db6d1a997b08",
+      "configuration": "Release",
+      "target": "runtime",
+      "command": [
+        "python3",
+        "scripts/build.py",
+        "--target",
+        "runtime",
+        "--configuration",
+        "Release"
+      ],
+      "default_off_gates": {
+        "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+        "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+        "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+        "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+        "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+        "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+        "MELEE_WEB_RESULTS_RENDERED_TRACE": "OFF",
+        "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+        "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF",
+        "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF"
+      },
+      "native_closure": "Source, patches, dependency pins and native build flags unchanged; CMake differences only add web configure_file staging copies. No native rebuild or current-head binary relabeling.",
+      "three_artifacts": {
+        "gameplay_menu_browser.js": {
+          "bytes": 300352,
+          "sha256": "213fd21eea42113a57fef994b3589e002e2c2a4c293ab9a682b69c8698b69c3f"
+        },
+        "gameplay_menu_browser.wasm": {
+          "bytes": 15749904,
+          "sha256": "a3154d5fc3c0f5821aa1ca2bc7a849bdfc841ced136d1e57a131727f3bb54f77"
+        },
+        "gameplay_menu_browser.data": {
+          "bytes": 3674112,
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+        }
+      },
+      "historical_inventory_count": 32
+    },
+    "current_staged_and_served": {
+      "artifact_count": 34,
+      "artifacts": {
+        "action-sweep.mjs": {
+          "bytes": 18698,
+          "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+        },
+        "audio-ring.mjs": {
+          "bytes": 2040,
+          "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+        },
+        "audio-worklet.js": {
+          "bytes": 1517,
+          "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+        },
+        "controller-input.mjs": {
+          "bytes": 19263,
+          "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+        },
+        "controller-panel.css": {
+          "bytes": 5240,
+          "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+        },
+        "controller-panel.mjs": {
+          "bytes": 36847,
+          "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+        },
+        "controller-settings.css": {
+          "bytes": 3482,
+          "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+        },
+        "controller-settings.mjs": {
+          "bytes": 18680,
+          "sha256": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f"
+        },
+        "diagnostics-schema.mjs": {
+          "bytes": 18780,
+          "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+        },
+        "diagnostics-settings.mjs": {
+          "bytes": 2876,
+          "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+        },
+        "disc-image.mjs": {
+          "bytes": 15255,
+          "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+        },
+        "disc-session.mjs": {
+          "bytes": 7552,
+          "sha256": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2"
+        },
+        "dsp-coefficients.mjs": {
+          "bytes": 4043,
+          "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+        },
+        "gameplay_menu_browser.data": {
+          "bytes": 3674112,
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+        },
+        "gameplay_menu_browser.js": {
+          "bytes": 300352,
+          "sha256": "213fd21eea42113a57fef994b3589e002e2c2a4c293ab9a682b69c8698b69c3f"
+        },
+        "gameplay_menu_browser.wasm": {
+          "bytes": 15749904,
+          "sha256": "a3154d5fc3c0f5821aa1ca2bc7a849bdfc841ced136d1e57a131727f3bb54f77"
+        },
+        "hitch-capture.mjs": {
+          "bytes": 21958,
+          "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+        },
+        "match-flow.mjs": {
+          "bytes": 10679,
+          "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+        },
+        "match-menu.mjs": {
+          "bytes": 8566,
+          "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+        },
+        "melee-runtime.mjs": {
+          "bytes": 50699,
+          "sha256": "0fdd584a8636e821eb08b2a3232ec05d7c3ce0c33e43e5e640a16e0809709013"
+        },
+        "net-timing-pause.mjs": {
+          "bytes": 1043,
+          "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"
+        },
+        "net_lockstep_core.mjs": {
+          "bytes": 25527,
+          "sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff"
+        },
+        "net_lockstep_native_adapter.mjs": {
+          "bytes": 8445,
+          "sha256": "4130dce6c6390506b66bfafebace3fe33ac561ce8a873d06956b619fa5f0686a"
+        },
+        "prototype-keyboard-layouts.mjs": {
+          "bytes": 935,
+          "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+        },
+        "runtime-assets.mjs": {
+          "bytes": 17029,
+          "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190"
+        },
+        "runtime-audio-assets.mjs": {
+          "bytes": 5451,
+          "sha256": "033bf0bd4caa6c744ebead3dd7091bec8496b5f8d2039d60a3cdf9d398a7f05c"
+        },
+        "runtime-audio.mjs": {
+          "bytes": 7660,
+          "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+        },
+        "runtime-cache.js": {
+          "bytes": 16143,
+          "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+        },
+        "runtime-development.mjs": {
+          "bytes": 60714,
+          "sha256": "258dde2991c34f06f89c2e5ec3800aa8a1fad185949f807d3c3f8412e93f0e24"
+        },
+        "runtime-diagnostics-delivery.mjs": {
+          "bytes": 51514,
+          "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+        },
+        "runtime-diagnostics.mjs": {
+          "bytes": 85702,
+          "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+        },
+        "runtime.html": {
+          "bytes": 5205,
+          "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+        },
+        "touch-controls.css": {
+          "bytes": 6381,
+          "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+        },
+        "touch-controls.mjs": {
+          "bytes": 13954,
+          "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+        }
+      },
+      "pre_and_post_HTTP_identity_equal": true,
+      "loaded_module_set_claimed": false,
+      "loaded_runtime_data": {
+        "file_bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+        "loaded_bytes": 3674112,
+        "total_bytes": 3674112,
+        "from_cache": false
+      }
+    },
+    "browser": {
+      "executable": "installed Google Chrome",
+      "version": "154.0.8037.98",
+      "headless": true,
+      "host_speaker_output_silent": true
+    }
+  },
+  "acceptance": {
+    "equivalent": false,
+    "first_match_equivalent": false,
+    "Results_entry_equivalent": false,
+    "Results_scalar_equality": false,
+    "source_paired_Results_input": false,
+    "whole_session_equivalent": false,
+    "complete": false,
+    "gold_admitted": false
+  },
+  "failed_capture": {
+    "attempts": 1,
+    "requested_cursor": 16291,
+    "observed_source_frames": 16290,
+    "owner_exit_code": 1,
+    "elapsed_ms": 286269,
+    "replay_seconds": 330,
+    "owner_seconds": 390,
+    "cleanup_reserve_seconds": 30,
+    "first_error": "Whole-session replay source scene disagrees before input consumption: cursor=16290 expected=4 observed=3 owner=match host_phase=5 asset_destination=0 preparation_phase=0 pending=0 running=1",
+    "export_record_counts": {
+      "header": 1,
+      "session_frame": 16290,
+      "session_match_enter_complete": 1
+    },
+    "export_scene_counts": {
+      "1": 937,
+      "2": 247,
+      "3": 15106
+    },
+    "results_witness_present": false,
+    "last_frame": {
+      "index": 16289,
+      "scene": 3,
+      "match_frame": 14982,
+      "rng": 3134387889
+    },
+    "last_stocks": [
+      1,
+      1,
+      0,
+      0
+    ],
+    "source_last_match_stocks": [
+      1,
+      0,
+      0,
+      0
+    ],
+    "browser_errors": [],
+    "unexpected_requests": [],
+    "cleanup_passed": true,
+    "original_stats_stable": true,
+    "owned_lane_released": true
+  },
+  "strict_diagnostic": {
+    "purpose": "First-error reduction of failed retained export; all agreement and Results flags stay false even for matching prefixes.",
+    "result": "divergence_found",
+    "complete_export_validated_before_source_open": true,
+    "browser_session_rows": 16290,
+    "compared_frames": 5239,
+    "match_state_frames_compared": 4055,
+    "nonmatch_input_frames_compared": 1184,
+    "first_difference": {
+      "actual": 2352289036,
+      "expected": 2495929788,
+      "field": "rng",
+      "index": 5239,
+      "message": "match frame 5239: exact state differs at rng",
+      "record": "session_frame"
+    },
+    "first_error_provenance": {
+      "boundary": "source_tick",
+      "browser_frame_index": 5239,
+      "last_complete_source_tick_sequence": 24382,
+      "pending_PAD_source_sequence": 24385,
+      "source_sequence": 24387,
+      "source_tick": 4055
+    },
+    "fresh_gates_completed": [
+      {
+        "label": "clock1",
+        "prefix": {
+          "bytes_read": 10389712,
+          "last_source_sequence": 4735,
+          "records_read": 4736,
+          "sha256": "24d520abccf98ee109b3cee2ae67767d4363c7e941d688c3534c0cbfdd7cde4a"
+        }
+      },
+      {
+        "label": "clock60",
+        "prefix": {
+          "bytes_read": 12780628,
+          "last_source_sequence": 5030,
+          "records_read": 5031,
+          "sha256": "32b763453688c6335b90c9807b71c79d919b85e6e7435a3c2abccd1792f00e77"
+        }
+      },
+      {
+        "label": "clock300",
+        "prefix": {
+          "bytes_read": 22506388,
+          "last_source_sequence": 6230,
+          "records_read": 6231,
+          "sha256": "ef9569c32524aa79443a998867c4c418a2cfd8b21719ed24b03fc966ded025ef"
+        }
+      },
+      {
+        "label": "clock500",
+        "prefix": {
+          "bytes_read": 30611188,
+          "last_source_sequence": 7230,
+          "records_read": 7231,
+          "sha256": "ec1ceb5c56c87ec35b5dd8cd0d318c85b1917d554871883732de4d2e4f52e7b6"
+        }
+      },
+      {
+        "label": "clock1000",
+        "prefix": {
+          "bytes_read": 50873188,
+          "last_source_sequence": 9730,
+          "records_read": 9731,
+          "sha256": "7f71d2c8c9529e8171dfab854cd114abb0eef44ca8d59c6f7e96af5495d13cf7"
+        }
+      },
+      {
+        "label": "clock2000",
+        "prefix": {
+          "bytes_read": 91371214,
+          "last_source_sequence": 14728,
+          "records_read": 14729,
+          "sha256": "3f5eaf2c845a387d22c1da7abf74d0f4e4ca2c40fd8503b31a890f0f3f6b7296"
+        }
+      },
+      {
+        "label": "stock258",
+        "prefix": {
+          "bytes_read": 151442332,
+          "last_source_sequence": 22141,
+          "records_read": 22142,
+          "sha256": "db1f0b02e40e4f343f6398033aa1cb46486ddc5db1ffeed5fe8583a4847c8606"
+        }
+      },
+      {
+        "label": "stock271",
+        "prefix": {
+          "bytes_read": 166680623,
+          "last_source_sequence": 24022,
+          "records_read": 24023,
+          "sha256": "c31863f04fcc44a454f316b9090989aac057ab868f8b3afb4a034604f53889dc"
+        }
+      }
+    ],
+    "fresh_source_prefix": {
+      "bytes_read": 169638875,
+      "last_source_sequence": 24387,
+      "records_read": 24388,
+      "sha256": "9c0d0df33a110de30f9ab917d7b0685f354364d5b3b0f1d4a27adc8283e023d0"
+    },
+    "caps": {
+      "max_bytes": 617177113,
+      "max_records": 79625,
+      "max_seconds": 60
+    },
+    "owner_seconds": 65,
+    "cleanup_seconds": 5,
+    "source_terminal_consumed": false,
+    "source_stat_stable": true,
+    "fresh_owned_process_absence": true
+  },
+  "narrow_suffix": {
+    "purpose": "Inspect exact source states and PAD at the first divergence; no new acceptance or whole-prefix reconstruction.",
+    "window": {
+      "bytes": 2958252,
+      "end": 169638875,
+      "first_sequence": 24023,
+      "last_sequence": 24387,
+      "records": 365,
+      "start": 166680623
+    },
+    "window_sha256": "430fcae96d6d71a06457cee1303aaa5d99338738fcd844e7c5a32271ffaff392",
+    "source_payload_opens": 1,
+    "disc_payload_opens": 0,
+    "max_internal_seconds": 10,
+    "owner_seconds": 15,
+    "cleanup_seconds": 5,
+    "new_whole_prefix_hash": false,
+    "prior_entity_generation_basis": "prior accepted gate generation0 plus actual earlier full-prefix comparison; local raw pointer transitions strictly tracked",
+    "source_stat_stable": true,
+    "fresh_owned_process_absence": true,
+    "owned_tmp_removed": true,
+    "targets": {
+      "4054": {
+        "source_sequence": 24382,
+        "PAD_sequence": 24380,
+        "browser_index": 5238,
+        "match_clock": 3931,
+        "source_rng": 1630432334,
+        "browser_rng": 1630432334,
+        "first_difference_by_top_level_field": {}
+      },
+      "4055": {
+        "source_sequence": 24387,
+        "PAD_sequence": 24385,
+        "browser_index": 5239,
+        "match_clock": 3932,
+        "source_rng": 2495929788,
+        "browser_rng": 2352289036,
+        "first_difference_by_top_level_field": {
+          "fighters": [
+            "[1].motion",
+            90,
+            17
+          ],
+          "rng": [
+            "$",
+            2495929788,
+            2352289036
+          ]
+        }
+      }
+    },
+    "additional_fighter1_differences": [
+      "animation",
+      "animation_frame_bits",
+      "animation_speed_bits",
+      "damage_bits",
+      "ground_air",
+      "input_hex",
+      "knockback_bits",
+      "motion",
+      "velocity_bits"
+    ],
+    "matching_target_fields": [
+      "match_frame",
+      "fighter_entities",
+      "pad_state_hex",
+      "fighters[0]",
+      "fighters[2]",
+      "fighters[3]"
+    ],
+    "cause_identified": false,
+    "source_enum_interpretation": {
+      "kind": {
+        "value": 5,
+        "enum": "FTKIND_KOOPA",
+        "source": ".deps/melee/src/melee/ft/forward.h:95"
+      },
+      "source_motion": {
+        "value": 90,
+        "enum": "ftCo_MS_DamageFlyTop",
+        "source": ".deps/melee/src/melee/ft/ftmotionstates.c:1125"
+      },
+      "browser_motion": {
+        "value": 17,
+        "enum": "ftCo_MS_WalkFast",
+        "source": ".deps/melee/src/melee/ft/ftmotionstates.c:322"
+      },
+      "interpretation": "Original enum and motion table names only; these do not identify the hit source, collision path or RNG cause."
+    }
+  },
+  "preparation_boundary_violation": {
+    "status": "boundary-violation-preserved-no-rerun",
+    "payload_kind": "CISO",
+    "bytes": 1449165376,
+    "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "builder": {
+      "bytes": 5369,
+      "logical_name": "freeze_preparation_v1.py",
+      "sha256": "067cb6d63a178137a9bbe82742e9d8836975a28b2b096fbf01c2b4c655b06ea9"
+    },
+    "read_origin": "freeze_preparation_v1.py recursive walk(packet), location packet.browser.disc, identity(path).read_bytes()",
+    "observed_exit_code": 0,
+    "tool_reported_wall_seconds": 1.346146917,
+    "process_pid_recorded": false,
+    "exact_start_end_times_recorded": false,
+    "MWRO_payload_read": false,
+    "typed_scan_or_comparison_executed": false,
+    "initial_read_report_corrected": "Initial MWRO-read wording was corrected to CISO-read wording.",
+    "guarded_preflight_refused_CISO_before_source_iterator": true,
+    "corrected_metadata_builder_original_open_attempts": 0,
+    "correction": "Exclude normalized protected paths before hashing; install audit hook before builder work/imports; synthetic direct, alias and bytes-path refusal controls; separately reviewed fresh metadata execution."
+  },
+  "validation": {
+    "full_python_suite": {
+      "run": 2072,
+      "executed": 1919,
+      "skipped": 153,
+      "failures": 0
+    },
+    "new_real_compare_paths_controls": 10,
+    "next_stock_controls": 11,
+    "historical_controls": 7,
+    "diagnostic_synthetic_actual_engine_controls": 4,
+    "suffix_controls": 9,
+    "adapter_limits": "Synthetic decoder and historical sidecar fixture adapters are explicit; public compare_paths, collector, strict gates, complete export-tail validation and report path are actual APIs.",
+    "native_reuse_closure_reviewed": true,
+    "executable_unchanged_since_tested_producer": true
+  },
+  "retained_failures": [
+    "Historical B4 clock/stock receipts and binaries remain unchanged.",
+    "Capture Results scene guard failure; no unchanged retry.",
+    "Historical #271 initial TIME_WAIT cleanup check false; accepted attributed cleanup reduction retained separately.",
+    "Unauthorized full CISO preparation hash read and guarded refusal, metadata reducer v2 byte-path/destination errors; v3 corrected metadata execution.",
+    "Suffix control v1 used the lifecycle-only PC map for pad_poll; corrected actual BOUNDARIES map v2 passed."
+  ],
+  "provenance": {
+    "capture-failure-outcome-v1.json": {
+      "logical_name": "capture-failure-outcome-v1.json",
+      "bytes": 13090,
+      "sha256": "6ace001331677ce7eec10023a6048d5635dde8d909cec305379f5b46568a5d01"
+    },
+    "capture-failure-review-packet-v1.json": {
+      "logical_name": "capture-failure-review-packet-v1.json",
+      "bytes": 5148,
+      "sha256": "c09369a2ff48febc5b6710ec840381968a491c15e6a985c0b200053590a0a005"
+    },
+    "root-capture-failure-review-v1.json": {
+      "logical_name": "root-capture-failure-review-v1.json",
+      "bytes": 4419,
+      "sha256": "6e835dbe730a0319c81f019e07228252f5fbfee0253e603e661a5d7084151fc2"
+    },
+    "producer-source-manifest-v1.json": {
+      "logical_name": "producer-source-manifest-v1.json",
+      "bytes": 45082,
+      "sha256": "1423cde5e541dc694dff6aea091f42ec2bf7884cb28aa16d55da87d751b5b87c"
+    },
+    "runtime-artifact-manifest-v1.json": {
+      "logical_name": "runtime-artifact-manifest-v1.json",
+      "bytes": 5846,
+      "sha256": "6c0347345bbd053b9d2fa2c05015664d54861d172bd25cb5d707a818ea40a839"
+    },
+    "native-producer-reuse-v1.json": {
+      "logical_name": "native-producer-reuse-v1.json",
+      "bytes": 35484,
+      "sha256": "574ad74f4dcf0f9e5f7c3e53f53f13e42fc0d983323370137a9c3cc1fece1faa"
+    },
+    "root-launch-authorization-v1.json": {
+      "logical_name": "root-launch-authorization-v1.json",
+      "bytes": 32356,
+      "sha256": "abb1a42fc0e852895389f3e981693309cee3b73b25daacec528d6cc58397554e"
+    },
+    "capture-output-v1/report.json": {
+      "logical_name": "report.json",
+      "bytes": 10434891,
+      "sha256": "2b558b6cda0200c1a4d0463b13a7254dec7cbf07feb07e0287745d2781f8b482"
+    },
+    "capture-output-v1/retail-browser-report.json": {
+      "logical_name": "retail-browser-report.json",
+      "bytes": 18879,
+      "sha256": "416de5accf2bd7ce09ca18a052326d87f8f610b9c7fbfab7b9658c1999bc9046"
+    },
+    "capture-output-v1/retail-port.jsonl": {
+      "logical_name": "retail-port.jsonl",
+      "bytes": 73844776,
+      "sha256": "d9de44b12b8eb4122972af530a8b566962126c403706efb91506bbdf24b932f0"
+    },
+    "first-divergence-preparation-v3/diagnostic-result-v1.json": {
+      "logical_name": "diagnostic-result-v1.json",
+      "bytes": 3831,
+      "sha256": "9c882c3ec7709952935c3795f89823870bce958bcaefcd3684e3cd94f8647869"
+    },
+    "first-divergence-preparation-v3/diagnostic-outcome-review-v1.json": {
+      "logical_name": "diagnostic-outcome-review-v1.json",
+      "bytes": 10562,
+      "sha256": "83f707545e9b53862fb5fb9ea347d50a9dd730894a35aef31a205a5efdd28c25"
+    },
+    "first-divergence-preparation-v3/root-diagnostic-outcome-review-v1.json": {
+      "logical_name": "root-diagnostic-outcome-review-v1.json",
+      "bytes": 4861,
+      "sha256": "a4927b13391a93376888080dc69556590617716407795a3041f5e64ed6c0cbfa"
+    },
+    "suffix-window-preparation-v2/suffix-outcome-review-v2.json": {
+      "logical_name": "suffix-outcome-review-v2.json",
+      "bytes": 2706,
+      "sha256": "27fc59787cee62f34a764a088b03d234ce74b8d691ce5eab6f5ab6a70c19a5ba"
+    },
+    "suffix-window-preparation-v2/suffix-extraction-result-v2.json": {
+      "logical_name": "suffix-extraction-result-v2.json",
+      "bytes": 77751,
+      "sha256": "6916bca06020a288d3ade4ce8966ce2d0c9bb8e27ed5d1d7fb520b4b4ae49837"
+    },
+    "suffix-window-preparation-v2/source-window-24023-24387.mwro": {
+      "logical_name": "source-window-24023-24387.mwro",
+      "bytes": 2958252,
+      "sha256": "430fcae96d6d71a06457cee1303aaa5d99338738fcd844e7c5a32271ffaff392"
+    },
+    "suffix-window-preparation-v2/controls-v2.log": {
+      "logical_name": "controls-v2.log",
+      "bytes": 837,
+      "sha256": "71c0c3a364bdde3bf8f1a71fe04f00c07aadaac77f9aba2d18dc56f0a389fb25"
+    },
+    "suffix-window-preparation-v1/controls-v1.log": {
+      "logical_name": "controls-v1.log",
+      "bytes": 6314,
+      "sha256": "e17d6f2b9941d2f891943350c5bdbe7b275a1688f99f2e9fc440cbc0f6a670c5"
+    },
+    "metadata-inventory-reducer-v2/unauthorized-read-disclosure-v1.json": {
+      "logical_name": "unauthorized-read-disclosure-v1.json",
+      "bytes": 3194,
+      "sha256": "936f9f0f4777d053ee1e1843990690b80b28f099a2185acf1477a35e0bf87cac"
+    },
+    "metadata-inventory-reducer-v3/root-metadata-preparation-authorization-v3.json": {
+      "logical_name": "root-metadata-preparation-authorization-v3.json",
+      "bytes": 3891,
+      "sha256": "c2199843ed6fe724005ac25b0ca8459048dc4701d481e6474665a04260be5967"
+    },
+    "full_python_suite_log": {
+      "logical_name": "suite.log",
+      "bytes": 380908,
+      "sha256": "80afa888fc3877282cad1092970e1b645bd49ea92a34dbec0b35862b64053b2f"
+    },
+    "full_python_suite_receipt": {
+      "logical_name": "receipt.json",
+      "bytes": 827,
+      "sha256": "6db68b10bd99c1701e9ad72194928432d59583defb2b089190bd3c2664b8417f"
+    },
+    "root_comparator_review": {
+      "logical_name": "root-comparator-source-review-v1.json",
+      "bytes": 7966,
+      "sha256": "4f5b8852c4b894e42b31e62b007107f6f5abb6642604d3477b598982dbb62af7"
+    },
+    "comparator_packet": {
+      "logical_name": "comparator-review-packet-v1.json",
+      "bytes": 14437,
+      "sha256": "ecc8beba03918a28efba81b0542fea786f2f00117efcf1ebbdde9733141ba8df"
+    },
+    "root_suffix_outcome_review": {
+      "logical_name": "root-suffix-outcome-review-v2.json",
+      "bytes": 5229,
+      "sha256": "7ad07ba4a1697a007410048423518e994ac5adaf50b9fd1cf3b2ab4b68240c4f"
+    },
+    "prior271_accepted_reduced_cleanup": {
+      "logical_name": "root-capture-outcome-review-v1.json",
+      "bytes": 5650,
+      "sha256": "3bbdeecfa8b1c2fc8581d29372130a8224a7b58bbe304629868df2a2f1c06c2b"
+    },
+    "prior271_initial_cleanup_TIME_WAIT": {
+      "logical_name": "owner-report-v1.json",
+      "bytes": 102633,
+      "sha256": "f0ca3d6227ec96e36a58149bf7fed13f4ebb01dc12f77a1ea74ede8938ba7856"
+    },
+    "prior_v7_startup_failure": {
+      "logical_name": "capture-execution-outcome-v7.json",
+      "bytes": 8159,
+      "sha256": "53089a9908cb2d4b9fe5597da84bc6c020f9d407e4b09d6cc65d3718e3b52286"
+    },
+    "prior_v8_runtime_failure": {
+      "logical_name": "capture-execution-outcome-v8.json",
+      "bytes": 9130,
+      "sha256": "32c371247db87a9fa4a4a6d04eaa80e07949fbdcbcc4858009a757cac1248a15"
+    },
+    "retained274_preparation_history": {
+      "logical_name": "comparator-review-packet-v1.json",
+      "bytes": 14437,
+      "sha256": "ecc8beba03918a28efba81b0542fea786f2f00117efcf1ebbdde9733141ba8df"
+    },
+    ".deps/melee/src/melee/ft/forward.h": {
+      "logical_name": "forward.h",
+      "bytes": 12770,
+      "sha256": "73cf4918e768aa15477d7c9e17d6fa58ded77ee60c9e0398820dda1ac6cfc7fe"
+    },
+    ".deps/melee/src/melee/ft/kinds/ftCommon/forward.h": {
+      "logical_name": "forward.h",
+      "bytes": 30840,
+      "sha256": "514cd2e4a2ebf3729255efce6b88bb6b91acd685a519e2b4bb01bcb09f7492ca"
+    },
+    ".deps/melee/src/melee/ft/ftmotionstates.c": {
+      "logical_name": "ftmotionstates.c",
+      "bytes": 108843,
+      "sha256": "8785cfcb7091ce29268a8c2172aecd97a60bc6352c545a472aa77e4cbd66141a"
+    },
+    "tools/reference_capture_semantics.py": {
+      "logical_name": "reference_capture_semantics.py",
+      "bytes": 68176,
+      "sha256": "6fe275a481b4a5c9332175f75a7f90e809d3e772fad741b211e56209a7c3cec3"
+    }
+  },
+  "exclusions": [
+    "No first-match acceptance",
+    "No observed browser Results entry",
+    "No Results scalar/process or source-paired Results input equality",
+    "No RNG/collision/state-transition cause",
+    "No gameplay fix",
+    "No new browser run or native build after failure",
+    "No pixels, PCM, physical-input, live timing or performance acceptance",
+    "No full-session or competitive admission"
+  ],
+  "historical_cleanup_distinction": {
+    "issue271_initial_cleanup_false": "Historical owner report retained with TIME_WAIT port-check failure.",
+    "issue271_reduction": "Matching listener absence, refused connection, reusable bind and fresh attributed process absence subsequently passed; reduced outcome separate from initial false report.",
+    "issue274_current_capture_cleanup": "Current attributed cleanup passed; its receipt is separate from the historical271 initial failure."
+  },
+  "intended_comparison_boundary": {
+    "scope": "v10-first-match-results-entry",
+    "strict_match_state_frames": 15106,
+    "strict_nonmatch_input_frames": 1184,
+    "cursor_before_Results": 16290,
+    "browser_first_Results_cursor": 16291,
+    "new_scope_max_browser_session_rows": 16384,
+    "historical_scope_caps_unchanged": true,
+    "separate_browser_witness": "First actual scene4 session_frame must witness observed Results owner/tick entry; cursor alone is insufficient.",
+    "source_audit_stops_before_Results_PAD": true,
+    "first_Results_row_scalar_or_input_source_equality_claimed": false,
+    "acceptance_requirement_met": false
+  }
+}
