@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {spawnSync} from 'node:child_process';
-import {mkdtemp, rm} from 'node:fs/promises';
+import {mkdtemp, readFile, rm} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
-import {validateLockstepBrowserMode} from '../scripts/net_lockstep_browser_modes.mjs';
+import {buildRuntimeCssSssGamepadSamples, RUNTIME_CSS_SSS_GENERATOR_SHA256,
+  RUNTIME_CSS_SSS_INPUT_TICKS, RUNTIME_CSS_SSS_SOURCE_TICKS,
+  validateLockstepBrowserMode, validateRuntimeCssSssRecipe} from '../scripts/net_lockstep_browser_modes.mjs';
 
 const options = (overrides = {}) => ({scenario: 'positive', 'peer-owner': 'browser',
   'peer-transport': 'webrtc', 'webrtc-signaling': 'room-worker', ...overrides});
@@ -29,7 +32,7 @@ test('positive WebRTC cannot pass SDP through the Node memory coordinator', () =
 test('unsupported WebRTC scenarios and owners fail before acquisition', () => {
   for (const scenario of ['probe'])
     assert.throws(() => validateLockstepBrowserMode(options({scenario})),
-      /browser-owned input-sampling, positive, disconnect, flip, or native-pump mode/);
+      /browser-owned input-sampling, positive, disconnect, flip, native-pump, or runtime-css-sss mode/);
   assert.throws(() => validateLockstepBrowserMode(options({'peer-owner': 'node'})),
     /applies only to browser-owned peers/);
 });
@@ -120,7 +123,85 @@ test('runtime-owned native-pump CLI reaches output creation without a synthetic 
 test('runtime nonneutral fixture is explicit and restricted to existing eight-CSS runtime scope', () => {
   const valid = options({scenario: 'native-pump', 'peer-owner': 'runtime', 'source-ticks': '8', 'runtime-input-fixture': 'neutral-a-release'});
   assert.equal(validateLockstepBrowserMode(valid).runtimeInputFixture, true);
+  assert.equal(validateLockstepBrowserMode(valid).runtimeInputFixtureName, 'neutral-a-release');
   for (const overrides of [{'runtime-input-fixture': 'A'}, {'peer-owner': 'browser'}, {scenario: 'positive'}, {'source-ticks': '9'}])
     assert.throws(() => validateLockstepBrowserMode({...valid, ...overrides}));
   assert.equal(validateLockstepBrowserMode(options({scenario: 'native-pump', 'peer-owner': 'runtime', 'source-ticks': '8'})).runtimeInputFixture, undefined);
+});
+
+const runtimeCssSssOptions = (overrides = {}) => options({scenario: 'runtime-css-sss', 'peer-owner': 'runtime',
+  'peer-transport': 'webrtc', 'webrtc-signaling': 'room-worker', 'source-ticks': '520',
+  'runtime-input-fixture': 'css-start-to-sss', script: 'route.mwni', 'script-manifest': 'route.json', ...overrides});
+
+test('runtime CSS-to-SSS mode admits only the explicit 520-tick Room Worker fixture contract', () => {
+  assert.deepEqual(validateLockstepBrowserMode(runtimeCssSssOptions()), {browserOwned: true, runtimeOwned: true,
+    peerTransport: 'webrtc', localWebRtc: true, roomWorkerSignaling: true,
+    runtimeInputFixture: true, runtimeInputFixtureName: 'css-start-to-sss'});
+  for (const overrides of [
+    {'source-ticks': '519'}, {'source-ticks': undefined}, {'peer-owner': 'browser'},
+    {'peer-transport': 'relay'}, {'webrtc-signaling': 'memory'}, {'runtime-input-fixture': undefined},
+    {'runtime-input-fixture': 'neutral-a-release'}, {script: undefined}, {'script-manifest': undefined},
+  ]) assert.throws(() => validateLockstepBrowserMode(runtimeCssSssOptions(overrides)),
+    /runtime-css-sss|runtime-input-fixture|Runtime-owned peers/);
+  assert.throws(() => validateLockstepBrowserMode(options({'script-manifest': 'route.json'})), /only to runtime-css-sss/);
+  assert.throws(() => validateLockstepBrowserMode(runtimeCssSssOptions({scenario: 'positive', 'script-manifest': undefined})), /Runtime-owned peers/);
+});
+
+function runtimeRecipeFixture() {
+  const count = RUNTIME_CSS_SSS_INPUT_TICKS, body = Buffer.alloc(count * 44);
+  const port = (tick, player, {buttons = 0, stickX = 0, stickY = 0} = {}) => {
+    const offset = tick * 44 + player * 11;
+    body.writeUInt16BE(buttons, offset); body.writeInt8(stickX, offset + 2); body.writeInt8(stickY, offset + 3);
+  };
+  port(0, 0, {stickX: 80, stickY: -40});
+  port(1, 1, {stickX: -60, stickY: 20});
+  for (let tick = 150; tick <= 152; ++tick) port(tick, 0, {buttons: 0x1000});
+  port(153, 0, {buttons: 0x1000, stickX: 80}); // Outside the selected CSS prefix.
+  const header = Buffer.alloc(16); header.write('MWNI'); header.writeUInt32BE(1, 4);
+  header.writeUInt32BE(count, 8); header.writeUInt32BE(0, 12);
+  const scriptBytes = Buffer.concat([header, body]);
+  const digest = bytes => createHash('sha256').update(bytes).digest('hex');
+  const manifest = {schema: 'melee-web-net-input-script-v1', version: 1, seed: 305419896,
+    frames: count, frame_bytes: 44, human_ports: [0, 1], frames_sha256: digest(body), script_sha256: digest(scriptBytes)};
+  return {body, scriptBytes, manifestBytes: Buffer.from(JSON.stringify(manifest)), manifest};
+}
+
+test('runtime CSS-to-SSS recipe validation binds format, seed, generated bytes and reviewed generator identity', async () => {
+  const fixture = runtimeRecipeFixture();
+  const generatorBytes = await readFile(new URL('../tools/net_input_script.py', import.meta.url));
+  assert.equal(createHash('sha256').update(generatorBytes).digest('hex'), RUNTIME_CSS_SSS_GENERATOR_SHA256);
+  const identity = validateRuntimeCssSssRecipe({...fixture, generatorBytes, seed: fixture.manifest.seed});
+  assert.equal(identity.script_sha256, fixture.manifest.script_sha256);
+  assert.equal(identity.frame_count, RUNTIME_CSS_SSS_INPUT_TICKS);
+  assert.equal(identity.stimulus_frames, 153);
+  const badScript = Buffer.from(fixture.scriptBytes); badScript[16] = 1;
+  const badHeader = Buffer.from(fixture.scriptBytes); badHeader.writeUInt32BE(RUNTIME_CSS_SSS_INPUT_TICKS - 1, 8);
+  const wrongFramesManifest = {...fixture.manifest, frames: fixture.manifest.frames + 1};
+  for (const value of [
+    {...fixture, seed: fixture.manifest.seed + 1},
+    {...fixture, scriptBytes: badScript},
+    {...fixture, scriptBytes: badHeader},
+    {...fixture, manifestBytes: Buffer.from('{bad json')},
+    {...fixture, manifestBytes: Buffer.from(JSON.stringify(wrongFramesManifest))},
+    {...fixture, generatorBytes: Buffer.from('unreviewed generator')},
+  ]) assert.throws(() => validateRuntimeCssSssRecipe({...value,
+    generatorBytes: value.generatorBytes ?? generatorBytes,
+    seed: value.seed ?? fixture.manifest.seed}));
+  const wrongSeedManifest = {...fixture.manifest, seed: fixture.manifest.seed + 1};
+  assert.throws(() => validateRuntimeCssSssRecipe({...fixture,
+    manifestBytes: Buffer.from(JSON.stringify(wrongSeedManifest)), generatorBytes, seed: fixture.manifest.seed}), /manifest/);
+});
+
+test('runtime CSS-to-SSS Gamepad sample builder round-trips only the recipe prefix and neutral tail', () => {
+  const {body} = runtimeRecipeFixture();
+  const scriptFrames = Buffer.alloc(16 + body.length); body.copy(scriptFrames, 16);
+  const samples = buildRuntimeCssSssGamepadSamples(scriptFrames.subarray(16));
+  assert.equal(samples.alpha.length, RUNTIME_CSS_SSS_INPUT_TICKS);
+  assert.equal(samples.beta.length, RUNTIME_CSS_SSS_INPUT_TICKS);
+  assert.deepEqual(samples.alpha[0].bytes.slice(0, 4), [0, 0, 80, 216]);
+  assert.equal(samples.alpha[150].bytes[0], 0x10);
+  assert.equal(samples.alpha[153].bytes[0], 0);
+  assert.deepEqual(samples.beta[1].bytes.slice(0, 4), [0, 0, 196, 20]);
+  assert.deepEqual(samples.alpha[153].bytes, Array(11).fill(0));
+  assert.deepEqual(samples.alpha[153].gamepad.axes, [0, 0, 0, 0]);
 });

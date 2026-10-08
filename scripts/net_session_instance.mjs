@@ -23,24 +23,51 @@ export function firstFatalBrowserError(errors) {
 
 // Harness-only Gamepad state transitions after the existing native callback tail.
 // Native acquisition and the live publisher remain the sole PAD sample owner.
-export function installRuntimeInputFixtureInPage({role, inputTicks}) {
-  if (!['alpha', 'beta'].includes(role) || inputTicks !== 6 ||
+export function installRuntimeInputFixtureInPage({role, inputTicks, variant = 'neutral-a-release', samples = null}) {
+  const cssStartToSss = variant === 'css-start-to-sss';
+  if (!['alpha', 'beta'].includes(role) ||
+      (cssStartToSss ? inputTicks !== 518 || !Array.isArray(samples) || samples.length !== inputTicks :
+        variant !== 'neutral-a-release' || inputTicks !== 6) ||
       typeof window.menuFrame !== 'function' || typeof window.meleeNetRuntimeLockstepSnapshot !== 'function' ||
       typeof window.__meleeSyntheticPadTransition !== 'function' || window.__meleeSyntheticPadState !== 'neutral' ||
       window.__meleeRuntimeInputFixture)
-    throw Error('Runtime input fixture requires fresh neutral eight-CSS ownership');
+    throw Error(cssStartToSss ? 'CSS-to-SSS runtime input fixture requires fresh neutral 520-tick ownership' :
+      'Runtime input fixture requires fresh neutral eight-CSS ownership');
   const original = window.menuFrame, localPort = role === 'alpha' ? 0 : 1;
-  const retained = [], transitions = [];
+  const retained = [], transitions = [], phaseSamples = [];
   let failure = null, disposed = false, frozen = false;
+  let lastObservedCursor = -1;
   const fail = error => {
     failure ??= error;
     try { window.__meleeSyntheticPadTransition('neutral'); } catch {}
     return failure;
   };
-  const snapshot = () => ({role, input_ticks: inputTicks, captured_count: retained.length,
-    transitions: transitions.map(row => ({...row})), disposed, frozen,
+  const snapshot = () => ({role, variant, input_ticks: inputTicks, captured_count: retained.length,
+    transitions: transitions.map(row => ({...row})), phase_samples: phaseSamples.map(row => ({...row})), disposed, frozen,
     ...(frozen ? {captures: retained.map(row => JSON.parse(row))} : {}), failure: failure ? String(failure.message || failure) : null,
     input_source: 'synthetic standard Gamepad -> ordinary controller manager -> native live PAD capture'});
+  const recordPhase = () => {
+    if (!cssStartToSss || typeof window.__net?.status !== 'function' || typeof window.__net?.native !== 'function') return;
+    const status = window.__net.status(), native = window.__net.native();
+    if (status?.active !== 1) return;
+    if (!Number.isSafeInteger(status.cursor) || status.cursor < 0 || status.cursor > 520 ||
+        !Number.isInteger(native.phase) || !Number.isInteger(native.running))
+      throw Error('CSS-to-SSS source phase observation is malformed');
+    if (status.cursor > lastObservedCursor) {
+      phaseSamples.push({cursor: status.cursor, phase: native.phase, running: native.running});
+      lastObservedCursor = status.cursor;
+    }
+  };
+  const applyCssSample = sample => {
+    if (!sample || sample.kind !== 'css-start-to-sss' || !Number.isSafeInteger(sample.input_tick) ||
+        !Array.isArray(sample.buttons) || sample.buttons.length !== 17 ||
+        sample.buttons.some(button => !button || typeof button.pressed !== 'boolean' ||
+          typeof button.value !== 'number' || !Number.isFinite(button.value) || button.value < 0 || button.value > 1) ||
+        !Array.isArray(sample.axes) || sample.axes.length !== 4 ||
+        sample.axes.some(axis => typeof axis !== 'number' || !Number.isFinite(axis) || axis < -1 || axis > 1))
+      throw Error('CSS-to-SSS Gamepad state is malformed');
+    window.__meleeSyntheticPadTransition(sample);
+  };
   function observer() {
     let result;
     try { result = original.apply(this, arguments); }
@@ -48,6 +75,7 @@ export function installRuntimeInputFixtureInPage({role, inputTicks}) {
     if (disposed || failure) return result;
     try {
       if (result && typeof result.then === 'function') throw Error('Runtime input fixture callback must remain synchronous');
+      recordPhase();
       const owner = window.meleeNetRuntimeLockstepSnapshot();
       if (!owner) {
         if (retained.length) throw Error('Runtime input fixture lost its active owner');
@@ -74,14 +102,28 @@ export function installRuntimeInputFixtureInPage({role, inputTicks}) {
           throw Error('Runtime input fixture selected PAD witness is invalid');
         if (tick < retained.length && JSON.stringify(row) !== retained[tick])
           throw Error('Runtime input fixture retained sample changed during a wait');
-        const expectedButtons = role === 'alpha' && tick === 1 ? 0x0100 : 0;
-        if (((bytes[0] << 8) | bytes[1]) !== expectedButtons || bytes.slice(2).some(byte => byte !== 0))
-          throw Error('Runtime input fixture did not witness exact neutral/A/release samples');
+        if (cssStartToSss) {
+          const expected = samples[tick];
+          if (!expected || expected.input_tick !== tick || !Array.isArray(expected.bytes) ||
+              expected.bytes.length !== 11 || expected.bytes.some((byte, index) => byte !== bytes[index]))
+            throw Error('CSS-to-SSS runtime fixture selected PAD differs from the checked recipe sample');
+        } else {
+          const expectedButtons = role === 'alpha' && tick === 1 ? 0x0100 : 0;
+          if (((bytes[0] << 8) | bytes[1]) !== expectedButtons || bytes.slice(2).some(byte => byte !== 0))
+            throw Error('Runtime input fixture did not witness exact neutral/A/release samples');
+        }
       }
       if (captures.length > retained.length) {
         if (peer.protocol?.ready !== true) throw Error('Runtime input fixture sampled before native start agreement');
         retained.push(JSON.stringify(captures.at(-1)));
-        if (role === 'alpha' && retained.length <= 2) {
+        if (cssStartToSss && retained.length < inputTicks) {
+          const next = samples[retained.length];
+          applyCssSample(next.gamepad);
+          const prior = samples[retained.length - 1].bytes;
+          if (JSON.stringify(prior) !== JSON.stringify(next.bytes))
+            transitions.push({after_input_tick: retained.length - 1,
+              next_input_tick: retained.length, kind: 'css-start-to-sss'});
+        } else if (!cssStartToSss && role === 'alpha' && retained.length <= 2) {
           const state = retained.length === 1 ? 'A' : 'release';
           window.__meleeSyntheticPadTransition(state);
           transitions.push({after_input_tick: retained.length - 1, next_input_tick: retained.length, state});
@@ -95,17 +137,23 @@ export function installRuntimeInputFixtureInPage({role, inputTicks}) {
     try {
       const owner = window.meleeNetRuntimeLockstepSnapshot(), peer = owner?.peer;
       const status = window.__net?.status();
+      const native = cssStartToSss ? window.__net?.native() : null;
+      const phases = phaseSamples.map(row => row.phase).filter((phase, index, rows) => index === 0 || phase !== rows[index - 1]);
+      const expectedSourceTicks = cssStartToSss ? 520 : 8;
+      const expectedRemoteAck = inputTicks - 1;
       if (failure || disposed || window.menuFrame !== observer || owner?.armed !== true ||
           owner.closing !== false || owner.failure !== null || peer?.failure || peer?.protocol?.terminal ||
-          peer?.protocol?.ready !== true || status?.active !== 1 || status.cursor !== 8 ||
+          peer?.protocol?.ready !== true || status?.active !== 1 || status.cursor !== expectedSourceTicks ||
           status.blocker !== 'complete' || status.terminal?.kind !== 0 ||
-          peer.protocol.local_checksum_ticks !== 8 || peer.protocol.remote_checksum_ticks !== 8 ||
-          peer.protocol.next_checksum_compare !== 8 || peer.protocol.remote_ack_input !== 5 ||
+          peer.protocol.local_checksum_ticks !== expectedSourceTicks || peer.protocol.remote_checksum_ticks !== expectedSourceTicks ||
+          peer.protocol.next_checksum_compare !== expectedSourceTicks || peer.protocol.remote_ack_input !== expectedRemoteAck ||
           peer.localInputCapture?.mode !== 'live' || peer.localInputCapture?.enabled !== true ||
           retained.length !== inputTicks || peer.localInputCapture.captures?.length !== inputTicks ||
           peer.localInputCapture.captures.some((row, tick) => JSON.stringify(row) !== retained[tick]) ||
-          transitions.length !== (role === 'alpha' ? 2 : 0))
-        throw Error('Runtime input fixture cannot freeze before checked eight-CSS completion');
+          (cssStartToSss ? native?.phase !== 3 || phases[0] !== 1 || phases.at(-1) !== 3 ||
+            phases.some(phase => phase !== 1 && phase !== 3) : transitions.length !== (role === 'alpha' ? 2 : 0)))
+        throw Error(cssStartToSss ? 'CSS-to-SSS runtime input fixture cannot freeze before checked 520-tick SSS completion' :
+          'Runtime input fixture cannot freeze before checked eight-CSS completion');
       window.__meleeSyntheticPadTransition('neutral');
       window.menuFrame = original;
       frozen = true;
@@ -338,9 +386,20 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
       window.testPads[pad.index] = window.testPad;
       window.__meleeSyntheticPadState = 'neutral';
       window.__meleeSyntheticPadTransition = state => {
-        if (!['neutral', 'A', 'release'].includes(state)) throw Error('Unknown synthetic PAD sample state');
-        window.__meleeSyntheticPadState = state;
-        window.testPad.buttons[0] = state === 'A' ? {pressed: true, value: 1} : {pressed: false, value: 0};
+        if (typeof state === 'string') {
+          if (!['neutral', 'A', 'release'].includes(state)) throw Error('Unknown synthetic PAD sample state');
+          window.__meleeSyntheticPadState = state;
+          window.testPad.buttons = Array.from({length: 17}, (_, index) => ({
+            pressed: state === 'A' && index === 0, value: state === 'A' && index === 0 ? 1 : 0}));
+          window.testPad.axes = [0, 0, 0, 0];
+          return;
+        }
+        if (!state || state.kind !== 'css-start-to-sss' || !Number.isSafeInteger(state.input_tick) ||
+            !Array.isArray(state.buttons) || state.buttons.length !== 17 || !Array.isArray(state.axes) || state.axes.length !== 4)
+          throw Error('Unknown synthetic Gamepad sample state');
+        window.__meleeSyntheticPadState = `css-start-to-sss:${state.input_tick}`;
+        window.testPad.buttons = state.buttons.map(button => ({pressed: button.pressed, value: button.value}));
+        window.testPad.axes = [...state.axes];
       };
       Object.defineProperty(navigator, 'getGamepads', {configurable: true,
         value: () => window.testPads});
