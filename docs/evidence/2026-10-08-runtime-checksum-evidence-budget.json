@@ -1,0 +1,302 @@
+{
+  "schema": "runtime-checksum-evidence-budget-component-v1",
+  "issue": 279,
+  "label": "Compiled",
+  "scope": "Actual runtime owner, live acquisition callback, browser peer and paired protocol cores with synthetic native adapter records and queued endpoints; no browser run",
+  "source_producer": "1792f5bf512d57fc1be8436d4087fb8320062ac3",
+  "source_tree": "76bb65c6ef653e53baed529afe646792837a9a47",
+  "base_main": "724cbb1c7220a10921521aae58e21a958c401c56",
+  "documentation_head_is_not_producer": true,
+  "source_sha256": {
+    "scripts/net_lockstep_core.mjs": "be196a6bc2040907f61208e5b2608c25b5b3c3b2e9f5e6f0d0db1b9ebd1b35cb",
+    "scripts/net_lockstep_runtime_owner.mjs": "3cd93ca53a2a62606365739fb3ebe69bf57a60fc497f1ab983b963dbbd0c6b01",
+    "web/net_lockstep_development_owner.mjs": "17a4aa067e143f4dae770db0778fdbc9e73a8c65f2f05d109f99a25123fa76df",
+    "web/runtime-development.mjs": "585187bf7945c94e917a9502bf034563d48dec1b0e428fb8b1442416621d397d",
+    "tests/net_lockstep_runtime_owner.test.mjs": "901b70dab72d633258454910a9ef95cd359b8da5fdf671479ce8950ff41751bc",
+    "tests/net_lockstep_development_owner.test.mjs": "4e2cd7c637b66a9ed5e345b0696688aa8bc4fc63f063ff577db470f709da236f"
+  },
+  "authored_source_tick_max": 216000,
+  "default_checksum_evidence_records": 512,
+  "explicit_budget_rule": "safe integer equal to declared sourceTicks within authored maximum",
+  "default_513_control": {
+    "retained_records": 512,
+    "first_cause": "Runtime lockstep checksum evidence exceeds its bounded page retention",
+    "raw_receipt_sha256": "1c411d55673f8543da5f1e265e68a67d257658a91c5997fe6c6f59cd2efed961"
+  },
+  "explicit_520_control": {
+    "retained_records": 520,
+    "compared_records": 520,
+    "checksum_ack": 519,
+    "input_ack": 517,
+    "immutable_ordered_snapshot": true,
+    "normal_close_quiescence": "verified in synthetic native fixture",
+    "raw_receipt_sha256": "9d9de0b2d68aee0a0f18b23e47f0d0fdcf7bb693243a8c6f61a694c98c368487"
+  },
+  "focused": {
+    "pass": 136,
+    "fail": 0,
+    "log_sha256": "21dfa1eb1117054e3a478dee684dfe9e513b3a506c49190d90e41a2031c33034",
+    "contract_wrapper_exit": 0,
+    "contract_wrapper_log_sha256": "8ea575bc5eb49b31f4b7e86b9acae339c8c237d66b0d656dde0ce5197f25036f"
+  },
+  "full_suite": {
+    "tests": 2075,
+    "skipped": 153,
+    "failures": 0,
+    "seconds": 464.998,
+    "exit_code": 0,
+    "log_sha256": "f0551898085a3c295e0ace9d917736d89ce41c0ddc49d88b7609c0be8df16d9f",
+    "process_receipt_sha256": "10e5e0fd9df03776a5d46ea6ac2ae311afbaf39f0be961b4290f6d2a61a0e7b7"
+  },
+  "ordinary_release": {
+    "configuration": "Release",
+    "exit_code": 0,
+    "flags": {
+      "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+      "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+      "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+      "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+      "MELEE_WEB_RESULTS_RENDERED_TRACE": "OFF",
+      "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+      "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF",
+      "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF"
+    },
+    "cache_sha256": "fd0fbd5a610af974864da67d0fd8b17e7c3ee3a333bd8eeaf35b05b428025ce8",
+    "build_log_sha256": "525b0e1ba8afb93fed25d30bfce2c35118072ace0c2292b75302004831fd6bba",
+    "module_source_release_sha256": {
+      "net_lockstep_browser_peer.mjs": "2e3b71539130576feac17b4066c0470f878aac5435fa2e49ae4c662099416fc8",
+      "net_lockstep_core.mjs": "be196a6bc2040907f61208e5b2608c25b5b3c3b2e9f5e6f0d0db1b9ebd1b35cb",
+      "net_lockstep_native_adapter.mjs": "4130dce6c6390506b66bfafebace3fe33ac561ce8a873d06956b619fa5f0686a",
+      "net_lockstep_websocket_relay.mjs": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5",
+      "net_lockstep_webrtc.mjs": "f7bdc789211d097bae000fa7b966f157a5db72b185fbfea6f1179a140ee3e1fe",
+      "net_lockstep_webrtc_signaling.mjs": "4e54cb6b2286c6133efbd9477336553f876d17ae3425794328748580f4157326",
+      "net_lockstep_runtime_owner.mjs": "3cd93ca53a2a62606365739fb3ebe69bf57a60fc497f1ab983b963dbbd0c6b01",
+      "net_lockstep_development_owner.mjs": "17a4aa067e143f4dae770db0778fdbc9e73a8c65f2f05d109f99a25123fa76df"
+    },
+    "runtime_development_source_release_sha256": "585187bf7945c94e917a9502bf034563d48dec1b0e428fb8b1442416621d397d",
+    "runtime_artifacts": [
+      {
+        "path": "gameplay_menu_browser.js",
+        "bytes": 300352,
+        "sha256": "902ec663d65468d9388bed0cd2ba79954d7f634fac3ac775b65e958b9caf7110"
+      },
+      {
+        "path": "gameplay_menu_browser.wasm",
+        "bytes": 15748426,
+        "sha256": "a8fe0f0a0238f46432815ad05095c72a1cea189e87e01855cefce663c361c9a1"
+      },
+      {
+        "path": "gameplay_menu_browser.data",
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      {
+        "path": "runtime.html",
+        "bytes": 5205,
+        "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+      },
+      {
+        "path": "runtime-development.mjs",
+        "bytes": 62373,
+        "sha256": "585187bf7945c94e917a9502bf034563d48dec1b0e428fb8b1442416621d397d"
+      },
+      {
+        "path": "net-timing-pause.mjs",
+        "bytes": 1043,
+        "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"
+      },
+      {
+        "path": "melee-runtime.mjs",
+        "bytes": 54503,
+        "sha256": "f7fa37c65d92e50bf1b445d96e6f98514f688ac02841942f251beaa008c9df3b"
+      },
+      {
+        "path": "runtime-diagnostics.mjs",
+        "bytes": 85702,
+        "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+      },
+      {
+        "path": "runtime-diagnostics-delivery.mjs",
+        "bytes": 51514,
+        "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+      },
+      {
+        "path": "diagnostics-settings.mjs",
+        "bytes": 2876,
+        "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+      },
+      {
+        "path": "diagnostics-schema.mjs",
+        "bytes": 18780,
+        "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+      },
+      {
+        "path": "controller-input.mjs",
+        "bytes": 19263,
+        "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+      },
+      {
+        "path": "controller-panel.mjs",
+        "bytes": 36847,
+        "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+      },
+      {
+        "path": "controller-panel.css",
+        "bytes": 5240,
+        "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+      },
+      {
+        "path": "controller-settings.mjs",
+        "bytes": 18680,
+        "sha256": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f"
+      },
+      {
+        "path": "controller-settings.css",
+        "bytes": 3482,
+        "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+      },
+      {
+        "path": "touch-controls.mjs",
+        "bytes": 13954,
+        "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+      },
+      {
+        "path": "touch-controls.css",
+        "bytes": 6381,
+        "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+      },
+      {
+        "path": "prototype-keyboard-layouts.mjs",
+        "bytes": 935,
+        "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+      },
+      {
+        "path": "runtime-cache.js",
+        "bytes": 16143,
+        "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+      },
+      {
+        "path": "audio-worklet.js",
+        "bytes": 1517,
+        "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+      },
+      {
+        "path": "audio-ring.mjs",
+        "bytes": 2040,
+        "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+      },
+      {
+        "path": "disc-image.mjs",
+        "bytes": 15255,
+        "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+      },
+      {
+        "path": "disc-session.mjs",
+        "bytes": 7552,
+        "sha256": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2"
+      },
+      {
+        "path": "dsp-coefficients.mjs",
+        "bytes": 4043,
+        "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+      },
+      {
+        "path": "runtime-assets.mjs",
+        "bytes": 17029,
+        "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190"
+      },
+      {
+        "path": "runtime-audio-assets.mjs",
+        "bytes": 5451,
+        "sha256": "033bf0bd4caa6c744ebead3dd7091bec8496b5f8d2039d60a3cdf9d398a7f05c"
+      },
+      {
+        "path": "runtime-audio.mjs",
+        "bytes": 7660,
+        "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+      },
+      {
+        "path": "match-flow.mjs",
+        "bytes": 10679,
+        "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+      },
+      {
+        "path": "match-menu.mjs",
+        "bytes": 8566,
+        "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+      },
+      {
+        "path": "action-sweep.mjs",
+        "bytes": 18698,
+        "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+      },
+      {
+        "path": "hitch-capture.mjs",
+        "bytes": 21958,
+        "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+      },
+      {
+        "path": "net_lockstep_core.mjs",
+        "bytes": 25614,
+        "sha256": "be196a6bc2040907f61208e5b2608c25b5b3c3b2e9f5e6f0d0db1b9ebd1b35cb"
+      },
+      {
+        "path": "net_lockstep_native_adapter.mjs",
+        "bytes": 8445,
+        "sha256": "4130dce6c6390506b66bfafebace3fe33ac561ce8a873d06956b619fa5f0686a"
+      },
+      {
+        "path": "net_lockstep_browser_peer.mjs",
+        "bytes": 32468,
+        "sha256": "2e3b71539130576feac17b4066c0470f878aac5435fa2e49ae4c662099416fc8"
+      },
+      {
+        "path": "net_lockstep_websocket_relay.mjs",
+        "bytes": 19394,
+        "sha256": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5"
+      },
+      {
+        "path": "net_lockstep_webrtc.mjs",
+        "bytes": 13621,
+        "sha256": "f7bdc789211d097bae000fa7b966f157a5db72b185fbfea6f1179a140ee3e1fe"
+      },
+      {
+        "path": "net_lockstep_webrtc_signaling.mjs",
+        "bytes": 7377,
+        "sha256": "4e54cb6b2286c6133efbd9477336553f876d17ae3425794328748580f4157326"
+      },
+      {
+        "path": "net_lockstep_runtime_owner.mjs",
+        "bytes": 20736,
+        "sha256": "3cd93ca53a2a62606365739fb3ebe69bf57a60fc497f1ab983b963dbbd0c6b01"
+      },
+      {
+        "path": "net_lockstep_development_owner.mjs",
+        "bytes": 4838,
+        "sha256": "17a4aa067e143f4dae770db0778fdbc9e73a8c65f2f05d109f99a25123fa76df"
+      }
+    ]
+  },
+  "root_source_review_sha256": "ea23a32521a691392111d41ea990a4ce9accf1e8750a6b9942b8c06f34862a4c",
+  "independent_cleanup_receipt_sha256": "3f3eea579bca2cb3ba1fce67104960bf908645cfc34b3f59488ac53842a39a5e",
+  "preparation_failures_retained": {
+    "focused-v1.log": "9af132b5f062ea1c89fb289f5a497f3bbc2954ff3a622c42762cfdffd8554fa9",
+    "focused-v2.log": "d39248c6e953f33677c8d107efc2138388fd8d0ad701a1a89b3a0e165f7c46c9"
+  },
+  "historical_278_producer": "ee3f56a4b25cc6a6b6785b49c78d3d46ab871008",
+  "historical_278_measurements_unchanged": true,
+  "new_browser_runs": 0,
+  "exclusions": [
+    "native simulation or retail equivalence at 520 ticks",
+    "sustained browser session",
+    "full supported CSS/SSS/gameplay/Results/CSS route",
+    "public player admission",
+    "physical controllers",
+    "foreground timing",
+    "performance",
+    "two-machine Internet",
+    "pixels or PCM equivalence"
+  ]
+}
