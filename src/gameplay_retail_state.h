@@ -8,6 +8,11 @@ extern "C" {
 #endif
 
 struct Fighter;
+struct HSD_GObj;
+
+/* Read the existing exported primary-entity identity. Never advance its tracker. */
+int melee_web_retail_primary_identity(unsigned slot, const struct HSD_GObj*,
+    uint32_t* match_index, uint32_t* generation);
 
 /* One declared Fighter field list shared by the retail JSON printer and the
  * networked per-tick checksum. Visiting only reads source state. Floats are
