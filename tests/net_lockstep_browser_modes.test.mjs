@@ -5,10 +5,15 @@ import {mkdtemp, readFile, rm} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
+import vm from 'node:vm';
 import {buildRuntimeCssMatchGamepadSamples, buildRuntimeCssSssGamepadSamples,
   RUNTIME_CSS_MATCH_INPUT_TICKS, RUNTIME_CSS_MATCH_SOURCE_TICKS, RUNTIME_CSS_MATCH_STIMULUS_FRAMES,
   RUNTIME_CSS_SSS_GENERATOR_SHA256, RUNTIME_CSS_SSS_INPUT_TICKS, RUNTIME_CSS_SSS_SOURCE_TICKS,
-  validateLockstepBrowserMode, validateRuntimeCssMatchRecipe, validateRuntimeCssSssRecipe} from '../scripts/net_lockstep_browser_modes.mjs';
+  RUNTIME_FULL_ROUTE_BODY_SHA256, RUNTIME_FULL_ROUTE_GENERATOR_SHA256, RUNTIME_FULL_ROUTE_INPUT_TICKS,
+  RUNTIME_FULL_ROUTE_MANIFEST_SHA256, RUNTIME_FULL_ROUTE_SCRIPT_SHA256, RUNTIME_FULL_ROUTE_SEED,
+  RUNTIME_FULL_ROUTE_SOURCE_TICKS, buildRuntimeFullRouteGamepadSamples, buildRuntimeFullRouteProfile,
+  validateLockstepBrowserMode, validateRuntimeCssMatchRecipe, validateRuntimeCssSssRecipe,
+  validateRuntimeFullRouteRecipe} from '../scripts/net_lockstep_browser_modes.mjs';
 import {LOCKSTEP_MAX_SOURCE_TICKS} from '../scripts/net_lockstep_core.mjs';
 
 const options = (overrides = {}) => ({scenario: 'positive', 'peer-owner': 'browser',
@@ -34,7 +39,7 @@ test('positive WebRTC cannot pass SDP through the Node memory coordinator', () =
 test('unsupported WebRTC scenarios and owners fail before acquisition', () => {
   for (const scenario of ['probe'])
     assert.throws(() => validateLockstepBrowserMode(options({scenario})),
-      /browser-owned input-sampling, positive, disconnect, flip, native-pump, runtime-css-sss, or runtime-css-match mode/);
+      /browser-owned input-sampling, positive, disconnect, flip, native-pump, runtime-css-sss, runtime-css-match, or runtime-full-route mode/);
   assert.throws(() => validateLockstepBrowserMode(options({'peer-owner': 'node'})),
     /applies only to browser-owned peers/);
 });
@@ -145,7 +150,7 @@ test('runtime CSS-to-SSS mode admits only the explicit 520-tick Room Worker fixt
     {'runtime-input-fixture': 'neutral-a-release'}, {script: undefined}, {'script-manifest': undefined},
   ]) assert.throws(() => validateLockstepBrowserMode(runtimeCssSssOptions(overrides)),
     /runtime-css-sss|runtime-input-fixture|Runtime-owned peers/);
-  assert.throws(() => validateLockstepBrowserMode(options({'script-manifest': 'route.json'})), /only to runtime-css-sss or runtime-css-match/);
+  assert.throws(() => validateLockstepBrowserMode(options({'script-manifest': 'route.json'})), /only to runtime-css-sss, runtime-css-match or runtime-full-route/);
   assert.throws(() => validateLockstepBrowserMode(runtimeCssSssOptions({scenario: 'positive', 'script-manifest': undefined})), /Runtime-owned peers/);
 });
 
@@ -163,7 +168,7 @@ test('runtime CSS-to-match mode admits only the explicit 520-tick Room Worker fi
     {'runtime-input-fixture': 'css-start-to-sss'}, {script: undefined}, {'script-manifest': undefined},
   ]) assert.throws(() => validateLockstepBrowserMode(runtimeCssMatchOptions(overrides)),
     /runtime-css-match|runtime-input-fixture|Runtime-owned peers/);
-  assert.throws(() => validateLockstepBrowserMode(options({'script-manifest': 'route.json'})), /only to runtime-css-sss or runtime-css-match/);
+  assert.throws(() => validateLockstepBrowserMode(options({'script-manifest': 'route.json'})), /only to runtime-css-sss, runtime-css-match or runtime-full-route/);
   assert.throws(() => validateLockstepBrowserMode(runtimeCssMatchOptions({scenario: 'positive', 'script-manifest': undefined})), /Runtime-owned peers/);
 });
 
@@ -290,4 +295,173 @@ test('runtime CSS-to-match converts only CSS/SSS recipe frames, maps Start/A and
   assert.throws(() => buildRuntimeCssMatchGamepadSamples(invalidPort2), /input 303 port 2 is not the canonical no-controller PAD/);
   assert.throws(() => buildRuntimeCssMatchGamepadSamples(invalidPort3), /input 303 port 3 is not the canonical no-controller PAD/);
   assert.throws(() => buildRuntimeCssMatchGamepadSamples(unsupportedA), /input 216 port 0 has unsupported buttons/);
+});
+
+const runtimeFullRouteOptions = (overrides = {}) => options({scenario: 'runtime-full-route', 'peer-owner': 'runtime',
+  'peer-transport': 'webrtc', 'webrtc-signaling': 'room-worker', 'source-ticks': '5084',
+  'runtime-input-fixture': 'full-route', script: 'route1.mwni', 'script-manifest': 'route1.json', ...overrides});
+
+test('runtime full-route admits only the fixed 5082-input/5084-source runtime owner contract', () => {
+  assert.deepEqual(validateLockstepBrowserMode(runtimeFullRouteOptions()), {browserOwned: true, runtimeOwned: true,
+    peerTransport: 'webrtc', localWebRtc: true, roomWorkerSignaling: true,
+    runtimeInputFixture: true, runtimeInputFixtureName: 'full-route'});
+  for (const overrides of [
+    {'source-ticks': '5083'}, {'source-ticks': undefined}, {'peer-owner': 'browser'},
+    {'peer-transport': 'relay'}, {'webrtc-signaling': 'memory'}, {'runtime-input-fixture': undefined},
+    {'runtime-input-fixture': 'css-sss-to-match'}, {script: undefined}, {'script-manifest': undefined},
+  ]) assert.throws(() => validateLockstepBrowserMode(runtimeFullRouteOptions(overrides)),
+    /runtime-full-route|runtime-input-fixture|Runtime-owned peers/);
+  assert.throws(() => validateLockstepBrowserMode(runtimeFullRouteOptions({scenario: 'positive',
+    'script-manifest': undefined, 'runtime-input-fixture': undefined})), /Runtime-owned peers/);
+});
+
+test('runtime full-route orchestration maps its CLI fixture name to the registered decoder kind', async () => {
+  const source = await readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf("  if (runtimeInputFixture) for (const role of ['alpha', 'beta'])");
+  const end = source.indexOf("  await Promise.all(['alpha', 'beta'].map(role => instances[role].beginLockstep", start);
+  assert(start >= 0 && end > start);
+  const rows = {alpha: {}, beta: {}}, installed = [];
+  const context = {runtimeInputFixture: true, runtimeFullRoute: true, runtimeLiveRoute: true,
+    runtimeInputFixtureName: 'full-route', usedInputs: RUNTIME_FULL_ROUTE_INPUT_TICKS,
+    runtimeGamepadSamples: {alpha: [], beta: []}, instanceRows: rows,
+    instances: Object.fromEntries(['alpha', 'beta'].map(role => [role, {async installRuntimeInputFixture(options) {
+      installed.push({role, ...options}); return {variant: options.variant};
+    }}]))};
+  await vm.runInNewContext(`(async()=>{${source.slice(start, end)}\n})()`, context);
+  assert.deepEqual(installed.map(row => [row.role, row.variant]), [
+    ['alpha', 'runtime-full-route'], ['beta', 'runtime-full-route']]);
+  assert.equal(rows.alpha.runtime_input_fixture_start.variant, 'runtime-full-route');
+  assert.equal(rows.beta.runtime_input_fixture_start.variant, 'runtime-full-route');
+});
+
+test('runtime full-route recipe validator rejects bad identity, size, trailing bytes and seed', async () => {
+  const generatorBytes = await readFile(new URL('../tools/net_input_script.py', import.meta.url));
+  assert.equal(createHash('sha256').update(generatorBytes).digest('hex'), RUNTIME_FULL_ROUTE_GENERATOR_SHA256);
+  const header = Buffer.alloc(16); header.write('MWNI'); header.writeUInt32BE(1, 4);
+  header.writeUInt32BE(RUNTIME_FULL_ROUTE_INPUT_TICKS, 8);
+  const body = Buffer.alloc(RUNTIME_FULL_ROUTE_INPUT_TICKS * 44), scriptBytes = Buffer.concat([header, body]);
+  const manifestBytes = Buffer.from('{}');
+  const exact = (script, manifest = manifestBytes, generator = generatorBytes, seed = RUNTIME_FULL_ROUTE_SEED) =>
+    validateRuntimeFullRouteRecipe({scriptBytes: script, manifestBytes: manifest, generatorBytes: generator, seed});
+  assert.throws(() => exact(Buffer.concat([scriptBytes, Buffer.from([0])])), /body length|trailing-byte/);
+  assert.throws(() => exact(scriptBytes.subarray(0, scriptBytes.length - 1)), /body length|trailing-byte/);
+  const badHash = Buffer.from(scriptBytes); badHash[100] ^= 1;
+  assert.throws(() => exact(badHash), /identity/);
+  assert.throws(() => exact(scriptBytes, manifestBytes, Buffer.from('unreviewed')),
+    /generator identity/);
+  assert.throws(() => exact(scriptBytes, manifestBytes, generatorBytes, RUNTIME_FULL_ROUTE_SEED + 1),
+    /fixed reviewed seed/);
+  assert.equal(RUNTIME_FULL_ROUTE_SCRIPT_SHA256.length, 64);
+  assert.equal(RUNTIME_FULL_ROUTE_MANIFEST_SHA256.length, 64);
+  assert.equal(RUNTIME_FULL_ROUTE_BODY_SHA256.length, 64);
+  assert.equal(RUNTIME_FULL_ROUTE_SOURCE_TICKS, RUNTIME_FULL_ROUTE_INPUT_TICKS + 2);
+});
+
+test('runtime full-route validator accepts only the exact retained generator output and manifest', async () => {
+  const scratch = await mkdtemp(path.join(os.tmpdir(), 'melee-web-full-route-recipe-'));
+  const scriptPath = path.join(scratch, 'route1.mwni'), manifestPath = path.join(scratch, 'route1.json');
+  const generatorPath = path.resolve('tools/net_input_script.py');
+  try {
+    const generated = spawnSync('python3', [generatorPath, '--seed', String(RUNTIME_FULL_ROUTE_SEED),
+      '--match-end-tick', '4290', '--out', scriptPath, '--manifest', manifestPath],
+    {cwd: process.cwd(), encoding: 'utf8', timeout: 30000});
+    assert.equal(generated.status, 0, `${generated.stdout}\n${generated.stderr}`);
+    const [scriptBytes, manifestBytes, generatorBytes] = await Promise.all([
+      readFile(scriptPath), readFile(manifestPath), readFile(generatorPath),
+    ]);
+    const identity = validateRuntimeFullRouteRecipe({scriptBytes, manifestBytes, generatorBytes,
+      seed: RUNTIME_FULL_ROUTE_SEED});
+    assert.equal(identity.script_sha256, RUNTIME_FULL_ROUTE_SCRIPT_SHA256);
+    assert.equal(identity.manifest_sha256, RUNTIME_FULL_ROUTE_MANIFEST_SHA256);
+    assert.equal(identity.body_sha256, RUNTIME_FULL_ROUTE_BODY_SHA256);
+    assert.equal(identity.frame_count, RUNTIME_FULL_ROUTE_INPUT_TICKS);
+    const mutatedManifest = Buffer.from(JSON.stringify({...JSON.parse(manifestBytes.toString('utf8')),
+      seed: RUNTIME_FULL_ROUTE_SEED + 1}));
+    assert.throws(() => validateRuntimeFullRouteRecipe({scriptBytes, manifestBytes: mutatedManifest,
+      generatorBytes, seed: RUNTIME_FULL_ROUTE_SEED}), /manifest identity/);
+  } finally {
+    await rm(scratch, {recursive: true, force: true});
+  }
+});
+
+test('full-route profile keeps independent L/R clicks separate from trigger pressure', () => {
+  const profile = buildRuntimeFullRouteProfile();
+  assert.equal(Object.isFrozen(profile), true);
+  assert.equal(Object.isFrozen(profile.buttons), true);
+  assert.equal(Object.isFrozen(profile.axes), true);
+  assert.equal(profile.gamecube, true);
+  assert.equal('calibrateTriggerOrigin' in profile, false);
+  assert.deepEqual(profile.buttons.L, {kind: 'button', index: 4});
+  assert.deepEqual(profile.buttons.R, {kind: 'button', index: 8});
+  assert.deepEqual(profile.axes.triggerL, {kind: 'button', index: 6});
+  assert.deepEqual(profile.axes.triggerR, {kind: 'button', index: 7});
+});
+
+function fullRouteBody() {
+  const body = Buffer.alloc(RUNTIME_FULL_ROUTE_INPUT_TICKS * 44);
+  for (let tick = 0; tick < RUNTIME_FULL_ROUTE_INPUT_TICKS; ++tick) {
+    body[tick * 44 + 32] = 0xff;
+    body[tick * 44 + 43] = 0xff;
+  }
+  return body;
+}
+
+function fullRoutePad(body, tick, port, {buttons = 0, stickX = 0, stickY = 0,
+  cstickX = 0, cstickY = 0, triggerL = 0, triggerR = 0} = {}) {
+  const offset = tick * 44 + port * 11;
+  body.writeUInt16BE(buttons, offset);
+  body.writeInt8(stickX, offset + 2); body.writeInt8(stickY, offset + 3);
+  body.writeInt8(cstickX, offset + 4); body.writeInt8(cstickY, offset + 5);
+  body[offset + 6] = triggerL; body[offset + 7] = triggerR;
+}
+
+test('full-route Gamepad conversion preserves every supported PAD field and independent axes', () => {
+  const body = fullRouteBody();
+  fullRoutePad(body, 1, 0, {stickX: -128});
+  fullRoutePad(body, 2, 0, {stickY: 127});
+  fullRoutePad(body, 3, 0, {cstickX: 85});
+  fullRoutePad(body, 4, 0, {cstickY: -63});
+  fullRoutePad(body, 5, 1, {buttons: 0x0120, stickX: 80, stickY: -40,
+    cstickX: -70, cstickY: 30, triggerL: 51, triggerR: 70});
+  const samples = buildRuntimeFullRouteGamepadSamples(body);
+  assert.equal(samples.alpha.length, 5082);
+  assert.equal(samples.beta.length, 5082);
+  assert.deepEqual(samples.alpha[1].gamepad.axes, [-1, 0, 0, 0]);
+  assert.deepEqual(samples.alpha[2].gamepad.axes, [0, -127 / 128, 0, 0]);
+  assert.deepEqual(samples.alpha[3].gamepad.axes, [0, 0, 85 / 128, 0]);
+  assert.deepEqual(samples.alpha[4].gamepad.axes, [0, 0, 0, 63 / 128]);
+  assert.deepEqual(samples.beta[5].bytes, [0x01, 0x20, 80, 216, (-70) & 255, 30,
+    51, 70, 0, 0, 0]);
+  assert.equal(samples.beta[5].gamepad.buttons[4].pressed, false);
+  assert.equal(samples.beta[5].gamepad.buttons[8].pressed, true);
+  assert.equal(samples.beta[5].gamepad.buttons[6].value, 51 / 255);
+  assert.equal(samples.beta[5].gamepad.buttons[7].value, 70 / 255);
+  assert.throws(() => buildRuntimeFullRouteGamepadSamples(body.subarray(0, body.length - 44)), /exactly 5082/);
+  assert.throws(() => buildRuntimeFullRouteGamepadSamples(Buffer.concat([body, Buffer.from([0])])), /exactly 5082/);
+});
+
+test('full-route conversion keeps digital trigger clicks independent at every pressure boundary', () => {
+  const body = fullRouteBody(), pressures = [0, 70, 242, 243, 255];
+  for (let side = 0; side < 2; ++side) for (let index = 0; index < pressures.length; ++index) {
+    const tick = side * pressures.length * 2 + index * 2, pressure = pressures[index];
+    const clickMask = side === 0 ? 0x0040 : 0x0020, pressureFields = side === 0 ?
+      {triggerL: pressure} : {triggerR: pressure};
+    fullRoutePad(body, tick, 0, pressureFields);
+    fullRoutePad(body, tick + 1, 0, {buttons: clickMask, ...pressureFields});
+  }
+  const samples = buildRuntimeFullRouteGamepadSamples(body).alpha;
+  for (let side = 0; side < 2; ++side) for (let index = 0; index < pressures.length; ++index) {
+    const tick = side * pressures.length * 2 + index * 2;
+    const clickButton = side === 0 ? 4 : 8, pressureButton = side === 0 ? 6 : 7;
+    for (const click of [false, true]) {
+      const sample = samples[tick + Number(click)].gamepad;
+      assert.equal(sample.buttons[clickButton].pressed, click);
+      assert.equal(sample.buttons[pressureButton].value, pressures[index] / 255);
+      assert.equal(sample.buttons[side === 0 ? 8 : 4].pressed, false);
+    }
+  }
+  const badMask = fullRouteBody(); badMask[1] = 0x80;
+  assert.throws(() => buildRuntimeFullRouteGamepadSamples(badMask), /unsupported PAD fields/);
+  const badInactive = fullRouteBody(); badInactive[32] = 0;
+  assert.throws(() => buildRuntimeFullRouteGamepadSamples(badInactive), /canonical no-controller/);
 });

@@ -167,6 +167,8 @@ test('packet reordering holds state by sequence then acknowledges contiguous inp
   assert.equal(h.beta.nextChecksumCompare, 3);
   assert.equal(h.alpha.remoteAckChecksum, 2);
   assert.equal(h.beta.remoteAckChecksum, 2);
+  assert.equal(h.alpha.health().checksum_mismatch_count, h.alpha.summary().checksum_mismatches.length);
+  assert.equal(h.beta.health().checksum_mismatch_count, h.beta.summary().checksum_mismatches.length);
   assert(h.alpha.acknowledgedChecksums >= 3);
   assert(h.beta.acknowledgedChecksums >= 3);
 });
@@ -197,6 +199,9 @@ test('delayed checksums stop on the first changed declared channel', async () =>
   const terminal = [...h.terminals.alpha, ...h.terminals.beta][0];
   assert.equal(terminal?.kind, 'desync');
   assert.deepEqual({tick: terminal.tick, channel: terminal.channel}, {tick: 0, channel: 1});
+  for (const peer of [h.alpha, h.beta])
+    assert.equal(peer.health().checksum_mismatch_count, peer.summary().checksum_mismatches.length,
+      'compact mismatch count remains equivalent after desync close');
 });
 
 test('out-of-order checksum envelopes report the earliest contiguous mismatch', async () => {
@@ -213,6 +218,8 @@ test('out-of-order checksum envelopes report the earliest contiguous mismatch', 
     .sort((left, right) => left.tick - right.tick)[0];
   assert.deepEqual(mismatch, {tick: 1, channel: 1});
   assert.equal(h.terminals.alpha[0]?.tick, 1);
+  for (const peer of [h.alpha, h.beta])
+    assert.equal(peer.health().checksum_mismatch_count, peer.summary().checksum_mismatches.length);
 });
 
 test('loopback length framing handles partial and multiple envelopes without parsing their payloads', () => {

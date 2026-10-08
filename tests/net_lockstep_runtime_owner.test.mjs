@@ -387,6 +387,11 @@ test('runtime session starts one actual peer from frame-captured native identity
   const snapshot = await started;
   assert.equal(snapshot.protocol.ready, true);
   assert.equal(snapshot.protocol.role, 'alpha');
+  const health = run.session.health({inputFrom: 0, checksumFrom: 0});
+  assert.equal(health.peer.protocol.ready, snapshot.protocol.ready);
+  assert.equal(health.peer.localInputCapture.captured_count, 0);
+  assert.deepEqual(health.peer.localInputCapture.captures_since, []);
+  assert.deepEqual(health.checksum_records_since, []);
   assert.deepEqual(run.native.events.find(row => row[0] === 'capture'), ['capture', 0, 6]);
   assert.equal(run.transport.events[0][0], 'transport-start');
 
@@ -484,13 +489,22 @@ test('runtime session retains the page checksum consumer snapshot within the exi
     return {waitForReady: async () => {}, rpc: async () => {
       assert.equal(consume([record]), true);
       return {protocol: {ready: true}};
-    }, close: async () => {}, snapshot: () => ({protocol: {ready: true}, nativePump: {native_quiescence: 'verified'}})};
+    }, close: async () => {}, health: () => ({protocol: {ready: true},
+      localInputCapture: {captured_count: 0, enabled: true, mode: 'live'},
+      endpoint_error_count: 0, nativePump: {rpc_calls: 1}}),
+    snapshot: () => ({protocol: {ready: true}, nativePump: {native_quiescence: 'verified'}})};
   }});
   const started = run.session.start(() => ({protocol: 'melee-web-local-lockstep-a2-v1'}));
   run.native.state.start.recorded = 1;
   run.session.onFrame();
   await started;
   assert.deepEqual(run.session.snapshot().checksums, [record]);
+  const health = run.session.health({checksumFrom: 0});
+  assert.equal(health.checksum_record_count, 1);
+  assert.deepEqual(health.checksum_records_since, [record]);
+  assert(Object.isFrozen(health.checksum_records_since));
+  assert(Object.isFrozen(health.checksum_records_since[0]), 'health never exposes mutable retained checksum rows');
+  assert.throws(() => run.session.health({checksumFrom: 2}), /offset/);
   await run.session.close();
 });
 
@@ -695,7 +709,8 @@ test('actual harness reconstructs the runtime hello lifecycle without changing n
 test('actual autonomous harness observes each checksum ownership mode and freezes failed intervals', async () => {
   const harness = await fs.readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
   const source = harness.slice(harness.indexOf('function nativePumpChecksumEvidence('), harness.indexOf('async function pollRun()'));
-  const {verifyPositivePeerCompletion} = await import('../scripts/net_lockstep_observers.mjs');
+  const {verifyPositivePeerCompletion, validateNativeChecksumSuffix, createPerPeerProgressWatch} =
+    await import('../scripts/net_lockstep_observers.mjs');
   const rows = cursor => {
     const records = Array.from({length: cursor}, (_, tick) => { const b = Array(64).fill(0); b[0] = tick; return b; });
     return {status: {active: 1, cursor, blocker: cursor === 8 ? 'complete' : 'network_wait', terminal: {kind: 0}}, native: {},
@@ -708,11 +723,27 @@ test('actual autonomous harness observes each checksum ownership mode and freeze
     let iteration = 0, time = 0;
     const before = rows(initial), after = rows(8); mutate(after);
     if (!runtimeOwned) { before.snapshot.exportRecords = initial; after.snapshot.exportRecords = 8; }
-    const context = {runtimeOwned, runtimeCssSss: false, sourceTicks: 8, usedInputs: 6, NET_RECORD_BYTES: 64, deadline: 4, stallMs: 4, pollMs: 1,
+    const context = {runtimeOwned, runtimeCssSss: false, runtimeFullRoute: false,
+      sourceTicks: 8, usedInputs: 6, NET_RECORD_BYTES: 64, deadline: 4, stallMs: 4, pollMs: 1,
       Date: {now: () => time}, sleep: async () => { ++time; }, pairResults: {}, verifyPositivePeerCompletion,
+      validateNativeChecksumSuffix, createPerPeerProgressWatch,
       checkedHealth: async () => { const row = iteration < 2 ? before : after; return {status: row.status, native: row.native}; },
       instances: Object.fromEntries(['alpha', 'beta'].map(role => [role, {
-        runtimeLockstepSnapshot: async () => { const row = iteration++ < 2 ? before : after; return mutateOwner({armed: true, closing: false, failure: null, peer: row.snapshot, checksums: row.runtime_checksum_records}); },
+        runtimeLockstepHealth: async ({checksumFrom = 0} = {}) => {
+          const row = iteration++ < 2 ? before : after;
+          const owner = {armed: true, closing: false, failure: null,
+            checksum_record_count: Array.isArray(row.runtime_checksum_records) ? row.runtime_checksum_records.length : 0,
+            checksum_records_since: Array.isArray(row.runtime_checksum_records)
+              ? row.runtime_checksum_records.slice(checksumFrom) : undefined,
+            peer: {...row.snapshot, endpoint_error_count: row.snapshot.endpointErrors.length,
+              localInputCapture: {enabled: true, mode: 'live', input_ticks: 6, captured_count: 0},
+              checksumConsumer: {...row.snapshot.checksumConsumer,
+                pending_batch: Boolean(row.snapshot.checksumConsumer.pending_batch)}}};
+          owner.peer.protocol.checksum_mismatch_count = owner.peer.protocol.checksum_mismatches.length;
+          return mutateOwner(owner);
+        },
+        runtimeLockstepSnapshot: async () => ({armed: true, closing: false, failure: null,
+          peer: after.snapshot, checksums: after.runtime_checksum_records}),
         readPeerSnapshot: async () => (iteration++ < 2 ? before : after).snapshot,
       }]))};
     vm.createContext(context); vm.runInContext(source, context);
@@ -727,10 +758,21 @@ test('actual autonomous harness observes each checksum ownership mode and freeze
     const early = await run(mode, () => {}, 8); assert.match(String(early.error), /completed before/);
     assert.equal(early.context.pairResults.native_pump_interval.complete, false);
     const stuck = await run(mode, row => { row.status.cursor = 0; row.status.blocker = 'network_wait'; });
-    assert.match(String(stuck.error), /did not complete/); assert.equal(stuck.context.pairResults.native_pump_interval.actual_native_cursor_progress_each, false);
+    assert.match(String(stuck.error), /did not complete|no source\/protocol progress|outer wall-time deadline/);
+    assert.equal(stuck.context.pairResults.native_pump_interval.actual_native_cursor_progress_each, false);
     for (const key of ['remote_checksum_ticks', 'next_checksum_compare', 'remote_ack_input']) {
-      const rejected = await run(mode, row => { row.snapshot.protocol[key]--; }); assert.match(String(rejected.error), /did not complete/);
+      const rejected = await run(mode, row => { row.snapshot.protocol[key]--; });
+      assert.match(String(rejected.error), /did not complete|outer wall-time deadline/);
     }
+  }
+  for (const mutate of [
+    row => { row.snapshot.protocol.checksum_mismatches = 'malformed'; },
+    row => { row.snapshot.protocol.checksum_mismatch_count = 1; },
+    row => { row.snapshot.endpointErrors = 'malformed'; },
+    row => { row.snapshot.endpoint_error_count = 1; },
+  ]) {
+    const rejected = await run(false, mutate);
+    assert.match(String(rejected.error), /autonomous diagnostic peer failed/);
   }
   for (const mutate of [
     row => { delete row.runtime_checksum_records; },
@@ -741,14 +783,23 @@ test('actual autonomous harness observes each checksum ownership mode and freeze
     row => { row.runtime_checksum_records[7].pop(); },
     row => { row.runtime_checksum_records.push(Array(64).fill(0)); },
     row => { row.snapshot.checksumConsumer.accepted_records = 7; row.snapshot.checksumOwnership.consumer_accepted_records = 7; },
-  ]) { const rejected = await run(true, mutate); assert.match(String(rejected.error), /Invalid runtime|not delivered/); }
+  ]) { const rejected = await run(true, mutate);
+    assert.match(String(rejected.error), /Invalid runtime|runtime checksum ownership is invalid|not delivered|Native checksum suffix/); }
   for (const mutate of [row => { row.snapshot.exportRecords = 1; }, row => { row.snapshot.checksumConsumer.retained_records = 1; },
     row => { row.snapshot.checksumConsumer.pending_batch = {count: 1}; }]) {
-    const pending = await run(true, mutate); assert.match(String(pending.error), /did not complete/);
+    const pending = await run(true, mutate); assert.match(String(pending.error), /did not complete|outer wall-time deadline/);
   }
   for (const mutateOwner of [() => null, owner => ({...owner, armed: false}), owner => ({...owner, closing: true}),
     owner => ({...owner, failure: 'retained owner first error'}), owner => ({...owner, peer: null})]) {
     const rejected = await run(true, () => {}, 0, mutateOwner); assert.match(String(rejected.error), /autonomous runtime owner failed/);
+  }
+  for (const mutateOwner of [
+    owner => ({...owner, peer: {...owner.peer, protocol: {...owner.peer.protocol, checksum_mismatches: 'malformed'}}}),
+    owner => ({...owner, peer: {...owner.peer, protocol: {...owner.peer.protocol, checksum_mismatch_count: 1}}}),
+    owner => ({...owner, peer: {...owner.peer, endpointErrors: [{}]}}),
+  ]) {
+    const rejected = await run(true, () => {}, 0, mutateOwner);
+    assert.match(String(rejected.error), /autonomous diagnostic peer failed/);
   }
   const diagnostic = await run(false);
   for (const count of [undefined, null, 0, 7, 9, '8'])
@@ -758,7 +809,56 @@ test('actual autonomous harness observes each checksum ownership mode and freeze
   const pending = await run(true, row => {
     row.snapshot.checksumConsumer.accepted_records = 7; row.snapshot.checksumOwnership.consumer_accepted_records = 7;
     row.snapshot.checksumConsumer.pending_batch = {count: 1};
-  }); assert.match(String(pending.error), /did not complete/); // Legitimate delivery interval is incomplete, not malformed.
+  }); assert.match(String(pending.error), /did not complete|outer wall-time deadline/); // Delivery remains incomplete, not malformed.
+});
+
+test('runtime positive completion uses full peer snapshots at its bounded receipt gate', async () => {
+  const source = await fs.readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const facadeStart = source.indexOf('function runtimeOwnerPeerFacade(');
+  const facadeEnd = source.indexOf('\nasync function runtimeOwnerWebRtcState', facadeStart);
+  const completionStart = source.indexOf('async function waitForPositivePeerCompletion()');
+  const completionEnd = source.indexOf('\nasync function waitForTerminalPair', completionStart);
+  assert(facadeStart >= 0 && facadeEnd > facadeStart && completionStart >= 0 && completionEnd > completionStart);
+  const {verifyPositivePeerCompletion} = await import('../scripts/net_lockstep_observers.mjs');
+  const run = async mutate => {
+    const counts = {snapshot: {alpha: 0, beta: 0}, health: {alpha: 0, beta: 0}};
+    const peers = {}, instances = Object.fromEntries(['alpha', 'beta'].map(role => [role, {
+      runtimeLockstepSnapshot: async () => {
+        ++counts.snapshot[role];
+        const protocol = mutate({role, protocol: {terminal: null, checksum_mismatches: [],
+          remote_ack_input: 5, local_checksum_ticks: 8, remote_checksum_ticks: 8,
+          next_checksum_compare: 8}});
+        return {armed: true, closing: false, failure: null,
+          peer: {protocol, endpointErrors: [], exportRecords: 0}};
+      },
+      runtimeLockstepHealth: async () => { ++counts.health[role]; throw Error('completion gate requested compact health'); },
+    }]));
+    const context = {peers, instances, runtimeOwned: true, runtimeCssMatch: false, runtimeFullRoute: false,
+      usedInputs: 6, sourceTicks: 8, stallMs: 1000, deadline: Date.now() + 10000,
+      instanceRows: {alpha: {}, beta: {}}, verifyPositivePeerCompletion,
+      drainChecksums: async () => {}, sleep: async () => {},
+      refreshBrowserPeers: async () => Promise.all(['alpha', 'beta'].map(role => peers[role].refresh()))};
+    vm.createContext(context);
+    vm.runInContext(`${source.slice(facadeStart, facadeEnd)}\n${source.slice(completionStart, completionEnd)}`, context);
+    peers.alpha = context.runtimeOwnerPeerFacade(instances.alpha, 'alpha');
+    peers.beta = context.runtimeOwnerPeerFacade(instances.beta, 'beta');
+    try { await context.waitForPositivePeerCompletion(); return {context, counts, error: null}; }
+    catch (error) { return {context, counts, error}; }
+  };
+  const success = await run(({protocol}) => protocol);
+  assert.equal(success.error, null);
+  assert.equal(success.counts.health.alpha + success.counts.health.beta, 0,
+    'the bounded positive receipt gate keeps its original full peer summary contract');
+  assert(success.counts.snapshot.alpha > 0 && success.counts.snapshot.beta > 0);
+  assert.deepEqual(success.context.instanceRows.alpha.positive_completion,
+    {remote_ack_input: 5, local_checksum_ticks: 8, remote_checksum_ticks: 8, next_checksum_compare: 8});
+  for (const mutate of [
+    ({protocol}) => ({...protocol, checksum_mismatches: 'malformed'}),
+    ({protocol}) => ({...protocol, checksum_mismatch_count: 1}),
+  ]) {
+    const rejected = await run(mutate);
+    assert.match(String(rejected.error), /without terminal or mismatch/);
+  }
 });
 
 
@@ -766,8 +866,10 @@ test('runtime input fixture observes actual ready session and live native captur
   const prior = globalThis.window, run = makeSession({transportFactory: options => pairedTransport({...options, asyncSend: true})}), pad = standardPad();
   const manager = createControllerManager({getGamepads: () => [pad], storage: null, userAgent: 'Chrome/154'});
   manager.assign(manager.inspect()[0].key, 0);
+  let fullSnapshotReads = 0;
   const page = {menuFrame: () => run.session.onFrame(),
-    meleeNetRuntimeLockstepSnapshot: () => run.session.snapshot(), __meleeSyntheticPadState: 'neutral',
+    meleeNetRuntimeLockstepSnapshot: () => { ++fullSnapshotReads; return run.session.snapshot(); },
+    meleeNetRuntimeLockstepHealth: options => run.session.health(options), __meleeSyntheticPadState: 'neutral',
     __meleeSyntheticPadTransition(state) {
       this.__meleeSyntheticPadState = state;
       pad.buttons[0] = {pressed: state === 'A', value: state === 'A' ? 1 : 0};
@@ -785,9 +887,14 @@ test('runtime input fixture observes actual ready session and live native captur
       const bytes = new Uint8Array(11); bytes[0] = buttons >>> 8; bytes[1] = buttons & 255;
       assert.equal(globalThis.__meleeWebNetLocalInputCapture(tick, 0, tick + 10, bytes), true);
       page.menuFrame(); await turn(); page.menuFrame();
-      assert.equal(run.session.snapshot().peer.localInputCapture.captures.length, tick + 1);
+      const health = page.meleeNetRuntimeLockstepHealth({inputFrom: tick});
+      assert.equal(health.peer.localInputCapture.captured_count, tick + 1);
+      assert.equal(health.peer.localInputCapture.captures_since.length, 1);
     }
-    assert.equal(run.session.snapshot().peer.localInputCapture.mode, 'live');
+    assert.equal(fullSnapshotReads, 0, 'the actual callback fixture does not read full snapshots per frame');
+    const evidence = run.session.snapshot();
+    assert.equal(evidence.peer.localInputCapture.mode, 'live');
+    assert.equal(evidence.peer.localInputCapture.captures.length, 6, 'full captures remain available at evidence time');
     assert.deepEqual(page.__meleeRuntimeInputFixture.snapshot().transitions.map(row => row.state), ['A', 'release']);
     page.__meleeRuntimeInputFixture.dispose();
   } finally {
@@ -828,7 +935,8 @@ test('actual consumed-input witness binds every selected sample at the native tw
   assert.throws(() => verify(alpha, beta, exports.subarray(64), exports), /record count/);
   const shifted = structuredClone(alpha); shifted[1][0] = 0; shifted[2][0] = 1;
   assert.throws(() => verify(shifted, beta, exports, exports), /does not match/);
-  assert.equal((source.match(/verifyConsumedInputComponents\(samples.alpha, samples.beta, bytesA, bytesB\)/g) || []).length, 3);
+  const routeVerifierCalls = source.match(/verifyConsumedInputComponents\(samples\.alpha, samples\.beta, bytesA, bytesB\)/g) || [];
+  assert.equal(routeVerifierCalls.length, 4);
 });
 
 test('runtime CSS-to-SSS witness binds all 518 selected PAD rows to 520 native input checksums', async () => {

@@ -35,24 +35,51 @@ export function readNativeMatchObservationInPage() {
   return observation;
 }
 
+export function readNativeMatchBoundaryInPage() {
+  const readStatus = () => window.__net?.status();
+  const readNative = () => window.__net?.native();
+  const observe = () => {
+    const module = globalThis.Module;
+    if (!module || typeof module._melee_web_native_menu_match_observe !== 'function' ||
+        typeof module.UTF8ToString !== 'function')
+      throw Error('The existing native match observer is unavailable');
+    let observation;
+    try { observation = JSON.parse(module.UTF8ToString(module._melee_web_native_menu_match_observe())); }
+    catch { throw Error('The existing native match observer returned invalid JSON'); }
+    if (!observation || typeof observation !== 'object' || Array.isArray(observation))
+      throw Error('The existing native match observer returned a non-object value');
+    return observation;
+  };
+  const statusBefore = readStatus(), nativeBefore = readNative();
+  const observation = observe();
+  const nativeAfter = readNative(), statusAfter = readStatus();
+  return {status_before: statusBefore, native_before: nativeBefore, observation,
+    native_after: nativeAfter, status_after: statusAfter,
+    stable_cursor: statusBefore?.cursor === statusAfter?.cursor,
+    stable_phase: nativeBefore?.phase === nativeAfter?.phase};
+}
+
 // Harness-only Gamepad state transitions after the existing native callback tail.
 // Native acquisition and the live publisher remain the sole PAD sample owner.
 export function installRuntimeInputFixtureInPage({role, inputTicks, variant = 'neutral-a-release', samples = null}) {
   const cssStartToSss = variant === 'css-start-to-sss';
   const cssSssToMatch = variant === 'css-sss-to-match';
+  const fullRoute = variant === 'runtime-full-route';
   const cssRoute = cssStartToSss || cssSssToMatch;
+  const sampledRoute = cssRoute || fullRoute;
+  const sourceTicks = fullRoute ? 5084 : 520;
   if (!['alpha', 'beta'].includes(role) ||
-      (cssRoute ? inputTicks !== 518 || !Array.isArray(samples) || samples.length !== inputTicks :
+      (sampledRoute ? inputTicks !== (fullRoute ? 5082 : 518) || !Array.isArray(samples) || samples.length !== inputTicks :
         variant !== 'neutral-a-release' || inputTicks !== 6) ||
       typeof window.menuFrame !== 'function' || typeof window.meleeNetRuntimeLockstepSnapshot !== 'function' ||
       typeof window.__meleeSyntheticPadTransition !== 'function' || window.__meleeSyntheticPadState !== 'neutral' ||
       window.__meleeRuntimeInputFixture)
-    throw Error(cssRoute ? 'Runtime CSS route input fixture requires fresh neutral 520-tick ownership' :
+    throw Error(sampledRoute ? 'Runtime route input fixture requires fresh neutral source ownership' :
       'Runtime input fixture requires fresh neutral eight-CSS ownership');
   const original = window.menuFrame, localPort = role === 'alpha' ? 0 : 1;
   const retained = [], transitions = [], phaseSamples = [];
   let failure = null, disposed = false, frozen = false;
-  let lastObservedCursor = -1;
+  let lastObservedCursor = -1, lastObservedPollSerial = null;
   const fail = error => {
     failure ??= error;
     try { window.__meleeSyntheticPadTransition('neutral'); } catch {}
@@ -63,10 +90,10 @@ export function installRuntimeInputFixtureInPage({role, inputTicks, variant = 'n
     ...(frozen ? {captures: retained.map(row => JSON.parse(row))} : {}), failure: failure ? String(failure.message || failure) : null,
     input_source: 'synthetic standard Gamepad -> ordinary controller manager -> native live PAD capture'});
   const recordPhase = () => {
-    if (!cssRoute || typeof window.__net?.status !== 'function' || typeof window.__net?.native !== 'function') return;
+    if (!sampledRoute || typeof window.__net?.status !== 'function' || typeof window.__net?.native !== 'function') return;
     const status = window.__net.status(), native = window.__net.native();
     if (status?.active !== 1) return;
-    if (!Number.isSafeInteger(status.cursor) || status.cursor < 0 || status.cursor > 520 ||
+    if (!Number.isSafeInteger(status.cursor) || status.cursor < 0 || status.cursor > sourceTicks ||
         !Number.isInteger(native.phase) || !Number.isInteger(native.running))
       throw Error('Runtime CSS route source phase observation is malformed');
     // beginLockstep can make the native session active before its first source
@@ -87,6 +114,16 @@ export function installRuntimeInputFixtureInPage({role, inputTicks, variant = 'n
       throw Error('Runtime CSS route Gamepad state is malformed');
     window.__meleeSyntheticPadTransition(sample);
   };
+  const applyFullRouteSample = sample => {
+    if (!sample || sample.kind !== variant || !Number.isSafeInteger(sample.input_tick) ||
+        !Array.isArray(sample.buttons) || sample.buttons.length !== 17 ||
+        sample.buttons.some(button => !button || typeof button.pressed !== 'boolean' ||
+          typeof button.value !== 'number' || !Number.isFinite(button.value) || button.value < 0 || button.value > 1) ||
+        !Array.isArray(sample.axes) || sample.axes.length !== 4 ||
+        sample.axes.some(axis => typeof axis !== 'number' || !Number.isFinite(axis) || axis < -1 || axis > 1))
+      throw Error('Runtime full-route Gamepad state is malformed');
+    window.__meleeSyntheticPadTransition(sample);
+  };
   function observer() {
     let result;
     try { result = original.apply(this, arguments); }
@@ -95,49 +132,65 @@ export function installRuntimeInputFixtureInPage({role, inputTicks, variant = 'n
     try {
       if (result && typeof result.then === 'function') throw Error('Runtime input fixture callback must remain synchronous');
       recordPhase();
-      const owner = window.meleeNetRuntimeLockstepSnapshot();
+      const owner = typeof window.meleeNetRuntimeLockstepHealth === 'function'
+        ? window.meleeNetRuntimeLockstepHealth({inputFrom: retained.length})
+        : window.meleeNetRuntimeLockstepSnapshot();
       if (!owner) {
         if (retained.length) throw Error('Runtime input fixture lost its active owner');
         return result; // Prepared page has not begun its owned session.
       }
-      if (owner.armed !== true || owner.closing !== false || owner.failure !== null)
-        throw Error('Runtime input fixture owner failed or closed');
+      if (owner.armed !== true || owner.failure !== null)
+        throw Error('Runtime input fixture owner failed');
       if (!owner.peer) {
+        if (owner.closing === true) return result; // Teardown has fenced new input before a peer was created.
+        if (owner.closing !== false) throw Error('Runtime input fixture owner state is malformed');
         if (retained.length) throw Error('Runtime input fixture lost its active peer');
         return result; // Native identity/transport are still starting.
       }
-      const peer = owner.peer, captures = peer.localInputCapture?.captures;
-      if (peer.failure || peer.protocol?.terminal || peer.localInputCapture?.mode !== 'live' ||
-          peer.localInputCapture?.enabled !== true || !Array.isArray(captures) || captures.length > inputTicks ||
-          captures.length < retained.length || captures.length > retained.length + 1)
+      const peer = owner.peer, capture = peer.localInputCapture;
+      if (peer.failure || peer.protocol?.terminal)
+        throw Error('Runtime input fixture peer failed');
+      if (owner.closing === true) return result; // Expected close notification after the run boundary.
+      if (owner.closing !== false) throw Error('Runtime input fixture owner state is malformed');
+      const captures = capture?.captures_since ?? capture?.captures;
+      const captureCount = capture?.captured_count ?? captures?.length;
+      const incrementalCaptures = Array.isArray(capture?.captures_since);
+      if (peer.localInputCapture?.mode !== 'live' ||
+          peer.localInputCapture?.enabled !== true || !Array.isArray(captures) || !Number.isSafeInteger(captureCount) ||
+          captureCount > inputTicks || captureCount < retained.length || captureCount > retained.length + 1 ||
+          (incrementalCaptures && captures.length !== captureCount - retained.length))
         throw Error('Runtime input fixture capture ownership is invalid');
-      for (let tick = 0; tick < captures.length; ++tick) {
-        const row = captures[tick], bytes = row.bytes;
+      const firstCapture = incrementalCaptures ? retained.length : 0;
+      for (let offset = 0; offset < captures.length; ++offset) {
+        const tick = firstCapture + offset, row = captures[offset], bytes = row.bytes;
         if (row.source_cursor !== tick || row.input_tick !== tick || row.local_port !== localPort ||
             !Number.isSafeInteger(row.poll_serial) || row.poll_serial < 0 ||
-            (tick && row.poll_serial <= captures[tick - 1].poll_serial) ||
+            (incrementalCaptures && lastObservedPollSerial !== null && row.poll_serial <= lastObservedPollSerial) ||
+            (!incrementalCaptures && tick && row.poll_serial <= captures[tick - 1].poll_serial) ||
             !Array.isArray(bytes) || bytes.length !== 11 ||
             Array.from(bytes).some(byte => !Number.isInteger(byte) || byte < 0 || byte > 255))
           throw Error('Runtime input fixture selected PAD witness is invalid');
-        if (tick < retained.length && JSON.stringify(row) !== retained[tick])
+        if (!incrementalCaptures && tick < retained.length && JSON.stringify(row) !== retained[tick])
           throw Error('Runtime input fixture retained sample changed during a wait');
-        if (cssRoute) {
+        if (sampledRoute) {
           const expected = samples[tick];
           if (!expected || expected.input_tick !== tick || !Array.isArray(expected.bytes) ||
               expected.bytes.length !== 11 || expected.bytes.some((byte, index) => byte !== bytes[index]))
-            throw Error('Runtime CSS route fixture selected PAD differs from the checked recipe sample');
+            throw Error(fullRoute ? 'Runtime full-route fixture selected PAD differs from the checked recipe sample' :
+              'Runtime CSS route fixture selected PAD differs from the checked recipe sample');
         } else {
           const expectedButtons = role === 'alpha' && tick === 1 ? 0x0100 : 0;
           if (((bytes[0] << 8) | bytes[1]) !== expectedButtons || bytes.slice(2).some(byte => byte !== 0))
             throw Error('Runtime input fixture did not witness exact neutral/A/release samples');
         }
+        if (incrementalCaptures) lastObservedPollSerial = row.poll_serial;
       }
-      if (captures.length > retained.length) {
+      if (captureCount > retained.length) {
         if (peer.protocol?.ready !== true) throw Error('Runtime input fixture sampled before native start agreement');
         retained.push(JSON.stringify(captures.at(-1)));
-        if (cssRoute && retained.length < inputTicks) {
+        if (sampledRoute && retained.length < inputTicks) {
           const next = samples[retained.length];
-          applyCssSample(next.gamepad);
+          if (fullRoute) applyFullRouteSample(next.gamepad); else applyCssSample(next.gamepad);
           const prior = samples[retained.length - 1].bytes;
           if (JSON.stringify(prior) !== JSON.stringify(next.bytes))
             transitions.push({after_input_tick: retained.length - 1,
@@ -156,11 +209,12 @@ export function installRuntimeInputFixtureInPage({role, inputTicks, variant = 'n
     try {
       const owner = window.meleeNetRuntimeLockstepSnapshot(), peer = owner?.peer;
       const status = window.__net?.status();
-      const native = cssRoute ? window.__net?.native() : null;
+      const native = sampledRoute ? window.__net?.native() : null;
       const phases = phaseSamples.map(row => row.phase).filter((phase, index, rows) => index === 0 || phase !== rows[index - 1]);
-      const expectedSourceTicks = cssRoute ? 520 : 8;
+      const expectedSourceTicks = sampledRoute ? sourceTicks : 8;
       const expectedRemoteAck = inputTicks - 1;
-      const phaseComplete = cssStartToSss ? native?.phase === 3 && phases[0] === 1 && phases.at(-1) === 3 &&
+      const phaseComplete = fullRoute ? native?.phase === 1 && native?.running === 1 && native?.error === null &&
+        JSON.stringify(phases) === '[1,3,7,8,1]' : cssStartToSss ? native?.phase === 3 && phases[0] === 1 && phases.at(-1) === 3 &&
         phases.every(phase => phase === 1 || phase === 3) : cssSssToMatch ?
         native?.phase === 7 && native.running === 1 && native.error === null &&
           JSON.stringify(phases) === '[1,3,7]' : false;
@@ -170,12 +224,14 @@ export function installRuntimeInputFixtureInPage({role, inputTicks, variant = 'n
           status.blocker !== 'complete' || status.terminal?.kind !== 0 ||
           peer.protocol.local_checksum_ticks !== expectedSourceTicks || peer.protocol.remote_checksum_ticks !== expectedSourceTicks ||
           peer.protocol.next_checksum_compare !== expectedSourceTicks || peer.protocol.remote_ack_input !== expectedRemoteAck ||
+          (fullRoute && peer.protocol.remote_ack_checksum !== expectedSourceTicks - 1) ||
           peer.localInputCapture?.mode !== 'live' || peer.localInputCapture?.enabled !== true ||
           retained.length !== inputTicks || peer.localInputCapture.captures?.length !== inputTicks ||
           peer.localInputCapture.captures.some((row, tick) => JSON.stringify(row) !== retained[tick]) ||
-          (cssRoute ? !phaseComplete : transitions.length !== (role === 'alpha' ? 2 : 0)))
+          (sampledRoute ? !phaseComplete : transitions.length !== (role === 'alpha' ? 2 : 0)))
         throw Error(cssStartToSss ? 'CSS-to-SSS runtime input fixture cannot freeze before checked 520-tick SSS completion' :
           cssSssToMatch ? 'CSS-to-match runtime input fixture cannot freeze before checked 520-tick active-match completion' :
+          fullRoute ? 'Runtime full-route input fixture cannot freeze before checked 5084-source full-route completion' :
           'Runtime input fixture cannot freeze before checked eight-CSS completion');
       window.__meleeSyntheticPadTransition('neutral');
       window.menuFrame = original;
@@ -191,7 +247,11 @@ export function installRuntimeInputFixtureInPage({role, inputTicks, variant = 'n
     window.menuFrame = original;
     return snapshot();
   };
-  window.__meleeRuntimeInputFixture = {snapshot, freeze, dispose};
+  const health = () => Object.freeze({role, variant, input_ticks: inputTicks,
+    captured_count: retained.length, disposed, frozen,
+    failure: failure ? String(failure.message || failure) : null,
+    input_source: 'synthetic standard Gamepad -> ordinary controller manager -> native live PAD capture'});
+  window.__meleeRuntimeInputFixture = {snapshot, health, freeze, dispose};
   window.menuFrame = observer;
   return snapshot();
 }
@@ -417,9 +477,14 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
           window.testPad.axes = [0, 0, 0, 0];
           return;
         }
-        if (!state || !['css-start-to-sss', 'css-sss-to-match'].includes(state.kind) || !Number.isSafeInteger(state.input_tick) ||
+        const runtimeRoute = state?.kind === 'runtime-full-route';
+        if (!state || !['css-start-to-sss', 'css-sss-to-match', 'runtime-full-route'].includes(state.kind) || !Number.isSafeInteger(state.input_tick) ||
             !Array.isArray(state.buttons) || state.buttons.length !== 17 || !Array.isArray(state.axes) || state.axes.length !== 4)
           throw Error('Unknown synthetic Gamepad sample state');
+        if (runtimeRoute && (state.buttons.some(button => !button || typeof button.pressed !== 'boolean' ||
+            typeof button.value !== 'number' || !Number.isFinite(button.value) || button.value < 0 || button.value > 1) ||
+            state.axes.some(axis => typeof axis !== 'number' || !Number.isFinite(axis) || axis < -1 || axis > 1)))
+          throw Error('Malformed runtime full-route Gamepad sample state');
         window.__meleeSyntheticPadState = `${state.kind}:${state.input_tick}`;
         window.testPad.buttons = state.buttons.map(button => ({pressed: button.pressed, value: button.value}));
         window.testPad.axes = [...state.axes];
@@ -740,6 +805,8 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
     }));
     instance.runtimeLockstepSnapshot = () => bounded(() => page.evaluate(() =>
       window.meleeNetRuntimeLockstepSnapshot?.() ?? null));
+    instance.runtimeLockstepHealth = (options = {}) => bounded(() => page.evaluate(value =>
+      window.meleeNetRuntimeLockstepHealth?.(value) ?? null, options));
     instance.configureRuntimeLockstep = options => {
       if (!runtimeOwned) throw Error('Runtime-owned lockstep config is unavailable for this browser owner');
       return bounded(() => page.evaluate(options => window.meleeNetConfigureRuntimeLockstep(options), options));
@@ -797,27 +864,50 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
     instance.userAgent = await bounded(() => page.evaluate(() => navigator.userAgent));
     instance.browserVersion = context.browser()?.version() ?? null;
     instance.importDisc = async () => { await driver.selectDisc(disc); await driver.waitForStart(); };
-    instance.prepareSyntheticGamepadRouting = localPort => {
+    instance.prepareSyntheticGamepadRouting = (localPort, {profile = null} = {}) => {
       if (!syntheticGamepad) throw Error('Synthetic Gamepad routing requires its input fixture');
-      return bounded(() => page.evaluate(({localPort, gamepadIndex}) => {
+      return bounded(() => page.evaluate(({localPort, gamepadIndex, profile}) => {
         const manager = Module?.meleeControllers;
-        if (!manager || typeof manager.inspect !== 'function' || typeof manager.assign !== 'function')
+        if (!manager || typeof manager.inspect !== 'function' || typeof manager.assign !== 'function' ||
+            (profile && typeof manager.saveProfile !== 'function'))
           throw Error('The existing browser controller manager is unavailable');
         const discovered = manager.inspect();
         if (discovered.length !== 1 || discovered[0].index !== gamepadIndex)
           throw Error(`Expected only synthetic Gamepad ${gamepadIndex} after neutral discovery`);
         const row = discovered[0];
         const automaticPort = row.port;
+        if (profile) {
+          // Exercise the manager's neutral re-arm guard with a held input across
+          // profile save and manual assignment before returning to true neutral.
+          window.testPad.buttons = Array.from({length: 17}, (_, index) => ({
+            pressed: index === 0, value: index === 0 ? 1 : 0}));
+          manager.saveProfile(row.key, profile);
+        }
         manager.assign(row.key, localPort);
-        const routed = manager.inspect().find(candidate => candidate.key === row.key);
+        let routed = manager.inspect().find(candidate => candidate.key === row.key);
+        if (profile) {
+          const heldOutput = routed?.output;
+          if (!routed || routed.profileSource !== 'saved' || routed.profileConfig?.gamecube !== true ||
+              JSON.stringify(routed.profileConfig) !== JSON.stringify(profile) || routed.active ||
+              heldOutput?.buttons !== 0 || [...(heldOutput?.stick || []), ...(heldOutput?.cstick || []),
+                ...(heldOutput?.triggers || [])].some(value => value !== 0))
+            throw Error(`Saved synthetic Gamepad profile did not remain neutral while held on local port ${localPort}`);
+          window.testPad.buttons = Array.from({length: 17}, () => ({pressed: false, value: 0}));
+          window.testPad.axes = [0, 0, 0, 0];
+          routed = manager.inspect().find(candidate => candidate.key === row.key);
+        }
         const output = routed?.output;
         if (!routed || routed.port !== localPort || !routed.active || routed.status !== 'ready' ||
+            (profile && (routed.profileSource !== 'saved' || routed.profileConfig?.gamecube !== true ||
+              JSON.stringify(routed.profileConfig) !== JSON.stringify(profile))) ||
             output?.buttons !== 0 || [...(output?.stick || []), ...(output?.cstick || []),
               ...(output?.triggers || [])].some(value => value !== 0))
           throw Error(`Synthetic Gamepad ${gamepadIndex} did not activate neutrally on local port ${localPort}`);
         return {gamepad_index: gamepadIndex, automatic_port: automaticPort,
-          assigned_port: routed.port, active: routed.active, neutral: true};
-      }, {localPort, gamepadIndex: syntheticGamepad.index}));
+          assigned_port: routed.port, active: routed.active, neutral: true,
+          ...(profile ? {profile_source: routed.profileSource, profile_config: routed.profileConfig,
+            held_input_blocked: true, neutral_rearmed: true} : {})};
+      }, {localPort, gamepadIndex: syntheticGamepad.index, profile}));
     };
     instance.installRuntimeInputFixture = options => {
       if (!runtimeOwned || !syntheticGamepad) throw Error('Runtime input fixture requires runtime ownership and a Gamepad fixture');
@@ -828,6 +918,8 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
       return window.__meleeRuntimeInputFixture.freeze();
     }));
     instance.readRuntimeInputFixture = () => bounded(() => page.evaluate(() => window.__meleeRuntimeInputFixture?.snapshot() ?? null));
+    instance.readRuntimeInputFixtureHealth = () => bounded(() => page.evaluate(() =>
+      window.__meleeRuntimeInputFixture?.health?.() ?? null));
     instance.begin = (seed, maxFrames) => bounded(() => page.evaluate(([s, m]) => window.meleeNetBegin(s, m), [seed >>> 0, maxFrames]));
     instance.beginLockstep = (seed, maxFrames) => bounded(() => page.evaluate(([s, m]) => window.meleeNetBeginLockstep(s, m), [seed >>> 0, maxFrames]));
     instance.peerIdentity = () => bounded(() => page.evaluate(() => window.meleeNetPeerIdentity()));
@@ -860,6 +952,10 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
       if (!runtimeOwned) throw Error('Native match observation bridge requires runtime ownership');
       return bounded(() => page.evaluate(readNativeMatchObservationInPage));
     };
+    instance.matchObservationBoundary = () => {
+      if (!runtimeOwned) throw Error('Native match observation bridge requires runtime ownership');
+      return bounded(() => page.evaluate(readNativeMatchBoundaryInPage));
+    };
     instance.graphics = () => bounded(() => page.evaluate(async () => {
       const canvas = document.querySelector('canvas');
       const adapter = globalThis.navigator.gpu ? await navigator.gpu.requestAdapter().catch(() => null) : null;
@@ -884,6 +980,10 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
     };
     instance.timingPauseDiagnostics = () => bounded(() => page.evaluate(() =>
       window.meleeNetTimingPauseDiagnostics?.() ?? null));
+    instance.runtimeCallbackTimingSnapshot = () => bounded(() => page.evaluate(() =>
+      window.meleeNetRuntimeCallbackTimingSnapshot?.() ?? null));
+    instance.runtimeDiagnosticExport = () => bounded(() => page.evaluate(async () =>
+      await window.meleeNetRuntimeDiagnosticExport?.() ?? null));
     instance.unload = () => driver.unload();
     return instance;
   } catch (error) {

@@ -2,7 +2,7 @@ import {createNetLockstepNativeAdapter} from './net_lockstep_native_adapter.mjs'
 import {BROWSER_CHECKSUM_EXPORT_LIMIT, createBrowserNativePeer} from './net_lockstep_browser_peer.mjs';
 import {createDataChannelEndpoint} from './net_lockstep_webrtc.mjs';
 import {createRoomWebRtcSignaler} from './net_lockstep_webrtc_signaling.mjs';
-import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS, NET_RECORD_BYTES} from './net_lockstep_core.mjs';
+import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS, NET_RECORD_BYTES, readOnlySuffix} from './net_lockstep_core.mjs';
 
 const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]{22,64}$/;
 
@@ -395,7 +395,23 @@ export function createRuntimeLockstepSession({Module, role, sourceTicks, inputTi
     return closeOperation;
   }
 
-  return Object.freeze({start, onFrame, close, snapshot: () => Object.freeze({armed, closing, close_mode: closeMode,
+  function health({inputFrom, checksumFrom} = {}) {
+    const captureCount = peer?.health().localInputCapture.captured_count ?? 0;
+    if (inputFrom !== undefined && inputFrom !== null &&
+        (!Number.isSafeInteger(inputFrom) || inputFrom < 0 || inputFrom > captureCount))
+      throw Error('Runtime local input capture offset must be a nonnegative safe integer within retained history');
+    if (checksumFrom !== undefined && checksumFrom !== null &&
+        (!Number.isSafeInteger(checksumFrom) || checksumFrom < 0 || checksumFrom > checksumRecords.length))
+      throw Error('Runtime checksum evidence offset must be a nonnegative safe integer within retained history');
+    return Object.freeze({armed, closing, close_mode: closeMode,
+      peer: peer?.health(inputFrom === undefined || inputFrom === null ? {} : {inputFrom}) ?? null,
+      checksum_record_count: checksumRecords.length,
+      ...(checksumFrom === undefined || checksumFrom === null ? {} :
+        {checksum_records_since: readOnlySuffix(checksumRecords, checksumFrom, 'Runtime checksum evidence')}),
+      failure: failure ? String(failure?.message || failure) : null});
+  }
+
+  return Object.freeze({start, onFrame, close, health, snapshot: () => Object.freeze({armed, closing, close_mode: closeMode,
     peer: peer?.snapshot() ?? null,
     transport: transportInfo ? {...transportInfo,
       signaling: transport?.signalingSnapshot?.() ?? transportInfo.signaling} : null,

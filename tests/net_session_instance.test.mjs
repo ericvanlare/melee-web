@@ -5,13 +5,16 @@ import path from 'node:path';
 import vm from 'node:vm';
 import test from 'node:test';
 import {closePageNativeNetworkOwnership, firstFatalBrowserError, openNetInstance, PAGE_HELPERS,
-  installRuntimeInputFixtureInPage, readNativeMatchObservationInPage} from '../scripts/net_session_instance.mjs';
+  installRuntimeInputFixtureInPage, readNativeMatchBoundaryInPage,
+  readNativeMatchObservationInPage} from '../scripts/net_session_instance.mjs';
 import {createBrowserNativePeer} from '../scripts/net_lockstep_browser_peer.mjs';
 import {createNetLockstepNativeAdapter} from '../scripts/net_lockstep_native_adapter.mjs';
 import {LOCKSTEP_DELAY} from '../scripts/net_lockstep_core.mjs';
 import {installNetSourceAccounting, readNetSourceAccounting} from '../scripts/net_source_accounting.mjs';
 import {buildRuntimeCssMatchGamepadSamples, buildRuntimeCssSssGamepadSamples,
-  RUNTIME_CSS_MATCH_INPUT_TICKS, RUNTIME_CSS_SSS_INPUT_TICKS} from '../scripts/net_lockstep_browser_modes.mjs';
+  buildRuntimeFullRouteGamepadSamples, buildRuntimeFullRouteProfile,
+  RUNTIME_CSS_MATCH_INPUT_TICKS, RUNTIME_CSS_SSS_INPUT_TICKS, RUNTIME_FULL_ROUTE_INPUT_TICKS,
+  RUNTIME_FULL_ROUTE_SOURCE_TICKS} from '../scripts/net_lockstep_browser_modes.mjs';
 import {createControllerManager} from '../web/controller-input.mjs';
 import {standardPad} from './controller-fixtures.mjs';
 
@@ -116,6 +119,35 @@ test('runtime match observation bridge reads only the existing native export and
   } finally {
     if (hadModule) globalThis.Module = prior;
     else delete globalThis.Module;
+  }
+});
+
+test('native match observation boundary brackets the existing read-only export in one page task', () => {
+  const saved = new Map(['window', 'Module'].map(name => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+  const status = {active: 1, cursor: RUNTIME_FULL_ROUTE_SOURCE_TICKS, blocker: 'complete', terminal: {kind: 0}};
+  const native = {phase: 1, running: 0, error: null};
+  let matchReads = 0;
+  globalThis.window = {__net: {status: () => ({...status}), native: () => ({...native})}};
+  globalThis.Module = {_melee_web_native_menu_match_observe() { ++matchReads; return 19; },
+    UTF8ToString(pointer) { assert.equal(pointer, 19); return JSON.stringify({complete: true}); }};
+  try {
+    const stable = readNativeMatchBoundaryInPage();
+    assert.equal(matchReads, 1);
+    assert.equal(stable.stable_cursor, true);
+    assert.equal(stable.stable_phase, true);
+    assert.deepEqual(stable.observation, {complete: true});
+    let statusCalls = 0;
+    window.__net.status = () => ({...status, cursor: RUNTIME_FULL_ROUTE_SOURCE_TICKS + (statusCalls++ ? 1 : 0)});
+    assert.equal(readNativeMatchBoundaryInPage().stable_cursor, false);
+    let nativeCalls = 0;
+    window.__net.native = () => ({...native, phase: nativeCalls++ ? 8 : 1});
+    assert.equal(readNativeMatchBoundaryInPage().stable_phase, false);
+  } finally {
+    for (const name of ['window', 'Module']) {
+      const descriptor = saved.get(name);
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete globalThis[name];
+    }
   }
 });
 
@@ -300,6 +332,79 @@ test('actual synthetic Gamepad init script converts both CSS route kinds through
       assert.equal(window.__meleeSyntheticPadState, 'neutral', 'existing six-input string states remain supported');
       assert.equal(manager.sample().find(candidate => candidate.port === port)?.output.buttons, 0);
     }
+  });
+});
+
+test('registered full-route decoder and real manager save/reload preserve held-input re-arm and PAD fields', async () => {
+  await withProfile(async userDataDir => {
+    let pageContext = null;
+    const chrome = fakeChrome(async () => ({status: () => 200, headers: () => ({
+      'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'require-corp',
+    })}), async (fn, argument) => {
+      const source = String(fn);
+      if (source.includes('crossOriginIsolated')) return true;
+      if (source.includes('navigator.userAgent')) return 'Chrome/154';
+      if (source.includes('const manager = Module?.meleeControllers')) {
+        assert(pageContext, 'the page VM is installed before routing');
+        return vm.runInNewContext(`(${fn.toString()})(argument)`, {...pageContext, argument});
+      }
+      return undefined;
+    });
+    const pad = standardPad(0);
+    const instance = await openNetInstance({...common, chromium: chrome.chromium, userDataDir,
+      syntheticGamepad: pad});
+    try {
+      const initScript = chrome.initScripts.map(args => args[0]).find(fn =>
+        typeof fn === 'function' && String(fn).includes('Malformed runtime full-route Gamepad sample state'));
+      assert.equal(typeof initScript, 'function', 'full-route decoder is the registered native init callback');
+      const window = {}, navigator = {};
+      vm.runInNewContext(`(${initScript.toString()})(pad)`, {window, navigator, pad});
+      const values = new Map();
+      const storage = {getItem(key) { return values.get(key) ?? null; },
+        setItem(key, value) { values.set(key, value); }};
+      const manager = createControllerManager({getGamepads: () => navigator.getGamepads(), storage,
+        userAgent: 'Chrome/154'});
+      const Module = {meleeControllers: manager};
+      pageContext = {window, navigator, pad, Module};
+      const profile = buildRuntimeFullRouteProfile();
+      const routing = await instance.prepareSyntheticGamepadRouting(0, {profile});
+      assert.equal(routing.profile_source, 'saved');
+      assert.equal(routing.profile_config.gamecube, true);
+      assert.equal(JSON.stringify(routing.profile_config), JSON.stringify(profile));
+      assert.equal(routing.held_input_blocked, true);
+      assert.equal(routing.neutral_rearmed, true);
+      assert.equal(pad.buttons[0].pressed, false, 'the helper leaves the physical sample neutral');
+
+      const fresh = createControllerManager({getGamepads: () => navigator.getGamepads(), storage,
+        userAgent: 'Chrome/154'});
+      const row = fresh.inspect()[0];
+      assert.equal(row.profileSource, 'saved');
+      assert.equal(JSON.stringify(row.profileConfig), JSON.stringify(profile));
+      fresh.assign(row.key, 1);
+      const ready = fresh.inspect().find(candidate => candidate.port === 1);
+      assert.equal(ready.active, true);
+      assert.equal(ready.status, 'ready');
+      assert.equal(ready.output.buttons, 0);
+
+      const frames = Buffer.alloc(RUNTIME_FULL_ROUTE_INPUT_TICKS * 44);
+      for (let tick = 0; tick < RUNTIME_FULL_ROUTE_INPUT_TICKS; ++tick) {
+        frames[tick * 44 + 32] = 0xff; frames[tick * 44 + 43] = 0xff;
+      }
+      const offset = 608 * 44 + 11;
+      frames.writeUInt16BE(0x0020, offset); frames[offset + 7] = 70;
+      const sample = buildRuntimeFullRouteGamepadSamples(frames).beta[608];
+      window.__meleeSyntheticPadTransition(sample.gamepad);
+      assert.equal(window.__meleeSyntheticPadState, 'runtime-full-route:608');
+      const output = fresh.sample().find(candidate => candidate.port === 1)?.output;
+      assert.deepEqual([output.buttons >>> 8, output.buttons & 255,
+        ...output.stick.map(value => value & 255), ...output.cstick.map(value => value & 255),
+        ...output.triggers, 0, 0, 0], sample.bytes,
+      'registered decoder and reloaded saved profile preserve independent R click and pressure');
+      assert.throws(() => window.__meleeSyntheticPadTransition({...sample.gamepad, axes: [2, 0, 0, 0]}),
+        /Malformed runtime full-route Gamepad sample state/);
+      assert.throws(() => window.__meleeSyntheticPadTransition({...sample.gamepad, buttons: sample.gamepad.buttons.slice(1)}),
+        /Unknown synthetic Gamepad sample state/);
+    } finally { await instance.close(); }
   });
 });
 
@@ -518,6 +623,49 @@ test('runtime fixture tail changes only the next ordinary Gamepad sample and ret
     assert.equal(pad.buttons[0].pressed, false); page.__meleeRuntimeInputFixture.dispose();
     assert.throws(() => installRuntimeInputFixtureInPage({role: 'alpha', inputTicks: 6}), /fresh neutral/);
   } finally { if (prior === undefined) delete globalThis.window; else globalThis.window = prior; }
+});
+
+test('runtime fixture hot path reads only new captures and treats owner close as teardown', () => {
+  const prior = globalThis.window, captures = [], offsets = [];
+  const original = () => {};
+  let closing = false, protocolTerminal = null, snapshotReads = 0;
+  const page = {menuFrame: original, __meleeSyntheticPadState: 'neutral',
+    __meleeSyntheticPadTransition(state) { this.__meleeSyntheticPadState = state; },
+    meleeNetRuntimeLockstepSnapshot() { ++snapshotReads; throw Error('full snapshot is not a hot-path API'); },
+    meleeNetRuntimeLockstepHealth({inputFrom}) {
+      offsets.push(inputFrom);
+      return {armed: true, closing, failure: null,
+        peer: {failure: null, protocol: {ready: true, terminal: protocolTerminal},
+          localInputCapture: {enabled: true, mode: 'live', input_ticks: 6,
+            captured_count: captures.length, captures_since: Object.freeze(captures.slice(inputFrom))}}};
+    }};
+  globalThis.window = page;
+  try {
+    installRuntimeInputFixtureInPage({role: 'alpha', inputTicks: 6});
+    for (let tick = 0; tick < 6; ++tick) {
+      const bytes = Array(11).fill(0);
+      if (tick === 1) bytes[0] = 1;
+      captures.push(Object.freeze({source_cursor: tick, input_tick: tick, local_port: 0,
+        poll_serial: 100 + tick, bytes: Object.freeze(bytes)}));
+      page.menuFrame();
+      page.menuFrame(); // A wait callback receives an empty suffix.
+    }
+    assert.deepEqual(offsets, [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6]);
+    assert.equal(snapshotReads, 0, 'the per-frame observer never requests historical snapshots');
+    assert.equal(page.__meleeRuntimeInputFixture.snapshot().captured_count, 6,
+      'full retained captures remain available for final evidence');
+    closing = true;
+    page.menuFrame();
+    assert.equal(page.__meleeRuntimeInputFixture.health().failure, null,
+      'ordinary close notification is not a fixture failure');
+    protocolTerminal = {kind: 'protocol'};
+    assert.throws(() => page.menuFrame(), /peer failed/,
+      'a protocol terminal remains fatal during teardown');
+  } finally {
+    if (page.__meleeRuntimeInputFixture && !page.__meleeRuntimeInputFixture.snapshot().disposed)
+      page.__meleeRuntimeInputFixture.dispose();
+    if (prior === undefined) delete globalThis.window; else globalThis.window = prior;
+  }
 });
 
 test('CSS-to-SSS fixture drives the ordinary controller manager one selected sample at a time', () => {
@@ -772,6 +920,120 @@ test('CSS-to-match fixture refuses freeze without a positive-progress 1→3→7 
   } finally { if (prior === undefined) delete globalThis.window; else globalThis.window = prior; }
 });
 
+test('full-route fixture preserves 5082 inputs, waits, phase collapse and complete live-source freeze', () => {
+  const prior = globalThis.window, frames = Buffer.alloc(RUNTIME_FULL_ROUTE_INPUT_TICKS * 44);
+  for (let tick = 0; tick < RUNTIME_FULL_ROUTE_INPUT_TICKS; ++tick) {
+    frames[tick * 44 + 32] = 0xff; frames[tick * 44 + 43] = 0xff;
+  }
+  const offset = 608 * 44 + 11;
+  frames.writeUInt16BE(0x0020, offset); frames[offset + 7] = 70;
+  const samples = buildRuntimeFullRouteGamepadSamples(frames);
+  const pages = {};
+  const phaseFor = cursor => cursor < 153 ? 1 : cursor < 305 ? 3 : cursor < 4291 ? 7 : cursor < 4903 ? 8 : 1;
+  const setup = role => {
+    const port = role === 'alpha' ? 0 : 1, captures = [];
+    const status = {active: 1, cursor: 0, blocker: 'network_wait', terminal: {kind: 0}};
+    const native = {phase: 0, running: 1, error: null};
+    const owner = {armed: true, closing: false, failure: null, peer: null};
+    const pad = standardPad(port);
+    const original = () => {};
+    const page = {menuFrame: original, meleeNetRuntimeLockstepSnapshot: () => owner,
+      __net: {status: () => status, native: () => native}, __meleeSyntheticPadState: 'neutral',
+      __meleeSyntheticPadTransition(sample) {
+        if (sample === 'neutral') {
+          this.__meleeSyntheticPadState = 'neutral';
+          pad.buttons = Array.from({length: 17}, () => ({pressed: false, value: 0}));
+          pad.axes = [0, 0, 0, 0];
+          return;
+        }
+        this.__meleeSyntheticPadState = `${sample.kind}:${sample.input_tick}`;
+        pad.buttons = sample.buttons.map(button => ({...button})); pad.axes = [...sample.axes];
+      }};
+    globalThis.window = page;
+    installRuntimeInputFixtureInPage({role, inputTicks: RUNTIME_FULL_ROUTE_INPUT_TICKS,
+      variant: 'runtime-full-route', samples: samples[role]});
+    owner.peer = {failure: null, protocol: {ready: true, terminal: null,
+      local_checksum_ticks: 0, remote_checksum_ticks: 0, next_checksum_compare: 0,
+      remote_ack_input: -1, remote_ack_checksum: -1},
+      localInputCapture: {mode: 'live', enabled: true, captures}};
+    pages[role] = {page, original, status, native, owner, captures, port};
+    page.menuFrame();
+  };
+  try {
+    setup('alpha'); setup('beta');
+    for (const role of ['alpha', 'beta']) {
+      const {page, status, native, owner, captures, port} = pages[role];
+      globalThis.window = page;
+      for (let tick = 0; tick < RUNTIME_FULL_ROUTE_INPUT_TICKS; ++tick) {
+        const sourceCursor = tick + 1;
+        status.cursor = sourceCursor; native.phase = phaseFor(sourceCursor);
+        const bytes = [...samples[role][tick].bytes];
+        captures.push({source_cursor: tick, input_tick: tick, local_port: port,
+          poll_serial: tick * 2 + 10, bytes});
+        page.menuFrame();
+        assert.equal(page.__meleeRuntimeInputFixture.snapshot().captured_count, tick + 1);
+        if (tick === 607) {
+          const before = page.__meleeRuntimeInputFixture.snapshot().transitions.length;
+          page.menuFrame(); page.menuFrame();
+          assert.equal(captures.length, tick + 1, 'wait callbacks do not acquire another input');
+          assert.equal(page.__meleeRuntimeInputFixture.snapshot().transitions.length, before,
+            'wait callbacks do not repeat an input transition');
+        }
+      }
+      for (const cursor of [5083, 5084]) {
+        status.cursor = cursor; status.blocker = cursor === 5084 ? 'complete' : 'network_wait';
+        native.phase = 1; native.running = 1;
+        page.menuFrame();
+      }
+      Object.assign(owner.peer.protocol, {local_checksum_ticks: 5084, remote_checksum_ticks: 5084,
+        next_checksum_compare: 5084, remote_ack_input: 5081, remote_ack_checksum: 5083});
+      const frozen = page.__meleeRuntimeInputFixture.freeze();
+      const phases = frozen.phase_samples.map(row => row.phase)
+        .filter((phase, index, rows) => !index || phase !== rows[index - 1]);
+      assert.equal(frozen.frozen, true);
+      assert.equal(frozen.captured_count, 5082);
+      assert.deepEqual(phases, [1, 3, 7, 8, 1]);
+      assert.equal(status.cursor, RUNTIME_FULL_ROUTE_SOURCE_TICKS);
+      assert.equal(native.running, 1, 'a complete live lockstep source boundary remains running');
+      assert.deepEqual(frozen.captures[608].bytes, samples[role][608].bytes);
+      assert.equal(frozen.captures[608].bytes.length, 11);
+      assert.equal(page.menuFrame, pages[role].original);
+      assert.equal(page.__meleeSyntheticPadState, 'neutral');
+    }
+  } finally { if (prior === undefined) delete globalThis.window; else globalThis.window = prior; }
+});
+
+test('full-route fixture rejects mutated retained samples during a wait and refuses incomplete freeze', () => {
+  const prior = globalThis.window, frames = Buffer.alloc(RUNTIME_FULL_ROUTE_INPUT_TICKS * 44);
+  for (let tick = 0; tick < RUNTIME_FULL_ROUTE_INPUT_TICKS; ++tick) {
+    frames[tick * 44 + 32] = 0xff; frames[tick * 44 + 43] = 0xff;
+  }
+  const samples = buildRuntimeFullRouteGamepadSamples(frames), captures = [];
+  const status = {active: 1, cursor: 1, blocker: 'network_wait', terminal: {kind: 0}};
+  const native = {phase: 1, running: 1, error: null};
+  const owner = {armed: true, closing: false, failure: null, peer: {failure: null,
+    protocol: {ready: true, terminal: null, local_checksum_ticks: 0, remote_checksum_ticks: 0,
+      next_checksum_compare: 0, remote_ack_input: -1, remote_ack_checksum: -1},
+    localInputCapture: {mode: 'live', enabled: true, captures}}};
+  const original = () => {};
+  const page = {menuFrame: original, meleeNetRuntimeLockstepSnapshot: () => owner,
+    __net: {status: () => status, native: () => native}, __meleeSyntheticPadState: 'neutral',
+    __meleeSyntheticPadTransition() {}};
+  globalThis.window = page;
+  try {
+    installRuntimeInputFixtureInPage({role: 'alpha', inputTicks: 5082,
+      variant: 'runtime-full-route', samples: samples.alpha});
+    captures.push({source_cursor: 0, input_tick: 0, local_port: 0, poll_serial: 1,
+      bytes: [...samples.alpha[0].bytes]});
+    page.menuFrame();
+    captures[0].bytes[0] = 1;
+    assert.throws(() => page.menuFrame(), /retained sample changed during a wait/);
+    assert.match(page.__meleeRuntimeInputFixture.snapshot().failure, /retained sample changed during a wait/);
+    assert.throws(() => page.__meleeRuntimeInputFixture.freeze(), /retained sample changed during a wait/);
+    assert.notEqual(page.menuFrame, original);
+  } finally { if (prior === undefined) delete globalThis.window; else globalThis.window = prior; }
+});
+
 test('CSS-to-SSS phase zero after source progress remains visible and prevents freeze', () => {
   const prior = globalThis.window, frames = Buffer.alloc(153 * 44);
   for (let tick = 0; tick < 153; ++tick) {
@@ -870,8 +1132,9 @@ test('actual runtime fixture rejects malformed ownership, nonneutral pattern and
   };
   try {
     for (const mutate of [
-      ({owner}) => { owner.closing = true; }, ({owner}) => { owner.failure = 'first owner failure'; },
+      ({owner}) => { owner.failure = 'first owner failure'; },
       ({owner}) => { owner.armed = false; }, ({owner}) => { owner.peer.protocol.ready = false; },
+      ({owner}) => { owner.peer.failure = 'first peer failure'; },
       ({captures}) => { captures[0].local_port = 1; }, ({captures}) => { captures[0].input_tick = 1; },
       ({captures}) => { captures[0].poll_serial = -1; }, ({captures}) => { captures[0].bytes.pop(); },
       ({captures}) => { captures[0].bytes[4] = 256; }, ({captures}) => { captures[0].bytes[0] = 1; },
@@ -965,7 +1228,7 @@ test('actual harness freezes complete fixture before asynchronous normal close c
       await Promise.resolve();
       for (const role of ['alpha', 'beta']) { globalThis.window = pages[role]; pages[role].menuFrame(); }
     }};
-    const context = {runtimeOwned: true, runtimeInputFixture: true, runtimeCssSss: false, runtimeCssMatch: false,
+    const context = {runtimeOwned: true, runtimeInputFixture: true, runtimeCssSss: false, runtimeCssMatch: false, runtimeFullRoute: false,
       instanceRows, pairResults, relay,
       instances: Object.fromEntries(['alpha', 'beta'].map(role => [role, {freezeRuntimeInputFixture: async () => invoke(pages[role], 'freeze')}]))};
     await vm.runInNewContext(`(async()=>{${source.slice(start, end)}\n}})()`, context);
