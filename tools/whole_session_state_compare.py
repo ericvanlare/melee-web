@@ -889,6 +889,8 @@ class Comparator:
         self.last_observed_match_frame: int | None = None
         self.previous_stock_counts: list[int] | None = None
         self.stock_decrement_observed = False
+        self.accepted_stock_observed = False
+        self.accepted_stock_rejoined = False
 
     def fail(self, message: str, *, record: str | None = None,
              index: int | None = None, field: str | None = None,
@@ -1012,10 +1014,16 @@ class Comparator:
             assert self.match_clock_boundary is not None
             if self.stock_decrement_boundary is not None:
                 event = self.stock_decrement_boundary["event"]
+                accepted = self.stock_decrement_boundary.get("accepted_stock_checkpoint")
+                intermediate = checkpoints[1:]
+                if accepted is not None:
+                    intermediate = (*intermediate, _stock_decrement_tuple(
+                        accepted["boundary"]["event"]["target"]))
                 self._validate_match_clock_lineage_frame(
-                    frame, index, positive=checkpoints[0], intermediate=checkpoints[1:],
+                    frame, index, positive=checkpoints[0], intermediate=intermediate,
                     terminal=_stock_decrement_tuple(event["target"]),
-                    label="first typed stock decrement")
+                    label=("first typed stock decrement after accepted event" if accepted is not None
+                           else "first typed stock decrement"))
                 self._validate_stock_decrement_frame(frame, index)
             else:
                 self._validate_match_clock_lineage_frame(
@@ -1188,7 +1196,7 @@ class Comparator:
         self.last_observed_match_frame = match_frame
 
     def _validate_stock_decrement_frame(self, frame: Mapping[str, Any], index: int) -> None:
-        """Require the first typed stock decrease after the exact clock-2000 state."""
+        """Observe a typed terminal, optionally following an accepted typed checkpoint."""
         boundary = self.stock_decrement_boundary
         assert boundary is not None and self.match_clock_boundary is not None
         state = frame.get("state")
@@ -1202,6 +1210,9 @@ class Comparator:
         source_tick = _int(frame.get("source_tick"), "stock-decrement source tick")
         baseline_tick = self.match_clock_boundary["source_tick"]
         event = boundary["event"]
+        accepted = boundary.get("accepted_stock_checkpoint")
+        if accepted is not None and not self.accepted_stock_observed:
+            event = accepted["boundary"]["event"]
         target = event["target"]
         target_tuple = _stock_decrement_tuple(target)
         if source_tick < baseline_tick:
@@ -1240,7 +1251,16 @@ class Comparator:
                           actual={"changed_slots": decreases,
                                   "stocks_before": self.previous_stock_counts,
                                   "stocks_after": stocks})
-            self.stock_decrement_observed = True
+            if accepted is not None:
+                actual_state = {"scene_frame": state.get("scene_frame"), "rng": state.get("rng"),
+                                "fighter_entities": state.get("fighter_entities")}
+                if _first_difference({key: target[key] for key in actual_state}, actual_state):
+                    self.fail("stock checkpoint typed state differs from its frozen event",
+                              record="session_frame", index=index, field="state")
+            if accepted is not None and not self.accepted_stock_observed:
+                self.accepted_stock_observed = True
+            else:
+                self.stock_decrement_observed = True
         self.previous_stock_counts = stocks
 
     def on_final_css(self, state: dict[str, Any], source_seq: int) -> None:
@@ -1751,6 +1771,7 @@ ORDERED_CLOCK_LINEAGE_V2_SCHEMA = "melee-web-v10-ordered-match-clock-lineage-v2"
 ORDERED_CLOCK_LINEAGE_EXPECTATION_SCHEMA = "melee-web-v10-first-match-clock-ordered-lineage-expectations"
 STOCK_DECREMENT_EXPECTATION_SCHEMA = "melee-web-v10-first-stock-decrement-expectations"
 STOCK_DECREMENT_BOUNDARY_SCHEMA = "melee-web-v10-first-typed-stock-decrement-boundary-v1"
+STOCK_DECREMENT_BOUNDARY_V2_SCHEMA = "melee-web-v10-typed-stock-decrement-boundary-v2"
 ORDERED_CLOCK_ANCHORS = ("clock1", "clock60")
 ORDERED_CLOCK_TARGET = "target"
 ORDERED_CLOCK_TUPLE_FIELDS = frozenset({
@@ -1986,9 +2007,11 @@ def _validate_stock_decrement_expectations(source: Mapping[str, Any],
                                             recipe: Mapping[str, Any]
                                             ) -> dict[str, Any]:
     boundary = source.get("stock_decrement_boundary")
-    if not isinstance(boundary, dict) or set(boundary) != STOCK_DECREMENT_BOUNDARY_FIELDS:
+    subsequent = isinstance(boundary, dict) and boundary.get("schema") == STOCK_DECREMENT_BOUNDARY_V2_SCHEMA
+    fields = STOCK_DECREMENT_BOUNDARY_FIELDS | ({"accepted_stock_checkpoint"} if subsequent else set())
+    if not isinstance(boundary, dict) or set(boundary) != fields:
         raise ComparisonError("stock-decrement boundary expectations are malformed")
-    if boundary.get("schema") != STOCK_DECREMENT_BOUNDARY_SCHEMA:
+    if boundary.get("schema") not in {STOCK_DECREMENT_BOUNDARY_SCHEMA, STOCK_DECREMENT_BOUNDARY_V2_SCHEMA}:
         raise ComparisonError("stock-decrement boundary schema is unsupported")
     checkpoint = source.get("match_clock_boundary")
     if (not isinstance(checkpoint, dict) or
@@ -2109,6 +2132,38 @@ def _validate_stock_decrement_expectations(source: Mapping[str, Any],
             _int(limits.get("max_seconds"), "stock-decrement max_seconds", 1,
                  V10_STOCK_DECREMENT_SCAN_SECONDS) != V10_STOCK_DECREMENT_SCAN_SECONDS):
         raise ComparisonError("stock-decrement terminal source limits are not the approved fixed caps")
+    if subsequent:
+        accepted = boundary["accepted_stock_checkpoint"]
+        if not isinstance(accepted, dict) or set(accepted) != {"boundary", "prefix", "comparison"}:
+            raise ComparisonError("accepted stock checkpoint fields are malformed")
+        prior = accepted["boundary"]
+        if not isinstance(prior, dict) or prior.get("schema") != STOCK_DECREMENT_BOUNDARY_SCHEMA:
+            raise ComparisonError("accepted stock checkpoint must use the historical boundary")
+        _validate_stock_decrement_expectations({**source, "stock_decrement_boundary": prior}, recipe)
+        if _first_difference(prior["clock2000_baseline_stocks"], baseline):
+            raise ComparisonError("accepted stock checkpoint clock-2000 baseline differs")
+        prior_tuple = _stock_decrement_tuple(prior["event"]["target"])
+        if any(target_tuple[key] <= prior_tuple[key] for key in STOCK_DECREMENT_TUPLE_FIELDS
+               if key != "match_index"):
+            raise ComparisonError("terminal stock event must follow the accepted stock checkpoint")
+        prefix = accepted["prefix"]
+        if not isinstance(prefix, dict) or set(prefix) != ORDERED_CLOCK_PREFIX_FIELDS:
+            raise ComparisonError("accepted stock checkpoint prefix is malformed")
+        _int(prefix.get("bytes_read"), "accepted stock prefix bytes", 1, V10_STOCK_DECREMENT_SCAN_BYTE_CAP)
+        if (_int(prefix.get("records_read"), "accepted stock prefix records", 1,
+                 V10_STOCK_DECREMENT_SCAN_RECORD_CAP) != prior_tuple["source_sequence"] + 1 or
+                _int(prefix.get("last_source_sequence"), "accepted stock prefix last sequence", 0,
+                     (1 << 64) - 1) != prior_tuple["source_sequence"] or
+                not isinstance(prefix.get("sha256"), str) or
+                re.fullmatch(r"[0-9a-f]{64}", prefix["sha256"]) is None):
+            raise ComparisonError("accepted stock checkpoint prefix disagrees with its event")
+        identity = accepted["comparison"]
+        if (not isinstance(identity, dict) or set(identity) != {"path", "bytes", "sha256"} or
+                not isinstance(identity.get("path"), str) or not identity["path"] or
+                type(identity.get("bytes")) is not int or identity["bytes"] <= 0 or
+                not isinstance(identity.get("sha256"), str) or
+                re.fullmatch(r"[0-9a-f]{64}", identity["sha256"]) is None):
+            raise ComparisonError("accepted stock comparison identity is malformed")
     return boundary
 
 
@@ -2120,18 +2175,22 @@ def _validate_stock_decrement_boundary_audit(
     """Validate the typed terminal event audit separately from its 2000 lineage."""
     expected_source = packet["source"]
     boundary = expected_source["stock_decrement_boundary"]
+    accepted = boundary.get("accepted_stock_checkpoint")
     expected_audit = boundary["audit"]
     audit, digest, size = _read_json_sidecar(
         path, "stock-decrement source audit", max_bytes=8 * 1024 * 1024)
     _verify_expected_file(expected_audit, path, digest, size, "stock-decrement source audit")
 
-    if (audit.get("schema") != "melee-web-b4-first-stock-decrement-source-audit-v2" or
-            audit.get("scope") != "source-only-bounded-follow-up-first-stock-decrement-after-clock2000" or
-            type(audit.get("version")) is not int or audit["version"] != 2 or
+    if (audit.get("schema") != ("melee-web-b4-stock-decrement-source-audit-v3" if accepted is not None
+                                else "melee-web-b4-first-stock-decrement-source-audit-v2") or
+            audit.get("scope") != ("source-only-bounded-next-stock-decrement-after-accepted-event" if accepted is not None
+                                   else "source-only-bounded-follow-up-first-stock-decrement-after-clock2000") or
+            type(audit.get("version")) is not int or audit["version"] != (3 if accepted is not None else 2) or
             audit.get("audit_completed") is not True or
             audit.get("complete") is not False or
             audit.get("whole_session_equivalent") is not False or
-            audit.get("status") != "first_stock_count_decrement_found" or
+            audit.get("status") != ("next_stock_count_decrement_found" if accepted is not None
+                                    else "first_stock_count_decrement_found") or
             audit.get("error") is not None or
             audit.get("report_write_failed") is not False or
             audit.get("browser_comparison") != "not performed; source observations only" or
@@ -2139,6 +2198,8 @@ def _validate_stock_decrement_boundary_audit(
             Path(str(audit["report_path"])).resolve() != path.resolve()):
         raise ComparisonError("stock-decrement source audit schema or bounded status is unsupported")
     if audit.get("event_definition") != (
+            "first joined tick strictly after the accepted stock event where any exact signed-byte fighter stocks value decreases"
+            if accepted is not None else
             "first post-clock-2000 joined tick where any exact signed-byte fighter stocks value decreases"):
         raise ComparisonError("stock-decrement source audit event definition is unsupported")
 
@@ -2264,9 +2325,30 @@ def _validate_stock_decrement_boundary_audit(
          else item["label"]): True
         for item in checkpoints
     }
-    if observed.get("checkpoint_rejoins") != expected_rejoins:
+    if (observed.get("checkpoint_rejoins") != expected_rejoins or
+            (accepted is not None and _first_difference(expected_rejoins, observed.get("checkpoint_rejoins")))):
         raise ComparisonError("stock-decrement audit lacks every accepted clock-prefix rejoin")
     expected_checkpoint_status = {label: "pass" for label in expected_rejoins}
+    if accepted is not None:
+        expected_checkpoint_status["accepted_stock"] = "pass"
+        _validate_accepted_stock_receipts(accepted, packet, recipe, clock2000_audit,
+                                         source_stat_before=source_stat_before)
+        if (observed.get("accepted_stock_rejoined") is not True or
+                _first_difference(accepted["boundary"]["event"], observed.get("accepted_stock_observed"))):
+            raise ComparisonError("next stock audit lacks its actual accepted stock observation")
+        outer_identity = boundary["audit_context"]["outer_packet"]
+        outer, outer_sha, outer_bytes = _read_json_sidecar(
+            Path(outer_identity["path"]), "next stock audit launch packet", max_bytes=1024 * 1024)
+        _verify_expected_file(outer_identity, Path(outer_identity["path"]), outer_sha, outer_bytes,
+                              "next stock audit launch packet")
+        receipts = outer.get("accepted_receipts")
+        if (not isinstance(receipts, dict) or
+                _first_difference({"event": accepted["boundary"]["event"], "prefix": accepted["prefix"]},
+                              outer.get("accepted_baseline")) or
+                _first_difference(accepted["boundary"]["audit"],
+                                  receipts.get("source_audit")) or
+                _first_difference(accepted["comparison"], receipts.get("comparison"))):
+            raise ComparisonError("next stock source audit launch lineage differs from accepted receipts")
     if audit.get("checkpoints") != expected_checkpoint_status:
         raise ComparisonError("stock-decrement audit checkpoint statuses are incomplete")
 
@@ -2297,9 +2379,49 @@ def _validate_stock_decrement_boundary_audit(
             prefix_bytes < checkpoints[-1]["prefix"]["bytes_read"] or
             prefix_records < checkpoints[-1]["prefix"]["records_read"]):
         raise ComparisonError("stock-decrement terminal prefix is outside its independent scan caps")
+    if accepted is not None and (prefix_bytes <= accepted["prefix"]["bytes_read"] or
+                                 prefix_records <= accepted["prefix"]["records_read"]):
+        raise ComparisonError("next stock terminal prefix does not follow the accepted event prefix")
     if audit.get("preflight") != "passed before source content open":
         raise ComparisonError("stock-decrement audit does not confirm its metadata preflight")
     return audit, digest
+
+
+def _validate_accepted_stock_receipts(accepted: Mapping[str, Any], packet: Mapping[str, Any],
+                                    recipe: Recipe, clock2000_audit: Mapping[str, Any], *,
+                                    source_stat_before: Mapping[str, int] | None = None) -> None:
+    """Bind the historical comparison and audit; flags alone cannot accept a checkpoint."""
+    prior = accepted["boundary"]
+    prior_packet = {**packet, "source": {**packet["source"], "stock_decrement_boundary": prior}}
+    audit, digest = _validate_stock_decrement_boundary_audit(
+        Path(prior["audit"]["path"]), prior_packet, recipe, clock2000_audit,
+        source_stat_before=source_stat_before)
+    prefix = accepted["prefix"]
+    if _first_difference(prefix, {key: audit["observed"]["source_prefix"].get(key)
+                                  for key in ORDERED_CLOCK_PREFIX_FIELDS}):
+        raise ComparisonError("accepted stock prefix differs from its source audit")
+    identity = accepted["comparison"]
+    comparison, comparison_sha, size = _read_json_sidecar(
+        Path(identity["path"]), "accepted stock comparison", max_bytes=8 * 1024 * 1024)
+    _verify_expected_file(identity, Path(identity["path"]), comparison_sha, size,
+                          "accepted stock comparison")
+    terminal = comparison.get("stock_decrement_event_boundary")
+    checks = comparison.get("checks")
+    expected = {**_stock_decrement_tuple(prior["event"]["target"]),
+                "stocks_before": prior["event"]["stocks_before"],
+                "stocks_after": prior["event"]["stocks_after"],
+                "changed_slots": prior["event"]["changed_slots"],
+                "source_prefix_sha256": prefix["sha256"],
+                "source_prefix_bytes": prefix["bytes_read"],
+                "source_prefix_records": prefix["records_read"], "audit_sha256": digest}
+    if (not isinstance(terminal, dict) or not isinstance(checks, dict) or
+            _first_difference(expected, {key: terminal.get(key) for key in expected}) or
+            comparison.get("scope") != V10_FIRST_STOCK_DECREMENT_SCOPE or
+            comparison.get("boundary_result") != "equivalent" or
+            comparison.get("complete") is not False or comparison.get("whole_session_equivalent") is not False or
+            checks.get("stock_decrement_event_state") != "pass" or
+            checks.get("ordered_clock_checkpoint_states") != "pass"):
+        raise ComparisonError("accepted stock comparison did not pass its bound typed event")
 
 
 def _load_expectations(path: Path, selected: Mapping[str, Path], *,
@@ -2797,11 +2919,14 @@ def _consume_ordered_clock_lineage(records: Iterable[Mapping[str, Any]],
                                    checkpoints: Sequence[Mapping[str, Any]], *,
                                    terminal_event: Mapping[str, Any] | None = None,
                                    terminal_prefix: Mapping[str, Any] | None = None,
+                                   accepted_stock_checkpoint: Mapping[str, Any] | None = None,
                                    max_seconds: int | None = None
                                    ) -> tuple[bool, int | None]:
     """Rejoin ordered clock prefixes, optionally continuing to a typed event."""
     if terminal_event is not None and terminal_prefix is None:
         raise ComparisonError("typed terminal event lacks its accepted source prefix")
+    if accepted_stock_checkpoint is not None and terminal_event is None:
+        raise ComparisonError("accepted stock checkpoint lacks a later terminal event")
     if max_seconds is not None:
         _int(max_seconds, "ordered source scan wall-clock seconds", 1,
              V10_STOCK_DECREMENT_SCAN_SECONDS)
@@ -2829,8 +2954,24 @@ def _consume_ordered_clock_lineage(records: Iterable[Mapping[str, Any]],
                 checkpoint_index += 1
                 if checkpoint_index == len(checkpoints) and terminal_event is None:
                     return True, last_sequence
+        if accepted_stock_checkpoint is not None and not comparator.accepted_stock_rejoined:
+            target = _stock_decrement_tuple(accepted_stock_checkpoint["boundary"]["event"]["target"])
+            if last_sequence >= target["source_sequence"]:
+                if (checkpoint_index != len(checkpoints) or
+                        not comparator.accepted_stock_observed or
+                        not _match_boundary_join_complete(row, source, comparator, target)):
+                    raise ComparisonError("accepted stock event did not complete its observed typed/PAD join")
+                prefix = accepted_stock_checkpoint["prefix"]
+                if (stats.records_read != prefix["records_read"] or
+                        stats.bytes_read != prefix["bytes_read"] or
+                        stats.prefix_sha256 != prefix["sha256"] or
+                        last_sequence != prefix["last_source_sequence"]):
+                    raise ComparisonError("fresh source prefix differs from the accepted stock checkpoint")
+                comparator.accepted_stock_rejoined = True
         if (terminal_event is not None and checkpoint_index == len(checkpoints) and
                 comparator.stock_decrement_observed):
+            if accepted_stock_checkpoint is not None and not comparator.accepted_stock_rejoined:
+                raise ComparisonError("terminal stock event preceded the accepted stock rejoin")
             target = _stock_decrement_tuple(terminal_event["event"]["target"])
             if _match_boundary_join_complete(row, source, comparator, target):
                 assert terminal_prefix is not None
@@ -4503,6 +4644,8 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
     match_clock_scope = scope == V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE
     ordered_lineage_scope = scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE
     stock_decrement_scope = scope == V10_FIRST_STOCK_DECREMENT_SCOPE
+    accepted_stock_checkpoint = None
+    stock_tick_check = "source_ticks_through_first_stock_decrement"
     clock_lineage_scope = (clock60_scope or match_clock_scope or ordered_lineage_scope or
                            stock_decrement_scope)
     if not _is_v10_prefix_scope(scope):
@@ -4598,6 +4741,19 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
         if stock_decrement_scope:
             selected["stock_decrement_boundary_audit"] = stock_decrement_boundary_audit_path
         packet, packet_sha = _load_expectations(expectations_path, selected, scope=scope)
+        if stock_decrement_scope:
+            accepted_stock_checkpoint = packet["source"]["stock_decrement_boundary"].get("accepted_stock_checkpoint")
+            if accepted_stock_checkpoint is not None:
+                result["checks"].pop(stock_tick_check)
+                stock_tick_check = "source_ticks_through_first_stock_decrement_after_accepted_event"
+                result["checks"][stock_tick_check] = "not_checked"
+                result["checks"]["accepted_stock_event_rejoin"] = "not_checked"
+                result["limitations"]["boundary"] = (
+                    "Checks exact state through the first typed stock decrease strictly after the "
+                    "accepted stock event, following six clock rejoins and a fresh typed event/PAD/prefix "
+                    "rejoin. The legacy CLI spelling selects the shared engine, not the historical "
+                    "first-decrease-after-clock2000 boundary. Stops at the event, first mismatch, "
+                    "256 MiB, 48,000 records, or 60 seconds.")
         if ordered_lineage_scope:
             ordered_source_limits = _ordered_clock_lineage_limits(
                 packet["source"].get("ordered_clock_lineage"))
@@ -4752,7 +4908,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
             prefix_complete, last_source_sequence = _consume_ordered_clock_lineage(
                 records, source, comparator, stats, ordered_checkpoints,
                 terminal_event=packet["source"]["stock_decrement_boundary"],
-                terminal_prefix=prefix, max_seconds=max_seconds)
+                terminal_prefix=prefix, max_seconds=max_seconds,
+                accepted_stock_checkpoint=packet["source"]["stock_decrement_boundary"].get(
+                    "accepted_stock_checkpoint"))
         elif ordered_lineage_scope:
             assert ordered_checkpoints is not None
             prefix_complete, last_source_sequence = _consume_ordered_clock_lineage(
@@ -4826,7 +4984,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                         break
         result["last_source_sequence"] = last_source_sequence
         if not prefix_complete:
-            boundary = ("frozen first typed stock-decrement event after rejoining all accepted clock checkpoints"
+            boundary = ("frozen first typed stock decrease after the accepted stock event rejoin"
+                        if accepted_stock_checkpoint is not None else
+                        "frozen first typed stock-decrement event after rejoining all accepted clock checkpoints"
                         if stock_decrement_scope else
                         "frozen ordered match-clock target after rejoining all earlier checkpoints"
                         if ordered_lineage_scope else
@@ -4880,7 +5040,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 stats.bytes_read != expected_prefix_bytes or
                 (expected_prefix_sha is not None and
                  stats.prefix_sha256 != expected_prefix_sha)):
-            message = ("freshly consumed source prefix differs from its bounded first-stock-decrement audit"
+            message = ("freshly consumed source prefix differs from its next-stock-decrement audit"
+                       if accepted_stock_checkpoint is not None else
+                       "freshly consumed source prefix differs from its bounded first-stock-decrement audit"
                        if stock_decrement_scope else
                        "freshly consumed source prefix differs from its bounded ordered clock-lineage audit"
                        if ordered_lineage_scope else
@@ -4893,7 +5055,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                        "freshly consumed source prefix differs from its bounded identity audit")
             raise ComparisonError(message)
         if (comparator.frame_index != required_cursor or comparator.compared != required_cursor):
-            message = ("comparison did not stop immediately after its frozen first-stock-decrement target"
+            message = ("comparison did not stop immediately after its first stock decrease following the accepted event"
+                       if accepted_stock_checkpoint is not None else
+                       "comparison did not stop immediately after its frozen first-stock-decrement target"
                        if stock_decrement_scope else
                        "comparison did not stop immediately after its frozen ordered clock-lineage target"
                        if ordered_lineage_scope else
@@ -4912,7 +5076,7 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
         if stock_decrement_scope:
             if not comparator.stock_decrement_observed:
                 raise ComparisonError("comparison did not observe the exact frozen stock-decrement transition")
-            result["checks"]["source_ticks_through_first_stock_decrement"] = "pass"
+            result["checks"][stock_tick_check] = "pass"
             result["checks"]["source_ticks_through_prior_ordered_checkpoints"] = "pass"
             result["checks"]["source_pad_to_tick0_join"] = "pass"
             result["checks"]["tick0_state"] = "pass"
@@ -4970,7 +5134,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 "records_read": stats.records_read,
                 "bytes_read": stats.bytes_read,
                 "sha256": stats.prefix_sha256,
-                "hash_basis": ("fresh SHA-256 over exactly the raw bytes consumed through the first typed stock-decrement source event"
+                "hash_basis": ("fresh SHA-256 over exactly the raw bytes consumed through the first typed stock decrease after the accepted stock event"
+                               if accepted_stock_checkpoint is not None else
+                               "fresh SHA-256 over exactly the raw bytes consumed through the first typed stock-decrement source event"
                                if stock_decrement_scope else
                                f"fresh SHA-256 over exactly the raw bytes consumed through the ordered first match_frame {match_clock_target['target_match_frame_at_least']} boundary"
                                if ordered_lineage_scope and match_clock_target is not None else
@@ -4998,7 +5164,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 "browser_target_cursor": browser_identity["target_cursor"],
             }} if not needs_positive_audit else {}),
             "source_scene_spans_observed": comparator.source_spans,
-            "capture_status": ("incomplete bounded capture; semantic comparison stopped at the first typed fighter-stock decrement after clock 2000"
+            "capture_status": ("incomplete bounded capture; semantic comparison stopped at the first typed stock decrease after the accepted stock event"
+                               if accepted_stock_checkpoint is not None else
+                               "incomplete bounded capture; semantic comparison stopped at the first typed fighter-stock decrement after clock 2000"
                                if stock_decrement_scope else
                                "incomplete bounded capture; semantic comparison stopped after the frozen ordered match-clock source boundary"
                                if ordered_lineage_scope else
@@ -5106,6 +5274,36 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 "first_stock_decrement_only": True,
                 "ko_claim": False,
             }
+            accepted = boundary.get("accepted_stock_checkpoint")
+            if accepted is not None:
+                if not comparator.accepted_stock_rejoined:
+                    raise ComparisonError("comparison did not freshly rejoin the accepted stock event")
+                result["checks"].pop("source_ticks_through_first_stock_decrement", None)
+                result["checks"]["source_ticks_through_first_stock_decrement_after_accepted_event"] = "pass"
+                result["checks"]["accepted_stock_event_rejoin"] = "pass"
+                result["limitations"]["boundary"] = (
+                    "Checks CSS/SSS consumed-input order and exact match state through the first typed "
+                    "stock decrease strictly after the accepted stock event, freshly rejoining six "
+                    "clock prefixes and that event's typed state, PAD join and consumed prefix. "
+                    "The legacy CLI scope name selects the shared engine; this is not the first "
+                    "decrease after clock2000. Stops at the terminal event, first mismatch, "
+                    "256 MiB, 48,000 records, or 60 seconds.")
+                report_boundary = result["stock_decrement_event_boundary"]
+                report_boundary["first_stock_decrement_only"] = False
+                report_boundary["event_definition"] = "first typed stock decrease strictly after the accepted stock event"
+                report_boundary["accepted_stock_checkpoint"] = {
+                    "event": accepted["boundary"]["event"], "prefix": accepted["prefix"],
+                    "audit_sha256": accepted["boundary"]["audit"]["sha256"],
+                    "comparison_sha256": accepted["comparison"]["sha256"],
+                }
+                report_boundary["fresh_prefix_checkpoints"].append({
+                    "label": "accepted_stock", **_stock_decrement_tuple(accepted["boundary"]["event"]["target"]),
+                    "bytes_read": accepted["prefix"]["bytes_read"],
+                    "records_read": accepted["prefix"]["records_read"],
+                    "source_prefix_sha256": accepted["prefix"]["sha256"],
+                    "audit_sha256": accepted["boundary"]["audit"]["sha256"],
+                    "rejoined_before_continuing": True,
+                })
         if (match_clock_scope and match_clock_target is not None and
                 positive_audit_sha is not None and clock60_audit_sha is not None and
                 match_clock_audit_sha is not None):

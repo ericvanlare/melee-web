@@ -1,0 +1,275 @@
+{
+  "accepted_event": {
+    "changed_slots": [
+      {
+        "after": 3,
+        "before": 4,
+        "slot": 1
+      }
+    ],
+    "event": "first_typed_stock_count_decrement",
+    "stocks_after": [
+      4,
+      3,
+      3,
+      4
+    ],
+    "stocks_before": [
+      4,
+      4,
+      3,
+      4
+    ],
+    "target": {
+      "cursor_after_frame": 4791,
+      "fighter_entities": [
+        {
+          "entity_index": 0,
+          "fighter_gobj_linked": true,
+          "fighter_player_id": 0,
+          "generation": 0,
+          "match_index": 0,
+          "slot": 0
+        },
+        {
+          "entity_index": 0,
+          "fighter_gobj_linked": true,
+          "fighter_player_id": 1,
+          "generation": 0,
+          "match_index": 0,
+          "slot": 1
+        },
+        {
+          "entity_index": 0,
+          "fighter_gobj_linked": true,
+          "fighter_player_id": 2,
+          "generation": 0,
+          "match_index": 0,
+          "slot": 2
+        },
+        {
+          "entity_index": 0,
+          "fighter_gobj_linked": true,
+          "fighter_player_id": 3,
+          "generation": 0,
+          "match_index": 0,
+          "slot": 3
+        }
+      ],
+      "match_frame": 3483,
+      "match_index": 0,
+      "pad_consume_source_sequence": 22140,
+      "rng": 4228862339,
+      "scene_frame": 3606,
+      "source_tick": 3606,
+      "source_tick_seq": 22141,
+      "state_fields_observed": [
+        "fighter_entities",
+        "fighters",
+        "match_frame",
+        "pad_state_hex",
+        "rng",
+        "scene_frame"
+      ],
+      "timeline_frame_index": 4790
+    }
+  },
+  "accepted_prefix": {
+    "bytes_read": 151442332,
+    "last_source_sequence": 22141,
+    "records_read": 22142,
+    "sha256": "db1f0b02e40e4f343f6398033aa1cb46486ddc5db1ffeed5fe8583a4847c8606"
+  },
+  "all_rejoins_passed": true,
+  "audit_completed": true,
+  "complete": false,
+  "evidence_labels": [
+    "Source identified"
+  ],
+  "exclusions": [
+    "Browser state comparison at cursor 5167",
+    "KO or respawn attribution",
+    "Uninterrupted original-menu whole session",
+    "Live timing or physical input",
+    "Pixels, PCM, draw cadence or performance",
+    "Tournament admission"
+  ],
+  "execution": {
+    "elapsed_seconds": 2.718514750013128,
+    "owned_process_absent": true,
+    "owned_process_group_absent": true,
+    "returncode": 0,
+    "source_stat_stable": true
+  },
+  "follow_up_issue": 271,
+  "fresh_rejoins": [
+    "clock1",
+    "clock60",
+    "clock300",
+    "clock500",
+    "clock1000",
+    "clock2000",
+    "accepted_stock"
+  ],
+  "host": "Mac mini / macOS / verified external NVMe",
+  "issue": 269,
+  "limits": {
+    "accepted_clock2000_checkpoint_caps": {
+      "max_bytes": 134217728,
+      "max_records": 24000
+    },
+    "execution_timeout_seconds": 60,
+    "fresh_source_scan_caps": {
+      "max_bytes": 268435456,
+      "max_records": 48000
+    },
+    "stop": "first stock decrement, invalid state/lineage/join, EOF, either scan cap, or timeout"
+  },
+  "next_step": "Parameterize the existing stock comparator with the accepted event rejoin and terminal event, then review asset-free controls and metadata before authorizing a bounded browser capture.",
+  "owner_cleanup_budget_seconds": 5,
+  "owner_deadline_seconds": 65,
+  "receipts": {
+    "metadata-preflight-v8.json": {
+      "artifact": "metadata-preflight-v8.json",
+      "bytes": 5578,
+      "sha256": "9828884441e6cc9e831cd38467b3f51fa1a3abd8c53f6f0b18cfd3d3e8c39ae2"
+    },
+    "next-stock-source-audit-v8.json": {
+      "artifact": "next-stock-source-audit-v8.json",
+      "bytes": 782996,
+      "sha256": "ea03452bf9870d8af82c9f755370b9c21b3fa5c38c0df7dfed575b1cd3851577"
+    },
+    "root-launch-review-v1.json": {
+      "artifact": "root-launch-review-v1.json",
+      "bytes": 7280,
+      "sha256": "2a164acf9b1428297ad89849ebbd6bddc9b52ca6162c7cc2f6f7dcf11422b8ab"
+    },
+    "root-result-review-v1.json": {
+      "artifact": "root-result-review-v1.json",
+      "bytes": 3583,
+      "sha256": "0c6ff795dc75b45834adb078524eadad64390504f55cdf280bd74cf2cdd58b6f"
+    },
+    "root-source-audit-execution-v1.json": {
+      "artifact": "root-source-audit-execution-v1.json",
+      "bytes": 4016,
+      "sha256": "005f0a6fa3cb35192469c3d94f855edea190169ba6dff427390c7982d9950155"
+    },
+    "source-outcome-review-v1.json": {
+      "artifact": "source-outcome-review-v1.json",
+      "bytes": 7004,
+      "sha256": "93383ae578d52431c8306977f058d7250106ee48686d971b2534c6f5fc62640e"
+    },
+    "stock-decrement-launch-packet-v8.json": {
+      "artifact": "stock-decrement-launch-packet-v8.json",
+      "bytes": 28555,
+      "sha256": "90549a921af6ce6fbcc846959cf2c24fc572c573523efd520f505a27951e087d"
+    }
+  },
+  "retained_failure_evidence": [
+    "metadata-preflight-v6.json",
+    "failed-preflight-v6-snapshot",
+    "metadata-preflight-v7.json",
+    "failed-preflight-v7-snapshot"
+  ],
+  "schema": "melee-web-v10-next-stock-decrement-source-evidence-v1",
+  "scope": "Source-only first typed stock decrease strictly after the accepted #258 event; not a browser comparison or whole-session acceptance.",
+  "source_auditor": {
+    "artifact": "audit_stock_decrement_v6.py",
+    "bytes": 49744,
+    "sha256": "b050148b4b75ec891313ffd9e1ead617c0f303734582772f774a91a1750df801"
+  },
+  "source_checkout": {
+    "head": "a7af7d63ce70bb892432d81bcc00b47bca3d1111",
+    "tree": "14f3cec2205a8d3f93e858da820a9e6f6af4127e"
+  },
+  "source_trace": {
+    "capture_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "full_trace_rehashed": false,
+    "recorded_full_bytes": 2137257881,
+    "recorded_full_sha256": "81f8a0a3c8cac644e86be2e07451a5876be08b60ebb4295290a35c8a187c5580",
+    "sequence_id": "melee-fighter-v10-origin-main-20261003-r1"
+  },
+  "status": "next_stock_count_decrement_found",
+  "terminal_event": {
+    "changed_slots": [
+      {
+        "after": 3,
+        "before": 4,
+        "slot": 3
+      }
+    ],
+    "event": "first_typed_stock_count_decrement",
+    "stocks_after": [
+      4,
+      3,
+      3,
+      3
+    ],
+    "stocks_before": [
+      4,
+      3,
+      3,
+      4
+    ],
+    "target": {
+      "cursor_after_frame": 5167,
+      "fighter_entities": [
+        {
+          "entity_index": 0,
+          "fighter_gobj_linked": true,
+          "fighter_player_id": 0,
+          "generation": 0,
+          "match_index": 0,
+          "slot": 0
+        },
+        {
+          "entity_index": 0,
+          "fighter_gobj_linked": true,
+          "fighter_player_id": 1,
+          "generation": 0,
+          "match_index": 0,
+          "slot": 1
+        },
+        {
+          "entity_index": 0,
+          "fighter_gobj_linked": true,
+          "fighter_player_id": 2,
+          "generation": 0,
+          "match_index": 0,
+          "slot": 2
+        },
+        {
+          "entity_index": 0,
+          "fighter_gobj_linked": true,
+          "fighter_player_id": 3,
+          "generation": 0,
+          "match_index": 0,
+          "slot": 3
+        }
+      ],
+      "match_frame": 3859,
+      "match_index": 0,
+      "pad_consume_source_sequence": 24020,
+      "rng": 1688650196,
+      "scene_frame": 3982,
+      "source_tick": 3982,
+      "source_tick_seq": 24022,
+      "state_fields_observed": [
+        "fighter_entities",
+        "fighters",
+        "match_frame",
+        "pad_state_hex",
+        "rng",
+        "scene_frame"
+      ],
+      "timeline_frame_index": 5166
+    }
+  },
+  "terminal_prefix": {
+    "bytes_read": 166680623,
+    "last_source_sequence": 24022,
+    "records_read": 24023,
+    "sha256": "c31863f04fcc44a454f316b9090989aac057ab868f8b3afb4a034604f53889dc"
+  },
+  "whole_session_equivalent": false
+}
