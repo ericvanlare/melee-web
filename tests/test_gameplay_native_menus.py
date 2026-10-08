@@ -91,13 +91,15 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
             self.skipTest("The native menu host trace has not been built")
         absent = self.scratch / "absent-sd-fixtures"
         self.assertFalse(absent.exists())
+        revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
         for stage, expected in (
                 (32, "Missing owned menu host fixture: MnSlChr.usd"),
                 (31, "Explicit FD recipes require Final Destination")):
             with self.subTest(stage=stage):
                 trace = self.scratch / f"sd-dispatch-{stage}.jsonl"
                 command = [str(node_runtime()), str(target), str(absent),
-                           str(absent), str(stage), str(trace), "asset-free-dispatch",
+                           str(absent), str(stage), str(trace), revision,
                            "sudden-death-world-control-v1"]
                 run = subprocess.run(command, cwd=ROOT, capture_output=True,
                                      text=True, timeout=30)
