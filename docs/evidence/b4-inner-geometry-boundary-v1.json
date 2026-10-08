@@ -1,0 +1,101 @@
+{
+  "schema": "b4-inner-geometry-boundary-v1",
+  "issue": 274,
+  "evidence_labels": [
+    "Compiled",
+    "Browser exercised"
+  ],
+  "scope": "Selected browser-bound collision geometry at source cursor 5239, followed by an offline host-float reduction using extracted source helpers.",
+  "capture": {
+    "machine": "Mac mini",
+    "browser": "Headless Google Chrome",
+    "native_observer_producer_commit": "aea0d318a2734709b99d6be4901463c0f8bfbad1",
+    "canonical_patch_metadata_commit": "afec01dd02a2328a5e76a4384e7f611c85d06940",
+    "observer_harness_commit": "159334762d696d208f9959056dc547e9360b7377",
+    "release_build_closure_sha256": "dc8384e65f11a7cdbdd9173cedd012b20a58bc1450a68983695e15649b563e3d",
+    "review_receipts": {
+      "capture_outcome_sha256": "61817cc1479bb5f8869bbc9e1c2f2b67ea13bd4c52e4b9d1adea74162f450943",
+      "capture_review_packet_sha256": "32efc5800a1203cac8a957857a3b769ada6dac405bd91c0e92e6a926c524cab6"
+    },
+    "selected_cursors": [
+      5238,
+      5239,
+      5240
+    ],
+    "cursor_5239": {
+      "outer_events": 76,
+      "actual_inner_geometry_calls": 60,
+      "all_inner_calls_observed_once": true,
+      "captured_false_results": 60
+    },
+    "selected_hit_probe_sha256": "a172cce202a76d795d06c065196bc46d55e6ffda647caa540395d787e1ff54b6",
+    "capture_outcome": {
+      "requested_stop_cursor": 5241,
+      "observed_stop_cursor": 5244,
+      "exported_source_frames": 5247,
+      "owner_exit_code": 1,
+      "complete": false,
+      "final_css_entered": false,
+      "cause": "The owner stopped the replay after manual unload; the whole-session route did not complete."
+    }
+  },
+  "offline_reducer": {
+    "producer_commit": "b7c6c9e83a84e2684c26a6f0cee5f65e8372897d",
+    "review_receipts": {
+      "source_review_sha256": "8e5b3cfe3499c139ab3bde7570303a885c7a4b8120ed8b2f69b6d8b4002facfc",
+      "v3_review_packet_sha256": "97a15d2d5b6f3ba9fe471e2a5289c424a2065b43897e786d3a8ad4eb88bdf163"
+    },
+    "test_sources": [
+      {
+        "path": "tests/test_hit_transition_probe.py",
+        "bytes": 73965,
+        "sha256": "8a8ba5831c2a5c147e7d6e883640d3a48cbdb3aa047bb666ff4a5e03e111bf66"
+      },
+      {
+        "path": "tests/native_hit_candidate_probe_fixture.c",
+        "bytes": 37169,
+        "sha256": "63dbf8b6ddcf31a9fa976484b322c0a5e1d9cea7df944411411dd0349629025d"
+      }
+    ],
+    "records": 60,
+    "extracted_source_results_match_capture": true,
+    "unchanged_and_instrumented_results_and_written_bits_match": true,
+    "observed_reject_branches": {
+      "axis_aligned_bounds": 52,
+      "solver_distance": 8
+    },
+    "limit": "Host C floating-point sensitivity evidence only; no PowerPC execution or equivalence, and no causal attribution."
+  },
+  "existing_original_divergence": {
+    "source_tick": 4055,
+    "browser_index": 5239,
+    "source_bowser": {
+      "damage": 11,
+      "motion": "DamageFlyTop"
+    },
+    "browser_bowser": {
+      "damage": 0,
+      "motion": "WalkFast"
+    },
+    "status": "Unresolved; this diagnostic does not identify the cause."
+  },
+  "full_suite": {
+    "source_commit": "b7c6c9e83a84e2684c26a6f0cee5f65e8372897d",
+    "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+    "result": "passed",
+    "discovered": 2109,
+    "skipped": 154,
+    "executed_passed": 1955,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 487.111,
+    "retained_run_id": "b4-inner-full-suite-20261008-20261008-110437-02c878f4",
+    "log_bytes": 386792,
+    "log_sha256": "ca92aa2241d3137b07501962940d6454017966be7ddff947a716f66dd72c987c"
+  },
+  "limits": [
+    "The capped browser capture failed and remains incomplete.",
+    "The offline reducer does not prove original-game arithmetic or explain the first divergence.",
+    "Issue 274, Results, and whole-session acceptance remain open."
+  ]
+}
