@@ -64,6 +64,7 @@ const uint32 = text => {
   return value;
 };
 const inputSampling = values.scenario === 'input-sampling';
+const nativePump = values.scenario === 'native-pump';
 if (!values.url || !values.disc || !values.out || !values.seed || (!inputSampling && !values.script))
   throw Error('Required: --url runtime.html --disc DISC [--script route1.mwni] --seed U32 --out NEW_DIR');
 if (inputSampling && values.script)
@@ -104,7 +105,7 @@ if (scriptBytes && scriptBytes.length !== HEADER_BYTES + inputCount * NET_FRAME_
   throw Error('Script length disagrees with its declared input count');
 const scriptFrames = scriptBytes?.subarray(HEADER_BYTES) ?? Buffer.alloc(0);
 const probe = values.scenario === 'probe';
-const usedInputs = inputSampling ? INPUT_SAMPLING_SOURCE_TICKS - LOCKSTEP_DELAY : probe ? probeSourceTicks - LOCKSTEP_DELAY :
+const usedInputs = inputSampling ? INPUT_SAMPLING_SOURCE_TICKS - LOCKSTEP_DELAY : probe || nativePump ? probeSourceTicks - LOCKSTEP_DELAY :
   scenario === 'flip' && flip ? Math.min(inputCount, flip.tick + 8) :
   scenario === 'disconnect' ? Math.min(inputCount, Math.max(1, disconnectAt + 1 - LOCKSTEP_DELAY)) : inputCount;
 if (!inputSampling && usedInputs > inputCount) throw Error('Requested local input workload exceeds the script');
@@ -151,14 +152,15 @@ const fnv1a64 = bytes => {
 
 const pairResults = {
   schema: inputSampling ? 'melee-web-local-lockstep-a3-input-sampling-v1' : 'melee-web-local-lockstep-a2-run-v1', scenario, seed,
-  scope: inputSampling ? 'synthetic browser-local native PAD sampling and two-tick delay component check' :
+  scope: nativePump ? 'bounded eight-tick diagnostic browser-owned native checksum pump' : inputSampling ? 'synthetic browser-local native PAD sampling and two-tick delay component check' :
     probe ? 'CSS network-wait and duplicate-contribution probe' :
     scenario === 'positive' ? 'full original-route functional lockstep' : `bounded ${scenario} control`,
   exclusions: inputSampling ? ['physical controllers', 'keyboard sampling', 'wall-clock latency',
     'foreground timing', 'uninterrupted/audio-output acceptance', 'Internet/two-machine play',
     ...(!localWebRtc ? ['WebRTC'] : []),
     'pixels/PCM', 'full-route or whole-session accuracy', 'performance'] :
-    ['live timing', 'performance', 'pixels', 'PCM equivalence', 'retail equivalence', 'two-machine Internet acceptance'],
+    ['live timing', 'performance', 'pixels', 'PCM equivalence', 'retail equivalence', 'two-machine Internet acceptance',
+      ...(nativePump ? ['product room/session integration', 'physical/live input', 'unbounded evidence consumer policy'] : [])],
   peer_owner: values['peer-owner'], peer_transport: peerTransport,
   input_delay: LOCKSTEP_DELAY,
   neutral_prefix: {source_ticks: LOCKSTEP_DELAY, player_ports: 'neutral PADStatus', unowned_ports: 'no-controller'},
@@ -496,6 +498,52 @@ async function publishProbeInputs(alpha, beta) {
   // delayed/duplicated CSS contribution that releases alpha's exact wait tick.
 }
 
+async function observeNativePumpWithoutRpc() {
+  const read = async role => {
+    const {status, native} = await checkedHealth(role);
+    const snapshot = await instances[role].readPeerSnapshot();
+    if (snapshot.failure || snapshot.protocol.terminal || (!Array.isArray(snapshot.protocol.checksum_mismatches) || snapshot.protocol.checksum_mismatches.length) ||
+        !Array.isArray(snapshot.endpointErrors) || snapshot.endpointErrors.length ||
+        snapshot.nativePump?.enabled !== true || !Number.isSafeInteger(snapshot.nativePump.rpc_calls) ||
+        snapshot.nativePump.rpc_calls < 0 || status.active !== 1 ||
+        !Number.isSafeInteger(status.cursor) || status.cursor < 0 || status.cursor > sourceTicks ||
+        !Number.isSafeInteger(snapshot.protocol.local_checksum_ticks) ||
+        snapshot.protocol.local_checksum_ticks < 0 || snapshot.protocol.local_checksum_ticks > sourceTicks)
+      throw Error(`${role} autonomous diagnostic peer failed: ${JSON.stringify(snapshot)}`);
+    return {status, native, snapshot};
+  };
+  const before = Object.fromEntries(await Promise.all(['alpha', 'beta'].map(async role => [role, await read(role)])));
+  for (const role of ['alpha', 'beta']) {
+    if (before[role].status.cursor >= sourceTicks || before[role].snapshot.protocol.local_checksum_ticks >= sourceTicks)
+      throw Error(`${role} completed before the no-RPC observation interval; autonomous progress was not witnessed`);
+  }
+  let after, observations = 0;
+  const started = Date.now();
+  while (Date.now() <= deadline && Date.now() - started <= stallMs) {
+    after = Object.fromEntries(await Promise.all(['alpha', 'beta'].map(async role => [role, await read(role)])));
+    ++observations;
+    for (const role of ['alpha', 'beta']) {
+      if (after[role].snapshot.nativePump.rpc_calls !== before[role].snapshot.nativePump.rpc_calls)
+        throw Error(`${role} peer RPC occurred during autonomous observation`);
+    }
+    if (['alpha', 'beta'].every(role => {
+      const row = after[role];
+      return row.status.cursor === sourceTicks && row.status.blocker === 'complete' && row.status.terminal.kind === 0 &&
+        row.snapshot.exportRecords === sourceTicks && row.snapshot.protocol.local_checksum_ticks === sourceTicks &&
+        row.snapshot.protocol.remote_checksum_ticks === sourceTicks && row.snapshot.protocol.next_checksum_compare === sourceTicks &&
+        row.snapshot.protocol.remote_ack_input === usedInputs - 1;
+    })) {
+      for (const role of ['alpha', 'beta']) verifyPositivePeerCompletion(after[role].snapshot.protocol, usedInputs, sourceTicks);
+      pairResults.native_pump_interval = {before, after, observations,
+        observation: 'read-only native health and pure controller snapshot; no peer RPC, evidence drain, progress publication or timing resume',
+        no_peer_RPC_during_interval: true, actual_native_cursor_progress_each: true};
+      return;
+    }
+    await sleep(pollMs);
+  }
+  throw Error('Autonomous native pump did not complete within its bounded no-RPC interval');
+}
+
 async function pollRun() {
   let lastProgress = Date.now();
   const lastCursors = {alpha: -1, beta: -1};
@@ -768,6 +816,7 @@ async function run() {
     const roomId = localWebRtc ? undefined : createRoomId();
     const peerOptions = role => ({role, sourceTicks, inputTicks: usedInputs,
       ...(localWebRtc ? {} : {relayUrl: values['relay-url'], roomId}),
+      ...(nativePump ? {autonomousPump: true} : {}),
       agreement: agreements[role], timeoutMs: Math.min(stallMs, deadline - Date.now()),
       ...(inputSampling ? {inputCapture: {deferSendTicks: role === 'beta' ? [0] : [],
         pattern: role === 'alpha' ? ['neutral', 'A', 'release', 'neutral'] : Array(usedInputs).fill('neutral')}} : {})});
@@ -904,6 +953,10 @@ async function run() {
   if (inputSampling) {
     // Native input hooks own both local contributions; Node only releases the
     // explicitly deferred browser-owned beta sample after observing the wait.
+  } else if (nativePump) {
+    const entries = role => Array.from({length: usedInputs}, (_, tick) => [tick, localSample(role, tick)]);
+    await peers.alpha.addLocalInputs(entries('alpha'));
+    await peers.beta.addLocalInputs(entries('beta'));
   } else if (scenario === 'probe') {
     await publishProbeInputs(peers.alpha, peers.beta);
   } else if (scenario === 'disconnect') {
@@ -912,7 +965,8 @@ async function run() {
     await publishAllInputs(peers.alpha, peers.beta);
   }
   recordAvailableTransportMetrics(pairResults.transport, relay);
-  await pollRun();
+  if (nativePump) await observeNativePumpWithoutRpc();
+  else await pollRun();
   if (scenario === 'flip' || scenario === 'disconnect') {
     const expectedKind = scenario === 'flip' ? TERMINAL.desync : TERMINAL.disconnect;
     const before = await waitForTerminalPair(expectedKind);
@@ -938,6 +992,13 @@ async function run() {
   }
   stopRouteCaptureWatchers = true;
   await settleRouteBoundaryWatchers();
+  if (nativePump) {
+    pairResults.local_webrtc_final_before_peer_close = Object.fromEntries(await Promise.all(['alpha', 'beta'].map(async role =>
+      [role, verifyReliableHostWebRtc(await instances[role].localWebRtcState())])));
+    await Promise.all(['alpha', 'beta'].map(role => instances[role].armPeerClose()));
+    await Promise.all(['alpha', 'beta'].map(role => peers[role].close(true)));
+    for (const role of ['alpha', 'beta']) await drainChecksums(role, peers[role]);
+  }
   for (const role of ['alpha', 'beta']) {
     const capture = await instances[role].readSourceAccounting({freeze: true});
     const bytes = Buffer.from(JSON.stringify(capture, null, 2) + '\n');
@@ -945,7 +1006,7 @@ async function run() {
     instanceRows[role].source_accounting_artifact = {name: 'source-accounting.json',
       bytes: bytes.length, sha256: sha256(bytes)};
     instanceRows[role].source_accounting = verifyNetSourceAccounting(capture,
-      scenario === 'positive' || scenario === 'probe' || inputSampling ? sourceTicks :
+      scenario === 'positive' || scenario === 'probe' || inputSampling || nativePump ? sourceTicks :
         localWebRtc && scenario === 'disconnect' ? disconnectAt : capture.final.cursor);
   }
   pairResults.wait_observations = waitObservations;
@@ -961,7 +1022,7 @@ async function run() {
       ...(inputSampling ? {local_input_capture: peers[role].localInputCapture} : {}),
     };
   });
-  if (browserOwned && (probe || scenario === 'positive' || inputSampling)) {
+  if (browserOwned && (probe || scenario === 'positive' || inputSampling || nativePump)) {
     for (const role of ['alpha', 'beta']) {
       const ownership = peers[role].checksumOwnership;
       if (ownership.active_native_records_submitted_before_export !== sourceTicks ||
@@ -994,6 +1055,23 @@ async function run() {
       throw Error('Reduced probe did not exercise duplicate and out-of-order remote input');
     for (const role of ['alpha', 'beta']) await captureAccountedCss(role, sourceTicks);
     pairResults.route = {scope: 'CSS-only prefix', status: 'not-full-route', scene: 'CSS'};
+    pairResults.outcome = 'complete';
+  } else if (nativePump) {
+    for (const role of ['alpha', 'beta']) {
+      verifyPositivePeerCompletion(peers[role].summary(), usedInputs, sourceTicks);
+      if (instanceRows[role].records !== sourceTicks || instanceRows[role].scene_runs.length !== sourceTicks ||
+          instanceRows[role].scene_runs.some(row => row.scene !== 1))
+        throw Error(`${role} autonomous diagnostic did not retain exactly eight original CSS records`);
+      instanceRows[role].final_status = await instances[role].status();
+      instanceRows[role].final_native = await instances[role].native();
+      await captureAccountedCss(role, sourceTicks);
+    }
+    const bytesA = await fs.readFile(path.join(childDirectory('alpha'), 'checksums.bin'));
+    const bytesB = await fs.readFile(path.join(childDirectory('beta'), 'checksums.bin'));
+    if (bytesA.length !== sourceTicks * NET_RECORD_BYTES || !bytesA.equals(bytesB))
+      throw Error('Autonomous diagnostic raw eight-record native streams differ');
+    pairResults.checksums = {records_each: sourceTicks, streams_identical: true, sha256: sha256(bytesA)};
+    pairResults.route = {scope: 'CSS-only bounded native-pump diagnostic', status: 'not-full-route', scene: 'CSS'};
     pairResults.outcome = 'complete';
   } else if (inputSampling) {
     if (!instanceRows.input_capture_released || !instanceRows.input_capture_wait?.stable_bytes_and_serial)

@@ -9,20 +9,58 @@ export async function installNetSourceAccounting(page, capacity = 32768) {
     const initial = window.__net.status();
     if (initial.active !== 1 || initial.cursor !== 0 || initial.blocker !== 'start_identity')
       throw Error('Network accounting must start at the unconsumed identity barrier');
+    let subscriber = null;
     const state = {capacity, initial, rows: [], overflow: 0, errors: [], frozen: false};
     const fail = message => { if (state.errors.length < 32) state.errors.push(message); };
     const observer = function(data) {
+      let originalError = null;
       try { return original.apply(this, arguments); }
-      catch (error) { fail(`Original timing observer failed: ${String(error)}`); throw error; }
+      catch (error) { originalError = error; fail(`Original timing observer failed: ${String(error)}`); throw error; }
       finally {
         if (state.rows.length >= capacity) ++state.overflow;
         else state.rows.push({frame: data?.frame, valid: data?.valid,
           source_steps: data?.source_steps, source_draws: data?.source_draws});
+        if (subscriber) {
+          const observationError = originalError || (state.overflow || data?.valid !== 1 ||
+            !Number.isSafeInteger(data?.frame) || data.frame < 1 ||
+            !Number.isSafeInteger(data?.source_steps) || data.source_steps < 0 ||
+            data.source_steps !== data.source_draws
+              ? Error('Diagnostic native progress callback has invalid source accounting') : null);
+          if (observationError && !originalError) fail(observationError.message);
+          try { subscriber(observationError); }
+          catch (error) {
+            fail(`Native progress subscriber failed: ${String(error)}`);
+            if (!originalError) throw error;
+          }
+        }
       }
     };
     window.menuRuntimeTiming = observer;
     window.__netSourceAccounting = {
+      subscribeProgress(callback) {
+        if (state.frozen || window.menuRuntimeTiming !== observer || state.errors.length ||
+            subscriber || typeof callback !== 'function') {
+          const error = Error('Diagnostic native progress observer is frozen, changed, failed or already owned');
+          fail(error.message);
+          throw error;
+        }
+        subscriber = callback;
+        return () => {
+          if (subscriber !== callback) throw Error('Diagnostic native progress subscription ownership changed');
+          subscriber = null;
+          if (window.menuRuntimeTiming !== observer || state.frozen) {
+            const error = Error('Diagnostic native progress observer changed before unsubscribe');
+            fail(error.message);
+            throw error;
+          }
+        };
+      },
       read(freeze) {
+        if (freeze && subscriber) {
+          const error = Error('Cannot freeze source accounting with an active native progress subscriber');
+          fail(error.message);
+          throw error;
+        }
         if (window.menuRuntimeTiming !== observer && !state.frozen)
           fail('Timing observer changed during network accounting');
         if (freeze && !state.frozen) {

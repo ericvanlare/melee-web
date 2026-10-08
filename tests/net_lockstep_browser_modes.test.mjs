@@ -25,7 +25,7 @@ test('positive WebRTC cannot pass SDP through the Node memory coordinator', () =
 test('unsupported WebRTC scenarios and owners fail before acquisition', () => {
   for (const scenario of ['probe'])
     assert.throws(() => validateLockstepBrowserMode(options({scenario})),
-      /browser-owned input-sampling, positive, disconnect, or flip mode/);
+      /browser-owned input-sampling, positive, disconnect, flip, or native-pump mode/);
   assert.throws(() => validateLockstepBrowserMode(options({'peer-owner': 'node'})),
     /applies only to browser-owned peers/);
 });
@@ -69,4 +69,15 @@ test('flip WebRTC reuses page-owned room signaling and rejects Node SDP coordina
     'webrtc-signaling': 'memory'})), /Flip WebRTC mode requires/);
   assert.throws(() => validateLockstepBrowserMode(options({scenario: 'flip',
     'peer-owner': 'node'})), /applies only to browser-owned peers/);
+});
+
+
+test('bounded diagnostic native pump admits only eight-tick page-owned room WebRTC', () => {
+  const value = options({scenario: 'native-pump', 'source-ticks': '8'});
+  assert.equal(validateLockstepBrowserMode(value).roomWorkerSignaling, true);
+  for (const count of ['7', '9', undefined, 'bad'])
+    assert.throws(() => validateLockstepBrowserMode({...value, 'source-ticks': count}), /exactly eight/);
+  assert.throws(() => validateLockstepBrowserMode({...value, 'webrtc-signaling': 'memory'}), /room-worker/);
+  assert.throws(() => validateLockstepBrowserMode({...value, 'peer-owner': 'node'}), /browser-owned/);
+  assert.throws(() => validateLockstepBrowserMode({...value, 'peer-transport': 'relay'}), /local WebRTC/);
 });

@@ -1,16 +1,24 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {readFile} from 'node:fs/promises';
+import vm from 'node:vm';
+import {verifyPositivePeerCompletion} from '../scripts/net_lockstep_observers.mjs';
 import {createBrowserNativePeer, BROWSER_CHECKSUM_EXPORT_LIMIT} from '../scripts/net_lockstep_browser_peer.mjs';
 import {LockstepPeer} from '../scripts/net_lockstep_core.mjs';
 
 const turn = () => new Promise(resolve => setImmediate(resolve));
 const record = tick => { const row = new Uint8Array(64); new DataView(row.buffer).setUint32(0, tick, true); return Array.from(row); };
-function fixture({sourceTicks = 8} = {}) {
+function fixture({sourceTicks = 8, subscription = 'valid'} = {}) {
   const queue = [], records = [], terminals = [], remoteRecords = [];
   let callbacks, listener, cursor = 0, terminal = {kind: 0, tick: 0, channel: 0};
   let flushOperation = null, drainGate = null, draining = false, accesses = 0, overlap = false;
   const native = {
-    subscribeProgress(callback) { listener = callback; return () => { listener = null; }; },
+    subscribeProgress(callback) {
+      if (subscription === 'throw') throw Error('fixture subscription failure');
+      listener = callback;
+      if (subscription === 'missing-owner') return undefined;
+      return () => { listener = null; if (subscription === 'unsubscribe-throw') throw Error('fixture unsubscribe failure'); };
+    },
     async pushIndexed(first, bytes) {
       if (draining) overlap = true;
       ++accesses;
@@ -49,7 +57,7 @@ function fixture({sourceTicks = 8} = {}) {
     {createEndpoint: options => { callbacks = options; return endpoint; }});
   return {page, native, endpoint, records, remote, remoteRecords, terminals, flush,
     async start() { await remote.start({build: 'same'}); await page.rpc('start'); await idle(); },
-    notify() { listener?.(); }, setGate(gate) { drainGate = gate; },
+    notify(error = null) { listener?.(error); }, setGate(gate) { drainGate = gate; },
     get cursor() { return cursor; }, get accesses() { return accesses; }, get overlap() { return overlap; },
     get subscribed() { return listener !== null; },
   };
@@ -164,4 +172,76 @@ test('native drain rejection reaches sticky background failure and native protoc
   assert.equal(run.terminals.at(-1).kind, 3);
   await assert.rejects(run.page.close(), /close failed/);
   assert.equal(run.endpoint.closed, true);
+});
+
+
+for (const subscription of ['throw', 'missing-owner']) {
+  test(`subscription ${subscription} returns failed controller with joined endpoint cleanup`, async () => {
+    const run = fixture({subscription});
+    assert.match(run.page.snapshot().failure, /subscription failure|requires an unsubscribe owner/);
+    await assert.rejects(run.page.rpc('start'), /subscription failure|requires an unsubscribe owner/);
+    await assert.rejects(run.page.close(), /close failed/);
+    assert.equal(run.endpoint.closed, true);
+    const accesses = run.accesses; run.notify(); await idle(); assert.equal(run.accesses, accesses);
+  });
+}
+test('unsubscribe failure remains explicit while endpoint cleanup is joined', async () => {
+  const run = fixture({subscription: 'unsubscribe-throw'}); await run.start();
+  await run.page.rpc('disconnect', ['fixture terminal']);
+  await assert.rejects(run.page.close(), /close failed/);
+  assert.match(run.page.snapshot().failure, /fixture unsubscribe failure/);
+  assert.equal(run.endpoint.closed, true); assert.equal(run.subscribed, false);
+});
+
+
+test('progress observer failure becomes sticky controller failure and a native protocol terminal', async () => {
+  const run = fixture(); await run.start();
+  run.notify(Error('original native observation failure')); await idle();
+  assert.match(run.page.snapshot().failure, /original native observation failure/);
+  assert.equal(run.terminals.at(-1).kind, 3);
+  await assert.rejects(run.page.close(), /close failed/);
+  assert.equal(run.endpoint.closed, true);
+});
+
+
+const browserSource = await readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+const intervalSource = browserSource.slice(browserSource.indexOf('async function observeNativePumpWithoutRpc('),
+  browserSource.indexOf('async function pollRun('));
+async function runActualInterval({completedBefore = false, injectedRpc = false, stalled = false, failure = null} = {}) {
+  let rounds = 0, now = 0;
+  const pairResults = {}, instances = {};
+  const makeSnapshot = role => {
+    const complete = completedBefore || rounds > 0;
+    const count = complete && !stalled ? 8 : 2;
+    return {failure, endpointErrors: [], exportRecords: count,
+      nativePump: {enabled: true, rpc_calls: injectedRpc && rounds > 0 ? 5 : 4},
+      protocol: {role, ready: true, terminal: null, checksum_mismatches: [],
+        remote_ack_input: complete ? 5 : -1, local_input_ticks: 6, remote_input_ticks: 6,
+        local_checksum_ticks: count, remote_checksum_ticks: count, next_checksum_compare: count,
+        next_source_frame: 8}};
+  };
+  for (const role of ['alpha', 'beta']) instances[role] = {
+    readPeerSnapshot: async () => makeSnapshot(role),
+    peerRpc: () => { throw Error('test must never invoke peer RPC'); },
+  };
+  const context = vm.createContext({instances, pairResults, sourceTicks: 8, usedInputs: 6, stallMs: 3,
+    pollMs: 1, deadline: 100, Date: {now: () => now}, verifyPositivePeerCompletion,
+    checkedHealth: async role => ({status: {active: 1, cursor: makeSnapshot(role).exportRecords,
+      blocker: makeSnapshot(role).exportRecords === 8 ? 'complete' : 'network_wait', terminal: {kind: 0}}, native: {phase: 1}}),
+    sleep: async () => { ++rounds; ++now; }});
+  await vm.runInContext(`${intervalSource}; observeNativePumpWithoutRpc()`, context);
+  return pairResults;
+}
+test('actual harness interval observes progress using pure reads and exact unchanged RPC counts', async () => {
+  const result = await runActualInterval();
+  assert.equal(result.native_pump_interval.no_peer_RPC_during_interval, true);
+  assert.equal(result.native_pump_interval.before.alpha.status.cursor, 2);
+  assert.equal(result.native_pump_interval.after.alpha.status.cursor, 8);
+  assert.equal(result.native_pump_interval.after.beta.snapshot.protocol.next_checksum_compare, 8);
+});
+test('actual interval rejects already complete, intervening RPC, sticky failure and missing autonomous progress', async () => {
+  await assert.rejects(runActualInterval({completedBefore: true}), /completed before/);
+  await assert.rejects(runActualInterval({injectedRpc: true}), /peer RPC occurred/);
+  await assert.rejects(runActualInterval({failure: 'actual retained failure'}), /diagnostic peer failed/);
+  await assert.rejects(runActualInterval({stalled: true}), /bounded no-RPC interval/);
 });

@@ -115,6 +115,10 @@ const PAGE_HELPERS = () => {
       confirmStart: () => window.__net.confirmStart(),
       terminate: (...args) => window.__net.terminate(...args),
       status: () => window.__net.status(),
+      subscribeProgress: callback => {
+        if (!window.__netSourceAccounting) throw Error('Diagnostic native progress requires source accounting');
+        return window.__netSourceAccounting.subscribeProgress(callback);
+      },
       drain: max => {
         const result = window.__net.drain(max), text = atob(result.data), records = [];
         if (text.length !== result.count * 64) throw Error('Native checksum byte count differs');
@@ -515,6 +519,7 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
         channel_state: state.channel?.readyState ?? null,
         room_signaling: state.signaler?.snapshot() ?? null};
     }));
+    instance.readPeerSnapshot = () => bounded(() => page.evaluate(() => window.__netPeer.snapshot()));
     instance.peerRpc = (name, args = []) => bounded(() => page.evaluate(([name, args]) =>
       window.__netPeer.rpc(name, args), [name, args]));
     instance.armPeerClose = () => bounded(() => page.evaluate(() => {

@@ -24,7 +24,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
   if (typeof autonomousPump !== 'boolean' || (autonomousPump && typeof native.subscribeProgress !== 'function'))
     throw Error('Autonomous native pump requires a progress subscription');
   let failure = null, intentionalClose = false, closed = false, closing = false;
-  let wakeRequested = false, wakeQueued = false, wakeRuns = 0, unsubscribeProgress = null;
+  let wakeRequested = false, wakeQueued = false, wakeRuns = 0, rpcCalls = 0, unsubscribeProgress = null;
   let closeOperation = null, drainFailure = null;
   let nativeChain = Promise.resolve();
   const callNative = (name, ...args) => {
@@ -168,7 +168,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       active_native_records_submitted_before_export: activeNativeRecords,
       post_terminal_native_evidence_records: postTerminalNativeRecords},
     nativePump: {enabled: autonomousPump, closing, wake_requested: wakeRequested,
-      wake_queued: wakeQueued, completed_wakeups: wakeRuns, drain_failure: drainFailure},
+      wake_queued: wakeQueued, completed_wakeups: wakeRuns, rpc_calls: rpcCalls, drain_failure: drainFailure},
     failure: failure ? String(failure?.stack || failure) : null, transport: endpoint.transport});
 
   // Native observations and RPCs join one owner; notifications never step source time.
@@ -177,8 +177,10 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     rpcChain = result.catch(remember);
     return result;
   }
-  function requestWakeup() {
-    if (closing || closed || failure) return;
+  function requestWakeup(error = null) {
+    if (closing || closed) return;
+    if (error) remember(error);
+    if (failure && !error) return;
     wakeRequested = true;
     if (wakeQueued) return;
     wakeQueued = true;
@@ -201,13 +203,21 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     operation.catch(remember);
   }
   if (autonomousPump) {
-    unsubscribeProgress = native.subscribeProgress(requestWakeup);
-    if (typeof unsubscribeProgress !== 'function')
-      throw Error('Native progress subscription requires an unsubscribe owner');
+    try {
+      const unsubscribe = native.subscribeProgress(requestWakeup);
+      if (typeof unsubscribe !== 'function')
+        throw Error('Native progress subscription requires an unsubscribe owner');
+      unsubscribeProgress = unsubscribe;
+    } catch (error) {
+      // Return the failed controller so its caller can still join startup and
+      // endpoint cleanup. Setup failure must not orphan an allocated endpoint.
+      remember(error);
+    }
   }
 
   // Serialize RPCs so native scratch and evidence exports have one owner.
   function rpc(name, args = []) {
+    ++rpcCalls;
     if (autonomousPump && closing && !closed)
       return Promise.reject(Error('Browser native peer is closing'));
     const operation = serialize(async () => {
