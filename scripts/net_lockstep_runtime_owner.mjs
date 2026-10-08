@@ -75,17 +75,24 @@ export function createRoomTransport({url, roomId, role, timeoutMs, createEndpoin
   const channelState = {value: null, attach: null, closed: false, cancelPendingStart: null};
   const signalState = {signaler: null, channel: null};
   const pendingTransportWaits = new Set();
-  let closed = false, cleanupSnapshot = null;
+  let closed = false, cleanupSnapshot = null, channelFailure = null;
   const rememberChannel = (channel, source) => {
     if (closed) { try { channel.close(); } catch {} return; }
-    if (channelState.value) throw Error('Local WebRTC data channel was announced more than once');
+    if (channelState.value) {
+      if (channel !== channelState.value) { try { channel.close(); } catch {} }
+      throw Error('Local WebRTC data channel was announced more than once');
+    }
     channelState.value = channel;
     signalState.channel = {source, ready_state: channel.readyState, ordered: channel.ordered,
       max_retransmits: channel.maxRetransmits, max_packet_lifetime: channel.maxPacketLifeTime};
     channelState.attach?.(channel);
   };
+  const receivedChannel = event => {
+    try { rememberChannel(event.channel, 'datachannel'); }
+    catch (error) { channelFailure ??= error; }
+  };
+  pc.addEventListener('datachannel', receivedChannel);
   if (role === 'alpha') rememberChannel(pc.createDataChannel('a3-native-input', {ordered: true}), 'createDataChannel');
-  else pc.addEventListener('datachannel', event => rememberChannel(event.channel, 'datachannel'), {once: true});
 
   const waitForIce = async () => {
     if (closed) throw Error('Room WebRTC transport closed during ICE gathering');
@@ -115,34 +122,47 @@ export function createRoomTransport({url, roomId, role, timeoutMs, createEndpoin
     return types;
   };
   const waitForConnected = async () => {
-    const channel = channelState.value;
-    if (!channel) throw Error('Local WebRTC data channel was not attached');
     await new Promise((resolve, reject) => {
-      let timer;
+      let timer, channel = null, settled = false;
       const cleanup = () => {
         clearTimeout(timer);
         pc.removeEventListener('connectionstatechange', changed);
         pc.removeEventListener('iceconnectionstatechange', changed);
-        channel.removeEventListener('open', changed);
-        channel.removeEventListener('close', changed);
-        channel.removeEventListener('error', failed);
+        pc.removeEventListener('datachannel', changed);
+        channel?.removeEventListener('open', changed);
+        channel?.removeEventListener('close', changed);
+        channel?.removeEventListener('error', failed);
         pendingTransportWaits.delete(failed);
       };
-      const failed = () => { cleanup(); reject(Error('Local WebRTC data channel connection failed')); };
+      const finish = error => {
+        if (settled) return;
+        settled = true; cleanup();
+        if (error) reject(error); else resolve();
+      };
+      const failed = () => finish(Error('Local WebRTC data channel connection failed'));
       pendingTransportWaits.add(failed);
       const changed = () => {
+        if (settled) return;
+        if (channelFailure) { finish(channelFailure); return; }
+        if (!channel && channelState.value) {
+          channel = channelState.value;
+          channel.addEventListener('open', changed);
+          channel.addEventListener('close', changed);
+          channel.addEventListener('error', failed);
+        }
         if (pc.connectionState === 'connected' &&
-            ['connected', 'completed'].includes(pc.iceConnectionState) && channel.readyState === 'open') {
-          cleanup(); resolve();
+            ['connected', 'completed'].includes(pc.iceConnectionState) && channel?.readyState === 'open') {
+          finish();
         } else if (closed || pc.connectionState === 'failed' || pc.connectionState === 'closed' ||
-            pc.iceConnectionState === 'failed' || channel.readyState === 'closed') failed();
+            pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed' ||
+            channel?.readyState === 'closed' || channel?.readyState === 'closing') failed();
       };
-      timer = setTimeout(() => { cleanup(); reject(Error('Local WebRTC data channel connection timed out')); }, timeoutMs);
+      // Signaling may finish before beta's datachannel event. This one existing
+      // deadline covers attachment, channel open and PC/ICE connection together.
+      timer = setTimeout(() => finish(Error('Local WebRTC data channel connection timed out')), timeoutMs);
       pc.addEventListener('connectionstatechange', changed);
       pc.addEventListener('iceconnectionstatechange', changed);
-      channel.addEventListener('open', changed);
-      channel.addEventListener('close', changed);
-      channel.addEventListener('error', failed);
+      pc.addEventListener('datachannel', changed);
       changed();
     });
   };
@@ -213,6 +233,7 @@ export function createRoomTransport({url, roomId, role, timeoutMs, createEndpoin
       try { cancelPendingStart(); } catch (error) { failures.push(error); }
       closed = true;
       channelState.closed = true;
+      pc.removeEventListener('datachannel', receivedChannel);
       try { await signalState.signaler?.close(); } catch (error) { failures.push(error); }
       try { pc.close(); } catch (error) { failures.push(error); }
       cleanupSnapshot = {connection_state: pc.connectionState,

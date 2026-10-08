@@ -82,6 +82,18 @@ function makeSession({adapterFixture: native = adapterFixture(), role = 'alpha',
 
 const hostSdp = 'v=0\r\na=candidate:1 1 udp 2122260223 127.0.0.1 8998 typ host\r\n';
 
+function trackListeners(target) {
+  const listeners = new Map(), add = target.addEventListener.bind(target), remove = target.removeEventListener.bind(target);
+  target.addEventListener = (name, callback, options) => {
+    if (!listeners.has(name)) listeners.set(name, new Set());
+    listeners.get(name).add(callback); add(name, callback, options);
+  };
+  target.removeEventListener = (name, callback, options) => {
+    listeners.get(name)?.delete(callback); remove(name, callback, options);
+  };
+  return () => [...listeners.values()].reduce((total, callbacks) => total + callbacks.size, 0);
+}
+
 class NeverOpenDataChannel extends EventTarget {
   constructor() {
     super();
@@ -157,6 +169,137 @@ class ReadyButUnpairedWebSocket extends EventTarget {
     });
   }
 }
+
+function emitMessage(socket, data) {
+  const event = new Event('message');
+  Object.defineProperty(event, 'data', {value: JSON.stringify(data)});
+  socket.dispatchEvent(event);
+}
+
+function negotiatingSocket(role, roomId) {
+  return class extends ReadyButUnpairedWebSocket {
+    constructor(url) {
+      super(url);
+      if (role === 'beta') queueMicrotask(() => emitMessage(this, {
+        protocol: 'melee-local-webrtc', version: 1, roomId, from: 'alpha', to: 'beta',
+        kind: 'offer', description: {type: 'offer', sdp: hostSdp},
+      }));
+    }
+    send(text) {
+      const signal = JSON.parse(text);
+      if (role === 'alpha') queueMicrotask(() => emitMessage(this, {...signal,
+        from: 'beta', to: 'alpha', kind: 'answer', description: {type: 'answer', sdp: hostSdp}}));
+    }
+  };
+}
+
+test('actual Room transport waits for asynchronous channel attachment, open and PC/ICE connection', async t => {
+  const prior = Object.getOwnPropertyDescriptor(globalThis, 'WebSocket');
+  const roomId = 'd'.repeat(32);
+  async function setup(role, timeoutMs = 200, duplicateBeforeNegotiation = false) {
+    Object.defineProperty(globalThis, 'WebSocket', {configurable: true, writable: true,
+      value: negotiatingSocket(role, roomId)});
+    const pc = new FakeRoomPeerConnection(role), pcListeners = trackListeners(pc), channels = new Set();
+    const channel = () => {
+      const value = new NeverOpenDataChannel(); value.send = () => {};
+      value.listenerCount = trackListeners(value); channels.add(value);
+      return value;
+    };
+    pc.createDataChannel = () => (pc.channel = channel());
+    if (duplicateBeforeNegotiation) pc.setRemoteDescription = async description => {
+      pc.remoteDescription = description;
+      for (let count = 0; count < 2; ++count) {
+        const value = channel(); pc.channel ??= value;
+        const event = new Event('datachannel'); Object.defineProperty(event, 'channel', {value}); pc.dispatchEvent(event);
+      }
+    };
+    const transport = createRoomTransport({url: 'ws://127.0.0.1:8787', roomId, role, timeoutMs,
+      createPeerConnection: () => pc});
+    const endpoint = transport.createEndpoint({onMessage() {}, onDisconnect() {}, onEndpointError() {}});
+    const started = transport.start(); started.catch(() => {});
+    let settled = false; started.then(() => { settled = true; }, () => { settled = true; });
+    for (let attempt = 0; attempt < 20 && transport.signalingSnapshot()?.phase !== 'negotiated'; ++attempt) await turn();
+    assert.equal(transport.signalingSnapshot()?.phase, 'negotiated', 'Actual signaling completes before beta datachannel is announced');
+    const attach = (value = channel()) => {
+      pc.channel ??= value;
+      const event = new Event('datachannel'); Object.defineProperty(event, 'channel', {value}); pc.dispatchEvent(event);
+      return value;
+    };
+    const connect = (ice = 'connected') => {
+      pc.connectionState = 'connected'; pc.iceConnectionState = ice;
+      pc.dispatchEvent(new Event('connectionstatechange')); pc.dispatchEvent(new Event('iceconnectionstatechange'));
+    };
+    const open = value => { value.readyState = 'open'; value.dispatchEvent(new Event('open')); };
+    const close = async () => {
+      await endpoint.close().catch(() => {}); await transport.close().catch(() => {});
+      assert.equal(pcListeners(), 0, 'Transport close removes every owned PC listener');
+      for (const channel of channels) assert.equal(channel.listenerCount(), 0, 'Endpoint and connection waits remove every owned channel listener');
+    };
+    return {pc, transport, endpoint, started, attach, connect, open, close, channel, settled: () => settled};
+  }
+  try {
+    await t.test('beta datachannel arrives after completed answer signaling', async t => {
+      const run = await setup('beta'); t.after(run.close);
+      run.connect(); await turn(); assert.equal(run.settled(), false, 'Connected PC/ICE cannot replace missing channel attachment');
+      const channel = run.attach(); await turn(); assert.equal(run.settled(), false, 'Attachment alone cannot replace open');
+      run.open(channel); const result = await run.started;
+      assert.equal(result.local_webrtc.attach_source, 'datachannel'); assert.equal(result.local_webrtc.ready_state, 'open');
+      assert.equal(result.local_webrtc.connection_state, 'connected'); assert.equal(result.local_webrtc.ice_connection_state, 'connected');
+    });
+    await t.test('alpha existing channel still requires PC and ICE connected', async t => {
+      const run = await setup('alpha'); t.after(run.close);
+      run.open(run.pc.channel); await run.endpoint.ready; await turn(); assert.equal(run.settled(), false);
+      run.connect('checking'); await turn(); assert.equal(run.settled(), false, 'Open channel and connected PC still require connected ICE');
+      run.connect('completed'); assert.equal((await run.started).local_webrtc.attach_source, 'createDataChannel');
+    });
+    for (const stage of ['before-attachment', 'before-open', 'during-connection'])
+      for (const mode of ['normal', 'fatal']) await t.test(`${mode} close ${stage}`, async t => {
+        const run = await setup('beta'); t.after(run.close);
+        if (stage !== 'before-attachment') {
+          const channel = run.attach();
+          if (stage === 'during-connection') run.open(channel);
+        }
+        const rejected = assert.rejects(run.started, /connection failed|cancelled|closed/);
+        if (mode === 'fatal') run.transport.cancelPendingStart();
+        await run.transport.close(); await rejected;
+        assert.equal(run.pc.connectionState, 'closed');
+      });
+    for (const fault of ['duplicate', 'channel-error', 'channel-closed', 'pc-failed', 'ice-failed'])
+      await t.test(`startup rejects ${fault} and retains first failure`, async t => {
+        const run = await setup('beta'); t.after(run.close); const channel = run.attach();
+        const rejected = assert.rejects(run.started, fault === 'duplicate' ? /announced more than once/ : /connection failed/);
+        if (fault === 'duplicate') {
+          const duplicate = run.attach(); assert.equal(duplicate.readyState, 'closed', 'Extra channel is retired');
+        } else if (fault === 'channel-error') channel.dispatchEvent(new Event('error'));
+        else if (fault === 'channel-closed') channel.close();
+        else {
+          run.pc[fault === 'pc-failed' ? 'connectionState' : 'iceConnectionState'] = 'failed';
+          run.pc.dispatchEvent(new Event(fault === 'pc-failed' ? 'connectionstatechange' : 'iceconnectionstatechange'));
+        }
+        await rejected;
+        channel.dispatchEvent(new Event('error'));
+        await assert.rejects(run.started, fault === 'duplicate' ? /announced more than once/ : /connection failed/);
+      });
+    await t.test('missing attachment expires within existing connection timeout', async t => {
+      const run = await setup('beta', 30); t.after(run.close); run.connect();
+      await assert.rejects(run.started, /connection timed out/);
+    });
+    await t.test('duplicate channel announced during offer application preserves its first failure', async t => {
+      const run = await setup('beta', 200, true); t.after(run.close);
+      await assert.rejects(run.started, /announced more than once/);
+    });
+    await t.test('late attachment does not renew the original connection deadline', async t => {
+      t.mock.timers.enable({apis: ['setTimeout']});
+      const run = await setup('beta', 40); t.after(run.close);
+      t.mock.timers.tick(25);
+      run.attach(); run.connect();
+      const expired = assert.rejects(run.started, /connection timed out/);
+      t.mock.timers.tick(15); await expired;
+    });
+  } finally {
+    if (prior) Object.defineProperty(globalThis, 'WebSocket', prior); else delete globalThis.WebSocket;
+  }
+});
 
 function makeProductionUnreadyRoomSession(role, pendingIce = false) {
   const native = adapterFixture();
