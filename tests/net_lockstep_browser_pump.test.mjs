@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
-import {verifyPositivePeerCompletion} from '../scripts/net_lockstep_observers.mjs';
+import {readyRenderEvent, verifyAccountedRenderReadiness, verifyPositivePeerCompletion} from '../scripts/net_lockstep_observers.mjs';
 import {collapseConsecutiveScenes} from '../scripts/net_determinism_contract.mjs';
 import {createBrowserNativePeer, BROWSER_CHECKSUM_EXPORT_LIMIT} from '../scripts/net_lockstep_browser_peer.mjs';
 import {LockstepPeer} from '../scripts/net_lockstep_core.mjs';
@@ -433,20 +433,21 @@ const browserSource = await readFile(new URL('../scripts/net_lockstep_browser.mj
 const intervalSource = browserSource.slice(browserSource.indexOf('function nativePumpChecksumEvidence('),
   browserSource.indexOf('async function pollRun('));
 async function runActualInterval({completedBefore = false, injectedRpc = false, stalled = false, failure = null,
-  runtimeCssSss = false, beforeCursor = null} = {}) {
+  runtimeCssSss = false, runtimeCssMatch = false, beforeCursor = null} = {}) {
   let rounds = 0, now = 0;
+  const runtimeCssLiveRoute = runtimeCssSss || runtimeCssMatch;
   const pairResults = {}, instances = {};
   const makeSnapshot = role => {
     const complete = completedBefore || rounds > 0;
-    const sourceTicks = runtimeCssSss ? 520 : 8, usedInputs = sourceTicks - 2;
-    const count = complete && !stalled ? sourceTicks : beforeCursor ?? (runtimeCssSss ? 510 : 2);
+    const sourceTicks = runtimeCssLiveRoute ? 520 : 8, usedInputs = sourceTicks - 2;
+    const count = complete && !stalled ? sourceTicks : beforeCursor ?? (runtimeCssLiveRoute ? 510 : 2);
     const protocol = {role, ready: true, terminal: null, checksum_mismatches: [],
       remote_ack_input: complete ? usedInputs - 1 : count - 2, local_input_ticks: Math.min(count, usedInputs),
       remote_input_ticks: Math.min(count, usedInputs), local_checksum_ticks: count,
       remote_checksum_ticks: count, next_checksum_compare: count, next_source_frame: sourceTicks};
-    return {failure, endpointErrors: [], exportRecords: runtimeCssSss ? 0 : count,
+    return {failure, endpointErrors: [], exportRecords: runtimeCssLiveRoute ? 0 : count,
       nativePump: {enabled: true, rpc_calls: injectedRpc && rounds > 0 ? 5 : 4},
-      protocol, ...(runtimeCssSss ? {checksumConsumer: {enabled: true, accepted_records: count,
+      protocol, ...(runtimeCssLiveRoute ? {checksumConsumer: {enabled: true, accepted_records: count,
         pending_batch: null, retained_records: 0}, checksumOwnership: {consumer_accepted_records: count}} : {})};
   };
   for (const role of ['alpha', 'beta']) instances[role] = {
@@ -455,14 +456,15 @@ async function runActualInterval({completedBefore = false, injectedRpc = false, 
       peer: makeSnapshot(role), checksums: Array.from({length: makeSnapshot(role).protocol.local_checksum_ticks}, (_, tick) => record(tick))}),
     peerRpc: () => { throw Error('test must never invoke peer RPC'); },
   };
-  const sourceTicks = runtimeCssSss ? 520 : 8, usedInputs = sourceTicks - 2;
-  const context = vm.createContext({instances, pairResults, runtimeOwned: runtimeCssSss, runtimeCssSss,
+  const sourceTicks = runtimeCssLiveRoute ? 520 : 8, usedInputs = sourceTicks - 2;
+  const context = vm.createContext({instances, pairResults, runtimeOwned: runtimeCssLiveRoute, runtimeCssSss, runtimeCssMatch,
+    runtimeCssLiveRoute,
     NET_RECORD_BYTES: 64, sourceTicks, usedInputs, stallMs: 3,
     pollMs: 1, deadline: 100, Date: {now: () => now}, verifyPositivePeerCompletion,
     checkedHealth: async role => ({status: {active: 1,
-      cursor: runtimeCssSss ? makeSnapshot(role).protocol.local_checksum_ticks : makeSnapshot(role).exportRecords,
+      cursor: runtimeCssLiveRoute ? makeSnapshot(role).protocol.local_checksum_ticks : makeSnapshot(role).exportRecords,
       blocker: makeSnapshot(role).protocol.local_checksum_ticks === sourceTicks ? 'complete' : 'network_wait',
-      terminal: {kind: 0}}, native: {phase: runtimeCssSss ? 3 : 1}}),
+      terminal: {kind: 0}}, native: {phase: runtimeCssMatch ? 7 : runtimeCssSss ? 3 : 1}}),
     sleep: async () => { ++rounds; ++now; }});
   await vm.runInContext(`${intervalSource}; observeNativePumpWithoutRpc()`, context);
   return pairResults;
@@ -492,6 +494,17 @@ test('runtime CSS-to-SSS interval observes retained partial evidence and crosses
   await assert.rejects(runActualInterval({runtimeCssSss: true, injectedRpc: true}), /peer RPC occurred/);
 });
 
+test('runtime CSS-to-match interval crosses source cursor 512 without peer RPC', async () => {
+  const result = await runActualInterval({runtimeCssMatch: true});
+  assert.equal(result.native_pump_interval.before.alpha.status.cursor, 510);
+  assert.equal(result.native_pump_interval.after.alpha.status.cursor, 520);
+  assert.equal(result.native_pump_interval.crossed_512_each, true);
+  assert.equal(result.native_pump_interval.no_peer_RPC_during_interval, true);
+  assert.equal(result.native_pump_interval.complete, true);
+  await assert.rejects(runActualInterval({runtimeCssMatch: true, beforeCursor: 512}), /passed source cursor 512/);
+  await assert.rejects(runActualInterval({runtimeCssMatch: true, injectedRpc: true}), /peer RPC occurred/);
+});
+
 test('runtime CSS-to-SSS scene verifier requires 520 ordered checksums with only CSS then SSS', async () => {
   const source = await readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
   const start = source.indexOf('function verifyRuntimeCssSssSceneRuns(');
@@ -505,6 +518,38 @@ test('runtime CSS-to-SSS scene verifier requires 520 ordered checksums with only
     const bad = structuredClone(sceneRuns); mutate(bad);
     assert.throws(() => verify(bad));
   }
+});
+
+test('runtime CSS-to-match scene verifier requires the exact CSS/SSS/match source order', async () => {
+  const source = await readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf('function verifyRuntimeCssMatchSceneRuns(');
+  const end = source.indexOf('function routeBoundaryPath(', start);
+  const verify = vm.runInNewContext(`${source.slice(start, end)}\nverifyRuntimeCssMatchSceneRuns`,
+    {RUNTIME_CSS_MATCH_SOURCE_TICKS: 520, collapseConsecutiveScenes});
+  const sceneRuns = Array.from({length: 520}, (_, tick) => ({tick, scene: tick < 153 ? 1 : tick < 304 ? 2 : 3}));
+  assert.deepEqual(JSON.parse(JSON.stringify(verify(sceneRuns))), {scenes: [1, 2, 3], firstSssTick: 153, firstMatchTick: 304});
+  for (const mutate of [rows => rows.pop(), rows => { rows[512].tick = 511; },
+    rows => { rows[200].scene = 3; }, rows => { rows[519].scene = 1; }, rows => { rows[510].scene = 4; }]) {
+    const bad = structuredClone(sceneRuns); mutate(bad);
+    assert.throws(() => verify(bad));
+  }
+});
+
+test('runtime CSS-to-match completion requires the final checksum acknowledgment', async () => {
+  const source = await readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf('function verifyRuntimeCssMatchPeerCompletion(');
+  const end = source.indexOf('\nfunction routeBoundaryPath(', start);
+  const verify = vm.runInNewContext(`${source.slice(start, end)}\nverifyRuntimeCssMatchPeerCompletion`, {
+    verifyPositivePeerCompletion, usedInputs: 518, sourceTicks: 520,
+  });
+  const summary = {terminal: null, checksum_mismatches: [], remote_ack_input: 517,
+    local_checksum_ticks: 520, remote_checksum_ticks: 520, next_checksum_compare: 520,
+    remote_ack_checksum: 519};
+  assert.deepEqual(JSON.parse(JSON.stringify(verify(summary))), {remote_ack_input: 517,
+    local_checksum_ticks: 520, remote_checksum_ticks: 520, next_checksum_compare: 520,
+    remote_ack_checksum: 519});
+  for (const ack of [518, 520, null])
+    assert.throws(() => verify({...summary, remote_ack_checksum: ack}), /did not acknowledge checksum 519/);
 });
 
 test('runtime CSS-to-SSS final SSS screenshot waits for frozen input and the read-only 512 interval', async () => {
@@ -580,6 +625,151 @@ test('runtime CSS-to-SSS final SSS capture runs after fixture freeze and before 
   const capture = source.indexOf('await captureRuntimeCssSssFinalBoundary(role);', freeze);
   const close = source.indexOf('await relay.close();', capture);
   assert(freeze >= 0 && capture > freeze && close > capture);
+});
+
+test('runtime CSS-to-match final screenshot retains the phase-7 active-match boundary after read-only progress', async () => {
+  const source = await readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf('function routeBoundaryPath(');
+  const end = source.indexOf('\nasync function watchRouteBoundary(', start);
+  const helperSource = source.slice(start, end);
+  assert(start >= 0 && end > start);
+  const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]);
+  async function run({frozen = true, complete = true, noPeerRpc = true, crossed512 = true,
+    cursorAfterScreenshot = 520, phaseAfterScreenshot = 7, gpuObserved = true, invalidReadiness = null, pngValid = true,
+    nativeBefore = {}, statusBefore = {}} = {}) {
+    const events = [], instanceRows = {alpha: {route_boundary_captures: [], route_boundary_misses: [],
+      runtime_input_fixture_frozen: {frozen, captured_count: 518}}};
+    const accounting = {frozen: false, initial: {active: 1, cursor: 0, blocker: 'start_identity'},
+      final: {active: 1, cursor: 520, blocker: 'complete', terminal: {kind: 0}}, overflow: 0, errors: [],
+      rows: Array.from({length: 520}, (_, index) => ({frame: index + 1, valid: 1, source_steps: 1, source_draws: 1})),
+      render_readiness_enabled: true, render_readiness: {row_index: 519, frame: 520, valid: 1,
+        source_steps: 1, source_draws: 1, began: 1, drawn: 1, preparation_ms: 0, draw_suppressed: 0,
+        draw_calls: 252, source_cursor: 520, phase: 7, running: 1, error: null,
+        status: 'Original match', source: 'source frame: 90 · ready: 1'}};
+    if (invalidReadiness) Object.assign(accounting.render_readiness, invalidReadiness);
+    let statusCalls = 0, screenshotCount = 0;
+    const instances = {alpha: {
+      async readSourceAccounting(options) { assert.equal(options.freeze, false); events.push('accounting'); return accounting; },
+      driver: {async diagnostics() { events.push('driver'); return {phase: 7, running: 1, status: 'Original match', log: ''}; }},
+      async native() { events.push('native'); return {phase: events.includes('screenshot') ? phaseAfterScreenshot : 7, running: 1, error: null, ...(!events.includes('screenshot') ? nativeBefore : {})}; },
+      async status() { events.push('status'); ++statusCalls; return {active: 1, cursor: statusCalls === 1 ? 520 : cursorAfterScreenshot,
+        blocker: 'complete', ...(!events.includes('screenshot') ? statusBefore : {})}; },
+      async screenshot(file) { events.push('screenshot'); ++screenshotCount; assert.match(file, /route-match\.png$/); },
+      async graphics() { events.push('graphics'); return {cross_origin_isolated: true, webgpu_api: true,
+        webgpu_adapter: gpuObserved}; },
+    }};
+    const pairResults = {native_pump_interval: {complete, no_peer_RPC_during_interval: noPeerRpc,
+      actual_native_cursor_progress_each: true, crossed_512_each: crossed512}};
+    const context = vm.createContext({
+      Buffer, Date, Promise, path: await import('node:path'), output: '/capture',
+      childDirectory: role => `/capture/${role}`, instances, instanceRows, pairResults,
+      runtimeCssMatch: true, sourceTicks: 520, usedInputs: 518,
+      POSITIVE_ROUTE_BOUNDARIES: [{name: 'css-start', phase: 1, label: 'CSS'},
+        {name: 'sss', phase: 3, label: 'SSS'}, {name: 'match', phase: 7, label: 'original match'}],
+      fs: {async readFile(file) { events.push('read'); assert.match(file, /route-match\.png$/); return pngValid ? png : Buffer.from([0]); }},
+      readyRenderEvent, verifyAccountedRenderReadiness,
+      sha256: () => 'fixture-png-sha256',
+    });
+    const capture = vm.runInContext(`${helperSource}\n;captureRuntimeCssMatchFinalBoundary`, context);
+    return {events, instanceRows, pairResults, get screenshotCount() { return screenshotCount; },
+      capture: () => capture('alpha')};
+  }
+
+  const valid = await run();
+  await valid.capture();
+  const row = valid.instanceRows.alpha.route_boundary_captures[0];
+  assert.equal(valid.screenshotCount, 1);
+  assert.deepEqual(valid.events, ['accounting', 'driver', 'native', 'status', 'screenshot', 'read', 'native', 'status', 'graphics']);
+  assert.equal(row.name, 'match');
+  assert.equal(row.source_cursor_sampled_before_screenshot, 520);
+  assert.equal(row.source_cursor_after_screenshot, 520);
+  assert.equal(row.source_cursor_stable_during_screenshot, true);
+  assert.equal(row.screenshot_phase_stable, true);
+  assert.equal(row.gpu_observed, true);
+  assert.equal(row.browser_driver.phase, 7);
+  assert.equal(row.render_readiness.kind, 'structured native accounting callback');
+  assert.equal(valid.instanceRows.alpha.route_boundary_observations[0].source_accounting_snapshot.frozen, false);
+  assert.equal(readyRenderEvent(row.browser_driver, 7), null);
+  for (const invalidReadiness of [{source_cursor: 519}, {phase: 3}, {preparation_ms: 1}, {draw_suppressed: 1}, {draw_calls: 0}]) {
+    const invalid = await run({invalidReadiness});
+    await assert.rejects(invalid.capture(), /screenshot was not captured/);
+    assert.equal(invalid.screenshotCount, 0);
+    assert.match(invalid.instanceRows.alpha.route_boundary_observations[0].render_readiness_error, /Structured render readiness/);
+  }
+
+  for (const options of [{frozen: false}, {complete: false}, {noPeerRpc: false}, {crossed512: false}, {gpuObserved: false}]) {
+    const invalid = await run(options);
+    if (options.gpuObserved === false) await assert.rejects(invalid.capture(), /lacks driver\/GPU diagnostics/);
+    else await assert.rejects(invalid.capture());
+    assert.equal(invalid.screenshotCount, options.gpuObserved === false ? 1 : 0);
+  }
+  for (const options of [{nativeBefore: {phase: 3}}, {nativeBefore: {error: 'native failed'}},
+    {nativeBefore: {running: 0}}, {statusBefore: {blocker: 'terminal'}}]) {
+    const invalid = await run(options);
+    await assert.rejects(invalid.capture(), /screenshot was not captured/);
+    assert.equal(invalid.screenshotCount, 0);
+    const observation = invalid.instanceRows.alpha.route_boundary_observations[0];
+    assert(observation.render_readiness_error);
+    assert.deepEqual(options.nativeBefore ?? options.statusBefore,
+      Object.fromEntries(Object.keys(options.nativeBefore ?? options.statusBefore)
+        .map(key => [key, (options.nativeBefore ? observation.native : observation.status)[key]])));
+    assert.match(invalid.instanceRows.alpha.route_boundary_misses[0].reason, /verified structured draw/);
+  }
+  const invalidPng = await run({pngValid: false});
+  await assert.rejects(invalidPng.capture(), /not a PNG/);
+  assert.equal(invalidPng.screenshotCount, 1);
+  const changedPhase = await run({phaseAfterScreenshot: 8});
+  await assert.rejects(changedPhase.capture(), /changed the source boundary/);
+  const moved = await run({cursorAfterScreenshot: 521});
+  await assert.rejects(moved.capture(), /changed the source boundary/);
+});
+
+test('runtime CSS-to-match freezes both fixtures and awaits match observations before asynchronous owner close', async () => {
+  const source = await readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf('    if (runtimeOwned) {', source.indexOf('  stopRouteCaptureWatchers = true;'));
+  const end = source.indexOf('    } else {', start);
+  assert(start >= 0 && end > start);
+  const events = [], rows = {alpha: {}, beta: {}}, instances = {};
+  for (const role of ['alpha', 'beta']) instances[role] = {
+    async freezeRuntimeInputFixture() {
+      events.push(`freeze:${role}`);
+      return rows[role].runtime_input_fixture_frozen = {frozen: true, captured_count: 518};
+    },
+    async status() { events.push(`status:${role}`); return {cursor: 520, blocker: 'complete', terminal: {kind: 0}}; },
+    async native() { events.push(`native:${role}`); return {phase: 7, running: 1, error: null}; },
+    async matchObservation() {
+      assert.equal(rows.alpha.runtime_input_fixture_frozen?.frozen, true);
+      assert.equal(rows.beta.runtime_input_fixture_frozen?.frozen, true);
+      events.push(`observe:${role}`);
+      return {ready: true};
+    },
+  };
+  const context = {runtimeOwned: true, runtimeInputFixture: true, runtimeCssSss: false,
+    runtimeCssMatch: true, sourceTicks: 520, usedInputs: 518,
+    POSITIVE_ROUTE_BOUNDARIES: [{}, {}, {phase: 7}],
+    instanceRows: rows, pairResults: {}, instances,
+    runtimeOwnerWebRtcState: async role => ({role, state: 'connected'}),
+    verifyReliableHostWebRtc: value => value,
+    async captureRuntimeCssMatchFinalBoundary(role) {
+      assert.equal(rows[role].runtime_input_fixture_frozen?.frozen, true);
+      events.push(`capture:${role}`);
+    },
+    relay: {async close() {
+      events.push('close:start');
+      assert(events.includes('capture:alpha') && events.includes('capture:beta'));
+      await Promise.resolve();
+      events.push('close:resumed');
+    }},
+  };
+  await vm.runInNewContext(`(async()=>{${source.slice(start, end)}\n}})()`, context);
+  const closeStart = events.indexOf('close:start');
+  assert(closeStart > events.indexOf('capture:beta'));
+  assert(events.indexOf('freeze:beta') < events.indexOf('observe:alpha'));
+  assert(events.indexOf('observe:alpha') < events.indexOf('capture:alpha'));
+  assert(events.indexOf('capture:alpha') < events.indexOf('observe:beta'));
+  assert(events.indexOf('observe:beta') < events.indexOf('capture:beta'));
+  assert.equal(context.pairResults.relay_closed, true);
+  assert.equal(events.at(-1), 'close:resumed');
 });
 
 test('startup consumer failures set protocol and native terminal without a progress notification', async () => {

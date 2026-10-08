@@ -37,3 +37,6 @@ audio fidelity and sustained performance. The [roadmap](docs/ROADMAP.md),
 [accuracy contract](docs/ACCURACY_CONTRACT.md) and
 [performance/accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.md) define those
 boundaries; this section adds no new runtime or deployment evidence.
+
+The [runtime-owned CSS-to-active-match prerequisite](docs/status/2026-10-08-a3-runtime-css-active-match.md)
+is bounded local browser evidence; full A3 and whole-session acceptance remain open.

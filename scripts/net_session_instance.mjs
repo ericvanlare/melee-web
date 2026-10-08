@@ -21,17 +21,33 @@ export function firstFatalBrowserError(errors) {
   return errors.find(error => error.kind !== 'requestfailed') ?? null;
 }
 
+export function readNativeMatchObservationInPage() {
+  const module = globalThis.Module;
+  if (!module || typeof module._melee_web_native_menu_match_observe !== 'function' ||
+      typeof module.UTF8ToString !== 'function')
+    throw Error('The existing native match observer is unavailable');
+  const text = module.UTF8ToString(module._melee_web_native_menu_match_observe());
+  let observation;
+  try { observation = JSON.parse(text); }
+  catch { throw Error('The existing native match observer returned invalid JSON'); }
+  if (!observation || typeof observation !== 'object' || Array.isArray(observation))
+    throw Error('The existing native match observer returned a non-object value');
+  return observation;
+}
+
 // Harness-only Gamepad state transitions after the existing native callback tail.
 // Native acquisition and the live publisher remain the sole PAD sample owner.
 export function installRuntimeInputFixtureInPage({role, inputTicks, variant = 'neutral-a-release', samples = null}) {
   const cssStartToSss = variant === 'css-start-to-sss';
+  const cssSssToMatch = variant === 'css-sss-to-match';
+  const cssRoute = cssStartToSss || cssSssToMatch;
   if (!['alpha', 'beta'].includes(role) ||
-      (cssStartToSss ? inputTicks !== 518 || !Array.isArray(samples) || samples.length !== inputTicks :
+      (cssRoute ? inputTicks !== 518 || !Array.isArray(samples) || samples.length !== inputTicks :
         variant !== 'neutral-a-release' || inputTicks !== 6) ||
       typeof window.menuFrame !== 'function' || typeof window.meleeNetRuntimeLockstepSnapshot !== 'function' ||
       typeof window.__meleeSyntheticPadTransition !== 'function' || window.__meleeSyntheticPadState !== 'neutral' ||
       window.__meleeRuntimeInputFixture)
-    throw Error(cssStartToSss ? 'CSS-to-SSS runtime input fixture requires fresh neutral 520-tick ownership' :
+    throw Error(cssRoute ? 'Runtime CSS route input fixture requires fresh neutral 520-tick ownership' :
       'Runtime input fixture requires fresh neutral eight-CSS ownership');
   const original = window.menuFrame, localPort = role === 'alpha' ? 0 : 1;
   const retained = [], transitions = [], phaseSamples = [];
@@ -47,12 +63,12 @@ export function installRuntimeInputFixtureInPage({role, inputTicks, variant = 'n
     ...(frozen ? {captures: retained.map(row => JSON.parse(row))} : {}), failure: failure ? String(failure.message || failure) : null,
     input_source: 'synthetic standard Gamepad -> ordinary controller manager -> native live PAD capture'});
   const recordPhase = () => {
-    if (!cssStartToSss || typeof window.__net?.status !== 'function' || typeof window.__net?.native !== 'function') return;
+    if (!cssRoute || typeof window.__net?.status !== 'function' || typeof window.__net?.native !== 'function') return;
     const status = window.__net.status(), native = window.__net.native();
     if (status?.active !== 1) return;
     if (!Number.isSafeInteger(status.cursor) || status.cursor < 0 || status.cursor > 520 ||
         !Number.isInteger(native.phase) || !Number.isInteger(native.running))
-      throw Error('CSS-to-SSS source phase observation is malformed');
+      throw Error('Runtime CSS route source phase observation is malformed');
     // beginLockstep can make the native session active before its first source
     // step; phase evidence represents completed source progress only.
     if (status.cursor === 0) return;
@@ -62,13 +78,13 @@ export function installRuntimeInputFixtureInPage({role, inputTicks, variant = 'n
     }
   };
   const applyCssSample = sample => {
-    if (!sample || sample.kind !== 'css-start-to-sss' || !Number.isSafeInteger(sample.input_tick) ||
+    if (!sample || sample.kind !== variant || !Number.isSafeInteger(sample.input_tick) ||
         !Array.isArray(sample.buttons) || sample.buttons.length !== 17 ||
         sample.buttons.some(button => !button || typeof button.pressed !== 'boolean' ||
           typeof button.value !== 'number' || !Number.isFinite(button.value) || button.value < 0 || button.value > 1) ||
         !Array.isArray(sample.axes) || sample.axes.length !== 4 ||
         sample.axes.some(axis => typeof axis !== 'number' || !Number.isFinite(axis) || axis < -1 || axis > 1))
-      throw Error('CSS-to-SSS Gamepad state is malformed');
+      throw Error('Runtime CSS route Gamepad state is malformed');
     window.__meleeSyntheticPadTransition(sample);
   };
   function observer() {
@@ -105,11 +121,11 @@ export function installRuntimeInputFixtureInPage({role, inputTicks, variant = 'n
           throw Error('Runtime input fixture selected PAD witness is invalid');
         if (tick < retained.length && JSON.stringify(row) !== retained[tick])
           throw Error('Runtime input fixture retained sample changed during a wait');
-        if (cssStartToSss) {
+        if (cssRoute) {
           const expected = samples[tick];
           if (!expected || expected.input_tick !== tick || !Array.isArray(expected.bytes) ||
               expected.bytes.length !== 11 || expected.bytes.some((byte, index) => byte !== bytes[index]))
-            throw Error('CSS-to-SSS runtime fixture selected PAD differs from the checked recipe sample');
+            throw Error('Runtime CSS route fixture selected PAD differs from the checked recipe sample');
         } else {
           const expectedButtons = role === 'alpha' && tick === 1 ? 0x0100 : 0;
           if (((bytes[0] << 8) | bytes[1]) !== expectedButtons || bytes.slice(2).some(byte => byte !== 0))
@@ -119,13 +135,13 @@ export function installRuntimeInputFixtureInPage({role, inputTicks, variant = 'n
       if (captures.length > retained.length) {
         if (peer.protocol?.ready !== true) throw Error('Runtime input fixture sampled before native start agreement');
         retained.push(JSON.stringify(captures.at(-1)));
-        if (cssStartToSss && retained.length < inputTicks) {
+        if (cssRoute && retained.length < inputTicks) {
           const next = samples[retained.length];
           applyCssSample(next.gamepad);
           const prior = samples[retained.length - 1].bytes;
           if (JSON.stringify(prior) !== JSON.stringify(next.bytes))
             transitions.push({after_input_tick: retained.length - 1,
-              next_input_tick: retained.length, kind: 'css-start-to-sss'});
+              next_input_tick: retained.length, kind: variant});
         } else if (!cssStartToSss && role === 'alpha' && retained.length <= 2) {
           const state = retained.length === 1 ? 'A' : 'release';
           window.__meleeSyntheticPadTransition(state);
@@ -140,10 +156,14 @@ export function installRuntimeInputFixtureInPage({role, inputTicks, variant = 'n
     try {
       const owner = window.meleeNetRuntimeLockstepSnapshot(), peer = owner?.peer;
       const status = window.__net?.status();
-      const native = cssStartToSss ? window.__net?.native() : null;
+      const native = cssRoute ? window.__net?.native() : null;
       const phases = phaseSamples.map(row => row.phase).filter((phase, index, rows) => index === 0 || phase !== rows[index - 1]);
-      const expectedSourceTicks = cssStartToSss ? 520 : 8;
+      const expectedSourceTicks = cssRoute ? 520 : 8;
       const expectedRemoteAck = inputTicks - 1;
+      const phaseComplete = cssStartToSss ? native?.phase === 3 && phases[0] === 1 && phases.at(-1) === 3 &&
+        phases.every(phase => phase === 1 || phase === 3) : cssSssToMatch ?
+        native?.phase === 7 && native.running === 1 && native.error === null &&
+          JSON.stringify(phases) === '[1,3,7]' : false;
       if (failure || disposed || window.menuFrame !== observer || owner?.armed !== true ||
           owner.closing !== false || owner.failure !== null || peer?.failure || peer?.protocol?.terminal ||
           peer?.protocol?.ready !== true || status?.active !== 1 || status.cursor !== expectedSourceTicks ||
@@ -153,9 +173,9 @@ export function installRuntimeInputFixtureInPage({role, inputTicks, variant = 'n
           peer.localInputCapture?.mode !== 'live' || peer.localInputCapture?.enabled !== true ||
           retained.length !== inputTicks || peer.localInputCapture.captures?.length !== inputTicks ||
           peer.localInputCapture.captures.some((row, tick) => JSON.stringify(row) !== retained[tick]) ||
-          (cssStartToSss ? native?.phase !== 3 || phases[0] !== 1 || phases.at(-1) !== 3 ||
-            phases.some(phase => phase !== 1 && phase !== 3) : transitions.length !== (role === 'alpha' ? 2 : 0)))
+          (cssRoute ? !phaseComplete : transitions.length !== (role === 'alpha' ? 2 : 0)))
         throw Error(cssStartToSss ? 'CSS-to-SSS runtime input fixture cannot freeze before checked 520-tick SSS completion' :
+          cssSssToMatch ? 'CSS-to-match runtime input fixture cannot freeze before checked 520-tick active-match completion' :
           'Runtime input fixture cannot freeze before checked eight-CSS completion');
       window.__meleeSyntheticPadTransition('neutral');
       window.menuFrame = original;
@@ -397,10 +417,10 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
           window.testPad.axes = [0, 0, 0, 0];
           return;
         }
-        if (!state || state.kind !== 'css-start-to-sss' || !Number.isSafeInteger(state.input_tick) ||
+        if (!state || !['css-start-to-sss', 'css-sss-to-match'].includes(state.kind) || !Number.isSafeInteger(state.input_tick) ||
             !Array.isArray(state.buttons) || state.buttons.length !== 17 || !Array.isArray(state.axes) || state.axes.length !== 4)
           throw Error('Unknown synthetic Gamepad sample state');
-        window.__meleeSyntheticPadState = `css-start-to-sss:${state.input_tick}`;
+        window.__meleeSyntheticPadState = `${state.kind}:${state.input_tick}`;
         window.testPad.buttons = state.buttons.map(button => ({pressed: button.pressed, value: button.value}));
         window.testPad.axes = [...state.axes];
       };
@@ -836,6 +856,10 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
     instance.readSourceAccounting = options => bounded(() => readNetSourceAccounting(page, options));
     instance.native = () => bounded(() => page.evaluate(() => window.__net.native()));
     instance.observe = () => bounded(() => page.evaluate(() => window.__net.observe()));
+    instance.matchObservation = () => {
+      if (!runtimeOwned) throw Error('Native match observation bridge requires runtime ownership');
+      return bounded(() => page.evaluate(readNativeMatchObservationInPage));
+    };
     instance.graphics = () => bounded(() => page.evaluate(async () => {
       const canvas = document.querySelector('canvas');
       const adapter = globalThis.navigator.gpu ? await navigator.gpu.requestAdapter().catch(() => null) : null;
