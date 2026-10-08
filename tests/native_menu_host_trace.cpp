@@ -33,6 +33,7 @@
 #include "dat_stage_yaku.hpp"
 #include "gameplay_effect_banks.h"
 #include "gameplay_effect_runtime.h"
+#include "gameplay_vs_sis.h"
 #include "gameplay_ground_data.h"
 #include "gameplay_item_runtime.h"
 #include "gameplay_stage_last.h"
@@ -70,6 +71,7 @@ extern "C" {
 #include <melee/ef/eflib.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/objalloc.h>
+#include <sysdolphin/baselib/sislib.h>
 #endif
 #include <melee/ty/forward.h>
 #include <melee/ty/toy.h>
@@ -2208,6 +2210,112 @@ void run_stadium_effect_runtime_lifecycle_control()
     std::cout << "C1 asset-free original effect prepare/efLib_Init/complete/end passed; no stage callbacks, proc dispatch, or ticks\n";
 }
 
+void run_stadium_sis_allocator_lifecycle_control()
+{
+    char error[256]{};
+    // Reproduce the source menu lifecycle before a new diagnostic SDK heap.
+    check(melee_web_gameplay_startup(8U * 1024U * 1024U, error, sizeof(error)), error);
+    check(melee_web_native_world_enable(error, sizeof(error)), error);
+    HSD_SisLib_803A6048(MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES);
+    HSD_GObj parent{}; // Non-null parent prevents original611C creating a camera.
+    check(HSD_SisLib_803A611C(1, &parent, 9, 0xD, 0, 1, 0, 1) == 0,
+          "Retired-menu SIS baseline lost its first context index");
+    HSD_SisLib_803A5FBC();
+    check(HSD_SisLib_AllFontSlotsEmpty() && !HSD_SisLib_804D7978 &&
+              !HSD_SisLib_804D797C,
+          "Retired-menu SIS baseline retained live roots");
+    check(melee_web_gameplay_shutdown(error, sizeof(error)), error);
+
+    check(melee_web_gameplay_startup(8U * 1024U * 1024U, error, sizeof(error)), error);
+    check(melee_web_native_world_enable(error, sizeof(error)), error);
+    const auto before = melee_web_gameplay_stats();
+    const auto scheduler = HSD_GObj_804D783C;
+    const auto gobj_count = HSD_ObjAllocGetUsing(&gobj_alloc_data);
+    const auto proc_count = HSD_ObjAllocGetUsing(&gobjproc_alloc_data);
+    HSD_Text foreign_text{};
+    sislib_UnkAlloc3 foreign_context{};
+    SIS foreign_sis_data{};
+    SIS* const foreign_sis = &foreign_sis_data;
+    for (unsigned cycle = 0; cycle < 2; ++cycle) {
+        MeleeWebDiagnosticSisOwner owner{};
+        const auto text_head = HSD_SisLib_804D7978;
+        const auto context_head = HSD_SisLib_804D797C;
+        HSD_SisLib_804D7978 = &foreign_text;
+        check(!melee_web_diagnostic_sis_begin(&owner, error, sizeof(error)) &&
+                  HSD_SisLib_804D7978 == &foreign_text && !owner.heap,
+              "Diagnostic SIS begin cleared a foreign text owner");
+        HSD_SisLib_804D7978 = text_head;
+        HSD_SisLib_804D797C = &foreign_context;
+        check(!melee_web_diagnostic_sis_begin(&owner, error, sizeof(error)) &&
+                  HSD_SisLib_804D797C == &foreign_context && !owner.heap,
+              "Diagnostic SIS begin cleared a foreign context owner");
+        HSD_SisLib_804D797C = context_head;
+        HSD_SisLib_804D1124[1] = foreign_sis;
+        check(!melee_web_diagnostic_sis_begin(&owner, error, sizeof(error)) &&
+                  HSD_SisLib_804D1124[1] == foreign_sis && !owner.heap,
+              "Diagnostic SIS begin cleared a foreign font slot");
+        HSD_SisLib_804D1124[1] = nullptr;
+        check(melee_web_diagnostic_sis_begin(&owner, error, sizeof(error)), error);
+        MeleeWebDiagnosticSisOwner contender{};
+        check(!melee_web_diagnostic_sis_begin(&contender, error, sizeof(error)) &&
+                  !contender.heap && HSD_SisLib_HeapOwner() == owner.heap,
+              "Diagnostic SIS accepted a second allocator owner");
+        HSD_SisLib_804D7978 = &foreign_text;
+        check(!melee_web_diagnostic_sis_end(&owner, error, sizeof(error)) &&
+                  HSD_SisLib_804D7978 == &foreign_text,
+              "Diagnostic SIS end swept a foreign text owner");
+        HSD_SisLib_804D7978 = text_head;
+        HSD_SisLib_804D797C = &foreign_context;
+        check(!melee_web_diagnostic_sis_end(&owner, error, sizeof(error)) &&
+                  HSD_SisLib_804D797C == &foreign_context,
+              "Diagnostic SIS end swept a foreign context owner");
+        HSD_SisLib_804D797C = context_head;
+        auto stale_world = owner;
+        ++stale_world.world_generation;
+        check(!melee_web_diagnostic_sis_end(&stale_world, error, sizeof(error)) &&
+                  HSD_SisLib_HeapOwner() == owner.heap,
+              "Diagnostic SIS end accepted a stale world token");
+        auto replaced = owner;
+        ++replaced.allocation_generation;
+        check(!melee_web_diagnostic_sis_end(&replaced, error, sizeof(error)) &&
+                  HSD_SisLib_HeapOwner() == owner.heap,
+              "Diagnostic SIS drained an altered allocation lease");
+        void* const raw_borrower = HSD_SisLib_Alloc(16);
+        check(raw_borrower && used_head &&
+                  !melee_web_diagnostic_sis_end(&owner, error, sizeof(error)),
+              "Diagnostic SIS end swept an outstanding allocator borrower");
+        HSD_SisLib_Free(raw_borrower);
+        check(HSD_SisLib_803A611C(1, &parent, 9, 0xD, 0, 1, 0, 1) == 0,
+              "Fresh diagnostic SIS allocation lost its first context index");
+        const auto live_context = HSD_SisLib_804D797C;
+        check(live_context && !live_context->x4 &&
+                  !melee_web_diagnostic_sis_end(&owner, error, sizeof(error)) &&
+                  HSD_SisLib_804D797C == live_context,
+              "Diagnostic SIS end swept a live context");
+        // Remove only this control's known611C context through original teardown.
+        HSD_SisLib_803A5E70();
+        check(melee_web_gameplay_vs_sis(MELEE_WEB_VS_SIS_VALIDATE_BORROW,
+                                       1, foreign_sis, error, sizeof(error)), error);
+        HSD_SisLib_804D1124[1] = foreign_sis;
+        check(!melee_web_diagnostic_sis_end(&owner, error, sizeof(error)) &&
+                  HSD_SisLib_804D1124[1] == foreign_sis,
+              "Diagnostic SIS end erased a borrowed font slot before retirement");
+        check(melee_web_gameplay_vs_sis(MELEE_WEB_VS_SIS_RETIRE_BORROW,
+                                       1, foreign_sis, error, sizeof(error)), error);
+        check(melee_web_diagnostic_sis_end(&owner, error, sizeof(error)), error);
+        check(!owner.heap && !melee_web_diagnostic_sis_end(&owner, error, sizeof(error)),
+              "Diagnostic SIS accepted a second drain of a retired owner");
+    }
+    const auto after = melee_web_gameplay_stats();
+    check(after.generation == before.generation && after.ticks == before.ticks &&
+              HSD_GObj_804D783C == scheduler &&
+              HSD_ObjAllocGetUsing(&gobj_alloc_data) == gobj_count &&
+              HSD_ObjAllocGetUsing(&gobjproc_alloc_data) == proc_count,
+          "SIS lifecycle control advanced source ticks or created scheduled/camera owners");
+    check(melee_web_gameplay_shutdown(error, sizeof(error)), error);
+    std::cout << "C1 asset-free SIS retired-menu baseline, two owned allocator lifetimes, foreign-root/lease refusals and single drain passed; no camera, scheduled procs or source ticks\n";
+}
+
 void run_stadium_bind_refusal_control()
 {
     char error[256]{};
@@ -2357,6 +2465,7 @@ void run_stadium_e8_request(
     bool ground_param_published = false;
     bool effect_bank_attached = false;
     bool effect_runtime_owned = false;
+    MeleeWebDiagnosticSisOwner sis_owner{};
     bool stage_selection_owned = false;
     bool observer_window_owned = false;
     bool cleanup_complete = false;
@@ -2413,6 +2522,9 @@ void run_stadium_e8_request(
                       !melee_web_effect_runtime_active() && links &&
                       !links[11] && !links[12],
                   "OnInit cleanup did not retire the original effect runtime before map-bank detach");
+        }
+        if (sis_owner.heap) {
+            check(melee_web_diagnostic_sis_end(&sis_owner, error, sizeof(error)), error);
         }
         if (effect_bank_attached) {
             check(melee_web_effect_bank_detach(effects->bank(), error,
@@ -2595,6 +2707,7 @@ void run_stadium_e8_request(
             check(!melee_web_effect_runtime_prepared() &&
                       !melee_web_effect_runtime_active(),
                   "Source-ordered OnInit requires an unowned original effect runtime");
+            check(melee_web_diagnostic_sis_begin(&sis_owner, error, sizeof(error)), error);
             const int effect_begin_succeeded =
                 melee_web_effect_runtime_begin(error, sizeof(error));
             effect_runtime_owned = melee_web_effect_runtime_prepared();
@@ -3949,6 +4062,9 @@ int main(int argc,char** argv){try{
    run_stadium_effect_runtime_lifecycle_control();
    std::cout<<"C1 source OnInit refusal and synthetic event-journal controls passed; no Stadium stage initialization invoked\n";
    return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-sis-allocator-controls"){
+   run_stadium_sis_allocator_lifecycle_control();return 0;
   }
   if(argc==2&&std::string_view(argv[1])=="--stadium-bind-refusal-controls"){
    run_stadium_bind_refusal_control();return 0;
