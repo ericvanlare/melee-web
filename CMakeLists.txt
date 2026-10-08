@@ -138,6 +138,8 @@ if(EMSCRIPTEN)
   target_compile_definitions(hsd_native_runtime PUBLIC TARGET_PC)
   if(NOT MELEE_WEB_PUBLIC_RUNTIME AND NOT MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
     target_compile_definitions(hsd_native_runtime PRIVATE MELEE_WEB_RNG_DRAW_OBSERVER=1)
+    # Fighter collision-owner and motion hooks live in the lower source target.
+    target_compile_definitions(gameplay_runtime PRIVATE MELEE_WEB_RNG_DRAW_OBSERVER=1)
   endif()
   target_compile_options(hsd_native_runtime PRIVATE -ffunction-sections -fdata-sections -ffp-contract=off
     -fno-builtin-sinf -fno-builtin-cosf -fno-builtin-tanf

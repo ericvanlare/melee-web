@@ -19,7 +19,7 @@ import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {finalizeSessionCapture, validateRuntimeDataAbort, boundedCaptureOperation,
   retainFirstCaptureError, FIRST_REPLAY_BOUNDARY_MARKER_NAMES, parseFirstReplayBoundaryMarker,
   FIRST_REPLAY_BOUNDARY_MARKER_PREFIX, inspectFirstReplayBoundaryMarkers} from './whole_session_capture_result.mjs';
-import {parseRngDrawProbe, validateRngDrawProbeRows} from './rng_draw_probe.mjs';
+import {parseRngDrawProbe, validateRngDrawProbeRows, parseHitTransitionProbe, validateHitTransitionProbeRows} from './rng_draw_probe.mjs';
 import {NATURAL_PAUSE_PROTOCOL, STOPPED_SCENE_PAIR_PROTOCOL, resolveCaptureMode,
   validateNaturalPauseManifest, validateStoppedScenePairManifest, naturalPauseRuntimeUrl,
   validateNaturalPauseBrowserIdentity, validateDefaultTwoRingStatus, firstNaturalPauseStop,
@@ -53,6 +53,7 @@ const {values, tokens} = parseArgs({tokens: true, options: {
   'cpu-observations': {type: 'boolean', default: false},
   'rng-draw-probe-range': {type: 'string'},
   'rng-draw-probe-cursors': {type: 'string'},
+  'hit-transition-probe-cursors': {type: 'string'},
   'first-replay-callback-probe': {type: 'boolean', default: false},
   'expected-frame0': {type: 'string'},
   'artifact-root': {type: 'string'},
@@ -129,10 +130,14 @@ const expectedFrame0Path = values['expected-frame0'] ? path.resolve(values['expe
 const probeTimeoutMs = 10000;
 const rngDrawProbe = parseRngDrawProbe({range: values['rng-draw-probe-range'],
   cursors: values['rng-draw-probe-cursors']});
-if (diagnostic && (values['cpu-observations'] || rngDrawProbe))
+const hitTransitionProbe = parseHitTransitionProbe(values['hit-transition-probe-cursors']);
+if (hitTransitionProbe && (captureCpuObservations || stopAfter !== 5241 ||
+    rngDrawProbe?.selected.join(',') !== hitTransitionProbe.selected.join(',')))
+  throw Error('Hit transition diagnosis requires its matching RNG selection, stop cursor 5241, and no historical CPU observer');
+if (diagnostic && (values['cpu-observations'] || rngDrawProbe || hitTransitionProbe))
   throw Error('Performance diagnosis does not enable CPU-prefix or RNG observers');
 if (firstReplayCallbackProbe && (diagnostic || !expectedFrame0Path || stopAfter || resumeTimingPauses ||
-    captureCpuObservations || rngDrawProbe))
+    captureCpuObservations || rngDrawProbe || hitTransitionProbe))
   throw Error('--first-replay-callback-probe requires --expected-frame0 and cannot be combined with prefix, resume, CPU, or RNG probes');
 if (!firstReplayCallbackProbe && (expectedFrame0Path || values['artifact-root']))
   throw Error('--expected-frame0 and --artifact-root require --first-replay-callback-probe');
@@ -175,6 +180,9 @@ const report = {
   cpu_observations: captureCpuObservations ? 'second_match_only' : 'not_captured',
   rng_draw_probe: rngDrawProbe ? {request: rngDrawProbe.request,
     selected_cursors: rngDrawProbe.selected, complete: false} : 'not_captured',
+  ...(hitTransitionProbe ? {hit_transition_probe: {request: hitTransitionProbe.request,
+    selected_cursors: hitTransitionProbe.selected, complete: false,
+    scope: 'Bowser transition failure diagnosis only; no agreement or Results acceptance'}} : {}),
   verified_runtime_data_aborts: [],
   phases: [],
   snapshots: [],
@@ -691,6 +699,10 @@ try {
     throw Error('RNG draw probe cursor must be inside the source recipe frame count');
   if (captureCpuObservations && report.recipe_header.version !== 9)
     throw Error('--cpu-observations is restricted to MWRC v9 second-match diagnostics');
+  if (hitTransitionProbe && (report.recipe_header.version !== 10 ||
+      report.recipe_header.seed !== 3336171383 || report.recipe_header.frames !== 50394 ||
+      report.inputs.recipe.sha256 !== 'cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b'))
+    throw Error('Hit transition diagnosis requires the exact frozen MWRC v10 recipe');
   if (firstReplayCallbackProbe) {
     const expectedRecipeSha256 = 'cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b';
     if (report.recipe_header.version !== 10 || report.recipe_header.seed !== 3336171383 ||
@@ -799,13 +811,24 @@ try {
     await write('report.json', report);
   }
   await page.addInitScript(({cpuObservationRowLimit, captureCpuObservations,
-    rngDrawProbeSelection, boundaryProbeEnabled, boundaryMarkerPrefix, boundaryMarkerNames}) => {
+    rngDrawProbeSelection, hitTransitionProbeSelection, boundaryProbeEnabled, boundaryMarkerPrefix, boundaryMarkerNames}) => {
     window.__meleeNativeRuntimeReady = false;
     const module = globalThis.Module || {};
     module.onRuntimeInitialized = () => { window.__meleeNativeRuntimeReady = true; };
     globalThis.Module = module;
     window.__cpuPrefixRows = [];
     window.__cpuItemEventRows = [];
+    window.__hitTransitionProbeRows = [];
+    window.__meleeHitTransitionProbeCursors = hitTransitionProbeSelection?.selected || null;
+    window.meleeHitTransitionObservation = text => {
+      if (!hitTransitionProbeSelection) throw Error('Unexpected hit transition observation');
+      const row = JSON.parse(text);
+      if (!hitTransitionProbeSelection.selected.includes(row.source_cursor) ||
+          window.__hitTransitionProbeRows.length >= hitTransitionProbeSelection.selected.length ||
+          window.__hitTransitionProbeRows.some(text => JSON.parse(text).source_cursor === row.source_cursor))
+        throw Error('Hit transition observation exceeded or duplicated selected cursors');
+      window.__hitTransitionProbeRows.push(text);
+    };
     window.__rngDrawProbeRows = [];
     window.__rngDrawProbeSelection = rngDrawProbeSelection;
     window.__meleeRngDrawProbeCursors = rngDrawProbeSelection?.request.kind === 'cursors'
@@ -850,6 +873,7 @@ try {
     };
   }, {cpuObservationRowLimit, captureCpuObservations,
     rngDrawProbeSelection: rngDrawProbe,
+    hitTransitionProbeSelection: hitTransitionProbe,
     boundaryProbeEnabled: firstReplayCallbackProbe,
     boundaryMarkerPrefix: FIRST_REPLAY_BOUNDARY_MARKER_PREFIX,
     boundaryMarkerNames: FIRST_REPLAY_BOUNDARY_MARKER_NAMES});
@@ -1364,6 +1388,28 @@ try {
           missing_cursors: validation.missing_cursors, artifact};
       } catch (error) {
         report.rng_draw_probe_error = String(error?.message || error);
+      }
+    }
+    if (hitTransitionProbe) {
+      try {
+        const rows = await page.evaluate(() => window.__hitTransitionProbeRows || []);
+        // Retain the raw bounded artifact even if its strict validation fails.
+        const text = rows.length ? rows.join('\n') + '\n' : '';
+        await write('hit-transition-probe.jsonl', text);
+        const artifact = {name: 'hit-transition-probe.jsonl', bytes: Buffer.byteLength(text),
+          sha256: createHash('sha256').update(text).digest('hex')};
+        report.saved_downloads ||= [];
+        report.saved_downloads.push(artifact);
+        const validation = validateHitTransitionProbeRows(rows, hitTransitionProbe, {
+          observedCursor: report.final_snapshot?.source_cursor,
+          deliberateStop: report.deliberate_prefix_stop,
+        });
+        report.hit_transition_probe = {...report.hit_transition_probe,
+          complete: validation.complete, missing_cursors: validation.missing_cursors,
+          captured_cursors: rows.map(text => JSON.parse(text).source_cursor), artifact};
+      } catch (error) {
+        report.hit_transition_probe_error = String(error?.message || error);
+        retainFirstCaptureError(report, 'hit_transition_probe', report.hit_transition_probe_error, 'artifact validation');
       }
     }
     try { await write('source-owner-trace.json', await page.evaluate(() => window.__meleeSourceOwnerTrace || [])); } catch(error) { report.owner_trace_error = String(error); }

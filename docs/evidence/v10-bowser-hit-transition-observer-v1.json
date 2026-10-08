@@ -1,0 +1,761 @@
+{
+  "schema": "melee-web-b4-bowser-hit-transition-observer-receipt-v1",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/274",
+  "evidence_labels": [
+    "Compiled",
+    "Browser exercised"
+  ],
+  "scope": "Private Release observer of three Bowser scheduler boundaries and an observed 76-event geometry row; strict reproduction of a retained failed browser prefix, with an already audited original state mismatch. Issue274 and original/full-session agreement remain open.",
+  "producers": {
+    "native_release_and_full_suite": {
+      "head": "7bd805699820fbf1f8d3d4132559c2865695cde6",
+      "tree": "da2c45acd7273a0e8ccad798af64d7dc9f507553",
+      "base_main": "ad7d8db9e5630b463206b6a02d36453f2977db70",
+      "configuration": "Release",
+      "target": "runtime",
+      "default_off_gates": {
+        "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+        "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+        "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+        "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+        "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+        "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+        "MELEE_WEB_RESULTS_RENDERED_TRACE": "OFF",
+        "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+        "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF",
+        "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF"
+      }
+    },
+    "capture_and_canonical_metadata": {
+      "head": "39b9379750082b0b35c8f9204321144eff8075c4",
+      "tree": "e858dbdc55e2ad27312628474b738061bd3665c3",
+      "base_main": "ad7d8db9e5630b463206b6a02d36453f2977db70"
+    },
+    "historical_native_d191": "Historical capture producer preserved separately; not relabeled as the observer build.",
+    "historical_observer_20c": "First actual observer Release build preserved separately from the current-main refresh."
+  },
+  "canonical_repair": {
+    "changes": "Only two patch index rows expanded to full blob identities",
+    "applied_source_tree_before": "90eb75e6eb8b6b40bc1969ce86cc595a49f17e6d",
+    "applied_source_tree_after": "90eb75e6eb8b6b40bc1969ce86cc595a49f17e6d",
+    "build_or_full_suite_repeated": false
+  },
+  "validation": {
+    "focused_actual_helper_and_synthetic_abi_controls": 17,
+    "focused_canonical_controls": 15,
+    "full_python_suite": {
+      "run_including_skips": 2092,
+      "skipped": 153,
+      "executed": 1939,
+      "passed": 1938,
+      "failed": 1,
+      "first_failure": "test_reviewed_patch_is_canonical",
+      "elapsed_seconds": 489.162,
+      "all_pass": false,
+      "failure_reduced_and_format_only_repair_reviewed": true,
+      "log": {
+        "name": "suite.log",
+        "bytes": 384985,
+        "sha256": "e30606ac9e18babbc03a47e7cfc818473e9330a6fa310c44abbdf27e6ec3fa39"
+      }
+    },
+    "ordinary_release_refresh": {
+      "exit_code": 0,
+      "elapsed_seconds": 20.805214082822204,
+      "runtime_hooks_compiled_and_linked": true
+    },
+    "failed_preparation_evidence_retained": true
+  },
+  "runtime_inventory": {
+    "current_staged_artifacts": 40,
+    "historical_staged_counts": [
+      32,
+      34
+    ],
+    "staged_count_asserts_loaded_modules": false,
+    "manifest": {
+      "name": "runtime-artifact-manifest-v1.json",
+      "bytes": 35052,
+      "sha256": "8d117e4b6b9c311d920d80263fdc0acb85c0f82a20f0ad3bb91625cc574c57c8"
+    },
+    "native_artifacts": {
+      "gameplay_menu_browser.js": {
+        "bytes": 300658,
+        "sha256": "87ca36ba1861d28de7f6f7aa0c4f430fac414a368d61f3a134d3f75b073fb0a9"
+      },
+      "gameplay_menu_browser.wasm": {
+        "bytes": 15758549,
+        "sha256": "765855a595ec4d65b40dd128cf5b72691cf08db8a5eaad9c5f5c016f58708884"
+      },
+      "gameplay_menu_browser.data": {
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      }
+    }
+  },
+  "recipe": {
+    "version": 10,
+    "frames": 50394,
+    "seed": 3336171383,
+    "identity": {
+      "name": "candidate-v10-caf9465.mwrc",
+      "bytes": 2241622,
+      "sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b"
+    }
+  },
+  "capture": {
+    "headless": true,
+    "host_speakers_silent": true,
+    "selected_cursors": [
+      5238,
+      5239,
+      5240
+    ],
+    "requested_stop_cursor": 5241,
+    "observed_stop_cursor": 5247,
+    "final_export_cursor": 5250,
+    "replay_timeout_ms": 120000,
+    "owner_deadline_ms": 180000,
+    "cleanup_reserve_ms": 30000,
+    "owner_exit_code": 1,
+    "owner_elapsed_seconds": 99.19519683299586,
+    "reported_result": "incomplete",
+    "first_reported_error": "Browser replay report failed: [\"whole-session final CSS was not entered\",\"Manual unload stopped the replay\",\"incomplete input timeline\",\"source tick/draw count mismatch\"]",
+    "first_reported_error_after_manual_unload": true,
+    "raw_hit_probe": {
+      "name": "hit-transition-probe.jsonl",
+      "bytes": 13950,
+      "sha256": "e4a15186d6a7d69faef2a1c0ed812f026616dc6484d1fc9dc063582234c7440d"
+    },
+    "raw_rng_probe": {
+      "name": "rng-draw-probe.jsonl",
+      "bytes": 2730,
+      "sha256": "62e083413651378e056a96ddfd75bd770b733ac545441c5193b1d6d4e0a79a21"
+    },
+    "browser_export": {
+      "name": "retail-port.jsonl",
+      "bytes": 21470735,
+      "sha256": "784101738d5f6e8de0c4b67ad78b2f725bef723b9d09b8e86255d2be88587892"
+    }
+  },
+  "retained_baseline_comparison": {
+    "api": "Actual Recipe, _validate_v10_browser_export, BrowserReader and _first_difference",
+    "session_frames_equal": 5240,
+    "indices_inclusive": [
+      0,
+      5239
+    ],
+    "setup_rows_equal": 1,
+    "all_new_5250_and_old_16290_export_rows_validated": true,
+    "first_retained_baseline_difference": null,
+    "original_payload_reopened": false,
+    "fresh_original_comparison": false,
+    "receipt": {
+      "name": "baseline-comparison-v1.json",
+      "bytes": 16235,
+      "sha256": "1ca990aea9ce7b38b9d0bc346e44c645e043deaf09b7a1e249d95748e903778d"
+    }
+  },
+  "observed": [
+    {
+      "cursor": 5238,
+      "hook_counts": [
+        1,
+        2,
+        0
+      ],
+      "ordered_phases": [
+        [
+          0,
+          "scheduler_start",
+          3,
+          0
+        ],
+        [
+          1,
+          "entry",
+          0,
+          1
+        ],
+        [
+          2,
+          "entry",
+          1,
+          2
+        ],
+        [
+          3,
+          "return",
+          1,
+          2
+        ],
+        [
+          4,
+          "entry",
+          1,
+          3
+        ],
+        [
+          5,
+          "return",
+          1,
+          3
+        ],
+        [
+          6,
+          "return",
+          0,
+          1
+        ],
+        [
+          7,
+          "scheduler_return",
+          3,
+          0
+        ]
+      ],
+      "damage_log_counts": [
+        0,
+        0
+      ],
+      "scheduler_start_rng": "2709b4a4",
+      "collision_entry_return_rng": "2709b4a4",
+      "scheduler_return_rng": "612e6c4e",
+      "recorded_rng_draws": 18,
+      "gate_x221f_b3": false,
+      "gate_x2219_b1": false,
+      "motion_start_return": [
+        17,
+        17
+      ],
+      "damage_bits_start_return": [
+        "00000000",
+        "00000000"
+      ],
+      "source_slot_start_return": [
+        2,
+        2
+      ],
+      "linked_primary_identity": {
+        "slot": 1,
+        "entity_index": 0,
+        "generation": 0,
+        "fighter_player_id": 1,
+        "match_index": 0
+      }
+    },
+    {
+      "cursor": 5239,
+      "hook_counts": [
+        1,
+        2,
+        0
+      ],
+      "ordered_phases": [
+        [
+          0,
+          "scheduler_start",
+          3,
+          0
+        ],
+        [
+          1,
+          "entry",
+          0,
+          1
+        ],
+        [
+          2,
+          "entry",
+          1,
+          2
+        ],
+        [
+          3,
+          "return",
+          1,
+          2
+        ],
+        [
+          4,
+          "entry",
+          1,
+          3
+        ],
+        [
+          5,
+          "return",
+          1,
+          3
+        ],
+        [
+          6,
+          "return",
+          0,
+          1
+        ],
+        [
+          7,
+          "scheduler_return",
+          3,
+          0
+        ]
+      ],
+      "damage_log_counts": [
+        0,
+        0
+      ],
+      "scheduler_start_rng": "612e6c4e",
+      "collision_entry_return_rng": "f9bc204f",
+      "scheduler_return_rng": "8c35150c",
+      "recorded_rng_draws": 22,
+      "gate_x221f_b3": false,
+      "gate_x2219_b1": false,
+      "motion_start_return": [
+        17,
+        17
+      ],
+      "damage_bits_start_return": [
+        "00000000",
+        "00000000"
+      ],
+      "source_slot_start_return": [
+        2,
+        2
+      ],
+      "linked_primary_identity": {
+        "slot": 1,
+        "entity_index": 0,
+        "generation": 0,
+        "fighter_player_id": 1,
+        "match_index": 0
+      }
+    },
+    {
+      "cursor": 5240,
+      "hook_counts": [
+        1,
+        2,
+        0
+      ],
+      "ordered_phases": [
+        [
+          0,
+          "scheduler_start",
+          3,
+          0
+        ],
+        [
+          1,
+          "entry",
+          0,
+          1
+        ],
+        [
+          2,
+          "entry",
+          1,
+          2
+        ],
+        [
+          3,
+          "return",
+          1,
+          2
+        ],
+        [
+          4,
+          "entry",
+          1,
+          3
+        ],
+        [
+          5,
+          "return",
+          1,
+          3
+        ],
+        [
+          6,
+          "return",
+          0,
+          1
+        ],
+        [
+          7,
+          "scheduler_return",
+          3,
+          0
+        ]
+      ],
+      "damage_log_counts": [
+        0,
+        0
+      ],
+      "scheduler_start_rng": "8c35150c",
+      "collision_entry_return_rng": "8c35150c",
+      "scheduler_return_rng": "4d9b3392",
+      "recorded_rng_draws": 14,
+      "gate_x221f_b3": false,
+      "gate_x2219_b1": false,
+      "motion_start_return": [
+        17,
+        17
+      ],
+      "damage_bits_start_return": [
+        "00000000",
+        "00000000"
+      ],
+      "source_slot_start_return": [
+        2,
+        2
+      ],
+      "linked_primary_identity": {
+        "slot": 1,
+        "entity_index": 0,
+        "generation": 0,
+        "fighter_player_id": 1,
+        "match_index": 0
+      }
+    }
+  ],
+  "retained_original_boundary": {
+    "source_tick": 4055,
+    "browser_index": 5239,
+    "source_sequence": 24387,
+    "PAD_sequence": 24385,
+    "source_rng": 2495929788,
+    "browser_rng": 2352289036,
+    "source_motion": 90,
+    "source_motion_name": "DamageFlyTop",
+    "browser_motion": 17,
+    "browser_motion_name": "WalkFast",
+    "source_damage": 11,
+    "browser_damage": 0,
+    "source_damage_linked_primary_slot": 0,
+    "earlier_tick4054_exact_state_equal": true,
+    "source_suffix_ends_at_tick4055": true,
+    "source_rng_70_LCG_steps": "Orbit-position inference only; no original RNG draw-call observation."
+  },
+  "findings": [
+    "The observer producer reproduces every retained setup/PAD/state/entity/order row through index5239, including the original first divergence at source4055. This is retained-baseline equivalence, not a fresh original comparison.",
+    "At each selected cursor Bowser collision owner entered with both suppressing gates false; two damage-processing invocations received zero logs and returned; no selected Bowser motion transition occurred. Collision entry/return RNG is unchanged.",
+    "At cursor5239 exactly22 HSD_Randf calls were recorded across the scheduler; seven precede collision entry and fifteen follow collision return. This documents browser draw order only.",
+    "Retained original4055 has damage11/DamageFlyTop and slot0-linked damage source while reproduced browser remains damage0/WalkFast. The missing damage log/transition is observed; no collision rejection or RNG cause is identified."
+  ],
+  "observation_gaps": [
+    "No original collision/log/hurtbox hooks or source RNG draw trace were captured.",
+    "Current hooks observe consumer logs, not each candidate pair, hitbox/hurtbox geometry or branch rejection in the normal hurt path ftColl_80078C70/lbColl_8000805C/ftColl_80076ED8.",
+    "Cursor5240 is browser-only; retained original suffix ends4055/index5239.",
+    "Raw object pointers identify relationships within this producer and are not cross-producer address equality."
+  ],
+  "cleanup": {
+    "owner_passed": true,
+    "fresh_owned_PIDs_and_groups_absent": true,
+    "CDP_attribution_complete": true,
+    "listener_absent": true,
+    "connection_refused": true,
+    "port_reusable": true,
+    "exact_owned_tmp_removed": true,
+    "only_matching_owned_lane_released": true,
+    "original_stat_unchanged": true,
+    "receipt": {
+      "name": "cleanup-outcome-v1.json",
+      "bytes": 43995,
+      "sha256": "b7dc2f8374620c4c31105605b53723cf36cdfde345b078c8c897035b7b9a18a1"
+    }
+  },
+  "root_review": {
+    "name": "root-outcome-review-v1.json",
+    "bytes": 12738,
+    "sha256": "e1ee478f79077b8337a92c6e34a35a1eadb1b74969cc9a6ac4f7c4435a5493b1"
+  },
+  "preparation_history": {
+    "prior_unauthorized_disc_full_file_read_disclosed": "Historical issue274 diagnostic metadata preparation boundary violation remains documented in the earlier failed-comparison receipt; no global zero-original-read claim.",
+    "current_metadata_and_interpretation_original_open_attempts": 0,
+    "browser_disc_import": "Authorized once for this exact capture; no original source trace scan or fresh disc hash."
+  },
+  "capacity_followup": {
+    "producer": {
+      "commit": "d1b906979c70731d2f934766cee08af52cd70da4",
+      "tree": "b020077cfe72cf67437925801a25dc6e7cd876c2",
+      "base_main": "fe28e8e0a6c47a793a42a92a93d8454d63d7b56c",
+      "working_tree_clean_at_capture": true,
+      "runtime_artifact_manifest": {
+        "name": "runtime-artifact-manifest-v1.json",
+        "sha256": "fcd224672cc57e2f7a36b7c28e1e0537b0736ca98b3729bca3fbb87d6cc51576"
+      },
+      "ordinary_release_build": {
+        "exit_code": 0,
+        "log": "ordinary-release-runtime-build-v1.log",
+        "sha256": "49e950926ead8e9aa9f76b31b68c4c0fea6153247ba6ad45141603cb10e06bc4",
+        "closure_packet": "ordinary-release-runtime-closure-v1.json",
+        "closure_sha256": "2828a4aa4f8b0f85cf2842d99fbfb2a2aaeb45836287bb08c5f5dc52ec317fbf"
+      },
+      "unfiltered_python_suite": {
+        "discovered": 2101,
+        "skipped": 153,
+        "passed": 1948,
+        "failures": 0,
+        "errors": 0,
+        "log": "full-suite-v1.log",
+        "sha256": "e705d6dcbeb9e7be4926c370849964dab1132650758a670e3383bc6d8a03a6d3"
+      },
+      "validation_timing": "Release build and suite were completed on the producer revision before merging the later main commit 7c5d47ab58f25b2a4241147c00d70c68a28b5ac6."
+    },
+    "capture": {
+      "selected_cursors": [5238, 5239, 5240],
+      "requested_stop_cursor": 5241,
+      "export_rows": 5251,
+      "export_indices": "0..5250",
+      "header_and_setup_rows": 2,
+      "probe_validation_receipt": {
+        "name": "probe-validation-review-v1.json",
+        "sha256": "502726223301550a4296e2835789631377658ae1639f7c9dfc23c849a7eaca05"
+      },
+      "raw_probe": {
+        "name": "hit-transition-probe.jsonl",
+        "bytes": 92849,
+        "sha256": "6122748b3a05927a83dd5c8bb3ad547f044bb5e7aeff048c5527ab1cdc4d995a"
+      },
+      "browser_export": {
+        "name": "retail-port.jsonl",
+        "bytes": 21475476,
+        "sha256": "f4680ed9e270db340c0b84f2c012ae9b1f595d29a5316440598276cdda98e710"
+      },
+      "cursor_5239": {
+        "events": 76,
+        "candidate_passes": 1,
+        "candidate_pairs": 1,
+        "candidate_hits": 4,
+        "geometry_events": 60,
+        "geometry_results_false": 60,
+        "order": "hit index0..3, each hurt index0..14",
+        "meaning": "Observed complete row requiring 76 events; not a global capacity bound or original collision-cause result."
+      },
+      "capture_result": "Whole-session capture remained incomplete after manual unload; owner exit code 1. Results and whole-session equivalence remain false.",
+      "probe_validators": "All three selected rows passed strict validation; complete new export tail validated."
+    },
+    "retained_comparison": {
+      "status": "baseline_reproduced",
+      "receipt": {
+        "name": "baseline-comparison-v1.json",
+        "bytes": 16209,
+        "sha256": "0e689bd122dce31d19258c4eae4fe51e718238d1329b1c5b622a5313638cc02d"
+      },
+      "state_pad_entity_order_rows": 5240,
+      "indices": "0..5239",
+      "setup_rows": 1,
+      "first_retained_difference": null,
+      "full_export_tail_validated": true,
+      "original_comparison_basis": "Retained extraction descriptors only; no original payload reopened during post-processing.",
+      "first_original_difference": {
+        "source_frame": 4055,
+        "browser_index": 5239,
+        "original": "11 damage / DamageFlyTop",
+        "browser": "0 damage / WalkFast"
+      },
+      "results_entry_equivalent": false,
+      "whole_session_equivalent": false
+    },
+    "cleanup_and_gate_status": {
+      "historical_owner_report_unchanged": true,
+      "owner_cdp_gate": "failed: recorded owner --browser-report path points to retail-browser-report.json, which lacks the required browser_process_info inventory",
+      "independent_actual_report_cdp_attribution": {
+        "name": "postcapture-cdp-attribution-v2.json",
+        "sha256": "503d216411f6f20e8d4636557d3b7f14171e7c7be284d29fca4542d4f0feec05",
+        "result": "Actual capture report identities cross-joined to owner OS inventory; no owned survivors. Does not retroactively pass the owner gate."
+      },
+      "cleanup": {
+        "name": "cleanup-outcome-v2.json",
+        "sha256": "b117a92d3a50d2f897dc52a8ee3bdd49152ab094b64275f13ee32eb99ef62ad9"
+      },
+      "lane_release": {
+        "name": "own-resource-release-v2.json",
+        "sha256": "3c6e5a68faaa5dd7f7a1fcfd051cee63b3562561080c1e9fb1c15aa63fdf7ffc",
+        "lane_absent": true,
+        "owned_tmp_absent": true
+      },
+      "retained_failed_attempts": {
+        "preparation": [
+          {
+            "name": "preparation-failure-v1/preparation-v1-failure-receipt.json",
+            "sha256": "5551dff1bc0085023e2fce9d83151a407f5dd03289b4479ddb139f17ecc8e988",
+            "failure": "Preparation expected 13 branch source paths; reviewed-base diff had 16. No runner, server, browser, capture or lane started."
+          },
+          {
+            "name": "preparation-failure-v2/preparation-v2-failure-receipt.json",
+            "sha256": "55d8c67e914b6fd26725b1093ce7a9a7e24387092b499c49b296ffcae1f37fc3",
+            "failure": "Tool identity guard rejected sys.executable because the invoked path was a symlink. No runner, server, browser, capture or lane started."
+          },
+          {
+            "name": "preparation-failure-v3/preparation-v3-failure-receipt.json",
+            "sha256": "967315fd54c884d2f9046304bf797bd101c6860dace06ba337d4e845d9ef2777",
+            "failure": "Startup guard still rejected the retained producer manifest. No runner, server, browser, capture or lane started."
+          }
+        ],
+        "retained_baseline_comparator_v1": {
+          "receipt": "baseline-comparison-attempt-v1-receipt.json",
+          "receipt_sha256": "65a2ae8028e6c767da970cb9fcf80d72647bcd0e4af905a30f3338c089a65498",
+          "raw_log": "baseline-comparison-attempt-v1.log",
+          "raw_log_sha256": "4af33732b110f8d216c667d1bea6de19d7c073c09de07071978b0d57045ecb90",
+          "failure": "Failed before validation because of JavaScript quoting; the corrected v2 comparator and its separate successful receipt are recorded above."
+        },
+        "postcapture_cdp_attribution_v1": {
+          "script": "postcapture_cdp_attribution_v1.py",
+          "script_sha256": "d9e3b6ef676b0bd9ad0378b474921a043694a13e542606752acb3abf88cf477c",
+          "failure": "Retained v1 script stopped on an overly strict local assertion; the v2 script and receipt are separate and do not rewrite that attempt."
+        }
+      }
+    },
+    "root_review": {
+      "name": "root-independent-outcome-review-v1.json",
+      "sha256": "27882c0e0a398cd3b07b88b623f0ec34cfd3eb3a7793203b0645f4f457f4b54e",
+      "outcome": "Bounded diagnostic accepted; whole-session result remains failed/incomplete and original owner CDP report-path gate remains failed. Independent retained actual CDP/OS cleanup reviewed."
+    },
+    "limits": [
+      "The 76-event row is an observed case only, not a global bound.",
+      "Browser geometry false rows do not identify the original collision cause or fix the retained first divergence.",
+      "The earlier unauthorized disc-read preparation disclosure remains documented in the historical receipt; this follow-up does not make a global zero-read claim.",
+      "Issue #274, Results and whole-session acceptance remain open."
+    ]
+  },
+  "pr284_ci_repair_followup": {
+    "initial_ci_run": {
+      "url": "https://github.com/ericvanlare/melee-web/actions/runs/37802098528",
+      "head": "a8f3bd00d13264334759e5436a0fc4de655ed4a0",
+      "unit_1": "Fixture counting-adapter compilation failed; retained job output did not include compiler stdout/stderr.",
+      "browser_build": "Not run; downstream verification-partition gate failed."
+    },
+    "diagnostic_ci_run": {
+      "url": "https://github.com/ericvanlare/melee-web/actions/runs/37804836113",
+      "head": "5dde40c5e0a1b75a70ff49bdb683298229b63abf",
+      "unit_1": "Failed compiling the fixture-only counting adapter; GCC reported -Werror=misleading-indentation at the event-growth and geometry-open guards.",
+      "compiler_error_sites": [
+        "tests/native_hit_candidate_probe_fixture.c:56",
+        "tests/native_hit_candidate_probe_fixture.c:134"
+      ],
+      "unit_0": "Passed.",
+      "other_partitions": "Passed: runtime, graphics, fighter, gameplay, effects, menus, public-shell, repository-content, and compiler-cache-probe.",
+      "browser_build": "Not run; the verification-partition gate failed before build/report steps.",
+      "raw_unit_log": {
+        "name": "unit1-job-logs-api-raw.txt",
+        "bytes": 409312,
+        "sha256": "a0049937118f68d63b715a34a403568430a334aa834a525543b6b9e08f6f4d87"
+      }
+    },
+    "repair": "Add braces around the two abort-only fixture guards and keep following unconditional assignments/return unchanged. No production/native source, compiler flags, runtime behavior, or capture producer changed.",
+    "validation_state": "Fixture correction awaits fresh Linux full-head CI; previously passing focused, local full-suite, and ordinary Release build evidence remains bound to its original revisions.",
+    "scope_limit": "This repair does not change the d1 capture/native producer distinction, establish an original collision cause, or close issue #274."
+  },
+  "current_main_integration_validation": {
+    "source": {
+      "commit": "43a3a929e9a678b6417e56e5ba6ea7bdbe6be101",
+      "tree": "ea3a7019e6237c589721b2e20bb638a526091e59",
+      "merge_commit": "7f6cec8de312c9d350382b96a5e4425e177e78e4",
+      "merged_main": "7c5d47ab58f25b2a4241147c00d70c68a28b5ac6",
+      "worktree_clean": true
+    },
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "discovered": 2101,
+      "skipped": 153,
+      "passed": 1948,
+      "failures": 0,
+      "errors": 0,
+      "elapsed_seconds": 492.369,
+      "stdout": {
+        "name": "full-suite-v1.stdout.log",
+        "bytes": 4671,
+        "sha256": "3203de3b41b3d2b0db4465fe7d0078356a4cff765bdbbcb968f8ccbdfda6fa74"
+      },
+      "stderr": {
+        "name": "full-suite-v1.stderr.log",
+        "bytes": 379877,
+        "sha256": "f1c2863cd5fcad0e5d9b1e72274cdeaf486e5fc2e92ab31c3bf86eb8d00fbbab"
+      },
+      "execution_receipt_sha256": "9b2ac2f61aa89306cf32b4bb93f5111578b8969577fe0154ad0a0e60d69dd318"
+    },
+    "ordinary_release_build": {
+      "command": "python3 scripts/build.py --target runtime --configuration Release",
+      "target": "runtime (gameplay_menu_browser)",
+      "configuration": "Release",
+      "effective_jobs": 6,
+      "exit_code": 0,
+      "stdout": {
+        "name": "ordinary-release-runtime-v1.stdout.log",
+        "bytes": 10778,
+        "sha256": "e573a2de0bcae4a5aabcaff04fbf4b83b8ac27269953c8a387b80924c3ea2cf9"
+      },
+      "stderr": {
+        "name": "ordinary-release-runtime-v1.stderr.log",
+        "bytes": 1551,
+        "sha256": "6787301500bf3a860667c358e3bc02cdc1782e7d086254270d13ecdc9a7cf177"
+      },
+      "execution_receipt_sha256": "09f14597acc7c3aea46de85ab1005d03b8a3a913d5a6bed3748d02d7934e45a2",
+      "closure_sha256": "4c80013fa2b479d610c941bc2cbb2ce83ee78110ae90731653fa4e534b00941f",
+      "source_probe_sha256": "0e8ddcae2ec2599eb26007edf45525d2d720e9f1b0f2c20ff2e4dae006c633fc",
+      "probe_object_sha256": "1743daca0ca5edb493cad6155b15dbb8b7ef4d4bd361d4991683d5b450f61c34",
+      "runtime_archive_sha256": "c30eb2d8f2017c9dc626d4c7647b49a03d9879a30ee01d77780c2cb8e93940b1",
+      "final_outputs": {
+        "gameplay_menu_browser.js": "1366dc5d194b16ba636faef34f4b0034afe2fec050b06b469bc51a16f5a3e635",
+        "gameplay_menu_browser.wasm": "a5686acbc136cbed20c15e7429fa2760945fe7356661302489330f18151df4a9",
+        "gameplay_menu_browser.data": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      "wasm_vs_preserved_d1_sha256": {
+        "d1": "cf99d7c3ad21dd3be96f717829723b765d6e7a34717f9dbe300875a281e3efd3",
+        "current_head": "a5686acbc136cbed20c15e7429fa2760945fe7356661302489330f18151df4a9",
+        "changed": true
+      }
+    },
+    "d1_prebuild_preservation": {
+      "receipt_sha256": "0a72a1fe4a4d7baffa5b509591d905ff27bddb66d682047db3a4ebfe50d85281",
+      "build_artifacts_copied_and_verified": 8,
+      "staged_capture_outputs_verified": 3,
+      "d1_capture_relabelled": false
+    },
+    "sdl_relink_provenance": {
+      "receipt_sha256": "ebb8ba0478507d8f3de00bb630b45c2c785cfbdb38525cbe76d989fa1cc7487f",
+      "SDL_version": "3.4.10",
+      "SDL_c_sha256": "20ee2ffdd011eacb5f30a11ff11c9746519c6818b097d1404cdf4d871e9d8476",
+      "SDL_compile_command_output_sha256": "290e0744d2af2cf334f28880da95a60e3a9739619a97efd265475f729ed7eba8",
+      "SDL_c_object_sha256": "5dfe0c2a8cb881ac22c4c5997e64cc722089860a35adee5cd15ae0d1c42baf2a",
+      "SDL_archive_sha256": "ce99bb6930e4f66a75f830f59d22b0c063c95067ff2fa15c606fe22c63a3f933",
+      "d1_SDL_object_archive_equivalents_retained": false,
+      "rebuild_trigger_established": false
+    },
+    "integration_packet": {
+      "name": "current-main-integration-validation-v2.json",
+      "sha256": "f8ee6fc6af2ecf3575cda2449a57c4a24e79824d971c88d0721251d903400f1c"
+    },
+    "documentation_checks": {
+      "relative_markdown_links": {
+        "test": "test_markdown_links.MarkdownLinkTests.test_relative_links_resolve",
+        "exit_code": 0,
+        "execution_receipt_sha256": "b30ea055b1abebb65792dd6ab88d34f3e078a61dbddbd86a98f03b2007900048"
+      },
+      "git_diff_check": "passed",
+      "json_parse": "passed",
+      "private_absolute_paths_in_added_diff": false
+    },
+    "limits": [
+      "No browser run or original payload read/hash was performed for this integration validation.",
+      "The successful host suite and Release build do not establish Bowser cause, Results entry, or whole-session acceptance.",
+      "The current-head Wasm output differs from the preserved d1 capture producer output; SDL rebuild cause remains unobserved and no post-build capture was made."
+    ]
+  },
+  "next_scope": "A further source/observation-gap proposal requires separate review. This evidence does not authorize another capture or original payload access and does not claim a collision cause or fix.",
+  "equivalent": false,
+  "complete": false,
+  "Results_entry_equivalent": false,
+  "whole_session_equivalent": false,
+  "unrun_gates": [
+    "Original collision-hook comparison",
+    "Results transition acceptance",
+    "Full match/session acceptance",
+    "Pixels and PCM fidelity",
+    "Physical input",
+    "Live timing and performance"
+  ]
+}

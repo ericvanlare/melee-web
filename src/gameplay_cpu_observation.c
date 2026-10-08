@@ -1,5 +1,6 @@
 /* Semantic companion to tools/retail_cpu_observation.py. No source writes. */
 #include "gameplay_cpu_observation.h"
+#include "gameplay_hit_transition_probe.h"
 #include "gameplay_match_rules.h"
 #include <stddef.h>
 #include <melee/cm/camera.h>
@@ -451,6 +452,7 @@ void melee_web_cpu_observation_set_event_cursor(size_t index)
 {
 #ifdef MELEE_WEB_RNG_DRAW_OBSERVER
     melee_web_cpu_observation_set_rng_draw_cursor(index);
+    melee_web_hit_probe_cursor(index);
 #endif
     source_event_cursor = index;
     source_event_sequence = 0;
@@ -642,6 +644,7 @@ void melee_web_cpu_observation_scheduler_return(void)
     }
 #ifdef MELEE_WEB_RNG_DRAW_OBSERVER
     melee_web_rng_draw_probe_scheduler_return();
+    melee_web_hit_probe_scheduler_return();
 #endif
 }
 static void hitlag_audit_line(size_t index, unsigned slot, const Fighter* fp)
