@@ -1,0 +1,9 @@
+# A3 live native input mode
+
+**Source identified / Compiled.** Issue [#257](https://github.com/ericvanlare/melee-web/issues/257) adds a deliberate live mode to the existing page-owned native-input publisher. Live samples retain the native source tick, local port, poll serial, and exact eleven PAD bytes through the existing `LockstepPeer` input queue. Diagnostic pattern checks remain in diagnostic mode. Setup validation precedes native mutation; a refused setup returns the existing failed controller so `close()` joins endpoint cleanup and preserves both setup and teardown failures.
+
+The frozen source commit is `9458853e6c6d24513d637f8027842dbdb52d9f6a` (tree `2a0fe326e841f31920006fa8d695f92c5262074c`), based on main `0a96b2213b7312e50a232172ca467d17ef8a939b`. The focused peer, pump, and publication tests passed 62/62. The full suite passed 2,040 tests with 152 skips, and the ordinary runtime Release build completed successfully. The [portable receipt](../evidence/a3-live-native-input-mode-v1.json) binds these results and the 32 runtime artifact hashes to the source commit.
+
+Before the build overwrote the shared Release output, all 32 retained #255 artifacts were rehashed against their original receipt and matched; their producer remains `e22594d17bc5cfb5cdbffa6185206d8f70ab233d`. The first focused run exposed a fixture baseline-count mismatch that was corrected and is retained separately. An earlier full-suite attempt was interrupted before its summary. Both earlier attempts remain incomplete evidence and are not counted as passing runs.
+
+This is source/component and compile evidence only. No browser capture, live browser integration, physical-input, foreground timing, audible-output, two-machine, or Internet check ran. It does not establish public UI, whole-session, or full A3 acceptance; the separate runtime-owned progress adapter remains out of scope.

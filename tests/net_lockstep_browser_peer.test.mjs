@@ -88,6 +88,7 @@ test('opt-in page capture copies native bytes, records source ticks and releases
     assert.equal(capture(1, 0, 9, pressed), true);
     assert.equal(globalThis.__meleeSyntheticPadState, 'release');
     const snapshot = await run.controller.rpc('snapshot');
+    assert.equal(snapshot.localInputCapture.mode, 'diagnostic');
     assert.deepEqual(snapshot.localInputCapture.captures.map(row => [row.source_cursor, row.input_tick,
       row.poll_serial, row.bytes[1], row.synthetic_state]), [
       [0, 0, 8, 1, 'neutral'], [1, 1, 9, 0, 'A'],
@@ -106,6 +107,198 @@ test('opt-in page capture copies native bytes, records source ticks and releases
     else delete globalThis.__meleeSyntheticPadTransition;
     delete globalThis.__meleeWebNetLocalInputCapture;
   }
+});
+
+test('explicit live input publishes exact native samples without synthetic Gamepad globals', async () => {
+  const priorState = Object.getOwnPropertyDescriptor(globalThis, '__meleeSyntheticPadState');
+  const priorTransition = Object.getOwnPropertyDescriptor(globalThis, '__meleeSyntheticPadTransition');
+  delete globalThis.__meleeSyntheticPadState;
+  delete globalThis.__meleeSyntheticPadTransition;
+  assert.equal(globalThis.__meleeWebNetLocalInputCapture ?? null, null);
+  const run = harness({sourceTicks: 6, inputCapture: {mode: 'live'}});
+  try {
+    await run.ready();
+    assert.equal(globalThis.__meleeSyntheticPadState, undefined);
+    assert.equal(globalThis.__meleeSyntheticPadTransition, undefined);
+    const capture = globalThis.__meleeWebNetLocalInputCapture;
+    const first = Uint8Array.of(0x80, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a);
+    const second = Uint8Array.of(0x00, 0xff, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90);
+    assert.equal(capture(0, 0, 41, first), true);
+    first[1] = 0xee;
+    assert.equal(capture(1, 0, 42, second), true);
+
+    const snapshot = await run.controller.rpc('snapshot');
+    assert.deepEqual(run.captureConfigs, [{port: 0, ticks: 4}]);
+    assert.equal(snapshot.localInputCapture.enabled, true);
+    assert.equal(snapshot.localInputCapture.mode, 'live');
+    assert.equal(snapshot.localInputCapture.input_ticks, 4);
+    assert.equal(snapshot.localInputCapture.captures.length, 2);
+    assert.deepEqual(snapshot.localInputCapture.captures.map(row => [row.source_cursor, row.input_tick,
+      row.local_port, row.poll_serial, row.bytes]), [
+      [0, 0, 0, 41, [0x80, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a]],
+      [1, 1, 0, 42, [0x00, 0xff, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90]],
+    ]);
+    assert.equal(Object.hasOwn(snapshot.localInputCapture.captures[0], 'synthetic_state'), false);
+    const latest = run.sent.filter(packet => packet.type === 'state').at(-1);
+    assert.deepEqual(latest.unacknowledged.map(entry => [entry.tick, [...Buffer.from(entry.pad, 'base64')]]), [
+      [0, [0x80, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a]],
+      [1, [0x00, 0xff, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90]],
+    ]);
+    await run.controller.close();
+    assert.equal(globalThis.__meleeWebNetLocalInputCapture, null);
+  } finally {
+    try { await run.controller.close(); } catch {}
+    delete globalThis.__meleeWebNetLocalInputCapture;
+    if (priorState) Object.defineProperty(globalThis, '__meleeSyntheticPadState', priorState);
+    else delete globalThis.__meleeSyntheticPadState;
+    if (priorTransition) Object.defineProperty(globalThis, '__meleeSyntheticPadTransition', priorTransition);
+    else delete globalThis.__meleeSyntheticPadTransition;
+  }
+});
+
+test('live and diagnostic input options are unambiguous before native configuration', () => {
+  assert.equal(globalThis.__meleeWebNetLocalInputCapture ?? null, null);
+  const invalid = [
+    {inputCapture: {mode: 'live', pattern: ['neutral']}},
+    {inputCapture: {mode: 'live', deferSendTicks: []}},
+    {inputCapture: {mode: 'other', pattern: [], deferSendTicks: []}},
+    {inputCapture: {mode: 'diagnostic', deferSendTicks: []}},
+    {inputCapture: {pattern: [], deferSendTicks: []}},
+    {inputCapture: {mode: 'live'}, autonomousPump: true},
+    {inputCapture: {mode: 'live'}, sourceTicks: 7},
+    {inputCapture: {mode: 'live'}, timeoutMs: 0},
+  ];
+  for (const options of invalid) {
+    let configureCalls = 0, endpointCalls = 0;
+    const sourceTicks = options.sourceTicks ?? 6;
+    assert.throws(() => createBrowserNativePeer({role: 'alpha', sourceTicks,
+      inputTicks: 4, relayUrl: 'ws://example.test', roomId: 'a'.repeat(32),
+      agreement: {build: 'same'}, inputCapture: options.inputCapture,
+      timeoutMs: options.timeoutMs ?? 5000,
+      autonomousPump: options.autonomousPump ?? false,
+      native: {configureLocalInputCapture() { ++configureCalls; return true; }}},
+    {createEndpoint() { ++endpointCalls; throw Error('endpoint must not be allocated'); }}));
+    assert.equal(configureCalls, 0, 'invalid options must fail before native input configuration');
+    assert.equal(endpointCalls, 0, 'invalid options must fail before endpoint allocation');
+  }
+});
+
+test('peer and endpoint construction fail before native capture, and setup refusal joins owned close cleanup', async () => {
+  assert.equal(globalThis.__meleeWebNetLocalInputCapture ?? null, null);
+  let configureCalls = 0;
+  assert.throws(() => createBrowserNativePeer({role: 'alpha', sourceTicks: 6, inputTicks: 4,
+    relayUrl: 'bad relay url', roomId: 'a'.repeat(32), timeoutMs: 5000,
+    agreement: {build: 'same'}, inputCapture: {mode: 'live'},
+    native: {configureLocalInputCapture() { ++configureCalls; return true; }}},
+  {createEndpoint() { throw Error('endpoint rejected relay configuration'); }}), /endpoint rejected relay configuration/);
+  assert.equal(configureCalls, 0, 'endpoint validation must complete before native capture is enabled');
+
+  const closeStarted = deferred(), allowCloseToFail = deferred();
+  const endpointCloseFailure = Error('endpoint close failed after setup refusal');
+  let endpointOptions;
+  const endpoint = {ready: Promise.resolve(), closed: false, errors: [], transport: {type: 'test'},
+    send: async () => {}, drainInbound: async () => {},
+    async close() {
+      closeStarted.resolve();
+      await allowCloseToFail.promise;
+      endpoint.closed = true;
+      await endpointOptions.onDisconnect('alpha', 'closed');
+      throw endpointCloseFailure;
+    }};
+  const controller = createBrowserNativePeer({role: 'alpha', sourceTicks: 6, inputTicks: 4,
+    relayUrl: 'ws://example.test', roomId: 'a'.repeat(32), timeoutMs: 5000,
+    agreement: {build: 'same'}, inputCapture: {mode: 'live'},
+    native: {configureLocalInputCapture() { ++configureCalls; return false; }}},
+  {createEndpoint(options) { endpointOptions = options; return endpoint; }});
+  assert.equal(configureCalls, 1);
+  assert.equal(controller.snapshot().failure.includes('configuration was rejected'), true,
+    'failed setup retains the original configuration failure');
+  assert.equal(globalThis.__meleeWebNetLocalInputCapture, null,
+    'failed native setup deactivates its callback before returning the cleanup owner');
+  let closeSettled = false;
+  const closing = controller.close().finally(() => { closeSettled = true; });
+  await closeStarted.promise;
+  await Promise.resolve();
+  assert.equal(closeSettled, false, 'close remains pending while endpoint teardown is pending');
+  allowCloseToFail.resolve();
+  await assert.rejects(closing, error => {
+    assert.equal(error instanceof AggregateError, true);
+    assert.equal(error.errors.some(item => String(item).includes('configuration was rejected')), true,
+      'joined close reports the original configuration failure');
+    assert.equal(error.errors.includes(endpointCloseFailure), true,
+      'joined close reports endpoint teardown failure');
+    return true;
+  });
+  assert.equal(endpoint.closed, true, 'failed setup closes its already allocated endpoint');
+});
+
+test('live input rejects a second callback owner before configuring native capture', async () => {
+  const first = harness({sourceTicks: 6, inputCapture: {mode: 'live'}});
+  try {
+    let configureCalls = 0, endpointCalls = 0;
+    assert.throws(() => createBrowserNativePeer({role: 'beta', sourceTicks: 6,
+      inputTicks: 4, relayUrl: 'ws://example.test', roomId: 'b'.repeat(32),
+      agreement: {build: 'same'}, inputCapture: {mode: 'live'},
+      native: {configureLocalInputCapture() { ++configureCalls; return true; }}},
+    {createEndpoint() { ++endpointCalls; throw Error('endpoint must not be allocated'); }}),
+    /already has an owner/);
+    assert.equal(configureCalls, 0);
+    assert.equal(endpointCalls, 0);
+  } finally {
+    await first.controller.close();
+  }
+  assert.equal(globalThis.__meleeWebNetLocalInputCapture, null);
+});
+
+test('live input enforces source tick, selected port, increasing serial and exact PAD size', async () => {
+  const invalidSamples = [
+    [1, 0, 1, new Uint8Array(11)],
+    [0, 1, 1, new Uint8Array(11)],
+    [0, 0, -1, new Uint8Array(11)],
+    [0, 0, Number.NaN, new Uint8Array(11)],
+    [0, 0, 1, new Uint8Array(10)],
+  ];
+  for (const sample of invalidSamples) {
+    const run = harness({sourceTicks: 6, inputCapture: {mode: 'live'}});
+    await run.ready();
+    const capture = globalThis.__meleeWebNetLocalInputCapture;
+    assert.equal(capture(...sample), false);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(run.controller.snapshot().localInputCapture.captures.length, 0);
+    assert.equal(run.terminals.at(-1)[0], 3);
+    await assert.rejects(run.controller.close(), /Browser native peer close failed/);
+    assert.equal(globalThis.__meleeWebNetLocalInputCapture, null);
+  }
+});
+
+test('live input callbacks stop after terminal and at close entry', async () => {
+  const terminal = harness({sourceTicks: 6, inputCapture: {mode: 'live'}});
+  await terminal.ready();
+  const retainedAfterTerminal = globalThis.__meleeWebNetLocalInputCapture;
+  await terminal.controller.rpc('disconnect', ['test terminal']);
+  const sentAfterTerminal = terminal.sent.length;
+  assert.equal(retainedAfterTerminal(0, 0, 1, new Uint8Array(11)), false);
+  assert.equal(terminal.sent.length, sentAfterTerminal, 'a terminal callback cannot publish another protocol packet');
+  assert.match(terminal.controller.snapshot().failure, /no longer active/);
+  await assert.rejects(terminal.controller.close(), /Browser native peer close failed/);
+  assert.equal(globalThis.__meleeWebNetLocalInputCapture, null);
+
+  const racing = harness({sourceTicks: 6, inputCapture: {mode: 'live'}});
+  await racing.ready();
+  const retainedAtClose = globalThis.__meleeWebNetLocalInputCapture;
+  const sentBeforeCapture = racing.sent.length;
+  const nativePublishesBeforeCapture = racing.frames.length;
+  assert.equal(retainedAtClose(0, 0, 5, new Uint8Array(11)), true);
+  const closing = racing.controller.close();
+  assert.equal(globalThis.__meleeWebNetLocalInputCapture, null, 'owned callback is deactivated synchronously at close entry');
+  await assert.rejects(closing, /Browser native peer close failed/);
+  const sentAfterClose = racing.sent.length;
+  assert.equal(retainedAtClose(1, 0, 6, new Uint8Array(11)), false);
+  assert.equal(racing.sent.length, sentAfterClose, 'queued or retained callbacks cannot publish after close starts');
+  assert.equal(sentAfterClose, sentBeforeCapture, 'queued local publication is stopped by close');
+  assert.equal(racing.frames.length, nativePublishesBeforeCapture,
+    'stopped input never reaches native indexed publication after the close race');
+  assert.match(racing.controller.snapshot().failure, /stopped before queued publication/);
 });
 
 test('sampled input rejects cursor/port/serial errors and async native queue failures terminate', async () => {
@@ -150,6 +343,10 @@ test('sampled input rejects cursor/port/serial errors and async native queue fai
     await assert.rejects(asyncFailure.deliver(remoteWire.at(-1)), /Native indexed input queue rejected/);
     await assert.rejects(asyncFailure.controller.rpc('snapshot'), /Native indexed input queue rejected/);
     assert.equal(asyncFailure.terminals.at(-1)[0], 3, 'async submission failure reaches native terminal');
+    const retainedAfterFailure = globalThis.__meleeWebNetLocalInputCapture;
+    const terminalCount = asyncFailure.terminals.length;
+    assert.equal(retainedAfterFailure(1, 0, 6, new Uint8Array(11)), false);
+    assert.equal(asyncFailure.terminals.length, terminalCount, 'failed capture cannot make another native call');
   } finally {
     try { await asyncFailure.controller.close(); } catch {}
     if (priorState) Object.defineProperty(globalThis, '__meleeSyntheticPadState', priorState);

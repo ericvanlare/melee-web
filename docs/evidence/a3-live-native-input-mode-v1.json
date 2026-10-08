@@ -1,0 +1,111 @@
+{
+  "schema": "melee-web-a3-live-native-input-mode-v1",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/257",
+  "scope": "Component live-input mode for the existing page-owned native input publisher. Exact PAD samples and source identities use the existing native callback and LockstepPeer queue. No new collector, timer, native behavior, public UI, browser integration, or physical-input acceptance.",
+  "source": {
+    "repository": "melee-web",
+    "branch": "codex/issue257-live-native-input",
+    "commit": "9458853e6c6d24513d637f8027842dbdb52d9f6a",
+    "tree": "2a0fe326e841f31920006fa8d695f92c5262074c",
+    "parent": "0a96b2213b7312e50a232172ca467d17ef8a939b",
+    "base_main": "0a96b2213b7312e50a232172ca467d17ef8a939b",
+    "files": [
+      "scripts/net_lockstep_browser_peer.mjs",
+      "tests/net_lockstep_browser_peer.test.mjs"
+    ],
+    "independent_review": {
+      "run_id": "issue257-constructor-cleanup-20261007-201218-6c94da11",
+      "file": "root-live-input-source-review-v1.json",
+      "sha256": "3e0ab11e887ba0a07ad3ae77a41ccb7fc66058c2578cffd03e0c3276d0239026"
+    },
+    "review_result": "Pass; root found and the owner corrected constructor validation order and joined asynchronous cleanup before approving broad checks."
+  },
+  "focused_tests": {
+    "command": "python3 scripts/agent_workspace.py run -- node --test tests/net_lockstep_browser_peer.test.mjs tests/net_lockstep_browser_pump.test.mjs tests/net_lockstep_browser_publication.test.mjs",
+    "result": "pass",
+    "tests": 62,
+    "failures": 0,
+    "log": {
+      "run_id": "issue257-constructor-cleanup-20261007-201218-6c94da11",
+      "file": "focused.log",
+      "bytes": 14375,
+      "sha256": "633a6c31b33342f28d32a5ed193b2eddfefb4e1e995d4c00223422077d45548f"
+    }
+  },
+  "full_suite": {
+    "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+    "result": "pass",
+    "tests": 2040,
+    "skipped": 152,
+    "log": {
+      "run_id": "issue257-constructor-cleanup-20261007-201218-6c94da11",
+      "file": "full-suite-v1.log",
+      "bytes": 374575,
+      "sha256": "e52a90a48e2fd2377cb3e95b937faac6f184b697fc56c83366e027603c395c34"
+    }
+  },
+  "runtime_build": {
+    "result": "pass",
+    "receipt": {
+      "run_id": "issue257-constructor-cleanup-20261007-201218-6c94da11",
+      "file": "ordinary-release-build-receipt-v1.json",
+      "bytes": 6348,
+      "sha256": "b6955bd3306bc33374567f918b78aedfdb22896d0fa5a07a3eb3fbce1db81710"
+    },
+    "log": {
+      "run_id": "issue257-constructor-cleanup-20261007-201218-6c94da11",
+      "file": "ordinary-release-build-v1.log",
+      "bytes": 18371,
+      "sha256": "252282c368d3b13e7bb87dedd173f6340b458d96c900e1ea7fb3a3ad25390bd4"
+    },
+    "configuration": "Release",
+    "target": "runtime",
+    "browser_or_native_capture": "not run",
+    "independent_validation_review": {
+      "run_id": "issue257-constructor-cleanup-20261007-201218-6c94da11",
+      "file": "root-validation-review-v1.json",
+      "sha256": "b8641bc5473d5612edf9c9c00c44b561eb0842e88a2f25356b324caacb484443",
+      "result": "pass",
+      "checked_build_log_cache_and_runtime_files": 36,
+      "release_optional_flags_off": 10,
+      "reviewed_source_hashes_match": true
+    }
+  },
+  "preserved_prior_evidence": {
+    "rehash_report": {
+      "run_id": "issue257-constructor-cleanup-20261007-201218-6c94da11",
+      "file": "issue255-preservation-rehash-before-build-v1.json"
+    },
+    "original_run_id": "issue255-page-checksum-consumer-20261007-190106-97d1c085",
+    "original_receipt_sha256": "35febd42a40f10bd484a6dfa2a0afe63a9a75d4ad101e12000c0e04edc4eea95",
+    "original_cache_sha256": "fd0fbd5a610af974864da67d0fd8b17e7c3ee3a333bd8eeaf35b05b428025ce8",
+    "all_32_prior_runtime_artifacts_match_their_receipt": true,
+    "producer": "e22594d17bc5cfb5cdbffa6185206d8f70ab233d"
+  },
+  "incomplete_attempts": {
+    "first_focused_failure": {
+      "run_id": "issue257-focused-live-input-20261007-194656-047c8cd9",
+      "file": "first-focused-failure.md"
+    },
+    "premature_full_suite": {
+      "run_id": "issue257-full-suite-20261007-194845-e347fa7a",
+      "log": "full-suite.log",
+      "note": "interrupted-run.md"
+    },
+    "interpretation": "Both are retained as incomplete historical attempts and are not counted as validation results."
+  },
+  "issue_plan": {
+    "run_id": "autonomous-roadmap-20261006-154157-ec099c21",
+    "file": "a3-live-input-mode-planning-v1.json",
+    "issue_body_sha256": "ef4e1e0d199d3a5c79a977181248e44d4ad7aa5e9a9b768710b28d33800abac4"
+  },
+  "evidence_labels": [
+    "Source identified",
+    "Compiled"
+  ],
+  "limits": [
+    "No browser capture or browser integration run.",
+    "No physical input, foreground timing, audible-output, two-machine, or Internet acceptance.",
+    "This component result does not claim whole-session or public runtime integration acceptance."
+  ]
+}
