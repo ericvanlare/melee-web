@@ -833,6 +833,10 @@ test('actual consumed-input witness binds every selected sample at the native tw
 
 test('runtime CSS-to-SSS witness binds all 518 selected PAD rows to 520 native input checksums', async () => {
   const frames = Buffer.alloc(153 * 44);
+  for (let tick = 0; tick < 153; ++tick) {
+    frames[tick * 44 + 32] = 0xff;
+    frames[tick * 44 + 43] = 0xff;
+  }
   const setPort = (tick, port, buttons, x, y) => {
     const offset = tick * 44 + port * 11;
     frames.writeUInt16BE(buttons, offset); frames.writeInt8(x, offset + 2); frames.writeInt8(y, offset + 3);

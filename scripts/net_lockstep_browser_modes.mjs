@@ -1,6 +1,7 @@
 // Validate transport scope before the harness reads inputs or creates output.
 import {createHash} from 'node:crypto';
 import {BUTTONS, STANDARD_PROFILE, normalizeController} from '../web/controller-input.mjs';
+import {LOCKSTEP_MAX_SOURCE_TICKS, lockstepConstants} from './net_lockstep_core.mjs';
 
 export const RUNTIME_CSS_SSS_INPUT_TICKS = 518;
 export const RUNTIME_CSS_SSS_SOURCE_TICKS = 520;
@@ -24,9 +25,12 @@ export function validateRuntimeCssSssRecipe({scriptBytes, manifestBytes, generat
     throw Error('CSS-to-SSS recipe is not a valid MWNI v1 file');
   const frameCount = script.readUInt32BE(8);
   const body = script.subarray(MWNI_HEADER_BYTES);
-  if (frameCount < RUNTIME_CSS_SSS_INPUT_TICKS ||
-      script.length !== MWNI_HEADER_BYTES + frameCount * MWNI_FRAME_BYTES)
-    throw Error('CSS-to-SSS MWNI frame count or body length is invalid');
+  if (frameCount < RUNTIME_CSS_SSS_INPUT_TICKS)
+    throw Error('CSS-to-SSS MWNI frame count is below the selected input bound');
+  if (frameCount > LOCKSTEP_MAX_SOURCE_TICKS)
+    throw Error(`CSS-to-SSS MWNI frame count exceeds the ${LOCKSTEP_MAX_SOURCE_TICKS}-frame source bound`);
+  if (script.length !== MWNI_HEADER_BYTES + frameCount * MWNI_FRAME_BYTES)
+    throw Error('CSS-to-SSS MWNI body length is invalid');
   let manifest;
   try { manifest = JSON.parse(manifestSource.toString('utf8')); }
   catch { throw Error('CSS-to-SSS recipe manifest is not valid JSON'); }
@@ -49,6 +53,14 @@ export function buildRuntimeCssSssGamepadSamples(scriptFrames) {
   const prefixBytes = RUNTIME_CSS_SSS_STIMULUS_FRAMES * MWNI_FRAME_BYTES;
   if (frames.length < prefixBytes)
     throw Error('CSS-to-SSS recipe is shorter than its 153-frame stimulus prefix');
+  const noControllerPad = Buffer.from(lockstepConstants.noControllerPad, 'hex');
+  for (let inputTick = 0; inputTick < RUNTIME_CSS_SSS_STIMULUS_FRAMES; ++inputTick) {
+    for (const port of [2, 3]) {
+      const offset = inputTick * MWNI_FRAME_BYTES + port * MWNI_PORT_BYTES;
+      if (!frames.subarray(offset, offset + MWNI_PORT_BYTES).equals(noControllerPad))
+        throw Error(`CSS-to-SSS recipe input ${inputTick} port ${port} is not the canonical no-controller PAD`);
+    }
+  }
   const byRole = {};
   for (const [role, port] of [['alpha', 0], ['beta', 1]]) {
     const samples = [];
@@ -56,6 +68,8 @@ export function buildRuntimeCssSssGamepadSamples(scriptFrames) {
       const bytes = inputTick < RUNTIME_CSS_SSS_STIMULUS_FRAMES ?
         Buffer.from(frames.subarray(inputTick * MWNI_FRAME_BYTES + port * MWNI_PORT_BYTES,
           inputTick * MWNI_FRAME_BYTES + (port + 1) * MWNI_PORT_BYTES)) : Buffer.alloc(MWNI_PORT_BYTES);
+      if (inputTick === 0 && bytes.some(byte => byte !== 0))
+        throw Error(`CSS-to-SSS first selected sample for ${role} must be neutral`);
       if (bytes.length !== MWNI_PORT_BYTES || bytes[8] !== 0 || bytes[9] !== 0 || bytes.readInt8(10) !== 0 ||
           bytes.readInt8(4) !== 0 || bytes.readInt8(5) !== 0 || bytes[6] !== 0 || bytes[7] !== 0)
         throw Error(`CSS-to-SSS recipe input ${inputTick} port ${port} has unsupported PAD fields`);

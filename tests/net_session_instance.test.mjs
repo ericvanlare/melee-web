@@ -407,6 +407,10 @@ test('runtime fixture tail changes only the next ordinary Gamepad sample and ret
 
 test('CSS-to-SSS fixture drives the ordinary controller manager one selected sample at a time', () => {
   const prior = globalThis.window, frames = Buffer.alloc(153 * 44);
+  for (let tick = 0; tick < 153; ++tick) {
+    frames[tick * 44 + 32] = 0xff;
+    frames[tick * 44 + 43] = 0xff;
+  }
   const setPort = (tick, port, buttons, x, y) => {
     const offset = tick * 44 + port * 11;
     frames.writeUInt16BE(buttons, offset); frames.writeInt8(x, offset + 2); frames.writeInt8(y, offset + 3);
@@ -496,6 +500,10 @@ test('CSS-to-SSS fixture drives the ordinary controller manager one selected sam
 test('CSS-to-SSS fixture refuses to freeze unless native status ends in SSS', () => {
   const prior = globalThis.window;
   const frames = Buffer.alloc(153 * 44);
+  for (let tick = 0; tick < 153; ++tick) {
+    frames[tick * 44 + 32] = 0xff;
+    frames[tick * 44 + 43] = 0xff;
+  }
   for (let tick = 150; tick <= 152; ++tick) frames.writeUInt16BE(0x1000, tick * 44);
   const samples = buildRuntimeCssSssGamepadSamples(frames).alpha;
   const captures = [], status = {active: 1, cursor: 0, blocker: 'network_wait', terminal: {kind: 0}};
