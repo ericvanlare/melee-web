@@ -3,6 +3,7 @@ import test from 'node:test';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import {verifyPositivePeerCompletion} from '../scripts/net_lockstep_observers.mjs';
+import {collapseConsecutiveScenes} from '../scripts/net_determinism_contract.mjs';
 import {createBrowserNativePeer, BROWSER_CHECKSUM_EXPORT_LIMIT} from '../scripts/net_lockstep_browser_peer.mjs';
 import {LockstepPeer} from '../scripts/net_lockstep_core.mjs';
 
@@ -431,27 +432,37 @@ test('progress observer failure becomes sticky controller failure and a native p
 const browserSource = await readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
 const intervalSource = browserSource.slice(browserSource.indexOf('function nativePumpChecksumEvidence('),
   browserSource.indexOf('async function pollRun('));
-async function runActualInterval({completedBefore = false, injectedRpc = false, stalled = false, failure = null} = {}) {
+async function runActualInterval({completedBefore = false, injectedRpc = false, stalled = false, failure = null,
+  runtimeCssSss = false, beforeCursor = null} = {}) {
   let rounds = 0, now = 0;
   const pairResults = {}, instances = {};
   const makeSnapshot = role => {
     const complete = completedBefore || rounds > 0;
-    const count = complete && !stalled ? 8 : 2;
-    return {failure, endpointErrors: [], exportRecords: count,
+    const sourceTicks = runtimeCssSss ? 520 : 8, usedInputs = sourceTicks - 2;
+    const count = complete && !stalled ? sourceTicks : beforeCursor ?? (runtimeCssSss ? 510 : 2);
+    const protocol = {role, ready: true, terminal: null, checksum_mismatches: [],
+      remote_ack_input: complete ? usedInputs - 1 : count - 2, local_input_ticks: Math.min(count, usedInputs),
+      remote_input_ticks: Math.min(count, usedInputs), local_checksum_ticks: count,
+      remote_checksum_ticks: count, next_checksum_compare: count, next_source_frame: sourceTicks};
+    return {failure, endpointErrors: [], exportRecords: runtimeCssSss ? 0 : count,
       nativePump: {enabled: true, rpc_calls: injectedRpc && rounds > 0 ? 5 : 4},
-      protocol: {role, ready: true, terminal: null, checksum_mismatches: [],
-        remote_ack_input: complete ? 5 : -1, local_input_ticks: 6, remote_input_ticks: 6,
-        local_checksum_ticks: count, remote_checksum_ticks: count, next_checksum_compare: count,
-        next_source_frame: 8}};
+      protocol, ...(runtimeCssSss ? {checksumConsumer: {enabled: true, accepted_records: count,
+        pending_batch: null, retained_records: 0}, checksumOwnership: {consumer_accepted_records: count}} : {})};
   };
   for (const role of ['alpha', 'beta']) instances[role] = {
     readPeerSnapshot: async () => makeSnapshot(role),
+    runtimeLockstepSnapshot: async () => ({armed: true, closing: false, failure: null,
+      peer: makeSnapshot(role), checksums: Array.from({length: makeSnapshot(role).protocol.local_checksum_ticks}, (_, tick) => record(tick))}),
     peerRpc: () => { throw Error('test must never invoke peer RPC'); },
   };
-  const context = vm.createContext({instances, pairResults, runtimeOwned: false, NET_RECORD_BYTES: 64, sourceTicks: 8, usedInputs: 6, stallMs: 3,
+  const sourceTicks = runtimeCssSss ? 520 : 8, usedInputs = sourceTicks - 2;
+  const context = vm.createContext({instances, pairResults, runtimeOwned: runtimeCssSss, runtimeCssSss,
+    NET_RECORD_BYTES: 64, sourceTicks, usedInputs, stallMs: 3,
     pollMs: 1, deadline: 100, Date: {now: () => now}, verifyPositivePeerCompletion,
-    checkedHealth: async role => ({status: {active: 1, cursor: makeSnapshot(role).exportRecords,
-      blocker: makeSnapshot(role).exportRecords === 8 ? 'complete' : 'network_wait', terminal: {kind: 0}}, native: {phase: 1}}),
+    checkedHealth: async role => ({status: {active: 1,
+      cursor: runtimeCssSss ? makeSnapshot(role).protocol.local_checksum_ticks : makeSnapshot(role).exportRecords,
+      blocker: makeSnapshot(role).protocol.local_checksum_ticks === sourceTicks ? 'complete' : 'network_wait',
+      terminal: {kind: 0}}, native: {phase: runtimeCssSss ? 3 : 1}}),
     sleep: async () => { ++rounds; ++now; }});
   await vm.runInContext(`${intervalSource}; observeNativePumpWithoutRpc()`, context);
   return pairResults;
@@ -468,6 +479,107 @@ test('actual interval rejects already complete, intervening RPC, sticky failure 
   await assert.rejects(runActualInterval({injectedRpc: true}), /peer RPC occurred/);
   await assert.rejects(runActualInterval({failure: 'actual retained failure'}), /diagnostic peer failed/);
   await assert.rejects(runActualInterval({stalled: true}), /bounded no-RPC interval/);
+});
+
+test('runtime CSS-to-SSS interval observes retained partial evidence and crosses source cursor 512 without peer RPC', async () => {
+  const result = await runActualInterval({runtimeCssSss: true});
+  assert.equal(result.native_pump_interval.before.alpha.status.cursor, 510);
+  assert.equal(result.native_pump_interval.after.alpha.status.cursor, 520);
+  assert.equal(result.native_pump_interval.crossed_512_each, true);
+  assert.equal(result.native_pump_interval.no_peer_RPC_during_interval, true);
+  assert.equal(result.native_pump_interval.complete, true);
+  await assert.rejects(runActualInterval({runtimeCssSss: true, beforeCursor: 512}), /passed source cursor 512/);
+  await assert.rejects(runActualInterval({runtimeCssSss: true, injectedRpc: true}), /peer RPC occurred/);
+});
+
+test('runtime CSS-to-SSS scene verifier requires 520 ordered checksums with only CSS then SSS', async () => {
+  const source = await readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf('function verifyRuntimeCssSssSceneRuns(');
+  const end = source.indexOf('function routeBoundaryPath(', start);
+  const verify = vm.runInNewContext(`${source.slice(start, end)}\nverifyRuntimeCssSssSceneRuns`,
+    {RUNTIME_CSS_SSS_SOURCE_TICKS: 520, collapseConsecutiveScenes});
+  const sceneRuns = Array.from({length: 520}, (_, tick) => ({tick, scene: tick < 153 ? 1 : 2}));
+  assert.deepEqual(JSON.parse(JSON.stringify(verify(sceneRuns))), {scenes: [1, 2], firstSssTick: 153});
+  for (const mutate of [rows => rows.pop(), rows => { rows[512].tick = 511; },
+    rows => { rows[200].scene = 3; }, rows => { rows[519].scene = 1; }]) {
+    const bad = structuredClone(sceneRuns); mutate(bad);
+    assert.throws(() => verify(bad));
+  }
+});
+
+test('runtime CSS-to-SSS final SSS screenshot waits for frozen input and the read-only 512 interval', async () => {
+  const source = await readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf('function routeBoundaryPath(');
+  const end = source.indexOf('\nasync function watchRouteBoundary(', start);
+  const helperSource = source.slice(start, end);
+  assert(start >= 0 && end > start);
+  const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]);
+  async function run({frozen = true, complete = true, noPeerRpc = true, crossed512 = true,
+    cursorAfterScreenshot = 520, phaseAfterScreenshot = 3} = {}) {
+    const events = [], instanceRows = {alpha: {route_boundary_captures: [], route_boundary_misses: [],
+      runtime_input_fixture_frozen: {frozen, captured_count: 518}}};
+    let statusCalls = 0, screenshotCount = 0;
+    const instances = {alpha: {
+      driver: {async diagnostics() { events.push('driver'); return {phase: 3, running: 1, status: 'Original stage select', log: ''}; }},
+      async native() { events.push('native'); return {phase: events.includes('screenshot') ? phaseAfterScreenshot : 3}; },
+      async status() { events.push('status'); ++statusCalls; return {cursor: statusCalls === 1 ? 520 : cursorAfterScreenshot,
+        blocker: 'complete'}; },
+      async screenshot(file) { events.push('screenshot'); ++screenshotCount; assert.match(file, /route-sss\.png$/); },
+      async graphics() { events.push('graphics'); return {cross_origin_isolated: true, webgpu_api: true, webgpu_adapter: true}; },
+    }};
+    const pairResults = {native_pump_interval: {complete, no_peer_RPC_during_interval: noPeerRpc,
+      actual_native_cursor_progress_each: true, crossed_512_each: crossed512}};
+    const context = vm.createContext({
+      Buffer, Date, Promise, path: await import('node:path'), output: '/capture',
+      childDirectory: role => `/capture/${role}`, instances, instanceRows, pairResults,
+      runtimeCssSss: true, sourceTicks: 520, usedInputs: 518,
+      POSITIVE_ROUTE_BOUNDARIES: [{name: 'css-start', phase: 1, label: 'CSS'},
+        {name: 'sss', phase: 3, label: 'original SSS'}],
+      fs: {async readFile(file) { events.push('read'); assert.match(file, /route-sss\.png$/); return png; }},
+      readyRenderEvent: (_diagnostics, phase) => phase === 3 ? {phase, draw_calls: 1, source_draws: 1} : null,
+      sha256: () => 'fixture-png-sha256',
+    });
+    const capture = vm.runInContext(`${helperSource}\n;captureRuntimeCssSssFinalBoundary`, context);
+    return {events, instanceRows, pairResults, get screenshotCount() { return screenshotCount; },
+      capture: () => capture('alpha')};
+  }
+
+  const valid = await run();
+  await valid.capture();
+  const row = valid.instanceRows.alpha.route_boundary_captures[0];
+  assert.equal(valid.screenshotCount, 1);
+  assert.deepEqual(valid.events, ['driver', 'native', 'status', 'screenshot', 'read', 'native', 'status', 'graphics']);
+  assert.equal(row.name, 'sss');
+  assert.equal(row.source_cursor_sampled_before_screenshot, 520);
+  assert.equal(row.source_cursor_after_screenshot, 520);
+  assert.equal(row.source_cursor_stable_during_screenshot, true);
+  assert.equal(row.screenshot_phase_stable, true);
+  assert.equal(row.gpu_observed, true);
+  assert.equal(row.browser_driver.phase, 3);
+
+  const notFrozen = await run({frozen: false});
+  await assert.rejects(notFrozen.capture(), /frozen input fixture/);
+  assert.equal(notFrozen.screenshotCount, 0);
+  const intervalIncomplete = await run({complete: false});
+  await assert.rejects(intervalIncomplete.capture(), /read-only 512 interval/);
+  assert.equal(intervalIncomplete.screenshotCount, 0);
+  const intervalHadRpc = await run({noPeerRpc: false});
+  await assert.rejects(intervalHadRpc.capture(), /read-only 512 interval/);
+  assert.equal(intervalHadRpc.screenshotCount, 0);
+  const intervalMissed512 = await run({crossed512: false});
+  await assert.rejects(intervalMissed512.capture(), /read-only 512 interval/);
+  assert.equal(intervalMissed512.screenshotCount, 0);
+  const movedDuringScreenshot = await run({cursorAfterScreenshot: 521});
+  await assert.rejects(movedDuringScreenshot.capture(), /changed the source boundary/);
+  assert.equal(movedDuringScreenshot.screenshotCount, 1);
+});
+
+test('runtime CSS-to-SSS final SSS capture runs after fixture freeze and before relay close', async () => {
+  const source = await readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const freeze = source.indexOf('instanceRows[role].runtime_input_fixture_frozen = await instances[role].freezeRuntimeInputFixture();');
+  const capture = source.indexOf('await captureRuntimeCssSssFinalBoundary(role);', freeze);
+  const close = source.indexOf('await relay.close();', capture);
+  assert(freeze >= 0 && capture > freeze && close > capture);
 });
 
 test('startup consumer failures set protocol and native terminal without a progress notification', async () => {

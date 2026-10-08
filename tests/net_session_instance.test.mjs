@@ -8,6 +8,9 @@ import {createBrowserNativePeer} from '../scripts/net_lockstep_browser_peer.mjs'
 import {createNetLockstepNativeAdapter} from '../scripts/net_lockstep_native_adapter.mjs';
 import {LOCKSTEP_DELAY} from '../scripts/net_lockstep_core.mjs';
 import {installNetSourceAccounting, readNetSourceAccounting} from '../scripts/net_source_accounting.mjs';
+import {buildRuntimeCssSssGamepadSamples, RUNTIME_CSS_SSS_INPUT_TICKS} from '../scripts/net_lockstep_browser_modes.mjs';
+import {createControllerManager} from '../web/controller-input.mjs';
+import {standardPad} from './controller-fixtures.mjs';
 
 function fakeChrome(goto, evaluate = async () => undefined) {
   let closeCalls = 0;
@@ -402,6 +405,193 @@ test('runtime fixture tail changes only the next ordinary Gamepad sample and ret
   } finally { if (prior === undefined) delete globalThis.window; else globalThis.window = prior; }
 });
 
+test('CSS-to-SSS fixture drives the ordinary controller manager one selected sample at a time', () => {
+  const prior = globalThis.window, frames = Buffer.alloc(153 * 44);
+  for (let tick = 0; tick < 153; ++tick) {
+    frames[tick * 44 + 32] = 0xff;
+    frames[tick * 44 + 43] = 0xff;
+  }
+  const setPort = (tick, port, buttons, x, y) => {
+    const offset = tick * 44 + port * 11;
+    frames.writeUInt16BE(buttons, offset); frames.writeInt8(x, offset + 2); frames.writeInt8(y, offset + 3);
+  };
+  setPort(20, 0, 0, 80, 0); setPort(21, 1, 0, -60, 40);
+  for (let tick = 150; tick <= 152; ++tick) setPort(tick, 0, 0x1000, 0, 0);
+  const samples = buildRuntimeCssSssGamepadSamples(frames);
+  const pages = {}, counters = {};
+  const encode = output => [output.buttons >>> 8, output.buttons & 255,
+    ...output.stick.map(value => value & 255), ...output.cstick.map(value => value & 255),
+    ...output.triggers, 0, 0, 0];
+  const setup = role => {
+    const port = role === 'alpha' ? 0 : 1, pad = standardPad(port);
+    const manager = createControllerManager({getGamepads: () => [pad], storage: null, userAgent: 'Chrome/154'});
+    const discovered = manager.inspect(); manager.assign(discovered[0].key, port); manager.inspect();
+    const captures = [], events = [], status = {active: 1, cursor: 0, blocker: 'network_wait', terminal: {kind: 0}};
+    const native = {phase: 0, running: 0}; let pollAllowed = false, pollCalls = 0, originalCalls = 0;
+    const owner = {armed: true, closing: false, failure: null, peer: null};
+    const original = () => {
+      ++originalCalls; events.push('original');
+      if (pollAllowed && captures.length < RUNTIME_CSS_SSS_INPUT_TICKS) {
+        ++pollCalls;
+        const row = manager.sample().find(item => item.port === port);
+        assert.ok(row?.active, `${role} controller remains active on its explicit port`);
+        const tick = captures.length, bytes = encode(row.output);
+        assert.deepEqual(bytes, samples[role][tick].bytes, `${role} ordinary conversion matches recipe tick ${tick}`);
+        captures.push({source_cursor: tick, input_tick: tick, local_port: port,
+          poll_serial: tick * 2 + 10, bytes});
+        status.cursor = tick + 1; native.phase = tick < 153 ? 1 : 3;
+      } else if (captures.length === RUNTIME_CSS_SSS_INPUT_TICKS) {
+        status.cursor = 520; status.blocker = 'complete'; native.phase = 3;
+      }
+    };
+    const page = {menuFrame: original, meleeNetRuntimeLockstepSnapshot: () => owner,
+      __net: {status: () => status, native: () => native}, __meleeSyntheticPadState: 'neutral',
+      __meleeSyntheticPadTransition(state) {
+        if (typeof state === 'string') {
+          this.__meleeSyntheticPadState = state;
+          pad.buttons = Array.from({length: 17}, (_, index) => ({pressed: state === 'A' && index === 0,
+            value: state === 'A' && index === 0 ? 1 : 0})); pad.axes = [0, 0, 0, 0];
+        } else {
+          this.__meleeSyntheticPadState = `css-start-to-sss:${state.input_tick}`;
+          pad.buttons = state.buttons.map(button => ({...button})); pad.axes = [...state.axes];
+        }
+      }};
+    globalThis.window = page;
+    installRuntimeInputFixtureInPage({role, inputTicks: RUNTIME_CSS_SSS_INPUT_TICKS,
+      variant: 'css-start-to-sss', samples: samples[role]});
+    pages[role] = {page, original, status, native, owner, captures, events, counters: () => ({pollCalls, originalCalls}),
+      setPollAllowed(value) { pollAllowed = value; }};
+  };
+  try {
+    setup('alpha'); setup('beta');
+    for (const role of ['alpha', 'beta']) {
+      const {page, native, owner, setPollAllowed} = pages[role];
+      globalThis.window = page;
+      page.menuFrame(); // Native lockstep has begun, but no source tick or peer exists yet.
+      assert.deepEqual(page.__meleeRuntimeInputFixture.snapshot().phase_samples, []);
+      native.phase = 1; native.running = 1;
+      page.menuFrame(); // Original CSS can be ready while the source cursor is still stationary.
+      assert.deepEqual(page.__meleeRuntimeInputFixture.snapshot().phase_samples, []);
+      owner.peer = {failure: null, protocol: {ready: true, terminal: null, local_checksum_ticks: 520,
+        remote_checksum_ticks: 520, next_checksum_compare: 520, remote_ack_input: 517},
+        localInputCapture: {mode: 'live', enabled: true, captures: pages[role].captures}};
+      page.menuFrame();
+      assert.deepEqual(page.__meleeRuntimeInputFixture.snapshot().phase_samples, []);
+      setPollAllowed(true);
+    }
+    for (const role of ['alpha', 'beta']) {
+      const {page, original, captures, events, counters, setPollAllowed, status, owner} = pages[role];
+      globalThis.window = page;
+      for (let tick = 0; tick < RUNTIME_CSS_SSS_INPUT_TICKS; ++tick) {
+        if (tick === 10) {
+          const before = captures.length, transitions = page.__meleeRuntimeInputFixture.snapshot().transitions.length;
+          setPollAllowed(false); page.menuFrame(); page.menuFrame(); setPollAllowed(true);
+          assert.equal(captures.length, before); assert.equal(page.__meleeRuntimeInputFixture.snapshot().transitions.length, transitions);
+        }
+        page.menuFrame();
+        assert.equal(captures.length, tick + 1);
+      }
+      page.menuFrame();
+      status.cursor = 520; status.blocker = 'complete';
+      owner.peer.protocol.local_checksum_ticks = 520; owner.peer.protocol.remote_checksum_ticks = 520;
+      owner.peer.protocol.next_checksum_compare = 520; owner.peer.protocol.remote_ack_input = 517;
+      const frozen = page.__meleeRuntimeInputFixture.freeze();
+      assert.equal(frozen.frozen, true); assert.equal(frozen.captured_count, RUNTIME_CSS_SSS_INPUT_TICKS);
+      assert.deepEqual(frozen.phase_samples.map(row => row.phase).filter((phase, index, rows) => !index || phase !== rows[index - 1]), [1, 3]);
+      assert.equal(page.menuFrame, original, 'fixture restores the callback it captured');
+      assert.equal(page.__meleeSyntheticPadState, 'neutral');
+      assert.equal(counters().pollCalls, RUNTIME_CSS_SSS_INPUT_TICKS);
+      assert.equal(counters().originalCalls, RUNTIME_CSS_SSS_INPUT_TICKS + 6,
+        'startup, input, wait, and completion callbacks each run the original synchronous callback once');
+      assert.equal(events.length, counters().originalCalls);
+      assert.equal(frozen.captures.length, RUNTIME_CSS_SSS_INPUT_TICKS);
+    }
+  } finally { if (prior === undefined) delete globalThis.window; else globalThis.window = prior; }
+});
+
+test('CSS-to-SSS phase zero after source progress remains visible and prevents freeze', () => {
+  const prior = globalThis.window, frames = Buffer.alloc(153 * 44);
+  for (let tick = 0; tick < 153; ++tick) {
+    frames[tick * 44 + 32] = 0xff;
+    frames[tick * 44 + 43] = 0xff;
+  }
+  for (let tick = 150; tick <= 152; ++tick) frames.writeUInt16BE(0x1000, tick * 44);
+  const samples = buildRuntimeCssSssGamepadSamples(frames).alpha;
+  const captures = [], status = {active: 1, cursor: 0, blocker: 'network_wait', terminal: {kind: 0}};
+  const native = {phase: 0, running: 0};
+  const owner = {armed: true, closing: false, failure: null, peer: {failure: null,
+    protocol: {ready: true, terminal: null, local_checksum_ticks: 520, remote_checksum_ticks: 520,
+      next_checksum_compare: 520, remote_ack_input: 517},
+    localInputCapture: {mode: 'live', enabled: true, captures}}};
+  const original = () => {
+    const tick = captures.length;
+    if (tick < RUNTIME_CSS_SSS_INPUT_TICKS) {
+      captures.push({source_cursor: tick, input_tick: tick, local_port: 0, poll_serial: tick + 10,
+        bytes: samples[tick].bytes});
+      status.cursor = tick + 1;
+      native.phase = tick === 0 ? 0 : tick < 153 ? 1 : 3;
+      native.running = 1;
+    } else {
+      status.cursor = 520; status.blocker = 'complete'; native.phase = 3;
+    }
+  };
+  const page = {menuFrame: original, meleeNetRuntimeLockstepSnapshot: () => owner,
+    __net: {status: () => status, native: () => native}, __meleeSyntheticPadState: 'neutral',
+    __meleeSyntheticPadTransition(state) {
+      this.__meleeSyntheticPadState = typeof state === 'string' ? state : `css-start-to-sss:${state.input_tick}`;
+    }};
+  try {
+    globalThis.window = page;
+    installRuntimeInputFixtureInPage({role: 'alpha', inputTicks: RUNTIME_CSS_SSS_INPUT_TICKS,
+      variant: 'css-start-to-sss', samples});
+    for (let tick = 0; tick < RUNTIME_CSS_SSS_INPUT_TICKS; ++tick) page.menuFrame();
+    page.menuFrame();
+    const phases = page.__meleeRuntimeInputFixture.snapshot().phase_samples;
+    assert.equal(phases[0].cursor, 1);
+    assert.equal(phases[0].phase, 0, 'only zero-progress startup observations are omitted');
+    assert.deepEqual(phases.map(row => row.phase).filter((phase, index, rows) => !index || phase !== rows[index - 1]), [0, 1, 3]);
+    assert.throws(() => page.__meleeRuntimeInputFixture.freeze(), /cannot freeze/);
+    assert.equal(page.__meleeRuntimeInputFixture.snapshot().frozen, false);
+    page.__meleeRuntimeInputFixture.dispose();
+    assert.equal(page.menuFrame, original);
+  } finally { if (prior === undefined) delete globalThis.window; else globalThis.window = prior; }
+});
+
+test('CSS-to-SSS fixture refuses to freeze unless native status ends in SSS', () => {
+  const prior = globalThis.window;
+  const frames = Buffer.alloc(153 * 44);
+  for (let tick = 0; tick < 153; ++tick) {
+    frames[tick * 44 + 32] = 0xff;
+    frames[tick * 44 + 43] = 0xff;
+  }
+  for (let tick = 150; tick <= 152; ++tick) frames.writeUInt16BE(0x1000, tick * 44);
+  const samples = buildRuntimeCssSssGamepadSamples(frames).alpha;
+  const captures = [], status = {active: 1, cursor: 0, blocker: 'network_wait', terminal: {kind: 0}};
+  const native = {phase: 1, running: 1};
+  const owner = {armed: true, closing: false, failure: null, peer: {failure: null,
+    protocol: {ready: true, terminal: null, local_checksum_ticks: 520, remote_checksum_ticks: 520,
+      next_checksum_compare: 520, remote_ack_input: 517},
+    localInputCapture: {mode: 'live', enabled: true, captures}}};
+  const page = {menuFrame() {
+    const tick = captures.length;
+    captures.push({source_cursor: tick, input_tick: tick, local_port: 0, poll_serial: tick + 1,
+      bytes: samples[tick].bytes});
+    status.cursor = tick + 1; native.phase = tick < 153 ? 1 : 3;
+  }, meleeNetRuntimeLockstepSnapshot: () => owner,
+  __net: {status: () => status, native: () => native}, __meleeSyntheticPadState: 'neutral',
+  __meleeSyntheticPadTransition(state) { this.__meleeSyntheticPadState = state; }};
+  try {
+    globalThis.window = page;
+    installRuntimeInputFixtureInPage({role: 'alpha', inputTicks: RUNTIME_CSS_SSS_INPUT_TICKS,
+      variant: 'css-start-to-sss', samples});
+    for (let tick = 0; tick < RUNTIME_CSS_SSS_INPUT_TICKS; ++tick) page.menuFrame();
+    status.cursor = 520; status.blocker = 'complete'; native.phase = 1;
+    assert.throws(() => page.__meleeRuntimeInputFixture.freeze(), /cannot freeze/);
+    assert.equal(page.__meleeRuntimeInputFixture.snapshot().frozen, false);
+    assert.equal(page.__meleeRuntimeInputFixture.snapshot().captured_count, RUNTIME_CSS_SSS_INPUT_TICKS);
+  } finally { if (prior === undefined) delete globalThis.window; else globalThis.window = prior; }
+});
+
 test('actual runtime fixture rejects malformed ownership, nonneutral pattern and asynchronous callback', () => {
   const prior = globalThis.window;
   const row = () => ({source_cursor: 0, input_tick: 0, local_port: 0, poll_serial: 10, bytes: Array(11).fill(0)});
@@ -512,7 +702,7 @@ test('actual harness freezes complete fixture before asynchronous normal close c
       await Promise.resolve();
       for (const role of ['alpha', 'beta']) { globalThis.window = pages[role]; pages[role].menuFrame(); }
     }};
-    const context = {runtimeOwned: true, runtimeInputFixture: true, instanceRows, pairResults, relay,
+    const context = {runtimeOwned: true, runtimeInputFixture: true, runtimeCssSss: false, instanceRows, pairResults, relay,
       instances: Object.fromEntries(['alpha', 'beta'].map(role => [role, {freezeRuntimeInputFixture: async () => invoke(pages[role], 'freeze')}]))};
     await vm.runInNewContext(`(async()=>{${source.slice(start, end)}\n}})()`, context);
     assert.equal(closeCalls, 1); assert.equal(pairResults.relay_closed, true);

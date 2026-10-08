@@ -10,6 +10,8 @@ import {createControllerManager} from '../web/controller-input.mjs';
 import {standardPad} from './controller-fixtures.mjs';
 import {LockstepPeer, parseNetChecksum, lockstepConstants, LOCKSTEP_MAX_SOURCE_TICKS} from '../scripts/net_lockstep_core.mjs';
 import {createRoomTransport, createRuntimeLockstepSession} from '../scripts/net_lockstep_runtime_owner.mjs';
+import {buildRuntimeCssSssGamepadSamples, RUNTIME_CSS_SSS_INPUT_TICKS,
+  RUNTIME_CSS_SSS_SOURCE_TICKS} from '../scripts/net_lockstep_browser_modes.mjs';
 
 const turn = () => new Promise(resolve => setImmediate(resolve));
 function deferred() {
@@ -706,7 +708,7 @@ test('actual autonomous harness observes each checksum ownership mode and freeze
     let iteration = 0, time = 0;
     const before = rows(initial), after = rows(8); mutate(after);
     if (!runtimeOwned) { before.snapshot.exportRecords = initial; after.snapshot.exportRecords = 8; }
-    const context = {runtimeOwned, sourceTicks: 8, usedInputs: 6, NET_RECORD_BYTES: 64, deadline: 4, stallMs: 4, pollMs: 1,
+    const context = {runtimeOwned, runtimeCssSss: false, sourceTicks: 8, usedInputs: 6, NET_RECORD_BYTES: 64, deadline: 4, stallMs: 4, pollMs: 1,
       Date: {now: () => time}, sleep: async () => { ++time; }, pairResults: {}, verifyPositivePeerCompletion,
       checkedHealth: async () => { const row = iteration < 2 ? before : after; return {status: row.status, native: row.native}; },
       instances: Object.fromEntries(['alpha', 'beta'].map(role => [role, {
@@ -826,7 +828,55 @@ test('actual consumed-input witness binds every selected sample at the native tw
   assert.throws(() => verify(alpha, beta, exports.subarray(64), exports), /record count/);
   const shifted = structuredClone(alpha); shifted[1][0] = 0; shifted[2][0] = 1;
   assert.throws(() => verify(shifted, beta, exports, exports), /does not match/);
-  assert.equal((source.match(/verifyConsumedInputComponents\(samples.alpha, samples.beta, bytesA, bytesB\)/g) || []).length, 1);
+  assert.equal((source.match(/verifyConsumedInputComponents\(samples.alpha, samples.beta, bytesA, bytesB\)/g) || []).length, 2);
+});
+
+test('runtime CSS-to-SSS witness binds all 518 selected PAD rows to 520 native input checksums', async () => {
+  const frames = Buffer.alloc(153 * 44);
+  for (let tick = 0; tick < 153; ++tick) {
+    frames[tick * 44 + 32] = 0xff;
+    frames[tick * 44 + 43] = 0xff;
+  }
+  const setPort = (tick, port, buttons, x, y) => {
+    const offset = tick * 44 + port * 11;
+    frames.writeUInt16BE(buttons, offset); frames.writeInt8(x, offset + 2); frames.writeInt8(y, offset + 3);
+  };
+  for (const [first, count, port, x, y] of [[20, 25, 0, 80, 0], [50, 12, 0, 0, 80],
+    [66, 20, 0, -80, -40], [90, 10, 0, 40, 0], [24, 20, 1, -80, 20],
+    [48, 14, 1, 0, 80], [66, 22, 1, 60, 0], [92, 12, 1, 0, -60]])
+    for (let tick = first; tick < first + count; ++tick) setPort(tick, port, 0, x, y);
+  for (let tick = 150; tick <= 152; ++tick) setPort(tick, 0, 0x1000, 0, 0);
+  const samples = buildRuntimeCssSssGamepadSamples(frames);
+  const source = await fs.readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const context = {Buffer, sourceTicks: RUNTIME_CSS_SSS_SOURCE_TICKS, LOCKSTEP_DELAY: 2,
+    NET_RECORD_BYTES: 64, FNV_OFFSET: 14695981039346656037n, FNV_PRIME: 1099511628211n,
+    parseNetChecksum, lockstepConstants};
+  const verify = vm.runInNewContext(source.slice(source.indexOf('const fnv1a64 = bytes =>'),
+    source.indexOf('const pairResults =')) + '\nverifyConsumedInputComponents', context);
+  const alpha = samples.alpha.map(row => row.bytes), beta = samples.beta.map(row => row.bytes);
+  const bytes = Buffer.alloc(RUNTIME_CSS_SSS_SOURCE_TICKS * 64);
+  const neutral = Buffer.from(lockstepConstants.neutralPad, 'hex');
+  const noController = Buffer.from(lockstepConstants.noControllerPad, 'hex');
+  for (let sourceTick = 0; sourceTick < RUNTIME_CSS_SSS_SOURCE_TICKS; ++sourceTick) {
+    const inputTick = sourceTick - 2;
+    const pair = inputTick < 0 ? [neutral, neutral] : [Buffer.from(alpha[inputTick]), Buffer.from(beta[inputTick])];
+    const padBytes = Buffer.concat([...pair, noController, noController]);
+    let inputHash = 14695981039346656037n;
+    for (const byte of padBytes) inputHash = ((inputHash ^ BigInt(byte)) * 1099511628211n) & ((1n << 64n) - 1n);
+    bytes.writeUInt32LE(sourceTick, sourceTick * 64);
+    bytes.writeBigUInt64LE(inputHash, sourceTick * 64 + 24);
+  }
+  const result = verify(alpha, beta, bytes, bytes);
+  assert.equal(result.expectedInputComponents.length, RUNTIME_CSS_SSS_SOURCE_TICKS);
+  assert.equal(result.expectedInputComponents[0].input_tick, null);
+  assert.equal(result.expectedInputComponents[1].input_tick, null);
+  assert.equal(result.expectedInputComponents[2].input_tick, 0);
+  assert.equal(result.expectedInputComponents[152].input_tick, 150);
+  assert.equal(result.expectedInputComponents[155].input_tick, 153);
+  assert.equal(result.expectedInputComponents[519].input_tick, 517);
+  const changed = structuredClone(alpha); changed[150][0] ^= 0x10;
+  assert.throws(() => verify(changed, beta, bytes, bytes), /does not match/);
+  assert.throws(() => verify(alpha.slice(1), beta, bytes, bytes), /every canonical selected PAD sample/);
 });
 
 
