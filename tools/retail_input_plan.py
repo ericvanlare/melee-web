@@ -10,6 +10,10 @@ state equivalence.  Both policies require physical buttons and exact,
 invertible physical trigger floats.  Digital L/R force analog 255; A/B
 pressure is zero at Melee's serial-interface mode-3 PAD boundary. The old
 raw-v1 movement canary remains readable only where no A/B pressure was assumed.
+
+Version 4 separately declares one fixed authored two-human SD prerequisite. It
+contains a recipe hash, never a Slippi source hash. Existing capture consumers
+reject it; only static declaration tooling may explicitly opt into loading it.
 """
 import hashlib
 import json
@@ -27,6 +31,7 @@ POLICIES = (LEGACY_RAW_POLICY, POLICY, PROCESSED_POLICY)
 EXPORT_POLICIES = (POLICY, PROCESSED_POLICY)
 CPU_PLAN_VERSION = 2
 MULTIPLAYER_CPU_PLAN_VERSION = 3
+AUTHORED_PLAN_VERSION = 4
 MAX_ACTIVE_PLAYERS = 4
 MAX_FRAMES = 36000
 PAD = struct.Struct('>HbbbbBBBBb')
@@ -82,6 +87,8 @@ def _pad(value):
 
 def validate_plan(value):
     version = value.get('version') if isinstance(value, dict) else None
+    if type(version) is int and version == AUTHORED_PLAN_VERSION:
+        return _validate_authored_plan(value)
     common = ('schema','version','policy','source_sha256','first_frame',
               'source_stage','source_characters','frames')
     cpu_fields = ('source_player_types','source_cpu_kinds','source_cpu_levels',
@@ -187,6 +194,44 @@ def validate_plan(value):
     return value
 
 
+def _validate_authored_plan(value):
+    """Keep the new declaration separate from recorded/CPU v1--v3 contracts."""
+    from authored_sd_reference_plan import (PROVENANCE, STARTUP_TICKS, MATCH_TICKS,
+                                           validate_recipe, recipe_sha256)
+    _keys(value, ('schema', 'version', 'policy', 'provenance', 'authored_recipe',
+                  'authored_recipe_sha256', 'first_frame', 'source_stage',
+                  'source_characters', 'active_player_count', 'source_player_types',
+                  'controlled_ports', 'frames'))
+    if value['schema'] != SCHEMA or value['policy'] != POLICY or value['provenance'] != PROVENANCE:
+        raise ValueError('Unsupported authored input plan schema, policy or provenance')
+    declaration = validate_recipe(value['authored_recipe'])
+    if value['authored_recipe_sha256'] != recipe_sha256(declaration):
+        raise ValueError('Authored input plan recipe hash differs from its declaration')
+    _integer(value['first_frame'], -123, -123)
+    _integer(value['source_stage'], 32, 32)
+    _integer(value['active_player_count'], 2, 2)
+    for key, expected in (('source_characters', [8, 8]),
+                          ('source_player_types', [0, 0]), ('controlled_ports', [1, 2])):
+        if (not isinstance(value[key], list) or
+                any(type(item) is not int for item in value[key]) or value[key] != expected):
+            raise ValueError('Authored input plan differs from its declared ' + key)
+    frames = value['frames']
+    if not isinstance(frames, list) or len(frames) != STARTUP_TICKS + MATCH_TICKS:
+        raise ValueError('Authored input plan requires its complete fixed sample cap')
+    expected = [NEUTRAL_PAD, NEUTRAL_PAD, DISCONNECTED_PAD, DISCONNECTED_PAD]
+    for index, frame in enumerate(frames):
+        if not isinstance(frame, list) or frame != expected:
+            raise ValueError('Authored input plan differs from declared neutral vector at tick %d' % index)
+    return value
+
+
+def require_capture_plan(plan):
+    """Existing capture/acceptance formats have no authored SD phase contract."""
+    if plan.get('version') == AUTHORED_PLAN_VERSION:
+        raise ValueError('Authored SD input plans are declaration-only; capture receiver is not ready')
+    return plan
+
+
 def _unique(pairs):
     result = {}
     for key, value in pairs:
@@ -196,14 +241,21 @@ def _unique(pairs):
     return result
 
 
-def load_plan(path):
+def load_plan(path, *, allow_authored=False):
+    """Load legacy capture plans; authored declarations require explicit opt-in."""
     path = Path(path)
     if path.stat().st_size > 4*1024*1024:
         raise ValueError('Input plan exceeds byte limit')
     raw = path.read_bytes()
     if len(raw) > 4*1024*1024:
         raise ValueError('Input plan exceeds byte limit')
-    return validate_plan(json.loads(raw, object_pairs_hook=_unique)), hashlib.sha256(raw).hexdigest()
+    value = json.loads(raw, object_pairs_hook=_unique)
+    if not allow_authored and isinstance(value, dict):
+        # Reject before importing the authored builder: existing self-contained
+        # collector packages intentionally do not include that new contract.
+        require_capture_plan(value)
+    plan = validate_plan(value)
+    return plan, hashlib.sha256(raw).hexdigest()
 
 
 def prefix_timeline(timeline, frame_count):
@@ -287,6 +339,18 @@ def pipe_commands(pad):
 
 
 def verify_entry(plan, start_hex):
+    if plan.get('version') == AUTHORED_PLAN_VERSION:
+        validate_plan(plan)
+        # Reuse the checked ordinary-VS setup decoder rather than inventing a
+        # second packed-bit interpretation or accepting only a matchup subset.
+        from retail_setup_validation import _decode_setup
+        actual = _decode_setup(start_hex)
+        raw = bytes.fromhex(start_hex)
+        if any(raw[0x61 + slot * 0x24] != 3 for slot in range(2, 6)):
+            raise ValueError('Authored setup requires all inactive source slots to be NA')
+        if actual != plan['authored_recipe']['expected_setup']:
+            raise ValueError('Retail menu selection differs from the authored setup declaration')
+        return
     raw = bytes.fromhex(start_hex)
     active_count = (plan.get('active_player_count', 2)
                     if plan.get('version') == MULTIPLAYER_CPU_PLAN_VERSION else 2)
@@ -310,6 +374,14 @@ def verify_entry(plan, start_hex):
 
 
 def verify_tick(plan, index, inputs):
+    if plan.get('version') == AUTHORED_PLAN_VERSION:
+        if type(index) is not int or not 0 <= index < len(plan['frames']):
+            raise ValueError('Authored input plan sample cap exhausted or index invalid')
+        expected = plan['frames'][index]
+        if inputs != expected:
+            raise ValueError('Input intent mismatch at tick %d: expected %s, consumed %s' %
+                             (index, expected, inputs))
+        return
     expected = (plan['frames'][index] if plan.get('version') == MULTIPLAYER_CPU_PLAN_VERSION
                 else plan['frames'][index] + [DISCONNECTED_PAD, DISCONNECTED_PAD])
     if inputs != expected:
@@ -318,6 +390,7 @@ def verify_tick(plan, index, inputs):
 
 
 def verify_capture(plan, capture):
+    require_capture_plan(plan)
     verify_entry(plan, capture.match_enter['start_melee_hex'])
     if len(capture.frames) != len(plan['frames']):
         raise ValueError('Capture does not consume the complete input plan')
