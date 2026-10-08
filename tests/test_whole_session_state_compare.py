@@ -3980,6 +3980,8 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             ("runner-float-echo", "runner", "max_records",
              float(V10_ORDERED_LINEAGE_V2_RECORD_CAP),
              "ordered clock runner packet caps differ from this bounded scope"),
+            ("runner-extra-key", "runner", "unexpected", "metadata",
+             "ordered clock runner packet caps differ from this bounded scope"),
             ("audit-count-mismatch", "audit", "max_records",
              V10_ORDERED_LINEAGE_V2_RECORD_CAP - 1,
              "later match-clock audit caps differ from the frozen bounded reader"),
@@ -4013,6 +4015,57 @@ class WholeSessionStateCompareTests(unittest.TestCase):
                 self.assertIn(expected_error, result["error"])
                 self.assertEqual(iterator_calls, 0)
                 self.assertEqual(opened_source, [])
+
+    def test_ordered_audit_stop_metadata_is_preserved_for_v1_prior_and_v2_parent(self):
+        stop = "first invalid record/join/checkpoint, cap, EOF before target, or first completed target tick"
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = _nest_ordered_checkpoint_prior(
+                _attach_ordered_comparison_lineage(
+                    _clock60_comparison_fixture(
+                        Path(directory), terminal_match_frame=2000), (1000,),
+                    source_limits={
+                        "max_bytes": V10_ORDERED_LINEAGE_V2_BYTE_CAP,
+                        "max_records": V10_ORDERED_LINEAGE_V2_RECORD_CAP,
+                    }),
+                "clock1000")
+
+            outer_audit = copy.deepcopy(fixture["match_clock_audit"])
+            outer_audit["limits"]["stop"] = stop
+            _refresh_ordered_terminal_audit_identity(fixture, outer_audit)
+
+            nested_audit_path = fixture["nested_prior_audit_path"]
+            nested_audit = json.loads(nested_audit_path.read_text(encoding="utf-8"))
+            self.assertEqual(nested_audit["schema"],
+                             "melee-web-b4-source-clock1000-audit-v1")
+            nested_audit["limits"]["stop"] = stop
+            nested_audit_path.write_text(json.dumps(nested_audit), encoding="utf-8")
+            nested_identity = {
+                "path": str(nested_audit_path), "bytes": nested_audit_path.stat().st_size,
+                "sha256": hashlib.sha256(nested_audit_path.read_bytes()).hexdigest(),
+            }
+            prior_path = fixture["nested_prior_expectations_path"]
+            prior = json.loads(prior_path.read_text(encoding="utf-8"))
+            prior_source = prior["source"]
+            prior_source["match_clock_boundary_audit"] = nested_identity
+            prior_source["ordered_clock_lineage"]["checkpoints"][-1][
+                "audit"] = nested_identity
+            _refresh_nested_prior_chain(fixture, prior)
+
+            outer_runner_path = Path(fixture["packet"]["source"][
+                "ordered_clock_lineage"]["runner_packet"]["path"])
+            outer_runner = json.loads(outer_runner_path.read_text(encoding="utf-8"))
+            self.assertEqual(set(outer_runner["caps"]), {"max_bytes", "max_records"})
+            self.assertEqual(outer_audit["limits"]["stop"], stop)
+            self.assertEqual(nested_audit["limits"]["stop"], stop)
+
+            result, iterator_calls, _validated, opened_source = \
+                _run_ordered_comparison_to_source_sentinel(fixture)
+
+            self.assertEqual(result["result"], "invalid", result)
+            self.assertEqual(result["error"],
+                             "source-read sentinel reached after metadata validation")
+            self.assertEqual(iterator_calls, 1)
+            self.assertEqual(opened_source, [])
 
     def test_nested_ordered_clock1000_prior_validates_before_source_iteration(self):
         with tempfile.TemporaryDirectory() as directory:

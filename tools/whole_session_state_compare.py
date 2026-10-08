@@ -1688,8 +1688,8 @@ def _ordered_clock_lineage_limits(lineage: Any) -> tuple[int, int]:
 
 def _ordered_clock_limits_echo_matches(value: Any, max_bytes: int,
                                        max_records: int) -> bool:
-    """Require exact integer cap echoes from ordered runner/audit sidecars."""
-    return (isinstance(value, dict) and set(value) == {"max_bytes", "max_records"} and
+    """Require exact integer cap values while preserving audit metadata fields."""
+    return (isinstance(value, dict) and
             type(value.get("max_bytes")) is int and value["max_bytes"] == max_bytes and
             type(value.get("max_records")) is int and value["max_records"] == max_records)
 
@@ -3035,7 +3035,9 @@ def _validate_ordered_clock_audit_lineage(audit: Mapping[str, Any],
         raise ComparisonError("ordered clock runner packet binds a different original trace")
     byte_cap, record_cap = _ordered_clock_lineage_limits(lineage)
     limits = runner.get("caps")
-    if not _ordered_clock_limits_echo_matches(limits, byte_cap, record_cap):
+    if (not isinstance(limits, dict) or
+            set(limits) != {"max_bytes", "max_records"} or
+            not _ordered_clock_limits_echo_matches(limits, byte_cap, record_cap)):
         raise ComparisonError("ordered clock runner packet caps differ from this bounded scope")
     target_packet = runner.get("target")
     if (not isinstance(target_packet, dict) or
