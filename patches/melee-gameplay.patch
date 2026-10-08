@@ -13119,6 +13119,90 @@ index 72776f83322214c6cee06d235e9af762c71b1d3a..2aa1009954979ea4566538cb1bc711a2
 +    melee_fx_active=0;
 +}
 +#endif
+diff --git a/src/sysdolphin/baselib/class.c b/src/sysdolphin/baselib/class.c
+index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..6fd8b370aac507675f16d9a23afc9d76f806e122 100644
+--- a/src/sysdolphin/baselib/class.c
++++ b/src/sysdolphin/baselib/class.c
+@@ -1,5 +1,9 @@
+ #include "class.h"
+ 
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++#include "stadium_c1_heap_owner_observer.h"
++#endif
++
+ #include <string.h>
+ 
+ #include "debug.h"
+@@ -94,10 +98,19 @@ HSD_MemoryEntry* GetMemoryEntry(s32 idx)
+             }
+             memset(memory_list, 0, new_nb * sizeof(*memory_list));
+             nb_memory_list = new_nb;
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++            melee_web_stadium_c1_heap_owner_record(
++                MELEE_WEB_STADIUM_C1_HEAP_OWNER_CLASS_DIRECTORY,
++                memory_list, sizeof(*memory_list), (uint32_t) new_nb,
++                memory_list, new_nb * sizeof(*memory_list));
++#endif
+         } else { // Resizes the array
+             HSD_MemoryEntry** old_list;
+             HSD_MemoryEntry** new_list;
+             s32 old_nb, new_nb;
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++            uint32_t owner_token;
++#endif
+ 
+             new_nb = nb_memory_list * 2;
+             while (idx >= new_nb) {
+@@ -108,6 +121,12 @@ HSD_MemoryEntry* GetMemoryEntry(s32 idx)
+             if (new_list == NULL) {
+                 return NULL;
+             }
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++            owner_token = melee_web_stadium_c1_heap_owner_reserve(
++                MELEE_WEB_STADIUM_C1_HEAP_OWNER_CLASS_DIRECTORY,
++                new_list, sizeof(*memory_list), (uint32_t) new_nb, new_list,
++                sizeof(*memory_list) * new_nb);
++#endif
+ 
+             memcpy(new_list, memory_list,
+                    sizeof(*memory_list) * nb_memory_list);
+@@ -123,6 +142,9 @@ HSD_MemoryEntry* GetMemoryEntry(s32 idx)
+ 
+             hsdFreeMemPiece(old_list, old_nb);
+             memory_list[OSRoundUp32B(old_nb) / 32 - 1]->nb_alloc += 1;
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++            melee_web_stadium_c1_heap_owner_complete(owner_token);
++#endif
+         }
+     }
+ 
+@@ -157,6 +179,12 @@ HSD_MemoryEntry* GetMemoryEntry(s32 idx)
+                     }
+                 }
+             }
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++            melee_web_stadium_c1_heap_owner_record(
++                MELEE_WEB_STADIUM_C1_HEAP_OWNER_CLASS_BUCKET, entry,
++                entry->size, (uint32_t) idx, entry,
++                sizeof(HSD_MemoryEntry));
++#endif
+         }
+         return memory_list[idx];
+     }
+@@ -228,6 +256,13 @@ void* hsdAllocMemPiece(s32 size)
+         var_r30->nb_free += 1;
+     }
+     temp_r3_3->nb_alloc += 1;
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    melee_web_stadium_c1_heap_owner_record(
++        MELEE_WEB_STADIUM_C1_HEAP_OWNER_CLASS_SLAB, temp_r3_3,
++        temp_r3_3->size,
++        temp_r28 >= 0 ? var_r30->size : 0, temp_r3,
++        nb_memory_list * 32);
++#endif
+     return temp_r3;
+ }
+ 
 diff --git a/src/sysdolphin/baselib/cobj.c b/src/sysdolphin/baselib/cobj.c
 index ff44dcde84072dcea551c30cdb6582ac3d23a6bd..535e6449e151d8360a596cd47933f3b13c61d103 100644
 --- a/src/sysdolphin/baselib/cobj.c
@@ -13537,6 +13621,34 @@ index 15fa8a880a290516780c5febbc76db6c0cf04105..d6acdf2e32548b6c119cda499038ee38
      m[2][2] = cosY * (vec1z * cosX);
      m[0][3] = vec3->x;
      m[1][3] = vec3->y;
+diff --git a/src/sysdolphin/baselib/objalloc.c b/src/sysdolphin/baselib/objalloc.c
+index 499fe7804bee57eee4e5bad306235086489dde19..13bdd96a9b58010cd665de64692a3a62fd52d38b 100644
+--- a/src/sysdolphin/baselib/objalloc.c
++++ b/src/sysdolphin/baselib/objalloc.c
+@@ -1,5 +1,9 @@
+ #include "objalloc.h"
+ 
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++#include "stadium_c1_heap_owner_observer.h"
++#endif
++
+ #include <string.h>
+ 
+ #include "initialize.h"
+@@ -65,6 +69,13 @@ s32 HSD_ObjAllocAddFree(HSD_ObjAllocData* data, u32 num)
+ 
+     data->freehead = (HSD_ObjAllocLink*) pool_start;
+     data->free += num;
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (obj_heap.top == 0) {
++        melee_web_stadium_c1_heap_owner_record(
++            MELEE_WEB_STADIUM_C1_HEAP_OWNER_OBJALLOC_POOL, data,
++            data->size, num, pool_start, pool_size);
++    }
++#endif
+     return num;
+ }
+ 
 diff --git a/src/sysdolphin/baselib/particle.c b/src/sysdolphin/baselib/particle.c
 index 2b9052578d839648c308ee7317e19c5a15d5a224..061d98799d249a0ca49c24a90e5d0771ec4c56af 100644
 --- a/src/sysdolphin/baselib/particle.c

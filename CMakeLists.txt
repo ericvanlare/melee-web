@@ -124,10 +124,15 @@ if(EMSCRIPTEN)
     src/gameplay_stage_context.c src/gameplay_common_context.c "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lbspdisplay.c")
   if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     # Keep C1 source observers limited to their original implementation units.
+    set_property(SOURCE "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/objalloc.c"
+      APPEND PROPERTY COMPILE_DEFINITIONS MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
+    set_property(SOURCE "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/class.c"
+      APPEND PROPERTY COMPILE_DEFINITIONS MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
     set_property(SOURCE "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/gr/ground.c"
       APPEND PROPERTY COMPILE_DEFINITIONS MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
     set_property(SOURCE "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lbspdisplay.c"
       APPEND PROPERTY COMPILE_DEFINITIONS MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
+    target_sources(gameplay_runtime PRIVATE src/stadium_c1_heap_owner_observer.c)
   endif()
   foreach(unit class object hash id list jobj dobj mobj tobj texp texpdag tev sobjlib hsd_3924
       displayfunc state aobj fobj robj shadow wobj lobj spline mtx util quatlib

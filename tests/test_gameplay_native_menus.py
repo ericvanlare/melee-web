@@ -68,6 +68,110 @@ def parse_c1_record(line, prefix):
     return result
 
 
+def parse_c1_heap_owner_records(stderr, scope, expected_phases=()):
+    metadata = []
+    results = []
+    markers = []
+    events = []
+    diagnostic_bytes = 0
+    for line in stderr.splitlines():
+        if line.startswith("C1_HEAP_OWNER_"):
+            diagnostic_bytes += len((line + "\n").encode("utf-8"))
+            if diagnostic_bytes > 4 * 1024 * 1024:
+                raise AssertionError("heap-owner diagnostics exceeded the 4 MiB bound")
+        if line.startswith("C1_HEAP_OWNER_META "):
+            metadata.append(parse_c1_record(line, "C1_HEAP_OWNER_META"))
+        elif line.startswith("C1_HEAP_OWNER_RESULT "):
+            results.append(parse_c1_record(line, "C1_HEAP_OWNER_RESULT"))
+        elif line.startswith("C1_HEAP_OWNER_MARK "):
+            markers.append(parse_c1_record(line, "C1_HEAP_OWNER_MARK"))
+        elif line.startswith("C1_HEAP_OWNER_EVENT "):
+            events.append(parse_c1_record(line, "C1_HEAP_OWNER_EVENT"))
+
+    if len(metadata) != 1 or len(results) != 1:
+        raise AssertionError("heap-owner summary is missing or duplicated")
+    meta, result = metadata[0], results[0]
+    if meta.get("scope") != scope or result.get("scope") != scope:
+        raise AssertionError("heap-owner scope changed")
+    if (result.get("status") != meta.get("status") or
+            result.get("overflow") != meta.get("overflow") or
+            result.get("overflow_count") != meta.get("overflow_count")):
+        raise AssertionError("heap-owner status or overflow summaries disagree")
+    if result.get("rows") != meta.get("rows") or result.get("markers") != meta.get("markers"):
+        raise AssertionError("heap-owner summary counts disagree")
+    if (result.get("invalid_count") != meta.get("invalid_count") or
+            result.get("pending_rows") != meta.get("pending_rows")):
+        raise AssertionError("heap-owner invalid or pending summary counts disagree")
+    capacity = int(meta["capacity"])
+    row_bytes = int(meta["row_bytes"])
+    buffer_bytes = int(meta["buffer_bytes"])
+    row_count = int(meta["rows"])
+    if (capacity != 4096 or not 0 < row_bytes <= 64 or
+            buffer_bytes != capacity * row_bytes or row_count > capacity):
+        raise AssertionError("heap-owner fixed storage bounds are inconsistent")
+    if meta.get("overflow") != "0" or int(meta.get("overflow_count", "-1")) != 0:
+        raise AssertionError("heap-owner buffer overflowed")
+    if int(meta.get("invalid_count", "-1")) != 0:
+        raise AssertionError("heap-owner completion token was invalid or duplicated")
+    if int(meta.get("pending_rows", "-1")) != 0:
+        raise AssertionError("heap-owner rows were left incomplete")
+    if len(markers) != int(meta["markers"]):
+        raise AssertionError("heap-owner marker rows disagree with the declared count")
+    if meta.get("status") == "disabled":
+        if (meta.get("armed") != "0" or row_count or markers or events or
+                result.get("status") != "disabled"):
+            raise AssertionError("disabled heap-owner mode recorded partial rows")
+        return {"metadata": meta, "markers": [], "events": []}
+    if meta.get("status") != "complete" or result.get("status") != "complete" or meta.get("armed") != "1":
+        raise AssertionError("heap-owner observer was unavailable")
+    if len(events) != row_count or not events:
+        raise AssertionError("heap-owner event rows are missing or duplicated")
+
+    if expected_phases:
+        if len(markers) != len(expected_phases):
+            raise AssertionError("heap-owner phase markers are incomplete")
+        previous_count = 0
+        for marker, phase in zip(markers, expected_phases):
+            event_count = int(marker["next_sequence"]) - 1
+            if (marker.get("scope") != scope or marker.get("phase") != phase or
+                    int(marker["first_sequence"]) != previous_count + 1 or
+                    event_count < previous_count or event_count > row_count or
+                    marker.get("census_complete") != "1"):
+                raise AssertionError(f"invalid heap-owner phase marker: {marker}")
+            previous_count = event_count
+        if previous_count != row_count:
+            raise AssertionError("heap-owner rows occurred after the final phase marker")
+    elif markers:
+        raise AssertionError("asset-free heap-owner control unexpectedly emitted phase markers")
+
+    for sequence, event in enumerate(events, 1):
+        if int(event.get("sequence", "-1")) != sequence:
+            raise AssertionError("heap-owner event order is not monotonic")
+        if (event.get("scope") != scope or parse_pointer(event["owner"]) == 0 or
+                parse_pointer(event["payload"]) == 0 or
+                int(event["hsd_requested"]) <= 0 or
+                int(event["lease_status"]) != 0 or event.get("live") != "1" or
+                int(event["heap"]) < 0 or
+                int(event["lease_requested"]) != int(event["hsd_requested"]) or
+                int(event["world"]) <= 0 or
+                int(event["allocation_generation"]) <= 0):
+            raise AssertionError(f"heap-owner event has no exact live SDK lease: {event}")
+        if event.get("kind") not in {
+                "objalloc_pool", "class_directory", "class_bucket_metadata", "class_slab"}:
+            raise AssertionError(f"unknown heap-owner site kind: {event}")
+        if expected_phases:
+            expected_phase = expected_phases[-1]
+            for marker in markers:
+                if sequence < int(marker["next_sequence"]):
+                    expected_phase = marker["phase"]
+                    break
+            if event.get("phase") != expected_phase:
+                raise AssertionError(f"heap-owner event phase disagrees with markers: {event}")
+        elif event.get("phase") != "asset-free-control":
+            raise AssertionError(f"asset-free heap-owner event has an unexpected phase: {event}")
+    return {"metadata": meta, "markers": markers, "events": events}
+
+
 def parse_pointer(value):
     if value in {"0", "0x0", "nullptr", "(nil)"}:
         return 0
@@ -325,6 +429,105 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
     @classmethod
     def setUpClass(cls):
         cls.scratch = cls.new_workspace(ROOT, "stadium-c1a-native-menu-")
+
+    def test_c1_heap_owner_parser_requires_exact_bounded_rows(self):
+        meta = ("C1_HEAP_OWNER_META scope=asset-free-control status=complete armed=1 "
+                "rows=1 row_bytes=64 capacity=4096 buffer_bytes=262144 "
+                "overflow=0 overflow_count=0 invalid_count=0 pending_rows=0 markers=0")
+        event = ("C1_HEAP_OWNER_EVENT scope=asset-free-control sequence=1 "
+                 "phase=asset-free-control kind=objalloc_pool owner_label=GObj "
+                 "owner=0x1000 payload=0x2000 owner_size=56 auxiliary=2 "
+                 "hsd_requested=112 lease_status=0 live=1 heap=0 "
+                 "lease_requested=112 world=1 allocation_generation=2")
+        result = ("C1_HEAP_OWNER_RESULT scope=asset-free-control status=complete "
+                  "rows=1 markers=0 overflow=0 overflow_count=0 "
+                  "invalid_count=0 pending_rows=0")
+        parsed = parse_c1_heap_owner_records(
+            "\n".join((meta, event, result)), "asset-free-control")
+        self.assertEqual(parsed["events"][0]["sequence"], "1")
+        malformed = (
+            (event.replace("sequence=1", "sequence=2"), "event order"),
+            (event.replace("allocation_generation=2", "allocation_generation=0"),
+             "exact live SDK lease"),
+            (event.replace("lease_requested=112", "lease_requested=111"),
+             "exact live SDK lease"),
+            (meta.replace("buffer_bytes=262144", "buffer_bytes=262143"),
+             "storage bounds"),
+            (meta.replace("overflow=0", "overflow=1"), "status or overflow"),
+            (meta.replace("invalid_count=0", "invalid_count=1"),
+             "invalid or pending summary counts disagree"),
+            (meta.replace("pending_rows=0", "pending_rows=1"),
+             "invalid or pending summary counts disagree"),
+            (meta.replace("status=complete", "status=unavailable"), "status or overflow"),
+            (result.replace("overflow_count=0", "overflow_count=1"),
+             "status or overflow"),
+        )
+        for bad_line, message in malformed:
+            with self.subTest(message=message):
+                stderr = "\n".join((bad_line if bad_line.startswith("C1_HEAP_OWNER_META") else meta,
+                                     bad_line if bad_line.startswith("C1_HEAP_OWNER_EVENT") else event,
+                                     bad_line if bad_line.startswith("C1_HEAP_OWNER_RESULT") else result))
+                with self.assertRaisesRegex(AssertionError, message):
+                    parse_c1_heap_owner_records(stderr, "asset-free-control")
+
+        for field, value, reason in (
+                ("overflow_count", "1", "overflowed"),
+                ("invalid_count", "1", "invalid or duplicated"),
+                ("pending_rows", "1", "left incomplete")):
+            bad_meta = meta.replace(f"{field}=0", f"{field}={value}")
+            bad_result = result.replace(f"{field}=0", f"{field}={value}")
+            if field == "overflow_count":
+                bad_meta = bad_meta.replace("overflow=0", "overflow=1")
+                bad_result = bad_result.replace("overflow=0", "overflow=1")
+            bad_status = bad_meta.replace("status=complete", "status=unavailable")
+            bad_result_status = bad_result.replace("status=complete", "status=unavailable")
+            with self.subTest(message=reason):
+                with self.assertRaisesRegex(AssertionError, reason):
+                    parse_c1_heap_owner_records(
+                        "\n".join((bad_status, event, bad_result_status)),
+                        "asset-free-control")
+
+        marked_meta = meta.replace("markers=0", "markers=2")
+        marked_event = event.replace("phase=asset-free-control",
+                                     "phase=after-light-preparation-before-e8")
+        marked_result = result.replace("markers=0", "markers=2")
+        marker_before = ("C1_HEAP_OWNER_MARK scope=asset-free-control "
+                         "phase=before-light-preparation first_sequence=1 "
+                         "next_sequence=1 census_complete=1")
+        marker_after = ("C1_HEAP_OWNER_MARK scope=asset-free-control "
+                        "phase=after-light-preparation-before-e8 first_sequence=1 "
+                        "next_sequence=2 census_complete=1")
+        expected_phases = ("before-light-preparation",
+                           "after-light-preparation-before-e8")
+        marked = "\n".join((marked_meta, marker_before, marker_after,
+                            marked_event, marked_result))
+        parsed = parse_c1_heap_owner_records(
+            marked, "asset-free-control", expected_phases)
+        self.assertEqual(len(parsed["markers"]), 2)
+        marked_mutations = (
+            (marker_after.replace("scope=asset-free-control", "scope=other"),
+             "invalid heap-owner phase marker"),
+            (marker_after.replace("next_sequence=2", "next_sequence=1"),
+             "rows occurred after the final phase marker"),
+        )
+        for bad_marker, message in marked_mutations:
+            with self.subTest(message=message):
+                lines = [marked_meta, marker_before, marker_after,
+                         marked_event, marked_result]
+                if bad_marker.startswith("C1_HEAP_OWNER_META"):
+                    lines[0] = bad_marker
+                else:
+                    lines[2] = bad_marker
+                with self.assertRaisesRegex(AssertionError, message):
+                    parse_c1_heap_owner_records(
+                        "\n".join(lines), "asset-free-control", expected_phases)
+        declared_meta = marked_meta.replace("markers=2", "markers=3")
+        declared_result = marked_result.replace("markers=2", "markers=3")
+        with self.assertRaisesRegex(AssertionError, "marker rows disagree"):
+            parse_c1_heap_owner_records(
+                "\n".join((declared_meta, marker_before, marker_after,
+                           marked_event, declared_result)),
+                "asset-free-control", expected_phases)
 
     def test_stadium_yakumono_exchange_round_trip_without_assets(self):
         target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
@@ -850,24 +1053,59 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
         if not target.is_file():
             self.skipTest("Build the reviewed C1 cache/live reducer first")
-        command = [str(node_runtime()), str(target), "--stadium-cache-live-controls"]
+        commands = {
+            "off": [str(node_runtime()), str(target), "--stadium-cache-live-controls"],
+            "on": [str(node_runtime()), str(target), "--stadium-cache-live-controls-owner"],
+        }
         (self.scratch / "cache-live-command.txt").write_text(
-            " ".join(command) + "\n", encoding="utf-8")
-        try:
-            run = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=30)
-        except subprocess.TimeoutExpired as failure:
-            for stream in ("stdout", "stderr"):
-                value = getattr(failure, stream)
-                (self.scratch / ("cache-live." + stream)).write_bytes(
-                    value.encode() if isinstance(value, str) else (value or b""))
-            raise
-        (self.scratch / "cache-live.stdout").write_text(run.stdout, encoding="utf-8")
-        (self.scratch / "cache-live.stderr").write_text(run.stderr, encoding="utf-8")
+            "\n".join(f"{mode}: {' '.join(command)}"
+                       for mode, command in commands.items()) + "\n",
+            encoding="utf-8")
+        runs = {}
+        for mode, command in commands.items():
+            try:
+                runs[mode] = subprocess.run(
+                    command, cwd=ROOT, capture_output=True, text=True, timeout=30)
+            except subprocess.TimeoutExpired as failure:
+                for stream in ("stdout", "stderr"):
+                    value = getattr(failure, stream)
+                    (self.scratch / (f"cache-live-{mode}." + stream)).write_bytes(
+                        value.encode() if isinstance(value, str) else (value or b""))
+                raise
+            (self.scratch / f"cache-live-{mode}.stdout").write_text(
+                runs[mode].stdout, encoding="utf-8")
+            (self.scratch / f"cache-live-{mode}.stderr").write_text(
+                runs[mode].stderr, encoding="utf-8")
+        off_run, run = runs["off"], runs["on"]
+        self.assertEqual(off_run.returncode, 0,
+                         (off_run.stdout + off_run.stderr)[-9000:])
         self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-9000:])
         self.assertIn("bounded original SDK allocation/free census", run.stdout)
         self.assertIn("source-state purity", run.stdout)
         self.assertNotIn("C1_HEAP_CENSUS_UNAVAILABLE", run.stderr)
         self.assertNotIn("C1_CACHE_LIVE_REFUSAL", run.stderr)
+
+        owner_off = parse_c1_heap_owner_records(
+            off_run.stderr, "asset-free-control")
+        owner_on = parse_c1_heap_owner_records(
+            run.stderr, "asset-free-control")
+        self.assertEqual(owner_off["events"], [])
+        self.assertGreater(len(owner_on["events"]), 0)
+        invariant_prefixes = (
+            "C1_HEAP_DUMP_BEGIN ", "C1_HEAP_DUMP_END ",
+            "C1_HEAP_SNAPSHOT ", "C1_HEAP_ALLOC ", "C1_HEAP_GUARD ",
+            "C1_HEAP_QUERY ", "C1_HEAP_QUERY_GUARD ", "C1_CACHE_LIVE ",
+        )
+        source_identity_order = lambda stderr: [
+            line for line in stderr.splitlines()
+            if line.startswith(invariant_prefixes)
+        ]
+        self.assertEqual(source_identity_order(off_run.stderr),
+                         source_identity_order(run.stderr),
+                         "Recorder on/off changed source allocation identities, state or order")
+        self.assertEqual(parse_c1_heap_dumps(off_run.stderr),
+                         parse_c1_heap_dumps(run.stderr),
+                         "Recorder on/off changed the exact SDK heap dump")
 
         snapshots = {}
         allocations = defaultdict(list)
@@ -894,6 +1132,21 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
             elif line.startswith("C1_HEAP_QUERY_GUARD "):
                 row = parse_c1_record(line, "C1_HEAP_QUERY_GUARD")
                 query_guards[c1_record_key(row)] = row
+
+        census_identities = {
+            (int(row["generation"]), int(row["allocation_generation"]),
+             parse_pointer(row["payload"]), int(row["heap"]))
+            for rows in allocations.values() for row in rows
+            if int(row["live"]) == 1
+        }
+        owner_identities = {
+            (int(row["world"]), int(row["allocation_generation"]),
+             parse_pointer(row["payload"]), int(row["heap"]))
+            for row in owner_on["events"]
+        }
+        self.assertTrue(owner_identities)
+        self.assertLessEqual(owner_identities, census_identities,
+                             "Owner rows did not join exact source allocation generations")
 
         expected_phases = [(0, "cold"), (0, "live"), (0, "removed"),
                            (1, "warm"), (1, "live"), (1, "removed")]
