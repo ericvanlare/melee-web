@@ -3028,6 +3028,32 @@ index 5c5cf8c34a68839698e4c24f4d8336b5d6a7d69d..e39c7cd170b1a03a261c0b88082e18c2
      }
  }
  
+diff --git a/src/melee/ft/kinds/ftKoopa/ftkoopaspecialhi.c b/src/melee/ft/kinds/ftKoopa/ftkoopaspecialhi.c
+index 490c23f44482e003f2408138c3cdb2d90da8e9c3..9f4e2b99bf0b8b041bdee58342021461e7444e8c 100644
+--- a/src/melee/ft/kinds/ftKoopa/ftkoopaspecialhi.c
++++ b/src/melee/ft/kinds/ftKoopa/ftkoopaspecialhi.c
+@@ -17,11 +17,19 @@
+ #include <melee/ft/kinds/ftCommon/ftCo_Fall.h>
+ #include <melee/ft/kinds/ftCommon/ftCo_FallSpecial.h>
+ 
++/* The original empty provider takes no arguments. Use the callback ABI
++ * required by Fighter on Wasm while retaining that provider. */
++static void melee_web_koopa_specialhi_callback(HSD_GObj* gobj)
++{
++    (void) gobj;
++    ftKp_Init_80132B38();
++}
++
+ static inline void ftKp_SpecialHi_Enter_inline(Fighter_GObj* gobj)
+ {
+     Fighter* fp = GET_FIGHTER(gobj);
+-    fp->take_dmg_cb = (void (*)(HSD_GObj*)) ftKp_Init_80132B38;
+-    fp->death2_cb = (void (*)(HSD_GObj*)) ftKp_Init_80132B38;
++    fp->take_dmg_cb = melee_web_koopa_specialhi_callback;
++    fp->death2_cb = melee_web_koopa_specialhi_callback;
+ }
+ 
+ void ftKp_SpecialHi_Enter(Fighter_GObj* gobj)
 diff --git a/src/melee/ft/kinds/ftPurin/ftpurin.c b/src/melee/ft/kinds/ftPurin/ftpurin.c
 index 5781099cc506a586f861010d06b4cac9417dc449..50a25eaf3e5f8112d836adfbc124f68183fc2be0 100644
 --- a/src/melee/ft/kinds/ftPurin/ftpurin.c
