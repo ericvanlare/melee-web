@@ -7,9 +7,12 @@ import {createRoomRelayPeerEndpoint} from './net_lockstep_websocket_relay.mjs';
 export const BROWSER_CHECKSUM_EXPORT_LIMIT = 512;
 
 export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl, roomId,
-  timeoutMs = 5000, agreement, native, inputCapture = null, autonomousPump = false},
+  timeoutMs = 5000, agreement, native, inputCapture = null, autonomousPump = false,
+  checksumConsumer = null},
 {createEndpoint = createRoomRelayPeerEndpoint} = {}) {
   if (!agreement || typeof agreement !== 'object') throw Error('Browser peer requires its frozen start agreement');
+  if (checksumConsumer !== null && typeof checksumConsumer !== 'function')
+    throw Error('Browser checksum consumer must be a function');
   if (inputCapture !== null && (!inputCapture || typeof inputCapture !== 'object' ||
       !Array.isArray(inputCapture.deferSendTicks) || !Array.isArray(inputCapture.pattern) ||
       inputCapture.pattern.length !== inputTicks))
@@ -37,10 +40,127 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     return operation;
   };
   let rpcChain = Promise.resolve(), activeNativeRecords = 0, postTerminalNativeRecords = 0;
+  let nativeRecordsDrained = 0, consumerAcceptedRecords = 0, pendingConsumerBatch = null;
+  let nextConsumerBatchId = 1;
   const exports = [], pending = new Set(), capturedLocalInputs = [];
   let localInputQueue = Promise.resolve(), lastCapturePollSerial = null, peer = null;
-  const remember = error => { failure ??= error; return error; };
+  const asError = error => error instanceof Error ? error : Error(String(error));
+  function invalidateConsumerBatch(batch, reason) {
+    if (!batch || batch.invalidated) return batch;
+    batch.invalidated = true;
+    batch.phase = 'cancelled';
+    batch.cancelReason = asError(reason);
+    try { batch.abortController.abort(batch.cancelReason); } catch {}
+    batch.rejectAbort(batch.cancelReason);
+    return batch;
+  }
+  function invalidatePendingConsumer(reason) {
+    return invalidateConsumerBatch(pendingConsumerBatch, reason);
+  }
+  const remember = error => {
+    failure ??= error;
+    invalidatePendingConsumer(failure);
+    return error;
+  };
   const check = () => { if (failure) throw failure; };
+  const readonlyRecords = rows => Object.freeze(rows.map(row => Object.freeze(Array.from(row))));
+  const recordTick = record => new DataView(Uint8Array.from(record).buffer).getUint32(0, true);
+  function beginConsumerBatch(records) {
+    if (pendingConsumerBatch) throw Error('Browser checksum consumer already owns a pending batch');
+    const rows = Object.freeze(records.map(record => Object.freeze(Array.from(record))));
+    let rejectAbort;
+    const abortPromise = new Promise((_, reject) => { rejectAbort = reject; });
+    abortPromise.catch(() => {});
+    const batch = {
+      id: nextConsumerBatchId++, records: rows, firstTick: rows.length ? recordTick(rows[0]) : null,
+      lastTick: rows.length ? recordTick(rows[rows.length - 1]) : null, exportStart: exports.length,
+      abortController: new AbortController(), abortPromise, rejectAbort,
+      phase: 'submitting', invalidated: false, callbackStarted: false, callbackSettled: false,
+      joined: false, unjoined: false, settlement: Promise.resolve({state: 'not-started'}),
+      settlementState: 'not-started', settlementError: null, accepted: false,
+    };
+    exports.push(...rows);
+    pendingConsumerBatch = batch;
+    return batch;
+  }
+  function consumerBatchIsCurrent(batch) {
+    return pendingConsumerBatch === batch && !batch.invalidated && !failure &&
+      !closing && !closed && !peer.terminal && !batch.abortController.signal.aborted;
+  }
+  async function consumeBatch(batch) {
+    if (!batch) return;
+    if (!checksumConsumer) throw Error('Browser checksum consumer is not configured');
+    if (!consumerBatchIsCurrent(batch))
+      throw batch.cancelReason ?? Error('Browser checksum consumer batch is no longer current');
+    batch.phase = 'accepting';
+    batch.callbackStarted = true;
+    batch.callbackSettled = false;
+    const callback = Promise.resolve().then(() => {
+      if (!consumerBatchIsCurrent(batch))
+        throw batch.cancelReason ?? Error('Browser checksum consumer batch was cancelled before callback');
+      return checksumConsumer(batch.records, {signal: batch.abortController.signal});
+    });
+    batch.settlement = callback.then(value => {
+      batch.callbackSettled = true;
+      batch.settlementState = 'resolved';
+      return {state: 'resolved', value};
+    }, error => {
+      batch.callbackSettled = true;
+      batch.settlementState = 'rejected';
+      batch.settlementError = asError(error);
+      return {state: 'rejected', error: batch.settlementError};
+    });
+    let timer = null;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        const error = Error(`Browser checksum consumer did not acknowledge within ${timeoutMs}ms`);
+        invalidateConsumerBatch(batch, error);
+        remember(error);
+        reject(error);
+      }, timeoutMs);
+    });
+    try {
+      const outcome = await Promise.race([batch.settlement, batch.abortPromise, timeout]);
+      if (outcome.state === 'rejected') throw outcome.error;
+      if (outcome.value !== true)
+        throw Error('Browser checksum consumer must acknowledge the complete batch by returning true');
+      if (!consumerBatchIsCurrent(batch))
+        throw batch.cancelReason ?? Error('Browser checksum consumer batch was invalidated before acceptance');
+      if (exports.length !== batch.exportStart + batch.records.length ||
+          batch.records.some((record, index) => exports[batch.exportStart + index] !== record))
+        throw Error('Browser checksum consumer pending batch changed before acceptance');
+      exports.splice(batch.exportStart, batch.records.length);
+      consumerAcceptedRecords += batch.records.length;
+      batch.accepted = true;
+      batch.phase = 'accepted';
+      batch.joined = true;
+      pendingConsumerBatch = null;
+    } catch (error) {
+      invalidateConsumerBatch(batch, error);
+      remember(error);
+      // RPC-driven startup must fail the peer too; no later native wake is required.
+      if (!peer.terminal && !closing && !closed) {
+        try { await peer.fail('protocol', {reason: String(error?.message || error)}); }
+        catch (terminalError) { remember(terminalError); }
+      }
+      throw error;
+    } finally {
+      if (timer !== null) clearTimeout(timer);
+    }
+  }
+  async function joinConsumerBatch(batch) {
+    if (!batch || !batch.callbackStarted || batch.callbackSettled) {
+      if (batch) batch.joined = true;
+      return true;
+    }
+    let timer = null;
+    const joined = await Promise.race([batch.settlement.then(() => true),
+      new Promise(resolve => { timer = setTimeout(() => resolve(false), timeoutMs); })]);
+    if (timer !== null) clearTimeout(timer);
+    batch.joined = joined;
+    batch.unjoined = !joined;
+    return joined;
+  }
   const track = operation => {
     const result = Promise.resolve().then(operation);
     const observed = result.catch(remember).finally(() => pending.delete(observed));
@@ -54,9 +174,12 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     onReady: async () => {
       if (!await callNative('confirmStart')) throw Error('Native rejected peer start identity confirmation');
     },
-    onTerminal: terminal => callNative('terminate', TERMINAL[terminal.kind] ?? TERMINAL.protocol,
-      Number.isInteger(terminal.tick) ? terminal.tick : 0,
-      Number.isInteger(terminal.channel) ? terminal.channel : 0),
+    onTerminal: terminal => {
+      invalidatePendingConsumer(Error(`Browser checksum consumer batch cancelled by ${terminal.kind} terminal`));
+      return callNative('terminate', TERMINAL[terminal.kind] ?? TERMINAL.protocol,
+        Number.isInteger(terminal.tick) ? terminal.tick : 0,
+        Number.isInteger(terminal.channel) ? terminal.channel : 0);
+    },
   });
   const endpoint = createEndpoint({url: relayUrl, roomId, role, timeoutMs,
     onMessage: text => track(() => peer.receive(text)),
@@ -131,6 +254,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     // One extra record detects capacity exhaustion; do not silently truncate or
     // stop draining and describe the remaining native records as exported.
     const records = await callNative('drain', BROWSER_CHECKSUM_EXPORT_LIMIT - exports.length + 1);
+    if (Array.isArray(records)) nativeRecordsDrained += records.length;
     if (!Array.isArray(records) || records.some(record =>
         (!Array.isArray(record) && !(record instanceof Uint8Array)) || record.length !== NET_RECORD_BYTES ||
         Array.from(record).some(byte => !Number.isInteger(byte) || byte < 0 || byte > 255))) {
@@ -146,11 +270,15 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       await peer.fail('protocol', {reason: error.message});
       throw error;
     }
-    for (const record of records) {
+    const consumerBatch = checksumConsumer && records.length && !peer.terminal
+      ? beginConsumerBatch(records) : null;
+    if (checksumConsumer && records.length && peer.terminal)
+      exports.push(...records.map(record => Object.freeze(Array.from(record))));
+    for (const record of consumerBatch ? consumerBatch.records : records) {
       const bytes = Uint8Array.from(record);
       if (!peer.terminal) { await peer.addChecksum(bytes); ++activeNativeRecords; }
       else ++postTerminalNativeRecords;
-      exports.push(Array.from(bytes));
+      if (!checksumConsumer) exports.push(Array.from(bytes));
     }
     if (peer.ready && !peer.terminal) {
       const status = await callNative('status');
@@ -159,14 +287,31 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       await peer.setNativeProgress(status.cursor, {flushFinal});
     }
     await settle();
+    if (consumerBatch) await consumeBatch(consumerBatch);
   }
   const snapshot = () => ({protocol: peer.summary(), endpointErrors: endpoint.errors,
     endpointClosed: endpoint.closed, closed, exportRecords: exports.length,
     localInputCapture: inputCapture ? {enabled: true, input_ticks: inputTicks,
       captures: capturedLocalInputs.slice()} : {enabled: false},
     checksumOwnership: {owner: 'browser-page', export_limit_records: BROWSER_CHECKSUM_EXPORT_LIMIT,
+      native_records_drained: nativeRecordsDrained,
       active_native_records_submitted_before_export: activeNativeRecords,
-      post_terminal_native_evidence_records: postTerminalNativeRecords},
+      post_terminal_native_evidence_records: postTerminalNativeRecords,
+      consumer_accepted_records: consumerAcceptedRecords, retained_records: exports.length},
+    checksumConsumer: {enabled: Boolean(checksumConsumer), accepted_records: consumerAcceptedRecords,
+      retained_records: exports.length, retained: checksumConsumer ? readonlyRecords(exports) : null,
+      pending_batch: checksumConsumer && pendingConsumerBatch ? Object.freeze({
+        id: pendingConsumerBatch.id, first_tick: pendingConsumerBatch.firstTick,
+        last_tick: pendingConsumerBatch.lastTick, count: pendingConsumerBatch.records.length,
+        phase: pendingConsumerBatch.phase, aborted: pendingConsumerBatch.invalidated,
+        abort_reason: pendingConsumerBatch.cancelReason ? String(pendingConsumerBatch.cancelReason) : null,
+        callback_started: pendingConsumerBatch.callbackStarted,
+        callback_settled: pendingConsumerBatch.callbackSettled,
+        settlement_state: pendingConsumerBatch.settlementState,
+        settlement_error: pendingConsumerBatch.settlementError ? String(pendingConsumerBatch.settlementError) : null,
+        accepted: pendingConsumerBatch.accepted, joined: pendingConsumerBatch.joined,
+        unjoined: pendingConsumerBatch.unjoined,
+        records: readonlyRecords(pendingConsumerBatch.records)}) : null},
     nativePump: {enabled: autonomousPump, closing, wake_requested: wakeRequested,
       wake_queued: wakeQueued, completed_wakeups: wakeRuns, rpc_calls: rpcCalls, drain_failure: drainFailure},
     failure: failure ? String(failure?.stack || failure) : null, transport: endpoint.transport});
@@ -189,7 +334,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       try { check(); await pump(); ++wakeRuns; }
       catch (error) {
         remember(error);
-        if (!peer.terminal) {
+        if (!peer.terminal && !closing && !closed) {
           try { await peer.fail('protocol', {reason: String(error?.message || error)}); }
           catch (terminalError) { remember(terminalError); }
         }
@@ -218,6 +363,8 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
   // Serialize RPCs so native scratch and evidence exports have one owner.
   function rpc(name, args = []) {
     ++rpcCalls;
+    if (checksumConsumer && name === 'drain')
+      return Promise.reject(Error('Browser checksum drain RPC is disabled while a checksum consumer owns evidence'));
     if (autonomousPump && closing && !closed)
       return Promise.reject(Error('Browser native peer is closing'));
     const operation = serialize(async () => {
@@ -271,6 +418,16 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     if (unsubscribeProgress) {
       try { unsubscribeProgress(); } catch (error) { failures.push(remember(error)); }
       unsubscribeProgress = null;
+    }
+    const consumerAtClose = pendingConsumerBatch;
+    if (checksumConsumer && consumerAtClose) {
+      const error = Error('Browser checksum consumer batch cancelled during close');
+      invalidateConsumerBatch(consumerAtClose, error);
+      failures.push(remember(error));
+      if (!await joinConsumerBatch(consumerAtClose)) {
+        consumerAtClose.unjoined = true;
+        failures.push(remember(Error(`Browser checksum consumer was not joined within ${timeoutMs}ms`)));
+      }
     }
     const finalNativeDrain = async () => {
       if (!autonomousPump) return;
