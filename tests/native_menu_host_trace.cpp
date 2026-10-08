@@ -296,6 +296,12 @@ void run_vs_sudden_death_source_control()
               "Typed host accepted a match continuation before source menus closed");
         check(rejected_continuation.kind == 0,
               "Rejected typed continuation retained a stale payload");
+        rejected_continuation.kind = MELEE_WEB_MENU_MATCH_CONTINUATION_RESULTS;
+        check(!melee_web_menu_host_sudden_death_finish(
+                  host, &rejected_exit, 2,
+                  &rejected_continuation, error, sizeof(error)) &&
+                  rejected_continuation.kind == 0,
+              "Typed host accepted a Sudden Death finish without its live route");
         check(melee_web_vs_mode_begin(),
               "Rejected typed continuation leaked its original VS owner");
         check(melee_web_vs_mode_end(),
@@ -313,6 +319,129 @@ void run_vs_sudden_death_source_control()
     }
     std::cout << "Original VS timeout/tie and Sudden Death-to-Results source callbacks passed; "
                  "asset-free callback control only, no gameplay claim\n";
+}
+
+void run_sudden_death_host_control(
+    MeleeWebMenuHost* host, const MeleeWebMenuMatchSelection& selection,
+    const StartMeleeData& source_start,
+    char* error, std::size_t error_size)
+{
+    check(host != nullptr && selection.player_count >= 2 &&
+              selection.player_count <= GM_MAX_PLAYERS,
+          "Sudden Death host control requires the committed source menu selection");
+    check(melee_web_menu_host_input(host) != nullptr,
+          "Closed SSS did not retain its source PAD owner");
+
+    std::array<std::uint8_t, MELEE_WEB_PAD_STATE_BYTES> pad_bytes{};
+    melee_web_pad_state_capture(pad_bytes.data());
+    const std::uint32_t menu_seed = selection.random_seed;
+    std::uint32_t vs_final_seed = menu_seed ^ 0x6d2b79f5U;
+    if (vs_final_seed == menu_seed) ++vs_final_seed;
+    std::uint32_t sudden_death_final_seed = vs_final_seed ^ 0xa5c31e27U;
+    if (sudden_death_final_seed == vs_final_seed) ++sudden_death_final_seed;
+
+    const StartMeleeData original_start = gmVsMelee_StartData;
+    const MatchExitInfo original_sudden_death_exit =
+        gmVsMelee_SuddenDeathExitInfo;
+    check(melee_web_menu_host_match_finished(
+              host, menu_seed, pad_bytes.data(), error, error_size), error);
+
+    MatchExitInfo tied_timeout{};
+    tied_timeout.match_end.outcome = OUTCOME_TIMEOUT;
+    tied_timeout.match_end.match_kind = source_start.rules.match_kind;
+    tied_timeout.match_end.n_winners =
+        static_cast<std::uint8_t>(selection.player_count);
+    tied_timeout.match_end.frame_count = 3600;
+    for (auto& player : tied_timeout.match_end.player_standings)
+        player.slot_type = Gm_PKind_NA;
+    for (unsigned i = 0; i < selection.player_count; ++i) {
+        const auto& source = source_start.players[i];
+        auto& standing = tied_timeout.match_end.player_standings[i];
+        check(source.slot_type != Gm_PKind_NA,
+              "Committed VS source payload has a gap before its active players");
+        standing.slot_type = source.slot_type;
+        standing.ckind = source.ckind;
+        standing.stocks = 1;
+        standing.is_big_loser = false;
+        tied_timeout.match_end.winners[i] = static_cast<u8>(i);
+    }
+
+    StartMeleeData expected_sudden_death{};
+    expected_sudden_death.rules = source_start.rules;
+    for (unsigned i = 0; i < GM_MAX_PLAYERS; ++i)
+        expected_sudden_death.players[i] = source_start.players[i];
+    gm_SetupSubColors(&expected_sudden_death);
+    gm_LoadRumbleEnabled(&expected_sudden_death);
+    gm_SetupSuddenDeath(&expected_sudden_death, &tied_timeout.match_end);
+
+    MeleeWebMenuMatchContinuation continuation{};
+    check(melee_web_menu_host_match_continuation_begin(
+              host, &tied_timeout, vs_final_seed, &continuation,
+              error, error_size), error);
+    check(continuation.kind == MELEE_WEB_MENU_MATCH_CONTINUATION_SUDDEN_DEATH &&
+              std::memcmp(&continuation.payload.sudden_death_start,
+                          &expected_sudden_death,
+                          sizeof(expected_sudden_death)) == 0 &&
+              std::memcmp(&gmVsMelee_StartData, &expected_sudden_death,
+                          sizeof(expected_sudden_death)) == 0,
+          "Typed host did not retain the original tie-selected Sudden Death payload");
+    MeleeWebMenuMatchSelection observed{};
+    check(melee_web_menu_host_selection(host, &observed, error, error_size) &&
+              observed.random_seed == vs_final_seed,
+          "Typed VS continuation did not transfer the closed match RNG seed");
+    check(!melee_web_vs_mode_begin(),
+          "Typed Sudden Death continuation released its original VS mode lease");
+
+    MatchExitInfo sudden_death_exit{};
+    sudden_death_exit.match_end.match_kind = source_start.rules.match_kind;
+    sudden_death_exit.match_end.outcome = OUTCOME_ELIMINATION;
+    sudden_death_exit.match_end.frame_count = 9876;
+    sudden_death_exit.match_end.n_winners = 1;
+    const unsigned winner = selection.player_count - 1;
+    sudden_death_exit.match_end.winners[0] = static_cast<u8>(winner);
+    for (auto& player : sudden_death_exit.match_end.player_standings)
+        player.slot_type = Gm_PKind_NA;
+    auto& winning_standing =
+        sudden_death_exit.match_end.player_standings[winner];
+    winning_standing.slot_type = source_start.players[winner].slot_type;
+    winning_standing.ckind = source_start.players[winner].ckind;
+    winning_standing.stocks = 1;
+
+    MatchEnd expected_result = tied_timeout.match_end;
+    MatchEnd sudden_death_result = sudden_death_exit.match_end;
+    gm_80166CCC(&expected_result, &sudden_death_result);
+    check(melee_web_menu_host_sudden_death_finish(
+              host, &sudden_death_exit, sudden_death_final_seed,
+              &continuation, error, error_size), error);
+    check(continuation.kind == MELEE_WEB_MENU_MATCH_CONTINUATION_RESULTS &&
+              std::memcmp(&continuation.payload.results.match_end,
+                          &expected_result, sizeof(expected_result)) == 0 &&
+              std::memcmp(&gmVsMelee_VsExitInfo.match_end, &expected_result,
+                          sizeof(expected_result)) == 0 &&
+              std::memcmp(&gmVsMelee_SuddenDeathExitInfo, &sudden_death_exit,
+                          sizeof(sudden_death_exit)) == 0,
+          "Typed Sudden Death finish did not preserve the source Results merge");
+    check(melee_web_menu_host_selection(host, &observed, error, error_size) &&
+              observed.random_seed == sudden_death_final_seed,
+          "Typed Sudden Death finish did not transfer its final RNG seed");
+    check(!melee_web_menu_host_sudden_death_finish(
+              host, &sudden_death_exit, sudden_death_final_seed,
+              &continuation, error, error_size) && continuation.kind == 0,
+          "Typed host replayed the Sudden Death exit callback");
+    check(melee_web_menu_host_destroy(host, error, error_size), error);
+    check(std::memcmp(&gmVsMelee_StartData, &original_start,
+                      sizeof(original_start)) == 0 &&
+              std::memcmp(&gmVsMelee_SuddenDeathExitInfo,
+                          &original_sudden_death_exit,
+                          sizeof(original_sudden_death_exit)) == 0,
+          "Typed host did not restore its Sudden Death route globals");
+    check(melee_web_vs_mode_begin(),
+          "Typed Sudden Death host destruction leaked its VS mode lease");
+    check(melee_web_vs_mode_end(),
+          "Typed Sudden Death host control could not retire the VS lease");
+    std::cout << "Original CSS/SSS typed VS tie to Sudden Death to Results handoff "
+                 "retained both final RNG seeds and restored route globals; "
+                 "constructed callback control only\n";
 }
 
 std::string hex32(uint32_t value){std::ostringstream out;out<<std::hex<<std::setfill('0')<<std::setw(8)<<value;return out.str();}
@@ -3378,6 +3507,8 @@ int main(int argc,char** argv){try{
  const bool opening_movie_preload_recipe=input_recipe&&std::string(input_recipe)=="opening-movie-preload-v1";
  const bool trophy_baseline_recipe=input_recipe&&std::string(input_recipe)=="trophy-baseline-v1";
  const bool sound_settings_recipe=input_recipe&&std::string(input_recipe)=="main-settings-sound-v1";
+ const bool sudden_death_host_recipe=input_recipe&&
+     std::string(input_recipe)=="sudden-death-host-control-v1";
  const bool v10_css_replay_start_recipe=input_recipe&&
      std::string(input_recipe)=="whole-session-css-replay-start-v10-v1";
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
@@ -3402,7 +3533,7 @@ int main(int argc,char** argv){try{
 #endif
  if(input_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
-    !sound_settings_recipe&&!stadium_c1a_recipe&&
+    !sound_settings_recipe&&!sudden_death_host_recipe&&!stadium_c1a_recipe&&
     !stadium_c1_context_preflight_recipe&&
     !stadium_c1_item_state_preflight_recipe&&!stadium_screen_roots_recipe&&
     !stadium_e8_request_recipe&&!stadium_ground_map1_owner_recipe&&
@@ -3413,7 +3544,8 @@ int main(int argc,char** argv){try{
    throw std::runtime_error("MWRC v10 CSS replay-start reducer requires trace, source revision and exact recipe path");
  if(!v10_css_replay_start_recipe&&argc==8)
    throw std::runtime_error("Only the MWRC v10 CSS replay-start reducer accepts an exact recipe path");
- if((retail_fd_recipe||results_mario_recipe||v10_css_replay_start_recipe)&&
+ if((retail_fd_recipe||results_mario_recipe||sudden_death_host_recipe||
+     v10_css_replay_start_recipe)&&
     stage_kind!=St_Kind_Last)
    throw std::runtime_error("Explicit FD recipes require Final Destination");
  if((stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
@@ -3424,7 +3556,8 @@ int main(int argc,char** argv){try{
  TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
  std::vector<std::string> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"};
- if(stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
+ if(sudden_death_host_recipe||stadium_c1a_recipe||
+    stadium_c1_context_preflight_recipe||
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
     v10_css_replay_start_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
@@ -3494,7 +3627,7 @@ int main(int argc,char** argv){try{
   std::cout<<"Native Main Settings Sound source route passed; no browser or retail-route claim\n";
   return 0;
  }
- const unsigned cycle_count=results_mario_recipe?1:2;
+ const unsigned cycle_count=(results_mario_recipe||sudden_death_host_recipe)?1:2;
  for(unsigned cycle=0;cycle<cycle_count;cycle++){
   trace.begin_run(cycle);
   if((retail_fd_recipe||results_mario_recipe)&&cycle==0)*seed_ptr=1840631306u;
@@ -3646,6 +3779,15 @@ int main(int argc,char** argv){try{
   raw_selection.random_seed=selection_rng;
   trace.event("sss_exit_complete",world->audio(),"match",&raw_selection,&selection_rng);
   world->close();world.reset();audio_phase=0;
+  if(sudden_death_host_recipe){
+   run_sudden_death_host_control(host,selection,raw_start,error,sizeof(error));
+   const auto retained=melee_web_gameplay_allocation();
+   check(retained.identity==session_allocation.identity&&
+         retained.generation==session_allocation.generation&&
+         retained.bytes==session_allocation.bytes&&!melee_web_gameplay_world_exists(),
+         "Typed Sudden Death host control changed the retained application arena");
+   continue;
+  }
   for(const auto& name:melee_web::match_asset_names(selection)){
    if(files.find(name)!=files.end())continue;
    auto path=std::filesystem::path(argv[1])/name;
@@ -3982,6 +4124,9 @@ int main(int argc,char** argv){try{
  check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
  if(link_css_unload_recipe)
   std::cout<<"Native Link/Young Link CSS audio registry and unload smoke passed; no match/rendered claim\n";
+ else if(sudden_death_host_recipe)
+  std::cout<<"Native menu-host Sudden Death callback handoff passed through source CSS/SSS; "
+              "constructed callback control only, no GameplayMatchSession or Results-scene claim\n";
  else if(results_mario_recipe)
   std::cout<<"Native source Mario Results smoke (No Contest and elimination) returned to CSS; no retail/rendered claim\n";
  else

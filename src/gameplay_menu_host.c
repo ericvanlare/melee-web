@@ -144,6 +144,8 @@ struct MeleeWebMenuHost {
 #endif
     int results_active,results_exited,results_committed,prize_active;
     int sudden_death_active;
+    StartMeleeData route_saved_start;
+    MatchExitInfo route_saved_sudden_death_exit;
     int entered,drawing,transition;
 };
 static MeleeWebMenuHost* owner;
@@ -1836,6 +1838,8 @@ int melee_web_menu_host_match_finished(MeleeWebMenuHost* h,uint32_t seed,
 static void restore_results_route(MeleeWebMenuHost* h){
     *gmVsMelee_GetVsData()=h->route_saved_vs;
     gmVsMelee_VsExitInfo=h->route_saved_exit;
+    gmVsMelee_StartData=h->route_saved_start;
+    gmVsMelee_SuddenDeathExitInfo=h->route_saved_sudden_death_exit;
     gmVsMelee_ResultsEnterData=h->route_saved_result;
     *gm_GetChallengerData()=h->route_saved_challenger;
     memcpy(gmVsMelee_GetKOCounts(),h->route_saved_ko,sizeof(h->route_saved_ko));
@@ -1856,6 +1860,8 @@ static int begin_vs_match_route(MeleeWebMenuHost* h,
     if(!melee_web_vs_mode_begin())return fail(e,n,"Original VS mode is already owned");
     h->route_saved_vs=*gmVsMelee_GetVsData();
     h->route_saved_exit=gmVsMelee_VsExitInfo;
+    h->route_saved_start=gmVsMelee_StartData;
+    h->route_saved_sudden_death_exit=gmVsMelee_SuddenDeathExitInfo;
     h->route_saved_result=gmVsMelee_ResultsEnterData;
     h->route_saved_challenger=*gm_GetChallengerData();
     memcpy(h->route_saved_ko,gmVsMelee_GetKOCounts(),sizeof(h->route_saved_ko));
@@ -1921,14 +1927,19 @@ int melee_web_menu_host_match_continuation_begin(MeleeWebMenuHost* h,
     return 0;
 }
 int melee_web_menu_host_sudden_death_finish(MeleeWebMenuHost* h,
-    const MatchExitInfo* exit_info,
+    const MatchExitInfo* exit_info,uint32_t seed,
     MeleeWebMenuMatchContinuation* continuation,char* e,size_t n){
+    if(!continuation)
+        return fail(e,n,"Sudden Death Results continuation output is required");
+    memset(continuation,0,sizeof(*continuation));
     if(!h||h!=owner||h->entered||h->audio||!h->results_active||
-       !h->sudden_death_active||h->results_exited||!exit_info||!continuation||
+       !h->sudden_death_active||h->results_exited||!exit_info||
        seed_ptr!=&h->seed||melee_web_gameplay_generation()||
        melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_READY)
         return fail(e,n,"Sudden Death must close before its original Results handoff");
-    memset(continuation,0,sizeof(*continuation));
+    /* Match teardown restores the previous RNG pointer, not its final value.
+     * Transfer the closed Sudden Death match seed before source callbacks. */
+    h->seed=seed;
     gmVsMelee_SuddenDeathExitInfo=*exit_info;
     if(!melee_web_vs_mode_select_state(gmVsMode_State_SuddenDeath))abort();
     gm_Mode_Vs_States[3].on_exit(&gm_Mode_Vs_States[3]);

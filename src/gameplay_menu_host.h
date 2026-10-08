@@ -204,7 +204,8 @@ int melee_web_menu_host_match_continuation_begin(MeleeWebMenuHost*,
     const struct MatchExitInfo*,uint32_t random_seed,
     MeleeWebMenuMatchContinuation*,char*,size_t);
 int melee_web_menu_host_sudden_death_finish(MeleeWebMenuHost*,
-    const struct MatchExitInfo*,MeleeWebMenuMatchContinuation*,char*,size_t);
+    const struct MatchExitInfo*,uint32_t random_seed,
+    MeleeWebMenuMatchContinuation*,char*,size_t);
 int melee_web_menu_host_results_exit(MeleeWebMenuHost*,char*,size_t);
 int melee_web_menu_host_results_end(MeleeWebMenuHost*,uint32_t random_seed,
     const uint8_t input[MELEE_WEB_PAD_STATE_BYTES],char*,size_t);
