@@ -2398,6 +2398,93 @@ void run_stadium_effect_runtime_lifecycle_control()
 }
 
 
+void run_stadium_cache_live_control()
+{
+    namespace screen = melee_web::test::stadium_screen;
+    struct Baseline {
+        MeleeWebGameplayStats stats{};
+        decltype(screen::runtime_roots_snapshot()) roots;
+        decltype(screen::live_class_counts()) classes;
+        decltype(screen::live_pool_counts()) pools{};
+        uint32_t gobj_used{}, proc_used{};
+    };
+    struct State {
+        unsigned world{};
+        Baseline baseline;
+        std::string consumer;
+        unsigned records{};
+        unsigned completed{};
+    };
+    auto observer = +[](const char* consumer, const char* phase, unsigned cycle,
+                        const void* owned, void* user) -> int {
+        auto& state = *static_cast<State*>(user);
+        try {
+            Baseline now{melee_web_gameplay_stats(), screen::runtime_roots_snapshot(),
+                screen::live_class_counts(), screen::live_pool_counts(),
+                HSD_ObjAllocGetUsing(&gobj_alloc_data),
+                HSD_ObjAllocGetUsing(&gobjproc_alloc_data)};
+            std::cerr << "C1_CACHE_LIVE world=" << state.world
+                      << " generation=" << now.stats.generation
+                      << " consumer=" << consumer << " phase=" << phase
+                      << " cycle=" << cycle << " owned=" << owned
+                      << " heap_free_bytes=" << now.stats.heap_free_bytes
+                      << " ticks=" << now.stats.ticks
+                      << " gobj_used=" << now.gobj_used
+                      << " gobj_free=" << HSD_ObjAllocGetFreed(&gobj_alloc_data)
+                      << " gobj_size=" << gobj_alloc_data.size
+                      << " proc_used=" << now.proc_used
+                      << " proc_free=" << HSD_ObjAllocGetFreed(&gobjproc_alloc_data)
+                      << " proc_size=" << gobjproc_alloc_data.size << " classes=";
+            for (const auto& [identity, count] : now.classes)
+                std::cerr << static_cast<const void*>(identity) << ':' << count << ',';
+            std::cerr << " pools=";
+            for (auto count : now.pools) std::cerr << count << ',';
+            std::cerr << '\n'; std::cerr.flush();
+            ++state.records;
+            if (std::string_view(phase) == "cold") {
+                check(cycle == 0 && owned == nullptr, "Invalid cold cache/live phase");
+                state.baseline = std::move(now);
+                state.consumer = consumer;
+            } else {
+                check(state.consumer == consumer && now.stats.generation == state.baseline.stats.generation &&
+                      now.stats.ticks == state.baseline.stats.ticks,
+                      "Cache/live control changed world or source ticks");
+                if (std::string_view(phase) == "live") {
+                    check(owned != nullptr && now.classes != state.baseline.classes,
+                          "Original allocation did not expose live class ownership");
+                } else {
+                    check(owned == nullptr && (std::string_view(phase) == "removed" ||
+                          std::string_view(phase) == "warm"), "Invalid cache/live phase");
+                    check(now.roots == state.baseline.roots && now.classes == state.baseline.classes &&
+                          now.pools == state.baseline.pools && now.gobj_used == state.baseline.gobj_used &&
+                          now.proc_used == state.baseline.proc_used && melee_web_source_memory_healthy(),
+                          "Original removal retained roots, live classes, used pools or unhealthy leases");
+                    if (std::string_view(phase) == "removed") ++state.completed;
+                }
+            }
+            return 1;
+        } catch (const std::exception& failure) {
+            std::cerr << "C1_CACHE_LIVE_REFUSAL " << failure.what() << '\n';
+            std::cerr.flush(); return 0;
+        }
+    };
+    uint64_t previous_generation = 0;
+    for (unsigned lifetime = 0; lifetime < 2; ++lifetime) {
+        char error[256]{};
+        check(melee_web_gameplay_startup(8U * 1024U * 1024U, error, sizeof(error)), error);
+        check(melee_web_native_world_enable(error, sizeof(error)), error);
+        check(melee_web_gameplay_stats().generation != previous_generation,
+              "Cache/live reducer reused a world generation");
+        previous_generation = melee_web_gameplay_stats().generation;
+        State state{}; state.world = lifetime;
+        check(melee_web_stadium_c1_cache_live_control(observer, &state, error, sizeof(error)), error);
+        check(state.records == 12 && state.completed == 4,
+              "Cache/live reducer skipped a cold/live/removed/warm observation");
+        check(melee_web_gameplay_shutdown(error, sizeof(error)), error);
+    }
+    std::cout << "C1 asset-free cache/live reducer passed; two worlds, 24 phase records, original JObj removal and Ground-light refusals; no original Stadium callback, camera or source ticks\n";
+}
+
 void run_stadium_map_light_adoption_control()
 {
     char error[256]{};
@@ -4454,6 +4541,9 @@ int main(int argc,char** argv){try{
    run_stadium_selection_rng_controls();
    std::cout<<"C1 source OnInit refusal and synthetic event-journal controls passed; no Stadium stage initialization invoked\n";
    return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-cache-live-controls"){
+   run_stadium_cache_live_control();return 0;
   }
   if(argc==2&&std::string_view(argv[1])=="--stadium-map-light-adoption-controls"){
    run_stadium_map_light_adoption_control();return 0;

@@ -12,6 +12,7 @@
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjplink.h>
 #include <sysdolphin/baselib/objalloc.h>
+#include <sysdolphin/baselib/jobj.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -422,7 +423,8 @@ static int map_light_control_fail(char* error,size_t size,const char* message)
 }
 #define LIGHT_CONTROL_CHECK(condition,message) \
     do { if(!(condition))return map_light_control_fail(error,size,message); } while(0)
-int melee_web_stadium_c1_map_light_adoption_control(char* error,size_t size)
+static int map_light_adoption_control(
+    MeleeWebStadiumC1CacheLiveObserver observer,void* user,char* error,size_t size)
 {
     if(!error||!size)return 0;
     /* Keep borrowed synthetic map/row storage alive even after a failed check.
@@ -444,6 +446,8 @@ int melee_web_stadium_c1_map_light_adoption_control(char* error,size_t size)
         strcmp(error,"Source map-light adoption has no published descriptor context")==0,
         "Missing publication did not report its exact adoption condition");
     for(unsigned cycle=0;cycle<2;++cycle){
+        LIGHT_CONTROL_CHECK(!observer||observer("ground-light",cycle?"warm":"cold",cycle,NULL,user),
+                            "Map-light cold/warm snapshot refused");
         MeleeWebStageLightDesc descriptor={0};descriptor.flags=0x20;
         memset(descriptor.color,255,sizeof(descriptor.color));
         context=melee_web_stage_lights_create(&descriptor,1,error,size);
@@ -489,6 +493,8 @@ int melee_web_stadium_c1_map_light_adoption_control(char* error,size_t size)
         LIGHT_CONTROL_CHECK(!melee_web_stage_lights_detach(context,error,size),"Live source context detached before retirement");
         LIGHT_CONTROL_CHECK(!melee_web_stage_lights_destroy(context,error,size),"Live source context destroyed before retirement");
         LIGHT_CONTROL_CHECK(!melee_web_stage_lights_retire_source(&foreign,error,size),"Foreign owner retirement succeeded");
+        LIGHT_CONTROL_CHECK(!observer||observer("ground-light","live",cycle,owner,user),
+                            "Map-light live snapshot refused");
         LIGHT_CONTROL_CHECK(melee_web_stage_lights_retire_source(owner,error,size),error);
         HSD_GObjPLink_80390228(owner);
         LIGHT_CONTROL_CHECK(!Ground_801C498C(),"Original Ground owner survived its exact teardown");
@@ -500,9 +506,36 @@ int melee_web_stadium_c1_map_light_adoption_control(char* error,size_t size)
             HSD_ObjAllocGetUsing(&gobj_alloc_data)==gobj_before&&
             HSD_ObjAllocGetUsing(&gobjproc_alloc_data)==proc_before,
             "Map-light reducer advanced scheduling or retained original GObj/proc owners");
+        LIGHT_CONTROL_CHECK(!observer||observer("ground-light","removed",cycle,NULL,user),
+                            "Map-light removed snapshot refused");
     }
     if(error&&size)*error=0;
     return 1;
+}
+
+int melee_web_stadium_c1_map_light_adoption_control(char* error,size_t size)
+{
+    return map_light_adoption_control(NULL,NULL,error,size);
+}
+int melee_web_stadium_c1_cache_live_control(
+    MeleeWebStadiumC1CacheLiveObserver observer,void* user,char* error,size_t size)
+{
+    /* Do not drain an unexpected graph. Retain its actual pointer on failure. */
+    static HSD_JObj* owned;
+    LIGHT_CONTROL_CHECK(observer&&error&&size&&!owned,
+                        "Cache/live reducer requires a fresh owned control");
+    for(unsigned cycle=0;cycle<2;++cycle){
+        LIGHT_CONTROL_CHECK(observer("jobj",cycle?"warm":"cold",cycle,NULL,user),
+                            "JObj cold/warm snapshot refused");
+        owned=HSD_JObjAlloc();
+        LIGHT_CONTROL_CHECK(owned!=NULL,"Original JObj allocation failed");
+        LIGHT_CONTROL_CHECK(observer("jobj","live",cycle,owned,user),
+                            "JObj live snapshot refused");
+        HSD_JObjRemoveAll(owned);owned=NULL;
+        LIGHT_CONTROL_CHECK(observer("jobj","removed",cycle,NULL,user),
+                            "JObj removed snapshot refused");
+    }
+    return map_light_adoption_control(observer,user,error,size);
 }
 #undef LIGHT_CONTROL_CHECK
 #endif

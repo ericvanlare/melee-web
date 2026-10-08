@@ -527,6 +527,32 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         self.assertEqual(events[0]["event"], "stadium_e8_request_returned")
         self.assertEqual(events[0]["selection"]["rules"]["stage_kind"], 3)
 
+    def test_stadium_cache_live_asset_free_controls(self):
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("Build the reviewed C1 cache/live reducer first")
+        command = [str(node_runtime()), str(target), "--stadium-cache-live-controls"]
+        (self.scratch / "cache-live-command.txt").write_text(" ".join(command) + "\n", encoding="utf-8")
+        try:
+            run = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=30)
+        except subprocess.TimeoutExpired as failure:
+            for stream in ("stdout", "stderr"):
+                value = getattr(failure, stream)
+                (self.scratch / ("cache-live." + stream)).write_bytes(
+                    value.encode() if isinstance(value, str) else (value or b""))
+            raise
+        (self.scratch / "cache-live.stdout").write_text(run.stdout, encoding="utf-8")
+        (self.scratch / "cache-live.stderr").write_text(run.stderr, encoding="utf-8")
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-9000:])
+        self.assertIn("two worlds, 24 phase records, original JObj removal and Ground-light refusals", run.stdout)
+        rows = [line for line in run.stderr.splitlines() if line.startswith("C1_CACHE_LIVE ")]
+        self.assertEqual(len(rows), 24)
+        for world in range(2):
+            for consumer in ("jobj", "ground-light"):
+                actual = [line.split(" phase=", 1)[1].split()[0] for line in rows
+                          if f"world={world} " in line and f"consumer={consumer} " in line]
+                self.assertEqual(actual, ["cold", "live", "removed", "warm", "live", "removed"])
+
     def test_stadium_map_light_asset_free_adoption_controls(self):
         target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
         if not target.is_file():
