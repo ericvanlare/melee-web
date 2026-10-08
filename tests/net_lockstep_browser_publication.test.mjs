@@ -4,7 +4,8 @@ import test from 'node:test';
 import vm from 'node:vm';
 import {createBrowserNativePeer} from '../scripts/net_lockstep_browser_peer.mjs';
 import {browserPeerFacade} from '../scripts/net_session_instance.mjs';
-import {retainAccountedCssObservation} from '../scripts/net_lockstep_observers.mjs';
+import {retainAccountedCssObservation, verifyAccountedRenderReadiness} from '../scripts/net_lockstep_observers.mjs';
+import {installNetSourceAccounting, readNetSourceAccounting} from '../scripts/net_source_accounting.mjs';
 const source = await readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
 const first = source.indexOf('async function publishAllInputs(');
 const last = source.indexOf('\nasync function publishDisconnectPrefix(', first);
@@ -185,7 +186,7 @@ const cssSource = source.slice(source.indexOf('async function captureAccountedCs
 for (const expectedTerminal of [1, 2]) {
   test(`held CSS capture preserves expected terminal ${expectedTerminal} and observed cursor`, async () => {
     const rows = {alpha: {source_accounting: {source_cursor: 16}}};
-    const context = vm.createContext({Buffer, Number, TERMINAL: {disconnect: 2}, retainAccountedCssObservation,
+    const context = vm.createContext({Buffer, Number, nativePump: false, TERMINAL: {disconnect: 2}, retainAccountedCssObservation,
       instanceRows: rows, childDirectory: () => '/pure-fixture',
       path: {join: (...parts) => parts.join('/')},
       fs: {readFile: async () => Buffer.from([137,80,78,71,13,10,26,10])},
@@ -211,3 +212,41 @@ for (const expectedTerminal of [1, 2]) {
     assert(rows.alpha.accounted_css_observation.failed_predicates.includes('render_draw_calls'));
   });
 }
+
+test('actual CSS capture helper accepts frozen real observer readiness and retains stale-context rejection', async () => {
+  const native = {phase: 1, running: 1, error: null};
+  const status = {active: 1, cursor: 0, blocker: 'start_identity'};
+  const window = {menuRuntimeTiming: () => {}, __net: {status: () => ({...status}),
+    native: () => native, renderSource: () => 'Original character select'}};
+  const pageContext = vm.createContext({window});
+  const page = {evaluate: async (fn, argument) => {
+    pageContext.argument = argument;
+    return JSON.parse(JSON.stringify(vm.runInContext(`(${fn.toString()})(argument)`, pageContext)));
+  }};
+  await installNetSourceAccounting(page, 32768, {retainRenderReadiness: true});
+  status.cursor = 8; status.blocker = 'complete';
+  window.menuRuntimeTiming({frame: 84, valid: 1, source_steps: 8, source_draws: 8,
+    began: 1, drawn: 1, preparation_ms: 0, draw_suppressed: 0, draw_calls: 297});
+  const frozen = await readNetSourceAccounting(page, {freeze: true});
+  const rows = {alpha: {source_accounting: {source_cursor: 8}}};
+  const context = vm.createContext({Buffer, Number, nativePump: true, TERMINAL: {disconnect: 2},
+    retainAccountedCssObservation, verifyAccountedRenderReadiness, instanceRows: rows,
+    childDirectory: () => '/pure-fixture', path: {join: (...parts) => parts.join('/')},
+    fs: {readFile: async name => name.endsWith('source-accounting.json') ? JSON.stringify(frozen) :
+      Buffer.from([137,80,78,71,13,10,26,10])}, sha256: () => 'synthetic-fixture-hash',
+    instances: {alpha: {screenshot: async () => {},
+      graphics: async () => ({cross_origin_isolated: true, webgpu_adapter: true}),
+      driver: {diagnostics: async () => ({log: '', phase: 1, running: 1})},
+      native: async () => native, status: async () => ({...status})}},
+  });
+  const capture = vm.runInContext(cssSource + '\ncaptureAccountedCss', context);
+  await capture('alpha', 8);
+  assert.equal(rows.alpha.accounted_css.render_readiness.frame, 84);
+  assert.equal(rows.alpha.accounted_css.render_readiness.source_cursor, 8);
+  assert.equal(rows.alpha.accounted_css_observation.render_readiness_basis, 'frozen structured source accounting');
+  status.cursor = 9;
+  await assert.rejects(capture('alpha', 8), /CSS accounting capture/);
+  assert.equal(rows.alpha.accounted_css, undefined);
+  assert.equal(rows.alpha.accounted_css_observation.structured_render_observation.frame, 84);
+  assert.match(rows.alpha.accounted_css_observation.render_readiness_error, /held source boundary/);
+});

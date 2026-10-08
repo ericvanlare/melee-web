@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {verifyNetSourceAccounting} from './net_source_accounting.mjs';
 
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 
@@ -19,22 +20,45 @@ export function renderEventSignatures(log) {
   return new Set(renderEvents(log).map(row => row.signature));
 }
 
+export function readyRenderCallback(data) {
+  return Boolean(data && data.began === 1 && data.drawn === 1 && data.draw_suppressed === 0 &&
+    data.preparation_ms === 0 && data.draw_calls > 0 && data.source_draws > 0 &&
+    !/preparing|ready:\s*0/i.test(data.source || ''));
+}
+
 export function readyRenderEvent(diagnostics, expectedPhase, priorSignatures = new Set()) {
   if (!diagnostics || diagnostics.unavailable || diagnostics.phase !== expectedPhase ||
       diagnostics.running !== 1 || /preparing original/i.test(diagnostics.status || '')) return null;
   const rows = renderEvents(diagnostics.log);
   for (let index = rows.length - 1; index >= 0; --index) {
     const row = rows[index], data = row.data;
-    if (priorSignatures.has(row.signature) || data.began !== 1 || data.drawn !== 1 ||
-        data.draw_suppressed !== 0 || data.preparation_ms !== 0 ||
-        !(data.draw_calls > 0) || !(data.source_draws > 0) ||
-        /preparing|ready:\s*0/i.test(data.source || '')) continue;
+    if (priorSignatures.has(row.signature) || !readyRenderCallback(data)) continue;
     return {phase: expectedPhase, kind: row.kind, frame: data.frame ?? null,
       draw_calls: data.draw_calls, source_draws: data.source_draws,
       draw_suppressed: data.draw_suppressed, source: data.source ?? null,
       signature: row.signature};
   }
   return null;
+}
+
+export function verifyAccountedRenderReadiness(capture, native, status, expectedCursor, expectedPhase = 1) {
+  verifyNetSourceAccounting(capture, expectedCursor);
+  const draw = capture.render_readiness, row = capture.rows[draw?.row_index];
+  if (capture.render_readiness_enabled !== true || !draw ||
+      !Number.isSafeInteger(draw.row_index) || draw.row_index < 0 || !row ||
+      row.frame !== draw.frame || row.valid !== 1 || draw.valid !== 1 ||
+      row.source_steps !== draw.source_steps || row.source_draws !== draw.source_draws ||
+      draw.source_cursor !== expectedCursor || status?.active !== 1 || status?.cursor !== expectedCursor || status?.blocker !== 'complete' ||
+      draw.phase !== expectedPhase || native?.phase !== expectedPhase ||
+      draw.running !== 1 || native?.running !== 1 || draw.error !== null || native?.error !== null ||
+      /preparing original/i.test(draw.status || '') || typeof draw.source !== 'string' || !draw.source.length || draw.source.length > 4096 ||
+      !Number.isSafeInteger(draw.draw_calls) || draw.draw_calls <= 0 ||
+      !Number.isSafeInteger(draw.source_draws) || draw.source_draws <= 0 || !readyRenderCallback(draw) ||
+      capture.rows.slice(0, draw.row_index + 1).reduce((sum, item) => sum + item.source_steps, 0) !== expectedCursor)
+    throw Error('Structured render readiness is missing, invalid or outside the held source boundary');
+  return {phase: expectedPhase, kind: 'structured native accounting callback', frame: draw.frame,
+    source_cursor: draw.source_cursor, row_index: draw.row_index, draw_calls: draw.draw_calls,
+    source_draws: draw.source_draws, draw_suppressed: draw.draw_suppressed, source: draw.source};
 }
 
 // Retain the actual screenshot assertion operands even when the guard rejects.

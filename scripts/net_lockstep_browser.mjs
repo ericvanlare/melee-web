@@ -19,7 +19,7 @@ import {NET_FRAME_BYTES, NET_RECORD_BYTES, firstFatalBrowserError, openNetInstan
 import {createTransportCallbackQueue, describeLockstepTransport, describeLockstepTransportAttempt,
   openLockstepPeerPair, recordAvailableTransportMetrics} from './net_lockstep_transport.mjs';
 import {LOCKSTEP_DELAY, LockstepPeer, parseNetChecksum, TERMINAL} from './net_lockstep_protocol.mjs';
-import {readyRenderEvent, renderEventSignatures, retainAccountedCssObservation, verifyFirstChecksumMismatch,
+import {readyRenderEvent, renderEventSignatures, retainAccountedCssObservation, verifyAccountedRenderReadiness, verifyFirstChecksumMismatch,
   verifyTerminalHold, verifyPositivePeerCompletion, verifyReliableHostWebRtc, verifyDisconnectBoundary} from './net_lockstep_observers.mjs';
 import {verifyNetSourceAccounting} from './net_source_accounting.mjs';
 import {BUTTONS} from '../web/controller-input.mjs';
@@ -127,12 +127,19 @@ async function captureAccountedCss(role, expectedCursor, expectedBlocker = 'comp
   const bytes = await fs.readFile(filename);
   const graphics = await instances[role].graphics();
   const driverDiagnostics = await instances[role].driver.diagnostics();
-  const readiness = readyRenderEvent(driverDiagnostics, 1);
   const [native, status] = await Promise.all([instances[role].native(), instances[role].status()]);
+  let readiness = null, readinessError = null, accounting = null;
+  if (nativePump) {
+    accounting = JSON.parse(await fs.readFile(path.join(childDirectory(role), 'source-accounting.json'), 'utf8'));
+    try { readiness = verifyAccountedRenderReadiness(accounting, native, status, expectedCursor); }
+    catch (error) { readinessError = String(error.message || error); }
+  } else readiness = readyRenderEvent(driverDiagnostics, 1);
   retainAccountedCssObservation(instanceRows[role], {
     screenshot: 'accounted-css.png', bytes: bytes.length, sha256: sha256(bytes),
     png_signature_valid: bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
     gpu: graphics, browser_driver: driverDiagnostics, render_readiness: readiness, native, status,
+    render_readiness_basis: nativePump ? 'frozen structured source accounting' : 'existing driver text events',
+    structured_render_observation: accounting?.render_readiness ?? null, render_readiness_error: readinessError,
   }, {role, expectedCursor, expectedBlocker, expectedTerminal});
   instanceRows[role].accounted_css = {source_cursor: status.cursor, phase: native.phase,
     screenshot: 'accounted-css.png', bytes: bytes.length, sha256: sha256(bytes),
@@ -780,7 +787,7 @@ async function run() {
   await Promise.all(['alpha', 'beta'].map(role => instances[role].beginLockstep(seed, sourceTicks)));
   const startRows = await waitForStart();
   for (const role of ['alpha', 'beta']) {
-    instanceRows[role].source_accounting_start = await instances[role].installSourceAccounting();
+    instanceRows[role].source_accounting_start = await instances[role].installSourceAccounting({retainRenderReadiness: nativePump});
   }
   // Freeze the initial browser load-response set before peerIdentity performs
   // its separate cache-bypassing fetch of the served Wasm artifact.

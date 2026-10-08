@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import {installNetSourceAccounting, readNetSourceAccounting,
   verifyNetSourceAccounting} from '../scripts/net_source_accounting.mjs';
+import {readyRenderEvent, verifyAccountedRenderReadiness} from '../scripts/net_lockstep_observers.mjs';
 
 function fixture(original = () => 'original-result') {
   const native = {active: 1, cursor: 0, blocker: 'start_identity'};
@@ -17,6 +18,113 @@ function fixture(original = () => 'original-result') {
 }
 const callback = (frame, steps, draws = steps) =>
   ({frame, valid: 1, source_steps: steps, source_draws: draws});
+
+test('actual accounting owner retains a final real draw after the 4k text tail loses readiness', async () => {
+  let log = '';
+  const f = fixture(data => {
+    log += data.source_draws ? `Native callback ${JSON.stringify({...data, source: 'Original character select'})}\n` :
+      `Browser callback gap ${JSON.stringify({native: data, context: 'idle held source boundary '.repeat(20)})}\n`;
+    return 'original-result';
+  });
+  f.window.__net.native = () => ({phase: 1, running: 1, error: null});
+  f.window.__net.renderSource = () => 'Original character select';
+  await installNetSourceAccounting(f.page, 32768, {retainRenderReadiness: true});
+  for (let frame = 1; frame <= 8; ++frame) {
+    f.native.cursor = frame;
+    f.window.menuRuntimeTiming({...callback(frame, 1), began: 1, drawn: 1,
+      preparation_ms: 0, draw_suppressed: 0, draw_calls: 297});
+  }
+  f.native.blocker = 'complete';
+  for (let frame = 9; frame <= 88; ++frame) f.window.menuRuntimeTiming(callback(frame, 0));
+  const diagnostics = {phase: 1, running: 1, status: 'Local game data loaded.', log: log.slice(-4000)};
+  assert.equal(diagnostics.log.length, 4000);
+  assert.equal(readyRenderEvent(diagnostics, 1), null);
+  const capture = await readNetSourceAccounting(f.page, {freeze: true});
+  assert.equal(verifyNetSourceAccounting(capture, 8).source_draws, 8);
+  assert.equal(capture.render_readiness?.frame, 8);
+  assert.equal(capture.render_readiness?.source_cursor, 8);
+  assert.equal(capture.render_readiness?.phase, 1);
+  const readiness = verifyAccountedRenderReadiness(capture, f.window.__net.native(), f.native, 8);
+  assert.equal(readiness.frame, 8); assert.equal(readiness.draw_calls, 297);
+  assert.equal(f.window.menuRuntimeTiming, f.original);
+});
+
+async function renderFixture(source = 'Original character select') {
+  const f = fixture();
+  f.window.__net.native = () => ({phase: 1, running: 1, error: null});
+  f.window.__net.renderSource = () => source;
+  await installNetSourceAccounting(f.page, 32768, {retainRenderReadiness: true});
+  f.native.cursor = 8; f.native.blocker = 'complete';
+  const row = {...callback(1, 8), began: 1, drawn: 1, preparation_ms: 0, draw_suppressed: 0, draw_calls: 297};
+  return {...f, row};
+}
+
+test('structured readiness rejects missing, stale, wrong-phase and invalid actual context', async () => {
+  const f = await renderFixture(); f.window.menuRuntimeTiming(f.row);
+  const capture = await readNetSourceAccounting(f.page, {freeze: true});
+  const mutations = [
+    c => { c.render_readiness = null; }, c => { delete c.render_readiness_enabled; },
+    c => { c.render_readiness.source_cursor = 7; }, c => { c.render_readiness.phase = 2; },
+    c => { c.render_readiness.row_index = 5; }, c => { c.render_readiness.frame = 2; },
+    c => { c.render_readiness.draw_calls = 0; }, c => { c.render_readiness.draw_calls = 0.5; },
+    c => { c.render_readiness.source_draws = 0; }, c => { c.render_readiness.began = 0; },
+    c => { c.render_readiness.drawn = 0; }, c => { c.render_readiness.preparation_ms = 1; },
+    c => { c.render_readiness.draw_suppressed = 1; }, c => { c.render_readiness.source = 'preparing'; },
+    c => { c.render_readiness.source = 'ready: 0'; }, c => { c.render_readiness.source = 'x'.repeat(4097); },
+    c => { c.render_readiness.error = 'actual error'; }, c => { c.errors.push('observer failure'); },
+  ];
+  for (const mutate of mutations) {
+    const bad = structuredClone(capture); mutate(bad);
+    assert.throws(() => verifyAccountedRenderReadiness(bad, f.window.__net.native(), f.native, 8));
+  }
+  for (const native of [{phase: 2, running: 1, error: null}, {phase: 1, running: 0, error: null},
+    {phase: 1, running: 1, error: 'actual error'}])
+    assert.throws(() => verifyAccountedRenderReadiness(capture, native, f.native, 8));
+  assert.throws(() => verifyAccountedRenderReadiness(capture, f.window.__net.native(), {...f.native, cursor: 9}, 8));
+  const older = structuredClone(capture); older.rows = [callback(1, 7), callback(2, 1)];
+  older.render_readiness = {...older.render_readiness, frame: 1, source_steps: 7, source_draws: 7};
+  assert.throws(() => verifyAccountedRenderReadiness(older, f.window.__net.native(), f.native, 8));
+});
+
+test('structured getter/4096 overflow failures retain exact rows before waking and preserve error precedence', async () => {
+  for (const failure of ['getter', 'overflow']) {
+    const f = await renderFixture(failure === 'overflow' ? 'x'.repeat(4097) : 'source');
+    const getterError = Error('actual source getter failure');
+    if (failure === 'getter') f.window.__net.renderSource = () => { throw getterError; };
+    let notified;
+    const stop = f.window.__netSourceAccounting.subscribeProgress(error => {
+      assert.equal(f.window.__netSourceAccounting.read(false).rows.length, 1);
+      notified = error; throw Error('subscriber secondary failure');
+    });
+    assert.throws(() => f.window.menuRuntimeTiming(f.row), failure === 'getter' ? error => error === getterError : /4096/);
+    assert(notified); stop();
+    const captured = await readNetSourceAccounting(f.page, {freeze: true});
+    assert.equal(captured.rows.length, 1); assert.equal(captured.render_readiness, null);
+    assert.equal(captured.errors.length, 2);
+  }
+  const exact = Error('original exact failure');
+  // A separate actual owner starts with the throwing original, never replacing
+  // an already-installed owner in order to make a fixture pass.
+  const broken = fixture(() => { throw exact; });
+  broken.window.__net.native = () => { throw Error('getter must not run after original fails'); };
+  broken.window.__net.renderSource = () => 'source';
+  await installNetSourceAccounting(broken.page, 32768, {retainRenderReadiness: true});
+  const stop = broken.window.__netSourceAccounting.subscribeProgress(error => { assert.equal(error, exact); throw Error('secondary'); });
+  assert.throws(() => broken.window.menuRuntimeTiming({...callback(1, 8), began: 1, drawn: 1,
+    preparation_ms: 0, draw_suppressed: 0, draw_calls: 297}), error => error === exact); stop();
+  const failed = await readNetSourceAccounting(broken.page, {freeze: true});
+  assert.equal(failed.rows.length, 1); assert.equal(failed.render_readiness, null);
+});
+
+test('structured source text4096 is accepted and legacy observer skips readiness getters', async () => {
+  const f = await renderFixture('x'.repeat(4096)); f.window.menuRuntimeTiming(f.row);
+  const capture = await readNetSourceAccounting(f.page, {freeze: true});
+  assert.equal(verifyAccountedRenderReadiness(capture, f.window.__net.native(), f.native, 8).source.length, 4096);
+  const legacy = fixture(); legacy.window.__net.native = () => { throw Error('unused'); };
+  await installNetSourceAccounting(legacy.page); legacy.window.menuRuntimeTiming(callback(1, 1));
+  const old = await readNetSourceAccounting(legacy.page, {freeze: true});
+  assert.equal('render_readiness' in old, false);
+});
 
 test('actual page observer preserves callbacks and accounts preparation, catch-up and final draws', async () => {
   const calls = [];

@@ -68,6 +68,7 @@ const PAGE_HELPERS = () => {
       return {count, data: count ? toBase64(Module.HEAPU8.subarray(ptr, ptr + count * 64)) : ''};
     },
     status() { return JSON.parse(Module.UTF8ToString(Module._melee_web_net_status())); },
+    renderSource() { return Module.UTF8ToString(Module._melee_web_native_menu_diagnostics()); },
     native() {
       return {
         phase: Module._melee_web_native_menu_phase(),
@@ -596,7 +597,7 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
       return {count: result.count, bytes: Buffer.from(result.data, 'base64')};
     };
     instance.status = () => bounded(() => page.evaluate(() => window.__net.status()));
-    instance.installSourceAccounting = () => bounded(() => installNetSourceAccounting(page));
+    instance.installSourceAccounting = options => bounded(() => installNetSourceAccounting(page, 32768, options));
     instance.readSourceAccounting = options => bounded(() => readNetSourceAccounting(page, options));
     instance.native = () => bounded(() => page.evaluate(() => window.__net.native()));
     instance.observe = () => bounded(() => page.evaluate(() => window.__net.observe()));
