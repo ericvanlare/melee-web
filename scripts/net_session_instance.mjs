@@ -53,6 +53,9 @@ export function installRuntimeInputFixtureInPage({role, inputTicks, variant = 'n
     if (!Number.isSafeInteger(status.cursor) || status.cursor < 0 || status.cursor > 520 ||
         !Number.isInteger(native.phase) || !Number.isInteger(native.running))
       throw Error('CSS-to-SSS source phase observation is malformed');
+    // beginLockstep can make the native session active before its first source
+    // step; phase evidence represents completed source progress only.
+    if (status.cursor === 0) return;
     if (status.cursor > lastObservedCursor) {
       phaseSamples.push({cursor: status.cursor, phase: native.phase, running: native.running});
       lastObservedCursor = status.cursor;

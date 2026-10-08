@@ -427,11 +427,8 @@ test('CSS-to-SSS fixture drives the ordinary controller manager one selected sam
     const manager = createControllerManager({getGamepads: () => [pad], storage: null, userAgent: 'Chrome/154'});
     const discovered = manager.inspect(); manager.assign(discovered[0].key, port); manager.inspect();
     const captures = [], events = [], status = {active: 1, cursor: 0, blocker: 'network_wait', terminal: {kind: 0}};
-    const native = {phase: 1, running: 1}; let pollAllowed = true, pollCalls = 0, originalCalls = 0;
-    const owner = {armed: true, closing: false, failure: null, peer: {failure: null,
-      protocol: {ready: true, terminal: null, local_checksum_ticks: 520, remote_checksum_ticks: 520,
-        next_checksum_compare: 520, remote_ack_input: 517},
-      localInputCapture: {mode: 'live', enabled: true, captures}}};
+    const native = {phase: 0, running: 0}; let pollAllowed = false, pollCalls = 0, originalCalls = 0;
+    const owner = {armed: true, closing: false, failure: null, peer: null};
     const original = () => {
       ++originalCalls; events.push('original');
       if (pollAllowed && captures.length < RUNTIME_CSS_SSS_INPUT_TICKS) {
@@ -468,6 +465,21 @@ test('CSS-to-SSS fixture drives the ordinary controller manager one selected sam
   try {
     setup('alpha'); setup('beta');
     for (const role of ['alpha', 'beta']) {
+      const {page, native, owner, setPollAllowed} = pages[role];
+      globalThis.window = page;
+      page.menuFrame(); // Native lockstep has begun, but no source tick or peer exists yet.
+      assert.deepEqual(page.__meleeRuntimeInputFixture.snapshot().phase_samples, []);
+      native.phase = 1; native.running = 1;
+      page.menuFrame(); // Original CSS can be ready while the source cursor is still stationary.
+      assert.deepEqual(page.__meleeRuntimeInputFixture.snapshot().phase_samples, []);
+      owner.peer = {failure: null, protocol: {ready: true, terminal: null, local_checksum_ticks: 520,
+        remote_checksum_ticks: 520, next_checksum_compare: 520, remote_ack_input: 517},
+        localInputCapture: {mode: 'live', enabled: true, captures: pages[role].captures}};
+      page.menuFrame();
+      assert.deepEqual(page.__meleeRuntimeInputFixture.snapshot().phase_samples, []);
+      setPollAllowed(true);
+    }
+    for (const role of ['alpha', 'beta']) {
       const {page, original, captures, events, counters, setPollAllowed, status, owner} = pages[role];
       globalThis.window = page;
       for (let tick = 0; tick < RUNTIME_CSS_SSS_INPUT_TICKS; ++tick) {
@@ -489,11 +501,59 @@ test('CSS-to-SSS fixture drives the ordinary controller manager one selected sam
       assert.equal(page.menuFrame, original, 'fixture restores the callback it captured');
       assert.equal(page.__meleeSyntheticPadState, 'neutral');
       assert.equal(counters().pollCalls, RUNTIME_CSS_SSS_INPUT_TICKS);
-      assert.equal(counters().originalCalls, RUNTIME_CSS_SSS_INPUT_TICKS + 3,
-        'the original synchronous callback runs once for every input and wait frame');
+      assert.equal(counters().originalCalls, RUNTIME_CSS_SSS_INPUT_TICKS + 6,
+        'startup, input, wait, and completion callbacks each run the original synchronous callback once');
       assert.equal(events.length, counters().originalCalls);
       assert.equal(frozen.captures.length, RUNTIME_CSS_SSS_INPUT_TICKS);
     }
+  } finally { if (prior === undefined) delete globalThis.window; else globalThis.window = prior; }
+});
+
+test('CSS-to-SSS phase zero after source progress remains visible and prevents freeze', () => {
+  const prior = globalThis.window, frames = Buffer.alloc(153 * 44);
+  for (let tick = 0; tick < 153; ++tick) {
+    frames[tick * 44 + 32] = 0xff;
+    frames[tick * 44 + 43] = 0xff;
+  }
+  for (let tick = 150; tick <= 152; ++tick) frames.writeUInt16BE(0x1000, tick * 44);
+  const samples = buildRuntimeCssSssGamepadSamples(frames).alpha;
+  const captures = [], status = {active: 1, cursor: 0, blocker: 'network_wait', terminal: {kind: 0}};
+  const native = {phase: 0, running: 0};
+  const owner = {armed: true, closing: false, failure: null, peer: {failure: null,
+    protocol: {ready: true, terminal: null, local_checksum_ticks: 520, remote_checksum_ticks: 520,
+      next_checksum_compare: 520, remote_ack_input: 517},
+    localInputCapture: {mode: 'live', enabled: true, captures}}};
+  const original = () => {
+    const tick = captures.length;
+    if (tick < RUNTIME_CSS_SSS_INPUT_TICKS) {
+      captures.push({source_cursor: tick, input_tick: tick, local_port: 0, poll_serial: tick + 10,
+        bytes: samples[tick].bytes});
+      status.cursor = tick + 1;
+      native.phase = tick === 0 ? 0 : tick < 153 ? 1 : 3;
+      native.running = 1;
+    } else {
+      status.cursor = 520; status.blocker = 'complete'; native.phase = 3;
+    }
+  };
+  const page = {menuFrame: original, meleeNetRuntimeLockstepSnapshot: () => owner,
+    __net: {status: () => status, native: () => native}, __meleeSyntheticPadState: 'neutral',
+    __meleeSyntheticPadTransition(state) {
+      this.__meleeSyntheticPadState = typeof state === 'string' ? state : `css-start-to-sss:${state.input_tick}`;
+    }};
+  try {
+    globalThis.window = page;
+    installRuntimeInputFixtureInPage({role: 'alpha', inputTicks: RUNTIME_CSS_SSS_INPUT_TICKS,
+      variant: 'css-start-to-sss', samples});
+    for (let tick = 0; tick < RUNTIME_CSS_SSS_INPUT_TICKS; ++tick) page.menuFrame();
+    page.menuFrame();
+    const phases = page.__meleeRuntimeInputFixture.snapshot().phase_samples;
+    assert.equal(phases[0].cursor, 1);
+    assert.equal(phases[0].phase, 0, 'only zero-progress startup observations are omitted');
+    assert.deepEqual(phases.map(row => row.phase).filter((phase, index, rows) => !index || phase !== rows[index - 1]), [0, 1, 3]);
+    assert.throws(() => page.__meleeRuntimeInputFixture.freeze(), /cannot freeze/);
+    assert.equal(page.__meleeRuntimeInputFixture.snapshot().frozen, false);
+    page.__meleeRuntimeInputFixture.dispose();
+    assert.equal(page.menuFrame, original);
   } finally { if (prior === undefined) delete globalThis.window; else globalThis.window = prior; }
 });
 
