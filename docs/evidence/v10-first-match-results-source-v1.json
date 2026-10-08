@@ -1,0 +1,925 @@
+{
+  "schema": "melee-web-b4-first-match-results-source-receipt-v1",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/273",
+  "evidence_label": "Source identified",
+  "scope": "First typed Results entry for match 0, after the ordered original VS exit chain; source-only, not browser comparison.",
+  "source_producer": "e850046c970fcfb6b72fd17c04852516c9541944",
+  "source_tree": "33ac515a786e075baafe6c5fddc95630926041e6",
+  "source_identity": {
+    "capture_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "sequence_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "trace_bytes": 2137257881,
+    "recorded_full_trace_sha256": "81f8a0a3c8cac644e86be2e07451a5876be08b60ebb4295290a35c8a187c5580",
+    "full_trace_rehashed": false
+  },
+  "recipe_identity": {
+    "bytes": 2241622,
+    "sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b",
+    "version": 10,
+    "frame_count": 50394,
+    "seed": 3336171383
+  },
+  "result": {
+    "status": "first_match_results_entry_found",
+    "audit_completed": true,
+    "complete": false,
+    "whole_session_equivalent": false,
+    "elapsed_seconds": 10.043823916930705,
+    "original_scans": 1,
+    "fresh_scan_caps": {
+      "max_bytes": 2137257881,
+      "max_records": 79708
+    },
+    "execution_owner": {
+      "internal_seconds": 60,
+      "external_seconds": 65,
+      "cleanup_seconds": 5
+    },
+    "historical_clock_caps": {
+      "max_bytes": 134217728,
+      "max_records": 24000
+    },
+    "historical_stock_caps": {
+      "max_bytes": 268435456,
+      "max_records": 48000
+    },
+    "source_stat_stable": true,
+    "owner_cleanup_passed": true,
+    "fresh_owned_process_group_absent": true,
+    "no_browser": true
+  },
+  "observed": {
+    "exit_chain": [
+      {
+        "boundary": "vs_exit",
+        "draw_ordinal": 15093,
+        "source_sequence": 79620,
+        "source_tick": 15106
+      },
+      {
+        "boundary": "vs_exit_return",
+        "draw_ordinal": 15093,
+        "source_sequence": 79622,
+        "source_tick": 15106
+      },
+      {
+        "boundary": "vs_mode_exit",
+        "draw_ordinal": 15093,
+        "source_sequence": 79623,
+        "source_tick": 15106
+      },
+      {
+        "boundary": "results_enter",
+        "draw_ordinal": 15093,
+        "source_sequence": 79624,
+        "source_tick": 15106
+      }
+    ],
+    "last_complete_match": {
+      "state": {
+        "fighter_entities": [
+          {
+            "entity_index": 0,
+            "fighter_gobj_linked": true,
+            "fighter_player_id": 0,
+            "generation": 0,
+            "match_index": 0,
+            "slot": 0
+          },
+          {
+            "entity_index": 0,
+            "fighter_gobj_linked": true,
+            "fighter_player_id": 1,
+            "generation": 0,
+            "match_index": 0,
+            "slot": 1
+          },
+          {
+            "entity_index": 0,
+            "fighter_gobj_linked": true,
+            "fighter_player_id": 2,
+            "generation": 0,
+            "match_index": 0,
+            "slot": 2
+          },
+          {
+            "entity_index": 0,
+            "fighter_gobj_linked": true,
+            "fighter_player_id": 3,
+            "generation": 0,
+            "match_index": 0,
+            "slot": 3
+          }
+        ],
+        "fighters": [
+          {
+            "animation": 2,
+            "animation_frame_bits": "43120000",
+            "animation_speed_bits": "3f800000",
+            "damage_bits": "430351ec",
+            "facing_bits": "3f800000",
+            "ground_air": 0,
+            "input_hex": "000000000000000000000000000000003f800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fefefefefefed0fefefefefed0ffffffffffffa405ffffffffffffff",
+            "kind": 3,
+            "knockback_bits": [
+              "00000000",
+              "00000000",
+              "00000000"
+            ],
+            "motion": 14,
+            "position_bits": [
+              "42a45007",
+              "38d1b717",
+              "00000000"
+            ],
+            "shield_bits": "42700000",
+            "slot": 0,
+            "stocks": 1,
+            "velocity_bits": [
+              "00000000",
+              "00000000",
+              "00000000"
+            ]
+          },
+          {
+            "animation": 29,
+            "animation_frame_bits": "42240000",
+            "animation_speed_bits": "3f800000",
+            "damage_bits": "431f2148",
+            "facing_bits": "bf800000",
+            "ground_air": 1,
+            "input_hex": "bf7e000000000000bf7e000000000000bf7e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fefefefefefefebabafefefeffefffb3b3ffff1e00e6e7ffe7ff00ff",
+            "kind": 5,
+            "knockback_bits": [
+              "00000000",
+              "00000000",
+              "00000000"
+            ],
+            "motion": 4,
+            "position_bits": [
+              "4370c09d",
+              "4288cce4",
+              "c3af000d"
+            ],
+            "shield_bits": "42700000",
+            "slot": 1,
+            "stocks": 0,
+            "velocity_bits": [
+              "00000000",
+              "00000000",
+              "00000000"
+            ]
+          },
+          {
+            "animation": 4294967295,
+            "animation_frame_bits": "bf800000",
+            "animation_speed_bits": "3f800000",
+            "damage_bits": "42e9d1eb",
+            "facing_bits": "bf800000",
+            "ground_air": 1,
+            "input_hex": "bf7e000000000000bf7e0000000000003f8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005dfefe5dfefe5df6f6fefefee7fffff0f0ffff0200ffffffffff00ff",
+            "kind": 8,
+            "knockback_bits": [
+              "00000000",
+              "00000000",
+              "00000000"
+            ],
+            "motion": 11,
+            "position_bits": [
+              "426105bb",
+              "4288ccd4",
+              "c3af000d"
+            ],
+            "shield_bits": "42700000",
+            "slot": 2,
+            "stocks": 0,
+            "velocity_bits": [
+              "00000000",
+              "00000000",
+              "00000000"
+            ]
+          },
+          {
+            "animation": 4294967295,
+            "animation_frame_bits": "bf800000",
+            "animation_speed_bits": "3f800000",
+            "damage_bits": "431170a3",
+            "facing_bits": "bf800000",
+            "ground_air": 1,
+            "input_hex": "00000000000000000000000000000000bf7e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000010000000000fefefefefefe2927fdfefefe00d7fffffcffff0200ffffffd1ffff71",
+            "kind": 9,
+            "knockback_bits": [
+              "00000000",
+              "00000000",
+              "00000000"
+            ],
+            "motion": 11,
+            "position_bits": [
+              "c0188ff2",
+              "41262e7a",
+              "4336e890"
+            ],
+            "shield_bits": "42700000",
+            "slot": 3,
+            "stocks": 0,
+            "velocity_bits": [
+              "00000000",
+              "00000000",
+              "00000000"
+            ]
+          }
+        ],
+        "match_frame": 14868,
+        "pad_state_hex": "0000002d00000008001e0000000000015000018c0000ff00508cff0000000000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000ffffbe3e0000000000000000000000000000000000000000000000000000000000000000000000000000000001ff0000000000000000000000000000000000000000ffffbe3e0000000000000000000000000000000000000000000000000000000000000000000000000000000001ff0000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000ffffbe3e0000000000000000000000000000000000000000000000000000000000000000000000000000000001ff0000000000000000000000000000000000000000ffffbe3e0000000000000000000000000000000000000000000000000000000000000000000000000000000001ff0000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000ffffbe3e0000000000000000000000000000000000000000000000000000000000000000000000000000000001ff0000000000000000000000000000000000000000ffffbe3e0000000000000000000000000000000000000000000000000000000000000000000000000000000001ff",
+        "rng": 3752831213,
+        "scene_frame": 15105
+      },
+      "target": {
+        "cursor_after_frame": 16290,
+        "fighter_entities": [
+          {
+            "entity_index": 0,
+            "fighter_gobj_linked": true,
+            "fighter_player_id": 0,
+            "generation": 0,
+            "match_index": 0,
+            "slot": 0
+          },
+          {
+            "entity_index": 0,
+            "fighter_gobj_linked": true,
+            "fighter_player_id": 1,
+            "generation": 0,
+            "match_index": 0,
+            "slot": 1
+          },
+          {
+            "entity_index": 0,
+            "fighter_gobj_linked": true,
+            "fighter_player_id": 2,
+            "generation": 0,
+            "match_index": 0,
+            "slot": 2
+          },
+          {
+            "entity_index": 0,
+            "fighter_gobj_linked": true,
+            "fighter_player_id": 3,
+            "generation": 0,
+            "match_index": 0,
+            "slot": 3
+          }
+        ],
+        "match_frame": 14868,
+        "match_index": 0,
+        "pad_consume_source_sequence": 79613,
+        "rng": 3752831213,
+        "scene_frame": 15105,
+        "source_tick": 15105,
+        "source_tick_seq": 79616,
+        "state_fields_observed": [
+          "fighter_entities",
+          "fighters",
+          "match_frame",
+          "pad_state_hex",
+          "rng",
+          "scene_frame"
+        ],
+        "timeline_frame_index": 16289
+      }
+    },
+    "recipe_cursor": 16290,
+    "rejoins": [
+      {
+        "label": "clock1",
+        "prefix": {
+          "bytes_read": 10389712,
+          "last_source_sequence": 4735,
+          "records_read": 4736,
+          "sha256": "24d520abccf98ee109b3cee2ae67767d4363c7e941d688c3534c0cbfdd7cde4a"
+        },
+        "target": {
+          "cursor_after_frame": 1309,
+          "fighter_entities": [
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 0,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 0
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 1,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 1
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 2,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 2
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 3,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 3
+            }
+          ],
+          "match_frame": 1,
+          "match_index": 0,
+          "pad_consume_source_sequence": 4734,
+          "rng": 402611075,
+          "scene_frame": 124,
+          "source_tick": 124,
+          "source_tick_seq": 4735,
+          "state_fields_observed": [
+            "fighter_entities",
+            "fighters",
+            "match_frame",
+            "pad_state_hex",
+            "rng",
+            "scene_frame"
+          ],
+          "timeline_frame_index": 1308
+        }
+      },
+      {
+        "label": "clock60",
+        "prefix": {
+          "bytes_read": 12780628,
+          "last_source_sequence": 5030,
+          "records_read": 5031,
+          "sha256": "32b763453688c6335b90c9807b71c79d919b85e6e7435a3c2abccd1792f00e77"
+        },
+        "target": {
+          "cursor_after_frame": 1368,
+          "fighter_entities": [
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 0,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 0
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 1,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 1
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 2,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 2
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 3,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 3
+            }
+          ],
+          "match_frame": 60,
+          "match_index": 0,
+          "pad_consume_source_sequence": 5029,
+          "rng": 485756123,
+          "scene_frame": 183,
+          "source_tick": 183,
+          "source_tick_seq": 5030,
+          "state_fields_observed": [
+            "fighter_entities",
+            "fighters",
+            "match_frame",
+            "pad_state_hex",
+            "rng",
+            "scene_frame"
+          ],
+          "timeline_frame_index": 1367
+        }
+      },
+      {
+        "label": "clock300",
+        "prefix": {
+          "bytes_read": 22506388,
+          "last_source_sequence": 6230,
+          "records_read": 6231,
+          "sha256": "ef9569c32524aa79443a998867c4c418a2cfd8b21719ed24b03fc966ded025ef"
+        },
+        "target": {
+          "cursor_after_frame": 1608,
+          "fighter_entities": [
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 0,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 0
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 1,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 1
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 2,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 2
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 3,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 3
+            }
+          ],
+          "match_frame": 300,
+          "match_index": 0,
+          "pad_consume_source_sequence": 6229,
+          "rng": 1028332010,
+          "scene_frame": 423,
+          "source_tick": 423,
+          "source_tick_seq": 6230,
+          "state_fields_observed": [
+            "fighter_entities",
+            "fighters",
+            "match_frame",
+            "pad_state_hex",
+            "rng",
+            "scene_frame"
+          ],
+          "timeline_frame_index": 1607
+        }
+      },
+      {
+        "label": "clock500",
+        "prefix": {
+          "bytes_read": 30611188,
+          "last_source_sequence": 7230,
+          "records_read": 7231,
+          "sha256": "ec1ceb5c56c87ec35b5dd8cd0d318c85b1917d554871883732de4d2e4f52e7b6"
+        },
+        "target": {
+          "cursor_after_frame": 1808,
+          "fighter_entities": [
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 0,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 0
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 1,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 1
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 2,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 2
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 3,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 3
+            }
+          ],
+          "match_frame": 500,
+          "match_index": 0,
+          "pad_consume_source_sequence": 7229,
+          "rng": 448789154,
+          "scene_frame": 623,
+          "source_tick": 623,
+          "source_tick_seq": 7230,
+          "state_fields_observed": [
+            "fighter_entities",
+            "fighters",
+            "match_frame",
+            "pad_state_hex",
+            "rng",
+            "scene_frame"
+          ],
+          "timeline_frame_index": 1807
+        }
+      },
+      {
+        "label": "clock1000",
+        "prefix": {
+          "bytes_read": 50873188,
+          "last_source_sequence": 9730,
+          "records_read": 9731,
+          "sha256": "7f71d2c8c9529e8171dfab854cd114abb0eef44ca8d59c6f7e96af5495d13cf7"
+        },
+        "target": {
+          "cursor_after_frame": 2308,
+          "fighter_entities": [
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 0,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 0
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 1,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 1
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 2,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 2
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 3,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 3
+            }
+          ],
+          "match_frame": 1000,
+          "match_index": 0,
+          "pad_consume_source_sequence": 9729,
+          "rng": 3882645769,
+          "scene_frame": 1123,
+          "source_tick": 1123,
+          "source_tick_seq": 9730,
+          "state_fields_observed": [
+            "fighter_entities",
+            "fighters",
+            "match_frame",
+            "pad_state_hex",
+            "rng",
+            "scene_frame"
+          ],
+          "timeline_frame_index": 2307
+        }
+      },
+      {
+        "label": "clock2000",
+        "prefix": {
+          "bytes_read": 91371214,
+          "last_source_sequence": 14728,
+          "records_read": 14729,
+          "sha256": "3f5eaf2c845a387d22c1da7abf74d0f4e4ca2c40fd8503b31a890f0f3f6b7296"
+        },
+        "target": {
+          "cursor_after_frame": 3308,
+          "fighter_entities": [
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 0,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 0
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 1,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 1
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 2,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 2
+            },
+            {
+              "entity_index": 0,
+              "fighter_gobj_linked": true,
+              "fighter_player_id": 3,
+              "generation": 0,
+              "match_index": 0,
+              "slot": 3
+            }
+          ],
+          "match_frame": 2000,
+          "match_index": 0,
+          "pad_consume_source_sequence": 14727,
+          "rng": 1682403597,
+          "scene_frame": 2123,
+          "source_tick": 2123,
+          "source_tick_seq": 14728,
+          "state_fields_observed": [
+            "fighter_entities",
+            "fighters",
+            "match_frame",
+            "pad_state_hex",
+            "rng",
+            "scene_frame"
+          ],
+          "timeline_frame_index": 3307
+        }
+      },
+      {
+        "event": {
+          "changed_slots": [
+            {
+              "after": 3,
+              "before": 4,
+              "slot": 1
+            }
+          ],
+          "event": "first_typed_stock_count_decrement",
+          "stocks_after": [
+            4,
+            3,
+            3,
+            4
+          ],
+          "stocks_before": [
+            4,
+            4,
+            3,
+            4
+          ],
+          "target": {
+            "cursor_after_frame": 4791,
+            "fighter_entities": [
+              {
+                "entity_index": 0,
+                "fighter_gobj_linked": true,
+                "fighter_player_id": 0,
+                "generation": 0,
+                "match_index": 0,
+                "slot": 0
+              },
+              {
+                "entity_index": 0,
+                "fighter_gobj_linked": true,
+                "fighter_player_id": 1,
+                "generation": 0,
+                "match_index": 0,
+                "slot": 1
+              },
+              {
+                "entity_index": 0,
+                "fighter_gobj_linked": true,
+                "fighter_player_id": 2,
+                "generation": 0,
+                "match_index": 0,
+                "slot": 2
+              },
+              {
+                "entity_index": 0,
+                "fighter_gobj_linked": true,
+                "fighter_player_id": 3,
+                "generation": 0,
+                "match_index": 0,
+                "slot": 3
+              }
+            ],
+            "match_frame": 3483,
+            "match_index": 0,
+            "pad_consume_source_sequence": 22140,
+            "rng": 4228862339,
+            "scene_frame": 3606,
+            "source_tick": 3606,
+            "source_tick_seq": 22141,
+            "state_fields_observed": [
+              "fighter_entities",
+              "fighters",
+              "match_frame",
+              "pad_state_hex",
+              "rng",
+              "scene_frame"
+            ],
+            "timeline_frame_index": 4790
+          }
+        },
+        "label": "stock258",
+        "prefix": {
+          "bytes_read": 151442332,
+          "last_source_sequence": 22141,
+          "records_read": 22142,
+          "sha256": "db1f0b02e40e4f343f6398033aa1cb46486ddc5db1ffeed5fe8583a4847c8606"
+        }
+      },
+      {
+        "event": {
+          "changed_slots": [
+            {
+              "after": 3,
+              "before": 4,
+              "slot": 3
+            }
+          ],
+          "event": "first_typed_stock_count_decrement",
+          "stocks_after": [
+            4,
+            3,
+            3,
+            3
+          ],
+          "stocks_before": [
+            4,
+            3,
+            3,
+            4
+          ],
+          "target": {
+            "cursor_after_frame": 5167,
+            "fighter_entities": [
+              {
+                "entity_index": 0,
+                "fighter_gobj_linked": true,
+                "fighter_player_id": 0,
+                "generation": 0,
+                "match_index": 0,
+                "slot": 0
+              },
+              {
+                "entity_index": 0,
+                "fighter_gobj_linked": true,
+                "fighter_player_id": 1,
+                "generation": 0,
+                "match_index": 0,
+                "slot": 1
+              },
+              {
+                "entity_index": 0,
+                "fighter_gobj_linked": true,
+                "fighter_player_id": 2,
+                "generation": 0,
+                "match_index": 0,
+                "slot": 2
+              },
+              {
+                "entity_index": 0,
+                "fighter_gobj_linked": true,
+                "fighter_player_id": 3,
+                "generation": 0,
+                "match_index": 0,
+                "slot": 3
+              }
+            ],
+            "match_frame": 3859,
+            "match_index": 0,
+            "pad_consume_source_sequence": 24020,
+            "rng": 1688650196,
+            "scene_frame": 3982,
+            "source_tick": 3982,
+            "source_tick_seq": 24022,
+            "state_fields_observed": [
+              "fighter_entities",
+              "fighters",
+              "match_frame",
+              "pad_state_hex",
+              "rng",
+              "scene_frame"
+            ],
+            "timeline_frame_index": 5166
+          }
+        },
+        "label": "stock271",
+        "prefix": {
+          "bytes_read": 166680623,
+          "last_source_sequence": 24022,
+          "records_read": 24023,
+          "sha256": "c31863f04fcc44a454f316b9090989aac057ab868f8b3afb4a034604f53889dc"
+        }
+      }
+    ],
+    "results_entry": {
+      "boundary": "results_enter",
+      "draw_ordinal": 15093,
+      "source_sequence": 79624,
+      "source_tick": 15106
+    },
+    "results_scalar_state_observed": false,
+    "source_prefix": {
+      "bytes_read": 617177113,
+      "last_source_sequence": 79624,
+      "records_read": 79625,
+      "sha256": "c0eb464b6c57e2e8168d6605be55b0b463e62fa84945e3edbed3a565fe79aa0b"
+    },
+    "winner_or_ko_claim": false
+  },
+  "provenance": {
+    "source_audit": {
+      "logical_name": "first-results-source-audit-v3.json",
+      "bytes": 40641,
+      "sha256": "de444fd08fa4dfd043c4cbb8105f2931c603b73970ee47ffd63c1072e7e76959"
+    },
+    "auditor": {
+      "logical_name": "audit_first_results_v2.py",
+      "bytes": 18887,
+      "sha256": "aa707d61b5db63d5d29f949862102df9afced675e7fe068cc9d32b81fb72df7a"
+    },
+    "controls": {
+      "logical_name": "typed-controls-v4.log",
+      "bytes": 1606,
+      "sha256": "1e2486e0defee3972b11d94c308d0af4e71da7680805b933554bdc1e5bef8a16"
+    },
+    "launch_packet": {
+      "logical_name": "first-results-launch-packet-v3.json",
+      "bytes": 32117,
+      "sha256": "0fe2cd8612599e099669839b6b881dc6d4ca6e9eaf4a2479bb540be9c61c8eae"
+    },
+    "source_execution_owner": {
+      "logical_name": "source-owner-report-v3.json",
+      "bytes": 5729,
+      "sha256": "b0da4ad2e5ae908339a6d27d3d767dad93331d2094b8ead9e8847e905161a0dc"
+    },
+    "local_result_review": {
+      "logical_name": "local-source-result-review-v1.json",
+      "bytes": 14854,
+      "sha256": "81c6fc9e99da0a3cb65c58b16c05879d236f18a0ead5dc1c97d9dbc0c610b5c2"
+    },
+    "independent_result_review": {
+      "logical_name": "root-source-result-review-v1.json",
+      "bytes": 2672,
+      "sha256": "850cb99994632a864e20271568494baca9613f9375685cd664579b83a638d94d"
+    }
+  },
+  "validation": {
+    "focused_controls_passed": 13,
+    "controls_scope": "Actual SourceCollector, typed state/entity/PAD, callback, fresh prefix and terminal APIs with a synthetic decoded-row adapter; real binary reader cap controls; explicitly labeled direct-method reducers.",
+    "metadata_only_original_content_reads": 0,
+    "fresh_rejoins": [
+      "clock1",
+      "clock60",
+      "clock300",
+      "clock500",
+      "clock1000",
+      "clock2000",
+      "stock258",
+      "stock271"
+    ],
+    "last_completed_PAD_tick_nonadjacent": true,
+    "later_stock_event_selection_stopped_after_second_fresh_gate": true,
+    "later_typed_stock_state_entity_PAD_validation_preserved": true,
+    "ordered_exit_chain_and_pending_consume_guards": true,
+    "exact_typed_Results_stop": true
+  },
+  "retained_preparation_history": [
+    "Incomplete lifecycle-row reducer fixture failed; corrected actual-method reducer passed.",
+    "Full synthetic control v1 used two invalid fixture expectations: an unread duplicate terminal and a valid two-byte span encoding stock zero. Both were reduced; v1 source/log retained.",
+    "Launch packet v1 had incorrect owner option names; caught before launch.",
+    "Packet v2 filename replacement changed its schema; guarded metadata rejected it before original content access.",
+    "Corrected v3 guarded metadata and final focused controls passed."
+  ],
+  "observation_gaps": [
+    "Browser state equality",
+    "Results scalar state or runtime process equality",
+    "KO or winner cause",
+    "Results input consume after typed entry",
+    "Pixels",
+    "PCM",
+    "Physical input",
+    "Live timing and performance",
+    "Full-session acceptance",
+    "Competitive admission"
+  ]
+}

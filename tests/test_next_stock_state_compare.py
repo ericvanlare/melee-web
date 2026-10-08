@@ -72,6 +72,7 @@ class NextStockStateCompareTests(unittest.TestCase):
         obj.stock_decrement_observed = False
         obj.accepted_stock_observed = False
         obj.accepted_stock_rejoined = False
+        obj.first_results_boundary = None
         obj.fail = lambda message, **kwargs: (_ for _ in ()).throw(compare.ComparisonError(message))
         return obj
 

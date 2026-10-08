@@ -3719,6 +3719,7 @@ class WholeSessionStateCompareTests(unittest.TestCase):
         def comparator():
             instance = Comparator.__new__(Comparator)
             instance.stock_decrement_boundary = boundary
+            instance.first_results_boundary = None
             instance.match_clock_boundary = source["match_clock_boundary"]
             instance.previous_stock_counts = None
             instance.stock_decrement_observed = False
