@@ -20,6 +20,10 @@ def _retain_reducer_evidence(name,stdout,stderr):
         (directory/(name+".stdout")).write_text(stdout)
         (directory/(name+".stderr")).write_text(stderr)
 
+def _compile_failure(label,result,scratch,log_name):
+    return RuntimeError(f"{label}; compiler log retained at {scratch/log_name}\n"
+        f"Compiler stdout:\n{result.stdout}\nCompiler stderr:\n{result.stderr}")
+
 HEADERS=r"""
 #ifndef HIT_PROBE_SYNTHETIC_TYPES
 #define HIT_PROBE_SYNTHETIC_TYPES
@@ -84,7 +88,8 @@ class HitTransitionProbeTest(unittest.TestCase):
             str(ROOT/"tests/native_hit_transition_probe_fixture.c"),str(identity),
             "-o",str(cls.binary)],capture_output=True,text=True)
         (cls.scratch/"compile.log").write_text(compile_result.stdout+compile_result.stderr)
-        if compile_result.returncode:raise RuntimeError("Synthetic compile failed; retained "+str(cls.scratch))
+        if compile_result.returncode:raise _compile_failure(
+            "Synthetic compile failed",compile_result,cls.scratch,"compile.log")
         cls.failed=False
     def run(self, result=None):
         result=super().run(result)
@@ -238,16 +243,19 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
         built=compile_fixture(cls.candidate_binary,
             ['-DMELEE_WEB_RNG_DRAW_OBSERVER=1','-DMELEE_WEB_HIT_PROBE_SYNTHETIC=1'],
             [probe,fixture,identity],'candidate-compile.log')
-        if built.returncode:raise RuntimeError('Actual bodies/synthetic ABI compile failed; retained '+str(cls.scratch))
+        if built.returncode:raise _compile_failure(
+            'Actual bodies/synthetic ABI compile failed',built,cls.scratch,'candidate-compile.log')
         cls.no_observer_binary=cls.scratch/'actual-candidates-no-observer'
         built=compile_fixture(cls.no_observer_binary,[],[probe,fixture,identity],'no-observer-compile.log')
-        if built.returncode:raise RuntimeError('No-observer comparison compile failed; retained '+str(cls.scratch))
+        if built.returncode:raise _compile_failure(
+            'No-observer comparison compile failed',built,cls.scratch,'no-observer-compile.log')
         cls.adapter_binary=cls.scratch/'fixture-counting-adapter'
         built=compile_fixture(cls.adapter_binary,
             ['-DMELEE_WEB_RNG_DRAW_OBSERVER=1','-DMELEE_WEB_HIT_PROBE_SYNTHETIC=1',
              '-DMELEE_WEB_HIT_PROBE_COUNTING_ADAPTER=1'],
             [fixture,identity],'counting-adapter-compile.log')
-        if built.returncode:raise RuntimeError('Fixture-only counting adapter compile failed; retained '+str(cls.scratch))
+        if built.returncode:raise _compile_failure(
+            'Fixture-only counting adapter compile failed',built,cls.scratch,'counting-adapter-compile.log')
     def run(self,result=None):
         result=unittest.TestCase.run(self,result)
         self.__class__.test_result=result
