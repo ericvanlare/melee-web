@@ -54,6 +54,8 @@ int main(int argc,char** argv)
         if(strcmp(mode,"zero")&&strcmp(mode,"disabled")&&strcmp(mode,"unselected")){
             size_t logs=!strcmp(mode,"log20")?20:!strcmp(mode,"count21")?21:1;
             unsigned collision=melee_web_hit_probe_begin(&test_entities[1],0,0,0,0,0,0,0,0);
+            unsigned pass=melee_web_hit_probe_pass_begin(&test_entities[1]);
+            melee_web_hit_probe_pass_end(pass);
             unsigned damage=melee_web_hit_probe_begin(&test_entities[1],1,0,0,0,0,0,logs,1);
             for(size_t i=0;i<logs;++i)
                 melee_web_hit_probe_log(damage,!strcmp(mode,"log_gap")?i+1:i,1,0,

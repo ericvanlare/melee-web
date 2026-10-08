@@ -17,13 +17,29 @@ HEADERS=r"""
 #define HIT_PROBE_SYNTHETIC_TYPES
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
+typedef float Mtx[3][4];typedef float (*MtxPtr)[4];
+typedef struct HSD_JObj {Mtx matrix;} HSD_JObj;
+typedef struct HitVictim {void* victim;unsigned x4;} HitVictim;
+enum {HitCapsule_Disabled=0,HitCapsule_Enabled=1,HurtCapsule_Intangible=2,GA_Ground=0,GA_Air=1,HitElement_Catch=8,ftCo_MS_DamageIce=325};
 typedef struct HSD_GObj { void* user_data; } HSD_GObj;
 typedef struct Vec3 { float x,y,z; } Vec3;
 enum { FTKIND_KOOPA=5, Gm_PKind_Cpu=1, Gm_PKind_NA=3 };
+typedef struct HitCapsule {
+ int state; unsigned element,x4,unk_count; float damage,scale,coll_distance; Vec3 x58,x4C,hurt_coll_pos;
+ HitVictim victims_2[12];HSD_GObj* owner;
+ unsigned x42_b5,x40_b2,x40_b3,hit_grabbed_victim_only,x43_b2,x43_b1,x40_b0;
+} HitCapsule;
+typedef struct HurtCapsule { int state; unsigned skip_update_pos; Vec3 a_pos,b_pos,a_offset,b_offset;float scale;HSD_JObj* bone;} HurtCapsule;
+typedef struct FighterHurtCapsule {HurtCapsule capsule;} FighterHurtCapsule;
 typedef struct Fighter {
  HSD_GObj* gobj; unsigned player_id; int kind,motion_id,anim_id;
  unsigned x221F_b3,x2219_b1; Vec3 x8c_kb_vel;
- struct { float x1830_percent,x1838_percentTemp; int x183C_applied;
+ HitCapsule x914[4];FighterHurtCapsule hurt_capsules[15];unsigned hurt_capsules_len;
+ int ground_or_air,x1988,x198C;unsigned x221B_b0,x221D_b6,x221B_b5,x221C_b4;
+ HSD_GObj* victim_gobj;HitCapsule x1064_thrownHitbox;
+ struct { float x182c_behavior,x1834,x1830_percent,x1838_percentTemp; int x183C_applied;
+ int x1840,x189C_unk_num_frames,x1914;
  HSD_GObj* x1868_source; int x18c4_source_ply,x18ac_time_since_hit;
  float x195c_hitlag_frames,x18a0; } dmg;
 } Fighter;
@@ -131,5 +147,121 @@ class HitTransitionProbeTest(unittest.TestCase):
     def test_missing_hook_return(self):self.run_mode("missing_return",False)
     def test_missing_scheduler_completion(self):self.run_mode("missing_scheduler",False)
     def test_diagnostic_storage_overflow(self):self.run_mode("overflow",False)
+
+
+def _actual_function(source, signature):
+    """Extract a verified whole C function, including nested conditional bodies."""
+    start=source.index(signature); opening=source.index('{',start); depth=1; pos=opening+1
+    while depth:
+        if source[pos]=='{':depth+=1
+        elif source[pos]=='}':depth-=1
+        pos+=1
+    return source[start:pos]+'\n'
+
+class HitCandidateSourceTest(unittest.TestCase):
+    """Actual patched routines; explicitly synthetic ABI and service implementations.
+
+    The enabled/disabled selector runs compare full fixture state, private logs,
+    service call counts and order. This is not runtime/compiler-ABI validation.
+    """
+    @classmethod
+    def setUpClass(cls):
+        HitTransitionProbeTest.setUpClass.__func__(cls)
+        source_root=cls.scratch/'source'
+        for relative in ('src/melee/ft/ftcoll.c','src/melee/lb/lbcollision.c'):
+            target=source_root/relative;target.parent.mkdir(parents=True,exist_ok=True)
+            shutil.copy2(ROOT/'.deps/melee'/relative,target)
+        applied=subprocess.run(['git','apply','--include=src/melee/ft/ftcoll.c',
+            '--include=src/melee/lb/lbcollision.c',str(ROOT/'patches/melee-gameplay.patch')],
+            cwd=source_root,capture_output=True,text=True)
+        (cls.scratch/'apply.log').write_text(applied.stdout+applied.stderr)
+        if applied.returncode:raise RuntimeError('Actual patch application failed; retained '+str(cls.scratch))
+        ft=(source_root/'src/melee/ft/ftcoll.c').read_text()
+        lb=(source_root/'src/melee/lb/lbcollision.c').read_text()
+        header=HEADERS+r"""
+typedef unsigned char u8;typedef int s32;typedef unsigned u32;typedef int FighterKind;typedef int HitCapsuleState;typedef void* UNK_T;
+typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;void *unk_anim0,*hurt1;Vec3 pos;int size_of_xC;float x20;} DmgLogEntry;
+"""
+        (cls.scratch/'candidate_source_fixture.h').write_text(header)
+        signatures=('static void tiplog(', 'static inline void inlineB0(',
+            'static inline HitCapsuleState checkTipLog(', 'static inline bool inlineB1(',
+            'static inline bool inlineB2(', 'static inline float inlineB3(', 'bool ftColl_80076ED8(')
+        bodies='static DmgLogEntry dmg_log0[20];\nstruct DmgLogEntry dmg_log1[20];\nstatic int dmg_log0_idx;\nstatic int dmg_log1_idx;\n'
+        bodies+='\n'.join(_actual_function(ft,x) for x in signatures)
+        bodies+=_actual_function(lb,'bool lbColl_8000805C(')
+        # Exact admission predicate from the verified whole normal-hurt owner.
+        owner=_actual_function(ft,'void ftColl_80078C70(')
+        start=owner.index('if ((temp_r23->state != HitCapsule_Disabled)')+3
+        pos=start;depth=0
+        while True:
+            if owner[pos]=='(':depth+=1
+            elif owner[pos]==')':
+                depth-=1
+                if not depth:break
+            pos+=1
+        predicate=owner[start:pos+1]
+        bodies+='\nstatic int actual_admission(Fighter* this_fp,Fighter* victim_fp,HitCapsule* temp_r23,HSD_GObj* this_gobj) {return '+predicate+';}\n'
+
+        (cls.scratch/'candidate_source_bodies.inc').write_text(bodies)
+        cls.candidate_binary=cls.scratch/'actual-candidates'
+        built=subprocess.run([shutil.which('cc') or 'cc','-std=c11','-Wall','-Wextra','-Werror',
+            '-ffp-contract=off','-DMELEE_WEB_RNG_DRAW_OBSERVER=1','-DMELEE_WEB_HIT_PROBE_SYNTHETIC=1',
+            '-I'+str(cls.scratch),'-I'+str(ROOT/'src'),str(ROOT/'src/gameplay_hit_transition_probe.c'),
+            str(ROOT/'tests/native_hit_candidate_probe_fixture.c'),str(cls.scratch/'identity.c'),
+            '-o',str(cls.candidate_binary)],capture_output=True,text=True)
+        (cls.scratch/'candidate-compile.log').write_text(built.stdout+built.stderr)
+        if built.returncode:raise RuntimeError('Actual bodies/synthetic ABI compile failed; retained '+str(cls.scratch))
+    def run(self,result=None):
+        result=unittest.TestCase.run(self,result)
+        self.__class__.test_result=result
+        return result
+    @classmethod
+    def tearDownClass(cls):HitTransitionProbeTest.tearDownClass.__func__(cls)
+    def candidate_mode(self,mode,valid=True):
+        result=subprocess.run([str(self.candidate_binary),mode],capture_output=True,text=True)
+        (self.scratch/('candidate-'+mode+'.stdout')).write_text(result.stdout)
+        (self.scratch/('candidate-'+mode+'.stderr')).write_text(result.stderr)
+        if not valid:
+            self.assertNotEqual(result.returncode,0,result.stderr)
+            if mode=="overflow":
+                partial=json.loads(result.stdout.splitlines()[-1])
+                self.assertTrue(partial["overflowed"])
+                self.assertEqual(len(partial["events"]),64)
+            return
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('exact_state_writes=1',result.stderr)
+        rows=[json.loads(x) for x in result.stdout.splitlines()]
+        validated=subprocess.run(['node','--input-type=module','-e',
+            "import {parseHitTransitionProbe,validateHitTransitionProbeRows} from './scripts/rng_draw_probe.mjs';"
+            "let t='';for await(const c of process.stdin)t+=c;"
+            "validateHitTransitionProbeRows(JSON.parse(t).map(JSON.stringify),parseHitTransitionProbe('5238,5239,5240'),{observedCursor:5240});"],
+            cwd=ROOT,input=json.dumps(rows),capture_output=True,text=True)
+        (self.scratch/('candidate-'+mode+'.validation')).write_text(validated.stdout+validated.stderr)
+        self.assertEqual(validated.returncode,0,validated.stderr)
+        return rows[1]
+    def test_actual_candidate_branches_and_state_equivalence(self):
+        for mode in ('normal','phantom','zero','wrong_pair','intangible','cache','mode','matrix','two_geometry','hurt15','zero_overlap','hit_disabled','catch','flag_zero','air_miss','grab_blocked','eligibility_blocked','phantom_existing','phantom_busy','phantom_invulnerable','normal_invulnerable','normal_armored'):
+            with self.subTest(mode=mode):self.candidate_mode(mode)
+    def test_candidate_completion_and_authored_bounds_fail_closed(self):
+        for mode in ('hurt16','gap','missing_pair','missing_pass','missing_geometry','duplicate_geometry','duplicate_pair','duplicate_pair_return','overflow'):
+            with self.subTest(mode=mode):self.candidate_mode(mode,False)
+
+    def test_actual_rows_reject_corrupted_candidate_artifacts(self):
+        row=self.candidate_mode('normal')
+        # Actual C output is retained as the base; only one artifact field is corrupted per control.
+        result=subprocess.run(['node','--input-type=module','-e',
+            "import {validateHitTransitionProbeRows} from './scripts/rng_draw_probe.mjs';"
+            "let t='';for await(const c of process.stdin)t+=c;const base=JSON.parse(t);"
+            "const changes=[r=>r.events.find(e=>e.phase==='pair_entry').hurt_length=16,"
+            "r=>r.events.find(e=>e.phase==='geometry').geometry_before.pop(),"
+            "r=>r.events.find(e=>e.phase==='producer_branch').branch=5,"
+            "r=>r.events=r.events.filter(e=>e.phase!=='pair_return'),"
+            "r=>r.candidate_pairs++];"
+            "for(const change of changes){const r=structuredClone(base);change(r);let failed=false;"
+            "try{validateHitTransitionProbeRows([JSON.stringify(r)],{selected:[5239]},{observedCursor:5239});}catch{failed=true;}"
+            "if(!failed)throw Error('corrupted artifact accepted');}"],
+            cwd=ROOT,input=json.dumps(row),capture_output=True,text=True)
+        (self.scratch/'corrupted-artifact-validation.log').write_text(result.stdout+result.stderr)
+        self.assertEqual(result.returncode,0,result.stderr)
 
 if __name__=="__main__":unittest.main()

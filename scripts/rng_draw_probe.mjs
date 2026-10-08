@@ -116,7 +116,16 @@ export function validateHitTransitionProbeRows(textRows, selection,
         !row.hook_counts.every(uint)) throw Error('Invalid hit transition row identity or bound');
     seen.add(row.source_cursor); previousCursor = row.source_cursor;
     const counts = [0,0,0], stack = [], pending = new Map();
-    let ordinal = 0;
+    let ordinal = 0, passOrdinal = 0, pairOrdinal = 0, geometryOrdinal = 0, producerOrdinal = 0;
+    let candidatePass = null, candidatePair = null, candidateProducer = null, expectedPasses = 0;
+    const candidateEnabled = Object.hasOwn(row,'candidate_enabled');
+    if (candidateEnabled && (row.source_cursor !== 5239 || row.candidate_enabled !== true ||
+        !uint(row.candidate_passes) || !uint(row.candidate_pairs)))
+      throw Error('Invalid selected candidate protocol summary');
+    const candidateBits = (values,n) => Array.isArray(values) && values.length === n &&
+      values.every(value => typeof value === 'string' && SEED.test(value));
+    const candidateLogs = event => Number.isInteger(event.log0_count) && event.log0_count >= 0 && event.log0_count <= 20 &&
+      Number.isInteger(event.log1_count) && event.log1_count >= 0 && event.log1_count <= 20;
     const identity = row.events[0];
     if (!uint(identity.match_index) || !uint(identity.generation))
       throw Error('Invalid hit transition entity generation');
@@ -125,13 +134,90 @@ export function validateHitTransitionProbeRows(textRows, selection,
           event.match_index !== identity.match_index || event.generation !== identity.generation ||
           event.fighter_player_id !== 1 || event.fighter_gobj_linked !== true ||
           typeof event.rng !== 'string' || !SEED.test(event.rng) ||
-          !uint(event.invocation) || !Number.isInteger(event.kind) || event.kind < 0 || event.kind > 3)
+          !uint(event.invocation) || !Number.isInteger(event.kind) || event.kind < 0 || event.kind > 4)
         throw Error('Invalid hit transition event identity or sequence');
       const marker = index === 0 || index === row.events.length - 1;
       if (marker) {
         if (event.phase !== (index === 0 ? 'scheduler_start' : 'scheduler_return') ||
             event.kind !== 3 || event.invocation !== 0 || (index && stack.length))
           throw Error('Missing scheduler marker or unmatched hook');
+      } else if (event.kind === 4) {
+        if (!candidateEnabled || pending.get(stack.at(-1))?.kind !== 0 ||
+            event.attacker_slot !== 0 || event.receiver_slot !== 1 || !uint(event.pass) || !uint(event.pair) ||
+            !Number.isInteger(event.hit_index) || event.hit_index < -1 || event.hit_index >= 4 ||
+            !Number.isInteger(event.hurt_index) || event.hurt_index < -1 || event.hurt_index >= 15)
+          throw Error('Invalid selected pair identity or authored bounds');
+        if (event.phase === 'pass_entry') {
+          if (candidatePass || candidatePair || candidateProducer || event.invocation !== ++passOrdinal ||
+              event.pass !== event.invocation || event.pair !== 0 || event.hit_index !== -1 || event.hurt_index !== -1)
+            throw Error('Duplicate or invalid candidate pass');
+          candidatePass = event.invocation;
+        } else if (event.phase === 'pass_return') {
+          if (event.invocation !== candidatePass || event.pass !== candidatePass || event.pair !== 0 ||
+              candidatePair || candidateProducer) throw Error('Incomplete candidate pass');
+          candidatePass = null;
+        } else if (event.phase === 'pair_entry') {
+          if (!candidatePass || candidatePair || candidateProducer || event.pass !== candidatePass ||
+              event.invocation !== ++pairOrdinal || event.pair !== event.invocation ||
+              event.hit_index !== -1 || event.hurt_index !== -1 || !uint(event.encounter) ||
+              typeof event.self_seen !== 'boolean' || !uint(event.attacker_generation) ||
+              !Number.isInteger(event.hurt_length) || event.hurt_length < 0 || event.hurt_length > 15 ||
+              !sint(event.receiver_ground_air) || !sint(event.receiver_x1988) || !sint(event.receiver_x198c) ||
+              typeof event.receiver_shield !== 'boolean' || typeof event.receiver_x221d_b6 !== 'boolean')
+            throw Error('Invalid pair entry or runtime hurt length');
+          candidatePair = {id:event.pair,pass:event.pass,encounter:event.encounter,self:event.self_seen,
+            candidates:0,hurtLength:event.hurt_length,geometry:null};
+        } else {
+          if (!candidatePass || !candidatePair || event.pass !== candidatePair.pass || event.pair !== candidatePair.id)
+            throw Error('Candidate event outside its selected pair');
+          if (event.phase === 'candidate') {
+            if (candidateProducer || event.invocation !== candidatePair.id ||
+                event.hit_index !== candidatePair.candidates++ || event.hurt_index !== -1 ||
+                !sint(event.hit_state) || !uint(event.hit_element) || !Array.isArray(event.hit_flags) ||
+                event.hit_flags.length !== 6 || !event.hit_flags.every(v => v === 0 || v === 1) ||
+                !candidateBits([event.hit_damage_bits,event.hit_radius_bits],2))
+              throw Error('Invalid ordered hit candidate');
+            candidatePair.geometry = null;
+          } else if (event.phase === 'geometry') {
+            if (candidateProducer || event.invocation !== ++geometryOrdinal ||
+                event.hit_index !== candidatePair.candidates - 1 || event.hurt_index < 0 ||
+                event.hurt_index >= candidatePair.hurtLength || ![0,1].includes(event.result) || !sint(event.mode) ||
+                typeof event.cache_before !== 'boolean' || typeof event.cache_after !== 'boolean' ||
+                typeof event.matrix_present !== 'boolean' || !candidateBits(event.geometry_before,18) ||
+                !candidateBits(event.geometry_after,10) || !candidateBits(event.arguments,3) ||
+                !candidateBits(event.matrix_bits,12)) throw Error('Invalid actual geometry completion');
+            candidatePair.geometry = {result:event.result,hit:event.hit_index,hurt:event.hurt_index,consumed:false};
+          } else if (event.phase === 'producer_entry') {
+            const geometry = candidatePair.geometry;
+            if (candidateProducer || !geometry || geometry.result !== 1 || geometry.consumed ||
+                event.hit_index !== geometry.hit || event.hurt_index !== geometry.hurt ||
+                event.invocation !== ++producerOrdinal || !candidateLogs(event))
+              throw Error('Producer lacks a fresh actual geometry completion');
+            geometry.consumed = true;
+            candidateProducer = {id:event.invocation,phase:-1,log0:event.log0_count,log1:event.log1_count};
+          } else if (event.phase === 'producer_branch') {
+            if (!candidateProducer || candidateProducer.id !== event.invocation || !candidateLogs(event) ||
+                !Number.isInteger(event.branch) || event.branch < 0 || event.branch > 5)
+              throw Error('Invalid original producer branch');
+            const previous = event.branch === 0 || event.branch === 3 ? -1 :
+              event.branch === 1 ? 0 : event.branch === 2 ? 1 : event.branch === 4 ? 3 : 4;
+            if (candidateProducer.phase !== previous ||
+                (event.branch === 2 && event.log1_count !== candidateProducer.log1 + 1) ||
+                (event.branch === 5 && event.log0_count !== candidateProducer.log0 + 1))
+              throw Error('Duplicate or reordered producer branch/log append');
+            candidateProducer = {...candidateProducer,phase:event.branch,log0:event.log0_count,log1:event.log1_count};
+          } else if (event.phase === 'producer_return') {
+            if (!candidateProducer || candidateProducer.id !== event.invocation || !candidateLogs(event) ||
+                candidateProducer.phase < 0 || event.result !== (candidateProducer.phase === 0 ? 0 : 1))
+              throw Error('Incomplete actual producer return');
+            candidateProducer = null;
+          } else if (event.phase === 'pair_return') {
+            if (candidateProducer || event.invocation !== candidatePair.id ||
+                event.encounter !== candidatePair.encounter || event.self_seen !== candidatePair.self ||
+                event.candidates !== candidatePair.candidates) throw Error('Incomplete candidate pair');
+            candidatePair = null;
+          } else throw Error('Unexpected candidate observation phase');
+        }
       } else if (event.phase === 'entry') {
         if (event.kind === 3 || event.invocation !== ++ordinal ||
             !sint(event.requested_motion) || !['flags','frame_bits','speed_bits','blend_bits']
@@ -140,6 +226,7 @@ export function validateHitTransitionProbeRows(textRows, selection,
             ![0,1].includes(event.log_kind) || (event.kind !== 1 && event.log_count !== 0))
           throw Error('Invalid hook entry or authored log bound');
         counts[event.kind]++;
+        if (event.kind === 0 && !event.gate_x221f_b3 && !event.gate_x2219_b1) expectedPasses++;
         pending.set(event.invocation,{kind:event.kind,count:event.log_count,logs:0});
         stack.push(event.invocation);
       } else if (event.phase === 'log') {
@@ -164,6 +251,9 @@ export function validateHitTransitionProbeRows(textRows, selection,
           !vector(event.knockback_bits) || !source(event)))
         throw Error('Invalid exact hit transition state bits');
     }
+    if (candidatePass || candidatePair || candidateProducer || (candidateEnabled &&
+        (passOrdinal !== row.candidate_passes || pairOrdinal !== row.candidate_pairs ||
+         passOrdinal !== expectedPasses))) throw Error('Missing candidate pass/pair completion');
     if (pending.size || counts.some((value,index) => value !== row.hook_counts[index]))
       throw Error('Incomplete hit transition hooks or count disagreement');
   }
