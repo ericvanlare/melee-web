@@ -48,14 +48,22 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
   if (inputCapture && globalThis.__meleeWebNetLocalInputCapture != null)
     throw Error('Browser native local input capture already has an owner');
   let failure = null, intentionalClose = false, closed = false, closing = false;
+  let closeMode = null, closeNativePhase = null, nativeCallEpoch = 0, closingNativeEpoch = null;
+  let nativeQuiescence = 'not-run';
+  let closeFenceFailures = [];
   let wakeRequested = false, wakeQueued = false, wakeRuns = 0, rpcCalls = 0, unsubscribeProgress = null;
   let closeOperation = null, drainFailure = null;
   let startup = null;
   let nativeChain = Promise.resolve();
   const callNative = (name, ...args) => {
-    if (!autonomousPump) return native[name](...args);
+    const callEpoch = nativeCallEpoch;
     const operation = nativeChain.then(() => {
       if (closed) throw Error('Native access after autonomous peer close');
+      if (closing && (closeMode === 'fatal' || callEpoch !== closingNativeEpoch ||
+          (closeNativePhase === 'terminal' && name !== 'terminate') ||
+          (closeNativePhase === 'drain' && name !== 'status' && name !== 'drain') ||
+          !['terminal', 'drain'].includes(closeNativePhase)))
+        throw Error('Queued native access was fenced by autonomous peer close');
       return native[name](...args);
     });
     nativeChain = operation.catch(remember);
@@ -199,17 +207,20 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     },
     onTerminal: terminal => {
       invalidatePendingConsumer(Error(`Browser checksum consumer batch cancelled by ${terminal.kind} terminal`));
+      if (closeMode === 'fatal') return;
       return callNative('terminate', TERMINAL[terminal.kind] ?? TERMINAL.protocol,
         Number.isInteger(terminal.tick) ? terminal.tick : 0,
         Number.isInteger(terminal.channel) ? terminal.channel : 0);
     },
   });
   const endpoint = createEndpoint({url: relayUrl, roomId, role, timeoutMs,
-    onMessage: text => track(() => peer.receive(text)),
-    onDisconnect: (_role, reason) => intentionalClose ? Promise.resolve() : track(() => peer.disconnect(reason)),
+    onMessage: text => track(() => closing || closed ? undefined : peer.receive(text)),
+    onDisconnect: (_role, reason) => intentionalClose || closed || closeMode === 'fatal'
+      ? Promise.resolve() : track(() => closed || closeMode === 'fatal' ? undefined : peer.disconnect(reason)),
     onEndpointError: (_role, error) => track(async () => {
       remember(error);
-      await peer.fail('protocol', {reason: `transport receive failed: ${String(error?.message || error)}`});
+      if (!closing && !closed)
+        await peer.fail('protocol', {reason: `transport receive failed: ${String(error?.message || error)}`});
     }),
   });
   endpoint.ready.catch(remember);
@@ -270,19 +281,26 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     }
     return true;
   };
-  async function settle() {
-    await endpoint.drainInbound(timeoutMs);
-    await localInputQueue;
-    while (pending.size) await Promise.all([...pending]);
-    await peer.receiveQueue;
-    await peer.pump;
-    check();
+  async function settle({checkFailure = true} = {}) {
+    const failures = [];
+    const joins = [() => endpoint.drainInbound(timeoutMs), () => localInputQueue,
+      async () => { while (pending.size) await Promise.all([...pending]); },
+      () => peer.receiveQueue, () => peer.pump];
+    for (const join of joins) {
+      try { await join(); } catch (error) { failures.push(error); }
+    }
+    if (checkFailure && failure) failures.push(failure);
+    if (failures.length) throw new AggregateError([...new Set(failures)], 'Browser native peer work did not settle cleanly');
   }
-  async function pump() {
-    await settle();
+  async function pump({closingOwner = false} = {}) {
+    if (closing && (!closingOwner || closeMode === 'fatal')) return;
+    await settle({checkFailure: !closingOwner});
     // One extra record detects capacity exhaustion; do not silently truncate or
     // stop draining and describe the remaining native records as exported.
     const records = await callNative('drain', BROWSER_CHECKSUM_EXPORT_LIMIT - exports.length + 1);
+    // Fatal escalation may arrive during this await. Recheck at the exact
+    // drain-to-status boundary before any continuation starts another native read.
+    if (closing && closeMode === 'fatal') return;
     if (Array.isArray(records)) nativeRecordsDrained += records.length;
     if (!Array.isArray(records) || records.some(record =>
         (!Array.isArray(record) && !(record instanceof Uint8Array)) || record.length !== NET_RECORD_BYTES ||
@@ -315,7 +333,9 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
         status.cursor === sourceTicks && status.terminal?.kind === 0;
       await peer.setNativeProgress(status.cursor, {flushFinal});
     }
-    await settle();
+    // Closing still joins all work and reports sticky errors in finishClose;
+    // a rejected startup must not prevent observation of the final native boundary.
+    await settle({checkFailure: !closingOwner});
     if (consumerBatch) await consumeBatch(consumerBatch);
   }
   const snapshot = () => ({protocol: peer.summary(), endpointErrors: endpoint.errors,
@@ -341,7 +361,8 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
         accepted: pendingConsumerBatch.accepted, joined: pendingConsumerBatch.joined,
         unjoined: pendingConsumerBatch.unjoined,
         records: readonlyRecords(pendingConsumerBatch.records)}) : null},
-    nativePump: {enabled: autonomousPump, closing, wake_requested: wakeRequested,
+    nativePump: {enabled: autonomousPump, closing, close_mode: closeMode,
+      native_quiescence: nativeQuiescence, wake_requested: wakeRequested,
       wake_queued: wakeQueued, completed_wakeups: wakeRuns, rpc_calls: rpcCalls, drain_failure: drainFailure},
     failure: failure ? String(failure?.stack || failure) : null, transport: endpoint.transport});
 
@@ -359,6 +380,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     if (wakeQueued) return;
     wakeQueued = true;
     const operation = serialize(async () => {
+      if (closing || closed) { wakeQueued = false; return; }
       wakeRequested = false;
       try { check(); await pump(); ++wakeRuns; }
       catch (error) {
@@ -381,10 +403,12 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     ++rpcCalls;
     if (checksumConsumer && name === 'drain')
       return Promise.reject(Error('Browser checksum drain RPC is disabled while a checksum consumer owns evidence'));
-    if (autonomousPump && closing && !closed)
+    if (closing && !closed)
       return Promise.reject(Error('Browser native peer is closing'));
     const operation = serialize(async () => {
       check();
+      if (closing && !['snapshot', 'drain'].includes(name))
+        throw Error('Browser native peer is closing');
       if (closed && !['snapshot', 'drain'].includes(name)) throw Error('Browser native peer is closed');
       if (name === 'start') { await Promise.all([startup, endpoint.ready]); await settle(); }
       else if (name === 'addLocalInput' || name === 'addLocalInputs') {
@@ -415,29 +439,45 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       else if (name === 'disconnect') await peer.disconnect(...args);
       else if (name === 'fail') await peer.fail(...args);
       else if (name !== 'snapshot' && name !== 'drain') throw Error(`Unknown browser peer RPC: ${name}`);
-      if (!autonomousPump || !closed) await pump();
+      if (!closing || (!autonomousPump && closed)) await pump();
       const result = snapshot();
       if (name === 'drain') result.records = exports.splice(0);
       return result;
     });
     return operation;
   }
-  function close(options = {}) {
-    closeOperation ??= finishClose(options);
-    return closeOperation;
-  }
-  async function finishClose({intentional = true} = {}) {
+  function close({mode = 'normal', intentional = true} = {}) {
+    if (!['normal', 'fatal'].includes(mode))
+      return Promise.reject(Error('Browser native peer close mode must be normal or fatal'));
+    if (closeOperation) {
+      if (mode === 'fatal' && closeMode !== 'fatal') {
+        closeMode = 'fatal';
+        closeNativePhase = null;
+        nativeQuiescence = 'aborted-fatal';
+      }
+      return closeOperation;
+    }
     closing = true;
+    closeMode = mode;
+    closeNativePhase = mode === 'fatal' ? null : 'terminal';
+    nativeQuiescence = mode === 'fatal' ? 'aborted-fatal' : 'pending';
+    closingNativeEpoch = ++nativeCallEpoch;
     wakeRequested = false;
     intentionalClose = intentional;
     if (inputCaptureRegistered && globalThis.__meleeWebNetLocalInputCapture === captureLocalInput)
       globalThis.__meleeWebNetLocalInputCapture = null;
     inputCaptureRegistered = false;
-    const failures = [];
     if (unsubscribeProgress) {
-      try { unsubscribeProgress(); } catch (error) { failures.push(remember(error)); }
+      try { unsubscribeProgress(); } catch (error) { closeFenceFailures.push(remember(error)); }
       unsubscribeProgress = null;
     }
+    closeOperation = finishClose();
+    closeOperation.catch(() => {});
+    return closeOperation;
+  }
+  async function finishClose() {
+    const failures = [...closeFenceFailures];
+    const recordFailure = error => { failures.push(remember(error)); };
     const consumerAtClose = pendingConsumerBatch;
     if (checksumConsumer && consumerAtClose) {
       const error = Error('Browser checksum consumer batch cancelled during close');
@@ -449,30 +489,53 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       }
     }
     const finalNativeDrain = async () => {
-      if (!autonomousPump || !startup) return;
-      await settle();
-      const before = await callNative('status');
-      const quiescent = status => status?.active === 1 &&
-        Number.isSafeInteger(status.cursor) && status.cursor >= 0 && status.cursor <= sourceTicks &&
-        ((status.blocker === 'complete' && status.cursor === sourceTicks && status.terminal?.kind === 0) ||
-         (status.blocker === 'terminal' && Number.isInteger(status.terminal?.kind) &&
-          status.terminal.kind >= 1 && status.terminal.kind <= 4 &&
-          Number.isSafeInteger(status.terminal.tick) && status.terminal.tick >= 0 &&
-          status.terminal.tick < sourceTicks && Number.isSafeInteger(status.terminal.channel) &&
-          status.terminal.channel >= 0 && status.terminal.channel <= 0xffffffff));
-      if (!quiescent(before)) throw Error('Autonomous native pump close requires complete or terminal native quiescence');
-      await pump();
-      const after = await callNative('status');
-      if (!quiescent(after) || after.cursor !== before.cursor ||
-          JSON.stringify(after.terminal) !== JSON.stringify(before.terminal) || after.ring_pending !== 0)
-        throw Error('Autonomous native pump close boundary changed or retained native records');
+      if (closeMode === 'fatal') { nativeQuiescence = 'aborted-fatal'; return; }
+      if (!autonomousPump || !startup) { nativeQuiescence = 'not-applicable'; return; }
+      try {
+        await settle({checkFailure: false});
+        if (closeMode === 'fatal') { nativeQuiescence = 'aborted-fatal'; return; }
+        closeNativePhase = 'drain';
+        let before = await callNative('status');
+        const quiescent = status => status?.active === 1 &&
+          Number.isSafeInteger(status.cursor) && status.cursor >= 0 && status.cursor <= sourceTicks &&
+          ((status.blocker === 'complete' && status.cursor === sourceTicks && status.terminal?.kind === 0) ||
+           (status.blocker === 'terminal' && Number.isInteger(status.terminal?.kind) &&
+            status.terminal.kind >= 1 && status.terminal.kind <= 4 &&
+            Number.isSafeInteger(status.terminal.tick) && status.terminal.tick >= 0 &&
+            status.terminal.tick < sourceTicks && Number.isSafeInteger(status.terminal.channel) &&
+            status.terminal.channel >= 0 && status.terminal.channel <= 0xffffffff));
+        const complete = status => status?.blocker === 'complete' && status.cursor === sourceTicks &&
+          status.terminal?.kind === 0;
+        const terminal = status => status?.blocker === 'terminal' && Number.isInteger(status.terminal?.kind) &&
+          status.terminal.kind >= 1 && status.terminal.kind <= 4;
+        if (!complete(before) && !terminal(before) && !peer.terminal) {
+          closeNativePhase = 'terminal';
+          await peer.disconnect('runtime owner closed before natural completion');
+          if (closeMode === 'fatal') { nativeQuiescence = 'aborted-fatal'; return; }
+          closeNativePhase = 'drain';
+          before = await callNative('status');
+        }
+        if (!quiescent(before)) throw Error('Autonomous native pump close requires complete or terminal native quiescence');
+        await pump({closingOwner: true});
+        if (closeMode === 'fatal') { nativeQuiescence = 'aborted-fatal'; return; }
+        const after = await callNative('status');
+        if (!quiescent(after) || after.cursor !== before.cursor ||
+            JSON.stringify(after.terminal) !== JSON.stringify(before.terminal) || after.ring_pending !== 0)
+          throw Error('Autonomous native pump close boundary changed or retained native records');
+        nativeQuiescence = 'verified';
+      } catch (error) {
+        nativeQuiescence = closeMode === 'fatal' ? 'aborted-fatal' : 'failed';
+        throw error;
+      }
     };
     for (const operation of [() => rpcChain, finalNativeDrain, () => endpoint.close(),
-      () => startup, () => settle(), () => nativeChain]) {
-      try { await operation(); } catch (error) { failures.push(remember(error)); }
+      () => startup, () => settle({checkFailure: false}), () => nativeChain]) {
+      try { await operation(); } catch (error) { recordFailure(error); }
+      if (closeMode === 'fatal') nativeQuiescence = 'aborted-fatal';
     }
-    try { await native.dispose?.(); } catch (error) { failures.push(remember(error)); }
+    try { await native.dispose?.(); } catch (error) { recordFailure(error); }
     closed = endpoint.closed;
+    if (closeMode === 'fatal') nativeQuiescence = 'aborted-fatal';
     if (failure) failures.push(failure);
     if (failures.length) throw new AggregateError([...new Set(failures)], 'Browser native peer close failed');
     return snapshot();

@@ -448,7 +448,7 @@ test('facade refresh replaces stale ACK and terminal snapshot and serializes PAD
 });
 
 
-test('settled snapshot and close join a receive blocked inside native confirmation', async () => {
+test('close fences an inbound callback queued before execution while the snapshot remains readable', async () => {
   const gate = deferred(), run = harness({readyGate: gate});
   await run.controller.rpc('start', [{build: 'same'}]);
   const receive = run.deliver({type: 'hello', version: 1, role: 'beta', local_port: 1, remote_port: 0,
@@ -457,11 +457,11 @@ test('settled snapshot and close join a receive blocked inside native confirmati
   const snapshot = run.controller.rpc('snapshot').then(() => { snapshotDone = true; });
   const close = run.controller.close().then(() => { closeDone = true; });
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(snapshotDone, false);
-  assert.equal(closeDone, false);
+  assert.equal(snapshotDone, true);
+  assert.equal(closeDone, true);
   gate.resolve();
   await Promise.all([receive, snapshot, close]);
-  assert.equal(run.confirmations, 1);
+  assert.equal(run.confirmations, 0, 'the not-yet-entered handshake callback is fenced at execution');
   assert.equal(closeDone, true);
 });
 
@@ -469,6 +469,8 @@ const moduleNames = ['net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs',
   'net_lockstep_native_adapter.mjs', 'net_lockstep_websocket_relay.mjs'];
 const webrtcModuleNames = [...moduleNames, 'net_lockstep_webrtc.mjs'];
 const roomSignaledWebRtcModuleNames = [...webrtcModuleNames, 'net_lockstep_webrtc_signaling.mjs'];
+const runtimeOwnedModuleNames = [...roomSignaledWebRtcModuleNames,
+  'net_lockstep_runtime_owner.mjs', 'net_lockstep_development_owner.mjs'];
 const moduleBody = Buffer.from('module bytes');
 const moduleHash = createHash('sha256').update(moduleBody).digest('hex');
 function moduleObserver(names = moduleNames) {
@@ -499,7 +501,7 @@ test('peer module observer binds the optional local WebRTC endpoint module', asy
     [...webrtcModuleNames].sort());
   assert.throws(() => createPeerModuleResponseObserver({url: 'http://127.0.0.1:8787/runtime.html',
     peerModuleHashes: {'net_lockstep_webrtc.mjs': moduleHash}, runtimeArtifactNames: []}),
-  /exact relay or WebRTC module SHA-256 inventory/);
+  /exact relay, WebRTC, room-signaling or runtime-owned module SHA-256 inventory/);
 });
 
 test('peer module observer binds the page-owned room signaling module as an exact extension', async () => {
@@ -509,7 +511,18 @@ test('peer module observer binds the page-owned room signaling module as an exac
   assert.deepEqual(rows.map(row => new URL(row.url).pathname.split('/').at(-1)).sort(),
     [...roomSignaledWebRtcModuleNames].sort());
   assert.throws(() => moduleObserver([...webrtcModuleNames, 'unexpected.mjs']),
-    /exact relay or WebRTC module SHA-256 inventory/);
+    /exact relay, WebRTC, room-signaling or runtime-owned module SHA-256 inventory/);
+});
+
+test('runtime-owned module observer binds both lifecycle owners as an exact eight-module set', async () => {
+  const observer = moduleObserver(runtimeOwnedModuleNames);
+  for (const name of runtimeOwnedModuleNames) observer.observe(response(name));
+  const rows = await observer.freeze();
+  assert.equal(rows.length, 8);
+  assert.deepEqual(rows.map(row => new URL(row.url).pathname.split('/').at(-1)).sort(),
+    [...runtimeOwnedModuleNames].sort());
+  assert.throws(() => moduleObserver([...runtimeOwnedModuleNames, 'unexpected.mjs']),
+    /exact relay, WebRTC, room-signaling or runtime-owned module SHA-256 inventory/);
 });
 
 test('peer module observer rejects unexpected paths, changed bytes, headers and duplicate/missing responses', async () => {
@@ -604,8 +617,8 @@ test('unarmed endpoint close calls native disconnect without sending on the clos
   assert.equal(run.sent.length, before);
   run.nativeRecords.push(run.record(0));
   const drained = await run.controller.rpc('drain');
-  assert.deepEqual(drained.records, [run.record(0)]);
-  assert.equal(drained.checksumOwnership.post_terminal_native_evidence_records, 1);
+  assert.deepEqual(drained.records, []);
+  assert.equal(run.nativeRecords.length, 1, 'closed peer does not touch native scratch after disposal');
   assert.equal(drained.protocol.local_checksum_ticks, 0);
 });
 

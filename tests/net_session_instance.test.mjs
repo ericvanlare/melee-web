@@ -257,6 +257,37 @@ test('peer close releases progress ownership while the instance keeps native sta
   }
 });
 
+test('page cleanup joins the actual runtime owner and retains its close failures', async () => {
+  const prior = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  const failure = Error('runtime owner cleanup failed');
+  let modeSeen = null, legacyClose = false, legacyDispose = false;
+  const state = {closing: false, close_mode: null, peer: {nativePump: {native_quiescence: 'aborted-fatal'}}};
+  globalThis.window = {
+    meleeNetRuntimeLockstepSnapshot: () => state,
+    async meleeNetCloseRuntimeLockstep(mode) { modeSeen = mode; throw failure; },
+    __netPeer: {async close() { legacyClose = true; }},
+    __meleeWebNetNativeAdapter: {dispose() { legacyDispose = true; }},
+  };
+  try {
+    const cleanup = await closePageNativeNetworkOwnership();
+    assert.equal(modeSeen, 'fatal');
+    assert.equal(legacyClose, false, 'runtime mode must not fall back to the stale peer facade');
+    assert.equal(legacyDispose, false, 'runtime session remains the sole scratch owner');
+    assert.match(cleanup.runtime_lockstep.error, /runtime owner cleanup failed/);
+    assert.deepEqual(cleanup.errors, [String(failure.stack || failure.message)]);
+
+    state.closing = true;
+    state.close_mode = 'normal';
+    globalThis.window.meleeNetCloseRuntimeLockstep = async mode => { modeSeen = mode; return {closed: true}; };
+    const repeated = await closePageNativeNetworkOwnership();
+    assert.equal(modeSeen, 'normal', 'completed normal close does not get escalated during browser cleanup');
+    assert.deepEqual(repeated.errors, []);
+  } finally {
+    if (prior) Object.defineProperty(globalThis, 'window', prior);
+    else delete globalThis.window;
+  }
+});
+
 test('passes bounded room-signaling options through the page invocation', async () => {
   await withProfile(async profile => {
     const cleanupStarted = deferred(), allowCleanup = deferred();

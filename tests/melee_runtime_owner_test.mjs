@@ -44,6 +44,9 @@ const diagnosticsRetentionMode = diagnosticsRetentionCheckpoint || diagnosticsRe
   diagnosticsRetentionFailedThenDestroy || diagnosticsMatureDelivery || diagnosticsNormalDeliveryFreshness;
 const fatalAudioProcessor = process.argv.includes('--fatal-audio-processor');
 const fatalAudioDiscOperation = process.argv.includes('--fatal-audio-disc-operation');
+const networkOwnerNormalClose = process.argv.includes('--network-owner-normal-close');
+const networkOwnerFatalClose = process.argv.includes('--network-owner-fatal-close');
+const networkOwnerLifecycle = networkOwnerNormalClose || networkOwnerFatalClose;
 const fatalAudioOutput = fatalAudioProcessor || process.argv.includes('--fatal-audio-output') || fatalAudioDiscOperation;
 const diagnosticsKnownHost = fatalAudioOutput || process.argv.includes('--diagnostics-known-host') || diagnosticsRetentionMode ||
   diagnosticsMatureDelivery || diagnosticsNormalDeliveryFreshness;
@@ -179,8 +182,8 @@ globalThis.testDiscReader = async (file, report) => {
   return new Map(entries);
 };
 globalThis.testOpenNativeGameDiscSession = async file => {
-  assert.equal(fatalAudioDiscOperation, true,
-    'The controlled session is only used by the fatal disc-operation case');
+  assert.equal(fatalAudioDiscOperation || networkOwnerLifecycle, true,
+    'The controlled session is only used by a scoped runtime owner case');
   calls.push(['openDisc', file.name]);
   let release;
   const released = new Promise(resolve => { release = resolve; });
@@ -196,7 +199,7 @@ globalThis.testOpenNativeGameDiscSession = async file => {
       calls.push(['streamScope', names.length]);
       reportDiscProgress = report;
       report({phase: 'read', complete: 0, total: names.length});
-      await released;
+      if (!networkOwnerLifecycle) await released;
       if (this.closed) throw Error('DiscAssetSession is closed');
       yield ['asset.dat', new Uint8Array([1])];
     },
@@ -321,7 +324,7 @@ if (adapterRace || adapterRetry || adapterTimeoutLate || adapterDeadlineSpan) {
 }
 let owner;
 const mounted = mountMeleeRuntime({canvas,
-  openDisc: fatalAudioDiscOperation ? globalThis.testOpenNativeGameDiscSession : null,
+  openDisc: fatalAudioDiscOperation || networkOwnerLifecycle ? globalThis.testOpenNativeGameDiscSession : null,
   createAudio: withAudio ? options => {
   calls.push(['createAudio']); return createRuntimeAudio(options);
 } : undefined, loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
@@ -407,7 +410,7 @@ Object.assign(Module, {
   _melee_web_input_set_activity(focused, visible) { calls.push(['activity', focused, visible]); },
   _melee_web_input_set_keyboard_layout(value) { calls.push(['layout', value]); return 1; },
 });
-if (fatalAudioDiscOperation) Object.assign(Module, {
+if (fatalAudioDiscOperation || networkOwnerLifecycle) Object.assign(Module, {
   _melee_web_native_source_file_external_set(_pointer, size) {
     calls.push(['sourceRegister', size]); return 1;
   },
@@ -1047,6 +1050,10 @@ if (diagnosticsKnownHost) {
   console.log('Shared runtime owner: known-host diagnostics identity, scalar incident wiring, inactive delivery delay/cancel, opt-out storage event, denied persistence, audio/input/save ownership pass.');
   process.exit(0);
 }
+if (networkOwnerLifecycle) {
+  await runNetworkOwnerLifecycle();
+  process.exit(0);
+}
 await assert.rejects(player.openDiscSession({name: 'unsupported.iso'}), /no local disc session loader/,
   'the public shell can request validation only through a configured profile adapter');
 await assert.rejects(player.importDisc({name: 'forged.iso'}, {preopenedSession: {
@@ -1086,6 +1093,75 @@ async function pump(promise) {
 }
 const nativeServiceCommands = window.menuServiceCommands;
 window.menuServiceCommands = () => { ++serviceBatch; return nativeServiceCommands(); };
+
+async function runNetworkOwnerLifecycle() {
+  const deferred = () => {
+    let resolve, reject;
+    const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+    promise.catch(() => {});
+    return {promise, resolve, reject};
+  };
+  await pump(player.importDisc({name: 'network-owner-disc.iso'}));
+  assert.equal(controlledDiscSession.closed, false);
+  const gate = deferred(), closeModes = [];
+  owner.attachNetworkSession(({mode: closeMode}) => { closeModes.push(closeMode); return gate.promise; });
+  assert.throws(() => owner.attachNetworkSession(() => Promise.resolve()), /already owns/,
+    'the shared runtime accepts only one network cleanup owner');
+
+  if (networkOwnerNormalClose) {
+    const unloadsBeforeClose = calls.filter(row => row[0] === 'unload').length;
+    const unloading = player.unload();
+    const destroying = player.destroy();
+    for (let i = 0; i < 8; i++) { window.menuServiceCommands(); await Promise.resolve(); }
+    assert.deepEqual(closeModes, ['normal']);
+    assert.equal(calls.filter(row => row[0] === 'unload').length, unloadsBeforeClose,
+      'normal native unload waits until the network close promise settles');
+    assert.equal(controlledDiscSession.closed, false,
+      'disc resources remain owned while network close is pending');
+    gate.resolve();
+    await pump(Promise.all([unloading, destroying]));
+    assert.deepEqual(closeModes, ['normal'], 'simultaneous unload and destroy share one close attempt');
+    assert.equal(calls.filter(row => row[0] === 'unload').length, unloadsBeforeClose + 1);
+    assert.equal(calls.filter(row => row[0] === 'discClose').length, 1,
+      'disc session retires once after joined network close and native unload');
+    assert.equal(player.getState().state, 'destroyed');
+    console.log('Shared runtime owner: normal unload joins its single network close before native unload and disc retirement.');
+    return;
+  }
+
+  const unhandled = [];
+  const onUnhandled = error => unhandled.push(error);
+  process.on('unhandledRejection', onUnhandled);
+  const unloadsBeforeClose = calls.filter(row => row[0] === 'unload').length;
+  const unloading = player.unload();
+  for (let i = 0; i < 8; i++) { window.menuServiceCommands(); await Promise.resolve(); }
+  assert.deepEqual(closeModes, ['normal']);
+  const primary = Error('first runtime fatal');
+  owner.stop(primary);
+  assert.equal(player.getState().message, primary.message);
+  assert.deepEqual(closeModes, ['normal', 'fatal'],
+    'fatal stop escalates an in-flight normal close without starting a separate owner');
+  const unloadingOutcome = unloading.then(() => null, error => error);
+  const destroying = player.destroy();
+  for (let i = 0; i < 8; i++) { window.menuServiceCommands(); await Promise.resolve(); }
+  assert.equal(calls.filter(row => row[0] === 'unload').length, unloadsBeforeClose,
+    'fatal close never advances to native unload');
+  assert.equal(controlledDiscSession.closed, false,
+    'fatal stop keeps dependent disc resources alive until network work joins');
+  gate.reject(Error('network endpoint cleanup failed'));
+  const unloadFailure = await unloadingOutcome;
+  assert.ok(unloadFailure, 'the active unload reports that network close did not succeed');
+  await pump(destroying);
+  await new Promise(resolve => setImmediate(resolve));
+  process.removeListener('unhandledRejection', onUnhandled);
+  assert.equal(player.getState().message, primary.message, 'cleanup failure cannot replace the first fatal');
+  assert.equal(controlledDiscSession.closed, true, 'fatal destroy retires disc resources after the joined cleanup failure');
+  assert.equal(calls.filter(row => row[0] === 'discClose').length, 1);
+  assert.ok(owner.getNetworkCleanupErrors().length > 0,
+    'fatal cleanup errors remain separately observable on the shared owner');
+  assert.equal(unhandled.length, 0, 'normal/fatal joined close rejection is handled');
+  console.log('Shared runtime owner: fatal escalation fences unload, joins pending close, preserves primary failure and reports cleanup separately.');
+}
 
 if (lifecycleHandoff) {
   function dispatch(type) {

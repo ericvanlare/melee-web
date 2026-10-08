@@ -4,6 +4,9 @@ import {mountControllerSettings} from './controller-settings.mjs';
 import {createRuntimeAudio} from './runtime-audio.mjs';
 import {loadNativeGameDisc, openNativeGameSession} from './runtime-audio-assets.mjs';
 import {attemptNetworkTimingPauseResume, evaluateNetworkTimingPause} from './net-timing-pause.mjs';
+import {createRuntimeLockstepSession} from './net_lockstep_runtime_owner.mjs';
+import {createDevelopmentLockstepOwner} from './net_lockstep_development_owner.mjs';
+import {LOCKSTEP_DELAY} from './net_lockstep_core.mjs';
 const developmentHooks = {};
 const markFirstReplayBoundary=(...args)=>{try{window.__meleeReplayBoundaryProbe?.mark?.(...args);}catch{}};
 const RETAIL_REPLAY_LEGACY_MAX_FRAMES = 36000;
@@ -23,6 +26,7 @@ const RETAIL_REPLAY_MAX_BYTES = 16 + 4 + 8 + (0x18 + 0x55E8 + 0x148 + 6) +
   4 + 3 * 0x138 + 822 + RETAIL_REPLAY_WHOLE_SESSION_MAX_FRAMES * 44 + 2 + 32 * 12;
 let owner, controllerSettings, Module, boundary, status, check, put, prepareAudio, pauseAudioForPreparation;
 let syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck, waitForAudioRender;
+let runtimeLockstepEntry = null;
 let preparationKeepsAudio = false;
 const stop = error => owner.stop(error);
 const $=id=>document.getElementById(id);const startupUrl=new URL(location.href),clearRenderCacheOnLoad=startupUrl.searchParams.get('render-cache')==='clear',hitchCaptureFromUrl=startupUrl.searchParams.get('hitch-capture')==='1',hitchCausalFromUrl=startupUrl.searchParams.get('hitch-causal')==='1',hitchUserTimingFromUrl=startupUrl.searchParams.get('hitch-marks')==='1';if(clearRenderCacheOnLoad){startupUrl.searchParams.delete('render-cache');history.replaceState(null,'',startupUrl);}let ready=false,fatal=false,bundle=false,inputDirty=true,importing=false,uiMessage="";let frameLast=0,perfLastReport=0,activeFrames=0,worstFrame=0,worstBrowserCallback=null,longFrames=0,browserLongTasks=0,browserLongTaskWorst=0;let nativeTimingFrames=0,nativeTimingWorst=0,nativeLongFrames=0,nativeOverBudgetFrames=0,nativeSourceSteps=0,nativeSourceDraws=0,nativeWorstTiming=null,nativeFirstUse=0,nativeFirstUseWorst=0,nativePreviousTiming=null,nativeLastTiming=null,livePipelineQueued=0,livePipelineCreated=0,liveTextureUploads=0,liveStagingUsedBytes=0,peakStagingUsedBytes=0;let constructionCounts={},constructionWorst=0,constructionFirstUseWorst=0,preparationSince=0,preparationLabel="",preparationSequence=0,activePreparation=null,pendingEntryProfile=null,settlingEntryProfile=null,entryProfiles=[],latestNativePreparation=null;let preparationCount=0,preparationWorst=0;let diagnosticCaptureInvalid=false,audioStateAcknowledged=true,audioAckWaiters=[],stockCheckActive=false,latestAudio={queued:0,underruns:0,overflows:0},actionSweepActive=false,actionSweepFocusLost=false,selectionDriveActive=false,sweepAutomaticResumes=0;
@@ -66,6 +70,7 @@ window.menuCacheWritesFlushed=data=>{
 };
 developmentHooks.frame=wasRunning=>{
  if(!ready||fatal)return;
+ try{runtimeLockstepEntry?.onFrame();}catch(error){owner.stop(error);}
  const now=performance.now();
  const active=!importing&&!document.hidden&&!!wasRunning;
  if(active){
@@ -298,12 +303,34 @@ window.meleeNetBegin=async(seed,maxFrames)=>{
 window.meleeNetBeginLockstep=async(seed,maxFrames)=>{
  if(retailRun||replayLoading||!ready||fatal||!bundle||typeof Module._melee_web_native_menu_net_begin_lockstep!=='function')throw Error('Lockstep session is unavailable');
  if(owner.handle.getState().state!=='prepared')throw Error('A lockstep session requires a freshly imported disc before opening character select.');
- resetTiming(false);await prepareAudio();await pauseAudioForPreparation();
- await boundary(()=>check(Module._melee_web_native_menu_net_begin_lockstep(seed>>>0,maxFrames>>>0)));
- await waitForAudioRender();
- await boundary(()=>check(Module._melee_web_native_menu_launch()));
- $('canvas').focus();inputDirty=true;syncAudio();
+ if(!runtimeLockstepEntry?.state().configured){
+  resetTiming(false);await prepareAudio();await pauseAudioForPreparation();
+  await boundary(()=>check(Module._melee_web_native_menu_net_begin_lockstep(seed>>>0,maxFrames>>>0)));
+  await waitForAudioRender();
+  await boundary(()=>check(Module._melee_web_native_menu_launch()));
+  $('canvas').focus();inputDirty=true;syncAudio();
+  return;
+ }
+ await runtimeLockstepEntry.begin(seed,maxFrames);
 };
+window.meleeNetConfigureRuntimeLockstep=config=>{
+ if(!ready||fatal)throw Error('Runtime lockstep configuration is unavailable');
+ if(!runtimeLockstepEntry)runtimeLockstepEntry=createDevelopmentLockstepOwner({Module,owner,inputDelay:LOCKSTEP_DELAY,
+  getContext:()=>({ready,fatal,bundle,replayActive:!!retailRun||replayLoading,
+   ownerState:owner.handle.getState().state,phase:Module._melee_web_native_menu_phase()}),
+  getIdentity:()=>window.meleeNetPeerIdentity(),
+  createSession:options=>createRuntimeLockstepSession(options),
+  runNativeStart:async({seed,sourceTicks})=>{
+   resetTiming(false);await prepareAudio();await pauseAudioForPreparation();
+   await boundary(()=>check(Module._melee_web_native_menu_net_begin_lockstep(seed,sourceTicks)));
+   await waitForAudioRender();
+   await boundary(()=>check(Module._melee_web_native_menu_launch()));
+   $('canvas').focus();inputDirty=true;syncAudio();
+  }});
+ return runtimeLockstepEntry.configure(config);
+};
+window.meleeNetRuntimeLockstepSnapshot=()=>runtimeLockstepEntry?.snapshot()??null;
+window.meleeNetCloseRuntimeLockstep=mode=>runtimeLockstepEntry?.close({mode})??Promise.resolve(null);
 window.meleeNetPeerIdentity=async()=>{
  if(!owner?.handle?.discIdentity)throw Error('Lockstep disc identity is unavailable');
  const response=await fetch(new URL('./gameplay_menu_browser.wasm',import.meta.url),{cache:'no-store'});

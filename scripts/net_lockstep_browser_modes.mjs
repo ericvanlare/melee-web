@@ -3,11 +3,12 @@ export function validateLockstepBrowserMode(values) {
   const scenario = values.scenario;
   if (!['probe', 'positive', 'flip', 'disconnect', 'input-sampling', 'native-pump'].includes(scenario))
     throw Error('--scenario must be probe, positive, flip, disconnect, input-sampling, or native-pump');
-  if (!['node', 'browser'].includes(values['peer-owner']))
-    throw Error('--peer-owner must be node or browser');
-  const browserOwned = values['peer-owner'] === 'browser';
+  if (!['node', 'browser', 'runtime'].includes(values['peer-owner']))
+    throw Error('--peer-owner must be node, browser or runtime');
+  const runtimeOwned = values['peer-owner'] === 'runtime';
+  const browserOwned = values['peer-owner'] !== 'node';
   const peerTransport = values['peer-transport'] ??
-    (browserOwned || values['relay-url'] ? 'relay' : 'tcp-loopback');
+    (runtimeOwned ? 'webrtc' : browserOwned || values['relay-url'] ? 'relay' : 'tcp-loopback');
   if (values['peer-transport'] !== undefined && !['relay', 'webrtc'].includes(peerTransport))
     throw Error('--peer-transport must be relay or webrtc');
   if (!browserOwned && values['peer-transport'] !== undefined)
@@ -16,6 +17,8 @@ export function validateLockstepBrowserMode(values) {
   const roomWorkerSignaling = values['webrtc-signaling'] === 'room-worker';
   if (!['memory', 'room-worker'].includes(values['webrtc-signaling']))
     throw Error('--webrtc-signaling must be memory or room-worker');
+  if (runtimeOwned && (scenario !== 'native-pump' || !localWebRtc || values['webrtc-signaling'] !== 'room-worker'))
+    throw Error('Runtime-owned peers require native-pump with WebRTC and Room Worker signaling');
   if (!localWebRtc && values['webrtc-signaling'] !== 'memory')
     throw Error('--webrtc-signaling applies only to the local WebRTC transport');
   if (browserOwned && !localWebRtc && !values['relay-url'])
@@ -29,5 +32,5 @@ export function validateLockstepBrowserMode(values) {
     throw Error('Native-pump diagnostic requires browser-owned Room Worker WebRTC and exactly eight source ticks');
   if (scenario === 'input-sampling' && !browserOwned)
     throw Error('The input-sampling scenario requires --peer-owner browser');
-  return {browserOwned, peerTransport, localWebRtc, roomWorkerSignaling};
+  return {browserOwned, runtimeOwned, peerTransport, localWebRtc, roomWorkerSignaling};
 }

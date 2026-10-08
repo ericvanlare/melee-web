@@ -296,7 +296,7 @@ test('asymmetric lockstep startup failures close the successfully opened sibling
       async unload() { this.unloaded = true; },
       async close() { this.closed = true; return true; },
       async status() { return null; }, async native() { return null; }};
-    const context = vm.createContext({browserOwned: false, inputSampling: false, peerModuleHashes: null,
+    const context = vm.createContext({browserOwned: false, runtimeOwned: false, inputSampling: false, peerModuleHashes: null,
       instances: {}, instanceRows: {alpha: {}, beta: {}},
       chromium: {}, launchOptions: {}, values: {url: 'http://127.0.0.1/', disc: '/unused'},
       path, childDirectory: role => role, openTimeout: 100, deadline: 100,
@@ -426,7 +426,8 @@ test('browser finalizer observes late module failure after context close before 
     },
     async status() { return null; }, async native() { return null; },
   };
-  const context = vm.createContext({browserOwned: true, intentionalRelayClose: false, roomRuntime: null, runPassed: false,
+  const context = vm.createContext({browserOwned: true, runtimeOwned: false,
+    intentionalRelayClose: false, roomRuntime: null, runPassed: false,
     transportCallbackQueue: {async drain() { return []; }},
     instances: {alpha: instance}, instanceRows: {alpha: {}}, checksumFiles: {}, peers: null,
     relay: {async close() {}}, path, output: 'out', childDirectory: role => role,

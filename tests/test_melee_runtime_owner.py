@@ -357,6 +357,14 @@ int main() {{
     def test_required_directory_failure_stops_native_startup(self):
         self.run_owner(['--silent', '--mkdir-failure'], 'required directory failure prevents native initialization')
 
+    def test_network_session_close_joins_before_normal_unload_and_destroy(self):
+        self.run_owner(['--silent', '--network-owner-normal-close'],
+                       'normal unload joins its single network close before native unload and disc retirement')
+
+    def test_fatal_network_close_joins_before_disc_retirement_and_preserves_primary_failure(self):
+        self.run_owner(['--silent', '--network-owner-fatal-close'],
+                       'fatal escalation fences unload, joins pending close, preserves primary failure and reports cleanup separately')
+
     def run_owner(self, args, expected='repeat launch and reload-only destruction pass'):
         result = subprocess.run([str(node_runtime()), str(ROOT / 'tests/melee_runtime_owner_test.mjs'), *args],
                                 capture_output=True, text=True, timeout=30)

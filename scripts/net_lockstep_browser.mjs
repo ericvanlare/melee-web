@@ -65,12 +65,13 @@ const uint32 = text => {
 };
 const inputSampling = values.scenario === 'input-sampling';
 const nativePump = values.scenario === 'native-pump';
-if (!values.url || !values.disc || !values.out || !values.seed || (!inputSampling && !values.script))
+const runtimeOwnerRequested = values['peer-owner'] === 'runtime';
+if (!values.url || !values.disc || !values.out || !values.seed || (!inputSampling && !runtimeOwnerRequested && !values.script))
   throw Error('Required: --url runtime.html --disc DISC [--script route1.mwni] --seed U32 --out NEW_DIR');
 if (inputSampling && values.script)
   throw Error('The input-sampling scenario captures browser-local input and does not accept --script');
 const scenario = values.scenario;
-const {browserOwned, peerTransport, localWebRtc, roomWorkerSignaling} =
+const {browserOwned, runtimeOwned, peerTransport, localWebRtc, roomWorkerSignaling} =
   validateLockstepBrowserMode(values);
 const url = new URL(values.url);
 if (!['http:', 'https:'].includes(url.protocol) || !url.pathname.endsWith('/runtime.html'))
@@ -96,7 +97,7 @@ if (values.scenario === 'disconnect' && disconnectAt === null)
 if (values.scenario === 'disconnect' && disconnectAt < 3)
   throw Error('The bounded disconnect must occur after the two neutral-prefix source ticks');
 
-const scriptBytes = inputSampling ? null : await fs.readFile(values.script);
+const scriptBytes = inputSampling || runtimeOwned ? null : await fs.readFile(values.script);
 if (scriptBytes && (scriptBytes.length < HEADER_BYTES || scriptBytes.subarray(0, 4).toString() !== 'MWNI' ||
     scriptBytes.readUInt32BE(4) !== 1))
   throw Error('Script is not an MWNI v1 input recipe');
@@ -108,7 +109,8 @@ const probe = values.scenario === 'probe';
 const usedInputs = inputSampling ? INPUT_SAMPLING_SOURCE_TICKS - LOCKSTEP_DELAY : probe || nativePump ? probeSourceTicks - LOCKSTEP_DELAY :
   scenario === 'flip' && flip ? Math.min(inputCount, flip.tick + 8) :
   scenario === 'disconnect' ? Math.min(inputCount, Math.max(1, disconnectAt + 1 - LOCKSTEP_DELAY)) : inputCount;
-if (!inputSampling && usedInputs > inputCount) throw Error('Requested local input workload exceeds the script');
+if (!inputSampling && !runtimeOwned && usedInputs > inputCount)
+  throw Error('Requested local input workload exceeds the script');
 if (flip && flip.tick >= usedInputs) throw Error('Input flip tick is outside the selected workload');
 const sourceTicks = inputSampling ? INPUT_SAMPLING_SOURCE_TICKS : usedInputs + LOCKSTEP_DELAY;
 if (sourceTicks > 216000) throw Error('Source tick workload exceeds the native bound');
@@ -157,7 +159,8 @@ const fnv1a64 = bytes => {
 
 const pairResults = {
   schema: inputSampling ? 'melee-web-local-lockstep-a3-input-sampling-v1' : 'melee-web-local-lockstep-a2-run-v1', scenario, seed,
-  scope: nativePump ? 'bounded eight-tick diagnostic browser-owned native checksum pump' : inputSampling ? 'synthetic browser-local native PAD sampling and two-tick delay component check' :
+  scope: nativePump ? runtimeOwned ? 'bounded eight-tick development runtime-owned native checksum pump' :
+    'bounded eight-tick diagnostic browser-owned native checksum pump' : inputSampling ? 'synthetic browser-local native PAD sampling and two-tick delay component check' :
     probe ? 'CSS network-wait and duplicate-contribution probe' :
     scenario === 'positive' ? 'full original-route functional lockstep' : `bounded ${scenario} control`,
   exclusions: inputSampling ? ['physical controllers', 'keyboard sampling', 'wall-clock latency',
@@ -165,7 +168,9 @@ const pairResults = {
     ...(!localWebRtc ? ['WebRTC'] : []),
     'pixels/PCM', 'full-route or whole-session accuracy', 'performance'] :
     ['live timing', 'performance', 'pixels', 'PCM equivalence', 'retail equivalence', 'two-machine Internet acceptance',
-      ...(nativePump ? ['product room/session integration', 'physical/live input', 'unbounded evidence consumer policy'] : [])],
+      ...(nativePump ? runtimeOwned ? ['public player UI/runtime integration', 'physical controllers',
+        'unbounded evidence consumer policy'] : ['product room/session integration', 'physical/live input',
+        'unbounded evidence consumer policy'] : [])],
   peer_owner: values['peer-owner'], peer_transport: peerTransport,
   input_delay: LOCKSTEP_DELAY,
   neutral_prefix: {source_ticks: LOCKSTEP_DELAY, player_ports: 'neutral PADStatus', unowned_ports: 'no-controller'},
@@ -173,7 +178,9 @@ const pairResults = {
     input_ticks_used: usedInputs, source_ticks: sourceTicks} : null,
   input_capture: inputSampling ? {source: 'browser-local native PADStatus', input_ticks: usedInputs,
     source_ticks: sourceTicks, pattern: ['neutral', 'A', 'release', 'neutral'],
-    beta_deferred_input_tick: 0} : null,
+    beta_deferred_input_tick: 0} : runtimeOwned ? {source: 'browser-local native PADStatus',
+      input_ticks: usedInputs, source_ticks: sourceTicks, pattern: null,
+      synthetic_gamepad: false, player_input_callback: 'existing runtime native poll'} : null,
   transport_attempt: localWebRtc ? {type: 'webrtc-datachannel', local_only: true, ice_servers: []} :
     describeLockstepTransportAttempt(values['relay-url']),
   webrtc_signaling: localWebRtc ? values['webrtc-signaling'] : null,
@@ -382,15 +389,38 @@ async function finishRouteBoundaryEvidence(role, phase, cursor) {
 
 async function refreshBrowserPeers() {
   if (browserOwned && peers) {
-    if (roomWorkerSignaling)
+    if (roomWorkerSignaling && !runtimeOwned)
       await Promise.all(['alpha', 'beta'].map(role => instances[role].assertRoomSignalingHealthy()));
     await Promise.all(['alpha', 'beta'].map(role => peers[role].refresh()));
+    if (runtimeOwned && roomWorkerSignaling) {
+      for (const role of ['alpha', 'beta']) {
+        const signaling = peers[role].signaling;
+        if (!signaling || signaling.failure_code) throw Error(`${role} Room Worker signaling failed: ${JSON.stringify(signaling)}`);
+      }
+    }
     if (peers.alpha.terminal?.kind === 'disconnect' || peers.beta.terminal?.kind === 'disconnect') disconnectHandled = true;
   }
 }
 
 async function drainChecksums(role, peer) {
   const instance = instances[role], result = instanceRows[role];
+  if (runtimeOwned) {
+    const snapshot = await instance.runtimeLockstepSnapshot();
+    const rows = snapshot?.checksums;
+    if (!Array.isArray(rows) || rows.length < result.records)
+      throw Error(`${role} runtime checksum snapshot lost retained records`);
+    for (let index = result.records; index < rows.length; ++index) {
+      const record = Buffer.from(rows[index]);
+      if (record.length !== NET_RECORD_BYTES) throw Error(`${role} runtime checksum record is malformed`);
+      const tick = record.readUInt32LE(0);
+      if (tick !== result.records) throw Error(`${role} checksum cursor jumped: expected ${result.records}, observed ${tick}`);
+      await checksumFiles[role].write(record);
+      result.records++;
+      const parsed = parseNetChecksum(record);
+      result.scene_runs.push({tick: parsed.tick, scene: parsed.scene});
+    }
+    return;
+  }
   for (;;) {
     const drained = browserOwned ? await peer.drain() : await instance.drain(512);
     for (let index = 0; index < drained.count; ++index) {
@@ -407,6 +437,48 @@ async function drainChecksums(role, peer) {
   }
 }
 
+function runtimeOwnerPeerFacade(instance, role) {
+  let snapshot = null, ownerSnapshot = null, closeResult = null;
+  const refresh = async () => {
+    ownerSnapshot = await instance.runtimeLockstepSnapshot();
+    if (!ownerSnapshot?.peer) throw Error(`${role} runtime lockstep peer snapshot is unavailable`);
+    snapshot = ownerSnapshot.peer;
+    return snapshot;
+  };
+  const facade = {
+    browserOwned: true,
+    refresh,
+    summary: () => snapshot?.protocol ?? null,
+    async close(mode = 'normal') {
+      closeResult = await instance.closeRuntimeLockstep(mode);
+      await refresh();
+      return snapshot;
+    },
+    armClose: async () => true,
+    get closeResult() { return closeResult; },
+    get errors() { return snapshot?.endpointErrors ?? []; },
+    get transport() { return ownerSnapshot?.transport ? {type: 'webrtc-datachannel', ordered: true,
+      reliable: true, ...ownerSnapshot.transport.local_webrtc} : snapshot?.transport ?? null; },
+    get signaling() { return ownerSnapshot?.transport?.signaling ?? null; },
+    get checksumOwnership() { return snapshot?.checksumOwnership ?? null; },
+    get localInputCapture() { return snapshot?.localInputCapture ?? null; },
+  };
+  for (const [name, field] of Object.entries({ready: 'ready', terminal: 'terminal',
+    remoteAckInput: 'remote_ack_input', inputDuplicates: 'input_duplicates',
+    outOfOrderInputs: 'out_of_order_inputs', checksumMismatches: 'checksum_mismatches',
+    agreementHash: 'start_identity_hash'}))
+    Object.defineProperty(facade, name, {get: () => snapshot?.protocol?.[field]});
+  return facade;
+}
+
+async function runtimeOwnerWebRtcState(role) {
+  const snapshot = await instances[role].runtimeLockstepSnapshot();
+  const state = snapshot?.transport?.local_webrtc;
+  if (!state) throw Error(`${role} runtime-owned WebRTC state is unavailable`);
+  return {...state, room_signaling: snapshot.transport.signaling,
+    room_signaling_error: snapshot.transport.signaling?.failure_code ?? null};
+}
+
 function createAgreement(identity, start) {
   return {
     protocol: 'melee-web-local-lockstep-a2-v1',
@@ -415,7 +487,7 @@ function createAgreement(identity, start) {
     neutral_prefix: {ticks: LOCKSTEP_DELAY, ports_0_1: 'zero-PADStatus', ports_2_3: 'PAD_ERR_NO_CONTROLLER'},
     pad_encoding: 'MWNI-v1-port-records-11-byte',
     port_ownership: {0: 'alpha', 1: 'beta', 2: 'no-controller', 3: 'no-controller'},
-    ...(inputSampling ? {input_source: 'browser-local-native-PADStatus'} :
+    ...(inputSampling || runtimeOwned ? {input_source: 'browser-local-native-PADStatus'} :
       {input_recipe: {sha256: scriptHash, frame_count: inputCount, input_ticks_used: usedInputs}}),
     runtime_wasm_sha256: identity.wasm,
     disc: identity.disc,
@@ -758,13 +830,18 @@ async function run() {
   const peerModuleNames = ['net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs',
     'net_lockstep_native_adapter.mjs', 'net_lockstep_websocket_relay.mjs',
     ...(localWebRtc ? ['net_lockstep_webrtc.mjs'] : []),
-    ...(roomWorkerSignaling ? ['net_lockstep_webrtc_signaling.mjs'] : [])];
+    ...(roomWorkerSignaling ? ['net_lockstep_webrtc_signaling.mjs'] : []),
+    ...(runtimeOwned ? ['net_lockstep_runtime_owner.mjs', 'net_lockstep_development_owner.mjs'] : [])];
+  const peerModulePath = name => name === 'net_lockstep_development_owner.mjs'
+    ? new URL('../web/net_lockstep_development_owner.mjs', import.meta.url)
+    : new URL(name, import.meta.url);
   const peerModuleHashes = browserOwned ? Object.fromEntries(await Promise.all(peerModuleNames.map(async name =>
-    [name, sha256(await fs.readFile(new URL(name, import.meta.url)))]))) : null;
+    [name, sha256(await fs.readFile(peerModulePath(name)))]))) : null;
   const opened = await Promise.allSettled(['alpha', 'beta'].map(role => openNetInstance({
     chromium, launchOptions, url: values.url, disc: values.disc,
     userDataDir: path.join(childDirectory(role), 'profile'), label: role,
     timeoutMs: openTimeout, deadline, peerModuleHashes,
+    runtimeOwned,
     syntheticGamepad: inputSampling ? standardPad(role === 'alpha' ? 0 : 1) : null,
   })));
   // Transfer every successful launch before reporting a sibling failure so
@@ -778,6 +855,26 @@ async function run() {
   checksumFiles.alpha = await fs.open(path.join(childDirectory('alpha'), 'checksums.bin'), 'wx');
   checksumFiles.beta = await fs.open(path.join(childDirectory('beta'), 'checksums.bin'), 'wx');
   await Promise.all(['alpha', 'beta'].map(role => instances[role].importDisc()));
+  let loadedWasm = null;
+  if (runtimeOwned) {
+    roomRuntime = await startRoomRelayRuntime({evidenceDir: path.join(output, 'worker-evidence')});
+    const roomId = createRoomId();
+    const signalingUrl = roomRuntime.base.replace(/^http:/, 'ws:');
+    await Promise.all(['alpha', 'beta'].map(role => instances[role].configureRuntimeLockstep({
+      role, url: signalingUrl, roomId, timeoutMs: Math.min(stallMs, deadline - Date.now()),
+    })));
+    pairResults.runtime_session_start = {owner: 'web/runtime-development.mjs',
+      protocol_owner: 'browser runtime peer and native adapter',
+      input_source: 'existing native PADStatus callback', progress_source: 'existing menuFrame event',
+      room_worker: {loopback: true, port: roomRuntime.port, identity: roomRuntime.runtimeIdentity,
+        hashes: roomRuntime.hashes}, raw_sdp_exposed_to_node: false};
+    // Observe the live native timing callback and freeze the actual first
+    // Wasm response before beginLockstep performs its page-owned identity fetch.
+    for (const role of ['alpha', 'beta'])
+      instanceRows[role].source_accounting_start = await instances[role].installSourceAccounting({
+        retainRenderReadiness: true, awaitStartIdentity: true});
+    loadedWasm = await Promise.all(['alpha', 'beta'].map(role => instances[role].freezeLoadedWasmIdentity()));
+  }
   if (inputSampling) {
     for (const role of ['alpha', 'beta']) {
       const localPort = role === 'alpha' ? 0 : 1;
@@ -787,12 +884,11 @@ async function run() {
   }
   await Promise.all(['alpha', 'beta'].map(role => instances[role].beginLockstep(seed, sourceTicks)));
   const startRows = await waitForStart();
-  for (const role of ['alpha', 'beta']) {
+  if (!runtimeOwned) for (const role of ['alpha', 'beta'])
     instanceRows[role].source_accounting_start = await instances[role].installSourceAccounting({retainRenderReadiness: nativePump});
-  }
   // Freeze the initial browser load-response set before peerIdentity performs
   // its separate cache-bypassing fetch of the served Wasm artifact.
-  const loadedWasm = await Promise.all(['alpha', 'beta'].map(role => instances[role].freezeLoadedWasmIdentity()));
+  loadedWasm ??= await Promise.all(['alpha', 'beta'].map(role => instances[role].freezeLoadedWasmIdentity()));
   const identities = await Promise.all(['alpha', 'beta'].map(role => instances[role].peerIdentity()));
   for (const [index, role] of ['alpha', 'beta'].entries()) {
     if (loadedWasm[index].sha256 !== identities[index].wasm)
@@ -802,6 +898,8 @@ async function run() {
     alpha: createAgreement(identities[0], startRows[0]),
     beta: createAgreement(identities[1], startRows[1]),
   };
+  const expectedAgreementHashes = Object.fromEntries(['alpha', 'beta'].map(role =>
+    [role, sha256(Buffer.from(JSON.stringify(agreements[role])))]));
   pairResults.identity = {
     wasm_sha256_equal: identities[0].wasm === identities[1].wasm,
     loaded_wasm_response_sha256_equal: loadedWasm[0].sha256 === loadedWasm[1].sha256,
@@ -816,9 +914,39 @@ async function run() {
       compared_to_handshake_fresh_fetch: true,
       fresh_fetch_byte_length: 'not exposed by peerIdentity',
     },
+    ...(runtimeOwned ? {expected_peer_agreement_sha256: expectedAgreementHashes} : {}),
   };
   peers = {};
-  if (browserOwned) {
+  if (runtimeOwned) {
+    peers.alpha = runtimeOwnerPeerFacade(instances.alpha, 'alpha');
+    peers.beta = runtimeOwnerPeerFacade(instances.beta, 'beta');
+    await Promise.all(['alpha', 'beta'].map(role => peers[role].refresh()));
+    pairResults.browser_peer_modules = {expected: peerModuleHashes, responses: {
+      alpha: await instances.alpha.freezePeerModuleIdentity(), beta: await instances.beta.freezePeerModuleIdentity(),
+    }};
+    let runtimeRelayClosed = false;
+    relay = {alpha: peers.alpha, beta: peers.beta, transport: peers.alpha.transport,
+      async close(mode = 'normal') {
+        if (runtimeRelayClosed) return;
+        const rows = await Promise.allSettled(['alpha', 'beta'].map(role => peers[role].close(mode)));
+        const errors = rows.filter(row => row.status === 'rejected').map(row => row.reason);
+        for (const role of ['alpha', 'beta']) {
+          const cleanup = peers[role].closeResult?.transport_cleanup;
+          if (cleanup) {
+            pairResults.local_webrtc_cleanup ??= {};
+            pairResults.local_webrtc_cleanup[role] = cleanup;
+          }
+        }
+        if (errors.length) throw new AggregateError(errors, 'Runtime-owned peer pair close failed');
+        runtimeRelayClosed = true;
+      }};
+    pairResults.transport = describeLockstepTransport(relay);
+    pairResults.local_webrtc_signaling = {ice_servers: [],
+      signaling: 'runtime-owned page offer/answer over the existing local RoomRelay Worker',
+      room_worker: pairResults.runtime_session_start.room_worker,
+      peers: {alpha: peers.alpha.transport, beta: peers.beta.transport},
+      raw_sdp_exposed_to_node: false};
+  } else if (browserOwned) {
     const roomId = localWebRtc ? undefined : createRoomId();
     const peerOptions = role => ({role, sourceTicks, inputTicks: usedInputs,
       ...(localWebRtc ? {} : {relayUrl: values['relay-url'], roomId}),
@@ -910,7 +1038,8 @@ async function run() {
     endpoint.onMessage(text => peers[role].receive(text));
     peers[role].attach(text => endpoint.send(text));
   }
-  if (browserOwned) await Promise.all([peers.alpha.start(agreements.alpha), peers.beta.start(agreements.beta)]);
+  if (runtimeOwned) await refreshBrowserPeers();
+  else if (browserOwned) await Promise.all([peers.alpha.start(agreements.alpha), peers.beta.start(agreements.beta)]);
   else { await peers.alpha.start(agreements.alpha); await peers.beta.start(agreements.beta); }
   const startDeadline = Math.min(deadline, Date.now() + stallMs);
   while ((!peers.alpha.ready || !peers.beta.ready) && Date.now() < startDeadline &&
@@ -924,9 +1053,16 @@ async function run() {
   if (!peers.alpha.ready || !peers.beta.ready) throw Error('A2 start identity handshake timed out');
   pairResults.identity.handshake_confirmed_before_tick0 = true;
   pairResults.identity.peer_agreement_sha256 = peers.alpha.agreementHash;
+  if (runtimeOwned) pairResults.identity.runtime_peer_agreement_sha256 = {
+    alpha: peers.alpha.agreementHash, beta: peers.beta.agreementHash};
+  if (runtimeOwned && ['alpha', 'beta'].some(role =>
+      peers[role].agreementHash !== expectedAgreementHashes[role]))
+    throw Error(`Runtime peer agreement differs from independently built identity: ${JSON.stringify({
+      expected: expectedAgreementHashes,
+      observed: {alpha: peers.alpha.agreementHash, beta: peers.beta.agreementHash}})}`);
   if (localWebRtc) {
     const states = Object.fromEntries(await Promise.all(['alpha', 'beta'].map(async role =>
-      [role, await instances[role].localWebRtcState()])));
+      [role, await (runtimeOwned ? runtimeOwnerWebRtcState(role) : instances[role].localWebRtcState())])));
     if (states.alpha.attach_source !== 'createDataChannel' ||
         states.alpha.ready_state_at_attach !== 'connecting' ||
         states.beta.attach_source !== 'datachannel' || states.beta.ready_state_at_attach !== 'open' ||
@@ -959,10 +1095,12 @@ async function run() {
   if (inputSampling) {
     // Native input hooks own both local contributions; Node only releases the
     // explicitly deferred browser-owned beta sample after observing the wait.
-  } else if (nativePump) {
+  } else if (nativePump && !runtimeOwned) {
     const entries = role => Array.from({length: usedInputs}, (_, tick) => [tick, localSample(role, tick)]);
     await peers.alpha.addLocalInputs(entries('alpha'));
     await peers.beta.addLocalInputs(entries('beta'));
+  } else if (nativePump && runtimeOwned) {
+    // The native runtime's existing local PADStatus callback feeds the page peer.
   } else if (scenario === 'probe') {
     await publishProbeInputs(peers.alpha, peers.beta);
   } else if (scenario === 'disconnect') {
@@ -1000,9 +1138,14 @@ async function run() {
   await settleRouteBoundaryWatchers();
   if (nativePump) {
     pairResults.local_webrtc_final_before_peer_close = Object.fromEntries(await Promise.all(['alpha', 'beta'].map(async role =>
-      [role, verifyReliableHostWebRtc(await instances[role].localWebRtcState())])));
-    await Promise.all(['alpha', 'beta'].map(role => instances[role].armPeerClose()));
-    await Promise.all(['alpha', 'beta'].map(role => peers[role].close(true)));
+      [role, verifyReliableHostWebRtc(await (runtimeOwned ? runtimeOwnerWebRtcState(role) : instances[role].localWebRtcState()))])));
+    if (runtimeOwned) {
+      await relay.close();
+      pairResults.relay_closed = true;
+    } else {
+      await Promise.all(['alpha', 'beta'].map(role => instances[role].armPeerClose()));
+      await Promise.all(['alpha', 'beta'].map(role => peers[role].close(true)));
+    }
     for (const role of ['alpha', 'beta']) await drainChecksums(role, peers[role]);
   }
   for (const role of ['alpha', 'beta']) {
@@ -1271,7 +1414,12 @@ try {
     if (!instances?.[role]) continue;
     try { instanceRows[role].failure_status = await instances[role].status(); } catch {}
     try { instanceRows[role].failure_native = await instances[role].native(); } catch {}
-    if (localWebRtc) {
+    if (runtimeOwned) {
+      try { instanceRows[role].runtime_owner_failure_snapshot = await instances[role].runtimeLockstepSnapshot(); }
+      catch (captureError) {
+        instanceRows[role].runtime_owner_failure_snapshot_error = String(captureError.message || captureError);
+      }
+    } else if (localWebRtc) {
       try { instanceRows[role].local_webrtc_failure_state = await instances[role].localWebRtcState(); }
       catch (captureError) {
         instanceRows[role].local_webrtc_failure_state_error = String(captureError.message || captureError);
@@ -1290,8 +1438,29 @@ try {
     }
   }
   if (browserOwned && relay) {
-    try { await relay.close(); pairResults.relay_closed = true; }
+    try {
+      if (runtimeOwned) await relay.close(runPassed ? 'normal' : 'fatal');
+      else await relay.close();
+      pairResults.relay_closed = true;
+    }
     catch (error) { closeNotes.push(`browser peer close: ${String(error.stack || error)}`); }
+  } else if (browserOwned && instances && runtimeOwned) {
+    // Configuration or startup can fail before the Node-side pair facade is
+    // assigned. The browser runtime still owns the peer, native adapter and
+    // deferred transport, so join its actual fatal owner directly.
+    for (const [role, instance] of Object.entries(instances)) {
+      try {
+        const before = await instance.runtimeLockstepSnapshot();
+        const result = await instance.closeRuntimeLockstep('fatal');
+        const after = await instance.runtimeLockstepSnapshot();
+        instanceRows[role].runtime_owner_cleanup = {mode: 'fatal', before, result, after};
+        pairResults.runtime_partial_cleanup ??= {};
+        pairResults.runtime_partial_cleanup[role] = instanceRows[role].runtime_owner_cleanup;
+      } catch (error) {
+        instanceRows[role].runtime_owner_cleanup_error = String(error.stack || error);
+        closeNotes.push(`${role} partial runtime owner close: ${String(error.message || error)}`);
+      }
+    }
   } else if (browserOwned && instances) {
     // Partial setup still owns page endpoints, even if no pair facade was built.
     await Promise.allSettled(Object.values(instances).map(instance => instance.armPeerClose()));
@@ -1337,6 +1506,11 @@ try {
         const closed = await instance.close();
         if (closed !== true) closeNotes.push(`${role} browser close did not confirm completion`);
       } catch (error) { closeNotes.push(`${role} browser close: ${String(error.message || error)}`); }
+      if (instance.nativeNetworkCleanup) {
+        instanceRows[role].native_network_cleanup = instance.nativeNetworkCleanup;
+        if (runtimeOwned && !instanceRows[role].runtime_owner_cleanup)
+          instanceRows[role].runtime_owner_cleanup = instance.nativeNetworkCleanup.runtime_lockstep ?? null;
+      }
       if (browserOwned) {
         try { instanceRows[role].final_peer_module_responses = await instance.finishPeerModuleIdentity(); }
         catch (error) { closeNotes.push(`${role} closed-browser module identity: ${String(error.message || error)}`); }

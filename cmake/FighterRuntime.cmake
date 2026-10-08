@@ -227,10 +227,16 @@ configure_file(web/touch-controls.css touch-controls.css COPYONLY)
 configure_file(web/audio-ring.mjs audio-ring.mjs COPYONLY)
 configure_file(web/audio-worklet.js audio-worklet.js COPYONLY)
 if(NOT MELEE_WEB_PUBLIC_RUNTIME AND NOT MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
-  # Network determinism harness modules are served beside the private runtime
-  # for every openNetInstance caller, including A1's sequential publisher.
+  # Development network modules are served beside every private runtime for
+  # openNetInstance callers and the development runtime-owned session.
   configure_file(scripts/net_lockstep_core.mjs net_lockstep_core.mjs COPYONLY)
   configure_file(scripts/net_lockstep_native_adapter.mjs net_lockstep_native_adapter.mjs COPYONLY)
+  configure_file(scripts/net_lockstep_browser_peer.mjs net_lockstep_browser_peer.mjs COPYONLY)
+  configure_file(scripts/net_lockstep_websocket_relay.mjs net_lockstep_websocket_relay.mjs COPYONLY)
+  configure_file(scripts/net_lockstep_webrtc.mjs net_lockstep_webrtc.mjs COPYONLY)
+  configure_file(scripts/net_lockstep_webrtc_signaling.mjs net_lockstep_webrtc_signaling.mjs COPYONLY)
+  configure_file(scripts/net_lockstep_runtime_owner.mjs net_lockstep_runtime_owner.mjs COPYONLY)
+  configure_file(web/net_lockstep_development_owner.mjs net_lockstep_development_owner.mjs COPYONLY)
 endif()
 
 add_executable(gameplay_audio_trace EXCLUDE_FROM_ALL tests/gameplay_audio_trace.cpp)

@@ -145,6 +145,45 @@ test('actual page observer preserves callbacks and accounts preparation, catch-u
   assert.equal((await readNetSourceAccounting(f.page, {freeze: true})).rows.length, 4);
 });
 
+test('runtime-owned accounting installs before native begin and starts at the captured identity barrier', async () => {
+  const f = fixture();
+  f.window.__net.native = () => ({phase: 1, running: 1, error: null});
+  f.window.__net.renderSource = () => 'Original character select';
+  f.native.active = 0;
+  f.native.blocker = 'idle';
+  const installed = await installNetSourceAccounting(f.page, 32768,
+    {retainRenderReadiness: true, awaitStartIdentity: true});
+  assert.equal(installed.initial, null);
+  assert.equal(installed.awaiting_start_identity, true);
+  f.window.menuRuntimeTiming(callback(1, 0)); // preparation callback before lockstep begins
+  f.native.active = 1;
+  f.native.blocker = 'start_identity';
+  f.window.menuRuntimeTiming(callback(2, 0));
+  assert.equal(f.window.__netSourceAccounting.read(false).initial.blocker, 'start_identity');
+  f.native.cursor = 1;
+  f.window.menuRuntimeTiming({...callback(3, 1), began: 1, drawn: 1,
+    preparation_ms: 0, draw_suppressed: 0, draw_calls: 297});
+  f.native.blocker = 'complete';
+  const capture = await readNetSourceAccounting(f.page, {freeze: true});
+  assert.deepEqual(capture.rows.map(row => row.frame), [2, 3]);
+  assert.equal(verifyNetSourceAccounting(capture, 1).source_steps, 1);
+  assert.equal(capture.render_readiness?.frame, 3);
+});
+
+test('runtime-owned accounting fails if native ticks pass identity before its first observer row', async () => {
+  const f = fixture();
+  f.native.active = 0;
+  f.native.blocker = 'idle';
+  await installNetSourceAccounting(f.page, 32768, {awaitStartIdentity: true});
+  f.native.active = 1;
+  f.native.cursor = 1;
+  f.native.blocker = 'network_wait';
+  f.window.menuRuntimeTiming(callback(2, 1));
+  const capture = await readNetSourceAccounting(f.page, {freeze: true});
+  assert.ok(capture.errors.some(error => /passed the start-identity barrier/.test(error)));
+  assert.throws(() => verifyNetSourceAccounting(capture, 1), /incomplete/);
+});
+
 test('accounting fails closed on missing, repeated, reordered, invalid or uneven draws', async () => {
   for (const rows of [
     [callback(1, 1), callback(3, 1)],

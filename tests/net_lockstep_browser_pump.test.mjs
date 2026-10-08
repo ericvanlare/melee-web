@@ -13,10 +13,12 @@ function deferred() {
   const promise = new Promise(done => { resolve = done; });
   return {promise, resolve};
 }
-function fixture({sourceTicks = 8, subscription = 'valid', checksumConsumer = null, timeoutMs = 5000, notifyOnPush = true} = {}) {
-  const queue = [], records = [], producedRecords = [], terminals = [], remoteRecords = [], rpcNames = [];
+function fixture({sourceTicks = 8, subscription = 'valid', checksumConsumer = null, timeoutMs = 5000,
+  notifyOnPush = true, ignoreTerminate = false} = {}) {
+  const queue = [], records = [], producedRecords = [], terminals = [], remoteRecords = [], rpcNames = [], disposals = [];
   let callbacks, listener, cursor = 0, terminal = {kind: 0, tick: 0, channel: 0};
   let flushOperation = null, drainGate = null, draining = false, accesses = 0, overlap = false;
+  let drainCalls = 0, drainEntered = deferred();
   const native = {
     subscribeProgress(callback) {
       if (subscription === 'throw') throw Error('fixture subscription failure');
@@ -35,14 +37,19 @@ function fixture({sourceTicks = 8, subscription = 'valid', checksumConsumer = nu
       }
       return true;
     }, confirmStart: async () => true,
-    terminate(kind, tick, channel) { terminal = {kind, tick, channel}; terminals.push(terminal); },
+    terminate(kind, tick, channel) {
+      terminals.push({kind, tick, channel});
+      if (!ignoreTerminate) terminal = {kind, tick, channel};
+    },
     status: () => ({active: 1, cursor, ring_pending: records.length,
       blocker: terminal.kind ? 'terminal' : cursor === sourceTicks ? 'complete' : 'network_wait', terminal}),
     async drain(max) {
+      ++drainCalls; drainEntered.resolve(drainCalls); drainEntered = deferred();
       ++accesses; assert.equal(draining, false); draining = true;
       try { if (drainGate) await drainGate; return records.splice(0, max); }
       finally { draining = false; }
     },
+    dispose() { disposals.push(accesses); },
   };
   const remote = new LockstepPeer({role: 'beta', sourceTicks, inputTicks: sourceTicks - 2,
     pushFrame: async (first, bytes) => { for (let offset = 0; offset < bytes.length; offset += 44) remoteRecords.push(record(first + offset / 44)); }});
@@ -64,6 +71,8 @@ function fixture({sourceTicks = 8, subscription = 'valid', checksumConsumer = nu
   const pageRpc = page.rpc;
   page.rpc = (name, args = []) => { rpcNames.push(name); return pageRpc(name, args); };
   return {page, native, endpoint, records, producedRecords, remote, remoteRecords, terminals, rpcNames, flush,
+    waitForNextDrain() { return drainEntered.promise; }, get drainCalls() { return drainCalls; }, disposals,
+    remoteDisconnect(reason = 'remote transport closed') { return callbacks.onDisconnect('alpha', reason); },
     async start() { await remote.start({build: 'same'}); await page.rpc('start'); await idle(); },
     notify(error = null) { listener?.(error); }, setGate(gate) { drainGate = gate; },
     get cursor() { return cursor; }, get accesses() { return accesses; }, get overlap() { return overlap; },
@@ -123,11 +132,91 @@ test('close joins a queued pump and retains trailing terminal evidence without s
   assert.equal(run.page.close(), closing);
 });
 
-test('close at a network wait fails explicitly and closes transport without advancing source', async () => {
+test('owner close terminalizes an early network wait through native disconnect before quiescence', async () => {
   const run = fixture(); await run.start();
+  const closed = await run.page.close();
+  assert.equal(run.cursor, 2); assert.equal(run.endpoint.closed, true); assert.equal(run.subscribed, false);
+  assert.equal(run.terminals.length, 1);
+  assert.equal(run.terminals[0].kind, 2, 'early owner close must call LockstepPeer.disconnect');
+  assert.equal(closed.nativePump.native_quiescence, 'verified');
+  assert.equal(closed.protocol.terminal.kind, 'disconnect');
+});
+
+test('remote disconnect before natural completion reaches native terminal and preserves quiescence checks', async () => {
+  const run = fixture(); await run.start();
+  await run.remoteDisconnect('remote closed early');
+  assert.equal(run.cursor, 2);
+  assert.equal(run.terminals.length, 1, 'remote disconnect calls native terminate before close');
+  const closed = await run.page.close();
+  assert.equal(closed.nativePump.native_quiescence, 'verified');
+  assert.equal(closed.protocol.terminal.kind, 'disconnect');
+  assert.equal(run.endpoint.closed, true);
+});
+
+test('native network-wait status still fails unchanged terminal quiescence requirement', async () => {
+  const run = fixture({ignoreTerminate: true}); await run.start();
   await assert.rejects(run.page.close(), /close failed/);
   assert.match(run.page.snapshot().failure, /requires complete or terminal native quiescence/);
+  assert.equal(run.page.snapshot().nativePump.native_quiescence, 'failed');
   assert.equal(run.cursor, 2); assert.equal(run.endpoint.closed, true); assert.equal(run.subscribed, false);
+});
+
+test('fatal escalation joins an in-flight normal close and prevents later native work', async () => {
+  const run = fixture(); await run.start();
+  let release;
+  run.setGate(new Promise(resolve => { release = resolve; }));
+  const drainStarted = run.waitForNextDrain();
+  const normalClose = run.page.close();
+  await drainStarted;
+  const terminalCalls = run.terminals.length;
+  assert.equal(terminalCalls, 1, 'normal early close has entered its terminal transition');
+  const escalated = run.page.close({mode: 'fatal'});
+  assert.equal(escalated, normalClose, 'fatal escalation joins the same close operation');
+  const accessCount = run.accesses;
+  run.notify();
+  await assert.rejects(run.page.rpc('addLocalInput', [0, new Uint8Array(11)]), /closing/);
+  release(); run.setGate(null);
+  await escalated;
+  const state = run.page.snapshot();
+  assert.equal(state.nativePump.close_mode, 'fatal');
+  assert.equal(state.nativePump.native_quiescence, 'aborted-fatal',
+    'fatal cleanup must not be reported as a successful native quiescence check');
+  assert.equal(run.terminals.length, terminalCalls, 'no native terminal mutation starts after escalation');
+  assert.equal(run.accesses, accessCount, 'the already-entered drain was joined; no after-drain status began');
+  assert.equal(run.endpoint.closed, true);
+  assert.equal(run.subscribed, false);
+});
+
+test('fatal close fences queued callbacks, joins entered work and disposes afterward', async () => {
+  const run = fixture(); await run.start();
+  let release;
+  run.setGate(new Promise(resolve => { release = resolve; }));
+  const drainStarted = run.waitForNextDrain();
+  run.notify();
+  await drainStarted;
+  const before = run.accesses;
+  const draining = run.page.close({mode: 'fatal'});
+  run.notify();
+  await assert.rejects(run.page.rpc('addLocalInput', [0, new Uint8Array(11)]), /closing/);
+  assert.equal(run.accesses, before, 'progress and rejected RPC do not enter native work');
+  release(); run.setGate(null);
+  await draining;
+  assert.equal(run.accesses, before, 'only the already-entered drain completed');
+  assert.equal(run.page.snapshot().nativePump.native_quiescence, 'aborted-fatal');
+  assert.equal(run.endpoint.closed, true);
+  assert.deepEqual(run.disposals, [before], 'adapter disposal follows the joined native drain');
+});
+
+test('endpoint join rejection is retained while endpoint and adapter cleanup still run', async () => {
+  const run = fixture(); await run.start();
+  run.endpoint.drainInbound = async () => { throw Error('fixture inbound join failure'); };
+  await assert.rejects(run.page.close(), error => {
+    const errors = [...(error.errors || []), ...(error.errors || []).flatMap(item => item.errors || [])];
+    return errors.some(item => /fixture inbound join failure/.test(item.message));
+  });
+  assert.equal(run.endpoint.closed, true);
+  assert.equal(run.page.snapshot().nativePump.native_quiescence, 'failed');
+  assert.equal(run.disposals.length, 1, 'adapter cleanup still runs after the failed callback join settles');
 });
 
 test('background overflow is sticky, protocol terminal and retains the bounded offending drain', async () => {

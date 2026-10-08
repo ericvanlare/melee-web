@@ -112,23 +112,41 @@ export const PAGE_HELPERS = async (loadNativeAdapter = async () =>
 };
 
 export async function closePageNativeNetworkOwnership() {
-  const failures = [];
-  try { if (window.__netPeer) await window.__netPeer.close({intentional: true}); }
-  catch (error) { failures.push(error); }
-  try { window.__meleeWebNetNativeAdapter?.dispose(); }
-  catch (error) { failures.push(error); }
-  if (failures.length) throw new AggregateError(failures, 'Page native network cleanup failed');
+  const failures = [], cleanup = {runtime_lockstep: null, legacy_peer_closed: false,
+    native_adapter_disposed: false};
+  const runtimeBefore = window.meleeNetRuntimeLockstepSnapshot?.() ?? null;
+  if (runtimeBefore) {
+    const mode = runtimeBefore.closing && runtimeBefore.close_mode === 'normal' ? 'normal' : 'fatal';
+    try {
+      cleanup.runtime_lockstep = {mode, before: runtimeBefore,
+        result: await window.meleeNetCloseRuntimeLockstep(mode),
+        after: window.meleeNetRuntimeLockstepSnapshot?.() ?? null};
+    } catch (error) { failures.push(error); cleanup.runtime_lockstep = {mode, before: runtimeBefore,
+      after: window.meleeNetRuntimeLockstepSnapshot?.() ?? null,
+      error: String(error?.stack || error?.message || error)}; }
+  } else {
+    try {
+      if (window.__netPeer) { await window.__netPeer.close({intentional: true}); cleanup.legacy_peer_closed = true; }
+    } catch (error) { failures.push(error); }
+    try {
+      window.__meleeWebNetNativeAdapter?.dispose();
+      cleanup.native_adapter_disposed = Boolean(window.__meleeWebNetNativeAdapter);
+    } catch (error) { failures.push(error); }
+  }
+  cleanup.errors = failures.map(error => String(error?.stack || error?.message || error));
+  return cleanup;
 }
 
 export async function openNetInstance({chromium, launchOptions, url, disc, userDataDir, label,
   throttle = 1, arenaFill = -1, timeoutMs = 120000, deadline = Infinity, peerModuleHashes = null,
-  syntheticGamepad = null}) {
+  syntheticGamepad = null, runtimeOwned = false}) {
   await fs.mkdir(path.resolve(userDataDir), {recursive: true});
   const context = await chromium.launchPersistentContext(path.resolve(userDataDir), {
     ...browserLaunchOptions(launchOptions, {timeout: timeoutMs}),
     viewport: {width: 900, height: 700}, deviceScaleFactor: 1,
   });
-  let page, driver, instance, wasmResponses, closed = false, closeComplete = false, closeOperation = null;
+  let page, driver, instance, wasmResponses, nativeNetworkCleanup = null,
+    closed = false, closeComplete = false, closeOperation = null;
   const close = () => {
     if (closeOperation) return closeOperation;
     closed = true;
@@ -138,7 +156,9 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
         ? error.errors.forEach(addFailure) : failures.push(error);
       if (page && typeof page.evaluate === 'function') {
         try {
-          await bounded(() => page.evaluate(closePageNativeNetworkOwnership));
+          nativeNetworkCleanup = await bounded(() => page.evaluate(closePageNativeNetworkOwnership));
+          if (instance) instance.nativeNetworkCleanup = nativeNetworkCleanup;
+          for (const message of nativeNetworkCleanup?.errors ?? []) failures.push(Error(message));
         } catch (error) { addFailure(error); }
       }
       try { driver?.dispose(); } catch {}
@@ -186,7 +206,7 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
       onFailure: error => noteError({kind: 'peer-module-identity', message: String(error?.stack || error)}),
     }) : null;
     if (peerModules) page.on('response', response => peerModules.observe(response));
-    let browserPeerAllocated = false;
+    let browserPeerAllocated = runtimeOwned;
     const noteError = error => { if (errors.length < 32) errors.push(error); };
     const wasmCdp = await bounded(() => context.newCDPSession(page));
     wasmResponses = await bounded(() => attachWasmResponseIdentityObserver(wasmCdp, {
@@ -526,7 +546,20 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
         channel_state: state.channel?.readyState ?? null,
         room_signaling: state.signaler?.snapshot() ?? null};
     }));
-    instance.readPeerSnapshot = () => bounded(() => page.evaluate(() => window.__netPeer.snapshot()));
+    instance.readPeerSnapshot = () => bounded(() => page.evaluate(() => {
+      if (typeof window.__netPeer?.snapshot === 'function') return window.__netPeer.snapshot();
+      return window.meleeNetRuntimeLockstepSnapshot?.()?.peer ?? null;
+    }));
+    instance.runtimeLockstepSnapshot = () => bounded(() => page.evaluate(() =>
+      window.meleeNetRuntimeLockstepSnapshot?.() ?? null));
+    instance.configureRuntimeLockstep = options => {
+      if (!runtimeOwned) throw Error('Runtime-owned lockstep config is unavailable for this browser owner');
+      return bounded(() => page.evaluate(options => window.meleeNetConfigureRuntimeLockstep(options), options));
+    };
+    instance.closeRuntimeLockstep = mode => {
+      if (!runtimeOwned) throw Error('Runtime-owned lockstep close is unavailable for this browser owner');
+      return bounded(() => page.evaluate(mode => window.meleeNetCloseRuntimeLockstep(mode), mode));
+    };
     instance.peerRpc = (name, args = []) => bounded(() => page.evaluate(([name, args]) =>
       window.__netPeer.rpc(name, args), [name, args]));
     instance.armPeerClose = () => bounded(() => page.evaluate(() => {
@@ -544,7 +577,26 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
       throw Error('Runtime did not load over COOP/COEP HTTP isolation');
     if (!await bounded(() => page.evaluate(() => crossOriginIsolated))) throw Error('Browser page is not cross-origin isolated');
     await driver.waitForImport();
-    await bounded(() => page.evaluate(PAGE_HELPERS));
+    if (runtimeOwned) {
+      await bounded(() => page.evaluate(() => {
+        if (window.__net) throw Error('Runtime-owned native observation facade already exists');
+        const status = () => {
+          const pointer = Module._melee_web_net_status();
+          return JSON.parse(Module.UTF8ToString(pointer));
+        };
+        window.__net = {
+          status,
+          native() {
+            return {phase: Module._melee_web_native_menu_phase(),
+              running: Module._melee_web_native_menu_running(),
+              message: Module.UTF8ToString(Module._melee_web_native_menu_message()),
+              error: document.querySelector('#status')?.dataset.runtimeError || null,
+              status: document.querySelector('#status')?.textContent?.slice(-300) || null};
+          },
+          renderSource() { return Module.UTF8ToString(Module._melee_web_native_menu_diagnostics()); },
+        };
+      }));
+    } else await bounded(() => page.evaluate(PAGE_HELPERS));
     if (throttle !== 1) {
       instance.cdp = await bounded(() => context.newCDPSession(page));
       await bounded(() => instance.cdp.send('Emulation.setCPUThrottlingRate', {rate: throttle}));
@@ -598,7 +650,7 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
       window.__net.terminate(k, t, c); return window.__net.status();
     }, [kind, tick, channel]));
     instance.drain = async (max = 1024) => {
-      if (browserPeerAllocated) throw Error('Browser peer solely owns the native checksum drain');
+      if (browserPeerAllocated) throw Error('The browser runtime owner solely owns the native checksum drain');
       const result = await bounded(() => page.evaluate(count => window.__net.drain(count), max));
       return {count: result.count, bytes: Buffer.from(result.data, 'base64')};
     };
@@ -692,12 +744,14 @@ export function createPeerModuleResponseObserver({url, peerModuleHashes, runtime
     'net_lockstep_native_adapter.mjs', 'net_lockstep_websocket_relay.mjs'];
   const webrtcModules = [...relayModules, 'net_lockstep_webrtc.mjs'];
   const roomSignaledWebRtcModules = [...webrtcModules, 'net_lockstep_webrtc_signaling.mjs'];
+  const runtimeOwnedModules = [...roomSignaledWebRtcModules,
+    'net_lockstep_runtime_owner.mjs', 'net_lockstep_development_owner.mjs'];
   const provided = Object.keys(peerModuleHashes).sort().join();
-  const names = [relayModules, webrtcModules, roomSignaledWebRtcModules]
+  const names = [relayModules, webrtcModules, roomSignaledWebRtcModules, runtimeOwnedModules]
     .find(modules => provided === [...modules].sort().join());
   if (!names ||
       Object.values(peerModuleHashes).some(hash => !/^[0-9a-f]{64}$/.test(hash)))
-    throw Error('Browser peer requires an exact relay or WebRTC module SHA-256 inventory, optionally including room signaling');
+    throw Error('Browser peer requires an exact relay, WebRTC, room-signaling or runtime-owned module SHA-256 inventory');
   const expected = new Map(names.map(name => [new URL(name, url).href, peerModuleHashes[name]]));
   const allowed = new Set([...runtimeArtifactNames, ...names].map(name => new URL(name, url).href));
   const responses = [], tasks = new Set();
