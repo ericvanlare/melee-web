@@ -1,0 +1,290 @@
+{
+  "browser_integration": {
+    "capture_observation_path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-integration-20261008-045400-b93/capture-observation-v4.json",
+    "capture_observation_sha256": "a07d1472d5680e47fe2c627c723f0e0ec9ec38498698e2d4548dcac59a74f8ec",
+    "loaded_identity": {
+      "actual_http_claim": "No generic all-38 HTTP pre/post hash claim. The existing capture observer hashed the six dynamically imported peer module response bodies on each page plus the actual loaded Wasm response; statuses/byte lengths/hashes matched the frozen packet/build identities.",
+      "all_six_module_responses_match_on_both_pages": true,
+      "local_stage_preflight": "all 38 staged file lengths and SHA-256 values matched the manifest",
+      "module_names": [
+        "net_lockstep_browser_peer.mjs",
+        "net_lockstep_core.mjs",
+        "net_lockstep_native_adapter.mjs",
+        "net_lockstep_websocket_relay.mjs",
+        "net_lockstep_webrtc.mjs",
+        "net_lockstep_webrtc_signaling.mjs"
+      ],
+      "staged_local_files": 38,
+      "wasm_loaded_response_matches_release_on_both_pages": true,
+      "wasm_loaded_response_sha256": "286be8518bf81f90cb3b6c9bd3a8bb62cbd9f43b78d37a8ecec6380162b1b3b1"
+    },
+    "outcome": {
+      "both_browsers_closed": true,
+      "both_pages_unloaded": true,
+      "both_peers_ready": true,
+      "checksum_bytes_per_peer": 512,
+      "checksum_records_per_peer": 8,
+      "checksum_streams_identical": true,
+      "checksums_sha256": "a1ca04fff4a658ac8542e90e1580b3d456f29dfe31132e1be35fa4a348d1baab",
+      "first_error": null,
+      "local_input_ticks_per_peer": 6,
+      "native_local_divergences_per_peer": 0,
+      "remote_input_ticks_per_peer": 6,
+      "runner": "complete",
+      "source_accounting_after_peer_close": {
+        "alpha": {
+          "callback_ids_contiguous": true,
+          "cursor": 8,
+          "draws": 8,
+          "each_step_drawn": true,
+          "steps": 8
+        },
+        "beta": {
+          "callback_ids_contiguous": true,
+          "cursor": 8,
+          "draws": 8,
+          "each_step_drawn": true,
+          "steps": 8
+        }
+      }
+    },
+    "packet": {
+      "exact_wrapped_argv_path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-integration-20261008-045400-b93/wrapped-command-v4.json",
+      "exact_wrapped_argv_sha256": "b178d49f1f7305603974bdf37c99cf778e2d09d288a8cc94742f838a07b0ee6f",
+      "path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-integration-20261008-045400-b93/launch-packet-v4.json",
+      "preparation_receipt_path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-integration-20261008-045400-b93/launch-preparation-v1.json",
+      "preparation_receipt_sha256": "c2a888247fccf081fe852949a877f23a9f5e417e5603556aae834e0d6c7dd74e",
+      "sha256": "94ae34bb12a821cb52e41b3dd7df29ccfcafa990f6f18e282f2f5df744667182",
+      "staging_manifest_path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-integration-20261008-045400-b93/staging-manifest-v4.json",
+      "staging_manifest_sha256": "0d2673962b32a6f795999f3d1a4ec95566748cecf656846d81873c1d2ce74cfd"
+    },
+    "prior_failed_runs": [
+      {
+        "outcome": "failed at unsupported loopback origin 127.0.0.1:49237 (Worker returned 403); preserve as historical.",
+        "packet_path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-integration-20261007-210654-v2/launch-packet-v2.json",
+        "packet_sha256": "448439333a0d7e8dd94bc6ada281a6fbc039052f9eea613316418348b4705dac",
+        "source": "cf3e3b573c63209f4c6aafc2139621a85eab8b3d",
+        "version": "v2"
+      },
+      {
+        "capture_observation_path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-integration-20261008-041732-v3/capture-observation-v3.json",
+        "capture_observation_sha256": "b489ca5c32847c5d46eda5f1e62b4ad391e74ac7483ea12e9b692eacee11b333",
+        "outcome": "overall failure after WebRTC peers became ready because peer close disposed the borrowed shared adapter before post-close source accounting; both browsers otherwise recorded six local/remote inputs, eight checksums, zero local divergences, and equal checksum bytes.",
+        "packet_path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-integration-20261008-041732-v3/launch-packet-v3.json",
+        "packet_sha256": "82ffdefa53ab395c7e43bd576b30e13d2c7935041b71703b7a34871d4a23691a",
+        "source": "cf3e3b573c63209f4c6aafc2139621a85eab8b3d",
+        "version": "v3"
+      }
+    ],
+    "producer": {
+      "all_ten_optional_runtime_flags": "OFF",
+      "artifact_count": 34,
+      "base_main": "6645508cd7f09eed4ed5a5d39c5f4e1676734d58",
+      "configuration": "Release",
+      "head": "b93b7bd44bd4199e4dece77d0673d75c6af5d44a",
+      "release_receipt_path": "/Volumes/AgentStorage/melee-web/runs/issue262-current-main-preservation-20261007-213243-fe2d958b/current-main-validation-v1.json",
+      "release_receipt_sha256": "571e54e04e3773fcadf3c73d485c07f16843d5115d7a4ca539dd88d4ee1b6b84",
+      "tree": "5943efb772888345ed3f7175460c23f12f3397bd",
+      "wasm_sha256": "286be8518bf81f90cb3b6c9bd3a8bb62cbd9f43b78d37a8ecec6380162b1b3b1"
+    },
+    "raw_outputs": {
+      "browser-process-trace-v4.jsonl": {
+        "bytes": 163093,
+        "path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-capture-20261008-045400-b93/browser-process-trace-v4.jsonl",
+        "sha256": "ca4ea552b03d482d62cafb4876260f8d9de761ac579773ca49e86bd6560d26d8"
+      },
+      "browser-run/alpha/accounted-css.png": {
+        "bytes": 480611,
+        "path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-capture-20261008-045400-b93/browser-run/alpha/accounted-css.png",
+        "sha256": "0e8718acbbc07c7ea0666c3c3aa907ffb812e284cc3da3594bba80a52a6e567c"
+      },
+      "browser-run/alpha/checksums.bin": {
+        "bytes": 512,
+        "path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-capture-20261008-045400-b93/browser-run/alpha/checksums.bin",
+        "sha256": "a1ca04fff4a658ac8542e90e1580b3d456f29dfe31132e1be35fa4a348d1baab"
+      },
+      "browser-run/alpha/instance.json": {
+        "bytes": 19030,
+        "path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-capture-20261008-045400-b93/browser-run/alpha/instance.json",
+        "sha256": "47484e4ccfe8955df7d16d10f181c7fcec3d3a6d7e0be9f2abe45dd7251abd85"
+      },
+      "browser-run/beta/accounted-css.png": {
+        "bytes": 480428,
+        "path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-capture-20261008-045400-b93/browser-run/beta/accounted-css.png",
+        "sha256": "1859369b66d0bce68e76be21926b4b599370369341938e8623f11bc4e48b6b6c"
+      },
+      "browser-run/beta/checksums.bin": {
+        "bytes": 512,
+        "path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-capture-20261008-045400-b93/browser-run/beta/checksums.bin",
+        "sha256": "a1ca04fff4a658ac8542e90e1580b3d456f29dfe31132e1be35fa4a348d1baab"
+      },
+      "browser-run/beta/instance.json": {
+        "bytes": 19027,
+        "path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-capture-20261008-045400-b93/browser-run/beta/instance.json",
+        "sha256": "22ae2cbfff194b19c731a655d2ddc758fb18f6f310dc5f9107e43e49b703ff13"
+      },
+      "browser-run/run.json": {
+        "bytes": 86706,
+        "path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-capture-20261008-045400-b93/browser-run/run.json",
+        "sha256": "b29eb88d57308c92b65d05d3bca1c06dae25d934902827b4b997d4193cb48f92"
+      },
+      "owner-result-v4.json": {
+        "bytes": 181118,
+        "path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-capture-20261008-045400-b93/owner-result-v4.json",
+        "sha256": "26708e0ff8f709dc3ee297206a10e90192dbc5e4c1a81d3738354ade5482becb"
+      },
+      "owner.log": {
+        "bytes": 102,
+        "path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-capture-20261008-045400-b93/owner.log",
+        "sha256": "4cdc75a8b997ef6236f326d7531d74d84b915d68f5391b1f3b10ad87b4a5f9b5"
+      },
+      "server.log": {
+        "bytes": 5932,
+        "path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-capture-20261008-045400-b93/server.log",
+        "sha256": "b16ef3b35569e3bbc91733524d436c3129e9e385cbd6c2b793f43ef7f311fcc0"
+      }
+    },
+    "result": "pass for the bounded eight-CSS-tick indexed-adapter local Worker/WebRTC component after the instance-owned lifetime repair; does not establish full route acceptance.",
+    "scenario": {
+      "browser": "two headless installed Chrome contexts, speaker output muted with Web Audio processing retained",
+      "input_ticks_per_peer": 6,
+      "neutral_prefix_ticks": 2,
+      "origin": "http://127.0.0.1:8787",
+      "peer_owner": "browser page",
+      "scene": "CSS",
+      "signaling": "local Room Worker, no ICE servers",
+      "source": "A3 native-pump existing browser/Worker harness",
+      "source_ticks": 8,
+      "transport": "ordered reliable local WebRTC data channels"
+    },
+    "scope_limitations": [
+      "Component-level A3 browser result only; not the supported CSS\u2192SSS\u2192gameplay\u2192Results route or full-session acceptance.",
+      "No runtime-owned product session/progress integration or public UI.",
+      "No keyboard, Gamepad, physical or live input validation.",
+      "No retail comparison, full-game equivalence, foreground timing/performance, pixel fidelity, PCM fidelity or uninterrupted-audio claim.",
+      "No Internet, STUN/TURN or two-machine multiplayer claim.",
+      "No CDP PID attribution claim; cleanup is supported by exact owner process inventory and independent PID/group/port checks.",
+      "No generic HTTP pre/post identity claim for all 38 staged files."
+    ],
+    "worker_and_cleanup": {
+      "both_webrtc_channels_closed": true,
+      "exact_TMPDIR_removed": true,
+      "independent_browser_pids_absent": 24,
+      "independent_process_groups_absent": [
+        44558,
+        44559,
+        44562,
+        44563
+      ],
+      "lane_marker_released": true,
+      "owned_temp_paths_clean": true,
+      "owner_cleanup_passed": true,
+      "ports_bindable_after_capture": [
+        8787,
+        59318,
+        59319
+      ],
+      "retained_profiles": [
+        {
+          "bytes": 30213176,
+          "files": 228,
+          "path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-capture-20261008-045400-b93/browser-run/alpha/profile",
+          "retained": true,
+          "role": "alpha"
+        },
+        {
+          "bytes": 30186633,
+          "files": 228,
+          "path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-capture-20261008-045400-b93/browser-run/beta/profile",
+          "retained": true,
+          "role": "beta"
+        }
+      ],
+      "room_worker_disposed": true,
+      "room_worker_ready": true,
+      "root_independent_review_path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-integration-20261008-045400-b93/root-capture-result-review-v1.json",
+      "root_independent_review_sha256": "715149780b7a9e21f0cdc45bb009daa696848b35793fdbbe372c8d7ea8b609e5"
+    }
+  },
+  "date": "2026-10-08",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "issue": "https://github.com/ericvanlare/melee-web/issues/262",
+  "not_claimed": [
+    "Post-repair browser integration or A3 acceptance",
+    "Runtime-owned product session lifecycle",
+    "Public UI or deployment",
+    "Physical or keyboard input",
+    "Full supported route or retail equivalence",
+    "Timing, latency, performance, foreground, pixel, or audio acceptance",
+    "Internet or two-machine multiplayer"
+  ],
+  "previous_snapshot": "docs/evidence/net-lockstep-native-adapter-v1.json records the earlier pre-capture validation and remains historical.",
+  "schema": "melee-web-issue262-native-adapter-evidence-v3",
+  "scope": "Shared development-only browser ABI adapter for sequential A1 and indexed A3 native lockstep publication, bounded checksum draining, optional progress notifications, and instance-owned joined disposal. The new headless A3 evidence is limited to the eight-CSS-tick native-pump/Room Worker WebRTC component scenario.",
+  "source": {
+    "base_main": "6645508cd7f09eed4ed5a5d39c5f4e1676734d58",
+    "head": "b93b7bd44bd4199e4dece77d0673d75c6af5d44a",
+    "ownership_repair": "The shared adapter remains owned by openNetInstance. The peer borrows native calls and progress subscription; peer close unsubscribes and joins native work, then session-instance cleanup disposes the adapter after post-close source accounting can read status.",
+    "previous_reviewed_source": "26d0626e543e5799976021395fbf49d566a14cb5",
+    "refresh": "All four adapter commits mapped exactly by git range-diff onto current main; no conflicts.",
+    "tree": "5943efb772888345ed3f7175460c23f12f3397bd"
+  },
+  "validation": {
+    "focused": {
+      "command": "node --test tests/net_lockstep_native_adapter.test.mjs tests/net_lockstep_browser_peer.test.mjs tests/net_session_instance.test.mjs tests/net_source_accounting.test.mjs",
+      "log_path": "/Volumes/AgentStorage/melee-web/runs/issue262-current-main-preservation-20261007-213243-fe2d958b/adapter-focused-after-refresh-v1.log",
+      "log_sha256": "ee15ac2e4695ed1a22db91de11f0d3a62063d2afda82f9e09af7b73c9dec2cb5",
+      "result": "pass",
+      "skipped": 0,
+      "tests": 56
+    },
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "failures": 0,
+      "log_path": "/Volumes/AgentStorage/melee-web/runs/issue262-current-main-preservation-20261007-213243-fe2d958b/full-suite-v2.log",
+      "log_sha256": "e272490cac23d88af50f46f465420b8ec7bacee6e69f0b798d0f5c0a0683b28c",
+      "result": "pass",
+      "retained_incomplete_attempt": {
+        "failure": "An existing test sliced PAGE_HELPERS from source text using adjacent-function delimiters; after the helper became exported, the slice included an export declaration that the isolated VM could not parse. The test now imports PAGE_HELPERS directly; the focused test and corrected full suite pass.",
+        "log_path": "/Volumes/AgentStorage/melee-web/runs/issue262-current-main-preservation-20261007-213243-fe2d958b/full-suite-v1.log",
+        "log_sha256": "d529da6fd8694e8c1e41735e13e81ddef286acf00b2e62e8afa1b6a4b76e416e"
+      },
+      "skipped": 153,
+      "tests": 2042
+    },
+    "historical_preservation": {
+      "manifest_path": "/Volumes/AgentStorage/melee-web/runs/issue262-current-main-preservation-20261007-213243-fe2d958b/pre-refresh-preservation-v1.json",
+      "manifest_sha256": "2bd6b985e523021bc86107f6aaf394d84f800861adafc101b6e2f1bb8aa77daf",
+      "sets": [
+        {
+          "artifacts": 32,
+          "cache_and_receipt_verified": true,
+          "producer": "9458853e6c6d24513d637f8027842dbdb52d9f6a"
+        },
+        {
+          "artifacts": 34,
+          "cache_and_native_object_verified": true,
+          "producer": "cf3e3b573c63209f4c6aafc2139621a85eab8b3d"
+        }
+      ]
+    },
+    "ordinary_release": {
+      "artifact_count": 34,
+      "build_log_path": "/Volumes/AgentStorage/melee-web/runs/issue262-current-main-preservation-20261007-213243-fe2d958b/ordinary-release-build-v1.log",
+      "build_log_sha256": "bd42225abd60ebc7c75746dfeae49926f230749d38c00300e34c70414b7bd017",
+      "configuration": "Release",
+      "native_target": "gameplay_menu_browser",
+      "optional_runtime_flags": "all ten listed in the validation receipt are OFF",
+      "receipt_path": "/Volumes/AgentStorage/melee-web/runs/issue262-current-main-preservation-20261007-213243-fe2d958b/current-main-validation-v1.json",
+      "result": "pass"
+    },
+    "receipt": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/issue262-current-main-preservation-20261007-213243-fe2d958b/current-main-validation-v1.json",
+      "sha256": "571e54e04e3773fcadf3c73d485c07f16843d5115d7a4ca539dd88d4ee1b6b84"
+    }
+  }
+}
