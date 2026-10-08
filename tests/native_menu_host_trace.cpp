@@ -42,7 +42,10 @@
 #include "stadium_c1_item_owner_preflight.hpp"
 #include "stadium_live_image_consumer.hpp"
 #include "stadium_buffer_consumer.hpp"
+#include "stadium_ground_owner_contract.hpp"
 #include "stadium_c0_native_map_contract.hpp"
+#include <limits>
+#include <optional>
 #endif
 #include <melee/ft/forward.h>
 #include <melee/gm/forward.h>
@@ -465,6 +468,9 @@ struct GroundStorageLease {
     void end()
     {
         if (!begin_attempted || finished) return;
+        MeleeWebSourceMemoryContext before_free_context{};
+        auto before_free_context_status =
+            MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
         if (owned) {
             if (melee_web_stadium_c1_ground_map_lookup(1) != nullptr ||
                 !source_stage_registry_empty() ||
@@ -473,6 +479,35 @@ struct GroundStorageLease {
                 std::cerr << "Ground storage end refused while source map owners remain; preserving Ground storage\n";
                 std::abort();
             }
+            MeleeWebGroundMapStorageView before_free_storage{};
+            MeleeWebSourceMemoryAllocation before_free_allocation{};
+            before_free_context_status =
+                melee_web_source_memory_context_read(&before_free_context);
+            const auto before_free_allocation_status =
+                melee_web_source_memory_allocation_read(
+                    payload, &before_free_allocation);
+            const auto world_before_free = melee_web_gameplay_stats();
+            check(melee_web_ground_map_storage_read(&before_free_storage) &&
+                      before_free_storage.payload == payload &&
+                      before_free_storage.requested_bytes ==
+                          allocation.requested_bytes &&
+                      before_free_context_status ==
+                          MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                      before_free_context.source_heap_handle ==
+                          facts.memory.source_heap_handle &&
+                      before_free_context.world_generation ==
+                          facts.memory.world_generation &&
+                      melee_web::test::stadium_buffer::
+                          exact_live_allocation_matches_context(
+                          before_free_allocation_status, before_free_allocation,
+                          before_free_context, allocation.requested_bytes,
+                          allocation.allocation_generation) &&
+                      __OSCurrHeap == facts.os_heap &&
+                      HSD_GetHeap() == facts.hsd_heap &&
+                      world_before_free.generation == facts.world_generation &&
+                      melee_web_gameplay_world_exists() &&
+                      melee_web_source_memory_healthy(),
+                  "Ground storage end refused a changed exact live lease or owner context");
             if (!melee_web_ground_map_storage_end()) {
                 std::cerr << "Ground storage end refused; preserving the live source owner\n";
                 std::abort();
@@ -490,81 +525,118 @@ struct GroundStorageLease {
         MeleeWebGroundMapStorageView ended_storage{};
         MeleeWebSourceMemoryAllocation retired_lease{};
         MeleeWebSourceMemoryContext after_end{};
+        const auto retired_lease_status =
+            melee_web_source_memory_allocation_read(payload, &retired_lease);
+        const auto after_end_status =
+            melee_web_source_memory_context_read(&after_end);
+        const auto world_after_end = melee_web_gameplay_stats();
         check(melee_web_ground_map_storage_available() &&
                   melee_web_ground_map_storage_read(&ended_storage) &&
                   ended_storage.payload == nullptr &&
-                  melee_web_source_memory_allocation_read(
-                      payload, &retired_lease) ==
-                      MELEE_WEB_SOURCE_MEMORY_READ_OK &&
-                  retired_lease.live == 0 &&
-                  retired_lease.allocation_generation ==
-                      allocation.allocation_generation &&
-                  melee_web_source_memory_context_read(&after_end) ==
-                      MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                  ended_storage.requested_bytes ==
+                      allocation.requested_bytes &&
+                  melee_web::test::stadium_buffer::
+                      exact_retired_allocation_supported(
+                      retired_lease_status, retired_lease,
+                      before_free_context_status, before_free_context,
+                      after_end_status, after_end) &&
                   after_end.source_heap_handle ==
                       facts.memory.source_heap_handle &&
                   after_end.world_generation == facts.memory.world_generation &&
+                  __OSCurrHeap == facts.os_heap &&
+                  HSD_GetHeap() == facts.hsd_heap &&
+                  world_after_end.generation == facts.world_generation &&
+                  melee_web_gameplay_world_exists() &&
                   devices_before.matches() && melee_web_source_memory_healthy(),
               "Ground storage end did not retire its exact lease and restore typed devices");
     }
 };
 
-struct GroundSourceMarkerBinding {
-    uint16_t joint_index = 0;
-    uint16_t marker_id = 0;
-};
-
-std::vector<GroundSourceMarkerBinding> checked_ground_source_markers(
+melee_web::test::stadium_ground::SourceMarkerSelection
+checked_ground_source_markers(
     const std::shared_ptr<const melee_web::DatArchive>& archive,
     const melee_web::DatStage& stage,
     const melee_web::DatStageEntry& map_entry,
     std::vector<uint16_t>& row_joint_indices)
 {
-    check(archive && stage.joint_reference_table.count == 1 &&
+    using melee_web::test::stadium_ground::SourceMarkerRow;
+    check(archive && stage.joint_reference_table.count != 0 &&
               stage.joint_reference_table.data_offset.has_value(),
-          "Stadium source marker reference table is not its checked single row");
+          "Stadium source marker reference table has no bounded authored rows");
     check(map_entry.joint_offset.has_value() &&
               map_entry.joint_indices.element_bytes == sizeof(uint16_t) &&
               (!map_entry.joint_indices.count ||
                map_entry.joint_indices.data_offset.has_value()),
           "Stadium map1 source joint-index row is incomplete");
-    const auto marker_row = *stage.joint_reference_table.data_offset;
-    const auto marker_root = archive->pointer(marker_row, 64);
-    check(marker_root && *marker_root == *map_entry.joint_offset,
-          "Stadium source marker root does not match resident map1");
-    const uint32_t pair_count = archive->be32(marker_row + 8);
-    check(pair_count > 0,
-          "Stadium source marker pair table is empty");
-    const auto pairs = archive->pointer(marker_row + 4,
-                                        size_t(pair_count) * 4);
-    check(pairs.has_value(),
-          "Stadium source marker pairs are not bounded by the checked archive");
-    melee_web::DatNativeJoint joint_owner(archive, *marker_root);
-    const auto& graph = joint_owner.graph();
-    check(graph.joint_count != 0,
-          "Stadium source marker root has no decoded source joints");
+    const uint32_t selected_root = *map_entry.joint_offset;
+    std::vector<SourceMarkerRow> rows;
+    rows.reserve(stage.joint_reference_table.count);
+    for (uint32_t row_index = 0;
+         row_index < stage.joint_reference_table.count; ++row_index) {
+        const uint32_t marker_row =
+            *stage.joint_reference_table.data_offset + row_index * 12;
+        const auto marker_root = archive->pointer(marker_row, 64);
+        check(marker_root.has_value(),
+              "Stadium marker row has no bounded authored root pointer");
+        const auto root_entry = std::find_if(
+            stage.entries.begin(), stage.entries.end(),
+            [&](const auto& entry) {
+                return entry.joint_offset &&
+                       *entry.joint_offset == *marker_root;
+            });
+        check(root_entry != stage.entries.end(),
+              "Stadium marker root does not resolve to an authored stage entry");
+        melee_web::DatNativeJoint joint_owner(archive, *marker_root);
+        const auto& graph = joint_owner.graph();
+        check(graph.joint_count != 0 && graph.root == 0 &&
+                  graph.joints[0].source_offset == *marker_root,
+              "Stadium marker row root differs from its checked source joint graph");
 
-    std::vector<GroundSourceMarkerBinding> markers;
-    markers.reserve(pair_count);
-    for (uint32_t i = 0; i < pair_count; ++i) {
-        const uint16_t joint_index = archive->be16(*pairs + i * 4);
-        const uint16_t marker_id = archive->be16(*pairs + i * 4 + 2);
-        check(joint_index < graph.joint_count &&
-                  marker_id < source_stage_marker_count(),
-              "Stadium source marker pair exceeds its decoded joint or marker array");
-        markers.push_back({joint_index, marker_id});
+        const int32_t signed_pair_count =
+            std::bit_cast<int32_t>(archive->be32(marker_row + 8));
+        check(signed_pair_count >= 0,
+              "Stadium marker row has a negative source signed pair count");
+        const uint32_t pair_count = static_cast<uint32_t>(signed_pair_count);
+        const uint64_t pair_bytes = uint64_t(pair_count) * 4;
+        check(pair_bytes <= std::numeric_limits<size_t>::max(),
+              "Stadium marker pair extent exceeds the host archive size type");
+        std::optional<uint32_t> pairs;
+        if (pair_count)
+            pairs = archive->pointer(marker_row + 4,
+                                     static_cast<size_t>(pair_bytes));
+        check(pair_count == 0 || pairs.has_value(),
+              "Stadium marker row pairs are not bounded by the checked archive");
+
+        SourceMarkerRow row;
+        row.root_offset = *marker_root;
+        row.bindings.reserve(pair_count);
+        for (uint32_t i = 0; i < pair_count; ++i) {
+            const uint16_t joint_index = archive->be16(*pairs + i * 4);
+            const uint16_t marker_id = archive->be16(*pairs + i * 4 + 2);
+            check(joint_index < graph.joint_count &&
+                      marker_id < source_stage_marker_count(),
+                  "Stadium marker pair exceeds its own graph or actual marker-slot bound");
+            row.bindings.push_back({joint_index, marker_id});
+        }
+        rows.push_back(std::move(row));
     }
 
+    melee_web::DatNativeJoint map_joint_owner(archive, selected_root);
+    const auto& map_graph = map_joint_owner.graph();
+    check(map_graph.joint_count != 0 && map_graph.root == 0 &&
+              map_graph.joints[0].source_offset == selected_root,
+          "Stadium map1 root differs from its checked source joint graph");
     row_joint_indices.reserve(map_entry.joint_indices.count);
     for (uint32_t i = 0; i < map_entry.joint_indices.count; ++i) {
         const uint32_t at = *map_entry.joint_indices.data_offset +
                             i * map_entry.joint_indices.element_bytes;
         const int16_t index = std::bit_cast<int16_t>(archive->be16(at));
-        check(index >= 0 && static_cast<uint16_t>(index) < graph.joint_count,
+        check(index >= 0 && static_cast<uint16_t>(index) < map_graph.joint_count,
               "Stadium map1 source joint index is outside its checked joint graph");
         row_joint_indices.push_back(static_cast<uint16_t>(index));
     }
-    return markers;
+    return melee_web::test::stadium_ground::select_source_markers_for_root(
+        rows, selected_root);
 }
 
 void run_stadium_ground_map1_owner(
@@ -607,8 +679,11 @@ void run_stadium_ground_map1_owner(
           "Stadium authored GrJoint table contains a map1 collision row");
 
     std::vector<uint16_t> row_joint_indices;
-    const auto source_markers = checked_ground_source_markers(
+    const auto marker_selection = checked_ground_source_markers(
         archive, source_stage, map_entry, row_joint_indices);
+    const auto& source_markers = marker_selection.map_bindings;
+    check(marker_selection.matched_row_count == 0 && source_markers.empty(),
+          "Bounded map1 probe requires no authored marker row for its exact root");
     check(melee_web_stadium_c1_stage_object_failures() == 0 &&
               source_stage_registry_empty() && source_stage_gobj_count() == 0,
           "Ground map1 preflight found an existing source Stage GObj owner");
@@ -725,16 +800,6 @@ void run_stadium_ground_map1_owner(
 
         HSD_JObj* const loaded_root =
             static_cast<HSD_JObj*>(map_object->hsd_obj);
-        std::map<uint16_t, HSD_JObj*> expected_markers;
-        for (const auto& binding : source_markers) {
-            HSD_JObj* const marker =
-                static_cast<HSD_JObj*>(
-                    melee_web_stadium_c1_ground_map_joint(
-                        map_object, binding.joint_index));
-            check(marker != nullptr && source_jobj_owned_by(marker, loaded_root),
-                  "Original Ground map1 marker does not belong to its loaded JObj owner");
-            expected_markers[binding.marker_id] = marker;
-        }
         for (uint16_t joint_index : row_joint_indices) {
             HSD_JObj* const indexed = static_cast<HSD_JObj*>(
                 melee_web_stadium_c1_ground_map_joint(map_object,
@@ -745,16 +810,12 @@ void run_stadium_ground_map1_owner(
         for (size_t i = 0; i < source_stage_marker_count(); ++i) {
             auto* current_marker = static_cast<HSD_JObj*>(
                 melee_web_stadium_c1_ground_marker_slot(i));
-            const auto expected = expected_markers.find(static_cast<uint16_t>(i));
-            if (expected == expected_markers.end()) {
-                check(current_marker == stage_markers_before[i],
-                      "Ground map1 changed a source marker outside its authored marker row");
-            } else {
-                check(current_marker == expected->second &&
-                          source_jobj_owned_by(current_marker, loaded_root),
-                      "Ground map1 source marker slot does not match its exact loaded joint");
-            }
+            check(current_marker == stage_markers_before[i],
+                  "Ground map1 changed the source StageInfo x280 marker baseline");
         }
+        check(source_stage_markers_empty() &&
+                  source_stage_marker_snapshot() == stage_markers_before,
+              "Ground map1 changed the empty StageInfo x280 marker baseline");
         check(HSD_GObj_804D783C == scheduler_cycle_before &&
                   melee_web_gameplay_stats().ticks == gameplay_ticks_before &&
                   ground_dispatch_quiet(),
@@ -816,7 +877,11 @@ void run_stadium_ground_map1_owner(
                   << hex64(reinterpret_cast<uintptr_t>(device_addresses[4]))
                   << "\",\""
                   << hex64(reinterpret_cast<uintptr_t>(device_addresses[5]))
-                  << "\"],\"source_markers\":" << source_markers.size()
+                  << "\"],\"authored_marker_pair_count\":"
+                  << marker_selection.authored_pair_count
+                  << ",\"map1_matched_marker_pair_count\":"
+                  << source_markers.size()
+                  << ",\"stage_info_marker_baseline_empty\":true"
                   << ",\"map1_joint_indices\":" << row_joint_indices.size()
                   << ",\"map_id\":1,\"device_bytes_restored\":true,"
                      "\"buffer_retired\":true,\"callback_dispatch\":false,"

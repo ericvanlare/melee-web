@@ -157,6 +157,43 @@ inline bool exact_new_allocation_supported(
            allocation.requested_bytes == requested_bytes;
 }
 
+inline bool exact_live_allocation_matches_context(
+    MeleeWebSourceMemoryReadStatus status,
+    const MeleeWebSourceMemoryAllocation& allocation,
+    const MeleeWebSourceMemoryContext& context, uint32_t requested_bytes,
+    uint64_t expected_generation)
+{
+    return status == MELEE_WEB_SOURCE_MEMORY_READ_OK && allocation.live == 1 &&
+           requested_bytes != 0 && allocation.requested_bytes == requested_bytes &&
+           expected_generation != 0 &&
+           allocation.allocation_generation == expected_generation &&
+           allocation.allocation_generation <=
+               context.allocation_generation_watermark &&
+           allocation.source_heap_handle == context.source_heap_handle &&
+           allocation.world_generation == context.world_generation;
+}
+
+inline bool exact_retired_allocation_supported(
+    MeleeWebSourceMemoryReadStatus allocation_status,
+    const MeleeWebSourceMemoryAllocation& allocation,
+    MeleeWebSourceMemoryReadStatus before_status,
+    const MeleeWebSourceMemoryContext& before,
+    MeleeWebSourceMemoryReadStatus after_status,
+    const MeleeWebSourceMemoryContext& after)
+{
+    return allocation_status == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+           before_status == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+           after_status == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+           allocation.live == 0 && allocation.requested_bytes == 0 &&
+           allocation.allocation_generation == 0 &&
+           allocation.source_heap_handle == before.source_heap_handle &&
+           allocation.world_generation == before.world_generation &&
+           after.source_heap_handle == before.source_heap_handle &&
+           after.world_generation == before.world_generation &&
+           after.allocation_generation_watermark ==
+               before.allocation_generation_watermark;
+}
+
 inline ConstructorPreCallFacts actual_pre_call_facts(
     const MeleeWebStadiumBufferLayout& layout)
 {

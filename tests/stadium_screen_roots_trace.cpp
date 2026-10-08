@@ -1,14 +1,83 @@
 #include "stadium_live_image_consumer.hpp"
 #include "stadium_buffer_consumer.hpp"
+#include "stadium_ground_owner_contract.hpp"
+#include <array>
 #include <iostream>
+#include <string>
 extern "C" {
 #include <sysdolphin/baselib/initialize.h>
 }
 using namespace melee_web::test::stadium_screen;
 namespace {
+void owner_contract_pure_controls()
+{
+    using namespace melee_web::test::stadium_buffer;
+    const std::array<melee_web::test::stadium_ground::SourceMarkerRow, 1>
+        authored_marker_rows{{{0x100, {{2, 0x87}}}}};
+    const auto different_root_selection =
+        melee_web::test::stadium_ground::select_source_markers_for_root(
+            authored_marker_rows, 0x200);
+    require(different_root_selection.authored_pair_count == 1 &&
+                different_root_selection.matched_row_count == 0 &&
+                different_root_selection.map_bindings.empty(),
+            "Different authored marker root incorrectly matched the selected map");
+    const auto exact_root_selection =
+        melee_web::test::stadium_ground::select_source_markers_for_root(
+            authored_marker_rows, 0x100);
+    require(exact_root_selection.authored_pair_count == 1 &&
+                exact_root_selection.matched_row_count == 1 &&
+                exact_root_selection.map_bindings.size() == 1 &&
+                exact_root_selection.map_bindings[0].joint_index == 2 &&
+                exact_root_selection.map_bindings[0].marker_id == 0x87,
+            "Exact authored marker root did not select its original pair");
+    const std::array<melee_web::test::stadium_ground::SourceMarkerRow, 2>
+        duplicate_root_rows{{{0x100, {{2, 0x87}}},
+                             {0x100, {{3, 0x88}}}}};
+    const auto first_root_selection =
+        melee_web::test::stadium_ground::select_source_markers_for_root(
+            duplicate_root_rows, 0x100);
+    require(first_root_selection.authored_pair_count == 2 &&
+                first_root_selection.matched_row_count == 1 &&
+                first_root_selection.map_bindings.size() == 1 &&
+                first_root_selection.map_bindings[0].joint_index == 2 &&
+                first_root_selection.map_bindings[0].marker_id == 0x87,
+            "Duplicate marker roots did not preserve original first-row selection");
+
+    const MeleeWebSourceMemoryContext before_free{7, 19, 24};
+    const MeleeWebSourceMemoryAllocation live_allocation{7, 64, 19, 24, 1};
+    require(exact_live_allocation_matches_context(
+                MELEE_WEB_SOURCE_MEMORY_READ_OK, live_allocation,
+                before_free, 64, 24),
+            "Exact live payload in its current owner context was rejected");
+    const MeleeWebSourceMemoryAllocation retired_allocation{7, 0, 19, 0, 0};
+    require(exact_retired_allocation_supported(
+                MELEE_WEB_SOURCE_MEMORY_READ_OK, retired_allocation,
+                MELEE_WEB_SOURCE_MEMORY_READ_OK, before_free,
+                MELEE_WEB_SOURCE_MEMORY_READ_OK, before_free),
+            "Exact retired payload with a stable generation watermark was rejected");
+    MeleeWebSourceMemoryAllocation reused_live_allocation{7, 64, 19, 25, 1};
+    const MeleeWebSourceMemoryContext after_reuse{7, 19, 25};
+    require(!exact_retired_allocation_supported(
+                MELEE_WEB_SOURCE_MEMORY_READ_OK, reused_live_allocation,
+                MELEE_WEB_SOURCE_MEMORY_READ_OK, before_free,
+                MELEE_WEB_SOURCE_MEMORY_READ_OK, after_reuse),
+            "A reused exact address passed the retired-payload check");
+    require(!exact_retired_allocation_supported(
+                MELEE_WEB_SOURCE_MEMORY_READ_OK, retired_allocation,
+                MELEE_WEB_SOURCE_MEMORY_READ_OK, before_free,
+                MELEE_WEB_SOURCE_MEMORY_READ_OK, after_reuse),
+            "A freed payload with a newer reuse generation passed retirement");
+    MeleeWebSourceMemoryAllocation changed_generation_allocation{7, 64, 19, 25, 1};
+    require(!exact_live_allocation_matches_context(
+                MELEE_WEB_SOURCE_MEMORY_READ_OK, changed_generation_allocation,
+                after_reuse, 64, 24),
+            "A newer lease at the same address passed the original-generation check");
+}
+
 void source_observer_preflight()
 {
     using namespace melee_web::test::stadium_buffer;
+    owner_contract_pure_controls();
     MeleeWebSourceMemoryContext context{};
     const auto context_status = melee_web_source_memory_context_read(&context);
     const auto stats = melee_web_gameplay_stats();
@@ -123,7 +192,14 @@ void source_observer_preflight()
               << "; actual-layout and pure pre-call controls passed\n";
 }
 }
-int main(){try{
+int main(int argc, char** argv){try{
+    if (argc == 2 && std::string(argv[1]) == "--pure-owner-controls") {
+        owner_contract_pure_controls();
+        std::cout << "Stadium Ground owner pure selector/lease controls passed\n";
+        return 0;
+    }
+    if (argc != 1)
+        throw std::runtime_error("Expected optional --pure-owner-controls");
     char error[256]{};
     require(melee_web_gameplay_startup(32*1024*1024,error,sizeof(error)),error);
     require(melee_web_native_world_enable(error,sizeof(error)),error);
