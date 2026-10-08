@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-import {verifyNetSourceAccounting} from './net_source_accounting.mjs';
+import {verifyNetSourceAccounting, verifyHeldNetSourceAccounting} from './net_source_accounting.mjs';
 
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 
@@ -41,8 +41,10 @@ export function readyRenderEvent(diagnostics, expectedPhase, priorSignatures = n
   return null;
 }
 
-export function verifyAccountedRenderReadiness(capture, native, status, expectedCursor, expectedPhase = 1) {
-  verifyNetSourceAccounting(capture, expectedCursor);
+export function verifyAccountedRenderReadiness(capture, native, status, expectedCursor, expectedPhase = 1,
+  {heldSnapshot = false} = {}) {
+  if (heldSnapshot) verifyHeldNetSourceAccounting(capture, expectedCursor);
+  else verifyNetSourceAccounting(capture, expectedCursor);
   const draw = capture.render_readiness, row = capture.rows[draw?.row_index];
   if (capture.render_readiness_enabled !== true || !draw ||
       !Number.isSafeInteger(draw.row_index) || draw.row_index < 0 || !row ||

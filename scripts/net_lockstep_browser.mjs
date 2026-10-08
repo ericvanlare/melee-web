@@ -11,11 +11,14 @@ import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {createRoomId} from './net_lockstep_websocket_relay.mjs';
 import {parseArgs} from 'node:util';
-import {buildRuntimeCssSssGamepadSamples, RUNTIME_CSS_SSS_INPUT_TICKS, RUNTIME_CSS_SSS_SOURCE_TICKS,
-  validateLockstepBrowserMode, validateRuntimeCssSssRecipe} from './net_lockstep_browser_modes.mjs';
+import {buildRuntimeCssMatchGamepadSamples, buildRuntimeCssSssGamepadSamples,
+  RUNTIME_CSS_MATCH_INPUT_TICKS, RUNTIME_CSS_MATCH_SOURCE_TICKS, RUNTIME_CSS_SSS_INPUT_TICKS,
+  RUNTIME_CSS_SSS_SOURCE_TICKS, validateLockstepBrowserMode, validateRuntimeCssMatchRecipe,
+  validateRuntimeCssSssRecipe} from './net_lockstep_browser_modes.mjs';
 import {loadBrowserTools} from './browser_tools.mjs';
 import {startRoomRelayRuntime} from './net_room_relay_runtime_owner.mjs';
-import {classifyRoute, collapseConsecutiveScenes, expectedFullSceneOrder, validateFullRoute} from './net_determinism_contract.mjs';
+import {classifyRoute, collapseConsecutiveScenes, expectedFullSceneOrder, validateActiveMatchRoute,
+  validateFullRoute} from './net_determinism_contract.mjs';
 import {NET_FRAME_BYTES, NET_RECORD_BYTES, firstFatalBrowserError, openNetInstance, browserPeerFacade} from './net_session_instance.mjs';
 import {createTransportCallbackQueue, describeLockstepTransport, describeLockstepTransportAttempt,
   openLockstepPeerPair, recordAvailableTransportMetrics} from './net_lockstep_transport.mjs';
@@ -69,6 +72,8 @@ const uint32 = text => {
 const inputSampling = values.scenario === 'input-sampling';
 const nativePump = values.scenario === 'native-pump';
 const runtimeCssSss = values.scenario === 'runtime-css-sss';
+const runtimeCssMatch = values.scenario === 'runtime-css-match';
+const runtimeCssLiveRoute = runtimeCssSss || runtimeCssMatch;
 const runtimeOwnerRequested = values['peer-owner'] === 'runtime';
 if (!values.url || !values.disc || !values.out || !values.seed || (!inputSampling && !runtimeOwnerRequested && !values.script))
   throw Error('Required: --url runtime.html --disc DISC [--script route1.mwni] --seed U32 --out NEW_DIR');
@@ -101,7 +106,7 @@ if (values.scenario === 'disconnect' && disconnectAt === null)
 if (values.scenario === 'disconnect' && disconnectAt < 3)
   throw Error('The bounded disconnect must occur after the two neutral-prefix source ticks');
 
-const scriptBytes = inputSampling || (runtimeOwned && !runtimeCssSss) ? null : await fs.readFile(values.script);
+const scriptBytes = inputSampling || (runtimeOwned && !runtimeCssLiveRoute) ? null : await fs.readFile(values.script);
 if (scriptBytes && (scriptBytes.length < HEADER_BYTES || scriptBytes.subarray(0, 4).toString() !== 'MWNI' ||
     scriptBytes.readUInt32BE(4) !== 1))
   throw Error('Script is not an MWNI v1 input recipe');
@@ -110,22 +115,25 @@ if (scriptBytes && scriptBytes.length !== HEADER_BYTES + inputCount * NET_FRAME_
   throw Error('Script length disagrees with its declared input count');
 const scriptFrames = scriptBytes?.subarray(HEADER_BYTES) ?? Buffer.alloc(0);
 let runtimeRecipeIdentity = null, runtimeGamepadSamples = null;
-if (runtimeCssSss) {
+if (runtimeCssLiveRoute) {
   const [manifestBytes, generatorBytes] = await Promise.all([
     fs.readFile(values['script-manifest']), fs.readFile(new URL('../tools/net_input_script.py', import.meta.url)),
   ]);
-  runtimeRecipeIdentity = validateRuntimeCssSssRecipe({scriptBytes, manifestBytes, generatorBytes, seed});
-  runtimeGamepadSamples = buildRuntimeCssSssGamepadSamples(scriptFrames);
+  runtimeRecipeIdentity = runtimeCssMatch ?
+    validateRuntimeCssMatchRecipe({scriptBytes, manifestBytes, generatorBytes, seed}) :
+    validateRuntimeCssSssRecipe({scriptBytes, manifestBytes, generatorBytes, seed});
+  runtimeGamepadSamples = runtimeCssMatch ? buildRuntimeCssMatchGamepadSamples(scriptFrames) :
+    buildRuntimeCssSssGamepadSamples(scriptFrames);
 }
 const probe = values.scenario === 'probe';
-const usedInputs = runtimeCssSss ? RUNTIME_CSS_SSS_INPUT_TICKS :
+const usedInputs = runtimeCssMatch ? RUNTIME_CSS_MATCH_INPUT_TICKS : runtimeCssSss ? RUNTIME_CSS_SSS_INPUT_TICKS :
   inputSampling ? INPUT_SAMPLING_SOURCE_TICKS - LOCKSTEP_DELAY : probe || nativePump ? probeSourceTicks - LOCKSTEP_DELAY :
   scenario === 'flip' && flip ? Math.min(inputCount, flip.tick + 8) :
   scenario === 'disconnect' ? Math.min(inputCount, Math.max(1, disconnectAt + 1 - LOCKSTEP_DELAY)) : inputCount;
 if (!inputSampling && !runtimeOwned && usedInputs > inputCount)
   throw Error('Requested local input workload exceeds the script');
 if (flip && flip.tick >= usedInputs) throw Error('Input flip tick is outside the selected workload');
-const sourceTicks = runtimeCssSss ? RUNTIME_CSS_SSS_SOURCE_TICKS :
+const sourceTicks = runtimeCssMatch ? RUNTIME_CSS_MATCH_SOURCE_TICKS : runtimeCssSss ? RUNTIME_CSS_SSS_SOURCE_TICKS :
   inputSampling ? INPUT_SAMPLING_SOURCE_TICKS : usedInputs + LOCKSTEP_DELAY;
 if (sourceTicks > 216000) throw Error('Source tick workload exceeds the native bound');
 if (disconnectAt !== null && disconnectAt >= sourceTicks)
@@ -207,9 +215,10 @@ function verifyConsumedInputComponents(alphaSamples, betaSamples, bytesA, bytesB
 }
 
 const pairResults = {
-  schema: runtimeCssSss ? 'melee-web-a3-runtime-css-sss-v1' :
+  schema: runtimeCssMatch ? 'melee-web-a3-runtime-css-match-v1' : runtimeCssSss ? 'melee-web-a3-runtime-css-sss-v1' :
     inputSampling ? 'melee-web-local-lockstep-a3-input-sampling-v1' : 'melee-web-local-lockstep-a2-run-v1', scenario, seed,
-  scope: runtimeCssSss ? 'bounded runtime-owned original CSS-to-SSS live-input route' :
+  scope: runtimeCssMatch ? 'bounded runtime-owned original CSS-to-active-match live-input route' :
+    runtimeCssSss ? 'bounded runtime-owned original CSS-to-SSS live-input route' :
     nativePump ? runtimeOwned ? 'bounded eight-tick development runtime-owned native checksum pump' :
     'bounded eight-tick diagnostic browser-owned native checksum pump' : inputSampling ? 'synthetic browser-local native PAD sampling and two-tick delay component check' :
     probe ? 'CSS network-wait and duplicate-contribution probe' :
@@ -219,7 +228,8 @@ const pairResults = {
     ...(!localWebRtc ? ['WebRTC'] : []),
     'pixels/PCM', 'full-route or whole-session accuracy', 'performance'] :
     ['live timing', 'performance', 'pixels', 'PCM equivalence', 'retail equivalence', 'two-machine Internet acceptance',
-      ...((nativePump || runtimeCssSss) ? runtimeOwned ? ['public player UI/runtime integration', 'physical controllers',
+      ...(runtimeCssLiveRoute ? ['whole match, Results, and CSS return'] : []),
+      ...((nativePump || runtimeCssLiveRoute) ? runtimeOwned ? ['public player UI/runtime integration', 'physical controllers',
         'unbounded evidence consumer policy'] : ['product room/session integration', 'physical/live input',
         'unbounded evidence consumer policy'] : [])],
   peer_owner: values['peer-owner'], peer_transport: peerTransport,
@@ -227,14 +237,17 @@ const pairResults = {
   neutral_prefix: {source_ticks: LOCKSTEP_DELAY, player_ports: 'neutral PADStatus', unowned_ports: 'no-controller'},
   script: scriptBytes ? {name: path.basename(values.script), sha256: scriptHash, frame_count: inputCount,
     input_ticks_used: usedInputs, source_ticks: sourceTicks} : null,
-  ...(runtimeRecipeIdentity ? {runtime_css_sss_recipe_identity: runtimeRecipeIdentity} : {}),
+  ...(runtimeRecipeIdentity ? runtimeCssMatch ? {runtime_css_match_recipe_identity: runtimeRecipeIdentity} :
+    {runtime_css_sss_recipe_identity: runtimeRecipeIdentity} : {}),
   input_capture: inputSampling ? {source: 'browser-local native PADStatus', input_ticks: usedInputs,
     source_ticks: sourceTicks, pattern: ['neutral', 'A', 'release', 'neutral'],
     beta_deferred_input_tick: 0} : runtimeOwned ? {source: 'browser-local native PADStatus',
-      input_ticks: usedInputs, source_ticks: sourceTicks, pattern: null,
+      input_ticks: usedInputs, source_ticks: sourceTicks,
+      pattern: runtimeCssMatch ? {recipe_input_ticks: [0, 303], neutral_input_ticks: [304, 517]} : null,
       synthetic_gamepad: Boolean(runtimeInputFixture), ...(runtimeInputFixture ? {fixture:
         runtimeInputFixtureName === 'css-start-to-sss' ? 'css-start-to-sss via ordinary controller manager' :
-          'neutral-a-release via ordinary controller manager'} : {}),
+          runtimeInputFixtureName === 'css-sss-to-match' ? 'css-sss-to-match via ordinary controller manager' :
+            'neutral-a-release via ordinary controller manager'} : {}),
       player_input_callback: 'existing runtime native poll'} : null,
   transport_attempt: localWebRtc ? {type: 'webrtc-datachannel', local_only: true, ice_servers: []} :
     describeLockstepTransportAttempt(values['relay-url']),
@@ -317,6 +330,27 @@ function verifyRuntimeCssSssSceneRuns(sceneRuns) {
   return {scenes, firstSssTick};
 }
 
+function verifyRuntimeCssMatchSceneRuns(sceneRuns) {
+  if (!Array.isArray(sceneRuns) || sceneRuns.length !== RUNTIME_CSS_MATCH_SOURCE_TICKS ||
+      sceneRuns.some((row, tick) => !row || row.tick !== tick || !Number.isInteger(row.scene)))
+    throw Error('Runtime CSS-to-match route did not retain 520 sequential scene records');
+  const scenes = collapseConsecutiveScenes(sceneRuns.map(row => row.scene));
+  if (JSON.stringify(scenes) !== '[1,2,3]')
+    throw Error(`Runtime route did not remain in original CSS, SSS then match: ${JSON.stringify(scenes)}`);
+  const firstSssTick = sceneRuns.find(row => row.scene === 2)?.tick;
+  const firstMatchTick = sceneRuns.find(row => row.scene === 3)?.tick;
+  if (!Number.isInteger(firstSssTick) || !Number.isInteger(firstMatchTick))
+    throw Error('Runtime route has no SSS and match checksum records');
+  return {scenes, firstSssTick, firstMatchTick};
+}
+
+function verifyRuntimeCssMatchPeerCompletion(summary) {
+  const completed = verifyPositivePeerCompletion(summary, usedInputs, sourceTicks);
+  if (summary.remote_ack_checksum !== sourceTicks - 1)
+    throw Error(`Runtime CSS-to-match peer did not acknowledge checksum ${sourceTicks - 1}: ${JSON.stringify(summary)}`);
+  return {...completed, remote_ack_checksum: summary.remote_ack_checksum};
+}
+
 function routeBoundaryPath(role, boundary) {
   const filename = boundary.name === 'css-return' ? 'final.png' : `route-${boundary.name}.png`;
   return path.join(childDirectory(role), filename);
@@ -331,14 +365,29 @@ function recordMissedBoundary(role, boundary, reason, {phase = null, cursor = nu
   }
 }
 
-async function captureRouteBoundary(role, boundary, priorSignatures) {
+async function captureRouteBoundary(role, boundary, priorSignatures, heldAccounting = null) {
   const row = instanceRows[role];
   if (row.route_boundary_captures.some(item => item.name === boundary.name) ||
       row.route_boundary_misses.some(item => item.name === boundary.name)) return;
   const driverDiagnostics = await instances[role].driver.diagnostics();
-  const readiness = readyRenderEvent(driverDiagnostics, boundary.phase, priorSignatures);
   const nativeBefore = await instances[role].native();
   const statusBefore = await instances[role].status();
+  let readiness = null, readinessError = null;
+  if (heldAccounting) {
+    try { readiness = verifyAccountedRenderReadiness(heldAccounting, nativeBefore, statusBefore,
+      sourceTicks, boundary.phase, {heldSnapshot: true}); }
+    catch (error) { readinessError = String(error.message || error); }
+  } else readiness = readyRenderEvent(driverDiagnostics, boundary.phase, priorSignatures);
+  (row.route_boundary_observations ??= []).push({name: boundary.name,
+    browser_driver: driverDiagnostics, native: nativeBefore, status: statusBefore,
+    render_readiness: readiness, render_readiness_error: readinessError,
+    render_readiness_basis: heldAccounting ? 'held read-only source accounting snapshot' : 'existing driver text events',
+    structured_render_observation: heldAccounting?.render_readiness ?? null,
+    source_accounting_snapshot: heldAccounting,
+    prior_signatures: [...priorSignatures],
+    predicates: {render_readiness: Boolean(readiness), native_phase: nativeBefore.phase === boundary.phase,
+      nonterminal: statusBefore.blocker !== 'terminal'},
+    observed_at: new Date().toISOString()});
   if (!readiness || nativeBefore.phase !== boundary.phase || statusBefore.blocker === 'terminal') return false;
   const cursor = statusBefore.cursor;
   const screenshotPath = routeBoundaryPath(role, boundary);
@@ -389,6 +438,33 @@ async function captureRuntimeCssSssFinalBoundary(role) {
       evidence.screenshot_phase_stable !== true || evidence.phase_after_screenshot !== boundary.phase ||
       !evidence.browser_driver || !evidence.gpu)
     throw Error(`${role} final SSS screenshot changed the source boundary or lacks driver/GPU diagnostics`);
+  return evidence;
+}
+
+async function captureRuntimeCssMatchFinalBoundary(role) {
+  const fixture = instanceRows[role].runtime_input_fixture_frozen;
+  const interval = pairResults.native_pump_interval;
+  if (!runtimeCssMatch || fixture?.frozen !== true || fixture.captured_count !== usedInputs ||
+      interval?.complete !== true || interval.no_peer_RPC_during_interval !== true ||
+      interval.actual_native_cursor_progress_each !== true || interval.crossed_512_each !== true)
+    throw Error(`${role} final match observation requires the frozen input fixture and completed read-only 512 interval`);
+  const boundary = POSITIVE_ROUTE_BOUNDARIES[2];
+  // Reading does not detach the owner's progress subscriber or advance source.
+  const accounting = await instances[role].readSourceAccounting({freeze: false});
+  const captured = await captureRouteBoundary(role, boundary, new Set(), accounting);
+  if (!captured) {
+    const [status, native] = await Promise.all([instances[role].status(), instances[role].native()]);
+    recordMissedBoundary(role, boundary, 'active match had no verified structured draw at the held source boundary for screenshot and GPU diagnostics',
+      {phase: native.phase, cursor: status.cursor});
+    throw Error(`${role} final active-match boundary screenshot was not captured`);
+  }
+  const evidence = instanceRows[role].route_boundary_captures.find(item => item.name === boundary.name);
+  if (evidence.source_cursor_sampled_before_screenshot !== sourceTicks ||
+      evidence.source_cursor_after_screenshot !== sourceTicks ||
+      evidence.source_cursor_stable_during_screenshot !== true ||
+      evidence.screenshot_phase_stable !== true || evidence.phase_after_screenshot !== boundary.phase ||
+      !evidence.browser_driver || !evidence.gpu || evidence.gpu_observed !== true)
+    throw Error(`${role} final match screenshot changed the source boundary or lacks driver/GPU diagnostics`);
   return evidence;
 }
 
@@ -697,6 +773,7 @@ function nativePumpChecksumEvidence(row, runtimeOwner, ticks) {
 }
 
 async function observeNativePumpWithoutRpc() {
+  const cssLiveRoute = runtimeCssSss || (typeof runtimeCssMatch !== 'undefined' && runtimeCssMatch);
   const read = async role => {
     const {status, native} = await checkedHealth(role);
     const owner = runtimeOwned ? await instances[role].runtimeLockstepSnapshot() : null;
@@ -720,12 +797,12 @@ async function observeNativePumpWithoutRpc() {
     observation: 'read-only native health and pure owner/controller snapshot; no peer RPC, evidence drain, progress publication or timing resume',
     checksum_evidence_owner: runtimeOwned ? 'runtime ACK consumer and retained canonical records' : 'diagnostic peer export queue',
     no_peer_RPC_during_interval: true, actual_native_cursor_progress_each: false,
-    ...(runtimeCssSss ? {crossed_512_each: false} : {}), complete: false};
+    ...(cssLiveRoute ? {crossed_512_each: false} : {}), complete: false};
   for (const role of ['alpha', 'beta']) {
     if (before[role].status.cursor >= sourceTicks || before[role].snapshot.protocol.local_checksum_ticks >= sourceTicks)
       throw Error(`${role} completed before the no-RPC observation interval; autonomous progress was not witnessed`);
-    if (runtimeCssSss && before[role].status.cursor >= 512)
-      throw Error(`${role} passed source cursor 512 before the CSS-to-SSS no-RPC observation interval`);
+    if (cssLiveRoute && before[role].status.cursor >= 512)
+      throw Error(`${role} passed source cursor 512 before the ${runtimeCssMatch ? 'CSS-to-match' : 'CSS-to-SSS'} no-RPC observation interval`);
   }
   let after, observations = 0;
   const started = Date.now();
@@ -734,7 +811,7 @@ async function observeNativePumpWithoutRpc() {
     ++observations;
     interval.after = after; interval.observations = observations;
     interval.actual_native_cursor_progress_each = ['alpha', 'beta'].every(role => after[role].status.cursor > before[role].status.cursor);
-    if (runtimeCssSss) interval.crossed_512_each = ['alpha', 'beta'].every(role =>
+    if (cssLiveRoute) interval.crossed_512_each = ['alpha', 'beta'].every(role =>
       before[role].status.cursor < 512 && after[role].status.cursor > 512);
     for (const role of ['alpha', 'beta']) {
       if (after[role].snapshot.nativePump.rpc_calls !== before[role].snapshot.nativePump.rpc_calls) {
@@ -750,8 +827,8 @@ async function observeNativePumpWithoutRpc() {
         row.snapshot.protocol.remote_ack_input === usedInputs - 1;
     })) {
       for (const role of ['alpha', 'beta']) verifyPositivePeerCompletion(after[role].snapshot.protocol, usedInputs, sourceTicks);
-      if (runtimeCssSss && !interval.crossed_512_each)
-        throw Error('CSS-to-SSS no-RPC observation did not witness both source cursors cross 512');
+      if (cssLiveRoute && !interval.crossed_512_each)
+        throw Error(`${runtimeCssMatch ? 'CSS-to-match' : 'CSS-to-SSS'} no-RPC observation did not witness both source cursors cross 512`);
       interval.complete = true;
       return;
     }
@@ -890,13 +967,17 @@ async function pollRun() {
 async function waitForPositivePeerCompletion() {
   const receiptDeadline = Math.min(deadline, Date.now() + stallMs);
   const expected = {remote_ack_input: usedInputs - 1, local_checksum_ticks: sourceTicks,
-    remote_checksum_ticks: sourceTicks, next_checksum_compare: sourceTicks};
+    remote_checksum_ticks: sourceTicks, next_checksum_compare: sourceTicks,
+    ...(runtimeCssMatch ? {remote_ack_checksum: sourceTicks - 1} : {})};
   while (Date.now() <= receiptDeadline) {
     await refreshBrowserPeers();
     for (const role of ['alpha', 'beta']) await drainChecksums(role, peers[role]);
     await refreshBrowserPeers();
     const summaries = Object.fromEntries(['alpha', 'beta'].map(role => [role, peers[role].summary()]));
     for (const summary of Object.values(summaries)) {
+      if (runtimeCssMatch && Number.isInteger(summary.remote_ack_checksum) &&
+          summary.remote_ack_checksum > sourceTicks - 1)
+        throw Error(`Runtime CSS-to-match peer acknowledged checksum beyond ${sourceTicks - 1}: ${JSON.stringify(summary)}`);
       if (summary.terminal || !Array.isArray(summary.checksum_mismatches) || summary.checksum_mismatches.length ||
           Object.entries(expected).some(([key, value]) =>
             !Number.isInteger(summary[key]) || summary[key] < (key === 'remote_ack_input' ? -1 : 0) ||
@@ -906,7 +987,8 @@ async function waitForPositivePeerCompletion() {
     if (Object.values(summaries).every(summary =>
         Object.entries(expected).every(([key, value]) => summary[key] === value))) {
       for (const role of ['alpha', 'beta'])
-        instanceRows[role].positive_completion = verifyPositivePeerCompletion(summaries[role], usedInputs, sourceTicks);
+        instanceRows[role].positive_completion = runtimeCssMatch ? verifyRuntimeCssMatchPeerCompletion(summaries[role]) :
+          verifyPositivePeerCompletion(summaries[role], usedInputs, sourceTicks);
       return;
     }
     await sleep(pollMs);
@@ -1024,7 +1106,7 @@ async function run() {
   if (runtimeInputFixture) for (const role of ['alpha', 'beta'])
     instanceRows[role].runtime_input_fixture_start = await instances[role].installRuntimeInputFixture({role,
       inputTicks: usedInputs, variant: runtimeInputFixtureName,
-      ...(runtimeCssSss ? {samples: runtimeGamepadSamples[role]} : {})});
+      ...(runtimeCssLiveRoute ? {samples: runtimeGamepadSamples[role]} : {})});
   await Promise.all(['alpha', 'beta'].map(role => instances[role].beginLockstep(seed, sourceTicks)));
   const startRows = await waitForStart();
   if (!runtimeOwned) for (const role of ['alpha', 'beta'])
@@ -1096,7 +1178,7 @@ async function run() {
     const roomId = localWebRtc ? undefined : createRoomId();
     const peerOptions = role => ({role, sourceTicks, inputTicks: usedInputs,
       ...(localWebRtc ? {} : {relayUrl: values['relay-url'], roomId}),
-      ...(nativePump || runtimeCssSss ? {autonomousPump: true} : {}),
+      ...(nativePump || runtimeCssLiveRoute ? {autonomousPump: true} : {}),
       agreement: agreements[role], timeoutMs: Math.min(stallMs, deadline - Date.now()),
       ...(inputSampling ? {inputCapture: {deferSendTicks: role === 'beta' ? [0] : [],
         pattern: role === 'alpha' ? ['neutral', 'A', 'release', 'neutral'] : Array(usedInputs).fill('neutral')}} : {})});
@@ -1245,9 +1327,9 @@ async function run() {
     const entries = role => Array.from({length: usedInputs}, (_, tick) => [tick, localSample(role, tick)]);
     await peers.alpha.addLocalInputs(entries('alpha'));
     await peers.beta.addLocalInputs(entries('beta'));
-  } else if ((nativePump || runtimeCssSss) && runtimeOwned) {
+  } else if ((nativePump || runtimeCssLiveRoute) && runtimeOwned) {
     // The native runtime's existing local PADStatus callback feeds the page peer;
-    // the CSS-to-SSS fixture changes only the standard Gamepad sampled there.
+    // each bounded CSS route fixture changes only the standard Gamepad sampled there.
   } else if (scenario === 'probe') {
     await publishProbeInputs(peers.alpha, peers.beta);
   } else if (scenario === 'disconnect') {
@@ -1256,7 +1338,7 @@ async function run() {
     await publishAllInputs(peers.alpha, peers.beta);
   }
   recordAvailableTransportMetrics(pairResults.transport, relay);
-  if (nativePump || runtimeCssSss) await observeNativePumpWithoutRpc();
+  if (nativePump || runtimeCssLiveRoute) await observeNativePumpWithoutRpc();
   else await pollRun();
   if (scenario === 'flip' || scenario === 'disconnect') {
     const expectedKind = scenario === 'flip' ? TERMINAL.desync : TERMINAL.disconnect;
@@ -1283,7 +1365,7 @@ async function run() {
   }
   stopRouteCaptureWatchers = true;
   await settleRouteBoundaryWatchers();
-  if (nativePump || runtimeCssSss) {
+  if (nativePump || runtimeCssLiveRoute) {
     pairResults.local_webrtc_final_before_peer_close = Object.fromEntries(await Promise.all(['alpha', 'beta'].map(async role =>
       [role, verifyReliableHostWebRtc(await (runtimeOwned ? runtimeOwnerWebRtcState(role) : instances[role].localWebRtcState()))])));
     if (runtimeOwned) {
@@ -1291,6 +1373,32 @@ async function run() {
         instanceRows[role].runtime_input_fixture_frozen = await instances[role].freezeRuntimeInputFixture();
       if (runtimeCssSss) for (const role of ['alpha', 'beta'])
         await captureRuntimeCssSssFinalBoundary(role);
+      if (runtimeCssMatch) {
+        for (const role of ['alpha', 'beta']) {
+          const statusBefore = await instances[role].status();
+          const nativeBefore = await instances[role].native();
+          const observation = await instances[role].matchObservation();
+          const nativeAfter = await instances[role].native();
+          const statusAfter = await instances[role].status();
+          if (statusBefore.cursor !== sourceTicks || statusAfter.cursor !== statusBefore.cursor ||
+              statusBefore.blocker !== 'complete' || statusAfter.blocker !== 'complete' ||
+              statusBefore.terminal?.kind !== 0 || statusAfter.terminal?.kind !== 0 ||
+              nativeBefore.phase !== POSITIVE_ROUTE_BOUNDARIES[2].phase ||
+              nativeAfter.phase !== nativeBefore.phase || nativeBefore.running !== 1 || nativeAfter.running !== 1 ||
+              nativeBefore.error !== null || nativeAfter.error !== null)
+            throw Error(`${role} native match observation changed the active source cursor or phase`);
+          const timingResumes = instances[role].timingResumes ?? [];
+          if (!Array.isArray(timingResumes) || timingResumes.length !== 0)
+            throw Error(`${role} runtime CSS-to-match route resumed native timing`);
+          instanceRows[role].final_status = statusAfter;
+          instanceRows[role].final_native = nativeAfter;
+          instanceRows[role].timing_resumes = timingResumes;
+          instanceRows[role].match_observation = observation;
+          instanceRows[role].match_observation_boundary = {status_before: statusBefore, status_after: statusAfter,
+            native_before: nativeBefore, native_after: nativeAfter, stable_cursor: true, stable_phase: true};
+          await captureRuntimeCssMatchFinalBoundary(role);
+        }
+      }
       await relay.close();
       pairResults.relay_closed = true;
     } else {
@@ -1306,7 +1414,7 @@ async function run() {
     instanceRows[role].source_accounting_artifact = {name: 'source-accounting.json',
       bytes: bytes.length, sha256: sha256(bytes)};
     instanceRows[role].source_accounting = verifyNetSourceAccounting(capture,
-      scenario === 'positive' || scenario === 'probe' || inputSampling || nativePump || runtimeCssSss ? sourceTicks :
+      scenario === 'positive' || scenario === 'probe' || inputSampling || nativePump || runtimeCssLiveRoute ? sourceTicks :
         localWebRtc && scenario === 'disconnect' ? disconnectAt : capture.final.cursor);
   }
   pairResults.wait_observations = waitObservations;
@@ -1322,7 +1430,7 @@ async function run() {
       ...(inputSampling ? {local_input_capture: peers[role].localInputCapture} : {}),
     };
   });
-  if (browserOwned && (probe || scenario === 'positive' || inputSampling || nativePump || runtimeCssSss)) {
+  if (browserOwned && (probe || scenario === 'positive' || inputSampling || nativePump || runtimeCssLiveRoute)) {
     for (const role of ['alpha', 'beta']) {
       const ownership = peers[role].checksumOwnership;
       if (ownership.active_native_records_submitted_before_export !== sourceTicks ||
@@ -1436,6 +1544,82 @@ async function run() {
     pairResults.route = {scope: 'runtime-owned original CSS-to-SSS transition', status: 'passed',
       observed_scenes: observedScenes, final_native_phase: {alpha: 3, beta: 3}, first_sss_checksum_tick: firstSssTick,
       final_sss_boundary_capture: {expected: {name: 'sss', phase: 3}, captures: finalSssCaptures,
+        source: 'existing route-boundary screenshot, browser-driver and WebGPU diagnostics', pixel_equivalence_claim: false}};
+    pairResults.outcome = 'complete';
+  } else if (runtimeCssMatch) {
+    const fixtures = {}, samples = {}, observedScenes = {}, firstSssTick = {}, firstMatchTick = {};
+    const validatedMatches = {}, stableSelections = {};
+    for (const role of ['alpha', 'beta']) {
+      verifyPositivePeerCompletion(peers[role].summary(), usedInputs, sourceTicks);
+      if (instanceRows[role].records !== sourceTicks)
+        throw Error(`${role} runtime CSS-to-match route retained ${instanceRows[role].records} of ${sourceTicks} scene records`);
+      const route = verifyRuntimeCssMatchSceneRuns(instanceRows[role].scene_runs);
+      observedScenes[role] = route.scenes;
+      firstSssTick[role] = route.firstSssTick;
+      firstMatchTick[role] = route.firstMatchTick;
+      const status = instanceRows[role].final_status, native = instanceRows[role].final_native;
+      if (status?.cursor !== sourceTicks || status.blocker !== 'complete' || status.terminal?.kind !== 0 ||
+          native?.phase !== 7 || native.running !== 1 || native.error !== null)
+        throw Error(`${role} runtime route did not finish active in the original match: ${JSON.stringify({status, native})}`);
+      const routing = instanceRows[role].synthetic_gamepad_routing;
+      const expectedPort = role === 'alpha' ? 0 : 1;
+      if (!routing || routing.gamepad_index !== expectedPort || routing.assigned_port !== expectedPort ||
+          !routing.active || !routing.neutral || (role === 'beta' && routing.automatic_port !== 0))
+        throw Error(`${role} CSS-to-match synthetic Gamepad was not assigned through the ordinary controller manager`);
+      const boundary = instanceRows[role].match_observation_boundary;
+      if (!boundary?.stable_cursor || !boundary.stable_phase || boundary.status_before.cursor !== sourceTicks ||
+          boundary.status_after.cursor !== sourceTicks || boundary.native_before.phase !== 7 ||
+          boundary.native_after.phase !== 7 || boundary.native_before.running !== 1 || boundary.native_after.running !== 1)
+        throw Error(`${role} active-match observation did not preserve the frozen source cursor and phase`);
+      validatedMatches[role] = validateActiveMatchRoute(route.scenes, instanceRows[role].match_observation);
+      stableSelections[role] = validatedMatches[role].selection;
+      fixtures[role] = await instances[role].readRuntimeInputFixture();
+      const observedPhases = fixtures[role]?.phase_samples?.map(row => row.phase)
+        .filter((phase, index, phases) => !index || phase !== phases[index - 1]);
+      if (fixtures[role]?.variant !== 'css-sss-to-match' || fixtures[role]?.failure || fixtures[role]?.disposed ||
+          fixtures[role]?.frozen !== true || fixtures[role]?.captured_count !== usedInputs ||
+          JSON.stringify(observedPhases) !== '[1,3,7]' ||
+          fixtures[role]?.captures?.length !== usedInputs ||
+          fixtures[role].captures.some((row, tick) => row.input_tick !== tick || row.source_cursor !== tick ||
+            row.local_port !== expectedPort || row.bytes?.length !== 11 || (tick &&
+              row.poll_serial <= fixtures[role].captures[tick - 1].poll_serial)))
+        throw Error(`${role} CSS-to-match fixture did not retain all canonical native-selected inputs`);
+      samples[role] = fixtures[role].captures.map(row => row.bytes);
+    }
+    if (JSON.stringify(stableSelections.alpha) !== JSON.stringify(stableSelections.beta))
+      throw Error('Runtime peers disagree on stable active-match identity and selection fields');
+    const bytesA = await fs.readFile(path.join(childDirectory('alpha'), 'checksums.bin'));
+    const bytesB = await fs.readFile(path.join(childDirectory('beta'), 'checksums.bin'));
+    if (bytesA.length !== sourceTicks * NET_RECORD_BYTES || !bytesA.equals(bytesB))
+      throw Error('Runtime CSS-to-match sequential native checksum streams differ');
+    const witness = verifyConsumedInputComponents(samples.alpha, samples.beta, bytesA, bytesB);
+    const finalMatchCaptures = Object.fromEntries(['alpha', 'beta'].map(role => {
+      const capture = instanceRows[role].route_boundary_captures.find(item => item.name === 'match');
+      if (!capture) throw Error(`${role} final active-match screenshot and diagnostics were not retained`);
+      return [role, capture];
+    }));
+    pairResults.checksums = {records_each: sourceTicks, streams_identical: true, sha256: sha256(bytesA)};
+    pairResults.runtime_input_fixture_result = {input_source: fixtures.alpha.input_source,
+      css_sss_stimulus_frames: 304, neutral_tail_input_ticks: usedInputs - 304,
+      recipe_identity: runtimeRecipeIdentity, observed_scenes: observedScenes,
+      first_sss_checksum_tick: firstSssTick, first_match_checksum_tick: firstMatchTick,
+      phase_samples: {alpha: fixtures.alpha.phase_samples, beta: fixtures.beta.phase_samples}, fixtures,
+      matched_every_native_consumed_input_component: true, ...witness};
+    pairResults.active_match_observation = {reader: 'existing melee_web_native_menu_match_observe export',
+      fields_compared_between_peers: ['rules.stage', 'rules.player_stocks', 'players[].fighter', 'players[].human', 'players[].stocks'],
+      remote_checksum_ack_each: Object.fromEntries(['alpha', 'beta'].map(role =>
+        [role, peers[role].summary().remote_ack_checksum])),
+      stable_selection_fields: stableSelections,
+      per_peer_observation_boundary: Object.fromEntries(['alpha', 'beta'].map(role =>
+        [role, instanceRows[role].match_observation_boundary])),
+      per_peer_frame_and_live_fields: Object.fromEntries(['alpha', 'beta'].map(role => [role, {
+        frame: instanceRows[role].match_observation.frame,
+        position_and_motion: instanceRows[role].match_observation.players.map(({x, y, motion, groundAir}) =>
+          ({x, y, motion, groundAir})),
+      }]))};
+    pairResults.route = {scope: 'runtime-owned original CSS-to-active-match transition', status: 'passed',
+      observed_scenes: observedScenes, final_native_phase: {alpha: 7, beta: 7}, active_match: validatedMatches,
+      final_match_boundary_capture: {expected: {name: 'match', phase: 7}, captures: finalMatchCaptures,
         source: 'existing route-boundary screenshot, browser-driver and WebGPU diagnostics', pixel_equivalence_claim: false}};
     pairResults.outcome = 'complete';
   } else if (inputSampling) {
