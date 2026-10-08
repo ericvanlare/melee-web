@@ -17,6 +17,7 @@ without a scalar CSS state join.
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import math
@@ -82,6 +83,7 @@ V10_FIRST_MATCH_CLOCK_GE60_SCOPE = "v10-first-match-clock-ge60"
 V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE = "v10-first-match-clock-boundary"
 V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE = "v10-first-match-clock-ordered-lineage"
 V10_FIRST_STOCK_DECREMENT_SCOPE = "v10-first-stock-decrement"
+V10_FIRST_MATCH_RESULTS_SCOPE = "v10-first-match-results-entry"
 PRIMARY_STATIC_ENTITY_PROFILE = "primary-static-player-pair-v1"
 FRAME_BYTES = 44
 PORT_BYTES = 11
@@ -121,6 +123,10 @@ V10_STOCK_DECREMENT_SCAN_BYTE_CAP = 256 * 1024 * 1024
 V10_STOCK_DECREMENT_SCAN_RECORD_CAP = 48000
 V10_STOCK_DECREMENT_SCAN_SECONDS = 60
 V10_BROWSER_EXPORT_RECORD_CAP = 8192
+V10_RESULTS_BROWSER_EXPORT_RECORD_CAP = 16384
+V10_RESULTS_SCAN_BYTE_CAP = 2137257881
+V10_RESULTS_SCAN_RECORD_CAP = 79708
+V10_RESULTS_SCAN_SECONDS = 60
 V10_MANUAL_UNLOAD_FAILURES = (
     "whole-session final CSS was not entered",
     "Manual unload stopped the replay",
@@ -153,7 +159,7 @@ def _is_v10_prefix_scope(scope: str) -> bool:
                      V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
                      V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
                      V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-                     V10_FIRST_STOCK_DECREMENT_SCOPE}
+                     V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}
 
 
 class ComparisonError(ValueError):
@@ -575,7 +581,7 @@ class Recipe:
                          V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
                          V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
                          V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-                         V10_FIRST_STOCK_DECREMENT_SCOPE}:
+                         V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}:
             raise ComparisonError(f"unsupported whole-session comparison scope {scope!r}")
         self.scope = scope
         if len(raw) < MWRC_HEADER.size + CONTEXT_HEADER.size:
@@ -780,13 +786,20 @@ class Comparator:
                  clock60_boundary: Mapping[str, int] | None = None,
                  match_clock_boundary: Mapping[str, int] | None = None,
                  ordered_clock_checkpoints: Sequence[Mapping[str, Any]] | None = None,
-                 stock_decrement_boundary: Mapping[str, Any] | None = None) -> None:
+                 stock_decrement_boundary: Mapping[str, Any] | None = None,
+                 first_results_boundary: Mapping[str, Any] | None = None) -> None:
         self.recipe = recipe
         self.browser = browser
+        if (recipe.scope == V10_FIRST_MATCH_RESULTS_SCOPE) != (first_results_boundary is not None):
+            raise ComparisonError("Results terminal is only valid in its explicit scope")
+        self.first_results_boundary = first_results_boundary
+        self.second_stock_rejoined = False
+        self.last_match_frame: dict[str, Any] | None = None
+        self.results_exit_chain: list[dict[str, Any]] = []
         self.ordered_clock_checkpoints: tuple[Mapping[str, int], ...] | None = None
         self.stock_decrement_boundary: Mapping[str, Any] | None = None
         if recipe.scope in {V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-                            V10_FIRST_STOCK_DECREMENT_SCOPE}:
+                            V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}:
             if (not isinstance(positive_boundary, Mapping) or
                     not isinstance(clock60_boundary, Mapping) or
                     not isinstance(match_clock_boundary, Mapping) or
@@ -814,7 +827,7 @@ class Comparator:
                         key: value for key, value in match_clock_boundary.items()
                         if key != "target_match_frame_at_least"})):
                 raise ComparisonError("ordered match-clock boundaries disagree with checkpoint list")
-            if recipe.scope == V10_FIRST_STOCK_DECREMENT_SCOPE:
+            if recipe.scope in {V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}:
                 if not isinstance(stock_decrement_boundary, Mapping):
                     raise ComparisonError("stock-decrement scope lacks its typed event boundary")
                 event = stock_decrement_boundary.get("event")
@@ -836,7 +849,7 @@ class Comparator:
         elif stock_decrement_boundary is not None:
             raise ComparisonError("stock-decrement target is only valid in its explicit scope")
         if recipe.scope in {V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-                            V10_FIRST_STOCK_DECREMENT_SCOPE}:
+                            V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}:
             pass
         elif recipe.scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE:
             if not isinstance(positive_boundary, Mapping):
@@ -1019,10 +1032,16 @@ class Comparator:
                 if accepted is not None:
                     intermediate = (*intermediate, _stock_decrement_tuple(
                         accepted["boundary"]["event"]["target"]))
+                terminal = _stock_decrement_tuple(event["target"])
+                if self.first_results_boundary is not None:
+                    intermediate = (*intermediate, terminal)
+                    terminal = _stock_decrement_tuple(
+                        self.first_results_boundary["last_complete_match"]["target"])
                 self._validate_match_clock_lineage_frame(
                     frame, index, positive=checkpoints[0], intermediate=intermediate,
-                    terminal=_stock_decrement_tuple(event["target"]),
-                    label=("first typed stock decrement after accepted event" if accepted is not None
+                    terminal=terminal,
+                    label=("first match Results entry" if self.first_results_boundary is not None else
+                           "first typed stock decrement after accepted event" if accepted is not None
                            else "first typed stock decrement"))
                 self._validate_stock_decrement_frame(frame, index)
             else:
@@ -1087,6 +1106,16 @@ class Comparator:
             self._compare(frame["state"], row, self.compare_fields, record="session_frame",
                           index=index, context=f"match frame {index}")
             self.match_compared += 1
+            if self.first_results_boundary is not None:
+                state = frame["state"]
+                self.last_match_frame = copy.deepcopy({"state": state, "target": {
+                    "match_index": frame["match_index"], "source_tick": frame["source_tick"],
+                    "source_tick_seq": frame["source_tick_seq"],
+                    "pad_consume_source_sequence": frame["source_seq"],
+                    "timeline_frame_index": index, "cursor_after_frame": index + 1,
+                    "scene_frame": state["scene_frame"], "match_frame": state["match_frame"],
+                    "rng": state["rng"], "fighter_entities": state["fighter_entities"],
+                    "state_fields_observed": sorted(state)}})
         else:
             # The original observer has no match clock or FighterHead slices
             # in menu/result scenes. Keep this explicit in the report.
@@ -1207,6 +1236,12 @@ class Comparator:
         stocks = [_int(fighter.get("stocks") if isinstance(fighter, Mapping) else None,
                        f"stock-decrement source frame {index} fighter {slot} stocks", -128, 127)
                   for slot, fighter in enumerate(fighters)]
+        if self.first_results_boundary is not None and self.second_stock_rejoined:
+            # Only event selection ends. Typed signed-stock validation above,
+            # original SourceCollector state/entity/PAD checks and the exact
+            # per-frame browser comparison remain active through match exit.
+            self.previous_stock_counts = stocks
+            return
         source_tick = _int(frame.get("source_tick"), "stock-decrement source tick")
         baseline_tick = self.match_clock_boundary["source_tick"]
         event = boundary["event"]
@@ -1770,6 +1805,8 @@ ORDERED_CLOCK_LINEAGE_SCHEMA = "melee-web-v10-ordered-match-clock-lineage-v1"
 ORDERED_CLOCK_LINEAGE_V2_SCHEMA = "melee-web-v10-ordered-match-clock-lineage-v2"
 ORDERED_CLOCK_LINEAGE_EXPECTATION_SCHEMA = "melee-web-v10-first-match-clock-ordered-lineage-expectations"
 STOCK_DECREMENT_EXPECTATION_SCHEMA = "melee-web-v10-first-stock-decrement-expectations"
+RESULTS_EXPECTATION_SCHEMA = "melee-web-v10-first-match-results-entry-expectations"
+RESULTS_BOUNDARY_SCHEMA = "melee-web-v10-first-match-results-entry-boundary-v1"
 STOCK_DECREMENT_BOUNDARY_SCHEMA = "melee-web-v10-first-typed-stock-decrement-boundary-v1"
 STOCK_DECREMENT_BOUNDARY_V2_SCHEMA = "melee-web-v10-typed-stock-decrement-boundary-v2"
 ORDERED_CLOCK_ANCHORS = ("clock1", "clock60")
@@ -2387,6 +2424,181 @@ def _validate_stock_decrement_boundary_audit(
     return audit, digest
 
 
+def _validate_first_results_expectations(source: Mapping[str, Any],
+                                         recipe: Mapping[str, Any]) -> dict[str, Any]:
+    boundary = source.get("first_results_boundary")
+    fields = {"schema", "audit", "receipt", "last_complete_match", "exit_chain", "source_prefix",
+              "accepted_stock_receipts", "source_scan_limits", "browser_witness"}
+    if not isinstance(boundary, dict) or set(boundary) != fields or boundary.get("schema") != RESULTS_BOUNDARY_SCHEMA:
+        raise ComparisonError("first Results boundary expectations are malformed")
+    limits = {"max_bytes": V10_RESULTS_SCAN_BYTE_CAP, "max_records": V10_RESULTS_SCAN_RECORD_CAP,
+              "max_seconds": V10_RESULTS_SCAN_SECONDS}
+    if _first_difference(limits, boundary.get("source_scan_limits")):
+        raise ComparisonError("first Results scan limits differ from reviewed scope")
+    for label in ("audit", "receipt"):
+        identity = boundary[label]
+        if (not isinstance(identity, dict) or set(identity) != {"path", "bytes", "sha256"} or
+                not isinstance(identity["path"], str) or not identity["path"] or
+                type(identity["bytes"]) is not int or identity["bytes"] <= 0 or
+                not isinstance(identity["sha256"], str) or re.fullmatch(r"[0-9a-f]{64}", identity["sha256"]) is None):
+            raise ComparisonError(f"first Results {label} identity is malformed")
+    last = boundary["last_complete_match"]
+    if not isinstance(last, dict) or set(last) != {"target", "state"}:
+        raise ComparisonError("first Results last complete match is malformed")
+    target = last["target"]
+    if not isinstance(target, dict) or set(target) != STOCK_DECREMENT_REPORT_TARGET_FIELDS:
+        raise ComparisonError("Results last target fields are malformed")
+    normalized = _stock_decrement_tuple(target)
+    if normalized["match_index"] != 0 or normalized["source_tick"] <= source["stock_decrement_boundary"]["event"]["target"]["source_tick"]:
+        raise ComparisonError("Results terminal does not follow both accepted stock events")
+    state = last["state"]
+    if not isinstance(state, dict) or set(state) != {"rng", "match_frame", "scene_frame", "pad_state_hex", "fighters", "fighter_entities"}:
+        raise ComparisonError("Results last state fields are malformed")
+    _int(state["rng"], "Results last rng"); _int(state["match_frame"], "Results last match clock")
+    _int(state["scene_frame"], "Results last source clock")
+    _hex(state["pad_state_hex"], PAD_STATE_BYTES, "Results last PAD snapshot")
+    _validate_v10_browser_fighters(state["fighters"], "Results last typed fighters")
+    _browser_entities(state["fighter_entities"], "Results last typed entities", 0)
+    expected_target = {"rng": state["rng"], "match_frame": state["match_frame"],
+                       "scene_frame": state["scene_frame"], "fighter_entities": state["fighter_entities"],
+                       "state_fields_observed": sorted(state)}
+    if _first_difference(expected_target, {key: target.get(key) for key in expected_target}):
+        raise ComparisonError("Results last target differs from its typed state")
+    if target["scene_frame"] != normalized["source_tick"]:
+        raise ComparisonError("Results last typed clock differs from completed join")
+    cursor = normalized["browser_cursor"]
+    if cursor != normalized["timeline_frame_index"] + 1 or cursor >= recipe["frame_count"]:
+        raise ComparisonError("Results witness cursor is outside recipe")
+    if _first_difference({"scene": SCENES["results"], "index": cursor, "cursor": cursor + 1}, boundary["browser_witness"]):
+        raise ComparisonError("Results browser witness is missing or malformed")
+    chain = boundary["exit_chain"]
+    if not isinstance(chain, list) or len(chain) != 4:
+        raise ComparisonError("Results typed exit chain is missing")
+    sequence = normalized["source_sequence"]
+    for row, name in zip(chain, ("vs_exit", "vs_exit_return", "vs_mode_exit", "results_enter")):
+        if not isinstance(row, dict) or set(row) != {"boundary", "source_sequence", "source_tick", "draw_ordinal"} or row["boundary"] != name:
+            raise ComparisonError("Results typed exit chain is reordered")
+        value = _int(row["source_sequence"], "Results exit sequence", 0, (1 << 64) - 1)
+        _int(row["source_tick"], "Results exit source tick"); _int(row["draw_ordinal"], "Results exit draw ordinal")
+        if value <= sequence:
+            raise ComparisonError("Results typed exit sequence is not increasing")
+        sequence = value
+    prefix = boundary["source_prefix"]
+    if not isinstance(prefix, dict) or set(prefix) != ORDERED_CLOCK_PREFIX_FIELDS:
+        raise ComparisonError("Results source prefix is malformed")
+    _int(prefix["bytes_read"], "Results prefix bytes", 1, V10_RESULTS_SCAN_BYTE_CAP)
+    _int(prefix["records_read"], "Results prefix records", 1, V10_RESULTS_SCAN_RECORD_CAP)
+    _int(prefix["last_source_sequence"], "Results prefix last sequence", 0, V10_RESULTS_SCAN_RECORD_CAP - 1)
+    if (prefix["last_source_sequence"] != sequence or prefix["records_read"] != sequence + 1 or
+            not isinstance(prefix["sha256"], str) or re.fullmatch(r"[0-9a-f]{64}", prefix["sha256"]) is None):
+        raise ComparisonError("Results prefix is detached from typed entry")
+    refs = boundary["accepted_stock_receipts"]
+    stock_boundary = source["stock_decrement_boundary"]
+    accepted = stock_boundary.get("accepted_stock_checkpoint")
+    if accepted is None or not isinstance(refs, list) or len(refs) != 2:
+        raise ComparisonError("Results requires two flat accepted stock receipt references")
+    expected_first = {"label": "stock258", "audit": accepted["boundary"]["audit"],
+                      "comparison": accepted["comparison"], "prefix": accepted["prefix"]}
+    if _first_difference(expected_first, refs[0]) or not isinstance(refs[1], dict) or set(refs[1]) != set(expected_first) or refs[1].get("label") != "stock271" or _first_difference(stock_boundary["audit"], refs[1].get("audit")):
+        raise ComparisonError("Results flat stock references differ from historical accepted receipts")
+    return boundary
+
+
+def _validate_first_results_source_audit(path: Path, packet: Mapping[str, Any], recipe: Recipe,
+                                         clock_audit: Mapping[str, Any], stock_audit: Mapping[str, Any], *,
+                                         source_stat_before: Mapping[str, int]) -> tuple[dict[str, Any], str]:
+    boundary = _validate_first_results_expectations(packet["source"], packet["recipe"])
+    audit, digest, size = _read_json_sidecar(path, "first Results source audit", max_bytes=8 * 1024 * 1024)
+    _verify_expected_file(boundary["audit"], path, digest, size, "first Results source audit")
+    if (audit.get("schema") != "melee-web-b4-first-results-source-audit-v1" or
+            audit.get("status") != "first_match_results_entry_found" or audit.get("audit_completed") is not True or
+            audit.get("complete") is not False or audit.get("whole_session_equivalent") is not False or
+            audit.get("source_stat_stable") is not True or
+            _first_difference(dict(source_stat_before), audit.get("source_stat_before")) or
+            _first_difference(dict(source_stat_before), audit.get("source_stat_after"))):
+        raise ComparisonError("first Results audit status/source identity differs")
+    observed = audit.get("observed")
+    for key in ("last_complete_match", "exit_chain", "source_prefix"):
+        if not isinstance(observed, dict) or _first_difference(boundary[key], observed.get(key)):
+            raise ComparisonError(f"first Results audit {key} differs from expectations")
+    if (observed.get("results_scalar_state_observed") is not False or observed.get("winner_or_ko_claim") is not False or
+            _first_difference(boundary["source_prefix"], audit.get("source_prefix")) or
+            _first_difference(boundary["exit_chain"][-1], observed.get("results_entry"))):
+        raise ComparisonError("first Results audit overstates or detaches its terminal")
+    cursor = boundary["browser_witness"]["index"]
+    if (type(observed.get("recipe_cursor")) is not int or observed["recipe_cursor"] != cursor or
+            recipe.frames[cursor]["scene"] != SCENES["results"] or
+            recipe.frames[cursor - 1]["scene"] != SCENES["match"] or
+            _first_match_timeline_index(recipe) + boundary["last_complete_match"]["target"]["source_tick"] + 1 != cursor):
+        raise ComparisonError("Results terminal differs from the authored first match span")
+    refs = boundary["accepted_stock_receipts"]
+    if _first_difference(refs[1]["prefix"], {key: stock_audit["observed"]["source_prefix"][key] for key in ORDERED_CLOCK_PREFIX_FIELDS}):
+        raise ComparisonError("Results second accepted stock prefix differs from its audit")
+    stock_boundary = packet["source"]["stock_decrement_boundary"]
+    _validate_accepted_stock_receipts(stock_boundary["accepted_stock_checkpoint"], packet, recipe, clock_audit,
+                                     source_stat_before=source_stat_before)
+    _validate_accepted_stock_receipts({"boundary": stock_boundary, "prefix": refs[1]["prefix"],
+                                     "comparison": refs[1]["comparison"]}, packet, recipe, clock_audit,
+                                     source_stat_before=source_stat_before)
+    receipt_id = boundary["receipt"]
+    receipt_path = Path(receipt_id["path"])
+    receipt, receipt_sha, receipt_size = _read_json_sidecar(receipt_path, "portable Results receipt", max_bytes=8 * 1024 * 1024)
+    _verify_expected_file(receipt_id, receipt_path, receipt_sha, receipt_size, "portable Results receipt")
+    source = packet["source"]
+    identity = {"capture_id": source["capture_id"], "sequence_id": source["sequence_id"],
+                "trace_bytes": source["trace"]["bytes"], "recorded_full_trace_sha256": source["trace"]["recorded_full_sha256"],
+                "full_trace_rehashed": False}
+    if (receipt.get("schema") != "melee-web-b4-first-match-results-source-receipt-v1" or
+            _first_difference(identity, receipt.get("source_identity")) or
+            _first_difference(observed, receipt.get("observed")) or
+            receipt.get("provenance", {}).get("source_audit", {}).get("sha256") != digest):
+        raise ComparisonError("portable Results receipt is detached from source/audit observations")
+    expected_labels = ["clock1", "clock60", "clock300", "clock500", "clock1000", "clock2000", "stock258", "stock271"]
+    rejoins = observed.get("rejoins")
+    if (not isinstance(rejoins, list) or [row.get("label") for row in rejoins] != expected_labels or
+            _first_difference(rejoins, audit.get("checkpoints_rejoined"))):
+        raise ComparisonError("Results audit lacks eight ordered observed rejoins")
+    clocks = source["ordered_clock_lineage"]["checkpoints"]
+    for row, checkpoint in zip(rejoins[:6], clocks):
+        if (_first_difference(checkpoint["tuple"], _stock_decrement_tuple(row.get("target", {}))) or
+                _first_difference(checkpoint["prefix"], row.get("prefix"))):
+            raise ComparisonError("Results audit clock rejoin differs from accepted checkpoint")
+    for row, event, ref in zip(rejoins[6:], (stock_boundary["accepted_stock_checkpoint"]["boundary"]["event"], stock_boundary["event"]), refs):
+        if _first_difference(event, row.get("event")) or _first_difference(ref["prefix"], row.get("prefix")):
+            raise ComparisonError("Results audit stock rejoin differs from accepted event")
+    return audit, digest
+
+
+def _check_results_exit(row: Mapping[str, Any], source: SourceCollector, comparator: Comparator,
+                        checkpoints_rejoined: bool) -> bool:
+    """Narrow terminal adapter; all acceptance derives from completed actual gates."""
+    boundary = comparator.first_results_boundary
+    assert boundary is not None
+    payload = row.get("payload", {})
+    name = payload.get("boundary") if row.get("event") == "boundary" else None
+    names = ("vs_exit", "vs_exit_return", "vs_mode_exit", "results_enter")
+    if name not in names:
+        if comparator.results_exit_chain and name in {"pad_consume", "source_tick", "setup", "entry", "return_css"}:
+            raise ComparisonError("source match activity crossed the Results exit chain")
+        return False
+    index = len(comparator.results_exit_chain)
+    if index >= len(names) or name != names[index]:
+        raise ComparisonError("source Results exit chain is missing, duplicated or reordered")
+    target = _stock_decrement_tuple(boundary["last_complete_match"]["target"])
+    if (not checkpoints_rejoined or not comparator.accepted_stock_rejoined or not comparator.second_stock_rejoined or
+            source.scene != "match" or source.match_index != 0 or source.pending is not None or
+            source.last_source_tick.get(0) != target["source_tick"] or source.last_source_tick_seq != target["source_sequence"] or
+            comparator.frame_index != target["browser_cursor"] or
+            _first_difference(boundary["last_complete_match"], comparator.last_match_frame)):
+        raise ComparisonError("Results exit has incomplete gates, pending consume or wrong last complete match")
+    expected_row = boundary["exit_chain"][index]
+    actual_row = {"boundary": name, "source_sequence": row["seq"], "source_tick": row["source_tick"], "draw_ordinal": row["draw_ordinal"]}
+    if (_first_difference(expected_row, actual_row) or type(payload.get("match_index")) is not int or payload["match_index"] != 0 or
+            payload.get("pc") != semantics.WHOLE_OBSERVER_PCS[name]):
+        raise ComparisonError("Results exit typed sequence/match/authored PC differs")
+    return True
+
+
 def _validate_accepted_stock_receipts(accepted: Mapping[str, Any], packet: Mapping[str, Any],
                                     recipe: Recipe, clock2000_audit: Mapping[str, Any], *,
                                     source_stat_before: Mapping[str, int] | None = None) -> None:
@@ -2428,7 +2640,9 @@ def _load_expectations(path: Path, selected: Mapping[str, Path], *,
                        scope: str = V10_FIRST_SETUP_TICK0_SCOPE
                        ) -> tuple[dict[str, Any], str]:
     packet, packet_sha, _ = _read_json_sidecar(path, "v10 comparison expectations", max_bytes=1024 * 1024)
-    expected_schema = (STOCK_DECREMENT_EXPECTATION_SCHEMA
+    expected_schema = (RESULTS_EXPECTATION_SCHEMA
+                       if scope == V10_FIRST_MATCH_RESULTS_SCOPE else
+                       STOCK_DECREMENT_EXPECTATION_SCHEMA
                        if scope == V10_FIRST_STOCK_DECREMENT_SCOPE else
                        ORDERED_CLOCK_LINEAGE_EXPECTATION_SCHEMA
                        if scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE else
@@ -2463,17 +2677,21 @@ def _load_expectations(path: Path, selected: Mapping[str, Path], *,
     elif scope in {V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
                    V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
                    V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-                   V10_FIRST_STOCK_DECREMENT_SCOPE}:
+                   V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}:
         named_paths["positive_boundary_audit"] = source.get("positive_boundary_audit")
         named_paths["clock60_boundary_audit"] = source.get("clock60_boundary_audit")
     if scope in {V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
                  V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-                 V10_FIRST_STOCK_DECREMENT_SCOPE}:
+                 V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}:
         named_paths["match_clock_boundary_audit"] = source.get("match_clock_boundary_audit")
-    if scope == V10_FIRST_STOCK_DECREMENT_SCOPE:
+    if scope in {V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}:
         boundary = source.get("stock_decrement_boundary")
         named_paths["stock_decrement_boundary_audit"] = (
             boundary.get("audit") if isinstance(boundary, dict) else None)
+    if scope == V10_FIRST_MATCH_RESULTS_SCOPE:
+        terminal = source.get("first_results_boundary")
+        named_paths["first_results_boundary_audit"] = (
+            terminal.get("audit") if isinstance(terminal, dict) else None)
     for name, expected_path in selected.items():
         identity = named_paths.get(name)
         if not isinstance(identity, dict):
@@ -2505,7 +2723,7 @@ def _load_expectations(path: Path, selected: Mapping[str, Path], *,
                  V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
                  V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
                  V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-                 V10_FIRST_STOCK_DECREMENT_SCOPE}:
+                 V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}:
         target = source.get("first_positive_boundary")
         required_target_fields = {
             "match_index", "source_tick", "source_sequence", "pad_consume_sequence",
@@ -2528,7 +2746,7 @@ def _load_expectations(path: Path, selected: Mapping[str, Path], *,
     if scope in {V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
                  V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
                  V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-                 V10_FIRST_STOCK_DECREMENT_SCOPE}:
+                 V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}:
         target = source.get("clock60_boundary")
         required_target_fields = {
             "match_index", "source_tick", "source_sequence", "pad_consume_sequence",
@@ -2551,11 +2769,11 @@ def _load_expectations(path: Path, selected: Mapping[str, Path], *,
             raise ComparisonError("clock-60 expectations contain an invalid first-match target")
     if scope in {V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
                  V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-                 V10_FIRST_STOCK_DECREMENT_SCOPE}:
+                 V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}:
         ordered_limits = (_ordered_clock_lineage_limits(
             source.get("ordered_clock_lineage"))
             if scope in {V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-                         V10_FIRST_STOCK_DECREMENT_SCOPE} else None)
+                         V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE} else None)
         target = source.get("match_clock_boundary")
         required_target_fields = {
             "target_match_frame_at_least", "match_index", "source_tick",
@@ -2585,11 +2803,13 @@ def _load_expectations(path: Path, selected: Mapping[str, Path], *,
                 target["browser_cursor"] > recipe["frame_count"]):
             raise ComparisonError("match-clock expectations contain an invalid post-clock-60 target")
     if scope in {V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-                 V10_FIRST_STOCK_DECREMENT_SCOPE}:
+                 V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}:
         source["ordered_clock_lineage"]["checkpoints"] = \
             _validate_ordered_clock_lineage_expectations(source, recipe)
-    if scope == V10_FIRST_STOCK_DECREMENT_SCOPE:
+    if scope in {V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}:
         _validate_stock_decrement_expectations(source, recipe)
+    if scope == V10_FIRST_MATCH_RESULTS_SCOPE:
+        _validate_first_results_expectations(source, recipe)
     producer = browser.get("producer")
     if not isinstance(producer, dict) or any(
             not isinstance(producer.get(field), str) or not producer[field]
@@ -2920,7 +3140,8 @@ def _consume_ordered_clock_lineage(records: Iterable[Mapping[str, Any]],
                                    terminal_event: Mapping[str, Any] | None = None,
                                    terminal_prefix: Mapping[str, Any] | None = None,
                                    accepted_stock_checkpoint: Mapping[str, Any] | None = None,
-                                   max_seconds: int | None = None
+                                   max_seconds: int | None = None,
+                                   results_boundary: Mapping[str, Any] | None = None
                                    ) -> tuple[bool, int | None]:
     """Rejoin ordered clock prefixes, optionally continuing to a typed event."""
     if terminal_event is not None and terminal_prefix is None:
@@ -2938,7 +3159,23 @@ def _consume_ordered_clock_lineage(records: Iterable[Mapping[str, Any]],
             raise ComparisonError(
                 f"typed stock-decrement source comparison exceeded its {max_seconds}-second bound")
         last_sequence = row["seq"]
+        exit_row = (_check_results_exit(row, source, comparator, checkpoint_index == len(checkpoints))
+                    if results_boundary is not None else False)
         source.consume(row)
+        if exit_row:
+            index = len(comparator.results_exit_chain)
+            comparator.results_exit_chain.append(dict(results_boundary["exit_chain"][index]))
+            if row["payload"]["boundary"] == "results_enter":
+                if max_seconds is not None and time.monotonic() - started_at >= max_seconds:
+                    raise ComparisonError("Results comparison exceeded its source deadline")
+                if source.scene != "results" or source.pending is not None or source.match_index != 0:
+                    raise ComparisonError("original Results owner phase did not commit")
+                prefix = results_boundary["source_prefix"]
+                actual = {"bytes_read": stats.bytes_read, "records_read": stats.records_read,
+                          "sha256": stats.prefix_sha256, "last_source_sequence": last_sequence}
+                if _first_difference(prefix, actual):
+                    raise ComparisonError("fresh Results terminal consumed prefix differs from source audit")
+                return True, last_sequence
         if max_seconds is not None and time.monotonic() - started_at >= max_seconds:
             raise ComparisonError(
                 f"typed stock-decrement source comparison exceeded its {max_seconds}-second bound")
@@ -2981,7 +3218,9 @@ def _consume_ordered_clock_lineage(records: Iterable[Mapping[str, Any]],
                         last_sequence != terminal_prefix.get("last_source_sequence")):
                     raise ComparisonError(
                         "fresh source prefix differs from the accepted stock-decrement event audit")
-                return True, last_sequence
+                if results_boundary is None:
+                    return True, last_sequence
+                comparator.second_stock_rejoined = True
     return False, last_sequence
 
 
@@ -4069,7 +4308,9 @@ def _require_stable_mwro_stat(before: Mapping[str, int], after: Mapping[str, int
 
 def _validate_v10_browser_setup_row(browser: BrowserReader, recipe: Recipe,
                                     match_index: int) -> None:
-    if browser.line >= V10_BROWSER_EXPORT_RECORD_CAP:
+    record_cap = (V10_RESULTS_BROWSER_EXPORT_RECORD_CAP
+                  if recipe.scope == V10_FIRST_MATCH_RESULTS_SCOPE else V10_BROWSER_EXPORT_RECORD_CAP)
+    if browser.line >= record_cap:
         raise ComparisonError("browser trace reached its bounded record count before match setup")
     row = browser.next()
     expected_keys = {"record", "rng", "match_frame", "pad_state_hex", "fighters",
@@ -4122,8 +4363,10 @@ def _validate_v10_browser_entities(value: Any, context: str,
 def _validate_v10_browser_export(port_trace_path: Path, recipe: Recipe,
                                  exported_cursor: int, packet: Mapping[str, Any]) -> int:
     """Validate the bounded, possibly overshot browser export without source state."""
+    record_cap = (V10_RESULTS_BROWSER_EXPORT_RECORD_CAP
+                  if recipe.scope == V10_FIRST_MATCH_RESULTS_SCOPE else V10_BROWSER_EXPORT_RECORD_CAP)
     exported_cursor = _int(exported_cursor, "browser exported cursor", 1,
-                           min(recipe.frame_count, V10_BROWSER_EXPORT_RECORD_CAP - 1))
+                           min(recipe.frame_count, record_cap - 1))
     browser = BrowserReader(port_trace_path)
     try:
         if (type(browser.header.get("frames_requested")) is not int or
@@ -4134,31 +4377,33 @@ def _validate_v10_browser_export(port_trace_path: Path, recipe: Recipe,
             V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE, V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
             V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
             V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-            V10_FIRST_STOCK_DECREMENT_SCOPE
+            V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE
         } else None)
         clock60_boundary = (packet["source"].get("clock60_boundary")
                             if recipe.scope in {V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
                                                 V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
                                                 V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-                                                V10_FIRST_STOCK_DECREMENT_SCOPE}
+                                                V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}
                             else None)
         match_clock_boundary = (packet["source"].get("match_clock_boundary")
                                 if recipe.scope in {V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
                                                     V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-                                                    V10_FIRST_STOCK_DECREMENT_SCOPE}
+                                                    V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}
                                 else None)
         ordered_clock_checkpoints = (
             packet["source"].get("ordered_clock_lineage", {}).get("checkpoints")
             if recipe.scope in {V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-                                V10_FIRST_STOCK_DECREMENT_SCOPE} else None)
+                                V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE} else None)
         frame_validator = Comparator(recipe, browser, positive_boundary=positive_boundary,
                                      clock60_boundary=clock60_boundary,
                                      match_clock_boundary=match_clock_boundary,
                                      ordered_clock_checkpoints=ordered_clock_checkpoints,
                                      stock_decrement_boundary=(
                                          packet["source"].get("stock_decrement_boundary")
-                                         if recipe.scope == V10_FIRST_STOCK_DECREMENT_SCOPE
-                                         else None))
+                                         if recipe.scope in {V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}
+                                         else None),
+                                     first_results_boundary=(packet["source"]["first_results_boundary"]
+                                                             if recipe.scope == V10_FIRST_MATCH_RESULTS_SCOPE else None))
         match_starts = {
             span["first_frame"]: match_index
             for match_index, span in enumerate(
@@ -4171,7 +4416,7 @@ def _validate_v10_browser_export(port_trace_path: Path, recipe: Recipe,
             if match_index is not None:
                 _validate_v10_browser_setup_row(browser, recipe, match_index)
                 frame_validator.current_match = match_index
-            if browser.line >= V10_BROWSER_EXPORT_RECORD_CAP:
+            if browser.line >= record_cap:
                 raise ComparisonError("browser trace reached its bounded record count before EOF")
             row = frame_validator._expect_frame_row(recipe.frames[index]["scene"], index)
             if type(row["scene"]) is not int or type(row["index"]) is not int:
@@ -4183,8 +4428,8 @@ def _validate_v10_browser_export(port_trace_path: Path, recipe: Recipe,
                 _validate_v10_browser_entities(row["fighter_entities"],
                                                f"browser frame {index}",
                                                frame_validator.current_match)
-        browser.expect_eof(max_records=V10_BROWSER_EXPORT_RECORD_CAP)
-        if browser.line > V10_BROWSER_EXPORT_RECORD_CAP:
+        browser.expect_eof(max_records=record_cap)
+        if browser.line > record_cap:
             raise ComparisonError("browser trace exceeds its bounded record count")
         return browser.line
     finally:
@@ -4638,12 +4883,14 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                                    positive_boundary_audit_path: Path | None = None,
                                    clock60_boundary_audit_path: Path | None = None,
                                    match_clock_boundary_audit_path: Path | None = None,
-                                   stock_decrement_boundary_audit_path: Path | None = None) -> dict[str, Any]:
+                                   stock_decrement_boundary_audit_path: Path | None = None,
+                                   first_results_boundary_audit_path: Path | None = None) -> dict[str, Any]:
     positive_scope = scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE
     clock60_scope = scope == V10_FIRST_MATCH_CLOCK_GE60_SCOPE
     match_clock_scope = scope == V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE
     ordered_lineage_scope = scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE
-    stock_decrement_scope = scope == V10_FIRST_STOCK_DECREMENT_SCOPE
+    first_results_scope = scope == V10_FIRST_MATCH_RESULTS_SCOPE
+    stock_decrement_scope = scope in {V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}
     accepted_stock_checkpoint = None
     stock_tick_check = "source_ticks_through_first_stock_decrement"
     clock_lineage_scope = (clock60_scope or match_clock_scope or ordered_lineage_scope or
@@ -4695,6 +4942,11 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
         result["checks"]["source_ticks_through_ordered_clock_lineage"] = "not_checked"
     if stock_decrement_scope:
         result["checks"]["source_ticks_through_first_stock_decrement"] = "not_checked"
+    if first_results_scope:
+        result["checks"].pop("source_ticks_through_first_stock_decrement", None)
+        result["checks"]["source_ticks_through_first_match_results_entry"] = "not_checked"
+        result["checks"]["browser_results_owner_witness"] = "not_checked"
+        result["limitations"]["boundary"] = "Strict complete first-match comparison through typed source Results entry; the first browser Results frame is a separate owner witness, without a Results input/scalar source join."
     comparator: Comparator | None = None
     source: SourceCollector | None = None
     browser: BrowserReader | None = None
@@ -4721,6 +4973,8 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
         if stock_decrement_scope != (stock_decrement_boundary_audit_path is not None):
             raise ComparisonError(
                 "bounded prefix scope and stock-decrement audit selection disagree")
+        if first_results_scope != (first_results_boundary_audit_path is not None):
+            raise ComparisonError("Results scope and source-only Results audit selection disagree")
         selected = {
             "reference": reference_path,
             "source_manifest": source_manifest_path,
@@ -4740,11 +4994,13 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
             selected["match_clock_boundary_audit"] = match_clock_boundary_audit_path
         if stock_decrement_scope:
             selected["stock_decrement_boundary_audit"] = stock_decrement_boundary_audit_path
+        if first_results_scope:
+            selected["first_results_boundary_audit"] = first_results_boundary_audit_path
         packet, packet_sha = _load_expectations(expectations_path, selected, scope=scope)
         if stock_decrement_scope:
             accepted_stock_checkpoint = packet["source"]["stock_decrement_boundary"].get("accepted_stock_checkpoint")
             if accepted_stock_checkpoint is not None:
-                result["checks"].pop(stock_tick_check)
+                result["checks"].pop(stock_tick_check, None)
                 stock_tick_check = "source_ticks_through_first_stock_decrement_after_accepted_event"
                 result["checks"][stock_tick_check] = "not_checked"
                 result["checks"]["accepted_stock_event_rejoin"] = "not_checked"
@@ -4754,6 +5010,11 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                     "rejoin. The legacy CLI spelling selects the shared engine, not the historical "
                     "first-decrease-after-clock2000 boundary. Stops at the event, first mismatch, "
                     "256 MiB, 48,000 records, or 60 seconds.")
+        if first_results_scope:
+            result["checks"].pop(stock_tick_check, None)
+            stock_tick_check = "source_ticks_through_first_match_results_entry"
+            result["checks"][stock_tick_check] = "not_checked"
+            result["limitations"]["boundary"] = "Strict complete first-match comparison through typed source Results entry after eight fresh rejoins. Separate browser Results-owner witness; no original Results PAD/scalar equality."
         if ordered_lineage_scope:
             ordered_source_limits = _ordered_clock_lineage_limits(
                 packet["source"].get("ordered_clock_lineage"))
@@ -4806,6 +5067,8 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
         stock_decrement_audit: dict[str, Any] | None = None
         stock_decrement_audit_sha: str | None = None
         ordered_checkpoints: list[dict[str, Any]] | None = None
+        first_results_audit: dict[str, Any] | None = None
+        first_results_audit_sha: str | None = None
         target: Mapping[str, int] | None = None
         if needs_positive_audit:
             assert positive_boundary_audit_path is not None
@@ -4857,7 +5120,13 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                     stock_decrement_boundary_audit_path, packet, recipe_obj,
                     match_clock_audit, source_stat_before=source_stat_before)
             ordered_checkpoints = packet["source"]["ordered_clock_lineage"]["checkpoints"]
-        if positive_scope:
+        if first_results_scope:
+            assert first_results_boundary_audit_path is not None and stock_decrement_audit is not None and match_clock_audit is not None
+            first_results_audit, first_results_audit_sha = _validate_first_results_source_audit(
+                first_results_boundary_audit_path, packet, recipe_obj, match_clock_audit,
+                stock_decrement_audit, source_stat_before=source_stat_before)
+            target = _stock_decrement_tuple(packet["source"]["first_results_boundary"]["last_complete_match"]["target"])
+        elif positive_scope:
             target = positive_target
         elif clock60_scope:
             target = clock60_target
@@ -4871,7 +5140,8 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
             _validate_v10_browser_provenance(
                 browser_capture_report_path, browser_producer_manifest_path,
                 browser_report_path, port_path, recipe_path, recipe_sha, recipe_obj, packet,
-                required_cursor=(target["browser_cursor"] if target is not None else None))
+                required_cursor=(packet["source"]["first_results_boundary"]["browser_witness"]["cursor"]
+                                 if first_results_scope else target["browser_cursor"] if target is not None else None))
         result["browser_capture"] = browser_identity
         result["checks"]["browser_capture_provenance"] = "pass"
         required_cursor = browser_identity["required_cursor"]
@@ -4883,15 +5153,18 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
             match_clock_boundary=match_clock_target,
             ordered_clock_checkpoints=ordered_checkpoints,
             stock_decrement_boundary=(packet["source"]["stock_decrement_boundary"]
-                                      if stock_decrement_scope else None))
+                                      if stock_decrement_scope else None),
+            first_results_boundary=(packet["source"]["first_results_boundary"] if first_results_scope else None))
         source = SourceCollector(comparator, recipe_obj, manifest, audit, packet["source"])
         stats = ObserverStreamStats()
         records = iter_records(
             reference_path,
-            max_bytes=(V10_STOCK_DECREMENT_SCAN_BYTE_CAP if stock_decrement_scope else
+            max_bytes=(V10_RESULTS_SCAN_BYTE_CAP if first_results_scope else
+                       V10_STOCK_DECREMENT_SCAN_BYTE_CAP if stock_decrement_scope else
                        ordered_source_limits[0] if ordered_lineage_scope
                        else V10_PREFIX_BYTE_CAP),
-            max_records=(V10_STOCK_DECREMENT_SCAN_RECORD_CAP if stock_decrement_scope else
+            max_records=(V10_RESULTS_SCAN_RECORD_CAP if first_results_scope else
+                         V10_STOCK_DECREMENT_SCAN_RECORD_CAP if stock_decrement_scope else
                          ordered_source_limits[1] if ordered_lineage_scope else
                          V10_MATCH_CLOCK_RECORD_CAP if clock_lineage_scope else
                          V10_FIRST_POSITIVE_RECORD_CAP if positive_scope
@@ -4910,7 +5183,8 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 terminal_event=packet["source"]["stock_decrement_boundary"],
                 terminal_prefix=prefix, max_seconds=max_seconds,
                 accepted_stock_checkpoint=packet["source"]["stock_decrement_boundary"].get(
-                    "accepted_stock_checkpoint"))
+                    "accepted_stock_checkpoint"),
+                results_boundary=(packet["source"]["first_results_boundary"] if first_results_scope else None))
         elif ordered_lineage_scope:
             assert ordered_checkpoints is not None
             prefix_complete, last_source_sequence = _consume_ordered_clock_lineage(
@@ -4984,7 +5258,8 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                         break
         result["last_source_sequence"] = last_source_sequence
         if not prefix_complete:
-            boundary = ("frozen first typed stock decrease after the accepted stock event rejoin"
+            boundary = ("first typed match-0 Results entry" if first_results_scope else
+                        "frozen first typed stock decrease after the accepted stock event rejoin"
                         if accepted_stock_checkpoint is not None else
                         "frozen first typed stock-decrement event after rejoining all accepted clock checkpoints"
                         if stock_decrement_scope else
@@ -5001,7 +5276,12 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
         result["source_full_trace"]["stat_after"] = source_stat_after
         _require_stable_mwro_stat(source_stat_before, source_stat_after)
         result["source_full_trace"]["stat_stable_during_attempt"] = True
-        if stock_decrement_scope:
+        if first_results_scope:
+            audited_prefix = packet["source"]["first_results_boundary"]["source_prefix"]
+            expected_prefix_records = audited_prefix["records_read"]
+            expected_prefix_bytes = audited_prefix["bytes_read"]
+            expected_prefix_sha = audited_prefix["sha256"]
+        elif stock_decrement_scope:
             assert stock_decrement_audit is not None
             audited_prefix = stock_decrement_audit["observed"]["source_prefix"]
             expected_prefix_records = audited_prefix["records_read"]
@@ -5054,8 +5334,11 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                        if positive_scope else
                        "freshly consumed source prefix differs from its bounded identity audit")
             raise ComparisonError(message)
-        if (comparator.frame_index != required_cursor or comparator.compared != required_cursor):
-            message = ("comparison did not stop immediately after its first stock decrease following the accepted event"
+        source_cursor = target["browser_cursor"] if first_results_scope and target is not None else required_cursor
+        if (comparator.frame_index != source_cursor or comparator.compared != source_cursor):
+            message = ("comparison did not stop at its last complete first-match state before Results entry"
+                       if first_results_scope else
+                       "comparison did not stop immediately after its first stock decrease following the accepted event"
                        if accepted_stock_checkpoint is not None else
                        "comparison did not stop immediately after its frozen first-stock-decrement target"
                        if stock_decrement_scope else
@@ -5069,6 +5352,17 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                        if positive_scope else
                        "comparison did not stop immediately after the first match tick join")
             raise ComparisonError(message)
+        browser_results_witness = None
+        if first_results_scope:
+            witness = packet["source"]["first_results_boundary"]["browser_witness"]
+            row = comparator._expect_frame_row(witness["scene"], witness["index"])
+            browser_results_witness = {
+                "record": row["record"], "scene": row["scene"], "index": row["index"],
+                "recipe_supplied_inputs_validated": True,
+                "live_owner_basis": "Native exporter checks its actual Results owner before and after its tick.",
+                "source_paired_Results_input": False, "Results_scalar_equality": False,
+                "uncompared_fields": ["rng", "pad_state_hex"]}
+            result["checks"]["browser_results_owner_witness"] = "pass"
         if source.setup_bytes != [recipe_obj.match_setups[0]]:
             raise ComparisonError("bounded source prefix consumed an unexpected match setup count")
         result["checks"]["source_first_css_and_setup_binding"] = "pass"
@@ -5134,7 +5428,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 "records_read": stats.records_read,
                 "bytes_read": stats.bytes_read,
                 "sha256": stats.prefix_sha256,
-                "hash_basis": ("fresh SHA-256 over exactly the raw bytes consumed through the first typed stock decrease after the accepted stock event"
+                "hash_basis": ("fresh SHA-256 through first typed match-0 Results entry, before any Results PAD consume"
+                               if first_results_scope else
+                               "fresh SHA-256 over exactly the raw bytes consumed through the first typed stock decrease after the accepted stock event"
                                if accepted_stock_checkpoint is not None else
                                "fresh SHA-256 over exactly the raw bytes consumed through the first typed stock-decrement source event"
                                if stock_decrement_scope else
@@ -5164,7 +5460,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 "browser_target_cursor": browser_identity["target_cursor"],
             }} if not needs_positive_audit else {}),
             "source_scene_spans_observed": comparator.source_spans,
-            "capture_status": ("incomplete bounded capture; semantic comparison stopped at the first typed stock decrease after the accepted stock event"
+            "capture_status": ("incomplete bounded capture; strict full first-match comparison stopped at source Results entry, with a separate browser-only Results-owner witness"
+                               if first_results_scope else
+                               "incomplete bounded capture; semantic comparison stopped at the first typed stock decrease after the accepted stock event"
                                if accepted_stock_checkpoint is not None else
                                "incomplete bounded capture; semantic comparison stopped at the first typed fighter-stock decrement after clock 2000"
                                if stock_decrement_scope else
@@ -5304,6 +5602,39 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                     "audit_sha256": accepted["boundary"]["audit"]["sha256"],
                     "rejoined_before_continuing": True,
                 })
+        if first_results_scope:
+            assert comparator.second_stock_rejoined and first_results_audit_sha is not None
+            historical_event_report = result.pop("stock_decrement_event_boundary")
+            fresh = historical_event_report["fresh_prefix_checkpoints"]
+            fresh[-1]["label"] = "stock258"
+            refs = packet["source"]["first_results_boundary"]["accepted_stock_receipts"]
+            fresh.append({"label": "stock271", **_stock_decrement_tuple(packet["source"]["stock_decrement_boundary"]["event"]["target"]),
+                          "bytes_read": refs[1]["prefix"]["bytes_read"], "records_read": refs[1]["prefix"]["records_read"],
+                          "source_prefix_sha256": refs[1]["prefix"]["sha256"], "rejoined_before_continuing": True})
+            result["first_match_results_entry_boundary"] = {
+                "exit_chain": comparator.results_exit_chain,
+                "last_complete_match": comparator.last_match_frame,
+                "source_prefix": packet["source"]["first_results_boundary"]["source_prefix"],
+                "source_audit_sha256": first_results_audit_sha,
+                "fresh_prefix_checkpoints": fresh, "first_stock_decrement_only": False,
+                "source_scan_caps": packet["source"]["first_results_boundary"]["source_scan_limits"],
+                "browser_export_record_cap": V10_RESULTS_BROWSER_EXPORT_RECORD_CAP,
+                "accepted_stock_events": [
+                    {"label": ref["label"], "event": event, "prefix": ref["prefix"],
+                     "audit_sha256": ref["audit"]["sha256"], "comparison_sha256": ref["comparison"]["sha256"]}
+                    for ref, event in zip(refs, (
+                        packet["source"]["stock_decrement_boundary"]["accepted_stock_checkpoint"]["boundary"]["event"],
+                        packet["source"]["stock_decrement_boundary"]["event"]))],
+                "source_paired_Results_input": False, "Results_scalar_equality": False,
+                "winner_or_KO_claim": False}
+            result["browser_results_owner_witness"] = browser_results_witness
+            result["checks"].pop("source_ticks_through_first_stock_decrement_after_accepted_event", None)
+            result["checks"]["source_ticks_through_first_match_results_entry"] = "pass"
+            result["checks"].pop("stock_decrement_event_state", None)
+            result["checks"]["accepted_stock_event_states"] = "pass"
+            result["checks"]["second_accepted_stock_event_rejoin"] = "pass"
+            result["checks"]["ordered_source_results_exit_chain"] = "pass"
+            result["limitations"]["boundary"] = "Strict full first-match state and preceding nonmatch input comparison through typed source Results entry after eight fresh state/PAD/prefix rejoins. First browser Results frame separately witnesses the live owner; no paired Results input or scalar comparison."
         if (match_clock_scope and match_clock_target is not None and
                 positive_audit_sha is not None and clock60_audit_sha is not None and
                 match_clock_audit_sha is not None):
@@ -5401,7 +5732,8 @@ def compare_paths(reference: str | Path, recipe: str | Path, port_trace: str | P
                   positive_boundary_audit: str | Path | None = None,
                   clock60_boundary_audit: str | Path | None = None,
                   match_clock_boundary_audit: str | Path | None = None,
-                  stock_decrement_boundary_audit: str | Path | None = None) -> dict[str, Any]:
+                  stock_decrement_boundary_audit: str | Path | None = None,
+                  first_results_boundary_audit: str | Path | None = None) -> dict[str, Any]:
     """Compare one source capture, its MWRC recipe, and one browser trace."""
     reference_path = Path(reference)
     recipe_path = Path(recipe)
@@ -5413,21 +5745,24 @@ def compare_paths(reference: str | Path, recipe: str | Path, port_trace: str | P
                      V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
                      V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
                      V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-                     V10_FIRST_STOCK_DECREMENT_SCOPE}:
+                     V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}:
             required += (positive_boundary_audit,)
         if scope in {V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
                      V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
                      V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-                     V10_FIRST_STOCK_DECREMENT_SCOPE}:
+                     V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}:
             required += (clock60_boundary_audit,)
         if scope in {V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
                      V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
-                     V10_FIRST_STOCK_DECREMENT_SCOPE}:
+                     V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}:
             required += (match_clock_boundary_audit,)
-        if scope == V10_FIRST_STOCK_DECREMENT_SCOPE:
+        if scope in {V10_FIRST_STOCK_DECREMENT_SCOPE, V10_FIRST_MATCH_RESULTS_SCOPE}:
             required += (stock_decrement_boundary_audit,)
+        if scope == V10_FIRST_MATCH_RESULTS_SCOPE:
+            required += (first_results_boundary_audit,)
         if any(value is None for value in required):
-            label = ("v10 first typed stock-decrement" if scope == V10_FIRST_STOCK_DECREMENT_SCOPE else
+            label = ("v10 first-match Results entry" if scope == V10_FIRST_MATCH_RESULTS_SCOPE else
+                     "v10 first typed stock-decrement" if scope == V10_FIRST_STOCK_DECREMENT_SCOPE else
                      "v10 ordered match-clock lineage" if scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE else
                      "v10 first-match clock-boundary" if scope == V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE else
                      "v10 first-match clock-60" if scope == V10_FIRST_MATCH_CLOCK_GE60_SCOPE else
@@ -5455,7 +5790,9 @@ def compare_paths(reference: str | Path, recipe: str | Path, port_trace: str | P
             match_clock_boundary_audit_path=(Path(match_clock_boundary_audit)
                                              if match_clock_boundary_audit is not None else None),
             stock_decrement_boundary_audit_path=(Path(stock_decrement_boundary_audit)
-                                                 if stock_decrement_boundary_audit is not None else None))
+                                                 if stock_decrement_boundary_audit is not None else None),
+            first_results_boundary_audit_path=(Path(first_results_boundary_audit)
+                                                if first_results_boundary_audit is not None else None))
     if scope != WHOLE_SESSION_SCOPE:
         return {"schema": SCHEMA, "scope": scope, "boundary_result": None,
                 "result": "invalid", "complete": False,
