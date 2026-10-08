@@ -93,8 +93,8 @@ extern "C" {
 }
 #pragma GCC diagnostic pop
 #endif
-#include <sysdolphin/baselib/random.h>
 extern "C" {
+#include <sysdolphin/baselib/random.h>
 #include <melee/lb/lb_013B.h>
 #include <sysdolphin/baselib/rumble.h>
 extern HSD_RumbleData HSD_Rumble_804C22E0[4];
@@ -1033,12 +1033,165 @@ melee_web::RuntimeFiles exact_stadium_runtime_union(
     return result;
 }
 
+// The selected handoff remains immutable. This witness belongs to its live
+// menu seed storage until the retained host is destroyed; only the immediate
+// return from the authorized source OnInit can advance its expected value.
+struct StadiumSelectionRngWitness {
+    const uint32_t* owner;
+    uint32_t initial;
+    uint32_t expected_live;
+    bool source_return_captured = false;
+};
+
+bool stadium_rng_witness_matches(const StadiumSelectionRngWitness& witness,
+                                 const MeleeWebMenuMatchSelection& selected)
+{
+    return witness.owner != nullptr && seed_ptr == witness.owner &&
+           selected.random_seed == witness.initial &&
+           *witness.owner == witness.expected_live;
+}
+
+void check_stadium_rng_witness(const StadiumSelectionRngWitness& witness,
+                               const MeleeWebMenuMatchSelection& selected,
+                               const char* boundary)
+{
+    // Do not dereference the retained pointer after ownership changes.
+    const bool owner_matches = witness.owner && seed_ptr == witness.owner;
+    std::fprintf(stderr,
+        "C1_SELECTION_RNG boundary=%s phase=%s owner=%p current_owner=%p "
+        "initial=%u expected_live=%u live_available=%u live=%u\n",
+        boundary, witness.source_return_captured ? "source-return" : "selected",
+        static_cast<const void*>(witness.owner), static_cast<void*>(seed_ptr),
+        witness.initial, witness.expected_live, owner_matches,
+        owner_matches ? *witness.owner : 0);
+    std::fflush(stderr);
+    check(stadium_rng_witness_matches(witness, selected),
+          "C1 selection RNG witness lost its initial seed, live owner or frozen phase value");
+}
+
+struct StadiumSelectionDifference {
+    const char* field = nullptr;
+    size_t byte_offset = 0;
+    uint64_t expected = 0;
+    uint64_t observed = 0;
+};
+
+StadiumSelectionDifference stadium_selection_difference(
+    const MeleeWebMenuMatchSelection& observed,
+    const MeleeWebMenuMatchSelection& expected, uint32_t expected_live_seed)
+{
+    auto bytes = [](const char* field, const void* actual, const void* initial,
+                    size_t count) -> StadiumSelectionDifference {
+        const auto* a = static_cast<const unsigned char*>(actual);
+        const auto* b = static_cast<const unsigned char*>(initial);
+        for (size_t i = 0; i < count; ++i)
+            if (a[i] != b[i]) return {field, i, b[i], a[i]};
+        return {};
+    };
+    if (auto d = bytes("start", &observed.start, &expected.start,
+                       sizeof(expected.start)); d.field) return d;
+    if (auto d = bytes("players", observed.players, expected.players,
+                       sizeof(expected.players)); d.field) return d;
+#define C1_COMPARE_FIELD(field) \
+    if (observed.field != expected.field) \
+        return {#field, 0, expected.field, observed.field}
+    C1_COMPARE_FIELD(player_count);
+    if (observed.random_seed != expected_live_seed)
+        return {"random_seed", 0, expected_live_seed, observed.random_seed};
+    C1_COMPARE_FIELD(hud_layout);
+    C1_COMPARE_FIELD(unlocked_characters);
+    C1_COMPARE_FIELD(unlocked_stages);
+    C1_COMPARE_FIELD(save_profile_present);
+    C1_COMPARE_FIELD(opening_demo);
+#undef C1_COMPARE_FIELD
+    return {};
+}
+
+void run_stadium_selection_rng_controls()
+{
+    // Execute the linked original random.c body; no cloned LCG or map2 body.
+    struct RestoreSeedOwner {
+        uint32_t* prior = seed_ptr;
+        ~RestoreSeedOwner() { seed_ptr = prior; }
+    } restore;
+    auto is_field = [](StadiumSelectionDifference difference, const char* field) {
+        return difference.field && std::string_view(difference.field) == field;
+    };
+    for (unsigned lifetime = 0; lifetime < 2; ++lifetime) {
+        uint32_t local_seed = 0x12345678u + lifetime;
+        seed_ptr = &local_seed;
+        MeleeWebMenuMatchSelection selected{};
+        selected.random_seed = local_seed;
+        StadiumSelectionRngWitness witness{seed_ptr, local_seed, local_seed};
+        auto observed = selected;
+        check(stadium_rng_witness_matches(witness, selected) &&
+                  !stadium_selection_difference(observed, selected,
+                                                witness.expected_live).field,
+              "Selected-phase control rejected an unchanged selection");
+        auto no_draw_return = witness;
+        no_draw_return.source_return_captured = true;
+        check(stadium_rng_witness_matches(no_draw_return, selected) &&
+                  !stadium_selection_difference(observed, selected,
+                                                no_draw_return.expected_live).field,
+              "Source-return phase incorrectly required an RNG draw");
+        (void)HSD_Randi(13);
+        observed.random_seed = local_seed;
+        check(local_seed != selected.random_seed &&
+                  !stadium_rng_witness_matches(witness, selected) &&
+                  is_field(stadium_selection_difference(
+                      observed, selected, witness.expected_live), "random_seed"),
+              "Actual source RNG draw did not reject the stale selected phase");
+        witness.expected_live = local_seed;
+        witness.source_return_captured = true;
+        check(stadium_rng_witness_matches(witness, selected) &&
+                  !stadium_selection_difference(observed, selected,
+                                                witness.expected_live).field,
+              "Frozen source-return control rejected the same owned live seed");
+        uint32_t foreign_seed = local_seed;
+        seed_ptr = &foreign_seed;
+        check(!stadium_rng_witness_matches(witness, selected),
+              "Same-value foreign RNG owner was accepted");
+        seed_ptr = &local_seed;
+        auto changed_initial = selected;
+        changed_initial.random_seed ^= 1;
+        check(!stadium_rng_witness_matches(witness, changed_initial),
+              "Changed immutable selected seed was accepted");
+        auto changed = observed;
+        reinterpret_cast<unsigned char*>(&changed.start)[0] ^= 1;
+        check(is_field(stadium_selection_difference(changed, selected,
+                  witness.expected_live), "start"), "Start change was accepted");
+        changed = observed;
+        reinterpret_cast<unsigned char*>(changed.players)[0] ^= 1;
+        check(is_field(stadium_selection_difference(changed, selected,
+                  witness.expected_live), "players"), "Player change was accepted");
+#define C1_REFUSE_FIELD(field) \
+        changed = observed; changed.field ^= 1; \
+        check(is_field(stadium_selection_difference(changed, selected, \
+                  witness.expected_live), #field), "Selection field change was accepted")
+        C1_REFUSE_FIELD(player_count);
+        C1_REFUSE_FIELD(random_seed);
+        C1_REFUSE_FIELD(hud_layout);
+        C1_REFUSE_FIELD(unlocked_characters);
+        C1_REFUSE_FIELD(unlocked_stages);
+        C1_REFUSE_FIELD(save_profile_present);
+        C1_REFUSE_FIELD(opening_demo);
+#undef C1_REFUSE_FIELD
+        (void)HSD_Randi(13);
+        check(!stadium_rng_witness_matches(witness, selected),
+              "An additional cleanup-phase RNG draw was accepted");
+    }
+    std::cout << "C1 asset-free original HSD_Randi and immutable selection/live-owner phase controls passed; two lifetimes and every compared field refused\n";
+}
+
 void check_stadium_selection_preserved(
     MeleeWebMenuHost* host,
     const MeleeWebMenuMatchSelection& expected,
     const std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES>&
-        expected_baseline)
+        expected_baseline,
+    const StadiumSelectionRngWitness* rng_witness = nullptr)
 {
+    if (rng_witness)
+        check_stadium_rng_witness(*rng_witness, expected, "selection-export-before");
     check(host != nullptr &&
               melee_web_menu_host_phase(host) == MELEE_WEB_MENU_READY &&
               melee_web_menu_host_source_scene(host) == 0,
@@ -1047,20 +1200,24 @@ void check_stadium_selection_preserved(
     char error[256]{};
     check(melee_web_menu_host_stadium_c1a_selection(
               host, &observed, error, sizeof(error)), error);
-    check(observed.start.rules.stkind == St_Kind_PStadium &&
-              std::memcmp(&observed.start, &expected.start,
-                          sizeof(expected.start)) == 0,
-          "C1 context preflight changed the source-selected StKind 3 payload");
-    check(std::memcmp(observed.players, expected.players,
-                      sizeof(expected.players)) == 0 &&
-              observed.player_count == expected.player_count &&
-              observed.random_seed == expected.random_seed &&
-              observed.hud_layout == expected.hud_layout &&
-              observed.unlocked_characters == expected.unlocked_characters &&
-              observed.unlocked_stages == expected.unlocked_stages &&
-              observed.save_profile_present == expected.save_profile_present &&
-              observed.opening_demo == expected.opening_demo,
-          "C1 context preflight changed retained menu save or RNG provenance");
+    check(observed.start.rules.stkind == St_Kind_PStadium,
+          "C1 selection export changed source-selected StKind 3");
+    if (rng_witness)
+        check_stadium_rng_witness(*rng_witness, expected, "selection-export-after");
+    const auto difference = stadium_selection_difference(
+        observed, expected, rng_witness ? rng_witness->expected_live
+                                      : expected.random_seed);
+    if (difference.field) {
+        std::fprintf(stderr,
+            "C1_SELECTION_DIFFERENCE field=%s byte_offset=%zu expected=%llu observed=%llu initial_seed=%u exported_seed=%u\n",
+            difference.field, difference.byte_offset,
+            static_cast<unsigned long long>(difference.expected),
+            static_cast<unsigned long long>(difference.observed),
+            expected.random_seed, observed.random_seed);
+        std::fflush(stderr);
+    }
+    check(difference.field == nullptr,
+          "C1 selection export changed a retained field or its frozen live RNG phase");
     std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES> baseline{};
     check(melee_web_menu_host_snapshot_card_data(
               host, 1, baseline.data(), baseline.size(), error,
@@ -2529,6 +2686,7 @@ void run_stadium_e8_request(
     bool perform_ground_map1_owner,
     bool perform_on_init,
     const MeleeWebRetiredSisLease* retired_sis,
+    StadiumSelectionRngWitness& selection_rng,
     TransitionTrace& trace)
 {
     using namespace melee_web;
@@ -2600,6 +2758,9 @@ void run_stadium_e8_request(
     check(seed_owner != nullptr,
           "E8 request lost the source seed owner before preparation");
     seed_before = *seed_owner;
+    check_stadium_rng_witness(selection_rng, selected, "e8-preparation");
+    check(!selection_rng.source_return_captured,
+          "E8 request cannot reuse a captured source-return RNG witness");
     const char* grps_resolved_name = lbFileGetFullName("/GrPs");
     check(grps_resolved_name &&
               std::strcmp(grps_resolved_name, "/GrPs.usd") == 0,
@@ -2923,6 +3084,7 @@ void run_stadium_e8_request(
         check(melee_web_stadium_e8_call_observer_begin(),
               "Could not open the bounded E8 source-call window");
         observer_window_owned = true;
+        check_stadium_rng_witness(selection_rng, selected, "before-original-e8-oninit");
         if (perform_on_init) {
             returned_stage_owner = melee_web_stage_begin_kind_on_init_diagnostic(
                     St_Kind_PStadium, yakumono_data, effects->bank(),
@@ -2934,6 +3096,12 @@ void run_stadium_e8_request(
                       returned_stage_owner == retained_stage_owner,
                   error[0] ? error
                            : "Original Stadium OnInit did not return its retained owner");
+            check(seed_ptr == seed_owner && seed_owner == selection_rng.owner,
+                  "OnInit returned with a replaced retained menu RNG owner");
+            selection_rng.expected_live = *seed_owner;
+            selection_rng.source_return_captured = true;
+            on_init_observation.seed_after_on_init = selection_rng.expected_live;
+            check_stadium_rng_witness(selection_rng, selected, "on-init-return");
             check(melee_web_stage_last_stadium_map2_buffer_snapshot(
                       retained_stage_owner,
                       &on_init_observation.map2_owner),
@@ -3062,7 +3230,7 @@ void run_stadium_e8_request(
                       "OnInit actual map return journal differs from its owner/slot pointer");
             }
             on_init.stats_after_on_init = melee_web_gameplay_stats();
-            on_init.seed_after_on_init = *seed_owner;
+            check_stadium_rng_witness(selection_rng, selected, "on-init-verified");
             check(on_init.stats_after_on_init.generation ==
                       on_init.stats_before_init.generation &&
                       on_init.stats_after_on_init.ticks ==
@@ -3116,7 +3284,7 @@ void run_stadium_e8_request(
                       on_init.ground_storage_before_end,
                       on_init.memory_before_init, 64),
                   "OnInit Ground storage did not retain its exact new 64-byte lease");
-            check_stadium_selection_preserved(host, selected, baseline);
+            check_stadium_selection_preserved(host, selected, baseline, &selection_rng);
             check(seed_ptr == seed_owner &&
                       gm_GetCurrentGameMode() == GM_VS && !gm_IsCurrently1PMode() &&
                       lbLang_GetLanguageSetting() == LANG_US &&
@@ -3133,7 +3301,7 @@ void run_stadium_e8_request(
                   "OnInit changed the selected save or immutable GrPs owner bytes");
             trace.event("stadium_source_oninit_returned", world->audio(),
                         "diagnostic-source-ordered-pstadium", &selected,
-                        &seed_before);
+                        &on_init.seed_after_on_init);
 
             const auto class_counts_before_end = on_init.class_counts_before;
             const auto pool_counts_before_end = on_init.pool_counts_before;
@@ -3152,7 +3320,8 @@ void run_stadium_e8_request(
             retained_stage_owner = nullptr;
             returned_stage_owner = nullptr;
             on_init.stats_after_end = melee_web_gameplay_stats();
-            on_init.seed_after_end = *seed_ptr;
+            check_stadium_rng_witness(selection_rng, selected, "stage-last-end");
+            on_init.seed_after_end = *seed_owner;
             on_init.map2_allocation_status_after_end =
                 melee_web_source_memory_allocation_read(
                     on_init.map2_owner.buffer, &on_init.map2_after_end);
@@ -3244,11 +3413,11 @@ void run_stadium_e8_request(
             on_init.cleanup_verified = true;
             trace.event("stadium_source_oninit_cleaned", world->audio(),
                         "original-stage-last-end", &selected,
-                        &on_init.seed_after_on_init);
+                        &on_init.seed_after_end);
         }
-        check_stadium_selection_preserved(host, selected, baseline);
+        check_stadium_selection_preserved(host, selected, baseline, &selection_rng);
         check(seed_ptr == seed_owner &&
-                  (perform_on_init || *seed_ptr == seed_before),
+                  *seed_ptr == selection_rng.expected_live,
               "E8 request changed the source seed owner or value");
         check(gm_GetCurrentGameMode() == GM_VS && !gm_IsCurrently1PMode() &&
                   lbLang_GetLanguageSetting() == LANG_US &&
@@ -3295,7 +3464,7 @@ void run_stadium_e8_request(
                   melee_web_menu_host_phase(host) == MELEE_WEB_MENU_READY,
               "E8 request entered an original source menu scene");
         check(seed_ptr == seed_owner &&
-                  (perform_on_init || *seed_ptr == seed_before),
+                  *seed_ptr == selection_rng.expected_live,
               "E8 teardown changed the retained source seed owner or value");
         if (perform_on_init) {
             const auto& on_init = on_init_observation;
@@ -3855,6 +4024,9 @@ void run_stadium_c1_context_preflight(
               host, 1, baseline.data(), baseline.size(), error,
               sizeof(error)), error);
     check_stadium_selection_preserved(host, selected, baseline);
+    StadiumSelectionRngWitness selection_rng{
+        seed_ptr, selected.random_seed, selected.random_seed};
+    check_stadium_rng_witness(selection_rng, selected, "reopened-context-start");
     check(melee_web_menu_host_snapshot_card_data(
               host, 0, save_before.data(), save_before.size(), error,
               sizeof(error)), error);
@@ -3990,7 +4162,7 @@ void run_stadium_c1_context_preflight(
             run_stadium_e8_request(reopened_files, host, world.get(), selected,
                                    baseline, save_before,
                                    perform_ground_map1_owner, perform_on_init,
-                                   retired_sis, trace);
+                                   retired_sis, selection_rng, trace);
             check_stadium_preflight_stage_empty();
         }
 
@@ -4006,7 +4178,7 @@ void run_stadium_c1_context_preflight(
                   sizeof(error)), error);
         check(save_after == save_before,
               "C1 reopened-context preflight changed the live source save owner");
-        check_stadium_selection_preserved(host, selected, baseline);
+        check_stadium_selection_preserved(host, selected, baseline, &selection_rng);
         check((Toy_804A284C[3] & 4) != 0,
               "C1 context teardown changed the retained Toy category baseline");
         cleanup();
@@ -4218,6 +4390,7 @@ int main(int argc,char** argv){try{
   if(argc==2&&std::string_view(argv[1])=="--stadium-on-init-controls"){
    run_stadium_profile_controls();
    run_stadium_effect_runtime_lifecycle_control();
+   run_stadium_selection_rng_controls();
    std::cout<<"C1 source OnInit refusal and synthetic event-journal controls passed; no Stadium stage initialization invoked\n";
    return 0;
   }

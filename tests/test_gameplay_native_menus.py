@@ -590,6 +590,10 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
             "C1 asset-free original effect prepare/efLib_Init/complete/end passed; no stage callbacks, proc dispatch, or ticks",
             run.stdout,
         )
+        self.assertIn(
+            "C1 asset-free original HSD_Randi and immutable selection/live-owner phase controls passed; two lifetimes and every compared field refused",
+            run.stdout,
+        )
         self.assertNotIn("OnInit lifetime", run.stdout)
 
     def test_stadium_source_oninit_one_shot(self):
@@ -698,6 +702,8 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         self.assertFalse(result["rendered"])
         self.assertTrue(result["ordinary_admission_closed"])
         self.assertTrue(result["checked_teardown"])
+        self.assertEqual(result["source_seed_after_cleanup"],
+                         result["source_seed_after_oninit"])
         if result["map2_buffer_origin"] == "owned_fallback":
             self.assertEqual(result["map2_requested_bytes"], 0x50000)
             self.assertGreater(result["map2_allocation_generation"], 0)
@@ -736,6 +742,8 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
             "stadium_source_oninit_returned",
             "stadium_source_oninit_cleaned",
         ])
+        self.assertEqual(events[0]["rng"], result["source_seed_after_oninit"])
+        self.assertEqual(events[1]["rng"], result["source_seed_after_cleanup"])
 
     def test_owned_css_scene_lifecycle(self):
         targets = [ROOT / "build" / name / "native_css_callbacks.js"
