@@ -169,6 +169,13 @@ void run_vs_sudden_death_source_control()
             exit.match_end.n_winners = static_cast<u8>(winner_count);
             for (auto& player : exit.match_end.player_standings)
                 player.slot_type = Gm_PKind_NA;
+            for (unsigned i = 0; i < 2; ++i) {
+                auto& standing = exit.match_end.player_standings[i];
+                standing.slot_type = Gm_PKind_Cpu;
+                standing.ckind = i == 0 ? CKIND_MARIO : CKIND_FOX;
+                standing.stocks = winner_count == 2 || i == 0 ? 1 : 0;
+                standing.is_big_loser = winner_count != 2 && i != 0;
+            }
             check(melee_web_vs_mode_select_state(gmVsMode_State_Vs),
                   "Original VS state could not be selected");
             gm_Mode_Vs_States[gmVsMode_State_Vs].on_exit(
@@ -192,6 +199,26 @@ void run_vs_sudden_death_source_control()
         gm_LoadRumbleEnabled(&expected_start);
         gm_SetupSuddenDeath(&expected_start,
                             &gmVsMelee_VsExitInfo.match_end);
+
+        StartMeleeData excluded_start{};
+        excluded_start.players[0].slot_type = Gm_PKind_Cpu;
+        excluded_start.players[1].slot_type = Gm_PKind_Cpu;
+        MatchEnd excluded_end{};
+        excluded_end.match_kind = MatchKind_Stock;
+        excluded_end.outcome = OUTCOME_TIMEOUT;
+        excluded_end.player_standings[0].slot_type = Gm_PKind_Cpu;
+        excluded_end.player_standings[0].ckind = CKIND_MARIO;
+        excluded_end.player_standings[0].stocks = 0;
+        excluded_end.player_standings[0].is_big_loser = false;
+        excluded_end.player_standings[1].slot_type = Gm_PKind_Cpu;
+        excluded_end.player_standings[1].ckind = CKIND_FOX;
+        excluded_end.player_standings[1].stocks = 1;
+        excluded_end.player_standings[1].is_big_loser = true;
+        gm_SetupSuddenDeath(&excluded_start, &excluded_end);
+        check(excluded_start.players[0].slot_type == Gm_PKind_NA &&
+                  excluded_start.players[1].slot_type == Gm_PKind_NA,
+              "Original Sudden Death helper retained zero-stock or big-loser players");
+
         check(melee_web_vs_mode_select_state(gmVsMode_State_SuddenDeath),
               "Original Sudden Death state could not be selected");
         gm_Mode_Vs_States[gmVsMode_State_SuddenDeath].on_enter(
