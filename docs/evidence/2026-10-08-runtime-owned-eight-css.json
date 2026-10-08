@@ -1,0 +1,101 @@
+{
+  "actual8module_response_binding_each": true,
+  "all_native_samples_neutral": true,
+  "all_ten_optional_runtime_flags": "OFF",
+  "autonomous_no_peer_rpc_interval": true,
+  "browser": "Chrome154.0.8037.98 headless silent",
+  "capture_exit": 0,
+  "elapsed_ms": 7211,
+  "exclusions": [
+    "live timing",
+    "performance",
+    "pixels",
+    "PCM equivalence",
+    "retail equivalence",
+    "two-machine Internet acceptance",
+    "public player UI/runtime integration",
+    "physical controllers",
+    "unbounded evidence consumer policy"
+  ],
+  "export_bytes_each": 512,
+  "head": "039ed88176a779d89ac76d21548e7f0bdf77a2e8",
+  "host": "Mac mini same-host loopback",
+  "independent_root_outcome_review_sha256": "8992085cabab49074c08e5c7751fe81d654dba85eeb8cc2e2bdea83474f61253",
+  "input_delay": 2,
+  "label": "eight-CSS runtime-owned native-pump functional diagnostic",
+  "live_native_samples_each": 6,
+  "local_result_sha256": "240be772e2498a1fdcfb4afc3e3b421de17873b3461d1b3f054cc06672d3fb22",
+  "local_worker_and_os_cleanup_pass": true,
+  "native_release_producer_head": "09db5f3bfa355ed66c454736a611ae608a7cbaa5",
+  "native_release_producer_tree": "cb16625f10f95b2584b6eff863313f9735f6c62d",
+  "normal_close_native_quiescence_verified_each": true,
+  "portable_artifact_sha256": {
+    "browser-process-trace-v1.jsonl": "439ffa05e91fd3aaf3747950b679a1e7cb11383c6509f5221b6438af13ddf2c9",
+    "browser-run/alpha/accounted-css.png": "ce3cd1c8753012650d6b25e0ef5931ebe61659c366f9a0acf3d4876b06d147b6",
+    "browser-run/alpha/checksums.bin": "a1ca04fff4a658ac8542e90e1580b3d456f29dfe31132e1be35fa4a348d1baab",
+    "browser-run/alpha/instance.json": "0022018e197a0c1ca06795bcae23b2ae18a790371655042c36c79ee061b1a13c",
+    "browser-run/alpha/source-accounting.json": "765a442869dc874934e2ad9905f8e2bc25b33f8611eb67963d6ae0c716e8cd24",
+    "browser-run/beta/accounted-css.png": "6dbfdfbff67c51a66446e656523a917651bb4f11949ab7437c47e7ddfd438939",
+    "browser-run/beta/checksums.bin": "a1ca04fff4a658ac8542e90e1580b3d456f29dfe31132e1be35fa4a348d1baab",
+    "browser-run/beta/instance.json": "f6359c9f24699ae4552aadc5a9ac21f35815cb4f6a50ace89546fcf2860cc1bd",
+    "browser-run/beta/source-accounting.json": "bfdf599333e2b0af05bfbe0b8d7ebdcd0dd40020b399f0d542c168897506953d",
+    "browser-run/run.json": "1305f2e84d3776a981a46f238e79e08f7ee36ce3562613b327440890a9b36e20",
+    "browser-run/worker-evidence/direct-miniflare-a3-room-relay-direct-rOLNdi.receipt.json": "21bd3f9f83d16d6ec4fda0079b18b9abb5b18afdb7639e8bdbd2d2c8e4146eac",
+    "browser-run/worker-evidence/direct-miniflare-a3-room-relay-direct-rOLNdi.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "browser-run/worker-evidence/direct-miniflare-a3-room-relay-direct-rOLNdi.stdout.log": "09f84f8c29e753822951c5c99a1e5ace840629eda22bc7ac6bee9dc9653b1820",
+    "owner-result-v1.json": "d051fedb012ad60fb95b00c8f331cf3c3901fcf09cce89c1a2e69428b4917afb",
+    "owner.log": "4cdc75a8b997ef6236f326d7531d74d84b915d68f5391b1f3b10ad87b4a5f9b5",
+    "server.log": "a72e65639e537eb98bdae85cdc7e2aa860415518a3bced401c280a4e179316c7"
+  },
+  "prior_failed_attempts": [
+    {
+      "first_failure_reduction": "Prepared phase0 was mistaken for entered CSS; corrected CREATED guard.",
+      "head": "d711ddb0d920d679fa1627e69f94ca6c822122a5",
+      "historical_stage_and_failure_retained": true,
+      "result_receipt_sha256": "40cf349ee434b8c60e673ee75110d3500dacfd3d3a55c685356929084e390061"
+    },
+    {
+      "first_failure_reduction": "Beta channel attachment arrived after signaling; reused readiness events.",
+      "head": "c5e879510a5ec09efb4a4db62679d090ec28839a",
+      "historical_stage_and_failure_retained": true,
+      "result_receipt_sha256": "1afaff2a094c24e75a79962545283c90a8c1b540b8fc06ee6254e916ec132e70"
+    },
+    {
+      "first_failure_reduction": "Startup snapshot preceded remote hello/native confirmation; added readiness fence.",
+      "head": "5e030440590357ece430f12b823e53717839a76a",
+      "historical_stage_and_failure_retained": true,
+      "result_receipt_sha256": "08bdd0880ccf4314b1c9ed076c19d80e0c6d748172c2307f87e56c6abf26ccba"
+    },
+    {
+      "first_failure_reduction": "Observer used post-confirm lifecycle bit in hello reconstruction; reconstructed confirmed0 only after confirmed1 guard and preserved other identities.",
+      "head": "69f60beb3f7eccc0c7370f013ccfd07e9166a167",
+      "historical_stage_and_failure_retained": true,
+      "result_receipt_sha256": "2d14f5ef4ab959bf2bd43134cb91c8545653e05b6a2776dd5d68ed6ed16aa502"
+    },
+    {
+      "first_failure_reduction": "Observer expected diagnostic export queue after runtime ACK consumer accepted8; retained snapshots held8 records while actual exports remained0. Corrected ownership predicate.",
+      "head": "09db5f3bfa355ed66c454736a611ae608a7cbaa5",
+      "historical_stage_and_failure_retained": true,
+      "result_receipt_sha256": "38feccdb63f6df840d46a00daa073fd7bcbd866838f829e739bc169d2301c510"
+    }
+  ],
+  "records_each": 8,
+  "regression_validation": {
+    "current_harness_failures": 0,
+    "current_harness_focused_tests": 82,
+    "failures": 0,
+    "final_integration_suite_and_release": "Passed; see2026-10-08-runtime-owned-integration.json for current-main source/build identities and retained failedfixture attempt.",
+    "prior_full_suite_head": "09db5f3bfa355ed66c454736a611ae608a7cbaa5",
+    "skips": 153,
+    "tests": 2065
+  },
+  "rendered_css_limitation": "Original CSS visible with partial Ready-to-Fight banner and rendering defects; no pixel fidelity accepted.",
+  "result": "pass",
+  "runtime_artifacts": 40,
+  "schema": "melee-web-runtime-owned-eight-css-evidence-v1",
+  "seed": 305419896,
+  "source_boundary": "Original CSS source ticks0through7",
+  "source_native_identity_guards_unchanged": true,
+  "source_steps_and_draws_each": 8,
+  "streams_sha256": "a1ca04fff4a658ac8542e90e1580b3d456f29dfe31132e1be35fa4a348d1baab"
+}

@@ -88,6 +88,9 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   let loading = Object.freeze({phase: 'boot', message: 'Starting player…', complete: 0, total: 0});
   let preparationLabel = '', preparationKeepsAudio = false;
   let discSession = null, assetTransfer = null;
+  let networkSessionClose = null, networkCloseOperation = null, networkCloseMode = null;
+  let discRetirementOperation = null, destroyOperation = null, unloadOperation = null;
+  const networkCleanupErrors = [];
   const sourceReadResults = new Map();
   const openedDiscSessions = new WeakSet();
   let keyboard = [true, true], layout = 'two';
@@ -402,13 +405,69 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     if (key !== lastState) { lastState = key; onState(state); }
     return state;
   }
+  function recordNetworkCleanupError(error, label = 'Network session cleanup failed') {
+    if (!networkCleanupErrors.includes(error)) networkCleanupErrors.push(error);
+    try { onLog(`${label}: ${String(error?.message || error)}`, true); } catch {}
+  }
+  function attachNetworkSession(close) {
+    if (typeof close !== 'function') throw Error('Network session close owner must be a function');
+    if (fatal || destroyed) throw Error('Cannot attach a network session to a stopped player');
+    if (networkSessionClose) throw Error('This player already owns a network session');
+    networkSessionClose = close;
+  }
+  function closeNetworkSession(mode = 'normal') {
+    if (!networkSessionClose) return Promise.resolve();
+    if (!['normal', 'fatal'].includes(mode)) return Promise.reject(Error('Network session close mode must be normal or fatal'));
+    if (!networkCloseOperation) {
+      networkCloseMode = mode;
+      try { networkCloseOperation = Promise.resolve(networkSessionClose({mode})); }
+      catch (error) { networkCloseOperation = Promise.reject(error); }
+      networkCloseOperation.catch(error => recordNetworkCleanupError(error));
+      return networkCloseOperation;
+    }
+    if (mode === 'fatal' && networkCloseMode !== 'fatal') {
+      networkCloseMode = 'fatal';
+      let escalation;
+      try { escalation = Promise.resolve(networkSessionClose({mode})); }
+      catch (error) { escalation = Promise.reject(error); }
+      const previous = networkCloseOperation;
+      networkCloseOperation = Promise.allSettled([previous, escalation]).then(results => {
+        const failures = results.filter(result => result.status === 'rejected').map(result => result.reason);
+        if (failures.length) throw new AggregateError([...new Set(failures)], 'Network session fatal cleanup failed');
+      });
+      networkCloseOperation.catch(error => recordNetworkCleanupError(error));
+    }
+    return networkCloseOperation;
+  }
+  function retireDiscSession() {
+    if (discRetirementOperation) return discRetirementOperation;
+    const session = discSession;
+    discSession = null;
+    if (!session) return Promise.resolve();
+    try {
+      discRetirementOperation = Promise.resolve(session.close()).catch(error => {
+        recordNetworkCleanupError(error, 'Disc session cleanup failed');
+      });
+    } catch (error) {
+      recordNetworkCleanupError(error, 'Disc session cleanup failed');
+      discRetirementOperation = Promise.resolve();
+    }
+    return discRetirementOperation;
+  }
+  function retireDiscAfterNetwork(closeOperation) {
+    if (!networkSessionClose) { void retireDiscSession(); return; }
+    Promise.resolve(closeOperation).catch(() => {}).then(retireDiscSession).catch(error => {
+      recordNetworkCleanupError(error, 'Disc session cleanup failed');
+    });
+  }
   function stop(error) {
     if (fatal || destroyed) return;
     try { diagnosticIncident(4, null, null, null, null, 0); } catch {}
     diagnosticActivity(false);
     fatal = true; message = String(error?.message || error || 'Player stopped. Reload to recover.');
     clearStartupTimeout();
-    discSession?.close(); discSession = null;
+    const networkClosing = closeNetworkSession('fatal');
+    retireDiscAfterNetwork(networkClosing);
     preparationLabel = ''; preparationKeepsAudio = false; loading = null;
     syncAudio();
     for (const c of commands.splice(0)) c.reject(Error(message));
@@ -645,6 +704,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     } finally { Module._free(ptr); }
   }
   async function unloadAndSave() {
+    await closeNetworkSession('normal');
     const unloaded = await boundary(() => { syncAudio(); return Module._melee_web_native_menu_unload(); });
     if (!unloaded) return false;
     prepared = false; callbacks.menuPreparationCanceled(); await pauseAudioForPreparation();
@@ -900,35 +960,50 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       if (!['two', 'boxx'].includes(value)) return Promise.reject(Error('Unknown keyboard layout.'));
       return boundary(() => { check(Module._melee_web_input_set_keyboard_layout(value === 'boxx' ? 1 : 0)); layout = value; inputDirty = true; });
     },
-    unload() { return operation('unloading', async () => { check(await unloadAndSave()); }); },
-    async destroy() {
-      if (destroyed) return Object.freeze({requiresReload: true});
-      try {
-        if (!fatal) await handle.unload();
-      } catch (error) {
-        stop(error);
-        throw error;
-      } finally {
-        clearStartupTimeout();
-        if (!fatal && discSession) {
-          try { await clearSourceFileStreams(); }
-          catch (error) { onLog(`Source movie catalog cleanup failed: ${error.message}`, true); }
+    unload() {
+      if (unloadOperation) return unloadOperation;
+      unloadOperation = operation('unloading', async () => { check(await unloadAndSave()); })
+        .finally(() => { unloadOperation = null; });
+      return unloadOperation;
+    },
+    destroy() {
+      if (destroyOperation) return destroyOperation;
+      destroyOperation = (async () => {
+        let operationError = null;
+        try {
+          if (!fatal) await handle.unload();
+          else await closeNetworkSession('fatal');
+        } catch (error) {
+          if (!fatal) { operationError = error; stop(error); }
+          else recordNetworkCleanupError(error);
+        } finally {
+          clearStartupTimeout();
+          if (!fatal && discSession) {
+            try { await clearSourceFileStreams(); }
+            catch (error) { onLog(`Source movie catalog cleanup failed: ${error.message}`, true); }
+          }
+          if (fatal) {
+            try { await closeNetworkSession('fatal'); } catch {}
+          }
+          await retireDiscSession();
+          destroyed = true; syncAudio();
+          diagnosticLifecycle('scene_exit'); diagnosticActivity(false);
+          try { await awaitDiagnosticCheckpoint(); } catch {}
+          cancelDiagnosticDelivery(); diagnosticDelivery?.dispose();
+          longtaskObserver?.disconnect();
+          try { await audio?.destroy(); }
+          finally {
+            for (const [type, listener] of listeners) window.removeEventListener(type, listener, true);
+            publish();
+          }
         }
-        destroyed = true; syncAudio();
-        diagnosticLifecycle('scene_exit'); diagnosticActivity(false);
-        try { await awaitDiagnosticCheckpoint(); } catch {}
-        cancelDiagnosticDelivery(); diagnosticDelivery?.dispose();
-        longtaskObserver?.disconnect();
-        discSession?.close(); discSession = null;
-        try { await audio?.destroy(); }
-        finally {
-          for (const [type, listener] of listeners) window.removeEventListener(type, listener, true);
-          publish();
-        }
-      }
-      // Native consumes the terminal owner state at its next safe boundary.
-      // The global Emscripten heap remains until this document retires.
-      return Object.freeze({requiresReload: true});
+        if (operationError) throw operationError;
+        // Native consumes the terminal owner state at its next safe boundary.
+        // The global Emscripten heap remains until this document retires.
+        return Object.freeze({requiresReload: true});
+      })();
+      destroyOperation.catch(() => {});
+      return destroyOperation;
     },
   });
   function setAutomaticDiagnostics(enabled, persistPreference = true) {
@@ -941,7 +1016,8 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   }
   // The development entry may attach tools before loading; these are never part of the public handle.
   onOwner?.({Module, boundary, handle, status, check, put, prepareAudio, pauseAudioForPreparation,
-    syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck, waitForAudioRender, stop, callbacks, diagnostics});
+    syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck, waitForAudioRender, stop, callbacks,
+    attachNetworkSession, getNetworkCleanupErrors: () => Object.freeze(networkCleanupErrors.slice()), diagnostics});
   configureModule?.(Module);
   // Native seed loading needs this directory even when optional browser
   // persistence is disabled or unavailable. Keep that prerequisite in the

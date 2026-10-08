@@ -1,17 +1,22 @@
 /** Bounded observation of existing native callback counters; no source mutation. */
-export async function installNetSourceAccounting(page, capacity = 32768, {retainRenderReadiness = false} = {}) {
+export async function installNetSourceAccounting(page, capacity = 32768,
+  {retainRenderReadiness = false, awaitStartIdentity = false} = {}) {
   if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 32768)
     throw Error('Invalid network accounting capacity');
   if (typeof retainRenderReadiness !== 'boolean') throw Error('Invalid render-readiness option');
-  return page.evaluate(({capacity, retainRenderReadiness}) => {
+  if (typeof awaitStartIdentity !== 'boolean') throw Error('Invalid start-identity wait option');
+  return page.evaluate(({capacity, retainRenderReadiness, awaitStartIdentity}) => {
     if (window.__netSourceAccounting) throw Error('Network accounting is already installed');
     const original = window.menuRuntimeTiming;
     if (typeof original !== 'function') throw Error('Native timing observer is unavailable');
-    const initial = window.__net.status();
-    if (initial.active !== 1 || initial.cursor !== 0 || initial.blocker !== 'start_identity')
+    const initialAtInstall = window.__net.status();
+    const atStartIdentity = status => status?.active === 1 && status.cursor === 0 &&
+      status.blocker === 'start_identity';
+    if (!awaitStartIdentity && !atStartIdentity(initialAtInstall))
       throw Error('Network accounting must start at the unconsumed identity barrier');
     let subscriber = null;
-    const state = {capacity, initial, rows: [], overflow: 0, errors: [], frozen: false,
+    const state = {capacity, initial: atStartIdentity(initialAtInstall) ? initialAtInstall : null,
+      awaitingStartIdentity: awaitStartIdentity, rows: [], overflow: 0, errors: [], frozen: false,
       ...(retainRenderReadiness ? {render_readiness_enabled: true, render_readiness: null} : {})};
     const fail = message => { if (state.errors.length < 32) state.errors.push(message); };
     const observer = function(data) {
@@ -19,11 +24,22 @@ export async function installNetSourceAccounting(page, capacity = 32768, {retain
       try { return original.apply(this, arguments); }
       catch (error) { originalError = error; fail(`Original timing observer failed: ${String(error)}`); throw error; }
       finally {
-        if (state.rows.length >= capacity) ++state.overflow;
-        else state.rows.push({frame: data?.frame, valid: data?.valid,
-          source_steps: data?.source_steps, source_draws: data?.source_draws});
+        if (state.awaitingStartIdentity && !state.initial) {
+          try {
+            const status = window.__net.status();
+            if (atStartIdentity(status)) state.initial = status;
+            else if (status?.active === 1 && Number.isSafeInteger(status.cursor) && status.cursor > 0)
+              fail('Lockstep source progress passed the start-identity barrier before accounting observed it');
+          } catch (error) { fail(`Start-identity accounting observation failed: ${String(error)}`); }
+        }
+        const accountingActive = !state.awaitingStartIdentity || Boolean(state.initial);
+        if (accountingActive) {
+          if (state.rows.length >= capacity) ++state.overflow;
+          else state.rows.push({frame: data?.frame, valid: data?.valid,
+            source_steps: data?.source_steps, source_draws: data?.source_draws});
+        }
         let renderError = null;
-        if (retainRenderReadiness && !originalError && !state.overflow &&
+        if (accountingActive && retainRenderReadiness && !originalError && !state.overflow &&
             (data?.source_steps > 0 || data?.source_draws > 0)) {
           try {
             const status = window.__net.status(), native = window.__net.native();
@@ -43,7 +59,7 @@ export async function installNetSourceAccounting(page, capacity = 32768, {retain
             fail(`Structured render observation failed: ${String(error)}`);
           }
         }
-        if (subscriber) {
+        if (subscriber && accountingActive) {
           const observationError = originalError || renderError || (state.overflow || data?.valid !== 1 ||
             !Number.isSafeInteger(data?.frame) || data.frame < 1 ||
             !Number.isSafeInteger(data?.source_steps) || data.source_steps < 0 ||
@@ -96,8 +112,8 @@ export async function installNetSourceAccounting(page, capacity = 32768, {retain
           errors: state.errors.slice()};
       },
     };
-    return {capacity, initial};
-  }, {capacity, retainRenderReadiness});
+    return {capacity, initial: state.initial, awaiting_start_identity: state.awaitingStartIdentity};
+    }, {capacity, retainRenderReadiness, awaitStartIdentity});
 }
 
 export async function readNetSourceAccounting(page, {freeze = false} = {}) {

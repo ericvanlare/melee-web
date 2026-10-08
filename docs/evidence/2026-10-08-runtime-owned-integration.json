@@ -1,0 +1,253 @@
+{
+  "approved_test_fixture_change": "Existing diagnosticVM now extracts actual checksum helper and binds runtimeOwnedfalse/recordbytes64; assertions unchanged.",
+  "base_main": "2540f9b8f36fc7d124eebb0e9554c24ba56d1bf2",
+  "browser_evidence": "2026-10-08-runtime-owned-eight-css.json",
+  "browser_not_rerun_after_rebase": true,
+  "executable_hash_bindings": {
+    "cmake/FighterRuntime.cmake": {
+      "capture039_sha256": "7d4e47709479ebaed54f61d89d49d9d915817f1eadccf94ce44a039307ee300c",
+      "current89c_sha256": "7d4e47709479ebaed54f61d89d49d9d915817f1eadccf94ce44a039307ee300c",
+      "pre_rebase_2a8_sha256": "7d4e47709479ebaed54f61d89d49d9d915817f1eadccf94ce44a039307ee300c",
+      "unchanged": true
+    },
+    "scripts/net_lockstep_browser.mjs": {
+      "capture039_sha256": "917dfa0f284f1397b0623156609e39b259a615f80aa0afa2a3795b599965c293",
+      "current89c_sha256": "917dfa0f284f1397b0623156609e39b259a615f80aa0afa2a3795b599965c293",
+      "pre_rebase_2a8_sha256": "917dfa0f284f1397b0623156609e39b259a615f80aa0afa2a3795b599965c293",
+      "unchanged": true
+    },
+    "scripts/net_lockstep_browser_modes.mjs": {
+      "capture039_sha256": "a128d408040df9f7157a0b0bd980b97d2f5396c9f6e8440a9f925e97fa01063c",
+      "current89c_sha256": "a128d408040df9f7157a0b0bd980b97d2f5396c9f6e8440a9f925e97fa01063c",
+      "pre_rebase_2a8_sha256": "a128d408040df9f7157a0b0bd980b97d2f5396c9f6e8440a9f925e97fa01063c",
+      "unchanged": true
+    },
+    "scripts/net_lockstep_browser_peer.mjs": {
+      "capture039_sha256": "2e3b71539130576feac17b4066c0470f878aac5435fa2e49ae4c662099416fc8",
+      "current89c_sha256": "2e3b71539130576feac17b4066c0470f878aac5435fa2e49ae4c662099416fc8",
+      "pre_rebase_2a8_sha256": "2e3b71539130576feac17b4066c0470f878aac5435fa2e49ae4c662099416fc8",
+      "unchanged": true
+    },
+    "scripts/net_lockstep_runtime_owner.mjs": {
+      "capture039_sha256": "0490e870ab423623d40c24f9623939993bd200f68fa8eded6ac13ed58e185107",
+      "current89c_sha256": "0490e870ab423623d40c24f9623939993bd200f68fa8eded6ac13ed58e185107",
+      "pre_rebase_2a8_sha256": "0490e870ab423623d40c24f9623939993bd200f68fa8eded6ac13ed58e185107",
+      "unchanged": true
+    },
+    "scripts/net_session_instance.mjs": {
+      "capture039_sha256": "0f394334e718acd6f26e6db869fb799c22e1315fa1c86c7bc2a24381fc0e1513",
+      "current89c_sha256": "0f394334e718acd6f26e6db869fb799c22e1315fa1c86c7bc2a24381fc0e1513",
+      "pre_rebase_2a8_sha256": "0f394334e718acd6f26e6db869fb799c22e1315fa1c86c7bc2a24381fc0e1513",
+      "unchanged": true
+    },
+    "scripts/net_source_accounting.mjs": {
+      "capture039_sha256": "81af4cd5344b96497ab64e917a39fdfbf6092a7eaf812d09557e6dc536be5a54",
+      "current89c_sha256": "81af4cd5344b96497ab64e917a39fdfbf6092a7eaf812d09557e6dc536be5a54",
+      "pre_rebase_2a8_sha256": "81af4cd5344b96497ab64e917a39fdfbf6092a7eaf812d09557e6dc536be5a54",
+      "unchanged": true
+    },
+    "tests/browser_replay_lifecycle_test.mjs": {
+      "capture039_sha256": "6829e3a021c886b99b7ab93032d222e74f9c934ca2d793c6a7a49795fcb0d8b2",
+      "current89c_sha256": "6829e3a021c886b99b7ab93032d222e74f9c934ca2d793c6a7a49795fcb0d8b2",
+      "pre_rebase_2a8_sha256": "6829e3a021c886b99b7ab93032d222e74f9c934ca2d793c6a7a49795fcb0d8b2",
+      "unchanged": true
+    },
+    "tests/hitch_profile_test.mjs": {
+      "capture039_sha256": "e30b33ef58dcbaddeb1ebead60c78e26bf4ab587ee7da634c29d046b8730a031",
+      "current89c_sha256": "e30b33ef58dcbaddeb1ebead60c78e26bf4ab587ee7da634c29d046b8730a031",
+      "pre_rebase_2a8_sha256": "e30b33ef58dcbaddeb1ebead60c78e26bf4ab587ee7da634c29d046b8730a031",
+      "unchanged": true
+    },
+    "tests/melee_runtime_owner_test.mjs": {
+      "capture039_sha256": "f6c436fc2089740dd1516e7c2e38109cf8fc32de28bc4871690fedb274a29f71",
+      "current89c_sha256": "f6c436fc2089740dd1516e7c2e38109cf8fc32de28bc4871690fedb274a29f71",
+      "pre_rebase_2a8_sha256": "f6c436fc2089740dd1516e7c2e38109cf8fc32de28bc4871690fedb274a29f71",
+      "unchanged": true
+    },
+    "tests/net_lockstep_browser_modes.test.mjs": {
+      "capture039_sha256": "43baa82eae96c9062f9ff02244f3e4ec9c98bb6372c6f006439e77a4b3a30cc0",
+      "current89c_sha256": "43baa82eae96c9062f9ff02244f3e4ec9c98bb6372c6f006439e77a4b3a30cc0",
+      "pre_rebase_2a8_sha256": "43baa82eae96c9062f9ff02244f3e4ec9c98bb6372c6f006439e77a4b3a30cc0",
+      "unchanged": true
+    },
+    "tests/net_lockstep_browser_peer.test.mjs": {
+      "capture039_sha256": "82bc67bffadb495d16e02c9a540a95b2e8fa86c68512518720f4ed6950620a2c",
+      "current89c_sha256": "82bc67bffadb495d16e02c9a540a95b2e8fa86c68512518720f4ed6950620a2c",
+      "pre_rebase_2a8_sha256": "82bc67bffadb495d16e02c9a540a95b2e8fa86c68512518720f4ed6950620a2c",
+      "unchanged": true
+    },
+    "tests/net_lockstep_browser_pump.test.mjs": {
+      "capture039_sha256": "fb5a8a765d6cdfc88e4552647183f34b89f26802b35efcb9dc891d772f7c3073",
+      "current89c_sha256": "1169fc4b0761dcaf4f8be390e1a21fffb6042a2544de8fd81e78250ed6d3f079",
+      "pre_rebase_2a8_sha256": "fb5a8a765d6cdfc88e4552647183f34b89f26802b35efcb9dc891d772f7c3073",
+      "unchanged": false
+    },
+    "tests/net_lockstep_development_owner.test.mjs": {
+      "capture039_sha256": "6b64d480be9bcbe6b68ea1f4440703cd5572e2493fc72f981079780950697f03",
+      "current89c_sha256": "6b64d480be9bcbe6b68ea1f4440703cd5572e2493fc72f981079780950697f03",
+      "pre_rebase_2a8_sha256": "6b64d480be9bcbe6b68ea1f4440703cd5572e2493fc72f981079780950697f03",
+      "unchanged": true
+    },
+    "tests/net_lockstep_observers.test.mjs": {
+      "capture039_sha256": "58d28b98566a208c4638b2083218d50ca2712f16b051106dc3be7bed8d31922f",
+      "current89c_sha256": "58d28b98566a208c4638b2083218d50ca2712f16b051106dc3be7bed8d31922f",
+      "pre_rebase_2a8_sha256": "58d28b98566a208c4638b2083218d50ca2712f16b051106dc3be7bed8d31922f",
+      "unchanged": true
+    },
+    "tests/net_lockstep_runtime_owner.test.mjs": {
+      "capture039_sha256": "8bfdde466682cd5c5a4640fd024d497ff6993ed2e1d61875972b1876767d6b1d",
+      "current89c_sha256": "8bfdde466682cd5c5a4640fd024d497ff6993ed2e1d61875972b1876767d6b1d",
+      "pre_rebase_2a8_sha256": "8bfdde466682cd5c5a4640fd024d497ff6993ed2e1d61875972b1876767d6b1d",
+      "unchanged": true
+    },
+    "tests/net_session_instance.test.mjs": {
+      "capture039_sha256": "7565a1553bcdf558a9c5069fbe8420fd74f5d706e5de9cfa1c2c95108f3137e1",
+      "current89c_sha256": "7565a1553bcdf558a9c5069fbe8420fd74f5d706e5de9cfa1c2c95108f3137e1",
+      "pre_rebase_2a8_sha256": "7565a1553bcdf558a9c5069fbe8420fd74f5d706e5de9cfa1c2c95108f3137e1",
+      "unchanged": true
+    },
+    "tests/net_source_accounting.test.mjs": {
+      "capture039_sha256": "1fbcc8fabc03c9ea06061ef3aabd0d586937db705dce956df3baba491262cbfe",
+      "current89c_sha256": "1fbcc8fabc03c9ea06061ef3aabd0d586937db705dce956df3baba491262cbfe",
+      "pre_rebase_2a8_sha256": "1fbcc8fabc03c9ea06061ef3aabd0d586937db705dce956df3baba491262cbfe",
+      "unchanged": true
+    },
+    "tests/test_melee_runtime_owner.py": {
+      "capture039_sha256": "bb49c2199b585c24557ed8a40681c39af6f068f4f869abae2c421dc021a5566f",
+      "current89c_sha256": "bb49c2199b585c24557ed8a40681c39af6f068f4f869abae2c421dc021a5566f",
+      "pre_rebase_2a8_sha256": "bb49c2199b585c24557ed8a40681c39af6f068f4f869abae2c421dc021a5566f",
+      "unchanged": true
+    },
+    "tests/test_net_lockstep_contracts.py": {
+      "capture039_sha256": "c73692f0d94587ab753472e71775711863f1f292b984961aa183cde231de2965",
+      "current89c_sha256": "c73692f0d94587ab753472e71775711863f1f292b984961aa183cde231de2965",
+      "pre_rebase_2a8_sha256": "c73692f0d94587ab753472e71775711863f1f292b984961aa183cde231de2965",
+      "unchanged": true
+    },
+    "tests/test_web_launch.py": {
+      "capture039_sha256": "38944648b9e0166b36377116d1a25930f881283c121200f865d00138559ba977",
+      "current89c_sha256": "38944648b9e0166b36377116d1a25930f881283c121200f865d00138559ba977",
+      "pre_rebase_2a8_sha256": "38944648b9e0166b36377116d1a25930f881283c121200f865d00138559ba977",
+      "unchanged": true
+    },
+    "tools/browser_build_artifacts.json": {
+      "capture039_sha256": "959be465807737f4b6856892321289d8ce0f3a2f86193318d5bdea8b120a727f",
+      "current89c_sha256": "959be465807737f4b6856892321289d8ce0f3a2f86193318d5bdea8b120a727f",
+      "pre_rebase_2a8_sha256": "959be465807737f4b6856892321289d8ce0f3a2f86193318d5bdea8b120a727f",
+      "unchanged": true
+    },
+    "web/melee-runtime.mjs": {
+      "capture039_sha256": "f7fa37c65d92e50bf1b445d96e6f98514f688ac02841942f251beaa008c9df3b",
+      "current89c_sha256": "f7fa37c65d92e50bf1b445d96e6f98514f688ac02841942f251beaa008c9df3b",
+      "pre_rebase_2a8_sha256": "f7fa37c65d92e50bf1b445d96e6f98514f688ac02841942f251beaa008c9df3b",
+      "unchanged": true
+    },
+    "web/net_lockstep_development_owner.mjs": {
+      "capture039_sha256": "edcbe44b896b4577cb4634d4c7a591199346a44e2142e018933286f0404a161b",
+      "current89c_sha256": "edcbe44b896b4577cb4634d4c7a591199346a44e2142e018933286f0404a161b",
+      "pre_rebase_2a8_sha256": "edcbe44b896b4577cb4634d4c7a591199346a44e2142e018933286f0404a161b",
+      "unchanged": true
+    },
+    "web/runtime-development.mjs": {
+      "capture039_sha256": "224fbfc9ddce7fbbf178d5e75d2a52ceec7b89dc9a5bb4db06abcac1a93438a1",
+      "current89c_sha256": "224fbfc9ddce7fbbf178d5e75d2a52ceec7b89dc9a5bb4db06abcac1a93438a1",
+      "pre_rebase_2a8_sha256": "224fbfc9ddce7fbbf178d5e75d2a52ceec7b89dc9a5bb4db06abcac1a93438a1",
+      "unchanged": true
+    }
+  },
+  "external_validation_receipt_sha256": "7e0b5ff5e088eddd6bf1bf2fc9b28ab835169a8d20f9cdb88a7ae45566305969",
+  "full_suite": {
+    "exit": 0,
+    "failures": 0,
+    "log_sha256": "1c79ad14b973b944f9fe2797b5c949e2ad6f251efe0550368d4f510895019cd6",
+    "process_receipt_sha256": "bbfa063deae6a0866b4d40fa2493ff18cce6a47e2f3435ef8e7ac770674920f8",
+    "seconds": 461.735,
+    "skips": 153,
+    "tests": 2075
+  },
+  "historical_browser_native_release_head": "09db5f3bfa355ed66c454736a611ae608a7cbaa5",
+  "historical_browser_source_head": "039ed88176a779d89ac76d21548e7f0bdf77a2e8",
+  "ordinary_release": {
+    "all_ten_optional_flags_off": {
+      "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+      "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+      "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+      "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+      "MELEE_WEB_RESULTS_RENDERED_TRACE": "OFF",
+      "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+      "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF",
+      "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF"
+    },
+    "artifact_sha256": {
+      "action-sweep.mjs": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30",
+      "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+      "audio-worklet.js": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea",
+      "controller-input.mjs": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842",
+      "controller-panel.css": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e",
+      "controller-panel.mjs": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95",
+      "controller-settings.css": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00",
+      "controller-settings.mjs": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f",
+      "diagnostics-schema.mjs": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5",
+      "diagnostics-settings.mjs": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7",
+      "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+      "disc-session.mjs": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2",
+      "dsp-coefficients.mjs": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1",
+      "gameplay_menu_browser.data": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+      "gameplay_menu_browser.js": "902ec663d65468d9388bed0cd2ba79954d7f634fac3ac775b65e958b9caf7110",
+      "gameplay_menu_browser.wasm": "15814e1e2cff7c124145db93ef330276a6b61ac8db84b7436b5e267b5ef8392d",
+      "hitch-capture.mjs": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3",
+      "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+      "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+      "melee-runtime.mjs": "f7fa37c65d92e50bf1b445d96e6f98514f688ac02841942f251beaa008c9df3b",
+      "net-timing-pause.mjs": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16",
+      "net_lockstep_browser_peer.mjs": "2e3b71539130576feac17b4066c0470f878aac5435fa2e49ae4c662099416fc8",
+      "net_lockstep_core.mjs": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+      "net_lockstep_development_owner.mjs": "edcbe44b896b4577cb4634d4c7a591199346a44e2142e018933286f0404a161b",
+      "net_lockstep_native_adapter.mjs": "4130dce6c6390506b66bfafebace3fe33ac561ce8a873d06956b619fa5f0686a",
+      "net_lockstep_runtime_owner.mjs": "0490e870ab423623d40c24f9623939993bd200f68fa8eded6ac13ed58e185107",
+      "net_lockstep_webrtc.mjs": "f7bdc789211d097bae000fa7b966f157a5db72b185fbfea6f1179a140ee3e1fe",
+      "net_lockstep_webrtc_signaling.mjs": "4e54cb6b2286c6133efbd9477336553f876d17ae3425794328748580f4157326",
+      "net_lockstep_websocket_relay.mjs": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5",
+      "prototype-keyboard-layouts.mjs": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745",
+      "runtime-assets.mjs": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190",
+      "runtime-audio-assets.mjs": "033bf0bd4caa6c744ebead3dd7091bec8496b5f8d2039d60a3cdf9d398a7f05c",
+      "runtime-audio.mjs": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc",
+      "runtime-cache.js": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26",
+      "runtime-development.mjs": "224fbfc9ddce7fbbf178d5e75d2a52ceec7b89dc9a5bb4db06abcac1a93438a1",
+      "runtime-diagnostics-delivery.mjs": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241",
+      "runtime-diagnostics.mjs": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec",
+      "runtime.html": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d",
+      "touch-controls.css": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d",
+      "touch-controls.mjs": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+    },
+    "build_log_sha256": "ab5727cfcf39b1954b8f18e91a30e5d90d9e5c042f0183b335b5b79d5be7d33d",
+    "configuration": "Release",
+    "exit": 0,
+    "process_receipt_sha256": "08f73b73bea223b7b56db5cc14911e85cda93ebc9a3f3c39cd1dcba4277f73ed",
+    "producer_head": "89c2ac825e6681ffa14255da00d1783d5a57189c",
+    "runtime_module_source_release_sha256": {
+      "net_lockstep_browser_peer.mjs": "2e3b71539130576feac17b4066c0470f878aac5435fa2e49ae4c662099416fc8",
+      "net_lockstep_core.mjs": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+      "net_lockstep_development_owner.mjs": "edcbe44b896b4577cb4634d4c7a591199346a44e2142e018933286f0404a161b",
+      "net_lockstep_native_adapter.mjs": "4130dce6c6390506b66bfafebace3fe33ac561ce8a873d06956b619fa5f0686a",
+      "net_lockstep_runtime_owner.mjs": "0490e870ab423623d40c24f9623939993bd200f68fa8eded6ac13ed58e185107",
+      "net_lockstep_webrtc.mjs": "f7bdc789211d097bae000fa7b966f157a5db72b185fbfea6f1179a140ee3e1fe",
+      "net_lockstep_webrtc_signaling.mjs": "4e54cb6b2286c6133efbd9477336553f876d17ae3425794328748580f4157326",
+      "net_lockstep_websocket_relay.mjs": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5"
+    }
+  },
+  "retained_failed_integration_attempt": {
+    "cause": "Diagnostic VM fixture missing actual helper and runtime ownership binding; production/harness bodies unchanged.",
+    "failures": 1,
+    "head": "51697302f166a62c7af91d74bf7d6769d56b5647",
+    "log_sha256": "df4c90c12d46fed363aa9bd3b02ec92f56165a05507c2c1c2c26c885375bb8f5",
+    "process_receipt_sha256": "21ecd40b1418828d6cbc47e4e29fdf2228c68fb770252728f0100f4da87c399d",
+    "skips": 153,
+    "tests": 2075
+  },
+  "schema": "melee-web-runtime-owned-final-integration-v1",
+  "scope": "Current-main regression/build closure. Historical browser producer remains distinct; no new browser/timing/physical/nonneutral/full-route claim.",
+  "validated_source_head": "89c2ac825e6681ffa14255da00d1783d5a57189c"
+}

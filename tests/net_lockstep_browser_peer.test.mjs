@@ -55,7 +55,7 @@ function harness({terminalFailure = false, confirmFailure = false, sourceTicks =
     return Array.from(bytes);
   };
   return {controller, endpoint, sent, nativeRecords, frames, terminals, deliver, ready, record,
-    captureConfigs, cleanupOrder, setPushFailure(value) { pushFailure = value; },
+    captureConfigs, cleanupOrder, endpointError: error => callbacks.onEndpointError('alpha', error), setPushFailure(value) { pushFailure = value; },
     get confirmations() { return confirmations; }};
 }
 
@@ -448,7 +448,7 @@ test('facade refresh replaces stale ACK and terminal snapshot and serializes PAD
 });
 
 
-test('settled snapshot and close join a receive blocked inside native confirmation', async () => {
+test('close fences an inbound callback queued before execution while the snapshot remains readable', async () => {
   const gate = deferred(), run = harness({readyGate: gate});
   await run.controller.rpc('start', [{build: 'same'}]);
   const receive = run.deliver({type: 'hello', version: 1, role: 'beta', local_port: 1, remote_port: 0,
@@ -457,11 +457,11 @@ test('settled snapshot and close join a receive blocked inside native confirmati
   const snapshot = run.controller.rpc('snapshot').then(() => { snapshotDone = true; });
   const close = run.controller.close().then(() => { closeDone = true; });
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(snapshotDone, false);
-  assert.equal(closeDone, false);
+  assert.equal(snapshotDone, true);
+  assert.equal(closeDone, true);
   gate.resolve();
   await Promise.all([receive, snapshot, close]);
-  assert.equal(run.confirmations, 1);
+  assert.equal(run.confirmations, 0, 'the not-yet-entered handshake callback is fenced at execution');
   assert.equal(closeDone, true);
 });
 
@@ -469,6 +469,8 @@ const moduleNames = ['net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs',
   'net_lockstep_native_adapter.mjs', 'net_lockstep_websocket_relay.mjs'];
 const webrtcModuleNames = [...moduleNames, 'net_lockstep_webrtc.mjs'];
 const roomSignaledWebRtcModuleNames = [...webrtcModuleNames, 'net_lockstep_webrtc_signaling.mjs'];
+const runtimeOwnedModuleNames = [...roomSignaledWebRtcModuleNames,
+  'net_lockstep_runtime_owner.mjs', 'net_lockstep_development_owner.mjs'];
 const moduleBody = Buffer.from('module bytes');
 const moduleHash = createHash('sha256').update(moduleBody).digest('hex');
 function moduleObserver(names = moduleNames) {
@@ -499,7 +501,7 @@ test('peer module observer binds the optional local WebRTC endpoint module', asy
     [...webrtcModuleNames].sort());
   assert.throws(() => createPeerModuleResponseObserver({url: 'http://127.0.0.1:8787/runtime.html',
     peerModuleHashes: {'net_lockstep_webrtc.mjs': moduleHash}, runtimeArtifactNames: []}),
-  /exact relay or WebRTC module SHA-256 inventory/);
+  /exact relay, WebRTC, room-signaling or runtime-owned module SHA-256 inventory/);
 });
 
 test('peer module observer binds the page-owned room signaling module as an exact extension', async () => {
@@ -509,7 +511,18 @@ test('peer module observer binds the page-owned room signaling module as an exac
   assert.deepEqual(rows.map(row => new URL(row.url).pathname.split('/').at(-1)).sort(),
     [...roomSignaledWebRtcModuleNames].sort());
   assert.throws(() => moduleObserver([...webrtcModuleNames, 'unexpected.mjs']),
-    /exact relay or WebRTC module SHA-256 inventory/);
+    /exact relay, WebRTC, room-signaling or runtime-owned module SHA-256 inventory/);
+});
+
+test('runtime-owned module observer binds both lifecycle owners as an exact eight-module set', async () => {
+  const observer = moduleObserver(runtimeOwnedModuleNames);
+  for (const name of runtimeOwnedModuleNames) observer.observe(response(name));
+  const rows = await observer.freeze();
+  assert.equal(rows.length, 8);
+  assert.deepEqual(rows.map(row => new URL(row.url).pathname.split('/').at(-1)).sort(),
+    [...runtimeOwnedModuleNames].sort());
+  assert.throws(() => moduleObserver([...runtimeOwnedModuleNames, 'unexpected.mjs']),
+    /exact relay, WebRTC, room-signaling or runtime-owned module SHA-256 inventory/);
 });
 
 test('peer module observer rejects unexpected paths, changed bytes, headers and duplicate/missing responses', async () => {
@@ -604,8 +617,8 @@ test('unarmed endpoint close calls native disconnect without sending on the clos
   assert.equal(run.sent.length, before);
   run.nativeRecords.push(run.record(0));
   const drained = await run.controller.rpc('drain');
-  assert.deepEqual(drained.records, [run.record(0)]);
-  assert.equal(drained.checksumOwnership.post_terminal_native_evidence_records, 1);
+  assert.deepEqual(drained.records, []);
+  assert.equal(run.nativeRecords.length, 1, 'closed peer does not touch native scratch after disposal');
   assert.equal(drained.protocol.local_checksum_ticks, 0);
 });
 
@@ -615,4 +628,90 @@ test('unarmed endpoint close retains rejected native terminal callback', async (
   await assert.rejects(run.controller.close({intentional: false}), /Browser native peer close failed/);
   assert.match(run.controller.snapshot().failure, /terminal callback failure/);
   assert.equal(run.terminals.length, 1);
+});
+
+
+test('event-driven identity readiness joins late hello and asynchronous native confirmation', async t => {
+  t.mock.timers.enable({apis: ['setTimeout']});
+  const gate = deferred(), run = harness({readyGate: gate});
+  const local = await run.controller.rpc('start');
+  assert.equal(local.protocol.ready, false, 'Start RPC preserves its local startup semantics');
+  const ready = run.controller.waitForReady();
+  assert.equal(run.controller.waitForReady(), ready, 'One readiness waiter owns one deadline');
+  let settled = false; ready.then(() => { settled = true; }, () => { settled = true; });
+  const receive = run.deliver({type: 'hello', version: 1, role: 'beta', local_port: 1, remote_port: 0,
+    agreement: {build: 'same'}});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(run.controller.snapshot().protocol.ready, true, 'Core hello agreement precedes native callback completion');
+  assert.equal(run.confirmations, 1); assert.equal(settled, false, 'Native confirmation is still pending');
+  gate.resolve(); await receive; await ready; assert.equal(settled, true);
+  t.mock.timers.tick(5000);
+  assert.equal(run.controller.snapshot().failure, null, 'Successful readiness clears its deadline');
+  await run.controller.close();
+});
+
+test('identity readiness retains mismatch and native confirmation refusal first causes', async t => {
+  for (const mode of ['mismatch', 'native-refusal']) await t.test(mode, async () => {
+    const run = harness({confirmFailure: mode === 'native-refusal'});
+    await run.controller.rpc('start');
+    const ready = run.controller.waitForReady();
+    const rejected = assert.rejects(ready, mode === 'mismatch' ? /start identity/ : /confirmation/);
+    await assert.rejects(run.deliver({type: 'hello', version: 1, role: 'beta', local_port: 1, remote_port: 0,
+      agreement: {build: mode === 'mismatch' ? 'different' : 'same'}}));
+    await rejected;
+    assert.equal(run.confirmations, mode === 'mismatch' ? 0 : 1);
+    await assert.rejects(run.controller.close(), /close failed/);
+  });
+});
+
+test('identity readiness close fence cancels before hello and during native confirmation', async t => {
+  t.mock.timers.enable({apis: ['setTimeout']});
+  for (const mode of ['normal', 'fatal']) for (const phase of ['before-hello', 'during-confirm'])
+    await t.test(mode + ' ' + phase, async () => {
+      const gate = deferred(), run = harness({readyGate: phase === 'during-confirm' ? gate : null});
+      await run.controller.rpc('start');
+      const ready = run.controller.waitForReady(), rejected = assert.rejects(ready, /closed before identity agreement/);
+      let receive = Promise.resolve();
+      if (phase === 'during-confirm') {
+        receive = run.deliver({type: 'hello', version: 1, role: 'beta', local_port: 1, remote_port: 0, agreement: {build: 'same'}});
+        await new Promise(resolve => setImmediate(resolve)); assert.equal(run.confirmations, 1);
+      }
+      const closed = run.controller.close({mode}); await rejected;
+      gate.resolve();
+      if (phase === 'during-confirm') {
+        await assert.rejects(receive, /fenced/);
+        await assert.rejects(closed, /close failed/);
+      } else { await receive; await closed; }
+      assert.equal(run.controller.snapshot().closed, true);
+      assert.equal(run.confirmations, phase === 'during-confirm' ? 1 : 0);
+      const failure = run.controller.snapshot().failure; t.mock.timers.tick(5000);
+      assert.equal(run.controller.snapshot().failure, failure, 'Close clears the readiness deadline');
+    });
+});
+
+test('missing hello expires one readiness deadline and late close leaves no timer', async t => {
+  t.mock.timers.enable({apis: ['setTimeout']});
+  const run = harness(); await run.controller.rpc('start');
+  const ready = run.controller.waitForReady(), rejected = assert.rejects(ready, /identity agreement did not complete within 5000ms/);
+  t.mock.timers.tick(4999); await Promise.resolve();
+  assert.equal(run.controller.snapshot().failure, null);
+  t.mock.timers.tick(1); await rejected;
+  const failure = run.controller.snapshot().failure;
+  await assert.rejects(run.controller.close(), /close failed/); t.mock.timers.tick(5000);
+  assert.equal(run.controller.snapshot().failure, failure, 'First timeout cause is stable after close');
+});
+
+
+test('identity readiness retains endpoint error object and terminal reason before hello', async t => {
+  for (const mode of ['endpoint-error', 'remote-terminal']) await t.test(mode, async () => {
+    const run = harness(); await run.controller.rpc('start');
+    const ready = run.controller.waitForReady(), first = Error('first inbound transport failure');
+    const rejected = assert.rejects(ready, mode === 'endpoint-error' ? error => error === first : /remote rejected native identity/);
+    if (mode === 'endpoint-error') {
+      await run.endpointError(first); await run.endpointError(Error('later transport failure'));
+    } else await run.deliver({type: 'terminal', version: 1, role: 'beta', kind: 'startIdentity',
+      details: {reason: 'remote rejected native identity'}});
+    await rejected; assert.equal(run.confirmations, 0);
+    await run.controller.close().catch(() => {});
+  });
 });

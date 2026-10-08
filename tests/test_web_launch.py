@@ -12,6 +12,19 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class WebLaunchTests(unittest.TestCase):
+    def test_network_owner_modules_are_staged_only_for_private_runtimes(self):
+        cmake = (ROOT / "cmake" / "FighterRuntime.cmake").read_text(encoding="utf-8")
+        condition = "if(NOT MELEE_WEB_PUBLIC_RUNTIME AND NOT MELEE_WEB_AUDIO_PREVIEW_RUNTIME)"
+        first = cmake.index(condition)
+        start = cmake.index(condition, first + len(condition))
+        end = cmake.index("\nendif()", start)
+        private_network_modules = cmake[start:end]
+        for module in ("net_lockstep_core.mjs", "net_lockstep_native_adapter.mjs",
+                       "net_lockstep_browser_peer.mjs", "net_lockstep_websocket_relay.mjs",
+                       "net_lockstep_webrtc.mjs", "net_lockstep_webrtc_signaling.mjs",
+                       "net_lockstep_runtime_owner.mjs", "net_lockstep_development_owner.mjs"):
+            self.assertIn(module, private_network_modules)
+
     def test_runtime_is_native_menu_player(self):
         runtime = (ROOT / "web" / "runtime.html").read_text(encoding="utf-8")
         development = (ROOT / "web" / "runtime-development.mjs").read_text(encoding="utf-8")
@@ -88,6 +101,11 @@ class WebLaunchTests(unittest.TestCase):
         self.assertIn("_melee_web_native_menu_player_state", cmake)
         self.assertIn("configure_file(scripts/net_lockstep_core.mjs net_lockstep_core.mjs COPYONLY)", cmake)
         self.assertIn("configure_file(scripts/net_lockstep_native_adapter.mjs net_lockstep_native_adapter.mjs COPYONLY)", cmake)
+        for name in ("net_lockstep_browser_peer", "net_lockstep_websocket_relay",
+                     "net_lockstep_webrtc", "net_lockstep_webrtc_signaling",
+                     "net_lockstep_runtime_owner"):
+            self.assertIn(f"configure_file(scripts/{name}.mjs {name}.mjs COPYONLY)", cmake)
+        self.assertIn("configure_file(web/net_lockstep_development_owner.mjs net_lockstep_development_owner.mjs COPYONLY)", cmake)
         self.assertIn("if(NOT MELEE_WEB_PUBLIC_RUNTIME AND NOT MELEE_WEB_AUDIO_PREVIEW_RUNTIME)", cmake)
 
     def test_kirby_copy_manifest_includes_every_authored_model_color(self):

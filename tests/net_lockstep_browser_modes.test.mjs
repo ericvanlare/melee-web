@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
+import {spawnSync} from 'node:child_process';
+import {mkdtemp, rm} from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import {validateLockstepBrowserMode} from '../scripts/net_lockstep_browser_modes.mjs';
 
 const options = (overrides = {}) => ({scenario: 'positive', 'peer-owner': 'browser',
@@ -7,7 +11,7 @@ const options = (overrides = {}) => ({scenario: 'positive', 'peer-owner': 'brows
 
 test('recorded full route uses page-owned room-signaled WebRTC', () => {
   assert.deepEqual(validateLockstepBrowserMode(options()), {browserOwned: true,
-    peerTransport: 'webrtc', localWebRtc: true, roomWorkerSignaling: true});
+    runtimeOwned: false, peerTransport: 'webrtc', localWebRtc: true, roomWorkerSignaling: true});
 });
 
 test('input-sampling retains both existing WebRTC signaling modes', () => {
@@ -40,10 +44,10 @@ test('room signaling requires WebRTC and relay mode still requires a URL', () =>
 test('ordinary positive TCP and browser relay modes keep their defaults', () => {
   assert.deepEqual(validateLockstepBrowserMode(options({'peer-owner': 'node',
     'peer-transport': undefined, 'webrtc-signaling': 'memory'})), {browserOwned: false,
-    peerTransport: 'tcp-loopback', localWebRtc: false, roomWorkerSignaling: false});
+    runtimeOwned: false, peerTransport: 'tcp-loopback', localWebRtc: false, roomWorkerSignaling: false});
   assert.deepEqual(validateLockstepBrowserMode(options({'peer-transport': undefined,
     'webrtc-signaling': 'memory', 'relay-url': 'ws://127.0.0.1:8788'})), {browserOwned: true,
-    peerTransport: 'relay', localWebRtc: false, roomWorkerSignaling: false});
+    runtimeOwned: false, peerTransport: 'relay', localWebRtc: false, roomWorkerSignaling: false});
 });
 
 test('unknown mode values and Node input-sampling remain rejected', () => {
@@ -64,11 +68,21 @@ test('disconnect WebRTC requires page-owned room signaling', () => {
 
 test('flip WebRTC reuses page-owned room signaling and rejects Node SDP coordination', () => {
   assert.deepEqual(validateLockstepBrowserMode(options({scenario: 'flip'})), {
-    browserOwned: true, peerTransport: 'webrtc', localWebRtc: true, roomWorkerSignaling: true});
+    browserOwned: true, runtimeOwned: false, peerTransport: 'webrtc', localWebRtc: true, roomWorkerSignaling: true});
   assert.throws(() => validateLockstepBrowserMode(options({scenario: 'flip',
     'webrtc-signaling': 'memory'})), /Flip WebRTC mode requires/);
   assert.throws(() => validateLockstepBrowserMode(options({scenario: 'flip',
     'peer-owner': 'node'})), /applies only to browser-owned peers/);
+});
+
+test('runtime-owned diagnostic path keeps protocol and live PAD ownership in the browser runtime', () => {
+  const value = options({scenario: 'native-pump', 'peer-owner': 'runtime',
+    'peer-transport': undefined, 'source-ticks': '8'});
+  assert.deepEqual(validateLockstepBrowserMode(value), {browserOwned: true, runtimeOwned: true,
+    peerTransport: 'webrtc', localWebRtc: true, roomWorkerSignaling: true});
+  for (const override of [{scenario: 'positive'}, {'peer-transport': 'relay'},
+    {'webrtc-signaling': 'memory'}])
+    assert.throws(() => validateLockstepBrowserMode({...value, ...override}), /Runtime-owned peers require/);
 });
 
 
@@ -80,4 +94,24 @@ test('bounded diagnostic native pump admits only eight-tick page-owned room WebR
   assert.throws(() => validateLockstepBrowserMode({...value, 'webrtc-signaling': 'memory'}), /room-worker/);
   assert.throws(() => validateLockstepBrowserMode({...value, 'peer-owner': 'node'}), /browser-owned/);
   assert.throws(() => validateLockstepBrowserMode({...value, 'peer-transport': 'relay'}), /local WebRTC/);
+});
+
+test('runtime-owned native-pump CLI reaches output creation without a synthetic script', async () => {
+  const scratch = await mkdtemp(path.join(os.tmpdir(), 'melee-web-runtime-cli-'));
+  const existingOutput = path.join(scratch, 'already-exists');
+  const {mkdir} = await import('node:fs/promises');
+  await mkdir(existingOutput);
+  try {
+    const result = spawnSync(process.execPath, [path.resolve('scripts/net_lockstep_browser.mjs'),
+      '--url', 'http://127.0.0.1:8787/runtime.html', '--disc', path.join(scratch, 'unused.iso'),
+      '--seed', '1', '--out', existingOutput, '--scenario', 'native-pump', '--peer-owner', 'runtime',
+      '--peer-transport', 'webrtc', '--webrtc-signaling', 'room-worker', '--source-ticks', '8'],
+    {cwd: process.cwd(), encoding: 'utf8', timeout: 5000});
+    const output = `${result.stdout}\n${result.stderr}`;
+    assert.notEqual(result.status, 0, 'existing output directory must stop this reducer before browser launch');
+    assert.match(output, /EEXIST|already exists/);
+    assert.doesNotMatch(output, /Requested local input workload exceeds the script/);
+  } finally {
+    await rm(scratch, {recursive: true, force: true});
+  }
 });
