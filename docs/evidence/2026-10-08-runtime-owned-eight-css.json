@@ -84,7 +84,7 @@
     "current_harness_failures": 0,
     "current_harness_focused_tests": 82,
     "failures": 0,
-    "final_integration_suite_and_release": "pending after rebase to current main",
+    "final_integration_suite_and_release": "Passed; see2026-10-08-runtime-owned-integration.json for current-main source/build identities and retained failedfixture attempt.",
     "prior_full_suite_head": "09db5f3bfa355ed66c454736a611ae608a7cbaa5",
     "skips": 153,
     "tests": 2065

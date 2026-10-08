@@ -31,6 +31,7 @@ This is a CSS-only functional diagnostic. It does not establish the supported
 CSS → SSS → gameplay → Results → CSS session, public player integration, physical
 controller input, foreground/live timing, performance, two-machine Internet
 acceptance, original-game pixels or PCM equivalence. Focused owner, peer and
-lifecycle controls passed 82 tests. Final integration suite and affected Release
-refresh remain pending after rebase to current main. The reused Release producer's
-prior suite passed 2,065 tests with 153 skips.
+lifecycle controls passed 82 tests. The [final integration receipt](../evidence/2026-10-08-runtime-owned-integration.json)
+binds the passing current-main regression suite and ordinary Release refresh. The
+historical browser/native producer identities remain unchanged. The first rebased
+suite failure and its narrow diagnostic fixture correction remain recorded.
