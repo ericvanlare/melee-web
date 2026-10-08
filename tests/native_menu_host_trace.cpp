@@ -2360,6 +2360,7 @@ void run_stadium_e8_request(
     bool cleanup_complete = false;
     std::unique_ptr<NativeDatArena> scalar_owner;
     std::unique_ptr<DatNativeMap> map_owner;
+    std::unique_ptr<DatNativeStage> on_init_map_owner;
     std::unique_ptr<DatStageYaku> random_yaku;
     std::unique_ptr<DatEffectBanks> effects;
     std::unique_ptr<DatScene> quake;
@@ -2375,6 +2376,9 @@ void run_stadium_e8_request(
     std::unique_ptr<GroundStorageLease> ground_storage;
     void* ground_data = nullptr;
     void* yakumono_data = nullptr;
+    void* native_map_head = nullptr;
+    void* native_collision = nullptr;
+    void* native_ald_yaku = nullptr;
     uint32_t seed_before = 0;
     const uint32_t* seed_owner = seed_ptr;
     check(seed_owner != nullptr,
@@ -2443,6 +2447,8 @@ void run_stadium_e8_request(
                       snapshot, error, sizeof(error)), error);
             snapshot = nullptr;
         }
+        // The stage-map archive and light table borrow this owner's descriptors.
+        on_init_map_owner.reset();
         stadium_sis.reset();
         items.reset();
         quake.reset();
@@ -2471,17 +2477,34 @@ void run_stadium_e8_request(
         scalar_owner = std::make_unique<NativeDatArena>(archive);
         ground_data = melee_web_ground_data_decode(
             scalar_owner->reader(), ground_root);
-        yakumono_data = melee_web_stadium_yakumono_decode(
-            scalar_owner->reader(), yakumono_root);
-        check(ground_data != nullptr && yakumono_data != nullptr,
-              "C0 typed scalar owners did not decode the Stadium roots");
-        map_owner = std::make_unique<DatNativeMap>(
-            archive, map_contract.view());
-        check(map_owner->map_head() != nullptr && map_owner->collision() != nullptr,
-              "C0 typed map owner did not decode map_head/coll_data");
-        random_yaku = std::make_unique<DatStageYaku>(archive, yaku_root);
-        check(random_yaku->native_data() != nullptr,
-              "C0 ALDYakuAll typed owner is absent");
+        check(ground_data != nullptr,
+              "C0 typed scalar owner did not decode GroundParam");
+        if (perform_on_init) {
+            on_init_map_owner = std::make_unique<DatNativeStage>(
+                archive, St_Kind_PStadium,
+                DatNativeStage::ProfileMode::DiagnosticOnly);
+            native_map_head = on_init_map_owner->map_head();
+            native_ald_yaku = on_init_map_owner->random_item_scripts();
+            yakumono_data = on_init_map_owner->yakumono();
+        } else {
+            yakumono_data = melee_web_stadium_yakumono_decode(
+                scalar_owner->reader(), yakumono_root);
+            map_owner = std::make_unique<DatNativeMap>(
+                archive, map_contract.view());
+            native_map_head = map_owner->map_head();
+            native_collision = map_owner->collision();
+            random_yaku = std::make_unique<DatStageYaku>(archive, yaku_root);
+            native_ald_yaku = random_yaku->native_data();
+            stadium_sis = std::make_unique<DatSis>(archive, "SIS_GrPStadiumData");
+            check(stadium_sis->descriptor() != nullptr,
+                  "Stadium SIS typed owner returned a null descriptor");
+        }
+        check(yakumono_data != nullptr && native_map_head != nullptr &&
+                  native_ald_yaku != nullptr,
+              "C0 typed stage owner did not decode its map/yaku roots");
+        if (!perform_on_init)
+            check(native_collision != nullptr,
+                  "C0 typed map owner did not decode coll_data");
         effects = std::make_unique<DatEffectBanks>(
             archive, "map_ptcl", "map_texg", 0x40);
         check(effects->command_root() != nullptr &&
@@ -2496,22 +2519,78 @@ void run_stadium_e8_request(
               "C0 authored-null itemdata unexpectedly decoded stage items");
         check(melee_web_stadium_c1_stage_object_failures() == 0,
               "E8 typed preparation published a stage object or item/light root");
-
-        stadium_sis = std::make_unique<DatSis>(archive, "SIS_GrPStadiumData");
-        check(stadium_sis->descriptor() != nullptr,
-              "Stadium SIS typed owner returned a null descriptor");
-
-        const std::vector<MeleeWebArchiveSymbol> symbols{
-            {"GrPs.usd", "map_head", map_owner->map_head()},
-            {"GrPs.usd", "coll_data", map_owner->collision()},
-            {"GrPs.usd", "grGroundParam", ground_data},
-            {"GrPs.usd", "ALDYakuAll", random_yaku->native_data()},
-            {"GrPs.usd", "map_ptcl", effects->command_root()},
-            {"GrPs.usd", "map_texg", effects->texture_root()},
-            {"GrPs.usd", "yakumono_param", yakumono_data},
-            {"GrPs.usd", "quake_model_set", quake->single_model()},
-            {"GrPs.usd", "SIS_GrPStadiumData", stadium_sis->descriptor()},
-        };
+        std::vector<MeleeWebArchiveSymbol> symbols;
+        if (perform_on_init) {
+            on_init_map_owner->set_particle_roots(
+                effects->command_root(), effects->texture_root());
+            on_init_map_owner->set_quake_model(quake->single_model());
+            symbols = on_init_map_owner->public_symbols();
+            check(!symbols.empty() && symbols.front().filename &&
+                      std::strcmp(symbols.front().filename, "GrPs.usd") == 0,
+                  "Diagnostic stage catalog lost its exact filename identity");
+            const char* const catalog_filename = symbols.front().filename;
+            for (const auto& symbol : symbols)
+                check(symbol.filename && symbol.symbol &&
+                          std::strcmp(symbol.filename, catalog_filename) == 0,
+                      "Diagnostic stage catalog mixes filenames or has an unnamed symbol");
+            const auto find_owned_symbol = [&](const char* name) {
+                const auto count = std::count_if(
+                    symbols.begin(), symbols.end(),
+                    [&](const auto& symbol) {
+                        return std::strcmp(symbol.symbol, name) == 0;
+                    });
+                check(count == 1,
+                      "Diagnostic stage catalog must expose one requested public name");
+                const auto found = std::find_if(
+                    symbols.begin(), symbols.end(),
+                    [&](const auto& symbol) {
+                        return std::strcmp(symbol.symbol, name) == 0;
+                    });
+                return &*found;
+            };
+            auto* ground_symbol = find_owned_symbol("grGroundParam");
+            check(ground_symbol->native_data == nullptr,
+                  "Diagnostic GroundParam source entry must remain explicitly unhydrated");
+            ground_symbol->native_data = ground_data;
+            auto* map_head_symbol = find_owned_symbol("map_head");
+            auto* collision_symbol = find_owned_symbol("coll_data");
+            auto* yakumono_symbol = find_owned_symbol("yakumono_param");
+            auto* ald_yaku_symbol = find_owned_symbol("ALDYakuAll");
+            auto* sis_symbol = find_owned_symbol("SIS_GrPStadiumData");
+            auto* particle_symbol = find_owned_symbol("map_ptcl");
+            auto* texture_symbol = find_owned_symbol("map_texg");
+            auto* quake_symbol = find_owned_symbol("quake_model_set");
+            native_map_head = map_head_symbol->native_data;
+            native_collision = collision_symbol->native_data;
+            native_ald_yaku = ald_yaku_symbol->native_data;
+            yakumono_data = yakumono_symbol->native_data;
+            check(ground_symbol->native_data == ground_data &&
+                      native_map_head != nullptr && native_collision != nullptr &&
+                      native_ald_yaku != nullptr && yakumono_data != nullptr &&
+                      sis_symbol->native_data != nullptr &&
+                      particle_symbol->native_data == effects->command_root() &&
+                      texture_symbol->native_data == effects->texture_root() &&
+                      quake_symbol->native_data == quake->single_model() &&
+                      native_map_head == on_init_map_owner->map_head() &&
+                      native_ald_yaku ==
+                          on_init_map_owner->random_item_scripts() &&
+                      yakumono_data == on_init_map_owner->yakumono(),
+                  "Diagnostic catalog identities differ from the one typed stage owner");
+            check(!on_init_map_owner->light_overrides().empty(),
+                  "Diagnostic stage owner has no typed light identity table");
+        } else {
+            symbols = {
+                {"GrPs.usd", "map_head", native_map_head},
+                {"GrPs.usd", "coll_data", native_collision},
+                {"GrPs.usd", "grGroundParam", ground_data},
+                {"GrPs.usd", "ALDYakuAll", native_ald_yaku},
+                {"GrPs.usd", "map_ptcl", effects->command_root()},
+                {"GrPs.usd", "map_texg", effects->texture_root()},
+                {"GrPs.usd", "yakumono_param", yakumono_data},
+                {"GrPs.usd", "quake_model_set", quake->single_model()},
+                {"GrPs.usd", "SIS_GrPStadiumData", stadium_sis->descriptor()},
+            };
+        }
         if (perform_on_init) {
             check(!melee_web_effect_runtime_prepared() &&
                       !melee_web_effect_runtime_active(),
@@ -2524,11 +2603,17 @@ void run_stadium_e8_request(
                   "Original effects were not initialized before stage-map and bank publication");
         }
         stage_map = melee_web_stage_map_publish(
-            map_owner->map_head(), error, sizeof(error));
+            native_map_head, error, sizeof(error));
         check(stage_map != nullptr, error);
         check(melee_web_stage_map_set_public(
                   stage_map, symbols.data(), symbols.size(), error,
                   sizeof(error)), error);
+        if (perform_on_init) {
+            const auto& overrides = on_init_map_owner->light_overrides();
+            check(melee_web_stage_map_set_overrides(
+                      stage_map, overrides.data(), overrides.size(), error,
+                      sizeof(error)), error);
+        }
         previous_ground_param = melee_web_ground_data_publish(ground_data);
         ground_param_published = true;
         check(previous_ground_param == before_view.param,
@@ -2629,13 +2714,13 @@ void run_stadium_e8_request(
               "E8 typed open did not preserve and resolve exact /GrPs.usd identity");
         check(observed.map_head_calls == 1 &&
                   observed.map_head_archive == observed.typed_archive_handle &&
-                  observed.map_head_value == map_owner->map_head() &&
+                  observed.map_head_value == native_map_head &&
                   observed.coll_data_calls == 1 &&
-                  observed.coll_data_value == map_owner->collision() &&
+                  observed.coll_data_value == native_collision &&
                   observed.ground_param_calls == 0 &&
                   observed.itemdata_calls == 0 &&
                   observed.ald_yaku_all_calls == 1 &&
-                  observed.ald_yaku_all_value == random_yaku->native_data() &&
+                  observed.ald_yaku_all_value == native_ald_yaku &&
                   observed.map_ptcl_calls == 1 &&
                   observed.map_ptcl_value == effects->command_root() &&
                   observed.map_texg_calls == 1 &&
@@ -2654,8 +2739,8 @@ void run_stadium_e8_request(
                   after_view.param == ground_data &&
                   after_view.x6E4[0] == -1 &&
                   after_view.x6E4[1] == before_view.x6E4[1] &&
-                  after_view.coll_data == map_owner->collision() &&
-                  after_view.ald_yaku_all == random_yaku->native_data() &&
+                  after_view.coll_data == native_collision &&
+                  after_view.ald_yaku_all == native_ald_yaku &&
                   after_view.map_ptcl == effects->command_root() &&
                   after_view.map_texg == effects->texture_root() &&
                   after_view.yakumono_param == yakumono_data &&
