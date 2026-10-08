@@ -16,7 +16,7 @@ const deferred = () => {
 function fixture({context = {}, identityPromise = Promise.resolve(identity), startFailure = null,
   closeFailure = null} = {}) {
   const state = {ready: true, fatal: false, bundle: true, replayActive: false,
-    ownerState: 'prepared', phase: 1, ...context};
+    ownerState: 'prepared', phase: 0, ...context};
   const events = [];
   let entry;
   const session = {
@@ -45,7 +45,7 @@ function fixture({context = {}, identityPromise = Promise.resolve(identity), sta
   return {entry, events, state, owner};
 }
 
-test('development entry binds fresh CSS, identity, adapter session and native start in order', async () => {
+test('development entry binds fresh prepared context, identity, adapter session and native start in order', async () => {
   const run = fixture();
   assert.equal(run.entry.configure(config), true);
   assert.throws(() => run.entry.configure(config), /unavailable or already owned/);
@@ -61,17 +61,26 @@ test('development entry binds fresh CSS, identity, adapter session and native st
   assert.equal(agreement.input_source, 'browser-local-native-PADStatus');
   assert.equal(agreement.runtime_wasm_sha256, identity.wasm);
   assert.equal(run.entry.state().used, true);
+  const completedEvents = run.events.length;
+  await assert.rejects(run.entry.begin(17, 8), /already owns or used/);
+  assert.equal(run.events.length, completedEvents, 'Used sessions cannot read identity or reenter native work');
 });
 
 test('development entry rejects invalid context before identity or native work', async () => {
-  for (const context of [{ownerState: 'css'}, {phase: 3}, {fatal: true}, {replayActive: true}, {bundle: false}]) {
+  for (const context of [{phase: 1}, {ownerState: 'css'}, {ownerState: 'idle'}, {phase: 3},
+    {ready: false}, {fatal: true}, {replayActive: true}, {bundle: false}]) {
     const run = fixture({context});
     assert.throws(() => run.entry.configure(config), /Runtime lockstep/);
     assert.deepEqual(run.events, []);
+    const stale = fixture();
+    stale.entry.configure(config);
+    Object.assign(stale.state, context);
+    await assert.rejects(stale.entry.begin(1, 8), /Runtime lockstep/);
+    assert.deepEqual(stale.events, [], 'A context changed after configuration cannot read identity or enter native work');
   }
   const run = fixture();
   run.entry.configure(config);
-  run.state.phase = 3;
+  run.state.phase = 1;
   await assert.rejects(run.entry.begin(1, 8), /Runtime lockstep/);
   assert.deepEqual(run.events, []);
 });
@@ -82,7 +91,7 @@ test('development entry synchronously reserves identity fetch and rechecks conte
   run.entry.configure(config);
   const first = run.entry.begin(1, 8);
   await assert.rejects(run.entry.begin(1, 8), /already owns or used/);
-  run.state.phase = 3;
+  run.state.phase = 1;
   identityWait.resolve(identity);
   await assert.rejects(first, /Runtime lockstep/);
   assert.deepEqual(run.events.map(row => row[0]), ['identity']);
@@ -107,16 +116,25 @@ test('development runtime APIs use the guarded owner and only frame callbacks ad
   const frameEnd = source.indexOf(' const now=performance.now();', frameStart);
   assert.ok(frameStart >= 0 && frameEnd > frameStart, 'frame entry calls the owner before ordinary frame work');
 
-  const events = [], identityGate = deferred();
+  const events = [], identityGate = deferred(), sessionReady = deferred();
   const identityValue = {algorithm: 'sha256', wasm: 'c'.repeat(64), disc: {sha256: 'd'.repeat(64)}};
-  const nativeCalls = [];
+  const nativeCalls = [];let buildStartAgreement = null, nativeStart = null;
   const Module = {
-    phase: 1,
+    phase: 0,
     _melee_web_native_menu_phase() { return this.phase; },
     _melee_web_native_menu_net_begin_lockstep(seed, ticks) {
+      assert.equal(this.phase, 0, 'Native begin requires the unentered prepared host');
+      assert.equal(nativeStart, null, 'No CSS start identity exists before native begin');
       nativeCalls.push(['begin', seed, ticks]); return 1;
     },
-    _melee_web_native_menu_launch() { nativeCalls.push(['launch']); return 1; },
+    _melee_web_native_menu_launch() {
+      assert.equal(this.phase, 0, 'No prelaunch source tick enters CSS');
+      assert.equal(nativeCalls.length, 1, 'Native lockstep begins before CSS entry');
+      nativeCalls.push(['launch']); this.phase = 1;
+      nativeStart = {recorded: 1, required: 1, capture_failed: false, scene: 1};
+      queueMicrotask(() => scope.developmentHooks.frame(false));
+      return 1;
+    },
   };
   const owner = {
     stop(error) { events.push(['stop', error]); },
@@ -139,11 +157,19 @@ test('development runtime APIs use the guarded owner and only frame callbacks ad
       session = {
         start(buildAgreement) {
           events.push(['session-start']);
-          const agreement = buildAgreement({recorded: 1, required: 1, capture_failed: false});
-          events.push(['agreement', agreement]);
-          return Promise.resolve({protocol: {ready: true}});
+          buildStartAgreement = buildAgreement;
+          return sessionReady.promise;
         },
-        onFrame() { events.push(['frame']); },
+        onFrame() {
+          events.push(['frame']);
+          if (buildStartAgreement) {
+            assert.equal(Module.phase, 1, 'Start identity is observed after original CSS entry');
+            assert.ok(nativeStart, 'The native CSS identity is available at the frame callback');
+            events.push(['agreement', buildStartAgreement(nativeStart)]);
+            buildStartAgreement = null;
+            sessionReady.resolve({protocol: {ready: true}});
+          }
+        },
         async close(options) { events.push(['session-close', options?.mode || 'normal']); return {closed: true}; },
         snapshot() { return {role: 'alpha'}; },
       };
@@ -173,13 +199,13 @@ test('development runtime APIs use the guarded owner and only frame callbacks ad
   const guardedStart = window.meleeNetBeginLockstep(11, 8);
   await Promise.resolve();
   assert.equal(identityCalls, 1, 'identity read begins only after the runtime API guard');
-  Module.phase = 3;
+  Module.phase = 1;
   identityGate.resolve(identityValue);
-  await assert.rejects(guardedStart, /fresh original CSS native context/);
+  await assert.rejects(guardedStart, /fresh prepared native context/);
   assert.equal(ownerFactories, 0, 'context is rechecked before adapter/session creation');
   assert.equal(nativeCalls.length, 0, 'stale context cannot enter native lockstep or launch');
 
-  Module.phase = 1;
+  Module.phase = 0;
   await window.meleeNetBeginLockstep(17, 8);
   assert.equal(ownerFactories, 1);
   assert.equal(window.meleeNetRuntimeLockstepSnapshot().role, 'alpha');
@@ -191,6 +217,8 @@ test('development runtime APIs use the guarded owner and only frame callbacks ad
   const agreement = events.find(row => row[0] === 'agreement')[1];
   assert.equal(agreement.input_delay, 2);
   assert.equal(agreement.native_start.recorded, 1);
+  assert.equal(agreement.native_start.scene, 1);
+  assert.equal(Module.phase, 1, 'Successful entry reaches CSS only after native begin');
   assert.deepEqual(events.filter(row => ['reset-timing', 'prepare-audio', 'pause-audio', 'audio-render', 'focus', 'sync-audio']
     .includes(row[0])).map(row => row[0]),
   ['reset-timing', 'prepare-audio', 'pause-audio', 'audio-render', 'focus', 'sync-audio']);
@@ -199,7 +227,7 @@ test('development runtime APIs use the guarded owner and only frame callbacks ad
   assert.equal(events.at(-1)[0], 'frame', 'the actual frame hook forwards progress once');
   scope.fatal = true;
   scope.developmentHooks.frame(false);
-  assert.equal(events.filter(row => row[0] === 'frame').length, 1, 'fatal frames stop forwarding progress');
+  assert.equal(events.filter(row => row[0] === 'frame').length, 2, 'fatal frames stop forwarding progress');
   scope.fatal = false;
   const frameFailure = Error('frame owner failed');
   session.onFrame = () => { throw frameFailure; };

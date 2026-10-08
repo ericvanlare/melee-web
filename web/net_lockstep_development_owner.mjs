@@ -16,8 +16,9 @@ function assertAvailable(context) {
   if (!context?.ready || context.fatal || !context.bundle || context.replayActive ||
       context.ownerState !== 'prepared')
     throw Error('Runtime lockstep session is unavailable or does not own a fresh prepared disc');
-  if (context.phase !== 1)
-    throw Error('Runtime lockstep requires the fresh original CSS native context');
+  // Native begin_lockstep requires the CREATED host before launch enters CSS.
+  if (context.phase !== 0)
+    throw Error('Runtime lockstep requires the fresh prepared native context');
 }
 
 /** Owns the development-only start boundary for one runtime lockstep session. */
