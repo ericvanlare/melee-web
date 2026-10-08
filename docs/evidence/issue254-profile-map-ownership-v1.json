@@ -1,0 +1,213 @@
+{
+  "schema": "melee-web-issue254-profile-map-ownership-v1",
+  "result": "passed_scoped_profile_to_native_map_contract_and_controls",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/254",
+  "evidence_labels": [
+    "Compiled",
+    "Synthetic controls",
+    "Source identified"
+  ],
+  "boundary": "Convert the canonical MeleeWebStageProfile map policy into the existing DatNativeMapContract, then use the existing hydrator. No new content registry, DAT decoder, Stadium admission, or stage initialization is introduced.",
+  "behavior": {
+    "existing_profiles": "All seven current profiles explicitly select current_all_resident. Their prior archive-derived external references, resident policy, nonzero flag consumers, local flag target behavior, ordering, and hydration checks are preserved.",
+    "authored_profiles": "The opt-in authored policy requires a complete typed declaration and rejects missing or contradictory fields, malformed symbols, invalid flag kinds, nonzero local targets on external-null flags, and mismatched authored flag counts before the existing hydrator checks referenced rows and symbols.",
+    "reuse": "The adapter copies policy data into DatNativeMapContractData; the existing DatNativeStage hydrator remains the sole map owner and retains its bounds and identity checks.",
+    "rejected": "No per-stage decoder/registry, asset-specific exemption, inferred authored identity, Stadium profile, or default fallback for unspecified policy."
+  },
+  "source": {
+    "validation_producer_commit": "5b5112a5467e65442808be7da167acadb8cff33b",
+    "validation_producer_tree": "0e9170500a22d515f9bb39e53e2fdad029a06b8c",
+    "base_commit": "75c2541f23c0c8fdf68802bd911402e6df8f681c",
+    "base_tree": "d617c853d9b48e51f2d7db3f959ebdf4f21ee7e6",
+    "tracked_worktree_clean_at_validation": true,
+    "source_blobs": {
+      "src/dat_native_stage.cpp": "4c3482947d1a20c48c50a4c54201f20fad4e0abc",
+      "src/dat_native_stage.hpp": "2ecd689956b3b1385cdf286bd53a9a8866ddc22a",
+      "src/gameplay_stage_profile.c": "e5dbda6eae1419582b31b794706a5249ab598411",
+      "src/gameplay_stage_profile.h": "4676c6bf50f8c61785ac54bb765b5c0510d6d4b7",
+      "tests/dat_native_stage_map_trace.cpp": "354d68a6e7d551e9356a40c40c5c6a10bc91976d"
+    }
+  },
+  "focused_validation": {
+    "target": "dat_native_stage_map_trace",
+    "configuration": "Release, MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=ON",
+    "command": [
+      "python3",
+      "scripts/agent_workspace.py",
+      "run",
+      "--",
+      ".venv/bin/cmake",
+      "--build",
+      "build/browser-stadium-c1a-release",
+      "--target",
+      "dat_native_stage_map_trace",
+      "-j",
+      "6"
+    ],
+    "exit_code": 0,
+    "log": {
+      "external_run": "issue254-profile-contract-20261008-20261007-191523-d5abc429/focused-build-v4.log",
+      "sha256": "e16fa240ce58068c7f0d2c084958c69266e24f57b17989fc9cdee97216e22481"
+    },
+    "outputs": {
+      "dat_native_stage_map_trace.js": {
+        "bytes": 235253,
+        "sha256": "8da0f773ed5acd434ac98655227bd5ce625733987a6081258fd6eaaea8630ca8"
+      },
+      "dat_native_stage_map_trace.wasm": {
+        "bytes": 7925533,
+        "sha256": "e63bebfa57fb9ecdf7b0a9b1bd3878dbac5f3874346868cee986e5b042c9e07f"
+      },
+      "CMakeCache.txt": {
+        "bytes": 61252,
+        "sha256": "59b26ab9d7f1414fd337c83e8dc3f009655dad37c38dbd6e7434268b69e7d9e6"
+      }
+    },
+    "synthetic_run": {
+      "command": "python3 -m unittest tests.test_dat_native_stage.NativeStageOriginalRuntime.test_structural_marker_pairs_preserve_authored_order_and_checks -v",
+      "mechanism": "The test runs the C1-built trace under the repository-pinned Node runtime with --marker-fixture.",
+      "exit_code": 0,
+      "success_lines": [
+        "Explicit stage-profile map policies and authored ownership adapter controls passed",
+        "Structural marker pairs preserve duplicates/order, strict stage requirements and checked negatives passed"
+      ],
+      "log": {
+        "external_run": "issue254-profile-contract-20261008-20261007-191523-d5abc429/focused-run-v2.log",
+        "sha256": "ab49ed845bffcdeb6860c34c84de7145f929698d9dd17260598b1a779c2ab15f"
+      }
+    }
+  },
+  "integration_validation": {
+    "full_suite": {
+      "command": [
+        "python3",
+        "scripts/agent_workspace.py",
+        "run",
+        "--",
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "producer_commit": "5b5112a5467e65442808be7da167acadb8cff33b",
+      "exit_code": 0,
+      "tests_run": 2046,
+      "skipped": 133,
+      "elapsed_seconds": 394.648,
+      "result_line": "OK (skipped=133)",
+      "log": {
+        "external_run": "issue254-profile-contract-20261008-20261007-191523-d5abc429/full-suite-v2.log",
+        "sha256": "cabfb6cf0319855dccf1af24fa49f1b516942cdf0306e75409e2ed47d307c6cd"
+      },
+      "relevant_existing_regression": "The standard suite ran and passed test_stadium_map_only_owner_preserves_exact_imports_and_nulls using its existing retained C0 GrPs.usd fixture. This is the existing C0 regression, not a new Stadium C1 or OnInit run."
+    },
+    "ordinary_release_runtime": {
+      "command": [
+        "python3",
+        "scripts/agent_workspace.py",
+        "run",
+        "--",
+        "python3",
+        "scripts/build.py",
+        "--target",
+        "runtime",
+        "--configuration",
+        "Release"
+      ],
+      "producer_commit": "5b5112a5467e65442808be7da167acadb8cff33b",
+      "exit_code": 0,
+      "target": "gameplay_menu_browser.js",
+      "diagnostic_options": {
+        "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+        "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+        "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+        "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+        "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+        "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+        "MELEE_WEB_RESULTS_RENDERED_TRACE": "OFF",
+        "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+        "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF",
+        "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF"
+      },
+      "cache": {
+        "bytes": 60977,
+        "sha256": "de0c1275f03b2fd5b618fbbe59e3d7d16a251176ad41c68db9939100d6356bdc"
+      },
+      "outputs": {
+        "gameplay_menu_browser.js": {
+          "bytes": 300352,
+          "sha256": "a6d9562e638f2395e49cb23bbdd97567e2dbc0f2b993008842d9407317f18d64"
+        },
+        "gameplay_menu_browser.wasm": {
+          "bytes": 15749040,
+          "sha256": "a985c95eec8c2e7c869b86dc8f77dd3d8ae589d98420c91f017a8bba4778f6db"
+        },
+        "gameplay_menu_browser.data": {
+          "bytes": 3674112,
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+        }
+      },
+      "log": {
+        "external_run": "issue254-profile-contract-20261008-20261007-191523-d5abc429/ordinary-release-runtime-build-v1.log",
+        "sha256": "12166d765a50f2a0a2b3e4247588506e92548b358d22cb6d1e8c9a655a9c1157"
+      }
+    }
+  },
+  "preserved_prebuild_artifacts": {
+    "manifest_sha256": "bd0b5e1001af8e018e6ea58855d6e963b6ea28b592e1134c6dd6a72fa4474cd7",
+    "manifest_external_run": "issue254-profile-contract-20261008-20261007-191523-d5abc429/preserved-artifact-manifest-v1.json",
+    "verified_count": 9,
+    "all_copies_match_at_receipt_preparation": true,
+    "source_builds_left_in_place": true,
+    "artifacts": [
+      {"path": "preserved-artifacts/build/browser-stadium-c1a-release/CMakeCache.txt", "producer": "13d93caa69ada0d8475c61ec66768816b0522c24", "bytes": 61252, "sha256": "59b26ab9d7f1414fd337c83e8dc3f009655dad37c38dbd6e7434268b69e7d9e6"},
+      {"path": "preserved-artifacts/build/browser-stadium-c1a-release/CMakeFiles/fighter_source_runtime.dir/build/gameplay-source/src/melee/gr/grpstadium.c.o", "producer": "13d93caa69ada0d8475c61ec66768816b0522c24", "bytes": 32172, "sha256": "c40ab6d44f014d7a3264dedeb402d06a45b6b438b0cada82f2db3de7609d61f8"},
+      {"path": "preserved-artifacts/build/browser-stadium-c1a-release/CMakeFiles/native_menu_host_trace.dir/tests/native_menu_host_trace.cpp.o", "producer": "13d93caa69ada0d8475c61ec66768816b0522c24", "bytes": 594828, "sha256": "1a640ef87f889a3dca17ac504dcf6ad08ee42b5380949df0cc2d9dee86461dc7"},
+      {"path": "preserved-artifacts/build/browser-stadium-c1a-release/native_menu_host_trace.js", "producer": "13d93caa69ada0d8475c61ec66768816b0522c24", "bytes": 233346, "sha256": "fa7234633e33c1817448f79ddcae8247f4f5cf48d375e346c27bdec033ee3958"},
+      {"path": "preserved-artifacts/build/browser-stadium-c1a-release/native_menu_host_trace.wasm", "producer": "13d93caa69ada0d8475c61ec66768816b0522c24", "bytes": 13917028, "sha256": "1620a89cc369622b64b812cd8bf01482144e82d633cd4bd1257cc771abeaca38"},
+      {"path": "preserved-artifacts/build/browser-release/gameplay_menu_browser.js", "producer": "0c3c932a66349b7db817b982a6a9c815d23fc00d", "bytes": 300352, "sha256": "4e751ebb2467c3a8ee74583b37aa1753f1233c89e496b61458594c16eb262e61"},
+      {"path": "preserved-artifacts/build/browser-release/gameplay_menu_browser.wasm", "producer": "0c3c932a66349b7db817b982a6a9c815d23fc00d", "bytes": 15742171, "sha256": "fed9176c93ba0feb98fc38d7dc6cacadc2ccd42b67d96825ea71b89c9c21685b"},
+      {"path": "preserved-artifacts/build/browser-release/gameplay_menu_browser.data", "producer": "0c3c932a66349b7db817b982a6a9c815d23fc00d", "bytes": 3674112, "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"},
+      {"path": "preserved-artifacts/build/browser-release/CMakeCache.txt", "producer": "0c3c932a66349b7db817b982a6a9c815d23fc00d", "bytes": 60977, "sha256": "de0c1275f03b2fd5b618fbbe59e3d7d16a251176ad41c68db9939100d6356bdc"}
+    ]
+  },
+  "failures_and_corrections": [
+    {
+      "attempt": "focused-build-v1",
+      "result": "preparation_failed_before_build",
+      "cause": "The wrapper could not resolve cmake from PATH; later invocation used the checkout-pinned .venv/bin/cmake.",
+      "log": {"external_run": "issue254-profile-contract-20261008-20261007-191523-d5abc429/focused-build-v1.log", "sha256": "a0591c760be629ba438165e963fc258a55714fe7706b70679e49d478d3399711"}
+    },
+    {
+      "attempt": "focused-build-v2",
+      "result": "compile_failed",
+      "cause": "The focused test declared an invalid enum value as constexpr; compiler required runtime initialization. Corrected in the following source revision.",
+      "log": {"external_run": "issue254-profile-contract-20261008-20261007-191523-d5abc429/focused-build-v2.log", "sha256": "ea5aa5a5b24f89f93a90d5990aa8b602dbadfc61bbf0f35d727bdf93b73e84c1"}
+    },
+    {
+      "attempt": "focused-run-v1",
+      "result": "synthetic_fixture_failed",
+      "cause": "The test fixture accidentally inserted a duplicate DAT relocation slot. Corrected fixture construction; final controls passed.",
+      "log": {"external_run": "issue254-profile-contract-20261008-20261007-191523-d5abc429/focused-run-v1.log", "sha256": "be2fa895622552b7ad441dfee437fe2b88605789ff1f863fc343f2c736e62b91"}
+    },
+    {
+      "attempt": "full-suite-v1",
+      "result": "intentionally_interrupted_incomplete",
+      "cause": "The first suite attempt was stopped during scope clarification after the existing retained C0 map ownership regression had passed. The corrected scope required the standard suite to run normally; it was restarted unchanged and completed as full-suite-v2.",
+      "log": {"external_run": "issue254-profile-contract-20261008-20261007-191523-d5abc429/full-suite-v1.log", "sha256": "74621242f3a80d93844b078188665c953f0659e3b97bc14b12cbab9b76ad3ef2"}
+    }
+  ],
+  "limits": {
+    "authored_local_material": "Synthetic adapter selection is checked, but the fixture has no authored material graph; the existing hydrator's unsupported-descriptor rejection is preserved. No real local-material hydration is claimed.",
+    "not_run": [
+      "A Stadium profile or authored Stadium ownership declaration",
+      "A new retained Stadium C1/native fixture run",
+      "Original Stadium OnInit, stage admission, callbacks, rendering, browser, or visual acceptance",
+      "A material-graph hydration through the new authored policy"
+    ]
+  },
+  "private_evidence": "Raw logs, the pre-build copy manifest and preserved build artifacts are retained under external run ID issue254-profile-contract-20261008-20261007-191523-d5abc429. Artifact-relative names above are relative to that run; no machine-specific path is required."
+}
