@@ -5554,7 +5554,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807d
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..ce50a4c7d10f71cac57e4295d6b134842ff00650 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..9973393ef39e2a48e89abc0973d7f9a2fdcb6338 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,10 @@
@@ -5568,7 +5568,24 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..ce50a4c7d10f71cac57e4295d6b13484
  #include <sysdolphin/baselib/forward.h>
  
  #include "granime.h"
-@@ -652,6 +657,38 @@ typedef struct ImageDescWrapper {
+@@ -64,6 +69,16 @@ static struct grPStadium_YakumonoParam {
+     s16 x50;
+ }* yakumono_param;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Restore this source-owned pointer after a Stadium map lifetime. */
++void* melee_web_grpstadium_exchange_yakumono(void* value)
++{
++    void* previous = yakumono_param;
++    yakumono_param = value;
++    return previous;
++}
++#endif
++
+ GrJoint grPs_803E1248[] = {
+     { 1, 3, 0 }, { 2, 3, 0 }, { 3, 4, 0 },
+     { 4, 5, 0 }, { 5, 6, 0 }, { 7, 9, 0 },
+@@ -652,6 +667,38 @@ typedef struct ImageDescWrapper {
      u16 x1A, x1C;
  } ImageDescWrapper;
  

@@ -62,6 +62,7 @@ extern "C" {
 #include <melee/mn/mnmain.h>
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include <melee/gr/grdatfiles.h>
+#include <melee/gr/ground.h>
 #include <melee/gr/stage.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/objalloc.h>
@@ -90,6 +91,7 @@ extern "C" {
 #include <sysdolphin/baselib/rumble.h>
 extern HSD_RumbleData HSD_Rumble_804C22E0[4];
 }
+#include <array>
 #include <bit>
 #include <cmath>
 #include <cstdlib>
@@ -111,6 +113,7 @@ extern "C" int melee_web_vs_mode_end(void);
 extern "C" int melee_web_vs_mode_select_state(int);
 extern "C" int melee_web_vs_mode_set_route(int current_mode, int previous_mode);
 extern "C" void* melee_web_current_scene_info(void);
+extern "C" void* melee_web_grpstadium_exchange_yakumono(void* value);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 extern "C" int melee_web_stage_selection_begin(int stage_kind);
 extern "C" int melee_web_stage_selection_end(void);
@@ -125,6 +128,77 @@ std::string stream_name(MeleeWebAudio* audio){
  std::string result(path);const auto slash=result.find_last_of("/\\");return slash==std::string::npos?result:result.substr(slash+1);
 }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+void run_stadium_yakumono_exchange_control()
+{
+    check(stage_info.yakumono_param == nullptr &&
+              std::all_of(std::begin(stage_info.map_gobjs),
+                          std::end(stage_info.map_gobjs),
+                          [](const auto* gobj) { return gobj == nullptr; }) &&
+              std::all_of(std::begin(stage_info.x280),
+                          std::end(stage_info.x280),
+                          [](const auto* marker) { return marker == nullptr; }) &&
+              HSD_GObj_Entities == nullptr,
+          "Asset-free exchange control must start before source Ground/GObj construction");
+    std::array<unsigned char, sizeof(StageInfo)> stage_before{};
+    std::array<unsigned char, sizeof(HSD_GObjLibInitData)> init_before{};
+    std::array<unsigned char, sizeof(HSD_GObj_804CE3E4)> dispatch_before{};
+    std::memcpy(stage_before.data(), &stage_info, sizeof(stage_info));
+    std::memcpy(init_before.data(), &HSD_GObjLibInitData,
+                sizeof(HSD_GObjLibInitData));
+    std::memcpy(dispatch_before.data(), &HSD_GObj_804CE3E4,
+                sizeof(HSD_GObj_804CE3E4));
+    const HSD_GObjList* entities_before = HSD_GObj_Entities;
+    GObjFunc* funcs_before = HSD_GObj_804D7810;
+    HSD_GObj* callback_a_before = HSD_GObj_804D7814;
+    HSD_GObj* callback_b_before = HSD_GObj_804D7818;
+    HSD_GObj* callback_c_before = HSD_GObj_804D781C;
+    HSD_GObj** object_lists_before = HSD_GObj_804D7820;
+    HSD_GObj** gx_lists_before = HSD_GObjGXLinkHead;
+    HSD_GObj** low_lists_before = plinklow_gobjs;
+    HSD_GObjProc* proc_a_before = HSD_GObj_804D7830;
+    const s32 proc_a_count_before = HSD_GObj_804D7834;
+    HSD_GObjProc* proc_b_before = HSD_GObj_804D7838;
+    const s32 proc_b_count_before = HSD_GObj_804D783C;
+    HSD_GObjProc** proc_lists_a_before = HSD_GObj_804D7840;
+    HSD_GObjProc** proc_lists_b_before = HSD_GObj_804D7844;
+
+    // Distinct, naturally aligned source-shaped sentinels; the exchange never dereferences them.
+    MeleeWebStadiumYakumono a{};
+    MeleeWebStadiumYakumono b{};
+    void* original = melee_web_grpstadium_exchange_yakumono(&a);
+    void* previous_b = melee_web_grpstadium_exchange_yakumono(&b);
+    void* previous_a = melee_web_grpstadium_exchange_yakumono(&a);
+    void* previous_restore = melee_web_grpstadium_exchange_yakumono(original);
+    void* previous_verify = melee_web_grpstadium_exchange_yakumono(nullptr);
+
+    check(original == nullptr && previous_b == &a && previous_a == &b &&
+              previous_restore == &a && previous_verify == nullptr,
+          "Stadium yakumono exchange did not preserve NULL/A/B/A/NULL pointer ownership");
+    check(std::memcmp(stage_before.data(), &stage_info, sizeof(stage_info)) == 0,
+          "Stadium yakumono exchange changed source StageInfo");
+    check(HSD_GObj_Entities == entities_before &&
+              HSD_GObj_804D7810 == funcs_before &&
+              HSD_GObj_804D7814 == callback_a_before &&
+              HSD_GObj_804D7818 == callback_b_before &&
+              HSD_GObj_804D781C == callback_c_before &&
+              HSD_GObj_804D7820 == object_lists_before &&
+              HSD_GObjGXLinkHead == gx_lists_before &&
+              plinklow_gobjs == low_lists_before &&
+              HSD_GObj_804D7830 == proc_a_before &&
+              HSD_GObj_804D7834 == proc_a_count_before &&
+              HSD_GObj_804D7838 == proc_b_before &&
+              HSD_GObj_804D783C == proc_b_count_before &&
+              HSD_GObj_804D7840 == proc_lists_a_before &&
+              HSD_GObj_804D7844 == proc_lists_b_before &&
+              std::memcmp(init_before.data(), &HSD_GObjLibInitData,
+                          sizeof(HSD_GObjLibInitData)) == 0 &&
+              std::memcmp(dispatch_before.data(), &HSD_GObj_804CE3E4,
+                          sizeof(HSD_GObj_804CE3E4)) == 0,
+          "Stadium yakumono exchange changed original GObj registry/dispatch state");
+    std::cout << "Stadium yakumono exchange asset-free control passed; pointer restored and "
+                 "source StageInfo/GObj owner state unchanged\n";
+}
+
 void check_stadium_preflight_stage_empty()
 {
     check(melee_web_stage_map_archives() == nullptr,
@@ -3085,6 +3159,11 @@ void run_stadium_c1a_selection_smoke(
 #endif
 }
 int main(int argc,char** argv){try{
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(argc==2&&std::string_view(argv[1])=="--stadium-yakumono-exchange"){
+  run_stadium_yakumono_exchange_control();return 0;
+ }
+#endif
  if(argc<3||argc>8)throw std::runtime_error("Expected menu/audio directories, optional stage kind, transition trace path, source revision and input recipe");
  const int stage_kind=argc>=4?std::stoi(argv[3]):St_Kind_Last;
  const char* trace_path=argc>=5?argv[4]:nullptr;
