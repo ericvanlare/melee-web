@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {verifyNetSourceAccounting} from './net_source_accounting.mjs';
 
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 
@@ -19,22 +20,78 @@ export function renderEventSignatures(log) {
   return new Set(renderEvents(log).map(row => row.signature));
 }
 
+export function readyRenderCallback(data) {
+  return Boolean(data && data.began === 1 && data.drawn === 1 && data.draw_suppressed === 0 &&
+    data.preparation_ms === 0 && data.draw_calls > 0 && data.source_draws > 0 &&
+    !/preparing|ready:\s*0/i.test(data.source || ''));
+}
+
 export function readyRenderEvent(diagnostics, expectedPhase, priorSignatures = new Set()) {
   if (!diagnostics || diagnostics.unavailable || diagnostics.phase !== expectedPhase ||
       diagnostics.running !== 1 || /preparing original/i.test(diagnostics.status || '')) return null;
   const rows = renderEvents(diagnostics.log);
   for (let index = rows.length - 1; index >= 0; --index) {
     const row = rows[index], data = row.data;
-    if (priorSignatures.has(row.signature) || data.began !== 1 || data.drawn !== 1 ||
-        data.draw_suppressed !== 0 || data.preparation_ms !== 0 ||
-        !(data.draw_calls > 0) || !(data.source_draws > 0) ||
-        /preparing|ready:\s*0/i.test(data.source || '')) continue;
+    if (priorSignatures.has(row.signature) || !readyRenderCallback(data)) continue;
     return {phase: expectedPhase, kind: row.kind, frame: data.frame ?? null,
       draw_calls: data.draw_calls, source_draws: data.source_draws,
       draw_suppressed: data.draw_suppressed, source: data.source ?? null,
       signature: row.signature};
   }
   return null;
+}
+
+export function verifyAccountedRenderReadiness(capture, native, status, expectedCursor, expectedPhase = 1) {
+  verifyNetSourceAccounting(capture, expectedCursor);
+  const draw = capture.render_readiness, row = capture.rows[draw?.row_index];
+  if (capture.render_readiness_enabled !== true || !draw ||
+      !Number.isSafeInteger(draw.row_index) || draw.row_index < 0 || !row ||
+      row.frame !== draw.frame || row.valid !== 1 || draw.valid !== 1 ||
+      row.source_steps !== draw.source_steps || row.source_draws !== draw.source_draws ||
+      draw.source_cursor !== expectedCursor || status?.active !== 1 || status?.cursor !== expectedCursor || status?.blocker !== 'complete' ||
+      draw.phase !== expectedPhase || native?.phase !== expectedPhase ||
+      draw.running !== 1 || native?.running !== 1 || draw.error !== null || native?.error !== null ||
+      /preparing original/i.test(draw.status || '') || typeof draw.source !== 'string' || !draw.source.length || draw.source.length > 4096 ||
+      !Number.isSafeInteger(draw.draw_calls) || draw.draw_calls <= 0 ||
+      !Number.isSafeInteger(draw.source_draws) || draw.source_draws <= 0 || !readyRenderCallback(draw) ||
+      capture.rows.slice(0, draw.row_index + 1).reduce((sum, item) => sum + item.source_steps, 0) !== expectedCursor)
+    throw Error('Structured render readiness is missing, invalid or outside the held source boundary');
+  return {phase: expectedPhase, kind: 'structured native accounting callback', frame: draw.frame,
+    source_cursor: draw.source_cursor, row_index: draw.row_index, draw_calls: draw.draw_calls,
+    source_draws: draw.source_draws, draw_suppressed: draw.draw_suppressed, source: draw.source};
+}
+
+// Retain the actual screenshot assertion operands even when the guard rejects.
+// Retain the existing driver snapshot without additional truncation. Its DOM
+// text fields and error rows have source bounds; runtimeError is not capped.
+export function retainAccountedCssObservation(row, observation, {
+  role, expectedCursor, expectedBlocker = 'complete', expectedTerminal,
+}) {
+  delete row.accounted_css;
+  const {png_signature_valid, gpu, native, status, render_readiness: readiness} = observation;
+  const predicates = {
+    png_signature_valid: png_signature_valid === true,
+    cross_origin_isolated: gpu?.cross_origin_isolated === true,
+    webgpu_adapter: gpu?.webgpu_adapter === true,
+    native_phase: native?.phase === 1,
+    native_running: native?.running === 1,
+    native_error: native?.error === null,
+    render_readiness: Boolean(readiness),
+    render_draw_calls: Number.isSafeInteger(readiness?.draw_calls) && readiness.draw_calls > 0,
+    render_source_draws: Number.isSafeInteger(readiness?.source_draws) && readiness.source_draws > 0,
+    source_cursor: status?.cursor === expectedCursor,
+    blocker: status?.blocker === expectedBlocker,
+    terminal_kind: expectedBlocker !== 'terminal' || status?.terminal?.kind === expectedTerminal,
+  };
+  const failedPredicates = Object.keys(predicates).filter(name => !predicates[name]);
+  row.accounted_css_observation = {...observation, expected_cursor: expectedCursor,
+    expected_blocker: expectedBlocker, expected_terminal: expectedTerminal,
+    predicates, failed_predicates: failedPredicates,
+    outcome: failedPredicates.length ? 'failed' : 'guard-passed',
+    provisional: true, scope: 'Screenshot guard operands; not an accepted accounted_css artifact'};
+  if (failedPredicates.length)
+    throw Error(`${role} CSS accounting capture did not retain its rendered final cursor ${expectedCursor}`);
+  return row.accounted_css_observation;
 }
 
 function validateTerminalStatus(status, expectedKind, role) {

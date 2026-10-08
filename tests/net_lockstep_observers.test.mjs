@@ -5,7 +5,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import vm from 'node:vm';
 import {EventEmitter} from 'node:events';
-import {readyRenderEvent, renderEventSignatures, verifyFirstChecksumMismatch,
+import {readyRenderEvent, renderEventSignatures, retainAccountedCssObservation, verifyFirstChecksumMismatch,
   verifyTerminalHold, verifyDisconnectBoundary, verifyPositivePeerCompletion, verifyReliableHostWebRtc, WasmResponseIdentityObserver, attachWasmResponseIdentityObserver} from '../scripts/net_lockstep_observers.mjs';
 import {createTransportCallbackQueue} from '../scripts/net_lockstep_transport.mjs';
 
@@ -15,6 +15,78 @@ function callback(data, kind = 'Native callback') {
 
 const readyDraw = extra => ({began: 1, drawn: 1, frame: 17, preparation_ms: 0,
   draw_calls: 90, source_draws: 1, draw_suppressed: 0, source: 'Original stage select', ...extra});
+
+const cssObservation = () => ({screenshot: 'accounted-css.png', bytes: 100,
+  sha256: 'observed-png-hash', png_signature_valid: true,
+  gpu: {cross_origin_isolated: true, webgpu_adapter: true},
+  browser_driver: {phase: 1, running: 1, log: callback(readyDraw())},
+  render_readiness: {draw_calls: 90, source_draws: 1},
+  native: {phase: 1, running: 1, error: null},
+  status: {cursor: 8, blocker: 'complete', terminal: {kind: 0}}});
+
+test('CSS observation retains exact guard operands and stays provisional on success', () => {
+  const row = {}, observed = cssObservation();
+  retainAccountedCssObservation(row, observed, {role: 'alpha', expectedCursor: 8});
+  assert.equal(row.accounted_css, undefined);
+  assert.equal(row.accounted_css_observation.provisional, true);
+  assert.equal(row.accounted_css_observation.outcome, 'guard-passed');
+  assert.deepEqual(row.accounted_css_observation.failed_predicates, []);
+  for (const [key, value] of Object.entries(observed))
+    assert.deepEqual(row.accounted_css_observation[key], value);
+});
+
+const cssFailures = [
+  ['png_signature_valid', o => { o.png_signature_valid = false; }],
+  ['png_signature_valid', o => { delete o.png_signature_valid; }],
+  ['cross_origin_isolated', o => { delete o.gpu.cross_origin_isolated; }],
+  ['cross_origin_isolated', o => { o.gpu.cross_origin_isolated = false; }],
+  ['cross_origin_isolated', o => { o.gpu = null; }],
+  ['webgpu_adapter', o => { o.gpu.webgpu_adapter = false; }],
+  ['webgpu_adapter', o => { delete o.gpu.webgpu_adapter; }],
+  ['native_phase', o => { o.native.phase = 0; }],
+  ['native_phase', o => { delete o.native.phase; }],
+  ['native_phase', o => { o.native = null; }],
+  ['native_running', o => { delete o.native.running; }],
+  ['native_running', o => { o.native.running = 0; }],
+  ['native_error', o => { o.native.error = 'observed error'; }],
+  ['native_error', o => { delete o.native.error; }],
+  ['render_readiness', o => { o.render_readiness = null; }],
+  ...['draw_calls', 'source_draws'].flatMap(key => [undefined, 0, -1, NaN, 0.5].map(value =>
+    [`render_${key}`, o => { o.render_readiness[key] = value; }])),
+  ['source_cursor', o => { delete o.status.cursor; }],
+  ['source_cursor', o => { o.status.cursor = 7; }],
+  ['source_cursor', o => { o.status = null; }],
+  ['blocker', o => { o.status.blocker = 'network_wait'; }],
+  ['blocker', o => { delete o.status.blocker; }],
+];
+for (const [predicate, mutate] of cssFailures) test(`CSS guard retains failed ${predicate} operand`, () => {
+  const row = {}, observed = cssObservation(); mutate(observed);
+  assert.throws(() => retainAccountedCssObservation(row, observed,
+    {role: 'alpha', expectedCursor: 8}), /alpha CSS accounting capture/);
+  assert.equal(row.accounted_css, undefined);
+  assert.equal(row.accounted_css_observation.outcome, 'failed');
+  assert.equal(row.accounted_css_observation.provisional, true);
+  assert(row.accounted_css_observation.failed_predicates.includes(predicate));
+  for (const [key, value] of Object.entries(observed))
+    assert.deepEqual(row.accounted_css_observation[key], value);
+});
+
+test('CSS terminal guard preserves actual kind and rejects missing or wrong terminal', () => {
+  for (const terminal of [undefined, {kind: 0}, {kind: 2}]) {
+    const observed = cssObservation(), row = {};
+    observed.status = {cursor: 8, blocker: 'terminal', terminal};
+    if (terminal?.kind === 2) {
+      retainAccountedCssObservation(row, observed,
+        {role: 'alpha', expectedCursor: 8, expectedBlocker: 'terminal', expectedTerminal: 2});
+      assert.deepEqual(row.accounted_css_observation.failed_predicates, []);
+    } else {
+      assert.throws(() => retainAccountedCssObservation(row, observed,
+        {role: 'alpha', expectedCursor: 8, expectedBlocker: 'terminal', expectedTerminal: 2}));
+      assert(row.accounted_css_observation.failed_predicates.includes('terminal_kind'));
+    }
+    assert.deepEqual(row.accounted_css_observation.status, observed.status);
+  }
+});
 
 test('route readiness requires a new same-phase positive source draw with no preparation', () => {
   const oldDraw = callback(readyDraw({frame: 16}));

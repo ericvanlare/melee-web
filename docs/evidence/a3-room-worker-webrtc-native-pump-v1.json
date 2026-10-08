@@ -1,0 +1,516 @@
+{
+  "schema": "melee-web-a3-room-worker-webrtc-native-pump-v1",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/247",
+  "evidence_labels": [
+    "Source identified",
+    "Browser exercised"
+  ],
+  "scope": "Eight recorded source ticks in original CSS over same-host headless page-owned reliable ordered host-only WebRTC with local RoomRelay Worker signaling. Browser-owned diagnostic wake/drain component evidence only.",
+  "capture_source": {
+    "head": "5fe6b23d39cfcc2d40f0cc83387835553e4c030b",
+    "tree": "9b161d16b3abc29197c1e633d9d013a5cf88dc8f",
+    "base_main": "6c6ebb85bd7df7445fe4246dba9ddbdd212e3ed3",
+    "clean": true
+  },
+  "native_runtime": {
+    "producer_commit": "15bc1023bcc6cba461274bb06ee3ec9ff6d86b31",
+    "producer_tree": "617009b5d6e010d059641c9f748d48d72a0beb30",
+    "configuration": "Release",
+    "fresh_build_at_capture_source": false,
+    "target_input_delta": [],
+    "native_files": 32,
+    "peer_modules": 5,
+    "staged_files": 37,
+    "optional_flags": {
+      "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+      "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+      "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+      "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+      "MELEE_WEB_RESULTS_RENDERED_TRACE": "OFF",
+      "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+      "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF",
+      "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF"
+    },
+    "manifest": {
+      "name": "manifest.json",
+      "bytes": 13449,
+      "sha256": "135ae979cc9b9ef2f3db4434b6ce4477c5856aefad4d5a2c5163ebf2b1b83ce8"
+    },
+    "historical_build_receipt": {
+      "name": "ordinary-release-build-receipt-v1.json",
+      "bytes": 6862,
+      "sha256": "18d3bc9858f932d474bb97ff345142ea052b18821ea24e994c66c4dc0f6e7965"
+    }
+  },
+  "source_validation": {
+    "full_suite": {
+      "count": 2034,
+      "duration_seconds": 376.143,
+      "skipped": 151,
+      "result": "pass",
+      "actual_source_head": "5fe6b23d39cfcc2d40f0cc83387835553e4c030b",
+      "actual_source_tree": "9b161d16b3abc29197c1e633d9d013a5cf88dc8f",
+      "scope": "Actual final clean structured readiness repair source full suite"
+    },
+    "suite_log": {
+      "name": "full-suite-structured-readiness-v1.log",
+      "bytes": 373346,
+      "sha256": "8f342379ebd0ee8831fa5559b25b2d88cdc6ca8d19b3e62c1ea0460eea5e494e"
+    },
+    "focused_tests": 73,
+    "focused_log": {
+      "name": "structured-readiness-focused-v2.log",
+      "bytes": 6238,
+      "sha256": "b685ea2d95bf804f7ad8ab015c99b2fc40a31b04851638f00d1ce6e950c55f5a"
+    },
+    "contracts_log": {
+      "name": "structured-readiness-contracts-v1.log",
+      "bytes": 245,
+      "sha256": "662cbf7d63f02629f81f4f76b2c5660ee34c5c4c702e8e5e013b1eb087adefa5"
+    },
+    "retained_first_tail_loss_reproducer_failure": {
+      "name": "structured-readiness-first-reproducer-v1.log",
+      "bytes": 965,
+      "sha256": "1878e195940226393c8142196b54142d1e3fdcd1c5bbd1fb636b6a3032eeafca"
+    },
+    "source_review": {
+      "name": "root-structured-readiness-source-review-v1.json",
+      "bytes": 4768,
+      "sha256": "80762c00b8d8b1079c41d75e4c70baa990e0f1ed73f16028d78c39a163d0cd11"
+    }
+  },
+  "recorded_input": {
+    "recipe_bytes": 223624,
+    "recipe_inputs": 5082,
+    "recipe_sha256": "007fafb2bfc1c34b81509b8ee073b6250b32ab6d227502be6d4b986ddd8cbb4c",
+    "selected_inputs": 6,
+    "neutral_bootstrap_ticks": 2,
+    "source_capacity": 8,
+    "input_delay": 2,
+    "seed": 305419896
+  },
+  "transport": {
+    "peer_owner": "browser-page",
+    "signaling_owner": "browser-page",
+    "local_room_worker": true,
+    "ordered_reliable_host_only": true,
+    "raw_SDP_crosses_Node": false,
+    "ice_servers": [],
+    "node_role": "Recorded input orchestration, pure interval observations, later polling/evidence export and lifecycle. No polling/drain RPC inside the declared no-RPC interval.",
+    "capture_node_version": "v24.19.0",
+    "headless_chrome_version": "154.0.8037.98",
+    "speaker_muted": true,
+    "audio_processing_enabled": true,
+    "final_rtc": {
+      "alpha": {
+        "role": "alpha",
+        "connection_state": "closed",
+        "channel_state": "closed",
+        "room_signaling": {
+          "role": "alpha",
+          "phase": "closed",
+          "failure_code": null,
+          "endpoint_closed": true
+        }
+      },
+      "beta": {
+        "role": "beta",
+        "connection_state": "closed",
+        "channel_state": "closed",
+        "room_signaling": {
+          "role": "beta",
+          "phase": "closed",
+          "failure_code": null,
+          "endpoint_closed": true
+        }
+      }
+    }
+  },
+  "result": {
+    "coordinator_pass": true,
+    "outcome": "complete",
+    "first_error": null,
+    "checksums_equal": true,
+    "raw_scope": "Eight records0..7 only; no original-game or whole-session equivalence claim",
+    "peers": [
+      {
+        "role": "alpha",
+        "interval": {
+          "cursor_before": 0,
+          "cursor_after": 8,
+          "RPC_before": 3,
+          "RPC_after": 3,
+          "compared_before": 0,
+          "compared_after": 8
+        },
+        "raw": {
+          "name": "checksums.bin",
+          "bytes": 512,
+          "sha256": "a1ca04fff4a658ac8542e90e1580b3d456f29dfe31132e1be35fa4a348d1baab"
+        },
+        "source_accounting": {
+          "source_cursor": 8,
+          "source_steps": 8,
+          "source_draws": 8,
+          "callback_count": 62,
+          "first_callback": 31,
+          "last_callback": 92,
+          "callback_ids_contiguous": true,
+          "each_step_drawn": true,
+          "scope": "Source draw completion accounting; no pixel, GPU completion or timing equivalence claim"
+        },
+        "accounting_artifact": {
+          "name": "source-accounting.json",
+          "bytes": 9542,
+          "sha256": "479e3e5f51b0c8ee90fde296707f4d840e970f7cea9a65f505154d758c5e305f"
+        },
+        "final_protocol": {
+          "role": "alpha",
+          "local_port": 0,
+          "remote_port": 1,
+          "ready": true,
+          "terminal": null,
+          "local_input_ticks": 6,
+          "deferred_input_ticks": [],
+          "remote_input_ticks": 6,
+          "native_local_divergences": 0,
+          "remote_contiguous_input": 5,
+          "remote_ack_input": 5,
+          "local_checksum_ticks": 8,
+          "remote_checksum_ticks": 8,
+          "remote_contiguous_checksum": 7,
+          "next_checksum_compare": 8,
+          "remote_ack_checksum": 7,
+          "local_contiguous_input": 5,
+          "local_contiguous_checksum": 7,
+          "next_source_frame": 8,
+          "input_duplicates": 0,
+          "checksum_duplicates": 14,
+          "out_of_order_inputs": 5,
+          "acknowledged_inputs": 6,
+          "acknowledged_checksums": 8,
+          "checksum_mismatches": [],
+          "start_identity_hash": "78f5b67fc6feb6ce0abffbc148f770634e25c18ef0e422a194c6cdf393c5144e"
+        },
+        "checksum_ownership": {
+          "owner": "browser-page",
+          "export_limit_records": 512,
+          "active_native_records_submitted_before_export": 8,
+          "post_terminal_native_evidence_records": 0
+        },
+        "final_native": {
+          "phase": 1,
+          "running": 1,
+          "message": "Original character select",
+          "error": null,
+          "status": "Local game data loaded."
+        },
+        "final_status": {
+          "active": 1,
+          "cursor": 8,
+          "pushed": 8,
+          "blocker": "complete",
+          "ring_pending": 0,
+          "terminal": {
+            "kind": 0,
+            "tick": 0,
+            "channel": 0
+          }
+        },
+        "live_CSS": {
+          "source_cursor": 8,
+          "phase": 1,
+          "gpu": {
+            "cross_origin_isolated": true,
+            "webgpu_api": true,
+            "webgpu_adapter": true,
+            "canvas": {
+              "width": 640,
+              "height": 480
+            },
+            "webgl": null
+          },
+          "render_readiness": {
+            "phase": 1,
+            "kind": "structured native accounting callback",
+            "frame": 89,
+            "source_cursor": 8,
+            "row_index": 58,
+            "draw_calls": 297,
+            "source_draws": 1,
+            "draw_suppressed": 0,
+            "source": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 3 \u00b7 revisits: 0"
+          },
+          "blocker": "complete"
+        },
+        "screenshot": {
+          "name": "accounted-css.png",
+          "bytes": 480235,
+          "sha256": "92e6285e26cabb65b6a3760c1c60696261e76150276b25fbe335e5b69a76872f"
+        }
+      },
+      {
+        "role": "beta",
+        "interval": {
+          "cursor_before": 0,
+          "cursor_after": 8,
+          "RPC_before": 3,
+          "RPC_after": 3,
+          "compared_before": 0,
+          "compared_after": 8
+        },
+        "raw": {
+          "name": "checksums.bin",
+          "bytes": 512,
+          "sha256": "a1ca04fff4a658ac8542e90e1580b3d456f29dfe31132e1be35fa4a348d1baab"
+        },
+        "source_accounting": {
+          "source_cursor": 8,
+          "source_steps": 8,
+          "source_draws": 8,
+          "callback_count": 63,
+          "first_callback": 31,
+          "last_callback": 93,
+          "callback_ids_contiguous": true,
+          "each_step_drawn": true,
+          "scope": "Source draw completion accounting; no pixel, GPU completion or timing equivalence claim"
+        },
+        "accounting_artifact": {
+          "name": "source-accounting.json",
+          "bytes": 9641,
+          "sha256": "e18c0090afa350660de14c7bc98ea08c48b7d9e339b418e0fc69244d27ae6e42"
+        },
+        "final_protocol": {
+          "role": "beta",
+          "local_port": 1,
+          "remote_port": 0,
+          "ready": true,
+          "terminal": null,
+          "local_input_ticks": 6,
+          "deferred_input_ticks": [],
+          "remote_input_ticks": 6,
+          "native_local_divergences": 0,
+          "remote_contiguous_input": 5,
+          "remote_ack_input": 5,
+          "local_checksum_ticks": 8,
+          "remote_checksum_ticks": 8,
+          "remote_contiguous_checksum": 7,
+          "next_checksum_compare": 8,
+          "remote_ack_checksum": 7,
+          "local_contiguous_input": 5,
+          "local_contiguous_checksum": 7,
+          "next_source_frame": 8,
+          "input_duplicates": 0,
+          "checksum_duplicates": 12,
+          "out_of_order_inputs": 5,
+          "acknowledged_inputs": 6,
+          "acknowledged_checksums": 8,
+          "checksum_mismatches": [],
+          "start_identity_hash": "78f5b67fc6feb6ce0abffbc148f770634e25c18ef0e422a194c6cdf393c5144e"
+        },
+        "checksum_ownership": {
+          "owner": "browser-page",
+          "export_limit_records": 512,
+          "active_native_records_submitted_before_export": 8,
+          "post_terminal_native_evidence_records": 0
+        },
+        "final_native": {
+          "phase": 1,
+          "running": 1,
+          "message": "Original character select",
+          "error": null,
+          "status": "Local game data loaded."
+        },
+        "final_status": {
+          "active": 1,
+          "cursor": 8,
+          "pushed": 8,
+          "blocker": "complete",
+          "ring_pending": 0,
+          "terminal": {
+            "kind": 0,
+            "tick": 0,
+            "channel": 0
+          }
+        },
+        "live_CSS": {
+          "source_cursor": 8,
+          "phase": 1,
+          "gpu": {
+            "cross_origin_isolated": true,
+            "webgpu_api": true,
+            "webgpu_adapter": true,
+            "canvas": {
+              "width": 640,
+              "height": 480
+            },
+            "webgl": null
+          },
+          "render_readiness": {
+            "phase": 1,
+            "kind": "structured native accounting callback",
+            "frame": 90,
+            "source_cursor": 8,
+            "row_index": 59,
+            "draw_calls": 297,
+            "source_draws": 1,
+            "draw_suppressed": 0,
+            "source": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 3 \u00b7 revisits: 0"
+          },
+          "blocker": "complete"
+        },
+        "screenshot": {
+          "name": "accounted-css.png",
+          "bytes": 480863,
+          "sha256": "083d6068eea0b8accb259dd672c1cd1b7b1ba31961bf5fc5b713e33d89fe6de8"
+        }
+      }
+    ]
+  },
+  "readiness_repair": {
+    "owner": "Existing source accounting callback only; original observer then accounting row then one actual render snapshot then existing subscriber wake",
+    "readiness": "Unchanged strict callback readiness plus exact frozen row/frame/cumulative cursor and held current CSS phase",
+    "source_text_max_characters": 4096,
+    "overflow": "Explicit rejection",
+    "legacy_text_path_default": true,
+    "source_reconstruction": false,
+    "additional_scheduler_or_listener": false
+  },
+  "render_audio_limits": {
+    "screenshots_reviewed": true,
+    "visual_observations": [
+      "Red horizontal roster geometry remains visible",
+      "Lower viewport clipping remains visible"
+    ],
+    "snapshot_underrun_frames": {
+      "alpha": 107,
+      "beta": 107
+    },
+    "complete_or_final_underrun_witness": false,
+    "pixel_equivalence": false,
+    "PCM_or_uninterrupted_audio_acceptance": false,
+    "foreground_timing_or_performance_acceptance": false
+  },
+  "cleanup": {
+    "recorded_PID_count": 26,
+    "recorded_group_count": 7,
+    "all_independently_absent": true,
+    "bindable_ports": 3,
+    "worker_paths_absent": true,
+    "Chrome_tmp_empty": true,
+    "successful_profiles_removed": true,
+    "outer_wrapper_and_coordinator_observed_live_and_joined": true,
+    "served37_equal_before_after_HTTP_local": true,
+    "callback_endpoint_transport_page_cleanup_errors_empty": true,
+    "root_released_marker_after_review": true,
+    "retry_performed": false
+  },
+  "retained_failures": [
+    {
+      "kind": "first_browser",
+      "source": "6b5956823946ebfed8af492143a7a3bdfa44ddcf",
+      "overall": "FAIL",
+      "root_review": {
+        "name": "root-failed-result-review-v1.json",
+        "bytes": 3294,
+        "sha256": "d8928162207517b419b4a2d4d14a5e1d7e32a55eb3dcac551af7fb71f806c1ed"
+      },
+      "run": {
+        "name": "run.json",
+        "bytes": 59147,
+        "sha256": "dddcc4cf9616945718037298f3b9a85db3f23cdc620677f9b0f062c968faff35"
+      },
+      "reason": "Screenshot guard failed; exact readiness operand initially unretained",
+      "profiles_and_Worker_failure_data_retained": true
+    },
+    {
+      "kind": "second_browser",
+      "source": "81ea514379ecf625e3a66ac0a2d104063d6c6253",
+      "overall": "FAIL",
+      "root_review": {
+        "name": "root-second-browser-failure-review-v1.json",
+        "bytes": 6120,
+        "sha256": "0c4fb56acf8599d2f73585b704cfa93b7147c2862ab8126f78a4bfbc2358197e"
+      },
+      "run": {
+        "name": "run.json",
+        "bytes": 67415,
+        "sha256": "2c50938a7e85da163513fe0d0aa8d433962eb575fbe90add1ff626e5d68f03dc"
+      },
+      "reason": "4000-character text tail lost full readiness event; three strict readiness predicates failed",
+      "profiles_and_Worker_failure_data_retained": true
+    },
+    {
+      "kind": "pre_service_launch2",
+      "overall": "FAIL",
+      "browser_started": false,
+      "services_started": false,
+      "root_review": {
+        "name": "root-second-launch-preflight-failure-v1.json",
+        "bytes": 2682,
+        "sha256": "6fbe30d70d14bfe42e051389aff936c106cab4a07b7191ac8836d57fed3b6798"
+      },
+      "reason": "Same-format manifest incorrectly used schema-v2; actualreadManifest reducer preserved failure and corrected schema-v1"
+    },
+    {
+      "kind": "pre_service_launch4",
+      "overall": "FAIL",
+      "browser_started": false,
+      "services_started": false,
+      "root_review": {
+        "name": "root-v4-pre-service-failure-review-v1.json",
+        "bytes": 853,
+        "sha256": "c1109073cc8079b89d7361d20df4c0fdc13e6bd0ba46e1b998deb5eb47a2e03b"
+      },
+      "reason": "Separate runner head/tree pins remained81ea; actual complete preparation reducer proves stale failure and two-pin correction"
+    }
+  ],
+  "artifacts": {
+    "run": {
+      "name": "run.json",
+      "bytes": 83595,
+      "sha256": "f05f32b09b64b7211a28918a8066ceb881476d12e5ca07036a4ca2e26e8f2541"
+    },
+    "coordinator": {
+      "name": "coordinator.json",
+      "bytes": 209389,
+      "sha256": "727957874c8d7b3900b6d38e1eeef0c3ef0ae238c7376fac71c86eb1815dc536"
+    },
+    "browser_owner": {
+      "name": "browser-owner.json",
+      "bytes": 156100,
+      "sha256": "9634519bc43bf029456f683bf3cea12324414864de761553ef5ad35fae7a513e"
+    },
+    "cleanup_observation": {
+      "name": "result-cleanup-observation-v1.json",
+      "bytes": 61186,
+      "sha256": "8fa55d1a8edfeaf150e4482b7bb3ccda3821a1f3fc4d71a4429d255183eca926"
+    },
+    "root_result_review": {
+      "name": "root-third-browser-result-review-v1.json",
+      "bytes": 5405,
+      "sha256": "826a8784517c5bd60203164140135d9b462e2be122476c1d7ec4661b84c364b7"
+    },
+    "launch_packet": {
+      "name": "launch-packet-issue247-v5.json",
+      "bytes": 40590,
+      "sha256": "9f12c4a59f56c9c2722bb1de1793729a502c623c5fc086e215f4daa432c32088"
+    },
+    "complete_pre_service_reducer": {
+      "name": "complete-pre-service-reducer-v5.json",
+      "bytes": 4152,
+      "sha256": "c2f3e45739aa3ad5e8cd81cb8cf35d539ac28f3585a2dfe59cb042a3417a4020"
+    }
+  },
+  "open_gaps": [
+    "Page-owned sustained checksum export consumer/backpressure; current512-record cap remains and later diagnostic RPC drain consumes exports",
+    "Product native progress adapter; current subscription is diagnostic source accounting",
+    "User-facing room/session integration",
+    "Physical/live controller input; current harness uses recorded input",
+    "Internet/two-machine/STUN/TURN/relay fallback",
+    "Original full route and whole-session accuracy",
+    "Pixel/audio/timing/performance/tournament acceptance"
+  ]
+}
