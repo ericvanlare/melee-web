@@ -93,6 +93,15 @@ test('runtime-owned diagnostic path keeps protocol and live PAD ownership in the
   assert.deepEqual(validateLockstepBrowserMode({...value, 'peer-transport': 'relay',
     'webrtc-signaling': 'memory'}), {browserOwned: true, runtimeOwned: true,
     peerTransport: 'relay', localWebRtc: false, roomWorkerSignaling: false});
+  assert.deepEqual(validateLockstepBrowserMode({...value, 'peer-transport': undefined,
+    'relay-url': 'wss://rooms.example', 'webrtc-signaling': 'memory'}), {browserOwned: true,
+    runtimeOwned: true, peerTransport: 'relay', localWebRtc: false, roomWorkerSignaling: false});
+  assert.throws(() => validateLockstepBrowserMode({...value, 'peer-transport': 'webrtc',
+    'relay-url': 'wss://rooms.example'}), /cannot be combined with --peer-transport webrtc/);
+  for (const relayUrl of ['https://rooms.example', 'wss://user:pass@rooms.example',
+    'wss://rooms.example/path', 'wss://rooms.example?query=1', 'wss://rooms.example#fragment'])
+    assert.throws(() => validateLockstepBrowserMode({...value, 'peer-transport': undefined,
+      'relay-url': relayUrl, 'webrtc-signaling': 'memory'}), /Runtime-owned --relay-url/);
   for (const override of [{scenario: 'positive'}, {'peer-transport': 'relay',
     'webrtc-signaling': 'room-worker'}, {'webrtc-signaling': 'memory'}])
     assert.throws(() => validateLockstepBrowserMode({...value, ...override}), /Runtime-owned/);

@@ -4,7 +4,8 @@
  * the relay forwards opaque packets and each peer validates identities,
  * acknowledgements, remote PAD contributions and delayed checksums before it
  * submits complete indexed frames to its own native queue. --relay-url selects
- * the room WebSocket relay explicitly; omission preserves the TCP baseline.
+ * the room WebSocket relay explicitly; runtime-owned peers use that endpoint
+ * directly, while omission preserves each peer owner's existing default.
  */
 import fs from 'node:fs/promises';
 import {createHash} from 'node:crypto';
@@ -87,6 +88,7 @@ if (inputSampling && values.script)
 const scenario = values.scenario;
 const {browserOwned, runtimeOwned, peerTransport, localWebRtc, roomWorkerSignaling,
   runtimeInputFixture = false, runtimeInputFixtureName = null} = validateLockstepBrowserMode(values);
+const explicitRuntimeRelay = runtimeOwned && peerTransport === 'relay' && values['relay-url'] !== undefined;
 const url = new URL(values.url);
 if (!['http:', 'https:'].includes(url.protocol) || !url.pathname.endsWith('/runtime.html'))
   throw Error('A real HTTP development runtime.html URL is required');
@@ -1278,20 +1280,25 @@ async function run() {
   checksumFiles.beta = await fs.open(path.join(childDirectory('beta'), 'checksums.bin'), 'wx');
   await Promise.all(['alpha', 'beta'].map(role => instances[role].importDisc()));
   let loadedWasm = null;
+  let runtimeRelayUrl;
   if (runtimeOwned) {
-    roomRuntime = await startRoomRelayRuntime({evidenceDir: path.join(output, 'worker-evidence')});
     const roomId = createRoomId();
-    const relayUrl = roomRuntime.base.replace(/^http:/, 'ws:');
+    if (explicitRuntimeRelay) runtimeRelayUrl = values['relay-url'];
+    else {
+      roomRuntime = await startRoomRelayRuntime({evidenceDir: path.join(output, 'worker-evidence')});
+      runtimeRelayUrl = roomRuntime.base.replace(/^http:/, 'ws:');
+    }
     await Promise.all(['alpha', 'beta'].map(role => instances[role].configureRuntimeLockstep({
-      role, url: relayUrl, roomId, timeoutMs: Math.min(stallMs, deadline - Date.now()),
+      role, url: runtimeRelayUrl, roomId, timeoutMs: Math.min(stallMs, deadline - Date.now()),
       transport: peerTransport,
     })));
     pairResults.runtime_session_start = {owner: 'web/runtime-development.mjs',
       protocol_owner: 'browser runtime peer and native adapter',
       input_source: 'existing native PADStatus callback', progress_source: 'existing menuFrame event',
       selected_transport: peerTransport,
-      room_worker: {loopback: true, port: roomRuntime.port, identity: roomRuntime.runtimeIdentity,
-        hashes: roomRuntime.hashes},
+      ...(roomRuntime ? {room_worker: {loopback: true, port: roomRuntime.port, identity: roomRuntime.runtimeIdentity,
+        hashes: roomRuntime.hashes}} : {relay_endpoint: {selection: '--relay-url',
+        endpoint_origin: describeLockstepTransportAttempt(runtimeRelayUrl).endpoint_origin}}),
       ...(localWebRtc ? {raw_sdp_exposed_to_node: false} : {relay_payloads_exposed_to_node: false})};
     // Observe the live native timing callback and freeze the actual first
     // Wasm response before beginLockstep performs its page-owned identity fetch.
@@ -1374,7 +1381,7 @@ async function run() {
         if (errors.length) throw new AggregateError(errors, 'Runtime-owned peer pair close failed');
         runtimeRelayClosed = true;
       }};
-    pairResults.transport = describeLockstepTransport(relay);
+    pairResults.transport = describeLockstepTransport(relay, {relayUrl: runtimeRelayUrl});
     if (localWebRtc) {
       pairResults.local_webrtc_signaling = {ice_servers: [],
         signaling: 'runtime-owned page offer/answer over the existing local RoomRelay Worker',
@@ -1382,8 +1389,10 @@ async function run() {
         peers: {alpha: peers.alpha.transport, beta: peers.beta.transport},
         raw_sdp_exposed_to_node: false};
     } else {
-      pairResults.runtime_room_relay = {selection: 'direct existing RoomRelay WebSocket endpoint',
-        room_worker: pairResults.runtime_session_start.room_worker,
+      pairResults.runtime_room_relay = {selection: explicitRuntimeRelay ?
+        'explicit --relay-url RoomRelay WebSocket endpoint' : 'direct existing RoomRelay WebSocket endpoint',
+        ...(roomRuntime ? {room_worker: pairResults.runtime_session_start.room_worker} :
+          {relay_endpoint: pairResults.runtime_session_start.relay_endpoint}),
         peers: {alpha: peers.alpha.transport, beta: peers.beta.transport},
         relay_payloads_exposed_to_node: false};
     }

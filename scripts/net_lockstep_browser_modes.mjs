@@ -265,11 +265,22 @@ export function validateLockstepBrowserMode(values) {
   const runtimeOwned = values['peer-owner'] === 'runtime';
   const browserOwned = values['peer-owner'] !== 'node';
   const peerTransport = values['peer-transport'] ??
-    (runtimeOwned ? 'webrtc' : browserOwned || values['relay-url'] ? 'relay' : 'tcp-loopback');
+    (runtimeOwned ? values['relay-url'] !== undefined ? 'relay' : 'webrtc' :
+      browserOwned || values['relay-url'] ? 'relay' : 'tcp-loopback');
   if (values['peer-transport'] !== undefined && !['relay', 'webrtc'].includes(peerTransport))
     throw Error('--peer-transport must be relay or webrtc');
   if (!browserOwned && values['peer-transport'] !== undefined)
     throw Error('--peer-transport applies only to browser-owned peers');
+  if (runtimeOwned && values['relay-url'] !== undefined) {
+    if (values['peer-transport'] === 'webrtc')
+      throw Error('--relay-url selects runtime-owned relay and cannot be combined with --peer-transport webrtc');
+    let relayUrl;
+    try { relayUrl = new URL(values['relay-url']); }
+    catch { throw Error('Runtime-owned --relay-url must be a ws:// or wss:// room relay base URL'); }
+    if (!['ws:', 'wss:'].includes(relayUrl.protocol) || relayUrl.pathname !== '/' ||
+        relayUrl.username || relayUrl.password || relayUrl.search || relayUrl.hash)
+      throw Error('Runtime-owned --relay-url must be a ws:// or wss:// room relay base URL without credentials, a path, query, or fragment');
+  }
   const localWebRtc = peerTransport === 'webrtc';
   const roomWorkerSignaling = values['webrtc-signaling'] === 'room-worker';
   if (!['memory', 'room-worker'].includes(values['webrtc-signaling']))
