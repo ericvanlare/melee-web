@@ -16,7 +16,10 @@ a complete acceptance result.
 
 ## Current priorities
 
-Set by the owner on 2026-10-05. Two tracks run in parallel. When they compete
+Set by the owner on 2026-10-05, with the owner-adopted
+[2026-10-08 architect check-in](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6069469010)
+and [execution response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6069737799)
+setting the immediate milestone queue. Two tracks run in parallel. When they compete
 for the same scarce resource, such as the single browser-timing lane on the test
 machine or a reviewer's attention, take the lowest-numbered unblocked item and
 prefer Track A.
@@ -57,6 +60,22 @@ channels that A1 must rule out, is [architecture decision 016](ARCHITECTURE.md#0
 Every online mode carries an explicit mode identity under #9, so a networked
 session is never reported as retail-equivalent evidence.
 
+**Immediate A3 milestone:** [#288](https://github.com/ericvanlare/melee-web/issues/288)
+delivers Host/Join by room code through the deployed staging Worker at its
+public URL. First verify the deployed Worker identity, endpoint and allowed
+client origin, then exercise a short live-input CSS interval with two separate
+headless profiles. Only then extend live input on both sides through original
+CSS → SSS → one four-stock Mario/Final Destination
+match → Results → CSS, with per-tick checksum desync detection and clean
+disconnect. Record RTT, chosen input delay and `network_wait` totals/durations,
+and retain incident recording on long runs. Label this functional networked
+mode, not acceptance. A human two-machine session follows by arrangement with
+the owner; same-machine profiles do not establish that gate. Loopback is not a
+substitute for the public relay experiment. Reuse existing relay, protocol and
+runtime owners; do only the ownership work this slice needs. WebRTC, complete
+sets, rollback and cross-play follow it. Current prerequisite failures and
+producer identities stay in the issue and scoped receipts.
+
 ### Track B: competitive-rules Melee before the whole game
 
 **Target.** A player can run a competitive singles or doubles set through the
@@ -82,6 +101,40 @@ Whole-game items that no competitive set needs wait until Tracks A and B finish,
 unless they block one of those tracks. These include single-player modes, Event
 Matches, trophies, movies, non-legal stages, minigames and unlock challenges.
 Existing work on them may land, but no new campaign starts.
+
+**Immediate Track B queue:** complete these small milestones before further
+fighter or stage depth:
+
+1. [Sudden Death routing #291](https://github.com/ericvanlare/melee-web/issues/291):
+   preserve original tied-timeout participation and resolution through Results
+   and CSS, with non-tied timeout and elimination controls.
+2. [Competitive Rules Plus receipt #292](https://github.com/ericvanlare/melee-web/issues/292):
+   four stock, 8:00, all items and switches off, pause off, friendly fire on,
+   damage ratio 1.0 and handicap off, followed by a natural non-tied timeout to
+   Results and CSS. No accelerated timer or forced outcome.
+3. [Sparse P1+P3 singles #293](https://github.com/ericvanlare/melee-web/issues/293):
+   preserve source port identities through input, HUD, outcome and the full
+   route, retaining contiguous singles and four-player Teams as controls.
+4. [Competitive inventory/docs refresh #294](https://github.com/ericvanlare/melee-web/issues/294):
+   reconcile implementation and evidence without promoting an unobserved gate.
+
+Then [the weaker-fighter lineup #295](https://github.com/ericvanlare/melee-web/issues/295)
+covers Sheik, Jigglypuff, Peach and Ice Climbers with existing strict comparison
+tools. Timebox each first divergence; after two experiments at one boundary,
+retain a reduced reproducer and move to the next fighter. Bowser's
+[#274 checkpoint](https://github.com/ericvanlare/melee-web/issues/274) remains
+unresolved and parked after the reconstructed-prefix attempt budget.
+
+The next Stadium milestone is [C3 idle in-match lifetime #251](https://github.com/ericvanlare/melee-web/issues/251),
+with its remaining prerequisites counted and tracked inside that issue and PR.
+Use the existing source-ordered stage harness for two sequential native no-draw
+lifetimes through OnInit/OnLoad/OnStart/Ready/GO, each with at least 3,500
+post-GO ticks before the first transformation, checked state/RNG ownership and
+full retirement/recreation. Prerequisite fixes are
+commits within C3, not isolated ownership PRs. Transformation, rendering,
+browser admission and original-comparison gates remain separate. Source-only
+and documentation work may overlap when ownership permits; Track A retains
+priority for shared capture resources.
 
 ### Standing rules and baselines
 
@@ -123,6 +176,13 @@ Each boundary below stays separate:
 | Networked play | Keep lockstep, rollback and cross-play claims separate from single-machine accuracy. | Per-tick checksum agreement between peers, input delivery and delay, desync and disconnect handling, and measured restore/re-simulation cost. A networked session is never retail-equivalent evidence by itself. |
 
 ## How to run an execution issue
+
+Use one issue and PR per milestone, with prerequisite steps as checklist items
+and commits. Aim for a handful of merges a day. From 2026-10-08 onward, keep one
+status entry per boundary and update it in place as the boundary advances,
+preserving historical results, failures and exact producer/evidence identities.
+Do not rewrite or consolidate past entries. Evidence rules, independent review,
+current-main validation and complete current-head CI before merge are unchanged.
 
 1. Start from the current candidate and retained receipts. Preserve current
    local-resource, audio and headless-browser policies.
