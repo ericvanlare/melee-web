@@ -10,6 +10,13 @@ export const PAD_BYTES = 11;
 export const NET_FRAME_BYTES = 44;
 export const TERMINAL = Object.freeze({desync: 1, disconnect: 2, protocol: 3, startIdentity: 4});
 
+/** Return a frozen suffix without reading or copying the retained prefix. */
+export function readOnlySuffix(rows, first, label = 'Retained rows') {
+  if (!Array.isArray(rows) || !Number.isSafeInteger(first) || first < 0 || first > rows.length)
+    throw Error(`${label} offset must be a nonnegative safe integer within retained history`);
+  return Object.freeze(rows.slice(first));
+}
+
 const opposite = Object.freeze({alpha: 'beta', beta: 'alpha'});
 const portFor = Object.freeze({alpha: 0, beta: 1});
 const zeroPad = new Uint8Array(PAD_BYTES);
@@ -129,6 +136,7 @@ export class LockstepPeer {
     this.terminal = null;
     this.local = new Map();
     this.nativeLocal = new Map();
+    this.nativeLocalDivergences = 0;
     this.deferredInputs = new Set();
     this.remote = new Map();
     this.localChecksums = new Map();
@@ -304,6 +312,9 @@ export class LockstepPeer {
       const oldNative = this.nativeLocal.get(tick);
       if (oldNative && !equalBytes(oldNative, native))
         return this.fail('protocol', {reason: 'native local input changed after publication', tick});
+      const wasDivergent = oldNative !== undefined && previous !== undefined && !equalBytes(oldNative, previous);
+      const isDivergent = !equalBytes(native, value);
+      this.nativeLocalDivergences += Number(isDivergent) - Number(wasDivergent);
       this.nativeLocal.set(tick, native);
     }
     while (this.local.has(this.localContiguousInput + 1)) ++this.localContiguousInput;
@@ -552,6 +563,30 @@ export class LockstepPeer {
       checksum_mismatches: this.checksumMismatches,
       start_identity_hash: this.agreementHash ?? null,
     };
+  }
+
+  /** Compact read-only counters for hot health paths; full arrays stay in summary(). */
+  health() {
+    return Object.freeze({
+      role: this.role, local_port: this.localPort, remote_port: this.remotePort,
+      ready: this.ready, terminal: this.terminal ? Object.freeze({...this.terminal}) : null,
+      local_input_ticks: this.local.size, deferred_input_count: this.deferredInputs.size,
+      remote_input_ticks: this.remote.size,
+      native_local_divergences: this.nativeLocalDivergences,
+      remote_contiguous_input: this.remoteContiguousInput, remote_ack_input: this.remoteAckInput,
+      local_checksum_ticks: this.localChecksums.size,
+      remote_checksum_ticks: this.remoteChecksums.size,
+      remote_contiguous_checksum: this.remoteContiguousChecksum,
+      next_checksum_compare: this.nextChecksumCompare, remote_ack_checksum: this.remoteAckChecksum,
+      local_contiguous_input: this.localContiguousInput,
+      local_contiguous_checksum: this.localContiguousChecksum,
+      next_source_frame: this.nextSourceFrame,
+      input_duplicates: this.inputDuplicates, checksum_duplicates: this.checksumDuplicates,
+      out_of_order_inputs: this.outOfOrderInputs, acknowledged_inputs: this.acknowledgedInputs,
+      acknowledged_checksums: this.acknowledgedChecksums,
+      checksum_mismatch_count: this.checksumMismatches.length,
+      start_identity_hash: this.agreementHash ?? null,
+    });
   }
 }
 

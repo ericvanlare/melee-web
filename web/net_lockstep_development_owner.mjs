@@ -92,6 +92,7 @@ export function createDevelopmentLockstepOwner({Module, owner, inputDelay, sourc
 
   return Object.freeze({configure, begin, onFrame: () => session?.onFrame(),
     close: options => session?.close(options),
+    health: options => session?.health(options) ?? null,
     snapshot: () => session?.snapshot() ?? null,
     state: () => Object.freeze({configured: Boolean(config), starting, used, attached: Boolean(session)})});
 }

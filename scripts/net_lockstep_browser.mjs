@@ -11,10 +11,12 @@ import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {createRoomId} from './net_lockstep_websocket_relay.mjs';
 import {parseArgs} from 'node:util';
-import {buildRuntimeCssMatchGamepadSamples, buildRuntimeCssSssGamepadSamples,
+import {buildRuntimeCssMatchGamepadSamples, buildRuntimeCssSssGamepadSamples, buildRuntimeFullRouteGamepadSamples,
+  buildRuntimeFullRouteProfile,
   RUNTIME_CSS_MATCH_INPUT_TICKS, RUNTIME_CSS_MATCH_SOURCE_TICKS, RUNTIME_CSS_SSS_INPUT_TICKS,
-  RUNTIME_CSS_SSS_SOURCE_TICKS, validateLockstepBrowserMode, validateRuntimeCssMatchRecipe,
-  validateRuntimeCssSssRecipe} from './net_lockstep_browser_modes.mjs';
+  RUNTIME_CSS_SSS_SOURCE_TICKS, RUNTIME_FULL_ROUTE_INPUT_TICKS, RUNTIME_FULL_ROUTE_SOURCE_TICKS,
+  validateLockstepBrowserMode, validateRuntimeCssMatchRecipe, validateRuntimeCssSssRecipe,
+  validateRuntimeFullRouteRecipe} from './net_lockstep_browser_modes.mjs';
 import {loadBrowserTools} from './browser_tools.mjs';
 import {startRoomRelayRuntime} from './net_room_relay_runtime_owner.mjs';
 import {classifyRoute, collapseConsecutiveScenes, expectedFullSceneOrder, validateActiveMatchRoute,
@@ -23,8 +25,9 @@ import {NET_FRAME_BYTES, NET_RECORD_BYTES, firstFatalBrowserError, openNetInstan
 import {createTransportCallbackQueue, describeLockstepTransport, describeLockstepTransportAttempt,
   openLockstepPeerPair, recordAvailableTransportMetrics} from './net_lockstep_transport.mjs';
 import {LOCKSTEP_DELAY, LockstepPeer, parseNetChecksum, TERMINAL} from './net_lockstep_protocol.mjs';
-import {readyRenderEvent, renderEventSignatures, retainAccountedCssObservation, verifyAccountedRenderReadiness, verifyFirstChecksumMismatch,
-  verifyTerminalHold, verifyPositivePeerCompletion, verifyReliableHostWebRtc, verifyDisconnectBoundary} from './net_lockstep_observers.mjs';
+import {readyRenderEvent, renderEventSignatures, retainAccountedCssObservation, verifyAccountedRenderReadiness,
+  verifyFirstChecksumMismatch, verifyTerminalHold, verifyPositivePeerCompletion, verifyReliableHostWebRtc,
+  verifyDisconnectBoundary, validateNativeChecksumSuffix, createPerPeerProgressWatch} from './net_lockstep_observers.mjs';
 import {verifyNetSourceAccounting} from './net_source_accounting.mjs';
 import {BUTTONS} from '../web/controller-input.mjs';
 import {lockstepConstants} from './net_lockstep_core.mjs';
@@ -74,6 +77,8 @@ const nativePump = values.scenario === 'native-pump';
 const runtimeCssSss = values.scenario === 'runtime-css-sss';
 const runtimeCssMatch = values.scenario === 'runtime-css-match';
 const runtimeCssLiveRoute = runtimeCssSss || runtimeCssMatch;
+const runtimeFullRoute = values.scenario === 'runtime-full-route';
+const runtimeLiveRoute = runtimeCssLiveRoute || runtimeFullRoute;
 const runtimeOwnerRequested = values['peer-owner'] === 'runtime';
 if (!values.url || !values.disc || !values.out || !values.seed || (!inputSampling && !runtimeOwnerRequested && !values.script))
   throw Error('Required: --url runtime.html --disc DISC [--script route1.mwni] --seed U32 --out NEW_DIR');
@@ -106,7 +111,7 @@ if (values.scenario === 'disconnect' && disconnectAt === null)
 if (values.scenario === 'disconnect' && disconnectAt < 3)
   throw Error('The bounded disconnect must occur after the two neutral-prefix source ticks');
 
-const scriptBytes = inputSampling || (runtimeOwned && !runtimeCssLiveRoute) ? null : await fs.readFile(values.script);
+const scriptBytes = inputSampling || (runtimeOwned && !runtimeLiveRoute) ? null : await fs.readFile(values.script);
 if (scriptBytes && (scriptBytes.length < HEADER_BYTES || scriptBytes.subarray(0, 4).toString() !== 'MWNI' ||
     scriptBytes.readUInt32BE(4) !== 1))
   throw Error('Script is not an MWNI v1 input recipe');
@@ -115,25 +120,26 @@ if (scriptBytes && scriptBytes.length !== HEADER_BYTES + inputCount * NET_FRAME_
   throw Error('Script length disagrees with its declared input count');
 const scriptFrames = scriptBytes?.subarray(HEADER_BYTES) ?? Buffer.alloc(0);
 let runtimeRecipeIdentity = null, runtimeGamepadSamples = null;
-if (runtimeCssLiveRoute) {
+if (runtimeLiveRoute) {
   const [manifestBytes, generatorBytes] = await Promise.all([
     fs.readFile(values['script-manifest']), fs.readFile(new URL('../tools/net_input_script.py', import.meta.url)),
   ]);
-  runtimeRecipeIdentity = runtimeCssMatch ?
+  runtimeRecipeIdentity = runtimeFullRoute ? validateRuntimeFullRouteRecipe({scriptBytes, manifestBytes,
+    generatorBytes, seed}) : runtimeCssMatch ?
     validateRuntimeCssMatchRecipe({scriptBytes, manifestBytes, generatorBytes, seed}) :
     validateRuntimeCssSssRecipe({scriptBytes, manifestBytes, generatorBytes, seed});
-  runtimeGamepadSamples = runtimeCssMatch ? buildRuntimeCssMatchGamepadSamples(scriptFrames) :
+  runtimeGamepadSamples = runtimeFullRoute ? buildRuntimeFullRouteGamepadSamples(scriptFrames) : runtimeCssMatch ? buildRuntimeCssMatchGamepadSamples(scriptFrames) :
     buildRuntimeCssSssGamepadSamples(scriptFrames);
 }
 const probe = values.scenario === 'probe';
-const usedInputs = runtimeCssMatch ? RUNTIME_CSS_MATCH_INPUT_TICKS : runtimeCssSss ? RUNTIME_CSS_SSS_INPUT_TICKS :
+const usedInputs = runtimeFullRoute ? RUNTIME_FULL_ROUTE_INPUT_TICKS : runtimeCssMatch ? RUNTIME_CSS_MATCH_INPUT_TICKS : runtimeCssSss ? RUNTIME_CSS_SSS_INPUT_TICKS :
   inputSampling ? INPUT_SAMPLING_SOURCE_TICKS - LOCKSTEP_DELAY : probe || nativePump ? probeSourceTicks - LOCKSTEP_DELAY :
   scenario === 'flip' && flip ? Math.min(inputCount, flip.tick + 8) :
   scenario === 'disconnect' ? Math.min(inputCount, Math.max(1, disconnectAt + 1 - LOCKSTEP_DELAY)) : inputCount;
 if (!inputSampling && !runtimeOwned && usedInputs > inputCount)
   throw Error('Requested local input workload exceeds the script');
 if (flip && flip.tick >= usedInputs) throw Error('Input flip tick is outside the selected workload');
-const sourceTicks = runtimeCssMatch ? RUNTIME_CSS_MATCH_SOURCE_TICKS : runtimeCssSss ? RUNTIME_CSS_SSS_SOURCE_TICKS :
+const sourceTicks = runtimeFullRoute ? RUNTIME_FULL_ROUTE_SOURCE_TICKS : runtimeCssMatch ? RUNTIME_CSS_MATCH_SOURCE_TICKS : runtimeCssSss ? RUNTIME_CSS_SSS_SOURCE_TICKS :
   inputSampling ? INPUT_SAMPLING_SOURCE_TICKS : usedInputs + LOCKSTEP_DELAY;
 if (sourceTicks > 216000) throw Error('Source tick workload exceeds the native bound');
 if (disconnectAt !== null && disconnectAt >= sourceTicks)
@@ -215,9 +221,10 @@ function verifyConsumedInputComponents(alphaSamples, betaSamples, bytesA, bytesB
 }
 
 const pairResults = {
-  schema: runtimeCssMatch ? 'melee-web-a3-runtime-css-match-v1' : runtimeCssSss ? 'melee-web-a3-runtime-css-sss-v1' :
+  schema: runtimeFullRoute ? 'melee-web-a3-runtime-full-route-v1' : runtimeCssMatch ? 'melee-web-a3-runtime-css-match-v1' : runtimeCssSss ? 'melee-web-a3-runtime-css-sss-v1' :
     inputSampling ? 'melee-web-local-lockstep-a3-input-sampling-v1' : 'melee-web-local-lockstep-a2-run-v1', scenario, seed,
-  scope: runtimeCssMatch ? 'bounded runtime-owned original CSS-to-active-match live-input route' :
+  scope: runtimeFullRoute ? 'bounded runtime-owned original full-route live-input fixture' :
+    runtimeCssMatch ? 'bounded runtime-owned original CSS-to-active-match live-input route' :
     runtimeCssSss ? 'bounded runtime-owned original CSS-to-SSS live-input route' :
     nativePump ? runtimeOwned ? 'bounded eight-tick development runtime-owned native checksum pump' :
     'bounded eight-tick diagnostic browser-owned native checksum pump' : inputSampling ? 'synthetic browser-local native PAD sampling and two-tick delay component check' :
@@ -228,8 +235,8 @@ const pairResults = {
     ...(!localWebRtc ? ['WebRTC'] : []),
     'pixels/PCM', 'full-route or whole-session accuracy', 'performance'] :
     ['live timing', 'performance', 'pixels', 'PCM equivalence', 'retail equivalence', 'two-machine Internet acceptance',
-      ...(runtimeCssLiveRoute ? ['whole match, Results, and CSS return'] : []),
-      ...((nativePump || runtimeCssLiveRoute) ? runtimeOwned ? ['public player UI/runtime integration', 'physical controllers',
+      ...((runtimeCssSss || runtimeCssMatch) ? ['whole match, Results, and CSS return'] : []),
+      ...((nativePump || runtimeLiveRoute) ? runtimeOwned ? ['public player UI/runtime integration', 'physical controllers',
         'unbounded evidence consumer policy'] : ['product room/session integration', 'physical/live input',
         'unbounded evidence consumer policy'] : [])],
   peer_owner: values['peer-owner'], peer_transport: peerTransport,
@@ -237,16 +244,19 @@ const pairResults = {
   neutral_prefix: {source_ticks: LOCKSTEP_DELAY, player_ports: 'neutral PADStatus', unowned_ports: 'no-controller'},
   script: scriptBytes ? {name: path.basename(values.script), sha256: scriptHash, frame_count: inputCount,
     input_ticks_used: usedInputs, source_ticks: sourceTicks} : null,
-  ...(runtimeRecipeIdentity ? runtimeCssMatch ? {runtime_css_match_recipe_identity: runtimeRecipeIdentity} :
-    {runtime_css_sss_recipe_identity: runtimeRecipeIdentity} : {}),
+  ...(runtimeRecipeIdentity ? runtimeFullRoute ? {runtime_full_route_recipe_identity: runtimeRecipeIdentity} :
+    runtimeCssMatch ? {runtime_css_match_recipe_identity: runtimeRecipeIdentity} :
+      {runtime_css_sss_recipe_identity: runtimeRecipeIdentity} : {}),
   input_capture: inputSampling ? {source: 'browser-local native PADStatus', input_ticks: usedInputs,
     source_ticks: sourceTicks, pattern: ['neutral', 'A', 'release', 'neutral'],
     beta_deferred_input_tick: 0} : runtimeOwned ? {source: 'browser-local native PADStatus',
       input_ticks: usedInputs, source_ticks: sourceTicks,
-      pattern: runtimeCssMatch ? {recipe_input_ticks: [0, 303], neutral_input_ticks: [304, 517]} : null,
+      pattern: runtimeFullRoute ? {recipe_input_ticks: [0, 5081], source_ticks: [0, 5083]} :
+        runtimeCssMatch ? {recipe_input_ticks: [0, 303], neutral_input_ticks: [304, 517]} : null,
       synthetic_gamepad: Boolean(runtimeInputFixture), ...(runtimeInputFixture ? {fixture:
         runtimeInputFixtureName === 'css-start-to-sss' ? 'css-start-to-sss via ordinary controller manager' :
           runtimeInputFixtureName === 'css-sss-to-match' ? 'css-sss-to-match via ordinary controller manager' :
+            runtimeInputFixtureName === 'full-route' ? 'fixed full-route via saved independent-click profile and ordinary controller manager' :
             'neutral-a-release via ordinary controller manager'} : {}),
       player_input_callback: 'existing runtime native poll'} : null,
   transport_attempt: localWebRtc ? {type: 'webrtc-datachannel', local_only: true, ice_servers: []} :
@@ -279,9 +289,24 @@ async function checkedHealth(role) {
   const instance = instances[role];
   const status = await instance.status();
   const native = await instance.native();
+  if (runtimeFullRoute && native.running === 0 &&
+      typeof native.message === 'string' && native.message.startsWith('Paused after a timing disruption')) {
+    if (!instanceRows[role].first_native_timing_pause_before_teardown) {
+      const evidence = {captured_at_ms: Date.now(), status, native,
+        owner_health: await instance.runtimeLockstepHealth().catch(error => ({read_error: String(error.message || error)})),
+        owner_snapshot: await instance.runtimeLockstepSnapshot().catch(error => ({read_error: String(error.message || error)})),
+        input_fixture_health: await instance.readRuntimeInputFixtureHealth().catch(error => ({read_error: String(error.message || error)})),
+        timing_pause_diagnostics: await instance.timingPauseDiagnostics().catch(error => ({read_error: String(error.message || error)})),
+        callback_timing: await instance.runtimeCallbackTimingSnapshot().catch(error => ({read_error: String(error.message || error)})),
+        retained_diagnostics: await instance.runtimeDiagnosticExport().catch(error => ({read_error: String(error.message || error)}))};
+      instanceRows[role].first_native_timing_pause_before_teardown = evidence;
+      pairResults.first_native_timing_pause_before_teardown ??= {role, ...evidence};
+    }
+    throw Error(`${role} native timing pause stopped the live route at source cursor ${status.cursor}: ${native.message}`);
+  }
   if (native.error) throw Error(`${role} runtime error: ${native.error}`);
   if (runtimeInputFixture) {
-    const fixture = await instance.readRuntimeInputFixture();
+    const fixture = await (instance.readRuntimeInputFixtureHealth?.() ?? instance.readRuntimeInputFixture());
     if (!fixture || fixture.failure || fixture.disposed) throw Error(`${role} runtime input fixture failed: ${JSON.stringify(fixture)}`);
   }
   const fatal = firstFatalBrowserError(instance.errors);
@@ -344,11 +369,56 @@ function verifyRuntimeCssMatchSceneRuns(sceneRuns) {
   return {scenes, firstSssTick, firstMatchTick};
 }
 
+function verifyRuntimeFullRouteSceneRuns(sceneRuns) {
+  if (!Array.isArray(sceneRuns) || sceneRuns.length !== RUNTIME_FULL_ROUTE_SOURCE_TICKS ||
+      sceneRuns.some((row, tick) => !row || row.tick !== tick || !Number.isInteger(row.scene)))
+    throw Error('Runtime full route did not retain 5084 sequential scene records');
+  const starts = [];
+  for (const row of sceneRuns) {
+    if (!starts.length || starts.at(-1).scene !== row.scene)
+      starts.push({scene: row.scene, first_tick: row.tick});
+  }
+  const scenes = starts.map(row => row.scene);
+  if (JSON.stringify(scenes) !== JSON.stringify(expectedFullSceneOrder()))
+    throw Error(`Runtime full route scene order mismatch: ${JSON.stringify(scenes)}`);
+  return {scenes, starts};
+}
+
 function verifyRuntimeCssMatchPeerCompletion(summary) {
   const completed = verifyPositivePeerCompletion(summary, usedInputs, sourceTicks);
   if (summary.remote_ack_checksum !== sourceTicks - 1)
     throw Error(`Runtime CSS-to-match peer did not acknowledge checksum ${sourceTicks - 1}: ${JSON.stringify(summary)}`);
   return {...completed, remote_ack_checksum: summary.remote_ack_checksum};
+}
+
+function verifyRuntimeFullRoutePeerCompletion(summary) {
+  const completed = verifyPositivePeerCompletion(summary, usedInputs, sourceTicks);
+  if (summary.remote_ack_checksum !== sourceTicks - 1)
+    throw Error(`Runtime full-route peer did not acknowledge checksum ${sourceTicks - 1}: ${JSON.stringify(summary)}`);
+  return {...completed, remote_ack_checksum: summary.remote_ack_checksum};
+}
+
+function validateRuntimeFullRouteTerminalResult(match) {
+  // Source MatchOutcome values from gm/forward.h: TIMEOUT=1, ELIMINATION=2.
+  const terminal = match?.terminal, players = match?.players;
+  if (!match || match.complete !== true || !terminal ||
+      ![1, 2].includes(terminal.outcome) || !Array.isArray(terminal.winners) ||
+      terminal.winners.length < 1 || terminal.winners.length > 2 ||
+      (terminal.outcome === 2 && terminal.winners.length !== 1) ||
+      !Array.isArray(players) || players.length !== 2 ||
+      players.some(player => player?.human !== true) ||
+      terminal.winners.some(winner => !Number.isSafeInteger(winner) || winner < 0 || winner >= players.length) ||
+      new Set(terminal.winners).size !== terminal.winners.length)
+    throw Error(`Runtime full route did not retain a natural two-human MatchEnd outcome and unique participant winners: ${JSON.stringify(match)}`);
+  return {outcome: terminal.outcome, winners: [...terminal.winners]};
+}
+
+function compareRuntimeFullRouteTerminalResults(alpha, beta) {
+  const left = validateRuntimeFullRouteTerminalResult(alpha);
+  const right = validateRuntimeFullRouteTerminalResult(beta);
+  if (JSON.stringify(left) !== JSON.stringify(right))
+    throw Error(`Runtime peers disagree on original MatchEnd outcome or ordered winners: ${JSON.stringify({alpha: left, beta: right})}`);
+  return left;
 }
 
 function routeBoundaryPath(role, boundary) {
@@ -386,9 +456,11 @@ async function captureRouteBoundary(role, boundary, priorSignatures, heldAccount
     source_accounting_snapshot: heldAccounting,
     prior_signatures: [...priorSignatures],
     predicates: {render_readiness: Boolean(readiness), native_phase: nativeBefore.phase === boundary.phase,
-      nonterminal: statusBefore.blocker !== 'terminal'},
+      nonterminal: statusBefore.blocker !== 'terminal' &&
+        (heldAccounting === null || statusBefore.terminal?.kind === 0)},
     observed_at: new Date().toISOString()});
-  if (!readiness || nativeBefore.phase !== boundary.phase || statusBefore.blocker === 'terminal') return false;
+  if (!readiness || nativeBefore.phase !== boundary.phase || statusBefore.blocker === 'terminal' ||
+      (heldAccounting !== null && statusBefore.terminal?.kind !== 0)) return false;
   const cursor = statusBefore.cursor;
   const screenshotPath = routeBoundaryPath(role, boundary);
   await instances[role].screenshot(screenshotPath);
@@ -402,6 +474,8 @@ async function captureRouteBoundary(role, boundary, priorSignatures, heldAccount
     phase: boundary.phase, source_cursor_sampled_before_screenshot: cursor,
     last_consumed_tick: cursor > 0 ? cursor - 1 : null,
     source_cursor_after_screenshot: statusAfter.cursor,
+    status_after_screenshot: statusAfter,
+    native_after_screenshot: nativeAfter,
     source_cursor_stable_during_screenshot: statusAfter.cursor === cursor,
     screenshot: path.relative(output, screenshotPath),
     screenshot_bytes: screenshot.length, screenshot_sha256: sha256(screenshot),
@@ -465,6 +539,39 @@ async function captureRuntimeCssMatchFinalBoundary(role) {
       evidence.screenshot_phase_stable !== true || evidence.phase_after_screenshot !== boundary.phase ||
       !evidence.browser_driver || !evidence.gpu || evidence.gpu_observed !== true)
     throw Error(`${role} final match screenshot changed the source boundary or lacks driver/GPU diagnostics`);
+  return evidence;
+}
+
+async function captureRuntimeFullRouteFinalBoundary(role) {
+  const fixture = instanceRows[role].runtime_input_fixture_frozen;
+  const interval = pairResults.native_pump_interval;
+  if (!runtimeFullRoute || fixture?.frozen !== true || fixture.captured_count !== usedInputs ||
+      interval?.complete !== true || interval.no_peer_RPC_during_interval !== true ||
+      interval.actual_native_cursor_progress_each !== true)
+    throw Error(`${role} final CSS capture requires frozen full-route input and completed read-only source progress`);
+  const boundary = POSITIVE_ROUTE_BOUNDARIES[4];
+  // The held callback snapshot ties readiness to this exact complete source cursor;
+  // driver logs can retain an earlier draw from any prior scene.
+  const accounting = await instances[role].readSourceAccounting({freeze: false});
+  const captured = await captureRouteBoundary(role, boundary, new Set(), accounting);
+  if (!captured) {
+    const [status, native] = await Promise.all([instances[role].status(), instances[role].native()]);
+    recordMissedBoundary(role, boundary, 'final CSS had no verified structured draw at the held source boundary for screenshot and GPU diagnostics',
+      {phase: native.phase, cursor: status.cursor});
+    throw Error(`${role} final CSS boundary screenshot was not captured`);
+  }
+  const evidence = instanceRows[role].route_boundary_captures.find(item => item.name === boundary.name);
+  if (!evidence || evidence.source_cursor_sampled_before_screenshot !== sourceTicks ||
+      evidence.source_cursor_after_screenshot !== sourceTicks ||
+      evidence.status_after_screenshot?.active !== 1 || evidence.status_after_screenshot?.blocker !== 'complete' ||
+      evidence.status_after_screenshot?.terminal?.kind !== 0 ||
+      evidence.native_after_screenshot?.phase !== boundary.phase || evidence.native_after_screenshot?.running !== 1 ||
+      evidence.native_after_screenshot?.error !== null ||
+      evidence.source_cursor_stable_during_screenshot !== true ||
+      evidence.screenshot_phase_stable !== true || evidence.phase_after_screenshot !== boundary.phase ||
+      evidence.render_readiness?.kind !== 'structured native accounting callback' ||
+      evidence.render_readiness?.source_cursor !== sourceTicks || !evidence.gpu || evidence.gpu_observed !== true)
+    throw Error(`${role} final CSS screenshot changed the source boundary or lacks held structured readiness/GPU diagnostics`);
   return evidence;
 }
 
@@ -577,13 +684,13 @@ async function refreshBrowserPeers() {
 async function drainChecksums(role, peer) {
   const instance = instances[role], result = instanceRows[role];
   if (runtimeOwned) {
-    const snapshot = await instance.runtimeLockstepSnapshot();
-    const rows = snapshot?.checksums;
-    if (!Array.isArray(rows) || rows.length < result.records)
-      throw Error(`${role} runtime checksum snapshot lost retained records`);
-    for (let index = result.records; index < rows.length; ++index) {
-      const record = Buffer.from(rows[index]);
-      if (record.length !== NET_RECORD_BYTES) throw Error(`${role} runtime checksum record is malformed`);
+    const health = await instance.runtimeLockstepHealth({checksumFrom: result.records});
+    const rows = health?.checksum_records_since;
+    if (!Array.isArray(rows) || !Number.isSafeInteger(health.checksum_record_count))
+      throw Error(`${role} runtime checksum health lost retained records`);
+    validateNativeChecksumSuffix(rows, result.records, health.checksum_record_count, sourceTicks);
+    for (const row of rows) {
+      const record = Buffer.from(row);
       const tick = record.readUInt32LE(0);
       if (tick !== result.records) throw Error(`${role} checksum cursor jumped: expected ${result.records}, observed ${tick}`);
       await checksumFiles[role].write(record);
@@ -774,27 +881,77 @@ function nativePumpChecksumEvidence(row, runtimeOwner, ticks) {
 
 async function observeNativePumpWithoutRpc() {
   const cssLiveRoute = runtimeCssSss || (typeof runtimeCssMatch !== 'undefined' && runtimeCssMatch);
+  const validatedChecksumCounts = {alpha: 0, beta: 0};
   const read = async role => {
     const {status, native} = await checkedHealth(role);
-    const owner = runtimeOwned ? await instances[role].runtimeLockstepSnapshot() : null;
+    const owner = runtimeOwned ? await instances[role].runtimeLockstepHealth({checksumFrom: validatedChecksumCounts[role]}) : null;
     if (runtimeOwned && (!owner || owner.armed !== true || owner.closing !== false || owner.failure !== null || !owner.peer))
       throw Error(`${role} autonomous runtime owner failed: ${JSON.stringify(owner)}`);
     const snapshot = runtimeOwned ? owner.peer : await instances[role].readPeerSnapshot();
-    if (snapshot.failure || snapshot.protocol.terminal || (!Array.isArray(snapshot.protocol.checksum_mismatches) || snapshot.protocol.checksum_mismatches.length) ||
-        !Array.isArray(snapshot.endpointErrors) || snapshot.endpointErrors.length ||
+    const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+    const mismatchRows = snapshot.protocol.checksum_mismatches;
+    const mismatchCount = runtimeOwned ? snapshot.protocol.checksum_mismatch_count :
+      Array.isArray(mismatchRows) ? mismatchRows.length : null;
+    const mismatchShapeValid = runtimeOwned ? Number.isSafeInteger(mismatchCount) &&
+      (!hasOwn(snapshot.protocol, 'checksum_mismatches') ||
+        (Array.isArray(mismatchRows) && mismatchRows.length === mismatchCount)) :
+      Array.isArray(mismatchRows) && (!hasOwn(snapshot.protocol, 'checksum_mismatch_count') ||
+        (Number.isSafeInteger(snapshot.protocol.checksum_mismatch_count) &&
+          snapshot.protocol.checksum_mismatch_count === mismatchRows.length));
+    const endpointRows = snapshot.endpointErrors;
+    const endpointErrorCount = runtimeOwned ? snapshot.endpoint_error_count :
+      Array.isArray(endpointRows) ? endpointRows.length : null;
+    const endpointShapeValid = runtimeOwned ? Number.isSafeInteger(endpointErrorCount) &&
+      (!hasOwn(snapshot, 'endpointErrors') ||
+        (Array.isArray(endpointRows) && endpointRows.length === endpointErrorCount)) :
+      Array.isArray(endpointRows) && (!hasOwn(snapshot, 'endpoint_error_count') ||
+        (Number.isSafeInteger(snapshot.endpoint_error_count) &&
+          snapshot.endpoint_error_count === endpointRows.length));
+    if (snapshot.failure || snapshot.protocol.terminal || !mismatchShapeValid || mismatchCount !== 0 ||
+        !endpointShapeValid || endpointErrorCount !== 0 ||
         snapshot.nativePump?.enabled !== true || !Number.isSafeInteger(snapshot.nativePump.rpc_calls) ||
         snapshot.nativePump.rpc_calls < 0 || status.active !== 1 ||
         !Number.isSafeInteger(status.cursor) || status.cursor < 0 || status.cursor > sourceTicks ||
         !Number.isSafeInteger(snapshot.protocol.local_checksum_ticks) ||
         snapshot.protocol.local_checksum_ticks < 0 || snapshot.protocol.local_checksum_ticks > sourceTicks)
       throw Error(`${role} autonomous diagnostic peer failed: ${JSON.stringify(snapshot)}`);
-    const row = {status, native, snapshot, ...(runtimeOwned ? {runtime_checksum_records: owner?.checksums} : {})};
-    nativePumpChecksumEvidence(row, runtimeOwned, sourceTicks);
+    if (runtimeOwned) {
+      const consumer = snapshot.checksumConsumer, ownership = snapshot.checksumOwnership;
+      if (!Array.isArray(owner.checksum_records_since) ||
+          !Number.isSafeInteger(owner.checksum_record_count) || owner.checksum_record_count > sourceTicks ||
+          !consumer || consumer.enabled !== true || !Number.isSafeInteger(consumer.accepted_records) ||
+          consumer.accepted_records < 0 || consumer.accepted_records > owner.checksum_record_count ||
+          ownership?.consumer_accepted_records !== consumer.accepted_records ||
+          (owner.checksum_record_count > consumer.accepted_records && !consumer.pending_batch))
+        throw Error(`${role} autonomous runtime checksum ownership is invalid: ${JSON.stringify(owner)}`);
+      validatedChecksumCounts[role] = validateNativeChecksumSuffix(owner.checksum_records_since,
+        validatedChecksumCounts[role], owner.checksum_record_count, sourceTicks);
+    }
+    const row = {status, native, snapshot, ...(runtimeOwned ? {
+      runtime_checksum_count: owner.checksum_record_count,
+      runtime_checksum_records_validated: validatedChecksumCounts[role]} : {})};
+    if (runtimeFullRoute && !instanceRows[role].first_active_match_witness && native.phase === 7) {
+      const boundary = await instances[role].matchObservationBoundary();
+      if (boundary.stable_cursor && boundary.stable_phase && boundary.native_before?.phase === 7 &&
+          boundary.native_after?.phase === 7 && boundary.native_before?.running === 1 &&
+          boundary.native_after?.running === 1 && boundary.native_before?.error === null &&
+          boundary.native_after?.error === null && boundary.status_before?.active === 1 &&
+          boundary.status_after?.active === 1 && boundary.status_before?.terminal?.kind === 0 &&
+          boundary.status_after?.terminal?.kind === 0 &&
+          boundary.status_before?.cursor === boundary.status_after?.cursor &&
+          boundary.status_before?.cursor > 0 && boundary.observation?.ready === true &&
+          !(boundary.observation.frame === 0 && boundary.observation.observer_error !== true)) {
+        const validated = validateActiveMatchRoute([1, 2, 3], boundary.observation);
+        instanceRows[role].first_active_match_witness = {...boundary,
+          source_cursor: boundary.status_before.cursor, source_phase: boundary.native_before.phase,
+          selection: validated.selection};
+      }
+    }
     return row;
   };
   const before = Object.fromEntries(await Promise.all(['alpha', 'beta'].map(async role => [role, await read(role)])));
   const interval = pairResults.native_pump_interval = {before, after: null, observations: 0,
-    observation: 'read-only native health and pure owner/controller snapshot; no peer RPC, evidence drain, progress publication or timing resume',
+    observation: 'read-only native health and incremental owner evidence; no peer RPC, evidence drain, progress publication or timing resume',
     checksum_evidence_owner: runtimeOwned ? 'runtime ACK consumer and retained canonical records' : 'diagnostic peer export queue',
     no_peer_RPC_during_interval: true, actual_native_cursor_progress_each: false,
     ...(cssLiveRoute ? {crossed_512_each: false} : {}), complete: false};
@@ -806,7 +963,14 @@ async function observeNativePumpWithoutRpc() {
   }
   let after, observations = 0;
   const started = Date.now();
-  while (Date.now() <= deadline && Date.now() - started <= stallMs) {
+  const progressToken = row => JSON.stringify([row.status.cursor, row.snapshot.protocol.local_checksum_ticks,
+    row.snapshot.protocol.remote_checksum_ticks, row.snapshot.protocol.next_checksum_compare,
+    row.snapshot.protocol.remote_ack_input, row.snapshot.protocol.remote_ack_checksum,
+    row.runtime_checksum_count ?? row.snapshot.exportRecords]);
+  const progressWatch = createPerPeerProgressWatch({roles: ['alpha', 'beta'],
+    initialProgress: Object.fromEntries(['alpha', 'beta'].map(role => [role, progressToken(before[role])])),
+    startedAt: started, deadline, stallMs});
+  while (Date.now() <= deadline) {
     after = Object.fromEntries(await Promise.all(['alpha', 'beta'].map(async role => [role, await read(role)])));
     ++observations;
     interval.after = after; interval.observations = observations;
@@ -822,19 +986,51 @@ async function observeNativePumpWithoutRpc() {
     if (['alpha', 'beta'].every(role => {
       const row = after[role];
       return row.status.cursor === sourceTicks && row.status.blocker === 'complete' && row.status.terminal.kind === 0 &&
-        nativePumpChecksumEvidence(row, runtimeOwned, sourceTicks) && row.snapshot.protocol.local_checksum_ticks === sourceTicks &&
+        (!runtimeOwned ? row.snapshot.exportRecords === sourceTicks :
+          row.runtime_checksum_records_validated === sourceTicks) &&
+        (!runtimeOwned || row.snapshot.checksumOwnership?.consumer_accepted_records === sourceTicks) &&
+        (!runtimeOwned || row.snapshot.checksumConsumer?.retained_records === 0) &&
+        (!runtimeOwned || row.snapshot.checksumConsumer?.pending_batch === false) &&
+        (!runtimeOwned || row.runtime_checksum_count === sourceTicks) &&
+        (!runtimeOwned || row.snapshot.exportRecords === 0) && row.snapshot.protocol.local_checksum_ticks === sourceTicks &&
         row.snapshot.protocol.remote_checksum_ticks === sourceTicks && row.snapshot.protocol.next_checksum_compare === sourceTicks &&
-        row.snapshot.protocol.remote_ack_input === usedInputs - 1;
+        row.snapshot.protocol.remote_ack_input === usedInputs - 1 &&
+        (!runtimeFullRoute || row.snapshot.protocol.remote_ack_checksum === sourceTicks - 1);
     })) {
+      if (Date.now() > deadline)
+        throw Error('Autonomous native pump exceeded the outer wall-time deadline before completion');
+      if (runtimeOwned) {
+        for (const role of ['alpha', 'beta']) {
+          const owner = await instances[role].runtimeLockstepSnapshot();
+          if (!owner || owner.armed !== true || owner.closing !== false || owner.failure !== null ||
+              !owner.peer || owner.checksums?.length !== sourceTicks)
+            throw Error(`${role} final autonomous runtime evidence snapshot is incomplete`);
+          after[role].snapshot = owner.peer;
+          after[role].runtime_checksum_records = owner.checksums;
+          if (!nativePumpChecksumEvidence(after[role], true, sourceTicks))
+            throw Error(`${role} final autonomous runtime checksum evidence is incomplete`);
+        }
+        interval.after = after;
+      }
+      if (Date.now() > deadline)
+        throw Error('Autonomous native pump exceeded the outer wall-time deadline while retaining final evidence');
       for (const role of ['alpha', 'beta']) verifyPositivePeerCompletion(after[role].snapshot.protocol, usedInputs, sourceTicks);
+      if (runtimeFullRoute) for (const role of ['alpha', 'beta'])
+        verifyRuntimeFullRoutePeerCompletion(after[role].snapshot.protocol);
       if (cssLiveRoute && !interval.crossed_512_each)
         throw Error(`${runtimeCssMatch ? 'CSS-to-match' : 'CSS-to-SSS'} no-RPC observation did not witness both source cursors cross 512`);
       interval.complete = true;
       return;
     }
+    const progress = progressWatch.observe(Object.fromEntries(['alpha', 'beta'].map(role =>
+      [role, progressToken(after[role])])), Date.now());
+    if (progress.outer_deadline_expired)
+      throw Error('Autonomous native pump exceeded the outer wall-time deadline before completion');
+    if (progress.stalled_role)
+      throw Error(`${progress.stalled_role} autonomous native pump made no source/protocol progress for ${progress.stalled_for_ms} ms`);
     await sleep(pollMs);
   }
-  throw Error('Autonomous native pump did not complete within its bounded no-RPC interval');
+  throw Error('Autonomous native pump exceeded the outer wall-time deadline before completion');
 }
 
 async function pollRun() {
@@ -968,16 +1164,16 @@ async function waitForPositivePeerCompletion() {
   const receiptDeadline = Math.min(deadline, Date.now() + stallMs);
   const expected = {remote_ack_input: usedInputs - 1, local_checksum_ticks: sourceTicks,
     remote_checksum_ticks: sourceTicks, next_checksum_compare: sourceTicks,
-    ...(runtimeCssMatch ? {remote_ack_checksum: sourceTicks - 1} : {})};
+    ...((runtimeCssMatch || runtimeFullRoute) ? {remote_ack_checksum: sourceTicks - 1} : {})};
   while (Date.now() <= receiptDeadline) {
     await refreshBrowserPeers();
     for (const role of ['alpha', 'beta']) await drainChecksums(role, peers[role]);
     await refreshBrowserPeers();
     const summaries = Object.fromEntries(['alpha', 'beta'].map(role => [role, peers[role].summary()]));
     for (const summary of Object.values(summaries)) {
-      if (runtimeCssMatch && Number.isInteger(summary.remote_ack_checksum) &&
+      if ((runtimeCssMatch || runtimeFullRoute) && Number.isInteger(summary.remote_ack_checksum) &&
           summary.remote_ack_checksum > sourceTicks - 1)
-        throw Error(`Runtime CSS-to-match peer acknowledged checksum beyond ${sourceTicks - 1}: ${JSON.stringify(summary)}`);
+        throw Error(`Runtime route peer acknowledged checksum beyond ${sourceTicks - 1}: ${JSON.stringify(summary)}`);
       if (summary.terminal || !Array.isArray(summary.checksum_mismatches) || summary.checksum_mismatches.length ||
           Object.entries(expected).some(([key, value]) =>
             !Number.isInteger(summary[key]) || summary[key] < (key === 'remote_ack_input' ? -1 : 0) ||
@@ -987,7 +1183,8 @@ async function waitForPositivePeerCompletion() {
     if (Object.values(summaries).every(summary =>
         Object.entries(expected).every(([key, value]) => summary[key] === value))) {
       for (const role of ['alpha', 'beta'])
-        instanceRows[role].positive_completion = runtimeCssMatch ? verifyRuntimeCssMatchPeerCompletion(summaries[role]) :
+        instanceRows[role].positive_completion = runtimeFullRoute ? verifyRuntimeFullRoutePeerCompletion(summaries[role]) :
+          runtimeCssMatch ? verifyRuntimeCssMatchPeerCompletion(summaries[role]) :
           verifyPositivePeerCompletion(summaries[role], usedInputs, sourceTicks);
       return;
     }
@@ -1100,13 +1297,14 @@ async function run() {
     for (const role of ['alpha', 'beta']) {
       const localPort = role === 'alpha' ? 0 : 1;
       instanceRows[role].synthetic_gamepad_routing =
-        await instances[role].prepareSyntheticGamepadRouting(localPort);
+        await instances[role].prepareSyntheticGamepadRouting(localPort,
+          runtimeFullRoute ? {profile: buildRuntimeFullRouteProfile()} : {});
     }
   }
   if (runtimeInputFixture) for (const role of ['alpha', 'beta'])
     instanceRows[role].runtime_input_fixture_start = await instances[role].installRuntimeInputFixture({role,
-      inputTicks: usedInputs, variant: runtimeInputFixtureName,
-      ...(runtimeCssLiveRoute ? {samples: runtimeGamepadSamples[role]} : {})});
+      inputTicks: usedInputs, variant: runtimeFullRoute ? 'runtime-full-route' : runtimeInputFixtureName,
+      ...(runtimeLiveRoute ? {samples: runtimeGamepadSamples[role]} : {})});
   await Promise.all(['alpha', 'beta'].map(role => instances[role].beginLockstep(seed, sourceTicks)));
   const startRows = await waitForStart();
   if (!runtimeOwned) for (const role of ['alpha', 'beta'])
@@ -1178,7 +1376,7 @@ async function run() {
     const roomId = localWebRtc ? undefined : createRoomId();
     const peerOptions = role => ({role, sourceTicks, inputTicks: usedInputs,
       ...(localWebRtc ? {} : {relayUrl: values['relay-url'], roomId}),
-      ...(nativePump || runtimeCssLiveRoute ? {autonomousPump: true} : {}),
+      ...(nativePump || runtimeLiveRoute ? {autonomousPump: true} : {}),
       agreement: agreements[role], timeoutMs: Math.min(stallMs, deadline - Date.now()),
       ...(inputSampling ? {inputCapture: {deferSendTicks: role === 'beta' ? [0] : [],
         pattern: role === 'alpha' ? ['neutral', 'A', 'release', 'neutral'] : Array(usedInputs).fill('neutral')}} : {})});
@@ -1327,7 +1525,7 @@ async function run() {
     const entries = role => Array.from({length: usedInputs}, (_, tick) => [tick, localSample(role, tick)]);
     await peers.alpha.addLocalInputs(entries('alpha'));
     await peers.beta.addLocalInputs(entries('beta'));
-  } else if ((nativePump || runtimeCssLiveRoute) && runtimeOwned) {
+  } else if ((nativePump || runtimeLiveRoute) && runtimeOwned) {
     // The native runtime's existing local PADStatus callback feeds the page peer;
     // each bounded CSS route fixture changes only the standard Gamepad sampled there.
   } else if (scenario === 'probe') {
@@ -1338,7 +1536,7 @@ async function run() {
     await publishAllInputs(peers.alpha, peers.beta);
   }
   recordAvailableTransportMetrics(pairResults.transport, relay);
-  if (nativePump || runtimeCssLiveRoute) await observeNativePumpWithoutRpc();
+  if (nativePump || runtimeLiveRoute) await observeNativePumpWithoutRpc();
   else await pollRun();
   if (scenario === 'flip' || scenario === 'disconnect') {
     const expectedKind = scenario === 'flip' ? TERMINAL.desync : TERMINAL.disconnect;
@@ -1365,7 +1563,7 @@ async function run() {
   }
   stopRouteCaptureWatchers = true;
   await settleRouteBoundaryWatchers();
-  if (nativePump || runtimeCssLiveRoute) {
+  if (nativePump || runtimeLiveRoute) {
     pairResults.local_webrtc_final_before_peer_close = Object.fromEntries(await Promise.all(['alpha', 'beta'].map(async role =>
       [role, verifyReliableHostWebRtc(await (runtimeOwned ? runtimeOwnerWebRtcState(role) : instances[role].localWebRtcState()))])));
     if (runtimeOwned) {
@@ -1399,6 +1597,27 @@ async function run() {
           await captureRuntimeCssMatchFinalBoundary(role);
         }
       }
+      if (runtimeFullRoute) {
+        for (const role of ['alpha', 'beta']) {
+          const boundary = await instances[role].matchObservationBoundary();
+          const {status_before: statusBefore, native_before: nativeBefore, observation,
+            native_after: nativeAfter, status_after: statusAfter} = boundary;
+          if (!boundary.stable_cursor || !boundary.stable_phase || statusBefore?.active !== 1 ||
+              statusAfter?.active !== 1 || statusBefore?.cursor !== sourceTicks || statusAfter?.cursor !== sourceTicks ||
+              statusBefore.blocker !== 'complete' ||
+              statusAfter.blocker !== 'complete' || statusBefore.terminal?.kind !== 0 ||
+              statusAfter.terminal?.kind !== 0 || nativeBefore?.phase !== 1 || nativeAfter?.phase !== 1 ||
+              nativeBefore?.running !== 1 || nativeAfter?.running !== 1 ||
+              nativeBefore?.error !== null || nativeAfter?.error !== null)
+            throw Error(`${role} final native match observation changed complete source cursor, phase or running state`);
+          validateRuntimeFullRouteTerminalResult(observation);
+          instanceRows[role].final_status = statusAfter;
+          instanceRows[role].final_native = nativeAfter;
+          instanceRows[role].final_match_observation = observation;
+          instanceRows[role].final_match_observation_boundary = boundary;
+          await captureRuntimeFullRouteFinalBoundary(role);
+        }
+      }
       await relay.close();
       pairResults.relay_closed = true;
     } else {
@@ -1414,7 +1633,7 @@ async function run() {
     instanceRows[role].source_accounting_artifact = {name: 'source-accounting.json',
       bytes: bytes.length, sha256: sha256(bytes)};
     instanceRows[role].source_accounting = verifyNetSourceAccounting(capture,
-      scenario === 'positive' || scenario === 'probe' || inputSampling || nativePump || runtimeCssLiveRoute ? sourceTicks :
+      scenario === 'positive' || scenario === 'probe' || inputSampling || nativePump || runtimeLiveRoute ? sourceTicks :
         localWebRtc && scenario === 'disconnect' ? disconnectAt : capture.final.cursor);
   }
   pairResults.wait_observations = waitObservations;
@@ -1430,7 +1649,7 @@ async function run() {
       ...(inputSampling ? {local_input_capture: peers[role].localInputCapture} : {}),
     };
   });
-  if (browserOwned && (probe || scenario === 'positive' || inputSampling || nativePump || runtimeCssLiveRoute)) {
+  if (browserOwned && (probe || scenario === 'positive' || inputSampling || nativePump || runtimeLiveRoute)) {
     for (const role of ['alpha', 'beta']) {
       const ownership = peers[role].checksumOwnership;
       if (ownership.active_native_records_submitted_before_export !== sourceTicks ||
@@ -1621,6 +1840,101 @@ async function run() {
       observed_scenes: observedScenes, final_native_phase: {alpha: 7, beta: 7}, active_match: validatedMatches,
       final_match_boundary_capture: {expected: {name: 'match', phase: 7}, captures: finalMatchCaptures,
         source: 'existing route-boundary screenshot, browser-driver and WebGPU diagnostics', pixel_equivalence_claim: false}};
+    pairResults.outcome = 'complete';
+  } else if (runtimeFullRoute) {
+    const fixtures = {}, samples = {}, observedScenes = {}, activeWitnesses = {}, completedRoutes = {}, finalTerminalObservations = {};
+    for (const role of ['alpha', 'beta']) {
+      verifyRuntimeFullRoutePeerCompletion(peers[role].summary());
+      if (instanceRows[role].records !== sourceTicks ||
+          instanceRows[role].scene_runs.length !== sourceTicks ||
+          instanceRows[role].source_accounting.source_steps !== sourceTicks ||
+          instanceRows[role].source_accounting.source_draws !== sourceTicks)
+        throw Error(`${role} runtime full route did not retain exactly 5084 checksummed source draws`);
+      const route = verifyRuntimeFullRouteSceneRuns(instanceRows[role].scene_runs);
+      observedScenes[role] = route.scenes;
+      const status = instanceRows[role].final_status, native = instanceRows[role].final_native;
+      if (status?.cursor !== sourceTicks || status.blocker !== 'complete' || status.terminal?.kind !== 0 ||
+          native?.phase !== 1 || native.running !== 1 || native.error !== null)
+        throw Error(`${role} runtime full route did not finish complete in original CSS: ${JSON.stringify({status, native})}`);
+      const expectedPort = role === 'alpha' ? 0 : 1;
+      const routing = instanceRows[role].synthetic_gamepad_routing;
+      const profile = buildRuntimeFullRouteProfile();
+      if (!routing || routing.gamepad_index !== expectedPort || routing.assigned_port !== expectedPort ||
+          !routing.active || !routing.neutral || routing.profile_source !== 'saved' ||
+          JSON.stringify(routing.profile_config) !== JSON.stringify(profile) ||
+          routing.held_input_blocked !== true || routing.neutral_rearmed !== true ||
+          (role === 'beta' && routing.automatic_port !== 0))
+        throw Error(`${role} full-route Gamepad was not saved, re-armed neutral and assigned by the ordinary controller manager`);
+      fixtures[role] = await instances[role].readRuntimeInputFixture();
+      const phases = fixtures[role]?.phase_samples?.map(row => row.phase)
+        .filter((phase, index, rows) => !index || phase !== rows[index - 1]);
+      if (fixtures[role]?.variant !== 'runtime-full-route' || fixtures[role]?.failure ||
+          fixtures[role]?.disposed || fixtures[role]?.frozen !== true ||
+          fixtures[role]?.captured_count !== usedInputs || fixtures[role]?.captures?.length !== usedInputs ||
+          JSON.stringify(phases) !== '[1,3,7,8,1]' ||
+          fixtures[role].captures.some((row, tick) => row.input_tick !== tick || row.source_cursor !== tick ||
+            row.local_port !== expectedPort || row.bytes?.length !== 11 ||
+            (tick && row.poll_serial <= fixtures[role].captures[tick - 1].poll_serial)))
+        throw Error(`${role} full-route fixture did not retain all ordered native-selected inputs and five route phases`);
+      samples[role] = fixtures[role].captures.map(row => row.bytes);
+      const witness = instanceRows[role].first_active_match_witness;
+      if (!witness || witness.source_phase !== 7 || witness.source_cursor !== witness.status_before?.cursor ||
+          witness.status_after?.cursor !== witness.source_cursor || witness.status_before?.active !== 1 ||
+          witness.status_after?.active !== 1 || witness.status_before?.terminal?.kind !== 0 ||
+          witness.status_after?.terminal?.kind !== 0 || witness.native_before?.phase !== 7 ||
+          witness.native_after?.phase !== 7 || witness.native_before?.running !== 1 ||
+          witness.native_after?.running !== 1 || witness.native_before?.error !== null ||
+          witness.native_after?.error !== null || !witness.stable_cursor || !witness.stable_phase)
+        throw Error(`${role} pure-health observer did not retain a stable first active-match context`);
+      activeWitnesses[role] = validateActiveMatchRoute([1, 2, 3], witness.observation);
+      const finalBoundary = instanceRows[role].final_match_observation_boundary;
+      if (!finalBoundary?.stable_cursor || !finalBoundary.stable_phase ||
+          finalBoundary.status_before?.active !== 1 || finalBoundary.status_after?.active !== 1 ||
+          finalBoundary.status_before?.cursor !== sourceTicks || finalBoundary.status_after?.cursor !== sourceTicks ||
+          finalBoundary.status_before?.blocker !== 'complete' || finalBoundary.status_after?.blocker !== 'complete' ||
+          finalBoundary.status_before?.terminal?.kind !== 0 || finalBoundary.status_after?.terminal?.kind !== 0 ||
+          finalBoundary.native_before?.phase !== 1 || finalBoundary.native_after?.phase !== 1 ||
+          finalBoundary.native_before?.running !== 1 || finalBoundary.native_after?.running !== 1)
+        throw Error(`${role} final completed-match observer was not bracketed by stable complete CSS state`);
+      completedRoutes[role] = validateFullRoute(route.scenes, instanceRows[role].final_match_observation);
+      finalTerminalObservations[role] = instanceRows[role].final_match_observation;
+      const capture = instanceRows[role].route_boundary_captures.find(item => item.name === 'css-return');
+      if (!capture || capture.screenshot !== path.join(role, 'final.png') ||
+          capture.source_cursor_sampled_before_screenshot !== sourceTicks ||
+          capture.source_cursor_after_screenshot !== sourceTicks ||
+          capture.source_cursor_stable_during_screenshot !== true || capture.screenshot_phase_stable !== true ||
+          capture.phase_after_screenshot !== 1 || capture.gpu_observed !== true)
+        throw Error(`${role} final CSS PNG lacks stable 5084-source native/status/GPU evidence`);
+    }
+    if (JSON.stringify(completedRoutes.alpha.selection) !== JSON.stringify(completedRoutes.beta.selection) ||
+        JSON.stringify(activeWitnesses.alpha.selection) !== JSON.stringify(activeWitnesses.beta.selection))
+      throw Error('Runtime peers disagree on active or completed full-route match selection');
+    const terminalResult = compareRuntimeFullRouteTerminalResults(
+      finalTerminalObservations.alpha, finalTerminalObservations.beta);
+    const bytesA = await fs.readFile(path.join(childDirectory('alpha'), 'checksums.bin'));
+    const bytesB = await fs.readFile(path.join(childDirectory('beta'), 'checksums.bin'));
+    if (bytesA.length !== sourceTicks * NET_RECORD_BYTES || !bytesA.equals(bytesB))
+      throw Error('Runtime full-route 5084-record 64-byte checksum streams differ');
+    const witness = verifyConsumedInputComponents(samples.alpha, samples.beta, bytesA, bytesB);
+    pairResults.checksums = {records_each: sourceTicks, record_bytes: NET_RECORD_BYTES,
+      streams_identical: true, sha256: sha256(bytesA)};
+    pairResults.runtime_input_fixture_result = {input_source: fixtures.alpha.input_source,
+      recipe_identity: runtimeRecipeIdentity, selected_input_ticks: usedInputs, source_ticks: sourceTicks,
+      observed_scenes: observedScenes, collapsed_phase_order: {alpha: [1, 3, 7, 8, 1], beta: [1, 3, 7, 8, 1]},
+      independent_click_profile: buildRuntimeFullRouteProfile(), fixtures,
+      matched_every_native_consumed_input_component: true, ...witness};
+    pairResults.active_match_observation = {reader: 'existing melee_web_native_menu_match_observe export',
+      first_ready_active_match: Object.fromEntries(['alpha', 'beta'].map(role => [role,
+        instanceRows[role].first_active_match_witness])),
+      final_cached_completed_match: Object.fromEntries(['alpha', 'beta'].map(role => [role,
+        {observation: instanceRows[role].final_match_observation,
+          boundary: instanceRows[role].final_match_observation_boundary}]))};
+    pairResults.route = {scope: 'runtime-owned original full route through Results and CSS return', status: 'passed',
+      expected_scene_order: expectedFullSceneOrder(), observed_scenes: observedScenes,
+      original_terminal_result: terminalResult,
+      alpha: completedRoutes.alpha, beta: completedRoutes.beta,
+      final_css_png: Object.fromEntries(['alpha', 'beta'].map(role => [role,
+        instanceRows[role].route_boundary_captures.find(item => item.name === 'css-return')]))};
     pairResults.outcome = 'complete';
   } else if (inputSampling) {
     if (!instanceRows.input_capture_released || !instanceRows.input_capture_wait?.stable_bytes_and_serial)

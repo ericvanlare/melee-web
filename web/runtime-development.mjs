@@ -287,6 +287,12 @@ window.meleeNetCanResumeTimingPause=()=>{
 };
 window.meleeNetTimingPauseDiagnostics=()=>({checks:window.__meleeNetTimingPauseChecks||[],
  current:window.meleeNetTimingPauseEligibilitySnapshot()});
+window.meleeNetRuntimeCallbackTimingSnapshot=()=>Object.freeze({frames:nativeTimingFrames,
+ over_budget_frames:nativeOverBudgetFrames,long_frames:nativeLongFrames,
+ worst_active_ms:nativeTimingWorst,worst:nativeWorstTiming?Object.freeze({...nativeWorstTiming}):null,
+ previous:nativePreviousTiming?Object.freeze({...nativePreviousTiming}):null,
+ last:nativeLastTiming?Object.freeze({...nativeLastTiming}):null});
+window.meleeNetRuntimeDiagnosticExport=async()=>owner?.handle?.exportDiagnostics?.()??null;
 window.meleeNetResumeTimingPause=async()=>{
  return attemptNetworkTimingPauseResume({canResume:()=>window.meleeNetCanResumeTimingPause(),
   resume:()=>owner.handle.resume(),isRunning:()=>Module._melee_web_native_menu_running()===1});
@@ -330,6 +336,7 @@ window.meleeNetConfigureRuntimeLockstep=config=>{
  return runtimeLockstepEntry.configure(config);
 };
 window.meleeNetRuntimeLockstepSnapshot=()=>runtimeLockstepEntry?.snapshot()??null;
+window.meleeNetRuntimeLockstepHealth=options=>runtimeLockstepEntry?.health(options)??null;
 window.meleeNetCloseRuntimeLockstep=mode=>runtimeLockstepEntry?.close({mode})??Promise.resolve(null);
 window.meleeNetPeerIdentity=async()=>{
  if(!owner?.handle?.discIdentity)throw Error('Lockstep disc identity is unavailable');
