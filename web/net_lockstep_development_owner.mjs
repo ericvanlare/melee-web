@@ -22,10 +22,11 @@ function assertAvailable(context) {
 }
 
 /** Owns the development-only start boundary for one runtime lockstep session. */
-export function createDevelopmentLockstepOwner({Module, owner, inputDelay, getContext, getIdentity,
+export function createDevelopmentLockstepOwner({Module, owner, inputDelay, sourceTickLimit, getContext, getIdentity,
   createSession, runNativeStart} = {}) {
   if (!Module || typeof Module !== 'object' || !owner || typeof owner.attachNetworkSession !== 'function' ||
       !Number.isSafeInteger(inputDelay) || inputDelay < 0 ||
+      !Number.isSafeInteger(sourceTickLimit) || sourceTickLimit <= inputDelay ||
       typeof owner.stop !== 'function' || typeof getContext !== 'function' ||
       typeof getIdentity !== 'function' || typeof createSession !== 'function' ||
       typeof runNativeStart !== 'function')
@@ -46,7 +47,7 @@ export function createDevelopmentLockstepOwner({Module, owner, inputDelay, getCo
     if (used || starting || session) throw Error('This player already owns or used a lockstep session');
     assertAvailable(getContext());
     if (!Number.isSafeInteger(seed) || seed < 0 || seed > 0xffffffff ||
-        !Number.isSafeInteger(sourceTicks) || sourceTicks <= inputDelay)
+        !Number.isSafeInteger(sourceTicks) || sourceTicks <= inputDelay || sourceTicks > sourceTickLimit)
       throw Error('Runtime lockstep seed or source tick bound is invalid');
 
     // Reserve synchronously so a second caller cannot pass while Wasm identity
@@ -60,7 +61,7 @@ export function createDevelopmentLockstepOwner({Module, owner, inputDelay, getCo
         throw Error('Runtime lockstep Wasm identity is invalid');
 
       const ownedSession = createSession({Module, role: config.role, sourceTicks,
-        inputTicks: sourceTicks - inputDelay, url: config.url, roomId: config.roomId,
+        inputTicks: sourceTicks - inputDelay, checksumEvidenceRecords: sourceTicks, url: config.url, roomId: config.roomId,
         timeoutMs: config.timeoutMs});
       session = ownedSession;
       owner.attachNetworkSession(options => ownedSession.close(options));
