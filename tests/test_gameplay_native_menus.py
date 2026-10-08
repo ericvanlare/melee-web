@@ -56,6 +56,36 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
     def setUpClass(cls):
         cls.scratch = cls.new_workspace(ROOT, "stadium-c1a-native-menu-")
 
+    def test_stadium_yakumono_exchange_round_trip_without_assets(self):
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("The C1 diagnostic native host trace has not been built")
+        command = [str(node_runtime()), str(target),
+                   "--stadium-yakumono-exchange"]
+        (self.scratch / "yakumono-exchange-command.txt").write_text(
+            " ".join(command) + "\n", encoding="utf-8")
+        try:
+            run = subprocess.run(
+                command, cwd=ROOT, capture_output=True, text=True, timeout=30)
+        except subprocess.TimeoutExpired as failure:
+            (self.scratch / "yakumono-exchange.stdout").write_bytes(
+                failure.stdout.encode() if isinstance(failure.stdout, str)
+                else (failure.stdout or b""))
+            (self.scratch / "yakumono-exchange.stderr").write_bytes(
+                failure.stderr.encode() if isinstance(failure.stderr, str)
+                else (failure.stderr or b""))
+            raise
+        (self.scratch / "yakumono-exchange.stdout").write_text(
+            run.stdout, encoding="utf-8")
+        (self.scratch / "yakumono-exchange.stderr").write_text(
+            run.stderr, encoding="utf-8")
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-4000:])
+        self.assertIn(
+            "Stadium yakumono exchange asset-free control passed; pointer restored",
+            run.stdout,
+        )
+        self.assertIn("source StageInfo/GObj owner state unchanged", run.stdout)
+
     def test_stadium_c1a_raw_pad_selection_stops_before_match_admission(self):
         target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
         fixture_root = Path(os.environ.get("MELEE_MENU_FIXTURE_ROOT", ROOT / "assets-local"))

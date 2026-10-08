@@ -1,0 +1,199 @@
+{
+  "schema": "melee-web-issue261-stadium-yakumono-exchange-v1",
+  "issue": 261,
+  "result": "passed_scoped_yakumono_pointer_exchange_control",
+  "scope": {
+    "source_api": "melee_web_grpstadium_exchange_yakumono(void*)",
+    "guard": "MELEE_WEB_GAMEPLAY",
+    "behavior": "Return the current source-owned Stadium yakumono_param pointer, assign the supplied pointer, and return without dereferencing either pointer.",
+    "test": "The asset-free native trace exercises NULL/A/B/A/NULL and verifies explicit NULL restoration.",
+    "no_stage_lifecycle": true
+  },
+  "source": {
+    "base_commit": "0a96b2213b7312e50a232172ca467d17ef8a939b",
+    "base_tree": "97ea1f3413d6b9edff2e5b4f07d7c920683effdd",
+    "producer_commit": "756182a78fc8deb6306f19997834f0fd0a3c01a3",
+    "producer_tree": "67a20e54ed78e843db042ff6223bef9e7f287eb1",
+    "tracked_worktree_clean_at_validation": true,
+    "source_files": {
+      "patches/melee-gameplay.patch": {
+        "sha256": "3ec1d8f1b64e7247540b1efac9e4c7e48afe36d75038d053bb248c19f705cc0e"
+      },
+      "tests/native_menu_host_trace.cpp": {
+        "sha256": "2f9fc81ea8262c7f7ba915744970997b85fc5cd9e3fbfa2bde7d6295365c2adf"
+      },
+      "tests/stadium_c1_stage_state_probe.c": {
+        "sha256": "95773e02e7c65e0a2608b85d48b72219f22da5f229aaf1409540082a85c44a58"
+      },
+      "tests/stadium_c1_stage_state_probe.h": {
+        "sha256": "567d39ca1c6fa373fea01db5c7cb247b871ed5fb8b3bc59b1c0a61b703249e5d"
+      },
+      "tests/test_gameplay_native_menus.py": {
+        "sha256": "8eadf672b52e2ac14167263b7d1b06a0dac177b6ce615c175103d7c984762ce7"
+      }
+    },
+    "patch_generated_source": {
+      "path": "build/gameplay-source/src/melee/gr/grpstadium.c",
+      "sha256": "37a1ebff60e8be7e4227c53638d7d524c91b0b49b68819471a61226a0923dfa7"
+    }
+  },
+  "focused_validation": {
+    "c1_diagnostic_build": {
+      "command": [
+        "python3", "scripts/agent_workspace.py", "run", "--",
+        "python3", "scripts/build.py", "--trace-target", "native_menu_host_trace",
+        "--configuration", "Release", "--stadium-c1a-diagnostic"
+      ],
+      "producer_commit": "756182a78fc8deb6306f19997834f0fd0a3c01a3",
+      "exit_code": 0,
+      "target": "native_menu_host_trace.js",
+      "standalone_raw_log_retained": false,
+      "log_note": "The command completed successfully, but the tool truncated its large console response. The exact producer artifacts are hashed below; no missing build log is inferred. The root review receipt also records this limitation.",
+      "artifacts": {
+        "build/browser-stadium-c1a-release/native_menu_host_trace.js": {
+          "bytes": 233346,
+          "sha256": "97eb1430087d79961e5e93a75b3f0be79496a7f0e2f6b3a2860a56b27e42086e"
+        },
+        "build/browser-stadium-c1a-release/native_menu_host_trace.wasm": {
+          "bytes": 13928261,
+          "sha256": "80cc3cd2674d61e8727f2a8fb8161aca4fed07e0c7c2acd1bdb33fc91b2ee914"
+        },
+        "build/browser-stadium-c1a-release/CMakeFiles/native_menu_host_trace.dir/tests/native_menu_host_trace.cpp.o": {
+          "bytes": 598621,
+          "sha256": "8a45ddc460a148fa1c7cd23f826db84a0665e55954e424ad8cf8e3b1c5ba4fe9"
+        },
+        "build/browser-stadium-c1a-release/CMakeFiles/native_menu_host_trace.dir/tests/stadium_c1_stage_state_probe.c.o": {
+          "bytes": 7288,
+          "sha256": "7664f988fc2b5956aecde72397d5d078528dabc6e6a730935d0ed403283d5d79"
+        },
+        "build/browser-stadium-c1a-release/CMakeFiles/fighter_source_runtime.dir/build/gameplay-source/src/melee/gr/grpstadium.c.o": {
+          "bytes": 32276,
+          "sha256": "16e59304c59bc713ac328be07f52f759e940a8cc819722f715ccadfa2bb612d2"
+        }
+      }
+    },
+    "asset_free_control": {
+      "command": [
+        "python3", "scripts/agent_workspace.py", "run", "--",
+        "python3", "-m", "unittest", "discover", "-s", "tests",
+        "-p", "test_gameplay_native_menus.py", "-k",
+        "stadium_yakumono_exchange_round_trip_without_assets", "-v"
+      ],
+      "producer_commit": "756182a78fc8deb6306f19997834f0fd0a3c01a3",
+      "exit_code": 0,
+      "tests_run": 1,
+      "result": "passed",
+      "runtime": "Pinned checkout Node 24.19.0 executing the compiled WebAssembly host trace; no browser was launched.",
+      "observations": [
+        "The NULL/A/B/A/NULL round trip observes restoration of the original NULL pointer.",
+        "An opaque C-only probe compares the complete StageInfo byte snapshot and releases it only if unchanged; the C++ test does not include Ground layout headers or write the snapshot back.",
+        "stage_object_failures equals STAGE_LIST_UNAVAILABLE before and after the exchange, and the existing C++-safe GObj registry/dispatch observations remain equal.",
+        "Synthetic pointers are aligned source-shaped objects and are never dereferenced by the exchange hook."
+      ],
+      "tool_output_transcript": {
+        "external_run": "issue261-yakumono-source-prep-20261007/focused-exchange-control-v1.tool-output.txt",
+        "sha256": "f4591939b41bd4c8021b23eb2bf1f08b00b5e334946fa9afd3e99db76a16a67e",
+        "note": "The captured console rendering combines unittest output; separate stdout/stderr streams are unavailable."
+      },
+      "external_result_receipt": {
+        "external_run": "issue261-yakumono-source-prep-20261007/issue261-focused-build-control-result-v1.json",
+        "sha256": "d8134ff44397953c402aeb808c1f9930076d4a5060e9bb9a2cb046424622a278"
+      }
+    }
+  },
+  "integration_validation": {
+    "full_suite": {
+      "command": [
+        "python3", "scripts/agent_workspace.py", "run", "--",
+        "python3", "-m", "unittest", "discover", "-s", "tests", "-v"
+      ],
+      "producer_commit": "756182a78fc8deb6306f19997834f0fd0a3c01a3",
+      "exit_code": 0,
+      "tests_run": 2047,
+      "skipped": 133,
+      "elapsed_seconds": 413.025,
+      "result_line": "OK (skipped=133)",
+      "log": {
+        "external_run": "issue261-yakumono-source-prep-20261007/issue261-full-suite-v1.log",
+        "sha256": "fc251babf185c76a373a000c2b2a5ba5d75e9639c53bfb2d364de14267f5dc6f"
+      },
+      "existing_regression": "test_stadium_map_only_owner_preserves_exact_imports_and_nulls passed using the existing retained C0 fixture. The new retained map1 constructor test remained behind its explicit run gate and was skipped."
+    },
+    "ordinary_release_build": {
+      "command": [
+        "python3", "scripts/agent_workspace.py", "run", "--",
+        "python3", "scripts/build.py", "--configuration", "Release"
+      ],
+      "producer_commit": "756182a78fc8deb6306f19997834f0fd0a3c01a3",
+      "exit_code": 0,
+      "target_set": "Default Release target set (108 build steps), including gameplay_menu_browser.js.",
+      "diagnostic_options": {
+        "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+        "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+        "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+        "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+        "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+        "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+        "MELEE_WEB_RESULTS_RENDERED_TRACE": "OFF",
+        "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+        "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF",
+        "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF"
+      },
+      "log": {
+        "external_run": "issue261-yakumono-source-prep-20261007/issue261-ordinary-release-build-v1.log",
+        "sha256": "843029935f190ea4f8531c34db1b78fa75cca028a61a4fc1757fd9716f5e2e1f"
+      },
+      "cache": {
+        "bytes": 60977,
+        "sha256": "de0c1275f03b2fd5b618fbbe59e3d7d16a251176ad41c68db9939100d6356bdc"
+      },
+      "outputs": {
+        "gameplay_menu_browser.js": {
+          "bytes": 300352,
+          "sha256": "a6d9562e638f2395e49cb23bbdd97567e2dbc0f2b993008842d9407317f18d64"
+        },
+        "gameplay_menu_browser.wasm": {
+          "bytes": 15749040,
+          "sha256": "bd62f0c80ebaf286151cfded796f305543a37b14a2cee2ee920d85d90dcc441f"
+        },
+        "gameplay_menu_browser.data": {
+          "bytes": 3674112,
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+        },
+        "grpstadium.c.o": {
+          "bytes": 32276,
+          "sha256": "16e59304c59bc713ac328be07f52f759e940a8cc819722f715ccadfa2bb612d2"
+        }
+      },
+      "external_result_receipt": {
+        "external_run": "issue261-yakumono-source-prep-20261007/issue261-ordinary-release-build-result-v1.json",
+        "sha256": "7942b9778a607005693bc418678179012e0d51cf0b35b4869b0dd0797d3fedbf"
+      }
+    }
+  },
+  "retained_preparation": {
+    "preserved_current_issue254_artifacts": {
+      "external_run": "issue261-yakumono-source-prep-20261007/issue261-prebuild-artifact-retention-v1.json",
+      "sha256": "c5753a0554c17ee63dd52b4cc25d86ecd40373fc7d9d7c86029f6f0bdc07dd69",
+      "note": "Seven current #254 C1/Release outputs were preserved before the C1 build. Historical #249 native-trace artifacts are separately identified in the same manifest."
+    },
+    "first_focused_build_failure": {
+      "external_run": "issue261-yakumono-source-prep-20261007/focused-c1-native-trace-build-v1.log",
+      "sha256": "e4c81eeb9cc32ed6f78305c0e1b34cedba9e38d9d1024190290e67c2bbb7a37a",
+      "inventory": {
+        "external_run": "issue261-yakumono-source-prep-20261007/focused-c1-native-trace-build-v1-inventory.json",
+        "sha256": "f655a5a171483de54cdf66e4b45c6b44592af0d4e79bb60e3b8bcd6ede1d4efe"
+      },
+      "cause": "The C++ test included generated Ground headers whose CmdUnion anonymous union is C-only. The correction moves StageInfo layout access into the existing C-only probe."
+    },
+    "preparation_producer_selection_correction": {
+      "external_run": "issue261-yakumono-source-prep-20261007/issue261-prebuild-artifact-retention-v1.json",
+      "note": "The retained precheck initially compared current #254 outputs against a historical #249 archive. It is preserved as a producer-selection mistake; the corrected manifest preserves the exact #254 producer outputs."
+    }
+  },
+  "limits": [
+    "This is a scoped pointer-exchange control, not a Stadium profile or stage construction result.",
+    "No Stage OnInit, public stage admission, retained C1 constructor fixture, browser, callback dispatch, rendering, or whole-session acceptance is claimed.",
+    "The focused C1 build succeeded but its large tool response was truncated; linked artifact hashes and the root review record its log limitation."
+  ]
+}

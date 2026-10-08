@@ -139,6 +139,21 @@ uint32_t melee_web_stadium_c1_stage_object_failures(void)
     return failures;
 }
 
+int melee_web_stadium_c1_yakumono_exchange_baseline_empty(void)
+{
+    if (stage_info.yakumono_param != NULL || HSD_GObj_Entities != NULL)
+        return 0;
+    for (size_t i = 0; i < sizeof(stage_info.map_gobjs) /
+                                sizeof(stage_info.map_gobjs[0]); ++i) {
+        if (stage_info.map_gobjs[i] != NULL) return 0;
+    }
+    for (size_t i = 0; i < sizeof(stage_info.x280) /
+                                sizeof(stage_info.x280[0]); ++i) {
+        if (stage_info.x280[i] != NULL) return 0;
+    }
+    return 1;
+}
+
 MeleeWebStadiumC1StageInfoSnapshot*
 melee_web_stadium_c1_stage_info_snapshot_begin(char* error,
                                                 size_t error_size)
@@ -191,6 +206,27 @@ int melee_web_stadium_c1_stage_info_snapshot_restore(
         return snapshot_fail(error, error_size,
                              "Full source StageInfo restoration did not match its snapshot");
     snapshot->restored = 1;
+    if (error && error_size) error[0] = '\0';
+    return 1;
+}
+
+int melee_web_stadium_c1_stage_info_snapshot_matches(
+    const MeleeWebStadiumC1StageInfoSnapshot* snapshot)
+{
+    return snapshot != NULL && snapshot == active_snapshot &&
+           memcmp(&stage_info, &snapshot->saved, sizeof(snapshot->saved)) == 0;
+}
+
+int melee_web_stadium_c1_stage_info_snapshot_release_unchanged(
+    MeleeWebStadiumC1StageInfoSnapshot* snapshot, char* error,
+    size_t error_size)
+{
+    if (!snapshot || snapshot != active_snapshot || snapshot->restored ||
+        memcmp(&stage_info, &snapshot->saved, sizeof(snapshot->saved)) != 0)
+        return snapshot_fail(error, error_size,
+                             "The active StageInfo snapshot changed before read-only release");
+    active_snapshot = NULL;
+    free(snapshot);
     if (error && error_size) error[0] = '\0';
     return 1;
 }
