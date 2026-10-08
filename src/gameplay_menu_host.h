@@ -32,6 +32,9 @@ typedef struct MeleeWebMenuMatchSelection {
     /* Set only for the source Title attract demo. This keeps its authored
      * mode/callback and 99-stock payload separate from ordinary VS rules. */
     uint8_t opening_demo;
+    /* The original Sudden Death scene callback adds rules.x6 before entering
+     * fn_8016E730. Its active source players may occupy sparse original ports. */
+    uint8_t sudden_death;
 } MeleeWebMenuMatchSelection;
 typedef enum MeleeWebMenuMatchContinuationKind {
     MELEE_WEB_MENU_MATCH_CONTINUATION_RESULTS = 1,
@@ -39,6 +42,8 @@ typedef enum MeleeWebMenuMatchContinuationKind {
 } MeleeWebMenuMatchContinuationKind;
 typedef struct MeleeWebMenuMatchContinuation {
     MeleeWebMenuMatchContinuationKind kind;
+    /* Nonzero only while this host owns the matching original SD continuation. */
+    uint64_t owner_id;
     union {
         /* The exact StartMeleeData produced by the original VS Sudden Death
          * on_enter callback. The source may change its participants/rules. */
@@ -204,8 +209,26 @@ int melee_web_menu_host_match_continuation_begin(MeleeWebMenuHost*,
     const struct MatchExitInfo*,uint32_t random_seed,
     MeleeWebMenuMatchContinuation*,char*,size_t);
 int melee_web_menu_host_sudden_death_finish(MeleeWebMenuHost*,
-    const struct MatchExitInfo*,uint32_t random_seed,
+    uint64_t owner_id,const struct MatchExitInfo*,uint32_t random_seed,
+    const uint8_t input[MELEE_WEB_PAD_STATE_BYTES],
     MeleeWebMenuMatchContinuation*,char*,size_t);
+/* Read or claim the exact source SD continuation while its VS mode lease stays
+ * with the host. The match owner must release its claim after world teardown. */
+int melee_web_menu_host_sudden_death_selection(
+    const MeleeWebMenuHost*,const MeleeWebMenuMatchContinuation*,
+    MeleeWebMenuMatchSelection*,char*,size_t);
+int melee_web_menu_host_sudden_death_match_claim(
+    MeleeWebMenuHost*,const MeleeWebMenuMatchContinuation*,
+    MeleeWebMenuMatchSelection*,char*,size_t);
+int melee_web_menu_host_sudden_death_match_release(
+    MeleeWebMenuHost*,uint64_t owner_id,char*,size_t);
+/* Temporarily assigns the original GS_SUDDEN_DEATH scene-info identity while
+ * its claimed native match owns the world. The matching end restores the exact
+ * prior host-owned CSS/SSS scene-info pointer after teardown. */
+int melee_web_menu_host_sudden_death_scene_begin(
+    MeleeWebMenuHost*,uint64_t owner_id,char*,size_t);
+int melee_web_menu_host_sudden_death_scene_end(
+    MeleeWebMenuHost*,uint64_t owner_id,char*,size_t);
 int melee_web_menu_host_results_exit(MeleeWebMenuHost*,char*,size_t);
 int melee_web_menu_host_results_end(MeleeWebMenuHost*,uint32_t random_seed,
     const uint8_t input[MELEE_WEB_PAD_STATE_BYTES],char*,size_t);

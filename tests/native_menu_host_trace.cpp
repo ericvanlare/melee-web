@@ -5,6 +5,7 @@
 #include "gameplay_menu_host.h"
 #include "gameplay_save_profile.h"
 #include "gameplay_match_session.hpp"
+#include "runtime_archive_cache.hpp"
 #include "gameplay_results_session.hpp"
 #include "gameplay_prize_session.hpp"
 #include "gameplay_match_rules.h"
@@ -52,6 +53,7 @@
 extern "C" {
 #include <melee/gm/gm_1601.h>
 #include <melee/gm/gm_16F1.h>
+#include <melee/gm/gm_1A45.h>
 #include <melee/gm/gm_1A3F.h>
 #include <melee/gm/gm_16AE.h>
 #include <melee/gm/gm_1B03.h>
@@ -298,7 +300,7 @@ void run_vs_sudden_death_source_control()
               "Rejected typed continuation retained a stale payload");
         rejected_continuation.kind = MELEE_WEB_MENU_MATCH_CONTINUATION_RESULTS;
         check(!melee_web_menu_host_sudden_death_finish(
-                  host, &rejected_exit, 2,
+                  host,0,&rejected_exit,2,nullptr,
                   &rejected_continuation, error, sizeof(error)) &&
                   rejected_continuation.kind == 0,
               "Typed host accepted a Sudden Death finish without its live route");
@@ -307,6 +309,33 @@ void run_vs_sudden_death_source_control()
         check(melee_web_vs_mode_end(),
               "Typed continuation ownership control could not retire the VS lease");
         check(melee_web_menu_host_destroy(host, error, sizeof(error)), error);
+
+        melee_web::RuntimeFiles empty_files;
+        melee_web::RuntimeArchiveCache empty_cache(empty_files);
+        std::uint8_t initial_input_bytes[MELEE_WEB_PAD_STATE_BYTES];
+        melee_web_pad_state_capture(initial_input_bytes);
+        MeleeWebPadState* initial_input=melee_web_pad_state_decode(
+            initial_input_bytes,sizeof(initial_input_bytes),error,sizeof(error));
+        check(initial_input!=nullptr,error);
+        MeleeWebMenuMatchContinuation unowned_sudden_death{};
+        unowned_sudden_death.kind=MELEE_WEB_MENU_MATCH_CONTINUATION_SUDDEN_DEATH;
+        unowned_sudden_death.owner_id=1;
+        bool rejected_unowned=false;
+        try{
+            melee_web::GameplayMatchSession invalid(
+                empty_files,nullptr,unowned_sudden_death,empty_cache,
+                melee_web::GameplayMatchConstruction::Deferred,*initial_input);
+        }catch(const std::exception&){rejected_unowned=true;}
+        melee_web_pad_state_free(initial_input);
+        check(rejected_unowned,
+              "Native Sudden Death session accepted a continuation without its live host");
+        MeleeWebMenuMatchSelection bypass_selection{};
+        bypass_selection.sudden_death=1;
+        bool rejected_bypass=false;
+        try{melee_web::GameplayMatchSession invalid(empty_files,bypass_selection);}
+        catch(const std::exception&){rejected_bypass=true;}
+        check(rejected_bypass,
+              "Native Sudden Death session accepted a source payload without its host claim");
 
         check(melee_web_gameplay_session_end(error, sizeof(error)), error);
         session_active = false;
@@ -381,6 +410,82 @@ void run_sudden_death_host_control(
               std::memcmp(&gmVsMelee_StartData, &expected_sudden_death,
                           sizeof(expected_sudden_death)) == 0,
           "Typed host did not retain the original tie-selected Sudden Death payload");
+    const std::uint64_t sudden_death_owner_id=continuation.owner_id;
+    check(sudden_death_owner_id!=0,
+          "Typed Sudden Death continuation has no checked owner identity");
+    MeleeWebMenuMatchSelection sudden_death_selection{};
+    check(melee_web_menu_host_sudden_death_selection(
+              host,&continuation,&sudden_death_selection,error,error_size)&&
+              sudden_death_selection.sudden_death&&
+              sudden_death_selection.start.rules.x6,
+          "Typed Sudden Death selection did not preserve original scene setup");
+    check(melee_web_menu_host_sudden_death_match_claim(
+              host,&continuation,&sudden_death_selection,error,error_size),error);
+    check(!melee_web_menu_host_sudden_death_match_claim(
+              host,&continuation,&sudden_death_selection,error,error_size),
+          "Typed Sudden Death continuation allowed a duplicate match owner");
+    check(!melee_web_menu_host_destroy(host,error,error_size),
+          "Typed Sudden Death host was destroyed before its match owner");
+    check(!melee_web_menu_host_sudden_death_scene_begin(
+              host,sudden_death_owner_id+1,error,error_size),
+          "Typed Sudden Death scene accepted a stale owner identity");
+    const void* saved_sudden_death_scene=melee_web_current_scene_info();
+    check(melee_web_menu_host_sudden_death_scene_begin(
+              host,sudden_death_owner_id,error,error_size),error);
+    const auto* sudden_death_scene=
+        static_cast<const GameSceneInfo*>(melee_web_current_scene_info());
+    check(sudden_death_scene&&sudden_death_scene->scene_kind==GS_SUDDEN_DEATH,
+          "Typed match owner did not assign the original GS_SUDDEN_DEATH scene");
+    check(gmVsMelee_StartData.rules.x6,
+          "Original GS_SUDDEN_DEATH scene setup did not set the global source payload");
+    check(gm_GetCurrentSceneEnterData()==&gmVsMelee_StartData&&
+              gm_GetCurrentSceneExitData()==&gmVsMelee_SuddenDeathExitInfo,
+          "Sudden Death scene identity did not retain the original global entry and exit payloads");
+    const auto* retained_sudden_death_scene=melee_web_current_scene_info();
+    const StartMeleeData retained_sudden_death_start=gmVsMelee_StartData;
+    const MatchExitInfo retained_sudden_death_exit=gmVsMelee_SuddenDeathExitInfo;
+    std::uint8_t input_before_premature_finish[MELEE_WEB_PAD_STATE_BYTES];
+    std::uint8_t input_after_premature_finish[MELEE_WEB_PAD_STATE_BYTES];
+    melee_web_pad_state_capture(input_before_premature_finish);
+    MeleeWebMenuMatchContinuation premature_finish{};
+    check(!melee_web_menu_host_sudden_death_finish(
+              host,sudden_death_owner_id,&tied_timeout,sudden_death_final_seed,
+              input_before_premature_finish,&premature_finish,error,error_size)&&
+              premature_finish.kind==0,
+          "Typed host accepted Results handoff before its SD owner released the scene");
+    melee_web_pad_state_capture(input_after_premature_finish);
+    check(melee_web_current_scene_info()==retained_sudden_death_scene&&
+              std::memcmp(&gmVsMelee_StartData,&retained_sudden_death_start,
+                          sizeof(retained_sudden_death_start))==0&&
+              std::memcmp(&gmVsMelee_SuddenDeathExitInfo,
+                          &retained_sudden_death_exit,
+                          sizeof(retained_sudden_death_exit))==0&&
+              std::memcmp(input_before_premature_finish,
+                          input_after_premature_finish,
+                          sizeof(input_before_premature_finish))==0,
+          "Rejected early Results handoff changed SD scene, source payloads or PAD state");
+    MeleeWebMenuMatchSelection after_premature_selection{};
+    check(melee_web_menu_host_selection(host,&after_premature_selection,
+                                        error,error_size)&&
+              after_premature_selection.random_seed==vs_final_seed&&
+              !melee_web_gameplay_generation(),
+          "Rejected early Results handoff changed the VS owner seed or world boundary");
+    check(!melee_web_menu_host_sudden_death_match_release(
+              host,sudden_death_owner_id,error,error_size),
+          "Typed Sudden Death match claim released before its source scene restored");
+    check(!melee_web_menu_host_sudden_death_scene_end(
+              host,sudden_death_owner_id+1,error,error_size),
+          "Typed Sudden Death scene restored for a stale owner identity");
+    check(melee_web_menu_host_sudden_death_scene_end(
+              host,sudden_death_owner_id,error,error_size),error);
+    check(melee_web_current_scene_info()==saved_sudden_death_scene&&
+              gm_GetCurrentSceneEnterData()!=&gmVsMelee_StartData,
+          "Sudden Death scene end did not restore the exact prior host scene");
+    check(melee_web_menu_host_sudden_death_match_release(
+              host,sudden_death_owner_id,error,error_size),error);
+    check(!melee_web_menu_host_sudden_death_match_claim(
+              host,&continuation,&sudden_death_selection,error,error_size),
+          "Typed Sudden Death continuation allowed a second match after release");
     MeleeWebMenuMatchSelection observed{};
     check(melee_web_menu_host_selection(host, &observed, error, error_size) &&
               observed.random_seed == vs_final_seed,
@@ -406,8 +511,17 @@ void run_sudden_death_host_control(
     MatchEnd expected_result = tied_timeout.match_end;
     MatchEnd sudden_death_result = sudden_death_exit.match_end;
     gm_80166CCC(&expected_result, &sudden_death_result);
+    std::uint8_t final_sudden_death_input[MELEE_WEB_PAD_STATE_BYTES];
+    melee_web_pad_state_capture(final_sudden_death_input);
+    MeleeWebMenuMatchContinuation rejected_finish{};
+    check(!melee_web_menu_host_sudden_death_finish(
+              host,sudden_death_owner_id+1,&sudden_death_exit,
+              sudden_death_final_seed,final_sudden_death_input,
+              &rejected_finish,error,error_size)&&rejected_finish.kind==0,
+          "Typed Sudden Death finish accepted a stale match owner identity");
     check(melee_web_menu_host_sudden_death_finish(
-              host, &sudden_death_exit, sudden_death_final_seed,
+              host,sudden_death_owner_id,&sudden_death_exit,sudden_death_final_seed,
+              final_sudden_death_input,
               &continuation, error, error_size), error);
     check(continuation.kind == MELEE_WEB_MENU_MATCH_CONTINUATION_RESULTS &&
               std::memcmp(&continuation.payload.results.match_end,
@@ -420,8 +534,17 @@ void run_sudden_death_host_control(
     check(melee_web_menu_host_selection(host, &observed, error, error_size) &&
               observed.random_seed == sudden_death_final_seed,
           "Typed Sudden Death finish did not transfer its explicit final RNG seed");
+    std::uint8_t transferred_input[MELEE_WEB_PAD_STATE_BYTES];
+    check(melee_web_menu_host_input(host)!=nullptr,
+          "Sudden Death Results handoff lost its transferred source PAD owner");
+    melee_web_pad_state_apply(melee_web_menu_host_input(host));
+    melee_web_pad_state_capture(transferred_input);
+    check(std::memcmp(transferred_input,final_sudden_death_input,
+                      sizeof(transferred_input))==0,
+          "Sudden Death Results handoff changed the captured full PAD bank");
     check(!melee_web_menu_host_sudden_death_finish(
-              host, &sudden_death_exit, sudden_death_final_seed,
+              host,sudden_death_owner_id,&sudden_death_exit,sudden_death_final_seed,
+              final_sudden_death_input,
               &continuation, error, error_size) && continuation.kind == 0,
           "Typed host replayed the Sudden Death exit callback");
     check(melee_web_menu_host_destroy(host, error, error_size), error);
@@ -437,7 +560,7 @@ void run_sudden_death_host_control(
           "Typed Sudden Death host control could not retire the VS lease");
     std::cout << "Original CSS/SSS typed VS tie to Sudden Death to Results handoff "
                  "retained both final RNG seeds and restored route globals; "
-                 "constructed callback control only\n";
+                 "menu-backed constructed-result host control only\n";
 }
 
 std::string hex32(uint32_t value){std::ostringstream out;out<<std::hex<<std::setfill('0')<<std::setw(8)<<value;return out.str();}

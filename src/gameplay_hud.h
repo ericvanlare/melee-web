@@ -12,6 +12,9 @@ MeleeWebHud* melee_web_hud_begin(unsigned layout, char*, size_t);
  * construction and before Ready/Go, as in fn_8016E730 + VS OnEnter. */
 MeleeWebHud* melee_web_hud_begin_with_music(unsigned layout,
     int (*prepare_music)(void*, char*, size_t), void*, char*, size_t);
+/* Original Sudden Death scene entry uses status 1 after source match startup. */
+MeleeWebHud* melee_web_hud_begin_sudden_death_with_music(unsigned layout,
+    int (*prepare_music)(void*, char*, size_t), void*, char*, size_t);
 /* Source teardown must precede fighters, cameras and the SDK world. */
 int melee_web_hud_end(MeleeWebHud*, char*, size_t);
 int melee_web_hud_ready(const MeleeWebHud*);

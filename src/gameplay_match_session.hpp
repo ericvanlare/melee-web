@@ -23,20 +23,34 @@ public:
     GameplayMatchSession(const RuntimeFiles&,const MeleeWebMenuMatchSelection&,
                          RuntimeArchiveCache&,GameplayMatchConstruction,
                          const MeleeWebPadState&);
+    // Claims the exact host-owned Sudden Death continuation and borrows its
+    // retained VS mode lease until this source world has fully closed.
+    GameplayMatchSession(const RuntimeFiles&,MeleeWebMenuHost*,
+                         const MeleeWebMenuMatchContinuation&,
+                         RuntimeArchiveCache&,GameplayMatchConstruction,
+                         const MeleeWebPadState&);
     ~GameplayMatchSession();
     GameplayMatchSession(const GameplayMatchSession&)=delete;
     GameplayMatchSession& operator=(const GameplayMatchSession&)=delete;
     void tick(const PADStatus[4]);
     void draw();
+    // Requires the original source flow to complete before capturing final
+    // RNG/PAD, closing the Sudden Death world and scene owner, and handing off.
+    void finish_sudden_death(MeleeWebMenuMatchContinuation& results);
     int outcome(int& winner) const;
     bool ready() const;
     bool ending() const;
     bool complete() const;
     bool opening_demo() const;
+    bool sudden_death() const;
     bool paused() const;
     uint32_t source_frames() const;
     int hud_damage(unsigned player) const;
     uint32_t random_seed() const;
+    // Capture final source RNG and the complete raw PAD bank before closing a
+    // Sudden Death world and restoring its host-owned global pointers.
+    void capture_handoff(uint32_t& seed,
+                         uint8_t input[MELEE_WEB_PAD_STATE_BYTES]) const;
     int fighter_kind(unsigned index) const;
     const StartMeleeData& start_data() const;
     // Copied menu selection only; safe during deferred construction and never

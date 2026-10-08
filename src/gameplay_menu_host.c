@@ -144,11 +144,19 @@ struct MeleeWebMenuHost {
 #endif
     int results_active,results_exited,results_committed,prize_active;
     int sudden_death_active;
+    int sudden_death_claimed;
+    int sudden_death_claim_consumed;
+    uint64_t sudden_death_owner_id;
+    StartMeleeData sudden_death_start;
+    GameSceneInfo sudden_death_scene_info;
+    GameSceneInfo* sudden_death_saved_scene_info;
+    int sudden_death_scene_active;
     StartMeleeData route_saved_start;
     MatchExitInfo route_saved_sudden_death_exit;
     int entered,drawing,transition;
 };
 static MeleeWebMenuHost* owner;
+static uint64_t next_sudden_death_owner_id=1;
 static int fail(char* e,size_t n,const char* text){if(e&&n)snprintf(e,n,"%s",text);return 0;}
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
 static GameModeState* training_state_for_scene(MeleeWebMenuScene scene)
@@ -1850,6 +1858,13 @@ static void restore_results_route(MeleeWebMenuHost* h){
     if(!melee_web_vs_mode_end())abort();
     h->results_active=h->results_exited=h->results_committed=h->prize_active=0;
     h->sudden_death_active=0;
+    h->sudden_death_claimed=0;
+    h->sudden_death_claim_consumed=0;
+    h->sudden_death_owner_id=0;
+    memset(&h->sudden_death_start,0,sizeof(h->sudden_death_start));
+    memset(&h->sudden_death_scene_info,0,sizeof(h->sudden_death_scene_info));
+    h->sudden_death_saved_scene_info=NULL;
+    h->sudden_death_scene_active=0;
 }
 static int begin_vs_match_route(MeleeWebMenuHost* h,
     const MatchExitInfo* exit_info,uint32_t seed,int* next,char* e,size_t n){
@@ -1915,10 +1930,19 @@ int melee_web_menu_host_match_continuation_begin(MeleeWebMenuHost* h,
         return ok(e,n);
     }
     if(next==gmVsMode_State_SuddenDeath){
+        if(!next_sudden_death_owner_id){
+            restore_results_route(h);
+            return fail(e,n,"Sudden Death continuation identity space is exhausted");
+        }
         if(!melee_web_vs_mode_select_state(gmVsMode_State_SuddenDeath))abort();
         gm_Mode_Vs_States[3].on_enter(&gm_Mode_Vs_States[3]);
         continuation->payload.sudden_death_start=gmVsMelee_StartData;
         continuation->kind=MELEE_WEB_MENU_MATCH_CONTINUATION_SUDDEN_DEATH;
+        continuation->owner_id=next_sudden_death_owner_id++;
+        h->sudden_death_owner_id=continuation->owner_id;
+        h->sudden_death_start=gmVsMelee_StartData;
+        h->sudden_death_claimed=0;
+        h->sudden_death_claim_consumed=0;
         h->sudden_death_active=1;
         return ok(e,n);
     }
@@ -1927,16 +1951,24 @@ int melee_web_menu_host_match_continuation_begin(MeleeWebMenuHost* h,
     return 0;
 }
 int melee_web_menu_host_sudden_death_finish(MeleeWebMenuHost* h,
-    const MatchExitInfo* exit_info,uint32_t seed,
+    uint64_t owner_id,const MatchExitInfo* exit_info,uint32_t seed,
+    const uint8_t input[MELEE_WEB_PAD_STATE_BYTES],
     MeleeWebMenuMatchContinuation* continuation,char* e,size_t n){
     if(!continuation)
         return fail(e,n,"Sudden Death Results continuation output is required");
     memset(continuation,0,sizeof(*continuation));
     if(!h||h!=owner||h->entered||h->audio||!h->results_active||
-       !h->sudden_death_active||h->results_exited||!exit_info||
+       !h->sudden_death_active||h->sudden_death_claimed||
+       h->sudden_death_scene_active||
+       !owner_id||h->sudden_death_owner_id!=owner_id||
+       h->results_exited||!exit_info||
+       !input||
        seed_ptr!=&h->seed||melee_web_gameplay_generation()||
        melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_READY)
         return fail(e,n,"Sudden Death must close before its original Results handoff");
+    MeleeWebPadState* next_input=melee_web_pad_state_decode(
+        input,MELEE_WEB_PAD_STATE_BYTES,e,n);
+    if(!next_input)return 0;
     /* Match teardown restores the previous RNG pointer, not its final value.
      * Transfer the closed Sudden Death match seed before source callbacks. */
     h->seed=seed;
@@ -1948,12 +1980,130 @@ int melee_web_menu_host_sudden_death_finish(MeleeWebMenuHost* h,
         /* OnExit may already have merged source MatchEnd state. End this
          * continuation before returning so callers cannot invoke it twice. */
         restore_results_route(h);
+        melee_web_pad_state_free(next_input);
         if(e&&n)snprintf(e,n,"Original Sudden Death requested unsupported state %d",next);
         return 0;
     }
     enter_results_route(&continuation->payload.results);
+    melee_web_pad_state_free(h->input);
+    h->input=next_input;
     continuation->kind=MELEE_WEB_MENU_MATCH_CONTINUATION_RESULTS;
     h->sudden_death_active=0;
+    h->sudden_death_owner_id=0;
+    h->sudden_death_claim_consumed=0;
+    memset(&h->sudden_death_start,0,sizeof(h->sudden_death_start));
+    return ok(e,n);
+}
+
+static int sudden_death_selection(const MeleeWebMenuHost* h,
+    const MeleeWebMenuMatchContinuation* continuation,
+    MeleeWebMenuMatchSelection* out,char* e,size_t n){
+    if(!out)return fail(e,n,"Sudden Death selection output is required");
+    memset(out,0,sizeof(*out));
+    if(!h||h!=owner||h->entered||h->audio||!continuation||
+       continuation->kind!=MELEE_WEB_MENU_MATCH_CONTINUATION_SUDDEN_DEATH||
+       !continuation->owner_id||!h->sudden_death_active||
+       h->sudden_death_owner_id!=continuation->owner_id||
+       memcmp(&h->sudden_death_start,&continuation->payload.sudden_death_start,
+              sizeof(h->sudden_death_start))!=0||
+       seed_ptr!=&h->seed||melee_web_gameplay_generation()||
+       melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_READY)
+        return fail(e,n,"Sudden Death continuation is stale or no longer owned by this host");
+    out->start=continuation->payload.sudden_death_start;
+    /* gm_Scene_SuddenDeath_OnEnter performs this write before fn_8016E730. */
+    out->start.rules.x6=1;
+    unsigned count=0;
+    for(unsigned slot=0;slot<MELEE_WEB_MENU_MAX_PLAYERS;++slot){
+        const PlayerInitData* source=&out->start.players[slot];
+        if(source->slot_type==Gm_PKind_NA)continue;
+        const unsigned port=source->slot?source->slot-1u:slot;
+        const MeleeWebFighterContent* content=melee_web_fighter_content(source->ckind);
+        if(port!=slot||!content||source->stocks<1||source->stocks>5||
+           source->color>=content->costumes||source->sub_color>4)
+            return fail(e,n,"Sudden Death source player identity is unsupported");
+        out->players[slot].controller=port;
+        out->players[slot].stocks=source->stocks;
+        out->players[slot].costume=source->color;
+        out->players[slot].sub_color=source->sub_color;
+        ++count;
+    }
+    if(count<MELEE_WEB_MENU_MIN_PLAYERS||count>MELEE_WEB_MENU_MAX_PLAYERS||
+       out->start.players[4].slot_type!=Gm_PKind_NA||
+       out->start.players[5].slot_type!=Gm_PKind_NA||
+       out->start.rules.x0_3<1||out->start.rules.x0_3>6)
+        return fail(e,n,"Sudden Death payload has an unsupported source roster or HUD layout");
+    out->player_count=count;
+    out->hud_layout=out->start.rules.x0_3;
+    out->random_seed=h->seed;
+    out->unlocked_characters=h->selected_characters;
+    out->unlocked_stages=h->selected_stages;
+    out->save_profile_present=1;
+    out->sudden_death=1;
+    return ok(e,n);
+}
+int melee_web_menu_host_sudden_death_selection(
+    const MeleeWebMenuHost* h,const MeleeWebMenuMatchContinuation* continuation,
+    MeleeWebMenuMatchSelection* out,char* e,size_t n){
+    return sudden_death_selection(h,continuation,out,e,n);
+}
+int melee_web_menu_host_sudden_death_match_claim(
+    MeleeWebMenuHost* h,const MeleeWebMenuMatchContinuation* continuation,
+    MeleeWebMenuMatchSelection* out,char* e,size_t n){
+    if(!h||h!=owner)
+        return fail(e,n,"Sudden Death match claim requires the live owning host");
+    if(h->sudden_death_claimed||h->sudden_death_claim_consumed)
+        return fail(e,n,"Sudden Death continuation already has a live match owner");
+    if(!sudden_death_selection(h,continuation,out,e,n))return 0;
+    h->sudden_death_claimed=1;
+    h->sudden_death_claim_consumed=1;
+    return ok(e,n);
+}
+int melee_web_menu_host_sudden_death_match_release(
+    MeleeWebMenuHost* h,uint64_t owner_id,char* e,size_t n){
+    if(!h||h!=owner||!h->sudden_death_active||!h->sudden_death_claimed||
+       !owner_id||h->sudden_death_owner_id!=owner_id||
+       h->sudden_death_scene_active||
+       seed_ptr!=&h->seed||melee_web_gameplay_generation())
+        return fail(e,n,"Sudden Death match must close before releasing its host claim");
+    h->sudden_death_claimed=0;
+    return ok(e,n);
+}
+int melee_web_menu_host_sudden_death_scene_begin(
+    MeleeWebMenuHost* h,uint64_t owner_id,char* e,size_t n){
+    if(!h||h!=owner||!h->sudden_death_active||!h->sudden_death_claimed||
+       !h->sudden_death_claim_consumed||!owner_id||
+       h->sudden_death_owner_id!=owner_id||h->sudden_death_scene_active||
+       h->entered||h->audio||seed_ptr!=&h->seed||melee_web_gameplay_generation()||
+       melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_READY)
+        return fail(e,n,"Sudden Death scene requires its claimed live continuation before world construction");
+    GameSceneInfo* current=melee_web_current_scene_info();
+    if(current!=&h->source_scene_info||current->scene_kind!=GS_SSS||
+       memcmp(&gmVsMelee_StartData,&h->sudden_death_start,
+              sizeof(h->sudden_death_start))!=0)
+        return fail(e,n,"Sudden Death scene requires the current original SSS scene and its exact source payload");
+    h->sudden_death_saved_scene_info=current;
+    gmVsMelee_StartData.rules.x6=true;
+    h->sudden_death_scene_info.scene_kind=GS_SUDDEN_DEATH;
+    h->sudden_death_scene_info.enter_data=&gmVsMelee_StartData;
+    h->sudden_death_scene_info.exit_data=&gmVsMelee_SuddenDeathExitInfo;
+    gm_801A4B88(&h->sudden_death_scene_info);
+    h->sudden_death_scene_active=1;
+    return ok(e,n);
+}
+int melee_web_menu_host_sudden_death_scene_end(
+    MeleeWebMenuHost* h,uint64_t owner_id,char* e,size_t n){
+    if(!h||h!=owner||!h->sudden_death_active||!h->sudden_death_claimed||
+       !owner_id||h->sudden_death_owner_id!=owner_id||
+       !h->sudden_death_scene_active||
+       melee_web_current_scene_info()!=&h->sudden_death_scene_info||
+       melee_web_gameplay_generation()||seed_ptr!=&h->seed||
+       (h->sudden_death_saved_scene_info!=&h->source_scene_info&&
+        h->sudden_death_saved_scene_info!=&h->source_state.info))
+        return fail(e,n,"Sudden Death scene can restore only after its owned world closes");
+    gm_801A4B88(h->sudden_death_saved_scene_info);
+    h->sudden_death_saved_scene_info=NULL;
+    h->sudden_death_scene_active=0;
+    memset(&h->sudden_death_scene_info,0,sizeof(h->sudden_death_scene_info));
     return ok(e,n);
 }
 static int commit_results_route(MeleeWebMenuHost* h,char* e,size_t n){
@@ -2045,6 +2195,7 @@ int melee_web_menu_host_prize_end(MeleeWebMenuHost* h,uint32_t seed,
 int melee_web_menu_host_destroy(MeleeWebMenuHost* h,char* e,size_t n){
     if(!h||h!=owner||h->entered||h->source_scene!=MELEE_WEB_HOST_SCENE_NONE||
        h->transition||h->audio||h->opening_active||h->opening_match_suspended||
+       h->sudden_death_active||h->sudden_death_claimed||h->sudden_death_scene_active||
        seed_ptr!=&h->seed)
         return fail(e,n,"Close native menu scene and restore RNG before destroying host");
     const int owns_scene_info =
