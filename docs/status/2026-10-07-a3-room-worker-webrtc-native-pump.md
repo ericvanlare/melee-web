@@ -71,3 +71,9 @@ interface, product progress adapter, real controller input and user-facing room
 integration remain open. Internet/two-machine play, original full-route or
 whole-session accuracy and general A3/tournament acceptance remain separate
 [roadmap](../ROADMAP.md) gates.
+
+The separate [current-main integration receipt](../evidence/a3-room-worker-webrtc-native-pump-integration-v1.json)
+records the disjoint refresh onto main `56a8604`. All owned patch bytes and current
+native inputs remained unchanged, so the historical capture and suite retain
+producer `5fe6b23` and native runtime `15bc102`. The refreshed PR requires its own
+current-head CI; the refresh does not repeat or relabel the browser result.

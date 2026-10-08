@@ -1,0 +1,104 @@
+{
+  "schema": "melee-web-a3-native-pump-current-main-integration-v1",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/247",
+  "current_source_head": "21a4458564d27a0ffc0b80a868a5aaa886bccf4d",
+  "current_source_tree": "e4d63959151efe1cba292cab12334ea96399a920",
+  "base_main": "56a860432c498b996f02c2cb81ca1a28eca1a9da",
+  "prior_pr_head": "d82c76bbf864fcf2c9af5b098d3bade2cccf9782",
+  "prior_base": "6c6ebb85bd7df7445fe4246dba9ddbdd212e3ed3",
+  "clean": true,
+  "owned_patch_sha256": "88c7d9d2c26a847d53c6050cbf5540c95da377f80f88283fe51e83dbc7fb4685",
+  "owned_blob_identities": [
+    {
+      "path": "docs/evidence/a3-room-worker-webrtc-native-pump-v1.json",
+      "bytes": 18238,
+      "sha256": "8e430a65ef61b2c3a11f1c2ab46e501962569ac8248b729b684175f4350fc1ab"
+    },
+    {
+      "path": "docs/status/2026-10-07-a3-room-worker-webrtc-native-pump.md",
+      "bytes": 4632,
+      "sha256": "73c886cf22be2061ead252d3a1ded03a9dbcc632f605247b87630d88ab1e7a2e"
+    },
+    {
+      "path": "scripts/net_lockstep_browser.mjs",
+      "bytes": 84161,
+      "sha256": "b3e8eef3103805699bb489fc82f3b24e18563148a3506765998cf4438782b4a9"
+    },
+    {
+      "path": "scripts/net_lockstep_browser_modes.mjs",
+      "bytes": 2464,
+      "sha256": "90a42f9ab5100f0625c61d41741f0a3417964441c29504f5f7ef261b0214494c"
+    },
+    {
+      "path": "scripts/net_lockstep_browser_peer.mjs",
+      "bytes": 16264,
+      "sha256": "b2fa0de894c8bc048f5e02b423444882a2064b0a3013b2caf26e1a8e4323ba96"
+    },
+    {
+      "path": "scripts/net_lockstep_observers.mjs",
+      "bytes": 18629,
+      "sha256": "783e8c635eae35160fca946e69643ea533f46d652b6ca950277893b2ef38e0f0"
+    },
+    {
+      "path": "scripts/net_session_instance.mjs",
+      "bytes": 40818,
+      "sha256": "d8db5dd146607f396e291610682a1a036c9491c868821835a0e5ec870788d28c"
+    },
+    {
+      "path": "scripts/net_source_accounting.mjs",
+      "bytes": 7780,
+      "sha256": "10766ab05c148dc47b64a2b4aaa1b9ae0f764098130a0ddeee9d3dbafb3218a8"
+    },
+    {
+      "path": "tests/net_lockstep_browser_modes.test.mjs",
+      "bytes": 4772,
+      "sha256": "fb30fced6e8fd7bf6487f81fccd33e04974938598137442adbfd6a30959bcf49"
+    },
+    {
+      "path": "tests/net_lockstep_browser_publication.test.mjs",
+      "bytes": 14212,
+      "sha256": "2069dac626372d15bf9f0d47b43159a0a70c44a11e8a0320c0ddedee08ed4fca"
+    },
+    {
+      "path": "tests/net_lockstep_browser_pump.test.mjs",
+      "bytes": 14259,
+      "sha256": "31cef0df72434a4a75741b601f9a7b6e9f97aabbfc89756ea69db8b14dd29f69"
+    },
+    {
+      "path": "tests/net_lockstep_observers.test.mjs",
+      "bytes": 27570,
+      "sha256": "22514b606b19267580b688c0769021533a56878baca46dfdd36f0c6346ccd3ff"
+    },
+    {
+      "path": "tests/net_source_accounting.test.mjs",
+      "bytes": 16188,
+      "sha256": "198fcbc93e09f15ccfe6106c42384053da9900a52f4d59382cf9e1713e835895"
+    },
+    {
+      "path": "tests/test_net_lockstep_contracts.py",
+      "bytes": 1746,
+      "sha256": "cd237b1e4b2cf7cae1f8745f41405722b205083466a1403a691c22a7b339ee0a"
+    }
+  ],
+  "base_changed_paths": [
+    "docs/RECORDED_SESSION_STATE.md",
+    "docs/evidence/b4-v10-first-match-clock2000-comparison-v1.json",
+    "docs/evidence/b4-v10-first-match-clock2000-source-only-v1.json",
+    "docs/status/2026-10-07-b4-v10-first-match-clock2000-comparison.md",
+    "docs/status/2026-10-07-b4-v10-first-match-clock2000-source-only.md",
+    "tests/test_whole_session_state_compare.py",
+    "tools/whole_session_state_compare.py"
+  ],
+  "base_and_owned_paths_disjoint": true,
+  "owned_patch_bytes_equal_before_after_rebase": true,
+  "range_diff_all_commits_equal": true,
+  "native_runtime_producer": "15bc1023bcc6cba461274bb06ee3ec9ff6d86b31",
+  "native_target_input_delta": [],
+  "all37_current_source_build_files_equal_capture_manifest": true,
+  "historical_capture_producer": "5fe6b23d39cfcc2d40f0cc83387835553e4c030b",
+  "historical_capture_receipt": "a3-room-worker-webrtc-native-pump-v1.json",
+  "historical_suite_producer": "5fe6b23d39cfcc2d40f0cc83387835553e4c030b",
+  "suite_or_build_repeated": false,
+  "reason": "Disjoint B4 comparator/tests/docs base refresh; owned source and retained native inputs/bytes unchanged. Current-head CI required separately.",
+  "source_head_scope": "Clean executable rebase producer before this integration-only documentation commit"
+}
