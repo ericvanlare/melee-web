@@ -2631,6 +2631,59 @@ void c1_emit_heap_census(unsigned world, const char* consumer, unsigned cycle,
     if (after_out) *after_out = std::move(after);
 }
 
+bool c1_gameplay_stats_equal(const MeleeWebGameplayStats& a,
+                             const MeleeWebGameplayStats& b)
+{
+    return a.ticks == b.ticks && a.objects == b.objects &&
+           a.processes == b.processes && a.object_peak == b.object_peak &&
+           a.process_peak == b.process_peak &&
+           a.heap_free_bytes == b.heap_free_bytes &&
+           a.generation == b.generation;
+}
+
+void c1_v23_census_unavailable(const char* phase, const char* reason) noexcept
+{
+    std::cerr << "C1_V23_CENSUS status=unavailable world=0 consumer=original-oninit"
+              << " cycle=0 phase=" << (phase ? phase : "unknown") << " error=";
+    const char* value = reason ? reason : "unknown_observer_error";
+    for (size_t i = 0; value[i] && i < 128; ++i) {
+        const unsigned char c = static_cast<unsigned char>(value[i]);
+        const bool safe = (c >= 'a' && c <= 'z') ||
+                          (c >= 'A' && c <= 'Z') ||
+                          (c >= '0' && c <= '9') || c == '_' || c == '-' ||
+                          c == '.' || c == ':';
+        std::cerr << (safe ? static_cast<char>(c) : '_');
+    }
+    std::cerr << '\n';
+    std::cerr.flush();
+}
+
+void c1_try_emit_v23_heap_census(bool& prior_failure, const char* phase,
+                                 const MeleeWebGameplayStats& boundary_stats) noexcept
+{
+    if (prior_failure) {
+        c1_v23_census_unavailable(phase, "prior_phase_failed");
+        return;
+    }
+    try {
+        const C1HeapGuard before = c1_heap_guard();
+        check(c1_gameplay_stats_equal(before.stats, boundary_stats),
+              "C1 V23 census boundary stats changed before observation");
+        C1HeapGuard after{};
+        c1_emit_heap_census(0, "original-oninit", 0, phase, before, &after);
+        std::cerr << "C1_V23_CENSUS status=complete world=0"
+                  << " consumer=original-oninit cycle=0 phase=" << phase
+                  << " rows=" << c1_heap_census.count << '\n';
+        std::cerr.flush();
+    } catch (const std::exception& failure) {
+        prior_failure = true;
+        c1_v23_census_unavailable(phase, failure.what());
+    } catch (...) {
+        prior_failure = true;
+        c1_v23_census_unavailable(phase, "unknown_observer_error");
+    }
+}
+
 void run_stadium_cache_live_control()
 {
     namespace screen = melee_web::test::stadium_screen;
@@ -3092,6 +3145,7 @@ struct StadiumSourceOnInitObservation {
     bool light_preparation_stats_captured = false;
     MeleeWebGameplayStats stats_after_on_init{};
     MeleeWebGameplayStats stats_after_end{};
+    bool census_observer_failed = false;
     MeleeWebStadiumC1StageInfoView stage_info_before_init{};
     decltype(melee_web::test::stadium_screen::runtime_roots_snapshot()) roots_before{};
     decltype(melee_web::test::stadium_screen::live_class_counts()) class_counts_before{};
@@ -3585,6 +3639,9 @@ void run_stadium_e8_request(
             check(on_init.stats_before_init.generation ==
                       on_init.memory_before_init.world_generation,
                   "OnInit boundary source-memory/world generations disagree");
+            c1_try_emit_v23_heap_census(
+                on_init.census_observer_failed, "before-light-preparation",
+                on_init.stats_before_init);
             check(melee_web_stadium_c1_stage_info_current_view(
                       &on_init.stage_info_before_init),
                   "OnInit boundary could not observe its typed pre-call StageInfo");
@@ -3639,6 +3696,10 @@ void run_stadium_e8_request(
         if (perform_on_init) {
             on_init_observation.stats_after_light_preparation = melee_web_gameplay_stats();
             on_init_observation.light_preparation_stats_captured = true;
+            c1_try_emit_v23_heap_census(
+                on_init_observation.census_observer_failed,
+                "after-light-preparation-before-e8",
+                on_init_observation.stats_after_light_preparation);
         }
         check(melee_web_stadium_e8_call_observer_begin(),
               "Could not open the bounded E8 source-call window");
@@ -3789,6 +3850,9 @@ void run_stadium_e8_request(
                       "OnInit actual map return journal differs from its owner/slot pointer");
             }
             on_init.stats_after_on_init = melee_web_gameplay_stats();
+            c1_try_emit_v23_heap_census(
+                on_init.census_observer_failed, "after-oninit",
+                on_init.stats_after_on_init);
             check_stadium_rng_witness(selection_rng, selected, "on-init-verified");
             check(on_init.stats_after_on_init.generation ==
                       on_init.stats_before_init.generation &&
@@ -3903,6 +3967,10 @@ void run_stadium_e8_request(
             retained_stage_owner = nullptr;
             returned_stage_owner = nullptr;
             on_init.stats_after_end = melee_web_gameplay_stats();
+            c1_try_emit_v23_heap_census(
+                on_init.census_observer_failed,
+                "after-stage-last-and-light-destroy",
+                on_init.stats_after_end);
             check_stadium_rng_witness(selection_rng, selected, "stage-last-end");
             on_init.seed_after_end = *seed_owner;
             on_init.map2_allocation_status_after_end =

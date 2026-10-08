@@ -126,6 +126,201 @@ def parse_c1_heap_dumps(stderr):
         raise AssertionError(f"unterminated OSDumpHeap section: {current_key}")
     return dumps
 
+
+C1_V23_CENSUS_PHASES = (
+    "before-light-preparation",
+    "after-light-preparation-before-e8",
+    "after-oninit",
+    "after-stage-last-and-light-destroy",
+)
+C1_V23_CENSUS_ROW_LIMIT = 4096
+C1_V23_CENSUS_OUTPUT_LIMIT = 16 * 1024 * 1024
+
+
+
+def parse_c1_v23_heap_census(stderr):
+    expected_keys = {(0, "original-oninit", 0, phase)
+                     for phase in C1_V23_CENSUS_PHASES}
+    statuses, snapshots, guards = {}, {}, {}
+    allocations, queries = defaultdict(list), defaultdict(list)
+    in_dump = False
+    diagnostic_bytes = 0
+
+    def count_bytes(line):
+        nonlocal diagnostic_bytes
+        diagnostic_bytes += len((line + "\n").encode("utf-8"))
+        if diagnostic_bytes > C1_V23_CENSUS_OUTPUT_LIMIT:
+            raise AssertionError("V23 census diagnostic output exceeded 16 MiB")
+
+    for line in stderr.splitlines():
+        if line.startswith("C1_HEAP_DUMP_BEGIN "):
+            in_dump = True
+        if in_dump or line.startswith(("C1_V23_CENSUS ", "C1_HEAP_SNAPSHOT ",
+                                       "C1_HEAP_ALLOC ", "C1_HEAP_GUARD ",
+                                       "C1_HEAP_QUERY ", "C1_HEAP_DUMP_BEGIN ",
+                                       "C1_HEAP_DUMP_END ")):
+            count_bytes(line)
+        if line.startswith("C1_HEAP_DUMP_END "):
+            in_dump = False
+
+        if line.startswith("C1_V23_CENSUS "):
+            row = parse_c1_record(line, "C1_V23_CENSUS")
+            key = (int(row["world"]), row["consumer"], int(row["cycle"]), row["phase"])
+            if key not in expected_keys:
+                raise AssertionError(f"unexpected V23 census phase: {key}")
+            if key in statuses:
+                raise AssertionError(f"duplicate V23 census status: {key}")
+            statuses[key] = row
+        elif line.startswith("C1_HEAP_SNAPSHOT "):
+            row = parse_c1_record(line, "C1_HEAP_SNAPSHOT")
+            key = c1_record_key(row)
+            if key in expected_keys:
+                if key in snapshots:
+                    raise AssertionError(f"duplicate V23 census snapshot: {key}")
+                snapshots[key] = row
+        elif line.startswith("C1_HEAP_ALLOC "):
+            row = parse_c1_record(line, "C1_HEAP_ALLOC")
+            key = c1_record_key(row)
+            if key in expected_keys:
+                allocations[key].append(row)
+        elif line.startswith("C1_HEAP_GUARD "):
+            row = parse_c1_record(line, "C1_HEAP_GUARD")
+            key = c1_record_key(row)
+            if key in expected_keys:
+                if key in guards:
+                    raise AssertionError(f"duplicate V23 census guard: {key}")
+                guards[key] = row
+        elif line.startswith("C1_HEAP_QUERY "):
+            row = parse_c1_record(line, "C1_HEAP_QUERY")
+            key = c1_record_key(row)
+            if key in expected_keys:
+                queries[key].append(row)
+
+    if in_dump:
+        raise AssertionError("unterminated V23 OSDumpHeap section")
+    for label, observed in (("status", statuses), ("snapshot", snapshots),
+                            ("guard", guards)):
+        if set(observed) != expected_keys:
+            raise AssertionError(f"missing V23 census {label} phase")
+    for key, row in statuses.items():
+        if row.get("status") != "complete":
+            raise AssertionError(f"V23 census unavailable at {key[3]}: {row.get('error')}")
+        if not 0 <= int(row.get("rows", "-1")) <= C1_V23_CENSUS_ROW_LIMIT:
+            raise AssertionError(f"V23 census row bound exceeded at {key}")
+
+    dumps = parse_c1_heap_dumps(stderr)
+    if set(dumps) != expected_keys:
+        raise AssertionError("V23 OSDumpHeap phases are missing or unexpected")
+
+    generation = heap = descriptor_bounds = None
+    lease_payloads, metrics = {}, {}
+    guard_fields = ("equal", "source_healthy", "world_equal", "heap_owner",
+                    "watermark", "ticks", "free_bytes", "roots", "classes",
+                    "pools", "gobj_used", "proc_used")
+    for phase in C1_V23_CENSUS_PHASES:
+        key = (0, "original-oninit", 0, phase)
+        snapshot, status, guard = snapshots[key], statuses[key], guards[key]
+        if any(guard.get(field) != "1" for field in guard_fields):
+            raise AssertionError(f"V23 census purity guard failed at {phase}")
+        rows = allocations[key]
+        row_count = int(snapshot["rows"])
+        if (snapshot.get("overflow") != "0" or row_count > C1_V23_CENSUS_ROW_LIMIT or
+                int(status["rows"]) != row_count or len(rows) != row_count):
+            raise AssertionError(f"V23 census overflow or row mismatch at {phase}")
+        current_generation, current_heap = int(snapshot["generation"]), int(snapshot["heap"])
+        watermark = int(snapshot["watermark"])
+        if current_generation <= 0 or current_heap < 0 or watermark < 0:
+            raise AssertionError(f"invalid V23 source heap identity at {phase}")
+        if generation is None:
+            generation, heap = current_generation, current_heap
+        elif (current_generation, current_heap) != (generation, heap):
+            raise AssertionError(f"V23 census changed source world or heap at {phase}")
+
+        allocated, free = dumps[key]["allocated"], dumps[key]["free"]
+        if not allocated or not free:
+            raise AssertionError(f"V23 OSDumpHeap omitted an allocated/free section at {phase}")
+        for cells in (allocated, free):
+            for index, cell in enumerate(cells):
+                if (cell["addr"] % 32 or cell["size"] < 64 or cell["size"] % 32 or
+                        cell["end"] != cell["addr"] + cell["size"] or
+                        cell["prev"] != (cells[index - 1]["addr"] if index else 0) or
+                        cell["next"] != (cells[index + 1]["addr"]
+                                         if index + 1 < len(cells) else 0)):
+                    raise AssertionError(f"malformed V23 OSDumpHeap cell at {phase}: {cell}")
+        cells = sorted(allocated + free, key=lambda cell: cell["addr"])
+        for previous, cell in zip(cells, cells[1:]):
+            if previous["end"] != cell["addr"]:
+                raise AssertionError(f"V23 heap cells do not partition descriptor at {phase}")
+        bounds = (cells[0]["addr"], cells[-1]["end"])
+        if descriptor_bounds is None:
+            descriptor_bounds = bounds
+        elif descriptor_bounds != bounds:
+            raise AssertionError(f"V23 heap descriptor bounds changed at {phase}")
+
+        dumped = sorted((cell["addr"] + 32, cell["size"] - 32) for cell in allocated)
+        visited = sorted((parse_pointer(row["payload"]), int(row["visitor_capacity"]))
+                         for row in rows)
+        if dumped != visited or len({payload for payload, _ in visited}) != len(visited):
+            raise AssertionError(f"V23 visitor rows differ from OSDumpHeap at {phase}")
+        for row in rows:
+            payload = parse_pointer(row["payload"])
+            capacity, requested = int(row["visitor_capacity"]), int(row["requested"])
+            alloc_gen, live = int(row["allocation_generation"]), int(row["live"])
+            if (int(row["lease_status"]) != 0 or int(row["referent_capacity"]) != capacity or
+                    int(row["heap"]) != heap or int(row["generation"]) != generation or
+                    int(row["lease_world"]) != generation):
+                raise AssertionError(f"V23 exact lease query disagrees at {phase}: {row}")
+            if live not in (0, 1) or requested < 0:
+                raise AssertionError(f"invalid V23 live/requested fields at {phase}: {row}")
+            if live:
+                if not 0 < alloc_gen <= watermark or requested > capacity:
+                    raise AssertionError(f"invalid live V23 lease at {phase}: {row}")
+                identity = (heap, generation, alloc_gen)
+                if lease_payloads.setdefault(identity, payload) != payload:
+                    raise AssertionError(f"V23 allocation identity changed exact payload: {row}")
+            elif requested or alloc_gen:
+                raise AssertionError(f"unknown V23 lease reports allocation metadata: {row}")
+
+        query_by_kind = {row["kind"]: row for row in queries[key]}
+        if (len(query_by_kind) != len(queries[key]) or
+                set(query_by_kind) != {"unknown", "interior"}):
+            raise AssertionError(f"V23 exact-payload controls are missing or duplicated at {phase}")
+        for query in query_by_kind.values():
+            if (int(query["status"]) != 0 or int(query["live"]) != 0 or
+                    int(query["generation"]) != 0 or
+                    int(query["lease_world"]) != generation):
+                raise AssertionError(f"V23 query is not explicitly unknown at {phase}: {query}")
+        exact_payloads = {payload for payload, _ in visited}
+        if (parse_pointer(query_by_kind["unknown"]["payload"]) in exact_payloads or
+                parse_pointer(query_by_kind["interior"]["payload"]) not in
+                {payload + 1 for payload, _ in visited}):
+            raise AssertionError(f"V23 unknown/interior query classification failed at {phase}")
+
+        allocated_span = sum(cell["size"] for cell in allocated)
+        free_bytes = sum(cell["size"] - 32 for cell in free)
+        if free_bytes != int(snapshot["free"]):
+            raise AssertionError(f"V23 free-cell byte accounting failed at {phase}")
+        metrics[phase] = (free_bytes, allocated_span, len(free))
+
+    transitions = []
+    for before_phase, after_phase in zip(C1_V23_CENSUS_PHASES, C1_V23_CENSUS_PHASES[1:]):
+        before, after = metrics[before_phase], metrics[after_phase]
+        observed = before[0] - after[0]
+        derived = after[1] - before[1] + 32 * (after[2] - before[2])
+        if observed != derived:
+            raise AssertionError(f"V23 heap partition conservation failed: "
+                                 f"{before_phase}->{after_phase}")
+        transitions.append({"from": before_phase, "to": after_phase,
+                            "free_bytes_delta": observed,
+                            "allocated_cell_span_delta": after[1] - before[1],
+                            "free_cell_count_delta": after[2] - before[2]})
+    return {"phase_count": 4, "row_count": sum(int(statuses[
+                (0, "original-oninit", 0, phase)]["rows"])
+                for phase in C1_V23_CENSUS_PHASES),
+            "heap": heap, "generation": generation,
+            "descriptor_bounds": descriptor_bounds, "transitions": transitions,
+            "diagnostic_bytes": diagnostic_bytes}
+
 class NativeMenuSourceTests(OwnedWorkspaceTests):
     @classmethod
     def setUpClass(cls):
@@ -602,6 +797,55 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         self.assertEqual(events[0]["event"], "stadium_e8_request_returned")
         self.assertEqual(events[0]["selection"]["rules"]["stage_kind"], 3)
 
+    def test_c1_v23_heap_census_parser_rejects_incomplete_output(self):
+        fields = "world=0 consumer=original-oninit cycle=0"
+        lines = []
+        for phase in C1_V23_CENSUS_PHASES:
+            lines.extend([
+                f"C1_HEAP_DUMP_BEGIN {fields} phase={phase}",
+                "[info] [aurora::os::alloc] OSDumpHeap(0)",
+                "[info] [aurora::os::alloc] addr\tsize\tend\tprev\tnext",
+                "[info] [aurora::os::alloc] --------Allocated",
+                "[info] [aurora::os::alloc] 0x1000\t96\t0x1060\t0x0\t0x0",
+                "[info] [aurora::os::alloc] --------Free",
+                "[info] [aurora::os::alloc] 0x1060\t64\t0x10a0\t0x0\t0x0",
+                f"C1_HEAP_DUMP_END {fields} phase={phase}",
+                f"C1_HEAP_QUERY {fields} phase={phase} kind=unknown payload=0x2000 status=0 live=0 generation=0 lease_world=1 prior_generation=0 refused=0",
+                f"C1_HEAP_QUERY {fields} phase={phase} kind=interior payload=0x1021 status=0 live=0 generation=0 lease_world=1 prior_generation=0 refused=0",
+                f"C1_HEAP_GUARD {fields} phase={phase} equal=1 source_healthy=1 world_equal=1 heap_owner=1 watermark=1 ticks=1 free_bytes=1 roots=1 classes=1 pools=1 gobj_used=1 proc_used=1",
+                f"C1_HEAP_SNAPSHOT {fields} phase={phase} generation=1 heap=0 free=32 watermark=1 rows=1 overflow=0",
+                f"C1_HEAP_ALLOC {fields} phase={phase} generation=1 payload=0x1020 visitor_capacity=64 referent_capacity=64 lease_status=0 live=1 heap=0 lease_world=1 requested=48 allocation_generation=1",
+                f"C1_V23_CENSUS status=complete {fields} phase={phase} rows=1",
+            ])
+        valid = "\n".join(lines) + "\n"
+        result = parse_c1_v23_heap_census(valid)
+        self.assertEqual(result["phase_count"], 4)
+        self.assertEqual(result["row_count"], 4)
+        self.assertEqual(len(result["transitions"]), 3)
+
+        unavailable = next(line for line in lines
+                           if line.startswith("C1_V23_CENSUS status=complete") and
+                           "phase=after-oninit " in line)
+        bad_inputs = (
+            valid.replace(unavailable + "\n", "", 1),
+            valid.replace("overflow=0", "overflow=1", 1),
+            valid + unavailable + "\n",
+            valid.replace(
+                "0x1000\t96\t0x1060\t0x0\t0x0", "0x1000\tbroken", 1),
+            valid.replace("generation=1 payload=0x1020", "generation=2 payload=0x1020", 1),
+            valid.replace("requested=48 allocation_generation=1", "requested=-1 allocation_generation=1", 1),
+            valid.replace("live=1 heap=0", "live=2 heap=0", 1),
+            valid.replace("watermark=1 rows=1", "watermark=-1 rows=1", 1),
+            valid.replace(
+                unavailable,
+                unavailable.replace("status=complete", "status=unavailable")
+                .replace("rows=1", "error=probe_failed"), 1),
+        )
+        for malformed in bad_inputs:
+            with self.subTest(malformed=malformed[-100:]):
+                with self.assertRaises(AssertionError):
+                    parse_c1_v23_heap_census(malformed)
+
     def test_stadium_cache_live_asset_free_controls(self):
         target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
         if not target.is_file():
@@ -1042,6 +1286,8 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         (self.scratch / "stadium-source-oninit.stderr").write_text(
             run.stderr, encoding="utf-8")
         self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-9000:])
+        census = parse_c1_v23_heap_census(run.stderr)
+        self.assertEqual(census["phase_count"], 4)
         self.assertIn(
             "one source-ordered Stadium OnInit lifetime passed",
             run.stdout,
