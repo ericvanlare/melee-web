@@ -438,11 +438,15 @@ void run_sudden_death_host_control(
             check(std::memcmp(&match.start_data(),&sudden_death_selection.start,
                               sizeof(StartMeleeData))==0,
                   "Actual SD world changed its source-generated payload");
+            check(!match.start_data().rules.timer_enabled,
+                  "Actual SD world retained ordinary VS timer");
             for(unsigned i=0;i<selection.player_count;++i){
                 const auto stats=match.player_stats(i);
                 check(stats.player_slot==i&&stats.stocks==1&&
+                      stats.damage_percent==300.0f&&
+                      match.start_data().players[i].x12==300&&
                       match.start_data().players[i].slot==source_start.players[i].slot,
-                      "Actual SD world changed original player slots or one-stock setup");
+                      "Actual SD world changed original slots, stock or 300-percent damage setup");
             }
             const auto retained_scene=melee_web_current_scene_info();
             const auto retained_start=gmVsMelee_StartData;
