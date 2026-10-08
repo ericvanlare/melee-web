@@ -1,0 +1,413 @@
+{
+  "capture": {
+    "attempt": "02",
+    "checksum_stream_sha256": "fcdb4e288ccf4ad06acf5e0e8ec920b5c7893bfdfd4777c65f5b930ccf12a092",
+    "checksum_streams_identical": true,
+    "final_native_phase": {
+      "alpha": 3,
+      "beta": 3
+    },
+    "finished_at": "2026-10-08T14:08:35.070Z",
+    "fixture": "css-start-to-sss via ordinary controller manager",
+    "input_source": "browser-local native PADStatus",
+    "observed_scenes": {
+      "alpha": [
+        1,
+        2
+      ],
+      "beta": [
+        1,
+        2
+      ]
+    },
+    "outcome": "complete",
+    "peer_owner": "runtime",
+    "peers": {
+      "alpha": {
+        "checksums": {
+          "ack_highest_index": 519,
+          "acknowledged": 520,
+          "count": 520,
+          "mismatches": [],
+          "remote_received": 520,
+          "stream_sha256": "fcdb4e288ccf4ad06acf5e0e8ec920b5c7893bfdfd4777c65f5b930ccf12a092"
+        },
+        "input_capture": {
+          "ack_highest_index": 517,
+          "acknowledged": 518,
+          "count": 518,
+          "fixture_captured_count": 518,
+          "fixture_frozen": true,
+          "matches_all_native_consumed_components": true,
+          "native_local_divergences": 0,
+          "remote_received": 518
+        },
+        "scene_records": {
+          "css_scene_1": 154,
+          "sss_scene_2": 366
+        },
+        "source_accounting": {
+          "callback_count": 613,
+          "callback_ids_contiguous": true,
+          "each_step_drawn": true,
+          "first_callback": 82,
+          "last_callback": 694,
+          "scope": "Source draw completion accounting; no pixel, GPU completion or timing equivalence claim",
+          "source_cursor": 520,
+          "source_draws": 520,
+          "source_steps": 520
+        },
+        "source_records": 520,
+        "sss_boundary": {
+          "boundary_misses": [],
+          "browser_driver": {
+            "controls": {
+              "import": {
+                "disabled": false,
+                "visible": true
+              },
+              "pause": {
+                "disabled": false,
+                "visible": true
+              },
+              "start": {
+                "disabled": true,
+                "visible": true
+              },
+              "unload": {
+                "disabled": false,
+                "visible": true
+              }
+            },
+            "error": null,
+            "errors": [],
+            "focused": true,
+            "hidden": false,
+            "phase": 3,
+            "running": 1,
+            "status": "Original stage select",
+            "url": "http://127.0.0.1:8787/runtime.html"
+          },
+          "cursor_after_screenshot": 520,
+          "cursor_before_screenshot": 520,
+          "cursor_stable": true,
+          "final_phase": 3,
+          "first_sss_checksum_tick": 154,
+          "gpu": {
+            "canvas": {
+              "height": 480,
+              "width": 640
+            },
+            "cross_origin_isolated": true,
+            "webgl": null,
+            "webgpu_adapter": true,
+            "webgpu_api": true
+          },
+          "gpu_observed": true,
+          "last_consumed_tick": 519,
+          "page_errors": [],
+          "phase_stable": true,
+          "screenshot": {
+            "bytes": 598939,
+            "path": "alpha/route-sss.png",
+            "sha256": "b3c7305bb0481cbb74d34e41097cfda90568f3bc56fb427f75a3a2f32bdde218"
+          }
+        }
+      },
+      "beta": {
+        "checksums": {
+          "ack_highest_index": 519,
+          "acknowledged": 520,
+          "count": 520,
+          "mismatches": [],
+          "remote_received": 520,
+          "stream_sha256": "fcdb4e288ccf4ad06acf5e0e8ec920b5c7893bfdfd4777c65f5b930ccf12a092"
+        },
+        "input_capture": {
+          "ack_highest_index": 517,
+          "acknowledged": 518,
+          "count": 518,
+          "fixture_captured_count": 518,
+          "fixture_frozen": true,
+          "matches_all_native_consumed_components": true,
+          "native_local_divergences": 0,
+          "remote_received": 518
+        },
+        "scene_records": {
+          "css_scene_1": 154,
+          "sss_scene_2": 366
+        },
+        "source_accounting": {
+          "callback_count": 612,
+          "callback_ids_contiguous": true,
+          "each_step_drawn": true,
+          "first_callback": 84,
+          "last_callback": 695,
+          "scope": "Source draw completion accounting; no pixel, GPU completion or timing equivalence claim",
+          "source_cursor": 520,
+          "source_draws": 520,
+          "source_steps": 520
+        },
+        "source_records": 520,
+        "sss_boundary": {
+          "boundary_misses": [],
+          "browser_driver": {
+            "controls": {
+              "import": {
+                "disabled": false,
+                "visible": true
+              },
+              "pause": {
+                "disabled": false,
+                "visible": true
+              },
+              "start": {
+                "disabled": true,
+                "visible": true
+              },
+              "unload": {
+                "disabled": false,
+                "visible": true
+              }
+            },
+            "error": null,
+            "errors": [],
+            "focused": true,
+            "hidden": false,
+            "phase": 3,
+            "running": 1,
+            "status": "Original stage select",
+            "url": "http://127.0.0.1:8787/runtime.html"
+          },
+          "cursor_after_screenshot": 520,
+          "cursor_before_screenshot": 520,
+          "cursor_stable": true,
+          "final_phase": 3,
+          "first_sss_checksum_tick": 154,
+          "gpu": {
+            "canvas": {
+              "height": 480,
+              "width": 640
+            },
+            "cross_origin_isolated": true,
+            "webgl": null,
+            "webgpu_adapter": true,
+            "webgpu_api": true
+          },
+          "gpu_observed": true,
+          "last_consumed_tick": 519,
+          "page_errors": [],
+          "phase_stable": true,
+          "screenshot": {
+            "bytes": 598473,
+            "path": "beta/route-sss.png",
+            "sha256": "9ef15909d9352a8d656039d83db9ab404c31d36382c84571deb923f8de1155a5"
+          }
+        }
+      }
+    },
+    "records_each_peer": 520,
+    "route_boundary_misses": {
+      "alpha": [],
+      "beta": []
+    },
+    "signaling": "local Room Worker; loopback only; no ICE servers; host candidates",
+    "started_at": "2026-10-08T14:08:16.895Z",
+    "transport": "webrtc-datachannel",
+    "transport_ordered": true,
+    "transport_reliable": true
+  },
+  "cleanup": {
+    "groups_gone": true,
+    "independent_owned_pid_pgid_audit": "24 observed PIDs and 4 process groups; no observed IDs or owned Chrome/server/capture signatures remained",
+    "lane_marker_removed_after_verification": true,
+    "owned_groups_remaining": [],
+    "owned_process_survivors": [],
+    "port_8787_bindable": true,
+    "port_8787_listener_rows": "",
+    "room_worker_disposed": true,
+    "supervisor_exit_code": 0,
+    "worker_owned_temp_paths_clean": true
+  },
+  "evidence_labels": [
+    "Source identified",
+    "Browser exercised"
+  ],
+  "issue": 281,
+  "loaded_identity": {
+    "disc_identity_equal": true,
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "dol_size": 4425184,
+    "fst_sha256": "ef099ee0edf64189544d36fe8e4be2293282d595eef27715df8aacb95fc6d4d7",
+    "fst_size": 29993,
+    "room_worker_runtime": {
+      "miniflare": "5.20260911.0-alpha",
+      "node": "v24.19.0",
+      "workerd": "1.20260911.1",
+      "wrangler": "4.131.1"
+    },
+    "wasm_response_equal": true,
+    "wasm_sha256": "a8fe0f0a0238f46432815ad05095c72a1cea189e87e01855cefce663c361c9a1"
+  },
+  "ordinary_release_reuse": {
+    "closure_receipt_sha256": "29f451da34849832b65fc2d34334c91ba1f4e1d59ce7c2100f2fc2cec1b72e6f",
+    "receipt": "issue281-release-reuse-v2.json",
+    "producer": "1792f5bf512d57fc1be8436d4087fb8320062ac3",
+    "producer_tree": "76bb65c6ef653e53baed529afe646792837a9a47",
+    "rebuilt_for_capture": false,
+    "rebuilt_for_final_test_fix": false,
+    "verified_output_closure_files": 88
+  },
+  "read_only_interval": {
+    "native_cursor_progress_each": true,
+    "no_peer_rpc": true,
+    "peers": {
+      "alpha": {
+        "cursor_after": 520,
+        "cursor_before": 4,
+        "phase_after": 3,
+        "phase_before": 1,
+        "rpc_calls_after": 1,
+        "rpc_calls_before": 1
+      },
+      "beta": {
+        "cursor_after": 520,
+        "cursor_before": 5,
+        "phase_after": 3,
+        "phase_before": 1,
+        "rpc_calls_after": 1,
+        "rpc_calls_before": 1
+      }
+    }
+  },
+  "recipe": {
+    "css_stimulus_samples": 153,
+    "generated_frames": 1097,
+    "generator_sha256": "eec74da2d353a16df177d3b5da2dfd5ef905687f53f02351cf47a0850d2e42ca",
+    "live_input_ticks": 518,
+    "manifest_mode": "explicit --script-manifest required",
+    "manifest_sha256": "f14c011836579da6277d0ac70f11249195ab63ce904012567aa9673eaeff9b8a",
+    "neutral_tail_samples": 365,
+    "scenario": "runtime-css-sss",
+    "script_sha256": "893fe7ff4de3957ee82aa56678e4c65bff2bde0b287a9783062517b08087d9cb",
+    "seed": 305419896,
+    "source_ticks": 520,
+    "stimulus": "Generated input samples 0\u2013152 wander in CSS; Start is held on samples 150\u2013152. Samples 153\u2013517 are neutral."
+  },
+  "retained_artifacts": {
+    "artifact_inventory_sha256": "52f0bf518d3ae1d1245704819370904a8384f394575c3423879d4b9f7eed3ad3",
+    "attempt01_functional_only_result_sha256": "ae876e66efd97d5c2e0e3b5907e5487c37251c089a754361d453ab64506999f6",
+    "attempt01_note": "Attempt 01 completed the functional 520/518 route but had no final SSS screenshots/GPU/driver diagnostics; preserved separately and not relabeled.",
+    "attempt02_result_packet_sha256": "f5b5b5941ab5d7d59bcb2a065938efaf95b225c79bb86b7539a7cace08a7514a",
+    "capture_authorization_sha256": "27f72a7e8e1e82164c95fb026bd86cbd121a0f77c3359f798131b02db87723b5",
+    "capture_directory": "issue281-runtime-css-sss-seed-305419896-attempt-02",
+    "root_capture_result_review_sha256": "55e11bcde33ae7c6d05ff33be5cbfdccfce3d070882c5e18e8f6b657660c7b7c",
+    "root_test_fix_review_sha256": "526e062d9d0e4b4d45c9c25e724a74d4bff02315c23ad156f9bb91e14ae62216",
+    "run_json_sha256": "f7531b7ad123034ac27374ee2e7eee94b76289ff29cd0e2a067cf74f4cb32bbf",
+    "run_set": "issue279-integration-20261008-044647-f5374bb3",
+    "supervisor_log_sha256": "1f56daa49692e0169c295c5b3de3c42b52a558565dd6c410c073055c7515baaa"
+  },
+  "root_reviews": {
+    "final_sss_observation_review_sha256": "4af90243d35db527630c6064afdfff8415b0343d08efe0c9ae8fa7138542b8f0",
+    "source_review_v3_sha256": "40c085e127c8f9bdc7465e642af94ff32ce08fd973c937f5e9cdfb63070733ab"
+  },
+  "schema": "melee-web-a3-runtime-css-sss-live-input-v1",
+  "scope": "Bounded, headless, local runtime-owned original CSS-to-SSS route with synthetic standard Gamepad values flowing through the ordinary controller manager and native live PAD capture.",
+  "scope_limits": [
+    "No physical controller input",
+    "No Internet or remote-peer operation",
+    "No pixel-equivalence or original-hardware visual claim",
+    "No live-timing or sustained-performance claim",
+    "No uninterrupted-audio or audio-fidelity claim",
+    "No SSS selection or gameplay; no whole-session acceptance"
+  ],
+  "source": {
+    "capture_head": "7c5faca63a8f820d29dffbf74bd40c30f15f14f6",
+    "capture_parent": "80775f41acb9226397ef5394df0ece845a254bc2",
+    "capture_patch_sha256": "45fb2db106b21609477c6dc77b4412ab903bd2830949a2ea818fec94145e9000",
+    "capture_tree": "576c734e264615b4ae13476de8561b8dd61077bc",
+    "final_test_commit_parent": "7c5faca63a8f820d29dffbf74bd40c30f15f14f6",
+    "final_test_head": "c414a0aa2cb9e3183a3a3d8cfff51c7e2865856c",
+    "final_test_tree": "15757e4200a6d798b502bb4755281ad789d4a246",
+    "native_or_runtime_production_changes": false,
+    "source_review_sha256": "40c085e127c8f9bdc7465e642af94ff32ce08fd973c937f5e9cdfb63070733ab",
+    "test_only_change": "tests/net_session_instance.test.mjs VM context explicitly sets runtimeCssSss=false for the extracted legacy close-path test; freeze-before-close assertions remain unchanged."
+  },
+  "tools": {
+    "chrome": "154.0.8037.98",
+    "chrome_sha256": "ccffd5c5fe77ba3212e07c2c69091f8048b73c396b4647ecaa150e1e01a04954",
+    "headless": true,
+    "node": "v24.19.0",
+    "node_sha256": "feb7d4915fd8176dde7ca9cae71e407fbbdb85dbcaa2e195adf6b4a0202d798c",
+    "playwright": "1.62.1",
+    "playwright_entry_sha256": "a0f5715ea22354f922791a9c53dc012d5d5c067ff9cc4cd35ffb7cd272071a9f",
+    "playwright_package_sha256": "ca170ec143a88ed3043ac953eb3b2377b2b97304104f4e1e23316684ce2c35af",
+    "speaker_output_muted": true
+  },
+  "validation": {
+    "earlier_focused_controls": {
+      "corrected": {
+        "failed": 0,
+        "raw_log": "issue281-focused-v2.raw.log",
+        "passed": 114,
+        "sha256": "e6d35e8c136013426204ca572a433b0b0af6effc11e3c2ebafc83273ee6104e9",
+        "skipped": 0,
+        "total": 114
+      },
+      "failure_scope": "Test fixtures/contract assertions, not browser, native runtime or capture failures.",
+      "first_failure": {
+        "failed": 4,
+        "raw_tap_retained": false,
+        "transcribed_summary": "issue281-focused-first-failure-v1.log",
+        "passed": 109,
+        "transcribed_summary_sha256": "3b1ab8be9f76f7f339f946f4f9e9e9ad6a40bed6fbb2f7e905122984bf691202",
+        "skipped": 0,
+        "total": 113
+      }
+    },
+    "final_full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "duration_seconds": 467.636,
+      "failures": 0,
+      "head": "c414a0aa2cb9e3183a3a3d8cfff51c7e2865856c",
+      "passed": 1922,
+      "raw_log": "issue281-final-suite-v2.log",
+      "raw_log_sha256": "49625434f97712e4ce844b9688a8f7fd48841a3ec297776932feb4c4fb9dd586",
+      "skipped": 153,
+      "total": 2075,
+      "workspace_wrapped": true
+    },
+    "final_sss_observation_focused_controls": {
+      "failed": 0,
+      "passed": 32,
+      "raw_stdout": "not retained",
+      "receipt": "issue281-final-sss-observation-focused-test-receipt-v1.json",
+      "receipt_sha256": "ddc00c9848034cd18dcd629cb5d0a01ada2f569f1f64d2fba6869f9f0f497ad3",
+      "skipped": 0
+    },
+    "postfix_focused_checks": {
+      "node_failed": 0,
+      "node_log": "issue281-postsuite-fix-node-focused-v1.log",
+      "node_log_sha256": "3a0ae2727b7428827fea850b049cde4ccfac044f771e2158ad680661ca812008",
+      "node_passed": 15,
+      "node_skipped": 0,
+      "node_test": "tests/net_session_instance.test.mjs",
+      "python_failed": 0,
+      "python_log": "issue281-postsuite-fix-python-boundary-v1.log",
+      "python_log_sha256": "662cbf7d63f02629f81f4f76b2c5660ee34c5c4c702e8e5e013b1eb087adefa5",
+      "python_passed": 1,
+      "python_test": "test_net_lockstep_contracts.py"
+    },
+    "prior_full_suite_failure": {
+      "failed_tmp_preserved": true,
+      "failure": "A test VM extracted the legacy close path without runtimeCssSss in its context; no browser or capture failed. The one-line fixture correction is in final_test_head.",
+      "failures": 1,
+      "head": "7c5faca63a8f820d29dffbf74bd40c30f15f14f6",
+      "passed": 1921,
+      "raw_log": "issue281-final-suite-v1.log",
+      "raw_log_sha256": "b4216700603f7973955bb3ee57793f442dffe0e495c9c7c97eb825117fd292fa",
+      "skipped": 153,
+      "total": 2075
+    }
+  }
+}
