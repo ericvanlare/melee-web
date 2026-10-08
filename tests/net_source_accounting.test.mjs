@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import vm from 'node:vm';
-import {readFile} from 'node:fs/promises';
 import {installNetSourceAccounting, readNetSourceAccounting,
   verifyNetSourceAccounting} from '../scripts/net_source_accounting.mjs';
 import {createNetLockstepNativeAdapter} from '../scripts/net_lockstep_native_adapter.mjs';
+import {PAGE_HELPERS} from '../scripts/net_session_instance.mjs';
 import {readyRenderEvent, verifyAccountedRenderReadiness} from '../scripts/net_lockstep_observers.mjs';
 
 function fixture(original = () => 'original-result') {
@@ -244,8 +244,6 @@ test('active subscriber freeze, foreign/frozen observer and duplicate owners fai
 
 
 test('actual native peer diagnostic adapter uses accounting subscriber without replacing callback ownership', async () => {
-  const source = await readFile(new URL('../scripts/net_session_instance.mjs', import.meta.url), 'utf8');
-  const helpers = source.slice(source.indexOf('const PAGE_HELPERS ='), source.indexOf('export async function openNetInstance'));
   const f = fixture(); await installNetSourceAccounting(f.page);
   const observer = f.window.menuRuntimeTiming;
   const heap = new Uint8Array(2048), pushed = [], indexed = [];
@@ -261,7 +259,7 @@ test('actual native peer diagnostic adapter uses accounting subscriber without r
     _melee_web_net_terminate() {}, _melee_web_net_checksum_drain() { return 0; },
     _melee_web_net_status() { return 0; }, UTF8ToString() { return '{"active":1,"cursor":0,"blocker":"start_identity"}'; },
   };
-  await vm.runInNewContext(`${helpers}; PAGE_HELPERS(() => createNetLockstepNativeAdapter)`,
+  await vm.runInNewContext(`(${PAGE_HELPERS.toString()})(() => createNetLockstepNativeAdapter)`,
     {window: f.window, Module, createNetLockstepNativeAdapter, atob, btoa});
   const native = f.window.__meleeWebNetNativePeerApi();
   const frame = Uint8Array.from({length: 44}, (_, index) => index ^ 0xa5);
