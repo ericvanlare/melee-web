@@ -21,19 +21,28 @@ final CSS route and complete input timeline were not reached. The three selected
 rows passed their validators, but the capture remains failed/incomplete and is
 not whole-session evidence.
 
-The offline reducer in test commit `b7c6c9e83a84e2684c26a6f0cee5f65e8372897d`
-uses extracted collision, matrix-inverse and matrix-vector source helpers. It
-reproduces all 60 captured false results and the unchanged/instrumented output
-bits. Fifty-two records reject at the axis-aligned bounds checks and eight at
-the solver distance check. This is a host-float sensitivity diagnostic; it does
-not establish PowerPC equivalence or identify why the original accepted the hit.
+The retained-data reducer ran once from base commit
+`159334762d696d208f9959056dc547e9360b7377` with the two dirty test sources
+identified in the receipt's v2 run. That run passed 33 Python tests and one Node
+test, and reproduced all 60 captured false results and the unchanged/instrumented
+output bits: 52 reject at the axis-aligned bounds checks and eight at the solver
+distance check. The reviewed v3 change only scopes the captured-output map to the
+selected cursor; its two pure controls passed without rerunning the reducer.
+Because the retained geometry is at cursor 5239, that filter preserves the v2
+reducer result. Final implementation commit
+`b7c6c9e83a84e2684c26a6f0cee5f65e8372897d` contains the v3 source.
+
+This is a host-float sensitivity diagnostic; it does not establish PowerPC
+equivalence or explain why the original and browser fighter states differ.
 
 The full suite passed on that exact test commit: 2,109 discovered, 154 skipped,
-1,955 passed, zero failures or errors, in 487.111 seconds. Its retained log
-identity and the two approved test source hashes are in the receipt.
+1,955 passed, zero failures or errors, in 487.111 seconds. It skipped the
+optional retained-capture reducer test; its retained log identity and the v2
+and v3 source identities are in the receipt.
 
 The original divergence remains source tick 4055 / browser index 5239: original
 Bowser has 11 damage and `DamageFlyTop`, while the browser has zero damage and
-`WalkFast`. The inner-geometry observation does not establish a cause or a fix.
+`WalkFast`. The inner-geometry observation does not explain why those fighter
+states differ or establish a fix.
 Results, whole-session acceptance, original arithmetic equivalence, pixels,
 PCM, physical input, live timing and performance remain open or separate gates.

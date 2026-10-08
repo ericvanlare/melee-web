@@ -40,31 +40,70 @@
     }
   },
   "offline_reducer": {
-    "producer_commit": "b7c6c9e83a84e2684c26a6f0cee5f65e8372897d",
-    "review_receipts": {
-      "source_review_sha256": "8e5b3cfe3499c139ab3bde7570303a885c7a4b8120ed8b2f69b6d8b4002facfc",
-      "v3_review_packet_sha256": "97a15d2d5b6f3ba9fe471e2a5289c424a2065b43897e786d3a8ad4eb88bdf163"
-    },
-    "test_sources": [
-      {
-        "path": "tests/test_hit_transition_probe.py",
-        "bytes": 73965,
-        "sha256": "8a8ba5831c2a5c147e7d6e883640d3a48cbdb3aa047bb666ff4a5e03e111bf66"
+    "implementation_commit": "b7c6c9e83a84e2684c26a6f0cee5f65e8372897d",
+    "source_review_sha256": "8e5b3cfe3499c139ab3bde7570303a885c7a4b8120ed8b2f69b6d8b4002facfc",
+    "v2_retained_capture_run": {
+      "source_base_commit": "159334762d696d208f9959056dc547e9360b7377",
+      "dirty_test_sources": [
+        {
+          "path": "tests/test_hit_transition_probe.py",
+          "bytes": 73360,
+          "sha256": "4533d529028c794ed5d36fc8bed72f029a4f8d3bc08874aa6b82465f92fb168b"
+        },
+        {
+          "path": "tests/native_hit_candidate_probe_fixture.c",
+          "bytes": 37169,
+          "sha256": "63dbf8b6ddcf31a9fa976484b322c0a5e1d9cea7df944411411dd0349629025d"
+        }
+      ],
+      "review_packet_sha256": "0fc31e62280c4d7e6bf3b3b8db110226f7e3589c76574489b963b00d542b85a9",
+      "python_tests": {
+        "tests": 33,
+        "passed": 33,
+        "skipped": 0,
+        "failures": 0,
+        "errors": 0,
+        "seconds": 4.499,
+        "retained_capture_reducer_executions": 1
       },
-      {
-        "path": "tests/native_hit_candidate_probe_fixture.c",
-        "bytes": 37169,
-        "sha256": "63dbf8b6ddcf31a9fa976484b322c0a5e1d9cea7df944411411dd0349629025d"
-      }
-    ],
-    "records": 60,
-    "extracted_source_results_match_capture": true,
-    "unchanged_and_instrumented_results_and_written_bits_match": true,
-    "observed_reject_branches": {
-      "axis_aligned_bounds": 52,
-      "solver_distance": 8
+      "node_tests_passed": 1,
+      "capture_cursor": 5239,
+      "records": 60,
+      "captured_false_results": 60,
+      "extracted_source_results_match_capture": true,
+      "unchanged_and_instrumented_results_and_written_bits_match": true,
+      "observed_reject_branches": {
+        "axis_aligned_bounds": 52,
+        "solver_distance": 8
+      },
+      "limit": "Host C floating-point sensitivity evidence only; no PowerPC execution or equivalence, and no causal attribution."
     },
-    "limit": "Host C floating-point sensitivity evidence only; no PowerPC execution or equivalence, and no causal attribution."
+    "v3_reviewed_delta": {
+      "source_base_commit": "159334762d696d208f9959056dc547e9360b7377",
+      "change": "Selected-cursor-scoped captured output map; adjacent identical keys cannot overwrite the target.",
+      "final_sources": [
+        {
+          "path": "tests/test_hit_transition_probe.py",
+          "bytes": 73965,
+          "sha256": "8a8ba5831c2a5c147e7d6e883640d3a48cbdb3aa047bb666ff4a5e03e111bf66"
+        },
+        {
+          "path": "tests/native_hit_candidate_probe_fixture.c",
+          "bytes": 37169,
+          "sha256": "63dbf8b6ddcf31a9fa976484b322c0a5e1d9cea7df944411411dd0349629025d"
+        }
+      ],
+      "review_packet_sha256": "97a15d2d5b6f3ba9fe471e2a5289c424a2065b43897e786d3a8ad4eb88bdf163",
+      "pure_tests": {
+        "ran": 2,
+        "passed": 2
+      },
+      "retained_v2_evidence": true,
+      "reducer_rerun": false,
+      "capture_geometry_cursor": 5239,
+      "effect_on_v2_result": "The retained capture has geometry only at cursor 5239, so the cursor filter preserves the v2 reducer output."
+    },
+    "limit": "The final full suite validates the committed implementation but skipped the optional retained-capture test; the one retained-data reducer execution is the v2 run above. No PPC equivalence or causal attribution."
   },
   "existing_original_divergence": {
     "source_tick": 4055,
@@ -77,7 +116,7 @@
       "damage": 0,
       "motion": "WalkFast"
     },
-    "status": "Unresolved; this diagnostic does not identify the cause."
+    "status": "Unresolved; this diagnostic does not explain why the original and browser fighter states differ."
   },
   "full_suite": {
     "source_commit": "b7c6c9e83a84e2684c26a6f0cee5f65e8372897d",
