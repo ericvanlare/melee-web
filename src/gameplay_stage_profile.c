@@ -36,6 +36,10 @@ static const MeleeWebStageProfile final_destination = {
     10,
     0,
     0,
+    NULL,
+    0,
+    MELEE_WEB_STAGE_MAP_OWNERSHIP_CURRENT_ALL_RESIDENT,
+    NULL,
 };
 static const MeleeWebStageProfile battlefield = {
     St_Kind_Battle, Gr_Kind_Battle, &grNBa_StageData,
@@ -48,6 +52,10 @@ static const MeleeWebStageProfile battlefield = {
     7,
     0,
     0,
+    NULL,
+    0,
+    MELEE_WEB_STAGE_MAP_OWNERSHIP_CURRENT_ALL_RESIDENT,
+    NULL,
 };
 static const uint8_t yoshis_story_map_ids[] = {0, 1, 2, 3};
 static const MeleeWebStageProfile yoshis_story = {
@@ -61,6 +69,10 @@ static const MeleeWebStageProfile yoshis_story = {
     4,
     0,
     0,
+    NULL,
+    0,
+    MELEE_WEB_STAGE_MAP_OWNERSHIP_CURRENT_ALL_RESIDENT,
+    NULL,
 };
 static const uint8_t dream_land_map_ids[] = {0, 1, 3, 4, 5, 6, 7, 8};
 static const MeleeWebStageProfile dream_land = {
@@ -72,6 +84,10 @@ static const MeleeWebStageProfile dream_land = {
     (const uint8_t[]){1, 6, 1, 1, 1, 1, 2, 6}, 8,
     0,
     0,
+    NULL,
+    0,
+    MELEE_WEB_STAGE_MAP_OWNERSHIP_CURRENT_ALL_RESIDENT,
+    NULL,
 };
 
 static const uint8_t shrine_map_ids[] = {0, 1, 2};
@@ -86,6 +102,10 @@ static const MeleeWebStageProfile shrine = {
     3,
     1,
     1,
+    NULL,
+    0,
+    MELEE_WEB_STAGE_MAP_OWNERSHIP_CURRENT_ALL_RESIDENT,
+    NULL,
 };
 
 static const uint8_t fountain_map_ids[] = {0, 1, 2, 3, 4};
@@ -100,6 +120,8 @@ static const MeleeWebStageProfile fountain = {
     melee_web_fountain_yakumono_decode,
     0, 5, (const uint8_t[]){1, 1, 1, 1, 1}, 5,
     0, 0, fountain_public, sizeof(fountain_public)/sizeof(fountain_public[0]),
+    MELEE_WEB_STAGE_MAP_OWNERSHIP_CURRENT_ALL_RESIDENT,
+    NULL,
 };
 
 static const uint8_t old_yoshi_map_ids[] = {0, 1, 4, 5, 2, 3};
@@ -110,6 +132,10 @@ static const MeleeWebStageProfile old_yoshi = {
     melee_web_old_yoshi_yakumono_decode,
     0, 6, (const uint8_t[]){1, 1, 3, 1, 1, 1}, 6,
     0, 0,
+    NULL,
+    0,
+    MELEE_WEB_STAGE_MAP_OWNERSHIP_CURRENT_ALL_RESIDENT,
+    NULL,
 };
 
 const MeleeWebStageProfile* melee_web_stage_profile(int stage_kind)

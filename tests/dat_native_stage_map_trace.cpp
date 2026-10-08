@@ -2,6 +2,7 @@
 #include "stadium_c0_native_map_contract.hpp"
 #include "dat_stage.hpp"
 #include "gameplay_bootstrap.h"
+#include "gameplay_content.h"
 #include "gameplay_stage_numeric.h"
 #include <algorithm>
 #include <array>
@@ -46,14 +47,23 @@ template<class F>void expect_error(F&& operation,std::string_view expected){
  try{operation();}catch(const melee_web::DatError& error){rejected=std::string_view(error.what()).find(expected)!=std::string_view::npos;}
  check(rejected,"native map negative case rejects at its declared boundary");
 }
-std::vector<uint8_t> marker_fixture(uint32_t node_count=13){
+std::vector<uint8_t> marker_fixture(uint32_t node_count=13,bool null_flag=false,
+                                    bool external_map_field=false,bool local_flag=false,
+                                    bool external_flag=false){
  constexpr uint32_t data_size=0x600,root=0x100,references=0x140,entries=0x160;
- constexpr uint32_t pairs=0x1a0,tree=0x200;
+ constexpr uint32_t pairs=0x1a0,flagged=0x1c0,tree=0x200;
+ check(!(local_flag&&external_flag),"synthetic flagged slot has one authored kind");
  check(node_count>=13&&tree+node_count*64<=data_size,"synthetic marker tree fits bounded fixture");
  std::vector<uint8_t> data(data_size,0);
  write_be32(data,root,references);write_be32(data,root+4,1);
  write_be32(data,root+8,entries);write_be32(data,root+12,1);
  write_be32(data,references,tree);write_be32(data,references+4,pairs);write_be32(data,references+8,8);
+ if(null_flag||local_flag||external_flag){
+  write_be32(data,root+40,flagged);write_be32(data,root+44,1);
+  if(local_flag)write_be32(data,flagged,tree);
+  if(external_flag)write_be32(data,flagged,UINT32_MAX);
+ }
+ if(external_map_field)write_be32(data,entries+4,UINT32_MAX);
  write_be32(data,entries,tree);
  for(uint32_t i=0;i<node_count;i++){
   const uint32_t node=tree+64*i;
@@ -65,17 +75,40 @@ std::vector<uint8_t> marker_fixture(uint32_t node_count=13){
   write_be16(data,pairs+4*i,authored[i][0]);write_be16(data,pairs+4*i+2,authored[i][1]);
  }
  std::vector<uint32_t> relocations={root,root+8,references,references+4,entries};
+ if(null_flag||local_flag||external_flag)relocations.push_back(root+40);
+ if(local_flag)relocations.push_back(flagged);
  for(uint32_t i=0;i+1<node_count;i++)relocations.push_back(tree+64*i+8);
  std::sort(relocations.begin(),relocations.end());
- const std::vector<uint8_t> names={'m','a','p','_','h','e','a','d',0};
- const size_t total=0x20+data.size()+relocations.size()*4+8+names.size();
+ std::vector<uint8_t> names={'m','a','p','_','h','e','a','d',0};
+ const auto add_name=[&](std::string_view name){
+  const uint32_t offset=uint32_t(names.size());
+  for(char value:name)names.push_back(uint8_t(value));
+  names.push_back(0);
+  return offset;
+ };
+ const uint32_t external_map_name=external_map_field?add_name("SyntheticExternal"):0;
+ const uint32_t external_flag_name=external_flag?add_name("SyntheticFlag"):0;
+ const uint32_t external_count=uint32_t(external_map_field)+uint32_t(external_flag);
+ const size_t total=0x20+data.size()+relocations.size()*4+8+
+                    size_t(external_count)*8+names.size();
  std::vector<uint8_t> archive(total,0);
  write_be32(archive,0,uint32_t(total));write_be32(archive,4,data_size);
  write_be32(archive,8,uint32_t(relocations.size()));write_be32(archive,12,1);
+ write_be32(archive,16,external_count);
  std::copy(data.begin(),data.end(),archive.begin()+0x20);
  size_t cursor=0x20+data.size();
  for(uint32_t slot:relocations){write_be32(archive,uint32_t(cursor),slot);cursor+=4;}
  write_be32(archive,uint32_t(cursor),root);write_be32(archive,uint32_t(cursor+4),0);cursor+=8;
+ if(external_map_field){
+  write_be32(archive,uint32_t(cursor),entries+4);
+  write_be32(archive,uint32_t(cursor+4),external_map_name);
+  cursor+=8;
+ }
+ if(external_flag){
+  write_be32(archive,uint32_t(cursor),flagged);
+  write_be32(archive,uint32_t(cursor+4),external_flag_name);
+  cursor+=8;
+ }
  std::copy(names.begin(),names.end(),archive.begin()+static_cast<std::ptrdiff_t>(cursor));
  return archive;
 }
@@ -88,6 +121,263 @@ const melee_web::DatNativeMapContract& marker_contract(){
 void expect_marker_map_error(const std::vector<uint8_t>& bytes,std::string_view message){
  auto archive=std::make_shared<melee_web::DatArchive>(bytes);
  expect_error([&]{melee_web::DatNativeMap rejected(archive,marker_contract());},message);
+}
+void profile_map_contract_controls(const std::vector<uint8_t>& legacy_bytes){
+ using namespace melee_web;
+ static constexpr std::array<uint8_t,1> animation_counts={1};
+ auto legacy_archive=std::make_shared<DatArchive>(legacy_bytes);
+ DatStage legacy_metadata(*legacy_archive);
+ MeleeWebStageProfile legacy_profile{};
+ legacy_profile.entry_count=1;
+ legacy_profile.animation_counts=animation_counts.data();
+ legacy_profile.animation_count_count=animation_counts.size();
+ legacy_profile.map_ownership_policy=MELEE_WEB_STAGE_MAP_OWNERSHIP_CURRENT_ALL_RESIDENT;
+ auto legacy=dat_native_stage_map_contract_from_profile(
+     legacy_profile,*legacy_archive,legacy_metadata);
+ const auto legacy_view=legacy.view();
+ check(legacy_view.entry_count==1&&legacy_view.animation_consumer_counts.size()==1&&
+       legacy_view.animation_consumer_counts[0]==1,
+       "explicit current policy retains authored animation consumer counts");
+ check(legacy_view.resident_entry_ids.size()==1&&legacy_view.resident_entry_ids[0]==0&&
+       legacy_view.external_references.empty()&&legacy_view.animation_flag_entry_ids.empty()&&
+       legacy_view.flagged_objects.empty(),
+       "explicit current policy preserves prior all-resident/archive-derived map contract");
+ auto derived_bytes=marker_fixture(13,false,true,true);
+ auto derived_archive=std::make_shared<DatArchive>(derived_bytes,DatExternalPolicy::ResolveNull);
+ DatStage derived_metadata(*derived_archive);
+ auto derived=dat_native_stage_map_contract_from_profile(
+     legacy_profile,*derived_archive,derived_metadata);
+ const auto derived_view=derived.view();
+ check(derived_view.resident_entry_ids.size()==1&&derived_view.resident_entry_ids[0]==0&&
+       derived_view.external_references.size()==1&&
+       derived_view.external_references[0].entry_index==0&&
+       derived_view.external_references[0].field_offset==4&&
+       derived_view.external_references[0].symbol=="SyntheticExternal"&&
+       derived_view.animation_flag_entry_ids.empty()&&
+       derived_view.flagged_objects.size()==1&&
+       derived_view.flagged_objects[0].index==0&&
+       derived_view.flagged_objects[0].kind==DatNativeMapFlagKind::LocalMaterial&&
+       derived_view.flagged_objects[0].target_offset==0x200,
+       "current policy retains exact archive-derived external and local-flag identities");
+ {
+  DatNativeMap owner(legacy_archive,legacy_view);
+  check(owner.map_head(),"explicit current profile policy hydrates the existing synthetic map");
+ }
+
+ const std::array<int,7> current_profile_kinds={
+  St_Kind_Last,St_Kind_Battle,St_Kind_Story,St_Kind_OldPupupu,
+  St_Kind_Shrine,St_Kind_Izumi,St_Kind_OldYoshi,
+ };
+ for(int kind:current_profile_kinds){
+  const auto* profile=melee_web_stage_profile(kind);
+  check(profile&&profile->map_ownership_policy==MELEE_WEB_STAGE_MAP_OWNERSHIP_CURRENT_ALL_RESIDENT&&
+        !profile->map_ownership,
+        "each existing complete stage profile explicitly selects the current map policy");
+ }
+
+ auto unspecified=legacy_profile;
+ unspecified.map_ownership_policy=MELEE_WEB_STAGE_MAP_OWNERSHIP_UNSPECIFIED;
+ expect_error([&]{(void)dat_native_stage_map_contract_from_profile(
+     unspecified,*legacy_archive,legacy_metadata);},"no explicit map ownership policy");
+ static const MeleeWebStageMapOwnership empty_declaration{};
+ auto contradictory=legacy_profile;
+ contradictory.map_ownership=&empty_declaration;
+ expect_error([&]{(void)dat_native_stage_map_contract_from_profile(
+     contradictory,*legacy_archive,legacy_metadata);},"contradicts an authored declaration");
+ auto missing_authored=legacy_profile;
+ missing_authored.map_ownership_policy=MELEE_WEB_STAGE_MAP_OWNERSHIP_AUTHORED;
+ expect_error([&]{(void)dat_native_stage_map_contract_from_profile(
+     missing_authored,*legacy_archive,legacy_metadata);},"lacks its declaration");
+
+ static constexpr std::array<uint32_t,1> resident_ids={0};
+ static constexpr std::array<uint32_t,1> flag_consumers={0};
+ static constexpr std::array<MeleeWebStageMapExternalReference,1> external_references={{{
+  0,4,"SyntheticExternal"
+ }}};
+ static constexpr std::array<MeleeWebStageMapFlagExpectation,1> null_flag={{{
+  0,MELEE_WEB_STAGE_MAP_FLAG_NULL,0,nullptr
+ }}};
+ static const MeleeWebStageMapOwnership authored_ownership={
+  resident_ids.data(),resident_ids.size(),
+  external_references.data(),external_references.size(),
+  flag_consumers.data(),flag_consumers.size(),
+  null_flag.data(),null_flag.size(),
+ };
+ auto authored_bytes=marker_fixture(13,true,true);
+ auto authored_archive=std::make_shared<DatArchive>(authored_bytes,DatExternalPolicy::ResolveNull);
+ DatStage authored_metadata(*authored_archive);
+ MeleeWebStageProfile authored_profile{};
+ authored_profile.entry_count=1;
+ authored_profile.animation_counts=animation_counts.data();
+ authored_profile.animation_count_count=animation_counts.size();
+ authored_profile.map_ownership_policy=MELEE_WEB_STAGE_MAP_OWNERSHIP_AUTHORED;
+ authored_profile.map_ownership=&authored_ownership;
+ auto authored=dat_native_stage_map_contract_from_profile(
+     authored_profile,*authored_archive,authored_metadata);
+ const auto authored_view=authored.view();
+ check(authored_view.entry_count==1&&authored_view.animation_consumer_counts.size()==1&&
+       authored_view.animation_consumer_counts[0]==1&&
+       std::equal(authored_view.resident_entry_ids.begin(),authored_view.resident_entry_ids.end(),resident_ids.begin())&&
+       std::equal(authored_view.animation_flag_entry_ids.begin(),authored_view.animation_flag_entry_ids.end(),flag_consumers.begin())&&
+       authored_view.external_references.size()==1&&
+       authored_view.external_references[0].entry_index==0&&
+       authored_view.external_references[0].field_offset==4&&
+       authored_view.external_references[0].symbol=="SyntheticExternal"&&
+       authored_view.flagged_objects.size()==1&&
+       authored_view.flagged_objects[0].index==0&&
+       authored_view.flagged_objects[0].kind==DatNativeMapFlagKind::Null&&
+       authored_view.flagged_objects[0].target_offset==0&&
+       authored_view.flagged_objects[0].symbol.empty(),
+       "authored profile maps exact row, flag-consumer and null-slot declarations");
+ {
+  DatNativeMap owner(authored_archive,authored_view);
+  check(owner.map_head(),"complete authored profile declaration reaches the checked map hydrator");
+ }
+
+ static constexpr std::array<MeleeWebStageMapExternalReference,1> wrong_external={{{
+  0,4,"WrongExternal"
+ }}};
+ auto wrong_external_ownership=authored_ownership;
+ wrong_external_ownership.external_references=wrong_external.data();
+ auto wrong_external_profile=authored_profile;
+ wrong_external_profile.map_ownership=&wrong_external_ownership;
+ auto wrong_external_contract=dat_native_stage_map_contract_from_profile(
+     wrong_external_profile,*authored_archive,authored_metadata);
+ expect_error([&]{DatNativeMap rejected(authored_archive,wrong_external_contract.view());},
+              "external entry symbol differs");
+ auto missing_external_ownership=authored_ownership;
+ missing_external_ownership.external_references=nullptr;
+ missing_external_ownership.external_reference_count=0;
+ auto missing_external_profile=authored_profile;
+ missing_external_profile.map_ownership=&missing_external_ownership;
+ auto missing_external_contract=dat_native_stage_map_contract_from_profile(
+     missing_external_profile,*authored_archive,authored_metadata);
+ expect_error([&]{DatNativeMap rejected(authored_archive,missing_external_contract.view());},
+              "external entry fields differ");
+ static constexpr std::array<MeleeWebStageMapExternalReference,1> extra_external={{{
+  0,8,"SyntheticExtra"
+ }}};
+ auto extra_external_ownership=authored_ownership;
+ extra_external_ownership.external_references=extra_external.data();
+ auto extra_external_profile=authored_profile;
+ extra_external_profile.map_ownership=&extra_external_ownership;
+ auto extra_external_contract=dat_native_stage_map_contract_from_profile(
+     extra_external_profile,*authored_archive,authored_metadata);
+ expect_error([&]{DatNativeMap rejected(authored_archive,extra_external_contract.view());},
+              "external entry fields differ");
+
+ auto incomplete_declaration=authored_ownership;
+ incomplete_declaration.external_references=nullptr;
+ incomplete_declaration.external_reference_count=1;
+ auto incomplete_profile=authored_profile;
+ incomplete_profile.map_ownership=&incomplete_declaration;
+ expect_error([&]{(void)dat_native_stage_map_contract_from_profile(
+     incomplete_profile,*authored_archive,authored_metadata);},"external-reference list is missing");
+ auto incomplete_flags=authored_ownership;
+ incomplete_flags.flagged_objects=nullptr;
+ auto incomplete_flags_profile=authored_profile;
+ incomplete_flags_profile.map_ownership=&incomplete_flags;
+ expect_error([&]{(void)dat_native_stage_map_contract_from_profile(
+     incomplete_flags_profile,*authored_archive,authored_metadata);},"flagged-object list is missing");
+ static constexpr std::array<uint32_t,1> invalid_resident={1};
+ auto invalid_resident_ownership=authored_ownership;
+ invalid_resident_ownership.resident_entry_ids=invalid_resident.data();
+ auto invalid_resident_profile=authored_profile;
+ invalid_resident_profile.map_ownership=&invalid_resident_ownership;
+ auto invalid_resident_contract=dat_native_stage_map_contract_from_profile(
+     invalid_resident_profile,*authored_archive,authored_metadata);
+ expect_error([&]{DatNativeMap rejected(authored_archive,invalid_resident_contract.view());},
+              "invalid or duplicate resident ID");
+ std::array<MeleeWebStageMapFlagExpectation,1> invalid_flag{};
+ invalid_flag[0]={0,static_cast<MeleeWebStageMapFlagKind>(99),0,nullptr};
+ auto invalid_flag_ownership=authored_ownership;
+ invalid_flag_ownership.flagged_objects=invalid_flag.data();
+ auto invalid_flag_profile=authored_profile;
+ invalid_flag_profile.map_ownership=&invalid_flag_ownership;
+ expect_error([&]{(void)dat_native_stage_map_contract_from_profile(
+     invalid_flag_profile,*authored_archive,authored_metadata);},"unknown kind");
+
+ auto local_flag_bytes=marker_fixture(13,false,false,true);
+ auto local_flag_archive=std::make_shared<DatArchive>(local_flag_bytes);
+ DatStage local_flag_metadata(*local_flag_archive);
+ static constexpr std::array<MeleeWebStageMapFlagExpectation,1> local_flag={{{
+  0,MELEE_WEB_STAGE_MAP_FLAG_LOCAL_MATERIAL,0x200,nullptr
+ }}};
+ auto local_flag_ownership=authored_ownership;
+ local_flag_ownership.external_references=nullptr;
+ local_flag_ownership.external_reference_count=0;
+ local_flag_ownership.flagged_objects=local_flag.data();
+ auto local_flag_profile=authored_profile;
+ local_flag_profile.map_ownership=&local_flag_ownership;
+ auto local_flag_contract=dat_native_stage_map_contract_from_profile(
+     local_flag_profile,*local_flag_archive,local_flag_metadata);
+ const auto local_flag_view=local_flag_contract.view();
+ check(local_flag_view.flagged_objects.size()==1&&
+       local_flag_view.flagged_objects[0].kind==DatNativeMapFlagKind::LocalMaterial&&
+       local_flag_view.flagged_objects[0].target_offset==0x200&&
+       local_flag_view.flagged_objects[0].symbol.empty(),
+       "authored local-material flag preserves its exact source target");
+ expect_error([&]{DatNativeMap rejected(local_flag_archive,local_flag_view);},
+              "flag mutation names unsupported descriptor kind");
+
+ auto external_flag_bytes=marker_fixture(13,false,false,false,true);
+ auto external_flag_archive=std::make_shared<DatArchive>(
+     external_flag_bytes,DatExternalPolicy::ResolveNull);
+ DatStage external_flag_metadata(*external_flag_archive);
+ static constexpr std::array<MeleeWebStageMapFlagExpectation,1> external_flag={{{
+  0,MELEE_WEB_STAGE_MAP_FLAG_EXTERNAL_NULL,0,"SyntheticFlag"
+ }}};
+ auto external_flag_ownership=authored_ownership;
+ external_flag_ownership.external_references=nullptr;
+ external_flag_ownership.external_reference_count=0;
+ external_flag_ownership.flagged_objects=external_flag.data();
+ auto external_flag_profile=authored_profile;
+ external_flag_profile.map_ownership=&external_flag_ownership;
+ auto external_flag_contract=dat_native_stage_map_contract_from_profile(
+     external_flag_profile,*external_flag_archive,external_flag_metadata);
+ const auto external_flag_view=external_flag_contract.view();
+ check(external_flag_view.flagged_objects.size()==1&&
+       external_flag_view.flagged_objects[0].kind==DatNativeMapFlagKind::ExternalNull&&
+       external_flag_view.flagged_objects[0].target_offset==0&&
+       external_flag_view.flagged_objects[0].symbol=="SyntheticFlag",
+       "authored external-null flag preserves its exact symbol identity");
+ {
+  DatNativeMap owner(external_flag_archive,external_flag_view);
+  check(owner.map_head(),"authored external-null flag reaches the checked map hydrator");
+ }
+ static constexpr std::array<MeleeWebStageMapFlagExpectation,1> wrong_flag={{{
+  0,MELEE_WEB_STAGE_MAP_FLAG_EXTERNAL_NULL,0,"WrongFlag"
+ }}};
+ auto wrong_flag_ownership=external_flag_ownership;
+ wrong_flag_ownership.flagged_objects=wrong_flag.data();
+ auto wrong_flag_profile=external_flag_profile;
+ wrong_flag_profile.map_ownership=&wrong_flag_ownership;
+ auto wrong_flag_contract=dat_native_stage_map_contract_from_profile(
+     wrong_flag_profile,*external_flag_archive,external_flag_metadata);
+ expect_error([&]{DatNativeMap rejected(external_flag_archive,wrong_flag_contract.view());},
+              "flagged external slot or name differs");
+ static constexpr std::array<MeleeWebStageMapFlagExpectation,1> missing_flag_identity={{{
+  0,MELEE_WEB_STAGE_MAP_FLAG_NULL,0,nullptr
+ }}};
+ auto missing_flag_ownership=external_flag_ownership;
+ missing_flag_ownership.flagged_objects=missing_flag_identity.data();
+ auto missing_flag_profile=external_flag_profile;
+ missing_flag_profile.map_ownership=&missing_flag_ownership;
+ auto missing_flag_contract=dat_native_stage_map_contract_from_profile(
+     missing_flag_profile,*external_flag_archive,external_flag_metadata);
+ expect_error([&]{DatNativeMap rejected(external_flag_archive,missing_flag_contract.view());},
+              "unexpectedly names an external slot");
+ static constexpr std::array<MeleeWebStageMapFlagExpectation,1> external_with_target={{{
+  0,MELEE_WEB_STAGE_MAP_FLAG_EXTERNAL_NULL,0x200,"SyntheticFlag"
+ }}};
+ auto external_with_target_ownership=external_flag_ownership;
+ external_with_target_ownership.flagged_objects=external_with_target.data();
+ auto external_with_target_profile=external_flag_profile;
+ external_with_target_profile.map_ownership=&external_with_target_ownership;
+ expect_error([&]{(void)dat_native_stage_map_contract_from_profile(
+     external_with_target_profile,*external_flag_archive,external_flag_metadata);},
+     "has a local target");
+ std::cout<<"Explicit stage-profile map policies and authored ownership adapter controls passed\n";
 }
 void marker_fixture_trace(){
  const auto original=marker_fixture();
@@ -114,6 +404,7 @@ void marker_fixture_trace(){
  char error[256];
  check(melee_web_gameplay_startup(32*1024*1024,error,sizeof(error)),error);
  check(melee_web_native_world_enable(error,sizeof(error)),error);
+ profile_map_contract_controls(original);
  constexpr std::array<uint16_t,16> authored={3,0,0,1,2,2,1,3,12,135,4,135,9,134,9,134};
  {
   melee_web::DatNativeMap owner(archive,marker_contract());
