@@ -3,6 +3,7 @@ import test from 'node:test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import vm from 'node:vm';
+import {createBrowserNativePeer} from '../scripts/net_lockstep_browser_peer.mjs';
 import {LockstepPeer} from '../scripts/net_lockstep_core.mjs';
 import {createRoomTransport, createRuntimeLockstepSession} from '../scripts/net_lockstep_runtime_owner.mjs';
 
@@ -469,7 +470,7 @@ test('runtime session retains the page checksum consumer snapshot within the exi
   let consume;
   const run = makeSession({peerFactory(options) {
     consume = options.checksumConsumer;
-    return {rpc: async () => {
+    return {waitForReady: async () => {}, rpc: async () => {
       assert.equal(consume([record]), true);
       return {protocol: {ready: true}};
     }, close: async () => {}, snapshot: () => ({protocol: {ready: true}, nativePump: {native_quiescence: 'verified'}})};
@@ -505,9 +506,9 @@ test('fatal escalation joins normal close and preserves aborted native-quiescenc
     return transport;
   }, peerFactory() {
     let mode = 'normal';
-    return {rpc: async () => ({protocol: {ready: true}}),
+    return {waitForReady: async () => {}, rpc: async () => ({protocol: {ready: true}}),
       close(options) { modes.push(options.mode); if (options.mode === 'fatal') mode = 'fatal'; return join.promise; },
-      snapshot: () => ({nativePump: {native_quiescence: mode === 'fatal' ? 'aborted-fatal' : 'pending'}})};
+      snapshot: () => ({protocol: {ready: true}, nativePump: {native_quiescence: mode === 'fatal' ? 'aborted-fatal' : 'pending'}})};
   }});
   const started = run.session.start(() => ({protocol: 'melee-web-local-lockstep-a2-v1'}));
   run.native.state.start.recorded = 1;
@@ -534,8 +535,8 @@ test('peer join failure still closes endpoint transport and disposes adapter scr
     transport = {createEndpoint() {}, async start() {}, async close() { events.push('transport-close'); }};
     return transport;
   }, peerFactory() {
-    return {rpc: async () => ({protocol: {ready: true}}), close: async () => { events.push('peer-close'); throw joinFailure; },
-      snapshot: () => ({nativePump: {native_quiescence: 'failed'}})};
+    return {waitForReady: async () => {}, rpc: async () => ({protocol: {ready: true}}), close: async () => { events.push('peer-close'); throw joinFailure; },
+      snapshot: () => ({protocol: {ready: true}, nativePump: {native_quiescence: 'failed'}})};
   }});
   const started = run.session.start(() => ({protocol: 'melee-web-local-lockstep-a2-v1'}));
   run.native.state.start.recorded = 1;
@@ -560,4 +561,72 @@ test('runtime session rejects duplicate starts and incompatible contexts before 
   await assert.rejects(run.session.start(() => ({})), /already started/);
   await run.session.close({mode: 'fatal'});
   await assert.rejects(first, /closed before native start identity/);
+});
+
+
+test('actual runtime, native ABI and Room transport await a delayed remote identity hello', async t => {
+  for (const delayedConfirmation of [false, true]) await t.test(delayedConfirmation ? 'asynchronous native confirmation' : 'delayed hello', async () => {
+  const confirmationGate = deferred();
+  const prior = Object.getOwnPropertyDescriptor(globalThis, 'WebSocket');
+  const roomId = 'e'.repeat(32), events = [], sent = [];
+  Object.defineProperty(globalThis, 'WebSocket', {configurable: true, writable: true,
+    value: negotiatingSocket('alpha', roomId)});
+  const pc = new FakeRoomPeerConnection('alpha'), channel = new NeverOpenDataChannel();
+  pc.createDataChannel = () => channel;
+  channel.send = text => { sent.push(JSON.parse(text)); events.push('send-' + JSON.parse(text).type); };
+  const state = {active: 1, cursor: 0, ring_pending: 0, blocker: 'start_identity',
+    terminal: {kind: 0, tick: 0, channel: 0}, start: {recorded: 1, required: 1, confirmed: 0,
+      capture_failed: 0, scene: 1, seed: 305419896, frame: 0, total: 'a8f1925aa316f1e8'}};
+  const heap = new Uint8Array(131072);
+  const Module = {HEAPU8: heap, _malloc: () => 8192, _free: () => events.push('free'),
+    _melee_web_net_push: () => 1, _melee_web_net_push_indexed: () => 1,
+    _melee_web_net_enable_local_input_capture: () => 1,
+    _melee_web_net_confirm_start: () => { events.push('native-confirm'); state.start.confirmed = 1; return 1; },
+    _melee_web_net_terminate: (kind, tick, channel) => { state.terminal = {kind, tick, channel}; state.blocker = 'terminal'; },
+    _melee_web_net_checksum_drain: () => 0,
+    _melee_web_net_status: () => { const bytes = new TextEncoder().encode(JSON.stringify(state)); heap.set(bytes, 8); heap[8 + bytes.length] = 0; return 8; },
+    UTF8ToString: (pointer, length) => new TextDecoder().decode(heap.subarray(pointer, pointer + length))};
+  const session = createRuntimeLockstepSession({Module, role: 'alpha', sourceTicks: 8, inputTicks: 6,
+    url: 'ws://127.0.0.1:8787', roomId, timeoutMs: 250,
+    createTransport: options => createRoomTransport({...options, createPeerConnection: () => pc}),
+    ...(delayedConfirmation ? {createPeer(options, dependencies) {
+      const native = options.native;
+      return createBrowserNativePeer({...options, native: {...native, async confirmStart() {
+        events.push('enter-native-confirm'); await confirmationGate.promise; return native.confirmStart();
+      }}}, dependencies);
+    }} : {})});
+  const started = session.start(nativeStart => ({protocol: 'melee-web-local-lockstep-a2-v1', native_start: nativeStart}));
+  const observed = started.then(value => ({value}), error => ({error}));
+  let settled = false; observed.then(() => { settled = true; });
+  try {
+    session.onFrame();
+    for (let count = 0; count < 10; ++count) await turn();
+    channel.readyState = 'open'; channel.dispatchEvent(new Event('open'));
+    pc.connectionState = 'connected'; pc.iceConnectionState = 'connected';
+    pc.dispatchEvent(new Event('connectionstatechange')); pc.dispatchEvent(new Event('iceconnectionstatechange'));
+    for (let count = 0; count < 20 && !sent.some(x => x.type === 'hello'); ++count) await turn();
+    assert.ok(sent.some(x => x.type === 'hello'), 'Actual endpoint sends local hello');
+    await turn();
+    assert.equal(state.start.confirmed, 0); assert.equal(session.snapshot().peer.protocol.ready, false);
+    assert.equal(settled, false, 'Connected transport and local hello do not imply remote agreement');
+    const local = sent.find(x => x.type === 'hello');
+    const event = new Event('message'); Object.defineProperty(event, 'data', {value: JSON.stringify({...local,
+      role: 'beta', local_port: 1, remote_port: 0})}); events.push('receive-hello'); channel.dispatchEvent(event);
+    if (delayedConfirmation) {
+      for (let count = 0; count < 20 && !events.includes('enter-native-confirm'); ++count) await turn();
+      assert.ok(events.includes('enter-native-confirm'));
+      assert.equal(session.snapshot().peer.protocol.ready, true);
+      assert.equal(state.start.confirmed, 0); assert.equal(settled, false);
+      confirmationGate.resolve();
+    }
+    const result = await observed; assert.equal(result.error, undefined, String(result.error));
+    assert.equal(result.value.protocol.ready, true); assert.equal(state.start.confirmed, 1);
+    assert.ok(events.indexOf('receive-hello') < events.indexOf('native-confirm'));
+    assert.equal(state.cursor, 0, 'Readiness does not advance native source ticks');
+  } finally {
+    confirmationGate.resolve();
+    await session.close({mode: 'fatal'}).catch(() => {}); await observed;
+    if (prior) Object.defineProperty(globalThis, 'WebSocket', prior); else delete globalThis.WebSocket;
+  }
+  });
 });

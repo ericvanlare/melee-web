@@ -317,7 +317,8 @@ export function createRuntimeLockstepSession({Module, role, sourceTicks, inputTi
       }}, {createEndpoint: transport.createEndpoint});
     const transportReady = Promise.resolve().then(() => transport.start());
     const protocolReady = Promise.resolve().then(() => peer.rpc('start'));
-    peerReady = Promise.all([transportReady, protocolReady]).then(([transportSnapshot, snapshot]) => {
+    peerReady = Promise.all([transportReady, protocolReady, peer.waitForReady()]).then(([transportSnapshot]) => {
+      const snapshot = peer.snapshot();
       transportInfo = transportSnapshot;
       if (snapshot?.protocol?.ready !== true)
         throw Error('Runtime lockstep peer did not confirm the native start identity');

@@ -54,6 +54,23 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
   let wakeRequested = false, wakeQueued = false, wakeRuns = 0, rpcCalls = 0, unsubscribeProgress = null;
   let closeOperation = null, drainFailure = null;
   let startup = null;
+  let resolveReady, rejectReady, readinessSettled = false, readinessTimer = null;
+  const protocolReady = new Promise((resolve, reject) => { resolveReady = resolve; rejectReady = reject; });
+  protocolReady.catch(() => {});
+  const settleReady = error => {
+    if (readinessSettled) return false;
+    readinessSettled = true;
+    if (readinessTimer !== null) { clearTimeout(readinessTimer); readinessTimer = null; }
+    if (error) rejectReady(error); else resolveReady();
+    return true;
+  };
+  // This event join stays outside the RPC chain so close can cancel it without
+  // waiting for a remote hello, and core.ready cannot bypass native confirmation.
+  function waitForReady() {
+    if (!readinessSettled && readinessTimer === null)
+      readinessTimer = setTimeout(() => remember(Error(`Browser peer identity agreement did not complete within ${timeoutMs}ms`)), timeoutMs);
+    return protocolReady;
+  }
   let nativeChain = Promise.resolve();
   const callNative = (name, ...args) => {
     const callEpoch = nativeCallEpoch;
@@ -91,6 +108,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
   const remember = error => {
     failure ??= error;
     invalidatePendingConsumer(failure);
+    settleReady(failure);
     return error;
   };
   const check = () => { if (failure) throw failure; };
@@ -204,8 +222,10 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     },
     onReady: async () => {
       if (!await callNative('confirmStart')) throw Error('Native rejected peer start identity confirmation');
+      if (!closing && !closed && !failure) settleReady();
     },
     onTerminal: terminal => {
+      settleReady(failure ?? Error(terminal.reason ?? `Browser peer identity agreement ended with ${terminal.kind}`));
       invalidatePendingConsumer(Error(`Browser checksum consumer batch cancelled by ${terminal.kind} terminal`));
       if (closeMode === 'fatal') return;
       return callNative('terminate', TERMINAL[terminal.kind] ?? TERMINAL.protocol,
@@ -458,6 +478,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       return closeOperation;
     }
     closing = true;
+    settleReady(failure ?? Error('Browser peer closed before identity agreement confirmation'));
     closeMode = mode;
     closeNativePhase = mode === 'fatal' ? null : 'terminal';
     nativeQuiescence = mode === 'fatal' ? 'aborted-fatal' : 'pending';
@@ -541,7 +562,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     return snapshot();
   }
 
-  const controller = {rpc, close, armClose() { intentionalClose = true; }, snapshot};
+  const controller = {rpc, waitForReady, close, armClose() { intentionalClose = true; }, snapshot};
   if (inputCapture) {
     try {
       globalThis.__meleeWebNetLocalInputCapture = captureLocalInput;
