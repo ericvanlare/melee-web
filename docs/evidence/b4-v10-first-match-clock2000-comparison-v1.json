@@ -81,7 +81,7 @@
     "boundary_result": "equivalent",
     "browser_export_validated_through_eof": true,
     "cli_exit": 1,
-    "cli_exit_interpretation": "Expected for an equivalent bounded prefix with incomplete=true; not a failed field comparison.",
+    "cli_exit_interpretation": "Expected for an equivalent bounded prefix with complete=false; not a failed field comparison.",
     "complete": false,
     "css_sss_input_order_only": 1184,
     "execution": {
@@ -135,7 +135,7 @@
     },
     "result": "incomplete",
     "root_result_review_sha256": "521c067da80361b9cc37e753c6d0597431aff784b8492ca1ae47f805eb0a5d17",
-    "run_id": "b4-clock2000-browser-capture-prep-20261007-20261007-174221-41d475ac/comparison-prep-v3",
+    "run_id": "b4-clock2000-browser-capture-prep-20261007-20261007-174221-41d475ac",
     "scope": "v10-first-match-clock-ordered-lineage",
     "setup_fields_compared": [
       "rng",
