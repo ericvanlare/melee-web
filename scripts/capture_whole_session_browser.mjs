@@ -29,6 +29,7 @@ import {NATURAL_PAUSE_PROTOCOL, STOPPED_SCENE_PAIR_PROTOCOL, resolveCaptureMode,
 import {installPauseTraceCapture, readPauseTraceCapture, readPauseTraceStatus,
   readRetainedPauseDiagnostics} from '../tests/pause_trace_capture.mjs';
 import {traceSettings, finalizeTrace} from './run_hitch_matrix.mjs';
+import {browserArtifactInventory as readSharedArtifactInventory} from './browser_artifact_inventory.mjs';
 
 const {values, tokens} = parseArgs({tokens: true, options: {
   url: {type: 'string'},
@@ -294,29 +295,7 @@ function persistBoundaryConsoleEvent(params) {
 }
 
 async function browserArtifactInventory() {
-  const inventoryPath = path.join(repoRoot, 'tools/browser_build_artifacts.json');
-  const names = JSON.parse(await fs.readFile(inventoryPath, 'utf8'));
-  if (!Array.isArray(names) || names.length !== 32 || new Set(names).size !== 32)
-    throw Error('The reviewed browser artifact inventory must contain exactly 32 unique files');
-  const rows = await Promise.all(names.map(async name => {
-    const localPath = path.resolve(artifactRoot, name);
-    if (!localPath.startsWith(artifactRoot + path.sep))
-      throw Error(`Browser artifact path escaped its build directory: ${name}`);
-    const local = await statInput(localPath);
-    const response = await fetch(new URL(name, url), {cache: 'no-store',
-      signal: AbortSignal.timeout(8000)});
-    if (!response.ok) throw Error(`Served browser artifact ${name} returned HTTP ${response.status}`);
-    const hash = createHash('sha256');
-    let servedBytes = 0;
-    for await (const chunk of response.body) { servedBytes += chunk.length; hash.update(chunk); }
-    const servedSha256 = hash.digest('hex');
-    return {name, local_bytes: local.bytes, local_sha256: local.sha256,
-      served_bytes: servedBytes, served_sha256: servedSha256,
-      equal: local.bytes === servedBytes && local.sha256 === servedSha256};
-  }));
-  const mismatches = rows.filter(row => !row.equal).map(row => row.name);
-  return {path: 'tools/browser_build_artifacts.json', artifact_root: artifactRoot,
-    count: rows.length, rows, mismatches, equal: mismatches.length === 0};
+  return readSharedArtifactInventory({artifactRoot, url});
 }
 
 function firstError(kind, message, details = null) {
@@ -613,7 +592,7 @@ async function finalizeFirstReplayCallbackProbe() {
   if (report.artifact_inventory_pre) {
     try {
       report.artifact_inventory_post = await boundedCaptureOperation(
-        browserArtifactInventory(), 5000, 'post-capture 32-file served/local inventory');
+        browserArtifactInventory(), 5000, 'post-capture shared-allowlist served/local inventory');
       const pre = report.artifact_inventory_pre.rows;
       const post = report.artifact_inventory_post.rows;
       report.artifact_inventory_identity = {
@@ -635,7 +614,7 @@ async function finalizeFirstReplayCallbackProbe() {
     failures.push('A fatal browser or harness diagnostic was recorded');
   if (!report.artifact_inventory_pre?.equal || !report.artifact_inventory_post?.equal ||
       !report.artifact_inventory_identity?.equal)
-    failures.push('The 32-file local/served browser artifact inventory changed or failed');
+    failures.push('The committed local/served browser artifact inventory changed or failed');
   if (report.close_error || report.cdp_detach_error)
     failures.push('Owned browser/CDP cleanup did not settle within its bound');
   report.finalization_failures = failures;

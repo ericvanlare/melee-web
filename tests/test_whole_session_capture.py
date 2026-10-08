@@ -10,6 +10,13 @@ from check_gameplay import node_runtime
 
 
 class WholeSessionCaptureTests(unittest.TestCase):
+    def test_shared_runtime_inventory_uses_real_http_and_rejects_missing_or_changed_modules(self):
+        result = subprocess.run(
+            [str(node_runtime()), str(ROOT / 'tests/browser_artifact_inventory_test.mjs')],
+            capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Current 34-file inventory', result.stdout)
+
     def test_natural_pause_diagnostic_ownership_and_export_boundaries(self):
         result = subprocess.run(
             [str(node_runtime()), str(ROOT / 'tests/natural_pause_diagnostic_test.mjs')],
