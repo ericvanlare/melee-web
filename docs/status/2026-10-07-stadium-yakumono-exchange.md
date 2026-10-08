@@ -28,9 +28,10 @@ and their exact diff were unchanged. PR #263 changed only browser-peer
 JavaScript/tests and scoped docs, disjoint from the affected C/C++ build source
 closures. The focused build/control, full-suite, and Release results remain
 identified to producer `756182a`; the
-[current-main refresh receipt](../evidence/issue261-current-main-refresh-v1.json)
-records the reuse proof and does not relabel those results as runs on the new
-head.
+[current-main refresh receipt](../evidence/issue261-current-main-refresh-v2.json)
+records the reuse proof and reports Git blob IDs separately from before/after
+raw-file SHA-256 values. It does not relabel those results as runs on the new
+head. The v2 receipt supersedes the earlier hash-ambiguous v1 record.
 
 This establishes only the guarded pointer exchange and its asset-free owner
 control. It does not establish Stadium profile admission, map construction or
