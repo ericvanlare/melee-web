@@ -680,3 +680,73 @@ test('actual harness reconstructs the runtime hello lifecycle without changing n
   assert.match(harness, /peers\[role\]\.agreementHash !== expectedAgreementHashes\[role\]/,
     'Actual callsite still requires exact agreement hashes for both runtime peers');
 });
+
+
+test('actual autonomous harness observes each checksum ownership mode and freezes failed intervals', async () => {
+  const harness = await fs.readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const source = harness.slice(harness.indexOf('function nativePumpChecksumEvidence('), harness.indexOf('async function pollRun()'));
+  const {verifyPositivePeerCompletion} = await import('../scripts/net_lockstep_observers.mjs');
+  const rows = cursor => {
+    const records = Array.from({length: cursor}, (_, tick) => { const b = Array(64).fill(0); b[0] = tick; return b; });
+    return {status: {active: 1, cursor, blocker: cursor === 8 ? 'complete' : 'network_wait', terminal: {kind: 0}}, native: {},
+      runtime_checksum_records: records, snapshot: {failure: null, endpointErrors: [], nativePump: {enabled: true, rpc_calls: 1},
+        exportRecords: 0, checksumConsumer: {enabled: true, accepted_records: cursor, retained_records: 0, pending_batch: null},
+        checksumOwnership: {consumer_accepted_records: cursor}, protocol: {terminal: null, checksum_mismatches: [],
+          local_checksum_ticks: cursor, remote_checksum_ticks: cursor, next_checksum_compare: cursor, remote_ack_input: 5}}};
+  };
+  const run = async (runtimeOwned, mutate = () => {}, initial = 0, mutateOwner = value => value) => {
+    let iteration = 0, time = 0;
+    const before = rows(initial), after = rows(8); mutate(after);
+    if (!runtimeOwned) { before.snapshot.exportRecords = initial; after.snapshot.exportRecords = 8; }
+    const context = {runtimeOwned, sourceTicks: 8, usedInputs: 6, NET_RECORD_BYTES: 64, deadline: 4, stallMs: 4, pollMs: 1,
+      Date: {now: () => time}, sleep: async () => { ++time; }, pairResults: {}, verifyPositivePeerCompletion,
+      checkedHealth: async () => { const row = iteration < 2 ? before : after; return {status: row.status, native: row.native}; },
+      instances: Object.fromEntries(['alpha', 'beta'].map(role => [role, {
+        runtimeLockstepSnapshot: async () => { const row = iteration++ < 2 ? before : after; return mutateOwner({armed: true, closing: false, failure: null, peer: row.snapshot, checksums: row.runtime_checksum_records}); },
+        readPeerSnapshot: async () => (iteration++ < 2 ? before : after).snapshot,
+      }]))};
+    vm.createContext(context); vm.runInContext(source, context);
+    let error; try { await context.observeNativePumpWithoutRpc(); } catch (value) { error = value; }
+    return {context, error, after};
+  };
+  for (const mode of [true, false]) {
+    const valid = await run(mode); assert.equal(valid.error, undefined); assert.equal(valid.context.pairResults.native_pump_interval.complete, true);
+    const rpc = await run(mode, row => { row.snapshot.nativePump.rpc_calls++; });
+    assert.match(String(rpc.error), /peer RPC occurred/); assert.equal(rpc.context.pairResults.native_pump_interval.no_peer_RPC_during_interval, false);
+    assert.equal(rpc.context.pairResults.native_pump_interval.after.alpha.status.cursor, 8);
+    const early = await run(mode, () => {}, 8); assert.match(String(early.error), /completed before/);
+    assert.equal(early.context.pairResults.native_pump_interval.complete, false);
+    const stuck = await run(mode, row => { row.status.cursor = 0; row.status.blocker = 'network_wait'; });
+    assert.match(String(stuck.error), /did not complete/); assert.equal(stuck.context.pairResults.native_pump_interval.actual_native_cursor_progress_each, false);
+    for (const key of ['remote_checksum_ticks', 'next_checksum_compare', 'remote_ack_input']) {
+      const rejected = await run(mode, row => { row.snapshot.protocol[key]--; }); assert.match(String(rejected.error), /did not complete/);
+    }
+  }
+  for (const mutate of [
+    row => { delete row.runtime_checksum_records; },
+    row => { row.runtime_checksum_records.pop(); },
+    row => { row.runtime_checksum_records[7] = row.runtime_checksum_records[6]; },
+    row => { row.runtime_checksum_records[7][10] = 256; },
+    row => { delete row.runtime_checksum_records[7][10]; },
+    row => { row.runtime_checksum_records[7].pop(); },
+    row => { row.runtime_checksum_records.push(Array(64).fill(0)); },
+    row => { row.snapshot.checksumConsumer.accepted_records = 7; row.snapshot.checksumOwnership.consumer_accepted_records = 7; },
+  ]) { const rejected = await run(true, mutate); assert.match(String(rejected.error), /Invalid runtime|not delivered/); }
+  for (const mutate of [row => { row.snapshot.exportRecords = 1; }, row => { row.snapshot.checksumConsumer.retained_records = 1; },
+    row => { row.snapshot.checksumConsumer.pending_batch = {count: 1}; }]) {
+    const pending = await run(true, mutate); assert.match(String(pending.error), /did not complete/);
+  }
+  for (const mutateOwner of [() => null, owner => ({...owner, armed: false}), owner => ({...owner, closing: true}),
+    owner => ({...owner, failure: 'retained owner first error'}), owner => ({...owner, peer: null})]) {
+    const rejected = await run(true, () => {}, 0, mutateOwner); assert.match(String(rejected.error), /autonomous runtime owner failed/);
+  }
+  const diagnostic = await run(false);
+  for (const count of [undefined, null, 0, 7, 9, '8'])
+    assert.equal(diagnostic.context.nativePumpChecksumEvidence({snapshot: {exportRecords: count}}, false, 8), false);
+  assert.equal(diagnostic.context.nativePumpChecksumEvidence({snapshot: {exportRecords: 8},
+    runtime_checksum_records: ['irrelevant diagnostic owner shape']}, false, 8), true);
+  const pending = await run(true, row => {
+    row.snapshot.checksumConsumer.accepted_records = 7; row.snapshot.checksumOwnership.consumer_accepted_records = 7;
+    row.snapshot.checksumConsumer.pending_batch = {count: 1};
+  }); assert.match(String(pending.error), /did not complete/); // Legitimate delivery interval is incomplete, not malformed.
+});

@@ -580,10 +580,33 @@ async function publishProbeInputs(alpha, beta) {
   // delayed/duplicated CSS contribution that releases alpha's exact wait tick.
 }
 
+function nativePumpChecksumEvidence(row, runtimeOwner, ticks) {
+  if (!runtimeOwner) return row.snapshot.exportRecords === ticks;
+  const records = row.runtime_checksum_records, consumer = row.snapshot.checksumConsumer;
+  if (!Array.isArray(records) || records.length > ticks || !consumer || consumer.enabled !== true ||
+      !Number.isSafeInteger(consumer.accepted_records) || consumer.accepted_records < 0 ||
+      consumer.accepted_records > records.length ||
+      row.snapshot.checksumOwnership?.consumer_accepted_records !== consumer.accepted_records)
+    throw Error('Invalid runtime autonomous checksum ownership');
+  records.forEach((record, tick) => {
+    if (!Array.isArray(record) || record.length !== NET_RECORD_BYTES ||
+        Array.from(record).some(byte => !Number.isInteger(byte) || byte < 0 || byte > 255) ||
+        new DataView(Uint8Array.from(record).buffer).getUint32(0, true) !== tick)
+      throw Error('Invalid runtime autonomous retained checksum record');
+  });
+  if (records.length > consumer.accepted_records && consumer.pending_batch == null)
+    throw Error('Runtime autonomous checksum records were not delivered to the consumer');
+  return consumer.accepted_records === ticks && records.length === ticks &&
+    consumer.pending_batch === null && row.snapshot.exportRecords === 0 && consumer.retained_records === 0;
+}
+
 async function observeNativePumpWithoutRpc() {
   const read = async role => {
     const {status, native} = await checkedHealth(role);
-    const snapshot = await instances[role].readPeerSnapshot();
+    const owner = runtimeOwned ? await instances[role].runtimeLockstepSnapshot() : null;
+    if (runtimeOwned && (!owner || owner.armed !== true || owner.closing !== false || owner.failure !== null || !owner.peer))
+      throw Error(`${role} autonomous runtime owner failed: ${JSON.stringify(owner)}`);
+    const snapshot = runtimeOwned ? owner.peer : await instances[role].readPeerSnapshot();
     if (snapshot.failure || snapshot.protocol.terminal || (!Array.isArray(snapshot.protocol.checksum_mismatches) || snapshot.protocol.checksum_mismatches.length) ||
         !Array.isArray(snapshot.endpointErrors) || snapshot.endpointErrors.length ||
         snapshot.nativePump?.enabled !== true || !Number.isSafeInteger(snapshot.nativePump.rpc_calls) ||
@@ -592,9 +615,15 @@ async function observeNativePumpWithoutRpc() {
         !Number.isSafeInteger(snapshot.protocol.local_checksum_ticks) ||
         snapshot.protocol.local_checksum_ticks < 0 || snapshot.protocol.local_checksum_ticks > sourceTicks)
       throw Error(`${role} autonomous diagnostic peer failed: ${JSON.stringify(snapshot)}`);
-    return {status, native, snapshot};
+    const row = {status, native, snapshot, ...(runtimeOwned ? {runtime_checksum_records: owner?.checksums} : {})};
+    nativePumpChecksumEvidence(row, runtimeOwned, sourceTicks);
+    return row;
   };
   const before = Object.fromEntries(await Promise.all(['alpha', 'beta'].map(async role => [role, await read(role)])));
+  const interval = pairResults.native_pump_interval = {before, after: null, observations: 0,
+    observation: 'read-only native health and pure owner/controller snapshot; no peer RPC, evidence drain, progress publication or timing resume',
+    checksum_evidence_owner: runtimeOwned ? 'runtime ACK consumer and retained canonical records' : 'diagnostic peer export queue',
+    no_peer_RPC_during_interval: true, actual_native_cursor_progress_each: false, complete: false};
   for (const role of ['alpha', 'beta']) {
     if (before[role].status.cursor >= sourceTicks || before[role].snapshot.protocol.local_checksum_ticks >= sourceTicks)
       throw Error(`${role} completed before the no-RPC observation interval; autonomous progress was not witnessed`);
@@ -604,21 +633,23 @@ async function observeNativePumpWithoutRpc() {
   while (Date.now() <= deadline && Date.now() - started <= stallMs) {
     after = Object.fromEntries(await Promise.all(['alpha', 'beta'].map(async role => [role, await read(role)])));
     ++observations;
+    interval.after = after; interval.observations = observations;
+    interval.actual_native_cursor_progress_each = ['alpha', 'beta'].every(role => after[role].status.cursor > before[role].status.cursor);
     for (const role of ['alpha', 'beta']) {
-      if (after[role].snapshot.nativePump.rpc_calls !== before[role].snapshot.nativePump.rpc_calls)
+      if (after[role].snapshot.nativePump.rpc_calls !== before[role].snapshot.nativePump.rpc_calls) {
+        interval.no_peer_RPC_during_interval = false;
         throw Error(`${role} peer RPC occurred during autonomous observation`);
+      }
     }
     if (['alpha', 'beta'].every(role => {
       const row = after[role];
       return row.status.cursor === sourceTicks && row.status.blocker === 'complete' && row.status.terminal.kind === 0 &&
-        row.snapshot.exportRecords === sourceTicks && row.snapshot.protocol.local_checksum_ticks === sourceTicks &&
+        nativePumpChecksumEvidence(row, runtimeOwned, sourceTicks) && row.snapshot.protocol.local_checksum_ticks === sourceTicks &&
         row.snapshot.protocol.remote_checksum_ticks === sourceTicks && row.snapshot.protocol.next_checksum_compare === sourceTicks &&
         row.snapshot.protocol.remote_ack_input === usedInputs - 1;
     })) {
       for (const role of ['alpha', 'beta']) verifyPositivePeerCompletion(after[role].snapshot.protocol, usedInputs, sourceTicks);
-      pairResults.native_pump_interval = {before, after, observations,
-        observation: 'read-only native health and pure controller snapshot; no peer RPC, evidence drain, progress publication or timing resume',
-        no_peer_RPC_during_interval: true, actual_native_cursor_progress_each: true};
+      interval.complete = true;
       return;
     }
     await sleep(pollMs);
