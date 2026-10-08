@@ -202,7 +202,8 @@ jobs:
     needs: repository-content
     name: verify (${{ matrix.group }})
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 10
+    # Include dependency setup, report upload and teardown in the job bound.
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
