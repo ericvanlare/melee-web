@@ -37,6 +37,38 @@ export function readyRenderEvent(diagnostics, expectedPhase, priorSignatures = n
   return null;
 }
 
+// Retain the actual screenshot assertion operands even when the guard rejects.
+// The browser driver's diagnostics are already bounded at their source.
+export function retainAccountedCssObservation(row, observation, {
+  role, expectedCursor, expectedBlocker = 'complete', expectedTerminal,
+}) {
+  delete row.accounted_css;
+  const {png_signature_valid, gpu, native, status, render_readiness: readiness} = observation;
+  const predicates = {
+    png_signature_valid: png_signature_valid === true,
+    cross_origin_isolated: gpu?.cross_origin_isolated === true,
+    webgpu_adapter: gpu?.webgpu_adapter === true,
+    native_phase: native?.phase === 1,
+    native_running: native?.running === 1,
+    native_error: native?.error === null,
+    render_readiness: Boolean(readiness),
+    render_draw_calls: Number.isSafeInteger(readiness?.draw_calls) && readiness.draw_calls > 0,
+    render_source_draws: Number.isSafeInteger(readiness?.source_draws) && readiness.source_draws > 0,
+    source_cursor: status?.cursor === expectedCursor,
+    blocker: status?.blocker === expectedBlocker,
+    terminal_kind: expectedBlocker !== 'terminal' || status?.terminal?.kind === expectedTerminal,
+  };
+  const failedPredicates = Object.keys(predicates).filter(name => !predicates[name]);
+  row.accounted_css_observation = {...observation, expected_cursor: expectedCursor,
+    expected_blocker: expectedBlocker, expected_terminal: expectedTerminal,
+    predicates, failed_predicates: failedPredicates,
+    outcome: failedPredicates.length ? 'failed' : 'guard-passed',
+    provisional: true, scope: 'Screenshot guard operands; not an accepted accounted_css artifact'};
+  if (failedPredicates.length)
+    throw Error(`${role} CSS accounting capture did not retain its rendered final cursor ${expectedCursor}`);
+  return row.accounted_css_observation;
+}
+
 function validateTerminalStatus(status, expectedKind, role) {
   if (!status || status.active !== 1 || status.blocker !== 'terminal' ||
       status.terminal?.kind !== expectedKind)

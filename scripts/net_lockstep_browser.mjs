@@ -19,7 +19,7 @@ import {NET_FRAME_BYTES, NET_RECORD_BYTES, firstFatalBrowserError, openNetInstan
 import {createTransportCallbackQueue, describeLockstepTransport, describeLockstepTransportAttempt,
   openLockstepPeerPair, recordAvailableTransportMetrics} from './net_lockstep_transport.mjs';
 import {LOCKSTEP_DELAY, LockstepPeer, parseNetChecksum, TERMINAL} from './net_lockstep_protocol.mjs';
-import {readyRenderEvent, renderEventSignatures, verifyFirstChecksumMismatch,
+import {readyRenderEvent, renderEventSignatures, retainAccountedCssObservation, verifyFirstChecksumMismatch,
   verifyTerminalHold, verifyPositivePeerCompletion, verifyReliableHostWebRtc, verifyDisconnectBoundary} from './net_lockstep_observers.mjs';
 import {verifyNetSourceAccounting} from './net_source_accounting.mjs';
 import {BUTTONS} from '../web/controller-input.mjs';
@@ -126,16 +126,14 @@ async function captureAccountedCss(role, expectedCursor, expectedBlocker = 'comp
   await instances[role].screenshot(filename);
   const bytes = await fs.readFile(filename);
   const graphics = await instances[role].graphics();
-  const readiness = readyRenderEvent(await instances[role].driver.diagnostics(), 1);
+  const driverDiagnostics = await instances[role].driver.diagnostics();
+  const readiness = readyRenderEvent(driverDiagnostics, 1);
   const [native, status] = await Promise.all([instances[role].native(), instances[role].status()]);
-  if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
-      graphics.cross_origin_isolated !== true || graphics.webgpu_adapter !== true ||
-      native.phase !== 1 || native.running !== 1 || native.error !== null ||
-      !readiness || !Number.isSafeInteger(readiness.draw_calls) || readiness.draw_calls <= 0 ||
-      !Number.isSafeInteger(readiness.source_draws) || readiness.source_draws <= 0 ||
-      status.cursor !== expectedCursor || status.blocker !== expectedBlocker ||
-      (expectedBlocker === 'terminal' && status.terminal.kind !== expectedTerminal))
-    throw Error(`${role} CSS accounting capture did not retain its rendered final cursor ${expectedCursor}`);
+  retainAccountedCssObservation(instanceRows[role], {
+    screenshot: 'accounted-css.png', bytes: bytes.length, sha256: sha256(bytes),
+    png_signature_valid: bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
+    gpu: graphics, browser_driver: driverDiagnostics, render_readiness: readiness, native, status,
+  }, {role, expectedCursor, expectedBlocker, expectedTerminal});
   instanceRows[role].accounted_css = {source_cursor: status.cursor, phase: native.phase,
     screenshot: 'accounted-css.png', bytes: bytes.length, sha256: sha256(bytes),
     gpu: graphics, render_readiness: readiness, source_steps_and_draws: instanceRows[role].source_accounting,

@@ -4,6 +4,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 import {createBrowserNativePeer} from '../scripts/net_lockstep_browser_peer.mjs';
 import {browserPeerFacade} from '../scripts/net_session_instance.mjs';
+import {retainAccountedCssObservation} from '../scripts/net_lockstep_observers.mjs';
 const source = await readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
 const first = source.indexOf('async function publishAllInputs(');
 const last = source.indexOf('\nasync function publishDisconnectPrefix(', first);
@@ -184,7 +185,7 @@ const cssSource = source.slice(source.indexOf('async function captureAccountedCs
 for (const expectedTerminal of [1, 2]) {
   test(`held CSS capture preserves expected terminal ${expectedTerminal} and observed cursor`, async () => {
     const rows = {alpha: {source_accounting: {source_cursor: 16}}};
-    const context = vm.createContext({Buffer, Number, TERMINAL: {disconnect: 2},
+    const context = vm.createContext({Buffer, Number, TERMINAL: {disconnect: 2}, retainAccountedCssObservation,
       instanceRows: rows, childDirectory: () => '/pure-fixture',
       path: {join: (...parts) => parts.join('/')},
       fs: {readFile: async () => Buffer.from([137,80,78,71,13,10,26,10])},
@@ -201,7 +202,12 @@ for (const expectedTerminal of [1, 2]) {
     assert.equal(rows.alpha.accounted_css.source_cursor, 16);
     assert.equal(rows.alpha.accounted_css.render_readiness.draw_calls, 16);
     await assert.rejects(capture('alpha', 16, 'terminal', expectedTerminal === 1 ? 2 : 1), /CSS accounting capture/);
+    assert.equal(rows.alpha.accounted_css, undefined);
+    assert.equal(rows.alpha.accounted_css_observation.outcome, 'failed');
+    assert(rows.alpha.accounted_css_observation.failed_predicates.includes('terminal_kind'));
     context.readyRenderEvent = () => ({draw_calls: NaN, source_draws: 16});
     await assert.rejects(capture('alpha', 16, 'terminal', expectedTerminal), /CSS accounting capture/);
+    assert.equal(rows.alpha.accounted_css, undefined);
+    assert(rows.alpha.accounted_css_observation.failed_predicates.includes('render_draw_calls'));
   });
 }
