@@ -3741,9 +3741,10 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             "max_bytes": V10_ORDERED_LINEAGE_V2_BYTE_CAP,
             "max_records": V10_ORDERED_LINEAGE_V2_RECORD_CAP,
         }
-        cases = (((), None), ((72,), None), ((72, 80), None),
-                 ((72, 75, 85), None), ((72,), expanded_limits))
-        for intermediate_frames, source_limits in cases:
+        cases = (((), None, False), ((72,), None, False), ((72, 80), None, False),
+                 ((72, 75, 85), None, False), ((72,), expanded_limits, False),
+                 ((72,), expanded_limits, True))
+        for intermediate_frames, source_limits, corrupt_prefix in cases:
             with self.subTest(intermediates=intermediate_frames), \
                     tempfile.TemporaryDirectory() as directory:
                 fixture = _attach_ordered_comparison_lineage(
@@ -3773,10 +3774,19 @@ class WholeSessionStateCompareTests(unittest.TestCase):
                     "port_trace_sha256": packet["browser"]["trace"]["sha256"],
                 }
                 yielded, observed_limits = [], {}
+                raw_records = list(fixture["raw_records"])
+                failed_sequence = None
+                if corrupt_prefix:
+                    self.assertIsNotNone(source_limits)
+                    clock60_sequence = fixture["ordered_checkpoints"][1]["tuple"][
+                        "source_sequence"]
+                    failed_sequence = fixture["ordered_checkpoints"][2]["tuple"][
+                        "source_sequence"]
+                    raw_records[clock60_sequence + 1] += b"!"
 
                 def synthetic_records(path, *, max_bytes, max_records, stats):
                     observed_limits.update(max_bytes=max_bytes, max_records=max_records)
-                    for row, raw in zip(fixture["rows"], fixture["raw_records"]):
+                    for row, raw in zip(fixture["rows"], raw_records):
                         stats.record_bytes(raw)
                         stats.records_read += 1
                         yielded.append(row["seq"])
@@ -3817,7 +3827,6 @@ class WholeSessionStateCompareTests(unittest.TestCase):
                     )
 
                 self.assertEqual(validated_lineage.call_count, 1)
-                self.assertEqual(result["result"], "incomplete", result)
                 expected_limits = source_limits or {
                     "max_bytes": V10_ORDERED_LINEAGE_BYTE_CAP,
                     "max_records": V10_ORDERED_LINEAGE_RECORD_CAP,
@@ -3826,6 +3835,16 @@ class WholeSessionStateCompareTests(unittest.TestCase):
                     "max_bytes": expected_limits["max_bytes"],
                     "max_records": expected_limits["max_records"],
                 })
+                if corrupt_prefix:
+                    self.assertEqual(result["result"], "invalid", result)
+                    self.assertIn(
+                        "fresh source prefix differs from the accepted clock72 checkpoint",
+                        result["error"])
+                    self.assertEqual(yielded[-1], failed_sequence)
+                    self.assertEqual(len(yielded), failed_sequence + 1)
+                    continue
+
+                self.assertEqual(result["result"], "incomplete", result)
                 self.assertEqual(yielded[-1], target["source_sequence"])
                 self.assertEqual(len(yielded), target["source_sequence"] + 1)
                 self.assertEqual(result["boundary_result"], "equivalent")
@@ -3888,6 +3907,18 @@ class WholeSessionStateCompareTests(unittest.TestCase):
 
     def test_ordered_clock_v2_cap_and_audit_controls_fail_before_source_read(self):
         cases = (
+            ("zero-byte-limit", lambda limits: limits.__setitem__("max_bytes", 0),
+             "ordered clock-lineage max_bytes"),
+            ("negative-byte-limit", lambda limits: limits.__setitem__("max_bytes", -1),
+             "ordered clock-lineage max_bytes"),
+            ("string-byte-limit", lambda limits: limits.__setitem__("max_bytes", "134217728"),
+             "ordered clock-lineage max_bytes"),
+            ("zero-record-limit", lambda limits: limits.__setitem__("max_records", 0),
+             "ordered clock-lineage max_records"),
+            ("negative-record-limit", lambda limits: limits.__setitem__("max_records", -1),
+             "ordered clock-lineage max_records"),
+            ("string-record-limit", lambda limits: limits.__setitem__("max_records", "24000"),
+             "ordered clock-lineage max_records"),
             ("boolean-byte-limit", lambda limits: limits.__setitem__("max_bytes", True),
              "ordered clock-lineage max_bytes"),
             ("fractional-record-limit", lambda limits: limits.__setitem__("max_records", 24_000.0),
@@ -3895,6 +3926,9 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             ("above-byte-ceiling", lambda limits: limits.__setitem__(
                 "max_bytes", V10_ORDERED_LINEAGE_V2_BYTE_CAP + 1),
              "ordered clock-lineage max_bytes"),
+            ("above-record-ceiling", lambda limits: limits.__setitem__(
+                "max_records", V10_ORDERED_LINEAGE_V2_RECORD_CAP + 1),
+             "ordered clock-lineage max_records"),
             ("unknown-limit-key", lambda limits: limits.__setitem__("future", 1),
              "source limits are malformed"),
             ("missing-limit-key", lambda limits: limits.pop("max_records"),
@@ -3937,6 +3971,48 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             self.assertIn("schema or bounded status is unsupported", result["error"])
             self.assertEqual(iterator_calls, 0)
             self.assertEqual(opened_source, [])
+
+    def test_ordered_v2_runner_and_audit_cap_echoes_are_exact_before_source(self):
+        cases = (
+            ("runner-count-mismatch", "runner", "max_records",
+             V10_ORDERED_LINEAGE_V2_RECORD_CAP - 1,
+             "ordered clock runner packet caps differ from this bounded scope"),
+            ("runner-float-echo", "runner", "max_records",
+             float(V10_ORDERED_LINEAGE_V2_RECORD_CAP),
+             "ordered clock runner packet caps differ from this bounded scope"),
+            ("audit-count-mismatch", "audit", "max_records",
+             V10_ORDERED_LINEAGE_V2_RECORD_CAP - 1,
+             "later match-clock audit caps differ from the frozen bounded reader"),
+            ("audit-float-echo", "audit", "max_records",
+             float(V10_ORDERED_LINEAGE_V2_RECORD_CAP),
+             "later match-clock audit caps differ from the frozen bounded reader"),
+        )
+        for name, surface, field, value, expected_error in cases:
+            with self.subTest(case=name), tempfile.TemporaryDirectory() as directory:
+                fixture = _attach_ordered_comparison_lineage(
+                    _clock60_comparison_fixture(Path(directory), terminal_match_frame=90),
+                    (72,), source_limits={
+                        "max_bytes": V10_ORDERED_LINEAGE_V2_BYTE_CAP,
+                        "max_records": V10_ORDERED_LINEAGE_V2_RECORD_CAP,
+                    })
+                if surface == "runner":
+                    runner_path = Path(fixture["packet"]["source"][
+                        "ordered_clock_lineage"]["runner_packet"]["path"])
+                    runner = json.loads(runner_path.read_text(encoding="utf-8"))
+                    runner["caps"][field] = value
+                    runner_path.write_text(json.dumps(runner), encoding="utf-8")
+                    _refresh_outer_ordered_audit_chain(fixture)
+                else:
+                    audit = copy.deepcopy(fixture["match_clock_audit"])
+                    audit["limits"][field] = value
+                    _refresh_ordered_terminal_audit_identity(fixture, audit)
+
+                result, iterator_calls, _validated, opened_source = \
+                    _run_ordered_comparison_to_source_sentinel(fixture)
+                self.assertEqual(result["result"], "invalid", result)
+                self.assertIn(expected_error, result["error"])
+                self.assertEqual(iterator_calls, 0)
+                self.assertEqual(opened_source, [])
 
     def test_nested_ordered_clock1000_prior_validates_before_source_iteration(self):
         with tempfile.TemporaryDirectory() as directory:
