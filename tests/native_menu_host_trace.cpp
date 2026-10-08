@@ -2206,9 +2206,9 @@ struct StadiumSourceOnInitObservation {
     MeleeWebGameplayStats stats_after_on_init{};
     MeleeWebGameplayStats stats_after_end{};
     MeleeWebStadiumC1StageInfoView stage_info_before_init{};
-    decltype(screen::runtime_roots_snapshot()) roots_before{};
-    decltype(screen::live_class_counts()) class_counts_before{};
-    decltype(screen::live_pool_counts()) pool_counts_before{};
+    decltype(melee_web::test::stadium_screen::runtime_roots_snapshot()) roots_before{};
+    decltype(melee_web::test::stadium_screen::live_class_counts()) class_counts_before{};
+    decltype(melee_web::test::stadium_screen::live_pool_counts()) pool_counts_before{};
     MeleeWebStadiumC1FtDeviceSnapshot* device_snapshot = nullptr;
     int map2_allocation_status_before_end =
         MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
@@ -2460,9 +2460,9 @@ void run_stadium_e8_request(
                       source_stage_gobj_count() == 0 &&
                       source_stage_markers_empty() && ground_dispatch_quiet(),
                   "OnInit boundary requires an empty stage/Ground baseline");
-            on_init.roots_before = screen::runtime_roots_snapshot();
-            on_init.class_counts_before = screen::live_class_counts();
-            on_init.pool_counts_before = screen::live_pool_counts();
+            on_init.roots_before = melee_web::test::stadium_screen::runtime_roots_snapshot();
+            on_init.class_counts_before = melee_web::test::stadium_screen::live_class_counts();
+            on_init.pool_counts_before = melee_web::test::stadium_screen::live_pool_counts();
             on_init.gobj_pool_before = HSD_ObjAllocGetUsing(&gobj_alloc_data);
             on_init.proc_pool_before = HSD_ObjAllocGetUsing(&gobjproc_alloc_data);
             on_init.stage_gobj_count_before = source_stage_gobj_count();
@@ -2752,9 +2752,9 @@ void run_stadium_e8_request(
                       HSD_ObjAllocGetUsing(&gobjproc_alloc_data) ==
                           proc_pool_before_end &&
                       HSD_GObj_804D783C == scheduler_cycle_before_end &&
-                      screen::live_class_counts() == class_counts_before_end &&
-                      screen::live_pool_counts() == pool_counts_before_end &&
-                      screen::runtime_roots_snapshot() == roots_before_end &&
+                      melee_web::test::stadium_screen::live_class_counts() == class_counts_before_end &&
+                      melee_web::test::stadium_screen::live_pool_counts() == pool_counts_before_end &&
+                      melee_web::test::stadium_screen::runtime_roots_snapshot() == roots_before_end &&
                       melee_web_stadium_c1_ft_device_snapshot_matches(
                           on_init.device_snapshot) &&
                       melee_web_source_memory_healthy() &&
