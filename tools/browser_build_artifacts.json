@@ -30,5 +30,7 @@
   "match-flow.mjs",
   "match-menu.mjs",
   "action-sweep.mjs",
-  "hitch-capture.mjs"
+  "hitch-capture.mjs",
+  "net_lockstep_core.mjs",
+  "net_lockstep_native_adapter.mjs"
 ]

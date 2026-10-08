@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {firstFatalBrowserError, openNetInstance} from '../scripts/net_session_instance.mjs';
 
-function fakeChrome(goto) {
+function fakeChrome(goto, evaluate = async () => undefined) {
   let closeCalls = 0;
   let removeCalls = 0;
   const cdpListeners = new Map(), cdpCalls = [];
@@ -31,6 +31,10 @@ function fakeChrome(goto) {
     },
     off() { ++removeCalls; },
     async addInitScript() {},
+    evaluate: (...args) => evaluate(...args),
+    async waitForFunction() {
+      return {jsonValue: async () => ({ready: true}), dispose: async () => {}};
+    },
     setDefaultTimeout() {},
     setDefaultNavigationTimeout() {},
     goto: (...args) => {
@@ -70,6 +74,12 @@ const common = {
   label: 'failure-test',
   timeoutMs: 1000,
 };
+
+function deferred() {
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  return {promise, resolve};
+}
 
 test('retains request failures as diagnostics while keeping HTTP and page errors fatal', () => {
   const abortedData = {kind: 'requestfailed', method: 'GET', url: '/gameplay_menu_browser.data', failure: 'net::ERR_ABORTED'};
@@ -137,8 +147,43 @@ test('bounds a pending navigation by the session deadline and closes Chrome', as
   });
 });
 
+test('startup failure without a peer disposes the imported adapter and exposes cleanup failure', async () => {
+  await withProfile(async profile => {
+    let adapterImported = false, adapterDisposed = false;
+    const disposeFailure = Error('native adapter disposal failed');
+    const chrome = fakeChrome(async () => ({status: () => 200, headers: () => ({
+      'cross-origin-opener-policy': 'same-origin',
+      'cross-origin-embedder-policy': 'require-corp',
+    })}), async fn => {
+      const source = String(fn);
+      if (source.includes("import('./net_lockstep_native_adapter.mjs')")) {
+        adapterImported = true;
+        return undefined;
+      }
+      if (source.includes('crossOriginIsolated')) return true;
+      if (source.includes('navigator.userAgent')) throw Error('injected startup failure after page helpers');
+      if (source.includes('__meleeWebNetNativeAdapter?.dispose()')) {
+        assert.equal(adapterImported, true, 'the staged adapter is initialized before runtime startup continues');
+        adapterDisposed = true;
+        throw disposeFailure;
+      }
+      return undefined;
+    });
+    let failure;
+    try { await openNetInstance({...common, chromium: chrome.chromium, userDataDir: profile}); }
+    catch (error) { failure = error; }
+    assert.match(failure?.message ?? '', /injected startup failure after page helpers/);
+    assert.equal(failure.browserClosed, true);
+    assert.equal(adapterDisposed, true, 'no-peer startup failure still runs adapter cleanup');
+    assert.equal(failure.cleanupError instanceof AggregateError, true);
+    assert(failure.cleanupError.errors.includes(disposeFailure));
+    assert.equal(chrome.closeCalls, 1);
+  });
+});
+
 test('passes bounded room-signaling options through the page invocation', async () => {
   await withProfile(async profile => {
+    const cleanupStarted = deferred(), allowCleanup = deferred();
     const listeners = new Map();
     const cdp = {
       on(name, listener) { listeners.set(name, listener); },
@@ -156,6 +201,11 @@ test('passes bounded room-signaling options through the page invocation', async 
         'cross-origin-embedder-policy': 'require-corp',
       })}; },
       async evaluate(fn, argument) {
+        if (String(fn).includes('__meleeWebNetNativeAdapter?.dispose()')) {
+          cleanupStarted.resolve();
+          await allowCleanup.promise;
+          return undefined;
+        }
         if (argument && typeof argument === 'object' && 'roomId' in argument) {
           invocation = {argument, source: String(fn)};
           return {peer: {ready: true}};
@@ -195,7 +245,16 @@ test('passes bounded room-signaling options through the page invocation', async 
       assert.match(invocation.source, /createRoomWebRtcSignaler/);
       await assert.rejects(instance.assertRoomSignalingHealthy(), /Room WebRTC signaling is unavailable/);
     } finally {
-      assert.equal(await instance.close(), true);
+      const closing = instance.close();
+      let settled = false;
+      closing.then(() => { settled = true; }, () => { settled = true; });
+      try {
+        await cleanupStarted.promise;
+        assert.equal(instance.close(), closing, 'repeated close joins the same cleanup operation');
+        await Promise.resolve();
+        assert.equal(settled, false, 'close remains pending while page-owned cleanup is pending');
+      } finally { allowCleanup.resolve(); }
+      assert.equal(await closing, true);
     }
   });
 });

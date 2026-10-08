@@ -13,61 +13,46 @@ import {browserLaunchOptions} from './browser_tools.mjs';
 import {createBrowserDriver} from './browser_driver.mjs';
 import {attachWasmResponseIdentityObserver} from './net_lockstep_observers.mjs';
 import {installNetSourceAccounting, readNetSourceAccounting} from './net_source_accounting.mjs';
+import {NET_FRAME_BYTES, NET_RECORD_BYTES} from './net_lockstep_core.mjs';
 
-export const NET_FRAME_BYTES = 44;
-export const NET_RECORD_BYTES = 64;
+export {NET_FRAME_BYTES, NET_RECORD_BYTES};
 
 export function firstFatalBrowserError(errors) {
   return errors.find(error => error.kind !== 'requestfailed') ?? null;
 }
 
-// Installed once per page. Every call reads Module.HEAPU8 fresh because the
-// heap can grow between callbacks.
-const PAGE_HELPERS = () => {
+// Installed once per page. The binary adapter owns all network ABI scratch
+// memory; Base64 remains only at the Node/Playwright boundary used by A1.
+const PAGE_HELPERS = async (loadNativeAdapter = async () =>
+  (await import('./net_lockstep_native_adapter.mjs')).createNetLockstepNativeAdapter) => {
+  const createNativeAdapter = await loadNativeAdapter();
+  const nativeAdapter = createNativeAdapter(Module, {subscribeProgress: callback => {
+    if (!window.__netSourceAccounting) throw Error('Diagnostic native progress requires source accounting');
+    return window.__netSourceAccounting.subscribeProgress(callback);
+  }});
+  window.__meleeWebNetNativeAdapter = nativeAdapter;
   const toBase64 = bytes => {
     let text = '';
     for (let i = 0; i < bytes.length; i += 0x8000)
       text += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
     return btoa(text);
   };
-  const scratch = {ptr: 0, bytes: 0};
-  const buffer = bytes => {
-    if (scratch.bytes < bytes) {
-      if (scratch.ptr) Module._free(scratch.ptr);
-      scratch.ptr = Module._malloc(bytes);
-      if (!scratch.ptr) throw Error('Networked scratch allocation failed');
-      scratch.bytes = bytes;
-    }
-    return scratch.ptr;
+  const fromBase64 = base64 => {
+    const text = atob(base64), bytes = new Uint8Array(text.length);
+    for (let i = 0; i < text.length; ++i) bytes[i] = text.charCodeAt(i);
+    return bytes;
   };
   window.__net = {
-    push(base64) {
-      const text = atob(base64);
-      const ptr = buffer(text.length);
-      const heap = Module.HEAPU8;
-      for (let i = 0; i < text.length; ++i) heap[ptr + i] = text.charCodeAt(i);
-      return Module._melee_web_net_push(ptr, text.length / 44);
-    },
-    pushIndexed(firstTick, base64) {
-      const text = atob(base64);
-      const ptr = buffer(text.length);
-      const heap = Module.HEAPU8;
-      for (let i = 0; i < text.length; ++i) heap[ptr + i] = text.charCodeAt(i);
-      return Module._melee_web_net_push_indexed(firstTick >>> 0, ptr, text.length / 44);
-    },
-    configureLocalInputCapture(port, ticks) {
-      return Module._melee_web_net_enable_local_input_capture(port, ticks);
-    },
-    confirmStart() { return Module._melee_web_net_confirm_start(); },
-    terminate(kind, tick, channel) {
-      Module._melee_web_net_terminate(kind >>> 0, tick >>> 0, channel >>> 0);
-    },
+    push(base64) { return nativeAdapter.push(fromBase64(base64)); },
+    pushIndexed(firstTick, base64) { return nativeAdapter.pushIndexed(firstTick, fromBase64(base64)); },
+    configureLocalInputCapture(port, ticks) { return nativeAdapter.configureLocalInputCapture(port, ticks); },
+    confirmStart() { return nativeAdapter.confirmStart(); },
+    terminate(kind, tick, channel) { return nativeAdapter.terminate(kind, tick, channel); },
     drain(max) {
-      const ptr = buffer(max * 64);
-      const count = Module._melee_web_net_checksum_drain(ptr, max);
-      return {count, data: count ? toBase64(Module.HEAPU8.subarray(ptr, ptr + count * 64)) : ''};
+      const result = nativeAdapter.drain(max);
+      return {count: result.count, data: result.count ? toBase64(result.bytes) : ''};
     },
-    status() { return JSON.parse(Module.UTF8ToString(Module._melee_web_net_status())); },
+    status() { return nativeAdapter.status(); },
     renderSource() { return Module.UTF8ToString(Module._melee_web_native_menu_diagnostics()); },
     native() {
       return {
@@ -105,28 +90,22 @@ const PAGE_HELPERS = () => {
     },
   };
   window.__meleeWebNetNativePeerApi = () => {
-    const encode = bytes => {
-      let text = '';
-      for (const byte of bytes) text += String.fromCharCode(byte);
-      return btoa(text);
-    };
     return {
-      pushIndexed: (tick, bytes) => window.__net.pushIndexed(tick, encode(bytes)),
+      pushIndexed: (tick, bytes) => nativeAdapter.pushIndexed(tick, bytes),
       configureLocalInputCapture: (port, ticks) => window.__net.configureLocalInputCapture(port, ticks),
       confirmStart: () => window.__net.confirmStart(),
       terminate: (...args) => window.__net.terminate(...args),
       status: () => window.__net.status(),
-      subscribeProgress: callback => {
-        if (!window.__netSourceAccounting) throw Error('Diagnostic native progress requires source accounting');
-        return window.__netSourceAccounting.subscribeProgress(callback);
-      },
+      subscribeProgress: callback => nativeAdapter.subscribeProgress(callback),
       drain: max => {
-        const result = window.__net.drain(max), text = atob(result.data), records = [];
-        if (text.length !== result.count * 64) throw Error('Native checksum byte count differs');
-        for (let offset = 0; offset < text.length; offset += 64)
-          records.push(Array.from(text.slice(offset, offset + 64), byte => byte.charCodeAt(0)));
+        const result = nativeAdapter.drain(max), records = [];
+        if (result.bytes.length !== result.count * nativeAdapter.recordBytes)
+          throw Error('Native checksum byte count differs');
+        for (let offset = 0; offset < result.bytes.length; offset += nativeAdapter.recordBytes)
+          records.push(Array.from(result.bytes.subarray(offset, offset + nativeAdapter.recordBytes)));
         return records;
       },
+      dispose: () => nativeAdapter.dispose(),
     };
   };
 };
@@ -139,18 +118,42 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
     ...browserLaunchOptions(launchOptions, {timeout: timeoutMs}),
     viewport: {width: 900, height: 700}, deviceScaleFactor: 1,
   });
-  let page, driver, instance, wasmResponses, closed = false, closeComplete = false;
-  const close = async () => {
-    if (closed) return closeComplete;
+  let page, driver, instance, wasmResponses, closed = false, closeComplete = false, closeOperation = null;
+  const close = () => {
+    if (closeOperation) return closeOperation;
     closed = true;
-    try { driver?.dispose(); } catch {}
-    try { await wasmResponses?.detach(); } catch {}
-    let browser;
-    try { browser = context.browser(); } catch {}
-    try { await context.close(); closeComplete = true; }
-    catch { try { if (browser) { await browser.close(); closeComplete = true; } } catch {} }
-    if (instance) instance.closed = closeComplete;
-    return closeComplete;
+    closeOperation = (async () => {
+      const failures = [];
+      const addFailure = error => error instanceof AggregateError
+        ? error.errors.forEach(addFailure) : failures.push(error);
+      if (page && typeof page.evaluate === 'function') {
+        try {
+          await bounded(() => page.evaluate(async () => {
+            const failures = [];
+            try { if (window.__netPeer) await window.__netPeer.close({intentional: true}); }
+            catch (error) { failures.push(error); }
+            try { window.__meleeWebNetNativeAdapter?.dispose(); }
+            catch (error) { failures.push(error); }
+            if (failures.length) throw new AggregateError(failures, 'Page native network cleanup failed');
+          }));
+        } catch (error) { addFailure(error); }
+      }
+      try { driver?.dispose(); } catch {}
+      try { await wasmResponses?.detach(); } catch (error) { addFailure(error); }
+      let browser;
+      try { browser = context.browser(); } catch {}
+      try { await context.close(); closeComplete = true; }
+      catch (error) {
+        if (browser) {
+          try { await browser.close(); closeComplete = true; }
+          catch (browserError) { addFailure(error); addFailure(browserError); }
+        } else addFailure(error);
+      }
+      if (instance) instance.closed = closeComplete;
+      if (failures.length) throw new AggregateError(failures, 'Network browser instance cleanup failed');
+      return closeComplete;
+    })();
+    return closeOperation;
   };
   const remaining = () => {
     const ms = Math.min(timeoutMs, deadline - Date.now());
@@ -632,8 +635,12 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
       error.browserErrors = instance?.errors ? [...instance.errors] : [];
       error.startupDiagnostics = error.diagnostics ?? null;
     }
-    const browserClosed = await close();
-    if (error && typeof error === 'object') error.browserClosed = browserClosed;
+    let browserClosed = false;
+    try { browserClosed = await close(); }
+    catch (cleanupError) {
+      if (error && typeof error === 'object') error.cleanupError = cleanupError;
+    }
+    if (error && typeof error === 'object') error.browserClosed = browserClosed || closeComplete;
     throw error;
   }
 }
@@ -678,7 +685,8 @@ export function browserPeerFacade(instance, initial) {
 }
 
 export function createPeerModuleResponseObserver({url, peerModuleHashes, runtimeArtifactNames, onFailure = () => {}}) {
-  const relayModules = ['net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs', 'net_lockstep_websocket_relay.mjs'];
+  const relayModules = ['net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs',
+    'net_lockstep_native_adapter.mjs', 'net_lockstep_websocket_relay.mjs'];
   const webrtcModules = [...relayModules, 'net_lockstep_webrtc.mjs'];
   const roomSignaledWebRtcModules = [...webrtcModules, 'net_lockstep_webrtc_signaling.mjs'];
   const provided = Object.keys(peerModuleHashes).sort().join();

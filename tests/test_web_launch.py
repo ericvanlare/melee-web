@@ -86,6 +86,9 @@ class WebLaunchTests(unittest.TestCase):
         self.assertIn("LINK_DEPENDS", cmake)
         self.assertIn("_melee_web_native_menu_pad_sample_full", cmake)
         self.assertIn("_melee_web_native_menu_player_state", cmake)
+        self.assertIn("configure_file(scripts/net_lockstep_core.mjs net_lockstep_core.mjs COPYONLY)", cmake)
+        self.assertIn("configure_file(scripts/net_lockstep_native_adapter.mjs net_lockstep_native_adapter.mjs COPYONLY)", cmake)
+        self.assertIn("if(NOT MELEE_WEB_PUBLIC_RUNTIME AND NOT MELEE_WEB_AUDIO_PREVIEW_RUNTIME)", cmake)
 
     def test_kirby_copy_manifest_includes_every_authored_model_color(self):
         source = ROOT / ".deps/melee/src/melee/ft/kinds/ftKirby/ftkirbydata.c"

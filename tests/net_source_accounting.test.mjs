@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import {installNetSourceAccounting, readNetSourceAccounting,
   verifyNetSourceAccounting} from '../scripts/net_source_accounting.mjs';
+import {createNetLockstepNativeAdapter} from '../scripts/net_lockstep_native_adapter.mjs';
 import {readyRenderEvent, verifyAccountedRenderReadiness} from '../scripts/net_lockstep_observers.mjs';
 
 function fixture(original = () => 'original-result') {
@@ -247,8 +248,29 @@ test('actual native peer diagnostic adapter uses accounting subscriber without r
   const helpers = source.slice(source.indexOf('const PAGE_HELPERS ='), source.indexOf('export async function openNetInstance'));
   const f = fixture(); await installNetSourceAccounting(f.page);
   const observer = f.window.menuRuntimeTiming;
-  vm.runInNewContext(`${helpers}; PAGE_HELPERS()`, {window: f.window, Module: {}});
+  const heap = new Uint8Array(2048), pushed = [], indexed = [];
+  const Module = {
+    HEAPU8: heap, _malloc: () => 8, _free() {},
+    _melee_web_net_push(pointer, count) {
+      pushed.push(heap.slice(pointer, pointer + count * 44)); return 1;
+    },
+    _melee_web_net_push_indexed(tick, pointer, count) {
+      indexed.push({tick, bytes: heap.slice(pointer, pointer + count * 44)}); return 1;
+    },
+    _melee_web_net_enable_local_input_capture() { return 1; }, _melee_web_net_confirm_start() { return 1; },
+    _melee_web_net_terminate() {}, _melee_web_net_checksum_drain() { return 0; },
+    _melee_web_net_status() { return 0; }, UTF8ToString() { return '{"active":1,"cursor":0,"blocker":"start_identity"}'; },
+  };
+  await vm.runInNewContext(`${helpers}; PAGE_HELPERS(() => createNetLockstepNativeAdapter)`,
+    {window: f.window, Module, createNetLockstepNativeAdapter, atob, btoa});
   const native = f.window.__meleeWebNetNativePeerApi();
+  const frame = Uint8Array.from({length: 44}, (_, index) => index ^ 0xa5);
+  assert.equal(f.window.__net.push(Buffer.from(frame).toString('base64')), true,
+    'the A1 bridge publishes decoded bytes through the shared adapter');
+  assert.equal(native.pushIndexed(9, frame), true,
+    'the A3 page peer publishes typed PAD frames through the same adapter');
+  assert.deepEqual(pushed, [frame]);
+  assert.deepEqual(indexed, [{tick: 9, bytes: frame}]);
   let calls = 0;
   const unsubscribe = native.subscribeProgress(error => { assert.equal(error, null); ++calls; });
   assert.equal(f.window.menuRuntimeTiming, observer);
