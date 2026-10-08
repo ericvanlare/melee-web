@@ -1,0 +1,552 @@
+{
+  "schema": "melee-web-a3-room-worker-webrtc-desync-v1",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/243",
+  "scope": "One same-host headless recorded original CSS first-checksum desync component over browser-owned reliable ordered host-only WebRTC with page-owned local RoomRelay Worker signaling. Functional evidence only.",
+  "evidence_labels": [
+    "Source identified",
+    "Browser exercised"
+  ],
+  "capture_source_producer": {
+    "head": "a94c37ef7701970c132dcf34968b60eb521a549c",
+    "tree": "ec0ac12fd070ea41e6ecfd02918d62eee442ba29",
+    "base_main": "1923f737428f213288c46b478c1282239d8a320a",
+    "clean_at_start_and_finish": true
+  },
+  "capture_native_build": {
+    "producer_commit": "0d8556e44bf65ca9db4f93fabb44a35b07ca2350",
+    "producer_tree": "8ff5460dcecef41acd25375cbca62e32dbaf9af5",
+    "configuration": "Release",
+    "fresh_native_build_at_capture_source": false,
+    "target_input_delta_to_capture_source": [],
+    "runtime_files": 32,
+    "page_peer_modules": 5,
+    "staged_inventory_files": 37,
+    "all_37_equal_prior_issue238_staging": true,
+    "diagnostic_optional_flags": {
+      "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+      "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+      "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+      "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+      "MELEE_WEB_RESULTS_RENDERED_TRACE": "OFF",
+      "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+      "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF",
+      "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF"
+    },
+    "staged_manifest": {
+      "name": "manifest.json",
+      "bytes": 14402,
+      "sha256": "c6b2f9d9bd6ba2aa493211d61a703865a24d3867caeaa52e1103329ce8f8facf"
+    },
+    "build_to_capture_source_diff_sha256": "a34672a10b6a9d972c0e6d7fe28cc39bc3565515d72e11c70ca3b187f7560ffb",
+    "note": "Historical ordinary Release bytes at 0d8556e, not a native build at a94c37e. Later current-main build validation is separate."
+  },
+  "capture_source_validation": {
+    "full_python_suite": {
+      "count": 2029,
+      "duration_seconds": 394.99,
+      "skipped": 151,
+      "result": "pass",
+      "log": {
+        "name": "full-suite-v1.log",
+        "bytes": 372335,
+        "sha256": "6a53e1a2d0051895fac3bb3ccf0d582c845cfd7ede43b93a26b08fe8f6d623fa"
+      }
+    },
+    "focused_contract_log": {
+      "name": "focused-complete-source-v2.log",
+      "bytes": 245,
+      "sha256": "8ea575bc5eb49b31f4b7e86b9acae339c8c237d66b0d656dde0ce5197f25036f"
+    },
+    "focused_child_node_version": "v24.19.0",
+    "publisher_regression_scope": "Actual extracted publisher and imported facade/page RPC/core terminal APIs; explicit synthetic native/endpoint scheduling fixtures cover positive ACK, alpha/beta publication, ACK refresh, drain between batches, unexpected/mixed terminal and missing ACK. Not native/browser proof.",
+    "coordinator_metadata_negatives": 42,
+    "coordinator_diagnostic_negatives": 14,
+    "unequal_synthetic_raw_tails_accepted": true,
+    "coordinator_validation_node_version": "v22.23.2",
+    "coordinator_validation_log": {
+      "name": "coordinator-validation-v3.log",
+      "bytes": 158,
+      "sha256": "71fd74921e776944eefe9e2118ca3ad1ebfe5b254d14c6e2eb0594b5dcfe6cd7"
+    },
+    "root_source_review": {
+      "name": "root-complete-source-review-v1.json",
+      "bytes": 3597,
+      "sha256": "be00ad8ac9e0e61a2ce15b650333c9a15491db3b0792b9e24dc442ce862ebeab"
+    }
+  },
+  "recorded_input": {
+    "recipe_version": 1,
+    "recipe_bytes": 223624,
+    "recipe_input_ticks": 5082,
+    "recipe_sha256": "007fafb2bfc1c34b81509b8ee073b6250b32ab6d227502be6d4b986ddd8cbb4c",
+    "selected_input_slots": 18,
+    "neutral_source_ticks": 2,
+    "source_capacity_ticks": 20,
+    "seed": 305419896,
+    "delay_ticks": 2,
+    "native_only_override": {
+      "role": "alpha",
+      "local_port": 0,
+      "input_tick": 10,
+      "byte": 2,
+      "bit": 0,
+      "recorded_stickX": 0,
+      "native_stickX": 1
+    },
+    "exchanged_recorded_contribution_changed": false,
+    "actual_native_local_divergences": {
+      "alpha": 1,
+      "beta": 0
+    },
+    "actual_published_inputs_each": 18,
+    "actual_published_contiguous_input_range_each": {
+      "first": 0,
+      "last": 17,
+      "count": 18
+    },
+    "actual_remote_input_ACK_each": 17,
+    "note": "Published counts/contiguous indices and ACK17 observed in this run; terminal publication guards never infer batch-end receipt from selected capacity."
+  },
+  "signaling_and_transport": {
+    "browser": "Google Chrome154.0.8037.98, headless, Playwright1.62.1",
+    "capture_node_version": "v24.19.0",
+    "speaker_muted": true,
+    "audio_processing_enabled": true,
+    "peer_owner": "browser-page",
+    "raw_SDP_exposed_to_Node": false,
+    "ice_servers": [],
+    "initial_both_connected": true,
+    "initial_reliable_ordered_host_only": true,
+    "room_worker_signaling": "Offer and answer stay in pages and traverse existing local RoomRelay Worker. Node orchestrates recorded input, polling/evidence export and lifecycle; pages own protocol, signaling and transport.",
+    "worker_runtime": {
+      "node": "v24.19.0",
+      "wrangler": "4.131.1",
+      "miniflare": "5.20260911.0-alpha",
+      "workerd": "1.20260911.1"
+    },
+    "final_connection_observation": "Both channels/peer connections and signaling endpoints closed during cleanup; no final-connected acceptance claim"
+  },
+  "capture": {
+    "coordinator_pass": true,
+    "outcome": "expected-desync",
+    "first_error": null,
+    "expected_first_mismatch": {
+      "changed_local_port": 0,
+      "input_tick": 10,
+      "source_tick": 12,
+      "byte": 2,
+      "bit": 0,
+      "detected_at_first_mismatch": true,
+      "channel": 1,
+      "native_checksum_prefix": {
+        "equal_prefix_through_tick": 11,
+        "first_mismatch_tick": 12,
+        "first_mismatch_channel": 1
+      }
+    },
+    "native_terminal_hold": {
+      "minimum_hold_ms": 120,
+      "peers": {
+        "alpha": {
+          "kind": 1,
+          "tick": 12,
+          "channel": 1,
+          "active": 1,
+          "blocker": "terminal",
+          "cursor_before": 16,
+          "cursor_after": 16,
+          "pushed_before": 20,
+          "pushed_after": 20
+        },
+        "beta": {
+          "kind": 1,
+          "tick": 12,
+          "channel": 1,
+          "active": 1,
+          "blocker": "terminal",
+          "cursor_before": 16,
+          "cursor_after": 16,
+          "pushed_before": 20,
+          "pushed_after": 20
+        }
+      },
+      "no_fallback": true,
+      "window_observed_ms": 124
+    },
+    "peers": [
+      {
+        "role": "alpha",
+        "consumed_source_cursor": 16,
+        "pushed_source_frames": 20,
+        "raw_checksum_records": 16,
+        "raw_checksum_artifact": {
+          "name": "checksums.bin",
+          "bytes": 1024,
+          "sha256": "5c156c5e8690b3d70110edf590da4a791b0c92152ca61f77de08e9e31401fcb0"
+        },
+        "raw_tail_after_first_mismatch": {
+          "first_tick": 13,
+          "records": 3,
+          "bytes": 192,
+          "sha256": "1cfce6429c7babe737a1849e8585426c628db99df8cc32f4e47ba36fe6d47106",
+          "scope": "Raw tail retained; no comparison/equality inferred from active submission"
+        },
+        "protocol": {
+          "role": "alpha",
+          "local_port": 0,
+          "remote_port": 1,
+          "ready": true,
+          "terminal": {
+            "kind": "desync",
+            "tick": 12,
+            "channel": 1
+          },
+          "local_input_ticks": 18,
+          "deferred_input_ticks": [],
+          "remote_input_ticks": 18,
+          "native_local_divergences": 1,
+          "remote_contiguous_input": 17,
+          "remote_ack_input": 17,
+          "local_checksum_ticks": 16,
+          "remote_checksum_ticks": 14,
+          "remote_contiguous_checksum": 13,
+          "next_checksum_compare": 12,
+          "remote_ack_checksum": 10,
+          "local_contiguous_input": 17,
+          "local_contiguous_checksum": 15,
+          "next_source_frame": 20,
+          "input_duplicates": 0,
+          "checksum_duplicates": 11,
+          "out_of_order_inputs": 17,
+          "acknowledged_inputs": 18,
+          "acknowledged_checksums": 11,
+          "checksum_mismatches": [
+            {
+              "tick": 12,
+              "channel": 1
+            }
+          ],
+          "start_identity_hash": "0943d00655e80306c6bdf94fd80d54651b8e131c109a9bb7a0e6cd2633dfe2c2"
+        },
+        "native_checksum_ownership": {
+          "owner": "browser-page",
+          "export_limit_records": 512,
+          "active_native_records_submitted_before_export": 16,
+          "post_terminal_native_evidence_records": 0
+        },
+        "source_accounting": {
+          "callbacks": 75,
+          "first_frame": 33,
+          "last_frame": 107,
+          "steps": 16,
+          "draws": 16,
+          "artifact": {
+            "name": "source-accounting.json",
+            "bytes": 10302,
+            "sha256": "04034f8bb8bc8fb30c7574389c7ea50e327b10ed4de68058214178bc17e8d438"
+          }
+        },
+        "held_native": {
+          "phase": 1,
+          "running": 1,
+          "message": "Original character select",
+          "error": null,
+          "status": "Local game data loaded."
+        },
+        "live_CSS": {
+          "phase": 1,
+          "source_cursor": 16,
+          "blocker": "terminal",
+          "GPU": {
+            "cross_origin_isolated": true,
+            "webgpu_api": true,
+            "webgpu_adapter": true,
+            "canvas": {
+              "width": 640,
+              "height": 480
+            },
+            "webgl": null
+          },
+          "render_readiness": {
+            "phase": 1,
+            "kind": "Live render resource",
+            "frame": 93,
+            "draw_calls": 594,
+            "source_draws": 2,
+            "draw_suppressed": 0,
+            "source": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 3 \u00b7 revisits: 0",
+            "signature": "Live render resource {\"frame\":93,\"started\":5528.885,\"valid\":1,\"first_use\":0,\"input_ms\":0.03,\"simulation_audio_ms\":0.615,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0.015,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.03,\"record_ms\":0.01,\"pipeline_ms\":0,\"worker_ms\":0.03,\"encoder_ms\":0.02,\"total_ms\":0.095,\"residual_ms\":0.01,\"outer_surface_ms\":0.015,\"outer_imgui_ms\":0.12,\"outer_fifo_ms\":0,\"outer_total_ms\":0.235,\"outer_residual_ms\":0.005,\"start_ms\":5532.195,\"end_ms\":5532.315,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":197},\"begin_ms\":0.235,\"draw_ms\":4.73,\"end_ms\":1.415,\"total_ms\":7.03,\"end_phases\":{\"last_frame\":197,\"fifo_texture_ms\":0.025,\"gfx_finish_ms\":0.625,\"staging_writes_ms\":0.49,\"surface_encode_ms\":0.1,\"encoder_finish_ms\":0,\"queue_submit_ms\":0.055,\"cleanup_ms\":0.01,\"outer_prep_ms\":0.02,\"record_ms\":0.005,\"packet_ms\":0.02,\"callback_ms\":0.165,\"callback_post_submit_ms\":0.005,\"observer_ms\":0.045,\"callback_residual_ms\":0.005,\"tail_ms\":0.015,\"worker_ms\":0.74,\"worker_residual_ms\":0.005,\"total_ms\":1.415,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":884,\"draw_calls\":594,\"texture_upload_bytes\":8192,\"staging_used_bytes\":1676616,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":2,\"source_draws\":2,\"source\":\"Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 3 \u00b7 revisits: 0\"}"
+          },
+          "screenshot": {
+            "name": "accounted-css.png",
+            "bytes": 485082,
+            "sha256": "295fbefb1d4c7bee7c0c334c213273dc63cf2fb390f6758b0d848c290479281f"
+          },
+          "viewport": {
+            "width": 900,
+            "height": 700
+          },
+          "snapshot_audio_underrun_frames": 64
+        }
+      },
+      {
+        "role": "beta",
+        "consumed_source_cursor": 16,
+        "pushed_source_frames": 20,
+        "raw_checksum_records": 16,
+        "raw_checksum_artifact": {
+          "name": "checksums.bin",
+          "bytes": 1024,
+          "sha256": "d0b340864708f7cd478a3b2cbaec1bd83e3ba63db7cf9972955896d22b4c0120"
+        },
+        "raw_tail_after_first_mismatch": {
+          "first_tick": 13,
+          "records": 3,
+          "bytes": 192,
+          "sha256": "1cfce6429c7babe737a1849e8585426c628db99df8cc32f4e47ba36fe6d47106",
+          "scope": "Raw tail retained; no comparison/equality inferred from active submission"
+        },
+        "protocol": {
+          "role": "beta",
+          "local_port": 1,
+          "remote_port": 0,
+          "ready": true,
+          "terminal": {
+            "kind": "desync",
+            "tick": 12,
+            "channel": 1
+          },
+          "local_input_ticks": 18,
+          "deferred_input_ticks": [],
+          "remote_input_ticks": 18,
+          "native_local_divergences": 0,
+          "remote_contiguous_input": 17,
+          "remote_ack_input": 17,
+          "local_checksum_ticks": 16,
+          "remote_checksum_ticks": 14,
+          "remote_contiguous_checksum": 13,
+          "next_checksum_compare": 12,
+          "remote_ack_checksum": 10,
+          "local_contiguous_input": 17,
+          "local_contiguous_checksum": 15,
+          "next_source_frame": 20,
+          "input_duplicates": 0,
+          "checksum_duplicates": 11,
+          "out_of_order_inputs": 17,
+          "acknowledged_inputs": 18,
+          "acknowledged_checksums": 11,
+          "checksum_mismatches": [
+            {
+              "tick": 12,
+              "channel": 1
+            }
+          ],
+          "start_identity_hash": "0943d00655e80306c6bdf94fd80d54651b8e131c109a9bb7a0e6cd2633dfe2c2"
+        },
+        "native_checksum_ownership": {
+          "owner": "browser-page",
+          "export_limit_records": 512,
+          "active_native_records_submitted_before_export": 16,
+          "post_terminal_native_evidence_records": 0
+        },
+        "source_accounting": {
+          "callbacks": 77,
+          "first_frame": 33,
+          "last_frame": 109,
+          "steps": 16,
+          "draws": 16,
+          "artifact": {
+            "name": "source-accounting.json",
+            "bytes": 10502,
+            "sha256": "64fdb83565cd7e04bef4795293a28ed13f685add56f91cd76a802732df1120a4"
+          }
+        },
+        "held_native": {
+          "phase": 1,
+          "running": 1,
+          "message": "Original character select",
+          "error": null,
+          "status": "Local game data loaded."
+        },
+        "live_CSS": {
+          "phase": 1,
+          "source_cursor": 16,
+          "blocker": "terminal",
+          "GPU": {
+            "cross_origin_isolated": true,
+            "webgpu_api": true,
+            "webgpu_adapter": true,
+            "canvas": {
+              "width": 640,
+              "height": 480
+            },
+            "webgl": null
+          },
+          "render_readiness": {
+            "phase": 1,
+            "kind": "Live render resource",
+            "frame": 95,
+            "draw_calls": 594,
+            "source_draws": 2,
+            "draw_suppressed": 0,
+            "source": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 3 \u00b7 revisits: 0",
+            "signature": "Live render resource {\"frame\":95,\"started\":5529.985,\"valid\":1,\"first_use\":0,\"input_ms\":0.03,\"simulation_audio_ms\":0.56,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0.005,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.03,\"record_ms\":0.02,\"pipeline_ms\":0,\"worker_ms\":0.055,\"encoder_ms\":0.025,\"total_ms\":0.11,\"residual_ms\":0,\"outer_surface_ms\":0.005,\"outer_imgui_ms\":0.1,\"outer_fifo_ms\":0,\"outer_total_ms\":0.225,\"outer_residual_ms\":0.01,\"start_ms\":5533.595,\"end_ms\":5533.71,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":182},\"begin_ms\":0.235,\"draw_ms\":4.08,\"end_ms\":1.215,\"total_ms\":6.12,\"end_phases\":{\"last_frame\":182,\"fifo_texture_ms\":0.015,\"gfx_finish_ms\":0.405,\"staging_writes_ms\":0.52,\"surface_encode_ms\":0.09,\"encoder_finish_ms\":0.005,\"queue_submit_ms\":0.045,\"cleanup_ms\":0.005,\"outer_prep_ms\":0.02,\"record_ms\":0.015,\"packet_ms\":0.01,\"callback_ms\":0.16,\"callback_post_submit_ms\":0.01,\"observer_ms\":0.04,\"callback_residual_ms\":0.01,\"tail_ms\":0.005,\"worker_ms\":0.75,\"worker_residual_ms\":0.015,\"total_ms\":1.21,\"residual_ms\":0.005},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":884,\"draw_calls\":594,\"texture_upload_bytes\":8192,\"staging_used_bytes\":1676616,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":2,\"source_draws\":2,\"source\":\"Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 3 \u00b7 revisits: 0\"}"
+          },
+          "screenshot": {
+            "name": "accounted-css.png",
+            "bytes": 484484,
+            "sha256": "59bbf3d93c904c94d3f9da9bd50ff40e8bf46fd07e7651aecab35130d6f4602f"
+          },
+          "viewport": {
+            "width": 900,
+            "height": 700
+          },
+          "snapshot_audio_underrun_frames": 107
+        }
+      }
+    ],
+    "raw_comparison": {
+      "equal_prefix_through_tick": 11,
+      "first_mismatch_tick": 12,
+      "channel": 1,
+      "tail_lengths_equal": true,
+      "tail_bytes_equal": true
+    },
+    "raw_tail_note": "Actual records13..15 are equal in this run. Equality of these raw tails does not establish protocol comparison after the first mismatch. Native consumption did not stop exactly at tick12.",
+    "matching_protocol_checksum_prefix_each": 12,
+    "actual_remote_checksum_records_each": 14,
+    "actual_remote_checksum_ACK_each": 10,
+    "locally_active_submitted_records_each": 16,
+    "post_terminal_evidence_records_each": 0,
+    "note": "Active submissions, remote receipts, ACKs, matching comparison prefix and raw evidence are separate observations."
+  },
+  "render_audio_timing_scope": {
+    "both_live_original_CSS_phase": 1,
+    "both_ready_positive_integer_draw_diagnostics": true,
+    "both_GPU_and_isolation_observed": true,
+    "screenshots_reviewed": true,
+    "visual_observations": [
+      "Red banner/horizontal geometry across the roster is visible",
+      "Lower viewport clipping remains visible"
+    ],
+    "snapshot_audio_underrun_frames": {
+      "alpha": 64,
+      "beta": 107
+    },
+    "complete_or_final_underrun_witness": false,
+    "PCM_or_uninterrupted_audio_comparison": false,
+    "audible_listening": false,
+    "foreground_timing_or_performance_acceptance": false,
+    "pixel_equivalence_claim": false
+  },
+  "cleanup": {
+    "owned_PID_count": 26,
+    "owned_process_group_count": 7,
+    "all_recorded_PIDs_and_groups_independently_absent": true,
+    "ports_bindable_count": 3,
+    "Worker_owned_paths_absent": true,
+    "Chrome_temporary_storage_empty": true,
+    "both_success_profiles_removed": true,
+    "outer_wrapper_and_coordinator_identities_recorded_while_live": true,
+    "outer_wrapper_joined_and_group_absent": true,
+    "all_37_served_identities_equal_before_after_HTTP_and_local": true,
+    "endpoint_errors_empty": true,
+    "callback_transport_page_cleanup_errors_empty": true,
+    "timing_resumes": 0,
+    "retry_performed": false,
+    "root_released_exact_marker_after_independent_review": true
+  },
+  "retained_preparation_failures": {
+    "publisher_v1": "Actual beta inactive-peer error exposed. Scratch reporter then used snapshot RPC after sticky failure; first log retained.",
+    "publisher_v2": "Actual synchronous snapshot retained both peers desync and actual ACK-1. Expected-success regression failed: alpha return continues beta publication, beta return/ACK refresh stalls.",
+    "publisher_reproducer_node_version": "v22.23.2",
+    "source_reproducer_receipt": {
+      "name": "source-reproducer-review-v1.json",
+      "bytes": 3596,
+      "sha256": "047473ad5f0a09cc17f23dc17e1545dcf0c95e6e9ab36e7c1cc1440815f19015"
+    },
+    "first_logs": [
+      {
+        "name": "first-reproducer-v1.log",
+        "bytes": 807,
+        "sha256": "a6e92683771d15296d461021957d2606ab2e668d10ebd5bcfb5a03ba9aa2485a"
+      },
+      {
+        "name": "first-reproducer-v2.log",
+        "bytes": 2401,
+        "sha256": "84c2a225c8ceabe5b2df2d1512ce5e9fd8cd2c40d72ac45243721fd32b12d17c"
+      }
+    ],
+    "staging_refusal": "Workspace rejected staging while owned fullsuite held mutex, before stager ran. Retained log; staged only after suite released checkout.",
+    "staging_refusal_log": {
+      "name": "runtime-reuse-v1.log",
+      "bytes": 203,
+      "sha256": "995678f10855cfeb02ac4d9e97c63040b867e027377440a48a4ac8656d97b27c"
+    },
+    "packet_v1_correction": "Copied desync-experiment exclusion contradicted this scenario. Preserved; v2 changes only exclusion text and revision; source/argv/runtime/coordinator pins unchanged.",
+    "packet_v1": {
+      "name": "launch-packet-issue243-v1.json",
+      "bytes": 25043,
+      "sha256": "3a4c52de24edcfb14d3a2a782a4c2fbd287b416a6f70610589be21ee18260ae2"
+    }
+  },
+  "artifacts": {
+    "run": {
+      "name": "run.json",
+      "bytes": 52746,
+      "sha256": "4b6a9c2c85f0d333b8c72d6a498e61ac3dcf3aa25a7804c389fbc33e8b990660"
+    },
+    "coordinator": {
+      "name": "coordinator.json",
+      "bytes": 203823,
+      "sha256": "841e606d473f5e42e5b1a9de4c04831d34e1c39ba0f28470e67e2aff26f665c5"
+    },
+    "browser_owner": {
+      "name": "browser-owner.json",
+      "bytes": 149742,
+      "sha256": "751c2fdd74f8f81f0fbd8a663239a9b489ed6c4a3d56d5dfdc47fd34cdf12e6e"
+    },
+    "single_capture_observation": {
+      "name": "single-capture-observation-v1.json",
+      "bytes": 21656,
+      "sha256": "bffeb8df9f45df703a0a3e9f66e62ec2730e1f8c606c81c81f795d74b0c80161"
+    },
+    "root_result_review": {
+      "name": "root-result-review-v1.json",
+      "bytes": 7898,
+      "sha256": "5b3dfd0086aa9d2291ad6c5e3b9293af112336530e5b11d13e18f6ba1c4bcc6a"
+    },
+    "outer_execution_result": {
+      "name": "authorized-execution-v1-result.json",
+      "bytes": 2810,
+      "sha256": "d362ce58372f179ec88844786b65f3b04bfe5c7e9a0322e615f67a17ae5ccebe"
+    },
+    "launch_packet": {
+      "name": "launch-packet-issue243-v2.json",
+      "bytes": 25055,
+      "sha256": "2c7e4659b99ed3ab1ae00e82c9ccd133b9c659048ff399a5d35115039f44c732"
+    },
+    "root_authorization": {
+      "name": "root-browser-authorization-v1.json",
+      "bytes": 36002,
+      "sha256": "c0ed92d27ba7926845a8a5af7b6c808244a96e2bef8bff9d9f66b533de92429e"
+    }
+  },
+  "exclusions": [
+    "Internet/two-machine play",
+    "STUN/TURN or relay fallback",
+    "physical/live input",
+    "full-route negative control",
+    "foreground timing/performance",
+    "pixel fidelity",
+    "continuous/PCM/audible audio acceptance",
+    "retail/whole-session equivalence",
+    "general A3 or tournament acceptance",
+    "deployment or infrastructure",
+    "autonomous browser progress/native checksum pump",
+    "user-facing session integration",
+    "another browser capture"
+  ]
+}
