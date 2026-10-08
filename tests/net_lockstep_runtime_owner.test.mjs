@@ -708,7 +708,8 @@ test('actual autonomous harness observes each checksum ownership mode and freeze
     let iteration = 0, time = 0;
     const before = rows(initial), after = rows(8); mutate(after);
     if (!runtimeOwned) { before.snapshot.exportRecords = initial; after.snapshot.exportRecords = 8; }
-    const context = {runtimeOwned, runtimeCssSss: false, sourceTicks: 8, usedInputs: 6, NET_RECORD_BYTES: 64, deadline: 4, stallMs: 4, pollMs: 1,
+    const context = {runtimeOwned, runtimeCssSss: false, runtimeFullRoute: false,
+      sourceTicks: 8, usedInputs: 6, NET_RECORD_BYTES: 64, deadline: 4, stallMs: 4, pollMs: 1,
       Date: {now: () => time}, sleep: async () => { ++time; }, pairResults: {}, verifyPositivePeerCompletion,
       checkedHealth: async () => { const row = iteration < 2 ? before : after; return {status: row.status, native: row.native}; },
       instances: Object.fromEntries(['alpha', 'beta'].map(role => [role, {
@@ -828,7 +829,8 @@ test('actual consumed-input witness binds every selected sample at the native tw
   assert.throws(() => verify(alpha, beta, exports.subarray(64), exports), /record count/);
   const shifted = structuredClone(alpha); shifted[1][0] = 0; shifted[2][0] = 1;
   assert.throws(() => verify(shifted, beta, exports, exports), /does not match/);
-  assert.equal((source.match(/verifyConsumedInputComponents\(samples.alpha, samples.beta, bytesA, bytesB\)/g) || []).length, 3);
+  const routeVerifierCalls = source.match(/verifyConsumedInputComponents\(samples\.alpha, samples\.beta, bytesA, bytesB\)/g) || [];
+  assert.equal(routeVerifierCalls.length, 4);
 });
 
 test('runtime CSS-to-SSS witness binds all 518 selected PAD rows to 520 native input checksums', async () => {
