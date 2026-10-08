@@ -296,7 +296,7 @@ test('asymmetric lockstep startup failures close the successfully opened sibling
       async unload() { this.unloaded = true; },
       async close() { this.closed = true; return true; },
       async status() { return null; }, async native() { return null; }};
-    const context = vm.createContext({browserOwned: false, runtimeOwned: false, inputSampling: false, peerModuleHashes: null,
+    const context = vm.createContext({browserOwned: false, runtimeOwned: false, runtimeInputFixture: false, inputSampling: false, peerModuleHashes: null,
       instances: {}, instanceRows: {alpha: {}, beta: {}},
       chromium: {}, launchOptions: {}, values: {url: 'http://127.0.0.1/', disc: '/unused'},
       path, childDirectory: role => role, openTimeout: 100, deadline: 100,

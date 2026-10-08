@@ -3,7 +3,7 @@ import {mkdtemp, rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import {closePageNativeNetworkOwnership, firstFatalBrowserError, openNetInstance, PAGE_HELPERS} from '../scripts/net_session_instance.mjs';
+import {closePageNativeNetworkOwnership, firstFatalBrowserError, openNetInstance, PAGE_HELPERS, installRuntimeInputFixtureInPage} from '../scripts/net_session_instance.mjs';
 import {createBrowserNativePeer} from '../scripts/net_lockstep_browser_peer.mjs';
 import {createNetLockstepNativeAdapter} from '../scripts/net_lockstep_native_adapter.mjs';
 import {LOCKSTEP_DELAY} from '../scripts/net_lockstep_core.mjs';
@@ -364,4 +364,184 @@ test('passes bounded room-signaling options through the page invocation', async 
       assert.equal(await closing, true);
     }
   });
+});
+
+
+test('runtime fixture tail changes only the next ordinary Gamepad sample and retains waits', async () => {
+  const {standardPad} = await import('./controller-fixtures.mjs');
+  const {createControllerManager} = await import('../web/controller-input.mjs');
+  const prior = globalThis.window, pad = standardPad();
+  const manager = createControllerManager({getGamepads: () => [pad], storage: null, userAgent: 'Chrome/154'});
+  const discovered = manager.inspect(); manager.assign(discovered[0].key, 0);
+  const captures = [], events = [], owner = {armed: true, closing: false, failure: null, peer: null};
+  const original = () => { events.push('original'); };
+  const page = {menuFrame: original, meleeNetRuntimeLockstepSnapshot: () => owner,
+    __meleeSyntheticPadState: 'neutral', __meleeSyntheticPadTransition(state) {
+      events.push(state); this.__meleeSyntheticPadState = state; pad.buttons[0] = {pressed: state === 'A', value: state === 'A' ? 1 : 0};
+    }};
+  globalThis.window = page;
+  try {
+    installRuntimeInputFixtureInPage({role: 'alpha', inputTicks: 6});
+    page.menuFrame(); assert.deepEqual(events, ['original']);
+    owner.peer = {failure: null, protocol: {ready: true, terminal: null},
+      localInputCapture: {mode: 'live', enabled: true, captures}};
+    for (let tick = 0; tick < 6; ++tick) {
+      const poll = manager.sample()[0].output;
+      assert.equal(poll.buttons, tick === 1 ? 0x0100 : 0, 'Ordinary controller manager sees transition only on the next poll');
+      // Explicit native ABI stand-in; production PAD conversion remains native.
+      const bytes = Array(11).fill(0); bytes[0] = poll.buttons >>> 8; bytes[1] = poll.buttons & 255;
+      captures.push({source_cursor: tick, input_tick: tick, local_port: 0, poll_serial: tick + 10, bytes});
+      page.menuFrame(); const transitions = page.__meleeRuntimeInputFixture.snapshot().transitions.length;
+      page.menuFrame(); assert.equal(page.__meleeRuntimeInputFixture.snapshot().transitions.length, transitions, 'Wait callback does not resample or repeat transition');
+    }
+    assert.deepEqual(page.__meleeRuntimeInputFixture.snapshot().transitions.map(x => x.state), ['A', 'release']);
+    assert.equal(page.__meleeRuntimeInputFixture.snapshot().captured_count, 6);
+    assert.equal(page.__meleeRuntimeInputFixture.dispose().disposed, true); assert.equal(page.menuFrame, original);
+    assert.equal(pad.buttons[0].pressed, false); page.__meleeRuntimeInputFixture.dispose();
+    assert.throws(() => installRuntimeInputFixtureInPage({role: 'alpha', inputTicks: 6}), /fresh neutral/);
+  } finally { if (prior === undefined) delete globalThis.window; else globalThis.window = prior; }
+});
+
+test('actual runtime fixture rejects malformed ownership, nonneutral pattern and asynchronous callback', () => {
+  const prior = globalThis.window;
+  const row = () => ({source_cursor: 0, input_tick: 0, local_port: 0, poll_serial: 10, bytes: Array(11).fill(0)});
+  const run = mutate => {
+    const captures = [row()], owner = {armed: true, closing: false, failure: null,
+      peer: {failure: null, protocol: {ready: true, terminal: null}, localInputCapture: {mode: 'live', enabled: true, captures}}};
+    const page = {menuFrame() {}, meleeNetRuntimeLockstepSnapshot: () => owner,
+      __meleeSyntheticPadState: 'neutral', __meleeSyntheticPadTransition(state) { this.__meleeSyntheticPadState = state; }};
+    globalThis.window = page; mutate({page, owner, captures});
+    installRuntimeInputFixtureInPage({role: 'alpha', inputTicks: 6});
+    assert.throws(() => page.menuFrame()); assert.ok(page.__meleeRuntimeInputFixture.snapshot().failure);
+    assert.equal(page.__meleeSyntheticPadState, 'neutral'); page.__meleeRuntimeInputFixture.dispose();
+  };
+  try {
+    for (const mutate of [
+      ({owner}) => { owner.closing = true; }, ({owner}) => { owner.failure = 'first owner failure'; },
+      ({owner}) => { owner.armed = false; }, ({owner}) => { owner.peer.protocol.ready = false; },
+      ({captures}) => { captures[0].local_port = 1; }, ({captures}) => { captures[0].input_tick = 1; },
+      ({captures}) => { captures[0].poll_serial = -1; }, ({captures}) => { captures[0].bytes.pop(); },
+      ({captures}) => { captures[0].bytes[4] = 256; }, ({captures}) => { captures[0].bytes[0] = 1; },
+      ({captures}) => { captures.push({...row(), source_cursor: 1, input_tick: 1}); },
+      ({page}) => { page.menuFrame = () => Promise.resolve(); },
+      ({page}) => { page.menuFrame = () => { throw Error('original first error'); }; },
+    ]) run(mutate);
+    for (const lost of ['owner', 'peer']) {
+      let owner = {armed: true, closing: false, failure: null, peer: {failure: null,
+        protocol: {ready: true, terminal: null}, localInputCapture: {mode: 'live', enabled: true, captures: [row()]}}};
+      const page = {menuFrame() {}, meleeNetRuntimeLockstepSnapshot: () => owner,
+        __meleeSyntheticPadState: 'neutral', __meleeSyntheticPadTransition(state) { this.__meleeSyntheticPadState = state; }};
+      globalThis.window = page; installRuntimeInputFixtureInPage({role: 'alpha', inputTicks: 6});
+      page.menuFrame();
+      if (lost === 'owner') owner = null; else owner.peer = null;
+      assert.throws(() => page.menuFrame(), /lost its active/);
+      assert.equal(page.__meleeSyntheticPadState, 'neutral');
+      page.__meleeRuntimeInputFixture.dispose();
+    }
+    const page = {menuFrame() {}, meleeNetRuntimeLockstepSnapshot: () => null,
+      __meleeSyntheticPadState: 'neutral', __meleeSyntheticPadTransition() {}};
+    globalThis.window = page; installRuntimeInputFixtureInPage({role: 'beta', inputTicks: 6});
+    const other = () => {}; page.menuFrame = other;
+    assert.throws(() => page.__meleeRuntimeInputFixture.dispose(), /lost callback ownership/); assert.equal(page.menuFrame, other);
+  } finally { if (prior === undefined) delete globalThis.window; else globalThis.window = prior; }
+});
+
+
+test('beta runtime fixture stays neutral and refuses changed retained rows or extra capture', () => {
+  const prior = globalThis.window;
+  try {
+    for (const mutation of ['retained', 'duplicate', 'extra']) {
+      const captures = [], page = {menuFrame() {}, __meleeSyntheticPadState: 'neutral',
+        __meleeSyntheticPadTransition(state) { this.__meleeSyntheticPadState = state; },
+        meleeNetRuntimeLockstepSnapshot: () => ({armed: true, closing: false, failure: null,
+          peer: {failure: null, protocol: {ready: true, terminal: null}, localInputCapture: {mode: 'live', enabled: true, captures}}})};
+      globalThis.window = page; installRuntimeInputFixtureInPage({role: 'beta', inputTicks: 6});
+      for (let tick = 0; tick < 6; ++tick) {
+        captures.push({source_cursor: tick, input_tick: tick, local_port: 1, poll_serial: tick + 10, bytes: Array(11).fill(0)});
+        page.menuFrame(); page.menuFrame(); assert.equal(page.__meleeSyntheticPadState, 'neutral');
+      }
+      assert.deepEqual(page.__meleeRuntimeInputFixture.snapshot().transitions, []);
+      if (mutation === 'retained') captures[0].poll_serial = 9;
+      if (mutation === 'duplicate') captures[5] = {...captures[4]};
+      if (mutation === 'extra') captures.push({...captures[5], source_cursor: 6, input_tick: 6, poll_serial: 16});
+      assert.throws(() => page.menuFrame());
+      const first = page.__meleeRuntimeInputFixture.snapshot().failure;
+      page.menuFrame(); assert.equal(page.__meleeRuntimeInputFixture.snapshot().failure, first);
+      page.__meleeRuntimeInputFixture.dispose();
+    }
+  } finally { if (prior === undefined) delete globalThis.window; else globalThis.window = prior; }
+});
+
+
+test('actual harness freezes complete fixture before asynchronous normal close callbacks', async () => {
+  const {readFile} = await import('node:fs/promises');
+  const vm = await import('node:vm');
+  const source = await readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf('    if (runtimeOwned) {', source.indexOf('  stopRouteCaptureWatchers = true;'));
+  const end = source.indexOf('    } else {', start);
+  assert(start >= 0 && end > start);
+  const prior = globalThis.window, pages = {}, owners = {}, calls = {alpha: 0, beta: 0};
+  const setup = (role, count = 6) => {
+    const captures = [], owner = {armed: true, closing: false, failure: null,
+      peer: {failure: null, protocol: {ready: true, terminal: null, local_checksum_ticks: 8,
+        remote_checksum_ticks: 8, next_checksum_compare: 8, remote_ack_input: 5},
+        localInputCapture: {mode: 'live', enabled: true, captures}}};
+    const page = {menuFrame() { ++calls[role]; },
+      meleeNetRuntimeLockstepSnapshot: () => owner,
+      __net: {status: () => ({active: 1, cursor: 8, blocker: 'complete', terminal: {kind: 0}})},
+      __meleeSyntheticPadState: 'neutral', __meleeSyntheticPadTransition(state) { this.__meleeSyntheticPadState = state; }};
+    globalThis.window = page; installRuntimeInputFixtureInPage({role, inputTicks: 6});
+    for (let tick = 0; tick < count; ++tick) {
+      const bytes = Array(11).fill(0); if (role === 'alpha' && tick === 1) bytes[0] = 1;
+      captures.push({source_cursor: tick, input_tick: tick, local_port: role === 'alpha' ? 0 : 1, poll_serial: tick + 10, bytes});
+      page.menuFrame();
+    }
+    pages[role] = page; owners[role] = owner; return page;
+  };
+  const invoke = (page, method) => { globalThis.window = page; return page.__meleeRuntimeInputFixture[method](); };
+  try {
+    for (const role of ['alpha', 'beta']) setup(role);
+    let closeCalls = 0;
+    const instanceRows = {alpha: {}, beta: {}}, pairResults = {};
+    const relay = {async close() {
+      ++closeCalls;
+      for (const role of ['alpha', 'beta']) {
+        const page = pages[role]; assert.equal(page.__meleeRuntimeInputFixture.snapshot().frozen, true);
+        owners[role].closing = true; globalThis.window = page; page.menuFrame();
+      }
+      await Promise.resolve();
+      for (const role of ['alpha', 'beta']) { globalThis.window = pages[role]; pages[role].menuFrame(); }
+    }};
+    const context = {runtimeOwned: true, runtimeInputFixture: true, instanceRows, pairResults, relay,
+      instances: Object.fromEntries(['alpha', 'beta'].map(role => [role, {freezeRuntimeInputFixture: async () => invoke(pages[role], 'freeze')}]))};
+    await vm.runInNewContext(`(async()=>{${source.slice(start, end)}\n}})()`, context);
+    assert.equal(closeCalls, 1); assert.equal(pairResults.relay_closed, true);
+    for (const role of ['alpha', 'beta']) {
+      assert.equal(calls[role], 8, 'Original callback runs exactly once per capture/render callback');
+      const witness = invoke(pages[role], 'snapshot');
+      assert.equal(witness.frozen, true); assert.equal(witness.disposed, false); assert.equal(witness.failure, null);
+      assert.equal(witness.captures.length, 6); assert.equal(pages[role].__meleeSyntheticPadState, 'neutral');
+      witness.captures[0].bytes[0] = 255;
+      assert.equal(invoke(pages[role], 'snapshot').captures[0].bytes[0], 0, 'Frozen witness is isolated from caller mutation');
+      assert.equal(invoke(pages[role], 'dispose').frozen, true, 'Finalizer fallback preserves successful freeze');
+    }
+    for (const mutate of [
+      () => { owners.alpha.closing = true; },
+      () => { owners.alpha.failure = 'owner first cause'; },
+      () => { pages.alpha.__net.status = () => ({active: 1, cursor: 7, blocker: 'network_wait', terminal: {kind: 0}}); },
+      () => { owners.alpha.peer.protocol.remote_ack_input = 4; },
+      () => { owners.alpha.peer.localInputCapture.captures[0].poll_serial = 9; },
+    ]) {
+      setup('alpha'); mutate();
+      assert.throws(() => invoke(pages.alpha, 'freeze'), /cannot freeze/);
+      assert.equal(pages.alpha.__meleeRuntimeInputFixture.snapshot().frozen, false);
+      invoke(pages.alpha, 'dispose');
+    }
+    setup('alpha', 5); setup('beta'); closeCalls = 0;
+    await assert.rejects(vm.runInNewContext(`(async()=>{${source.slice(start, end)}\n}})()`, context), /cannot freeze/);
+    assert.equal(closeCalls, 0, 'Incomplete witness stops before normal relay close');
+    assert.equal(pages.alpha.__meleeRuntimeInputFixture.snapshot().frozen, false);
+    assert.ok(pages.alpha.__meleeRuntimeInputFixture.snapshot().failure);
+    assert.equal(invoke(pages.alpha, 'dispose').disposed, true, 'Failed freeze retains finalizer fallback');
+  } finally { if (prior === undefined) delete globalThis.window; else globalThis.window = prior; }
 });

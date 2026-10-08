@@ -5,7 +5,10 @@ import path from 'node:path';
 import vm from 'node:vm';
 import {createHash} from 'node:crypto';
 import {createBrowserNativePeer} from '../scripts/net_lockstep_browser_peer.mjs';
-import {LockstepPeer} from '../scripts/net_lockstep_core.mjs';
+import {installRuntimeInputFixtureInPage} from '../scripts/net_session_instance.mjs';
+import {createControllerManager} from '../web/controller-input.mjs';
+import {standardPad} from './controller-fixtures.mjs';
+import {LockstepPeer, parseNetChecksum, lockstepConstants} from '../scripts/net_lockstep_core.mjs';
 import {createRoomTransport, createRuntimeLockstepSession} from '../scripts/net_lockstep_runtime_owner.mjs';
 
 const turn = () => new Promise(resolve => setImmediate(resolve));
@@ -36,7 +39,7 @@ function adapterFixture({startRecorded = 0, statusFailure = null} = {}) {
   return {adapter, state, events};
 }
 
-function pairedTransport({agreement, sourceTicks, inputTicks, role}) {
+function pairedTransport({agreement, sourceTicks, inputTicks, role, asyncSend = false}) {
   const remoteRole = role === 'alpha' ? 'beta' : 'alpha';
   const queue = new Set(), events = [];
   let callbacks = null, endpoint = null, closed = false;
@@ -53,7 +56,12 @@ function pairedTransport({agreement, sourceTicks, inputTicks, role}) {
       callbacks = options;
       endpoint = {ready: Promise.resolve(), closed: false, errors: [],
         transport: {type: 'webrtc-datachannel', ordered: true, reliable: true},
-        send: text => remote.receive(text),
+        send: text => {
+          if (!asyncSend) return remote.receive(text);
+          const delivery = Promise.resolve().then(() => remote.receive(text));
+          queue.add(delivery);
+          void delivery.finally(() => queue.delete(delivery)).catch(error => options.onEndpointError(remoteRole, error));
+        },
         async drainInbound() { while (queue.size) await Promise.all([...queue]); },
         async close() { endpoint.closed = true; closed = true; await options.onDisconnect(remoteRole, 'local close'); },
       };
@@ -749,4 +757,74 @@ test('actual autonomous harness observes each checksum ownership mode and freeze
     row.snapshot.checksumConsumer.accepted_records = 7; row.snapshot.checksumOwnership.consumer_accepted_records = 7;
     row.snapshot.checksumConsumer.pending_batch = {count: 1};
   }); assert.match(String(pending.error), /did not complete/); // Legitimate delivery interval is incomplete, not malformed.
+});
+
+
+test('runtime input fixture observes actual ready session and live native capture callback', async () => {
+  const prior = globalThis.window, run = makeSession({transportFactory: options => pairedTransport({...options, asyncSend: true})}), pad = standardPad();
+  const manager = createControllerManager({getGamepads: () => [pad], storage: null, userAgent: 'Chrome/154'});
+  manager.assign(manager.inspect()[0].key, 0);
+  const page = {menuFrame: () => run.session.onFrame(),
+    meleeNetRuntimeLockstepSnapshot: () => run.session.snapshot(), __meleeSyntheticPadState: 'neutral',
+    __meleeSyntheticPadTransition(state) {
+      this.__meleeSyntheticPadState = state;
+      pad.buttons[0] = {pressed: state === 'A', value: state === 'A' ? 1 : 0};
+    }};
+  globalThis.window = page;
+  try {
+    installRuntimeInputFixtureInPage({role: 'alpha', inputTicks: 6});
+    const started = run.session.start(start => ({protocol: 'melee-web-local-lockstep-a2-v1', native_start: start}));
+    run.native.state.start.recorded = 1; page.menuFrame();
+    assert.equal((await started).protocol.ready, true, 'Actual hello and native confirmation settle readiness');
+    for (let tick = 0; tick < 6; ++tick) {
+      const buttons = manager.sample()[0].output.buttons;
+      assert.equal(buttons, tick === 1 ? 0x0100 : 0);
+      // Native ABI boundary stand-in only; no claim of browser/native PAD conversion.
+      const bytes = new Uint8Array(11); bytes[0] = buttons >>> 8; bytes[1] = buttons & 255;
+      assert.equal(globalThis.__meleeWebNetLocalInputCapture(tick, 0, tick + 10, bytes), true);
+      page.menuFrame(); await turn(); page.menuFrame();
+      assert.equal(run.session.snapshot().peer.localInputCapture.captures.length, tick + 1);
+    }
+    assert.equal(run.session.snapshot().peer.localInputCapture.mode, 'live');
+    assert.deepEqual(page.__meleeRuntimeInputFixture.snapshot().transitions.map(row => row.state), ['A', 'release']);
+    page.__meleeRuntimeInputFixture.dispose();
+  } finally {
+    await run.session.close();
+    if (prior === undefined) delete globalThis.window; else globalThis.window = prior;
+  }
+  assert.equal(globalThis.__meleeWebNetLocalInputCapture, null);
+});
+
+test('actual consumed-input witness binds every selected sample at the native two-tick delay', async () => {
+  const source = await fs.readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const context = {Buffer, sourceTicks: 8, LOCKSTEP_DELAY: 2, NET_RECORD_BYTES: 64,
+    FNV_OFFSET: 14695981039346656037n, FNV_PRIME: 1099511628211n, lockstepConstants, parseNetChecksum};
+  const verify = vm.runInNewContext(source.slice(source.indexOf('const fnv1a64 = bytes =>'),
+    source.indexOf('const pairResults =')) + '\nverifyConsumedInputComponents', context);
+  const alpha = Array.from({length: 6}, () => Array(11).fill(0));
+  const beta = structuredClone(alpha); alpha[1][0] = 1;
+  const exports = Buffer.alloc(8 * 64);
+  for (let tick = 0; tick < 8; ++tick) {
+    const pads = tick < 2 ? [Buffer.from(lockstepConstants.neutralPad, 'hex'), Buffer.from(lockstepConstants.neutralPad, 'hex')] :
+      [Buffer.from(alpha[tick - 2]), Buffer.from(beta[tick - 2])];
+    const bytes = Buffer.concat([...pads, Buffer.from(lockstepConstants.noControllerPad, 'hex'), Buffer.from(lockstepConstants.noControllerPad, 'hex')]);
+    let hash = 14695981039346656037n;
+    for (const byte of bytes) hash = ((hash ^ BigInt(byte)) * 1099511628211n) & ((1n << 64n) - 1n);
+    exports.writeUInt32LE(tick, tick * 64); exports.writeBigUInt64LE(hash, tick * 64 + 24);
+  }
+  const witness = verify(alpha, beta, exports, exports);
+  assert.equal(witness.expectedInputComponents[3].input_tick, 1);
+  assert.notEqual(witness.expectedInputComponents[3].input_hash, witness.expectedInputComponents[4].input_hash);
+  for (const mutate of [bytes => { bytes[3 * 64 + 24] ^= 1; },
+    bytes => { bytes.writeUInt32LE(2, 3 * 64); },
+    bytes => { bytes.copy(bytes, 3 * 64, 2 * 64, 3 * 64); }]) {
+    const bad = Buffer.from(exports); mutate(bad); assert.throws(() => verify(alpha, beta, bad, exports), /does not match/);
+  }
+  assert.throws(() => verify(alpha.slice(1), beta, exports, exports), /canonical selected/);
+  const malformed = structuredClone(alpha); malformed[1][0] = 256;
+  assert.throws(() => verify(malformed, beta, exports, exports), /canonical selected/);
+  assert.throws(() => verify(alpha, beta, exports.subarray(64), exports), /record count/);
+  const shifted = structuredClone(alpha); shifted[1][0] = 0; shifted[2][0] = 1;
+  assert.throws(() => verify(shifted, beta, exports, exports), /does not match/);
+  assert.equal((source.match(/verifyConsumedInputComponents\(samples.alpha, samples.beta, bytesA, bytesB\)/g) || []).length, 1);
 });
