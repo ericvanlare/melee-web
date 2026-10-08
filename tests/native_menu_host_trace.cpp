@@ -2089,6 +2089,8 @@ void run_stadium_profile_controls()
           "Stadium SIS owner list controls changed a foreign text/context chain");
     check(melee_web_stadium_display_owner_retirement_controls(),
           "Stadium display owner refused mixed-buffer retirement or lost partial ownership");
+    check(melee_web_stadium_map2_buffer_controls(),
+          "Stadium map-2 0x7D5 origin journal lost the nested Ground owner or released a borrowed buffer");
     const auto* profile = melee_web_stage_stadium_profile_data();
     check(profile && melee_web_stage_profile(St_Kind_PStadium) == profile &&
               profile->diagnostic_only && profile->source != nullptr,

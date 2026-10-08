@@ -34,6 +34,7 @@ class StadiumOnInitBoundaryTests(unittest.TestCase):
         capture_call = body[capture_owner:]
         self.assertIn("Ground_GetMapGObj(1)", capture_call)
         self.assertNotIn("Ground_GetStageGObj(1)", capture_call)
+        self.assertIn("&h->stadium_map2_buffer_owner", capture_call)
         collision_adoption = body.index("h->collision_map=stage_info.coll_data;")
         required_owners = body.index("for(unsigned i=0;i<definition->required_map_count;i++)")
         diagnostic_return = body.index(
@@ -64,6 +65,11 @@ class StadiumOnInitBoundaryTests(unittest.TestCase):
         owner_end = end.index("melee_web_stadium_display_owner_end(")
         first_general_removal = end.index("HSD_GObjPLink_80390228(h->manager)")
         self.assertLess(owner_end, first_general_removal)
+        ground_removal = end.index("Ground_801C4A08(found)")
+        buffer_retire = end.index("melee_web_stadium_map2_buffer_owner_end(")
+        self.assertGreater(buffer_retire, ground_removal)
+        self.assertGreater(buffer_retire, end.index("melee_web_ground_remove_unmapped(found)"))
+        self.assertLess(buffer_retire, end.index("melee_web_ground_remove_camera("))
 
     def test_only_guarded_entry_selects_source_ordered_oninit_mode(self):
         source = (ROOT / "src/gameplay_stage_last.c").read_text(encoding="utf-8")

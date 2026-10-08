@@ -36,6 +36,7 @@ struct MeleeWebStageLast {
     const void* collision_map;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     MeleeWebStadiumDisplayOwner* stadium_display_owner;
+    MeleeWebStadiumMap2BufferOwner stadium_map2_buffer_owner;
 #endif
 };
 static MeleeWebStageLast* active;
@@ -83,7 +84,8 @@ static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,voi
   Stage_8022524C();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
   if(on_init_diagnostic&&!melee_web_stadium_display_owner_capture(
-       h->stadium_display_owner,Ground_GetMapGObj(1),e,n)){
+       h->stadium_display_owner,Ground_GetMapGObj(1),
+       &h->stadium_map2_buffer_owner,e,n)){
    if(retained_owner)*retained_owner=h;
    return NULL;
   }
@@ -183,6 +185,10 @@ int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
   if(!found)break;
   if(!melee_web_ground_remove_unmapped(found))return fail(e,n,"Unexpected source stage object remains during teardown");
  }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(h->stadium_map2_buffer_owner.captured&&
+    !melee_web_stadium_map2_buffer_owner_end(&h->stadium_map2_buffer_owner,e,n))return 0;
+#endif
  for(size_t i=0;i<camera_count;i++)melee_web_ground_remove_camera(cameras[i]);
  if(h->map_lights){
   if(Ground_801C498C()!=h->map_lights)return fail(e,n,"Original selected map-light owner was replaced");

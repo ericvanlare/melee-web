@@ -25,6 +25,26 @@ typedef struct HSD_GObj HSD_GObj;
 typedef struct MeleeWebStadiumDisplayOwner MeleeWebStadiumDisplayOwner;
 typedef void (*MeleeWebStadiumBufferFree)(void* image_ptr, void* context);
 
+typedef enum MeleeWebStadiumMap2BufferOrigin {
+    MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_UNKNOWN = 0,
+    MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_BORROWED_PRELOAD = 1,
+    MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK = 2,
+    MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_RETIRED = 3,
+} MeleeWebStadiumMap2BufferOrigin;
+
+/* This source-derived record crosses the private Stadium TU boundary. It
+ * keeps the exact branch provenance alive after display/SIS retirement and
+ * until the original Ground owner objects have been removed. */
+typedef struct MeleeWebStadiumMap2BufferOwner {
+    HSD_GObj* map0_ground;
+    HSD_GObj* display_ground;
+    HSD_GObj* map2_ground;
+    HSD_GObj* nested_map5_ground;
+    void* buffer;
+    MeleeWebStadiumMap2BufferOrigin origin;
+    int captured;
+} MeleeWebStadiumMap2BufferOwner;
+
 /* The owner is opaque so the private grpstadium TextWrapper ABI stays in its
  * defining translation unit. Call prepare before E8, bind after E8, and
  * capture immediately after original Ground_801C0800 returns. */
@@ -34,6 +54,7 @@ int melee_web_stadium_display_owner_bind_source(
     MeleeWebStadiumDisplayOwner*, char* error, size_t error_size);
 int melee_web_stadium_display_owner_capture(
     MeleeWebStadiumDisplayOwner*, HSD_GObj* display_ground,
+    MeleeWebStadiumMap2BufferOwner* map2_buffer_owner,
     char* error, size_t error_size);
 int melee_web_stadium_display_owner_cancel(
     MeleeWebStadiumDisplayOwner*, char* error, size_t error_size);
@@ -41,6 +62,8 @@ int melee_web_stadium_display_owner_retire(
     MeleeWebStadiumDisplayOwner*, char* error, size_t error_size);
 int melee_web_stadium_display_owner_end(
     MeleeWebStadiumDisplayOwner*, char* error, size_t error_size);
+int melee_web_stadium_map2_buffer_owner_end(
+    MeleeWebStadiumMap2BufferOwner*, char* error, size_t error_size);
 int melee_web_stadium_image_release(
     MeleeWebStadiumImageProvenance*, MeleeWebStadiumBufferFree, void* context);
 
@@ -49,6 +72,7 @@ int melee_web_stadium_image_release(
 int melee_web_stadium_display_provenance_controls(void);
 int melee_web_stadium_display_list_controls(void);
 int melee_web_stadium_display_owner_retirement_controls(void);
+int melee_web_stadium_map2_buffer_controls(void);
 #endif
 
 #ifdef __cplusplus

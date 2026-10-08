@@ -5580,7 +5580,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807d
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905fc5cbf499 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..253cf269ca8b49bb5da380db73211656976724b1 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,15 @@
@@ -5599,10 +5599,11 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
  #include <sysdolphin/baselib/forward.h>
  
  #include "granime.h"
-@@ -11,8 +21,13 @@
+@@ -11,8 +21,14 @@
  #include "stage.h"
  #include "types.h"
  #include <dolphin/gx/GXStruct.h>
++#include <limits.h>
 +#include <stdint.h>
 +#include <stdio.h>
 +#include <stdlib.h>
@@ -5613,7 +5614,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
  #include <melee/gm/gm_unsplit.h>
  #include <melee/lb/lb_00B0.h>
  #include <melee/lb/lb_00F9.h>
-@@ -29,6 +44,7 @@
+@@ -29,6 +45,7 @@
  #include <sysdolphin/baselib/fog.h>
  #include <sysdolphin/baselib/gobjgxlink.h>
  #include <sysdolphin/baselib/gobjobject.h>
@@ -5621,7 +5622,21 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
  #include <sysdolphin/baselib/gobjproc.h>
  #include <sysdolphin/baselib/gobjuserdata.h>
  #include <sysdolphin/baselib/jobj.h>
-@@ -64,6 +80,16 @@ static struct grPStadium_YakumonoParam {
+@@ -38,6 +55,13 @@
+ #include <sysdolphin/baselib/sislib.h>
+ #include <sysdolphin/baselib/wobj.h>
+ 
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++static void stadium_owner_journal_map2_buffer(
++    HSD_GObj* gobj, const void* lookup_result, const void* stored_result);
++static void stadium_owner_note_map2_proc_dispatch(void);
++static void stadium_owner_note_map2_buffer_use(const void* buffer);
++#endif
++
+ static struct grPStadium_YakumonoParam {
+     int x0;
+     int x4;
+@@ -64,6 +88,16 @@ static struct grPStadium_YakumonoParam {
      s16 x50;
  }* yakumono_param;
  
@@ -5638,7 +5653,27 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
  GrJoint grPs_803E1248[] = {
      { 1, 3, 0 }, { 2, 3, 0 }, { 3, 4, 0 },
      { 4, 5, 0 }, { 5, 6, 0 }, { 7, 9, 0 },
-@@ -652,6 +678,38 @@ typedef struct ImageDescWrapper {
+@@ -315,6 +349,9 @@ void grStadium_801D13E0(Ground_GObj* gobj)
+     if (mobj == NULL) {
+         gr->u.stadium.xCC = HSD_MemAlloc(0x50000);
+     }
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    stadium_owner_journal_map2_buffer(gobj, mobj, gr->u.stadium.xCC);
++#endif
+     gr->u.stadium.xC4_b1 = false;
+     gr->u.stadium.xD0 = NULL;
+     gr->u.stadium.xD4 = 0.0F;
+@@ -346,6 +383,9 @@ bool grStadium_801D1518(Ground_GObj* gobj)
+ 
+ void grStadium_801D1520(Ground_GObj* gobj)
+ {
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    stadium_owner_note_map2_proc_dispatch();
++#endif
+     Ground* gp = GET_GROUND(gobj);
+     if (!gp->u.stadium.xC4_b0) {
+         grStadium_801D4548(gobj);
+@@ -652,6 +692,38 @@ typedef struct ImageDescWrapper {
      u16 x1A, x1C;
  } ImageDescWrapper;
  
@@ -5677,7 +5712,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -920,6 +978,1420 @@ typedef struct TextWrapper {
+@@ -920,6 +992,2059 @@ typedef struct TextWrapper {
      HSD_Text* win_dynamic_p;
  } TextWrapper;
  
@@ -5711,6 +5746,14 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +    SIS* source_sis;
 +    HSD_GObj* display_ground;
 +    Ground* display_ground_data;
++    HSD_GObj* map2_ground;
++    HSD_GObj* nested_map5_ground;
++    void* map2_buffer;
++    MeleeWebStadiumMap2BufferOrigin map2_buffer_origin;
++    unsigned map2_buffer_journal_count;
++    unsigned map2_proc_dispatch_count;
++    unsigned map2_buffer_use_count;
++    MeleeWebStadiumMap2BufferOwner* map2_buffer_output;
 +    HSD_Text* text_head_before;
 +    StadiumTextNodeIdentity* text_before;
 +    size_t text_count_before;
@@ -5720,6 +5763,49 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +};
 +
 +static MeleeWebStadiumDisplayOwner* stadium_display_owner_current;
++
++static void stadium_owner_journal_map2_buffer(
++    HSD_GObj* gobj, const void* lookup_result, const void* stored_result)
++{
++    MeleeWebStadiumDisplayOwner* owner = stadium_display_owner_current;
++    Ground* ground;
++    if (owner == NULL) return;
++    if (owner->state != STADIUM_DISPLAY_OWNER_BOUND || gobj == NULL ||
++        owner->map2_buffer_journal_count != 0) {
++        owner->journal_failed = 1;
++        if (owner->map2_buffer_journal_count != UINT_MAX)
++            ++owner->map2_buffer_journal_count;
++        return;
++    }
++    ++owner->map2_buffer_journal_count;
++    ground = HSD_GObjGetUserData(gobj);
++    owner->map2_ground = gobj;
++    owner->map2_buffer = (void*) stored_result;
++    if (ground == NULL || ground->map_id != (enum GrKind) 2 ||
++        stored_result == NULL ||
++        (lookup_result != NULL && lookup_result != stored_result)) {
++        owner->journal_failed = 1;
++        return;
++    }
++    owner->map2_buffer_origin = lookup_result != NULL
++        ? MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_BORROWED_PRELOAD
++        : MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK;
++}
++
++static void stadium_owner_note_map2_proc_dispatch(void)
++{
++    MeleeWebStadiumDisplayOwner* owner = stadium_display_owner_current;
++    if (owner != NULL && owner->map2_proc_dispatch_count != UINT_MAX)
++        ++owner->map2_proc_dispatch_count;
++}
++
++static void stadium_owner_note_map2_buffer_use(const void* buffer)
++{
++    MeleeWebStadiumDisplayOwner* owner = stadium_display_owner_current;
++    if (owner != NULL && buffer != NULL && buffer == owner->map2_buffer &&
++        owner->map2_buffer_use_count != UINT_MAX)
++        ++owner->map2_buffer_use_count;
++}
 +
 +static int stadium_owner_error(char* error, size_t error_size,
 +                               const char* message)
@@ -6224,6 +6310,121 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +    return 1;
 +}
 +
++static int stadium_owner_ground_map_matches(HSD_GObj* gobj, int map_id)
++{
++    u8 found_link;
++    Ground* ground;
++    if (gobj == NULL ||
++        !stadium_owner_gobj_list_contains(gobj, &found_link) ||
++        found_link != 5 || gobj->p_link != 5 ||
++        gobj->classifier != HSD_GOBJ_CLASS_STAGE)
++        return 0;
++    ground = HSD_GObjGetUserData(gobj);
++    return ground != NULL && (int) ground->map_id == map_id;
++}
++
++/* The source-ordered Stadium teardown sweeps every stage-class object on
++ * link 5, not only the objects published in map_gobjs. Prove that its full
++ * stage-owned set is exactly the four journaled roots before any owner is
++ * drained or any Ground callback is allowed to run. Keep unrelated GObj
++ * classes outside this set untouched. */
++static int stadium_owner_map2_exact_stage_set_matches(
++    HSD_GObj* map0, HSD_GObj* display, HSD_GObj* map2, HSD_GObj* map5)
++{
++    HSD_GObj* head;
++    HSD_GObj* slow;
++    HSD_GObj* fast;
++    size_t found = 0;
++    const size_t map_count =
++        sizeof(stage_info.map_gobjs) / sizeof(stage_info.map_gobjs[0]);
++    if (HSD_GObj_Entities == NULL) return 0;
++
++    for (size_t i = 0; i < map_count; ++i) {
++        HSD_GObj* expected = NULL;
++        if (i == 0)
++            expected = map0;
++        else if (i == (size_t) PsType_Display)
++            expected = display;
++        else if (i == 2)
++            expected = map2;
++        else if (i == 5)
++            expected = map5;
++        if (stage_info.map_gobjs[i] != expected) return 0;
++    }
++
++    head = ((HSD_GObj**) HSD_GObj_Entities)[5];
++    slow = head;
++    fast = head;
++    while (fast != NULL && fast->next != NULL) {
++        slow = slow->next;
++        fast = fast->next->next;
++        if (slow == fast) return 0;
++    }
++    for (HSD_GObj* object = head; object != NULL; object = object->next) {
++        if (object->classifier != HSD_GOBJ_CLASS_STAGE) continue;
++        if (object != map0 && object != display && object != map2 &&
++            object != map5)
++            return 0;
++        if (++found > 4) return 0;
++    }
++    return found == 4;
++}
++
++static int stadium_owner_map2_output_is_empty(
++    const MeleeWebStadiumMap2BufferOwner* output)
++{
++    return output != NULL && output->map0_ground == NULL &&
++           output->display_ground == NULL && output->map2_ground == NULL &&
++           output->nested_map5_ground == NULL && output->buffer == NULL &&
++           output->origin == MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_UNKNOWN &&
++           output->captured == 0;
++}
++
++static int stadium_owner_map2_output_matches(
++    const MeleeWebStadiumDisplayOwner* owner)
++{
++    const MeleeWebStadiumMap2BufferOwner* output =
++        owner->map2_buffer_output;
++    return output != NULL && output->captured == 1 &&
++           output->map0_ground == Ground_GetMapGObj(0) &&
++           output->display_ground == owner->display_ground &&
++           output->map2_ground == owner->map2_ground &&
++           output->nested_map5_ground == owner->nested_map5_ground &&
++           output->buffer == owner->map2_buffer &&
++           output->origin == owner->map2_buffer_origin;
++}
++
++static int stadium_owner_map2_graph_matches(
++    const MeleeWebStadiumDisplayOwner* owner, HSD_GObj* display_ground)
++{
++    HSD_GObj* map0 = Ground_GetMapGObj(0);
++    HSD_GObj* display = Ground_GetMapGObj(PsType_Display);
++    HSD_GObj* map2 = Ground_GetMapGObj(2);
++    HSD_GObj* map5 = Ground_GetMapGObj(5);
++    Ground* map2_data;
++    if (owner->map2_buffer_journal_count != 1 || owner->journal_failed ||
++        owner->map2_proc_dispatch_count != 0 ||
++        owner->map2_buffer_use_count != 0 || owner->map2_buffer == NULL ||
++        (owner->map2_buffer_origin !=
++             MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_BORROWED_PRELOAD &&
++         owner->map2_buffer_origin !=
++             MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK) ||
++        owner->map2_ground != map2 ||
++        map0 == NULL || display != display_ground || map2 == NULL ||
++        map5 == NULL || !stadium_owner_ground_map_matches(map0, 0) ||
++        !stadium_owner_ground_map_matches(display, PsType_Display) ||
++        !stadium_owner_ground_map_matches(map2, 2) ||
++        !stadium_owner_ground_map_matches(map5, 5) ||
++        !stadium_owner_map2_exact_stage_set_matches(
++            map0, display, map2, map5))
++        return 0;
++    map2_data = HSD_GObjGetUserData(map2);
++    if (map2_data == NULL || map2_data->u.stadium.xCC != owner->map2_buffer ||
++        map2_data->u.stadium.xE4 != map5)
++        return 0;
++    return 1;
++}
++
 +static int stadium_owner_capture_matches(
 +    const MeleeWebStadiumDisplayOwner* owner, HSD_GObj* display_ground)
 +{
@@ -6235,7 +6436,10 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +        !stadium_owner_slot_is_exact(HSD_SisLib_FontSlotBorrowable(1),
 +                                     HSD_SisLib_804D1124[1],
 +                                     owner->source_sis) ||
-+        !stadium_owner_display_ground_matches(owner, display_ground))
++        !stadium_owner_display_ground_matches(owner, display_ground) ||
++        !stadium_owner_map2_graph_matches(owner, display_ground) ||
++        (owner->state == STADIUM_DISPLAY_OWNER_CAPTURED &&
++         !stadium_owner_map2_output_matches(owner)))
 +        return 0;
 +    for (size_t i = 0; i < 3; ++i) {
 +        HSD_GObj* child = owner->children[i];
@@ -6282,10 +6486,12 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +
 +int melee_web_stadium_display_owner_capture(
 +    MeleeWebStadiumDisplayOwner* owner, HSD_GObj* display_ground,
++    MeleeWebStadiumMap2BufferOwner* map2_buffer_owner,
 +    char* error, size_t error_size)
 +{
 +    if (owner == NULL || owner != stadium_display_owner_current ||
-+        owner->state != STADIUM_DISPLAY_OWNER_BOUND || owner->capture_attempted)
++        owner->state != STADIUM_DISPLAY_OWNER_BOUND || owner->capture_attempted ||
++        !stadium_owner_map2_output_is_empty(map2_buffer_owner))
 +        return stadium_owner_error(error, error_size,
 +                                   "Stadium display owner cannot capture this OnInit boundary");
 +    owner->capture_attempted = 1;
@@ -6294,6 +6500,15 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +                                   "Original Stadium display owner journal did not match source SIS and Ground state");
 +    owner->display_ground = display_ground;
 +    owner->display_ground_data = HSD_GObjGetUserData(display_ground);
++    owner->nested_map5_ground = Ground_GetMapGObj(5);
++    owner->map2_buffer_output = map2_buffer_owner;
++    map2_buffer_owner->map0_ground = Ground_GetMapGObj(0);
++    map2_buffer_owner->display_ground = display_ground;
++    map2_buffer_owner->map2_ground = owner->map2_ground;
++    map2_buffer_owner->nested_map5_ground = owner->nested_map5_ground;
++    map2_buffer_owner->buffer = owner->map2_buffer;
++    map2_buffer_owner->origin = owner->map2_buffer_origin;
++    map2_buffer_owner->captured = 1;
 +    owner->state = STADIUM_DISPLAY_OWNER_CAPTURED;
 +    if (error != NULL && error_size != 0) error[0] = '\0';
 +    return 1;
@@ -6308,7 +6523,10 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +        owner->children[2] != NULL || owner->wrappers[0] != NULL ||
 +        owner->wrappers[1] != NULL || owner->wrappers[2] != NULL ||
 +        owner->texts[0] != NULL || owner->texts[1] != NULL ||
-+        owner->context != NULL ||
++        owner->context != NULL || owner->map2_buffer_journal_count != 0 ||
++        owner->map2_ground != NULL || owner->map2_buffer != NULL ||
++        owner->map2_proc_dispatch_count != 0 ||
++        owner->map2_buffer_use_count != 0 ||
 +        !stadium_owner_text_topology_unchanged(owner) ||
 +        !stadium_owner_context_topology_unchanged(owner) ||
 +        !stadium_owner_slot_is_empty(HSD_SisLib_FontSlotBorrowable(1),
@@ -6399,7 +6617,13 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +
 +typedef struct StadiumDisplayOwnerControlFixture {
 +    HSD_GObj* entities[64];
++    HSD_GObj map0_ground;
 +    HSD_GObj display_ground;
++    HSD_GObj map2_ground;
++    HSD_GObj map5_ground;
++    HSD_GObj extra_map_ground;
++    HSD_GObj manager;
++    HSD_GObj unrelated_link5;
 +    HSD_GObj children[3];
 +    HSD_GObj renderers[2];
 +    HSD_Text foreign_text[2];
@@ -6409,11 +6633,17 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +    StadiumTextNodeIdentity text_identity[2];
 +    StadiumSisContextIdentity context_identity[2];
 +    MeleeWebStadiumDisplayOwner owner;
++    MeleeWebStadiumMap2BufferOwner map2_buffer_output;
++    Ground map0_ground_data;
 +    Ground display_ground_data;
++    Ground map2_ground_data;
++    Ground map5_ground_data;
++    Ground extra_map_ground_data;
 +    TextWrapper display_wrapper;
 +    ImageDescWrapper image_wrappers[2];
 +    SIS source_sis;
 +    u8 fallback_image[32];
++    u8 map2_fallback_buffer[32];
 +    int preflight_calls;
 +    int drain_calls;
 +    int drain_saw_xd4;
@@ -6533,7 +6763,10 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +    HSD_SisLib_804D7978 = &fixture->foreign_text[0];
 +    HSD_SisLib_804D797C = &fixture->foreign_contexts[0];
 +    HSD_SisLib_804D1124[1] = &fixture->source_sis;
++    stage_info.map_gobjs[0] = &fixture->map0_ground;
 +    stage_info.map_gobjs[PsType_Display] = &fixture->display_ground;
++    stage_info.map_gobjs[2] = &fixture->map2_ground;
++    stage_info.map_gobjs[5] = &fixture->map5_ground;
 +    stadium_display_owner_current = &fixture->owner;
 +}
 +
@@ -6552,11 +6785,35 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +{
 +    memset(fixture, 0, sizeof(*fixture));
 +    fixture->corrupt_foreign_text_after_drain = corrupt_foreign_text;
++    fixture->map0_ground.classifier = HSD_GOBJ_CLASS_STAGE;
++    fixture->map0_ground.p_link = 5;
++    fixture->map0_ground.user_data = &fixture->map0_ground_data;
 +    fixture->display_ground.classifier = HSD_GOBJ_CLASS_STAGE;
 +    fixture->display_ground.p_link = 5;
 +    fixture->display_ground.user_data = &fixture->display_ground_data;
-+    fixture->entities[5] = &fixture->display_ground;
++    fixture->map2_ground.classifier = HSD_GOBJ_CLASS_STAGE;
++    fixture->map2_ground.p_link = 5;
++    fixture->map2_ground.user_data = &fixture->map2_ground_data;
++    fixture->map5_ground.classifier = HSD_GOBJ_CLASS_STAGE;
++    fixture->map5_ground.p_link = 5;
++    fixture->map5_ground.user_data = &fixture->map5_ground_data;
++    fixture->entities[5] = &fixture->map0_ground;
++    fixture->map0_ground.next = &fixture->display_ground;
++    fixture->display_ground.next = &fixture->map2_ground;
++    fixture->map2_ground.next = &fixture->map5_ground;
++    fixture->map0_ground_data.map_id = (enum GrKind) 0;
 +    fixture->display_ground_data.map_id = (enum GrKind) PsType_Display;
++    fixture->map2_ground_data.map_id = (enum GrKind) 2;
++    fixture->map5_ground_data.map_id = (enum GrKind) 5;
++    fixture->map2_ground_data.u.stadium.xCC =
++        (HSD_MObj*) fixture->map2_fallback_buffer;
++    fixture->map2_ground_data.u.stadium.xE4 = &fixture->map5_ground;
++    fixture->owner.map2_ground = &fixture->map2_ground;
++    fixture->owner.nested_map5_ground = &fixture->map5_ground;
++    fixture->owner.map2_buffer = fixture->map2_fallback_buffer;
++    fixture->owner.map2_buffer_origin =
++        MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK;
++    fixture->owner.map2_buffer_journal_count = 1;
 +    for (size_t i = 0; i < 3; ++i) {
 +        fixture->children[i].classifier = HSD_GOBJ_CLASS_TEXT;
 +        fixture->children[i].p_link = i == 0 ? 0x13 : 0x12;
@@ -6650,7 +6907,10 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +    HSD_Text* original_text_head = HSD_SisLib_804D7978;
 +    sislib_UnkAlloc3* original_context_head = HSD_SisLib_804D797C;
 +    SIS* original_font1 = HSD_SisLib_804D1124[1];
++    HSD_GObj* original_map0 = stage_info.map_gobjs[0];
 +    HSD_GObj* original_display_map = stage_info.map_gobjs[PsType_Display];
++    HSD_GObj* original_map2 = stage_info.map_gobjs[2];
++    HSD_GObj* original_map5 = stage_info.map_gobjs[5];
 +    StadiumDisplayOwnerControlFixture success_fixture;
 +    StadiumDisplayOwnerControlFixture failure_fixture;
 +    HSD_GObj* empty_entities[64] = { NULL };
@@ -6714,7 +6974,9 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +    partial.source_sis = &partial_sis;
 +    stadium_display_owner_current = &partial;
 +    HSD_SisLib_804D1124[1] = &partial_sis;
-+    if (melee_web_stadium_display_owner_capture(&partial, NULL, error,
++    MeleeWebStadiumMap2BufferOwner partial_output = { 0 };
++    if (melee_web_stadium_display_owner_capture(&partial, NULL,
++                                               &partial_output, error,
 +                                               sizeof(error)) ||
 +        !partial.capture_attempted ||
 +        melee_web_stadium_display_owner_cancel(&partial, error,
@@ -6784,7 +7046,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +            failure_fixture.foreign_contexts[0].xA = 1;
 +        if (melee_web_stadium_display_owner_capture(
 +                &failure_fixture.owner, &failure_fixture.display_ground,
-+                error, sizeof(error)) ||
++                &failure_fixture.map2_buffer_output, error, sizeof(error)) ||
 +            !failure_fixture.owner.capture_attempted ||
 +            failure_fixture.owner.state != STADIUM_DISPLAY_OWNER_BOUND ||
 +            failure_fixture.owner.display_ground != NULL ||
@@ -6816,7 +7078,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +    if (Ground_GetMapGObj(PsType_Display) != &success_fixture.display_ground ||
 +        !melee_web_stadium_display_owner_capture(
 +            &success_fixture.owner, &success_fixture.display_ground,
-+            error, sizeof(error)) ||
++            &success_fixture.map2_buffer_output, error, sizeof(error)) ||
 +        success_fixture.owner.display_ground != &success_fixture.display_ground ||
 +        stage_info.map_gobjs[PsType_Display] != &success_fixture.display_ground ||
 +        stadium_owner_control_entity_count() != before_capture_count)
@@ -6841,7 +7103,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +        success_fixture.owner.images[2].image_ptr != (void*) (uintptr_t) 0x3040 ||
 +        stage_info.map_gobjs[PsType_Display] != &success_fixture.display_ground ||
 +        !stadium_owner_gobj_linked(&success_fixture.display_ground, 5) ||
-+        stadium_owner_control_entity_count() != 1 ||
++        stadium_owner_control_entity_count() != 4 ||
 +        success_fixture.display_ground_data.u.display.xD4 != NULL ||
 +        success_fixture.display_ground_data.u.display.xD8 != NULL ||
 +        success_fixture.display_ground_data.u.display.xDC != NULL ||
@@ -6862,7 +7124,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +    stadium_owner_control_activate(&failure_fixture);
 +    if (!melee_web_stadium_display_owner_capture(
 +            &failure_fixture.owner, &failure_fixture.display_ground,
-+            error, sizeof(error)))
++            &failure_fixture.map2_buffer_output, error, sizeof(error)))
 +        goto cleanup;
 +    HSD_SisLib_804D1124[1] = &foreign_sis;
 +    StadiumDisplayRetirementServices foreign_services =
@@ -6879,13 +7141,45 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +        goto cleanup;
 +    stadium_display_owner_current = NULL;
 +
++    /* Neither a scheduled map-2 proc nor its later 0x7D5 consumer can be
++     * crossed by this OnInit-only owner. Both checks run before SIS drain. */
++    for (int observed_use = 0; observed_use < 2; ++observed_use) {
++        stadium_owner_control_fixture_init(&failure_fixture, 0);
++        stadium_owner_control_activate(&failure_fixture);
++        if (!melee_web_stadium_display_owner_capture(
++                &failure_fixture.owner, &failure_fixture.display_ground,
++                &failure_fixture.map2_buffer_output, error, sizeof(error)))
++            goto cleanup;
++        if (observed_use == 0)
++            stadium_owner_note_map2_proc_dispatch();
++        else
++            stadium_owner_note_map2_buffer_use(
++                failure_fixture.owner.map2_buffer);
++        const size_t before_observed_use =
++            stadium_owner_control_entity_count();
++        if (melee_web_stadium_display_owner_retire(
++                &failure_fixture.owner, error, sizeof(error)) ||
++            failure_fixture.preflight_calls != 0 ||
++            failure_fixture.drain_calls != 0 ||
++            failure_fixture.retire_calls != 0 ||
++            failure_fixture.release_calls != 0 ||
++            failure_fixture.unlink_calls != 0 ||
++            stadium_owner_control_entity_count() != before_observed_use ||
++            HSD_SisLib_804D1124[1] != &failure_fixture.source_sis ||
++            stage_info.map_gobjs[2] != &failure_fixture.map2_ground ||
++            stage_info.map_gobjs[5] != &failure_fixture.map5_ground ||
++            stadium_display_owner_current != &failure_fixture.owner)
++            goto cleanup;
++        stadium_display_owner_current = NULL;
++    }
++
 +    /* If the original drain is followed by a foreign-list mismatch, no
 +     * descriptor retirement, image release or child unlink is attempted. */
 +    stadium_owner_control_fixture_init(&failure_fixture, 1);
 +    stadium_owner_control_activate(&failure_fixture);
 +    if (!melee_web_stadium_display_owner_capture(
 +            &failure_fixture.owner, &failure_fixture.display_ground,
-+            error, sizeof(error)))
++            &failure_fixture.map2_buffer_output, error, sizeof(error)))
 +        goto cleanup;
 +    StadiumDisplayRetirementServices failure_services =
 +        stadium_owner_control_services;
@@ -6912,7 +7206,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +        stadium_owner_control_activate(&failure_fixture);
 +        if (!melee_web_stadium_display_owner_capture(
 +                &failure_fixture.owner, &failure_fixture.display_ground,
-+                error, sizeof(error)))
++                &failure_fixture.map2_buffer_output, error, sizeof(error)))
 +            goto cleanup;
 +        if (selector_kinds[i] == 1)
 +            failure_fixture.foreign_text[0].font_idx = 1;
@@ -6994,7 +7288,10 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +    HSD_SisLib_804D7978 = original_text_head;
 +    HSD_SisLib_804D797C = original_context_head;
 +    HSD_SisLib_804D1124[1] = original_font1;
++    stage_info.map_gobjs[0] = original_map0;
 +    stage_info.map_gobjs[PsType_Display] = original_display_map;
++    stage_info.map_gobjs[2] = original_map2;
++    stage_info.map_gobjs[5] = original_map5;
 +    HSD_GObj_Entities = original_entities;
 +    HSD_GObjLibInitData = original_init;
 +    return success;
@@ -7026,7 +7323,9 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +    if (!stadium_owner_text_topology_matches(owner, 1) ||
 +        !stadium_owner_context_topology_matches(owner, 1) ||
 +        stadium_owner_has_font1_before(owner) ||
-+        HSD_SisLib_804D1124[1] != owner->source_sis)
++        HSD_SisLib_804D1124[1] != owner->source_sis ||
++        !stadium_owner_map2_graph_matches(owner, owner->display_ground) ||
++        !stadium_owner_map2_output_matches(owner))
 +        return stadium_owner_error(error, error_size,
 +                                   "Foreign SIS state changed before the original font-1 drain");
 +
@@ -7093,12 +7392,387 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
 +        return melee_web_stadium_display_owner_retire(owner, error, error_size);
 +    return melee_web_stadium_display_owner_cancel(owner, error, error_size);
 +}
++
++static int stadium_map2_buffer_owner_end_with_free(
++    MeleeWebStadiumMap2BufferOwner* owner, MeleeWebStadiumBufferFree free_fn,
++    void* context, char* error, size_t error_size)
++{
++    if (owner == NULL || owner->captured != 1 || owner->buffer == NULL ||
++        owner->map2_ground == NULL || owner->nested_map5_ground == NULL ||
++        (owner->origin !=
++             MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_BORROWED_PRELOAD &&
++         owner->origin !=
++             MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK))
++        return stadium_owner_error(error, error_size,
++                                   "Stadium map-2 buffer owner has no exact live provenance record");
++    if (Ground_GetMapGObj(2) != NULL || Ground_GetMapGObj(5) != NULL ||
++        HSD_GObj_Entities == NULL ||
++        stadium_owner_gobj_address_present(owner->map2_ground) ||
++        stadium_owner_gobj_address_present(owner->nested_map5_ground))
++        return stadium_owner_error(error, error_size,
++                                   "Stadium map-2 buffer cannot retire before map-2 and nested map-5 are gone");
++    if (owner->origin ==
++            MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK &&
++        free_fn == NULL)
++        return stadium_owner_error(error, error_size,
++                                   "Stadium map-2 fallback retirement needs its exact free operation");
++
++    if (owner->origin ==
++        MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK)
++        free_fn(owner->buffer, context);
++    owner->captured = 0;
++    owner->buffer = NULL;
++    owner->map0_ground = NULL;
++    owner->display_ground = NULL;
++    owner->map2_ground = NULL;
++    owner->nested_map5_ground = NULL;
++    owner->origin = MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_RETIRED;
++    if (error != NULL && error_size != 0) error[0] = '\0';
++    return 1;
++}
++
++static void stadium_owner_actual_free_map2_buffer(void* buffer, void* context)
++{
++    (void) context;
++    HSD_Free(buffer);
++}
++
++int melee_web_stadium_map2_buffer_owner_end(
++    MeleeWebStadiumMap2BufferOwner* owner, char* error, size_t error_size)
++{
++    return stadium_map2_buffer_owner_end_with_free(
++        owner, stadium_owner_actual_free_map2_buffer, NULL, error, error_size);
++}
++
++typedef struct StadiumMap2BufferControlFree {
++    void* freed;
++    unsigned calls;
++} StadiumMap2BufferControlFree;
++
++static void stadium_owner_control_free_map2_buffer(void* buffer, void* context)
++{
++    StadiumMap2BufferControlFree* free_state = context;
++    if (free_state->calls != UINT_MAX) ++free_state->calls;
++    free_state->freed = buffer;
++}
++
++static void stadium_owner_control_reset_map2_journal(
++    StadiumDisplayOwnerControlFixture* fixture)
++{
++    fixture->owner.journal_failed = 0;
++    fixture->owner.map2_ground = NULL;
++    fixture->owner.nested_map5_ground = NULL;
++    fixture->owner.map2_buffer = NULL;
++    fixture->owner.map2_buffer_origin =
++        MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_UNKNOWN;
++    fixture->owner.map2_buffer_journal_count = 0;
++    fixture->owner.map2_proc_dispatch_count = 0;
++    fixture->owner.map2_buffer_use_count = 0;
++    fixture->owner.map2_buffer_output = NULL;
++    fixture->map2_ground_data.u.stadium.xCC = NULL;
++    memset(&fixture->map2_buffer_output, 0,
++           sizeof(fixture->map2_buffer_output));
++}
++
++static void stadium_owner_control_journal_map2_branch(
++    StadiumDisplayOwnerControlFixture* fixture, int borrowed)
++{
++    const void* lookup = borrowed ? (const void*) &fixture->source_sis : NULL;
++    void* stored = borrowed ? (void*) lookup : fixture->map2_fallback_buffer;
++    fixture->map2_ground_data.u.stadium.xCC = stored;
++    stadium_owner_journal_map2_buffer(&fixture->map2_ground, lookup, stored);
++}
++
++static void stadium_owner_control_add_unowned_stage(
++    StadiumDisplayOwnerControlFixture* fixture, int manager)
++{
++    HSD_GObj* extra;
++    if (manager) {
++        extra = &fixture->manager;
++        extra->classifier = HSD_GOBJ_CLASS_STAGE;
++        extra->p_link = 5;
++        extra->user_data = NULL;
++    } else {
++        extra = &fixture->extra_map_ground;
++        extra->classifier = HSD_GOBJ_CLASS_STAGE;
++        extra->p_link = 5;
++        extra->user_data = &fixture->extra_map_ground_data;
++        fixture->extra_map_ground_data.map_id = (enum GrKind) 3;
++    }
++    fixture->map5_ground.next = extra;
++    extra->next = NULL;
++}
++
++int melee_web_stadium_map2_buffer_controls(void)
++{
++    HSD_GObjList* original_entities = HSD_GObj_Entities;
++    HSD_GObjLibInitDataType original_init = HSD_GObjLibInitData;
++    HSD_Text* original_text_head = HSD_SisLib_804D7978;
++    sislib_UnkAlloc3* original_context_head = HSD_SisLib_804D797C;
++    SIS* original_font1 = HSD_SisLib_804D1124[1];
++    HSD_GObj* original_map0 = stage_info.map_gobjs[0];
++    HSD_GObj* original_display = stage_info.map_gobjs[PsType_Display];
++    HSD_GObj* original_map2 = stage_info.map_gobjs[2];
++    HSD_GObj* original_map5 = stage_info.map_gobjs[5];
++    HSD_GObj* original_map3 = stage_info.map_gobjs[3];
++    StadiumDisplayOwnerControlFixture fixture;
++    HSD_GObj* empty_entities[64] = { NULL };
++    char error[192] = { 0 };
++    int success = 0;
++
++    if (stadium_display_owner_current != NULL || original_entities != NULL ||
++        original_text_head != NULL || original_context_head != NULL ||
++        original_font1 != NULL || original_map0 != NULL ||
++        original_display != NULL || original_map2 != NULL ||
++        original_map5 != NULL || original_map3 != NULL ||
++        HSD_GObj_804D781C != NULL ||
++        HSD_GObj_804D7814 != NULL)
++        return 0;
++    for (size_t i = 0;
++         i < sizeof(stage_info.map_gobjs) / sizeof(stage_info.map_gobjs[0]);
++         ++i)
++        if (stage_info.map_gobjs[i] != NULL) return 0;
++
++    HSD_GObjLibInitData.p_link_max = 63;
++    HSD_GObj_Entities = (HSD_GObjList*) empty_entities;
++
++    /* Missing, duplicate and mismatched branch observations all refuse a
++     * capture before the external output or source owners are changed. */
++    for (unsigned failure_kind = 0; failure_kind < 6; ++failure_kind) {
++        stadium_owner_control_fixture_init(&fixture, 0);
++        stadium_owner_control_reset_map2_journal(&fixture);
++        stadium_owner_control_activate(&fixture);
++        const void* lookup = &fixture.source_sis;
++        void* stored = lookup == NULL ? NULL : (void*) lookup;
++        if (failure_kind != 0) {
++            fixture.map2_ground_data.u.stadium.xCC = stored;
++            if (failure_kind == 1) {
++                stadium_owner_journal_map2_buffer(
++                    &fixture.map2_ground, lookup, stored);
++                stadium_owner_journal_map2_buffer(
++                    &fixture.map2_ground, lookup, stored);
++            } else if (failure_kind == 2) {
++                stored = fixture.map2_fallback_buffer;
++                fixture.map2_ground_data.u.stadium.xCC = stored;
++                stadium_owner_journal_map2_buffer(
++                    &fixture.map2_ground, lookup, stored);
++            } else {
++                stadium_owner_journal_map2_buffer(
++                    &fixture.map2_ground, lookup, stored);
++                if (failure_kind == 3)
++                    stadium_owner_note_map2_proc_dispatch();
++                else if (failure_kind == 4)
++                    stadium_owner_note_map2_buffer_use(stored);
++                else if (failure_kind == 5)
++                    fixture.map2_ground_data.u.stadium.xCC =
++                        fixture.map2_fallback_buffer;
++            }
++        }
++        const size_t before = stadium_owner_control_entity_count();
++        if (melee_web_stadium_display_owner_capture(
++                &fixture.owner, &fixture.display_ground,
++                &fixture.map2_buffer_output, error, sizeof(error)) ||
++            fixture.owner.state != STADIUM_DISPLAY_OWNER_BOUND ||
++            !stadium_owner_map2_output_is_empty(
++                &fixture.map2_buffer_output) ||
++            stadium_owner_control_entity_count() != before ||
++            stage_info.map_gobjs[2] != &fixture.map2_ground ||
++            stage_info.map_gobjs[5] != &fixture.map5_ground ||
++            HSD_SisLib_804D1124[1] != &fixture.source_sis ||
++            fixture.drain_calls != 0 || fixture.release_calls != 0 ||
++            fixture.unlink_calls != 0 ||
++            melee_web_stadium_display_owner_cancel(
++                &fixture.owner, error, sizeof(error)) ||
++            stadium_display_owner_current != &fixture.owner)
++            goto cleanup;
++        stadium_display_owner_current = NULL;
++    }
++
++    /* An exact map registry is not by itself a complete teardown boundary:
++     * StageLast also sweeps every stage-class object on link 5. Refuse an
++     * unexpected published slot, an unregistered map object, and a manager
++     * at both capture and retirement, before any SIS or buffer owner changes. */
++    for (unsigned phase = 0; phase < 2; ++phase) {
++        for (unsigned extra_kind = 0; extra_kind < 3; ++extra_kind) {
++            StadiumDisplayRetirementServices services =
++                stadium_owner_control_services;
++            stadium_owner_control_fixture_init(&fixture, 0);
++            stadium_owner_control_reset_map2_journal(&fixture);
++            stadium_owner_control_activate(&fixture);
++            stadium_owner_control_journal_map2_branch(&fixture, 0);
++            services.context = &fixture;
++
++            if (phase == 1 &&
++                !melee_web_stadium_display_owner_capture(
++                    &fixture.owner, &fixture.display_ground,
++                    &fixture.map2_buffer_output, error, sizeof(error)))
++                goto cleanup;
++
++            if (extra_kind == 0) {
++                fixture.extra_map_ground.classifier = HSD_GOBJ_CLASS_STAGE;
++                fixture.extra_map_ground.p_link = 5;
++                fixture.extra_map_ground.user_data =
++                    &fixture.extra_map_ground_data;
++                fixture.extra_map_ground_data.map_id = (enum GrKind) 3;
++                stage_info.map_gobjs[3] = &fixture.extra_map_ground;
++            } else {
++                stadium_owner_control_add_unowned_stage(
++                    &fixture, extra_kind == 2);
++            }
++
++            const size_t before = stadium_owner_control_entity_count();
++            StadiumMap2BufferControlFree free_state = { 0 };
++            if (phase == 0) {
++                if (melee_web_stadium_display_owner_capture(
++                        &fixture.owner, &fixture.display_ground,
++                        &fixture.map2_buffer_output, error, sizeof(error)) ||
++                    !fixture.owner.capture_attempted ||
++                    fixture.owner.state != STADIUM_DISPLAY_OWNER_BOUND ||
++                    !stadium_owner_map2_output_is_empty(
++                        &fixture.map2_buffer_output))
++                    goto cleanup;
++            } else if (stadium_owner_retire_with_services(
++                           &fixture.owner, &services, error, sizeof(error))) {
++                goto cleanup;
++            }
++            if (stadium_map2_buffer_owner_end_with_free(
++                    &fixture.map2_buffer_output,
++                    stadium_owner_control_free_map2_buffer, &free_state,
++                    error, sizeof(error)) ||
++                fixture.preflight_calls != 0 || fixture.drain_calls != 0 ||
++                fixture.retire_calls != 0 || fixture.release_calls != 0 ||
++                fixture.unlink_calls != 0 || free_state.calls != 0 ||
++                free_state.freed != NULL ||
++                stadium_owner_control_entity_count() != before ||
++                HSD_SisLib_804D1124[1] != &fixture.source_sis ||
++                HSD_SisLib_804D7978 != &fixture.foreign_text[0] ||
++                HSD_SisLib_804D797C != &fixture.foreign_contexts[0] ||
++                fixture.map2_buffer_output.captured != (phase == 1) ||
++                (phase == 1 &&
++                 (!stadium_owner_map2_output_matches(&fixture.owner) ||
++                  fixture.owner.state != STADIUM_DISPLAY_OWNER_CAPTURED)) ||
++                stadium_display_owner_current != &fixture.owner)
++                goto cleanup;
++            stadium_display_owner_current = NULL;
++            stage_info.map_gobjs[3] = NULL;
++        }
++    }
++
++    /* Exercise both manually observed branch outcomes, carry the captured record beyond
++     * display retirement, and free only a fallback after reverse removal. */
++    for (unsigned branch = 0; branch < 2; ++branch) {
++        const int borrowed = branch == 0;
++        const void* lookup;
++        void* stored;
++        StadiumDisplayRetirementServices services;
++        StadiumMap2BufferControlFree free_state = { 0 };
++        stadium_owner_control_fixture_init(&fixture, 0);
++        stadium_owner_control_reset_map2_journal(&fixture);
++        fixture.unrelated_link5.classifier = HSD_GOBJ_CLASS_CAMERA;
++        fixture.unrelated_link5.p_link = 5;
++        fixture.map5_ground.next = &fixture.unrelated_link5;
++        stadium_owner_control_activate(&fixture);
++        lookup = borrowed ? (const void*) &fixture.source_sis : NULL;
++        stored = borrowed ? (void*) lookup : fixture.map2_fallback_buffer;
++        fixture.map2_ground_data.u.stadium.xCC = stored;
++        stadium_owner_journal_map2_buffer(
++            &fixture.map2_ground, lookup, stored);
++        if (fixture.owner.map2_buffer_journal_count != 1 ||
++            fixture.owner.map2_ground != &fixture.map2_ground ||
++            fixture.owner.map2_buffer != stored ||
++            fixture.owner.map2_buffer_origin !=
++                (borrowed
++                     ? MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_BORROWED_PRELOAD
++                     : MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK) ||
++            fixture.owner.map2_proc_dispatch_count != 0 ||
++            fixture.owner.map2_buffer_use_count != 0 ||
++            !stadium_owner_map2_graph_matches(
++                &fixture.owner, &fixture.display_ground))
++            goto cleanup;
++        const size_t before_capture = stadium_owner_control_entity_count();
++        if (!melee_web_stadium_display_owner_capture(
++                &fixture.owner, &fixture.display_ground,
++                &fixture.map2_buffer_output, error, sizeof(error)) ||
++            !stadium_owner_map2_output_matches(&fixture.owner) ||
++            fixture.map2_buffer_output.buffer != stored ||
++            fixture.map2_buffer_output.origin != fixture.owner.map2_buffer_origin ||
++            stadium_owner_control_entity_count() != before_capture ||
++            stage_info.map_gobjs[0] != &fixture.map0_ground ||
++            stage_info.map_gobjs[2] != &fixture.map2_ground ||
++            stage_info.map_gobjs[5] != &fixture.map5_ground)
++            goto cleanup;
++
++        /* The source proc and its later archive/file users remain outside this
++         * OnInit boundary; either observation blocks destructive retirement. */
++        if (stadium_map2_buffer_owner_end_with_free(
++                &fixture.map2_buffer_output,
++                stadium_owner_control_free_map2_buffer, &free_state,
++                error, sizeof(error)) ||
++            free_state.calls != 0 || free_state.freed != NULL ||
++            fixture.map2_buffer_output.captured != 1)
++            goto cleanup;
++
++        services = stadium_owner_control_services;
++        services.context = &fixture;
++        if (!stadium_owner_retire_with_services(
++                &fixture.owner, &services, error, sizeof(error)) ||
++            fixture.drain_calls != 1 || !fixture.drain_saw_xd4 ||
++            !fixture.drain_removed_text_entities ||
++            fixture.retire_calls != 1 || fixture.release_calls != 1 ||
++            fixture.unlink_calls != 3 ||
++            stage_info.map_gobjs[2] != &fixture.map2_ground ||
++            stage_info.map_gobjs[5] != &fixture.map5_ground)
++            goto cleanup;
++        /* The existing display owner is now retired; only the outer record
++         * remains responsible for the exact map-2 fallback provenance. */
++        stadium_display_owner_current = NULL;
++        stadium_owner_control_remove_from_link(
++            &fixture, 5, &fixture.map5_ground);
++        stage_info.map_gobjs[5] = NULL;
++        stadium_owner_control_remove_from_link(
++            &fixture, 5, &fixture.map2_ground);
++        stage_info.map_gobjs[2] = NULL;
++        if (!stadium_map2_buffer_owner_end_with_free(
++                &fixture.map2_buffer_output,
++                stadium_owner_control_free_map2_buffer, &free_state,
++                error, sizeof(error)) ||
++            free_state.calls != (unsigned) !borrowed ||
++            (borrowed && free_state.freed != NULL) ||
++            (!borrowed && free_state.freed != stored) ||
++            fixture.map2_buffer_output.captured != 0 ||
++            fixture.map2_buffer_output.buffer != NULL ||
++            fixture.map2_buffer_output.origin !=
++                MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_RETIRED ||
++            !stadium_owner_gobj_linked(&fixture.unrelated_link5, 5) ||
++            stadium_map2_buffer_owner_end_with_free(
++                &fixture.map2_buffer_output,
++                stadium_owner_control_free_map2_buffer, &free_state,
++                error, sizeof(error)) ||
++            free_state.calls != (unsigned) !borrowed)
++            goto cleanup;
++    }
++    success = 1;
++
++cleanup:
++    stadium_display_owner_current = NULL;
++    HSD_SisLib_804D7978 = original_text_head;
++    HSD_SisLib_804D797C = original_context_head;
++    HSD_SisLib_804D1124[1] = original_font1;
++    stage_info.map_gobjs[0] = original_map0;
++    stage_info.map_gobjs[PsType_Display] = original_display;
++    stage_info.map_gobjs[2] = original_map2;
++    stage_info.map_gobjs[5] = original_map5;
++    stage_info.map_gobjs[3] = original_map3;
++    HSD_GObj_Entities = original_entities;
++    HSD_GObjLibInitData = original_init;
++    return success;
++}
 +#endif
 +
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
  {
-@@ -1185,22 +2657,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +3310,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -7140,7 +7814,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +2705,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +3358,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -7162,7 +7836,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +2727,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +3380,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
@@ -7185,6 +7859,36 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905f
      wrapper->flag = false;
      return gobj;
  }
+@@ -1896,6 +4060,9 @@ bool grStadium_801D42B8(void)
+     if (gp->u.stadium.xC4_b1) {
+         return false;
+     }
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    stadium_owner_note_map2_buffer_use(gp->u.stadium.xCC);
++#endif
+     gp->u.stadium.xD0 =
+         grDatFiles_801C6478(gp->u.stadium.xCC, gp->u.stadium.xC8);
+     return true;
+@@ -2093,6 +4260,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+             gp = GET_GROUND(map_gobj);
+             HSD_ASSERT(0x99B, gp);
+             gp->u.stadium.xC4_b1 = true;
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++            stadium_owner_note_map2_buffer_use(gp->u.stadium.xCC);
++#endif
+             lbFile_80016580(datfiles[var_r29], gp->u.stadium.xCC,
+                             &gp->u.stadium.xC8, fn_801D4220, NULL);
+             temp_r31->u.stadium.xDC = 1;
+@@ -2221,6 +4391,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+         if (temp_r31->u.stadium.xDE == 5) {
+             temp_r31->u.stadium.xD8 =
+                 randi_between_2(yakumono_param->x0, yakumono_param->x4);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++            stadium_owner_note_map2_buffer_use(temp_r31->u.stadium.xCC);
++#endif
+             grAnime_801C65B0((void*) temp_r31->u.stadium.xCC);
+             mpLib_800575B0(0x55);
+             mpLib_800575B0(0x6F);
 diff --git a/src/melee/gr/grshrine.c b/src/melee/gr/grshrine.c
 index 9851d18921226b2adc5917698fd8662c1dd1eb4e..02ccf3daeab7602ae44037257c788d1f0aaac216 100644
 --- a/src/melee/gr/grshrine.c
