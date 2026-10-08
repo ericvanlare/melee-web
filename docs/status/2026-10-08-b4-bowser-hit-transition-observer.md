@@ -1,5 +1,24 @@
 # B4: Bowser hit observer and geometry boundary remain unresolved
 
+**Current-main integration validation — Compiled.** The host checks ran on
+clean source head `43a3a929e9a678b6417e56e5ba6ea7bdbe6be101` (tree
+`ea3a7019e6237c589721b2e20bb638a526091e59`), after merging main commit
+`7c5d47ab58f25b2a4241147c00d70c68a28b5ac6`. The unfiltered suite passed
+1,948 tests with 153 skipped (2,101 discovered, zero failures or errors), and
+the ordinary Release runtime build passed. The current-head build closure and
+raw logs are recorded separately from the d1 capture producer.
+
+Before that build, all eight d1 Release build products were preserved and
+verified against their recorded closure; the three staged JS/WASM/data capture
+outputs also matched their manifest. The current-head build kept the probe
+object, runtime archive, JS and data hashes unchanged, while the emitted Wasm
+hash changed from the retained d1 output. The capture remains tied to d1's
+preserved artifacts; no browser run followed this build. This validation did
+not read or hash original payloads and makes no new Bowser-cause claim. The
+build log shows SDL 3.4.10's `SDL.c.o` and `libSDL3.a` were rebuilt, but the
+retained d1 evidence has no prior SDL object/archive identities; the rebuild
+trigger is unobserved.
+
 **Capacity follow-up — Browser exercised; issue #274 remains open.** The
 approved observer-capacity change was built from producer commit
 `d1b906979c70731d2f934766cee08af52cd70da4` (tree

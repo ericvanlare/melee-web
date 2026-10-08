@@ -620,6 +620,103 @@
       "Issue #274, Results and whole-session acceptance remain open."
     ]
   },
+  "current_main_integration_validation": {
+    "source": {
+      "commit": "43a3a929e9a678b6417e56e5ba6ea7bdbe6be101",
+      "tree": "ea3a7019e6237c589721b2e20bb638a526091e59",
+      "merge_commit": "7f6cec8de312c9d350382b96a5e4425e177e78e4",
+      "merged_main": "7c5d47ab58f25b2a4241147c00d70c68a28b5ac6",
+      "worktree_clean": true
+    },
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "discovered": 2101,
+      "skipped": 153,
+      "passed": 1948,
+      "failures": 0,
+      "errors": 0,
+      "elapsed_seconds": 492.369,
+      "stdout": {
+        "name": "full-suite-v1.stdout.log",
+        "bytes": 4671,
+        "sha256": "3203de3b41b3d2b0db4465fe7d0078356a4cff765bdbbcb968f8ccbdfda6fa74"
+      },
+      "stderr": {
+        "name": "full-suite-v1.stderr.log",
+        "bytes": 379877,
+        "sha256": "f1c2863cd5fcad0e5d9b1e72274cdeaf486e5fc2e92ab31c3bf86eb8d00fbbab"
+      },
+      "execution_receipt_sha256": "9b2ac2f61aa89306cf32b4bb93f5111578b8969577fe0154ad0a0e60d69dd318"
+    },
+    "ordinary_release_build": {
+      "command": "python3 scripts/build.py --target runtime --configuration Release",
+      "target": "runtime (gameplay_menu_browser)",
+      "configuration": "Release",
+      "effective_jobs": 6,
+      "exit_code": 0,
+      "stdout": {
+        "name": "ordinary-release-runtime-v1.stdout.log",
+        "bytes": 10778,
+        "sha256": "e573a2de0bcae4a5aabcaff04fbf4b83b8ac27269953c8a387b80924c3ea2cf9"
+      },
+      "stderr": {
+        "name": "ordinary-release-runtime-v1.stderr.log",
+        "bytes": 1551,
+        "sha256": "6787301500bf3a860667c358e3bc02cdc1782e7d086254270d13ecdc9a7cf177"
+      },
+      "execution_receipt_sha256": "09f14597acc7c3aea46de85ab1005d03b8a3a913d5a6bed3748d02d7934e45a2",
+      "closure_sha256": "4c80013fa2b479d610c941bc2cbb2ce83ee78110ae90731653fa4e534b00941f",
+      "source_probe_sha256": "0e8ddcae2ec2599eb26007edf45525d2d720e9f1b0f2c20ff2e4dae006c633fc",
+      "probe_object_sha256": "1743daca0ca5edb493cad6155b15dbb8b7ef4d4bd361d4991683d5b450f61c34",
+      "runtime_archive_sha256": "c30eb2d8f2017c9dc626d4c7647b49a03d9879a30ee01d77780c2cb8e93940b1",
+      "final_outputs": {
+        "gameplay_menu_browser.js": "1366dc5d194b16ba636faef34f4b0034afe2fec050b06b469bc51a16f5a3e635",
+        "gameplay_menu_browser.wasm": "a5686acbc136cbed20c15e7429fa2760945fe7356661302489330f18151df4a9",
+        "gameplay_menu_browser.data": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      "wasm_vs_preserved_d1_sha256": {
+        "d1": "cf99d7c3ad21dd3be96f717829723b765d6e7a34717f9dbe300875a281e3efd3",
+        "current_head": "a5686acbc136cbed20c15e7429fa2760945fe7356661302489330f18151df4a9",
+        "changed": true
+      }
+    },
+    "d1_prebuild_preservation": {
+      "receipt_sha256": "0a72a1fe4a4d7baffa5b509591d905ff27bddb66d682047db3a4ebfe50d85281",
+      "build_artifacts_copied_and_verified": 8,
+      "staged_capture_outputs_verified": 3,
+      "d1_capture_relabelled": false
+    },
+    "sdl_relink_provenance": {
+      "receipt_sha256": "ebb8ba0478507d8f3de00bb630b45c2c785cfbdb38525cbe76d989fa1cc7487f",
+      "SDL_version": "3.4.10",
+      "SDL_c_sha256": "20ee2ffdd011eacb5f30a11ff11c9746519c6818b097d1404cdf4d871e9d8476",
+      "SDL_compile_command_output_sha256": "290e0744d2af2cf334f28880da95a60e3a9739619a97efd265475f729ed7eba8",
+      "SDL_c_object_sha256": "5dfe0c2a8cb881ac22c4c5997e64cc722089860a35adee5cd15ae0d1c42baf2a",
+      "SDL_archive_sha256": "ce99bb6930e4f66a75f830f59d22b0c063c95067ff2fa15c606fe22c63a3f933",
+      "d1_SDL_object_archive_equivalents_retained": false,
+      "rebuild_trigger_established": false
+    },
+    "integration_packet": {
+      "name": "current-main-integration-validation-v2.json",
+      "sha256": "f8ee6fc6af2ecf3575cda2449a57c4a24e79824d971c88d0721251d903400f1c"
+    },
+    "documentation_checks": {
+      "relative_markdown_links": {
+        "test": "test_markdown_links.MarkdownLinkTests.test_relative_links_resolve",
+        "exit_code": 0,
+        "execution_receipt_sha256": "b30ea055b1abebb65792dd6ab88d34f3e078a61dbddbd86a98f03b2007900048"
+      },
+      "git_diff_check": "passed",
+      "json_parse": "passed",
+      "private_absolute_paths_in_added_diff": false
+    },
+    "limits": [
+      "No browser run or original payload read/hash was performed for this integration validation.",
+      "The successful host suite and Release build do not establish Bowser cause, Results entry, or whole-session acceptance.",
+      "The current-head Wasm output differs from the preserved d1 capture producer output; SDL rebuild cause remains unobserved and no post-build capture was made."
+    ]
+  },
   "next_scope": "A further source/observation-gap proposal requires separate review. This evidence does not authorize another capture or original payload access and does not claim a collision cause or fix.",
   "equivalent": false,
   "complete": false,
