@@ -1,0 +1,102 @@
+{
+  "schema": "melee-web-issue254-current-main-refresh-v1",
+  "result": "rebase_patch_and_build_closures_unchanged",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/254",
+  "validation_receipt": {
+    "path": "issue254-profile-map-ownership-v1.json",
+    "sha256": "9a109d6066a8765001896b116e6def4b33b9f25abe592457840fa4db7f799f0f"
+  },
+  "validation_producer": {
+    "commit": "5b5112a5467e65442808be7da167acadb8cff33b",
+    "tree": "0e9170500a22d515f9bb39e53e2fdad029a06b8c",
+    "full_suite_and_release_build_remain_at_this_producer": true
+  },
+  "refresh": {
+    "previous_base": "75c2541f23c0c8fdf68802bd911402e6df8f681c",
+    "new_main": "e782cb8440672711b40adea19a4ee8983da11908",
+    "new_main_tree": "a0feefd9727734b249d4e48ac461e5a9d0a2b215",
+    "refreshed_source_commit": "7ec84decf3394b99a460ee63c592874c589337e4",
+    "refreshed_source_tree": "f6024239a445545de5d7d6d015f2e52f5c7a6f8e",
+    "source_parent_is_new_main": true,
+    "original_validation_producer_preserved": true,
+    "rebase_conflicts": 0
+  },
+  "patch_identity": {
+    "source_patch_id_before_rebase": "696e6596d7d005589ad1697a1659e56bf5e884e1",
+    "source_patch_id_after_rebase": "696e6596d7d005589ad1697a1659e56bf5e884e1",
+    "original_docs_patch_id_before_rebase": "f758498d985a687d90c58b834c763b47e3a9b4c1",
+    "original_docs_patch_id_after_rebase": "f758498d985a687d90c58b834c763b47e3a9b4c1",
+    "all_five_source_blobs_unchanged": true,
+    "source_blobs": {
+      "src/dat_native_stage.cpp": "4c3482947d1a20c48c50a4c54201f20fad4e0abc",
+      "src/dat_native_stage.hpp": "2ecd689956b3b1385cdf286bd53a9a8866ddc22a",
+      "src/gameplay_stage_profile.c": "e5dbda6eae1419582b31b794706a5249ab598411",
+      "src/gameplay_stage_profile.h": "4676c6bf50f8c61785ac54bb765b5c0510d6d4b7",
+      "tests/dat_native_stage_map_trace.cpp": "354d68a6e7d551e9356a40c40c5c6a10bc91976d"
+    }
+  },
+  "merged_base_delta": [
+    "docs/evidence/a3-page-owned-checksum-consumer-v1.json",
+    "docs/status/2026-10-07-a3-page-owned-checksum-consumer.md",
+    "scripts/net_lockstep_browser_peer.mjs",
+    "tests/net_lockstep_browser_pump.test.mjs"
+  ],
+  "compiled_target_closure_comparison": {
+    "method": "Ninja -t inputs on the exact existing targets before and after rebase; full transitive input path lists were byte-identical.",
+    "ordinary_release_runtime": {
+      "target": "gameplay_menu_browser.js",
+      "input_count": 3345,
+      "input_list_sha256_before": "a6bfbea348941eecb1c7657575f8145b6cd27ce7f3a32f17b9da5cbb9976707a",
+      "input_list_sha256_after": "a6bfbea348941eecb1c7657575f8145b6cd27ce7f3a32f17b9da5cbb9976707a",
+      "identical": true,
+      "merged_base_paths_in_closure": []
+    },
+    "c1_synthetic_controls": {
+      "target": "dat_native_stage_map_trace.js",
+      "input_count": 3316,
+      "input_list_sha256_before": "ca7a8cc22b82013ddd4e1f885bb9eb5afc79f6314770e5ae71bd4041b31c965f",
+      "input_list_sha256_after": "ca7a8cc22b82013ddd4e1f885bb9eb5afc79f6314770e5ae71bd4041b31c965f",
+      "identical": true,
+      "merged_base_paths_in_closure": []
+    }
+  },
+  "compiled_object_identities_unchanged": {
+    "build/browser-release/CMakeFiles/fighter_asset_runtime.dir/src/dat_native_stage.cpp.o": {
+      "bytes": 310687,
+      "sha256": "bd43c970059d7c5cb17aba90e88da75d71ec81465a85ba4ac3d786b03582cf4c"
+    },
+    "build/browser-release/CMakeFiles/fighter_source_runtime.dir/src/gameplay_stage_profile.c.o": {
+      "bytes": 3520,
+      "sha256": "14f95464e043ea18c69f833da2db4f34dacba83ba5d0bda35cfbc9f067956ca2"
+    },
+    "build/browser-stadium-c1a-release/CMakeFiles/fighter_asset_runtime.dir/src/dat_native_stage.cpp.o": {
+      "bytes": 310687,
+      "sha256": "bd43c970059d7c5cb17aba90e88da75d71ec81465a85ba4ac3d786b03582cf4c"
+    },
+    "build/browser-stadium-c1a-release/CMakeFiles/dat_native_stage_map_trace.dir/tests/dat_native_stage_map_trace.cpp.o": {
+      "bytes": 130506,
+      "sha256": "70db5851dcaef4f4122b0255e1502b835c0832ea35fba21eb24f7729f2876129"
+    }
+  },
+  "gameplay_source_ownership": {
+    "canonical_patch_sha256_before_and_after": "895c5a0ffd91ca9b9d0ad8117bb62d06ed4cd5ce2c3fec68428588a42346c46a",
+    "generated_source_checkout_baseline_head": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+    "generated_source_checkout_expected_applied_patch_entries": 1126,
+    "upstream_dependency_checkout_clean": true
+  },
+  "preservation": {
+    "nine_prior_artifact_copies_rehashed_after_rebase": true,
+    "ordinary_release_and_c1_output_hashes_still_match_validation_receipt": true,
+    "full_suite_repeated": false,
+    "build_repeated": false,
+    "new_native_or_browser_experiment": false,
+    "reason": "The merged PR259 delta changes two evidence documents and the net-lockstep script/test only. Neither path intersects the byte-identical transitive input closure of either compiled target; the existing 5b5112a producer and all build/output hashes remain intact. This is scoped build-closure reuse, not a new current-main suite or runtime build result."
+  },
+  "external_identity_records": {
+    "run_id": "issue254-profile-contract-20261008-20261007-191523-d5abc429/post-259-refresh",
+    "before_record_sha256": "510823737aa7c457c2ba03f2070ed7c16f9cd83ce37534c6716c6dc77e858fe8",
+    "after_record_sha256": "e1101a67ee136ed0a40863d734f7fd0a63f1941089ef9f88b0a3dda859b0a402",
+    "release_input_list_sha256": "a6bfbea348941eecb1c7657575f8145b6cd27ce7f3a32f17b9da5cbb9976707a",
+    "c1_input_list_sha256": "ca7a8cc22b82013ddd4e1f885bb9eb5afc79f6314770e5ae71bd4041b31c965f"
+  }
+}

@@ -18,6 +18,15 @@ including its existing retained C0 Stadium map-owner regression. The ordinary
 synthetic-control build are recorded as distinct producers in the
 [portable receipt](../evidence/issue254-profile-map-ownership-v1.json).
 
+After PR #259 advanced main to `e782cb8440672711b40adea19a4ee8983da11908`,
+the two owned commits were refreshed once. The original `5b5112a` validation
+producer remains the suite/build producer. Source patch IDs and all five source
+blobs are unchanged; both existing Ninja target input lists are byte-identical
+before and after refresh, with no path overlap from PR #259. The
+[current-main refresh receipt](../evidence/issue254-current-main-refresh-v1.json)
+records this scoped reuse separately; no additional build, suite, native run,
+or browser run was performed.
+
 Earlier evidence is retained and scoped: a missing `cmake` PATH entry prevented
 one build from starting; a subsequent compile exposed an invalid `constexpr`
 test value; the first synthetic fixture run exposed a duplicate relocation
