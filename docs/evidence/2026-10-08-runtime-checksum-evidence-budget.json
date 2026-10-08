@@ -33,20 +33,28 @@
     "raw_receipt_sha256": "9d9de0b2d68aee0a0f18b23e47f0d0fdcf7bb693243a8c6f61a694c98c368487"
   },
   "focused": {
-    "pass": 136,
+    "pass": 128,
     "fail": 0,
-    "log_sha256": "21dfa1eb1117054e3a478dee684dfe9e513b3a506c49190d90e41a2031c33034",
+    "test_producer": "faca88f0a18c11445ba88d540f7691d04a43a66f",
+    "files": [
+      "tests/net_lockstep_runtime_owner.test.mjs",
+      "tests/net_lockstep_browser_peer.test.mjs",
+      "tests/net_lockstep_browser_pump.test.mjs",
+      "tests/net_lockstep_development_owner.test.mjs"
+    ],
+    "log_sha256": "e4f597a9c42774eda6eaef3f14482c4fb554666ef3e0955064731a382a29b113",
     "contract_wrapper_exit": 0,
-    "contract_wrapper_log_sha256": "8ea575bc5eb49b31f4b7e86b9acae339c8c237d66b0d656dde0ce5197f25036f"
+    "contract_wrapper_log_sha256": "5f19db9ed914e4fe2a2c3b90fb2edee4cf537cceba9a0ef78e96c550dcace0b2"
   },
   "full_suite": {
     "tests": 2075,
     "skipped": 153,
     "failures": 0,
-    "seconds": 464.998,
+    "seconds": 462.456,
     "exit_code": 0,
-    "log_sha256": "f0551898085a3c295e0ace9d917736d89ce41c0ddc49d88b7609c0be8df16d9f",
-    "process_receipt_sha256": "10e5e0fd9df03776a5d46ea6ac2ae311afbaf39f0be961b4290f6d2a61a0e7b7"
+    "test_producer": "faca88f0a18c11445ba88d540f7691d04a43a66f",
+    "log_sha256": "f0b0a034ade91060799dbb3f9b2c3cad252b074e8ecdc6217473fedfc515d463",
+    "process_receipt_sha256": "f60cb6c6dee21316bc93eba6e99c914517baf7a0c3d600c2c2a6dfda46685d63"
   },
   "ordinary_release": {
     "configuration": "Release",
@@ -298,5 +306,51 @@
     "performance",
     "two-machine Internet",
     "pixels or PCM equivalence"
-  ]
+  ],
+  "historical_pre_ci_full_suite": {
+    "tests": 2075,
+    "skipped": 153,
+    "failures": 0,
+    "seconds": 464.998,
+    "exit_code": 0,
+    "log_sha256": "f0551898085a3c295e0ace9d917736d89ce41c0ddc49d88b7609c0be8df16d9f",
+    "process_receipt_sha256": "10e5e0fd9df03776a5d46ea6ac2ae311afbaf39f0be961b4290f6d2a61a0e7b7"
+  },
+  "historical_pre_ci_focused": {
+    "pass": 136,
+    "fail": 0,
+    "log_sha256": "21dfa1eb1117054e3a478dee684dfe9e513b3a506c49190d90e41a2031c33034",
+    "contract_wrapper_exit": 0,
+    "contract_wrapper_log_sha256": "8ea575bc5eb49b31f4b7e86b9acae339c8c237d66b0d656dde0ce5197f25036f"
+  },
+  "failed_ci": {
+    "run": 37773902853,
+    "head": "a8c437c376084c57d8819f3d2baa5212094af229",
+    "unit_job": 113299983721,
+    "unit_log_sha256": "2338748771610dce5c6dc80ed0905c34f6b67fa8f30eef6c790661945afccec3",
+    "browser_job": 113303852011,
+    "browser_log_sha256": "cc70c7624b6f003a39bf47a3fdaf7b698857acd2cc8e89786c78737f89fddfba",
+    "first_cause": "Fixed twelve-turn test observation preceded authoritative default-513 error settlement; missing finally cleanup cascaded into capture-owner refusals",
+    "browser_build_executed": false
+  },
+  "test_repair": {
+    "producer": "faca88f0a18c11445ba88d540f7691d04a43a66f",
+    "tree": "599ad5d30c7410542fac4fd914181afe5c9f7630",
+    "path": "tests/net_lockstep_runtime_owner.test.mjs",
+    "sha256": "33a8d51da76afdc63932b1b07152418522c0e20e7b0f7b499b60660c33868bb9",
+    "diff_sha256": "c5352c56168ca47fcc64aec451fe1da39541783c66fdceaac88073dde55a39b6",
+    "root_review_sha256": "f7ea1c7264cff2657bb8cb346be4d6a676d91a7e4c637dd3044550cc438a7d40",
+    "deferred_push_reproduces_fixed_turn_race": true,
+    "bounded_authoritative_settlement": true,
+    "cleared_deadline_timers": true,
+    "assertion_failure_preserves_first_error_and_closes_owner": true,
+    "production_bytes_unchanged": true
+  },
+  "ordinary_release_reuse": {
+    "producer": "1792f5bf512d57fc1be8436d4087fb8320062ac3",
+    "no_new_build": true,
+    "exact_diff_only_test_and_docs": true,
+    "40_build_40_staged_8_modules_match_original": true,
+    "reuse_and_cleanup_receipt_sha256": "16113b45fc5f5bb2a118a38581b2fd8672ab0da1287d1078ac90686a0a189b87"
+  }
 }

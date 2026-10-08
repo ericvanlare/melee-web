@@ -6,10 +6,11 @@ Scoped component controls.
 
 Issue #279 removes the cumulative 512-record retention barrier for explicitly
 bounded development sessions. The [portable receipt](../evidence/2026-10-08-runtime-checksum-evidence-budget.json)
-binds the component controls and ordinary Release to source producer
+binds the unchanged runtime and ordinary Release to producer
 `1792f5bf512d57fc1be8436d4087fb8320062ac3`, based on merged main
 `724cbb1c7220a10921521aae58e21a958c401c56`. Documentation commits are separate
-from that producer.
+from that producer. The repaired component-test producer is
+`faca88f0a18c11445ba88d540f7691d04a43a66f`; it changes only the test fixture.
 
 The owner keeps its default 512-record budget. An explicit
 `checksumEvidenceRecords` must equal the declared source tick count, within the
@@ -28,8 +29,20 @@ normal-close quiescence in that fixture. Malformed records, conflicting duplicat
 checksums, out-of-range source ticks and cumulative overflow retain their failure
 guards and first causes. Two preparation assertion failures remain retained.
 
-Current-main regression validation passed 2,075 tests with 153 skips and no
-failures; ordinary Release also passed with all ten optional runtime flags off.
+The first CI run on `a8c437c3` failed because the new default control inspected
+an asynchronous final push after twelve event-loop turns, before its authoritative
+error state had settled. The failed assertion skipped cleanup and cascaded into
+capture-owner refusals; browser-build stopped at its verification gate without
+building. A deferred-push reproducer retains 512 records with no error after those
+twelve turns, then reaches the same expected refusal after release. The test-only
+repair waits for bounded completed/error predicates, clears its deadline timers
+and closes fixtures in `finally`, including an assertion-failure cleanup control.
+All failed job logs remain retained. No runtime guard or success assertion changed.
+
+The repaired regression suite passed 2,075 tests with 153 skips and no failures;
+the 128 affected focused controls and full contract wrapper also passed. The
+original `1792` ordinary Release remains the build producer, with all ten optional
+runtime flags off; no new build was run for the test-only repair.
 Forty build artifacts were staged and hashed, and all eight runtime module
 bodies match their source files. Owned suite/build processes and process groups
 exited, and the external temporary directory is empty.
