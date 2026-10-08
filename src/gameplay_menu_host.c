@@ -2195,7 +2195,8 @@ int melee_web_menu_host_prize_end(MeleeWebMenuHost* h,uint32_t seed,
 int melee_web_menu_host_destroy(MeleeWebMenuHost* h,char* e,size_t n){
     if(!h||h!=owner||h->entered||h->source_scene!=MELEE_WEB_HOST_SCENE_NONE||
        h->transition||h->audio||h->opening_active||h->opening_match_suspended||
-       h->sudden_death_active||h->sudden_death_claimed||h->sudden_death_scene_active||
+       h->sudden_death_claimed||h->sudden_death_scene_active||
+       (h->sudden_death_active&&melee_web_gameplay_generation())||
        seed_ptr!=&h->seed)
         return fail(e,n,"Close native menu scene and restore RNG before destroying host");
     const int owns_scene_info =
