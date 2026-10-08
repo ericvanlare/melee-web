@@ -124,9 +124,22 @@ export async function readNetSourceAccounting(page, {freeze = false} = {}) {
 }
 
 export function verifyNetSourceAccounting(capture, expectedCursor) {
+  return verifySourceAccounting(capture, expectedCursor, true);
+}
+
+// A read-only snapshot at a complete source boundary preserves the active
+// progress subscription. Final exported accounting still requires its freeze.
+export function verifyHeldNetSourceAccounting(capture, expectedCursor) {
+  if (capture?.frozen !== false || capture.final?.blocker !== 'complete' ||
+      capture.final?.terminal?.kind !== 0)
+    throw Error('Network source accounting snapshot is not held at a complete boundary');
+  return verifySourceAccounting(capture, expectedCursor, false);
+}
+
+function verifySourceAccounting(capture, expectedCursor, requireFrozen) {
   if (!Number.isSafeInteger(expectedCursor) || expectedCursor < 0)
     throw Error('Invalid expected network cursor');
-  if (!capture?.frozen || capture.initial?.active !== 1 || capture.initial?.cursor !== 0 ||
+  if ((requireFrozen && !capture?.frozen) || capture.initial?.active !== 1 || capture.initial?.cursor !== 0 ||
       capture.initial?.blocker !== 'start_identity' || capture.final?.active !== 1 ||
       capture.final?.cursor !== expectedCursor || capture.overflow !== 0 ||
       !Array.isArray(capture.errors) || capture.errors.length ||

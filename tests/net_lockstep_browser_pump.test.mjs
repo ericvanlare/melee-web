@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
-import {verifyPositivePeerCompletion} from '../scripts/net_lockstep_observers.mjs';
+import {readyRenderEvent, verifyAccountedRenderReadiness, verifyPositivePeerCompletion} from '../scripts/net_lockstep_observers.mjs';
 import {collapseConsecutiveScenes} from '../scripts/net_determinism_contract.mjs';
 import {createBrowserNativePeer, BROWSER_CHECKSUM_EXPORT_LIMIT} from '../scripts/net_lockstep_browser_peer.mjs';
 import {LockstepPeer} from '../scripts/net_lockstep_core.mjs';
@@ -635,15 +635,25 @@ test('runtime CSS-to-match final screenshot retains the phase-7 active-match bou
   assert(start >= 0 && end > start);
   const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]);
   async function run({frozen = true, complete = true, noPeerRpc = true, crossed512 = true,
-    cursorAfterScreenshot = 520, phaseAfterScreenshot = 7, gpuObserved = true} = {}) {
+    cursorAfterScreenshot = 520, phaseAfterScreenshot = 7, gpuObserved = true, invalidReadiness = null, pngValid = true,
+    nativeBefore = {}, statusBefore = {}} = {}) {
     const events = [], instanceRows = {alpha: {route_boundary_captures: [], route_boundary_misses: [],
       runtime_input_fixture_frozen: {frozen, captured_count: 518}}};
+    const accounting = {frozen: false, initial: {active: 1, cursor: 0, blocker: 'start_identity'},
+      final: {active: 1, cursor: 520, blocker: 'complete', terminal: {kind: 0}}, overflow: 0, errors: [],
+      rows: Array.from({length: 520}, (_, index) => ({frame: index + 1, valid: 1, source_steps: 1, source_draws: 1})),
+      render_readiness_enabled: true, render_readiness: {row_index: 519, frame: 520, valid: 1,
+        source_steps: 1, source_draws: 1, began: 1, drawn: 1, preparation_ms: 0, draw_suppressed: 0,
+        draw_calls: 252, source_cursor: 520, phase: 7, running: 1, error: null,
+        status: 'Original match', source: 'source frame: 90 · ready: 1'}};
+    if (invalidReadiness) Object.assign(accounting.render_readiness, invalidReadiness);
     let statusCalls = 0, screenshotCount = 0;
     const instances = {alpha: {
+      async readSourceAccounting(options) { assert.equal(options.freeze, false); events.push('accounting'); return accounting; },
       driver: {async diagnostics() { events.push('driver'); return {phase: 7, running: 1, status: 'Original match', log: ''}; }},
-      async native() { events.push('native'); return {phase: events.includes('screenshot') ? phaseAfterScreenshot : 7}; },
-      async status() { events.push('status'); ++statusCalls; return {cursor: statusCalls === 1 ? 520 : cursorAfterScreenshot,
-        blocker: 'complete'}; },
+      async native() { events.push('native'); return {phase: events.includes('screenshot') ? phaseAfterScreenshot : 7, running: 1, error: null, ...(!events.includes('screenshot') ? nativeBefore : {})}; },
+      async status() { events.push('status'); ++statusCalls; return {active: 1, cursor: statusCalls === 1 ? 520 : cursorAfterScreenshot,
+        blocker: 'complete', ...(!events.includes('screenshot') ? statusBefore : {})}; },
       async screenshot(file) { events.push('screenshot'); ++screenshotCount; assert.match(file, /route-match\.png$/); },
       async graphics() { events.push('graphics'); return {cross_origin_isolated: true, webgpu_api: true,
         webgpu_adapter: gpuObserved}; },
@@ -656,8 +666,8 @@ test('runtime CSS-to-match final screenshot retains the phase-7 active-match bou
       runtimeCssMatch: true, sourceTicks: 520, usedInputs: 518,
       POSITIVE_ROUTE_BOUNDARIES: [{name: 'css-start', phase: 1, label: 'CSS'},
         {name: 'sss', phase: 3, label: 'SSS'}, {name: 'match', phase: 7, label: 'original match'}],
-      fs: {async readFile(file) { events.push('read'); assert.match(file, /route-match\.png$/); return png; }},
-      readyRenderEvent: (_diagnostics, phase) => phase === 7 ? {phase, draw_calls: 1, source_draws: 1} : null,
+      fs: {async readFile(file) { events.push('read'); assert.match(file, /route-match\.png$/); return pngValid ? png : Buffer.from([0]); }},
+      readyRenderEvent, verifyAccountedRenderReadiness,
       sha256: () => 'fixture-png-sha256',
     });
     const capture = vm.runInContext(`${helperSource}\n;captureRuntimeCssMatchFinalBoundary`, context);
@@ -669,7 +679,7 @@ test('runtime CSS-to-match final screenshot retains the phase-7 active-match bou
   await valid.capture();
   const row = valid.instanceRows.alpha.route_boundary_captures[0];
   assert.equal(valid.screenshotCount, 1);
-  assert.deepEqual(valid.events, ['driver', 'native', 'status', 'screenshot', 'read', 'native', 'status', 'graphics']);
+  assert.deepEqual(valid.events, ['accounting', 'driver', 'native', 'status', 'screenshot', 'read', 'native', 'status', 'graphics']);
   assert.equal(row.name, 'match');
   assert.equal(row.source_cursor_sampled_before_screenshot, 520);
   assert.equal(row.source_cursor_after_screenshot, 520);
@@ -677,6 +687,15 @@ test('runtime CSS-to-match final screenshot retains the phase-7 active-match bou
   assert.equal(row.screenshot_phase_stable, true);
   assert.equal(row.gpu_observed, true);
   assert.equal(row.browser_driver.phase, 7);
+  assert.equal(row.render_readiness.kind, 'structured native accounting callback');
+  assert.equal(valid.instanceRows.alpha.route_boundary_observations[0].source_accounting_snapshot.frozen, false);
+  assert.equal(readyRenderEvent(row.browser_driver, 7), null);
+  for (const invalidReadiness of [{source_cursor: 519}, {phase: 3}, {preparation_ms: 1}, {draw_suppressed: 1}, {draw_calls: 0}]) {
+    const invalid = await run({invalidReadiness});
+    await assert.rejects(invalid.capture(), /screenshot was not captured/);
+    assert.equal(invalid.screenshotCount, 0);
+    assert.match(invalid.instanceRows.alpha.route_boundary_observations[0].render_readiness_error, /Structured render readiness/);
+  }
 
   for (const options of [{frozen: false}, {complete: false}, {noPeerRpc: false}, {crossed512: false}, {gpuObserved: false}]) {
     const invalid = await run(options);
@@ -684,6 +703,23 @@ test('runtime CSS-to-match final screenshot retains the phase-7 active-match bou
     else await assert.rejects(invalid.capture());
     assert.equal(invalid.screenshotCount, options.gpuObserved === false ? 1 : 0);
   }
+  for (const options of [{nativeBefore: {phase: 3}}, {nativeBefore: {error: 'native failed'}},
+    {nativeBefore: {running: 0}}, {statusBefore: {blocker: 'terminal'}}]) {
+    const invalid = await run(options);
+    await assert.rejects(invalid.capture(), /screenshot was not captured/);
+    assert.equal(invalid.screenshotCount, 0);
+    const observation = invalid.instanceRows.alpha.route_boundary_observations[0];
+    assert(observation.render_readiness_error);
+    assert.deepEqual(options.nativeBefore ?? options.statusBefore,
+      Object.fromEntries(Object.keys(options.nativeBefore ?? options.statusBefore)
+        .map(key => [key, (options.nativeBefore ? observation.native : observation.status)[key]])));
+    assert.match(invalid.instanceRows.alpha.route_boundary_misses[0].reason, /verified structured draw/);
+  }
+  const invalidPng = await run({pngValid: false});
+  await assert.rejects(invalidPng.capture(), /not a PNG/);
+  assert.equal(invalidPng.screenshotCount, 1);
+  const changedPhase = await run({phaseAfterScreenshot: 8});
+  await assert.rejects(changedPhase.capture(), /changed the source boundary/);
   const moved = await run({cursorAfterScreenshot: 521});
   await assert.rejects(moved.capture(), /changed the source boundary/);
 });

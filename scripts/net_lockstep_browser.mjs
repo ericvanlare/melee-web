@@ -365,14 +365,29 @@ function recordMissedBoundary(role, boundary, reason, {phase = null, cursor = nu
   }
 }
 
-async function captureRouteBoundary(role, boundary, priorSignatures) {
+async function captureRouteBoundary(role, boundary, priorSignatures, heldAccounting = null) {
   const row = instanceRows[role];
   if (row.route_boundary_captures.some(item => item.name === boundary.name) ||
       row.route_boundary_misses.some(item => item.name === boundary.name)) return;
   const driverDiagnostics = await instances[role].driver.diagnostics();
-  const readiness = readyRenderEvent(driverDiagnostics, boundary.phase, priorSignatures);
   const nativeBefore = await instances[role].native();
   const statusBefore = await instances[role].status();
+  let readiness = null, readinessError = null;
+  if (heldAccounting) {
+    try { readiness = verifyAccountedRenderReadiness(heldAccounting, nativeBefore, statusBefore,
+      sourceTicks, boundary.phase, {heldSnapshot: true}); }
+    catch (error) { readinessError = String(error.message || error); }
+  } else readiness = readyRenderEvent(driverDiagnostics, boundary.phase, priorSignatures);
+  (row.route_boundary_observations ??= []).push({name: boundary.name,
+    browser_driver: driverDiagnostics, native: nativeBefore, status: statusBefore,
+    render_readiness: readiness, render_readiness_error: readinessError,
+    render_readiness_basis: heldAccounting ? 'held read-only source accounting snapshot' : 'existing driver text events',
+    structured_render_observation: heldAccounting?.render_readiness ?? null,
+    source_accounting_snapshot: heldAccounting,
+    prior_signatures: [...priorSignatures],
+    predicates: {render_readiness: Boolean(readiness), native_phase: nativeBefore.phase === boundary.phase,
+      nonterminal: statusBefore.blocker !== 'terminal'},
+    observed_at: new Date().toISOString()});
   if (!readiness || nativeBefore.phase !== boundary.phase || statusBefore.blocker === 'terminal') return false;
   const cursor = statusBefore.cursor;
   const screenshotPath = routeBoundaryPath(role, boundary);
@@ -434,10 +449,12 @@ async function captureRuntimeCssMatchFinalBoundary(role) {
       interval.actual_native_cursor_progress_each !== true || interval.crossed_512_each !== true)
     throw Error(`${role} final match observation requires the frozen input fixture and completed read-only 512 interval`);
   const boundary = POSITIVE_ROUTE_BOUNDARIES[2];
-  const captured = await captureRouteBoundary(role, boundary, new Set());
+  // Reading does not detach the owner's progress subscriber or advance source.
+  const accounting = await instances[role].readSourceAccounting({freeze: false});
+  const captured = await captureRouteBoundary(role, boundary, new Set(), accounting);
   if (!captured) {
     const [status, native] = await Promise.all([instances[role].status(), instances[role].native()]);
-    recordMissedBoundary(role, boundary, 'active match had no ready driver draw for screenshot and GPU diagnostics',
+    recordMissedBoundary(role, boundary, 'active match had no verified structured draw at the held source boundary for screenshot and GPU diagnostics',
       {phase: native.phase, cursor: status.cursor});
     throw Error(`${role} final active-match boundary screenshot was not captured`);
   }
