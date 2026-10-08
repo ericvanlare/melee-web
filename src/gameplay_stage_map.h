@@ -7,6 +7,13 @@
 extern "C" {
 #endif
 typedef struct MeleeWebStageMap MeleeWebStageMap;
+/* Read-only view of Ground's original private map-state allocation. The byte
+ * request is the authored Ground buffer_size; callers must not infer a layout
+ * or use this pointer to mutate the source owner. */
+typedef struct MeleeWebGroundMapStorageView {
+ const void* payload;
+ size_t requested_bytes;
+} MeleeWebGroundMapStorageView;
 /* Publish an already checked, completely hydrated original UnkStageDat graph.
  * Borrows all descriptors; no raw HSD_Archive handle is manufactured. This is
  * map storage readiness only. Call original stage initialization separately
@@ -22,6 +29,10 @@ int melee_web_stage_map_close(MeleeWebStageMap*,char*,size_t);
 /* Original grDatFiles storage adapters. NULL means no owned native context. */
 void* melee_web_stage_map_archives(void);
 void* melee_web_stage_map_lookup(int map_id);
+int melee_web_ground_map_storage_available(void);
+int melee_web_ground_map_storage_begin(void);
+int melee_web_ground_map_storage_end(void);
+int melee_web_ground_map_storage_read(MeleeWebGroundMapStorageView*);
 #ifdef __cplusplus
 }
 #endif

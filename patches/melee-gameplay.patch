@@ -5349,7 +5349,7 @@ index 116be3d41cc321eefbd5c71c9de7282e92220bbc..3d5a61476b4327b7f321704dceb7e8d2
  
  void grOldYoshi_8020E79C(void)
 diff --git a/src/melee/gr/ground.c b/src/melee/gr/ground.c
-index 6c26c029432e5a07f6c0a34343d87f9fd3364367..137d9c8d76dfe57c96ef79159de59e246f97e0da 100644
+index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807dfc36eabb 100644
 --- a/src/melee/gr/ground.c
 +++ b/src/melee/gr/ground.c
 @@ -1,5 +1,10 @@
@@ -5363,7 +5363,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..137d9c8d76dfe57c96ef79159de59e24
  #include <Runtime/platform.h>
  
  #include <math.h>
-@@ -284,6 +289,28 @@ void Ground_801C0378(int arg0)
+@@ -284,6 +289,35 @@ void Ground_801C0378(int arg0)
      zeroBuffer();
  }
  
@@ -5387,12 +5387,19 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..137d9c8d76dfe57c96ef79159de59e24
 +    Ground_804D6950 = NULL;
 +    return 1;
 +}
++int melee_web_ground_map_storage_read(MeleeWebGroundMapStorageView* out)
++{
++    if (out == NULL) return 0;
++    out->payload = Ground_804D6950;
++    out->requested_bytes = (size_t) buffer_size;
++    return 1;
++}
 +#endif
 +
  void mem_free(void* ptr)
  {
      HSD_Free(ptr);
-@@ -499,8 +526,15 @@ void Ground_801C0800(StageIdPair* pair)
+@@ -499,8 +533,15 @@ void Ground_801C0800(StageIdPair* pair)
          }
      }
      if (stage_info.map_ptcl != NULL && stage_info.map_texg != NULL) {
@@ -5408,7 +5415,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..137d9c8d76dfe57c96ef79159de59e24
      }
      mpLibLoad(stage_info.coll_data);
      mpLib_80058820();
-@@ -694,8 +728,13 @@ void Ground_801C0FB8(StageIdPair* pair)
+@@ -694,8 +735,13 @@ void Ground_801C0FB8(StageIdPair* pair)
  {
      struct {
          void* unk0;
@@ -5422,7 +5429,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..137d9c8d76dfe57c96ef79159de59e24
      }* cur;
      void* next;
      stage_datas[pair->grkind]->on_start();
-@@ -1187,6 +1226,19 @@ static inline bool find_light_override(UnkArchiveStruct* archive,
+@@ -1187,6 +1233,19 @@ static inline bool find_light_override(UnkArchiveStruct* archive,
                                         HSD_LightDesc* desc, bool* b6, bool* b7,
                                         bool* b5)
  {
@@ -5442,7 +5449,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..137d9c8d76dfe57c96ef79159de59e24
      UnkStageDat* dat = archive->unk4;
      s32 count = dat->unk1C;
      s32 i;
-@@ -1210,6 +1262,19 @@ static inline bool find_light_override_in_dat(UnkStageDat* dat,
+@@ -1210,6 +1269,19 @@ static inline bool find_light_override_in_dat(UnkStageDat* dat,
                                                HSD_LightDesc* desc, bool* b6,
                                                bool* b7, bool* b5)
  {
@@ -5462,7 +5469,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..137d9c8d76dfe57c96ef79159de59e24
      s32 count = dat->unk1C;
      s32 i;
  
-@@ -1523,6 +1588,13 @@ void Ground_801C28CC(s32* arg0, StKind stkind)
+@@ -1523,6 +1595,13 @@ void Ground_801C28CC(s32* arg0, StKind stkind)
      panicMissingStageParam(stkind, count);
  }
  
@@ -5476,7 +5483,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..137d9c8d76dfe57c96ef79159de59e24
  s32* Ground_801C2AD8(void)
  {
      return &stage_info.xA0;
-@@ -2646,6 +2718,7 @@ void Ground_801C466C(void)
+@@ -2646,6 +2725,7 @@ void Ground_801C466C(void)
      int i;
      int count;
      HSD_GObj* temp_r3;
@@ -5484,7 +5491,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..137d9c8d76dfe57c96ef79159de59e24
      HSD_LObj* temp_r3_2;
      LightList** var_r27_2;
      HSD_LObj* var_r27;
-@@ -2666,6 +2739,7 @@ void Ground_801C466C(void)
+@@ -2666,6 +2746,7 @@ void Ground_801C466C(void)
          if (callbacks->flags_b0 == 1) {
              archive = grDatFiles_801C6330(i);
              selected = Ground_801C20E0(archive, archive->unk4->unk8[i].x18);
@@ -5492,7 +5499,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..137d9c8d76dfe57c96ef79159de59e24
              goto light_selected;
          }
          callbacks++;
-@@ -2674,7 +2748,18 @@ void Ground_801C466C(void)
+@@ -2674,7 +2755,18 @@ void Ground_801C466C(void)
  light_selected:
      if ((r28_carrier.lights = selected) == NULL) {
          r28_carrier.lights = Ground_803E06C8;
@@ -5511,7 +5518,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..137d9c8d76dfe57c96ef79159de59e24
      temp_r3 = GObj_Create(0xD, 3, 0);
      if (temp_r3 == NULL) {
          OSReport("%s:%d: couldn t get gobj\n", __FILE__, 0xEAF);
-@@ -3356,3 +3441,34 @@ void Ground_801C5AEC(Vec3* v, Vec3* arg1, Vec3* arg2, Vec3* arg3)
+@@ -3356,3 +3448,34 @@ void Ground_801C5AEC(Vec3* v, Vec3* arg1, Vec3* arg2, Vec3* arg3)
  
  /// @todo Is this used by base pointer anywhere? Not stripped by mwcc.
  static int unused_ints[] = { 1, 1, 0, 0, 0, 180, 0, 0, 0 };

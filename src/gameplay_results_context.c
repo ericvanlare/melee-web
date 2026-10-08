@@ -4,6 +4,7 @@
 #include "gameplay_collision.h"
 #include "gameplay_fighter_assets.h"
 #include "gameplay_match_clock.h"
+#include "gameplay_stage_map.h"
 #include "hsd_native_joint.h"
 
 #include <melee/cm/camera.h>
@@ -64,8 +65,6 @@ extern TyDspEntry *Toy_sbss_804D6EB0, *Toy_sbss_804D6EAC;
 
 /* Results invokes this source allocator itself in fn_8017AA78. This accessor
  * is read-only here: a competing stage scope must fail before OnEnter. */
-extern int melee_web_ground_map_storage_available(void);
-extern int melee_web_ground_map_storage_end(void);
 extern int melee_web_stage_selection_begin(int);
 extern int melee_web_stage_selection_end(void);
 extern int melee_web_audio_is_active(MeleeWebAudio*);

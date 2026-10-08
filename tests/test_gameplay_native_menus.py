@@ -389,6 +389,112 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         self.assertEqual(events[0]["event"], "stadium_e8_request_returned")
         self.assertEqual(events[0]["selection"]["rules"]["stage_kind"], 3)
 
+    def test_stadium_ground_map1_owner_lifetime(self):
+        if os.environ.get("MELEE_RUN_STADIUM_GROUND_MAP1_OWNER") != "1":
+            self.skipTest(
+                "The single retained map1 constructor experiment requires its explicit run gate"
+            )
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        fixture_value = os.environ.get("MELEE_MENU_FIXTURE_ROOT")
+        if not fixture_value:
+            self.fail("MELEE_MENU_FIXTURE_ROOT is required for the retained map1 packet")
+        fixture_root = Path(fixture_value)
+        if not fixture_root.is_absolute():
+            fixture_root = ROOT / fixture_root
+        menu, game = fixture_root / "native-menus", fixture_root / "next-gate"
+        self.assertTrue(target.is_file(), f"Build the reviewed diagnostic target first: {target}")
+        self.assertTrue(menu.is_dir(), f"Missing owned menu fixture root: {menu}")
+        self.assertTrue(game.is_dir(), f"Missing owned game fixture root: {game}")
+
+        script = (
+            "import {NATIVE_MENU_DISC_FILES} from './web/runtime-assets.mjs'; "
+            "console.log(JSON.stringify([...Object.keys(NATIVE_MENU_DISC_FILES), "
+            "'dsp_coef.bin', 'sislib_font.bin']))"
+        )
+        menu_names = json.loads(subprocess.check_output(
+            [str(node_runtime()), "--input-type=module", "-e", script],
+            cwd=ROOT, text=True))
+        selected_names = stadium_c1_selected_file_names()
+        self.assertEqual(len(menu_names), 76)
+        self.assertEqual(len(selected_names), 36)
+        required = sorted(set(menu_names) | set(selected_names))
+        self.assertEqual(len(required), 98)
+        missing = [name for name in required
+                   if not (menu / name).is_file() and not (game / name).is_file()]
+        self.assertFalse(
+            missing,
+            "Frozen C1 map1 RuntimeFiles are incomplete before launch: " +
+            ", ".join(missing),
+        )
+
+        source_revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        trace = self.scratch / "stadium-ground-map1-owner.jsonl"
+        command = [str(node_runtime()), str(target), str(menu), str(game), "3",
+                   str(trace), source_revision, "stadium-ground-map1-owner-v1"]
+        (self.scratch / "stadium-ground-map1-owner-command.txt").write_text(
+            " ".join(command) + "\n", encoding="utf-8")
+        (self.scratch / "stadium-ground-map1-owner-fixture-preflight.json").write_text(
+            json.dumps({"menu_names": menu_names,
+                        "selected_names": selected_names,
+                        "missing": missing}, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        try:
+            run = subprocess.run(
+                command, cwd=ROOT, capture_output=True, text=True, timeout=120)
+        except subprocess.TimeoutExpired as failure:
+            (self.scratch / "stadium-ground-map1-owner.stdout").write_bytes(
+                failure.stdout.encode() if isinstance(failure.stdout, str)
+                else (failure.stdout or b""))
+            (self.scratch / "stadium-ground-map1-owner.stderr").write_bytes(
+                failure.stderr.encode() if isinstance(failure.stderr, str)
+                else (failure.stderr or b""))
+            raise
+        (self.scratch / "stadium-ground-map1-owner.stdout").write_text(
+            run.stdout, encoding="utf-8")
+        (self.scratch / "stadium-ground-map1-owner.stderr").write_text(
+            run.stderr, encoding="utf-8")
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-7000:])
+        self.assertIn(
+            "C1a raw PAD CSS->SSS selection, one E8 typed request, and one "
+            "Ground map1 constructor/removal passed",
+            run.stdout,
+        )
+        e8_result = next(json.loads(line) for line in run.stdout.splitlines()
+                         if line.startswith('{"probe":"stadium-e8-request"'))
+        self.assertTrue(e8_result["stage_objects_started"])
+        self.assertTrue(e8_result["checked_teardown"])
+        self.assertEqual(e8_result["source_size_name"], "/GrPs.usd")
+        self.assertEqual(e8_result["typed_open_name"], "/GrPs.usd")
+        self.assertEqual(e8_result["itemdata_public_calls"], 0)
+        self.assertEqual(e8_result["map_plit_public_calls"], 0)
+        owner_result = next(json.loads(line) for line in run.stdout.splitlines()
+                            if line.startswith('{"probe":"stadium-ground-map1-owner"'))
+        self.assertEqual(owner_result["map_id"], 1)
+        self.assertEqual(owner_result["requested_bytes"], 64)
+        self.assertGreater(owner_result["source_heap"], -1)
+        self.assertGreater(owner_result["world_generation"], 0)
+        self.assertGreater(owner_result["allocation_generation"], 0)
+        self.assertGreater(owner_result["source_markers"], 0)
+        self.assertTrue(owner_result["device_bytes_restored"])
+        self.assertTrue(owner_result["buffer_retired"])
+        self.assertFalse(owner_result["callback_dispatch"])
+        self.assertEqual(owner_result["proc_ticks"], 0)
+        self.assertFalse(owner_result["rendered"])
+        self.assertTrue(owner_result["single_constructor_removal"])
+        owner_ids = owner_result["ft_device_owner_ids"]
+        self.assertEqual(len(owner_ids), 6)
+        self.assertEqual(len(set(owner_ids)), 6)
+
+        rows = [json.loads(line) for line in trace.read_text().splitlines()]
+        self.assertEqual(rows[0]["record"], "header")
+        self.assertEqual(rows[0]["input_recipe"], "stadium-ground-map1-owner-v1")
+        events = [row for row in rows if row.get("record") == "event"]
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["event"], "stadium_e8_request_returned")
+        self.assertEqual(events[0]["selection"]["rules"]["stage_kind"], 3)
+
     def test_owned_css_scene_lifecycle(self):
         targets = [ROOT / "build" / name / "native_css_callbacks.js"
                    for name in ("browser", "browser-release")]

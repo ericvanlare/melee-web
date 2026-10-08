@@ -25,6 +25,7 @@
 #include "dat_item_registry.hpp"
 #include "dat_item_registry_native.hpp"
 #include "dat_native_stage.hpp"
+#include "dat_native_joint.hpp"
 #include "dat_scene.hpp"
 #include "dat_stage.hpp"
 #include "dat_stage_items.hpp"
@@ -35,6 +36,7 @@
 #include "gameplay_stage_map.h"
 #include "native_dat.hpp"
 #include "stadium_c0_native_map_contract.hpp"
+#include "stadium_screen_roots_probe.h"
 #include "stadium_c1_e8_call_observer.h"
 #include "stadium_c1_item_owner_negative_cases.hpp"
 #include "stadium_c1_item_owner_preflight.hpp"
@@ -57,13 +59,22 @@ extern "C" {
 #include <melee/mn/mnmain.h>
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include <melee/gr/grdatfiles.h>
+#include <melee/gr/grpstadium.h>
+#include <melee/gr/ground.h>
 #include <melee/gr/stage.h>
+#include <melee/ft/ftdevice.h>
+#include <melee/ft/types.h>
 #include <sysdolphin/baselib/gobj.h>
+#include <sysdolphin/baselib/objalloc.h>
 #endif
 #include <melee/ty/forward.h>
 #include <melee/ty/toy.h>
 #include <melee/ty/types.h>
 extern HSD_Archive* _Toy_sbss_804D6ED0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+extern HSD_ObjAllocData gobj_alloc_data;
+extern HSD_ObjAllocData gobjproc_alloc_data;
+#endif
 }
 #include <melee/gr/forward.h>
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
@@ -137,6 +148,659 @@ void check_stadium_preflight_stage_empty()
     if (failures & MELEE_WEB_STADIUM_C1_ORDINARY_GRDAT_SLOT)
         detail += " ordinary grDatFiles slot occupied";
     check(failures == 0, detail.c_str());
+}
+
+struct GroundStoragePreCallFacts {
+    MeleeWebSourceMemoryReadStatus memory_status{};
+    MeleeWebSourceMemoryContext memory{};
+    int os_heap = -1;
+    int hsd_heap = -1;
+    uint64_t world_generation = 0;
+    bool world_active = false;
+    bool memory_healthy = false;
+    bool storage_available = false;
+    MeleeWebGroundMapStorageView storage{};
+    bool map_registry_empty = false;
+    bool stage_gobj_list_empty = false;
+    bool stage_markers_empty = false;
+    bool dispatch_quiet = false;
+};
+
+bool ground_storage_pre_call_supported(const GroundStoragePreCallFacts& facts)
+{
+    return facts.memory_status == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+           facts.os_heap >= 0 && facts.os_heap == facts.hsd_heap &&
+           facts.memory.source_heap_handle == facts.hsd_heap &&
+           facts.memory.world_generation != 0 &&
+           facts.memory.world_generation == facts.world_generation &&
+           facts.world_active && facts.memory_healthy &&
+           facts.storage_available && facts.storage.payload == nullptr &&
+           facts.storage.requested_bytes == 64 &&
+           facts.map_registry_empty && facts.stage_gobj_list_empty &&
+           facts.stage_markers_empty && facts.dispatch_quiet;
+}
+
+void ground_storage_pre_call_controls()
+{
+    GroundStoragePreCallFacts valid{};
+    valid.memory_status = MELEE_WEB_SOURCE_MEMORY_READ_OK;
+    valid.memory = {7, 19, 23};
+    valid.os_heap = 7;
+    valid.hsd_heap = 7;
+    valid.world_generation = 19;
+    valid.world_active = true;
+    valid.memory_healthy = true;
+    valid.storage_available = true;
+    valid.storage = {nullptr, 64};
+    valid.map_registry_empty = true;
+    valid.stage_gobj_list_empty = true;
+    valid.stage_markers_empty = true;
+    valid.dispatch_quiet = true;
+    check(ground_storage_pre_call_supported(valid),
+          "Ground storage pure gate rejected its supported synthetic context");
+    auto rejected = [&](auto change, const char* message) {
+        auto invalid = valid;
+        change(invalid);
+        check(!ground_storage_pre_call_supported(invalid), message);
+    };
+    rejected([](auto& f) { f.memory_status = MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE; },
+             "Ground storage pure gate accepted inactive source memory");
+    rejected([](auto& f) { f.hsd_heap += 1; },
+             "Ground storage pure gate accepted a different HSD heap");
+    rejected([](auto& f) { f.world_generation += 1; },
+             "Ground storage pure gate accepted a stale world generation");
+    rejected([](auto& f) { f.memory_healthy = false; },
+             "Ground storage pure gate accepted unhealthy source memory");
+    rejected([](auto& f) { f.storage_available = false; },
+             "Ground storage pure gate accepted an already-owned buffer");
+    rejected([](auto& f) { f.storage.payload = reinterpret_cast<void*>(1); },
+             "Ground storage pure gate accepted a live buffer before begin");
+    rejected([](auto& f) { f.storage.requested_bytes = 63; },
+             "Ground storage pure gate accepted a changed authored request");
+    rejected([](auto& f) { f.map_registry_empty = false; },
+             "Ground storage pure gate accepted an occupied map registry");
+    rejected([](auto& f) { f.stage_gobj_list_empty = false; },
+             "Ground storage pure gate accepted an existing Stage GObj");
+    rejected([](auto& f) { f.stage_markers_empty = false; },
+             "Ground storage pure gate accepted pre-existing StageInfo marker owners");
+    rejected([](auto& f) { f.dispatch_quiet = false; },
+             "Ground storage pure gate accepted active object dispatch");
+}
+
+struct FtDeviceGlobalSnapshot {
+    std::array<ftDeviceUnk3, 1> first{};
+    std::array<ftDeviceUnk5, 2> bury_things{};
+    std::array<ftDeviceUnk3, 1> third{};
+    ftDeviceUnk4 fourth{};
+    int first_count = 0;
+    int bury_thing_count = 0;
+
+    FtDeviceGlobalSnapshot() { capture(); }
+
+    void capture()
+    {
+        std::memcpy(first.data(), ft_80459A68, sizeof(first));
+        std::memcpy(bury_things.data(), ftDevice_BuryThings,
+                    sizeof(bury_things));
+        std::memcpy(third.data(), ft_80459A8C, sizeof(third));
+        std::memcpy(&fourth, &ft_804D6578, sizeof(fourth));
+        first_count = ft_804D6570;
+        bury_thing_count = ftDevice_BuryThingCount;
+    }
+
+    void restore() const
+    {
+        std::memcpy(ft_80459A68, first.data(), sizeof(first));
+        std::memcpy(ftDevice_BuryThings, bury_things.data(),
+                    sizeof(bury_things));
+        std::memcpy(ft_80459A8C, third.data(), sizeof(third));
+        std::memcpy(&ft_804D6578, &fourth, sizeof(fourth));
+        ft_804D6570 = first_count;
+        ftDevice_BuryThingCount = bury_thing_count;
+    }
+
+    bool matches() const
+    {
+        return std::memcmp(ft_80459A68, first.data(), sizeof(first)) == 0 &&
+               std::memcmp(ftDevice_BuryThings, bury_things.data(),
+                           sizeof(bury_things)) == 0 &&
+               std::memcmp(ft_80459A8C, third.data(), sizeof(third)) == 0 &&
+               std::memcmp(&ft_804D6578, &fourth, sizeof(fourth)) == 0 &&
+               ft_804D6570 == first_count &&
+               ftDevice_BuryThingCount == bury_thing_count;
+    }
+};
+
+bool ground_dispatch_quiet()
+{
+    return HSD_GObj_804D781C == nullptr && HSD_GObj_804D7818 == nullptr &&
+           HSD_GObj_804D7814 == nullptr && HSD_GObj_804D7830 == nullptr &&
+           HSD_GObj_804D7838 == nullptr && HSD_GObj_804CE3E4.flags == 0;
+}
+
+uint32_t source_stage_gobj_count()
+{
+    check(HSD_GObj_Entities != nullptr,
+          "Ground map probe has no original GObj list owner");
+    auto** heads = reinterpret_cast<HSD_GObj**>(HSD_GObj_Entities);
+    const uint32_t used = HSD_ObjAllocGetUsing(&gobj_alloc_data);
+    uint32_t traversed = 0;
+    uint32_t stage_count = 0;
+    for (uint32_t link = 0; link <= HSD_GObjLibInitData.p_link_max; ++link) {
+        for (HSD_GObj* current = heads[link]; current;
+             current = current->next) {
+            check(++traversed <= used && current->p_link == link,
+                  "Original GObj list is cyclic or disagrees with its pool owner");
+            if (current->classifier == HSD_GOBJ_CLASS_STAGE) ++stage_count;
+        }
+    }
+    return stage_count;
+}
+
+bool source_stage_registry_empty()
+{
+    for (size_t i = 0; i < std::size(stage_info.map_gobjs); ++i)
+        if (stage_info.map_gobjs[i] != nullptr) return false;
+    return true;
+}
+
+bool source_jobj_owned_by(HSD_JObj* node, HSD_JObj* root)
+{
+    for (HSD_JObj* current = node; current;
+         current = HSD_JObjGetParent(current))
+        if (current == root) return true;
+    return false;
+}
+
+std::array<HSD_JObj*, sizeof(stage_info.x280) / sizeof(stage_info.x280[0])>
+source_stage_marker_snapshot()
+{
+    std::array<HSD_JObj*, sizeof(stage_info.x280) / sizeof(stage_info.x280[0])>
+        result{};
+    std::copy(std::begin(stage_info.x280), std::end(stage_info.x280),
+              result.begin());
+    return result;
+}
+
+std::array<Ground_GObj*,
+           sizeof(stage_info.map_gobjs) / sizeof(stage_info.map_gobjs[0])>
+source_stage_map_registry_snapshot()
+{
+    std::array<Ground_GObj*,
+               sizeof(stage_info.map_gobjs) / sizeof(stage_info.map_gobjs[0])>
+        result{};
+    std::copy(std::begin(stage_info.map_gobjs), std::end(stage_info.map_gobjs),
+              result.begin());
+    return result;
+}
+
+struct GroundStorageLease {
+    GroundStoragePreCallFacts facts{};
+    FtDeviceGlobalSnapshot devices_before{};
+    FtDeviceGlobalSnapshot devices_after_begin{};
+    const void* payload = nullptr;
+    MeleeWebSourceMemoryAllocation allocation{};
+    std::vector<uint8_t> bytes_after_begin;
+    MeleeWebSourceMemoryContext context_after_competing_begin{};
+    uint32_t stage_gobj_count_before = 0;
+    bool begin_attempted = false;
+    bool owned = false;
+    bool ever_owned = false;
+    bool devices_restored = false;
+    bool finished = false;
+
+    void begin()
+    {
+        check(!begin_attempted && !owned && !finished,
+              "Ground storage lease begin was requested more than once");
+        ground_storage_pre_call_controls();
+        facts.memory_status =
+            melee_web_source_memory_context_read(&facts.memory);
+        const auto world = melee_web_gameplay_stats();
+        facts.os_heap = __OSCurrHeap;
+        facts.hsd_heap = HSD_GetHeap();
+        facts.world_generation = world.generation;
+        facts.world_active = melee_web_gameplay_world_exists() != 0;
+        facts.memory_healthy = melee_web_source_memory_healthy() != 0;
+        facts.storage_available = melee_web_ground_map_storage_available() != 0;
+        check(melee_web_ground_map_storage_read(&facts.storage) != 0,
+              "Ground storage preflight cannot observe its original owner");
+        facts.map_registry_empty = source_stage_registry_empty();
+        stage_gobj_count_before = source_stage_gobj_count();
+        facts.stage_gobj_list_empty = stage_gobj_count_before == 0;
+        facts.stage_markers_empty = std::all_of(
+            std::begin(stage_info.x280), std::end(stage_info.x280),
+            [](HSD_JObj* marker) { return marker == nullptr; });
+        facts.dispatch_quiet = ground_dispatch_quiet();
+        check(melee_web_stage_map_archives() == nullptr,
+              "Ground storage preflight found a pre-existing native stage map scope");
+        check(ground_storage_pre_call_supported(facts),
+              "Ground storage owner preconditions are not satisfied");
+
+        begin_attempted = true;
+        if (melee_web_ground_map_storage_begin()) {
+            owned = true;
+            ever_owned = true;
+        } else {
+            MeleeWebGroundMapStorageView failed_view{};
+            if (!melee_web_ground_map_storage_read(&failed_view)) {
+                std::cerr << "Ground storage begin failed without a readable owner state; preserving it\n";
+                std::abort();
+            }
+            owned = failed_view.payload != nullptr;
+            ever_owned = owned;
+            check(0, "Original Ground storage begin did not acquire its owner");
+        }
+
+        MeleeWebGroundMapStorageView storage{};
+        check(melee_web_ground_map_storage_read(&storage) &&
+                  storage.payload != nullptr && storage.requested_bytes == 64,
+              "Original Ground storage accessor disagrees with its authored request");
+        check(storage.requested_bytes <= UINT32_MAX,
+              "Ground source allocation request exceeds observer representation");
+        payload = storage.payload;
+        const auto lease_status = melee_web_source_memory_allocation_read(
+            payload, &allocation);
+        check(melee_web::test::stadium_buffer::exact_new_allocation_supported(
+                  lease_status, allocation, facts.memory,
+                  static_cast<uint32_t>(storage.requested_bytes)) &&
+                  allocation.source_heap_handle == facts.hsd_heap &&
+                  allocation.world_generation == facts.world_generation,
+              "Ground storage allocation identity differs from its exact live source owner");
+        const auto* storage_bytes = static_cast<const uint8_t*>(storage.payload);
+        check(std::all_of(storage_bytes,
+                          storage_bytes + storage.requested_bytes,
+                          [](uint8_t value) { return value == 0; }),
+              "Original Ground storage bytes were not zeroed by Ground_801C0378");
+
+        devices_after_begin.capture();
+        const auto world_after_begin = melee_web_gameplay_stats();
+        MeleeWebSourceMemoryContext before_competing_begin{};
+        check(melee_web_source_memory_context_read(&before_competing_begin) ==
+                  MELEE_WEB_SOURCE_MEMORY_READ_OK,
+              "Ground storage context became unavailable after original begin");
+        bytes_after_begin.assign(storage_bytes,
+                                 storage_bytes + storage.requested_bytes);
+        check(melee_web_ground_map_storage_begin() == 0,
+              "Competing Ground storage begin did not reject an owned buffer");
+        MeleeWebGroundMapStorageView competing_view{};
+        MeleeWebSourceMemoryAllocation competing_lease{};
+        check(melee_web_ground_map_storage_read(&competing_view) &&
+                  competing_view.payload == storage.payload &&
+                  competing_view.requested_bytes == storage.requested_bytes &&
+                  melee_web_source_memory_context_read(
+                      &context_after_competing_begin) ==
+                      MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                  context_after_competing_begin.source_heap_handle ==
+                      before_competing_begin.source_heap_handle &&
+                  context_after_competing_begin.world_generation ==
+                      before_competing_begin.world_generation &&
+                  context_after_competing_begin.allocation_generation_watermark ==
+                      before_competing_begin.allocation_generation_watermark &&
+                  melee_web_source_memory_allocation_read(
+                      storage.payload, &competing_lease) ==
+                      MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                  competing_lease.live == 1 &&
+                  competing_lease.allocation_generation ==
+                      allocation.allocation_generation &&
+                  std::equal(bytes_after_begin.begin(), bytes_after_begin.end(),
+                             storage_bytes) &&
+                  devices_after_begin.matches() &&
+                  melee_web_gameplay_stats().generation ==
+                      world_after_begin.generation &&
+                  melee_web_gameplay_stats().ticks == world_after_begin.ticks,
+              "Competing Ground storage begin changed its live owner or source state");
+    }
+
+    void end()
+    {
+        if (!begin_attempted || finished) return;
+        if (owned) {
+            if (Ground_GetMapGObj(1) != nullptr ||
+                !source_stage_registry_empty() ||
+                source_stage_gobj_count() != stage_gobj_count_before ||
+                !std::all_of(std::begin(stage_info.x280),
+                             std::end(stage_info.x280),
+                             [](HSD_JObj* marker) { return marker == nullptr; })) {
+                std::cerr << "Ground storage end refused while source map owners remain; preserving Ground storage\n";
+                std::abort();
+            }
+            if (!melee_web_ground_map_storage_end()) {
+                std::cerr << "Ground storage end refused; preserving the live source owner\n";
+                std::abort();
+            }
+            owned = false;
+            devices_before.restore();
+            devices_restored = true;
+        } else if (!devices_restored) {
+            devices_before.restore();
+            devices_restored = true;
+        }
+        finished = true;
+        if (!ever_owned) return;
+
+        MeleeWebGroundMapStorageView ended_storage{};
+        MeleeWebSourceMemoryAllocation retired_lease{};
+        MeleeWebSourceMemoryContext after_end{};
+        check(melee_web_ground_map_storage_available() &&
+                  melee_web_ground_map_storage_read(&ended_storage) &&
+                  ended_storage.payload == nullptr &&
+                  melee_web_source_memory_allocation_read(
+                      payload, &retired_lease) ==
+                      MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                  retired_lease.live == 0 &&
+                  retired_lease.allocation_generation ==
+                      allocation.allocation_generation &&
+                  melee_web_source_memory_context_read(&after_end) ==
+                      MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                  after_end.source_heap_handle ==
+                      facts.memory.source_heap_handle &&
+                  after_end.world_generation == facts.memory.world_generation &&
+                  devices_before.matches() && melee_web_source_memory_healthy(),
+              "Ground storage end did not retire its exact lease and restore typed devices");
+    }
+};
+
+struct GroundSourceMarkerBinding {
+    uint16_t joint_index = 0;
+    uint16_t marker_id = 0;
+};
+
+std::vector<GroundSourceMarkerBinding> checked_ground_source_markers(
+    const std::shared_ptr<const melee_web::DatArchive>& archive,
+    const melee_web::DatStage& stage,
+    const melee_web::DatStageEntry& map_entry,
+    std::vector<uint16_t>& row_joint_indices)
+{
+    check(archive && stage.joint_reference_table.count == 1 &&
+              stage.joint_reference_table.data_offset.has_value(),
+          "Stadium source marker reference table is not its checked single row");
+    check(map_entry.joint_offset.has_value() &&
+              map_entry.joint_indices.element_bytes == sizeof(uint16_t) &&
+              (!map_entry.joint_indices.count ||
+               map_entry.joint_indices.data_offset.has_value()),
+          "Stadium map1 source joint-index row is incomplete");
+    const auto marker_row = *stage.joint_reference_table.data_offset;
+    const auto marker_root = archive->pointer(marker_row, 64);
+    check(marker_root && *marker_root == *map_entry.joint_offset,
+          "Stadium source marker root does not match resident map1");
+    const uint32_t pair_count = archive->be32(marker_row + 8);
+    check(pair_count > 0,
+          "Stadium source marker pair table is empty");
+    const auto pairs = archive->pointer(marker_row + 4,
+                                        size_t(pair_count) * 4);
+    check(pairs.has_value(),
+          "Stadium source marker pairs are not bounded by the checked archive");
+    melee_web::DatNativeJoint joint_owner(archive, *marker_root);
+    const auto& graph = joint_owner.graph();
+    check(graph.joint_count != 0,
+          "Stadium source marker root has no decoded source joints");
+
+    std::vector<GroundSourceMarkerBinding> markers;
+    markers.reserve(pair_count);
+    for (uint32_t i = 0; i < pair_count; ++i) {
+        const uint16_t joint_index = archive->be16(*pairs + i * 4);
+        const uint16_t marker_id = archive->be16(*pairs + i * 4 + 2);
+        check(joint_index < graph.joint_count &&
+                  marker_id < sizeof(stage_info.x280) /
+                                  sizeof(stage_info.x280[0]),
+              "Stadium source marker pair exceeds its decoded joint or marker array");
+        markers.push_back({joint_index, marker_id});
+    }
+
+    row_joint_indices.reserve(map_entry.joint_indices.count);
+    for (uint32_t i = 0; i < map_entry.joint_indices.count; ++i) {
+        const uint32_t at = *map_entry.joint_indices.data_offset +
+                            i * map_entry.joint_indices.element_bytes;
+        const int16_t index = std::bit_cast<int16_t>(archive->be16(at));
+        check(index >= 0 && static_cast<uint16_t>(index) < graph.joint_count,
+              "Stadium map1 source joint index is outside its checked joint graph");
+        row_joint_indices.push_back(static_cast<uint16_t>(index));
+    }
+    return markers;
+}
+
+void run_stadium_ground_map1_owner(
+    const std::shared_ptr<const melee_web::DatArchive>& archive,
+    melee_web::DatNativeMap& map_owner,
+    GroundStorageLease& storage_scope)
+{
+    constexpr int map_id = 1;
+    namespace screen = melee_web::test::stadium_screen;
+    check(archive && map_owner.map_head() != nullptr,
+          "Ground map1 owner probe lost its retained C0 archive/map owner");
+    check(storage_scope.owned && storage_scope.payload != nullptr &&
+              storage_scope.allocation.live == 1,
+          "Ground map1 constructor requires the already-owned source storage lease");
+
+    const melee_web::DatStage source_stage(*archive);
+    check(map_id < source_stage.entry_table.count &&
+              map_id < source_stage.entries.size() &&
+              map_id < std::size(stage_info.map_gobjs),
+          "Stadium map1 is outside an authored map or StageInfo table bound");
+    check(std::find(melee_web::test::stadium_resident_ids.begin(),
+                    melee_web::test::stadium_resident_ids.end(), map_id) !=
+              melee_web::test::stadium_resident_ids.end(),
+          "C0 Stadium contract does not retain map1 in this archive");
+    const auto& map_entry = source_stage.entries[map_id];
+    check(map_entry.index == map_id && map_entry.joint_offset.has_value() &&
+              stadium_screen_map_entry_joint(map_owner.map_head(), map_id) != nullptr,
+          "Original Ground map1 has no resident source joint root");
+    check(map_entry.collision_bindings.count == 0,
+          "Stadium map1 has authored collision bindings; original removal is unsafe");
+    check(grPs_StageData.grkind == Gr_Kind_PStadium &&
+              grPs_StageData.callbacks != nullptr &&
+              grPs_StageData.callbacks[map_id].flags_b2 == 0,
+          "Stadium map1 callback row enables a secondary camera");
+    check(grPs_StageData.joint_count == 0 || grPs_StageData.joints != nullptr,
+          "Stadium source collision joint table has no owner");
+    for (size_t i = 0; i < grPs_StageData.joint_count; ++i)
+        check(grPs_StageData.joints[i].y != map_id,
+              "Stadium authored GrJoint table contains a map1 collision row");
+
+    std::vector<uint16_t> row_joint_indices;
+    const auto source_markers = checked_ground_source_markers(
+        archive, source_stage, map_entry, row_joint_indices);
+    check(melee_web_stadium_c1_stage_object_failures() == 0 &&
+              source_stage_registry_empty() && source_stage_gobj_count() == 0,
+          "Ground map1 preflight found an existing source Stage GObj owner");
+
+    const auto world = melee_web_gameplay_stats();
+    const auto stage_registry_before = source_stage_map_registry_snapshot();
+    const auto stage_markers_before = source_stage_marker_snapshot();
+    check(std::all_of(stage_markers_before.begin(), stage_markers_before.end(),
+                      [](HSD_JObj* marker) { return marker == nullptr; }),
+          "Ground map1 constructor refused pre-existing StageInfo marker owners");
+    const auto classes_before = screen::live_class_counts();
+    const auto pools_before = screen::live_pool_counts();
+    const uint32_t gobj_used_before = HSD_ObjAllocGetUsing(&gobj_alloc_data);
+    const uint32_t gobjproc_used_before =
+        HSD_ObjAllocGetUsing(&gobjproc_alloc_data);
+    const uint32_t stage_gobj_count_before = source_stage_gobj_count();
+    check(stage_gobj_count_before == storage_scope.stage_gobj_count_before,
+          "E8 source setup changed the pre-begin Stage GObj baseline");
+    const int scheduler_cycle_before = HSD_GObj_804D783C;
+    const uint64_t gameplay_ticks_before = world.ticks;
+
+    HSD_GObj* map_object = nullptr;
+    auto cleanup = [&]() {
+        if (map_object == nullptr) map_object = Ground_GetMapGObj(map_id);
+        if (map_object != nullptr) {
+            if (map_object->classifier != HSD_GOBJ_CLASS_STAGE ||
+                map_object->user_data == nullptr ||
+                static_cast<Ground*>(map_object->user_data)->map_id != map_id) {
+                std::cerr << "Ground map1 teardown refused to remove an unowned object\n";
+                std::abort();
+            }
+            Ground_801C4A08(map_object);
+            map_object = nullptr;
+        }
+        if (Ground_GetMapGObj(map_id) != nullptr ||
+            !source_stage_registry_empty() ||
+            source_stage_gobj_count() != stage_gobj_count_before) {
+            std::cerr << "Ground map1 teardown left a source Stage GObj owner; preserving Ground storage\n";
+            std::abort();
+        }
+    };
+
+    try {
+        MeleeWebGroundMapStorageView storage{};
+        check(melee_web_ground_map_storage_read(&storage) &&
+                  storage.payload == storage_scope.payload &&
+                  storage.requested_bytes == 64,
+              "Original Ground storage owner changed before map1 construction");
+        MeleeWebSourceMemoryContext before_constructor{};
+        MeleeWebSourceMemoryAllocation live_lease{};
+        check(melee_web_source_memory_context_read(&before_constructor) ==
+                  MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                  before_constructor.source_heap_handle ==
+                      storage_scope.facts.memory.source_heap_handle &&
+                  before_constructor.world_generation ==
+                      storage_scope.facts.memory.world_generation &&
+                  melee_web_source_memory_allocation_read(
+                      storage_scope.payload, &live_lease) ==
+                      MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                  live_lease.live == 1 &&
+                  live_lease.allocation_generation ==
+                      storage_scope.allocation.allocation_generation &&
+                  live_lease.requested_bytes == storage.requested_bytes &&
+                  __OSCurrHeap == storage_scope.facts.os_heap &&
+                  HSD_GetHeap() == storage_scope.facts.hsd_heap &&
+                  melee_web_gameplay_world_exists() &&
+                  melee_web_source_memory_healthy(),
+              "E8 preparation changed the original Ground storage lease context");
+        const auto* storage_bytes =
+            static_cast<const uint8_t*>(storage.payload);
+        check(std::all_of(storage_bytes,
+                          storage_bytes + storage.requested_bytes,
+                          [](uint8_t value) { return value == 0; }),
+              "Original Ground storage bytes were not zeroed by Ground_801C0378");
+
+        check(source_stage_registry_empty() &&
+                  source_stage_gobj_count() == stage_gobj_count_before &&
+                  ground_dispatch_quiet(),
+              "Ground storage preparation changed Stage GObj or dispatch state");
+        map_object = Ground_GetStageGObj(map_id);
+        check(map_object != nullptr && Ground_GetMapGObj(map_id) == map_object &&
+                  map_object->classifier == HSD_GOBJ_CLASS_STAGE &&
+                  map_object->user_data != nullptr && map_object->hsd_obj != nullptr,
+              "Original Ground map1 constructor did not publish its exact source object");
+        auto* ground = static_cast<Ground*>(map_object->user_data);
+        check(ground->map_id == map_id && ground->gobj == map_object &&
+                  ground->x18 == nullptr && map_object->render_cb == nullptr &&
+                  map_object->gx_link == HSD_GOBJ_GXLINK_NONE,
+              "Original Ground map1 object has a different owner, camera, or render link");
+        check(source_stage_gobj_count() == stage_gobj_count_before + 1 &&
+                  HSD_ObjAllocGetUsing(&gobj_alloc_data) == gobj_used_before + 1 &&
+                  HSD_ObjAllocGetUsing(&gobjproc_alloc_data) ==
+                      gobjproc_used_before + 2,
+              "Ground map1 constructor changed the source Stage GObj/process counts unexpectedly");
+        check(map_object->proc != nullptr && map_object->proc->child != nullptr &&
+                  map_object->proc->child->child == nullptr &&
+                  map_object->proc->gobj == map_object &&
+                  map_object->proc->child->gobj == map_object &&
+                  map_object->proc->on_invoke != nullptr &&
+                  map_object->proc->child->on_invoke != nullptr,
+              "Original Ground generic processes were not registered exactly once");
+
+        HSD_JObj* const loaded_root =
+            static_cast<HSD_JObj*>(map_object->hsd_obj);
+        std::map<uint16_t, HSD_JObj*> expected_markers;
+        for (const auto& binding : source_markers) {
+            HSD_JObj* const marker =
+                Ground_801C3FA4(map_object, binding.joint_index);
+            check(marker != nullptr && source_jobj_owned_by(marker, loaded_root),
+                  "Original Ground map1 marker does not belong to its loaded JObj owner");
+            expected_markers[binding.marker_id] = marker;
+        }
+        for (uint16_t joint_index : row_joint_indices) {
+            HSD_JObj* const indexed = Ground_801C3FA4(map_object, joint_index);
+            check(indexed != nullptr && source_jobj_owned_by(indexed, loaded_root),
+                  "Original Ground map1 row joint index did not resolve in its loaded JObj owner");
+        }
+        for (size_t i = 0; i < std::size(stage_info.x280); ++i) {
+            const auto expected = expected_markers.find(static_cast<uint16_t>(i));
+            if (expected == expected_markers.end()) {
+                check(stage_info.x280[i] == stage_markers_before[i],
+                      "Ground map1 changed a source marker outside its authored marker row");
+            } else {
+                check(stage_info.x280[i] == expected->second &&
+                          source_jobj_owned_by(stage_info.x280[i], loaded_root),
+                      "Ground map1 source marker slot does not match its exact loaded joint");
+            }
+        }
+        check(HSD_GObj_804D783C == scheduler_cycle_before &&
+                  melee_web_gameplay_stats().ticks == gameplay_ticks_before &&
+                  ground_dispatch_quiet(),
+              "Ground generic process or stage callback dispatched during construction");
+
+        Ground_801C4A08(map_object);
+        map_object = nullptr;
+        check(source_stage_registry_empty() &&
+                  source_stage_map_registry_snapshot() == stage_registry_before &&
+                  source_stage_marker_snapshot() == stage_markers_before &&
+                  source_stage_gobj_count() == stage_gobj_count_before &&
+                  HSD_ObjAllocGetUsing(&gobj_alloc_data) == gobj_used_before &&
+                  HSD_ObjAllocGetUsing(&gobjproc_alloc_data) ==
+                      gobjproc_used_before &&
+                  HSD_GObj_804D783C == scheduler_cycle_before &&
+                  melee_web_gameplay_stats().ticks == gameplay_ticks_before &&
+                  ground_dispatch_quiet(),
+              "Original Ground map1 removal did not restore registry/marker/process state");
+        cleanup();
+        storage_scope.end();
+        check(storage_scope.finished && storage_scope.devices_restored &&
+                  storage_scope.devices_before.matches() &&
+                  source_stage_map_registry_snapshot() == stage_registry_before &&
+                  source_stage_marker_snapshot() == stage_markers_before &&
+                  source_stage_gobj_count() == stage_gobj_count_before &&
+                  HSD_ObjAllocGetUsing(&gobj_alloc_data) == gobj_used_before &&
+                  HSD_ObjAllocGetUsing(&gobjproc_alloc_data) ==
+                      gobjproc_used_before &&
+                  screen::live_class_counts() == classes_before &&
+                  screen::live_pool_counts() == pools_before &&
+                  HSD_GObj_804D783C == scheduler_cycle_before &&
+                  melee_web_gameplay_stats().ticks == gameplay_ticks_before &&
+                  ground_dispatch_quiet(),
+              "Ground map1 owner cleanup did not restore its exact source baselines");
+
+        std::cout << "{\"probe\":\"stadium-ground-map1-owner\","
+                     "\"scope\":\"one original Ground_GetStageGObj(1)/Ground_801C4A08 lifetime\","
+                     "\"ground_buffer\":\""
+                  << hex64(reinterpret_cast<uintptr_t>(storage_scope.payload))
+                  << "\",\"requested_bytes\":" << storage.requested_bytes
+                  << ",\"source_heap\":"
+                  << storage_scope.allocation.source_heap_handle
+                  << ",\"world_generation\":"
+                  << storage_scope.allocation.world_generation
+                  << ",\"allocation_generation\":"
+                  << storage_scope.allocation.allocation_generation
+                  << ",\"ft_device_owner_ids\":[\""
+                  << hex64(reinterpret_cast<uintptr_t>(ft_80459A68))
+                  << "\",\""
+                  << hex64(reinterpret_cast<uintptr_t>(ftDevice_BuryThings))
+                  << "\",\""
+                  << hex64(reinterpret_cast<uintptr_t>(ft_80459A8C))
+                  << "\",\""
+                  << hex64(reinterpret_cast<uintptr_t>(&ft_804D6578))
+                  << "\",\""
+                  << hex64(reinterpret_cast<uintptr_t>(&ft_804D6570))
+                  << "\",\""
+                  << hex64(reinterpret_cast<uintptr_t>(&ftDevice_BuryThingCount))
+                  << "\"],\"source_markers\":" << source_markers.size()
+                  << ",\"map1_joint_indices\":" << row_joint_indices.size()
+                  << ",\"map_id\":1,\"device_bytes_restored\":true,"
+                     "\"buffer_retired\":true,\"callback_dispatch\":false,"
+                     "\"proc_ticks\":0,\"rendered\":false,"
+                     "\"single_constructor_removal\":true}\n";
+    } catch (...) {
+        try {
+            cleanup();
+        } catch (...) {
+            std::abort();
+        }
+        throw;
+    }
 }
 
 melee_web::RuntimeFiles exact_stadium_runtime_union(
@@ -1255,6 +1919,7 @@ void run_stadium_e8_request(
     const MeleeWebMenuMatchSelection& selected,
     const std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES>& baseline,
     const std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES>& save_before,
+    bool perform_ground_map1_owner,
     TransitionTrace& trace)
 {
     using namespace melee_web;
@@ -1303,6 +1968,7 @@ void run_stadium_e8_request(
     MeleeWebStadiumE8CallObservation observed{};
     MeleeWebStadiumC1StageInfoView before_view{};
     MeleeWebStadiumC1StageInfoView after_view{};
+    std::unique_ptr<GroundStorageLease> ground_storage;
     void* ground_data = nullptr;
     void* yakumono_data = nullptr;
     uint32_t seed_before = 0;
@@ -1322,6 +1988,7 @@ void run_stadium_e8_request(
                   "Could not close the E8 source-call observation window");
             observer_window_owned = false;
         }
+        if (ground_storage) ground_storage->end();
         if (effect_bank_attached) {
             check(melee_web_effect_bank_detach(effects->bank(), error,
                                                 sizeof(error)), error);
@@ -1367,6 +2034,10 @@ void run_stadium_e8_request(
     };
 
     try {
+        if (perform_ground_map1_owner) {
+            ground_storage = std::make_unique<GroundStorageLease>();
+            ground_storage->begin();
+        }
         snapshot = melee_web_stadium_c1_stage_info_snapshot_begin(
             error, sizeof(error));
         check(snapshot != nullptr, error);
@@ -1519,8 +2190,20 @@ void run_stadium_e8_request(
                              archive_data_before.end(), archive->data().begin(),
                              archive->data().end()),
               "E8 request changed the immutable source archive bytes");
+        if (perform_ground_map1_owner) {
+            check(ground_storage != nullptr,
+                  "Ground map1 owner lost its pre-E8 storage lease");
+            run_stadium_ground_map1_owner(archive, *map_owner,
+                                          *ground_storage);
+            check(melee_web_stadium_c1_stage_object_failures() == 0 &&
+                      source_stage_registry_empty(),
+                  "Ground map1 component did not restore its empty StageInfo owner");
+        }
         trace.event("stadium_e8_request_returned", world->audio(),
-                    "typed-catalog-request-only", &selected, &seed_before);
+                    perform_ground_map1_owner
+                        ? "typed-catalog-request-plus-map1-owner-component"
+                        : "typed-catalog-request-only",
+                    &selected, &seed_before);
         cleanup();
         check(cleanup_complete && stage_map == nullptr && snapshot == nullptr &&
                   !melee_web_stage_map_archives(),
@@ -1537,7 +2220,11 @@ void run_stadium_e8_request(
         check(seed_ptr == seed_owner && *seed_ptr == seed_before,
               "E8 teardown changed the retained source seed owner or value");
         std::cout << "{\"probe\":\"stadium-e8-request\","
-                     "\"scope\":\"one original E8 request and checked typed teardown only\","
+                     "\"scope\":\""
+                  << (perform_ground_map1_owner
+                          ? "one original E8 request plus one Ground map1 lifetime"
+                          : "one original E8 request and checked typed teardown only")
+                  << "\","
                      "\"source_size_name\":\""
                   << observed.source_size_name
                   << "\",\"typed_open_name\":\""
@@ -1553,8 +2240,9 @@ void run_stadium_e8_request(
                   << after_view.x6E4[0] << ',' << after_view.x6E4[1]
                   << "],\"source_seed_unchanged\":true,"
                      "\"save_owner_unchanged\":true,"
-                     "\"stage_objects_started\":false,"
-                     "\"checked_teardown\":true}\n";
+                     "\"stage_objects_started\":"
+                  << (perform_ground_map1_owner ? "true" : "false")
+                  << ",\"checked_teardown\":true}\n";
     } catch (...) {
         if (!cleanup_complete) {
             try {
@@ -1951,6 +2639,7 @@ void run_stadium_c1_context_preflight(
     bool perform_e8_request,
     bool perform_item_state_preflight,
     bool perform_screen_roots_preflight,
+    bool perform_ground_map1_owner,
     TransitionTrace& trace)
 {
     char error[256]{};
@@ -2097,9 +2786,10 @@ void run_stadium_c1_context_preflight(
         world->verify_immutable_archives();
         check_stadium_preflight_stage_empty();
 
-        if (perform_e8_request) {
+        if (perform_e8_request || perform_ground_map1_owner) {
             run_stadium_e8_request(reopened_files, host, world.get(), selected,
-                                   baseline, save_before, trace);
+                                   baseline, save_before,
+                                   perform_ground_map1_owner, trace);
             check_stadium_preflight_stage_empty();
         }
 
@@ -2121,7 +2811,11 @@ void run_stadium_c1_context_preflight(
         cleanup();
         check(host == nullptr && !melee_web_source_files_active(),
               "C1 context preflight did not release host and source-file owners");
-        if (perform_e8_request) {
+        if (perform_ground_map1_owner) {
+            std::cout << "C1 reopened-context lifecycle and one E8 typed request, "
+                         "plus one isolated Ground map1 lifetime passed; "
+                         "no rendered stage entry or source menu entry\n";
+        } else if (perform_e8_request) {
             std::cout << "C1 reopened-context lifecycle preflight and one E8 typed request passed; "
                          "no stage object or source menu entry\n";
         } else if (perform_item_state_preflight) {
@@ -2149,6 +2843,7 @@ void run_stadium_c1a_selection_smoke(
     bool e8_request_trace,
     bool item_state_preflight,
     bool screen_roots_preflight,
+    bool ground_map1_owner,
     const std::filesystem::path& menu_dir,
     const std::filesystem::path& game_dir,
     TransitionTrace& trace)
@@ -2271,7 +2966,8 @@ void run_stadium_c1a_selection_smoke(
     if (reopened_context_preflight) {
         run_stadium_c1_context_preflight(
             files, host, world, selected, names, menu_dir, game_dir,
-            e8_request_trace, item_state_preflight, screen_roots_preflight, trace);
+            e8_request_trace, item_state_preflight, screen_roots_preflight,
+            ground_map1_owner, trace);
     } else {
         world->verify_immutable_archives();
         world->close();
@@ -2281,7 +2977,10 @@ void run_stadium_c1a_selection_smoke(
     }
     check(!melee_web_menu_stage_explicit_confirm_available(St_Kind_PStadium),
           "C1a explicit-confirm permission survived unload");
-    if (e8_request_trace) {
+    if (ground_map1_owner) {
+        std::cout << "C1a raw PAD CSS->SSS selection, one E8 typed request, and one "
+                     "Ground map1 constructor/removal passed; admission remains closed\n";
+    } else if (e8_request_trace) {
         std::cout << "C1a raw PAD CSS->SSS selection and one E8 typed request passed; "
                      "ordinary match admission and gameplay entry remain closed\n";
     } else {
@@ -2317,18 +3016,22 @@ int main(int argc,char** argv){try{
      std::string(input_recipe)=="stadium-screen-roots-preflight-v1";
  const bool stadium_e8_request_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-e8-request-v1";
+ const bool stadium_ground_map1_owner_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-ground-map1-owner-v1";
 #else
  const bool stadium_c1a_recipe=false;
  const bool stadium_c1_context_preflight_recipe=false;
  const bool stadium_c1_item_state_preflight_recipe=false;
  const bool stadium_screen_roots_recipe=false;
  const bool stadium_e8_request_recipe=false;
+ const bool stadium_ground_map1_owner_recipe=false;
 #endif
  if(input_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
     !sound_settings_recipe&&!stadium_c1a_recipe&&
     !stadium_c1_context_preflight_recipe&&
-    !stadium_c1_item_state_preflight_recipe&&!stadium_screen_roots_recipe&&!stadium_e8_request_recipe&&
+    !stadium_c1_item_state_preflight_recipe&&!stadium_screen_roots_recipe&&
+    !stadium_e8_request_recipe&&!stadium_ground_map1_owner_recipe&&
     !v10_css_replay_start_recipe)
     throw std::runtime_error("Unknown transition input recipe");
  if(v10_css_replay_start_recipe&&
@@ -2340,14 +3043,16 @@ int main(int argc,char** argv){try{
     stage_kind!=St_Kind_Last)
    throw std::runtime_error("Explicit FD recipes require Final Destination");
  if((stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
-     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||stadium_e8_request_recipe)&&
+     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
+     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe)&&
     stage_kind!=St_Kind_PStadium)
    throw std::runtime_error("C1a recipes require source StKind 3");
  TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
  std::vector<std::string> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"};
  if(stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
-    stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||stadium_e8_request_recipe||
+    stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
+    stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
     v10_css_replay_start_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
     trophy_baseline_recipe||sound_settings_recipe)
   keys=melee_web::menu_asset_names();
@@ -2377,11 +3082,15 @@ int main(int argc,char** argv){try{
  }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  if(stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
-    stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||stadium_e8_request_recipe){
+    stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
+    stadium_e8_request_recipe||stadium_ground_map1_owner_recipe){
   run_stadium_c1a_selection_smoke(
       files, stadium_c1_context_preflight_recipe||
-          stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||stadium_e8_request_recipe,
-      stadium_e8_request_recipe, stadium_c1_item_state_preflight_recipe, stadium_screen_roots_recipe,
+          stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
+          stadium_e8_request_recipe||stadium_ground_map1_owner_recipe,
+      stadium_e8_request_recipe||stadium_ground_map1_owner_recipe,
+      stadium_c1_item_state_preflight_recipe, stadium_screen_roots_recipe,
+      stadium_ground_map1_owner_recipe,
       argv[1], argv[2], trace);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
   return 0;
