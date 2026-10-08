@@ -445,7 +445,7 @@
   ],
   "observation_gaps": [
     "No original collision/log/hurtbox hooks or source RNG draw trace were captured.",
-    "Current hooks observe consumer logs, not each candidate pair, hitbox/hurtbox geometry or branch rejection in ftColl_80078C70/ftColl_80076CBC.",
+    "Current hooks observe consumer logs, not each candidate pair, hitbox/hurtbox geometry or branch rejection in the normal hurt path ftColl_80078C70/lbColl_8000805C/ftColl_80076ED8.",
     "Cursor5240 is browser-only; retained original suffix ends4055/index5239.",
     "Raw object pointers identify relationships within this producer and are not cross-producer address equality."
   ],
