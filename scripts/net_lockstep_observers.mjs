@@ -38,7 +38,8 @@ export function readyRenderEvent(diagnostics, expectedPhase, priorSignatures = n
 }
 
 // Retain the actual screenshot assertion operands even when the guard rejects.
-// The browser driver's diagnostics are already bounded at their source.
+// Retain the existing driver snapshot without additional truncation. Its DOM
+// text fields and error rows have source bounds; runtimeError is not capped.
 export function retainAccountedCssObservation(row, observation, {
   role, expectedCursor, expectedBlocker = 'complete', expectedTerminal,
 }) {
