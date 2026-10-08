@@ -3992,24 +3992,32 @@ def _validate_v10_browser_export(port_trace_path: Path, recipe: Recipe,
         positive_boundary = (first_positive if recipe.scope in {
             V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE, V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
             V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
-            V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE
+            V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
+            V10_FIRST_STOCK_DECREMENT_SCOPE
         } else None)
         clock60_boundary = (packet["source"].get("clock60_boundary")
                             if recipe.scope in {V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
                                                 V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
-                                                V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE}
+                                                V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
+                                                V10_FIRST_STOCK_DECREMENT_SCOPE}
                             else None)
         match_clock_boundary = (packet["source"].get("match_clock_boundary")
                                 if recipe.scope in {V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
-                                                    V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE}
+                                                    V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
+                                                    V10_FIRST_STOCK_DECREMENT_SCOPE}
                                 else None)
         ordered_clock_checkpoints = (
-            packet["source"]["ordered_clock_lineage"]["checkpoints"]
-            if recipe.scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE else None)
+            packet["source"].get("ordered_clock_lineage", {}).get("checkpoints")
+            if recipe.scope in {V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
+                                V10_FIRST_STOCK_DECREMENT_SCOPE} else None)
         frame_validator = Comparator(recipe, browser, positive_boundary=positive_boundary,
                                      clock60_boundary=clock60_boundary,
                                      match_clock_boundary=match_clock_boundary,
-                                     ordered_clock_checkpoints=ordered_clock_checkpoints)
+                                     ordered_clock_checkpoints=ordered_clock_checkpoints,
+                                     stock_decrement_boundary=(
+                                         packet["source"].get("stock_decrement_boundary")
+                                         if recipe.scope == V10_FIRST_STOCK_DECREMENT_SCOPE
+                                         else None))
         match_starts = {
             span["first_frame"]: match_index
             for match_index, span in enumerate(

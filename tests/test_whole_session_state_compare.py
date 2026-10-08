@@ -3991,6 +3991,50 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             finally:
                 browser.close()
 
+    def test_stock_decrement_browser_export_requires_all_boundaries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = _clock60_comparison_fixture(
+                Path(directory), terminal_match_frame=3483)
+            source = fixture["packet"]["source"]
+            clock2000 = {
+                "target_match_frame_at_least": 2000, "match_index": 0,
+                "source_tick": 2123, "source_sequence": 4257,
+                "pad_consume_sequence": 4256, "timeline_frame_index": 2125,
+                "browser_cursor": 2126, "match_frame": 2000,
+            }
+            fixture["match_clock_target"] = clock2000
+            source["match_clock_boundary"] = clock2000
+            source["ordered_clock_lineage"] = {
+                "checkpoints": _ordered_fixture_checkpoints(fixture, (300, 500, 1000)),
+            }
+            _, boundary = self._stock_decrement_expectation_fixture()
+            source["stock_decrement_boundary"] = boundary
+            recipe = Recipe(Path("stock.mwrc"), fixture["recipe"].raw,
+                            scope=V10_FIRST_STOCK_DECREMENT_SCOPE)
+            trace = fixture["selected"]["port_trace"]
+            rows = trace.read_text().splitlines()
+            exported = max(json.loads(row).get("index", -1) for row in rows) + 1
+            self.assertEqual(len(source["ordered_clock_lineage"]["checkpoints"]), 6)
+            self.assertEqual(_validate_v10_browser_export(
+                trace, recipe, exported, fixture["packet"]), len(rows))
+
+            for key in ("first_positive_boundary", "clock60_boundary",
+                        "match_clock_boundary", "ordered_clock_lineage",
+                        "stock_decrement_boundary"):
+                with self.subTest(missing=key):
+                    candidate = copy.deepcopy(fixture["packet"])
+                    candidate["source"].pop(key)
+                    with self.assertRaises(ComparisonError):
+                        _validate_v10_browser_export(trace, recipe, exported, candidate)
+            candidate = copy.deepcopy(fixture["packet"])
+            candidate["source"]["stock_decrement_boundary"]["event"]["target"] = None
+            with self.assertRaisesRegex(ComparisonError, "frozen event tuple"):
+                _validate_v10_browser_export(trace, recipe, exported, candidate)
+            candidate = copy.deepcopy(fixture["packet"])
+            candidate["source"]["ordered_clock_lineage"]["checkpoints"][2]["tuple"] = None
+            with self.assertRaisesRegex(ComparisonError, "selection is malformed"):
+                _validate_v10_browser_export(trace, recipe, exported, candidate)
+
     def test_stock_decrement_scope_report_names_event_without_relabeling_ordered_scope(self):
         def boundary_report(scope):
             return compare_paths(
