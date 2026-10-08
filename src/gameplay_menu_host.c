@@ -57,6 +57,7 @@ extern int melee_web_vs_mode_begin(void);
 extern int melee_web_vs_mode_end(void);
 extern int melee_web_vs_mode_select_state(int);
 extern int melee_web_vs_mode_next_state(void);
+extern int melee_web_vs_mode_resolve_next_state(GameModeState*);
 extern int melee_web_vs_mode_pending_mode(void);
 extern int melee_web_vs_mode_set_route(int current_mode, int previous_mode);
 extern int melee_web_menu_parent_route_pending(const MeleeWebMenuSession*);
@@ -142,6 +143,7 @@ struct MeleeWebMenuHost {
     int stadium_c1a_enabled;
 #endif
     int results_active,results_exited,results_committed,prize_active;
+    int sudden_death_active;
     int entered,drawing,transition;
 };
 static MeleeWebMenuHost* owner;
@@ -1843,12 +1845,12 @@ static void restore_results_route(MeleeWebMenuHost* h){
     *gmMainLib_8015EDA4()=h->route_saved_stages;
     if(!melee_web_vs_mode_end())abort();
     h->results_active=h->results_exited=h->results_committed=h->prize_active=0;
+    h->sudden_death_active=0;
 }
-int melee_web_menu_host_results_begin(MeleeWebMenuHost* h,
-    const MatchExitInfo* exit_info,uint32_t seed,ResultsMatchInfo* result,
-    char* e,size_t n){
+static int begin_vs_match_route(MeleeWebMenuHost* h,
+    const MatchExitInfo* exit_info,uint32_t seed,int* next,char* e,size_t n){
     if(!h||h!=owner||h->entered||h->audio||h->results_active||
-       seed_ptr!=&h->seed||!exit_info||!result||
+       seed_ptr!=&h->seed||!exit_info||!next||
        melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_READY)
         return fail(e,n,"Results routing requires a completed closed match");
     if(!melee_web_vs_mode_begin())return fail(e,n,"Original VS mode is already owned");
@@ -1872,15 +1874,75 @@ int melee_web_menu_host_results_begin(MeleeWebMenuHost* h,
     gmVsMelee_VsExitInfo=*exit_info;
     if(!melee_web_vs_mode_select_state(gmVsMode_State_Vs))abort();
     gm_Mode_Vs_States[2].on_exit(&gm_Mode_Vs_States[2]);
-    const int next=melee_web_vs_mode_next_state();
+    *next=melee_web_vs_mode_resolve_next_state(gm_Mode_Vs_States);
+    return ok(e,n);
+}
+static void enter_results_route(ResultsMatchInfo* result){
+    if(!melee_web_vs_mode_select_state(gmVsMode_State_Results))abort();
+    gm_Mode_Vs_States[4].on_enter(&gm_Mode_Vs_States[4]);
+    *result=gmVsMelee_ResultsEnterData;
+}
+int melee_web_menu_host_results_begin(MeleeWebMenuHost* h,
+    const MatchExitInfo* exit_info,uint32_t seed,ResultsMatchInfo* result,
+    char* e,size_t n){
+    int next;
+    if(!result)return fail(e,n,"Results routing requires a completed closed match");
+    if(!begin_vs_match_route(h,exit_info,seed,&next,e,n))return 0;
     if(next!=gmVsMode_State_Results){
         restore_results_route(h);
         if(e&&n)snprintf(e,n,"Original VS requested unsupported state %d before Results",next);
         return 0;
     }
-    if(!melee_web_vs_mode_select_state(gmVsMode_State_Results))abort();
-    gm_Mode_Vs_States[4].on_enter(&gm_Mode_Vs_States[4]);
-    *result=gmVsMelee_ResultsEnterData;
+    enter_results_route(result);
+    return ok(e,n);
+}
+int melee_web_menu_host_match_continuation_begin(MeleeWebMenuHost* h,
+    const MatchExitInfo* exit_info,uint32_t seed,
+    MeleeWebMenuMatchContinuation* continuation,char* e,size_t n){
+    int next;
+    if(!continuation)return fail(e,n,"Match continuation output is required");
+    memset(continuation,0,sizeof(*continuation));
+    if(!begin_vs_match_route(h,exit_info,seed,&next,e,n))return 0;
+    if(next==gmVsMode_State_Results){
+        enter_results_route(&continuation->payload.results);
+        continuation->kind=MELEE_WEB_MENU_MATCH_CONTINUATION_RESULTS;
+        return ok(e,n);
+    }
+    if(next==gmVsMode_State_SuddenDeath){
+        if(!melee_web_vs_mode_select_state(gmVsMode_State_SuddenDeath))abort();
+        gm_Mode_Vs_States[3].on_enter(&gm_Mode_Vs_States[3]);
+        continuation->payload.sudden_death_start=gmVsMelee_StartData;
+        continuation->kind=MELEE_WEB_MENU_MATCH_CONTINUATION_SUDDEN_DEATH;
+        h->sudden_death_active=1;
+        return ok(e,n);
+    }
+    restore_results_route(h);
+    if(e&&n)snprintf(e,n,"Original VS requested unsupported state %d",next);
+    return 0;
+}
+int melee_web_menu_host_sudden_death_finish(MeleeWebMenuHost* h,
+    const MatchExitInfo* exit_info,
+    MeleeWebMenuMatchContinuation* continuation,char* e,size_t n){
+    if(!h||h!=owner||h->entered||h->audio||!h->results_active||
+       !h->sudden_death_active||h->results_exited||!exit_info||!continuation||
+       seed_ptr!=&h->seed||melee_web_gameplay_generation()||
+       melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_READY)
+        return fail(e,n,"Sudden Death must close before its original Results handoff");
+    memset(continuation,0,sizeof(*continuation));
+    gmVsMelee_SuddenDeathExitInfo=*exit_info;
+    if(!melee_web_vs_mode_select_state(gmVsMode_State_SuddenDeath))abort();
+    gm_Mode_Vs_States[3].on_exit(&gm_Mode_Vs_States[3]);
+    const int next=melee_web_vs_mode_resolve_next_state(gm_Mode_Vs_States);
+    if(next!=gmVsMode_State_Results){
+        /* OnExit may already have merged source MatchEnd state. End this
+         * continuation before returning so callers cannot invoke it twice. */
+        restore_results_route(h);
+        if(e&&n)snprintf(e,n,"Original Sudden Death requested unsupported state %d",next);
+        return 0;
+    }
+    enter_results_route(&continuation->payload.results);
+    continuation->kind=MELEE_WEB_MENU_MATCH_CONTINUATION_RESULTS;
+    h->sudden_death_active=0;
     return ok(e,n);
 }
 static int commit_results_route(MeleeWebMenuHost* h,char* e,size_t n){
@@ -1902,7 +1964,7 @@ static int results_handoff_owned(MeleeWebMenuHost* h,const char* phase,char* e,s
     return melee_web_results_context_check_handoff(phase,e,n);
 }
 int melee_web_menu_host_results_exit(MeleeWebMenuHost* h,char* e,size_t n){
-    if(!h||h!=owner||!h->results_active||h->results_exited)
+    if(!h||h!=owner||!h->results_active||h->sudden_death_active||h->results_exited)
         return fail(e,n,"Results mode exit requires its live source world");
     if(!results_handoff_owned(h,"mode OnExit entry",e,n))return 0;
     gm_Mode_Vs_States[4].on_exit(&gm_Mode_Vs_States[4]);
@@ -1921,7 +1983,7 @@ int melee_web_menu_host_results_exit(MeleeWebMenuHost* h,char* e,size_t n){
 }
 int melee_web_menu_host_results_end(MeleeWebMenuHost* h,uint32_t seed,
     const uint8_t input[MELEE_WEB_PAD_STATE_BYTES],char* e,size_t n){
-    if(!h||h!=owner||!h->results_active||!h->results_exited||h->prize_active||
+    if(!h||h!=owner||!h->results_active||h->sudden_death_active||!h->results_exited||h->prize_active||
        melee_web_gameplay_generation()||seed_ptr!=&h->seed)
         return fail(e,n,"Results must tear down before restoring its route owner");
     if(!h->results_committed){

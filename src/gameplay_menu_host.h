@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <dolphin/pad.h>
+#include <melee/gm/types.h>
 #include <melee/mn/types.h>
 #include "gameplay_audio.h"
 #include "gameplay_pad_state.h"
@@ -32,6 +33,21 @@ typedef struct MeleeWebMenuMatchSelection {
      * mode/callback and 99-stock payload separate from ordinary VS rules. */
     uint8_t opening_demo;
 } MeleeWebMenuMatchSelection;
+typedef enum MeleeWebMenuMatchContinuationKind {
+    MELEE_WEB_MENU_MATCH_CONTINUATION_RESULTS = 1,
+    MELEE_WEB_MENU_MATCH_CONTINUATION_SUDDEN_DEATH = 2,
+} MeleeWebMenuMatchContinuationKind;
+typedef struct MeleeWebMenuMatchContinuation {
+    MeleeWebMenuMatchContinuationKind kind;
+    union {
+        /* The exact StartMeleeData produced by the original VS Sudden Death
+         * on_enter callback. The source may change its participants/rules. */
+        StartMeleeData sudden_death_start;
+        /* The exact ResultsMatchInfo produced by the original Results
+         * on_enter callback after either VS or Sudden Death. */
+        struct ResultsMatchInfo results;
+    } payload;
+} MeleeWebMenuMatchContinuation;
 typedef struct MeleeWebMenuSourceObservation {
     int source_scene;
     int menu_kind;
@@ -182,6 +198,13 @@ int melee_web_menu_host_match_finished(MeleeWebMenuHost*,uint32_t random_seed,
 int melee_web_menu_host_results_begin(MeleeWebMenuHost*,
     const struct MatchExitInfo*,uint32_t random_seed,
     struct ResultsMatchInfo*,char*,size_t);
+/* Follow original VS/Sudden Death callbacks. A Sudden Death continuation
+ * retains the VS mode lease until sudden_death_finish and Results teardown. */
+int melee_web_menu_host_match_continuation_begin(MeleeWebMenuHost*,
+    const struct MatchExitInfo*,uint32_t random_seed,
+    MeleeWebMenuMatchContinuation*,char*,size_t);
+int melee_web_menu_host_sudden_death_finish(MeleeWebMenuHost*,
+    const struct MatchExitInfo*,MeleeWebMenuMatchContinuation*,char*,size_t);
 int melee_web_menu_host_results_exit(MeleeWebMenuHost*,char*,size_t);
 int melee_web_menu_host_results_end(MeleeWebMenuHost*,uint32_t random_seed,
     const uint8_t input[MELEE_WEB_PAD_STATE_BYTES],char*,size_t);

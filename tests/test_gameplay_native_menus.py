@@ -56,6 +56,35 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
     def setUpClass(cls):
         cls.scratch = cls.new_workspace(ROOT, "stadium-c1a-native-menu-")
 
+    def test_vs_sudden_death_source_callbacks_without_assets(self):
+        target = ROOT / "build/browser-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("The native menu host trace has not been built")
+        command = [str(node_runtime()), str(target),
+                   "--vs-sudden-death-source-control"]
+        (self.scratch / "sudden-death-source-command.txt").write_text(
+            " ".join(command) + "\n", encoding="utf-8")
+        try:
+            run = subprocess.run(
+                command, cwd=ROOT, capture_output=True, text=True, timeout=30)
+        except subprocess.TimeoutExpired as failure:
+            (self.scratch / "sudden-death-source.stdout").write_bytes(
+                failure.stdout.encode() if isinstance(failure.stdout, str)
+                else (failure.stdout or b""))
+            (self.scratch / "sudden-death-source.stderr").write_bytes(
+                failure.stderr.encode() if isinstance(failure.stderr, str)
+                else (failure.stderr or b""))
+            raise
+        (self.scratch / "sudden-death-source.stdout").write_text(
+            run.stdout, encoding="utf-8")
+        (self.scratch / "sudden-death-source.stderr").write_text(
+            run.stderr, encoding="utf-8")
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-4000:])
+        self.assertIn(
+            "Original VS timeout/tie and Sudden Death-to-Results source callbacks passed",
+            run.stdout,
+        )
+
     def test_stadium_yakumono_exchange_round_trip_without_assets(self):
         target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
         if not target.is_file():

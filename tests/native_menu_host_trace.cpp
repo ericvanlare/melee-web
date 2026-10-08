@@ -54,6 +54,9 @@ extern "C" {
 #include <melee/gm/gm_16F1.h>
 #include <melee/gm/gm_1A3F.h>
 #include <melee/gm/gm_16AE.h>
+#include <melee/gm/gm_1B03.h>
+#include <melee/gm/gmvsmode.h>
+#include <melee/gm/gmvsmelee.h>
 #include <melee/gm/gmresultplayer.h>
 #include <melee/gm/gmmain_lib.h>
 #include <melee/gm/types.h>
@@ -110,6 +113,7 @@ extern HSD_RumbleData HSD_Rumble_804C22E0[4];
 extern "C" int melee_web_vs_mode_begin(void);
 extern "C" int melee_web_vs_mode_end(void);
 extern "C" int melee_web_vs_mode_select_state(int);
+extern "C" int melee_web_vs_mode_resolve_next_state(GameModeState*);
 extern "C" int melee_web_vs_mode_set_route(int current_mode, int previous_mode);
 extern "C" void* melee_web_current_scene_info(void);
 extern "C" void* melee_web_grpstadium_exchange_yakumono(void* value);
@@ -120,6 +124,170 @@ extern "C" int melee_web_stage_selection_end(void);
 static void check(int value,const char* error){if(!value){std::cerr<<"Check failed before teardown: "<<error<<"\n";throw std::runtime_error(error);}}
 
 namespace {
+void run_vs_sudden_death_source_control()
+{
+    char error[256]{};
+    check(melee_web_gameplay_session_begin(32U * 1024U * 1024U,
+                                           error, sizeof(error)), error);
+    bool mode_owned = false;
+    bool session_active = true;
+    try {
+        check(melee_web_vs_mode_begin(),
+              "Original VS source-mode lease did not begin");
+        mode_owned = true;
+        check(melee_web_vs_mode_set_route(GM_VS, GM_MENU),
+              "Original VS source route was not selected");
+
+        VsModeData* const vs = gmVsMelee_GetVsData();
+        std::memset(vs, 0, sizeof(*vs));
+        vs->start.rules.match_kind = MatchKind_Stock;
+        vs->start.rules.is_stock = true;
+        vs->start.rules.is_vs = true;
+        vs->start.rules.timer_enabled = true;
+        vs->start.rules.time_limit = 60;
+        for (unsigned i = 0; i < GM_MAX_PLAYERS; ++i)
+            vs->start.players[i].slot_type = Gm_PKind_NA;
+        vs->start.players[0].slot_type = Gm_PKind_Cpu;
+        vs->start.players[0].ckind = CKIND_MARIO;
+        vs->start.players[0].slot = 1;
+        vs->start.players[0].stocks = 4;
+        vs->start.players[0].color = 2;
+        vs->start.players[0].sub_color = 1;
+        vs->start.players[1].slot_type = Gm_PKind_Cpu;
+        vs->start.players[1].ckind = CKIND_FOX;
+        vs->start.players[1].slot = 2;
+        vs->start.players[1].stocks = 4;
+        vs->start.players[1].color = 1;
+        vs->start.players[1].sub_color = 2;
+
+        const auto route_vs_result = [](MatchOutcome outcome,
+                                        unsigned winner_count) {
+            MatchExitInfo& exit = gmVsMelee_VsExitInfo;
+            std::memset(&exit, 0, sizeof(exit));
+            exit.match_end.outcome = outcome;
+            exit.match_end.match_kind = MatchKind_Stock;
+            exit.match_end.n_winners = static_cast<u8>(winner_count);
+            for (auto& player : exit.match_end.player_standings)
+                player.slot_type = Gm_PKind_NA;
+            check(melee_web_vs_mode_select_state(gmVsMode_State_Vs),
+                  "Original VS state could not be selected");
+            gm_Mode_Vs_States[gmVsMode_State_Vs].on_exit(
+                &gm_Mode_Vs_States[gmVsMode_State_Vs]);
+            return melee_web_vs_mode_resolve_next_state(gm_Mode_Vs_States);
+        };
+        check(route_vs_result(OUTCOME_TIMEOUT, 1) == gmVsMode_State_Results,
+              "Original single-winner timeout did not select Results");
+        check(route_vs_result(OUTCOME_ELIMINATION, 1) == gmVsMode_State_Results,
+              "Original single-winner elimination did not select Results");
+        check(route_vs_result(OUTCOME_TIMEOUT, 2) ==
+                  gmVsMode_State_SuddenDeath,
+              "Original tied timeout did not select Sudden Death");
+
+        const StartMeleeData before_sudden_death = vs->start;
+        StartMeleeData expected_start{};
+        expected_start.rules = before_sudden_death.rules;
+        for (unsigned i = 0; i < GM_MAX_PLAYERS; ++i)
+            expected_start.players[i] = before_sudden_death.players[i];
+        gm_SetupSubColors(&expected_start);
+        gm_LoadRumbleEnabled(&expected_start);
+        gm_SetupSuddenDeath(&expected_start,
+                            &gmVsMelee_VsExitInfo.match_end);
+        check(melee_web_vs_mode_select_state(gmVsMode_State_SuddenDeath),
+              "Original Sudden Death state could not be selected");
+        gm_Mode_Vs_States[gmVsMode_State_SuddenDeath].on_enter(
+            &gm_Mode_Vs_States[gmVsMode_State_SuddenDeath]);
+        check(std::memcmp(&gmVsMelee_StartData, &expected_start,
+                          sizeof(expected_start)) == 0,
+              "Original Sudden Death callback changed source-generated StartMeleeData");
+        check(gmVsMelee_StartData.rules.match_kind == MatchKind_Stock &&
+                  !gmVsMelee_StartData.rules.timer_enabled &&
+                  gmVsMelee_StartData.players[0].slot_type == Gm_PKind_Cpu &&
+                  gmVsMelee_StartData.players[1].slot_type == Gm_PKind_Cpu &&
+                  gmVsMelee_StartData.players[0].stocks == 1 &&
+                  gmVsMelee_StartData.players[1].stocks == 1,
+              "Original Sudden Death callback did not produce its source rules and players");
+        check(!melee_web_vs_mode_begin(),
+              "Sudden Death did not retain its original VS mode owner");
+
+        MatchExitInfo sudden_death_exit{};
+        sudden_death_exit.x0 = 0x13579;
+        sudden_death_exit.x4 = 0x2468;
+        sudden_death_exit.x8 = 0x11223344;
+        MatchEnd& end = sudden_death_exit.match_end;
+        end.match_kind = MatchKind_Stock;
+        end.outcome = OUTCOME_ELIMINATION;
+        end.frame_count = 9876;
+        end.n_winners = 1;
+        end.winners[0] = 1;
+        for (auto& player : end.player_standings)
+            player.slot_type = Gm_PKind_NA;
+        end.player_standings[1].slot_type = Gm_PKind_Cpu;
+        end.player_standings[1].ckind = CKIND_FOX;
+        end.player_standings[1].stocks = 1;
+        gmVsMelee_SuddenDeathExitInfo = sudden_death_exit;
+
+        MatchEnd expected_result = gmVsMelee_VsExitInfo.match_end;
+        MatchEnd sudden_death_match_end = end;
+        gm_80166CCC(&expected_result, &sudden_death_match_end);
+        check(melee_web_vs_mode_select_state(gmVsMode_State_SuddenDeath),
+              "Original Sudden Death state could not be reselected for exit");
+        gm_Mode_Vs_States[gmVsMode_State_SuddenDeath].on_exit(
+            &gm_Mode_Vs_States[gmVsMode_State_SuddenDeath]);
+        check(melee_web_vs_mode_resolve_next_state(gm_Mode_Vs_States) ==
+                  gmVsMode_State_Results,
+              "Original Sudden Death state table did not select Results");
+        check(std::memcmp(&gmVsMelee_VsExitInfo.match_end, &expected_result,
+                          sizeof(expected_result)) == 0,
+              "Original Sudden Death exit did not preserve its authored MatchEnd merge");
+        check(gmVsMelee_VsExitInfo.x0 == 0 &&
+                  gmVsMelee_VsExitInfo.x4 == 0 &&
+                  gmVsMelee_VsExitInfo.x8 == 0,
+              "Sudden Death source callback changed non-MatchEnd VS exit fields");
+
+        check(melee_web_vs_mode_select_state(gmVsMode_State_Results),
+              "Original Results state could not be selected after Sudden Death");
+        gm_Mode_Vs_States[gmVsMode_State_Results].on_enter(
+            &gm_Mode_Vs_States[gmVsMode_State_Results]);
+        check(std::memcmp(&gmVsMelee_ResultsEnterData.match_end,
+                          &expected_result, sizeof(expected_result)) == 0,
+              "Original Results callback changed the Sudden Death MatchEnd payload");
+        check(melee_web_vs_mode_end(),
+              "Original VS source-mode lease did not retire after Results");
+        mode_owned = false;
+        check(melee_web_vs_mode_begin(),
+              "Original VS source-mode lease could not be reacquired after retirement");
+        check(melee_web_vs_mode_end(),
+              "Reacquired Original VS source-mode lease did not retire");
+
+        auto* host = melee_web_menu_host_create(error, sizeof(error));
+        check(host != nullptr, error);
+        MeleeWebMenuMatchContinuation rejected_continuation{};
+        MatchExitInfo rejected_exit{};
+        check(!melee_web_menu_host_match_continuation_begin(
+                  host, &rejected_exit, 1, &rejected_continuation,
+                  error, sizeof(error)),
+              "Typed host accepted a match continuation before source menus closed");
+        check(rejected_continuation.kind == 0,
+              "Rejected typed continuation retained a stale payload");
+        check(melee_web_vs_mode_begin(),
+              "Rejected typed continuation leaked its original VS owner");
+        check(melee_web_vs_mode_end(),
+              "Typed continuation ownership control could not retire the VS lease");
+        check(melee_web_menu_host_destroy(host, error, sizeof(error)), error);
+
+        check(melee_web_gameplay_session_end(error, sizeof(error)), error);
+        session_active = false;
+    } catch (...) {
+        if (mode_owned)
+            (void)melee_web_vs_mode_end();
+        if (session_active)
+            (void)melee_web_gameplay_session_end(error, sizeof(error));
+        throw;
+    }
+    std::cout << "Original VS timeout/tie and Sudden Death-to-Results source callbacks passed; "
+                 "asset-free callback control only, no gameplay claim\n";
+}
+
 std::string hex32(uint32_t value){std::ostringstream out;out<<std::hex<<std::setfill('0')<<std::setw(8)<<value;return out.str();}
 std::string hex64(uint64_t value){std::ostringstream out;out<<std::hex<<std::setfill('0')<<std::setw(16)<<value;return out.str();}
 std::string stream_name(MeleeWebAudio* audio){
@@ -3162,6 +3330,9 @@ void run_stadium_c1a_selection_smoke(
 #endif
 }
 int main(int argc,char** argv){try{
+ if(argc==2&&std::string_view(argv[1])=="--vs-sudden-death-source-control"){
+  run_vs_sudden_death_source_control();return 0;
+ }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  if(argc==2&&std::string_view(argv[1])=="--stadium-yakumono-exchange"){
   run_stadium_yakumono_exchange_control();return 0;

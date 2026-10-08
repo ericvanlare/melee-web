@@ -4318,10 +4318,10 @@ index 0d98426aac3e0be448f50e387ac8be218f65eeb3..31f017533cf7cbeded9f194397e083e5
 +}
 +#endif
 diff --git a/src/melee/gm/gm_1A3F.c b/src/melee/gm/gm_1A3F.c
-index 9fc7d6b09a3f0881a23881b758adc65103d025b4..095a8a147cd90ddaf5c4b70ca71af8df47fb3958 100644
+index 9fc7d6b09a3f0881a23881b758adc65103d025b4..c2f7519ad4be10e92f22d53876f3cf9a1afdae5d 100644
 --- a/src/melee/gm/gm_1A3F.c
 +++ b/src/melee/gm/gm_1A3F.c
-@@ -359,3 +359,100 @@ void gm_801A4510(void)
+@@ -359,3 +359,107 @@ void gm_801A4510(void)
          gamestate->routing.curr_mode = next_mode;
      }
  }
@@ -4357,6 +4357,13 @@ index 9fc7d6b09a3f0881a23881b758adc65103d025b4..095a8a147cd90ddaf5c4b70ca71af8df
 +    if (!melee_web_vs_mode_owned || !state_machine.routing.next_state_id)
 +        return -1;
 +    return state_machine.routing.next_state_id - 1;
++}
++int melee_web_vs_mode_resolve_next_state(GameModeState* states)
++{
++    if (!melee_web_vs_mode_owned || states == NULL) return -1;
++    if (state_machine.routing.next_state_id)
++        return state_machine.routing.next_state_id - 1;
++    return nextState(states);
 +}
 +int melee_web_vs_mode_pending_mode(void)
 +{
