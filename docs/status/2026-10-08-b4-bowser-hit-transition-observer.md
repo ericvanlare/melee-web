@@ -1,4 +1,43 @@
-# B4: Bowser's missing hit narrowed to candidate/log production
+# B4: Bowser hit observer and geometry boundary remain unresolved
+
+**Capacity follow-up — Browser exercised; issue #274 remains open.** The
+approved observer-capacity change was built from producer commit
+`d1b906979c70731d2f934766cee08af52cd70da4` (tree
+`b020077cfe72cf67437925801a25dc6e7cd876c2`, based on `fe28e8e`). The ordinary
+Release runtime build passed, and the unfiltered Python suite passed 1,948
+tests with 153 skipped (2,101 discovered, zero failures or errors). These
+checks belong to that producer revision, before the later main-branch merge.
+
+The capacity follow-up retained a complete, validated 76-event row at browser
+cursor 5239: four candidate hits each visited all fifteen authored hurtboxes
+in order, and all 60 geometry results were false. The row also contains one
+candidate pass/pair and the expected entry/return records. This is an observed
+case requiring 76 rows, not a global event bound; it does not identify why the
+retained original accepted the hit. The selector-off control and the historical
+64-row overflow behavior remain separate controls. The selected rows at 5238,
+5239 and 5240 and the full captured export passed their strict validators.
+
+The retained-export comparison reproduced 5,240 state/PAD/entity/order rows
+(indices 0–5239) and the setup row, with no difference through that prefix;
+strict validation also checked the complete old and new export tails. The
+original divergence remains at source frame 4055 / browser index 5239:
+original Bowser has 11 damage and `DamageFlyTop`, while the browser has zero
+damage and `WalkFast`. The capture remained incomplete after manual unload
+(owner exit 1); Results and whole-session acceptance failed. The historical
+owner CDP gate also remains failed because its recorded report path pointed at
+the retail-browser report, which did not contain the required process list.
+Separate retained CDP-to-OS attribution and cleanup review verified the actual
+capture report's process identities and no owned survivors; that does not
+retroactively pass the owner's gate. Preparation, quoting and attribution
+attempt failures remain preserved as failed attempts, separately from the
+corrected receipts. The comparison used retained extraction descriptors and
+did not reopen original payloads during post-processing.
+
+This follow-up does not establish an original collision cause or fix the first
+divergence. Issue #274, Results and whole-session acceptance remain open.
+Pixels, PCM, physical input, live timing and performance remain separate gates.
+
+**Earlier observer capture and controls.**
 
 **Compiled / Browser exercised**
 

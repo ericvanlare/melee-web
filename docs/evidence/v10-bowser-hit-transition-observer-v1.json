@@ -5,7 +5,7 @@
     "Compiled",
     "Browser exercised"
   ],
-  "scope": "Private Release observer of three Bowser scheduler boundaries; strict reproduction of a retained failed browser prefix, with an already audited original state mismatch. Issue274 and original/full-session agreement remain open.",
+  "scope": "Private Release observer of three Bowser scheduler boundaries and an observed 76-event geometry row; strict reproduction of a retained failed browser prefix, with an already audited original state mismatch. Issue274 and original/full-session agreement remain open.",
   "producers": {
     "native_release_and_full_suite": {
       "head": "7bd805699820fbf1f8d3d4132559c2865695cde6",
@@ -475,7 +475,152 @@
     "current_metadata_and_interpretation_original_open_attempts": 0,
     "browser_disc_import": "Authorized once for this exact capture; no original source trace scan or fresh disc hash."
   },
-  "next_scope": "Normal hurt/phantom candidate and log-producer interface proposal only. Shield-only ftColl_80076CBC is excluded from the primary normal path; source proposal corrects the preliminary name in the private outcome. No source change/build/capture is authorized by this receipt.",
+  "capacity_followup": {
+    "producer": {
+      "commit": "d1b906979c70731d2f934766cee08af52cd70da4",
+      "tree": "b020077cfe72cf67437925801a25dc6e7cd876c2",
+      "base_main": "fe28e8e0a6c47a793a42a92a93d8454d63d7b56c",
+      "working_tree_clean_at_capture": true,
+      "runtime_artifact_manifest": {
+        "name": "runtime-artifact-manifest-v1.json",
+        "sha256": "fcd224672cc57e2f7a36b7c28e1e0537b0736ca98b3729bca3fbb87d6cc51576"
+      },
+      "ordinary_release_build": {
+        "exit_code": 0,
+        "log": "ordinary-release-runtime-build-v1.log",
+        "sha256": "49e950926ead8e9aa9f76b31b68c4c0fea6153247ba6ad45141603cb10e06bc4",
+        "closure_packet": "ordinary-release-runtime-closure-v1.json",
+        "closure_sha256": "2828a4aa4f8b0f85cf2842d99fbfb2a2aaeb45836287bb08c5f5dc52ec317fbf"
+      },
+      "unfiltered_python_suite": {
+        "discovered": 2101,
+        "skipped": 153,
+        "passed": 1948,
+        "failures": 0,
+        "errors": 0,
+        "log": "full-suite-v1.log",
+        "sha256": "e705d6dcbeb9e7be4926c370849964dab1132650758a670e3383bc6d8a03a6d3"
+      },
+      "validation_timing": "Release build and suite were completed on the producer revision before merging the later main commit 7c5d47ab58f25b2a4241147c00d70c68a28b5ac6."
+    },
+    "capture": {
+      "selected_cursors": [5238, 5239, 5240],
+      "requested_stop_cursor": 5241,
+      "export_rows": 5251,
+      "export_indices": "0..5250",
+      "header_and_setup_rows": 2,
+      "probe_validation_receipt": {
+        "name": "probe-validation-review-v1.json",
+        "sha256": "502726223301550a4296e2835789631377658ae1639f7c9dfc23c849a7eaca05"
+      },
+      "raw_probe": {
+        "name": "hit-transition-probe.jsonl",
+        "bytes": 92849,
+        "sha256": "6122748b3a05927a83dd5c8bb3ad547f044bb5e7aeff048c5527ab1cdc4d995a"
+      },
+      "browser_export": {
+        "name": "retail-port.jsonl",
+        "bytes": 21475476,
+        "sha256": "f4680ed9e270db340c0b84f2c012ae9b1f595d29a5316440598276cdda98e710"
+      },
+      "cursor_5239": {
+        "events": 76,
+        "candidate_passes": 1,
+        "candidate_pairs": 1,
+        "candidate_hits": 4,
+        "geometry_events": 60,
+        "geometry_results_false": 60,
+        "order": "hit index0..3, each hurt index0..14",
+        "meaning": "Observed complete row requiring 76 events; not a global capacity bound or original collision-cause result."
+      },
+      "capture_result": "Whole-session capture remained incomplete after manual unload; owner exit code 1. Results and whole-session equivalence remain false.",
+      "probe_validators": "All three selected rows passed strict validation; complete new export tail validated."
+    },
+    "retained_comparison": {
+      "status": "baseline_reproduced",
+      "receipt": {
+        "name": "baseline-comparison-v1.json",
+        "bytes": 16209,
+        "sha256": "0e689bd122dce31d19258c4eae4fe51e718238d1329b1c5b622a5313638cc02d"
+      },
+      "state_pad_entity_order_rows": 5240,
+      "indices": "0..5239",
+      "setup_rows": 1,
+      "first_retained_difference": null,
+      "full_export_tail_validated": true,
+      "original_comparison_basis": "Retained extraction descriptors only; no original payload reopened during post-processing.",
+      "first_original_difference": {
+        "source_frame": 4055,
+        "browser_index": 5239,
+        "original": "11 damage / DamageFlyTop",
+        "browser": "0 damage / WalkFast"
+      },
+      "results_entry_equivalent": false,
+      "whole_session_equivalent": false
+    },
+    "cleanup_and_gate_status": {
+      "historical_owner_report_unchanged": true,
+      "owner_cdp_gate": "failed: recorded owner --browser-report path points to retail-browser-report.json, which lacks the required browser_process_info inventory",
+      "independent_actual_report_cdp_attribution": {
+        "name": "postcapture-cdp-attribution-v2.json",
+        "sha256": "503d216411f6f20e8d4636557d3b7f14171e7c7be284d29fca4542d4f0feec05",
+        "result": "Actual capture report identities cross-joined to owner OS inventory; no owned survivors. Does not retroactively pass the owner gate."
+      },
+      "cleanup": {
+        "name": "cleanup-outcome-v2.json",
+        "sha256": "b117a92d3a50d2f897dc52a8ee3bdd49152ab094b64275f13ee32eb99ef62ad9"
+      },
+      "lane_release": {
+        "name": "own-resource-release-v2.json",
+        "sha256": "3c6e5a68faaa5dd7f7a1fcfd051cee63b3562561080c1e9fb1c15aa63fdf7ffc",
+        "lane_absent": true,
+        "owned_tmp_absent": true
+      },
+      "retained_failed_attempts": {
+        "preparation": [
+          {
+            "name": "preparation-failure-v1/preparation-v1-failure-receipt.json",
+            "sha256": "5551dff1bc0085023e2fce9d83151a407f5dd03289b4479ddb139f17ecc8e988",
+            "failure": "Preparation expected 13 branch source paths; reviewed-base diff had 16. No runner, server, browser, capture or lane started."
+          },
+          {
+            "name": "preparation-failure-v2/preparation-v2-failure-receipt.json",
+            "sha256": "55d8c67e914b6fd26725b1093ce7a9a7e24387092b499c49b296ffcae1f37fc3",
+            "failure": "Tool identity guard rejected sys.executable because the invoked path was a symlink. No runner, server, browser, capture or lane started."
+          },
+          {
+            "name": "preparation-failure-v3/preparation-v3-failure-receipt.json",
+            "sha256": "967315fd54c884d2f9046304bf797bd101c6860dace06ba337d4e845d9ef2777",
+            "failure": "Startup guard still rejected the retained producer manifest. No runner, server, browser, capture or lane started."
+          }
+        ],
+        "retained_baseline_comparator_v1": {
+          "receipt": "baseline-comparison-attempt-v1-receipt.json",
+          "receipt_sha256": "65a2ae8028e6c767da970cb9fcf80d72647bcd0e4af905a30f3338c089a65498",
+          "raw_log": "baseline-comparison-attempt-v1.log",
+          "raw_log_sha256": "4af33732b110f8d216c667d1bea6de19d7c073c09de07071978b0d57045ecb90",
+          "failure": "Failed before validation because of JavaScript quoting; the corrected v2 comparator and its separate successful receipt are recorded above."
+        },
+        "postcapture_cdp_attribution_v1": {
+          "script": "postcapture_cdp_attribution_v1.py",
+          "script_sha256": "d9e3b6ef676b0bd9ad0378b474921a043694a13e542606752acb3abf88cf477c",
+          "failure": "Retained v1 script stopped on an overly strict local assertion; the v2 script and receipt are separate and do not rewrite that attempt."
+        }
+      }
+    },
+    "root_review": {
+      "name": "root-independent-outcome-review-v1.json",
+      "sha256": "27882c0e0a398cd3b07b88b623f0ec34cfd3eb3a7793203b0645f4f457f4b54e",
+      "outcome": "Bounded diagnostic accepted; whole-session result remains failed/incomplete and original owner CDP report-path gate remains failed. Independent retained actual CDP/OS cleanup reviewed."
+    },
+    "limits": [
+      "The 76-event row is an observed case only, not a global bound.",
+      "Browser geometry false rows do not identify the original collision cause or fix the retained first divergence.",
+      "The earlier unauthorized disc-read preparation disclosure remains documented in the historical receipt; this follow-up does not make a global zero-read claim.",
+      "Issue #274, Results and whole-session acceptance remain open."
+    ]
+  },
+  "next_scope": "A further source/observation-gap proposal requires separate review. This evidence does not authorize another capture or original payload access and does not claim a collision cause or fix.",
   "equivalent": false,
   "complete": false,
   "Results_entry_equivalent": false,
