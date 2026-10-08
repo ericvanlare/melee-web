@@ -1,0 +1,107 @@
+{
+  "browser_integration": {
+    "capture_observation_path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-integration-20261008-045400-b93/capture-observation-v4.json",
+    "capture_observation_sha256": "a07d1472d5680e47fe2c627c723f0e0ec9ec38498698e2d4548dcac59a74f8ec",
+    "packet_sha256": "94ae34bb12a821cb52e41b3dd7df29ccfcafa990f6f18e282f2f5df744667182",
+    "prior_detailed_receipt": "docs/evidence/net-lockstep-native-adapter-v3.json",
+    "producer": {
+      "base_main": "6645508cd7f09eed4ed5a5d39c5f4e1676734d58",
+      "head": "b93b7bd44bd4199e4dece77d0673d75c6af5d44a",
+      "tree": "5943efb772888345ed3f7175460c23f12f3397bd",
+      "wasm_sha256": "286be8518bf81f90cb3b6c9bd3a8bb62cbd9f43b78d37a8ecec6380162b1b3b1"
+    },
+    "refreshed_release_was_used": false,
+    "result": "Pass for the bounded two-headless-Chrome, local Room Worker/WebRTC A3 native-pump component: eight CSS source ticks, six local and six remote inputs per peer, zero native-local divergences, matching eight-record/512-byte checksum streams, and post-peer-close cursor/steps/draws of eight on both pages. Cleanup was independently reviewed.",
+    "root_review_sha256": "715149780b7a9e21f0cdc45bb009daa696848b35793fdbbe372c8d7ea8b609e5",
+    "scope_limit": "The run does not establish whole-session acceptance, live/keyboard/Gamepad/physical input, retail equivalence, timing/performance, visual/audio fidelity, Internet or two-machine multiplayer. No all-38 HTTP pre/post identity or CDP PID attribution is claimed."
+  },
+  "date": "2026-10-08",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "history": "Earlier failed v2/v3 browser attempts, incomplete suite output, and the older 32- and 34-artifact build sets remain preserved and identified by the v3 receipt and run receipts; none is relabeled as current evidence.",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/262",
+  "not_claimed": [
+    "A3 browser integration on the refreshed a73 Release Wasm identity",
+    "Runtime-owned product session/progress integration or public UI",
+    "Keyboard, Gamepad, physical or live input validation",
+    "Full supported route, retail equivalence, or whole-session acceptance",
+    "Foreground timing, latency, performance, pixel, PCM, or uninterrupted-audio acceptance",
+    "Internet, STUN/TURN, or two-machine multiplayer",
+    "Generic all-38 HTTP pre/post identity or CDP PID attribution"
+  ],
+  "refreshed_validation": {
+    "focused": {
+      "command": "node --test tests/net_lockstep_native_adapter.test.mjs tests/net_lockstep_browser_peer.test.mjs tests/net_session_instance.test.mjs tests/net_source_accounting.test.mjs",
+      "duration_ms": 88.315,
+      "failed": 0,
+      "log_path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/adapter-focused-v1.log",
+      "log_sha256": "7f473b9d13547ab88f62abc5d721e0b0b39b895a4c94a23e4c004278060e8f6b",
+      "passed": 56,
+      "result": "pass",
+      "skipped": 0,
+      "tests": 56
+    },
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "elapsed_seconds": 383.368,
+      "failures": 0,
+      "log_path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/full-suite-v1.log",
+      "log_sha256": "c6c402832f037c53e19880490be4d390cfc09b9382344ed358626c21aec55ace",
+      "result": "pass",
+      "skipped": 153,
+      "tests": 2050
+    },
+    "ordinary_release": {
+      "all_ten_optional_runtime_flags_off": true,
+      "artifact_catalog_exact_matches_to_preserved_b93": 33,
+      "artifact_count": 34,
+      "build_log_path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/ordinary-release-build-v1.log",
+      "build_log_sha256": "c385284553d3c5e4584b884dba52c55ce6437902f4ef51b0ef0d42a4e386107f",
+      "cmake_cache_sha256": "fd0fbd5a610af974864da67d0fd8b17e7c3ee3a333bd8eeaf35b05b428025ce8",
+      "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime --configuration Release",
+      "configuration": "Release",
+      "nonmatching_artifacts": [
+        {
+          "b93_captured_sha256": "286be8518bf81f90cb3b6c9bd3a8bb62cbd9f43b78d37a8ecec6380162b1b3b1",
+          "b93_preserved_sha256": "286be8518bf81f90cb3b6c9bd3a8bb62cbd9f43b78d37a8ecec6380162b1b3b1",
+          "bytes": 15748425,
+          "exact_b93_match": false,
+          "name": "gameplay_menu_browser.wasm",
+          "path": "/Volumes/AgentStorage/melee-web/checkouts/claude-net-determinism-20261005-181853-90d704ea/build/browser-release/gameplay_menu_browser.wasm",
+          "sha256": "812dd8f20c5b8886b039f95f0689d3b41ff0536db658d6bc11279f2e4bad11ca"
+        }
+      ],
+      "result": "pass",
+      "target": "runtime",
+      "wasm_identity_note": "The refreshed gameplay_menu_browser.wasm is the same length as the preserved b93 file but has a different SHA-256; the cause is undetermined. No browser capture was run against the refreshed Wasm, and the b93 capture evidence is not attributed to it."
+    },
+    "preservation_receipt_path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/pre-refresh-preservation-v1.json",
+    "preservation_receipt_sha256": "a2104b063aad33666f2b7e798ebe7f5a63de41162c4ff018e0f895d2a43c08eb",
+    "receipt_path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/current-main-validation-v2.json",
+    "receipt_sha256": "75b5fd6b8aa5b7b764202d426c87d15e41220215cd29489b3de9e71e9e731022"
+  },
+  "schema": "melee-web-issue262-native-adapter-evidence-v4",
+  "scope": "Shared development-only browser ABI adapter for sequential A1 and indexed A3 native lockstep publication, bounded checksum draining, optional progress notifications, and instance-owned joined disposal. Refreshed source/test/build validation is separate from the bounded browser capture, which remains attached only to the earlier b93 producer.",
+  "source": {
+    "base_main": "a7af7d63ce70bb892432d81bcc00b47bca3d1111",
+    "base_main_tree": "14f3cec2205a8d3f93e858da820a9e6f6af4127e",
+    "head": "a73eac585436f9fa7923c3e26489fe219acaa0d3",
+    "owned_commits": [
+      "9210dd9214145d915d0a0e678f57c878c4601446",
+      "1d488069457e270153731b91d4babba107024d31",
+      "99f5e10e5cc0ca3236f981730ae177b7367e4787",
+      "c11cd0ed3e9a7351e6079b66889eb5bfc9d8e366",
+      "b502488005a693a63d62d1ac7a189d5951e8c55e",
+      "a73eac585436f9fa7923c3e26489fe219acaa0d3"
+    ],
+    "ownership": "The shared adapter remains owned by openNetInstance. The peer borrows native calls and progress subscription; peer close unsubscribes and joins work, then instance cleanup disposes the adapter after post-close source accounting can read status.",
+    "previous_capture_producer": "b93b7bd44bd4199e4dece77d0673d75c6af5d44a",
+    "range_diff_path": "/Volumes/AgentStorage/melee-web/runs/issue262-a7af-validation-20261008-050256/owned-range-diff-v1.txt",
+    "range_diff_sha256": "b4ae033a569abe2e917accb5bdc96929ee3b610bc8f1e197b922b9cfb093dce0",
+    "refresh": "All six issue commits map exactly by range-diff from the previously validated b93 branch onto current main a7af7d6. PR #268 changed comparator code/tests and documentation; no issue #262 runtime sources changed.",
+    "tree": "c83769d75a2b5994b342ac441f51d54db00c56b7"
+  }
+}

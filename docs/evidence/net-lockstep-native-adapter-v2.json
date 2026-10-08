@@ -1,0 +1,96 @@
+{
+  "schema": "melee-web-issue262-native-adapter-evidence-v2",
+  "date": "2026-10-07",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/262",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified"
+  ],
+  "scope": "Shared development-only browser ABI adapter for sequential A1 and indexed A3 native lockstep publication, bounded checksum draining, optional progress notifications, and instance-owned joined disposal.",
+  "source": {
+    "head": "b93b7bd44bd4199e4dece77d0673d75c6af5d44a",
+    "tree": "5943efb772888345ed3f7175460c23f12f3397bd",
+    "base_main": "6645508cd7f09eed4ed5a5d39c5f4e1676734d58",
+    "previous_reviewed_source": "26d0626e543e5799976021395fbf49d566a14cb5",
+    "refresh": "All four adapter commits mapped exactly by git range-diff onto current main; no conflicts.",
+    "ownership_repair": "The shared adapter remains owned by openNetInstance. The peer borrows native calls and progress subscription; peer close unsubscribes and joins native work, then session-instance cleanup disposes the adapter after post-close source accounting can read status."
+  },
+  "validation": {
+    "receipt": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/issue262-current-main-preservation-20261007-213243-fe2d958b/current-main-validation-v1.json",
+      "sha256": "571e54e04e3773fcadf3c73d485c07f16843d5115d7a4ca539dd88d4ee1b6b84"
+    },
+    "focused": {
+      "command": "node --test tests/net_lockstep_native_adapter.test.mjs tests/net_lockstep_browser_peer.test.mjs tests/net_session_instance.test.mjs tests/net_source_accounting.test.mjs",
+      "result": "pass",
+      "tests": 56,
+      "skipped": 0,
+      "log_path": "/Volumes/AgentStorage/melee-web/runs/issue262-current-main-preservation-20261007-213243-fe2d958b/adapter-focused-after-refresh-v1.log",
+      "log_sha256": "ee15ac2e4695ed1a22db91de11f0d3a62063d2afda82f9e09af7b73c9dec2cb5"
+    },
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "result": "pass",
+      "tests": 2042,
+      "skipped": 153,
+      "failures": 0,
+      "log_path": "/Volumes/AgentStorage/melee-web/runs/issue262-current-main-preservation-20261007-213243-fe2d958b/full-suite-v2.log",
+      "log_sha256": "e272490cac23d88af50f46f465420b8ec7bacee6e69f0b798d0f5c0a0683b28c",
+      "retained_incomplete_attempt": {
+        "log_path": "/Volumes/AgentStorage/melee-web/runs/issue262-current-main-preservation-20261007-213243-fe2d958b/full-suite-v1.log",
+        "log_sha256": "d529da6fd8694e8c1e41735e13e81ddef286acf00b2e62e8afa1b6a4b76e416e",
+        "failure": "An existing test sliced PAGE_HELPERS from source text using adjacent-function delimiters; after the helper became exported, the slice included an export declaration that the isolated VM could not parse. The test now imports PAGE_HELPERS directly; the focused test and corrected full suite pass."
+      }
+    },
+    "ordinary_release": {
+      "result": "pass",
+      "configuration": "Release",
+      "native_target": "gameplay_menu_browser",
+      "artifact_count": 34,
+      "optional_runtime_flags": "all ten listed in the validation receipt are OFF",
+      "receipt_path": "/Volumes/AgentStorage/melee-web/runs/issue262-current-main-preservation-20261007-213243-fe2d958b/current-main-validation-v1.json",
+      "build_log_path": "/Volumes/AgentStorage/melee-web/runs/issue262-current-main-preservation-20261007-213243-fe2d958b/ordinary-release-build-v1.log",
+      "build_log_sha256": "bd42225abd60ebc7c75746dfeae49926f230749d38c00300e34c70414b7bd017"
+    },
+    "historical_preservation": {
+      "manifest_path": "/Volumes/AgentStorage/melee-web/runs/issue262-current-main-preservation-20261007-213243-fe2d958b/pre-refresh-preservation-v1.json",
+      "manifest_sha256": "2bd6b985e523021bc86107f6aaf394d84f800861adafc101b6e2f1bb8aa77daf",
+      "sets": [
+        {
+          "producer": "9458853e6c6d24513d637f8027842dbdb52d9f6a",
+          "artifacts": 32,
+          "cache_and_receipt_verified": true
+        },
+        {
+          "producer": "cf3e3b573c63209f4c6aafc2139621a85eab8b3d",
+          "artifacts": 34,
+          "cache_and_native_object_verified": true
+        }
+      ]
+    }
+  },
+  "browser_integration": {
+    "result": "failed before the ownership repair; no post-repair browser capture yet",
+    "captured_source": "cf3e3b573c63209f4c6aafc2139621a85eab8b3d",
+    "capture_observation_path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-integration-20261008-041732-v3/capture-observation-v3.json",
+    "capture_observation_sha256": "b489ca5c32847c5d46eda5f1e62b4ad391e74ac7483ea12e9b692eacee11b333",
+    "failure": "The v3 run used the already-allowed http://127.0.0.1:8787 origin and reached both ready peers, but the scenario failed when post-peer-close source accounting read status from the disposed shared adapter.",
+    "partial_observations": "Both pages recorded six local and remote input ticks, eight local and remote checksum ticks, zero native-local divergences, and identical 512-byte checksum files. These facts do not change the overall FAIL result.",
+    "cleanup_review_path": "/Volumes/AgentStorage/melee-web/runs/issue262-browser-integration-20261008-041732-v3/root-failed-capture-review-v1.json",
+    "cleanup_review_sha256": "2c2633ee426cd30e7e80c6be163f3836e7477a9ab1e8c042eb80c7da9bfcd0e1",
+    "profiles": [
+      "/Volumes/AgentStorage/melee-web/runs/issue262-browser-capture-20261008-041732-v3/browser-run/alpha/profile",
+      "/Volumes/AgentStorage/melee-web/runs/issue262-browser-capture-20261008-041732-v3/browser-run/beta/profile"
+    ]
+  },
+  "previous_snapshot": "docs/evidence/net-lockstep-native-adapter-v1.json records the earlier pre-capture validation and remains historical.",
+  "not_claimed": [
+    "Post-repair browser integration or A3 acceptance",
+    "Runtime-owned product session lifecycle",
+    "Public UI or deployment",
+    "Physical or keyboard input",
+    "Full supported route or retail equivalence",
+    "Timing, latency, performance, foreground, pixel, or audio acceptance",
+    "Internet or two-machine multiplayer"
+  ]
+}

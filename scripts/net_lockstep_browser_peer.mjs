@@ -467,9 +467,11 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
           JSON.stringify(after.terminal) !== JSON.stringify(before.terminal) || after.ring_pending !== 0)
         throw Error('Autonomous native pump close boundary changed or retained native records');
     };
-    for (const operation of [() => rpcChain, finalNativeDrain, () => endpoint.close(), () => startup, () => settle()]) {
+    for (const operation of [() => rpcChain, finalNativeDrain, () => endpoint.close(),
+      () => startup, () => settle(), () => nativeChain]) {
       try { await operation(); } catch (error) { failures.push(remember(error)); }
     }
+    try { await native.dispose?.(); } catch (error) { failures.push(remember(error)); }
     closed = endpoint.closed;
     if (failure) failures.push(failure);
     if (failures.length) throw new AggregateError([...new Set(failures)], 'Browser native peer close failed');
