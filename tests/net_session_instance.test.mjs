@@ -3,7 +3,11 @@ import {mkdtemp, rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import {firstFatalBrowserError, openNetInstance} from '../scripts/net_session_instance.mjs';
+import {closePageNativeNetworkOwnership, firstFatalBrowserError, openNetInstance, PAGE_HELPERS} from '../scripts/net_session_instance.mjs';
+import {createBrowserNativePeer} from '../scripts/net_lockstep_browser_peer.mjs';
+import {createNetLockstepNativeAdapter} from '../scripts/net_lockstep_native_adapter.mjs';
+import {LOCKSTEP_DELAY} from '../scripts/net_lockstep_core.mjs';
+import {installNetSourceAccounting, readNetSourceAccounting} from '../scripts/net_source_accounting.mjs';
 
 function fakeChrome(goto, evaluate = async () => undefined) {
   let closeCalls = 0;
@@ -179,6 +183,78 @@ test('startup failure without a peer disposes the imported adapter and exposes c
     assert(failure.cleanupError.errors.includes(disposeFailure));
     assert.equal(chrome.closeCalls, 1);
   });
+});
+
+test('peer close releases progress ownership while the instance keeps native status for post-close accounting', async () => {
+  const saved = new Map(['window', 'Module'].map(name => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+  const frees = [];
+  let heap = new Uint8Array(128), allocation = 8;
+  const status = {active: 1, cursor: 0, blocker: 'start_identity'};
+  const Module = {
+    get HEAPU8() { return heap; },
+    _malloc(size) {
+      const pointer = allocation;
+      allocation += size + 8;
+      if (allocation > heap.length) {
+        const grown = new Uint8Array(allocation);
+        grown.set(heap);
+        heap = grown;
+      }
+      return pointer;
+    },
+    _free(pointer) { frees.push(pointer); },
+    _melee_web_net_push() { return 1; },
+    _melee_web_net_push_indexed() { return 1; },
+    _melee_web_net_enable_local_input_capture() { return 1; },
+    _melee_web_net_confirm_start() { return 1; },
+    _melee_web_net_terminate() {},
+    _melee_web_net_checksum_drain() { return 0; },
+    _melee_web_net_status() { return 4; },
+    UTF8ToString() { return JSON.stringify(status); },
+  };
+  const window = {menuRuntimeTiming() {}};
+  const page = {evaluate(fn, argument) { return fn(argument); }};
+  const restoreGlobal = (name, descriptor) => {
+    if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+    else delete globalThis[name];
+  };
+  try {
+    globalThis.window = window;
+    globalThis.Module = Module;
+    await PAGE_HELPERS(async () => createNetLockstepNativeAdapter);
+    await installNetSourceAccounting(page);
+    assert.equal(Object.hasOwn(window.__meleeWebNetNativePeerApi(), 'dispose'), false,
+      'the peer borrows adapter lifetime from its enclosing instance');
+
+    const endpoint = {ready: Promise.resolve(), errors: [], closed: false,
+      transport: {type: 'test'}, async send() {}, async drainInbound() {},
+      async close() { this.closed = true; }};
+    const peer = createBrowserNativePeer({role: 'alpha', sourceTicks: LOCKSTEP_DELAY,
+      inputTicks: 0, relayUrl: 'ws://example.test', roomId: 'a'.repeat(32), timeoutMs: 500,
+      agreement: {build: 'same'}, native: window.__meleeWebNetNativePeerApi(), autonomousPump: true},
+    {createEndpoint: () => endpoint});
+    window.__netPeer = peer;
+
+    status.cursor = LOCKSTEP_DELAY;
+    status.blocker = 'complete';
+    status.terminal = {kind: 0};
+    status.ring_pending = 0;
+    await peer.close();
+
+    const accounting = await readNetSourceAccounting(page, {freeze: true});
+    assert.equal(accounting.frozen, true, 'peer close released its source-progress subscription');
+    assert.equal(accounting.final.cursor, LOCKSTEP_DELAY);
+    assert.equal(window.__net.status().blocker, 'complete', 'the borrowed adapter remains usable after peer close');
+
+    await closePageNativeNetworkOwnership();
+    assert.equal(frees.length, 1, 'instance cleanup frees the shared adapter scratch once');
+    assert.throws(() => window.__net.status(), /adapter is disposed/);
+    await closePageNativeNetworkOwnership();
+    assert.equal(frees.length, 1, 'repeated instance cleanup keeps adapter disposal idempotent');
+  } finally {
+    restoreGlobal('window', saved.get('window'));
+    restoreGlobal('Module', saved.get('Module'));
+  }
 });
 
 test('passes bounded room-signaling options through the page invocation', async () => {

@@ -23,7 +23,7 @@ export function firstFatalBrowserError(errors) {
 
 // Installed once per page. The binary adapter owns all network ABI scratch
 // memory; Base64 remains only at the Node/Playwright boundary used by A1.
-const PAGE_HELPERS = async (loadNativeAdapter = async () =>
+export const PAGE_HELPERS = async (loadNativeAdapter = async () =>
   (await import('./net_lockstep_native_adapter.mjs')).createNetLockstepNativeAdapter) => {
   const createNativeAdapter = await loadNativeAdapter();
   const nativeAdapter = createNativeAdapter(Module, {subscribeProgress: callback => {
@@ -105,10 +105,20 @@ const PAGE_HELPERS = async (loadNativeAdapter = async () =>
           records.push(Array.from(result.bytes.subarray(offset, offset + nativeAdapter.recordBytes)));
         return records;
       },
-      dispose: () => nativeAdapter.dispose(),
+      // This peer borrows the instance-owned adapter. openNetInstance.close()
+      // disposes it only after peer and accounting work have joined.
     };
   };
 };
+
+export async function closePageNativeNetworkOwnership() {
+  const failures = [];
+  try { if (window.__netPeer) await window.__netPeer.close({intentional: true}); }
+  catch (error) { failures.push(error); }
+  try { window.__meleeWebNetNativeAdapter?.dispose(); }
+  catch (error) { failures.push(error); }
+  if (failures.length) throw new AggregateError(failures, 'Page native network cleanup failed');
+}
 
 export async function openNetInstance({chromium, launchOptions, url, disc, userDataDir, label,
   throttle = 1, arenaFill = -1, timeoutMs = 120000, deadline = Infinity, peerModuleHashes = null,
@@ -128,14 +138,7 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
         ? error.errors.forEach(addFailure) : failures.push(error);
       if (page && typeof page.evaluate === 'function') {
         try {
-          await bounded(() => page.evaluate(async () => {
-            const failures = [];
-            try { if (window.__netPeer) await window.__netPeer.close({intentional: true}); }
-            catch (error) { failures.push(error); }
-            try { window.__meleeWebNetNativeAdapter?.dispose(); }
-            catch (error) { failures.push(error); }
-            if (failures.length) throw new AggregateError(failures, 'Page native network cleanup failed');
-          }));
+          await bounded(() => page.evaluate(closePageNativeNetworkOwnership));
         } catch (error) { addFailure(error); }
       }
       try { driver?.dispose(); } catch {}
