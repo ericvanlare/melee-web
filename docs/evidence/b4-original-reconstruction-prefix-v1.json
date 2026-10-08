@@ -1,0 +1,117 @@
+{
+  "schema": "melee-web-b4-original-reconstruction-prefix-receipt",
+  "version": 1,
+  "evidence_labels": [
+    "Source identified",
+    "Native traced"
+  ],
+  "scope": "Conditional exact original observer prefix under declared reconstructed cold boot. Original/Dolphin versus reproduced original/Dolphin only. No browser or whole-session acceptance.",
+  "producer": {
+    "repository_commit": "1b05ba89e6be640b9c89c59308d6c84fc89cfc16",
+    "tree": "3353e371259e5587ea2db67a351ebfff83c1702b",
+    "private_untracked_adapter_sha256": "70609087b5e76b9dc59c96668fe78798f3602cba3457d05d2270a79de9c642dd",
+    "private_test_sha256": "811b788bbea1ac0017b68e311e34a152f602ca7748657fcffa779578efe5c32c",
+    "retained_binary_sha256": "469b73f1053fbcae2ca43809a532e075498771a770f9c6b3799c22a99a6c3831",
+    "dolphin_commit": "c77bbaa0f372c3f72281602a8b087206706542cb",
+    "DOL_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "fighter_entity_profile": "v10-live-static-player-pair",
+    "retained_build_receipt_sha256": "74305476bdd0a91ac8e52d564eac734bc640afc15cd98a684e4a6dc737c043fd",
+    "retained_observer_overlay_sha256": "e0aaed02a90b8b81a50137a84ea94d0fd2b8f3a1d16d5d2b58c933e9b004ef31",
+    "runner_sha256": "53a698039063687f951e9a1042007ee221f2841ffbcf5c0f6b7a3088260df857",
+    "launch_packet_sha256": "2b9e39777f0aa28e8b8d8dda0775cf151950ed6b99ff514d1bde22d71b0654e2"
+  },
+  "strict_prefix": {
+    "rows": 24393,
+    "sequences": [
+      0,
+      24392
+    ],
+    "match_index": 0,
+    "through_source_tick": 4056,
+    "source_copy_bytes": 169679399,
+    "source_copy_sha256": "4020995861b7fc6769bba596ad60319813139556bb458f083eb3edbebc08dab5",
+    "actual_generated_prefix": {
+      "records": 24393,
+      "bytes": 169679429,
+      "sha256": "0d4f939b4106a8a6fa57e05dbb73ea0d322912dde6e068aa5fac76316880be07"
+    },
+    "agreement": "Every decoded field/raw span/address/register/draw ordinal/setup/PAD/state bit equal. Only transport timestamp and separately-bound capture/sequence IDs excluded. Wire byte lengths/hashes differ legitimately because IDs/timestamps differ; no wire equality claimed.",
+    "root_review_sha256": "e87f1ca8758aa6735bc0b7b72f8d22a0f2c9d5f0a49ccfa4bb1b408d39aa31ac",
+    "actual_result_sha256": "4ce870e3aac303b00b2352fbe7cb61343c4cb748ab3b1b79b675ff89af1ec96b"
+  },
+  "verified_4055_state": {
+    "fighter": "Bowser",
+    "slot": 1,
+    "damage_bits": "41300000",
+    "damage": 11,
+    "motion_id": 90
+  },
+  "planned_stop": {
+    "seconds_including_cleanup": 108.2324705410283,
+    "exit_code": 0,
+    "survivors": [],
+    "input_events": 25802,
+    "source_input_events": 209238,
+    "input_complete": false,
+    "input_invalid": false,
+    "observer_tick_at_stop": 4067,
+    "observer_state": "interrupted",
+    "observer_invalid": false,
+    "tail_scope": "Generated records beyond the compared tick4056 group are retained but unpaired; last reported counter4067 need not be a complete group. Not natural completion, finalized replay or whole session."
+  },
+  "historical_unknowns": [
+    "exact original argv",
+    "effective original speed",
+    "complete historical preboot environment/config",
+    "native initial RNG seed",
+    "identity-v2 producer-at-read source hash/command absent"
+  ],
+  "scope_exclusions": [
+    "browser equivalence",
+    "collision cause or arithmetic diagnosis",
+    "pixels or PCM",
+    "physical input",
+    "live timing/performance",
+    "whole-session acceptance"
+  ],
+  "artifact_provenance": "Private retained evidence names/hashes only; no recordings/inputs/personal paths in Git. Currentmain documentation integration is separate from this B producer and passive probe.",
+  "evidence_label_note": "Original-versus-original reconstruction control. This receipt does not establish browser-versus-retail agreement.",
+  "captured_utc": {
+    "started": "2026-10-08T21:04:10.595427+00:00",
+    "finished": "2026-10-08T21:05:58.827718+00:00"
+  },
+  "input_identity": {
+    "recorded_controller_stream": {
+      "bytes": 8369576,
+      "events": 209238,
+      "sha256": "445e48a898c6e3badca4b032a61f38b5a97fde74d67aa8de0580cc6db22d89e7"
+    },
+    "saved_GCI_sha256": "39171db67ec4e6b85837107f7cd7e1231402e239ec7f74bfc9efa35d5a2879ce",
+    "saved_SRAM_sha256": "49dee06d38cb76aaa8f90bfb2e937face180243d1a170078b4e13226b012f82c",
+    "declared_configuration_snapshot_sha256": "194383a7360815593249f5a2e42e67fb218c8d17c40204d23eed21c08c459066",
+    "scope": "Retained inputs identity-bound; owned save copies and declared configuration used. Historical complete prelaunch identity is not recovered."
+  },
+  "generated_stream": {
+    "bytes": 170110727,
+    "sha256": "a55a0e30093412f518137e5beae4453ec08fe627dc990e6a452b258457309f59"
+  },
+  "retained_failed_attempts": [
+    {
+      "attempt": 1,
+      "boundary": "command-line parser",
+      "result": "nogui rejected GUI-only -b before observations",
+      "compared_rows": 0
+    },
+    {
+      "attempt": 2,
+      "boundary": "observer announcement sequence0",
+      "result": "missing runtime fighter_entity_profile; reduced with actual comparator and source inspection before third attempt",
+      "compared_rows": 0
+    }
+  ],
+  "private_evidence_locator": {
+    "campaign": "b4-reconstruction-prefix-narrowing-20261008-125657-a944d0c1",
+    "result": "coldboot-run-v3/actual-result-v3.json",
+    "root_review": "root-coldboot-result-review-v3.json"
+  }
+}

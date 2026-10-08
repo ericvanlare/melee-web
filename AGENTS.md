@@ -9,9 +9,12 @@ Read [README.md](README.md), then [the developer entry](docs/DEVELOPMENT.md).
 That entry routes the task to the authoritative boundary document; do not read
 the entire status and playbook history by default. Consult [current evidence](STATUS.md)
 when a task depends on an existing result, and cite the scoped receipt or report
-that supports any new claim. `STATUS.md` is the current evidence index; record new evidence as a new
-entry file under `docs/status/` (never a new STATUS section), and do not
-copy its changing measurements into another document. Keep status backed by
+that supports any new claim. `STATUS.md` is the current evidence index. From
+2026-10-08 onward, keep one entry under `docs/status/` per boundary and update it
+in place as that boundary advances; create an entry for a new boundary, never a
+new STATUS section. Preserve historical results and exact evidence identities;
+do not rewrite or consolidate past entries. Do not copy changing measurements
+into another document. Keep status backed by
 observed evidence and use the playbook's scoped evidence labels.
 
 Read [local resource ownership](docs/LOCAL_RESOURCES.md) before bootstrapping,
@@ -38,7 +41,9 @@ Choose work from the [roadmap's current priorities](docs/ROADMAP.md#current-prio
 its pinned [priorities tracker](https://github.com/ericvanlare/melee-web/issues/158)
 and current evidence in `STATUS.md`. Online multiplayer and competitive-rules
 scope come before whole-game breadth; the supported route stays the regression
-baseline. Each execution issue needs an observable failure or outcome,
+baseline. Use one issue and PR per milestone, with prerequisite steps as checklist
+items and commits within it. Aim for a handful of milestone merges a day. Each
+execution issue needs an observable failure or outcome,
 smallest next experiment, pass criteria, exclusions and a stopping rule. Check
 existing implementations for relevant solutions and record reuse or rejection.
 Component fixes do not close whole-session acceptance.

@@ -146,9 +146,12 @@ draw ordering.
 Before an execution task, record its observable outcome/failure, smallest next
 experiment, exact pass criteria, exclusions, existing solutions checked and
 stopping rule in the issue. After two experiments at one boundary, reduce the
-reproducer or request a bounded review before another long run. Reference the
-acceptance issue from component PRs without auto-closing it until all its gates
-pass. Keep new evidence in a new `docs/status/` entry and scoped reports rather
+reproducer or request a bounded review before another long run. Keep component
+steps as commits within the milestone PR, and keep the broader acceptance issue
+open until all its gates pass. Keep one `docs/status/` entry per boundary, updating it in place as the
+boundary advances and preserving historical results and exact evidence
+identities. Create an entry for a new boundary; do not rewrite or consolidate
+past entries. Keep evidence in these entries and scoped reports rather
 than copying it into the roadmap or another status document.
 
 To pause unfinished work, push a WIP branch with one handoff at

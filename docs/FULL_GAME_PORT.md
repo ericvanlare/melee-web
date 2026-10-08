@@ -12,9 +12,10 @@ costumes and alternate parts, transformations, partners and bosses, stages,
 items and CPU, local multiplayer and VS rules, menus and results, unlocks,
 trophies, single-player modes, minigames, events, movies, save and memory-card
 behavior, audio, graphics, input and browser lifecycle. Netplay, online
-services, custom content and non-vanilla revisions are later scope. The
-inventory keeps those exclusions explicit so a missing offline feature cannot
-be mistaken for an online or product-extras task.
+services, custom content and non-vanilla revisions are outside this offline
+inventory. The [roadmap](ROADMAP.md) prioritizes online multiplayer and
+competitive rules before broader offline scope; this inventory's exclusions
+do not change that order.
 
 The current route and bounded acceptance work are tracked in the
 [roadmap](ROADMAP.md); this inventory does not duplicate changing evidence or
