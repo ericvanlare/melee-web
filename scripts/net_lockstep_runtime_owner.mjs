@@ -2,6 +2,7 @@ import {createNetLockstepNativeAdapter} from './net_lockstep_native_adapter.mjs'
 import {BROWSER_CHECKSUM_EXPORT_LIMIT, createBrowserNativePeer} from './net_lockstep_browser_peer.mjs';
 import {createDataChannelEndpoint} from './net_lockstep_webrtc.mjs';
 import {createRoomWebRtcSignaler} from './net_lockstep_webrtc_signaling.mjs';
+import {createRoomRelayPeerEndpoint} from './net_lockstep_websocket_relay.mjs';
 import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS, NET_RECORD_BYTES, readOnlySuffix} from './net_lockstep_core.mjs';
 
 const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]{22,64}$/;
@@ -247,10 +248,57 @@ export function createRoomTransport({url, roomId, role, timeoutMs, createEndpoin
   };
 }
 
+/** Adapts the existing bounded Worker WebSocket endpoint to the runtime owner. */
+export function createRoomRelayTransport({url, roomId, role, timeoutMs,
+  createEndpoint = createRoomRelayPeerEndpoint} = {}) {
+  if (role !== 'alpha' && role !== 'beta') throw Error('Room relay runtime role must be alpha or beta');
+  if (typeof createEndpoint !== 'function') throw Error('Room relay runtime endpoint factory is required');
+  let endpoint = null, closed = false, readinessSettled = false, closeOperation = null, startOperation = null;
+  return {
+    createEndpoint(options = {}) {
+      if (closed) throw Error('Room relay runtime transport is closed');
+      if (endpoint) throw Error('Room relay runtime endpoint was already allocated');
+      endpoint = createEndpoint({onMessage: options.onMessage, onDisconnect: options.onDisconnect,
+        onEndpointError: options.onEndpointError, url, roomId, role, timeoutMs});
+      return endpoint;
+    },
+    cancelPendingStart() {
+      if (closed || readinessSettled || !endpoint || endpoint.closed) return false;
+      endpoint.destroy();
+      return true;
+    },
+    start() {
+      if (startOperation) return startOperation;
+      if (closed) return Promise.reject(Error('Room relay runtime transport is closed'));
+      if (!endpoint) return Promise.reject(Error('Room relay runtime endpoint was not allocated'));
+      startOperation = Promise.resolve(endpoint.ready).then(value => {
+        readinessSettled = true;
+        return endpoint.transport ?? value?.transport;
+      }, error => {
+        readinessSettled = true;
+        throw error;
+      });
+      startOperation.catch(() => {});
+      return startOperation;
+    },
+    close() {
+      if (closeOperation) return closeOperation;
+      closed = true;
+      closeOperation = (async () => {
+        if (endpoint) await endpoint.close();
+        return Object.freeze({closed: true, type: 'room-websocket'});
+      })();
+      closeOperation.catch(() => {});
+      return closeOperation;
+    },
+  };
+}
+
 /** One runtime-owned native adapter, browser peer, and frame-driven progress subscription. */
 export function createRuntimeLockstepSession({Module, role, sourceTicks, inputTicks, url, roomId,
-  timeoutMs = 5000, checksumEvidenceRecords = undefined, createAdapter = createNetLockstepNativeAdapter,
-  createPeer = createBrowserNativePeer, createTransport = createRoomTransport} = {}) {
+  timeoutMs = 5000, checksumEvidenceRecords = undefined, transportType = 'webrtc',
+  createAdapter = createNetLockstepNativeAdapter, createPeer = createBrowserNativePeer,
+  createTransport = createRoomTransport, createRelayTransport = createRoomRelayTransport} = {}) {
   if (!Module || typeof Module !== 'object') throw Error('Runtime lockstep session requires the loaded native Module');
   if (role !== 'alpha' && role !== 'beta') throw Error('Runtime lockstep role must be alpha or beta');
   if (!Number.isSafeInteger(sourceTicks) || sourceTicks < LOCKSTEP_DELAY || sourceTicks > LOCKSTEP_MAX_SOURCE_TICKS ||
@@ -259,6 +307,8 @@ export function createRuntimeLockstepSession({Module, role, sourceTicks, inputTi
   if (checksumEvidenceRecords !== undefined &&
       (!Number.isSafeInteger(checksumEvidenceRecords) || checksumEvidenceRecords !== sourceTicks))
     throw Error('Runtime lockstep checksum evidence budget must equal its declared source tick bound');
+  if (!['webrtc', 'relay'].includes(transportType))
+    throw Error('Runtime lockstep transport type must be webrtc or relay');
   const evidenceLimit = checksumEvidenceRecords ?? BROWSER_CHECKSUM_EXPORT_LIMIT;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) throw Error('Runtime lockstep timeout must be positive');
   if (typeof url !== 'string' || !/^wss?:\/\//.test(url) || typeof roomId !== 'string' || !ROOM_ID_PATTERN.test(roomId))
@@ -310,7 +360,10 @@ export function createRuntimeLockstepSession({Module, role, sourceTicks, inputTi
     const agreement = agreementForStart(start);
     if (!agreement || typeof agreement !== 'object' || Array.isArray(agreement))
       throw Error('Runtime lockstep agreement builder returned an invalid value');
-    transport = createTransport({url, roomId, role, timeoutMs, agreement, sourceTicks, inputTicks});
+    if (agreement.transport !== transportType)
+      throw Error(`Runtime lockstep agreement transport does not match selected ${transportType} transport`);
+    const buildTransport = transportType === 'relay' ? createRelayTransport : createTransport;
+    transport = buildTransport({url, roomId, role, timeoutMs, agreement, sourceTicks, inputTicks});
     peer = createPeer({role, sourceTicks, inputTicks, timeoutMs, agreement, native,
       inputCapture: {mode: 'live'}, autonomousPump: true,
       checksumConsumer(records) {

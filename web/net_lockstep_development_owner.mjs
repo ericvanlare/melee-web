@@ -2,14 +2,18 @@ const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]{22,64}$/;
 const WASM_SHA256_PATTERN = /^[a-f0-9]{64}$/;
 
 function validateConfig(config) {
+  const keys = config && typeof config === 'object' && !Array.isArray(config) ? Object.keys(config).sort() : [];
+  const required = ['role', 'roomId', 'timeoutMs', 'url'];
+  const allowed = keys.join(',') === required.join(',') ||
+    keys.join(',') === [...required, 'transport'].sort().join(',');
   if (!config || typeof config !== 'object' || Array.isArray(config) ||
-      Object.keys(config).sort().join(',') !== 'role,roomId,timeoutMs,url' ||
+      !allowed ||
       !['alpha', 'beta'].includes(config.role) || typeof config.url !== 'string' ||
       !/^wss?:\/\//.test(config.url) || typeof config.roomId !== 'string' ||
       !ROOM_ID_PATTERN.test(config.roomId) || !Number.isSafeInteger(config.timeoutMs) ||
-      config.timeoutMs <= 0)
+      config.timeoutMs <= 0 || (config.transport !== undefined && !['webrtc', 'relay'].includes(config.transport)))
     throw Error('Runtime lockstep configuration is invalid');
-  return Object.freeze({...config});
+  return Object.freeze({...config, transport: config.transport ?? 'webrtc'});
 }
 
 function assertAvailable(context) {
@@ -62,7 +66,7 @@ export function createDevelopmentLockstepOwner({Module, owner, inputDelay, sourc
 
       const ownedSession = createSession({Module, role: config.role, sourceTicks,
         inputTicks: sourceTicks - inputDelay, checksumEvidenceRecords: sourceTicks, url: config.url, roomId: config.roomId,
-        timeoutMs: config.timeoutMs});
+        timeoutMs: config.timeoutMs, transportType: config.transport});
       session = ownedSession;
       owner.attachNetworkSession(options => ownedSession.close(options));
       attached = true;
@@ -73,7 +77,8 @@ export function createDevelopmentLockstepOwner({Module, owner, inputDelay, sourc
         neutral_prefix: {ticks: inputDelay, ports_0_1: 'zero-PADStatus', ports_2_3: 'PAD_ERR_NO_CONTROLLER'},
         pad_encoding: 'MWNI-v1-port-records-11-byte',
         port_ownership: {0: 'alpha', 1: 'beta', 2: 'no-controller', 3: 'no-controller'},
-        input_source: 'browser-local-native-PADStatus', runtime_wasm_sha256: identity.wasm,
+        input_source: 'browser-local-native-PADStatus', transport: config.transport,
+        runtime_wasm_sha256: identity.wasm,
         disc: identity.disc, native_start: nativeStart,
       }));
       ready.catch(() => {});

@@ -736,8 +736,11 @@ function runtimeOwnerPeerFacade(instance, role) {
     armClose: async () => true,
     get closeResult() { return closeResult; },
     get errors() { return snapshot?.endpointErrors ?? []; },
-    get transport() { return ownerSnapshot?.transport ? {type: 'webrtc-datachannel', ordered: true,
-      reliable: true, ...ownerSnapshot.transport.local_webrtc} : snapshot?.transport ?? null; },
+    get transport() {
+      if (!ownerSnapshot?.transport) return snapshot?.transport ?? null;
+      return localWebRtc ? {type: 'webrtc-datachannel', ordered: true,
+        reliable: true, ...ownerSnapshot.transport.local_webrtc} : ownerSnapshot.transport;
+    },
     get signaling() { return ownerSnapshot?.transport?.signaling ?? null; },
     get checksumOwnership() { return snapshot?.checksumOwnership ?? null; },
     get localInputCapture() { return snapshot?.localInputCapture ?? null; },
@@ -770,6 +773,7 @@ function createAgreement(identity, start) {
     port_ownership: {0: 'alpha', 1: 'beta', 2: 'no-controller', 3: 'no-controller'},
     ...(inputSampling || runtimeOwned ? {input_source: 'browser-local-native-PADStatus'} :
       {input_recipe: {sha256: scriptHash, frame_count: inputCount, input_ticks_used: usedInputs}}),
+    ...(runtimeOwned ? {transport: peerTransport} : {}),
     runtime_wasm_sha256: identity.wasm,
     disc: identity.disc,
     // Runtime begin joins remote agreement and native confirmation before this
@@ -1247,8 +1251,8 @@ async function run() {
   if (openTimeout <= 0) throw Error('No run deadline remains for browser startup');
   const peerModuleNames = ['net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs',
     'net_lockstep_native_adapter.mjs', 'net_lockstep_websocket_relay.mjs',
-    ...(localWebRtc ? ['net_lockstep_webrtc.mjs'] : []),
-    ...(roomWorkerSignaling ? ['net_lockstep_webrtc_signaling.mjs'] : []),
+    ...(localWebRtc || runtimeOwned ? ['net_lockstep_webrtc.mjs'] : []),
+    ...(roomWorkerSignaling || runtimeOwned ? ['net_lockstep_webrtc_signaling.mjs'] : []),
     ...(runtimeOwned ? ['net_lockstep_runtime_owner.mjs', 'net_lockstep_development_owner.mjs'] : [])];
   const peerModulePath = name => name === 'net_lockstep_development_owner.mjs'
     ? new URL('../web/net_lockstep_development_owner.mjs', import.meta.url)
@@ -1277,15 +1281,18 @@ async function run() {
   if (runtimeOwned) {
     roomRuntime = await startRoomRelayRuntime({evidenceDir: path.join(output, 'worker-evidence')});
     const roomId = createRoomId();
-    const signalingUrl = roomRuntime.base.replace(/^http:/, 'ws:');
+    const relayUrl = roomRuntime.base.replace(/^http:/, 'ws:');
     await Promise.all(['alpha', 'beta'].map(role => instances[role].configureRuntimeLockstep({
-      role, url: signalingUrl, roomId, timeoutMs: Math.min(stallMs, deadline - Date.now()),
+      role, url: relayUrl, roomId, timeoutMs: Math.min(stallMs, deadline - Date.now()),
+      transport: peerTransport,
     })));
     pairResults.runtime_session_start = {owner: 'web/runtime-development.mjs',
       protocol_owner: 'browser runtime peer and native adapter',
       input_source: 'existing native PADStatus callback', progress_source: 'existing menuFrame event',
+      selected_transport: peerTransport,
       room_worker: {loopback: true, port: roomRuntime.port, identity: roomRuntime.runtimeIdentity,
-        hashes: roomRuntime.hashes}, raw_sdp_exposed_to_node: false};
+        hashes: roomRuntime.hashes},
+      ...(localWebRtc ? {raw_sdp_exposed_to_node: false} : {relay_payloads_exposed_to_node: false})};
     // Observe the live native timing callback and freeze the actual first
     // Wasm response before beginLockstep performs its page-owned identity fetch.
     for (const role of ['alpha', 'beta'])
@@ -1359,19 +1366,27 @@ async function run() {
         for (const role of ['alpha', 'beta']) {
           const cleanup = peers[role].closeResult?.transport_cleanup;
           if (cleanup) {
-            pairResults.local_webrtc_cleanup ??= {};
-            pairResults.local_webrtc_cleanup[role] = cleanup;
+            const field = localWebRtc ? 'local_webrtc_cleanup' : 'runtime_transport_cleanup';
+            pairResults[field] ??= {};
+            pairResults[field][role] = cleanup;
           }
         }
         if (errors.length) throw new AggregateError(errors, 'Runtime-owned peer pair close failed');
         runtimeRelayClosed = true;
       }};
     pairResults.transport = describeLockstepTransport(relay);
-    pairResults.local_webrtc_signaling = {ice_servers: [],
-      signaling: 'runtime-owned page offer/answer over the existing local RoomRelay Worker',
-      room_worker: pairResults.runtime_session_start.room_worker,
-      peers: {alpha: peers.alpha.transport, beta: peers.beta.transport},
-      raw_sdp_exposed_to_node: false};
+    if (localWebRtc) {
+      pairResults.local_webrtc_signaling = {ice_servers: [],
+        signaling: 'runtime-owned page offer/answer over the existing local RoomRelay Worker',
+        room_worker: pairResults.runtime_session_start.room_worker,
+        peers: {alpha: peers.alpha.transport, beta: peers.beta.transport},
+        raw_sdp_exposed_to_node: false};
+    } else {
+      pairResults.runtime_room_relay = {selection: 'direct existing RoomRelay WebSocket endpoint',
+        room_worker: pairResults.runtime_session_start.room_worker,
+        peers: {alpha: peers.alpha.transport, beta: peers.beta.transport},
+        relay_payloads_exposed_to_node: false};
+    }
   } else if (browserOwned) {
     const roomId = localWebRtc ? undefined : createRoomId();
     const peerOptions = role => ({role, sourceTicks, inputTicks: usedInputs,
@@ -1564,8 +1579,15 @@ async function run() {
   stopRouteCaptureWatchers = true;
   await settleRouteBoundaryWatchers();
   if (nativePump || runtimeLiveRoute) {
-    pairResults.local_webrtc_final_before_peer_close = Object.fromEntries(await Promise.all(['alpha', 'beta'].map(async role =>
-      [role, verifyReliableHostWebRtc(await (runtimeOwned ? runtimeOwnerWebRtcState(role) : instances[role].localWebRtcState()))])));
+    if (localWebRtc) {
+      pairResults.local_webrtc_final_before_peer_close = Object.fromEntries(await Promise.all(['alpha', 'beta'].map(async role =>
+        [role, verifyReliableHostWebRtc(await (runtimeOwned ? runtimeOwnerWebRtcState(role) : instances[role].localWebRtcState()))])));
+    } else if (runtimeOwned) {
+      await refreshBrowserPeers();
+      pairResults.runtime_relay_final_before_peer_close = {
+        alpha: peers.alpha.transport, beta: peers.beta.transport,
+      };
+    }
     if (runtimeOwned) {
       if (runtimeInputFixture) for (const role of ['alpha', 'beta'])
         instanceRows[role].runtime_input_fixture_frozen = await instances[role].freezeRuntimeInputFixture();
