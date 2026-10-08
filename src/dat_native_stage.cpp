@@ -419,6 +419,130 @@ void* DatNativeMap::collision(){
 }
 std::span<const uint32_t> DatNativeMap::source_light_counts()const noexcept{return storage_->source_light_counts;}
 
+DatNativeMapContract DatNativeStageMapContractData::view() const noexcept
+{
+ return {
+  entry_count,
+  animation_consumer_counts,
+  resident_entry_ids,
+  external_references,
+  animation_flag_entry_ids,
+  flagged_objects,
+ };
+}
+
+DatNativeStageMapContractData dat_native_stage_map_contract_from_profile(
+    const MeleeWebStageProfile& profile, const DatArchive& archive,
+    const DatStage& metadata)
+{
+ require(metadata.entries.size()==profile.entry_count,
+         "Native stage map entry count differs from source profile");
+ require(profile.animation_count_count==profile.entry_count&&profile.animation_counts,
+         "Native stage profile lacks animation consumer counts");
+
+ DatNativeStageMapContractData result;
+ result.entry_count=profile.entry_count;
+ result.animation_consumer_counts.assign(
+     profile.animation_counts,profile.animation_counts+profile.animation_count_count);
+
+ constexpr std::array<uint32_t,11> pointer_fields={0,4,8,12,16,20,24,28,32,40,44};
+ switch(profile.map_ownership_policy){
+ case MELEE_WEB_STAGE_MAP_OWNERSHIP_UNSPECIFIED:
+  require(false,"Native stage profile has no explicit map ownership policy");
+  break;
+ case MELEE_WEB_STAGE_MAP_OWNERSHIP_CURRENT_ALL_RESIDENT:{
+  require(!profile.map_ownership,
+          "Current all-resident map policy contradicts an authored declaration");
+  result.resident_entry_ids.resize(metadata.entries.size());
+  for(uint32_t i=0;i<result.resident_entry_ids.size();i++)result.resident_entry_ids[i]=i;
+  for(const auto& entry:metadata.entries)for(uint32_t field:pointer_fields){
+   const uint32_t slot=entry.descriptor_offset+field;
+   for(const auto& symbol:archive.external_symbols())
+    if(std::find(symbol.slots.begin(),symbol.slots.end(),slot)!=symbol.slots.end())
+     result.external_references.push_back({entry.index,field,symbol.name});
+  }
+  for(const auto& entry:metadata.entries)
+   if(entry.index!=0)result.animation_flag_entry_ids.push_back(entry.index);
+  result.flagged_objects.reserve(metadata.flagged_object_table.count);
+  for(uint32_t i=0;i<metadata.flagged_object_table.count;i++){
+   const uint32_t slot=*metadata.flagged_object_table.data_offset+4*i;
+   const auto target=archive.pointer(slot,8);
+   require(target.has_value(),"Native stage flag mutation pointer is null");
+   result.flagged_objects.push_back({i,DatNativeMapFlagKind::LocalMaterial,*target,{}});
+  }
+  break;
+ }
+ case MELEE_WEB_STAGE_MAP_OWNERSHIP_AUTHORED:{
+  const auto* ownership=profile.map_ownership;
+  require(ownership,"Authored native stage map policy lacks its declaration");
+  const auto require_array=[](const void* data,size_t count,const char* message){
+   require(!count||data,message);
+  };
+  require(ownership->resident_entry_count<=profile.entry_count,
+          "Authored native stage resident list exceeds the entry table");
+  require_array(ownership->resident_entry_ids,ownership->resident_entry_count,
+                "Authored native stage resident list is missing");
+  require(ownership->animation_flag_entry_count<=profile.entry_count,
+          "Authored native stage animation-flag list exceeds the entry table");
+  require_array(ownership->animation_flag_entry_ids,ownership->animation_flag_entry_count,
+                "Authored native stage animation-flag list is missing");
+  require(ownership->external_reference_count<=profile.entry_count*pointer_fields.size(),
+          "Authored native stage external-reference list exceeds pointer fields");
+  require_array(ownership->external_references,ownership->external_reference_count,
+                "Authored native stage external-reference list is missing");
+  require(ownership->flagged_object_count==metadata.flagged_object_table.count,
+          "Authored native stage flagged-object list differs from its source table");
+  require_array(ownership->flagged_objects,ownership->flagged_object_count,
+                "Authored native stage flagged-object list is missing");
+
+  if(ownership->resident_entry_count)
+   result.resident_entry_ids.assign(ownership->resident_entry_ids,
+                                    ownership->resident_entry_ids+ownership->resident_entry_count);
+  if(ownership->animation_flag_entry_count)
+   result.animation_flag_entry_ids.assign(ownership->animation_flag_entry_ids,
+                                          ownership->animation_flag_entry_ids+ownership->animation_flag_entry_count);
+  result.external_references.reserve(ownership->external_reference_count);
+  for(size_t i=0;i<ownership->external_reference_count;i++){
+   const auto& reference=ownership->external_references[i];
+   require(reference.symbol&&reference.symbol[0],
+           "Authored native stage external reference lacks its exact symbol");
+   result.external_references.push_back({reference.entry_index,reference.field_offset,reference.symbol});
+  }
+  result.flagged_objects.reserve(ownership->flagged_object_count);
+  for(size_t i=0;i<ownership->flagged_object_count;i++){
+   const auto& expected=ownership->flagged_objects[i];
+   const std::string_view symbol=expected.symbol?expected.symbol:"";
+   DatNativeMapFlagKind kind;
+   switch(expected.kind){
+   case MELEE_WEB_STAGE_MAP_FLAG_LOCAL_MATERIAL:
+    require(symbol.empty(),"Authored local native stage flag has an external symbol");
+    kind=DatNativeMapFlagKind::LocalMaterial;
+    break;
+   case MELEE_WEB_STAGE_MAP_FLAG_EXTERNAL_NULL:
+    require(!symbol.empty()&&!expected.target_offset,
+            "Authored external native stage flag lacks its exact symbol or has a local target");
+    kind=DatNativeMapFlagKind::ExternalNull;
+    break;
+   case MELEE_WEB_STAGE_MAP_FLAG_NULL:
+    require(symbol.empty()&&!expected.target_offset,
+            "Authored null native stage flag has a target or symbol");
+    kind=DatNativeMapFlagKind::Null;
+    break;
+   default:
+    require(false,"Authored native stage flag has an unknown kind");
+    kind=DatNativeMapFlagKind::Null;
+    break;
+   }
+   result.flagged_objects.push_back({expected.index,kind,expected.target_offset,symbol});
+  }
+  break;
+ }
+ default:
+  require(false,"Native stage profile has an unknown map ownership policy");
+ }
+ return result;
+}
+
 DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive)
     : DatNativeStage(std::move(archive), St_Kind_Last) {}
 
@@ -430,40 +554,8 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
  for(const auto& symbol:a.public_symbols())
   if(symbol.name=="ALDYakuAll")
    s.random_item_scripts=std::make_unique<DatStageYaku>(archive,symbol.data_offset);
- require(meta.entries.size()==profile->entry_count,"Native stage map entry count differs from source profile");
- require(profile->animation_count_count==profile->entry_count&&profile->animation_counts,
-         "Native stage profile lacks animation consumer counts");
-
- // Stage profiles define which rows begin live, but the complete stage owner
- // hydrates the entire authored descriptor table (including deferred rows).
- std::vector<uint32_t> residents(meta.entries.size());
- for(uint32_t i=0;i<residents.size();i++)residents[i]=i;
- constexpr std::array<uint32_t,11> pointer_fields={0,4,8,12,16,20,24,28,32,40,44};
- std::vector<DatNativeMapExternalReference> external_references;
- for(const auto& entry:meta.entries)for(uint32_t field:pointer_fields){
-  const uint32_t slot=entry.descriptor_offset+field;
-  for(const auto& symbol:a.external_symbols())
-   if(std::find(symbol.slots.begin(),symbol.slots.end(),slot)!=symbol.slots.end())
-    external_references.push_back({entry.index,field,symbol.name});
- }
- std::vector<uint32_t> animation_flag_consumers;
- for(const auto& entry:meta.entries)if(entry.index!=0)animation_flag_consumers.push_back(entry.index);
- std::vector<DatNativeMapFlagExpectation> flag_expectations;
- flag_expectations.reserve(meta.flagged_object_table.count);
- for(uint32_t i=0;i<meta.flagged_object_table.count;i++){
-  const uint32_t slot=*meta.flagged_object_table.data_offset+4*i;
-  const auto target=a.pointer(slot,8);
-  require(target.has_value(),"Native stage flag mutation pointer is null");
-  flag_expectations.push_back({i,DatNativeMapFlagKind::LocalMaterial,*target,{}});
- }
- const DatNativeMapContract contract{
-  profile->entry_count,
-  std::span<const uint8_t>(profile->animation_counts,profile->animation_count_count),
-  residents,
-  external_references,
-  animation_flag_consumers,
-  flag_expectations
- };
+ auto contract_data=dat_native_stage_map_contract_from_profile(*profile,a,meta);
+ const DatNativeMapContract contract=contract_data.view();
  auto* markers=melee_web_stage_markers_decode(s.arena.reader(),meta.root_offset);
  require(markers,"Native stage strict marker decoder returned null");
  s.hydrate_map(contract,markers);

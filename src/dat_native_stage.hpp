@@ -4,6 +4,7 @@
 #include "native_dat.hpp"
 #include "gameplay_stage_map.h"
 #include "gameplay_archive_sections.h"
+#include "gameplay_stage_profile.h"
 #include <cstdint>
 #include <span>
 #include <string_view>
@@ -37,6 +38,23 @@ struct DatNativeMapContract {
     // One source-ordered expectation per authored flagged-object table slot.
     std::span<const DatNativeMapFlagExpectation> flagged_objects;
 };
+
+// Owns the vectors referenced by a map-contract view. The compatibility policy
+// reproduces the current complete-stage contract; authored profiles provide
+// every ownership identity explicitly.
+struct DatNativeStageMapContractData {
+    uint32_t entry_count = 0;
+    std::vector<uint8_t> animation_consumer_counts;
+    std::vector<uint32_t> resident_entry_ids;
+    std::vector<DatNativeMapExternalReference> external_references;
+    std::vector<uint32_t> animation_flag_entry_ids;
+    std::vector<DatNativeMapFlagExpectation> flagged_objects;
+    DatNativeMapContract view() const noexcept;
+};
+
+class DatStage;
+DatNativeStageMapContractData dat_native_stage_map_contract_from_profile(
+    const MeleeWebStageProfile&, const DatArchive&, const DatStage&);
 
 // Owns only the checked source map graph. It does not publish the map or
 // imply that a complete stage, stage callbacks, or world services exist.
