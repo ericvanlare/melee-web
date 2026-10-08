@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
-import {readyRenderCallback, readyRenderEvent, verifyAccountedRenderReadiness, verifyPositivePeerCompletion} from '../scripts/net_lockstep_observers.mjs';
+import {readyRenderCallback, readyRenderEvent, verifyAccountedRenderReadiness, verifyPositivePeerCompletion,
+  createPerPeerProgressWatch, validateNativeChecksumSuffix} from '../scripts/net_lockstep_observers.mjs';
 import {collapseConsecutiveScenes, validateActiveMatchRoute} from '../scripts/net_determinism_contract.mjs';
 import {createBrowserNativePeer, BROWSER_CHECKSUM_EXPORT_LIMIT} from '../scripts/net_lockstep_browser_peer.mjs';
 import {LockstepPeer} from '../scripts/net_lockstep_core.mjs';
@@ -437,7 +438,7 @@ const fullRouteCompletionSource = browserSource.slice(fullRouteCompletionStart,
   browserSource.indexOf('\nfunction routeBoundaryPath(', fullRouteCompletionStart));
 async function runActualInterval({completedBefore = false, injectedRpc = false, stalled = false, failure = null,
   runtimeCssSss = false, runtimeCssMatch = false, runtimeFullRoute = false, beforeCursor = null,
-  matchBoundary = {}, matchFrameSequence = null} = {}) {
+  matchBoundary = {}, matchFrameSequence = null, healthMutation = null} = {}) {
   let rounds = 0, now = 0;
   const runtimeCssLiveRoute = runtimeCssSss || runtimeCssMatch;
   const runtimeOwned = runtimeCssLiveRoute || runtimeFullRoute;
@@ -463,10 +464,38 @@ async function runActualInterval({completedBefore = false, injectedRpc = false, 
         pending_batch: null, retained_records: 0}, checksumOwnership: {consumer_accepted_records: count}} : {})};
     return snapshot;
   };
+  const makeRuntimeHealth = (role, checksumFrom = 0) => {
+    const snapshot = makeSnapshot(role);
+    const {checksum_mismatches, ...protocol} = snapshot.protocol;
+    protocol.checksum_mismatch_count = checksum_mismatches.length;
+    const {endpointErrors, ...peer} = snapshot;
+    peer.protocol = protocol;
+    peer.endpoint_error_count = endpointErrors.length;
+    peer.localInputCapture = {enabled: true, mode: 'live', input_ticks: usedInputs,
+      captured_count: usedInputs, captures_since: []};
+    if (peer.checksumConsumer) peer.checksumConsumer.pending_batch = false;
+    const checksumCount = snapshot.protocol.local_checksum_ticks;
+    const owner = {armed: true, closing: false, failure: null, peer,
+      checksum_record_count: checksumCount,
+      checksum_records_since: Array.from({length: checksumCount - checksumFrom}, (_, offset) => record(checksumFrom + offset))};
+    if (healthMutation && rounds === 0 && role === 'beta') {
+      if (healthMutation === 'malformed-mismatch-count') owner.peer.protocol.checksum_mismatch_count = '0';
+      else if (healthMutation === 'inconsistent-mismatch-rows') owner.peer.protocol.checksum_mismatches = [{tick: 0}];
+      else if (healthMutation === 'malformed-endpoint-count') owner.peer.endpoint_error_count = -1;
+      else if (healthMutation === 'inconsistent-endpoint-rows') owner.peer.endpointErrors = ['fixture endpoint error'];
+      else if (healthMutation === 'malformed-suffix') owner.checksum_records_since[0] = [0];
+      else if (healthMutation === 'duplicate-suffix-tick' && owner.checksum_records_since.length > 1)
+        owner.checksum_records_since[1] = record(checksumFrom);
+      else if (healthMutation === 'gapped-suffix-tick' && owner.checksum_records_since.length > 1)
+        owner.checksum_records_since[1] = record(checksumFrom + 2);
+    }
+    return owner;
+  };
   for (const role of ['alpha', 'beta']) instances[role] = {
     readPeerSnapshot: async () => makeSnapshot(role),
     runtimeLockstepSnapshot: async () => ({armed: true, closing: false, failure: null,
       peer: makeSnapshot(role), checksums: Array.from({length: makeSnapshot(role).protocol.local_checksum_ticks}, (_, tick) => record(tick))}),
+    runtimeLockstepHealth: async ({checksumFrom = 0} = {}) => makeRuntimeHealth(role, checksumFrom),
     matchObservationBoundary: async () => {
       const sequence = matchFrameSequence?.[role];
       const observation = sequence?.length ? {...activeMatch,
@@ -488,6 +517,7 @@ async function runActualInterval({completedBefore = false, injectedRpc = false, 
     runtimeCssMatch, runtimeCssLiveRoute, runtimeFullRoute,
     NET_RECORD_BYTES: 64, sourceTicks, usedInputs, stallMs: 3,
     pollMs: 1, deadline: 100, Date: {now: () => now}, verifyPositivePeerCompletion,
+    createPerPeerProgressWatch, validateNativeChecksumSuffix,
     verifyRuntimeFullRoutePeerCompletion: vm.runInNewContext(
       `${fullRouteCompletionSource}\nverifyRuntimeFullRoutePeerCompletion`,
       {verifyPositivePeerCompletion, usedInputs, sourceTicks}), validateActiveMatchRoute,
@@ -510,7 +540,7 @@ test('actual interval rejects already complete, intervening RPC, sticky failure 
   await assert.rejects(runActualInterval({completedBefore: true}), /completed before/);
   await assert.rejects(runActualInterval({injectedRpc: true}), /peer RPC occurred/);
   await assert.rejects(runActualInterval({failure: 'actual retained failure'}), /diagnostic peer failed/);
-  await assert.rejects(runActualInterval({stalled: true}), /bounded no-RPC interval/);
+  await assert.rejects(runActualInterval({stalled: true}), /no source\/protocol progress/);
 });
 
 test('runtime CSS-to-SSS interval observes retained partial evidence and crosses source cursor 512 without peer RPC', async () => {
@@ -565,6 +595,11 @@ test('runtime full-route pure-health interval retains the first stable active-ma
   }
   await assert.rejects(runActualInterval({runtimeFullRoute: true, beforeCursor: 5084}), /completed before/);
   await assert.rejects(runActualInterval({runtimeFullRoute: true, injectedRpc: true}), /peer RPC occurred/);
+  for (const healthMutation of ['malformed-mismatch-count', 'inconsistent-mismatch-rows',
+    'malformed-endpoint-count', 'inconsistent-endpoint-rows'])
+    await assert.rejects(runActualInterval({runtimeFullRoute: true, healthMutation}), /autonomous diagnostic peer failed/);
+  for (const healthMutation of ['malformed-suffix', 'duplicate-suffix-tick', 'gapped-suffix-tick'])
+    await assert.rejects(runActualInterval({runtimeFullRoute: true, healthMutation}), /Native checksum suffix/);
   const zeroThenPositive = await runActualInterval({runtimeFullRoute: true,
     matchFrameSequence: {alpha: [0, 1], beta: [0, 1]}});
   for (const role of ['alpha', 'beta'])
