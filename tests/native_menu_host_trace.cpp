@@ -27,6 +27,7 @@
 #include "dat_native_stage.hpp"
 #include "dat_native_joint.hpp"
 #include "dat_scene.hpp"
+#include "dat_sis.hpp"
 #include "dat_stage.hpp"
 #include "dat_stage_items.hpp"
 #include "dat_stage_yaku.hpp"
@@ -2363,6 +2364,7 @@ void run_stadium_e8_request(
     std::unique_ptr<DatEffectBanks> effects;
     std::unique_ptr<DatScene> quake;
     std::unique_ptr<DatStageItems> items;
+    std::unique_ptr<DatSis> stadium_sis;
     MeleeWebStadiumE8CallObservation observed{};
     MeleeWebStadiumC1StageInfoView before_view{};
     MeleeWebStadiumC1StageInfoView after_view{};
@@ -2441,6 +2443,7 @@ void run_stadium_e8_request(
                       snapshot, error, sizeof(error)), error);
             snapshot = nullptr;
         }
+        stadium_sis.reset();
         items.reset();
         quake.reset();
         effects.reset();
@@ -2494,6 +2497,10 @@ void run_stadium_e8_request(
         check(melee_web_stadium_c1_stage_object_failures() == 0,
               "E8 typed preparation published a stage object or item/light root");
 
+        stadium_sis = std::make_unique<DatSis>(archive, "SIS_GrPStadiumData");
+        check(stadium_sis->descriptor() != nullptr,
+              "Stadium SIS typed owner returned a null descriptor");
+
         const std::vector<MeleeWebArchiveSymbol> symbols{
             {"GrPs.usd", "map_head", map_owner->map_head()},
             {"GrPs.usd", "coll_data", map_owner->collision()},
@@ -2503,6 +2510,7 @@ void run_stadium_e8_request(
             {"GrPs.usd", "map_texg", effects->texture_root()},
             {"GrPs.usd", "yakumono_param", yakumono_data},
             {"GrPs.usd", "quake_model_set", quake->single_model()},
+            {"GrPs.usd", "SIS_GrPStadiumData", stadium_sis->descriptor()},
         };
         if (perform_on_init) {
             check(!melee_web_effect_runtime_prepared() &&
