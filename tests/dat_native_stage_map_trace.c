@@ -96,3 +96,9 @@ int melee_web_test_ground_marker_last_write(void* pointer){
  Ground_801C2D0C(135,before_135);Ground_801C2D0C(134,before_134);
  return last_wins;
 }
+int melee_web_test_native_map_light_identity(void* pointer,void* descriptor){
+ UnkStageDat* map=pointer;
+ if(!map||map->unkC!=1||!map->unk8||!descriptor)return 0;
+ LightList** lights=map->unk8[0].x18;
+ return lights&&lights[0]&&lights[0]->desc==descriptor&&lights[1]==NULL;
+}

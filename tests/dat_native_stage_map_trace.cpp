@@ -21,6 +21,7 @@ extern "C" const uint8_t* melee_web_test_native_stadium_flags(void*,int);
 extern "C" void* melee_web_test_native_stadium_flag(void*,int);
 extern "C" int melee_web_test_native_marker_pairs(void*,const uint16_t*,int);
 extern "C" int melee_web_test_ground_marker_last_write(void*);
+extern "C" int melee_web_test_native_map_light_identity(void*,void*);
 static void check(bool c,const char* e){if(!c)throw std::runtime_error(e);}
 namespace {
 using namespace melee_web::test;
@@ -49,14 +50,25 @@ template<class F>void expect_error(F&& operation,std::string_view expected){
 }
 std::vector<uint8_t> marker_fixture(uint32_t node_count=13,bool null_flag=false,
                                     bool external_map_field=false,bool local_flag=false,
-                                    bool external_flag=false){
+                                    bool external_flag=false,bool light_override=false){
  constexpr uint32_t data_size=0x600,root=0x100,references=0x140,entries=0x160;
  constexpr uint32_t pairs=0x1a0,flagged=0x1c0,tree=0x200;
  check(!(local_flag&&external_flag),"synthetic flagged slot has one authored kind");
  check(node_count>=13&&tree+node_count*64<=data_size,"synthetic marker tree fits bounded fixture");
+ check(!light_override||tree+node_count*64<=0x540,
+       "synthetic marker tree does not overlap its typed light fixture");
  std::vector<uint8_t> data(data_size,0);
+ constexpr uint32_t light_table=0x540,light_list=0x548,light=0x550;
+ constexpr uint32_t light_overrides=0x570;
  write_be32(data,root,references);write_be32(data,root+4,1);
  write_be32(data,root+8,entries);write_be32(data,root+12,1);
+ if(light_override){
+  write_be32(data,root+24,light_overrides);write_be32(data,root+28,1);
+  write_be32(data,entries+24,light_table);
+  write_be32(data,light_table,light_list);
+  write_be32(data,light_list,light);
+  write_be32(data,light_overrides,light);data[light_overrides+4]=0xe0;
+ }
  write_be32(data,references,tree);write_be32(data,references+4,pairs);write_be32(data,references+8,8);
  if(null_flag||local_flag||external_flag){
   write_be32(data,root+40,flagged);write_be32(data,root+44,1);
@@ -75,6 +87,11 @@ std::vector<uint8_t> marker_fixture(uint32_t node_count=13,bool null_flag=false,
   write_be16(data,pairs+4*i,authored[i][0]);write_be16(data,pairs+4*i+2,authored[i][1]);
  }
  std::vector<uint32_t> relocations={root,root+8,references,references+4,entries};
+ if(light_override){
+  relocations.push_back(root+24);relocations.push_back(entries+24);
+  relocations.push_back(light_table);relocations.push_back(light_list);
+  relocations.push_back(light_overrides);
+ }
  if(null_flag||local_flag||external_flag)relocations.push_back(root+40);
  if(local_flag)relocations.push_back(flagged);
  for(uint32_t i=0;i+1<node_count;i++)relocations.push_back(tree+64*i+8);
@@ -416,6 +433,71 @@ void marker_fixture_trace(){
   expect_error([&]{(void)owner.collision();},
                "Collision public coll_data descriptor is missing");
  }
+ auto light_bytes=marker_fixture(13,false,false,false,false,true);
+ auto light_archive=std::make_shared<melee_web::DatArchive>(light_bytes);
+ const std::vector<uint8_t> light_data_before(
+     light_archive->data().begin(),light_archive->data().end());
+ melee_web::DatStage light_metadata(*light_archive);
+ check(light_metadata.light_override_table.count==1&&
+           light_metadata.light_override_table.data_offset&&
+           light_metadata.entries[0].light_table_offset,
+       "synthetic source identity includes one map light and one override row");
+ const uint32_t source_override_slot=*light_metadata.light_override_table.data_offset;
+ const auto source_light_offset=light_archive->pointer(source_override_slot,28);
+ check(source_light_offset&&*source_light_offset==0x550&&
+           light_archive->range(source_override_slot+4,1)[0]==0xe0,
+       "synthetic override table retains the exact light source offset and flags");
+ const auto& source_symbols=light_archive->public_symbols();
+ const auto source_map_symbol=std::find_if(
+     source_symbols.begin(),source_symbols.end(),
+     [](const auto& symbol){return symbol.name=="map_head";});
+ check(source_map_symbol!=source_symbols.end()&&
+           source_map_symbol->data_offset==light_metadata.root_offset&&
+           std::count_if(source_symbols.begin(),source_symbols.end(),
+                         [](const auto& symbol){return symbol.name=="map_head";})==1,
+       "synthetic source catalog retains one exact map_head root identity");
+ {
+  melee_web::DatNativeMap owner(light_archive,marker_contract());
+  const auto& overrides=owner.light_overrides();
+  check(overrides.size()==1&&overrides[0].descriptor&&
+            overrides[0].found==1&&overrides[0].flags==0xe0,
+        "structural map owner exposes the typed source light identity and override");
+  check(melee_web_test_native_map_light_identity(
+            owner.map_head(),overrides[0].descriptor),
+        "typed override descriptor is the exact light used by its map row");
+  check(melee_web_test_native_marker_pairs(owner.map_head(),authored.data(),8)&&
+            melee_web_test_ground_marker_last_write(owner.map_head()),
+        "typed light publication retains duplicate marker order and last-write semantics");
+  char error[256];
+  auto* publication=melee_web_stage_map_publish(owner.map_head(),error,sizeof(error));
+  check(publication!=nullptr,error);
+  MeleeWebArchiveSymbol public_symbols[]={{
+      "SyntheticStage.dat",source_map_symbol->name.c_str(),owner.map_head()}};
+  check(melee_web_stage_map_set_public(
+            publication,public_symbols,1,error,sizeof(error)),error);
+  check(melee_web_stage_map_set_overrides(
+            publication,overrides.data(),overrides.size(),error,sizeof(error)),error);
+  auto* source_archive=melee_web_archive_sections_open("SyntheticStage.dat");
+  check(source_archive&&
+            melee_web_archive_sections_public(source_archive,
+                                              source_map_symbol->name.c_str())==owner.map_head(),
+        "synthetic public source identity retains the map-owner pointer");
+  int found=0;uint8_t flags=0;
+  check(melee_web_stage_map_lookup_override(
+            overrides[0].descriptor,&found,&flags)&&found==1&&flags==0xe0,
+        "registered exact source light identity returns its authored override");
+  check(!melee_web_stage_map_close(publication,error,sizeof(error)),
+        "live source archive handle retains the map and typed light owners");
+  melee_web_archive_sections_release(source_archive);
+  check(melee_web_stage_map_close(publication,error,sizeof(error)),error);
+  check(owner.light_overrides()[0].descriptor==overrides[0].descriptor&&
+            melee_web_test_native_map_light_identity(
+                owner.map_head(),overrides[0].descriptor),
+        "typed map light descriptors remain owned until after source catalog close");
+ }
+ check(std::equal(light_data_before.begin(),light_data_before.end(),
+                   light_archive->data().begin(),light_archive->data().end()),
+       "typed light identity hydration leaves authored DAT bytes unchanged");
  auto bad_pair_index=original;write_be16(bad_pair_index,0x20+0x1a0+4,13);
  expect_marker_map_error(bad_pair_index,"Invalid marker binding");
  auto bad_marker_id=original;write_be16(bad_marker_id,0x20+0x1a0+2,261);

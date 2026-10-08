@@ -384,6 +384,13 @@ struct NativeMapStorage {
         // original Ground light queries use a bounded identity resolver.
         map.unk1C=metadata.light_override_table.count;map.unk18=nullptr;
     }
+    void populate_light_overrides(){
+        overrides.clear();overrides.reserve(lights.size());
+        for(const auto& [offset,descriptor]:lights){
+            auto flags=read_dat_light_override(*archive,offset);
+            overrides.push_back({descriptor,flags.has_value(),flags.value_or(0)});
+        }
+    }
     void build_map(){
         native_map=melee_web_stage_map_build(arena.reader(),&map);
         require(native_map,"Native source map builder returned null");
@@ -407,6 +414,7 @@ DatNativeMap::DatNativeMap(std::shared_ptr<const DatArchive> archive,
         storage_->arena.reader(),storage_->metadata.root_offset);
     require(markers,"Native map structural marker decoder returned null");
     storage_->hydrate_map(contract,markers);
+    storage_->populate_light_overrides();
     storage_->build_map();
 }
 DatNativeMap::~DatNativeMap()=default;
@@ -419,6 +427,7 @@ void* DatNativeMap::collision(){
  if(!storage_->native_collision)storage_->native_collision=storage_->collision();
  return storage_->native_collision;
 }
+const std::vector<MeleeWebMapLightOverride>& DatNativeMap::light_overrides()const noexcept{return storage_->overrides;}
 std::span<const uint32_t> DatNativeMap::source_light_counts()const noexcept{return storage_->source_light_counts;}
 
 DatNativeMapContract DatNativeStageMapContractData::view() const noexcept
@@ -606,7 +615,7 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive,
   }
   s.yaku=programs;
  }
- for(const auto& [offset,light]:s.lights){auto flags=read_dat_light_override(a,offset);s.overrides.push_back({light,flags.has_value(),flags.value_or(0)});}
+ s.populate_light_overrides();
  require(s.yaku,"Native stage yakumono symbol absent");
  s.build_map();
  s.native_collision=s.collision();

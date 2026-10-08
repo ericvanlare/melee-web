@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <span>
 #include <string_view>
+#include <vector>
 namespace melee_web {
 struct DatNativeMapExternalReference {
     uint32_t entry_index;
@@ -72,6 +73,9 @@ public:
      * DatNativeMap. Decoded lazily because marker-only maps need no collision
      * archive; the pointer is valid only through this owner's lifetime. */
     void* collision();
+    /* Borrows exact source light descriptors and override flags owned by this
+     * map. The view remains valid only for this DatNativeMap's lifetime. */
+    const std::vector<MeleeWebMapLightOverride>& light_overrides()const noexcept;
     std::span<const uint32_t> source_light_counts()const noexcept;
 private:
     struct Storage;
