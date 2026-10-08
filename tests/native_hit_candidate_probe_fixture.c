@@ -1,3 +1,177 @@
+/* The offline reducer shares this file but has a separate ABI and no game
+ * services. Its included bodies come from the checked source extraction. */
+#ifdef MELEE_WEB_HIT_PROBE_OFFLINE_REDUCER
+#include <math.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef float f32;
+typedef uint32_t u32;
+typedef float Mtx[3][4];
+typedef float (*MtxPtr)[4];
+typedef struct Vec3 { float x, y, z; } Vec3;
+typedef Vec3 Vec;
+
+#define PAD_STACK(bytes) do { unsigned char pad_stack_[(bytes)]; (void)pad_stack_; } while (0)
+#define PSMTXMultVec melee_web_ps_mtx_mult_vec
+#define MTXIdentity C_MTXIdentity
+#define MTXCopy C_MTXCopy
+#define ASSERTMSGLINE(line, condition, message) do { (void)(line); (void)(message); if (!(condition)) abort(); } while (0)
+
+#ifdef MELEE_WEB_HIT_PROBE_INSTRUMENTED
+static unsigned offline_cursor, offline_hit, offline_hurt, offline_trace_sequence;
+static void offline_trace_reset(unsigned cursor, unsigned hit, unsigned hurt)
+{
+    offline_cursor = cursor;
+    offline_hit = hit;
+    offline_hurt = hurt;
+    offline_trace_sequence = 0;
+}
+#else
+static void offline_trace_reset(unsigned cursor, unsigned hit, unsigned hurt)
+{
+    (void)cursor;
+    (void)hit;
+    (void)hurt;
+}
+#endif
+static uint32_t offline_float_bits(float value)
+{
+    uint32_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    return bits;
+}
+#ifdef MELEE_WEB_HIT_PROBE_INSTRUMENTED
+static void offline_trace_values(const char* label, const float* values, size_t count)
+{
+    fprintf(stderr, "TRACE %u %u %u %u %s", offline_cursor, offline_hit,
+        offline_hurt, offline_trace_sequence++, label);
+    for (size_t i = 0; i < count; ++i)
+        fprintf(stderr, " %08x", offline_float_bits(values[i]));
+    fputc('\n', stderr);
+}
+static void offline_trace_reject(unsigned branch, float bound)
+{
+    char label[32];
+    snprintf(label, sizeof(label), "aabb_reject_%02u", branch);
+    offline_trace_values(label, &bound, 1);
+}
+static void offline_trace_vec(const char* label, const Vec3* value)
+{
+    const float values[3] = { value->x, value->y, value->z };
+    offline_trace_values(label, values, 3);
+}
+static void offline_trace_mtx(const char* label, const Mtx value)
+{
+    float values[12];
+    for (unsigned row = 0; row < 3; ++row)
+        for (unsigned column = 0; column < 4; ++column)
+            values[row * 4 + column] = value[row][column];
+    offline_trace_values(label, values, 12);
+}
+#define MELEE_TRACE_VALUE(label, value) offline_trace_values(label, &(value), 1)
+#define MELEE_TRACE_VEC(label, value) offline_trace_vec(label, &(value))
+#define MELEE_TRACE_MTX(label, value) offline_trace_mtx(label, value)
+#define MELEE_TRACE_REJECT(branch, bound) offline_trace_reject(branch, bound)
+#define MELEE_TRACE_EVENT(label) offline_trace_values(label, NULL, 0)
+#else
+#define MELEE_TRACE_VALUE(label, value) ((void)0)
+#define MELEE_TRACE_VEC(label, value) ((void)0)
+#define MELEE_TRACE_MTX(label, value) ((void)0)
+#define MELEE_TRACE_REJECT(branch, bound) ((void)0)
+#define MELEE_TRACE_EVENT(label) ((void)0)
+#endif
+
+#include "offline_source_bodies.inc"
+
+static float offline_from_bits(uint32_t bits)
+{
+    float value;
+    memcpy(&value, &bits, sizeof(value));
+    return value;
+}
+static void offline_print_vec(const Vec3* value)
+{
+    printf("[\"%08x\",\"%08x\",\"%08x\"]",
+        offline_float_bits(value->x), offline_float_bits(value->y),
+        offline_float_bits(value->z));
+}
+static void offline_print_record(unsigned cursor, unsigned hit, unsigned hurt,
+    int captured, int result, const Vec3* hit_closest,
+    const Vec3* hurt_closest, const Vec3* contact, float overlap)
+{
+    printf("{\"cursor\":%u,\"hit_index\":%u,\"hurt_index\":%u,"
+        "\"captured_result\":%d,\"result\":%d,\"hit_closest\":",
+        cursor, hit, hurt, captured, result);
+    offline_print_vec(hit_closest);
+    printf(",\"hurt_closest\":");
+    offline_print_vec(hurt_closest);
+    printf(",\"contact\":");
+    offline_print_vec(contact);
+    printf(",\"overlap\":\"%08x\"}\n", offline_float_bits(overlap));
+}
+
+int main(int argc, char** argv)
+{
+    if (argc != 2) {
+        fprintf(stderr, "usage: %s capture-input.tsv\n", argv[0]);
+        return 2;
+    }
+    FILE* input = fopen(argv[1], "r");
+    if (!input) {
+        perror("fopen capture input");
+        return 2;
+    }
+    unsigned cursor, hit, hurt;
+    int captured;
+    unsigned words[27];
+    while (fscanf(input, "%u %u %u %d", &cursor, &hit, &hurt, &captured) == 4) {
+        for (unsigned i = 0; i < 27; ++i) {
+            if (fscanf(input, "%x", &words[i]) != 1) {
+                fprintf(stderr, "short input record at cursor %u hit %u hurt %u\n",
+                    cursor, hit, hurt);
+                fclose(input);
+                return 2;
+            }
+        }
+        Vec3 endpoints[4];
+        for (unsigned endpoint = 0; endpoint < 4; ++endpoint) {
+            endpoints[endpoint].x = offline_from_bits(words[endpoint * 3]);
+            endpoints[endpoint].y = offline_from_bits(words[endpoint * 3 + 1]);
+            endpoints[endpoint].z = offline_from_bits(words[endpoint * 3 + 2]);
+        }
+        Mtx matrix;
+        for (unsigned row = 0; row < 3; ++row)
+            for (unsigned column = 0; column < 4; ++column)
+                matrix[row][column] = offline_from_bits(words[12 + row * 4 + column]);
+        const float hit_radius = offline_from_bits(words[24]);
+        const float hurt_radius = offline_from_bits(words[25]);
+        const float broadphase_scale = offline_from_bits(words[26]);
+        const float sentinel = offline_from_bits(0xc640e400u);
+        Vec3 hit_closest = { sentinel, sentinel, sentinel };
+        Vec3 hurt_closest = { sentinel, sentinel, sentinel };
+        Vec3 contact = { sentinel, sentinel, sentinel };
+        float overlap = sentinel;
+        offline_trace_reset(cursor, hit, hurt);
+        const bool result = melee_web_offline_inner(&endpoints[0], &endpoints[1],
+            &endpoints[2], &endpoints[3], &hit_closest, &hurt_closest,
+            matrix, &contact, &overlap, hit_radius, hurt_radius, broadphase_scale);
+        offline_print_record(cursor, hit, hurt, captured, result,
+            &hit_closest, &hurt_closest, &contact, overlap);
+    }
+    if (!feof(input)) {
+        fprintf(stderr, "malformed capture input after cursor %u\n", cursor);
+        fclose(input);
+        return 2;
+    }
+    fclose(input);
+    return 0;
+}
+
+#else
 /* Actual selected helper + extracted original function bodies; services below
  * are explicit controlled synthetic ABI adapters, never production fallbacks. */
 #include "gameplay_hit_transition_probe.h"
@@ -547,3 +721,4 @@ int main(int argc,char** argv)
  fputc('\n',stderr);
  return 0;
 }
+#endif
