@@ -122,6 +122,11 @@ if(EMSCRIPTEN)
   add_library(hsd_native_runtime STATIC src/hsd_texture_bounds.c src/hsd_native_camera.c src/hsd_native_arrays.c src/hsd_native_pobj.c src/hsd_native_joint.c src/hsd_native_common.c
     src/gameplay_rng_draw_probe.c
     src/gameplay_stage_context.c src/gameplay_common_context.c "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lbspdisplay.c")
+  if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    # Keep the C1 provenance API limited to the source unit that owns it.
+    set_property(SOURCE "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lbspdisplay.c"
+      APPEND PROPERTY COMPILE_DEFINITIONS MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
+  endif()
   foreach(unit class object hash id list jobj dobj mobj tobj texp texpdag tev sobjlib hsd_3924
       displayfunc state aobj fobj robj shadow wobj lobj spline mtx util quatlib
       bytecode perf random)
