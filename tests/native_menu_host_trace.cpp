@@ -319,9 +319,13 @@ void run_vs_sudden_death_source_control()
               "Sudden Death host accepted a continuation without its live owner");
         MeleeWebMenuMatchSelection bypass_selection{};
         bypass_selection.sudden_death=1;
+        const melee_web::RuntimeFiles empty_files{};
         bool rejected_bypass=false;
         try{melee_web::GameplayMatchSession invalid(empty_files,bypass_selection);}
-        catch(const std::exception&){rejected_bypass=true;}
+        catch(const std::exception& exception){
+            rejected_bypass=std::string_view(exception.what())==
+                "Sudden Death source payload requires a checked host-owned match claim";
+        }
         check(rejected_bypass,
               "Native Sudden Death session accepted a source payload without its host claim");
 
