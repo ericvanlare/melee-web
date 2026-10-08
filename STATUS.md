@@ -38,5 +38,7 @@ audio fidelity and sustained performance. The [roadmap](docs/ROADMAP.md),
 [performance/accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.md) define those
 boundaries; this section adds no new runtime or deployment evidence.
 
-The [runtime-owned CSS-to-active-match prerequisite](docs/status/2026-10-08-a3-runtime-css-active-match.md)
-is bounded local browser evidence; full A3 and whole-session acceptance remain open.
+The [Issue #286 runtime-owned full-route capture](docs/status/2026-10-08-a3-runtime-full-route-issue-286.md)
+records one bounded local run through the CSS return. The separate
+[CSS-to-active-match prefix](docs/status/2026-10-08-a3-runtime-css-active-match.md)
+remains historical bounded evidence; full A3 and whole-session acceptance remain open.

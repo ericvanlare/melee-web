@@ -1,0 +1,962 @@
+{
+  "browser_run": {
+    "browser": "Google Chrome",
+    "browser_version": "154.0.8037.98",
+    "duration_seconds": 109.801,
+    "finished_at": "2026-10-08T20:26:49.446Z",
+    "first_error": null,
+    "ice_servers": [],
+    "local_only": true,
+    "native_pump_interval": {
+      "actual_native_cursor_progress_each": true,
+      "complete": true,
+      "no_peer_RPC_during_interval": true,
+      "observation": "read-only native health and incremental owner evidence; no peer RPC, evidence drain, progress publication or timing resume",
+      "observations": 1528
+    },
+    "outcome": "complete",
+    "peer_owner": "runtime",
+    "private_run_id": "issue286-runtime-full-route-ap6-20261008-20261008-130923-14b88f77",
+    "signaling": "room-worker",
+    "started_at": "2026-10-08T20:24:59.645Z",
+    "transport": "webrtc",
+    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36"
+  },
+  "candidate": {
+    "base_main": "26ff73a3236e0c72884fe44a92d54678e52fad08",
+    "branch": "codex/issue286-runtime-full-route",
+    "documentation_followup_is_not_producer": true,
+    "head": "403ea51b76cbe97115b12039e0d374fd6963bf64",
+    "merge_base": "26ff73a3236e0c72884fe44a92d54678e52fad08",
+    "origin_main": "26ff73a3236e0c72884fe44a92d54678e52fad08",
+    "tree": "a6fe302bd6da163322e0ebc2d31c74d1982ac491"
+  },
+  "cleanup": {
+    "capture_root_parent_pid": 69811,
+    "capture_root_pid": 69820,
+    "no_server_listener_after_run": true,
+    "peers": {
+      "alpha": {
+        "browser_closed": true,
+        "browser_diagnostics": [
+          {
+            "failure": "net::ERR_ABORTED",
+            "kind": "requestfailed",
+            "method": "GET",
+            "url": "http://127.0.0.1:8787/gameplay_menu_browser.data"
+          }
+        ],
+        "native_network_cleanup_errors": [],
+        "normal_owner_close": true,
+        "page_errors": [],
+        "runtime_owner_close": {
+          "closed": true,
+          "mode": "normal",
+          "native_quiescence": "verified",
+          "transport_cleanup": {
+            "channel_state": "closed",
+            "connection_state": "closed",
+            "signaling": {
+              "endpoint_closed": true,
+              "failure_code": null,
+              "phase": "closed",
+              "role": "alpha"
+            }
+          }
+        },
+        "timing_pause_checks": 0,
+        "timing_resumes": [],
+        "unloaded": true
+      },
+      "beta": {
+        "browser_closed": true,
+        "browser_diagnostics": [
+          {
+            "failure": "net::ERR_ABORTED",
+            "kind": "requestfailed",
+            "method": "GET",
+            "url": "http://127.0.0.1:8787/gameplay_menu_browser.data"
+          }
+        ],
+        "native_network_cleanup_errors": [],
+        "normal_owner_close": true,
+        "page_errors": [],
+        "runtime_owner_close": {
+          "closed": true,
+          "mode": "normal",
+          "native_quiescence": "verified",
+          "transport_cleanup": {
+            "channel_state": "closed",
+            "connection_state": "closed",
+            "signaling": {
+              "endpoint_closed": true,
+              "failure_code": null,
+              "phase": "closed",
+              "role": "beta"
+            }
+          }
+        },
+        "timing_pause_checks": 0,
+        "timing_resumes": [],
+        "unloaded": true
+      }
+    },
+    "room_worker": {
+      "disposed": true,
+      "exit": {
+        "code": 0,
+        "signal": null
+      },
+      "fallbackUsed": false,
+      "groupAlive": false,
+      "ownedTempPathsClean": true,
+      "passed": true,
+      "processClose": {
+        "code": 0,
+        "signal": null
+      },
+      "ready": true,
+      "runtimeErrors": [],
+      "stderrErrors": false,
+      "structuredErrors": []
+    },
+    "root_cleanup_review": {
+      "all_absent": true,
+      "fresh_ps_checked": true,
+      "ports_bindable": [
+        8787,
+        54050,
+        54051,
+        58585,
+        58586
+      ],
+      "supervisor_final": {
+        "groups_gone": true,
+        "owned_groups_remaining": [],
+        "owned_process_survivors": [],
+        "port_bindable": true,
+        "port_listener": {
+          "error": null,
+          "rows": ""
+        },
+        "within_cleanup_deadline": true
+      }
+    },
+    "supervisor_log_cleanup_proof_passed": true
+  },
+  "evidence_labels": [
+    "Source identified",
+    "Compiled",
+    "Browser exercised"
+  ],
+  "harness": {
+    "candidate_head": "403ea51b76cbe97115b12039e0d374fd6963bf64",
+    "candidate_tree": "a6fe302bd6da163322e0ebc2d31c74d1982ac491",
+    "compiled_producer_is_separately_identified": true,
+    "file_count": 20,
+    "files": [
+      {
+        "bytes": 146404,
+        "path": "scripts/net_lockstep_browser.mjs",
+        "sha256": "2be1f965b111e2861ff427a05624db970287961f495f4324172aab0d33864e07"
+      },
+      {
+        "bytes": 21543,
+        "path": "scripts/net_lockstep_browser_modes.mjs",
+        "sha256": "73c474d720407222090469ccc4fc4e0117bb839b9babcf03892690e1899f0739"
+      },
+      {
+        "bytes": 65106,
+        "path": "scripts/net_session_instance.mjs",
+        "sha256": "ff0f100b737b9cb460c5afcc71964cd9e145c5d2149ba1ccfca19e638a79cdce"
+      },
+      {
+        "bytes": 34403,
+        "path": "scripts/net_lockstep_browser_peer.mjs",
+        "sha256": "ecf3b39d2d1b96f04a887caa362bd190c8e8cd3ca3ac6a9a683eea1759bc9369"
+      },
+      {
+        "bytes": 27701,
+        "path": "scripts/net_lockstep_core.mjs",
+        "sha256": "c2bf5e6d10f1bdd0fe00b3f1510f3ce6e4b4bd31459a2740fc726f342deeb5fa"
+      },
+      {
+        "bytes": 8445,
+        "path": "scripts/net_lockstep_native_adapter.mjs",
+        "sha256": "4130dce6c6390506b66bfafebace3fe33ac561ce8a873d06956b619fa5f0686a"
+      },
+      {
+        "bytes": 13621,
+        "path": "scripts/net_lockstep_webrtc.mjs",
+        "sha256": "f7bdc789211d097bae000fa7b966f157a5db72b185fbfea6f1179a140ee3e1fe"
+      },
+      {
+        "bytes": 7377,
+        "path": "scripts/net_lockstep_webrtc_signaling.mjs",
+        "sha256": "4e54cb6b2286c6133efbd9477336553f876d17ae3425794328748580f4157326"
+      },
+      {
+        "bytes": 21912,
+        "path": "scripts/net_lockstep_runtime_owner.mjs",
+        "sha256": "9c1e05c17ad9ecba59befbea6ab21d1a2f78caf3142869047868db7d56dc2646"
+      },
+      {
+        "bytes": 19394,
+        "path": "scripts/net_lockstep_websocket_relay.mjs",
+        "sha256": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5"
+      },
+      {
+        "bytes": 22397,
+        "path": "scripts/net_lockstep_observers.mjs",
+        "sha256": "f0585492a2821f6151548fd4c161ea8861eb1f7dbd513b480b216d3699f69d22"
+      },
+      {
+        "bytes": 9599,
+        "path": "scripts/net_source_accounting.mjs",
+        "sha256": "23d5664010a2bff0900fcc312880a6915c5442aeee4c96226210cbda725eebd3"
+      },
+      {
+        "bytes": 2780,
+        "path": "scripts/net_determinism_contract.mjs",
+        "sha256": "cf792b487450d823ea6a8c04b5eb97e4f3fd7d891b37f0c2c56c2402281f4615"
+      },
+      {
+        "bytes": 14494,
+        "path": "scripts/net_room_relay_runtime_owner.mjs",
+        "sha256": "9ba5fafdcc7955646959362228e5cc07a19c7f99be11543fbd56f670a30ddb68"
+      },
+      {
+        "bytes": 3853,
+        "path": "scripts/browser_tools.mjs",
+        "sha256": "737a8ef5807edba0009487877e1b65badc3a8bb4d07ff9fcd445a7b8bef40c81"
+      },
+      {
+        "bytes": 11876,
+        "path": "scripts/browser_driver.mjs",
+        "sha256": "75e4886df976a4c9292cef13ddfc8af89c2e0795f4ef7a6bc57b66cccb8a0233"
+      },
+      {
+        "bytes": 6711,
+        "path": "scripts/serve.py",
+        "sha256": "32734f1515420190408c565b66d9e907331e1d3c711307d4ff61ec810ad1eea4"
+      },
+      {
+        "bytes": 4895,
+        "path": "web/net_lockstep_development_owner.mjs",
+        "sha256": "c0c6d7db56786278cb28230d7eeb569a7afcf39c2ea34a13c85c616770007629"
+      },
+      {
+        "bytes": 19263,
+        "path": "web/controller-input.mjs",
+        "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+      },
+      {
+        "bytes": 14740,
+        "path": "tools/net_input_script.py",
+        "sha256": "eec74da2d353a16df177d3b5da2dfd5ef905687f53f02351cf47a0850d2e42ca"
+      }
+    ]
+  },
+  "input": {
+    "actual_component_count": {
+      "alpha": 5084,
+      "beta": 5084
+    },
+    "assigned_ports": {
+      "alpha": 0,
+      "beta": 1
+    },
+    "capture_count_each_peer": {
+      "alpha": 5082,
+      "beta": 5082
+    },
+    "component_match_recomputed": {
+      "alpha": true,
+      "beta": true
+    },
+    "fixture_frozen_each_peer": {
+      "alpha": true,
+      "beta": true
+    },
+    "held_input_blocked": {
+      "alpha": true,
+      "beta": true
+    },
+    "native_component_match": true,
+    "neutral_rearmed": {
+      "alpha": true,
+      "beta": true
+    },
+    "profile": {
+      "axes": {
+        "cstickX": {
+          "end": 1,
+          "index": 2,
+          "kind": "axis",
+          "rest": 0
+        },
+        "cstickY": {
+          "end": -1,
+          "index": 3,
+          "kind": "axis",
+          "rest": 0
+        },
+        "stickX": {
+          "end": 1,
+          "index": 0,
+          "kind": "axis",
+          "rest": 0
+        },
+        "stickY": {
+          "end": -1,
+          "index": 1,
+          "kind": "axis",
+          "rest": 0
+        },
+        "triggerL": {
+          "index": 6,
+          "kind": "button"
+        },
+        "triggerR": {
+          "index": 7,
+          "kind": "button"
+        }
+      },
+      "buttons": {
+        "A": {
+          "index": 0,
+          "kind": "button"
+        },
+        "B": {
+          "index": 1,
+          "kind": "button"
+        },
+        "Down": {
+          "index": 13,
+          "kind": "button"
+        },
+        "L": {
+          "index": 4,
+          "kind": "button"
+        },
+        "Left": {
+          "index": 14,
+          "kind": "button"
+        },
+        "R": {
+          "index": 8,
+          "kind": "button"
+        },
+        "Right": {
+          "index": 15,
+          "kind": "button"
+        },
+        "Start": {
+          "index": 9,
+          "kind": "button"
+        },
+        "Up": {
+          "index": 12,
+          "kind": "button"
+        },
+        "X": {
+          "index": 2,
+          "kind": "button"
+        },
+        "Y": {
+          "index": 3,
+          "kind": "button"
+        },
+        "Z": {
+          "index": 5,
+          "kind": "button"
+        }
+      },
+      "gamecube": true,
+      "name": "Synthetic independent-click PAD capability",
+      "version": 1
+    },
+    "profile_source": {
+      "alpha": "saved",
+      "beta": "saved"
+    },
+    "selected_input_ticks": 5082,
+    "source": "synthetic standard Gamepad -> ordinary controller manager -> native live PAD capture",
+    "source_ticks": 5084
+  },
+  "issue": "https://github.com/ericvanlare/melee-web/issues/286",
+  "limitations": [
+    "This is one same-host, local Worker/WebRTC, headless Chrome run using a synthetic standard Gamepad; it does not establish physical controller behavior, Internet transport, remote-machine play, or foreground timing.",
+    "The retained final PNGs establish a readiness-qualified CSS-return image at the held source boundary only; no pixel equivalence or original visual comparison is claimed.",
+    "No PCM or uninterrupted-audio comparison was performed; speaker/audio-fidelity acceptance remains open.",
+    "No sustained timing or performance acceptance is claimed. Beta\u2019s native network wait is reported separately above.",
+    "This bounded run does not establish full A3, full-game accuracy, whole-session or competitive-set acceptance."
+  ],
+  "native_wait_and_timing": {
+    "interpretation": "There was no timing-pause diagnostic or timing resume. Beta had one native network-wait episode at source tick 2195 (four callbacks, one wait resume). The run-level wait_observations array is a harness-owned probe list and is empty; it does not mean no native wait occurred.",
+    "native_network_wait": {
+      "alpha": {
+        "network_wait": {
+          "active": 0,
+          "callbacks": 0,
+          "episodes": 0,
+          "last_tick": 0,
+          "resume_count": 0,
+          "start_tick": 0
+        },
+        "wait_callbacks": 0,
+        "wait_episodes": 0,
+        "wait_last_tick": 0,
+        "wait_resume_count": 0,
+        "wait_start_tick": 0
+      },
+      "beta": {
+        "network_wait": {
+          "active": 0,
+          "callbacks": 4,
+          "episodes": 1,
+          "last_tick": 2195,
+          "resume_count": 1,
+          "start_tick": 2195
+        },
+        "wait_callbacks": 4,
+        "wait_episodes": 1,
+        "wait_last_tick": 2195,
+        "wait_resume_count": 1,
+        "wait_start_tick": 2195
+      }
+    },
+    "timing_pause_diagnostic_checks": {
+      "alpha": 0,
+      "beta": 0
+    },
+    "timing_resumes": {
+      "alpha": [],
+      "beta": []
+    }
+  },
+  "prior_failure_scope_note": "AP4 remains a distinct retained failure and is explicitly linked above. AP6 success is not used to relabel or erase it.",
+  "producer": {
+    "build_command": [
+      "python3",
+      "scripts/build.py",
+      "--target",
+      "runtime",
+      "--configuration",
+      "Release"
+    ],
+    "build_log_sha256": "90b014b50e63ee7475abe440f3f90cd476639c6bc41cb9e6a15a8a81a41485e2",
+    "build_process_receipt_sha256": "e98dfb99a08bbb4233f7bd04e0cb3e71db776753139017e0dd851f20c620961f",
+    "build_site_byte_identity": true,
+    "build_target": "runtime",
+    "configuration": "Release",
+    "exit_code": 0,
+    "head": "403ea51b76cbe97115b12039e0d374fd6963bf64",
+    "loaded_browser_wasm_response": {
+      "alpha_bytes": 15773096,
+      "alpha_response_count": 1,
+      "alpha_sha256": "36f29762816f5e476c4a8d7d72ae2df3e3b81c9b0e50271a0c33950089292f73",
+      "beta_bytes": 15773096,
+      "beta_response_count": 1,
+      "beta_sha256": "36f29762816f5e476c4a8d7d72ae2df3e3b81c9b0e50271a0c33950089292f73",
+      "response_set_frozen_before_handshake_fetch": true
+    },
+    "optional_flags": {
+      "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+      "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+      "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+      "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+      "MELEE_WEB_RESULTS_RENDERED_TRACE": "OFF",
+      "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+      "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF",
+      "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF"
+    },
+    "runtime_artifacts": {
+      "gameplay_menu_browser.data": {
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      "gameplay_menu_browser.js": {
+        "bytes": 300658,
+        "sha256": "87ca36ba1861d28de7f6f7aa0c4f430fac414a368d61f3a134d3f75b073fb0a9"
+      },
+      "gameplay_menu_browser.wasm": {
+        "bytes": 15773096,
+        "sha256": "36f29762816f5e476c4a8d7d72ae2df3e3b81c9b0e50271a0c33950089292f73"
+      }
+    },
+    "tree": "a6fe302bd6da163322e0ebc2d31c74d1982ac491"
+  },
+  "protocol": {
+    "alpha": {
+      "acknowledged_checksums": 5084,
+      "acknowledged_inputs": 5082,
+      "checksum_duplicates": 15248,
+      "checksum_mismatches": [],
+      "input_duplicates": 15250,
+      "local_checksum_ticks": 5084,
+      "local_input_ticks": 5082,
+      "native_local_divergences": 0,
+      "next_checksum_compare": 5084,
+      "out_of_order_inputs": 0,
+      "ready": true,
+      "remote_ack_checksum": 5083,
+      "remote_ack_input": 5081,
+      "remote_checksum_ticks": 5084,
+      "remote_input_ticks": 5082
+    },
+    "beta": {
+      "acknowledged_checksums": 5084,
+      "acknowledged_inputs": 5082,
+      "checksum_duplicates": 15248,
+      "checksum_mismatches": [],
+      "input_duplicates": 15250,
+      "local_checksum_ticks": 5084,
+      "local_input_ticks": 5082,
+      "native_local_divergences": 0,
+      "next_checksum_compare": 5084,
+      "out_of_order_inputs": 0,
+      "ready": true,
+      "remote_ack_checksum": 5083,
+      "remote_ack_input": 5081,
+      "remote_checksum_ticks": 5084,
+      "remote_input_ticks": 5082
+    },
+    "binary_bytes_each": 325376,
+    "checksums_sha256_alpha": "4ac68c125ef7de127db9ab6c56e3fd40665bd42f02bff7ad8a75519b461d82a0",
+    "checksums_sha256_beta": "4ac68c125ef7de127db9ab6c56e3fd40665bd42f02bff7ad8a75519b461d82a0",
+    "protocol_start_identity_equal": true,
+    "record_bytes": 64,
+    "records_each": 5084,
+    "streams_identical": true
+  },
+  "raw_evidence": {
+    "capture/alpha/checksums.bin": {
+      "bytes": 325376,
+      "sha256": "4ac68c125ef7de127db9ab6c56e3fd40665bd42f02bff7ad8a75519b461d82a0"
+    },
+    "capture/alpha/final.png": {
+      "bytes": 485850,
+      "sha256": "88dd041b181249c20c1ba2668d6d4f2310c6d1ab567824283bbd3dcf59176a5a"
+    },
+    "capture/alpha/instance.json": {
+      "bytes": 32062705,
+      "sha256": "2528c5feaa67b9b6be5ceca2c0622e79b142caa93bf951502279fcf49a916d9f"
+    },
+    "capture/alpha/source-accounting.json": {
+      "bytes": 561831,
+      "sha256": "bdb3706d7aab97f46d8a8658a034bf51ba400d641673960ab60f9d25938e288d"
+    },
+    "capture/beta/checksums.bin": {
+      "bytes": 325376,
+      "sha256": "4ac68c125ef7de127db9ab6c56e3fd40665bd42f02bff7ad8a75519b461d82a0"
+    },
+    "capture/beta/final.png": {
+      "bytes": 485419,
+      "sha256": "3df12945f9ccd36b6778a6494e7cfba29e4eeb051b2e63bffd9e2aa1319eba3a"
+    },
+    "capture/beta/instance.json": {
+      "bytes": 32067523,
+      "sha256": "fd1508306009aaba6b5da2124e3a373ce05bce4164ff2d9546d09fa123f3890d"
+    },
+    "capture/beta/source-accounting.json": {
+      "bytes": 562855,
+      "sha256": "7dc0253d87b78bdb7a7385065477eff266b8243a90ec6bf25279c509b0e1e85a"
+    },
+    "capture/run.json": {
+      "bytes": 101309220,
+      "sha256": "a7b37ab928e3e73f12cfb36a285ab04b78df2001252447c43be7772a0b9df032"
+    },
+    "capture/worker-evidence/direct-miniflare-a3-room-relay-direct-2I9U7U.receipt.json": {
+      "bytes": 6857,
+      "sha256": "bff62e92920d609e48236496770bce97c3970aebd8508d96664ce01eb59c4b65"
+    },
+    "frozen-launch-packet-v2.json": {
+      "bytes": 47734,
+      "sha256": "e92dff0c4618355d0514297f60d07af3f53f80c1d6195b107f625e0d0b12edd7"
+    },
+    "fullsuite-process-v2.json": {
+      "bytes": 1774,
+      "sha256": "5e084e326681c810238f71ed28009ea36635902e8370a6a2dbd1857450486638"
+    },
+    "ordinary-release-build-process-v2.json": {
+      "bytes": 1125,
+      "sha256": "e98dfb99a08bbb4233f7bd04e0cb3e71db776753139017e0dd851f20c620961f"
+    },
+    "ordinary-release-build.log": {
+      "bytes": 12253,
+      "sha256": "90b014b50e63ee7475abe440f3f90cd476639c6bc41cb9e6a15a8a81a41485e2"
+    },
+    "ordinary-release-v3.json": {
+      "bytes": 45413,
+      "sha256": "f8c6e8f5afed448a24af1953abef41dc64e62ed6b93ae5bef92656d3e1aa0f1f"
+    },
+    "supervisor.log": {
+      "bytes": 1222725,
+      "sha256": "44c9efe91b7c879b20db83fa71293ea548565ee1fe9b6d995c8eb766220c3e2a"
+    },
+    "unittest-full.log": {
+      "bytes": 386708,
+      "sha256": "57bb33586745c9d6c5a34afdaedca5022aa08ea22514dd322373bbe84888d9e0"
+    }
+  },
+  "recipe": {
+    "body_sha256": "5e37415a204aa5466110cd132008a840fa3468c9393a0e83c2957aef8b0e97a2",
+    "bytes_per_input": 44,
+    "generator_sha256": "eec74da2d353a16df177d3b5da2dfd5ef905687f53f02351cf47a0850d2e42ca",
+    "input_frames": 5082,
+    "manifest_file": "route1.json",
+    "manifest_sha256": "c3290b3954b4d08ff3214caab03ea14df55c7737356c374b95db7915138264dc",
+    "private_run_file": "route1.mwni",
+    "script_bytes": 223624,
+    "script_sha256": "007fafb2bfc1c34b81509b8ee073b6250b32ab6d227502be6d4b986ddd8cbb4c",
+    "seed": 305419896,
+    "source_ticks": 5084
+  },
+  "retained_prior_failure": {
+    "alpha_checksums": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "alpha_instance": {
+      "bytes": 19719190,
+      "sha256": "41d5438f929e32c55b87079ad25f58ff1b3e38c8992f506c13eef3eada70a8ec"
+    },
+    "beta_checksums": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "beta_instance": {
+      "bytes": 19706134,
+      "sha256": "2d97379605dc8cb361256176ddb28db6b5afcbacff6454115d71bb5135861236"
+    },
+    "classification": "Retained failed run. Beta reached native timing-pause message before teardown; alpha remained at network_wait/cursor 2864 and the no-RPC bounded observer failed. No route/checksum acceptance was completed. Both browser unloads reported fixture-owner failure; OS process cleanup was verified separately. This failure is not relabeled by AP6 success.",
+    "close_failure": {
+      "browser_closed": {
+        "alpha": true,
+        "beta": true
+      },
+      "native_quiescence": {
+        "alpha": "aborted-fatal",
+        "beta": "aborted-fatal"
+      },
+      "page_error": {
+        "alpha": "Error: Runtime input fixture owner failed or closed",
+        "beta": "Error: Runtime input fixture owner failed or closed"
+      },
+      "unload_error": {
+        "alpha": "Browser driver development/unload: Runtime input fixture owner failed or closed",
+        "beta": "Browser driver development/unload: Runtime input fixture owner failed or closed"
+      },
+      "unloaded": {
+        "alpha": false,
+        "beta": false
+      }
+    },
+    "first_error": "Error: Autonomous native pump did not complete within its bounded no-RPC interval",
+    "native_failure": {
+      "alpha_blocker": "network_wait",
+      "alpha_cursor": 2864,
+      "beta_cursor": 2862,
+      "beta_message": "Paused after a timing disruption. Resume to continue.",
+      "beta_phase": 7,
+      "beta_running": 0,
+      "timing_auto_resumes": {
+        "alpha": [],
+        "beta": []
+      }
+    },
+    "private_run_id": "issue286-runtime-full-route-capture-proposal-20261008-attempt-04",
+    "result": "fail",
+    "run_finished_at": "2026-10-08T19:20:57.890Z",
+    "run_json": {
+      "bytes": 53002255,
+      "sha256": "25983288794ffcc37a602064752789eeee9feda2477b5ac8092063749037cb1e"
+    },
+    "run_started_at": "2026-10-08T19:18:40.992Z"
+  },
+  "root_independent_review": {
+    "closure_rows_freshly_verified": 103,
+    "ordinary_unload_verified": true,
+    "outcome": "passed",
+    "private_receipt": "root-functional-result-review-v1.json",
+    "sha256": "db4042d57ee9ff30e6d28876911676863fa7c2de6fcf8dadad98aa32ede7ff89",
+    "wasm_sha256": "36f29762816f5e476c4a8d7d72ae2df3e3b81c9b0e50271a0c33950089292f73"
+  },
+  "route": {
+    "collapsed_native_phase_order": {
+      "alpha": [
+        1,
+        3,
+        7,
+        8,
+        1
+      ],
+      "beta": [
+        1,
+        3,
+        7,
+        8,
+        1
+      ]
+    },
+    "final_css_png": {
+      "alpha": {
+        "last_consumed_tick": 5083,
+        "name": "css-return",
+        "phase": 1,
+        "render_readiness": {
+          "draw_calls": 297,
+          "draw_suppressed": 0,
+          "frame": 5361,
+          "kind": "structured native accounting callback",
+          "phase": 1,
+          "row_index": 5190,
+          "source": "Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 4 \u00b7 revisits: 0",
+          "source_cursor": 5084,
+          "source_draws": 1
+        },
+        "screenshot_bytes": 485850,
+        "screenshot_phase_stable": true,
+        "screenshot_sha256": "88dd041b181249c20c1ba2668d6d4f2310c6d1ab567824283bbd3dcf59176a5a",
+        "source_cursor_after_screenshot": 5084,
+        "source_cursor_sampled_before_screenshot": 5084,
+        "source_cursor_stable_during_screenshot": true
+      },
+      "beta": {
+        "last_consumed_tick": 5083,
+        "name": "css-return",
+        "phase": 1,
+        "render_readiness": {
+          "draw_calls": 297,
+          "draw_suppressed": 0,
+          "frame": 5368,
+          "kind": "structured native accounting callback",
+          "phase": 1,
+          "row_index": 5195,
+          "source": "Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 4 \u00b7 revisits: 0",
+          "source_cursor": 5084,
+          "source_draws": 1
+        },
+        "screenshot_bytes": 485419,
+        "screenshot_phase_stable": true,
+        "screenshot_sha256": "3df12945f9ccd36b6778a6494e7cfba29e4eeb051b2e63bffd9e2aa1319eba3a",
+        "source_cursor_after_screenshot": 5084,
+        "source_cursor_sampled_before_screenshot": 5084,
+        "source_cursor_stable_during_screenshot": true
+      }
+    },
+    "first_ready_active_match": {
+      "alpha": {
+        "observation": {
+          "complete": false,
+          "ending": false,
+          "frame": 2,
+          "outcome": 0,
+          "paused": false,
+          "ready": true,
+          "winner": -1
+        },
+        "phase": 7,
+        "selection": {
+          "current_stocks": [
+            4,
+            4
+          ],
+          "fighters": [
+            0,
+            0
+          ],
+          "humans": [
+            true,
+            true
+          ],
+          "player_stocks": [
+            4,
+            4
+          ],
+          "stage": 32
+        },
+        "source_cursor": 432
+      },
+      "beta": {
+        "observation": {
+          "complete": false,
+          "ending": false,
+          "frame": 2,
+          "outcome": 0,
+          "paused": false,
+          "ready": true,
+          "winner": -1
+        },
+        "phase": 7,
+        "selection": {
+          "current_stocks": [
+            4,
+            4
+          ],
+          "fighters": [
+            0,
+            0
+          ],
+          "humans": [
+            true,
+            true
+          ],
+          "player_stocks": [
+            4,
+            4
+          ],
+          "stage": 32
+        },
+        "source_cursor": 432
+      }
+    },
+    "observed_scenes": {
+      "alpha": [
+        1,
+        2,
+        3,
+        4,
+        1
+      ],
+      "beta": [
+        1,
+        2,
+        3,
+        4,
+        1
+      ]
+    },
+    "original_terminal_result": {
+      "outcome": 2,
+      "winners": [
+        1
+      ]
+    },
+    "preclose_completed_match_observation": {
+      "alpha": {
+        "complete": true,
+        "ending": true,
+        "frame": 3748,
+        "outcome": 2,
+        "winner": -1
+      },
+      "beta": {
+        "complete": true,
+        "ending": true,
+        "frame": 3748,
+        "outcome": 2,
+        "winner": -1
+      }
+    },
+    "selection": {
+      "alpha": {
+        "humans": [
+          true,
+          true
+        ],
+        "player_stocks": [
+          4,
+          4
+        ],
+        "stage": 32
+      },
+      "beta": {
+        "humans": [
+          true,
+          true
+        ],
+        "player_stocks": [
+          4,
+          4
+        ],
+        "stage": 32
+      }
+    },
+    "status": "passed",
+    "terminal_observations_equal": true
+  },
+  "schema": "melee-web-issue286-runtime-full-route-browser-evidence-v1",
+  "scope": "One same-host headless Release browser run: saved synthetic Gamepad input through the ordinary controller manager and native PADStatus callback, two runtime-owned peers over local Worker-signaled WebRTC, original CSS \u2192 SSS \u2192 Mario/Final Destination match \u2192 original Results \u2192 CSS return. Conditional input/checksum/source-boundary evidence only.",
+  "source_accounting": {
+    "alpha": {
+      "capacity": 32768,
+      "errors": [],
+      "final_blocker": "complete",
+      "final_cursor": 5084,
+      "final_render_readiness": {
+        "began": 1,
+        "draw_calls": 297,
+        "draw_suppressed": 0,
+        "drawn": 1,
+        "frame": 5361,
+        "kind": null,
+        "phase": 1,
+        "source_cursor": 5084,
+        "source_draws": 1,
+        "source_steps": 1,
+        "valid": 1
+      },
+      "frozen": true,
+      "overflow": 0,
+      "row_count": 5531,
+      "source_draws_sum": 5084,
+      "source_steps_sum": 5084
+    },
+    "beta": {
+      "capacity": 32768,
+      "errors": [],
+      "final_blocker": "complete",
+      "final_cursor": 5084,
+      "final_render_readiness": {
+        "began": 1,
+        "draw_calls": 297,
+        "draw_suppressed": 0,
+        "drawn": 1,
+        "frame": 5368,
+        "kind": null,
+        "phase": 1,
+        "source_cursor": 5084,
+        "source_draws": 1,
+        "source_steps": 1,
+        "valid": 1
+      },
+      "frozen": true,
+      "overflow": 0,
+      "row_count": 5541,
+      "source_draws_sum": 5084,
+      "source_steps_sum": 5084
+    }
+  },
+  "validation": {
+    "focused_pump": "43 passed, 0 failed",
+    "full_suite": {
+      "errors": 0,
+      "exit_code": 0,
+      "failures": 0,
+      "log_sha256": "57bb33586745c9d6c5a34afdaedca5022aa08ea22514dd322373bbe84888d9e0",
+      "process_receipt_sha256": "5e084e326681c810238f71ed28009ea36635902e8370a6a2dbd1857450486638",
+      "receipt_fields": {
+        "errors": 0,
+        "exit_code": 0,
+        "failures": 0,
+        "pid": 60760,
+        "skipped": 154
+      },
+      "result": "PASS",
+      "skipped": 154,
+      "tests": 2109
+    },
+    "node_contract": "all 19 Node files passed under the observer/protocol/route contract boundary",
+    "ordinary_release": {
+      "exit_code": 0,
+      "flags_all_off": true,
+      "log_sha256": "90b014b50e63ee7475abe440f3f90cd476639c6bc41cb9e6a15a8a81a41485e2",
+      "process_receipt_sha256": "e98dfb99a08bbb4233f7bd04e0cb3e71db776753139017e0dd851f20c620961f",
+      "result": "PASS"
+    }
+  }
+}
