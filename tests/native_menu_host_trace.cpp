@@ -71,7 +71,9 @@ extern "C" {
 #include <melee/mn/mnmain.h>
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include <melee/gr/grdatfiles.h>
+#include <melee/gr/ground.h>
 #include <melee/gr/stage.h>
+#include <melee/mp/mpisland.h>
 #include <melee/ef/eflib.h>
 #include <sysdolphin/baselib/aobj.h>
 #include <sysdolphin/baselib/gobj.h>
@@ -2407,6 +2409,28 @@ void run_stadium_effect_runtime_lifecycle_control()
 
 
 constexpr size_t kC1HeapCensusRowCapacity = 4096;
+constexpr size_t kC1HeapGraphCapacity = kC1HeapCensusRowCapacity;
+constexpr size_t kC1HeapGraphRootCount = 10;
+constexpr uint32_t kC1HeapGraphIslandRequestBytes = 0x2C;
+static_assert(kC1HeapGraphCapacity == kC1HeapCensusRowCapacity);
+static_assert(kC1HeapGraphRootCount <= 16);
+
+struct C1GroundStartCallbackShape {
+    // Mirrors Ground_801C10B8's local LIFO callback node; only `next` is read.
+    void* next;
+    HSD_GObj* gobj;
+    HSD_GObjEvent callback;
+};
+static_assert(sizeof(C1GroundStartCallbackShape) <=
+              std::numeric_limits<uint32_t>::max());
+constexpr uint32_t kC1HeapGraphCallbackRequestBytes =
+    static_cast<uint32_t>(sizeof(C1GroundStartCallbackShape));
+
+enum class C1HeapGraphNodeKind : uint8_t {
+    island_segment,
+    ground_start_callback,
+};
+
 struct C1HeapCensusRow {
     uintptr_t payload{};
     uint32_t visitor_capacity{};
@@ -2414,6 +2438,10 @@ struct C1HeapCensusRow {
     MeleeWebSourceMemoryAllocation lease{};
     MeleeWebSourceMemoryReadStatus lease_status =
         MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
+    uintptr_t graph_next{};
+    uint16_t graph_root_mask{};
+    uint16_t graph_cycle_mask{};
+    uint8_t graph_kind{};
 };
 struct C1HeapCensus {
     C1HeapCensusRow rows[kC1HeapCensusRowCapacity]{};
@@ -2424,6 +2452,77 @@ struct C1HeapCensus {
 };
 C1HeapCensus c1_heap_census;
 
+enum class C1HeapGraphFailure : uint8_t {
+    none,
+    lease_query_refused,
+    exact_lease_absent_or_not_live,
+    lease_owner_mismatch,
+    requested_size_mismatch,
+    missing_census_cell,
+    census_lease_mismatch,
+    node_budget_exceeded,
+    node_capacity_exceeded,
+    invalid_node_kind,
+    node_kind_alias_mismatch,
+    same_path_cycle,
+};
+
+struct C1HeapGraphResolvedNode {
+    uintptr_t next{};
+};
+
+using C1HeapGraphResolver = bool (*)(
+    uintptr_t, C1HeapGraphNodeKind, C1HeapGraphResolvedNode*,
+    C1HeapGraphFailure*, void*);
+
+struct C1HeapGraphWalkState {
+    C1HeapCensusRow* rows{};
+    size_t row_count{};
+    size_t budget{};
+    size_t unique_nodes{};
+    size_t aliases{};
+    size_t cycles{};
+    bool unavailable{};
+};
+
+struct C1HeapGraphRoot {
+    const char* name{};
+    uintptr_t payload{};
+    C1HeapGraphNodeKind kind{};
+};
+
+struct C1HeapGraphRootResult {
+    uint32_t visited{};
+    uintptr_t failure_payload{};
+    C1HeapGraphFailure failure = C1HeapGraphFailure::none;
+    bool attempted{};
+};
+
+struct C1HeapGraphSavedIdentity {
+    uintptr_t payload{};
+    int32_t heap{};
+    uint32_t requested_bytes{};
+    uint64_t world_generation{};
+    uint64_t allocation_generation{};
+};
+
+bool c1_heap_graph_is_new_generation_reuse(
+    const C1HeapGraphSavedIdentity& prior,
+    const MeleeWebSourceMemoryAllocation& current)
+{
+    return current.live == 1 &&
+        current.allocation_generation > prior.allocation_generation;
+}
+
+struct C1HeapGraphSavedState {
+    C1HeapGraphSavedIdentity identities[kC1HeapGraphCapacity]{};
+    size_t count{};
+    bool complete{};
+};
+
+C1HeapGraphWalkState c1_heap_graph_walk_state;
+C1HeapGraphSavedState c1_heap_graph_saved_state;
+
 void c1_heap_census_visitor(void* payload, u32 visitor_capacity)
 {
     ++c1_heap_census.visited;
@@ -2432,6 +2531,7 @@ void c1_heap_census_visitor(void* payload, u32 visitor_capacity)
         return;
     }
     auto& row = c1_heap_census.rows[c1_heap_census.count++];
+    row = C1HeapCensusRow{};
     row.payload = reinterpret_cast<uintptr_t>(payload);
     row.visitor_capacity = visitor_capacity;
     row.referent_capacity = OSReferentSize(payload);
@@ -2813,6 +2913,769 @@ bool c1_gameplay_stats_equal(const MeleeWebGameplayStats& a,
            a.process_peak == b.process_peak &&
            a.heap_free_bytes == b.heap_free_bytes &&
            a.generation == b.generation;
+}
+
+const char* c1_heap_graph_failure_name(C1HeapGraphFailure failure)
+{
+    switch (failure) {
+    case C1HeapGraphFailure::none: return "none";
+    case C1HeapGraphFailure::lease_query_refused: return "lease_query_refused";
+    case C1HeapGraphFailure::exact_lease_absent_or_not_live:
+        return "exact_lease_absent_or_not_live";
+    case C1HeapGraphFailure::lease_owner_mismatch: return "lease_owner_mismatch";
+    case C1HeapGraphFailure::requested_size_mismatch: return "requested_size_mismatch";
+    case C1HeapGraphFailure::missing_census_cell: return "missing_census_cell";
+    case C1HeapGraphFailure::census_lease_mismatch: return "census_lease_mismatch";
+    case C1HeapGraphFailure::node_budget_exceeded: return "node_budget_exceeded";
+    case C1HeapGraphFailure::node_capacity_exceeded: return "node_capacity_exceeded";
+    case C1HeapGraphFailure::invalid_node_kind: return "invalid_node_kind";
+    case C1HeapGraphFailure::node_kind_alias_mismatch: return "node_kind_alias_mismatch";
+    case C1HeapGraphFailure::same_path_cycle: return "same_path_cycle";
+    }
+    return "invalid_failure_code";
+}
+
+C1HeapCensusRow* c1_heap_graph_find_row(C1HeapGraphWalkState& state,
+                                        uintptr_t payload)
+{
+    for (size_t i = 0; i < state.row_count; ++i)
+        if (state.rows[i].payload == payload) return &state.rows[i];
+    return nullptr;
+}
+
+bool c1_heap_graph_request_bytes(C1HeapGraphNodeKind kind, uint32_t* bytes)
+{
+    if (!bytes) return false;
+    switch (kind) {
+    case C1HeapGraphNodeKind::island_segment:
+        *bytes = kC1HeapGraphIslandRequestBytes;
+        return true;
+    case C1HeapGraphNodeKind::ground_start_callback:
+        *bytes = kC1HeapGraphCallbackRequestBytes;
+        return true;
+    }
+    return false;
+}
+
+C1HeapGraphFailure c1_heap_graph_validate_live_lease(
+    MeleeWebSourceMemoryReadStatus status,
+    const MeleeWebSourceMemoryAllocation& lease,
+    int32_t expected_heap, uint64_t expected_world,
+    uint64_t generation_watermark, uint32_t expected_request_bytes)
+{
+    if (status != MELEE_WEB_SOURCE_MEMORY_READ_OK)
+        return C1HeapGraphFailure::lease_query_refused;
+    if (lease.live != 1 || !lease.allocation_generation ||
+        lease.allocation_generation > generation_watermark)
+        return C1HeapGraphFailure::exact_lease_absent_or_not_live;
+    for (uint8_t reserved : lease.reserved)
+        if (reserved) return C1HeapGraphFailure::census_lease_mismatch;
+    if (lease.source_heap_handle != expected_heap ||
+        lease.world_generation != expected_world)
+        return C1HeapGraphFailure::lease_owner_mismatch;
+    if (lease.requested_bytes != expected_request_bytes)
+        return C1HeapGraphFailure::requested_size_mismatch;
+    return C1HeapGraphFailure::none;
+}
+
+bool c1_heap_graph_walk_root(C1HeapGraphWalkState& state, size_t root_index,
+                             const C1HeapGraphRoot& root,
+                             C1HeapGraphResolver resolver, void* resolver_context,
+                             C1HeapGraphRootResult* result)
+{
+    if (!result || !resolver || !state.rows ||
+        root_index >= kC1HeapGraphRootCount) {
+        if (result) {
+            *result = {};
+            result->failure = C1HeapGraphFailure::node_capacity_exceeded;
+        }
+        state.unavailable = true;
+        return false;
+    }
+    *result = {};
+    if (root.kind != C1HeapGraphNodeKind::island_segment &&
+        root.kind != C1HeapGraphNodeKind::ground_start_callback) {
+        result->failure = C1HeapGraphFailure::invalid_node_kind;
+        result->failure_payload = root.payload;
+        state.unavailable = true;
+        return false;
+    }
+    result->attempted = true;
+    uintptr_t payload = root.payload;
+    if (!payload) return true;
+
+    const uint16_t root_bit = static_cast<uint16_t>(uint16_t{1} << root_index);
+    while (payload) {
+        C1HeapCensusRow* row = c1_heap_graph_find_row(state, payload);
+        if (!row) {
+            result->failure = C1HeapGraphFailure::missing_census_cell;
+            result->failure_payload = payload;
+            state.unavailable = true;
+            return false;
+        }
+        if (row->graph_root_mask == 0) {
+            if (state.unique_nodes >= state.budget) {
+                result->failure = C1HeapGraphFailure::node_budget_exceeded;
+                result->failure_payload = payload;
+                state.unavailable = true;
+                return false;
+            }
+            if (state.unique_nodes >= kC1HeapGraphCapacity) {
+                result->failure = C1HeapGraphFailure::node_capacity_exceeded;
+                result->failure_payload = payload;
+                state.unavailable = true;
+                return false;
+            }
+            C1HeapGraphResolvedNode resolved{};
+            C1HeapGraphFailure failure = C1HeapGraphFailure::none;
+            if (!resolver(payload, root.kind, &resolved, &failure,
+                          resolver_context)) {
+                result->failure = failure == C1HeapGraphFailure::none
+                    ? C1HeapGraphFailure::lease_query_refused : failure;
+                result->failure_payload = payload;
+                state.unavailable = true;
+                return false;
+            }
+            row->graph_next = resolved.next;
+            row->graph_kind = static_cast<uint8_t>(root.kind);
+            row->graph_root_mask = root_bit;
+            ++state.unique_nodes;
+        } else {
+            if (row->graph_kind != static_cast<uint8_t>(root.kind)) {
+                result->failure = C1HeapGraphFailure::node_kind_alias_mismatch;
+                result->failure_payload = payload;
+                state.unavailable = true;
+                return false;
+            }
+            if (row->graph_root_mask & root_bit) {
+                row->graph_cycle_mask |= root_bit;
+                ++state.cycles;
+                result->failure = C1HeapGraphFailure::same_path_cycle;
+                result->failure_payload = payload;
+                state.unavailable = true;
+                return false;
+            }
+            ++state.aliases;
+            row->graph_root_mask |= root_bit;
+        }
+        if (result->visited == UINT32_MAX) {
+            result->failure = C1HeapGraphFailure::node_budget_exceeded;
+            result->failure_payload = payload;
+            state.unavailable = true;
+            return false;
+        }
+        ++result->visited;
+        payload = row->graph_next;
+    }
+    return true;
+}
+
+std::array<C1HeapGraphRoot, kC1HeapGraphRootCount>
+c1_heap_graph_current_roots()
+{
+    // Source keeps independent list heads, tail cursors and repartition roots.
+    // B334 intentionally links some of those roots into next/x4, so the walk
+    // keeps a membership bit per field and treats only same-path repeats as cycles.
+    return {{
+        {"island.next", reinterpret_cast<uintptr_t>(mpIsland_80458E88.next),
+         C1HeapGraphNodeKind::island_segment},
+        {"island.x4", reinterpret_cast<uintptr_t>(mpIsland_80458E88.x4),
+         C1HeapGraphNodeKind::island_segment},
+        {"island.x8", reinterpret_cast<uintptr_t>(mpIsland_80458E88.x8),
+         C1HeapGraphNodeKind::island_segment},
+        {"island.xC", reinterpret_cast<uintptr_t>(mpIsland_80458E88.xC),
+         C1HeapGraphNodeKind::island_segment},
+        {"island.x10", reinterpret_cast<uintptr_t>(mpIsland_80458E88.x10),
+         C1HeapGraphNodeKind::island_segment},
+        {"island.x14", reinterpret_cast<uintptr_t>(mpIsland_80458E88.x14),
+         C1HeapGraphNodeKind::island_segment},
+        {"island.x18", reinterpret_cast<uintptr_t>(mpIsland_80458E88.x18),
+         C1HeapGraphNodeKind::island_segment},
+        {"island.x1C", reinterpret_cast<uintptr_t>(mpIsland_80458E88.x1C),
+         C1HeapGraphNodeKind::island_segment},
+        {"island.x20", reinterpret_cast<uintptr_t>(mpIsland_80458E88.x20),
+         C1HeapGraphNodeKind::island_segment},
+        {"stage_info.x6A4", reinterpret_cast<uintptr_t>(stage_info.x6A4),
+         C1HeapGraphNodeKind::ground_start_callback},
+    }};
+}
+
+bool c1_heap_graph_source_resolver(
+    uintptr_t payload, C1HeapGraphNodeKind kind,
+    C1HeapGraphResolvedNode* out, C1HeapGraphFailure* failure,
+    void* context)
+{
+    auto refuse = [failure](C1HeapGraphFailure reason) {
+        if (failure) *failure = reason;
+        return false;
+    };
+    if (!payload || !out || !failure || !context)
+        return refuse(C1HeapGraphFailure::lease_query_refused);
+
+    const auto& guard = *static_cast<const C1HeapGuard*>(context);
+    MeleeWebSourceMemoryAllocation lease{};
+    const auto status = melee_web_source_memory_allocation_read(
+        reinterpret_cast<const void*>(payload), &lease);
+    uint32_t expected_bytes = 0;
+    if (!c1_heap_graph_request_bytes(kind, &expected_bytes))
+        return refuse(C1HeapGraphFailure::invalid_node_kind);
+    const C1HeapGraphFailure lease_failure = c1_heap_graph_validate_live_lease(
+        status, lease, guard.context.source_heap_handle,
+        guard.context.world_generation,
+        guard.context.allocation_generation_watermark, expected_bytes);
+    if (lease_failure != C1HeapGraphFailure::none)
+        return refuse(lease_failure);
+
+    C1HeapCensusRow* row = nullptr;
+    for (size_t i = 0; i < c1_heap_census.count; ++i) {
+        if (c1_heap_census.rows[i].payload == payload) {
+            if (row) return refuse(C1HeapGraphFailure::census_lease_mismatch);
+            row = &c1_heap_census.rows[i];
+        }
+    }
+    if (!row) return refuse(C1HeapGraphFailure::missing_census_cell);
+    if (row->lease_status != MELEE_WEB_SOURCE_MEMORY_READ_OK ||
+        row->visitor_capacity != row->referent_capacity ||
+        row->lease.live != 1 ||
+        row->lease.source_heap_handle != lease.source_heap_handle ||
+        row->lease.world_generation != lease.world_generation ||
+        row->lease.allocation_generation != lease.allocation_generation ||
+        row->lease.requested_bytes != lease.requested_bytes)
+        return refuse(C1HeapGraphFailure::census_lease_mismatch);
+
+    uintptr_t next = 0;
+    if (kind == C1HeapGraphNodeKind::island_segment) {
+        const auto* node = reinterpret_cast<const mp_UnkStruct0*>(payload);
+        next = reinterpret_cast<uintptr_t>(node->next);
+    } else {
+        void* next_pointer = nullptr;
+        std::memcpy(&next_pointer, reinterpret_cast<const void*>(payload),
+                    sizeof(next_pointer));
+        next = reinterpret_cast<uintptr_t>(next_pointer);
+    }
+    *out = {next};
+    *failure = C1HeapGraphFailure::none;
+    return true;
+}
+
+bool c1_heap_graph_root_snapshots_equal(
+    const std::array<C1HeapGraphRoot, kC1HeapGraphRootCount>& a,
+    const std::array<C1HeapGraphRoot, kC1HeapGraphRootCount>& b)
+{
+    for (size_t i = 0; i < a.size(); ++i)
+        if (a[i].payload != b[i].payload || a[i].kind != b[i].kind)
+            return false;
+    return true;
+}
+
+void c1_heap_graph_emit_root_snapshots(
+    const char* phase,
+    const std::array<C1HeapGraphRoot, kC1HeapGraphRootCount>& before,
+    const std::array<C1HeapGraphRoot, kC1HeapGraphRootCount>& after,
+    bool valid,
+    const std::array<C1HeapGraphRootResult, kC1HeapGraphRootCount>* walks)
+{
+    for (size_t i = 0; i < before.size(); ++i) {
+        const C1HeapGraphRootResult walk = walks ? (*walks)[i]
+                                                  : C1HeapGraphRootResult{};
+        std::cerr << "C1_HEAP_GRAPH_ROOT phase=" << phase
+                  << " index=" << i << " name=" << before[i].name
+                  << " payload_before=0x" << std::hex << before[i].payload
+                  << " payload_after=0x" << after[i].payload << std::dec
+                  << " unchanged=" << (before[i].payload == after[i].payload)
+                  << " snapshot_valid=" << valid
+                  << " walk_attempted=" << walk.attempted
+                  << " walk_status=" << c1_heap_graph_failure_name(walk.failure)
+                  << " failure_payload=0x" << std::hex
+                  << walk.failure_payload << std::dec
+                  << " visited=" << walk.visited << '\n';
+    }
+}
+
+bool c1_heap_graph_save_reached_identities(
+    bool graph_complete, const char** reason)
+{
+    c1_heap_graph_saved_state.count = 0;
+    c1_heap_graph_saved_state.complete = false;
+    if (!reason) return false;
+    *reason = "identity_census_unavailable";
+    if (c1_heap_census.overflow || c1_heap_census.invalid ||
+        c1_heap_census.count > kC1HeapGraphCapacity) {
+        *reason = "census_incomplete_or_over_capacity";
+        return false;
+    }
+    if (!graph_complete) {
+        *reason = "root_graph_incomplete";
+        return false;
+    }
+    for (size_t i = 0; i < c1_heap_census.count; ++i) {
+        const auto& row = c1_heap_census.rows[i];
+        if (!row.graph_root_mask) continue;
+        if (!row.payload ||
+            c1_heap_graph_saved_state.count == kC1HeapGraphCapacity) {
+            *reason = "reached_identity_capacity_exceeded";
+            return false;
+        }
+        c1_heap_graph_saved_state.identities[
+            c1_heap_graph_saved_state.count++] = {
+                row.payload, row.lease.source_heap_handle,
+                row.lease.requested_bytes, row.lease.world_generation,
+                row.lease.allocation_generation};
+    }
+    *reason = "none";
+    return true;
+}
+
+void c1_heap_graph_emit_after_oninit(
+    bool census_complete, const MeleeWebGameplayStats& boundary_stats)
+{
+    const char* reason = "unknown_observer_error";
+    bool graph_complete = false;
+    bool identities_complete = false;
+    bool observer_failed = false;
+    bool pure = false;
+    C1HeapGuard before{};
+    C1HeapGuard after{};
+    bool have_before = false;
+    std::array<C1HeapGraphRoot, kC1HeapGraphRootCount> roots_before =
+        c1_heap_graph_current_roots();
+    std::array<C1HeapGraphRoot, kC1HeapGraphRootCount> roots_after = roots_before;
+    std::array<C1HeapGraphRootResult, kC1HeapGraphRootCount> results{};
+    c1_heap_graph_walk_state = {};
+    c1_heap_graph_saved_state.complete = false;
+    c1_heap_graph_saved_state.count = 0;
+
+    try {
+        before = c1_heap_guard();
+        have_before = true;
+        roots_before = c1_heap_graph_current_roots();
+        if (!c1_gameplay_stats_equal(before.stats, boundary_stats)) {
+            reason = "boundary_stats_changed_before_observation";
+        } else if (!census_complete) {
+            reason = "after_oninit_census_unavailable";
+        } else {
+            c1_heap_graph_walk_state.rows = c1_heap_census.rows;
+            c1_heap_graph_walk_state.row_count = c1_heap_census.count;
+            for (size_t i = 0; i < c1_heap_census.count; ++i) {
+                auto& row = c1_heap_census.rows[i];
+                row.graph_next = 0;
+                row.graph_root_mask = 0;
+                row.graph_cycle_mask = 0;
+                row.graph_kind = 0;
+                if (row.lease_status == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                    row.lease.live == 1 &&
+                    row.lease.source_heap_handle == before.context.source_heap_handle &&
+                    row.lease.world_generation == before.context.world_generation)
+                    ++c1_heap_graph_walk_state.budget;
+            }
+            bool roots_complete = true;
+            for (size_t i = 0; i < roots_before.size(); ++i) {
+                if (!c1_heap_graph_walk_root(
+                        c1_heap_graph_walk_state, i, roots_before[i],
+                        c1_heap_graph_source_resolver, &before, &results[i])) {
+                    roots_complete = false;
+                    if (std::strcmp(reason, "unknown_observer_error") == 0)
+                        reason = c1_heap_graph_failure_name(results[i].failure);
+                }
+            }
+            graph_complete = roots_complete &&
+                !c1_heap_graph_walk_state.unavailable;
+            const char* identity_reason = "none";
+            identities_complete = c1_heap_graph_save_reached_identities(
+                graph_complete, &identity_reason);
+            if (!identities_complete && graph_complete)
+                reason = identity_reason;
+        }
+        roots_after = c1_heap_graph_current_roots();
+        after = c1_heap_guard();
+        pure = c1_heap_guards_equal(before, after) &&
+            c1_heap_graph_root_snapshots_equal(roots_before, roots_after);
+        if (!pure) reason = "source_or_root_purity_guard_failed";
+        else if (graph_complete && identities_complete) reason = "none";
+    } catch (const std::exception&) {
+        observer_failed = true;
+        reason = "observer_exception";
+    } catch (...) {
+        observer_failed = true;
+        reason = "unknown_observer_exception";
+    }
+    if (!have_before) pure = false;
+    const bool complete = graph_complete && identities_complete && pure &&
+        have_before && !observer_failed;
+    c1_heap_graph_saved_state.complete = complete;
+    std::cerr << "C1_HEAP_GRAPH_RESULT phase=after-oninit status="
+              << (complete ? "complete" : "unavailable")
+              << " reason=" << (complete ? "none" : reason)
+              << " root_count=" << kC1HeapGraphRootCount
+              << " unique_nodes=" << c1_heap_graph_walk_state.unique_nodes
+              << " aliases=" << c1_heap_graph_walk_state.aliases
+              << " cycles=" << c1_heap_graph_walk_state.cycles
+              << " census_heap_row_budget=" << c1_heap_graph_walk_state.budget
+              << " identity_capacity=" << kC1HeapGraphCapacity
+              << " census_row_bytes=" << sizeof(C1HeapCensusRow)
+              << " census_storage_bytes=" << sizeof(c1_heap_census.rows)
+              << " census_state_bytes=" << sizeof(c1_heap_census)
+              << " graph_state_bytes=" << sizeof(c1_heap_graph_walk_state)
+              << " saved_identities=" << c1_heap_graph_saved_state.count
+              << " saved_identity_row_bytes=" << sizeof(C1HeapGraphSavedIdentity)
+              << " saved_identity_storage_bytes="
+              << sizeof(c1_heap_graph_saved_state.identities)
+              << " saved_state_bytes=" << sizeof(c1_heap_graph_saved_state)
+              << " graph_auxiliary_state_bytes="
+              << (sizeof(c1_heap_graph_walk_state) +
+                  sizeof(c1_heap_graph_saved_state))
+              << " census_and_graph_static_bytes="
+              << (sizeof(c1_heap_census) +
+                  sizeof(c1_heap_graph_walk_state) +
+                  sizeof(c1_heap_graph_saved_state))
+              << " identity_set_complete=" << complete
+              << " pure=" << pure << '\n';
+    c1_heap_graph_emit_root_snapshots(
+        "after-oninit", roots_before, roots_after, pure, &results);
+    for (size_t i = 0; i < c1_heap_census.count; ++i) {
+        const auto& row = c1_heap_census.rows[i];
+        if (!row.graph_root_mask) continue;
+        std::cerr << "C1_HEAP_GRAPH_NODE phase=after-oninit payload=0x"
+                  << std::hex << row.payload << std::dec
+                  << " requested=" << row.lease.requested_bytes
+                  << " heap=" << row.lease.source_heap_handle
+                  << " world=" << row.lease.world_generation
+                  << " allocation_generation="
+                  << row.lease.allocation_generation
+                  << " capacity=" << row.visitor_capacity
+                  << " root_mask=0x" << std::hex << row.graph_root_mask
+                  << " cycle_mask=0x" << row.graph_cycle_mask << std::dec
+                  << " membership=" << (complete ? "complete" : "partial")
+                  << '\n';
+    }
+    std::cerr.flush();
+}
+
+void c1_heap_graph_emit_after_stage_last(bool census_complete)
+{
+    const char* reason = "unknown_observer_error";
+    bool pure = false;
+    bool queries_complete = c1_heap_graph_saved_state.complete;
+    bool roots_stable = false;
+    C1HeapGuard before{};
+    C1HeapGuard after{};
+    std::array<C1HeapGraphRoot, kC1HeapGraphRootCount> roots_before =
+        c1_heap_graph_current_roots();
+    std::array<C1HeapGraphRoot, kC1HeapGraphRootCount> roots_after = roots_before;
+    bool have_before = false;
+    try {
+        before = c1_heap_guard();
+        have_before = true;
+        roots_before = c1_heap_graph_current_roots();
+        if (!c1_heap_graph_saved_state.complete) {
+            reason = "after_oninit_identity_set_unavailable";
+            queries_complete = false;
+        } else {
+            for (size_t i = 0; i < c1_heap_graph_saved_state.count; ++i) {
+                const auto& prior = c1_heap_graph_saved_state.identities[i];
+                MeleeWebSourceMemoryAllocation lease{};
+                const auto status = melee_web_source_memory_allocation_read(
+                    reinterpret_cast<const void*>(prior.payload), &lease);
+                const char* classification = "unavailable";
+                bool valid = status == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                    lease.live <= 1 &&
+                    lease.source_heap_handle == prior.heap &&
+                    lease.world_generation == prior.world_generation &&
+                    prior.heap == before.context.source_heap_handle &&
+                    prior.world_generation == before.context.world_generation &&
+                    (!lease.live || lease.allocation_generation <=
+                        before.context.allocation_generation_watermark) &&
+                    lease.reserved[0] == 0 && lease.reserved[1] == 0 &&
+                    lease.reserved[2] == 0 && lease.reserved[3] == 0 &&
+                    lease.reserved[4] == 0 && lease.reserved[5] == 0 &&
+                    lease.reserved[6] == 0;
+                if (valid && lease.live == 0 && !lease.requested_bytes &&
+                    !lease.allocation_generation) {
+                    classification = "absent_current_sdk_lease";
+                } else if (valid && lease.live == 1 &&
+                           lease.requested_bytes == prior.requested_bytes &&
+                           lease.allocation_generation ==
+                               prior.allocation_generation) {
+                    classification = "unchanged_live_sdk_lease";
+                } else if (valid &&
+                           c1_heap_graph_is_new_generation_reuse(prior, lease)) {
+                    classification = "new_generation_reuse";
+                } else {
+                    valid = false;
+                    queries_complete = false;
+                    reason = status == MELEE_WEB_SOURCE_MEMORY_READ_OK
+                        ? "saved_identity_lease_mismatch" : "saved_identity_query_refused";
+                }
+                std::cerr << "C1_HEAP_GRAPH_LEASE phase=after-stage-last"
+                          << " payload=0x" << std::hex << prior.payload << std::dec
+                          << " prior_requested=" << prior.requested_bytes
+                          << " prior_allocation_generation="
+                          << prior.allocation_generation
+                          << " status=" << static_cast<int>(status)
+                          << " live=" << static_cast<unsigned>(lease.live)
+                          << " requested=" << lease.requested_bytes
+                          << " heap=" << lease.source_heap_handle
+                          << " world=" << lease.world_generation
+                          << " allocation_generation=" << lease.allocation_generation
+                          << " classification=" << classification
+                          << " valid=" << valid << '\n';
+            }
+        }
+        roots_after = c1_heap_graph_current_roots();
+        after = c1_heap_guard();
+        roots_stable = c1_heap_graph_root_snapshots_equal(roots_before, roots_after);
+        pure = c1_heap_guards_equal(before, after) && roots_stable;
+        if (!pure) {
+            queries_complete = false;
+            reason = "source_or_root_purity_guard_failed";
+        } else if (!census_complete) {
+            queries_complete = false;
+            reason = "after_stage_last_census_unavailable";
+        } else if (queries_complete) {
+            reason = "none";
+        }
+    } catch (const std::exception&) {
+        queries_complete = false;
+        reason = "observer_exception";
+    } catch (...) {
+        queries_complete = false;
+        reason = "unknown_observer_exception";
+    }
+    if (!have_before) {
+        pure = false;
+        queries_complete = false;
+    }
+    const bool complete = queries_complete && pure && census_complete;
+    std::cerr << "C1_HEAP_GRAPH_RESULT phase=after-stage-last status="
+              << (complete ? "complete" : "unavailable")
+              << " reason=" << (complete ? "none" : reason)
+              << " saved_identities=" << c1_heap_graph_saved_state.count
+              << " identity_set_complete=" << c1_heap_graph_saved_state.complete
+              << " census_complete=" << census_complete
+              << " roots_stable=" << roots_stable << " pure=" << pure << '\n';
+    c1_heap_graph_emit_root_snapshots(
+        "after-stage-last", roots_before, roots_after, roots_stable, nullptr);
+    std::cerr.flush();
+}
+
+struct C1HeapGraphControlNode {
+    uintptr_t payload{};
+    uintptr_t next{};
+    int32_t heap{};
+    uint32_t requested_bytes{};
+    uint64_t world_generation{};
+    uint64_t allocation_generation{};
+    bool live{};
+};
+
+struct C1HeapGraphControlContext {
+    C1HeapGraphControlNode nodes[4]{};
+    size_t count{};
+    size_t queries{};
+    size_t dereferences{};
+    int32_t expected_heap{};
+    uint64_t expected_world_generation{};
+};
+
+bool c1_heap_graph_control_resolver(
+    uintptr_t payload, C1HeapGraphNodeKind kind,
+    C1HeapGraphResolvedNode* out, C1HeapGraphFailure* failure,
+    void* context)
+{
+    auto refuse = [failure](C1HeapGraphFailure reason) {
+        if (failure) *failure = reason;
+        return false;
+    };
+    if (!payload || !out || !failure || !context)
+        return refuse(C1HeapGraphFailure::lease_query_refused);
+    auto& state = *static_cast<C1HeapGraphControlContext*>(context);
+    ++state.queries;
+    C1HeapGraphControlNode* node = nullptr;
+    for (size_t i = 0; i < state.count; ++i)
+        if (state.nodes[i].payload == payload) {
+            node = &state.nodes[i];
+            break;
+        }
+    uint32_t expected_bytes = 0;
+    if (!c1_heap_graph_request_bytes(kind, &expected_bytes))
+        return refuse(C1HeapGraphFailure::invalid_node_kind);
+    MeleeWebSourceMemoryAllocation lease{};
+    if (node) {
+        lease.source_heap_handle = node->heap;
+        lease.requested_bytes = node->requested_bytes;
+        lease.world_generation = node->world_generation;
+        lease.allocation_generation = node->allocation_generation;
+        lease.live = node->live ? 1 : 0;
+    }
+    const C1HeapGraphFailure lease_failure = c1_heap_graph_validate_live_lease(
+        MELEE_WEB_SOURCE_MEMORY_READ_OK, lease, state.expected_heap,
+        state.expected_world_generation, UINT64_MAX, expected_bytes);
+    if (lease_failure != C1HeapGraphFailure::none)
+        return refuse(lease_failure);
+    ++state.dereferences;
+    *out = {node->next};
+    *failure = C1HeapGraphFailure::none;
+    return true;
+}
+
+void c1_heap_graph_control_copy_census(
+    std::array<C1HeapCensusRow, 4>& rows,
+    const C1HeapGraphControlContext& context)
+{
+    for (size_t i = 0; i < context.count; ++i) {
+        const auto& node = context.nodes[i];
+        auto& row = rows[i];
+        row = C1HeapCensusRow{};
+        row.payload = node.payload;
+        row.lease_status = MELEE_WEB_SOURCE_MEMORY_READ_OK;
+        row.lease.source_heap_handle = node.heap;
+        row.lease.requested_bytes = node.requested_bytes;
+        row.lease.world_generation = node.world_generation;
+        row.lease.allocation_generation = node.allocation_generation;
+        row.lease.live = node.live ? 1 : 0;
+    }
+}
+
+void c1_heap_graph_control_reset(
+    C1HeapGraphWalkState& walk, std::array<C1HeapCensusRow, 4>& rows,
+    size_t row_count, size_t budget)
+{
+    walk = {};
+    walk.rows = rows.data();
+    walk.row_count = row_count;
+    walk.budget = budget;
+    for (auto& row : rows) {
+        row.graph_next = 0;
+        row.graph_root_mask = 0;
+        row.graph_cycle_mask = 0;
+        row.graph_kind = 0;
+    }
+}
+
+void run_stadium_owner_graph_controls()
+{
+    constexpr int32_t heap = 3;
+    constexpr uint64_t world = 11;
+    constexpr uintptr_t first = 0x1000;
+    constexpr uintptr_t second = 0x2000;
+    constexpr uintptr_t mismatch = 0x3000;
+
+    std::array<C1HeapCensusRow, 4> rows{};
+    C1HeapGraphWalkState walk{};
+    C1HeapGraphControlContext fake{};
+    fake.expected_heap = heap;
+    fake.expected_world_generation = world;
+
+    fake.count = 2;
+    fake.nodes[0] = {first, second, heap, kC1HeapGraphIslandRequestBytes,
+                     world, 1, true};
+    fake.nodes[1] = {second, 0, heap, kC1HeapGraphIslandRequestBytes,
+                     world, 2, true};
+    c1_heap_graph_control_copy_census(rows, fake);
+    c1_heap_graph_control_reset(walk, rows, fake.count, fake.count);
+    C1HeapGraphRootResult first_result{}, alias_result{};
+    check(c1_heap_graph_walk_root(
+              walk, 0,
+              {"control.head", first, C1HeapGraphNodeKind::island_segment},
+              c1_heap_graph_control_resolver, &fake, &first_result) &&
+              c1_heap_graph_walk_root(
+                  walk, 1,
+                  {"control.tail", second,
+                   C1HeapGraphNodeKind::island_segment},
+                  c1_heap_graph_control_resolver, &fake, &alias_result) &&
+              walk.unique_nodes == 2 && walk.aliases == 1 && walk.cycles == 0 &&
+              rows[1].graph_root_mask == 3 && fake.dereferences == 2,
+          "Owner graph alias control counted a cross-root alias as a cycle");
+
+    fake = {};
+    fake.expected_heap = heap;
+    fake.expected_world_generation = world;
+    fake.count = 2;
+    fake.nodes[0] = {first, second, heap, kC1HeapGraphIslandRequestBytes,
+                     world, 1, true};
+    fake.nodes[1] = {second, first, heap, kC1HeapGraphIslandRequestBytes,
+                     world, 2, true};
+    c1_heap_graph_control_copy_census(rows, fake);
+    c1_heap_graph_control_reset(walk, rows, fake.count, fake.count);
+    C1HeapGraphRootResult cycle_result{};
+    check(!c1_heap_graph_walk_root(
+              walk, 0,
+              {"control.cycle", first,
+               C1HeapGraphNodeKind::island_segment},
+              c1_heap_graph_control_resolver, &fake, &cycle_result) &&
+              cycle_result.failure == C1HeapGraphFailure::same_path_cycle &&
+              walk.cycles == 1 && walk.unavailable &&
+              rows[0].graph_cycle_mask == 1 && fake.dereferences == 2,
+          "Owner graph same-path cycle was not rejected as unavailable");
+
+    fake = {};
+    fake.expected_heap = heap;
+    fake.expected_world_generation = world;
+    fake.count = 1;
+    fake.nodes[0] = {mismatch, 0, heap, kC1HeapGraphIslandRequestBytes,
+                     world + 1, 1, true};
+    c1_heap_graph_control_copy_census(rows, fake);
+    c1_heap_graph_control_reset(walk, rows, fake.count, fake.count);
+    C1HeapGraphRootResult lease_mismatch_result{};
+    check(!c1_heap_graph_walk_root(
+              walk, 0,
+              {"control.lease-mismatch", mismatch,
+               C1HeapGraphNodeKind::island_segment},
+              c1_heap_graph_control_resolver, &fake,
+              &lease_mismatch_result) &&
+              lease_mismatch_result.failure ==
+                  C1HeapGraphFailure::lease_owner_mismatch &&
+              fake.queries == 1 && fake.dereferences == 0,
+          "Owner graph dereferenced a lease from a different world");
+
+    fake = {};
+    fake.expected_heap = heap;
+    fake.expected_world_generation = world;
+    fake.count = 1;
+    fake.nodes[0] = {mismatch, 0, heap,
+                     kC1HeapGraphIslandRequestBytes + 1, world, 1, true};
+    c1_heap_graph_control_copy_census(rows, fake);
+    c1_heap_graph_control_reset(walk, rows, fake.count, fake.count);
+    C1HeapGraphRootResult size_mismatch_result{};
+    check(!c1_heap_graph_walk_root(
+              walk, 0,
+              {"control.size-mismatch", mismatch,
+               C1HeapGraphNodeKind::island_segment},
+              c1_heap_graph_control_resolver, &fake,
+              &size_mismatch_result) &&
+              size_mismatch_result.failure ==
+                  C1HeapGraphFailure::requested_size_mismatch &&
+              fake.queries == 1 && fake.dereferences == 0,
+          "Owner graph dereferenced a cell with a mismatched source request size");
+
+    fake = {};
+    fake.expected_heap = heap;
+    fake.expected_world_generation = world;
+    fake.count = 1;
+    fake.nodes[0] = {mismatch, 0, heap, kC1HeapGraphIslandRequestBytes,
+                     world, 1, true};
+    c1_heap_graph_control_reset(walk, rows, 0, fake.count);
+    C1HeapGraphRootResult absent_census_result{};
+    check(!c1_heap_graph_walk_root(
+              walk, 0,
+              {"control.absent-census-cell", mismatch,
+               C1HeapGraphNodeKind::island_segment},
+              c1_heap_graph_control_resolver, &fake,
+              &absent_census_result) &&
+              absent_census_result.failure ==
+                  C1HeapGraphFailure::missing_census_cell &&
+              fake.queries == 0 && fake.dereferences == 0,
+          "Owner graph queried or dereferenced a node absent from the allocation census");
+
+    const C1HeapGraphSavedIdentity prior_reuse{
+        mismatch, heap, kC1HeapGraphIslandRequestBytes, world, 1};
+    const MeleeWebSourceMemoryAllocation reused_with_new_size{
+        heap, kC1HeapGraphCallbackRequestBytes, world, 2, 1, {}};
+    check(c1_heap_graph_is_new_generation_reuse(
+              prior_reuse, reused_with_new_size),
+          "Owner graph did not classify a higher-generation same-payload lease with a changed request size as reuse");
+
+    std::cout << "C1 source-owner graph alias/cycle/lease-world/request-size/missing-cell/generation-reuse controls passed; no source world or fixture\n";
 }
 
 void c1_v23_census_unavailable(const char* phase, const char* reason) noexcept
@@ -4049,6 +4912,9 @@ void run_stadium_e8_request(
             melee_web_stadium_c1_heap_owner_mark(
                 MELEE_WEB_STADIUM_C1_HEAP_OWNER_PHASE_AFTER_ONINIT,
                 !on_init.census_observer_failed);
+            c1_heap_graph_emit_after_oninit(
+                !on_init.census_observer_failed,
+                on_init.stats_after_on_init);
             check_stadium_rng_witness(selection_rng, selected, "on-init-verified");
             check(on_init.stats_after_on_init.generation ==
                       on_init.stats_before_init.generation &&
@@ -4169,6 +5035,8 @@ void run_stadium_e8_request(
                 on_init.stats_after_end);
             melee_web_stadium_c1_heap_owner_mark(
                 MELEE_WEB_STADIUM_C1_HEAP_OWNER_PHASE_AFTER_STAGE_LAST,
+                !on_init.census_observer_failed);
+            c1_heap_graph_emit_after_stage_last(
                 !on_init.census_observer_failed);
             check_stadium_rng_witness(selection_rng, selected, "stage-last-end");
             on_init.seed_after_end = *seed_owner;
@@ -5328,6 +6196,9 @@ int main(int argc,char** argv){try{
   }
   if(argc==2&&std::string_view(argv[1])=="--stadium-bind-refusal-controls"){
    run_stadium_bind_refusal_control();return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-owner-graph-controls"){
+   run_stadium_owner_graph_controls();return 0;
   }
   if(argc==2&&std::string_view(argv[1])=="--stadium-yakumono-exchange"){
   run_stadium_yakumono_exchange_control();return 0;
