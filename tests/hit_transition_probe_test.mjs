@@ -18,6 +18,11 @@ const row=cursor=>({schema:'melee-web-hit-transition-probe',version:1,source_cur
 const rows=selection.selected.map(row);
 const validate=values=>validateHitTransitionProbeRows(values.map(JSON.stringify),selection,{observedCursor:5240});
 assert.equal(validate(rows).complete,true);
+const version2Rows=rows.map(value=>({...structuredClone(value),version:2}));
+assert.equal(validate(version2Rows).complete,true);
+assert.throws(()=>validate([rows[0],version2Rows[1],rows[2]]),/version/);
+const unsupportedVersion=structuredClone(version2Rows);unsupportedVersion[1].version=3;
+assert.throws(()=>validate(unsupportedVersion),/version/);
 const zeroPassRow=(collisionCount,motionCount)=>{
  const events=[];
  const event=(phase,kind,invocation,extra={})=>events.push({...base,sequence:events.length,phase,kind,invocation,...extra});
