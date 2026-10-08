@@ -1,0 +1,455 @@
+{
+  "audit": {
+    "audit_completed": true,
+    "browser_comparison": "not performed; source observations only",
+    "complete": false,
+    "css_sss_frames_input_ordered_through_boundary": 1184,
+    "limits": {
+      "max_bytes": 134217728,
+      "max_records": 24000,
+      "stop": "first invalid record/join/checkpoint, cap, EOF before target, or first completed target tick"
+    },
+    "ordered_checkpoint_rejoins": [
+      {
+        "fresh_prefix": {
+          "bytes_read": 10389712,
+          "last_source_sequence": 4735,
+          "records_read": 4736,
+          "sha256": "24d520abccf98ee109b3cee2ae67767d4363c7e941d688c3534c0cbfdd7cde4a"
+        },
+        "label": "clock1",
+        "rejoined": true,
+        "tuple": {
+          "browser_cursor": 1309,
+          "match_frame": 1,
+          "match_index": 0,
+          "pad_consume_sequence": 4734,
+          "source_sequence": 4735,
+          "source_tick": 124,
+          "timeline_frame_index": 1308
+        }
+      },
+      {
+        "fresh_prefix": {
+          "bytes_read": 12780628,
+          "last_source_sequence": 5030,
+          "records_read": 5031,
+          "sha256": "32b763453688c6335b90c9807b71c79d919b85e6e7435a3c2abccd1792f00e77"
+        },
+        "label": "clock60",
+        "rejoined": true,
+        "tuple": {
+          "browser_cursor": 1368,
+          "match_frame": 60,
+          "match_index": 0,
+          "pad_consume_sequence": 5029,
+          "source_sequence": 5030,
+          "source_tick": 183,
+          "timeline_frame_index": 1367
+        }
+      },
+      {
+        "fresh_prefix": {
+          "bytes_read": 22506388,
+          "last_source_sequence": 6230,
+          "records_read": 6231,
+          "sha256": "ef9569c32524aa79443a998867c4c418a2cfd8b21719ed24b03fc966ded025ef"
+        },
+        "label": "clock300",
+        "rejoined": true,
+        "tuple": {
+          "browser_cursor": 1608,
+          "match_frame": 300,
+          "match_index": 0,
+          "pad_consume_sequence": 6229,
+          "source_sequence": 6230,
+          "source_tick": 423,
+          "timeline_frame_index": 1607
+        }
+      },
+      {
+        "fresh_prefix": {
+          "bytes_read": 30611188,
+          "last_source_sequence": 7230,
+          "records_read": 7231,
+          "sha256": "ec1ceb5c56c87ec35b5dd8cd0d318c85b1917d554871883732de4d2e4f52e7b6"
+        },
+        "label": "clock500",
+        "rejoined": true,
+        "tuple": {
+          "browser_cursor": 1808,
+          "match_frame": 500,
+          "match_index": 0,
+          "pad_consume_sequence": 7229,
+          "source_sequence": 7230,
+          "source_tick": 623,
+          "timeline_frame_index": 1807
+        }
+      },
+      {
+        "fresh_prefix": {
+          "bytes_read": 50873188,
+          "last_source_sequence": 9730,
+          "records_read": 9731,
+          "sha256": "7f71d2c8c9529e8171dfab854cd114abb0eef44ca8d59c6f7e96af5495d13cf7"
+        },
+        "label": "clock1000",
+        "rejoined": true,
+        "tuple": {
+          "browser_cursor": 2308,
+          "match_frame": 1000,
+          "match_index": 0,
+          "pad_consume_sequence": 9729,
+          "source_sequence": 9730,
+          "source_tick": 1123,
+          "timeline_frame_index": 2307
+        }
+      }
+    ],
+    "report_key_caveat": "The report also contains an unused null target_clock2000_observed field. The actual observed tuple is target_clock_ge2000_observed; preserve the report unchanged.",
+    "source_prefix": {
+      "bytes_read": 91371214,
+      "hash_basis": "fresh SHA-256 over exactly the raw source bytes consumed before stop/failure",
+      "last_source_sequence": 14728,
+      "records_read": 14729,
+      "sha256": "3f5eaf2c845a387d22c1da7abf74d0f4e4ca2c40fd8503b31a890f0f3f6b7296"
+    },
+    "source_ticks_observed": 2124,
+    "status": "first_match_clock_ge2000_found",
+    "target": {
+      "cursor_after_frame": 3308,
+      "fighter_entities": [
+        {
+          "entity_index": 0,
+          "fighter_gobj_linked": true,
+          "fighter_player_id": 0,
+          "generation": 0,
+          "match_index": 0,
+          "slot": 0
+        },
+        {
+          "entity_index": 0,
+          "fighter_gobj_linked": true,
+          "fighter_player_id": 1,
+          "generation": 0,
+          "match_index": 0,
+          "slot": 1
+        },
+        {
+          "entity_index": 0,
+          "fighter_gobj_linked": true,
+          "fighter_player_id": 2,
+          "generation": 0,
+          "match_index": 0,
+          "slot": 2
+        },
+        {
+          "entity_index": 0,
+          "fighter_gobj_linked": true,
+          "fighter_player_id": 3,
+          "generation": 0,
+          "match_index": 0,
+          "slot": 3
+        }
+      ],
+      "match_frame": 2000,
+      "match_index": 0,
+      "pad_consume_source_sequence": 14727,
+      "rng": 1682403597,
+      "scene_frame": 2123,
+      "source_tick": 2123,
+      "source_tick_seq": 14728,
+      "state_fields_observed": [
+        "fighter_entities",
+        "fighters",
+        "match_frame",
+        "pad_state_hex",
+        "rng",
+        "scene_frame"
+      ],
+      "timeline_frame_index": 3307
+    },
+    "target_entity_summary": {
+      "generations": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "player_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "primary_entity_count": 4,
+      "slots": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "tick0": {
+      "cursor_after_frame": 1185,
+      "fighter_entities": [
+        {
+          "entity_index": 0,
+          "fighter_gobj_linked": true,
+          "fighter_player_id": 0,
+          "generation": 0,
+          "match_index": 0,
+          "slot": 0
+        },
+        {
+          "entity_index": 0,
+          "fighter_gobj_linked": true,
+          "fighter_player_id": 1,
+          "generation": 0,
+          "match_index": 0,
+          "slot": 1
+        },
+        {
+          "entity_index": 0,
+          "fighter_gobj_linked": true,
+          "fighter_player_id": 2,
+          "generation": 0,
+          "match_index": 0,
+          "slot": 2
+        },
+        {
+          "entity_index": 0,
+          "fighter_gobj_linked": true,
+          "fighter_player_id": 3,
+          "generation": 0,
+          "match_index": 0,
+          "slot": 3
+        }
+      ],
+      "match_frame": 0,
+      "match_index": 0,
+      "pad_consume_source_sequence": 4114,
+      "rng": 3724308856,
+      "scene_frame": 0,
+      "source_tick": 0,
+      "source_tick_seq": 4115,
+      "state_fields_observed": [
+        "fighter_entities",
+        "fighters",
+        "match_frame",
+        "pad_state_hex",
+        "rng",
+        "scene_frame"
+      ],
+      "timeline_frame_index": 1184
+    },
+    "timeline_frames_input_ordered_through_boundary": 3308,
+    "whole_session_equivalent": false
+  },
+  "comparison_readiness": {
+    "audit_prefix_exceeds_current_comparator_limits": true,
+    "browser_comparison_performed": false,
+    "current_ordered_comparator_limits": {
+      "max_bytes": 67108864,
+      "max_records": 12000
+    },
+    "next_step": "Review an explicit bounded cap-policy extension for the existing generic ordered-lineage comparator before assembling or running a browser comparison packet."
+  },
+  "date": "2026-10-07",
+  "issue": 237,
+  "planned_repository_paths": {
+    "receipt": "docs/evidence/b4-v10-first-match-clock2000-source-only-v1.json",
+    "status": "docs/status/2026-10-07-b4-v10-first-match-clock2000-source-only.md"
+  },
+  "preparation_history": {
+    "failures": [
+      {
+        "artifact": "runner-inspection-correction-v1.json",
+        "outcome": "Indentation issue found before execution; corrected before source read.",
+        "run_id": "b4-clock2000-source-audit-proposal-20261007-812d895b",
+        "sha256": "71509a9442557d705f71d657096bcc387b7c2dc8d7fd322ef9c951e6d79361a6",
+        "source_content_opened": false,
+        "stage": "runner_source_inspection"
+      },
+      {
+        "artifact": "packet-freeze-failure-v1.json",
+        "cause": "Freeze helper rejected the configured Python symlink; resolved executable was separately bound.",
+        "failure": "ValueError: missing or symlinked input: approved Python symlink path",
+        "packet_written": false,
+        "run_id": "b4-clock2000-source-audit-proposal-20261007-812d895b",
+        "sha256": "80f2ac7eeaeddfea90d0c43a9b22a22598e8a7d4d8f09a7ac7cec232f806bd9b",
+        "source_content_opened": false,
+        "stage": "packet_freeze_v1"
+      },
+      {
+        "artifact": "clock2000-metadata-preflight-v2.json",
+        "failure": "ComparisonError: v10 comparison expectations schema/version is unsupported",
+        "log_artifact": "clock2000-metadata-preflight-v2.log",
+        "log_sha256": "95ae85ba6358889d33bc51095d71725583b8a5dcfb1963c3d9fd4d99087d567b",
+        "run_id": "b4-clock2000-source-audit-proposal-20261007-812d895b",
+        "sha256": "0c1de452612a2578eb4a53634efa03735cbb173fb5eabb024d9ce96835de6356",
+        "source_open_attempts": {
+          "builtin_open": 0,
+          "iter_records": 0,
+          "path_open": 0
+        },
+        "stage": "metadata_preflight_v2"
+      },
+      {
+        "artifact": "clock2000-launch-preflight-verifier-failure-v1.json",
+        "audit_invoked": false,
+        "detail": "Verifier incorrectly rejected the packet-bound symlink before checking its bound resolved target; corrected preflight then verified symlink, resolved path, binary SHA/size and Python version.",
+        "exact_old_argv": "not retained; not reconstructed",
+        "failure": "AssertionError: python symlinked",
+        "run_id": "b4-clock2000-source-audit-canonical-20261007-ca10b90-r1",
+        "sha256": "baa5b479bf19f5f710a09c7b7ca8d38cf0f939bb01157e4988fd3c9db97a378e",
+        "source_content_opened": false,
+        "stage": "final_launch_verifier"
+      }
+    ],
+    "interpretation": "Preparation and verifier failures occurred before the authorized source audit; they are retained separately and are not source-audit outcomes."
+  },
+  "producer": {
+    "checkout_clean": true,
+    "issue": 237,
+    "packet": {
+      "artifact": "clock2000-launch-packet-v4.json",
+      "bytes": 25304,
+      "private_run_id": "b4-clock2000-source-audit-canonical-20261007-ca10b90-r1",
+      "sha256": "5b9274c14d74d20819bab51ee1d3d5cd84e1372e9db86fba06d5742876958f23"
+    },
+    "runner": {
+      "artifact": "audit_match_clock2000_v4.py",
+      "bytes": 42970,
+      "private_run_id": "b4-clock2000-source-audit-canonical-20261007-ca10b90-r1",
+      "sha256": "69031f6e07ffb585c816452746afc9407ba7c49ede5be1b2eed9c1dfc76323df"
+    },
+    "source_checkout_commit": "ca10b90becbec78255155c1cfc02eb9565f27bbe",
+    "source_checkout_tree": "0b07b86108869826cf0af31d0760b94773a2c47d"
+  },
+  "review_caveats": [
+    "Unused historical target_clock2000_observed key remains null; canonical target_clock_ge2000_observed contains actual observed tuple. Do not rewrite frozen report.",
+    "Outer execution reports process group absent but retained receipt has no numeric PID/PGID; no independent root process identity claim. Runner exited0 after1.66s; no servers/browser.",
+    "Prior Python-symlink verifier failure occurred before source read and is retained, with exact old argv explicitly unobserved.",
+    "Current comparison metadata limits64MiB/12000 do not admit this91MiB/14729 prefix; separate bounded interface review before browser comparison."
+  ],
+  "schema": "melee-web-b4-v10-first-match-clock2000-source-only-v1",
+  "scope": {
+    "description": "Bounded original-trace observation. State fields and input order were observed from source; no browser was compared through this boundary.",
+    "evidence_label": "Source identified",
+    "name": "Source-only observation through first match-0 match_frame >= 2000",
+    "not_claimed": [
+      "No browser comparison through clock 2000.",
+      "No complete session or whole-session equivalence.",
+      "No later match, whole-roster, visual, audio, live-timing, performance, or gameplay acceptance.",
+      "CSS/SSS frame ranges establish input order only; they are not state comparisons."
+    ]
+  },
+  "source_identity": {
+    "capture_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "first_entry_sequence": 4088,
+    "first_setup_identity_audit_sha256": "742a9a6b7317651c654620c1f69c87cff4177a8c9e7eea8c34d596e817af43e8",
+    "first_setup_sequence": 4113,
+    "first_source_tick_sequence": 4115,
+    "full_trace_rehashed_during_audit": false,
+    "manifest_sha256": "c88f0e2cbd1fd79d28cb9cd554ce1b34ca2b858262d6032a327c08c46b941da7",
+    "private_source_run_id": "fighter-accuracy-v10-origin-main-20261003-20261003-110505-57263165",
+    "recorded_full_trace_sha256": "81f8a0a3c8cac644e86be2e07451a5876be08b60ebb4295290a35c8a187c5580",
+    "sequence_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "source_report_sha256": "88a8ca551d2077f200fbcf4670836357e508fdb503d7b360e8b3b67654911913",
+    "stat_after": {
+      "bytes": 2137257881,
+      "device": 16777242,
+      "inode": 6599739,
+      "mtime_ns": 1791051579441504716
+    },
+    "stat_before": {
+      "bytes": 2137257881,
+      "device": 16777242,
+      "inode": 6599739,
+      "mtime_ns": 1791051579441504716
+    },
+    "stat_stable": true,
+    "trace_bytes_recorded": 2137257881
+  },
+  "validation": {
+    "authorization": {
+      "artifact": "root-source-audit-authorization-v1.json",
+      "private_run_id": "b4-clock2000-source-audit-canonical-20261007-ca10b90-r1",
+      "sha256": "723b72eec823719f426491e0d8ed6f1165a5b357bd94067b2ce740a2b1534c39"
+    },
+    "execution": {
+      "elapsed_seconds": 1.6618388330098242,
+      "execution_receipt": {
+        "artifact": "clock2000-source-audit-execution-v1.json",
+        "bytes": 4807,
+        "sha256": "238667783a5cd9f2a4945ce3f3270cdc4de1aced014522575e32cc3a342a90ac"
+      },
+      "exit_code": 0,
+      "outer_timeout_seconds": 60,
+      "process_group_absence": "Owner-reported from execution wrapper; no numeric PID/PGID was recorded, so this is not an independent root process-identity check.",
+      "report": {
+        "artifact": "clock2000-source-audit-v4.json",
+        "bytes": 415282,
+        "sha256": "019d86cd96de13aa7b7b3de4a64c0bfbca6c04d580dcc3ad4b2e188ee3af8ca1"
+      },
+      "report_write_failed": false,
+      "stderr": {
+        "artifact": "clock2000-source-audit-v4.stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "artifact": "clock2000-source-audit-v4.stdout.log",
+        "bytes": 260,
+        "sha256": "11ae643c609c732122058892a01029449a2596a20c25619e1fc276bb41cb2ea1"
+      },
+      "timed_out": false
+    },
+    "final_launch_preflight": {
+      "artifact": {
+        "artifact": "clock2000-launch-preflight-v1.json",
+        "bytes": 2156,
+        "sha256": "4f208775f2a1dc267350f0f1478f9243e551e6fa31944a733d1ffd1a7dcd753e"
+      },
+      "checks": [
+        "authorization_and_packet_hashes",
+        "clean_checkout_head_tree",
+        "31_authorized_small_file_identities",
+        "bound_python_symlink_target_hash_and_version",
+        "external_storage_uuid",
+        "source_stat_and_fresh_outputs"
+      ],
+      "status": "pass"
+    },
+    "metadata_preflight": {
+      "execution": {
+        "artifact": "clock2000-metadata-preflight-execution-v4.json",
+        "bytes": 4272,
+        "sha256": "ea68da99ae1b9146c4475e04db2575b364bd9f3fcee8725570ee7ce0b7bdcd6e"
+      },
+      "log": {
+        "artifact": "clock2000-metadata-preflight-v4.log",
+        "bytes": 3658,
+        "sha256": "cc813edd0a55c4741ca54c7feb8a79dcfbb99d34eabeb293ec9dcc968383b753"
+      },
+      "report": {
+        "artifact": "clock2000-metadata-preflight-v4.json",
+        "bytes": 5096,
+        "sha256": "37c6ce86a24eaed3896cc7a687c8f81faa24b2751c74170f128b1eb8ed9fb596"
+      },
+      "source_open_blockers": {
+        "builtin_open_attempts": 0,
+        "iter_records_attempts": 0,
+        "path_open_attempts": 0
+      },
+      "status": "preflight_passed_no_source_open"
+    },
+    "root_review": {
+      "artifact": "root-source-audit-result-review-v1.json",
+      "private_run_id": "b4-clock2000-source-audit-canonical-20261007-ca10b90-r1",
+      "result": "accepted; exact invariants, source hash/command/prefix/stat independently checked; no second source read",
+      "sha256": "ce0703a03e517d3bafae6a3bb2a348ca91df763543acf51bf708f9471fda9a13"
+    }
+  }
+}

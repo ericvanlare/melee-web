@@ -1,0 +1,363 @@
+{
+  "browser_capture": {
+    "authorization_sha256": "24fa9996b175c43013f44a4b0c02b793cd813fcdf75552c9cc05317c93fb242a",
+    "browser_errors": 0,
+    "browser_report": {
+      "artifact": "capture-output-v4/retail-browser-report.json",
+      "bytes": 18470,
+      "sha256": "cee3d67a8d85fcc3e2f8059a79d32a41003fa42ef1efd365aa33a88e8d66d042"
+    },
+    "capture_id": "b4-v10-first-match-clock2000-browser-prefix-20261007-69dcd-r1",
+    "cdp_inventory_count": 5,
+    "first_error": "Browser replay report failed: [\"whole-session final CSS was not entered\",\"Manual unload stopped the replay\",\"incomplete input timeline\",\"source tick/draw count mismatch\"]",
+    "first_error_interpretation": "Capture finalization reported a bounded manual unload, incomplete timeline and source tick/draw count mismatch; this aggregate is not a state-comparison divergence.",
+    "first_mismatch": {
+      "failure": "whole-session final CSS was not entered",
+      "phase": "whole-session-replay"
+    },
+    "inventories_32_pre_post_passed": true,
+    "owned_temp_root_empty": true,
+    "packet_sha256": "0cc873449903f95e0cc5f1da45d6b707a5158c6b68d54a01378edcf1fe1435f4",
+    "port_18796_free": true,
+    "producer": {
+      "base_main": "6c6ebb85bd7df7445fe4246dba9ddbdd212e3ed3",
+      "commit": "69dcd626a2f946b999753a5a045ea05114e1b015",
+      "manifest_sha256": "f0b0f6ac889377872effe4cf4b7ae893b6e7ebe2e0bedcc85eb2a9f3f10e34e5",
+      "tree": "8ecae08dfe652252ac12f234c6193459f246eb4b"
+    },
+    "report": {
+      "artifact": "capture-output-v4/report.json",
+      "bytes": 2795812,
+      "sha256": "e18d04134467b75397d244aecd4a0311973f22aa7873d3c7da3341604d3622e1"
+    },
+    "root_review_sha256": "d66de549bb72f6eb707967e6ee75ca63b88350df50c385e64dbc806062199bb0",
+    "run_id": "b4-clock2000-browser-capture-prep-20261007-20261007-174221-41d475ac",
+    "runtime_data_loaded_and_hash_verified_during_capture": {
+      "bytes": 3674112,
+      "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+    },
+    "stop": {
+      "capture_exit": 1,
+      "complete": false,
+      "exported_frames": 3310,
+      "last_exported_match_frame": 2002,
+      "observed_cursor": 3309,
+      "owner_exit": 1,
+      "requested_cursor": 3308,
+      "target_match_frame": 2000,
+      "uncompared_tail_rows": 2
+    },
+    "strict_cleanup_passed": true,
+    "timing_pause_resumes": 0,
+    "trace": {
+      "artifact": "capture-output-v4/retail-port.jsonl",
+      "bytes": 12274101,
+      "indices": [
+        0,
+        3309
+      ],
+      "records": 3312,
+      "scene_frames": {
+        "css": 937,
+        "match": 2126,
+        "sss": 247
+      },
+      "session_frames": 3310,
+      "sha256": "7447e94e266704d9920f45f950323a874cc0d8ff634f06f9b7794740cd5b789f"
+    },
+    "unexpected_requests": 0
+  },
+  "capture_preparation_history": {
+    "artifact": "preparation-history-v4.json",
+    "capture_packet_failures_recorded": 5,
+    "historical_runtime_template_checkout_and_source_audit_failures_preserved": true,
+    "prior_source_only_receipt_sha256": "be96dcb6bdc0b65d20cb18585389f55840e00cb9d3052aa6f50427cc23b6a938",
+    "run_id": "b4-clock2000-browser-capture-prep-20261007-20261007-174221-41d475ac",
+    "sha256": "676deded64a41ac53793cdc65442171eab2d04ca26c245f8eb182d5d57da6271"
+  },
+  "comparison": {
+    "authorization_sha256": "b03aa0e06b6780b34e828555e59131bb9ff33eb8ee809ca1202014777d8ed075",
+    "base_main": "6c6ebb85bd7df7445fe4246dba9ddbdd212e3ed3",
+    "boundary_result": "equivalent",
+    "browser_export_validated_through_eof": true,
+    "cli_exit": 1,
+    "cli_exit_interpretation": "Expected for an equivalent bounded prefix with complete=false; not a failed field comparison.",
+    "complete": false,
+    "css_sss_input_order_only": 1184,
+    "execution": {
+      "artifact": "comparison-prep-v3/comparison-execution-v1.json",
+      "bytes": 5139,
+      "sha256": "71cd32b37342f8893ef55b7e7978a2280b7ae550cbd9e32540fe0570ba057217"
+    },
+    "expectations_sha256": "a3619262075427e39460dcf6df0dc87364370a0bbbd6440eaba2990f3f66cceb",
+    "first_difference": null,
+    "fresh_ordered_rejoins": 6,
+    "limits": {
+      "max_bytes": 134217728,
+      "max_records": 24000
+    },
+    "match_fields_compared": [
+      "rng",
+      "match_frame",
+      "pad_state_hex",
+      "fighters",
+      "fighter_entities"
+    ],
+    "match_state_frames_compared": 2124,
+    "match_ticks": [
+      0,
+      2123
+    ],
+    "metadata_preflight_sha256": "c8572070cb97c27c400c3a8db2a6dbe97f4d0d633a90b72f931c678718b56c3c",
+    "nonmatch_fields_compared": [],
+    "packet_sha256": "4de5715f038b4eeec71ab5f718d5b5392ade9b969fddb83f93cca5fcba949af0",
+    "post_target_match_rows_shape_order_only": 2,
+    "preflight_browser_records_validated": 3312,
+    "preflight_source_open_attempts": 0,
+    "preparation_failures": [
+      {
+        "artifact": "comparison-prep-v1/packet-preparation-failure-v1.json",
+        "outcome": "Stopped before packet write after incorrect capture-ID field assumption; no source/CISO/runtime-data read and no comparison.",
+        "sha256": "8f984b80f4e395a2f2d1023a7f39d9370903afb9a36e728ebcb6162d372864c9"
+      },
+      {
+        "artifact": "comparison-prep-v2/packet-preparation-failure-v1.json",
+        "outcome": "Stopped before packet write because its fresh-output check counted its own builder; no source/CISO/runtime-data read and no comparison.",
+        "sha256": "d8ea3410ef48dc6d0919c3c3e3c46b6bb42059b943f4af7a1215024d1b315a90"
+      }
+    ],
+    "producer_commit": "69dcd626a2f946b999753a5a045ea05114e1b015",
+    "producer_tree": "8ecae08dfe652252ac12f234c6193459f246eb4b",
+    "report": {
+      "artifact": "comparison-prep-v3/comparison-report-v1.json",
+      "bytes": 27795,
+      "sha256": "537e999ab165e791ce282ea47b9554759237978660a745a4eafd143ea55913fc"
+    },
+    "result": "incomplete",
+    "root_result_review_sha256": "521c067da80361b9cc37e753c6d0597431aff784b8492ca1ae47f805eb0a5d17",
+    "run_id": "b4-clock2000-browser-capture-prep-20261007-20261007-174221-41d475ac",
+    "scope": "v10-first-match-clock-ordered-lineage",
+    "setup_fields_compared": [
+      "rng",
+      "match_frame",
+      "pad_state_hex",
+      "fighters",
+      "fighter_entities",
+      "declared_setup"
+    ],
+    "setup_records_compared": 1,
+    "source_full_hash_computed": false,
+    "source_prefix": {
+      "bytes": 91371214,
+      "last_sequence": 14728,
+      "records": 14729,
+      "sha256": "3f5eaf2c845a387d22c1da7abf74d0f4e4ca2c40fd8503b31a890f0f3f6b7296"
+    },
+    "source_stat_stable": true,
+    "stderr": {
+      "artifact": "comparison-prep-v3/comparison.stderr-v1.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "artifact": "comparison-prep-v3/comparison.stdout-v1.log",
+      "bytes": 27795,
+      "sha256": "537e999ab165e791ce282ea47b9554759237978660a745a4eafd143ea55913fc"
+    },
+    "whole_session_equivalent": false
+  },
+  "date": "2026-10-07",
+  "issue": 246,
+  "prior_validation": {
+    "docs_only_change_after_validation": true,
+    "footer_reducer_sha256": "457925c9bc87f7daf633425be39672a495f30ad6937f0caeded62cf222e5dbd7",
+    "new_runtime_build_performed": false,
+    "producer_commit": "69dcd626a2f946b999753a5a045ea05114e1b015",
+    "producer_tree": "8ecae08dfe652252ac12f234c6193459f246eb4b",
+    "python_suite": {
+      "elapsed_seconds": 385.789,
+      "log_artifact": "full-unittest-discovery.log",
+      "sha256": "eaf4ea0621902e1f0e527929505d51c37dacaf901f7f4b4a99245db7e2362ea1",
+      "skipped": 151,
+      "status": "completed",
+      "tests": 2039
+    }
+  },
+  "review_receipts": {
+    "capture_result_sha256": "d66de549bb72f6eb707967e6ee75ca63b88350df50c385e64dbc806062199bb0",
+    "comparison_preparer_sha256": "0792c8ee4226b5358f8dd87ae11bdf100bc69ba8939886f7cf417650d151807d",
+    "comparison_result_sha256": "521c067da80361b9cc37e753c6d0597431aff784b8492ca1ae47f805eb0a5d17"
+  },
+  "runtime_reuse": {
+    "a3_build_used": false,
+    "complete_historical_7740_32_file_inventory_available": false,
+    "current_32_artifacts_fresh_inventory_sha256": "7f846350d87c27fd820e95a1e9ad9504774cb8b49df77e34b5f9240b641fdf17",
+    "generated_outputs_matching_7740": [
+      {
+        "bytes": 300352,
+        "name": "gameplay_menu_browser.js",
+        "sha256": "1c7619d300dfa6ac187063f72fa9f4c7d91cfc7d6e9eb8808d2ed773d622429f"
+      },
+      {
+        "bytes": 15742957,
+        "name": "gameplay_menu_browser.wasm",
+        "sha256": "e162cb83255e624501f3bc14403d2d88145dedf2f7bd011999c2a2ad3bec6055"
+      },
+      {
+        "bytes": 3674112,
+        "name": "gameplay_menu_browser.data",
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      }
+    ],
+    "native_target_input_delta": [],
+    "producer_commit": "7740c7e22ae9262326ff306339ca35278aaa4638",
+    "producer_tree": "724c2857acc1de4b15d05fd796a8d879148a16e6",
+    "reuse_proof_sha256": "92e4ce3472d8f727760ead40b532f96e779386be22f7e009841aca97bf9f9af3",
+    "root_reuse_review_sha256": "a7562eaae806d3a15e0b551422221c03a102afc384f8c1f90e6018797e3d506b",
+    "unchanged_web_source_copies": 29
+  },
+  "schema": "melee-web-b4-v10-first-match-clock2000-comparison-v1",
+  "scope": {
+    "boundary_result": "equivalent",
+    "cli_exit": 1,
+    "complete": false,
+    "evidence_labels": [
+      "Compiled",
+      "Source identified",
+      "Retail compared",
+      "Browser exercised"
+    ],
+    "limitations": [
+      "CSS/SSS rows establish consumed-input order only; no nonmatch fields were compared.",
+      "Two exported match rows after the target received shape/order checks only; their state was not compared.",
+      "No later match, Results, return-to-CSS, whole-session, pixel, PCM, live timing, performance, physical input, competitive-readiness or admission claim."
+    ],
+    "result": "incomplete",
+    "whole_session_equivalent": false
+  },
+  "source": {
+    "audit_artifact": "clock2000-source-audit-v4.json",
+    "audit_producer_commit": "ca10b90becbec78255155c1cfc02eb9565f27bbe",
+    "audit_producer_tree": "0b07b86108869826cf0af31d0760b94773a2c47d",
+    "audit_run_id": "b4-clock2000-source-audit-canonical-20261007-ca10b90-r1",
+    "audit_sha256": "019d86cd96de13aa7b7b3de4a64c0bfbca6c04d580dcc3ad4b2e188ee3af8ca1",
+    "capture_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "first_entry_sequence": 4088,
+    "first_setup_sequence": 4113,
+    "first_source_tick_sequence": 4115,
+    "fresh_comparison_prefix": {
+      "bytes": 91371214,
+      "first_tick": 0,
+      "last_sequence": 14728,
+      "records": 14729,
+      "sha256": "3f5eaf2c845a387d22c1da7abf74d0f4e4ca2c40fd8503b31a890f0f3f6b7296"
+    },
+    "full_trace": {
+      "artifact": "capture.mwro",
+      "recorded_bytes": 2137257881,
+      "recorded_sha256": "81f8a0a3c8cac644e86be2e07451a5876be08b60ebb4295290a35c8a187c5580",
+      "rehashed_during_comparison": false,
+      "stat_stable_during_bounded_read": true
+    },
+    "manifest_sha256": "c88f0e2cbd1fd79d28cb9cd554ce1b34ca2b858262d6032a327c08c46b941da7",
+    "ordered_rejoins": [
+      {
+        "audit_sha256": "9e74c7018001369295e569ef071427633db53e2a0e6dc1db182c8aa3604d096d",
+        "browser_cursor": 1309,
+        "label": "clock1",
+        "match_frame": 1,
+        "pad_consume_sequence": 4734,
+        "prefix_bytes": 10389712,
+        "prefix_records": 4736,
+        "prefix_sha256": "24d520abccf98ee109b3cee2ae67767d4363c7e941d688c3534c0cbfdd7cde4a",
+        "rejoined_before_continuing": true,
+        "source_sequence": 4735,
+        "source_tick": 124,
+        "timeline_frame_index": 1308
+      },
+      {
+        "audit_sha256": "c4f2bd73157f36c80c7ad5b11275c205d484608813241d3af94b9462bf3187b1",
+        "browser_cursor": 1368,
+        "label": "clock60",
+        "match_frame": 60,
+        "pad_consume_sequence": 5029,
+        "prefix_bytes": 12780628,
+        "prefix_records": 5031,
+        "prefix_sha256": "32b763453688c6335b90c9807b71c79d919b85e6e7435a3c2abccd1792f00e77",
+        "rejoined_before_continuing": true,
+        "source_sequence": 5030,
+        "source_tick": 183,
+        "timeline_frame_index": 1367
+      },
+      {
+        "audit_sha256": "503e1d5c54262fa1c3369aae0e950f646890f98dea4598a9823cd1e0d06f34bb",
+        "browser_cursor": 1608,
+        "label": "clock300",
+        "match_frame": 300,
+        "pad_consume_sequence": 6229,
+        "prefix_bytes": 22506388,
+        "prefix_records": 6231,
+        "prefix_sha256": "ef9569c32524aa79443a998867c4c418a2cfd8b21719ed24b03fc966ded025ef",
+        "rejoined_before_continuing": true,
+        "source_sequence": 6230,
+        "source_tick": 423,
+        "timeline_frame_index": 1607
+      },
+      {
+        "audit_sha256": "b5cc71c227bd619e14407f2535d9e38063cf142c33936df221f16759cf9b91f4",
+        "browser_cursor": 1808,
+        "label": "clock500",
+        "match_frame": 500,
+        "pad_consume_sequence": 7229,
+        "prefix_bytes": 30611188,
+        "prefix_records": 7231,
+        "prefix_sha256": "ec1ceb5c56c87ec35b5dd8cd0d318c85b1917d554871883732de4d2e4f52e7b6",
+        "rejoined_before_continuing": true,
+        "source_sequence": 7230,
+        "source_tick": 623,
+        "timeline_frame_index": 1807
+      },
+      {
+        "audit_sha256": "521e00f57aac27a999619d5adb3aa6fe6fa86e5c4f774b8f211cd002f9bcb632",
+        "browser_cursor": 2308,
+        "label": "clock1000",
+        "match_frame": 1000,
+        "pad_consume_sequence": 9729,
+        "prefix_bytes": 50873188,
+        "prefix_records": 9731,
+        "prefix_sha256": "7f71d2c8c9529e8171dfab854cd114abb0eef44ca8d59c6f7e96af5495d13cf7",
+        "rejoined_before_continuing": true,
+        "source_sequence": 9730,
+        "source_tick": 1123,
+        "timeline_frame_index": 2307
+      },
+      {
+        "audit_sha256": "019d86cd96de13aa7b7b3de4a64c0bfbca6c04d580dcc3ad4b2e188ee3af8ca1",
+        "browser_cursor": 3308,
+        "label": "target",
+        "match_frame": 2000,
+        "pad_consume_sequence": 14727,
+        "prefix_bytes": 91371214,
+        "prefix_records": 14729,
+        "prefix_sha256": "3f5eaf2c845a387d22c1da7abf74d0f4e4ca2c40fd8503b31a890f0f3f6b7296",
+        "rejoined_before_continuing": true,
+        "source_sequence": 14728,
+        "source_tick": 2123,
+        "timeline_frame_index": 3307
+      }
+    ],
+    "recipe": {
+      "bytes": 2241622,
+      "frame_count": 50394,
+      "seed": 3336171383,
+      "sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b",
+      "version": 10
+    },
+    "report_sha256": "88a8ca551d2077f200fbcf4670836357e508fdb503d7b360e8b3b67654911913",
+    "revision": "GALE01r2",
+    "sequence_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "setup_identity_audit_sha256": "742a9a6b7317651c654620c1f69c87cff4177a8c9e7eea8c34d596e817af43e8",
+    "source_audit_root_review_sha256": "ce0703a03e517d3bafae6a3bb2a348ca91df763543acf51bf708f9471fda9a13",
+    "source_only_receipt_sha256": "be96dcb6bdc0b65d20cb18585389f55840e00cb9d3052aa6f50427cc23b6a938"
+  }
+}
