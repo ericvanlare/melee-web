@@ -3303,6 +3303,30 @@ void run_stadium_e8_request(
                         "diagnostic-source-ordered-pstadium", &selected,
                         &on_init.seed_after_on_init);
 
+            // Publish the already checked copied observations before retirement.
+            // Pointer values below are historical identities only: never follow
+            // them after StageLast has removed the corresponding source objects.
+            std::fprintf(stderr,
+                "C1_ONINIT_CAPTURE count=%u failed=%d overflowed=%d map2_origin=%d map2_buffer=%p map2_read=%d map2_live=%d map2_bytes=%u map2_world=%llu map2_allocation=%llu ground_buffer=%p ground_read=%d ground_bytes=%u ground_world=%llu ground_allocation=%llu\n",
+                on_init.source_journal.count, on_init.source_journal.failed,
+                on_init.source_journal.overflowed, static_cast<int>(on_init.map2_owner.origin),
+                on_init.map2_owner.buffer, on_init.map2_allocation_status_before_end,
+                on_init.map2_before_end.live, on_init.map2_before_end.requested_bytes,
+                static_cast<unsigned long long>(on_init.map2_before_end.world_generation),
+                static_cast<unsigned long long>(on_init.map2_before_end.allocation_generation),
+                on_init.ground_storage_live.payload,
+                on_init.ground_storage_allocation_status_before_end,
+                on_init.ground_storage_before_end.requested_bytes,
+                static_cast<unsigned long long>(on_init.ground_storage_before_end.world_generation),
+                static_cast<unsigned long long>(on_init.ground_storage_before_end.allocation_generation));
+            for (size_t i = 0; i < on_init.source_journal.count; ++i) {
+                const auto& event = on_init.source_journal.events[i];
+                std::fprintf(stderr, "C1_ONINIT_CAPTURE_TAP index=%zu kind=%s map_id=%d gobj=%p\n",
+                    i, stadium_source_event_kind_name(event.kind), event.map_id,
+                    static_cast<void*>(event.gobj));
+            }
+            std::fflush(stderr);
+
             const auto class_counts_before_end = on_init.class_counts_before;
             const auto pool_counts_before_end = on_init.pool_counts_before;
             const auto roots_before_end = on_init.roots_before;
@@ -3374,38 +3398,75 @@ void run_stadium_e8_request(
                               on_init.map2_before_end.live,
                       "Original OnInit teardown changed a borrowed preload buffer lease");
             }
-            check(on_init.stats_after_end.generation ==
-                      on_init.stats_before_init.generation &&
-                      on_init.stats_after_end.ticks == on_init.stats_before_init.ticks &&
-                      on_init.stats_after_end.objects ==
-                          on_init.stats_before_init.objects &&
-                      on_init.stats_after_end.processes ==
-                          on_init.stats_before_init.processes &&
-                      on_init.stats_after_end.heap_free_bytes ==
-                          on_init.stats_before_init.heap_free_bytes &&
-                      on_init.memory_after_end.allocation_generation_watermark ==
-                          on_init.memory_before_end.allocation_generation_watermark &&
-                      on_init.memory_after_end.source_heap_handle ==
-                          on_init.memory_before_init.source_heap_handle &&
-                      on_init.memory_after_end.world_generation ==
-                          on_init.memory_before_init.world_generation &&
-                      source_stage_registry_empty() &&
-                      source_stage_gobj_count() == stage_gobj_count_before_end &&
-                      source_stage_markers_empty() &&
-                      melee_web_stadium_c1_stage_object_failures() == 0 &&
-                      HSD_ObjAllocGetUsing(&gobj_alloc_data) ==
-                          gobj_pool_before_end &&
-                      HSD_ObjAllocGetUsing(&gobjproc_alloc_data) ==
-                          proc_pool_before_end &&
-                      HSD_GObj_804D783C == scheduler_cycle_before_end &&
-                      melee_web::test::stadium_screen::live_class_counts() == class_counts_before_end &&
-                      melee_web::test::stadium_screen::live_pool_counts() == pool_counts_before_end &&
-                      melee_web::test::stadium_screen::runtime_roots_snapshot() == roots_before_end &&
-                      melee_web_stadium_c1_ft_device_snapshot_matches(
-                          on_init.device_snapshot) &&
-                      melee_web_source_memory_healthy() &&
-                      ground_dispatch_quiet(),
-                  "Original OnInit teardown did not restore source lists, pools, ticks, leases, or typed devices");
+            // Keep the original left-to-right, fail-first conjunction order.
+            // Every baseline and exact equality remains unchanged; do not read
+            // later runtime graphs when an earlier scalar condition has failed.
+            const char* const teardown_error =
+                "Original OnInit teardown did not restore source lists, pools, ticks, leases, or typed devices";
+            auto equal = [&](const char* field, auto actual, auto expected) {
+                if (actual != expected) {
+                    std::cerr << "C1_TEARDOWN_DIFFERENCE field=" << field
+                              << " expected=" << expected << " observed=" << actual << '\n';
+                    std::cerr.flush();
+                }
+                check(actual == expected, teardown_error);
+            };
+            equal("generation", on_init.stats_after_end.generation, on_init.stats_before_init.generation);
+            equal("ticks", on_init.stats_after_end.ticks, on_init.stats_before_init.ticks);
+            equal("objects", on_init.stats_after_end.objects, on_init.stats_before_init.objects);
+            equal("processes", on_init.stats_after_end.processes, on_init.stats_before_init.processes);
+            equal("heap_free_bytes", on_init.stats_after_end.heap_free_bytes, on_init.stats_before_init.heap_free_bytes);
+            equal("allocation_generation_watermark", on_init.memory_after_end.allocation_generation_watermark,
+                  on_init.memory_before_end.allocation_generation_watermark);
+            equal("source_heap_handle", on_init.memory_after_end.source_heap_handle, on_init.memory_before_init.source_heap_handle);
+            equal("world_generation", on_init.memory_after_end.world_generation, on_init.memory_before_init.world_generation);
+            equal("stage_registry_empty", source_stage_registry_empty(), true);
+            equal("stage_gobj_count", source_stage_gobj_count(), stage_gobj_count_before_end);
+            equal("stage_markers_empty", source_stage_markers_empty(), true);
+            equal("stage_object_failures", melee_web_stadium_c1_stage_object_failures(), uint32_t{0});
+            equal("gobj_pool_used", HSD_ObjAllocGetUsing(&gobj_alloc_data), gobj_pool_before_end);
+            equal("proc_pool_used", HSD_ObjAllocGetUsing(&gobjproc_alloc_data), proc_pool_before_end);
+            equal("scheduler_cycle", HSD_GObj_804D783C, scheduler_cycle_before_end);
+            const auto classes_after_end = melee_web::test::stadium_screen::live_class_counts();
+            if (classes_after_end != class_counts_before_end) {
+                // Compare copied map keys/counts without dereferencing class identities.
+                for (const auto& [identity, expected] : class_counts_before_end) {
+                    const auto found = classes_after_end.find(identity);
+                    const auto actual = found == classes_after_end.end() ? 0 : found->second;
+                    if (actual != expected)
+                        std::cerr << "C1_TEARDOWN_DIFFERENCE field=live_class_counts identity="
+                                  << static_cast<void*>(identity) << " expected=" << expected << " observed=" << actual << '\n';
+                }
+                for (const auto& [identity, actual] : classes_after_end)
+                    if (!class_counts_before_end.contains(identity))
+                        std::cerr << "C1_TEARDOWN_DIFFERENCE field=live_class_counts identity="
+                                  << static_cast<void*>(identity) << " expected=0 observed=" << actual << '\n';
+                std::cerr.flush();
+            }
+            check(classes_after_end == class_counts_before_end, teardown_error);
+            const auto pools_after_end = melee_web::test::stadium_screen::live_pool_counts();
+            for (size_t i = 0; i < pools_after_end.size(); ++i)
+                if (pools_after_end[i] != pool_counts_before_end[i])
+                    std::cerr << "C1_TEARDOWN_DIFFERENCE field=live_pool_counts index=" << i
+                              << " expected=" << pool_counts_before_end[i] << " observed=" << pools_after_end[i] << '\n';
+            std::cerr.flush();
+            check(pools_after_end == pool_counts_before_end, teardown_error);
+            const auto roots_after_end = melee_web::test::stadium_screen::runtime_roots_snapshot();
+            if (roots_after_end != roots_before_end) {
+                std::cerr << "C1_TEARDOWN_DIFFERENCE field=runtime_roots bytes_expected=" << roots_before_end.size()
+                          << " bytes_observed=" << roots_after_end.size();
+                for (size_t i = 0; i < std::min(roots_before_end.size(), roots_after_end.size()); ++i)
+                    if (roots_before_end[i] != roots_after_end[i]) {
+                        std::cerr << " first_byte_offset=" << i << " expected=" << unsigned(roots_before_end[i])
+                                  << " observed=" << unsigned(roots_after_end[i]);
+                        break;
+                    }
+                std::cerr << '\n';std::cerr.flush();
+            }
+            check(roots_after_end == roots_before_end, teardown_error);
+            equal("ft_device_snapshot_matches", melee_web_stadium_c1_ft_device_snapshot_matches(on_init.device_snapshot), 1);
+            equal("source_memory_healthy", melee_web_source_memory_healthy(), 1);
+            equal("ground_dispatch_quiet", ground_dispatch_quiet(), true);
             check(melee_web_stadium_c1_ft_device_snapshot_release(
                       on_init.device_snapshot),
                   "Could not release restored OnInit ftDevice snapshot");
