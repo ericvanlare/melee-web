@@ -5580,7 +5580,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807d
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..253cf269ca8b49bb5da380db73211656976724b1 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..dba97568f6d52ecb24096c4ca848db96c97177ba 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,15 @@
@@ -7565,7 +7565,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..253cf269ca8b49bb5da380db73211656
 +                    stadium_owner_note_map2_buffer_use(stored);
 +                else if (failure_kind == 5)
 +                    fixture.map2_ground_data.u.stadium.xCC =
-+                        fixture.map2_fallback_buffer;
++                        (HSD_MObj*) fixture.map2_fallback_buffer;
 +            }
 +        }
 +        const size_t before = stadium_owner_control_entity_count();
