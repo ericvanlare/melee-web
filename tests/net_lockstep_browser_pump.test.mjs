@@ -429,7 +429,7 @@ test('progress observer failure becomes sticky controller failure and a native p
 
 
 const browserSource = await readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
-const intervalSource = browserSource.slice(browserSource.indexOf('async function observeNativePumpWithoutRpc('),
+const intervalSource = browserSource.slice(browserSource.indexOf('function nativePumpChecksumEvidence('),
   browserSource.indexOf('async function pollRun('));
 async function runActualInterval({completedBefore = false, injectedRpc = false, stalled = false, failure = null} = {}) {
   let rounds = 0, now = 0;
@@ -448,7 +448,7 @@ async function runActualInterval({completedBefore = false, injectedRpc = false, 
     readPeerSnapshot: async () => makeSnapshot(role),
     peerRpc: () => { throw Error('test must never invoke peer RPC'); },
   };
-  const context = vm.createContext({instances, pairResults, sourceTicks: 8, usedInputs: 6, stallMs: 3,
+  const context = vm.createContext({instances, pairResults, runtimeOwned: false, NET_RECORD_BYTES: 64, sourceTicks: 8, usedInputs: 6, stallMs: 3,
     pollMs: 1, deadline: 100, Date: {now: () => now}, verifyPositivePeerCompletion,
     checkedHealth: async role => ({status: {active: 1, cursor: makeSnapshot(role).exportRecords,
       blocker: makeSnapshot(role).exportRecords === 8 ? 'complete' : 'network_wait', terminal: {kind: 0}}, native: {phase: 1}}),
