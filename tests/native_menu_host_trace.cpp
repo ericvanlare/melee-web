@@ -2083,6 +2083,12 @@ void run_trophy_baseline_smoke(const melee_web::RuntimeFiles& files)
 void run_stadium_profile_controls()
 {
     using namespace melee_web;
+    check(melee_web_stadium_display_provenance_controls(),
+          "Shared Stadium image assignment lost mixed preload/fallback provenance");
+    check(melee_web_stadium_display_list_controls(),
+          "Stadium SIS owner list controls changed a foreign text/context chain");
+    check(melee_web_stadium_display_owner_retirement_controls(),
+          "Stadium display owner refused mixed-buffer retirement or lost partial ownership");
     const auto* profile = melee_web_stage_stadium_profile_data();
     check(profile && melee_web_stage_profile(St_Kind_PStadium) == profile &&
               profile->diagnostic_only && profile->source != nullptr,
@@ -2132,8 +2138,18 @@ void run_stadium_profile_controls()
               std::string_view(error) ==
                   "Diagnostic-only stage profile requires its explicit OnInit boundary",
           "Ordinary stage-begin API did not reject the diagnostic Stadium profile");
+    MeleeWebStageLast* rejected_stage =
+        reinterpret_cast<MeleeWebStageLast*>(uintptr_t{0x7008});
     check(melee_web_stage_begin_kind_on_init_diagnostic(
-              St_Kind_Last, nullptr, nullptr, error, sizeof(error)) == nullptr &&
+              St_Kind_Last, nullptr, nullptr, &rejected_stage, error, sizeof(error)) == nullptr &&
+              rejected_stage == reinterpret_cast<MeleeWebStageLast*>(uintptr_t{0x7008}) &&
+              std::string_view(error) ==
+                  "OnInit-only retained-owner output slot must be empty",
+          "Rejected OnInit begin erased the caller's retained-owner handle");
+    rejected_stage = nullptr;
+    check(melee_web_stage_begin_kind_on_init_diagnostic(
+              St_Kind_Last, nullptr, nullptr, &rejected_stage, error, sizeof(error)) == nullptr &&
+              rejected_stage == nullptr &&
               std::string_view(error) ==
                   "OnInit-only stage boundary is limited to the diagnostic Stadium profile",
           "OnInit-only boundary accepted a non-Stadium source profile");

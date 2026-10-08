@@ -5580,12 +5580,17 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807d
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..9973393ef39e2a48e89abc0973d7f9a2fdcb6338 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c0ad0123dfa4ddf005c8575f674b992c85f32c93 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
-@@ -1,5 +1,10 @@
+@@ -1,5 +1,15 @@
  #include "grpstadium.h"
  
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++#include "gameplay_stadium_display_owner.h"
++#include "gameplay_vs_sis.h"
++#endif
++
 +#if defined(MELEE_WEB_GAMEPLAY)
 +#include <stddef.h>
 +#include "gameplay_source_preload.h"
@@ -5594,7 +5599,28 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..9973393ef39e2a48e89abc0973d7f9a2
  #include <sysdolphin/baselib/forward.h>
  
  #include "granime.h"
-@@ -64,6 +69,16 @@ static struct grPStadium_YakumonoParam {
+@@ -11,8 +21,12 @@
+ #include "stage.h"
+ #include "types.h"
+ #include <dolphin/gx/GXStruct.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
+ #include <melee/cm/camera.h>
+ #include <melee/ft/ftlib.h>
++#include <melee/gr/ground.h>
+ #include <melee/gm/gm_unsplit.h>
+ #include <melee/lb/lb_00B0.h>
+ #include <melee/lb/lb_00F9.h>
+@@ -29,6 +43,7 @@
+ #include <sysdolphin/baselib/fog.h>
+ #include <sysdolphin/baselib/gobjgxlink.h>
+ #include <sysdolphin/baselib/gobjobject.h>
++#include <sysdolphin/baselib/gobjplink.h>
+ #include <sysdolphin/baselib/gobjproc.h>
+ #include <sysdolphin/baselib/gobjuserdata.h>
+ #include <sysdolphin/baselib/jobj.h>
+@@ -64,6 +79,16 @@ static struct grPStadium_YakumonoParam {
      s16 x50;
  }* yakumono_param;
  
@@ -5611,7 +5637,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..9973393ef39e2a48e89abc0973d7f9a2
  GrJoint grPs_803E1248[] = {
      { 1, 3, 0 }, { 2, 3, 0 }, { 3, 4, 0 },
      { 4, 5, 0 }, { 5, 6, 0 }, { 7, 9, 0 },
-@@ -652,6 +667,38 @@ typedef struct ImageDescWrapper {
+@@ -652,6 +677,38 @@ typedef struct ImageDescWrapper {
      u16 x1A, x1C;
  } ImageDescWrapper;
  
@@ -5650,6 +5676,1511 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..9973393ef39e2a48e89abc0973d7f9a2
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
+@@ -920,6 +977,1417 @@ typedef struct TextWrapper {
+     HSD_Text* win_dynamic_p;
+ } TextWrapper;
+ 
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++typedef struct StadiumTextNodeIdentity {
++    HSD_Text* node;
++    HSD_Text* next;
++} StadiumTextNodeIdentity;
++
++typedef struct StadiumSisContextIdentity {
++    sislib_UnkAlloc3* node;
++    sislib_UnkAlloc3* next;
++} StadiumSisContextIdentity;
++
++typedef enum StadiumDisplayOwnerState {
++    STADIUM_DISPLAY_OWNER_PREPARED,
++    STADIUM_DISPLAY_OWNER_BOUND,
++    STADIUM_DISPLAY_OWNER_CAPTURED,
++} StadiumDisplayOwnerState;
++
++struct MeleeWebStadiumDisplayOwner {
++    StadiumDisplayOwnerState state;
++    int capture_attempted;
++    int journal_failed;
++    HSD_GObj* children[3];
++    void* wrappers[3];
++    MeleeWebStadiumImageProvenance images[3];
++    HSD_Text* texts[2];
++    HSD_GObj* renderers[2];
++    sislib_UnkAlloc3* context;
++    SIS* source_sis;
++    HSD_GObj* display_ground;
++    Ground* display_ground_data;
++    HSD_Text* text_head_before;
++    StadiumTextNodeIdentity* text_before;
++    size_t text_count_before;
++    sislib_UnkAlloc3* context_head_before;
++    StadiumSisContextIdentity* context_before;
++    size_t context_count_before;
++};
++
++static MeleeWebStadiumDisplayOwner* stadium_display_owner_current;
++
++static int stadium_owner_error(char* error, size_t error_size,
++                               const char* message)
++{
++    if (error != NULL && error_size != 0) snprintf(error, error_size, "%s", message);
++    return 0;
++}
++
++static int stadium_owner_slot_is_empty(int private_archive_absent,
++                                       const SIS* current)
++{
++    return private_archive_absent && current == NULL;
++}
++
++static int stadium_owner_slot_is_exact(int private_archive_absent,
++                                       const SIS* current,
++                                       const SIS* expected)
++{
++    return private_archive_absent && expected != NULL && current == expected;
++}
++
++static int stadium_text_list_count(HSD_Text* head, size_t* count)
++{
++    HSD_Text* slow = head;
++    HSD_Text* fast = head;
++    while (fast != NULL && fast->next != NULL) {
++        slow = slow->next;
++        fast = fast->next->next;
++        if (slow == fast) return 0;
++    }
++    *count = 0;
++    for (HSD_Text* node = head; node != NULL; node = node->next) {
++        if (*count == SIZE_MAX) return 0;
++        ++*count;
++    }
++    return 1;
++}
++
++static int stadium_context_list_count(sislib_UnkAlloc3* head, size_t* count)
++{
++    sislib_UnkAlloc3* slow = head;
++    sislib_UnkAlloc3* fast = head;
++    while (fast != NULL && fast->x0 != NULL) {
++        slow = slow->x0;
++        fast = fast->x0->x0;
++        if (slow == fast) return 0;
++    }
++    *count = 0;
++    for (sislib_UnkAlloc3* node = head; node != NULL; node = node->x0) {
++        if (*count == SIZE_MAX) return 0;
++        ++*count;
++    }
++    return 1;
++}
++
++static void stadium_owner_release_bookkeeping(MeleeWebStadiumDisplayOwner* owner)
++{
++    if (owner == NULL) return;
++    free(owner->text_before);
++    free(owner->context_before);
++    free(owner);
++}
++
++static int stadium_owner_text_topology_matches_head(
++    const MeleeWebStadiumDisplayOwner* owner, HSD_Text* head,
++    int with_owned_texts)
++{
++    HSD_Text* current = head;
++    if (owner->text_count_before != 0) {
++        if (current != owner->text_before[0].node) return 0;
++        for (size_t i = 0; i < owner->text_count_before; ++i) {
++            HSD_Text* const expected_next = i + 1 < owner->text_count_before
++                ? owner->text_before[i + 1].node
++                : with_owned_texts ? owner->texts[0] : NULL;
++            if (current != owner->text_before[i].node ||
++                current->next != expected_next ||
++                owner->text_before[i].node->next !=
++                    (i + 1 < owner->text_count_before
++                         ? owner->text_before[i + 1].node
++                         : with_owned_texts ? owner->texts[0]
++                                            : owner->text_before[i].next))
++                return 0;
++            current = current->next;
++        }
++    } else if (with_owned_texts) {
++        if (current != owner->texts[0]) return 0;
++    } else if (current != owner->text_head_before) {
++        return 0;
++    }
++    if (!with_owned_texts) return current == NULL;
++    if (current != owner->texts[0] || owner->texts[0] == NULL ||
++        owner->texts[1] == NULL || owner->texts[0]->next != owner->texts[1] ||
++        owner->texts[1]->next != NULL)
++        return 0;
++    return 1;
++}
++
++static int stadium_owner_text_topology_matches(
++    const MeleeWebStadiumDisplayOwner* owner, int with_owned_texts)
++{
++    return stadium_owner_text_topology_matches_head(
++        owner, HSD_SisLib_804D7978, with_owned_texts);
++}
++
++static int stadium_owner_context_topology_matches_head(
++    const MeleeWebStadiumDisplayOwner* owner, sislib_UnkAlloc3* head,
++    int with_owned_context)
++{
++    sislib_UnkAlloc3* current = head;
++    if (owner->context_count_before != 0) {
++        if (current != owner->context_before[0].node) return 0;
++        for (size_t i = 0; i < owner->context_count_before; ++i) {
++            sislib_UnkAlloc3* const expected_next =
++                i + 1 < owner->context_count_before
++                    ? owner->context_before[i + 1].node
++                    : with_owned_context ? owner->context :
++                                           owner->context_before[i].next;
++            if (current != owner->context_before[i].node ||
++                current->x0 != expected_next)
++                return 0;
++            current = current->x0;
++        }
++    } else if (with_owned_context) {
++        if (current != owner->context) return 0;
++    } else if (current != owner->context_head_before) {
++        return 0;
++    }
++    if (!with_owned_context) return current == NULL;
++    return current == owner->context && owner->context != NULL &&
++           owner->context->x0 == NULL;
++}
++
++static int stadium_owner_context_topology_matches(
++    const MeleeWebStadiumDisplayOwner* owner, int with_owned_context)
++{
++    return stadium_owner_context_topology_matches_head(
++        owner, HSD_SisLib_804D797C, with_owned_context);
++}
++
++static int stadium_owner_has_font1_before(
++    const MeleeWebStadiumDisplayOwner* owner)
++{
++    for (size_t i = 0; i < owner->text_count_before; ++i)
++        if (owner->text_before[i].node->font_idx == 1) return 1;
++    for (size_t i = 0; i < owner->context_count_before; ++i)
++        if (owner->context_before[i].node->xA == 1) return 1;
++    return 0;
++}
++
++static int stadium_owner_copy_baselines(MeleeWebStadiumDisplayOwner* owner)
++{
++    if (!stadium_text_list_count(HSD_SisLib_804D7978,
++                                 &owner->text_count_before) ||
++        !stadium_context_list_count(HSD_SisLib_804D797C,
++                                    &owner->context_count_before))
++        return 0;
++    if (owner->text_count_before > SIZE_MAX / sizeof(*owner->text_before) ||
++        owner->context_count_before > SIZE_MAX / sizeof(*owner->context_before))
++        return 0;
++    if (owner->text_count_before != 0) {
++        owner->text_before = malloc(owner->text_count_before *
++                                    sizeof(*owner->text_before));
++        if (owner->text_before == NULL) return 0;
++    }
++    if (owner->context_count_before != 0) {
++        owner->context_before = malloc(owner->context_count_before *
++                                       sizeof(*owner->context_before));
++        if (owner->context_before == NULL) return 0;
++    }
++    owner->text_head_before = HSD_SisLib_804D7978;
++    owner->context_head_before = HSD_SisLib_804D797C;
++    size_t i = 0;
++    for (HSD_Text* node = owner->text_head_before; node != NULL;
++         node = node->next) {
++        owner->text_before[i].node = node;
++        owner->text_before[i].next = node->next;
++        ++i;
++    }
++    i = 0;
++    for (sislib_UnkAlloc3* node = owner->context_head_before; node != NULL;
++         node = node->x0) {
++        owner->context_before[i].node = node;
++        owner->context_before[i].next = node->x0;
++        ++i;
++    }
++    return 1;
++}
++
++static int stadium_owner_text_topology_unchanged(
++    const MeleeWebStadiumDisplayOwner* owner)
++{
++    if (HSD_SisLib_804D7978 != owner->text_head_before) return 0;
++    HSD_Text* current = owner->text_head_before;
++    for (size_t i = 0; i < owner->text_count_before; ++i) {
++        if (current != owner->text_before[i].node ||
++            current->next != owner->text_before[i].next)
++            return 0;
++        current = current->next;
++    }
++    return current == NULL;
++}
++
++static int stadium_owner_context_topology_unchanged(
++    const MeleeWebStadiumDisplayOwner* owner)
++{
++    if (HSD_SisLib_804D797C != owner->context_head_before) return 0;
++    sislib_UnkAlloc3* current = owner->context_head_before;
++    for (size_t i = 0; i < owner->context_count_before; ++i) {
++        if (current != owner->context_before[i].node ||
++            current->x0 != owner->context_before[i].next)
++            return 0;
++        current = current->x0;
++    }
++    return current == NULL;
++}
++
++int melee_web_stadium_display_list_controls(void)
++{
++    HSD_Text foreign_text[2] = { 0 };
++    HSD_Text owned_text[2] = { 0 };
++    HSD_Text wrong_text = { 0 };
++    sislib_UnkAlloc3 foreign_context[2] = { 0 };
++    sislib_UnkAlloc3 owned_context = { 0 };
++    StadiumTextNodeIdentity text_identity[2];
++    StadiumSisContextIdentity context_identity[2];
++    MeleeWebStadiumDisplayOwner owner = { 0 };
++
++    foreign_text[0].next = &foreign_text[1];
++    foreign_context[0].x0 = &foreign_context[1];
++    owner.text_head_before = &foreign_text[0];
++    owner.text_before = text_identity;
++    owner.text_count_before = 2;
++    owner.context_head_before = &foreign_context[0];
++    owner.context_before = context_identity;
++    owner.context_count_before = 2;
++    owner.texts[0] = &owned_text[0];
++    owner.texts[1] = &owned_text[1];
++    owner.context = &owned_context;
++    text_identity[0] = (StadiumTextNodeIdentity){
++        &foreign_text[0], &foreign_text[1]
++    };
++    text_identity[1] = (StadiumTextNodeIdentity){ &foreign_text[1], NULL };
++    context_identity[0] = (StadiumSisContextIdentity){
++        &foreign_context[0], &foreign_context[1]
++    };
++    context_identity[1] = (StadiumSisContextIdentity){ &foreign_context[1], NULL };
++
++    foreign_text[1].next = &owned_text[0];
++    owned_text[0].next = &owned_text[1];
++    foreign_context[1].x0 = &owned_context;
++    if (!stadium_owner_text_topology_matches_head(&owner, &foreign_text[0], 1) ||
++        !stadium_owner_context_topology_matches_head(
++            &owner, &foreign_context[0], 1))
++        return 0;
++    foreign_text[0].next = &owned_text[0];
++    if (stadium_owner_text_topology_matches_head(&owner, &foreign_text[0], 1))
++        return 0;
++    foreign_text[0].next = &foreign_text[1];
++    foreign_text[1].next = &wrong_text;
++    if (stadium_owner_text_topology_matches_head(&owner, &foreign_text[0], 1))
++        return 0;
++    foreign_text[1].next = &owned_text[0];
++    owned_text[0].next = &owned_text[1];
++    owned_text[1].next = NULL;
++    foreign_context[0].x0 = &owned_context;
++    if (stadium_owner_context_topology_matches_head(
++            &owner, &foreign_context[0], 1))
++        return 0;
++    foreign_context[0].x0 = &foreign_context[1];
++    foreign_context[1].x0 = NULL;
++    owned_context.x0 = NULL;
++    if (!stadium_owner_text_topology_matches_head(&owner, &foreign_text[0], 0) ||
++        !stadium_owner_context_topology_matches_head(
++            &owner, &foreign_context[0], 0))
++        return 0;
++    if (!stadium_owner_slot_is_empty(1, NULL) ||
++        stadium_owner_slot_is_empty(0, NULL) ||
++        stadium_owner_slot_is_empty(1, (SIS*) (uintptr_t) 0x7010) ||
++        !stadium_owner_slot_is_exact(1, (SIS*) (uintptr_t) 0x7020,
++                                     (SIS*) (uintptr_t) 0x7020) ||
++        stadium_owner_slot_is_exact(1, NULL, (SIS*) (uintptr_t) 0x7020) ||
++        stadium_owner_slot_is_exact(0, (SIS*) (uintptr_t) 0x7020,
++                                    (SIS*) (uintptr_t) 0x7020) ||
++        stadium_owner_slot_is_exact(1, (SIS*) (uintptr_t) 0x7030,
++                                    (SIS*) (uintptr_t) 0x7020))
++        return 0;
++    if (stadium_owner_has_font1_before(&owner)) return 0;
++    foreign_text[0].font_idx = 1;
++    if (!stadium_owner_has_font1_before(&owner)) return 0;
++    foreign_text[0].font_idx = 0;
++    foreign_context[0].xA = 1;
++    if (!stadium_owner_has_font1_before(&owner)) return 0;
++    return 1;
++}
++
++static int stadium_owner_gobj_list_contains(const HSD_GObj* expected,
++                                            u8* found_link)
++{
++    if (expected == NULL || HSD_GObj_Entities == NULL)
++        return 0;
++    for (u32 link = 0; link <= HSD_GObjLibInitData.p_link_max; ++link) {
++        for (HSD_GObj* object = ((HSD_GObj**) HSD_GObj_Entities)[link];
++             object != NULL; object = object->next) {
++            if (object == expected) {
++                if (found_link != NULL) *found_link = (u8) link;
++                return 1;
++            }
++        }
++    }
++    return 0;
++}
++
++static int stadium_owner_gobj_linked(const HSD_GObj* expected, u8 p_link)
++{
++    if (expected == NULL || HSD_GObj_Entities == NULL ||
++        p_link > HSD_GObjLibInitData.p_link_max)
++        return 0;
++    for (HSD_GObj* object = ((HSD_GObj**) HSD_GObj_Entities)[p_link];
++         object != NULL; object = object->next)
++        if (object == expected) return 1;
++    return 0;
++}
++
++static int stadium_owner_gobj_address_present(const HSD_GObj* expected)
++{
++    return stadium_owner_gobj_list_contains(expected, NULL);
++}
++
++static HSD_ImageDesc* stadium_owner_image_desc(
++    const MeleeWebStadiumDisplayOwner* owner, size_t index)
++{
++    if (index == 0) return &((TextWrapper*) owner->wrappers[0])->desc;
++    return &((ImageDescWrapper*) owner->wrappers[index])->desc;
++}
++
++static int stadium_owner_journal_image(
++    MeleeWebStadiumDisplayOwner* owner, size_t index,
++    MeleeWebStadiumImageProvenance provenance)
++{
++    if (owner == NULL || owner != stadium_display_owner_current || index >= 3 ||
++        owner->state != STADIUM_DISPLAY_OWNER_BOUND ||
++        owner->images[index].origin != MELEE_WEB_STADIUM_IMAGE_ORIGIN_UNKNOWN) {
++        if (owner != NULL) owner->journal_failed = 1;
++        return 0;
++    }
++    owner->images[index] = provenance;
++    return 1;
++}
++
++static void stadium_owner_journal_child(size_t index, HSD_GObj* gobj)
++{
++    MeleeWebStadiumDisplayOwner* owner = stadium_display_owner_current;
++    if (owner == NULL) return;
++    if (owner->state != STADIUM_DISPLAY_OWNER_BOUND || index >= 3 ||
++        gobj == NULL || owner->children[index] != NULL) {
++        owner->journal_failed = 1;
++        return;
++    }
++    owner->children[index] = gobj;
++}
++
++static void stadium_owner_journal_wrapper(size_t index, void* wrapper)
++{
++    MeleeWebStadiumDisplayOwner* owner = stadium_display_owner_current;
++    if (owner == NULL) return;
++    if (owner->state != STADIUM_DISPLAY_OWNER_BOUND || index >= 3 ||
++        wrapper == NULL || owner->wrappers[index] != NULL) {
++        owner->journal_failed = 1;
++        return;
++    }
++    owner->wrappers[index] = wrapper;
++}
++
++static void stadium_owner_journal_context(void)
++{
++    MeleeWebStadiumDisplayOwner* owner = stadium_display_owner_current;
++    sislib_UnkAlloc3* context;
++    if (owner == NULL) return;
++    context = owner->context_count_before == 0
++                  ? HSD_SisLib_804D797C
++                  : owner->context_before[owner->context_count_before - 1].node->x0;
++    if (context == NULL || context->x0 != NULL || context->xA != 1 ||
++        context->x4 != NULL || owner->context != NULL) {
++        owner->journal_failed = 1;
++        return;
++    }
++    owner->context = context;
++}
++
++static void stadium_owner_journal_text(size_t index, HSD_Text* text)
++{
++    MeleeWebStadiumDisplayOwner* owner = stadium_display_owner_current;
++    if (owner == NULL) return;
++    if (owner->state != STADIUM_DISPLAY_OWNER_BOUND || index >= 2 ||
++        text == NULL || owner->texts[index] != NULL || text->font_idx != 1) {
++        owner->journal_failed = 1;
++        return;
++    }
++    owner->texts[index] = text;
++    owner->renderers[index] = text->entity;
++}
++
++static HSD_ImageDesc* stadium_owner_initialize_image(
++    HSD_ImageDesc* desc, int width, int height, GXTexFmt format, s16 entry_num,
++    size_t index)
++{
++    MeleeWebStadiumDisplayOwner* owner = stadium_display_owner_current;
++    if (owner == NULL)
++        return lb_800121FC(desc, width, height, format, entry_num);
++    MeleeWebStadiumImageProvenance provenance = {
++        NULL, MELEE_WEB_STADIUM_IMAGE_ORIGIN_UNKNOWN
++    };
++    HSD_ImageDesc* result = lb_800121FC_with_provenance(
++        desc, width, height, format, entry_num, &provenance);
++    stadium_owner_journal_image(owner, index, provenance);
++    return result;
++}
++
++int melee_web_stadium_display_owner_prepare(
++    MeleeWebStadiumDisplayOwner** out, char* error, size_t error_size)
++{
++    MeleeWebStadiumDisplayOwner* owner;
++    if (out == NULL) return stadium_owner_error(error, error_size,
++                                                "Stadium display owner needs a live output slot");
++    if (*out != NULL)
++        return stadium_owner_error(error, error_size,
++                                   "Stadium display owner output slot must be empty");
++    if (stadium_display_owner_current != NULL || HSD_GObj_Entities == NULL ||
++        !stadium_owner_slot_is_empty(HSD_SisLib_FontSlotBorrowable(1),
++                                     HSD_SisLib_804D1124[1]))
++        return stadium_owner_error(error, error_size,
++                                   "Stadium display requires exclusive font-1 descriptor ownership");
++    owner = calloc(1, sizeof(*owner));
++    if (owner == NULL)
++        return stadium_owner_error(error, error_size,
++                                   "Cannot allocate Stadium display owner journal");
++    owner->state = STADIUM_DISPLAY_OWNER_PREPARED;
++    if (!stadium_owner_copy_baselines(owner) || stadium_owner_has_font1_before(owner) ||
++        !stadium_owner_text_topology_unchanged(owner) ||
++        !stadium_owner_context_topology_unchanged(owner)) {
++        stadium_owner_release_bookkeeping(owner);
++        return stadium_owner_error(error, error_size,
++                                   "Stadium display requires stable foreign SIS lists and no font-1 owners");
++    }
++    stadium_display_owner_current = owner;
++    *out = owner;
++    if (error != NULL && error_size != 0) error[0] = '\0';
++    return 1;
++}
++
++int melee_web_stadium_display_owner_bind_source(
++    MeleeWebStadiumDisplayOwner* owner, char* error, size_t error_size)
++{
++    UnkArchiveStruct* archive;
++    SIS* descriptor;
++    if (owner == NULL || owner != stadium_display_owner_current ||
++        owner->state != STADIUM_DISPLAY_OWNER_PREPARED ||
++        !stadium_owner_text_topology_unchanged(owner) ||
++        !stadium_owner_context_topology_unchanged(owner) ||
++        stadium_owner_has_font1_before(owner) ||
++        !stadium_owner_slot_is_empty(HSD_SisLib_FontSlotBorrowable(1),
++                                     HSD_SisLib_804D1124[1]))
++        return stadium_owner_error(error, error_size,
++                                   "Stadium source SIS bind preconditions changed after E8");
++    archive = grDatFiles_GetArchive();
++    if (archive == NULL || archive->unk0 == NULL)
++        return stadium_owner_error(error, error_size,
++                                   "Original Stadium archive is unavailable after E8");
++    descriptor = HSD_ArchiveGetPublicAddress(archive->unk0,
++                                              "SIS_GrPStadiumData");
++    if (descriptor == NULL ||
++        !melee_web_gameplay_vs_sis(MELEE_WEB_VS_SIS_VALIDATE_BORROW, 1,
++                                   descriptor, error, error_size))
++        return stadium_owner_error(error, error_size,
++                                   "Original Stadium SIS descriptor is not safely borrowable");
++    owner->source_sis = descriptor;
++    owner->state = STADIUM_DISPLAY_OWNER_BOUND;
++    if (error != NULL && error_size != 0) error[0] = '\0';
++    return 1;
++}
++
++static int stadium_owner_display_ground_matches(
++    const MeleeWebStadiumDisplayOwner* owner, HSD_GObj* display_ground)
++{
++    Ground* ground;
++    u8 found_link;
++    if (display_ground == NULL ||
++        !stadium_owner_gobj_list_contains(display_ground, &found_link) ||
++        display_ground->p_link != found_link ||
++        display_ground->classifier != HSD_GOBJ_CLASS_STAGE ||
++        display_ground != Ground_GetMapGObj(PsType_Display))
++        return 0;
++    ground = HSD_GObjGetUserData(display_ground);
++    if (ground == NULL || ground->map_id != PsType_Display ||
++        ground->u.display.xD4 != owner->children[0] ||
++        ground->u.display.xD8 != owner->children[1] ||
++        ground->u.display.xDC != owner->children[2])
++        return 0;
++    return 1;
++}
++
++static int stadium_owner_capture_matches(
++    const MeleeWebStadiumDisplayOwner* owner, HSD_GObj* display_ground)
++{
++    static const u8 child_links[3] = { 0x13, 0x12, 0x12 };
++    if (owner->journal_failed || owner->source_sis == NULL ||
++        !stadium_owner_text_topology_matches(owner, 1) ||
++        !stadium_owner_context_topology_matches(owner, 1) ||
++        stadium_owner_has_font1_before(owner) ||
++        !stadium_owner_slot_is_exact(HSD_SisLib_FontSlotBorrowable(1),
++                                     HSD_SisLib_804D1124[1],
++                                     owner->source_sis) ||
++        !stadium_owner_display_ground_matches(owner, display_ground))
++        return 0;
++    for (size_t i = 0; i < 3; ++i) {
++        HSD_GObj* child = owner->children[i];
++        HSD_ImageDesc* desc;
++        if (child == NULL || owner->wrappers[i] == NULL ||
++            !stadium_owner_gobj_linked(child, child_links[i]) ||
++            child->classifier != HSD_GOBJ_CLASS_TEXT ||
++            child->p_link != child_links[i] ||
++            child->user_data != owner->wrappers[i] ||
++            child->user_data_remove_func != HSD_Free)
++            return 0;
++        desc = stadium_owner_image_desc(owner, i);
++        if (owner->images[i].image_ptr == NULL ||
++            owner->images[i].image_ptr != desc->image_ptr ||
++            (owner->images[i].origin != MELEE_WEB_STADIUM_IMAGE_ORIGIN_OWNED_HSD &&
++             owner->images[i].origin != MELEE_WEB_STADIUM_IMAGE_ORIGIN_BORROWED_PRELOAD))
++            return 0;
++        for (size_t j = 0; j < i; ++j)
++            if (owner->images[i].image_ptr == owner->images[j].image_ptr &&
++                (owner->images[i].origin == MELEE_WEB_STADIUM_IMAGE_ORIGIN_OWNED_HSD ||
++                 owner->images[j].origin == MELEE_WEB_STADIUM_IMAGE_ORIGIN_OWNED_HSD))
++                return 0;
++    }
++    if (owner->context == NULL || owner->context->x4 != NULL ||
++        owner->context->xA != 1 || owner->context->x8 != 9 ||
++        owner->context->xC != 0xD || owner->context->xD != 0 ||
++        owner->context->xE != 1 || owner->context->xF != 0)
++        return 0;
++    for (size_t i = 0; i < 2; ++i) {
++        HSD_Text* text = owner->texts[i];
++        HSD_GObj* renderer = owner->renderers[i];
++        if (text == NULL || renderer == NULL ||
++            !stadium_owner_gobj_linked(renderer, 0xD) ||
++            text->font_idx != 1 ||
++            text->entity != renderer || renderer->classifier != HSD_GOBJ_CLASS_SISLIB_UNK ||
++            renderer->p_link != 0xD || renderer->user_data != text ||
++            renderer->user_data_remove_func != HSD_SisLib_803A5A2C)
++            return 0;
++    }
++    if (HSD_GObj_804D781C != NULL || HSD_GObj_804D7814 != NULL)
++        return 0;
++    return 1;
++}
++
++int melee_web_stadium_display_owner_capture(
++    MeleeWebStadiumDisplayOwner* owner, HSD_GObj* display_ground,
++    char* error, size_t error_size)
++{
++    if (owner == NULL || owner != stadium_display_owner_current ||
++        owner->state != STADIUM_DISPLAY_OWNER_BOUND || owner->capture_attempted)
++        return stadium_owner_error(error, error_size,
++                                   "Stadium display owner cannot capture this OnInit boundary");
++    owner->capture_attempted = 1;
++    if (!stadium_owner_capture_matches(owner, display_ground))
++        return stadium_owner_error(error, error_size,
++                                   "Original Stadium display owner journal did not match source SIS and Ground state");
++    owner->display_ground = display_ground;
++    owner->display_ground_data = HSD_GObjGetUserData(display_ground);
++    owner->state = STADIUM_DISPLAY_OWNER_CAPTURED;
++    if (error != NULL && error_size != 0) error[0] = '\0';
++    return 1;
++}
++
++int melee_web_stadium_display_owner_cancel(
++    MeleeWebStadiumDisplayOwner* owner, char* error, size_t error_size)
++{
++    if (owner == NULL || owner != stadium_display_owner_current ||
++        owner->capture_attempted || owner->state == STADIUM_DISPLAY_OWNER_CAPTURED ||
++        owner->children[0] != NULL || owner->children[1] != NULL ||
++        owner->children[2] != NULL || owner->wrappers[0] != NULL ||
++        owner->wrappers[1] != NULL || owner->wrappers[2] != NULL ||
++        owner->texts[0] != NULL || owner->texts[1] != NULL ||
++        owner->context != NULL ||
++        !stadium_owner_text_topology_unchanged(owner) ||
++        !stadium_owner_context_topology_unchanged(owner) ||
++        !stadium_owner_slot_is_empty(HSD_SisLib_FontSlotBorrowable(1),
++                                     HSD_SisLib_804D1124[1]))
++        return stadium_owner_error(error, error_size,
++                                   "Partial Stadium display ownership must remain reachable");
++    stadium_display_owner_current = NULL;
++    stadium_owner_release_bookkeeping(owner);
++    if (error != NULL && error_size != 0) error[0] = '\0';
++    return 1;
++}
++
++static int stadium_owner_text_or_renderer_present(
++    const MeleeWebStadiumDisplayOwner* owner)
++{
++    for (HSD_Text* text = HSD_SisLib_804D7978; text != NULL; text = text->next)
++        if (text == owner->texts[0] || text == owner->texts[1]) return 1;
++    for (u32 link = 0; link <= HSD_GObjLibInitData.p_link_max; ++link)
++        for (HSD_GObj* object = ((HSD_GObj**) HSD_GObj_Entities)[link];
++             object != NULL; object = object->next)
++            if (object == owner->renderers[0] || object == owner->renderers[1])
++                return 1;
++    return 0;
++}
++
++static void stadium_owner_hsd_free(void* image_ptr, void* context)
++{
++    (void) context;
++    HSD_Free(image_ptr);
++}
++
++typedef struct StadiumDisplayRetirementServices {
++    int (*preflight_sis)(SIS*, char*, size_t, void*);
++    void (*drain_sis_font)(int font_idx, void*);
++    int (*retire_sis)(SIS*, char*, size_t, void*);
++    int (*release_image)(MeleeWebStadiumImageProvenance*, void*);
++    void (*unlink_child)(HSD_GObj*, void*);
++    void* context;
++} StadiumDisplayRetirementServices;
++
++static int stadium_owner_actual_preflight_sis(SIS* expected, char* error,
++                                               size_t error_size, void* context)
++{
++    (void) context;
++    return melee_web_gameplay_vs_sis(MELEE_WEB_VS_SIS_PREFLIGHT_BORROW, 1,
++                                     expected, error, error_size);
++}
++
++static void stadium_owner_actual_drain_sis(int font_idx, void* context)
++{
++    (void) context;
++    HSD_SisLib_803A5F50(font_idx);
++}
++
++static int stadium_owner_actual_retire_sis(SIS* expected, char* error,
++                                            size_t error_size, void* context)
++{
++    (void) context;
++    return melee_web_gameplay_vs_sis(MELEE_WEB_VS_SIS_RETIRE_BORROW, 1,
++                                     expected, error, error_size);
++}
++
++static int stadium_owner_actual_release_image(
++    MeleeWebStadiumImageProvenance* image, void* context)
++{
++    (void) context;
++    return melee_web_stadium_image_release(image, stadium_owner_hsd_free, NULL);
++}
++
++static void stadium_owner_actual_unlink_child(HSD_GObj* child, void* context)
++{
++    (void) context;
++    HSD_GObjPLink_80390228(child);
++}
++
++static const StadiumDisplayRetirementServices stadium_owner_actual_services = {
++    stadium_owner_actual_preflight_sis,
++    stadium_owner_actual_drain_sis,
++    stadium_owner_actual_retire_sis,
++    stadium_owner_actual_release_image,
++    stadium_owner_actual_unlink_child,
++    NULL,
++};
++
++static int stadium_owner_retire_with_services(
++    MeleeWebStadiumDisplayOwner*, const StadiumDisplayRetirementServices*,
++    char*, size_t);
++
++typedef struct StadiumDisplayOwnerControlFixture {
++    HSD_GObj* entities[64];
++    HSD_GObj display_ground;
++    HSD_GObj children[3];
++    HSD_GObj renderers[2];
++    HSD_Text foreign_text[2];
++    HSD_Text owned_texts[2];
++    sislib_UnkAlloc3 foreign_contexts[2];
++    sislib_UnkAlloc3 owned_context;
++    StadiumTextNodeIdentity text_identity[2];
++    StadiumSisContextIdentity context_identity[2];
++    MeleeWebStadiumDisplayOwner owner;
++    Ground display_ground_data;
++    TextWrapper display_wrapper;
++    ImageDescWrapper image_wrappers[2];
++    SIS source_sis;
++    u8 fallback_image[32];
++    int preflight_calls;
++    int drain_calls;
++    int drain_saw_xd4;
++    int drain_removed_text_entities;
++    int retire_calls;
++    int release_calls;
++    int unlink_calls;
++    int unlink_order[3];
++    int corrupt_foreign_text_after_drain;
++    int mutate_foreign_font_after_preflight;
++    int mutate_foreign_context_after_preflight;
++} StadiumDisplayOwnerControlFixture;
++
++static int stadium_owner_control_preflight_sis(
++    SIS* expected, char* error, size_t error_size, void* context)
++{
++    StadiumDisplayOwnerControlFixture* fixture = context;
++    ++fixture->preflight_calls;
++    if (expected != &fixture->source_sis ||
++        HSD_SisLib_804D1124[1] != expected ||
++        !HSD_SisLib_FontSlotBorrowable(1))
++        return stadium_owner_error(error, error_size,
++                                   "Control SIS preflight rejected its exact borrowed slot");
++    if (fixture->mutate_foreign_font_after_preflight)
++        fixture->foreign_text[0].font_idx = 1;
++    if (fixture->mutate_foreign_context_after_preflight)
++        fixture->foreign_contexts[0].xA = 1;
++    return 1;
++}
++
++static void stadium_owner_control_remove_from_link(
++    StadiumDisplayOwnerControlFixture* fixture, u8 link, HSD_GObj* expected)
++{
++    HSD_GObj** current = &fixture->entities[link];
++    while (*current != NULL) {
++        if (*current == expected) {
++            *current = expected->next;
++            expected->next = NULL;
++            return;
++        }
++        current = &(*current)->next;
++    }
++}
++
++static void stadium_owner_control_drain_sis(int font_idx, void* context)
++{
++    StadiumDisplayOwnerControlFixture* fixture = context;
++    if (font_idx != 1) return;
++    ++fixture->drain_calls;
++    fixture->drain_saw_xd4 = stadium_owner_gobj_linked(
++        fixture->owner.children[0], 0x13);
++    fixture->foreign_text[1].next = NULL;
++    fixture->foreign_contexts[1].x0 = NULL;
++    HSD_SisLib_804D7978 = &fixture->foreign_text[0];
++    HSD_SisLib_804D797C = &fixture->foreign_contexts[0];
++    stadium_owner_control_remove_from_link(fixture, 0xD,
++                                           &fixture->renderers[0]);
++    stadium_owner_control_remove_from_link(fixture, 0xD,
++                                           &fixture->renderers[1]);
++    fixture->drain_removed_text_entities =
++        !stadium_owner_text_or_renderer_present(&fixture->owner);
++    if (fixture->corrupt_foreign_text_after_drain)
++        fixture->foreign_text[0].next = NULL;
++}
++
++static int stadium_owner_control_retire_sis(
++    SIS* expected, char* error, size_t error_size, void* context)
++{
++    StadiumDisplayOwnerControlFixture* fixture = context;
++    ++fixture->retire_calls;
++    if (expected != &fixture->source_sis ||
++        HSD_SisLib_804D1124[1] != expected)
++        return stadium_owner_error(error, error_size,
++                                   "Control SIS retirement lost its exact descriptor");
++    HSD_SisLib_804D1124[1] = NULL;
++    return 1;
++}
++
++static void stadium_owner_control_free_image(void* image_ptr, void* context)
++{
++    StadiumDisplayOwnerControlFixture* fixture = context;
++    if (image_ptr == fixture->fallback_image) ++fixture->release_calls;
++}
++
++static int stadium_owner_control_release_image(
++    MeleeWebStadiumImageProvenance* image, void* context)
++{
++    StadiumDisplayOwnerControlFixture* fixture = context;
++    return melee_web_stadium_image_release(
++        image, stadium_owner_control_free_image, fixture);
++}
++
++static void stadium_owner_control_unlink_child(HSD_GObj* child, void* context)
++{
++    StadiumDisplayOwnerControlFixture* fixture = context;
++    int id = -1;
++    for (int i = 0; i < 3; ++i)
++        if (child == &fixture->children[i]) id = i;
++    if (id < 0 || fixture->unlink_calls >= 3) return;
++    fixture->unlink_order[fixture->unlink_calls++] = id;
++    stadium_owner_control_remove_from_link(fixture, child->p_link, child);
++}
++
++static const StadiumDisplayRetirementServices stadium_owner_control_services = {
++    stadium_owner_control_preflight_sis,
++    stadium_owner_control_drain_sis,
++    stadium_owner_control_retire_sis,
++    stadium_owner_control_release_image,
++    stadium_owner_control_unlink_child,
++    NULL,
++};
++
++static void stadium_owner_control_activate(
++    StadiumDisplayOwnerControlFixture* fixture)
++{
++    HSD_GObj_Entities = (HSD_GObjList*) fixture->entities;
++    HSD_SisLib_804D7978 = &fixture->foreign_text[0];
++    HSD_SisLib_804D797C = &fixture->foreign_contexts[0];
++    HSD_SisLib_804D1124[1] = &fixture->source_sis;
++    stage_info.map_gobjs[PsType_Display] = &fixture->display_ground;
++    stadium_display_owner_current = &fixture->owner;
++}
++
++static size_t stadium_owner_control_entity_count(void)
++{
++    size_t count = 0;
++    for (u32 link = 0; link <= HSD_GObjLibInitData.p_link_max; ++link)
++        for (HSD_GObj* object = ((HSD_GObj**) HSD_GObj_Entities)[link];
++             object != NULL; object = object->next)
++            ++count;
++    return count;
++}
++
++static void stadium_owner_control_fixture_init(
++    StadiumDisplayOwnerControlFixture* fixture, int corrupt_foreign_text)
++{
++    memset(fixture, 0, sizeof(*fixture));
++    fixture->corrupt_foreign_text_after_drain = corrupt_foreign_text;
++    fixture->display_ground.classifier = HSD_GOBJ_CLASS_STAGE;
++    fixture->display_ground.p_link = 5;
++    fixture->display_ground.user_data = &fixture->display_ground_data;
++    fixture->entities[5] = &fixture->display_ground;
++    fixture->display_ground_data.map_id = PsType_Display;
++    for (size_t i = 0; i < 3; ++i) {
++        fixture->children[i].classifier = HSD_GOBJ_CLASS_TEXT;
++        fixture->children[i].p_link = i == 0 ? 0x13 : 0x12;
++        fixture->children[i].user_data_remove_func = HSD_Free;
++        fixture->owner.children[i] = &fixture->children[i];
++    }
++    fixture->owner.wrappers[0] = &fixture->display_wrapper;
++    fixture->owner.wrappers[1] = &fixture->image_wrappers[0];
++    fixture->owner.wrappers[2] = &fixture->image_wrappers[1];
++    for (size_t i = 0; i < 3; ++i)
++        fixture->children[i].user_data = fixture->owner.wrappers[i];
++    fixture->entities[0x13] = &fixture->children[0];
++    fixture->entities[0x12] = &fixture->children[1];
++    fixture->children[1].next = &fixture->children[2];
++    for (size_t i = 0; i < 2; ++i) {
++        fixture->renderers[i].classifier = HSD_GOBJ_CLASS_SISLIB_UNK;
++        fixture->renderers[i].p_link = 0xD;
++        fixture->renderers[i].next = i == 0 ? &fixture->renderers[1] : NULL;
++        fixture->renderers[i].user_data = &fixture->owned_texts[i];
++        fixture->renderers[i].user_data_remove_func = HSD_SisLib_803A5A2C;
++        fixture->entities[0xD] = &fixture->renderers[0];
++        fixture->owned_texts[i].font_idx = 1;
++        fixture->owned_texts[i].entity = &fixture->renderers[i];
++        fixture->owner.texts[i] = &fixture->owned_texts[i];
++        fixture->owner.renderers[i] = &fixture->renderers[i];
++    }
++    fixture->foreign_text[0].next = &fixture->foreign_text[1];
++    fixture->foreign_text[1].next = &fixture->owned_texts[0];
++    fixture->owned_texts[0].next = &fixture->owned_texts[1];
++    fixture->owned_texts[1].next = NULL;
++    fixture->text_identity[0] = (StadiumTextNodeIdentity){
++        &fixture->foreign_text[0], &fixture->foreign_text[1]
++    };
++    fixture->text_identity[1] = (StadiumTextNodeIdentity){
++        &fixture->foreign_text[1], NULL
++    };
++    fixture->foreign_contexts[0].x0 = &fixture->foreign_contexts[1];
++    fixture->foreign_contexts[1].x0 = &fixture->owned_context;
++    fixture->owned_context.x0 = NULL;
++    fixture->context_identity[0] = (StadiumSisContextIdentity){
++        &fixture->foreign_contexts[0], &fixture->foreign_contexts[1]
++    };
++    fixture->context_identity[1] = (StadiumSisContextIdentity){
++        &fixture->foreign_contexts[1], NULL
++    };
++    fixture->owner.state = STADIUM_DISPLAY_OWNER_BOUND;
++    fixture->owner.source_sis = &fixture->source_sis;
++    fixture->owner.text_head_before = &fixture->foreign_text[0];
++    fixture->owner.text_before = fixture->text_identity;
++    fixture->owner.text_count_before = 2;
++    fixture->owner.context_head_before = &fixture->foreign_contexts[0];
++    fixture->owner.context_before = fixture->context_identity;
++    fixture->owner.context_count_before = 2;
++    fixture->owner.images[0] = (MeleeWebStadiumImageProvenance){
++        (void*) (uintptr_t) 0x1020,
++        MELEE_WEB_STADIUM_IMAGE_ORIGIN_BORROWED_PRELOAD
++    };
++    fixture->owner.images[1] = (MeleeWebStadiumImageProvenance){
++        fixture->fallback_image,
++        MELEE_WEB_STADIUM_IMAGE_ORIGIN_OWNED_HSD
++    };
++    fixture->owner.images[2] = (MeleeWebStadiumImageProvenance){
++        (void*) (uintptr_t) 0x3040,
++        MELEE_WEB_STADIUM_IMAGE_ORIGIN_BORROWED_PRELOAD
++    };
++    fixture->owner.context = &fixture->owned_context;
++    fixture->display_wrapper.desc.image_ptr =
++        fixture->owner.images[0].image_ptr;
++    fixture->display_wrapper.win_static_p = &fixture->owned_texts[0];
++    fixture->display_wrapper.win_dynamic_p = &fixture->owned_texts[1];
++    fixture->image_wrappers[0].desc.image_ptr =
++        fixture->owner.images[1].image_ptr;
++    fixture->image_wrappers[1].desc.image_ptr =
++        fixture->owner.images[2].image_ptr;
++    fixture->owned_context.x4 = NULL;
++    fixture->owned_context.xA = 1;
++    fixture->owned_context.x8 = 9;
++    fixture->owned_context.xC = 0xD;
++    fixture->owned_context.xD = 0;
++    fixture->owned_context.xE = 1;
++    fixture->owned_context.xF = 0;
++    fixture->display_ground_data.u.display.xD4 = &fixture->children[0];
++    fixture->display_ground_data.u.display.xD8 = &fixture->children[1];
++    fixture->display_ground_data.u.display.xDC = &fixture->children[2];
++}
++
++int melee_web_stadium_display_owner_retirement_controls(void)
++{
++    HSD_GObjList* original_entities = HSD_GObj_Entities;
++    HSD_GObjLibInitDataType original_init = HSD_GObjLibInitData;
++    HSD_Text* original_text_head = HSD_SisLib_804D7978;
++    sislib_UnkAlloc3* original_context_head = HSD_SisLib_804D797C;
++    SIS* original_font1 = HSD_SisLib_804D1124[1];
++    HSD_GObj* original_display_map = stage_info.map_gobjs[PsType_Display];
++    StadiumDisplayOwnerControlFixture success_fixture;
++    StadiumDisplayOwnerControlFixture failure_fixture;
++    HSD_GObj* empty_entities[64] = { NULL };
++    HSD_Text foreign_text = { 0 };
++    SIS foreign_sis = { 0 };
++    char error[192] = { 0 };
++    int success = 0;
++    const int selector_kinds[] = { 1, 2 };
++
++    if (stadium_display_owner_current != NULL || original_entities != NULL ||
++        original_text_head != NULL || original_context_head != NULL ||
++        original_font1 != NULL || HSD_GObj_804D781C != NULL ||
++        HSD_GObj_804D7814 != NULL || original_display_map != NULL)
++        return 0;
++
++    HSD_GObjLibInitData.p_link_max = 63;
++    HSD_GObj_Entities = (HSD_GObjList*) empty_entities;
++
++    /* A foreign descriptor or font-1 list entry is refused without changing
++     * the descriptor or either list head/link. */
++    MeleeWebStadiumDisplayOwner* rejected = NULL;
++    MeleeWebStadiumDisplayOwner* const retained_sentinel =
++        (MeleeWebStadiumDisplayOwner*) (uintptr_t) 0x7008;
++    rejected = retained_sentinel;
++    if (melee_web_stadium_display_owner_prepare(&rejected, error,
++                                               sizeof(error)) ||
++        rejected != retained_sentinel || stadium_display_owner_current != NULL)
++        goto cleanup;
++    rejected = NULL;
++    HSD_SisLib_804D1124[1] = (SIS*) (uintptr_t) 0x7010;
++    if (melee_web_stadium_display_owner_prepare(&rejected, error,
++                                               sizeof(error)) ||
++        rejected != NULL || HSD_SisLib_804D1124[1] != (SIS*) (uintptr_t) 0x7010)
++        goto cleanup;
++    HSD_SisLib_804D1124[1] = NULL;
++    foreign_text.font_idx = 1;
++    HSD_SisLib_804D7978 = &foreign_text;
++    if (melee_web_stadium_display_owner_prepare(&rejected, error,
++                                               sizeof(error)) ||
++        rejected != NULL || HSD_SisLib_804D7978 != &foreign_text ||
++        foreign_text.next != NULL || stadium_display_owner_current != NULL)
++        goto cleanup;
++    HSD_SisLib_804D7978 = NULL;
++
++    /* A prepared owner can cancel a source-setup refusal with no SIS drain. */
++    if (!melee_web_stadium_display_owner_prepare(&rejected, error,
++                                                sizeof(error)) ||
++        rejected == NULL ||
++        !melee_web_stadium_display_owner_cancel(rejected, error,
++                                                sizeof(error)) ||
++        stadium_display_owner_current != NULL ||
++        HSD_SisLib_804D7978 != NULL || HSD_SisLib_804D797C != NULL ||
++        HSD_SisLib_804D1124[1] != NULL)
++        goto cleanup;
++
++    /* A rejected post-capture check leaves the partially initialized owner
++     * externally reachable; ordinary cancel must refuse to discard it. */
++    MeleeWebStadiumDisplayOwner partial = { 0 };
++    SIS partial_sis = { 0 };
++    partial.state = STADIUM_DISPLAY_OWNER_BOUND;
++    partial.source_sis = &partial_sis;
++    stadium_display_owner_current = &partial;
++    HSD_SisLib_804D1124[1] = &partial_sis;
++    if (melee_web_stadium_display_owner_capture(&partial, NULL, error,
++                                               sizeof(error)) ||
++        !partial.capture_attempted ||
++        melee_web_stadium_display_owner_cancel(&partial, error,
++                                               sizeof(error)) ||
++        stadium_display_owner_current != &partial)
++        goto cleanup;
++    stadium_display_owner_current = NULL;
++    HSD_SisLib_804D1124[1] = NULL;
++
++    /* The real bind entry must reject font-1 foreign owners before archive
++     * lookup, while preserving the caller's prepared owner and list links. */
++    for (size_t i = 0; i < sizeof(selector_kinds) / sizeof(selector_kinds[0]);
++         ++i) {
++        MeleeWebStadiumDisplayOwner bind_owner = { 0 };
++        HSD_Text bind_text[2] = { 0 };
++        sislib_UnkAlloc3 bind_context[2] = { 0 };
++        StadiumTextNodeIdentity bind_text_identity[2] = {
++            { &bind_text[0], &bind_text[1] }, { &bind_text[1], NULL }
++        };
++        StadiumSisContextIdentity bind_context_identity[2] = {
++            { &bind_context[0], &bind_context[1] }, { &bind_context[1], NULL }
++        };
++        bind_owner.state = STADIUM_DISPLAY_OWNER_PREPARED;
++        bind_owner.text_head_before = &bind_text[0];
++        bind_owner.text_before = bind_text_identity;
++        bind_owner.text_count_before = 2;
++        bind_owner.context_head_before = &bind_context[0];
++        bind_owner.context_before = bind_context_identity;
++        bind_owner.context_count_before = 2;
++        bind_text[0].next = &bind_text[1];
++        bind_context[0].x0 = &bind_context[1];
++        if (selector_kinds[i] == 1)
++            bind_text[0].font_idx = 1;
++        else
++            bind_context[0].xA = 1;
++        HSD_GObj_Entities = (HSD_GObjList*) empty_entities;
++        HSD_SisLib_804D7978 = &bind_text[0];
++        HSD_SisLib_804D797C = &bind_context[0];
++        stadium_display_owner_current = &bind_owner;
++        if (melee_web_stadium_display_owner_bind_source(
++                &bind_owner, error, sizeof(error)) ||
++            bind_owner.state != STADIUM_DISPLAY_OWNER_PREPARED ||
++            bind_owner.source_sis != NULL ||
++            stadium_display_owner_current != &bind_owner ||
++            HSD_SisLib_804D7978 != &bind_text[0] ||
++            bind_text[0].next != &bind_text[1] || bind_text[1].next != NULL ||
++            HSD_SisLib_804D797C != &bind_context[0] ||
++            bind_context[0].x0 != &bind_context[1] ||
++            bind_context[1].x0 != NULL || HSD_SisLib_804D1124[1] != NULL)
++            goto cleanup;
++        stadium_display_owner_current = NULL;
++        HSD_SisLib_804D7978 = NULL;
++        HSD_SisLib_804D797C = NULL;
++    }
++
++    /* Public capture rejects both foreign selector changes even when every
++     * saved list link is unchanged. It retains the live bound owner and does
++     * not create, drain, free, retire or unlink any object. */
++    for (size_t i = 0; i < sizeof(selector_kinds) / sizeof(selector_kinds[0]);
++         ++i) {
++        stadium_owner_control_fixture_init(&failure_fixture, 0);
++        stadium_owner_control_activate(&failure_fixture);
++        const size_t before_count = stadium_owner_control_entity_count();
++        if (selector_kinds[i] == 1)
++            failure_fixture.foreign_text[0].font_idx = 1;
++        else
++            failure_fixture.foreign_contexts[0].xA = 1;
++        if (melee_web_stadium_display_owner_capture(
++                &failure_fixture.owner, &failure_fixture.display_ground,
++                error, sizeof(error)) ||
++            !failure_fixture.owner.capture_attempted ||
++            failure_fixture.owner.state != STADIUM_DISPLAY_OWNER_BOUND ||
++            failure_fixture.owner.display_ground != NULL ||
++            stadium_owner_control_entity_count() != before_count ||
++            stage_info.map_gobjs[PsType_Display] !=
++                &failure_fixture.display_ground ||
++            HSD_SisLib_804D1124[1] != &failure_fixture.source_sis ||
++            !stadium_owner_gobj_linked(failure_fixture.owner.children[0], 0x13) ||
++            !stadium_owner_gobj_linked(failure_fixture.owner.children[1], 0x12) ||
++            !stadium_owner_gobj_linked(failure_fixture.owner.children[2], 0x12) ||
++            HSD_SisLib_804D7978 != &failure_fixture.foreign_text[0] ||
++            failure_fixture.foreign_text[0].next !=
++                &failure_fixture.foreign_text[1] ||
++            failure_fixture.foreign_text[1].next !=
++                &failure_fixture.owned_texts[0] ||
++            HSD_SisLib_804D797C != &failure_fixture.foreign_contexts[0] ||
++            failure_fixture.foreign_contexts[1].x0 !=
++                &failure_fixture.owned_context)
++            goto cleanup;
++        stadium_display_owner_current = NULL;
++    }
++
++    /* The same retirement state machine runs against controlled original-
++     * service dependencies to prove that capture/retirement only observe the
++     * existing map object, plus mixed buffer release and teardown order. */
++    stadium_owner_control_fixture_init(&success_fixture, 0);
++    stadium_owner_control_activate(&success_fixture);
++    const size_t before_capture_count = stadium_owner_control_entity_count();
++    if (Ground_GetMapGObj(PsType_Display) != &success_fixture.display_ground ||
++        !melee_web_stadium_display_owner_capture(
++            &success_fixture.owner, &success_fixture.display_ground,
++            error, sizeof(error)) ||
++        success_fixture.owner.display_ground != &success_fixture.display_ground ||
++        stage_info.map_gobjs[PsType_Display] != &success_fixture.display_ground ||
++        stadium_owner_control_entity_count() != before_capture_count)
++        goto cleanup;
++    StadiumDisplayRetirementServices success_services =
++        stadium_owner_control_services;
++    success_services.context = &success_fixture;
++    if (!stadium_owner_retire_with_services(
++            &success_fixture.owner, &success_services, error, sizeof(error)) ||
++        success_fixture.preflight_calls != 1 ||
++        success_fixture.drain_calls != 1 || !success_fixture.drain_saw_xd4 ||
++        !success_fixture.drain_removed_text_entities ||
++        success_fixture.retire_calls != 1 || success_fixture.release_calls != 1 ||
++        success_fixture.unlink_calls != 3 ||
++        success_fixture.unlink_order[0] != 2 ||
++        success_fixture.unlink_order[1] != 1 ||
++        success_fixture.unlink_order[2] != 0 ||
++        success_fixture.owner.images[0].image_ptr != (void*) (uintptr_t) 0x1020 ||
++        success_fixture.owner.images[1].image_ptr != NULL ||
++        success_fixture.owner.images[1].origin !=
++            MELEE_WEB_STADIUM_IMAGE_ORIGIN_RELEASED ||
++        success_fixture.owner.images[2].image_ptr != (void*) (uintptr_t) 0x3040 ||
++        stage_info.map_gobjs[PsType_Display] != &success_fixture.display_ground ||
++        !stadium_owner_gobj_linked(&success_fixture.display_ground, 5) ||
++        stadium_owner_control_entity_count() != 1 ||
++        success_fixture.display_ground_data.u.display.xD4 != NULL ||
++        success_fixture.display_ground_data.u.display.xD8 != NULL ||
++        success_fixture.display_ground_data.u.display.xDC != NULL ||
++        HSD_SisLib_804D7978 != &success_fixture.foreign_text[0] ||
++        success_fixture.foreign_text[0].next != &success_fixture.foreign_text[1] ||
++        success_fixture.foreign_text[1].next != NULL ||
++        HSD_SisLib_804D797C != &success_fixture.foreign_contexts[0] ||
++        success_fixture.foreign_contexts[0].x0 !=
++            &success_fixture.foreign_contexts[1] ||
++        success_fixture.foreign_contexts[1].x0 != NULL ||
++        HSD_SisLib_804D1124[1] != NULL ||
++        stadium_display_owner_current != &success_fixture.owner)
++        goto cleanup;
++    stadium_display_owner_current = NULL;
++
++    /* A replaced descriptor is refused before the drain or any release. */
++    stadium_owner_control_fixture_init(&failure_fixture, 0);
++    stadium_owner_control_activate(&failure_fixture);
++    if (!melee_web_stadium_display_owner_capture(
++            &failure_fixture.owner, &failure_fixture.display_ground,
++            error, sizeof(error)))
++        goto cleanup;
++    HSD_SisLib_804D1124[1] = &foreign_sis;
++    StadiumDisplayRetirementServices foreign_services =
++        stadium_owner_control_services;
++    foreign_services.context = &failure_fixture;
++    if (stadium_owner_retire_with_services(
++            &failure_fixture.owner, &foreign_services, error, sizeof(error)) ||
++        failure_fixture.preflight_calls != 0 ||
++        failure_fixture.drain_calls != 0 || failure_fixture.retire_calls != 0 ||
++        failure_fixture.release_calls != 0 || failure_fixture.unlink_calls != 0 ||
++        HSD_SisLib_804D1124[1] != &foreign_sis ||
++        !stadium_owner_gobj_linked(failure_fixture.owner.children[0], 0x13) ||
++        stadium_display_owner_current != &failure_fixture.owner)
++        goto cleanup;
++    stadium_display_owner_current = NULL;
++
++    /* If the original drain is followed by a foreign-list mismatch, no
++     * descriptor retirement, image release or child unlink is attempted. */
++    stadium_owner_control_fixture_init(&failure_fixture, 1);
++    stadium_owner_control_activate(&failure_fixture);
++    if (!melee_web_stadium_display_owner_capture(
++            &failure_fixture.owner, &failure_fixture.display_ground,
++            error, sizeof(error)))
++        goto cleanup;
++    StadiumDisplayRetirementServices failure_services =
++        stadium_owner_control_services;
++    failure_services.context = &failure_fixture;
++    if (stadium_owner_retire_with_services(
++            &failure_fixture.owner, &failure_services, error, sizeof(error)) ||
++        failure_fixture.preflight_calls != 1 ||
++        failure_fixture.drain_calls != 1 ||
++        failure_fixture.retire_calls != 0 || failure_fixture.release_calls != 0 ||
++        failure_fixture.unlink_calls != 0 ||
++        stadium_display_owner_current != &failure_fixture.owner ||
++        HSD_SisLib_804D1124[1] != &failure_fixture.source_sis ||
++        failure_fixture.owner.images[1].image_ptr !=
++            failure_fixture.fallback_image ||
++        !stadium_owner_gobj_linked(failure_fixture.owner.children[0], 0x13))
++        goto cleanup;
++    stadium_display_owner_current = NULL;
++
++    /* The exact same capture/retirement preflights reject font-selector
++     * changes injected after SIS preflight, before the destructive drain. */
++    for (size_t i = 0; i < sizeof(selector_kinds) / sizeof(selector_kinds[0]);
++         ++i) {
++        stadium_owner_control_fixture_init(&failure_fixture, 0);
++        stadium_owner_control_activate(&failure_fixture);
++        if (!melee_web_stadium_display_owner_capture(
++                &failure_fixture.owner, &failure_fixture.display_ground,
++                error, sizeof(error)))
++            goto cleanup;
++        if (selector_kinds[i] == 1)
++            failure_fixture.foreign_text[0].font_idx = 1;
++        else
++            failure_fixture.foreign_contexts[0].xA = 1;
++        const size_t before_public_retire_count =
++            stadium_owner_control_entity_count();
++        if (melee_web_stadium_display_owner_retire(
++                &failure_fixture.owner, error, sizeof(error)) ||
++            failure_fixture.preflight_calls != 0 ||
++            failure_fixture.drain_calls != 0 ||
++            failure_fixture.retire_calls != 0 ||
++            failure_fixture.release_calls != 0 ||
++            failure_fixture.unlink_calls != 0 ||
++            failure_fixture.owner.state != STADIUM_DISPLAY_OWNER_CAPTURED ||
++            stadium_display_owner_current != &failure_fixture.owner ||
++            HSD_SisLib_804D1124[1] != &failure_fixture.source_sis ||
++            stage_info.map_gobjs[PsType_Display] !=
++                &failure_fixture.display_ground ||
++            stadium_owner_control_entity_count() != before_public_retire_count ||
++            failure_fixture.owner.images[1].image_ptr !=
++                failure_fixture.fallback_image ||
++            !stadium_owner_gobj_linked(failure_fixture.owner.children[0], 0x13) ||
++            !stadium_owner_gobj_linked(failure_fixture.owner.renderers[0], 0xD) ||
++            !stadium_owner_gobj_linked(failure_fixture.owner.renderers[1], 0xD) ||
++            HSD_SisLib_804D7978 != &failure_fixture.foreign_text[0] ||
++            failure_fixture.foreign_text[0].next !=
++                &failure_fixture.foreign_text[1] ||
++            failure_fixture.foreign_text[1].next !=
++                &failure_fixture.owned_texts[0] ||
++            HSD_SisLib_804D797C != &failure_fixture.foreign_contexts[0] ||
++            failure_fixture.foreign_contexts[1].x0 !=
++                &failure_fixture.owned_context)
++            goto cleanup;
++        failure_fixture.foreign_text[0].font_idx = 0;
++        failure_fixture.foreign_contexts[0].xA = 0;
++        failure_fixture.mutate_foreign_font_after_preflight =
++            selector_kinds[i] == 1;
++        failure_fixture.mutate_foreign_context_after_preflight =
++            selector_kinds[i] == 2;
++        StadiumDisplayRetirementServices changed_services =
++            stadium_owner_control_services;
++        changed_services.context = &failure_fixture;
++        const size_t before_retire_count = stadium_owner_control_entity_count();
++        if (stadium_owner_retire_with_services(
++                &failure_fixture.owner, &changed_services, error,
++                sizeof(error)) ||
++            failure_fixture.preflight_calls != 1 ||
++            failure_fixture.drain_calls != 0 ||
++            failure_fixture.retire_calls != 0 ||
++            failure_fixture.release_calls != 0 ||
++            failure_fixture.unlink_calls != 0 ||
++            failure_fixture.owner.state != STADIUM_DISPLAY_OWNER_CAPTURED ||
++            stadium_display_owner_current != &failure_fixture.owner ||
++            HSD_SisLib_804D1124[1] != &failure_fixture.source_sis ||
++            stage_info.map_gobjs[PsType_Display] !=
++                &failure_fixture.display_ground ||
++            stadium_owner_control_entity_count() != before_retire_count ||
++            failure_fixture.owner.images[1].image_ptr !=
++                failure_fixture.fallback_image ||
++            !stadium_owner_gobj_linked(failure_fixture.owner.children[0], 0x13) ||
++            !stadium_owner_gobj_linked(failure_fixture.owner.renderers[0], 0xD) ||
++            !stadium_owner_gobj_linked(failure_fixture.owner.renderers[1], 0xD) ||
++            HSD_SisLib_804D7978 != &failure_fixture.foreign_text[0] ||
++            failure_fixture.foreign_text[0].next !=
++                &failure_fixture.foreign_text[1] ||
++            failure_fixture.foreign_text[1].next !=
++                &failure_fixture.owned_texts[0] ||
++            HSD_SisLib_804D797C != &failure_fixture.foreign_contexts[0] ||
++            failure_fixture.foreign_contexts[1].x0 !=
++                &failure_fixture.owned_context)
++            goto cleanup;
++        stadium_display_owner_current = NULL;
++    }
++    success = 1;
++
++cleanup:
++    stadium_display_owner_current = NULL;
++    HSD_SisLib_804D7978 = original_text_head;
++    HSD_SisLib_804D797C = original_context_head;
++    HSD_SisLib_804D1124[1] = original_font1;
++    stage_info.map_gobjs[PsType_Display] = original_display_map;
++    HSD_GObj_Entities = original_entities;
++    HSD_GObjLibInitData = original_init;
++    return success;
++}
++
++static int stadium_owner_retire_with_services(
++    MeleeWebStadiumDisplayOwner* owner,
++    const StadiumDisplayRetirementServices* services,
++    char* error, size_t error_size)
++{
++    if (owner == NULL || owner->state != STADIUM_DISPLAY_OWNER_CAPTURED ||
++        owner->display_ground_data == NULL || services == NULL ||
++        services->preflight_sis == NULL ||
++        services->drain_sis_font == NULL || services->retire_sis == NULL ||
++        services->release_image == NULL || services->unlink_child == NULL ||
++        owner->source_sis == NULL)
++        return stadium_owner_error(error, error_size,
++                                   "Stadium display retirement dependencies are incomplete");
++    if (owner != stadium_display_owner_current ||
++        !stadium_owner_capture_matches(owner, owner->display_ground) ||
++        owner->display_ground_data != HSD_GObjGetUserData(owner->display_ground))
++        return stadium_owner_error(error, error_size,
++                                   "Stadium display teardown refused a mismatched live owner");
++    if (HSD_SisLib_804D1124[1] != owner->source_sis ||
++        !services->preflight_sis(owner->source_sis, error, error_size,
++                                 services->context))
++        return stadium_owner_error(error, error_size,
++                                   "Stadium borrowed SIS slot failed its exact preflight");
++    if (!stadium_owner_text_topology_matches(owner, 1) ||
++        !stadium_owner_context_topology_matches(owner, 1) ||
++        stadium_owner_has_font1_before(owner) ||
++        HSD_SisLib_804D1124[1] != owner->source_sis)
++        return stadium_owner_error(error, error_size,
++                                   "Foreign SIS state changed before the original font-1 drain");
++
++    services->drain_sis_font(1, services->context);
++    if (stadium_owner_text_or_renderer_present(owner) ||
++        !stadium_owner_text_topology_matches(owner, 0) ||
++        !stadium_owner_context_topology_matches(owner, 0) ||
++        HSD_SisLib_804D1124[1] != owner->source_sis ||
++        !HSD_SisLib_FontSlotBorrowable(1) ||
++        !stadium_owner_gobj_linked(owner->children[0], 0x13) ||
++        !stadium_owner_gobj_linked(owner->children[1], 0x12) ||
++        !stadium_owner_gobj_linked(owner->children[2], 0x12))
++        return stadium_owner_error(error, error_size,
++                                   "Original font-1 drain did not retire only the journaled SIS owners");
++    if (HSD_SisLib_804D1124[1] != owner->source_sis ||
++        !services->retire_sis(owner->source_sis, error, error_size,
++                              services->context))
++        return stadium_owner_error(error, error_size,
++                                   "Stadium source SIS descriptor changed before borrowed-slot retirement");
++    for (size_t i = 0; i < 3; ++i)
++        if (!services->release_image(&owner->images[i], services->context))
++            return stadium_owner_error(error, error_size,
++                                       "Stadium fallback image provenance could not be retired exactly once");
++
++    for (int i = 2; i >= 0; --i) {
++        services->unlink_child(owner->children[i], services->context);
++    }
++    if (stadium_owner_gobj_address_present(owner->children[0]) ||
++        stadium_owner_gobj_address_present(owner->children[1]) ||
++        stadium_owner_gobj_address_present(owner->children[2]) ||
++        !stadium_owner_text_topology_unchanged(owner) ||
++        !stadium_owner_context_topology_unchanged(owner) ||
++        HSD_SisLib_804D1124[1] != NULL)
++        return stadium_owner_error(error, error_size,
++                                   "Stadium display child unlink did not restore its SIS ownership baseline");
++    owner->display_ground_data->u.display.xD4 = NULL;
++    owner->display_ground_data->u.display.xD8 = NULL;
++    owner->display_ground_data->u.display.xDC = NULL;
++
++    if (error != NULL && error_size != 0) error[0] = '\0';
++    return 1;
++}
++
++int melee_web_stadium_display_owner_retire(
++    MeleeWebStadiumDisplayOwner* owner, char* error, size_t error_size)
++{
++    if (!stadium_owner_retire_with_services(
++            owner, &stadium_owner_actual_services, error, error_size))
++        return 0;
++
++    stadium_display_owner_current = NULL;
++    stadium_owner_release_bookkeeping(owner);
++    if (error != NULL && error_size != 0) error[0] = '\0';
++    return 1;
++}
++
++int melee_web_stadium_display_owner_end(
++    MeleeWebStadiumDisplayOwner* owner, char* error, size_t error_size)
++{
++    if (owner == NULL || owner != stadium_display_owner_current)
++        return stadium_owner_error(error, error_size,
++                                   "Stadium display owner is not the active source owner");
++    if (owner->state == STADIUM_DISPLAY_OWNER_CAPTURED)
++        return melee_web_stadium_display_owner_retire(owner, error, error_size);
++    return melee_web_stadium_display_owner_cancel(owner, error, error_size);
++}
++#endif
++
+ /// @todo can these inlines be merged?
+ static inline int randi_between_2(int a, int b)
+ {
+@@ -1185,22 +2653,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+     PAD_STACK(4);
+ 
+     gobj = GObj_Create(0x11, 0x13, 0);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    stadium_owner_journal_child(0, gobj);
++#endif
+     cobj = lb_80013B14(&grPs_803E14FC);
+     HSD_CObjSetOrtho(cobj, 0.0F, -160.0F, 0.0F, 250.0F);
+     HSD_GObjObject_80390A70(gobj, HSD_GObj_CameraKind, cobj);
+     GObj_SetupGXLinkMax(gobj, fn_801D2ED0, 1);
+     gobj->gxlink_prios = 2;
+     text = HSD_MemAlloc(sizeof(*text));
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    stadium_owner_journal_wrapper(0, text);
++#endif
+     GObj_InitUserData(gobj, 3, HSD_Free, text);
+     memzero(text, 0x18);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    stadium_owner_initialize_image(&text->desc, 0xFA, 0xA0, 4, 0x7D2, 0);
++#else
+     lb_800121FC(&text->desc, 0xFA, 0xA0, 4, 0x7D2);
++#endif
+     archive = grDatFiles_GetArchive();
+     HSD_SisLib_803A611C(1, gobj, 9, 0xD, 0, 1, 0, 1);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    stadium_owner_journal_context();
++#endif
+     HSD_SisLib_804D1124[1] =
+         HSD_ArchiveGetPublicAddress(archive->unk0, "SIS_GrPStadiumData");
+     text->win_static_p =
+         HSD_SisLib_803A5ACC(1, 0, 0.0F, 0.0F, 0.0F, 250.0F, 160.0F);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    stadium_owner_journal_text(0, text->win_static_p);
++#endif
+     text->win_dynamic_p = HSD_SisLib_803A6754(1, 0);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    stadium_owner_journal_text(1, text->win_dynamic_p);
++#endif
+     text->win_dynamic_p->pos_z = 0.0F;
+     hsd_text = text->win_dynamic_p;
+     hsd_text->box_size_x = 250.0F;
+@@ -1214,11 +2701,21 @@ HSD_GObj* grStadium_801D2D78(void)
+     ImageDescWrapper* wrapper;
+ 
+     temp_r3 = GObj_Create(0x11, 0x12, 0);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    stadium_owner_journal_child(1, temp_r3);
++#endif
+     GObj_SetupGXLinkMax(temp_r3, grStadium_801D2FD0, 3);
+     wrapper = HSD_MemAlloc(0x1C);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    stadium_owner_journal_wrapper(1, wrapper);
++#endif
+     GObj_InitUserData(temp_r3, 3, HSD_Free, wrapper);
+     memzero(&wrapper->desc, sizeof(wrapper->desc));
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    stadium_owner_initialize_image(&wrapper->desc, 0x280, 0x196, 4, 0x7D3, 1);
++#else
+     lb_800121FC(&wrapper->desc, 0x280, 0x196, 4, 0x7D3);
++#endif
+     wrapper->flag = true;
+     return temp_r3;
+ }
+@@ -1226,12 +2723,22 @@ HSD_GObj* grStadium_801D2D78(void)
+ HSD_GObj* grStadium_801D2E24(void)
+ {
+     HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    stadium_owner_journal_child(2, gobj);
++#endif
+     ImageDescWrapper* wrapper;
+     GObj_SetupGXLinkMax(gobj, grStadium_801D3084, 3);
+     wrapper = HSD_MemAlloc(sizeof(ImageDescWrapper));
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    stadium_owner_journal_wrapper(2, wrapper);
++#endif
+     GObj_InitUserData(gobj, 3, HSD_Free, wrapper);
+     memzero(&wrapper->desc, sizeof(HSD_ImageDesc));
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    stadium_owner_initialize_image(&wrapper->desc, 0x7C, 0x50, 4, 0x7D4, 2);
++#else
+     lb_800121FC(&wrapper->desc, 0x7C, 0x50, 4, 0x7D4);
++#endif
+     wrapper->flag = false;
+     return gobj;
+ }
 diff --git a/src/melee/gr/grshrine.c b/src/melee/gr/grshrine.c
 index 9851d18921226b2adc5917698fd8662c1dd1eb4e..02ccf3daeab7602ae44037257c788d1f0aaac216 100644
 --- a/src/melee/gr/grshrine.c
@@ -7904,6 +9435,236 @@ index fde58837b1a2b93a05f6b737959b8537a8bd1703..961cdbbc251c1fd72241dcb5881c0b62
      }
  }
  
+diff --git a/src/melee/lb/lbspdisplay.c b/src/melee/lb/lbspdisplay.c
+index 2f9d9a1c14fddf436bf8f5c22c1c371ae6efd131..13cb578fdb8ac2a3b26051de0f233c4a417bac6d 100644
+--- a/src/melee/lb/lbspdisplay.c
++++ b/src/melee/lb/lbspdisplay.c
+@@ -1,4 +1,5 @@
+ #include "lbspdisplay.h"
++#include "gameplay_stadium_display_owner.h"
+ 
+ #include <Runtime/platform.h>
+ 
+@@ -7,6 +8,7 @@
+ #include <placeholder.h>
+ #include <stdarg.h>
+ #include <stddef.h>
++#include <stdint.h>
+ 
+ #include "lbdvd.h"
+ #include "types.h"
+@@ -275,17 +277,30 @@ int lb_8001204C(HSD_JObj* root, HSD_JObj** result, u16* indices, int count)
+     return found;
+ }
+ 
+-static void* setImageFromPreloadedArchive(HSD_ImageDesc* image_desc,
+-                                          s16 entry_num)
++typedef void* (*ImagePreloadLookup)(int entry_num, void* context);
++typedef void* (*ImageBufferAllocate)(size_t size, void* context);
++
++static void* originalImagePreloadLookup(int entry_num, void* context)
+ {
+-    void* image_ptr = lbDvd_GetPreloadedArchive(entry_num);
+-    image_desc->image_ptr = image_ptr;
+-    return image_ptr;
++    (void) context;
++    return lbDvd_GetPreloadedArchive(entry_num);
+ }
+ 
+-HSD_ImageDesc* lb_800121FC(HSD_ImageDesc* image_desc, int width, int height,
+-                           GXTexFmt format, s16 entry_num)
++static void* originalImageBufferAllocate(size_t size, void* context)
++{
++    (void) context;
++    return HSD_MemAlloc(size);
++}
++
++static HSD_ImageDesc* initializeImageDesc(
++    HSD_ImageDesc* image_desc, int width, int height, GXTexFmt format,
++    s16 entry_num, ImagePreloadLookup lookup, ImageBufferAllocate allocate,
++    void* callback_context, MeleeWebStadiumImageProvenance* provenance)
+ {
++    if (provenance != NULL) {
++        provenance->image_ptr = NULL;
++        provenance->origin = MELEE_WEB_STADIUM_IMAGE_ORIGIN_UNKNOWN;
++    }
+     image_desc->width = width;
+     image_desc->height = height;
+     image_desc->mipmap = 0;
+@@ -296,15 +311,139 @@ HSD_ImageDesc* lb_800121FC(HSD_ImageDesc* image_desc, int width, int height,
+     {
+         size_t buffer_size = GXGetTexBufferSize(
+             image_desc->width, image_desc->height, image_desc->format, 0, 0);
+-        if (entry_num == 0 ||
+-            !setImageFromPreloadedArchive(image_desc, entry_num))
+-        {
+-            image_desc->image_ptr = HSD_MemAlloc((buffer_size + 0x1F) & ~0x1F);
++        void* preloaded = entry_num == 0 ? NULL : lookup(entry_num, callback_context);
++        if (preloaded == NULL) {
++            image_desc->image_ptr = allocate((buffer_size + 0x1F) & ~0x1F,
++                                             callback_context);
++            if (provenance != NULL) {
++                provenance->image_ptr = image_desc->image_ptr;
++                provenance->origin = MELEE_WEB_STADIUM_IMAGE_ORIGIN_OWNED_HSD;
++            }
++        } else {
++            image_desc->image_ptr = preloaded;
++            if (provenance != NULL) {
++                provenance->image_ptr = preloaded;
++                provenance->origin =
++                    MELEE_WEB_STADIUM_IMAGE_ORIGIN_BORROWED_PRELOAD;
++            }
+         }
+     }
+     return image_desc;
+ }
+ 
++HSD_ImageDesc* lb_800121FC(HSD_ImageDesc* image_desc, int width, int height,
++                           GXTexFmt format, s16 entry_num)
++{
++    return initializeImageDesc(image_desc, width, height, format, entry_num,
++                               originalImagePreloadLookup,
++                               originalImageBufferAllocate, NULL, NULL);
++}
++
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++HSD_ImageDesc* lb_800121FC_with_provenance(
++    HSD_ImageDesc* image_desc, int width, int height, GXTexFmt format,
++    s16 entry_num, MeleeWebStadiumImageProvenance* provenance)
++{
++    return initializeImageDesc(image_desc, width, height, format, entry_num,
++                               originalImagePreloadLookup,
++                               originalImageBufferAllocate, NULL, provenance);
++}
++
++int melee_web_stadium_image_release(
++    MeleeWebStadiumImageProvenance* provenance,
++    MeleeWebStadiumBufferFree release, void* context)
++{
++    if (provenance == NULL || release == NULL || provenance->image_ptr == NULL)
++        return 0;
++    switch (provenance->origin) {
++    case MELEE_WEB_STADIUM_IMAGE_ORIGIN_BORROWED_PRELOAD:
++        return 1;
++    case MELEE_WEB_STADIUM_IMAGE_ORIGIN_OWNED_HSD:
++        release(provenance->image_ptr, context);
++        provenance->image_ptr = NULL;
++        provenance->origin = MELEE_WEB_STADIUM_IMAGE_ORIGIN_RELEASED;
++        return 1;
++    default:
++        return 0;
++    }
++}
++
++typedef struct ImageBranchControl {
++    int lookup_count;
++    int allocate_count;
++    int release_count;
++    void* fallback;
++    void* released;
++} ImageBranchControl;
++
++static void* controlImageLookup(int entry_num, void* context)
++{
++    ImageBranchControl* control = context;
++    control->lookup_count++;
++    if (entry_num == 0x7D2) return (void*) (uintptr_t) 0x1020;
++    if (entry_num == 0x7D4) return (void*) (uintptr_t) 0x3040;
++    return NULL;
++}
++
++static void* controlImageAllocate(size_t size, void* context)
++{
++    ImageBranchControl* control = context;
++    if (size == 0) return NULL;
++    control->allocate_count++;
++    return control->fallback;
++}
++
++static void controlImageRelease(void* image_ptr, void* context)
++{
++    ImageBranchControl* control = context;
++    if (image_ptr == control->fallback) {
++        control->release_count++;
++        control->released = image_ptr;
++    }
++}
++
++int melee_web_stadium_display_provenance_controls(void)
++{
++    HSD_ImageDesc descriptors[3] = { 0 };
++    MeleeWebStadiumImageProvenance provenance[3] = { 0 };
++    ImageBranchControl control = { 0, 0, 0, (void*) (uintptr_t) 0x5060, NULL };
++    initializeImageDesc(&descriptors[0], 0xFA, 0xA0, 4, 0x7D2,
++                        controlImageLookup, controlImageAllocate, &control,
++                        &provenance[0]);
++    initializeImageDesc(&descriptors[1], 0x280, 0x196, 4, 0x7D3,
++                        controlImageLookup, controlImageAllocate, &control,
++                        &provenance[1]);
++    initializeImageDesc(&descriptors[2], 0x7C, 0x50, 4, 0x7D4,
++                        controlImageLookup, controlImageAllocate, &control,
++                        &provenance[2]);
++    if (control.lookup_count != 3 || control.allocate_count != 1 ||
++        descriptors[0].image_ptr != (void*) (uintptr_t) 0x1020 ||
++        descriptors[1].image_ptr != control.fallback ||
++        descriptors[2].image_ptr != (void*) (uintptr_t) 0x3040 ||
++        provenance[0].origin != MELEE_WEB_STADIUM_IMAGE_ORIGIN_BORROWED_PRELOAD ||
++        provenance[1].origin != MELEE_WEB_STADIUM_IMAGE_ORIGIN_OWNED_HSD ||
++        provenance[2].origin != MELEE_WEB_STADIUM_IMAGE_ORIGIN_BORROWED_PRELOAD)
++        return 0;
++    if (!melee_web_stadium_image_release(&provenance[0], controlImageRelease,
++                                         &control) ||
++        !melee_web_stadium_image_release(&provenance[1], controlImageRelease,
++                                         &control) ||
++        !melee_web_stadium_image_release(&provenance[2], controlImageRelease,
++                                         &control) ||
++        control.release_count != 1 || control.released != control.fallback ||
++        provenance[0].image_ptr != descriptors[0].image_ptr ||
++        provenance[2].image_ptr != descriptors[2].image_ptr ||
++        provenance[1].image_ptr != NULL ||
++        provenance[1].origin != MELEE_WEB_STADIUM_IMAGE_ORIGIN_RELEASED)
++        return 0;
++    if (melee_web_stadium_image_release(&provenance[1], controlImageRelease,
++                                        &control) ||
++        control.release_count != 1)
++        return 0;
++    return 1;
++}
++#endif
++
+ void lb_800122C8(HSD_ImageDesc* image_desc, u16 origx, u16 origy, bool clear)
+ {
+     HSD_ImageDescCopyFromEFB(image_desc, origx, origy, clear, true);
+diff --git a/src/melee/lb/lbspdisplay.h b/src/melee/lb/lbspdisplay.h
+index af129da1fb07de422ebe73efc2941bafc8d0a73e..9f3174a7b21d9854f33fc048b480dbc43b21e5e5 100644
+--- a/src/melee/lb/lbspdisplay.h
++++ b/src/melee/lb/lbspdisplay.h
+@@ -8,6 +8,10 @@
+ 
+ #include <dolphin/gx.h>
+ 
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++#include "gameplay_stadium_display_owner.h"
++#endif
++
+ /* 011AC4 */ HSD_LObj* lb_80011AC4(LightList**);
+ /* 011B74 */ void lb_80011B74(HSD_DObj* dobj, u32 flags);
+ /* 011C18 */ void lb_80011C18(HSD_JObj* jobj, u32 flags);
+@@ -16,6 +20,14 @@
+ /* 0121FC */ HSD_ImageDesc* lb_800121FC(HSD_ImageDesc* image_desc, int width,
+                                         int height, GXTexFmt format,
+                                         s16 entry_num);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++/* Diagnostic Stadium constructors observe provenance at the actual source
++ * lookup/allocation branch. This caller-owned output performs no extra cache
++ * lookup and does not change the ordinary ABI above. */
++HSD_ImageDesc* lb_800121FC_with_provenance(
++    HSD_ImageDesc*, int width, int height, GXTexFmt format, s16 entry_num,
++    MeleeWebStadiumImageProvenance*);
++#endif
+ /* 0122C8 */ void lb_800122C8(HSD_ImageDesc* image_desc, u16 origx, u16 origy,
+                               bool clear);
+ /* 0122F0 */ void lb_800122F0(HSD_ImageDesc*, GXTexObj*, float);
 diff --git a/src/melee/lb/lbtrigf.c b/src/melee/lb/lbtrigf.c
 index d2759ffe39764fe8fbcac0f8c352234b1b2506de..38b0d0ece83da481dbaef2da0ee2d47dca867792 100644
 --- a/src/melee/lb/lbtrigf.c
