@@ -123,7 +123,9 @@ if(EMSCRIPTEN)
     src/gameplay_rng_draw_probe.c
     src/gameplay_stage_context.c src/gameplay_common_context.c "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lbspdisplay.c")
   if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-    # Keep the C1 provenance API limited to the source unit that owns it.
+    # Keep C1 source observers limited to their original implementation units.
+    set_property(SOURCE "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/gr/ground.c"
+      APPEND PROPERTY COMPILE_DEFINITIONS MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
     set_property(SOURCE "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lbspdisplay.c"
       APPEND PROPERTY COMPILE_DEFINITIONS MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
   endif()

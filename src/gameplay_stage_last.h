@@ -30,6 +30,9 @@ MeleeWebStageLast* melee_web_stage_begin_kind_on_init_diagnostic(
  * or extend the private Ground layout. Call only before stage_last_end. */
 int melee_web_stage_last_stadium_map2_buffer_snapshot(
     const MeleeWebStageLast*, MeleeWebStadiumMap2BufferOwner* out);
+/* Snapshot the actual guarded source taps while their StageLast owner is live. */
+int melee_web_stage_last_stadium_source_journal_snapshot(
+    const MeleeWebStageLast*, MeleeWebStadiumSourceJournal* out);
 #endif
 /* Requires full native map/overrides, stage particle bank64, original effect
  * runtime, numeric stage/collision and original camera contexts already live.

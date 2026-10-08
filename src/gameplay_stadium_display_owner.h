@@ -32,6 +32,29 @@ typedef enum MeleeWebStadiumMap2BufferOrigin {
     MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_RETIRED = 3,
 } MeleeWebStadiumMap2BufferOrigin;
 
+#define MELEE_WEB_STADIUM_SOURCE_EVENT_CAPACITY 8
+
+typedef enum MeleeWebStadiumSourceEventKind {
+    MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8 = 1,
+    MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_24C = 2,
+    MELEE_WEB_STADIUM_SOURCE_EVENT_GROUND_0800 = 3,
+    MELEE_WEB_STADIUM_SOURCE_EVENT_ON_INIT = 4,
+    MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ = 5,
+} MeleeWebStadiumSourceEventKind;
+
+typedef struct MeleeWebStadiumSourceEvent {
+    MeleeWebStadiumSourceEventKind kind;
+    int map_id;
+    HSD_GObj* gobj;
+} MeleeWebStadiumSourceEvent;
+
+typedef struct MeleeWebStadiumSourceJournal {
+    MeleeWebStadiumSourceEvent events[MELEE_WEB_STADIUM_SOURCE_EVENT_CAPACITY];
+    unsigned count;
+    int failed;
+    int overflowed;
+} MeleeWebStadiumSourceJournal;
+
 /* This source-derived record crosses the private Stadium TU boundary. It
  * keeps the exact branch provenance alive after display/SIS retirement and
  * until the original Ground owner objects have been removed. */
@@ -52,6 +75,12 @@ int melee_web_stadium_display_owner_prepare(
     MeleeWebStadiumDisplayOwner** out, char* error, size_t error_size);
 int melee_web_stadium_display_owner_bind_source(
     MeleeWebStadiumDisplayOwner*, char* error, size_t error_size);
+int melee_web_stadium_display_owner_arm_source_journal(
+    MeleeWebStadiumDisplayOwner*, char* error, size_t error_size);
+void melee_web_stadium_display_owner_note_source_event(
+    MeleeWebStadiumSourceEventKind, int map_id, HSD_GObj*);
+int melee_web_stadium_display_owner_source_journal_snapshot(
+    const MeleeWebStadiumDisplayOwner*, MeleeWebStadiumSourceJournal* out);
 int melee_web_stadium_display_owner_capture(
     MeleeWebStadiumDisplayOwner*, HSD_GObj* display_ground,
     MeleeWebStadiumMap2BufferOwner* map2_buffer_owner,
@@ -73,6 +102,7 @@ int melee_web_stadium_display_provenance_controls(void);
 int melee_web_stadium_display_list_controls(void);
 int melee_web_stadium_display_owner_retirement_controls(void);
 int melee_web_stadium_map2_buffer_controls(void);
+int melee_web_stadium_source_journal_controls(void);
 #endif
 
 #ifdef __cplusplus

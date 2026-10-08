@@ -5375,10 +5375,10 @@ index 116be3d41cc321eefbd5c71c9de7282e92220bbc..3d5a61476b4327b7f321704dceb7e8d2
  
  void grOldYoshi_8020E79C(void)
 diff --git a/src/melee/gr/ground.c b/src/melee/gr/ground.c
-index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807dfc36eabb 100644
+index 6c26c029432e5a07f6c0a34343d87f9fd3364367..192404b5e89227bab1bb611994c81ba48d7b58e8 100644
 --- a/src/melee/gr/ground.c
 +++ b/src/melee/gr/ground.c
-@@ -1,5 +1,10 @@
+@@ -1,5 +1,13 @@
  #include "ground.h"
  
 +#ifdef TARGET_PC
@@ -5386,10 +5386,13 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807d
 +#include "gameplay_stage_map.h"
 +#include "gameplay_stage_context.h"
 +#endif
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++#include "gameplay_stadium_display_owner.h"
++#endif
  #include <Runtime/platform.h>
  
  #include <math.h>
-@@ -284,6 +289,35 @@ void Ground_801C0378(int arg0)
+@@ -284,6 +292,35 @@ void Ground_801C0378(int arg0)
      zeroBuffer();
  }
  
@@ -5425,7 +5428,18 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807d
  void mem_free(void* ptr)
  {
      HSD_Free(ptr);
-@@ -499,8 +533,15 @@ void Ground_801C0800(StageIdPair* pair)
+@@ -468,6 +505,10 @@ void Ground_801C0754(StageIdPair* pair)
+ void Ground_801C0800(StageIdPair* pair)
+ {
+     StageData* stage_data = stage_datas[pair->grkind];
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_GROUND_0800, -1, NULL);
++#endif
+     Ground_801C38D0(stage_info.param->x8, stage_info.param->x14,
+                     stage_info.param->x1C, stage_info.param->x18);
+     Ground_801C38EC(stage_info.param->x10, stage_info.param->xC);
+@@ -499,8 +540,15 @@ void Ground_801C0800(StageIdPair* pair)
          }
      }
      if (stage_info.map_ptcl != NULL && stage_info.map_texg != NULL) {
@@ -5441,7 +5455,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807d
      }
      mpLibLoad(stage_info.coll_data);
      mpLib_80058820();
-@@ -694,8 +735,13 @@ void Ground_801C0FB8(StageIdPair* pair)
+@@ -694,8 +742,13 @@ void Ground_801C0FB8(StageIdPair* pair)
  {
      struct {
          void* unk0;
@@ -5455,7 +5469,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807d
      }* cur;
      void* next;
      stage_datas[pair->grkind]->on_start();
-@@ -1187,6 +1233,19 @@ static inline bool find_light_override(UnkArchiveStruct* archive,
+@@ -1187,6 +1240,19 @@ static inline bool find_light_override(UnkArchiveStruct* archive,
                                         HSD_LightDesc* desc, bool* b6, bool* b7,
                                         bool* b5)
  {
@@ -5475,7 +5489,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807d
      UnkStageDat* dat = archive->unk4;
      s32 count = dat->unk1C;
      s32 i;
-@@ -1210,6 +1269,19 @@ static inline bool find_light_override_in_dat(UnkStageDat* dat,
+@@ -1210,6 +1276,19 @@ static inline bool find_light_override_in_dat(UnkStageDat* dat,
                                                HSD_LightDesc* desc, bool* b6,
                                                bool* b7, bool* b5)
  {
@@ -5495,7 +5509,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807d
      s32 count = dat->unk1C;
      s32 i;
  
-@@ -1523,6 +1595,13 @@ void Ground_801C28CC(s32* arg0, StKind stkind)
+@@ -1523,6 +1602,13 @@ void Ground_801C28CC(s32* arg0, StKind stkind)
      panicMissingStageParam(stkind, count);
  }
  
@@ -5509,7 +5523,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807d
  s32* Ground_801C2AD8(void)
  {
      return &stage_info.xA0;
-@@ -2646,6 +2725,7 @@ void Ground_801C466C(void)
+@@ -2646,6 +2732,7 @@ void Ground_801C466C(void)
      int i;
      int count;
      HSD_GObj* temp_r3;
@@ -5517,7 +5531,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807d
      HSD_LObj* temp_r3_2;
      LightList** var_r27_2;
      HSD_LObj* var_r27;
-@@ -2666,6 +2746,7 @@ void Ground_801C466C(void)
+@@ -2666,6 +2753,7 @@ void Ground_801C466C(void)
          if (callbacks->flags_b0 == 1) {
              archive = grDatFiles_801C6330(i);
              selected = Ground_801C20E0(archive, archive->unk4->unk8[i].x18);
@@ -5525,12 +5539,12 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807d
              goto light_selected;
          }
          callbacks++;
-@@ -2674,7 +2755,18 @@ void Ground_801C466C(void)
+@@ -2674,7 +2762,18 @@ void Ground_801C466C(void)
  light_selected:
      if ((r28_carrier.lights = selected) == NULL) {
          r28_carrier.lights = Ground_803E06C8;
 +        selected_entry = -1;
-+    }
+     }
 +#if defined(TARGET_PC)
 +    /* The selected source row is bounded by its authored LightList** table in
 +     * map_head. Compare Ground's live HSD chain to that entry count instead of
@@ -5539,12 +5553,12 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807d
 +        OSReport("%s:%d: source Ground light entry has no checked bound\n",
 +                 __FILE__, __LINE__);
 +        while (true) {}
-     }
++    }
 +#endif
      temp_r3 = GObj_Create(0xD, 3, 0);
      if (temp_r3 == NULL) {
          OSReport("%s:%d: couldn t get gobj\n", __FILE__, 0xEAF);
-@@ -3356,3 +3448,34 @@ void Ground_801C5AEC(Vec3* v, Vec3* arg1, Vec3* arg2, Vec3* arg3)
+@@ -3356,3 +3455,34 @@ void Ground_801C5AEC(Vec3* v, Vec3* arg1, Vec3* arg2, Vec3* arg3)
  
  /// @todo Is this used by base pointer anywhere? Not stripped by mwcc.
  static int unused_ints[] = { 1, 1, 0, 0, 0, 180, 0, 0, 0 };
@@ -5580,7 +5594,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807d
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..dba97568f6d52ecb24096c4ca848db96c97177ba 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..378273ba8e9b134647a5264c778fa9991d13fa05 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,15 @@
@@ -5653,7 +5667,29 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..dba97568f6d52ecb24096c4ca848db96
  GrJoint grPs_803E1248[] = {
      { 1, 3, 0 }, { 2, 3, 0 }, { 3, 4, 0 },
      { 4, 5, 0 }, { 5, 6, 0 }, { 7, 9, 0 },
-@@ -315,6 +349,9 @@ void grStadium_801D13E0(Ground_GObj* gobj)
+@@ -162,6 +196,10 @@ void grStadium_OnDemoInit(int unused) {}
+ 
+ void grStadium_OnInit(void)
+ {
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_ON_INIT, -1, NULL);
++#endif
+     yakumono_param = Ground_GetYakumonoParam();
+ 
+     stage_info.unk8C.b4 = false;
+@@ -206,6 +244,10 @@ Ground_GObj* grStadium_801D10F8(StadiumGrType id)
+ 
+     cb = &grPs_StageCallbacks[id];
+     gobj = Ground_GetStageGObj(id);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ, (int) id, gobj);
++#endif
+ 
+     if (gobj != NULL) {
+         Ground* gp = GET_GROUND(gobj);
+@@ -315,6 +357,9 @@ void grStadium_801D13E0(Ground_GObj* gobj)
      if (mobj == NULL) {
          gr->u.stadium.xCC = HSD_MemAlloc(0x50000);
      }
@@ -5663,7 +5699,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..dba97568f6d52ecb24096c4ca848db96
      gr->u.stadium.xC4_b1 = false;
      gr->u.stadium.xD0 = NULL;
      gr->u.stadium.xD4 = 0.0F;
-@@ -346,6 +383,9 @@ bool grStadium_801D1518(Ground_GObj* gobj)
+@@ -346,6 +391,9 @@ bool grStadium_801D1518(Ground_GObj* gobj)
  
  void grStadium_801D1520(Ground_GObj* gobj)
  {
@@ -5673,7 +5709,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..dba97568f6d52ecb24096c4ca848db96
      Ground* gp = GET_GROUND(gobj);
      if (!gp->u.stadium.xC4_b0) {
          grStadium_801D4548(gobj);
-@@ -652,6 +692,38 @@ typedef struct ImageDescWrapper {
+@@ -652,6 +700,38 @@ typedef struct ImageDescWrapper {
      u16 x1A, x1C;
  } ImageDescWrapper;
  
@@ -5712,7 +5748,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..dba97568f6d52ecb24096c4ca848db96
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -920,6 +992,2059 @@ typedef struct TextWrapper {
+@@ -920,6 +1000,2341 @@ typedef struct TextWrapper {
      HSD_Text* win_dynamic_p;
  } TextWrapper;
  
@@ -5737,6 +5773,12 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..dba97568f6d52ecb24096c4ca848db96
 +    StadiumDisplayOwnerState state;
 +    int capture_attempted;
 +    int journal_failed;
++    int source_journal_armed;
++    int source_journal_failed;
++    int source_journal_overflowed;
++    unsigned source_event_count;
++    MeleeWebStadiumSourceEvent source_events[
++        MELEE_WEB_STADIUM_SOURCE_EVENT_CAPACITY];
 +    HSD_GObj* children[3];
 +    void* wrappers[3];
 +    MeleeWebStadiumImageProvenance images[3];
@@ -5763,6 +5805,130 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..dba97568f6d52ecb24096c4ca848db96
 +};
 +
 +static MeleeWebStadiumDisplayOwner* stadium_display_owner_current;
++static int stadium_owner_error(char* error, size_t error_size,
++                               const char* message);
++
++static int stadium_owner_source_event_matches_index(
++    unsigned index, const MeleeWebStadiumSourceEvent* event)
++{
++    static const MeleeWebStadiumSourceEventKind entry_kinds[4] = {
++        MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8,
++        MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_24C,
++        MELEE_WEB_STADIUM_SOURCE_EVENT_GROUND_0800,
++        MELEE_WEB_STADIUM_SOURCE_EVENT_ON_INIT,
++    };
++    static const int map_ids[4] = { 0, 1, 2, 5 };
++    if (event == NULL) return 0;
++    if (index < ARRAY_SIZE(entry_kinds))
++        return event->kind == entry_kinds[index] && event->map_id == -1 &&
++               event->gobj == NULL;
++    if (index < ARRAY_SIZE(entry_kinds) + ARRAY_SIZE(map_ids)) {
++        size_t map_index = index - ARRAY_SIZE(entry_kinds);
++        return event->kind == MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ &&
++               event->map_id == map_ids[map_index];
++    }
++    return 0;
++}
++
++static int stadium_owner_source_journal_matches(
++    const MeleeWebStadiumDisplayOwner* owner, HSD_GObj* const* map_slots,
++    size_t map_slot_count)
++{
++    if (owner == NULL || map_slots == NULL || !owner->source_journal_armed ||
++        owner->source_journal_failed || owner->source_journal_overflowed ||
++        owner->source_event_count != MELEE_WEB_STADIUM_SOURCE_EVENT_CAPACITY)
++        return 0;
++    for (unsigned i = 0; i < owner->source_event_count; ++i) {
++        const MeleeWebStadiumSourceEvent* event = &owner->source_events[i];
++        if (!stadium_owner_source_event_matches_index(i, event)) return 0;
++        if (i >= 4) {
++            if (event->map_id < 0 || (size_t) event->map_id >= map_slot_count ||
++                event->gobj == NULL || event->gobj != map_slots[event->map_id])
++                return 0;
++        }
++    }
++    return 1;
++}
++
++static int stadium_owner_source_journal_validate(
++    MeleeWebStadiumDisplayOwner* owner, HSD_GObj* const* map_slots,
++    size_t map_slot_count)
++{
++    if (!stadium_owner_source_journal_matches(owner, map_slots,
++                                              map_slot_count)) {
++        if (owner != NULL) owner->source_journal_failed = 1;
++        return 0;
++    }
++    return 1;
++}
++
++static int stadium_owner_source_event_state_matches(
++    const MeleeWebStadiumDisplayOwner* owner,
++    MeleeWebStadiumSourceEventKind kind)
++{
++    if (kind == MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8)
++        return owner->state == STADIUM_DISPLAY_OWNER_PREPARED;
++    return owner->state == STADIUM_DISPLAY_OWNER_BOUND;
++}
++
++int melee_web_stadium_display_owner_arm_source_journal(
++    MeleeWebStadiumDisplayOwner* owner, char* error, size_t error_size)
++{
++    if (owner == NULL || owner != stadium_display_owner_current ||
++        owner->state != STADIUM_DISPLAY_OWNER_PREPARED ||
++        owner->source_journal_armed || owner->source_event_count != 0 ||
++        owner->source_journal_failed || owner->source_journal_overflowed)
++        return stadium_owner_error(error, error_size,
++                                   "Stadium source journal must arm once on its prepared owner");
++    owner->source_journal_armed = 1;
++    if (error != NULL && error_size != 0) error[0] = '\0';
++    return 1;
++}
++
++void melee_web_stadium_display_owner_note_source_event(
++    MeleeWebStadiumSourceEventKind kind, int map_id, HSD_GObj* gobj)
++{
++    MeleeWebStadiumDisplayOwner* owner = stadium_display_owner_current;
++    unsigned index;
++    MeleeWebStadiumSourceEvent* event;
++    if (owner == NULL || !owner->source_journal_armed) return;
++    if (owner->source_event_count >= MELEE_WEB_STADIUM_SOURCE_EVENT_CAPACITY) {
++        owner->source_journal_failed = 1;
++        owner->source_journal_overflowed = 1;
++        return;
++    }
++    index = owner->source_event_count++;
++    event = &owner->source_events[index];
++    event->kind = kind;
++    event->map_id = map_id;
++    event->gobj = gobj;
++    if (!stadium_owner_source_event_matches_index(index, event) ||
++        !stadium_owner_source_event_state_matches(owner, kind) ||
++        (kind == MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ && gobj == NULL))
++        owner->source_journal_failed = 1;
++}
++
++int melee_web_stadium_display_owner_source_journal_snapshot(
++    const MeleeWebStadiumDisplayOwner* owner,
++    MeleeWebStadiumSourceJournal* out)
++{
++    if (owner == NULL || owner != stadium_display_owner_current || out == NULL ||
++        !owner->source_journal_armed)
++        return 0;
++    memset(out, 0, sizeof(*out));
++    out->count = owner->source_event_count;
++    if (out->count > MELEE_WEB_STADIUM_SOURCE_EVENT_CAPACITY) {
++        out->count = MELEE_WEB_STADIUM_SOURCE_EVENT_CAPACITY;
++        out->failed = 1;
++        out->overflowed = 1;
++        return 1;
++    }
++    memcpy(out->events, owner->source_events,
++           out->count * sizeof(out->events[0]));
++    out->failed = owner->source_journal_failed;
++    out->overflowed = owner->source_journal_overflowed;
++    return 1;
++}
 +
 +static void stadium_owner_journal_map2_buffer(
 +    HSD_GObj* gobj, const void* lookup_result, const void* stored_result)
@@ -6429,6 +6595,12 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..dba97568f6d52ecb24096c4ca848db96
 +    const MeleeWebStadiumDisplayOwner* owner, HSD_GObj* display_ground)
 +{
 +    static const u8 child_links[3] = { 0x13, 0x12, 0x12 };
++    if (owner->source_journal_failed) return 0;
++    if (owner->source_journal_armed &&
++        !stadium_owner_source_journal_validate(
++            owner, stage_info.map_gobjs,
++            ARRAY_SIZE(stage_info.map_gobjs)))
++        return 0;
 +    if (owner->journal_failed || owner->source_sis == NULL ||
 +        !stadium_owner_text_topology_matches(owner, 1) ||
 +        !stadium_owner_context_topology_matches(owner, 1) ||
@@ -6525,6 +6697,8 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..dba97568f6d52ecb24096c4ca848db96
 +        owner->texts[0] != NULL || owner->texts[1] != NULL ||
 +        owner->context != NULL || owner->map2_buffer_journal_count != 0 ||
 +        owner->map2_ground != NULL || owner->map2_buffer != NULL ||
++        (owner->source_journal_armed && owner->source_event_count != 0) ||
++        owner->source_journal_failed || owner->source_journal_overflowed ||
 +        owner->map2_proc_dispatch_count != 0 ||
 +        owner->map2_buffer_use_count != 0 ||
 +        !stadium_owner_text_topology_unchanged(owner) ||
@@ -7483,6 +7657,150 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..dba97568f6d52ecb24096c4ca848db96
 +    stadium_owner_journal_map2_buffer(&fixture->map2_ground, lookup, stored);
 +}
 +
++static int stadium_owner_control_arm_source_journal(
++    MeleeWebStadiumDisplayOwner* owner)
++{
++    memset(owner, 0, sizeof(*owner));
++    owner->state = STADIUM_DISPLAY_OWNER_PREPARED;
++    stadium_display_owner_current = owner;
++    return melee_web_stadium_display_owner_arm_source_journal(owner, NULL, 0);
++}
++
++static void stadium_owner_control_emit_source_sequence(
++    MeleeWebStadiumDisplayOwner* owner, HSD_GObj* map0,
++    HSD_GObj* display, HSD_GObj* map2, HSD_GObj* map5)
++{
++    (void) owner;
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8, -1, NULL);
++    owner->state = STADIUM_DISPLAY_OWNER_BOUND;
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_24C, -1, NULL);
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_GROUND_0800, -1, NULL);
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_ON_INIT, -1, NULL);
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ, 0, map0);
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ, 1, display);
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ, 2, map2);
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ, 5, map5);
++}
++
++int melee_web_stadium_source_journal_controls(void)
++{
++    MeleeWebStadiumDisplayOwner owner;
++    HSD_GObj maps[4];
++    HSD_GObj wrong_map;
++    HSD_GObj* slots[6] = { NULL };
++    HSD_GObj* wrong_slots[6] = { NULL };
++    MeleeWebStadiumSourceJournal snapshot;
++    int success = 0;
++    if (stadium_display_owner_current != NULL) return 0;
++    memset(maps, 0, sizeof(maps));
++    memset(&wrong_map, 0, sizeof(wrong_map));
++    slots[0] = &maps[0];
++    slots[1] = &maps[1];
++    slots[2] = &maps[2];
++    slots[5] = &maps[3];
++
++    if (!stadium_owner_control_arm_source_journal(&owner)) goto cleanup;
++    stadium_owner_control_emit_source_sequence(
++        &owner, slots[0], slots[1], slots[2], slots[5]);
++    if (!melee_web_stadium_display_owner_source_journal_snapshot(
++            &owner, &snapshot) || snapshot.count != 8 || snapshot.failed ||
++        snapshot.overflowed ||
++        !stadium_owner_source_journal_matches(&owner, slots,
++                                               ARRAY_SIZE(slots)))
++        goto cleanup;
++    for (unsigned i = 0; i < snapshot.count; ++i)
++        if (snapshot.events[i].kind != owner.source_events[i].kind ||
++            snapshot.events[i].map_id != owner.source_events[i].map_id ||
++            snapshot.events[i].gobj != owner.source_events[i].gobj)
++            goto cleanup;
++
++    if (!stadium_owner_control_arm_source_journal(&owner)) goto cleanup;
++    owner.state = STADIUM_DISPLAY_OWNER_BOUND;
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8, -1, NULL);
++    if (owner.source_event_count != 1 || !owner.source_journal_failed ||
++        owner.source_events[0].kind !=
++            MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8 ||
++        stadium_owner_source_journal_matches(&owner, slots,
++                                              ARRAY_SIZE(slots)))
++        goto cleanup;
++
++    if (!stadium_owner_control_arm_source_journal(&owner)) goto cleanup;
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8, -1, NULL);
++    owner.state = STADIUM_DISPLAY_OWNER_BOUND;
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8, -1, NULL);
++    if (owner.source_event_count != 2 || !owner.source_journal_failed ||
++        owner.source_events[1].kind !=
++            MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8)
++        goto cleanup;
++
++    if (!stadium_owner_control_arm_source_journal(&owner)) goto cleanup;
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8, -1, NULL);
++    owner.state = STADIUM_DISPLAY_OWNER_BOUND;
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_GROUND_0800, -1, NULL);
++    if (owner.source_event_count != 2 || !owner.source_journal_failed ||
++        owner.source_events[1].kind !=
++            MELEE_WEB_STADIUM_SOURCE_EVENT_GROUND_0800)
++        goto cleanup;
++
++    if (!stadium_owner_control_arm_source_journal(&owner)) goto cleanup;
++    stadium_owner_control_emit_source_sequence(
++        &owner, slots[0], slots[1], slots[2], slots[5]);
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ, 5, slots[5]);
++    if (owner.source_event_count != 8 || !owner.source_journal_failed ||
++        !owner.source_journal_overflowed ||
++        owner.source_events[7].map_id != 5 ||
++        owner.source_events[7].gobj != slots[5])
++        goto cleanup;
++
++    if (!stadium_owner_control_arm_source_journal(&owner)) goto cleanup;
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8, -1, NULL);
++    owner.state = STADIUM_DISPLAY_OWNER_BOUND;
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_24C, -1, NULL);
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_GROUND_0800, -1, NULL);
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_ON_INIT, -1, NULL);
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ, 0, NULL);
++    if (owner.source_event_count != 5 || !owner.source_journal_failed ||
++        owner.source_events[4].gobj != NULL ||
++        stadium_owner_source_journal_matches(&owner, slots,
++                                              ARRAY_SIZE(slots)))
++        goto cleanup;
++
++    if (!stadium_owner_control_arm_source_journal(&owner)) goto cleanup;
++    stadium_owner_control_emit_source_sequence(
++        &owner, slots[0], slots[1], slots[2], slots[5]);
++    memcpy(wrong_slots, slots, sizeof(slots));
++    wrong_slots[1] = &wrong_map;
++    if (owner.source_journal_failed) goto cleanup;
++    if (stadium_owner_source_journal_validate(
++            &owner, wrong_slots, ARRAY_SIZE(wrong_slots)) ||
++        !owner.source_journal_failed)
++        goto cleanup;
++    success = 1;
++
++cleanup:
++    stadium_display_owner_current = NULL;
++    return success;
++}
++
 +static void stadium_owner_control_add_unowned_stage(
 +    StadiumDisplayOwnerControlFixture* fixture, int manager)
 +{
@@ -7772,7 +8090,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..dba97568f6d52ecb24096c4ca848db96
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
  {
-@@ -1185,22 +3310,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +3600,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -7814,7 +8132,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..dba97568f6d52ecb24096c4ca848db96
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +3358,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +3648,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -7836,7 +8154,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..dba97568f6d52ecb24096c4ca848db96
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +3380,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +3670,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
@@ -7859,7 +8177,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..dba97568f6d52ecb24096c4ca848db96
      wrapper->flag = false;
      return gobj;
  }
-@@ -1896,6 +4060,9 @@ bool grStadium_801D42B8(void)
+@@ -1896,6 +4350,9 @@ bool grStadium_801D42B8(void)
      if (gp->u.stadium.xC4_b1) {
          return false;
      }
@@ -7869,7 +8187,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..dba97568f6d52ecb24096c4ca848db96
      gp->u.stadium.xD0 =
          grDatFiles_801C6478(gp->u.stadium.xCC, gp->u.stadium.xC8);
      return true;
-@@ -2093,6 +4260,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2093,6 +4550,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
              gp = GET_GROUND(map_gobj);
              HSD_ASSERT(0x99B, gp);
              gp->u.stadium.xC4_b1 = true;
@@ -7879,7 +8197,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..dba97568f6d52ecb24096c4ca848db96
              lbFile_80016580(datfiles[var_r29], gp->u.stadium.xCC,
                              &gp->u.stadium.xC8, fn_801D4220, NULL);
              temp_r31->u.stadium.xDC = 1;
-@@ -2221,6 +4391,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2221,6 +4681,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
          if (temp_r31->u.stadium.xDE == 5) {
              temp_r31->u.stadium.xD8 =
                  randi_between_2(yakumono_param->x0, yakumono_param->x4);
@@ -7933,10 +8251,20 @@ index 98700a79819d50c89fce0b030538a94af4ea0136..aaff533e48f1da7e4262847f864ba1d4
  static u32 _[] = {
      0xC3920000, 0x42D20000, 0xC3920000, 0x42960000, 0xC3920000, 0x42480000,
 diff --git a/src/melee/gr/stage.c b/src/melee/gr/stage.c
-index 5a63015df51b87fa22d8e474b10c7047692e0e3e..565fb6e2899ef43a136f119d518f4efd7dd397af 100644
+index 5a63015df51b87fa22d8e474b10c7047692e0e3e..8c99ea5dfd13251c175b1196b7813abe8bf471ea 100644
 --- a/src/melee/gr/stage.c
 +++ b/src/melee/gr/stage.c
-@@ -292,7 +292,13 @@ bool Stage_80224FDC(Vec3* arg0)
+@@ -1,5 +1,9 @@
+ #include "stage.h"
+ 
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++#include "gameplay_stadium_display_owner.h"
++#endif
++
+ #include "ground.h"
+ #include "types.h"
+ #include <melee/gm/gm_unsplit.h>
+@@ -292,7 +296,13 @@ bool Stage_80224FDC(Vec3* arg0)
      return false;
  }
  
@@ -7950,7 +8278,7 @@ index 5a63015df51b87fa22d8e474b10c7047692e0e3e..565fb6e2899ef43a136f119d518f4efd
  {
      s32 r31;
      s32 spC;
-@@ -325,12 +331,35 @@ s32 Stage_80225074(s32 arg0)
+@@ -325,11 +335,34 @@ s32 Stage_80225074(s32 arg0)
      }
  
      tmp = Ground_801C28AC(selected_stage.stkind, r31, &spC);
@@ -7962,9 +8290,9 @@ index 5a63015df51b87fa22d8e474b10c7047692e0e3e..565fb6e2899ef43a136f119d518f4efd
      Ground_801C5A84(spC);
      Ground_801C5AA4(tmp);
 +#endif
-     return arg0;
- }
- 
++    return arg0;
++}
++
 +#if defined(MELEE_WEB_GAMEPLAY)
 +void melee_web_stage_commit_music(s32 music, int alternate)
 +{
@@ -7979,14 +8307,13 @@ index 5a63015df51b87fa22d8e474b10c7047692e0e3e..565fb6e2899ef43a136f119d518f4efd
 +    int alternate;
 +    melee_web_stage_select_music(arg0, &music, &alternate);
 +    melee_web_stage_commit_music(music, alternate);
-+    return arg0;
-+}
+     return arg0;
+ }
 +#endif
-+
+ 
  StKind Stage_80225194(void)
  {
-     return selected_stage.stkind;
-@@ -483,6 +512,28 @@ struct StageIdMapEntry stage_id_map[] = {
+@@ -483,6 +516,28 @@ struct StageIdMapEntry stage_id_map[] = {
      { Gr_Kind_Shrine, 0, 0 },       { Gr_Kind_Battle, 0, 0 },
  };
  
@@ -8015,6 +8342,30 @@ index 5a63015df51b87fa22d8e474b10c7047692e0e3e..565fb6e2899ef43a136f119d518f4efd
  GrKind Stage_8022519C(StKind stkind)
  {
      return stage_id_map[stkind].grkind;
+@@ -497,6 +552,11 @@ void Stage_802251E8(StKind stkind, s32* _)
+ {
+     StageIdPair local_data;
+ 
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8, -1, NULL);
++#endif
++
+     selected_stage.stkind = stkind;
+     selected_stage.entry = &stage_id_map[stkind];
+ 
+@@ -512,6 +572,11 @@ void Stage_8022524C(void)
+ {
+     StageIdPair local_data;
+ 
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    melee_web_stadium_display_owner_note_source_event(
++        MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_24C, -1, NULL);
++#endif
++
+     local_data = default_stage_pair;
+ 
+     local_data.grkind = selected_stage.entry->grkind;
 diff --git a/src/melee/gr/types.h b/src/melee/gr/types.h
 index 4a0b8b70cec184ee529308e3e54240a431845dfb..b9f18e242e799923df754450195cffdf08034534 100644
 --- a/src/melee/gr/types.h

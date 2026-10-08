@@ -27,6 +27,8 @@ class StadiumOnInitBoundaryTests(unittest.TestCase):
         body = function_body(source, "static MeleeWebStageLast* begin_stage(")
 
         prepare_owner = body.index("melee_web_stadium_display_owner_prepare(")
+        arm_source_journal = body.index(
+            "melee_web_stadium_display_owner_arm_source_journal(")
         authored_initialization = body.index("Stage_802251E8(")
         bind_source = body.index("melee_web_stadium_display_owner_bind_source(")
         original_ground_setup = body.index("Stage_8022524C(")
@@ -43,10 +45,10 @@ class StadiumOnInitBoundaryTests(unittest.TestCase):
         camera = body.index("Stage_80225298();")
         onstart = body.index("Stage_802252E4(")
         self.assertEqual(
-            [prepare_owner, authored_initialization, bind_source,
+            [prepare_owner, arm_source_journal, authored_initialization, bind_source,
              original_ground_setup, capture_owner, collision_adoption,
              required_owners, diagnostic_return, camera, onstart],
-            sorted([prepare_owner, authored_initialization, bind_source,
+            sorted([prepare_owner, arm_source_journal, authored_initialization, bind_source,
                     original_ground_setup, capture_owner, collision_adoption,
                     required_owners, diagnostic_return, camera, onstart]),
         )
@@ -87,9 +89,11 @@ class StadiumOnInitBoundaryTests(unittest.TestCase):
         self.assertIn("MELEE_RUN_STADIUM_SOURCE_ONINIT", (ROOT / "tests/test_gameplay_native_menus.py").read_text(encoding="utf-8"))
         self.assertIn("melee_web_stage_begin_kind_on_init_diagnostic(", helper)
         self.assertIn("melee_web_stage_last_stadium_map2_buffer_snapshot(", helper)
+        self.assertIn("melee_web_stage_last_stadium_source_journal_snapshot(", helper)
         self.assertIn("melee_web_stage_last_end(retained_stage_owner", helper)
         self.assertIn("std::_Exit(1)", helper)
-        self.assertIn("runtime_map_call_order_observed\\\":false", helper)
+        self.assertIn("runtime_map_call_order_observed\\\":true", helper)
+        self.assertIn("MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ", helper)
         self.assertNotIn("Stage_802251E8(St_Kind_PStadium, NULL);\n            check(melee_web_stage_last", helper)
         api = (ROOT / "src/gameplay_stage_last.c").read_text(encoding="utf-8")
         accessor = function_body(api, "int melee_web_stage_last_stadium_map2_buffer_snapshot(")

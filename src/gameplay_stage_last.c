@@ -69,6 +69,11 @@ static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,voi
   if(!melee_web_stage_last_end(h,e,n)){if(retained_owner)*retained_owner=h;return NULL;}
   fail(e,n,prepare_error);return NULL;
  }
+ if(on_init_diagnostic&&!melee_web_stadium_display_owner_arm_source_journal(h->stadium_display_owner,e,n)){
+  char journal_error[160];snprintf(journal_error,sizeof(journal_error),"%s",e&&n?e:"Stadium source journal could not be armed");
+  if(!melee_web_stage_last_end(h,e,n)){if(retained_owner)*retained_owner=h;return NULL;}
+  fail(e,n,journal_error);return NULL;
+ }
 #endif
  if(source_ordered){
   /* The retail scene enters Ground's state buffer and stage archive before
@@ -124,6 +129,10 @@ MeleeWebStageLast* melee_web_stage_begin_kind_on_init_diagnostic(int stage_kind,
 int melee_web_stage_last_stadium_map2_buffer_snapshot(const MeleeWebStageLast* h,MeleeWebStadiumMap2BufferOwner* out){
  if(!h||h!=active||!out||h->generation!=melee_web_gameplay_stats().generation||!h->definition||!h->definition->diagnostic_only||!h->stadium_map2_buffer_owner.captured)return 0;
  *out=h->stadium_map2_buffer_owner;return 1;
+}
+int melee_web_stage_last_stadium_source_journal_snapshot(const MeleeWebStageLast* h,MeleeWebStadiumSourceJournal* out){
+ if(!h||h!=active||!out||h->generation!=melee_web_gameplay_stats().generation||!h->definition||!h->definition->diagnostic_only||!h->stadium_display_owner)return 0;
+ return melee_web_stadium_display_owner_source_journal_snapshot(h->stadium_display_owner,out);
 }
 #endif
 MeleeWebStageLast* melee_web_stage_last_begin(void* yaku,MeleeWebEffectBank* bank,char* e,size_t n){

@@ -2092,6 +2092,8 @@ void run_stadium_profile_controls()
           "Stadium display owner refused mixed-buffer retirement or lost partial ownership");
     check(melee_web_stadium_map2_buffer_controls(),
           "Stadium map-2 0x7D5 origin journal lost the nested Ground owner or released a borrowed buffer");
+    check(melee_web_stadium_source_journal_controls(),
+          "Synthetic source-event journal controls lost ordering, pointers, or sticky refusal state");
     const auto* profile = melee_web_stage_stadium_profile_data();
     check(profile && melee_web_stage_profile(St_Kind_PStadium) == profile &&
               profile->diagnostic_only && profile->source != nullptr,
@@ -2191,8 +2193,28 @@ const char* stadium_map2_buffer_origin_name(
     }
 }
 
+const char* stadium_source_event_kind_name(
+    MeleeWebStadiumSourceEventKind kind)
+{
+    switch (kind) {
+    case MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8:
+        return "stage_e8";
+    case MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_24C:
+        return "stage_24c";
+    case MELEE_WEB_STADIUM_SOURCE_EVENT_GROUND_0800:
+        return "ground_0800";
+    case MELEE_WEB_STADIUM_SOURCE_EVENT_ON_INIT:
+        return "stadium_on_init";
+    case MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ:
+        return "map_gobj";
+    default:
+        return "unknown";
+    }
+}
+
 struct StadiumSourceOnInitObservation {
     MeleeWebStadiumMap2BufferOwner map2_owner{};
+    MeleeWebStadiumSourceJournal source_journal{};
     MeleeWebSourceMemoryContext memory_before_init{};
     MeleeWebSourceMemoryContext memory_before_end{};
     MeleeWebSourceMemoryContext memory_after_end{};
@@ -2491,6 +2513,10 @@ void run_stadium_e8_request(
                       retained_stage_owner,
                       &on_init_observation.map2_owner),
                   "OnInit owner did not expose its captured map2 provenance record");
+            check(melee_web_stage_last_stadium_source_journal_snapshot(
+                      retained_stage_owner,
+                      &on_init_observation.source_journal),
+                  "OnInit owner did not expose its actual source-event journal");
         } else {
             Stage_802251E8(St_Kind_PStadium, NULL);
         }
@@ -2570,6 +2596,23 @@ void run_stadium_e8_request(
                 on_init.map2_owner.map2_ground,
                 on_init.map2_owner.nested_map5_ground,
             };
+            const std::array<MeleeWebStadiumSourceEventKind, 4> entry_events{
+                MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8,
+                MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_24C,
+                MELEE_WEB_STADIUM_SOURCE_EVENT_GROUND_0800,
+                MELEE_WEB_STADIUM_SOURCE_EVENT_ON_INIT,
+            };
+            check(on_init.source_journal.count ==
+                          MELEE_WEB_STADIUM_SOURCE_EVENT_CAPACITY &&
+                      !on_init.source_journal.failed &&
+                      !on_init.source_journal.overflowed,
+                  "OnInit source-event journal is incomplete, reordered, or overflowed");
+            for (size_t i = 0; i < entry_events.size(); ++i) {
+                const auto& event = on_init.source_journal.events[i];
+                check(event.kind == entry_events[i] && event.map_id == -1 &&
+                          event.gobj == nullptr,
+                      "OnInit source-entry taps differed from E8→24C→Ground→OnInit");
+            }
             check(on_init.map2_owner.captured == 1 &&
                       on_init.map2_owner.buffer != nullptr &&
                       (on_init.map2_owner.origin ==
@@ -2585,6 +2628,11 @@ void run_stadium_e8_request(
                               melee_web_stadium_c1_ground_map_slot(
                                   static_cast<size_t>(map_ids[i])),
                       "OnInit map2 owner record differs from an actual StageInfo map slot");
+                const auto& event = on_init.source_journal.events[4 + i];
+                check(event.kind == MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ &&
+                          event.map_id == map_ids[i] &&
+                          event.gobj == recorded_maps[i],
+                      "OnInit actual map return journal differs from its owner/slot pointer");
             }
             on_init.stats_after_on_init = melee_web_gameplay_stats();
             on_init.seed_after_on_init = *seed_owner;
@@ -2837,9 +2885,27 @@ void run_stadium_e8_request(
                          "\"stage_info_xA0_observed_only\":"
                       << after_view.xA0
                       << ",\"authored_map_sequence\":[0,1,2,5],"
-                         "\"runtime_map_call_order_observed\":false,"
+                         "\"runtime_map_call_order_observed\":true,"
                          "\"map_slots_match_owner_record\":true,"
-                         "\"map0_gobj\":"
+                         "\"runtime_source_events\":[";
+            for (size_t i = 0; i < on_init.source_journal.count; ++i) {
+                const auto& event = on_init.source_journal.events[i];
+                if (i != 0) std::cout << ",";
+                std::cout << "{\"kind\":\""
+                          << stadium_source_event_kind_name(event.kind)
+                          << "\",\"map_id\":";
+                if (event.kind == MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ)
+                    std::cout << event.map_id;
+                else
+                    std::cout << "null";
+                std::cout << ",\"gobj\":";
+                if (event.gobj != nullptr)
+                    std::cout << reinterpret_cast<uintptr_t>(event.gobj);
+                else
+                    std::cout << "null";
+                std::cout << "}";
+            }
+            std::cout << "],\"map0_gobj\":"
                       << reinterpret_cast<uintptr_t>(on_init.map2_owner.map0_ground)
                       << ",\"display_gobj\":"
                       << reinterpret_cast<uintptr_t>(on_init.map2_owner.display_ground)
@@ -3686,7 +3752,7 @@ int main(int argc,char** argv){try{
   }
   if(argc==2&&std::string_view(argv[1])=="--stadium-on-init-controls"){
    run_stadium_profile_controls();
-   std::cout<<"C1 source OnInit wrong-kind/output-owner refusal controls passed; no source initialization invoked\n";
+   std::cout<<"C1 source OnInit refusal and synthetic event-journal controls passed; no source initialization invoked\n";
    return 0;
   }
   if(argc==2&&std::string_view(argv[1])=="--stadium-yakumono-exchange"){
