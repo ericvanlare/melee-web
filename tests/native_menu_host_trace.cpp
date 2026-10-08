@@ -59,6 +59,7 @@ extern "C" {
 #include <melee/mn/mnmain.h>
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include <melee/gr/grdatfiles.h>
+#include <melee/gr/stage.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/objalloc.h>
 #endif
@@ -742,7 +743,7 @@ void run_stadium_ground_map1_owner(
                   "Original Ground map1 row joint index did not resolve in its loaded JObj owner");
         }
         for (size_t i = 0; i < source_stage_marker_count(); ++i) {
-            const auto* current_marker = static_cast<HSD_JObj*>(
+            auto* current_marker = static_cast<HSD_JObj*>(
                 melee_web_stadium_c1_ground_marker_slot(i));
             const auto expected = expected_markers.find(static_cast<uint16_t>(i));
             if (expected == expected_markers.end()) {
