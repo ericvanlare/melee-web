@@ -433,7 +433,8 @@ void run_sudden_death_host_control(
     check(melee_web_menu_host_sudden_death_scene_begin(
               host,sudden_death_owner_id,error,error_size),error);
     const auto* sudden_death_scene=
-        static_cast<const GameSceneInfo*>(melee_web_current_scene_info());
+        static_cast<const GameModeState::GameSceneInfo*>(
+            melee_web_current_scene_info());
     check(sudden_death_scene&&sudden_death_scene->scene_kind==GS_SUDDEN_DEATH,
           "Typed match owner did not assign the original GS_SUDDEN_DEATH scene");
     check(gmVsMelee_StartData.rules.x6,

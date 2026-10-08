@@ -54,6 +54,7 @@ extern "C" {
 }
 #pragma GCC diagnostic pop
 #include <melee/ty/types.h>
+#include <melee/pl/forward.h>
 #include "gameplay_trophy_roots.hpp"
 #include "gameplay_fighter_assets.hpp"
 #include <iostream>
