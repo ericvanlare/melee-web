@@ -546,6 +546,8 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         (self.scratch / "sis-allocator.stderr").write_text(run.stderr, encoding="utf-8")
         self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-5000:])
         self.assertIn("C1 asset-free SIS retired-menu baseline, two owned allocator lifetimes", run.stdout)
+        self.assertIn("genuine-new-owner and later-epoch refusals passed", run.stdout)
+        self.assertRegex(run.stdout, r"actual post-restart retired SIS address reuse=[01]")
         self.assertIn("foreign-root/lease refusals and single drain passed", run.stdout)
         self.assertIn("no camera, scheduled procs or source ticks", run.stdout)
 
@@ -686,6 +688,27 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         rows = [json.loads(line) for line in trace.read_text().splitlines()]
         self.assertEqual(rows[0]["record"], "header")
         self.assertEqual(rows[0]["input_recipe"], "stadium-source-oninit-v1")
+        leases = [row for row in rows if row.get("record") == "sis_lease"]
+        self.assertEqual([row["boundary"] for row in leases], [
+            "captured_before_menu_leave", "verified_retired_before_world_shutdown", "before_begin",
+        ])
+        captured, retired, reopened = leases
+        self.assertTrue(captured["source_active"])
+        self.assertTrue(captured["current_live"])
+        self.assertFalse(captured["retirement_verified"])
+        self.assertFalse(retired["source_active"])
+        self.assertFalse(retired["current_live"])
+        self.assertTrue(retired["retirement_verified"])
+        self.assertEqual(retired["current_world"], captured["prior_world"])
+        self.assertEqual(retired["source_epoch"], captured["prior_source_epoch"] + 1)
+        self.assertEqual(reopened["prior_world"], captured["prior_world"])
+        self.assertEqual(reopened["prior_allocation"], captured["prior_allocation"])
+        self.assertFalse(reopened["source_active"])
+        self.assertEqual(reopened["source_epoch"], retired["source_epoch"])
+        self.assertGreater(reopened["current_world"], reopened["prior_world"])
+        if reopened["current_live"]:
+            self.assertNotEqual((reopened["current_world"], reopened["current_allocation"]),
+                                (reopened["prior_world"], reopened["prior_allocation"]))
         events = [row for row in rows if row.get("record") == "event"]
         self.assertEqual([row["event"] for row in events], [
             "stadium_source_oninit_returned",

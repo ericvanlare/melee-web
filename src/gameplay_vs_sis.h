@@ -2,6 +2,7 @@
 #define MELEE_WEB_GAMEPLAY_VS_SIS_H
 
 #include "gameplay_bootstrap.h"
+#include "gameplay_source_memory_runtime.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,8 +22,28 @@ typedef struct MeleeWebDiagnosticSisOwner {
     uint64_t world_generation;
     uint64_t allocation_generation;
     int source_heap_handle;
+    uint64_t source_epoch;
 } MeleeWebDiagnosticSisOwner;
 
+typedef struct MeleeWebRetiredSisLease {
+    MeleeWebDiagnosticSisOwner prior;
+    size_t requested_bytes;
+    int retirement_verified;
+} MeleeWebRetiredSisLease;
+
+/* Pure allocation identity reducer; current is the exact-address lookup. */
+int melee_web_diagnostic_sis_distinct_retired_lease(
+    const MeleeWebRetiredSisLease* retired,
+    const MeleeWebSourceMemoryAllocation* current);
+
+/* Capture before the known menu drain, verify while its SDK world is active. */
+int melee_web_diagnostic_sis_capture(MeleeWebRetiredSisLease* lease,
+                                    char* error, size_t error_size);
+int melee_web_diagnostic_sis_verify_retired(MeleeWebRetiredSisLease* lease,
+                                           char* error, size_t error_size);
+int melee_web_diagnostic_sis_begin_retired(MeleeWebDiagnosticSisOwner* owner,
+                                         const MeleeWebRetiredSisLease* retired,
+                                         char* error, size_t error_size);
 int melee_web_diagnostic_sis_begin(MeleeWebDiagnosticSisOwner* owner,
                                   char* error, size_t error_size);
 int melee_web_diagnostic_sis_end(MeleeWebDiagnosticSisOwner* owner,

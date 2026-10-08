@@ -13697,22 +13697,33 @@ index 9536d2a353ac39e156c8fc17f9a780871229c060..41143790a92d43d934e32627112598ea
              if (a->frame == -2) {
                  return 1;
 diff --git a/src/sysdolphin/baselib/sislib.c b/src/sysdolphin/baselib/sislib.c
-index bc3a9125d905210c360664c5b93a78eb49f43b4d..e8d131263678cfa010a01e43e8d37c28334c4b2c 100644
+index bc3a9125d905210c360664c5b93a78eb49f43b4d..372619c91bde5eb34dae8c87fe748bc312f07191 100644
 --- a/src/sysdolphin/baselib/sislib.c
 +++ b/src/sysdolphin/baselib/sislib.c
-@@ -1,6 +1,8 @@
+@@ -1,6 +1,13 @@
  #include "sislib.h"
  
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++static u64 diagnostic_sis_epoch;
++static int diagnostic_sis_active;
++#endif
++
 +#if !defined(MELEE_WEB_GAMEPLAY)
  #include <printf.h> // IWYU pragma: keep
 +#endif
  #include <stdio.h>
  
  #include "cobj.h"
-@@ -456,6 +458,31 @@ void HSD_SisLib_803A5FBC(void)
+@@ -454,7 +461,39 @@ void HSD_SisLib_803A5FBC(void)
+         }
+     }
      HSD_Free(HSD_SisLib_804D796C);
- }
- 
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    ++diagnostic_sis_epoch;
++    diagnostic_sis_active = 0;
++#endif
++}
++
 +int HSD_SisLib_FontSlotBorrowable(s32 font_idx)
 +{
 +    return font_idx >= 0 &&
@@ -13722,6 +13733,9 @@ index bc3a9125d905210c360664c5b93a78eb49f43b4d..e8d131263678cfa010a01e43e8d37c28
 +}
 +
 +#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++u64 HSD_SisLib_HeapEpoch(void) { return diagnostic_sis_epoch; }
++int HSD_SisLib_HeapActive(void) { return diagnostic_sis_active; }
++
 +void* HSD_SisLib_HeapOwner(void)
 +{
 +    return HSD_SisLib_804D796C;
@@ -13735,22 +13749,34 @@ index bc3a9125d905210c360664c5b93a78eb49f43b4d..e8d131263678cfa010a01e43e8d37c28
 +            return 0;
 +    }
 +    return 1;
-+}
+ }
 +#endif
-+
+ 
  /// @todo Currently 97.56% match - extra lwz reload optimized away by
  /// compiler after dual global store
- void HSD_SisLib_803A6048(size_t size)
+@@ -475,6 +514,10 @@ void HSD_SisLib_803A6048(size_t size)
+         HSD_SisLib_804D1110[i] = NULL;
+         HSD_SisLib_804D1124[i] = NULL;
+     }
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    ++diagnostic_sis_epoch;
++    diagnostic_sis_active = 1;
++#endif
+ }
+ 
+ /// GObj "remove" function callback
 diff --git a/src/sysdolphin/baselib/sislib.h b/src/sysdolphin/baselib/sislib.h
-index 153b907c1b0375796291582008f24380142e3bdc..a8b503947a43a6f5ca6299ee3211bec0bc50676f 100644
+index 153b907c1b0375796291582008f24380142e3bdc..df88dec26c6bd8944616acbd761b84bf63abff05 100644
 --- a/src/sysdolphin/baselib/sislib.h
 +++ b/src/sysdolphin/baselib/sislib.h
-@@ -149,6 +149,11 @@ void HSD_SisLib_803A5DA0(s32);
+@@ -149,6 +149,13 @@ void HSD_SisLib_803A5DA0(s32);
  void HSD_SisLib_803A5E70(void);
  void HSD_SisLib_803A5F50(s32);
  void HSD_SisLib_803A5FBC(void);
 +int HSD_SisLib_FontSlotBorrowable(s32 font_idx);
 +#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++u64 HSD_SisLib_HeapEpoch(void);
++int HSD_SisLib_HeapActive(void);
 +void* HSD_SisLib_HeapOwner(void);
 +int HSD_SisLib_AllFontSlotsEmpty(void);
 +#endif

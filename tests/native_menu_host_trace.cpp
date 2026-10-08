@@ -72,6 +72,7 @@ extern "C" {
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/objalloc.h>
 #include <sysdolphin/baselib/sislib.h>
+#include <sysdolphin/baselib/memory.h>
 #endif
 #include <melee/ty/forward.h>
 #include <melee/ty/toy.h>
@@ -1196,6 +1197,34 @@ public:
   output<<"}\n";
  }
  void begin_run(unsigned run){run_=run;index_=0;epochs.clear();}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ void sis_lease(const char* boundary, const MeleeWebRetiredSisLease* retired) {
+  if(!output)return;
+  const void* current_heap=HSD_SisLib_HeapOwner();
+  MeleeWebSourceMemoryAllocation current{};
+  const auto status=current_heap ? melee_web_source_memory_allocation_read(current_heap,&current)
+                                : MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
+  output<<"{\"record\":\"sis_lease\",\"boundary\":\""<<boundary
+        <<"\",\"source_epoch\":"<<HSD_SisLib_HeapEpoch()
+        <<",\"source_active\":"<<(HSD_SisLib_HeapActive()?"true":"false")
+        <<",\"current_heap\":"<<reinterpret_cast<uintptr_t>(current_heap)
+        <<",\"current_read_status\":"<<status
+        <<",\"current_world\":"<<current.world_generation
+        <<",\"current_allocation\":"<<current.allocation_generation
+        <<",\"current_heap_handle\":"<<current.source_heap_handle
+        <<",\"current_requested_bytes\":"<<current.requested_bytes
+        <<",\"current_live\":"<<(current.live?"true":"false");
+  if(retired)output<<",\"prior_heap\":"<<reinterpret_cast<uintptr_t>(retired->prior.heap)
+        <<",\"prior_world\":"<<retired->prior.world_generation
+        <<",\"prior_allocation\":"<<retired->prior.allocation_generation
+        <<",\"prior_heap_handle\":"<<retired->prior.source_heap_handle
+        <<",\"prior_requested_bytes\":"<<retired->requested_bytes
+        <<",\"prior_source_epoch\":"<<retired->prior.source_epoch
+        <<",\"retirement_verified\":"<<(retired->retirement_verified?"true":"false");
+  output<<"}\n";output.flush();
+ }
+#endif
+
  void event(const char* name,MeleeWebAudio* audio,const char* route=nullptr,
             const MeleeWebMenuMatchSelection* selection=nullptr,const uint32_t* rng=nullptr){
   if(!output)return;const auto stream=stream_name(audio);
@@ -2220,7 +2249,10 @@ void run_stadium_sis_allocator_lifecycle_control()
     HSD_GObj parent{}; // Non-null parent prevents original611C creating a camera.
     check(HSD_SisLib_803A611C(1, &parent, 9, 0xD, 0, 1, 0, 1) == 0,
           "Retired-menu SIS baseline lost its first context index");
+    MeleeWebRetiredSisLease retired{};
+    check(melee_web_diagnostic_sis_capture(&retired, error, sizeof(error)), error);
     HSD_SisLib_803A5FBC();
+    check(melee_web_diagnostic_sis_verify_retired(&retired, error, sizeof(error)), error);
     check(HSD_SisLib_AllFontSlotsEmpty() && !HSD_SisLib_804D7978 &&
               !HSD_SisLib_804D797C,
           "Retired-menu SIS baseline retained live roots");
@@ -2232,6 +2264,65 @@ void run_stadium_sis_allocator_lifecycle_control()
     const auto scheduler = HSD_GObj_804D783C;
     const auto gobj_count = HSD_ObjAllocGetUsing(&gobj_alloc_data);
     const auto proc_count = HSD_ObjAllocGetUsing(&gobjproc_alloc_data);
+    // One real current-world allocation at the old size adds address pressure.
+    // Record reuse; never require a particular allocator address or fake a lease.
+    void* const pressure = HSD_MemAlloc(MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES);
+    MeleeWebSourceMemoryAllocation pressure_before{};
+    check(pressure && melee_web_source_memory_allocation_read(
+              pressure, &pressure_before) == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+              pressure_before.live, "SIS pressure allocation lacks its actual lease");
+    const bool reused_retired_address = pressure == retired.prior.heap;
+    // Synthetic same-address records use the same pure identity reducer as begin.
+    // A live record with the prior generation remains the same owner; replacing
+    // either generation is distinct only after verified original retirement.
+    auto synthetic_same = pressure_before;
+    synthetic_same.world_generation = retired.prior.world_generation;
+    synthetic_same.allocation_generation = retired.prior.allocation_generation;
+    check(!melee_web_diagnostic_sis_distinct_retired_lease(&retired, &synthetic_same),
+          "Retirement reducer accepted the same live SIS lease");
+    ++synthetic_same.allocation_generation;
+    check(melee_web_diagnostic_sis_distinct_retired_lease(&retired, &synthetic_same),
+          "Retirement reducer confused same-address replacement generation");
+    synthetic_same.allocation_generation = retired.prior.allocation_generation;
+    ++synthetic_same.world_generation;
+    check(melee_web_diagnostic_sis_distinct_retired_lease(&retired, &synthetic_same),
+          "Retirement reducer confused same-address replacement world");
+    auto unverified = retired;
+    unverified.retirement_verified = 0;
+    check(!melee_web_diagnostic_sis_distinct_retired_lease(&unverified, &synthetic_same),
+          "Unverified retirement authorized a replacement lease");
+
+    MeleeWebDiagnosticSisOwner pressure_owner{};
+    check(melee_web_diagnostic_sis_begin_retired(
+              &pressure_owner, &retired, error, sizeof(error)), error);
+    check(melee_web_diagnostic_sis_end(&pressure_owner, error, sizeof(error)), error);
+    MeleeWebSourceMemoryAllocation pressure_after{};
+    check(melee_web_source_memory_allocation_read(pressure, &pressure_after) ==
+              MELEE_WEB_SOURCE_MEMORY_READ_OK && pressure_after.live &&
+              pressure_after.world_generation == pressure_before.world_generation &&
+              pressure_after.allocation_generation == pressure_before.allocation_generation,
+          "Retired SIS handoff freed or replaced a current foreign allocation");
+    HSD_Free(pressure);
+
+    // A new original initializer is a genuine owner, even if its numeric address
+    // matches an old token. Model equal address explicitly, retaining old epoch.
+    HSD_SisLib_803A6048(MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES);
+    auto stale_equal_address = retired;
+    stale_equal_address.prior.heap = HSD_SisLib_HeapOwner();
+    MeleeWebDiagnosticSisOwner refused{};
+    check(!melee_web_diagnostic_sis_begin_retired(
+              &refused, &stale_equal_address, error, sizeof(error)) && !refused.heap &&
+              HSD_SisLib_HeapActive(),
+          "Retired token overwrote a genuine newly initialized SIS owner");
+    MeleeWebRetiredSisLease fresh_retired{};
+    check(melee_web_diagnostic_sis_capture(&fresh_retired, error, sizeof(error)), error);
+    HSD_SisLib_803A5FBC();
+    check(melee_web_diagnostic_sis_verify_retired(&fresh_retired, error, sizeof(error)), error);
+    check(!melee_web_diagnostic_sis_begin_retired(
+              &refused, &stale_equal_address, error, sizeof(error)) && !refused.heap,
+          "Old retirement token survived a later source startup/drain epoch");
+    std::cout << "C1 actual post-restart retired SIS address reuse="
+              << reused_retired_address << "; genuine-new-owner and later-epoch refusals passed\n";
     HSD_Text foreign_text{};
     sislib_UnkAlloc3 foreign_context{};
     SIS foreign_sis_data{};
@@ -2255,7 +2346,8 @@ void run_stadium_sis_allocator_lifecycle_control()
                   HSD_SisLib_804D1124[1] == foreign_sis && !owner.heap,
               "Diagnostic SIS begin cleared a foreign font slot");
         HSD_SisLib_804D1124[1] = nullptr;
-        check(melee_web_diagnostic_sis_begin(&owner, error, sizeof(error)), error);
+        check(melee_web_diagnostic_sis_begin_retired(
+                  &owner, cycle == 0 ? &fresh_retired : nullptr, error, sizeof(error)), error);
         MeleeWebDiagnosticSisOwner contender{};
         check(!melee_web_diagnostic_sis_begin(&contender, error, sizeof(error)) &&
                   !contender.heap && HSD_SisLib_HeapOwner() == owner.heap,
@@ -2424,6 +2516,7 @@ void run_stadium_e8_request(
     const std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES>& save_before,
     bool perform_ground_map1_owner,
     bool perform_on_init,
+    const MeleeWebRetiredSisLease* retired_sis,
     TransitionTrace& trace)
 {
     using namespace melee_web;
@@ -2707,7 +2800,9 @@ void run_stadium_e8_request(
             check(!melee_web_effect_runtime_prepared() &&
                       !melee_web_effect_runtime_active(),
                   "Source-ordered OnInit requires an unowned original effect runtime");
-            check(melee_web_diagnostic_sis_begin(&sis_owner, error, sizeof(error)), error);
+            trace.sis_lease("before_begin", retired_sis);
+            check(melee_web_diagnostic_sis_begin_retired(
+                      &sis_owner, retired_sis, error, sizeof(error)), error);
             const int effect_begin_succeeded =
                 melee_web_effect_runtime_begin(error, sizeof(error));
             effect_runtime_owned = melee_web_effect_runtime_prepared();
@@ -3694,6 +3789,7 @@ void run_stadium_c1_context_preflight(
     bool perform_screen_roots_preflight,
     bool perform_ground_map1_owner,
     bool perform_on_init,
+    const MeleeWebRetiredSisLease* retired_sis,
     TransitionTrace& trace)
 {
     char error[256]{};
@@ -3844,7 +3940,7 @@ void run_stadium_c1_context_preflight(
             run_stadium_e8_request(reopened_files, host, world.get(), selected,
                                    baseline, save_before,
                                    perform_ground_map1_owner, perform_on_init,
-                                   trace);
+                                   retired_sis, trace);
             check_stadium_preflight_stage_empty();
         }
 
@@ -3908,6 +4004,7 @@ void run_stadium_c1a_selection_smoke(
     TransitionTrace& trace)
 {
     char error[256]{};
+    MeleeWebRetiredSisLease retired_sis{};
     MeleeWebMenuHost* host = melee_web_menu_host_create(error, sizeof(error));
     check(host != nullptr, error);
     check(melee_web_menu_host_enable_stadium_c1a(host, error, sizeof(error)), error);
@@ -3929,6 +4026,8 @@ void run_stadium_c1a_selection_smoke(
         return result;
     };
     auto transition = [&]() {
+        const bool capture_sis = source_on_init &&
+            melee_web_menu_host_phase(host) == MELEE_WEB_MENU_SSS;
         melee_web_stage_input_button(raw, PAD_BUTTON_START);
         int result = tick();
         melee_web_stage_input_neutral(raw);
@@ -3950,7 +4049,15 @@ void run_stadium_c1a_selection_smoke(
             }
             check(0, detail.c_str());
         }
+        if (capture_sis) {
+            check(melee_web_diagnostic_sis_capture(&retired_sis, error, sizeof(error)), error);
+            trace.sis_lease("captured_before_menu_leave", &retired_sis);
+        }
         check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
+        if (capture_sis) {
+            check(melee_web_diagnostic_sis_verify_retired(&retired_sis, error, sizeof(error)), error);
+            trace.sis_lease("verified_retired_before_world_shutdown", &retired_sis);
+        }
     };
 
     // The armed SSS still begins on an admitted stage. Its existing validation
@@ -4026,7 +4133,8 @@ void run_stadium_c1a_selection_smoke(
         run_stadium_c1_context_preflight(
             files, host, world, selected, names, menu_dir, game_dir,
             e8_request_trace, item_state_preflight, screen_roots_preflight,
-            ground_map1_owner, source_on_init, trace);
+            ground_map1_owner, source_on_init,
+            source_on_init ? &retired_sis : nullptr, trace);
     } else {
         world->verify_immutable_archives();
         world->close();

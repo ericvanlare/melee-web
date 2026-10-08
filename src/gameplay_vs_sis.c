@@ -55,14 +55,73 @@ static int diagnostic_sis_roots_empty(void)
            HSD_SisLib_AllFontSlotsEmpty();
 }
 
+int melee_web_diagnostic_sis_distinct_retired_lease(
+    const MeleeWebRetiredSisLease* retired,
+    const MeleeWebSourceMemoryAllocation* current)
+{
+    return retired && current && retired->retirement_verified &&
+           retired->prior.heap && retired->prior.world_generation &&
+           retired->prior.allocation_generation && retired->requested_bytes &&
+           (!current->live ||
+            current->world_generation != retired->prior.world_generation ||
+            current->allocation_generation != retired->prior.allocation_generation);
+}
+
+int melee_web_diagnostic_sis_capture(MeleeWebRetiredSisLease* lease,
+                                    char* error, size_t error_size)
+{
+    MeleeWebSourceMemoryAllocation allocation;
+    if (!lease || lease->prior.heap || lease->retirement_verified ||
+        !HSD_SisLib_HeapActive() || !HSD_SisLib_HeapOwner())
+        return fail(error, error_size, "SIS capture requires an empty token and active source allocator");
+    if (melee_web_source_memory_allocation_read(HSD_SisLib_HeapOwner(), &allocation) !=
+            MELEE_WEB_SOURCE_MEMORY_READ_OK)
+        return fail(error, error_size, "SIS prior allocation identity read failed");
+    if (!allocation.live || !allocation.allocation_generation)
+        return fail(error, error_size, "SIS prior allocator lacks a live exact lease");
+    lease->prior.heap = HSD_SisLib_HeapOwner();
+    lease->prior.world_generation = allocation.world_generation;
+    lease->prior.source_heap_handle = allocation.source_heap_handle;
+    lease->prior.allocation_generation = allocation.allocation_generation;
+    lease->prior.source_epoch = HSD_SisLib_HeapEpoch();
+    lease->requested_bytes = allocation.requested_bytes;
+    return 1;
+}
+
+int melee_web_diagnostic_sis_verify_retired(MeleeWebRetiredSisLease* lease,
+                                           char* error, size_t error_size)
+{
+    MeleeWebSourceMemoryAllocation allocation;
+    if (!lease || !lease->prior.heap || lease->retirement_verified ||
+        HSD_SisLib_HeapActive() || HSD_SisLib_HeapOwner() != lease->prior.heap ||
+        HSD_SisLib_HeapEpoch() != lease->prior.source_epoch + 1 ||
+        !diagnostic_sis_roots_empty())
+        return fail(error, error_size, "SIS prior source drain epoch or roots changed");
+    if (melee_web_source_memory_allocation_read(lease->prior.heap, &allocation) !=
+            MELEE_WEB_SOURCE_MEMORY_READ_OK)
+        return fail(error, error_size, "SIS retired allocation identity read failed");
+    if (allocation.live || allocation.world_generation != lease->prior.world_generation ||
+        allocation.source_heap_handle != lease->prior.source_heap_handle)
+        return fail(error, error_size, "SIS prior lease was not retired in its original world");
+    lease->retirement_verified = 1;
+    return 1;
+}
+
 int melee_web_diagnostic_sis_begin(MeleeWebDiagnosticSisOwner* owner,
                                   char* error, size_t error_size)
+{
+    return melee_web_diagnostic_sis_begin_retired(owner, NULL, error, error_size);
+}
+
+int melee_web_diagnostic_sis_begin_retired(MeleeWebDiagnosticSisOwner* owner,
+                                         const MeleeWebRetiredSisLease* retired,
+                                         char* error, size_t error_size)
 {
     MeleeWebSourceMemoryContext context;
     MeleeWebSourceMemoryAllocation allocation;
     void* prior_heap;
     if (!owner || owner->heap || owner->world_generation ||
-        owner->allocation_generation)
+        owner->allocation_generation || owner->source_epoch)
         return fail(error, error_size, "Diagnostic SIS owner slot must be empty");
     if (melee_web_source_memory_context_read(&context) !=
         MELEE_WEB_SOURCE_MEMORY_READ_OK)
@@ -70,13 +129,26 @@ int melee_web_diagnostic_sis_begin(MeleeWebDiagnosticSisOwner* owner,
     if (!diagnostic_sis_roots_empty())
         return fail(error, error_size, "Diagnostic SIS refuses live text/context/font owners");
     prior_heap = HSD_SisLib_HeapOwner();
-    if (prior_heap &&
-        (melee_web_source_memory_allocation_read(prior_heap, &allocation) !=
-             MELEE_WEB_SOURCE_MEMORY_READ_OK || allocation.live))
-        return fail(error, error_size, "Diagnostic SIS refuses a live allocator owner");
+    if (HSD_SisLib_HeapActive())
+        return fail(error, error_size, "Diagnostic SIS refuses an active source allocator epoch");
+    if (retired && (!retired->retirement_verified ||
+        retired->prior.heap != prior_heap ||
+        HSD_SisLib_HeapEpoch() != retired->prior.source_epoch + 1))
+        return fail(error, error_size, "Diagnostic SIS retired source epoch was replaced");
+    if (prior_heap) {
+        if (melee_web_source_memory_allocation_read(prior_heap, &allocation) !=
+                MELEE_WEB_SOURCE_MEMORY_READ_OK)
+            return fail(error, error_size, "Diagnostic SIS prior allocation identity read failed");
+        if (allocation.live &&
+            !melee_web_diagnostic_sis_distinct_retired_lease(retired, &allocation))
+            return fail(error, error_size, "Diagnostic SIS refuses a live allocator lease without verified retirement");
+        /* A different current lease at this retired address belongs to another
+         * allocation. Never free/read it; original6048 allocates a fresh block. */
+    }
     /* Original source initializer, as used by ordinary Match startup. No
      * allocator arithmetic changes and no manager/camera/proc dispatch. */
     HSD_SisLib_803A6048(MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES);
+    owner->source_epoch = HSD_SisLib_HeapEpoch();
     owner->heap = HSD_SisLib_HeapOwner();
     owner->world_generation = context.world_generation;
     owner->source_heap_handle = context.source_heap_handle;
@@ -105,6 +177,8 @@ int melee_web_diagnostic_sis_end(MeleeWebDiagnosticSisOwner* owner,
         context.world_generation != owner->world_generation ||
         context.source_heap_handle != owner->source_heap_handle ||
         HSD_SisLib_HeapOwner() != owner->heap ||
+        !HSD_SisLib_HeapActive() ||
+        HSD_SisLib_HeapEpoch() != owner->source_epoch ||
         melee_web_source_memory_allocation_read(owner->heap, &allocation) !=
             MELEE_WEB_SOURCE_MEMORY_READ_OK || !allocation.live ||
         allocation.allocation_generation != owner->allocation_generation ||
