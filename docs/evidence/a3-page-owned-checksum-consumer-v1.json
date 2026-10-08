@@ -1,0 +1,367 @@
+{
+  "schema": "melee-web-a3-page-owned-checksum-consumer-v1",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/255",
+  "scope": "Actual browser-native controller and two LockstepPeer core component fixtures using explicitly synthetic native/endpoint primitives. Ordinary Release integration build only; no new browser/native lifecycle witness.",
+  "evidence_labels": [
+    "Compiled"
+  ],
+  "source_producer": {
+    "head": "e22594d17bc5cfb5cdbffa6185206d8f70ab233d",
+    "tree": "0d4c29db8624c224f7c67ef9626d9cc09cc20ec3",
+    "base_main": "75c2541f23c0c8fdf68802bd911402e6df8f681c",
+    "prior_reviewed_producer": "1efe93298343c15122dd640be6a10b43b9509de0",
+    "owned_patch_identical_after_disjoint_refresh": true,
+    "patch_sha256": "098923b43a00b1917b50f9752957405ffbee32214bc6e36482311faa776fb6ff",
+    "clean": true
+  },
+  "implementation": {
+    "API": "Optional checksumConsumer(batch, {signal}) => true | Promise<true>",
+    "immutable_batch": "Frozen outer array and frozen original 64-byte record arrays; at most one pending batch bounded by 512 records",
+    "acceptance": "Whole batch only; exactly true and current token with no failure/closing/closed/terminal/abort removes evidence atomically",
+    "protocol": "Existing protocol receives the same frozen original bytes before consumption; comparisons unchanged",
+    "legacy": "Absent consumer retains original 512 overflow rejection and RPC drain semantics",
+    "consumer_drain_RPC": "Explicit rejection avoids conflicting ownership",
+    "cancellation": "Failure/terminal/close invalidates token and signals AbortController outside serialized queue",
+    "close": "Existing timeout bounds consumer settlement join. Ignored abort reports retained unjoined failure; cancelled batch stays retained. Endpoint/startup cleanup still joins.",
+    "late_settlement": "Updates settlement observation only; never accepts/removes evidence, schedules another pump or touches native state",
+    "startup_failure": "Refusal/throw/rejection/timeout during start RPC explicitly invokes existing protocol/native terminal without a later progress notification",
+    "source_clock_or_native_arithmetic_changed": false,
+    "wire_protocol_changed": false,
+    "partial_acceptance_or_persistence_guarantee": false
+  },
+  "positive_component": {
+    "source_capacity": 520,
+    "published_inputs_each": 518,
+    "record_indices": [
+      0,
+      519
+    ],
+    "records_exactly_equal_produced_consumed_remote": true,
+    "both_actual_LockstepPeer_cores": true,
+    "both_input_ACK": 517,
+    "both_checksum_ACK": 519,
+    "both_checksum_comparisons": 520,
+    "both_local_remote_checksums": 520,
+    "mismatches": [],
+    "terminal": null,
+    "drain_RPC_used": false,
+    "native_records_drained": 520,
+    "active_native_records_submitted": 520,
+    "consumer_accepted_records": 520,
+    "retained_records": 0,
+    "pending_batch": null,
+    "native_overlap": false,
+    "scope": "Fixture-produced 64-byte checksum records; no original-game/native/browser correctness claim"
+  },
+  "focused_controls": {
+    "pump_tests": 23,
+    "result": "pass",
+    "node": "v24.19.0",
+    "log": {
+      "name": "sol-pump-focused-v1.log",
+      "bytes": 2440,
+      "sha256": "4c81d60a7d305576c2681c25b15c2ae0e7c02f546a72f369ee33263b80e8368a"
+    },
+    "existing_lockstep_contract_adapter": {
+      "name": "sol-contracts-focused-v1.log",
+      "bytes": 245,
+      "sha256": "ad4e5bafa6f53644c0358f9aa51793f0b34d339393f421b4980783708b4ebf74"
+    },
+    "controls": [
+      "Default 512 overflow witness retained",
+      "Whole immutable acceptance and rejected conflicting drain ownership",
+      "Thrown/rejected/non-true start consumption with no progress notification sets protocol/native terminal",
+      "Slow consumer one pending batch; 100 wakeups coalesce without native overlap",
+      "Actual remote core desync cancels pending consumption without overwriting terminal",
+      "Prompt abort joins; timeout and ignored close abort retain unjoined failure",
+      "Late true settlement after abort never removes retained bytes or accesses native state"
+    ]
+  },
+  "full_suite": {
+    "producer": "e22594d17bc5cfb5cdbffa6185206d8f70ab233d",
+    "tree": "0d4c29db8624c224f7c67ef9626d9cc09cc20ec3",
+    "count": 2040,
+    "duration_seconds": 387.542,
+    "skipped": 152,
+    "result": "pass",
+    "log": {
+      "name": "full-suite-v1.log",
+      "bytes": 374576,
+      "sha256": "16d7b50a91449ca774ad4ad3e63d37927d6e27bc9f04fb5e5c6925c74a13bc83"
+    }
+  },
+  "ordinary_release_build": {
+    "producer_head": "e22594d17bc5cfb5cdbffa6185206d8f70ab233d",
+    "producer_tree": "0d4c29db8624c224f7c67ef9626d9cc09cc20ec3",
+    "argv": [
+      "python3",
+      "scripts/build.py",
+      "--target",
+      "runtime",
+      "--configuration",
+      "Release"
+    ],
+    "target": "gameplay_menu_browser",
+    "configuration": "Release",
+    "result": "pass",
+    "runtime_files": 32,
+    "optional_flags": {
+      "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+      "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+      "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+      "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+      "MELEE_WEB_RESULTS_RENDERED_TRACE": "OFF",
+      "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+      "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF",
+      "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF"
+    },
+    "cache": {
+      "name": "ordinary-release-CMakeCache-v1.txt",
+      "bytes": 60839,
+      "sha256": "fd0fbd5a610af974864da67d0fd8b17e7c3ee3a333bd8eeaf35b05b428025ce8"
+    },
+    "log": {
+      "name": "ordinary-release-build-v1.log",
+      "bytes": 18739,
+      "sha256": "2b1007f499f2a7d95c3ead3adc17cd02de4fcd51c0de0ba1fd9f819adece9dbc"
+    },
+    "receipt": {
+      "name": "ordinary-release-build-receipt-v1.json",
+      "bytes": 6714,
+      "sha256": "35febd42a40f10bd484a6dfa2a0afe63a9a75d4ad101e12000c0e04edc4eea95"
+    },
+    "runtime_artifacts": [
+      {
+        "name": "gameplay_menu_browser.js",
+        "bytes": 300352,
+        "sha256": "05e19b0c1e508ef44bacc45b1ed513e4dd450eb25e88fa9e40150f100ca42ab3"
+      },
+      {
+        "name": "gameplay_menu_browser.wasm",
+        "bytes": 15741510,
+        "sha256": "412aa864d35ff326da20daaaeb92f09d057772fa5dad01189183935b559b1cf7"
+      },
+      {
+        "name": "gameplay_menu_browser.data",
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      {
+        "name": "runtime.html",
+        "bytes": 5205,
+        "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+      },
+      {
+        "name": "runtime-development.mjs",
+        "bytes": 60714,
+        "sha256": "258dde2991c34f06f89c2e5ec3800aa8a1fad185949f807d3c3f8412e93f0e24"
+      },
+      {
+        "name": "net-timing-pause.mjs",
+        "bytes": 1043,
+        "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"
+      },
+      {
+        "name": "melee-runtime.mjs",
+        "bytes": 50699,
+        "sha256": "0fdd584a8636e821eb08b2a3232ec05d7c3ce0c33e43e5e640a16e0809709013"
+      },
+      {
+        "name": "runtime-diagnostics.mjs",
+        "bytes": 85702,
+        "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+      },
+      {
+        "name": "runtime-diagnostics-delivery.mjs",
+        "bytes": 51514,
+        "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+      },
+      {
+        "name": "diagnostics-settings.mjs",
+        "bytes": 2876,
+        "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+      },
+      {
+        "name": "diagnostics-schema.mjs",
+        "bytes": 18780,
+        "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+      },
+      {
+        "name": "controller-input.mjs",
+        "bytes": 19263,
+        "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+      },
+      {
+        "name": "controller-panel.mjs",
+        "bytes": 36847,
+        "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+      },
+      {
+        "name": "controller-panel.css",
+        "bytes": 5240,
+        "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+      },
+      {
+        "name": "controller-settings.mjs",
+        "bytes": 18680,
+        "sha256": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f"
+      },
+      {
+        "name": "controller-settings.css",
+        "bytes": 3482,
+        "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+      },
+      {
+        "name": "touch-controls.mjs",
+        "bytes": 13954,
+        "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+      },
+      {
+        "name": "touch-controls.css",
+        "bytes": 6381,
+        "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+      },
+      {
+        "name": "prototype-keyboard-layouts.mjs",
+        "bytes": 935,
+        "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+      },
+      {
+        "name": "runtime-cache.js",
+        "bytes": 16143,
+        "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+      },
+      {
+        "name": "audio-worklet.js",
+        "bytes": 1517,
+        "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+      },
+      {
+        "name": "audio-ring.mjs",
+        "bytes": 2040,
+        "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+      },
+      {
+        "name": "disc-image.mjs",
+        "bytes": 15255,
+        "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+      },
+      {
+        "name": "disc-session.mjs",
+        "bytes": 7552,
+        "sha256": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2"
+      },
+      {
+        "name": "dsp-coefficients.mjs",
+        "bytes": 4043,
+        "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+      },
+      {
+        "name": "runtime-assets.mjs",
+        "bytes": 17029,
+        "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190"
+      },
+      {
+        "name": "runtime-audio-assets.mjs",
+        "bytes": 5451,
+        "sha256": "033bf0bd4caa6c744ebead3dd7091bec8496b5f8d2039d60a3cdf9d398a7f05c"
+      },
+      {
+        "name": "runtime-audio.mjs",
+        "bytes": 7660,
+        "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+      },
+      {
+        "name": "match-flow.mjs",
+        "bytes": 10679,
+        "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+      },
+      {
+        "name": "match-menu.mjs",
+        "bytes": 8566,
+        "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+      },
+      {
+        "name": "action-sweep.mjs",
+        "bytes": 18698,
+        "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+      },
+      {
+        "name": "hitch-capture.mjs",
+        "bytes": 21958,
+        "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+      }
+    ],
+    "scope": "Fresh current-main integration build, no new lifecycle/browser run"
+  },
+  "preserved_prior_runtime": {
+    "native_producer": "15bc1023bcc6cba461274bb06ee3ec9ff6d86b31",
+    "native_files": 32,
+    "cache_preserved": true,
+    "all_bytes_verified_before_current_build": true,
+    "preservation_receipt": {
+      "name": "preservation-receipt.json",
+      "bytes": 5443,
+      "sha256": "c7c4cb242620c60e45c8e9f54be1e7cee29b6c627214c1c6c1fef6a328c63d16"
+    },
+    "historical_issue247_capture_source": "5fe6b23d39cfcc2d40f0cc83387835553e4c030b",
+    "historical_capture_or_manifest_rewritten": false
+  },
+  "retained_failures": {
+    "first_focused": {
+      "pass": 16,
+      "tests": 19,
+      "log": {
+        "name": "focused-v1.log",
+        "bytes": 6521,
+        "sha256": "35fee133e3a83faa0dd8ba3b5410c8fcab99162c6bf37ecf760e606905155ad8"
+      }
+    },
+    "second_focused": {
+      "pass": 16,
+      "tests": 19,
+      "log": {
+        "name": "focused-v2.log",
+        "bytes": 6519,
+        "sha256": "8217cd78ce774fdd04435130aea45028b9bb64d1b89ecd3acf8b0dc5bf1d687a"
+      }
+    },
+    "first_boundary": "Tests incorrectly expected start to return before consumer receives the original two neutral fixture records",
+    "actual_source_gap": "Consumer start/RPC failures depended on a later wake to set terminal; explicit terminal path corrected under Sol review",
+    "unverified_fixture_changes_before_escalation_retained": {
+      "name": "sol-inherited-unverified-patch-v1.diff",
+      "bytes": 23686,
+      "sha256": "1dbbb1d32125e71f1d34e9185641fac9ecb0772e1008d4153644a9584844a973"
+    }
+  },
+  "reviews": {
+    "sol": {
+      "name": "sol-source-review-v1.json",
+      "bytes": 4741,
+      "sha256": "17282d88515bccdc8cc03b7852b634869b39c409df1d17d74daa5f498473a6af"
+    },
+    "root": {
+      "name": "root-consumer-source-review-v1.json",
+      "bytes": 1991,
+      "sha256": "2256e18f12df1566c78d05448163be6486284de1423656d4767400a25e40f09e"
+    },
+    "source_freeze": {
+      "name": "current-main-source-freeze-v1.json",
+      "bytes": 975,
+      "sha256": "1cc7b3f2f8c3ffd098259086b2b0eb620479b27f504db1451ab199b6173beed0"
+    }
+  },
+  "open_gaps": [
+    "Product native progress adapter and page-owned session/controller integration",
+    "Actual browser/session-owner consumer validation",
+    "Physical input/synthetic fixture removal",
+    "Sustained native/full-session ring/core memory bounds",
+    "Internet/two-machine/STUN/TURN/relay fallback",
+    "Original full-route/whole-session agreement",
+    "Pixels/PCM/uninterrupted audio/timing/performance/tournament acceptance"
+  ],
+  "browser_run": false,
+  "native_lifecycle_or_original_capture_run": false
+}
