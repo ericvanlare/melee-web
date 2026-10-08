@@ -24,6 +24,51 @@ uint32_t melee_web_stadium_c1_stage_state_failures(void);
  * typed map owner occupies the archive slots. */
 uint32_t melee_web_stadium_c1_stage_object_failures(void);
 
+/* Keep the authored Ground/StageInfo layouts inside this C translation unit.
+ * The native harness is C++ and these upstream declarations contain C-only
+ * anonymous structures and reserved-word members. */
+typedef struct MeleeWebStadiumC1GroundMapObjectView {
+    int32_t map_id;
+    void* gobj;
+    void* camera;
+} MeleeWebStadiumC1GroundMapObjectView;
+typedef struct MeleeWebStadiumC1GroundStageProfile {
+    int32_t grkind;
+    int32_t callback_row_present;
+    int32_t callback_flags_b2;
+    int32_t joint_table_present;
+    int32_t collision_row_present;
+    size_t joint_count;
+} MeleeWebStadiumC1GroundStageProfile;
+typedef struct MeleeWebStadiumC1FtDeviceSnapshot
+    MeleeWebStadiumC1FtDeviceSnapshot;
+
+size_t melee_web_stadium_c1_ground_map_slot_count(void);
+void* melee_web_stadium_c1_ground_map_slot(size_t index);
+size_t melee_web_stadium_c1_ground_marker_slot_count(void);
+void* melee_web_stadium_c1_ground_marker_slot(size_t index);
+/* This profile reader is deliberately limited to the validated Stadium map1
+ * callback row; StageData does not carry an authored callback-array length. */
+int melee_web_stadium_c1_ground_map_profile(
+    int map_id, MeleeWebStadiumC1GroundStageProfile* profile);
+void* melee_web_stadium_c1_ground_map_lookup(int map_id);
+void* melee_web_stadium_c1_ground_map_create(int map_id);
+int melee_web_stadium_c1_ground_map_remove(void* object);
+void* melee_web_stadium_c1_ground_map_joint(void* object, int depth);
+int melee_web_stadium_c1_ground_map_object_view(
+    void* user_data, MeleeWebStadiumC1GroundMapObjectView* view);
+MeleeWebStadiumC1FtDeviceSnapshot*
+melee_web_stadium_c1_ft_device_snapshot_create(void);
+int melee_web_stadium_c1_ft_device_snapshot_restore(
+    const MeleeWebStadiumC1FtDeviceSnapshot* snapshot);
+int melee_web_stadium_c1_ft_device_snapshot_matches(
+    const MeleeWebStadiumC1FtDeviceSnapshot* snapshot);
+int melee_web_stadium_c1_ft_device_snapshot_release(
+    MeleeWebStadiumC1FtDeviceSnapshot* snapshot);
+size_t melee_web_stadium_c1_ft_device_snapshot_addresses(
+    const MeleeWebStadiumC1FtDeviceSnapshot* snapshot,
+    const void** addresses, size_t capacity);
+
 typedef struct MeleeWebStadiumC1StageInfoSnapshot
     MeleeWebStadiumC1StageInfoSnapshot;
 typedef struct MeleeWebStadiumC1StageInfoView {

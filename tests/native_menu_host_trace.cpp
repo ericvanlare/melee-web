@@ -59,11 +59,6 @@ extern "C" {
 #include <melee/mn/mnmain.h>
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include <melee/gr/grdatfiles.h>
-#include <melee/gr/grpstadium.h>
-#include <melee/gr/ground.h>
-#include <melee/gr/stage.h>
-#include <melee/ft/ftdevice.h>
-#include <melee/ft/types.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/objalloc.h>
 #endif
@@ -228,46 +223,48 @@ void ground_storage_pre_call_controls()
 }
 
 struct FtDeviceGlobalSnapshot {
-    std::array<ftDeviceUnk3, 1> first{};
-    std::array<ftDeviceUnk5, 2> bury_things{};
-    std::array<ftDeviceUnk3, 1> third{};
-    ftDeviceUnk4 fourth{};
-    int first_count = 0;
-    int bury_thing_count = 0;
+    MeleeWebStadiumC1FtDeviceSnapshot* snapshot = nullptr;
 
     FtDeviceGlobalSnapshot() { capture(); }
+    FtDeviceGlobalSnapshot(const FtDeviceGlobalSnapshot&) = delete;
+    FtDeviceGlobalSnapshot& operator=(const FtDeviceGlobalSnapshot&) = delete;
+
+    ~FtDeviceGlobalSnapshot()
+    {
+        if (snapshot != nullptr)
+            melee_web_stadium_c1_ft_device_snapshot_release(snapshot);
+    }
 
     void capture()
     {
-        std::memcpy(first.data(), ft_80459A68, sizeof(first));
-        std::memcpy(bury_things.data(), ftDevice_BuryThings,
-                    sizeof(bury_things));
-        std::memcpy(third.data(), ft_80459A8C, sizeof(third));
-        std::memcpy(&fourth, &ft_804D6578, sizeof(fourth));
-        first_count = ft_804D6570;
-        bury_thing_count = ftDevice_BuryThingCount;
+        if (snapshot != nullptr) {
+            check(melee_web_stadium_c1_ft_device_snapshot_release(snapshot),
+                  "Typed ftDevice snapshot release failed before recapture");
+            snapshot = nullptr;
+        }
+        snapshot = melee_web_stadium_c1_ft_device_snapshot_create();
+        check(snapshot != nullptr,
+              "Typed ftDevice source snapshot allocation failed");
     }
 
     void restore() const
     {
-        std::memcpy(ft_80459A68, first.data(), sizeof(first));
-        std::memcpy(ftDevice_BuryThings, bury_things.data(),
-                    sizeof(bury_things));
-        std::memcpy(ft_80459A8C, third.data(), sizeof(third));
-        std::memcpy(&ft_804D6578, &fourth, sizeof(fourth));
-        ft_804D6570 = first_count;
-        ftDevice_BuryThingCount = bury_thing_count;
+        check(melee_web_stadium_c1_ft_device_snapshot_restore(snapshot),
+              "Typed ftDevice source snapshot restoration failed");
     }
 
     bool matches() const
     {
-        return std::memcmp(ft_80459A68, first.data(), sizeof(first)) == 0 &&
-               std::memcmp(ftDevice_BuryThings, bury_things.data(),
-                           sizeof(bury_things)) == 0 &&
-               std::memcmp(ft_80459A8C, third.data(), sizeof(third)) == 0 &&
-               std::memcmp(&ft_804D6578, &fourth, sizeof(fourth)) == 0 &&
-               ft_804D6570 == first_count &&
-               ftDevice_BuryThingCount == bury_thing_count;
+        return melee_web_stadium_c1_ft_device_snapshot_matches(snapshot) != 0;
+    }
+
+    std::array<const void*, 6> addresses() const
+    {
+        std::array<const void*, 6> result{};
+        check(melee_web_stadium_c1_ft_device_snapshot_addresses(
+                  snapshot, result.data(), result.size()) == result.size(),
+              "Typed ftDevice snapshot did not expose its source identities");
+        return result;
     }
 };
 
@@ -299,8 +296,9 @@ uint32_t source_stage_gobj_count()
 
 bool source_stage_registry_empty()
 {
-    for (size_t i = 0; i < std::size(stage_info.map_gobjs); ++i)
-        if (stage_info.map_gobjs[i] != nullptr) return false;
+    for (size_t i = 0;
+         i < melee_web_stadium_c1_ground_map_slot_count(); ++i)
+        if (melee_web_stadium_c1_ground_map_slot(i) != nullptr) return false;
     return true;
 }
 
@@ -312,26 +310,39 @@ bool source_jobj_owned_by(HSD_JObj* node, HSD_JObj* root)
     return false;
 }
 
-std::array<HSD_JObj*, sizeof(stage_info.x280) / sizeof(stage_info.x280[0])>
+std::vector<HSD_JObj*>
 source_stage_marker_snapshot()
 {
-    std::array<HSD_JObj*, sizeof(stage_info.x280) / sizeof(stage_info.x280[0])>
-        result{};
-    std::copy(std::begin(stage_info.x280), std::end(stage_info.x280),
-              result.begin());
+    std::vector<HSD_JObj*> result;
+    const size_t count = melee_web_stadium_c1_ground_marker_slot_count();
+    result.reserve(count);
+    for (size_t i = 0; i < count; ++i)
+        result.push_back(static_cast<HSD_JObj*>(
+            melee_web_stadium_c1_ground_marker_slot(i)));
     return result;
 }
 
-std::array<Ground_GObj*,
-           sizeof(stage_info.map_gobjs) / sizeof(stage_info.map_gobjs[0])>
+std::vector<void*>
 source_stage_map_registry_snapshot()
 {
-    std::array<Ground_GObj*,
-               sizeof(stage_info.map_gobjs) / sizeof(stage_info.map_gobjs[0])>
-        result{};
-    std::copy(std::begin(stage_info.map_gobjs), std::end(stage_info.map_gobjs),
-              result.begin());
+    std::vector<void*> result;
+    const size_t count = melee_web_stadium_c1_ground_map_slot_count();
+    result.reserve(count);
+    for (size_t i = 0; i < count; ++i)
+        result.push_back(melee_web_stadium_c1_ground_map_slot(i));
     return result;
+}
+
+size_t source_stage_marker_count()
+{
+    return melee_web_stadium_c1_ground_marker_slot_count();
+}
+
+bool source_stage_markers_empty()
+{
+    const auto markers = source_stage_marker_snapshot();
+    return std::all_of(markers.begin(), markers.end(),
+                       [](HSD_JObj* marker) { return marker == nullptr; });
 }
 
 struct GroundStorageLease {
@@ -368,9 +379,7 @@ struct GroundStorageLease {
         facts.map_registry_empty = source_stage_registry_empty();
         stage_gobj_count_before = source_stage_gobj_count();
         facts.stage_gobj_list_empty = stage_gobj_count_before == 0;
-        facts.stage_markers_empty = std::all_of(
-            std::begin(stage_info.x280), std::end(stage_info.x280),
-            [](HSD_JObj* marker) { return marker == nullptr; });
+        facts.stage_markers_empty = source_stage_markers_empty();
         facts.dispatch_quiet = ground_dispatch_quiet();
         check(melee_web_stage_map_archives() == nullptr,
               "Ground storage preflight found a pre-existing native stage map scope");
@@ -456,12 +465,10 @@ struct GroundStorageLease {
     {
         if (!begin_attempted || finished) return;
         if (owned) {
-            if (Ground_GetMapGObj(1) != nullptr ||
+            if (melee_web_stadium_c1_ground_map_lookup(1) != nullptr ||
                 !source_stage_registry_empty() ||
                 source_stage_gobj_count() != stage_gobj_count_before ||
-                !std::all_of(std::begin(stage_info.x280),
-                             std::end(stage_info.x280),
-                             [](HSD_JObj* marker) { return marker == nullptr; })) {
+                !source_stage_markers_empty()) {
                 std::cerr << "Ground storage end refused while source map owners remain; preserving Ground storage\n";
                 std::abort();
             }
@@ -542,8 +549,7 @@ std::vector<GroundSourceMarkerBinding> checked_ground_source_markers(
         const uint16_t joint_index = archive->be16(*pairs + i * 4);
         const uint16_t marker_id = archive->be16(*pairs + i * 4 + 2);
         check(joint_index < graph.joint_count &&
-                  marker_id < sizeof(stage_info.x280) /
-                                  sizeof(stage_info.x280[0]),
+                  marker_id < source_stage_marker_count(),
               "Stadium source marker pair exceeds its decoded joint or marker array");
         markers.push_back({joint_index, marker_id});
     }
@@ -576,7 +582,7 @@ void run_stadium_ground_map1_owner(
     const melee_web::DatStage source_stage(*archive);
     check(map_id < source_stage.entry_table.count &&
               map_id < source_stage.entries.size() &&
-              map_id < std::size(stage_info.map_gobjs),
+              map_id < melee_web_stadium_c1_ground_map_slot_count(),
           "Stadium map1 is outside an authored map or StageInfo table bound");
     check(std::find(melee_web::test::stadium_resident_ids.begin(),
                     melee_web::test::stadium_resident_ids.end(), map_id) !=
@@ -588,15 +594,16 @@ void run_stadium_ground_map1_owner(
           "Original Ground map1 has no resident source joint root");
     check(map_entry.collision_bindings.count == 0,
           "Stadium map1 has authored collision bindings; original removal is unsafe");
-    check(grPs_StageData.grkind == Gr_Kind_PStadium &&
-              grPs_StageData.callbacks != nullptr &&
-              grPs_StageData.callbacks[map_id].flags_b2 == 0,
+    MeleeWebStadiumC1GroundStageProfile stage_profile{};
+    check(melee_web_stadium_c1_ground_map_profile(map_id, &stage_profile) &&
+              stage_profile.grkind == Gr_Kind_PStadium &&
+              stage_profile.callback_row_present &&
+              stage_profile.callback_flags_b2 == 0,
           "Stadium map1 callback row enables a secondary camera");
-    check(grPs_StageData.joint_count == 0 || grPs_StageData.joints != nullptr,
+    check(stage_profile.joint_table_present,
           "Stadium source collision joint table has no owner");
-    for (size_t i = 0; i < grPs_StageData.joint_count; ++i)
-        check(grPs_StageData.joints[i].y != map_id,
-              "Stadium authored GrJoint table contains a map1 collision row");
+    check(!stage_profile.collision_row_present,
+          "Stadium authored GrJoint table contains a map1 collision row");
 
     std::vector<uint16_t> row_joint_indices;
     const auto source_markers = checked_ground_source_markers(
@@ -624,18 +631,25 @@ void run_stadium_ground_map1_owner(
 
     HSD_GObj* map_object = nullptr;
     auto cleanup = [&]() {
-        if (map_object == nullptr) map_object = Ground_GetMapGObj(map_id);
+        if (map_object == nullptr)
+            map_object = static_cast<HSD_GObj*>(
+                melee_web_stadium_c1_ground_map_lookup(map_id));
         if (map_object != nullptr) {
+            MeleeWebStadiumC1GroundMapObjectView ground_view{};
             if (map_object->classifier != HSD_GOBJ_CLASS_STAGE ||
-                map_object->user_data == nullptr ||
-                static_cast<Ground*>(map_object->user_data)->map_id != map_id) {
+                !melee_web_stadium_c1_ground_map_object_view(
+                    map_object->user_data, &ground_view) ||
+                ground_view.map_id != map_id) {
                 std::cerr << "Ground map1 teardown refused to remove an unowned object\n";
                 std::abort();
             }
-            Ground_801C4A08(map_object);
+            if (!melee_web_stadium_c1_ground_map_remove(map_object)) {
+                std::cerr << "Ground map1 original removal rejected its owned object\n";
+                std::abort();
+            }
             map_object = nullptr;
         }
-        if (Ground_GetMapGObj(map_id) != nullptr ||
+        if (melee_web_stadium_c1_ground_map_lookup(map_id) != nullptr ||
             !source_stage_registry_empty() ||
             source_stage_gobj_count() != stage_gobj_count_before) {
             std::cerr << "Ground map1 teardown left a source Stage GObj owner; preserving Ground storage\n";
@@ -680,14 +694,19 @@ void run_stadium_ground_map1_owner(
                   source_stage_gobj_count() == stage_gobj_count_before &&
                   ground_dispatch_quiet(),
               "Ground storage preparation changed Stage GObj or dispatch state");
-        map_object = Ground_GetStageGObj(map_id);
-        check(map_object != nullptr && Ground_GetMapGObj(map_id) == map_object &&
+        map_object = static_cast<HSD_GObj*>(
+            melee_web_stadium_c1_ground_map_create(map_id));
+        check(map_object != nullptr &&
+                  melee_web_stadium_c1_ground_map_lookup(map_id) == map_object &&
                   map_object->classifier == HSD_GOBJ_CLASS_STAGE &&
                   map_object->user_data != nullptr && map_object->hsd_obj != nullptr,
               "Original Ground map1 constructor did not publish its exact source object");
-        auto* ground = static_cast<Ground*>(map_object->user_data);
-        check(ground->map_id == map_id && ground->gobj == map_object &&
-                  ground->x18 == nullptr && map_object->render_cb == nullptr &&
+        MeleeWebStadiumC1GroundMapObjectView ground_view{};
+        check(melee_web_stadium_c1_ground_map_object_view(
+                  map_object->user_data, &ground_view) &&
+                  ground_view.map_id == map_id &&
+                  ground_view.gobj == map_object &&
+                  ground_view.camera == nullptr && map_object->render_cb == nullptr &&
                   map_object->gx_link == HSD_GOBJ_GXLINK_NONE,
               "Original Ground map1 object has a different owner, camera, or render link");
         check(source_stage_gobj_count() == stage_gobj_count_before + 1 &&
@@ -708,24 +727,30 @@ void run_stadium_ground_map1_owner(
         std::map<uint16_t, HSD_JObj*> expected_markers;
         for (const auto& binding : source_markers) {
             HSD_JObj* const marker =
-                Ground_801C3FA4(map_object, binding.joint_index);
+                static_cast<HSD_JObj*>(
+                    melee_web_stadium_c1_ground_map_joint(
+                        map_object, binding.joint_index));
             check(marker != nullptr && source_jobj_owned_by(marker, loaded_root),
                   "Original Ground map1 marker does not belong to its loaded JObj owner");
             expected_markers[binding.marker_id] = marker;
         }
         for (uint16_t joint_index : row_joint_indices) {
-            HSD_JObj* const indexed = Ground_801C3FA4(map_object, joint_index);
+            HSD_JObj* const indexed = static_cast<HSD_JObj*>(
+                melee_web_stadium_c1_ground_map_joint(map_object,
+                                                      joint_index));
             check(indexed != nullptr && source_jobj_owned_by(indexed, loaded_root),
                   "Original Ground map1 row joint index did not resolve in its loaded JObj owner");
         }
-        for (size_t i = 0; i < std::size(stage_info.x280); ++i) {
+        for (size_t i = 0; i < source_stage_marker_count(); ++i) {
+            const auto* current_marker = static_cast<HSD_JObj*>(
+                melee_web_stadium_c1_ground_marker_slot(i));
             const auto expected = expected_markers.find(static_cast<uint16_t>(i));
             if (expected == expected_markers.end()) {
-                check(stage_info.x280[i] == stage_markers_before[i],
+                check(current_marker == stage_markers_before[i],
                       "Ground map1 changed a source marker outside its authored marker row");
             } else {
-                check(stage_info.x280[i] == expected->second &&
-                          source_jobj_owned_by(stage_info.x280[i], loaded_root),
+                check(current_marker == expected->second &&
+                          source_jobj_owned_by(current_marker, loaded_root),
                       "Ground map1 source marker slot does not match its exact loaded joint");
             }
         }
@@ -734,7 +759,8 @@ void run_stadium_ground_map1_owner(
                   ground_dispatch_quiet(),
               "Ground generic process or stage callback dispatched during construction");
 
-        Ground_801C4A08(map_object);
+        check(melee_web_stadium_c1_ground_map_remove(map_object),
+              "Original Ground map1 removal rejected its owned object");
         map_object = nullptr;
         check(source_stage_registry_empty() &&
                   source_stage_map_registry_snapshot() == stage_registry_before &&
@@ -764,6 +790,8 @@ void run_stadium_ground_map1_owner(
                   ground_dispatch_quiet(),
               "Ground map1 owner cleanup did not restore its exact source baselines");
 
+        const auto device_addresses =
+            storage_scope.devices_before.addresses();
         std::cout << "{\"probe\":\"stadium-ground-map1-owner\","
                      "\"scope\":\"one original Ground_GetStageGObj(1)/Ground_801C4A08 lifetime\","
                      "\"ground_buffer\":\""
@@ -776,17 +804,17 @@ void run_stadium_ground_map1_owner(
                   << ",\"allocation_generation\":"
                   << storage_scope.allocation.allocation_generation
                   << ",\"ft_device_owner_ids\":[\""
-                  << hex64(reinterpret_cast<uintptr_t>(ft_80459A68))
+                  << hex64(reinterpret_cast<uintptr_t>(device_addresses[0]))
                   << "\",\""
-                  << hex64(reinterpret_cast<uintptr_t>(ftDevice_BuryThings))
+                  << hex64(reinterpret_cast<uintptr_t>(device_addresses[1]))
                   << "\",\""
-                  << hex64(reinterpret_cast<uintptr_t>(ft_80459A8C))
+                  << hex64(reinterpret_cast<uintptr_t>(device_addresses[2]))
                   << "\",\""
-                  << hex64(reinterpret_cast<uintptr_t>(&ft_804D6578))
+                  << hex64(reinterpret_cast<uintptr_t>(device_addresses[3]))
                   << "\",\""
-                  << hex64(reinterpret_cast<uintptr_t>(&ft_804D6570))
+                  << hex64(reinterpret_cast<uintptr_t>(device_addresses[4]))
                   << "\",\""
-                  << hex64(reinterpret_cast<uintptr_t>(&ftDevice_BuryThingCount))
+                  << hex64(reinterpret_cast<uintptr_t>(device_addresses[5]))
                   << "\"],\"source_markers\":" << source_markers.size()
                   << ",\"map1_joint_indices\":" << row_joint_indices.size()
                   << ",\"map_id\":1,\"device_bytes_restored\":true,"
