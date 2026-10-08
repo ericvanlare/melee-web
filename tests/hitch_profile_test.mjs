@@ -9,9 +9,9 @@ const artifacts=Object.fromEntries(BUILD_ARTIFACTS.map(name=>[name,hash(name)]))
 const profile={schema:'melee-web-hitch-browser-profile',version:1,artifacts,
   harness_artifacts:Object.fromEntries(HARNESS_ARTIFACTS.map(name=>[name,hash(name)]))};
 const manifest=BUILD_ARTIFACTS.map(name=>({path:path.resolve('frozen-build',name),sha256:artifacts[name]}));
-assert.equal(BUILD_ARTIFACTS.length,32);
-assert.equal(new Set(BUILD_ARTIFACTS).size,32);
-for (const name of ['disc-session.mjs','runtime-development.mjs','net-timing-pause.mjs','melee-runtime.mjs','runtime-diagnostics.mjs','runtime-diagnostics-delivery.mjs','diagnostics-settings.mjs','diagnostics-schema.mjs','runtime-audio-assets.mjs','runtime-audio.mjs','controller-input.mjs','controller-panel.mjs','controller-panel.css','controller-settings.mjs','controller-settings.css','touch-controls.mjs','touch-controls.css','prototype-keyboard-layouts.mjs'])
+assert.equal(BUILD_ARTIFACTS.length,34);
+assert.equal(new Set(BUILD_ARTIFACTS).size,34);
+for (const name of ['disc-session.mjs','runtime-development.mjs','net-timing-pause.mjs','melee-runtime.mjs','runtime-diagnostics.mjs','runtime-diagnostics-delivery.mjs','diagnostics-settings.mjs','diagnostics-schema.mjs','runtime-audio-assets.mjs','runtime-audio.mjs','controller-input.mjs','controller-panel.mjs','controller-panel.css','controller-settings.mjs','controller-settings.css','touch-controls.mjs','touch-controls.css','prototype-keyboard-layouts.mjs','net_lockstep_core.mjs','net_lockstep_native_adapter.mjs'])
   assert(BUILD_ARTIFACTS.includes(name), `Extracted executable input must be frozen: ${name}`);
 assert(HARNESS_ARTIFACTS.includes('tools/browser_build_artifacts.json'));
 assert(HARNESS_ARTIFACTS.includes('scripts/browser_driver.mjs'));
