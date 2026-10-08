@@ -42,6 +42,57 @@ struct MeleeWebStageLast {
 static MeleeWebStageLast* active;
 static int fail(char* e,size_t n,const char* m){if(e&&n)snprintf(e,n,"%s",m);return 0;}
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+static int stage_report_on_init_bind_failure(MeleeWebStageLast* h,
+        MeleeWebStageLast** retained_owner,const char* bind_error,char* e,size_t n){
+ char cleanup_error[160]={0};
+ if(!melee_web_stage_last_end(h,cleanup_error,sizeof(cleanup_error))){
+  if(retained_owner)*retained_owner=h;
+  if(e&&n){
+   const int each=(int)(n>33?(n-33)/2:0);
+   snprintf(e,n,"bind failed: %.*s; cleanup refused: %.*s",each,
+            bind_error?bind_error:"Stadium source SIS bind failed",each,
+            cleanup_error);
+  }
+  return 0;
+ }
+ fail(e,n,bind_error?bind_error:"Stadium source SIS bind failed");
+ return 1;
+}
+
+int melee_web_stage_last_on_init_bind_refusal_controls(void){
+ MeleeWebStageLast* h;
+ MeleeWebStageLast* retained=NULL;
+ char error[256]={0};
+ uint64_t generation=melee_web_gameplay_generation();
+ if(active||!generation||!HSD_GObj_Entities||HSD_GObj_804D781C||
+    HSD_GObj_804D7814)return 0;
+ h=calloc(1,sizeof(*h));if(!h)return 0;
+ h->generation=generation;
+ h->definition=melee_web_stage_profile(St_Kind_PStadium);
+ h->source_ordered=1;
+ if(!h->definition||!h->definition->diagnostic_only||
+    !melee_web_stadium_display_owner_prepare(&h->stadium_display_owner,
+                                             error,sizeof(error))||
+    !melee_web_stadium_display_owner_arm_source_journal(
+        h->stadium_display_owner,error,sizeof(error))){
+  free(h);return 0;
+ }
+ active=h;
+ melee_web_stadium_display_owner_note_source_event(
+     MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8,-1,NULL);
+ if(stage_report_on_init_bind_failure(
+        h,&retained,"Synthetic asset-free SIS bind refusal",error,
+        sizeof(error))||retained!=h||active!=h||
+    h->stadium_display_owner==NULL||
+    strstr(error,"Synthetic asset-free SIS bind refusal")==NULL||
+    strstr(error,"Partial Stadium display ownership must remain reachable")==NULL)
+  return 0;
+ /* The retained h and opaque display owner intentionally remain rooted by
+  * active until this isolated control process exits. */
+ return 1;
+}
+#endif
 static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,void* yaku,MeleeWebEffectBank* map_bank,int defer_start,int source_ordered,int on_init_diagnostic,MeleeWebStageLast** retained_owner,char* e,size_t n){
  MeleeWebEffectBankStats bank;
  if(retained_owner&&*retained_owner!=NULL){fail(e,n,"Stage retained-owner output slot must be empty");return NULL;}
@@ -82,8 +133,8 @@ static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,voi
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
   if(on_init_diagnostic&&!melee_web_stadium_display_owner_bind_source(h->stadium_display_owner,e,n)){
    char bind_error[160];snprintf(bind_error,sizeof(bind_error),"%s",e&&n?e:"Stadium source SIS bind failed");
-   if(!melee_web_stage_last_end(h,e,n)){if(retained_owner)*retained_owner=h;return NULL;}
-   fail(e,n,bind_error);return NULL;
+   stage_report_on_init_bind_failure(h,retained_owner,bind_error,e,n);
+   return NULL;
   }
 #endif
   Stage_8022524C();

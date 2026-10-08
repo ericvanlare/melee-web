@@ -25,6 +25,11 @@ MeleeWebStageLast* melee_web_stage_begin_kind(int stage_kind, void* yakumono,
 MeleeWebStageLast* melee_web_stage_begin_kind_on_init_diagnostic(
     int stage_kind, void* yakumono, MeleeWebEffectBank*,
     MeleeWebStageLast** owner_out, char*, size_t);
+/* Asset-free reducer for the diagnostic bind-refusal reporting path. It
+ * injects the bind failure and E8 journal event, then exercises the real
+ * display-owner cancellation guard. The partial owner remains live until the
+ * standalone control process exits; no archive or source Stage routine runs. */
+int melee_web_stage_last_on_init_bind_refusal_controls(void);
 /* Read the already-captured private Stadium map2 journal while its StageLast
  * owner is still active. This copies the existing record; it does not inspect
  * or extend the private Ground layout. Call only before stage_last_end. */

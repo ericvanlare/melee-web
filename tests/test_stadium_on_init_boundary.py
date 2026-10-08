@@ -111,6 +111,29 @@ class StadiumOnInitBoundaryTests(unittest.TestCase):
         self.assertIn("owner_out==NULL", body)
         self.assertIn("begin_stage(definition,yaku,bank,1,1,1,owner_out", body)
 
+    def test_bind_refusal_preserves_cause_and_real_cancel_error(self):
+        source = (ROOT / "src/gameplay_stage_last.c").read_text(encoding="utf-8")
+        helper = function_body(source, "static int stage_report_on_init_bind_failure(")
+        self.assertIn("melee_web_stage_last_end(h,cleanup_error", helper)
+        self.assertIn("bind failed:", helper)
+        self.assertIn("cleanup refused:", helper)
+        self.assertIn("if(retained_owner)*retained_owner=h", helper)
+
+        control = function_body(
+            source, "int melee_web_stage_last_on_init_bind_refusal_controls("
+        )
+        self.assertIn("melee_web_stadium_display_owner_arm_source_journal(", control)
+        self.assertIn("MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8", control)
+        self.assertIn("stage_report_on_init_bind_failure(", control)
+        self.assertIn("Partial Stadium display ownership must remain reachable", control)
+        self.assertIn("active=h", control)
+
+        host = (ROOT / "tests/native_menu_host_trace.cpp").read_text(encoding="utf-8")
+        self.assertIn("--stadium-bind-refusal-controls", host)
+        self.assertIn("no archive lookup or ", host)
+        self.assertIn("original Stage routine/OnInit call", host)
+        self.assertIn("std::_Exit(0)", host)
+
     def test_one_shot_driver_uses_distinct_guarded_recipe_and_existing_owner(self):
         source = (ROOT / "tests/native_menu_host_trace.cpp").read_text(encoding="utf-8")
         helper = function_body(source, "void run_stadium_e8_request(")

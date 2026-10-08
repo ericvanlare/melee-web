@@ -2207,6 +2207,22 @@ void run_stadium_effect_runtime_lifecycle_control()
     std::cout << "C1 asset-free original effect prepare/efLib_Init/complete/end passed; no stage callbacks, proc dispatch, or ticks\n";
 }
 
+void run_stadium_bind_refusal_control()
+{
+    char error[256]{};
+    check(melee_web_gameplay_startup(8U * 1024U * 1024U,
+                                     error, sizeof(error)), error);
+    check(melee_web_native_world_enable(error, sizeof(error)), error);
+    check(melee_web_stage_last_on_init_bind_refusal_controls(),
+          "Asset-free bind-refusal reducer did not preserve the real cancellation refusal");
+    std::cout << "C1 asset-free bind-refusal reporter preserved the initiating bind error and "
+                 "real owner-cancel refusal; synthetic E8/bind adapter only, no archive lookup or "
+                 "original Stage routine/OnInit call; "
+                 "partial owner retained through process exit\n";
+    std::cout.flush();
+    std::_Exit(0);
+}
+
 uint32_t stadium_archive_symbol_offset(const melee_web::DatArchive& archive,
                                        const char* name)
 {
@@ -3840,6 +3856,9 @@ int main(int argc,char** argv){try{
    run_stadium_effect_runtime_lifecycle_control();
    std::cout<<"C1 source OnInit refusal and synthetic event-journal controls passed; no Stadium stage initialization invoked\n";
    return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-bind-refusal-controls"){
+   run_stadium_bind_refusal_control();return 0;
   }
   if(argc==2&&std::string_view(argv[1])=="--stadium-yakumono-exchange"){
   run_stadium_yakumono_exchange_control();return 0;
