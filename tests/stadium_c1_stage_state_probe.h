@@ -26,6 +26,11 @@ uint32_t melee_web_stadium_c1_stage_object_failures(void);
 /* The isolated exchange control requires a fresh source stage/GObj baseline. */
 int melee_web_stadium_c1_yakumono_exchange_baseline_empty(void);
 
+/* Asset-free diagnostic control: original Ground-created owner, exact checked
+ * publication/bounds and retirement. Retains its static fixture on failure;
+ * does not dispatch a source proc, camera, OnInit or simulation tick. */
+int melee_web_stadium_c1_map_light_adoption_control(char* error, size_t error_size);
+
 /* Keep the authored Ground/StageInfo layouts inside this C translation unit.
  * The native harness is C++ and these upstream declarations contain C-only
  * anonymous structures and reserved-word members. */

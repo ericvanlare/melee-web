@@ -68,9 +68,6 @@ extern "C" {
 #include <melee/mn/mnmain.h>
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include <melee/gr/grdatfiles.h>
-#include <melee/gr/ground.h>
-void melee_web_ground_load_map_lights(void);
-#include <melee/gr/types.h>
 #include <melee/gr/stage.h>
 #include <melee/ef/eflib.h>
 #include <sysdolphin/baselib/gobj.h>
@@ -2249,75 +2246,7 @@ void run_stadium_map_light_adoption_control()
     char error[256]{};
     check(melee_web_gameplay_startup(8U * 1024U * 1024U, error, sizeof(error)), error);
     check(melee_web_native_world_enable(error, sizeof(error)), error);
-    const auto saved_stage_info = stage_info;
-    const auto before = melee_web_gameplay_stats();
-    const int scheduler_before = HSD_GObj_804D783C;
-    const uint32_t gobj_before = HSD_ObjAllocGetUsing(&gobj_alloc_data);
-    const uint32_t proc_before = HSD_ObjAllocGetUsing(&gobjproc_alloc_data);
-    check(!Ground_801C498C() && !stage_info.map_plit,
-          "Map-light reducer requires an unowned source baseline");
-    check(!melee_web_stage_lights_adopt_source(nullptr, error, sizeof(error)) &&
-              std::string_view(error) == "Source map-light adoption has no published descriptor context",
-          "Missing publication did not report its exact adoption condition");
-    for (unsigned cycle = 0; cycle < 2; ++cycle) {
-        MeleeWebStageLightDesc descriptor{};
-        descriptor.flags = 0x20;
-        descriptor.color[0] = descriptor.color[1] = descriptor.color[2] = descriptor.color[3] = 255;
-        auto* context = melee_web_stage_lights_create(&descriptor, 1, error, sizeof(error));
-        check(context != nullptr, error);
-        check(melee_web_stage_lights_set_override(context, 0, 0, 0, error, sizeof(error)), error);
-        check(melee_web_stage_lights_attach(context, error, sizeof(error)), error);
-        // The one synthetic map row has no source callback light flag. Original
-        // Ground therefore selects its authored two-row static fallback list.
-        UnkStageDat_x8_t entry{};
-        UnkStageDat map{};map.unk8 = &entry;map.unkC = 1;
-        auto* publication = melee_web_stage_map_publish(&map, error, sizeof(error));
-        check(publication != nullptr, error);
-        const uint32_t row_count = 1;
-        check(melee_web_stage_lights_set_source_counts(context, &row_count, 1, error, sizeof(error)), error);
-        stage_info.grkind = Gr_Kind_PStadium;stage_info.param = nullptr;
-        melee_web_ground_load_map_lights();
-        HSD_GObj* const owner = Ground_801C498C();
-        check(owner && owner->classifier == HSD_GOBJ_CLASS_GROUND && owner->hsd_obj,
-              "Original Ground did not create its own source light owner");
-        HSD_GObj foreign{};foreign.classifier = HSD_GOBJ_CLASS_GROUND;
-        check(!melee_web_stage_lights_adopt_source(&foreign, error, sizeof(error)) &&
-                  std::string_view(error) == "Source map-light adoption requires Ground's current original owner",
-              "Foreign Ground-class owner was accepted");
-        auto* const published_list = stage_info.map_plit;
-        stage_info.map_plit = nullptr;
-        check(!melee_web_stage_lights_adopt_source(owner, error, sizeof(error)) &&
-                  std::string_view(error) == "Source map-light adoption descriptor publication was replaced",
-              "Replaced descriptor publication was accepted");
-        check(!melee_web_stage_lights_detach(context, error, sizeof(error)),
-              "Detach overwrote a replaced descriptor publication");
-        stage_info.map_plit = published_list;
-        check(melee_web_stage_lights_select_source_entry(0), "Synthetic row selection failed");
-        check(!melee_web_stage_lights_adopt_source(owner, error, sizeof(error)) &&
-                  std::string_view(error) == "Original Ground light chain exceeds its selected DAT entry count",
-              "Wrong authored row bound did not refuse the actual chain");
-        check(melee_web_stage_lights_select_source_entry(-1), "Original static-list bound selection failed");
-        check(melee_web_stage_lights_adopt_source(owner, error, sizeof(error)), error);
-        uint32_t count = 0;uint16_t flags[2]{};uint8_t colors[8]{};
-        check(melee_web_stage_lights_stats(context, &count, flags, colors, 2, error, sizeof(error)) && count == 2,
-              "Adopted original static-list chain differs from its authored bound");
-        check(!melee_web_stage_lights_adopt_source(owner, error, sizeof(error)), "Duplicate adoption succeeded");
-        check(!melee_web_stage_lights_detach(context, error, sizeof(error)), "Live source context detached before retirement");
-        check(!melee_web_stage_lights_destroy(context, error, sizeof(error)), "Live source context destroyed before retirement");
-        check(!melee_web_stage_lights_retire_source(&foreign, error, sizeof(error)), "Foreign owner retirement succeeded");
-        check(melee_web_stage_lights_retire_source(owner, error, sizeof(error)), error);
-        HSD_GObjPLink_80390228(owner);
-        check(!Ground_801C498C(), "Original Ground owner survived its exact teardown");
-        check(melee_web_stage_lights_destroy(context, error, sizeof(error)), error);
-        check(melee_web_stage_map_close(publication, error, sizeof(error)), error);
-        stage_info = saved_stage_info;
-        check(melee_web_gameplay_stats().generation == before.generation &&
-                  melee_web_gameplay_stats().ticks == before.ticks &&
-                  HSD_GObj_804D783C == scheduler_before &&
-                  HSD_ObjAllocGetUsing(&gobj_alloc_data) == gobj_before &&
-                  HSD_ObjAllocGetUsing(&gobjproc_alloc_data) == proc_before,
-              "Map-light reducer advanced scheduling or retained original GObj/proc owners");
-    }
+    check(melee_web_stadium_c1_map_light_adoption_control(error, sizeof(error)), error);
     check(melee_web_gameplay_shutdown(error, sizeof(error)), error);
     std::cout << "C1 asset-free original Ground map-light creation/adoption, two retire-before-detach cycles and foreign/replaced/bound refusals passed; no camera, scheduled proc dispatch or source ticks\n";
 }
