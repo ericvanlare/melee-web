@@ -6,6 +6,7 @@ import {NET_FRAME_BYTES, NET_RECORD_BYTES, PAD_BYTES} from '../scripts/net_locks
 
 function fakeModule(options = {}) {
   let memory = new Uint8Array(options.initialHeap ?? 64), cursor = 8;
+  let mallocCalls = 0;
   const allocations = new Map(), freed = [], pushed = [], indexed = [], configured = [], terminals = [];
   const records = options.records ?? [Uint8Array.from({length: NET_RECORD_BYTES}, (_, i) => i)];
   const grow = minimum => {
@@ -17,6 +18,7 @@ function fakeModule(options = {}) {
   const Module = {
     get HEAPU8() { return memory; },
     _malloc(size) {
+      ++mallocCalls;
       if (options.allocationFails) return 0;
       const ptr = options.outOfBoundsAllocation ? memory.length - 1 : cursor;
       cursor += size + 8;
@@ -50,7 +52,7 @@ function fakeModule(options = {}) {
     UTF8ToString(pointer) { assert.equal(pointer, 4); return '{"active":1,"cursor":0}'; },
   };
   return {Module, allocations, freed, pushed, indexed, configured, terminals,
-    heap: () => memory, grow};
+    heap: () => memory, grow, mallocCalls: () => mallocCalls};
 }
 
 test('one adapter preserves A1 sequential and A3 indexed PAD envelopes through the same scratch owner', () => {
@@ -83,6 +85,35 @@ test('adapter refreshes the heap after allocation and native drain, and returns 
   assert.deepEqual(drained.bytes, saved, 'drained evidence does not alias Wasm memory');
 });
 
+test('adapter copies HEAP-backed input before real Wasm memory growth detaches the source view', () => {
+  const memory = new WebAssembly.Memory({initial: 1, maximum: 2});
+  let pushed;
+  const Module = {
+    get HEAPU8() { return new Uint8Array(memory.buffer); },
+    _malloc(size) { assert.equal(size, NET_FRAME_BYTES); memory.grow(1); return 8; },
+    _free() {},
+    _melee_web_net_push(pointer, count) {
+      pushed = {count, bytes: Module.HEAPU8.slice(pointer, pointer + count * NET_FRAME_BYTES)};
+      return 1;
+    },
+    _melee_web_net_push_indexed() { return 1; },
+    _melee_web_net_enable_local_input_capture() { return 1; },
+    _melee_web_net_confirm_start() { return 1; },
+    _melee_web_net_terminate() {},
+    _melee_web_net_checksum_drain() { return 0; },
+    _melee_web_net_status() { return 4; },
+    UTF8ToString() { return '{}'; },
+  };
+  const adapter = createNetLockstepNativeAdapter(Module);
+  const input = Module.HEAPU8.subarray(128, 128 + NET_FRAME_BYTES);
+  input.forEach((_, index) => { input[index] = (index * 7) & 0xff; });
+  const expected = Uint8Array.from(input);
+
+  assert.equal(adapter.push(input), true);
+  assert.equal(input.byteLength, 0, 'real memory.grow detached the original caller view');
+  assert.deepEqual(pushed, {count: 1, bytes: expected});
+});
+
 test('adapter validates ABI shapes, native result/count bounds and unsigned input cursors', () => {
   const native = fakeModule();
   const adapter = createNetLockstepNativeAdapter(native.Module);
@@ -104,6 +135,11 @@ test('adapter validates ABI shapes, native result/count bounds and unsigned inpu
     /invalid result/);
   const badCount = fakeModule({drainCount: 3});
   assert.throws(() => createNetLockstepNativeAdapter(badCount.Module).drain(2), /invalid record count/);
+  const abiOverflow = fakeModule();
+  const abiOverflowAdapter = createNetLockstepNativeAdapter(abiOverflow.Module);
+  assert.throws(() => abiOverflowAdapter.drain(Math.floor(0xffffffff / NET_RECORD_BYTES) + 1),
+    /32-bit Wasm ABI/);
+  assert.equal(abiOverflow.mallocCalls(), 0, 'an ABI-overflowing drain is rejected before allocation');
   const missingExport = fakeModule().Module;
   delete missingExport._melee_web_net_push_indexed;
   assert.throws(() => createNetLockstepNativeAdapter(missingExport), /complete browser ABI/);
@@ -139,6 +175,9 @@ test('adapter disposal is idempotent, frees its owned scratch once, and rejects 
 });
 
 test('progress adapter owns one subscription and silences retained callbacks after unsubscribe', () => {
+  const withoutOwner = createNetLockstepNativeAdapter(fakeModule().Module);
+  assert.throws(() => withoutOwner.subscribeProgress(() => {}), /progress subscription is unavailable/);
+
   const native = fakeModule();
   let captured, unsubscribeCalls = 0, notifications = 0;
   const adapter = createNetLockstepNativeAdapter(native.Module, {subscribeProgress(callback) {

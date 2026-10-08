@@ -31,10 +31,10 @@ export function createNetLockstepNativeAdapter(Module, {subscribeProgress: subsc
   const ensureCapacity = size => {
     assertActive();
     if (!Number.isSafeInteger(size) || size < 0) throw Error('Native network buffer size is invalid');
+    if (size > UINT32_MAX) throw Error('Native network buffer exceeds the 32-bit Wasm ABI range');
     if (size <= capacity) return pointer;
     const next = Module._malloc(size);
     if (!Number.isSafeInteger(next) || next <= 0) {
-      if (Number.isSafeInteger(next) && next > 0) Module._free(next);
       throw Error('Networked scratch allocation failed');
     }
     const heap = Module.HEAPU8;
@@ -52,12 +52,14 @@ export function createNetLockstepNativeAdapter(Module, {subscribeProgress: subsc
     const bytes = bytesOf(value, label);
     if (bytes.byteLength % frameBytes !== 0)
       throw Error(`${label} must contain complete ${frameBytes}-byte frames`);
-    const ptr = ensureCapacity(bytes.byteLength);
+    // _malloc may grow WebAssembly.Memory and detach a caller's HEAP-backed view.
+    const input = Uint8Array.from(bytes);
+    const ptr = ensureCapacity(input.byteLength);
     const heap = Module.HEAPU8;
-    if (!(heap instanceof Uint8Array) || ptr > heap.length || bytes.byteLength > heap.length - ptr)
+    if (!(heap instanceof Uint8Array) || ptr > heap.length || input.byteLength > heap.length - ptr)
       throw Error('Networked scratch input is outside the current Wasm heap');
-    heap.set(bytes, ptr);
-    return {ptr, count: bytes.byteLength / frameBytes};
+    heap.set(input, ptr);
+    return {ptr, count: input.byteLength / frameBytes};
   };
   const accepted = (value, label) => {
     if (value !== 0 && value !== 1) throw Error(`Native ${label} returned an invalid result`);
@@ -84,11 +86,12 @@ export function createNetLockstepNativeAdapter(Module, {subscribeProgress: subsc
   };
   const drain = maxRecords => {
     assertActive();
-    if (!Number.isSafeInteger(maxRecords) || maxRecords < 0 || maxRecords > UINT32_MAX ||
-        maxRecords > Math.floor(Number.MAX_SAFE_INTEGER / NET_RECORD_BYTES))
+    if (!Number.isSafeInteger(maxRecords) || maxRecords < 0 || maxRecords > UINT32_MAX)
       throw Error('Native checksum drain bound is invalid');
     if (!maxRecords) return {count: 0, bytes: new Uint8Array(0)};
     const bytesRequested = maxRecords * NET_RECORD_BYTES;
+    if (!Number.isSafeInteger(bytesRequested) || bytesRequested > UINT32_MAX)
+      throw Error('Native checksum drain byte bound exceeds the 32-bit Wasm ABI range');
     const ptr = ensureCapacity(bytesRequested);
     const count = Module._melee_web_net_checksum_drain(ptr, maxRecords);
     if (!Number.isSafeInteger(count) || count < 0 || count > maxRecords)
@@ -101,7 +104,7 @@ export function createNetLockstepNativeAdapter(Module, {subscribeProgress: subsc
   };
   const subscribeProgress = callback => {
     assertActive();
-    if (!subscribeProgressOwner) throw Error('Diagnostic native progress requires source accounting');
+    if (!subscribeProgressOwner) throw Error('Native progress subscription is unavailable');
     if (typeof callback !== 'function') throw Error('Native progress subscriber must be a function');
     if (progressUnsubscribe) throw Error('Native progress subscriber already has an owner');
     let active = true;
