@@ -4,6 +4,7 @@
 #include "dat_shape_animation.hpp"
 #include "dat_stage.hpp"
 #include "dat_lights.hpp"
+#include "dat_sis.hpp"
 #include "gameplay_stage_numeric.h"
 #include "gameplay_stage_profile.h"
 #include "gameplay_content.h"
@@ -393,6 +394,7 @@ struct DatNativeMap::Storage : NativeMapStorage {
 };
 struct DatNativeStage::Storage : NativeMapStorage {
     std::unique_ptr<DatStageYaku> random_item_scripts;
+    std::vector<std::unique_ptr<DatSis>> sis_owners;
     std::vector<MeleeWebArchiveSymbol> public_symbols;
     void* yaku=nullptr;
     using NativeMapStorage::NativeMapStorage;
@@ -544,13 +546,20 @@ DatNativeStageMapContractData dat_native_stage_map_contract_from_profile(
 }
 
 DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive)
-    : DatNativeStage(std::move(archive), St_Kind_Last) {}
+    : DatNativeStage(std::move(archive), St_Kind_Last, ProfileMode::Complete) {}
 
 DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int stage_kind)
+    : DatNativeStage(std::move(archive), stage_kind, ProfileMode::Complete) {}
+
+DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive,
+                               int stage_kind, ProfileMode profile_mode)
     : storage_(std::make_unique<Storage>(archive)){
- auto& s=*storage_;const auto& a=*archive;const auto& meta=s.metadata;
- const auto* profile=melee_web_stage_profile(stage_kind);
- require(profile,"Native stage has no complete source callback profile");
+  auto& s=*storage_;const auto& a=*archive;const auto& meta=s.metadata;
+  const auto* profile=melee_web_stage_profile(stage_kind);
+  require(profile,"Native stage has no complete source callback profile");
+  require(profile->diagnostic_only ==
+              (profile_mode == ProfileMode::DiagnosticOnly),
+          "Native stage profile mode does not match its admission scope");
  for(const auto& symbol:a.public_symbols())
   if(symbol.name=="ALDYakuAll")
    s.random_item_scripts=std::make_unique<DatStageYaku>(archive,symbol.data_offset);
@@ -601,7 +610,7 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
  require(s.yaku,"Native stage yakumono symbol absent");
  s.build_map();
  s.native_collision=s.collision();
- const auto* content=melee_web_stage_content(stage_kind);
+  const auto* content=melee_web_stage_content_for_profile(stage_kind);
  require(content,"Native stage public catalog has no archive identity");
  for(const auto& symbol:a.public_symbols()){
   void* value=nullptr;
@@ -625,6 +634,11 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
      s.joints.emplace(symbol.data_offset,descriptor);s.graphs.push_back(std::move(graph));
     }
     value=s.joints.at(symbol.data_offset);
+   }else if(request.kind==MELEE_WEB_STAGE_PUBLIC_SIS){
+    auto owner=std::make_unique<DatSis>(archive,symbol.name);
+    value=owner->descriptor();
+    require(value,"Stage public SIS owner returned a null descriptor");
+    s.sis_owners.push_back(std::move(owner));
    }else require(false,"Unknown native stage public descriptor kind");
   }
   // Retain unhydrated public names as explicit unsupported capabilities.

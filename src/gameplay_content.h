@@ -121,20 +121,49 @@ typedef struct MeleeWebStageContent {
     const char* music;
     int music_id; /* Authored primary BGM; the original stage selector chooses the live track. */
     const char* audio_bank;
+    int diagnostic_only;
 } MeleeWebStageContent;
+
+/* One content authority serves both ordinary admission and private profile
+ * hydration. Diagnostic rows stay out of the ordinary lookup below. */
+static inline const MeleeWebStageContent* melee_web_stage_content_rows(size_t* count)
+{
+    static const MeleeWebStageContent rows[] = {
+        { St_Kind_Last, Gr_Kind_Last, "Final Destination", "GrNLa.dat", "sp_end.hps", 78, NULL, 0 },
+        { St_Kind_Battle, Gr_Kind_Battle, "Battlefield", "GrNBa.dat", "sp_zako.hps", 81, NULL, 0 },
+        { St_Kind_Story, Gr_Kind_Story, "Yoshi's Story", "GrSt.dat", "ystory.hps", 96, NULL, 0 },
+        { St_Kind_OldPupupu, Gr_Kind_OldPupupu, "Dream Land", "GrOp.dat", "old_kb.hps", 58, "pupupu.ssm", 0 },
+        { St_Kind_Shrine, Gr_Kind_Shrine, "Hyrule Temple", "GrSh.dat", "shrine.hps", 75, NULL, 0 },
+        { St_Kind_Izumi, Gr_Kind_Izumi, "Fountain of Dreams", "GrIz.dat", "izumi.hps", 49, NULL, 0 },
+        { St_Kind_OldYoshi, Gr_Kind_OldYoshi, "Yoshi's Island 64", "GrOy.dat", "old_ys.hps", 59, NULL, 0 },
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        /* This row is visible only to source-profile hydration in the private
+         * C1 diagnostic build. Ordinary stage-content lookup rejects it. */
+        { St_Kind_PStadium, Gr_Kind_PStadium, "Pokémon Stadium", "GrPs.usd",
+          "pstadium.hps", 64, "pstadium.ssm", 1 },
+#endif
+    };
+    if (count) *count = sizeof(rows) / sizeof(rows[0]);
+    return rows;
+}
 
 static inline const MeleeWebStageContent* melee_web_stage_content(int stkind)
 {
-    static const MeleeWebStageContent rows[] = {
-        { St_Kind_Last, Gr_Kind_Last, "Final Destination", "GrNLa.dat", "sp_end.hps", 78, NULL },
-        { St_Kind_Battle, Gr_Kind_Battle, "Battlefield", "GrNBa.dat", "sp_zako.hps", 81, NULL },
-        { St_Kind_Story, Gr_Kind_Story, "Yoshi's Story", "GrSt.dat", "ystory.hps", 96, NULL },
-        { St_Kind_OldPupupu, Gr_Kind_OldPupupu, "Dream Land", "GrOp.dat", "old_kb.hps", 58, "pupupu.ssm" },
-        { St_Kind_Shrine, Gr_Kind_Shrine, "Hyrule Temple", "GrSh.dat", "shrine.hps", 75, NULL },
-        { St_Kind_Izumi, Gr_Kind_Izumi, "Fountain of Dreams", "GrIz.dat", "izumi.hps", 49, NULL },
-        { St_Kind_OldYoshi, Gr_Kind_OldYoshi, "Yoshi's Island 64", "GrOy.dat", "old_ys.hps", 59, NULL },
-    };
-    for (size_t i = 0; i < sizeof(rows) / sizeof(rows[0]); ++i)
+    size_t count = 0;
+    const MeleeWebStageContent* rows = melee_web_stage_content_rows(&count);
+    for (size_t i = 0; i < count; ++i)
+        if (rows[i].stage_kind == stkind && !rows[i].diagnostic_only)
+            return &rows[i];
+    return NULL;
+}
+
+/* Internal source-profile lookup. A diagnostic-only row is never returned by
+ * the ordinary content/admission helper. */
+static inline const MeleeWebStageContent* melee_web_stage_content_for_profile(int stkind)
+{
+    size_t count = 0;
+    const MeleeWebStageContent* rows = melee_web_stage_content_rows(&count);
+    for (size_t i = 0; i < count; ++i)
         if (rows[i].stage_kind == stkind) return &rows[i];
     return NULL;
 }

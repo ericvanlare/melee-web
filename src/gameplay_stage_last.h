@@ -13,6 +13,13 @@ typedef struct MeleeWebStageLast MeleeWebStageLast;
  * descriptors, material programs and particle bank must outlive this scope. */
 MeleeWebStageLast* melee_web_stage_begin_kind(int stage_kind, void* yakumono,
     MeleeWebEffectBank*, int defer_start, int source_ordered, char*, size_t);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* Diagnostic-only PStadium boundary: run original source-ordered OnInit,
+ * return its live owner scope before camera/OnStart, and leave inspection and
+ * teardown to the caller through melee_web_stage_last_end. */
+MeleeWebStageLast* melee_web_stage_begin_kind_on_init_diagnostic(
+    int stage_kind, void* yakumono, MeleeWebEffectBank*, char*, size_t);
+#endif
 /* Requires full native map/overrides, stage particle bank64, original effect
  * runtime, numeric stage/collision and original camera contexts already live.
  * These compatibility wrappers select Final Destination. */

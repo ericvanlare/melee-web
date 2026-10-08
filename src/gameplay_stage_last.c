@@ -38,9 +38,11 @@ struct MeleeWebStageLast {
 static MeleeWebStageLast* active;
 static int fail(char* e,size_t n,const char* m){if(e&&n)snprintf(e,n,"%s",m);return 0;}
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
-static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,void* yaku,MeleeWebEffectBank* map_bank,int defer_start,int source_ordered,char* e,size_t n){
+static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,void* yaku,MeleeWebEffectBank* map_bank,int defer_start,int source_ordered,int on_init_diagnostic,char* e,size_t n){
  MeleeWebEffectBankStats bank;
  if(!definition){fail(e,n,"Stage has no complete source callback profile");return NULL;}
+ if(definition->diagnostic_only&&!on_init_diagnostic){fail(e,n,"Diagnostic-only stage profile requires its explicit OnInit boundary");return NULL;}
+ if(on_init_diagnostic&&(!definition->diagnostic_only||!source_ordered||definition->stage_kind!=St_Kind_PStadium)){fail(e,n,"OnInit-only stage boundary requires the diagnostic source-ordered Stadium profile");return NULL;}
  if(!map_bank&&!definition->allow_absent_particle_bank){fail(e,n,"Stage requires its actual registered particle bank64");return NULL;}
  if(map_bank&&!melee_web_effect_bank_stats(map_bank,&bank,e,n)||map_bank&&(bank.bank!=64||!bank.particle_bank_ready)){fail(e,n,"Stage requires its actual registered particle bank64");return NULL;}
  if(active||!yaku||!definition->source||!melee_web_effect_runtime_active()||!melee_web_stage_map_archives()||(!source_ordered&&(!stage_info.param||stage_info.grkind!=definition->ground_kind))){fail(e,n,"Stage requires original effects and published native map/numeric stage contexts");return NULL;}
@@ -74,19 +76,28 @@ static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,voi
   h->lights_adopted=1;
  }else definition->source->on_init();
  for(unsigned i=0;i<definition->required_map_count;i++)if(definition->required_map_ids[i]>=sizeof(stage_info.map_gobjs)/sizeof(stage_info.map_gobjs[0])||!stage_info.map_gobjs[definition->required_map_ids[i]]){melee_web_stage_last_end(h,NULL,0);fail(e,n,"Original stage initializer did not create every required map object");return NULL;}
+ if(on_init_diagnostic){ok(e,n);return h;}
  Stage_80225298();
  if(!defer_start)Stage_802252E4((StKind)definition->stage_kind,NULL);
  ok(e,n);return h;
 }
 MeleeWebStageLast* melee_web_stage_begin_kind(int stage_kind,void* yaku,MeleeWebEffectBank* bank,int defer_start,int source_ordered,char* e,size_t n){
  const MeleeWebStageProfile* definition=melee_web_stage_profile(stage_kind);
- return begin_stage(definition,yaku,bank,defer_start,source_ordered,e,n);
+ return begin_stage(definition,yaku,bank,defer_start,source_ordered,0,e,n);
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+MeleeWebStageLast* melee_web_stage_begin_kind_on_init_diagnostic(int stage_kind,void* yaku,MeleeWebEffectBank* bank,char* e,size_t n){
+ if(stage_kind!=St_Kind_PStadium){fail(e,n,"OnInit-only stage boundary is limited to the diagnostic Stadium profile");return NULL;}
+ const MeleeWebStageProfile* definition=melee_web_stage_profile(stage_kind);
+ if(!definition||!definition->diagnostic_only){fail(e,n,"Diagnostic Stadium source profile is unavailable");return NULL;}
+ return begin_stage(definition,yaku,bank,1,1,1,e,n);
+}
+#endif
 MeleeWebStageLast* melee_web_stage_last_begin(void* yaku,MeleeWebEffectBank* bank,char* e,size_t n){
- return melee_web_stage_begin_kind(St_Kind_Last,yaku,bank,0,0,e,n);
+ return begin_stage(melee_web_stage_profile(St_Kind_Last),yaku,bank,0,0,0,e,n);
 }
 MeleeWebStageLast* melee_web_stage_last_begin_intro(void* yaku,MeleeWebEffectBank* bank,char* e,size_t n){
- return melee_web_stage_begin_kind(St_Kind_Last,yaku,bank,1,0,e,n);
+ return begin_stage(melee_web_stage_profile(St_Kind_Last),yaku,bank,1,0,0,e,n);
 }
 int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
  if(!h)return ok(e,n);

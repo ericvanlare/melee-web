@@ -33,6 +33,7 @@
 #include "gameplay_effect_banks.h"
 #include "gameplay_ground_data.h"
 #include "gameplay_item_runtime.h"
+#include "gameplay_stage_last.h"
 #include "gameplay_stage_map.h"
 #include "native_dat.hpp"
 #include "stadium_c0_native_map_contract.hpp"
@@ -734,9 +735,17 @@ void run_stadium_ground_map1_owner(
               map_id < source_stage.entries.size() &&
               map_id < melee_web_stadium_c1_ground_map_slot_count(),
           "Stadium map1 is outside an authored map or StageInfo table bound");
-    check(std::find(melee_web::test::stadium_resident_ids.begin(),
-                    melee_web::test::stadium_resident_ids.end(), map_id) !=
-              melee_web::test::stadium_resident_ids.end(),
+    const auto* ownership =
+        melee_web::test::stadium_profile_data().map_ownership;
+    check(ownership &&
+              ownership->resident_entry_ids &&
+              ownership->resident_entry_count != 0 &&
+              std::find(ownership->resident_entry_ids,
+                        ownership->resident_entry_ids +
+                            ownership->resident_entry_count,
+                        static_cast<uint32_t>(map_id)) !=
+                  ownership->resident_entry_ids +
+                      ownership->resident_entry_count,
           "C0 Stadium contract does not retain map1 in this archive");
     const auto& map_entry = source_stage.entries[map_id];
     check(map_entry.index == map_id && map_entry.joint_offset.has_value() &&
@@ -2071,6 +2080,71 @@ void run_trophy_baseline_smoke(const melee_web::RuntimeFiles& files)
 }
 
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+void run_stadium_profile_controls()
+{
+    using namespace melee_web;
+    const auto* profile = melee_web_stage_stadium_profile_data();
+    check(profile && melee_web_stage_profile(St_Kind_PStadium) == profile &&
+              profile->diagnostic_only && profile->source != nullptr,
+          "Guarded Stadium source profile is not resolved by its canonical owner");
+    check(melee_web_stage_content(St_Kind_PStadium) == nullptr &&
+              !melee_web_menu_stage_available(St_Kind_PStadium),
+          "Diagnostic Stadium profile leaked into ordinary content admission");
+    const auto* content = melee_web_stage_content_for_profile(St_Kind_PStadium);
+    check(content && content->diagnostic_only &&
+              content->ground_kind == Gr_Kind_PStadium &&
+              std::string_view(content->archive) == "GrPs.usd" &&
+              std::string_view(content->music) == "pstadium.hps" &&
+              content->music_id == 64 &&
+              std::string_view(content->audio_bank) == "pstadium.ssm",
+          "Diagnostic Stadium content row differs from the prepared source identity");
+    check(profile->required_map_count == 4 && profile->required_map_ids &&
+              profile->required_map_ids[0] == 0 &&
+              profile->required_map_ids[1] == 1 &&
+              profile->required_map_ids[2] == 2 &&
+              profile->required_map_ids[3] == 5,
+          "Stadium profile omitted a source-ordered OnInit map owner");
+    const auto* ownership = profile->map_ownership;
+    check(profile->map_ownership_policy == MELEE_WEB_STAGE_MAP_OWNERSHIP_AUTHORED &&
+              ownership && ownership->resident_entry_count == 4 &&
+              ownership->external_reference_count == 26 &&
+              ownership->animation_flag_entry_count == 10 &&
+              ownership->flagged_object_count == 44 &&
+              profile->entry_count == 10 && profile->animation_count_count == 10,
+          "Stadium profile did not reuse the complete C0 authored map contract");
+    check(profile->public_symbol_count == 2 && profile->public_symbols &&
+              profile->public_symbols[0].kind == MELEE_WEB_STAGE_PUBLIC_IMAGE &&
+              std::string_view(profile->public_symbols[0].name) ==
+                  "GrdPStadiumBG_OVDummy_mat6962_GrdPStadiumDummy_0_image_desc" &&
+              profile->public_symbols[1].kind == MELEE_WEB_STAGE_PUBLIC_SIS &&
+              std::string_view(profile->public_symbols[1].name) ==
+                  "SIS_GrPStadiumData",
+          "Stadium profile omitted its map-owned IMAGE or DatSis-backed SIS public symbol");
+
+    char snapshot_error[160]{};
+    MeleeWebStadiumC1StageInfoSnapshot* const stage_snapshot =
+        melee_web_stadium_c1_stage_info_snapshot_begin(
+            snapshot_error, sizeof(snapshot_error));
+    check(stage_snapshot != nullptr, snapshot_error);
+    char error[256]{};
+    check(melee_web_stage_begin_kind(
+              St_Kind_PStadium, nullptr, nullptr, 0, 0, error, sizeof(error)) == nullptr &&
+              std::string_view(error) ==
+                  "Diagnostic-only stage profile requires its explicit OnInit boundary",
+          "Ordinary stage-begin API did not reject the diagnostic Stadium profile");
+    check(melee_web_stage_begin_kind_on_init_diagnostic(
+              St_Kind_Last, nullptr, nullptr, error, sizeof(error)) == nullptr &&
+              std::string_view(error) ==
+                  "OnInit-only stage boundary is limited to the diagnostic Stadium profile",
+          "OnInit-only boundary accepted a non-Stadium source profile");
+    check(melee_web_stadium_c1_stage_info_snapshot_matches(stage_snapshot),
+          "Rejected diagnostic profile controls changed source StageInfo bytes");
+    check(melee_web_stadium_c1_stage_info_snapshot_release_unchanged(
+              stage_snapshot, snapshot_error, sizeof(snapshot_error)),
+          snapshot_error);
+    std::cout << "Diagnostic Stadium profile/content gate and source-state rejection controls passed\n";
+}
+
 uint32_t stadium_archive_symbol_offset(const melee_web::DatArchive& archive,
                                        const char* name)
 {
@@ -2101,6 +2175,8 @@ void run_stadium_e8_request(
     const std::vector<std::uint8_t> raw_before = raw_bytes;
     auto archive = std::make_shared<const DatArchive>(
         raw_bytes, DatExternalPolicy::ResolveNull);
+    const DatStage map_metadata(*archive);
+    auto map_contract = test::stadium_contract_data(*archive, map_metadata);
     const std::uint32_t ground_root =
         stadium_archive_symbol_offset(*archive, "grGroundParam");
     const std::uint32_t itemdata_root =
@@ -2226,7 +2302,7 @@ void run_stadium_e8_request(
         check(ground_data != nullptr && yakumono_data != nullptr,
               "C0 typed scalar owners did not decode the Stadium roots");
         map_owner = std::make_unique<DatNativeMap>(
-            archive, test::stadium_contract);
+            archive, map_contract.view());
         check(map_owner->map_head() != nullptr && map_owner->collision() != nullptr,
               "C0 typed map owner did not decode map_head/coll_data");
         random_yaku = std::make_unique<DatStageYaku>(archive, yaku_root);
@@ -2718,6 +2794,9 @@ void run_stadium_screen_roots_preflight(
     const auto& raw = files.at("GrPs.usd");
     const auto raw_before = raw;
     auto archive = std::make_shared<const DatArchive>(raw, DatExternalPolicy::ResolveNull);
+    const DatStage map_metadata(*archive);
+    auto map_contract = melee_web::test::stadium_contract_data(
+        *archive, map_metadata);
     // ResolveNull clears validated external-link slots in the archive's owned
     // copy. Preserve that decoded baseline separately from immutable input.
     const std::vector<std::uint8_t> archive_before(archive->data().begin(), archive->data().end());
@@ -2763,11 +2842,11 @@ void run_stadium_screen_roots_preflight(
     invariants();
     for (unsigned lifetime=0; lifetime<2; ++lifetime) {
         {
-            DatNativeMap map(archive, melee_web::test::stadium_contract);
+            DatNativeMap map(archive, map_contract.view());
             DatSis sis(archive, screen::sis_name);
             check(sis.entry_count() == 22, "Screen SIS changed authored 22-slot count");
             {
-                DatNativeMap foreign(archive, melee_web::test::stadium_contract);
+                DatNativeMap foreign(archive, map_contract.view());
                 screen::synthetic::rejects([&] {
                     screen::identity(map, 1, foreign.image_descriptor(image_offset));
                 }, "unique map descriptor");
@@ -2785,7 +2864,7 @@ void run_stadium_screen_roots_preflight(
             check(stadium_screen_source_public(catalog.handle, screen::image_name) == image &&
                       stadium_screen_source_public(catalog.handle, screen::sis_name) == sis.descriptor(),
                   "Live consumer catalog lost canonical IMAGE/SIS owners");
-            DatNativeMap foreign(archive, melee_web::test::stadium_contract);
+            DatNativeMap foreign(archive, map_contract.view());
             auto* foreign_image = static_cast<HSD_ImageDesc*>(foreign.image_descriptor(image_offset));
             auto* descriptor = static_cast<HSD_Joint*>(
                 stadium_screen_map_entry_joint(map.map_head(), 1));
@@ -3163,7 +3242,10 @@ void run_stadium_c1a_selection_smoke(
 }
 int main(int argc,char** argv){try{
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
- if(argc==2&&std::string_view(argv[1])=="--stadium-yakumono-exchange"){
+  if(argc==2&&std::string_view(argv[1])=="--stadium-profile-controls"){
+   run_stadium_profile_controls();return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-yakumono-exchange"){
   run_stadium_yakumono_exchange_control();return 0;
  }
 #endif

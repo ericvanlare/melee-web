@@ -434,11 +434,13 @@ void marker_fixture_trace(){
 void stadium_map_trace(const char* path){
  auto bytes=read_bytes(path);
  auto archive=std::make_shared<melee_web::DatArchive>(bytes,melee_web::DatExternalPolicy::ResolveNull);
- const auto original_data_section=std::vector<uint8_t>(archive->data().begin(),archive->data().end());
- melee_web::DatStage metadata(*archive);
- check(metadata.entries.size()==10&&metadata.flagged_object_table.count==44,
+  const auto original_data_section=std::vector<uint8_t>(archive->data().begin(),archive->data().end());
+  melee_web::DatStage metadata(*archive);
+  auto contract_data=stadium_contract_data(*archive,metadata);
+  const auto stadium_contract=contract_data.view();
+  check(metadata.entries.size()==10&&metadata.flagged_object_table.count==44,
        "C0 authored Stadium map row/flag counts");
- for(const auto& expected:stadium_external_references){
+ for(const auto& expected:stadium_contract.external_references){
   const auto& row=metadata.entries[expected.entry_index];
   const uint32_t slot=row.descriptor_offset+expected.field_offset;
   bool found=false;
@@ -463,7 +465,7 @@ void stadium_map_trace(const char* path){
           "C0 map light row matches source table");
     if(entry.animation_flags_offset){
      const auto* flags=melee_web_test_native_stadium_flags(map,int(entry.index));
-     const auto source=archive->range(*entry.animation_flags_offset,stadium_animation_counts[entry.index]);
+     const auto source=archive->range(*entry.animation_flags_offset,stadium_contract.animation_consumer_counts[entry.index]);
      check(flags&&std::equal(source.begin(),source.end(),flags),
            "C0 local animation flags remain present on imported rows");
     }
@@ -499,21 +501,21 @@ void stadium_map_trace(const char* path){
  // widen the owner into a stage profile.
  auto wrong_count=stadium_contract;wrong_count.entry_count=9;
  expect_error([&]{melee_web::DatNativeMap rejected(archive,wrong_count);},"entry count");
- auto bad_counts=stadium_animation_counts;bad_counts[3]=65;
+ std::vector<uint8_t> bad_counts(stadium_contract.animation_consumer_counts.begin(),stadium_contract.animation_consumer_counts.end());bad_counts[3]=65;
  auto bad_bound=stadium_contract;bad_bound.animation_consumer_counts=bad_counts;
  expect_error([&]{melee_web::DatNativeMap rejected(archive,bad_bound);},"animation consumer count");
  constexpr std::array<uint32_t,3> missing_resident={0,1,2};
  auto missing=stadium_contract;missing.resident_entry_ids=missing_resident;
  expect_error([&]{melee_web::DatNativeMap rejected(archive,missing);},"Unexpected local joint");
- auto wrong_imports=stadium_external_references;
+ std::vector<melee_web::DatNativeMapExternalReference> wrong_imports(stadium_contract.external_references.begin(),stadium_contract.external_references.end());
  wrong_imports[0].symbol="GrdPStadiumWrong_TopN_joint";
  auto wrong_import=stadium_contract;wrong_import.external_references=wrong_imports;
  expect_error([&]{melee_web::DatNativeMap rejected(archive,wrong_import);},"symbol differs");
- auto wrong_flag_name=stadium_flag_expectations;
+ std::vector<melee_web::DatNativeMapFlagExpectation> wrong_flag_name(stadium_contract.flagged_objects.begin(),stadium_contract.flagged_objects.end());
  wrong_flag_name[2].symbol="GrdPStadiumWrong_FShadowmat3_mobjdesc";
  auto wrong_flag_identity=stadium_contract;wrong_flag_identity.flagged_objects=wrong_flag_name;
  expect_error([&]{melee_web::DatNativeMap rejected(archive,wrong_flag_identity);},"flagged external slot or name");
- auto wrong_flag_slot=stadium_flag_expectations;wrong_flag_slot[2].index=3;
+ std::vector<melee_web::DatNativeMapFlagExpectation> wrong_flag_slot(stadium_contract.flagged_objects.begin(),stadium_contract.flagged_objects.end());wrong_flag_slot[2].index=3;
  auto wrong_flag_order=stadium_contract;wrong_flag_order.flagged_objects=wrong_flag_slot;
  expect_error([&]{melee_web::DatNativeMap rejected(archive,wrong_flag_order);},"expectations changed authored order");
 
@@ -524,7 +526,7 @@ void stadium_map_trace(const char* path){
  size_t external_index=archive->external_symbols().size();
  for(size_t i=0;i<archive->external_symbols().size();i++){
   const auto& symbol=archive->external_symbols()[i];
-  if(symbol.name==stadium_flag_expectations[2].symbol&&
+  if(symbol.name==stadium_contract.flagged_objects[2].symbol&&
      std::find(symbol.slots.begin(),symbol.slots.end(),external_flag_slot)!=symbol.slots.end())
    external_index=i;
  }
@@ -564,7 +566,7 @@ void stadium_map_trace(const char* path){
  auto unowned_flag=bytes;
  write_be32(unowned_flag,32+local_flag_slot,metadata.root_offset);
  auto unowned_archive=std::make_shared<melee_web::DatArchive>(unowned_flag,melee_web::DatExternalPolicy::ResolveNull);
- auto unowned_expectations=stadium_flag_expectations;
+ std::vector<melee_web::DatNativeMapFlagExpectation> unowned_expectations(stadium_contract.flagged_objects.begin(),stadium_contract.flagged_objects.end());
  unowned_expectations[0].target_offset=metadata.root_offset;
  auto unowned_contract=stadium_contract;unowned_contract.flagged_objects=unowned_expectations;
  expect_error([&]{melee_web::DatNativeMap rejected(unowned_archive,unowned_contract);},"flag mutation");

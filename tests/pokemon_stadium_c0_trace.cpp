@@ -1301,8 +1301,10 @@ int run_probe(std::string_view probe, const std::filesystem::path& path)
                   "catalog Stadium yakumono owner differs from the typed source ABI");
 
             melee_web::DatStage map_metadata(*archive);
+            auto stadium_contract =
+                melee_web::test::stadium_contract_data(*archive, map_metadata);
             melee_web::DatNativeMap map_owner(
-                archive, melee_web::test::stadium_contract);
+                archive, stadium_contract.view());
             check(map_owner.map_head() && map_owner.collision(),
                   "catalog map_head/coll_data owners are incomplete");
             const auto source_light_counts =
