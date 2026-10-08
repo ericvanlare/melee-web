@@ -18,6 +18,28 @@ const row=cursor=>({schema:'melee-web-hit-transition-probe',version:1,source_cur
 const rows=selection.selected.map(row);
 const validate=values=>validateHitTransitionProbeRows(values.map(JSON.stringify),selection,{observedCursor:5240});
 assert.equal(validate(rows).complete,true);
+const zeroPassRow=(collisionCount,motionCount)=>{
+ const events=[];
+ const event=(phase,kind,invocation,extra={})=>events.push({...base,sequence:events.length,phase,kind,invocation,...extra});
+ event('scheduler_start',3,0);
+ for(let invocation=1;invocation<=collisionCount+motionCount;invocation++){
+  const kind=invocation<=collisionCount?0:2;
+  const gate=kind===0?{gate_x221f_b3:true}:{};
+  event('entry',kind,invocation,{requested_motion:17,flags:'00000000',frame_bits:'00000000',
+   speed_bits:'00000000',blend_bits:'00000000',log_count:0,log_kind:0,...gate});
+  event('return',kind,invocation,gate);
+ }
+ event('scheduler_return',3,0);
+ return {schema:'melee-web-hit-transition-probe',version:1,source_cursor:5239,
+  candidate_enabled:true,candidate_passes:0,candidate_pairs:0,overflowed:false,
+  hook_counts:[collisionCount,0,motionCount],events};
+};
+const zeroPass64=zeroPassRow(30,1);
+assert.equal(zeroPass64.events.length,64);
+assert.equal(validate([rows[0],zeroPass64,rows[2]]).complete,true);
+const zeroPass76=zeroPassRow(36,1);
+assert.equal(zeroPass76.events.length,76);
+assert.throws(()=>validate([rows[0],zeroPass76,rows[2]]),/bound/);
 for(const mutate of [
  r=>r.events[0].phase='entry',
  r=>r.events[1].phase='return',

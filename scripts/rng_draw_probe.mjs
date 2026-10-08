@@ -112,7 +112,7 @@ export function validateHitTransitionProbeRows(textRows, selection,
     try { row = JSON.parse(text); } catch { throw Error('Invalid hit transition JSON'); }
     const candidateEnabled = Boolean(row && typeof row === 'object' && Object.hasOwn(row,'candidate_enabled'));
     const candidateHeaderValid = candidateEnabled && row.source_cursor === 5239 && row.candidate_enabled === true &&
-      uint(row.candidate_passes) && uint(row.candidate_pairs);
+      uint(row.candidate_passes) && row.candidate_passes > 0 && uint(row.candidate_pairs);
     if (!row || row.schema !== 'melee-web-hit-transition-probe' || row.version !== 1 ||
         !selection.selected.includes(row.source_cursor) || seen.has(row.source_cursor) ||
         row.source_cursor <= previousCursor || row.overflowed !== false ||
