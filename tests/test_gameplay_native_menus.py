@@ -537,7 +537,11 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-5000:])
         self.assertIn("Diagnostic Stadium profile/content gate", run.stdout)
         self.assertIn(
-            "C1 source OnInit refusal and synthetic event-journal controls passed; no source initialization invoked",
+            "C1 source OnInit refusal and synthetic event-journal controls passed; no Stadium stage initialization invoked",
+            run.stdout,
+        )
+        self.assertIn(
+            "C1 asset-free original effect prepare/efLib_Init/complete/end passed; no stage callbacks, proc dispatch, or ticks",
             run.stdout,
         )
         self.assertNotIn("OnInit lifetime", run.stdout)

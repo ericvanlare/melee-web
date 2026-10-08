@@ -31,6 +31,7 @@
 #include "dat_stage_items.hpp"
 #include "dat_stage_yaku.hpp"
 #include "gameplay_effect_banks.h"
+#include "gameplay_effect_runtime.h"
 #include "gameplay_ground_data.h"
 #include "gameplay_item_runtime.h"
 #include "gameplay_stage_last.h"
@@ -65,6 +66,7 @@ extern "C" {
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include <melee/gr/grdatfiles.h>
 #include <melee/gr/stage.h>
+#include <melee/ef/eflib.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/objalloc.h>
 #endif
@@ -2166,6 +2168,45 @@ void run_stadium_profile_controls()
     std::cout << "Diagnostic Stadium profile/content gate and source-state rejection controls passed\n";
 }
 
+void run_stadium_effect_runtime_lifecycle_control()
+{
+    char error[256]{};
+    check(melee_web_gameplay_startup(8U * 1024U * 1024U,
+                                     error, sizeof(error)), error);
+    check(melee_web_native_world_enable(error, sizeof(error)), error);
+    HSD_GObj** const links = reinterpret_cast<HSD_GObj**>(HSD_GObj_Entities);
+    check(links != nullptr && !links[11] && !links[12] &&
+              !melee_web_effect_runtime_prepared() &&
+              !melee_web_effect_runtime_active(),
+          "Asset-free effect lifecycle requires an unowned runtime and empty source links");
+    const MeleeWebGameplayStats before = melee_web_gameplay_stats();
+    const int scheduler_cycle_before = HSD_GObj_804D783C;
+    const uint32_t gobj_pool_before = HSD_ObjAllocGetUsing(&gobj_alloc_data);
+    const uint32_t proc_pool_before = HSD_ObjAllocGetUsing(&gobjproc_alloc_data);
+    check(melee_web_effect_runtime_prepare(error, sizeof(error)), error);
+    check(melee_web_effect_runtime_prepared() &&
+              !melee_web_effect_runtime_active(),
+          "Original effect reservation must remain inactive before efLib_Init");
+    efLib_Init();
+    check(links[11] && links[12],
+          "Original efLib_Init did not create both source effect link owners");
+    check(melee_web_effect_runtime_complete_source_init(error, sizeof(error)), error);
+    check(melee_web_effect_runtime_active(),
+          "Original effect runtime did not activate after source scheduler validation");
+    check(melee_web_effect_runtime_end(error, sizeof(error)), error);
+    check(!melee_web_effect_runtime_prepared() &&
+              !melee_web_effect_runtime_active() && !links[11] && !links[12],
+          "Original effect runtime teardown did not retire both source link owners");
+    const MeleeWebGameplayStats after = melee_web_gameplay_stats();
+    check(after.generation == before.generation && after.ticks == before.ticks &&
+              HSD_GObj_804D783C == scheduler_cycle_before &&
+              HSD_ObjAllocGetUsing(&gobj_alloc_data) == gobj_pool_before &&
+              HSD_ObjAllocGetUsing(&gobjproc_alloc_data) == proc_pool_before,
+          "Asset-free effect lifecycle advanced the source cursor or retained scheduler owners");
+    check(melee_web_gameplay_shutdown(error, sizeof(error)), error);
+    std::cout << "C1 asset-free original effect prepare/efLib_Init/complete/end passed; no stage callbacks, proc dispatch, or ticks\n";
+}
+
 uint32_t stadium_archive_symbol_offset(const melee_web::DatArchive& archive,
                                        const char* name)
 {
@@ -2296,6 +2337,7 @@ void run_stadium_e8_request(
     void* previous_ground_param = nullptr;
     bool ground_param_published = false;
     bool effect_bank_attached = false;
+    bool effect_runtime_owned = false;
     bool stage_selection_owned = false;
     bool observer_window_owned = false;
     bool cleanup_complete = false;
@@ -2339,6 +2381,16 @@ void run_stadium_e8_request(
             on_init_observation.device_snapshot = nullptr;
         }
         if (ground_storage) ground_storage->end();
+        if (effect_runtime_owned) {
+            check(melee_web_effect_runtime_end(error, sizeof(error)), error);
+            effect_runtime_owned = false;
+            HSD_GObj** const links =
+                reinterpret_cast<HSD_GObj**>(HSD_GObj_Entities);
+            check(!melee_web_effect_runtime_prepared() &&
+                      !melee_web_effect_runtime_active() && links &&
+                      !links[11] && !links[12],
+                  "OnInit cleanup did not retire the original effect runtime before map-bank detach");
+        }
         if (effect_bank_attached) {
             check(melee_web_effect_bank_detach(effects->bank(), error,
                                                 sizeof(error)), error);
@@ -2436,6 +2488,17 @@ void run_stadium_e8_request(
             {"GrPs.usd", "yakumono_param", yakumono_data},
             {"GrPs.usd", "quake_model_set", quake->single_model()},
         };
+        if (perform_on_init) {
+            check(!melee_web_effect_runtime_prepared() &&
+                      !melee_web_effect_runtime_active(),
+                  "Source-ordered OnInit requires an unowned original effect runtime");
+            const int effect_begin_succeeded =
+                melee_web_effect_runtime_begin(error, sizeof(error));
+            effect_runtime_owned = melee_web_effect_runtime_prepared();
+            check(effect_begin_succeeded, error);
+            check(effect_runtime_owned && melee_web_effect_runtime_active(),
+                  "Original effects were not initialized before stage-map and bank publication");
+        }
         stage_map = melee_web_stage_map_publish(
             map_owner->map_head(), error, sizeof(error));
         check(stage_map != nullptr, error);
@@ -3774,7 +3837,8 @@ int main(int argc,char** argv){try{
   }
   if(argc==2&&std::string_view(argv[1])=="--stadium-on-init-controls"){
    run_stadium_profile_controls();
-   std::cout<<"C1 source OnInit refusal and synthetic event-journal controls passed; no source initialization invoked\n";
+   run_stadium_effect_runtime_lifecycle_control();
+   std::cout<<"C1 source OnInit refusal and synthetic event-journal controls passed; no Stadium stage initialization invoked\n";
    return 0;
   }
   if(argc==2&&std::string_view(argv[1])=="--stadium-yakumono-exchange"){
