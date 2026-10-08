@@ -702,7 +702,7 @@ test('actual harness freezes complete fixture before asynchronous normal close c
       await Promise.resolve();
       for (const role of ['alpha', 'beta']) { globalThis.window = pages[role]; pages[role].menuFrame(); }
     }};
-    const context = {runtimeOwned: true, runtimeInputFixture: true, instanceRows, pairResults, relay,
+    const context = {runtimeOwned: true, runtimeInputFixture: true, runtimeCssSss: false, instanceRows, pairResults, relay,
       instances: Object.fromEntries(['alpha', 'beta'].map(role => [role, {freezeRuntimeInputFixture: async () => invoke(pages[role], 'freeze')}]))};
     await vm.runInNewContext(`(async()=>{${source.slice(start, end)}\n}})()`, context);
     assert.equal(closeCalls, 1); assert.equal(pairResults.relay_closed, true);
