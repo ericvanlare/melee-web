@@ -6,12 +6,20 @@ Owned scratch is external and retained on a failing control.
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
+def _retain_reducer_evidence(name,stdout,stderr):
+    evidence=os.environ.get("MELEE_HIT_REDUCER_EVIDENCE_DIR")
+    if evidence:
+        directory=Path(evidence);directory.mkdir(parents=True,exist_ok=True)
+        (directory/(name+".stdout")).write_text(stdout)
+        (directory/(name+".stderr")).write_text(stderr)
+
 HEADERS=r"""
 #ifndef HIT_PROBE_SYNTHETIC_TYPES
 #define HIT_PROBE_SYNTHETIC_TYPES
@@ -204,13 +212,31 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
 
         (cls.scratch/'candidate_source_bodies.inc').write_text(bodies)
         cls.candidate_binary=cls.scratch/'actual-candidates'
-        built=subprocess.run([shutil.which('cc') or 'cc','-std=c11','-Wall','-Wextra','-Werror',
-            '-ffp-contract=off','-DMELEE_WEB_RNG_DRAW_OBSERVER=1','-DMELEE_WEB_HIT_PROBE_SYNTHETIC=1',
-            '-I'+str(cls.scratch),'-I'+str(ROOT/'src'),str(ROOT/'src/gameplay_hit_transition_probe.c'),
-            str(ROOT/'tests/native_hit_candidate_probe_fixture.c'),str(cls.scratch/'identity.c'),
-            '-o',str(cls.candidate_binary)],capture_output=True,text=True)
-        (cls.scratch/'candidate-compile.log').write_text(built.stdout+built.stderr)
+        compiler=shutil.which('cc') or 'cc'
+        common=[compiler,'-std=c11','-Wall','-Wextra','-Werror','-ffp-contract=off',
+            '-I'+str(cls.scratch),'-I'+str(ROOT/'src')]
+        fixture=str(ROOT/'tests/native_hit_candidate_probe_fixture.c')
+        identity=str(cls.scratch/'identity.c')
+        probe=str(ROOT/'src/gameplay_hit_transition_probe.c')
+        def compile_fixture(binary,defines,sources,log_name):
+            result=subprocess.run(common+defines+sources+['-o',str(binary)],capture_output=True,text=True)
+            log=result.stdout+result.stderr
+            (cls.scratch/log_name).write_text(log)
+            _retain_reducer_evidence(log_name,log,'')
+            return result
+        built=compile_fixture(cls.candidate_binary,
+            ['-DMELEE_WEB_RNG_DRAW_OBSERVER=1','-DMELEE_WEB_HIT_PROBE_SYNTHETIC=1'],
+            [probe,fixture,identity],'candidate-compile.log')
         if built.returncode:raise RuntimeError('Actual bodies/synthetic ABI compile failed; retained '+str(cls.scratch))
+        cls.no_observer_binary=cls.scratch/'actual-candidates-no-observer'
+        built=compile_fixture(cls.no_observer_binary,[],[probe,fixture,identity],'no-observer-compile.log')
+        if built.returncode:raise RuntimeError('No-observer comparison compile failed; retained '+str(cls.scratch))
+        cls.adapter_binary=cls.scratch/'fixture-counting-adapter'
+        built=compile_fixture(cls.adapter_binary,
+            ['-DMELEE_WEB_RNG_DRAW_OBSERVER=1','-DMELEE_WEB_HIT_PROBE_SYNTHETIC=1',
+             '-DMELEE_WEB_HIT_PROBE_COUNTING_ADAPTER=1'],
+            [fixture,identity],'counting-adapter-compile.log')
+        if built.returncode:raise RuntimeError('Fixture-only counting adapter compile failed; retained '+str(cls.scratch))
     def run(self,result=None):
         result=unittest.TestCase.run(self,result)
         self.__class__.test_result=result
@@ -239,6 +265,123 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
         (self.scratch/('candidate-'+mode+'.validation')).write_text(validated.stdout+validated.stderr)
         self.assertEqual(validated.returncode,0,validated.stderr)
         return rows[1]
+    def run_reducer_binary(self,binary,mode,label):
+        result=subprocess.run([str(binary),mode],capture_output=True,text=True)
+        _retain_reducer_evidence(label,result.stdout,result.stderr)
+        (self.scratch/(label+'.stdout')).write_text(result.stdout)
+        (self.scratch/(label+'.stderr')).write_text(result.stderr)
+        return result
+    def test_authored_selector_off_completes_all_sixty_geometry_calls(self):
+        observed=self.run_reducer_binary(self.candidate_binary,'authored_off','selector-off-observer')
+        uninstrumented=self.run_reducer_binary(self.no_observer_binary,'authored_off','selector-off-no-observer')
+        for result in (observed,uninstrumented):
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual(result.stdout,'')
+            self.assertIn('geometry_calls=60 emitted_rows=0',result.stderr)
+        observed_hash=re.search(r'state_hash=([0-9a-f]{16})',observed.stderr)
+        uninstrumented_hash=re.search(r'state_hash=([0-9a-f]{16})',uninstrumented.stderr)
+        self.assertIsNotNone(observed_hash,observed.stderr)
+        self.assertIsNotNone(uninstrumented_hash,uninstrumented.stderr)
+        self.assertEqual(observed_hash.group(1),uninstrumented_hash.group(1))
+    def test_authored_four_by_fifteen_reproduces_actual_helper_overflow(self):
+        result=self.run_reducer_binary(self.candidate_binary,'authored_overflow','actual-helper-overflow')
+        self.assertNotEqual(result.returncode,0,result.stderr)
+        self.assertIn('attempted_geometry_calls=57 retained_records=64',result.stderr)
+        self.assertEqual(len(result.stdout.splitlines()),1)
+        row=json.loads(result.stdout.splitlines()[0])
+        self.assertEqual(row['source_cursor'],5239)
+        self.assertTrue(row['overflowed'])
+        self.assertEqual(row['hook_counts'],[1,0,0])
+        events=row['events']
+        self.assertEqual(len(events),64)
+        self.assertEqual([event['sequence'] for event in events],list(range(64)))
+        expected=[(hit,hurt) for hit in range(3) for hurt in range(15)]+[(3,hurt) for hurt in range(11)]
+        geometries=[event for event in events if event['phase']=='geometry']
+        self.assertEqual(len(geometries),56)
+        self.assertEqual([(event['hit_index'],event['hurt_index']) for event in geometries],expected)
+        expected_order=['scheduler_start','entry','pass_entry','pair_entry']
+        for hit in range(4):
+            expected_order.append('candidate')
+            expected_order.extend(['geometry']*(15 if hit<3 else 11))
+        self.assertEqual([event['phase'] for event in events],expected_order)
+        self.assertEqual([event['hit_index'] for event in events if event['phase']=='candidate'],[0,1,2,3])
+        for event in (event for event in events if event['phase']=='candidate'):
+            self.assertEqual(len(event['hit_flags']),6)
+            self.assertEqual(re.fullmatch(r'[0-9a-f]{8}',event['hit_damage_bits']).group(0),event['hit_damage_bits'])
+            self.assertEqual(re.fullmatch(r'[0-9a-f]{8}',event['hit_radius_bits']).group(0),event['hit_radius_bits'])
+        self.assertTrue(all(event['result']==0 for event in geometries))
+        for event in geometries:
+            self.assertEqual(len(event['geometry_before']),18)
+            self.assertEqual(len(event['geometry_after']),10)
+            self.assertEqual(len(event['arguments']),3)
+            self.assertEqual(len(event['matrix_bits']),12)
+            for field in ('geometry_before','geometry_after','arguments','matrix_bits'):
+                self.assertTrue(all(re.fullmatch(r'[0-9a-f]{8}',value) for value in event[field]))
+        self.assertEqual((geometries[-1]['hit_index'],geometries[-1]['hurt_index']),(3,10))
+    def counting_adapter_mode(self,mode,label):
+        result=self.run_reducer_binary(self.adapter_binary,mode,label)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('source_state_writes_equal=1 service_counts_and_order_equal=1',result.stderr)
+        row=json.loads(result.stdout)
+        self.assertIn('fixture-only counting adapter',row['adapter_scope'])
+        self.assertEqual(row['event_count'],len(row['events']))
+        self.assertEqual([event['sequence'] for event in row['events']],list(range(row['event_count'])))
+        counts={}
+        for event in row['events']:counts[event['phase']]=counts.get(event['phase'],0)+1
+        self.assertEqual([(event['kind'],event['ordinal']) for event in row['events']
+                          if event['phase']=='return'],[(1,2),(1,3),(0,1)])
+        self.assert_common_projection(mode,row['events'])
+        return counts,row['events']
+    def assert_common_projection(self,mode,events):
+        expected=[('scheduler_start',3,0),('entry',0,1),('pass_entry',4,1),('pair_entry',4,1)]
+        geometry_ordinal=0;producer_ordinal=0
+        for hit in range(4):
+            expected.append(('candidate',4,1))
+            for hurt in range(15 if mode=='count_all_false' else 1):
+                geometry_ordinal+=1;expected.append(('geometry',4,geometry_ordinal))
+                if mode!='count_all_false':
+                    producer_ordinal+=1
+                    expected.append(('producer_entry',4,producer_ordinal))
+                    branch_count=3 if mode=='count_mixed' and hit==3 else 1
+                    expected.extend([('producer_branch',4,producer_ordinal)]*branch_count)
+                    expected.append(('producer_return',4,producer_ordinal))
+        expected.extend([('pair_return',4,1),('pass_return',4,1)])
+        for invocation in (2,3):
+            expected.append(('entry',1,invocation))
+            if mode=='count_mixed' and invocation==2:expected.append(('log',1,invocation))
+            expected.append(('return',1,invocation))
+        expected.extend([('return',0,1),('scheduler_return',3,0)])
+        actual=[(event['sequence'],event['phase'],event['kind'],event['ordinal']) for event in events]
+        self.assertEqual(actual,[(sequence,*projection) for sequence,projection in enumerate(expected)])
+    def test_fixture_counting_adapter_all_false_records_all_sixty_geometry_calls(self):
+        counts,events=self.counting_adapter_mode('count_all_false','adapter-all-false')
+        self.assertEqual(len(events),76)
+        self.assertEqual(counts,{'scheduler_start':1,'entry':3,'pass_entry':1,'pair_entry':1,
+            'candidate':4,'geometry':60,'pair_return':1,'pass_return':1,'return':3,'scheduler_return':1})
+        geometries=[event for event in events if event['phase']=='geometry']
+        self.assertEqual([(event['hit_index'],event['hurt_index'],event['result']) for event in geometries],
+            [(hit,hurt,0) for hit in range(4) for hurt in range(15)])
+    def test_fixture_counting_adapter_preserves_phantom_and_final_normal_branch_order(self):
+        counts,events=self.counting_adapter_mode('count_phantom','adapter-repeated-phantom-false')
+        self.assertEqual(len(events),32)
+        self.assertEqual(counts,{'scheduler_start':1,'entry':3,'pass_entry':1,'pair_entry':1,
+            'candidate':4,'geometry':4,'producer_entry':4,'producer_branch':4,'producer_return':4,
+            'pair_return':1,'pass_return':1,'return':3,'scheduler_return':1})
+        phantom=[event for event in events if event['phase']=='producer_branch']
+        self.assertEqual([(event['hit_index'],event['branch']) for event in phantom],[(i,0) for i in range(4)])
+        returns=[event for event in events if event['phase']=='producer_return']
+        self.assertEqual([(event['hit_index'],event['result']) for event in returns],[(i,0) for i in range(4)])
+        counts,events=self.counting_adapter_mode('count_mixed','adapter-phantom-then-normal')
+        self.assertEqual(len(events),35)
+        self.assertEqual(counts,{'scheduler_start':1,'entry':3,'pass_entry':1,'pair_entry':1,
+            'candidate':4,'geometry':4,'producer_entry':4,'producer_branch':6,'producer_return':4,
+            'log':1,'pair_return':1,'pass_return':1,'return':3,'scheduler_return':1})
+        branches=[event for event in events if event['phase']=='producer_branch']
+        self.assertEqual([(event['hit_index'],event['branch']) for event in branches],
+            [(0,0),(1,0),(2,0),(3,3),(3,4),(3,5)])
+        returns=[event for event in events if event['phase']=='producer_return']
+        self.assertEqual([(event['hit_index'],event['result']) for event in returns],
+            [(0,0),(1,0),(2,0),(3,1)])
     def test_actual_candidate_branches_and_state_equivalence(self):
         for mode in ('normal','phantom','zero','wrong_pair','intangible','cache','mode','matrix','two_geometry','hurt15','zero_overlap','hit_disabled','catch','flag_zero','air_miss','grab_blocked','eligibility_blocked','phantom_existing','phantom_busy','phantom_invulnerable','normal_invulnerable','normal_armored'):
             with self.subTest(mode=mode):self.candidate_mode(mode)
