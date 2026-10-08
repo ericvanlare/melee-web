@@ -3761,7 +3761,8 @@ int main(int argc,char** argv){try{
 #endif
  if(input_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
-    !sound_settings_recipe&&!sudden_death_host_recipe&&!stadium_c1a_recipe&&
+    !sound_settings_recipe&&!sudden_death_host_recipe&&!sudden_death_world_recipe&&
+    !stadium_c1a_recipe&&
     !stadium_c1_context_preflight_recipe&&
     !stadium_c1_item_state_preflight_recipe&&!stadium_screen_roots_recipe&&
     !stadium_e8_request_recipe&&!stadium_ground_map1_owner_recipe&&
@@ -3773,6 +3774,7 @@ int main(int argc,char** argv){try{
  if(!v10_css_replay_start_recipe&&argc==8)
    throw std::runtime_error("Only the MWRC v10 CSS replay-start reducer accepts an exact recipe path");
  if((retail_fd_recipe||results_mario_recipe||sudden_death_host_recipe||
+     sudden_death_world_recipe||
      v10_css_replay_start_recipe)&&
     stage_kind!=St_Kind_Last)
    throw std::runtime_error("Explicit FD recipes require Final Destination");

@@ -85,6 +85,30 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
             run.stdout,
         )
 
+    def test_sudden_death_world_dispatch_without_assets(self):
+        target = ROOT / "build/browser-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("The native menu host trace has not been built")
+        absent = self.scratch / "absent-sd-fixtures"
+        self.assertFalse(absent.exists())
+        for stage, expected in (
+                (32, "Missing owned menu host fixture: MnSlChr.usd"),
+                (31, "Explicit FD recipes require Final Destination")):
+            with self.subTest(stage=stage):
+                trace = self.scratch / f"sd-dispatch-{stage}.jsonl"
+                command = [str(node_runtime()), str(target), str(absent),
+                           str(absent), str(stage), str(trace), "asset-free-dispatch",
+                           "sudden-death-world-control-v1"]
+                run = subprocess.run(command, cwd=ROOT, capture_output=True,
+                                     text=True, timeout=30)
+                (self.scratch / f"sd-dispatch-{stage}.stdout").write_text(
+                    run.stdout, encoding="utf-8")
+                (self.scratch / f"sd-dispatch-{stage}.stderr").write_text(
+                    run.stderr, encoding="utf-8")
+                self.assertNotEqual(run.returncode, 0)
+                self.assertIn(expected, run.stderr)
+                self.assertNotIn("Unknown transition input recipe", run.stderr)
+
     def test_stadium_yakumono_exchange_round_trip_without_assets(self):
         target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
         if not target.is_file():
