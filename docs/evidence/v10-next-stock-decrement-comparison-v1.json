@@ -1,0 +1,569 @@
+{
+  "accepted_event": {
+    "audit_sha256": "7fbc127cc6c340eeaa11e4451af2a4d3b155931e460bd1fc26b3b6d806e75069",
+    "comparison_sha256": "e93e5388359d1fe7e1a6747b18ac84d7e97b5655d1e913e27b98727deb5ea03a",
+    "event": {
+      "changed_slots": [
+        {
+          "after": 3,
+          "before": 4,
+          "slot": 1
+        }
+      ],
+      "event": "first_typed_stock_count_decrement",
+      "stocks_after": [
+        4,
+        3,
+        3,
+        4
+      ],
+      "stocks_before": [
+        4,
+        4,
+        3,
+        4
+      ],
+      "target": {
+        "cursor_after_frame": 4791,
+        "fighter_entities": [
+          {
+            "entity_index": 0,
+            "fighter_gobj_linked": true,
+            "fighter_player_id": 0,
+            "generation": 0,
+            "match_index": 0,
+            "slot": 0
+          },
+          {
+            "entity_index": 0,
+            "fighter_gobj_linked": true,
+            "fighter_player_id": 1,
+            "generation": 0,
+            "match_index": 0,
+            "slot": 1
+          },
+          {
+            "entity_index": 0,
+            "fighter_gobj_linked": true,
+            "fighter_player_id": 2,
+            "generation": 0,
+            "match_index": 0,
+            "slot": 2
+          },
+          {
+            "entity_index": 0,
+            "fighter_gobj_linked": true,
+            "fighter_player_id": 3,
+            "generation": 0,
+            "match_index": 0,
+            "slot": 3
+          }
+        ],
+        "match_frame": 3483,
+        "match_index": 0,
+        "pad_consume_source_sequence": 22140,
+        "rng": 4228862339,
+        "scene_frame": 3606,
+        "source_tick": 3606,
+        "source_tick_seq": 22141,
+        "state_fields_observed": [
+          "fighter_entities",
+          "fighters",
+          "match_frame",
+          "pad_state_hex",
+          "rng",
+          "scene_frame"
+        ],
+        "timeline_frame_index": 4790
+      }
+    },
+    "prefix": {
+      "bytes_read": 151442332,
+      "last_source_sequence": 22141,
+      "records_read": 22142,
+      "sha256": "db1f0b02e40e4f343f6398033aa1cb46486ddc5db1ffeed5fe8583a4847c8606"
+    }
+  },
+  "base_main": "0f129cf0c5ebaa39816d98a8638a02b7b5269361",
+  "boundary_result": "equivalent",
+  "caps": {
+    "cleanup_reserve_ms": 5000,
+    "fresh_max_bytes": 268435456,
+    "fresh_max_records": 48000,
+    "historical_clock2000_max_bytes": 134217728,
+    "historical_clock2000_max_records": 24000,
+    "internal_seconds": 60,
+    "owner_overall_timeout_ms": 65000
+  },
+  "capture": {
+    "browser": "Headless installed Google Chrome 154.0.8037.98",
+    "browser_errors": [],
+    "capture_count": 1,
+    "cleanup_check_distinction": "Outer plain bind hit TCP TIME_WAIT and initially retained the lane. Original receipt remains; separate reduction verified attributed PID/group absence, refused connection, no listener and reusable bind before releasing only the owned marker.",
+    "exported_cursor": 5179,
+    "exported_jsonl_records": 5181,
+    "lane_released": true,
+    "loaded_runtime_data": {
+      "file_bytes": 3674112,
+      "from_cache": false,
+      "loaded_bytes": 3674112,
+      "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+      "total_bytes": 3674112
+    },
+    "local_http_inventory_count": 34,
+    "observed_stop_cursor": 5177,
+    "owner_cleanup_passed": true,
+    "pre_post_inventory_passed": true,
+    "report": {
+      "artifact": "report.json",
+      "bytes": 3847922,
+      "sha256": "9265735fff1e5ff9607accb16c1dd319ac57c6470fd40182409193a2cec3cec9"
+    },
+    "requested_cursor": 5167,
+    "result": "incomplete",
+    "retail_report": {
+      "artifact": "retail-browser-report.json",
+      "bytes": 18597,
+      "sha256": "50f44a2e39c1dffc5e2132a1a428d2de5aca3517f48efe09186e7af4d4dc3256"
+    },
+    "returncode": 1,
+    "speakers": "Muted by launch options; DSP, PCM and Web Audio processing retained.",
+    "tail_scope": "All browser export rows validated for shape, inputs, lineage and exact EOF; rows after cursor5167 do not claim source-state equivalence.",
+    "trace": {
+      "artifact": "retail-port.jsonl",
+      "bytes": 21134220,
+      "sha256": "7df40dacff625aab465d3d6e793eff54419291108a0b01bbe2c82363df10fa31"
+    },
+    "unexpected_requests": []
+  },
+  "comparator_and_capture_producer": {
+    "branch": "codex/issue269-next-typed-stock-source",
+    "head": "bb891d03cdd154890631e710ef017ca1d8c3c98c",
+    "tree": "5fc68a2ab5bd78143ea48a773bbc6558c849291f"
+  },
+  "comparison": {
+    "checks": {
+      "accepted_stock_event_rejoin": "pass",
+      "browser_capture_provenance": "pass",
+      "clock60_match_frame_state": "pass",
+      "first_positive_match_frame_state": "pass",
+      "ordered_clock_checkpoint_states": "pass",
+      "setup_state": "pass",
+      "source_first_css_and_setup_binding": "pass",
+      "source_pad_to_tick0_join": "pass",
+      "source_provenance": "pass",
+      "source_ticks_through_first_stock_decrement_after_accepted_event": "pass",
+      "source_ticks_through_prior_ordered_checkpoints": "pass",
+      "stock_decrement_event_state": "pass",
+      "tick0_state": "pass",
+      "whole_session": "incomplete"
+    },
+    "cleanup_passed": true,
+    "elapsed_seconds": 3.187335291877389,
+    "fields_compared": [
+      "rng",
+      "match_frame",
+      "pad_state_hex",
+      "fighters",
+      "fighter_entities"
+    ],
+    "full_source_trace_rehashed": false,
+    "match_state_frames_compared": 3983,
+    "nonmatch_frames_input_ordered": 1184,
+    "nonmatch_scalar_state_compared": false,
+    "process_group_absent": true,
+    "returncode": 1,
+    "setup_records_compared": 1,
+    "source_stat_stable": true,
+    "timeline_frames_consumed": 5167
+  },
+  "complete": false,
+  "evidence_labels": [
+    "Source identified",
+    "Browser exercised",
+    "Retail compared"
+  ],
+  "exclusions": [
+    "KO/respawn attribution",
+    "Full match, original Results/CSS return or whole session",
+    "CSS/SSS scalar-state equality",
+    "Foreground timing, live or physical input, performance",
+    "Pixels, PCM or audible fidelity",
+    "Competitive admission"
+  ],
+  "first_stock_decrement_only": false,
+  "fresh_rejoins": [
+    {
+      "audit_sha256": "9e74c7018001369295e569ef071427633db53e2a0e6dc1db182c8aa3604d096d",
+      "browser_cursor": 1309,
+      "bytes_read": 10389712,
+      "label": "clock1",
+      "match_frame": 1,
+      "match_index": 0,
+      "pad_consume_sequence": 4734,
+      "records_read": 4736,
+      "rejoined_before_continuing": true,
+      "source_prefix_sha256": "24d520abccf98ee109b3cee2ae67767d4363c7e941d688c3534c0cbfdd7cde4a",
+      "source_sequence": 4735,
+      "source_tick": 124,
+      "timeline_frame_index": 1308
+    },
+    {
+      "audit_sha256": "c4f2bd73157f36c80c7ad5b11275c205d484608813241d3af94b9462bf3187b1",
+      "browser_cursor": 1368,
+      "bytes_read": 12780628,
+      "label": "clock60",
+      "match_frame": 60,
+      "match_index": 0,
+      "pad_consume_sequence": 5029,
+      "records_read": 5031,
+      "rejoined_before_continuing": true,
+      "source_prefix_sha256": "32b763453688c6335b90c9807b71c79d919b85e6e7435a3c2abccd1792f00e77",
+      "source_sequence": 5030,
+      "source_tick": 183,
+      "timeline_frame_index": 1367
+    },
+    {
+      "audit_sha256": "503e1d5c54262fa1c3369aae0e950f646890f98dea4598a9823cd1e0d06f34bb",
+      "browser_cursor": 1608,
+      "bytes_read": 22506388,
+      "label": "clock300",
+      "match_frame": 300,
+      "match_index": 0,
+      "pad_consume_sequence": 6229,
+      "records_read": 6231,
+      "rejoined_before_continuing": true,
+      "source_prefix_sha256": "ef9569c32524aa79443a998867c4c418a2cfd8b21719ed24b03fc966ded025ef",
+      "source_sequence": 6230,
+      "source_tick": 423,
+      "timeline_frame_index": 1607
+    },
+    {
+      "audit_sha256": "b5cc71c227bd619e14407f2535d9e38063cf142c33936df221f16759cf9b91f4",
+      "browser_cursor": 1808,
+      "bytes_read": 30611188,
+      "label": "clock500",
+      "match_frame": 500,
+      "match_index": 0,
+      "pad_consume_sequence": 7229,
+      "records_read": 7231,
+      "rejoined_before_continuing": true,
+      "source_prefix_sha256": "ec1ceb5c56c87ec35b5dd8cd0d318c85b1917d554871883732de4d2e4f52e7b6",
+      "source_sequence": 7230,
+      "source_tick": 623,
+      "timeline_frame_index": 1807
+    },
+    {
+      "audit_sha256": "521e00f57aac27a999619d5adb3aa6fe6fa86e5c4f774b8f211cd002f9bcb632",
+      "browser_cursor": 2308,
+      "bytes_read": 50873188,
+      "label": "clock1000",
+      "match_frame": 1000,
+      "match_index": 0,
+      "pad_consume_sequence": 9729,
+      "records_read": 9731,
+      "rejoined_before_continuing": true,
+      "source_prefix_sha256": "7f71d2c8c9529e8171dfab854cd114abb0eef44ca8d59c6f7e96af5495d13cf7",
+      "source_sequence": 9730,
+      "source_tick": 1123,
+      "timeline_frame_index": 2307
+    },
+    {
+      "audit_sha256": "019d86cd96de13aa7b7b3de4a64c0bfbca6c04d580dcc3ad4b2e188ee3af8ca1",
+      "browser_cursor": 3308,
+      "bytes_read": 91371214,
+      "label": "clock2000",
+      "match_frame": 2000,
+      "match_index": 0,
+      "pad_consume_sequence": 14727,
+      "records_read": 14729,
+      "rejoined_before_continuing": true,
+      "source_prefix_sha256": "3f5eaf2c845a387d22c1da7abf74d0f4e4ca2c40fd8503b31a890f0f3f6b7296",
+      "source_sequence": 14728,
+      "source_tick": 2123,
+      "timeline_frame_index": 3307
+    },
+    {
+      "audit_sha256": "7fbc127cc6c340eeaa11e4451af2a4d3b155931e460bd1fc26b3b6d806e75069",
+      "browser_cursor": 4791,
+      "bytes_read": 151442332,
+      "label": "accepted_stock",
+      "match_frame": 3483,
+      "match_index": 0,
+      "pad_consume_sequence": 22140,
+      "records_read": 22142,
+      "rejoined_before_continuing": true,
+      "source_prefix_sha256": "db1f0b02e40e4f343f6398033aa1cb46486ddc5db1ffeed5fe8583a4847c8606",
+      "source_sequence": 22141,
+      "source_tick": 3606,
+      "timeline_frame_index": 4790
+    }
+  ],
+  "fresh_source_prefix": {
+    "bytes_read": 166680623,
+    "first_entry_seq": 4088,
+    "first_setup_seq": 4113,
+    "first_setup_source_tick": 247,
+    "first_source_tick": 0,
+    "first_source_tick_seq": 4115,
+    "hash_basis": "fresh SHA-256 over exactly the raw bytes consumed through the first typed stock decrease after the accepted stock event",
+    "last_source_sequence": 24022,
+    "records_read": 24023,
+    "sha256": "c31863f04fcc44a454f316b9090989aac057ab868f8b3afb4a034604f53889dc"
+  },
+  "issue": 271,
+  "ko_claim": false,
+  "native_artifacts": {
+    "gameplay_menu_browser.data": {
+      "bytes": 3674112,
+      "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+    },
+    "gameplay_menu_browser.js": {
+      "bytes": 300352,
+      "sha256": "213fd21eea42113a57fef994b3589e002e2c2a4c293ab9a682b69c8698b69c3f"
+    },
+    "gameplay_menu_browser.wasm": {
+      "bytes": 15749904,
+      "sha256": "a3154d5fc3c0f5821aa1ca2bc7a849bdfc841ced136d1e57a131727f3bb54f77"
+    }
+  },
+  "native_reuse": {
+    "added_modules": {
+      "net_lockstep_core.mjs": {
+        "bytes": 25527,
+        "sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff"
+      },
+      "net_lockstep_native_adapter.mjs": {
+        "bytes": 8445,
+        "sha256": "4130dce6c6390506b66bfafebace3fe33ac561ce8a873d06956b619fa5f0686a"
+      }
+    },
+    "cmake_changes": "Only two configure_file copies for current web modules; no compiled behavior change.",
+    "compiled_source_patch_dependency_equal": true,
+    "current_staged_inventory_count": 34,
+    "historical_inventory_count": 32,
+    "reused_web_artifacts": "Each authored source hash and retained/current Git blob matched; fresh retained artifact hashes matched.",
+    "served_inventory_not_loaded_module_set": true
+  },
+  "next_step": "Propose a first-match completion and original Results transition milestone; no further source scan or browser capture is authorized by this receipt.",
+  "receipts": {
+    "capture-cleanup-reduction-v1.json": {
+      "artifact": "capture-cleanup-reduction-v1.json",
+      "bytes": 831,
+      "sha256": "eff2b362c2797d31b66d48666cde7ccc695e9d9c131b5231c14346cb8f802a61"
+    },
+    "capture-execution-outcome-v1.json": {
+      "artifact": "capture-execution-outcome-v1.json",
+      "bytes": 6821,
+      "sha256": "047ab0db49feaf941ceb2a62fe4c65891bb27d99026f89f119b1df2b77b56e2e"
+    },
+    "capture-owned-execution-v1.json": {
+      "artifact": "capture-owned-execution-v1.json",
+      "bytes": 373,
+      "sha256": "53da4ba7021b8c8468937f65c542526bd96eddd1c0e42229bae75deb24053611"
+    },
+    "comparison-expectations-v3.json": {
+      "artifact": "comparison-expectations-v3.json",
+      "bytes": 27312,
+      "sha256": "26de70c517d804186a1857de18f74e18912a2343ba75c769c8c1068324c997b4"
+    },
+    "comparison-metadata-preflight-v1.log": {
+      "artifact": "comparison-metadata-preflight-v1.log",
+      "bytes": 345,
+      "sha256": "d58db33fff01f7518a4a8447bbbadce610d32ca2a0a95d69e9803eaa2ceea0cc"
+    },
+    "comparison-metadata-preflight-v2.json": {
+      "artifact": "comparison-metadata-preflight-v2.json",
+      "bytes": 2718,
+      "sha256": "5448226338d38b9c7e675b3476f1d0fe74782696fa24f52aa6e101f94ca1d62b"
+    },
+    "comparison-metadata-preflight-v2.log": {
+      "artifact": "comparison-metadata-preflight-v2.log",
+      "bytes": 178,
+      "sha256": "c3f4742f41b86071f94a42c9e6ee1e135e8b543b826799f97545ab4884d33efd"
+    },
+    "comparison-owned-execution-v1.json": {
+      "artifact": "comparison-owned-execution-v1.json",
+      "bytes": 544,
+      "sha256": "c4f16578fc84debc5935115ef449b6bdd7cf89a943cf583a67dcfc95d393a1a1"
+    },
+    "comparison-owner-report-v1.json": {
+      "artifact": "comparison-owner-report-v1.json",
+      "bytes": 4512,
+      "sha256": "a66b2a814961857b571a3f5d7d78876bf6ee19a1078e0ab9f34db5ee62ec9909"
+    },
+    "comparison-result-review-v1.json": {
+      "artifact": "comparison-result-review-v1.json",
+      "bytes": 18441,
+      "sha256": "6b8ed22b308701137933e66bd1e4e58b854e042b5d5391b470410c97d6552793"
+    },
+    "full-python-suite-execution-v3.json": {
+      "artifact": "full-python-suite-execution-v3.json",
+      "bytes": 925,
+      "sha256": "5130c223c7dae6b570847950550d628d9c65e52ca8422e5d8b2285b57afb7b3a"
+    },
+    "full-python-suite-v3.log": {
+      "artifact": "full-python-suite-v3.log",
+      "bytes": 378586,
+      "sha256": "ee7e6c70227fbaaeaab3c8ab3b8d74a19f75916a639abbdf93092d497febd213"
+    },
+    "inventory-focused-controls-v3.log": {
+      "artifact": "inventory-focused-controls-v3.log",
+      "bytes": 721,
+      "sha256": "fb911459a868217c759391f37ed20eddc6b7d29708dc8b438a99ff96b887eeb8"
+    },
+    "inventory-source-review-packet-v2.json": {
+      "artifact": "inventory-source-review-packet-v2.json",
+      "bytes": 1921,
+      "sha256": "dbe42e76c173296767a2df070aab6c96bd1b3aa7d8b80878414c3a5c1d2c48fc"
+    },
+    "native-producer-reuse-v1.json": {
+      "artifact": "native-producer-reuse-v1.json",
+      "bytes": 26556,
+      "sha256": "3d6ab8ec1a0537fd315b90a14cc37a62559ddc4a9ba061b936f5aec5acac1df7"
+    },
+    "next-stock-comparison-v1.json": {
+      "artifact": "next-stock-comparison-v1.json",
+      "bytes": 40478,
+      "sha256": "6a6ce598f05322be38f929aed3d96bab82391df7fadc2dd65df302bae45c047e"
+    },
+    "producer-source-manifest-v1.json": {
+      "artifact": "producer-source-manifest-v1.json",
+      "bytes": 21977,
+      "sha256": "8c28722f0f08e5df387d5038410a052abae8faf62b8a1c0f1f1af1b725c38535"
+    },
+    "reduced-runtime-label-v1.log": {
+      "artifact": "reduced-runtime-label-v1.log",
+      "bytes": 97,
+      "sha256": "d5bc06fde08ec7fcc242a0b6a5a7ef24a0e7bf94f9600e5b6c62212da6d39d07"
+    },
+    "root-capture-outcome-review-v1.json": {
+      "artifact": "root-capture-outcome-review-v1.json",
+      "bytes": 5650,
+      "sha256": "3bbdeecfa8b1c2fc8581d29372130a8224a7b58bbe304629868df2a2f1c06c2b"
+    },
+    "root-capture-review-v1.json": {
+      "artifact": "root-capture-review-v1.json",
+      "bytes": 1909,
+      "sha256": "7a99415ddc8528c8f139c6aab90a222de0fb64fa771883fdfe5aeacb0277e1da"
+    },
+    "root-comparison-launch-review-v1.json": {
+      "artifact": "root-comparison-launch-review-v1.json",
+      "bytes": 1699,
+      "sha256": "ccb1e13fc1165757f04a1546df5d624fcc88687f5a3fa1241f9f520f8db434c4"
+    },
+    "root-comparison-result-review-v1.json": {
+      "artifact": "root-comparison-result-review-v1.json",
+      "bytes": 1193,
+      "sha256": "9c5a366f29b596144692cb5f50c4a027447faa0ba92cc8dc3a2c5d427ee5de76"
+    },
+    "root-comparison-review-packet-v1.json": {
+      "artifact": "root-comparison-review-packet-v1.json",
+      "bytes": 15047,
+      "sha256": "9e817969a862bcce19569d4fb67b4aae7e66d68da3575eb8caaa36af19e563d3"
+    },
+    "root-inventory-source-review-v2.json": {
+      "artifact": "root-inventory-source-review-v2.json",
+      "bytes": 1600,
+      "sha256": "140b83f73ef7d574664b378cd281275bba5bb946361ed7ef18311108cf82dfcd"
+    },
+    "runtime-artifact-manifest-v1.json": {
+      "artifact": "runtime-artifact-manifest-v1.json",
+      "bytes": 5775,
+      "sha256": "52382f38637dff5afa0bbd4663d329e47f15ea7dd0d0dbb65a383e1f9b7e0e03"
+    },
+    "wrapper-focused-controls-v2.log": {
+      "artifact": "wrapper-focused-controls-v2.log",
+      "bytes": 151,
+      "sha256": "30b955ede44ae28814585e6ad00960918c66ead39956d2757951c4359e9b1547"
+    }
+  },
+  "result": "incomplete",
+  "retained_failure_evidence": [
+    "Earlier #258 startup and callback failures remain historical.",
+    "Inventory HTTP fixture response-header error retained and reduced.",
+    "Comparator fixtures retained malformed PAD, overbroad content guard, synthetic byte-cap and local-prefix-closure failures.",
+    "Comparison metadata preparation retained incorrect record spelling and runtime identity label; actual-validator reducer passed.",
+    "Initial outer TIME_WAIT cleanup result and separate verified reduction both retained."
+  ],
+  "retained_native_producer": {
+    "base_main": "6645508cd7f09eed4ed5a5d39c5f4e1676734d58",
+    "branch": "codex/b4-stock-decrement-browser-comparison-20261008",
+    "command": [
+      "python3",
+      "scripts/build.py",
+      "--target",
+      "runtime",
+      "--configuration",
+      "Release"
+    ],
+    "commit": "d1914d7320e7559ed7e43b0eadf50d55ddd46e6d",
+    "configuration": "Release",
+    "exit_code": 0,
+    "target": "runtime",
+    "tree": "3db3078be94303a6008b8b18b096db6d1a997b08"
+  },
+  "schema": "melee-web-v10-next-stock-decrement-comparison-evidence-v1",
+  "scope": "Conditional recorded-queue state through first typed fighter-stock decrease strictly after accepted #258 event. Legacy CLI selects parameterized v2 boundary; historical first-after-clock2000 behavior is unchanged.",
+  "source_only_issue": 269,
+  "source_only_receipt": "v10-next-stock-decrement-source-v1.json",
+  "suite": {
+    "elapsed_seconds": 400.80849933298305,
+    "executed": 1909,
+    "failures": 0,
+    "native_game_build": false,
+    "producer_head": "bb891d03cdd154890631e710ef017ca1d8c3c98c",
+    "producer_tree": "5fc68a2ab5bd78143ea48a773bbc6558c849291f",
+    "skipped": 153,
+    "tests_run": 2062
+  },
+  "terminal_event": {
+    "audit_sha256": "ea03452bf9870d8af82c9f755370b9c21b3fa5c38c0df7dfed575b1cd3851577",
+    "browser_cursor": 5167,
+    "browser_exported_cursor": 5179,
+    "browser_observed_cursor": 5177,
+    "changed_slots": [
+      {
+        "after": 3,
+        "before": 4,
+        "slot": 3
+      }
+    ],
+    "clock2000_baseline_stocks": [
+      4,
+      4,
+      3,
+      4
+    ],
+    "event_definition": "first typed stock decrease strictly after the accepted stock event",
+    "first_stock_decrement_only": false,
+    "ko_claim": false,
+    "match_frame": 3859,
+    "match_index": 0,
+    "pad_consume_sequence": 24020,
+    "source_prefix_bytes": 166680623,
+    "source_prefix_records": 24023,
+    "source_prefix_sha256": "c31863f04fcc44a454f316b9090989aac057ab868f8b3afb4a034604f53889dc",
+    "source_scan_caps": {
+      "max_bytes": 268435456,
+      "max_records": 48000,
+      "max_seconds": 60
+    },
+    "source_sequence": 24022,
+    "source_tick": 3982,
+    "stocks_after": [
+      4,
+      3,
+      3,
+      3
+    ],
+    "stocks_before": [
+      4,
+      3,
+      3,
+      4
+    ],
+    "timeline_frame_index": 5166
+  },
+  "whole_session_equivalent": false
+}
