@@ -48,6 +48,7 @@ const {values} = parseArgs({options: {
   'stall-ms': {type: 'string', default: '120000'}, 'poll-ms': {type: 'string', default: '50'},
   'delay-ms': {type: 'string', default: '250'}, 'flip': {type: 'string'},
   'disconnect-at': {type: 'string'},
+  'runtime-input-fixture': {type: 'string'},
 }});
 const integer = (name, min, max, fallback = undefined) => {
   const value = values[name] === undefined ? fallback : Number(values[name]);
@@ -71,7 +72,7 @@ if (!values.url || !values.disc || !values.out || !values.seed || (!inputSamplin
 if (inputSampling && values.script)
   throw Error('The input-sampling scenario captures browser-local input and does not accept --script');
 const scenario = values.scenario;
-const {browserOwned, runtimeOwned, peerTransport, localWebRtc, roomWorkerSignaling} =
+const {browserOwned, runtimeOwned, peerTransport, localWebRtc, roomWorkerSignaling, runtimeInputFixture = false} =
   validateLockstepBrowserMode(values);
 const url = new URL(values.url);
 if (!['http:', 'https:'].includes(url.protocol) || !url.pathname.endsWith('/runtime.html'))
@@ -157,6 +158,41 @@ const fnv1a64 = bytes => {
   return hash;
 };
 
+function verifyConsumedInputComponents(alphaSamples, betaSamples, bytesA, bytesB) {
+  for (const samples of [alphaSamples, betaSamples]) {
+    if (!Array.isArray(samples) || samples.length !== sourceTicks - LOCKSTEP_DELAY ||
+        samples.some(bytes => !Array.isArray(bytes) || bytes.length !== 11 ||
+          Array.from(bytes).some(byte => !Number.isInteger(byte) || byte < 0 || byte > 255)))
+      throw Error('Native consumed input witness requires every canonical selected PAD sample');
+  }
+  const neutralPad = Buffer.from(lockstepConstants.neutralPad, 'hex');
+  const noControllerPad = Buffer.from(lockstepConstants.noControllerPad, 'hex');
+  const expectedInputComponents = Array.from({length: sourceTicks}, (_, sourceTick) => {
+    const inputTick = sourceTick - LOCKSTEP_DELAY;
+    const playerPads = inputTick < 0 ? [neutralPad, neutralPad] :
+      [Buffer.from(alphaSamples[inputTick]), Buffer.from(betaSamples[inputTick])];
+    // Port order and the existing 11-byte records are the core's 44-byte frame layout.
+    const nativePadBytes = Buffer.concat([...playerPads, noControllerPad, noControllerPad]);
+    return {source_tick: sourceTick, input_tick: inputTick < 0 ? null : inputTick,
+      input_hash: fnv1a64(nativePadBytes).toString(16).padStart(16, '0')};
+  });
+  const actualInputComponents = {};
+  for (const [role, bytes] of [['alpha', bytesA], ['beta', bytesB]]) {
+    if (bytes.length !== sourceTicks * NET_RECORD_BYTES)
+      throw Error(`${role} input-sampling checksum evidence has an unexpected record count`);
+    actualInputComponents[role] = [];
+    for (const expected of expectedInputComponents) {
+      const offset = expected.source_tick * NET_RECORD_BYTES;
+      const parsed = parseNetChecksum(bytes.subarray(offset, offset + NET_RECORD_BYTES));
+      if (parsed.tick !== expected.source_tick || parsed.input !== expected.input_hash)
+        throw Error(`${role} native input checksum at source ${expected.source_tick} does not match ` +
+          `the sample expected from input ${expected.input_tick}: ${parsed.input} != ${expected.input_hash}`);
+      actualInputComponents[role].push({source_tick: parsed.tick, input_hash: parsed.input});
+    }
+  }
+  return {expectedInputComponents, actualInputComponents};
+}
+
 const pairResults = {
   schema: inputSampling ? 'melee-web-local-lockstep-a3-input-sampling-v1' : 'melee-web-local-lockstep-a2-run-v1', scenario, seed,
   scope: nativePump ? runtimeOwned ? 'bounded eight-tick development runtime-owned native checksum pump' :
@@ -180,7 +216,8 @@ const pairResults = {
     source_ticks: sourceTicks, pattern: ['neutral', 'A', 'release', 'neutral'],
     beta_deferred_input_tick: 0} : runtimeOwned ? {source: 'browser-local native PADStatus',
       input_ticks: usedInputs, source_ticks: sourceTicks, pattern: null,
-      synthetic_gamepad: false, player_input_callback: 'existing runtime native poll'} : null,
+      synthetic_gamepad: runtimeInputFixture, ...(runtimeInputFixture ? {fixture: 'neutral-a-release via ordinary controller manager'} : {}),
+      player_input_callback: 'existing runtime native poll'} : null,
   transport_attempt: localWebRtc ? {type: 'webrtc-datachannel', local_only: true, ice_servers: []} :
     describeLockstepTransportAttempt(values['relay-url']),
   webrtc_signaling: localWebRtc ? values['webrtc-signaling'] : null,
@@ -212,6 +249,10 @@ async function checkedHealth(role) {
   const status = await instance.status();
   const native = await instance.native();
   if (native.error) throw Error(`${role} runtime error: ${native.error}`);
+  if (runtimeInputFixture) {
+    const fixture = await instance.readRuntimeInputFixture();
+    if (!fixture || fixture.failure || fixture.disposed) throw Error(`${role} runtime input fixture failed: ${JSON.stringify(fixture)}`);
+  }
   const fatal = firstFatalBrowserError(instance.errors);
   if (fatal) throw Error(`${role} browser error: ${JSON.stringify(fatal)}`);
   if (!status.active) throw Error(`${role} native network session became inactive`);
@@ -878,7 +919,7 @@ async function run() {
     userDataDir: path.join(childDirectory(role), 'profile'), label: role,
     timeoutMs: openTimeout, deadline, peerModuleHashes,
     runtimeOwned,
-    syntheticGamepad: inputSampling ? standardPad(role === 'alpha' ? 0 : 1) : null,
+    syntheticGamepad: inputSampling || runtimeInputFixture ? standardPad(role === 'alpha' ? 0 : 1) : null,
   })));
   // Transfer every successful launch before reporting a sibling failure so
   // the shared finalizer still owns its source session and browser context.
@@ -911,13 +952,15 @@ async function run() {
         retainRenderReadiness: true, awaitStartIdentity: true});
     loadedWasm = await Promise.all(['alpha', 'beta'].map(role => instances[role].freezeLoadedWasmIdentity()));
   }
-  if (inputSampling) {
+  if (inputSampling || runtimeInputFixture) {
     for (const role of ['alpha', 'beta']) {
       const localPort = role === 'alpha' ? 0 : 1;
       instanceRows[role].synthetic_gamepad_routing =
         await instances[role].prepareSyntheticGamepadRouting(localPort);
     }
   }
+  if (runtimeInputFixture) for (const role of ['alpha', 'beta'])
+    instanceRows[role].runtime_input_fixture_start = await instances[role].installRuntimeInputFixture({role, inputTicks: usedInputs});
   await Promise.all(['alpha', 'beta'].map(role => instances[role].beginLockstep(seed, sourceTicks)));
   const startRows = await waitForStart();
   if (!runtimeOwned) for (const role of ['alpha', 'beta'])
@@ -1179,6 +1222,8 @@ async function run() {
     pairResults.local_webrtc_final_before_peer_close = Object.fromEntries(await Promise.all(['alpha', 'beta'].map(async role =>
       [role, verifyReliableHostWebRtc(await (runtimeOwned ? runtimeOwnerWebRtcState(role) : instances[role].localWebRtcState()))])));
     if (runtimeOwned) {
+      if (runtimeInputFixture) for (const role of ['alpha', 'beta'])
+        instanceRows[role].runtime_input_fixture_frozen = await instances[role].freezeRuntimeInputFixture();
       await relay.close();
       pairResults.relay_closed = true;
     } else {
@@ -1259,6 +1304,20 @@ async function run() {
     if (bytesA.length !== sourceTicks * NET_RECORD_BYTES || !bytesA.equals(bytesB))
       throw Error('Autonomous diagnostic raw eight-record native streams differ');
     pairResults.checksums = {records_each: sourceTicks, streams_identical: true, sha256: sha256(bytesA)};
+    if (runtimeInputFixture) {
+      const fixtures = {}, samples = {};
+      for (const role of ['alpha', 'beta']) {
+        fixtures[role] = await instances[role].readRuntimeInputFixture();
+        if (fixtures[role]?.failure || fixtures[role]?.disposed || fixtures[role]?.frozen !== true || fixtures[role]?.captured_count !== usedInputs ||
+            fixtures[role]?.transitions.length !== (role === 'alpha' ? 2 : 0))
+          throw Error(`${role} runtime nonneutral input fixture did not complete`);
+        samples[role] = fixtures[role].captures?.map(row => row.bytes);
+      }
+      const witness = verifyConsumedInputComponents(samples.alpha, samples.beta, bytesA, bytesB);
+      pairResults.runtime_input_fixture_result = {input_source: fixtures.alpha.input_source,
+        alpha_pattern: ['neutral', 'A', 'release', 'neutral', 'neutral', 'neutral'], beta_pattern: Array(usedInputs).fill('neutral'),
+        fixtures, matched_every_native_consumed_input_component: true, ...witness};
+    }
     pairResults.route = {scope: 'CSS-only bounded native-pump diagnostic', status: 'not-full-route', scene: 'CSS'};
     pairResults.outcome = 'complete';
   } else if (inputSampling) {
@@ -1308,31 +1367,7 @@ async function run() {
     const bytesA = await fs.readFile(path.join(childDirectory('alpha'), 'checksums.bin'));
     const bytesB = await fs.readFile(path.join(childDirectory('beta'), 'checksums.bin'));
     if (!bytesA.equals(bytesB)) throw Error('Input-sampling per-consumed-tick checksum streams differ');
-    const neutralPad = Buffer.from(lockstepConstants.neutralPad, 'hex');
-    const noControllerPad = Buffer.from(lockstepConstants.noControllerPad, 'hex');
-    const expectedInputComponents = Array.from({length: sourceTicks}, (_, sourceTick) => {
-      const inputTick = sourceTick - LOCKSTEP_DELAY;
-      const playerPads = inputTick < 0 ? [neutralPad, neutralPad] :
-        [Buffer.from(alphaSamples[inputTick]), Buffer.from(betaSamples[inputTick])];
-      // Port order and the existing 11-byte records are the core's 44-byte frame layout.
-      const nativePadBytes = Buffer.concat([...playerPads, noControllerPad, noControllerPad]);
-      return {source_tick: sourceTick, input_tick: inputTick < 0 ? null : inputTick,
-        input_hash: fnv1a64(nativePadBytes).toString(16).padStart(16, '0')};
-    });
-    const actualInputComponents = {};
-    for (const [role, bytes] of [['alpha', bytesA], ['beta', bytesB]]) {
-      if (bytes.length !== sourceTicks * NET_RECORD_BYTES)
-        throw Error(`${role} input-sampling checksum evidence has an unexpected record count`);
-      actualInputComponents[role] = [];
-      for (const expected of expectedInputComponents) {
-        const offset = expected.source_tick * NET_RECORD_BYTES;
-        const parsed = parseNetChecksum(bytes.subarray(offset, offset + NET_RECORD_BYTES));
-        if (parsed.tick !== expected.source_tick || parsed.input !== expected.input_hash)
-          throw Error(`${role} native input checksum at source ${expected.source_tick} does not match ` +
-            `the sample expected from input ${expected.input_tick}: ${parsed.input} != ${expected.input_hash}`);
-        actualInputComponents[role].push({source_tick: parsed.tick, input_hash: parsed.input});
-      }
-    }
+    const {expectedInputComponents, actualInputComponents} = verifyConsumedInputComponents(alphaSamples, betaSamples, bytesA, bytesB);
     pairResults.input_capture_result = {input_ticks: usedInputs, source_ticks: sourceTicks,
       sample_source: 'native input->raw selected local PADStatus; no second poll or JavaScript serializer',
       delay: 'capture S is consumed at source S+2; source ticks 0/1 remain neutral',

@@ -32,5 +32,8 @@ export function validateLockstepBrowserMode(values) {
     throw Error('Native-pump diagnostic requires browser-owned Room Worker WebRTC and exactly eight source ticks');
   if (scenario === 'input-sampling' && !browserOwned)
     throw Error('The input-sampling scenario requires --peer-owner browser');
-  return {browserOwned, runtimeOwned, peerTransport, localWebRtc, roomWorkerSignaling};
+  const runtimeInputFixture = values['runtime-input-fixture'] !== undefined;
+  if (runtimeInputFixture && (values['runtime-input-fixture'] !== 'neutral-a-release' || !runtimeOwned || scenario !== 'native-pump'))
+    throw Error('--runtime-input-fixture requires neutral-a-release with runtime-owned eight-CSS native-pump');
+  return {browserOwned, runtimeOwned, peerTransport, localWebRtc, roomWorkerSignaling, ...(runtimeInputFixture ? {runtimeInputFixture} : {})};
 }

@@ -115,3 +115,12 @@ test('runtime-owned native-pump CLI reaches output creation without a synthetic 
     await rm(scratch, {recursive: true, force: true});
   }
 });
+
+
+test('runtime nonneutral fixture is explicit and restricted to existing eight-CSS runtime scope', () => {
+  const valid = options({scenario: 'native-pump', 'peer-owner': 'runtime', 'source-ticks': '8', 'runtime-input-fixture': 'neutral-a-release'});
+  assert.equal(validateLockstepBrowserMode(valid).runtimeInputFixture, true);
+  for (const overrides of [{'runtime-input-fixture': 'A'}, {'peer-owner': 'browser'}, {scenario: 'positive'}, {'source-ticks': '9'}])
+    assert.throws(() => validateLockstepBrowserMode({...valid, ...overrides}));
+  assert.equal(validateLockstepBrowserMode(options({scenario: 'native-pump', 'peer-owner': 'runtime', 'source-ticks': '8'})).runtimeInputFixture, undefined);
+});
