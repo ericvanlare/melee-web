@@ -108,6 +108,51 @@ test('portable core imports and runs without Buffer, Node imports, or a transpor
   });
 });
 
+test('indexed suffix reads touch only the new fixed-workload rows', async () => {
+  await loadCoreWithoutBuffer(async core => {
+    for (const history of [0, 3000, 5084]) {
+      const rows = Array.from({length: history + 1}, (_, index) => Object.freeze({index}));
+      const reads = [];
+      const observed = new Proxy(rows, {get(target, key, receiver) {
+        if (typeof key === 'string' && /^\d+$/.test(key)) reads.push(Number(key));
+        return Reflect.get(target, key, receiver);
+      }});
+      const suffix = core.readOnlySuffix(observed, history, 'test history');
+      assert.deepEqual(reads, [history], `history ${history} performed no prior-row reads`);
+      assert.equal(suffix.length, 1);
+      assert.equal(suffix[0], rows[history], 'immutable retained row is referenced without copying');
+      assert(Object.isFrozen(suffix));
+      assert.throws(() => core.readOnlySuffix(observed, -1), /offset/);
+      assert.throws(() => core.readOnlySuffix(observed, history + 2), /offset/);
+    }
+  });
+});
+
+test('compact peer health matches summary counters after rejected and terminal input paths', async () => {
+  const core = portableCore ?? await import('../scripts/net_lockstep_core.mjs');
+  const peer = await readyAlpha(core);
+  const assertCounters = () => {
+    const full = peer.summary(), health = peer.health();
+    for (const key of ['local_input_ticks', 'remote_input_ticks', 'remote_ack_input',
+      'local_checksum_ticks', 'remote_checksum_ticks', 'next_checksum_compare',
+      'remote_ack_checksum', 'local_contiguous_input', 'local_contiguous_checksum',
+      'next_source_frame', 'native_local_divergences'])
+      assert.equal(health[key], full[key], `compact ${key} remains summary-equivalent`);
+    assert.equal(health.deferred_input_count, full.deferred_input_ticks.length);
+    assert.equal(health.checksum_mismatch_count, full.checksum_mismatches.length);
+  };
+  await peer.addLocalInputs([[0, sample(4)]], {nativeOverrides: [[0, sample(7)]]});
+  assert.equal(peer.health().native_local_divergences, peer.summary().native_local_divergences);
+  await assert.rejects(peer.addLocalInputs([[1, sample(5)]],
+    {nativeOverrides: [[1, new Uint8Array(10)]]}), /11 bytes/);
+  assertCounters();
+  await peer.addLocalInput(1, sample(5));
+  assertCounters();
+  await peer.addLocalInput(0, sample(4), {nativeSample: sample(8)});
+  assert.equal(peer.health().terminal.kind, 'protocol');
+  assertCounters();
+});
+
 test('browser-local input ticks 0 and 1 keep the neutral prefix and map to source ticks 2 and 3', async () => {
   const core = portableCore ?? await import('../scripts/net_lockstep_core.mjs');
   const {peers, wire, frames} = await readyPair(core);

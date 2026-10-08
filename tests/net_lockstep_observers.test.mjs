@@ -6,7 +6,9 @@ import path from 'node:path';
 import vm from 'node:vm';
 import {EventEmitter} from 'node:events';
 import {readyRenderEvent, renderEventSignatures, retainAccountedCssObservation, verifyFirstChecksumMismatch,
-  verifyTerminalHold, verifyDisconnectBoundary, verifyPositivePeerCompletion, verifyReliableHostWebRtc, WasmResponseIdentityObserver, attachWasmResponseIdentityObserver} from '../scripts/net_lockstep_observers.mjs';
+  verifyTerminalHold, verifyDisconnectBoundary, verifyPositivePeerCompletion, verifyReliableHostWebRtc,
+  validateNativeChecksumSuffix, createPerPeerProgressWatch, WasmResponseIdentityObserver,
+  attachWasmResponseIdentityObserver} from '../scripts/net_lockstep_observers.mjs';
 import {createTransportCallbackQueue} from '../scripts/net_lockstep_transport.mjs';
 
 function callback(data, kind = 'Native callback') {
@@ -33,6 +35,53 @@ test('CSS observation retains exact guard operands and stays provisional on succ
   assert.deepEqual(row.accounted_css_observation.failed_predicates, []);
   for (const [key, value] of Object.entries(observed))
     assert.deepEqual(row.accounted_css_observation[key], value);
+});
+
+test('incremental checksum consumption rejects stale, gapped, duplicate and malformed rows', () => {
+  const record = tick => {
+    const bytes = new Uint8Array(64);
+    new DataView(bytes.buffer).setUint32(0, tick, true);
+    return Array.from(bytes);
+  };
+  assert.equal(validateNativeChecksumSuffix([record(0), record(1)], 0, 2, 4), 2);
+  assert.equal(validateNativeChecksumSuffix([record(2)], 2, 3, 4), 3);
+  assert.throws(() => validateNativeChecksumSuffix([record(1)], 0, 1, 4), /cursor jumped/);
+  assert.throws(() => validateNativeChecksumSuffix([record(1)], 1, 3, 4), /stale, gapped/);
+  assert.throws(() => validateNativeChecksumSuffix([record(0), record(0)], 0, 2, 4), /cursor jumped/);
+  assert.throws(() => validateNativeChecksumSuffix([record(0).slice(0, 63)], 0, 1, 4), /malformed/);
+  const malformedByte = record(0); malformedByte[17] = 256;
+  assert.throws(() => validateNativeChecksumSuffix([malformedByte], 0, 1, 4), /malformed/);
+  assert.throws(() => validateNativeChecksumSuffix([], 5, 5, 4), /stale, gapped/);
+});
+
+test('per-peer progress clocks detect one stuck peer without overriding the outer deadline', () => {
+  const watch = createPerPeerProgressWatch({roles: ['alpha', 'beta'],
+    initialProgress: {alpha: '0/0', beta: '0/0'}, startedAt: 100, deadline: 5000, stallMs: 1000});
+  assert.deepEqual(watch.observe({alpha: '1/0', beta: '0/0'}, 900), {
+    outer_deadline_expired: false, stalled_role: null, stalled_for_ms: 0,
+    last_progress_at: {alpha: 900, beta: 100},
+  });
+  const stuck = watch.observe({alpha: '2/0', beta: '0/0'}, 1500);
+  assert.equal(stuck.outer_deadline_expired, false);
+  assert.equal(stuck.stalled_role, 'beta', 'alpha progress cannot reset beta’s clock');
+  assert.equal(stuck.stalled_for_ms, 1400);
+  const outer = watch.observe({alpha: '3/0', beta: '1/0'}, 5100);
+  assert.equal(outer.outer_deadline_expired, true, 'continued progress does not extend the total deadline');
+});
+
+test('positive peer completion accepts compact mismatch counters and rejects nonzero health', () => {
+  const compact = {terminal: null, checksum_mismatch_count: 0, remote_ack_input: 5,
+    local_checksum_ticks: 8, remote_checksum_ticks: 8, next_checksum_compare: 8};
+  assert.deepEqual(verifyPositivePeerCompletion(compact, 6, 8), {
+    remote_ack_input: 5, local_checksum_ticks: 8, remote_checksum_ticks: 8, next_checksum_compare: 8});
+  assert.throws(() => verifyPositivePeerCompletion({...compact, checksum_mismatch_count: 1}, 6, 8), /without terminal or mismatch/);
+  const legacy = {...compact, checksum_mismatches: []}; delete legacy.checksum_mismatch_count;
+  assert.deepEqual(verifyPositivePeerCompletion(legacy, 6, 8), {
+    remote_ack_input: 5, local_checksum_ticks: 8, remote_checksum_ticks: 8, next_checksum_compare: 8});
+  assert.throws(() => verifyPositivePeerCompletion({...compact, checksum_mismatches: 'none'}, 6, 8),
+    /without terminal or mismatch/);
+  assert.throws(() => verifyPositivePeerCompletion({...compact, checksum_mismatches: [], checksum_mismatch_count: 1}, 6, 8),
+    /without terminal or mismatch/);
 });
 
 const cssFailures = [

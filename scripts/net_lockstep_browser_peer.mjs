@@ -1,7 +1,7 @@
 /** Page-owned A3 protocol, room endpoint and native checksum boundary.
  * Node may publish recipe inputs and export evidence, but never handles packets
  * or submits native checksums to the protocol in this mode. */
-import {LockstepPeer, LOCKSTEP_DELAY, NET_RECORD_BYTES, PAD_BYTES, TERMINAL} from './net_lockstep_core.mjs';
+import {LockstepPeer, LOCKSTEP_DELAY, NET_RECORD_BYTES, PAD_BYTES, TERMINAL, readOnlySuffix} from './net_lockstep_core.mjs';
 import {createRoomRelayPeerEndpoint} from './net_lockstep_websocket_relay.mjs';
 
 export const BROWSER_CHECKSUM_EXPORT_LIMIT = 512;
@@ -358,6 +358,30 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     await settle({checkFailure: !closingOwner});
     if (consumerBatch) await consumeBatch(consumerBatch);
   }
+  const health = ({inputFrom} = {}) => {
+    if (inputFrom !== undefined && inputFrom !== null &&
+        (!Number.isSafeInteger(inputFrom) || inputFrom < 0 || inputFrom > capturedLocalInputs.length))
+      throw Error('Browser local input capture offset must be a nonnegative safe integer within retained history');
+    return Object.freeze({protocol: peer.health(), endpoint_error_count: endpoint.errors.length,
+      endpointClosed: endpoint.closed, closed,
+      exportRecords: exports.length,
+      localInputCapture: inputCapture ? Object.freeze({enabled: true, mode: inputCaptureMode,
+        input_ticks: inputTicks, captured_count: capturedLocalInputs.length,
+        ...(inputFrom === undefined || inputFrom === null ? {} :
+          {captures_since: readOnlySuffix(capturedLocalInputs, inputFrom, 'Browser local input capture')})}) :
+        Object.freeze({enabled: false, mode: null, input_ticks: 0, captured_count: 0}),
+      checksumOwnership: Object.freeze({owner: 'browser-page', export_limit_records: BROWSER_CHECKSUM_EXPORT_LIMIT,
+        native_records_drained: nativeRecordsDrained,
+        active_native_records_submitted_before_export: activeNativeRecords,
+        post_terminal_native_evidence_records: postTerminalNativeRecords,
+        consumer_accepted_records: consumerAcceptedRecords, retained_records: exports.length}),
+      checksumConsumer: Object.freeze({enabled: Boolean(checksumConsumer), accepted_records: consumerAcceptedRecords,
+        retained_records: exports.length, pending_batch: Boolean(pendingConsumerBatch)}),
+      nativePump: Object.freeze({enabled: autonomousPump, closing, close_mode: closeMode,
+        native_quiescence: nativeQuiescence, wake_requested: wakeRequested,
+        wake_queued: wakeQueued, completed_wakeups: wakeRuns, rpc_calls: rpcCalls, drain_failure: drainFailure}),
+      failure: failure ? String(failure?.stack || failure) : null});
+  };
   const snapshot = () => ({protocol: peer.summary(), endpointErrors: endpoint.errors,
     endpointClosed: endpoint.closed, closed, exportRecords: exports.length,
     localInputCapture: inputCapture ? {enabled: true, mode: inputCaptureMode, input_ticks: inputTicks,
@@ -562,7 +586,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     return snapshot();
   }
 
-  const controller = {rpc, waitForReady, close, armClose() { intentionalClose = true; }, snapshot};
+  const controller = {rpc, waitForReady, close, armClose() { intentionalClose = true; }, health, snapshot};
   if (inputCapture) {
     try {
       globalThis.__meleeWebNetLocalInputCapture = captureLocalInput;

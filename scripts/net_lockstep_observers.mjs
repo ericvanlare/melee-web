@@ -291,13 +291,70 @@ export async function attachWasmResponseIdentityObserver(cdp, {expectedUrl,
 // Completion is distinct from exporting the local checksum stream: the remote
 // receipt and comparison can arrive after the final native record is drained.
 export function verifyPositivePeerCompletion(summary, inputTicks, sourceTicks) {
+  const hasMismatchArray = summary !== null && typeof summary === 'object' &&
+    Object.prototype.hasOwnProperty.call(summary, 'checksum_mismatches');
+  const hasMismatchCount = summary !== null && typeof summary === 'object' &&
+    Object.prototype.hasOwnProperty.call(summary, 'checksum_mismatch_count');
+  const mismatchArray = summary?.checksum_mismatches;
+  const mismatchCount = hasMismatchArray ?
+    (Array.isArray(mismatchArray) && (!hasMismatchCount || summary.checksum_mismatch_count === mismatchArray.length)
+      ? mismatchArray.length : null) : summary?.checksum_mismatch_count;
   const expected = {remote_ack_input: inputTicks - 1, local_checksum_ticks: sourceTicks,
     remote_checksum_ticks: sourceTicks, next_checksum_compare: sourceTicks};
-  if (summary?.terminal || !Array.isArray(summary?.checksum_mismatches) ||
-      summary.checksum_mismatches.length || Object.entries(expected).some(([key, value]) =>
+  if (summary?.terminal || !Number.isSafeInteger(mismatchCount) || mismatchCount !== 0 ||
+      Object.entries(expected).some(([key, value]) =>
         summary[key] !== value))
     throw Error(`Positive peer did not complete exact ACK/checksum totals without terminal or mismatch: ${JSON.stringify(summary)}`);
   return expected;
+}
+
+/** Validate only the newly retained native checksum suffix, preserving the exact tick cursor. */
+export function validateNativeChecksumSuffix(rows, firstTick, retainedCount, sourceTicks) {
+  if (!Array.isArray(rows) || !Number.isSafeInteger(firstTick) || firstTick < 0 ||
+      !Number.isSafeInteger(retainedCount) || retainedCount < firstTick || retainedCount > sourceTicks ||
+      !Number.isSafeInteger(sourceTicks) || sourceTicks <= 0 ||
+      rows.length !== retainedCount - firstTick)
+    throw Error('Native checksum suffix offset or retained count is stale, gapped or outside its source bound');
+  for (let offset = 0; offset < rows.length; ++offset) {
+    const row = rows[offset];
+    if ((!Array.isArray(row) && !(row instanceof Uint8Array)) || row.length !== 64 ||
+        (Array.isArray(row) && row.some(byte => !Number.isInteger(byte) || byte < 0 || byte > 255)))
+      throw Error(`Native checksum suffix record ${firstTick + offset} is malformed`);
+    const tick = (row[0] | (row[1] << 8) | (row[2] << 16) | (row[3] << 24)) >>> 0;
+    if (tick !== firstTick + offset)
+      throw Error(`Native checksum suffix cursor jumped: expected ${firstTick + offset}, observed ${tick}`);
+  }
+  return retainedCount;
+}
+
+/** Per-peer unchanged-progress clocks bounded independently by one outer deadline. */
+export function createPerPeerProgressWatch({roles, initialProgress, startedAt, deadline, stallMs} = {}) {
+  if (!Array.isArray(roles) || !roles.length || new Set(roles).size !== roles.length ||
+      roles.some(role => typeof role !== 'string' || !role) || !initialProgress ||
+      typeof initialProgress !== 'object' || Array.isArray(initialProgress) ||
+      !Number.isSafeInteger(startedAt) || startedAt < 0 || !Number.isSafeInteger(deadline) ||
+      deadline < startedAt || !Number.isSafeInteger(stallMs) || stallMs <= 0 ||
+      roles.some(role => typeof initialProgress[role] !== 'string'))
+    throw Error('Native progress watch requires unique roles, stable progress tokens and bounded times');
+  const lastProgress = Object.fromEntries(roles.map(role => [role, initialProgress[role]]));
+  const lastProgressAt = Object.fromEntries(roles.map(role => [role, startedAt]));
+  return Object.freeze({
+    observe(progress, now) {
+      if (!progress || typeof progress !== 'object' || Array.isArray(progress) ||
+          roles.some(role => typeof progress[role] !== 'string') || !Number.isSafeInteger(now) || now < startedAt)
+        throw Error('Native progress observation is malformed');
+      for (const role of roles) {
+        if (progress[role] !== lastProgress[role]) {
+          lastProgress[role] = progress[role];
+          lastProgressAt[role] = now;
+        }
+      }
+      const stalledRole = roles.find(role => now - lastProgressAt[role] > stallMs) ?? null;
+      return Object.freeze({outer_deadline_expired: now > deadline, stalled_role: stalledRole,
+        stalled_for_ms: stalledRole === null ? 0 : now - lastProgressAt[stalledRole],
+        last_progress_at: Object.freeze({...lastProgressAt})});
+    },
+  });
 }
 
 export function verifyReliableHostWebRtc(state) {

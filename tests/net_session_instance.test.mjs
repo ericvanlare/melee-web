@@ -625,6 +625,49 @@ test('runtime fixture tail changes only the next ordinary Gamepad sample and ret
   } finally { if (prior === undefined) delete globalThis.window; else globalThis.window = prior; }
 });
 
+test('runtime fixture hot path reads only new captures and treats owner close as teardown', () => {
+  const prior = globalThis.window, captures = [], offsets = [];
+  const original = () => {};
+  let closing = false, protocolTerminal = null, snapshotReads = 0;
+  const page = {menuFrame: original, __meleeSyntheticPadState: 'neutral',
+    __meleeSyntheticPadTransition(state) { this.__meleeSyntheticPadState = state; },
+    meleeNetRuntimeLockstepSnapshot() { ++snapshotReads; throw Error('full snapshot is not a hot-path API'); },
+    meleeNetRuntimeLockstepHealth({inputFrom}) {
+      offsets.push(inputFrom);
+      return {armed: true, closing, failure: null,
+        peer: {failure: null, protocol: {ready: true, terminal: protocolTerminal},
+          localInputCapture: {enabled: true, mode: 'live', input_ticks: 6,
+            captured_count: captures.length, captures_since: Object.freeze(captures.slice(inputFrom))}}};
+    }};
+  globalThis.window = page;
+  try {
+    installRuntimeInputFixtureInPage({role: 'alpha', inputTicks: 6});
+    for (let tick = 0; tick < 6; ++tick) {
+      const bytes = Array(11).fill(0);
+      if (tick === 1) bytes[0] = 1;
+      captures.push(Object.freeze({source_cursor: tick, input_tick: tick, local_port: 0,
+        poll_serial: 100 + tick, bytes: Object.freeze(bytes)}));
+      page.menuFrame();
+      page.menuFrame(); // A wait callback receives an empty suffix.
+    }
+    assert.deepEqual(offsets, [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6]);
+    assert.equal(snapshotReads, 0, 'the per-frame observer never requests historical snapshots');
+    assert.equal(page.__meleeRuntimeInputFixture.snapshot().captured_count, 6,
+      'full retained captures remain available for final evidence');
+    closing = true;
+    page.menuFrame();
+    assert.equal(page.__meleeRuntimeInputFixture.health().failure, null,
+      'ordinary close notification is not a fixture failure');
+    protocolTerminal = {kind: 'protocol'};
+    assert.throws(() => page.menuFrame(), /peer failed/,
+      'a protocol terminal remains fatal during teardown');
+  } finally {
+    if (page.__meleeRuntimeInputFixture && !page.__meleeRuntimeInputFixture.snapshot().disposed)
+      page.__meleeRuntimeInputFixture.dispose();
+    if (prior === undefined) delete globalThis.window; else globalThis.window = prior;
+  }
+});
+
 test('CSS-to-SSS fixture drives the ordinary controller manager one selected sample at a time', () => {
   const prior = globalThis.window, frames = Buffer.alloc(153 * 44);
   for (let tick = 0; tick < 153; ++tick) {
@@ -1089,8 +1132,9 @@ test('actual runtime fixture rejects malformed ownership, nonneutral pattern and
   };
   try {
     for (const mutate of [
-      ({owner}) => { owner.closing = true; }, ({owner}) => { owner.failure = 'first owner failure'; },
+      ({owner}) => { owner.failure = 'first owner failure'; },
       ({owner}) => { owner.armed = false; }, ({owner}) => { owner.peer.protocol.ready = false; },
+      ({owner}) => { owner.peer.failure = 'first peer failure'; },
       ({captures}) => { captures[0].local_port = 1; }, ({captures}) => { captures[0].input_tick = 1; },
       ({captures}) => { captures[0].poll_serial = -1; }, ({captures}) => { captures[0].bytes.pop(); },
       ({captures}) => { captures[0].bytes[4] = 256; }, ({captures}) => { captures[0].bytes[0] = 1; },
