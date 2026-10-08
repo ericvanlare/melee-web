@@ -150,10 +150,16 @@ assert(start&&pause&&completion);
  const cacheReader=shared.slice(shared.indexOf('  function readNativeCacheIdle() {'),shared.indexOf('  function clearStartupTimeout() {'));
  const unload=shared.slice(shared.indexOf('  async function unloadAndSave() {'),shared.indexOf('  async function put('));
  assert(unload.includes('boundary(readNativeCacheIdle)'));
+ const assertNormalCloseBeforeUnload=events=>{
+  assert.equal(events.filter(x=>x==='network-close:normal').length,1,'Normal network cleanup must run once');
+  assert.equal(events.filter(x=>x==='unload').length,1,'Native unload must run once');
+  assert(events.indexOf('network-close:normal')<events.indexOf('unload'),'Normal network cleanup must join before native unload');
+ };
  const flush=page.slice(page.indexOf('window.menuCacheWritesFlushed='),page.indexOf('\n};',page.indexOf('window.menuCacheWritesFlushed='))+3);
  for(const finalState of [1,-1,2]){
   const events=[],display={};let idleCalls=0;
   const scope={window:{},prepared:true,callbacks:{menuPreparationCanceled:()=>events.push('cancel')},performance,
+   closeNetworkSession:async mode=>{events.push(`network-close:${mode}`);},
    emit:(name,message)=>{assert.equal(name,'cacheWriteFailed');display.textContent=message;},
    $:()=>display,log:text=>events.push(text),syncAudio:()=>events.push('sync-audio'),
    pauseAudioForPreparation:async()=>events.push('audio-stopped'),boundary:async run=>run(),
@@ -165,6 +171,7 @@ assert(start&&pause&&completion);
   vm.createContext(scope);vm.runInContext(cacheReader+'\n'+unload+'\n'+flush,scope);
   if(finalState===2){
    await assert.rejects(scope.unloadAndSave(),/Invalid native cache idle state: 2/);
+   assertNormalCloseBeforeUnload(events);
    assert.equal(events.includes('save'),false,'Invalid cache state must not publish a saved cache');
    assert.equal(display.textContent,undefined,'Invalid state is not an optional persistence failure');
    continue;
@@ -173,6 +180,7 @@ assert(start&&pause&&completion);
   assert.equal(await scope.unloadAndSave(),true,'Optional cache failure cannot undo successful source teardown');
   assert.deepEqual(events.filter(x=>['unload','audio-stopped','idle-check','save'].includes(x)),
    finalState===1?['unload','audio-stopped','idle-check','idle-check','save']:['unload','audio-stopped','idle-check','idle-check']);
+  assertNormalCloseBeforeUnload(events);
   if(finalState===-1){assert.equal(scope.Module.runtimeCacheState.dirty,false);assert.match(display.textContent,/native cache writes failed/);}
  }
  const exportHandler=page.split('\n').find(line=>line.startsWith("$('export-render-cache').onclick="));
@@ -474,10 +482,11 @@ function harness(unload=true,wholeSession=false){
  const reset=page.split('\n').find(line=>line.startsWith('function resetTiming('));
  const frame=page.slice(page.indexOf('developmentHooks.frame='),page.indexOf("\nfor(const type of ['focus'")).replace('developmentHooks.frame=', 'window.menuFrame=');
  const metrics=page.split('\n').find(line=>line.startsWith('function replayMetrics('));
- let clock=1000,polls=0;
+ let clock=1000,polls=0,networkFrames=0;
  const elements=new Map();
  const $=id=>{if(!elements.has(id))elements.set(id,{disabled:false,textContent:'',dataset:{},closest:()=>({open:false})});return elements.get(id);};
  const scope={window:{menuReplayPoll:()=>{polls++;}},performance:{now:()=>clock},document:{hidden:false,hasFocus:()=>true,activeElement:null},
+  runtimeLockstepEntry:{onFrame:()=>{networkFrames++;}},owner:{stop:error=>{throw error;}},
   ready:true,fatal:false,importing:false,uiMessage:'hold',preparationSince:0,preparationLabel:'',preparationKeepsAudio:false,
   retailRun:null,stockCheckActive:false,actionSweepActive:false,selectionDriveActive:false,$,log(){},syncAudio(){},
   Module:{HEAPU8:new Uint8Array(2048),_melee_web_native_menu_phase:()=>7,_melee_web_native_menu_stock_check_ready:()=>1,
@@ -496,16 +505,18 @@ function harness(unload=true,wholeSession=false){
  assert.equal(report.worstBrowserCallback.native.end_phases.staging_writes_ms,13);
  assert.equal(report.worstBrowserCallback.previous_native.end_phases.staging_writes_ms,0.4);
  assert.equal(report.browserCallbacks,1);assert.equal(polls,1,'Replay polling remains per callback');
+ assert.equal(networkFrames,1,'Network owner receives each frame callback');
  scope.resetTiming(false);assert.equal(scope.replayMetrics({consumed:42}).worstBrowserCallback,null,'Reset clears the bounded browser interval record');
 }
 {
  const reset=page.split('\n').find(line=>line.startsWith('function resetTiming('));
  const frame=page.slice(page.indexOf('developmentHooks.frame='),page.indexOf("\nfor(const type of ['focus'")).replace('developmentHooks.frame=', 'window.menuFrame=');
- let clock=1016,polls=0,sceneReads=0,inputReads=0;
+ let clock=1016,polls=0,sceneReads=0,inputReads=0,networkFrames=0;
  const elements=new Map();
  const $=id=>{if(!elements.has(id))elements.set(id,{disabled:false,textContent:'',dataset:{},closest:()=>({open:false})});return elements.get(id);};
  $('scene-check').closest=()=>{sceneReads++;return{open:true};};$('input').closest=()=>{inputReads++;return{open:true};};
  const scope={window:{menuReplayPoll:()=>{polls++;}},performance:{now:()=>clock},document:{hidden:false,hasFocus:()=>true,activeElement:null},
+  runtimeLockstepEntry:{onFrame:()=>{networkFrames++;}},owner:{stop:error=>{throw error;}},
   ready:true,fatal:false,importing:false,uiMessage:'hold',preparationSince:0,preparationLabel:'',preparationKeepsAudio:false,
   retailRun:null,stockCheckActive:false,actionSweepActive:false,selectionDriveActive:false,$,log(){},syncAudio(){},
   Module:{HEAPU8:new Uint8Array(2048),_melee_web_native_menu_phase:()=>7,_melee_web_native_menu_stock_check_ready:()=>1,
@@ -515,5 +526,6 @@ function harness(unload=true,wholeSession=false){
  scope.window.menuFrame(true);assert.equal(sceneReads,0);assert.equal(inputReads,0);assert.equal(polls,1);
  clock=1260;scope.window.menuFrame(true);assert.equal(sceneReads,1);assert.equal(inputReads,1);
  assert.equal(polls,2,'Replay polling remains per callback while diagnostics refresh is throttled');assert.equal(scope.activeFrames,2);
+ assert.equal(networkFrames,2,'Network owner receives each frame callback while diagnostics refresh is throttled');
 }
 console.log('Actual browser replay handlers: duplicate start, failed teardown and manual timing pause rejected.');
