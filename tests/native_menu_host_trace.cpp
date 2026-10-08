@@ -2739,6 +2739,8 @@ struct StadiumSourceOnInitObservation {
     MeleeWebGroundMapStorageView ground_storage_live{};
     MeleeWebGroundMapStorageView ground_storage_ended{};
     MeleeWebGameplayStats stats_before_init{};
+    MeleeWebGameplayStats stats_after_light_preparation{};
+    bool light_preparation_stats_captured = false;
     MeleeWebGameplayStats stats_after_on_init{};
     MeleeWebGameplayStats stats_after_end{};
     MeleeWebStadiumC1StageInfoView stage_info_before_init{};
@@ -2762,6 +2764,123 @@ struct StadiumSourceOnInitObservation {
     uint32_t seed_after_end = 0;
     bool cleanup_verified = false;
 };
+
+
+// Diagnostic reads only after the original first heap equality has failed.
+// Its 21 checks still own acceptance, order and baselines unchanged.
+void publish_stadium_heap_failure_observations(const StadiumSourceOnInitObservation& saved)
+{
+    auto stats = [](const char* phase, const MeleeWebGameplayStats& value) {
+        std::cerr << "C1_HEAP_PHASE phase=" << phase << " provenance=copied"
+                  << " generation=" << value.generation << " ticks=" << value.ticks
+                  << " objects=" << value.objects << " processes=" << value.processes
+                  << " heap_free_bytes=" << value.heap_free_bytes << '\n';
+    };
+    stats("before-light-preparation", saved.stats_before_init);
+    if (saved.light_preparation_stats_captured)
+        stats("after-light-preparation-before-e8", saved.stats_after_light_preparation);
+    else
+        std::cerr << "C1_HEAP_PHASE phase=after-light-preparation-before-e8 status=unavailable\n";
+    stats("after-oninit", saved.stats_after_on_init);
+    stats("after-stage-last-and-light-destroy", saved.stats_after_end);
+    std::cerr.flush();
+    MeleeWebSourceMemoryContext current{};
+    const auto status = melee_web_source_memory_context_read(&current);
+    const auto current_stats = melee_web_gameplay_stats();
+    std::cerr << "C1_POST_HEAP_CONTEXT read_status=" << status
+              << " heap=" << current.source_heap_handle << " world=" << current.world_generation
+              << " watermark=" << current.allocation_generation_watermark
+              << " current_gameplay_world=" << current_stats.generation
+              << " expected_heap=" << saved.memory_before_init.source_heap_handle
+              << " expected_world=" << saved.memory_before_init.world_generation
+              << " before_end_watermark=" << saved.memory_before_end.allocation_generation_watermark
+              << " captured_after_end_watermark=" << saved.memory_after_end.allocation_generation_watermark << '\n';
+    if (status != MELEE_WEB_SOURCE_MEMORY_READ_OK ||
+        current.source_heap_handle != saved.memory_before_init.source_heap_handle ||
+        current.world_generation != saved.memory_before_init.world_generation ||
+        !melee_web_gameplay_world_exists() ||
+        current_stats.generation != current.world_generation) {
+        std::cerr << "C1_POST_HEAP_OBSERVATION status=unavailable reason=current-owner-guard\n";
+        std::cerr.flush(); return;
+    }
+    // A diagnostic read failure never replaces the original first error.
+    auto observe = [](const char* field, auto read) {
+        try { read(); }
+        catch (const std::exception& failure) {
+            std::cerr << "C1_POST_HEAP_OBSERVATION field=" << field
+                      << " status=unavailable reason=" << failure.what() << '\n';
+        } catch (...) {
+            std::cerr << "C1_POST_HEAP_OBSERVATION field=" << field
+                      << " status=unavailable reason=unknown-read-error\n";
+        }
+        std::cerr.flush();
+    };
+    auto scalar = [](const char* field, auto actual, auto baseline) {
+        std::cerr << "C1_POST_HEAP_OBSERVATION field=" << field << " actual=" << actual
+                  << " baseline=" << baseline << " acceptance=not-executed\n";
+    };
+    observe("source-registries", [&] {
+        scalar("stage_registry_empty", source_stage_registry_empty(), true);
+        scalar("stage_gobj_count", source_stage_gobj_count(), saved.stage_gobj_count_before);
+        scalar("stage_markers_empty", source_stage_markers_empty(), true);
+        scalar("stage_object_failures", melee_web_stadium_c1_stage_object_failures(), uint32_t{0});
+    });
+    observe("gobj-proc-pools", [&] {
+        scalar("gobj_used", HSD_ObjAllocGetUsing(&gobj_alloc_data), saved.gobj_pool_before);
+        scalar("proc_used", HSD_ObjAllocGetUsing(&gobjproc_alloc_data), saved.proc_pool_before);
+        std::cerr << "C1_POST_HEAP_CAPACITY gobj_free=" << HSD_ObjAllocGetFreed(&gobj_alloc_data)
+                  << " gobj_size=" << gobj_alloc_data.size
+                  << " proc_free=" << HSD_ObjAllocGetFreed(&gobjproc_alloc_data)
+                  << " proc_size=" << gobjproc_alloc_data.size
+                  << " scope=public-pools-not-total-heap-accounting\n";
+    });
+    observe("live-classes", [&] {
+        const auto now = melee_web::test::stadium_screen::live_class_counts();
+        for (const auto& [identity, baseline] : saved.class_counts_before) {
+            const auto found = now.find(identity);
+            std::cerr << "C1_POST_HEAP_CLASS identity=" << static_cast<const void*>(identity)
+                      << " actual=" << (found == now.end() ? 0 : found->second)
+                      << " baseline=" << baseline << " acceptance=not-executed\n";
+        }
+        for (const auto& [identity, actual] : now)
+            if (!saved.class_counts_before.contains(identity))
+                std::cerr << "C1_POST_HEAP_CLASS identity=" << static_cast<const void*>(identity)
+                          << " actual=" << actual << " baseline=0 acceptance=not-executed\n";
+        std::cerr << "C1_POST_HEAP_OBSERVATION field=live_class_counts equal="
+                  << (now == saved.class_counts_before) << " acceptance=not-executed\n";
+    });
+    observe("live-pools", [&] {
+        const auto now = melee_web::test::stadium_screen::live_pool_counts();
+        for (size_t i = 0; i < now.size(); ++i)
+            std::cerr << "C1_POST_HEAP_POOL index=" << i << " actual=" << now[i]
+                      << " baseline=" << saved.pool_counts_before[i] << " acceptance=not-executed\n";
+    });
+    observe("runtime-roots", [&] {
+        const auto now = melee_web::test::stadium_screen::runtime_roots_snapshot();
+        std::cerr << "C1_POST_HEAP_ROOTS actual_bytes=" << now.size()
+                  << " baseline_bytes=" << saved.roots_before.size()
+                  << " equal=" << (now == saved.roots_before) << " acceptance=not-executed";
+        const auto common = std::min(now.size(), saved.roots_before.size());
+        size_t first = 0;
+        while (first < common && now[first] == saved.roots_before[first]) ++first;
+        if (first < common)
+            std::cerr << " first_offset=" << first << " actual=" << unsigned(now[first])
+                      << " baseline=" << unsigned(saved.roots_before[first]);
+        std::cerr << '\n';
+    });
+    observe("ft-device", [&] {
+        if (saved.device_snapshot == nullptr)
+            std::cerr << "C1_POST_HEAP_OBSERVATION field=ft_device status=unavailable reason=no-owned-copy\n";
+        else
+            scalar("ft_device_snapshot_matches",
+                melee_web_stadium_c1_ft_device_snapshot_matches(saved.device_snapshot), 1);
+    });
+    observe("scheduler-health", [&] {
+        scalar("scheduler_cycle", HSD_GObj_804D783C, saved.scheduler_cycle_before);
+        scalar("source_memory_healthy", melee_web_source_memory_healthy(), 1);
+        scalar("ground_dispatch_quiet", ground_dispatch_quiet(), true);
+    });
+}
 
 void run_stadium_e8_request(
     const melee_web::RuntimeFiles& reopened_files,
@@ -3167,6 +3286,10 @@ void run_stadium_e8_request(
             const auto counts = map_owner->source_light_counts();
             check(melee_web_stage_lights_set_source_counts(light_context,
                       counts.data(), counts.size(), error, sizeof(error)), error);
+        }
+        if (perform_on_init) {
+            on_init_observation.stats_after_light_preparation = melee_web_gameplay_stats();
+            on_init_observation.light_preparation_stats_captured = true;
         }
         check(melee_web_stadium_e8_call_observer_begin(),
               "Could not open the bounded E8 source-call window");
@@ -3719,6 +3842,28 @@ void run_stadium_e8_request(
                       << ",\"checked_teardown\":true}\n";
         }
     } catch (...) {
+        bool original_heap_failure = false;
+        try { throw; }
+        catch (const std::exception& original) {
+            const auto& observation = on_init_observation;
+            original_heap_failure = perform_on_init && on_init_stage_end_succeeded &&
+                retained_stage_owner == nullptr && returned_stage_owner == nullptr &&
+                light_context == nullptr && !observation.cleanup_verified &&
+                std::string_view(original.what()) ==
+                    "Original OnInit teardown did not restore source lists, pools, ticks, leases, or typed devices" &&
+                observation.stats_after_end.generation == observation.stats_before_init.generation &&
+                observation.stats_after_end.ticks == observation.stats_before_init.ticks &&
+                observation.stats_after_end.objects == observation.stats_before_init.objects &&
+                observation.stats_after_end.processes == observation.stats_before_init.processes &&
+                observation.stats_after_end.heap_free_bytes != observation.stats_before_init.heap_free_bytes;
+        } catch (...) { /* Unknown original failure remains without new reads. */ }
+        if (original_heap_failure) {
+            try { publish_stadium_heap_failure_observations(on_init_observation); }
+            catch (...) {
+                std::cerr << "C1_POST_HEAP_OBSERVATION status=unavailable reason=diagnostic-publication-error\n";
+                std::cerr.flush();
+            }
+        }
         if (retained_stage_owner != nullptr || returned_stage_owner != nullptr ||
             (perform_on_init && on_init_stage_end_succeeded &&
              !on_init_observation.cleanup_verified)) {
