@@ -5580,7 +5580,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807d
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c0ad0123dfa4ddf005c8575f674b992c85f32c93 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..cf4d4c4b6a8f2e1aef04b9e2c7ca027c5a52d5ab 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,15 @@
@@ -5599,20 +5599,21 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c0ad0123dfa4ddf005c8575f674b992c
  #include <sysdolphin/baselib/forward.h>
  
  #include "granime.h"
-@@ -11,8 +21,12 @@
+@@ -11,8 +21,13 @@
  #include "stage.h"
  #include "types.h"
  #include <dolphin/gx/GXStruct.h>
 +#include <stdint.h>
 +#include <stdio.h>
 +#include <stdlib.h>
++#include <string.h>
  #include <melee/cm/camera.h>
  #include <melee/ft/ftlib.h>
 +#include <melee/gr/ground.h>
  #include <melee/gm/gm_unsplit.h>
  #include <melee/lb/lb_00B0.h>
  #include <melee/lb/lb_00F9.h>
-@@ -29,6 +43,7 @@
+@@ -29,6 +44,7 @@
  #include <sysdolphin/baselib/fog.h>
  #include <sysdolphin/baselib/gobjgxlink.h>
  #include <sysdolphin/baselib/gobjobject.h>
@@ -5620,7 +5621,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c0ad0123dfa4ddf005c8575f674b992c
  #include <sysdolphin/baselib/gobjproc.h>
  #include <sysdolphin/baselib/gobjuserdata.h>
  #include <sysdolphin/baselib/jobj.h>
-@@ -64,6 +79,16 @@ static struct grPStadium_YakumonoParam {
+@@ -64,6 +80,16 @@ static struct grPStadium_YakumonoParam {
      s16 x50;
  }* yakumono_param;
  
@@ -5637,7 +5638,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c0ad0123dfa4ddf005c8575f674b992c
  GrJoint grPs_803E1248[] = {
      { 1, 3, 0 }, { 2, 3, 0 }, { 3, 4, 0 },
      { 4, 5, 0 }, { 5, 6, 0 }, { 7, 9, 0 },
-@@ -652,6 +677,38 @@ typedef struct ImageDescWrapper {
+@@ -652,6 +678,38 @@ typedef struct ImageDescWrapper {
      u16 x1A, x1C;
  } ImageDescWrapper;
  
@@ -5676,7 +5677,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c0ad0123dfa4ddf005c8575f674b992c
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -920,6 +977,1417 @@ typedef struct TextWrapper {
+@@ -920,6 +978,1417 @@ typedef struct TextWrapper {
      HSD_Text* win_dynamic_p;
  } TextWrapper;
  
@@ -6212,7 +6213,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c0ad0123dfa4ddf005c8575f674b992c
 +        display_ground != Ground_GetMapGObj(PsType_Display))
 +        return 0;
 +    ground = HSD_GObjGetUserData(display_ground);
-+    if (ground == NULL || ground->map_id != PsType_Display ||
++    if (ground == NULL || ground->map_id != (enum GrKind) PsType_Display ||
 +        ground->u.display.xD4 != owner->children[0] ||
 +        ground->u.display.xD8 != owner->children[1] ||
 +        ground->u.display.xDC != owner->children[2])
@@ -6552,7 +6553,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c0ad0123dfa4ddf005c8575f674b992c
 +    fixture->display_ground.p_link = 5;
 +    fixture->display_ground.user_data = &fixture->display_ground_data;
 +    fixture->entities[5] = &fixture->display_ground;
-+    fixture->display_ground_data.map_id = PsType_Display;
++    fixture->display_ground_data.map_id = (enum GrKind) PsType_Display;
 +    for (size_t i = 0; i < 3; ++i) {
 +        fixture->children[i].classifier = HSD_GOBJ_CLASS_TEXT;
 +        fixture->children[i].p_link = i == 0 ? 0x13 : 0x12;
@@ -7094,7 +7095,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c0ad0123dfa4ddf005c8575f674b992c
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
  {
-@@ -1185,22 +2653,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +2654,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -7136,7 +7137,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c0ad0123dfa4ddf005c8575f674b992c
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +2701,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +2702,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -7158,7 +7159,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c0ad0123dfa4ddf005c8575f674b992c
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +2723,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +2724,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
