@@ -407,7 +407,7 @@ void melee_web_hit_probe_scheduler_return(void)
         cursor,calls[0],calls[1],calls[2]);
     for(size_t i=0;i<count;++i)put(line,sizeof(line),&used,"%s%s",i?",":"",rows[i]);
     put(line,sizeof(line),&used,"]");
-    if(candidate_enabled)put(line,sizeof(line),&used,",\"candidate_enabled\":true,\"candidate_passes\":%u,\"candidate_pairs\":%u",passes,pairs);
+    if(cursor==5239)put(line,sizeof(line),&used,",\"candidate_enabled\":true,\"candidate_passes\":%u,\"candidate_pairs\":%u",passes,pairs);
     put(line,sizeof(line),&used,"}");
     emit_line();
     active=0;

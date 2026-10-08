@@ -121,6 +121,8 @@ class HitTransitionProbeTest(unittest.TestCase):
         for row in rows:
             self.assertEqual(row["hook_counts"],[0,0,0])
             self.assertEqual([e["phase"] for e in row["events"]],["scheduler_start","scheduler_return"])
+        self.assertEqual((rows[1]["candidate_enabled"],rows[1]["candidate_passes"],
+            rows[1]["candidate_pairs"]),(True,0,0))
     def test_actual_ordered_logs_and_multiple_motion_ordinals(self):
         rows=self.run_mode("log20")
         for row in rows:
