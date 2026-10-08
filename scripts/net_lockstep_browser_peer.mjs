@@ -1,7 +1,7 @@
 /** Page-owned A3 protocol, room endpoint and native checksum boundary.
  * Node may publish recipe inputs and export evidence, but never handles packets
  * or submits native checksums to the protocol in this mode. */
-import {LockstepPeer, NET_RECORD_BYTES, TERMINAL} from './net_lockstep_core.mjs';
+import {LockstepPeer, LOCKSTEP_DELAY, NET_RECORD_BYTES, PAD_BYTES, TERMINAL} from './net_lockstep_core.mjs';
 import {createRoomRelayPeerEndpoint} from './net_lockstep_websocket_relay.mjs';
 
 export const BROWSER_CHECKSUM_EXPORT_LIMIT = 512;
@@ -11,24 +11,46 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
   checksumConsumer = null},
 {createEndpoint = createRoomRelayPeerEndpoint} = {}) {
   if (!agreement || typeof agreement !== 'object') throw Error('Browser peer requires its frozen start agreement');
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0)
+    throw Error('Browser peer timeout must be a positive integer');
+  if (!Number.isSafeInteger(sourceTicks) || sourceTicks < LOCKSTEP_DELAY ||
+      !Number.isSafeInteger(inputTicks) || inputTicks < 0 ||
+      inputTicks + LOCKSTEP_DELAY !== sourceTicks)
+    throw Error('Browser peer requires bounded source and input ticks with the fixed two-tick delay');
   if (checksumConsumer !== null && typeof checksumConsumer !== 'function')
     throw Error('Browser checksum consumer must be a function');
-  if (inputCapture !== null && (!inputCapture || typeof inputCapture !== 'object' ||
-      !Array.isArray(inputCapture.deferSendTicks) || !Array.isArray(inputCapture.pattern) ||
-      inputCapture.pattern.length !== inputTicks))
-    throw Error('Browser local input capture requires a bounded pattern and deferred tick list');
+  let inputCaptureMode = null;
+  if (inputCapture !== null) {
+    if (!inputCapture || typeof inputCapture !== 'object' || Array.isArray(inputCapture))
+      throw Error('Browser local input capture requires an explicit configuration');
+    if (inputCapture.mode === 'live') {
+      if (Object.prototype.hasOwnProperty.call(inputCapture, 'pattern') ||
+          Object.prototype.hasOwnProperty.call(inputCapture, 'deferSendTicks'))
+        throw Error('Live browser input cannot include diagnostic pattern or deferred tick configuration');
+      inputCaptureMode = 'live';
+    } else if (inputCapture.mode === undefined || inputCapture.mode === 'diagnostic') {
+      if (!Array.isArray(inputCapture.deferSendTicks) || !Array.isArray(inputCapture.pattern) ||
+          inputCapture.pattern.length !== inputTicks)
+        throw Error('Browser local input capture requires a bounded pattern and deferred tick list');
+      inputCaptureMode = 'diagnostic';
+    } else throw Error('Browser local input capture mode must be live or diagnostic');
+  }
   const localPort = role === 'alpha' ? 0 : role === 'beta' ? 1 : -1;
   const deferredTicks = new Set(inputCapture?.deferSendTicks ?? []);
   if ([...deferredTicks].some(tick => !Number.isSafeInteger(tick) || tick < 0 || tick >= inputTicks))
     throw Error('Browser local input capture deferred tick is outside its input bound');
-  if (inputCapture && (localPort < 0 || typeof native.configureLocalInputCapture !== 'function' ||
-      !native.configureLocalInputCapture(localPort, inputTicks)))
-    throw Error('Native local input capture configuration was rejected');
-  if (typeof autonomousPump !== 'boolean' || (autonomousPump && typeof native.subscribeProgress !== 'function'))
+  if (inputCapture && (localPort < 0 || !native || typeof native !== 'object' ||
+      typeof native.configureLocalInputCapture !== 'function'))
+    throw Error('Native local input capture configuration is unavailable');
+  if (typeof autonomousPump !== 'boolean' || (autonomousPump &&
+      (!native || typeof native.subscribeProgress !== 'function')))
     throw Error('Autonomous native pump requires a progress subscription');
+  if (inputCapture && globalThis.__meleeWebNetLocalInputCapture != null)
+    throw Error('Browser native local input capture already has an owner');
   let failure = null, intentionalClose = false, closed = false, closing = false;
   let wakeRequested = false, wakeQueued = false, wakeRuns = 0, rpcCalls = 0, unsubscribeProgress = null;
   let closeOperation = null, drainFailure = null;
+  let startup = null;
   let nativeChain = Promise.resolve();
   const callNative = (name, ...args) => {
     if (!autonomousPump) return native[name](...args);
@@ -44,6 +66,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
   let nextConsumerBatchId = 1;
   const exports = [], pending = new Set(), capturedLocalInputs = [];
   let localInputQueue = Promise.resolve(), lastCapturePollSerial = null, peer = null;
+  let inputCaptureRegistered = false;
   const asError = error => error instanceof Error ? error : Error(String(error));
   function invalidateConsumerBatch(batch, reason) {
     if (!batch || batch.invalidated) return batch;
@@ -189,44 +212,57 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       await peer.fail('protocol', {reason: `transport receive failed: ${String(error?.message || error)}`});
     }),
   });
+  endpoint.ready.catch(remember);
   peer.attach(text => endpoint.send(text));
   const captureLocalInput = (tick, port, pollSerial, bytes) => {
     const reject = reason => {
+      const shouldFailPeer = inputCaptureRegistered && !failure && !closing && !closed && !peer?.terminal;
       const error = remember(Error(reason));
-      if (peer && !peer.terminal)
+      if (shouldFailPeer)
         void peer.fail('protocol', {reason: error.message}).catch(remember);
       return false;
     };
     if (!inputCapture) return reject('Native local input capture was not enabled for this peer');
+    if (!inputCaptureRegistered || failure || closing || closed || peer?.terminal)
+      return reject('Native local input capture is no longer active');
     if (!Number.isSafeInteger(tick) || tick < 0 || tick >= inputTicks ||
         tick !== capturedLocalInputs.length || port !== localPort ||
         !Number.isSafeInteger(pollSerial) ||
+        pollSerial < 0 ||
         (lastCapturePollSerial !== null && pollSerial <= lastCapturePollSerial) ||
-        !(bytes instanceof Uint8Array) || bytes.length !== 11)
+        !(bytes instanceof Uint8Array) || bytes.length !== PAD_BYTES)
       return reject('Native local input capture cursor, port, serial or PAD bytes are invalid');
-    const expectedState = inputCapture.pattern[tick];
-    const fixtureState = globalThis.__meleeSyntheticPadState ?? null;
-    if (fixtureState !== expectedState ||
-        (inputCapture.pattern[tick + 1] !== undefined &&
-         typeof globalThis.__meleeSyntheticPadTransition !== 'function'))
-      return reject(`Synthetic Gamepad state differs at source cursor ${tick}`);
+    let fixtureState = null;
+    if (inputCaptureMode === 'diagnostic') {
+      const expectedState = inputCapture.pattern[tick];
+      fixtureState = globalThis.__meleeSyntheticPadState ?? null;
+      if (fixtureState !== expectedState ||
+          (inputCapture.pattern[tick + 1] !== undefined &&
+           typeof globalThis.__meleeSyntheticPadTransition !== 'function'))
+        return reject(`Synthetic Gamepad state differs at source cursor ${tick}`);
+    }
     const immutableBytes = new Uint8Array(bytes);
     const row = Object.freeze({source_cursor: tick, input_tick: tick, local_port: port,
       poll_serial: pollSerial, bytes: Object.freeze(Array.from(immutableBytes)),
-      synthetic_state: fixtureState});
+      ...(inputCaptureMode === 'diagnostic' ? {synthetic_state: fixtureState} : {})});
     capturedLocalInputs.push(row);
     lastCapturePollSerial = pollSerial;
     const deferSend = deferredTicks.has(tick);
-    const operation = localInputQueue.then(() => peer.addLocalInput(tick, immutableBytes, {deferSend}));
+    const operation = localInputQueue.then(() => {
+      if (!inputCaptureRegistered || failure || closing || closed || peer.terminal)
+        throw Error('Native local input capture stopped before queued publication');
+      return peer.addLocalInput(tick, immutableBytes, {deferSend});
+    });
     localInputQueue = operation.catch(async error => {
+      const shouldFailPeer = !failure && !peer.terminal && !closing && !closed;
       const cause = remember(Error(`Asynchronous browser-local input ${tick} failed: ${String(error?.message || error)}`));
-      if (!peer.terminal) {
+      if (shouldFailPeer) {
         try { await peer.fail('protocol', {reason: cause.message, tick}); }
         catch (terminalError) { remember(terminalError); }
       }
     });
-    track(() => operation);
-    if (inputCapture.pattern[tick + 1] !== undefined) {
+    void track(() => operation).catch(() => {});
+    if (inputCaptureMode === 'diagnostic' && inputCapture.pattern[tick + 1] !== undefined) {
       try { globalThis.__meleeSyntheticPadTransition(inputCapture.pattern[tick + 1]); }
       catch (error) {
         return reject(`Synthetic Gamepad transition failed after source cursor ${tick}: ${String(error?.message || error)}`);
@@ -234,13 +270,6 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     }
     return true;
   };
-  if (inputCapture) globalThis.__meleeWebNetLocalInputCapture = captureLocalInput;
-  // Start WebCrypto preparation before returning the allocated endpoint. An
-  // early remote hello must join that same preparation, never precede it.
-  const startup = peer.start(agreement);
-  startup.catch(remember);
-  endpoint.ready.catch(remember);
-
   async function settle() {
     await endpoint.drainInbound(timeoutMs);
     await localInputQueue;
@@ -291,8 +320,8 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
   }
   const snapshot = () => ({protocol: peer.summary(), endpointErrors: endpoint.errors,
     endpointClosed: endpoint.closed, closed, exportRecords: exports.length,
-    localInputCapture: inputCapture ? {enabled: true, input_ticks: inputTicks,
-      captures: capturedLocalInputs.slice()} : {enabled: false},
+    localInputCapture: inputCapture ? {enabled: true, mode: inputCaptureMode, input_ticks: inputTicks,
+      captures: capturedLocalInputs.slice(0, inputTicks)} : {enabled: false, mode: null},
     checksumOwnership: {owner: 'browser-page', export_limit_records: BROWSER_CHECKSUM_EXPORT_LIMIT,
       native_records_drained: nativeRecordsDrained,
       active_native_records_submitted_before_export: activeNativeRecords,
@@ -347,19 +376,6 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     // A background error is sticky evidence, never an unhandled rejection.
     operation.catch(remember);
   }
-  if (autonomousPump) {
-    try {
-      const unsubscribe = native.subscribeProgress(requestWakeup);
-      if (typeof unsubscribe !== 'function')
-        throw Error('Native progress subscription requires an unsubscribe owner');
-      unsubscribeProgress = unsubscribe;
-    } catch (error) {
-      // Return the failed controller so its caller can still join startup and
-      // endpoint cleanup. Setup failure must not orphan an allocated endpoint.
-      remember(error);
-    }
-  }
-
   // Serialize RPCs so native scratch and evidence exports have one owner.
   function rpc(name, args = []) {
     ++rpcCalls;
@@ -414,6 +430,9 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     closing = true;
     wakeRequested = false;
     intentionalClose = intentional;
+    if (inputCaptureRegistered && globalThis.__meleeWebNetLocalInputCapture === captureLocalInput)
+      globalThis.__meleeWebNetLocalInputCapture = null;
+    inputCaptureRegistered = false;
     const failures = [];
     if (unsubscribeProgress) {
       try { unsubscribeProgress(); } catch (error) { failures.push(remember(error)); }
@@ -430,7 +449,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       }
     }
     const finalNativeDrain = async () => {
-      if (!autonomousPump) return;
+      if (!autonomousPump || !startup) return;
       await settle();
       const before = await callNative('status');
       const quiescent = status => status?.active === 1 &&
@@ -452,11 +471,41 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       try { await operation(); } catch (error) { failures.push(remember(error)); }
     }
     closed = endpoint.closed;
-    if (inputCapture && globalThis.__meleeWebNetLocalInputCapture === captureLocalInput)
-      globalThis.__meleeWebNetLocalInputCapture = null;
     if (failure) failures.push(failure);
     if (failures.length) throw new AggregateError([...new Set(failures)], 'Browser native peer close failed');
     return snapshot();
   }
-  return {rpc, close, armClose() { intentionalClose = true; }, snapshot};
+
+  const controller = {rpc, close, armClose() { intentionalClose = true; }, snapshot};
+  if (inputCapture) {
+    try {
+      globalThis.__meleeWebNetLocalInputCapture = captureLocalInput;
+      inputCaptureRegistered = true;
+      if (!native.configureLocalInputCapture(localPort, inputTicks))
+        throw Error('Native local input capture configuration was rejected');
+    } catch (error) {
+      remember(error);
+      if (globalThis.__meleeWebNetLocalInputCapture === captureLocalInput)
+        globalThis.__meleeWebNetLocalInputCapture = null;
+      inputCaptureRegistered = false;
+      return controller;
+    }
+  }
+  // Start WebCrypto preparation only after the peer, endpoint and optional
+  // native capture owner are all established. Early hello still joins this work.
+  startup = peer.start(agreement);
+  startup.catch(remember);
+  if (autonomousPump) {
+    try {
+      const unsubscribe = native.subscribeProgress(requestWakeup);
+      if (typeof unsubscribe !== 'function')
+        throw Error('Native progress subscription requires an unsubscribe owner');
+      unsubscribeProgress = unsubscribe;
+    } catch (error) {
+      // Return the failed controller so its caller can still join startup and
+      // endpoint cleanup. Setup failure must not orphan an allocated endpoint.
+      remember(error);
+    }
+  }
+  return controller;
 }
