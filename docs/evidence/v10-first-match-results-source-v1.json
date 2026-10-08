@@ -119,7 +119,6 @@
             "damage_bits": "430351ec",
             "facing_bits": "3f800000",
             "ground_air": 0,
-            "input_hex": "000000000000000000000000000000003f800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fefefefefefed0fefefefefed0ffffffffffffa405ffffffffffffff",
             "kind": 3,
             "knockback_bits": [
               "00000000",
@@ -139,7 +138,14 @@
               "00000000",
               "00000000",
               "00000000"
-            ]
+            ],
+            "input_identity": {
+              "bytes": 108,
+              "sha256": "12b8603c2b3b23174598e60304c490e88772d2f31d98537a7885183794668138",
+              "encoding": "raw bytes decoded from retained hex",
+              "retained_evidence": "first-results-source-audit-v3.json",
+              "stored_in_Git": false
+            }
           },
           {
             "animation": 29,
@@ -148,7 +154,6 @@
             "damage_bits": "431f2148",
             "facing_bits": "bf800000",
             "ground_air": 1,
-            "input_hex": "bf7e000000000000bf7e000000000000bf7e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fefefefefefefebabafefefeffefffb3b3ffff1e00e6e7ffe7ff00ff",
             "kind": 5,
             "knockback_bits": [
               "00000000",
@@ -168,7 +173,14 @@
               "00000000",
               "00000000",
               "00000000"
-            ]
+            ],
+            "input_identity": {
+              "bytes": 108,
+              "sha256": "fc263a5f220e5dfe55355e9b648d6f79042657b8df487dcaa88b8e91baa7ffea",
+              "encoding": "raw bytes decoded from retained hex",
+              "retained_evidence": "first-results-source-audit-v3.json",
+              "stored_in_Git": false
+            }
           },
           {
             "animation": 4294967295,
@@ -177,7 +189,6 @@
             "damage_bits": "42e9d1eb",
             "facing_bits": "bf800000",
             "ground_air": 1,
-            "input_hex": "bf7e000000000000bf7e0000000000003f8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005dfefe5dfefe5df6f6fefefee7fffff0f0ffff0200ffffffffff00ff",
             "kind": 8,
             "knockback_bits": [
               "00000000",
@@ -197,7 +208,14 @@
               "00000000",
               "00000000",
               "00000000"
-            ]
+            ],
+            "input_identity": {
+              "bytes": 108,
+              "sha256": "001e1fb7722ef87f766950544071531904001c0db15f6263b03bb9a80fdf5438",
+              "encoding": "raw bytes decoded from retained hex",
+              "retained_evidence": "first-results-source-audit-v3.json",
+              "stored_in_Git": false
+            }
           },
           {
             "animation": 4294967295,
@@ -206,7 +224,6 @@
             "damage_bits": "431170a3",
             "facing_bits": "bf800000",
             "ground_air": 1,
-            "input_hex": "00000000000000000000000000000000bf7e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000010000000000fefefefefefe2927fdfefefe00d7fffffcffff0200ffffffd1ffff71",
             "kind": 9,
             "knockback_bits": [
               "00000000",
@@ -226,13 +243,26 @@
               "00000000",
               "00000000",
               "00000000"
-            ]
+            ],
+            "input_identity": {
+              "bytes": 108,
+              "sha256": "230a56c11eabc64f5b55dd1cd1adccc3023018f0b876a38466669e46648ec454",
+              "encoding": "raw bytes decoded from retained hex",
+              "retained_evidence": "first-results-source-audit-v3.json",
+              "stored_in_Git": false
+            }
           }
         ],
         "match_frame": 14868,
-        "pad_state_hex": "0000002d00000008001e0000000000015000018c0000ff00508cff0000000000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000ffffbe3e0000000000000000000000000000000000000000000000000000000000000000000000000000000001ff0000000000000000000000000000000000000000ffffbe3e0000000000000000000000000000000000000000000000000000000000000000000000000000000001ff0000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000ffffbe3e0000000000000000000000000000000000000000000000000000000000000000000000000000000001ff0000000000000000000000000000000000000000ffffbe3e0000000000000000000000000000000000000000000000000000000000000000000000000000000001ff0000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000ffffbe3e0000000000000000000000000000000000000000000000000000000000000000000000000000000001ff0000000000000000000000000000000000000000ffffbe3e0000000000000000000000000000000000000000000000000000000000000000000000000000000001ff",
         "rng": 3752831213,
-        "scene_frame": 15105
+        "scene_frame": 15105,
+        "pad_state_identity": {
+          "bytes": 822,
+          "sha256": "f131bcc54e6d78d95645257470754013f5eeb301b759a407f4b1c1c429569fc4",
+          "encoding": "raw bytes decoded from retained hex",
+          "retained_evidence": "first-results-source-audit-v3.json",
+          "stored_in_Git": false
+        }
       },
       "target": {
         "cursor_after_frame": 16290,
@@ -908,7 +938,8 @@
     "Full synthetic control v1 used two invalid fixture expectations: an unread duplicate terminal and a valid two-byte span encoding stock zero. Both were reduced; v1 source/log retained.",
     "Launch packet v1 had incorrect owner option names; caught before launch.",
     "Packet v2 filename replacement changed its schema; guarded metadata rejected it before original content access.",
-    "Corrected v3 guarded metadata and final focused controls passed."
+    "Corrected v3 guarded metadata and final focused controls passed.",
+    "PR275 first CI run37757472869 rejected the portable last-match PAD hex as encoded_payload. The raw PAD and fighter input blocks were replaced with byte lengths and SHA256 identities, binding unchanged retained source audit evidence; policy/checker unchanged."
   ],
   "observation_gaps": [
     "Browser state equality",
