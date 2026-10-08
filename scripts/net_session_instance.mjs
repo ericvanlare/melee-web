@@ -417,10 +417,10 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
           window.testPad.axes = [0, 0, 0, 0];
           return;
         }
-        if (!state || state.kind !== 'css-start-to-sss' || !Number.isSafeInteger(state.input_tick) ||
+        if (!state || !['css-start-to-sss', 'css-sss-to-match'].includes(state.kind) || !Number.isSafeInteger(state.input_tick) ||
             !Array.isArray(state.buttons) || state.buttons.length !== 17 || !Array.isArray(state.axes) || state.axes.length !== 4)
           throw Error('Unknown synthetic Gamepad sample state');
-        window.__meleeSyntheticPadState = `css-start-to-sss:${state.input_tick}`;
+        window.__meleeSyntheticPadState = `${state.kind}:${state.input_tick}`;
         window.testPad.buttons = state.buttons.map(button => ({pressed: button.pressed, value: button.value}));
         window.testPad.axes = [...state.axes];
       };

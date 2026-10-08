@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp, rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import vm from 'node:vm';
 import test from 'node:test';
 import {closePageNativeNetworkOwnership, firstFatalBrowserError, openNetInstance, PAGE_HELPERS,
   installRuntimeInputFixtureInPage, readNativeMatchObservationInPage} from '../scripts/net_session_instance.mjs';
@@ -17,6 +18,7 @@ import {standardPad} from './controller-fixtures.mjs';
 function fakeChrome(goto, evaluate = async () => undefined) {
   let closeCalls = 0;
   let removeCalls = 0;
+  const initScripts = [];
   const cdpListeners = new Map(), cdpCalls = [];
   let cdpDetachCalls = 0, cdpSessions = 0;
   const cdp = {
@@ -39,7 +41,7 @@ function fakeChrome(goto, evaluate = async () => undefined) {
       listeners.set(kind, entries);
     },
     off() { ++removeCalls; },
-    async addInitScript() {},
+    async addInitScript(...args) { initScripts.push(args); },
     evaluate: (...args) => evaluate(...args),
     async waitForFunction() {
       return {jsonValue: async () => ({ready: true}), dispose: async () => {}};
@@ -67,6 +69,7 @@ function fakeChrome(goto, evaluate = async () => undefined) {
     get cdpCalls() { return cdpCalls; },
     get closeCalls() { return closeCalls; },
     get removeCalls() { return removeCalls; },
+    get initScripts() { return initScripts; },
   };
 }
 
@@ -206,6 +209,97 @@ test('startup failure without a peer disposes the imported adapter and exposes c
     assert.equal(failure.cleanupError instanceof AggregateError, true);
     assert(failure.cleanupError.errors.includes(disposeFailure));
     assert.equal(chrome.closeCalls, 1);
+  });
+});
+
+test('actual synthetic Gamepad init script converts both CSS route kinds through ordinary controller polling', async () => {
+  await withProfile(async profile => {
+    const chrome = fakeChrome(async () => ({status: () => 200, headers: () => ({
+      'cross-origin-opener-policy': 'same-origin',
+      'cross-origin-embedder-policy': 'require-corp',
+    })}), async fn => {
+      if (String(fn).includes('crossOriginIsolated')) return true;
+      if (String(fn).includes('navigator.userAgent')) return 'Chrome/154';
+      return undefined;
+    });
+    const instance = await openNetInstance({...common, chromium: chrome.chromium, userDataDir: profile,
+      syntheticGamepad: standardPad(0)});
+    let initScript;
+    try {
+      initScript = chrome.initScripts.map(args => args[0]).find(fn =>
+        typeof fn === 'function' && String(fn).includes('Unknown synthetic Gamepad sample state'));
+      assert.equal(typeof initScript, 'function', 'the captured callback is the registered browser init script');
+    } finally { await instance.close(); }
+
+    const makeFrames = count => {
+      const frames = Buffer.alloc(count * 44);
+      for (let tick = 0; tick < count; ++tick) {
+        frames[tick * 44 + 32] = 0xff;
+        frames[tick * 44 + 43] = 0xff;
+      }
+      return frames;
+    };
+    const setPort = (frames, tick, port, buttons, x = 0, y = 0) => {
+      const offset = tick * 44 + port * 11;
+      frames.writeUInt16BE(buttons, offset);
+      frames.writeInt8(x, offset + 2);
+      frames.writeInt8(y, offset + 3);
+    };
+    const sssFrames = makeFrames(153);
+    setPort(sssFrames, 20, 0, 0, 80, 0);
+    setPort(sssFrames, 24, 1, 0, -60, 40);
+    for (let tick = 150; tick <= 152; ++tick) setPort(sssFrames, tick, 0, 0x1000);
+    const matchFrames = makeFrames(304);
+    setPort(matchFrames, 20, 0, 0, 80, 0);
+    setPort(matchFrames, 24, 1, 0, -80, 20);
+    for (let tick = 150; tick <= 152; ++tick) setPort(matchFrames, tick, 0, 0x1000);
+    for (let tick = 183; tick < 197; ++tick) setPort(matchFrames, tick, 0, 0, 80, 0);
+    for (let tick = 197; tick < 202; ++tick) setPort(matchFrames, tick, 0, 0, 0, 80);
+    for (let tick = 202; tick < 206; ++tick) setPort(matchFrames, tick, 0, 0, -80, -80);
+    for (let tick = 206; tick < 213; ++tick) setPort(matchFrames, tick, 0, 0, -80, 0);
+    for (let tick = 213; tick < 216; ++tick) setPort(matchFrames, tick, 0, 0x0100);
+    const routes = [
+      ['css-start-to-sss', buildRuntimeCssSssGamepadSamples(sssFrames)],
+      ['css-sss-to-match', buildRuntimeCssMatchGamepadSamples(matchFrames)],
+    ];
+    const encode = output => [output.buttons >>> 8, output.buttons & 255,
+      ...output.stick.map(value => value & 255), ...output.cstick.map(value => value & 255),
+      ...output.triggers, 0, 0, 0];
+
+    for (const [kind, byRole] of routes) for (const role of ['alpha', 'beta']) {
+      const port = role === 'alpha' ? 0 : 1, pad = standardPad(port);
+      const window = {}, navigator = {};
+      vm.runInNewContext(`(${initScript.toString()})(pad)`, {window, navigator, pad});
+      assert.equal(window.__meleeSyntheticPadState, 'neutral');
+      const manager = createControllerManager({getGamepads: () => navigator.getGamepads(),
+        storage: null, userAgent: 'Chrome/154'});
+      const discovered = manager.inspect();
+      assert.equal(discovered.length, 1);
+      manager.assign(discovered[0].key, port);
+      manager.inspect();
+      const samples = byRole[role];
+      for (const sample of samples) {
+        assert.equal(sample.gamepad.kind, kind);
+        window.__meleeSyntheticPadTransition(sample.gamepad);
+        assert.equal(window.__meleeSyntheticPadState, `${kind}:${sample.input_tick}`);
+        const row = manager.sample().find(candidate => candidate.port === port);
+        assert.ok(row?.active, `${role} controller remains active on explicit port ${port}`);
+        assert.deepEqual(encode(row.output), sample.bytes,
+          `${kind} ${role} recipe tick ${sample.input_tick} follows the actual init-script/controller path`);
+      }
+      const valid = samples[1].gamepad;
+      assert.throws(() => window.__meleeSyntheticPadTransition({...valid, kind: 'unreviewed-kind'}),
+        /Unknown synthetic Gamepad sample state/);
+      assert.throws(() => window.__meleeSyntheticPadTransition({...valid, buttons: valid.buttons.slice(1)}),
+        /Unknown synthetic Gamepad sample state/);
+      assert.throws(() => window.__meleeSyntheticPadTransition({...valid, axes: valid.axes.slice(1)}),
+        /Unknown synthetic Gamepad sample state/);
+      assert.throws(() => window.__meleeSyntheticPadTransition({...valid, input_tick: Number.MAX_SAFE_INTEGER + 1}),
+        /Unknown synthetic Gamepad sample state/);
+      for (const state of ['A', 'release', 'neutral']) window.__meleeSyntheticPadTransition(state);
+      assert.equal(window.__meleeSyntheticPadState, 'neutral', 'existing six-input string states remain supported');
+      assert.equal(manager.sample().find(candidate => candidate.port === port)?.output.buttons, 0);
+    }
   });
 });
 
