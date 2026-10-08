@@ -4,6 +4,7 @@
 #include "candidate_source_fixture.h"
 #include <assert.h>
 #include <limits.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,8 +12,8 @@ StaticPlayer test_players[4];Fighter test_fighters[4];HSD_GObj test_entities[4];
 uint32_t test_seed=0x12345678,*seed_ptr=&test_seed;
 static int selected;
 static HSD_JObj bone;
-static int service_calls[8],service_order[1024],order_count;
-static int overlap_result=1,eligibility_result;
+static int service_calls[10],service_order[1024],order_count;
+static int eligibility_result;
 static struct {float x128,x714,x7A8;} common={0.5f,2.0f,1.0f};
 void* unused_common;
 int melee_web_retail_primary_identity(unsigned,HSD_GObj*,uint32_t*,uint32_t*);
@@ -46,6 +47,7 @@ static unsigned count_invocations,count_pass,count_pair,count_geometries,count_p
 static unsigned count_invocation_kind[64];
 static unsigned count_pass_candidates;
 static int count_hit_index,count_hurt_index,count_producer_phase;
+static unsigned count_geometry_inner_calls;
 static void record_event(const char* phase,unsigned kind,unsigned ordinal,
  int hit,int hurt,int result,int branch,int log_index)
 {
@@ -68,6 +70,7 @@ static void reset_counter(void)
  memset(count_invocation_kind,0,sizeof(count_invocation_kind));
  count_pass_candidates=0;count_hit_index=count_hurt_index=-1;
  count_geometry_result=count_geometry_consumed=count_geometry_open=0;count_producer_phase=-1;
+ count_geometry_inner_calls=0;
 }
 void melee_web_hit_probe_cursor(size_t cursor)
 {
@@ -138,13 +141,21 @@ unsigned melee_web_hit_probe_geometry_begin(const HitCapsule* hit,const HurtCaps
  if(count_hurt_index<0) {
   abort();
  }
- count_geometry_open=1;
+ count_geometry_open=1;count_geometry_inner_calls=0;
  return ++count_geometries;
+}
+void melee_web_hit_probe_geometry_inner(const void* a,const void* b,const void* c,
+ const void* d,const void* matrix,float hit_radius,float hurt_radius,float broadphase_scale)
+{
+ (void)a;(void)b;(void)c;(void)d;(void)matrix;(void)hit_radius;(void)hurt_radius;(void)broadphase_scale;
+ if(!count_geometry_open)return;
+ if(count_geometry_inner_calls++)abort();
 }
 void melee_web_hit_probe_geometry_end(unsigned geometry,int result)
 {
  if(!geometry)return;
  if(geometry!=count_geometries||!count_pair||!count_geometry_open||count_hurt_index<0)abort();
+ if(count_geometry_inner_calls!=1)abort();
  record_event("geometry",4,geometry,count_hit_index,count_hurt_index,result,-1,-1);
  count_geometry_open=0;count_geometry_result=result;count_geometry_consumed=0;
 }
@@ -189,10 +200,48 @@ static void write_counting_adapter(const char* mode)
 void lb_8000B1CC(HSD_JObj* joint,Vec3* input,Vec3* output)
 {assert(joint==&bone);called(0);*output=*input;}
 MtxPtr HSD_JObjGetMtxPtr(HSD_JObj* joint){assert(joint==&bone);called(1);return joint->matrix;}
-void PSMTXConcat(Mtx a,Mtx b,Mtx result){called(2);for(int i=0;i<3;++i)for(int j=0;j<4;++j)result[i][j]=a[i][j]+b[i][j];}
-int lbColl_80006E58(Vec3* a,Vec3* b,Vec3* c,Vec3* d,Vec3* e,Vec3* f,Mtx matrix,
+void PSMTXConcat(Mtx a,Mtx b,Mtx result)
+{
+ called(2);Mtx copy;
+ for(int row=0;row<3;++row){
+  for(int column=0;column<3;++column){
+   copy[row][column]=a[row][0]*b[0][column]+a[row][1]*b[1][column]+a[row][2]*b[2][column];
+  }
+  copy[row][3]=a[row][0]*b[0][3]+a[row][1]*b[1][3]+a[row][2]*b[2][3]+a[row][3];
+ }
+ memcpy(result,copy,sizeof(copy));
+}
+void HSD_MtxInverse(MtxPtr matrix,Mtx inverse)
+{
+ called(8);
+ float a=matrix[0][0],b=matrix[0][1],c=matrix[0][2];
+ float d=matrix[1][0],e=matrix[1][1],f=matrix[1][2];
+ float g=matrix[2][0],h=matrix[2][1],i=matrix[2][2];
+ float determinant=a*(e*i-f*h)-b*(d*i-f*g)+c*(d*h-e*g);
+ if(determinant==0.0f)abort();
+ float scale=1.0f/determinant;
+ inverse[0][0]=(e*i-f*h)*scale;inverse[0][1]=(c*h-b*i)*scale;inverse[0][2]=(b*f-c*e)*scale;
+ inverse[1][0]=(f*g-d*i)*scale;inverse[1][1]=(a*i-c*g)*scale;inverse[1][2]=(c*d-a*f)*scale;
+ inverse[2][0]=(d*h-e*g)*scale;inverse[2][1]=(b*g-a*h)*scale;inverse[2][2]=(a*e-b*d)*scale;
+ for(int row=0;row<3;++row)
+  inverse[row][3]=-(inverse[row][0]*matrix[0][3]+inverse[row][1]*matrix[1][3]+
+      inverse[row][2]*matrix[2][3]);
+}
+void PSMTXMultVec(Mtx matrix,Vec3* input,Vec3* output)
+{
+ called(9);Vec3 value=*input;
+ output->x=matrix[0][0]*value.x+matrix[0][1]*value.y+matrix[0][2]*value.z+matrix[0][3];
+ output->y=matrix[1][0]*value.x+matrix[1][1]*value.y+matrix[1][2]*value.z+matrix[1][3];
+ output->z=matrix[2][0]*value.x+matrix[2][1]*value.y+matrix[2][2]*value.z+matrix[2][3];
+}
+static bool melee_web_actual_inner_body(Vec3*,Vec3*,Vec3*,Vec3*,Vec3*,Vec3*,MtxPtr,
+ Vec3*,float*,float,float,float);
+bool lbColl_80006E58(Vec3* a,Vec3* b,Vec3* c,Vec3* d,Vec3* e,Vec3* f,MtxPtr matrix,
  Vec3* position,float* distance,float radius,float hurt_radius,float factor)
-{(void)a;(void)b;(void)c;(void)d;(void)e;(void)f;called(3);assert(matrix);position->x=radius;position->y=hurt_radius;position->z=factor;*distance=2.0f;return overlap_result;}
+{
+ called(3);
+ return melee_web_actual_inner_body(a,b,c,d,e,f,matrix,position,distance,radius,hurt_radius,factor);
+}
 void ftColl_80076808(Fighter* a,HitCapsule* b,int c,void* d,int e)
 {(void)a;(void)b;(void)c;(void)d;(void)e;called(4);}
 int lbColl_80008688(HitCapsule* hit,int mode,void* target)
@@ -219,6 +268,7 @@ void synthetic_assert(void){abort();}
 static void reset(void)
 {
  memset(test_fighters,0,sizeof(test_fighters));memset(test_players,0,sizeof(test_players));
+ memset(&bone,0,sizeof(bone));bone.matrix[0][0]=bone.matrix[1][1]=bone.matrix[2][2]=1.0f;
  memset(test_entities,0,sizeof(test_entities));memset(service_calls,0,sizeof(service_calls));
  memset(service_order,0,sizeof(service_order));memset(dmg_log0,0,sizeof(dmg_log0));memset(dmg_log1,0,sizeof(dmg_log1));
  dmg_log0_idx=dmg_log1_idx=order_count=0;test_seed=0x12345678;
@@ -226,14 +276,14 @@ static void reset(void)
   test_fighters[i].gobj=&test_entities[i];test_fighters[i].player_id=i;test_fighters[i].kind=i==1?FTKIND_KOOPA:0;test_fighters[i].dmg.x182c_behavior=1.0f;}
  for(unsigned i=0;i<4;++i){HitCapsule* h=&test_fighters[0].x914[i];h->state=HitCapsule_Enabled;h->x4=i;h->damage=11;h->scale=2;h->unk_count=8;h->x42_b5=h->x40_b3=1;}
  test_fighters[1].hurt_capsules_len=2;
- for(unsigned n=0;n<15;++n){HurtCapsule* h=&test_fighters[1].hurt_capsules[n].capsule;h->bone=&bone;h->scale=3;h->a_offset.x=1;h->b_offset.y=2;}
+ for(unsigned n=0;n<15;++n){HurtCapsule* h=&test_fighters[1].hurt_capsules[n].capsule;h->bone=&bone;h->bone_idx=(int)n;h->scale=3;h->a_offset.x=1;h->b_offset.y=2;}
  test_tracker_init();
 }
 
 #ifdef MELEE_WEB_HIT_PROBE_COUNTING_ADAPTER
 typedef struct FixtureSnapshot {
  Fighter fighters[4];StaticPlayer players[4];HSD_GObj entities[4];
- DmgLogEntry logs0[20],logs1[20];int log0,log1,calls[8],order[1024],order_count;uint32_t seed;
+ DmgLogEntry logs0[20],logs1[20];int log0,log1,calls[10],order[1024],order_count;uint32_t seed;
 } FixtureSnapshot;
 static void take_snapshot(FixtureSnapshot* out)
 {
@@ -303,8 +353,18 @@ static uint64_t fixture_state_hash(void)
 static int exercise_authored(const char* mode)
 {
  Fighter* attacker=&test_fighters[0];Fighter* receiver=&test_fighters[1];
- receiver->hurt_capsules_len=15;overlap_result=!strcmp(mode,"authored_off")||!strcmp(mode,"authored_complete")||
-  !strcmp(mode,"candidate_overflow")||!strcmp(mode,"count_all_false")?0:1;
+ receiver->hurt_capsules_len=15;
+ int all_false=!strcmp(mode,"authored_off")||!strcmp(mode,"authored_complete")||
+  !strcmp(mode,"candidate_overflow")||!strcmp(mode,"count_all_false");
+ for(unsigned i=0;i<4;++i){
+  HitCapsule* hit=&attacker->x914[i];hit->x58=(Vec3){0,0,0};hit->x4C=(Vec3){1,0,0};
+  hit->x43_b1=i&1;
+ }
+ for(unsigned n=0;n<15;++n){
+  HurtCapsule* hurt=&receiver->hurt_capsules[n].capsule;hurt->skip_update_pos=1;
+  if(all_false){hurt->a_pos=(Vec3){100.0f+(float)n,0,0};hurt->b_pos=(Vec3){101.0f+(float)n,0,0};}
+  else {hurt->a_pos=(Vec3){0.5f,0,0};hurt->b_pos=hurt->a_pos;}
+ }
  for(unsigned i=0;i<4;i++){
   HitCapsule* hit=&attacker->x914[i];
   int phantom=!strcmp(mode,"count_phantom")||(!strcmp(mode,"count_mixed")&&i<3);
@@ -402,7 +462,13 @@ static int exercise(const char* mode)
  if(!strcmp(mode,"hurt16"))receiver->hurt_capsules_len=16;
  if(!strcmp(mode,"intangible"))hurt->state=HurtCapsule_Intangible;
  if(!strcmp(mode,"cache"))hurt->skip_update_pos=1;
- if(!strcmp(mode,"zero_overlap"))overlap_result=0;
+ if(!strcmp(mode,"zero_overlap")||!strcmp(mode,"aabb_reject")){
+  hurt->skip_update_pos=1;hurt->a_pos=(Vec3){100,0,0};hurt->b_pos=(Vec3){101,0,0};
+ }
+ if(!strcmp(mode,"zero_distance")||!strcmp(mode,"nonzero_distance")){
+  hit->x58=(Vec3){0,0,0};hit->x4C=(Vec3){10,0,0};hurt->skip_update_pos=1;
+  hurt->a_pos=(Vec3){5,0,!strcmp(mode,"zero_distance")?0.0f:1.0f};hurt->b_pos=hurt->a_pos;
+ }
  if(!strcmp(mode,"hit_disabled"))hit->state=HitCapsule_Disabled;
  if(!strcmp(mode,"catch"))hit->element=HitElement_Catch;
  if(!strcmp(mode,"flag_zero"))hit->x42_b5=0;
@@ -463,14 +529,21 @@ int main(int argc,char** argv)
   return run_counting_adapter(argv[1]);
 #endif
  reset();selected=0;melee_web_hit_probe_cursor(5239);int disabled=exercise(argv[1]);
- Fighter expected[4];memcpy(expected,test_fighters,sizeof(expected));int calls[8],order[1024];memcpy(calls,service_calls,sizeof(calls));memcpy(order,service_order,sizeof(order));int expected_count=order_count;
+ uint64_t disabled_hash=fixture_state_hash();
+ Fighter expected[4];memcpy(expected,test_fighters,sizeof(expected));int calls[10],order[1024];memcpy(calls,service_calls,sizeof(calls));memcpy(order,service_order,sizeof(order));int expected_count=order_count;
  DmgLogEntry logs0[20],logs1[20];memcpy(logs0,dmg_log0,sizeof(logs0));memcpy(logs1,dmg_log1,sizeof(logs1));int log0=dmg_log0_idx,log1=dmg_log1_idx;
  reset();selected=1;melee_web_hit_probe_cursor(5238);melee_web_hit_probe_scheduler_return();melee_web_hit_probe_cursor(5239);int enabled=exercise(argv[1]);
+ uint64_t enabled_hash=fixture_state_hash();
  assert(enabled==disabled&&memcmp(expected,test_fighters,sizeof(expected))==0);
  assert(memcmp(calls,service_calls,sizeof(calls))==0&&memcmp(order,service_order,sizeof(order))==0&&order_count==expected_count);
  assert(log0==dmg_log0_idx&&log1==dmg_log1_idx&&memcmp(logs0,dmg_log0,sizeof(logs0))==0&&memcmp(logs1,dmg_log1,sizeof(logs1))==0);
  assert(test_seed==0x12345678);
  melee_web_hit_probe_cursor(5240);melee_web_hit_probe_scheduler_return();
- fprintf(stderr,"SOURCE_OBSERVATION_CONTROL result=%d log0=%d log1=%d calls=%d ordered=%d exact_state_writes=1\n",enabled,log0,log1,order_count,expected_count);
+ fprintf(stderr,"SOURCE_OBSERVATION_CONTROL result=%d log0=%d log1=%d calls=%d ordered=%d geometry_calls=%d matrix_getters=%d matrix_concats=%d inverse_calls=%d vector_calls=%d selector_off_state_hash=%016llx selected_state_hash=%016llx exact_state_writes=1\n",
+  enabled,log0,log1,order_count,expected_count,service_calls[3],service_calls[1],service_calls[2],service_calls[8],service_calls[9],
+  (unsigned long long)disabled_hash,(unsigned long long)enabled_hash);
+ fprintf(stderr,"SOURCE_OBSERVATION_CALL_ORDER");
+ for(int i=0;i<order_count;++i)fprintf(stderr,"%s%d",i?",":" ",service_order[i]);
+ fputc('\n',stderr);
  return 0;
 }

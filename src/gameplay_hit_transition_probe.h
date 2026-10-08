@@ -28,6 +28,10 @@ void melee_web_hit_probe_candidate(unsigned pair, unsigned index, const struct H
 unsigned melee_web_hit_probe_geometry_begin(const struct HitCapsule*, const struct HurtCapsule*,
     const void* matrix, int mode, float attacker_scale, float receiver_scale, float z);
 void melee_web_hit_probe_geometry_end(unsigned geometry, int result);
+void melee_web_hit_probe_geometry_inner(const void* hit_start,
+    const void* hit_end, const void* hurt_start,
+    const void* hurt_end, const void* matrix, float hit_radius,
+    float hurt_radius, float broadphase_scale);
 unsigned melee_web_hit_probe_producer_begin(struct Fighter* attacker, const struct HitCapsule*,
     struct Fighter* receiver, const void* hurt, size_t log0, size_t log1);
 void melee_web_hit_probe_producer_branch(unsigned producer, unsigned branch, size_t log0, size_t log1);

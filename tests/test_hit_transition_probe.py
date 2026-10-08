@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
+import struct
 import subprocess
 import tempfile
 import unittest
@@ -36,13 +38,15 @@ typedef struct HitVictim {void* victim;unsigned x4;} HitVictim;
 enum {HitCapsule_Disabled=0,HitCapsule_Enabled=1,HurtCapsule_Intangible=2,GA_Ground=0,GA_Air=1,HitElement_Catch=8,ftCo_MS_DamageIce=325};
 typedef struct HSD_GObj { void* user_data; } HSD_GObj;
 typedef struct Vec3 { float x,y,z; } Vec3;
+void HSD_MtxInverse(MtxPtr matrix,Mtx inverse);
+void PSMTXMultVec(Mtx matrix,Vec3* input,Vec3* output);
 enum { FTKIND_KOOPA=5, Gm_PKind_Cpu=1, Gm_PKind_NA=3 };
 typedef struct HitCapsule {
  int state; unsigned element,x4,unk_count; float damage,scale,coll_distance; Vec3 x58,x4C,hurt_coll_pos;
  HitVictim victims_2[12];HSD_GObj* owner;
  unsigned x42_b5,x40_b2,x40_b3,hit_grabbed_victim_only,x43_b2,x43_b1,x40_b0;
 } HitCapsule;
-typedef struct HurtCapsule { int state; unsigned skip_update_pos; Vec3 a_pos,b_pos,a_offset,b_offset;float scale;HSD_JObj* bone;} HurtCapsule;
+typedef struct HurtCapsule { int state; unsigned skip_update_pos; Vec3 a_pos,b_pos,a_offset,b_offset;float scale;HSD_JObj* bone;int bone_idx;} HurtCapsule;
 typedef struct FighterHurtCapsule {HurtCapsule capsule;} FighterHurtCapsule;
 typedef struct Fighter {
  HSD_GObj* gobj; unsigned player_id; int kind,motion_id,anim_id;
@@ -182,6 +186,19 @@ def _actual_function(source, signature):
         pos+=1
     return source[start:pos]+'\n'
 
+def _serialized_event_sizes(line):
+    marker='"events":['
+    position=line.index(marker)+len(marker)
+    decoder=json.JSONDecoder()
+    sizes=[]
+    while line[position]!=']':
+        _,end=decoder.raw_decode(line,position)
+        sizes.append(len(line[position:end].encode('utf-8')))
+        position=end
+        if line[position]==',':position+=1
+        else:break
+    return sizes
+
 class HitCandidateSourceTest(unittest.TestCase):
     """Actual patched routines; explicitly synthetic ABI and service implementations.
 
@@ -202,6 +219,7 @@ class HitCandidateSourceTest(unittest.TestCase):
         if applied.returncode:raise RuntimeError('Actual patch application failed; retained '+str(cls.scratch))
         ft=(source_root/'src/melee/ft/ftcoll.c').read_text()
         lb=(source_root/'src/melee/lb/lbcollision.c').read_text()
+        lb_header=(ROOT/'.deps/melee/src/melee/lb/lbcollision.h').read_text()
         header=HEADERS+r"""
 typedef unsigned char u8;typedef int s32;typedef unsigned u32;typedef int FighterKind;typedef int HitCapsuleState;typedef void* UNK_T;
 typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;void *unk_anim0,*hurt1;Vec3 pos;int size_of_xC;float x20;} DmgLogEntry;
@@ -212,6 +230,11 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
             'static inline bool inlineB2(', 'static inline float inlineB3(', 'bool ftColl_80076ED8(')
         bodies='static DmgLogEntry dmg_log0[20];\nstruct DmgLogEntry dmg_log1[20];\nstatic int dmg_log0_idx;\nstatic int dmg_log1_idx;\n'
         bodies+='\n'.join(_actual_function(ft,x) for x in signatures)
+        bodies+=_actual_function(lb_header,'static inline bool approximatelyZero(')
+        bodies+=_actual_function(lb,'float lbColl_80005EBC(')
+        inner=_actual_function(lb,'bool lbColl_80006E58(')
+        inner=inner.replace('bool lbColl_80006E58(','static bool melee_web_actual_inner_body(',1)
+        bodies+=inner
         bodies+=_actual_function(lb,'bool lbColl_8000805C(')
         # Exact admission predicate from the verified whole normal-hurt owner.
         owner=_actual_function(ft,'void ftColl_80078C70(')
@@ -229,13 +252,15 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
         (cls.scratch/'candidate_source_bodies.inc').write_text(bodies)
         cls.candidate_binary=cls.scratch/'actual-candidates'
         compiler=shutil.which('cc') or 'cc'
-        common=[compiler,'-std=c11','-Wall','-Wextra','-Werror','-ffp-contract=off',
-            '-I'+str(cls.scratch),'-I'+str(ROOT/'src')]
+        common=[compiler,'-std=c11','-Wall','-Wextra','-Werror','-ffp-contract=off']
         fixture=str(ROOT/'tests/native_hit_candidate_probe_fixture.c')
         identity=str(cls.scratch/'identity.c')
         probe=str(ROOT/'src/gameplay_hit_transition_probe.c')
-        def compile_fixture(binary,defines,sources,log_name):
-            result=subprocess.run(common+defines+sources+['-o',str(binary)],capture_output=True,text=True)
+        def compile_fixture(binary,defines,sources,log_name,include_dirs=None):
+            include_dirs=include_dirs or (cls.scratch,)
+            include_args=['-I'+str(directory) for directory in include_dirs]
+            result=subprocess.run(common+include_args+['-I'+str(ROOT/'src')]+defines+
+                sources+['-lm','-o',str(binary)],capture_output=True,text=True)
             log=result.stdout+result.stderr
             (cls.scratch/log_name).write_text(log)
             _retain_reducer_evidence(log_name,log,'')
@@ -249,6 +274,30 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
         built=compile_fixture(cls.no_observer_binary,[],[probe,fixture,identity],'no-observer-compile.log')
         if built.returncode:raise _compile_failure(
             'No-observer comparison compile failed',built,cls.scratch,'no-observer-compile.log')
+        hook_call=('    melee_web_hit_probe_geometry_inner(hit_start, hit_end, hurt_start, hurt_end,\n'
+            '        hurt_mtx, hit_radius, hurt_radius, broadphase_scale);\n')
+        if bodies.count(hook_call)!=1:raise RuntimeError('Expected one extracted actual inner-helper hook')
+        cls.missing_inner_dir=cls.scratch/'missing-inner-hook'
+        cls.missing_inner_dir.mkdir()
+        (cls.missing_inner_dir/'candidate_source_bodies.inc').write_text(bodies.replace(hook_call,''))
+        cls.missing_inner_binary=cls.scratch/'actual-candidates-missing-inner-hook'
+        built=compile_fixture(cls.missing_inner_binary,
+            ['-DMELEE_WEB_RNG_DRAW_OBSERVER=1','-DMELEE_WEB_HIT_PROBE_SYNTHETIC=1'],
+            [probe,fixture,identity],'missing-inner-compile.log',
+            (cls.missing_inner_dir,cls.scratch))
+        if built.returncode:raise _compile_failure(
+            'Missing-inner fail-closed variant compile failed',built,cls.scratch,'missing-inner-compile.log')
+        cls.duplicate_inner_dir=cls.scratch/'duplicate-inner-hook'
+        cls.duplicate_inner_dir.mkdir()
+        (cls.duplicate_inner_dir/'candidate_source_bodies.inc').write_text(
+            bodies.replace(hook_call,hook_call+hook_call))
+        cls.duplicate_inner_binary=cls.scratch/'actual-candidates-duplicate-inner-hook'
+        built=compile_fixture(cls.duplicate_inner_binary,
+            ['-DMELEE_WEB_RNG_DRAW_OBSERVER=1','-DMELEE_WEB_HIT_PROBE_SYNTHETIC=1'],
+            [probe,fixture,identity],'duplicate-inner-compile.log',
+            (cls.duplicate_inner_dir,cls.scratch))
+        if built.returncode:raise _compile_failure(
+            'Duplicate-inner fail-closed variant compile failed',built,cls.scratch,'duplicate-inner-compile.log')
         cls.adapter_binary=cls.scratch/'fixture-counting-adapter'
         built=compile_fixture(cls.adapter_binary,
             ['-DMELEE_WEB_RNG_DRAW_OBSERVER=1','-DMELEE_WEB_HIT_PROBE_SYNTHETIC=1',
@@ -333,6 +382,13 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
             self.assertEqual(re.fullmatch(r'[0-9a-f]{8}',event['hit_radius_bits']).group(0),event['hit_radius_bits'])
         geometries=[event for event in events if event['phase']=='geometry']
         self.assertEqual(len(geometries),60)
+        selected_line=next(line for line in result.stdout.splitlines() if '"source_cursor":5239' in line)
+        serialized_sizes=_serialized_event_sizes(selected_line)
+        max_serialized_bytes=max(serialized_sizes)
+        _retain_reducer_evidence('actual-helper-complete-76-max-row-bytes',
+            f'max_serialized_event_bytes={max_serialized_bytes}\nrow_capacity_bytes=2048\n', '')
+        self.assertEqual(len(serialized_sizes),76)
+        self.assertLess(max_serialized_bytes,2048)
         self.assertEqual([(event['hit_index'],event['hurt_index']) for event in geometries],
             [(hit,hurt) for hit in range(4) for hurt in range(15)])
         self.assertTrue(all(event['result']==0 for event in geometries))
@@ -345,8 +401,13 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
                 self.assertTrue(all(re.fullmatch(r'[0-9a-f]{8}',value) for value in event[field]))
             self.assertEqual(event['arguments'],['3f800000','3f800000','80000000'])
             self.assertEqual(event['matrix_bits'],['00000000']*12)
-            self.assertEqual(event['geometry_after'],['3f800000','00000000','00000000','00000000',
-                '40000000','00000000','40000000','40400000','40400000','40000000'])
+            hurt=event['hurt_index']
+            self.assertEqual(event['hurt_bone_idx'],hurt)
+            self.assertEqual(event['geometry_after'],[
+                struct.pack('>f',float(100+hurt)).hex(),
+                '00000000','00000000',
+                struct.pack('>f',float(101+hurt)).hex(),
+                '00000000','00000000','00000000','00000000','00000000','00000000'])
         self.assertEqual((geometries[-1]['hit_index'],geometries[-1]['hurt_index']),(3,14))
         self.assertRegex(result.stderr,r'geometry_calls=60 rows=76 enabled_state_hash=([0-9a-f]{16}) selector_off_state_hash=\1')
         validation=subprocess.run(['node','--input-type=module','-e',
@@ -372,6 +433,73 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
             cwd=ROOT,input=json.dumps(rows),capture_output=True,text=True)
         _retain_reducer_evidence('candidate-header-bound-controls',header_checks.stdout,header_checks.stderr)
         self.assertEqual(header_checks.returncode,0,header_checks.stderr)
+
+    def test_actual_inner_aabb_reject_observer_selector_controls(self):
+        observed=self.run_reducer_binary(self.candidate_binary,'aabb_reject',
+            'actual-inner-aabb-reject-observer')
+        uninstrumented=self.run_reducer_binary(self.no_observer_binary,'aabb_reject',
+            'actual-inner-aabb-reject-no-observer')
+        self.assertEqual(observed.returncode,0,observed.stderr)
+        self.assertEqual(uninstrumented.returncode,0,uninstrumented.stderr)
+        self.assertEqual(uninstrumented.stdout,'')
+        rows=[json.loads(line) for line in observed.stdout.splitlines()]
+        self.assertEqual([row['source_cursor'] for row in rows],[5238,5239,5240])
+        geometry=next(event for event in rows[1]['events'] if event['phase']=='geometry')
+        self.assertEqual(geometry['result'],0)
+        self.assertEqual(geometry['hurt_bone_idx'],0)
+        self.assertEqual(geometry['inner_call_count'],1)
+        self.assertTrue(geometry['inner_matrix_present'])
+        self.assertEqual(geometry['inner_matrix_bits'],[
+            '3f800000','00000000','00000000','00000000',
+            '00000000','3f800000','00000000','00000000',
+            '00000000','00000000','3f800000','00000000'])
+        self.assertEqual(geometry['inner_effective_arguments_bits'],
+            ['40000000','40400000','40400000'])
+        control=re.compile(
+            r'SOURCE_OBSERVATION_CONTROL result=0 log0=0 log1=0 calls=3 ordered=3 '
+            r'geometry_calls=1 matrix_getters=1 matrix_concats=0 inverse_calls=0 vector_calls=0 '
+            r'selector_off_state_hash=([0-9a-f]{16}) selected_state_hash=([0-9a-f]{16}) '
+            r'exact_state_writes=1')
+        observed_control=control.search(observed.stderr)
+        plain_control=control.search(uninstrumented.stderr)
+        self.assertIsNotNone(observed_control,observed.stderr)
+        self.assertIsNotNone(plain_control,uninstrumented.stderr)
+        self.assertEqual(observed_control.groups()[0],observed_control.groups()[1])
+        self.assertEqual(plain_control.groups()[0],plain_control.groups()[1])
+        self.assertEqual(observed_control.groups()[0],plain_control.groups()[0])
+        call_order='SOURCE_OBSERVATION_CALL_ORDER 5,1,3'
+        self.assertIn(call_order,observed.stderr)
+        self.assertIn(call_order,uninstrumented.stderr)
+    def test_actual_inner_remaining_observer_selector_controls(self):
+        for mode in ('zero_distance','nonzero_distance','cache','intangible','mode','matrix'):
+            with self.subTest(mode=mode):
+                observed=self.run_reducer_binary(self.candidate_binary,mode,
+                    'actual-inner-'+mode+'-observer')
+                uninstrumented=self.run_reducer_binary(self.no_observer_binary,mode,
+                    'actual-inner-'+mode+'-no-observer')
+                for result in (observed,uninstrumented):
+                    self.assertEqual(result.returncode,0,result.stderr)
+                    self.assertIn('exact_state_writes=1',result.stderr)
+                    hashes=re.search(r'selector_off_state_hash=([0-9a-f]{16}) '
+                        r'selected_state_hash=([0-9a-f]{16})',result.stderr)
+                    self.assertIsNotNone(hashes,result.stderr)
+                    self.assertEqual(hashes.group(1),hashes.group(2))
+                self.assertEqual(uninstrumented.stdout,'')
+                # The fixture asserts all Fighter/log writes, RNG and service
+                # counts/order exactly; compare its complete diagnostics across binaries.
+                self.assertEqual(observed.stderr,uninstrumented.stderr)
+                rows=[json.loads(line) for line in observed.stdout.splitlines()]
+                validated=subprocess.run(['node','--input-type=module','-e',
+                    "import {parseHitTransitionProbe,validateHitTransitionProbeRows} from './scripts/rng_draw_probe.mjs';"
+                    "let t='';for await(const c of process.stdin)t+=c;"
+                    "if(!validateHitTransitionProbeRows(JSON.parse(t).map(JSON.stringify),"
+                    "parseHitTransitionProbe('5238,5239,5240'),{observedCursor:5240}).complete)"
+                    "throw Error('incomplete actual inner control');"],
+                    cwd=ROOT,input=json.dumps(rows),capture_output=True,text=True)
+                _retain_reducer_evidence('actual-inner-'+mode+'-validation',
+                    validated.stdout,validated.stderr)
+                self.assertEqual(validated.returncode,0,validated.stderr)
+
     def test_authored_candidate_row_77_overflows_at_76_and_retains_all_rows(self):
         result=self.run_reducer_binary(self.candidate_binary,'candidate_overflow','actual-helper-row77-overflow')
         self.assertNotEqual(result.returncode,0,result.stderr)
@@ -470,27 +598,97 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
         self.assertEqual([(event['hit_index'],event['result']) for event in returns],
             [(0,0),(1,0),(2,0),(3,1)])
     def test_actual_candidate_branches_and_state_equivalence(self):
-        for mode in ('normal','phantom','zero','wrong_pair','intangible','cache','mode','matrix','two_geometry','hurt15','zero_overlap','hit_disabled','catch','flag_zero','air_miss','grab_blocked','eligibility_blocked','phantom_existing','phantom_busy','phantom_invulnerable','normal_invulnerable','normal_armored'):
+        for mode in ('normal','phantom','zero','wrong_pair','intangible','cache','mode','matrix','two_geometry','hurt15','zero_overlap','aabb_reject','zero_distance','nonzero_distance','hit_disabled','catch','flag_zero','air_miss','grab_blocked','eligibility_blocked','phantom_existing','phantom_busy','phantom_invulnerable','normal_invulnerable','normal_armored'):
             with self.subTest(mode=mode):self.candidate_mode(mode)
+
+    def test_version2_records_actual_inner_call_and_explicit_outer_skips(self):
+        for mode in ('aabb_reject','zero_distance','nonzero_distance','cache','matrix'):
+            with self.subTest(mode=mode):
+                row=self.candidate_mode(mode)
+                geometry=next(event for event in row['events'] if event['phase']=='geometry')
+                self.assertEqual(geometry['inner_call_count'],1)
+                self.assertIsNone(geometry['inner_skip_reason'])
+                self.assertEqual(len(geometry['inner_endpoints_bits']),12)
+                self.assertEqual(len(geometry['inner_effective_arguments_bits']),3)
+                self.assertTrue(geometry['inner_matrix_present'])
+                self.assertEqual(len(geometry['inner_matrix_bits']),12)
+                diagnostic=(self.scratch/('candidate-'+mode+'.stderr')).read_text()
+                if mode in ('aabb_reject','zero_distance'):
+                    self.assertIn('inverse_calls=0 vector_calls=0',diagnostic)
+                if mode=='nonzero_distance':
+                    self.assertIn('inverse_calls=1 vector_calls=2',diagnostic)
+                if mode=='cache':self.assertTrue(geometry['cache_before'])
+        for mode,reason in (('intangible','intangible'),('mode','mode_nonzero')):
+            with self.subTest(skip=mode):
+                row=self.candidate_mode(mode)
+                geometry=next(event for event in row['events'] if event['phase']=='geometry')
+                self.assertEqual(geometry['inner_call_count'],0)
+                self.assertEqual(geometry['inner_skip_reason'],reason)
+                self.assertIsNone(geometry['inner_endpoints_bits'])
+                self.assertFalse(geometry['inner_matrix_present'])
+
+    def test_version2_inner_fields_reject_corrupted_artifacts(self):
+        self.candidate_mode('normal')
+        rows=[json.loads(line) for line in
+            (self.scratch/'candidate-normal.stdout').read_text().splitlines()]
+        result=subprocess.run(['node','--input-type=module','-e',
+            "import {parseHitTransitionProbe,validateHitTransitionProbeRows} from './scripts/rng_draw_probe.mjs';"
+            "let t='';for await(const c of process.stdin)t+=c;const base=JSON.parse(t);"
+            "const selection=parseHitTransitionProbe('5238,5239,5240');"
+            "const validate=r=>validateHitTransitionProbeRows(r.map(JSON.stringify),selection,{observedCursor:5240});"
+            "if(!validate(base).complete)throw Error('valid v2 actual rows rejected');"
+            "const changes=[r=>r.events.find(e=>e.phase==='geometry').inner_call_count=2,"
+            "r=>r.events.find(e=>e.phase==='geometry').inner_endpoints_bits.pop(),"
+            "r=>r.events.find(e=>e.phase==='geometry').hurt_bone_present=false,"
+            "r=>r.events.find(e=>e.phase==='geometry').inner_matrix_present=false,"
+            "r=>r.events.find(e=>e.phase==='geometry').hurt_bone_idx=2147483648];"
+            "for(const change of changes){const r=structuredClone(base);const before=JSON.stringify(r);change(r[1]);"
+            "if(JSON.stringify(r)===before)throw Error('corruption mutation did not change the actual row');let failed=false;"
+            "try{validate(r);}catch{failed=true;}"
+            "if(!failed)throw Error('corrupted v2 geometry artifact accepted');}"],
+            cwd=ROOT,input=json.dumps(rows),capture_output=True,text=True)
+        _retain_reducer_evidence('v2-corrupted-artifact-validation',result.stdout,result.stderr)
+        (self.scratch/'v2-corrupted-artifact-validation.log').write_text(result.stdout+result.stderr)
+        self.assertEqual(result.returncode,0,result.stderr)
+
+    def test_actual_inner_hook_missing_or_duplicate_fails_closed(self):
+        for binary,label in ((self.missing_inner_binary,'actual-helper-inner-hook-missing'),
+                             (self.duplicate_inner_binary,'actual-helper-inner-hook-duplicate')):
+            with self.subTest(label=label):
+                result=self.run_reducer_binary(binary,'normal',label)
+                self.assertEqual(result.returncode,-signal.SIGABRT,result.stderr)
+                rows=[json.loads(line) for line in result.stdout.splitlines()]
+                self.assertEqual([row['source_cursor'] for row in rows],[5238])
+                self.assertFalse(rows[0]['overflowed'])
+                self.assertEqual([event['phase'] for event in rows[0]['events']],
+                    ['scheduler_start','scheduler_return'])
+
     def test_candidate_completion_and_authored_bounds_fail_closed(self):
         for mode in ('hurt16','gap','missing_pair','missing_pass','missing_geometry','duplicate_geometry','duplicate_pair','duplicate_pair_return','overflow'):
             with self.subTest(mode=mode):self.candidate_mode(mode,False)
 
     def test_actual_rows_reject_corrupted_candidate_artifacts(self):
-        row=self.candidate_mode('normal')
-        # Actual C output is retained as the base; only one artifact field is corrupted per control.
+        self.candidate_mode('normal')
+        rows=[json.loads(line) for line in
+            (self.scratch/'candidate-normal.stdout').read_text().splitlines()]
+        # Accept the complete actual C output before corrupting one selected artifact field.
         result=subprocess.run(['node','--input-type=module','-e',
-            "import {validateHitTransitionProbeRows} from './scripts/rng_draw_probe.mjs';"
+            "import {parseHitTransitionProbe,validateHitTransitionProbeRows} from './scripts/rng_draw_probe.mjs';"
             "let t='';for await(const c of process.stdin)t+=c;const base=JSON.parse(t);"
+            "const selection=parseHitTransitionProbe('5238,5239,5240');"
+            "const validate=r=>validateHitTransitionProbeRows(r.map(JSON.stringify),selection,{observedCursor:5240});"
+            "if(!validate(base).complete)throw Error('valid actual candidate rows rejected');"
             "const changes=[r=>r.events.find(e=>e.phase==='pair_entry').hurt_length=16,"
             "r=>r.events.find(e=>e.phase==='geometry').geometry_before.pop(),"
             "r=>r.events.find(e=>e.phase==='producer_branch').branch=5,"
             "r=>r.events=r.events.filter(e=>e.phase!=='pair_return'),"
             "r=>r.candidate_pairs++];"
-            "for(const change of changes){const r=structuredClone(base);change(r);let failed=false;"
-            "try{validateHitTransitionProbeRows([JSON.stringify(r)],{selected:[5239]},{observedCursor:5239});}catch{failed=true;}"
+            "for(const change of changes){const r=structuredClone(base);const before=JSON.stringify(r);change(r[1]);"
+            "if(JSON.stringify(r)===before)throw Error('corruption mutation did not change the actual row');let failed=false;"
+            "try{validate(r);}catch{failed=true;}"
             "if(!failed)throw Error('corrupted artifact accepted');}"],
-            cwd=ROOT,input=json.dumps(row),capture_output=True,text=True)
+            cwd=ROOT,input=json.dumps(rows),capture_output=True,text=True)
+        _retain_reducer_evidence('corrupted-artifact-validation',result.stdout,result.stderr)
         (self.scratch/'corrupted-artifact-validation.log').write_text(result.stdout+result.stderr)
         self.assertEqual(result.returncode,0,result.stderr)
 

@@ -7687,6 +7687,15 @@ index 0e13b1ace9287b34f1cc7f7abdb2540b54ac8267..db615663fd06cf59f2d9a55e9460bb2b
  
  /* 006E58 */ static bool
  lbColl_80006E58(Vec3* hit_start, Vec3* hit_end, Vec3* hurt_start,
+@@ -1162,4 +1162,8 @@
+     float hurt_start_y;
+     float hurt_start_z;
+     PAD_STACK(4);
++#ifdef MELEE_WEB_RNG_DRAW_OBSERVER
++    melee_web_hit_probe_geometry_inner(hit_start, hit_end, hurt_start, hurt_end,
++        hurt_mtx, hit_radius, hurt_radius, broadphase_scale);
++#endif
+     // Fast reject when the expanded hit segment AABB misses both hurt
 @@ -1479,6 +1486,7 @@ void lbColl_800077A0(Vec3* a, MtxPtr arg1, Vec3* b, Vec3* c, Vec3* d, Vec3* e,
      Vec3 normalize_e;
      Vec3 normal_x;

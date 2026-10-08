@@ -100,6 +100,7 @@ export function validateHitTransitionProbeRows(textRows, selection,
     throw Error('Invalid hit transition request or cursor-row bound');
   const seen = new Set();
   let previousCursor = -1;
+  let captureVersion = null;
   const pointer = value => typeof value === 'string' && /^[0-9a-f]{16}$/.test(value);
   const uint = value => Number.isInteger(value) && value >= 0 && value <= 0xffffffff;
   const sint = value => Number.isInteger(value) && value >= -0x80000000 && value <= 0x7fffffff;
@@ -113,13 +114,15 @@ export function validateHitTransitionProbeRows(textRows, selection,
     const candidateEnabled = Boolean(row && typeof row === 'object' && Object.hasOwn(row,'candidate_enabled'));
     const candidateHeaderValid = candidateEnabled && row.source_cursor === 5239 && row.candidate_enabled === true &&
       uint(row.candidate_passes) && row.candidate_passes > 0 && uint(row.candidate_pairs);
-    if (!row || row.schema !== 'melee-web-hit-transition-probe' || row.version !== 1 ||
+    if (!row || row.schema !== 'melee-web-hit-transition-probe' ||
+        ![1,2].includes(row.version) || (captureVersion !== null && row.version !== captureVersion) ||
         !selection.selected.includes(row.source_cursor) || seen.has(row.source_cursor) ||
         row.source_cursor <= previousCursor || row.overflowed !== false ||
         !Array.isArray(row.events) || row.events.length < 2 ||
         row.events.length > (candidateHeaderValid ? MAX_CANDIDATE_HIT_TRANSITION_ROWS : MAX_HIT_TRANSITION_ROWS) ||
         !Array.isArray(row.hook_counts) || row.hook_counts.length !== 3 ||
-        !row.hook_counts.every(uint)) throw Error('Invalid hit transition row identity or bound');
+        !row.hook_counts.every(uint)) throw Error('Invalid hit transition row identity, version, or bound');
+    if(captureVersion===null)captureVersion=row.version;
     seen.add(row.source_cursor); previousCursor = row.source_cursor;
     const counts = [0,0,0], stack = [], pending = new Map();
     let ordinal = 0, passOrdinal = 0, pairOrdinal = 0, geometryOrdinal = 0, producerOrdinal = 0;
@@ -191,6 +194,33 @@ export function validateHitTransitionProbeRows(textRows, selection,
                 typeof event.matrix_present !== 'boolean' || !candidateBits(event.geometry_before,18) ||
                 !candidateBits(event.geometry_after,10) || !candidateBits(event.arguments,3) ||
                 !candidateBits(event.matrix_bits,12)) throw Error('Invalid actual geometry completion');
+            if(row.version===2) {
+              const bonePointer=event.hurt_bone_pointer;
+              if(!Number.isInteger(event.hurt_index)||!sint(event.outer_hurt_state) ||
+                 typeof event.hit_radius_direct!=='boolean' ||
+                 typeof event.hurt_bone_present!=='boolean' || !sint(event.hurt_bone_idx) ||
+                 !pointer(bonePointer) ||
+                 event.hurt_bone_present!==(bonePointer!=='0000000000000000') ||
+                 !candidateBits(event.outer_offsets_bits,6) ||
+                 ![0,1].includes(event.inner_call_count) ||
+                 typeof event.inner_matrix_present!=='boolean')
+                throw Error('Invalid version-2 outer geometry identity');
+              if(event.inner_call_count===1) {
+                if(event.inner_skip_reason!==null || event.mode!==0 || event.outer_hurt_state===2 ||
+                   !candidateBits(event.inner_endpoints_bits,12) ||
+                   !candidateBits(event.inner_effective_arguments_bits,3) ||
+                   (event.inner_matrix_present ? !candidateBits(event.inner_matrix_bits,12) :
+                     event.inner_matrix_bits!==null))
+                  throw Error('Invalid version-2 actual inner-helper input');
+              } else {
+                const expectedSkip=event.outer_hurt_state===2?'intangible':
+                  event.mode!==0?'mode_nonzero':null;
+                if(expectedSkip===null || event.inner_skip_reason!==expectedSkip ||
+                   event.inner_endpoints_bits!==null || event.inner_matrix_present!==false ||
+                   event.inner_matrix_bits!==null || event.inner_effective_arguments_bits!==null)
+                  throw Error('Unexplained version-2 inner-helper omission');
+              }
+            }
             candidatePair.geometry = {result:event.result,hit:event.hit_index,hurt:event.hurt_index,consumed:false};
           } else if (event.phase === 'producer_entry') {
             const geometry = candidatePair.geometry;
