@@ -200,6 +200,11 @@ int melee_web_stadium_c1_stage_info_current_view(
     return 1;
 }
 
+void* melee_web_stadium_c1_stage_info_x6A4_root(void)
+{
+    return stage_info.x6A4;
+}
+
 int melee_web_stadium_c1_stage_info_snapshot_restore(
     MeleeWebStadiumC1StageInfoSnapshot* snapshot, char* error,
     size_t error_size)

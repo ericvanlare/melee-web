@@ -71,7 +71,6 @@ extern "C" {
 #include <melee/mn/mnmain.h>
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include <melee/gr/grdatfiles.h>
-#include <melee/gr/ground.h>
 #include <melee/gr/stage.h>
 #include <melee/mp/mpisland.h>
 #include <melee/ef/eflib.h>
@@ -3095,7 +3094,8 @@ c1_heap_graph_current_roots()
          C1HeapGraphNodeKind::island_segment},
         {"island.x20", reinterpret_cast<uintptr_t>(mpIsland_80458E88.x20),
          C1HeapGraphNodeKind::island_segment},
-        {"stage_info.x6A4", reinterpret_cast<uintptr_t>(stage_info.x6A4),
+        {"stage_info.x6A4", reinterpret_cast<uintptr_t>(
+             melee_web_stadium_c1_stage_info_x6A4_root()),
          C1HeapGraphNodeKind::ground_start_callback},
     }};
 }

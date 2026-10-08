@@ -141,6 +141,9 @@ int melee_web_stadium_c1_stage_info_snapshot_view(
     MeleeWebStadiumC1StageInfoView* view);
 int melee_web_stadium_c1_stage_info_current_view(
     MeleeWebStadiumC1StageInfoView* view);
+/* Read the authored Ground start-callback root while keeping StageInfo's C-only
+ * layout inside this probe translation unit. */
+void* melee_web_stadium_c1_stage_info_x6A4_root(void);
 int melee_web_stadium_c1_stage_info_snapshot_restore(
     MeleeWebStadiumC1StageInfoSnapshot* snapshot, char* error,
     size_t error_size);
