@@ -4,6 +4,8 @@ const MAX_REPLAY_FRAMES = 108000;
 const MAX_SELECTED_CURSORS = 9;
 const MAX_DRAWS_PER_CURSOR = 1024;
 const SEED = /^[0-9a-f]{8}$/;
+const MAX_HIT_TRANSITION_ROWS = 64;
+const MAX_CANDIDATE_HIT_TRANSITION_ROWS = 76;
 
 function decimal(value, name) {
   if (!/^(0|[1-9][0-9]*)$/.test(value))
@@ -108,17 +110,20 @@ export function validateHitTransitionProbeRows(textRows, selection,
   for (const text of textRows) {
     let row;
     try { row = JSON.parse(text); } catch { throw Error('Invalid hit transition JSON'); }
+    const candidateEnabled = Boolean(row && typeof row === 'object' && Object.hasOwn(row,'candidate_enabled'));
+    const candidateHeaderValid = candidateEnabled && row.source_cursor === 5239 && row.candidate_enabled === true &&
+      uint(row.candidate_passes) && uint(row.candidate_pairs);
     if (!row || row.schema !== 'melee-web-hit-transition-probe' || row.version !== 1 ||
         !selection.selected.includes(row.source_cursor) || seen.has(row.source_cursor) ||
         row.source_cursor <= previousCursor || row.overflowed !== false ||
-        !Array.isArray(row.events) || row.events.length < 2 || row.events.length > 64 ||
+        !Array.isArray(row.events) || row.events.length < 2 ||
+        row.events.length > (candidateHeaderValid ? MAX_CANDIDATE_HIT_TRANSITION_ROWS : MAX_HIT_TRANSITION_ROWS) ||
         !Array.isArray(row.hook_counts) || row.hook_counts.length !== 3 ||
         !row.hook_counts.every(uint)) throw Error('Invalid hit transition row identity or bound');
     seen.add(row.source_cursor); previousCursor = row.source_cursor;
     const counts = [0,0,0], stack = [], pending = new Map();
     let ordinal = 0, passOrdinal = 0, pairOrdinal = 0, geometryOrdinal = 0, producerOrdinal = 0;
     let candidatePass = null, candidatePair = null, candidateProducer = null, expectedPasses = 0;
-    const candidateEnabled = Object.hasOwn(row,'candidate_enabled');
     if (candidateEnabled && (row.source_cursor !== 5239 || row.candidate_enabled !== true ||
         !uint(row.candidate_passes) || !uint(row.candidate_pairs)))
       throw Error('Invalid selected candidate protocol summary');

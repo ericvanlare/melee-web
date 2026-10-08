@@ -15,16 +15,19 @@
 #endif
 
 #ifdef MELEE_WEB_RNG_DRAW_OBSERVER
-#define HIT_PROBE_ROWS 64 /* Diagnostic storage limit, never a source table bound. */
+#define HIT_PROBE_ROWS 76 /* Scoped candidate-cursor diagnostic capacity, not a source bound. */
+#define HIT_PROBE_LEGACY_ROWS 64
+#define HIT_PROBE_INVOCATIONS 64
 #define HIT_PROBE_ROW_BYTES 2048
 static char rows[HIT_PROBE_ROWS][HIT_PROBE_ROW_BYTES];
 static char line[HIT_PROBE_ROWS * HIT_PROBE_ROW_BYTES + 512];
 static size_t cursor, count;
 static unsigned invocations, calls[3];
-static unsigned open_invocations[HIT_PROBE_ROWS], invocation_kind[HIT_PROBE_ROWS];
-static unsigned invocation_logs[HIT_PROBE_ROWS], invocation_log_count[HIT_PROBE_ROWS];
+static unsigned open_invocations[HIT_PROBE_INVOCATIONS], invocation_kind[HIT_PROBE_INVOCATIONS];
+static unsigned invocation_logs[HIT_PROBE_INVOCATIONS], invocation_log_count[HIT_PROBE_INVOCATIONS];
 static int active;
-static unsigned stack[HIT_PROBE_ROWS], depth;
+static unsigned stack[HIT_PROBE_INVOCATIONS], depth;
+static int candidate_enabled;
 static HSD_GObj* victim;
 static uint32_t match_index, generation;
 static unsigned passes, pairs, geometries, producers;
@@ -115,11 +118,15 @@ static void retain_overflow(void)
     put(line,sizeof(line),&used,"]}");
     emit_line();
 }
+static size_t row_capacity(void)
+{
+    return cursor==5239 && candidate_enabled ? HIT_PROBE_ROWS : HIT_PROBE_LEGACY_ROWS;
+}
 static char* start(const char* phase, unsigned kind, unsigned invocation, size_t* used)
 {
-    if(count == HIT_PROBE_ROWS) {
+    if(count == row_capacity()) {
         retain_overflow();
-        fprintf(stderr,"HIT_TRANSITION_PROBE diagnostic 64-row overflow\n");
+        fprintf(stderr,"HIT_TRANSITION_PROBE diagnostic %zu-row overflow\n",row_capacity());
         abort();
     }
     if(!seed_ptr) abort();
@@ -156,6 +163,7 @@ void melee_web_hit_probe_cursor(size_t index)
     if(active) abort();
     cursor=index;
     active=0;
+    candidate_enabled=0;
 #ifdef MELEE_WEB_HIT_PROBE_SYNTHETIC
     extern int melee_web_hit_probe_test_selected(size_t);
     active=melee_web_hit_probe_test_selected(index);
@@ -184,7 +192,7 @@ unsigned melee_web_hit_probe_begin(HSD_GObj* gobj,unsigned kind,int requested,
 {
     if(!active||!identity(gobj,0))return 0;
     if(kind>2 || (kind==1 && (log_count>20 || (log_kind!=0 && log_kind!=1))) ||
-       invocations==HIT_PROBE_ROWS)abort();
+       invocations==HIT_PROBE_INVOCATIONS || depth==HIT_PROBE_INVOCATIONS)abort();
     unsigned id=++invocations;
     stack[depth++]=id;
     open_invocations[id-1]=1;invocation_kind[id-1]=kind;
@@ -253,6 +261,7 @@ unsigned melee_web_hit_probe_pass_begin(HSD_GObj* receiver)
 {
     if(!active||cursor!=5239||!identity(receiver,0))return 0;
     if(pass_open||pair_open||geometry_open||producer_open)abort();
+    candidate_enabled=1;
     pass_open=++passes;hit_index=hurt_index=-1;
     size_t used;char* row=candidate_row("pass_entry",pass_open,&used);
     put(row,HIT_PROBE_ROW_BYTES,&used,"}");return pass_open;
@@ -398,7 +407,7 @@ void melee_web_hit_probe_scheduler_return(void)
         cursor,calls[0],calls[1],calls[2]);
     for(size_t i=0;i<count;++i)put(line,sizeof(line),&used,"%s%s",i?",":"",rows[i]);
     put(line,sizeof(line),&used,"]");
-    if(cursor==5239)put(line,sizeof(line),&used,",\"candidate_enabled\":true,\"candidate_passes\":%u,\"candidate_pairs\":%u",passes,pairs);
+    if(candidate_enabled)put(line,sizeof(line),&used,",\"candidate_enabled\":true,\"candidate_passes\":%u,\"candidate_pairs\":%u",passes,pairs);
     put(line,sizeof(line),&used,"}");
     emit_line();
     active=0;

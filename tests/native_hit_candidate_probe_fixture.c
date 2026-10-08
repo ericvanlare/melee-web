@@ -20,7 +20,14 @@ StaticPlayer* Player_GetPtrForSlot(unsigned slot){return slot<4?&test_players[sl
 int Player_GetPlayerSlotType(unsigned slot){return slot<4?Gm_PKind_Cpu:Gm_PKind_NA;}
 int melee_web_hit_probe_test_selected(size_t cursor){return selected&&cursor>=5238&&cursor<=5240;}
 void melee_web_hit_probe_test_emit(const char* text)
-{puts(text);if(strstr(text,"\"overflowed\":true"))fprintf(stderr,"ACTUAL_HELPER_CONTROL attempted_geometry_calls=%d retained_records=64\n",service_calls[3]);}
+{
+ puts(text);
+ if(strstr(text,"\"overflowed\":true")){
+  unsigned records=0;const char* row=strstr(text,"\"sequence\":");
+  while(row){++records;row=strstr(row+1,"\"sequence\":");}
+  fprintf(stderr,"ACTUAL_HELPER_CONTROL attempted_geometry_calls=%d retained_records=%u\n",service_calls[3],records);
+ }
+}
 void test_tracker_init(void);
 static void called(int id){assert(order_count<1024);service_calls[id]++;service_order[order_count++]=id;}
 
@@ -288,7 +295,8 @@ static uint64_t fixture_state_hash(void)
 static int exercise_authored(const char* mode)
 {
  Fighter* attacker=&test_fighters[0];Fighter* receiver=&test_fighters[1];
- receiver->hurt_capsules_len=15;overlap_result=!strcmp(mode,"authored_off")||!strcmp(mode,"authored_overflow")||!strcmp(mode,"count_all_false")?0:1;
+ receiver->hurt_capsules_len=15;overlap_result=!strcmp(mode,"authored_off")||!strcmp(mode,"authored_complete")||
+  !strcmp(mode,"candidate_overflow")||!strcmp(mode,"count_all_false")?0:1;
  for(unsigned i=0;i<4;i++){
   HitCapsule* hit=&attacker->x914[i];
   int phantom=!strcmp(mode,"count_phantom")||(!strcmp(mode,"count_mixed")&&i<3);
@@ -322,7 +330,12 @@ static int exercise_authored(const char* mode)
   }
   melee_web_hit_probe_end(&test_entities[1],consumer);
  }
- melee_web_hit_probe_end(&test_entities[1],owner);melee_web_hit_probe_scheduler_return();return 0;
+ melee_web_hit_probe_end(&test_entities[1],owner);
+ if(!strcmp(mode,"candidate_overflow")){
+  unsigned extra=melee_web_hit_probe_begin(&test_entities[1],0,0,0,0,0,0,0,0);
+  melee_web_hit_probe_end(&test_entities[1],extra);
+ }
+ melee_web_hit_probe_scheduler_return();return 0;
 }
 static int run_authored_off(void)
 {
@@ -331,10 +344,34 @@ static int run_authored_off(void)
  fprintf(stderr,"AUTHORED_SELECTOR_OFF geometry_calls=%d emitted_rows=0 state_hash=%016llx\n",
   service_calls[3],(unsigned long long)fixture_state_hash());return 0;
 }
-static int run_authored_overflow(void)
+static int run_authored_complete(void)
 {
- reset();selected=1;melee_web_hit_probe_cursor(5239);exercise_authored("authored_overflow");
- return 0; /* Reaching here means the actual 64-row control failed to overflow. */
+ reset();selected=0;melee_web_hit_probe_cursor(5238);melee_web_hit_probe_scheduler_return();
+ melee_web_hit_probe_cursor(5239);exercise_authored("authored_complete");
+ melee_web_hit_probe_cursor(5240);melee_web_hit_probe_scheduler_return();
+ uint64_t disabled_hash=fixture_state_hash();
+ reset();selected=1;melee_web_hit_probe_cursor(5238);melee_web_hit_probe_scheduler_return();
+ melee_web_hit_probe_cursor(5239);exercise_authored("authored_complete");
+ melee_web_hit_probe_cursor(5240);melee_web_hit_probe_scheduler_return();
+ uint64_t enabled_hash=fixture_state_hash();
+ if(disabled_hash!=enabled_hash||service_calls[3]!=60)abort();
+ fprintf(stderr,"AUTHORED_CANDIDATE_COMPLETE geometry_calls=%d rows=76 enabled_state_hash=%016llx selector_off_state_hash=%016llx\n",
+  service_calls[3],(unsigned long long)enabled_hash,(unsigned long long)disabled_hash);return 0;
+}
+static int run_authored_candidate_overflow(void)
+{
+ reset();selected=1;melee_web_hit_probe_cursor(5239);exercise_authored("candidate_overflow");
+ return 0; /* Reaching here means the actual 76-row control failed to overflow. */
+}
+static int run_candidate_header_missing_overflow(void)
+{
+ reset();selected=1;melee_web_hit_probe_cursor(5239);
+ for(unsigned i=0;i<32;i++){
+  unsigned id=melee_web_hit_probe_begin(&test_entities[1],0,0,0,0,0,0,0,0);
+  melee_web_hit_probe_end(&test_entities[1],id);
+ }
+ melee_web_hit_probe_scheduler_return();
+ return 0; /* Reaching here means a cursor without a candidate pass got 76 rows. */
 }
 #ifdef MELEE_WEB_HIT_PROBE_COUNTING_ADAPTER
 static int run_counting_adapter(const char* mode)
@@ -410,7 +447,9 @@ int main(int argc,char** argv)
 {
  if(argc!=2)return 2;
  if(!strcmp(argv[1],"authored_off"))return run_authored_off();
- if(!strcmp(argv[1],"authored_overflow"))return run_authored_overflow();
+ if(!strcmp(argv[1],"authored_complete"))return run_authored_complete();
+ if(!strcmp(argv[1],"candidate_overflow"))return run_authored_candidate_overflow();
+ if(!strcmp(argv[1],"candidate_header_missing_overflow"))return run_candidate_header_missing_overflow();
 #ifdef MELEE_WEB_HIT_PROBE_COUNTING_ADAPTER
  if(!strcmp(argv[1],"count_all_false")||!strcmp(argv[1],"count_phantom")||!strcmp(argv[1],"count_mixed"))
   return run_counting_adapter(argv[1]);

@@ -100,12 +100,21 @@ class HitTransitionProbeTest(unittest.TestCase):
         result=subprocess.run([str(self.binary),mode],capture_output=True,text=True)
         (self.scratch/(mode+".stdout")).write_text(result.stdout)
         (self.scratch/(mode+".stderr")).write_text(result.stderr)
+        if mode=="overflow":
+            _retain_reducer_evidence("legacy-64-overflow",result.stdout,result.stderr)
         if valid:
             if result.returncode: self.__class__.failed=True
             self.assertEqual(result.returncode,0,result.stderr)
             return [json.loads(line) for line in result.stdout.splitlines()]
         if result.returncode==0:self.__class__.failed=True
         self.assertNotEqual(result.returncode,0)
+        if mode=="overflow":
+            row=json.loads(result.stdout.splitlines()[-1])
+            self.assertEqual(row["source_cursor"],5238)
+            self.assertTrue(row["overflowed"])
+            self.assertNotIn("candidate_enabled",row)
+            self.assertEqual(len(row["events"]),64)
+            self.assertEqual([event["sequence"] for event in row["events"]],list(range(64)))
     def test_zero_hooks_still_complete(self):
         rows=self.run_mode("zero")
         self.assertEqual([r["source_cursor"] for r in rows],[5238,5239,5240])
@@ -252,7 +261,7 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
             if mode=="overflow":
                 partial=json.loads(result.stdout.splitlines()[-1])
                 self.assertTrue(partial["overflowed"])
-                self.assertEqual(len(partial["events"]),64)
+                self.assertEqual(len(partial["events"]),76)
             return
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertIn('exact_state_writes=1',result.stderr)
@@ -283,32 +292,39 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
         self.assertIsNotNone(observed_hash,observed.stderr)
         self.assertIsNotNone(uninstrumented_hash,uninstrumented.stderr)
         self.assertEqual(observed_hash.group(1),uninstrumented_hash.group(1))
-    def test_authored_four_by_fifteen_reproduces_actual_helper_overflow(self):
-        result=self.run_reducer_binary(self.candidate_binary,'authored_overflow','actual-helper-overflow')
-        self.assertNotEqual(result.returncode,0,result.stderr)
-        self.assertIn('attempted_geometry_calls=57 retained_records=64',result.stderr)
-        self.assertEqual(len(result.stdout.splitlines()),1)
-        row=json.loads(result.stdout.splitlines()[0])
+    def test_authored_four_by_fifteen_completes_and_validates_all_76_rows(self):
+        result=self.run_reducer_binary(self.candidate_binary,'authored_complete','actual-helper-complete-76')
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(len(result.stdout.splitlines()),3)
+        rows=[json.loads(line) for line in result.stdout.splitlines()]
+        self.assertEqual([row['source_cursor'] for row in rows],[5238,5239,5240])
+        for legacy in (rows[0],rows[2]):
+            self.assertNotIn('candidate_enabled',legacy)
+            self.assertEqual(len(legacy['events']),2)
+        row=rows[1]
         self.assertEqual(row['source_cursor'],5239)
-        self.assertTrue(row['overflowed'])
-        self.assertEqual(row['hook_counts'],[1,0,0])
+        self.assertFalse(row['overflowed'])
+        self.assertEqual(row['candidate_enabled'],True)
+        self.assertEqual((row['candidate_passes'],row['candidate_pairs']),(1,1))
+        self.assertEqual(row['hook_counts'],[1,2,0])
         events=row['events']
-        self.assertEqual(len(events),64)
-        self.assertEqual([event['sequence'] for event in events],list(range(64)))
-        expected=[(hit,hurt) for hit in range(3) for hurt in range(15)]+[(3,hurt) for hurt in range(11)]
-        geometries=[event for event in events if event['phase']=='geometry']
-        self.assertEqual(len(geometries),56)
-        self.assertEqual([(event['hit_index'],event['hurt_index']) for event in geometries],expected)
+        self.assertEqual(len(events),76)
+        self.assertEqual([event['sequence'] for event in events],list(range(76)))
         expected_order=['scheduler_start','entry','pass_entry','pair_entry']
         for hit in range(4):
             expected_order.append('candidate')
-            expected_order.extend(['geometry']*(15 if hit<3 else 11))
+            expected_order.extend(['geometry']*15)
+        expected_order.extend(['pair_return','pass_return','entry','return','entry','return','return','scheduler_return'])
         self.assertEqual([event['phase'] for event in events],expected_order)
         self.assertEqual([event['hit_index'] for event in events if event['phase']=='candidate'],[0,1,2,3])
         for event in (event for event in events if event['phase']=='candidate'):
             self.assertEqual(len(event['hit_flags']),6)
             self.assertEqual(re.fullmatch(r'[0-9a-f]{8}',event['hit_damage_bits']).group(0),event['hit_damage_bits'])
             self.assertEqual(re.fullmatch(r'[0-9a-f]{8}',event['hit_radius_bits']).group(0),event['hit_radius_bits'])
+        geometries=[event for event in events if event['phase']=='geometry']
+        self.assertEqual(len(geometries),60)
+        self.assertEqual([(event['hit_index'],event['hurt_index']) for event in geometries],
+            [(hit,hurt) for hit in range(4) for hurt in range(15)])
         self.assertTrue(all(event['result']==0 for event in geometries))
         for event in geometries:
             self.assertEqual(len(event['geometry_before']),18)
@@ -317,7 +333,68 @@ typedef struct DmgLogEntry {int x0,kind;HSD_GObj* gobj;HitCapsule *hit0,*hit1;vo
             self.assertEqual(len(event['matrix_bits']),12)
             for field in ('geometry_before','geometry_after','arguments','matrix_bits'):
                 self.assertTrue(all(re.fullmatch(r'[0-9a-f]{8}',value) for value in event[field]))
-        self.assertEqual((geometries[-1]['hit_index'],geometries[-1]['hurt_index']),(3,10))
+            self.assertEqual(event['arguments'],['3f800000','3f800000','80000000'])
+            self.assertEqual(event['matrix_bits'],['00000000']*12)
+            self.assertEqual(event['geometry_after'],['3f800000','00000000','00000000','00000000',
+                '40000000','00000000','40000000','40400000','40400000','40000000'])
+        self.assertEqual((geometries[-1]['hit_index'],geometries[-1]['hurt_index']),(3,14))
+        self.assertRegex(result.stderr,r'geometry_calls=60 rows=76 enabled_state_hash=([0-9a-f]{16}) selector_off_state_hash=\1')
+        validation=subprocess.run(['node','--input-type=module','-e',
+            "import {parseHitTransitionProbe,validateHitTransitionProbeRows} from './scripts/rng_draw_probe.mjs';"
+            "let t='';for await(const c of process.stdin)t+=c;const rows=JSON.parse(t);"
+            "const selection=parseHitTransitionProbe('5238,5239,5240');"
+            "const result=validateHitTransitionProbeRows(rows.map(JSON.stringify),selection,{observedCursor:5240});"
+            "if(!result.complete)throw Error('76-row actual candidate artifact incomplete');"],
+            cwd=ROOT,input=json.dumps(rows),capture_output=True,text=True)
+        _retain_reducer_evidence('actual-helper-complete-76-validation',validation.stdout,validation.stderr)
+        self.assertEqual(validation.returncode,0,validation.stderr)
+        header_checks=subprocess.run(['node','--input-type=module','-e',
+            "import {parseHitTransitionProbe,validateHitTransitionProbeRows} from './scripts/rng_draw_probe.mjs';"
+            "let t='';for await(const c of process.stdin)t+=c;const rows=JSON.parse(t);"
+            "const selection=parseHitTransitionProbe('5238,5239,5240');"
+            "validateHitTransitionProbeRows(rows.map(JSON.stringify),selection,{observedCursor:5240});"
+            "const variants=[];const missing=structuredClone(rows);delete missing[1].candidate_enabled;"
+            "delete missing[1].candidate_passes;delete missing[1].candidate_pairs;variants.push(missing);"
+            "const bad=structuredClone(rows);bad[1].candidate_passes='1';variants.push(bad);"
+            "const legacy=structuredClone(rows);legacy[1].source_cursor=5240;variants.push(legacy);"
+            "for(const value of variants){let rejected=false;try{validateHitTransitionProbeRows(value.map(JSON.stringify),selection,{observedCursor:5240});}catch{rejected=true;}"
+            "if(!rejected)throw Error('76-row allowance accepted a missing or invalid candidate header');}"],
+            cwd=ROOT,input=json.dumps(rows),capture_output=True,text=True)
+        _retain_reducer_evidence('candidate-header-bound-controls',header_checks.stdout,header_checks.stderr)
+        self.assertEqual(header_checks.returncode,0,header_checks.stderr)
+    def test_authored_candidate_row_77_overflows_at_76_and_retains_all_rows(self):
+        result=self.run_reducer_binary(self.candidate_binary,'candidate_overflow','actual-helper-row77-overflow')
+        self.assertNotEqual(result.returncode,0,result.stderr)
+        self.assertIn('attempted_geometry_calls=60 retained_records=76',result.stderr)
+        self.assertIn('diagnostic 76-row overflow',result.stderr)
+        self.assertEqual(len(result.stdout.splitlines()),1)
+        row=json.loads(result.stdout.splitlines()[0])
+        self.assertEqual(row['source_cursor'],5239)
+        self.assertTrue(row['overflowed'])
+        self.assertEqual(row['hook_counts'],[2,2,0])
+        events=row['events']
+        self.assertEqual(len(events),76)
+        self.assertEqual([event['sequence'] for event in events],list(range(76)))
+        geometries=[event for event in events if event['phase']=='geometry']
+        self.assertEqual(len(geometries),60)
+        self.assertEqual([(event['hit_index'],event['hurt_index']) for event in geometries],
+            [(hit,hurt) for hit in range(4) for hurt in range(15)])
+        self.assertEqual(events[-1]['phase'],'entry')
+        self.assertEqual((events[-1]['kind'],events[-1]['invocation']),(0,4))
+    def test_candidate_header_missing_keeps_5239_at_legacy_64_rows(self):
+        result=self.run_reducer_binary(self.candidate_binary,'candidate_header_missing_overflow',
+            'candidate-header-missing-64-overflow')
+        self.assertNotEqual(result.returncode,0,result.stderr)
+        self.assertIn('attempted_geometry_calls=0 retained_records=64',result.stderr)
+        self.assertIn('diagnostic 64-row overflow',result.stderr)
+        row=json.loads(result.stdout.splitlines()[0])
+        self.assertEqual(row['source_cursor'],5239)
+        self.assertTrue(row['overflowed'])
+        self.assertNotIn('candidate_enabled',row)
+        self.assertEqual(len(row['events']),64)
+        self.assertEqual([event['sequence'] for event in row['events']],list(range(64)))
+        self.assertEqual((row['events'][-1]['phase'],row['events'][-1]['invocation']),('entry',32))
+        self.assertEqual(row['hook_counts'],[32,0,0])
     def counting_adapter_mode(self,mode,label):
         result=self.run_reducer_binary(self.adapter_binary,mode,label)
         self.assertEqual(result.returncode,0,result.stderr)
