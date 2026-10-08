@@ -400,6 +400,9 @@ scope and all earlier v8/v9 and v10 scopes keep their existing behavior.
 
 The issue-221 synthetic comparator controls and their limitations are recorded
 in the [scoped comparator entry](status/2026-10-07-b4-v10-ordered-clock-lineage-comparator.md).
+The [nested ordered-prior validation entry](status/2026-10-07-b4-v10-nested-ordered-priors.md)
+records recursive metadata checks using synthetic audit chains; it does not
+contain an authentic clock-2000 source audit or an original-to-browser result.
 The separate
 [clock-1000 source-only entry](status/2026-10-07-b4-v10-first-match-clock1000-source-only.md)
 records the original-trace observation without a browser comparison.
