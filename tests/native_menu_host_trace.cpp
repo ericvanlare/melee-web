@@ -5,7 +5,6 @@
 #include "gameplay_menu_host.h"
 #include "gameplay_save_profile.h"
 #include "gameplay_match_session.hpp"
-#include "runtime_archive_cache.hpp"
 #include "gameplay_results_session.hpp"
 #include "gameplay_prize_session.hpp"
 #include "gameplay_match_rules.h"
@@ -310,25 +309,14 @@ void run_vs_sudden_death_source_control()
               "Typed continuation ownership control could not retire the VS lease");
         check(melee_web_menu_host_destroy(host, error, sizeof(error)), error);
 
-        melee_web::RuntimeFiles empty_files;
-        melee_web::RuntimeArchiveCache empty_cache(empty_files);
-        std::uint8_t initial_input_bytes[MELEE_WEB_PAD_STATE_BYTES];
-        melee_web_pad_state_capture(initial_input_bytes);
-        MeleeWebPadState* initial_input=melee_web_pad_state_decode(
-            initial_input_bytes,sizeof(initial_input_bytes),error,sizeof(error));
-        check(initial_input!=nullptr,error);
         MeleeWebMenuMatchContinuation unowned_sudden_death{};
         unowned_sudden_death.kind=MELEE_WEB_MENU_MATCH_CONTINUATION_SUDDEN_DEATH;
         unowned_sudden_death.owner_id=1;
-        bool rejected_unowned=false;
-        try{
-            melee_web::GameplayMatchSession invalid(
-                empty_files,nullptr,unowned_sudden_death,empty_cache,
-                melee_web::GameplayMatchConstruction::Deferred,*initial_input);
-        }catch(const std::exception&){rejected_unowned=true;}
-        melee_web_pad_state_free(initial_input);
-        check(rejected_unowned,
-              "Native Sudden Death session accepted a continuation without its live host");
+        MeleeWebMenuMatchSelection refused_selection{};
+        check(!melee_web_menu_host_sudden_death_selection(
+                  nullptr,&unowned_sudden_death,&refused_selection,
+                  error,sizeof(error))&&refused_selection.player_count==0,
+              "Sudden Death host accepted a continuation without its live owner");
         MeleeWebMenuMatchSelection bypass_selection{};
         bypass_selection.sudden_death=1;
         bool rejected_bypass=false;
