@@ -22,6 +22,16 @@ options OFF. A first focused compilation failed on a C-only Ground header
 included from C++; that log and its partial-output inventory are retained, and
 the follow-up fix confines `StageInfo` byte observation to the C probe.
 
+After main advanced through PR #263, the owned commits were rebased onto
+`0af3ff5f66ec4d55139aab7f7082c552b319a4d4`. The five source/test file blobs
+and their exact diff were unchanged. PR #263 changed only browser-peer
+JavaScript/tests and scoped docs, disjoint from the affected C/C++ build source
+closures. The focused build/control, full-suite, and Release results remain
+identified to producer `756182a`; the
+[current-main refresh receipt](../evidence/issue261-current-main-refresh-v1.json)
+records the reuse proof and does not relabel those results as runs on the new
+head.
+
 This establishes only the guarded pointer exchange and its asset-free owner
 control. It does not establish Stadium profile admission, map construction or
 removal, OnInit, callbacks, rendering, browser behavior, or whole-session

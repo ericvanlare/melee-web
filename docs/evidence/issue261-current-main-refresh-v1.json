@@ -1,0 +1,116 @@
+{
+  "schema": "issue261-current-main-refresh-v1",
+  "validation_producer_commit": "756182a78fc8deb6306f19997834f0fd0a3c01a3",
+  "validation_base_commit": "0a96b2213b7312e50a232172ca467d17ef8a939b",
+  "pre_refresh_head": "3b39cc4d82aa70a13eaa9b2cd18e484bc2eaca10",
+  "pre_refresh_source_diff_sha256": "fbeca09ada9ade8b1cbfec45c09b07445d1d0255ef043c862fe1679823cc0237",
+  "current_main_commit": "0af3ff5f66ec4d55139aab7f7082c552b319a4d4",
+  "current_main_tree": "5df60d05c61fb637b29162999313f50d83fa22a1",
+  "refreshed_head": "d7ae0074dc1037faec9f7cf7d6ec59e9cdb6e127",
+  "refreshed_tree": "5dec6785425ec7d9f1ea69bdbb48ab5840af977b",
+  "source_file_paths": [
+    "patches/melee-gameplay.patch",
+    "tests/native_menu_host_trace.cpp",
+    "tests/stadium_c1_stage_state_probe.c",
+    "tests/stadium_c1_stage_state_probe.h",
+    "tests/test_gameplay_native_menus.py"
+  ],
+  "source_blob_ids_before": {
+    "patches/melee-gameplay.patch": "604f14fd83a0c55e7318681aa9f414e46637d021",
+    "tests/native_menu_host_trace.cpp": "4a41c8ad05fd0301d11b81ed35b5e23ab1c502ca",
+    "tests/stadium_c1_stage_state_probe.c": "eff6449cdb97d031f39457b8b5507e3d837f3d82",
+    "tests/stadium_c1_stage_state_probe.h": "0d72a9fbc63675d0bfa83b50e9746fc64b463e61",
+    "tests/test_gameplay_native_menus.py": "3b53282c0e24051c4cd292f80f8ef099ce9604ff"
+  },
+  "source_blob_ids_after": {
+    "patches/melee-gameplay.patch": "604f14fd83a0c55e7318681aa9f414e46637d021",
+    "tests/native_menu_host_trace.cpp": "4a41c8ad05fd0301d11b81ed35b5e23ab1c502ca",
+    "tests/stadium_c1_stage_state_probe.c": "eff6449cdb97d031f39457b8b5507e3d837f3d82",
+    "tests/stadium_c1_stage_state_probe.h": "0d72a9fbc63675d0bfa83b50e9746fc64b463e61",
+    "tests/test_gameplay_native_menus.py": "3b53282c0e24051c4cd292f80f8ef099ce9604ff"
+  },
+  "source_blobs_unchanged": true,
+  "owned_source_diff_sha256_after": "fbeca09ada9ade8b1cbfec45c09b07445d1d0255ef043c862fe1679823cc0237",
+  "owned_source_diff_unchanged": true,
+  "main_delta": [
+    {
+      "status": "A",
+      "path": "docs/evidence/a3-live-native-input-mode-v1.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/status/2026-10-07-a3-live-native-input-mode.md"
+    },
+    {
+      "status": "M",
+      "path": "scripts/net_lockstep_browser_peer.mjs",
+      "sha256": "ebe5018c5d445dd8cb994b57cb9f166eb31b5c4e220e1e007f3f7f2e09b004ab"
+    },
+    {
+      "status": "M",
+      "path": "tests/net_lockstep_browser_peer.test.mjs",
+      "sha256": "35b16f977a5c3dbf547a03a8bc88fc3a4b5b6b69fd2677125eaf30306e5f632f"
+    }
+  ],
+  "main_delta_scope": "Only docs and net-lockstep browser peer JavaScript/test files changed; no owned patched C source, C/C++ trace/probe, Python test, CMake, source patch, or runtime build input changed.",
+  "validation_reuse": "The focused C1 build/control, full suite, and ordinary Release build remain observations on producer 756182a. This refresh does not claim those commands ran at refreshed_head. Reuse is based on unchanged owned source patch and disjoint main delta; CI is the current-base integration check.",
+  "validated_artifacts": [
+    {
+      "path": "build/browser-stadium-c1a-release/native_menu_host_trace.js",
+      "bytes": 233346,
+      "sha256": "97eb1430087d79961e5e93a75b3f0be79496a7f0e2f6b3a2860a56b27e42086e",
+      "matches_validation_receipt": true
+    },
+    {
+      "path": "build/browser-stadium-c1a-release/native_menu_host_trace.wasm",
+      "bytes": 13928261,
+      "sha256": "80cc3cd2674d61e8727f2a8fb8161aca4fed07e0c7c2acd1bdb33fc91b2ee914",
+      "matches_validation_receipt": true
+    },
+    {
+      "path": "build/browser-stadium-c1a-release/CMakeFiles/native_menu_host_trace.dir/tests/native_menu_host_trace.cpp.o",
+      "bytes": 598621,
+      "sha256": "8a45ddc460a148fa1c7cd23f826db84a0665e55954e424ad8cf8e3b1c5ba4fe9",
+      "matches_validation_receipt": true
+    },
+    {
+      "path": "build/browser-stadium-c1a-release/CMakeFiles/fighter_source_runtime.dir/build/gameplay-source/src/melee/gr/grpstadium.c.o",
+      "bytes": 32276,
+      "sha256": "16e59304c59bc713ac328be07f52f759e940a8cc819722f715ccadfa2bb612d2",
+      "matches_validation_receipt": true
+    },
+    {
+      "path": "build/browser-stadium-c1a-release/CMakeFiles/native_menu_host_trace.dir/tests/stadium_c1_stage_state_probe.c.o",
+      "bytes": 7288,
+      "sha256": "7664f988fc2b5956aecde72397d5d078528dabc6e6a730935d0ed403283d5d79",
+      "matches_validation_receipt": true
+    },
+    {
+      "path": "build/browser-release/gameplay_menu_browser.js",
+      "bytes": 300352,
+      "sha256": "a6d9562e638f2395e49cb23bbdd97567e2dbc0f2b993008842d9407317f18d64",
+      "matches_validation_receipt": true
+    },
+    {
+      "path": "build/browser-release/gameplay_menu_browser.wasm",
+      "bytes": 15749040,
+      "sha256": "bd62f0c80ebaf286151cfded796f305543a37b14a2cee2ee920d85d90dcc441f",
+      "matches_validation_receipt": true
+    },
+    {
+      "path": "build/browser-release/gameplay_menu_browser.data",
+      "bytes": 3674112,
+      "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+      "matches_validation_receipt": true
+    },
+    {
+      "path": "build/browser-release/CMakeFiles/fighter_source_runtime.dir/build/gameplay-source/src/melee/gr/grpstadium.c.o",
+      "bytes": 32276,
+      "sha256": "16e59304c59bc713ac328be07f52f759e940a8cc819722f715ccadfa2bb612d2",
+      "matches_validation_receipt": true
+    }
+  ],
+  "full_suite_log_sha256": "fc251babf185c76a373a000c2b2a5ba5d75e9639c53bfb2d364de14267f5dc6f",
+  "ordinary_release_log_sha256": "843029935f190ea4f8531c34db1b78fa75cca028a61a4fc1757fd9716f5e2e1f",
+  "no_build_or_suite_after_refresh": true
+}
