@@ -139,3 +139,18 @@ void melee_web_retail_entities_index(uint32_t match_index){
        Player_GetPlayerSlotType(5)!=Gm_PKind_NA)abort();
     printf("]");
 }
+
+int melee_web_retail_primary_identity(unsigned slot, const HSD_GObj* entity,
+    uint32_t* match_index, uint32_t* generation)
+{
+    if(slot>=4||!entity||!match_index||!generation||
+       observed_match==UINT_MAX||observed_entities[slot]!=entity)return 0;
+    const StaticPlayer* player=Player_GetPtrForSlot(slot);
+    const Fighter* fighter=entity->user_data;
+    if(!player||Player_GetPlayerSlotType(slot)!=Gm_PKind_Cpu||
+       player->player_entity[0]!=entity||player->player_entity[1]||
+       !fighter||fighter->gobj!=entity||fighter->player_id!=slot)return 0;
+    *match_index=observed_match;
+    *generation=entity_generations[slot];
+    return 1;
+}
