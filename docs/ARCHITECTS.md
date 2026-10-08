@@ -33,9 +33,12 @@ ships with a migration path, and is measured against those PRs before merge.
 1. **Scope stays open.** The owner has said scope will not be frozen and
    human-only gates (physical controllers, foreground timing, audible output)
    will not be scheduled soon. Plan around that; do not block work on it.
-2. **Add, don't append.** Add evidence in a new `docs/status/` entry. New docs
-   go in the narrowest `docs/` subdirectory. Shared lists should not grow at
-   their end.
+2. **Batch by milestone and boundary.** From 2026-10-08 onward, use one issue
+   and PR per milestone, with component steps as checklist items and commits.
+   Keep one `docs/status/` entry per boundary and update it in place, retaining
+   historical results, failures and exact evidence identities. Do not rewrite
+   or consolidate past entries. New docs go in the narrowest subdirectory;
+   shared lists should not grow at their end. Aim for a handful of merges a day.
 3. **Patch hygiene.** Keep `patches/melee-gameplay.patch` and
    `patches/aurora-browser.patch` canonical. The conflict helper is supplied by
    [#146](https://github.com/ericvanlare/melee-web/pull/146) (add
@@ -48,6 +51,32 @@ ships with a migration path, and is measured against those PRs before merge.
    contributor rules) before the owner merges.
 
 ## Log
+
+### 2026-10-08 — Claude and Codex: milestone delivery and playable network slice
+
+**Ask:** The owner adopted Claude's course correction: batch milestone PRs and
+boundary status entries; prioritize a staging room-code multiplayer slice and
+the small competitive rules/ports gaps; timebox Bowser and make Stadium C3 the
+next stage milestone.
+
+**Status:** Agreed. In-flight steps are checkpointed. Codex's response orders
+#288 (public staging relay slice), #291 (Sudden Death), #292 (competitive Rules
+Plus), #293 (sparse ports), #294 (inventory/docs), #295 (weaker-fighter lineup)
+and #251 (Stadium C3), with a first experiment, pass criteria and stopping rule
+for each. Track A wins shared resources; the four small competitive milestones
+precede further fighter/stage depth. Bowser #274 is parked with its unresolved
+disagreement and retained reproducer. #286's local route subsequently merged in
+#289; further ownership work is limited to what the playable slice needs. H1
+and human-only gates remain open. Component and functional network results do
+not establish acceptance. Before a new capture, Track A needs a verified public
+staging endpoint and a reviewed plan with strict run-owned process cleanup;
+the live prerequisites and retained failures are tracked in #288. This log
+update ships with the inventory/docs batch.
+
+**Links:** [Owner-adopted check-in](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6069469010),
+[execution response and checkpoints](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6069737799),
+[current queue](https://github.com/ericvanlare/melee-web/issues/158),
+[inventory/docs milestone](https://github.com/ericvanlare/melee-web/issues/294).
 
 ### 2026-10-07 — Codex: H1 natural-route outcome met once
 
