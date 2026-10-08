@@ -1,6 +1,7 @@
 """Original SIS bytecode behavior; runs without proprietary menu assets."""
 from pathlib import Path
 import json
+from collections import defaultdict
 import os
 import subprocess
 import sys
@@ -50,6 +51,80 @@ def missing_stadium_fixture_names(menu, game, required_names):
 def stadium_fixture_campaign_is_explicit():
     return (bool(os.environ.get("MELEE_MENU_FIXTURE_ROOT"))
             or os.environ.get("MELEE_REQUIRE_STADIUM_E8_FIXTURES") == "1")
+
+
+def parse_c1_record(line, prefix):
+    parts = line.split()
+    if not parts or parts[0] != prefix:
+        raise AssertionError(f"expected {prefix} record: {line}")
+    result = {}
+    for item in parts[1:]:
+        if "=" not in item:
+            raise AssertionError(f"malformed {prefix} field: {item}")
+        key, value = item.split("=", 1)
+        if key in result:
+            raise AssertionError(f"duplicate {prefix} field: {key}")
+        result[key] = value
+    return result
+
+
+def parse_pointer(value):
+    if value in {"0", "0x0", "nullptr", "(nil)"}:
+        return 0
+    return int(value, 16) if value.startswith("0x") else int(value)
+
+
+def c1_record_key(row):
+    return (int(row["world"]), row["consumer"], int(row["cycle"]), row["phase"])
+
+
+def parse_c1_heap_dumps(stderr):
+    dumps = {}
+    current_key = None
+    current = None
+    section = None
+    for line in stderr.splitlines():
+        if line.startswith("C1_HEAP_DUMP_BEGIN "):
+            fields = parse_c1_record(line, "C1_HEAP_DUMP_BEGIN")
+            current_key = c1_record_key(fields)
+            if current_key in dumps or current is not None:
+                raise AssertionError(f"duplicate/nested OSDumpHeap section: {current_key}")
+            current = {"allocated": [], "free": [], "sections": set(), "called": False}
+        elif line.startswith("C1_HEAP_DUMP_END "):
+            fields = parse_c1_record(line, "C1_HEAP_DUMP_END")
+            if current is None or c1_record_key(fields) != current_key:
+                raise AssertionError("OSDumpHeap end marker does not match its beginning")
+            if current["sections"] != {"allocated", "free"} or not current["called"]:
+                raise AssertionError(f"OSDumpHeap INFO rows were unavailable or filtered: {current_key}")
+            dumps[current_key] = current
+            current_key = None
+            current = None
+            section = None
+        elif current is not None:
+            body = line.rsplit("] ", 1)[-1].strip()
+            if body.startswith("OSDumpHeap("):
+                current["called"] = True
+            elif body == "--------Allocated":
+                section = "allocated"
+                current["sections"].add(section)
+            elif body == "--------Free":
+                section = "free"
+                current["sections"].add(section)
+            elif body in {"--------Invalid", "--------Broken"}:
+                raise AssertionError(f"OSDumpHeap refused/broke heap {current_key}: {body}")
+            elif body.startswith("addr"):
+                continue
+            elif section and body:
+                fields = body.split()
+                if len(fields) != 5:
+                    raise AssertionError(f"malformed OSDumpHeap {section} row: {body}")
+                row = {"addr": parse_pointer(fields[0]), "size": int(fields[1]),
+                       "end": parse_pointer(fields[2]), "prev": parse_pointer(fields[3]),
+                       "next": parse_pointer(fields[4])}
+                current[section].append(row)
+    if current is not None:
+        raise AssertionError(f"unterminated OSDumpHeap section: {current_key}")
+    return dumps
 
 class NativeMenuSourceTests(OwnedWorkspaceTests):
     @classmethod
@@ -532,7 +607,8 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         if not target.is_file():
             self.skipTest("Build the reviewed C1 cache/live reducer first")
         command = [str(node_runtime()), str(target), "--stadium-cache-live-controls"]
-        (self.scratch / "cache-live-command.txt").write_text(" ".join(command) + "\n", encoding="utf-8")
+        (self.scratch / "cache-live-command.txt").write_text(
+            " ".join(command) + "\n", encoding="utf-8")
         try:
             run = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=30)
         except subprocess.TimeoutExpired as failure:
@@ -544,14 +620,291 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         (self.scratch / "cache-live.stdout").write_text(run.stdout, encoding="utf-8")
         (self.scratch / "cache-live.stderr").write_text(run.stderr, encoding="utf-8")
         self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-9000:])
-        self.assertIn("two worlds, 24 phase records, original JObj removal and Ground-light refusals", run.stdout)
-        rows = [line for line in run.stderr.splitlines() if line.startswith("C1_CACHE_LIVE ")]
-        self.assertEqual(len(rows), 24)
+        self.assertIn("bounded original SDK allocation/free census", run.stdout)
+        self.assertIn("source-state purity", run.stdout)
+        self.assertNotIn("C1_HEAP_CENSUS_UNAVAILABLE", run.stderr)
+        self.assertNotIn("C1_CACHE_LIVE_REFUSAL", run.stderr)
+
+        snapshots = {}
+        allocations = defaultdict(list)
+        queries = []
+        guards = {}
+        query_guards = {}
+        cache_rows = [line for line in run.stderr.splitlines()
+                      if line.startswith("C1_CACHE_LIVE ")]
+        self.assertEqual(len(cache_rows), 24)
+        for line in run.stderr.splitlines():
+            if line.startswith("C1_HEAP_SNAPSHOT "):
+                row = parse_c1_record(line, "C1_HEAP_SNAPSHOT")
+                key = c1_record_key(row)
+                self.assertNotIn(key, snapshots)
+                snapshots[key] = row
+            elif line.startswith("C1_HEAP_ALLOC "):
+                row = parse_c1_record(line, "C1_HEAP_ALLOC")
+                allocations[c1_record_key(row)].append(row)
+            elif line.startswith("C1_HEAP_QUERY "):
+                queries.append(parse_c1_record(line, "C1_HEAP_QUERY"))
+            elif line.startswith("C1_HEAP_GUARD "):
+                row = parse_c1_record(line, "C1_HEAP_GUARD")
+                guards[c1_record_key(row)] = row
+            elif line.startswith("C1_HEAP_QUERY_GUARD "):
+                row = parse_c1_record(line, "C1_HEAP_QUERY_GUARD")
+                query_guards[c1_record_key(row)] = row
+
+        expected_phases = [(0, "cold"), (0, "live"), (0, "removed"),
+                           (1, "warm"), (1, "live"), (1, "removed")]
+        expected_keys = {(world, consumer, cycle, phase)
+                         for world in range(2)
+                         for consumer in ("jobj", "ground-light")
+                         for cycle, phase in expected_phases}
+        self.assertEqual(set(snapshots), expected_keys)
+        self.assertEqual(set(allocations), expected_keys)
+        self.assertEqual(set(guards), expected_keys)
+        expected_query_guard_keys = {
+            (world, consumer, cycle, phase)
+            for world in range(2)
+            for consumer in ("jobj", "ground-light")
+            for cycle, phase in expected_phases if phase != "cold"
+        }
+        self.assertEqual(set(query_guards), expected_query_guard_keys)
+        guard_fields = ("equal", "source_healthy", "world_equal", "heap_owner",
+                        "watermark", "ticks", "free_bytes", "roots", "classes",
+                        "pools", "gobj_used", "proc_used")
+        for row in list(guards.values()) + list(query_guards.values()):
+            for field in guard_fields:
+                self.assertEqual(row.get(field), "1", (field, row))
+
+        dumps = parse_c1_heap_dumps(run.stderr)
+        self.assertEqual(set(dumps), expected_keys,
+                         "Every census snapshot must retain its complete original OSDumpHeap log")
+        generation_by_world = {}
+        heap_by_world = {}
+        descriptor_span_by_world = {}
+        identity_payloads = {}
+        identity_attributes = {}
+        snapshot_metrics = {}
+
+        def validate_linked_rows(rows, label, key):
+            self.assertTrue(rows, (label, key, "OSDumpHeap returned no rows"))
+            for index, row in enumerate(rows):
+                self.assertEqual(row["addr"] % 32, 0, (label, key, row))
+                self.assertGreaterEqual(row["size"], 64, (label, key, row))
+                self.assertEqual(row["size"] % 32, 0, (label, key, row))
+                self.assertEqual(row["end"], row["addr"] + row["size"], (label, key, row))
+                self.assertEqual(row["prev"], rows[index - 1]["addr"] if index else 0,
+                                 (label, key, index, row))
+                self.assertEqual(row["next"], rows[index + 1]["addr"]
+                                 if index + 1 < len(rows) else 0,
+                                 (label, key, index, row))
+
+        for key in sorted(expected_keys):
+            row = snapshots[key]
+            self.assertEqual(row.get("overflow"), "0", key)
+            self.assertEqual(int(row["rows"]), len(allocations[key]), key)
+            generation = int(row["generation"])
+            heap = int(row["heap"])
+            if key[0] in generation_by_world:
+                self.assertEqual(generation, generation_by_world[key[0]], key)
+                self.assertEqual(heap, heap_by_world[key[0]], key)
+            else:
+                generation_by_world[key[0]] = generation
+                heap_by_world[key[0]] = heap
+            dump = dumps[key]
+            allocated_cells, free_cells = dump["allocated"], dump["free"]
+            validate_linked_rows(allocated_cells, "allocated", key)
+            validate_linked_rows(free_cells, "free", key)
+            intervals = sorted((cell["addr"], cell["end"])
+                               for cell in allocated_cells + free_cells)
+            for previous, current in zip(intervals, intervals[1:]):
+                self.assertLessEqual(previous[1], current[0], (key, previous, current))
+
+            dumped_payloads = sorted((cell["addr"] + 32, cell["size"] - 32)
+                                     for cell in allocated_cells)
+            census_payloads = sorted((parse_pointer(item["payload"]),
+                                      int(item["visitor_capacity"]))
+                                     for item in allocations[key])
+            self.assertEqual(census_payloads, dumped_payloads, key)
+            self.assertEqual(len({payload for payload, _ in census_payloads}),
+                             len(census_payloads), (key, "duplicate payload"))
+            self.assertEqual(int(row["watermark"]) >= 0, True, key)
+
+            live_ids = set()
+            for item in allocations[key]:
+                self.assertEqual(int(item["lease_status"]), 0, (key, item))
+                self.assertEqual(int(item["visitor_capacity"]),
+                                 int(item["referent_capacity"]), (key, item))
+                self.assertLessEqual(int(item["heap"]), heap, (key, item))
+                self.assertEqual(int(item["heap"]), heap, (key, item))
+                self.assertEqual(int(item["lease_world"]), generation, (key, item))
+                capacity = int(item["visitor_capacity"])
+                if int(item["live"]):
+                    payload = parse_pointer(item["payload"])
+                    allocation_generation = int(item["allocation_generation"])
+                    requested = int(item["requested"])
+                    self.assertGreater(allocation_generation, 0, (key, item))
+                    self.assertLessEqual(allocation_generation, int(row["watermark"]), (key, item))
+                    self.assertLessEqual(requested, capacity, (key, item))
+                    identity = (key[0], generation, allocation_generation, payload)
+                    self.assertNotIn(identity, live_ids, (key, identity))
+                    live_ids.add(identity)
+                    generation_key = (key[0], generation, allocation_generation)
+                    prior_payload = identity_payloads.setdefault(generation_key, payload)
+                    self.assertEqual(prior_payload, payload, (key, generation_key))
+                    prior_attributes = identity_attributes.setdefault(
+                        identity, (requested, capacity))
+                    self.assertEqual(prior_attributes, (requested, capacity), (key, identity))
+                else:
+                    self.assertEqual(int(item["requested"]), 0, (key, item))
+                    self.assertEqual(int(item["allocation_generation"]), 0, (key, item))
+            free_bytes = sum(cell["size"] - 32 for cell in free_cells)
+            allocated_span = sum(cell["size"] for cell in allocated_cells)
+            free_span = sum(cell["size"] for cell in free_cells)
+            descriptor_span = allocated_span + free_span
+            self.assertEqual(free_bytes, int(row["free"]), (key, free_bytes, row["free"]))
+            if key[0] in descriptor_span_by_world:
+                self.assertEqual(descriptor_span, descriptor_span_by_world[key[0]], key)
+            else:
+                descriptor_span_by_world[key[0]] = descriptor_span
+            snapshot_metrics[key] = {
+                "generation": generation, "heap": heap, "free_bytes": free_bytes,
+                "allocated_cell_count": len(allocated_cells),
+                "free_cell_count": len(free_cells),
+                "allocated_cell_span": allocated_span, "free_cell_span": free_span,
+                "descriptor_partition_span": descriptor_span,
+                "live_exact_lease_count": len(live_ids),
+                "unknown_lease_row_count": sum(not int(item["live"])
+                                                for item in allocations[key]),
+            }
+
+        transitions = []
+        cache_observations = []
         for world in range(2):
             for consumer in ("jobj", "ground-light"):
-                actual = [line.split(" phase=", 1)[1].split()[0] for line in rows
-                          if f"world={world} " in line and f"consumer={consumer} " in line]
-                self.assertEqual(actual, ["cold", "live", "removed", "warm", "live", "removed"])
+                keys = [(world, consumer, cycle, phase) for cycle, phase in expected_phases]
+                rows = [snapshot_metrics[key] for key in keys]
+                for before_key, after_key, before, after in zip(keys, keys[1:], rows, rows[1:]):
+                    actual = before["free_bytes"] - after["free_bytes"]
+                    derived = (after["allocated_cell_span"] - before["allocated_cell_span"] +
+                               32 * (after["free_cell_count"] - before["free_cell_count"]))
+                    self.assertEqual(actual, derived,
+                                     (before_key, after_key, actual, derived))
+                    transitions.append({"world": world, "consumer": consumer,
+                                        "from": [before_key[2], before_key[3]],
+                                        "to": [after_key[2], after_key[3]],
+                                        "free_bytes_consumed": actual,
+                                        "allocated_cell_span_delta":
+                                            after["allocated_cell_span"] - before["allocated_cell_span"],
+                                        "free_cell_count_delta":
+                                            after["free_cell_count"] - before["free_cell_count"],
+                                        "header_bytes_delta":
+                                            32 * (after["free_cell_count"] - before["free_cell_count"])})
+                cache_observations.append({
+                    "world": world, "consumer": consumer,
+                    "cold_free_bytes": rows[0]["free_bytes"],
+                    "live0_free_bytes": rows[1]["free_bytes"],
+                    "removed0_free_bytes": rows[2]["free_bytes"],
+                    "warm1_free_bytes": rows[3]["free_bytes"],
+                    "live1_free_bytes": rows[4]["free_bytes"],
+                    "removed1_free_bytes": rows[5]["free_bytes"],
+                    "cold_to_removed0_free_delta":
+                        rows[0]["free_bytes"] - rows[2]["free_bytes"],
+                    "cold_to_warm1_free_delta":
+                        rows[0]["free_bytes"] - rows[3]["free_bytes"],
+                })
+
+        query_counts = defaultdict(int)
+        prior_object_relations = defaultdict(int)
+        for row in queries:
+            query_counts[row["kind"]] += 1
+            status = int(row["status"])
+            live = int(row["live"])
+            if row["kind"] in {"unknown", "interior"}:
+                self.assertEqual((status, live, int(row["generation"])), (0, 0, 0), row)
+                key = c1_record_key(row)
+                self.assertEqual(int(row["lease_world"]), int(snapshots[key]["generation"]), row)
+            elif row["kind"] == "prior_object_payload":
+                relation = row["relation"]
+                classification = row["classification"]
+                prior_object_relations[(relation, classification)] += 1
+                if relation == "after_shutdown":
+                    self.assertEqual((status, int(row["refused"])), (1, 1), row)
+                    self.assertEqual(classification, "inactive_owner", row)
+                elif relation in {"capture", "recheck"}:
+                    key = c1_record_key(row)
+                    snapshot_generation = int(snapshots[key]["generation"])
+                    self.assertEqual(status, 0, row)
+                    self.assertEqual(int(row["lease_world"]), snapshot_generation, row)
+                if relation == "capture":
+                    if classification == "captured_exact_live_sdk_lease":
+                        self.assertEqual(live, 1, row)
+                        self.assertGreater(int(row["generation"]), 0, row)
+                        self.assertEqual(int(row["prior_generation"]),
+                                         int(row["generation"]), row)
+                    elif classification in {
+                            "captured_exact_payload_without_source_lease",
+                            "captured_unknown_nonexact_or_unmapped"}:
+                        self.assertEqual((live, int(row["generation"]),
+                                          int(row["prior_generation"])), (0, 0, 0), row)
+                    else:
+                        self.fail(f"unclassified object-payload capture: {row}")
+                elif relation == "recheck":
+                    if classification == "unchanged_live_sdk_lease":
+                        self.assertEqual(live, 1, row)
+                        self.assertEqual(int(row["generation"]),
+                                         int(row["prior_generation"]), row)
+                    elif classification == "freed_sdk_lease":
+                        self.assertEqual((live, int(row["generation"])), (0, 0), row)
+                        self.assertGreater(int(row["prior_generation"]), 0, row)
+                    elif classification == "new_generation_reuse":
+                        self.assertEqual(live, 1, row)
+                        self.assertGreater(int(row["generation"]),
+                                           int(row["prior_generation"]), row)
+                    elif classification == "unknown_no_exact_lease_baseline":
+                        self.assertEqual(int(row["prior_generation"]), 0, row)
+                    else:
+                        self.fail(f"unclassified prior-object-payload recheck: {row}")
+                elif relation != "after_shutdown":
+                    self.fail(f"unclassified prior-object-payload relation: {row}")
+            elif row["kind"] in {"null_payload", "null_output"}:
+                self.assertEqual((status, int(row["refused"])), (3, 1), row)
+            elif row["kind"] == "foreign_owner":
+                self.assertEqual((status, int(row["refused"])), (-1, 1), row)
+            else:
+                self.fail(f"unclassified allocation query: {row}")
+        self.assertEqual(query_counts["unknown"], 24)
+        self.assertEqual(query_counts["interior"], 24)
+        self.assertEqual(query_counts["prior_object_payload"], 26)
+        self.assertEqual(prior_object_relations[("capture", "captured_exact_live_sdk_lease")] +
+                         prior_object_relations[("capture", "captured_exact_payload_without_source_lease")] +
+                         prior_object_relations[("capture", "captured_unknown_nonexact_or_unmapped")], 8)
+        self.assertEqual(sum(count for (relation, _), count in prior_object_relations.items()
+                            if relation == "recheck"), 16)
+        self.assertEqual(prior_object_relations[("after_shutdown", "inactive_owner")], 2)
+        self.assertEqual(query_counts["null_payload"], 4)
+        self.assertEqual(query_counts["null_output"], 4)
+        self.assertEqual(query_counts["foreign_owner"], 4)
+
+        accounting = {
+            "schema": "issue251-asset-free-heap-census-accounting-v1",
+            "scope": "Two-world synthetic C1 JObj/Ground-light cold/live/removed/warm controls only; no Stadium asset or original OnInit",
+            "source_heap_header_bytes": 32,
+            "census_row_capacity": 4096,
+            "census_rows_total": sum(len(rows) for rows in allocations.values()),
+            "snapshot_count": len(snapshots), "osdumpheap_logs_emitted": len(dumps),
+            "osdumpheap_logger_policy": "Unchanged process policy; every allocated/free section was observed in captured INFO output",
+            "descriptor_partition_span_by_world": descriptor_span_by_world,
+            "snapshots": [{"world": key[0], "consumer": key[1], "cycle": key[2],
+                           "phase": key[3], **snapshot_metrics[key]} for key in sorted(snapshot_metrics)],
+            "transitions": transitions,
+            "cache_observations": cache_observations,
+            "query_counts": dict(query_counts),
+            "query_guards": len(query_guards), "snapshot_guards": len(guards),
+            "excluded_claims": ["88576-byte original heap gap explained",
+                                "source allocation attributed to cache ownership",
+                                "stage admitted", "whole-session acceptance"],
+        }
+        (self.scratch / "cache-live-allocation-census-accounting.json").write_text(
+            json.dumps(accounting, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     def test_stadium_map_light_asset_free_adoption_controls(self):
         target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"

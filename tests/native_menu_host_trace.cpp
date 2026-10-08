@@ -17,7 +17,9 @@
 #include "native_menu_fighter_input.h"
 #include "native_menu_stage_input.h"
 #include "stadium_c1_stage_state_probe.h"
+#include "gameplay_source_memory_runtime.h"
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#include "gameplay_heap.h"
 #include "dat_archive.hpp"
 #include "dat_color_animation.hpp"
 #include "dat_effect_banks.hpp"
@@ -74,6 +76,7 @@ extern "C" {
 #include <sysdolphin/baselib/objalloc.h>
 #include <sysdolphin/baselib/sislib.h>
 #include <sysdolphin/baselib/memory.h>
+#include <dolphin/os/OSAlloc.h>
 #endif
 #include <melee/ty/forward.h>
 #include <melee/ty/toy.h>
@@ -2398,6 +2401,236 @@ void run_stadium_effect_runtime_lifecycle_control()
 }
 
 
+constexpr size_t kC1HeapCensusRowCapacity = 4096;
+struct C1HeapCensusRow {
+    uintptr_t payload{};
+    uint32_t visitor_capacity{};
+    uint32_t referent_capacity{};
+    MeleeWebSourceMemoryAllocation lease{};
+    MeleeWebSourceMemoryReadStatus lease_status =
+        MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
+};
+struct C1HeapCensus {
+    C1HeapCensusRow rows[kC1HeapCensusRowCapacity]{};
+    size_t count{};
+    size_t visited{};
+    bool overflow{};
+    bool invalid{};
+};
+C1HeapCensus c1_heap_census;
+
+void c1_heap_census_visitor(void* payload, u32 visitor_capacity)
+{
+    ++c1_heap_census.visited;
+    if (c1_heap_census.count == kC1HeapCensusRowCapacity) {
+        c1_heap_census.overflow = true;
+        return;
+    }
+    auto& row = c1_heap_census.rows[c1_heap_census.count++];
+    row.payload = reinterpret_cast<uintptr_t>(payload);
+    row.visitor_capacity = visitor_capacity;
+    row.referent_capacity = OSReferentSize(payload);
+    row.lease_status = melee_web_source_memory_allocation_read(payload, &row.lease);
+    if (!payload || !visitor_capacity ||
+        row.referent_capacity != visitor_capacity ||
+        row.lease_status != MELEE_WEB_SOURCE_MEMORY_READ_OK ||
+        (row.lease.live && (!row.lease.allocation_generation ||
+                            row.lease.requested_bytes > visitor_capacity)) ||
+        (!row.lease.live && (row.lease.requested_bytes ||
+                             row.lease.allocation_generation)))
+        c1_heap_census.invalid = true;
+}
+
+struct C1HeapGuard {
+    MeleeWebGameplayStats stats{};
+    MeleeWebSourceMemoryContext context{};
+    uintptr_t arena_identity{};
+    decltype(melee_web::test::stadium_screen::runtime_roots_snapshot()) roots;
+    decltype(melee_web::test::stadium_screen::live_class_counts()) classes;
+    decltype(melee_web::test::stadium_screen::live_pool_counts()) pools{};
+    uint32_t gobj_used{};
+    uint32_t proc_used{};
+};
+
+C1HeapGuard c1_heap_guard()
+{
+    namespace screen = melee_web::test::stadium_screen;
+    const MeleeWebGameplayAllocation allocation = melee_web_gameplay_allocation();
+    check(allocation.identity != 0 &&
+              allocation.identity <= std::numeric_limits<uintptr_t>::max(),
+          "C1 census cannot read the exact gameplay arena identity");
+    const auto arena_identity = static_cast<uintptr_t>(allocation.identity);
+    check(melee_web_gameplay_heap_owns(
+              reinterpret_cast<const void*>(arena_identity)),
+          "C1 census refuses traversal after gameplay heap ownership changes");
+    MeleeWebSourceMemoryContext context{};
+    check(melee_web_source_memory_context_read(&context) ==
+              MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+              context.source_heap_handle >= 0 && context.world_generation != 0,
+          "C1 census requires a healthy exact source-memory context");
+    const MeleeWebGameplayStats stats = melee_web_gameplay_stats();
+    check(stats.generation == context.world_generation &&
+              stats.heap_free_bytes >= 0 && melee_web_source_memory_healthy(),
+          "C1 census requires a healthy source heap and live gameplay world");
+    return {stats, context, arena_identity, screen::runtime_roots_snapshot(),
+            screen::live_class_counts(), screen::live_pool_counts(),
+            HSD_ObjAllocGetUsing(&gobj_alloc_data),
+            HSD_ObjAllocGetUsing(&gobjproc_alloc_data)};
+}
+
+bool c1_heap_guards_equal(const C1HeapGuard& a, const C1HeapGuard& b)
+{
+    return a.stats.ticks == b.stats.ticks &&
+           a.stats.objects == b.stats.objects &&
+           a.stats.processes == b.stats.processes &&
+           a.stats.object_peak == b.stats.object_peak &&
+           a.stats.process_peak == b.stats.process_peak &&
+           a.stats.heap_free_bytes == b.stats.heap_free_bytes &&
+           a.stats.generation == b.stats.generation &&
+           a.context.source_heap_handle == b.context.source_heap_handle &&
+           a.context.world_generation == b.context.world_generation &&
+           a.context.allocation_generation_watermark ==
+               b.context.allocation_generation_watermark &&
+           a.arena_identity == b.arena_identity && a.roots == b.roots &&
+           a.classes == b.classes && a.pools == b.pools &&
+           a.gobj_used == b.gobj_used && a.proc_used == b.proc_used &&
+           melee_web_source_memory_healthy();
+}
+
+void c1_heap_query_line(unsigned world, const char* consumer, unsigned cycle,
+                        const char* phase, const char* kind, uintptr_t payload,
+                        int status,
+                        const MeleeWebSourceMemoryAllocation& lease,
+                        uint64_t prior_generation = 0, int refused = 0,
+                        const char* relation = nullptr,
+                        const char* classification = nullptr)
+{
+    std::cerr << "C1_HEAP_QUERY world=" << world << " consumer=" << consumer
+              << " cycle=" << cycle << " phase=" << phase << " kind=" << kind
+              << " payload=0x" << std::hex << payload << std::dec
+              << " status=" << status
+              << " live=" << static_cast<unsigned>(lease.live)
+              << " generation=" << lease.allocation_generation
+              << " lease_world=" << lease.world_generation
+              << " prior_generation=" << prior_generation
+              << " refused=" << refused;
+    if (relation) std::cerr << " relation=" << relation;
+    if (classification) std::cerr << " classification=" << classification;
+    std::cerr << '\n';
+}
+
+void c1_emit_heap_census(unsigned world, const char* consumer, unsigned cycle,
+                         const char* phase, const C1HeapGuard& before,
+                         C1HeapGuard* after_out)
+{
+    c1_heap_census.count = 0;
+    c1_heap_census.visited = 0;
+    c1_heap_census.overflow = false;
+    c1_heap_census.invalid = false;
+    OSVisitAllocated(c1_heap_census_visitor);
+    check(!c1_heap_census.overflow &&
+              c1_heap_census.visited == c1_heap_census.count,
+          "C1 allocated-cell census overflowed its external 4096-row bound");
+    check(!c1_heap_census.invalid,
+          "C1 allocated-cell census found a missing lease or capacity mismatch");
+
+    // OSDumpHeap is the pinned SDK source of real allocated/free cell spans.
+    // The caller preserves the process logger policy; the host test parses its
+    // ordinary INFO output and fails if the rows are filtered.
+    std::cerr << "C1_HEAP_DUMP_BEGIN world=" << world << " consumer=" << consumer
+              << " cycle=" << cycle << " phase=" << phase << '\n';
+    std::cerr.flush();
+    OSDumpHeap(before.context.source_heap_handle);
+    std::cerr << "C1_HEAP_DUMP_END world=" << world << " consumer=" << consumer
+              << " cycle=" << cycle << " phase=" << phase << '\n';
+    std::cerr.flush();
+
+    const auto first_live = std::find_if(
+        c1_heap_census.rows, c1_heap_census.rows + c1_heap_census.count,
+        [](const C1HeapCensusRow& row) { return row.lease.live != 0; });
+    check(first_live != c1_heap_census.rows + c1_heap_census.count &&
+              first_live->visitor_capacity > 1,
+          "C1 census has no live exact payload for its interior-query control");
+    int unknown_marker = 0;
+    MeleeWebSourceMemoryAllocation unknown{};
+    const auto unknown_status = melee_web_source_memory_allocation_read(
+        &unknown_marker, &unknown);
+    check(unknown_status == MELEE_WEB_SOURCE_MEMORY_READ_OK && !unknown.live,
+          "C1 census unknown exact-payload query was not reported explicitly");
+    c1_heap_query_line(world, consumer, cycle, phase, "unknown",
+                       reinterpret_cast<uintptr_t>(&unknown_marker),
+                       unknown_status, unknown);
+    MeleeWebSourceMemoryAllocation interior{};
+    const auto interior_status = melee_web_source_memory_allocation_read(
+        reinterpret_cast<const void*>(first_live->payload + 1), &interior);
+    check(interior_status == MELEE_WEB_SOURCE_MEMORY_READ_OK && !interior.live &&
+              interior.allocation_generation == 0,
+          "C1 census interior pointer was mistaken for an exact allocation lease");
+    c1_heap_query_line(world, consumer, cycle, phase, "interior",
+                       first_live->payload + 1, interior_status, interior);
+
+    if (std::string_view(phase) == "cold") {
+        MeleeWebSourceMemoryAllocation invalid{};
+        const auto null_payload_status =
+            melee_web_source_memory_allocation_read(nullptr, &invalid);
+        const auto null_output_status = melee_web_source_memory_allocation_read(
+            reinterpret_cast<const void*>(first_live->payload), nullptr);
+        check(null_payload_status == MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT &&
+                  null_output_status == MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT,
+              "C1 census invalid query arguments were not refused explicitly");
+        c1_heap_query_line(world, consumer, cycle, phase, "null_payload", 0,
+                           null_payload_status, invalid, 0, 1);
+        c1_heap_query_line(world, consumer, cycle, phase, "null_output",
+                           first_live->payload, null_output_status, invalid, 0, 1);
+        uintptr_t foreign_identity = before.arena_identity ^ uintptr_t{0x20};
+        if (!foreign_identity || foreign_identity == before.arena_identity)
+            ++foreign_identity;
+        const int foreign_refused = !melee_web_gameplay_heap_owns(
+            reinterpret_cast<const void*>(foreign_identity));
+        check(foreign_refused,
+              "C1 census did not refuse a foreign arena identity before traversal");
+        c1_heap_query_line(world, consumer, cycle, phase, "foreign_owner",
+                           foreign_identity,
+                           -1, invalid, 0, 1);
+    }
+
+    C1HeapGuard after = c1_heap_guard();
+    check(c1_heap_guards_equal(before, after),
+          "C1 visitor/dump/query snapshot changed source owner, watermark, heap, roots, pools, classes, or ticks");
+    std::cerr << "C1_HEAP_GUARD world=" << world << " consumer=" << consumer
+              << " cycle=" << cycle << " phase=" << phase
+              << " equal=1 source_healthy=1 world_equal=1 heap_owner=1 watermark=1"
+              << " ticks=1 free_bytes=1 roots=1 classes=1 pools=1 gobj_used=1 proc_used=1\n";
+
+    std::cerr << "C1_HEAP_SNAPSHOT world=" << world
+              << " generation=" << before.context.world_generation
+              << " consumer=" << consumer << " cycle=" << cycle
+              << " phase=" << phase
+              << " heap=" << before.context.source_heap_handle
+              << " free=" << before.stats.heap_free_bytes
+              << " watermark=" << before.context.allocation_generation_watermark
+              << " rows=" << c1_heap_census.count << " overflow=0\n";
+    for (size_t i = 0; i < c1_heap_census.count; ++i) {
+        const auto& row = c1_heap_census.rows[i];
+        std::cerr << "C1_HEAP_ALLOC world=" << world
+                  << " generation=" << before.context.world_generation
+                  << " consumer=" << consumer << " cycle=" << cycle
+                  << " phase=" << phase << " payload=0x" << std::hex
+                  << row.payload << std::dec
+                  << " visitor_capacity=" << row.visitor_capacity
+                  << " referent_capacity=" << row.referent_capacity
+                  << " lease_status=" << static_cast<int>(row.lease_status)
+                  << " live=" << static_cast<unsigned>(row.lease.live)
+                  << " heap=" << row.lease.source_heap_handle
+                  << " lease_world=" << row.lease.world_generation
+                  << " requested=" << row.lease.requested_bytes
+                  << " allocation_generation=" << row.lease.allocation_generation
+                  << '\n';
+    }
+    std::cerr.flush();
+    if (after_out) *after_out = std::move(after);
+}
+
 void run_stadium_cache_live_control()
 {
     namespace screen = melee_web::test::stadium_screen;
@@ -2412,6 +2645,10 @@ void run_stadium_cache_live_control()
         unsigned world{};
         Baseline baseline;
         std::string consumer;
+        uintptr_t prior_object_payload{};
+        uint64_t prior_object_generation{};
+        bool prior_object_has_exact_lease{};
+        bool has_prior_object_payload{};
         unsigned records{};
         unsigned completed{};
     };
@@ -2419,10 +2656,105 @@ void run_stadium_cache_live_control()
                         const void* owned, void* user) -> int {
         auto& state = *static_cast<State*>(user);
         try {
-            Baseline now{melee_web_gameplay_stats(), screen::runtime_roots_snapshot(),
-                screen::live_class_counts(), screen::live_pool_counts(),
-                HSD_ObjAllocGetUsing(&gobj_alloc_data),
-                HSD_ObjAllocGetUsing(&gobjproc_alloc_data)};
+            const std::string_view current_phase(phase);
+            if (current_phase == "cold") {
+                // The reducer starts the next consumer with a cold observation;
+                // never carry the prior consumer's object address into it.
+                state.prior_object_payload = 0;
+                state.prior_object_generation = 0;
+                state.prior_object_has_exact_lease = false;
+                state.has_prior_object_payload = false;
+            }
+            const C1HeapGuard census_before = c1_heap_guard();
+            C1HeapGuard census_after{};
+            c1_emit_heap_census(state.world, consumer, cycle, phase,
+                                census_before, &census_after);
+            Baseline now{census_after.stats, census_after.roots,
+                census_after.classes, census_after.pools,
+                census_after.gobj_used, census_after.proc_used};
+            const bool current_is_live = current_phase == "live";
+            const bool query_needed = state.has_prior_object_payload || current_is_live;
+            C1HeapGuard query_before{};
+            if (query_needed) query_before = c1_heap_guard();
+            if (state.has_prior_object_payload) {
+                MeleeWebSourceMemoryAllocation prior{};
+                const auto prior_status = melee_web_source_memory_allocation_read(
+                    reinterpret_cast<const void*>(state.prior_object_payload), &prior);
+                check(prior_status == MELEE_WEB_SOURCE_MEMORY_READ_OK,
+                      "C1 prior object payload query was refused");
+                const char* classification = "unknown_no_exact_lease_baseline";
+                if (state.prior_object_has_exact_lease) {
+                    check(prior.world_generation == now.stats.generation,
+                          "C1 prior exact payload moved to a different world generation");
+                    if (!prior.live) {
+                        classification = "freed_sdk_lease";
+                    } else if (prior.allocation_generation ==
+                               state.prior_object_generation) {
+                        classification = "unchanged_live_sdk_lease";
+                    } else {
+                        check(prior.allocation_generation >
+                                  state.prior_object_generation,
+                              "C1 prior exact payload generation moved backwards");
+                        classification = "new_generation_reuse";
+                    }
+                }
+                c1_heap_query_line(
+                    state.world, consumer, cycle, phase, "prior_object_payload",
+                    state.prior_object_payload, prior_status, prior,
+                    state.prior_object_generation, 0, "recheck", classification);
+            }
+            if (current_is_live) {
+                check(owned != nullptr,
+                      "C1 live cache phase omitted its owned object pointer");
+                const uintptr_t object_payload = reinterpret_cast<uintptr_t>(owned);
+                const auto object_row = std::find_if(
+                    c1_heap_census.rows,
+                    c1_heap_census.rows + c1_heap_census.count,
+                    [object_payload](const C1HeapCensusRow& row) {
+                        return row.payload == object_payload;
+                    });
+                MeleeWebSourceMemoryAllocation object_lease{};
+                const auto object_status = melee_web_source_memory_allocation_read(
+                    owned, &object_lease);
+                check(object_status == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                          object_lease.world_generation == now.stats.generation,
+                      "C1 object payload exact-lease query was refused or changed worlds");
+                const char* classification = nullptr;
+                if (object_row != c1_heap_census.rows + c1_heap_census.count) {
+                    check(object_row->lease.live == object_lease.live &&
+                              object_row->lease.allocation_generation ==
+                                  object_lease.allocation_generation,
+                          "C1 exact object payload query disagrees with its census row");
+                    classification = object_lease.live
+                        ? "captured_exact_live_sdk_lease"
+                        : "captured_exact_payload_without_source_lease";
+                } else {
+                    check(!object_lease.live,
+                          "C1 live object lease is missing from the allocated-cell census");
+                    classification = "captured_unknown_nonexact_or_unmapped";
+                }
+                c1_heap_query_line(
+                    state.world, consumer, cycle, phase, "prior_object_payload",
+                    object_payload, object_status, object_lease,
+                    object_lease.live ? object_lease.allocation_generation : 0,
+                    0, "capture", classification);
+                state.prior_object_payload = object_payload;
+                state.prior_object_generation = object_lease.live
+                    ? object_lease.allocation_generation : 0;
+                state.prior_object_has_exact_lease = object_lease.live;
+                state.has_prior_object_payload = true;
+            }
+            if (query_needed) {
+                const C1HeapGuard query_after = c1_heap_guard();
+                check(c1_heap_guards_equal(query_before, query_after),
+                      "C1 prior object payload query changed source allocation state");
+                std::cerr << "C1_HEAP_QUERY_GUARD world=" << state.world
+                          << " consumer=" << consumer << " cycle=" << cycle
+                          << " phase=" << phase
+                          << " equal=1 source_healthy=1 world_equal=1 heap_owner=1 watermark=1"
+                          << " ticks=1 free_bytes=1 roots=1 classes=1 pools=1"
+                          << " gobj_used=1 proc_used=1\n";
+            }
             std::cerr << "C1_CACHE_LIVE world=" << state.world
                       << " generation=" << now.stats.generation
                       << " consumer=" << consumer << " phase=" << phase
@@ -2481,8 +2813,25 @@ void run_stadium_cache_live_control()
         check(state.records == 12 && state.completed == 4,
               "Cache/live reducer skipped a cold/live/removed/warm observation");
         check(melee_web_gameplay_shutdown(error, sizeof(error)), error);
+        MeleeWebSourceMemoryContext inactive_context{};
+        const auto inactive_status =
+            melee_web_source_memory_context_read(&inactive_context);
+        MeleeWebSourceMemoryAllocation inactive_allocation{};
+        const auto inactive_allocation_status =
+            melee_web_source_memory_allocation_read(
+                reinterpret_cast<const void*>(state.prior_object_payload),
+                &inactive_allocation);
+        check(inactive_status == MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE &&
+                  inactive_allocation_status ==
+                      MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE,
+              "C1 prior-object-payload query after shutdown was not refused as inactive");
+        c1_heap_query_line(lifetime, state.consumer.c_str(), 1, "removed",
+                           "prior_object_payload", state.prior_object_payload,
+                           inactive_allocation_status, inactive_allocation,
+                           state.prior_object_generation, 1, "after_shutdown",
+                           "inactive_owner");
     }
-    std::cout << "C1 asset-free cache/live reducer passed; two worlds, 24 phase records, original JObj removal and Ground-light refusals; no original Stadium callback, camera or source ticks\n";
+    std::cout << "C1 asset-free cache/live reducer passed; two worlds, 24 phase records, bounded original SDK allocation/free census, exact lease queries and source-state purity; no original Stadium callback, camera or source ticks\n";
 }
 
 void run_stadium_map_light_adoption_control()
