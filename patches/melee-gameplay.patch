@@ -5580,7 +5580,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..01c20224cc3a3cf60d55e32c0c70807d
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..cf4d4c4b6a8f2e1aef04b9e2c7ca027c5a52d5ab 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..decaa45d148da657110344315c41905fc5cbf499 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,15 @@
@@ -5677,7 +5677,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..cf4d4c4b6a8f2e1aef04b9e2c7ca027c
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -920,6 +978,1417 @@ typedef struct TextWrapper {
+@@ -920,6 +978,1420 @@ typedef struct TextWrapper {
      HSD_Text* win_dynamic_p;
  } TextWrapper;
  
@@ -5991,6 +5991,9 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..cf4d4c4b6a8f2e1aef04b9e2c7ca027c
 +    foreign_context[0].x0 = &foreign_context[1];
 +    foreign_context[1].x0 = NULL;
 +    owned_context.x0 = NULL;
++    if (stadium_owner_text_topology_matches_head(&owner, &foreign_text[0], 0))
++        return 0;
++    foreign_text[1].next = NULL;
 +    if (!stadium_owner_text_topology_matches_head(&owner, &foreign_text[0], 0) ||
 +        !stadium_owner_context_topology_matches_head(
 +            &owner, &foreign_context[0], 0))
@@ -7095,7 +7098,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..cf4d4c4b6a8f2e1aef04b9e2c7ca027c
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
  {
-@@ -1185,22 +2654,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +2657,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -7137,7 +7140,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..cf4d4c4b6a8f2e1aef04b9e2c7ca027c
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +2702,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +2705,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -7159,7 +7162,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..cf4d4c4b6a8f2e1aef04b9e2c7ca027c
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +2724,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +2727,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
