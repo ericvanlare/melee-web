@@ -25,6 +25,11 @@ MeleeWebStageLast* melee_web_stage_begin_kind(int stage_kind, void* yakumono,
 MeleeWebStageLast* melee_web_stage_begin_kind_on_init_diagnostic(
     int stage_kind, void* yakumono, MeleeWebEffectBank*,
     MeleeWebStageLast** owner_out, char*, size_t);
+/* Read the already-captured private Stadium map2 journal while its StageLast
+ * owner is still active. This copies the existing record; it does not inspect
+ * or extend the private Ground layout. Call only before stage_last_end. */
+int melee_web_stage_last_stadium_map2_buffer_snapshot(
+    const MeleeWebStageLast*, MeleeWebStadiumMap2BufferOwner* out);
 #endif
 /* Requires full native map/overrides, stage particle bank64, original effect
  * runtime, numeric stage/collision and original camera contexts already live.

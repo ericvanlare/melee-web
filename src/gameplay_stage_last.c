@@ -121,6 +121,10 @@ MeleeWebStageLast* melee_web_stage_begin_kind_on_init_diagnostic(int stage_kind,
  if(!definition||!definition->diagnostic_only){fail(e,n,"Diagnostic Stadium source profile is unavailable");return NULL;}
  return begin_stage(definition,yaku,bank,1,1,1,owner_out,e,n);
 }
+int melee_web_stage_last_stadium_map2_buffer_snapshot(const MeleeWebStageLast* h,MeleeWebStadiumMap2BufferOwner* out){
+ if(!h||h!=active||!out||h->generation!=melee_web_gameplay_stats().generation||!h->definition||!h->definition->diagnostic_only||!h->stadium_map2_buffer_owner.captured)return 0;
+ *out=h->stadium_map2_buffer_owner;return 1;
+}
 #endif
 MeleeWebStageLast* melee_web_stage_last_begin(void* yaku,MeleeWebEffectBank* bank,char* e,size_t n){
  return begin_stage(melee_web_stage_profile(St_Kind_Last),yaku,bank,0,0,0,NULL,e,n);

@@ -80,6 +80,23 @@ class StadiumOnInitBoundaryTests(unittest.TestCase):
         self.assertIn("owner_out==NULL", body)
         self.assertIn("begin_stage(definition,yaku,bank,1,1,1,owner_out", body)
 
+    def test_one_shot_driver_uses_distinct_guarded_recipe_and_existing_owner(self):
+        source = (ROOT / "tests/native_menu_host_trace.cpp").read_text(encoding="utf-8")
+        helper = function_body(source, "void run_stadium_e8_request(")
+        self.assertIn("stadium-source-oninit-v1", source)
+        self.assertIn("MELEE_RUN_STADIUM_SOURCE_ONINIT", (ROOT / "tests/test_gameplay_native_menus.py").read_text(encoding="utf-8"))
+        self.assertIn("melee_web_stage_begin_kind_on_init_diagnostic(", helper)
+        self.assertIn("melee_web_stage_last_stadium_map2_buffer_snapshot(", helper)
+        self.assertIn("melee_web_stage_last_end(retained_stage_owner", helper)
+        self.assertIn("std::_Exit(1)", helper)
+        self.assertIn("runtime_map_call_order_observed\\\":false", helper)
+        self.assertNotIn("Stage_802251E8(St_Kind_PStadium, NULL);\n            check(melee_web_stage_last", helper)
+        api = (ROOT / "src/gameplay_stage_last.c").read_text(encoding="utf-8")
+        accessor = function_body(api, "int melee_web_stage_last_stadium_map2_buffer_snapshot(")
+        self.assertIn("h!=active", accessor)
+        self.assertIn("h->generation!=melee_web_gameplay_stats().generation", accessor)
+        self.assertIn("*out=h->stadium_map2_buffer_owner", accessor)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -527,6 +527,127 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         self.assertEqual(events[0]["event"], "stadium_e8_request_returned")
         self.assertEqual(events[0]["selection"]["rules"]["stage_kind"], 3)
 
+    def test_stadium_on_init_asset_free_refusal_controls(self):
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("The reviewed C1 diagnostic native trace target is not built")
+        run = subprocess.run(
+            [str(node_runtime()), str(target), "--stadium-on-init-controls"],
+            cwd=ROOT, capture_output=True, text=True, timeout=30)
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-5000:])
+        self.assertIn("Diagnostic Stadium profile/content gate", run.stdout)
+        self.assertIn("wrong-kind/output-owner refusal controls passed", run.stdout)
+        self.assertNotIn("OnInit lifetime", run.stdout)
+
+    def test_stadium_source_oninit_one_shot(self):
+        if os.environ.get("MELEE_RUN_STADIUM_SOURCE_ONINIT") != "1":
+            self.skipTest(
+                "The single source-ordered OnInit experiment requires its explicit run gate"
+            )
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        fixture_value = os.environ.get("MELEE_MENU_FIXTURE_ROOT")
+        if not fixture_value:
+            self.fail("MELEE_MENU_FIXTURE_ROOT is required for the retained OnInit packet")
+        fixture_root = Path(fixture_value)
+        if not fixture_root.is_absolute():
+            fixture_root = ROOT / fixture_root
+        menu, game = fixture_root / "native-menus", fixture_root / "next-gate"
+        self.assertTrue(target.is_file(), f"Build the reviewed diagnostic target first: {target}")
+        self.assertTrue(menu.is_dir(), f"Missing owned menu fixture root: {menu}")
+        self.assertTrue(game.is_dir(), f"Missing owned game fixture root: {game}")
+
+        script = (
+            "import {NATIVE_MENU_DISC_FILES} from './web/runtime-assets.mjs'; "
+            "console.log(JSON.stringify([...Object.keys(NATIVE_MENU_DISC_FILES), "
+            "'dsp_coef.bin', 'sislib_font.bin']))"
+        )
+        menu_names = json.loads(subprocess.check_output(
+            [str(node_runtime()), "--input-type=module", "-e", script],
+            cwd=ROOT, text=True))
+        selected_names = stadium_c1_selected_file_names()
+        self.assertEqual(len(menu_names), 76)
+        self.assertEqual(len(selected_names), 36)
+        required = sorted(set(menu_names) | set(selected_names))
+        self.assertEqual(len(required), 98)
+        missing = [name for name in required
+                   if not (menu / name).is_file() and not (game / name).is_file()]
+        self.assertFalse(
+            missing,
+            "Frozen C1 OnInit RuntimeFiles are incomplete before launch: " +
+            ", ".join(missing),
+        )
+
+        source_revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        trace = self.scratch / "stadium-source-oninit.jsonl"
+        command = [str(node_runtime()), str(target), str(menu), str(game), "3",
+                   str(trace), source_revision, "stadium-source-oninit-v1"]
+        (self.scratch / "stadium-source-oninit-command.txt").write_text(
+            " ".join(command) + "\n", encoding="utf-8")
+        (self.scratch / "stadium-source-oninit-fixture-preflight.json").write_text(
+            json.dumps({"menu_names": menu_names,
+                        "selected_names": selected_names,
+                        "missing": missing}, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        try:
+            run = subprocess.run(
+                command, cwd=ROOT, capture_output=True, text=True, timeout=120)
+        except subprocess.TimeoutExpired as failure:
+            (self.scratch / "stadium-source-oninit.stdout").write_bytes(
+                failure.stdout.encode() if isinstance(failure.stdout, str)
+                else (failure.stdout or b""))
+            (self.scratch / "stadium-source-oninit.stderr").write_bytes(
+                failure.stderr.encode() if isinstance(failure.stderr, str)
+                else (failure.stderr or b""))
+            raise
+        (self.scratch / "stadium-source-oninit.stdout").write_text(
+            run.stdout, encoding="utf-8")
+        (self.scratch / "stadium-source-oninit.stderr").write_text(
+            run.stderr, encoding="utf-8")
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-9000:])
+        self.assertIn(
+            "one source-ordered Stadium OnInit lifetime passed",
+            run.stdout,
+        )
+        result = next(json.loads(line) for line in run.stdout.splitlines()
+                      if line.startswith('{"probe":"stadium-source-oninit"'))
+        self.assertEqual(result["source_size_name"], "/GrPs.usd")
+        self.assertEqual(result["typed_open_name"], "/GrPs.usd")
+        self.assertEqual(result["authored_map_sequence"], [0, 1, 2, 5])
+        self.assertFalse(result["runtime_map_call_order_observed"])
+        self.assertTrue(result["map_slots_match_owner_record"])
+        self.assertGreater(result["map2_buffer_pointer"], 0)
+        self.assertIn(result["map2_buffer_origin"],
+                      ("borrowed_preload", "owned_fallback"))
+        self.assertEqual(result["ground_storage_requested_bytes"], 64)
+        self.assertTrue(result["ground_storage_retired"])
+        self.assertTrue(result["ft_device_bytes_restored"])
+        self.assertEqual(result["source_tick_delta"], 0)
+        self.assertTrue(result["map2_scheduled_proc_dispatch_absent"])
+        self.assertFalse(result["camera_called"])
+        self.assertFalse(result["onstart_called"])
+        self.assertFalse(result["rendered"])
+        self.assertTrue(result["ordinary_admission_closed"])
+        self.assertTrue(result["checked_teardown"])
+        if result["map2_buffer_origin"] == "owned_fallback":
+            self.assertEqual(result["map2_requested_bytes"], 0x50000)
+            self.assertGreater(result["map2_allocation_generation"], 0)
+            self.assertTrue(result["map2_fallback_retired"])
+            self.assertFalse(result["borrowed_preload_preserved"])
+        else:
+            self.assertTrue(result["borrowed_preload_preserved"])
+            self.assertFalse(result["map2_fallback_retired"])
+
+        rows = [json.loads(line) for line in trace.read_text().splitlines()]
+        self.assertEqual(rows[0]["record"], "header")
+        self.assertEqual(rows[0]["input_recipe"], "stadium-source-oninit-v1")
+        events = [row for row in rows if row.get("record") == "event"]
+        self.assertEqual([row["event"] for row in events], [
+            "stadium_source_oninit_returned",
+            "stadium_source_oninit_cleaned",
+        ])
+
     def test_owned_css_scene_lifecycle(self):
         targets = [ROOT / "build" / name / "native_css_callbacks.js"
                    for name in ("browser", "browser-release")]
