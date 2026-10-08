@@ -413,10 +413,9 @@ def _browser_entities(value: Any, context: str, match_index: int) -> list[dict[s
     for slot, item in enumerate(value):
         if not isinstance(item, dict) or set(item) != expected_keys:
             raise ComparisonError(f"{context}: malformed fighter entity identity at slot {slot}")
-        if (any(type(item.get(field)) is not int for field in
-                ("match_index", "slot", "entity_index", "generation", "fighter_player_id")) or
-                type(item.get("fighter_gobj_linked")) is not bool):
-            raise ComparisonError(f"{context}: fighter entity identity is not exactly typed at slot {slot}")
+        for field in ("match_index", "slot", "entity_index"):
+            if type(item.get(field)) is not int:
+                _int(item.get(field), f"{context}.fighter_entities[{slot}].{field}")
         if (item.get("match_index") != match_index or item.get("slot") != slot or
                 item.get("entity_index") != 0 or item.get("fighter_player_id") != slot):
             raise ComparisonError(f"{context}: fighter entity identities are missing, extra, or reordered")

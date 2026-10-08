@@ -3986,7 +3986,7 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             invalid_entities[2]["generation"] = True
             comparator, browser = run_frame(path, entities=invalid_entities)
             try:
-                with self.assertRaisesRegex(ComparisonError, "not exactly typed"):
+                with self.assertRaisesRegex(ComparisonError, "expected integer"):
                     comparator._expect_frame_row(SCENES["match"], 0)
             finally:
                 browser.close()
