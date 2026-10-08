@@ -332,8 +332,6 @@ void run_sudden_death_host_control(
     check(melee_web_menu_host_input(host) != nullptr,
           "Closed SSS did not retain its source PAD owner");
 
-    std::array<std::uint8_t, MELEE_WEB_PAD_STATE_BYTES> pad_bytes{};
-    melee_web_pad_state_capture(pad_bytes.data());
     const std::uint32_t menu_seed = selection.random_seed;
     std::uint32_t vs_final_seed = menu_seed ^ 0x6d2b79f5U;
     if (vs_final_seed == menu_seed) ++vs_final_seed;
@@ -343,8 +341,6 @@ void run_sudden_death_host_control(
     const StartMeleeData original_start = gmVsMelee_StartData;
     const MatchExitInfo original_sudden_death_exit =
         gmVsMelee_SuddenDeathExitInfo;
-    check(melee_web_menu_host_match_finished(
-              host, menu_seed, pad_bytes.data(), error, error_size), error);
 
     MatchExitInfo tied_timeout{};
     tied_timeout.match_end.outcome = OUTCOME_TIMEOUT;
@@ -388,7 +384,7 @@ void run_sudden_death_host_control(
     MeleeWebMenuMatchSelection observed{};
     check(melee_web_menu_host_selection(host, &observed, error, error_size) &&
               observed.random_seed == vs_final_seed,
-          "Typed VS continuation did not transfer the closed match RNG seed");
+          "Typed VS continuation did not transfer its explicit match RNG seed");
     check(!melee_web_vs_mode_begin(),
           "Typed Sudden Death continuation released its original VS mode lease");
 
@@ -423,7 +419,7 @@ void run_sudden_death_host_control(
           "Typed Sudden Death finish did not preserve the source Results merge");
     check(melee_web_menu_host_selection(host, &observed, error, error_size) &&
               observed.random_seed == sudden_death_final_seed,
-          "Typed Sudden Death finish did not transfer its final RNG seed");
+          "Typed Sudden Death finish did not transfer its explicit final RNG seed");
     check(!melee_web_menu_host_sudden_death_finish(
               host, &sudden_death_exit, sudden_death_final_seed,
               &continuation, error, error_size) && continuation.kind == 0,
