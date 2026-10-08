@@ -367,6 +367,31 @@ async function captureRouteBoundary(role, boundary, priorSignatures) {
   return true;
 }
 
+async function captureRuntimeCssSssFinalBoundary(role) {
+  const fixture = instanceRows[role].runtime_input_fixture_frozen;
+  const interval = pairResults.native_pump_interval;
+  if (!runtimeCssSss || fixture?.frozen !== true || fixture.captured_count !== usedInputs ||
+      interval?.complete !== true || interval.no_peer_RPC_during_interval !== true ||
+      interval.actual_native_cursor_progress_each !== true || interval.crossed_512_each !== true)
+    throw Error(`${role} final SSS observation requires the frozen input fixture and completed read-only 512 interval`);
+  const boundary = POSITIVE_ROUTE_BOUNDARIES[1];
+  const captured = await captureRouteBoundary(role, boundary, new Set());
+  if (!captured) {
+    const [status, native] = await Promise.all([instances[role].status(), instances[role].native()]);
+    recordMissedBoundary(role, boundary, 'final SSS had no ready driver draw for screenshot and GPU diagnostics',
+      {phase: native.phase, cursor: status.cursor});
+    throw Error(`${role} final SSS boundary screenshot was not captured`);
+  }
+  const evidence = instanceRows[role].route_boundary_captures.find(item => item.name === boundary.name);
+  if (evidence.source_cursor_sampled_before_screenshot !== sourceTicks ||
+      evidence.source_cursor_after_screenshot !== sourceTicks ||
+      evidence.source_cursor_stable_during_screenshot !== true ||
+      evidence.screenshot_phase_stable !== true || evidence.phase_after_screenshot !== boundary.phase ||
+      !evidence.browser_driver || !evidence.gpu)
+    throw Error(`${role} final SSS screenshot changed the source boundary or lacks driver/GPU diagnostics`);
+  return evidence;
+}
+
 async function watchRouteBoundary(role, boundary, {includeCurrentRender = false} = {}) {
   let priorSignatures = new Set();
   if (!includeCurrentRender) {
@@ -1264,6 +1289,8 @@ async function run() {
     if (runtimeOwned) {
       if (runtimeInputFixture) for (const role of ['alpha', 'beta'])
         instanceRows[role].runtime_input_fixture_frozen = await instances[role].freezeRuntimeInputFixture();
+      if (runtimeCssSss) for (const role of ['alpha', 'beta'])
+        await captureRuntimeCssSssFinalBoundary(role);
       await relay.close();
       pairResults.relay_closed = true;
     } else {
@@ -1401,8 +1428,15 @@ async function run() {
       recipe_identity: runtimeRecipeIdentity, observed_scenes: observedScenes,
       first_sss_checksum_tick: firstSssTick, phase_samples: {alpha: fixtures.alpha.phase_samples,
         beta: fixtures.beta.phase_samples}, fixtures, matched_every_native_consumed_input_component: true, ...witness};
+    const finalSssCaptures = Object.fromEntries(['alpha', 'beta'].map(role => {
+      const capture = instanceRows[role].route_boundary_captures.find(item => item.name === 'sss');
+      if (!capture) throw Error(`${role} final SSS screenshot and diagnostics were not retained`);
+      return [role, capture];
+    }));
     pairResults.route = {scope: 'runtime-owned original CSS-to-SSS transition', status: 'passed',
-      observed_scenes: observedScenes, final_native_phase: {alpha: 3, beta: 3}, first_sss_checksum_tick: firstSssTick};
+      observed_scenes: observedScenes, final_native_phase: {alpha: 3, beta: 3}, first_sss_checksum_tick: firstSssTick,
+      final_sss_boundary_capture: {expected: {name: 'sss', phase: 3}, captures: finalSssCaptures,
+        source: 'existing route-boundary screenshot, browser-driver and WebGPU diagnostics', pixel_equivalence_claim: false}};
     pairResults.outcome = 'complete';
   } else if (inputSampling) {
     if (!instanceRows.input_capture_released || !instanceRows.input_capture_wait?.stable_bytes_and_serial)

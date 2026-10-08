@@ -507,6 +507,81 @@ test('runtime CSS-to-SSS scene verifier requires 520 ordered checksums with only
   }
 });
 
+test('runtime CSS-to-SSS final SSS screenshot waits for frozen input and the read-only 512 interval', async () => {
+  const source = await readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf('function routeBoundaryPath(');
+  const end = source.indexOf('\nasync function watchRouteBoundary(', start);
+  const helperSource = source.slice(start, end);
+  assert(start >= 0 && end > start);
+  const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]);
+  async function run({frozen = true, complete = true, noPeerRpc = true, crossed512 = true,
+    cursorAfterScreenshot = 520, phaseAfterScreenshot = 3} = {}) {
+    const events = [], instanceRows = {alpha: {route_boundary_captures: [], route_boundary_misses: [],
+      runtime_input_fixture_frozen: {frozen, captured_count: 518}}};
+    let statusCalls = 0, screenshotCount = 0;
+    const instances = {alpha: {
+      driver: {async diagnostics() { events.push('driver'); return {phase: 3, running: 1, status: 'Original stage select', log: ''}; }},
+      async native() { events.push('native'); return {phase: events.includes('screenshot') ? phaseAfterScreenshot : 3}; },
+      async status() { events.push('status'); ++statusCalls; return {cursor: statusCalls === 1 ? 520 : cursorAfterScreenshot,
+        blocker: 'complete'}; },
+      async screenshot(file) { events.push('screenshot'); ++screenshotCount; assert.match(file, /route-sss\.png$/); },
+      async graphics() { events.push('graphics'); return {cross_origin_isolated: true, webgpu_api: true, webgpu_adapter: true}; },
+    }};
+    const pairResults = {native_pump_interval: {complete, no_peer_RPC_during_interval: noPeerRpc,
+      actual_native_cursor_progress_each: true, crossed_512_each: crossed512}};
+    const context = vm.createContext({
+      Buffer, Date, Promise, path: await import('node:path'), output: '/capture',
+      childDirectory: role => `/capture/${role}`, instances, instanceRows, pairResults,
+      runtimeCssSss: true, sourceTicks: 520, usedInputs: 518,
+      POSITIVE_ROUTE_BOUNDARIES: [{name: 'css-start', phase: 1, label: 'CSS'},
+        {name: 'sss', phase: 3, label: 'original SSS'}],
+      fs: {async readFile(file) { events.push('read'); assert.match(file, /route-sss\.png$/); return png; }},
+      readyRenderEvent: (_diagnostics, phase) => phase === 3 ? {phase, draw_calls: 1, source_draws: 1} : null,
+      sha256: () => 'fixture-png-sha256',
+    });
+    const capture = vm.runInContext(`${helperSource}\n;captureRuntimeCssSssFinalBoundary`, context);
+    return {events, instanceRows, pairResults, get screenshotCount() { return screenshotCount; },
+      capture: () => capture('alpha')};
+  }
+
+  const valid = await run();
+  await valid.capture();
+  const row = valid.instanceRows.alpha.route_boundary_captures[0];
+  assert.equal(valid.screenshotCount, 1);
+  assert.deepEqual(valid.events, ['driver', 'native', 'status', 'screenshot', 'read', 'native', 'status', 'graphics']);
+  assert.equal(row.name, 'sss');
+  assert.equal(row.source_cursor_sampled_before_screenshot, 520);
+  assert.equal(row.source_cursor_after_screenshot, 520);
+  assert.equal(row.source_cursor_stable_during_screenshot, true);
+  assert.equal(row.screenshot_phase_stable, true);
+  assert.equal(row.gpu_observed, true);
+  assert.equal(row.browser_driver.phase, 3);
+
+  const notFrozen = await run({frozen: false});
+  await assert.rejects(notFrozen.capture(), /frozen input fixture/);
+  assert.equal(notFrozen.screenshotCount, 0);
+  const intervalIncomplete = await run({complete: false});
+  await assert.rejects(intervalIncomplete.capture(), /read-only 512 interval/);
+  assert.equal(intervalIncomplete.screenshotCount, 0);
+  const intervalHadRpc = await run({noPeerRpc: false});
+  await assert.rejects(intervalHadRpc.capture(), /read-only 512 interval/);
+  assert.equal(intervalHadRpc.screenshotCount, 0);
+  const intervalMissed512 = await run({crossed512: false});
+  await assert.rejects(intervalMissed512.capture(), /read-only 512 interval/);
+  assert.equal(intervalMissed512.screenshotCount, 0);
+  const movedDuringScreenshot = await run({cursorAfterScreenshot: 521});
+  await assert.rejects(movedDuringScreenshot.capture(), /changed the source boundary/);
+  assert.equal(movedDuringScreenshot.screenshotCount, 1);
+});
+
+test('runtime CSS-to-SSS final SSS capture runs after fixture freeze and before relay close', async () => {
+  const source = await readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const freeze = source.indexOf('instanceRows[role].runtime_input_fixture_frozen = await instances[role].freezeRuntimeInputFixture();');
+  const capture = source.indexOf('await captureRuntimeCssSssFinalBoundary(role);', freeze);
+  const close = source.indexOf('await relay.close();', capture);
+  assert(freeze >= 0 && capture > freeze && close > capture);
+});
+
 test('startup consumer failures set protocol and native terminal without a progress notification', async () => {
   for (const consumer of [() => { throw Error('fixture consumer throw'); },
     () => Promise.reject(Error('fixture consumer reject')), () => undefined, () => 1]) {
