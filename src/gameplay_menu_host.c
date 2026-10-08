@@ -1773,6 +1773,10 @@ static int host_selection_from_vs(const MeleeWebMenuHost* h,
     out->save_profile_present=1;
     return ok(e,n);
 }
+const VsModeData* melee_web_menu_host_post_vs_mode(const MeleeWebMenuHost* h){
+    if(!h||h!=owner||h->entered||h->audio||seed_ptr!=&h->seed)return NULL;
+    return melee_web_menu_post_vs_mode(h->session);
+}
 int melee_web_menu_host_selection(const MeleeWebMenuHost* h,MeleeWebMenuMatchSelection* out,char* e,size_t n){
     if(!h||h!=owner||h->entered||h->audio||!out||seed_ptr!=&h->seed)
         return fail(e,n,"Selection requires a closed menu scene with owned RNG");
@@ -1872,6 +1876,8 @@ static int begin_vs_match_route(MeleeWebMenuHost* h,
        seed_ptr!=&h->seed||!exit_info||!next||
        melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_READY)
         return fail(e,n,"Results routing requires a completed closed match");
+    const VsModeData* prepared=melee_web_menu_post_vs_mode(h->session);
+    if(!prepared)return fail(e,n,"VS route requires its retained original entry state");
     if(!melee_web_vs_mode_begin())return fail(e,n,"Original VS mode is already owned");
     h->route_saved_vs=*gmVsMelee_GetVsData();
     h->route_saved_exit=gmVsMelee_VsExitInfo;
@@ -1890,7 +1896,7 @@ static int begin_vs_match_route(MeleeWebMenuHost* h,
     *gmMainLib_GetUnlockedCharactersBitmaskPtr()=h->selected_characters;
     *gmMainLib_8015EDA4()=h->selected_stages;
     const CSSData* css=melee_web_menu_css(h->session);
-    *gmVsMelee_GetVsData()=css->vs;
+    *gmVsMelee_GetVsData()=*prepared;
     memcpy(gmVsMelee_GetKOCounts(),css->ko_counts,sizeof(h->route_saved_ko));
     gmVsMelee_VsExitInfo=*exit_info;
     if(!melee_web_vs_mode_select_state(gmVsMode_State_Vs))abort();

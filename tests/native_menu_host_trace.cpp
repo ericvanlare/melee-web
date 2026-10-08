@@ -112,6 +112,9 @@ extern HSD_RumbleData HSD_Rumble_804C22E0[4];
 #include <stdexcept>
 #include <string_view>
 #include <vector>
+extern "C" int melee_web_vs_prepare_start_source(StartMeleeData*,const VsModeData*,VsModeData*);
+extern "C" int melee_web_match_validate_source_start(StartMeleeData*,int,int);
+extern "C" int melee_web_match_prepare_source(StartMeleeData*,int);
 extern "C" int melee_web_vs_mode_begin(void);
 extern "C" int melee_web_vs_mode_end(void);
 extern "C" int melee_web_vs_mode_select_state(int);
@@ -126,6 +129,83 @@ extern "C" int melee_web_stage_selection_end(void);
 static void check(int value,const char* error){if(!value){std::cerr<<"Check failed before teardown: "<<error<<"\n";throw std::runtime_error(error);}}
 
 namespace {
+void run_post_vs_mode_asset_free_contract()
+{
+    const GameRules saved_rules=*gmMainLib_GetGameRules();
+    const auto saved_preferences=*gmMainLib_8015CC58();
+    try{
+        gmMainLib_GetGameRules()->mode=1;
+        gmMainLib_GetGameRules()->stock_count=4;
+        gmMainLib_GetGameRules()->stock_time_limit=0;
+        gmMainLib_8015CC58()->item_freq=-1;
+        VsModeData raw{};gm_InitVsMode(&raw);raw.start.rules.stkind=St_Kind_Last;
+        for(unsigned i=0;i<2;++i){
+            raw.start.players[i].slot_type=Gm_PKind_Cpu;
+            raw.start.players[i].ckind=CKIND_MARIO;
+            raw.start.players[i].slot=i+1;
+            raw.start.players[i].color=i;
+            raw.start.players[i].cpu_kind=4;
+            raw.start.players[i].cpu_level=9;
+        }
+        const VsModeData untouched=raw;
+        VsModeData oracle=raw;gm_80167BC8(&oracle);
+        StartMeleeData expected{};expected.rules=oracle.start.rules;
+        expected.rules.is_stock=true;expected.rules.is_vs=true;
+        for(unsigned i=0;i<GM_MAX_PLAYERS;++i)expected.players[i]=oracle.start.players[i];
+        gm_SetupSubColors(&expected);gm_LoadRumbleEnabled(&expected);
+        StartMeleeData output{};VsModeData retained{};
+        check(melee_web_vs_prepare_start_source(&output,&raw,&retained),
+              "VS preparation did not return its exact persistent mode state");
+        check(std::memcmp(&raw,&untouched,sizeof(raw))==0&&
+              std::memcmp(&retained,&oracle,sizeof(retained))==0&&
+              std::memcmp(&output,&expected,sizeof(output))==0&&
+              !retained.start.rules.is_stock&&!retained.start.rules.is_vs&&
+              output.rules.is_stock&&output.rules.is_vs&&
+              retained.start.rules.xB==-1&&retained.start.players[0].stocks==4,
+              "VS preparation lost raw, persistent mode or normalized Start separation");
+        const auto retained_before=retained;const auto output_before=output;
+        check(!melee_web_vs_prepare_start_source(&output,&raw,nullptr)&&
+              std::memcmp(&retained,&retained_before,sizeof(retained))==0&&
+              std::memcmp(&output,&output_before,sizeof(output))==0,
+              "Missing retained VS output changed preparation state");
+        check(melee_web_match_validate_source_start(&output,0,0),
+              "Ordinary VS contract rejected its unchanged normalized Start");
+        StartMeleeData ordinary_without_flags=output;
+        ordinary_without_flags.rules.is_stock=false;ordinary_without_flags.rules.is_vs=false;
+        check(!melee_web_match_validate_source_start(&ordinary_without_flags,0,0)&&
+              !melee_web_match_prepare_source(&ordinary_without_flags,0),
+              "Ordinary VS accepted missing stock/VS source flags");
+        MatchEnd tie{};tie.match_kind=output.rules.match_kind;tie.outcome=OUTCOME_TIMEOUT;
+        tie.n_winners=2;tie.winners[0]=0;tie.winners[1]=1;
+        for(auto& player:tie.player_standings)player.slot_type=Gm_PKind_NA;
+        for(unsigned i=0;i<2;++i){tie.player_standings[i].slot_type=Gm_PKind_Cpu;
+            tie.player_standings[i].ckind=CKIND_MARIO;tie.player_standings[i].stocks=1;}
+        StartMeleeData sd{};sd.rules=retained.start.rules;
+        for(unsigned i=0;i<GM_MAX_PLAYERS;++i)sd.players[i]=retained.start.players[i];
+        gm_SetupSubColors(&sd);gm_LoadRumbleEnabled(&sd);gm_SetupSuddenDeath(&sd,&tie);
+        sd.rules.x6=true; // GS_SUDDEN_DEATH source scene entry adapter boundary.
+        const auto sd_before=sd;
+        check(melee_web_match_validate_source_start(&sd,0,1)&&
+              std::memcmp(&sd,&sd_before,sizeof(sd))==0&&
+              !sd.rules.is_stock&&!sd.rules.is_vs&&
+              !melee_web_match_validate_source_start(&sd,0,0)&&
+              !melee_web_match_prepare_source(&sd,0),
+              "Explicit SD contract changed source flags or bypassed ordinary VS");
+        for(unsigned negative=0;negative<4;++negative){
+            StartMeleeData invalid=sd;
+            if(negative==0)invalid.rules.x6=false;
+            if(negative==1)invalid.rules.timer_enabled=true;
+            if(negative==2)invalid.players[0].stocks=2;
+            if(negative==3)invalid.players[0].x12=0;
+            check(!melee_web_match_validate_source_start(&invalid,0,1),
+                  "Explicit SD contract accepted wrong scene/timer/stock/damage");
+        }
+    }catch(...){*gmMainLib_GetGameRules()=saved_rules;
+        *gmMainLib_8015CC58()=saved_preferences;throw;}
+    *gmMainLib_GetGameRules()=saved_rules;*gmMainLib_8015CC58()=saved_preferences;
+    std::cout<<"Asset-free post-VS mode retention and explicit SD/ordinary-VS validation contracts passed\n";
+}
+
 void run_vs_sudden_death_source_control()
 {
     char error[256]{};
@@ -134,6 +214,7 @@ void run_vs_sudden_death_source_control()
     bool mode_owned = false;
     bool session_active = true;
     try {
+        run_post_vs_mode_asset_free_contract();
         check(melee_web_vs_mode_begin(),
               "Original VS source-mode lease did not begin");
         mode_owned = true;
@@ -292,6 +373,9 @@ void run_vs_sudden_death_source_control()
         check(host != nullptr, error);
         MeleeWebMenuMatchContinuation rejected_continuation{};
         MatchExitInfo rejected_exit{};
+        check(melee_web_menu_host_post_vs_mode(host)==nullptr&&
+              melee_web_menu_host_post_vs_mode(nullptr)==nullptr,
+              "Fresh or missing host exposed a prepared VS route");
         check(!melee_web_menu_host_match_continuation_begin(
                   host, &rejected_exit, 1, &rejected_continuation,
                   error, sizeof(error)),
@@ -345,7 +429,6 @@ void run_vs_sudden_death_source_control()
 
 void run_sudden_death_host_control(
     MeleeWebMenuHost* host, const MeleeWebMenuMatchSelection& selection,
-    const StartMeleeData& source_start,
     char* error, std::size_t error_size,
     const melee_web::RuntimeFiles* world_files = nullptr)
 {
@@ -355,6 +438,10 @@ void run_sudden_death_host_control(
     check(melee_web_menu_host_input(host) != nullptr,
           "Closed SSS did not retain its source PAD owner");
 
+    const VsModeData* prepared_mode=melee_web_menu_host_post_vs_mode(host);
+    check(prepared_mode!=nullptr,"SD control has no retained original VS entry state");
+    const VsModeData retained_mode=*prepared_mode;
+    const StartMeleeData& route_start=retained_mode.start;
     const std::uint32_t menu_seed = selection.random_seed;
     std::uint32_t vs_final_seed = menu_seed ^ 0x6d2b79f5U;
     if (vs_final_seed == menu_seed) ++vs_final_seed;
@@ -367,14 +454,14 @@ void run_sudden_death_host_control(
 
     MatchExitInfo tied_timeout{};
     tied_timeout.match_end.outcome = OUTCOME_TIMEOUT;
-    tied_timeout.match_end.match_kind = source_start.rules.match_kind;
+    tied_timeout.match_end.match_kind = selection.start.rules.match_kind;
     tied_timeout.match_end.n_winners =
         static_cast<std::uint8_t>(selection.player_count);
     tied_timeout.match_end.frame_count = 3600;
     for (auto& player : tied_timeout.match_end.player_standings)
         player.slot_type = Gm_PKind_NA;
     for (unsigned i = 0; i < selection.player_count; ++i) {
-        const auto& source = source_start.players[i];
+        const auto& source = route_start.players[i];
         auto& standing = tied_timeout.match_end.player_standings[i];
         check(source.slot_type != Gm_PKind_NA,
               "Committed VS source payload has a gap before its active players");
@@ -386,9 +473,9 @@ void run_sudden_death_host_control(
     }
 
     StartMeleeData expected_sudden_death{};
-    expected_sudden_death.rules = source_start.rules;
+    expected_sudden_death.rules = route_start.rules;
     for (unsigned i = 0; i < GM_MAX_PLAYERS; ++i)
-        expected_sudden_death.players[i] = source_start.players[i];
+        expected_sudden_death.players[i] = route_start.players[i];
     gm_SetupSubColors(&expected_sudden_death);
     gm_LoadRumbleEnabled(&expected_sudden_death);
     gm_SetupSuddenDeath(&expected_sudden_death, &tied_timeout.match_end);
@@ -445,7 +532,7 @@ void run_sudden_death_host_control(
                 check(stats.player_slot==i&&stats.stocks==1&&
                       stats.damage_percent==300.0f&&
                       match.start_data().players[i].x12==300&&
-                      match.start_data().players[i].slot==source_start.players[i].slot,
+                      match.start_data().players[i].slot==route_start.players[i].slot,
                       "Actual SD world changed original slots, stock or 300-percent damage setup");
             }
             const auto retained_scene=melee_web_current_scene_info();
@@ -605,7 +692,7 @@ void run_sudden_death_host_control(
           "Typed Sudden Death continuation released its original VS mode lease");
 
     MatchExitInfo sudden_death_exit{};
-    sudden_death_exit.match_end.match_kind = source_start.rules.match_kind;
+    sudden_death_exit.match_end.match_kind = route_start.rules.match_kind;
     sudden_death_exit.match_end.outcome = OUTCOME_ELIMINATION;
     sudden_death_exit.match_end.frame_count = 9876;
     sudden_death_exit.match_end.n_winners = 1;
@@ -615,8 +702,8 @@ void run_sudden_death_host_control(
         player.slot_type = Gm_PKind_NA;
     auto& winning_standing =
         sudden_death_exit.match_end.player_standings[winner];
-    winning_standing.slot_type = source_start.players[winner].slot_type;
-    winning_standing.ckind = source_start.players[winner].ckind;
+    winning_standing.slot_type = route_start.players[winner].slot_type;
+    winning_standing.ckind = route_start.players[winner].ckind;
     winning_standing.stocks = 1;
 
     MatchEnd expected_result = tied_timeout.match_end;
@@ -1736,6 +1823,7 @@ public:
  }
  void menu_selection(const StartMeleeData& raw,
                      const MeleeWebMenuMatchSelection& normalized,
+                     const VsModeData& post_mode,
                      const uint8_t pad[MELEE_WEB_PAD_STATE_BYTES]){
   check(output.is_open(),"Menu selection diagnostic requires retained trace output");
   auto bytes=[&](const void* data,size_t size){
@@ -1749,6 +1837,10 @@ public:
         <<",\"boundary\":\"closed_original_sss\",\"rng\":"<<normalized.random_seed
         <<",\"raw\":";write_selection(output,raw_selection);
   output<<",\"normalized\":";write_selection(output,normalized);
+  MeleeWebMenuMatchSelection post_selection{};post_selection.start=post_mode.start;
+  output<<",\"post_vs_mode_start\":";write_selection(output,post_selection);
+  output<<",\"post_vs_mode_hex\":";bytes(&post_mode,sizeof(post_mode));
+  output<<",\"post_vs_start_hex\":";bytes(&post_mode.start,sizeof(post_mode.start));
   output<<",\"source_start_bytes_scope\":\"native ABI including pointers and padding\""
         <<",\"raw_start_hex\":";bytes(&raw,sizeof(raw));
   output<<",\"normalized_start_hex\":";bytes(&normalized.start,sizeof(normalized.start));
@@ -4049,7 +4141,9 @@ int main(int argc,char** argv){try{
          "Closed SSS has no retained PAD bank");
    melee_web_pad_state_apply(melee_web_menu_host_input(host));
    uint8_t pad[MELEE_WEB_PAD_STATE_BYTES];melee_web_pad_state_capture(pad);
-   trace.menu_selection(raw_start,selection,pad);
+   const auto* prepared=melee_web_menu_host_post_vs_mode(host);
+   check(prepared!=nullptr,"Menu diagnostic has no retained VS entry state");
+   trace.menu_selection(raw_start,selection,*prepared,pad);
    check(!melee_web_gameplay_generation()&&!melee_web_gameplay_world_exists(),
          "Menu-only setup retained a world after closed SSS");
    check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);host=nullptr;
@@ -4067,9 +4161,13 @@ int main(int argc,char** argv){try{
    if(sudden_death_world_recipe){
     check(selection.player_count==2&&selection.start.rules.stkind==St_Kind_Last&&
           selection.start.players[0].ckind==CKIND_MARIO&&
-          selection.start.players[1].ckind==CKIND_FOX&&
-          selection.start.players[0].color==0&&selection.start.players[1].color==0,
-          "SD lifecycle fixture contract requires neutral Mario/Fox in source slots 0/1 on FD");
+          selection.start.players[1].ckind==CKIND_MARIO&&
+          selection.start.players[0].color==1&&selection.start.players[1].color==0&&
+          selection.players[0].controller==0&&selection.players[1].controller==1&&
+          selection.start.rules.match_kind==MatchKind_Stock&&
+          selection.start.rules.is_stock&&selection.start.rules.is_vs&&
+          selection.start.players[0].stocks==4&&selection.start.players[1].stocks==4,
+          "SD lifecycle fixture contract requires observed four-stock Mario/Mario colors 1/0 ports 0/1 on FD");
     for(const auto& name:melee_web::match_asset_names(selection)){
      if(files.contains(name))continue;
      auto path=std::filesystem::path(argv[1])/name;
@@ -4079,7 +4177,14 @@ int main(int argc,char** argv){try{
      files[name]={(std::istreambuf_iterator<char>(input)),{}};
     }
    }
-   run_sudden_death_host_control(host,selection,raw_start,error,sizeof(error),
+   if(sudden_death_world_recipe){
+    const auto* prepared=melee_web_menu_host_post_vs_mode(host);
+    check(prepared!=nullptr,"SD lifecycle has no retained original VS mode");
+    melee_web_pad_state_apply(melee_web_menu_host_input(host));
+    uint8_t pad[MELEE_WEB_PAD_STATE_BYTES];melee_web_pad_state_capture(pad);
+    trace.menu_selection(raw_start,selection,*prepared,pad);
+   }
+   run_sudden_death_host_control(host,selection,error,sizeof(error),
                                 sudden_death_world_recipe?&files:nullptr);
    const auto retained=melee_web_gameplay_allocation();
    check(retained.identity==session_allocation.identity&&

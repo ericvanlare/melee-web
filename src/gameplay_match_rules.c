@@ -14,6 +14,7 @@
 extern void melee_web_match_source_refresh_ratio(void);
 extern int melee_web_match_init_source(StartMeleeData*);
 extern int melee_web_match_prepare_source(StartMeleeData*,int opening_demo);
+extern int melee_web_match_prepare_sudden_death_source(StartMeleeData*);
 extern int melee_web_match_finish_source(StartMeleeData*);
 extern void melee_web_match_source_demo_end(void);
 extern int melee_web_match_source_publish_result(void);
@@ -56,6 +57,11 @@ static int supported_stock_rules(const StartMeleeData* start){
            start->rules.is_vs&&melee_web_match_timer_supported(&start->rules)&&
            start->rules.xB==-1&&melee_web_stage_content(start->rules.stkind);
 }
+static int supported_sudden_death_rules(const StartMeleeData* start){
+    return start&&start->rules.x6&&start->rules.match_kind==MatchKind_Stock&&
+           !start->rules.timer_enabled&&!start->rules.x2_5&&
+           start->rules.xB==-1&&melee_web_stage_content(start->rules.stkind);
+}
 static int supported_sudden_death_players(const StartMeleeData* start){
     int count=0,first_team=-1,opposing_teams=0;
     if(!start||!start->rules.x6||start->rules.is_teams>1)return 0;
@@ -65,8 +71,8 @@ static int supported_sudden_death_players(const StartMeleeData* start){
         const int port=player->slot==0?i:(int)player->slot-1;
         const MeleeWebFighterContent* content=melee_web_fighter_content(player->ckind);
         if(port!=i||player->slot>MELEE_WEB_VS_TEAM_MAX_PLAYERS||!content||
-           !melee_web_match_player_supported(player)||player->stocks<1||
-           player->stocks>5||player->color>=content->costumes||player->sub_color>4)
+           !melee_web_match_player_supported(player)||player->stocks!=1||
+           player->x12!=300||player->color>=content->costumes||player->sub_color>4)
             return 0;
         if(start->rules.is_teams){
             if(player->team>=MELEE_WEB_VS_TEAM_COLORS)return 0;
@@ -157,12 +163,12 @@ int melee_web_match_rules_prepare_sudden_death_from_menu(
         return fail(e,n,"Original match data is already prepared");
     if(!menu)return fail(e,n,"A complete original Sudden Death payload is required");
     StartMeleeData candidate=*menu;
-    if(!supported_stock_rules(&candidate)||
+    if(!supported_sudden_death_rules(&candidate)||
        !supported_sudden_death_players(&candidate))
         return fail(e,n,"Sudden Death payload does not preserve a supported sparse source roster");
     h->start=candidate;
     h->opening_demo=0;
-    if(!melee_web_match_prepare_source(&h->start,0)){
+    if(!melee_web_match_prepare_sudden_death_source(&h->start)){
         memset(&h->start,0,sizeof(h->start));
         return fail(e,n,"Original Sudden Death source preparation rejected its payload");
     }

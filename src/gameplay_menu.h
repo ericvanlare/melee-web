@@ -158,6 +158,9 @@ int melee_web_menu_apply_reference_css_context(
 /* Returns the separate VS-entry payload after the original source adapter has
  * applied persistent rules, stocks, item settings and rumble. */
 const VsModeData* melee_web_menu_ready_vs(const MeleeWebMenuSession*);
+/* Exact persistent mode state after the same one VS preparation callback;
+ * distinct from raw menus and the separately normalized Start output. */
+const VsModeData* melee_web_menu_post_vs_mode(const MeleeWebMenuSession*);
 /* Commit the ordinary VS Results callback's persistent menu payload. */
 int melee_web_menu_commit_results(MeleeWebMenuSession*, const VsModeData*,
     const uint8_t ko_counts[GM_MAX_PLAYERS], char*, size_t);

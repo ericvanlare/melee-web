@@ -22,6 +22,8 @@ struct MeleeWebMenuSession {
     CSSData css;
     SSSData sss;
     VsModeData match_vs;
+    VsModeData post_vs_mode;
+    int post_vs_mode_valid;
     u8 css_ko_counts[GM_MAX_PLAYERS];
     uint64_t ticks;
     MeleeWebMenuPhase phase;
@@ -172,7 +174,7 @@ static int melee_web_menu_gobj_teardown(MeleeWebMenuSession* session,
 }
 
 extern int melee_web_vs_prepare_start_source(StartMeleeData*,
-                                              const VsModeData*);
+                                              const VsModeData*, VsModeData*);
 
 static int fail(char* error, size_t error_size, const char* message)
 {
@@ -1334,6 +1336,7 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
         return fail(error, error_size, "SSS published an unavailable selection");
     }
     if (session->sss.start_game) {
+        session->post_vs_mode_valid = 0;
         if (session->training_mode_scene) {
             if (!training_sss_selection_valid_internal(&session->sss, 0)) {
                 session->phase = MELEE_WEB_MENU_CLOSED;
@@ -1353,7 +1356,8 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
                 session->css.vs = session->sss.vs;
                 session->match_vs = session->sss.vs;
                 if (!melee_web_vs_prepare_start_source(&session->match_vs.start,
-                                                        &session->sss.vs)) {
+                                                        &session->sss.vs,
+                                                        &session->post_vs_mode)) {
                     session->phase = MELEE_WEB_MENU_CLOSED;
                     return fail(error, error_size,
                                 "Original VS entry could not prepare the Stadium diagnostic payload");
@@ -1365,6 +1369,7 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
                     return fail(error, error_size,
                                 "Original VS entry produced an unsupported Stadium diagnostic payload");
                 }
+                session->post_vs_mode_valid = 1;
                 session->stadium_c1a_ready = 1;
                 session->phase = MELEE_WEB_MENU_READY;
                 return ok(error, error_size);
@@ -1377,13 +1382,15 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
         session->css.vs = session->sss.vs;
         session->match_vs = session->sss.vs;
         if (!melee_web_vs_prepare_start_source(&session->match_vs.start,
-                                                &session->sss.vs) ||
+                                                &session->sss.vs,
+                                                &session->post_vs_mode) ||
             !match_selection_valid(&session->match_vs.start))
         {
             session->phase = MELEE_WEB_MENU_CLOSED;
             return fail(error, error_size,
                         "Original VS entry produced an unsupported match payload");
         }
+        session->post_vs_mode_valid = 1;
         session->phase = MELEE_WEB_MENU_READY;
     } else {
         session->css.vs = session->sss.vs;
@@ -1459,6 +1466,14 @@ const VsModeData* melee_web_menu_ready_vs(const MeleeWebMenuSession* session)
         return NULL;
     }
     return &session->match_vs;
+}
+
+const VsModeData* melee_web_menu_post_vs_mode(const MeleeWebMenuSession* session)
+{
+    if (!session || session != owner || session->phase != MELEE_WEB_MENU_READY ||
+        !session->post_vs_mode_valid || session->training_mode_scene)
+        return NULL;
+    return &session->post_vs_mode;
 }
 
 int melee_web_menu_commit_results(MeleeWebMenuSession* session,

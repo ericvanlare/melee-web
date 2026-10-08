@@ -3667,7 +3667,7 @@ index fea468cc6c89d7d4c6c8a1a81e31f99eec07bc63..6d0819f60ef4c12cdf80b1ea29bbd805
  
  void gm_80168C5C(u32 arg0)
 diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
-index cd7e31a0636e4e1a48d6a870e09319e887345ed1..f6bbbc7615c14e1916f56f3dd27af511299bfd3b 100644
+index cd7e31a0636e4e1a48d6a870e09319e887345ed1..eb459193ff578c06a970b875e22b132d39b8e639 100644
 --- a/src/melee/gm/gm_16AE.c
 +++ b/src/melee/gm/gm_16AE.c
 @@ -1,4 +1,6 @@
@@ -3880,7 +3880,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..f6bbbc7615c14e1916f56f3dd27af511
      }
      un_802FD428();
      ifStatus_802F665C(data->rules.x0_3);
-@@ -2277,3 +2324,213 @@ int fn_8016F160(int arg0, int arg1)
+@@ -2277,3 +2324,230 @@ int fn_8016F160(int arg0, int arg1)
  {
      return pl_80039418(arg0, arg1);
  }
@@ -3999,16 +3999,15 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..f6bbbc7615c14e1916f56f3dd27af511
 +#include "gameplay_match_rules.h"
 +#include "gameplay_player_selection.h"
 +extern void gm_80183218(void);
-+static int melee_web_match_validate_source_start(StartMeleeData* start,
-+                                                  int opening_demo)
++int melee_web_match_validate_source_start(StartMeleeData* start,
++                                          int opening_demo, int sudden_death)
 +{
 +    const StartMeleeRules* rules;
 +    int i;
 +    int active = 0;
 +    int first_team = -1;
 +    int opposing_teams = 0;
-+    const int sudden_death = !opening_demo && start != NULL && start->rules.x6;
-+    if (start == NULL) return 0;
++    if (start == NULL || (opening_demo && sudden_death)) return 0;
 +    rules = &start->rules;
 +    if (opening_demo) {
 +        if (rules->match_kind > MatchKind_Bonus || rules->timer_enabled ||
@@ -4020,7 +4019,16 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..f6bbbc7615c14e1916f56f3dd27af511
 +            rules->on_frame_start != NULL || rules->on_frame_end != NULL ||
 +            rules->on_match_end != NULL || !melee_web_stage_content(rules->stkind))
 +            return 0;
-+    } else if (rules->match_kind != MatchKind_Stock || !rules->is_stock ||
++    } else if (sudden_death) {
++        /* SD inherits exact persistent VS flags. It does not add the separate
++         * ordinary Start is_stock/is_vs bits. Never normalize them here. */
++        if (!rules->x6 || rules->match_kind != MatchKind_Stock ||
++            rules->timer_enabled || rules->x2_5 || rules->is_teams > 1 ||
++            !melee_web_stage_content(rules->stkind) || rules->xB != -1 ||
++            rules->game_speed != 1.0F || rules->x54 != NULL ||
++            rules->on_match_start != NULL || rules->on_frame_start != NULL ||
++            rules->on_frame_end != NULL || rules->on_match_end != NULL) return 0;
++    } else if (rules->x6 || rules->match_kind != MatchKind_Stock || !rules->is_stock ||
 +               !rules->is_vs || rules->is_teams > 1 ||
 +               !melee_web_match_timer_supported(rules) ||
 +               !melee_web_stage_content(rules->stkind) ||
@@ -4044,6 +4052,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..f6bbbc7615c14e1916f56f3dd27af511
 +        if (opening_demo &&
 +            (player->slot_type != Gm_PKind_Cpu || player->cpu_kind != 4 ||
 +             player->cpu_level != 9)) return 0;
++        if (sudden_death && (player->stocks != 1 || player->x12 != 300)) return 0;
 +        if (sudden_death && rules->is_teams) {
 +            if (player->team >= 3) return 0;
 +            if (first_team < 0) first_team = player->team;
@@ -4066,9 +4075,17 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..f6bbbc7615c14e1916f56f3dd27af511
 + * refraction. The caller owns the later dynamics/effect and stage boundaries. */
 +int melee_web_match_prepare_source(StartMeleeData* start, int opening_demo)
 +{
-+    if (!melee_web_match_validate_source_start(start, opening_demo)) return 0;
++    if (!melee_web_match_validate_source_start(start, opening_demo, 0)) return 0;
 +    fn_8016DCC0(start);
 +    melee_web_opening_demo_active = opening_demo != 0;
++    return 1;
++}
++/* Explicit SD entry: the checked host route already owns its source scene. */
++int melee_web_match_prepare_sudden_death_source(StartMeleeData* start)
++{
++    if (!melee_web_match_validate_source_start(start, 0, 1)) return 0;
++    fn_8016DCC0(start);
++    melee_web_opening_demo_active = false;
 +    return 1;
 +}
 +void melee_web_match_source_demo_end(void)
@@ -5025,10 +5042,10 @@ index 706ec65b2fc143d94a68493af6851648a716055d..55e8f92830a5b0720053ad71cb2a728d
  
  #endif
 diff --git a/src/melee/gm/gmvsmelee.c b/src/melee/gm/gmvsmelee.c
-index eb0b42c246c1a9529d791c99e2b78bd080e67d84..26fbc415e8bb179bbe3eef6b84f657d712272aed 100644
+index eb0b42c246c1a9529d791c99e2b78bd080e67d84..5b74b9d740eb03233a32b15832d100d3fb18ba0a 100644
 --- a/src/melee/gm/gmvsmelee.c
 +++ b/src/melee/gm/gmvsmelee.c
-@@ -204,6 +204,36 @@ void gmVsMelee_EnterVs(GameModeState* state, VsModeData* vs,
+@@ -204,6 +204,40 @@ void gmVsMelee_EnterVs(GameModeState* state, VsModeData* vs,
      gm_LoadAnnouncer();
  }
  
@@ -5038,16 +5055,20 @@ index eb0b42c246c1a9529d791c99e2b78bd080e67d84..26fbc415e8bb179bbe3eef6b84f657d7
 + * its checked match construction phase. Keep the menu-owned VsModeData raw:
 + * retail does not apply persistent rules until after SSS has exited. */
 +int melee_web_vs_prepare_start_source(StartMeleeData* start,
-+                                      const VsModeData* menu)
++                                      const VsModeData* menu,
++                                      VsModeData* prepared_mode)
 +{
 +    VsModeData vs;
 +    ssize_t i;
 +
-+    if (start == NULL || menu == NULL) {
++    if (start == NULL || menu == NULL || prepared_mode == NULL) {
 +        return 0;
 +    }
 +    vs = *menu;
 +    gm_80167BC8(&vs);
++    /* Retain the persistent mode state from this exact preparation callback.
++     * Ordinary VS flags below belong only to its separate Start output. */
++    *prepared_mode = vs;
 +    start->rules = vs.start.rules;
 +    if (start->rules.match_kind == MatchKind_Stock) {
 +        start->rules.is_stock = true;
