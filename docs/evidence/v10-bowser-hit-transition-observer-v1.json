@@ -620,6 +620,34 @@
       "Issue #274, Results and whole-session acceptance remain open."
     ]
   },
+  "pr284_ci_repair_followup": {
+    "initial_ci_run": {
+      "url": "https://github.com/ericvanlare/melee-web/actions/runs/37802098528",
+      "head": "a8f3bd00d13264334759e5436a0fc4de655ed4a0",
+      "unit_1": "Fixture counting-adapter compilation failed; retained job output did not include compiler stdout/stderr.",
+      "browser_build": "Not run; downstream verification-partition gate failed."
+    },
+    "diagnostic_ci_run": {
+      "url": "https://github.com/ericvanlare/melee-web/actions/runs/37804836113",
+      "head": "5dde40c5e0a1b75a70ff49bdb683298229b63abf",
+      "unit_1": "Failed compiling the fixture-only counting adapter; GCC reported -Werror=misleading-indentation at the event-growth and geometry-open guards.",
+      "compiler_error_sites": [
+        "tests/native_hit_candidate_probe_fixture.c:56",
+        "tests/native_hit_candidate_probe_fixture.c:134"
+      ],
+      "unit_0": "Passed.",
+      "other_partitions": "Passed: runtime, graphics, fighter, gameplay, effects, menus, public-shell, repository-content, and compiler-cache-probe.",
+      "browser_build": "Not run; the verification-partition gate failed before build/report steps.",
+      "raw_unit_log": {
+        "name": "unit1-job-logs-api-raw.txt",
+        "bytes": 409312,
+        "sha256": "a0049937118f68d63b715a34a403568430a334aa834a525543b6b9e08f6f4d87"
+      }
+    },
+    "repair": "Add braces around the two abort-only fixture guards and keep following unconditional assignments/return unchanged. No production/native source, compiler flags, runtime behavior, or capture producer changed.",
+    "validation_state": "Fixture correction awaits fresh Linux full-head CI; previously passing focused, local full-suite, and ordinary Release build evidence remains bound to its original revisions.",
+    "scope_limit": "This repair does not change the d1 capture/native producer distinction, establish an original collision cause, or close issue #274."
+  },
   "current_main_integration_validation": {
     "source": {
       "commit": "43a3a929e9a678b6417e56e5ba6ea7bdbe6be101",

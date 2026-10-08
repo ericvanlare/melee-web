@@ -56,6 +56,23 @@ This follow-up does not establish an original collision cause or fix the first
 divergence. Issue #274, Results and whole-session acceptance remain open.
 Pixels, PCM, physical input, live timing and performance remain separate gates.
 
+**PR284 CI repair follow-up — fixture-only.** The first Linux CI run
+([37802098528](https://github.com/ericvanlare/melee-web/actions/runs/37802098528))
+failed while compiling the counting adapter but did not retain the compiler
+diagnostic; its downstream browser-build gate stopped before building. The
+diagnostic run at
+[37804836113](https://github.com/ericvanlare/melee-web/actions/runs/37804836113)
+exposed GCC `-Werror=misleading-indentation` at
+`tests/native_hit_candidate_probe_fixture.c:56` and `:134`, the fixture-only
+event-growth and geometry-open guards. Braces now make those two abort-only
+guards explicit and leave their following unconditional assignments and return
+unchanged; compiler flags and runtime code are unchanged. In that diagnostic
+run, unit-1 failed at the adapter compile, unit-0 and the other completed
+partitions passed, and browser-build again stopped at the verification-partition
+gate. The retained raw unit log is bound in the portable receipt. This CI repair
+does not alter the d1 capture/native producer distinction, recapture the
+browser, or resolve the retained Bowser divergence.
+
 **Earlier observer capture and controls.**
 
 **Compiled / Browser exercised**

@@ -53,7 +53,11 @@ static void record_event(const char* phase,unsigned kind,unsigned ordinal,
  if(count_event_len==count_event_cap){
   size_t next=count_event_cap?count_event_cap*2:128;
   ProbeCountEvent* grown=realloc(count_events,next*sizeof(*grown));
-  if(!grown)abort();count_events=grown;count_event_cap=next;
+  if(!grown) {
+   abort();
+  }
+  count_events=grown;
+  count_event_cap=next;
  }
  count_events[count_event_len++]=(ProbeCountEvent){phase,kind,ordinal,hit,hurt,result,branch,log_index};
 }
@@ -131,7 +135,11 @@ unsigned melee_web_hit_probe_geometry_begin(const HitCapsule* hit,const HurtCaps
  if(count_geometries==UINT_MAX||count_geometry_open)abort();
  Fighter* receiver=count_victim->user_data;count_hurt_index=-1;
  for(unsigned i=0;i<receiver->hurt_capsules_len;i++)if(hurt==&receiver->hurt_capsules[i].capsule)count_hurt_index=(int)i;
- if(count_hurt_index<0)abort();count_geometry_open=1;return ++count_geometries;
+ if(count_hurt_index<0) {
+  abort();
+ }
+ count_geometry_open=1;
+ return ++count_geometries;
 }
 void melee_web_hit_probe_geometry_end(unsigned geometry,int result)
 {
