@@ -1,0 +1,442 @@
+{
+  "base_main": "6645508cd7f09eed4ed5a5d39c5f4e1676734d58",
+  "capture": {
+    "browser": "Headless installed Google Chrome 154.0.8037.98",
+    "capture_report": {
+      "artifact": "report.json",
+      "bytes": 3716404,
+      "sha256": "70be1d6003b2b610c97ff7d53dc7765baea76fd16d18e07cdf243ff9a2a9ee66"
+    },
+    "cleanup": "12 PIDs and 3 groups absent; port 18798 free; owned empty temp and exact marker removed",
+    "exported_cursor": 4807,
+    "host": "Mac mini / macOS / external NVMe",
+    "local_http_inventories": "32/32 pre and post pass",
+    "native_artifact_count": 32,
+    "native_artifacts": {
+      "gameplay_menu_browser.data": {
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      "gameplay_menu_browser.js": {
+        "bytes": 300352,
+        "sha256": "213fd21eea42113a57fef994b3589e002e2c2a4c293ab9a682b69c8698b69c3f"
+      },
+      "gameplay_menu_browser.wasm": {
+        "bytes": 15749904,
+        "sha256": "a3154d5fc3c0f5821aa1ca2bc7a849bdfc841ced136d1e57a131727f3bb54f77"
+      }
+    },
+    "observed_stop_cursor": 4804,
+    "producer_manifest": {
+      "artifact": "producer-source-manifest-v9.json",
+      "bytes": 16052,
+      "sha256": "149faca66b39ba7d5ba9c71b3968c226eb9055ee7514ebb8befc5b6e3d99072c"
+    },
+    "receipt": {
+      "artifact": "capture-execution-outcome-v9.json",
+      "bytes": 30145,
+      "sha256": "ab1b6dde410eb63e3fb3eeaa9ec9abdb68105e770a0d92be379e9bdde7b71b1e"
+    },
+    "requested_cursor": 4791,
+    "result": "incomplete",
+    "retail_report": {
+      "artifact": "retail-browser-report.json",
+      "bytes": 18709,
+      "sha256": "3cd078c44b42b31b30244b90ae22550004ec97301b2ffd54159e9e7766a90f27"
+    },
+    "speakers": "muted by launch options; Web Audio processing retained",
+    "tail_scope": "Rows after cursor4791 checked for shape/input/order/EOF, not original-state equivalence.",
+    "trace": {
+      "artifact": "retail-port.jsonl",
+      "bytes": 19371248,
+      "sha256": "f4cbc54d1b5d8c316e4eaa9b614feac77dd4cf31600bea42ddab3f15b1de342d"
+    }
+  },
+  "comparator_producer": {
+    "base_main": "6645508cd7f09eed4ed5a5d39c5f4e1676734d58",
+    "head": "4dddc3bf445b58971a712cf5077e5cf95f0ac0a0",
+    "tree": "5c75dca6fe96f37085a564717e07237f5b204b77"
+  },
+  "evidence_labels": [
+    "Source identified",
+    "Browser exercised",
+    "Retail compared"
+  ],
+  "exit_status_scope": "Capture, comparator and deadline owner return1 for intentionally incomplete results; inventory/cleanup passes do not override these exit statuses.",
+  "inputs": {
+    "disc": {
+      "bytes": 1449165376,
+      "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+    },
+    "recipe": {
+      "bytes": 2241622,
+      "sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b"
+    },
+    "source_whole_trace_recorded": {
+      "bytes": 2137257881,
+      "full_hash_recomputed": false,
+      "sha256": "81f8a0a3c8cac644e86be2e07451a5876be08b60ebb4295290a35c8a187c5580"
+    }
+  },
+  "issue252": {
+    "caps": {
+      "max_bytes": 134217728,
+      "max_records": 24000,
+      "stop": "first stock decrement, invalid state/lineage/join, EOF, or either cap"
+    },
+    "complete": false,
+    "receipt": {
+      "artifact": "stock-decrement-source-audit-v3.json",
+      "bytes": 618069,
+      "sha256": "ea7f54c5a9e0eb7da168e72c33a040b140f5af122d536379142918f499f266f2"
+    },
+    "source_prefix": {
+      "bytes_read": 134206689,
+      "hash_basis": "fresh SHA-256 over exactly the raw source bytes consumed before stop/failure",
+      "last_source_sequence": 20015,
+      "records_read": 20016,
+      "sha256": "5d199ca9f44ae8fb0791a7b7af876ff6cae121deb355c1cc0aa945b598e35b6a"
+    },
+    "status": "cap_before_stock_decrement",
+    "stock_decrement": null
+  },
+  "issue256": {
+    "complete": false,
+    "event": {
+      "changed_slots": [
+        {
+          "after": 3,
+          "before": 4,
+          "slot": 1
+        }
+      ],
+      "event": "first_typed_stock_count_decrement",
+      "stocks_after": [
+        4,
+        3,
+        3,
+        4
+      ],
+      "stocks_before": [
+        4,
+        4,
+        3,
+        4
+      ],
+      "target_tuple": {
+        "browser_cursor": 4791,
+        "match_frame": 3483,
+        "match_index": 0,
+        "pad_consume_sequence": 22140,
+        "source_sequence": 22141,
+        "source_tick": 3606,
+        "timeline_frame_index": 4790
+      }
+    },
+    "receipt": {
+      "artifact": "stock-decrement-source-audit-v5.json",
+      "bytes": 705596,
+      "sha256": "7fbc127cc6c340eeaa11e4451af2a4d3b155931e460bd1fc26b3b6d806e75069"
+    },
+    "source_prefix": {
+      "bytes_read": 151442332,
+      "hash_basis": "fresh SHA-256 over exactly the raw source bytes consumed before stop/failure",
+      "last_source_sequence": 22141,
+      "records_read": 22142,
+      "sha256": "db1f0b02e40e4f343f6398033aa1cb46486ddc5db1ffeed5fe8583a4847c8606"
+    },
+    "status": "first_stock_count_decrement_found"
+  },
+  "issue258": {
+    "boundary_result": "equivalent",
+    "checks": {
+      "browser_capture_provenance": "pass",
+      "clock60_match_frame_state": "pass",
+      "first_positive_match_frame_state": "pass",
+      "ordered_clock_checkpoint_states": "pass",
+      "setup_state": "pass",
+      "source_first_css_and_setup_binding": "pass",
+      "source_pad_to_tick0_join": "pass",
+      "source_provenance": "pass",
+      "source_ticks_through_first_stock_decrement": "pass",
+      "source_ticks_through_prior_ordered_checkpoints": "pass",
+      "stock_decrement_event_state": "pass",
+      "tick0_state": "pass",
+      "whole_session": "incomplete"
+    },
+    "comparison_execution": {
+      "artifact": "comparison-execution-receipt-v1.json",
+      "bytes": 7400,
+      "sha256": "51f3707aad8c7a8b3ae1de0cc038f067246d464815a615fd2cbc5592d96f2282"
+    },
+    "comparison_report": {
+      "artifact": "stock-decrement-comparison-v1.json",
+      "bytes": 32199,
+      "sha256": "e93e5388359d1fe7e1a6747b18ac84d7e97b5655d1e913e27b98727deb5ea03a"
+    },
+    "complete": false,
+    "match_fields_compared": [
+      "rng",
+      "match_frame",
+      "pad_state_hex",
+      "fighters",
+      "fighter_entities"
+    ],
+    "match_frames_compared": 3607,
+    "nonmatch_fields_compared": [],
+    "nonmatch_frames_input_ordered": 1184,
+    "result": "incomplete",
+    "root_result_review": {
+      "artifact": "root-stock-decrement-comparison-result-review-v1.json",
+      "bytes": 6978,
+      "sha256": "95634a990968b8d4eb33531082d95cff63ab6f15c6006032a62217d7078624ed"
+    },
+    "scope": "v10-first-stock-decrement",
+    "source_prefix": {
+      "bytes_read": 151442332,
+      "first_entry_seq": 4088,
+      "first_setup_seq": 4113,
+      "first_setup_source_tick": 247,
+      "first_source_tick": 0,
+      "first_source_tick_seq": 4115,
+      "hash_basis": "fresh SHA-256 over exactly the raw bytes consumed through the first typed stock-decrement source event",
+      "last_source_sequence": 22141,
+      "records_read": 22142,
+      "sha256": "db1f0b02e40e4f343f6398033aa1cb46486ddc5db1ffeed5fe8583a4847c8606"
+    },
+    "target": {
+      "audit_sha256": "7fbc127cc6c340eeaa11e4451af2a4d3b155931e460bd1fc26b3b6d806e75069",
+      "browser_cursor": 4791,
+      "browser_exported_cursor": 4807,
+      "browser_observed_cursor": 4804,
+      "changed_slots": [
+        {
+          "after": 3,
+          "before": 4,
+          "slot": 1
+        }
+      ],
+      "clock2000_baseline_stocks": [
+        4,
+        4,
+        3,
+        4
+      ],
+      "first_stock_decrement_only": true,
+      "fresh_prefix_checkpoints": [
+        {
+          "audit_sha256": "9e74c7018001369295e569ef071427633db53e2a0e6dc1db182c8aa3604d096d",
+          "browser_cursor": 1309,
+          "bytes_read": 10389712,
+          "label": "clock1",
+          "match_frame": 1,
+          "match_index": 0,
+          "pad_consume_sequence": 4734,
+          "records_read": 4736,
+          "rejoined_before_continuing": true,
+          "source_prefix_sha256": "24d520abccf98ee109b3cee2ae67767d4363c7e941d688c3534c0cbfdd7cde4a",
+          "source_sequence": 4735,
+          "source_tick": 124,
+          "timeline_frame_index": 1308
+        },
+        {
+          "audit_sha256": "c4f2bd73157f36c80c7ad5b11275c205d484608813241d3af94b9462bf3187b1",
+          "browser_cursor": 1368,
+          "bytes_read": 12780628,
+          "label": "clock60",
+          "match_frame": 60,
+          "match_index": 0,
+          "pad_consume_sequence": 5029,
+          "records_read": 5031,
+          "rejoined_before_continuing": true,
+          "source_prefix_sha256": "32b763453688c6335b90c9807b71c79d919b85e6e7435a3c2abccd1792f00e77",
+          "source_sequence": 5030,
+          "source_tick": 183,
+          "timeline_frame_index": 1367
+        },
+        {
+          "audit_sha256": "503e1d5c54262fa1c3369aae0e950f646890f98dea4598a9823cd1e0d06f34bb",
+          "browser_cursor": 1608,
+          "bytes_read": 22506388,
+          "label": "clock300",
+          "match_frame": 300,
+          "match_index": 0,
+          "pad_consume_sequence": 6229,
+          "records_read": 6231,
+          "rejoined_before_continuing": true,
+          "source_prefix_sha256": "ef9569c32524aa79443a998867c4c418a2cfd8b21719ed24b03fc966ded025ef",
+          "source_sequence": 6230,
+          "source_tick": 423,
+          "timeline_frame_index": 1607
+        },
+        {
+          "audit_sha256": "b5cc71c227bd619e14407f2535d9e38063cf142c33936df221f16759cf9b91f4",
+          "browser_cursor": 1808,
+          "bytes_read": 30611188,
+          "label": "clock500",
+          "match_frame": 500,
+          "match_index": 0,
+          "pad_consume_sequence": 7229,
+          "records_read": 7231,
+          "rejoined_before_continuing": true,
+          "source_prefix_sha256": "ec1ceb5c56c87ec35b5dd8cd0d318c85b1917d554871883732de4d2e4f52e7b6",
+          "source_sequence": 7230,
+          "source_tick": 623,
+          "timeline_frame_index": 1807
+        },
+        {
+          "audit_sha256": "521e00f57aac27a999619d5adb3aa6fe6fa86e5c4f774b8f211cd002f9bcb632",
+          "browser_cursor": 2308,
+          "bytes_read": 50873188,
+          "label": "clock1000",
+          "match_frame": 1000,
+          "match_index": 0,
+          "pad_consume_sequence": 9729,
+          "records_read": 9731,
+          "rejoined_before_continuing": true,
+          "source_prefix_sha256": "7f71d2c8c9529e8171dfab854cd114abb0eef44ca8d59c6f7e96af5495d13cf7",
+          "source_sequence": 9730,
+          "source_tick": 1123,
+          "timeline_frame_index": 2307
+        },
+        {
+          "audit_sha256": "019d86cd96de13aa7b7b3de4a64c0bfbca6c04d580dcc3ad4b2e188ee3af8ca1",
+          "browser_cursor": 3308,
+          "bytes_read": 91371214,
+          "label": "clock2000",
+          "match_frame": 2000,
+          "match_index": 0,
+          "pad_consume_sequence": 14727,
+          "records_read": 14729,
+          "rejoined_before_continuing": true,
+          "source_prefix_sha256": "3f5eaf2c845a387d22c1da7abf74d0f4e4ca2c40fd8503b31a890f0f3f6b7296",
+          "source_sequence": 14728,
+          "source_tick": 2123,
+          "timeline_frame_index": 3307
+        }
+      ],
+      "ko_claim": false,
+      "match_frame": 3483,
+      "match_index": 0,
+      "pad_consume_sequence": 22140,
+      "source_prefix_bytes": 151442332,
+      "source_prefix_records": 22142,
+      "source_prefix_sha256": "db1f0b02e40e4f343f6398033aa1cb46486ddc5db1ffeed5fe8583a4847c8606",
+      "source_scan_caps": {
+        "max_bytes": 268435456,
+        "max_records": 48000,
+        "max_seconds": 60
+      },
+      "source_sequence": 22141,
+      "source_tick": 3606,
+      "stocks_after": [
+        4,
+        3,
+        3,
+        4
+      ],
+      "stocks_before": [
+        4,
+        4,
+        3,
+        4
+      ],
+      "timeline_frame_index": 4790
+    },
+    "timeline_frames_consumed": 4791,
+    "whole_session_equivalent": false
+  },
+  "issues": [
+    252,
+    256,
+    258
+  ],
+  "limitations": {
+    "boundary": "Checks CSS/SSS consumed-input order and exact match state through the first typed fighter-stock decrement after rejoining every accepted ordered clock prefix, with independent terminal scan caps. The source comparison stops at the event, first mismatch, 256 MiB, 48,000 records, or 60 seconds.",
+    "browser_export_tail": "All exported rows are checked for schema, typed shape, recipe input/order and exact EOF. Match rows beyond the semantic comparison boundary receive shape checks only; their state is not compared with the original.",
+    "nonmatch_state": "CSS/SSS consumed-input ordering is not scalar state equivalence; nonmatch_fields_compared is empty.",
+    "timing_rendering_audio": "No timing, draw cadence, pixels, PCM, performance, or tournament-admission claim.",
+    "whole_session": "This is incomplete prefix evidence and never establishes whole-session equivalence."
+  },
+  "native_and_capture_producer": {
+    "base_main": "6645508cd7f09eed4ed5a5d39c5f4e1676734d58",
+    "head": "d1914d7320e7559ed7e43b0eadf50d55ddd46e6d",
+    "tree": "3db3078be94303a6008b8b18b096db6d1a997b08"
+  },
+  "next_boundary_proposal": {
+    "artifact": "next-typed-stock-boundary-proposal-v1.json",
+    "bytes": 2476,
+    "sha256": "98034a4f5f9dc48ef20840a6cab3b7fa5ff8aa8b4ae85139c49480cc21da9d92"
+  },
+  "retained_failures": [
+    {
+      "boundary": "v7 startup",
+      "receipt": {
+        "artifact": "capture-execution-outcome-v7.json",
+        "bytes": 8159,
+        "sha256": "53089a9908cb2d4b9fe5597da84bc6c020f9d407e4b09d6cc65d3718e3b52286"
+      },
+      "result": "ENOENT because TMPDIR was missing; no native execution"
+    },
+    {
+      "boundary": "v8 runtime",
+      "receipt": {
+        "artifact": "capture-execution-outcome-v8.json",
+        "bytes": 9130,
+        "sha256": "32c371247db87a9fa4a4a6d04eaa80e07949fbdcbcc4858009a757cac1248a15"
+      },
+      "result": "Wasm indirect call signature mismatch before target; distinct old native producer"
+    },
+    {
+      "boundary": "initial metadata preflight",
+      "receipt": {
+        "artifact": "comparison-metadata-validation-v1.json",
+        "bytes": 5483,
+        "sha256": "c81b564fcc28a7b3e7fb647de64e1a8a330fee60e0d34cf60ecedb7b6d73055a"
+      },
+      "result": "Stock-decrement export validator omitted frozen boundary selections; corrected Python-only"
+    },
+    {
+      "boundary": "first regression fixture",
+      "receipt": {
+        "artifact": "comparator-export-correction-focused-v1.log",
+        "bytes": 23326,
+        "sha256": "c52c8aab4f756491e302376c6ed21460f0023d916d147188b88663eac58cb517"
+      },
+      "result": "Synthetic export cursor exceeded retained trace; corrected test cursor"
+    }
+  ],
+  "schema": "melee-web-v10-first-stock-decrement-comparison-v1",
+  "source_auditor_producer": "56a860432c498b996f02c2cb81ca1a28eca1a9da",
+  "validation": {
+    "correction_receipt": {
+      "artifact": "comparator-export-correction-receipt-v1.json",
+      "bytes": 2647,
+      "sha256": "aacf5e5192557988bd67562a449bce5a9e69929eddf9dbb15f883c293f4fb978"
+    },
+    "focused_comparator_tests": 97,
+    "full_suite": {
+      "exit_code": 0,
+      "log": {
+        "artifact": "comparator-corrected-full-suite-v1.log",
+        "bytes": 376802,
+        "sha256": "e29a599375e177a807f620c3a25331232431a369a79525e540ea6f5442941f97"
+      },
+      "producer": "4dddc3bf445b58971a712cf5077e5cf95f0ac0a0",
+      "seconds": 391.904,
+      "skipped": 153,
+      "tests": 2050
+    },
+    "metadata_validation": {
+      "artifact": "comparison-metadata-validation-v2.json",
+      "bytes": 10241,
+      "sha256": "574f7aeab133b783284ca7018863d03df7ac42401f4d4ffdfa7e49d035b6d9ed"
+    },
+    "ordinary_release_producer": "d1914d7320e7559ed7e43b0eadf50d55ddd46e6d",
+    "release_receipt": {
+      "artifact": "refreshed-suite-release-v1.json",
+      "bytes": 3128,
+      "sha256": "e25518b7dab3291263477f0697a297942eb488cf130a464e3adcc1b6df284c8b"
+    }
+  }
+}

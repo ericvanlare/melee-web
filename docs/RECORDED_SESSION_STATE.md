@@ -408,6 +408,40 @@ contain an authentic clock-2000 source audit or an original-to-browser result.
 The separate
 [clock-1000 source-only entry](status/2026-10-07-b4-v10-first-match-clock1000-source-only.md)
 records the original-trace observation without a browser comparison.
+
+For the bounded post-clock-2000 source event and browser comparison, select
+`--scope v10-first-stock-decrement` and pass its separate frozen audit with
+`--stock-decrement-boundary-audit`. The packet binds the accepted first-positive,
+clock-60, and clock-2000 checkpoints, then the first exact signed-byte fighter
+stock decrease after clock 2000. The comparator reuses the ordered match-clock
+lineage, rejoins every accepted prefix, compares each contiguous match tick,
+checks that no earlier stock decrease occurred, and stops at the frozen event
+or its first mismatch.
+
+The terminal scan has an independent 256 MiB, 48,000-record, and 60-second
+limit. Those limits do not widen the historical 64 MiB / 12,000-record v1 or
+128 MiB / 24,000-record v2 checkpoint limits. The result remains incomplete
+prefix evidence; a stock-count decrement does not establish a KO or whole-game
+acceptance. The default scope and earlier bounded scopes remain unchanged.
+
+```sh
+python3 scripts/compare_whole_session_state.py \
+  --reference "$SESSION_REFERENCE" --recipe "$SESSION_RECIPE" \
+  --port-trace "$SESSION_BROWSER_TRACE" \
+  --browser-report "$SESSION_BROWSER_REPORT" \
+  --scope v10-first-stock-decrement \
+  --expectations "$SESSION_EXPECTATIONS" \
+  --source-manifest "$SESSION_SOURCE_MANIFEST" \
+  --source-report "$SESSION_SOURCE_REPORT" \
+  --source-audit "$SESSION_SOURCE_AUDIT" \
+  --positive-boundary-audit "$SESSION_POSITIVE_AUDIT" \
+  --clock60-boundary-audit "$SESSION_CLOCK60_AUDIT" \
+  --match-clock-boundary-audit "$SESSION_CLOCK2000_AUDIT" \
+  --stock-decrement-boundary-audit "$SESSION_STOCK_DECREMENT_AUDIT" \
+  --browser-capture-report "$SESSION_BROWSER_CAPTURE_REPORT" \
+  --browser-producer-manifest "$SESSION_BROWSER_PRODUCER_MANIFEST" \
+  --out "$SESSION_COMPARISON_OUT"
+```
 The [clock-1000 comparison entry](status/2026-10-07-b4-v10-first-match-clock1000-comparison.md)
 records the earlier bounded source-to-browser result. Its retained historical v1
 source audit does not contain `report_write_failed`; that observation remains

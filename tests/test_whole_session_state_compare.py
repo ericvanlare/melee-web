@@ -21,6 +21,7 @@ from whole_session_replay import (  # noqa: E402
     EXPECTED_OBSERVER_SCHEMA, SCENES, _consumed_ports, _first_css_context,
 )
 from whole_session_state_compare import (  # noqa: E402
+    BROWSER_SCHEMA, BROWSER_VERSION, FIGHTER_KEYS,
     BrowserReader, Comparator, SourceCollector, _browser_completion_ok, _is_match_field,
     _browser_report, _fighter_entities, _snapshot_values, _state_from_payload,
     _validate_browser_report,
@@ -32,6 +33,9 @@ from whole_session_state_compare import (  # noqa: E402
     V10_MATCH_CLOCK_REJOIN_FRAME,
     V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE, CLOCK60_EXPECTATION_SCHEMA,
     MATCH_CLOCK_EXPECTATION_SCHEMA, V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
+    V10_FIRST_STOCK_DECREMENT_SCOPE, STOCK_DECREMENT_EXPECTATION_SCHEMA,
+    STOCK_DECREMENT_BOUNDARY_SCHEMA, V10_STOCK_DECREMENT_SCAN_BYTE_CAP,
+    V10_STOCK_DECREMENT_SCAN_RECORD_CAP, V10_STOCK_DECREMENT_SCAN_SECONDS,
     ORDERED_CLOCK_LINEAGE_SCHEMA, ORDERED_CLOCK_LINEAGE_V2_SCHEMA,
     ORDERED_CLOCK_LINEAGE_EXPECTATION_SCHEMA,
     V10_ORDERED_LINEAGE_BYTE_CAP,
@@ -47,6 +51,8 @@ from whole_session_state_compare import (  # noqa: E402
     _validate_v10_browser_provenance, _validate_v10_browser_export,
     _validate_first_positive_audit, _validate_clock60_audit,
     _validate_match_clock_boundary_audit,
+    _validate_stock_decrement_expectations, _validate_stock_decrement_boundary_audit,
+    _stock_decrement_tuple,
     _validate_match_clock_audit_status,
     _validate_ordered_clock_audit_lineage,
     _validate_ordered_clock_lineage_expectations,
@@ -3627,6 +3633,750 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             self.assertTrue(result["clock60_prefix_rejoin"]["rejoined_before_continuing"])
             self.assertEqual(result["match_clock_boundary"]["match_frame"], 300)
             self.assertEqual(result["match_clock_boundary"]["source_tick"], 423)
+
+    @staticmethod
+    def _stock_decrement_expectation_fixture():
+        entities = [
+            {"match_index": 0, "slot": slot, "entity_index": 0, "generation": 0,
+             "fighter_player_id": slot, "fighter_gobj_linked": True}
+            for slot in range(4)
+        ]
+        baseline = [4, 4, 3, 4]
+        target = {
+            "cursor_after_frame": 4791, "fighter_entities": copy.deepcopy(entities),
+            "match_frame": 3483, "match_index": 0,
+            "pad_consume_source_sequence": 22140, "rng": 4228862339,
+            "scene_frame": 3606, "source_tick": 3606, "source_tick_seq": 22141,
+            "state_fields_observed": ["fighter_entities", "fighters", "match_frame",
+                                       "pad_state_hex", "rng", "scene_frame"],
+            "timeline_frame_index": 4790,
+        }
+        event = {
+            "event": "first_typed_stock_count_decrement",
+            "changed_slots": [{"slot": 1, "before": 4, "after": 3}],
+            "stocks_before": list(baseline), "stocks_after": [4, 3, 3, 4],
+            "target": target,
+        }
+        identity = {"path": "/audit/context.json", "bytes": 10, "sha256": "a" * 64}
+        boundary = {
+            "schema": STOCK_DECREMENT_BOUNDARY_SCHEMA,
+            "clock2000_baseline_stocks": list(baseline),
+            "event": event,
+            "audit": {"path": "/audit/report.json", "bytes": 10, "sha256": "b" * 64},
+            "audit_context": {
+                "clock2000_expectations": copy.deepcopy(identity),
+                "clock2000_prior_audit": copy.deepcopy(identity),
+                "packet": copy.deepcopy(identity), "outer_packet": copy.deepcopy(identity),
+            },
+            "source_scan_limits": {
+                "max_bytes": V10_STOCK_DECREMENT_SCAN_BYTE_CAP,
+                "max_records": V10_STOCK_DECREMENT_SCAN_RECORD_CAP,
+                "max_seconds": V10_STOCK_DECREMENT_SCAN_SECONDS,
+            },
+        }
+        source = {
+            "match_clock_boundary": {
+                "target_match_frame_at_least": 2000, "match_index": 0,
+                "source_tick": 2123, "source_sequence": 14728,
+                "pad_consume_sequence": 14727, "timeline_frame_index": 3307,
+                "browser_cursor": 3308, "match_frame": 2000,
+            },
+            "first_positive_boundary": {
+                "match_index": 0, "source_tick": 124, "source_sequence": 4116,
+                "pad_consume_sequence": 4115, "timeline_frame_index": 1308,
+                "browser_cursor": 1309, "match_frame": 1,
+            },
+            "stock_decrement_boundary": boundary,
+        }
+        return source, boundary
+
+    def test_stock_decrement_expectations_bind_typed_transition_and_separate_caps(self):
+        source, _ = self._stock_decrement_expectation_fixture()
+        validated = _validate_stock_decrement_expectations(source, {"frame_count": 5000})
+        self.assertEqual(validated["event"]["event"], "first_typed_stock_count_decrement")
+        self.assertEqual(_stock_decrement_tuple(validated["event"]["target"])["source_tick"], 3606)
+
+        for name, mutation in (
+                ("float byte cap", lambda b: b["source_scan_limits"].update(max_bytes=256.0 * 1024 * 1024)),
+                ("oversized byte cap", lambda b: b["source_scan_limits"].update(max_bytes=512 * 1024 * 1024)),
+                ("oversized record cap", lambda b: b["source_scan_limits"].update(max_records=48001)),
+                ("float timeout", lambda b: b["source_scan_limits"].update(max_seconds=60.0)),
+                ("wrong stock slot", lambda b: b["event"].update(changed_slots=[
+                    {"slot": 2, "before": 4, "after": 3}])),
+                ("malformed entity", lambda b: b["event"]["target"]["fighter_entities"][1].update(
+                    generation=True)),
+                ("event before clock 2000", lambda b: b["event"]["target"].update(source_tick=2123)),
+        ):
+            with self.subTest(name=name):
+                candidate_source, candidate = self._stock_decrement_expectation_fixture()
+                mutation(candidate)
+                with self.assertRaises(ComparisonError):
+                    _validate_stock_decrement_expectations(candidate_source, {"frame_count": 5000})
+
+    def test_stock_decrement_comparator_rejects_early_late_wrong_slot_and_malformed_stock(self):
+        source, boundary = self._stock_decrement_expectation_fixture()
+
+        def comparator():
+            instance = Comparator.__new__(Comparator)
+            instance.stock_decrement_boundary = boundary
+            instance.match_clock_boundary = source["match_clock_boundary"]
+            instance.previous_stock_counts = None
+            instance.stock_decrement_observed = False
+            instance.divergence = None
+            instance.first_difference = None
+            return instance
+
+        frame = lambda tick, stocks: {
+            "source_tick": tick,
+            "state": {"fighters": [{"stocks": value} for value in stocks]},
+        }
+        current = comparator()
+        current._validate_stock_decrement_frame(frame(2123, [4, 4, 3, 4]), 3308)
+        current._validate_stock_decrement_frame(frame(2124, [4, 4, 3, 4]), 3309)
+        current._validate_stock_decrement_frame(frame(3606, [4, 3, 3, 4]), 4790)
+        self.assertTrue(current.stock_decrement_observed)
+
+        early = comparator()
+        early._validate_stock_decrement_frame(frame(2123, [4, 4, 3, 4]), 3308)
+        with self.assertRaisesRegex(ComparisonError, "occurred before"):
+            early._validate_stock_decrement_frame(frame(2124, [4, 3, 3, 4]), 3309)
+
+        late = comparator()
+        late._validate_stock_decrement_frame(frame(2123, [4, 4, 3, 4]), 3308)
+        with self.assertRaisesRegex(ComparisonError, "transition differs"):
+            late._validate_stock_decrement_frame(frame(3606, [4, 4, 3, 4]), 4790)
+
+        wrong_slot = comparator()
+        wrong_slot._validate_stock_decrement_frame(frame(2123, [4, 4, 3, 4]), 3308)
+        with self.assertRaisesRegex(ComparisonError, "transition differs"):
+            wrong_slot._validate_stock_decrement_frame(frame(3606, [4, 4, 2, 4]), 4790)
+
+        malformed = comparator()
+        malformed._validate_stock_decrement_frame(frame(2123, [4, 4, 3, 4]), 3308)
+        with self.assertRaises(ComparisonError):
+            malformed._validate_stock_decrement_frame(frame(2124, [4, 4.0, 3, 4]), 3309)
+
+    def _stock_decrement_audit_fixture(self, directory, *, mix_caps=False):
+        directory = Path(directory)
+        directory.mkdir(parents=True, exist_ok=True)
+        source, boundary = self._stock_decrement_expectation_fixture()
+        trace_identity = {
+            "path": str(directory / "capture.mwro"), "bytes": 2137257881,
+            "recorded_full_sha256": "f" * 64,
+        }
+        source.update({
+            "capture_id": "capture-v10", "sequence_id": "sequence-v10",
+            "trace": trace_identity,
+            "manifest": {"sha256": "1" * 64}, "report": {"sha256": "2" * 64},
+            "audit": {"sha256": "3" * 64},
+        })
+        checkpoint_targets = [
+            ("clock1", 124, 1, 4116), ("clock60", 183, 60, 4200),
+            ("clock300", 423, 300, 8000), ("clock500", 623, 500, 10000),
+            ("clock1000", 1123, 1000, 13000), ("target", 2123, 2000, 14728),
+        ]
+        checkpoints = []
+        for index, (label, tick, match_frame, sequence) in enumerate(checkpoint_targets):
+            timeline = 1184 + tick
+            checkpoints.append({
+                "label": label,
+                "tuple": {
+                    "match_index": 0, "source_tick": tick, "source_sequence": sequence,
+                    "pad_consume_sequence": sequence - 1,
+                    "timeline_frame_index": timeline, "browser_cursor": timeline + 1,
+                    "match_frame": match_frame,
+                },
+                "prefix": {
+                    "bytes_read": (index + 1) * 20000000,
+                    "records_read": sequence + 1,
+                    "last_source_sequence": sequence,
+                    "sha256": (str(index + 1) * 64)[:64],
+                },
+                "audit": {"path": f"{label}.json", "bytes": 1,
+                          "sha256": (str(index + 1) * 64)[:64]},
+            })
+        prior_identity = {"path": str(directory / "clock2000.json"), "bytes": 10,
+                          "sha256": "4" * 64}
+        source["match_clock_boundary_audit"] = prior_identity
+        source["ordered_clock_lineage"] = {
+            "schema": ORDERED_CLOCK_LINEAGE_V2_SCHEMA,
+            "checkpoints": checkpoints,
+            "runner_packet": {"path": "runner.json", "bytes": 10, "sha256": "5" * 64},
+            "supporting_expectations": {
+                label: {"path": f"{label}-expectations.json", "bytes": 10,
+                        "sha256": "6" * 64}
+                for label, *_ in checkpoint_targets[2:-1]
+            },
+            "source_limits": {"max_bytes": V10_ORDERED_LINEAGE_V2_BYTE_CAP,
+                              "max_records": V10_ORDERED_LINEAGE_V2_RECORD_CAP},
+        }
+        context = {
+            "clock2000_expectations": {"path": "clock2000-expectations.json", "bytes": 10,
+                                       "sha256": "7" * 64},
+            "clock2000_prior_audit": prior_identity,
+            "packet": {"path": "clock2000-packet.json", "bytes": 10,
+                       "sha256": "8" * 64},
+            "outer_packet": {"path": "stock-decrement-packet.json", "bytes": 10,
+                             "sha256": "9" * 64},
+        }
+        boundary["audit_context"] = copy.deepcopy(context)
+        boundary["audit"] = {"path": str(directory / "stock-audit.json"),
+                              "bytes": 1, "sha256": "0" * 64}
+        source["stock_decrement_boundary"] = boundary
+        target = boundary["event"]["target"]
+        clock_target = source["match_clock_boundary"]
+        clock_observation = {
+            "match_index": clock_target["match_index"],
+            "source_tick": clock_target["source_tick"],
+            "source_tick_seq": clock_target["source_sequence"],
+            "pad_consume_source_sequence": clock_target["pad_consume_sequence"],
+            "timeline_frame_index": clock_target["timeline_frame_index"],
+            "cursor_after_frame": clock_target["browser_cursor"],
+            "match_frame": clock_target["match_frame"],
+            "scene_frame": clock_target["source_tick"], "rng": 1682403597,
+            "fighter_entities": copy.deepcopy(target["fighter_entities"]),
+        }
+        stat = {"device": 1, "inode": 2, "bytes": trace_identity["bytes"], "mtime_ns": 3}
+        source_provenance = {
+            "manifest_sha256": source["manifest"]["sha256"],
+            "source_report_sha256": source["report"]["sha256"],
+            "audit_sha256": source["audit"]["sha256"],
+            "recorded_full_trace_sha256": trace_identity["recorded_full_sha256"],
+            "full_trace_rehashed": False, "trace_bytes": trace_identity["bytes"],
+        }
+        labels = [f"clock{item['tuple']['match_frame']}" if item["label"] == "target"
+                  else item["label"] for item in checkpoints]
+        event_prefix = {
+            "bytes_read": 151442332, "records_read": 22142,
+            "last_source_sequence": target["source_tick_seq"],
+            "sha256": "d" * 64,
+        }
+        report = {
+            "schema": "melee-web-b4-first-stock-decrement-source-audit-v2",
+            "scope": "source-only-bounded-follow-up-first-stock-decrement-after-clock2000",
+            "version": 2, "audit_completed": True, "complete": False,
+            "whole_session_equivalent": False,
+            "status": "first_stock_count_decrement_found", "error": None,
+            "report_write_failed": False,
+            "browser_comparison": "not performed; source observations only",
+            "report_path": str(boundary["audit"]["path"]),
+            "event_definition": "first post-clock-2000 joined tick where any exact signed-byte fighter stocks value decreases",
+            "limits": {
+                "accepted_clock2000_checkpoint_caps": {
+                    "max_bytes": V10_ORDERED_LINEAGE_V2_BYTE_CAP,
+                    "max_records": V10_ORDERED_LINEAGE_V2_RECORD_CAP,
+                },
+                "execution_timeout_seconds": V10_STOCK_DECREMENT_SCAN_SECONDS,
+                "fresh_source_scan_caps": {
+                    "max_bytes": V10_STOCK_DECREMENT_SCAN_BYTE_CAP,
+                    "max_records": V10_STOCK_DECREMENT_SCAN_RECORD_CAP,
+                },
+                "stop": "first stock decrement, invalid state/lineage/join, EOF, either scan cap, or timeout",
+            },
+            "outer_packet": context["outer_packet"], "packet": context["packet"],
+            "expectations": context["clock2000_expectations"],
+            "clock2000_prior_audit": context["clock2000_prior_audit"],
+            "preflight": "passed before source content open",
+            "source": {
+                "path": trace_identity["path"], "capture_id": source["capture_id"],
+                "sequence_id": source["sequence_id"],
+                "recorded_full_trace_bytes": trace_identity["bytes"],
+                "recorded_full_trace_sha256": trace_identity["recorded_full_sha256"],
+                "full_trace_rehashed": False, "content_opened": True,
+                "stream_attempted": True, "content_bytes_read": event_prefix["bytes_read"],
+                "stat_before": stat, "stat_after": stat,
+                "stat_stable_during_audit": True, "provenance": source_provenance,
+            },
+            "observed": {
+                "checkpoint_rejoins": dict.fromkeys(labels, True),
+                "clock2000_baseline_stocks": list(boundary["clock2000_baseline_stocks"]),
+                "clock2000_target_observed": clock_observation,
+                "stock_decrement": copy.deepcopy(boundary["event"]),
+                "source_prefix": event_prefix,
+                "match_ticks_observed": target["source_tick"] + 1,
+                "timeline_frames_input_ordered_against_recipe": target["cursor_after_frame"],
+                "css_sss_frames_input_ordered_against_recipe": 1184,
+            },
+            "checkpoints": dict.fromkeys(labels, "pass"),
+        }
+        if mix_caps:
+            report["limits"]["accepted_clock2000_checkpoint_caps"]["max_bytes"] = \
+                V10_STOCK_DECREMENT_SCAN_BYTE_CAP
+        report_path = Path(boundary["audit"]["path"])
+        report_path.write_text(json.dumps(report, sort_keys=True), encoding="utf-8")
+        raw = report_path.read_bytes()
+        boundary["audit"] = {"path": str(report_path), "bytes": len(raw),
+                              "sha256": hashlib.sha256(raw).hexdigest()}
+        recipe = SimpleNamespace(
+            spans=[{"scene": SCENES["match"], "first_frame": 1184},
+                   {"scene": SCENES["match"], "first_frame": 6000},
+                   {"scene": SCENES["match"], "first_frame": 8000}],
+            frame_count=10000,
+        )
+        prior_audit = {"observed": {
+            "target_clock_ge2000_observed": copy.deepcopy(clock_observation),
+        }}
+        return {"source": source}, report_path, recipe, prior_audit, stat
+
+    def test_stock_decrement_audit_validator_binds_event_and_cap_domains(self):
+        with tempfile.TemporaryDirectory() as directory:
+            packet, report_path, recipe, prior_audit, stat = \
+                self._stock_decrement_audit_fixture(directory)
+            audit, digest = _validate_stock_decrement_boundary_audit(
+                report_path, packet, recipe, prior_audit, source_stat_before=stat)
+            self.assertEqual(digest, packet["source"]["stock_decrement_boundary"]["audit"]["sha256"])
+            self.assertEqual(audit["observed"]["stock_decrement"]["target"]["cursor_after_frame"], 4791)
+
+        with tempfile.TemporaryDirectory() as directory:
+            packet, report_path, recipe, prior_audit, stat = \
+                self._stock_decrement_audit_fixture(directory, mix_caps=True)
+            with self.assertRaisesRegex(ComparisonError, "mixes historical checkpoint caps"):
+                _validate_stock_decrement_boundary_audit(
+                    report_path, packet, recipe, prior_audit, source_stat_before=stat)
+
+    def test_stock_decrement_scope_keeps_exact_browser_pad_and_entity_validation(self):
+        valid_entities = [
+            {"match_index": 0, "slot": slot, "entity_index": 0, "generation": 0,
+             "fighter_player_id": slot, "fighter_gobj_linked": True}
+            for slot in range(4)
+        ]
+        fighters = [{field: 0 for field in FIGHTER_KEYS} for _ in range(4)]
+        for slot, fighter in enumerate(fighters):
+            fighter["slot"] = slot
+            fighter["input_hex"] = "00" * 11
+
+        def run_frame(path, *, pads=None, entities=None):
+            row = {
+                "record": "session_frame", "scene": SCENES["match"], "index": 0,
+                "supplied_inputs": pads if pads is not None else ["00" * 11] * 4,
+                "rng": 1, "pad_state_hex": PAD_HEX, "match_frame": 1,
+                "fighters": fighters,
+                "fighter_entities": entities if entities is not None else valid_entities,
+            }
+            header = {
+                "record": "header", "schema": BROWSER_SCHEMA, "version": BROWSER_VERSION,
+                "frames_requested": 1, "comparison": "not_run",
+                "cpu_observations": "not_captured", "draw_state": "not_captured",
+            }
+            path.write_text(json.dumps(header) + "\n" + json.dumps(row) + "\n",
+                            encoding="utf-8")
+            browser = BrowserReader(path)
+            recipe = SimpleNamespace(
+                scope=V10_FIRST_STOCK_DECREMENT_SCOPE, frame_count=1,
+                frames=[{"pads": ["00" * 11] * 4}], entity_profile="primary-static-player-pair-v1",
+            )
+            comparator = Comparator.__new__(Comparator)
+            comparator.recipe = recipe
+            comparator.browser = browser
+            comparator.current_match = 0
+            comparator.divergence = None
+            comparator.first_difference = None
+            return comparator, browser
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "browser.jsonl"
+            comparator, browser = run_frame(path, pads=["bad"] * 4)
+            try:
+                with self.assertRaisesRegex(ComparisonError, "lowercase hexadecimal"):
+                    comparator._expect_frame_row(SCENES["match"], 0)
+            finally:
+                browser.close()
+
+            invalid_entities = copy.deepcopy(valid_entities)
+            invalid_entities[2]["generation"] = True
+            comparator, browser = run_frame(path, entities=invalid_entities)
+            try:
+                with self.assertRaisesRegex(ComparisonError, "expected integer"):
+                    comparator._expect_frame_row(SCENES["match"], 0)
+            finally:
+                browser.close()
+
+    def test_stock_decrement_browser_export_requires_all_boundaries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = _clock60_comparison_fixture(
+                Path(directory), terminal_match_frame=3483)
+            source = fixture["packet"]["source"]
+            clock2000 = {
+                "target_match_frame_at_least": 2000, "match_index": 0,
+                "source_tick": 2123, "source_sequence": 4257,
+                "pad_consume_sequence": 4256, "timeline_frame_index": 2125,
+                "browser_cursor": 2126, "match_frame": 2000,
+            }
+            fixture["match_clock_target"] = clock2000
+            source["match_clock_boundary"] = clock2000
+            source["ordered_clock_lineage"] = {
+                "checkpoints": _ordered_fixture_checkpoints(fixture, (300, 500, 1000)),
+            }
+            _, boundary = self._stock_decrement_expectation_fixture()
+            source["stock_decrement_boundary"] = boundary
+            recipe = Recipe(Path("stock.mwrc"), fixture["recipe"].raw,
+                            scope=V10_FIRST_STOCK_DECREMENT_SCOPE)
+            trace = fixture["selected"]["port_trace"]
+            rows = trace.read_text().splitlines()
+            exported = max(json.loads(row).get("index", -1) for row in rows) + 1
+            self.assertEqual(len(source["ordered_clock_lineage"]["checkpoints"]), 6)
+            self.assertEqual(_validate_v10_browser_export(
+                trace, recipe, exported, fixture["packet"]), len(rows))
+
+            for key in ("first_positive_boundary", "clock60_boundary",
+                        "match_clock_boundary", "ordered_clock_lineage",
+                        "stock_decrement_boundary"):
+                with self.subTest(missing=key):
+                    candidate = copy.deepcopy(fixture["packet"])
+                    candidate["source"].pop(key)
+                    with self.assertRaises(ComparisonError):
+                        _validate_v10_browser_export(trace, recipe, exported, candidate)
+            candidate = copy.deepcopy(fixture["packet"])
+            candidate["source"]["stock_decrement_boundary"]["event"]["target"] = None
+            with self.assertRaisesRegex(ComparisonError, "frozen event tuple"):
+                _validate_v10_browser_export(trace, recipe, exported, candidate)
+            candidate = copy.deepcopy(fixture["packet"])
+            candidate["source"]["ordered_clock_lineage"]["checkpoints"][2]["tuple"] = None
+            with self.assertRaisesRegex(ComparisonError, "selection is malformed"):
+                _validate_v10_browser_export(trace, recipe, exported, candidate)
+
+    def test_stock_decrement_scope_report_names_event_without_relabeling_ordered_scope(self):
+        def boundary_report(scope):
+            return compare_paths(
+                "unused.mwro", "unused.mwrc", "unused.jsonl", scope=scope,
+                expectations="missing-expectations.json", source_manifest="unused-manifest.json",
+                source_report="unused-report.json", source_audit="unused-audit.json",
+                browser_capture_report="unused-capture.json",
+                browser_producer_manifest="unused-producer.json",
+                browser_report="unused-browser.json", positive_boundary_audit="unused-positive.json",
+                clock60_boundary_audit="unused-clock60.json",
+                match_clock_boundary_audit="unused-clock2000.json",
+                stock_decrement_boundary_audit="unused-stock.json")
+
+        stock = boundary_report(V10_FIRST_STOCK_DECREMENT_SCOPE)
+        ordered = boundary_report(V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE)
+        self.assertIn("first typed fighter-stock decrement", stock["limitations"]["boundary"])
+        self.assertIn("ordered clock-lineage target", ordered["limitations"]["boundary"])
+        self.assertNotIn("fighter-stock decrement", ordered["limitations"]["boundary"])
+
+    def test_stock_decrement_compare_path_rejoins_clock2000_and_stops_at_event(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = _clock60_comparison_fixture(Path(directory), terminal_match_frame=2100)
+            packet, selected = fixture["packet"], fixture["selected"]
+            recipe = fixture["recipe"]
+            source = packet["source"]
+            raw_records = list(fixture["raw_records"])
+            rows = fixture["rows"]
+
+            def source_tick(tick):
+                return next(row for row in rows
+                            if row.get("event") == "boundary" and
+                            row.get("payload", {}).get("boundary") == "source_tick" and
+                            row.get("source_tick") == tick)
+
+            def tuple_at(tick, match_frame):
+                row = source_tick(tick)
+                timeline = _first_match_timeline_index(recipe) + tick
+                return {
+                    "match_index": 0, "source_tick": tick,
+                    "source_sequence": row["seq"],
+                    "pad_consume_sequence": row["seq"] - 1,
+                    "timeline_frame_index": timeline,
+                    "browser_cursor": timeline + 1, "match_frame": match_frame,
+                }
+
+            checkpoints = []
+            prefix_by_label = {}
+            for label, frame in (("clock1", 1), ("clock60", 60), ("clock300", 300),
+                                 ("clock500", 500), ("clock1000", 1000),
+                                 ("target", 2000)):
+                boundary = tuple_at(123 + frame, frame)
+                prefix_bytes = b"".join(raw_records[:boundary["source_sequence"] + 1])
+                if label == "clock1":
+                    audit_identity = source["positive_boundary_audit"]
+                elif label == "clock60":
+                    audit_identity = source["clock60_boundary_audit"]
+                elif label == "target":
+                    audit_identity = None
+                else:
+                    audit_identity = {"path": f"{label}.json", "bytes": 10,
+                                      "sha256": ("a" if frame == 300 else
+                                                 "b" if frame == 500 else "c") * 64}
+                prefix = {
+                    "bytes_read": len(prefix_bytes),
+                    "records_read": boundary["source_sequence"] + 1,
+                    "last_source_sequence": boundary["source_sequence"],
+                    "sha256": hashlib.sha256(prefix_bytes).hexdigest(),
+                }
+                checkpoints.append({"label": label, "tuple": boundary,
+                                    "prefix": prefix,
+                                    "audit": audit_identity or {"path": "pending", "bytes": 1,
+                                                                 "sha256": "d" * 64}})
+                prefix_by_label[label] = prefix
+
+            clock2000_target = tuple_at(2123, 2000)
+            source["match_clock_boundary"] = {
+                "target_match_frame_at_least": 2000, **clock2000_target,
+            }
+            source["ordered_clock_lineage"] = {
+                "schema": ORDERED_CLOCK_LINEAGE_SCHEMA,
+                "checkpoints": checkpoints,
+                "runner_packet": {"path": "ordered-runner.json", "bytes": 10,
+                                  "sha256": "e" * 64},
+                "supporting_expectations": {
+                    label: {"path": f"{label}-expectations.json", "bytes": 10,
+                            "sha256": ("a" if label == "clock300" else
+                                       "b" if label == "clock500" else "c") * 64}
+                    for label in ("clock300", "clock500", "clock1000")
+                },
+            }
+
+            clock_audit_path = Path(directory) / "clock2000-audit.json"
+            clock_audit_path.write_text("{}\n", encoding="utf-8")
+            clock_audit_identity = {
+                "path": str(clock_audit_path), "bytes": clock_audit_path.stat().st_size,
+                "sha256": hashlib.sha256(clock_audit_path.read_bytes()).hexdigest(),
+            }
+            source["match_clock_boundary_audit"] = clock_audit_identity
+            checkpoints[-1]["audit"] = clock_audit_identity
+
+            event_tick = 2150
+            event_row = source_tick(event_tick)
+            event_tuple = tuple_at(event_tick, event_tick - 123)
+            event_payload = event_row["payload"]
+            stock_slice = next(item for item in event_payload["slices"]
+                               if item.get("name") == "fighter_stocks" and item.get("flags") == 1)
+            stock_slice["hex"] = "03"
+            browser_rows = [json.loads(line) for line in selected["port_trace"].read_text().splitlines()]
+            browser_event_row = browser_rows[4 + event_tick]
+            browser_event_row["fighters"][1]["stocks"] = 3
+            selected["port_trace"].write_text(
+                "\n".join(json.dumps(row, separators=(",", ":")) for row in browser_rows) + "\n",
+                encoding="utf-8")
+            packet["browser"]["trace"].update({
+                "bytes": selected["port_trace"].stat().st_size,
+                "sha256": hashlib.sha256(selected["port_trace"].read_bytes()).hexdigest(),
+            })
+
+            event_prefix_bytes = b"".join(raw_records[:event_tuple["source_sequence"] + 1])
+            event_prefix = {
+                "bytes_read": len(event_prefix_bytes),
+                "records_read": event_tuple["source_sequence"] + 1,
+                "last_source_sequence": event_tuple["source_sequence"],
+                "sha256": hashlib.sha256(event_prefix_bytes).hexdigest(),
+            }
+            source_state = _state_from_payload(event_payload, "synthetic stock event")
+            source_state.update(_snapshot_values(event_payload, "synthetic stock event"))
+            event_target = {
+                "cursor_after_frame": event_tuple["browser_cursor"],
+                "fighter_entities": copy.deepcopy(browser_event_row["fighter_entities"]),
+                "match_frame": event_tuple["match_frame"], "match_index": 0,
+                "pad_consume_source_sequence": event_tuple["pad_consume_sequence"],
+                "rng": source_state["rng"], "scene_frame": source_state["scene_frame"],
+                "source_tick": event_tick, "source_tick_seq": event_tuple["source_sequence"],
+                "state_fields_observed": ["fighter_entities", "fighters", "match_frame",
+                                           "pad_state_hex", "rng", "scene_frame"],
+                "timeline_frame_index": event_tuple["timeline_frame_index"],
+            }
+            identities = {
+                "clock2000_expectations": {"path": "clock2000-expectations.json", "bytes": 10,
+                                           "sha256": "1" * 64},
+                "clock2000_prior_audit": clock_audit_identity,
+                "packet": {"path": "clock2000-packet.json", "bytes": 10, "sha256": "2" * 64},
+                "outer_packet": {"path": "stock-packet.json", "bytes": 10, "sha256": "3" * 64},
+            }
+            stock_audit_path = Path(directory) / "stock-decrement-audit.json"
+            stock_audit_path.write_text("{}\n", encoding="utf-8")
+            source["stock_decrement_boundary"] = {
+                "schema": STOCK_DECREMENT_BOUNDARY_SCHEMA,
+                "clock2000_baseline_stocks": [4, 4, 4, 4],
+                "event": {
+                    "event": "first_typed_stock_count_decrement",
+                    "changed_slots": [{"slot": 1, "before": 4, "after": 3}],
+                    "stocks_before": [4, 4, 4, 4], "stocks_after": [4, 3, 4, 4],
+                    "target": event_target,
+                },
+                "audit": {"path": str(stock_audit_path),
+                          "bytes": stock_audit_path.stat().st_size,
+                          "sha256": hashlib.sha256(stock_audit_path.read_bytes()).hexdigest()},
+                "audit_context": identities,
+                "source_scan_limits": {"max_bytes": V10_STOCK_DECREMENT_SCAN_BYTE_CAP,
+                                        "max_records": V10_STOCK_DECREMENT_SCAN_RECORD_CAP,
+                                        "max_seconds": V10_STOCK_DECREMENT_SCAN_SECONDS},
+            }
+            packet.update({"schema": STOCK_DECREMENT_EXPECTATION_SCHEMA,
+                           "scope": V10_FIRST_STOCK_DECREMENT_SCOPE, "version": 1})
+            selected["match_clock_boundary_audit"] = clock_audit_path
+            selected["stock_decrement_boundary_audit"] = stock_audit_path
+            packet_path = fixture["packet_path"]
+            packet_path.write_text(json.dumps(packet), encoding="utf-8")
+
+            source_stat = _file_stat_identity(selected["reference"])
+            source_identity = {
+                "trace_bytes": source_stat["bytes"],
+                "recorded_full_trace_sha256": packet["source"]["trace"]["recorded_full_sha256"],
+                "full_trace_rehashed": False,
+                "manifest_sha256": packet["source"]["manifest"]["sha256"],
+                "source_report_sha256": packet["source"]["report"]["sha256"],
+                "audit_sha256": packet["source"]["audit"]["sha256"],
+                "audit_records_decoded": 4116, "audit_bytes_read": 5364736,
+            }
+            browser_cursor = event_tuple["browser_cursor"]
+            browser_identity = {
+                "required_cursor": browser_cursor, "target_cursor": browser_cursor,
+                "observed_cursor": browser_cursor, "requested_cursor": browser_cursor,
+                "exported_cursor": browser_cursor + 1,
+                "capture_report_sha256": "4" * 64,
+                "producer_manifest_sha256": "5" * 64,
+                "browser_report_sha256": "6" * 64, "port_trace_sha256": "7" * 64,
+            }
+            synthetic_stock_audit = {"observed": {"source_prefix": event_prefix}}
+            yielded = []
+            limits = {}
+
+            def synthetic_records(_path, *, max_bytes, max_records, stats):
+                limits.update(max_bytes=max_bytes, max_records=max_records)
+
+                def stream():
+                    for row, raw in zip(rows, raw_records):
+                        stats.record_bytes(raw)
+                        stats.records_read += 1
+                        yielded.append(row["seq"])
+                        yield row
+                return stream()
+
+            with (mock.patch("whole_session_state_compare._validate_v10_source_provenance",
+                             return_value=(fixture["source_manifest"], {},
+                                           fixture["source_audit"], source_identity)),
+                  mock.patch("whole_session_state_compare._validate_v10_browser_provenance",
+                             return_value=({}, {}, {}, browser_identity)),
+                  mock.patch("whole_session_state_compare._validate_first_positive_audit",
+                             return_value=(fixture["positive_audit"],
+                                           source["positive_boundary_audit"]["sha256"])),
+                  mock.patch("whole_session_state_compare._validate_clock60_audit",
+                             return_value=(fixture["clock_audit"],
+                                           source["clock60_boundary_audit"]["sha256"])),
+                  mock.patch("whole_session_state_compare._validate_match_clock_boundary_audit",
+                             return_value=({"observed": {}}, clock_audit_identity["sha256"])),
+                  mock.patch("whole_session_state_compare._validate_stock_decrement_boundary_audit",
+                             return_value=(synthetic_stock_audit,
+                                           packet["source"]["stock_decrement_boundary"]["audit"]["sha256"])),
+                  mock.patch("whole_session_state_compare.iter_records",
+                             side_effect=synthetic_records)):
+                result = compare_paths(
+                    selected["reference"], selected["recipe"], selected["port_trace"],
+                    scope=V10_FIRST_STOCK_DECREMENT_SCOPE,
+                    expectations=packet_path, source_manifest=selected["source_manifest"],
+                    source_report=selected["source_report"], source_audit=selected["source_audit"],
+                    browser_capture_report=selected["browser_capture_report"],
+                    browser_producer_manifest=selected["browser_producer_manifest"],
+                    browser_report=selected["browser_report"],
+                    positive_boundary_audit=selected["positive_boundary_audit"],
+                    clock60_boundary_audit=selected["clock60_boundary_audit"],
+                    match_clock_boundary_audit=clock_audit_path,
+                    stock_decrement_boundary_audit=stock_audit_path)
+
+            self.assertEqual(result["boundary_result"], "equivalent")
+            self.assertEqual(result["result"], "incomplete")
+            self.assertFalse(result["complete"])
+            self.assertFalse(result["whole_session_equivalent"])
+            self.assertEqual(limits, {"max_bytes": V10_STOCK_DECREMENT_SCAN_BYTE_CAP,
+                                     "max_records": V10_STOCK_DECREMENT_SCAN_RECORD_CAP})
+            self.assertEqual(yielded[-1], event_tuple["source_sequence"])
+            self.assertEqual(len(yielded), event_tuple["source_sequence"] + 1)
+            self.assertEqual(result["source_prefix"]["sha256"], event_prefix["sha256"])
+            self.assertEqual(result["timeline_frames_consumed"], event_tuple["browser_cursor"])
+            self.assertEqual(result["stock_decrement_event_boundary"]["changed_slots"],
+                             [{"slot": 1, "before": 4, "after": 3}])
+
+    def test_ordered_prefix_loop_continues_to_event_and_stops_at_first_failure(self):
+        raw_records = [f"record-{index}\n".encode() for index in range(7)]
+        checkpoint_sequences = [1, 2, 3]
+        checkpoints = []
+        for index, (label, sequence) in enumerate(zip(
+                ("clock1", "clock60", "clock2000"), checkpoint_sequences)):
+            prefix = b"".join(raw_records[:sequence + 1])
+            checkpoints.append({
+                "label": label,
+                "tuple": {"source_sequence": sequence},
+                "prefix": {"records_read": sequence + 1, "bytes_read": len(prefix),
+                           "sha256": hashlib.sha256(prefix).hexdigest()},
+            })
+        event_prefix = b"".join(raw_records[:5])
+        event = {"event": {"target": {
+            "match_index": 0, "source_tick": 4, "source_tick_seq": 4,
+            "pad_consume_source_sequence": 3, "timeline_frame_index": 4,
+            "cursor_after_frame": 5, "match_frame": 4,
+        }}}
+
+        class FakeComparator:
+            stock_decrement_observed = False
+
+        class FakeSource:
+            def __init__(self, comparator, *, fail_at=None):
+                self.comparator = comparator
+                self.fail_at = fail_at
+
+            def consume(self, row):
+                if row["seq"] == self.fail_at:
+                    raise ComparisonError("synthetic first event mismatch")
+                if row["seq"] == 4:
+                    self.comparator.stock_decrement_observed = True
+
+        def run(*, fail_at=None):
+            stats = ObserverStreamStats()
+            comparator = FakeComparator()
+            source = FakeSource(comparator, fail_at=fail_at)
+            yielded = []
+
+            def records():
+                for sequence, raw in enumerate(raw_records):
+                    stats.record_bytes(raw)
+                    stats.records_read += 1
+                    yielded.append(sequence)
+                    yield {"seq": sequence}
+
+            terminal = {
+                "records_read": 5, "bytes_read": len(event_prefix),
+                "sha256": hashlib.sha256(event_prefix).hexdigest(),
+                "last_source_sequence": 4,
+            }
+
+            def joined(row, _source, _comparator, target):
+                return row["seq"] == target.get("source_sequence")
+
+            with mock.patch("whole_session_state_compare._match_boundary_join_complete",
+                            side_effect=joined):
+                complete, last_sequence = _consume_ordered_clock_lineage(
+                    records(), source, comparator, stats, checkpoints,
+                    terminal_event=event, terminal_prefix=terminal, max_seconds=60)
+            return complete, last_sequence, yielded
+
+        complete, last_sequence, yielded = run()
+        self.assertTrue(complete)
+        self.assertEqual(last_sequence, 4)
+        self.assertEqual(yielded, [0, 1, 2, 3, 4])
+
+        stats = ObserverStreamStats()
+        comparator = FakeComparator()
+        source = FakeSource(comparator, fail_at=4)
+        yielded_failure = []
+
+        def failing_records():
+            for sequence, raw in enumerate(raw_records):
+                stats.record_bytes(raw)
+                stats.records_read += 1
+                yielded_failure.append(sequence)
+                yield {"seq": sequence}
+
+        def joined(row, _source, _comparator, target):
+            return row["seq"] == target.get("source_sequence")
+
+        with mock.patch("whole_session_state_compare._match_boundary_join_complete",
+                        side_effect=joined):
+            with self.assertRaisesRegex(ComparisonError, "first event mismatch"):
+                _consume_ordered_clock_lineage(
+                    failing_records(), source, comparator, stats, checkpoints,
+                    terminal_event=event,
+                    terminal_prefix={"records_read": 5, "bytes_read": len(event_prefix),
+                                     "sha256": hashlib.sha256(event_prefix).hexdigest(),
+                                     "last_source_sequence": 4}, max_seconds=60)
+        self.assertEqual(yielded_failure, [0, 1, 2, 3, 4])
 
     def test_ordered_clock_lineage_production_loop_supports_variable_checkpoint_counts(self):
         cases = ((), (120,), (120, 300), (120, 240, 360))
