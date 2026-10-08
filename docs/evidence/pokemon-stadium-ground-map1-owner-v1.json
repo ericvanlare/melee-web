@@ -1,0 +1,182 @@
+{
+  "schema": "melee-web-pokemon-stadium-ground-map1-owner-v1",
+  "result": "passed_scoped_single_map1_lifetime",
+  "issue": 245,
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "boundary": "One isolated original Stadium map-1 Ground constructor/removal lifetime under the checked C1 archive, E8 and Ground storage owners. This does not exercise normal full-stage startup or admission.",
+  "source_producer": {
+    "branch": "codex/stadium-map1-ground-owner-20261007",
+    "commit": "13d93caa69ada0d8475c61ec66768816b0522c24",
+    "git_tree": "b5ae431c3877e53badffee0179c9259f09add154",
+    "base_main": "6c6ebb85bd7df7445fe4246dba9ddbdd212e3ed3",
+    "clean": true
+  },
+  "host_and_runtime": {
+    "host": "macOS 26.6 arm64",
+    "runtime": "Node.js v24.19.0 executing the Emscripten wasm32 diagnostic target",
+    "browser_used": false
+  },
+  "source_and_input_identity": {
+    "game_revision": "GALE01 revision 2",
+    "gameplay_patch_sha256": "895c5a0ffd91ca9b9d0ad8117bb62d06ed4cd5ce2c3fec68428588a42346c46a",
+    "generated_ground_source_sha256": "43445c8923a50849c4466b6c3102f7a84c12ad752fa58d0278bf9ee314d3b76d",
+    "compiled_grpstadium_object_sha256": "c40ab6d44f014d7a3264dedeb402d06a45b6b438b0cada82f2db3de7609d61f8",
+    "fixture_union": {
+      "run_id": "stadium-buffer-retained98-c1-prep-20261007-215542-cf4a",
+      "logical_file_count": 98,
+      "pre_run_inventory": {
+        "artifact": "fixture-input-inventory-pre-run-v5.json",
+        "sha256": "855a50a92d91d9d2f2f7abb4079471f9dfc65c2bd1103a47f23ac6519b72d264"
+      },
+      "invocation_inventory": {
+        "artifact": "fixture-input-inventory-invocation-v5.json",
+        "sha256": "d3e9185228f2a45fcd5b104d0062eb26e0bfe78b3206a374935f7ebed3b52ee4"
+      },
+      "post_run_inventory": {
+        "artifact": "fixture-input-inventory-post-run-v5.json",
+        "sha256": "b160db242672403aa99b4b70cf57ad7af778131410e2adb15170eef70f130e31",
+        "captured_after_owned_process_group_absence": true
+      },
+      "all_98_hashes_match": true
+    }
+  },
+  "harness_source_observations": {
+    "map_id": 1,
+    "original_create": "Ground_GetStageGObj(1)",
+    "original_remove": "Ground_801C4A08",
+    "ground_storage_requested_bytes": 64,
+    "authored_marker_pairs_validated_against_their_own_root": 20,
+    "marker_pairs_matching_map1_root": 0,
+    "stage_info_x280_baseline_empty_and_unchanged": true,
+    "map1_joint_indices": 0,
+    "preconstructor_gates": [
+      "Map-1 row is resident and bounded by authored entry count and StageInfo capacity.",
+      "Callback flags do not enable the secondary camera; authored map-1 collision bindings and GrJoint collision row are absent.",
+      "No existing source Stage GObj owner or non-empty StageInfo marker slot is overwritten.",
+      "Actual Emscripten32 Ground storage pointer, exact live allocation, heap/world context, allocation generation and zeroed 64-byte payload are checked before constructor entry."
+    ],
+    "cleanup_observations": {
+      "typed_ft_device_bytes_restored": true,
+      "ground_buffer_retired": true,
+      "single_constructor_removal": true,
+      "source_seed_unchanged": true,
+      "save_owner_unchanged": true,
+      "checked_e8_teardown": true
+    },
+    "not_dispatched_or_rendered": {
+      "ground_callback_dispatch": false,
+      "proc_ticks": 0,
+      "rendered": false
+    },
+    "stage_info_xA0": {
+      "observed_value": 160,
+      "interpretation": "observed only; not compared with an expected value"
+    }
+  },
+  "focused_validation": {
+    "pure_selector_and_lease_controls": {
+      "result": "passed",
+      "run_id": "stadium-map1-ground-owner-harness-repair-20261007-v1",
+      "log": "pure-controls-run-v1.log",
+      "log_sha256": "b21d2ae706897eb8cbb95084c333903aa8655f026bca19d86012f68815672a04"
+    },
+    "affected_translation_unit": {
+      "result": "passed",
+      "log": "native-menu-affected-tu-compile-v2.log",
+      "log_sha256": "3895189825bcade7b8dd7800be16f5a5ad388a71c2d8f5871b3ceb6e4f8076d1",
+      "output_object_sha256": "1a640ef87f889a3dca17ac504dcf6ad08ee42b5380949df0cc2d9dee86461dc7"
+    },
+    "full_python_suite": {
+      "result": "passed",
+      "tests": 2041,
+      "skipped": 133,
+      "log": "full-unittest-v1.log",
+      "log_sha256": "b2e1817123a893c0f533cdd2b645621429c4518fb9125389b79c3171b5ee5db6",
+      "fixture_context": "The retained fixture exists under its owned local resource path; the full suite did not configure MELEE_MENU_FIXTURE_ROOT or the map-1 gate, so the retained map-1 test was skipped."
+    }
+  },
+  "diagnostic_build": {
+    "producer_commit": "13d93caa69ada0d8475c61ec66768816b0522c24",
+    "target": "native_menu_host_trace",
+    "configuration": "Release",
+    "profile": "C1A diagnostic ON; the other nine MELEE_WEB boolean options OFF",
+    "build_result": "passed; linked but not separately launched during build validation",
+    "build_log": "diagnostic-build-v1.log",
+    "build_log_sha256": "d27a079993f99bdd102136b68196f3697115b74aff516115c60324d7577b8cc0",
+    "cmake_cache_sha256": "59b26ab9d7f1414fd337c83e8dc3f009655dad37c38dbd6e7434268b69e7d9e6",
+    "native_menu_host_trace_object_sha256": "1a640ef87f889a3dca17ac504dcf6ad08ee42b5380949df0cc2d9dee86461dc7",
+    "javascript_artifact_sha256": "fa7234633e33c1817448f79ddcae8247f4f5cf48d375e346c27bdec033ee3958",
+    "wasm_artifact_sha256": "1620a89cc369622b64b812cd8bf01482144e82d633cd4bd1257cc771abeaca38"
+  },
+  "ordinary_release_provenance": {
+    "target": "gameplay_menu_browser",
+    "producer_commit": "0c3c932a66349b7db817b982a6a9c815d23fc00d",
+    "producer_tree": "a6ffdc677db0d4005d3fb899d9f87ddc13a93ee6",
+    "fresh_build_at_13d93caa": false,
+    "reuse_proof": {
+      "run_id": "stadium-map1-ground-owner-validation-20261007-v1",
+      "artifact": "ordinary-release-reuse-proof-v1.json",
+      "sha256": "92ac1ada746ca533d4fcd1ea121dfa556c388c60c95519baebca57a085935c55"
+    },
+    "review_sha256": "dfd9b25c89b79765e89f5bcc3d240e917623a8f0d51b529f57e733568f61d15d",
+    "limitation": "Ordinary Release artifacts are identified at their own producer and are distinct from the current C1 diagnostic producer and native run."
+  },
+  "native_attempt": {
+    "run_id": "stadium-map1-ground-owner-validation-20261007-v1",
+    "attempt_count": 1,
+    "packet": {
+      "artifact": "issue245-map1-native-run-packet-v5.json",
+      "sha256": "7d716fff827b830e286fa1a4352675424a85c6546e4ae62cb739c91f5432aefd"
+    },
+    "authorization_sha256": "45af1c266db0745bfd6a5b338d00a73657b4e7c14450fd99ce07da33e0335155",
+    "result": {
+      "artifact": "issue245-map1-native-v5.result.json",
+      "sha256": "de5ff2bcc82be3cca527028bb563f9a3144779833735cb833af2d603af9fceba",
+      "status": "passed-scoped-single-map1-lifetime"
+    },
+    "post_run_identity_supplement": {
+      "artifact": "issue245-map1-post-attempt-identities-v2.json",
+      "sha256": "9a6bb2bea2a1dac83003960d4b7bb5d95765a49b65ebef10f33b4836a09f79ed"
+    },
+    "root_review_sha256": "0951d6deccbba02823ae432ce9f640e327c824c6212a12c2a9b780aa02b350f0",
+    "process_identity": {
+      "wrapper": {"pid": 86503, "ppid": 86491, "pgid": 86503},
+      "node": {"pid": 86509, "ppid": 86505, "pgid": 86503},
+      "owned_process_group_absent_after_exit": true
+    },
+    "raw_trace": {
+      "retained_scratch_run_relative_path": "work/stadium-c1a-native-menu-h22cyy7k/stadium-ground-map1-owner.jsonl",
+      "sha256": "b9c116c086621134456ac63550b892385d4a6d1f1b46985d5d62c1459f825ba9",
+      "records": "one header and one stadium_e8_request_returned event"
+    }
+  },
+  "retained_failures": [
+    {
+      "run_id": "stadium-map1-ground-owner-validation-20261007-v1",
+      "artifact": "issue245-map1-native-v4.result.json",
+      "sha256": "c305a822d7bc9bc7d10910310ba55fe4ea9f7360d731730a2e19475e05cfcefd",
+      "scope": "The prior attempt stopped before Ground_GetStageGObj because the harness incorrectly required the authored marker row to match map-1's root; its retired-allocation check also expected a freed generation to remain queryable. It is preserved as a failure and is not constructor evidence."
+    },
+    {
+      "run_id": "stadium-map1-ground-owner-harness-repair-20261007-v1",
+      "artifact": "native-menu-affected-tu-compile-v1.log",
+      "sha256": "848413edefe935f7a867748c66a2f04ec689ddce21ede645a648ab43b1f2bad4",
+      "scope": "Initial exact-TU compiler failure; corrected namespace-qualified TU compile is recorded separately."
+    },
+    {
+      "run_id": "stadium-map1-ground-owner-validation-20261007-v1",
+      "artifact": "issue245-map1-packet-preparation-v5-first-failure.json",
+      "sha256": "31eb87bf736cc1aba88ed5f6d7407e5f558d046421b96fe700f4da1a91f7f46f",
+      "scope": "Metadata-only packet-preparation mistake; no source/build/native action was started."
+    }
+  ],
+  "limitations": [
+    "This is one isolated map-1 owner lifetime, not the original full map0-to-map1-to-map2 startup sequence.",
+    "No Stage_8022524C, Stadium OnInit, map0/map2, callback dispatch, process tick, draw/render, collision startup, browser, retail comparison, performance, audio-fidelity or public-admission result is established.",
+    "The result is component evidence and does not establish whole-session acceptance; Pokémon Stadium remains outside public stage admission."
+  ]
+}

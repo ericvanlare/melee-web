@@ -1,8 +1,10 @@
 #include "stadium_c1_stage_state_probe.h"
 
 #include <melee/gr/grdatfiles.h>
+#include <melee/gr/grpstadium.h>
 #include <melee/gr/ground.h>
 #include <melee/gr/types.h>
+#include <melee/ft/ftdevice.h>
 #include <melee/it/it_3F14.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <stdio.h>
@@ -204,4 +206,167 @@ int melee_web_stadium_c1_stage_info_snapshot_release(
     free(snapshot);
     if (error && error_size) error[0] = '\0';
     return 1;
+}
+
+struct MeleeWebStadiumC1FtDeviceSnapshot {
+    struct ftDeviceUnk3 first[1];
+    struct ftDeviceUnk5 bury_things[2];
+    struct ftDeviceUnk3 third[1];
+    struct ftDeviceUnk4 fourth;
+    int first_count;
+    int bury_thing_count;
+    const void* addresses[6];
+};
+
+size_t melee_web_stadium_c1_ground_map_slot_count(void)
+{
+    return sizeof(stage_info.map_gobjs) / sizeof(stage_info.map_gobjs[0]);
+}
+
+void* melee_web_stadium_c1_ground_map_slot(size_t index)
+{
+    if (index >= melee_web_stadium_c1_ground_map_slot_count()) return NULL;
+    return stage_info.map_gobjs[index];
+}
+
+size_t melee_web_stadium_c1_ground_marker_slot_count(void)
+{
+    return sizeof(stage_info.x280) / sizeof(stage_info.x280[0]);
+}
+
+void* melee_web_stadium_c1_ground_marker_slot(size_t index)
+{
+    if (index >= melee_web_stadium_c1_ground_marker_slot_count()) return NULL;
+    return stage_info.x280[index];
+}
+
+int melee_web_stadium_c1_ground_map_profile(
+    int map_id, MeleeWebStadiumC1GroundStageProfile* profile)
+{
+    if (profile == NULL || map_id != 1 ||
+        (size_t) map_id >= melee_web_stadium_c1_ground_map_slot_count())
+        return 0;
+    profile->grkind = (int32_t) grPs_StageData.grkind;
+    profile->callback_row_present = grPs_StageData.callbacks != NULL;
+    profile->callback_flags_b2 = profile->callback_row_present
+                                     ? grPs_StageData.callbacks[map_id].flags_b2
+                                     : 0;
+    profile->joint_count = grPs_StageData.joint_count;
+    profile->joint_table_present = profile->joint_count == 0 ||
+                                   grPs_StageData.joints != NULL;
+    profile->collision_row_present = 0;
+    if (grPs_StageData.joints != NULL) {
+        for (size_t i = 0; i < grPs_StageData.joint_count; ++i) {
+            if (grPs_StageData.joints[i].y == map_id) {
+                profile->collision_row_present = 1;
+                break;
+            }
+        }
+    }
+    return 1;
+}
+
+void* melee_web_stadium_c1_ground_map_lookup(int map_id)
+{
+    return Ground_GetMapGObj(map_id);
+}
+
+void* melee_web_stadium_c1_ground_map_create(int map_id)
+{
+    return Ground_GetStageGObj(map_id);
+}
+
+int melee_web_stadium_c1_ground_map_remove(void* object)
+{
+    if (object == NULL) return 0;
+    Ground_801C4A08((HSD_GObj*) object);
+    return 1;
+}
+
+void* melee_web_stadium_c1_ground_map_joint(void* object, int depth)
+{
+    if (object == NULL) return NULL;
+    return Ground_801C3FA4((HSD_GObj*) object, depth);
+}
+
+int melee_web_stadium_c1_ground_map_object_view(
+    void* user_data, MeleeWebStadiumC1GroundMapObjectView* view)
+{
+    if (user_data == NULL || view == NULL) return 0;
+    Ground* ground = (Ground*) user_data;
+    view->map_id = ground->map_id;
+    view->gobj = ground->gobj;
+    view->camera = ground->x18;
+    return 1;
+}
+
+MeleeWebStadiumC1FtDeviceSnapshot*
+melee_web_stadium_c1_ft_device_snapshot_create(void)
+{
+    MeleeWebStadiumC1FtDeviceSnapshot* snapshot =
+        malloc(sizeof(*snapshot));
+    if (snapshot == NULL) return NULL;
+    memcpy(snapshot->first, ft_80459A68, sizeof(snapshot->first));
+    memcpy(snapshot->bury_things, ftDevice_BuryThings,
+           sizeof(snapshot->bury_things));
+    memcpy(snapshot->third, ft_80459A8C, sizeof(snapshot->third));
+    memcpy(&snapshot->fourth, &ft_804D6578, sizeof(snapshot->fourth));
+    snapshot->first_count = ft_804D6570;
+    snapshot->bury_thing_count = ftDevice_BuryThingCount;
+    snapshot->addresses[0] = ft_80459A68;
+    snapshot->addresses[1] = ftDevice_BuryThings;
+    snapshot->addresses[2] = ft_80459A8C;
+    snapshot->addresses[3] = &ft_804D6578;
+    snapshot->addresses[4] = &ft_804D6570;
+    snapshot->addresses[5] = &ftDevice_BuryThingCount;
+    return snapshot;
+}
+
+int melee_web_stadium_c1_ft_device_snapshot_restore(
+    const MeleeWebStadiumC1FtDeviceSnapshot* snapshot)
+{
+    if (snapshot == NULL) return 0;
+    memcpy(ft_80459A68, snapshot->first, sizeof(snapshot->first));
+    memcpy(ftDevice_BuryThings, snapshot->bury_things,
+           sizeof(snapshot->bury_things));
+    memcpy(ft_80459A8C, snapshot->third, sizeof(snapshot->third));
+    memcpy(&ft_804D6578, &snapshot->fourth, sizeof(snapshot->fourth));
+    ft_804D6570 = snapshot->first_count;
+    ftDevice_BuryThingCount = snapshot->bury_thing_count;
+    return melee_web_stadium_c1_ft_device_snapshot_matches(snapshot);
+}
+
+int melee_web_stadium_c1_ft_device_snapshot_matches(
+    const MeleeWebStadiumC1FtDeviceSnapshot* snapshot)
+{
+    return snapshot != NULL &&
+           memcmp(ft_80459A68, snapshot->first,
+                  sizeof(snapshot->first)) == 0 &&
+           memcmp(ftDevice_BuryThings, snapshot->bury_things,
+                  sizeof(snapshot->bury_things)) == 0 &&
+           memcmp(ft_80459A8C, snapshot->third,
+                  sizeof(snapshot->third)) == 0 &&
+           memcmp(&ft_804D6578, &snapshot->fourth,
+                  sizeof(snapshot->fourth)) == 0 &&
+           ft_804D6570 == snapshot->first_count &&
+           ftDevice_BuryThingCount == snapshot->bury_thing_count;
+}
+
+int melee_web_stadium_c1_ft_device_snapshot_release(
+    MeleeWebStadiumC1FtDeviceSnapshot* snapshot)
+{
+    if (snapshot == NULL) return 0;
+    free(snapshot);
+    return 1;
+}
+
+size_t melee_web_stadium_c1_ft_device_snapshot_addresses(
+    const MeleeWebStadiumC1FtDeviceSnapshot* snapshot,
+    const void** addresses, size_t capacity)
+{
+    if (snapshot == NULL || addresses == NULL ||
+        capacity < sizeof(snapshot->addresses) / sizeof(snapshot->addresses[0]))
+        return 0;
+    memcpy(addresses, snapshot->addresses, sizeof(snapshot->addresses));
+    return sizeof(snapshot->addresses) / sizeof(snapshot->addresses[0]);
 }

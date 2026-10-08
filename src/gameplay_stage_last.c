@@ -18,8 +18,6 @@
 #include <string.h>
 extern int melee_web_stage_selection_begin(int);
 extern int melee_web_stage_selection_end(void);
-extern int melee_web_ground_map_storage_begin(void);
-extern int melee_web_ground_map_storage_end(void);
 extern int melee_web_ground_remove_unmapped(HSD_GObj*);
 extern void melee_web_ground_remove_camera(HSD_GObj*);
 struct MeleeWebStageLast {
