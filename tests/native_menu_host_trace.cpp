@@ -2305,7 +2305,7 @@ void run_typed_results_source_smoke(const melee_web::RuntimeFiles& files,
     for(unsigned t=0;t<240;t++)tick(neutral);
     if(expected){
         emit_native_bytes("declared_results_entry_payload",&result,sizeof(result));
-        std::cout<<"Declared Results entry seed "<<seed<<'\n';
+        std::cout<<"Declared Results session initial seed "<<seed<<'\n';
         unsigned input_ticks=0;
         auto observe=[&](const char* label){
             const auto& state=lbl_8046DBE8;
