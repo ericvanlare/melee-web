@@ -23,6 +23,21 @@ from sd_reference_diagnostic import Receiver, SdDiagnosticError, require
 from capture_retail_replay import dolphin_command, _copy_tree
 from capture_allocation_history import validate_reference_build_manifest
 from reference_observer_stream import read_status
+from reference_input_stream import validate_status
+
+
+def wait_terminal_statuses(observer, native, deadline):
+    """Two independently published writers; neither status stands in for the other."""
+    while time.monotonic() < deadline:
+        primary = read_status(observer) if Path(observer).is_file() else None
+        inputs = validate_status(native, mode="record", require_complete=False) if Path(native).is_file() else None
+        if primary:
+            require(not primary["invalid"] and not primary["error"], "SD observer failed during finalization")
+            require(primary["state"] != "completed", "SD observer unexpectedly completed a legacy capture")
+        if primary and primary["state"] == "interrupted" and inputs and inputs["complete"]:
+            return
+        time.sleep(0.02)
+    raise SdDiagnosticError("SD independent writer finalization deadline expired")
 
 
 def menu_actions(path):
@@ -133,13 +148,7 @@ def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manife
                     next_row()
                 # MWRO End is flushed before the writer publishes final status.
                 # Do not treat that publication race as native completion.
-                while True:
-                    require(time.monotonic() < deadline, "SD final status publication deadline expired")
-                    if status.is_file():
-                        state = read_status(status)["state"]
-                        if state in ("interrupted", "invalid", "completed"):
-                            break
-                    time.sleep(0.02)
+                wait_terminal_statuses(status, native_status, deadline)
                 report = receiver.finish(status, native, native_status)
                 (output / "report.json").write_bytes(canonical(report))
                 return report
@@ -153,3 +162,22 @@ def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manife
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait(timeout=5)
+
+
+def main(argv=None):
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    for name in ("dolphin", "disc", "profile", "input-plan", "menu-recipe", "output", "build-manifest"):
+        parser.add_argument("--" + name, type=Path, required=True)
+    parser.add_argument("--timeout", type=float, default=180)
+    args = parser.parse_args(argv)
+    try:
+        report = run(**vars(args))
+    except (OSError, ValueError) as error:
+        parser.exit(1, f"SD prefix diagnostic failed: {error}\n")
+    print(json.dumps(report, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
