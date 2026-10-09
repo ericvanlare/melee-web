@@ -165,7 +165,7 @@ test('actual harness finally preserves primary failure and closes after capture/
   const start=source.lastIndexOf('} finally {')+'} finally {'.length;
   const body=source.slice(start,source.indexOf('\n}\nconsole.log',start));
   for(const primary of [null,Error('original route failure')]){
-    const calls=[];const scope={failure:primary,nativeSessionActive:false,suddenDeathRoute:true,sparseMarioPrefix:false,
+    const calls=[];const scope={failure:primary,nativeSessionActive:false,suddenDeathRoute:true,sparseMarioPrefix:false,competitiveTimeoutRoute:false,
       report:{result:primary?'fail':'pass'},page:{},redactDiscPath:String,reportWriteError:null,
       driver:{diagnostics:async()=>{throw Error('diagnostic failure');}},
       readRuntimeDiagnosticsCapture:async()=>{throw Error('capture unavailable');},validateFinalSdCapture,
@@ -199,7 +199,7 @@ test('actual finally retains late failing capture and still closes without repla
   for(const primary of [null,Error('primary source failure')]){
     const capture=structuredClone(counter);for(const phase of [7,14,8])capture.phase_source_steps[phase]=1;
     capture.reason_counts[3]=1;let closed=0;
-    const scope={failure:primary,nativeSessionActive:false,suddenDeathRoute:true,sparseMarioPrefix:false,
+    const scope={failure:primary,nativeSessionActive:false,suddenDeathRoute:true,sparseMarioPrefix:false,competitiveTimeoutRoute:false,
       report:{result:'pass'},page:{},redactDiscPath:String,reportWriteError:null,
       driver:{diagnostics:async()=>({})},validateFinalSdCapture,
       readRuntimeDiagnosticsCapture:async()=>capture,persistReport:async()=>{},
@@ -245,4 +245,14 @@ test('actual v5 271-row P1-only prefix cannot admit next-scene preparation',asyn
     press:async key=>{keys.push(key);++actions;},wait:async()=>{},
   }),/P2 statistics confirmation.*(?:exactly one|one consumed|Start)/);
   assert.deepEqual(keys,['Enter','Enter','End']);
+});
+
+test('combined sparse and competitive flags reject before output or browser loading',()=>{
+ const harness=new URL('./vs_rules_item_menu_browser_test.mjs',import.meta.url).pathname;
+ for(const sparse of ['--sparse-mario-route','--sparse-mario-prefix','--sparse-mario-css-only'])
+  for(const competitive of ['--competitive-profile-only','--competitive-match-start-only','--competitive-timeout-route']){
+   const child=spawnSync(process.execPath,[harness,sparse,competitive,'--runtime-wasm-sha256','0'.repeat(64)],{encoding:'utf8'});
+   assert.equal(child.status,1);assert.match(child.stderr,/exclusive/);
+   assert.doesNotMatch(child.stderr,/Chrome|Playwright|Missing --|ENOENT/);
+  }
 });

@@ -189,7 +189,7 @@ def _s8(value: int) -> int:
     return value - 256 if value >= 128 else value
 
 
-def _decode_setup(start_melee_hex: Any) -> dict[str, Any]:
+def _decode_setup(start_melee_hex: Any, *, competitive_profile: bool = False) -> dict[str, Any]:
     _require(isinstance(start_melee_hex, str) and
              len(start_melee_hex) == SETUP_BYTES * 2 and
              re.fullmatch(r"[0-9a-fA-F]+", start_melee_hex) is not None,
@@ -202,11 +202,13 @@ def _decode_setup(start_melee_hex: Any) -> dict[str, Any]:
     # native setup decoder's pointer rejection.  Do not accept a capture that
     # would enter a different source profile merely because the declared
     # donor fields happen to match.
+    # The authored competitive profile opt-in exposes (and compares) FF;
+    # historical donor/CPU callers retain the default false-only contract.
     _require(raw[4] & 0x40,
              "capture setup requires the ordinary VS is_vs profile")
     _require((raw[1] & 0x02) == 0,
              "capture setup requires timer_shows_hours to be false")
-    _require((raw[1] & 0x01) == 0,
+    _require(competitive_profile or (raw[1] & 0x01) == 0,
              "capture setup requires friendly_fire to be false")
     _require(raw[0x14] == 0,
              "capture setup requires the ordinary zero timer subframe")
@@ -229,6 +231,8 @@ def _decode_setup(start_melee_hex: Any) -> dict[str, Any]:
         "game_speed_bits": raw[0x34:0x38].hex(),
         "players": [],
     }
+    if competitive_profile:
+        actual["friendly_fire"] = bool(raw[1] & 1)
     _require(raw[8] in (0, 1), "capture setup has an invalid is_teams byte")
     for index in range(6):
         base = 0x60 + index * 0x24

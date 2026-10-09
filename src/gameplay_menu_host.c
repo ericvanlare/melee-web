@@ -1680,6 +1680,7 @@ int melee_web_menu_host_source_observe(
     out->handicap = rules->handicap;
     out->damage_ratio = rules->damage_ratio;
     out->friendly_fire = rules->friendly_fire;
+    out->pause = rules->pause;
     out->item_frequency = (int) (int8_t) preferences->item_freq;
     out->item_mask = preferences->item_mask;
     if (h->source_scene == MELEE_WEB_HOST_SCENE_CSS) {

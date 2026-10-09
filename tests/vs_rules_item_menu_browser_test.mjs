@@ -10,9 +10,37 @@ import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
+import {observeRuntimeOwner} from './runtime_owner_observation.mjs';
+import {createCssHumanJoinDriver} from './vs_css_two_human_driver.mjs';
+import {
+  classifyResultsOwnerReadiness,
+  confirmTwoHumanResults,
+} from './vs_rules_results_confirmation_driver.mjs';
+import {
+  installRuntimeDiagnosticsCapture,
+  readRuntimeDiagnosticCounters,
+  readRuntimeDiagnosticsCapture,
+} from './runtime_callback_recorder.mjs';
+import {
+  ITEM_ROW_TO_PREFERENCE_BIT,
+  competitiveMatchStartFailures,
+  competitiveProfileFailures,
+  deriveAllOffItemMasks,
+} from './vs_rules_competitive_profile_helpers.mjs';
+import {
+  COMPETITIVE_TIMEOUT_BOUNDS,
+  competitiveTimeoutDeferredResultsFailures,
+  competitiveTimeoutFirstLossFailures,
+  competitiveTimeoutProgressFailures,
+  competitiveTimeoutReadinessFailures,
+  competitiveTimeoutStableFailures,
+  competitiveTimeoutTerminalFailures,
+  returnFromCompetitivePrize,
+  runtimeDiagnosticCounterFailures,
+  runtimeDiagnosticsFailures,
+} from './vs_rules_timeout_route_helpers.mjs';
 import {runSuddenDeathBrowserRoute,validateFinalSdCapture} from './vs_sudden_death_browser_route.mjs';
 import {runSparseMarioBrowserPrefix,installSparseVirtualController,validateFinalSparseCapture} from './vs_sparse_mario_browser_route.mjs';
-import {installRuntimeDiagnosticsCapture,readRuntimeDiagnosticsCapture} from './runtime_callback_recorder.mjs';
 
 const options = Object.fromEntries(['url', 'disc', 'out', 'playwright', 'runtime-wasm-sha256']
   .map(name => [name, {type: 'string'}]));
@@ -26,6 +54,9 @@ options['team-setup-only'] = {type: 'boolean', default: false};
 options['sparse-mario-route'] = {type: 'boolean', default: false};
 options['sparse-mario-css-only'] = {type: 'boolean', default: false};
 options['sparse-mario-prefix'] = {type: 'boolean', default: false};
+options['competitive-profile-only'] = {type: 'boolean', default: false};
+options['competitive-match-start-only'] = {type: 'boolean', default: false};
+options['competitive-timeout-route'] = {type: 'boolean', default: false};
 options['sudden-death-route'] = {type: 'boolean', default: false};
 const {values} = parseArgs({options, strict: true});
 const suddenDeathRoute = values['sudden-death-route'];
@@ -33,9 +64,9 @@ const sparseCssOnly=values['sparse-mario-css-only'];
 const sparseFullRoute=values['sparse-mario-route'];
 assert([sparseCssOnly,values['sparse-mario-prefix'],sparseFullRoute].filter(Boolean).length<=1,'Sparse modes are exclusive');
 const sparseMarioPrefix = values['sparse-mario-prefix']||sparseCssOnly||sparseFullRoute;
-if(sparseMarioPrefix && ['sudden-death-route','menu-only','rules-items-only','css-sss-only','stage-only','no-contest-only','team-battle','team-setup-only'].some(name=>values[name]))
+if(sparseMarioPrefix && ['sudden-death-route','menu-only','rules-items-only','css-sss-only','stage-only','no-contest-only','team-battle','team-setup-only','competitive-profile-only','competitive-match-start-only','competitive-timeout-route'].some(name=>values[name]))
   throw Error('Sparse prefix selects one exclusive route');
-if(suddenDeathRoute && ['menu-only','rules-items-only','css-sss-only','stage-only','no-contest-only','team-battle','team-setup-only'].some(name=>values[name]))
+if(suddenDeathRoute && ['menu-only','rules-items-only','css-sss-only','stage-only','no-contest-only','team-battle','team-setup-only','competitive-profile-only','competitive-match-start-only','competitive-timeout-route'].some(name=>values[name]))
   throw Error('SD selects one full route; reduced/team route flags are incompatible');
 if((suddenDeathRoute||sparseMarioPrefix) && !/^[a-f0-9]{64}$/.test(values['runtime-wasm-sha256']||''))
   throw Error('Declared route requires the frozen --runtime-wasm-sha256 identity');
@@ -44,12 +75,31 @@ const rulesItemsOnly = values['rules-items-only'];
 const cssSssOnly = values['css-sss-only'];
 const stageOnly = values['stage-only'];
 const noContestOnly = values['no-contest-only'];
+const competitiveProfileOnly = values['competitive-profile-only'];
+const competitiveMatchStartOnly = values['competitive-match-start-only'];
+const competitiveTimeoutRoute = values['competitive-timeout-route'];
+const competitiveSourceRoute = competitiveMatchStartOnly || competitiveTimeoutRoute;
+if(sparseMarioPrefix && (competitiveProfileOnly || competitiveSourceRoute))
+  throw Error('Sparse and competitive modes are exclusive');
 const teamSetupOnly = values['team-setup-only'];
 const teamBattle = values['team-battle'] || teamSetupOnly;
 if (teamSetupOnly && values['team-battle'])
   throw Error('--team-setup-only and --team-battle select different route lengths');
-if (teamBattle && (menuOnly || rulesItemsOnly || cssSssOnly || stageOnly || noContestOnly))
+if (teamBattle && (menuOnly || rulesItemsOnly || cssSssOnly || stageOnly || noContestOnly ||
+    competitiveProfileOnly || competitiveMatchStartOnly))
   throw Error('--team-battle runs the full Rules/Items/match route and cannot be combined with a reduced-route flag');
+if (competitiveProfileOnly &&
+    (menuOnly || rulesItemsOnly || cssSssOnly || stageOnly || noContestOnly || teamSetupOnly ||
+      competitiveMatchStartOnly))
+  throw Error('--competitive-profile-only is a dedicated source Rules/Items-to-CSS route');
+if (competitiveMatchStartOnly &&
+    (menuOnly || rulesItemsOnly || cssSssOnly || stageOnly || noContestOnly || teamSetupOnly ||
+      competitiveProfileOnly || competitiveTimeoutRoute))
+  throw Error('--competitive-match-start-only runs the competitive profile through a short normalized match prefix');
+if (competitiveTimeoutRoute &&
+    (menuOnly || rulesItemsOnly || cssSssOnly || stageOnly || noContestOnly || teamSetupOnly ||
+      teamBattle || competitiveProfileOnly || competitiveMatchStartOnly))
+  throw Error('--competitive-timeout-route runs the original competitive profile through natural timeout, Results, CSS and Eject');
 for (const name of ['url', 'disc', 'out'])
   if (!values[name]) throw Error('Use --url DEVELOPMENT_RUNTIME_URL --disc OWNED_DISC --out NEW_DIRECTORY [--playwright PACKAGE_DIR]');
 const output = path.resolve(values.out);
@@ -68,9 +118,19 @@ const sha256File = file => new Promise((resolve, reject) => {
   stream.on('end', () => resolve(hash.digest('hex')));
 });
 let browser, context, page, driver, browserPath, playwrightPath;
+let lastRuntimeCounterPollAt = 0;
+let failure;
+let interruptionSignal = null;
+const cleanupPromises = new Map();
+const cleanupResults = new Map();
+let reportWriteError = null;
 const report = {
   schema: 'melee-web-vs-rules-item-menu-browser-v1',
-  mode: sparseFullRoute ? 'source-sparse-mario-elimination-results-css' : sparseCssOnly ? 'source-sparse-mario-css-only-reducer' : sparseMarioPrefix ? 'source-sparse-mario-rendered-prefix' : suddenDeathRoute ? 'source-natural-timeout-sudden-death-results-css' : noContestOnly ? 'source-no-contest-results-reproducer'
+  mode: sparseFullRoute ? 'source-sparse-mario-elimination-results-css' : sparseCssOnly ? 'source-sparse-mario-css-only-reducer' : sparseMarioPrefix ? 'source-sparse-mario-rendered-prefix' : suddenDeathRoute ? 'source-natural-timeout-sudden-death-results-css'
+    : competitiveMatchStartOnly ? 'source-competitive-normalized-match-start-prefix'
+    : competitiveTimeoutRoute ? 'source-competitive-natural-timeout-results-route'
+    : competitiveProfileOnly ? 'source-competitive-rules-profile-preflight'
+    : noContestOnly ? 'source-no-contest-results-reproducer'
     : teamSetupOnly ? 'source-team-setup-cancel-reentry-reproducer'
     : teamBattle ? 'source-two-player-team-battle-results-route'
     : stageOnly ? 'source-sss-stage-driver-reproducer'
@@ -79,6 +139,12 @@ const report = {
     : menuOnly ? 'source-menu-boundary-reproducer' : 'source-rules-items-match-route',
   scope: sparseFullRoute ? 'Virtual Gamepad P3/keyboard P1; original sparse Mario CSS/SSS, live elimination and canonical Results/CSS. Functional only; no physical input, original comparison, pixels/PCM or timing acceptance.' : sparseCssOnly ? 'Rendered original sparse CSS and exact copied/raw PAD observation then Eject only; no SSS/world, physical input or timing acceptance.' : sparseMarioPrefix ? 'Virtual Browser Gamepad P3 and keyboard P1; original sparse CSS/SSS to a short ordinary Mario/FD prefix and Eject. No Results, original comparison, physical input or timing acceptance.' : suddenDeathRoute
     ? 'Original Rules one-minute four-stock two-human Mario/FD; natural timeout, active SD live input elimination, typed original Results and CSS/Eject. Zero timing-pause recovery. Functional only; no reference, timing, physical input or PCM acceptance.'
+    : competitiveMatchStartOnly
+    ? 'Headless original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS; enable P2 through Controls and require the original CSS CPU/empty/Human transitions before Start; select Final Destination through original SSS, check normalized two-human Mario stock settings once at the first available observation in the bounded 180–240 source-frame window (about a 3-second prefix), then Eject. No 8-minute match, timeout, Results, retail comparison, or full-route acceptance claim.'
+    : competitiveTimeoutRoute
+    ? 'Headless original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS -> original SSS -> two-human Mario/Final Destination match. A bounded P1 outward-left schedule from the authored x=-60 spawn must cause exactly one source stock loss; both players then remain neutral until the original 8-minute timer reaches a unique P2 timeout result, followed by original Results -> CSS, a read-only check of committed Rules and item mask/frequency, then Eject. The route permits host phase 5 only while stopped for Results asset preparation and only with the retained exact timeout winner, [3,4] live stocks, and every normalized setup rule unchanged; otherwise the phase is an error. It does not re-enter the Rules/Items row menus after Results. Runtime callbacks are retained through a bounded recorder: sample rows are thinned/ring-bounded, incident rows are lossless only when dropped_incidents is zero, and publication-phase source-step totals can include transition-spanning callbacks. A counter poll fails as soon as cumulative incidents exceed the 24-row ring. Stops on timing/runtime/browser/observer errors, invalid or lost incident diagnostics, wrong stocks/outcome, 15 seconds without source-frame progress, or the 660-second gameplay wall bound from phase-7 entry. This is a single headless functional route, not a retail comparison, physical-input, timing, visual/audio-equivalence or performance claim.'
+    : competitiveProfileOnly
+    ? 'Headless original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS; B0XX P1 inputs set and verify the exact GameRules profile and preserve raw CSS StartMeleeData for provenance. CSS data is not treated as normalized before SSS. No match, timeout, Results, retail comparison, or acceptance claim.'
     : noContestOnly
     ? 'Headless rendered original CSS -> SSS -> Final Destination -> match; P1 Start opens the original source pause, then the held LRAS+Start No Contest chord enters Results and Eject verifies teardown.'
     : teamSetupOnly
@@ -114,12 +180,14 @@ const report = {
     rulesToItems: 'fn_8022F538 selection 5 calls mnItemSw_802358C0',
     rulesToRulesPlus: 'fn_8022F538 selection 6 calls mn_802339FC; mn_802339FC sets MENU_KIND_RULES_EXTRA=15 and enters the source Rules Plus GObj',
     rulesPlusInput: 'fn_8023201C uses D-pad left/right on option 0, saves stock_time_limit in minutes, B commits and returns through mn_8023164C, and Start commits before mn_80229860(GM_VS)',
+    rulesPlusProfileRows: 'Rules Plus rows 0/1/2 are stock timer minutes, friendly_fire, and pause; the source GameRules observation reports the committed values, while normalized StartMeleeData fields are produced later by gm_80167BC8 on original VS entry after SSS',
     rulesPlusMatchHandoff: 'gm_80167BC8 converts nonzero stock_time_limit minutes to StartMeleeRules.time_limit seconds and enables the match timer',
     itemInput: 'fn_80233E10: MenuInput_Back commits the item table and returns to Rules; MenuInput_A toggles the selected item; MenuInput_Start commits and returns to VS',
     itemThink: 'fn_80234C24: animates Items entry/exit, observes cursor/value changes, and commits the source item settings after confirmed changes',
     itemInputGate: 'Observer reads mnItemSw_804D6BEC so the harness waits for the original transition lock before navigation inputs',
     itemCancelCommit: 'fn_80233E10 MenuInput_Back -> mnItemSw_CommitItems -> lbCardGame_UpdatePowerTime -> mn_8023164C',
-    itemSaveEffect: 'mnItemSw_CommitItems writes 31 authored item flags to gmMainLib_8015CC58()->item_mask and x21 - 1 to item_freq; B/Start then call lbCardGame_UpdatePowerTime',
+    itemSaveEffect: 'mnItemSw_CommitItems writes 31 authored item flags through MnItemSwTable.item_order (mnItemSw_803ED438) to gmMainLib_8015CC58()->item_mask and x21 - 1 to item_freq; the observer reports the live row-to-preference bit',
+    selectionPayload: 'melee_web_menu_host_selection_state copies raw session-owned CSS VsModeData.start; gm_80167BC8 converts GameRules later when original VS enters gameplay after SSS, so this preflight records CSS provenance without treating raw StartMeleeData as normalized settings',
     rulesMatchHandoff: 'fn_8022F538 Start in GM_MENU commits GameRules then calls mn_80229860(GM_VS)',
     sourceModeHandoff: 'gmmenumode.c:onExit passes MenuExitData.pending_mode to gm_SetPendingGameMode and gm_SetNewGameModePending; host snapshots source globals after this callback',
     cssToMain: 'mnCharSel_Scene_OnFrame checks mn_8022F218 for PAD_LR_START; B0XX q+9+7 follows the original CSS parent route to GM_MENU',
@@ -144,12 +212,68 @@ const report = {
     physicalInput: {status: 'not_run', reason: 'browser PAD keyboard routing only'},
     performance: {status: 'not_run', reason: 'functional route capture is not a performance campaign'},
   },
+  competitiveProfile: competitiveProfileOnly || competitiveSourceRoute ? {
+    requested: {mode: 'stock', stocks: 4, timer_minutes: 8, item_frequency: -1,
+      all_31_item_switches_off: true, pause_enabled: false, friendly_fire: true,
+      damage_ratio_menu_value: 10, handicap: 0},
+    raw_css_selection_stage: 'CSS-owned VsModeData.start before SSS and gm_80167BC8 conversion',
+    source_item_row_preference_bits: ITEM_ROW_TO_PREFERENCE_BIT,
+    initial_css_selection: null,
+    item_rows_after_original_inputs: [],
+    derived_masks: null,
+    final_css_selection: null,
+  } : null,
+  competitiveMatchStart: competitiveSourceRoute ? {
+    requested: {players: ['Mario', 'Mario'], css_port_identities: [1, 2],
+      raw_match_payload_slot_fields: [0, 0], resolved_controller_ports: [0, 1],
+      stage: 'Final Destination', normalized_stock_timer_seconds: 480,
+      source_frame_observation_window: [180, 240]},
+    controls_change: null,
+    css_roster: [],
+    normalized_match: null,
+    last_observation_before_eject: null,
+  } : null,
+  competitiveTimeoutRoute: competitiveTimeoutRoute ? {
+    input_schedule: {
+      owner: 'original source PAD port 0, injected only through menuDiagnosticPad',
+      loss_action: '12-source-frame outward-left stick pulses from the exact authored P1 x=-60 spawn; at most 50 pulses / 600 directional source frames',
+      stop: 'stop at first source observation [P1 stocks, P2 stocks] == [3, 4]; any P2 stock change, P1 below 3, or no loss by pulse 50 fails',
+      post_loss: 'P1 and P2 remain neutral; verify [3,4] remains stable for 120 advancing source frames',
+    },
+    bounds: {stock_loss_wall_ms: 120000, no_source_progress_wall_ms: 15000,
+      results_transition_wall_ms: 30000, results_return_wall_ms: 45000, gameplay_wall_ms: 660000,
+      source_snapshot_limit: 12, source_snapshot_period_frames: 3600},
+    post_results_scope: 'After Results returns to CSS, read the committed GameRules and exact item mask/frequency. The route does not re-enter the Rules/Items row menus after Results.',
+    terminal: {outcome: 1, winner_ports: [1], meaning: 'original OUTCOME_TIMEOUT and original source ranking gives P2 uniquely'},
+    match_snapshots: [],
+    stock_loss_samples: [],
+    results_asset_preparation: null,
+    results_pad_trace_latest: null,
+    terminal_observation: null,
+    retained_css_profile: null,
+    runtime_diagnostics_scope: 'One callback sample every >=100ms, rolling 100-row sample ring, fixed 24-row incident ring; callbacks may be observed in host phase 5 during validated Results asset preparation and in source phases 7 and 8. All callback counts, source-step aggregates, reason totals and drop counts are retained separately. Counter polls run at least once per second during active input, timeout waiting, and stopped Results asset preparation; cumulative incident counts above24 fail immediately. dropped_samples is expected bounded thinning and does not fail. Any dropped_incidents, unknown/non-preparation reason, malformed preparation row, invalid phase-step observation, missing recorder, or browser/runtime/timing/observer error fails the route.',
+    runtime_diagnostics: null,
+  } : null,
   checks: [], screenshots: {}, input: [], sourcePadSamples: [], timingPauses: [], timingPauseRecovery: [],
   sourceObservations: [], cssObservations: [], matchObservations: [],
   lifecycleObservations: [], errors: [],
 };
-let failure,reportWriteError,interruptionSignal;
-const cleanupPromises=new Map(),cleanupResults=new Map();
+const runtimeCaptureIdentity = competitiveTimeoutRoute ? {
+  scenario: 'competitive-eight-minute-natural-timeout-results-v2',
+  output_directory: path.basename(output),
+  disc_sha256: expectedDiscSha256,
+} : null;
+const runtimeCaptureIdentityScope = competitiveTimeoutRoute ? {
+  source_phases: [5, 7, 8],
+  callbacks: ['menuDiagnosticSample', 'menuDiagnosticIncident'],
+  sample_ring: {capacity: 100, interval_ms: 100, lossy: true},
+  incident_ring: {capacity: 24, dropped_records_fail: true},
+  source_steps: 'counted at callback publication phase; a callback may straddle a source phase transition',
+} : null;
+if (competitiveTimeoutRoute) {
+  report.competitiveTimeoutRoute.runtime_diagnostics_identity = runtimeCaptureIdentity;
+  report.competitiveTimeoutRoute.runtime_diagnostics_identity_scope = runtimeCaptureIdentityScope;
+}
 const serializeReport = () => JSON.stringify(report, (_key, value) =>
   typeof value === 'string' ? redactDiscPath(value) : value, 2) + '\n';
 const closeOnce = (name, resource, close) => {
@@ -231,25 +355,23 @@ try {
   checkInterruption();
   driver = createBrowserDriver(page, {surface: 'development', timeoutMs: 90000,
     deadline: Date.now() + (suddenDeathRoute ? 10 : 15) * 60 * 1000});
+  checkInterruption();
   report.browser = {executable: path.basename(browserPath), version: browser.version(), playwright: playwrightPath};
   report.discSha256 = await sha256File(discPath);
   assert.equal(report.discSha256, expectedDiscSha256,
     'Browser route requires the owned USA Rev. 2 source image identity');
 } catch (error) {
-  failure=error;
-  report.result = 'fail';
+  failure = error;
+  report.result = interruptionSignal ? 'interrupted' : 'fail';
   report.evidenceClaims.renderedBrowser.status = 'failed';
   report.evidenceClaims.sourceStateAndNavigation.status = 'not_started';
   report.failure = {message: redactDiscPath(error.message), stack: redactDiscPath(error.stack)};
-  await closeOwnedResources();
-  const cleanupFailed=Object.values(report.cleanup).some(item=>item.status==='failed');
-  if(cleanupFailed){
-    report.cleanup_failure='Owned browser resource cleanup failed';
-    if(!failure)failure=Error(report.cleanup_failure);
-    report.result='fail';
+  try { await closeOwnedResources(); } catch (cleanupError) {
+    report.cleanup_error = cleanupError.message;
   }
   await persistReport();
-  process.off('SIGINT',onSigint);process.off('SIGTERM',onSigterm);
+  process.off('SIGINT', onSigint);
+  process.off('SIGTERM', onSigterm);
   throw Error(redactDiscPath(error.message));
 }
 const MAIN_MENU_KIND = 0;
@@ -265,9 +387,9 @@ const current = () => page.evaluate(() => ({
   message: Module?._melee_web_native_menu_message ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : null,
   phase: Module?._melee_web_native_menu_phase?.() ?? null,
   running: Module?._melee_web_native_menu_running?.() ?? null,
-  status: document.querySelector('#status')?.textContent || '',
-  pause_present: !!document.querySelector('#pause'),
+  pause_present: Boolean(document.querySelector('#pause')),
   pause_disabled: document.querySelector('#pause')?.disabled ?? null,
+  status: document.querySelector('#status')?.textContent || '',
   error: document.querySelector('#status')?.dataset.runtimeError ||
     (document.querySelector('#error-dialog[open]') ?
       document.querySelector('#error')?.textContent || 'Application error' : null),
@@ -299,20 +421,90 @@ const waitCssTeams = async (isTeams, teams, label) => {
 const observeCssSetup = () => page.evaluate(() => window.menuObserveCssSetup?.() ?? null);
 const observeMatch = () => page.evaluate(() => JSON.parse(
   Module.UTF8ToString(Module._melee_web_native_menu_match_observe())));
+const checkRuntimeDiagnosticCounters = async (label, retainCheckpoint = true) => {
+  const counters = await readRuntimeDiagnosticCounters(page);
+  lastRuntimeCounterPollAt = Date.now();
+  const failures = runtimeDiagnosticCounterFailures(counters);
+  if (failures.length)
+    throw Error(`${label}: runtime diagnostic counters are invalid: ${JSON.stringify({failures, counters})}`);
+  if (retainCheckpoint) {
+    report.competitiveTimeoutRoute.runtime_counter_checkpoints ??= [];
+    report.competitiveTimeoutRoute.runtime_counter_checkpoints.push({
+      label, callback_count: counters.callback_count,
+      phase_source_steps: counters.phase_source_steps,
+      reason_counts: counters.reason_counts,
+    });
+  }
+  return counters;
+};
+const retainRuntimeDiagnostics = async () => {
+  const capture = await readRuntimeDiagnosticsCapture(page);
+  const failures = runtimeDiagnosticsFailures(capture, {
+    identity: runtimeCaptureIdentity,
+    identityScope: runtimeCaptureIdentityScope,
+  });
+  report.competitiveTimeoutRoute.runtime_diagnostics = capture;
+  report.competitiveTimeoutRoute.runtime_diagnostics_failures = failures;
+  if (failures.length)
+    throw Error(`Bounded runtime diagnostic evidence failed validation: ${JSON.stringify(failures)}`);
+  return capture;
+};
+const waitForMatchSourceFrames = async (target, maximum) => {
+  const deadline = Date.now() + 30000;
+  let observation;
+  while (Date.now() < deadline) {
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+    await resumeTimingPause(`competitive match source frame ${target}`);
+    observation = await observeMatch();
+    if (observation?.observer_error)
+      throw Error(`Match observer failed while waiting for source frame ${target}: ${JSON.stringify(observation)}`);
+    if (observation?.ready && observation.frame >= target) {
+      if (observation.frame > maximum)
+        throw Error(`First ready match observation passed frame ${maximum}: ${JSON.stringify(observation)}`);
+      return observation;
+    }
+    await ensureNoError(`competitive match source frame ${target}`);
+  }
+  throw Error(`Competitive match did not reach source frame ${target}: ${JSON.stringify(observation)}`);
+};
 const observeLifecycle = () => page.evaluate(() => JSON.parse(
   Module.UTF8ToString(Module._melee_web_native_menu_memory())));
 const ensureNoError = async label => {
   checkInterruption();
   const state = await current();
   if (state.error) throw Error(`${label}: ${state.error}`);
+  if (competitiveTimeoutRoute && report.errors.length)
+    throw Error(`${label}: browser emitted errors: ${JSON.stringify(report.errors)}`);
+  if (competitiveTimeoutRoute && (state.phase === 7 || state.phase === 8 || state.phase === 9) &&
+      Date.now() - lastRuntimeCounterPollAt >= 1000)
+    await checkRuntimeDiagnosticCounters(`phase-${state.phase} runtime diagnostic poll`, false);
   return state;
 };
-const waitForNoQueuedPad = async label => {
-  const deadline = Date.now() + 3000;
+const observeTimeoutOwner = async (label, options) => {
+  const snapshot = await observeRuntimeOwner(page, report.competitiveTimeoutRoute, label, options);
+  const state = snapshot.state;
+  if (options?.includeResultsTrace)
+    report.competitiveTimeoutRoute.results_pad_trace_latest = snapshot.trace;
+  if (state.error) throw Error(`${label}: ${state.error}`);
+  if (state.message?.startsWith('Paused after a timing disruption')) {
+    report.timingPauses.push({label, phase: state.phase, message: state.message,
+      observedAt: new Date().toISOString(), status: 'failed_route'});
+    throw Error(`${label}: competitive route stops on a runtime timing disruption: ${state.message}`);
+  }
+  if (report.errors.length)
+    throw Error(`${label}: browser emitted errors: ${JSON.stringify(report.errors)}`);
+  if ((state.phase === 7 || state.phase === 8 || state.phase === 9 ||
+       state.phase === 5 || state.running === 0 || state.pause_disabled === true) &&
+      Date.now() - lastRuntimeCounterPollAt >= 1000)
+    await checkRuntimeDiagnosticCounters(`${label} runtime diagnostic poll`, false);
+  return snapshot;
+};
+const waitForNoQueuedPad = async (label, timeoutMs = 3000) => {
+  const deadline = Date.now() + timeoutMs;
   let state;
   while (Date.now() < deadline) {
     await resumeTimingPause(label);
-    state = await current();
+    state = await ensureNoError(label);
     if (state.error) throw Error(`${label}: ${state.error}`);
     if (state.diagnostics.includes('raw PAD: none')) return state;
     await page.waitForTimeout(20);
@@ -325,7 +517,11 @@ const resumeTimingPause = async label => {
   const pause = {label, phase: state.phase, message: state.message,
     observedAt: new Date().toISOString()};
   report.timingPauses.push(pause);
-  if(suddenDeathRoute||sparseMarioPrefix)throw Error(`${label}: timing disruption; declared route forbids recovery`);
+  if (competitiveProfileOnly || competitiveMatchStartOnly || competitiveTimeoutRoute) {
+    pause.status = 'failed_route';
+    throw Error(`${label}: competitive route stops on a runtime timing disruption: ${state.message}`);
+  }
+  if(suddenDeathRoute||sparseMarioPrefix)throw Error(`${label}: timing disruption; SD route forbids recovery`);
   const control = await page.evaluate(() => {
     const button = document.querySelector('#pause');
     return {found: Boolean(button), enabled: Boolean(button && !button.disabled),
@@ -391,27 +587,23 @@ const chord = async keys => {
   await ensureNoError(`after ${keys.join('+')}`);
   await resumeTimingPause(`after ${keys.join('+')}`);
 };
-const sourcePadSample = async (buttons, stickX, stickY, label) => {
+const sourcePadSample = async (buttons, stickX, stickY, label, port = 0, duration = 1) => {
   await ensureNoError(`before source PAD ${label}`);
   const accepted = await page.evaluate(args => window.menuDiagnosticPad(...args),
-    [0, buttons, stickX, stickY, 1]);
+    [port, buttons, stickX, stickY, duration]);
   assert.equal(accepted, 1, `Source PAD rejected ${label}`);
-  report.sourcePadSamples.push({port: 0, buttons, stickX, stickY, duration: 1, label});
-  await waitForNoQueuedPad(`source PAD ${label} drains`);
+  report.sourcePadSamples.push({port, buttons, stickX, stickY, duration, label});
+  await waitForNoQueuedPad(`source PAD ${label} drains`, Math.max(3000, duration * 50));
 };
-const sourcePadTap = async (button, label) => {
-  await sourcePadSample(button, 0, 0, label);
-  const acceptedRelease = await page.evaluate(args => window.menuDiagnosticPad(...args), [0, 0, 0, 0, 2]);
-  assert.equal(acceptedRelease,1,`Source PAD release rejected ${label}`);
-  report.sourcePadSamples.push({port: 0, buttons: 0, stickX: 0, stickY: 0,
-    duration: 2, label: `${label}:release`});
-  await waitForNoQueuedPad(`source PAD ${label} release drains`);
+const sourcePadTap = async (button, label, port = 0) => {
+  await sourcePadSample(button, 0, 0, label, port);
+  await sourcePadSample(0, 0, 0, `${label}:release`, port, 2);
 };
 const waitMessage = async (message, label) => {
   const deadline = Date.now() + 90000;
   let state;
   while (Date.now() < deadline) {
-    state = await current();
+    state = await ensureNoError(label || message);
     if (state.error) throw Error(`${label || message}: ${state.error}`);
     if (state.running && state.message === message) break;
     await resumeTimingPause(label || message);
@@ -427,7 +619,7 @@ const waitPhase = async (phases, label, timeoutMs = 90000) => {
   const expected = Array.isArray(phases) ? phases : [phases];
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const state = await current();
+    const state = await ensureNoError(label);
     if (state.error) throw Error(`${label}: ${state.error}`);
     if (state.running && expected.includes(state.phase)) return state;
     if (await resumeTimingPause(label)) continue;
@@ -478,6 +670,27 @@ const waitRulesPlusTimer = async (expected, label) => {
   report.sourceObservations.push({label, ...observation});
   return observation;
 };
+const waitRulesPlusValue = async (row, expected, label, sourceField = null) => {
+  const deadline = Date.now() + 15000;
+  let observation;
+  while (Date.now() < deadline) {
+    await resumeTimingPause(label);
+    observation = await observeSource();
+    const source = observation.source;
+    if (source?.valid && source.scene === 4 && source.menu_kind === RULES_PLUS_MENU_KIND &&
+        source.hovered_selection === row && source.confirmed_selection === expected &&
+        (sourceField === null || source.rules[sourceField] === expected)) break;
+    await ensureNoError(label);
+    await page.waitForTimeout(50);
+  }
+  const source = observation?.source;
+  assert(source?.valid && source.scene === 4 && source.menu_kind === RULES_PLUS_MENU_KIND &&
+    source.hovered_selection === row && source.confirmed_selection === expected &&
+    (sourceField === null || source.rules[sourceField] === expected),
+    `Timed out waiting for Rules Plus row ${row} value ${expected}: ${JSON.stringify(observation)}`);
+  report.sourceObservations.push({label, ...observation});
+  return observation;
+};
 const waitItemInputReady = async label => {
   const deadline = Date.now() + 15000;
   let observation;
@@ -495,39 +708,39 @@ const waitItemInputReady = async label => {
   report.sourceObservations.push({label, ...observation});
   return observation;
 };
-const waitItemConfirmed = async (expected, label) => {
+const waitItemConfirmed = async (expected, label, row = 0) => {
   const deadline = Date.now() + 15000;
   let observation;
   while (Date.now() < deadline) {
     await resumeTimingPause(label);
     observation = await observeSource();
     if (observation.source?.valid && observation.source.menu_kind === ITEMS_MENU_KIND &&
-        observation.source.hovered_selection === 0 &&
+        observation.source.hovered_selection === row &&
         observation.source.confirmed_selection === expected) break;
     await ensureNoError(label);
     await page.waitForTimeout(50);
   }
   assert(observation?.source?.valid && observation.source.menu_kind === ITEMS_MENU_KIND &&
-    observation.source.hovered_selection === 0 &&
+    observation.source.hovered_selection === row &&
     observation.source.confirmed_selection === expected,
     `Timed out waiting for original item row confirmation ${expected}: ${JSON.stringify(observation)}`);
   report.sourceObservations.push({label, ...observation});
   return observation;
 };
-const waitLiveItemState = async (expected, label) => {
+const waitLiveItemState = async (expected, label, row = 0) => {
   const deadline = Date.now() + 15000;
   let observation;
   while (Date.now() < deadline) {
     await resumeTimingPause(label);
     observation = await observeSource();
     if (observation.source?.valid && observation.source.menu_kind === ITEMS_MENU_KIND &&
-        observation.items_menu?.valid && observation.items_menu.cursor === 0 &&
+        observation.items_menu?.valid && observation.items_menu.cursor === row &&
         observation.items_menu.selected_item_enabled === expected) break;
     await ensureNoError(label);
     await page.waitForTimeout(50);
   }
   assert(observation?.source?.valid && observation.source.menu_kind === ITEMS_MENU_KIND &&
-    observation.items_menu?.valid && observation.items_menu.cursor === 0 &&
+    observation.items_menu?.valid && observation.items_menu.cursor === row &&
     observation.items_menu.selected_item_enabled === expected,
     `Timed out waiting for source MnItemSwData row value ${expected}: ${JSON.stringify(observation)}`);
   report.sourceObservations.push({label, ...observation});
@@ -550,6 +763,48 @@ const waitItemsCursor = async (expected, label) => {
     observation.items_menu.cursor === expected,
     `Timed out waiting for source Items cursor ${expected}: ${JSON.stringify(observation)}`);
   report.sourceObservations.push({label, ...observation});
+  return observation;
+};
+const moveItemsCursor = async target => {
+  const current = await observeSource();
+  assert.equal(current.source?.valid, true, 'Source Items owner must be live before row navigation');
+  assert.equal(current.source.menu_kind, ITEMS_MENU_KIND, 'Original Items menu must own row navigation');
+  const start = current.items_menu?.cursor;
+  assert(Number.isInteger(start) && start >= 0 && start < 31 && target >= 0 && target < 31,
+    `Items row navigation requires source item rows 0..30: ${JSON.stringify({start, target})}`);
+  if (start === target) return current;
+
+  const nextByInput = cursor => {
+    const up = cursor === 0 ? 31 : cursor === 16 ? 32 : cursor === 31 ? 15 : cursor === 32 ? 30 : cursor - 1;
+    const down = cursor === 15 ? 31 : cursor === 30 ? 32 : cursor === 31 ? 0 : cursor === 32 ? 16 : cursor + 1;
+    const left = cursor >= 16 && cursor < 31 ? cursor - 16 : cursor;
+    const right = cursor < 16 ? Math.min(cursor + 16, 30) : cursor;
+    return [[']', up], ['3', down], ['2', left], ['4', right]];
+  };
+  const previous = new Map([[start, null]]);
+  const queue = [start];
+  for (let offset = 0; offset < queue.length && !previous.has(target); offset++) {
+    const cursor = queue[offset];
+    for (const [key, next] of nextByInput(cursor)) {
+      if (next >= 31 || next === cursor || previous.has(next)) continue;
+      previous.set(next, {cursor, key});
+      queue.push(next);
+    }
+  }
+  assert(previous.has(target), `Original Items directional graph cannot reach row ${target} from ${start}`);
+  const steps = [];
+  for (let cursor = target; cursor !== start;) {
+    const step = previous.get(cursor);
+    steps.push({key: step.key, next: cursor});
+    cursor = step.cursor;
+  }
+  steps.reverse();
+  let observation = current;
+  for (const [index, step] of steps.entries()) {
+    await press(step.key);
+    observation = await waitItemsCursor(step.next,
+      `source Items navigation ${index + 1}/${steps.length} reaches row ${step.next}`);
+  }
   return observation;
 };
 const waitItemFrequency = async (expected, label) => {
@@ -606,6 +861,150 @@ const enterVsRules = async label => {
   await shot(`${label}-rules`);
   return rules;
 };
+const runCompetitiveProfilePreflight = async initial => {
+  assert.equal(initial.source?.valid, true, 'Initial source CSS owner must be observable');
+  assert.equal(initial.source.scene, 1, 'Profile baseline must come from original CSS');
+  assert.equal(initial.selection?.valid, true, 'CSS-owned StartMeleeData selection must be observable');
+  assert.equal(initial.selection.scene, 1, 'Profile baseline must use the CSS selection-state API');
+  assert.equal(initial.selection.provenance, 'raw_css_vs_start',
+    'Profile baseline must retain the raw CSS payload before SSS conversion');
+  const initialPreferenceMaskHex = initial.source.items.mask_hex;
+  report.competitiveProfile.initial_css_selection = {
+    rules: initial.source.rules,
+    items: initial.source.items,
+    selection: initial.selection,
+  };
+
+  await moveMenuCursor(RULES_MENU_KIND, 7, 5);
+  await press('m');
+  await waitMenu(ITEMS_MENU_KIND, 0, 'competitive profile opens original Items');
+  await waitItemInputReady('competitive profile Items transition lock released');
+  await shot('03-competitive-items-entry');
+
+  const itemRows = [];
+  for (let cursor = 0; cursor < ITEM_ROW_TO_PREFERENCE_BIT.length; cursor++) {
+    const row = await moveItemsCursor(cursor);
+    const item = row.items_menu;
+    assert.equal(item?.valid, true, `Original Items row ${cursor} must expose its live source value`);
+    assert.equal(item.cursor, cursor);
+    const preferenceBit = item.selected_item_preference_bit;
+    assert(Number.isInteger(preferenceBit) && preferenceBit >= 0 && preferenceBit < 32,
+      `Original Items row ${cursor} has no live preference-bit mapping: ${JSON.stringify(item)}`);
+    assert(item.selected_item_enabled === 0 || item.selected_item_enabled === 1,
+      `Original Items row ${cursor} has a non-binary source switch value: ${JSON.stringify(item)}`);
+    const initialEnabled = item.selected_item_enabled;
+    let finalItem = row;
+    if (initialEnabled !== 0) {
+      await press('m');
+      await waitItemConfirmed(0, `source Items A confirms row ${cursor} off`, cursor);
+      finalItem = await waitLiveItemState(0, `source Items applies row ${cursor} off`, cursor);
+      finalItem = await waitItemInputReady(`source Items accepts the next profile input after row ${cursor}`);
+    }
+    assert.equal(finalItem.items_menu.selected_item_preference_bit, preferenceBit,
+      `Original Items row ${cursor} must keep the same source preference mapping after A`);
+    assert.equal(finalItem.items_menu.selected_item_enabled, 0,
+      `Original Items row ${cursor} must be off before the menu commits`);
+    itemRows.push({cursor, preference_bit: preferenceBit, enabled: 0, initial_enabled: initialEnabled});
+  }
+  report.competitiveProfile.item_rows_after_original_inputs = itemRows;
+
+  await moveItemsCursor(0);
+  await press(']');
+  let frequency = await waitItemsCursor(31, 'source Items Up enters the original frequency selector');
+  let frequencyValue = frequency.items_menu.frequency_selector;
+  assert(Number.isInteger(frequencyValue) && frequencyValue >= 0 && frequencyValue <= 5,
+    `Original Items frequency selector is outside its source range: ${JSON.stringify(frequency.items_menu)}`);
+  while (frequencyValue > 0) {
+    await press('4');
+    frequencyValue--;
+    frequency = await waitItemFrequency(frequencyValue,
+      `source Items frequency selector moves to None (${frequencyValue})`);
+  }
+  assert.equal(frequency.items_menu.frequency_selector, 0,
+    'Original Items frequency selector must be None before B commits the profile');
+  await shot('04-competitive-items-none');
+  await press('o');
+  let rules = await waitMenu(RULES_MENU_KIND, 5, 'original Items B commits all switches and returns to Rules');
+  const masks = deriveAllOffItemMasks({
+    initialPreferenceMaskHex,
+    rows: itemRows,
+  });
+  assert.equal(rules.source.items.frequency, -1,
+    'Original Items B must commit None as the source -1 frequency');
+  assert.equal(rules.source.items.mask_hex, masks.preferenceMaskHex,
+    'Original Items B must save the exact preferences cleared by the 31 observed source rows');
+  report.competitiveProfile.derived_masks = masks;
+  report.sourceObservations.push({label: 'all 31 original item switches committed off', ...rules});
+
+  const stock = await moveMenuCursor(RULES_MENU_KIND, 7, 1);
+  assert.equal(stock.source.confirmed_selection, 4,
+    'Original VS Rules selection must retain the four-stock setting');
+  assert.equal(stock.source.rules.mode, 1, 'Original VS Rules must remain in stock mode');
+  assert.equal(stock.source.rules.stock_count, 4, 'Original VS Rules must store four stocks');
+  assert.equal(stock.source.rules.handicap, 0, 'Original VS Rules must leave handicap off');
+  assert.equal(stock.source.rules.damage_ratio, 10,
+    'Original VS Rules must retain the source 1.0 damage-ratio setting');
+
+  await moveMenuCursor(RULES_MENU_KIND, 7, 6);
+  await press('m');
+  const timerEntry = await waitRulesPlusTimer(stock.source.rules.stock_time_limit,
+    'Rules selection 6 opens original Rules Plus');
+  assert.equal(timerEntry.source.previous_menu_kind, RULES_MENU_KIND);
+  assert.equal(timerEntry.source.rules.stock_time_limit, 0,
+    'Fresh Everything context must enter Rules Plus at its source zero-minute timer');
+  for (let minute = 1; minute <= 8; minute++) {
+    await press('4');
+    await waitRulesPlusTimer(minute,
+      `original Rules Plus right input sets timer to ${minute} minute${minute === 1 ? '' : 's'}`);
+  }
+  const friendlyFireEntry = await moveMenuCursor(RULES_PLUS_MENU_KIND, 6, 1);
+  let friendlyFireValue = friendlyFireEntry.source.confirmed_selection;
+  assert(friendlyFireValue === 0 || friendlyFireValue === 1,
+    `Original Rules Plus friendly-fire value is not binary: ${JSON.stringify(friendlyFireEntry.source)}`);
+  if (friendlyFireValue !== 1) {
+    assert.equal(friendlyFireValue, 0, 'Friendly fire can be set from its source off value');
+    await press('4');
+    friendlyFireValue = 1;
+  }
+  await waitRulesPlusValue(1, friendlyFireValue,
+    'original Rules Plus row 1 sets friendly fire on', 'friendly_fire');
+
+  const pauseEntry = await moveMenuCursor(RULES_PLUS_MENU_KIND, 6, 2);
+  let pauseValue = pauseEntry.source.confirmed_selection;
+  assert(pauseValue === 0 || pauseValue === 1,
+    `Original Rules Plus pause value is not binary: ${JSON.stringify(pauseEntry.source)}`);
+  if (pauseValue !== 0) {
+    assert.equal(pauseValue, 1, 'Pause can be disabled from its source enabled value');
+    await press('2');
+    pauseValue = 0;
+  }
+  await waitRulesPlusValue(2, pauseValue, 'original Rules Plus row 2 sets pause off');
+  assert.equal(pauseValue, 0);
+  await shot('05-competitive-rules-plus-profile');
+  await press('7');
+  await waitMessage('Original character select', 'Rules Plus Start commits the profile through original GM_VS');
+  const finalCss = await observeSource();
+  assert.equal(finalCss.source?.valid, true);
+  assert.equal(finalCss.source.scene, 1);
+  const failures = competitiveProfileFailures({
+    source: finalCss.source,
+    rawCssSelection: finalCss.selection,
+    expectedPreferenceMaskHex: masks.preferenceMaskHex,
+  });
+  assert.deepEqual(failures, [],
+    `CSS-owned competitive profile differs from the requested values: ${JSON.stringify({failures, finalCss})}`);
+  report.competitiveProfile.final_css_selection = {
+    rules: finalCss.source.rules,
+    items: finalCss.source.items,
+    selection: finalCss.selection,
+  };
+  report.sourceObservations.push({label: 'raw CSS-owned StartMeleeData provenance after source Rules commit', ...finalCss});
+  await shot('06-competitive-profile-css');
+  report.checks.push('Original Rules, Items, and Rules Plus PAD inputs set the exact GameRules profile; all 31 mapped item switches are off, pause is disabled, and raw CSS StartMeleeData provenance is retained without treating it as post-SSS normalized match data. This menu-profile checkpoint ends at CSS; subsequent route evidence is recorded separately.');
+};
+const cssHumanJoinDriver = createCssHumanJoinDriver({page, report, shot,
+  observeCssSetup, sourcePadSample, sourcePadTap, resumeTimingPause, ensureNoError});
+const configureCompetitiveSecondHuman = () => cssHumanJoinDriver.configureSecondHuman();
 const moveCssCursor = async (label, isInside, directionFor) => {
   for (let step = 0; step < 240; step++) {
     const setup = await observeCssSetup();
@@ -653,6 +1052,298 @@ const configureCssTeamBattle = async () => {
   await shot('11-css-team-battle-configured');
   report.checks.push('Original CSS Teams toggle and P2 color control use source predicates, live CSS geometry, and single-tick source PAD samples');
 };
+const compactMatchObservation = (label, observation) => ({
+  label, phase: 7, sampled_at: new Date().toISOString(), frame: observation.frame,
+  paused: observation.paused, ending: observation.ending, complete: observation.complete,
+  outcome: observation.outcome, winner: observation.winner,
+  stocks: observation.players.map(player => player.stocks),
+  positions: observation.players.map(player => ({x: player.x, y: player.y})),
+});
+const retainTimeoutSnapshot = (label, observation, {periodic = false} = {}) => {
+  const snapshots = report.competitiveTimeoutRoute.match_snapshots;
+  const maximum = COMPETITIVE_TIMEOUT_BOUNDS.snapshotLimit;
+  if (snapshots.length >= maximum)
+    throw Error(`Competitive timeout source snapshot limit ${maximum} was exceeded`);
+  if (periodic && snapshots.filter(row => row.periodic).length >= maximum - 4) return false;
+  snapshots.push({...compactMatchObservation(label, observation), periodic});
+  return true;
+};
+const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex, gameplayStartedAt) => {
+  const route = report.competitiveTimeoutRoute;
+  const startFailures = competitiveTimeoutProgressFailures(initialMatch);
+  assert.deepEqual(startFailures, [],
+    `Source match must start with two active four-stock Humans: ${JSON.stringify({startFailures, initialMatch})}`);
+  retainTimeoutSnapshot('first normalized live match observation', initialMatch);
+  await checkRuntimeDiagnosticCounters('match start');
+  await shot('10-competitive-timeout-match-start');
+
+  const initialX = initialMatch.players[0].x;
+  assert.equal(initialX, -60,
+    `The bounded source stock-loss schedule requires the reviewed P1 x=-60 spawn: ${JSON.stringify(initialMatch.players[0])}`);
+  const outwardStickX = -80;
+  route.input_schedule.observed_p1_spawn_x = initialX;
+  route.input_schedule.outward_stick_x = outwardStickX;
+  const gameplayDeadline = gameplayStartedAt + COMPETITIVE_TIMEOUT_BOUNDS.gameplayWallMs;
+  const stockLossDeadline = Math.min(Date.now() + COMPETITIVE_TIMEOUT_BOUNDS.stockLossWallMs,
+    gameplayDeadline);
+  route.gameplay_phase_7_observed_at = new Date(gameplayStartedAt).toISOString();
+  route.gameplay_phase_7_deadline_at = new Date(gameplayDeadline).toISOString();
+  let latest = initialMatch;
+  let firstLoss = null;
+  let lastCounterRead = Date.now();
+  for (let pulse = 1; pulse <= COMPETITIVE_TIMEOUT_BOUNDS.maximumOutwardPulses; pulse++) {
+    if (Date.now() >= gameplayDeadline)
+      throw Error(`Stock-loss input reached the ${COMPETITIVE_TIMEOUT_BOUNDS.gameplayWallMs}ms gameplay bound from phase-7 entry`);
+    if (Date.now() >= stockLossDeadline) break;
+    const {match: beforePulse} = await observeTimeoutOwner(`before source P1 outward stock-loss pulse ${pulse}`);
+    const beforePulseFailures = competitiveTimeoutProgressFailures(beforePulse);
+    assert.deepEqual(beforePulseFailures, [],
+      `Source match changed before outward pulse ${pulse}: ${JSON.stringify({beforePulseFailures, beforePulse})}`);
+    assert.deepEqual(beforePulse.players.map(player => player.stocks), [4, 4],
+      `A stock changed before the controlled P1 input at pulse ${pulse}`);
+    await sourcePadSample(0, outwardStickX, 0,
+      `P1 outward stock-loss pulse ${pulse}/${COMPETITIVE_TIMEOUT_BOUNDS.maximumOutwardPulses}`,
+      0, COMPETITIVE_TIMEOUT_BOUNDS.outwardPulseFrames);
+    const {state, match: pulseMatch} = await observeTimeoutOwner(`P1 stock-loss input ${pulse}`);
+    assert.equal(state.phase, 7, `The source match left gameplay during stock-loss pulse ${pulse}`);
+    latest = pulseMatch;
+    const consumedSourceFrames = latest.frame - beforePulse.frame;
+    assert(consumedSourceFrames >= COMPETITIVE_TIMEOUT_BOUNDS.outwardPulseFrames,
+      `Source PAD pulse ${pulse} did not advance through its declared ${COMPETITIVE_TIMEOUT_BOUNDS.outwardPulseFrames} source frames`);
+    const progressFailures = competitiveTimeoutProgressFailures(latest);
+    assert.deepEqual(progressFailures, [],
+      `P1 stock-loss pulse ${pulse} changed an unexpected source state: ${JSON.stringify({progressFailures, latest})}`);
+    route.stock_loss_samples.push({pulse, frame: latest.frame,
+      source_frames_since_prior_pulse: consumedSourceFrames,
+      stocks: latest.players.map(player => player.stocks), p1_x: latest.players[0].x,
+      p1_y: latest.players[0].y});
+    if (latest.players[0].stocks === 3) {
+      firstLoss = latest;
+      break;
+    }
+    if (Date.now() - lastCounterRead >= 1000) {
+      await checkRuntimeDiagnosticCounters('stock-loss input', false);
+      lastCounterRead = Date.now();
+    }
+  }
+  assert(firstLoss,
+    `P1 did not lose exactly one stock within ${COMPETITIVE_TIMEOUT_BOUNDS.maximumOutwardPulses} outward pulses and the ${COMPETITIVE_TIMEOUT_BOUNDS.stockLossWallMs}ms stock-loss wall bound`);
+  const lossFailures = competitiveTimeoutFirstLossFailures(initialMatch, firstLoss);
+  assert.deepEqual(lossFailures, [],
+    `The first source stock change was not P1's single loss: ${JSON.stringify({lossFailures, firstLoss})}`);
+  route.input_schedule.directional_pulses = route.stock_loss_samples.length;
+  route.input_schedule.directional_source_frames = route.stock_loss_samples.length *
+    COMPETITIVE_TIMEOUT_BOUNDS.outwardPulseFrames;
+  route.first_stock_loss = compactMatchObservation('first observed P1 stock decrement', firstLoss);
+  report.matchObservations.push({label: 'P1 first observed source stock decrement from input-driven outward movement', ...firstLoss});
+  retainTimeoutSnapshot('first P1 source stock decrement', firstLoss);
+  await shot('11-competitive-timeout-p1-lost-one-stock');
+
+  await sourcePadSample(0, 0, 0, 'P1 neutral after one source stock loss', 0,
+    COMPETITIVE_TIMEOUT_BOUNDS.stableNeutralFrames);
+  await sourcePadSample(0, 0, 0, 'P2 neutral after one source stock loss', 1,
+    COMPETITIVE_TIMEOUT_BOUNDS.stableNeutralFrames);
+  const {state: neutralState, match: neutralObservation} = await observeTimeoutOwner(
+    'neutral interval after first P1 stock loss');
+  assert.equal(neutralState.phase, 7, 'The source match must remain in gameplay during the neutral interval');
+  const stableFailures = competitiveTimeoutStableFailures(neutralObservation, firstLoss.frame);
+  assert.deepEqual(stableFailures, [],
+    `Both players did not remain neutral with exact [3,4] stocks for 120 source frames: ${JSON.stringify({stableFailures, neutralObservation})}`);
+  route.neutral_stable = compactMatchObservation('both ports neutral for at least 120 source frames', neutralObservation);
+  retainTimeoutSnapshot('both ports neutral with [3,4] stocks', neutralObservation);
+  report.checks.push('Exactly one P1 stock was lost through at most 600 outward P1 source-PAD frames; both source ports then received 120-frame neutral samples and stocks remained [3,4]');
+  await checkRuntimeDiagnosticCounters('neutral stabilization');
+  await shot('12-competitive-timeout-neutral-stable');
+
+  let lastFrame = neutralObservation.frame;
+  let lastFrameProgressAt = Date.now();
+  let terminalTransitionAt = null;
+  let deferredResultsIdentity = null;
+  let nextSnapshotFrame = neutralObservation.frame + COMPETITIVE_TIMEOUT_BOUNDS.snapshotPeriodFrames;
+  lastCounterRead = Date.now();
+  while (Date.now() < gameplayDeadline) {
+    const {state, match} = await observeTimeoutOwner('competitive timeout match remains unpaused');
+    if (state.phase === 8) {
+      if (terminalTransitionAt !== null &&
+          Date.now() - terminalTransitionAt > COMPETITIVE_TIMEOUT_BOUNDS.resultsTransitionWallMs)
+        throw Error('Original timeout outcome did not enter Results within the declared 30-second transition bound');
+      if (route.results_asset_preparation) {
+        route.results_asset_preparation.phase8_observed_at = new Date().toISOString();
+        route.results_asset_preparation.transition_wall_ms = Date.now() - terminalTransitionAt;
+      }
+      break;
+    }
+    if (state.phase === 5) {
+      latest = match;
+      const deferredFailures = competitiveTimeoutDeferredResultsFailures(state, latest, initialMatch.rules);
+      assert.deepEqual(deferredFailures, [],
+        `Stopped source phase 5 is accepted only for the retained unique P2 timeout during Results asset preparation: ${JSON.stringify({deferredFailures, state, latest})}`);
+      const identity = JSON.stringify({frame: latest.frame, ready: latest.ready,
+        paused: latest.paused, ending: latest.ending, complete: latest.complete,
+        outcome: latest.outcome, winner: latest.winner, rules: latest.rules,
+        stocks: latest.players.map(player => player.stocks), terminal: latest.terminal});
+      if (deferredResultsIdentity === null) {
+        deferredResultsIdentity = identity;
+        if (terminalTransitionAt === null) terminalTransitionAt = Date.now();
+        route.results_asset_preparation = {
+          phase: 5,
+          status: 'stopped_for_original_results_asset_preparation',
+          first_observed_at: new Date().toISOString(),
+          last_observed_at: null,
+          observations: 0,
+          retained_terminal: {frame: latest.frame, ready: latest.ready,
+            ending: latest.ending, complete: latest.complete, outcome: latest.outcome,
+            winner: latest.winner, rules: latest.rules,
+            stocks: latest.players.map(player => player.stocks), terminal: latest.terminal},
+          phase8_observed_at: null,
+          transition_wall_ms: null,
+        };
+      } else {
+        assert.equal(identity, deferredResultsIdentity,
+          'Retained terminal payload or normalized setup rules changed during Results asset preparation');
+      }
+      route.results_asset_preparation.last_observed_at = new Date().toISOString();
+      route.results_asset_preparation.observations++;
+      if (Date.now() - terminalTransitionAt > COMPETITIVE_TIMEOUT_BOUNDS.resultsTransitionWallMs)
+        throw Error('Original timeout outcome did not enter Results within the declared 30-second transition bound');
+      if (Date.now() - lastCounterRead >= 1000) {
+        await checkRuntimeDiagnosticCounters('stopped Results asset preparation', false);
+        lastCounterRead = Date.now();
+      }
+      await page.waitForTimeout(250);
+      continue;
+    }
+    if (deferredResultsIdentity !== null)
+      throw Error(`Source left deferred Results asset preparation for unexpected phase ${state.phase}`);
+    assert.equal(state.phase, 7,
+      `Source left gameplay before original Results (phase ${state.phase}): ${state.message}`);
+    latest = match;
+    if (latest?.observer_error)
+      throw Error(`Match observer reported an error during timeout: ${JSON.stringify(latest)}`);
+    const readinessFailures = competitiveTimeoutReadinessFailures(latest);
+    assert.deepEqual(readinessFailures, [],
+      `Source HUD readiness does not match the active-versus-ending state: ${JSON.stringify({readinessFailures, latest})}`);
+    assert.equal(latest.paused, false, `Source match paused during the timeout route: ${JSON.stringify(latest)}`);
+    assert.deepEqual(latest.players?.map(player => player.stocks), [3, 4],
+      `Source stocks changed after the controlled first loss: ${JSON.stringify(latest.players)}`);
+    if (!Number.isInteger(latest.frame) || latest.frame < lastFrame)
+      throw Error(`Source match frame regressed or became invalid: ${JSON.stringify(latest)}`);
+    if (latest.frame > lastFrame) {
+      lastFrame = latest.frame;
+      lastFrameProgressAt = Date.now();
+    }
+    if (latest.ending || latest.complete) {
+      if (terminalTransitionAt === null) terminalTransitionAt = Date.now();
+      assert.equal(latest.outcome, 1,
+        `Source began an unexpected terminal outcome instead of timeout: ${JSON.stringify(latest)}`);
+      if (Date.now() - terminalTransitionAt > COMPETITIVE_TIMEOUT_BOUNDS.resultsTransitionWallMs)
+        throw Error('Original timeout outcome did not enter Results within the declared 30-second transition bound');
+    } else if (Date.now() - lastFrameProgressAt > COMPETITIVE_TIMEOUT_BOUNDS.noSourceProgressWallMs) {
+      throw Error(`Source match frame ${lastFrame} made no progress for ${COMPETITIVE_TIMEOUT_BOUNDS.noSourceProgressWallMs}ms before the terminal transition`);
+    }
+    if (latest.frame >= nextSnapshotFrame) {
+      retainTimeoutSnapshot(`neutral match progress at or after source frame ${nextSnapshotFrame}`, latest,
+        {periodic: true});
+      do { nextSnapshotFrame += COMPETITIVE_TIMEOUT_BOUNDS.snapshotPeriodFrames; }
+      while (nextSnapshotFrame <= latest.frame);
+    }
+    if (Date.now() - lastCounterRead >= 1000) {
+      await checkRuntimeDiagnosticCounters('natural timeout progress', false);
+      lastCounterRead = Date.now();
+    }
+    await page.waitForTimeout(250);
+  }
+  if (Date.now() >= gameplayDeadline)
+    throw Error(`Original 8-minute source match did not reach Results within the ${COMPETITIVE_TIMEOUT_BOUNDS.gameplayWallMs}ms gameplay bound`);
+  const resultsEnteredAt = Date.now();
+  const {state: stateAfterTimeout, match: terminal} = await observeTimeoutOwner(
+    'original timeout Results entry');
+  assert.equal(stateAfterTimeout.phase, 8,
+    `Natural source timeout must enter original Results phase 8: ${JSON.stringify(stateAfterTimeout)}`);
+  const terminalFailures = competitiveTimeoutTerminalFailures(terminal);
+  assert.deepEqual(terminalFailures, [],
+    `Original source timeout result is not the unique P2 win: ${JSON.stringify({terminalFailures, terminal})}`);
+  assert.deepEqual(terminal.rules, initialMatch.rules,
+    'Original terminal snapshot changed normalized match settings from the live match start');
+  assert.deepEqual(terminal.players?.map(player => player.stocks), [3, 4],
+    `Source terminal observation changed the controlled stock pair: ${JSON.stringify(terminal)}`);
+  route.terminal_observation = terminal;
+  route.results_entered_wall_ms = resultsEnteredAt - gameplayStartedAt;
+  report.matchObservations.push({label: 'original MatchEnd terminal timeout payload used by Results', ...terminal});
+  retainTimeoutSnapshot('original source timeout and unique P2 ranking', terminal);
+  report.checks.push(`Original MatchEnd produced OUTCOME_TIMEOUT with its exact unique P2 source winner list after ${terminal.frame} source frames`);
+  await checkRuntimeDiagnosticCounters('original timeout Results entry');
+  const resultsDeadline = resultsEnteredAt + COMPETITIVE_TIMEOUT_BOUNDS.resultsReturnWallMs;
+  const observeResultsSample = async label => {
+    const snapshot = await observeTimeoutOwner(label,
+      {includeMatch: false, includeResultsTrace: true});
+    return {host: snapshot.state, trace: snapshot.trace};
+  };
+  const observeResultsHost = async label => (await observeResultsSample(label)).host;
+  let resultsPresentationReadyAt = null;
+  let resultsPresentationReady = false;
+  let lastResultsHostState = null;
+  while (Date.now() < resultsDeadline) {
+    lastResultsHostState = await observeResultsHost('original Results presentation readiness');
+    const readiness = classifyResultsOwnerReadiness(lastResultsHostState);
+    if (readiness.kind === 'invalid')
+      throw Error(`Original Results presentation reached an unsupported host state: ${JSON.stringify({readiness, state: lastResultsHostState})}`);
+    if (readiness.kind === 'active') {
+      resultsPresentationReadyAt ??= Date.now();
+      if (Date.now() - resultsPresentationReadyAt >= 4500) {
+        resultsPresentationReady = true;
+        break;
+      }
+    } else {
+      resultsPresentationReadyAt = null;
+    }
+    await page.waitForTimeout(Math.min(250, Math.max(0, resultsDeadline - Date.now())));
+  }
+  assert(resultsPresentationReady,
+    `Original Results did not remain active/UI-ready for the presentation interval: ${JSON.stringify(lastResultsHostState)}`);
+  await shot('13-original-timeout-results');
+  route.results_confirmation = await confirmTwoHumanResults({
+    deadlineAt: resultsDeadline,
+    observeSample: observeResultsSample,
+    press,
+    wait: milliseconds => page.waitForTimeout(milliseconds),
+  });
+  report.checks.push('Original Results phase/readiness trace gated one P1 presentation Start and separate P1/P2 statistics Starts; source-consumed PAD and each participant confirmation were retained before the first Results exit');
+  route.prize_return = await returnFromCompetitivePrize({
+    deadlineAt: resultsDeadline,
+    observeSample: observeResultsSample,
+    press,
+    wait: milliseconds => page.waitForTimeout(milliseconds),
+  });
+  const postResultsState = await waitPhase(1, 'original CSS after timeout Results',
+    Math.max(0, resultsDeadline - Date.now()));
+  if (Date.now() - resultsEnteredAt > COMPETITIVE_TIMEOUT_BOUNDS.resultsReturnWallMs)
+    throw Error(`Original Results did not return to CSS within the ${COMPETITIVE_TIMEOUT_BOUNDS.resultsReturnWallMs}ms route bound`);
+  const cssAfterResults = await observeSource();
+  const profileFailures = competitiveProfileFailures({
+    source: cssAfterResults.source,
+    rawCssSelection: cssAfterResults.selection,
+    expectedPreferenceMaskHex: sourcePreferenceMaskHex,
+  });
+  assert.deepEqual(profileFailures, [],
+    `Original Results -> CSS failed to retain the exact source Rules/Items profile: ${JSON.stringify({profileFailures, cssAfterResults})}`);
+  route.retained_css_profile = {
+    phase: postResultsState.phase,
+    rules: cssAfterResults.source.rules,
+    items: cssAfterResults.source.items,
+    selection: cssAfterResults.selection,
+  };
+  report.sourceObservations.push({label: 'original CSS after timeout Results retains exact competitive settings', ...cssAfterResults});
+  await shot('14-css-after-timeout-results-profile-retained');
+
+  const counterSnapshotBeforeEject = await checkRuntimeDiagnosticCounters('original CSS after timeout Results');
+  route.callback_summary_before_eject = counterSnapshotBeforeEject;
+  await driver.unload();
+  nativeSessionActive = false;
+  await verifyTeardown('Eject after original timeout Results -> CSS');
+  await retainRuntimeDiagnostics();
+  report.checks.push('Original timeout Results returned to CSS; the read-only source observer confirmed the committed Rules and exact item mask/frequency, then Eject cleared the source owners. This route did not re-enter the Rules/Items row menus after Results.');
+};
 let nativeSessionActive = false;
 try {
 route: {
@@ -677,6 +1368,17 @@ route: {
 
   await driver.selectDisc(discPath);
   await driver.waitForStart();
+  if (competitiveTimeoutRoute) {
+    await installRuntimeDiagnosticsCapture(runtimeCaptureIdentity, runtimeCaptureIdentityScope, page);
+    const recorderHooks = await page.evaluate(() => ({
+      sample: typeof window.menuDiagnosticSample,
+      incident: typeof window.menuDiagnosticIncident,
+      capture: window.__meleeWebRuntimeIncidentCampaignCapture?.status ?? null,
+    }));
+    assert.deepEqual(recorderHooks, {sample: 'function', incident: 'function', capture: 'installed'},
+      'The bounded original callback recorder must be installed before source gameplay begins');
+    report.checks.push('Installed the bounded sample/incident recorder before launching the source route');
+  }
   nativeSessionActive = true;
   await driver.launch();
   await waitMessage('Original character select', 'initial CSS');
@@ -694,6 +1396,9 @@ route: {
       waitItemInputReady,waitItemsCursor,waitItemFrequency,waitRulesPlusTimer,shot,verifyTeardown});
     nativeSessionActive=false;break route;
   }
+  const initialProfileCss = competitiveProfileOnly || competitiveSourceRoute ? await observeSource() : null;
+  if (competitiveProfileOnly || competitiveSourceRoute)
+    report.sourceObservations.push({label: 'initial CSS profile baseline', ...initialProfileCss});
 
   if (noContestOnly) {
     await page.waitForTimeout(800);
@@ -752,6 +1457,62 @@ route: {
   await waitMenu(MAIN_MENU_KIND, 0, 'source Main root');
   await shot('01-main-root');
   let rules = await enterVsRules('02-first');
+
+  if (competitiveProfileOnly || competitiveSourceRoute) {
+    await runCompetitiveProfilePreflight(initialProfileCss);
+    if (competitiveProfileOnly) {
+      await driver.unload();
+      nativeSessionActive = false;
+      await verifyTeardown('Eject after competitive Rules profile preflight');
+      report.checks.push('Source profile preflight stops at CSS; no SSS, match, timeout, Results, or full-route acceptance was exercised');
+      break route;
+    }
+
+    await configureCompetitiveSecondHuman();
+    await press('Enter');
+    await waitPhase(3, 'original SSS after P2 joins as a source Human');
+    report.checks.push('P1 Start on the two-player keyboard layout enters the original SSS after CSS confirmed P2 Human');
+    await shot('09-original-sss');
+    await waitForNoQueuedPad('CSS Start sample drains before source SSS stage driver');
+    let selectedStage = 1;
+    for (let sample = 0; sample < 600; sample++) {
+      selectedStage = await page.evaluate(() => Module._melee_web_native_menu_drive_stage(32));
+      if (selectedStage === 2) break;
+      if (selectedStage !== 1)
+        throw Error(`Original SSS source stage driver returned ${selectedStage}`);
+      await waitForNoQueuedPad(`competitive source SSS direction sample ${sample + 1} drains`);
+    }
+    assert.equal(selectedStage, 2,
+      'Competitive match-start route must select Final Destination through the original SSS PAD driver');
+    await press('j');
+    await waitPhase(7, 'two-human Mario Final Destination source match', 60000);
+    const gameplayStartedAt = Date.now();
+    const liveMatch = await waitForMatchSourceFrames(180, 240);
+    const sourcePreferenceMaskHex = report.competitiveProfile.derived_masks.preferenceMaskHex;
+    const matchFailures = competitiveMatchStartFailures(liveMatch, {sourcePreferenceMaskHex});
+    assert.deepEqual(matchFailures, [],
+      `Normalized source match differs from the competitive profile: ${JSON.stringify({matchFailures, liveMatch})}`);
+    report.competitiveMatchStart.normalized_match = liveMatch;
+    report.matchObservations.push({label: 'normalized source match at its first ready observation from frame 180 through 240', ...liveMatch});
+    if (competitiveMatchStartOnly) {
+      const lastBeforeEject = await observeMatch();
+      assert.equal(lastBeforeEject?.ready, true,
+        'The match observer must remain available immediately before Eject');
+      assert(Number.isInteger(lastBeforeEject.frame),
+        `The pre-Eject source frame must be observable: ${JSON.stringify(lastBeforeEject)}`);
+      report.competitiveMatchStart.last_observation_before_eject = {
+        ready: lastBeforeEject.ready,
+        frame: lastBeforeEject.frame,
+      };
+      await driver.unload();
+      nativeSessionActive = false;
+      await verifyTeardown('Eject after the bounded normalized match-start prefix');
+      report.checks.push(`Original two-human Mario match selected Final Destination; normalized settings were checked once at frame ${liveMatch.frame}, the last pre-Eject observation was frame ${report.competitiveMatchStart.last_observation_before_eject.frame}, and Eject ended the roughly 3-second prefix before timeout or Results`);
+    } else {
+      await runCompetitiveTimeoutRoute(liveMatch, sourcePreferenceMaskHex, gameplayStartedAt);
+    }
+    break route;
+  }
 
   if (rulesItemsOnly) {
     await moveMenuCursor(RULES_MENU_KIND, 7, 5);
@@ -1188,9 +1949,11 @@ route: {
   report.result = 'pass';
 } catch (error) {
   failure = error;
-  report.result = 'fail';
+  report.result = interruptionSignal ? 'interrupted' : 'fail';
   report.evidenceClaims.renderedBrowser.status = browser ? 'partial' : 'failed';
-  report.evidenceClaims.sourceStateAndNavigation.status = nativeSessionActive ? 'partial' : 'not_started';
+  report.evidenceClaims.sourceStateAndNavigation.status = nativeSessionActive ||
+    (competitiveTimeoutRoute && report.competitiveTimeoutRoute.match_snapshots.length > 0)
+    ? 'partial' : 'not_started';
   report.failure = {message: redactDiscPath(error.message), stack: redactDiscPath(error.stack), diagnostics: error.diagnostics || null,
     state: await current().catch(cause => ({error: cause.message})),
     source: await observeSource().catch(cause => ({error: cause.message})),
@@ -1232,6 +1995,28 @@ route: {
       report.result='fail';
     }
   }
+  if (competitiveTimeoutRoute && report.competitiveTimeoutRoute.runtime_diagnostics === null) {
+    if (page && !page.isClosed()) {
+      try { await retainRuntimeDiagnostics(); }
+      catch (error) {
+        report.competitiveTimeoutRoute.runtime_diagnostics_capture_error = redactDiscPath(error.message);
+        if (!failure) {
+          failure = error;
+          report.result = 'fail';
+        }
+      }
+    } else {
+      report.competitiveTimeoutRoute.runtime_diagnostics = {
+        schema: 'melee-web-runtime-callback-capture-v1', status: 'unavailable',
+        samples: [], incidents: [], dropped_samples: 0, dropped_incidents: 0,
+      };
+      report.competitiveTimeoutRoute.runtime_diagnostics_failures = ['browser page closed before diagnostic capture'];
+      if (!failure) {
+        failure = new Error('Browser page closed before full-route runtime diagnostics were retained');
+        report.result = 'fail';
+      }
+    }
+  }
   try{report.diagnostics=await driver.diagnostics();}
   catch(error){report.diagnostics_error=redactDiscPath(error.message);}
   await persistReport();
@@ -1249,5 +2034,6 @@ route: {
 console.log(JSON.stringify({result: report.result, checks: report.checks,
   sourceObservations: report.sourceObservations.length,
   matchObservations: report.matchObservations.length,
-  failure: report.failure?.message, report: path.join(output, 'report.json')}));
-if (failure) process.exitCode = 1;
+  failure: report.failure?.message || (failure ? redactDiscPath(failure.message) : null),
+  report: path.join(output, 'report.json')}));
+if (failure || reportWriteError) process.exitCode = 1;

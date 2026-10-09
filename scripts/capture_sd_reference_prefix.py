@@ -13,6 +13,7 @@ import os
 import subprocess
 import sys
 import time
+import threading
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -27,11 +28,70 @@ from reference_observer_stream import read_status
 from reference_input_stream import validate_status
 
 
+class BoundedIntentController(DualPipeController):
+    """Scope-local pre-write limits; historical controllers remain unchanged."""
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.intent_records=0
+
+    def write(self,port,pad,*,action):
+        from original_competitive_timeout import CAPS
+        # ASCII labels <=96 guarantee the existing JSON serializer's line is
+        # <=512 bytes, including two escaped quotes per character and ns time.
+        require(isinstance(action,str) and all(32<=ord(c)<=126 for c in action) and len(action)<=96 and
+                len(pad)==22 and self.intent_records<CAPS["intent_records"],
+                "Ordinary input intention identity/record cap")
+        size=self.log.stat().st_size if self.log.exists() else 0
+        require(size+512<=CAPS["intent_bytes"], "Ordinary input intention byte cap")
+        self.intent_records+=1
+        super().write(port,pad,action=action)
+
+
+class BoundedLog:
+    """Drain only the owned child's stdout; retain a hard bounded failed log."""
+    def __init__(self,source,target,cap):
+        self.source,self.target,self.cap=source,target,cap
+        self.size=0
+        self.error=None
+        self.thread=threading.Thread(target=self._drain,name="ordinary-owned-log",daemon=True)
+        self.thread.start()
+
+    def _drain(self):
+        try:
+            while True:
+                block=self.source.read(4096)
+                if not block: break
+                remaining=self.cap-self.size
+                kept=block[:remaining]
+                self.target.write(kept); self.target.flush(); self.size+=len(kept)
+                if len(kept)!=len(block): self.error="Ordinary native log byte cap"
+        except (OSError,ValueError) as error:
+            self.error=str(error)
+        finally:
+            self.source.close()
+
+    def check(self):
+        require(self.error is None,self.error or "Ordinary owned log failed")
+
+    def finish(self):
+        self.thread.join(timeout=5)
+        require(not self.thread.is_alive(),"Ordinary owned log drain did not finish after child cleanup")
+        self.check()
+
+
 def rules_dolphin_command(dolphin, user, disc):
     command = dolphin_command(Path(dolphin), Path(user), Path("unused"), Path(disc),
                               cpu="JITARM64", cold_boot=True, audible=False)
     return command + ["-p", "headless", "-C", "Session.Core.SaveDataWritable=False",
                       "-C", "Dolphin.Interface.ConfirmStop=False"]
+
+
+def check_owned_native_wait(process, bounded_log):
+    """Check only the direct child while an ordinary observer record is absent."""
+    returncode = process.poll()
+    require(returncode is None,
+            "Owned original native child exited before observer record: returncode " + str(returncode))
+    bounded_log.check()
 
 
 def cleanup_process(process, output, scope="rules_ready"):
@@ -75,7 +135,7 @@ def menu_actions(path):
     raw = Path(path).read_bytes()
     require(len(raw) <= 1024 * 1024, "SD menu recipe exceeds its bound")
     value = json.loads(raw)
-    if isinstance(value, dict) and value.get("version") in (2, 3, 4, 5, 6, 7):
+    if isinstance(value, dict) and value.get("version") in (2, 3, 4, 5, 6, 7, 8):
         validate_packet(value)
         return value, hashlib.sha256(raw).hexdigest()
     require(isinstance(value, dict) and set(value) == {"schema", "version", "actions"} and
@@ -124,15 +184,19 @@ def prepare_rules_profile(profile, user):
     return p1, p2, source_inventory
 
 
-def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manifest, timeout=180, gci=None):
+def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manifest, timeout=180, gci=None,
+        ordinary_policy=None):
     """Own fresh output before preparation so failures cannot vanish before launch."""
     output = Path(output)
     output.mkdir()  # A collision never overwrites another run or its evidence.
     scope = "rules_ready"
     try:
         scope = menu_actions(menu_recipe)[0].get("scope", scope)
+        if ordinary_policy is not None:
+            scope="ordinary_timeout_gci"
         return _run(dolphin=dolphin, disc=disc, profile=profile, input_plan=input_plan,
-                    menu_recipe=menu_recipe, output=output, build_manifest=build_manifest, timeout=timeout, gci=gci)
+                    menu_recipe=menu_recipe, output=output, build_manifest=build_manifest, timeout=timeout, gci=gci,
+                    ordinary_policy=ordinary_policy)
     except Exception as error:
         failure = output / "failure.json"
         if not failure.exists():
@@ -141,17 +205,28 @@ def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manife
         raise
 
 
-def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manifest, timeout, gci=None):
+def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manifest, timeout, gci=None,
+         ordinary_policy=None):
     build = validate_reference_build_manifest(Path(build_manifest), Path(dolphin))
     plan, plan_hash = load_plan(input_plan, allow_authored=True)
     menus, menu_hash = menu_actions(menu_recipe)
     items_probe = menus["scope"] == "items_row_gci"
-    full_route = menus["scope"] == "sd_prefix_gci" or items_probe
-    guarded_items = menus["scope"] == "sd_prefix_gci" and menus["version"] == 7
-    campaign = menus["scope"] in ("rules_ready_gci", "sd_prefix_gci", "items_row_gci")
+    competitive_entry = menus["scope"] == "competitive_entry_gci"
+    full_route = menus["scope"] == "sd_prefix_gci" or items_probe or competitive_entry
+    guarded_items = (menus["scope"] == "sd_prefix_gci" and menus["version"] == 7) or competitive_entry
+    campaign = menus["scope"] in ("rules_ready_gci", "sd_prefix_gci", "items_row_gci", "competitive_entry_gci")
     scope = menus["scope"]
-    require(plan["authored_recipe"]["version"] == (5 if full_route else 4 if campaign else 3) and
-            menus["version"] == (6 if items_probe else 7 if guarded_items else 5 if full_route else 4 if campaign else 2) and (gci is not None) == campaign and
+    ordinary = ordinary_policy is not None
+    if ordinary:
+        from original_competitive_timeout import load_policy, CAPS
+        policy, policy_hash = load_policy(Path(ordinary_policy))
+        require(competitive_entry and menus["version"]==8 and
+                policy["entry_recipe_sha256"]==plan["authored_recipe_sha256"] and
+                hashlib.sha256(canonical(menus)).hexdigest()==policy["menu_sha256"],
+                "Ordinary policy must retain exact competitive entry/menu provenance")
+        scope="ordinary_timeout_gci"
+    require(plan["authored_recipe"]["version"] == (6 if competitive_entry else 5 if full_route else 4 if campaign else 3) and
+            menus["version"] == (8 if competitive_entry else 6 if items_probe else 7 if guarded_items else 5 if full_route else 4 if campaign else 2) and (gci is not None) == campaign and
             menus["authored_recipe_sha256"] == plan["authored_recipe_sha256"],
             "Runnable original diagnostic requires the exact current scoped recipe/menu versions")
     loaded_profile = None
@@ -165,8 +240,11 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                 "Loaded-profile observer producer is stale or unbound")
         loaded_profile, owned_gci = prepare_gci_folder(gci, output / "gci-folder")
     receiver = GciRulesMenuReceiver(plan, loaded_profile, full_route=full_route, items_probe=items_probe,
-                                   guarded_items=guarded_items) if campaign else RulesMenuReceiver(plan)
-    require(type(timeout) in (int, float) and 0 < timeout <= (180 if full_route else 600),
+                                   guarded_items=guarded_items, competitive_entry=competitive_entry) if campaign else RulesMenuReceiver(plan)
+    if ordinary:
+        from ordinary_timeout_receiver import OrdinaryTimeoutReceiver
+        receiver=OrdinaryTimeoutReceiver(plan,loaded_profile)
+    require(type(timeout) in (int, float) and 0 < timeout <= (600 if ordinary else 180 if full_route else 600),
             "Original diagnostic deadline is unbounded")
     user = output / "user"
     p1, p2, source_inventory = prepare_rules_profile(profile, user)
@@ -178,8 +256,11 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                        MWRC_DOL_SHA256="dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
                        MWRC_OUTPUT=str(raw), MWRC_STATUS=str(status), MWRC_SD_INIT="1",
                        MWRC_SD_RECIPE_SHA256=plan["authored_recipe_sha256"],
-                       MWRC_SD_MENU_PROBE="items_row" if items_probe else "sd_prefix" if full_route else "rules_ready",
+                       MWRC_SD_MENU_PROBE="competitive_entry" if competitive_entry else "items_row" if items_probe else "sd_prefix" if full_route else "rules_ready",
                        MWRC_INPUT_RECORD=str(native), MWRC_INPUT_STATUS=str(native_status))
+    if ordinary:
+        environment.update(MWRC_SD_MENU_PROBE="ordinary_timeout",MWRC_ORDINARY_POLICY_SHA256=policy_hash)
+        (output/"ordinary-policy.json").write_bytes(canonical(policy))
     command = rules_dolphin_command(dolphin, user, disc)
     if campaign:
         environment["MWRC_SD_PROFILE_GCI_SHA256"] = loaded_profile["sha256"]
@@ -194,18 +275,34 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
         launch.update(profile_gci_sha256=loaded_profile["sha256"], owned_gci=str(owned_gci),
                       observed_prelaunch_config_modes={name: oct((user / "Config" / name).stat().st_mode & 0o777)
                          for name in ("Dolphin.ini", "GCPadNew.ini")})
+    if ordinary:
+        launch.update(ordinary_policy_sha256=policy_hash,caps=CAPS)
     (output / "launch.json").write_bytes(canonical(launch))
     controller = DualPipeController(p1, p2, output / "input-intentions.jsonl")
+    if ordinary:
+        controller=BoundedIntentController(p1,p2,output/"input-intentions.jsonl")
     deadline = time.monotonic() + timeout
     with (output / "dolphin.log").open("xb") as log:
-        process = subprocess.Popen(command, env=environment, stdout=log, stderr=subprocess.STDOUT,
+        process = subprocess.Popen(command, env=environment, stdout=subprocess.PIPE if ordinary else log, stderr=subprocess.STDOUT,
                                    start_new_session=True)
+        bounded_log=None
         try:
+            if ordinary:
+                bounded_log=BoundedLog(process.stdout,log,CAPS["log_bytes"])
             # The dedicated receiver expects an interrupted primary ending, so
             # do not use the whole-session Tail's completion-status policy.
-            with ObserverTail(raw, None) as tail:
+            with ObserverTail(raw, None, wait_check=(lambda: check_owned_native_wait(process, bounded_log))
+                              if ordinary else None) as tail:
                 def next_row():
+                    if ordinary:
+                        bounded_log.check()
+                        require(raw.stat().st_size<=CAPS["observer_bytes"] if raw.exists() else True,
+                                "Ordinary observer byte cap")
+                        require(native.stat().st_size<=CAPS["input_bytes"] if native.exists() else True,
+                                "Ordinary native input byte cap")
                     row = tail.next(deadline)
+                    if ordinary:
+                        require(tail.offset<=CAPS["observer_bytes"], "Ordinary consumed observer byte cap")
                     receiver.accept(row)
                     return row
                 def wait_source(predicate, label, max_polls):
@@ -240,16 +337,30 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                 for action in menus["actions"]:
                     wait_source(lambda: matches(receiver.latest_menu, action["before"]),
                                 action["label"] + ":ready", action["max_polls"])
-                    tap(action, action["label"], action["max_polls"])
+                    if "when_value" in action:
+                        require(receiver.latest_menu["value"] in (0,1), "Competitive item is not a observed switch")
+                    if "when_value" not in action or receiver.latest_menu["value"] == action["when_value"]:
+                        tap(action, action["label"], action["max_polls"])
                     wait_source(lambda: matches(receiver.latest_menu, action["after"]),
                                 action["label"] + ":observed", action["max_polls"])
                 if full_route and not items_probe:
                     drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, tap)
                 while not receiver.ended:
                     next_row()
+                    if ordinary and receiver.order==2:
+                        state=receiver.ordinary
+                        if state.phase=="first-loss" and not getattr(receiver,"direction_sent",False):
+                            from reference_versus_sequence_capture import raw_pad
+                            controller.set_both(raw_pad(x=-80),NEUTRAL_PAD,action="ordinary-first-loss")
+                            receiver.direction_sent=True
+                        elif state.phase=="held-bank-drain" and not getattr(receiver,"release_sent",False):
+                            controller.set_both(NEUTRAL_PAD,NEUTRAL_PAD,action="ordinary-first-loss:release")
+                            receiver.release_sent=True
                 # MWRO End is flushed before the writer publishes final status.
                 # Do not treat that publication race as native completion.
                 wait_terminal_statuses(status, native_status, deadline)
+                if ordinary:
+                    bounded_log.check()
                 report = receiver.finish(status, native, native_status)
                 (output / "report.json").write_bytes(canonical(report))
                 return report
@@ -258,14 +369,38 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                 "native_launched": True, "pid": process.pid, "error": str(error)}))
             raise
         finally:
+            # Cleanup closes the direct child's output; join its owned drain
+            # before closing the retained log. No process-name/group cleanup.
+            primary_error=sys.exc_info()[1]
+            cleanup_error=None
+            log_error=None
             try:
                 cleanup_process(process, output, scope=scope)
-            except SdDiagnosticError as error:
+            except Exception as error:
+                cleanup_error=error
+            # Independently finalize the owned drain even if PID cleanup failed.
+            if ordinary:
+                try:
+                    if bounded_log:
+                        bounded_log.finish()
+                    elif process.stdout:
+                        process.stdout.close()
+                except Exception as error:
+                    log_error=error
+                (output/"owned-log-cleanup.json").write_bytes(canonical(dict(
+                    scope=scope,initialized=bounded_log is not None,
+                    bytes=bounded_log.size if bounded_log else 0,
+                    thread_alive=bounded_log.thread.is_alive() if bounded_log else False,
+                    native_cleanup_error=str(cleanup_error) if cleanup_error else None,
+                    error=str(log_error) if log_error else None)))
+            if cleanup_error or log_error:
+                error=cleanup_error or log_error
                 failure = output / "failure.json"
                 if not failure.exists():
                     failure.write_bytes(canonical({"scope": scope, "stage": "cleanup",
                         "native_launched": True, "pid": process.pid, "error": str(error)}))
-                raise
+                if primary_error is None or not ordinary:
+                    raise error
 
 
 def require_css_join_owner(css, port, *, initial=False):
@@ -296,7 +431,9 @@ def drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, t
 
     All axes, targets and limits are frozen in the canonical packet. Observer
     input events prove actual consumption; host sleep never proves readiness.
-    This is an initialization prefix, with no Results/resolution continuation.
+    Menu7 SD and menu8 competitive entry share this source-owned join policy;
+    historical menus keep their immediate-Human precondition. There is no
+    Results/resolution continuation.
     """
     from reference_versus_sequence_capture import raw_pad
     policy = menus["css"]
@@ -337,14 +474,14 @@ def drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, t
             controller.set_both(intent["p1"], intent["p2"], action=label)
             wait_source(lambda: receiver.menu_polls > before, label+":cursor", 600)
     wait_source(lambda: receiver.css is not None, "CSS constructor-owned inventory", 600)
-    if menus["version"] == 7:
+    if menus["version"] in (7, 8):
         for port in policy["ports"]:
             require_css_join_owner(receiver.css, port, initial=True)
     else:
         require([p["kind"] for p in receiver.css["players"]] == [0, 0], "CSS requires two original humans")
     for port, costume in enumerate(policy["costumes"]):
         move(port, policy["point"], f"Mario-P{port+1}")
-        if menus["version"] == 7:
+        if menus["version"] in (7, 8):
             wait_source(lambda: receiver.css["players"][port]["kind"] == 0 and
                         receiver.css["doors"][port]["kind"] == 0,
                         f"CSS own Human join P{port+1}", 600)
@@ -403,6 +540,8 @@ def main(argv=None):
     for name in ("dolphin", "disc", "profile", "input-plan", "menu-recipe", "output", "build-manifest"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--gci", type=Path, help="Exact retained re-export; required only by the separate GCI campaign")
+    parser.add_argument("--ordinary-policy",type=Path,
+                        help="Exact separate adaptive competitive timeout policy; v4 remains entry provenance")
     parser.add_argument("--timeout", type=float, default=180)
     args = parser.parse_args(argv)
     try:

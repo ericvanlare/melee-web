@@ -9,7 +9,9 @@ with P2 winner → original two-Human Results confirmation → CSS → SSS/FD �
 fresh ordinary VS frame 1 → 15 → checked Eject. It is functional evidence only,
 with both later V3 native ordinary controls passed at `849b02e7`. Original
 SD initialization field comparison later passed against the original game;
-current-head CI/integration and broader acceptance remain open.
+PR #297 merged as `bedc15ec`, with the exact reviewed `35d7a239` tree.
+All 14 exact-head CI checks completed: 12 passed and two expected skips.
+Issue #291's functional milestone is closed; broader acceptance remains separate.
 
 The earlier native functional pass at source `8b6ad349` covered: original CSS/SSS, natural one-minute VS
 timeout, active Sudden Death resolved through raw controller input, original
@@ -133,14 +135,12 @@ non-tied timeout and elimination controls passed separately. The later initializ
 gates stay separate. The later executable
 phase/readiness and reference-toolset deltas were subsequently covered by the
 full suite at `cf8cbd88`; later reference-only changes remain separate. Frozen runtime `5308a80c` and
-native producers remain distinct from this tested source. Current-head CI and
-root integration review remain required.
+native producers remain distinct from this tested source. Later exact-head CI
+and owner integration review completed through PR #297.
 
-[Issue #291](https://github.com/ericvanlare/melee-web/issues/291) remains open for
-final source review, current-head CI and
-integration review. The
-subsequent ordinary
-entry/prefix passed in V11; a second whole match remains unrun. Physical
+[Issue #291](https://github.com/ericvanlare/melee-web/issues/291) is closed for
+the merged functional milestone. The subsequent ordinary entry/prefix passed
+in V11; a second whole match remains unrun. Physical
 input, pixels, uninterrupted audio, foreground timing and competitive-set
 acceptance keep their separate gates.
 
@@ -174,7 +174,7 @@ The reviewed `a051c52a` five-file original CSS autojoin extension is integrated
 exactly as source only. Reference native producer and SD integration head remain
 separate; this import does not establish original SD comparison.
 
-The latest original campaign at source `a051c52a` with retained native producer
+The earlier original campaign at source `a051c52a` with retained native producer
 `23b9ff37`/binary `b6ea` completed Items and CSS autojoin, then failed the first
 SSS cooldown guard. This is a bounded menu-prefix outcome; original gameplay,
 SD and comparison remain unrun. The receipt retains the exact campaign
@@ -195,7 +195,7 @@ and native artifact hashes stayed unchanged. The later `5e136a78` receiver-only
 retirement correction is imported as exact bytes: it retains frozen SSS
 observations after both OnExits and routing advance, without counting them as
 source steps or admitting VS. This later delta is outside the full-suite
-identity; imported focused controls and current-head CI remain required. No
+identity; imported focused controls and later exact-head CI covered it before PR #297 merged. No
 new runtime build or original comparison is claimed by that import.
 
 Original V6 at receiver `5e136a78`, native `23b9ff37`/binary `b6ea2fe3`,
@@ -208,7 +208,8 @@ stock/damage, FD/rules/items fields; tied terminal frame 3,600/outcome/winners;
 and actual SD fighter one-stock/300-damage observations. It excludes original
 SD resolution/Results, internal RNG, physical PAD equivalence, pixels, PCM and
 live timing. It is initialization-only original evidence, separate from V11's
-functional full route. Current-head CI and final integration review remain.
+functional full route. Exact-head CI and final integration review subsequently completed through
+PR #297; the initialization-only comparison exclusions remain unchanged.
 
 The initial CSS fixture now retains only exact actual row 899, with the CSSData
 owner displayed as its authored prefix and six player records. Reassembly is

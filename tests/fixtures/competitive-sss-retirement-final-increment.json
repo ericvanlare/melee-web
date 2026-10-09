@@ -1,0 +1,170 @@
+{
+  "rows": [
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 757,
+        "name": "menu",
+        "pc": 2150948236,
+        "slices": [
+          {
+            "address": 2151537092,
+            "flags": 0,
+            "hex": "09",
+            "tag": 40
+          },
+          {
+            "address": 2152176944,
+            "flags": 0,
+            "hex": "020201010000",
+            "tag": 17
+          },
+          {
+            "address": 2152557732,
+            "flags": 0,
+            "hex": "00000000",
+            "tag": 55
+          },
+          {
+            "address": 2152557742,
+            "flags": 0,
+            "hex": "19",
+            "tag": 41
+          },
+          {
+            "address": 2151614871,
+            "flags": 0,
+            "hex": "20",
+            "tag": 42
+          }
+        ]
+      },
+      "seq": 2124,
+      "source_tick": 238,
+      "timestamp_ns": 2057440258630875
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 758,
+        "name": "menu_input",
+        "pc": 2151118212,
+        "slices": [
+          {
+            "address": 2152116680,
+            "flags": 0,
+            "hex": "00000000000000000000004c00000000000000000000009800000000000000000000ff0500000000000000000000ff01",
+            "tag": 3
+          }
+        ]
+      },
+      "seq": 2125,
+      "source_tick": 238,
+      "timestamp_ns": 2057440258682375
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 758,
+        "name": "menu",
+        "pc": 2150948236,
+        "slices": [
+          {
+            "address": 2151537092,
+            "flags": 0,
+            "hex": "09",
+            "tag": 40
+          },
+          {
+            "address": 2152176944,
+            "flags": 0,
+            "hex": "020201020100",
+            "tag": 17
+          },
+          {
+            "address": 2152557732,
+            "flags": 0,
+            "hex": "00000000",
+            "tag": 55
+          },
+          {
+            "address": 2152557742,
+            "flags": 0,
+            "hex": "19",
+            "tag": 41
+          },
+          {
+            "address": 2151614871,
+            "flags": 0,
+            "hex": "20",
+            "tag": 42
+          }
+        ]
+      },
+      "seq": 2126,
+      "source_tick": 239,
+      "timestamp_ns": 2057440282092958
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 758,
+        "name": "menu",
+        "pc": 2150948236,
+        "slices": [
+          {
+            "address": 2151537092,
+            "flags": 0,
+            "hex": "09",
+            "tag": 40
+          },
+          {
+            "address": 2152176944,
+            "flags": 0,
+            "hex": "020201020100",
+            "tag": 17
+          },
+          {
+            "address": 2152557732,
+            "flags": 0,
+            "hex": "00000000",
+            "tag": 55
+          },
+          {
+            "address": 2152557742,
+            "flags": 0,
+            "hex": "19",
+            "tag": 41
+          },
+          {
+            "address": 2151614871,
+            "flags": 0,
+            "hex": "20",
+            "tag": 42
+          }
+        ]
+      },
+      "seq": 2127,
+      "source_tick": 239,
+      "timestamp_ns": 2057440291219375
+    }
+  ],
+  "scope": "Four exact original rows; earlier countdown/confirmation receiver context is injected in tests. No later VS/timeout claim.",
+  "source_raw": {
+    "bytes": 1393845,
+    "path": "/Volumes/AgentStorage/melee-web/runs/sd-reference-source-tests-20261008-170536-28e362d5/original-competitive-natural-terminal-coldboot-v1/observer.bin",
+    "sha256": "4d21da01311873c0268a557c748c15973f66bb5a680def434d5969b9cad58179"
+  }
+}
