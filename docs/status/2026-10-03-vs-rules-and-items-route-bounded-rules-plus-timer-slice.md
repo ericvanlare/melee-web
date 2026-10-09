@@ -96,6 +96,15 @@ seconds. Exact wrapper, supervisor and suite processes are absent, with clean
 and unchanged source. No production source changed for that repair. The
 receipt preserves both the failed suite and successful retry identities.
 
+The first PR CI run at `4369fd12` failed two Linux extracted-observer controls:
+the test fixture omitted `<cstdint>` and relied on macOS transitive headers for
+`uint32_t`. The fixture now includes that header explicitly; both focused controls
+pass, with production code and assertions unchanged. The graphics shard separately
+failed before compilation on a truncated pinned Node archive; seven other shards
+passed the same preparation. Compiler logs are retained, but the hosted runner's
+failed temporary source directories were not in its artifact upload. Complete CI
+on the corrected head remains required; no gameplay capture was repeated.
+
 The combined Rules/SD runtime passed the eight-minute functional route in V9.
 The [same scoped receipt](../evidence/competitive-rules-profile-preflight-v1.json)
 binds producer `87d89c27` and its fresh ordinary Release build: original menus

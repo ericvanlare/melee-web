@@ -1045,5 +1045,29 @@
       "physical input"
     ],
     "private_locator": "sd-reference-source-tests / competitive-original-null-natural-launch-v2 and original-competitive-null-natural-coldboot-v2"
+  },
+  "first_pr_ci_attempt": {
+    "head": "4369fd12188bae7a1800293788e51f1b6b25d659",
+    "run": "https://github.com/ericvanlare/melee-web/actions/runs/37928600043",
+    "result": "failed",
+    "unit_0": {
+      "tests": 1211,
+      "skipped": 113,
+      "failures": 2,
+      "seconds": 544.232,
+      "failure": "Extracted SD pair observer API fixture omitted cstdint; Linux compiler rejects uint32_t at exact damage/ratio bit casts. Existing macOS transitive headers masked the missing direct include.",
+      "log_sha256": "3a535e435b994f82dfbf2bd60de857ecdf2786054de712e2012b5e95ff32c391",
+      "remote_failed_source_gap": "Compiler diagnostics retained; hosted runner work/sd-pair-observer source directories were not included in the bounded CI artifact upload.",
+      "repair": "Add explicit cstdint to extracted fixture only; production observer and assertions unchanged.",
+      "focused_tests": 2,
+      "focused_seconds": 1.259,
+      "focused_log_sha256": "299df4f726683f8a85c5cc6e18dc3bce1fcbe0531b3345f57f264c799b525513"
+    },
+    "graphics": {
+      "failure": "Fresh pinned Emscripten Node24.19.0 arm64 archive truncated during download/extraction before graphics tests. Other seven shards passed the same dependency preparation.",
+      "log_sha256": "f0c3e27d150913cb9b4625668057f0be4764283cc0d77b18af0def16a95fa1c7"
+    },
+    "browser_build": "Aggregate correctly failed because unit-0 and graphics failed; no separate browser compile failure.",
+    "next": "One corrected-head full CI run; no retry of the superseded source head."
   }
 }
