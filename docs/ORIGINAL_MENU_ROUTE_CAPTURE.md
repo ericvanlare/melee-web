@@ -509,9 +509,19 @@ normalized setup are both checked; a None frequency alone cannot pass.
 `MWRC_SD_MENU_PROBE=competitive_entry` stops at the verified normal VS setup
 return with a complete native MWRI footer and interrupted primary observer.
 This scope rejects active gameplay, SD and legacy whole-session completion.
-The prior SD native producer is preserved and rejects this new scope; a new
-canonical observer build and reviewed original run are required. Source/unit
-controls do not establish runtime settings or eight-minute outcome equivalence.
+The prior SD native producer is preserved and rejects this new scope. The
+650caaf1/e4634a74 canonical producer compiled, and its first original attempt
+observed every switch off and the three frequency decrements. It failed at the
+first Items-to-Rules snapshot (seq1127): the receiver required cooldown0,
+while original `fn_80233E10` commits and sets cooldown5. The retained
+`competitive-original-profile-entry-launch-v1/first-items-boundary-reduction-v1.json`
+(SHA2595d314…) binds the actual return, held B release and countdown5→0.
+The receiver correction requires exactly that committed return and consecutive
+source countdown, allowing only the already consumed held B until neutral.
+Readiness remains cooldown0 before any new action. Native producer, recipe,
+menu and inputs are unchanged; the reviewed second attempt remains pending.
+The failed stream is incomplete and cannot establish profile-entry acceptance.
+Source/unit controls do not establish runtime settings or outcome equivalence.
 Natural non-tied timeout comparison remains a separate #292 gate. This prefix
 makes no original Results/CSS lifecycle claim; that continuation is not required
 unless the terminal source fields need it.

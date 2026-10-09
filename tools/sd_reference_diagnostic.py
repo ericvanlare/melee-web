@@ -320,6 +320,8 @@ class CompetitiveItemsProgress:
         self.off = set()
         self.frequency_rights = 0
         self.commit_seen = False
+        self.return_state = None
+        self.return_inventory = []
 
     def observe(self, state, seq):
         require(state["entering"] == 1 and state["items_locked"] == 0 and
@@ -379,11 +381,38 @@ class CompetitiveItemsProgress:
         self.pending = target
         self.bank = pad
 
-    def commit(self, state):
+    def commit(self, state, source_tick, seq):
         require(self.commit_seen and self.pending is None and self.current == (32,0) and
                 self.off == set(range(31)) and state ==
-                {"scene":1,"kind":13,"row":5,"value":0,"entering":0,"cooldown":0},
+                {"scene":1,"kind":13,"row":5,"value":0,"entering":0,"cooldown":5},
                 "Competitive Items owner left before strict committed profile")
+        require(type(source_tick) is int, "Competitive Items return source counter differs")
+        self.return_state = {"tick": source_tick, "cooldown": 5, "neutral": False}
+        self.return_inventory.append({"seq": seq, "source_tick": source_tick, "cooldown": 5})
+
+    def return_input(self, pad, previous, source_tick):
+        from retail_input_plan import NEUTRAL_PAD
+        from reference_versus_sequence_capture import raw_pad
+        state = self.return_state
+        require(source_tick == state["tick"], "Competitive Items return input source counter differs")
+        neutral = [NEUTRAL_PAD]*2
+        back = [raw_pad(buttons=["B"]), NEUTRAL_PAD]
+        require(pad == neutral or (not state["neutral"] and pad == back and previous == back),
+                "Competitive Items return consumed foreign/new continuation")
+        if pad == neutral:
+            state["neutral"] = True
+
+    def observe_return(self, state, source_tick, seq):
+        prior = self.return_state
+        cooldown = max(0, prior["cooldown"]-1)
+        require(type(source_tick) is int and source_tick == prior["tick"]+1 and state ==
+                {"scene":1,"kind":13,"row":5,"value":0,"entering":0,"cooldown":cooldown},
+                "Competitive Items return owner/countdown differs")
+        prior.update(tick=source_tick, cooldown=cooldown)
+        self.return_inventory.append({"seq":seq,"source_tick":source_tick,"cooldown":cooldown})
+        if cooldown == 0:
+            require(prior["neutral"], "Competitive Items return lacks observed neutral release")
+            self.return_state = None
 
 
 class RulesMenuReceiver(Receiver):
@@ -528,6 +557,11 @@ class RulesMenuReceiver(Receiver):
             from retail_input_plan import DISCONNECTED_PAD, NEUTRAL_PAD
             require(self.last_pad[2:] == [DISCONNECTED_PAD] * 2,
                     "Rules probe inactive controllers changed")
+            if self.competitive_entry and self.competitive_items.return_state is not None:
+                require(previous_pad is not None, "Competitive Items return lacks preceding PAD")
+                self.competitive_items.return_input(self.last_pad[:2], previous_pad[:2], row["source_tick"])
+                self.menu_consumed = count
+                return
             if self.guarded_items and self.latest_menu.get("scene") == 9:
                 from reference_versus_sequence_capture import raw_pad
                 select = [raw_pad(buttons=["A"]), NEUTRAL_PAD]
@@ -631,7 +665,9 @@ class RulesMenuReceiver(Receiver):
                     self.items_entry_drain = True
                     self.items_entry_drain_start = self.menu_polls
             if self.competitive_entry:
-                if self.latest_menu.get("kind") == 16 and self.items_entry_drain_closed:
+                if self.competitive_items.return_state is not None:
+                    self.competitive_items.observe_return(self.latest_menu, row["source_tick"], row["seq"])
+                elif self.latest_menu.get("kind") == 16 and self.items_entry_drain_closed:
                     if self.latest_menu["items_locked"] == 1 and self.competitive_items.current is None:
                         require(self.latest_menu["row"] == 0 and self.latest_menu["value"] == 1 and
                                 self.latest_menu["entering"] == 1,
@@ -639,7 +675,7 @@ class RulesMenuReceiver(Receiver):
                     else:
                         self.competitive_items.observe(self.latest_menu, row["seq"])
                 elif previous_menu is not None and previous_menu.get("kind") == 16 and self.latest_menu.get("kind") != 16:
-                    self.competitive_items.commit(self.latest_menu)
+                    self.competitive_items.commit(self.latest_menu, row["source_tick"], row["seq"])
                     self.items_committed = True
             elif self.guarded_items:
                 owner = self.latest_menu.get("scene") == 1 and self.latest_menu.get("kind") == 16
@@ -841,6 +877,7 @@ class GciRulesMenuReceiver(RulesMenuReceiver):
             report.update(schema="melee-web-original-competitive-profile-entry",scope="competitive_entry_gci",
                 menu_version=8, committed_game_rules_hex=self.committed_game_rules,
                 item_rows_observed=self.competitive_items.inventory,
+                items_return_countdown=self.competitive_items.return_inventory,
                 items_frequency_right_pulses=self.competitive_items.frequency_rights,
                 compared_setup=self.plan["authored_recipe"]["expected_setup"],
                 natural_timeout_admission=False, results_css_admission=False,

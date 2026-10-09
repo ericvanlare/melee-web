@@ -56,10 +56,19 @@ class CompetitiveOriginalEntryTests(unittest.TestCase):
                 row['payload']['slices'].pop()
                 field=next(s for s in row['payload']['slices'] if s['tag']==45)
                 data=bytearray.fromhex(field['hex']);data[0]=13;data[4]=0;data[17]=0;field['hex']=data.hex()
+                field=next(s for s in row['payload']['slices'] if s['tag']==46)
+                field['hex']='0005'+'00'*6
             r.accept(row)
             self.pad(r, next(b for b in ('A','B','D_RIGHT','D_DOWN','D_UP')
                              if a['p1']==raw_pad(buttons=[b])))
             self.pad(r)
+            if after['kind']==13:
+                # Source-derived return lifecycle, explicitly synthetic here.
+                for tick in range(1,6):
+                    returned=deepcopy(row);returned['seq']=r.seq;returned['source_tick']=tick
+                    returned['payload']['menu_consumed']=r.menu_consumed
+                    next(s for s in returned['payload']['slices'] if s['tag']==46)['hex']=(5-tick).to_bytes(2,'big').hex()+'00'*6
+                    r.accept(returned)
         self.assertTrue(r.items_committed)
         self.assertEqual(r.competitive_items.off,set(range(31)))
         self.assertEqual(r.competitive_items.frequency_rights,3)
@@ -151,6 +160,53 @@ class CompetitiveOriginalEntryTests(unittest.TestCase):
                         state['value']=0;p.observe(state,2)
                         if change=='newA':p.input(state,A,neutral)
                         else:p.observe(dict(state,row=1),3)
+
+    def test_actual_committed_return_countdown_and_held_back_release(self):
+        rows=json.loads((Path(__file__).parent/'fixtures/competitive-items-return-order.json').read_text())['rows']
+        p=CompetitiveItemsProgress()
+        # Earlier traversal is covered separately. This bounded actual fixture
+        # starts with the declared, verified all-off/None predecessor context.
+        p.current=(32,0);p.off=set(range(31));p.frequency_rights=3
+        from sd_reference_diagnostic import menu_state, slices
+        previous=[NEUTRAL_PAD]*2
+        state=menu_state(slices(rows[0]['payload']))
+        for row in rows[1:]:
+            payload=row['payload']
+            if payload['name']=='menu_input':
+                raw=bytes.fromhex(next(s['hex'] for s in payload['slices'] if s['tag']==3))
+                pad=[raw[n:n+11].hex() for n in (0,12)]
+                if p.return_state is None:p.input(dict(state,items_locked=0),pad,previous)
+                else:p.return_input(pad,previous,row['source_tick'])
+                previous=pad
+            else:
+                state=menu_state(slices(payload))
+                if p.return_state is None:p.commit(state,row['source_tick'],row['seq'])
+                else:p.observe_return(state,row['source_tick'],row['seq'])
+                if state['cooldown']==0:break
+        self.assertIsNone(p.return_state)
+        self.assertEqual([v['cooldown'] for v in p.return_inventory],[5,4,3,2,1,0])
+
+    def test_return_initial_countdown_owner_and_input_negatives(self):
+        neutral=[NEUTRAL_PAD]*2;back=[raw_pad(buttons=['B']),NEUTRAL_PAD]
+        first=dict(scene=1,kind=13,row=5,value=0,entering=0,cooldown=5)
+        def prepared():
+            p=CompetitiveItemsProgress();p.current=(32,0);p.off=set(range(31));p.frequency_rights=3
+            p.commit_seen=True;p.commit(first,332,1127);return p
+        for mutation in ('initial0','initial4','initial6','skip','duplicate','foreignowner','foreigninput','newB','postneutralB','inputtick','missingneutral'):
+            with self.subTest(mutation=mutation),self.assertRaises(SdDiagnosticError):
+                p=prepared()
+                if mutation.startswith('initial'):
+                    p.return_state=None;p.commit(dict(first,cooldown=int(mutation[7:])),332,1127)
+                elif mutation=='skip':p.observe_return(dict(first,cooldown=3),334,1129)
+                elif mutation=='duplicate':p.observe_return(first,332,1129)
+                elif mutation=='foreignowner':p.observe_return(dict(first,row=4,cooldown=4),333,1129)
+                elif mutation=='foreigninput':p.return_input([raw_pad(buttons=['A']),NEUTRAL_PAD],back,332)
+                elif mutation=='newB':p.return_input(back,neutral,332)
+                elif mutation=='postneutralB':
+                    p.return_input(neutral,back,332);p.return_input(back,neutral,332)
+                elif mutation=='inputtick':p.return_input(neutral,back,333)
+                else:
+                    for tick in range(333,338):p.observe_return(dict(first,cooldown=337-tick),tick,1127+tick-332)
 
     def test_friendly_fire_optin_keeps_default_decoder_strict(self):
         r=self.committed();self.entry_rows(r)
