@@ -2,6 +2,9 @@
 from copy import deepcopy
 from pathlib import Path
 import sys
+import json
+import struct
+from unittest.mock import patch
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,7 +18,8 @@ from original_source_ports import (DEFAULT_SOURCE_SLOTS, SPARSE_SOURCE_SLOTS,
 from retail_input_plan import DISCONNECTED_PAD, NEUTRAL_PAD, verify_entry
 from sd_original_menu_plan import gci_sparse_pair_packet, validate_packet
 from sd_reference_diagnostic import (PCS, Receiver, SCOPE, SdDiagnosticError,
-                                     RulesMenuReceiver, profile_rumble_copy, stage_state)
+                                     RulesMenuReceiver, GciRulesMenuReceiver, css_state, profile_rumble_copy, stage_state)
+from capture_sd_reference_prefix import require_css_join_owner
 from reference_versus_sequence_capture import raw_pad
 
 
@@ -131,6 +135,76 @@ class OriginalSparsePairTests(unittest.TestCase):
         self.assertEqual(packet["css"]["source_slots"], [0, 2])
         self.assertEqual(packet["css"]["ports"], [0, 1])  # Logical Pipe lanes.
 
+    def test_vacant_cursor_initializer_is_zero_for_default_second_and_sparse_third(self):
+        for slots in ((0, 1), (0, 2)):
+            slot = slots[1]
+            css = {"players": [{}, {"character": 26, "kind": 3, "slot": 0}],
+                   "doors": [{}, {"kind": 3, "costume": 0, "icon": 25}],
+                   "cursors": [{}, {"port": slot, "state": 0, "held": 0,
+                                     "x": 15.0 * slot - 31.0, "y": -21.5}],
+                   "models": [{}, {"owner": 0}]}
+            if slots == (0, 2):
+                css["source_slots"] = list(slots)
+            require_css_join_owner(css, 1, initial=True)
+            css["cursors"][1]["held"] = slot
+            with self.assertRaisesRegex(ValueError, "initialized owner"):
+                require_css_join_owner(css, 1, initial=True)
+
+    def test_default_css_row_shape_unchanged_and_sparse_metadata_explicit(self):
+        for slots in ((0, 1), (0, 2)):
+            live, doors = bytearray(0x148), bytearray(0x90)
+            data = {(48, 0): live, (44, 0): doors}
+            for slot in range(4):
+                live[0x70 + slot*0x24 + 1] = 0 if slot in slots else 3
+            for slot in slots:
+                cursor = bytearray(0x14); cursor[4] = slot
+                cursor[12:20] = struct.pack(">ff", 15.0*slot-31.0, -21.5)
+                data[(43, slot)] = cursor; data[(47, slot)] = bytes(0x18)
+            css = css_state(data, slots)
+            self.assertEqual(set(css["cursors"][1]),
+                             {"port", "state", "held", "x", "y"} |
+                             ({"source_slot"} if slots == (0, 2) else set()))
+            self.assertEqual(set(css["players"][1]), {"character", "kind", "slot"} |
+                             ({"source_slot"} if slots == (0, 2) else set()))
+
+    def test_actual_loaded_profile_precedes_target_menu_settings(self):
+        from sd_original_menu_plan import SPARSE_LOADED_RULES_HEX
+        from sd_gci_profile import SAVE_BYTES, BANK_BYTES
+        fixture = json.loads((ROOT / "tests/fixtures/original-sparse-initial-profile.json").read_text())
+        self.assertEqual(fixture["game_rules_hex"], SPARSE_LOADED_RULES_HEX)
+        rules = bytes.fromhex(fixture["game_rules_hex"])
+        self.assertEqual((rules[2], rules[4], rules[8]), (0, 3, 0))
+        self.assertEqual(bytes.fromhex(fixture["save_items_hex"])[0], 2)
+        packet = gci_sparse_pair_packet()
+        labels = [a["label"] for a in packet["actions"]]
+        self.assertEqual(labels[6:9], ["stock-mode", "stock-row", "four-stocks"])
+        self.assertNotIn("one-minute-stock-timer", labels)
+        self.assertEqual(labels[-5:], ["items-frequency-2", "items-frequency-1",
+                         "items-frequency-0", "commit-items-none", "Rules-start-CSS"])
+        self.assertEqual(next(a for a in packet["actions"] if a["label"] == "open-items")["before"],
+                         {"scene": 1, "kind": 13, "row": 5, "cooldown": 0, "entering": 1})
+        # Synthetic surrounding ABI extents; Rules/Items bytes are retained actual.
+        save = bytearray(0x55e8); save[:4] = bytes.fromhex("07ff07ff")
+        save[0x448:0x468] = bytes.fromhex(fixture["save_items_hex"])
+        receiver = GciRulesMenuReceiver.__new__(GciRulesMenuReceiver)
+        receiver.sparse_pair = True; receiver.competitive_entry = False
+        receiver.plan = make_input_plan(7)
+        receiver.profile = {"save": bytes(save[:SAVE_BYTES]), "banks": [bytes(BANK_BYTES)]*2}
+        root = 0x80400000
+        values = [(39, root+0x1868, bytes(save)), (38, root+0x1850, rules),
+                  (36, root+0x1868, bytes.fromhex("07ff")),
+                  (37, root+0x186a, bytes.fromhex("07ff")), (54, root+0x1cc0, b"\0")]
+        row = progress(563, 1, "rules_ready", 0, 39, bytes(save))
+        row["payload"]["slices"] = [{"tag": tag, "flags": 0, "address": address,
+                                     "hex": raw.hex()} for tag,address,raw in values]
+        with patch.object(RulesMenuReceiver, "accept", return_value=None):
+            receiver.accept(row)
+            self.assertEqual(receiver.loaded_context["game_rules_hex"], rules.hex())
+            wrong = deepcopy(row)
+            wrong["payload"]["slices"][1]["hex"] = (rules[:2]+b"\1"+rules[3:]).hex()
+            with self.assertRaisesRegex(SdDiagnosticError, "initial loaded GameRules"):
+                receiver.accept(wrong)
+
     def test_consumed_press_and_release_keep_full_queue_identity_without_poll_join(self):
         plan = make_input_plan(7)
         receiver = Receiver(plan, sparse_pair=True)
@@ -162,6 +236,7 @@ class OriginalSparsePairTests(unittest.TestCase):
         plan = make_input_plan(7)
         receiver = RulesMenuReceiver(plan, profile_campaign=True, full_route=True,
                                      sparse_pair=True)
+        self.assertTrue(receiver.items_guard and receiver.guarded_items)
         receiver.started = True
         receiver.order = 0
         receiver.ready = True

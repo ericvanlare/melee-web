@@ -534,6 +534,7 @@ class SdReferenceDiagnosticTests(unittest.TestCase):
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <iostream>
 using u8=uint8_t; using u16=uint16_t; using u32=uint32_t;
 #include "ReferenceSdInitState.h"
 #include "ReferenceOrdinaryTimeoutState.h"
@@ -545,7 +546,11 @@ constexpr u32 CSS_ENTER_RETURN=0x802669f0, PAD_READ_HSD_CALLER=0x80376a28;
 constexpr u32 PROFILE_SAVE_DATA_OFFSET=0x1868, PROFILE_SAVE_DATA_SIZE=0x55e8;
 bool SparsePairRequested() { return false; }
 enum class Event { Progress, Error };
-bool AppendHexBytes(std::string*, const u8*, size_t) { return true; }
+bool AppendHexBytes(std::string* out, const u8* bytes, size_t size) {
+  constexpr char hex[]="0123456789abcdef";
+  for(size_t i=0;i<size;++i) { out->push_back(hex[bytes[i]>>4]); out->push_back(hex[bytes[i]&15]); }
+  return true;
+}
 """ + enum + sparse_pad_checks + r"""
 struct Reader {
   SdInitState sd_init;
@@ -566,8 +571,12 @@ struct Reader {
   std::array<u8,192*1024> raw{};
   std::array<bool,4> fighter_present{};
   std::array<u32,4> fighter_pointers{};
-  void SetInvalid(const char*) {}
-  void PushJson(Event,const std::string&,u32,u32) {}
+  std::string last_error, last_json;
+  Event last_event=Event::Progress;
+  void SetInvalid(const char* reason) {last_error=reason;}
+  void PushJson(Event event,const std::string& json,u32,u32) {
+    last_event=event;last_json=json;
+  }
   bool ReadU32(Core::System*,u32,u32*) { return false; }
   bool ReadBytes(Core::System*,u32,size_t,u8*) { return false; }
   bool BoundaryInstructionMatches(Core::System*,u32) { return true; }
@@ -614,6 +623,15 @@ int main() {
   malformed[1].size=0x2f;
   assert(SparsePadSlotBytes(captured.data(),captured.size(),malformed.data(),malformed.size())==nullptr);
 
+  Reader rejected;
+  rejected.raw_size=captured.size(); rejected.slice_count=sparse_slices.size();
+  std::memcpy(rejected.raw.data(),captured.data(),captured.size());
+  std::memcpy(rejected.slices.data(),sparse_slices.data(),sizeof(sparse_slices));
+  rejected.sd_init.consumed=3;
+  rejected.SparseInputFailure("synthetic partial source press",0x80377584,43);
+  assert(rejected.last_event==Event::Error);
+  assert(rejected.last_error=="synthetic partial source press");
+  std::cout<<rejected.last_json<<"\n";
   SdInitState state;
   assert(!state.Entry(0x80001000,true));
   assert(state.Entry(0x80001000,false));
@@ -688,6 +706,19 @@ int main() {
                     (retained / "runtime.stdout").write_text(run.stdout)
                     (retained / "runtime.stderr").write_text(run.stderr)
                 self.fail("Native API-stub execution failed:\n" + run.stdout + run.stderr)
+            payload = json.loads(run.stdout)
+            self.assertEqual((payload["name"],payload["pc"],payload["consumed"]),
+                             ("input_rejected",0x80377584,3))
+            self.assertEqual([(v["tag"],v["address"],len(bytes.fromhex(v["hex"])))
+                              for v in payload["slices"]],
+                             [(2,0x804c1f78,12),(3,0x804c1f84,48)])
+            self.assertEqual(payload["slices"][0]["hex"], bytes(range(0x80,0x8c)).hex())
+            self.assertEqual(bytes.fromhex(payload["slices"][1]["hex"])[10],1)
+            rejected = {"seq":0,"source_tick":43,"event":"error","payload":payload}
+            receiver = Receiver(make_input_plan(7),sparse_pair=True)
+            receiver.started = True
+            with self.assertRaisesRegex(SdDiagnosticError,"Unexpected SD observer event"):
+                receiver.accept(rejected)
 
 
 if __name__ == "__main__":

@@ -444,7 +444,7 @@ def require_css_join_owner(css, port, *, initial=False):
             "CSS join has foreign slot/cursor ownership")
     if initial and player["kind"] == 3:
         require(player["character"] == 26 and door["kind"] == 3 and door["icon"] == 25 and
-                door["costume"] == 0 and cursor["state"] == 0 and cursor["held"] == source_slot and
+                door["costume"] == 0 and cursor["state"] == 0 and cursor["held"] == 0 and
                 cursor["x"] == 15.0*source_slot-31.0 and cursor["y"] == -21.5 and
                 model["owner"] == 0,
                 "CSS vacant door is not the observed initialized owner")

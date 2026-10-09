@@ -223,18 +223,24 @@ def gci_competitive_entry_packet():
     return value
 
 
+SPARSE_LOADED_RULES_HEX = "0036000203000a00000001000000080800000800ffffffff"
+
+
 def gci_sparse_pair_packet():
     """Default Rules route into a strict original source-slot pair 0/2 probe."""
     value = gci_rules_ready_packet()
     value.update(version=9, scope="sparse_pair_gci",
                  authored_recipe_sha256=recipe_sha256(recipe(7)))
-    value["actions"] = value["actions"][:6]
-    value["actions"].append({
-        "label": "Rules-start-CSS", "p1": raw_pad(buttons=["START"]),
-        "p2": NEUTRAL_PAD, "before": {"scene": 1, "kind": 13, "row": 0,
-            "value": 0, "entering": 1, "cooldown": 0},
-        "after": {"scene": 8}, "max_polls": 600,
-    })
+    # Reuse the verified stock/frequency choreography, omitting only the
+    # extra-Rules one-minute timer detour. The saved stock timer stays zero.
+    source = gci_sd_prefix_packet(7)
+    omitted = {"Rules-row-6", "extra-rules", "one-minute-stock-timer",
+               "commit-extra", "items-row"}
+    value["actions"] = [action for action in source["actions"]
+                        if action["label"] not in omitted]
+    for action in value["actions"]:
+        if action["label"] == "open-items":
+            action["before"]["entering"] = 1
     value["css"] = {"character": 8, "icon": 1, "point": [-20.9, 16.5],
         "costumes": [1, 0], "ports": [0, 1], "source_slots": [0, 2],
         "human_kind": 0, "axis_values": [-70, -35, 0, 35, 70],

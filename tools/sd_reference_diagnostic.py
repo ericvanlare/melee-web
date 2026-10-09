@@ -536,9 +536,9 @@ class RulesMenuReceiver(Receiver):
                 "Rules probe recipe/profile campaign differs")
         self.full_route = full_route
         self.items_probe = items_probe
-        self.guarded_items = guarded_items
+        self.guarded_items = guarded_items or sparse_pair
         self.sss_guard = guarded_items or sparse_pair
-        self.items_guard = items_probe or guarded_items
+        self.items_guard = items_probe or guarded_items or sparse_pair
         require(not competitive_entry or (profile_campaign and full_route and guarded_items and not items_probe),
                 "Competitive entry scope must own the full guarded original menu")
         require(not sparse_pair or (profile_campaign and full_route and not items_probe and not competitive_entry),
@@ -781,7 +781,7 @@ class RulesMenuReceiver(Receiver):
                         self.menu_polls - self.items_entry_drain_start < 600,
                         "Items locked entry drain owner/poll cap differs")
             elif not self.items_entry_drain_closed and not self.items_up_seen and previous_menu == {
-                    "scene":1,"kind":13,"row":5,"value":0,"entering":0,"cooldown":0}:
+                    "scene":1,"kind":13,"row":5,"value":0,"entering":1 if self.sparse_pair else 0,"cooldown":0}:
                 from reference_versus_sequence_capture import raw_pad
                 from retail_input_plan import NEUTRAL_PAD
                 if (self.latest_menu.get("scene"), self.latest_menu.get("kind"),
@@ -962,7 +962,7 @@ class GciRulesMenuReceiver(RulesMenuReceiver):
                                  if s["tag"] == 39 and s["flags"] == 0), None)
             require(len(save) == 0x55e8 and save_address == self.loaded_context["save_address"] and
                     save[:5] == self.profile["save"][:5] and
-                    save[0x448:0x468] == self.profile["save"][0x448:0x468] and
+                    save[0x449:0x468] == self.profile["save"][0x449:0x468] and
                     save[0x448] == (expected_setup["item_frequency"] & 0xff) and
                     save[0x450:0x458].hex() == expected_setup["item_mask_hex"],
                     "Sparse original entry changed loaded save/item preferences")
@@ -994,15 +994,11 @@ class GciRulesMenuReceiver(RulesMenuReceiver):
                     data.get((36, 0)) == bytes.fromhex("07ff") and
                     data.get((37, 0)) == bytes.fromhex("07ff"), "Loaded profile extents/unlocks differ")
             if self.sparse_pair:
-                fields = {"mode": 2, "time_limit": 3, "stock_count": 4, "handicap": 5,
-                          "damage_ratio": 6, "stock_time_limit": 8,
-                          "friendly_fire": 9, "pause": 10}
-                expected_rules = self.plan["authored_recipe"]["expected_game_rules"]
-                expected_setup = self.plan["authored_recipe"]["expected_setup"]
-                require({key: rules[offset] for key, offset in fields.items()} == expected_rules and
-                        save[0x448] == (expected_setup["item_frequency"] & 0xff) and
-                        save[0x450:0x458].hex() == expected_setup["item_mask_hex"],
-                        "Sparse loaded profile Rules/Items differ from the frozen browser field scope")
+                # Actual cold GCI Rules-ready bytes, before declared menu settings.
+                # The target stock/Items policy is checked separately at VS entry.
+                from sd_original_menu_plan import SPARSE_LOADED_RULES_HEX
+                require(rules.hex() == SPARSE_LOADED_RULES_HEX,
+                        "Sparse initial loaded GameRules differ from retained original profile")
             addresses = {(s["tag"], s["flags"]): s["address"] for s in row["payload"]["slices"]}
             root = addresses[(39, 0)] - 0x1868
             require(all(addresses[key] == root + offset for key, offset in
@@ -1086,12 +1082,15 @@ def css_state(data, source_slots=DEFAULT_SOURCE_SLOTS):
         mx, my = struct.unpack(">ff", model[8:16])
         import math
         require(all(math.isfinite(v) for v in (x, y, mx, my)), "CSS coordinate is invalid")
-        result["cursors"].append({"port": cursor[4], "source_slot": slot,
+        result["cursors"].append({"port": cursor[4],
             "state": cursor[5], "held": cursor[6], "x": x, "y": y})
         result["models"].append({"owner": model[5], "x": mx, "y": my})
         base = 0x70 + slot * 0x24
         result["players"].append({"character": live[base], "kind": live[base+1],
-                                   "slot": live[base+4], "source_slot": slot})
+                                   "slot": live[base+4]})
+        if source_slots != DEFAULT_SOURCE_SLOTS:
+            result["cursors"][-1]["source_slot"] = slot
+            result["players"][-1]["source_slot"] = slot
         base = slot * 0x24
         result["doors"].append({"kind": doors[base+11], "costume": doors[base+13],
                                 "icon": doors[base+14]})

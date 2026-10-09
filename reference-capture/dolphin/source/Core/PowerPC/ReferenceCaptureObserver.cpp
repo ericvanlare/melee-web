@@ -2168,7 +2168,7 @@ struct Observer::Impl
       return false;
     if (scene_kind == 1 && (Env("MWRC_SD_MENU_PROBE") == "items_row" ||
                             Env("MWRC_SD_MENU_PROBE") == "sd_prefix" ||
-                            Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested()))
+                            Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()))
     {
       u8 menu_kind = 0;
       if (!ReadBytes(system, 0x804a04f0, 1, &menu_kind))
@@ -2526,6 +2526,14 @@ struct Observer::Impl
     SetInvalid(reason);
   }
 
+  void SparseInputFailure(const char* reason, u32 pc, u32 tick)
+  {
+    // Preserve the queue descriptor and consumed full four-port slot already
+    // read at this boundary. Error-only: never a successful input or finish.
+    SdEvent("input_rejected", pc, tick, Event::Error);
+    SetInvalid(reason);
+  }
+
   void ObserveSdInit(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
   {
     u32 tick = 0;
@@ -2749,18 +2757,18 @@ struct Observer::Impl
       {
         const u8* pad = SparsePadSlotBytes(raw.data(), raw_size, slices.data(), slice_count);
         if (!pad)
-          return SetInvalid("Sparse source input lacks its observed full PadSlot slice"), void();
+          return SparseInputFailure("Sparse source input lacks its observed full PadSlot slice", pc, tick), void();
         if (sd_init.phase == SdInitState::Phase::VsSetup)
         {
           if (!SparsePadStatusMatches(pad, false))
-            return SetInvalid("Sparse original VS setup consumed non-neutral PAD0/PAD2 or active PAD1/PAD3"), void();
+            return SparseInputFailure("Sparse original VS setup consumed non-neutral PAD0/PAD2 or active PAD1/PAD3", pc, tick), void();
           SdEvent("input", pc, tick);
           return;
         }
         if (!sparse_active || !sparse_setup_seen ||
             sparse_source_samples >= SPARSE_SOURCE_SAMPLE_CAP ||
             !SparsePadErrorsValid(pad))
-          return SetInvalid("Sparse original consumed PAD lacks its declared four-port source identity"), void();
+          return SparseInputFailure("Sparse original consumed PAD lacks its declared four-port source identity", pc, tick), void();
 
         ++sparse_source_samples;
         if (sparse_witness_phase == 0)
@@ -2768,7 +2776,7 @@ struct Observer::Impl
           if (SparsePadStatusMatches(pad, false))
           {
             if (++sparse_prepress_neutral_samples > SPARSE_PREPRESS_NEUTRAL_CAP)
-              return SetInvalid("Sparse source press exceeded its original neutral-sample cap"), void();
+              return SparseInputFailure("Sparse source press exceeded its original neutral-sample cap", pc, tick), void();
           }
           else if (SparsePadStatusMatches(pad, true))
           {
@@ -2776,18 +2784,18 @@ struct Observer::Impl
           }
           else
           {
-            return SetInvalid("Sparse original PAD press differs from distinct source0/source2 intent"), void();
+            return SparseInputFailure("Sparse original PAD press differs from distinct source0/source2 intent", pc, tick), void();
           }
         }
         else if (sparse_witness_phase == 1)
         {
           if (!SparsePadStatusMatches(pad, false))
-            return SetInvalid("Sparse original PAD release did not restore neutral active ports"), void();
+            return SparseInputFailure("Sparse original PAD release did not restore neutral active ports", pc, tick), void();
           sparse_witness_phase = 2;
         }
         else
         {
-          return SetInvalid("Sparse original PAD continued after its exact release witness"), void();
+          return SparseInputFailure("Sparse original PAD continued after its exact release witness", pc, tick), void();
         }
         SdEvent("input", pc, tick);
         if (sparse_witness_phase == 2)
