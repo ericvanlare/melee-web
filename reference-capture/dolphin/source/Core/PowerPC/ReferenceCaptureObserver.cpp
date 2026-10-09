@@ -536,7 +536,9 @@ bool SparsePadStatusMatches(const u8* pad, bool pressed)
 {
   for (u32 port = 0; port < 4; ++port)
   {
-    for (u32 byte = 0; byte < 12; ++byte)
+    // PADStatus defines bytes 0x00..0x0A; byte 0x0B is trailing ABI padding.
+    // Retain all 48 raw bytes in the event, but compare only semantic fields.
+    for (u32 byte = 0; byte < 11; ++byte)
     {
       u8 expected = 0;
       if ((port == 1 || port == 3) && byte == 10)

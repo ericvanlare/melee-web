@@ -4,6 +4,8 @@ from pathlib import Path
 import sys
 import json
 import struct
+import shutil
+import subprocess
 from unittest.mock import patch
 import unittest
 
@@ -21,6 +23,7 @@ from sd_reference_diagnostic import (PCS, Receiver, SCOPE, SdDiagnosticError,
                                      RulesMenuReceiver, GciRulesMenuReceiver, css_state, profile_rumble_copy, stage_state)
 from capture_sd_reference_prefix import require_css_join_owner
 from reference_versus_sequence_capture import raw_pad
+from owned_test_workspace import OwnedWorkspaceTests
 
 
 def sparse_setup_bytes():
@@ -290,6 +293,70 @@ class OriginalSparsePairTests(unittest.TestCase):
         self.assertEqual(receiver.sss_countdown, 0)
         self.assertEqual(len(receiver.sss_retirement_inventory), 2)
         self.assertEqual(receiver.sss_retirement_inventory[0]["stage"]["kind"], 32)
+
+
+class OriginalSparsePadPredicateTests(OwnedWorkspaceTests):
+    @classmethod
+    def setUpClass(cls):
+        cls.workspace = cls.new_workspace(ROOT, "original-sparse-pad-predicate-")
+
+    def test_actual_neutral_padding_and_all_semantic_byte_negatives(self):
+        compiler = shutil.which("clang++") or shutil.which("g++")
+        if compiler is None:
+            self.skipTest("A native C++ compiler is not installed")
+        source = (ROOT / "reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp").read_text()
+        predicate = source[source.index("bool SparsePadStatusMatches("):
+                           source.index("bool ActivationRequested()")]
+        # Actual input_rejected seq1716 from observer.bin SHA256
+        # 5c1afd4e9628a01ecc08d34473c7f781f2d965807db0055e757654ae0128421b.
+        # All 48 observed bytes remain intact, including trailing ABI padding.
+        captured = bytes.fromhex(
+            "00000000000000000000009c00000000000000000000ff98"
+            "0000000000000000000000c800000000000000000000ff48")
+        self.assertEqual(len(captured), 48)
+        values = ",".join(str(b) for b in captured)
+        harness = """#include <array>
+#include <cassert>
+#include <cstdint>
+using u8 = uint8_t;
+using u32 = uint32_t;
+""" + predicate + """
+int main() {
+  const std::array<u8, 48> actual = {""" + values + """};
+  auto neutral = actual;
+  assert(SparsePadStatusMatches(neutral.data(), false));
+  assert(!SparsePadStatusMatches(neutral.data(), true));
+  assert(neutral == actual);
+  auto pressed = actual; // Synthetic declared press atop actual trailing bytes.
+  pressed[0] = 1; pressed[2] = 35; pressed[24] = 2; pressed[27] = 221;
+  assert(SparsePadStatusMatches(pressed.data(), true));
+  assert(!SparsePadStatusMatches(pressed.data(), false));
+  for (u32 port = 0; port < 4; ++port) {
+    for (u32 byte = 0; byte < 11; ++byte) {
+      auto bad_neutral = actual;
+      bad_neutral[12 * port + byte] ^= 1;
+      assert(!SparsePadStatusMatches(bad_neutral.data(), false));
+      auto bad_press = pressed;
+      bad_press[12 * port + byte] ^= 1;
+      assert(!SparsePadStatusMatches(bad_press.data(), true));
+    }
+    auto other_padding = actual;
+    other_padding[12 * port + 11] ^= 255;
+    assert(SparsePadStatusMatches(other_padding.data(), false));
+  }
+  assert(actual == neutral); // The actual production predicate is read-only.
+}
+"""
+        path = self.workspace
+        (path / "predicate.cpp").write_text(harness)
+        built = subprocess.run([compiler, "-std=c++17", "-Wall", "-Werror",
+                                str(path / "predicate.cpp"), "-o", str(path / "predicate")],
+                               capture_output=True, text=True)
+        (path / "compile.stdout-stderr.log").write_text(built.stdout + built.stderr)
+        self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+        checked = subprocess.run([str(path / "predicate")], capture_output=True, text=True)
+        (path / "run.stdout-stderr.log").write_text(checked.stdout + checked.stderr)
+        self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
 
 
 if __name__ == "__main__":
