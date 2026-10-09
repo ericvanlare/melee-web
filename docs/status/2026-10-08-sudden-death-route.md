@@ -94,7 +94,14 @@ Start at frame 274 → 275 produced phase 4 and all-confirmed flags. The overall
 experiment failed after active SSS entry because the new tail expected a
 committed start payload before confirmation. The test now checks raw SSS
 rules/items before `j` and normalized original identities from ready ordinary
-VS afterward. That subsequent VS/prefix remains unrun. Exact owned children
+VS afterward. V11 subsequently passed the full declared functional route at source `3285f344`
+and runtime `e13647cb`: SD cursor 278, 290 retained Results rows, both Human
+source confirmations, active CSS/SSS, then fresh ordinary VS cursor 1 → 15
+(+14 frames, exceeding the declared 12-frame minimum). Its normalized payload
+retained ports 0/1, colors [1, 0], four stocks, one-minute stock rules and items;
+completed matches stayed at one. All 13 incidents were declared preparation,
+with no other incidents or observer errors. Bounded sample thinning is reported;
+this is not lossless diagnostic retention or timing acceptance. Exact owned children
 were reaped, socket rebind passed, and Eject cleared source owners.
 
 The original-reference producer `8f944a09` (binary digest `c22d23c2`) passed a
@@ -109,7 +116,9 @@ and SD comparison remain unrun.
 
 The consolidated executable head `fd55b378` passed all 2,163 unittest cases
 with 154 skips. It includes the reference toolset and shared Results helper;
-the current corrected browser route remains failed. The later executable
+the earlier browser route failures remain retained. V11 passes the declared
+functional SD/Results/returned-menu/subsequent-prefix route; remaining ordinary
+non-tied/elimination regressions and original-comparison gates stay separate. The later executable
 phase/readiness and reference-toolset deltas have focused checks only; a current full suite is still required
 before integration. Frozen runtime `5308a80c` and
 native producers remain distinct from this tested source. Current-head CI and

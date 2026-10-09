@@ -536,6 +536,39 @@
       "failure": "pre-confirmation start.valid expected true; source contract only exposes it after closed committed SSS",
       "subsequent_ordinary_vs": "unrun",
       "cleanup": "exact four PIDs absent; port 63796 rebound; owned driver/context/browser closed; Eject source owners zero"
+    },
+    "v11": {
+      "result": "pass; authored functional route only",
+      "source_head": "3285f34413e3dc775b9ba16fc62321be52a00c92",
+      "runtime_producer": "e13647cb1a1b7a6309592f5a53f16051f4d0b7fb",
+      "receipt_sha256": "5ef057c3e5c90626ddc58e6b4a7475932d75f4e70a9b5d42ea747e8ff22d769d",
+      "results_trace_sha256": "4303b74e08d7d7c85582ebbcfb2fa2d70b81732f734feddbee49121dd161adf9",
+      "results_rows": 290,
+      "vs_source_frames": 3600,
+      "sd_final_cursor": 278,
+      "fresh_ordinary_cursor": [
+        1,
+        15
+      ],
+      "fresh_ordinary_delta": 14,
+      "completed_matches": 1,
+      "phase_source_steps": {
+        "7": 3987,
+        "14": 516,
+        "8": 290
+      },
+      "incidents": {
+        "declared_preparation": 13,
+        "other": 0
+      },
+      "sample_thinning": 5561,
+      "cleanup": "four exact PIDs absent, port rebound, driver/context/browser closed, checked Eject cleared owners",
+      "gaps": [
+        "second whole ordinary match unrun",
+        "internal final SD numeric PAD/RNG unobserved",
+        "original simulation/render/PCM comparison unrun",
+        "physical input/foreground timing/audible gates unrun"
+      ]
     }
   }
 }

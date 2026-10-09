@@ -533,9 +533,25 @@ void run_results_source_smoke(const melee_web::RuntimeFiles&,MeleeWebMenuHost*,
     const MatchExitInfo&,std::uint32_t&,std::uint8_t[MELEE_WEB_PAD_STATE_BYTES],
     bool two_human_control=false);
 void run_returned_menu_selection(const melee_web::RuntimeFiles& files,
-    MeleeWebMenuHost* host,char* error,std::size_t error_size)
+    MeleeWebMenuHost* host,char* error,std::size_t error_size,
+    const StartMeleeRules* expected_cache=nullptr)
 {
     float pcm[1068];unsigned audio_phase=0;
+    auto check_cache=[&](int expected_scene){
+        if(!expected_cache)return;
+        StartMeleeData observed{};uint8_t header[6]{};
+        check(melee_web_menu_host_selection_state(host,&observed,header)==expected_scene&&
+              std::memcmp(&observed.rules,expected_cache,sizeof(observed.rules))==0,
+              "Returned menu cache differs from the checked prior post-VS rules");
+        emit_native_bytes(expected_scene==1?"ordinary_returned_css_rules":"ordinary_returned_sss_rules",
+                          &observed.rules,sizeof(observed.rules));
+        CSSData copy{};copy.match_type=VS_MELEE;copy.vs.start=observed;
+        auto wrong=*expected_cache;wrong.timer_enabled=!wrong.timer_enabled;
+        check(melee_web_menu_css_cache_selection_valid(&copy,expected_cache)&&
+              !melee_web_menu_css_cache_selection_valid(&copy,&wrong)&&
+              !melee_web_menu_css_selection_valid(&copy),
+              "Retained cache mismatch or foreign-copy guard failed");
+    };
     auto css=std::make_unique<melee_web::GameplayMenuWorld>(files);
     try {
         check(melee_web_menu_host_enter(host,css->audio(),error,error_size),error);
@@ -551,6 +567,7 @@ void run_returned_menu_selection(const melee_web::RuntimeFiles& files,
         for(unsigned tick=0;tick<120;++tick)
             check(menu_tick(0)==1,"Unexpected returned CSS transition");
         check(melee_web_menu_host_phase(host)==1,"Results did not return to original CSS");
+        check_cache(1);
         int transition=1;
         for(unsigned tick=0;tick<600&&transition==1;++tick)
             transition=menu_tick(tick%90==0?PAD_BUTTON_START:0);
@@ -571,6 +588,7 @@ void run_returned_menu_selection(const melee_web::RuntimeFiles& files,
         check(melee_web_menu_host_enter(host,css->audio(),error,error_size),error);
         for(unsigned tick=0;tick<120;++tick)
             check(menu_tick(0)==1,"Unexpected returned SSS transition");
+        check_cache(2);
         PADStatus stage_pads[4]{};stage_pads[2].err=stage_pads[3].err=-1;
         bool at_target=false;
         for(unsigned tick=0;tick<120;++tick){
@@ -644,6 +662,105 @@ void emit_sd_resolution_fixture_manifest(bool include_match=true)
     std::cout<<"{\"record\":\"sd_resolution_fixture_manifest\",\"required\":[";
     for(unsigned i=0;i<names.size();++i){if(i)std::cout<<',';std::cout<<'"'<<names[i]<<'"';}
     std::cout<<"]}\n";
+}
+void run_ordinary_nontied_timeout(const melee_web::RuntimeFiles& files,
+    MeleeWebMenuHost* host,const MeleeWebMenuMatchSelection& selection,
+    char* error,std::size_t error_size)
+{
+    check(selection.player_count==2&&selection.start.rules.stkind==St_Kind_Last&&
+          selection.start.rules.timer_enabled&&selection.start.rules.time_limit==60&&
+          selection.start.rules.is_stock&&selection.start.rules.is_vs&&
+          selection.start.players[0].stocks==4&&selection.start.players[1].stocks==4&&
+          selection.start.players[0].ckind==CKIND_MARIO&&selection.start.players[1].ckind==CKIND_MARIO&&
+          selection.start.players[0].slot_type==Gm_PKind_Human&&selection.start.players[1].slot_type==Gm_PKind_Human&&
+          selection.players[0].controller==0&&selection.players[1].controller==1,
+          "Ordinary timeout requires the committed one-minute two-Human Mario/FD selection");
+    const auto* prepared=melee_web_menu_host_post_vs_mode(host);
+    const auto* input=melee_web_menu_host_input(host);
+    check(prepared&&input,"Ordinary timeout lost its closed menu state/input owner");
+    const VsModeData post_mode=*prepared;
+    const GameRules rules_before=*gmMainLib_GetGameRules();
+    const auto preferences_before=*gmMainLib_8015CC58();
+    const auto* host_rng=seed_ptr;const auto host_seed=*seed_ptr;
+    uint32_t final_seed=0;uint8_t final_pad[MELEE_WEB_PAD_STATE_BYTES]{};
+    MatchExitInfo terminal{};
+    {
+        melee_web::GameplayMatchSession match(files,selection,*input);
+        float pcm[1068];unsigned audio_phase=0,ticks=0,move_ticks=0,ending_ticks=0;
+        bool lost=false;int outward_stick=0;MeleeWebMatchStats frozen[2]{};
+        for(;ticks<4800&&!match.complete();++ticks){
+            PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
+            if(match.ready()&&!lost){
+                if(!outward_stick){
+                    const auto p1=match.player_stats(0),p2=match.player_stats(1);
+                    check(std::isfinite(p1.position[0])&&std::isfinite(p2.position[0])&&
+                          p1.position[0]!=0&&p1.position[0]*p2.position[0]<0,
+                          "Ordinary first-loss input requires actual opposite-side FD spawns");
+                    outward_stick=p1.position[0]<0?-80:80;
+                    std::cout<<"Ordinary actual ready spawn x: "<<p1.position[0]<<','<<p2.position[0]
+                             <<", outward stick "<<outward_stick<<'\n';
+                }
+                pads[0].stickX=outward_stick;++move_ticks;
+            }
+            check(move_ticks<=600,"First ordinary stock loss exceeded its source-input cap");
+            match.tick(pads);
+            audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
+            check(melee_web_audio_render(match.audio(),pcm,count,error,error_size),error);
+            const auto p1=match.player_stats(0),p2=match.player_stats(1);
+            check(p2.stocks==4&&p2.damage_percent==0.0f&&p1.damage_percent==0.0f&&
+                  (p1.stocks==4||p1.stocks==3),"Ordinary timeout lost declared stock/damage state");
+            if(p1.stocks==3)lost=true; // Release immediately on first source loss.
+            if(lost)check(p1.stocks==3,"Neutral post-loss ordinary player lost another stock");
+            if(match.ending()){
+                int winner=-1;check(lost&&match.outcome(winner)==OUTCOME_TIMEOUT,
+                                   "Ordinary ending was not the natural non-tied timeout");
+                for(unsigned slot=0;slot<2;++slot){
+                    const auto current=match.player_stats(slot);
+                    if(ending_ticks)check(current.motion_id==frozen[slot].motion_id&&
+                        current.animation_frame==frozen[slot].animation_frame&&
+                        current.position[0]==frozen[slot].position[0]&&current.position[1]==frozen[slot].position[1]&&
+                        current.stocks==frozen[slot].stocks,"Ordinary fighter advanced during GAME freeze");
+                    else frozen[slot]=current;
+                }
+                ++ending_ticks;
+            }
+        }
+        int winner=-1;const auto cursor=match.source_frames();
+        check(ticks<4800&&lost&&ending_ticks&&match.complete()&&cursor==3600&&
+              match.outcome(winner)==OUTCOME_TIMEOUT,"Ordinary non-tied timeout did not complete naturally");
+        // Canonical public finish publishes before capturing live RNG/PAD and
+        // closes/restores the world owner. Never capture before publication.
+        match.finish_vs(final_seed,final_pad);
+        check(seed_ptr==host_rng&&*host_rng==host_seed,"Ordinary finish did not restore host RNG owner/value");
+        check(melee_web_match_rules_terminal_data(&terminal)&&terminal.match_end.outcome==OUTCOME_TIMEOUT&&
+              terminal.match_end.match_kind==selection.start.rules.match_kind&&
+              terminal.match_end.n_winners==1&&terminal.match_end.winners[0]==1,
+              "Original ordinary terminal did not publish unique P2 timeout winner");
+        for(unsigned slot=0;slot<2;++slot){
+            const auto& p=terminal.match_end.player_standings[slot];const auto& start=selection.start.players[slot];
+            check(p.slot_type==start.slot_type&&p.ckind==start.ckind&&p.x3==start.color&&
+                  p.stocks==(slot==0?3:4),"Ordinary terminal lost original player identity/stocks");
+        }
+        MatchExitInfo repeated{};check(melee_web_match_rules_publish_result()&&
+            melee_web_match_rules_terminal_data(&repeated)&&std::memcmp(&terminal,&repeated,sizeof(terminal))==0,
+            "Closed ordinary terminal publication was not idempotent");
+        emit_native_bytes("ordinary_timeout_terminal",&terminal,sizeof(terminal));
+        emit_native_bytes("ordinary_timeout_final_pad",final_pad,sizeof(final_pad));
+        std::cout<<"Natural non-tied ordinary timeout: input ticks "<<ticks<<", source cursor "<<cursor
+                 <<", movement ticks "<<move_ticks<<", final seed "<<final_seed<<'\n';
+    }
+    MeleeWebMenuMatchContinuation continuation{};
+    check(melee_web_menu_host_match_continuation_begin(host,&terminal,final_seed,&continuation,error,error_size),error);
+    check(continuation.kind==MELEE_WEB_MENU_MATCH_CONTINUATION_RESULTS&&
+          std::memcmp(&continuation.payload.results.match_end,&terminal.match_end,sizeof(terminal.match_end))==0&&
+          std::memcmp(&gmVsMelee_GetVsData()->start.rules,&post_mode.start.rules,sizeof(post_mode.start.rules))==0,
+          "Ordinary typed Results lost its terminal or checked post-VS rules");
+    final_seed=*seed_ptr; // Observable host-owned Results-entry seed after original callbacks.
+    run_typed_results_source_smoke(files,host,continuation.payload.results,final_seed,final_pad,nullptr,true);
+    check(std::memcmp(gmMainLib_GetGameRules(),&rules_before,sizeof(rules_before))==0&&
+          std::memcmp(gmMainLib_8015CC58(),&preferences_before,sizeof(preferences_before))==0,
+          "Ordinary Results changed current GameRules or Items/preferences");
+    run_returned_menu_selection(files,host,error,error_size,&post_mode.start.rules);
 }
 void run_sudden_death_host_control(
     MeleeWebMenuHost* host, const MeleeWebMenuMatchSelection& selection,
@@ -4341,6 +4458,8 @@ int main(int argc,char** argv){try{
  const bool sound_settings_recipe=input_recipe&&std::string(input_recipe)=="main-settings-sound-v1";
  const bool sd_menu_setup_recipe=input_recipe&&
      std::string(input_recipe)=="sudden-death-menu-setup-control-v1";
+ const bool ordinary_timeout_recipe=input_recipe&&
+     std::string(input_recipe)=="ordinary-nontied-timeout-control-v1";
  const bool two_human_results_recipe=input_recipe&&
      std::string(input_recipe)=="returned-menu-two-human-results-input-control-v1";
  const bool returned_menu_recipe=two_human_results_recipe||(input_recipe&&
@@ -4375,7 +4494,7 @@ int main(int argc,char** argv){try{
  const bool stadium_e8_request_recipe=false;
  const bool stadium_ground_map1_owner_recipe=false;
 #endif
- if(input_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
+ if(input_recipe&&!ordinary_timeout_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
     !sound_settings_recipe&&!sudden_death_host_recipe&&!sudden_death_world_recipe&&
     !sd_menu_setup_recipe&&!returned_menu_recipe&&
@@ -4390,7 +4509,7 @@ int main(int argc,char** argv){try{
    throw std::runtime_error("MWRC v10 CSS replay-start reducer requires trace, source revision and exact recipe path");
  if(!v10_css_replay_start_recipe&&argc==8)
    throw std::runtime_error("Only the MWRC v10 CSS replay-start reducer accepts an exact recipe path");
- if((retail_fd_recipe||results_mario_recipe||sudden_death_host_recipe||
+ if((ordinary_timeout_recipe||retail_fd_recipe||results_mario_recipe||sudden_death_host_recipe||
      sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe||
      v10_css_replay_start_recipe)&&
     stage_kind!=St_Kind_Last)
@@ -4403,7 +4522,7 @@ int main(int argc,char** argv){try{
  TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
  std::vector<std::string> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"};
- if(sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe||stadium_c1a_recipe||
+ if(ordinary_timeout_recipe||sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe||stadium_c1a_recipe||
     stadium_c1_context_preflight_recipe||
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
@@ -4474,20 +4593,20 @@ int main(int argc,char** argv){try{
   std::cout<<"Native Main Settings Sound source route passed; no browser or retail-route claim\n";
   return 0;
  }
- const unsigned cycle_count=(results_mario_recipe||sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe)?1:2;
+ const unsigned cycle_count=(ordinary_timeout_recipe||results_mario_recipe||sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe)?1:2;
  for(unsigned cycle=0;cycle<cycle_count;cycle++){
   trace.begin_run(cycle);
   if((retail_fd_recipe||results_mario_recipe)&&cycle==0)*seed_ptr=1840631306u;
   const GameRules pre_native_rules=*gmMainLib_GetGameRules();
   char error[256]{};auto* host=melee_web_menu_host_create(error,sizeof(error));check(host!=nullptr,error);
-  if(natural_sd_recipe||returned_menu_recipe){
+  if(ordinary_timeout_recipe||natural_sd_recipe||returned_menu_recipe){
    GameRules rules=gmMainLib_803D4A48;rules.mode=1;rules.stock_count=4;rules.stock_time_limit=1;
    emit_native_bytes("stock_timer_fixture_initial_GameRules",&rules,sizeof(rules));
    check(melee_web_menu_host_apply_initial_native_rules(host,&rules,error,sizeof(error)),error);
   }
   auto world=std::make_unique<melee_web::GameplayMenuWorld>(files);
   check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
-  if(natural_sd_recipe||returned_menu_recipe){
+  if(ordinary_timeout_recipe||natural_sd_recipe||returned_menu_recipe){
    check(gmMainLib_GetGameRules()->stock_time_limit==1,
          "Initial CSS lost authored persistent one-minute fixture");
    GameRules invalid=*gmMainLib_GetGameRules();
@@ -4639,6 +4758,30 @@ int main(int argc,char** argv){try{
   raw_selection.random_seed=selection_rng;
   trace.event("sss_exit_complete",world->audio(),"match",&raw_selection,&selection_rng);
   world->close();world.reset();audio_phase=0;
+  if(ordinary_timeout_recipe){
+   const auto* prepared=melee_web_menu_host_post_vs_mode(host);
+   check(prepared!=nullptr,"Ordinary timeout has no retained post-VS mode");
+   melee_web_pad_state_apply(melee_web_menu_host_input(host));
+   uint8_t pad[MELEE_WEB_PAD_STATE_BYTES];melee_web_pad_state_capture(pad);
+   trace.menu_selection(raw_start,selection,*prepared,pad);
+   for(const auto& name:sd_resolution_asset_names(selection)){
+    if(files.contains(name))continue;
+    auto path=std::filesystem::path(argv[1])/name;
+    if(!std::filesystem::is_regular_file(path))path=std::filesystem::path(argv[2])/name;
+    std::ifstream input(path,std::ios::binary);
+    if(!input)throw std::runtime_error("Missing ordinary timeout fixture: "+name);
+    files[name]={(std::istreambuf_iterator<char>(input)),{}};
+   }
+   try{run_ordinary_nontied_timeout(files,host,selection,error,sizeof(error));}
+   catch(...){const auto primary=std::current_exception();
+    if(!melee_web_menu_host_destroy(host,error,sizeof(error)))std::cerr<<"Secondary ordinary host destroy: "<<error<<'\n';
+    std::rethrow_exception(primary);}
+   check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);host=nullptr;
+   check(melee_web_vs_mode_begin()&&melee_web_vs_mode_end(),"Ordinary timeout leaked VS mode lease");
+   check(!melee_web_gameplay_world_exists()&&std::memcmp(gmMainLib_GetGameRules(),&pre_native_rules,sizeof(pre_native_rules))==0,
+         "Ordinary timeout cleanup lost world or persistent rules restoration");
+   continue;
+  }
   if(returned_menu_recipe){
    check(selection.player_count==2&&selection.start.rules.time_limit==60,
          "Reduced returned menu control lost fixture-controlled stock timer");
@@ -5089,6 +5232,10 @@ int main(int argc,char** argv){try{
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
   trace.event("menu_setup_application_cleanup_complete",nullptr);
   std::cout<<"Native closed CSS/SSS raw and normalized selection diagnostic with host/VS/application cleanup passed; no tie or SD world\n";
+ }else if(ordinary_timeout_recipe){
+  check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
+  check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
+  std::cout<<"Native natural non-tied ordinary timeout/typed Results/cache/cleanup passed; no browser or original comparison\n";
  }else if(sudden_death_world_recipe){
   check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
