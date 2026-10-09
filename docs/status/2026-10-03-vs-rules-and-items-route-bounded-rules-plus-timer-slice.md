@@ -1,15 +1,31 @@
 # VS Rules and Items route — bounded Rules Plus timer slice
 
-The original competitive profile and initialized VS setup now pass the full
-predeclared comparison with browser V9. The
-[original profile receipt](../evidence/original-competitive-profile-entry-comparison-v1.json)
-binds the actual original entry/setup records and the independently replayed
-comparison. This covers GameRules, every selectable item switch, saved and
-normalized item masks, player/source-port identities, teams, stocks, damage and
-colors at their declared boundaries. It does not compare RNG, PAD schedules,
-positions, pixels, PCM or the natural terminal. The original eight-minute
-terminal experiment remains pending; its separate capture must supply its own
-starting-state and terminal observations.
+**Compiled / Source identified / Native traced / Retail compared / Browser exercised**,
+limited to the declared configuration, initialized state and terminal fields below.
+
+The complete declared original/browser competitive profile, initialized VS setup
+and natural non-tied timeout comparisons now pass. The
+[competitive route receipt](../evidence/competitive-rules-profile-preflight-v1.json)
+binds browser V9's full Rules → CSS → SSS → match → Results → CSS route to
+separate original-game observations. The original capture at `a8416142` used
+Null rendering, reached source frame 28,800 with timeout winner `[1]`, initial
+stocks `[4,4]`, live stocks `[3,4]` and zero damage, then stopped at strict VS
+retirement. Its own configuration/setup and terminal projections both match V9
+and were independently replayed from raw bytes. The 121,860-event input stream
+is complete; the 60,229-record primary observer intentionally ends as an
+interrupted prefix. Exact owned processes retired and original profile/GCI bytes
+remained unchanged. The fresh capture took 509.452 seconds. A pre-run offline
+comparator filename error was corrected in a separate retained script; it changed
+no capture, expected fields or comparison scope.
+
+This compares GameRules, every selectable item switch, saved and normalized item
+masks, source-port/player identities, teams, stocks, damage, colors and the declared
+terminal outcome/frame. The earlier
+[profile-only receipt](../evidence/original-competitive-profile-entry-comparison-v1.json)
+keeps its original producer. Original Results/CSS, RNG, PAD-schedule equality,
+positions, pixels, PCM, physical input, live timing and whole-session acceptance
+remain unobserved by these comparisons. Complete current-head CI remains required
+before integration.
 
 The integrated original diagnostic and test-only observer assertion correction
 passed 2,240 tests with 159 skips in 501.325 seconds at `d19fd07d`. The first
@@ -30,8 +46,9 @@ A receiver-only correction accepts that first final increment and freezes the
 actually observed retirement cursor thereafter; active gaps, later drift, changed
 input, stage and ownership remain failures. Eleven focused controls pass, and the
 retained buffered prefix replays without admitting its interrupted ending as
-completion. Native overlay bytes are unchanged. The original natural terminal
-comparison remains pending; the failed trace and incomplete MWRI are retained.
+completion. Native overlay bytes are unchanged. At that checkpoint the original
+natural terminal comparison was pending;
+the failed trace and incomplete MWRI remain retained.
 
 The second original attempt passed setup, readiness and one input-driven P1
 stock loss, then Dolphin's Metal backend aborted with an IOGPUDeviceShmem
@@ -69,11 +86,15 @@ guard/serializer controls; a separate unchanged original ranking routine also
 passes three synthetic score cases. Rejected terminal publications now retain
 typed slices as Error records before invalidation, without admitting successful
 exit or input completion. The existing workload and resource caps are unchanged.
-A fresh native build and original capture remain required. The next integrated
+The fresh canonical native build at `a8416142` passed; the original capture
+passed in the later attempt described above. The next integrated
 suite at `b140a721` ran 2,248 tests with 159 skips and one failure in the existing
 native API-stub fixture: its synthetic Event enum omitted the newly used Error
 value. The fixture-only correction passes all 22 tests in that module; the full
-suite retry remains pending. No production source changed for that repair.
+suite retry at `ab2f707b` passed 2,248 tests with 159 skips in 493.169
+seconds. Exact wrapper, supervisor and suite processes are absent, with clean
+and unchanged source. No production source changed for that repair. The
+receipt preserves both the failed suite and successful retry identities.
 
 The combined Rules/SD runtime passed the eight-minute functional route in V9.
 The [same scoped receipt](../evidence/competitive-rules-profile-preflight-v1.json)
@@ -94,9 +115,10 @@ the V9 build/capture producer. The clean `9fcf7771` combined source passed 2,202
 skips in 486.092 seconds. Exact suite/supervisor processes retired, and all
 46 served hashes stayed unchanged. Skips include native-host trace controls
 whose target is not built in this checkout; separate SD native evidence keeps
-its own producer. Exact-head CI and final integration review remain open. Original natural-terminal
-comparison, physical input, foreground timing, pixels/PCM, uninterrupted audio
-and competitive-set acceptance remain separate gates.
+its own producer. Complete current-head CI remains required before integration.
+Physical input, foreground timing, pixels/PCM, uninterrupted audio and
+competitive-set acceptance remain separate gates. The later original terminal
+comparison is scoped above.
 
 The 2026-10-08 [competitive-profile preflight receipt](../evidence/competitive-rules-profile-preflight-v1.json)
 adds **Compiled / Source identified / Browser exercised** evidence for setting
