@@ -2278,10 +2278,12 @@ int main(void)
 
         retained = records("C1_PAD_LEAVE_RETAINED")
         self.assertEqual(len(retained), 1)
+        # Leaving SSS closes the source scene, but the owning GameplayMenuWorld
+        # and its SDK world stay live until the explicit world->close() below.
         self.assertEqual({key: int(retained[0][key]) for key in
                           ("host_input", "host_phase", "source_scene", "source_world_exists")},
                          {"host_input": 1, "host_phase": 5, "source_scene": 0,
-                          "source_world_exists": 0})
+                          "source_world_exists": 1})
         close = records("C1_PAD_CLOSE")
         self.assertEqual(len(close), 1)
         self.assertEqual({key: int(close[0][key]) for key in
