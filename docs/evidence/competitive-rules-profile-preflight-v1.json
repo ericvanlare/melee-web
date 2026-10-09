@@ -1,6 +1,6 @@
 {
   "schema": "melee-web-competitive-rules-profile-preflight-v1",
-  "status": "passed_combined_browser_route_original_profile_comparison_and_integrated_regression_natural_original_terminal_pending",
+  "status": "competitive-profile-and-natural-timeout-browser-route-with-scoped-original-comparison",
   "issue": 292,
   "date": "2026-10-08",
   "labels": [
@@ -440,9 +440,8 @@
     }
   ],
   "open_gates": [
-    "Actual original natural eight-minute terminal comparison; current-capture profile/setup must also match predeclared fields. Earlier profile comparison is scoped independent evidence.",
-    "Final integration review and complete current-head CI; integrated suite passed d19fd07d.",
-    "Physical input, foreground timing, audible output, pixel/PCM equivalence and competitive-set acceptance."
+    "Complete current-head CI before integration.",
+    "Original Results/CSS, whole-session RNG/PAD-schedule equality, pixels/PCM, physical input, foreground timing, audible output and competitive-set acceptance."
   ],
   "natural_timeout_browser_route": {
     "status": "passed_first_natural_eight_minute_browser_route",
@@ -864,5 +863,187 @@
     ],
     "cleanup": "All four exact owned PIDs absent; source profile/GCI unchanged; owned Config modes0400 before launch and0644 after native shutdown.",
     "private_locator": "sd-reference-source-tests / competitive-original-null-entry-launch-v1"
+  },
+  "original_null_natural_attempt_v1": {
+    "result": "FAIL native terminal participant guard; no comparator ran",
+    "receiver": "6e3ad12f7de3b876c9f0342485163957ce01dd2c",
+    "native_producer": "00ef116f341f7961bd832b436e1760efc7328ddf",
+    "renderer": "Null",
+    "seconds": 509.3381921250839,
+    "error": "Ordinary MatchEnd participant/stock/damage differs",
+    "last_raw_tick": 29037,
+    "last_match_frame": 28800,
+    "clock_seconds": 0,
+    "clock_subframe": 59,
+    "last_live_stocks": [
+      3,
+      4
+    ],
+    "last_live_damage_bits": [
+      "00000000",
+      "00000000"
+    ],
+    "last_progress_seq": 60243,
+    "error_seq": 60244,
+    "interrupted_end_seq": 60245,
+    "rejected_terminal_bytes_observed": false,
+    "raw_sha256": "0de18f3d5d7e5f12dc5eac6a91bf2de8be8b31a225abd72eec5b615618f0462b",
+    "native_input_sha256": "cdd31667b2263db857ab7fb234d09e15db1263ccfccc6396fd05e65752b02a4a",
+    "native_input_events": 121904,
+    "native_input_complete": false,
+    "supervisor_sha256": "dad66da48f90100b176227989776a51dec0a631367ebd77074df1ffc8e6e3c4b",
+    "root_review_sha256": "eecae4c90f82c63bbaa8d01c6330de039b8b1cf52b92447105ec12b8fa42235c",
+    "cleanup": "Exact four owned PIDs absent; native terminate/wait exit0, no kill/error; owned log drain joined. Original profile/GCI unchanged.",
+    "open": "Terminal field/source reduction before any repeat. No successful terminal/MWRI or whole-session admission.",
+    "private_locator": "sd-reference-source-tests / competitive-original-null-natural-launch-v1"
+  },
+  "original_terminal_rank_correction": {
+    "source": "a84161429c018575a00e4f516be42a2123e35d2e",
+    "integrated_source": "5fd9a87f",
+    "scope": "Original fn_80165AC0 requires is_big_loser1/0 for3:4; strict native/Python correction and failure-only typed Error snapshot. Actual prior rejected MatchEnd bytes unobserved. No successful exit or completion on rejected snapshot.",
+    "focused_tests": 14,
+    "focused_log_sha256": "d6ff1b88b095d657811a3a3ba5d289f02729b704e05fce36eb7744df7fed2c45",
+    "extracted_original_ranking_sha256": "5279c324bce7907714ae2f811e7ac3bfc7adb1e01a839f8e9244984fa1ee420d",
+    "retained_host_compile_failure_sha256": "32a8e1cbf02cad364e7345d7fb33cf79e3b7ce0b0d4439049d02ed402f3c694c",
+    "source_review_sha256": "8acca87c20740fec4f4f2104e754a9b5fbbc31ec534c0f815a5cd71257a6e025",
+    "workload_policy_sha256": "c58eb6635d8f7115db86bc3601372fcf685ccecbd6c15d59d570a207e6d4d91d",
+    "open": "Fresh canonical build and original natural-timeout comparison subsequently passed; see original_null_natural_attempt_v2.",
+    "private_locator": "sd-reference-source-tests / terminal-rank-correction-v1",
+    "fresh_native_build": {
+      "result": "passed",
+      "producer": "a84161429c018575a00e4f516be42a2123e35d2e",
+      "tree": "e0e3a7f2241c88876237a8f17287e331d459daa7",
+      "seconds": 777.086,
+      "binary_sha256": "eb15cbb942a411ffa940caa3e74ba4cbc2226a2dcc04ae4dbfde8c56abd526ff",
+      "manifest_sha256": "67959541a29a932de816df3812ae33b78e4b439c04d38f9d286314dafd56a974",
+      "log_sha256": "f3f248530a32b578a615eb861143850f925dfed01b073bb9788f77494b1c1224",
+      "process_receipt_sha256": "90b570a15ea8b0d6158b7cc2d9a582423a3e2499a3a1ddf1ee4fc93c9ece6c98",
+      "root_review_sha256": "8b9e635567d44bbb5276a74998230727352d1fa319eb5f3adc98204b5e5ee914",
+      "cleanup": "Exact owned supervisor and builder absent; old binary retained unchanged.",
+      "scope": "Canonical pinned original observer build; no capture or comparison implied."
+    }
+  },
+  "final_integrated_suite_attempt_v3": {
+    "source": "b140a7212f154964d72cdd42207f5dc620d74774",
+    "tree": "18363df85ed3843185f09dbc9e6ab0fb68eefc8b",
+    "tests": 2248,
+    "skipped": 159,
+    "failures": 1,
+    "seconds": 520.309,
+    "failure": "Existing extracted native API-stub Event enum omitted Error; actual terminal diagnostic now references Error. Production source unchanged by fixture repair.",
+    "log_sha256": "3f2373944a3b6c4dbf259afaee9e9dfe988f7e43602c4df6160301150e14f760",
+    "process_receipt_sha256": "b67139c38fc3b19239e66391efd84e744e176961eb1baf81e3cb6c45d1a2c865",
+    "focused_repair_tests": 22,
+    "focused_repair_log_sha256": "e2a8578d5734b022cf79952f877875a6cb22ac400c146c2ce369475113b464d1",
+    "cleanup": "All exact wrapper88012/supervisor88061/suite88068 absent independently; test retained original failed compiler diagnostic in full log.",
+    "open": "Fixture-only repair and final fullsuite subsequently passed at ab2f707b; prior failure retained."
+  },
+  "final_integrated_validation_v4": {
+    "tested_head": "ab2f707b76105baa2d864cc1588a3ca5e0653695",
+    "tested_tree": "a8012b65c7da49f4d61109a35469920cfec05e5a",
+    "full_suite": {
+      "tests": 2248,
+      "skipped": 159,
+      "failures": 0,
+      "errors": 0,
+      "seconds": 493.169,
+      "log_sha256": "792d94d431afaca15acab0e99e539e47a02ce58400c9a1839f1e8e461e6d3914",
+      "process_receipt_sha256": "debfe9a697a7ac0d30bb9409743d85ad364edcd9ec92b4514b3f6765a7f5ab23",
+      "exit_code": 0
+    },
+    "cleanup": "Exact wrapper, supervisor and suite processes absent; source clean and unchanged.",
+    "source_review_sha256": "077426289967886e9421a83b77eb643f991e54d264f64392862ca66a101b3702",
+    "fixture_review_sha256": "3f064d70b0ae1a0fd9447a6900536a6bb618051bdd113cbf780e056dc8026908",
+    "skip_scope": "159 explicit skips retain the earlier native-target and optional asset limitations; no skipped gate is promoted.",
+    "remaining": "Complete current-head CI before integration."
+  },
+  "original_null_natural_attempt_v2": {
+    "result": "PASS for declared profile/setup and natural-terminal fields",
+    "producer": "a84161429c018575a00e4f516be42a2123e35d2e",
+    "browser_producer": "87d89c2759e2fac9441e87a45024ca4573ea8822",
+    "renderer": "Null; observed owned config and native banner",
+    "seconds": 509.452,
+    "capture_result_sha256": "e109c9b78b452f99034e832ad0222a5d45b110f90057b132ada984aeb5e74166",
+    "raw_sha256": "afcff2ad19190f755ca151847f804a7a2e9549a0d2d9364dca544f5bf9ac6a9b",
+    "mwri_sha256": "8e01aa1740b1e96e9ae436605ebaaedf9dafa0ea490863c9f399fc14bd20ee14",
+    "observer": {
+      "events": 60229,
+      "end": "intentional interrupted prefix after strict VS retirement",
+      "invalid": false,
+      "error": null
+    },
+    "native_input": {
+      "events": 121860,
+      "complete": true,
+      "invalid": false,
+      "error": null
+    },
+    "source_samples": 29038,
+    "menu_source_samples": 742,
+    "first_stock_loss": {
+      "frame": 291,
+      "counter": 414,
+      "directional_samples_at_loss": 111,
+      "total_directional_samples": 114
+    },
+    "terminal": {
+      "is_teams": 0,
+      "match_kind": 1,
+      "outcome": 1,
+      "players": [
+        {
+          "character_kind": 8,
+          "color": 1,
+          "damage_percent": 0,
+          "fighter_kind": 0,
+          "initial_stocks": 4,
+          "live_stocks": 3,
+          "slot_type": 0,
+          "source_player_index": 0
+        },
+        {
+          "character_kind": 8,
+          "color": 0,
+          "damage_percent": 0,
+          "fighter_kind": 0,
+          "initial_stocks": 4,
+          "live_stocks": 4,
+          "slot_type": 0,
+          "source_player_index": 1
+        }
+      ],
+      "source_frame": 28800,
+      "winners": [
+        1
+      ]
+    },
+    "comparisons": {
+      "profile": {
+        "sha256": "e932b63e3ed36307af17dc908780c2ae0dfce4a62dffe0c530ee3e37ffed5a4e",
+        "root_replay_sha256": "bdca719579f6abbd2fd9216b87b05bfaa51f7f0dac90f0e4d812ffcd27731789"
+      },
+      "terminal": {
+        "sha256": "15c164fdec0deff12522f02693f9b65570584e73a274a227f58edd069aed0e90",
+        "root_replay_sha256": "2aa9af4d6542971aa2fa1a3b26500cb6743e92b7d020a2057a3389eb300e06d1"
+      }
+    },
+    "root_review_sha256": "905f1262ef104b5cfa69849247635167e294b0568c901ad8b467d84dbb5c5aea",
+    "cleanup": "Exact4owned PIDs absent; direct native Popen terminated and waited exit0 without kill/error; originalprofile/GCI unchanged",
+    "offline_path_correction": {
+      "original_script_sha256": "efbcf8be22a20936060fb8d242c44834e858f6eb2184eb50475d79fe8dd6ce37",
+      "used_script_sha256": "c4d64f910ce731ae11c701de9b4c712d9b8048d181d8c610e11e2481bbd46b66",
+      "scope": "Reviewed comparator successor changes one missing packet filename v1\u2192v2 only; original frozen script retained/unrun. Root replay changes output names only."
+    },
+    "exclusions": [
+      "PAD schedule equality",
+      "RNG",
+      "terminal position/motion",
+      "Results confirmations/CSS return",
+      "pixels",
+      "PCM",
+      "live timing",
+      "physical input"
+    ],
+    "private_locator": "sd-reference-source-tests / competitive-original-null-natural-launch-v2 and original-competitive-null-natural-coldboot-v2"
   }
 }

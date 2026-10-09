@@ -42,12 +42,14 @@ def serialized_budget():
 
     Menu includes boot/Rules/Items/CSS/SSS. Rules-ready and VS entry carry
     full profile slices once each. No one-PAD-per-frame assumption is used.
-    The two writer-owned error/end records are included even on failure.
+    The failed-publication snapshot and writer-owned error/end records are
+    included even on failure; a rejected publication is never admitted.
     """
     inventory = {"menu":(7200,6144), "menu_input":(7200,512),
                  "input":(29523,512), "tick":(29523,2048),
                  "rules_ready":(1,65536), "vs_entry":(1,65536),
                  "vs_setup":(1,4096), "vs_exit":(1,8192), "vs_retired":(1,512),
+                 "terminal_rejected":(1,8192),
                  "handshake_start_error_end":(4,4096)}
     records=sum(count for count,_ in inventory.values())
     size=sum(count*(44+payload) for count,payload in inventory.values())
@@ -151,8 +153,10 @@ class TimeoutInventory:
                    int.from_bytes(result[8:12],"big")==28800 and result[13]==1 and
                    result[16]==1, "canonical timeout/winner")
         for slot, base in enumerate((0x58,0x100)):
+            # gm_80166378/fn_80165AC0 ranks stock scores3:4 as1:0.
+            # MatchPlayerData+5 is is_big_loser, not a setup/team field.
             self.check(result[base]==0 and result[base+1]==8 and
-                       result[base+3]>>2 == (1,0)[slot] and result[base+5]==0 and
+                       result[base+3]>>2 == (1,0)[slot] and result[base+5]==(1,0)[slot] and
                        result[base+8] == (3,4)[slot] and result[base+12:base+14]==b"\0\0",
                        "canonical participant/stock/damage")
         self.check(all(result[0x58+slot*0xa8]==3 for slot in range(2,6)),

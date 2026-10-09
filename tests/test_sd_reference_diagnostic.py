@@ -540,7 +540,7 @@ struct System { Memory m; Memory& GetMemory() { return m; } }; }
 namespace PowerPC { struct PowerPCState { std::array<u32,32> gpr{}; }; }
 constexpr u32 CSS_ENTER_RETURN=0x802669f0, PAD_READ_HSD_CALLER=0x80376a28;
 constexpr u32 PROFILE_SAVE_DATA_OFFSET=0x1868, PROFILE_SAVE_DATA_SIZE=0x55e8;
-enum class Event { Progress };
+enum class Event { Progress, Error };
 bool AppendHexBytes(std::string*, const u8*, size_t) { return true; }
 """ + enum + r"""
 struct Reader {
