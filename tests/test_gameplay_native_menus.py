@@ -163,6 +163,32 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
                 self.assertIn(expected, run.stderr)
                 self.assertNotIn("Unknown transition input recipe", run.stderr)
 
+    def test_sudden_death_returned_menu_reducer_dispatch_without_assets(self):
+        target = ROOT / "build/browser-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("The native menu host trace has not been built")
+        absent = self.scratch / "absent-returned-menu-fixtures"
+        self.assertFalse(absent.exists())
+        revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        for stage, expected in (
+                (32, "Missing owned menu host fixture: MnSlChr.usd"),
+                (31, "Explicit FD recipes require Final Destination")):
+            with self.subTest(stage=stage):
+                trace = self.scratch / f"returned-menu-dispatch-{stage}.jsonl"
+                command = [str(node_runtime()), str(target), str(absent),
+                           str(absent), str(stage), str(trace), revision,
+                           "returned-menu-results-control-v1"]
+                run = subprocess.run(command, cwd=ROOT, capture_output=True,
+                                     text=True, timeout=30)
+                (self.scratch / f"returned-menu-dispatch-{stage}.stdout").write_text(
+                    run.stdout, encoding="utf-8")
+                (self.scratch / f"returned-menu-dispatch-{stage}.stderr").write_text(
+                    run.stderr, encoding="utf-8")
+                self.assertNotEqual(run.returncode, 0)
+                self.assertIn(expected, run.stderr)
+                self.assertNotIn("Unknown transition input recipe", run.stderr)
+
     def test_sudden_death_resolution_manifest_without_assets(self):
         target = ROOT / "build/browser-release/native_menu_host_trace.js"
         if not target.is_file():
@@ -179,6 +205,23 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         self.assertTrue({"PlMrNr.dat", "PlMrYe.dat", "GrNLa.dat",
                          "GmRst.usd", "GmRstMMr.dat", "ff_mario.hps",
                          "IfPrize.usd", "SdPrize.usd", "s_info1.hps"}.issubset(names))
+    def test_sudden_death_returned_menu_manifest_without_assets(self):
+        target = ROOT / "build/browser-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("The native menu host trace has not been built")
+        run = subprocess.run([str(node_runtime()), str(target),
+                              "--returned-menu-fixture-manifest"], cwd=ROOT,
+                             capture_output=True, text=True, timeout=30)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        records = [json.loads(line) for line in run.stdout.splitlines()
+                   if line.startswith('{')]
+        self.assertEqual(len(records), 1)
+        names = records[0]["required"]
+        self.assertEqual(len(names), len(set(names)))
+        self.assertTrue({"PlMrNr.dat", "PlMrYe.dat",
+                         "GmRst.usd", "GmRstMMr.dat", "ff_mario.hps",
+                         "IfPrize.usd", "SdPrize.usd", "s_info1.hps"}.issubset(names))
+        self.assertNotIn("GrNLa.dat", names)
 
     def test_sudden_death_menu_setup_dispatch_without_assets(self):
         target = ROOT / "build/browser-release/native_menu_host_trace.js"

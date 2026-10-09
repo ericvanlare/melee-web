@@ -527,16 +527,99 @@ void run_vs_sudden_death_source_control()
 void run_typed_results_source_smoke(const melee_web::RuntimeFiles&,MeleeWebMenuHost*,
     const ResultsMatchInfo&,std::uint32_t&,std::uint8_t[MELEE_WEB_PAD_STATE_BYTES],
     const MeleeWebPadState* initial_input=nullptr);
-std::vector<std::string> sd_resolution_asset_names(const MeleeWebMenuMatchSelection& selection)
+void run_results_source_smoke(const melee_web::RuntimeFiles&,MeleeWebMenuHost*,
+    const MatchExitInfo&,std::uint32_t&,std::uint8_t[MELEE_WEB_PAD_STATE_BYTES]);
+void run_returned_menu_selection(const melee_web::RuntimeFiles& files,
+    MeleeWebMenuHost* host,char* error,std::size_t error_size)
+{
+    float pcm[1068];unsigned audio_phase=0;
+    auto css=std::make_unique<melee_web::GameplayMenuWorld>(files);
+    try {
+        check(melee_web_menu_host_enter(host,css->audio(),error,error_size),error);
+        auto menu_tick=[&](unsigned button){
+            PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
+            pads[0].button=pads[1].button=button;
+            const int result=melee_web_menu_host_tick(host,pads,error,error_size);
+            check(result>0,error);
+            audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
+            check(melee_web_audio_render(css->audio(),pcm,count,error,error_size),error);
+            return result;
+        };
+        for(unsigned tick=0;tick<120;++tick)
+            check(menu_tick(0)==1,"Unexpected returned CSS transition");
+        check(melee_web_menu_host_phase(host)==1,"Results did not return to original CSS");
+        int transition=1;
+        for(unsigned tick=0;tick<600&&transition==1;++tick)
+            transition=menu_tick(tick%90==0?PAD_BUTTON_START:0);
+        check(transition==3,"Returned CSS did not request its original SSS transition");
+        check(melee_web_menu_host_leave(host,0,error,error_size),error);
+        css->verify_immutable_archives();
+        auto* retained_audio=css->audio();
+        const auto retained_generation=melee_web_audio_generation(retained_audio);
+        uint32_t completed=0,revisited=0,after_completed=0,after_revisited=0;
+        check(retained_generation&&melee_web_audio_stream_progress(retained_audio,&completed,&revisited),
+              "Returned CSS audio owner/progress unavailable before SSS rebuild");
+        css->rebuild_scene(melee_web::GameplayMenuScene::Stages);
+        check(css->audio()==retained_audio&&melee_web_audio_generation(css->audio())==retained_generation&&
+              melee_web_audio_stream_progress(css->audio(),&after_completed,&after_revisited)&&
+              after_completed==completed&&after_revisited==revisited,
+              "Returned SSS rebuild changed original menu audio owner or stream progress");
+        std::cout<<"Returned CSS transition and explicit Stages hydration completed\n";
+        check(melee_web_menu_host_enter(host,css->audio(),error,error_size),error);
+        for(unsigned tick=0;tick<120;++tick)
+            check(menu_tick(0)==1,"Unexpected returned SSS transition");
+        PADStatus stage_pads[4]{};stage_pads[2].err=stage_pads[3].err=-1;
+        bool at_target=false;
+        for(unsigned tick=0;tick<120;++tick){
+            MeleeWebStageInputObservation observed{};
+            check(melee_web_stage_input_observe(MELEE_WEB_MENU_FD_ST_KIND,&observed),
+                  "Returned SSS cursor observation unavailable");
+            const int state=melee_web_stage_input_drive(stage_pads,&observed,MELEE_WEB_MENU_FD_ST_KIND);
+            check(state!=MELEE_WEB_STAGE_INPUT_INVALID,"Returned SSS FD target invalid");
+            if(state==MELEE_WEB_STAGE_INPUT_AT_TARGET){at_target=true;break;}
+            check(melee_web_menu_host_tick(host,stage_pads,error,error_size)==1,error);
+            audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
+            check(melee_web_audio_render(css->audio(),pcm,count,error,error_size),error);
+        }
+        check(at_target,"Returned SSS cursor did not reach original FD tile");
+        transition=1;
+        for(unsigned tick=0;tick<600&&transition==1;++tick)
+            transition=menu_tick(tick%90==0?PAD_BUTTON_START:0);
+        check(transition==3,"Returned SSS did not commit its source selection");
+        check(melee_web_menu_host_leave(host,0,error,error_size),error);
+        MeleeWebMenuMatchSelection next{};
+        check(melee_web_menu_host_selection(host,&next,error,error_size),error);
+        check(next.player_count==2&&next.start.rules.stkind==MELEE_WEB_MENU_FD_ST_KIND&&
+              next.start.rules.is_stock&&next.start.rules.is_vs&&
+              next.start.players[0].stocks==4&&next.start.players[1].stocks==4,
+              "Returned CSS/SSS lost its supported normalized rematch selection");
+        emit_native_bytes("returned_sss_normalized_start",&next.start,sizeof(next.start));
+        css->verify_immutable_archives();css->close();css.reset();
+    } catch (...) {
+        const auto primary=std::current_exception();
+        if(css){
+            if(!melee_web_menu_host_leave(host,1,error,error_size))
+                std::cerr<<"Secondary owned menu abort failure: "<<error<<'\n';
+            try{css->close();css.reset();}
+            catch(const std::exception& cleanup){
+                std::cerr<<"Secondary owned menu world retirement failure: "<<cleanup.what()<<'\n';
+            }
+        }
+        std::rethrow_exception(primary);
+    }
+    std::cout<<"Returned original CSS/SSS supported selection and owned menu close completed\n";
+}
+
+std::vector<std::string> sd_resolution_asset_names(const MeleeWebMenuMatchSelection& selection, bool include_match=true)
 {
     auto names=melee_web::menu_asset_names();
-    for(const auto& group:{melee_web::match_asset_names(selection),
+    for(const auto& group:{include_match?melee_web::match_asset_names(selection):std::vector<std::string>{},
                           melee_web::results_asset_names(selection),melee_web::prize_asset_names()})
         for(const auto& name:group)
             if(std::find(names.begin(),names.end(),name)==names.end())names.push_back(name);
     return names;
 }
-void emit_sd_resolution_fixture_manifest()
+void emit_sd_resolution_fixture_manifest(bool include_match=true)
 {
     // Descriptor only: observed two-Mario/FD identity, never a gameplay setup.
     MeleeWebMenuMatchSelection selection{};selection.player_count=2;
@@ -549,12 +632,12 @@ void emit_sd_resolution_fixture_manifest()
         selection.players[i].costume=p.color;
     }
     auto invalid=selection;invalid.players[1].controller=0;
-    bool rejected=false;try{sd_resolution_asset_names(invalid);}catch(const std::exception&){rejected=true;}
+    bool rejected=false;try{sd_resolution_asset_names(invalid,include_match);}catch(const std::exception&){rejected=true;}
     check(rejected,"SD resolution descriptor accepted a duplicate source controller");
     invalid=selection;invalid.start.players[1].color=255;
-    rejected=false;try{sd_resolution_asset_names(invalid);}catch(const std::exception&){rejected=true;}
+    rejected=false;try{sd_resolution_asset_names(invalid,include_match);}catch(const std::exception&){rejected=true;}
     check(rejected,"SD resolution descriptor accepted an unauthored costume");
-    const auto names=sd_resolution_asset_names(selection);
+    const auto names=sd_resolution_asset_names(selection,include_match);
     std::cout<<"{\"record\":\"sd_resolution_fixture_manifest\",\"required\":[";
     for(unsigned i=0;i<names.size();++i){if(i)std::cout<<',';std::cout<<'"'<<names[i]<<'"';}
     std::cout<<"]}\n";
@@ -876,56 +959,7 @@ void run_sudden_death_host_control(
                 check(results_input!=nullptr,"Typed Results did not retain the actual source handoff bank");
                 run_typed_results_source_smoke(*world_files,host,results.payload.results,
                                                result_seed,results_pad,results_input);
-                auto css=std::make_unique<melee_web::GameplayMenuWorld>(*world_files);
-                try {
-                    check(melee_web_menu_host_enter(host,css->audio(),error,error_size),error);
-                    auto menu_tick=[&](unsigned button){
-                        PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
-                        pads[0].button=pads[1].button=button;
-                        const int result=melee_web_menu_host_tick(host,pads,error,error_size);
-                        check(result>0,error);
-                        audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
-                        check(melee_web_audio_render(css->audio(),pcm,count,error,error_size),error);
-                        return result;
-                    };
-                    for(unsigned tick=0;tick<120;++tick)
-                        check(menu_tick(0)==1,"Unexpected returned CSS transition");
-                    check(melee_web_menu_host_phase(host)==1,"SD Results did not return to original CSS");
-                    int transition=1;
-                    for(unsigned tick=0;tick<600&&transition==1;++tick)
-                        transition=menu_tick(tick%90==0?PAD_BUTTON_START:0);
-                    check(transition==3,"Returned CSS did not request its original SSS transition");
-                    check(melee_web_menu_host_leave(host,0,error,error_size),error);
-                    css->verify_immutable_archives();css->close();css.reset();
-                    css=std::make_unique<melee_web::GameplayMenuWorld>(*world_files);
-                    check(melee_web_menu_host_enter(host,css->audio(),error,error_size),error);
-                    for(unsigned tick=0;tick<120;++tick)
-                        check(menu_tick(0)==1,"Unexpected returned SSS transition");
-                    transition=1;
-                    for(unsigned tick=0;tick<600&&transition==1;++tick)
-                        transition=menu_tick(tick%90==0?PAD_BUTTON_START:0);
-                    check(transition==3,"Returned SSS did not commit its source selection");
-                    check(melee_web_menu_host_leave(host,0,error,error_size),error);
-                    MeleeWebMenuMatchSelection next{};
-                    check(melee_web_menu_host_selection(host,&next,error,error_size),error);
-                    check(next.player_count==2&&next.start.rules.stkind==MELEE_WEB_MENU_FD_ST_KIND&&
-                          next.start.rules.is_stock&&next.start.rules.is_vs&&
-                          next.start.players[0].stocks==4&&next.start.players[1].stocks==4,
-                          "Returned CSS/SSS lost its supported normalized rematch selection");
-                    emit_native_bytes("returned_sss_normalized_start",&next.start,sizeof(next.start));
-                    css->verify_immutable_archives();css->close();css.reset();
-                } catch (...) {
-                    const auto primary=std::current_exception();
-                    if(css){
-                        if(!melee_web_menu_host_leave(host,1,error,error_size))
-                            std::cerr<<"Secondary owned menu abort failure: "<<error<<'\n';
-                        try{css->close();css.reset();}
-                        catch(const std::exception& cleanup){
-                            std::cerr<<"Secondary owned menu world retirement failure: "<<cleanup.what()<<'\n';
-                        }
-                    }
-                    std::rethrow_exception(primary);
-                }
+                run_returned_menu_selection(*world_files,host,error,error_size);
                 std::cout<<"Natural SD typed Results and original CSS return completed\n";
             }else{
             for(unsigned tick=0;tick<8;++tick){
@@ -4204,6 +4238,9 @@ void run_stadium_c1a_selection_smoke(
 #endif
 }
 int main(int argc,char** argv){try{
+ if(argc==2&&std::string_view(argv[1])=="--returned-menu-fixture-manifest"){
+  emit_sd_resolution_fixture_manifest(false);return 0;
+ }
  if(argc==2&&std::string_view(argv[1])=="--sd-resolution-fixture-manifest"){
   emit_sd_resolution_fixture_manifest();return 0;
  }
@@ -4230,6 +4267,8 @@ int main(int argc,char** argv){try{
  const bool sound_settings_recipe=input_recipe&&std::string(input_recipe)=="main-settings-sound-v1";
  const bool sd_menu_setup_recipe=input_recipe&&
      std::string(input_recipe)=="sudden-death-menu-setup-control-v1";
+ const bool returned_menu_recipe=input_recipe&&
+     std::string(input_recipe)=="returned-menu-results-control-v1";
  const bool resolve_sd_recipe=input_recipe&&
      std::string(input_recipe)=="sudden-death-natural-resolution-control-v1";
  const bool natural_sd_recipe=resolve_sd_recipe||(input_recipe&&
@@ -4263,7 +4302,7 @@ int main(int argc,char** argv){try{
  if(input_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
     !sound_settings_recipe&&!sudden_death_host_recipe&&!sudden_death_world_recipe&&
-    !sd_menu_setup_recipe&&
+    !sd_menu_setup_recipe&&!returned_menu_recipe&&
     !stadium_c1a_recipe&&
     !stadium_c1_context_preflight_recipe&&
     !stadium_c1_item_state_preflight_recipe&&!stadium_screen_roots_recipe&&
@@ -4276,7 +4315,7 @@ int main(int argc,char** argv){try{
  if(!v10_css_replay_start_recipe&&argc==8)
    throw std::runtime_error("Only the MWRC v10 CSS replay-start reducer accepts an exact recipe path");
  if((retail_fd_recipe||results_mario_recipe||sudden_death_host_recipe||
-     sudden_death_world_recipe||sd_menu_setup_recipe||
+     sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe||
      v10_css_replay_start_recipe)&&
     stage_kind!=St_Kind_Last)
    throw std::runtime_error("Explicit FD recipes require Final Destination");
@@ -4288,7 +4327,7 @@ int main(int argc,char** argv){try{
  TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
  std::vector<std::string> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"};
- if(sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe||stadium_c1a_recipe||
+ if(sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe||stadium_c1a_recipe||
     stadium_c1_context_preflight_recipe||
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
@@ -4359,20 +4398,20 @@ int main(int argc,char** argv){try{
   std::cout<<"Native Main Settings Sound source route passed; no browser or retail-route claim\n";
   return 0;
  }
- const unsigned cycle_count=(results_mario_recipe||sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe)?1:2;
+ const unsigned cycle_count=(results_mario_recipe||sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe)?1:2;
  for(unsigned cycle=0;cycle<cycle_count;cycle++){
   trace.begin_run(cycle);
   if((retail_fd_recipe||results_mario_recipe)&&cycle==0)*seed_ptr=1840631306u;
   const GameRules pre_native_rules=*gmMainLib_GetGameRules();
   char error[256]{};auto* host=melee_web_menu_host_create(error,sizeof(error));check(host!=nullptr,error);
-  if(natural_sd_recipe){
+  if(natural_sd_recipe||returned_menu_recipe){
    GameRules rules=gmMainLib_803D4A48;rules.mode=1;rules.stock_count=4;rules.stock_time_limit=1;
    emit_native_bytes("stock_timer_fixture_initial_GameRules",&rules,sizeof(rules));
    check(melee_web_menu_host_apply_initial_native_rules(host,&rules,error,sizeof(error)),error);
   }
   auto world=std::make_unique<melee_web::GameplayMenuWorld>(files);
   check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
-  if(natural_sd_recipe){
+  if(natural_sd_recipe||returned_menu_recipe){
    check(gmMainLib_GetGameRules()->stock_time_limit==1,
          "Initial CSS lost authored persistent one-minute fixture");
    GameRules invalid=*gmMainLib_GetGameRules();
@@ -4524,6 +4563,57 @@ int main(int argc,char** argv){try{
   raw_selection.random_seed=selection_rng;
   trace.event("sss_exit_complete",world->audio(),"match",&raw_selection,&selection_rng);
   world->close();world.reset();audio_phase=0;
+  if(returned_menu_recipe){
+   check(selection.player_count==2&&selection.start.rules.time_limit==60,
+         "Reduced returned menu control lost fixture-controlled stock timer");
+   const auto* prepared=melee_web_menu_host_post_vs_mode(host);
+   check(prepared!=nullptr,"Reduced control has no checked post-VS mode");
+   melee_web_pad_state_apply(melee_web_menu_host_input(host));
+   uint8_t pad[MELEE_WEB_PAD_STATE_BYTES];melee_web_pad_state_capture(pad);
+   trace.menu_selection(raw_start,selection,*prepared,pad);
+   for(const auto& name:sd_resolution_asset_names(selection,false)){
+    if(files.contains(name))continue;
+    auto path=std::filesystem::path(argv[1])/name;
+    if(!std::filesystem::is_regular_file(path))path=std::filesystem::path(argv[2])/name;
+    std::ifstream input(path,std::ios::binary);
+    if(!input)throw std::runtime_error("Missing constructed Results fixture: "+name);
+    files[name]={(std::istreambuf_iterator<char>(input)),{}};
+   }
+   MatchExitInfo constructed{};
+   constructed.match_end.outcome=OUTCOME_ELIMINATION;
+   constructed.match_end.match_kind=selection.start.rules.match_kind;
+   constructed.match_end.n_winners=1;constructed.match_end.winners[0]=1;
+   for(auto& standing:constructed.match_end.player_standings)standing.slot_type=Gm_PKind_NA;
+   for(unsigned slot=0;slot<selection.player_count;++slot){
+    const auto& player=selection.start.players[slot];
+    auto& standing=constructed.match_end.player_standings[slot];
+    standing.slot_type=player.slot_type;standing.ckind=player.ckind;
+    standing.x3=player.color;standing.x4=player.nametag;
+    standing.stocks=slot==1?4:0;standing.is_big_loser=slot==0;
+   }
+   emit_native_bytes("constructed_non_tied_terminal_no_gameplay",&constructed,sizeof(constructed));
+   auto result_seed=selection.random_seed;
+   try{
+    run_results_source_smoke(files,host,constructed,result_seed,pad);
+    run_returned_menu_selection(files,host,error,sizeof(error));
+   }catch(...){
+    const auto primary=std::current_exception();
+    if(!melee_web_menu_host_destroy(host,error,sizeof(error)))
+     std::cerr<<"Secondary reduced host destroy failure: "<<error<<'\n';
+    std::rethrow_exception(primary);
+   }
+   check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);host=nullptr;
+   check(melee_web_vs_mode_begin(),"Reduced menu control leaked VS lease");
+   check(melee_web_vs_mode_end(),"Reduced menu VS lease reacquisition did not close");
+   const auto retained=melee_web_gameplay_allocation();
+   check(retained.identity==session_allocation.identity&&
+         retained.generation==session_allocation.generation&&retained.bytes==session_allocation.bytes&&
+         !melee_web_gameplay_world_exists()&&
+         std::memcmp(gmMainLib_GetGameRules(),&pre_native_rules,sizeof(pre_native_rules))==0,
+         "Reduced menu control leaked world or initial rules");
+   std::cout<<"Constructed non-tied outcome through original Results and returned CSS/SSS passed; no gameplay world or natural outcome claim\n";
+   continue;
+  }
   if(sd_menu_setup_recipe){
    check(melee_web_menu_host_input(host)!=nullptr,
          "Closed SSS has no retained PAD bank");
@@ -4934,6 +5024,12 @@ int main(int argc,char** argv){try{
  else if(sudden_death_host_recipe)
   std::cout<<"Native menu-host Sudden Death callback handoff passed through source CSS/SSS; "
               "constructed callback control only, no GameplayMatchSession or Results-scene claim\n";
+ else if(returned_menu_recipe){
+  check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
+  check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
+  trace.event("returned_menu_application_cleanup_complete",nullptr);
+  std::cout<<"Reduced native original Results/returned menu ownership control complete; explicitly constructed terminal, no gameplay\n";
+ }
  else if(results_mario_recipe)
   std::cout<<"Native source Mario Results smoke (No Contest and elimination) returned to CSS; no retail/rendered claim\n";
  else
