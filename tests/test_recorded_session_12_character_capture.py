@@ -278,3 +278,150 @@ class RecordedSession12CharacterCaptureTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EntityPrefixMenuCaptureTests(unittest.TestCase):
+    """Synthetic source controls; no original menu acceptance claim."""
+    def test_actual_setup_validator_accepts_only_declared_single_cpu9_roster(self):
+        import copy
+        from test_retail_entity_prefix import synthetic_prefix
+        from tools.recorded_session_12_character_capture import _validate_setup
+        candidate, _ = synthetic_prefix()
+        raw = candidate["setup_hex"]
+        self.assertEqual([p["character_kind"] for p in
+                          _validate_setup(raw, 0, entity_prefix=True)["players"]],
+                         [15, 14, 8, 2])
+        with self.assertRaises(CaptureFailure):
+            _validate_setup(raw, 0)
+        with self.assertRaises(CaptureFailure):
+            _validate_setup(raw, 1, entity_prefix=True)
+        for offset, value in ((0x60, 8), (0x61, 0), (0x62, 3),
+                              (0x63, 1), (0x64, 2), (0x6E, 3), (0x6F, 8)):
+            broken = bytearray.fromhex(raw)
+            broken[offset] = value
+            with self.subTest(offset=offset), self.assertRaises(CaptureFailure):
+                _validate_setup(broken.hex(), 0, entity_prefix=True)
+
+    def test_actual_cpu_pickup_gate_rejects_unselected_foreign_and_held_owner(self):
+        import copy
+        from unittest.mock import Mock
+        base = {"players": [{"kind": 1}] * 4,
+                "doors": [{"kind": 1, "icon": 1}] * 4,
+                "models": {2: {"state": 0, "source_slot": 2, "x": -20.0, "y": 14.0}},
+                "cursors": {0: {"port": 0, "state": 0}}}
+        for field, value in (("icon", 25), ("model_owner", 1),
+                             ("model_slot", 3), ("cursor_port", 1), ("cursor_held", 1)):
+            state = copy.deepcopy(base)
+            if field == "icon": state["doors"][2]["icon"] = value
+            if field == "model_owner": state["models"][2]["state"] = value
+            if field == "model_slot": state["models"][2]["source_slot"] = value
+            if field == "cursor_port": state["cursors"][0]["port"] = value
+            if field == "cursor_held": state["cursors"][0]["state"] = value
+            driver = Driver(Mock(), state, threading.Event(), readiness_only=False, entity_prefix=True)
+            driver.move = Mock()
+            with self.subTest(field=field), self.assertRaisesRegex(CaptureFailure, "source-owned"):
+                driver.select_cpu(2, "MARIO")
+            driver.move.assert_not_called()
+
+    def test_actual_driver_named_branch_requires_exit_setup_and_never_results(self):
+        from unittest.mock import Mock
+        state = {"boundaries": {"sss_enter": 10, "sss_exit": 12, "setup": 13},
+                 "setup_records": [{}], "entity_prefix_complete": True}
+        driver = Driver(Mock(), state, threading.Event(), readiness_only=False, entity_prefix=True)
+        driver._boot_menus = Mock()
+        driver.configure_lineup = Mock()
+        driver.enter_fd = Mock()
+        driver.state = Mock()
+        driver._play_match = Mock(side_effect=AssertionError("prefix cannot enter Results"))
+        driver.boot_and_drive()
+        self.assertTrue(state["driver_complete"])
+        driver.configure_lineup.assert_called_once_with(0, initial=True)
+        driver.enter_fd.assert_called_once_with(choose_stage=True, before=10)
+        driver._play_match.assert_not_called()
+        state.pop("driver_complete"); state["boundaries"].pop("sss_exit")
+        driver.wait = lambda predicate, label, **kw: predicate()
+        # Use the actual wait with a declared already-stopped owner: missing exit
+        # must fail rather than a fixed delay being treated as source acceptance.
+        driver.wait = Driver.wait.__get__(driver)
+        driver.stop.set()
+        driver.boot_and_drive()
+        self.assertIn("driver_error", state)
+        self.assertNotIn("driver_complete", state)
+
+    def test_actual_prefix_finalizer_preserves_context_and_rejects_bad_footer_batch(self):
+        import copy
+        from test_retail_entity_prefix import synthetic_prefix
+        from tools.recorded_session_12_character_capture import _finish_entity_prefix
+        candidate, rows = synthetic_prefix()
+        latest = {"setup_records": [{}]}
+        result = _finish_entity_prefix(rows, latest)
+        self.assertTrue(result["diagnostic_prefix_complete"])
+        self.assertFalse(result["complete"])
+        self.assertFalse(result["whole_session_equivalent"])
+        self.assertEqual(result["prefix_interval"]["source_observations"], 60)
+        for change in ("footer", "extra_setup", "draw_gap"):
+            broken = copy.deepcopy(rows); state = copy.deepcopy(latest)
+            if change == "footer": broken[-1]["payload"]["natural"] = True
+            if change == "extra_setup": state["setup_records"].append({})
+            if change == "draw_gap":
+                next(row for row in broken if row.get("payload", {}).get("boundary") == "draw_return")["draw_ordinal"] += 1
+            with self.subTest(change=change), self.assertRaises((CaptureFailure, ValueError)):
+                _finish_entity_prefix(broken, state)
+
+    def test_prefix_is_mutually_exclusive_and_source_roster_icons_are_distinct(self):
+        from tools.recorded_session_12_character_capture import LINEUPS, ENTITY_PREFIX_LINEUP, ROSTER
+        self.assertEqual(len(LINEUPS), 3)
+        self.assertEqual(ENTITY_PREFIX_LINEUP, ("JIGGLYPUFF", "ICE_CLIMBERS", "MARIO", "FOX"))
+        self.assertEqual((ROSTER_ICON["JIGGLYPUFF"], ROSTER_ICON["ICE_CLIMBERS"]), (20, 12))
+        self.assertEqual((ROSTER["JIGGLYPUFF"][0], ROSTER["ICE_CLIMBERS"][0]), (15, 14))
+        for option in ({"readiness_only": True}, {"readiness_only": False, "team_route_only": True}):
+            with self.assertRaisesRegex(CaptureFailure, "separate"):
+                Driver(None, {}, threading.Event(), entity_prefix=True, **option)
+
+
+    def test_actual_held_puck_owner_predicate_accepts_source_pair_and_rejects_aliases(self):
+        import copy
+        base = {"cursors": {0: {"port": 0, "state": 1, "held": 2}},
+                "models": {2: {"source_slot": 2, "state": 1}}}
+        Driver(None, base, threading.Event(), readiness_only=False,
+               entity_prefix=True)._require_prefix_held_puck(2, 0)
+        for group, key, value in (("cursors", "port", 1), ("cursors", "state", 0),
+                                  ("cursors", "held", 3), ("models", "source_slot", 3),
+                                  ("models", "state", 2)):
+            state = copy.deepcopy(base)
+            state[group][0 if group == "cursors" else 2][key] = value
+            with self.subTest(group=group, key=key), self.assertRaisesRegex(CaptureFailure, "foreign"):
+                Driver(None, state, threading.Event(), readiness_only=False,
+                       entity_prefix=True)._require_prefix_held_puck(2, 0)
+        # Historical mode does not acquire a new predicate or metadata requirement.
+        Driver(None, {}, threading.Event(), readiness_only=False)._require_prefix_held_puck(2, 0)
+
+
+    def test_actual_finally_rejects_live_driver_and_preserves_first_failure(self):
+        import ast
+        from pathlib import Path
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        import tools.recorded_session_12_character_capture as implementation
+        tree = ast.parse(Path(implementation.__file__).read_text())
+        main = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main")
+        owned = next(n for n in main.body if isinstance(n, ast.Try) and n.finalbody)
+        block = ast.fix_missing_locations(ast.Module(body=owned.finalbody, type_ignores=[]))
+        for primary in (None, "retained source mismatch"):
+            report = {"result": "diagnostic_entity_prefix_complete", "diagnostic_prefix_complete": True}
+            if primary:
+                report.update(result="fail", error=primary)
+            thread = Mock(); thread.is_alive.return_value = True
+            absent = Mock(); absent.exists.return_value = False
+            log = Mock()
+            context = {"stop": Mock(), "thread": thread,
+                       "proc": SimpleNamespace(poll=lambda: 0, returncode=0), "log": log,
+                       "report": report, "args": SimpleNamespace(entity_prefix=True),
+                       "stream": absent, "input_stream": absent, "status": absent,
+                       "input_status": absent, "report_path": absent, "_write_json": Mock()}
+            exec(compile(block, implementation.__file__, "exec"), context)
+            self.assertEqual(report["result"], "fail")
+            self.assertFalse(report["diagnostic_prefix_complete"])
+            if primary: self.assertEqual(report["error"], primary)
+            log.close.assert_called_once()
+            thread.join.assert_called_once_with(2)
