@@ -1,0 +1,116 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import {spawnSync} from 'node:child_process';
+import {callbackSteps,checkDeclaredPair,checkNeutralTimeout,checkMatchObservation,runBoundedSdDeparture,SD_BROWSER_LIMITS} from './vs_sudden_death_browser_route.mjs';
+const counter={status:'installed',invalid_phase_steps:0,invalid_preparation_count:0,
+  unknown_reason_count:0,reason_counts:Array(10).fill(0),phase_source_steps:Array(16).fill(0)};
+function pair(sd=false){return {leg:sd?'sudden_death':'vs',observed_player_source_slots:[0,1],
+  prior_vs_source_frames:3600,prior_vs_terminal:{outcome:1,winners:[0,1]},
+  rules:{stage:32,match_kind:1,is_teams:0,item_frequency:-1,timer_enabled:sd?0:1,
+    time_limit:60,is_stock:sd?0:1,is_vs:sd?0:1,source_sudden_death_flag:sd?1:0,
+    player_stocks:sd?[1,1]:[4,4]},
+  players:[0,1].map(i=>({source_player_index:i,source_port:i,source_character:8,fighter:0,
+    human:true,slot_type:0,source_stocks:sd?1:4,stocks:sd?1:4,
+    source_initial_damage:sd?300:0,damage_percent:sd?300:0,source_color:i}))};}
+test('actual pair oracle separates original SD payload/live damage, slots and preserved flags',()=>{
+  const prior=pair();checkDeclaredPair(prior,false);checkDeclaredPair(pair(true),true,prior);
+  for(const mutate of [p=>p.players[1].damage_percent=0,p=>p.players[1].source_initial_damage=0,
+    p=>p.players[1].source_port=0,p=>p.rules.is_vs=1,p=>p.prior_vs_terminal.winners=[1],
+    p=>p.players[1].source_color=0]){
+    const bad=pair(true);mutate(bad);assert.throws(()=>checkDeclaredPair(bad,true,prior));
+  }
+});
+test('counter workload caps reject unavailable, invalid and unsafe observations',()=>{
+  const good={...counter,phase_source_steps:[1,2]};assert.equal(callbackSteps(good),3);
+  for(const bad of [{...good,status:'unavailable'},{...good,invalid_phase_steps:1},
+    {...good,phase_source_steps:[-1]},{...good,phase_source_steps:[Number.MAX_SAFE_INTEGER,1]}])
+    assert.throws(()=>callbackSteps(bad));
+});
+function departure(states){
+  let index=0,pulses=0;
+  const report={suddenDeath:{departurePulses:[]}};
+  return {report,get pulses(){return pulses;},args:{report,
+    driver:{pressChord:async(keys,timing)=>{assert.deepEqual(keys,['d']);
+      assert.equal(timing.holdMs,250);assert.equal(timing.releaseMs,25);pulses++;index++;}},
+    checked:async()=>index*10,current:async()=>states[Math.min(index,states.length-1)].state,
+    observeMatch:async()=>states[Math.min(index,states.length-1)].match,
+    record:async()=>states[Math.min(index,states.length-1)]}};
+}
+test('actual departure stops at source ending/phase transition and never sends another pulse',async()=>{
+  for(const end of [{state:{phase:14},match:{ending:true}}, {state:{phase:8},match:{}}]){
+    const control=departure([{state:{phase:14},match:{ending:false}},end]);
+    await runBoundedSdDeparture(control.args);assert.equal(control.pulses,1);
+  }
+  const already=departure([{state:{phase:14},match:{complete:true}}]);
+  await runBoundedSdDeparture(already.args);assert.equal(already.pulses,0);
+});
+test('actual departure has no retry after input rejection or capped neutral route',async()=>{
+  const control=departure([{state:{phase:14},match:{}}]);
+  await assert.rejects(runBoundedSdDeparture(control.args),/pulse cap/);
+  assert.equal(control.pulses,SD_BROWSER_LIMITS.departurePulses);
+  const rejected=departure([{state:{phase:14},match:{}}]);
+  rejected.args.driver.pressChord=async()=>{throw Error('owned input rejected');};
+  await assert.rejects(runBoundedSdDeparture(rejected.args),/owned input rejected/);
+  assert.equal(rejected.report.suddenDeath.departurePulses.length,1);
+});
+test('actual harness independent close attempts survive diagnostic/resource failures',async()=>{
+  const source=fs.readFileSync(new URL('./vs_rules_item_menu_browser_test.mjs',import.meta.url),'utf8');
+  const body=source.slice(source.indexOf('const closeOnce ='),source.indexOf('const checkInterruption ='));
+  const calls=[];
+  const scope={driver:{dispose(){calls.push('driver');throw Error('dispose');}},
+    context:{close:async()=>{calls.push('context');throw Error('context');}},
+    browser:{close:async()=>{calls.push('browser');}},report:{},
+    cleanupPromises:new Map(),cleanupResults:new Map()};
+  vm.runInNewContext(body+'\nglobalThis.closeOwned=closeOwnedResources;',scope);
+  await scope.closeOwned();await scope.closeOwned();
+  assert.deepEqual(calls,['driver','context','browser']);
+  assert.equal(scope.report.cleanup.driver.status,'failed');
+  assert.equal(scope.report.cleanup.context.status,'failed');
+  assert.equal(scope.report.cleanup.browser.status,'closed');
+});
+test('SD CLI rejects conflicting route/missing producer before browser loading or output',()=>{
+  const harness=new URL('./vs_rules_item_menu_browser_test.mjs',import.meta.url).pathname;
+  for(const args of [['--sudden-death-route'],['--sudden-death-route','--menu-only']]){
+    const child=spawnSync(process.execPath,[harness,...args],{encoding:'utf8'});
+    assert.equal(child.status,1);
+    assert.match(child.stderr,/frozen --runtime-wasm-sha256|incompatible/);
+    assert.doesNotMatch(child.stderr,/Chrome|Playwright|Missing --/);
+  }
+});
+
+test('natural timeout rejects observer errors, early Results, lost stocks/damage and pause immediately',()=>{
+  const good=pair();good.paused=false;good.outcome=0;
+  checkNeutralTimeout({phase:7},good);checkNeutralTimeout({phase:14},{});
+  for(const mutate of [p=>p.observer_error=true,p=>p.paused=true,p=>p.outcome=2,p=>p.players[0].stocks=3,p=>p.players[0].damage_percent=1]){
+    const bad=structuredClone(good);mutate(bad);assert.throws(()=>checkNeutralTimeout({phase:7},bad));
+  }
+  assert.throws(()=>checkNeutralTimeout({phase:8},good));
+  assert.throws(()=>checkMatchObservation({observer_error:true}));
+  for(const reason of [1,2,3,4,5,6,8,9]){
+    const c=structuredClone(counter);c.reason_counts[reason]=1;assert.throws(()=>callbackSteps(c));
+  }
+  const prep=structuredClone(counter);prep.reason_counts[7]=5;callbackSteps(prep);
+});
+
+test('actual harness finally preserves primary failure and closes after capture/diagnostic errors',async()=>{
+  const source=fs.readFileSync(new URL('./vs_rules_item_menu_browser_test.mjs',import.meta.url),'utf8');
+  const start=source.lastIndexOf('} finally {')+'} finally {'.length;
+  const body=source.slice(start,source.indexOf('\n}\nconsole.log',start));
+  for(const primary of [null,Error('original route failure')]){
+    const calls=[];const scope={failure:primary,nativeSessionActive:false,suddenDeathRoute:true,
+      report:{result:primary?'fail':'pass'},page:{},redactDiscPath:String,reportWriteError:null,
+      driver:{diagnostics:async()=>{throw Error('diagnostic failure');}},
+      readRuntimeDiagnosticsCapture:async()=>{throw Error('capture unavailable');},
+      persistReport:async()=>{calls.push('report');},
+      closeOwnedResources:async()=>{calls.push('close');scope.report.cleanup={browser:{status:'failed'}};},
+      process:{off(){}},onSigint(){},onSigterm(){}};
+    vm.runInNewContext('globalThis.finish=async()=>{'+body+';return failure;};',scope);
+    const returned=await scope.finish();
+    assert.equal(scope.report.result,'fail');assert.equal(scope.report.diagnostics_error,'diagnostic failure');
+    assert.equal(scope.report.callbackCapture.status,'unavailable');
+    assert.deepEqual(calls,['report','close','report']);
+    if(primary)assert.equal(returned,primary);else assert.match(returned.message,/cleanup failed/);
+  }
+});

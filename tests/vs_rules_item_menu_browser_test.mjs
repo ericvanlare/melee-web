@@ -10,8 +10,10 @@ import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
+import {runSuddenDeathBrowserRoute} from './vs_sudden_death_browser_route.mjs';
+import {installRuntimeDiagnosticsCapture,readRuntimeDiagnosticsCapture} from './runtime_callback_recorder.mjs';
 
-const options = Object.fromEntries(['url', 'disc', 'out', 'playwright']
+const options = Object.fromEntries(['url', 'disc', 'out', 'playwright', 'runtime-wasm-sha256']
   .map(name => [name, {type: 'string'}]));
 options['menu-only'] = {type: 'boolean', default: false};
 options['rules-items-only'] = {type: 'boolean', default: false};
@@ -20,7 +22,13 @@ options['stage-only'] = {type: 'boolean', default: false};
 options['no-contest-only'] = {type: 'boolean', default: false};
 options['team-battle'] = {type: 'boolean', default: false};
 options['team-setup-only'] = {type: 'boolean', default: false};
+options['sudden-death-route'] = {type: 'boolean', default: false};
 const {values} = parseArgs({options, strict: true});
+const suddenDeathRoute = values['sudden-death-route'];
+if(suddenDeathRoute && ['menu-only','rules-items-only','css-sss-only','stage-only','no-contest-only','team-battle','team-setup-only'].some(name=>values[name]))
+  throw Error('SD selects one full route; reduced/team route flags are incompatible');
+if(suddenDeathRoute && !/^[a-f0-9]{64}$/.test(values['runtime-wasm-sha256']||''))
+  throw Error('SD requires the frozen --runtime-wasm-sha256 identity');
 const menuOnly = values['menu-only'];
 const rulesItemsOnly = values['rules-items-only'];
 const cssSssOnly = values['css-sss-only'];
@@ -52,14 +60,16 @@ const sha256File = file => new Promise((resolve, reject) => {
 let browser, context, page, driver, browserPath, playwrightPath;
 const report = {
   schema: 'melee-web-vs-rules-item-menu-browser-v1',
-  mode: noContestOnly ? 'source-no-contest-results-reproducer'
+  mode: suddenDeathRoute ? 'source-natural-timeout-sudden-death-results-css' : noContestOnly ? 'source-no-contest-results-reproducer'
     : teamSetupOnly ? 'source-team-setup-cancel-reentry-reproducer'
     : teamBattle ? 'source-two-player-team-battle-results-route'
     : stageOnly ? 'source-sss-stage-driver-reproducer'
     : rulesItemsOnly ? 'source-rules-items-entry-reproducer'
     : cssSssOnly ? 'source-css-to-sss-cooldown-reproducer'
     : menuOnly ? 'source-menu-boundary-reproducer' : 'source-rules-items-match-route',
-  scope: noContestOnly
+  scope: suddenDeathRoute
+    ? 'Original Rules one-minute four-stock two-human Mario/FD; natural timeout, active SD live input elimination, typed original Results and CSS/Eject. Zero timing-pause recovery. Functional only; no reference, timing, physical input or PCM acceptance.'
+    : noContestOnly
     ? 'Headless rendered original CSS -> SSS -> Final Destination -> match; P1 Start opens the original source pause, then the held LRAS+Start No Contest chord enters Results and Eject verifies teardown.'
     : teamSetupOnly
     ? 'Headless rendered original CSS -> Main/VS/Rules/Items -> CSS; original CSS Teams toggle and P2 team-color input configure the two existing players, SSS B cancellation returns to CSS with Rules retained, SSS re-entry and a second B cancellation return to CSS, then Eject verifies teardown.'
@@ -128,30 +138,108 @@ const report = {
   sourceObservations: [], cssObservations: [], matchObservations: [],
   lifecycleObservations: [], errors: [],
 };
+let failure,reportWriteError,interruptionSignal;
+const cleanupPromises=new Map(),cleanupResults=new Map();
 const serializeReport = () => JSON.stringify(report, (_key, value) =>
   typeof value === 'string' ? redactDiscPath(value) : value, 2) + '\n';
+const closeOnce = (name, resource, close) => {
+  if (!resource) return null;
+  if (!cleanupPromises.has(name)) {
+    cleanupPromises.set(name, Promise.resolve().then(close).then(() => {
+      cleanupResults.set(name, {status: 'closed'});
+    }, error => {
+      cleanupResults.set(name, {status: 'failed', error: String(error?.message || error)});
+    }));
+  }
+  return cleanupPromises.get(name);
+};
+const closeOwnedResources = async () => {
+  if (driver) {
+    if (!cleanupPromises.has('driver')) {
+      cleanupPromises.set('driver', Promise.resolve().then(() => driver.dispose()).then(() => {
+        cleanupResults.set('driver', {status: 'disposed'});
+      }, error => {
+        cleanupResults.set('driver', {status: 'failed', error: String(error?.message || error)});
+      }));
+    }
+  }
+  closeOnce('context', context, () => context.close());
+  closeOnce('browser', browser, () => browser.close());
+  await Promise.all([...cleanupPromises.values()]);
+  report.cleanup = Object.fromEntries(cleanupResults);
+  return report.cleanup;
+};
+const checkInterruption = () => {
+  if (!interruptionSignal) return;
+  const error = new Error(`Browser route interrupted by ${interruptionSignal}`);
+  error.code = 'BROWSER_ROUTE_INTERRUPTED';
+  throw error;
+};
+const onOwnedInterrupt = signal => {
+  if (interruptionSignal) return;
+  interruptionSignal = signal;
+  const error = new Error(`Browser route interrupted by ${signal}`);
+  error.code = 'BROWSER_ROUTE_INTERRUPTED';
+  failure = failure || error;
+  report.result = 'interrupted';
+  report.interruption = {signal, receivedAt: new Date().toISOString(), cleanup: 'started'};
+  report.failure = report.failure || {message: error.message, code: error.code};
+  // Closing the owned Browser forces an in-flight Playwright operation to
+  // reject into the normal catch/finally path; the signal itself never exits
+  // Node before that cleanup can run.
+  void closeOwnedResources().then(cleanup => {
+    if (report.interruption) {
+      report.interruption.cleanup = Object.values(cleanup).every(item =>
+        item.status === 'closed' || item.status === 'disposed') ? 'completed' : 'partial';
+    }
+  }).catch(error => {
+    if (report.interruption) report.interruption.cleanup = `failed: ${error.message}`;
+  });
+};
+const onSigint = () => onOwnedInterrupt('SIGINT');
+const onSigterm = () => onOwnedInterrupt('SIGTERM');
+process.on('SIGINT', onSigint);
+process.on('SIGTERM', onSigterm);
+const persistReport = async () => {
+  try {
+    await fs.writeFile(path.join(output, 'report.json'), serializeReport());
+  } catch (error) {
+    reportWriteError = error;
+    console.error(`Could not persist browser route report: ${error.message}`);
+  }
+};
 try {
   const loaded = await loadBrowserTools(values.playwright);
+  checkInterruption();
   browserPath = loaded.browserPath;
   playwrightPath = loaded.playwrightPath;
   browser = await loaded.chromium.launch(browserLaunchOptions(loaded.browser, {headed: false}));
+  checkInterruption();
   context = await browser.newContext({viewport: {width: 1280, height: 960}});
+  checkInterruption();
   page = await context.newPage();
+  checkInterruption();
   driver = createBrowserDriver(page, {surface: 'development', timeoutMs: 90000,
-    deadline: Date.now() + 15 * 60 * 1000});
+    deadline: Date.now() + (suddenDeathRoute ? 10 : 15) * 60 * 1000});
   report.browser = {executable: path.basename(browserPath), version: browser.version(), playwright: playwrightPath};
   report.discSha256 = await sha256File(discPath);
   assert.equal(report.discSha256, expectedDiscSha256,
     'Browser route requires the owned USA Rev. 2 source image identity');
 } catch (error) {
+  failure=error;
   report.result = 'fail';
   report.evidenceClaims.renderedBrowser.status = 'failed';
   report.evidenceClaims.sourceStateAndNavigation.status = 'not_started';
   report.failure = {message: redactDiscPath(error.message), stack: redactDiscPath(error.stack)};
-  try { driver?.dispose(); } catch {}
-  try { await context?.close(); } catch {}
-  try { await browser?.close(); } catch {}
-  await fs.writeFile(path.join(output, 'report.json'), serializeReport());
+  await closeOwnedResources();
+  const cleanupFailed=Object.values(report.cleanup).some(item=>item.status==='failed');
+  if(cleanupFailed){
+    report.cleanup_failure='Owned browser resource cleanup failed';
+    if(!failure)failure=Error(report.cleanup_failure);
+    report.result='fail';
+  }
+  await persistReport();
+  process.off('SIGINT',onSigint);process.off('SIGTERM',onSigterm);
   throw Error(redactDiscPath(error.message));
 }
 const MAIN_MENU_KIND = 0;
@@ -200,6 +288,7 @@ const observeMatch = () => page.evaluate(() => JSON.parse(
 const observeLifecycle = () => page.evaluate(() => JSON.parse(
   Module.UTF8ToString(Module._melee_web_native_menu_memory())));
 const ensureNoError = async label => {
+  checkInterruption();
   const state = await current();
   if (state.error) throw Error(`${label}: ${state.error}`);
   return state;
@@ -222,6 +311,7 @@ const resumeTimingPause = async label => {
   const pause = {label, phase: state.phase, message: state.message,
     observedAt: new Date().toISOString()};
   report.timingPauses.push(pause);
+  if(suddenDeathRoute)throw Error(`${label}: timing disruption; SD route forbids recovery`);
   const control = await page.evaluate(() => {
     const button = document.querySelector('#pause');
     return {found: Boolean(button), enabled: Boolean(button && !button.disabled),
@@ -297,7 +387,8 @@ const sourcePadSample = async (buttons, stickX, stickY, label) => {
 };
 const sourcePadTap = async (button, label) => {
   await sourcePadSample(button, 0, 0, label);
-  await page.evaluate(args => window.menuDiagnosticPad(...args), [0, 0, 0, 0, 2]);
+  const acceptedRelease = await page.evaluate(args => window.menuDiagnosticPad(...args), [0, 0, 0, 0, 2]);
+  assert.equal(acceptedRelease,1,`Source PAD release rejected ${label}`);
   report.sourcePadSamples.push({port: 0, buttons: 0, stickX: 0, stickY: 0,
     duration: 2, label: `${label}:release`});
   await waitForNoQueuedPad(`source PAD ${label} release drains`);
@@ -548,13 +639,20 @@ const configureCssTeamBattle = async () => {
   await shot('11-css-team-battle-configured');
   report.checks.push('Original CSS Teams toggle and P2 color control use source predicates, live CSS geometry, and single-tick source PAD samples');
 };
-let failure;
 let nativeSessionActive = false;
 try {
 route: {
   const response = await page.goto(values.url, {timeout: 30000});
   assert.equal(response?.status(), 200);
   await driver.waitForImport();
+  if(suddenDeathRoute){
+    const response=await page.request.get(new URL('gameplay_menu_browser.wasm',values.url).href);
+    assert.equal(response.status(),200);
+    const hash=createHash('sha256').update(await response.body()).digest('hex');
+    assert.equal(hash,values['runtime-wasm-sha256'],'Served Wasm differs from frozen producer');
+    report.runtimeIdentity={wasm_sha256:hash};
+    await installRuntimeDiagnosticsCapture(report.runtimeIdentity,'served Wasm identity; full producer bound by external supervisor',page);
+  }
   await page.locator('#controls-open').click();
   await page.locator('#player-one-source').selectOption('keyboard');
   await page.locator('#player-two-source').selectOption('off');
@@ -568,6 +666,13 @@ route: {
   await driver.launch();
   await waitMessage('Original character select', 'initial CSS');
   await shot('00-initial-css');
+  if(suddenDeathRoute){
+    await runSuddenDeathBrowserRoute({page,report,driver,press,chord,current,ensureNoError,
+      resumeTimingPause,observeSource,observeMatch,observeCssSetup,sourcePadSample,sourcePadTap,
+      waitForNoQueuedPad,waitMessage,waitPhase,waitMenu,enterVsRules,moveMenuCursor,
+      waitItemInputReady,waitItemsCursor,waitItemFrequency,waitRulesPlusTimer,shot,verifyTeardown});
+    nativeSessionActive=false;break route;
+  }
 
   if (noContestOnly) {
     await page.waitForTimeout(800);
@@ -1094,11 +1199,23 @@ route: {
       report.failureCleanup = {status: 'failed', message: redactDiscPath(error.message)};
     }
   }
-  report.diagnostics = await driver.diagnostics();
-  await fs.writeFile(path.join(output, 'report.json'), serializeReport());
-  driver.dispose();
-  await context.close();
-  await browser.close();
+  if(suddenDeathRoute){
+    try{report.callbackCapture=await readRuntimeDiagnosticsCapture(page);}
+    catch(error){report.callbackCapture={status:'unavailable',error:redactDiscPath(error.message)};}
+  }
+  try{report.diagnostics=await driver.diagnostics();}
+  catch(error){report.diagnostics_error=redactDiscPath(error.message);}
+  await persistReport();
+  await closeOwnedResources();
+  const cleanupFailed=Object.values(report.cleanup).some(item=>item.status==='failed');
+  if(cleanupFailed){
+    report.cleanup_failure='Owned browser resource cleanup failed';
+    if(!failure)failure=Error(report.cleanup_failure);
+    report.result='fail';
+  }
+  await persistReport();
+  process.off('SIGINT',onSigint);process.off('SIGTERM',onSigterm);
+  if(reportWriteError&&!failure)failure=reportWriteError;
 }
 console.log(JSON.stringify({result: report.result, checks: report.checks,
   sourceObservations: report.sourceObservations.length,
