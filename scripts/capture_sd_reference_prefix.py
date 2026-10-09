@@ -27,6 +27,13 @@ from reference_observer_stream import read_status
 from reference_input_stream import validate_status
 
 
+def rules_dolphin_command(dolphin, user, disc):
+    command = dolphin_command(Path(dolphin), Path(user), Path("unused"), Path(disc),
+                              cpu="JITARM64", cold_boot=True, audible=False)
+    return command + ["-p", "headless", "-C", "Session.Core.SaveDataWritable=False",
+                      "-C", "Dolphin.Interface.ConfirmStop=False"]
+
+
 def cleanup_process(process, output):
     """Stop and reap only this runner's direct Popen; always retain the outcome."""
     receipt = {"scope": "rules_ready", "pid": process.pid, "ownership": "direct-Popen",
@@ -133,9 +140,7 @@ def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manife
                        MWRC_SD_RECIPE_SHA256=plan["authored_recipe_sha256"],
                        MWRC_SD_MENU_PROBE="rules_ready",
                        MWRC_INPUT_RECORD=str(native), MWRC_INPUT_STATUS=str(native_status))
-    command = dolphin_command(Path(dolphin), user, Path("unused"), Path(disc),
-                              cpu="JITARM64", cold_boot=True, audible=False)
-    command += ["-C", "Session.Core.SaveDataWritable=False", "-C", "Dolphin.Interface.ConfirmStop=False"]
+    command = rules_dolphin_command(dolphin, user, disc)
     (output / "input-plan.json").write_bytes(canonical(plan))
     (output / "menu-recipe.json").write_bytes(canonical(menus))
     (output / "launch.json").write_bytes(canonical({"scope": "rules_ready",
