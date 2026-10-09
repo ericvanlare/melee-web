@@ -14,12 +14,14 @@ export async function installSparseVirtualController(page){
     Object.defineProperty(navigator,'getGamepads',{value:()=>[window.sparseVirtualPad]});
   },standardPad(0,'Sparse Mario authored standard Gamepad'));
 }
-// Existing input/lifecycle exports only; never infer copied PAD from raw input.
-export function readSparsePadVectors(){
+// CSS explicitly audits lifecycle once; active sampling uses the cheap match getter.
+// Never infer copied PAD from raw input. Both native reads are synchronous.
+export function readSparsePadVectors({activeMatch=false}={}){
   const m=globalThis.Module;
   const input=JSON.parse(m.UTF8ToString(m._melee_web_input_message()));
-  const lifecycle=JSON.parse(m.UTF8ToString(m._melee_web_native_menu_memory()));
-  return {input,copied_errors:lifecycle.source_pad_errors};
+  const copied=JSON.parse(m.UTF8ToString(activeMatch?
+    m._melee_web_native_menu_match_observe():m._melee_web_native_menu_memory()));
+  return {input,copied_errors:copied.source_pad_errors};
 }
 export function checkSparsePadVectors(observation){
   assert(observation.input&&observation.input.active===1&&!observation.input.error);
@@ -78,8 +80,8 @@ export async function runSparseMarioBrowserPrefix(d){
   const route=report.sparseMario={limits:SPARSE_PREFIX_LIMITS,observations:[],css:[],gamepadPulses:[],
     claims:'Virtual live Browser Gamepad input and rendered functional prefix only',
     hudObservation:'Rendered screenshots retain original HUD; numeric HUD values are not exported by this observer'};
-  const padVectors=async label=>{
-    const observation=await page.evaluate(readSparsePadVectors);
+  const padVectors=async (label,activeMatch=false)=>{
+    const observation=await page.evaluate(readSparsePadVectors,{activeMatch});
     route.latestPadObservation={label,...observation};checkSparsePadVectors(observation);
     route.padObservations??=[];route.padObservations.push({label,...observation});return observation;
   };
@@ -91,7 +93,7 @@ export async function runSparseMarioBrowserPrefix(d){
     const snapshot=await observeRuntimeOwner(page,route,label);
     // The exact coherent failing pair is retained before any assertion.
     assert(!snapshot.state.error&&!snapshot.match?.observer_error&&!snapshot.match?.observer_error_reason);
-    await checked(label);if(snapshot.state.phase===7&&snapshot.state.running===1)await padVectors(label);return snapshot;
+    await checked(label);if(snapshot.state.phase===7&&snapshot.state.running===1)await padVectors(label,true);return snapshot;
   };
   await chord(['q','9','7']);await waitPhase(11,'Sparse original Main');
   let rules=await enterVsRules('sparse');

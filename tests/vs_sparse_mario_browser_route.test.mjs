@@ -60,3 +60,23 @@ test('actual serialized PAD reader requires distinct raw and original copied spa
   assert.throws(()=>checkSparsePadVectors(readSparsePadVectors()));
  }finally{globalThis.Module=original;}
 });
+
+
+test('actual serialized active PAD reader never performs a lifecycle heap audit',()=>{
+ const original=globalThis.Module;
+ const input={active:1,error:'',pads:[0,-1,0,-1].map(err=>({err}))};
+ let copied=[0,-1,0,-1],matchReads=0;
+ globalThis.Module={UTF8ToString:x=>x,
+  _melee_web_input_message:()=>JSON.stringify(input),
+  _melee_web_native_menu_match_observe:()=>{matchReads++;return JSON.stringify({source_pad_errors:copied});},
+  _melee_web_native_menu_memory:()=>{throw new Error('Unexpected lifecycle heap audit');}};
+ try{
+  checkSparsePadVectors(readSparsePadVectors({activeMatch:true}));
+  assert.equal(matchReads,1);
+  for(const wrong of [[0,0,-1,-1],[0,-1,-1,-1],[0,-1,0,0],undefined]){
+   copied=wrong;assert.throws(()=>checkSparsePadVectors(readSparsePadVectors({activeMatch:true})));
+  }
+  copied=[0,-1,0,-1];input.pads[1].err=0;
+  assert.throws(()=>checkSparsePadVectors(readSparsePadVectors({activeMatch:true})));
+ }finally{globalThis.Module=original;}
+});
