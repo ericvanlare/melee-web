@@ -75,7 +75,7 @@ def menu_actions(path):
     raw = Path(path).read_bytes()
     require(len(raw) <= 1024 * 1024, "SD menu recipe exceeds its bound")
     value = json.loads(raw)
-    if isinstance(value, dict) and value.get("version") in (2, 3, 4, 5):
+    if isinstance(value, dict) and value.get("version") in (2, 3, 4, 5, 6):
         validate_packet(value)
         return value, hashlib.sha256(raw).hexdigest()
     require(isinstance(value, dict) and set(value) == {"schema", "version", "actions"} and
@@ -145,11 +145,12 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
     build = validate_reference_build_manifest(Path(build_manifest), Path(dolphin))
     plan, plan_hash = load_plan(input_plan, allow_authored=True)
     menus, menu_hash = menu_actions(menu_recipe)
-    full_route = menus["scope"] == "sd_prefix_gci"
-    campaign = menus["scope"] in ("rules_ready_gci", "sd_prefix_gci")
+    items_probe = menus["scope"] == "items_row_gci"
+    full_route = menus["scope"] == "sd_prefix_gci" or items_probe
+    campaign = menus["scope"] in ("rules_ready_gci", "sd_prefix_gci", "items_row_gci")
     scope = menus["scope"]
     require(plan["authored_recipe"]["version"] == (5 if full_route else 4 if campaign else 3) and
-            menus["version"] == (5 if full_route else 4 if campaign else 2) and (gci is not None) == campaign and
+            menus["version"] == (6 if items_probe else 5 if full_route else 4 if campaign else 2) and (gci is not None) == campaign and
             menus["authored_recipe_sha256"] == plan["authored_recipe_sha256"],
             "Runnable original diagnostic requires the exact current scoped recipe/menu versions")
     loaded_profile = None
@@ -162,7 +163,7 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                     "Core/PowerPC/ReferenceCaptureObserver.cpp") == hashlib.sha256(overlay.read_bytes()).hexdigest(),
                 "Loaded-profile observer producer is stale or unbound")
         loaded_profile, owned_gci = prepare_gci_folder(gci, output / "gci-folder")
-    receiver = GciRulesMenuReceiver(plan, loaded_profile, full_route=full_route) if campaign else RulesMenuReceiver(plan)
+    receiver = GciRulesMenuReceiver(plan, loaded_profile, full_route=full_route, items_probe=items_probe) if campaign else RulesMenuReceiver(plan)
     require(type(timeout) in (int, float) and 0 < timeout <= (180 if full_route else 600),
             "Original diagnostic deadline is unbounded")
     user = output / "user"
@@ -175,7 +176,7 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                        MWRC_DOL_SHA256="dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
                        MWRC_OUTPUT=str(raw), MWRC_STATUS=str(status), MWRC_SD_INIT="1",
                        MWRC_SD_RECIPE_SHA256=plan["authored_recipe_sha256"],
-                       MWRC_SD_MENU_PROBE="sd_prefix" if full_route else "rules_ready",
+                       MWRC_SD_MENU_PROBE="items_row" if items_probe else "sd_prefix" if full_route else "rules_ready",
                        MWRC_INPUT_RECORD=str(native), MWRC_INPUT_STATUS=str(native_status))
     command = rules_dolphin_command(dolphin, user, disc)
     if campaign:
@@ -240,7 +241,7 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                     tap(action, action["label"], action["max_polls"])
                     wait_source(lambda: matches(receiver.latest_menu, action["after"]),
                                 action["label"] + ":observed", action["max_polls"])
-                if full_route:
+                if full_route and not items_probe:
                     drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, tap)
                 while not receiver.ended:
                     next_row()

@@ -13,7 +13,7 @@ SCOPE = "sd_initialization_prefix"
 PCS = {"vs_entry": 0x8016e934, "vs_setup": 0x8016e9c4, "vs_exit": 0x8016ebbc,
        "vs_retired": 0x8039157c, "sd_entry": 0x8016ebc0, "sd_setup": 0x8016ec24,
        "input": 0x80377584, "menu_input": 0x80377584, "tick": 0x80390eb4,
-       "menu": 0x8034dd8c, "rules_ready": 0x8034dd8c}
+       "menu": 0x8034dd8c, "rules_ready": 0x8034dd8c, "items_ready": 0x8034dd8c}
 ORDER = ("vs_entry", "vs_setup", "vs_exit", "vs_retired", "sd_entry", "sd_setup")
 
 
@@ -275,17 +275,34 @@ def menu_state(data):
     return result
 
 
+def items_lock_state(data, payload, state):
+    """Opt-in byte owner; a main-menu cooldown never substitutes for this lock."""
+    fields = [s for s in payload["slices"] if s["tag"] == 56]
+    owner = state.get("scene") == 1 and state.get("kind") == 16
+    require(bool(fields) == owner, "Items lock owner is missing or unexpected")
+    if owner:
+        require(len(fields) == 1 and fields[0]["flags"] == 0 and
+                fields[0]["address"] == 0x804d6bec and
+                data.get((56, 0)) in (b"\0", b"\1"), "Items lock address/size/value differs")
+        return dict(state, items_locked=data[(56, 0)][0])
+    return state
+
+
 class RulesMenuReceiver(Receiver):
     """Reduced Rules probe; unowned routing is observation, never scene admission.
 
     SceneKind omission does not attest a null pointer: the native producer also
     omits it on a failed pointer read. No steering or readiness precedes an owner.
     """
-    def __init__(self, plan, *, profile_campaign=False, full_route=False):
+    def __init__(self, plan, *, profile_campaign=False, full_route=False, items_probe=False):
         super().__init__(plan)
         require(plan["authored_recipe"]["version"] == (5 if full_route else 4 if profile_campaign else 3),
                 "Rules probe recipe/profile campaign differs")
         self.full_route = full_route
+        self.items_probe = items_probe
+        self.items_ready = False
+        self.items_up_seen = False
+        require(not items_probe or full_route, "Reduced Items probe requires its recipe-five owner")
         self.menu_consumed = 0
         self.menu_polls = 0
         self.last_pad = None
@@ -301,6 +318,9 @@ class RulesMenuReceiver(Receiver):
         if full_route:
             from sd_original_menu_plan import gci_sd_prefix_packet, route_pads
             packet = gci_sd_prefix_packet()
+            if items_probe:
+                from sd_original_menu_plan import gci_items_row_packet
+                packet = gci_items_row_packet()
             self.declared_menu_pads = route_pads(packet)
             self.css = None
             self.stage = None
@@ -313,7 +333,7 @@ class RulesMenuReceiver(Receiver):
     def accept(self, row):
         event, payload = row["event"], row["payload"]
         if event == "handshake":
-            require(payload.get("menu_probe") == ("sd_prefix" if self.full_route else "rules_ready"),
+            require(payload.get("menu_probe") == ("items_row" if self.items_probe else "sd_prefix" if self.full_route else "rules_ready"),
                     "Rules probe scope differs")
             require(payload.get("profile_gci_sha256", "") == getattr(self, "profile_sha256", ""),
                     "Rules probe loaded-profile identity differs")
@@ -321,7 +341,7 @@ class RulesMenuReceiver(Receiver):
             return super().accept(forwarded)
         if event == "start":
             return super().accept(row)
-        if self.full_route and (event == "end" or self.order or
+        if self.full_route and not self.items_probe and (event == "end" or self.order or
                 (event == "progress" and payload.get("name") not in ("menu", "menu_input", "rules_ready"))):
             require(self.ready, "Gameplay preceded verified loaded Rules readiness")
             if payload.get("name") == "vs_entry":
@@ -336,7 +356,7 @@ class RulesMenuReceiver(Receiver):
                 "Rules probe sequence/start differs")
         self.seq += 1
         if event == "end":
-            require(self.ready and payload == {"status": "interrupted", "natural": False},
+            require(self.ready and (not self.items_probe or self.items_ready) and payload == {"status": "interrupted", "natural": False},
                     "Rules probe lacks bounded interrupted readiness ending")
             self.ended = True
             return
@@ -344,7 +364,8 @@ class RulesMenuReceiver(Receiver):
                 type(payload.get("consumed")) is int and payload["consumed"] == 0,
                 "Rules probe escaped menu-only scope")
         name = payload.get("name")
-        require(name in ("menu", "menu_input", "rules_ready") and payload.get("pc") == PCS[name],
+        require(name in (("menu", "menu_input", "rules_ready", "items_ready") if self.items_probe else
+                        ("menu", "menu_input", "rules_ready")) and payload.get("pc") == PCS[name],
                 "Rules probe event owner differs")
         data = slices(payload)
         count = payload.get("menu_consumed")
@@ -369,17 +390,37 @@ class RulesMenuReceiver(Receiver):
                     "Rules probe source input gap/repeat/cap")
             raw = data.get((3, 0), b"")
             require(len(raw) == 48, "Rules probe source PAD missing")
+            previous_pad = self.last_pad
             self.last_pad = [raw[p:p + 11].hex() for p in range(0, 48, 12)]
             require(tuple(self.last_pad[:2]) in self.declared_menu_pads,
                     "Rules probe consumed undeclared menu PAD intent")
-            from retail_input_plan import DISCONNECTED_PAD
+            from retail_input_plan import DISCONNECTED_PAD, NEUTRAL_PAD
             require(self.last_pad[2:] == [DISCONNECTED_PAD] * 2,
                     "Rules probe inactive controllers changed")
+            if self.items_probe and self.latest_menu.get("kind") == 16:
+                from reference_versus_sequence_capture import raw_pad
+                up = [raw_pad(buttons=["D_UP"]), NEUTRAL_PAD]
+                require(self.last_pad[:2] in ([NEUTRAL_PAD]*2, up), "Items consumed undeclared continuation")
+                require(self.latest_menu.get("items_locked") == 0 or
+                        self.last_pad[:2] == [NEUTRAL_PAD] * 2,
+                        "Items input consumed while locked")
+                if self.last_pad[:2] == up and previous_pad[:2] != up:
+                    require(not self.items_up_seen, "Items consumed a second Up pulse")
+                    self.items_up_seen = True
             self.menu_consumed = count
             return
         require(count == self.menu_consumed, "Rules probe skipped observed input")
         self.latest_menu = menu_state(data)
-        if self.full_route and name == "menu":
+        if self.items_probe:
+            self.latest_menu = items_lock_state(data, payload, self.latest_menu)
+            if name == "items_ready":
+                from retail_input_plan import NEUTRAL_PAD
+                require(self.ready and self.items_up_seen and not self.items_ready and self.last_pad[:2] == [NEUTRAL_PAD]*2 and
+                        self.latest_menu == {"scene":1,"kind":16,"row":31,"value":3,
+                        "entering":1,"cooldown":0,"items_locked":0}, "Items ready predicate differs")
+                self.items_ready = True
+                return
+        if self.full_route and not self.items_probe and name == "menu":
             self.css = css_state(data) if self.latest_menu["scene"] == 8 else None
             self.stage = stage_state(data, payload) if self.latest_menu["scene"] == 9 else None
             require(self.latest_menu["scene"] != 8 or self.final_css is None or self.css is not None,
@@ -422,7 +463,7 @@ class RulesMenuReceiver(Receiver):
 
 class GciRulesMenuReceiver(RulesMenuReceiver):
     """New profile campaign, with observed loaded fields at the reduced ready gate."""
-    def __init__(self, plan, profile, *, full_route=False):
+    def __init__(self, plan, profile, *, full_route=False, items_probe=False):
         import hashlib
         from sd_gci_profile import GCI_SHA256
         require(profile["sha256"] == GCI_SHA256 and
@@ -431,7 +472,7 @@ class GciRulesMenuReceiver(RulesMenuReceiver):
         self.profile_sha256 = GCI_SHA256
         self.profile = profile
         self.loaded_context = None
-        super().__init__(plan, profile_campaign=True, full_route=full_route)
+        super().__init__(plan, profile_campaign=True, full_route=full_route, items_probe=items_probe)
 
     def accept(self, row):
         if row["event"] == "progress" and row["payload"].get("name") == "rules_ready":
@@ -461,10 +502,13 @@ class GciRulesMenuReceiver(RulesMenuReceiver):
 
     def finish(self, observer_status, input_path, input_status):
         require(self.loaded_context is not None, "Loaded profile was not observed")
-        report = (Receiver.finish(self, observer_status, input_path, input_status) if self.full_route
+        report = (Receiver.finish(self, observer_status, input_path, input_status) if self.full_route and not self.items_probe
                   else super().finish(observer_status, input_path, input_status))
-        report.update(scope="sd_prefix_gci" if self.full_route else "rules_ready_gci", profile_gci_sha256=self.profile_sha256,
+        report.update(scope="items_row_gci" if self.items_probe else "sd_prefix_gci" if self.full_route else "rules_ready_gci", profile_gci_sha256=self.profile_sha256,
                       loaded_context=self.loaded_context)
+        if self.items_probe:
+            report.update(schema="melee-web-original-items-row-probe",
+                          items_ready=self.items_ready, stop=self.latest_menu)
         if self.full_route:
             report.update(menu_source_samples=self.menu_consumed, menu_polls=self.menu_polls,
                           pre_owner_polls=self.pre_owner_polls, bootstrap_routes=self.bootstrap_routes)

@@ -34,6 +34,8 @@ def rules_ready_packet():
 def validate_packet(value):
     # Only this reduced route is supported. No guessed/default continuation.
     from authored_sd_reference_plan import canonical
+    if canonical(value) == canonical(gci_items_row_packet()):
+        return value
     if canonical(value) == canonical(gci_sd_prefix_packet()):
         return value
     if any(canonical(value) == canonical(gci_rules_ready_packet(version)) for version in (3, 4)):
@@ -117,6 +119,8 @@ def route_pads(packet):
     """Finite PAD alphabet for the declared conditional cursor policy."""
     pads = {(NEUTRAL_PAD, NEUTRAL_PAD)} | {
         (a["p1"], a["p2"]) for a in packet["boot"] + packet["actions"]}
+    if packet["scope"] == "items_row_gci":
+        return pads
     for port in (0, 1):
         for button in ("A", "X"):
             pair = [NEUTRAL_PAD] * 2
@@ -129,3 +133,19 @@ def route_pads(packet):
                 pads.add(tuple(pair))
     pads |= {(raw_pad(x=40), NEUTRAL_PAD), (raw_pad(y=40), NEUTRAL_PAD)}
     return pads
+
+
+def gci_items_row_packet():
+    """Reduced Items acceptance probe, ending after exactly one authored Up."""
+    value = gci_sd_prefix_packet()
+    value.update(version=6, scope="items_row_gci")
+    last = next(i for i, a in enumerate(value["actions"])
+                if a["label"] == "items-frequency-row")
+    value["actions"] = value["actions"][:last + 1]
+    action = value["actions"][-1]
+    action["before"]["items_locked"] = 0
+    action["after"]["items_locked"] = 0
+    value.pop("css")
+    value.pop("sss")
+    value["stop"] = dict(action["after"])
+    return value

@@ -399,3 +399,21 @@ The separate allocation-history GDB/Python route remains available for scopes
 that need a stopped scheduler and allocation/RNG sampling. It is not a
 prerequisite for observing this ordinary menu route. Keep future claims scoped
 to the retained capture and build identities above.
+# Reduced Items lock experiment
+
+After the recipe-five original prefix failed at `items-frequency-row:observed`,
+menu packet six retains the same setup actions but stops at Items row31/value3.
+Its separate `items_row` observer scope reads the original one-byte animation
+lock only under actual scene1/MenuFlow kind16. The verified GALE01r2
+`fn_80233E10` instructions at `0x80233ec0` load and test that byte at
+`0x804d6bec` before navigation. Main-menu cooldown zero alone is insufficient.
+The runner waits for the observed lock zero, sends one declared Up pulse, then
+requires the original row/value and neutral release. No CSS, gameplay, timeout
+or SD continuation is admitted. Native input completion remains separate from
+the intentionally interrupted observer. Missing, misplaced or malformed lock
+data and consumed input while locked fail explicitly.
+
+Portable reconstructed positive/negative controls do not establish native
+behavior. The failed original stream has no lock slice, so it establishes
+ignored normalized Up, not the actual runtime lock value. Prior full-prefix
+packets, producer binaries and failure evidence remain preserved.
