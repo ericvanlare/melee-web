@@ -961,7 +961,7 @@
         "sixth_ready_bound_files": 531,
         "deferred_control_owned_pid_absent": 19570
       },
-      "remaining": "Reduce actual successor ownership against original SIS callers and Session close order before a correction or another full Ready attempt. No list-tail waiver. Complete Session retirement, two3500 post-GO lifetimes, screen/stock-out/standings and original per-owner RNG ledger remain open.",
+      "remaining": "One new opt-in Ready text observation after reviewed source/control changes: current event logger plus exact current SIS backing snapshot, then bounded used_head membership only after original first text refusal. Preserve actual refusal and every guard; unavailable/replaced membership stops attribution. No ownership correction until reviewed identity evidence. Complete Session retirement, two3500 post-GO lives, screen/stock-out/standings and original per-owner RNG ledger remain open.",
       "c3_original_ledger_requirement": "Reuse existing RNG draw observer; C3 notes604-608 require per-tick/per-owner original comparison, separately from broader C8 transformation comparison.",
       "claim_boundary": "Native traced original HUD readiness after124source ticks observed; sixth run fails checked displayteardown. Synthetic marker/collision/deferred lifecycle controls pass. No checked fullSessionclose, postGOidle or C3pass.",
       "pad_input_reducer": {
@@ -1261,6 +1261,69 @@
         "owned_children_natural_exit_reaped_absent": true,
         "map2_guard_evaluated": false,
         "fixed_pre_OnStart_label_is_phase_evidence": false
+      },
+      "eighth_result_review": {
+        "artifact": "root-ready-eighth-luna-source-review-v1/result.json",
+        "sha256": "3f75f560a988dac49c05a52db6e06d39a7fc7635a89aa93a5c51de06dd168dbf"
+      },
+      "eighth_result_review_scope": "Independent v8 review hashed16 raw files and packet/receipt hashes/counts; did not independently rehash all636direct bindings/98fixtures.",
+      "zero_tick_text_identity": {
+        "source": "93151c8389874d27b0d09a48b847a279f97c1955",
+        "source_tree": "93fb33c575a4132b70240fc7d9ff5651425bc1f8",
+        "source_review": {
+          "artifact": "root-text-lifetime-source-review-v1.json",
+          "sha256": "c02c0909ac401e7ddcd9caa42c6eeb6e7385b3445c89f476826aa1b175e3dd66"
+        },
+        "independent_source_review": {
+          "artifact": "sol-no-tick-text-owner-source-review-v2.json",
+          "sha256": "1f2e8ac17bbe0de928ad548aacf17b2e3660481f5a7164e93d301220a4da4b18"
+        },
+        "diagnostic_build": {
+          "artifact": "text-lifetime-build-v1/result.json",
+          "sha256": "b5a6c4469ba11af37f0400f7c1ab53950c284f0ce5068b6a28c9e8ce6a9ccdbe"
+        },
+        "producer": {
+          "artifact": "text-lifetime-producer-93151c83-v1/identity.json",
+          "sha256": "b5db55383990a0f368e09194105661596c82497a6e1d3198e60885fcaae061bc"
+        },
+        "python_controls": {
+          "artifact": "root-text-lifetime-python-controls-v1.log",
+          "sha256": "30f6777e34ccaa186fcf78d1fc57a3ed3c5db1e0765fbf9fa85ac0d59112e15c"
+        },
+        "sdk_event_controls": {
+          "artifact": "root-text-lifetime-controls-v1/result.json",
+          "sha256": "9a80a2cb6d2adc4ec52a094092a1bca3bd3738c573baf20d1db63b3d8da6dd3a"
+        },
+        "independent_control_review": {
+          "artifact": "sol-text-lifetime-control-review-v1.json",
+          "sha256": "e43b7328ad4d2cb6f83a21ae86714a9caac320d9e603bc328dae91482f50cfda"
+        },
+        "packet": {
+          "artifact": "text-lifetime-preflight-packet-root-v1.json",
+          "sha256": "e7935504858af48645747a690f0ed3ad5486c1f390d06225654323e5db984a01"
+        },
+        "frozen_result": {
+          "artifact": "root-text-lifetime-zero-frozen-result-v1.json",
+          "sha256": "87c8ad120c5b2a900fd71ac6aaf44438c18bf4b8ed1b78059b6cfa9936b36aa3"
+        },
+        "independent_result_review": {
+          "artifact": "sol-text-lifetime-zero-review-v1.json",
+          "sha256": "426b28324504f98aba552c05d0daac9988303f1b3ac20568e024738641d62292"
+        },
+        "validation": "Diagnostic Release build and six Python controls pass. Actual two-life original allocator control emits8append/8matched-unlink events, with context=-1;32producer files independently checked.",
+        "observations": "At construction ticks0, original stage emits2font1appends followed by shared HUD font2nametag append/semantic assignment, both context0. HUDend returns with0matched-unlink events. Normal Session.close first refuses Partial Stadium OnStart ownership must remain reachable; topology guard not evaluated.",
+        "verification": {
+          "direct_bindings_unchanged": 695,
+          "fixtures_unchanged": 98,
+          "raw_files_independently_verified": 17,
+          "owned_pids_natural_exit_reaped_absent": [
+            32182,
+            32188
+          ],
+          "unittest_returncode": 0,
+          "native_returncode": 1
+        },
+        "scope": "Observation assertions pass, lifecycle fails. No same-object inference across runs, actual Ready-v8 successor attribution, live SIS membership, complete frees, checked Session retirement or C3."
       }
     }
   }

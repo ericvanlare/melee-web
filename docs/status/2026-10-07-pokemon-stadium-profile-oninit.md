@@ -8,8 +8,10 @@ passed. The latest [source-session preparation attempts](#october-9-source-sessi
 now complete match construction and reach the original HUD Ready predicate at
 124 source ticks, then fail because the display owner’s second text node has
 a non-null successor during teardown. That successor’s ownership remains
-unverified. The smaller input, marker, collision and SIS text controls pass;
-a complete lifetime and C3 remain unverified.
+unverified. A later zero-tick observation identifies the original HUD nametag
+append but stops at the incomplete-start guard before text teardown. The
+smaller input, marker, collision and SIS text controls pass; a complete
+lifetime and C3 remain unverified.
 
 The diagnostic-only Stadium profile and profile-to-`DatNativeMapContract`
 adapter compile in the C1 trace target. Focused profile and borrowed-yakumono
@@ -473,9 +475,30 @@ processes exit naturally, are reaped and are absent. The preparation script's
 initial review-schema lookup error is retained separately; no packet, output
 directory or native run had been created before it was corrected.
 
-Next, reduce this successor's ownership against the original SIS callers and
-Session close order before changing the owner contract or running another full
-Ready attempt. No text-list exemption or completed Session retirement is claimed.
+The smaller zero-tick observation on `93151c83` uses the actual original menu
+handoff and match constructor. Two original font-1 text appends precede HUD
+startup; the original shared font-2 nametag is the third append, and its
+semantic assignment agrees with the append's integer context ID 0. HUD shutdown
+returns without a matched text-unlink event. Normal `Session.close` then refuses
+**`Partial Stadium OnStart ownership must remain reachable`**, at zero match
+ticks. The text-topology guard is not evaluated. These events do not identify
+the earlier Ready run's successor or prove current allocation membership.
+
+The diagnostic build and six Python checks pass. The smaller original allocator
+control qualifies append and matched-unlink logging across two lifetimes;
+matched unlink is observed before frees, so it does not prove completed free.
+All 695 direct bindings and 98 fixtures remain unchanged before docs edits.
+Independent review verifies those inputs and all 17 raw files. The unittest
+passes its observation assertions, while native exit 1 retains the failed
+lifecycle; both exact children exit naturally, are reaped and are absent.
+
+Next, use one opt-in Ready observation with the same logger and a live SIS
+backing snapshot captured at construction. After the original first text
+refusal, inspect exact suballocation membership through the existing bounded
+used-list helper. An unavailable/replaced backing or missing membership must
+remain explicit. Preserve all guards and stop before any ownership correction
+until that identity evidence is reviewed. No text-list exemption or completed
+Session retirement is claimed.
 
 The existing RNG observer can be reused afterward, but the Stadium notes require
 C3's per-tick, per-owner ledger to be compared with the original. C8's broader
