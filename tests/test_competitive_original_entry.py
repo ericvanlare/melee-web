@@ -65,12 +65,14 @@ class CompetitiveOriginalEntryTests(unittest.TestCase):
         self.assertEqual(r.competitive_items.frequency_rights,3)
         return r
 
-    def entry_rows(self,r, mutation=None):
+    def entry_rows(self,r, mutation=None, *, setup_samples=1):
         # Existing synthetic CSS/SSS control, then explicitly authored competitive
         # setup. These are receiver controls, not original eight-minute evidence.
         rows=deepcopy(route_rows(self.profile)[6:])
         for row in rows:
             name=row['payload'].get('name')
+            if name=='input' and setup_samples == 0:
+                continue
             if name=='vs_entry':
                 for s in row['payload']['slices']:
                     if s['tag']==4:
@@ -87,6 +89,7 @@ class CompetitiveOriginalEntryTests(unittest.TestCase):
                 self.entry_payload=row['payload']
                 if mutation is not None:mutation(row)
             if name=='vs_setup':
+                row['payload']['consumed']=setup_samples
                 normal=next(s['hex'] for s in self.entry_payload['slices'] if s['tag']==4 and s['flags']==0)
                 b=bytearray.fromhex(normal)
                 row['payload']['slices']=[dict(tag=4,flags=0,address=0x80001000,hex=b.hex())]
@@ -107,6 +110,18 @@ class CompetitiveOriginalEntryTests(unittest.TestCase):
         r=self.committed();self.entry_rows(r)
         self.assertTrue(r.ended);self.assertEqual(r.phase_order,('vs_entry','vs_setup'))
         self.assertEqual(r.tick_count,0)
+
+    def test_actual_zero_setup_consumption_does_not_invent_a_gameplay_sample(self):
+        # Existing original V6 seq1740/1741 both consumed0/menu_consumed540
+        # and tick240. Competitive setup bytes remain synthetic here; the
+        # source-derived zero-input setup lifetime is the actual control.
+        r=self.committed();self.entry_rows(r,setup_samples=0)
+        self.assertTrue(r.ended);self.assertEqual(r.consumed,0)
+        self.assertGreater(r.menu_consumed,0)
+        r.ended=False;r.menu_consumed=0
+        with self.assertRaisesRegex(SdDiagnosticError,'source input consumption'):
+            r.accept(dict(seq=r.seq,event='end',source_tick=0,
+                          payload=dict(status='interrupted',natural=False)))
 
     def test_explicit_scope_recipe_menu_and_legacy_rejection(self):
         p=make_input_plan(6);m=gci_competitive_entry_packet();validate_packet(m)

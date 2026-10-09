@@ -126,7 +126,8 @@ class Receiver:
         if event == "end":
             require(self.order == len(self.phase_order) and payload == {"status": "interrupted", "natural": False},
                     "SD prefix must end interrupted after SD setup, never legacy completion")
-            require(self.consumed > 0, "SD prefix consumed no source input")
+            require((getattr(self, "menu_consumed", 0) > 0) if self.competitive_entry else self.consumed > 0,
+                    "Declared prefix lacks observed source input consumption")
             self.ended = True
             return
         require(event == "progress" and payload.get("diagnostic") == SCOPE, "Unexpected SD observer event")

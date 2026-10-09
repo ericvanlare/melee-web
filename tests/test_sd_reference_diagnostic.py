@@ -538,6 +538,7 @@ namespace Core { struct Memory { const u8* GetPointerForRange(u32, size_t) { sta
 struct System { Memory m; Memory& GetMemory() { return m; } }; }
 namespace PowerPC { struct PowerPCState { std::array<u32,32> gpr{}; }; }
 constexpr u32 CSS_ENTER_RETURN=0x802669f0, PAD_READ_HSD_CALLER=0x80376a28;
+constexpr u32 PROFILE_SAVE_DATA_OFFSET=0x1868, PROFILE_SAVE_DATA_SIZE=0x55e8;
 enum class Event { Progress };
 bool AppendHexBytes(std::string*, const u8*, size_t) { return true; }
 """ + enum + r"""
@@ -588,6 +589,15 @@ int main() {
   SdInitState capped; assert(capped.Entry(0x80001000,false));
   for (u32 i=0;i<4323;++i) assert(capped.Consume());
   assert(!capped.Consume()); assert(capped.consumed==4323);
+  SdInitState profile;
+  assert(!profile.Ready(false,true));
+  assert(profile.Entry(0x80001000,false));
+  assert(!profile.Ready(true,true)); // SD cannot satisfy ordinary profile scope
+  assert(profile.Ready(false,true));
+  assert(profile.phase==SdInitState::Phase::Complete);
+  assert(profile.setup_pointer==0x80001000 && profile.consumed==0);
+  assert(!profile.Consume() && !profile.Exit() && !profile.Retire());
+  assert(!profile.Entry(0x80003000,true));
 }
 """
         with tempfile.TemporaryDirectory() as directory:
