@@ -5945,7 +5945,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..3492cd22f052a658e060a4ab3847a9b4
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee43beaf59 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..1eb1396fd4cb9fed5d7c5088bb35323dee19b488 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,15 @@
@@ -6099,7 +6099,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -788,137 +868,4020 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
+@@ -788,137 +868,4036 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
              }
              break;
          }
@@ -7142,7 +7142,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
 + * Stadium font-1 objects are tracked by their original source identities;
 + * no foreign entity or camera pointer is followed. */
 +static int stadium_owner_started_sis_snapshot(
-+    MeleeWebStadiumDisplayOwner* owner)
++    MeleeWebStadiumDisplayOwner* owner, const char* phase)
 +{
 +    size_t block_count = 0;
 +    size_t text_count = 0;
@@ -7154,6 +7154,9 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
 +    StadiumStartedContextSnapshot* contexts = NULL;
 +    const MeleeWebDiagnosticSisOwner* lease =
 +        owner != NULL ? &owner->sis_backing_lease.prior : NULL;
++    fprintf(stderr,"STADIUM_STARTED_SIS_CHECK phase=%s owner=%p\n",
++        phase, (void*) owner);
++    fflush(stderr);
 +    if (!stadium_owner_started_retirement_authorized(owner) ||
 +        !stadium_sis_control_used_head_validate(lease, used_head,
 +                                                &block_count) ||
@@ -7167,12 +7170,19 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
 +
 +    HSD_Text* text = HSD_SisLib_804D7978;
 +    for (size_t i = 0; text != NULL; ++i) {
-+        if (i >= block_count ||
++        if (i >= block_count) goto fail;
++        size_t actual_size = 0;
++        const size_t expected_size = (sizeof(HSD_Text) + 3) & ~(size_t)3;
++        const StadiumTextMembershipStatus membership =
 +            stadium_sis_control_membership_state_from_head(
-+                lease, text, (sizeof(HSD_Text) + 3) & ~(size_t)3, used_head,
-+                NULL, NULL, NULL, NULL, NULL) !=
-+                STADIUM_TEXT_MEMBERSHIP_PRESENT)
++                lease, text, expected_size, used_head,
++                NULL, NULL, NULL, NULL, &actual_size);
++        if (membership != STADIUM_TEXT_MEMBERSHIP_PRESENT) {
++            fprintf(stderr,"STADIUM_STARTED_SIS_MEMBERSHIP_REJECT phase=%s kind=text node=%p index=%zu actual_size=%zu expected_size=%zu status=%d\n",
++                phase, (void*) text, i, actual_size, expected_size, (int) membership);
++            fflush(stderr);
 +            goto fail;
++        }
 +        int owned_index = text == owner->texts[0] ? 0 :
 +                          text == owner->texts[1] ? 1 : -1;
 +        if (owned_index >= 0) {
@@ -7204,13 +7214,19 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
 +
 +    sislib_UnkAlloc3* context = HSD_SisLib_804D797C;
 +    for (size_t i = 0; context != NULL; ++i) {
-+        if (i >= block_count ||
++        if (i >= block_count) goto fail;
++        size_t actual_size = 0;
++        const size_t expected_size = (sizeof(sislib_UnkAlloc3) + 3) & ~(size_t)3;
++        const StadiumTextMembershipStatus membership =
 +            stadium_sis_control_membership_state_from_head(
-+                lease, context,
-+                (sizeof(sislib_UnkAlloc3) + 3) & ~(size_t)3, used_head,
-+                NULL, NULL, NULL, NULL, NULL) !=
-+                STADIUM_TEXT_MEMBERSHIP_PRESENT)
++                lease, context, expected_size, used_head,
++                NULL, NULL, NULL, NULL, &actual_size);
++        if (membership != STADIUM_TEXT_MEMBERSHIP_PRESENT) {
++            fprintf(stderr,"STADIUM_STARTED_SIS_MEMBERSHIP_REJECT phase=%s kind=context node=%p index=%zu actual_size=%zu expected_size=%zu status=%d\n",
++                phase, (void*) context, i, actual_size, expected_size, (int) membership);
++            fflush(stderr);
 +            goto fail;
++        }
 +        if (context == owner->context) {
 +            if (owned_context_seen++ != 0 || context->xA != 1 ||
 +                context->x4 != NULL)
@@ -7319,7 +7335,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
 +/* The control owns this entire live backing. Compare bytes rather than
 + * dereferencing a deliberately cyclic or malformed synthetic root. */
 +static int stadium_owner_control_refusal_unchanged(
-+    MeleeWebStadiumDisplayOwner* owner)
++    MeleeWebStadiumDisplayOwner* owner, const char* phase)
 +{
 +    MeleeWebStadiumDisplayOwner before;
 +    unsigned char backing[MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES];
@@ -7329,7 +7345,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
 +    sislib_UnkAlloc3* const contexts_before = HSD_SisLib_804D797C;
 +    memcpy(&before, owner, sizeof(before));
 +    memcpy(backing, owner->sis_backing_lease.prior.heap, sizeof(backing));
-+    return !stadium_owner_started_sis_snapshot(owner) &&
++    return !stadium_owner_started_sis_snapshot(owner, phase) &&
 +           memcmp(&before, owner, sizeof(before)) == 0 &&
 +           memcmp(backing, owner->sis_backing_lease.prior.heap,
 +                  sizeof(backing)) == 0 &&
@@ -7446,39 +7462,39 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
 +    HSD_GObj* const renderer_before = owner.renderers[0];
 +    owner.renderers[0] = owner.renderers[1];
 +    const int replaced_renderer_refused =
-+        stadium_owner_control_refusal_unchanged(&owner);
++        stadium_owner_control_refusal_unchanged(&owner, "negative-replaced-renderer");
 +    owner.renderers[0] = renderer_before;
 +    if (!replaced_renderer_refused) goto cleanup;
 +
 +    const uint64_t epoch_before = owner.sis_backing_lease.prior.source_epoch;
 +    owner.sis_backing_lease.prior.source_epoch ^= 1;
 +    const int stale_backing_refused =
-+        stadium_owner_control_refusal_unchanged(&owner);
++        stadium_owner_control_refusal_unchanged(&owner, "negative-stale-epoch");
 +    owner.sis_backing_lease.prior.source_epoch = epoch_before;
 +    if (!stale_backing_refused) goto cleanup;
 +
 +    SisBlock* const valid_used_head = used_head;
 +    used_head = &malformed_head;
 +    const int malformed_used_head_refused =
-+        stadium_owner_control_refusal_unchanged(&owner);
++        stadium_owner_control_refusal_unchanged(&owner, "negative-malformed-used-head");
 +    used_head = valid_used_head;
 +    if (!malformed_used_head_refused) goto cleanup;
 +
 +    extra_text = HSD_SisLib_803A5ACC(1, 0, 0, 0, 0, 1, 1);
 +    if (extra_text == NULL ||
-+        !stadium_owner_control_refusal_unchanged(&owner))
++        !stadium_owner_control_refusal_unchanged(&owner, "negative-extra-font1-text"))
 +        goto cleanup;
 +    HSD_SisLib_803A5CC4(extra_text);
 +    extra_text = NULL;
-+    if (!stadium_owner_started_sis_snapshot(&owner)) goto cleanup;
++    if (!stadium_owner_started_sis_snapshot(&owner, "positive-after-extra-removal")) goto cleanup;
 +
 +    HSD_Text* const next_before = owner.texts[1]->next;
 +    owner.texts[1]->next = owner.texts[0];
-+    const int text_cycle_refused = stadium_owner_control_refusal_unchanged(&owner);
++    const int text_cycle_refused = stadium_owner_control_refusal_unchanged(&owner, "negative-text-cycle");
 +    owner.texts[1]->next = next_before;
 +    sislib_UnkAlloc3* const context_next_before = owner.context->x0;
 +    owner.context->x0 = owner.context;
-+    const int context_cycle_refused = stadium_owner_control_refusal_unchanged(&owner);
++    const int context_cycle_refused = stadium_owner_control_refusal_unchanged(&owner, "negative-context-cycle");
 +    owner.context->x0 = context_next_before;
 +    if (!text_cycle_refused || !context_cycle_refused) goto cleanup;
 +
@@ -7546,7 +7562,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
 +        goto cleanup;
 +    owner.renderers[0] = owner.texts[0]->entity;
 +    owner.renderers[1] = owner.texts[1]->entity;
-+    if (!stadium_owner_started_sis_snapshot(&owner)) goto cleanup;
++    if (!stadium_owner_started_sis_snapshot(&owner, "positive-before-cached-reuse")) goto cleanup;
 +    HSD_SisLib_803A5CC4(owner.texts[0]);
 +    if (owner.sis_payload_prior_destruction != 1u) goto cleanup;
 +    HSD_Text* replacement = HSD_SisLib_803A5ACC(1, 0, 0, 0, 0, 1, 1);
@@ -7587,12 +7603,12 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
 +            renderer->user_data_remove_func != HSD_SisLib_803A5A2C)
 +            goto cleanup;
 +    }
-+    if (!stadium_owner_control_refusal_unchanged(&owner)) goto cleanup;
++    if (!stadium_owner_control_refusal_unchanged(&owner, "negative-cached-reuse")) goto cleanup;
 +    /* Unbracketed original context retirement must latch the third identity
 +     * as well. Recreated shape is never a way to clear any prior event. */
 +    HSD_SisLib_803A5DA0(1);
 +    if (owner.sis_payload_prior_destruction != 7u ||
-+        !stadium_owner_control_refusal_unchanged(&owner)) goto cleanup;
++        !stadium_owner_control_refusal_unchanged(&owner, "negative-unbracketed-context-drain")) goto cleanup;
 +    fprintf(stderr,"C1_SIS_STARTED_REUSE original_text_remove_recreate=1 text_cells_reused=1 renderer_cells_reused=1 original_order_restored=1 prior_destruction_latched=7 refusal_unchanged=1\n");
 +    fflush(stderr);
 +    passed = 1;
@@ -7664,7 +7680,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
 +        blocks_before = used_head;
 +        text_head_before = HSD_SisLib_804D7978;
 +        context_head_before = HSD_SisLib_804D797C;
-+        refused = stadium_owner_control_refusal_unchanged(&owner);
++        refused = stadium_owner_control_refusal_unchanged(&owner, "negative-extra-font1-context");
 +        if (!refused || used_head != blocks_before ||
 +            HSD_SisLib_804D7978 != text_head_before ||
 +            HSD_SisLib_804D797C != context_head_before ||
@@ -9545,7 +9561,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
 +         owner->manager_events != 0) && !started_retirement)
 +        return stadium_owner_error(error, error_size,
 +                                   "Started Stadium display owner lacks its exact live SIS backing lease");
-+    if (started_retirement && !stadium_owner_started_sis_snapshot(owner))
++    if (started_retirement && !stadium_owner_started_sis_snapshot(owner, "retirement-preflight"))
 +        return stadium_owner_error(error, error_size,
 +                                   "Started Stadium SIS owners lack exact live backing or bounded payload membership");
 +    StadiumTextTopologyObservation text_observation;
@@ -9592,7 +9608,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
 +        return stadium_owner_error(error, error_size,
 +                                   "Stadium borrowed SIS slot failed its exact preflight");
 +    if ((started_retirement
-+             ? !stadium_owner_started_sis_snapshot(owner)
++             ? !stadium_owner_started_sis_snapshot(owner, "retirement-preflight-recheck")
 +             : (!stadium_owner_text_topology_matches(owner, 1) ||
 +                !stadium_owner_context_topology_matches(owner, 1) ||
 +                stadium_owner_has_font1_before(owner))) ||
@@ -10231,7 +10247,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
  
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
-@@ -1185,22 +5148,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +5164,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -10273,7 +10289,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +5196,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +5212,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -10295,7 +10311,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +5218,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +5234,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
@@ -10318,7 +10334,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
      wrapper->flag = false;
      return gobj;
  }
-@@ -1896,6 +5898,9 @@ bool grStadium_801D42B8(void)
+@@ -1896,6 +5914,9 @@ bool grStadium_801D42B8(void)
      if (gp->u.stadium.xC4_b1) {
          return false;
      }
@@ -10328,7 +10344,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
      gp->u.stadium.xD0 =
          grDatFiles_801C6478(gp->u.stadium.xCC, gp->u.stadium.xC8);
      return true;
-@@ -2093,6 +6098,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2093,6 +6114,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
              gp = GET_GROUND(map_gobj);
              HSD_ASSERT(0x99B, gp);
              gp->u.stadium.xC4_b1 = true;
@@ -10338,7 +10354,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..e6a0a650785f1f1be35da07f795a10ee
              lbFile_80016580(datfiles[var_r29], gp->u.stadium.xCC,
                              &gp->u.stadium.xC8, fn_801D4220, NULL);
              temp_r31->u.stadium.xDC = 1;
-@@ -2221,6 +6229,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2221,6 +6245,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
          if (temp_r31->u.stadium.xDE == 5) {
              temp_r31->u.stadium.xD8 =
                  randi_between_2(yakumono_param->x0, yakumono_param->x4);
