@@ -20,6 +20,7 @@ def observer_source():
 FIXTURE = r'''
 #include "fixed_format_writer.hpp"
 #include <bit>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
