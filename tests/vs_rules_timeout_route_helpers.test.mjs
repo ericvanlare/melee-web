@@ -143,8 +143,9 @@ test('Prize return sends Start only in phase 9 and remains inside the shared bou
 
   const alreadyCss = await returnFromCompetitivePrize({
     deadlineAt: Date.now() + 1000,
-    observeHost: async () => activeHost(1),
-    observeTrace: async () => completedResultsTrace(),
+    observeHost: async () => assert.fail('coherent callback replaces split host read'),
+    observeTrace: async () => assert.fail('coherent callback replaces split trace read'),
+    observeSample: async () => ({host:activeHost(1),trace:completedResultsTrace()}),
     press: async () => assert.fail('CSS return must not send a Prize Start'),
     wait: async () => {},
   });

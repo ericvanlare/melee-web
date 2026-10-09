@@ -10,6 +10,7 @@ import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
+import {observeRuntimeOwner} from './runtime_owner_observation.mjs';
 import {createCssHumanJoinDriver} from './vs_css_two_human_driver.mjs';
 import {
   classifyResultsOwnerReadiness,
@@ -398,16 +399,6 @@ const waitCssTeams = async (isTeams, teams, label) => {
 const observeCssSetup = () => page.evaluate(() => window.menuObserveCssSetup?.() ?? null);
 const observeMatch = () => page.evaluate(() => JSON.parse(
   Module.UTF8ToString(Module._melee_web_native_menu_match_observe())));
-const observeResultsPadTrace = async () => {
-  const trace = await page.evaluate(() => {
-    if (typeof Module?._melee_web_native_menu_results_pad_trace !== 'function') return null;
-    const pointer = Module._melee_web_native_menu_results_pad_trace();
-    return pointer ? JSON.parse(Module.UTF8ToString(pointer)) : null;
-  });
-  // Keep only the latest already-observed bounded trace; no additional native sampling.
-  report.competitiveTimeoutRoute.results_pad_trace_latest = trace;
-  return trace;
-};
 const checkRuntimeDiagnosticCounters = async (label, retainCheckpoint = true) => {
   const counters = await readRuntimeDiagnosticCounters(page);
   lastRuntimeCounterPollAt = Date.now();
@@ -465,6 +456,25 @@ const ensureNoError = async label => {
       Date.now() - lastRuntimeCounterPollAt >= 1000)
     await checkRuntimeDiagnosticCounters(`phase-${state.phase} runtime diagnostic poll`, false);
   return state;
+};
+const observeTimeoutOwner = async (label, options) => {
+  const snapshot = await observeRuntimeOwner(page, report.competitiveTimeoutRoute, label, options);
+  const state = snapshot.state;
+  if (options?.includeResultsTrace)
+    report.competitiveTimeoutRoute.results_pad_trace_latest = snapshot.trace;
+  if (state.error) throw Error(`${label}: ${state.error}`);
+  if (state.message?.startsWith('Paused after a timing disruption')) {
+    report.timingPauses.push({label, phase: state.phase, message: state.message,
+      observedAt: new Date().toISOString(), status: 'failed_route'});
+    throw Error(`${label}: competitive route stops on a runtime timing disruption: ${state.message}`);
+  }
+  if (report.errors.length)
+    throw Error(`${label}: browser emitted errors: ${JSON.stringify(report.errors)}`);
+  if ((state.phase === 7 || state.phase === 8 || state.phase === 9 ||
+       state.phase === 5 || state.running === 0 || state.pause_disabled === true) &&
+      Date.now() - lastRuntimeCounterPollAt >= 1000)
+    await checkRuntimeDiagnosticCounters(`${label} runtime diagnostic poll`, false);
+  return snapshot;
 };
 const waitForNoQueuedPad = async (label, timeoutMs = 3000) => {
   const deadline = Date.now() + timeoutMs;
@@ -1061,8 +1071,7 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
     if (Date.now() >= gameplayDeadline)
       throw Error(`Stock-loss input reached the ${COMPETITIVE_TIMEOUT_BOUNDS.gameplayWallMs}ms gameplay bound from phase-7 entry`);
     if (Date.now() >= stockLossDeadline) break;
-    await resumeTimingPause(`before source P1 outward stock-loss pulse ${pulse}`);
-    const beforePulse = await observeMatch();
+    const {match: beforePulse} = await observeTimeoutOwner(`before source P1 outward stock-loss pulse ${pulse}`);
     const beforePulseFailures = competitiveTimeoutProgressFailures(beforePulse);
     assert.deepEqual(beforePulseFailures, [],
       `Source match changed before outward pulse ${pulse}: ${JSON.stringify({beforePulseFailures, beforePulse})}`);
@@ -1071,10 +1080,9 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
     await sourcePadSample(0, outwardStickX, 0,
       `P1 outward stock-loss pulse ${pulse}/${COMPETITIVE_TIMEOUT_BOUNDS.maximumOutwardPulses}`,
       0, COMPETITIVE_TIMEOUT_BOUNDS.outwardPulseFrames);
-    const state = await current();
-    if (state.error) throw Error(`P1 stock-loss input ${pulse}: ${state.error}`);
+    const {state, match: pulseMatch} = await observeTimeoutOwner(`P1 stock-loss input ${pulse}`);
     assert.equal(state.phase, 7, `The source match left gameplay during stock-loss pulse ${pulse}`);
-    latest = await observeMatch();
+    latest = pulseMatch;
     const consumedSourceFrames = latest.frame - beforePulse.frame;
     assert(consumedSourceFrames >= COMPETITIVE_TIMEOUT_BOUNDS.outwardPulseFrames,
       `Source PAD pulse ${pulse} did not advance through its declared ${COMPETITIVE_TIMEOUT_BOUNDS.outwardPulseFrames} source frames`);
@@ -1111,9 +1119,9 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
     COMPETITIVE_TIMEOUT_BOUNDS.stableNeutralFrames);
   await sourcePadSample(0, 0, 0, 'P2 neutral after one source stock loss', 1,
     COMPETITIVE_TIMEOUT_BOUNDS.stableNeutralFrames);
-  const neutralState = await current();
+  const {state: neutralState, match: neutralObservation} = await observeTimeoutOwner(
+    'neutral interval after first P1 stock loss');
   assert.equal(neutralState.phase, 7, 'The source match must remain in gameplay during the neutral interval');
-  const neutralObservation = await observeMatch();
   const stableFailures = competitiveTimeoutStableFailures(neutralObservation, firstLoss.frame);
   assert.deepEqual(stableFailures, [],
     `Both players did not remain neutral with exact [3,4] stocks for 120 source frames: ${JSON.stringify({stableFailures, neutralObservation})}`);
@@ -1130,11 +1138,7 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
   let nextSnapshotFrame = neutralObservation.frame + COMPETITIVE_TIMEOUT_BOUNDS.snapshotPeriodFrames;
   lastCounterRead = Date.now();
   while (Date.now() < gameplayDeadline) {
-    const state = await current();
-    if (state.error) throw Error(`Competitive timeout source match failed: ${state.error}`);
-    await resumeTimingPause('competitive timeout match remains unpaused');
-    if (report.errors.length)
-      throw Error(`Browser emitted errors during the natural timeout route: ${JSON.stringify(report.errors)}`);
+    const {state, match} = await observeTimeoutOwner('competitive timeout match remains unpaused');
     if (state.phase === 8) {
       if (terminalTransitionAt !== null &&
           Date.now() - terminalTransitionAt > COMPETITIVE_TIMEOUT_BOUNDS.resultsTransitionWallMs)
@@ -1146,7 +1150,7 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
       break;
     }
     if (state.phase === 5) {
-      latest = await observeMatch();
+      latest = match;
       const deferredFailures = competitiveTimeoutDeferredResultsFailures(state, latest, initialMatch.rules);
       assert.deepEqual(deferredFailures, [],
         `Stopped source phase 5 is accepted only for the retained unique P2 timeout during Results asset preparation: ${JSON.stringify({deferredFailures, state, latest})}`);
@@ -1189,7 +1193,7 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
       throw Error(`Source left deferred Results asset preparation for unexpected phase ${state.phase}`);
     assert.equal(state.phase, 7,
       `Source left gameplay before original Results (phase ${state.phase}): ${state.message}`);
-    latest = await observeMatch();
+    latest = match;
     if (latest?.observer_error)
       throw Error(`Match observer reported an error during timeout: ${JSON.stringify(latest)}`);
     const readinessFailures = competitiveTimeoutReadinessFailures(latest);
@@ -1228,10 +1232,10 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
   if (Date.now() >= gameplayDeadline)
     throw Error(`Original 8-minute source match did not reach Results within the ${COMPETITIVE_TIMEOUT_BOUNDS.gameplayWallMs}ms gameplay bound`);
   const resultsEnteredAt = Date.now();
-  const stateAfterTimeout = await current();
+  const {state: stateAfterTimeout, match: terminal} = await observeTimeoutOwner(
+    'original timeout Results entry');
   assert.equal(stateAfterTimeout.phase, 8,
     `Natural source timeout must enter original Results phase 8: ${JSON.stringify(stateAfterTimeout)}`);
-  const terminal = await observeMatch();
   const terminalFailures = competitiveTimeoutTerminalFailures(terminal);
   assert.deepEqual(terminalFailures, [],
     `Original source timeout result is not the unique P2 win: ${JSON.stringify({terminalFailures, terminal})}`);
@@ -1246,14 +1250,12 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
   report.checks.push(`Original MatchEnd produced OUTCOME_TIMEOUT with its exact unique P2 source winner list after ${terminal.frame} source frames`);
   await checkRuntimeDiagnosticCounters('original timeout Results entry');
   const resultsDeadline = resultsEnteredAt + COMPETITIVE_TIMEOUT_BOUNDS.resultsReturnWallMs;
-  const observeResultsHost = async label => {
-    await resumeTimingPause(label);
-    const state = await ensureNoError(label);
-    if ((state.phase === 5 || state.running === 0 || state.pause_disabled === true) &&
-        Date.now() - lastRuntimeCounterPollAt >= 1000)
-      await checkRuntimeDiagnosticCounters(`${label} stopped preparation health`, false);
-    return state;
+  const observeResultsSample = async label => {
+    const snapshot = await observeTimeoutOwner(label,
+      {includeMatch: false, includeResultsTrace: true});
+    return {host: snapshot.state, trace: snapshot.trace};
   };
+  const observeResultsHost = async label => (await observeResultsSample(label)).host;
   let resultsPresentationReadyAt = null;
   let resultsPresentationReady = false;
   let lastResultsHostState = null;
@@ -1278,16 +1280,14 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
   await shot('13-original-timeout-results');
   route.results_confirmation = await confirmTwoHumanResults({
     deadlineAt: resultsDeadline,
-    observeHost: observeResultsHost,
-    observeTrace: observeResultsPadTrace,
+    observeSample: observeResultsSample,
     press,
     wait: milliseconds => page.waitForTimeout(milliseconds),
   });
   report.checks.push('Original Results phase/readiness trace gated one P1 presentation Start and separate P1/P2 statistics Starts; source-consumed PAD and each participant confirmation were retained before the first Results exit');
   route.prize_return = await returnFromCompetitivePrize({
     deadlineAt: resultsDeadline,
-    observeHost: observeResultsHost,
-    observeTrace: observeResultsPadTrace,
+    observeSample: observeResultsSample,
     press,
     wait: milliseconds => page.waitForTimeout(milliseconds),
   });
