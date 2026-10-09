@@ -483,11 +483,47 @@ void run_vs_sudden_death_source_control()
                  "asset-free callback control only, no gameplay claim\n";
 }
 
+void run_typed_results_source_smoke(const melee_web::RuntimeFiles&,MeleeWebMenuHost*,
+    const ResultsMatchInfo&,std::uint32_t&,std::uint8_t[MELEE_WEB_PAD_STATE_BYTES]);
+std::vector<std::string> sd_resolution_asset_names(const MeleeWebMenuMatchSelection& selection)
+{
+    auto names=melee_web::menu_asset_names();
+    for(const auto& group:{melee_web::match_asset_names(selection),
+                          melee_web::results_asset_names(selection),melee_web::prize_asset_names()})
+        for(const auto& name:group)
+            if(std::find(names.begin(),names.end(),name)==names.end())names.push_back(name);
+    return names;
+}
+void emit_sd_resolution_fixture_manifest()
+{
+    // Descriptor only: observed two-Mario/FD identity, never a gameplay setup.
+    MeleeWebMenuMatchSelection selection{};selection.player_count=2;
+    selection.start.rules.stkind=St_Kind_Last;
+    for(auto& p:selection.start.players)p.slot_type=Gm_PKind_NA;
+    for(unsigned i=0;i<2;++i){
+        auto& p=selection.start.players[i];p.slot_type=Gm_PKind_Human;p.ckind=CKIND_MARIO;
+        p.stocks=4;p.color=1-i;
+        selection.players[i].controller=i;selection.players[i].stocks=4;
+        selection.players[i].costume=p.color;
+    }
+    auto invalid=selection;invalid.players[1].controller=0;
+    bool rejected=false;try{sd_resolution_asset_names(invalid);}catch(const std::exception&){rejected=true;}
+    check(rejected,"SD resolution descriptor accepted a duplicate source controller");
+    invalid=selection;invalid.start.players[1].color=255;
+    rejected=false;try{sd_resolution_asset_names(invalid);}catch(const std::exception&){rejected=true;}
+    check(rejected,"SD resolution descriptor accepted an unauthored costume");
+    const auto names=sd_resolution_asset_names(selection);
+    std::cout<<"{\"record\":\"sd_resolution_fixture_manifest\",\"required\":[";
+    for(unsigned i=0;i<names.size();++i){if(i)std::cout<<',';std::cout<<'"'<<names[i]<<'"';}
+    std::cout<<"]}\n";
+}
 void run_sudden_death_host_control(
     MeleeWebMenuHost* host, const MeleeWebMenuMatchSelection& selection,
     char* error, std::size_t error_size,
-    const melee_web::RuntimeFiles* world_files = nullptr, bool natural_timeout = false)
+    const melee_web::RuntimeFiles* world_files = nullptr, bool natural_timeout = false, bool resolve_sd = false)
 {
+    check(!resolve_sd||(natural_timeout&&world_files),
+          "SD resolution requires the natural typed prior-VS world");
     check(host != nullptr && selection.player_count >= 2 &&
               selection.player_count <= GM_MAX_PLAYERS,
           "Sudden Death host control requires the committed source menu selection");
@@ -729,6 +765,84 @@ void run_sudden_death_host_control(
                          <<"}\n"<<std::flush;
             };
             float pcm[1068];unsigned audio_phase=0;
+            if(resolve_sd){
+                const auto tick_sd=[&](const PADStatus pads[4]){
+                    match.tick(pads);audio_phase+=32000;
+                    const unsigned count=audio_phase/60;audio_phase%=60;
+                    check(melee_web_audio_render(match.audio(),pcm,count,error,error_size),error);
+                };
+                unsigned ready_ticks=0;
+                for(;ready_ticks<600&&(!match.ready()||match.source_frames()==0);++ready_ticks){
+                    PADStatus pads[4]{};pads[2].err=pads[3].err=-1;tick_sd(pads);
+                }
+                observe_frame("ready_boundary",ready_ticks);
+                check(match.ready()&&match.source_frames()>0&&!match.complete(),
+                      "Actual SD did not reach ready with active source cursor within 600 ticks");
+                const auto sd_active_start=match.source_frames();
+                unsigned elimination_ticks=0,ending_ticks=0;MeleeWebMatchStats frozen[2]{};
+                int winner=-1;
+                for(;elimination_ticks<2400&&!match.complete();++elimination_ticks){
+                    PADStatus pads[4]{};pads[2].err=pads[3].err=-1;pads[0].stickX=80;
+                    tick_sd(pads);
+                    check(match.player_stats(1).stocks==1,"Neutral SD opponent lost its original stock");
+                    if(match.ending()){
+                        check(match.outcome(winner)==OUTCOME_ELIMINATION,
+                              "SD ending began without original elimination");
+                        for(unsigned slot=0;slot<2;++slot){
+                            const auto current=match.player_stats(slot);
+                            if(ending_ticks)check(current.motion_id==frozen[slot].motion_id&&
+                                current.animation_frame==frozen[slot].animation_frame&&
+                                current.position[0]==frozen[slot].position[0]&&
+                                current.position[1]==frozen[slot].position[1]&&
+                                current.stocks==frozen[slot].stocks,
+                                "SD fighter processes advanced during original GAME freeze");
+                            else frozen[slot]=current;
+                        }
+                        ++ending_ticks;
+                    }
+                }
+                check(match.complete()&&ending_ticks>0&&match.player_stats(0).stocks==0&&
+                      match.outcome(winner)==OUTCOME_ELIMINATION&&winner==1,
+                      "Input-driven SD did not complete its original P2 elimination winner");
+                const auto sd_final_frames=match.source_frames();
+                const auto* live_sd_rng_owner=seed_ptr;
+                check(melee_web_match_rules_publish_result(),"Completed SD could not publish source terminal");
+                MatchExitInfo sd_exit{};
+                check(melee_web_match_rules_terminal_data(&sd_exit)&&seed_ptr==live_sd_rng_owner,
+                      "SD terminal publication lost payload or live RNG owner");
+                std::uint32_t final_sd_seed=0;std::uint8_t final_sd_pad[MELEE_WEB_PAD_STATE_BYTES];
+                match.capture_handoff(final_sd_seed,final_sd_pad);
+                emit_native_bytes("natural_sd_terminal",&sd_exit,sizeof(sd_exit));
+                emit_native_bytes("natural_sd_final_pad",final_sd_pad,sizeof(final_sd_pad));
+                MatchEnd expected_result=tied_timeout.match_end;MatchEnd sd_merge=sd_exit.match_end;
+                gm_80166CCC(&expected_result,&sd_merge);
+                MeleeWebMenuMatchContinuation results{};match.finish_sudden_death(results);
+                check(results.kind==MELEE_WEB_MENU_MATCH_CONTINUATION_RESULTS&&
+                      std::memcmp(&results.payload.results.match_end,&expected_result,sizeof(expected_result))==0&&
+                      !melee_web_gameplay_generation()&&!melee_web_gameplay_world_exists(),
+                      "Natural SD typed Results lost original merge or live owner cleanup");
+                const auto results_entry_seed=*seed_ptr;
+                std::cout<<"Natural SD elimination: ready input ticks "<<ready_ticks
+                         <<", departure input ticks "<<elimination_ticks<<", active cursor "<<sd_active_start
+                         <<", final SD cursor "<<sd_final_frames<<", frozen ending ticks "<<ending_ticks
+                         <<", winner source slot "<<winner<<", final SD RNG "<<final_sd_seed
+                         <<", Results entry RNG "<<results_entry_seed<<'\n';
+                emit_native_bytes("natural_overall_results",&results.payload.results,sizeof(ResultsMatchInfo));
+                auto result_seed=results_entry_seed;
+                run_typed_results_source_smoke(*world_files,host,results.payload.results,result_seed,final_sd_pad);
+                auto css=std::make_unique<melee_web::GameplayMenuWorld>(*world_files);
+                check(melee_web_menu_host_enter(host,css->audio(),error,error_size),error);
+                for(unsigned tick=0;tick<120;++tick){
+                    PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
+                    check(melee_web_menu_host_tick(host,pads,error,error_size)==1,error);
+                    audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
+                    check(melee_web_audio_render(css->audio(),pcm,count,error,error_size),error);
+                }
+                check(melee_web_menu_host_phase(host)==1,"SD Results did not return to original CSS");
+                check(melee_web_menu_host_leave(host,1,error,error_size),error);
+                css->verify_immutable_archives();css->close();css.reset();
+                std::cout<<"Natural SD typed Results and original CSS return completed\n";
+            }else{
             for(unsigned tick=0;tick<8;++tick){
                 PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
                 observe_frame("pre",tick);
@@ -746,6 +860,7 @@ void run_sudden_death_host_control(
             check(!melee_web_menu_host_sudden_death_match_claim(
                       host,&continuation,&duplicate,error,error_size),
                   "Aborted SD world allowed replay of its consumed continuation");
+            }
         }catch(...){
             // Match RAII has already retired world/scene/claim before abort.
             check(melee_web_menu_host_destroy(host,error,error_size),error);
@@ -765,7 +880,8 @@ void run_sudden_death_host_control(
                   replacement,&continuation,&stale,error,error_size),
               "Replacement host accepted stale SD continuation");
         check(melee_web_menu_host_destroy(replacement,error,error_size),error);
-        std::cout<<(natural_timeout?"Fixture-controlled original CSS/SSS natural VS tie -> actual SD world, early finish rejection, ":"Original CSS/SSS constructed tie -> actual SD world, early finish rejection, ")
+        if(resolve_sd)std::cout<<"Fixture-controlled natural VS timeout to input-driven SD elimination, Results/CSS and cleanup passed; no rendered/equivalence claim\n";
+        else std::cout<<(natural_timeout?"Fixture-controlled original CSS/SSS natural VS tie -> actual SD world, early finish rejection, ":"Original CSS/SSS constructed tie -> actual SD world, early finish rejection, ")
                   <<"neutral prefix and abort/reacquisition passed; "
                   <<(natural_timeout?"actual final VS PAD origin, ":"synthetic SSS PAD origin, ")
                   <<"no winner, rendered or equivalence claim\n";
@@ -1865,6 +1981,13 @@ void run_results_source_smoke(const melee_web::RuntimeFiles& files,
           "Original VS exit did not update exactly one persistent result counter");
     check(std::memcmp(&result.match_end,&exit_info.match_end,sizeof(result.match_end))==0,
           "VS mode Results entry changed the completed MatchEnd");
+    run_typed_results_source_smoke(files,host,result,seed,input_bytes);
+}
+void run_typed_results_source_smoke(const melee_web::RuntimeFiles& files,
+    MeleeWebMenuHost* host,const ResultsMatchInfo& result,
+    std::uint32_t& seed,std::uint8_t input_bytes[MELEE_WEB_PAD_STATE_BYTES])
+{
+    char error[256]{};
     std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)> decoded(
         melee_web_pad_state_decode(input_bytes,MELEE_WEB_PAD_STATE_BYTES,error,sizeof(error)),
         melee_web_pad_state_free);
@@ -3991,6 +4114,9 @@ void run_stadium_c1a_selection_smoke(
 #endif
 }
 int main(int argc,char** argv){try{
+ if(argc==2&&std::string_view(argv[1])=="--sd-resolution-fixture-manifest"){
+  emit_sd_resolution_fixture_manifest();return 0;
+ }
  if(argc==2&&std::string_view(argv[1])=="--vs-sudden-death-source-control"){
   run_vs_sudden_death_source_control();return 0;
  }
@@ -4014,8 +4140,10 @@ int main(int argc,char** argv){try{
  const bool sound_settings_recipe=input_recipe&&std::string(input_recipe)=="main-settings-sound-v1";
  const bool sd_menu_setup_recipe=input_recipe&&
      std::string(input_recipe)=="sudden-death-menu-setup-control-v1";
- const bool natural_sd_recipe=input_recipe&&
-     std::string(input_recipe)=="sudden-death-natural-timeout-control-v1";
+ const bool resolve_sd_recipe=input_recipe&&
+     std::string(input_recipe)=="sudden-death-natural-resolution-control-v1";
+ const bool natural_sd_recipe=resolve_sd_recipe||(input_recipe&&
+     std::string(input_recipe)=="sudden-death-natural-timeout-control-v1");
  const bool sudden_death_world_recipe=natural_sd_recipe||(input_recipe&&
      std::string(input_recipe)=="sudden-death-world-control-v1");
  const bool sudden_death_host_recipe=input_recipe&&
@@ -4338,7 +4466,8 @@ int main(int argc,char** argv){try{
           selection.start.rules.is_stock&&selection.start.rules.is_vs&&
           selection.start.players[0].stocks==4&&selection.start.players[1].stocks==4,
           "SD lifecycle fixture contract requires observed four-stock Mario/Mario colors 1/0 ports 0/1 on FD");
-    for(const auto& name:melee_web::match_asset_names(selection)){
+    for(const auto& name:resolve_sd_recipe?sd_resolution_asset_names(selection):
+                           melee_web::match_asset_names(selection)){
      if(files.contains(name))continue;
      auto path=std::filesystem::path(argv[1])/name;
      if(!std::filesystem::is_regular_file(path))path=std::filesystem::path(argv[2])/name;
@@ -4355,7 +4484,7 @@ int main(int argc,char** argv){try{
     trace.menu_selection(raw_start,selection,*prepared,pad);
    }
    run_sudden_death_host_control(host,selection,error,sizeof(error),
-                                sudden_death_world_recipe?&files:nullptr,natural_sd_recipe);
+                                sudden_death_world_recipe?&files:nullptr,natural_sd_recipe,resolve_sd_recipe);
    const auto retained=melee_web_gameplay_allocation();
    check(retained.identity==session_allocation.identity&&
          retained.generation==session_allocation.generation&&
@@ -4707,9 +4836,9 @@ int main(int argc,char** argv){try{
  }else if(sudden_death_world_recipe){
   check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
-  std::cout<<"Native actual SD lifecycle prefix and application session reacquisition passed; "
+  std::cout<<(resolve_sd_recipe?"Native natural SD resolution and application session reacquisition passed; ":"Native actual SD lifecycle prefix and application session reacquisition passed; ")
            <<(natural_sd_recipe?"fixture-controlled natural VS timeout only, ":"constructed tie only, ")
-             <<"no Results or gameplay acceptance claim\n";
+             <<(resolve_sd_recipe?"native functional Results/CSS only, no original comparison or browser acceptance\n":"no Results or gameplay acceptance claim\n");
  }else if(link_css_unload_recipe)
   std::cout<<"Native Link/Young Link CSS audio registry and unload smoke passed; no match/rendered claim\n";
  else if(sudden_death_host_recipe)
