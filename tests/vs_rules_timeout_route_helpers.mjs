@@ -81,17 +81,28 @@ export function competitiveTimeoutTerminalFailures(match) {
   return failures;
 }
 
+export function competitiveTimeoutReadinessFailures(match) {
+  const failures = [];
+  if (typeof match?.ending !== 'boolean' || typeof match?.complete !== 'boolean')
+    failures.push('source ending/completion fields must remain booleans');
+  if (typeof match?.ready !== 'boolean') {
+    failures.push('source HUD readiness must remain a boolean');
+  } else if (match?.ending === true || match?.complete === true) {
+    expect(failures, 'source HUD is disabled after match ending begins', match.ready, false);
+  } else {
+    expect(failures, 'source HUD is enabled while the match is active', match.ready, true);
+  }
+  return failures;
+}
+
 export function competitiveTimeoutDeferredResultsFailures(state, match, expectedRules) {
   const failures = [...competitiveTimeoutTerminalFailures(match)];
   expect(failures, 'deferred original Results asset phase', state?.phase, 5);
   expect(failures, 'deferred Results asset preparation is stopped', state?.running, 0);
   expect(failures, 'retained terminal match observer is valid', match?.observer_error ?? false, false);
-  if (typeof match?.ready !== 'boolean')
-    failures.push('retained terminal HUD readiness must remain a source boolean');
+  failures.push(...competitiveTimeoutReadinessFailures(match));
   expect(failures, 'retained terminal match observation is not paused', match?.paused, false);
-  if (typeof match?.ending !== 'boolean' || typeof match?.complete !== 'boolean') {
-    failures.push('retained terminal ending/completion fields must remain source booleans');
-  } else if (!match.ending && !match.complete) {
+  if (match?.ending !== true && match?.complete !== true) {
     failures.push('retained terminal match has neither source ending nor completion set');
   }
   const stocks = stockPair(match);

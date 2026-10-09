@@ -27,6 +27,7 @@ import {
   competitiveTimeoutDeferredResultsFailures,
   competitiveTimeoutFirstLossFailures,
   competitiveTimeoutProgressFailures,
+  competitiveTimeoutReadinessFailures,
   competitiveTimeoutStableFailures,
   competitiveTimeoutTerminalFailures,
   runtimeDiagnosticCounterFailures,
@@ -1171,7 +1172,9 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
     latest = await observeMatch();
     if (latest?.observer_error)
       throw Error(`Match observer reported an error during timeout: ${JSON.stringify(latest)}`);
-    assert.equal(latest?.ready, true, `Live match observer became unavailable: ${JSON.stringify(latest)}`);
+    const readinessFailures = competitiveTimeoutReadinessFailures(latest);
+    assert.deepEqual(readinessFailures, [],
+      `Source HUD readiness does not match the active-versus-ending state: ${JSON.stringify({readinessFailures, latest})}`);
     assert.equal(latest.paused, false, `Source match paused during the timeout route: ${JSON.stringify(latest)}`);
     assert.deepEqual(latest.players?.map(player => player.stocks), [3, 4],
       `Source stocks changed after the controlled first loss: ${JSON.stringify(latest.players)}`);

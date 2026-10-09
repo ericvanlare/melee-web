@@ -5,6 +5,7 @@ import {
   competitiveTimeoutDeferredResultsFailures,
   competitiveTimeoutFirstLossFailures,
   competitiveTimeoutProgressFailures,
+  competitiveTimeoutReadinessFailures,
   competitiveTimeoutStableFailures,
   competitiveTimeoutTerminalFailures,
   runtimeDiagnosticCounterFailures,
@@ -65,6 +66,20 @@ test('terminal acceptance uses the original timeout result and unique source win
     rules: {...terminal.rules, player_stocks: [3, 4]}}).some(row => row.includes('setup stocks')));
 });
 
+test('source HUD readiness is active only before the original match ending/completion', () => {
+  assert.deepEqual(competitiveTimeoutReadinessFailures({ready: true, ending: false, complete: false}), []);
+  assert.deepEqual(competitiveTimeoutReadinessFailures({ready: false, ending: true, complete: true}), []);
+  assert.deepEqual(competitiveTimeoutReadinessFailures({ready: false, ending: false, complete: true}), []);
+  assert(competitiveTimeoutReadinessFailures({ready: false, ending: false, complete: false})
+    .some(row => row.includes('enabled while the match is active')));
+  assert(competitiveTimeoutReadinessFailures({ready: true, ending: true, complete: false})
+    .some(row => row.includes('disabled after match ending')));
+  assert(competitiveTimeoutReadinessFailures({ready: 0, ending: true, complete: true})
+    .some(row => row.includes('must remain a boolean')));
+  assert(competitiveTimeoutReadinessFailures({ready: false, ending: 1, complete: true})
+    .some(row => row.includes('ending/completion fields')));
+});
+
 test('phase-5 Results preparation requires the exact retained terminal and unchanged normalized rules', () => {
   const rules = {match_kind: 1, stage: 0x20, timer_enabled: 1, time_limit: 480,
     disable_pausing: 0, damage_ratio_bits: '3f800000', item_frequency: -1,
@@ -90,6 +105,7 @@ test('phase-5 Results preparation requires the exact retained terminal and uncha
     ['wrong stocks', {...snapshot, players: [{stocks: 3}, {stocks: 3}]}],
     ['not terminal', {...snapshot, ending: false, complete: false}],
     ['untyped HUD readiness', {...snapshot, ready: 0}],
+    ['HUD remains enabled after terminal', {...snapshot, ready: true}],
     ['paused', {...snapshot, paused: true}],
     ['changed setup', {...snapshot, rules: {...rules, player_stocks: [3, 4]}}],
     ['changed rule', {...snapshot, rules: {...rules, item_frequency: 0}}],
