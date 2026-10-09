@@ -161,3 +161,22 @@ test('actual captured deferred SD phase5 admits only completed neutral published
   }
   assert.throws(()=>checkNeutralTimeout({phase:5,running:0,message:'Preparing original match continuation...'},{}));
 });
+
+// These are actual retained row fields, not a synthetic P2/phase-4 completion.
+test('actual v5 271-row P1-only prefix cannot admit next-scene preparation',async()=>{
+  const {readFile}=await import('node:fs/promises');
+  const {confirmTwoHumanResults,resultsPadTraceFailures}=await import('./vs_rules_results_confirmation_driver.mjs');
+  const fixture=JSON.parse(await readFile(new URL('./fixtures/sd_results_v5_observed_prefix.json',import.meta.url),'utf8'));
+  const actual=fixture.trace;
+  assert.equal(actual.retained,271);assert.deepEqual(resultsPadTraceFailures(actual),[]);
+  assert.deepEqual(actual.samples.at(-1).results_state_after_tick.players.map(p=>p.confirmed),[1,0,1,1]);
+  let actions=0;const keys=[];
+  const prefix=()=>{const length=[201,231,271,271][actions];return {...actual,
+    attempts:length,retained:length,samples:actual.samples.slice(0,length)};};
+  await assert.rejects(confirmTwoHumanResults({deadlineAt:Date.now()+45000,
+    observeTrace:async()=>prefix(),
+    observeHost:async()=>actions===3?{phase:5,running:0,message:'Preparing original next scene...',error:null}:{phase:8,running:1,error:null},
+    press:async key=>{keys.push(key);++actions;},wait:async()=>{},
+  }),/P2 statistics confirmation.*(?:exactly one|one consumed|Start)/);
+  assert.deepEqual(keys,['Enter','Enter','End']);
+});

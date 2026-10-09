@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {createCssHumanJoinDriver} from './vs_css_two_human_driver.mjs';
 import {readRuntimeDiagnosticCounters} from './runtime_callback_recorder.mjs';
 import {confirmTwoHumanResults} from './vs_rules_results_confirmation_driver.mjs';
+import {returnFromCompetitivePrize} from './vs_rules_timeout_route_helpers.mjs';
 
 export const SD_BROWSER_LIMITS = Object.freeze({vsSteps:4800,vsWallMs:120000,
   readySteps:600,readyWallMs:20000,departureSteps:2400,departureWallMs:45000,
@@ -182,9 +183,7 @@ export async function runSuddenDeathBrowserRoute(d) {
   const resultsDeadline=Date.now()+45000;
   const observeResultsHost=async label=>{
     await checked(label); // No recovery: any timing/incident/error stops polling.
-    const state=await current();
-    assert.equal(state.running,1,`${label}: original Results/Prize stopped running`);
-    return state;
+    return current(); // Shared guard checks active or exact witnessed preparation state.
   };
   const observeResultsTrace=async()=>{
     const trace=await page.evaluate(()=>{
@@ -202,21 +201,11 @@ export async function runSuddenDeathBrowserRoute(d) {
     observeTrace:observeResultsTrace,press,
     wait:milliseconds=>page.waitForTimeout(milliseconds),
   });
-  // Prize remains an original optional route outside the Results helper.
-  let tail=await observeResultsHost('SD first original Results exit');
-  const prizeInitialPhase=tail.phase;let prizeConfirmations=0;
-  assert([1,9].includes(tail.phase),'SD Results exited into unsupported host phase');
-  while(tail.phase===9&&prizeConfirmations<60){
-    assert(Date.now()<resultsDeadline,'SD Prize exceeded shared 45-second Results deadline');
-    await press('Enter',{releaseMs:380});++prizeConfirmations;
-    tail=await observeResultsHost(`SD original Prize confirmation ${prizeConfirmations}`);
-    assert(Date.now()<resultsDeadline,'SD Prize exceeded shared Results deadline during input/observation');
-    assert([1,9].includes(tail.phase),'SD Prize entered an unsupported host phase');
-  }
-  assert.equal(tail.phase,1,'SD Prize did not return to CSS within 60 confirmations');
-  assert(Date.now()<resultsDeadline,'SD Results return exceeded shared 45-second deadline');
-  report.suddenDeath.prizeReturn={initialPhase:prizeInitialPhase,
-    finalPhase:tail.phase,confirmations:prizeConfirmations};
+  report.suddenDeath.prizeReturn=await returnFromCompetitivePrize({
+    deadlineAt:resultsDeadline,observeHost:observeResultsHost,
+    observeTrace:observeResultsTrace,press,
+    wait:milliseconds=>page.waitForTimeout(milliseconds),
+  });
   const returned=await observeSource();
   assert.equal(returned.source.scene,1);assert.equal(returned.source.rules.stock_count,4);
   assert.equal(returned.source.rules.stock_time_limit,1);
