@@ -6,6 +6,7 @@
 #include "Core/PowerPC/ReferenceAllocationProfile.h"
 #include "Core/PowerPC/ReferenceInputStream.h"
 #include "Core/PowerPC/ReferenceSdInitState.h"
+#include "Core/PowerPC/ReferenceOrdinaryTimeoutState.h"
 
 #include <array>
 #include <algorithm>
@@ -501,6 +502,11 @@ bool SdInitRequested()
   return requested;
 }
 
+bool OrdinaryTimeoutRequested()
+{
+  return Env("MWRC_SD_MENU_PROBE") == "ordinary_timeout";
+}
+
 bool ActivationRequested()
 {
   return Env("MWRC_ENABLE") == "1" && !Env("MWRC_OUTPUT").empty() &&
@@ -899,10 +905,13 @@ struct Observer::Impl
       SetInvalid("SD menu probe requires the opt-in SD diagnostic owner");
       return false;
     }
+    if (!Env("MWRC_ORDINARY_POLICY_SHA256").empty() && !SdInitRequested())
+      return SetInvalid("Ordinary policy requires its diagnostic owner"), false;
     if (!Env("MWRC_SD_PROFILE_GCI_SHA256").empty() &&
         (!SdInitRequested() || (Env("MWRC_SD_MENU_PROBE") != "rules_ready" &&
                               Env("MWRC_SD_MENU_PROBE") != "sd_prefix" &&
                               Env("MWRC_SD_MENU_PROBE") != "competitive_entry" &&
+                              Env("MWRC_SD_MENU_PROBE") != "ordinary_timeout" &&
                               Env("MWRC_SD_MENU_PROBE") != "items_row") ||
          Env("MWRC_SD_PROFILE_GCI_SHA256") !=
              "5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729"))
@@ -921,13 +930,17 @@ struct Observer::Impl
           !Env("MWRC_ALLOCATION_OUTPUT").empty() ||
           (!Env("MWRC_SD_MENU_PROBE").empty() && Env("MWRC_SD_MENU_PROBE") != "rules_ready" &&
            Env("MWRC_SD_MENU_PROBE") != "sd_prefix" && Env("MWRC_SD_MENU_PROBE") != "items_row" &&
-           Env("MWRC_SD_MENU_PROBE") != "competitive_entry") ||
+           Env("MWRC_SD_MENU_PROBE") != "competitive_entry" && !OrdinaryTimeoutRequested()) ||
           ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "items_row" ||
-            Env("MWRC_SD_MENU_PROBE") == "competitive_entry") && Env("MWRC_SD_PROFILE_GCI_SHA256").empty()))
+            Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested()) && Env("MWRC_SD_PROFILE_GCI_SHA256").empty()))
       {
         SetInvalid("SD prefix requires a recipe hash, native input recording and exclusive scope");
         return false;
       }
+      if ((OrdinaryTimeoutRequested() && (Env("MWRC_ORDINARY_POLICY_SHA256") != OrdinaryTimeoutState::policy_hash ||
+           hash != "6cfb538e58ef9692a3ac6c8dac0dcff10129af7e6e14d851dec95583255d5326")) ||
+          (!OrdinaryTimeoutRequested() && !Env("MWRC_ORDINARY_POLICY_SHA256").empty()))
+        return SetInvalid("Ordinary timeout policy requires its exclusive exact identity"), false;
     }
     if (!Env("MWRC_WHOLE_SESSION_MATCHES").empty() && whole_session_matches == 0)
     {
@@ -997,6 +1010,8 @@ struct Observer::Impl
                    Env("MWRC_SD_MENU_PROBE") + "\"";
     if (!Env("MWRC_SD_PROFILE_GCI_SHA256").empty())
       handshake += ",\"profile_gci_sha256\":\"" + Env("MWRC_SD_PROFILE_GCI_SHA256") + "\"";
+    if (OrdinaryTimeoutRequested())
+      handshake += ",\"ordinary_policy_sha256\":\"" + Env("MWRC_ORDINARY_POLICY_SHA256") + "\"";
     handshake += "}";
     PushJson(Event::Handshake, handshake);
     std::string start =
@@ -2101,7 +2116,7 @@ struct Observer::Impl
       return false;
     if (scene_kind == 1 && (Env("MWRC_SD_MENU_PROBE") == "items_row" ||
                             Env("MWRC_SD_MENU_PROBE") == "sd_prefix" ||
-                            Env("MWRC_SD_MENU_PROBE") == "competitive_entry"))
+                            Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested()))
     {
       u8 menu_kind = 0;
       if (!ReadBytes(system, 0x804a04f0, 1, &menu_kind))
@@ -2131,7 +2146,7 @@ struct Observer::Impl
     // Menu globals retain pointers after their scene arena is reclaimed.
     // Observe each steering owner only in its live source menu scene.
     u8 stage_index = 0;
-    if (scene_kind == 9 && (Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry"))
+    if (scene_kind == 9 && (Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested()))
     {
       if (!sd_sss_ready)
         return true;
@@ -2386,6 +2401,40 @@ struct Observer::Impl
     }
   }
 
+  bool AddOrdinaryLive(Core::System* system, std::array<u8, 2>* stocks,
+                       std::array<u32, 2>* positions)
+  {
+    // gm_Scene_Vs_OnExit publishes MatchEnd without destroying fighters.
+    // Nevertheless revalidate each StaticPlayer->GObj->Fighter link at every
+    // scheduled/terminal observation; recorded creation pointers alone do not
+    // attest current ownership. Arena retirement clears them before completion.
+    if (sd_init.phase != SdInitState::Phase::VsActive && sd_init.phase != SdInitState::Phase::VsExited)
+      return false;
+    u32 scene = 0;
+    u8 kind = 0, mode = 0;
+    if (!ReadU32(system, 0x804d6720, &scene) || !scene ||
+        !ReadBytes(system, scene, 1, &kind) || kind != 2 ||
+        !ReadBytes(system, 0x80479d30, 1, &mode) || mode != 2 ||
+        !AddSceneKindSlice(system) || !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6))
+      return false;
+    for (u32 slot = 0; slot < 2; ++slot)
+    {
+      std::array<u8, 0x100> head{};
+      u32 damage = 1;
+      if (!fighter_present[slot] || !AddPlayerEntitySlices(system, slot) ||
+          !ReadBytes(system, fighter_pointers[slot], head.size(), head.data()) ||
+          head[12] != slot || ReadBE32(head.data() + 4) != 0 ||
+          !ReadU32(system, fighter_pointers[slot] + 0x1830, &damage) || damage != 0 ||
+          !ReadBytes(system, 0x80453080 + slot * 0xe90 + 0x8e, 1, &(*stocks)[slot]) ||
+          !AddSlice(system, SliceTag::FighterHead, fighter_pointers[slot], 0x100, slot) ||
+          !AddSlice(system, SliceTag::FighterDamageShield, fighter_pointers[slot] + 0x1830, 4, slot) ||
+          !AddSlice(system, SliceTag::FighterStocks, 0x80453080 + slot * 0xe90 + 0x8e, 1, slot))
+        return false;
+      (*positions)[slot] = ReadBE32(head.data() + 0xb0);
+    }
+    return true;
+  }
+
   void SdEvent(const char* name, u32 pc, u32 tick)
   {
     std::string json = "{\"diagnostic\":\"sd_initialization_prefix\",\"name\":\"" +
@@ -2404,6 +2453,16 @@ struct Observer::Impl
       json += "\"}";
     }
     json += "]}";
+    if (OrdinaryTimeoutRequested())
+    {
+      const std::string event_name(name);
+      const size_t cap = event_name == "menu" ? 6144 :
+                         (event_name == "input" || event_name == "menu_input" || event_name == "vs_retired") ? 512 :
+                         event_name == "tick" ? 2048 : event_name == "vs_setup" ? 4096 :
+                         event_name == "vs_exit" ? 8192 : 65536;
+      if (json.size() > cap)
+        return SetInvalid("Ordinary timeout event exceeds its serialized ceiling"), void();
+    }
     PushJson(Event::Progress, json, pc, tick);
   }
 
@@ -2414,7 +2473,7 @@ struct Observer::Impl
       return SetInvalid("SD prefix source counter is invalid"), void();
     raw_size = 0;
     slice_count = 0;
-    if ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry") &&
+    if ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested()) &&
         (pc == 0x8025a998 || pc == 0x8025b84c))
     {
       u32 word = 0;
@@ -2513,13 +2572,22 @@ struct Observer::Impl
       if (!BoundaryInstructionMatches(system, pc) ||
           !AddSlice(system, SliceTag::MatchClock, 0x8046b6a0, 0x2e))
         return SetInvalid("SD prefix scheduler return instruction differs"), void();
+      if (OrdinaryTimeoutRequested())
+      {
+        std::array<u8, 2> stocks{};
+        std::array<u32, 2> positions{};
+        if (sd_init.phase != SdInitState::Phase::VsActive || !AddOrdinaryLive(system, &stocks, &positions) ||
+            !ordinary_timeout.Tick(tick, ReadBE32(raw.data() + 0x24), ReadBE32(raw.data() + 0x28),
+                                   (raw[0x2c] << 8) | raw[0x2d], stocks[0], stocks[1], positions[0], positions[1]))
+          return SetInvalid("Ordinary timeout source clock/live ownership/policy differs"), void();
+      }
       SdEvent("tick", pc, tick);
       return;
     }
     if (pc == 0x8016e934 || pc == 0x8016ebc0)
     {
       const bool sudden = pc == 0x8016ebc0;
-      if (sudden && Env("MWRC_SD_MENU_PROBE") == "competitive_entry")
+      if (sudden && (Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested()))
         return SetInvalid("Competitive profile entry cannot admit SD"), void();
       u32 word = 0, root = 0, scene = 0;
       std::array<u8, 6> route{};
@@ -2548,7 +2616,7 @@ struct Observer::Impl
           !AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358) || !AddProfileSlices(system) ||
           !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6) || !AddSceneKindSlice(system))
         return SetInvalid("SD prefix setup/persistent VS payload is invalid"), void();
-      if (Env("MWRC_SD_MENU_PROBE") == "competitive_entry" &&
+      if ((Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested()) &&
           !AddSlice(system, SliceTag::ProfileSaveData, root + PROFILE_SAVE_DATA_OFFSET, PROFILE_SAVE_DATA_SIZE))
         return SetInvalid("Competitive committed item preferences are missing"), void();
       u32 rng = 0;
@@ -2578,7 +2646,7 @@ struct Observer::Impl
     {
       std::array<u8, 0xc> queue{};
       const bool menu = sd_init.phase == SdInitState::Phase::Menu;
-      if (!BoundaryInstructionMatches(system, pc) || (!menu && !sd_init.Consume()) ||
+      if (!BoundaryInstructionMatches(system, pc) || (!menu && !sd_init.Consume(OrdinaryTimeoutRequested() ? 29523 : SdInitState::sample_cap)) ||
           !ReadBytes(system, 0x804c1f78, queue.size(), queue.data()) || !queue[0] ||
           state->gpr[6] >= queue[0] || ReadBE32(queue.data() + 8) + state->gpr[6] * 0x30 != state->gpr[25] ||
           !AddSlice(system, SliceTag::PadSlot, state->gpr[25], 0x30))
@@ -2593,6 +2661,26 @@ struct Observer::Impl
           for (u32 byte = 0; byte < 11; ++byte)
             sd_menu_neutral &= pad[port * 12 + byte] == (port >= 2 && byte == 10 ? 0xff : 0);
         SdEvent("menu_input", pc, tick);
+        return;
+      }
+      if (OrdinaryTimeoutRequested())
+      {
+        bool neutral = true, direction = true;
+        for (u32 port = 0; port < 4; ++port)
+          for (u32 byte = 0; byte < 11; ++byte)
+          {
+            const u8 expected = port >= 2 && byte == 10 ? 0xff : 0;
+            neutral &= pad[port * 12 + byte] == expected;
+            direction &= pad[port * 12 + byte] == (port == 0 && byte == 2 ? 0xb0 : expected);
+          }
+        if (sd_init.phase == SdInitState::Phase::VsSetup)
+        {
+          if (!neutral || sd_init.consumed > 123)
+            return SetInvalid("Ordinary constructor input/cap differs"), void();
+        }
+        else if (sd_init.phase != SdInitState::Phase::VsActive || !ordinary_timeout.Input(neutral, direction))
+          return SetInvalid("Ordinary actual PAD policy/cap differs"), void();
+        SdEvent("input", pc, tick);
         return;
       }
       for (u32 port = 0; port < 4; ++port)
@@ -2618,6 +2706,7 @@ struct Observer::Impl
             !AddSlice(system, SliceTag::FighterStocks, 0x80453080 + slot * 0xe90 + 0x8e, 1, slot))
           return SetInvalid("SD prefix initialized fighter snapshot is invalid"), void();
       SdEvent(sudden ? "sd_setup" : "vs_setup", pc, tick);
+      if (OrdinaryTimeoutRequested()) ordinary_timeout.setup_samples = sd_init.consumed;
       if (sudden || Env("MWRC_SD_MENU_PROBE") == "competitive_entry")
       {
         // The native input footer completes THIS declared prefix. The primary
@@ -2634,6 +2723,29 @@ struct Observer::Impl
           !AddSlice(system, SliceTag::Result, 0x80479d98 + 0xc, 0x448) ||
           !AddSlice(system, SliceTag::MatchClock, 0x8046b6a0, 0x2e))
         return SetInvalid("SD prefix normal timeout exit is invalid"), void();
+      if (OrdinaryTimeoutRequested())
+      {
+        std::array<u8, 2> stocks{};
+        std::array<u32, 2> positions{};
+        const u8* clock = raw.data() + 0x448;
+        if (raw[4] != 1 || raw[5] != 1 || raw[6] != 0 || ReadBE32(raw.data()+8) != 28800 ||
+            raw[13] != 1 || raw[16] != 1 || !AddOrdinaryLive(system, &stocks, &positions) ||
+            !ordinary_timeout.Exit(tick, ReadBE32(clock + 0x24), ReadBE32(clock + 0x28),
+                                   (clock[0x2c] << 8) | clock[0x2d], stocks[0], stocks[1]))
+          return SetInvalid("Ordinary canonical timeout/live terminal differs"), void();
+        for (u32 slot = 0; slot < 2; ++slot)
+        {
+          const size_t base = 0x58 + slot * 0xa8;
+          if (raw[base] != 0 || raw[base+1] != 8 || (raw[base+3] >> 2) != (slot == 0 ? 1 : 0) ||
+              raw[base+5] != 0 || raw[base+8] != (slot == 0 ? 3 : 4) || raw[base+12] || raw[base+13])
+            return SetInvalid("Ordinary MatchEnd participant/stock/damage differs"), void();
+        }
+        for (u32 slot = 2; slot < 6; ++slot)
+          if (raw[0x58 + slot * 0xa8] != 3)
+            return SetInvalid("Ordinary MatchEnd inactive roster differs"), void();
+        SdEvent("vs_exit", pc, tick);
+        return;
+      }
       // Original outcome and participant decision remain outputs, never inputs.
       if (raw[4] != 1 || raw[5] != 1 || raw[6] != 0 || raw[0xd] != 2 ||
           raw[0x58] != 0 || raw[0x100] != 0 ||
@@ -2649,6 +2761,15 @@ struct Observer::Impl
       fighter_present.fill(false);
       fighter_pointers.fill(0);
       SdEvent("vs_retired", pc, tick);
+      if (OrdinaryTimeoutRequested())
+      {
+        if (tick != ordinary_timeout.ticks || !ordinary_timeout.Retire())
+          return SetInvalid("Ordinary retirement precedes terminal publication"), void();
+        sd_init.phase = SdInitState::Phase::Complete;
+        InputStream::RequestFinish(true);
+        natural_completion.store(false);
+        finish_requested.store(true);
+      }
     }
   }
 
@@ -3329,6 +3450,16 @@ struct Observer::Impl
   void PushJson(Event event, const std::string& json, u32 pc = 0, u32 tick = 0,
                 u32 draw = 0)
   {
+    if (OrdinaryTimeoutRequested())
+    {
+      // All JSON records, including handshake/start, are charged. Writer error
+      // and End records reserve two extra 4096+44-byte records in the proof.
+      if (ordinary_records >= 73498 || json.size() > 65536 ||
+          ordinary_bytes + 44 + json.size() > 128ULL * 1024 * 1024 - 8280)
+        return SetInvalid("Ordinary observer aggregate record/byte cap"), void();
+      ++ordinary_records;
+      ordinary_bytes += 44 + json.size();
+    }
     Slot* slot = Reserve(event, pc, tick, draw);
     if (!slot)
       return;
@@ -4002,6 +4133,8 @@ struct Observer::Impl
   u32 cpu_probe_samus_effect_palette_address = 0;
   std::array<bool, 4> cpu_slots{};
   SdInitState sd_init;
+  OrdinaryTimeoutState ordinary_timeout;
+  u64 ordinary_records = 0, ordinary_bytes = 0;
   bool sd_sss_ready = false;
   bool sd_rules_observed = false;
   u32 sd_menu_polls = 0;
@@ -4181,7 +4314,7 @@ static bool IsCaptureBoundary(u32 guest_pc)
     // opt-in companion configuration.  The normal observer boundary set and
     // its disabled path remain unchanged.
     return (SdInitRequested() && (guest_pc == 0x8016ebc0 || guest_pc == 0x8016ec24 ||
-            ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry") && guest_pc == 0x8025b84c))) ||
+            ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested()) && guest_pc == 0x8025b84c))) ||
            (CpuProbeEnabled() && FindCpuProbePoint(guest_pc) != nullptr &&
             (CpuProbeEnvironment().rng_return_pc == 0 ||
              CpuProbeEnvironment().rng_return_pc == guest_pc)) ||

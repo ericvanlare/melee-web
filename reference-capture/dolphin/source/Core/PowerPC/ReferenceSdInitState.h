@@ -33,8 +33,8 @@ struct SdInitState {
     phase = Phase::VsRetired;
     return true;
   }
-  bool Consume() {
-    if (phase == Phase::Menu || phase == Phase::Complete || consumed >= sample_cap) return false;
+  bool Consume(std::uint32_t cap = sample_cap) {
+    if (phase == Phase::Menu || phase == Phase::Complete || consumed >= cap) return false;
     ++consumed;
     return true;
   }
