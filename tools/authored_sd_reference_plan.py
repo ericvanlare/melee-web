@@ -50,8 +50,8 @@ def recipe(version=1):
         "exclusions": ["SD resolution", "Results/CSS return", "pixels", "PCM", "live timing"],
         "setup_policy": "original menus only; no game, RNG, fighter or winner writes",
     }
-    if version == 2 and type(version) is int:
-        declaration["version"] = 2
+    if version in (2, 3) and type(version) is int:
+        declaration["version"] = version
         declaration["cold_original_context"] = {
             "port_rumble_preferences": [0, 0, 1, 1],
             "human_source_slots": [1, 2],
@@ -59,6 +59,9 @@ def recipe(version=1):
             "port_mapping": "slot zero uses player index; otherwise slot minus one",
             "preparation": "original Options Rumble: P1/P2 off; P3/P4 untouched defaults",
         }
+        if version == 3:
+            del declaration["cold_original_context"]["human_source_slots"]
+            declaration["cold_original_context"]["human_source_ports_zero_based"] = [0, 1]
     elif version != 1 or type(version) is not int:
         raise ValueError("Unsupported authored SD recipe version")
     return declaration
@@ -67,7 +70,7 @@ def recipe(version=1):
 def validate_recipe(value):
     # Byte comparison also rejects bool-for-int and int-for-float substitutions.
     version = value.get("version") if isinstance(value, dict) else None
-    if version not in (1, 2) or canonical(value) != canonical(recipe(version)):
+    if version not in (1, 2, 3) or canonical(value) != canonical(recipe(version)):
         raise ValueError("Unsupported or changed authored SD reference recipe")
     return value
 
