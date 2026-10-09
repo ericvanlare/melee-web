@@ -300,7 +300,9 @@ def drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, t
 
     All axes, targets and limits are frozen in the canonical packet. Observer
     input events prove actual consumption; host sleep never proves readiness.
-    This is an initialization prefix, with no Results/resolution continuation.
+    Menu7 SD and menu8 competitive entry share this source-owned join policy;
+    historical menus keep their immediate-Human precondition. There is no
+    Results/resolution continuation.
     """
     from reference_versus_sequence_capture import raw_pad
     policy = menus["css"]
@@ -341,14 +343,14 @@ def drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, t
             controller.set_both(intent["p1"], intent["p2"], action=label)
             wait_source(lambda: receiver.menu_polls > before, label+":cursor", 600)
     wait_source(lambda: receiver.css is not None, "CSS constructor-owned inventory", 600)
-    if menus["version"] == 7:
+    if menus["version"] in (7, 8):
         for port in policy["ports"]:
             require_css_join_owner(receiver.css, port, initial=True)
     else:
         require([p["kind"] for p in receiver.css["players"]] == [0, 0], "CSS requires two original humans")
     for port, costume in enumerate(policy["costumes"]):
         move(port, policy["point"], f"Mario-P{port+1}")
-        if menus["version"] == 7:
+        if menus["version"] in (7, 8):
             wait_source(lambda: receiver.css["players"][port]["kind"] == 0 and
                         receiver.css["doors"][port]["kind"] == 0,
                         f"CSS own Human join P{port+1}", 600)

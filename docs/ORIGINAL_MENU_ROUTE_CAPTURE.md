@@ -520,7 +520,15 @@ The receiver correction requires exactly that committed return and consecutive
 source countdown, allowing only the already consumed held B until neutral.
 Readiness remains cooldown0 before any new action. Native producer, recipe,
 menu and inputs are unchanged; the reviewed second attempt remains pending.
-The failed stream is incomplete and cannot establish profile-entry acceptance.
+The second attempt passed the return lifecycle and reached typed CSS seq1299.
+Its exact initialized NA-door/cursor ownership equals the prior SD join
+projection, but menu8 incorrectly selected the historical immediate-Human guard.
+The driver now explicitly reuses the same bounded menu7 join policy for menu8:
+source movement precedes observed own-Human admission and A placement. CPU,
+foreign and unconstructed ownership still fail; final two-Human Mario checks
+remain strict. Native/menu/input identities and caps are unchanged. The third
+attempt remains pending review. Both failed streams are incomplete and cannot
+establish profile-entry acceptance.
 Source/unit controls do not establish runtime settings or outcome equivalence.
 Natural non-tied timeout comparison remains a separate #292 gate. This prefix
 makes no original Results/CSS lifecycle claim; that continuation is not required
