@@ -1097,5 +1097,27 @@
       "discovery": "pr298-discovery-unique-inventory-v1.json",
       "review": "pr298-discovery-fix-independent-review-v1.json"
     }
+  },
+  "milestone_integration": {
+    "pr": 298,
+    "source_head": "eaa2e495d867ca71741b70036b10a0bbc160b4c7",
+    "source_tree": "eeb3106570607243d8503bf6d62dcc3ef3c685e0",
+    "merge_commit": "df92e1ae496cd53a602997c064547f2f0e61f423",
+    "merged_tree_matches_reviewed_tree": true,
+    "ci_run": 37931931012,
+    "ci_conclusion": "success",
+    "checks": {
+      "completed": 14,
+      "success": 12,
+      "expected_skip": 2
+    },
+    "review_sha256": "921829d86211032006733c42e40e2531a040325195783c59b7a7929504f59f57",
+    "merge_receipt_sha256": "85c5540ead9519536db1a00c3c58ddcc6efa7da91c54e7a04a68592799cce357",
+    "private_locator": {
+      "run": "autonomous-roadmap-20261006-154157-ec099c21",
+      "review": "pr298-final-integration-review-v1.json",
+      "merge": "pr298-merged-result-v1.json"
+    },
+    "scope": "Reviewed milestone source and CI integration; retains all historical producer identities and separate original Results/CSS, RNG/input, physical/audio/pixel/performance gates."
   }
 }

@@ -165,7 +165,104 @@
     "native no-draw CSS renderer guard",
     "full suite three stale fixture/metadata failures"
   ],
-  "gaps": [
+  "integration": "held pending original comparison and final validation",
+  "combined_candidate_browser_regressions": {
+    "producer": "282fbddb4cc397f9a0f34f31dd7f1fb921dbc2b2",
+    "tree": "cd938e8b4053bcea119590134b581db57cb9b14b",
+    "wasm_sha256": "5a63f36df70714cd5c1d8c3f77a15bd9d34f95549e9bf3b1834ff865af79c5c5",
+    "build_manifest_sha256": "447fdf2fb38bb5a157204a52f88d5678229bc0adeed26b8674908dc7cc14198b",
+    "served_files": 46,
+    "runs": {
+      "sparse": {
+        "result": "passed",
+        "report_sha256": "ffb6f9074317b58b40607ed6efa3cd741c70004a6c5404b9a9f7456f279663c0",
+        "supervisor_sha256": "329940417d4995c845b483a2c592763d262dc2171ca63007cbf7ccc797419d7f",
+        "root_review_sha256": "78b1b0a27ede3c3461d9aa66bb31fd312feb9ac644ac3e72ae85a8d38cab22ce",
+        "private_locator": "sparse-combined-full-route-20261009-042427-887b6a3c",
+        "cleanup": "Exact4owned processes absent independently and owned HTTP socket rebound; source Eject and browser cleanup passed.",
+        "source_ports": [
+          0,
+          2
+        ],
+        "absent_ports": [
+          1,
+          3
+        ],
+        "stock_loss_frames": [
+          319,
+          652,
+          986,
+          1306
+        ],
+        "terminal_outcome": 2,
+        "canonical_winners": [
+          2
+        ],
+        "legacy_winner": -1,
+        "live_terminal_stocks": [
+          0,
+          4
+        ],
+        "results_rows": 290,
+        "seconds": 48.489,
+        "preparation_incidents": 8,
+        "thinned_samples": 2420
+      },
+      "dense_sd": {
+        "result": "passed",
+        "report_sha256": "e08cb33a21af308bc2b803f319efb6908264eb6c98f899879015265e55439369",
+        "supervisor_sha256": "a60d53971dab4f5fdffe5535aa43dab8804992afbd16897c7c5fb27408199da1",
+        "root_review_sha256": "0110b97fecd7623a19448f637387c6fe7cde000b7350d5233bc5b5e540b9c4f6",
+        "private_locator": "sparse-combined-dense-sd-20261009-042600-bb5da2af",
+        "cleanup": "Exact4owned processes absent independently and owned HTTP socket rebound; source Eject and browser cleanup passed.",
+        "source_ports": [
+          0,
+          1
+        ],
+        "prior_natural_timeout_frame": 3600,
+        "sd_terminal_frame": 278,
+        "sd_outcome": 2,
+        "canonical_winners": [
+          1
+        ],
+        "results_rows": 289,
+        "seconds": 100.781,
+        "preparation_incidents": 13,
+        "thinned_samples": 5574,
+        "scope": "Dense two-Human natural tied timeout, Sudden Death elimination, strict Results, CSS and subsequent ordinary prefix; not ordinary four-stock elimination."
+      },
+      "teams": {
+        "result": "passed",
+        "report_sha256": "0b6b241c625e3d0535032b9d4aa925c3add4c793d31f5af3d131fea2c2c67092",
+        "supervisor_sha256": "2b229c39ab70140d9fa131a972163eca14c715d3a679e7545253c53bcf45635e",
+        "root_review_sha256": "ddb00106f6dc69327d864b0442fc09a30c808e3ed12cceb5e48968ca9e4da55b",
+        "private_locator": "sparse-combined-teams-20261009-042600-77795a3d",
+        "cleanup": "Exact4owned processes absent independently and owned HTTP socket rebound; source Eject and browser cleanup passed.",
+        "source_players": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "control": "Four CPU9 Mario, teams0/0/1/1 with friendly fire; keyboard-gated P1 Results input",
+        "source_frame": 12627,
+        "outcome": 3,
+        "canonical_winners": [
+          1
+        ],
+        "winning_team": 0,
+        "winning_team_doors": [
+          0,
+          1
+        ],
+        "results_rows": 452,
+        "seconds": 262.77,
+        "observation_gap": "Successful compact match report exposes only pair0/1; four-player setup/roster and rendered HUD retain separate observations. No four-Human or physical-port claim."
+      }
+    },
+    "browser_runtime_preservation": "Later a928 source integration changes original observation tooling only; runtime and route harness unchanged. Capture producer remains282."
+  },
+  "historical_gaps": [
     "original sparse state/port comparison unrun",
     "current-producer dense/Teams whole-route regression",
     "physical input",
@@ -175,5 +272,220 @@
     "live timing/performance",
     "dedicated Prize edge"
   ],
-  "integration": "held pending original comparison and final validation"
+  "gaps": [
+    "original sparse setup/source-port comparison pending",
+    "original sparse terminal/Results/CSS comparison unrun",
+    "physical input",
+    "numeric HUD export",
+    "pixel equivalence and magenta FD geometry",
+    "PCM/uninterrupted audio",
+    "live timing/performance",
+    "dedicated Prize edge",
+    "Teams compact gameplay export covers only first two fighters"
+  ],
+  "original_sparse_observer_build": {
+    "producer": "be1c69699f34047c10dcc89da241afef1758aaee",
+    "tree": "a7fd7675fe9d0165ebd4c4361dabb27c1429b6bf",
+    "configuration": "Release",
+    "result": "pass",
+    "binary_sha256": "6c7f5aff2a95c4339699c2453781695ff42c7d880d2abb9e53161a781fcdec71",
+    "manifest_sha256": "74a57678329298591e9511a5a90f48d67bf3a929d065bf73522de72da8cae7d8",
+    "root_review_sha256": "533a1abf73ae68f905fc8d9a697aa116faba1e1f3d40cf57908dcf8f583df432",
+    "source_overlays_verified": 9,
+    "exact_owned_pids_absent": true,
+    "writes_guest_memory": false,
+    "scope": "Passive original observer compilation only; no game acceptance",
+    "private_locator": {
+      "run": "original-sparse-p1-p3-probe-20261009-v1",
+      "manifest": "native-build-reviewed-source-v1/artifact/build-manifest.json",
+      "review": "root-canonical-sparse-native-build-result-review-v1.json"
+    }
+  },
+  "final_integrated_suite": {
+    "state": "pass",
+    "retained_attempt_v1": {
+      "producer": "a928c1babba98bddee60f1fa40f43fb2351e6140",
+      "tree": "bc00d00a334cf346e99dfdf6e6a01f0edf54bb08",
+      "tests": 2266,
+      "skipped": 153,
+      "failures": 2,
+      "seconds": 525.412,
+      "log_sha256": "a89a61a0d4e2e033c74ddce18d5700d4745b55d5e6fa388079fb83580d717bb4",
+      "failures_description": [
+        "Exact CSS context predicate assertion omitted sparse opt-in",
+        "Old direct context-close assertion predated owned bounded cleanup helper"
+      ],
+      "exact_owned_pids_absent": true
+    },
+    "repair": {
+      "producer": "43a09f37033ec8945615e4f2ac0329d906deb3b1",
+      "scope": "Only the two stale tests; production and browser/native producers unchanged",
+      "focused_tests": 32,
+      "skipped": 1,
+      "failures": 0,
+      "log_sha256": "e37cd88395f70de91f3876b2c9428c4c1c4a2ffc0fe05876d22a11cea4132c7a",
+      "root_review_sha256": "61afe4f8b7ba35eeab91062caa23f1551e414ee27680eb825156288fa5f72f71"
+    },
+    "private_locator": {
+      "run": "original-sparse-p1-p3-probe-20261009-v1",
+      "first_log": "integrated-sparse-fullsuite-v1.log",
+      "repair_log": "integrated-sparse-fixture-focused-v1.log",
+      "repair_review": "root-sparse-fixture-repair-review-v1.json",
+      "final_log": "integrated-sparse-fullsuite-v2.log",
+      "final_process": "integrated-sparse-fullsuite-v2-process.json",
+      "final_review": "root-integrated-sparse-fullsuite-v2-review.json",
+      "main_merge": "current-main-squash-integration-review-v1.json"
+    },
+    "current_result": {
+      "result": "pass",
+      "source": "42b222840e0927f04bf429cf719e73bf2f2ca800",
+      "tree": "1ac2e939a232364f562a15ede46d5a93bece2668",
+      "tests": 2253,
+      "seconds": 514.031,
+      "skipped": 153,
+      "failures": 0,
+      "log_sha256": "6f12197b023d8451643003c8e3df66df5949c7a227adb9ba2b3fe5afdc2a6ddc",
+      "process_receipt_sha256": "99af8ef9c760b579c412a03cc2d56a8b5c9233e0b37f098ee3f8ea37d8962d98",
+      "exact_owned_pids_absent": [
+        55630,
+        55639,
+        55642
+      ],
+      "source_clean_unchanged": true,
+      "root_review_sha256": "c9cdc5809f9ab62ca7dea2b82c332bcc1ecbb307c78ca699385b5555eeed1117"
+    },
+    "current_main_merge": {
+      "head": "07b451f8126c09f65d0aaf8b0ca3282266b652c8",
+      "main": "df92e1ae496cd53a602997c064547f2f0e61f423",
+      "tree_equal_to_tested_source": true,
+      "review_sha256": "25054ce7001850f58eecee94b23dec62a6e312b37392aa6dd8f0706e9a8694c1"
+    }
+  },
+  "original_sparse_first_capture": {
+    "producer": "be1c69699f34047c10dcc89da241afef1758aaee",
+    "result": "failed first consumed PAD sample",
+    "seconds": 21.716,
+    "observer_records": 1719,
+    "observer_status": "invalid",
+    "input_recording": "incomplete",
+    "raw_sha256": "5c1afd4e9628a01ecc08d34473c7f781f2d965807db0055e757654ae0128421b",
+    "supervisor_sha256": "242adc7087ef6cdd7a81f2aef20fb6d55b126988239bb2ee6861a99ef4a874e1",
+    "root_review_sha256": "03db6404ded56706925f8702577d4228823e22301111e3a4c74ea0c5811ff857",
+    "reduction_sha256": "4a2370841f292dfe0a2d11ed475c214e17881f897b4be985082c866fb9b11e18",
+    "first_rejected": {
+      "seq": 1716,
+      "source_cursor": 0,
+      "consumed": 1,
+      "menu_consumed": 525,
+      "errors": [
+        0,
+        -1,
+        0,
+        -1
+      ],
+      "semantic_fields": "all defined fields are neutral",
+      "trailing_abi_bytes": [
+        156,
+        152,
+        200,
+        72
+      ]
+    },
+    "cause": "Sparse native predicate compared trailing ABI padding to zero; original PADStatus defines11semantic bytes at12-byte stride. Source mapping/press/release success remained unobserved.",
+    "cleanup": "All3recorded PIDs absent; exact native child waited/reaped0, terminate only, no error; inner guarded Python PID not separately recorded. Original profile/GCI unchanged.",
+    "repair": {
+      "producer": "b72c212be3fcbaedd9031fa15adbdf77a786f6c9",
+      "predicate": "Compare11defined fields, retain48raw bytes unchanged",
+      "focused_tests": 56,
+      "skipped": 1,
+      "failures": 0,
+      "focused_log_sha256": "ec08cbcbd7c6bea019d789a5fb1a36e30138193e39c3a4bfdf15f65762cf294b",
+      "source_checkpoint_sha256": "4b1b090e94192fe515712a983293130e4c55050d8bbf24d76e7f5266f7abefe0",
+      "root_integrated_review_sha256": "44d6082e47bafe33c99fc5fc6e103087cc29935b93f7b35f30b2a7cf700aa480",
+      "retained_focused_failures": "First invocation lacked tests import path and exposed known old profile predicate assertion; repaired path/already-reviewed fixture alignment; logs retained"
+    },
+    "comparison": "not run on failed capture",
+    "private_locator": {
+      "run": "original-sparse-p1-p3-probe-20261009-v1",
+      "capture": "original-sparse-coldboot-v1",
+      "supervisor": "capture-supervisor-v1.result.json",
+      "reduction": "first-pad-boundary-reduction-v1.json",
+      "root_review": "root-original-sparse-first-failure-review-v1.json"
+    }
+  },
+  "original_sparse_second_capture": {
+    "status": "failed before observed release; no original comparison run",
+    "producer": "b72c212be3fcbaedd9031fa15adbdf77a786f6c9",
+    "tree": "940f5ef484f91416cc771f49428bc80c9570731c",
+    "native_build": {
+      "elapsed_seconds": 762.36,
+      "binary_sha256": "4c5c9aa5195f9d1ad189478679ccf3fbebc6d038c9943dbefc325b1b0a4bd254",
+      "manifest_sha256": "6dd450d11a7cb15d6c8803cf3c7dd79eb5c9978801ea603377abb33c6d1e815d",
+      "log_sha256": "d0b5ad7a052d5870d3f36f800b85f50f545ec65318d3431cce6ff8cfb061b2d4",
+      "root_review_sha256": "31c3cea6817082259cac83b126e5eea89e77f9622b08cdf9dbc6a9f2b5b734c9"
+    },
+    "elapsed_seconds": 21.865,
+    "capture_packet_sha256": "cf188cacdc2286ca13a98e28f0d91272133f6e9b31a13a65d694573cbf750a48",
+    "result_sha256": "285e53dc66d69131f7cefad9795444dfedff344fa4e7da8331e3982ca1c41051",
+    "observer_sha256": "efea41d2465e331f98bbf92c11d65c424a95efcda23fdf4e6af5d8ee4efcf0df",
+    "input_sha256": "a624425fff296e0486d646c4d97ed9f58106f6afab3722f64c0615577ad7be67",
+    "actual_sequence": [
+      {
+        "sequence": 1721,
+        "consumed": 1,
+        "cursor": 0,
+        "kind": "neutral",
+        "slot_index": 3
+      },
+      {
+        "sequence": 1722,
+        "consumed": 2,
+        "cursor": 1,
+        "kind": "exact authored P1 A+x35 and P3 B+y-35",
+        "slot_index": 4
+      },
+      {
+        "sequence": 1723,
+        "consumed": 3,
+        "cursor": 2,
+        "kind": "identical held press rejected by immediate-release guard",
+        "slot_index": 0
+      }
+    ],
+    "source_errors": [
+      0,
+      -1,
+      0,
+      -1
+    ],
+    "source_reduction": "Original queued PAD snapshots and Pipe UpdateInput publication are distinct from host release intention. Allow only identical authored press to drain until actual neutral, retaining each sample under unchanged total8/prepress6 caps. Actual three-row sequence remains incomplete.",
+    "reducer_result_sha256": "0914dbc14b487c12b006c71b356ab8f318055971584c3eeb4c595389de7b6f82",
+    "reducer_plan_sha256": "e015ec8acfee326fd9d37d646e7ba71f38cb5a51cc50be0b742e6238e8080248",
+    "root_review_sha256": "f08c9965e8be62828e2d3bd7b9bba8b1784bece50700708616c95d3a1ee06f8a",
+    "cleanup": {
+      "exact_owned_pids_absent": [
+        88919,
+        88929,
+        88931
+      ],
+      "native_returncode": 0,
+      "terminate_sent": true,
+      "kill_sent": false,
+      "error": null
+    },
+    "private_lookup": {
+      "run": "original-sparse-p1-p3-probe-20261009-v1",
+      "capture": "original-sparse-coldboot-v2",
+      "result": "original-sparse-second-result-v1.json",
+      "root_review": "root-original-sparse-second-failure-and-reducer-review-v1.json"
+    }
+  },
+  "current_main_integration": {
+    "source": "07b451f8126c09f65d0aaf8b0ca3282266b652c8",
+    "base": "df92e1ae496cd53a602997c064547f2f0e61f423",
+    "tree": "1ac2e939a232364f562a15ede46d5a93bece2668",
+    "same_tree_as_tested_source": "42b222840e0927f04bf429cf719e73bf2f2ca800",
+    "review_sha256": "25054ce7001850f58eecee94b23dec62a6e312b37392aa6dd8f0706e9a8694c1",
+    "scope": "History-only integration of already-contained source; no code/test/doc delta."
+  }
 }

@@ -1,5 +1,12 @@
 # VS Rules and Items route — bounded Rules Plus timer slice
 
+Competitive Rules Plus milestone [PR #298](https://github.com/ericvanlare/melee-web/pull/298)
+merged as `df92e1ae` after independent review and all 14 final-head checks
+(12 successful, two expected skips). The merged tree exactly matches reviewed
+`eaa2e495`. The same boundary receipt retains both repaired CI failures and the
+original/browser evidence below; this closes the scoped milestone, with the
+separate acceptance gaps unchanged.
+
 **Compiled / Source identified / Native traced / Retail compared / Browser exercised**,
 limited to the declared configuration, initialized state and terminal fields below.
 
