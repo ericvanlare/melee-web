@@ -379,6 +379,85 @@
       "active transformed[] and generations are separate from dormant entity presence"
     ],
     "next_source_component": "Checked original all-entity admission for declared Jigglypuff/Ice Climbers/Mario/Fox four-slot diagnostic profile, focused ownership negatives before any build/capture",
-    "capture_or_browser_implementation_authorized": false
+    "capture_or_browser_implementation_authorized": false,
+    "superseded_by": "entity_prefix_component; original review and its then-current authorization retained as historical"
+  },
+  "entity_prefix_component": {
+    "status": "Compiled and source/synthetic controls passed; no new original capture or Jigglypuff/Ice Climbers browser comparison",
+    "source": "1f9681e0a6bb15bf2626754ae9e7623f1af6901b",
+    "tree": "e29d6746a37531253428ce11c0939f8036dadc84",
+    "profile": "jiggly-ice-mario-fox-v1",
+    "declared_roster": {
+      "character_select_kinds": [
+        15,
+        14,
+        8,
+        2
+      ],
+      "fighter_entities": [
+        [
+          15
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          0
+        ],
+        [
+          1
+        ]
+      ],
+      "setup": "Four CPU9, cpu_kind4, four stocks, costumes0/1/2/3, ordinary non-Teams Final Destination"
+    },
+    "source_boundaries": [
+      "Original observer admits exact source entity slots, creation identities and GObj/Fighter backlinks; missing, extra, alias, wrong-kind and non-CPU owners fail. Default primary-only observation is unchanged.",
+      "Capture ends passively at the first actual DrawReturn covering at least60 contiguous SourceTicks; authored queue capacity5 permits60..64 observations. Retain every source/PAD row in that batch; compare first60 separately. No original loop break or fabricated final outcome.",
+      "Explicit MWRCv8 context flag1 binds actual firstCSS context, setup, PAD values and source/draw sequence. Existing v8 per-tick browser rendering rejects any zero-/multi-tick original draw batch. This is a preparation failure, not permission to trim inputs or alter scheduling.",
+      "Checked browser full-entity output uses existing strict diagnostic schema v2 at setup and Match rows. Defaultv8/v9/v10 writers and unchanged strict comparator retain their contracts.",
+      "Runtime counts gm_801A4BA8 scene traversal independently of gameplay clock and input cursor. Requested mode survives failure; completion waits for checked teardown and remains complete=false/whole_session_equivalent=false."
+    ],
+    "browser_build": {
+      "target": "runtime",
+      "configuration": "Release",
+      "source": "1f9681e0a6bb15bf2626754ae9e7623f1af6901b",
+      "tree": "e29d6746a37531253428ce11c0939f8036dadc84",
+      "log_sha256": "c779a92c2185bc56ed93b5b27d48a81d78f4ab4135c75cd59c9c45dd610fad74",
+      "result_sha256": "8ccd1520b38ad6e94c88a431cb39a28c50256e33da7a840a39643d46d4541b91",
+      "served_files": 46,
+      "served_manifest_sha256": "3d1cc5022b8e45577b420685b02a145643af04baef2d31d74d8f9a2aeb15f17d",
+      "private_locator": "runs/entity-prefix-runtime-build-20261009-20261009-083017-01db628a",
+      "diagnostic_compile_flags": "All10MELEE_WEB boolean diagnostic flags remainOFF; explicit recipe chooses diagnostic prefix at runtime"
+    },
+    "fullsuite": {
+      "source": "1f9681e0a6bb15bf2626754ae9e7623f1af6901b",
+      "tests": 2269,
+      "skipped": 153,
+      "failures": 0,
+      "seconds": 525.722,
+      "log_sha256": "866f5eb50ea83e6e150d7f16a8cf6075dfb062904a539945344347726f692668",
+      "private_locator": "runs/entity-prefix-runtime-build-20261009-20261009-083017-01db628a/fullsuite-v1.log"
+    },
+    "focused": "49 original/encoder/parser/completion controls; requested-mode failure controls;11 integrated writer/transport controls, all passed. Synthetic/native-source scope only.",
+    "reviews": {
+      "root_prefix_sha256": "ddd356b8cd93b69ab4e14693e1ef31a0ae89c8ecd3d38d0e4130d67d14cd801c",
+      "root_writer_sha256": "d546c1132ad71da835bfe6d389da4db4143e074f262865351de5bb1664f0b24c",
+      "peer_writer_sha256": "f45f034b257a53d6ae64a2160dd7ba9ac7aa2594fc17ac6e6c6483b223747db0",
+      "requested_mode_receipt_sha256": "3c726c4b99ba0236340eb8d9a82fa8a24edda386d3420ac7b124a21ad1ab1ebd",
+      "private_locator": "runs/all-entity-observer-20261009-072410-d492b90d"
+    },
+    "retained_findings": [
+      "Exact60-at-draw assumption was rejected by original queued-PAD loop; full first qualifying batch now retained.",
+      "Source-control fixture import name, span offset and missing bound-argument errors retained before corrected passes; legacy wrapper compiler scratch gap remains explicit in private receipt.",
+      "Reporting initially bound requested mode only on success; now upload identity survives early failure and disagreed native mode is rejected."
+    ],
+    "next": "Finish bounded original four-CPU CSS/SSS choreography using existing menu driver, then freeze original build/inputs/collector for one capture. Stop first source ownership, route, input or unsupported-draw-batching failure. Browser comparison follows only a valid independent original prefix.",
+    "exclusions": [
+      "No new original recording",
+      "No Jigglypuff or paired Ice Climbers browser comparison yet",
+      "No active Sheik interval",
+      "No natural match ending, Results/CSS return, pixels, PCM, physical input, performance or whole-session acceptance"
+    ]
   }
 }
