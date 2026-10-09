@@ -897,6 +897,14 @@ struct Observer::Impl
       SetInvalid("SD menu probe requires the opt-in SD diagnostic owner");
       return false;
     }
+    if (!Env("MWRC_SD_PROFILE_GCI_SHA256").empty() &&
+        (!SdInitRequested() || Env("MWRC_SD_MENU_PROBE") != "rules_ready" ||
+         Env("MWRC_SD_PROFILE_GCI_SHA256") !=
+             "5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729"))
+    {
+      SetInvalid("SD loaded-profile diagnostic identity/scope differs");
+      return false;
+    }
     if (SdInitRequested())
     {
       const std::string hash = Env("MWRC_SD_RECIPE_SHA256");
@@ -978,6 +986,8 @@ struct Observer::Impl
       handshake += ",\"diagnostic\":\"sd_initialization_prefix\",\"recipe_sha256\":\"" +
                    Env("MWRC_SD_RECIPE_SHA256") + "\",\"menu_probe\":\"" +
                    Env("MWRC_SD_MENU_PROBE") + "\"";
+    if (!Env("MWRC_SD_PROFILE_GCI_SHA256").empty())
+      handshake += ",\"profile_gci_sha256\":\"" + Env("MWRC_SD_PROFILE_GCI_SHA256") + "\"";
     handshake += "}";
     PushJson(Event::Handshake, handshake);
     std::string start =
@@ -2394,6 +2404,21 @@ struct Observer::Impl
             if (!ReadProfileRoot(system, &profile) ||
                 !AddSlice(system, SliceTag::SdRumblePorts, profile + 0x1cc0, 4))
               return SetInvalid("SD Rules probe profile is invalid"), void();
+            if (!Env("MWRC_SD_PROFILE_GCI_SHA256").empty())
+            {
+              // Existing typed profile ranges, now observed at this reduced
+              // gate. Actual getter words bind both roots before reading them.
+              const std::array<u32, 6> words = {0x806d8840, 0x38631868, 0x4e800020,
+                                               0x806d8840, 0x38632ff8, 0x4e800020};
+              for (size_t i = 0; i < words.size(); ++i)
+              {
+                u32 word = 0;
+                if (!ReadU32(system, 0x8015cc40 + static_cast<u32>(i * 4), &word) || word != words[i])
+                  return SetInvalid("SD loaded-profile getter identity differs"), void();
+              }
+              if (!AddProfileSlices(system) || !AddProfileContextSlices(system))
+                return SetInvalid("SD loaded-profile context is missing"), void();
+            }
             SdEvent("rules_ready", pc, tick);
             InputStream::RequestFinish(true);
             natural_completion.store(false);

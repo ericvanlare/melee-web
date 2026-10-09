@@ -560,6 +560,7 @@ struct Reader {
   bool AddSceneKindSlice(Core::System*) { return true; }
   bool AddMenuSteeringSlices(Core::System*) { return true; }
   bool AddProfileSlices(Core::System*) { return true; }
+  bool AddProfileContextSlices(Core::System*) { return true; }
   bool ReadProfileRoot(Core::System*,u32*) { return true; }
   bool ReadFighterSourceSlot(Core::System*,u32,u8*) { return true; }
   bool AddSlice(Core::System*,SliceTag,u32,size_t,u16=0) { return true; }

@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 from authored_sd_reference_plan import canonical
 from retail_input_plan import load_plan, NEUTRAL_PAD, pipe_commands
 from reference_versus_sequence_capture import _atomic_ini, prepare_dual_pipe, DualPipeController, ObserverTail
-from sd_reference_diagnostic import RulesMenuReceiver, SdDiagnosticError, require
+from sd_reference_diagnostic import RulesMenuReceiver, GciRulesMenuReceiver, SdDiagnosticError, require
 from sd_original_menu_plan import validate_packet, matches
 from capture_retail_replay import dolphin_command, _copy_tree
 from capture_allocation_history import validate_reference_build_manifest
@@ -34,9 +34,9 @@ def rules_dolphin_command(dolphin, user, disc):
                       "-C", "Dolphin.Interface.ConfirmStop=False"]
 
 
-def cleanup_process(process, output):
+def cleanup_process(process, output, scope="rules_ready"):
     """Stop and reap only this runner's direct Popen; always retain the outcome."""
-    receipt = {"scope": "rules_ready", "pid": process.pid, "ownership": "direct-Popen",
+    receipt = {"scope": scope, "pid": process.pid, "ownership": "direct-Popen",
                "terminate_sent": False, "kill_sent": False, "returncode": None, "error": None}
     try:
         if process.poll() is None:
@@ -75,7 +75,7 @@ def menu_actions(path):
     raw = Path(path).read_bytes()
     require(len(raw) <= 1024 * 1024, "SD menu recipe exceeds its bound")
     value = json.loads(raw)
-    if isinstance(value, dict) and value.get("version") == 2:
+    if isinstance(value, dict) and value.get("version") in (2, 3):
         validate_packet(value)
         return value, hashlib.sha256(raw).hexdigest()
     require(isinstance(value, dict) and set(value) == {"schema", "version", "actions"} and
@@ -124,28 +124,43 @@ def prepare_rules_profile(profile, user):
     return p1, p2, source_inventory
 
 
-def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manifest, timeout=180):
+def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manifest, timeout=180, gci=None):
     """Own fresh output before preparation so failures cannot vanish before launch."""
     output = Path(output)
     output.mkdir()  # A collision never overwrites another run or its evidence.
+    scope = "rules_ready"
     try:
+        scope = menu_actions(menu_recipe)[0].get("scope", scope)
         return _run(dolphin=dolphin, disc=disc, profile=profile, input_plan=input_plan,
-                    menu_recipe=menu_recipe, output=output, build_manifest=build_manifest, timeout=timeout)
+                    menu_recipe=menu_recipe, output=output, build_manifest=build_manifest, timeout=timeout, gci=gci)
     except Exception as error:
         failure = output / "failure.json"
         if not failure.exists():
-            failure.write_bytes(canonical({"scope": "rules_ready", "stage": "prelaunch",
+            failure.write_bytes(canonical({"scope": scope, "stage": "prelaunch",
                                            "native_launched": False, "error": str(error)}))
         raise
 
 
-def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manifest, timeout):
+def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manifest, timeout, gci=None):
     build = validate_reference_build_manifest(Path(build_manifest), Path(dolphin))
     plan, plan_hash = load_plan(input_plan, allow_authored=True)
     menus, menu_hash = menu_actions(menu_recipe)
-    require(plan["authored_recipe"]["version"] == 3 and menus["version"] == 2,
+    campaign = menus["scope"] == "rules_ready_gci"
+    scope = menus["scope"]
+    require(plan["authored_recipe"]["version"] == (4 if campaign else 3) and
+            menus["version"] == (3 if campaign else 2) and (gci is not None) == campaign,
             "Runnable original diagnostic requires corrected recipe v3 and guarded reduced menu packet v2")
-    receiver = RulesMenuReceiver(plan)
+    loaded_profile = None
+    if campaign:
+        from sd_gci_profile import prepare_gci_folder
+        manifest_raw = Path(build_manifest).read_bytes()
+        overlay = ROOT / "reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp"
+        require(hashlib.sha256(manifest_raw).hexdigest() == build["sha256"] and
+                json.loads(manifest_raw).get("observer_source_overlay_sha256", {}).get(
+                    "Core/PowerPC/ReferenceCaptureObserver.cpp") == hashlib.sha256(overlay.read_bytes()).hexdigest(),
+                "Loaded-profile observer producer is stale or unbound")
+        loaded_profile, owned_gci = prepare_gci_folder(gci, output / "gci-folder")
+    receiver = GciRulesMenuReceiver(plan, loaded_profile) if campaign else RulesMenuReceiver(plan)
     require(type(timeout) in (int, float) and 0 < timeout <= 600, "Rules deadline is unbounded")
     user = output / "user"
     p1, p2, source_inventory = prepare_rules_profile(profile, user)
@@ -160,11 +175,20 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                        MWRC_SD_MENU_PROBE="rules_ready",
                        MWRC_INPUT_RECORD=str(native), MWRC_INPUT_STATUS=str(native_status))
     command = rules_dolphin_command(dolphin, user, disc)
+    if campaign:
+        environment["MWRC_SD_PROFILE_GCI_SHA256"] = loaded_profile["sha256"]
+        command += ["-C", "Dolphin.Core.SlotA=8", "-C",
+                    "Dolphin.Core.GCIFolderAPath=" + str(output / "gci-folder")]
     (output / "input-plan.json").write_bytes(canonical(plan))
     (output / "menu-recipe.json").write_bytes(canonical(menus))
-    (output / "launch.json").write_bytes(canonical({"scope": "rules_ready",
+    launch = {"scope": scope,
         "input_plan_sha256": plan_hash, "menu_recipe_sha256": menu_hash,
-        "profile_sha256": source_inventory, "build": build, "command": command}))
+        "profile_sha256": source_inventory, "build": build, "command": command}
+    if campaign:
+        launch.update(profile_gci_sha256=loaded_profile["sha256"], owned_gci=str(owned_gci),
+                      observed_prelaunch_config_modes={name: oct((user / "Config" / name).stat().st_mode & 0o777)
+                         for name in ("Dolphin.ini", "GCPadNew.ini")})
+    (output / "launch.json").write_bytes(canonical(launch))
     controller = DualPipeController(p1, p2, output / "input-intentions.jsonl")
     deadline = time.monotonic() + timeout
     with (output / "dolphin.log").open("xb") as log:
@@ -222,16 +246,16 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                 (output / "report.json").write_bytes(canonical(report))
                 return report
         except Exception as error:
-            (output / "failure.json").write_bytes(canonical({"scope": "rules_ready", "stage": "native",
+            (output / "failure.json").write_bytes(canonical({"scope": scope, "stage": "native",
                 "native_launched": True, "pid": process.pid, "error": str(error)}))
             raise
         finally:
             try:
-                cleanup_process(process, output)
+                cleanup_process(process, output, scope=scope)
             except SdDiagnosticError as error:
                 failure = output / "failure.json"
                 if not failure.exists():
-                    failure.write_bytes(canonical({"scope": "rules_ready", "stage": "cleanup",
+                    failure.write_bytes(canonical({"scope": scope, "stage": "cleanup",
                         "native_launched": True, "pid": process.pid, "error": str(error)}))
                 raise
 
@@ -241,6 +265,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("dolphin", "disc", "profile", "input-plan", "menu-recipe", "output", "build-manifest"):
         parser.add_argument("--" + name, type=Path, required=True)
+    parser.add_argument("--gci", type=Path, help="Exact retained re-export; required only by the separate GCI campaign")
     parser.add_argument("--timeout", type=float, default=180)
     args = parser.parse_args(argv)
     try:
