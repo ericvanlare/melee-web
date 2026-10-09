@@ -614,9 +614,9 @@ class EntityPrefixRulesMenuTests(unittest.TestCase):
                 with patch.object(implementation.time, "sleep"):
                     driver._boot_menus()
                 toggles = [a for a in actions if a[:3] == (16, 0, "A")]
-                self.assertEqual(len(toggles), 0 if mode == "prefix" else 1)
-                self.assertEqual(observed["mask"], (1 << 64) - 1 if mode == "prefix"
-                                 else int("fffffffffffbffff", 16))
+                self.assertEqual(len(toggles), 1 if mode == "team" else 0)
+                self.assertEqual(observed["mask"], int("fffffffffffbffff", 16) if mode == "team"
+                                 else (1 << 64) - 1)
                 self.assertEqual(observed["frequency"], 0)
                 self.assertEqual(observed["stocks"], 3 if mode == "team" else 4)
                 self.assertIn("original Items transition animation", waits)
