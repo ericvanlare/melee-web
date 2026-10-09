@@ -73,9 +73,8 @@ test('finite source-backed Results and destination readiness matrix requires the
   'constructed-results-preparation');
   assert.equal(classifyResultsOwnerReadiness(
     preparationHost(8, 'Original Results', 'Preparing original match continuation...')).reason,
-  'constructed-results-preparation', 'the finite SD producer label is retained for shared-helper reuse');
+  'constructed-results-preparation', 'disc or preparation display does not change native constructed-owner classification');
   for (const host of [
-    preparationHost(8, 'Preparing original Results...', 'Preparing original next scene...'),
     preparationHost(8, 'Paused.'),
     {...activeHost(8), pause_present: false},
     {...activeHost(8), pause_disabled: true},
@@ -95,12 +94,9 @@ test('finite source-backed Results and destination readiness matrix requires the
     preparationHost(9, 'Preparing first-use rendering...')).reason,
   'prize-first-use-render-settle');
   for (const host of [
-    preparationHost(1, 'Original character select'),
-    preparationHost(9, 'Original unlock notification', 'Preparing original character select...'),
     preparationHost(5, 'Preparing original character select...'),
     {...preparationHost(1, 'Original character select', 'Preparing original next scene...'), pause_present: false},
     {...activeHost(1), pause_disabled: true},
-    {...activeHost(9), status: 'Preparing first-use rendering...'},
   ]) assert.equal(classifyResultsDestinationReadiness(host).kind, 'invalid', JSON.stringify(host));
 
   for (const host of [
@@ -114,7 +110,6 @@ test('finite source-backed Results and destination readiness matrix requires the
     preparationHost(9, 'Preparing first-use rendering...')).reason,
   'prize-first-use-render-settle');
   for (const host of [
-    preparationHost(1, 'Original character select', 'Preparing original next scene...'),
     preparationHost(5, 'Preparing original next scene...'),
     {...activeHost(1), pause_present: false},
     {...activeHost(1), pause_disabled: true},
@@ -218,14 +213,14 @@ test('Prize return waits through Prize render settle, CSS transfer, construction
   assert.equal(waitCount, 4);
   assert.equal(result.final_phase, 1, 'the route only completes on observed active CSS');
   assert.deepEqual(result.deferred_preparation, [
-    {phase: 9, reason: 'prize-first-use-render-settle', preparation_label: 'Preparing first-use rendering...',
-      message: 'Preparing first-use rendering...', after_confirmation: 1, observations: 1},
-    {phase: 5, reason: 'asset-transfer', preparation_label: 'Preparing original character select...',
-      message: 'Preparing original character select...', after_confirmation: 2, observations: 1},
-    {phase: 1, reason: 'destination-construction', preparation_label: 'Preparing original character select...',
-      message: 'Original character select', after_confirmation: 2, observations: 1},
-    {phase: 1, reason: 'first-use-render-settle', preparation_label: 'Preparing first-use rendering...',
-      message: 'Preparing first-use rendering...', after_confirmation: 2, observations: 1},
+    {phase: 9, reason: 'prize-first-use-render-settle',
+      message: 'Preparing first-use rendering...', status: 'Preparing first-use rendering... · 25 ms · audio paused', after_confirmation: 1, observations: 1},
+    {phase: 5, reason: 'asset-transfer',
+      message: 'Preparing original character select...', status: 'Preparing original character select... · 25 ms · audio paused', after_confirmation: 2, observations: 1},
+    {phase: 1, reason: 'destination-construction',
+      message: 'Original character select', status: 'Preparing original character select... · 25 ms · audio paused', after_confirmation: 2, observations: 1},
+    {phase: 1, reason: 'first-use-render-settle',
+      message: 'Preparing first-use rendering...', status: 'Preparing first-use rendering... · 25 ms · audio paused', after_confirmation: 2, observations: 1},
   ]);
   assert.match(result.prize_source_exit_witness, /no dedicated Prize PAD source trace/);
 });
@@ -242,7 +237,7 @@ test('Prize route rejects phase 5 without prior Prize input, with wrong preparat
   }), /not active CSS\/Prize or an exact Results-destination preparation state/);
 
   await assert.rejects(returnFromCompetitivePrize({...common,
-    observeHost: async () => preparationHost(9, 'Original unlock notification'),
+    observeHost: async () => preparationHost(9, 'Paused.'),
   }), /not active CSS\/Prize or an exact Results-destination preparation state/);
 
   let phaseNineReads = 0;
@@ -515,4 +510,24 @@ test('retained v5/v6 Results traces and v6 stopped-CSS host projection preserve 
   assert.equal(waits, 1);
   assert.deepEqual(continuation.deferred_preparation.map(row => row.reason),
     ['destination-construction', 'first-use-render-settle']);
+});
+
+// snapshot().message prefers disc progress over preparationLabel and native
+// status; development onState and frame hooks can publish either display.
+test('readiness uses native identity and live Pause capability across arbitrary progress displays', () => {
+  for (const status of ['Reading local data 76/76', 'arbitrary stale progress', '']) {
+    for (const [classify, hosts] of [
+      [classifyResultsOwnerReadiness, [activeHost(8), preparationHost(8, 'Original Results'),
+        preparationHost(8, 'Preparing original Results...'), preparationHost(8, 'Preparing first-use rendering...')]],
+      [classifyResultsDestinationReadiness, [activeHost(1), activeHost(9),
+        preparationHost(5, 'Preparing original next scene...'), preparationHost(1, 'Original character select')]],
+      [classifyPrizeReturnReadiness, [activeHost(1), activeHost(9),
+        preparationHost(5, 'Preparing original character select...'), preparationHost(9, 'Preparing first-use rendering...')]],
+    ]) for (const host of hosts) {
+      assert.notEqual(classify({...host, status}).kind, 'invalid');
+      for (const invalid of [{phase: 99}, {running: 2}, {message: 'Paused.'}, {pause_present: false},
+        {pause_disabled: !host.pause_disabled}, {error: 'runtime failure'}])
+        assert.equal(classify({...host, status, ...invalid}).kind, 'invalid');
+    }
+  }
 });

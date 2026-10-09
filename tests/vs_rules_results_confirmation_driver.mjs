@@ -13,13 +13,6 @@ const MATCH_CONTINUATION_PREPARATION_MESSAGE = 'Preparing original match continu
 const CHARACTER_SELECT_PREPARATION_MESSAGE = 'Preparing original character select...';
 const FIRST_USE_PREPARATION_MESSAGE = 'Preparing first-use rendering...';
 
-function preparationStatusMatches(status, label) {
-  if (typeof status !== 'string') return false;
-  if (status === `${label} · audio paused` || status === `${label} · audio continuing`) return true;
-  if (!status.startsWith(`${label} · `)) return false;
-  return /^\d+ ms · audio (?:paused|continuing)$/.test(status.slice(label.length + 3));
-}
-
 function invalidReadiness(reason) {
   return {kind: 'invalid', reason};
 }
@@ -36,14 +29,15 @@ function checkHostReadinessShape(host) {
 
 function activeOwner(host, phase, message, owner) {
   if (host.phase !== phase || host.running !== 1 || host.message !== message ||
-      host.status !== message || host.pause_disabled !== false) return null;
+      host.pause_disabled !== false) return null;
   return {kind: 'active', owner, phase};
 }
 
-function stoppedPreparation(host, phase, nativeMessage, domMessage, reason) {
+function stoppedPreparation(host, phase, nativeMessage, reason) {
   if (host.phase !== phase || host.running !== 0 || host.message !== nativeMessage ||
-      host.pause_disabled !== true || !preparationStatusMatches(host.status, domMessage)) return null;
-  return {kind: 'preparing', phase, reason, message: nativeMessage, preparation_label: domMessage};
+      host.pause_disabled !== true) return null;
+  return {kind: 'preparing', phase, reason, message: nativeMessage,
+    status: host.status};
 }
 
 export function classifyResultsOwnerReadiness(host) {
@@ -51,18 +45,14 @@ export function classifyResultsOwnerReadiness(host) {
   if (invalid) return invalidReadiness(invalid);
   const active = activeOwner(host, 8, 'Original Results', 'results');
   if (active) return active;
-  const preparing = stoppedPreparation(host, 8, RESULTS_PREPARATION_MESSAGE,
-    RESULTS_PREPARATION_MESSAGE, 'scene-preparation') ||
-    stoppedPreparation(host, 8, MATCH_CONTINUATION_PREPARATION_MESSAGE,
-      MATCH_CONTINUATION_PREPARATION_MESSAGE, 'scene-preparation') ||
-    // The source host publishes the constructed Results owner while the DOM
-    // status still carries begin_preparation's label.
-    stoppedPreparation(host, 8, 'Original Results', RESULTS_PREPARATION_MESSAGE,
-      'constructed-results-preparation') ||
-    stoppedPreparation(host, 8, 'Original Results', MATCH_CONTINUATION_PREPARATION_MESSAGE,
-      'constructed-results-preparation') ||
-    stoppedPreparation(host, 8, FIRST_USE_PREPARATION_MESSAGE,
-      FIRST_USE_PREPARATION_MESSAGE, 'first-use-render-settle');
+  // Status text has independent disc-progress and development-frame writers.
+  // Native owner identity and the live Pause capability define readiness;
+  // retain DOM text for diagnostics without treating it as a state signal.
+  const preparing = stoppedPreparation(host, 8, RESULTS_PREPARATION_MESSAGE, 'scene-preparation') ||
+    stoppedPreparation(host, 8, MATCH_CONTINUATION_PREPARATION_MESSAGE, 'scene-preparation') ||
+    // Native construction publishes the owner before preparation is armed.
+    stoppedPreparation(host, 8, 'Original Results', 'constructed-results-preparation') ||
+    stoppedPreparation(host, 8, FIRST_USE_PREPARATION_MESSAGE, 'first-use-render-settle');
   return preparing || invalidReadiness('host is not an active Results owner or an exact stopped Results preparation state');
 }
 
@@ -75,13 +65,11 @@ export function classifyResultsDestinationReadiness(host) {
   if (prize) return prize;
 
   const nextScene = RESULTS_NEXT_SCENE_PREPARATION_MESSAGE;
-  const preparing = stoppedPreparation(host, 5, nextScene, nextScene, 'asset-transfer') ||
-    stoppedPreparation(host, 1, 'Original character select', nextScene, 'destination-construction') ||
-    stoppedPreparation(host, 9, 'Original unlock notification', nextScene, 'destination-construction') ||
-    stoppedPreparation(host, 1, FIRST_USE_PREPARATION_MESSAGE,
-      FIRST_USE_PREPARATION_MESSAGE, 'first-use-render-settle') ||
-    stoppedPreparation(host, 9, FIRST_USE_PREPARATION_MESSAGE,
-      FIRST_USE_PREPARATION_MESSAGE, 'prize-first-use-render-settle');
+  const preparing = stoppedPreparation(host, 5, nextScene, 'asset-transfer') ||
+    stoppedPreparation(host, 1, 'Original character select', 'destination-construction') ||
+    stoppedPreparation(host, 9, 'Original unlock notification', 'destination-construction') ||
+    stoppedPreparation(host, 1, FIRST_USE_PREPARATION_MESSAGE, 'first-use-render-settle') ||
+    stoppedPreparation(host, 9, FIRST_USE_PREPARATION_MESSAGE, 'prize-first-use-render-settle');
   return preparing || invalidReadiness('host is not active CSS/Prize or an exact Results-destination preparation state');
 }
 
@@ -93,14 +81,10 @@ export function classifyPrizeReturnReadiness(host) {
   const prize = activeOwner(host, 9, 'Original unlock notification', 'prize');
   if (prize) return prize;
 
-  const preparing = stoppedPreparation(host, 5, CHARACTER_SELECT_PREPARATION_MESSAGE,
-    CHARACTER_SELECT_PREPARATION_MESSAGE, 'asset-transfer') ||
-    stoppedPreparation(host, 1, 'Original character select', CHARACTER_SELECT_PREPARATION_MESSAGE,
-      'destination-construction') ||
-    stoppedPreparation(host, 1, FIRST_USE_PREPARATION_MESSAGE,
-      FIRST_USE_PREPARATION_MESSAGE, 'first-use-render-settle') ||
-    stoppedPreparation(host, 9, FIRST_USE_PREPARATION_MESSAGE,
-      FIRST_USE_PREPARATION_MESSAGE, 'prize-first-use-render-settle');
+  const preparing = stoppedPreparation(host, 5, CHARACTER_SELECT_PREPARATION_MESSAGE, 'asset-transfer') ||
+    stoppedPreparation(host, 1, 'Original character select', 'destination-construction') ||
+    stoppedPreparation(host, 1, FIRST_USE_PREPARATION_MESSAGE, 'first-use-render-settle') ||
+    stoppedPreparation(host, 9, FIRST_USE_PREPARATION_MESSAGE, 'prize-first-use-render-settle');
   return preparing || invalidReadiness('host is not active CSS/Prize or an exact Prize-return preparation state');
 }
 
@@ -321,10 +305,11 @@ export async function confirmTwoHumanResults({
         assertP2CompletionTrace(observed.trace, allowResultsPreparationFromIndex, label);
       if (readiness.kind === 'preparing' && allowResultsPreparationFromIndex !== null) {
         const existing = postConfirmationPreparation.find(row => row.phase === readiness.phase &&
-          row.reason === readiness.reason && row.preparation_label === readiness.preparation_label);
+          row.reason === readiness.reason && row.message === readiness.message);
         if (existing) existing.observations++;
         else postConfirmationPreparation.push({phase: readiness.phase, reason: readiness.reason,
-          preparation_label: readiness.preparation_label, message: readiness.message, observations: 1});
+          message: readiness.message,
+          status: readiness.status, observations: 1});
       }
       if (readiness.kind === 'active' && predicate(observed)) return observed;
       await pause(label);
