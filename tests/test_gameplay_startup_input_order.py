@@ -7,8 +7,8 @@ small reducer catches restoring menu input after source player selection again.
 from pathlib import Path
 import shutil
 import subprocess
-import tempfile
 import unittest
+from owned_test_workspace import OwnedWorkspaceTests
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,11 +29,11 @@ struct Input { int button; };
 struct Selection {
     std::array<int, 4> source_players{};
     unsigned player_count=2, source_camera_subjects=70, source_random_seed=123;
-    bool opening_demo=false;
+    bool opening_demo=false, sudden_death=false;
     const Input* source_initial_input=nullptr;
 };
 int context, camera, rules_owner, menu_owner;
-int pad=-1, form=-1, restore_count=0, prepare_count=0;
+int pad=-1, form=-1, restore_count=0, prepare_count=0, sd_prepare_count=0;
 bool opening_mode_seen=false;
 bool reject_restore=false;
 void check(bool value, const char* error) {
@@ -41,7 +41,7 @@ void check(bool value, const char* error) {
 }
 int* melee_web_match_begin_players(const int*, unsigned, unsigned, unsigned,
                                    void*, char*, unsigned long) {
-    pad=0; form=-1; restore_count=prepare_count=0;
+    pad=0; form=-1; restore_count=prepare_count=sd_prepare_count=0;
     return &context;
 }
 int melee_web_match_restore_input(int* owner, const Input* input, char*, unsigned long) {
@@ -59,6 +59,11 @@ int melee_web_match_rules_prepare_from_menu(int* rules, const int* menu,
     // during Fighter_Create or deferred spawn-matrix evaluation.
     form=pad; return 1;
 }
+int melee_web_match_rules_prepare_sudden_death_from_menu(int* rules,
+        const int* menu, char* error, unsigned long size) {
+    ++sd_prepare_count;
+    return melee_web_match_rules_prepare_from_menu(rules, menu, false, error, size);
+}
 void enter(const Selection& selection, const int* source_start_data) {
     char error[64]="input rejected";
     int* match_context=nullptr;
@@ -70,6 +75,7 @@ void enter(const Selection& selection, const int* source_start_data) {
 SUFFIX = r'''
     assert(match_context==&context && render_context==&camera);
     assert(opening_mode_seen==selection.opening_demo);
+    assert(sd_prepare_count==(selection.sudden_death ? 1 : 0));
 }
 int main() {
     Selection selected;
@@ -81,6 +87,10 @@ int main() {
     enter(selected,&menu_owner);
     assert(form==0x100 && restore_count==1 && prepare_count==1);
     selected.opening_demo=false;
+    selected.sudden_death=true;
+    enter(selected,&menu_owner);
+    assert(form==0x100 && restore_count==1 && prepare_count==1);
+    selected.sudden_death=false;
     selected.source_initial_input=nullptr;
     enter(selected,&menu_owner);
     assert(form==0 && restore_count==0 && prepare_count==1);
@@ -94,7 +104,8 @@ int main() {
 '''
 
 
-class GameplayStartupInputOrderTests(unittest.TestCase):
+
+class GameplayStartupInputOrderTests(OwnedWorkspaceTests):
     def test_pre_collision_restore_retains_world_and_one_shot_guards(self):
         compiler = shutil.which("clang") or shutil.which("cc")
         if not compiler:
@@ -146,28 +157,28 @@ int main(void){
     assert(!melee_web_match_restore_input(owner,&input,NULL,0));
 }
 '''
-        with tempfile.TemporaryDirectory(prefix="melee-pad-lease-") as directory:
-            root = Path(directory)
-            source, binary = root / "lease.c", root / "lease"
-            source.write_text(harness)
-            subprocess.run([compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
-                            str(source), "-o", str(binary)],
-                           check=True, capture_output=True, text=True, timeout=30)
-            subprocess.run([str(binary)], check=True, timeout=10)
+        directory = self.new_workspace(ROOT, 'melee-pad-lease-')
+        root = Path(directory)
+        source, binary = root / "lease.c", root / "lease"
+        source.write_text(harness)
+        subprocess.run([compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
+                        str(source), "-o", str(binary)],
+                       check=True, capture_output=True, text=True, timeout=30)
+        subprocess.run([str(binary)], check=True, timeout=10)
 
     def test_input_restored_once_before_source_player_selection(self):
         compiler = shutil.which("clang++") or shutil.which("c++")
         if not compiler:
             self.skipTest("a C++ compiler is required")
-        with tempfile.TemporaryDirectory(prefix="melee-startup-input-") as directory:
-            root = Path(directory)
-            source, binary = root / "order.cpp", root / "order"
-            source.write_text(PREFIX + world_entry() + SUFFIX)
-            compiled = subprocess.run([compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror",
-                            str(source), "-o", str(binary)],
-                           capture_output=True, text=True, timeout=30)
-            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
-            subprocess.run([str(binary)], check=True, timeout=10)
+        directory = self.new_workspace(ROOT, 'melee-startup-input-')
+        root = Path(directory)
+        source, binary = root / "order.cpp", root / "order"
+        source.write_text(PREFIX + world_entry() + SUFFIX)
+        compiled = subprocess.run([compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror",
+                        str(source), "-o", str(binary)],
+                       capture_output=True, text=True, timeout=30)
+        self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+        subprocess.run([str(binary)], check=True, timeout=10)
 
 
 if __name__ == "__main__":

@@ -5,13 +5,14 @@ from pathlib import Path
 import subprocess
 import struct
 import sys
-import tempfile
 import unittest
+from types import SimpleNamespace
+from owned_test_workspace import OwnedWorkspaceTests
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-class GameplayKirbyCopyAssetsTests(unittest.TestCase):
+class GameplayKirbyCopyAssetsTests(OwnedWorkspaceTests):
     @classmethod
     def setUpClass(cls):
         sdk = ROOT / ".deps/emsdk"
@@ -21,8 +22,9 @@ class GameplayKirbyCopyAssetsTests(unittest.TestCase):
         sys.path.insert(0, str(ROOT / "scripts"))
         from check_gameplay import node_runtime
         cls.node = node_runtime(ROOT)
-        cls.temp = tempfile.TemporaryDirectory(prefix="melee-kirby-copy-")
-        cls.addClassCleanup(cls.temp.cleanup)
+        from gameplay_sources import prepare_sources
+        source = prepare_sources(ROOT)
+        cls.temp = SimpleNamespace(name=str(cls.new_workspace(ROOT, "melee-kirby-copy-")))
         cls.binary = Path(cls.temp.name) / "kirby-copy.js"
         env = dict(os.environ, EM_CONFIG=str(sdk / ".emscripten"),
                    EMSDK=str(sdk), EMSDK_PYTHON=sys.executable)
@@ -30,10 +32,10 @@ class GameplayKirbyCopyAssetsTests(unittest.TestCase):
         result = subprocess.run([
             sys.executable, str(sdk / "upstream/emscripten/emcc.py"),
             "-O1", "-DTARGET_PC", "-ffunction-sections", "-fdata-sections",
-            "-I", str(ROOT / "src"), "-I", str(ROOT / ".deps/melee/src"),
+            "-I", str(ROOT / "src"), "-I", str(source),
             "-I", str(ROOT / ".deps/aurora/include"),
             "-include", str(ROOT / "src/gameplay_compat.h"),
-            "-c", str(ROOT / ".deps/melee/src/melee/ft/kinds/ftKirby/ftkirbydata.c"),
+            "-c", str(source / "melee/ft/kinds/ftKirby/ftkirbydata.c"),
             "-o", str(source_tables),
         ], cwd=ROOT, env=env, capture_output=True, text=True, timeout=120)
         if result.returncode:
@@ -41,7 +43,7 @@ class GameplayKirbyCopyAssetsTests(unittest.TestCase):
         command = [
             sys.executable, str(compiler), "-std=c++20", "-O1", "-fexceptions",
             "-DTARGET_PC", "-ffunction-sections", "-fdata-sections",
-            "-I", str(ROOT / "src"), "-I", str(ROOT / ".deps/melee/src"),
+            "-I", str(ROOT / "src"), "-I", str(source),
             "-I", str(ROOT / ".deps/aurora/include"),
             str(ROOT / "src/dat_archive.cpp"),
             str(ROOT / "tests/gameplay_kirby_copy_assets_test.cpp"),
