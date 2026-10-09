@@ -93,6 +93,9 @@ int melee_web_stadium_display_owner_capture(
     MeleeWebStadiumDisplayOwner*, HSD_GObj* display_ground,
     MeleeWebStadiumMap2BufferOwner* map2_buffer_owner,
     char* error, size_t error_size);
+/* Called only after original SIS Free finds a matching used allocation.
+ * Pointer comparison records source destruction; it never reads payloads. */
+void melee_web_stadium_display_owner_note_sis_free(const void* payload);
 void melee_web_stadium_display_owner_note_manager(HSD_GObj*, HSD_GObjProc*);
 int melee_web_stadium_display_owner_capture_manager(
     MeleeWebStadiumDisplayOwner*, MeleeWebStadiumManagerView*, char*, size_t);
@@ -127,7 +130,7 @@ int melee_web_stadium_display_owner_retirement_controls(void);
 int melee_web_stadium_map2_buffer_controls(void);
 int melee_web_stadium_source_journal_controls(void);
 /* Actual text-only SIS append/remove controls, under a live backing-heap
- * token. Per-text identity is checked SIS suballocation membership. */
+ * token. Current payload membership is separate from source lifetime events. */
 struct MeleeWebDiagnosticSisOwner;
 int melee_web_stadium_text_topology_controls(
     const struct MeleeWebDiagnosticSisOwner*);

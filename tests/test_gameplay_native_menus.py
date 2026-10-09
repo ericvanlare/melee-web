@@ -2047,6 +2047,49 @@ int main(void)
             self.assertIn("stale_allocation=refused", line)
             self.assertIn("removed_payload=absent", line)
             self.assertIn("malformed_used_head=refused", line)
+        started_layouts = [line for line in run.stderr.splitlines()
+                           if line.startswith("C1_SIS_STARTED_RETIREMENT layout=")]
+        self.assertEqual(len(started_layouts), 12, run.stderr)
+        for layout in ("prefix", "middle", "suffix"):
+            observations = [line for line in started_layouts
+                            if f"layout={layout} " in line]
+            self.assertEqual(len(observations), 4, run.stderr)
+            self.assertEqual(sum("initial_snapshot=accepted" in line
+                                 for line in observations), 2, run.stderr)
+            self.assertEqual(sum("selective_drain_preserved_order_and_bytes=1" in line
+                                 for line in observations), 2, run.stderr)
+        for line in started_layouts:
+            if "initial_snapshot=accepted" in line:
+                self.assertIn("text_cycle_refused=1", line)
+                self.assertIn("context_cycle_refused=1", line)
+                self.assertIn("negative_state_unchanged=1", line)
+        reuse_rows = [line for line in run.stderr.splitlines()
+                      if line.startswith("C1_SIS_STARTED_REUSE ")]
+        self.assertEqual(len(reuse_rows), 2, run.stderr)
+        for line in reuse_rows:
+            for field in ("original_text_remove_recreate=1", "text_cells_reused=1",
+                          "renderer_cells_reused=1", "original_order_restored=1",
+                          "prior_destruction_latched=7", "refusal_unchanged=1"):
+                self.assertIn(field, line)
+        extra_context = [line for line in run.stderr.splitlines()
+                         if line.startswith(
+                             "C1_SIS_STARTED_RETIREMENT extra_font1_context_refused=")]
+        self.assertEqual(len(extra_context), 2, run.stderr)
+        for line in extra_context:
+            self.assertIn("extra_font1_context_refused=1", line)
+            self.assertIn("no_mutation_before_original_drain=1", line)
+            self.assertIn("original_all_text_context_drain_cleanup=1", line)
+        started_controls = [line for line in run.stderr.splitlines()
+                            if line.startswith(
+                                "C1_SIS_STARTED_RETIREMENT_CONTROL ")]
+        self.assertEqual(len(started_controls), 2, run.stderr)
+        for line in started_controls:
+            self.assertIn("source_611c=1", line)
+            self.assertIn("source_5acc=1", line)
+            self.assertIn("source_5da0=1", line)
+            self.assertIn("source_5e70_cleanup=1", line)
+            self.assertIn("all_three_splice_positions=1", line)
+            self.assertIn("destroyed_borrowed_parent_context_x4_null=1", line)
 
     def test_stadium_sis_allocator_asset_free_lifecycle_controls(self):
         target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
