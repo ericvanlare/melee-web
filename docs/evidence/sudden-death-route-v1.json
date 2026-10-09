@@ -8,7 +8,7 @@
     "Source identified",
     "Native traced"
   ],
-  "status": "browser_v11_native_ordinary_v3_and_scoped_original_sd_initialization_compared_current_head_ci_open",
+  "status": "merged_functional_milestone_with_scoped_original_initialization_comparison",
   "scope": "Browser functional SD resolution/Results/next-entry; native ordinary regressions; original initialization-only declared field comparison",
   "producer": {
     "source": "8b6ad34914c9e955a0aba8f6cc1e75a952fb6bc3",
@@ -273,7 +273,6 @@
     }
   ],
   "open_gates": [
-    "Full suite passed cf8; later reference-only delta needs focused checks/current-head CI and root integration review.",
     "Original SD resolution/Results/RNG/input equivalence/pixels/PCM/live timing excluded from passed initialization comparison; broader acceptance remains separate.",
     "Internal final SD numeric PAD/RNG remain separately unobserved; Results-entry observations do not substitute for that boundary.",
     "Second whole ordinary match, sparse/four-player browser coverage, physical input, pixels/PCM equivalence, uninterrupted audio and foreground timing remain unrun."
@@ -488,7 +487,7 @@
       "raw_log_sha256": "89ff3fc6f6c271bbbfa38666efae9df1cef1d78b44dc6611bf35e0001a5a735a"
     },
     "runtime_build": "Frozen ordinary Release5308; no rebuild for helper/reference-toolset integration",
-    "integration": "root review/current-head CI and playable/original gates remain separate",
+    "integration": "Historical validation producer retained; final reviewed35d7 exact-head CI and owner integration completed via #297/bedc15ec. Broader gates remain separate.",
     "subsequent_executable_delta": "8173e69e shared original phase0 validator/trace-retention changes focused-tested; 2163 full-suite result remains fd55b378 only. Current executable suite remains required before integration."
   },
   "browser_results_diagnostics": {
@@ -753,5 +752,20 @@
     "checks": "Five CSS tests and staged content check passed; no checker/policy/production decoder change. Full external28rows retained.",
     "first_content_failure": "Long encoded payload finding retained in external log",
     "receipt_sha256": "0248c4005d80c3eb5e7730bb6dfd387421c22a7b301090d6f613087e9c46af06"
+  },
+  "integration": {
+    "pull_request": 297,
+    "issue": 291,
+    "issue_closed": true,
+    "merge_commit": "bedc15ec1c6f80e9ec2e9fbf3828359ea67fc7cf",
+    "reviewed_head": "35d7a2391e6916f191f2eaa3ac61437b18426ba9",
+    "tree": "941198b0f407d7fea1df60d043c3f9cf99838004",
+    "tree_equal_reviewed_candidate": true,
+    "ci": {
+      "checks": 14,
+      "success": 12,
+      "expected_skipped": 2
+    },
+    "scope": "Functional SD milestone merged after owner review and exact-head CI; producer-specific evidence and broader gates remain distinct."
   }
 }

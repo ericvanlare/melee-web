@@ -1,5 +1,25 @@
 # VS Rules and Items route — bounded Rules Plus timer slice
 
+The combined Rules/SD runtime passed the eight-minute functional route in V9.
+The [same scoped receipt](../evidence/competitive-rules-profile-preflight-v1.json)
+binds producer `87d89c27` and its fresh ordinary Release build: original menus
+set four stocks, 8:00, all 31 items off/None, pause off, friendly fire on,
+ratio 1.0 and handicap off. Two-Human Mario/FD reached a unique P2 timeout
+at source frame 28,800 after one P1 stock loss and neutral play, with live
+stocks `[3,4]`. All 361 Results trace rows were retained; source P2 Start
+consumption reached phase 4/statistics 2/all confirmations before transfer.
+Active CSS retained exact GameRules and Items, then Eject cleared source owners
+and assets. The 17 preparation-only incidents had zero dropped incidents;
+32,230 thinned samples are explicit. Browser errors/timing pauses were zero.
+Exact owned Node/server processes retired and the socket rebound.
+
+The merged SD main `bedc15ec` has the exact reviewed SD candidate tree. The
+Rules refresh preserves the exact premerge combined tree; it does not relabel
+the V9 build/capture producer. Final combined full regression/current-head CI
+and owner integration review remain open. Original competitive field/route
+comparison, physical input, foreground timing, pixels/PCM, uninterrupted audio
+and competitive-set acceptance remain separate gates.
+
 The 2026-10-08 [competitive-profile preflight receipt](../evidence/competitive-rules-profile-preflight-v1.json)
 adds **Compiled / Source identified / Browser exercised** evidence for setting
 four stocks, 8:00, all 31 item switches off, None frequency, pause off, friendly
@@ -29,9 +49,10 @@ exited 0, Playwright closed, and the exact owned HTTP server was reaped.
 This is **Compiled / Source identified / Browser exercised** evidence. It does
 not supply a matching original-game comparison. The SD candidate changes post-VS
 mode and returned CSS cache ownership; this ordinary `365c6b31` result does not
-validate those changes. Combined native timeout/Results/CSS controls and a final
-combined-runtime browser route remain open, as do the full suite/current-head CI
-and physical input, foreground timing, pixel/PCM, audio and performance gates.
+validate those changes. The later SD ordinary native controls and combined V9 browser route cover
+those ownership changes under their distinct producers. Final combined
+full suite/current-head CI remains open, as do
+physical input, foreground timing, pixel/PCM, audio and performance gates.
 The private receipt preserves the historical unavailable original preflight stderr
 and first readiness-control failure raw-log gaps explicitly.
 
@@ -52,11 +73,12 @@ browser match, No Contest Results, and retained Rules Plus/CSS navigation. The
 [scoped receipt](../evidence/vs-rules-plus-timer-source-route-v1.json) binds
 the retail source prefix, rendered headless Chrome report and screenshots,
 Release package hashes, callbacks, assets, and focused/full-suite checks. The
-retail capture reaches its first match setup, natural Results, scene teardown,
+retail capture reaches its first match setup, input-driven No Contest Results, scene teardown,
 and CSS return; its enclosing three-match request later failed during another
 match teardown/recreation path. That failure and the reduced prefix are retained
 in the receipt. Retail video used Null rendering, so no retail pixel comparison
-is claimed.
+is claimed. The older receipt's natural-Results label was corrected: its procedure uses No Contest and
+supports original Results/CSS lifecycle, not natural non-tied timeout.
 
 The earlier v2 receipt's item-mask mapping is superseded. Rev. 2 source
 observation and the corrected browser route show that toggling Items cursor 0

@@ -1,6 +1,6 @@
 {
   "schema": "melee-web-competitive-rules-profile-preflight-v1",
-  "status": "passed_menu_profile_only",
+  "status": "passed_combined_sd_runtime_natural_eight_minute_browser_route_final_regression_open",
   "issue": 292,
   "date": "2026-10-08",
   "labels": [
@@ -441,7 +441,6 @@
   ],
   "open_gates": [
     "Matching original-route input/state comparison for the declared competitive eight-minute setup and non-tied terminal; earlier one-minute Rules Plus receipt is different workload provenance only.",
-    "Final combined SD-runtime ordinary-timeout/post-VS/returned-cache seam controls and final combined-runtime eight-minute browser route; this pass binds365c only.",
     "Full current-candidate regression suite, independent integration review and current-head CI.",
     "Physical input, foreground timing, audible output, pixel/PCM equivalence and competitive-set acceptance."
   ],
@@ -553,5 +552,175 @@
       "No full suite/current-head CI"
     ],
     "historical_log_gaps": "Original preflight stderr and first readiness-focused failure raw log unavailable; no substitution claimed"
+  },
+  "combined_timeout_browser_route_v9": {
+    "status": "pass",
+    "scope": "Original competitive menus -> two-Human Mario/FD -> source-input one P1 loss -> natural eight-minute unique P2 timeout -> per-Human original Results confirmation -> active CSS exact profile retained -> Eject. Combined SD/runtime owner and post-VS cache path; no original competitive comparison.",
+    "source": {
+      "head": "87d89c2759e2fac9441e87a45024ca4573ea8822",
+      "tree": "2a0b58fe609a2e77b637754810d62c67ec5562f1",
+      "sd_candidate_parent": "35d7a2391e6916f191f2eaa3ac61437b18426ba9",
+      "wasm_sha256": "e82b93fc2f19c6c0f1726b0ba4f95159b73c18504cec3b618636c578e47ae593"
+    },
+    "terminal": {
+      "source_frames": 28800,
+      "outcome": 1,
+      "winners": [
+        1
+      ],
+      "live_stocks": [
+        3,
+        4
+      ],
+      "initial_stocks": [
+        4,
+        4
+      ],
+      "colors": [
+        1,
+        0
+      ],
+      "ports": [
+        0,
+        1
+      ],
+      "timer_seconds": 480,
+      "pause_disabled": 1,
+      "normalized_item_mask": "fffffff80000000f"
+    },
+    "first_loss_source_frame": 301,
+    "neutral_stable_source_frame": 548,
+    "results": {
+      "retained_rows": 361,
+      "attempts": 361,
+      "overflow": false,
+      "presentation_before_after": [
+        290,
+        291
+      ],
+      "p1_confirmation_before_after": [
+        322,
+        323
+      ],
+      "p2_confirmation_before_after": [
+        349,
+        350
+      ],
+      "p2_phase": 4,
+      "p2_stats_phase": 2,
+      "p2_confirmed": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "source_pad_errors": [
+        0,
+        0,
+        -1,
+        -1
+      ],
+      "native_destination_preparation": [
+        "phase5 asset transfer",
+        "phase1 constructed CSS before ready"
+      ],
+      "prize_confirmations": 0
+    },
+    "returned_css": {
+      "phase": 1,
+      "rules": {
+        "mode": 1,
+        "stock_count": 4,
+        "time_limit": 2,
+        "stock_time_limit": 8,
+        "handicap": 0,
+        "damage_ratio": 10,
+        "friendly_fire": 1,
+        "pause": 0
+      },
+      "items": {
+        "frequency": -1,
+        "mask_hex": "0000000010000000"
+      },
+      "selection": {
+        "valid": true,
+        "scene": 1,
+        "provenance": "raw_css_vs_start",
+        "match_kind": 1,
+        "timer_enabled": 1,
+        "time_limit_seconds": 480,
+        "friendly_fire": 1,
+        "disable_pausing": 1,
+        "damage_ratio_bits": "3f800000",
+        "item_frequency": -1,
+        "item_mask_hex": "fffffff80000000f",
+        "player_stocks": [
+          4,
+          4
+        ]
+      }
+    },
+    "diagnostics": {
+      "browser_errors": 0,
+      "timing_pauses": 0,
+      "reason_counts": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        17,
+        0,
+        0
+      ],
+      "phase_source_steps": [
+        0,
+        126,
+        0,
+        124,
+        0,
+        0,
+        0,
+        29038,
+        361,
+        0,
+        0,
+        2546,
+        0,
+        0,
+        0,
+        0
+      ],
+      "dropped_incidents": 0,
+      "thinned_samples": 32230,
+      "scope": "Callback publication-phase source steps may span transitions; do not equate callback totals with terminal source frames. Sample thinning is expected, incidents loss checked independently."
+    },
+    "cleanup": {
+      "node_exit": 0,
+      "server_exit": -15,
+      "driver": "disposed",
+      "context": "closed",
+      "browser": "closed",
+      "exact_owned_pids_absent": 4,
+      "port_rebind": true,
+      "eject": "source owners/objects/processes/assets/audio banks cleared"
+    },
+    "evidence": {
+      "private_locator": "r292-combined-sd-source-integration-20261009-v1/combined-timeout-v9",
+      "result_receipt_sha256": "f8ef2fadc5ca0cff32be51de3bbb034eb37d1acf12a5bec3341b06931aa479cd",
+      "raw_report_sha256": "c7bd474ca23ddcee51e3e8adc1edfbd66f5cbefce001904433ccb3c8211d0a75",
+      "trace_sha256": "1b58833173aea34af8ef02d9360e708a7798de25f0c7b8add48e58c1354e21f0",
+      "supervisor_sha256": "617619a80620bea372a08b711de43aefe4868aa363558cac09d90a16d78ccde9",
+      "root_review_sha256": "433e62a9591d17508f1451446ad1f31a95203612caa4ab9f2a898fb5417bebda"
+    },
+    "subsequent_main_refresh": {
+      "merged_main": "bedc15ec1c6f80e9ec2e9fbf3828359ea67fc7cf",
+      "head": "471dcb5f7e6b08ab91dccc19bd18a6c15257e9f6",
+      "tree_unchanged": "2a0b58fe609a2e77b637754810d62c67ec5562f1",
+      "producer_not_relabelled": true
+    },
+    "open": "Final combined full suite/current-head CI and independent milestone integration review; broader gates remain separate."
   }
 }

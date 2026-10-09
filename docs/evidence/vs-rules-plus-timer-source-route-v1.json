@@ -125,7 +125,7 @@
         "time_limit_seconds": 60,
         "timer_enabled": true
       },
-      "natural_results_css_return": {
+      "no_contest_results_css_return": {
         "passed": true,
         "ordered_boundaries": [
           "css_enter",
@@ -355,5 +355,6 @@
       "log_relative_to_agent_storage_runs": "vs-rules-plus-timer-post-item-table-fix-20261002-203252-b0e6be32/full-suite.log",
       "log_sha256": "ca9d3f92b2c1f25c178ecf7662036c3c5299352a46378d3cdd6b4357642d421e"
     }
-  }
+  },
+  "scope_correction": "The retained original procedure uses No Contest. Its Results/CSS return supports lifecycle only, not natural non-tied timeout; original raw evidence and other identities are unchanged."
 }
