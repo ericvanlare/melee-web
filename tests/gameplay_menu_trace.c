@@ -312,6 +312,17 @@ static int sparse_port_mapping_contract(void)
     return 1;
 }
 
+/* Synthetic reader routing control only; actual CSS assets are a separate gate. */
+static unsigned observed_port_calls;
+static int foreign_cursor;
+int melee_web_css_observe_port(unsigned port,int kind,int ids[14],float geometry[8])
+{
+    (void)kind;++observed_port_calls;
+    const int fields[14]={(int)(foreign_cursor?3:port),-1,CKIND_DRMARIO,0,0,0,1,0,1,0,0,0,0,0};
+    const float bounds[8]={0,1,10,2,-1,1,1,-1};
+    memcpy(ids,fields,sizeof(fields));memcpy(geometry,bounds,sizeof(bounds));return 1;
+}
+
 int main(void)
 {
     if (!sparse_port_mapping_contract()) return 1;
@@ -355,6 +366,19 @@ int main(void)
         if(!melee_web_fighter_input_observe_valid(&observed,kind))return 100;
     if(melee_web_fighter_input_observe_valid(&observed,-1)||
        melee_web_fighter_input_observe_valid(&observed,CKIND_PLAYABLE_COUNT))return 101;
+    MeleeWebFighterInputObservation p3={0};PADStatus input_ports[4]={0};
+    if(!melee_web_fighter_input_observe_port(2,CKIND_MARIO,&p3)||p3.cursor_port!=2||
+       melee_web_fighter_input_drive(input_ports,&p3,CKIND_MARIO)==MELEE_WEB_FIGHTER_INPUT_INVALID||
+       input_ports[0].stickX||input_ports[1].stickX||!input_ports[2].stickX||input_ports[3].stickX||
+       input_ports[2].err!=PAD_ERR_NO_CONTROLLER)return 126;
+    /* The caller must explicitly connect its sparse port; dense default unchanged. */
+    const unsigned calls=observed_port_calls;
+    if(melee_web_fighter_input_observe_port(4,CKIND_MARIO,&p3)||observed_port_calls!=calls)return 127;
+    foreign_cursor=1;
+    if(melee_web_fighter_input_observe_port(2,CKIND_MARIO,&p3))return 128;
+    foreign_cursor=0;
+    if(!melee_web_fighter_input_observe(CKIND_MARIO,&p3)||p3.cursor_port!=0)return 129;
+    printf("CSS reader routing: original port2 retained, foreign cursor/port4 rejected, dense neutral unchanged\n");
     CSSData css;
     SSSData sss;
     setup(&css);
