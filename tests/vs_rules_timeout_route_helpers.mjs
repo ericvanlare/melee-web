@@ -35,6 +35,8 @@ export function competitiveTimeoutProgressFailures(match) {
   if (!stocks) failures.push('two live player stock observations are required');
   else if (!(stocks[0] === 4 || stocks[0] === 3) || stocks[1] !== 4)
     failures.push(`only P1 may lose one stock: expected [4,4] or [3,4], got ${JSON.stringify(stocks)}`);
+  expect(failures, 'source setup stocks remain [4,4]', JSON.stringify(match?.rules?.player_stocks),
+    JSON.stringify([4, 4]));
   return failures;
 }
 
@@ -74,6 +76,8 @@ export function competitiveTimeoutTerminalFailures(match) {
   expect(failures, 'retained terminal source settings use the eight-minute stock timer',
     match?.rules?.time_limit, 480);
   expect(failures, 'retained terminal source match kind is stock', match?.rules?.match_kind, 1);
+  expect(failures, 'source setup stocks remain [4,4] in terminal data',
+    JSON.stringify(match?.rules?.player_stocks), JSON.stringify([4, 4]));
   return failures;
 }
 

@@ -12,7 +12,8 @@ from check_gameplay import node_runtime
 class GameplaySdBrowserHelpersTests(unittest.TestCase):
     def test_source_inputs_and_bounded_callback_capture(self):
         result = subprocess.run([str(node_runtime(ROOT)), "--test",
-            str(ROOT / "tests/gameplay_sd_browser_helpers.test.mjs")], cwd=ROOT,
+            str(ROOT / "tests/gameplay_sd_browser_helpers.test.mjs"),
+            str(ROOT / "tests/vs_rules_timeout_route_helpers.test.mjs")], cwd=ROOT,
             capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
 

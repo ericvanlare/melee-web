@@ -13,7 +13,7 @@ import {
 const match = ({frame = 180, stocks = [4, 4], paused = false, ending = false,
   complete = false, observerError = false} = {}) => ({
   ready: true, frame, paused, ending, complete, observer_error: observerError,
-  players: stocks.map(value => ({stocks: value})),
+  players: stocks.map(value => ({stocks: value})), rules: {player_stocks: [4, 4]},
 });
 
 test('timeout input and wait bounds stay finite and source-tick based', () => {
@@ -35,6 +35,9 @@ test('stock-loss policy accepts only the first P1 decrement with P2 unchanged', 
   assert(competitiveTimeoutFirstLossFailures(
     match({frame: 200}), match({frame: 212, stocks: [3, 3]})).some(row => row.includes('[3,4]')));
   assert(competitiveTimeoutProgressFailures(match({stocks: [4, 3]})).length > 0);
+  const changedSetup = match({stocks: [3, 4]});
+  changedSetup.rules.player_stocks = [3, 4];
+  assert(competitiveTimeoutProgressFailures(changedSetup).some(row => row.includes('setup stocks')));
   assert(competitiveTimeoutProgressFailures(match({paused: true})).some(row => row.includes('not paused')));
   assert(competitiveTimeoutProgressFailures(match({observerError: true})).some(row => row.includes('observer')));
 });
@@ -48,7 +51,8 @@ test('neutral interval requires 120 advancing source frames with exact [3,4] sto
 });
 
 test('terminal acceptance uses the original timeout result and unique source winner', () => {
-  const terminal = {terminal: {outcome: 1, winners: [1]}, rules: {time_limit: 480, match_kind: 1}};
+  const terminal = {terminal: {outcome: 1, winners: [1]},
+    rules: {time_limit: 480, match_kind: 1, player_stocks: [4, 4]}};
   assert.deepEqual(competitiveTimeoutTerminalFailures(terminal), []);
   assert(competitiveTimeoutTerminalFailures({...terminal,
     terminal: {outcome: 2, winners: [1]}}).some(row => row.includes('timeout outcome')));
@@ -56,6 +60,8 @@ test('terminal acceptance uses the original timeout result and unique source win
     terminal: {outcome: 1, winners: [0, 1]}}).some(row => row.includes('winner count')));
   assert(competitiveTimeoutTerminalFailures({...terminal,
     terminal: {outcome: 1, winners: [0]}}).some(row => row.includes('unique winner is P2')));
+  assert(competitiveTimeoutTerminalFailures({...terminal,
+    rules: {...terminal.rules, player_stocks: [3, 4]}}).some(row => row.includes('setup stocks')));
 });
 
 const identity = {scenario: 'rules-timeout-route-v1'};
