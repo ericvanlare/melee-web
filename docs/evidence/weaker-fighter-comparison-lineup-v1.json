@@ -2,7 +2,7 @@
   "schema": "melee-web-weaker-fighter-comparison-lineup-v1",
   "issue": 295,
   "date": "2026-10-09",
-  "status": "partial_bounded_evidence_issue_open",
+  "status": "bounded_campaign_compared_or_reduced_failures_broader_accuracy_open",
   "portable_locator_root": "runs/",
   "source_bundle": {
     "private_run_id": "fighter-accuracy-v10-origin-main-20261003-20261003-110505-57263165",
@@ -105,7 +105,7 @@
   },
   "fighters": {
     "sheik": {
-      "status": "source_only_checkpoint_unbuilt_uncaptured",
+      "status": "original_items_menu_failure_reduced_transform_unverified",
       "source_checkpoint_commit": "0b3847ee3f69ef031decc3f2ccc9c37227bd4302",
       "checkpoint_tree": "3fe9fc0b8de2300cf7735e477b60605ff3bb2737",
       "plan": {
@@ -117,10 +117,13 @@
         "transform mode is not wired to CSS/SSS live-owner readiness barriers",
         "cold-boot pre-match/attract teardown must not fail before accepted VS entry; in-match teardown must still fail before prefix completion",
         "no native original capture, browser replay, or comparison"
-      ]
+      ],
+      "current_driver_source": "e7e1ec280b112c4a76a24d80d0e895b694674ee6",
+      "current_native_source": "7d3ce19753ac9aa03159539df20624ef3c18c809",
+      "current_result": "Retained Items-menu first failure before setup; consumed Up and neutral observed, entry-lock cause inferred from source because lock field was not recorded."
     },
     "jigglypuff": {
-      "status": "new_independent_ready_entry_prefix_compared_active_gameplay_missing",
+      "status": "setup_and_184_source_ticks_through_60_clock_advances_compared",
       "match_index": 1,
       "slot": 0,
       "port": 1,
@@ -287,7 +290,7 @@
       }
     },
     "ice_climbers": {
-      "status": "new_independent_ready_entry_prefix_compared_active_gameplay_missing",
+      "status": "setup_and_184_source_ticks_through_60_clock_advances_compared",
       "match_index": 2,
       "slot": 1,
       "port": 2,
@@ -678,15 +681,298 @@
         "sha256": "0bfd4293462831cc00c2ca755228cda7acf0b0b9ad308cbe0c6d62f48d98bc68"
       }
     ],
-    "next": "Review/integrate bounded Sheik source readiness closure, then prepare its first original active-owner experiment. Plan a separately identified Jiggly/Ice active-clock prefix; preserve this Ready-only recipe and its success scope.",
-    "unrun": [
+    "current_head_validation": "Historical fullsuite/build records in this section belong to runtime 1f9681e0. See active_and_transform_preparation.final_fullsuite for final milestone code validation.",
+    "next_at_checkpoint": "Review/integrate bounded Sheik source readiness closure, then prepare its first original active-owner experiment. Plan a separately identified Jiggly/Ice active-clock prefix; preserve this Ready-only recipe and its success scope.",
+    "unrun_at_ready_checkpoint": [
       "Active gameplay for Jigglypuff/Ice Climbers",
       "Active Sheik original/browser comparison",
       "Natural ending/Results/CSS return",
       "CPU decisions and draw scheduling equivalence",
       "Pixels/PCM/physical input/timing/performance",
       "Whole-session acceptance"
+    ]
+  },
+  "active_and_transform_preparation": {
+    "status": "bounded_lineup_compared_or_reduced_failure_local_validation_pass",
+    "integrated_source": "e7e1ec280b112c4a76a24d80d0e895b694674ee6",
+    "integrated_tree": "c5bff31659bb845a81f0e22cf906288066f1987d",
+    "private_run_id": "all-entity-observer-20261009-072410-d492b90d",
+    "active_profile": {
+      "name": "jiggly-ice-mario-fox-active60-v1",
+      "source": "197dc4c30a80ec97ba76494ad819a58c6120baec",
+      "integrated_source": "00c4de02fe5de5de74cd2d60106b15375407a12e",
+      "comparison": "All retained Ready+active rows through first DrawReturn after60 unit MatchClock advances; strict comparator unchanged",
+      "finite_bound": "600 source observations checked atDrawReturn, finishing original capacity-five batch<=604; per-tick browser encoder refuses nonunit draw batches",
+      "flag": 2,
+      "ready_profile_bytes_unchanged": true,
+      "root_control_tests": 46,
+      "root_control_failures": 0,
+      "root_control_skips": 0,
+      "source_checkpoint_sha256": "01082c1eb08198e8ae45abdf85de5f3ab003e9b230a981c8a30b5d4ff50223b2",
+      "root_review_sha256": "fcc55d2f36e9f2060c8de950339a120fe61eaf5b364a5c9e6a019b11a7d4d5d3"
+    },
+    "runtime_build": {
+      "source": "00c4de02fe5de5de74cd2d60106b15375407a12e",
+      "tree": "1e15e084655388b04a7f9359bcda849100c677d7",
+      "configuration": "ordinary Release; all10 diagnostic options OFF",
+      "result": "PASS",
+      "result_sha256": "b8d65fce389802d16134100653ff9c16f42773c7e424ae6b99ddfcbb10dfb16a",
+      "log_sha256": "ae4dda154153fade2ebf6d9eeb6165ec1f3ec29a899dc5caf344eb7ad3a424f2",
+      "served_artifact_count": 46,
+      "served_manifest_sha256": "1fcc7aa4561456047948838d3bc44c59cd225735ec6f38a56151b932b97b0509",
+      "prior_runtime": "All46 actual1f9681e0 files copied and verified before overwrite; historical Ready evidence unchanged"
+    },
+    "native_reader_fix": {
+      "source": "7d3ce19753ac9aa03159539df20624ef3c18c809",
+      "prior_failed_build_source": "197dc4c30a80ec97ba76494ad819a58c6120baec",
+      "first_failure": "Actual full observer translation unit lacked ReadBE16 at3callsites; extracted fixture suppliedhelper masked this",
+      "retained_failure_log_sha256": "76e30b08e2e82e2fa65cd5e776325b5854d2dfac7d1cab18a258130dd30b7bc2",
+      "result": "Minimalhelper added; fixturesuseactualReadBE16/32; fullTU syntaxcompilePASS and16focusedtests0skip0fail",
+      "source_checkpoint_sha256": "09afa19a8150d76b753a5b1f14230ce188f7006b45641d8374658d948c625c0f",
+      "native_build": "Fresh canonical v3 passed on 7d3ce197; successful old a66 producer and failed v2 retained."
+    },
+    "sheik_driver": {
+      "source": "ffd193c9bf3aec0554446a90453e07ce942e47a1",
+      "recipe": 8,
+      "menu": 10,
+      "native_mode": "MWRC_TRANSFORM_PREFIX=1 only; noGCIinjection",
+      "scope": "TwoHuman Zelda/Mario original menus, source-consumed neutral/groundedWait/downB355/release, active Sheik and later groundedWait, checkedindependentMWRO/MWRI ending",
+      "observation_cap": "600postsetupSourceTicks includingReady; inputplan-123 isfixedformatcoordinate only",
+      "focused_tests": 69,
+      "failures": 0,
+      "skips": 0,
+      "source_checkpoint_sha256": "2d75d5c0a36a1779a588a79bb77957d48a74f8ca355622d2ef7b2cbd89759f1d",
+      "root_review_sha256": "c720e70535ae83c004592e9818df00f503d30569a77a095aba0e489660f80c9b",
+      "remaining": "First original run stopped at Items-menu readiness before setup. No transform observation or strict comparison-preparation invocation. Existing two-human full-state transform observation gap remains."
+    },
+    "exclusions": [
+      "Sheik original transformation and browser comparison remain unverified; original run stopped before setup",
+      "No strict transformation comparison-preparation invocation was performed on the failed setup",
+      "No whole-session, pixels, PCM, physical-input or foreground-timing acceptance",
+      "Current-head CI and independent review required before merge"
     ],
-    "current_head_validation": "Fullsuite/build records above belong to runtime1f; final milestone source fullsuite/current-head CI pending."
+    "native_build": {
+      "source": "7d3ce19753ac9aa03159539df20624ef3c18c809",
+      "tree": "aa359c1599d21abd694acc36e528316571289340",
+      "result": "PASS",
+      "binary_bytes": 17124640,
+      "binary_sha256": "211384f977962ebbcd0467ea9e2a0be3ef20647bffb634aff567712e3d73ee13",
+      "manifest_sha256": "fa66acb14a43800bdc1f8cd4cf55783e2faf2eaaff0d3b67544327e69e9e4b42",
+      "checkpoint_sha256": "f9a84581fc0d2add7c90e36d25233b35844ecec0f111090aed30670c9155533e",
+      "root_review_sha256": "cdb059188f1215f844a0eab5dddb51b39d6a6b3115821f0cf47c7ac840e866d9",
+      "validation": "All nine source/composed/manifest overlays match; canonical source composition and pinned dependencies verified. Direct build owners retired."
+    },
+    "original_active60": {
+      "result": "PASS bounded original diagnostic prefix",
+      "collector_source": "7d3ce19753ac9aa03159539df20624ef3c18c809",
+      "source_ticks": 184,
+      "source_tick_interval": [
+        0,
+        183
+      ],
+      "match_clock_interval": [
+        0,
+        60
+      ],
+      "unit_clock_advances": 60,
+      "draw_batch_sizes": [
+        1
+      ],
+      "mwro_records": 5047,
+      "mwri_events": 10320,
+      "mwrc_input_frames": 1296,
+      "seed": 3336171383,
+      "packet_sha256": "6f435524dbd6551a2463ed7088745c03390eca41d494cbcad965a12e56e1fe7f",
+      "result_sha256": "ab2496ff026e9d839da716fea39a48a62a597ca3ba46630c47c91802d22dbd84",
+      "root_review_sha256": "03bcd7aa77abf1bf95bcfd32e2d1feca83ca8170e9f553e4dfebae659ea00d16",
+      "mwro_sha256": "634c03684b750bb63d5caef8e84853728527d8ff73ee6e224d887a58c1310ef8",
+      "mwri_sha256": "45a1a8b8a2218cde2527f96a228cdfaf631ecfc04bb917beb956af391c4c7173",
+      "mwrc_sha256": "8eacb1967f76af1145782f9c1e06e29cdfb70ad8631fc7aee1edb67e7c624d0d",
+      "metadata_sha256": "c7330bd59af04b337a49d4c744fca6bae0022aee8e4c508aacb07e5f347da0f5",
+      "verification": "Root independently decoded all raw rows and reproduced both recipe and metadata byte for byte; all 100 frozen inputs and 14 result files verified; all four exact owned PIDs absent.",
+      "reporting_gap": "The retained report scope incorrectly says first 60 SourceTicks. Raw data and prefix_interval establish 184 SourceTicks through 60 gameplay-clock advances. The captured report remains unchanged; future scope wording fixed at e7e1ec28.",
+      "complete": false,
+      "whole_session_equivalent": false
+    },
+    "fullsuite_checkpoint": {
+      "source": "193412b6e73a830b890fba5a392560f6ac49b90d",
+      "result": "FAILED: 2310 tests, 153 skips, two setup compilation errors",
+      "log_sha256": "64a2b1262793ac414e20d993012dd897899cf47f8a833f882d08631bbd765743",
+      "cause": "Two extraction fixtures included unrelated new observer helpers. Test-only extraction boundaries repaired at 97ddedee; no compiler flags or production checks weakened.",
+      "focused_repair_result": "Two lifecycle tests passed",
+      "root_repair_review_sha256": "079aa0585fa6d0d1cefebf23f51f6b3c9dc5e907351a89350d48a362ccb06bc0",
+      "limitation": "Compiler diagnostics retained; old test fixtures automatically removed their generated failing C++ sources before repair. Final rerun passed separately at e7e1ec28."
+    },
+    "active_browser": {
+      "scope": "Independent frozen input, raw result, cleanup and unchanged strict comparator review",
+      "runtime_source": {
+        "head": "00c4de02fe5de5de74cd2d60106b15375407a12e",
+        "tree": "1e15e084655388b04a7f9359bcda849100c677d7"
+      },
+      "bound_records_verified": 88,
+      "served_assets_verified": 46,
+      "comparison_ticks": 184,
+      "active_clock_advances": 60,
+      "comparison_report_byte_identical": true,
+      "comparison_sha256": "084e0af04737d88fdf38a0e47f9327cbebd8e53e49d39a1024239c43a8f1fbd4",
+      "root_comparator_exit": 0,
+      "root_comparator_reaped": true,
+      "port_reusable": true,
+      "whole_session_equivalent": false,
+      "harness_source": "e7e1ec280b112c4a76a24d80d0e895b694674ee6",
+      "harness_tree": "c5bff31659bb845a81f0e22cf906288066f1987d",
+      "root_review_sha256": "e0c6302d1173d481fe19e1a663feb251f8368c9303f8bd5f18adb33b1d1fbdd7",
+      "trace_sha256": "f0b2b92bd0a37fefa48483fee0c4103c105a1ef1b890ef74bc6eda83205dedc4",
+      "comparison_result": "prefix_unverified; complete=false; first_difference=null; unverified_remainder=true",
+      "result_receipt_sha256": "29afcde5f46615cdf7c2a83c01580a5303ac37270d0748b4bc190fb6091a41f1"
+    },
+    "sheik_first_failure": {
+      "schema": "sheik-first-items-failure-reduction-v1",
+      "capture_result": "failed",
+      "elapsed_seconds": 24.539771795272827,
+      "setup_seen": false,
+      "transform_verified": false,
+      "strict_comparison_preparation_invoked": false,
+      "observed": {
+        "mwro_records": 1951,
+        "items_polls": 617,
+        "first_items": {
+          "seq": 716,
+          "source_cursor": 70,
+          "scene": 1,
+          "kind": 16,
+          "row": 0,
+          "value": 1,
+          "entering": 1,
+          "cooldown": 5
+        },
+        "last_items": {
+          "seq": 1948,
+          "source_cursor": 686,
+          "scene": 1,
+          "kind": 16,
+          "row": 0,
+          "value": 1,
+          "entering": 1,
+          "cooldown": 0
+        },
+        "all_items_row0_value1": true,
+        "consumed_records": [
+          {
+            "seq": 729,
+            "source_cursor": 76,
+            "ports": [
+              "0000000000000000000000",
+              "0000000000000000000000",
+              "00000000000000000000ff",
+              "00000000000000000000ff"
+            ],
+            "errors": [
+              0,
+              0,
+              -1,
+              -1
+            ],
+            "queue": {
+              "queue_base": 2152116488,
+              "queue_count": 5,
+              "queue_slot_index": 1,
+              "queue_slot_address": 2152116536
+            }
+          },
+          {
+            "seq": 731,
+            "source_cursor": 77,
+            "ports": [
+              "0008000000000000000000",
+              "0000000000000000000000",
+              "00000000000000000000ff",
+              "00000000000000000000ff"
+            ],
+            "errors": [
+              0,
+              0,
+              -1,
+              -1
+            ],
+            "queue": {
+              "queue_base": 2152116488,
+              "queue_count": 5,
+              "queue_slot_index": 2,
+              "queue_slot_address": 2152116584
+            }
+          },
+          {
+            "seq": 733,
+            "source_cursor": 78,
+            "ports": [
+              "0000000000000000000000",
+              "0000000000000000000000",
+              "00000000000000000000ff",
+              "00000000000000000000ff"
+            ],
+            "errors": [
+              0,
+              0,
+              -1,
+              -1
+            ],
+            "queue": {
+              "queue_base": 2152116488,
+              "queue_count": 5,
+              "queue_slot_index": 3,
+              "queue_slot_address": 2152116632
+            }
+          },
+          {
+            "seq": 735,
+            "source_cursor": 79,
+            "ports": [
+              "0000000000000000000000",
+              "0000000000000000000000",
+              "00000000000000000000ff",
+              "00000000000000000000ff"
+            ],
+            "errors": [
+              0,
+              0,
+              -1,
+              -1
+            ],
+            "queue": {
+              "queue_base": 2152116488,
+              "queue_count": 5,
+              "queue_slot_index": 4,
+              "queue_slot_address": 2152116680
+            }
+          }
+        ],
+        "items_lock_not_captured": true
+      },
+      "source_supported_inference": "Items entry animation lock may have rejected consumed Up. Main cooldown0 does not prove lock0; actual lock byte unavailable. mnitemsw.c initializes lock1 at914, rejects input at255, clears lock after animation at681.",
+      "existing_reuse": "tools/sd_original_menu_plan.py gci_items_row_packet already binds before/after items_locked=0; existing typed tag56 and items_lock_state can be reused in a subsequent bounded component.",
+      "follow_up": {
+        "experiment": "capture existing checked Items entry lock under transform profile; wait for actual lock0 before the unchanged Up and neutral actions",
+        "pass": "observed lock1 to0, exact authored Up+neutral consumed, actual row0/value1 to31/value3, same source order and caps; stop first mismatch",
+        "excluded": "no new native build/capture/source change in this milestone; no executed predicted schema refusal"
+      },
+      "posthash_count": 78,
+      "all_posthash_equal": true,
+      "receipt_sha256": "a3e319879a2bc742c93731448c4361c14a8d6df6a47c95a5dac2898be5b3ef10",
+      "actual_records_fixture_sha256": "f1237d55c07e1bc123f23c0d2918fa4684549fa85c1c37a5fb05ebc19cd3998c",
+      "cleanup": "Exact direct native exit 0, collector/supervisor/guard retired; all four PIDs independently absent.",
+      "root_review_sha256": "f329e548329dae7db6830bcbcf13c25af0733fc8d2af0866133662c189f4aa64"
+    },
+    "final_fullsuite": {
+      "source": "e7e1ec280b112c4a76a24d80d0e895b694674ee6",
+      "tree": "c5bff31659bb845a81f0e22cf906288066f1987d",
+      "tests": 2312,
+      "skips": 153,
+      "failures": 0,
+      "elapsed_seconds": 514.6898210048676,
+      "log_sha256": "05e4d7ac5aff380329900c1261d7ede506cd27e612b123c5816fc5fe6797f6b3",
+      "result_sha256": "e2f9ddbc2cbe1eaf80ffad301be9ddf8f3a8f2238a09d9500d60fe26c020ae73",
+      "post_source_clean": true
+    }
   }
 }
