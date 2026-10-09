@@ -66,6 +66,8 @@ int main()
     melee_web_pad_state_capture(after_read);
     assert(std::memcmp(after_read, restored, sizeof(restored)) == 0);
     std::cout << first << '\n';
+    packet.clear();
+    assert(packet.json() == "null");
     packet.capture(2, terminal, result, 123, final_input);
     std::cout << packet.json() << '\n';
 }

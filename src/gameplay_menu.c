@@ -22,6 +22,10 @@ struct MeleeWebMenuSession {
     CSSData css;
     SSSData sss;
     VsModeData match_vs;
+    VsModeData post_vs_mode;
+    int post_vs_mode_valid;
+    StartMeleeRules returned_cache_rules;
+    int returned_cache_valid;
     u8 css_ko_counts[GM_MAX_PLAYERS];
     uint64_t ticks;
     MeleeWebMenuPhase phase;
@@ -172,7 +176,7 @@ static int melee_web_menu_gobj_teardown(MeleeWebMenuSession* session,
 }
 
 extern int melee_web_vs_prepare_start_source(StartMeleeData*,
-                                              const VsModeData*);
+                                              const VsModeData*, VsModeData*);
 
 static int fail(char* error, size_t error_size, const char* message)
 {
@@ -587,19 +591,46 @@ static int team_selection_valid(const StartMeleeData* start, int count,
     return melee_web_team_setup_supported(start, count, !allow_same_team);
 }
 
+/* Results retains the exact mode rules produced by the prior VS entry.
+ * CSS may edit Teams and SSS may edit stage, but neither normalizes this cache.
+ * Bind that alternative to the checked session; foreign CSS stays on the fresh
+ * default contract. This expectation survives the same-session CSS/Main/Rules
+ * route: that checked route does not rerun VS OnInit and keeps this cache.
+ * A later Results commit replaces it; destroying the session retires it.
+ * Never convert it back into a normalized match Start. */
+static const StartMeleeRules* returned_rules(const CSSData* css)
+{
+    return owner && owner->returned_cache_valid && css == &owner->css
+        ? &owner->returned_cache_rules : NULL;
+}
+
+static int cache_rules_valid(const StartMeleeRules* rules,
+                             const StartMeleeRules* retained)
+{
+    if (!retained)
+        return rules->match_kind == MatchKind_Time && !rules->is_stock &&
+            !rules->is_vs && !rules->timer_enabled && rules->xB == 2 &&
+            rules->x20 == UINT64_MAX;
+    if (retained->match_kind != MatchKind_Stock || retained->is_stock ||
+        retained->is_vs || retained->xB != -1 ||
+        !melee_web_match_timer_supported(retained)) return 0;
+    StartMeleeRules actual = *rules, expected = *retained;
+    actual.stkind = expected.stkind;
+    actual.is_teams = expected.is_teams;
+    return memcmp(&actual, &expected, sizeof(actual)) == 0;
+}
+
 static int css_selection_valid_internal(const CSSData* css,
                                         int allow_unselected_stage,
                                         int allow_unavailable_progress_character,
-                                        int allow_same_team)
+                                        int allow_same_team,
+                                        const StartMeleeRules* retained)
 {
     int i;
     int count;
 
     if (css == NULL || css->match_type != VS_MELEE ||
-        css->vs.start.rules.match_kind != MatchKind_Time ||
-        css->vs.start.rules.is_stock || css->vs.start.rules.is_vs ||
-        css->vs.start.rules.timer_enabled || css->vs.start.rules.xB != 2 ||
-        css->vs.start.rules.x20 != UINT64_MAX ||
+        !cache_rules_valid(&css->vs.start.rules, retained) ||
         !stage_selection_valid(css->vs.start.rules.stkind,
                                allow_unselected_stage))
     {
@@ -615,7 +646,8 @@ static int css_selection_valid_internal(const CSSData* css,
         const PlayerInitData* player=&css->vs.start.players[i];
         const MeleeWebFighterContent* content=melee_web_fighter_content(player->ckind);
         if (!melee_web_player_selection_supported(player) ||
-            player->stocks != 0 ||
+            (retained ? (player->stocks < 1 || player->stocks > 5)
+                      : player->stocks != 0) ||
             (player->slot ? player->slot - 1 : i) != i ||
             player->sub_color > 4)
         {
@@ -704,6 +736,12 @@ static int training_sss_selection_valid_internal(const SSSData* sss,
                                                  allow_unselected_stage);
 }
 
+int melee_web_menu_css_cache_selection_valid(const CSSData* css,
+                                              const StartMeleeRules* retained)
+{
+    return css_selection_valid_internal(css, 1, 0, 0, retained);
+}
+
 int melee_web_menu_css_selection_valid(const CSSData* css)
 {
     /* fn_80262F44 uses this guard before accepting Start. CSS has selected
@@ -712,7 +750,7 @@ int melee_web_menu_css_selection_valid(const CSSData* css)
     if (css != NULL && css->match_type == TRAINING_MODE) {
         return training_css_selection_valid_internal(css, 1, 1);
     }
-    return css_selection_valid_internal(css, 1, 0, 0);
+    return css_selection_valid_internal(css, 1, 0, 0, returned_rules(css));
 }
 
 static int match_selection_valid(const StartMeleeData* start)
@@ -796,10 +834,11 @@ static int css_progress_valid(const CSSData* css)
      * intermediate CSS state live while still requiring every authored team
      * ID to remain in range. CSS exit and match admission continue to
      * require opposing teams through the strict validator. */
-    return css_selection_valid_internal(&view, 1, 1, 1);
+    return css_selection_valid_internal(&view, 1, 1, 1, returned_rules(css));
 }
 
-static int vs_selection_valid(const VsModeData* vs, int allow_unselected_stage)
+static int vs_selection_valid(const VsModeData* vs, int allow_unselected_stage,
+                              const StartMeleeRules* retained)
 {
     CSSData view;
     if (vs == NULL) {
@@ -808,7 +847,7 @@ static int vs_selection_valid(const VsModeData* vs, int allow_unselected_stage)
     memset(&view, 0, sizeof(view));
     view.match_type = VS_MELEE;
     view.vs = *vs;
-    return css_selection_valid_internal(&view, allow_unselected_stage, 0, 0);
+    return css_selection_valid_internal(&view, allow_unselected_stage, 0, 0, retained);
 }
 
 int melee_web_menu_sss_selection_valid(const SSSData* sss)
@@ -818,7 +857,7 @@ int melee_web_menu_sss_selection_valid(const SSSData* sss)
     {
         return 0;
     }
-    return vs_selection_valid(&sss->vs, 1);
+    return vs_selection_valid(&sss->vs, 1, owner && owner->returned_cache_valid && sss == &owner->sss ? &owner->returned_cache_rules : NULL);
 }
 
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
@@ -832,7 +871,7 @@ static int stadium_c1a_sss_selection_valid(const SSSData* sss)
     /* Validate the ordinary source VS payload without changing the original
      * SSS-owned StKind value being observed by this development checkpoint. */
     validation.start.rules.stkind = MELEE_WEB_MENU_FD_ST_KIND;
-    return vs_selection_valid(&validation, 1);
+    return vs_selection_valid(&validation, 1, NULL);
 }
 
 int melee_web_menu_enable_stadium_c1a(MeleeWebMenuSession* session,
@@ -1082,7 +1121,7 @@ int melee_web_menu_enter_sss(MeleeWebMenuSession* session, char* error,
     if (session->phase != MELEE_WEB_MENU_SSS_READY ||
         (session->training_mode_scene
              ? !training_css_selection_valid_internal(&session->css, 1, 1)
-             : !css_selection_valid_internal(&session->css, 1, 0, 0)))
+             : !css_selection_valid_internal(&session->css, 1, 0, 0, returned_rules(&session->css))))
     {
         return fail(error, error_size,
                     "SSS requires a valid committed Mario CSS selection");
@@ -1247,7 +1286,7 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
     if (session->training_mode_scene
             ? !training_css_selection_valid_internal(
                   &session->css, parent_route == 0, 1)
-            : !css_selection_valid_internal(&session->css, 1, 0, parent_route)) {
+            : !css_selection_valid_internal(&session->css, 1, 0, parent_route, returned_rules(&session->css))) {
         return fail(error, error_size,
                     "Cannot commit an unavailable character selection");
     }
@@ -1281,7 +1320,7 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
      * payload before making the next scene available to the host. */
     if (session->training_mode_scene
             ? !training_css_selection_valid_internal(&session->css, 1, 1)
-            : !css_selection_valid_internal(&session->css, 1, 0, parent_route)) {
+            : !css_selection_valid_internal(&session->css, 1, 0, parent_route, returned_rules(&session->css))) {
         session->phase = MELEE_WEB_MENU_CLOSED;
         return fail(error, error_size, "CSS published an unavailable selection");
     }
@@ -1334,6 +1373,7 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
         return fail(error, error_size, "SSS published an unavailable selection");
     }
     if (session->sss.start_game) {
+        session->post_vs_mode_valid = 0;
         if (session->training_mode_scene) {
             if (!training_sss_selection_valid_internal(&session->sss, 0)) {
                 session->phase = MELEE_WEB_MENU_CLOSED;
@@ -1353,7 +1393,8 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
                 session->css.vs = session->sss.vs;
                 session->match_vs = session->sss.vs;
                 if (!melee_web_vs_prepare_start_source(&session->match_vs.start,
-                                                        &session->sss.vs)) {
+                                                        &session->sss.vs,
+                                                        &session->post_vs_mode)) {
                     session->phase = MELEE_WEB_MENU_CLOSED;
                     return fail(error, error_size,
                                 "Original VS entry could not prepare the Stadium diagnostic payload");
@@ -1365,6 +1406,7 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
                     return fail(error, error_size,
                                 "Original VS entry produced an unsupported Stadium diagnostic payload");
                 }
+                session->post_vs_mode_valid = 1;
                 session->stadium_c1a_ready = 1;
                 session->phase = MELEE_WEB_MENU_READY;
                 return ok(error, error_size);
@@ -1377,13 +1419,15 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
         session->css.vs = session->sss.vs;
         session->match_vs = session->sss.vs;
         if (!melee_web_vs_prepare_start_source(&session->match_vs.start,
-                                                &session->sss.vs) ||
+                                                &session->sss.vs,
+                                                &session->post_vs_mode) ||
             !match_selection_valid(&session->match_vs.start))
         {
             session->phase = MELEE_WEB_MENU_CLOSED;
             return fail(error, error_size,
                         "Original VS entry produced an unsupported match payload");
         }
+        session->post_vs_mode_valid = 1;
         session->phase = MELEE_WEB_MENU_READY;
     } else {
         session->css.vs = session->sss.vs;
@@ -1461,6 +1505,14 @@ const VsModeData* melee_web_menu_ready_vs(const MeleeWebMenuSession* session)
     return &session->match_vs;
 }
 
+const VsModeData* melee_web_menu_post_vs_mode(const MeleeWebMenuSession* session)
+{
+    if (!session || session != owner || session->phase != MELEE_WEB_MENU_READY ||
+        !session->post_vs_mode_valid || session->training_mode_scene)
+        return NULL;
+    return &session->post_vs_mode;
+}
+
 int melee_web_menu_commit_results(MeleeWebMenuSession* session,
                                   const VsModeData* vs,
                                   const uint8_t ko_counts[GM_MAX_PLAYERS],
@@ -1470,6 +1522,13 @@ int melee_web_menu_commit_results(MeleeWebMenuSession* session,
         session->css_open || session->sss_open ||
         session->phase != MELEE_WEB_MENU_READY)
         return fail(error, error_size, "Results commit requires closed source menus");
+    if (!session->post_vs_mode_valid ||
+        memcmp(&vs->start.rules, &session->post_vs_mode.start.rules,
+               sizeof(vs->start.rules)) != 0 ||
+        !cache_rules_valid(&vs->start.rules, &session->post_vs_mode.start.rules))
+        return fail(error, error_size, "Results cache lost its checked prior VS rules");
+    session->returned_cache_rules = vs->start.rules;
+    session->returned_cache_valid = 1;
     session->css.vs = *vs;
     session->sss.vs = *vs;
     memcpy(session->css_ko_counts, ko_counts, sizeof(session->css_ko_counts));

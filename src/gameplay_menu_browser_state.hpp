@@ -25,6 +25,7 @@ extern "C" {
 #include <melee/mn/mnitemsw.h>
 #include <melee/ty/toy.h>
 #include <sysdolphin/baselib/controller.h>
+#include <sysdolphin/baselib/random.h>
 extern ResultsData lbl_8046DBE8;
 }
 #include "gameplay_match_rules.h"
@@ -84,7 +85,7 @@ namespace melee_web_menu_browser {
 extern melee_web::RuntimeFiles files;
 extern melee_web::RuntimeAssetScope asset_scope;
 enum class AssetDestination {
- None, InitialMenu, Match, ReturnMenu, Replay, Results, Prize,
+ None, InitialMenu, Match, ReturnMenu, Replay, Results, Prize, SuddenDeath,
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  StadiumC1a,
 #endif
@@ -111,6 +112,9 @@ extern std::unique_ptr<melee_web::GameplayPrizeSession> prize;
 extern melee_web::ResultsEntryPacket results_entry_packet;
 #endif
 extern std::string terminal_match_observation;
+extern bool sudden_death_route_active;
+extern uint32_t prior_vs_source_frames, final_sd_source_frames;
+extern MatchExitInfo prior_vs_terminal;
 extern std::string match_observer_error;
 extern MeleeWebFighterInputObservation last_css_fighter_observation;
 extern int last_css_fighter_target,last_css_fighter_drive_state;

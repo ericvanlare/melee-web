@@ -111,19 +111,22 @@ static int source_item_frequency = -1;
 static uint64_t source_item_mask = UINT64_MAX;
 
 int melee_web_vs_prepare_start_source(StartMeleeData* start,
-                                      const VsModeData* menu)
+                                      const VsModeData* menu, VsModeData* post_mode)
 {
-    *start = menu->start;
-    start->rules.match_kind = MatchKind_Stock;
+    *post_mode = *menu;
+    post_mode->start.rules.match_kind = MatchKind_Stock;
+    post_mode->start.rules.xB = (int8_t) source_item_frequency;
+    post_mode->start.rules.x20 = source_item_mask;
+    for (int i = 0; i < GM_MAX_PLAYERS; ++i)
+        post_mode->start.players[i].stocks = 4;
+    /* Match the callback's separate retained-mode and normalized outputs;
+     * flags and rumble are added only after preserving post-gm mode state. */
+    *start = post_mode->start;
     start->rules.is_stock = true;
     start->rules.is_vs = true;
-    start->rules.xB = (int8_t) source_item_frequency;
-    start->rules.x20 = source_item_mask;
-    for (int i = 0; i < GM_MAX_PLAYERS; ++i) {
-        start->players[i].stocks = 4;
+    for (int i = 0; i < GM_MAX_PLAYERS; ++i)
         start->players[i].rumble_enabled =
             i < 4 && start->players[i].slot_type == Gm_PKind_Human;
-    }
     return 1;
 }
 

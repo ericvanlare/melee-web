@@ -28,6 +28,12 @@ match_asset_names(const MeleeWebMenuMatchSelection& selection);
 stadium_c1a_asset_names(const MeleeWebMenuMatchSelection& selection);
 #endif
 
+// Resolves only an exact live host continuation. Active source slots remain
+// sparse and unchanged; this is not an alternate ordinary VS admission API.
+[[nodiscard]] std::vector<std::string>
+sudden_death_asset_names(const MeleeWebMenuHost*,
+                        const MeleeWebMenuMatchContinuation&);
+
 // Complete menu plus selected-fighter/stage assets needed to enter one
 // source-selected Opening VS state. The preview is read-only source data; it
 // is not a synthetic StartMeleeData payload.
