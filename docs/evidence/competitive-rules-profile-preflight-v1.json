@@ -1,6 +1,6 @@
 {
   "schema": "melee-web-competitive-rules-profile-preflight-v1",
-  "status": "passed_combined_natural_eight_minute_browser_route_and_full_suite_final_review_ci_open",
+  "status": "passed_combined_browser_route_original_profile_comparison_and_integrated_regression_natural_original_terminal_pending",
   "issue": 292,
   "date": "2026-10-08",
   "labels": [
@@ -440,8 +440,8 @@
     }
   ],
   "open_gates": [
-    "Matching original-route input/state comparison for the declared competitive eight-minute setup and non-tied terminal; earlier one-minute Rules Plus receipt is different workload provenance only.",
-    "Independent final integration review and current-head CI; combined suite passed tested9fcf7771.",
+    "Actual original natural eight-minute terminal comparison; current-capture profile/setup must also match predeclared fields. Earlier profile comparison is scoped independent evidence.",
+    "Final integration review and complete current-head CI; integrated suite passed d19fd07d.",
     "Physical input, foreground timing, audible output, pixel/PCM equivalence and competitive-set acceptance."
   ],
   "natural_timeout_browser_route": {
@@ -742,5 +742,61 @@
     "skip_scope": "159 skips include native_menu_host_trace dispatch/manifest controls because that target is not built in this checkout, and optional local asset checks. Separate SD native controls retain their own producer; no combined native run claimed.",
     "runtime_capture_producer": "87d89c2759e2fac9441e87a45024ca4573ea8822",
     "subsequent_delta": "This validation recording is documentation only; exact-head CI remains before integration."
+  },
+  "original_profile_comparison": {
+    "receipt": "original-competitive-profile-entry-comparison-v1.json",
+    "result": "pass for all predeclared profile/setup fields",
+    "raw_comparison_sha256": "45c42e55aeee4cd9a7f78bc2a442d7d04f1daca84301b8ac43da348c8f5ffa36",
+    "root_independent_replay_review_sha256": "c42d62e26c8d51328eb02c4a336be19b90b25262c4f6273543befa6781a91f1f",
+    "scope": "Actual original profile/VS entry and initialized setup versus browser V9 declared config/initialized values. Different source epochs; no PAD-schedule, RNG, position, natural-terminal, pixels, PCM or timing comparison."
+  },
+  "integrated_reference_validation_v2": {
+    "tested_head": "d19fd07d6969cd8c5ef54d2e50b424b8b2155dc9",
+    "tested_tree": "1017eb2921332b9b4b8dcdefa5daea54aee661fd",
+    "tests": 2240,
+    "skipped": 159,
+    "failed": 0,
+    "errors": 0,
+    "seconds": 501.325,
+    "log_sha256": "604b40f3e1d01c1bea3b4870c7aad2ec97206c3e675448bc7114a402ba360874",
+    "root_review_sha256": "1983412235af90ce2887bfc6c0426b4363328ab94dd327b1bf5f476da3dad22e",
+    "cleanup": "Exact wrapper/suite processes absent; source clean at completion. Successful disposable test scratch removed by existing owner policy.",
+    "prior_failure": {
+      "head": "0751744b896af3540e6ed3864ec2de9cc66239dc",
+      "tests": 2240,
+      "failures": 1,
+      "skipped": 159,
+      "log_sha256": "8d24a5a16d8445d55cc743651a654a3dae560dd7eb0e414dea323e321cae6761",
+      "cause": "Unbounded source-string assertion included later opt-in profile slices. Test-only correction preserves normal-session exclusion and explicit profile gates."
+    },
+    "native_build": {
+      "producer": "00ef116f341f7961bd832b436e1760efc7328ddf",
+      "binary_sha256": "5ae29c6142bf80b287011d6733886e0608818e51df52ff738ff41dcfaabbe6ed",
+      "manifest_sha256": "52509b8547e0a9531c569822b4b3aea08b5111c7e3c7bf26f4a0ed6565bbeae0",
+      "log_sha256": "517c33d894b1da6441d1a6205b27162e9b92868ae889ea55af4cd27ce1278391",
+      "root_review_sha256": "67cf27e5b8769fbb0a5885944df961b1d342a91707fd41c8311b78fa53669e9a",
+      "overlay_identity": "All nine overlay files match both native producer and integrated checkout; old650 binary preserved",
+      "seconds": 779.7596938749775,
+      "capture": "original natural terminal still unrun at validation checkpoint"
+    }
+  },
+  "original_natural_terminal_attempt_v1": {
+    "result": "failed before gameplay at SSS retirement frozen state guard",
+    "receiver": "00ef116f341f7961bd832b436e1760efc7328ddf",
+    "native_binary_sha256": "5ae29c6142bf80b287011d6733886e0608818e51df52ff738ff41dcfaabbe6ed",
+    "seconds": 28.085,
+    "supervisor_result_sha256": "ad28b04354b9cf0586d84cf92f1c2bba1681c0137ceda08ca0b7adcac908a965",
+    "reducer_sha256": "42c6895b32117398b9b06c10ce30eb42b1fc606ef1b3445e86a29619451c4a43",
+    "root_review": "Verified all12 bound evidence/source identities and4 exact owned processes absent; source final increment explains238\u2192239 at first exact retirement.",
+    "retained": "Interrupted2136-event primary trace; incomplete5570-event MWRI; no VS setup, gameplay or terminal comparison.",
+    "receiver_correction": {
+      "source": "2d98cb381604e21f499c672f84f2c32df6286886",
+      "review_sha256": "70b4f4161d75876ddbacd3b05d55784476a62203d1d3f979b32f8f1126f6dafc",
+      "focused_tests": 11,
+      "focused_log_sha256": "9711dcb169eda07d277aa2c10ad0e4a80c251e674c1a1ee099c3bf41f13c38d2",
+      "actual_replay_sha256": "3efd277c88f5f2ac762088b970b36e4c3055241724696030fa24b82857732992",
+      "native_overlays_unchanged": true,
+      "scope": "First retiring cursor may include original final+1, later cursor/counters/stage freeze. Active/input/ownership guards unchanged. No retry result yet."
+    }
   }
 }

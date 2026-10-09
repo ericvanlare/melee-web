@@ -1,5 +1,38 @@
 # VS Rules and Items route — bounded Rules Plus timer slice
 
+The original competitive profile and initialized VS setup now pass the full
+predeclared comparison with browser V9. The
+[original profile receipt](../evidence/original-competitive-profile-entry-comparison-v1.json)
+binds the actual original entry/setup records and the independently replayed
+comparison. This covers GameRules, every selectable item switch, saved and
+normalized item masks, player/source-port identities, teams, stocks, damage and
+colors at their declared boundaries. It does not compare RNG, PAD schedules,
+positions, pixels, PCM or the natural terminal. The original eight-minute
+terminal experiment remains pending; its separate capture must supply its own
+starting-state and terminal observations.
+
+The integrated original diagnostic and test-only observer assertion correction
+passed 2,240 tests with 159 skips in 501.325 seconds at `d19fd07d`. The first
+integration run at `0751744b` retained one failure: an older test searched the
+whole remainder of the observer source after `AddSessionSlices`, so it rejected
+the intentional opt-in profile slice. The corrected assertion limits that
+exclusion to the normal session helper and separately checks the opt-in and
+first-CSS guards; no runtime bytes changed. The fresh canonical original
+reference build at `00ef116f` also passed. Those native overlays exactly match
+the integrated source; this does not relabel browser V9's producer.
+
+The first original natural-timeout attempt stopped before gameplay on the
+SSS retirement guard after 28.085 seconds. The reduced raw boundary is last
+active tick 238 followed by the exact retiring route at tick 239, with neutral
+input, Final Destination, zero cooldown and the consumed-input count preserved.
+The original scene loop increments its cursor after the final on-frame callback.
+A receiver-only correction accepts that first final increment and freezes the
+actually observed retirement cursor thereafter; active gaps, later drift, changed
+input, stage and ownership remain failures. Eleven focused controls pass, and the
+retained buffered prefix replays without admitting its interrupted ending as
+completion. Native overlay bytes are unchanged. The original natural terminal
+comparison remains pending; the failed trace and incomplete MWRI are retained.
+
 The combined Rules/SD runtime passed the eight-minute functional route in V9.
 The [same scoped receipt](../evidence/competitive-rules-profile-preflight-v1.json)
 binds producer `87d89c27` and its fresh ordinary Release build: original menus
@@ -19,7 +52,7 @@ the V9 build/capture producer. The clean `9fcf7771` combined source passed 2,202
 skips in 486.092 seconds. Exact suite/supervisor processes retired, and all
 46 served hashes stayed unchanged. Skips include native-host trace controls
 whose target is not built in this checkout; separate SD native evidence keeps
-its own producer. Exact-head CI and owner integration review remain open. Original competitive field/route
+its own producer. Exact-head CI and final integration review remain open. Original natural-terminal
 comparison, physical input, foreground timing, pixels/PCM, uninterrupted audio
 and competitive-set acceptance remain separate gates.
 
