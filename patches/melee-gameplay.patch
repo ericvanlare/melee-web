@@ -3667,7 +3667,7 @@ index fea468cc6c89d7d4c6c8a1a81e31f99eec07bc63..6d0819f60ef4c12cdf80b1ea29bbd805
  
  void gm_80168C5C(u32 arg0)
 diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
-index cd7e31a0636e4e1a48d6a870e09319e887345ed1..eb459193ff578c06a970b875e22b132d39b8e639 100644
+index cd7e31a0636e4e1a48d6a870e09319e887345ed1..58431b636c022f3df3ddf068f312ba829ddbeb77 100644
 --- a/src/melee/gm/gm_16AE.c
 +++ b/src/melee/gm/gm_16AE.c
 @@ -1,4 +1,6 @@
@@ -3880,7 +3880,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..eb459193ff578c06a970b875e22b132d
      }
      un_802FD428();
      ifStatus_802F665C(data->rules.x0_3);
-@@ -2277,3 +2324,230 @@ int fn_8016F160(int arg0, int arg1)
+@@ -2277,3 +2324,252 @@ int fn_8016F160(int arg0, int arg1)
  {
      return pl_80039418(arg0, arg1);
  }
@@ -3889,6 +3889,24 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..eb459193ff578c06a970b875e22b132d
 +/* Run the original active/pause/ending scene callback only after the resident
 + * owner has initialized its complete supported StartMeleeData. */
 +static bool melee_web_opening_demo_active;
++extern struct GameSceneInfo* melee_web_current_scene_info(void);
++/* Read-only admission predicate. SD needs its authoritative scene and exact
++ * original entry/exit objects, not ordinary VS flags or a bare x6 bypass. */
++int melee_web_match_source_scene_supported(int mode, int scene_kind,
++    const void* enter, const void* exit, int entry_x6,
++    const StartMeleeRules* rules)
++{
++    if (mode != GM_VS || rules == NULL) return 0;
++    if (scene_kind == GS_SUDDEN_DEATH || rules->x6) {
++        return scene_kind == GS_SUDDEN_DEATH &&
++               enter == &gmVsMelee_StartData &&
++               exit == &gmVsMelee_SuddenDeathExitInfo &&
++               entry_x6 && rules->x6;
++    }
++    /* Preserve existing ordinary VS admission, including its missing-flag
++     * rejection. Opening-demo dispatch remains separate below. */
++    return rules->is_vs;
++}
 +int melee_web_match_source_frame(void)
 +{
 +    lbl_8046B6A0_t* data = &lbl_8046B6A0;
@@ -3903,7 +3921,11 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..eb459193ff578c06a970b875e22b132d
 +               data->match_result == OUTCOME_ELIMINATION ||
 +               data->match_result == OUTCOME_NO_CONTEST;
 +    }
-+    if (gm_GetCurrentGameMode() != GM_VS || !data->x24C8.is_vs ||
++    const struct GameSceneInfo* scene = melee_web_current_scene_info();
++    if (!melee_web_match_source_scene_supported(gm_GetCurrentGameMode(),
++            scene ? scene->scene_kind : -1,
++            scene ? scene->enter_data : NULL, scene ? scene->exit_data : NULL,
++            gmVsMelee_StartData.rules.x6, &data->x24C8) ||
 +        data->x24C8.match_kind != MatchKind_Stock ||
 +        data->x24C8.x4_4 || data->is_singleplayer ||
 +        data->x24C8.on_frame_start || data->x24C8.on_frame_end ||

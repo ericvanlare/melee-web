@@ -114,6 +114,7 @@ extern HSD_RumbleData HSD_Rumble_804C22E0[4];
 #include <vector>
 extern "C" int melee_web_vs_prepare_start_source(StartMeleeData*,const VsModeData*,VsModeData*);
 extern "C" int melee_web_match_validate_source_start(StartMeleeData*,int,int);
+extern "C" int melee_web_match_source_scene_supported(int,int,const void*,const void*,int,const StartMeleeRules*);
 extern "C" int melee_web_match_prepare_source(StartMeleeData*,int);
 extern "C" int melee_web_vs_mode_begin(void);
 extern "C" int melee_web_vs_mode_end(void);
@@ -191,6 +192,31 @@ void run_post_vs_mode_asset_free_contract()
               !melee_web_match_validate_source_start(&sd,0,0)&&
               !melee_web_match_prepare_source(&sd,0),
               "Explicit SD contract changed source flags or bypassed ordinary VS");
+        check(melee_web_match_source_scene_supported(GM_VS,GS_SUDDEN_DEATH,
+                  &gmVsMelee_StartData,&gmVsMelee_SuddenDeathExitInfo,1,&sd.rules)&&
+              melee_web_match_source_scene_supported(GM_VS,GS_VS,
+                  &gmVsMelee_StartData,&gmVsMelee_VsExitInfo,0,&output.rules),
+              "Source frame admission rejected checked SD or unchanged ordinary VS");
+        StartMeleeRules no_vs_flag=output.rules;no_vs_flag.is_vs=false;
+        check(!melee_web_match_source_scene_supported(GM_VS,GS_VS,
+                  &gmVsMelee_StartData,&gmVsMelee_VsExitInfo,0,&no_vs_flag)&&
+              !melee_web_match_source_scene_supported(GM_VS,GS_SUDDEN_DEATH,
+                  &gmVsMelee_StartData,&gmVsMelee_SuddenDeathExitInfo,1,&output.rules)&&
+              !melee_web_match_source_scene_supported(GM_VS,GS_VS,
+                  &gmVsMelee_StartData,&gmVsMelee_VsExitInfo,1,&sd.rules),
+              "Source frame admission used ordinary flags or bare x6 to bypass scene identity");
+        check(!melee_web_match_source_scene_supported(GM_MENU,GS_SUDDEN_DEATH,
+                  &gmVsMelee_StartData,&gmVsMelee_SuddenDeathExitInfo,1,&sd.rules)&&
+              !melee_web_match_source_scene_supported(GM_VS,GS_SUDDEN_DEATH,
+                  &sd,&gmVsMelee_SuddenDeathExitInfo,1,&sd.rules)&&
+              !melee_web_match_source_scene_supported(GM_VS,GS_SUDDEN_DEATH,
+                  &gmVsMelee_StartData,&tie,1,&sd.rules)&&
+              !melee_web_match_source_scene_supported(GM_VS,GS_SUDDEN_DEATH,
+                  &gmVsMelee_StartData,&gmVsMelee_SuddenDeathExitInfo,0,&sd.rules)&&
+              !melee_web_match_source_scene_supported(GM_VS,GS_SUDDEN_DEATH,
+                  &gmVsMelee_StartData,&gmVsMelee_SuddenDeathExitInfo,1,nullptr)&&
+              std::memcmp(&sd,&sd_before,sizeof(sd))==0,
+              "Source frame admission accepted foreign mode/payload/missing source x6 or changed rules");
         for(unsigned negative=0;negative<4;++negative){
             StartMeleeData invalid=sd;
             if(negative==0)invalid.rules.x6=false;
@@ -576,10 +602,42 @@ void run_sudden_death_host_control(
                   !melee_web_menu_host_sudden_death_match_release(
                       host,sudden_death_owner_id+1,error,error_size),
                   "Actual live SD world accepted duplicate or stale ownership");
+            auto observe_frame=[&](const char* event,unsigned tick){
+                const auto* current=static_cast<const GameModeState::GameSceneInfo*>(
+                    melee_web_current_scene_info());
+                const auto& rules=*gm_GetRules();
+                const auto* data=gm_16AE_GetUnkData_0();
+                const int mode=gm_GetCurrentGameMode();
+                const int kind=current?current->scene_kind:-1;
+                const void* enter=current?current->enter_data:nullptr;
+                const void* exit=current?current->exit_data:nullptr;
+                std::cout<<"{\"record\":\"sd_source_frame_inputs\",\"event\":\""<<event
+                         <<"\",\"tick\":"<<tick<<",\"source_cursor\":"<<match.source_frames()
+                         <<",\"mode\":"<<mode<<",\"scene_kind\":"<<kind
+                         <<",\"entry_original\":"<<(enter==&gmVsMelee_StartData?"true":"false")
+                         <<",\"exit_original_sd\":"<<(exit==&gmVsMelee_SuddenDeathExitInfo?"true":"false")
+                         <<",\"entry_x6\":"<<(gmVsMelee_StartData.rules.x6?"true":"false")
+                         <<",\"rules_x6\":"<<(rules.x6?"true":"false")
+                         <<",\"is_stock\":"<<(rules.is_stock?"true":"false")
+                         <<",\"is_vs\":"<<(rules.is_vs?"true":"false")
+                         <<",\"match_kind\":"<<unsigned(rules.match_kind)
+                         <<",\"end_state\":"<<int(data->unk_0)
+                         <<",\"singleplayer\":"<<int(data->is_singleplayer)
+                         <<",\"x4_4\":"<<unsigned(rules.x4_4)
+                         <<",\"x3_2\":"<<unsigned(rules.x3_2)
+                         <<",\"frame_start_callback\":"<<(rules.on_frame_start?"true":"false")
+                         <<",\"frame_end_callback\":"<<(rules.on_frame_end?"true":"false")
+                         <<",\"scene_supported\":"
+                         <<(melee_web_match_source_scene_supported(mode,kind,enter,exit,
+                                  gmVsMelee_StartData.rules.x6,&rules)?"true":"false")
+                         <<"}\n"<<std::flush;
+            };
             float pcm[1068];unsigned audio_phase=0;
             for(unsigned tick=0;tick<8;++tick){
                 PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
-                match.tick(pads);
+                observe_frame("pre",tick);
+                try{match.tick(pads);}
+                catch(...){observe_frame("failure",tick);throw;}
                 audio_phase+=32000;unsigned count=audio_phase/60;audio_phase%=60;
                 check(melee_web_audio_render(match.audio(),pcm,count,error,error_size),error);
             }
