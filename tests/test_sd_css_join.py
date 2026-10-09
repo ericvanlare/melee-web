@@ -8,13 +8,13 @@ import unittest
 
 from test_sd_reference_diagnostic import index  # Shared tools/scripts import paths.
 from capture_sd_reference_prefix import drive_authored_css_sss, require_css_join_owner
-from sd_original_menu_plan import gci_sd_prefix_packet
+from sd_original_menu_plan import gci_sd_prefix_packet, gci_competitive_entry_packet
 from sd_reference_diagnostic import css_state, slices, SdDiagnosticError
 from retail_input_plan import NEUTRAL_PAD
 
 
-def actual_css_row():
-    fixture=json.loads((Path(__file__).parent/'fixtures/sd-css-initial-na-order.json').read_text())
+def actual_css_row(filename='sd-css-initial-na-order.json'):
+    fixture=json.loads((Path(__file__).parent/'fixtures'/filename).read_text())
     row=deepcopy(fixture['rows'][0])
     owner=next(s for s in row['payload']['slices'] if s['tag']==48 and s['flags']==0)
     css=owner.pop('css_data')
@@ -70,7 +70,8 @@ class CssJoinTests(unittest.TestCase):
             elif label=='CSS-start-SSS':r.stage={'kind':32,'cooldown':0}
             else:raise AssertionError('unexpected synthetic tap '+label)
         self.trace=trace
-        drive_authored_css_sss(r,gci_sd_prefix_packet(version),
+        packet=gci_competitive_entry_packet() if version==8 else gci_sd_prefix_packet(version)
+        drive_authored_css_sss(r,packet,
                               SimpleNamespace(set_both=set_both),lambda:None,wait,tap)
         return r,trace
 
@@ -93,6 +94,33 @@ class CssJoinTests(unittest.TestCase):
         self.assertEqual([p['kind'] for p in r.css['players']],[0,0])
         self.assertEqual([p['character'] for p in r.css['players']],[8,8])
         self.assertEqual([d['costume'] for d in r.css['doors']],[1,0])
+
+    def test_actual_competitive_css_reuses_same_join_before_placement(self):
+        row=actual_css_row('competitive-css-initial-na-order.json')
+        self.assertEqual((row['seq'],row['source_tick'],row['payload']['menu_consumed']),(1299,1,360))
+        css=css_state(slices(row['payload']))
+        self.assertEqual(css,actual_css())
+        self.assertEqual(gci_competitive_entry_packet()['css'],gci_sd_prefix_packet(7)['css'])
+        # Only the initial inventory is actual. All later autojoin/movement
+        # here is the portable synthetic source-ordering control.
+        r,trace=self.driver(version=8,css=css)
+        for port in (0,1):
+            self.assertLess(trace.index(('intent','Mario-P'+str(port+1))),trace.index(('synthetic-own-Human',port)))
+            self.assertLess(trace.index(('synthetic-own-Human',port)),trace.index(('placement',port)))
+        self.assertEqual([p['kind'] for p in r.css['players']],[0,0])
+        with self.assertRaisesRegex(SdDiagnosticError,'two original humans'):self.driver(version=5,css=css)
+        self.assertEqual(self.trace,[])
+
+    def test_competitive_join_keeps_foreign_owner_and_finite_readiness_guards(self):
+        css=css_state(slices(actual_css_row('competitive-css-initial-na-order.json')['payload']))
+        for group,key,value in (('players','kind',1),('players','slot',2),('doors','kind',0),
+                                ('cursors','port',1),('cursors','state',3),('cursors','x',0),
+                                ('models','owner',2)):
+            invalid=deepcopy(css);invalid[group][0][key]=value
+            with self.subTest(group=group,key=key),self.assertRaises(SdDiagnosticError):self.driver(version=8,css=invalid)
+            self.assertEqual(self.trace,[])
+        with self.assertRaisesRegex(SdDiagnosticError,'CSS own Human join'):self.driver(version=8,css=css,join=False)
+        self.assertFalse(any(kind=='placement' for kind,_ in self.trace))
 
     def test_missing_join_hits_existing_source_cap_without_placement(self):
         with self.assertRaisesRegex(SdDiagnosticError,'CSS own Human join'):

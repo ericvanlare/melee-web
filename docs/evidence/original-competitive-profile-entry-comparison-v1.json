@@ -1,0 +1,20 @@
+{
+  "schema": "original-competitive-profile-entry-comparison",
+  "version": 1,
+  "result": "PASS",
+  "scope": "Declared original constructor profile/setup versus browser V9 frame180 configuration only",
+  "original_receiver": "8a522536cf61a842e7fb6f1e02bb7e040d32387f",
+  "original_native_source": "650caaf101f674c5bc6ee53f8bea694349c2f3c5",
+  "original_binary_sha256": "e4634a74d4277dfff556631f93146aa17e217d6dc813d9a11b5f9ba05f55a246",
+  "original_raw_sha256": "ce968ac1c0beef83e0f040481debaacde1823ce6d9a213d2fac09efb1c74cf4d",
+  "browser_source": "87d89c2759e2fac9441e87a45024ca4573ea8822",
+  "browser_report_sha256": "c7bd474ca23ddcee51e3e8adc1edfbd66f5cbefce001904433ccb3c8211d0a75",
+  "expected_fields_sha256": "541a94b941f2564248f152f8ab34f728cef694cd16337c37b540b3b3587133e6",
+  "comparison_sha256": "45c42e55aeee4cd9a7f78bc2a442d7d04f1daca84301b8ac43da348c8f5ffa36",
+  "root_independent_replay_review_sha256": "c42d62e26c8d51328eb02c4a336be19b90b25262c4f6273543befa6781a91f1f",
+  "coverage": "All predeclared GameRules,31 item switches, preference mask, normalized entry rules including door teams, participant setup and initialized stocks/damage; exact key coverage asserted",
+  "retained_failures": ["attempt1: committed Items return cooldown5", "attempt2: initial CSS NA-door version8 dispatch", "superseded partial projection omitted door teams"],
+  "old_original_route_label": "Observed No Contest Results/CSS lifecycle; no natural timeout admission",
+  "remaining_gate": "Actual original480-second/28800-frame non-tied timeout publication/winner[1]/live3:4 and VS retirement comparison",
+  "exclusions": ["Equal source frame/sample/positions", "PAD schedule equality", "RNG", "Original Results confirmations", "pixels", "PCM", "physical input", "timing", "whole-session acceptance"]
+}

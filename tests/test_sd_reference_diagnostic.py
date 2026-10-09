@@ -523,7 +523,7 @@ class SdReferenceDiagnosticTests(unittest.TestCase):
         compiler = shutil.which("clang++") or shutil.which("g++")
         self.assertIsNotNone(compiler)
         observer = (ROOT / "reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp").read_text()
-        methods = observer[observer.index("  void SdEvent("):observer.index("  enum class SceneResetAction")]
+        methods = observer[observer.index("  bool AddOrdinaryLive("):observer.index("  enum class SceneResetAction")]
         enum = observer[observer.index("enum class SliceTag"):observer.index("struct Slot")]
         harness = r"""
 #include <array>
@@ -533,16 +533,19 @@ class SdReferenceDiagnosticTests(unittest.TestCase):
 #include <string>
 using u8=uint8_t; using u16=uint16_t; using u32=uint32_t;
 #include "ReferenceSdInitState.h"
+#include "ReferenceOrdinaryTimeoutState.h"
 using namespace ReferenceCapture;
 namespace Core { struct Memory { const u8* GetPointerForRange(u32, size_t) { static u8 kind=2; return &kind; } };
 struct System { Memory m; Memory& GetMemory() { return m; } }; }
 namespace PowerPC { struct PowerPCState { std::array<u32,32> gpr{}; }; }
 constexpr u32 CSS_ENTER_RETURN=0x802669f0, PAD_READ_HSD_CALLER=0x80376a28;
+constexpr u32 PROFILE_SAVE_DATA_OFFSET=0x1868, PROFILE_SAVE_DATA_SIZE=0x55e8;
 enum class Event { Progress };
 bool AppendHexBytes(std::string*, const u8*, size_t) { return true; }
 """ + enum + r"""
 struct Reader {
   SdInitState sd_init;
+  OrdinaryTimeoutState ordinary_timeout;
   u32 sd_menu_polls=0;
   u32 sd_menu_consumed=0;
   bool sd_menu_neutral=false;
@@ -562,6 +565,8 @@ struct Reader {
   bool AddSceneKindSlice(Core::System*) { return true; }
   bool AddMenuSteeringSlices(Core::System*) { return true; }
   bool AddProfileSlices(Core::System*) { return true; }
+  bool AddPlayerEntitySlices(Core::System*,u32) { return true; }
+  bool OrdinaryTimeoutRequested() { return false; }
   bool AddProfileContextSlices(Core::System*) { return true; }
   bool ReadProfileRoot(Core::System*,u32*) { return true; }
   bool ReadFighterSourceSlot(Core::System*,u32,u8*) { return true; }
@@ -588,14 +593,53 @@ int main() {
   SdInitState capped; assert(capped.Entry(0x80001000,false));
   for (u32 i=0;i<4323;++i) assert(capped.Consume());
   assert(!capped.Consume()); assert(capped.consumed==4323);
+  SdInitState profile;
+  assert(!profile.Ready(false,true));
+  assert(profile.Entry(0x80001000,false));
+  assert(!profile.Ready(true,true)); // SD cannot satisfy ordinary profile scope
+  assert(profile.Ready(false,true));
+  assert(profile.phase==SdInitState::Phase::Complete);
+  assert(profile.setup_pointer==0x80001000 && profile.consumed==0);
+  assert(!profile.Consume() && !profile.Exit() && !profile.Retire());
+  assert(!profile.Entry(0x80003000,true));
+  OrdinaryTimeoutState ordinary;
+  assert(!ordinary.Input(false,true));
+  assert(!ordinary.Retire());
+  assert(ordinary.Input(true,false));
+  assert(!ordinary.Tick(0,1,479,0,4,4,0xc2700000,0x42700000));
+  assert(ordinary.Tick(0,0,480,59,4,4,0xc2700000,0x42700000));
+  ordinary.phase=OrdinaryTimeoutState::Phase::FirstLoss;
+  assert(ordinary.Input(false,true));
+  assert(!ordinary.Input(true,false)); // neutral cannot restart before observed loss
+  ordinary.phase=OrdinaryTimeoutState::Phase::Drain;
+  assert(ordinary.Input(false,true)); // only the prior held bank drains
+  assert(ordinary.Input(true,false));
+  assert(!ordinary.Input(false,true));
+  assert(!ordinary.Exit(ordinary.ticks,28800,0,59,3,4)); // frame not terminal
+  ordinary.frame=28800;
+  assert(ordinary.Exit(ordinary.ticks,28800,0,59,3,4));
+  assert(ordinary.Retire());
+  assert(!ordinary.Input(true,false) && !ordinary.Retire());
+  OrdinaryTimeoutState total;
+  total.setup_samples=123;total.samples=29400;
+  assert(!total.Input(true,false)); //29523 includes constructor samples
 }
 """
         with tempfile.TemporaryDirectory() as directory:
             cpp, executable = Path(directory) / "probe.cpp", Path(directory) / "probe"
             cpp.write_text(harness)
-            subprocess.run([compiler, "-std=c++17", "-Wall", "-Werror", "-I", str(ROOT /
+            result = subprocess.run([compiler, "-std=c++17", "-Wall", "-Werror", "-I", str(ROOT /
                             "reference-capture/dolphin/source/Core/PowerPC"), str(cpp), "-o", str(executable)],
-                           check=True, capture_output=True, text=True)
+                           capture_output=True, text=True)
+            if result.returncode:
+                import os
+                failure_root=os.environ.get("REFERENCE_NATIVE_CONTROL_FAILURE_ROOT")
+                if failure_root:
+                    retained=Path(failure_root);retained.mkdir(parents=True,exist_ok=False)
+                    shutil.copy2(cpp,retained/"probe.cpp")
+                    (retained/"compiler.stdout").write_text(result.stdout)
+                    (retained/"compiler.stderr").write_text(result.stderr)
+                self.fail("Native API-stub compilation failed:\n"+result.stdout+result.stderr)
             subprocess.run([str(executable)], check=True, capture_output=True)
 
 
