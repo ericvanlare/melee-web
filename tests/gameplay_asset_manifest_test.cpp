@@ -31,12 +31,28 @@ using namespace melee_web;
 // The manifest test isolates the descriptor from source-runtime linkage. The
 // real source-table expansion and HSD owner are exercised by the compiled
 // match trace with disc-extracted Kirby donor archives.
+static MeleeWebMenuHost* descriptor_host=reinterpret_cast<MeleeWebMenuHost*>(1);
+static MeleeWebMenuMatchContinuation descriptor_continuation{};
+static MeleeWebMenuMatchSelection descriptor_selection{};
+extern "C" int melee_web_menu_host_sudden_death_selection(
+    const MeleeWebMenuHost* host,const MeleeWebMenuMatchContinuation* continuation,
+    MeleeWebMenuMatchSelection* out,char* error,size_t size){
+    if(host!=descriptor_host||!continuation||
+       std::memcmp(continuation,&descriptor_continuation,sizeof(*continuation))!=0){
+        if(error&&size)std::snprintf(error,size,"foreign or stale SD continuation");return 0;
+    }
+    *out=descriptor_selection;return 1;
+}
+
 namespace melee_web {
 std::vector<KirbyCopyArchiveRequirement>
 kirby_copy_archive_requirements(const MeleeWebMenuMatchSelection& value)
 {
     for (unsigned slot = 0; slot < GM_MAX_PLAYERS; ++slot) {
-        if (value.start.players[slot].slot_type == Gm_PKind_NA) break;
+        if (value.start.players[slot].slot_type == Gm_PKind_NA) {
+            if(value.sudden_death)continue;
+            break;
+        }
         if (value.start.players[slot].ckind == CKIND_KIRBY)
             return {{"PlKbCpGw.dat", "ftDataKirbyCopyGamewatch",
                      FTKIND_GAMEWATCH, false},
@@ -55,7 +71,10 @@ kirby_copy_effect_requirements(const MeleeWebMenuMatchSelection& value)
     std::vector<KirbyCopyEffectRequirement> result;
     for (unsigned slot = 0; slot < GM_MAX_PLAYERS; ++slot) {
         const auto ckind = value.start.players[slot].ckind;
-        if (value.start.players[slot].slot_type == Gm_PKind_NA) break;
+        if (value.start.players[slot].slot_type == Gm_PKind_NA) {
+            if(value.sudden_death)continue;
+            break;
+        }
         has_kirby |= ckind == CKIND_KIRBY;
         if (ckind == CKIND_FOX)
             result.push_back({"EfKbFx.dat", "effKirbyFoxDataTable", 33});
@@ -480,6 +499,42 @@ void print_descriptor_stage(int stage)
 
 } // namespace
 
+void source_sudden_death_descriptor(){
+    descriptor_continuation={};
+    descriptor_continuation.kind=MELEE_WEB_MENU_MATCH_CONTINUATION_SUDDEN_DEATH;
+    descriptor_continuation.owner_id=42;
+    auto dense=selection(St_Kind_Last,CKIND_MARIO,CKIND_FOX);
+    dense.sudden_death=1;dense.start.rules.is_vs=0;dense.start.rules.is_stock=0;
+    dense.start.rules.x6=1;
+    dense.start.players[0].stocks=dense.start.players[1].stocks=1;
+    dense.players[0].stocks=dense.players[1].stocks=1;
+    descriptor_selection=dense;
+    const auto names=sudden_death_asset_names(descriptor_host,descriptor_continuation);
+    check(has(names,"GrNLa.dat")&&has(names,"PlMr.dat")&&has(names,"PlFx.dat"),
+          "Dense SD closure lost source fighters/stage");
+    no_duplicates(names);
+    rejects([&]{(void)match_asset_names(dense);});
+    auto sparse=dense;
+    sparse.start.players[3]=dense.start.players[1];sparse.start.players[3].slot=4;
+    sparse.players[3]=dense.players[1];sparse.players[3].controller=3;
+    sparse.start.players[1]={};sparse.start.players[1].slot_type=Gm_PKind_NA;
+    sparse.players[1]={};descriptor_selection=sparse;
+    const auto before=sparse;
+    check(sudden_death_asset_names(descriptor_host,descriptor_continuation)==names,
+          "Sparse original slot3 did not retain its exact fighter closure");
+    check(std::memcmp(&before,&descriptor_selection,sizeof(before))==0,
+          "Descriptor rewrote sparse source selection");
+    rejects([&]{(void)sudden_death_asset_names(nullptr,descriptor_continuation);});
+    auto stale=descriptor_continuation;stale.owner_id++;
+    rejects([&]{(void)sudden_death_asset_names(descriptor_host,stale);});
+    descriptor_selection.players[3].controller=1;
+    rejects([&]{(void)sudden_death_asset_names(descriptor_host,descriptor_continuation);});
+    descriptor_selection=sparse;descriptor_selection.start.players[4]=dense.start.players[0];
+    rejects([&]{(void)sudden_death_asset_names(descriptor_host,descriptor_continuation);});
+    descriptor_selection=sparse;descriptor_selection.sudden_death=0;
+    rejects([&]{(void)sudden_death_asset_names(descriptor_host,descriptor_continuation);});
+}
+
 int main(int argc, char** argv)
 {
     try {
@@ -507,6 +562,7 @@ int main(int argc, char** argv)
         stadium_c1a_manifest_contract();
 #endif
         rejects_invalid_without_mutation();
+        source_sudden_death_descriptor();
         std::cout << "Source menu/match/results asset descriptors, fighter/archive closure, authored music candidates, and rejection boundaries: passed\n";
         return 0;
     } catch (const std::exception& error) {

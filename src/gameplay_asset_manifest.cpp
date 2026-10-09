@@ -109,10 +109,15 @@ unsigned active_player_count(const MeleeWebMenuMatchSelection& selection)
     return active;
 }
 
-void check_selection_common(const MeleeWebMenuMatchSelection& selection)
+void check_selection_common(const MeleeWebMenuMatchSelection& selection, bool sparse = false)
 {
     const auto& rules = selection.start.rules;
-    const unsigned active = active_player_count(selection);
+    unsigned active = active_player_count(selection);
+    if (sparse) {
+        active = 0;
+        for (unsigned i = 0; i < MELEE_WEB_MENU_MAX_PLAYERS; ++i)
+            active += selection.start.players[i].slot_type != Gm_PKind_NA;
+    }
     const unsigned player_count = selection.player_count != 0
                                       ? selection.player_count : active;
     if (player_count < MELEE_WEB_MENU_MIN_PLAYERS ||
@@ -124,12 +129,13 @@ void check_selection_common(const MeleeWebMenuMatchSelection& selection)
     // rule normalization or consume any source state here.
     if (selection.hud_layout != rules.x0_3)
         reject("Match selection has an unsupported HUD layout");
-    for (unsigned i = active; i < GM_MAX_PLAYERS; ++i) {
+    for (unsigned i = sparse ? MELEE_WEB_MENU_MAX_PLAYERS : active; i < GM_MAX_PLAYERS; ++i) {
         if (selection.start.players[i].slot_type != Gm_PKind_NA)
             reject("Match selection has an inactive source slot with data");
     }
 
-    for (unsigned i = 0; i < active; ++i) {
+    for (unsigned i = 0; i < (sparse ? MELEE_WEB_MENU_MAX_PLAYERS : active); ++i) {
+        if (selection.start.players[i].slot_type == Gm_PKind_NA) continue;
         const auto& source = selection.start.players[i];
         const auto& compatibility = selection.players[i];
         const auto* content = melee_web_fighter_content(source.ckind);
@@ -156,6 +162,7 @@ void check_selection_common(const MeleeWebMenuMatchSelection& selection)
 
 void check_selection(const MeleeWebMenuMatchSelection& selection)
 {
+    if (selection.sudden_death) reject("Sudden Death assets require their exact host continuation");
     check_selection_common(selection);
     if (!melee_web_stage_content(selection.start.rules.stkind))
         reject("Match selection stage has no admitted source content");
@@ -230,9 +237,10 @@ void add_selection_fighter_assets(std::vector<std::string>& result,
 {
     // Both the match and the Results scene that follows it resolve the same
     // source fighter identities, so the descriptor keeps one loop here.
-    const unsigned active = active_player_count(selection);
+    const unsigned slots = MELEE_WEB_MENU_MAX_PLAYERS;
     std::vector<unsigned> fighter_kinds;
-    for (unsigned i = 0; i < active; ++i) {
+    for (unsigned i = 0; i < slots; ++i) {
+        if (selection.start.players[i].slot_type == Gm_PKind_NA) continue;
         const auto ckind = selection.start.players[i].ckind;
         for (unsigned identity = 0; identity < melee_web_fighter_kind_count(ckind); ++identity) {
             const auto kind = static_cast<unsigned>(melee_web_fighter_kind_at(ckind, identity));
@@ -249,7 +257,8 @@ void add_selection_fighter_assets(std::vector<std::string>& result,
         add_unique(result, runtime_name(neutral->model_filename));
         if (content->effect_archive) add_unique(result, content->effect_archive);
         add_unique(result, content->audio_bank);
-        for (unsigned i = 0; i < active; ++i) {
+        for (unsigned i = 0; i < slots; ++i) {
+            if (selection.start.players[i].slot_type == Gm_PKind_NA) continue;
             const auto ckind = selection.start.players[i].ckind;
             bool selected = false;
             for (unsigned identity = 0; identity < melee_web_fighter_kind_count(ckind); ++identity)
@@ -317,6 +326,24 @@ match_asset_names(const MeleeWebMenuMatchSelection& selection)
     add_unique(result, stage->archive);
     if (stage->audio_bank) add_unique(result, stage->audio_bank);
     add_stage_music(result, stage->stage_kind);
+    return result;
+}
+
+std::vector<std::string>
+sudden_death_asset_names(const MeleeWebMenuHost* host,
+                        const MeleeWebMenuMatchContinuation& continuation)
+{
+    MeleeWebMenuMatchSelection selection{};char error[256]{};
+    if (!melee_web_menu_host_sudden_death_selection(
+            host,&continuation,&selection,error,sizeof(error))) reject(error);
+    if (!selection.sudden_death) reject("Host did not resolve a Sudden Death selection");
+    check_selection_common(selection,true);
+    const auto* stage = melee_web_stage_content(selection.start.rules.stkind);
+    if (!stage) reject("Sudden Death stage has no admitted source content");
+    auto result = common_match_asset_names(selection);
+    add_unique(result,stage->archive);
+    if (stage->audio_bank) add_unique(result,stage->audio_bank);
+    add_stage_music(result,stage->stage_kind);
     return result;
 }
 

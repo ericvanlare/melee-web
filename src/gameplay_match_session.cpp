@@ -14,6 +14,7 @@
 #include "gameplay_hud_assets.hpp"
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <stdexcept>
 #include <set>
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
@@ -23,6 +24,7 @@
 #endif
 extern "C" {
 #include <melee/gm/types.h>
+#include <melee/gm/gmvsmelee.h>
 }
 extern "C" int lbAudioAx_80023F28(int);
 extern "C" int melee_web_vs_mode_begin(void);
@@ -55,6 +57,10 @@ struct GameplayMatchSession::Storage {
     MeleeWebMatchFlow* flow=nullptr;
     bool mode_owned=false;
     bool profile_owned=false;
+    bool sudden_death_claimed=false;
+    bool sudden_death_scene_active=false;
+    MeleeWebMenuHost* sudden_death_host=nullptr;
+    uint64_t sudden_death_owner_id=0;
     uint16_t saved_characters=0,saved_stages=0;
     ~Storage(){try{close();}catch(const std::exception& e){std::fprintf(stderr,"Match session teardown: %s\n",e.what());std::abort();}}
     const RuntimeFiles* runtime_files=nullptr;
@@ -64,21 +70,59 @@ struct GameplayMatchSession::Storage {
     const MeleeWebStageContent* stage=nullptr;
     unsigned construction_phase=0;
     void begin(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection,
-               RuntimeArchiveCache* archive_cache,const MeleeWebPadState* initial_input=nullptr){
-        const bool opening_demo = selection.opening_demo != 0;
-        unsigned player_count = selection.player_count != 0
-                                    ? selection.player_count
-                                    : melee_web_menu_active_player_count(&selection.start);
+               RuntimeArchiveCache* archive_cache,const MeleeWebPadState* initial_input=nullptr,
+               MeleeWebMenuHost* sd_host=nullptr,
+               const MeleeWebMenuMatchContinuation* sd_continuation=nullptr){
+        MeleeWebMenuMatchSelection observed_selection{};
+        const MeleeWebMenuMatchSelection* resolved_selection=&selection;
+        const bool sudden_death=sd_host!=nullptr||sd_continuation!=nullptr;
+        if(sudden_death){
+            check(sd_continuation&&
+                  sd_continuation->kind==MELEE_WEB_MENU_MATCH_CONTINUATION_SUDDEN_DEATH&&
+                  sd_continuation->owner_id!=0,
+                  "Sudden Death match requires its exact typed host continuation");
+            char error[256]{};
+            check(melee_web_menu_host_sudden_death_selection(
+                      sd_host,sd_continuation,&observed_selection,error,sizeof(error)),error);
+            resolved_selection=&observed_selection;
+        }else{
+            check(!selection.sudden_death,
+                  "Sudden Death source payload requires a checked host-owned match claim");
+        }
+        const MeleeWebMenuMatchSelection& selected_input=*resolved_selection;
+        const bool opening_demo = selected_input.opening_demo != 0;
+        unsigned active_source_players=0;
+        if(sudden_death){
+            for(unsigned slot=0;slot<MELEE_WEB_MENU_MAX_PLAYERS;++slot)
+                active_source_players+=selected_input.start.players[slot].slot_type!=Gm_PKind_NA;
+        }else{
+            active_source_players=static_cast<unsigned>(
+                melee_web_menu_active_player_count(&selected_input.start));
+        }
+        unsigned player_count = selected_input.player_count != 0
+                                    ? selected_input.player_count
+                                    : active_source_players;
         check(player_count >= MELEE_WEB_MENU_MIN_PLAYERS &&
               player_count <= MELEE_WEB_MENU_MAX_PLAYERS,
               "Match requires two through four active source players");
-        check(melee_web_menu_active_player_count(&selection.start) ==
-              static_cast<int>(player_count),
-              "Match player count does not match contiguous source slots");
-        check(selection.hud_layout == selection.start.rules.x0_3,
+        check(active_source_players==player_count,
+              sudden_death?
+                "Sudden Death player count does not match its active source slots":
+                "Match player count does not match contiguous source slots");
+        if(!sudden_death)
+            check(melee_web_menu_active_player_count(&selected_input.start)==
+                  static_cast<int>(player_count),
+                  "Match player count does not match contiguous source slots");
+        check(selected_input.hud_layout == selected_input.start.rules.x0_3,
               "Match compatibility settings differ from source payload");
+        if(sudden_death)
+            check(selected_input.sudden_death&&selected_input.start.rules.x6,
+                  "Sudden Death source scene setup must precede match preparation");
+        else
+            check(!selected_input.start.rules.x6,
+                  "Sudden Death source payload cannot enter through ordinary VS construction");
         if(opening_demo){
-            const auto& rules=selection.start.rules;
+            const auto& rules=selected_input.start.rules;
             check(player_count==4&&rules.match_kind<=3&&!rules.timer_enabled&&
                   rules.time_limit==0&&rules.x1_0==0&&rules.x1_2&&rules.x1_3&&
                   rules.disable_pausing&&rules.x7==0&&rules.game_speed==1.0f&&
@@ -87,47 +131,83 @@ struct GameplayMatchSession::Storage {
                   rules.x54==nullptr,
                   "Opening demo requires the authored four-player source VS setup");
         }
-        runtime_files=&files;runtime_cache=archive_cache;selected=selection;
-        if(selection_uses_kirby(selection))
-            kirby_copy_assets=std::make_unique<GameplayKirbyCopyAssets>(files,selection);
-        stage=melee_web_stage_content(selection.start.rules.stkind);
+        runtime_files=&files;runtime_cache=archive_cache;selected=selected_input;
+        if(selection_uses_kirby(selected_input))
+            kirby_copy_assets=std::make_unique<GameplayKirbyCopyAssets>(files,selected_input);
+        stage=melee_web_stage_content(selected_input.start.rules.stkind);
         check(stage!=nullptr,"Match stage has no source runtime owner");
         content.ground_kind=stage->ground_kind;
         content.player_count=player_count;
-        for(unsigned i=0;i<player_count;i++){
-            const auto& source = selection.start.players[i];
-            const auto& settings = selection.players[i];
-            check(settings.controller == (source.slot ? source.slot - 1u : i) &&
+        unsigned compact_player=0;
+        for(unsigned source_slot=0;source_slot<MELEE_WEB_MENU_MAX_PLAYERS;++source_slot){
+            const auto& source=selected_input.start.players[source_slot];
+            if(source.slot_type==Gm_PKind_NA){
+                if(!sudden_death)break;
+                continue;
+            }
+            const auto& settings=selected_input.players[source_slot];
+            const unsigned source_port=source.slot?source.slot-1u:source_slot;
+            check(settings.controller == source_port &&
                   settings.stocks == source.stocks && settings.costume == source.color &&
                   settings.sub_color == source.sub_color,
                   "Match compatibility settings differ from source payload");
-            const auto* fighter=melee_web_fighter_content(selection.start.players[i].ckind);
-            check(fighter&&selection.players[i].controller==i&&
-                  selection.players[i].stocks>=1&&
-                  selection.players[i].stocks<=(opening_demo?99u:5u)&&
-                  selection.players[i].costume<fighter->costumes&&selection.players[i].sub_color<=4,
+            const auto* fighter=melee_web_fighter_content(source.ckind);
+            check(fighter&&settings.controller==source_port&&
+                  settings.stocks>=1&&
+                  settings.stocks<=(opening_demo?99u:5u)&&
+                  settings.costume<fighter->costumes&&settings.sub_color<=4,
                   "Match requires supported source player stock/costume selections");
             if(opening_demo){
                 check(source.slot_type==Gm_PKind_Cpu&&source.cpu_kind==4&&
                       source.cpu_level==9&&source.team==0&&
-                      (source.slot==0?i:source.slot-1u)==i&&
-                      source.stocks==selection.players[i].stocks,
+                      source_port==source_slot&&source_slot==compact_player&&
+                      source.stocks==settings.stocks,
                       "Opening demo player differs from its source four-CPU setup");
             }
-            content.fighter_kinds[i]=fighter->fighter_kind;
-            content.costume_indices[i]=selection.players[i].costume;
-            content.source_players[i]={i,selection.players[i].controller,
-                selection.players[i].stocks,{0,0,0},1.0f,
-                selection.players[i].costume,selection.players[i].sub_color,
-                content.fighter_kinds[i]};
+            check(sudden_death?source_port==source_slot:
+                  settings.controller==compact_player,
+                  "Match controller mapping changed its source slot identity");
+            content.fighter_kinds[compact_player]=fighter->fighter_kind;
+            content.costume_indices[compact_player]=settings.costume;
+            content.source_players[compact_player]={source_slot,settings.controller,
+                settings.stocks,{0,0,0},1.0f,
+                settings.costume,settings.sub_color,
+                content.fighter_kinds[compact_player]};
+            ++compact_player;
         }
+        check(compact_player==player_count,
+              "Match source-slot compaction changed its active player count");
         content.begin_source_match=true;
         content.opening_demo=opening_demo;
+        content.sudden_death=sudden_death;
         content.source_camera_subjects=70;
-        content.source_random_seed=selection.random_seed;
+        content.source_random_seed=selected_input.random_seed;
         content.source_start_data=&selected.start;
         content.source_initial_input=initial_input;
-        if(!opening_demo){
+        if(sudden_death){
+            MeleeWebMenuMatchSelection claimed{};
+            char error[256]{};
+            check(melee_web_menu_host_sudden_death_match_claim(
+                      sd_host,sd_continuation,&claimed,error,sizeof(error)),error);
+            sudden_death_host=sd_host;
+            sudden_death_owner_id=sd_continuation->owner_id;
+            sudden_death_claimed=true;
+            check(claimed.player_count==selected.player_count&&
+                  claimed.random_seed==selected.random_seed&&
+                  claimed.hud_layout==selected.hud_layout&&
+                  claimed.unlocked_characters==selected.unlocked_characters&&
+                  claimed.unlocked_stages==selected.unlocked_stages&&
+                  claimed.sudden_death==selected.sudden_death&&
+                  std::memcmp(&claimed.start,&selected.start,sizeof(selected.start))==0&&
+                  std::memcmp(claimed.players,selected.players,sizeof(selected.players))==0,
+                  "Sudden Death match claim changed the observed source selection");
+            check(melee_web_menu_host_sudden_death_scene_begin(
+                      sudden_death_host,sudden_death_owner_id,error,sizeof(error)),error);
+            sudden_death_scene_active=true;
+            check(std::memcmp(&gmVsMelee_StartData,&selected.start,
+                              sizeof(selected.start))==0,
+                  "Sudden Death scene global differs from the copied source payload");
+        }else if(!opening_demo){
             check(melee_web_vs_mode_begin(),"Original VS mode is already owned");
             mode_owned=true;
         }
@@ -232,11 +312,18 @@ struct GameplayMatchSession::Storage {
             MeleeWebRenderSettings settings{640,480,{0,25,180},{0,15,0},30,1,1000,(uint64_t(1)<<5)|(uint64_t(1)<<3)};
             check(melee_web_render_finish_match_camera(render,&settings,error,sizeof(error)),error);
             check(melee_web_render_use_match_passes(render,error,sizeof(error)),error);
-            hud=melee_web_hud_begin_with_music(selected.hud_layout,
-                [](void* context,char* message,size_t size)->int{
-                    try{static_cast<Storage*>(context)->prepare_music();return 1;}
-                    catch(const std::exception& e){if(message&&size)std::snprintf(message,size,"%s",e.what());return 0;}
-                },this,error,sizeof(error));check(hud!=nullptr,error);
+            auto prepare_music=[](void* context,char* message,size_t size)->int{
+                try{static_cast<Storage*>(context)->prepare_music();return 1;}
+                catch(const std::exception& e){if(message&&size)std::snprintf(message,size,"%s",e.what());return 0;}
+            };
+            /* The Sudden Death scene enters status 1 after the complete
+             * original match-start boundary, rather than VS status 3. */
+            hud=content.sudden_death?
+                melee_web_hud_begin_sudden_death_with_music(
+                    selected.hud_layout,prepare_music,this,error,sizeof(error)):
+                melee_web_hud_begin_with_music(
+                    selected.hud_layout,prepare_music,this,error,sizeof(error));
+            check(hud!=nullptr,error);
             check(melee_web_render_use_scene_cameras(render,error,sizeof(error)),error);
             if(selected.opening_demo){
                 check(selected.start.rules.on_match_start!=nullptr,
@@ -251,13 +338,19 @@ struct GameplayMatchSession::Storage {
         return true;
     }
     void start(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection,
-               RuntimeArchiveCache* archive_cache,const MeleeWebPadState* initial_input=nullptr){
-        begin(files,selection,archive_cache,initial_input);
+               RuntimeArchiveCache* archive_cache,const MeleeWebPadState* initial_input=nullptr,
+               MeleeWebMenuHost* sd_host=nullptr,
+               const MeleeWebMenuMatchContinuation* sd_continuation=nullptr){
+        begin(files,selection,archive_cache,initial_input,sd_host,sd_continuation);
         while(!advance_construction()){}
+    }
+    void end_flow(){
+        char error[256]{};
+        if(flow){check(melee_web_match_flow_end(flow,error,sizeof(error)),error);flow=nullptr;}
     }
     void close(){
         char error[256]{};
-        if(flow){check(melee_web_match_flow_end(flow,error,sizeof(error)),error);flow=nullptr;}
+        end_flow();
         /* The browser's final source draw has completed before close(). Keep
          * the original fighter state resident while publishing MatchEnd, then
          * let melee_web_match_end tear down the source objects. The rules
@@ -287,6 +380,16 @@ struct GameplayMatchSession::Storage {
         if(kirby_copy_assets){kirby_copy_assets->close();kirby_copy_assets.reset();}
         if(hud_assets){hud_assets->close();hud_assets.reset();}
         bank.reset();
+        if(sudden_death_scene_active){
+            check(melee_web_menu_host_sudden_death_scene_end(
+                      sudden_death_host,sudden_death_owner_id,error,sizeof(error)),error);
+            sudden_death_scene_active=false;
+        }
+        if(sudden_death_claimed){
+            check(melee_web_menu_host_sudden_death_match_release(
+                      sudden_death_host,sudden_death_owner_id,error,sizeof(error)),error);
+            sudden_death_claimed=false;
+        }
         if(profile_owned){
             *gmMainLib_GetUnlockedCharactersBitmaskPtr()=saved_characters;
             *gmMainLib_8015EDA4()=saved_stages;
@@ -328,7 +431,65 @@ GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
     else
         storage_->start(files,selection,&archive_cache,&initial_input);
 }
+GameplayMatchSession::GameplayMatchSession(
+    const RuntimeFiles& files,MeleeWebMenuHost* host,
+    const MeleeWebMenuMatchContinuation& continuation,
+    RuntimeArchiveCache& archive_cache,GameplayMatchConstruction construction,
+    const MeleeWebPadState& initial_input)
+    :storage_(std::make_unique<Storage>()){
+    const MeleeWebMenuMatchSelection unused{};
+    if(construction==GameplayMatchConstruction::Deferred)
+        storage_->begin(files,unused,&archive_cache,&initial_input,host,&continuation);
+    else
+        storage_->start(files,unused,&archive_cache,&initial_input,host,&continuation);
+}
 void GameplayMatchSession::close(){if(storage_){storage_->close();storage_.reset();}}
+void GameplayMatchSession::finish_vs(
+    uint32_t& seed,uint8_t input[MELEE_WEB_PAD_STATE_BYTES]){
+    check(input&&storage_&&storage_->match&&storage_->flow&&
+          !storage_->selected.opening_demo&&!storage_->selected.sudden_death&&
+          !storage_->sudden_death_claimed,
+          "VS handoff requires its live ordinary match owner and complete PAD output");
+    check(complete(),"VS handoff requires completed original source flow");
+    storage_->end_flow();
+    check(melee_web_match_rules_publish_result(),
+          "Original VS could not publish its complete terminal data");
+    char error[256]{};MeleeWebMatchStats stats{};
+    check(melee_web_match_stats(storage_->match,&stats,error,sizeof(error)),error);
+    seed=stats.random_seed;
+    melee_web_pad_state_capture(input);
+    storage_->close();storage_.reset();
+}
+void GameplayMatchSession::finish_sudden_death(
+    MeleeWebMenuMatchContinuation& results){
+    std::memset(&results,0,sizeof(results));
+    check(storage_&&storage_->selected.sudden_death&&
+          storage_->sudden_death_host&&storage_->sudden_death_claimed,
+          "Sudden Death Results handoff requires its live typed match owner");
+    check(complete(),
+          "Sudden Death Results handoff requires the completed original source flow");
+    // Keep canonical close order through publication while the match-owned
+    // RNG/PAD are still live. OnExit may change either; capture afterward.
+    storage_->end_flow();
+    check(melee_web_match_rules_publish_result(),
+          "Original Sudden Death could not publish its complete terminal data");
+    uint32_t final_seed=0;
+    uint8_t final_input[MELEE_WEB_PAD_STATE_BYTES];
+    capture_handoff(final_seed,final_input);
+    MeleeWebMenuHost* host=storage_->sudden_death_host;
+    const uint64_t owner_id=storage_->sudden_death_owner_id;
+    storage_->close();
+    MatchExitInfo exit_info{};
+    check(melee_web_match_rules_terminal_data(&exit_info),
+          "Original Sudden Death scene did not publish its complete MatchExitInfo");
+    char error[256]{};
+    check(melee_web_menu_host_sudden_death_finish(
+              host,owner_id,&exit_info,final_seed,final_input,
+              &results,error,sizeof(error)),error);
+    check(results.kind==MELEE_WEB_MENU_MATCH_CONTINUATION_RESULTS,
+          "Original Sudden Death mode did not continue to its Results scene");
+    storage_.reset();
+}
 void GameplayMatchSession::tick(const PADStatus raw[4]){
     check(storage_&&storage_->match,"Match session is closed");char error[256]{};
     check(melee_web_match_step_raw_phased(storage_->match,raw,melee_web_match_flow_renew,melee_web_match_flow_pre,melee_web_match_flow_post,storage_->flow,error,sizeof(error)),error);
@@ -356,7 +517,8 @@ MeleeWebPipelineSourceContext GameplayMatchSession::provenance_context() const {
     context.owner_kind=MELEE_WEB_PIPELINE_OWNER_ROUTE_COMPOSITE;
     bool entry=false,dead=false,respawn=false;
     for(unsigned i=0;i<context.active_player_count;++i){
-        const auto& selected=storage_->selected.start.players[i];
+        const auto source_slot=storage_->content.source_players[i].slot;
+        const auto& selected=storage_->selected.start.players[source_slot];
         const auto* content=melee_web_fighter_content(selected.ckind);
         auto& player=context.players[i];
         player.character=selected.ckind;player.fighter_kind=storage_->content.fighter_kinds[i];
@@ -385,9 +547,14 @@ MeleeWebPipelineSourceContext GameplayMatchSession::provenance_context() const {
 bool GameplayMatchSession::ending()const{return storage_&&melee_web_match_flow_ending(storage_->flow);}
 bool GameplayMatchSession::complete()const{return storage_&&melee_web_match_flow_complete(storage_->flow);}
 bool GameplayMatchSession::opening_demo()const{return storage_&&storage_->selected.opening_demo!=0;}
+bool GameplayMatchSession::sudden_death()const{return storage_&&storage_->selected.sudden_death!=0;}
 bool GameplayMatchSession::paused()const{return storage_&&melee_web_match_flow_paused(storage_->flow);}
 uint32_t GameplayMatchSession::source_frames()const{return storage_?melee_web_match_flow_frames(storage_->flow):0;}
-int GameplayMatchSession::hud_damage(unsigned player)const{return storage_?melee_web_hud_damage(storage_->hud,player):-1;}
+int GameplayMatchSession::hud_damage(unsigned player)const{
+    if(!storage_||player>=storage_->content.player_count)return -1;
+    return melee_web_hud_damage(storage_->hud,
+        storage_->content.source_players[player].slot);
+}
 bool GameplayMatchSession::ready()const{return storage_&&melee_web_hud_ready(storage_->hud);}
 int GameplayMatchSession::outcome(int& winner)const{
     check(storage_&&storage_->match,"Match session is closed");
@@ -399,6 +566,16 @@ int GameplayMatchSession::outcome(int& winner)const{
 uint32_t GameplayMatchSession::random_seed()const{
     check(storage_&&storage_->match,"Match session is closed");char error[256]{};MeleeWebMatchStats stats{};
     check(melee_web_match_stats(storage_->match,&stats,error,sizeof(error)),error);return stats.random_seed;
+}
+void GameplayMatchSession::capture_handoff(
+    uint32_t& seed,uint8_t input[MELEE_WEB_PAD_STATE_BYTES])const{
+    check(storage_&&storage_->match&&storage_->selected.sudden_death,
+          "Only a live Sudden Death match can capture its next-route handoff");
+    check(input!=nullptr,"Sudden Death handoff requires the complete source PAD bank");
+    char error[256]{};MeleeWebMatchStats stats{};
+    check(melee_web_match_stats(storage_->match,&stats,error,sizeof(error)),error);
+    seed=stats.random_seed;
+    melee_web_pad_state_capture(input);
 }
 int GameplayMatchSession::fighter_kind(unsigned index)const{
     check(storage_&&storage_->match&&index<storage_->content.player_count,"Match player index is outside the active source match");

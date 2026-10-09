@@ -3667,7 +3667,7 @@ index fea468cc6c89d7d4c6c8a1a81e31f99eec07bc63..6d0819f60ef4c12cdf80b1ea29bbd805
  
  void gm_80168C5C(u32 arg0)
 diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
-index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914deaa2e22d 100644
+index cd7e31a0636e4e1a48d6a870e09319e887345ed1..58431b636c022f3df3ddf068f312ba829ddbeb77 100644
 --- a/src/melee/gm/gm_16AE.c
 +++ b/src/melee/gm/gm_16AE.c
 @@ -1,4 +1,6 @@
@@ -3677,7 +3677,15 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
  
  #include <string.h>
  
-@@ -355,6 +357,13 @@ static float get_unk_float(void)
+@@ -7,6 +9,7 @@
+ #include "gm_1884.h"
+ #include "gm_18A1.h"
+ #include "gm_unsplit.h"
++#include "gmvsmelee.h"
+ #include "gmmain_lib.h"
+ #include "gmmultiman.h"
+ #include "gmpause.h"
+@@ -355,6 +358,13 @@ static float get_unk_float(void)
      }
  }
  
@@ -3691,7 +3699,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
  bool gm_IsCurrently1PMode(void)
  {
      return gm_Is1PMode(gm_GetCurrentGameMode());
-@@ -473,6 +482,20 @@ void fn_8016B784(void)
+@@ -473,6 +483,20 @@ void fn_8016B784(void)
      grStadium_801D4150();
  }
  
@@ -3712,7 +3720,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
  void fn_8016B7B4(int arg0)
  {
      Ground_801C1154();
-@@ -493,9 +516,9 @@ void fn_8016B7F8(void)
+@@ -493,9 +517,9 @@ void fn_8016B7F8(void)
      Stage_802252E4(tmp->x24C8.stkind, NULL);
      grStadium_801D4040();
      if (!tmp->x24C8.x1_3) {
@@ -3724,7 +3732,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
      }
      un_802FD428();
  }
-@@ -996,6 +1019,9 @@ int gm_8016C75C(HSD_GObj* arg0)
+@@ -996,6 +1020,9 @@ int gm_8016C75C(HSD_GObj* arg0)
      if (tmp->x0 != (UNK_T) gm_801A4BA8()) {
          tmp->x0 = (UNK_T) gm_801A4BA8();
          gm_80166378(tmp);
@@ -3734,7 +3742,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
      }
      return tmp->x58[ftLib_80086BE0(arg0)].x20;
  }
-@@ -1325,6 +1351,17 @@ static inline void fn_8016CFE0_inline(void)
+@@ -1325,6 +1352,17 @@ static inline void fn_8016CFE0_inline(void)
      }
  }
  
@@ -3752,7 +3760,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
  void fn_8016CFE0(void)
  {
      lbl_8046B6A0_t* tmp = &lbl_8046B6A0;
-@@ -1387,11 +1424,7 @@ void fn_8016CFE0(void)
+@@ -1387,11 +1425,7 @@ void fn_8016CFE0(void)
      }
      if (tmp->match_result != OUTCOME_NONE) {
      block_51:
@@ -3765,7 +3773,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
      } else {
          fn_8016CD98(tmp);
      }
-@@ -1661,7 +1694,11 @@ void fn_8016DCC0(StartMeleeData* arg0)
+@@ -1661,7 +1695,11 @@ void fn_8016DCC0(StartMeleeData* arg0)
      lbl_8046B6A0_t* tmp = &lbl_8046B6A0;
      int i;
  
@@ -3777,7 +3785,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
      lbl_8046B6A0.unk_D = 6;
      lbl_8046B6A0.unk_1C = (void*) &lbl_803D5630;
      lbl_8046B6A0.unk_20 = (void*) &lbl_803D5620;
-@@ -1871,6 +1908,33 @@ void fn_8016E124(void)
+@@ -1871,6 +1909,33 @@ void fn_8016E124(void)
      }
  }
  
@@ -3811,7 +3819,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
  /// @todo The loop's SFX flag load uses a different equivalent address form.
  void fn_8016E2BC(void)
  {
-@@ -1915,26 +1979,8 @@ void fn_8016E2BC(void)
+@@ -1915,26 +1980,8 @@ void fn_8016E2BC(void)
          fn_8016DEEC();
          for (i = 0; i < 6; i++) {
              if (Player_GetPlayerSlotType(i) != Gm_PKind_NA) {
@@ -3839,7 +3847,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
                  Player_80031AD0(i);
                  if (tmp->FighterMatchInfo[i].x4_b4) {
                      lbAudioAx_800237A8(0x41F4E, 0x7F, 0x40);
-@@ -2036,9 +2082,9 @@ void gm_Scene_Vs_OnEnter(void* arg0)
+@@ -2036,9 +2083,9 @@ void gm_Scene_Vs_OnEnter(void* arg0)
      StartMeleeData* tmp = arg0;
      fn_8016E730(tmp);
      if (tmp->rules.x1_2) {
@@ -3851,7 +3859,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
      }
      ifTime_CreateTimers();
      ifStatus_802F665C(tmp->rules.x0_3);
-@@ -2119,7 +2165,7 @@ void gm_Scene_SuddenDeath_OnEnter(void* user_data)
+@@ -2119,7 +2166,7 @@ void gm_Scene_SuddenDeath_OnEnter(void* user_data)
      StartMeleeData* data = user_data;
      data->rules.x6 = true;
      fn_8016E730(data);
@@ -3860,7 +3868,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
      ifTime_CreateTimers();
      ifStatus_802F665C(data->rules.x0_3);
  }
-@@ -2138,9 +2184,9 @@ void gm_Scene_Training_OnEnter(void* user_data)
+@@ -2138,9 +2185,9 @@ void gm_Scene_Training_OnEnter(void* user_data)
      Stage_802252E4(tmp2->x24C8.stkind, NULL);
      grStadium_801D4040();
      if (!lbl_8046B6A0.x24C8.x1_3) {
@@ -3872,7 +3880,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
      }
      un_802FD428();
      ifStatus_802F665C(data->rules.x0_3);
-@@ -2277,3 +2323,195 @@ int fn_8016F160(int arg0, int arg1)
+@@ -2277,3 +2324,252 @@ int fn_8016F160(int arg0, int arg1)
  {
      return pl_80039418(arg0, arg1);
  }
@@ -3881,6 +3889,24 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
 +/* Run the original active/pause/ending scene callback only after the resident
 + * owner has initialized its complete supported StartMeleeData. */
 +static bool melee_web_opening_demo_active;
++extern struct GameSceneInfo* melee_web_current_scene_info(void);
++/* Read-only admission predicate. SD needs its authoritative scene and exact
++ * original entry/exit objects, not ordinary VS flags or a bare x6 bypass. */
++int melee_web_match_source_scene_supported(int mode, int scene_kind,
++    const void* enter, const void* exit, int entry_x6,
++    const StartMeleeRules* rules)
++{
++    if (mode != GM_VS || rules == NULL) return 0;
++    if (scene_kind == GS_SUDDEN_DEATH || rules->x6) {
++        return scene_kind == GS_SUDDEN_DEATH &&
++               enter == &gmVsMelee_StartData &&
++               exit == &gmVsMelee_SuddenDeathExitInfo &&
++               entry_x6 && rules->x6;
++    }
++    /* Preserve existing ordinary VS admission, including its missing-flag
++     * rejection. Opening-demo dispatch remains separate below. */
++    return rules->is_vs;
++}
 +int melee_web_match_source_frame(void)
 +{
 +    lbl_8046B6A0_t* data = &lbl_8046B6A0;
@@ -3895,7 +3921,11 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
 +               data->match_result == OUTCOME_ELIMINATION ||
 +               data->match_result == OUTCOME_NO_CONTEST;
 +    }
-+    if (gm_GetCurrentGameMode() != GM_VS || !data->x24C8.is_vs ||
++    const struct GameSceneInfo* scene = melee_web_current_scene_info();
++    if (!melee_web_match_source_scene_supported(gm_GetCurrentGameMode(),
++            scene ? scene->scene_kind : -1,
++            scene ? scene->enter_data : NULL, scene ? scene->exit_data : NULL,
++            gmVsMelee_StartData.rules.x6, &data->x24C8) ||
 +        data->x24C8.match_kind != MatchKind_Stock ||
 +        data->x24C8.x4_4 || data->is_singleplayer ||
 +        data->x24C8.on_frame_start || data->x24C8.on_frame_end ||
@@ -3926,6 +3956,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
 +int melee_web_match_source_publish_result(void)
 +{
 +    lbl_8046B6A0_t* data = &lbl_8046B6A0;
++    MatchExitInfo* exit_data = &melee_web_match_exit_snapshot;
 +    int result = data->match_result;
 +    if (result == OUTCOME_NONE) result = gm_GetMatchOutcome();
 +    if (result == OUTCOME_NONE || result == OUTCOME_RETRY) return 0;
@@ -3934,7 +3965,10 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
 +    if (!melee_web_match_exit_published) {
 +        /* Publish the complete original exit payload, including source
 +         * player statistics and timer/stage fields used by Results. */
-+        gm_Scene_Vs_OnExit(&melee_web_match_exit_snapshot);
++        if (gm_GetCurrentSceneExitData() == &gmVsMelee_SuddenDeathExitInfo)
++            exit_data = &gmVsMelee_SuddenDeathExitInfo;
++        gm_Scene_Vs_OnExit(exit_data);
++        melee_web_match_exit_snapshot = *exit_data;
 +        melee_web_match_exit_published = true;
 +    }
 +    return 1;
@@ -3987,12 +4021,15 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
 +#include "gameplay_match_rules.h"
 +#include "gameplay_player_selection.h"
 +extern void gm_80183218(void);
-+static int melee_web_match_validate_source_start(StartMeleeData* start,
-+                                                  int opening_demo)
++int melee_web_match_validate_source_start(StartMeleeData* start,
++                                          int opening_demo, int sudden_death)
 +{
 +    const StartMeleeRules* rules;
 +    int i;
-+    if (start == NULL) return 0;
++    int active = 0;
++    int first_team = -1;
++    int opposing_teams = 0;
++    if (start == NULL || (opening_demo && sudden_death)) return 0;
 +    rules = &start->rules;
 +    if (opening_demo) {
 +        if (rules->match_kind > MatchKind_Bonus || rules->timer_enabled ||
@@ -4004,7 +4041,16 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
 +            rules->on_frame_start != NULL || rules->on_frame_end != NULL ||
 +            rules->on_match_end != NULL || !melee_web_stage_content(rules->stkind))
 +            return 0;
-+    } else if (rules->match_kind != MatchKind_Stock || !rules->is_stock ||
++    } else if (sudden_death) {
++        /* SD inherits exact persistent VS flags. It does not add the separate
++         * ordinary Start is_stock/is_vs bits. Never normalize them here. */
++        if (!rules->x6 || rules->match_kind != MatchKind_Stock ||
++            rules->timer_enabled || rules->x2_5 || rules->is_teams > 1 ||
++            !melee_web_stage_content(rules->stkind) || rules->xB != -1 ||
++            rules->game_speed != 1.0F || rules->x54 != NULL ||
++            rules->on_match_start != NULL || rules->on_frame_start != NULL ||
++            rules->on_frame_end != NULL || rules->on_match_end != NULL) return 0;
++    } else if (rules->x6 || rules->match_kind != MatchKind_Stock || !rules->is_stock ||
 +               !rules->is_vs || rules->is_teams > 1 ||
 +               !melee_web_match_timer_supported(rules) ||
 +               !melee_web_stage_content(rules->stkind) ||
@@ -4015,7 +4061,8 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
 +    for (i = 0; i < 6; ++i)
 +        if (Player_GetEntity(i) != NULL) return 0;
 +    for (i = 0; i < 4; ++i) {
-+        if (start->players[i].slot_type == Gm_PKind_NA) break;
++        if (!sudden_death && start->players[i].slot_type == Gm_PKind_NA) break;
++        if (start->players[i].slot_type == Gm_PKind_NA) continue;
 +        const PlayerInitData* player = &start->players[i];
 +        const int player_id = player->slot == 0 ? i : (int) player->slot - 1;
 +        const MeleeWebFighterContent* content = melee_web_fighter_content(player->ckind);
@@ -4027,12 +4074,21 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
 +        if (opening_demo &&
 +            (player->slot_type != Gm_PKind_Cpu || player->cpu_kind != 4 ||
 +             player->cpu_level != 9)) return 0;
++        if (sudden_death && (player->stocks != 1 || player->x12 != 300)) return 0;
++        if (sudden_death && rules->is_teams) {
++            if (player->team >= 3) return 0;
++            if (first_team < 0) first_team = player->team;
++            else if (first_team != player->team) opposing_teams = 1;
++        }
++        ++active;
 +    }
-+    if (opening_demo ? i != 4 : i < 2) return 0;
-+    /* Original CSS Team Battle: three team colours and at least two active
-+     * players on different teams (shared with the menu and rules gates). */
-+    if (!opening_demo && !melee_web_team_setup_supported(start, i, 1))
-+        return 0;
++    if (opening_demo ? active != 4 : active < 2) return 0;
++    /* Sudden Death preserves source slots, so validate the same authored
++     * three team colours across active rows without compacting the payload. */
++    if (sudden_death && rules->is_teams && !opposing_teams) return 0;
++    /* Ordinary VS still uses CSS's contiguous team layout and shared gate. */
++    if (!opening_demo && !sudden_death &&
++        !melee_web_team_setup_supported(start, active, 1)) return 0;
 +    for (; i < 6; ++i)
 +        if (start->players[i].slot_type != Gm_PKind_NA) return 0;
 +    return 1;
@@ -4041,9 +4097,17 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
 + * refraction. The caller owns the later dynamics/effect and stage boundaries. */
 +int melee_web_match_prepare_source(StartMeleeData* start, int opening_demo)
 +{
-+    if (!melee_web_match_validate_source_start(start, opening_demo)) return 0;
++    if (!melee_web_match_validate_source_start(start, opening_demo, 0)) return 0;
 +    fn_8016DCC0(start);
 +    melee_web_opening_demo_active = opening_demo != 0;
++    return 1;
++}
++/* Explicit SD entry: the checked host route already owns its source scene. */
++int melee_web_match_prepare_sudden_death_source(StartMeleeData* start)
++{
++    if (!melee_web_match_validate_source_start(start, 0, 1)) return 0;
++    fn_8016DCC0(start);
++    melee_web_opening_demo_active = false;
 +    return 1;
 +}
 +void melee_web_match_source_demo_end(void)
@@ -4056,8 +4120,9 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..3b1fc926aca699869c34156ecc72914d
 +    int i;
 +    if (start == NULL) return 0;
 +    fn_8016DEEC();
-+    for (i = 0; i < 4 && start->players[i].slot_type != Gm_PKind_NA; ++i)
-+        gm_prepare_player_start_position(i);
++    for (i = 0; i < 4; ++i)
++        if (start->players[i].slot_type != Gm_PKind_NA)
++            gm_prepare_player_start_position(i);
 +    return 1;
 +}
 +int melee_web_match_init_source(StartMeleeData* start)
@@ -4318,10 +4383,10 @@ index 0d98426aac3e0be448f50e387ac8be218f65eeb3..31f017533cf7cbeded9f194397e083e5
 +}
 +#endif
 diff --git a/src/melee/gm/gm_1A3F.c b/src/melee/gm/gm_1A3F.c
-index 9fc7d6b09a3f0881a23881b758adc65103d025b4..095a8a147cd90ddaf5c4b70ca71af8df47fb3958 100644
+index 9fc7d6b09a3f0881a23881b758adc65103d025b4..c2f7519ad4be10e92f22d53876f3cf9a1afdae5d 100644
 --- a/src/melee/gm/gm_1A3F.c
 +++ b/src/melee/gm/gm_1A3F.c
-@@ -359,3 +359,100 @@ void gm_801A4510(void)
+@@ -359,3 +359,107 @@ void gm_801A4510(void)
          gamestate->routing.curr_mode = next_mode;
      }
  }
@@ -4357,6 +4422,13 @@ index 9fc7d6b09a3f0881a23881b758adc65103d025b4..095a8a147cd90ddaf5c4b70ca71af8df
 +    if (!melee_web_vs_mode_owned || !state_machine.routing.next_state_id)
 +        return -1;
 +    return state_machine.routing.next_state_id - 1;
++}
++int melee_web_vs_mode_resolve_next_state(GameModeState* states)
++{
++    if (!melee_web_vs_mode_owned || states == NULL) return -1;
++    if (state_machine.routing.next_state_id)
++        return state_machine.routing.next_state_id - 1;
++    return nextState(states);
 +}
 +int melee_web_vs_mode_pending_mode(void)
 +{
@@ -4992,10 +5064,10 @@ index 706ec65b2fc143d94a68493af6851648a716055d..55e8f92830a5b0720053ad71cb2a728d
  
  #endif
 diff --git a/src/melee/gm/gmvsmelee.c b/src/melee/gm/gmvsmelee.c
-index eb0b42c246c1a9529d791c99e2b78bd080e67d84..26fbc415e8bb179bbe3eef6b84f657d712272aed 100644
+index eb0b42c246c1a9529d791c99e2b78bd080e67d84..5b74b9d740eb03233a32b15832d100d3fb18ba0a 100644
 --- a/src/melee/gm/gmvsmelee.c
 +++ b/src/melee/gm/gmvsmelee.c
-@@ -204,6 +204,36 @@ void gmVsMelee_EnterVs(GameModeState* state, VsModeData* vs,
+@@ -204,6 +204,40 @@ void gmVsMelee_EnterVs(GameModeState* state, VsModeData* vs,
      gm_LoadAnnouncer();
  }
  
@@ -5005,16 +5077,20 @@ index eb0b42c246c1a9529d791c99e2b78bd080e67d84..26fbc415e8bb179bbe3eef6b84f657d7
 + * its checked match construction phase. Keep the menu-owned VsModeData raw:
 + * retail does not apply persistent rules until after SSS has exited. */
 +int melee_web_vs_prepare_start_source(StartMeleeData* start,
-+                                      const VsModeData* menu)
++                                      const VsModeData* menu,
++                                      VsModeData* prepared_mode)
 +{
 +    VsModeData vs;
 +    ssize_t i;
 +
-+    if (start == NULL || menu == NULL) {
++    if (start == NULL || menu == NULL || prepared_mode == NULL) {
 +        return 0;
 +    }
 +    vs = *menu;
 +    gm_80167BC8(&vs);
++    /* Retain the persistent mode state from this exact preparation callback.
++     * Ordinary VS flags below belong only to its separate Start output. */
++    *prepared_mode = vs;
 +    start->rules = vs.start.rules;
 +    if (start->rules.match_kind == MatchKind_Stock) {
 +        start->rules.is_stock = true;

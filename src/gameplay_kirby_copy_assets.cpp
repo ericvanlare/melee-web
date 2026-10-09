@@ -127,7 +127,10 @@ void destroy_joint(MeleeWebNativeJoint* joint)
 bool contains_kirby(const MeleeWebMenuMatchSelection& selection)
 {
     for (unsigned player = 0; player < GM_MAX_PLAYERS; ++player) {
-        if (selection.start.players[player].slot_type == Gm_PKind_NA) break;
+        if (selection.start.players[player].slot_type == Gm_PKind_NA) {
+            if(selection.sudden_death)continue;
+            break;
+        }
         if (selection.start.players[player].ckind == CKIND_KIRBY) return true;
     }
     return false;
@@ -730,7 +733,10 @@ std::vector<unsigned> selected_kirby_costumes(
 {
     std::vector<unsigned> result;
     for (const auto& slot : selection.start.players) {
-        if (slot.slot_type == Gm_PKind_NA) break;
+        if (slot.slot_type == Gm_PKind_NA) {
+            if(selection.sudden_death)continue;
+            break;
+        }
         if (slot.ckind != CKIND_KIRBY) continue;
         const auto costume = static_cast<unsigned>(slot.color);
         if (costume >= 6U)
@@ -800,7 +806,10 @@ std::vector<unsigned> selected_copy_kinds(const MeleeWebMenuMatchSelection& sele
     std::vector<unsigned> selected_kinds;
     for (unsigned player = 0; player < GM_MAX_PLAYERS; ++player) {
         const auto& slot = selection.start.players[player];
-        if (slot.slot_type == Gm_PKind_NA) break;
+        if (slot.slot_type == Gm_PKind_NA) {
+            if(selection.sudden_death)continue;
+            break;
+        }
         for (unsigned identity = 0;
              identity < melee_web_fighter_kind_count(slot.ckind); ++identity) {
             const auto kind = static_cast<unsigned>(
@@ -845,7 +854,10 @@ kirby_copy_effect_requirements(const MeleeWebMenuMatchSelection& selection)
     std::vector<KirbyCopyEffectRequirement> result;
     for (unsigned player = 0; player < GM_MAX_PLAYERS; ++player) {
         const auto& slot = selection.start.players[player];
-        if (slot.slot_type == Gm_PKind_NA) break;
+        if (slot.slot_type == Gm_PKind_NA) {
+            if(selection.sudden_death)continue;
+            break;
+        }
         for (unsigned identity = 0;
              identity < melee_web_fighter_kind_count(slot.ckind); ++identity) {
             const auto kind = static_cast<unsigned>(

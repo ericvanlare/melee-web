@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from owned_test_workspace import OwnedWorkspaceTests
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -17,7 +18,8 @@ from check_gameplay import node_runtime
 from menu_browser_source import menu_browser_source
 
 
-class ResultsCameraOwnershipTests(unittest.TestCase):
+
+class ResultsCameraOwnershipTests(OwnedWorkspaceTests):
     def test_camera_subject_lists_and_free_boundary_are_observed(self):
         context = (ROOT / "src/gameplay_results_context.c").read_text(encoding="utf-8")
         trace_start = context.index("void melee_web_results_camera_subject_list_trace(")
@@ -114,7 +116,7 @@ class ResultsCameraOwnershipTests(unittest.TestCase):
 typedef struct { int live; } Profile;
 typedef struct {
     Profile* profile;
-    int results_active, results_exited;
+    int results_active, results_exited, sudden_death_active;
 } MeleeWebMenuHost;
 typedef struct GameModeState {
     void (*on_exit)(struct GameModeState*);
@@ -166,7 +168,7 @@ static int commit_results_route(MeleeWebMenuHost* h, char* e, size_t n) {
 ''' + production + r'''
 static void reset(int broken_stage, int kind) {
     profile.live=camera_live=1;
-    host=(MeleeWebMenuHost){&profile,1,0};
+    host=(MeleeWebMenuHost){&profile,1,0,0};
     gm_Mode_Vs_States[4].on_exit=on_exit;
     callbacks=commits=profile_checks=camera_checks=stage=0;
     fault_stage=broken_stage;
@@ -217,18 +219,18 @@ int main(void) {
     return 0;
 }
 '''
-        with tempfile.TemporaryDirectory(prefix="results-handoff-") as directory:
-            root = Path(directory)
-            source_path, binary = root / "handoff.c", root / "handoff"
-            source_path.write_text(harness, encoding="utf-8")
-            compiled = subprocess.run(
-                [compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
-                 str(source_path), "-o", str(binary)],
-                capture_output=True, text=True, timeout=30)
-            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
-            result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=10)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("non-repeatable exit passed", result.stdout)
+        directory = self.new_workspace(ROOT, 'results-handoff-')
+        root = Path(directory)
+        source_path, binary = root / "handoff.c", root / "handoff"
+        source_path.write_text(harness, encoding="utf-8")
+        compiled = subprocess.run(
+            [compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
+             str(source_path), "-o", str(binary)],
+            capture_output=True, text=True, timeout=30)
+        self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+        result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("non-repeatable exit passed", result.stdout)
 
     def _run_trace_cases(self, cases, *, host_route=False):
         roots = [ROOT / "assets-local" / name for name in

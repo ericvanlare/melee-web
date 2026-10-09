@@ -39,8 +39,9 @@ import {
   runtimeDiagnosticCounterFailures,
   runtimeDiagnosticsFailures,
 } from './vs_rules_timeout_route_helpers.mjs';
+import {runSuddenDeathBrowserRoute,validateFinalSdCapture} from './vs_sudden_death_browser_route.mjs';
 
-const options = Object.fromEntries(['url', 'disc', 'out', 'playwright']
+const options = Object.fromEntries(['url', 'disc', 'out', 'playwright', 'runtime-wasm-sha256']
   .map(name => [name, {type: 'string'}]));
 options['menu-only'] = {type: 'boolean', default: false};
 options['rules-items-only'] = {type: 'boolean', default: false};
@@ -52,7 +53,13 @@ options['team-setup-only'] = {type: 'boolean', default: false};
 options['competitive-profile-only'] = {type: 'boolean', default: false};
 options['competitive-match-start-only'] = {type: 'boolean', default: false};
 options['competitive-timeout-route'] = {type: 'boolean', default: false};
+options['sudden-death-route'] = {type: 'boolean', default: false};
 const {values} = parseArgs({options, strict: true});
+const suddenDeathRoute = values['sudden-death-route'];
+if(suddenDeathRoute && ['menu-only','rules-items-only','css-sss-only','stage-only','no-contest-only','team-battle','team-setup-only','competitive-profile-only','competitive-match-start-only','competitive-timeout-route'].some(name=>values[name]))
+  throw Error('SD selects one full route; reduced/team route flags are incompatible');
+if(suddenDeathRoute && !/^[a-f0-9]{64}$/.test(values['runtime-wasm-sha256']||''))
+  throw Error('SD requires the frozen --runtime-wasm-sha256 identity');
 const menuOnly = values['menu-only'];
 const rulesItemsOnly = values['rules-items-only'];
 const cssSssOnly = values['css-sss-only'];
@@ -107,7 +114,8 @@ const cleanupResults = new Map();
 let reportWriteError = null;
 const report = {
   schema: 'melee-web-vs-rules-item-menu-browser-v1',
-  mode: competitiveMatchStartOnly ? 'source-competitive-normalized-match-start-prefix'
+  mode: suddenDeathRoute ? 'source-natural-timeout-sudden-death-results-css'
+    : competitiveMatchStartOnly ? 'source-competitive-normalized-match-start-prefix'
     : competitiveTimeoutRoute ? 'source-competitive-natural-timeout-results-route'
     : competitiveProfileOnly ? 'source-competitive-rules-profile-preflight'
     : noContestOnly ? 'source-no-contest-results-reproducer'
@@ -117,7 +125,9 @@ const report = {
     : rulesItemsOnly ? 'source-rules-items-entry-reproducer'
     : cssSssOnly ? 'source-css-to-sss-cooldown-reproducer'
     : menuOnly ? 'source-menu-boundary-reproducer' : 'source-rules-items-match-route',
-  scope: competitiveMatchStartOnly
+  scope: suddenDeathRoute
+    ? 'Original Rules one-minute four-stock two-human Mario/FD; natural timeout, active SD live input elimination, typed original Results and CSS/Eject. Zero timing-pause recovery. Functional only; no reference, timing, physical input or PCM acceptance.'
+    : competitiveMatchStartOnly
     ? 'Headless original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS; enable P2 through Controls and require the original CSS CPU/empty/Human transitions before Start; select Final Destination through original SSS, check normalized two-human Mario stock settings once at the first available observation in the bounded 180–240 source-frame window (about a 3-second prefix), then Eject. No 8-minute match, timeout, Results, retail comparison, or full-route acceptance claim.'
     : competitiveTimeoutRoute
     ? 'Headless original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS -> original SSS -> two-human Mario/Final Destination match. A bounded P1 outward-left schedule from the authored x=-60 spawn must cause exactly one source stock loss; both players then remain neutral until the original 8-minute timer reaches a unique P2 timeout result, followed by original Results -> CSS, a read-only check of committed Rules and item mask/frequency, then Eject. The route permits host phase 5 only while stopped for Results asset preparation and only with the retained exact timeout winner, [3,4] live stocks, and every normalized setup rule unchanged; otherwise the phase is an error. It does not re-enter the Rules/Items row menus after Results. Runtime callbacks are retained through a bounded recorder: sample rows are thinned/ring-bounded, incident rows are lossless only when dropped_incidents is zero, and publication-phase source-step totals can include transition-spanning callbacks. A counter poll fails as soon as cumulative incidents exceed the 24-row ring. Stops on timing/runtime/browser/observer errors, invalid or lost incident diagnostics, wrong stocks/outcome, 15 seconds without source-frame progress, or the 660-second gameplay wall bound from phase-7 entry. This is a single headless functional route, not a retail comparison, physical-input, timing, visual/audio-equivalence or performance claim.'
@@ -283,15 +293,15 @@ const closeOwnedResources = async () => {
 };
 const checkInterruption = () => {
   if (!interruptionSignal) return;
-  const error = new Error(`Browser profile preflight interrupted by ${interruptionSignal}`);
-  error.code = 'PROFILE_PREFLIGHT_INTERRUPTED';
+  const error = new Error(`Browser route interrupted by ${interruptionSignal}`);
+  error.code = 'BROWSER_ROUTE_INTERRUPTED';
   throw error;
 };
 const onOwnedInterrupt = signal => {
   if (interruptionSignal) return;
   interruptionSignal = signal;
-  const error = new Error(`Browser profile preflight interrupted by ${signal}`);
-  error.code = 'PROFILE_PREFLIGHT_INTERRUPTED';
+  const error = new Error(`Browser route interrupted by ${signal}`);
+  error.code = 'BROWSER_ROUTE_INTERRUPTED';
   failure = failure || error;
   report.result = 'interrupted';
   report.interruption = {signal, receivedAt: new Date().toISOString(), cleanup: 'started'};
@@ -317,7 +327,7 @@ const persistReport = async () => {
     await fs.writeFile(path.join(output, 'report.json'), serializeReport());
   } catch (error) {
     reportWriteError = error;
-    console.error(`Could not persist browser profile report: ${error.message}`);
+    console.error(`Could not persist browser route report: ${error.message}`);
   }
 };
 try {
@@ -332,7 +342,7 @@ try {
   page = await context.newPage();
   checkInterruption();
   driver = createBrowserDriver(page, {surface: 'development', timeoutMs: 90000,
-    deadline: Date.now() + 15 * 60 * 1000});
+    deadline: Date.now() + (suddenDeathRoute ? 10 : 15) * 60 * 1000});
   checkInterruption();
   report.browser = {executable: path.basename(browserPath), version: browser.version(), playwright: playwrightPath};
   report.discSha256 = await sha256File(discPath);
@@ -448,6 +458,7 @@ const waitForMatchSourceFrames = async (target, maximum) => {
 const observeLifecycle = () => page.evaluate(() => JSON.parse(
   Module.UTF8ToString(Module._melee_web_native_menu_memory())));
 const ensureNoError = async label => {
+  checkInterruption();
   const state = await current();
   if (state.error) throw Error(`${label}: ${state.error}`);
   if (competitiveTimeoutRoute && report.errors.length)
@@ -498,6 +509,7 @@ const resumeTimingPause = async label => {
     pause.status = 'failed_route';
     throw Error(`${label}: competitive route stops on a runtime timing disruption: ${state.message}`);
   }
+  if(suddenDeathRoute)throw Error(`${label}: timing disruption; SD route forbids recovery`);
   const control = await page.evaluate(() => {
     const button = document.querySelector('#pause');
     return {found: Boolean(button), enabled: Boolean(button && !button.disabled),
@@ -1326,6 +1338,14 @@ route: {
   const response = await page.goto(values.url, {timeout: 30000});
   assert.equal(response?.status(), 200);
   await driver.waitForImport();
+  if(suddenDeathRoute){
+    const response=await page.request.get(new URL('gameplay_menu_browser.wasm',values.url).href);
+    assert.equal(response.status(),200);
+    const hash=createHash('sha256').update(await response.body()).digest('hex');
+    assert.equal(hash,values['runtime-wasm-sha256'],'Served Wasm differs from frozen producer');
+    report.runtimeIdentity={wasm_sha256:hash};
+    await installRuntimeDiagnosticsCapture(report.runtimeIdentity,'served Wasm identity; full producer bound by external supervisor',page);
+  }
   await page.locator('#controls-open').click();
   await page.locator('#player-one-source').selectOption('keyboard');
   await page.locator('#player-two-source').selectOption('off');
@@ -1350,6 +1370,13 @@ route: {
   await driver.launch();
   await waitMessage('Original character select', 'initial CSS');
   await shot('00-initial-css');
+  if(suddenDeathRoute){
+    await runSuddenDeathBrowserRoute({page,report,driver,press,chord,current,ensureNoError,
+      resumeTimingPause,observeSource,observeMatch,observeCssSetup,sourcePadSample,sourcePadTap,
+      waitForNoQueuedPad,waitMessage,waitPhase,waitMenu,enterVsRules,moveMenuCursor,
+      waitItemInputReady,waitItemsCursor,waitItemFrequency,waitRulesPlusTimer,shot,verifyTeardown});
+    nativeSessionActive=false;break route;
+  }
   const initialProfileCss = competitiveProfileOnly || competitiveSourceRoute ? await observeSource() : null;
   if (competitiveProfileOnly || competitiveSourceRoute)
     report.sourceObservations.push({label: 'initial CSS profile baseline', ...initialProfileCss});
@@ -1937,6 +1964,17 @@ route: {
       report.failureCleanup = {status: 'failed', message: redactDiscPath(error.message)};
     }
   }
+  if(suddenDeathRoute){
+    try{
+      report.callbackCapture=await readRuntimeDiagnosticsCapture(page);
+      validateFinalSdCapture(report.callbackCapture);
+    }catch(error){
+      report.callback_capture_error=redactDiscPath(error.message);
+      if(!report.callbackCapture)report.callbackCapture={status:'unavailable',error:report.callback_capture_error};
+      if(!failure)failure=error;
+      report.result='fail';
+    }
+  }
   if (competitiveTimeoutRoute && report.competitiveTimeoutRoute.runtime_diagnostics === null) {
     if (page && !page.isClosed()) {
       try { await retainRuntimeDiagnostics(); }
@@ -1959,26 +1997,19 @@ route: {
       }
     }
   }
-  try {
-    if (driver) report.diagnostics = await driver.diagnostics();
-  } catch (error) {
-    report.diagnostics = {status: 'unavailable', error: redactDiscPath(error.message)};
-  }
-  try {
-    await closeOwnedResources();
-  } catch (error) {
-    report.cleanup_error = redactDiscPath(error.message);
-  }
-  process.off('SIGINT', onSigint);
-  process.off('SIGTERM', onSigterm);
-  const cleanupFailures = Object.entries(report.cleanup || {})
-    .filter(([, value]) => value.status === 'failed');
-  if (cleanupFailures.length) {
-    failure = failure || new Error(`Owned browser cleanup failed: ${JSON.stringify(cleanupFailures)}`);
-    report.result = interruptionSignal ? 'interrupted' : 'fail';
-    report.cleanupFailures = cleanupFailures;
+  try{report.diagnostics=await driver.diagnostics();}
+  catch(error){report.diagnostics_error=redactDiscPath(error.message);}
+  await persistReport();
+  await closeOwnedResources();
+  const cleanupFailed=Object.values(report.cleanup).some(item=>item.status==='failed');
+  if(cleanupFailed){
+    report.cleanup_failure='Owned browser resource cleanup failed';
+    if(!failure)failure=Error(report.cleanup_failure);
+    report.result='fail';
   }
   await persistReport();
+  process.off('SIGINT',onSigint);process.off('SIGTERM',onSigterm);
+  if(reportWriteError&&!failure)failure=reportWriteError;
 }
 console.log(JSON.stringify({result: report.result, checks: report.checks,
   sourceObservations: report.sourceObservations.length,
