@@ -34,7 +34,11 @@ def rules_ready_packet():
 def validate_packet(value):
     # Only this reduced route is supported. No guessed/default continuation.
     from authored_sd_reference_plan import canonical
+    if canonical(value) == canonical(gci_items_row_packet()):
+        return value
     if canonical(value) == canonical(gci_sd_prefix_packet()):
+        return value
+    if canonical(value) == canonical(gci_sd_prefix_packet(7)):
         return value
     if any(canonical(value) == canonical(gci_rules_ready_packet(version)) for version in (3, 4)):
         return value
@@ -69,15 +73,17 @@ def matches(state, predicate):
     return state is not None and all(state.get(key) == value for key, value in predicate.items())
 
 
-def gci_sd_prefix_packet():
+def gci_sd_prefix_packet(version=5):
     """Finite original-menu policy, authored before observing the new campaign.
 
     MenuFlow already exposes committed/pending values. CSS uses the existing
     source cursor/door/live-state slices. SSS needs its separate acceptance
     cooldown, not another cursor-coordinate reader. Every movement is capped.
     """
+    if type(version) is not int or version not in (5,7):
+        raise ValueError("Unsupported full SD menu packet version")
     value = gci_rules_ready_packet()
-    value.update(version=5, scope="sd_prefix_gci",
+    value.update(version=version, scope="sd_prefix_gci",
                  authored_recipe_sha256=recipe_sha256(recipe(5)))
     def state(kind, row, confirmed=None, entering=1):
         result = guard(kind, row, confirmed)
@@ -110,6 +116,13 @@ def gci_sd_prefix_packet():
         "column_x": 40, "column_polls": 18, "scan_y": 40,
         "max_scan_polls": 600, "confirm_requires_cooldown": 0}
     value["stop"] = "observed sd_setup; interrupted primary with complete native MWRI"
+    if version == 7:
+        for action in value["actions"]:
+            if action["label"].startswith("items-frequency-"):
+                action["before"]["items_locked"] = 0
+                action["after"]["items_locked"] = 0
+            if action["label"] == "commit-items-none":
+                action["before"]["items_locked"] = 0
     return value
 
 
@@ -117,6 +130,8 @@ def route_pads(packet):
     """Finite PAD alphabet for the declared conditional cursor policy."""
     pads = {(NEUTRAL_PAD, NEUTRAL_PAD)} | {
         (a["p1"], a["p2"]) for a in packet["boot"] + packet["actions"]}
+    if packet["scope"] == "items_row_gci":
+        return pads
     for port in (0, 1):
         for button in ("A", "X"):
             pair = [NEUTRAL_PAD] * 2
@@ -129,3 +144,19 @@ def route_pads(packet):
                 pads.add(tuple(pair))
     pads |= {(raw_pad(x=40), NEUTRAL_PAD), (raw_pad(y=40), NEUTRAL_PAD)}
     return pads
+
+
+def gci_items_row_packet():
+    """Reduced Items acceptance probe, ending after exactly one authored Up."""
+    value = gci_sd_prefix_packet()
+    value.update(version=6, scope="items_row_gci")
+    last = next(i for i, a in enumerate(value["actions"])
+                if a["label"] == "items-frequency-row")
+    value["actions"] = value["actions"][:last + 1]
+    action = value["actions"][-1]
+    action["before"]["items_locked"] = 0
+    action["after"]["items_locked"] = 0
+    value.pop("css")
+    value.pop("sss")
+    value["stop"] = dict(action["after"])
+    return value

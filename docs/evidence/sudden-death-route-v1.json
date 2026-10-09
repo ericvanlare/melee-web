@@ -390,7 +390,14 @@
       "cross-producer strict comparison"
     ],
     "scope": "Original functional readiness only; no original simulation agreement.",
-    "current_recipe_alignment": "Earlier plan colors [0,1]/pause-off superseded by recipe 5 colors [1,0]/pause-enabled; Items prefix failed, revised original producer built; aligned full settings/SD comparison unrun."
+    "current_recipe_alignment": "Earlier plan colors [0,1]/pause-off superseded by recipe 5 colors [1,0]/pause-enabled; Items prefix failed, revised original producer built; aligned full settings/SD comparison unrun.",
+    "toolset_extension_23b9": {
+      "reviewed_source": "23b9ff37",
+      "integrated_base_equivalent": "6ade1bf4 equals 0e8caada tools before import",
+      "integration": "exact ten-file source/doc/fixture delta imported; SD work preserved",
+      "focused": "46 cheap Python source tests passed in 3.687s; no native compiler/assets/browser launched",
+      "native_reference_build": "owned separately by reference checkout; no new comparison claim from SD integration"
+    }
   },
   "validation": {
     "tested_executable_head": "fd55b378941b2ecd4cc4f1d8df84515ffab0b29a",

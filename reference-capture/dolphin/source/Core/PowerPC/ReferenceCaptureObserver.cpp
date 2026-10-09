@@ -220,6 +220,7 @@ enum class SliceTag : u16
   PlayerEntityUserData = 53,
   SdRumblePorts = 54,  // Opt-in Progress JSON only; never a full save-data slice.
   SdStageCooldown = 55,  // Recipe-five menu route only; original acceptance gate.
+  SdItemsLock = 56,  // Reduced Items owner only; original u8 animation lock.
 };
 
 struct SliceRef
@@ -900,7 +901,8 @@ struct Observer::Impl
     }
     if (!Env("MWRC_SD_PROFILE_GCI_SHA256").empty() &&
         (!SdInitRequested() || (Env("MWRC_SD_MENU_PROBE") != "rules_ready" &&
-                              Env("MWRC_SD_MENU_PROBE") != "sd_prefix") ||
+                              Env("MWRC_SD_MENU_PROBE") != "sd_prefix" &&
+                              Env("MWRC_SD_MENU_PROBE") != "items_row") ||
          Env("MWRC_SD_PROFILE_GCI_SHA256") !=
              "5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729"))
     {
@@ -917,8 +919,8 @@ struct Observer::Impl
           !Env("MWRC_CPU_PROBE_OUTPUT").empty() || !Env("MWRC_ITEM_PROBE_OUTPUT").empty() ||
           !Env("MWRC_ALLOCATION_OUTPUT").empty() ||
           (!Env("MWRC_SD_MENU_PROBE").empty() && Env("MWRC_SD_MENU_PROBE") != "rules_ready" &&
-           Env("MWRC_SD_MENU_PROBE") != "sd_prefix") ||
-          (Env("MWRC_SD_MENU_PROBE") == "sd_prefix" && Env("MWRC_SD_PROFILE_GCI_SHA256").empty()))
+           Env("MWRC_SD_MENU_PROBE") != "sd_prefix" && Env("MWRC_SD_MENU_PROBE") != "items_row") ||
+          ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "items_row") && Env("MWRC_SD_PROFILE_GCI_SHA256").empty()))
       {
         SetInvalid("SD prefix requires a recipe hash, native input recording and exclusive scope");
         return false;
@@ -2094,6 +2096,27 @@ struct Observer::Impl
         (!AddSlice(system, SliceTag::MenuMainFlow, 0x804a04f0, 0x18) ||
          !AddSlice(system, SliceTag::MenuMainInput, 0x804d6bc8, 8)))
       return false;
+    if (scene_kind == 1 && (Env("MWRC_SD_MENU_PROBE") == "items_row" ||
+                            Env("MWRC_SD_MENU_PROBE") == "sd_prefix"))
+    {
+      u8 menu_kind = 0;
+      if (!ReadBytes(system, 0x804a04f0, 1, &menu_kind))
+        return false;
+      if (menu_kind == 16)
+      {
+        // fn_80233E10: lbz r0,-0x4ab4(r13), cmpwi, bne.
+        // Verified original r13=0x804db6a0 derives u8 0x804d6bec.
+        const std::array<u32, 3> words = {0x880db54c, 0x28000000, 0x40820180};
+        for (size_t i = 0; i < words.size(); ++i)
+        {
+          u32 word = 0;
+          if (!ReadU32(system, 0x80233ec0 + static_cast<u32>(i * 4), &word) || word != words[i])
+            return false;
+        }
+        if (!AddSlice(system, SliceTag::SdItemsLock, 0x804d6bec, 1))
+          return false;
+      }
+    }
     // Source menu globals survive arena teardown. PAD interrupts can run
     // inside OnEnter while those globals still point into the old arena.
     // Publish CSS steering only after the verified OnEnter return.
@@ -2419,6 +2442,23 @@ struct Observer::Impl
         if (++sd_menu_polls > 7200)
           return SetInvalid("SD prefix menu polling cap exhausted"), void();
         SdEvent("menu", pc, tick);
+        if (Env("MWRC_SD_MENU_PROBE") == "items_row" && sd_rules_observed && sd_menu_neutral)
+        {
+          std::array<u8, 0x18> flow{};
+          std::array<u8, 8> input{};
+          u8 lock = 1;
+          if (raw[0] == 1 && ReadBytes(system, 0x804a04f0, flow.size(), flow.data()) &&
+              ReadBytes(system, 0x804d6bc8, input.size(), input.data()) &&
+              ReadBytes(system, 0x804d6bec, 1, &lock) && flow[0] == 16 &&
+              flow[2] == 0 && flow[3] == 31 && flow[4] == 3 && flow[0x11] == 1 &&
+              input[0] == 0 && input[1] == 0 && lock == 0)
+          {
+            SdEvent("items_ready", pc, tick);
+            InputStream::RequestFinish(true);
+            natural_completion.store(false);
+            finish_requested.store(true);
+          }
+        }
         if (!sd_rules_observed && !Env("MWRC_SD_MENU_PROBE").empty() && sd_menu_consumed && sd_menu_neutral)
         {
           std::array<u8, 0x18> flow{};
@@ -2484,7 +2524,7 @@ struct Observer::Impl
       const auto* kind = system->GetMemory().GetPointerForRange(scene, 1);
       // Opening demos also use the VS initializer. They are outside this recipe.
       if (!sudden && sd_init.phase == SdInitState::Phase::Menu && route[0] == 0x18) return;
-      if (Env("MWRC_SD_MENU_PROBE") == "rules_ready")
+      if (Env("MWRC_SD_MENU_PROBE") == "rules_ready" || Env("MWRC_SD_MENU_PROBE") == "items_row")
         return SetInvalid("SD Rules probe entered undeclared gameplay"), void();
       if (!kind || *kind != (sudden ? 3 : 2) || route[0] != 2 ||
           !sd_init.Entry(state->gpr[3], sudden))

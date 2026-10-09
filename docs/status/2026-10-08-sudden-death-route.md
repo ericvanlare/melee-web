@@ -139,3 +139,10 @@ separately checks rejection and retained terminal byte identity; its build/run
 is pending. The existing ordinary elimination control did not run after this
 first failure. No ordinary-control pass or emitted numeric terminal/PAD/seed
 claim is made from that failed attempt.
+
+The reviewed `23b9ff37` original-reference Items receiver/toolset extension
+is integrated as source only, preserving the earlier equivalent `6ade1bf4`
+baseline and SD work. All ten imported files match the reviewed source;
+46 cheap Python controls passed. The reference native producer is built in
+its own checkout. This integration does not establish an original full-prefix,
+SD or strict cross-producer comparison result.

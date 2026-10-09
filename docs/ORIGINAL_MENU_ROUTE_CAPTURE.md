@@ -399,3 +399,45 @@ The separate allocation-history GDB/Python route remains available for scopes
 that need a stopped scheduler and allocation/RNG sampling. It is not a
 prerequisite for observing this ordinary menu route. Keep future claims scoped
 to the retained capture and build identities above.
+# Reduced Items lock experiment
+
+After the recipe-five original prefix failed at `items-frequency-row:observed`,
+menu packet six retains the same setup actions but stops at Items row31/value3.
+Its separate `items_row` observer scope reads the original one-byte animation
+lock only under actual scene1/MenuFlow kind16. The verified GALE01r2
+`fn_80233E10` instructions at `0x80233ec0` load and test that byte at
+`0x804d6bec` before navigation. Main-menu cooldown zero alone is insufficient.
+The runner waits for the observed lock zero, sends one declared Up pulse, then
+requires the original row/value and neutral release. No CSS, gameplay, timeout
+or SD continuation is admitted. Native input completion remains separate from
+the intentionally interrupted observer. Missing, misplaced or malformed lock
+data and consumed input while locked fail explicitly.
+
+Portable reconstructed positive/negative controls do not establish native
+behavior. The failed original stream has no lock slice, so it establishes
+ignored normalized Up, not the actual runtime lock value. Prior full-prefix
+packets, producer binaries and failure evidence remain preserved.
+
+The reduced lock probe subsequently observed the opening A still held for one
+copied source sample after the Items owner appeared with lock1. Its receiver
+therefore recognizes an entry drain only after exact Rules row5/declared A to
+Items row0/value1/entering1/lock1 ownership. Only the identical held A bank can
+drain while that locked owner persists, within the existing polling/sample
+caps. The first copied neutral permanently closes this allowance. New A,
+unlocked A, another input or owner, and Up before lock0 are fatal. The runner
+still releases after first copied A and waits for copied neutral; no input is
+added or replaced and no queue is flushed. Entry samples remain reported.
+
+Full-prefix menu7 carries that same typed lock and entry drain through the
+existing recipe-five route. Its controller bytes and action order match
+historical menu5; Items frequency actions additionally require lock0. The
+receiver observes one Up to row31/value3, three separate Right pulses with
+source changes 3→2→1→0, then B and the original Rules owner. It rejects a
+frequency change without its declared pulse or leaving Items before commit.
+The original CSS/FD route and strict normalized VS/tied-timeout/SD payload
+checks remain; the stop is still SD setup, without resolution inputs. Tag56
+uses its existing verified byte reader for `sd_prefix` as well as the reduced
+`items_row` probe. The ed97 producer lacks the full-prefix tag scope and must
+be preserved; this source change needs a new compiled producer before capture.
+Actual reduced passing menu/PAD/lock fields are retained as a control; later
+frequency/CSS/tie/SD controls are explicitly synthetic, not original validation.
