@@ -25,6 +25,9 @@ int melee_web_stadium_c1_pending_queue_loss_control(void);
 /* Actual original OnLoad/OnStart + generator SDK retirement, two lifetimes;
  * no map callbacks, scheduler tick, fixture, or full StageLast acceptance. */
 int melee_web_stadium_c1_generator_lifetime_control(void);
+/* One original GObj/proc, exact allocator cache roots/leases and two owned
+ * world retirements. No generator data, map assets, witnesses or proc ticks. */
+int melee_web_stadium_c1_gobj_proc_pool_control(void);
 #endif
 
 /* Read source stage registries without copying or mutating their state. */

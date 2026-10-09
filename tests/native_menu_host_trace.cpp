@@ -7661,6 +7661,10 @@ int main(int argc,char** argv){try{
   run_vs_sudden_death_source_control();return 0;
  }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(argc==2&&std::string_view(argv[1])=="--stadium-gobj-proc-pool-controls"){
+   check(melee_web_stadium_c1_gobj_proc_pool_control(), "Stadium GObj/proc pool control failed");
+   return 0;
+  }
   if(argc==2&&std::string_view(argv[1])=="--stadium-generator-lifetime-controls"){
    check(melee_web_stadium_c1_generator_lifetime_control(), "Stadium generator lifetime control failed");
    return 0;

@@ -15,6 +15,9 @@
 #include <melee/it/it_3F14.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjplink.h>
+#include <sysdolphin/baselib/gobjproc.h>
+#include <sysdolphin/baselib/initialize.h>
+#include <sysdolphin/baselib/memory.h>
 #include <sysdolphin/baselib/objalloc.h>
 #include <sysdolphin/baselib/jobj.h>
 #include <stdio.h>
@@ -572,6 +575,106 @@ static void queue_control_require(int condition, const char* message)
         fflush(stderr);
         _Exit(1); /* Never raw-shutdown a partially owned source graph. */
     }
+}
+
+extern HSD_ObjAllocData gobj_alloc_data, gobjproc_alloc_data;
+static void gobj_pool_phase(const char* phase,unsigned world,
+                           const void* object,const void* proc)
+{
+    MeleeWebGameplayStats stats=melee_web_gameplay_stats();
+    printf("GOBJ_POOL_PHASE world=%u phase=%s heap_free=%d objects=%u processes=%u ticks=%llu source_generation=%llu "
+           "object_pool=%p object_used=%u object_free=%u object_size=%u object_root=%p "
+           "proc_pool=%p proc_used=%u proc_free=%u proc_size=%u proc_root=%p\n",
+           world,phase,stats.heap_free_bytes,stats.objects,stats.processes,
+           (unsigned long long)stats.ticks,(unsigned long long)stats.generation,(void*)&gobj_alloc_data,
+           gobj_alloc_data.used,gobj_alloc_data.free,gobj_alloc_data.size,
+           (void*)gobj_alloc_data.freehead,(void*)&gobjproc_alloc_data,
+           gobjproc_alloc_data.used,gobjproc_alloc_data.free,gobjproc_alloc_data.size,
+           (void*)gobjproc_alloc_data.freehead);
+    const void* payloads[]={object,proc};
+    for(size_t i=0;i<ARRAY_SIZE(payloads);++i){
+        if(!payloads[i])continue;
+        MeleeWebSourceMemoryAllocation lease;
+        MeleeWebSourceMemoryReadStatus status=melee_web_source_memory_allocation_read(payloads[i],&lease);
+        printf("GOBJ_POOL_LEASE world=%u phase=%s kind=%zu payload=%p status=%d live=%u requested=%u "
+               "generation=%llu source_world=%llu heap=%d\n",world,phase,i,payloads[i],
+               status,lease.live,lease.requested_bytes,(unsigned long long)lease.allocation_generation,
+               (unsigned long long)lease.world_generation,lease.source_heap_handle);
+    }
+    fflush(stdout);
+}
+int melee_web_stadium_c1_gobj_proc_pool_control(void)
+{
+    char error[256]={0};
+    const size_t bytes=8U*1024U*1024U;
+    queue_control_require(melee_web_gameplay_session_begin(bytes,error,sizeof(error)),error);
+    const MeleeWebGameplayAllocation session=melee_web_gameplay_allocation();
+    queue_control_require(session.identity&&session.bytes==bytes,"owned retained session identity");
+    for(unsigned world=0;world<2;++world){
+        queue_control_require(melee_web_gameplay_startup(bytes,error,sizeof(error)),error);
+        queue_control_require(melee_web_native_world_enable(error,sizeof(error)),error);
+        MeleeWebGameplayStats baseline=melee_web_gameplay_stats();
+        queue_control_require(!baseline.objects&&!baseline.processes&&!baseline.ticks&&
+                              !gobj_alloc_data.freehead&&!gobjproc_alloc_data.freehead&&
+                              !gobj_alloc_data.used&&!gobjproc_alloc_data.used&&
+                              !gobj_alloc_data.free&&!gobjproc_alloc_data.free,
+                              "fresh owned world object/proc pool baseline");
+        gobj_pool_phase("baseline",world,NULL,NULL);
+        HSD_GObj* object=GObj_Create(2,4,0);
+        queue_control_require(object!=NULL,"exact owned source GObj construction");
+        HSD_GObj_SetupProc(object,fn_801CADBC,0);
+        HSD_GObjProc* proc=object->proc;
+        queue_control_require(proc&&proc->gobj==object&&proc->on_invoke==fn_801CADBC&&
+                              proc->s_link==0&&!proc->child,"exact original source proc construction");
+        gobj_pool_phase("constructed",world,object,proc);
+        MeleeWebSourceMemoryAllocation object_lease,proc_lease;
+        queue_control_require(melee_web_source_memory_allocation_read(object,&object_lease)==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+                              melee_web_source_memory_allocation_read(proc,&proc_lease)==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+                              object_lease.live&&proc_lease.live&&
+                              object_lease.requested_bytes==gobj_alloc_data.size&&
+                              proc_lease.requested_bytes==gobjproc_alloc_data.size,
+                              "exact SDK-backed single-cell object/proc pools");
+        HSD_GObjPLink_80390228(object);
+        gobj_pool_phase("component_released",world,object,proc);
+        MeleeWebGameplayStats returned=melee_web_gameplay_stats();
+        MeleeWebSourceMemoryAllocation object_after,proc_after;
+        queue_control_require(!returned.objects&&!returned.processes&&!returned.ticks&&
+                              gobj_alloc_data.freehead==(void*)object&&gobjproc_alloc_data.freehead==(void*)proc&&
+                              !gobj_alloc_data.used&&!gobjproc_alloc_data.used&&
+                              gobj_alloc_data.free==1&&gobjproc_alloc_data.free==1,
+                              "original release roots exact idle cells in allocator free chains");
+        queue_control_require(melee_web_source_memory_allocation_read(object,&object_after)==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+                              melee_web_source_memory_allocation_read(proc,&proc_after)==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+                              object_after.live&&proc_after.live&&
+                              object_after.allocation_generation==object_lease.allocation_generation&&
+                              proc_after.allocation_generation==proc_lease.allocation_generation&&
+                              object_after.requested_bytes==object_lease.requested_bytes&&
+                              proc_after.requested_bytes==proc_lease.requested_bytes&&
+                              object_after.world_generation==object_lease.world_generation&&
+                              proc_after.world_generation==proc_lease.world_generation&&
+                              object_after.source_heap_handle==object_lease.source_heap_handle&&
+                              proc_after.source_heap_handle==proc_lease.source_heap_handle,
+                              "component release preserves allocator-owned backing leases");
+        /* No baseline heap equality is waived: this separate reducer locates
+         * the backing-cache lifetime and prints its exact numeric delta. */
+        queue_control_require(melee_web_gameplay_shutdown(error,sizeof(error)),error);
+        gobj_pool_phase("owned_world_retired",world,object,proc);
+        MeleeWebSourceMemoryContext inactive;
+        queue_control_require(melee_web_source_memory_context_read(&inactive)==MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE,
+                              "retired owned world has no active source-memory tracker");
+        queue_control_require(!melee_web_gameplay_world_exists()&&
+                              melee_web_gameplay_allocation().identity==session.identity&&
+                              HSD_GObj_Entities==NULL&&HSD_GetHeap()==-1&&
+                              !melee_web_gameplay_stats().objects&&!melee_web_gameplay_stats().processes,
+                              "owned world retirement inactivates heap/registry while retaining session arena");
+        /* Original ForgetMemory forgets the allocator registry, not each
+         * metadata freehead. Numeric inert pointers above are never dereferenced;
+         * next world's original ObjAllocInit must reset them before allocation. */
+    }
+    queue_control_require(melee_web_gameplay_session_end(error,sizeof(error)),error);
+    queue_control_require(!melee_web_gameplay_allocation().identity,"complete owned session retirement");
+    puts("GOBJ_POOL_CONTROL worlds=2 ticks=0 generator_data=0 borrowed_witness=0 per_cell_free=0 scope=asset-free-original-object-proc-pools-and-owned-world-retirement");
+    return 1;
 }
 
 int melee_web_stadium_c1_generator_lifetime_control(void)
