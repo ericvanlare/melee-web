@@ -315,8 +315,8 @@ export async function confirmTwoHumanResults({
       if (readiness.kind === 'invalid')
         throw Error(`${label}: ${readiness.reason}: ${JSON.stringify(observed.host)}`);
       // P2's copied PAD edge is asynchronous relative to the UI observer. Keep
-      // polling an active Results owner until that edge arrives; require the
-      // complete witness before accepting a stopped owner or a destination.
+      // polling Results, including its checked preparation states, until that
+      // edge arrives; require it before leaving Results for a destination.
       if (allowResultsPreparationFromIndex !== null && observed.host.phase !== 8)
         assertP2CompletionTrace(observed.trace, allowResultsPreparationFromIndex, label);
       if (readiness.kind === 'preparing' && allowResultsPreparationFromIndex !== null) {
