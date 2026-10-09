@@ -110,6 +110,7 @@ extern HSD_RumbleData HSD_Rumble_804C22E0[4];
 #include <sstream>
 #include <set>
 #include <stdexcept>
+#include <exception>
 #include <string_view>
 #include <vector>
 extern "C" GameRules gmMainLib_803D4A48;
@@ -172,6 +173,46 @@ void run_post_vs_mode_asset_free_contract()
               output.rules.is_stock&&output.rules.is_vs&&
               retained.start.rules.xB==-1&&retained.start.players[0].stocks==4,
               "VS preparation lost raw, persistent mode or normalized Start separation");
+        CSSData fresh{};fresh.match_type=VS_MELEE;fresh.vs=raw;
+        CSSData cached=fresh;cached.vs=retained;
+        check(melee_web_menu_css_cache_selection_valid(&fresh,nullptr)&&
+              melee_web_menu_css_cache_selection_valid(&cached,&retained.start.rules)&&
+              !melee_web_menu_css_selection_valid(&cached),
+              "Fresh or checked retained CSS cache contract failed; foreign cache admitted");
+        gmMainLib_GetGameRules()->stock_time_limit=1;
+        VsModeData timed=raw;gm_80167BC8(&timed);
+        cached.vs=timed;
+        check(melee_web_menu_css_cache_selection_valid(&cached,&timed.start.rules),
+              "Checked one-minute post-VS cache was rejected");
+        const CSSData unchanged=cached;
+        for(unsigned negative=0;negative<6;++negative){
+            CSSData bad=cached;
+            if(negative==0)bad.vs.start.rules.is_vs=true;
+            if(negative==1)bad.vs.start.rules.is_stock=true;
+            if(negative==2)bad.vs.start.rules.time_limit=61;
+            if(negative==3)bad.vs.start.players[0].stocks=0;
+            if(negative==4)bad.vs.start.players[0].stocks=6;
+            if(negative==5)bad.vs.start.players[1].slot=1;
+            check(!melee_web_menu_css_cache_selection_valid(&bad,&timed.start.rules),
+                  "Retained CSS cache accepted malformed flags/timer/stocks/ports");
+        }
+        auto bad_expected=timed.start.rules;bad_expected.time_limit=61;
+        check(!melee_web_menu_css_cache_selection_valid(&cached,&bad_expected)&&
+              std::memcmp(&cached,&unchanged,sizeof(cached))==0,
+              "Cache validation changed source bytes or accepted invalid timer expectation");
+        SSSData fresh_sss{};fresh_sss.force_stage_id=-1;fresh_sss.vs=raw;
+        SSSData foreign_sss=fresh_sss;foreign_sss.vs=timed;
+        check(melee_web_menu_sss_selection_valid(&fresh_sss)&&
+              !melee_web_menu_sss_selection_valid(&foreign_sss),
+              "Fresh SSS changed or foreign retained SSS bypassed owner binding");
+        CSSData training=fresh;training.match_type=TRAINING_MODE;
+        training.vs.start.players[0].slot_type=Gm_PKind_Human;
+        check(melee_web_menu_css_selection_valid(&training),
+              "Training CSS contract changed with returned VS cache support");
+        training.vs.start.rules.timer_enabled=true;
+        check(!melee_web_menu_css_selection_valid(&training),
+              "Training CSS admitted an ordinary VS timer cache");
+        gmMainLib_GetGameRules()->stock_time_limit=0;
         const auto retained_before=retained;const auto output_before=output;
         check(!melee_web_vs_prepare_start_source(&output,&raw,nullptr)&&
               std::memcmp(&retained,&retained_before,sizeof(retained))==0&&
@@ -836,16 +877,55 @@ void run_sudden_death_host_control(
                 run_typed_results_source_smoke(*world_files,host,results.payload.results,
                                                result_seed,results_pad,results_input);
                 auto css=std::make_unique<melee_web::GameplayMenuWorld>(*world_files);
-                check(melee_web_menu_host_enter(host,css->audio(),error,error_size),error);
-                for(unsigned tick=0;tick<120;++tick){
-                    PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
-                    check(melee_web_menu_host_tick(host,pads,error,error_size)==1,error);
-                    audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
-                    check(melee_web_audio_render(css->audio(),pcm,count,error,error_size),error);
+                try {
+                    check(melee_web_menu_host_enter(host,css->audio(),error,error_size),error);
+                    auto menu_tick=[&](unsigned button){
+                        PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
+                        pads[0].button=pads[1].button=button;
+                        const int result=melee_web_menu_host_tick(host,pads,error,error_size);
+                        check(result>0,error);
+                        audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
+                        check(melee_web_audio_render(css->audio(),pcm,count,error,error_size),error);
+                        return result;
+                    };
+                    for(unsigned tick=0;tick<120;++tick)
+                        check(menu_tick(0)==1,"Unexpected returned CSS transition");
+                    check(melee_web_menu_host_phase(host)==1,"SD Results did not return to original CSS");
+                    int transition=1;
+                    for(unsigned tick=0;tick<600&&transition==1;++tick)
+                        transition=menu_tick(tick%90==0?PAD_BUTTON_START:0);
+                    check(transition==3,"Returned CSS did not request its original SSS transition");
+                    check(melee_web_menu_host_leave(host,0,error,error_size),error);
+                    css->verify_immutable_archives();css->close();css.reset();
+                    css=std::make_unique<melee_web::GameplayMenuWorld>(*world_files);
+                    check(melee_web_menu_host_enter(host,css->audio(),error,error_size),error);
+                    for(unsigned tick=0;tick<120;++tick)
+                        check(menu_tick(0)==1,"Unexpected returned SSS transition");
+                    transition=1;
+                    for(unsigned tick=0;tick<600&&transition==1;++tick)
+                        transition=menu_tick(tick%90==0?PAD_BUTTON_START:0);
+                    check(transition==3,"Returned SSS did not commit its source selection");
+                    check(melee_web_menu_host_leave(host,0,error,error_size),error);
+                    MeleeWebMenuMatchSelection next{};
+                    check(melee_web_menu_host_selection(host,&next,error,error_size),error);
+                    check(next.player_count==2&&next.start.rules.stkind==MELEE_WEB_MENU_FD_ST_KIND&&
+                          next.start.rules.is_stock&&next.start.rules.is_vs&&
+                          next.start.players[0].stocks==4&&next.start.players[1].stocks==4,
+                          "Returned CSS/SSS lost its supported normalized rematch selection");
+                    emit_native_bytes("returned_sss_normalized_start",&next.start,sizeof(next.start));
+                    css->verify_immutable_archives();css->close();css.reset();
+                } catch (...) {
+                    const auto primary=std::current_exception();
+                    if(css){
+                        if(!melee_web_menu_host_leave(host,1,error,error_size))
+                            std::cerr<<"Secondary owned menu abort failure: "<<error<<'\n';
+                        try{css->close();css.reset();}
+                        catch(const std::exception& cleanup){
+                            std::cerr<<"Secondary owned menu world retirement failure: "<<cleanup.what()<<'\n';
+                        }
+                    }
+                    std::rethrow_exception(primary);
                 }
-                check(melee_web_menu_host_phase(host)==1,"SD Results did not return to original CSS");
-                check(melee_web_menu_host_leave(host,1,error,error_size),error);
-                css->verify_immutable_archives();css->close();css.reset();
                 std::cout<<"Natural SD typed Results and original CSS return completed\n";
             }else{
             for(unsigned tick=0;tick<8;++tick){
@@ -868,8 +948,10 @@ void run_sudden_death_host_control(
             }
         }catch(...){
             // Match RAII has already retired world/scene/claim before abort.
-            check(melee_web_menu_host_destroy(host,error,error_size),error);
-            throw;
+            const auto primary=std::current_exception();
+            if(!melee_web_menu_host_destroy(host,error,error_size))
+                std::cerr<<"Secondary host destroy failure: "<<error<<'\n';
+            std::rethrow_exception(primary);
         }
         check(melee_web_menu_host_destroy(host,error,error_size),error);
         check(std::memcmp(&gmVsMelee_StartData,&original_start,sizeof(original_start))==0&&

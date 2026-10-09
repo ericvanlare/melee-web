@@ -177,6 +177,9 @@ int melee_web_menu_character_available(int ckind);
 int melee_web_menu_stage_available(int stkind);
 /* Source explicit-tile confirmation only; never use for random or admission. */
 int melee_web_menu_stage_explicit_confirm_available(int stkind);
+/* Pure validation predicate, not a route/admission API. Live scene gates use
+ * only their owning session's checked Results-commit expectation. */
+int melee_web_menu_css_cache_selection_valid(const CSSData*, const StartMeleeRules*);
 int melee_web_menu_css_selection_valid(const CSSData*);
 int melee_web_menu_sss_selection_valid(const SSSData*);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
