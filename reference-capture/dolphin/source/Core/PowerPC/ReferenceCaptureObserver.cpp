@@ -233,6 +233,18 @@ struct SliceRef
   u32 offset;
 };
 
+const u8* SparsePadSlotBytes(const u8* raw, size_t raw_size, const SliceRef* slices,
+                             size_t slice_count)
+{
+  if (!raw || !slices || !slice_count)
+    return nullptr;
+  const SliceRef& slot = slices[slice_count - 1];
+  if (slot.tag != SliceTag::PadSlot || slot.size != 0x30 || slot.offset > raw_size ||
+      slot.size > raw_size - slot.offset)
+    return nullptr;
+  return raw + slot.offset;
+}
+
 struct Slot
 {
   std::atomic<bool> ready{false};
@@ -505,6 +517,43 @@ bool SdInitRequested()
 bool OrdinaryTimeoutRequested()
 {
   return Env("MWRC_SD_MENU_PROBE") == "ordinary_timeout";
+}
+
+bool SparsePairRequested()
+{
+  return Env("MWRC_SD_MENU_PROBE") == "sparse_pair";
+}
+
+bool SparsePadErrorsValid(const u8* pad)
+{
+  return pad[10] == 0 && pad[22] == 0xff && pad[34] == 0 && pad[46] == 0xff;
+}
+
+constexpr u32 SPARSE_SOURCE_SAMPLE_CAP = 8;
+constexpr u32 SPARSE_PREPRESS_NEUTRAL_CAP = 6;
+
+bool SparsePadStatusMatches(const u8* pad, bool pressed)
+{
+  for (u32 port = 0; port < 4; ++port)
+  {
+    for (u32 byte = 0; byte < 12; ++byte)
+    {
+      u8 expected = 0;
+      if ((port == 1 || port == 3) && byte == 10)
+        expected = 0xff;
+      if (pressed && port == 0 && byte == 0)
+        expected = 0x01;  // A button, high byte of the original PADStatus buttons.
+      if (pressed && port == 0 && byte == 2)
+        expected = 35;  // Distinct P1 MAIN X.
+      if (pressed && port == 2 && byte == 0)
+        expected = 0x02;  // B button on original source port 2.
+      if (pressed && port == 2 && byte == 3)
+        expected = static_cast<u8>(-35);  // Distinct P3 MAIN Y.
+      if (pad[port * 12 + byte] != expected)
+        return false;
+    }
+  }
+  return true;
 }
 
 bool ActivationRequested()
@@ -912,7 +961,8 @@ struct Observer::Impl
                               Env("MWRC_SD_MENU_PROBE") != "sd_prefix" &&
                               Env("MWRC_SD_MENU_PROBE") != "competitive_entry" &&
                               Env("MWRC_SD_MENU_PROBE") != "ordinary_timeout" &&
-                              Env("MWRC_SD_MENU_PROBE") != "items_row") ||
+                              Env("MWRC_SD_MENU_PROBE") != "items_row" &&
+                              !SparsePairRequested()) ||
          Env("MWRC_SD_PROFILE_GCI_SHA256") !=
              "5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729"))
     {
@@ -930,9 +980,11 @@ struct Observer::Impl
           !Env("MWRC_ALLOCATION_OUTPUT").empty() ||
           (!Env("MWRC_SD_MENU_PROBE").empty() && Env("MWRC_SD_MENU_PROBE") != "rules_ready" &&
            Env("MWRC_SD_MENU_PROBE") != "sd_prefix" && Env("MWRC_SD_MENU_PROBE") != "items_row" &&
-           Env("MWRC_SD_MENU_PROBE") != "competitive_entry" && !OrdinaryTimeoutRequested()) ||
+           Env("MWRC_SD_MENU_PROBE") != "competitive_entry" && !OrdinaryTimeoutRequested() &&
+           !SparsePairRequested()) ||
           ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "items_row" ||
-            Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested()) && Env("MWRC_SD_PROFILE_GCI_SHA256").empty()))
+            Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() ||
+            SparsePairRequested()) && Env("MWRC_SD_PROFILE_GCI_SHA256").empty()))
       {
         SetInvalid("SD prefix requires a recipe hash, native input recording and exclusive scope");
         return false;
@@ -2116,7 +2168,7 @@ struct Observer::Impl
       return false;
     if (scene_kind == 1 && (Env("MWRC_SD_MENU_PROBE") == "items_row" ||
                             Env("MWRC_SD_MENU_PROBE") == "sd_prefix" ||
-                            Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested()))
+                            Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()))
     {
       u8 menu_kind = 0;
       if (!ReadBytes(system, 0x804a04f0, 1, &menu_kind))
@@ -2146,7 +2198,7 @@ struct Observer::Impl
     // Menu globals retain pointers after their scene arena is reclaimed.
     // Observe each steering owner only in its live source menu scene.
     u8 stage_index = 0;
-    if (scene_kind == 9 && (Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested()))
+    if (scene_kind == 9 && (Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()))
     {
       if (!sd_sss_ready)
         return true;
@@ -2474,6 +2526,14 @@ struct Observer::Impl
     SetInvalid(reason);
   }
 
+  void SparseInputFailure(const char* reason, u32 pc, u32 tick)
+  {
+    // Preserve the queue descriptor and consumed full four-port slot already
+    // read at this boundary. Error-only: never a successful input or finish.
+    SdEvent("input_rejected", pc, tick, Event::Error);
+    SetInvalid(reason);
+  }
+
   void ObserveSdInit(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
   {
     u32 tick = 0;
@@ -2481,7 +2541,7 @@ struct Observer::Impl
       return SetInvalid("SD prefix source counter is invalid"), void();
     raw_size = 0;
     slice_count = 0;
-    if ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested()) &&
+    if ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()) &&
         (pc == 0x8025a998 || pc == 0x8025b84c))
     {
       u32 word = 0;
@@ -2577,6 +2637,8 @@ struct Observer::Impl
     }
     if (pc == 0x80390eb4 && sd_init.phase != SdInitState::Phase::Menu)
     {
+      if (SparsePairRequested())
+        return;  // This milestone stops at consumed input, before gameplay ticks.
       if (!BoundaryInstructionMatches(system, pc) ||
           !AddSlice(system, SliceTag::MatchClock, 0x8046b6a0, 0x2e))
         return SetInvalid("SD prefix scheduler return instruction differs"), void();
@@ -2624,9 +2686,9 @@ struct Observer::Impl
           !AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358) || !AddProfileSlices(system) ||
           !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6) || !AddSceneKindSlice(system))
         return SetInvalid("SD prefix setup/persistent VS payload is invalid"), void();
-      if ((Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested()) &&
+      if ((Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()) &&
           !AddSlice(system, SliceTag::ProfileSaveData, root + PROFILE_SAVE_DATA_OFFSET, PROFILE_SAVE_DATA_SIZE))
-        return SetInvalid("Competitive committed item preferences are missing"), void();
+        return SetInvalid("Original committed profile/save data is missing"), void();
       u32 rng = 0;
       if (!ReadU32(system, 0x804d5f94, &rng) || !rng ||
           !AddSlice(system, SliceTag::RngPointer, 0x804d5f94, 4) ||
@@ -2634,6 +2696,11 @@ struct Observer::Impl
         return SetInvalid("SD prefix RNG context is invalid"), void();
       fighter_present.fill(false);
       fighter_pointers.fill(0);
+      sparse_setup_seen = false;
+      sparse_setup_consumed = 0;
+      sparse_source_samples = 0;
+      sparse_prepress_neutral_samples = 0;
+      sparse_witness_phase = 0;
       SdEvent(sudden ? "sd_entry" : "vs_entry", pc, tick);
       return;
     }
@@ -2644,8 +2711,9 @@ struct Observer::Impl
       u8 slot = 0xff;
       if (!BoundaryInstructionMatches(system, pc) ||
           !ReadU32(system, state->gpr[3] + 0x2c, &pointer) ||
-          !ReadFighterSourceSlot(system, pointer, &slot) || slot > 1 || fighter_present[slot])
-        return SetInvalid("SD prefix fighter creation is missing, repeated or outside P1/P2"), void();
+          !ReadFighterSourceSlot(system, pointer, &slot) ||
+          (SparsePairRequested() ? (slot != 0 && slot != 2) : slot > 1) || fighter_present[slot])
+        return SetInvalid("SD prefix fighter creation is missing, repeated or outside its declared source pair"), void();
       fighter_present[slot] = true;
       fighter_pointers[slot] = pointer;
       return;
@@ -2654,21 +2722,88 @@ struct Observer::Impl
     {
       std::array<u8, 0xc> queue{};
       const bool menu = sd_init.phase == SdInitState::Phase::Menu;
-      if (!BoundaryInstructionMatches(system, pc) || (!menu && !sd_init.Consume(OrdinaryTimeoutRequested() ? 29523 : SdInitState::sample_cap)) ||
+      const bool sparse_active = SparsePairRequested() && sd_init.phase == SdInitState::Phase::VsActive;
+      const u32 sparse_cap = sparse_setup_consumed + SPARSE_SOURCE_SAMPLE_CAP;
+      if (!BoundaryInstructionMatches(system, pc) ||
+          (!menu && !sd_init.Consume(sparse_active ? sparse_cap :
+                                     OrdinaryTimeoutRequested() ? 29523 : SdInitState::sample_cap)) ||
           !ReadBytes(system, 0x804c1f78, queue.size(), queue.data()) || !queue[0] ||
           state->gpr[6] >= queue[0] || ReadBE32(queue.data() + 8) + state->gpr[6] * 0x30 != state->gpr[25] ||
+          (SparsePairRequested() && !AddSlice(system, SliceTag::PadQueue, 0x804c1f78, queue.size())) ||
           !AddSlice(system, SliceTag::PadSlot, state->gpr[25], 0x30))
         return SetInvalid("SD prefix input queue or declared sample cap is invalid"), void();
       const u8* pad = raw.data();
       if (menu)
       {
+        if (SparsePairRequested())
+        {
+          pad = SparsePadSlotBytes(raw.data(), raw_size, slices.data(), slice_count);
+          if (!pad)
+            return SetInvalid("Sparse menu input lacks its observed full PadSlot slice"), void();
+        }
         if (++sd_menu_consumed > 7200)
           return SetInvalid("SD menu consumed input cap exhausted"), void();
         sd_menu_neutral = true;
         for (u32 port = 0; port < 4; ++port)
           for (u32 byte = 0; byte < 11; ++byte)
-            sd_menu_neutral &= pad[port * 12 + byte] == (port >= 2 && byte == 10 ? 0xff : 0);
+          {
+            const bool inactive = SparsePairRequested() ? (port == 1 || port == 3) : port >= 2;
+            sd_menu_neutral &= pad[port * 12 + byte] == (inactive && byte == 10 ? 0xff : 0);
+          }
         SdEvent("menu_input", pc, tick);
+        return;
+      }
+      if (SparsePairRequested())
+      {
+        const u8* pad = SparsePadSlotBytes(raw.data(), raw_size, slices.data(), slice_count);
+        if (!pad)
+          return SparseInputFailure("Sparse source input lacks its observed full PadSlot slice", pc, tick), void();
+        if (sd_init.phase == SdInitState::Phase::VsSetup)
+        {
+          if (!SparsePadStatusMatches(pad, false))
+            return SparseInputFailure("Sparse original VS setup consumed non-neutral PAD0/PAD2 or active PAD1/PAD3", pc, tick), void();
+          SdEvent("input", pc, tick);
+          return;
+        }
+        if (!sparse_active || !sparse_setup_seen ||
+            sparse_source_samples >= SPARSE_SOURCE_SAMPLE_CAP ||
+            !SparsePadErrorsValid(pad))
+          return SparseInputFailure("Sparse original consumed PAD lacks its declared four-port source identity", pc, tick), void();
+
+        ++sparse_source_samples;
+        if (sparse_witness_phase == 0)
+        {
+          if (SparsePadStatusMatches(pad, false))
+          {
+            if (++sparse_prepress_neutral_samples > SPARSE_PREPRESS_NEUTRAL_CAP)
+              return SparseInputFailure("Sparse source press exceeded its original neutral-sample cap", pc, tick), void();
+          }
+          else if (SparsePadStatusMatches(pad, true))
+          {
+            sparse_witness_phase = 1;
+          }
+          else
+          {
+            return SparseInputFailure("Sparse original PAD press differs from distinct source0/source2 intent", pc, tick), void();
+          }
+        }
+        else if (sparse_witness_phase == 1)
+        {
+          if (!SparsePadStatusMatches(pad, false))
+            return SparseInputFailure("Sparse original PAD release did not restore neutral active ports", pc, tick), void();
+          sparse_witness_phase = 2;
+        }
+        else
+        {
+          return SparseInputFailure("Sparse original PAD continued after its exact release witness", pc, tick), void();
+        }
+        SdEvent("input", pc, tick);
+        if (sparse_witness_phase == 2)
+        {
+          InputStream::RequestFinish(true);
+          natural_completion.store(false);
+          finish_requested.store(true);
+        }
         return;
       }
       if (OrdinaryTimeoutRequested())
@@ -2704,16 +2839,26 @@ struct Observer::Impl
       if (!sudden && sd_init.phase == SdInitState::Phase::Menu) return;
       u32 word = 0;
       if (!ReadU32(system, pc, &word) || word != 0x4e800020 ||
-          !fighter_present[0] || !fighter_present[1] ||
+          (SparsePairRequested() ? (!fighter_present[0] || !fighter_present[2] ||
+                                    fighter_present[1] || fighter_present[3]) :
+                                   (!fighter_present[0] || !fighter_present[1])) ||
           !sd_init.Ready(sudden, Env("MWRC_SD_MENU_PROBE") == "competitive_entry") ||
           !AddSlice(system, SliceTag::MatchSetup, sd_init.setup_pointer, 0x138))
         return SetInvalid("SD prefix setup return lacks its retained entry owner"), void();
-      for (u32 slot = 0; slot < 2; ++slot)
+      for (u32 index = 0; index < 2; ++index)
+      {
+        const u32 slot = SparsePairRequested() ? (index == 0 ? 0 : 2) : index;
         if (!AddSlice(system, SliceTag::FighterHead, fighter_pointers[slot], 0x100, slot) ||
             !AddSlice(system, SliceTag::FighterDamageShield, fighter_pointers[slot] + 0x1830, 4, slot) ||
             !AddSlice(system, SliceTag::FighterStocks, 0x80453080 + slot * 0xe90 + 0x8e, 1, slot))
           return SetInvalid("SD prefix initialized fighter snapshot is invalid"), void();
+      }
       SdEvent(sudden ? "sd_setup" : "vs_setup", pc, tick);
+      if (SparsePairRequested())
+      {
+        sparse_setup_seen = true;
+        sparse_setup_consumed = sd_init.consumed;
+      }
       if (OrdinaryTimeoutRequested()) ordinary_timeout.setup_samples = sd_init.consumed;
       if (sudden || Env("MWRC_SD_MENU_PROBE") == "competitive_entry")
       {
@@ -2727,6 +2872,8 @@ struct Observer::Impl
     }
     if (pc == 0x8016ebbc && sd_init.phase == SdInitState::Phase::VsActive)
     {
+      if (SparsePairRequested())
+        return SetInvalid("Sparse setup/input milestone reached a VS terminal before its declared stop"), void();
       if (!BoundaryInstructionMatches(system, pc) || !sd_init.Exit() ||
           !AddSlice(system, SliceTag::Result, 0x80479d98 + 0xc, 0x448) ||
           !AddSlice(system, SliceTag::MatchClock, 0x8046b6a0, 0x2e))
@@ -4150,6 +4297,11 @@ struct Observer::Impl
   u32 sd_menu_polls = 0;
   u32 sd_menu_consumed = 0;
   bool sd_menu_neutral = false;
+  bool sparse_setup_seen = false;
+  u32 sparse_setup_consumed = 0;
+  u32 sparse_source_samples = 0;
+  u32 sparse_prepress_neutral_samples = 0;
+  u8 sparse_witness_phase = 0;
   u32 setup_pointer = 0;
   u32 active_slot_count = 0;
   bool match_active = false;
@@ -4324,7 +4476,7 @@ static bool IsCaptureBoundary(u32 guest_pc)
     // opt-in companion configuration.  The normal observer boundary set and
     // its disabled path remain unchanged.
     return (SdInitRequested() && (guest_pc == 0x8016ebc0 || guest_pc == 0x8016ec24 ||
-            ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested()) && guest_pc == 0x8025b84c))) ||
+            ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()) && guest_pc == 0x8025b84c))) ||
            (CpuProbeEnabled() && FindCpuProbePoint(guest_pc) != nullptr &&
             (CpuProbeEnvironment().rng_return_pc == 0 ||
              CpuProbeEnvironment().rng_return_pc == guest_pc)) ||

@@ -20,6 +20,49 @@ def canonical(value):
 
 def recipe(version=1):
     """Return a fresh copy of the single fixed, wholly authored experiment."""
+    if type(version) is int and version == 7:
+        from reference_versus_sequence_capture import raw_pad
+        from retail_input_plan import DISCONNECTED_PAD, NEUTRAL_PAD
+        declaration = recipe(5)
+        declaration.update(version=7, id="sparse-p1-p3-mario-fd-setup-input-witness",
+                           purpose="observe original sparse P1/P3 Mario/FD setup and a distinct consumed PAD witness")
+        declaration["source_slots"] = [0, 2]
+        declaration["cold_original_context"].update(
+            human_source_ports_zero_based=[0, 2],
+            preparation="unchanged original loaded profile; only source ports 0 and 2 join")
+        declaration["expected_setup"].update(
+            players=[
+                {"port": 1, "character_kind": 8, "costume": 1, "stocks": 4,
+                 "player_type": 0, "rumble_enabled": True,
+                 "source_slot": 0, "source_port": 0},
+                {"port": 3, "character_kind": 8, "costume": 0, "stocks": 4,
+                 "player_type": 0, "rumble_enabled": True,
+                 "source_slot": 2, "source_port": 2},
+            ],
+            stage=32, match_kind=1, timer_enabled=False, timer_counts_up=False,
+            time_limit_seconds=0, is_stock=True, disable_pausing=False,
+            is_teams=False, item_frequency=-1, item_mask_hex="ffffffffffffffff",
+            damage_ratio_bits="3f800000", game_speed_bits="3f800000",
+            friendly_fire=False)
+        declaration["expected_game_rules"] = {"mode": 1, "time_limit": 2, "stock_count": 4,
+            "handicap": 0, "damage_ratio": 10, "stock_time_limit": 0,
+            "friendly_fire": 0, "pause": 1}
+        press = [raw_pad(buttons=["A"], x=35), DISCONNECTED_PAD,
+                 raw_pad(buttons=["B"], y=-35), DISCONNECTED_PAD]
+        release = [NEUTRAL_PAD, DISCONNECTED_PAD, NEUTRAL_PAD, DISCONNECTED_PAD]
+        declaration["input_witness"] = {
+            "source_slots": [0, 2], "inactive_source_slots": [1, 3],
+            "press": press, "release": release,
+            "max_prepress_neutral_samples": 6, "max_source_samples": 8,
+            "expected_pad_errors": [0, -1, 0, -1],
+        }
+        declaration["expected_item_preference_mask_hex"] = "ffffffffffffffff"
+        declaration["original_profile"]["first_gate"] = (
+            "original sparse P1/P3 CSS/SSS setup and separate actual input witness")
+        declaration["stop"] = "observed exact VS setup, distinct PAD0/PAD2 consume and release; interrupt before terminal"
+        declaration["exclusions"] = ["natural match terminal", "elimination", "Results/CSS return",
+            "physical-device path equality", "RNG", "pixels", "PCM", "live timing"]
+        return declaration
     if type(version) is int and version == 6:
         declaration = recipe(5)
         declaration.update(version=6, id="two-human-mario-fd-competitive-profile-entry",
@@ -102,7 +145,7 @@ def recipe(version=1):
 def validate_recipe(value):
     # Byte comparison also rejects bool-for-int and int-for-float substitutions.
     version = value.get("version") if isinstance(value, dict) else None
-    if version not in (1, 2, 3, 4, 5, 6) or canonical(value) != canonical(recipe(version)):
+    if version not in (1, 2, 3, 4, 5, 6, 7) or canonical(value) != canonical(recipe(version)):
         raise ValueError("Unsupported or changed authored SD reference recipe")
     return value
 
@@ -117,13 +160,20 @@ def make_input_plan(recipe_version=1):
     from retail_input_plan import (AUTHORED_PLAN_VERSION, SCHEMA, POLICY,
                                    NEUTRAL_PAD, DISCONNECTED_PAD, validate_plan)
     declaration = recipe(recipe_version)
+    if recipe_version == 7:
+        witness = declaration["input_witness"]
+        frames = [witness["press"], witness["release"]]
+        controlled_ports = [1, 3]
+    else:
+        frames = [[NEUTRAL_PAD, NEUTRAL_PAD, DISCONNECTED_PAD, DISCONNECTED_PAD]
+                  for _ in range(STARTUP_TICKS + MATCH_TICKS)]
+        controlled_ports = [1, 2]
     return validate_plan({
         "schema": SCHEMA, "version": AUTHORED_PLAN_VERSION, "policy": POLICY,
         "provenance": PROVENANCE, "authored_recipe": declaration,
         "authored_recipe_sha256": recipe_sha256(declaration),
         "first_frame": -123, "source_stage": 32, "source_characters": [8, 8],
         "active_player_count": 2, "source_player_types": [0, 0],
-        "controlled_ports": [1, 2],
-        "frames": [[NEUTRAL_PAD, NEUTRAL_PAD, DISCONNECTED_PAD, DISCONNECTED_PAD]
-                   for _ in range(STARTUP_TICKS + MATCH_TICKS)],
+        "controlled_ports": controlled_ports,
+        "frames": frames,
     })
