@@ -514,6 +514,8 @@ void run_sudden_death_host_control(
         check(world_files&&selection.player_count==2&&
               selection.start.rules.timer_enabled&&selection.start.rules.time_limit==60,
               "Natural timeout requires original one-minute stock preparation");
+        const auto* host_rng_owner=seed_ptr;
+        const std::uint32_t host_rng_seed=*seed_ptr;
         try{
         melee_web::GameplayMatchSession prior(*world_files,selection,
                                               *melee_web_menu_host_input(host));
@@ -557,8 +559,8 @@ void run_sudden_death_host_control(
         std::cout<<"Natural neutral VS timeout: input ticks "<<input_ticks
                  <<", source cursor "<<cursor<<", final RNG "<<vs_final_seed<<'\n';
         prior.close();prior.close();
-        check(seed_ptr==final_rng_owner&&*seed_ptr==vs_final_seed,
-              "Natural VS close changed final source RNG owner or value");
+        check(seed_ptr==host_rng_owner&&*seed_ptr==host_rng_seed,
+              "Natural VS close did not restore the prior host RNG owner and value");
         MatchExitInfo after_close{};
         check(melee_web_match_rules_terminal_data(&after_close)&&
               std::memcmp(&after_close,&tied_timeout,sizeof(after_close))==0,
