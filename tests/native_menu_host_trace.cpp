@@ -3782,6 +3782,93 @@ void run_trophy_baseline_smoke(const melee_web::RuntimeFiles& files)
 }
 
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+// Diagnostic-only constructor-phase control in the existing SDK target.
+// Uses actual Ground owner and unchanged retirement predicate; no fixture/tick.
+extern "C" HSD_GObj* melee_web_stadium_c1_manager_create_control(void);
+void run_stadium_retirement_phase_controls()
+{
+    using namespace melee_web::test::stadium_buffer;
+    char error[256]{};
+    check(melee_web_gameplay_startup(8U * 1024U * 1024U,error,sizeof(error)),error);
+    check(melee_web_native_world_enable(error,sizeof(error)),error);
+    try {
+        const auto baseline = melee_web_gameplay_stats();
+        GroundStorageLease storage;
+        storage.begin();
+        MeleeWebSourceMemoryContext oninit{}, retirement{}, after{};
+        check(melee_web_source_memory_context_read(&oninit)==MELEE_WEB_SOURCE_MEMORY_READ_OK,"phase before constructor context");
+        const auto original = storage.allocation;
+        HSD_GObj* manager=melee_web_stadium_c1_manager_create_control();
+        check(manager && manager->proc,"phase original manager constructor");
+        auto* proc=manager->proc;
+        MeleeWebSourceMemoryAllocation manager_lease{},proc_lease{},live{};
+        check(melee_web_source_memory_context_read(&retirement)==MELEE_WEB_SOURCE_MEMORY_READ_OK,"phase after constructor context");
+        const auto live_status=melee_web_source_memory_allocation_read(storage.payload,&live);
+        const auto manager_status=melee_web_source_memory_allocation_read(manager,&manager_lease);
+        const auto proc_status=melee_web_source_memory_allocation_read(proc,&proc_lease);
+        auto numeric=[&](const char* phase,const MeleeWebSourceMemoryContext& context,
+                         MeleeWebSourceMemoryReadStatus status,const MeleeWebSourceMemoryAllocation& lease){
+            const auto stats=melee_web_gameplay_stats();
+            std::fprintf(stderr,"C3_PHASE_CONTROL phase=%s world=%llu heap=%d watermark=%llu status=%d live=%d requested=%u generation=%llu lease_world=%llu lease_heap=%d current_heap_free=%d current_objects=%u current_processes=%u current_ticks=%llu payload=%p manager=%p proc=%p\n",
+                phase,static_cast<unsigned long long>(context.world_generation),context.source_heap_handle,
+                static_cast<unsigned long long>(context.allocation_generation_watermark),status,lease.live,lease.requested_bytes,
+                static_cast<unsigned long long>(lease.allocation_generation),static_cast<unsigned long long>(lease.world_generation),
+                lease.source_heap_handle,stats.heap_free_bytes,stats.objects,stats.processes,
+                static_cast<unsigned long long>(stats.ticks),storage.payload,static_cast<void*>(manager),static_cast<void*>(proc));
+            std::fflush(stderr);
+        };
+        numeric("original-oninit",oninit,live_status,original);
+        numeric("after-original-manager-construction",retirement,live_status,live);
+        numeric("manager-object",retirement,manager_status,manager_lease);
+        numeric("manager-proc",retirement,proc_status,proc_lease);
+        check(retirement.world_generation==oninit.world_generation && retirement.source_heap_handle==oninit.source_heap_handle &&
+                  retirement.allocation_generation_watermark>oninit.allocation_generation_watermark &&
+                  exact_live_allocation_matches_context(live_status,live,retirement,64,original.allocation_generation) &&
+                  exact_new_allocation_supported(manager_status,manager_lease,oninit,sizeof(HSD_GObj)) &&
+                  exact_new_allocation_supported(proc_status,proc_lease,oninit,sizeof(HSD_GObjProc)) && melee_web_source_memory_healthy(),
+              "phase constructor changed owner or exact Ground lease");
+        HSD_GObjPLink_80390228(manager); // Exact direct original constructor owner.
+        storage.end(); // Existing checked owner restores original typed devices.
+        MeleeWebSourceMemoryAllocation dead{};
+        const auto dead_status=melee_web_source_memory_allocation_read(storage.payload,&dead);
+        const auto after_status=melee_web_source_memory_context_read(&after);
+        numeric("after-retirement",after,dead_status,dead);
+        const auto accepts=[&](MeleeWebSourceMemoryReadStatus status,const MeleeWebSourceMemoryAllocation& lease,
+                               const MeleeWebSourceMemoryContext& before,const MeleeWebSourceMemoryContext& finish){
+            return exact_retired_allocation_supported(status,lease,MELEE_WEB_SOURCE_MEMORY_READ_OK,before,after_status,finish);
+        };
+        check(!accepts(dead_status,dead,oninit,after),"unchanged old helper unexpectedly accepted stale construction baseline");
+        check(accepts(dead_status,dead,retirement,after),"unchanged helper refused actual pre-retirement baseline");
+        check(!accepts(live_status,live,retirement,after),"live exact Ground lease accepted as retired");
+        auto bad=dead;bad.requested_bytes=64;check(!accepts(dead_status,bad,retirement,after),"nonzero dead request accepted");
+        bad=dead;bad.allocation_generation=original.allocation_generation;check(!accepts(dead_status,bad,retirement,after),"nonzero dead generation accepted");
+        bad=dead;++bad.source_heap_handle;check(!accepts(dead_status,bad,retirement,after),"foreign heap accepted");
+        bad=dead;++bad.world_generation;check(!accepts(dead_status,bad,retirement,after),"foreign world accepted");
+        auto changed=after;++changed.allocation_generation_watermark;check(!accepts(dead_status,dead,retirement,changed),"watermark change accepted");
+        check(!accepts(MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT,dead,retirement,after),"allocation read failure accepted");
+        MeleeWebSourceMemoryContext pure{};MeleeWebSourceMemoryAllocation pure_dead{};
+        check(melee_web_source_memory_context_read(&pure)==after_status &&
+                  pure.world_generation==after.world_generation && pure.source_heap_handle==after.source_heap_handle &&
+                  pure.allocation_generation_watermark==after.allocation_generation_watermark &&
+                  melee_web_source_memory_allocation_read(storage.payload,&pure_dead)==dead_status &&
+                  pure_dead.live==dead.live && pure_dead.requested_bytes==dead.requested_bytes &&
+                  pure_dead.allocation_generation==dead.allocation_generation && storage.devices_before.matches(),
+              "pure phase/refusal controls mutated owner records");
+        const auto retired=melee_web_gameplay_stats();
+        check(retired.generation==baseline.generation && retired.ticks==baseline.ticks &&
+                  retired.objects==baseline.objects && retired.processes==baseline.processes &&
+                  source_stage_registry_empty() && source_stage_gobj_count()==0 && melee_web_ground_map_storage_available(),
+              "phase reducer left source owners live");
+        std::fprintf(stderr,"C3_PHASE_CONTROL_RESULT stale_refused=1 current_accepted=1 original_lease_preserved=1 negatives=1 pure=1 ticks=0 fullStage=0\n");
+    } catch (const std::exception& failure) {
+        std::fprintf(stderr,"C3_PHASE_CONTROL_RETAINED first_exception=%s\n",failure.what());std::fflush(stderr);
+        std::_Exit(1); // Explicit retained partial owner, no raw cleanup on refusal.
+    }
+    check(melee_web_gameplay_shutdown(error,sizeof(error)),error);
+    MeleeWebSourceMemoryContext inactive{};
+    check(melee_web_source_memory_context_read(&inactive)==MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE,"phase owned world remains active");
+}
+
 void run_stadium_profile_controls()
 {
     using namespace melee_web;
@@ -6562,6 +6649,8 @@ void run_stadium_e8_request(
                 on_init.stage_gobj_count_before;
             const int scheduler_cycle_before_end =
                 on_init.scheduler_cycle_before;
+            // OnInit-only assertions retain their original construction boundary.
+            auto retirement_memory_before_end = on_init.memory_before_end;
             if (stage_start_context) {
                 check(melee_web_stage_last_stadium_start(
                           retained_stage_owner, stage_start_context,
@@ -6573,6 +6662,37 @@ void run_stadium_e8_request(
                 trace.event("stadium_source_onstart_returned", world->audio(),
                             "original-onload-onstart-and-owned-header-drain", &selected,
                             &on_init.seed_after_on_init);
+                check(melee_web_source_memory_context_read(&retirement_memory_before_end) ==
+                          MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                          retirement_memory_before_end.world_generation == on_init.memory_before_end.world_generation &&
+                          retirement_memory_before_end.source_heap_handle == on_init.memory_before_end.source_heap_handle &&
+                          melee_web_source_memory_healthy(),
+                      "Started Stage construction changed its retirement memory owner");
+                MeleeWebSourceMemoryAllocation ground_at_retirement{}, map2_at_retirement{};
+                const auto ground_status = melee_web_source_memory_allocation_read(
+                    on_init.ground_storage_live.payload, &ground_at_retirement);
+                const auto map2_status = melee_web_source_memory_allocation_read(
+                    on_init.map2_owner.buffer, &map2_at_retirement);
+                std::fprintf(stderr,
+                    "C3_RETIREMENT_BASELINE world=%llu heap=%d oninit_watermark=%llu retirement_watermark=%llu ground_status=%d ground_live=%d ground_requested=%u ground_generation=%llu map2_status=%d map2_live=%d map2_requested=%u map2_generation=%llu\n",
+                    static_cast<unsigned long long>(retirement_memory_before_end.world_generation),
+                    retirement_memory_before_end.source_heap_handle,
+                    static_cast<unsigned long long>(on_init.memory_before_end.allocation_generation_watermark),
+                    static_cast<unsigned long long>(retirement_memory_before_end.allocation_generation_watermark),
+                    ground_status, ground_at_retirement.live, ground_at_retirement.requested_bytes,
+                    static_cast<unsigned long long>(ground_at_retirement.allocation_generation),
+                    map2_status, map2_at_retirement.live, map2_at_retirement.requested_bytes,
+                    static_cast<unsigned long long>(map2_at_retirement.allocation_generation));
+                std::fflush(stderr);
+                check(melee_web::test::stadium_buffer::exact_live_allocation_matches_context(
+                          ground_status, ground_at_retirement, retirement_memory_before_end, 64,
+                          on_init.ground_storage_before_end.allocation_generation),
+                      "Started construction changed the original Ground lease before retirement");
+                if (on_init.map2_owner.origin == MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK)
+                    check(melee_web::test::stadium_buffer::exact_live_allocation_matches_context(
+                              map2_status, map2_at_retirement, retirement_memory_before_end,
+                              on_init.map2_before_end.requested_bytes, on_init.map2_before_end.allocation_generation),
+                          "Started construction changed the original owned map2 lease before retirement");
             }
             check(melee_web_stage_last_end(retained_stage_owner, error,
                                            sizeof(error)), error);
@@ -6609,12 +6729,30 @@ void run_stadium_e8_request(
                       on_init.ground_storage_ended.requested_bytes == 64 &&
                       melee_web_ground_map_storage_available(),
                   "Original OnInit teardown did not release Ground storage ownership");
+            std::fprintf(stderr,
+                "C3_RETIRED_LEASES before_world=%llu after_world=%llu before_heap=%d after_heap=%d before_watermark=%llu after_watermark=%llu ground_status=%d ground_live=%d ground_requested=%u ground_generation=%llu ground_world=%llu ground_heap=%d map2_status=%d map2_live=%d map2_requested=%u map2_generation=%llu map2_world=%llu map2_heap=%d\n",
+                static_cast<unsigned long long>(retirement_memory_before_end.world_generation),
+                static_cast<unsigned long long>(on_init.memory_after_end.world_generation),
+                retirement_memory_before_end.source_heap_handle, on_init.memory_after_end.source_heap_handle,
+                static_cast<unsigned long long>(retirement_memory_before_end.allocation_generation_watermark),
+                static_cast<unsigned long long>(on_init.memory_after_end.allocation_generation_watermark),
+                on_init.ground_storage_allocation_status_after_end, on_init.ground_storage_after_end.live,
+                on_init.ground_storage_after_end.requested_bytes,
+                static_cast<unsigned long long>(on_init.ground_storage_after_end.allocation_generation),
+                static_cast<unsigned long long>(on_init.ground_storage_after_end.world_generation),
+                on_init.ground_storage_after_end.source_heap_handle,
+                on_init.map2_allocation_status_after_end, on_init.map2_after_end.live,
+                on_init.map2_after_end.requested_bytes,
+                static_cast<unsigned long long>(on_init.map2_after_end.allocation_generation),
+                static_cast<unsigned long long>(on_init.map2_after_end.world_generation),
+                on_init.map2_after_end.source_heap_handle);
+            std::fflush(stderr);
             check(melee_web::test::stadium_buffer::exact_retired_allocation_supported(
                       static_cast<MeleeWebSourceMemoryReadStatus>(
                           on_init.ground_storage_allocation_status_after_end),
                       on_init.ground_storage_after_end,
                       MELEE_WEB_SOURCE_MEMORY_READ_OK,
-                      on_init.memory_before_end,
+                      retirement_memory_before_end,
                       MELEE_WEB_SOURCE_MEMORY_READ_OK,
                       on_init.memory_after_end),
                   "Original OnInit teardown did not retire its exact Ground storage lease");
@@ -6626,7 +6764,7 @@ void run_stadium_e8_request(
                           on_init.map2_after_end,
                           static_cast<MeleeWebSourceMemoryReadStatus>(
                               on_init.map2_allocation_status_before_end),
-                          on_init.memory_before_end,
+                          retirement_memory_before_end,
                           MELEE_WEB_SOURCE_MEMORY_READ_OK,
                           on_init.memory_after_end),
                       "Original OnInit teardown did not retire the exact owned map2 fallback");
@@ -8027,6 +8165,9 @@ int main(int argc,char** argv){try{
   if(argc==2&&std::string_view(argv[1])=="--stadium-generator-lifetime-controls"){
    check(melee_web_stadium_c1_generator_lifetime_control(), "Stadium generator lifetime control failed");
    return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-retirement-phase-controls"){
+   run_stadium_retirement_phase_controls();return 0;
   }
   if(argc==2&&std::string_view(argv[1])=="--stadium-manager-mapset-controls"){
    check(melee_web_stadium_c1_manager_mapset_control(), "Stadium manager mapset control failed");
