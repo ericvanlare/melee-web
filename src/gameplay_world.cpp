@@ -208,6 +208,7 @@ struct GameplayWorld::Storage {
     std::unique_ptr<DatEffectBanks> stage_effects;
     MeleeWebStageMap* stage_map=nullptr;
     MeleeWebStageLast* stage_last=nullptr;
+    bool stadium_diagnostic=false;
     MeleeWebMatchRules* rules=nullptr;
     MeleeWebMatchContext* match_context=nullptr;
     MeleeWebRender* render_context=nullptr;
@@ -261,6 +262,26 @@ struct GameplayWorld::Storage {
         if(selection.player_count < MELEE_WEB_MENU_MIN_PLAYERS ||
            selection.player_count > MELEE_WEB_MENU_MAX_PLAYERS)
             throw DatError("Gameplay world requires two through four active fighters");
+        stadium_diagnostic=selection.stadium_diagnostic;
+#if !defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        check(!stadium_diagnostic,"Diagnostic Stadium source session is unavailable in this build");
+#else
+        if(stadium_diagnostic){
+            check(source_ordered && selection.begin_source_match &&
+                  selection.purpose==GameplayWorldPurpose::Match &&
+                  !selection.opening_demo && !selection.sudden_death &&
+                  selection.player_count==2 && selection.source_start_data &&
+                  selection.source_start_data->rules.stkind==St_Kind_PStadium &&
+                  selection.ground_kind==Gr_Kind_PStadium &&
+                  !selection.source_start_data->rules.is_teams,
+                  "Diagnostic Stadium world requires the exact source-session profile");
+            for(unsigned i=0;i<2;++i)
+                check(selection.fighter_kinds[i]==FTKIND_MARIO &&
+                      selection.source_start_data->players[i].ckind==CKIND_MARIO &&
+                      selection.source_start_data->players[i].slot_type==Gm_PKind_Human,
+                      "Diagnostic Stadium world requires two Human Mario players");
+        }
+#endif
         runtime_files=&files;
         archive_cache=cache;
         collision_deferred=source_ordered;
@@ -270,6 +291,9 @@ struct GameplayWorld::Storage {
             selection.source_start_data:nullptr;
         if(purpose==GameplayWorldPurpose::Match){
             stage=melee_web_stage_content_by_ground(selection.ground_kind);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+            if(stadium_diagnostic)stage=melee_web_stage_content_for_profile(St_Kind_PStadium);
+#endif
             if(!stage)throw DatError("No runtime owner for selected source ground kind");
         }
         auto load=[&](std::string_view name,DatExternalPolicy policy=DatExternalPolicy::Reject){
@@ -456,7 +480,12 @@ struct GameplayWorld::Storage {
             render_context=melee_web_render_prepare_match_camera(error,sizeof(error));
             check(render_context!=nullptr,error);
             if(source_start_data){
-                const int prepared=selection.sudden_death?
+                const int prepared=
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                    stadium_diagnostic?melee_web_match_rules_prepare_stadium_from_menu(
+                        rules,source_start_data,error,sizeof(error)):
+#endif
+                    selection.sudden_death?
                     melee_web_match_rules_prepare_sudden_death_from_menu(
                         rules,source_start_data,error,sizeof(error)):
                     melee_web_match_rules_prepare_from_menu(
@@ -522,7 +551,8 @@ struct GameplayWorld::Storage {
                 auto flags=read_dat_light_override(*archive(stage->archive),light_data.lights[i].source_offset);
                 check(melee_web_stage_lights_set_override(lights,i,flags.has_value(),flags.value_or(0),error,sizeof(error)),error);
                 if(light_data.animation_tables[i]){
-                    if(!full_stage)full_stage=std::make_unique<DatNativeStage>(archive(stage->archive),stage->stage_kind);
+                    if(!full_stage)full_stage=std::make_unique<DatNativeStage>(archive(stage->archive),stage->stage_kind,
+                        stadium_diagnostic?DatNativeStage::ProfileMode::DiagnosticOnly:DatNativeStage::ProfileMode::Complete);
                     check(melee_web_stage_lights_set_animations(lights,i,
                         full_stage->light_animation_table(*light_data.animation_tables[i]),error,sizeof(error)),error);
                 }
@@ -691,7 +721,8 @@ struct GameplayWorld::Storage {
         if(!source_ordered)
             check(melee_web_stage_lights_load(lights,error,sizeof(error)),error);
         auto source=archive(stage->archive);
-        if(!full_stage)full_stage=std::make_unique<DatNativeStage>(source,stage->stage_kind);
+        if(!full_stage)full_stage=std::make_unique<DatNativeStage>(source,stage->stage_kind,
+            stadium_diagnostic?DatNativeStage::ProfileMode::DiagnosticOnly:DatNativeStage::ProfileMode::Complete);
         const auto* profile=melee_web_stage_profile(stage->stage_kind);
         check(profile!=nullptr,"Stage has no complete source callback profile");
         const bool has_commands=has_symbol(*source,"map_ptcl");
@@ -735,6 +766,17 @@ struct GameplayWorld::Storage {
             floor_start=collision_data->line_ranges[0].start;
             collision_data.reset();
         }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        if(stadium_diagnostic){
+            check(defer_start && source_ordered,"Diagnostic Stadium requires deferred original Ready startup");
+            // owner_out retains the partial source owner if initialization refuses.
+            const auto initialized=melee_web_stage_begin_kind_on_init_diagnostic(
+                stage->stage_kind,full_stage->yakumono(),
+                stage_effects?stage_effects->bank():nullptr,&stage_last,error,sizeof(error));
+            check(initialized!=nullptr,error);
+            check(melee_web_stage_last_stadium_on_load(stage_last,error,sizeof(error)),error);
+        }else
+#endif
         stage_last=melee_web_stage_begin_kind(stage->stage_kind,full_stage->yakumono(),
             stage_effects?stage_effects->bank():nullptr,defer_start,source_ordered,
             error,sizeof(error));check(stage_last!=nullptr,error);
@@ -920,6 +962,15 @@ uint32_t GameplayWorld::unresolved_fighter_fields()const{
 void GameplayWorld::verify_immutable_archives()const{storage_->verify();}
 bool GameplayWorld::advance_construction(){return storage_->advance_construction();}
 bool GameplayWorld::construction_complete()const{return storage_->construction_phase==4;}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+void GameplayWorld::prepare_stadium_ready(MeleeWebMatchContext* camera)
+{
+    check(storage_ && storage_->stadium_diagnostic && storage_->stage_last,
+          "Diagnostic Stadium Ready requires its exact prepared source world");
+    char error[256]{};
+    check(melee_web_stage_last_stadium_prepare_ready(storage_->stage_last,camera,error,sizeof(error)),error);
+}
+#endif
 void GameplayWorld::initialize_match(const StartMeleeData& start) {
     check(storage_!=nullptr,"Gameplay world is closed");char error[256]{};
     if(storage_->source_start_data&&storage_->source_start_data!=&start)

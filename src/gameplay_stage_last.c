@@ -15,6 +15,7 @@
 #include <sysdolphin/baselib/gobjplink.h>
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include "gameplay_stadium_start.h"
+#include "gameplay_hud.h"
 #include "gameplay_source_memory_runtime.h"
 #include <melee/gr/grpstadium.h>
 #include <sysdolphin/baselib/gobjproc.h>
@@ -29,6 +30,9 @@ extern int melee_web_stage_selection_preflight(int);
 extern int melee_web_stage_selection_end(void);
 extern int melee_web_ground_remove_unmapped(HSD_GObj*);
 extern void melee_web_ground_remove_camera(HSD_GObj*);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+static const HSD_GObjEvent stadium_pending_callbacks[]={fn_801D13C8,fn_801D11E4};
+#endif
 struct MeleeWebStageLast {
     StageInfo saved;
     struct ftDeviceUnk3 device1[1],device3[1];
@@ -49,6 +53,12 @@ struct MeleeWebStageLast {
     MeleeWebMatchContext* stadium_camera_owner;
     CmSubject* stadium_subject;
     int stadium_started;
+    int stadium_ready_route,stadium_ready_armed,stadium_loaded;
+    void* stadium_ready_object;
+    void* stadium_ready_proc;
+    void* stadium_headers[ARRAY_SIZE(stadium_pending_callbacks)];
+    MeleeWebSourceMemoryAllocation stadium_header_leases[ARRAY_SIZE(stadium_pending_callbacks)];
+    MeleeWebSourceMemoryContext stadium_start_context;
     MeleeWebStadiumManagerView stadium_manager;
     MeleeWebSourceMemoryAllocation stadium_manager_lease;
     MeleeWebSourceMemoryAllocation stadium_manager_proc_lease;
@@ -248,7 +258,7 @@ static int stadium_manager_storage_preflight(MeleeWebStageLast* h,char* e,size_t
   return fail(e,n,"Original Stadium manager storage lease changed");
  return melee_web_stadium_manager_view_preflight(&h->stadium_manager,e,n);
 }
-int melee_web_stage_last_stadium_start(MeleeWebStageLast* h,
+static int stadium_prepare_start(MeleeWebStageLast* h,
         MeleeWebMatchContext* camera_owner,char* e,size_t n)
 {
  if(!h||h!=active||h->generation!=melee_web_gameplay_generation()||
@@ -270,8 +280,8 @@ int melee_web_stage_last_stadium_start(MeleeWebStageLast* h,
   {h->stadium_map2_buffer_owner.map2_ground,fn_801D13C8},
   {h->stadium_map2_buffer_owner.display_ground,fn_801D11E4}};
  struct Pending {void* next;HSD_GObj* object;HSD_GObjEvent callback;};
- void* headers[ARRAY_SIZE(expected)];
- MeleeWebSourceMemoryAllocation leases[ARRAY_SIZE(expected)];
+ void** headers=h->stadium_headers;
+ MeleeWebSourceMemoryAllocation* leases=h->stadium_header_leases;
  MeleeWebSourceMemoryContext context;
  if(melee_web_source_memory_context_read(&context)!=MELEE_WEB_SOURCE_MEMORY_READ_OK)
   return fail(e,n,"Stadium pending queue source heap is unavailable");
@@ -291,17 +301,26 @@ int melee_web_stage_last_stadium_start(MeleeWebStageLast* h,
  h->stadium_generator=melee_web_stadium_generator_prepare(e,n);
  if(!h->stadium_generator)return 0;
  h->stadium_camera_owner=camera_owner;h->stadium_started=1;
- Stage_80225298();
- Stage_802252E4(St_Kind_PStadium,NULL);
+ h->stadium_start_context=context;
+ if(!h->stadium_loaded){Stage_80225298();h->stadium_loaded=1;}
+ return ok(e,n);
+}
+static int stadium_capture_start(MeleeWebStageLast* h,int ready,char* e,size_t n)
+{
+ Ground* display=h->stadium_map2_buffer_owner.display_ground->user_data;
+ MeleeWebMatchContext* camera_owner=h->stadium_camera_owner;
+ const MeleeWebSourceMemoryContext context=h->stadium_start_context;
  h->stadium_subject=display->u.display.xF4;
- if(!melee_web_stadium_generator_capture(h->stadium_generator,e,n)||
-    !melee_web_match_camera_subject_preflight(camera_owner,h->stadium_subject,e,n))return 0;
+ if(!(ready?melee_web_stadium_generator_capture_ready(h->stadium_generator,e,n):
+            melee_web_stadium_generator_capture(h->stadium_generator,e,n))||
+    !(ready?melee_web_match_camera_subject_preflight_ready(camera_owner,h->stadium_subject,e,n):
+            melee_web_match_camera_subject_preflight(camera_owner,h->stadium_subject,e,n)))return 0;
  if(stage_info.x6A4)return fail(e,n,"Original Stadium OnStart did not drain the pending queue");
  /* The established tracker erases freed records. A reused address instead
   * has a live allocation newer than the context captured before OnStart. */
- for(size_t i=0;i<ARRAY_SIZE(headers);++i){
+ for(size_t i=0;i<ARRAY_SIZE(h->stadium_headers);++i){
   MeleeWebSourceMemoryAllocation after;
-  if(melee_web_source_memory_allocation_read(headers[i],&after)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+  if(melee_web_source_memory_allocation_read(h->stadium_headers[i],&after)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
      after.world_generation!=context.world_generation||after.source_heap_handle!=context.source_heap_handle||
      (!after.live&&(after.requested_bytes||after.allocation_generation))||
      (after.live&&after.allocation_generation<=context.allocation_generation_watermark))
@@ -312,6 +331,88 @@ int melee_web_stage_last_stadium_start(MeleeWebStageLast* h,
     melee_web_source_memory_allocation_read(h->stadium_manager.proc,&h->stadium_manager_proc_lease)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
     !stadium_manager_storage_preflight(h,e,n))return 0;
  h->stadium_started=2;return ok(e,n);
+}
+int melee_web_stage_last_stadium_start(MeleeWebStageLast* h,
+        MeleeWebMatchContext* camera_owner,char* e,size_t n)
+{
+ if(!stadium_prepare_start(h,camera_owner,e,n))return 0;
+ Stage_802252E4(St_Kind_PStadium,NULL);
+ return stadium_capture_start(h,0,e,n);
+}
+int melee_web_stage_last_stadium_on_load(MeleeWebStageLast* h,char* e,size_t n)
+{
+ if(!h || h!=active || h->generation!=melee_web_gameplay_generation() ||
+    !h->definition || !h->definition->diagnostic_only || !h->source_ordered ||
+    h->stadium_loaded || h->stadium_started || HSD_GObj_804D781C || HSD_GObj_804D7814 ||
+    !melee_web_stage_selection_preflight(St_Kind_PStadium))
+  return fail(e,n,"Diagnostic Stadium OnLoad requires its exact unstarted owner");
+ Stage_80225298();h->stadium_loaded=1;return ok(e,n);
+}
+int melee_web_stage_last_stadium_prepare_ready(MeleeWebStageLast* h,
+        MeleeWebMatchContext* camera_owner,char* e,size_t n)
+{
+ if(!stadium_prepare_start(h,camera_owner,e,n))return 0;
+ h->stadium_ready_route=1;h->stadium_ready_armed=1;
+ return ok(e,n);
+}
+/* Hooks surround only the untouched original Stage OnStart dispatch. Ordinary
+ * stages and the historical immediate diagnostic continuation are unchanged. */
+static int stadium_ready_phase(MeleeWebStageLast* h,int stage_kind,int armed)
+{
+ return h && h==active && h->generation==melee_web_gameplay_generation() &&
+        h->stadium_ready_route && h->definition && h->definition->diagnostic_only &&
+        h->definition->stage_kind==St_Kind_PStadium && h->source_ordered &&
+        stage_kind==St_Kind_PStadium && h->stadium_started==1 && h->stadium_ready_armed==armed;
+}
+int melee_web_stage_last_stadium_ready_before(int stage_kind,char* e,size_t n)
+{
+ MeleeWebStageLast* h=active;
+ if(!h || !h->stadium_ready_route)return ok(e,n);
+ if(!stadium_ready_phase(h,stage_kind,1) ||
+    !melee_web_stage_selection_preflight(stage_kind) ||
+    stage_info.grkind!=h->definition->ground_kind ||
+    !melee_web_hud_stadium_ready_snapshot(&h->stadium_ready_object,&h->stadium_ready_proc))
+  return fail(e,n,"Diagnostic Stadium OnStart requires its exact original HUD Ready callback");
+ if(!stadium_maps_live(h,e,n)||
+    !melee_web_match_camera_available_ready(h->stadium_camera_owner,e,n))return 0;
+ /* Other original setup allocations can occur between OnLoad and Ready. The
+  * exact original header leases remain owned; address reuse must be newer than
+  * the actual pre-OnStart construction watermark. */
+ if(melee_web_source_memory_context_read(&h->stadium_start_context)!=MELEE_WEB_SOURCE_MEMORY_READ_OK)
+  return fail(e,n,"Diagnostic Stadium Ready source heap is unavailable");
+ struct Pending {void* next;HSD_GObj* object;HSD_GObjEvent callback;};
+ const HSD_GObj* objects[]={h->stadium_map2_buffer_owner.map2_ground,
+                          h->stadium_map2_buffer_owner.display_ground};
+ void* node=stage_info.x6A4;
+ for(size_t i=0;i<ARRAY_SIZE(stadium_pending_callbacks);++i){
+  MeleeWebSourceMemoryAllocation lease;
+  if(node!=h->stadium_headers[i] ||
+     melee_web_source_memory_allocation_read(node,&lease)!=MELEE_WEB_SOURCE_MEMORY_READ_OK ||
+     !lease.live || lease.requested_bytes!=h->stadium_header_leases[i].requested_bytes ||
+     lease.world_generation!=h->stadium_header_leases[i].world_generation ||
+     lease.source_heap_handle!=h->stadium_header_leases[i].source_heap_handle ||
+     lease.allocation_generation!=h->stadium_header_leases[i].allocation_generation ||
+     lease.world_generation!=h->stadium_start_context.world_generation ||
+     lease.source_heap_handle!=h->stadium_start_context.source_heap_handle)
+   return fail(e,n,"Diagnostic Stadium Ready pending header lease changed");
+  const struct Pending* p=node;
+  if(p->object!=objects[i] || p->callback!=stadium_pending_callbacks[i])
+   return fail(e,n,"Diagnostic Stadium Ready callback borrower changed");
+  node=p->next;
+ }
+ if(node)return fail(e,n,"Diagnostic Stadium Ready pending queue has a foreign owner");
+ h->stadium_ready_armed=2;return ok(e,n);
+}
+int melee_web_stage_last_stadium_ready_after(int stage_kind,char* e,size_t n)
+{
+ MeleeWebStageLast* h=active;
+ if(!h || !h->stadium_ready_route)return ok(e,n);
+ if(!stadium_ready_phase(h,stage_kind,2) ||
+    !melee_web_hud_stadium_ready_context(h->stadium_ready_object,h->stadium_ready_proc))
+  return fail(e,n,"Diagnostic Stadium original OnStart changed its HUD callback identity");
+ if(!stadium_capture_start(h,1,e,n))return 0;
+ h->stadium_ready_armed=0;h->stadium_ready_object=NULL;h->stadium_ready_proc=NULL;
+ return ok(e,n);
 }
 int melee_web_stage_last_stadium_map2_buffer_snapshot(const MeleeWebStageLast* h,MeleeWebStadiumMap2BufferOwner* out){
  if(!h||h!=active||!out||h->generation!=melee_web_gameplay_stats().generation||!h->definition||!h->definition->diagnostic_only||!h->stadium_map2_buffer_owner.captured)return 0;

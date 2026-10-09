@@ -7570,7 +7570,8 @@ void run_stadium_c1_context_preflight(
     bool perform_on_init,
     const MeleeWebRetiredSisLease* retired_sis,
     TransitionTrace& trace,
-    bool full_world_lifecycle = false)
+    bool full_world_lifecycle = false,
+    bool ready_session = false)
 {
     char error[256]{};
     const int previous_mode = gm_GetCurrentGameMode();
@@ -7598,6 +7599,8 @@ void run_stadium_c1_context_preflight(
     check((Toy_804A284C[3] & 4) != 0,
           "C1 source handoff lost the retained Toy category baseline");
     check_stadium_preflight_stage_empty();
+    std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> ready_input_bytes{};
+    if(ready_session)melee_web_pad_state_capture(ready_input_bytes.data());
     world->verify_immutable_archives();
     world->close();
     world.reset();
@@ -7650,6 +7653,79 @@ void run_stadium_c1_context_preflight(
             menu_files, selected_names, menu_dir, game_dir);
         check(reopened_files.contains("GrPs.usd"),
               "Exact C1 RuntimeFiles union omitted GrPs.usd");
+
+        if(ready_session){
+            check(perform_on_init && retired_sis,
+                  "Stadium Ready requires the original menu leave/SIS retirement boundary");
+            auto prior_sis=*retired_sis;
+            check(melee_web_diagnostic_sis_verify_retired(&prior_sis,error,sizeof(error)),error);
+            check(!melee_web_gameplay_world_exists(),"Stadium Ready would double-own a source world");
+            const auto parent_seed_owner=seed_ptr;
+            check(parent_seed_owner && *parent_seed_owner==selected.random_seed,
+                  "Stadium Ready lost the actual host selected seed");
+            const auto session_before=melee_web_gameplay_allocation();
+            auto observe=[](const char* phase){
+                const auto stats=melee_web_gameplay_stats();
+                const auto allocation=melee_web_gameplay_allocation();
+                MeleeWebSourceMemoryContext memory{};
+                const auto status=melee_web_source_memory_context_read(&memory);
+                std::fprintf(stderr,"STADIUM_READY_SESSION phase=%s world_exists=%d world=%llu ticks=%llu heap=%d objects=%u processes=%u memory_status=%d memory_world=%llu memory_heap=%d watermark=%llu arena_identity=%llu arena_generation=%llu arena_bytes=%llu current_object=%p current_proc=%p gx=%p\n",
+                    phase,melee_web_gameplay_world_exists(),(unsigned long long)stats.generation,
+                    (unsigned long long)stats.ticks,stats.heap_free_bytes,stats.objects,stats.processes,
+                    int(status),(unsigned long long)memory.world_generation,memory.source_heap_handle,
+                    (unsigned long long)memory.allocation_generation_watermark,
+                    (unsigned long long)allocation.identity,(unsigned long long)allocation.generation,
+                    (unsigned long long)allocation.bytes,(void*)HSD_GObj_804D781C,
+                    (void*)HSD_GObj_804D7838,(void*)HSD_GObj_804D7814);
+                std::fflush(stderr);
+            };
+            std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)> input(
+                melee_web_pad_state_decode(ready_input_bytes.data(),ready_input_bytes.size(),error,sizeof(error)),
+                melee_web_pad_state_free);
+            check(input!=nullptr,error);
+            melee_web::RuntimeArchiveCache cache(reopened_files);
+            std::unique_ptr<melee_web::GameplayMatchSession> match;
+            try{
+                observe("before-construction");
+                match=std::make_unique<melee_web::GameplayMatchSession>(
+                    reopened_files,selected,cache,melee_web::GameplayMatchConstruction::Deferred,
+                    *input,melee_web::GameplayMatchDiagnostic::StadiumReady);
+                while(!match->advance_construction()){}
+                observe("construction-complete-before-source-ticks");
+                PADStatus pads[4]{};pads[2].err=pads[3].err=PAD_ERR_NO_CONTROLLER;
+                float pcm[1068]{};unsigned audio_phase=0;
+                for(unsigned tick=0;tick<600 && !match->ready();++tick){
+                    match->tick(pads);
+                    audio_phase+=32000;const unsigned samples=audio_phase/60;audio_phase%=60;
+                    check(melee_web_audio_render(match->audio(),pcm,samples,error,sizeof(error)),error);
+                }
+                observe("first-ready-before-close");
+                check(match->ready(),"Stadium did not reach original source Ready within 600 ticks");
+                check(match->fighter_kind(0)==FTKIND_MARIO && match->fighter_kind(1)==FTKIND_MARIO,
+                      "Stadium Ready lost actual selected Human Mario fighter identities");
+                match->close();match.reset();
+                observe("checked-session-close");
+                const auto closed=melee_web_gameplay_stats();
+                MeleeWebSourceMemoryContext closed_memory{};
+                const auto closed_status=melee_web_source_memory_context_read(&closed_memory);
+                const auto allocation=melee_web_gameplay_allocation();
+                check(!melee_web_gameplay_world_exists() && !closed.generation && !closed.objects && !closed.processes &&
+                      closed_status==MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE &&
+                      HSD_GetHeap()==-1 && allocation.identity==session_before.identity &&
+                      allocation.generation==session_before.generation && allocation.bytes==session_before.bytes,
+                      "Stadium Ready did not retire its complete owned source world");
+                check(seed_ptr==parent_seed_owner && *parent_seed_owner==selected.random_seed,
+                      "Stadium Ready failed to restore the exact parent host RNG owner");
+                check_stadium_selection_preserved(host,selected,baseline);
+                cleanup();
+                std::cout<<"Stadium original source-session Ready and checked owned-world retirement passed; one lifetime, no draw/post-GO idle/C3 claim\n";
+                return;
+            }catch(const std::exception& first){
+                observe("first-failure-retained");
+                std::fprintf(stderr,"STADIUM_READY_SESSION_FIRST_FAILURE diagnostic=%s match_retained=%d pre_OnStart_close_unsupported=1\n",first.what(),int(bool(match)));
+                std::fflush(stderr);std::cout.flush();std::_Exit(1);
+            }
+        }
 
         check(melee_web_vs_mode_begin(),
               "C1 context preflight could not acquire the source VS mode lease");
@@ -7986,7 +8062,8 @@ void run_stadium_c1a_selection_smoke(
     bool full_world_lifecycle,
     const std::filesystem::path& menu_dir,
     const std::filesystem::path& game_dir,
-    TransitionTrace& trace)
+    TransitionTrace& trace,
+    bool ready_session=false)
 {
     char error[256]{};
     MeleeWebRetiredSisLease retired_sis{};
@@ -8119,7 +8196,7 @@ void run_stadium_c1a_selection_smoke(
             files, host, world, selected, names, menu_dir, game_dir,
             e8_request_trace, item_state_preflight, screen_roots_preflight,
             ground_map1_owner, source_on_init,
-            source_on_init ? &retired_sis : nullptr, trace, full_world_lifecycle);
+            source_on_init ? &retired_sis : nullptr, trace, full_world_lifecycle, ready_session);
     } else {
         world->verify_immutable_archives();
         world->close();
@@ -8129,6 +8206,7 @@ void run_stadium_c1a_selection_smoke(
     }
     check(!melee_web_menu_stage_explicit_confirm_available(St_Kind_PStadium),
           "C1a explicit-confirm permission survived unload");
+    if(ready_session)return;
     if (full_world_lifecycle) {
         std::cout << "Stadium original OnInit/OnLoad/OnStart two owned-world lifetimes passed; Ready/GO and ticks remain unrun\n";
     } else if (source_on_init) {
@@ -8267,6 +8345,8 @@ int main(int argc,char** argv){try{
      std::string(input_recipe)=="stadium-ground-map1-owner-v1";
  const bool stadium_source_on_init_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-source-oninit-v1";
+ const bool stadium_ready_session_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-source-ready-session-v1";
  const bool stadium_source_world_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-source-world-lifecycle-v1";
 #else
@@ -8278,6 +8358,7 @@ int main(int argc,char** argv){try{
  const bool stadium_ground_map1_owner_recipe=false;
  const bool stadium_source_on_init_recipe=false;
  const bool stadium_source_world_recipe=false;
+ const bool stadium_ready_session_recipe=false;
 #endif
  if(input_recipe&&!css_observer_recipe&&!sparse_css_recipe&&!sparse_pad_recipe&&!ordinary_timeout_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
@@ -8287,7 +8368,7 @@ int main(int argc,char** argv){try{
     !stadium_c1_context_preflight_recipe&&
     !stadium_c1_item_state_preflight_recipe&&!stadium_screen_roots_recipe&&
     !stadium_e8_request_recipe&&!stadium_ground_map1_owner_recipe&&
-    !stadium_source_on_init_recipe&&!stadium_source_world_recipe&&
+    !stadium_source_on_init_recipe&&!stadium_source_world_recipe&&!stadium_ready_session_recipe&&
     !v10_css_replay_start_recipe)
     throw std::runtime_error("Unknown transition input recipe");
  if(v10_css_replay_start_recipe&&
@@ -8303,7 +8384,7 @@ int main(int argc,char** argv){try{
  if((stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
      stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
      stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
-     stadium_source_on_init_recipe||stadium_source_world_recipe)&&
+     stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe)&&
     stage_kind!=St_Kind_PStadium)
    throw std::runtime_error("C1a recipes require source StKind 3");
  TransitionTrace trace(trace_path,source_revision,input_recipe);
@@ -8313,7 +8394,7 @@ int main(int argc,char** argv){try{
     stadium_c1_context_preflight_recipe||
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
-    stadium_source_on_init_recipe||stadium_source_world_recipe||
+    stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
     v10_css_replay_start_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
     trophy_baseline_recipe||sound_settings_recipe)
   keys=melee_web::menu_asset_names();
@@ -8345,19 +8426,19 @@ int main(int argc,char** argv){try{
  if(stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
-    stadium_source_on_init_recipe||stadium_source_world_recipe){
+    stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe){
   run_stadium_c1a_selection_smoke(
       files, stadium_c1_context_preflight_recipe||
           stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
           stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
-          stadium_source_on_init_recipe||stadium_source_world_recipe,
+          stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe,
       stadium_e8_request_recipe||stadium_ground_map1_owner_recipe,
       stadium_c1_item_state_preflight_recipe, stadium_screen_roots_recipe,
-          stadium_ground_map1_owner_recipe, stadium_source_on_init_recipe||stadium_source_world_recipe,
+          stadium_ground_map1_owner_recipe, stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe,
       stadium_source_world_recipe,
-      argv[1], argv[2], trace);
+      argv[1], argv[2], trace,stadium_ready_session_recipe);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
-  if(stadium_source_world_recipe){
+  if(stadium_source_world_recipe||stadium_ready_session_recipe){
    const auto released=melee_web_gameplay_allocation();
    std::fprintf(stderr,"C3_SESSION_CLOSED identity=%llu generation=%llu bytes=%llu world_exists=%d\n",
        static_cast<unsigned long long>(released.identity),static_cast<unsigned long long>(released.generation),

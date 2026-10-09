@@ -90,6 +90,10 @@ int melee_web_match_stats(MeleeWebMatchContext*, MeleeWebMatchStats*, char*, siz
  * the authored pool bound before original Camera allocation/return runs. */
 int melee_web_match_camera_available(MeleeWebMatchContext*,char*,size_t);
 int melee_web_match_camera_subject_preflight(MeleeWebMatchContext*,const void*,char*,size_t);
+/* The same partition/lease checks in the exact owned status-3 Ready callback.
+ * Ordinary retirement APIs above still require an idle scheduler. */
+int melee_web_match_camera_available_ready(MeleeWebMatchContext*,char*,size_t);
+int melee_web_match_camera_subject_preflight_ready(MeleeWebMatchContext*,const void*,char*,size_t);
 int melee_web_match_camera_subject_return(MeleeWebMatchContext*,void*,char*,size_t);
 #endif
 /* Original GObj disposal invokes registered Fighter_Unload, which clears the

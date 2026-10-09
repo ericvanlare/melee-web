@@ -430,6 +430,236 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
     def setUpClass(cls):
         cls.scratch = cls.new_workspace(ROOT, "stadium-c1a-native-menu-")
 
+    def test_stadium_ready_rules_and_callback_owner_controls(self):
+        """Actual adapter predicates with explicit synthetic service witnesses.
+
+        This does not run Stage, Ready animation, audio or source construction.
+        """
+        import shutil
+        compiler = shutil.which("clang") or shutil.which("cc")
+        if not compiler or not (ROOT / "build/gameplay-source/src/melee/gm/types.h").is_file():
+            self.skipTest("Prepared source headers and C compiler are required")
+        rules = r"""
+#define main ordinary_rules_main
+#define melee_web_match_prepare_source fixture_ordinary_prepare_source
+#include "gameplay_match_item_mask_trace.c"
+#undef main
+#undef melee_web_match_prepare_source
+#include "gameplay_source_memory_runtime.h"
+#include <sysdolphin/baselib/random.h>
+static unsigned fixture_seed=17; u32* seed_ptr=&fixture_seed;
+static int prepare_failure,fixture_status,fixture_healthy=1;
+static uint64_t fixture_world=1;
+static const StartMeleeData* prepared_pointer;
+int melee_web_source_memory_healthy(void){return fixture_healthy;}
+MeleeWebSourceMemoryReadStatus melee_web_source_memory_context_read(MeleeWebSourceMemoryContext* c)
+{*c=(MeleeWebSourceMemoryContext){.source_heap_handle=7,.world_generation=fixture_world};return (MeleeWebSourceMemoryReadStatus)fixture_status;}
+int melee_web_match_prepare_source(StartMeleeData* start,int demo)
+{
+ if(start->rules.stkind!=St_Kind_PStadium)return fixture_ordinary_prepare_source(start,demo);
+ ++g_prepare_calls;prepared_pointer=start;
+ if(!melee_web_match_rules_stadium_source_start(start))return 0;
+ StartMeleeData copy=*start;
+ if(melee_web_match_rules_stadium_source_start(&copy))return 0;
+ u32* saved=seed_ptr;u32 foreign=17;seed_ptr=&foreign;
+ int admitted=melee_web_match_rules_stadium_source_start(start);seed_ptr=saved;
+ if(admitted)return 0;
+ ++g_stats.generation;admitted=melee_web_match_rules_stadium_source_start(start);--g_stats.generation;
+ if(admitted)return 0;
+ return !prepare_failure;
+}
+static int diagnostic_route(int variant,int expect,int fail_source)
+{
+ StartMeleeData start;const int teams[]={0,0,0,0};char error[256];
+ set_supported_vs_payload(&start,-1,UINT64_MAX,0,teams,2);
+ start.rules.stkind=St_Kind_PStadium;
+ switch(variant){
+ case 1:start.rules.stkind=St_Kind_Last;break;
+ case 2:start.players[0].ckind=FTKIND_MARIO;break;
+ case 3:start.players[1].slot_type=Gm_PKind_Cpu;break;
+ case 4:start.players[2]=start.players[1];break;
+ case 5:start.rules.is_teams=1;break;
+ case 6:start.rules.x6=1;break;
+ case 7:start.players[1].slot_type=Gm_PKind_NA;break;
+ case 8:fixture_world=2;break;
+ case 9:seed_ptr=NULL;break;
+ case 10:fixture_status=MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE;break;
+ case 11:fixture_healthy=0;break;
+ }
+ MeleeWebMatchRules* owner=melee_web_match_rules_begin(error,sizeof(error));
+ if(!owner)return 0;
+ g_prepare_calls=0;prepared_pointer=NULL;prepare_failure=fail_source;
+ int result=melee_web_match_rules_prepare_stadium_from_menu(owner,&start,error,sizeof(error));
+ fixture_world=1;seed_ptr=&fixture_seed;fixture_status=0;fixture_healthy=1;
+ if(result!=expect || g_prepare_calls!=(unsigned)(variant==0) ||
+    melee_web_match_rules_stadium_source_start(&start) ||
+    (prepared_pointer && melee_web_match_rules_stadium_source_start(prepared_pointer)))return 0;
+ if(!melee_web_match_rules_end(owner,error,sizeof(error)))return 0;
+ return !melee_web_match_rules_stadium_source_start(&start);
+}
+int main(void)
+{
+ if(CKIND_MARIO!=8 || FTKIND_MARIO!=0 || ordinary_rules_main())return 1;
+ if(!diagnostic_route(0,1,0) || !diagnostic_route(0,0,1))return 2;
+ for(int i=1;i<=11;++i)if(!diagnostic_route(i,0,0))return 3;
+ puts("Stadium rules: actual CK8 positive; FT0/CPU/third/team/SD/ordinary-stage refusal; pointer/RNG/world/failure reset");return 0;
+}
+"""
+        callbacks = r"""
+#include "gameplay_hud.c"
+#define owner fixture_match_owner
+#define fail fixture_match_fail
+#define ok fixture_match_ok
+#include "gameplay_match_context.c"
+#undef owner
+#undef fail
+#undef ok
+#include <sysdolphin/baselib/gobjproc.h>
+static uint64_t fixture_generation=1;
+MeleeWebGameplayStats melee_web_gameplay_stats(void){return (MeleeWebGameplayStats){.generation=fixture_generation};}
+uint64_t melee_web_gameplay_generation(void){return fixture_generation;}
+void fn_8016B7F8(void){}
+void if_802F73C4(HSD_GObj* p){(void)p;}
+HSD_GObj* HSD_GObj_804D781C;HSD_GObj* HSD_GObj_804D7814;
+HSD_GObjProc* HSD_GObj_804D7838;
+Element_803F9628 ifStatus_803F9628[8];
+CmSubject *cm_804D6458,*cm_804D645C,*cm_804D6460,*cm_804D6468;
+u32* seed_ptr;
+int melee_web_source_memory_healthy(void){return 1;}
+MeleeWebSourceMemoryReadStatus melee_web_source_memory_context_read(MeleeWebSourceMemoryContext* c)
+{*c=(MeleeWebSourceMemoryContext){.source_heap_handle=7,.world_generation=1};return MELEE_WEB_SOURCE_MEMORY_READ_OK;}
+MeleeWebSourceMemoryReadStatus melee_web_source_memory_allocation_read(const void* p,MeleeWebSourceMemoryAllocation* a)
+{if(p!=fixture_match_owner->pool)return MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;*a=fixture_match_owner->camera_lease;return MELEE_WEB_SOURCE_MEMORY_READ_OK;}
+int main(void)
+{
+ char error[256];HSD_GObj object={0},foreign={0};HSD_GObjProc proc={0},other={0};
+ MeleeWebHud hud={.generation=1,.ready_object=&object,.ready_proc=&proc};owner=&hud;
+ object.proc=&proc;proc.gobj=&object;proc.on_invoke=if_802F73C4;
+ ifStatus_803F9628[3]=(Element_803F9628){.x0=&object,.x8=if_802F73C4,.x1C=intro_finished};
+ HSD_GObj_804D781C=&object;HSD_GObj_804D7838=&proc;
+ CmSubject pool[3]={0};MeleeWebMatchContext match={.generation=1,.camera_count=3,.pool=pool,.seed=17};
+ fixture_match_owner=&match;seed_ptr=&match.seed;cm_804D645C=pool;
+ match.camera_lease=(MeleeWebSourceMemoryAllocation){.source_heap_handle=7,.world_generation=1,.allocation_generation=9,.requested_bytes=sizeof(pool),.live=1};
+ cm_804D6460=cm_804D6468=&pool[0];cm_804D6458=&pool[2];pool[2].prev=&pool[1];
+ if(!melee_web_hud_stadium_ready_context(&object,&proc) ||
+    !melee_web_match_camera_available_ready(&match,error,sizeof(error)) ||
+    !melee_web_match_camera_subject_preflight_ready(&match,&pool[0],error,sizeof(error)) ||
+    melee_web_match_camera_available(&match,error,sizeof(error)) ||
+    melee_web_match_camera_subject_preflight(&match,&pool[0],error,sizeof(error)))return 1;
+ for(int kind=0;kind<7;++kind){
+  Element_803F9628 saved=ifStatus_803F9628[3];
+  if(kind==0)ifStatus_803F9628[3].x0=&foreign;
+  if(kind==1)ifStatus_803F9628[3].x8=NULL;
+  if(kind==2)ifStatus_803F9628[3].x1C=NULL;
+  if(kind==3)HSD_GObj_804D7838=&other;
+  if(kind==4)HSD_GObj_804D781C=&foreign;
+  if(kind==5)HSD_GObj_804D7814=&object;
+  if(kind==6)fixture_generation=2;
+  if(melee_web_hud_stadium_ready_context(NULL,NULL) ||
+     melee_web_match_camera_available_ready(&match,error,sizeof(error)) ||
+     melee_web_match_camera_subject_preflight_ready(&match,&pool[0],error,sizeof(error)))return 2;
+  ifStatus_803F9628[3]=saved;HSD_GObj_804D7838=&proc;HSD_GObj_804D781C=&object;HSD_GObj_804D7814=NULL;fixture_generation=1;
+ }
+ CmSubject copy[3];memcpy(copy,pool,sizeof(pool));
+ pool[2].prev=&pool[2];
+ if(melee_web_match_camera_available_ready(&match,error,sizeof(error)))return 3;
+ pool[2].prev=&pool[1];
+ if(memcmp(copy,pool,sizeof(pool)) || cm_804D6460!=&pool[0] || cm_804D6468!=&pool[0] ||
+    melee_web_match_camera_subject_preflight_ready(&match,&foreign,error,sizeof(error)))return 4;
+ HSD_GObj_804D781C=NULL;HSD_GObj_804D7838=NULL;
+ if(!melee_web_match_camera_available(&match,error,sizeof(error)) ||
+    !melee_web_match_camera_subject_preflight(&match,&pool[0],error,sizeof(error)) ||
+    melee_web_match_camera_available_ready(&match,error,sizeof(error)))return 5;
+ puts("Stadium Ready HUD/camera: exact object/proc/row3 positive; foreign/cycle/GX/world refused without mutation; idle retirement unchanged");return 0;
+}
+"""
+        phase = r"""
+/* ACTUAL_STAGE_PHASE_SOURCE */
+static uint64_t fixture_generation=1;
+uint64_t melee_web_gameplay_generation(void){return fixture_generation;}
+int main(void)
+{
+ const MeleeWebStageProfile profile={.diagnostic_only=1,.stage_kind=St_Kind_PStadium};
+ MeleeWebStageLast h={.generation=1,.definition=&profile,.source_ordered=1,
+                     .stadium_ready_route=1,.stadium_started=1,.stadium_ready_armed=1};
+ active=&h;
+ if(!stadium_ready_phase(&h,St_Kind_PStadium,1) || stadium_ready_phase(&h,St_Kind_Last,1) ||
+    stadium_ready_phase(&h,St_Kind_PStadium,2))return 1;
+ h.stadium_ready_armed=2;
+ if(!stadium_ready_phase(&h,St_Kind_PStadium,2) || stadium_ready_phase(&h,St_Kind_PStadium,1))return 2;
+ h.stadium_started=2;h.stadium_ready_armed=0;
+ MeleeWebStageLast copy=h;
+ if(stadium_ready_phase(&h,St_Kind_PStadium,1) || stadium_ready_phase(&h,St_Kind_PStadium,2) ||
+    memcmp(&h,&copy,sizeof(h)))return 3;
+ h.stadium_started=1;h.stadium_ready_armed=1;fixture_generation=2;
+ if(stadium_ready_phase(&h,St_Kind_PStadium,1))return 4;
+ fixture_generation=1;active=NULL;
+ if(stadium_ready_phase(&h,St_Kind_PStadium,1))return 5;
+ puts("Stadium Ready actual phase predicate: before/after once; duplicate/foreign-kind/world/owner refused without mutation");return 0;
+}
+"""
+        # Compile the actual pure owner-phase predicate and actual owner type,
+        # excluding unrelated functions whose historical warnings differ from
+        # this reducer's -Werror profile. This is a source-fragment control.
+        def balanced_body(text, start):
+            opening = text.index("{", start)
+            depth = 1
+            cursor = opening + 1
+            while depth:
+                depth += (text[cursor] == "{") - (text[cursor] == "}")
+                cursor += 1
+            return text[start:cursor]
+        stage_source = (ROOT / "src/gameplay_stage_last.c").read_text()
+        owner_struct = balanced_body(stage_source, stage_source.index("struct MeleeWebStageLast {")) + ";"
+        helper = balanced_body(stage_source, stage_source.index("static int stadium_ready_phase("))
+        prefix = stage_source[:stage_source.index("struct MeleeWebStageLast {")]
+        # The owner type needs only the authored array bound. Preserve its
+        # initializer in sizeof without emitting an unused callback table.
+        table_start = prefix.index("static const HSD_GObjEvent stadium_pending_callbacks[]=")
+        table_end = prefix.index(";", table_start) + 1
+        table = prefix[table_start:table_end]
+        initializer = table.split("=", 1)[1].removesuffix(";")
+        prefix = prefix[:table_start] + (
+            "extern const HSD_GObjEvent stadium_pending_callbacks[sizeof((HSD_GObjEvent[])" +
+            initializer + ")/sizeof(HSD_GObjEvent)];") + prefix[table_end:]
+        phase = phase.replace("/* ACTUAL_STAGE_PHASE_SOURCE */",
+                              prefix + owner_struct + "\nstatic MeleeWebStageLast* active;\n" + helper)
+        import re
+        caller_source = (ROOT / "tests/native_menu_host_trace.cpp").read_text()
+        begin = caller_source.index(" if(input_recipe&&!css_observer_recipe")
+        end = caller_source.index("throw std::runtime_error(\"Unknown transition input recipe\")", begin)
+        predicate = caller_source[begin:end].strip()
+        flags = sorted(set(re.findall(r"\b\w+_recipe\b", predicate)) - {"input_recipe"})
+        admission = "int main(void){const char* input_recipe=\"stadium-source-ready-session-v1\";\n"
+        admission += "\n".join("int " + flag + "=0;" for flag in flags)
+        admission += "\nstadium_ready_session_recipe=1;\n" + predicate + " return 1;\n"
+        admission += "stadium_ready_session_recipe=0;int rejected=0;\n" + predicate + " rejected=1;\n"
+        admission += "return !rejected;}\n"
+        for name, source in (("rules", rules), ("callbacks", callbacks), ("phase", phase), ("admission", admission)):
+            input_path = self.scratch / ("stadium-ready-" + name + ".c")
+            output = self.scratch / ("stadium-ready-" + name)
+            input_path.write_text(source)
+            command = [compiler, "-std=gnu11", "-Wall", "-Wextra", "-Werror",
+                       "-Wno-unused-variable", "-DAURORA", "-DTARGET_PC",
+                       "-DMELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1", "-O1",
+                       "-ffunction-sections", "-fdata-sections", "-ffp-contract=off",
+                       "-include", str(ROOT / "src/gameplay_compat.h")]
+            for directory in ("src", "tests", "build/gameplay-source/src",
+                              ".deps/aurora/include", ".deps/melee/extern/dolphin/include"):
+                command += ["-I", str(ROOT / directory)]
+            command += [str(input_path)]
+            if name == "rules":
+                command += [str(ROOT / "src/gameplay_match_rules.c")]
+            command += ["-Wl,-dead_strip" if sys.platform == "darwin" else "-Wl,--gc-sections",
+                        "-o", str(output)]
+            (self.scratch / ("stadium-ready-" + name + "-command.json")).write_text(json.dumps(command))
+            build = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=60)
+            (self.scratch / ("stadium-ready-" + name + "-build.log")).write_text(build.stdout + build.stderr)
+            self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
+            run = subprocess.run([str(output)], cwd=ROOT, capture_output=True, text=True, timeout=10)
+            (self.scratch / ("stadium-ready-" + name + "-run.log")).write_text(run.stdout + run.stderr)
+            self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+
     def test_vs_sudden_death_source_callbacks_without_assets(self):
         target = ROOT / "build/browser-release/native_menu_host_trace.js"
         if not target.is_file():
@@ -1749,6 +1979,88 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
             run.stdout,
         )
         self.assertNotIn("OnInit lifetime", run.stdout)
+
+    def test_stadium_source_ready_session_one_shot(self):
+        if os.environ.get("MELEE_RUN_STADIUM_SOURCE_READY_SESSION") != "1":
+            self.skipTest("Real Stadium source Ready session requires its reviewed run gate")
+        import hashlib
+        from capture_sd_reference_prefix import cleanup_process
+
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        fixture_value = os.environ.get("MELEE_MENU_FIXTURE_ROOT")
+        self.assertTrue(fixture_value, "Retained Stadium fixture root is required")
+        fixture = Path(fixture_value)
+        self.assertTrue(fixture.is_absolute(), "Use the frozen absolute fixture root")
+        menu, game = fixture / "native-menus", fixture / "next-gate"
+        self.assertTrue(target.is_file())
+        menu_script = (
+            "import {NATIVE_MENU_DISC_FILES} from './web/runtime-assets.mjs'; "
+            "console.log(JSON.stringify([...Object.keys(NATIVE_MENU_DISC_FILES), "
+            "'dsp_coef.bin', 'sislib_font.bin']))"
+        )
+        menu_names = json.loads(subprocess.check_output(
+            [str(node_runtime()), "--input-type=module", "-e", menu_script],
+            cwd=ROOT, text=True))
+        selected_names = stadium_c1_selected_file_names()
+        names = sorted(set(menu_names) | set(selected_names))
+        self.assertEqual((len(menu_names), len(selected_names), len(names)), (76, 36, 98))
+        paths = {name: (menu / name if (menu / name).is_file() else game / name)
+                 for name in names}
+        self.assertTrue(all(path.is_file() for path in paths.values()))
+        before = {name: hashlib.sha256(path.read_bytes()).hexdigest()
+                  for name, path in paths.items()}
+        source = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        trace = self.scratch / "stadium-source-ready-session.jsonl"
+        command = [str(node_runtime()), str(target), str(menu), str(game), "3",
+                   str(trace), source, "stadium-source-ready-session-v1"]
+        output = self.scratch / "stadium-source-ready-node-owner"
+        output.mkdir(exist_ok=False)
+        identity = {
+            "scope": "stadium-source-ready-session-v1", "ownership": "direct-Popen",
+            "source_revision": source,
+            "source_tree": subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"],
+                                                     cwd=ROOT, text=True).strip(),
+            "argv": command, "cwd": str(ROOT), "timeout_seconds": 120,
+            "fixture_sha256_before": before,
+            "binary_sha256": {str(path): hashlib.sha256(path.read_bytes()).hexdigest()
+                              for path in [Path(command[0]).resolve(), target,
+                                           target.with_suffix(".wasm")]},
+        }
+        stdout_path = self.scratch / "stadium-source-ready.stdout"
+        stderr_path = self.scratch / "stadium-source-ready.stderr"
+        try:
+            with stdout_path.open("xb") as stdout, stderr_path.open("xb") as stderr:
+                process = subprocess.Popen(command, cwd=ROOT, stdout=stdout, stderr=stderr)
+                try:
+                    identity["pid"] = process.pid
+                    with (output / "identity.json").open("x", encoding="utf-8") as receipt:
+                        receipt.write(json.dumps(identity, indent=2) + "\n")
+                    process.wait(timeout=120)
+                finally:
+                    cleanup_process(process, output, scope="stadium-source-ready-session-v1")
+        finally:
+            after = {name: hashlib.sha256(path.read_bytes()).hexdigest()
+                     for name, path in paths.items()}
+            with (output / "fixture-after.json").open("x", encoding="utf-8") as receipt:
+                receipt.write(json.dumps(after, indent=2) + "\n")
+            self.assertEqual(after, before, "Real Stadium fixture changed during source Ready session")
+        stdout, stderr = stdout_path.read_text(), stderr_path.read_text()
+        self.assertEqual(process.returncode, 0, (stdout + stderr)[-12000:])
+        import re
+        phases = re.findall(r"STADIUM_READY_SESSION phase=(\S+) world_exists=(\d+) world=(\d+) ticks=(\d+) heap=(-?\d+) objects=(\d+) processes=(\d+)", stderr)
+        self.assertEqual([row[0] for row in phases], ["before-construction",
+                         "construction-complete-before-source-ticks", "first-ready-before-close",
+                         "checked-session-close"])
+        self.assertEqual(int(phases[0][1]), 0)
+        self.assertEqual(int(phases[1][3]), 0)
+        self.assertGreater(int(phases[2][2]), 0)
+        self.assertGreater(int(phases[2][3]), 0)
+        self.assertEqual([int(phases[3][i]) for i in (1, 2, 3, 5, 6)], [0, 0, 0, 0, 0])
+        self.assertIn("Stadium original source-session Ready and checked owned-world retirement passed; one lifetime, no draw/post-GO idle/C3 claim", stdout)
+        self.assertNotIn("STADIUM_READY_SESSION_FIRST_FAILURE", stderr)
+        self.assertNotIn("STADIUM_READY_CONSTRUCTION_FIRST_FAILURE", stderr)
+        self.assertIn("C3_SESSION_CLOSED identity=0 generation=0 bytes=0 world_exists=0", stderr)
+        self.assertNotIn('"probe":"stadium-source-oninit"', stdout)
 
     def test_stadium_source_world_lifecycle_one_shot(self):
         if os.environ.get("MELEE_RUN_STADIUM_SOURCE_WORLD_LIFECYCLE") != "1":

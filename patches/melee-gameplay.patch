@@ -3667,7 +3667,7 @@ index fea468cc6c89d7d4c6c8a1a81e31f99eec07bc63..6d0819f60ef4c12cdf80b1ea29bbd805
  
  void gm_80168C5C(u32 arg0)
 diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
-index cd7e31a0636e4e1a48d6a870e09319e887345ed1..d241ab7966e445d9f6c87992b6801a34c9008255 100644
+index cd7e31a0636e4e1a48d6a870e09319e887345ed1..2cf291e797065c1108b793a7408f92b9f06a5ef1 100644
 --- a/src/melee/gm/gm_16AE.c
 +++ b/src/melee/gm/gm_16AE.c
 @@ -1,4 +1,6 @@
@@ -3880,7 +3880,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..d241ab7966e445d9f6c87992b6801a34
      }
      un_802FD428();
      ifStatus_802F665C(data->rules.x0_3);
-@@ -2277,3 +2324,254 @@ int fn_8016F160(int arg0, int arg1)
+@@ -2277,3 +2324,258 @@ int fn_8016F160(int arg0, int arg1)
  {
      return pl_80039418(arg0, arg1);
  }
@@ -4053,7 +4053,11 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..d241ab7966e445d9f6c87992b6801a34
 +    } else if (rules->x6 || rules->match_kind != MatchKind_Stock || !rules->is_stock ||
 +               !rules->is_vs || rules->is_teams > 1 ||
 +               !melee_web_match_timer_supported(rules) ||
-+               !melee_web_stage_content(rules->stkind) ||
++               !(melee_web_stage_content(rules->stkind)
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++                 || melee_web_match_rules_stadium_source_start(start)
++#endif
++                 ) ||
 +               rules->xB != -1 ||
 +               rules->game_speed != 1.0F || rules->x54 != NULL ||
 +               rules->on_match_start != NULL || rules->on_frame_start != NULL ||
@@ -8858,20 +8862,23 @@ index 8c69f209f6e2a9a44d22398f0beda7da6bac3535..ab3986ed0442b573356f57e5e1c85f06
 +}
 +#endif
 diff --git a/src/melee/gr/stage.c b/src/melee/gr/stage.c
-index 5a63015df51b87fa22d8e474b10c7047692e0e3e..acf369c83215f2f9812c214d2225309fb64cd2e9 100644
+index 5a63015df51b87fa22d8e474b10c7047692e0e3e..a5d5e457591471725588e6b0c2308ef2c1442305 100644
 --- a/src/melee/gr/stage.c
 +++ b/src/melee/gr/stage.c
-@@ -1,5 +1,9 @@
+@@ -1,5 +1,12 @@
  #include "stage.h"
  
 +#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 +#include "gameplay_stadium_display_owner.h"
++#include "gameplay_stage_last.h"
++#include <stdio.h>
++#include <stdlib.h>
 +#endif
 +
  #include "ground.h"
  #include "types.h"
  #include <melee/gm/gm_unsplit.h>
-@@ -292,7 +296,13 @@ bool Stage_80224FDC(Vec3* arg0)
+@@ -292,7 +299,13 @@ bool Stage_80224FDC(Vec3* arg0)
      return false;
  }
  
@@ -8885,7 +8892,7 @@ index 5a63015df51b87fa22d8e474b10c7047692e0e3e..acf369c83215f2f9812c214d2225309f
  {
      s32 r31;
      s32 spC;
-@@ -325,12 +335,35 @@ s32 Stage_80225074(s32 arg0)
+@@ -325,11 +338,34 @@ s32 Stage_80225074(s32 arg0)
      }
  
      tmp = Ground_801C28AC(selected_stage.stkind, r31, &spC);
@@ -8897,9 +8904,9 @@ index 5a63015df51b87fa22d8e474b10c7047692e0e3e..acf369c83215f2f9812c214d2225309f
      Ground_801C5A84(spC);
      Ground_801C5AA4(tmp);
 +#endif
-     return arg0;
- }
- 
++    return arg0;
++}
++
 +#if defined(MELEE_WEB_GAMEPLAY)
 +void melee_web_stage_commit_music(s32 music, int alternate)
 +{
@@ -8914,14 +8921,13 @@ index 5a63015df51b87fa22d8e474b10c7047692e0e3e..acf369c83215f2f9812c214d2225309f
 +    int alternate;
 +    melee_web_stage_select_music(arg0, &music, &alternate);
 +    melee_web_stage_commit_music(music, alternate);
-+    return arg0;
-+}
+     return arg0;
+ }
 +#endif
-+
+ 
  StKind Stage_80225194(void)
  {
-     return selected_stage.stkind;
-@@ -483,6 +516,38 @@ struct StageIdMapEntry stage_id_map[] = {
+@@ -483,6 +519,38 @@ struct StageIdMapEntry stage_id_map[] = {
      { Gr_Kind_Shrine, 0, 0 },       { Gr_Kind_Battle, 0, 0 },
  };
  
@@ -8960,7 +8966,7 @@ index 5a63015df51b87fa22d8e474b10c7047692e0e3e..acf369c83215f2f9812c214d2225309f
  GrKind Stage_8022519C(StKind stkind)
  {
      return stage_id_map[stkind].grkind;
-@@ -497,6 +562,11 @@ void Stage_802251E8(StKind stkind, s32* _)
+@@ -497,6 +565,11 @@ void Stage_802251E8(StKind stkind, s32* _)
  {
      StageIdPair local_data;
  
@@ -8972,7 +8978,7 @@ index 5a63015df51b87fa22d8e474b10c7047692e0e3e..acf369c83215f2f9812c214d2225309f
      selected_stage.stkind = stkind;
      selected_stage.entry = &stage_id_map[stkind];
  
-@@ -512,6 +582,11 @@ void Stage_8022524C(void)
+@@ -512,6 +585,11 @@ void Stage_8022524C(void)
  {
      StageIdPair local_data;
  
@@ -8984,6 +8990,25 @@ index 5a63015df51b87fa22d8e474b10c7047692e0e3e..acf369c83215f2f9812c214d2225309f
      local_data = default_stage_pair;
  
      local_data.grkind = selected_stage.entry->grkind;
+@@ -541,7 +619,18 @@ void Stage_802252E4(StKind stkind, HSD_GObj* _)
+     local_data.grkind = selected_stage.entry->grkind;
+     local_data.stkind = stkind;
+ 
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    char ready_error[256];
++    if (!melee_web_stage_last_stadium_ready_before(stkind,ready_error,sizeof(ready_error))) {
++        fprintf(stderr,"STADIUM_READY_BEFORE_REFUSAL %s\n",ready_error);abort();
++    }
++#endif
+     Ground_801C0FB8(&local_data);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (!melee_web_stage_last_stadium_ready_after(stkind,ready_error,sizeof(ready_error))) {
++        fprintf(stderr,"STADIUM_READY_AFTER_REFUSAL %s\n",ready_error);abort();
++    }
++#endif
+ }
+ 
+ void Stage_8022532C(StKind stkind, s32 arg1)
 diff --git a/src/melee/gr/types.h b/src/melee/gr/types.h
 index 4a0b8b70cec184ee529308e3e54240a431845dfb..b9f18e242e799923df754450195cffdf08034534 100644
 --- a/src/melee/gr/types.h

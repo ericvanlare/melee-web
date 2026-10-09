@@ -8,6 +8,9 @@
 #endif
 namespace melee_web {
 enum class GameplayMatchConstruction { Immediate, Deferred };
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+enum class GameplayMatchDiagnostic { StadiumReady };
+#endif
 // Shared source match lifecycle. The confirmed menu payload supplies player
 // identity and source RNG; scene resources close before returning to a menu.
 class GameplayMatchSession {
@@ -29,6 +32,11 @@ public:
                          const MeleeWebMenuMatchContinuation&,
                          RuntimeArchiveCache&,GameplayMatchConstruction,
                          const MeleeWebPadState&);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    GameplayMatchSession(const RuntimeFiles&,const MeleeWebMenuMatchSelection&,
+                         RuntimeArchiveCache&,GameplayMatchConstruction,
+                         const MeleeWebPadState&,GameplayMatchDiagnostic);
+#endif
     ~GameplayMatchSession();
     GameplayMatchSession(const GameplayMatchSession&)=delete;
     GameplayMatchSession& operator=(const GameplayMatchSession&)=delete;

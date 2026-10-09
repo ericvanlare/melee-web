@@ -83,6 +83,7 @@ static int owned(MeleeWebMatchContext* h,char* e,size_t n)
     return 1;
 }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#include "gameplay_hud.h"
 static int camera_index(MeleeWebMatchContext* h,const CmSubject* p)
 {
     uintptr_t base=(uintptr_t)h->pool, address=(uintptr_t)p;
@@ -91,13 +92,14 @@ static int camera_index(MeleeWebMatchContext* h,const CmSubject* p)
     return (int)((address-base)/sizeof(*h->pool));
 }
 static int camera_partition(MeleeWebMatchContext* h,const CmSubject* subject,
-                            int need_free,char* e,size_t n)
+                            int need_free,int ready,char* e,size_t n)
 {
     MeleeWebSourceMemoryAllocation lease;
     MeleeWebSourceMemoryContext context;
     if(!owned(h,e,n))return 0;
-    if(HSD_GObj_804D781C||HSD_GObj_804D7814)
-        return fail(e,n,"Camera subject ownership requires idle source callbacks");
+    if(ready ? !melee_web_hud_stadium_ready_context(NULL,NULL) :
+       (HSD_GObj_804D781C||HSD_GObj_804D7814))
+        return fail(e,n,"Camera subject ownership requires its exact source callback boundary");
     if(melee_web_source_memory_context_read(&context)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
        melee_web_source_memory_allocation_read(h->pool,&lease)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
        !lease.live||!h->camera_lease.live||
@@ -130,11 +132,18 @@ static int camera_partition(MeleeWebMatchContext* h,const CmSubject* subject,
     return ok(e,n);
 }
 int melee_web_match_camera_available(MeleeWebMatchContext* h,char* e,size_t n)
-{return camera_partition(h,NULL,1,e,n);}
+{return camera_partition(h,NULL,1,0,e,n);}
 int melee_web_match_camera_subject_preflight(MeleeWebMatchContext* h,const void* p,char* e,size_t n)
 {
     if(!p)return fail(e,n,"Stadium camera subject is missing");
-    return camera_partition(h,p,0,e,n);
+    return camera_partition(h,p,0,0,e,n);
+}
+int melee_web_match_camera_available_ready(MeleeWebMatchContext* h,char* e,size_t n)
+{return camera_partition(h,NULL,1,1,e,n);}
+int melee_web_match_camera_subject_preflight_ready(MeleeWebMatchContext* h,const void* p,char* e,size_t n)
+{
+    if(!p)return fail(e,n,"Stadium camera subject is missing");
+    return camera_partition(h,p,0,1,e,n);
 }
 int melee_web_match_camera_subject_return(MeleeWebMatchContext* h,void* p,char* e,size_t n)
 {

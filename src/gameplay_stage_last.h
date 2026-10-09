@@ -30,6 +30,12 @@ MeleeWebStageLast* melee_web_stage_begin_kind_on_init_diagnostic(
  * OnLoad/OnStart run once while maps and the borrowed match camera pool live.
  * On refusal the caller must retain both owners; no cancellation is applied. */
 int melee_web_stage_last_stadium_start(MeleeWebStageLast*,MeleeWebMatchContext*,char*,size_t);
+/* Source-session OnLoad now, then exactly one original HUD-triggered OnStart.
+ * Pre-Ready close explicitly retains the partially prepared owner. */
+int melee_web_stage_last_stadium_on_load(MeleeWebStageLast*,char*,size_t);
+int melee_web_stage_last_stadium_prepare_ready(MeleeWebStageLast*,MeleeWebMatchContext*,char*,size_t);
+int melee_web_stage_last_stadium_ready_before(int stage_kind,char*,size_t);
+int melee_web_stage_last_stadium_ready_after(int stage_kind,char*,size_t);
 /* Asset-free reducer for the diagnostic bind-refusal reporting path. It
  * injects the bind failure and E8 journal event, then exercises the real
  * display-owner cancellation guard. The partial owner remains live until the

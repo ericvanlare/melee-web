@@ -1,6 +1,7 @@
 #include "gameplay_stadium_start.h"
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include "gameplay_bootstrap.h"
+#include "gameplay_hud.h"
 #include "gameplay_source_memory_runtime.h"
 #include <melee/gr/grzakogenerator.h>
 #include <sysdolphin/baselib/gobj.h>
@@ -34,7 +35,7 @@ static HSD_GObj* source_scheduler(int* count)
             if(p->on_invoke==fn_801CADBC){found=g;++*count;}
     return found;
 }
-static int live(MeleeWebStadiumGenerator* h,char* e,size_t n)
+static int live(MeleeWebStadiumGenerator* h,int ready,char* e,size_t n)
 {
     MeleeWebSourceMemoryContext context;
     if(!h||h!=owner||h->generation!=melee_web_gameplay_generation()||
@@ -42,7 +43,8 @@ static int live(MeleeWebStadiumGenerator* h,char* e,size_t n)
        context.world_generation!=h->context.world_generation||
        context.source_heap_handle!=h->context.source_heap_handle)
         return fail(e,n,"Stadium generator lost its source world/heap owner");
-    if(HSD_GObj_804D781C||HSD_GObj_804D7814)
+    if(ready ? !melee_web_hud_stadium_ready_context(NULL,NULL) :
+       (HSD_GObj_804D781C||HSD_GObj_804D7814))
         return fail(e,n,"Stadium generator ownership requires idle source callbacks");
     return 1;
 }
@@ -63,13 +65,14 @@ MeleeWebStadiumGenerator* melee_web_stadium_generator_prepare(char* e,size_t n)
         free(h->saved);free(h);fail(e,n,"Stadium generator source snapshot unavailable");return NULL;
     }
     owner=h;
-    if(!live(h,e,n)){owner=NULL;free(h->saved);free(h);return NULL;}
+    if(!live(h,0,e,n)){owner=NULL;free(h->saved);free(h);return NULL;}
     ok(e,n);return h;
 }
-int melee_web_stadium_generator_capture(MeleeWebStadiumGenerator* h,char* e,size_t n)
+static int generator_preflight(MeleeWebStadiumGenerator*,int,char*,size_t);
+static int generator_capture(MeleeWebStadiumGenerator* h,int ready,char* e,size_t n)
 {
     void *descs,*data;int count;
-    if(!live(h,e,n))return 0;
+    if(!live(h,ready,e,n))return 0;
     if(h->data||!melee_web_stadium_zako_view(&descs,&data)||descs||!data)
         return fail(e,n,"Original Stadium OnStart did not publish its NULL-desc generator");
     MeleeWebSourceMemoryAllocation lease;
@@ -85,12 +88,12 @@ int melee_web_stadium_generator_capture(MeleeWebStadiumGenerator* h,char* e,size
        g->proc->child||g->proc->gobj!=g||g->proc->s_link!=GENERATOR_PROC_LINK)
         return fail(e,n,"Original generator scheduler has a foreign or missing owner");
     h->data=data;h->lease=lease;h->scheduler=g;h->proc=g->proc;
-    return melee_web_stadium_generator_preflight(h,e,n);
+    return generator_preflight(h,ready,e,n);
 }
-int melee_web_stadium_generator_preflight(MeleeWebStadiumGenerator* h,char* e,size_t n)
+static int generator_preflight(MeleeWebStadiumGenerator* h,int ready,char* e,size_t n)
 {
     void *descs,*data;int count;MeleeWebSourceMemoryAllocation lease;
-    if(!live(h,e,n))return 0;
+    if(!live(h,ready,e,n))return 0;
     if(!h->data||!melee_web_stadium_zako_view(&descs,&data)||descs||data!=h->data||
        melee_web_source_memory_allocation_read(data,&lease)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
        !lease.live||lease.requested_bytes!=h->lease.requested_bytes||
@@ -111,6 +114,12 @@ int melee_web_stadium_generator_preflight(MeleeWebStadiumGenerator* h,char* e,si
             return fail(e,n,"Retire generator item borrowers before Stadium teardown");
     return ok(e,n);
 }
+int melee_web_stadium_generator_capture(MeleeWebStadiumGenerator* h,char* e,size_t n)
+{return generator_capture(h,0,e,n);}
+int melee_web_stadium_generator_capture_ready(MeleeWebStadiumGenerator* h,char* e,size_t n)
+{return generator_capture(h,1,e,n);}
+int melee_web_stadium_generator_preflight(MeleeWebStadiumGenerator* h,char* e,size_t n)
+{return generator_preflight(h,0,e,n);}
 int melee_web_stadium_generator_end(MeleeWebStadiumGenerator* h,char* e,size_t n)
 {
     if(!h)return ok(e,n);

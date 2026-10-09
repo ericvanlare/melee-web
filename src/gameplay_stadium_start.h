@@ -10,6 +10,8 @@ typedef struct MeleeWebStadiumGenerator MeleeWebStadiumGenerator;
  * retains this owner on capture/refusal; end refuses live item borrowers. */
 MeleeWebStadiumGenerator* melee_web_stadium_generator_prepare(char*,size_t);
 int melee_web_stadium_generator_capture(MeleeWebStadiumGenerator*,char*,size_t);
+/* Capture only inside the owned original status-3 Ready callback. */
+int melee_web_stadium_generator_capture_ready(MeleeWebStadiumGenerator*,char*,size_t);
 int melee_web_stadium_generator_preflight(MeleeWebStadiumGenerator*,char*,size_t);
 int melee_web_stadium_generator_end(MeleeWebStadiumGenerator*,char*,size_t);
 /* Source-local bridge: exact private bytes, never a client-side mirrored ABI. */

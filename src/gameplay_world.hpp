@@ -50,6 +50,9 @@ struct GameplayWorldSelection {
     // Opening demos retain their authored four-CPU/99-stock setup and
     // gm_80183218 source callback. This never applies to public VS matches.
     bool opening_demo=false;
+    // Stable layout across private diagnostic libraries and ordinary consumers.
+    // Non-diagnostic builds reject this request rather than admitting Stadium.
+    bool stadium_diagnostic=false;
     // Original Sudden Death scene setup uses source-indexed survivors, which
     // may be sparse after the authored winner filter.
     bool sudden_death=false;
@@ -74,6 +77,9 @@ public:
     void enable_stage_visual();
     void enable_full_stage(bool defer_start = false);
     void end_stage();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    void prepare_stadium_ready(MeleeWebMatchContext*);
+#endif
     void initialize_match(const StartMeleeData&);
     MeleeWebMatchContext* take_match_context();
     MeleeWebRender* take_render_context();
