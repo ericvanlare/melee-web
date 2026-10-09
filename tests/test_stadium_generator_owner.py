@@ -73,7 +73,9 @@ static MeleeWebSourceMemoryReadStatus melee_web_source_memory_context_read_impl(
 {*out=(MeleeWebSourceMemoryContext){7,1,watermark};return MELEE_WEB_SOURCE_MEMORY_READ_OK;}
 #define melee_web_source_memory_context_read melee_web_source_memory_context_read_impl
 static MeleeWebSourceMemoryReadStatus melee_web_source_memory_allocation_read_impl(const void* p,MeleeWebSourceMemoryAllocation* out)
-{assert(p==payload);*out=allocation;return MELEE_WEB_SOURCE_MEMORY_READ_OK;}
+{assert(p==payload);*out=allocation;
+ if(!allocation.live)*out=(MeleeWebSourceMemoryAllocation){.source_heap_handle=7,.world_generation=1};
+ return MELEE_WEB_SOURCE_MEMORY_READ_OK;}
 #define melee_web_source_memory_allocation_read melee_web_source_memory_allocation_read_impl
 static void* HSD_MemAlloc(size_t size)
 {
@@ -334,3 +336,54 @@ int main(void)
         finally:
             if passed:shutil.rmtree(scratch)
             else:print(f"Retained selected-stage native control: {scratch}",flush=True)
+
+    def test_actual_tracker_erases_and_recycles_exact_payload(self):
+        compiler=shutil.which("clang++") or shutil.which("c++")
+        if not compiler:self.skipTest("Native C++ compiler required")
+        program=r'''
+#include "gameplay_source_memory_runtime.h"
+#include <cassert>
+#include <cstdio>
+int main(void)
+{
+ alignas(32) unsigned char payload[64]={};
+ assert(melee_web_source_memory_begin(19,7));
+ MeleeWebSourceMemoryContext before{};
+ assert(melee_web_source_memory_context_read(&before)==MELEE_WEB_SOURCE_MEMORY_READ_OK);
+ assert(melee_web_source_memory_alloc(7,payload,sizeof(payload)));
+ MeleeWebSourceMemoryAllocation live{};
+ assert(melee_web_source_memory_allocation_read(payload,&live)==MELEE_WEB_SOURCE_MEMORY_READ_OK);
+ assert(live.live&&live.requested_bytes==sizeof(payload)&&live.allocation_generation>before.allocation_generation_watermark);
+ MeleeWebSourceMemoryContext pre_drain{};
+ assert(melee_web_source_memory_context_read(&pre_drain)==MELEE_WEB_SOURCE_MEMORY_READ_OK);
+ assert(melee_web_source_memory_free(7,payload));
+ MeleeWebSourceMemoryAllocation absent{};
+ assert(melee_web_source_memory_allocation_read(payload,&absent)==MELEE_WEB_SOURCE_MEMORY_READ_OK);
+ assert(!absent.live&&!absent.requested_bytes&&!absent.allocation_generation&&absent.world_generation==19&&absent.source_heap_handle==7);
+ assert(melee_web_source_memory_alloc(7,payload,sizeof(payload)));
+ MeleeWebSourceMemoryAllocation replacement{};
+ assert(melee_web_source_memory_allocation_read(payload,&replacement)==MELEE_WEB_SOURCE_MEMORY_READ_OK);
+ assert(replacement.live&&replacement.allocation_generation>pre_drain.allocation_generation_watermark&&replacement.world_generation==19&&replacement.source_heap_handle==7);
+ assert(melee_web_source_memory_free(7,payload));
+ assert(melee_web_source_memory_healthy());assert(melee_web_source_memory_end(19));
+ puts("Actual source-memory tracker: erased record has zero live/request/generation; same-address replacement advances pre-drain watermark; explicit synthetic host allocation events");return 0;
+}
+'''
+        scratch=Path(tempfile.mkdtemp(prefix="stadium-tracker-native-",dir=ROOT/"work"));passed=False
+        try:
+            path=scratch/"tracker.cpp";path.write_text(program);binary=scratch/"tracker"
+            command=[compiler,"-std=c++20","-O1","-Wall","-Wextra","-Werror","-ffp-contract=off",
+                     "-fsanitize=address,undefined","-I",str(ROOT/"src"),str(path),
+                     str(ROOT/"src/gameplay_source_memory_runtime.cpp"),str(ROOT/"src/source_address_context.cpp"),
+                     str(ROOT/"src/source_game_heap_context.cpp"),"-o",str(binary)]
+            (scratch/"command.txt").write_text(" ".join(command)+"\n")
+            build=subprocess.run(command,capture_output=True,text=True,timeout=60)
+            (scratch/"compile.stdout").write_text(build.stdout);(scratch/"compile.stderr").write_text(build.stderr)
+            self.assertEqual(build.returncode,0,build.stdout+build.stderr)
+            run=subprocess.run([str(binary)],capture_output=True,text=True,timeout=30)
+            (scratch/"stdout").write_text(run.stdout);(scratch/"stderr").write_text(run.stderr)
+            self.assertEqual(run.returncode,0,run.stdout+run.stderr)
+            print(run.stdout,end="",flush=True);passed=True
+        finally:
+            if passed:shutil.rmtree(scratch)
+            else:print(f"Retained tracker native control: {scratch}",flush=True)

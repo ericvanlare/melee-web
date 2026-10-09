@@ -612,8 +612,15 @@ int melee_web_stadium_c1_generator_lifetime_control(void)
   HSD_GObjPLink_80390228(borrowed);
   queue_control_require(melee_web_stadium_generator_end(owner,error,sizeof(error)),error);
   MeleeWebSourceMemoryAllocation retired;
-  queue_control_require(melee_web_source_memory_allocation_read(data,&retired)==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
-                       !retired.live&&retired.allocation_generation==lease.allocation_generation,"exact generator SDK data retired");
+  MeleeWebSourceMemoryReadStatus retired_status=melee_web_source_memory_allocation_read(data,&retired);
+  printf("STADIUM_GENERATOR_RETIRE lifetime=%u status=%d before_generation=%llu after_generation=%llu after_requested=%u after_live=%u world=%llu heap=%d\n",
+         lifetime,(int)retired_status,(unsigned long long)lease.allocation_generation,
+         (unsigned long long)retired.allocation_generation,retired.requested_bytes,retired.live,
+         (unsigned long long)retired.world_generation,retired.source_heap_handle);fflush(stdout);
+  queue_control_require(retired_status==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+                       !retired.live&&!retired.requested_bytes&&!retired.allocation_generation&&
+                       retired.world_generation==lease.world_generation&&
+                       retired.source_heap_handle==lease.source_heap_handle,"exact generator SDK data retired");
   queue_control_require(melee_web_stadium_zako_snapshot_read(after,size)&&memcmp(before,after,size)==0,"original private roots restored");
   MeleeWebGameplayStats current=melee_web_gameplay_stats();
   queue_control_require(current.heap_free_bytes==baseline.heap_free_bytes&&

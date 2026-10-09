@@ -257,12 +257,14 @@ int melee_web_stage_last_stadium_start(MeleeWebStageLast* h,
  if(!melee_web_stadium_generator_capture(h->stadium_generator,e,n)||
     !melee_web_match_camera_subject_preflight(camera_owner,h->stadium_subject,e,n))return 0;
  if(stage_info.x6A4)return fail(e,n,"Original Stadium OnStart did not drain the pending queue");
+ /* The established tracker erases freed records. A reused address instead
+  * has a live allocation newer than the context captured before OnStart. */
  for(size_t i=0;i<ARRAY_SIZE(headers);++i){
   MeleeWebSourceMemoryAllocation after;
   if(melee_web_source_memory_allocation_read(headers[i],&after)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
-     (after.allocation_generation==leases[i].allocation_generation&&after.live)||
-     after.allocation_generation<leases[i].allocation_generation||
-     after.world_generation!=context.world_generation||after.source_heap_handle!=context.source_heap_handle)
+     after.world_generation!=context.world_generation||after.source_heap_handle!=context.source_heap_handle||
+     (!after.live&&(after.requested_bytes||after.allocation_generation))||
+     (after.live&&after.allocation_generation<=context.allocation_generation_watermark))
    return fail(e,n,"Original Stadium OnStart did not retire its exact pending header lease");
  }
  h->stadium_started=2;return ok(e,n);
