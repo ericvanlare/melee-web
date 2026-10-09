@@ -337,6 +337,7 @@ class SdReferenceDiagnosticTests(unittest.TestCase):
                          "consumed": 0, "menu_consumed": count,
                          "slices": [{"tag": tag, "flags": 0, "address": 0x80001000,
                                      "hex": bytes(raw).hex()} for tag, raw in data]}})
+        add("menu", 0, [(40, b"\0")])
         add("menu_input", 1, [(3, pad)])
         flow = bytearray(0x18)
         flow[0] = 13
@@ -351,24 +352,63 @@ class SdReferenceDiagnosticTests(unittest.TestCase):
         with self.assertRaises(SdDiagnosticError): Receiver(make_input_plan(3)).accept(rows[0])
         variants = []
         missing = deepcopy(rows)
-        del missing[2]
+        del missing[3]
         variants.append(missing)
         for tag, changed in ((54, "00000101"), (46, "0001" + "00" * 6),
                              (45, "0d" + "00" * 3 + "01" + "00" * 19)):
             bad = deepcopy(rows)
-            next(s for s in bad[4]["payload"]["slices"] if s["tag"] == tag)["hex"] = changed
+            next(s for s in bad[5]["payload"]["slices"] if s["tag"] == tag)["hex"] = changed
             variants.append(bad)
         gameplay = deepcopy(rows)
-        gameplay[3] = events(2)[2]
+        gameplay[4] = events(2)[2]
         variants.append(gameplay)
         undeclared = deepcopy(rows)
-        undeclared[2]["payload"]["slices"][0]["hex"] = "0400" + pad[2:].hex()  # X
+        undeclared[3]["payload"]["slices"][0]["hex"] = "0400" + pad[2:].hex()  # X
         variants.append(undeclared)
         for bad in variants:
             for seq, row in enumerate(bad): row["seq"] = seq
             receiver = RulesMenuReceiver(make_input_plan(3))
             with self.assertRaises(SdDiagnosticError):
                 for row in bad: receiver.accept(row)
+
+    def test_pre_owner_menu_polls_have_exact_routing_counters_and_no_intent(self):
+        prefix = events(3)[:2]
+        prefix[0]["payload"]["menu_probe"] = "rules_ready"
+        poll = {"seq": 2, "event": "progress", "source_tick": 0,
+                "payload": {"diagnostic": SCOPE, "name": "menu", "pc": PCS["menu"],
+                            "consumed": 0, "menu_consumed": 0,
+                            "slices": [{"tag": 17, "flags": 0, "address": 0x80479d30,
+                                        "hex": "000000000000"}]}}
+        def receiver():
+            result = RulesMenuReceiver(make_input_plan(3))
+            for row in prefix: result.accept(row)
+            return result
+        good = receiver()
+        good.accept(poll)
+        self.assertEqual(good.pre_owner_polls, 1)
+        self.assertIsNone(good.latest_menu)
+        self.assertIsNone(good.last_pad)
+        self.assertFalse(good.scene_owner_seen or good.ready)
+        variants = []
+        for key, value in (("menu_consumed", 1), ("consumed", 1), ("consumed", False)):
+            bad = deepcopy(poll);bad["payload"][key] = value;variants.append(bad)
+        for tick in (1, False):
+            bad = deepcopy(poll);bad["source_tick"] = tick;variants.append(bad)
+        for data in ([], [{"tag": 17, "flags": 0, "address": 0x80479d30, "hex": "010000000000"}],
+                     poll["payload"]["slices"] + [{"tag": 54, "flags": 0,
+                                                   "address": 0x80001000, "hex": "01010101"}]):
+            bad = deepcopy(poll);bad["payload"]["slices"] = data;variants.append(bad)
+        for name in ("menu_input", "rules_ready"):
+            bad = deepcopy(poll);bad["payload"].update(name=name, pc=PCS[name]);variants.append(bad)
+        for bad in variants:
+            with self.assertRaises(SdDiagnosticError): receiver().accept(bad)
+        owned = deepcopy(poll)
+        owned["payload"]["slices"] = [{"tag": 40, "flags": 0, "address": 0x80001000, "hex": "00"}]
+        good = receiver();good.accept(owned)
+        missing = deepcopy(poll);missing["seq"] = 3
+        with self.assertRaisesRegex(SdDiagnosticError, "scene owner"): good.accept(missing)
+        capped = receiver();capped.menu_polls = 7199;capped.accept(poll)
+        with self.assertRaisesRegex(SdDiagnosticError, "cap"): capped.accept(missing)
 
     def accept(self, rows):
         receiver = Receiver(make_input_plan())
