@@ -961,7 +961,7 @@
         "sixth_ready_bound_files": 531,
         "deferred_control_owned_pid_absent": 19570
       },
-      "remaining": "Source-led display-owner teardown reduction with retained actualfullmatch/Ready state and priorzero-tick controls. Complete Session retirement, two3500post-GO lives, screen/stock-out/standings and original per-owner RNG ledger remain open.",
+      "remaining": "After two Ready attempts at displayteardown, reduce original SIS/HUD text-list lifecycle and live Stadium text roots with a smaller reproducer before another fullReady. No guard waiver. Complete Session retirement, two3500post-GO lives, screen/stock-out/standings and original per-owner RNG ledger remain open.",
       "c3_original_ledger_requirement": "Reuse existing RNG draw observer; C3 notes604-608 require per-tick/per-owner original comparison, separately from broader C8 transformation comparison.",
       "claim_boundary": "Native traced original HUD readiness after124source ticks observed; sixth run fails checked displayteardown. Synthetic marker/collision/deferred lifecycle controls pass. No checked fullSessionclose, postGOidle or C3pass.",
       "pad_input_reducer": {
@@ -1147,6 +1147,62 @@
       "sixth_result_review": {
         "artifact": "sol-ready-sixth-lifetime-review-v1.json",
         "sha256": "b69d119bd51ded838cdb781cb7bdc9a263391c0e71b63838f86547f366beb5b8"
+      },
+      "display_first_clause_diagnostic": {
+        "source": "8aa1e60af96d86f36bb69eaca0c2d5ccabcc670e",
+        "source_tree": "9c13d22dbb60bd93240bc51dbd9441822d10c15d",
+        "scope": "Read-only first-failed capture group/index or outer owner/data identity; original conditions, short-circuit evaluation and refusal behavior unchanged. No later predicate reevaluation for logging.",
+        "root_source_review": {
+          "artifact": "root-display-diagnostic-source-review-v1.json",
+          "sha256": "357618f3b6237e42d4063c46d836658cc5826ff4586934904ec95212dc7bb186"
+        },
+        "independent_source_review": {
+          "artifact": "sol-display-first-clause-source-review-v2.json",
+          "sha256": "3381a9ae0dd35ef2025d5b7a6ce4906ffb4a1431ea963570cf13ce6c1b1d622c"
+        },
+        "diagnostic_build": {
+          "artifact": "display-diagnostic-build-v1/result.json",
+          "sha256": "a0a38e021b4c62db625bdab1595c334cfa69cc66346c9b21a113a2b26d0c826d"
+        },
+        "diagnostic_build_log": {
+          "artifact": "display-diagnostic-build-v1/build.log",
+          "sha256": "f25d834d37a9a5416dfca8cc0de33c80cc577fc28a5b43a41576c9685c4aed97"
+        },
+        "producer": {
+          "artifact": "display-diagnostic-producer-8aa1e60a-v1/identity.json",
+          "sha256": "456ec6e3efb4becfbb8f70941a5f83efaaf1123c93720e8b78f537afb5814471"
+        },
+        "python_controls": {
+          "artifact": "root-display-diagnostic-python-controls-v1.log",
+          "sha256": "c97f38d1f7b1221059dc27a6c727c31849ceda8febb4afc22c039273b010db88"
+        },
+        "sdk_controls": {
+          "artifact": "root-display-diagnostic-controls-v1/result.json",
+          "sha256": "0ee043c366facf0837af71c0442b49459358859a6774ec1a10cf40f7bcbb9be0"
+        },
+        "validation": "Canonical diagnostic build PASS;6 Python boundary tests PASS,0skips; actual SDK profile/display-owner/map2/source-journal controls PASS including first-clause/index/no-mutation controls.",
+        "retained_source_draft_findings": "Before execution: original indexed negative used a null owned-text pointer and was masked by earlier topology check; private helper forward declaration missing. Finalv4 repairs both; drafts retained as source-only proposals."
+      },
+      "seventh_failed_run": {
+        "artifact": "root-ready-seventh-frozen-result-v1.json",
+        "sha256": "4976b90185f4443f63c2331cc60372805f3027b3c1cca82ff7fbea8760609b43"
+      },
+      "seventh_result_review": {
+        "artifact": "sol-ready-seventh-result-review-v1.json",
+        "sha256": "58fbd60891aff42b9ffedac04d6d7ee6cdc3d4ce7da212d27a583c42119f5abe"
+      },
+      "seventh_failure": "Original HUD Ready124; exactly one first capture rejection text-topology during close. World3/ticks124/29objects53processes retained after partialclose. Exact text node/list subpredicate unobserved; normal Session retirement not established.",
+      "seventh_observation_scope": {
+        "first_rejected_group": "text-topology",
+        "map2_journal": 1,
+        "map2_proc_dispatch": 124,
+        "map2_buffer_use": 0,
+        "map2_guard_evaluated": false,
+        "map2_counters_establish_cause": false,
+        "direct_bindings_unchanged": 583,
+        "fixtures_unchanged": 98,
+        "owned_children_natural_exit_reaped_absent": true,
+        "fixed_pre_OnStart_label_is_phase_evidence": false
       }
     }
   }

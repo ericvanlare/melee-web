@@ -6,7 +6,8 @@
 [zero-tick two-world lifecycle](#october-9-two-zero-tick-stadium-world-lifetimes)
 passed. The latest [source-session preparation attempts](#october-9-source-session-ready-preparation)
 now complete match construction and reach the original HUD Ready predicate at
-124 source ticks, then fail checked display teardown. The smaller input, marker
+124 source ticks, then fail the display owner’s text-list topology check during
+teardown. The smaller input, marker
 and collision controls pass; a complete lifetime and C3 remain unverified.
 
 The diagnostic-only Stadium profile and profile-to-`DatNativeMapContract`
@@ -418,8 +419,36 @@ The catch prints `pre_OnStart_close_unsupported=1` unconditionally, including
 this teardown failure; that field does not establish a pre-OnStart failure
 phase. This result observes original HUD readiness, not a checked full Session
 close, post-GO idle interval, second lifetime, or original RNG comparison.
-The next bounded step reduces the display-owner teardown contract using the
-retained full-match state and the prior zero-tick controls.
+The following diagnostic isolates that combined display-owner refusal while
+retaining the same full-match setup and prior zero-tick controls.
+
+The first-failure diagnostic at `8aa1e60a` preserves each existing guard,
+short-circuit order and refusal. It reports the first failed capture group or
+outer owner/data identity without evaluating later checks. Independent source
+review caught and corrected two proposed control defects before execution:
+a text-pointer fault masked the intended image-group negative, and a new helper
+call needed its declaration. Those source drafts remain retained. The canonical
+diagnostic build, six existing Python boundary tests and the actual SDK profile,
+display-owner, map-2 and source-journal controls pass. New fixture assertions
+check successful output clearing, earliest-clause and indexed-group reporting,
+null/wrong-current refusal, and unchanged owner/output/service counters.
+
+The seventh Ready attempt on `8aa1e60a` again reaches the original HUD Ready
+predicate at 124 source ticks, then stops during checked close. Exactly one
+rejection row names **`text-topology`** as the first failed capture group.
+It also observes map-2 journal count 1, proc-dispatch count 124 and buffer-use
+count 0. The later map-2 guard was not evaluated; those counters do not explain
+this first refusal. The exact text node or list subpredicate remains unobserved.
+Partial teardown retains world 3 at tick 124 with 29 objects and 53 processes.
+All 583 direct bindings and 98 fixtures match before documentation changes;
+the exact unittest and Node children exit naturally, are reaped and are absent.
+Independent review also verifies the build, focused controls and raw records.
+
+Two complete Ready attempts have now reached the teardown boundary. The next
+step is a smaller source/SIS text-lifecycle reproducer that distinguishes the
+captured list layout from live owned Stadium text roots, using the original
+HUD and close order. No further full Ready run follows until that reduction and
+its ownership contract are reviewed. No complete Session retirement is claimed.
 
 The existing RNG observer can be reused afterward, but the Stadium notes require
 C3's per-tick, per-owner ledger to be compared with the original. C8's broader
