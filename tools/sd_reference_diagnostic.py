@@ -25,6 +25,14 @@ def require(condition, message):
         raise SdDiagnosticError(message)
 
 
+def disabled_rumble_copy(persistent):
+    """Exact gm_LoadRumbleEnabled result for the validated unnamed, rumble-off profile."""
+    result = bytearray(persistent)
+    for slot in range(6):
+        result[0x60 + slot * 0x24 + 0xc] &= ~0x80
+    return result
+
+
 def slices(payload):
     require(set(payload) == {"diagnostic", "name", "consumed", "pc", "slices"}, "SD event fields differ")
     values = payload["slices"]
@@ -148,7 +156,7 @@ class Receiver:
             require(len(persistent) == 0x138, "SD persistent VS payload is missing")
             require(data.get((54, 0)) == b"\0" * 4,
                     "SD original profile requires all four port rumble settings disabled")
-            normalized = bytearray(persistent)
+            normalized = disabled_rumble_copy(persistent)
             normalized[2] |= 0x80
             normalized[4] |= 0x40
             for slot in range(6):
@@ -156,7 +164,6 @@ class Receiver:
                 if slot < 2:
                     require(persistent[base + 0xa] == 120,
                             "SD profile contract requires original unnamed human ports")
-                normalized[base + 0xc] &= ~0x80  # gm_LoadRumbleEnabled, exact owned bit
             require(bytes(normalized) == normal, "Normal VS setup differs from source rule normalization")
         if name == "vs_exit":
             raw = data.get((15, 0), b"")
@@ -176,7 +183,7 @@ class Receiver:
         if name == "sd_entry":
             persistent = self.records["vs_entry"][(4, 1)]
             require(data.get((4, 1)) == persistent, "SD persistent rules changed after normal VS")
-            expected = bytearray(persistent)
+            expected = disabled_rumble_copy(persistent)
             expected[0] &= ~2  # original gm_SetupSuddenDeath disables timer
             expected[2] &= ~4  # original x2_5
             for slot in range(2):
