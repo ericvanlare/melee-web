@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {spawnSync} from 'node:child_process';
-import {callbackSteps,validateFinalSdCapture,checkDeclaredPair,checkNeutralTimeout,checkMatchObservation,runBoundedSdDeparture,SD_BROWSER_LIMITS} from './vs_sudden_death_browser_route.mjs';
+import {callbackSteps,validateFinalSdCapture,checkDeclaredPair,checkNeutralTimeout,checkMatchObservation,runBoundedSdDeparture,SD_BROWSER_LIMITS,checkFreshOrdinaryEntry,runSubsequentOrdinaryEntry} from './vs_sudden_death_browser_route.mjs';
 const counter={status:'installed',invalid_phase_steps:0,invalid_preparation_count:0,
   unknown_reason_count:0,reason_counts:Array(10).fill(0),phase_source_steps:Array(16).fill(0)};
 function pair(sd=false){return {leg:sd?'sudden_death':'vs',observed_player_source_slots:[0,1],
@@ -14,6 +14,60 @@ function pair(sd=false){return {leg:sd?'sudden_death':'vs',observed_player_sourc
   players:[0,1].map(i=>({source_player_index:i,source_port:i,source_character:8,fighter:0,
     human:true,slot_type:0,source_stocks:sd?1:4,stocks:sd?1:4,
     source_initial_damage:sd?300:0,damage_percent:sd?300:0,source_color:i}))};}
+
+function freshPair(frame=1) {
+  const match=pair();delete match.prior_vs_terminal;
+  Object.assign(match,{prior_vs_source_frames:0,ready:true,paused:false,ending:false,
+    complete:false,outcome:0,frame});
+  match.players.forEach(player=>player.source_slot=0);
+  return match;
+}
+const freshState={phase:7,running:1,pause_present:true,pause_disabled:false,
+  error:null,diagnostics:'Completed matches: 1 · raw PAD: none'};
+test('fresh ordinary entry rejects retained SD, wrong identities/rules and non-ready owners',()=>{
+  const prior=freshPair();checkFreshOrdinaryEntry(freshState,freshPair(),prior);
+  for(const mutate of [m=>m.leg='sudden_death',m=>m.terminal={outcome:2,winners:[1]},
+    m=>m.prior_vs_terminal={outcome:1,winners:[0,1]},m=>m.prior_vs_source_frames=3600,
+    m=>m.players[1].source_port=0,m=>m.players[0].source_slot=1,
+    m=>m.players[1].source_color=0,m=>m.rules.is_vs=0,m=>m.rules.time_limit=480,
+    m=>m.players[0].stocks=1,m=>m.complete=true,m=>m.ending=true,m=>m.outcome=2]){
+    const bad=freshPair();mutate(bad);assert.throws(()=>checkFreshOrdinaryEntry(freshState,bad,prior));
+  }
+  for(const state of [{...freshState,pause_disabled:true},{...freshState,running:0},
+    {...freshState,phase:14},{...freshState,error:'fault'},
+    {...freshState,diagnostics:'Completed matches: 2 · raw PAD: none'}])
+    assert.throws(()=>checkFreshOrdinaryEntry(state,freshPair(),prior));
+});
+
+function subsequentFixture({badSelection=false,badDrain=false,noProgress=false,stepJump=false}={}) {
+  const calls=[];let phase=1,frame=0,steps=0;
+  const selection={source:{valid:true,scene:2,rules:{stock_count:4,stock_time_limit:1}},
+    start:{valid:true,stage:badSelection?31:32,match_kind:1,item_frequency:-1,
+      player_stocks:[4,4],players:[0,1].map(i=>({character_kind:8,slot_type:0,stocks:4,color:i}))
+        .concat([{slot_type:3},{slot_type:3}])}};
+  const report={suddenDeath:{},sourceObservations:[]};
+  return {calls,report,page:{evaluate:async()=>{calls.push('drive-FD');return 2;},
+      waitForTimeout:async()=>{}},press:async key=>{calls.push(key);phase=key==='Enter'?3:7;},
+    current:async()=>({...freshState,phase,message:phase===1?'Original character select':'source menu'}),
+    observeSource:async()=>selection,observeMatch:async()=>freshPair(noProgress?1:(frame+=6)),
+    checked:async()=>{steps+=stepJump&&phase===7?601:4;return steps;},
+    waitForNoQueuedPad:async()=>{calls.push('drain');if(badDrain)throw Error('PAD release rejected');},
+    shot:async label=>calls.push(label),prior:freshPair()};
+}
+test('subsequent tail uses original CSS/SSS inputs and a bounded advancing fresh VS prefix',async()=>{
+  const fixture=subsequentFixture();await runSubsequentOrdinaryEntry(fixture);
+  assert.deepEqual(fixture.calls,['Enter','drain','drive-FD','drain','sd-subsequent-sss-fd','j','sd-subsequent-ordinary-vs']);
+  const observations=fixture.report.suddenDeath.subsequentEntry.observations;
+  assert.equal(observations.length,2);assert.equal(observations[1].match.frame-observations[0].match.frame,12);
+  assert(observations[1].steps>observations[0].steps);
+});
+test('subsequent tail stops on source selection, PAD release, progress and callback cap failures',async()=>{
+  for(const options of [{badSelection:true},{badDrain:true},{noProgress:true},{stepJump:true}]){
+    const fixture=subsequentFixture(options);
+    await assert.rejects(runSubsequentOrdinaryEntry(fixture));
+    assert(!fixture.calls.includes('sd-subsequent-ordinary-vs'));
+  }
+});
 test('actual pair oracle separates original SD payload/live damage, slots and preserved flags',()=>{
   const prior=pair();checkDeclaredPair(prior,false);checkDeclaredPair(pair(true),true,prior);
   for(const mutate of [p=>p.players[1].damage_percent=0,p=>p.players[1].source_initial_damage=0,

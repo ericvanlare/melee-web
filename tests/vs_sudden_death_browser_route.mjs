@@ -10,6 +10,8 @@ import {returnFromCompetitivePrize} from './vs_rules_timeout_route_helpers.mjs';
 export const SD_BROWSER_LIMITS = Object.freeze({vsSteps:4800,vsWallMs:120000,
   readySteps:600,readyWallMs:20000,departureSteps:2400,departureWallMs:45000,
   departurePulses:96,holdMs:250,releaseMs:25});
+export const SD_SUBSEQUENT_LIMITS = Object.freeze({sssWallMs:20000,sssSamples:600,
+  readyWallMs:20000,readySteps:600,prefixWallMs:5000,prefixSteps:120,prefixFrames:12});
 export function callbackSteps(counters) {
   assert.equal(counters.status,'installed','Callback recorder must be installed');
   assert.equal(counters.invalid_phase_steps,0);
@@ -210,9 +212,102 @@ export async function runSuddenDeathBrowserRoute(d) {
   assert.equal(returned.source.scene,1);assert.equal(returned.source.rules.stock_count,4);
   assert.equal(returned.source.rules.stock_time_limit,1);
   report.sourceObservations.push({label:'SD original CSS return',...returned});
-  await shot('sd-returned-css');await driver.unload();
-  await verifyTeardown('SD CSS Eject');
-  report.checks.push('Original one-minute four-stock two-human Mario/FD timeout -> active 300-damage SD -> P1 live departure -> source P2 winner -> typed original Results -> CSS -> checked Eject');
+  await shot('sd-returned-css');
+  await runSubsequentOrdinaryEntry({page,report,press,current,observeSource,
+    observeMatch,checked,waitForNoQueuedPad,shot,prior});
+  await driver.unload();await verifyTeardown('SD subsequent VS Eject');
+  report.checks.push('Original one-minute four-stock two-human Mario/FD timeout -> active 300-damage SD -> P1 live departure -> source P2 winner -> typed original Results -> CSS -> SSS/FD -> fresh ordinary VS prefix -> checked Eject');
+}
+
+export function checkFreshOrdinaryEntry(state,match,prior) {
+  assert(!state.error,`Subsequent VS runtime error: ${state.error}`);
+  assert.equal(state.phase,7);assert.equal(state.running,1);
+  assert.equal(state.pause_present,true);assert.equal(state.pause_disabled,false);
+  checkDeclaredPair(match,false,prior);
+  assert.equal(match.ready,true);assert.equal(match.paused,false);
+  assert.equal(match.ending,false);assert.equal(match.complete,false);assert.equal(match.outcome,0);
+  assert.equal(match.prior_vs_source_frames,0);
+  assert.equal(match.terminal,undefined);assert.equal(match.prior_vs_terminal,undefined);
+  assert(match.frame>0);
+  match.players.forEach((player,i)=>assert.equal(player.source_slot,prior.players[i].source_slot));
+  assert.match(state.diagnostics,/Completed matches: 1(?: ·|$)/);
+}
+
+export async function runSubsequentOrdinaryEntry({page,report,press,current,
+  observeSource,observeMatch,checked,waitForNoQueuedPad,shot,prior}) {
+  const limits=SD_SUBSEQUENT_LIMITS;
+  const observations=[];
+  report.suddenDeath.subsequentEntry={limits,observations,
+    scope:'One fresh ordinary VS entry and short neutral prefix; no second completed match. Callback steps are distinct from active source frames.'};
+  const active=(state,phase)=>state.phase===phase&&state.running===1&&
+    state.pause_present===true&&state.pause_disabled===false;
+  const stageDeadline=Date.now()+limits.sssWallMs;
+  const stageCheck=async label=>{
+    const steps=await checked(label);
+    assert(Date.now()<stageDeadline,`${label}: returned CSS/SSS wall cap`);
+    return steps;
+  };
+  const returned=await current();await stageCheck('Subsequent CSS Start');
+  assert(active(returned,1));assert.equal(returned.message,'Original character select');
+  assert.match(returned.diagnostics,/Completed matches: 1(?: ·|$)/);
+  await press('Enter');
+  let state;
+  while(Date.now()<stageDeadline){
+    await stageCheck('Subsequent source SSS entry');state=await current();
+    if(active(state,3))break;
+    await page.waitForTimeout(50);
+  }
+  assert(active(state,3),'Subsequent SSS did not become active');
+  await waitForNoQueuedPad('Subsequent CSS Start released');
+  let stage=1;
+  for(let sample=0;sample<limits.sssSamples;sample++){
+    await stageCheck('Subsequent source FD selection');
+    stage=await page.evaluate(()=>Module._melee_web_native_menu_drive_stage(32));
+    assert(stage===1||stage===2,'Subsequent source FD selection rejected');
+    await waitForNoQueuedPad(`Subsequent SSS direction ${sample} released`);
+    await stageCheck('Subsequent FD PAD drain');
+    if(stage===2)break;
+  }
+  assert.equal(stage,2);
+  const selection=await observeSource();
+  assert.equal(selection.source.valid,true);assert.equal(selection.source.scene,2);
+  assert.equal(selection.source.rules.stock_count,4);
+  assert.equal(selection.source.rules.stock_time_limit,1);
+  assert.equal(selection.start.valid,true);assert.equal(selection.start.stage,32);
+  assert.equal(selection.start.match_kind,1);assert.equal(selection.start.item_frequency,-1);
+  assert.deepEqual(selection.start.player_stocks,[4,4]);
+  selection.start.players.slice(0,2).forEach((player,i)=>{
+    assert.equal(player.character_kind,8);assert.equal(player.slot_type,0);
+    assert.equal(player.stocks,4);assert.equal(player.color,prior.players[i].source_color);
+  });
+  assert(selection.start.players.slice(2).every(player=>player.slot_type===3));
+  report.sourceObservations.push({label:'Subsequent original SSS/normalized start',...selection});
+  await shot('sd-subsequent-sss-fd');
+  const readyStart=Date.now(),readySteps=await checked('Subsequent ordinary VS begins');
+  await press('j');
+  let first;
+  while(Date.now()-readyStart<=limits.readyWallMs){
+    const steps=await checked('Subsequent ordinary VS readiness');
+    assert(steps-readySteps<=limits.readySteps,'Subsequent VS readiness callback cap');
+    state=await current();const match=await observeMatch();checkMatchObservation(match);
+    if(active(state,7)&&match.ready&&match.frame>0){
+      checkFreshOrdinaryEntry(state,match,prior);first={state,match,steps};break;
+    }
+    await page.waitForTimeout(50);
+  }
+  assert(first,'Subsequent ordinary VS did not become ready');observations.push(first);
+  const prefixAt=Date.now();let final;
+  while(Date.now()-prefixAt<=limits.prefixWallMs){
+    const steps=await checked('Subsequent ordinary neutral prefix');
+    assert(steps-first.steps<=limits.prefixSteps,'Subsequent neutral prefix callback cap');
+    state=await current();const match=await observeMatch();checkFreshOrdinaryEntry(state,match,prior);
+    assert(match.frame>=first.match.frame,'Subsequent source cursor regressed');
+    final={state,match,steps};
+    if(match.frame-first.match.frame>=limits.prefixFrames)break;
+    await page.waitForTimeout(50);
+  }
+  assert(final&&final.match.frame-first.match.frame>=limits.prefixFrames,'Subsequent neutral source prefix did not advance');
+  observations.push(final);await shot('sd-subsequent-ordinary-vs');
 }
 
 export async function runBoundedSdDeparture({driver,report,checked,current,observeMatch,record}) {
