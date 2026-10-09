@@ -202,3 +202,13 @@ This route used a fresh isolated Everything-unlocked context and did not exercis
 Personal autosave or source GCI persistence. Item-family spawning, PCM/pixel
 equivalence, physical input, and performance remain outside its evidence. Host
 speaker output was muted while browser audio processing remained enabled.
+
+The corrected-head CI partitions at `0184d210` all passed, but the strict final
+inventory audit rejected 14 duplicate test IDs. Two helper `TestCase` classes
+were imported directly into the new competitive-entry test module and discovered
+a second time. Module-qualified imports preserve the same helpers and assertions
+while avoiding duplicate discovery; the aggregate guard is unchanged. The repair
+passes 33 focused checks and full discovery retains all 2,239 unique IDs with
+none added, missing or duplicated. The failed reports and independent review
+are retained in the existing receipt; complete CI on the repaired head remains
+required before merge.

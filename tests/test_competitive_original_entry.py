@@ -5,10 +5,11 @@ from pathlib import Path
 import struct
 import unittest
 
-from test_sd_items_lock import ItemsLockTests, menu_row
+import test_sd_items_lock as items_tests
+from test_sd_items_lock import menu_row
 from test_sd_gci_profile import ready_rows
 from test_sd_original_route import route_rows
-from test_sd_full_items import FullItemsTests
+import test_sd_full_items as full_items_tests
 from authored_sd_reference_plan import make_input_plan, recipe
 from sd_original_menu_plan import gci_competitive_entry_packet, validate_packet
 from sd_reference_diagnostic import GciRulesMenuReceiver, Receiver, CompetitiveItemsProgress, SdDiagnosticError
@@ -18,8 +19,8 @@ from reference_versus_sequence_capture import raw_pad
 
 
 class CompetitiveOriginalEntryTests(unittest.TestCase):
-    setUp = ItemsLockTests.setUp
-    pad = FullItemsTests.pad
+    setUp = items_tests.ItemsLockTests.setUp
+    pad = full_items_tests.FullItemsTests.pad
 
     def initial(self):
         r=GciRulesMenuReceiver(make_input_plan(6), self.profile, full_route=True,
@@ -112,7 +113,7 @@ class CompetitiveOriginalEntryTests(unittest.TestCase):
             r.accept(row)
             if name=='vs_setup':break
             if name=='menu' and any(s['tag']==55 for s in row['payload']['slices']):
-                FullItemsTests.confirm(self,r,row)
+                full_items_tests.FullItemsTests.confirm(self,r,row)
         r.accept(dict(seq=r.seq,event='end',source_tick=0,payload=dict(status='interrupted',natural=False)))
 
     def test_actual_entry_and_synthetic_complete_profile_prefix(self):
