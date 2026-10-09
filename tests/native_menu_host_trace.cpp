@@ -533,11 +533,13 @@ void run_sudden_death_host_control(
         check(input_ticks<4800&&prior.complete()&&prior.source_frames()>0&&
               prior.outcome(winner)==OUTCOME_TIMEOUT,
               "Neutral original VS did not reach its natural timeout boundary");
-        melee_web_pad_state_capture(natural_final_pad);vs_final_seed=prior.random_seed();
+        const auto* final_rng_owner=seed_ptr;
         const auto cursor=prior.source_frames();
         check(melee_web_match_rules_publish_result()&&
               melee_web_match_rules_terminal_data(&tied_timeout),
               "Natural timeout did not publish original terminal data");
+        check(seed_ptr==final_rng_owner,"Original terminal publication replaced RNG owner");
+        melee_web_pad_state_capture(natural_final_pad);vs_final_seed=prior.random_seed();
         check(tied_timeout.match_end.outcome==OUTCOME_TIMEOUT&&
               tied_timeout.match_end.match_kind==selection.start.rules.match_kind&&
               tied_timeout.match_end.n_winners==2&&
@@ -555,6 +557,8 @@ void run_sudden_death_host_control(
         std::cout<<"Natural neutral VS timeout: input ticks "<<input_ticks
                  <<", source cursor "<<cursor<<", final RNG "<<vs_final_seed<<'\n';
         prior.close();prior.close();
+        check(seed_ptr==final_rng_owner&&*seed_ptr==vs_final_seed,
+              "Natural VS close changed final source RNG owner or value");
         MatchExitInfo after_close{};
         check(melee_web_match_rules_terminal_data(&after_close)&&
               std::memcmp(&after_close,&tied_timeout,sizeof(after_close))==0,
@@ -4141,7 +4145,6 @@ int main(int argc,char** argv){try{
   if((retail_fd_recipe||results_mario_recipe)&&cycle==0)*seed_ptr=1840631306u;
   const GameRules pre_native_rules=*gmMainLib_GetGameRules();
   char error[256]{};auto* host=melee_web_menu_host_create(error,sizeof(error));check(host!=nullptr,error);
-  if(natural_sd_recipe)check(melee_web_menu_host_initialize_profile_baseline(host,error,sizeof(error)),error);
   if(natural_sd_recipe){
    GameRules rules=gmMainLib_803D4A48;rules.mode=1;rules.stock_count=4;rules.stock_time_limit=1;
    emit_native_bytes("stock_timer_fixture_initial_GameRules",&rules,sizeof(rules));
