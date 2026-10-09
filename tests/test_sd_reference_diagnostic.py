@@ -1,6 +1,8 @@
 """Portable prefix negative controls; synthetic unit data is not retail evidence."""
 from copy import deepcopy
 import importlib.util
+import configparser
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -17,7 +19,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from authored_sd_reference_plan import make_input_plan
 from sd_reference_diagnostic import Receiver, RulesMenuReceiver, SdDiagnosticError, SCOPE, PCS
 from sd_original_menu_plan import rules_ready_packet, matches
-from capture_sd_reference_prefix import cleanup_process, menu_actions, rules_dolphin_command, wait_terminal_statuses
+from capture_sd_reference_prefix import cleanup_process, menu_actions, prepare_rules_profile, rules_dolphin_command, run, wait_terminal_statuses
 from test_authored_sd_reference_plan import setup_bytes
 
 
@@ -98,6 +100,53 @@ def index(rows, name):
 
 
 class SdReferenceDiagnosticTests(unittest.TestCase):
+    def test_actual_pipe_then_inactive_port_update_preserves_frozen_copy_and_original(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            profile, user = base / "original", base / "owned"
+            config = profile / "Config"
+            config.mkdir(parents=True)
+            (config / "Dolphin.ini").write_text("[Core]\nSIDevice2 = 6\nSIDevice3 = 6\n[General]\nGDBSocket =\n")
+            (config / "GCPadNew.ini").write_text("[GCPad3]\nDevice = untouched\n")
+            before = {p.name: (p.read_bytes(), p.stat().st_mode & 0o777) for p in config.iterdir()}
+            p1, p2, inventory = prepare_rules_profile(profile, user)
+            self.assertTrue(p1.is_fifo() and p2.is_fifo())
+            ini = configparser.ConfigParser(interpolation=None)
+            ini.read(user / "Config/Dolphin.ini")
+            self.assertEqual([ini.get("Core", "SIDevice" + str(i)) for i in range(4)],
+                             ["6", "6", "0", "0"])
+            pad = configparser.ConfigParser(interpolation=None)
+            pad.read(user / "Config/GCPadNew.ini")
+            self.assertEqual(pad.get("GCPad1", "Device"), "Pipe/0/pad1")
+            self.assertEqual(pad.get("GCPad2", "Device"), "Pipe/0/pad2")
+            self.assertEqual(pad.get("GCPad3", "Device"), "untouched")
+            for name, (raw, mode) in before.items():
+                self.assertEqual((config / name).read_bytes(), raw)
+                self.assertEqual((config / name).stat().st_mode & 0o777, mode)
+                self.assertEqual(inventory["Config/" + name], hashlib.sha256(raw).hexdigest())
+                self.assertEqual((user / "Config" / name).stat().st_mode & 0o777, 0o400)
+
+    def test_prelaunch_profile_failure_is_retained_without_native_process(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            profile = base / "missing-config"
+            profile.mkdir()
+            plan, menu = base / "plan.json", base / "menu.json"
+            plan.write_text(json.dumps(make_input_plan(3)))
+            menu.write_text(json.dumps(rules_ready_packet()))
+            output = base / "failed-preparation"
+            with mock.patch("capture_sd_reference_prefix.validate_reference_build_manifest", return_value={}), \
+                 mock.patch("capture_sd_reference_prefix.subprocess.Popen") as launch:
+                with self.assertRaises(SdDiagnosticError):
+                    run(dolphin="unused", disc="unused", profile=profile, input_plan=plan,
+                        menu_recipe=menu, output=output, build_manifest="unit-manifest")
+                launch.assert_not_called()
+            failure = json.loads((output / "failure.json").read_text())
+            self.assertEqual(failure["scope"], "rules_ready")
+            self.assertEqual(failure["stage"], "prelaunch")
+            self.assertFalse(failure["native_launched"])
+            self.assertFalse((output / "cleanup.json").exists())
+
     def test_rules_launch_uses_explicit_headless_cold_boot_and_shared_speaker_mute(self):
         command = rules_dolphin_command("owned-dolphin", "owned-user", "owned-disc")
         self.assertEqual(command[command.index("-p") + 1], "headless")
