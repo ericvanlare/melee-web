@@ -2096,7 +2096,8 @@ struct Observer::Impl
         (!AddSlice(system, SliceTag::MenuMainFlow, 0x804a04f0, 0x18) ||
          !AddSlice(system, SliceTag::MenuMainInput, 0x804d6bc8, 8)))
       return false;
-    if (scene_kind == 1 && Env("MWRC_SD_MENU_PROBE") == "items_row")
+    if (scene_kind == 1 && (Env("MWRC_SD_MENU_PROBE") == "items_row" ||
+                            Env("MWRC_SD_MENU_PROBE") == "sd_prefix"))
     {
       u8 menu_kind = 0;
       if (!ReadBytes(system, 0x804a04f0, 1, &menu_kind))

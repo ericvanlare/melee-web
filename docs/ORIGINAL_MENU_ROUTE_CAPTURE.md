@@ -427,3 +427,17 @@ caps. The first copied neutral permanently closes this allowance. New A,
 unlocked A, another input or owner, and Up before lock0 are fatal. The runner
 still releases after first copied A and waits for copied neutral; no input is
 added or replaced and no queue is flushed. Entry samples remain reported.
+
+Full-prefix menu7 carries that same typed lock and entry drain through the
+existing recipe-five route. Its controller bytes and action order match
+historical menu5; Items frequency actions additionally require lock0. The
+receiver observes one Up to row31/value3, three separate Right pulses with
+source changes 3→2→1→0, then B and the original Rules owner. It rejects a
+frequency change without its declared pulse or leaving Items before commit.
+The original CSS/FD route and strict normalized VS/tied-timeout/SD payload
+checks remain; the stop is still SD setup, without resolution inputs. Tag56
+uses its existing verified byte reader for `sd_prefix` as well as the reduced
+`items_row` probe. The ed97 producer lacks the full-prefix tag scope and must
+be preserved; this source change needs a new compiled producer before capture.
+Actual reduced passing menu/PAD/lock fields are retained as a control; later
+frequency/CSS/tie/SD controls are explicitly synthetic, not original validation.

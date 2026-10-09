@@ -38,6 +38,8 @@ def validate_packet(value):
         return value
     if canonical(value) == canonical(gci_sd_prefix_packet()):
         return value
+    if canonical(value) == canonical(gci_sd_prefix_packet(7)):
+        return value
     if any(canonical(value) == canonical(gci_rules_ready_packet(version)) for version in (3, 4)):
         return value
     if canonical(value) != canonical(rules_ready_packet()):
@@ -71,15 +73,17 @@ def matches(state, predicate):
     return state is not None and all(state.get(key) == value for key, value in predicate.items())
 
 
-def gci_sd_prefix_packet():
+def gci_sd_prefix_packet(version=5):
     """Finite original-menu policy, authored before observing the new campaign.
 
     MenuFlow already exposes committed/pending values. CSS uses the existing
     source cursor/door/live-state slices. SSS needs its separate acceptance
     cooldown, not another cursor-coordinate reader. Every movement is capped.
     """
+    if type(version) is not int or version not in (5,7):
+        raise ValueError("Unsupported full SD menu packet version")
     value = gci_rules_ready_packet()
-    value.update(version=5, scope="sd_prefix_gci",
+    value.update(version=version, scope="sd_prefix_gci",
                  authored_recipe_sha256=recipe_sha256(recipe(5)))
     def state(kind, row, confirmed=None, entering=1):
         result = guard(kind, row, confirmed)
@@ -112,6 +116,13 @@ def gci_sd_prefix_packet():
         "column_x": 40, "column_polls": 18, "scan_y": 40,
         "max_scan_polls": 600, "confirm_requires_cooldown": 0}
     value["stop"] = "observed sd_setup; interrupted primary with complete native MWRI"
+    if version == 7:
+        for action in value["actions"]:
+            if action["label"].startswith("items-frequency-"):
+                action["before"]["items_locked"] = 0
+                action["after"]["items_locked"] = 0
+            if action["label"] == "commit-items-none":
+                action["before"]["items_locked"] = 0
     return value
 
 
