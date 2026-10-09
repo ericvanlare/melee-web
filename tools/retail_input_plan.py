@@ -344,7 +344,7 @@ def verify_entry(plan, start_hex):
         # Reuse the checked ordinary-VS setup decoder rather than inventing a
         # second packed-bit interpretation or accepting only a matchup subset.
         from retail_setup_validation import _decode_setup
-        actual = _decode_setup(start_hex)
+        actual = _decode_setup(start_hex, competitive_profile=plan['authored_recipe']['version'] == 6)
         raw = bytes.fromhex(start_hex)
         if any(raw[0x61 + slot * 0x24] != 3 for slot in range(2, 6)):
             raise ValueError('Authored setup requires all inactive source slots to be NA')

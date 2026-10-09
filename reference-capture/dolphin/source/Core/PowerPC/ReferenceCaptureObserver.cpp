@@ -902,6 +902,7 @@ struct Observer::Impl
     if (!Env("MWRC_SD_PROFILE_GCI_SHA256").empty() &&
         (!SdInitRequested() || (Env("MWRC_SD_MENU_PROBE") != "rules_ready" &&
                               Env("MWRC_SD_MENU_PROBE") != "sd_prefix" &&
+                              Env("MWRC_SD_MENU_PROBE") != "competitive_entry" &&
                               Env("MWRC_SD_MENU_PROBE") != "items_row") ||
          Env("MWRC_SD_PROFILE_GCI_SHA256") !=
              "5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729"))
@@ -919,8 +920,10 @@ struct Observer::Impl
           !Env("MWRC_CPU_PROBE_OUTPUT").empty() || !Env("MWRC_ITEM_PROBE_OUTPUT").empty() ||
           !Env("MWRC_ALLOCATION_OUTPUT").empty() ||
           (!Env("MWRC_SD_MENU_PROBE").empty() && Env("MWRC_SD_MENU_PROBE") != "rules_ready" &&
-           Env("MWRC_SD_MENU_PROBE") != "sd_prefix" && Env("MWRC_SD_MENU_PROBE") != "items_row") ||
-          ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "items_row") && Env("MWRC_SD_PROFILE_GCI_SHA256").empty()))
+           Env("MWRC_SD_MENU_PROBE") != "sd_prefix" && Env("MWRC_SD_MENU_PROBE") != "items_row" &&
+           Env("MWRC_SD_MENU_PROBE") != "competitive_entry") ||
+          ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "items_row" ||
+            Env("MWRC_SD_MENU_PROBE") == "competitive_entry") && Env("MWRC_SD_PROFILE_GCI_SHA256").empty()))
       {
         SetInvalid("SD prefix requires a recipe hash, native input recording and exclusive scope");
         return false;
@@ -2097,7 +2100,8 @@ struct Observer::Impl
          !AddSlice(system, SliceTag::MenuMainInput, 0x804d6bc8, 8)))
       return false;
     if (scene_kind == 1 && (Env("MWRC_SD_MENU_PROBE") == "items_row" ||
-                            Env("MWRC_SD_MENU_PROBE") == "sd_prefix"))
+                            Env("MWRC_SD_MENU_PROBE") == "sd_prefix" ||
+                            Env("MWRC_SD_MENU_PROBE") == "competitive_entry"))
     {
       u8 menu_kind = 0;
       if (!ReadBytes(system, 0x804a04f0, 1, &menu_kind))
@@ -2127,7 +2131,7 @@ struct Observer::Impl
     // Menu globals retain pointers after their scene arena is reclaimed.
     // Observe each steering owner only in its live source menu scene.
     u8 stage_index = 0;
-    if (scene_kind == 9 && Env("MWRC_SD_MENU_PROBE") == "sd_prefix")
+    if (scene_kind == 9 && (Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry"))
     {
       if (!sd_sss_ready)
         return true;
@@ -2410,7 +2414,7 @@ struct Observer::Impl
       return SetInvalid("SD prefix source counter is invalid"), void();
     raw_size = 0;
     slice_count = 0;
-    if (Env("MWRC_SD_MENU_PROBE") == "sd_prefix" &&
+    if ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry") &&
         (pc == 0x8025a998 || pc == 0x8025b84c))
     {
       u32 word = 0;
@@ -2515,6 +2519,8 @@ struct Observer::Impl
     if (pc == 0x8016e934 || pc == 0x8016ebc0)
     {
       const bool sudden = pc == 0x8016ebc0;
+      if (sudden && Env("MWRC_SD_MENU_PROBE") == "competitive_entry")
+        return SetInvalid("Competitive profile entry cannot admit SD"), void();
       u32 word = 0, root = 0, scene = 0;
       std::array<u8, 6> route{};
       if (!ReadU32(system, pc, &word) || word != 0x7c0802a6 ||
@@ -2542,6 +2548,9 @@ struct Observer::Impl
           !AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358) || !AddProfileSlices(system) ||
           !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6) || !AddSceneKindSlice(system))
         return SetInvalid("SD prefix setup/persistent VS payload is invalid"), void();
+      if (Env("MWRC_SD_MENU_PROBE") == "competitive_entry" &&
+          !AddSlice(system, SliceTag::ProfileSaveData, root + PROFILE_SAVE_DATA_OFFSET, PROFILE_SAVE_DATA_SIZE))
+        return SetInvalid("Competitive committed item preferences are missing"), void();
       u32 rng = 0;
       if (!ReadU32(system, 0x804d5f94, &rng) || !rng ||
           !AddSlice(system, SliceTag::RngPointer, 0x804d5f94, 4) ||
@@ -2599,7 +2608,8 @@ struct Observer::Impl
       if (!sudden && sd_init.phase == SdInitState::Phase::Menu) return;
       u32 word = 0;
       if (!ReadU32(system, pc, &word) || word != 0x4e800020 ||
-          !fighter_present[0] || !fighter_present[1] || !sd_init.Ready(sudden) ||
+          !fighter_present[0] || !fighter_present[1] ||
+          !sd_init.Ready(sudden, Env("MWRC_SD_MENU_PROBE") == "competitive_entry") ||
           !AddSlice(system, SliceTag::MatchSetup, sd_init.setup_pointer, 0x138))
         return SetInvalid("SD prefix setup return lacks its retained entry owner"), void();
       for (u32 slot = 0; slot < 2; ++slot)
@@ -2608,7 +2618,7 @@ struct Observer::Impl
             !AddSlice(system, SliceTag::FighterStocks, 0x80453080 + slot * 0xe90 + 0x8e, 1, slot))
           return SetInvalid("SD prefix initialized fighter snapshot is invalid"), void();
       SdEvent(sudden ? "sd_setup" : "vs_setup", pc, tick);
-      if (sudden)
+      if (sudden || Env("MWRC_SD_MENU_PROBE") == "competitive_entry")
       {
         // The native input footer completes THIS declared prefix. The primary
         // observer remains interrupted, never a successful match/scene teardown.
@@ -4171,7 +4181,7 @@ static bool IsCaptureBoundary(u32 guest_pc)
     // opt-in companion configuration.  The normal observer boundary set and
     // its disabled path remain unchanged.
     return (SdInitRequested() && (guest_pc == 0x8016ebc0 || guest_pc == 0x8016ec24 ||
-            (Env("MWRC_SD_MENU_PROBE") == "sd_prefix" && guest_pc == 0x8025b84c))) ||
+            ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry") && guest_pc == 0x8025b84c))) ||
            (CpuProbeEnabled() && FindCpuProbePoint(guest_pc) != nullptr &&
             (CpuProbeEnvironment().rng_return_pc == 0 ||
              CpuProbeEnvironment().rng_return_pc == guest_pc)) ||

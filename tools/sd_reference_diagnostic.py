@@ -75,9 +75,13 @@ def slices(payload):
 
 class Receiver:
     """Consume every event in order; original phase decisions remain observed outputs."""
-    def __init__(self, plan):
+    def __init__(self, plan, *, competitive_entry=False):
         validate_plan(plan)
         require(plan["version"] == AUTHORED_PLAN_VERSION, "SD receiver requires authored v4")
+        require((plan["authored_recipe"]["version"] == 6) == competitive_entry,
+                "Competitive entry requires its separate explicit receiver scope")
+        self.competitive_entry = competitive_entry
+        self.phase_order = ("vs_entry", "vs_setup") if competitive_entry else ORDER
         self.plan = plan
         self.seq = 0
         self.order = 0
@@ -120,7 +124,7 @@ class Receiver:
             return
         require(self.started, "SD event preceded its start")
         if event == "end":
-            require(self.order == len(ORDER) and payload == {"status": "interrupted", "natural": False},
+            require(self.order == len(self.phase_order) and payload == {"status": "interrupted", "natural": False},
                     "SD prefix must end interrupted after SD setup, never legacy completion")
             require(self.consumed > 0, "SD prefix consumed no source input")
             self.ended = True
@@ -138,7 +142,7 @@ class Receiver:
                     "SD menu input escaped preparation")
             return
         if name == "input":
-            require(0 < self.order < len(ORDER), "SD input escaped declared prefix")
+            require(0 < self.order < len(self.phase_order), "SD input escaped declared prefix")
             raw = data.get((3, 0), b"")
             require(len(raw) == 0x30 and payload["consumed"] == self.consumed + 1,
                     "SD consumed sample is missing or repeated")
@@ -147,6 +151,7 @@ class Receiver:
             return
         require(payload["consumed"] == self.consumed, "SD event skipped consumed input")
         if name == "tick":
+            require(not self.competitive_entry, "Competitive profile prefix admitted active gameplay")
             require(self.order == 2, "SD tick escaped declared VS active scene")
             current = row["source_tick"]
             require(type(current) is int and current == self.tick_count,
@@ -166,7 +171,7 @@ class Receiver:
             self.tick_consumed = self.consumed
             self.last_clock_frame = frame
             return
-        require(self.order < len(ORDER) and name == ORDER[self.order], "SD phase order differs")
+        require(self.order < len(self.phase_order) and name == self.phase_order[self.order], "SD phase order differs")
         self.order += 1
         self.records[name] = data
         if name in ("vs_entry", "sd_entry"):
@@ -184,7 +189,7 @@ class Receiver:
             require(data.get((54, 0)) == preferences,
                     "SD original profile port rumble preferences differ from declared recipe")
             normalized = (profile_rumble_copy(persistent, preferences) if
-                          self.plan["authored_recipe"]["version"] == 5 else disabled_rumble_copy(persistent))
+                          self.plan["authored_recipe"]["version"] >= 5 else disabled_rumble_copy(persistent))
             normalized[2] |= 0x80
             normalized[4] |= 0x40
             for slot in range(6):
@@ -207,6 +212,15 @@ class Receiver:
                                            for slot, raw in enumerate(raw_slots)],
                 "human_nametags": [persistent[0x6a + slot * 0x24] for slot in range(2)],
             }
+        if self.competitive_entry and name == "vs_setup":
+            # Ordinary VS initialization has no SD-only rules.x6=true write.
+            require(data.get((4, 0)) == self.records["vs_entry"][(4, 0)],
+                    "Competitive setup-return payload differs")
+            for slot in range(2):
+                head = data.get((5, slot), b"")
+                require(len(head) == 0x100 and head[12] == slot and head[4:8] == b"\0"*4 and
+                        data.get((8, slot)) == b"\4" and data.get((7, slot)) == struct.pack(">f",0),
+                        "Competitive initialized fighter identity/stocks/damage differ")
         if name == "vs_exit":
             raw = data.get((15, 0), b"")
             require(len(raw) == 0x448 and raw[4:7] == bytes((1, 1, 0)) and raw[0xd] == 2,
@@ -288,6 +302,89 @@ def items_lock_state(data, payload, state):
     return state
 
 
+class CompetitiveItemsProgress:
+    """Exact authored two-column switch traversal, isolated from historical SD policy.
+
+    A pending source transition belongs to one observed rising PAD bank. Held
+    copies can drain, but cannot authorize a second transition. No value or row
+    is reconstructed when a callback observation is missing.
+    """
+    def __init__(self):
+        self.rows = list(range(16)) + list(range(30,15,-1))
+        self.index = 0
+        self.current = None
+        self.pending = None
+        self.bank = None
+        self.inventory = []
+        self.off = set()
+        self.frequency_rights = 0
+        self.commit_seen = False
+
+    def observe(self, state, seq):
+        require(state["entering"] == 1 and state["items_locked"] == 0 and
+                state["row"] in self.rows + [32], "Competitive Items owner/lock/row differs")
+        observed = (state["row"], state["value"])
+        require(state["value"] in ((0,1,2,3) if state["row"] == 32 else (0,1)),
+                "Competitive Items value differs")
+        if self.current is None:
+            require(observed[0] == 0, "Competitive Items first row differs")
+        elif observed != self.current:
+            require(self.pending is not None and observed[0] == self.pending[0] and
+                    (self.pending[1] is None or observed[1] == self.pending[1]),
+                    "Competitive Items changed without its declared PAD transition")
+            if observed[0] != self.current[0]:
+                self.index += 1
+            self.pending = None
+        self.current = observed
+        self.inventory.append({"seq":seq,"row":observed[0],"value":observed[1]})
+        if observed[0] != 32 and observed[1] == 0:
+            self.off.add(observed[0])
+
+    def input(self, state, pad, previous):
+        from retail_input_plan import NEUTRAL_PAD
+        from reference_versus_sequence_capture import raw_pad
+        neutral = [NEUTRAL_PAD]*2
+        if pad == neutral:
+            self.bank = None
+            return
+        require(self.current == (state["row"],state["value"]),
+                "Competitive Items input lacks an observed current row")
+        require(state["cooldown"] == 0 and state["items_locked"] == 0 and not self.commit_seen,
+                "Competitive Items input lacks unlocked ready owner")
+        if pad == previous:
+            require(self.bank == pad, "Competitive Items held bank is undeclared")
+            return
+        require(previous == neutral and self.pending is None, "Competitive Items pulse lacks neutral/settled predecessor")
+        row,value = self.current
+        target = None
+        if pad == [raw_pad(buttons=["A"]),NEUTRAL_PAD]:
+            require(row != 32 and value == 1, "Competitive Items A requires an observed on switch")
+            target = (row,0)
+        elif row == 32:
+            if pad == [raw_pad(buttons=["D_RIGHT"]),NEUTRAL_PAD]:
+                require(value > 0 and self.frequency_rights < 3, "Competitive Items frequency cannot wrap")
+                self.frequency_rights += 1
+                target = (32,value-1)
+            else:
+                require(pad == [raw_pad(buttons=["B"]),NEUTRAL_PAD] and value == 0 and self.frequency_rights == 3 and
+                        self.off == set(range(31)), "Competitive Items commit lacks every observed off switch/None")
+                self.commit_seen = True
+        else:
+            require(value == 0 and row == self.rows[self.index], "Competitive Items navigation preceded off verification")
+            button = "D_DOWN" if row < 15 else "D_RIGHT" if row == 15 else "D_UP"
+            require(pad == [raw_pad(buttons=[button]),NEUTRAL_PAD], "Competitive Items source two-column direction differs")
+            next_row = self.rows[self.index+1] if self.index+1 < len(self.rows) else 32
+            target = (next_row,3 if next_row == 32 else None)
+        self.pending = target
+        self.bank = pad
+
+    def commit(self, state):
+        require(self.commit_seen and self.pending is None and self.current == (32,0) and
+                self.off == set(range(31)) and state ==
+                {"scene":1,"kind":13,"row":5,"value":0,"entering":0,"cooldown":0},
+                "Competitive Items owner left before strict committed profile")
+
+
 class RulesMenuReceiver(Receiver):
     """Reduced Rules probe; unowned routing is observation, never scene admission.
 
@@ -295,14 +392,17 @@ class RulesMenuReceiver(Receiver):
     omits it on a failed pointer read. No steering or readiness precedes an owner.
     """
     def __init__(self, plan, *, profile_campaign=False, full_route=False, items_probe=False,
-                 guarded_items=False):
-        super().__init__(plan)
-        require(plan["authored_recipe"]["version"] == (5 if full_route else 4 if profile_campaign else 3),
+                 guarded_items=False, competitive_entry=False):
+        super().__init__(plan, competitive_entry=competitive_entry)
+        require(plan["authored_recipe"]["version"] == (6 if competitive_entry else 5 if full_route else 4 if profile_campaign else 3),
                 "Rules probe recipe/profile campaign differs")
         self.full_route = full_route
         self.items_probe = items_probe
         self.guarded_items = guarded_items
         self.items_guard = items_probe or guarded_items
+        require(not competitive_entry or (profile_campaign and full_route and guarded_items and not items_probe),
+                "Competitive entry scope must own the full guarded original menu")
+        self.competitive_items = CompetitiveItemsProgress() if competitive_entry else None
         require(not guarded_items or (full_route and not items_probe), "Guarded full Items scope differs")
         self.items_ready = False
         self.items_up_seen = False
@@ -339,6 +439,9 @@ class RulesMenuReceiver(Receiver):
         if full_route:
             from sd_original_menu_plan import gci_sd_prefix_packet, route_pads
             packet = gci_sd_prefix_packet(7 if guarded_items else 5)
+            if competitive_entry:
+                from sd_original_menu_plan import gci_competitive_entry_packet
+                packet = gci_competitive_entry_packet()
             if items_probe:
                 from sd_original_menu_plan import gci_items_row_packet
                 packet = gci_items_row_packet()
@@ -354,7 +457,7 @@ class RulesMenuReceiver(Receiver):
     def accept(self, row):
         event, payload = row["event"], row["payload"]
         if event == "handshake":
-            require(payload.get("menu_probe") == ("items_row" if self.items_probe else "sd_prefix" if self.full_route else "rules_ready"),
+            require(payload.get("menu_probe") == ("competitive_entry" if self.competitive_entry else "items_row" if self.items_probe else "sd_prefix" if self.full_route else "rules_ready"),
                     "Rules probe scope differs")
             require(payload.get("profile_gci_sha256", "") == getattr(self, "profile_sha256", ""),
                     "Rules probe loaded-profile identity differs")
@@ -448,6 +551,11 @@ class RulesMenuReceiver(Receiver):
                 back = [raw_pad(buttons=["B"]), NEUTRAL_PAD]
                 opening = [raw_pad(buttons=["A"]), NEUTRAL_PAD]
                 if self.last_pad[:2] == opening:
+                    if self.competitive_entry and self.items_entry_drain_closed:
+                        require(previous_pad is not None, "Competitive Items A preceded its observed entry PAD")
+                        self.competitive_items.input(self.latest_menu, self.last_pad[:2], previous_pad[:2])
+                        self.menu_consumed = count
+                        return
                     require(self.items_entry_drain and not self.items_entry_drain_closed and
                             self.latest_menu.get("items_locked") == 1 and
                             previous_pad == self.last_pad and
@@ -456,7 +564,9 @@ class RulesMenuReceiver(Receiver):
                     self.items_entry_drain_samples.append({"seq":row["seq"], "menu_consumed":count})
                     self.menu_consumed = count
                     return
-                allowed = ([NEUTRAL_PAD]*2, up, right, back) if self.guarded_items else ([NEUTRAL_PAD]*2, up)
+                allowed = ([NEUTRAL_PAD]*2, up, right, back,
+                           [raw_pad(buttons=["D_DOWN"]),NEUTRAL_PAD]) if self.competitive_entry else (
+                           ([NEUTRAL_PAD]*2, up, right, back) if self.guarded_items else ([NEUTRAL_PAD]*2, up))
                 require(self.last_pad[:2] in allowed, "Items consumed undeclared continuation")
                 if self.items_entry_drain:
                     require(self.last_pad[:2] == [NEUTRAL_PAD]*2,
@@ -468,6 +578,12 @@ class RulesMenuReceiver(Receiver):
                         self.last_pad[:2] == [NEUTRAL_PAD] * 2,
                         "Items input consumed while locked")
                 require(previous_pad is not None, "Items input preceded its observed entry PAD")
+                if self.competitive_entry:
+                    if self.competitive_items.current is None and self.latest_menu["items_locked"] == 0:
+                        self.competitive_items.observe(self.latest_menu, row["seq"])
+                    self.competitive_items.input(self.latest_menu, self.last_pad[:2], previous_pad[:2])
+                    self.menu_consumed = count
+                    return
                 if self.guarded_items and self.last_pad[:2] == right:
                     require(self.items_up_seen and self.latest_menu["row"] == 31 and
                             self.items_frequency is not None and not self.items_commit_seen,
@@ -513,7 +629,18 @@ class RulesMenuReceiver(Receiver):
                             "Items locked entry lacks its declared opening A")
                     self.items_entry_drain = True
                     self.items_entry_drain_start = self.menu_polls
-            if self.guarded_items:
+            if self.competitive_entry:
+                if self.latest_menu.get("kind") == 16 and self.items_entry_drain_closed:
+                    if self.latest_menu["items_locked"] == 1 and self.competitive_items.current is None:
+                        require(self.latest_menu["row"] == 0 and self.latest_menu["value"] == 1 and
+                                self.latest_menu["entering"] == 1,
+                                "Competitive Items locked initial owner differs")
+                    else:
+                        self.competitive_items.observe(self.latest_menu, row["seq"])
+                elif previous_menu is not None and previous_menu.get("kind") == 16 and self.latest_menu.get("kind") != 16:
+                    self.competitive_items.commit(self.latest_menu)
+                    self.items_committed = True
+            elif self.guarded_items:
                 owner = self.latest_menu.get("scene") == 1 and self.latest_menu.get("kind") == 16
                 if owner:
                     require(not self.items_committed and self.latest_menu["row"] in (0,31),
@@ -629,7 +756,8 @@ class RulesMenuReceiver(Receiver):
 
 class GciRulesMenuReceiver(RulesMenuReceiver):
     """New profile campaign, with observed loaded fields at the reduced ready gate."""
-    def __init__(self, plan, profile, *, full_route=False, items_probe=False, guarded_items=False):
+    def __init__(self, plan, profile, *, full_route=False, items_probe=False, guarded_items=False,
+                 competitive_entry=False):
         import hashlib
         from sd_gci_profile import GCI_SHA256
         require(profile["sha256"] == GCI_SHA256 and
@@ -639,9 +767,27 @@ class GciRulesMenuReceiver(RulesMenuReceiver):
         self.profile = profile
         self.loaded_context = None
         super().__init__(plan, profile_campaign=True, full_route=full_route, items_probe=items_probe,
-                         guarded_items=guarded_items)
+                         guarded_items=guarded_items, competitive_entry=competitive_entry)
 
     def accept(self, row):
+        if self.competitive_entry and row["payload"].get("name") == "vs_entry":
+            data = slices(row["payload"])
+            rules = data.get((38,0), b"")
+            fields = {"mode":2,"stock_count":4,"handicap":5,"damage_ratio":6,
+                      "stock_time_limit":8,"friendly_fire":9,"pause":10}
+            address = next((s["address"] for s in row["payload"]["slices"] if s["tag"] == 38 and s["flags"] == 0),None)
+            require(self.loaded_context is not None and len(rules) == 0x18 and
+                    address == self.loaded_context["save_address"] - 0x18 and
+                    {key:rules[offset] for key,offset in fields.items()} == self.plan["authored_recipe"]["expected_game_rules"],
+                    "Competitive committed GameRules differ")
+            save = data.get((39,0), b"")
+            save_address = next((s["address"] for s in row["payload"]["slices"] if s["tag"] == 39 and s["flags"] == 0),None)
+            expected = bytearray(self.profile["save"][0x448:0x468])
+            expected[0] = 0xff  # mnItemSw_CommitItems: x21 - 1
+            expected[8:16] = bytes.fromhex(self.plan["authored_recipe"]["expected_item_preference_mask_hex"])
+            require(len(save) == 0x55e8 and save_address == self.loaded_context["save_address"] and
+                    save[0x448:0x468] == bytes(expected), "Competitive committed item preference bytes differ")
+            self.committed_game_rules = rules.hex()
         if row["event"] == "progress" and row["payload"].get("name") == "rules_ready":
             import hashlib
             from sd_gci_profile import SAVE_BYTES, BANK_BYTES
@@ -690,6 +836,15 @@ class GciRulesMenuReceiver(RulesMenuReceiver):
                           sss_confirmation_countdown=self.sss_countdown_inventory,
                           sss_confirmation_neutral=self.sss_confirmation_neutral,
                           sss_retirement_observations=self.sss_retirement_inventory)
+        if self.competitive_entry:
+            report.update(schema="melee-web-original-competitive-profile-entry",scope="competitive_entry_gci",
+                menu_version=8, committed_game_rules_hex=self.committed_game_rules,
+                item_rows_observed=self.competitive_items.inventory,
+                items_frequency_right_pulses=self.competitive_items.frequency_rights,
+                compared_setup=self.plan["authored_recipe"]["expected_setup"],
+                natural_timeout_admission=False, results_css_admission=False,
+                source_inventory={"vs":{"count":0,"scope":"setup-before-loop"}},
+                full_sd_prefix_admission=False)
         return report
 
 

@@ -1,6 +1,7 @@
 """Actual initial NA inventory; later source autojoin remains synthetic."""
 from copy import deepcopy
 import json
+import hashlib
 from pathlib import Path
 from types import SimpleNamespace
 import unittest
@@ -12,9 +13,27 @@ from sd_reference_diagnostic import css_state, slices, SdDiagnosticError
 from retail_input_plan import NEUTRAL_PAD
 
 
-def actual_css():
+def actual_css_row():
     fixture=json.loads((Path(__file__).parent/'fixtures/sd-css-initial-na-order.json').read_text())
-    return css_state(slices(fixture['rows'][0]['payload']))
+    row=deepcopy(fixture['rows'][0])
+    owner=next(s for s in row['payload']['slices'] if s['tag']==48 and s['flags']==0)
+    css=owner.pop('css_data')
+    prefix=bytes.fromhex(css['prefix_hex'])
+    players=css['players']
+    if len(prefix)!=0x70 or [p['index'] for p in players]!=list(range(6)):
+        raise ValueError('Actual CSSData fixture structure differs')
+    data=[bytes.fromhex(p['player_init_hex']) for p in players]
+    if any(len(p)!=0x24 for p in data):
+        raise ValueError('Actual PlayerInitData fixture extent differs')
+    owner['hex']=(prefix+b''.join(data)).hex()
+    digest=hashlib.sha256(json.dumps(row,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+    if digest!=fixture['row_sha256']:
+        raise ValueError('Actual CSS row bytes/source identity changed')
+    return row
+
+
+def actual_css():
+    return css_state(slices(actual_css_row()['payload']))
 
 
 class CssJoinTests(unittest.TestCase):
@@ -96,10 +115,9 @@ class CssJoinTests(unittest.TestCase):
         with self.assertRaises(SdDiagnosticError):self.driver(css=css)
 
     def test_missing_cursor_or_model_extent_rejects_before_driver(self):
-        fixture=json.loads((Path(__file__).parent/'fixtures/sd-css-initial-na-order.json').read_text())
         for tag in (43,47,48):
             with self.subTest(tag=tag):
-                row=deepcopy(fixture['rows'][0])
+                row=actual_css_row()
                 field=next(s for s in row['payload']['slices'] if s['tag']==tag and s['flags']==0)
                 field['hex']=field['hex'][:-2]
                 with self.assertRaises(SdDiagnosticError):css_state(slices(row['payload']))

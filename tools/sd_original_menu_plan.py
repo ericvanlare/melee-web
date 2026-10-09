@@ -34,6 +34,8 @@ def rules_ready_packet():
 def validate_packet(value):
     # Only this reduced route is supported. No guessed/default continuation.
     from authored_sd_reference_plan import canonical
+    if canonical(value) == canonical(gci_competitive_entry_packet()):
+        return value
     if canonical(value) == canonical(gci_items_row_packet()):
         return value
     if canonical(value) == canonical(gci_sd_prefix_packet()):
@@ -159,4 +161,61 @@ def gci_items_row_packet():
     value.pop("css")
     value.pop("sss")
     value["stop"] = dict(action["after"])
+    return value
+
+
+def gci_competitive_entry_packet():
+    """Original two-column Items path; each switch is observed, never inferred.
+
+    mnItemSw_80233B68: Down 0..15, Right 15->30, Up 30..16,
+    Up 16->32. Both frequency rows use x21; Right decrements its value.
+    Conditional A clears only an observed on switch, preserving unmapped bit28.
+    """
+    value = gci_sd_prefix_packet(7)
+    value.update(version=8, scope="competitive_entry_gci",
+                 authored_recipe_sha256=recipe_sha256(recipe(6)))
+    def state(kind, row, confirmed=None, entering=1, locked=False):
+        result = guard(kind, row, confirmed)
+        result["entering"] = entering
+        if locked:
+            result["items_locked"] = 0
+        return result
+    actions = value["actions"][:6]  # unchanged cold Main -> Rules route
+    def action(label, button, before, after, **extra):
+        actions.append(dict(label=label, p1=raw_pad(buttons=[button]), p2=NEUTRAL_PAD,
+                            before=before, after=after, max_polls=600, **extra))
+    action("stock-mode", "D_RIGHT", state(13,0,0), state(13,0,1))
+    action("stock-row", "D_DOWN", state(13,0,1), state(13,1,3))
+    action("four-stocks", "D_RIGHT", state(13,1,3), state(13,1,4))
+    for row in range(2,7):
+        action(f"Rules-row-{row}", "D_DOWN", state(13,row-1),
+               state(13,row,0 if row == 2 else 10 if row == 3 else None))
+    action("extra-rules", "A", state(13,6), state(15,0,0))
+    for minute in range(1,9):
+        action(f"stock-timer-{minute}", "D_RIGHT", state(15,0,minute-1), state(15,0,minute))
+    action("friendly-fire-row", "D_DOWN", state(15,0,8), state(15,1,0))
+    action("friendly-fire-on", "D_RIGHT", state(15,1,0), state(15,1,1))
+    action("pause-row", "D_DOWN", state(15,1,1), state(15,2,1))
+    action("pause-off", "D_RIGHT", state(15,2,1), state(15,2,0))
+    action("commit-extra", "B", state(15,2,0), state(13,6,entering=0))
+    action("items-row", "D_UP", state(13,6,entering=0), state(13,5,entering=0))
+    action("open-items", "A", state(13,5,entering=0), state(16,0,1))
+    path = list(range(16)) + list(range(30,15,-1))
+    for index, row in enumerate(path):
+        action(f"item-{row}-off", "A", state(16,row,locked=True), state(16,row,0,locked=True),
+               when_value=1)
+        target = path[index+1] if index+1 < len(path) else 32
+        button = "D_DOWN" if row < 15 else "D_RIGHT" if row == 15 else "D_UP"
+        action(f"item-{row}-to-{target}", button, state(16,row,0,locked=True),
+               state(16,target,3 if target == 32 else None,locked=True))
+    for after in (2,1,0):
+        action(f"items-frequency-{after}", "D_RIGHT", state(16,32,after+1,locked=True),
+               state(16,32,after,locked=True))
+    action("commit-items-none", "B", state(16,32,0,locked=True), state(13,5,entering=0))
+    action("Rules-start-CSS", "START", state(13,5,entering=0), {"scene":8})
+    value["actions"] = actions
+    value["items"] = {"rows":path, "preference_bits":[5,18,10,30,13,24,3,14,23,27,1,9,8,7,21,4,
+        6,2,15,0,17,11,31,26,20,25,16,22,19,29,12], "frequency_row":32,
+        "unmapped_bit":28, "expected_preference_mask_hex":"0000000010000000"}
+    value["stop"] = "observed vs_setup; interrupted primary with complete native MWRI"
     return value

@@ -494,3 +494,22 @@ scene-order and natural-timeout fields. These receipts are under the retained
 `menu-tie-extension-v1/sss-retirement-launch-v1` campaign. This remains an
 initialization comparison: original SD resolution/Results, raw PAD/RNG equality,
 pixels, PCM, physical input and live timing are excluded.
+
+### Separate competitive profile-entry diagnostic
+
+Authored recipe6/menu8 uses the same verified GCI and original menu, CSS,
+SSS and normalized VS ownership boundaries for a separate competitive profile.
+It observes stock4, handicap0, damage10, Rules Plus timer8/FF1/pause0,
+every selectable Items row0..30 off and frequency None. The Items path follows
+the original two-column navigation: Down0..15, Right15->30, Up30..16,
+Up16->32; each conditional A requires an observed on value and unlocked owner.
+The unmapped preference bit28 is retained. Committed preference bytes and
+normalized setup are both checked; a None frequency alone cannot pass.
+
+`MWRC_SD_MENU_PROBE=competitive_entry` stops at the verified normal VS setup
+return with a complete native MWRI footer and interrupted primary observer.
+This scope rejects active gameplay, SD and legacy whole-session completion.
+The prior SD native producer is preserved and rejects this new scope; a new
+canonical observer build and reviewed original run are required. Source/unit
+controls do not establish runtime settings or eight-minute outcome equivalence.
+Natural non-tied timeout and Results/CSS comparison remain separate gates.

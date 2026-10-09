@@ -16,9 +16,10 @@ struct SdInitState {
     phase = sudden ? Phase::SdSetup : Phase::VsSetup;
     return true;
   }
-  bool Ready(bool sudden) {
+  bool Ready(bool sudden, bool profile_entry = false) {
+    if (profile_entry && sudden) return false;
     if (phase != (sudden ? Phase::SdSetup : Phase::VsSetup)) return false;
-    phase = sudden ? Phase::Complete : Phase::VsActive;
+    phase = (sudden || profile_entry) ? Phase::Complete : Phase::VsActive;
     return true;
   }
   bool Exit() {
