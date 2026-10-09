@@ -7,8 +7,8 @@
     "Source identified",
     "Native traced"
   ],
-  "status": "native_fixture_controlled_natural_route_passed_browser_original_open",
-  "scope": "Native traced; fixture-controlled functional route",
+  "status": "native_route_passed_browser_sd_to_results_partial_css_failed_original_open",
+  "scope": "Native fixture-controlled route pass; browser original-menu SD-to-Results partial route; source/native Results confirmation control",
   "producer": {
     "source": "8b6ad34914c9e955a0aba8f6cc1e75a952fb6bc3",
     "tree": "3b47f21d59e0233c6a475bfc1b928984c3a2a3be",
@@ -144,6 +144,41 @@
         "relative_path": "returned-menu-v1-execution-receipt.json",
         "bytes": 2126,
         "sha256": "bc91491f046a0c1d46381309d5ce6b29addfdbc3f218a19ea626c835891ba8d0"
+      },
+      {
+        "relative_path": "browser-natural-sd-route-v1/browser-result-v3.json",
+        "bytes": 11133,
+        "sha256": "86d7f76983acd04480e91426a9ee56ea367e70ebaa6b33cadb7c64fab65fa225"
+      },
+      {
+        "relative_path": "browser-natural-sd-route-v1/browser-output-v3/report.json",
+        "bytes": 289085,
+        "sha256": "05510ef49e6176559ed3d9df322794ff022f947d853418b4bc62a5587b9fb936"
+      },
+      {
+        "relative_path": "results-two-human-source-policy-checkpoint-v1.json",
+        "bytes": 3771,
+        "sha256": "5cbe16da9499ef82c383de1154825b04a1aa4b03509aa92c0ac99fed402b94a0"
+      },
+      {
+        "relative_path": "results-two-human-native-v1-result.json",
+        "bytes": 11421,
+        "sha256": "d284dbfd0e5ed85ecd42f4c8ad918ffab1da1dd68357c1f630504528f2b30962"
+      },
+      {
+        "relative_path": "results-two-human-native-v1-execution-receipt.json",
+        "bytes": 2190,
+        "sha256": "808510b993c4757bdff07c0809f8da32d6129c6af0f21f8e8bb7eb98f7e8281c"
+      },
+      {
+        "relative_path": "results-two-human-native-v1.stdout-stderr.log",
+        "bytes": 44612,
+        "sha256": "9ef8f99d82ac9df104dc042d3a1d428d275b6bb2fae291fe1ec1483fd1d0ddfe"
+      },
+      {
+        "relative_path": "results-two-human-native-v1.trace.jsonl",
+        "bytes": 12773,
+        "sha256": "2eee5af05fd35945cb4d7aba0bec44a9dc1369ef9b480fa6349ee3baff57ef88"
       }
     ]
   },
@@ -169,14 +204,111 @@
     {
       "attempt": "resolutionv4preflight",
       "first_failure": "Supervisor referenced oldpacket filename; rejectedhashbeforeanychild. V4b correctedonlypacketpath/separatereceipt; oneactualrunpassed."
+    },
+    {
+      "attempt": "browser_v2",
+      "first_failure": "Deferred checked SD preparation phase5 rejected by harness; no actual SD reached. Producer/evidence retained."
+    },
+    {
+      "attempt": "browser_v3",
+      "source": "8ccdb002864eefc707d061b7530dc9b2fe8a7154",
+      "first_failure": "Actual SD and canonical P2 Results reached; P1-only repeated Start did not acknowledge connected P2. Returned CSS unrun; no full browser pass.",
+      "result_sha256": "86d7f76983acd04480e91426a9ee56ea367e70ebaa6b33cadb7c64fab65fa225"
     }
   ],
   "open_gates": [
-    "One-minute persistent GameRules fixture authored before original CSS/SSS, not Rules-menu input.",
-    "Final SD internal numeric seed/PAD unobserved; actual runtime ordering + compiled mutating-publisher control are distinct evidence from post-callback Results entry observations.",
-    "No browser, original comparison, physical input, audio/rendering equivalence, timing acceptance or subsequent matchworld. Returned SSS normalized supported selection only.",
-    "Current browser typedcontinuation integration and tied/non-tied/eliminationcontrols.",
-    "Verified originalroute andstrictdeclaredfieldcomparison.",
-    "Prepared currentcandidate fullsuite, affectedbuild, independentreview andcurrentheadCI."
-  ]
+    "Corrected shared two-Human Results keyboard confirmation and full browser Results-to-CSS/selection route.",
+    "Full suite required before integration after consolidated reference tooling; focused controls/builds do not substitute.",
+    "Original Rules-ready and SD reference route; strict comparison with matching colors, pause and declared fields.",
+    "Internal final SD numeric PAD/RNG and browser SD Results-entry bytes remain separately unobserved.",
+    "Subsequent matchworld, sparse/four-player browser coverage, physical input, pixels/PCM equivalence, uninterrupted audio and foreground timing remain unrun."
+  ],
+  "browser_partial_v3": {
+    "source": "8ccdb002864eefc707d061b7530dc9b2fe8a7154",
+    "runtime_source": "5308a80c3fe0d14b48f7c920a14e83010e19c85c",
+    "runtime_wasm_sha256": "48c2b7f25c46c4f2f796ea8877537be177bc11fab53fca676c8e28794964b9d7",
+    "setup": "Original Rules/menu inputs select one-minute four-stock two-Human Mario/FD; source colors1/0, resolved ports0/1. Headless silent functional run, source PCM processing retained.",
+    "prior_vs": {
+      "active_frames": 3600,
+      "canonical_outcome": 1,
+      "winner_slots": [
+        0,
+        1
+      ],
+      "neutral_stocks": [
+        4,
+        4
+      ],
+      "neutral_damage": [
+        0,
+        0
+      ]
+    },
+    "sd": {
+      "initial_stock": 1,
+      "observed_initial_live_and_payload_damage": 300,
+      "timer_enabled": false,
+      "is_stock": false,
+      "is_vs": false,
+      "ready_cursor": 3,
+      "p1_live_departure_pulses": 16,
+      "final_cursor": 280,
+      "canonical_outcome": 2,
+      "winner_slots": [
+        1
+      ]
+    },
+    "results": "Original typed Results reached; overall completed match count1. First failure Results-to-CSS after eight P1-only Enter pulses, Results cursor1904. No full browser route pass.",
+    "diagnostics": {
+      "phase7_callback_source_steps": 3838,
+      "phase14_callback_source_steps": 518,
+      "phase8_callback_source_steps": 1913,
+      "preparation_incidents": 13,
+      "other_incidents": 0,
+      "dropped_samples": 6874,
+      "dropped_incidents": 0,
+      "semantics": "Cumulative callback-publication phase tags; distinct from exact PAD/source-frame counts. Bounded samples are thinned."
+    },
+    "cleanup": "Eject source/asset/audio owners zero; driver/context/browser closed; exact Node exit1 and server reaped; socket rebind verified.",
+    "observation_gaps": [
+      "Internal final SD numeric seed/full PAD and SD Results-entry ABI payload were not captured. Pre-publication observer RNG is not final handoff RNG.",
+      "Source Mario pair only; no general four-player/sparse browser acceptance.",
+      "Browser colors1/0 differ original-reference planned0/1; native fixture pause enabled differs reference pauseoff. No cross-producer comparison."
+    ]
+  },
+  "results_confirmation_control": {
+    "source": "ff405bca82f2aacf7c5f7148039e53e8c0ada370",
+    "recipe": "returned-menu-two-human-results-input-control-v1",
+    "status": "pass",
+    "origin": "Original CSS/SSS closed menu PAD; explicitly constructed non-tied P2 ELIMINATION terminal, no VS/SD gameplay. Native ABI bytes not portable comparison.",
+    "component": "Full unchanged original fn_80178050 compiled in asset-free reducer, five source-policy groups passed; fake drawing/page/sound collaborators, no scene/GPU/assets.",
+    "actual_scene": {
+      "presentation_cursor": 240,
+      "initial_P1_presentation_Start_cursor": 241,
+      "stats_ready_cursor": 251,
+      "P1_only_cursor": 252,
+      "P1_only_neutral_cursor": 343,
+      "second_P1_toggle_off_cursor": 344,
+      "P1_reconfirm_cursor": 346,
+      "P2_Start_all_confirmed_cursor": 348,
+      "original_exit_cursor": 359,
+      "post_neutral_input_ticks": 119,
+      "observed_live_results_seed": 2978851317
+    },
+    "cleanup": "Original Results exit/end, returned CSS/SSS selection, host/VS lease/world/caller rules/application close and reacquisition all passed; direct Node reaped.",
+    "component_producer": "2f6f7d300882f83f8206343a0117218bb92bf000",
+    "component_recheck": "Passed again alongside native harness preparation; component producer is distinct from native ff405bca."
+  },
+  "original_reference": {
+    "producer": "New 7a3a20ac binary built",
+    "status": "first GCI Rules-ready run failed main-select-VS after passing the earlier memory-card startup boundary",
+    "unrun": [
+      "Rules-ready/loaded-field observation",
+      "Sudden Death reference",
+      "Cross-producer strict comparison"
+    ],
+    "root_review_sha256": "b990923c029a9c35a0cb9aee1c704d0772f5438530ad0d1de9ee57b094d72283",
+    "scope": "Bounded original-route preparation failure only; no reference simulation agreement claim.",
+    "source": "7a3a20ac1d3b9f1c469f5555332f19efad5b38c2"
+  }
 }
