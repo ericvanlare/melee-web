@@ -1,6 +1,6 @@
 # Sudden Death routing
 
-**Browser exercised / Compiled / Source identified / Native traced**
+**Browser exercised / Original compared (initialization only) / Compiled / Source identified / Native traced**
 
 The [scoped receipt](../evidence/sudden-death-route-v1.json) records the V11
 headless browser functional pass at harness `3285f344` and runtime `e13647cb`:
@@ -8,7 +8,8 @@ original one-minute Rules/CSS/SSS input, natural tied VS → active Sudden Death
 with P2 winner → original two-Human Results confirmation → CSS → SSS/FD →
 fresh ordinary VS frame 1 → 15 → checked Eject. It is functional evidence only,
 with both later V3 native ordinary controls passed at `849b02e7`. Original
-comparison and final validation gates remain open.
+SD initialization field comparison later passed against the original game;
+current-head CI/integration and broader acceptance remain open.
 
 The earlier native functional pass at source `8b6ad349` covered: original CSS/SSS, natural one-minute VS
 timeout, active Sudden Death resolved through raw controller input, original
@@ -119,24 +120,24 @@ reduced Rules-ready control using the exact selected GCI profile: menu kind 13,
 row 0/value 0, entering 1 and cooldown 0. Its 2,018-event MWRI recording completed;
 the primary observer was intentionally interrupted and exact owned children
 were reaped. The first `7a3a20ac` Main → VS failure remains retained. Full
-settings, SD reference and cross-producer comparison remain unrun. The earlier original plan used colors [0, 1] and pause-off; the current recipe 5
+settings/SD comparison were still unrun at that historical prefix. The earlier original plan used colors [0, 1] and pause-off; the current recipe 5
 extension aligns colors [1, 0] and pause-enabled with native setup. Its Items
-prefix failed and the revised original producer was built; aligned full settings
-and SD comparison remain unrun.
+prefix failed and the revised original producer was built. The later V6 result
+below reached natural SD initialization and passed its scoped comparison.
 
 The consolidated executable head `fd55b378` passed all 2,163 unittest cases
 with 154 skips. It includes the reference toolset and shared Results helper;
 the earlier browser route failures remain retained. V11 passes the declared
 functional SD/Results/returned-menu/subsequent-prefix route; later native V3
-non-tied timeout and elimination controls passed separately. Original-comparison
-gates stay open. The later executable
+non-tied timeout and elimination controls passed separately. The later initialization-only original comparison passed; broader acceptance
+gates stay separate. The later executable
 phase/readiness and reference-toolset deltas were subsequently covered by the
 full suite at `cf8cbd88`; later reference-only changes remain separate. Frozen runtime `5308a80c` and
 native producers remain distinct from this tested source. Current-head CI and
 root integration review remain required.
 
 [Issue #291](https://github.com/ericvanlare/melee-web/issues/291) remains open for
-original comparison, later reference-focused checks/current-head CI and
+final source review, current-head CI and
 integration review. The
 subsequent ordinary
 entry/prefix passed in V11; a second whole match remains unrun. Physical
@@ -196,3 +197,22 @@ observations after both OnExits and routing advance, without counting them as
 source steps or admitting VS. This later delta is outside the full-suite
 identity; imported focused controls and current-head CI remain required. No
 new runtime build or original comparison is claimed by that import.
+
+Original V6 at receiver `5e136a78`, native `23b9ff37`/binary `b6ea2fe3`,
+passed the natural one-minute VS tie through actual SD initialization. It
+consumed 3,838 declared source inputs; native MWRI completed 20,416 events,
+and the primary observer was intentionally interrupted after the prefix. Exact
+owned processes retired and profile/GCI inputs stayed unchanged. The declared
+comparison with V11 passed VS-entry and SD-setup player/port/slot/color,
+stock/damage, FD/rules/items fields; tied terminal frame 3,600/outcome/winners;
+and actual SD fighter one-stock/300-damage observations. It excludes original
+SD resolution/Results, internal RNG, physical PAD equivalence, pixels, PCM and
+live timing. It is initialization-only original evidence, separate from V11's
+functional full route. Current-head CI and final integration review remain.
+
+The initial CSS fixture now retains only exact actual row 899, with the CSSData
+owner displayed as its authored prefix and six player records. Reassembly is
+checked against the original row hash before the unchanged source decoder;
+no bytes are synthesized. Five focused CSS controls and the staged repository
+content check passed. The failed content check and full external 28-row fixture
+remain retained. No checker or exception policy was changed.
