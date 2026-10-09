@@ -283,6 +283,56 @@ void run_post_vs_mode_asset_free_contract()
     std::cout<<"Asset-free post-VS mode retention and explicit SD/ordinary-VS validation contracts passed\n";
 }
 
+// Test-only declared Results boundary, independent of the observed result.
+struct TwoHumanResultsExpectation {
+    MatchOutcome outcome;
+    int p1_stocks;
+    int p2_stocks;
+};
+constexpr TwoHumanResultsExpectation kEliminationResults{OUTCOME_ELIMINATION,0,4};
+constexpr TwoHumanResultsExpectation kTimeoutResults{OUTCOME_TIMEOUT,3,4};
+bool declared_two_human_results_valid(const MatchEnd& end,
+                                     const TwoHumanResultsExpectation& expected)
+{
+    if (!((expected.outcome==OUTCOME_ELIMINATION&&expected.p1_stocks==0&&expected.p2_stocks==4)||
+          (expected.outcome==OUTCOME_TIMEOUT&&expected.p1_stocks==3&&expected.p2_stocks==4)) ||
+        end.outcome!=expected.outcome || end.match_kind!=MatchKind_Stock ||
+        end.n_winners!=1 || end.winners[0]!=1) return false;
+    for(unsigned slot=0;slot<GM_MAX_PLAYERS;++slot){
+        const auto& player=end.player_standings[slot];
+        if(slot>=2){if(player.slot_type!=Gm_PKind_NA)return false;continue;}
+        if(player.slot_type!=Gm_PKind_Human||player.ckind!=CKIND_MARIO||
+           player.stocks!=(slot==0?expected.p1_stocks:expected.p2_stocks))return false;
+    }
+    return true;
+}
+void run_declared_results_asset_free_contract()
+{
+    for(const auto* expected:{&kEliminationResults,&kTimeoutResults}){
+        MatchEnd end{};end.outcome=expected->outcome;end.match_kind=MatchKind_Stock;
+        end.n_winners=1;end.winners[0]=1;
+        for(auto& player:end.player_standings)player.slot_type=Gm_PKind_NA;
+        for(unsigned slot=0;slot<2;++slot){auto& player=end.player_standings[slot];
+            player.slot_type=Gm_PKind_Human;player.ckind=CKIND_MARIO;
+            player.stocks=slot==0?expected->p1_stocks:expected->p2_stocks;}
+        check(declared_two_human_results_valid(end,*expected),"Declared Results boundary rejected its exact fixture");
+        for(unsigned negative=0;negative<8;++negative){auto invalid=end;
+            if(negative==0)invalid.winners[0]=0;
+            if(negative==1)invalid.n_winners=2;
+            if(negative==2)invalid.player_standings[1].slot_type=Gm_PKind_Cpu;
+            if(negative==3)invalid.player_standings[2].slot_type=Gm_PKind_Human;
+            if(negative==4)invalid.outcome=OUTCOME_NO_CONTEST;
+            if(negative==5)++invalid.player_standings[0].stocks;
+            if(negative==6)invalid.player_standings[1].ckind=CKIND_FOX;
+            if(negative==7)invalid.match_kind=MatchKind_Time;
+            check(!declared_two_human_results_valid(invalid,*expected),"Declared Results boundary accepted malformed outcome/player/winner/stocks");
+        }
+        check(!declared_two_human_results_valid(end,expected==&kTimeoutResults?kEliminationResults:kTimeoutResults),
+              "Declared Results boundary accepted a different caller expectation");
+    }
+    std::cout<<"Asset-free caller-bound two-Human Results admission controls passed\n";
+}
+
 void run_vs_sudden_death_source_control()
 {
     char error[256]{};
@@ -292,6 +342,7 @@ void run_vs_sudden_death_source_control()
     bool session_active = true;
     try {
         run_post_vs_mode_asset_free_contract();
+        run_declared_results_asset_free_contract();
         check(melee_web_vs_mode_begin(),
               "Original VS source-mode lease did not begin");
         mode_owned = true;
@@ -528,10 +579,10 @@ void run_vs_sudden_death_source_control()
 
 void run_typed_results_source_smoke(const melee_web::RuntimeFiles&,MeleeWebMenuHost*,
     const ResultsMatchInfo&,std::uint32_t&,std::uint8_t[MELEE_WEB_PAD_STATE_BYTES],
-    const MeleeWebPadState* initial_input=nullptr,bool two_human_control=false);
+    const MeleeWebPadState* initial_input=nullptr,const TwoHumanResultsExpectation* expected=nullptr);
 void run_results_source_smoke(const melee_web::RuntimeFiles&,MeleeWebMenuHost*,
     const MatchExitInfo&,std::uint32_t&,std::uint8_t[MELEE_WEB_PAD_STATE_BYTES],
-    bool two_human_control=false);
+    const TwoHumanResultsExpectation* expected=nullptr);
 void run_returned_menu_selection(const melee_web::RuntimeFiles& files,
     MeleeWebMenuHost* host,char* error,std::size_t error_size,
     const StartMeleeRules* expected_cache=nullptr)
@@ -759,7 +810,7 @@ void run_ordinary_nontied_timeout(const melee_web::RuntimeFiles& files,
           std::memcmp(&gmVsMelee_GetVsData()->start.rules,&post_mode.start.rules,sizeof(post_mode.start.rules))==0,
           "Ordinary typed Results lost its terminal or checked post-VS rules");
     final_seed=*seed_ptr; // Observable host-owned Results-entry seed after original callbacks.
-    run_typed_results_source_smoke(files,host,continuation.payload.results,final_seed,final_pad,nullptr,true);
+    run_typed_results_source_smoke(files,host,continuation.payload.results,final_seed,final_pad,nullptr,&kTimeoutResults);
     check(std::memcmp(gmMainLib_GetGameRules(),&rules_before,sizeof(rules_before))==0&&
           std::memcmp(gmMainLib_8015CC58(),&preferences_before,sizeof(preferences_before))==0,
           "Ordinary Results changed current GameRules or Items/preferences");
@@ -2212,7 +2263,7 @@ void run_results_source_smoke(const melee_web::RuntimeFiles& files,
                               MeleeWebMenuHost* host,
                               const MatchExitInfo& exit_info,
                               uint32_t& seed,
-                              uint8_t input_bytes[MELEE_WEB_PAD_STATE_BYTES],bool two_human_control)
+                              uint8_t input_bytes[MELEE_WEB_PAD_STATE_BYTES],const TwoHumanResultsExpectation* expected)
 {
     ResultsMatchInfo result{};
     char error[256]{};
@@ -2225,13 +2276,15 @@ void run_results_source_smoke(const melee_web::RuntimeFiles& files,
           "Original VS exit did not update exactly one persistent result counter");
     check(std::memcmp(&result.match_end,&exit_info.match_end,sizeof(result.match_end))==0,
           "VS mode Results entry changed the completed MatchEnd");
-    run_typed_results_source_smoke(files,host,result,seed,input_bytes,nullptr,two_human_control);
+    run_typed_results_source_smoke(files,host,result,seed,input_bytes,nullptr,expected);
 }
 void run_typed_results_source_smoke(const melee_web::RuntimeFiles& files,
     MeleeWebMenuHost* host,const ResultsMatchInfo& result,
     std::uint32_t& seed,std::uint8_t input_bytes[MELEE_WEB_PAD_STATE_BYTES],
-    const MeleeWebPadState* initial_input,bool two_human_control)
+    const MeleeWebPadState* initial_input,const TwoHumanResultsExpectation* expected)
 {
+    check(!expected||declared_two_human_results_valid(result.match_end,*expected),
+          "Two-Human Results differs from its caller-declared outcome/player/winner/stocks");
     char error[256]{};
     std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)> decoded(
         initial_input?nullptr:melee_web_pad_state_decode(input_bytes,MELEE_WEB_PAD_STATE_BYTES,error,sizeof(error)),
@@ -2250,14 +2303,9 @@ void run_typed_results_source_smoke(const melee_web::RuntimeFiles& files,
     };
     PADStatus neutral[4]{};neutral[2].err=neutral[3].err=-1;
     for(unsigned t=0;t<240;t++)tick(neutral);
-    if(two_human_control){
-        check(result.match_end.outcome==OUTCOME_ELIMINATION&&
-              result.match_end.n_winners==1&&result.match_end.winners[0]==1&&
-              result.match_end.player_standings[0].slot_type==Gm_PKind_Human&&
-              result.match_end.player_standings[1].slot_type==Gm_PKind_Human,
-              "Two-Human Results control requires its declared constructed P2 outcome");
-        emit_native_bytes("constructed_results_entry_payload",&result,sizeof(result));
-        std::cout<<"Constructed Results entry seed "<<seed<<'\n';
+    if(expected){
+        emit_native_bytes("declared_results_entry_payload",&result,sizeof(result));
+        std::cout<<"Declared Results entry seed "<<seed<<'\n';
         unsigned input_ticks=0;
         auto observe=[&](const char* label){
             const auto& state=lbl_8046DBE8;
@@ -4463,8 +4511,10 @@ int main(int argc,char** argv){try{
      std::string(input_recipe)=="sudden-death-menu-setup-control-v1";
  const bool ordinary_timeout_recipe=input_recipe&&
      std::string(input_recipe)=="ordinary-nontied-timeout-control-v1";
- const bool two_human_results_recipe=input_recipe&&
-     std::string(input_recipe)=="returned-menu-two-human-results-input-control-v1";
+ const bool timeout_results_recipe=input_recipe&&
+     std::string(input_recipe)=="returned-menu-two-human-timeout-results-control-v1";
+ const bool two_human_results_recipe=timeout_results_recipe||(input_recipe&&
+     std::string(input_recipe)=="returned-menu-two-human-results-input-control-v1");
  const bool returned_menu_recipe=two_human_results_recipe||(input_recipe&&
      std::string(input_recipe)=="returned-menu-results-control-v1");
  const bool resolve_sd_recipe=input_recipe&&
@@ -4802,7 +4852,7 @@ int main(int argc,char** argv){try{
     files[name]={(std::istreambuf_iterator<char>(input)),{}};
    }
    MatchExitInfo constructed{};
-   constructed.match_end.outcome=OUTCOME_ELIMINATION;
+   constructed.match_end.outcome=timeout_results_recipe?OUTCOME_TIMEOUT:OUTCOME_ELIMINATION;
    constructed.match_end.match_kind=selection.start.rules.match_kind;
    constructed.match_end.n_winners=1;constructed.match_end.winners[0]=1;
    for(auto& standing:constructed.match_end.player_standings)standing.slot_type=Gm_PKind_NA;
@@ -4811,12 +4861,12 @@ int main(int argc,char** argv){try{
     auto& standing=constructed.match_end.player_standings[slot];
     standing.slot_type=player.slot_type;standing.ckind=player.ckind;
     standing.x3=player.color;standing.x4=player.nametag;
-    standing.stocks=slot==1?4:0;standing.is_big_loser=slot==0;
+    standing.stocks=slot==1?4:(timeout_results_recipe?3:0);standing.is_big_loser=slot==0;
    }
    emit_native_bytes("constructed_non_tied_terminal_no_gameplay",&constructed,sizeof(constructed));
    auto result_seed=selection.random_seed;
    try{
-    run_results_source_smoke(files,host,constructed,result_seed,pad,two_human_results_recipe);
+    run_results_source_smoke(files,host,constructed,result_seed,pad,two_human_results_recipe?(timeout_results_recipe?&kTimeoutResults:&kEliminationResults):nullptr);
     run_returned_menu_selection(files,host,error,sizeof(error));
    }catch(...){
     const auto primary=std::current_exception();
