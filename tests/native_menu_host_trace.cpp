@@ -741,9 +741,12 @@ void run_ordinary_nontied_timeout(const melee_web::RuntimeFiles& files,
             check(p.slot_type==start.slot_type&&p.ckind==start.ckind&&p.x3==start.color&&
                   p.stocks==(slot==0?3:4),"Ordinary terminal lost original player identity/stocks");
         }
-        MatchExitInfo repeated{};check(melee_web_match_rules_publish_result()&&
-            melee_web_match_rules_terminal_data(&repeated)&&std::memcmp(&terminal,&repeated,sizeof(terminal))==0,
-            "Closed ordinary terminal publication was not idempotent");
+        check(!melee_web_match_rules_publish_result(),
+              "Closed ordinary match accepted publication without its live source owner");
+        MatchExitInfo repeated{};
+        check(melee_web_match_rules_terminal_data(&repeated)&&
+              std::memcmp(&terminal,&repeated,sizeof(terminal))==0,
+              "Closed ordinary retained terminal data changed");
         emit_native_bytes("ordinary_timeout_terminal",&terminal,sizeof(terminal));
         emit_native_bytes("ordinary_timeout_final_pad",final_pad,sizeof(final_pad));
         std::cout<<"Natural non-tied ordinary timeout: input ticks "<<ticks<<", source cursor "<<cursor

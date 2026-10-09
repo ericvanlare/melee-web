@@ -570,5 +570,16 @@
         "physical input/foreground timing/audible gates unrun"
       ]
     }
+  },
+  "ordinary_controls": {
+    "source_head": "6c5a6f8f89f0c30c01423d637da8f675901eab8b",
+    "build": "native Release passed; browser e13646assets unchanged",
+    "asset_free": "new absentfixture/wrongFD dispatch + existing source callback/cache controls passed2tests",
+    "non_tied_timeout_v1": "failed new post-close publication assertion after natural3600frame non-tiedtimeout and canonicalpublicfinish/exactP2terminal checks; API requiresliveowner and deliberatelyreturnsfalse afterclose",
+    "first_failure_receipt_sha256": "9f1ddc42a6d131cddef2f8e2567929f36305697836ce78c6c35b0a7355b9a3e4",
+    "correction": "Test-only split: reject publication on closed owner, independently verify retained terminal byteidentity; keep live-owner idempotence test and publicfinish ordering unchanged",
+    "results_mario_v1": "not launched at firstfailure stop",
+    "current_corrected_asset_run": "unrun",
+    "numeric_terminal_pad_seed": "unobserved; assertion failed before emission"
   }
 }

@@ -129,3 +129,13 @@ the corrected full browser route, original comparison, non-tied
 timeout/elimination controls and subsequent-match validation. Physical
 input, pixels, uninterrupted audio, foreground timing and competitive-set
 acceptance keep their separate gates.
+
+The final-source native ordinary controls compiled in Release and passed the
+asset-free recipe/FD negatives and source callback/cache controls. The first
+non-tied one-minute attempt completed natural timeout and canonical public
+finish, then failed a new test assertion requiring publication after the match
+owner had closed. That API intentionally rejects closed owners. The correction
+separately checks rejection and retained terminal byte identity; its build/run
+is pending. The existing ordinary elimination control did not run after this
+first failure. No ordinary-control pass or emitted numeric terminal/PAD/seed
+claim is made from that failed attempt.
