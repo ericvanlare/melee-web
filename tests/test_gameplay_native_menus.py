@@ -171,23 +171,25 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         self.assertFalse(absent.exists())
         revision = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-        for stage, expected in (
-                (32, "Missing owned menu host fixture: MnSlChr.usd"),
-                (31, "Explicit FD recipes require Final Destination")):
-            with self.subTest(stage=stage):
-                trace = self.scratch / f"returned-menu-dispatch-{stage}.jsonl"
-                command = [str(node_runtime()), str(target), str(absent),
-                           str(absent), str(stage), str(trace), revision,
-                           "returned-menu-results-control-v1"]
-                run = subprocess.run(command, cwd=ROOT, capture_output=True,
-                                     text=True, timeout=30)
-                (self.scratch / f"returned-menu-dispatch-{stage}.stdout").write_text(
-                    run.stdout, encoding="utf-8")
-                (self.scratch / f"returned-menu-dispatch-{stage}.stderr").write_text(
-                    run.stderr, encoding="utf-8")
-                self.assertNotEqual(run.returncode, 0)
-                self.assertIn(expected, run.stderr)
-                self.assertNotIn("Unknown transition input recipe", run.stderr)
+        for recipe in ("returned-menu-results-control-v1",
+                       "returned-menu-two-human-results-input-control-v1"):
+            for stage, expected in (
+                    (32, "Missing owned menu host fixture: MnSlChr.usd"),
+                    (31, "Explicit FD recipes require Final Destination")):
+                with self.subTest(stage=stage, recipe=recipe):
+                    trace = self.scratch / f"returned-menu-dispatch-{recipe}-{stage}.jsonl"
+                    command = [str(node_runtime()), str(target), str(absent),
+                               str(absent), str(stage), str(trace), revision,
+                               recipe]
+                    run = subprocess.run(command, cwd=ROOT, capture_output=True,
+                                         text=True, timeout=30)
+                    (self.scratch / f"returned-menu-dispatch-{recipe}-{stage}.stdout").write_text(
+                        run.stdout, encoding="utf-8")
+                    (self.scratch / f"returned-menu-dispatch-{recipe}-{stage}.stderr").write_text(
+                        run.stderr, encoding="utf-8")
+                    self.assertNotEqual(run.returncode, 0)
+                    self.assertIn(expected, run.stderr)
+                    self.assertNotIn("Unknown transition input recipe", run.stderr)
 
     def test_sudden_death_resolution_manifest_without_assets(self):
         target = ROOT / "build/browser-release/native_menu_host_trace.js"

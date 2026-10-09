@@ -62,6 +62,8 @@ extern "C" {
 #include <melee/gm/gmresultplayer.h>
 #include <melee/gm/gmmain_lib.h>
 #include <melee/gm/types.h>
+#include <sysdolphin/baselib/controller.h>
+extern ResultsData lbl_8046DBE8;
 #include <melee/lb/lbfile.h>
 #include <melee/lb/lblanguage.h>
 #include <melee/mn/mnmain.h>
@@ -526,9 +528,10 @@ void run_vs_sudden_death_source_control()
 
 void run_typed_results_source_smoke(const melee_web::RuntimeFiles&,MeleeWebMenuHost*,
     const ResultsMatchInfo&,std::uint32_t&,std::uint8_t[MELEE_WEB_PAD_STATE_BYTES],
-    const MeleeWebPadState* initial_input=nullptr);
+    const MeleeWebPadState* initial_input=nullptr,bool two_human_control=false);
 void run_results_source_smoke(const melee_web::RuntimeFiles&,MeleeWebMenuHost*,
-    const MatchExitInfo&,std::uint32_t&,std::uint8_t[MELEE_WEB_PAD_STATE_BYTES]);
+    const MatchExitInfo&,std::uint32_t&,std::uint8_t[MELEE_WEB_PAD_STATE_BYTES],
+    bool two_human_control=false);
 void run_returned_menu_selection(const melee_web::RuntimeFiles& files,
     MeleeWebMenuHost* host,char* error,std::size_t error_size)
 {
@@ -2089,7 +2092,7 @@ void run_results_source_smoke(const melee_web::RuntimeFiles& files,
                               MeleeWebMenuHost* host,
                               const MatchExitInfo& exit_info,
                               uint32_t& seed,
-                              uint8_t input_bytes[MELEE_WEB_PAD_STATE_BYTES])
+                              uint8_t input_bytes[MELEE_WEB_PAD_STATE_BYTES],bool two_human_control)
 {
     ResultsMatchInfo result{};
     char error[256]{};
@@ -2102,12 +2105,12 @@ void run_results_source_smoke(const melee_web::RuntimeFiles& files,
           "Original VS exit did not update exactly one persistent result counter");
     check(std::memcmp(&result.match_end,&exit_info.match_end,sizeof(result.match_end))==0,
           "VS mode Results entry changed the completed MatchEnd");
-    run_typed_results_source_smoke(files,host,result,seed,input_bytes);
+    run_typed_results_source_smoke(files,host,result,seed,input_bytes,nullptr,two_human_control);
 }
 void run_typed_results_source_smoke(const melee_web::RuntimeFiles& files,
     MeleeWebMenuHost* host,const ResultsMatchInfo& result,
     std::uint32_t& seed,std::uint8_t input_bytes[MELEE_WEB_PAD_STATE_BYTES],
-    const MeleeWebPadState* initial_input)
+    const MeleeWebPadState* initial_input,bool two_human_control)
 {
     char error[256]{};
     std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)> decoded(
@@ -2127,11 +2130,82 @@ void run_typed_results_source_smoke(const melee_web::RuntimeFiles& files,
     };
     PADStatus neutral[4]{};neutral[2].err=neutral[3].err=-1;
     for(unsigned t=0;t<240;t++)tick(neutral);
+    if(two_human_control){
+        check(result.match_end.outcome==OUTCOME_ELIMINATION&&
+              result.match_end.n_winners==1&&result.match_end.winners[0]==1&&
+              result.match_end.player_standings[0].slot_type==Gm_PKind_Human&&
+              result.match_end.player_standings[1].slot_type==Gm_PKind_Human,
+              "Two-Human Results control requires its declared constructed P2 outcome");
+        emit_native_bytes("constructed_results_entry_payload",&result,sizeof(result));
+        std::cout<<"Constructed Results entry seed "<<seed<<'\n';
+        unsigned input_ticks=0;
+        auto observe=[&](const char* label){
+            const auto& state=lbl_8046DBE8;
+            std::cout<<"RESULTS_CONFIRMATION {\"boundary\":\""<<label
+                <<"\",\"source_frame\":"<<session.source_frames()
+                <<",\"post_neutral_input_ticks\":"<<input_ticks
+                <<",\"phase\":"<<unsigned(state.x1)
+                <<",\"stats_phase\":"<<unsigned(state.x0_23)
+                <<",\"num_pages\":"<<unsigned(state.num_pages)
+                <<",\"requested\":"<<(session.requested()?"true":"false")
+                <<",\"live_seed\":"<<session.random_seed()<<",\"players\":[";
+            for(unsigned port=0;port<4;++port){
+                if(port)std::cout<<',';
+                const auto& pad=HSD_PadCopyStatus[port];
+                std::cout<<"{\"confirmed\":"<<unsigned(state.player_data[port].x0_0)
+                    <<",\"page\":"<<unsigned(state.player_data[port].page)
+                    <<",\"err\":"<<int(pad.err)<<",\"button\":"<<pad.button
+                    <<",\"trigger\":"<<pad.trigger<<",\"last_button\":"<<pad.last_button<<'}';
+            }
+            std::cout<<"]}\n";
+        };
+        auto step=[&](int start_port){
+            check(input_ticks<600,"Two-Human Results exceeded existing 600 tick confirmation bound");
+            PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
+            if(start_port>=0)pads[start_port].button=PAD_BUTTON_START;
+            tick(pads);++input_ticks;
+        };
+        auto flags=[&](bool p1,bool p2){
+            check(bool(lbl_8046DBE8.player_data[0].x0_0)==p1&&
+                  bool(lbl_8046DBE8.player_data[1].x0_0)==p2,
+                  "Original per-Human Results confirmation flags diverged");
+        };
+        observe("presentation_after_240_neutral");
+        check(lbl_8046DBE8.x1==2&&!session.requested(),
+              "Original Results presentation was not phase 2 after neutral bound");
+        // Presentation advance is distinct from each Human's later stats acknowledgement.
+        step(0);observe("initial_P1_presentation_Start");step(-1);
+        check(!(HSD_PadCopyStatus[0].trigger&PAD_BUTTON_START),
+              "Neutral did not release presentation Start");
+        while(input_ticks<480&&(lbl_8046DBE8.x1!=3||lbl_8046DBE8.x0_23!=2))step(-1);
+        observe("stats_ready_before_confirmation");
+        check(lbl_8046DBE8.x1==3&&lbl_8046DBE8.x0_23==2&&!session.requested(),
+              "Original Results stats did not become ready within shared confirmation bound");
+        flags(false,false);
+        step(0);observe("P1_only_confirm");flags(true,false);
+        check(!session.requested(),"P1-only confirmation incorrectly exited two-Human Results");
+        step(-1);
+        check(!(HSD_PadCopyStatus[0].trigger&PAD_BUTTON_START),"Neutral did not release P1 Start trigger");
+        for(unsigned t=0;t<90;++t)step(-1);
+        observe("P1_only_neutral_negative");flags(true,false);
+        check(!session.requested(),"Connected unconfirmed P2 was silently acknowledged");
+        step(0);observe("second_P1_toggles_off");flags(false,false);
+        check(!session.requested(),"Unconfirmed Human Results requested exit");
+        step(-1);observe("neutral_release");
+        check(!(HSD_PadCopyStatus[0].trigger&PAD_BUTTON_START),"Neutral did not release second P1 Start");
+        step(0);observe("P1_reconfirm");flags(true,false);
+        step(-1);step(1);observe("P2_Start_all_confirmed");flags(true,true);
+        check(lbl_8046DBE8.player_data[2].x0_0&&lbl_8046DBE8.player_data[3].x0_0,
+              "Original NA slots did not participate in all-confirmed policy");
+        while(input_ticks<600&&!session.requested())step(-1);
+        observe("original_exit_requested");
+    }else{
     for(unsigned t=0;t<600&&!session.requested();t++){
         PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
         // The original Results confirmation is Start; A changes stats pages.
         if(t%90==0)pads[0].button=pads[1].button=PAD_BUTTON_START;
         tick(pads);
+    }
     }
     check(session.requested(),"Original Results scene did not request its source exit");
     session.exit_scene();
@@ -4267,8 +4341,10 @@ int main(int argc,char** argv){try{
  const bool sound_settings_recipe=input_recipe&&std::string(input_recipe)=="main-settings-sound-v1";
  const bool sd_menu_setup_recipe=input_recipe&&
      std::string(input_recipe)=="sudden-death-menu-setup-control-v1";
- const bool returned_menu_recipe=input_recipe&&
-     std::string(input_recipe)=="returned-menu-results-control-v1";
+ const bool two_human_results_recipe=input_recipe&&
+     std::string(input_recipe)=="returned-menu-two-human-results-input-control-v1";
+ const bool returned_menu_recipe=two_human_results_recipe||(input_recipe&&
+     std::string(input_recipe)=="returned-menu-results-control-v1");
  const bool resolve_sd_recipe=input_recipe&&
      std::string(input_recipe)=="sudden-death-natural-resolution-control-v1";
  const bool natural_sd_recipe=resolve_sd_recipe||(input_recipe&&
@@ -4594,7 +4670,7 @@ int main(int argc,char** argv){try{
    emit_native_bytes("constructed_non_tied_terminal_no_gameplay",&constructed,sizeof(constructed));
    auto result_seed=selection.random_seed;
    try{
-    run_results_source_smoke(files,host,constructed,result_seed,pad);
+    run_results_source_smoke(files,host,constructed,result_seed,pad,two_human_results_recipe);
     run_returned_menu_selection(files,host,error,sizeof(error));
    }catch(...){
     const auto primary=std::current_exception();
