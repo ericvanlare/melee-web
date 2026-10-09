@@ -60,11 +60,11 @@ export async function returnFromCompetitivePrize({
   };
   const recordPreparation = (readiness, afterConfirmation) => {
     const row = deferredPreparation.find(item => item.phase === readiness.phase &&
-      item.reason === readiness.reason && item.preparation_label === readiness.preparation_label);
+      item.reason === readiness.reason && item.message === readiness.message);
     if (row) row.observations++;
     else deferredPreparation.push({phase: readiness.phase, reason: readiness.reason,
-      preparation_label: readiness.preparation_label, message: readiness.message,
-      after_confirmation: afterConfirmation, observations: 1});
+      message: readiness.message,
+      status: readiness.status, after_confirmation: afterConfirmation, observations: 1});
   };
   const waitForReadiness = async (label, classify, {afterConfirmation = null, cssOnlyAfterPrep = false} = {}) => {
     let state;

@@ -367,7 +367,9 @@ const current = () => page.evaluate(() => ({
   pause_present: Boolean(document.querySelector('#pause')),
   pause_disabled: document.querySelector('#pause')?.disabled ?? null,
   status: document.querySelector('#status')?.textContent || '',
-  error: document.querySelector('#status')?.dataset.runtimeError || null,
+  error: document.querySelector('#status')?.dataset.runtimeError ||
+    (document.querySelector('#error-dialog[open]') ?
+      document.querySelector('#error')?.textContent || 'Application error' : null),
   diagnostics: Module?._melee_web_native_menu_diagnostics
     ? Module.UTF8ToString(Module._melee_web_native_menu_diagnostics()) : '',
 }));

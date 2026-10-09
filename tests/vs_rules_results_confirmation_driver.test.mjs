@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {readFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import vm from 'node:vm';
 import {
   confirmTwoHumanResults,
   RESULTS_TRACE_CAPACITY,
@@ -309,8 +312,8 @@ test('Results next-scene phase 5 requires the actual P2 edge and waits for an ac
     'phase 5 is only an intermediate stopped transfer; the helper returns on actual Prize phase 9');
   assert.deepEqual(result.post_confirmation_preparation, [{
     phase: 5, reason: 'asset-transfer',
-    preparation_label: RESULTS_NEXT_SCENE_PREPARATION_MESSAGE,
-    message: RESULTS_NEXT_SCENE_PREPARATION_MESSAGE, observations: 1,
+    message: RESULTS_NEXT_SCENE_PREPARATION_MESSAGE,
+    status: `${RESULTS_NEXT_SCENE_PREPARATION_MESSAGE} · 25 ms · audio paused`, observations: 1,
   }]);
   assert(order.length % 2 === 0);
   for (let index = 0; index < order.length; index += 2)
@@ -367,5 +370,76 @@ test('Results phase 5 rejects a synthetic P1-only prefix and malformed P2 comple
     ['host error during preparation', {hostError: 'native source error'}, /native runtime error/],
   ]) {
     await assert.rejects(run(options), pattern, label);
+  }
+});
+
+const retainedV7TracePath = process.env.MELEE_SD_V7_RESULTS_TRACE;
+const retainedV7ReportPath = process.env.MELEE_SD_V7_BROWSER_REPORT;
+test('actual V7 P2 trace and disc-progress host continue only toward active CSS', {
+  skip: !retainedV7TracePath || !retainedV7ReportPath,
+}, async () => {
+  const [traceBytes, reportBytes] = await Promise.all([
+    readFile(retainedV7TracePath), readFile(retainedV7ReportPath),
+  ]);
+  assert.equal(createHash('sha256').update(traceBytes).digest('hex'),
+    '64eba3da11703e312da3268e879c65281c8f3a6fc1210f2fa9a83f2867d5fe89');
+  assert.equal(createHash('sha256').update(reportBytes).digest('hex'),
+    'a5c0523ecbad5c3d639838d37dfba3be5145f0e6855f117b1f034e28df3c2745');
+  const trace = JSON.parse(traceBytes);
+  const capturedHost = JSON.parse(reportBytes).failure.state;
+  assert.deepEqual(resultsPadTraceFailures(trace), []);
+  assert.equal(trace.retained, 290);
+  assert.equal(capturedHost.phase, 5);
+  assert.equal(capturedHost.running, 0);
+  assert.equal(capturedHost.message, RESULTS_NEXT_SCENE_PREPARATION_MESSAGE);
+  assert.equal(capturedHost.status, 'Reading local data 76/76');
+  assert.equal(capturedHost.pause_present, true);
+  assert.equal(capturedHost.pause_disabled, true);
+  const presses = [];
+  let retained = 220;
+  // Retained prefixes expose the actual source gates/edges; the keyboard
+  // actions and subsequent active CSS are synthetic continuation controls.
+  let host = activeHost(8);
+  let waits = 0;
+  const result = await confirmTwoHumanResults({
+    deadlineAt: Date.now() + 5000,
+    observeHost: async () => host,
+    observeTrace: async () => ({...trace, attempts: retained, retained, samples: trace.samples.slice(0, retained)}),
+    press: async key => {
+      assert.equal(host.running, 1);
+      presses.push(key);
+      retained = [250, 278, 290][presses.length - 1];
+      if (presses.length === 3) host = capturedHost;
+    },
+    wait: async () => { waits++; host = {...activeHost(1), status: 'stale arbitrary progress'}; },
+  });
+  assert.deepEqual(presses, ['Enter', 'Enter', 'End']);
+  assert.equal(waits, 1);
+  assert.equal(result.p2_confirmation.source_frame_before_tick, 278);
+  assert.deepEqual(result.p2_confirmation.confirmed, [1, 1, 1, 1]);
+  assert.equal(result.original_exit.host_phase, 1);
+  assert.equal(result.post_confirmation_preparation[0].status, capturedHost.status);
+});
+
+test('actual competitive host observer checks the explicit runtime and open-dialog error channels', async () => {
+  const source = await readFile(new URL('./vs_rules_item_menu_browser_test.mjs', import.meta.url), 'utf8');
+  const begin = source.indexOf('const current = () => page.evaluate(');
+  const end = source.indexOf('\nconst observeSource', begin);
+  assert(begin >= 0 && end > begin);
+  const observe = source.slice(begin, end) + '\ncurrent();';
+  for (const [runtimeError, open, text, expected] of [
+    ['', false, 'stale display', null], ['', true, 'dialog failure', 'dialog failure'],
+    ['', true, '', 'Application error'], ['native failure', true, 'dialog failure', 'native failure'],
+  ]) {
+    const value = vm.runInNewContext(observe, {
+      page: {evaluate: fn => fn()},
+      Module: {_melee_web_native_menu_phase: () => 8, _melee_web_native_menu_running: () => 1},
+      document: {querySelector: selector => selector === '#status'
+        ? {dataset: {runtimeError}, textContent: 'arbitrary progress'}
+        : selector === '#pause' ? {disabled: false}
+        : selector === '#error-dialog[open]' ? open ? {} : null
+        : selector === '#error' ? {textContent: text} : null},
+    });
+    assert.equal(value.error, expected);
   }
 });
