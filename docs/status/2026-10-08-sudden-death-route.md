@@ -50,15 +50,23 @@ it does not prove browser key scheduling. The shared browser correction remains
 unrun. Internal final SD numeric PAD/RNG and browser SD Results-entry bytes remain
 unobserved separately from later Results/source observations.
 
-The new original-reference `7a3a20ac` binary built, but its first GCI setup run failed
-at Main → VS after passing the earlier memory-card startup boundary. Rules-ready/loaded fields and the
-SD reference remain unrun. Native colors1/0 and pause-enabled setup also differ
-from the planned original colors0/1 and pause-off setup; no cross-producer
-comparison is claimed.
+The original-reference producer `8f944a09` (binary digest `c22d23c2`) passed a
+reduced Rules-ready control using the exact selected GCI profile: menu kind 13,
+row 0/value 0, entering 1 and cooldown 0. Its 2,018-event MWRI recording completed;
+the primary observer was intentionally interrupted and exact owned children
+were reaped. The first `7a3a20ac` Main → VS failure remains retained. Full
+settings, SD reference and cross-producer comparison remain unrun. Native
+colors [1, 0] and pause-enabled setup differ from the planned original colors
+[0, 1] and pause-off setup.
+
+The consolidated executable head `fd55b378` passed all 2,163 unittest cases
+with 154 skips. It includes the reference toolset and shared Results helper;
+that helper's corrected browser route remains unrun. Frozen runtime `5308a80c` and
+native producers remain distinct from this tested source. Current-head CI and
+root integration review remain required.
 
 [Issue #291](https://github.com/ericvanlare/melee-web/issues/291) remains open for
 the corrected full browser route, original comparison, non-tied
-timeout/elimination controls and subsequent-match validation. Full regression
-is required before integration after reference tools are consolidated. Physical
+timeout/elimination controls and subsequent-match validation. Physical
 input, pixels, uninterrupted audio, foreground timing and competitive-set
 acceptance keep their separate gates.
