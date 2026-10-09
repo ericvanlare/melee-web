@@ -97,6 +97,7 @@ extern ResultsData lbl_8046DBE8;
 #include <sysdolphin/baselib/tev.h>
 #include <sysdolphin/baselib/sislib.h>
 #include <sysdolphin/baselib/memory.h>
+void HSD_SisLib_C1TextProbeSet(int enabled);
 #include <dolphin/os/OSAlloc.h>
 #endif
 #include <melee/ty/forward.h>
@@ -7699,7 +7700,8 @@ void run_stadium_c1_context_preflight(
     TransitionTrace& trace,
     bool full_world_lifecycle = false,
     bool ready_session = false,
-    bool pad_leave_probe = false)
+    bool pad_leave_probe = false,
+    bool source_text_lifetime_probe = false)
 {
     char error[256]{};
     const int previous_mode = gm_GetCurrentGameMode();
@@ -7728,7 +7730,7 @@ void run_stadium_c1_context_preflight(
           "C1 source handoff lost the retained Toy category baseline");
     check_stadium_preflight_stage_empty();
     const MeleeWebPadState* ready_input=nullptr;
-    if(ready_session||pad_leave_probe){
+    if(ready_session||pad_leave_probe||source_text_lifetime_probe){
         ready_input=melee_web_menu_host_input(host);
         check(ready_input!=nullptr,
               "Closed Stadium SSS did not retain its decoded source PAD input");
@@ -7811,6 +7813,67 @@ void run_stadium_c1_context_preflight(
             menu_files, selected_names, menu_dir, game_dir);
         check(reopened_files.contains("GrPs.usd"),
               "Exact C1 RuntimeFiles union omitted GrPs.usd");
+
+        if(source_text_lifetime_probe){
+            check(perform_on_init && retired_sis,
+                  "Stadium text lifetime probe requires original menu leave/SIS retirement evidence");
+            check(retired_sis->retirement_verified && retired_sis->prior.heap &&
+                  retired_sis->prior.world_generation && retired_sis->prior.allocation_generation &&
+                  retired_sis->prior.source_epoch &&
+                  retired_sis->requested_bytes==MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES,
+                  "Stadium text lifetime probe requires already verified menu SIS retirement evidence");
+            check(!melee_web_gameplay_world_exists(),
+                  "Stadium text lifetime probe would double-own a source world");
+            check(ready_input!=nullptr,
+                  "Stadium text lifetime probe lost the closed host's retained source PAD input");
+            const auto parent_seed_owner=seed_ptr;
+            check(parent_seed_owner && *parent_seed_owner==selected.random_seed,
+                  "Stadium text lifetime probe lost the actual host selected seed");
+            melee_web::RuntimeArchiveCache cache(reopened_files);
+            std::unique_ptr<melee_web::GameplayMatchSession> match;
+            HSD_SisLib_C1TextProbeSet(1);
+            std::fprintf(stderr,"STADIUM_SOURCE_TEXT_LIFETIME phase=probe-armed\n");
+            std::fflush(stderr);
+            try{
+                match=std::make_unique<melee_web::GameplayMatchSession>(
+                    reopened_files,selected,cache,melee_web::GameplayMatchConstruction::Deferred,
+                    *ready_input,melee_web::GameplayMatchDiagnostic::StadiumReady);
+                while(!match->advance_construction()){}
+                const auto constructed=melee_web_gameplay_stats();
+                check(constructed.ticks==0,
+                      "Stadium text lifetime probe unexpectedly advanced a source match tick");
+                std::fprintf(stderr,
+                    "STADIUM_SOURCE_TEXT_LIFETIME phase=construction-complete world_exists=%d ticks=%llu match_retained=%d\n",
+                    melee_web_gameplay_world_exists(),
+                    static_cast<unsigned long long>(constructed.ticks),int(bool(match)));
+                std::fflush(stderr);
+                // Run normal Session.close at the source boundary, before any match tick.
+                // A refusal remains a failed lifecycle, not treated as success.
+                match->close();
+                match.reset();
+                HSD_SisLib_C1TextProbeSet(0);
+                const auto closed=melee_web_gameplay_stats();
+                std::fprintf(stderr,
+                    "STADIUM_SOURCE_TEXT_LIFETIME phase=normal-close-returned world_exists=%d ticks=%llu\n",
+                    melee_web_gameplay_world_exists(),
+                    static_cast<unsigned long long>(closed.ticks));
+                std::fflush(stderr);
+                check(closed.ticks==0,
+                      "Stadium text lifetime probe changed source tick count during normal close");
+                check(seed_ptr==parent_seed_owner && *parent_seed_owner==selected.random_seed,
+                      "Stadium text lifetime probe failed to restore exact parent host RNG owner/value");
+                cleanup();
+                std::cout<<"Stadium zero-tick source text-owner observation returned from normal Session.close; lifecycle acceptance remains unproven\n";
+                return;
+            }catch(const std::exception& first){
+                const auto failed=melee_web_gameplay_stats();
+                std::fprintf(stderr,
+                    "STADIUM_SOURCE_TEXT_LIFETIME_FIRST_FAILURE diagnostic=%s world_exists=%d ticks=%llu match_retained=%d lifecycle=failed\n",
+                    first.what(),melee_web_gameplay_world_exists(),
+                    static_cast<unsigned long long>(failed.ticks),int(bool(match)));
+                std::fflush(stderr);std::cout.flush();std::_Exit(1);
+            }
+        }
 
         if(ready_session){
             check(perform_on_init && retired_sis,
@@ -8234,7 +8297,8 @@ void run_stadium_c1a_selection_smoke(
     const std::filesystem::path& game_dir,
     TransitionTrace& trace,
     bool ready_session=false,
-    bool pad_leave_probe=false)
+    bool pad_leave_probe=false,
+    bool source_text_lifetime_probe=false)
 {
     char error[256]{};
     MeleeWebRetiredSisLease retired_sis{};
@@ -8386,7 +8450,7 @@ void run_stadium_c1a_selection_smoke(
             e8_request_trace, item_state_preflight, screen_roots_preflight,
             ground_map1_owner, source_on_init,
             source_on_init ? &retired_sis : nullptr, trace, full_world_lifecycle, ready_session,
-            pad_leave_probe);
+            pad_leave_probe, source_text_lifetime_probe);
     } else {
         world->verify_immutable_archives();
         world->close();
@@ -8396,7 +8460,7 @@ void run_stadium_c1a_selection_smoke(
     }
     check(!melee_web_menu_stage_explicit_confirm_available(St_Kind_PStadium),
           "C1a explicit-confirm permission survived unload");
-    if(ready_session||pad_leave_probe)return;
+    if(ready_session||pad_leave_probe||source_text_lifetime_probe)return;
     if (full_world_lifecycle) {
         std::cout << "Stadium original OnInit/OnLoad/OnStart two owned-world lifetimes passed; Ready/GO and ticks remain unrun\n";
     } else if (source_on_init) {
@@ -8472,6 +8536,12 @@ int main(int argc,char** argv){try{
   if(argc==2&&std::string_view(argv[1])=="--stadium-sis-allocator-controls"){
    run_stadium_sis_allocator_lifecycle_control();return 0;
   }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-sis-text-event-controls"){
+   HSD_SisLib_C1TextProbeSet(1);
+   run_stadium_sis_allocator_lifecycle_control();
+   HSD_SisLib_C1TextProbeSet(0);
+   return 0;
+  }
   if(argc==2&&std::string_view(argv[1])=="--stadium-bind-refusal-controls"){
    run_stadium_bind_refusal_control();return 0;
   }
@@ -8541,6 +8611,8 @@ int main(int argc,char** argv){try{
      std::string(input_recipe)=="stadium-source-world-lifecycle-v1";
  const bool stadium_pad_leave_probe_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-pad-leave-probe-v1";
+ const bool stadium_source_text_lifetime_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-source-text-lifetime-v1";
 #else
  const bool stadium_c1a_recipe=false;
  const bool stadium_c1_context_preflight_recipe=false;
@@ -8552,6 +8624,7 @@ int main(int argc,char** argv){try{
  const bool stadium_source_world_recipe=false;
  const bool stadium_ready_session_recipe=false;
  const bool stadium_pad_leave_probe_recipe=false;
+ const bool stadium_source_text_lifetime_recipe=false;
 #endif
  if(input_recipe&&!css_observer_recipe&&!sparse_css_recipe&&!sparse_pad_recipe&&!ordinary_timeout_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
@@ -8562,7 +8635,7 @@ int main(int argc,char** argv){try{
     !stadium_c1_item_state_preflight_recipe&&!stadium_screen_roots_recipe&&
     !stadium_e8_request_recipe&&!stadium_ground_map1_owner_recipe&&
     !stadium_source_on_init_recipe&&!stadium_source_world_recipe&&!stadium_ready_session_recipe&&
-    !stadium_pad_leave_probe_recipe&&
+    !stadium_pad_leave_probe_recipe&&!stadium_source_text_lifetime_recipe&&
     !v10_css_replay_start_recipe)
     throw std::runtime_error("Unknown transition input recipe");
  if(v10_css_replay_start_recipe&&
@@ -8579,7 +8652,7 @@ int main(int argc,char** argv){try{
      stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
      stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
      stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
-     stadium_pad_leave_probe_recipe)&&
+     stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe)&&
     stage_kind!=St_Kind_PStadium)
    throw std::runtime_error("C1a recipes require source StKind 3");
  TransitionTrace trace(trace_path,source_revision,input_recipe);
@@ -8590,7 +8663,7 @@ int main(int argc,char** argv){try{
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
     stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
-    stadium_pad_leave_probe_recipe||
+    stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
     v10_css_replay_start_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
     trophy_baseline_recipe||sound_settings_recipe)
   keys=melee_web::menu_asset_names();
@@ -8623,21 +8696,24 @@ int main(int argc,char** argv){try{
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
     stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
-    stadium_pad_leave_probe_recipe){
+    stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe){
   run_stadium_c1a_selection_smoke(
       files, stadium_c1_context_preflight_recipe||
           stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
           stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
           stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
-          stadium_pad_leave_probe_recipe,
+          stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe,
       stadium_e8_request_recipe||stadium_ground_map1_owner_recipe,
       stadium_c1_item_state_preflight_recipe, stadium_screen_roots_recipe,
           stadium_ground_map1_owner_recipe, stadium_source_on_init_recipe||stadium_source_world_recipe||
-              stadium_ready_session_recipe||stadium_pad_leave_probe_recipe,
+              stadium_ready_session_recipe||stadium_pad_leave_probe_recipe||
+                  stadium_source_text_lifetime_recipe,
       stadium_source_world_recipe,
-      argv[1], argv[2], trace,stadium_ready_session_recipe,stadium_pad_leave_probe_recipe);
+      argv[1], argv[2], trace,stadium_ready_session_recipe,
+      stadium_pad_leave_probe_recipe,stadium_source_text_lifetime_recipe);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
-  if(stadium_source_world_recipe||stadium_ready_session_recipe||stadium_pad_leave_probe_recipe){
+  if(stadium_source_world_recipe||stadium_ready_session_recipe||
+     stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe){
    const auto released=melee_web_gameplay_allocation();
    std::fprintf(stderr,"C3_SESSION_CLOSED identity=%llu generation=%llu bytes=%llu world_exists=%d\n",
        static_cast<unsigned long long>(released.identity),static_cast<unsigned long long>(released.generation),

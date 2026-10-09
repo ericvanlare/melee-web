@@ -2022,6 +2022,21 @@ int main(void)
         self.assertIn("two retire-before-detach cycles and foreign/replaced/bound refusals passed", run.stdout)
         self.assertIn("no camera, scheduled proc dispatch or source ticks", run.stdout)
 
+    def test_stadium_sis_text_event_controls(self):
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("Build the reviewed C1 diagnostic SIS text-event control first")
+        command = [str(node_runtime()), str(target), "--stadium-sis-text-event-controls"]
+        run = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=30)
+        (self.scratch / "sis-text-event.stdout").write_text(run.stdout, encoding="utf-8")
+        (self.scratch / "sis-text-event.stderr").write_text(run.stderr, encoding="utf-8")
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-5000:])
+        self.assertIn("C1 asset-free SIS retired-menu baseline", run.stdout)
+        self.assertRegex(run.stderr,
+                         r"C1_SIS_TEXT_EVENT event=append call=5ACC tail=\S+ text=\S+")
+        self.assertRegex(run.stderr,
+                         r"C1_SIS_TEXT_EVENT event=remove call=5A2C text=\S+ previous=\S+ next=\S+")
+
     def test_stadium_sis_allocator_asset_free_lifecycle_controls(self):
         target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
         if not target.is_file():
@@ -2391,6 +2406,212 @@ int main(void)
         self.assertNotIn("STADIUM_READY_CONSTRUCTION_FIRST_FAILURE", stderr)
         self.assertIn("C3_SESSION_CLOSED identity=0 generation=0 bytes=0 world_exists=0", stderr)
         self.assertNotIn('"probe":"stadium-source-oninit"', stdout)
+
+    def test_stadium_source_text_lifetime_one_shot(self):
+        if os.environ.get("MELEE_RUN_STADIUM_SOURCE_TEXT_LIFETIME") != "1":
+            self.skipTest("Zero-tick source text lifetime probe requires its reviewed run gate")
+        import hashlib
+        import re
+        from capture_sd_reference_prefix import cleanup_process
+
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        fixture_value = os.environ.get("MELEE_MENU_FIXTURE_ROOT")
+        self.assertTrue(fixture_value, "Retained Stadium fixture root is required")
+        fixture = Path(fixture_value)
+        self.assertTrue(fixture.is_absolute(), "Use the frozen absolute fixture root")
+        menu, game = fixture / "native-menus", fixture / "next-gate"
+        self.assertTrue(target.is_file())
+        self.assertTrue(target.with_suffix(".wasm").is_file())
+        menu_script = (
+            "import {NATIVE_MENU_DISC_FILES} from './web/runtime-assets.mjs'; "
+            "console.log(JSON.stringify([...Object.keys(NATIVE_MENU_DISC_FILES), "
+            "'dsp_coef.bin', 'sislib_font.bin']))"
+        )
+        menu_names = json.loads(subprocess.check_output(
+            [str(node_runtime()), "--input-type=module", "-e", menu_script],
+            cwd=ROOT, text=True))
+        selected_names = stadium_c1_selected_file_names()
+        names = sorted(set(menu_names) | set(selected_names))
+        self.assertEqual((len(menu_names), len(selected_names), len(names)), (76, 36, 98))
+        paths = {name: (menu / name if (menu / name).is_file() else game / name)
+                 for name in names}
+        self.assertTrue(all(path.is_file() for path in paths.values()))
+        before = {name: hashlib.sha256(path.read_bytes()).hexdigest()
+                  for name, path in paths.items()}
+        source = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        trace = self.scratch / "stadium-source-text-lifetime.jsonl"
+        command = [str(node_runtime()), str(target), str(menu), str(game), "3",
+                   str(trace), source, "stadium-source-text-lifetime-v1"]
+        output = self.scratch / "stadium-source-text-node-owner"
+        output.mkdir(exist_ok=False)
+        identity = {
+            "scope": "stadium-source-text-lifetime-v1", "ownership": "direct-Popen",
+            "source_revision": source,
+            "source_tree": subprocess.check_output(
+                ["git", "rev-parse", "HEAD^{tree}"], cwd=ROOT, text=True).strip(),
+            "argv": command, "cwd": str(ROOT), "timeout_seconds": 120,
+            "fixture_sha256_before": before,
+            "binary_sha256": {
+                str(path): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in [Path(command[0]).resolve(), target, target.with_suffix(".wasm")]},
+        }
+        stdout_path = self.scratch / "stadium-source-text.stdout"
+        stderr_path = self.scratch / "stadium-source-text.stderr"
+        try:
+            with stdout_path.open("xb") as stdout, stderr_path.open("xb") as stderr:
+                process = subprocess.Popen(command, cwd=ROOT, stdout=stdout, stderr=stderr)
+                try:
+                    identity["pid"] = process.pid
+                    with (output / "identity.json").open("x", encoding="utf-8") as receipt:
+                        receipt.write(json.dumps(identity, indent=2) + "\n")
+                    process.wait(timeout=120)
+                finally:
+                    cleanup_process(
+                        process, output, scope="stadium-source-text-lifetime-v1")
+        finally:
+            after = {name: hashlib.sha256(path.read_bytes()).hexdigest()
+                     for name, path in paths.items()}
+            with (output / "fixture-after.json").open("x", encoding="utf-8") as receipt:
+                receipt.write(json.dumps(after, indent=2) + "\n")
+            self.assertEqual(after, before, "Real Stadium fixture changed during zero-tick text probe")
+        stdout, stderr = stdout_path.read_text(), stderr_path.read_text()
+        self.assertEqual(process.returncode, 1, (stdout + stderr)[-12000:])
+        self.assertRegex(
+            stderr,
+            r"STADIUM_SOURCE_TEXT_LIFETIME phase=construction-complete world_exists=1 ticks=0 match_retained=1")
+        self.assertIn(
+            "STADIUM_SOURCE_TEXT_LIFETIME_FIRST_FAILURE", stderr,
+            "The known refusal must remain explicitly a failed Session.close")
+        first_failure = stderr.index("STADIUM_SOURCE_TEXT_LIFETIME_FIRST_FAILURE")
+        self.assertRegex(stderr[first_failure:], r"ticks=0 match_retained=1 lifecycle=failed")
+        self.assertIn("C1_HUD_TEXT_PHASE phase=begin-before-ifAll", stderr)
+        self.assertIn("C1_HUD_TEXT_PHASE phase=begin-after-ifAll", stderr)
+        self.assertIn("C1_HUD_TEXT_PHASE phase=end-before-ifAll", stderr)
+        self.assertIn("C1_HUD_TEXT_PHASE phase=end-after-ifAll", stderr)
+
+        # All rows share stderr ordering. Reconstruct pointer linkage only from
+        # the already observed append/remove operands; never dereference them.
+        append_pattern = re.compile(
+            r"C1_SIS_TEXT_EVENT event=append call=5ACC tail=(\S+) text=(\S+) "
+            r"entity=(\S+) font=(\d+) context=(-?\d+)")
+        remove_pattern = re.compile(
+            r"C1_SIS_TEXT_EVENT event=remove call=5A2C text=(\S+) "
+            r"previous=(\S+) next=(\S+) font=(\d+)")
+        event_pattern = re.compile(
+            r"C1_SIS_TEXT_EVENT event=(append|remove|remove-miss) call=(5ACC|5A2C) "
+            r"(.*)")
+        append_rows = list(append_pattern.finditer(stderr))
+        remove_rows = list(remove_pattern.finditer(stderr))
+        self.assertGreaterEqual(len(append_rows), 3, stderr)
+        tag_rows = list(re.finditer(
+            r"C1_NAMETAG_TEXT event=create function=un_802FD4C8 "
+            r"text=(\S+) context=(-?\d+) gobj=(\S+)", stderr))
+        self.assertEqual(len(tag_rows), 1, stderr)
+        tag_ptr = tag_rows[0].group(1)
+        tag_context = int(tag_rows[0].group(2), 10)
+        tag_append_rows = [row for row in append_rows
+                           if row.group(2) == tag_ptr and row.group(4) == "2"]
+        self.assertEqual(len(tag_append_rows), 1, stderr)
+        self.assertEqual(tag_context, int(tag_append_rows[0].group(5), 10),
+                         "Nametag SIS context ID differs from its matching append event")
+        probe_armed = stderr.index("STADIUM_SOURCE_TEXT_LIFETIME phase=probe-armed")
+        begin_before = stderr.index("C1_HUD_TEXT_PHASE phase=begin-before-ifAll")
+        begin_after = stderr.index("C1_HUD_TEXT_PHASE phase=begin-after-ifAll")
+        end_before = stderr.index("C1_HUD_TEXT_PHASE phase=end-before-ifAll")
+        end_after = stderr.index("C1_HUD_TEXT_PHASE phase=end-after-ifAll")
+        self.assertLess(probe_armed, append_rows[0].start())
+        self.assertLess(begin_before, tag_append_rows[0].start())
+        self.assertLess(tag_append_rows[0].start(), tag_rows[0].start())
+        self.assertLess(tag_rows[0].start(), begin_after)
+        self.assertLess(begin_after, end_before)
+        self.assertLess(end_before, end_after)
+        self.assertTrue(all(probe_armed < row.start() < first_failure for row in append_rows))
+        self.assertTrue(all(probe_armed < row.start() < first_failure for row in remove_rows))
+        self.assertLess(tag_rows[0].start(), first_failure)
+
+        def pointer(value):
+            return 0 if value in {"(nil)", "0", "0x0"} else int(value, 16)
+
+        observed_unremoved = []
+        observed_events = []
+        for match in event_pattern.finditer(stderr):
+            event, _call, fields = match.groups()
+            if event == "append":
+                row = append_pattern.match(match.group(0))
+                self.assertIsNotNone(row, match.group(0))
+                tail, text, entity, font, context = row.groups()
+                self.assertEqual(pointer(tail), observed_unremoved[-1] if observed_unremoved else 0,
+                                 "An unobserved prefix prevents source-pointer attribution")
+                text_address = pointer(text)
+                self.assertNotIn(text_address, observed_unremoved,
+                                 "Duplicate pointer in the observed SIS list")
+                observed_unremoved.append(text_address)
+                observed_events.append({"event": event, "tail": tail, "text": text,
+                                        "entity": entity, "font": int(font),
+                                        "context": int(context)})
+            elif event == "remove":
+                row = remove_pattern.match(match.group(0))
+                self.assertIsNotNone(row, match.group(0))
+                text, previous, next_text, font = row.groups()
+                address = pointer(text)
+                self.assertIn(address, observed_unremoved,
+                              "Removal lacks a retained observed append")
+                index = observed_unremoved.index(address)
+                expected_previous = observed_unremoved[index - 1] if index else 0
+                expected_next = (observed_unremoved[index + 1]
+                                 if index + 1 < len(observed_unremoved) else 0)
+                self.assertEqual((pointer(previous), pointer(next_text)),
+                                 (expected_previous, expected_next))
+                observed_unremoved.pop(index)
+                observed_events.append({"event": event, "text": text,
+                                        "previous": previous, "next": next_text,
+                                        "font": int(font)})
+            else:
+                observed_events.append({"event": event, "fields": fields})
+
+        refusal = re.search(
+            r"STADIUM_TEXT_TOPOLOGY_REJECT primitive=(\S+) index=(\d+) "
+            r"actual=(\S+) expected=(\S+) operand_lifetime=unverified", stderr)
+        refusal_relation = "unattributed"
+        actual = expected = None
+        if refusal:
+            primitive, index, actual, expected = refusal.groups()
+            self.assertLess(refusal.start(), first_failure)
+            if pointer(actual) in observed_unremoved:
+                refusal_relation = "matches-observed-unremoved-pointer-only"
+            if pointer(actual) == pointer(tag_ptr):
+                refusal_relation = "matches-nametag-pointer-only"
+        else:
+            primitive = index = None
+        observation = {
+            "scope": "zero-tick construction followed by normal Session.close",
+            "lifecycle": "failed; incomplete close, not teardown success",
+            "source_ticks_at_construction_complete": 0,
+            "nametag_pointer": tag_ptr,
+            "nametag_append": {
+                "tail": tag_append_rows[0].group(1),
+                "font": int(tag_append_rows[0].group(4)),
+                "context": int(tag_append_rows[0].group(5)),
+            },
+            "first_refusal_primitive": primitive,
+            "first_refusal_index": index,
+            "first_refusal_actual": actual,
+            "first_refusal_expected": expected,
+            "first_refusal_pointer_relation": refusal_relation,
+            "first_refusal_operand_lifetime": (
+                "unverified" if refusal else "no topology operand was observed"),
+            "source_append_remove_rows": observed_events,
+            "matched_remove_count": len(remove_rows),
+            "observed_unremoved_append_pointers": [hex(value) for value in observed_unremoved],
+            "claims": ["pointer identity and original append/remove call ordering only",
+                       "SIS backing/suballocation membership remains unverified",
+                       "no StageLast display retirement completion or C3 lifecycle acceptance"],
+        }
+        (self.scratch / "stadium-source-text-observation.json").write_text(
+            json.dumps(observation, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        self.assertNotIn("normal-close-returned", stderr)
+        self.assertNotIn("source Ready", stdout)
 
     def test_stadium_source_world_lifecycle_one_shot(self):
         if os.environ.get("MELEE_RUN_STADIUM_SOURCE_WORLD_LIFECYCLE") != "1":

@@ -13,6 +13,9 @@
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjproc.h>
 #endif
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+extern int HSD_SisLib_C1TextProbeActive(void);
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -111,7 +114,19 @@ static MeleeWebHud* melee_web_hud_begin_source_status(unsigned layout,
     lbLang_SetLanguageSetting(LANG_US);
     lbLang_SetSavedLanguage(LANG_US);
     owner = hud;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (HSD_SisLib_C1TextProbeActive()) {
+        fprintf(stderr,"C1_HUD_TEXT_PHASE phase=begin-before-ifAll\n");
+        fflush(stderr);
+    }
+#endif
     ifAll_802F390C();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (HSD_SisLib_C1TextProbeActive()) {
+        fprintf(stderr,"C1_HUD_TEXT_PHASE phase=begin-after-ifAll\n");
+        fflush(stderr);
+    }
+#endif
     /* fn_8016E730 creates the authored screen-flash system after ifAll. */
     if (!melee_web_bg_flash_begin()) {
         fail(error, size, "Original screen-flash ownership is unavailable");
@@ -168,7 +183,19 @@ int melee_web_hud_end(MeleeWebHud* hud, char* error, size_t size)
     if (hud->flash_owned && !melee_web_bg_flash_end())
         return fail(error, size, "Original screen-flash ownership changed");
     hud->flash_owned = 0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (HSD_SisLib_C1TextProbeActive()) {
+        fprintf(stderr,"C1_HUD_TEXT_PHASE phase=end-before-ifAll\n");
+        fflush(stderr);
+    }
+#endif
     ifAll_802F3A64();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (HSD_SisLib_C1TextProbeActive()) {
+        fprintf(stderr,"C1_HUD_TEXT_PHASE phase=end-after-ifAll\n");
+        fflush(stderr);
+    }
+#endif
     *ifAll_GetArchive() = hud->previous_archive;
     lbLang_SetLanguageSetting(hud->previous_language);
     lbLang_SetSavedLanguage(hud->previous_saved_language);

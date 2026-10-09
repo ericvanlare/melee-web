@@ -9471,6 +9471,37 @@ index 98af43bec5a15cf93233d2a09abcb2914ff62d5f..3415ee1404ac964c868bd651f1e5b5dd
      gobj->gxlink_prios = 0x10;
  
      idesc = player0->idesc;
+diff --git a/src/melee/if/ifnametag.c b/src/melee/if/ifnametag.c
+index 02c952298acf599f999c719bac0fddc6c17f89e7..c182a4e4bef44d0165d1df0ba0b04fbd22e0cb10 100644
+--- a/src/melee/if/ifnametag.c
++++ b/src/melee/if/ifnametag.c
+@@ -1,6 +1,10 @@
+ #include "ifnametag.h"
+ 
+ #include "ifall.h"
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++#include <stdio.h>
++extern int HSD_SisLib_C1TextProbeActive(void);
++#endif
+ #include <dolphin/mtx.h>
+ #include <melee/cm/camera.h>
+ #include <melee/gm/gm_unsplit.h>
+@@ -381,6 +385,15 @@ void un_802FD4C8(void)
+     // "Break the targets!" "Race to the finish!" etc strings
+     HSD_SisLib_803A62A0(2, "SdIntro.dat", "SIS_IntroData");
+     un_804D6D78 = HSD_SisLib_803A6754(2, un_804D6D7C);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (HSD_SisLib_C1TextProbeActive()) {
++        fprintf(stderr,
++                "C1_NAMETAG_TEXT event=create function=un_802FD4C8 text=%p context=%d gobj=%p\n",
++                (void*) un_804D6D78, un_804D6D7C,
++                (void*) un_804D6D68);
++        fflush(stderr);
++    }
++#endif
+     un_804D6D78->pos_z = -10.0;
+     un_804D6D78->default_alignment = 1;
+     un_802FCBA0();
 diff --git a/src/melee/if/ifprize.c b/src/melee/if/ifprize.c
 index 23da703072962c1532ade6101f65bfeb0cec4ec6..f559be3eafc7816dccd9672113bb18c1fd6cae88 100644
 --- a/src/melee/if/ifprize.c
@@ -14896,15 +14927,24 @@ index 9536d2a353ac39e156c8fc17f9a780871229c060..41143790a92d43d934e32627112598ea
              if (a->frame == -2) {
                  return 1;
 diff --git a/src/sysdolphin/baselib/sislib.c b/src/sysdolphin/baselib/sislib.c
-index bc3a9125d905210c360664c5b93a78eb49f43b4d..372619c91bde5eb34dae8c87fe748bc312f07191 100644
+index bc3a9125d905210c360664c5b93a78eb49f43b4d..0e948111e15d30a9e172855a8bd166796733304e 100644
 --- a/src/sysdolphin/baselib/sislib.c
 +++ b/src/sysdolphin/baselib/sislib.c
-@@ -1,6 +1,13 @@
+@@ -1,6 +1,22 @@
  #include "sislib.h"
  
 +#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 +static u64 diagnostic_sis_epoch;
 +static int diagnostic_sis_active;
++static int diagnostic_sis_text_probe;
++void HSD_SisLib_C1TextProbeSet(int enabled)
++{
++    diagnostic_sis_text_probe = enabled != 0;
++}
++int HSD_SisLib_C1TextProbeActive(void)
++{
++    return diagnostic_sis_text_probe;
++}
 +#endif
 +
 +#if !defined(MELEE_WEB_GAMEPLAY)
@@ -14913,7 +14953,52 @@ index bc3a9125d905210c360664c5b93a78eb49f43b4d..372619c91bde5eb34dae8c87fe748bc3
  #include <stdio.h>
  
  #include "cobj.h"
-@@ -454,7 +461,39 @@ void HSD_SisLib_803A5FBC(void)
+@@ -216,6 +232,14 @@ void HSD_SisLib_803A5A2C(void* ptr)
+             } else {
+                 HSD_SisLib_804D7978 = next_text;
+             }
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++            if (diagnostic_sis_text_probe) {
++                fprintf(stderr,
++                    "C1_SIS_TEXT_EVENT event=remove call=5A2C text=%p previous=%p next=%p font=%d\n",
++                    (void*) curr, (void*) last, (void*) next_text, curr->font_idx);
++                fflush(stderr);
++            }
++#endif
+             alloc = curr->alloc_data;
+             if (alloc != NULL) {
+                 if (alloc->data != NULL) {
+@@ -232,6 +256,13 @@ void HSD_SisLib_803A5A2C(void* ptr)
+         last = curr;
+         curr = next_text;
+     }
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (diagnostic_sis_text_probe) {
++        fprintf(stderr,
++            "C1_SIS_TEXT_EVENT event=remove-miss call=5A2C text=%p\n", ptr);
++        fflush(stderr);
++    }
++#endif
+ }
+ 
+ HSD_Text* HSD_SisLib_803A5ACC(int font_idx, s32 context_id, f32 pos_x,
+@@ -322,6 +353,15 @@ HSD_Text* HSD_SisLib_803A5ACC(int font_idx, s32 context_id, f32 pos_x,
+     text->x4C = 0;
+     text->render_callback = 0;
+     text->font_idx = font_idx;
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (diagnostic_sis_text_probe) {
++        fprintf(stderr,
++            "C1_SIS_TEXT_EVENT event=append call=5ACC tail=%p text=%p entity=%p font=%d context=%d\n",
++            (void*) list_tail, (void*) text, (void*) text->entity,
++            font_idx, context_id);
++        fflush(stderr);
++    }
++#endif
+     return text;
+ }
+ 
+@@ -454,7 +494,39 @@ void HSD_SisLib_803A5FBC(void)
          }
      }
      HSD_Free(HSD_SisLib_804D796C);
@@ -14953,7 +15038,7 @@ index bc3a9125d905210c360664c5b93a78eb49f43b4d..372619c91bde5eb34dae8c87fe748bc3
  
  /// @todo Currently 97.56% match - extra lwz reload optimized away by
  /// compiler after dual global store
-@@ -475,6 +514,10 @@ void HSD_SisLib_803A6048(size_t size)
+@@ -475,6 +547,10 @@ void HSD_SisLib_803A6048(size_t size)
          HSD_SisLib_804D1110[i] = NULL;
          HSD_SisLib_804D1124[i] = NULL;
      }
