@@ -7,11 +7,11 @@
 passed. The latest [source-session preparation attempts](#october-9-source-session-ready-preparation)
 now complete match construction and reach the original HUD Ready predicate at
 124 source ticks, then fail because the display owner’s second text node has
-a non-null successor during teardown. That successor’s ownership remains
-unverified. A later zero-tick observation identifies the original HUD nametag
-append but stops at the incomplete-start guard before text teardown. The
-smaller input, marker, collision and SIS text controls pass; a complete
-lifetime and C3 remain unverified.
+a non-null successor during teardown. The latest same-run observation matches
+that pointer to the original HUD nametag append and verifies its current SIS
+suballocation membership. This does not establish the full text/context/renderer
+ownership needed for safe retirement. The smaller input, marker, collision and
+SIS text controls pass; a complete lifetime and C3 remain unverified.
 
 The diagnostic-only Stadium profile and profile-to-`DatNativeMapContract`
 adapter compile in the C1 trace target. Focused profile and borrowed-yakumono
@@ -492,13 +492,31 @@ Independent review verifies those inputs and all 17 raw files. The unittest
 passes its observation assertions, while native exit 1 retains the failed
 lifecycle; both exact children exit naturally, are reaped and are absent.
 
-Next, use one opt-in Ready observation with the same logger and a live SIS
-backing snapshot captured at construction. After the original first text
-refusal, inspect exact suballocation membership through the existing bounded
-used-list helper. An unavailable/replaced backing or missing membership must
-remain explicit. Preserve all guards and stop before any ownership correction
-until that identity evidence is reviewed. No text-list exemption or completed
-Session retirement is claimed.
+The Ready text observation on `2ba901d7` reaches the same original Ready
+predicate at 124 ticks and preserves the first `owned-second-next` refusal.
+In this run, the successor pointer matches the original HUD nametag append and
+semantic assignment; no matched text-unlink event occurs across HUD shutdown.
+A separate snapshot of the SIS backing at construction still matches its world,
+heap, allocation generation, epoch and requested size at the refusal. A bounded
+walk of the current used list finds the exact 160-byte text payload. This is
+current allocator membership plus observed event order, without a per-text
+allocation generation or proof of the remaining renderer/context ownership.
+
+The diagnostic build, six Python controls, retained zero-tick parser regression
+and actual allocator controls pass. The controls cover stale backing identities,
+duplicate snapshots, present and removed payloads, and an invalid used-list head;
+the payload-size-mismatch reporting branch is not exercised. Independent review
+verifies all 754 direct bindings, 98 fixtures and 17 raw result files before docs
+changes. The unittest passes observation assertions; native exit 1 still records
+failed partial shutdown. Both exact children exit naturally, are reaped and are
+absent. The later map-2 guard remains unevaluated.
+
+Next, reduce the scheduled-retirement contract against the original font-1 drain:
+retain strict initialization checks, prove the exact stage-owned objects, and
+preserve the current foreign SIS list through owned removal. Review the live
+text/context memberships and source GObj ownership before any guard change.
+No nametag exemption, whole-list drain, cleanup reorder or completed Session
+retirement follows from this observation.
 
 The existing RNG observer can be reused afterward, but the Stadium notes require
 C3's per-tick, per-owner ledger to be compared with the original. C8's broader

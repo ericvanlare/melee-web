@@ -961,7 +961,7 @@
         "sixth_ready_bound_files": 531,
         "deferred_control_owned_pid_absent": 19570
       },
-      "remaining": "One new opt-in Ready text observation after reviewed source/control changes: current event logger plus exact current SIS backing snapshot, then bounded used_head membership only after original first text refusal. Preserve actual refusal and every guard; unavailable/replaced membership stops attribution. No ownership correction until reviewed identity evidence. Complete Session retirement, two3500 post-GO lives, screen/stock-out/standings and original per-owner RNG ledger remain open.",
+      "remaining": "Reduce a scheduled-retirement contract around the existing original font1 drain while retaining strict initialization capture. Prove current text/context membership and exact owned renderer identities; preserve current foreign SIS order/content through owned removal. No nametag exemption or whole-list drain. Complete Session retirement, two3500 post-GO lives, screen/stock-out/standings and original per-owner RNG ledger remain open.",
       "c3_original_ledger_requirement": "Reuse existing RNG draw observer; C3 notes604-608 require per-tick/per-owner original comparison, separately from broader C8 transformation comparison.",
       "claim_boundary": "Native traced original HUD readiness after124source ticks observed; sixth run fails checked displayteardown. Synthetic marker/collision/deferred lifecycle controls pass. No checked fullSessionclose, postGOidle or C3pass.",
       "pad_input_reducer": {
@@ -1324,6 +1324,68 @@
           "native_returncode": 1
         },
         "scope": "Observation assertions pass, lifecycle fails. No same-object inference across runs, actual Ready-v8 successor attribution, live SIS membership, complete frees, checked Session retirement or C3."
+      },
+      "ready_text_membership": {
+        "source": "2ba901d7608481e142627022e3684ca2d49c3a11",
+        "source_tree": "b821816b3e7c5f5213b06ce3fd5ee68d4225e4ed",
+        "source_review": {
+          "artifact": "root-ready-text-membership-source-review-v1.json",
+          "sha256": "b5963937517bcf152d0353ef1dd42019d82d9bc4933256bbd86b82109b6d976f"
+        },
+        "independent_source_review": {
+          "artifact": "sol-ready-text-membership-source-review-v2.json",
+          "sha256": "a386e95d96a10fa4876879dbab6821beb105abf1f4772370666d1d9c3e581fae"
+        },
+        "diagnostic_build": {
+          "artifact": "ready-text-membership-build-v1/result.json",
+          "sha256": "d052c3b926780f24c0796c813825b69a090702f8f195da4d4cf9d9e6208256a8"
+        },
+        "producer": {
+          "artifact": "ready-text-membership-producer-2ba901d7-v1/identity.json",
+          "sha256": "ced255476fdff0ef813f962e6ec5a779f9a6f2a48f4873ddf0ffc5322615df23"
+        },
+        "python_controls": {
+          "artifact": "root-ready-text-membership-python-controls-v1.log",
+          "sha256": "4fd6e6cb902b4fb984639f3f79eb867c2e01bd9fc5503362a6a9b6c1d8183ccf"
+        },
+        "parser_regression": {
+          "artifact": "root-ready-text-membership-parser-controls-v1/result.json",
+          "sha256": "435ee7b9019f9855af4b5fb0f55cdd0db211af49b673a29957f73da2dcfc1c3a"
+        },
+        "sdk_controls": {
+          "artifact": "root-ready-text-membership-controls-v1/result.json",
+          "sha256": "ad94e3345076baac7df0257327b53665b6fb2e514814ca9b874242a6ad38afff"
+        },
+        "independent_control_review": {
+          "artifact": "sol-ready-text-membership-control-review-v1.json",
+          "sha256": "0deba168e63bbbf4864f69c3547cede87793307ddd20eab2dbb04ea222753f2d"
+        },
+        "packet": {
+          "artifact": "ready-text-membership-preflight-packet-root-v1.json",
+          "sha256": "389397e778cb04114a324b429b76b3067592ebc910228c7f647819b5823e9652"
+        },
+        "frozen_result": {
+          "artifact": "root-ready-text-membership-frozen-result-v1.json",
+          "sha256": "93e19ec1adae52ed6d3a95da3361193fac0a76f2da8fba4f93056dc116769489"
+        },
+        "validation": "Diagnostic build and six Python controls pass. Existing zero-tick parser behavior preserved. Actual two-life SIS allocator controls cover backing identity mismatch, duplicate snapshot, present/removed payload and invalid used-list head; payload-size-mismatch branch remains unexercised.",
+        "observations": "Original Ready reached at124 ticks; unchanged text guard refuses nonnull owned-second-next. Same-run original append and semantic creation identify matching HUD nametag pointer;0 matched removals across HUD end. Separate immutable backing and bounded current used_head observation reports exact160-byte payload present. This is current allocator membership plus observed event lineage, not per-text lifetime/GObj/context ownership proof, guard correction or complete Session retirement/C3.",
+        "verification": {
+          "direct_bindings_unchanged": 754,
+          "fixtures_unchanged": 98,
+          "raw_files": 17,
+          "owned_pids_natural_exit_reaped_absent": [
+            35548,
+            35554
+          ],
+          "unittest_returncode": 0,
+          "native_returncode": 1
+        },
+        "scope": "Observation assertions pass; partial shutdown remains failed. Current SIS membership is separate from text lifetime and renderer/context ownership. Later map2 guard unevaluated. No complete Session retirement, C3, original comparison or browser acceptance.",
+        "independent_result_review": {
+          "artifact": "sol-ready-text-membership-result-review-v1.json",
+          "sha256": "be58c4e0d67093b1051d8730539d6395835daaab8dbad3ac763b60af478301d2"
+        }
       }
     }
   }
