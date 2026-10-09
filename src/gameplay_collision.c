@@ -114,20 +114,27 @@ static int collision_input(const MeleeWebCollisionInput* in, int source_loaded,
         const float magnitude = dx * dx + dy * dy;
         if (!isfinite(magnitude) || ((dx != 0 || dy != 0) && magnitude < FLT_MIN))
             return collision_fail(error, size, "Collision line exceeds the original normal arithmetic range");
-        if ((line->hi_flags & LINE_FLAG_KIND) == CollLine_Floor && (dx != 0 || dy != 0) && dx <= 0)
+        /* Dynamic effective kinds come from original current-endpoint
+         * classification; an authored floor hint is not a static floor. */
+        const MeleeWebCollisionRange static_floor = in->ranges[0];
+        if ((int) i >= static_floor.start && (int) i < static_floor.start + static_floor.count &&
+            (dx != 0 || dy != 0) && dx <= 0)
             return collision_fail(error, size, "Static floor queries require source left-to-right nonvertical lines");
     }
-    /* mpIsland walks raw next0 floor chains and prev0 ceiling chains. Reject
-     * cycles before invoking it, including loops entered after the first line. */
-    for (size_t start = 0; start < in->line_count; ++start) {
-        unsigned kind = in->lines[start].hi_flags & LINE_FLAG_KIND;
-        if (kind != CollLine_Floor && kind != CollLine_Ceiling) continue;
-        int current = (int) start;
-        size_t steps = 0;
-        while (current != -1 && (in->lines[current].hi_flags & LINE_FLAG_KIND) == kind) {
-            if (++steps > in->line_count)
-                return collision_fail(error, size, "Cyclic static island chains are unsupported");
-            current = kind == CollLine_Floor ? in->lines[current].next0 : in->lines[current].prev0;
+    /* mpIsland seeds only the static floor/ceiling ranges. It follows raw
+     * authored links by kind without stopping at a category boundary, so a
+     * static seed that enters another range still needs cycle protection. */
+    for (unsigned category = 0; category < 2; ++category) {
+        const MeleeWebCollisionRange range = in->ranges[category];
+        const unsigned kind = 1U << category;
+        for (int start = range.start; start < range.start + range.count; ++start) {
+            int current = start;
+            size_t steps = 0;
+            while (current != -1 && (in->lines[current].hi_flags & LINE_FLAG_KIND) == kind) {
+                if (++steps > in->line_count)
+                    return collision_fail(error, size, "Cyclic static island chains are unsupported");
+                current = kind == CollLine_Floor ? in->lines[current].next0 : in->lines[current].prev0;
+            }
         }
     }
     return 1;
