@@ -12,6 +12,11 @@
  * stripped; none of their stage/physics services are replaced by success stubs. */
 #include <melee/mp/mplib.c>
 
+/* These bounded owner tables match the fixed arrays declared in the included
+ * retail mplib.c: groundCollLine_count=1536 and groundCollJoint_count=256. */
+#define COLLISION_SOURCE_MAX_LINES 1536
+#define COLLISION_SOURCE_MAX_JOINTS 256
+
 _Static_assert(sizeof(MapLine) == 16 && sizeof(MapJoint) == 40 && sizeof(MapCollData) == 48,
                "Original collision descriptor ABI");
 /* mpIsland_8005A728 allocates only the 0x2c prefix; the source struct's final
@@ -24,8 +29,14 @@ struct MeleeWebCollision {
     HSD_GObj* object;
     MapCollData map;
     uint64_t generation;
-    int stage_joint_bindings_ready;
-    int stage_callbacks_ready;
+    const MapCollData* source_map;
+    const Vec2* source_vertices;
+    const MapLine* source_lines;
+    const MapJoint* source_joints;
+    GrKind source_stage_kind;
+    GrTouchLineCallback source_touch_line;
+    uint16_t source_dynamic_line_joint[COLLISION_SOURCE_MAX_LINES];
+    uint8_t source_dynamic_line_is_dynamic[COLLISION_SOURCE_MAX_LINES];
 };
 static MeleeWebCollision* collision_owner;
 
@@ -57,6 +68,9 @@ static int collision_adjacency(int index, size_t count)
 static int collision_input(const MeleeWebCollisionInput* in, int source_loaded,
                            char* error, size_t size)
 {
+    if (groundCollLine_count != COLLISION_SOURCE_MAX_LINES ||
+        groundCollJoint_count != COLLISION_SOURCE_MAX_JOINTS)
+        return collision_fail(error, size, "Original collision capacities exceed the bounded source owner tables");
     if (!in || !in->vertices || !in->lines || !in->joints ||
         !in->vertex_count || in->vertex_count > groundCollVtx_count ||
         !in->line_count || in->line_count > groundCollLine_count ||
@@ -67,7 +81,7 @@ static int collision_input(const MeleeWebCollisionInput* in, int source_loaded,
         return collision_fail(error, size, "Collision requires a source stage kind and positive finite stage scale");
     if (in->ranges[4].count && !source_loaded)
         return collision_fail(error, size, "Dynamic collision lines require pending stage bindings and callbacks");
-    unsigned char categories[1536] = {0};
+    unsigned char categories[COLLISION_SOURCE_MAX_LINES] = {0};
     for (unsigned category = 0; category < 5; ++category) {
         MeleeWebCollisionRange range = in->ranges[category];
         if (!collision_range(range, in->line_count))
@@ -140,47 +154,219 @@ static int collision_input(const MeleeWebCollisionInput* in, int source_loaded,
     return 1;
 }
 
-/* Retail Stage_8022524C loads the DAT collision map before StageData::on_init.
- * Dynamic ranges are usable only after that source callback has bound each
- * owning joint to its authored JObj. Keep this gate on source adoption alone;
- * synthetic collision creation runs before any stage callback by design. */
-static int collision_source_dynamic_ready(const MeleeWebCollisionInput* in,
-                                          char* error, size_t size)
+static int collision_source_joint_list(size_t joint_count,
+                                       unsigned char linked[COLLISION_SOURCE_MAX_JOINTS],
+                                       char* error, size_t size)
 {
-    if (!in->ranges[4].count) return 1;
+    CollJoint* current = jointListStart;
+    CollJoint* last = NULL;
+    const uintptr_t base = (uintptr_t) groundCollJoint;
+    const uintptr_t end = base + joint_count * sizeof(*groundCollJoint);
+    size_t steps = 0;
+    if ((!jointListStart) != (!jointListEnd))
+        return collision_fail(error, size, "Source dynamic collision active-joint list has mismatched endpoints");
+    while (current) {
+        const uintptr_t address = (uintptr_t) current;
+        if (address < base || address >= end ||
+            (address - base) % sizeof(*groundCollJoint) != 0)
+            return collision_fail(error, size, "Source dynamic collision active-joint list has a foreign owner");
+        const size_t index = (address - base) / sizeof(*groundCollJoint);
+        if (linked[index])
+            return collision_fail(error, size, "Source dynamic collision active-joint list contains a cycle");
+        linked[index] = 1;
+        last = current;
+        current = current->next;
+        if (++steps > joint_count)
+            return collision_fail(error, size, "Source dynamic collision active-joint list exceeds its source bounds");
+    }
+    if (last != jointListEnd)
+        return collision_fail(error, size, "Source dynamic collision active-joint list tail changed");
+    return 1;
+}
+
+static int collision_source_build_line_owners(MeleeWebCollision* owner,
+                                              char* error, size_t size)
+{
+    if (!owner->map.dynamic_count) return 1;
+    for (size_t i = 0; i < (size_t) owner->map.joint_count; ++i) {
+        const MapJoint* joint = &owner->map.joints[i];
+        if (!joint->dynamic_count) continue;
+        const int starts[5] = {joint->floor_start, joint->ceiling_start,
+            joint->right_wall_start, joint->left_wall_start, joint->dynamic_start};
+        const int counts[5] = {joint->floor_count, joint->ceiling_count,
+            joint->right_wall_count, joint->left_wall_count, joint->dynamic_count};
+        for (unsigned category = 0; category < 5; ++category) {
+            if (starts[category] < 0 || counts[category] < 0 ||
+                starts[category] > owner->map.line_count ||
+                counts[category] > owner->map.line_count - starts[category])
+                return collision_fail(error, size, "Source dynamic collision joint line range is outside its loaded map");
+            for (int line = starts[category]; line < starts[category] + counts[category]; ++line) {
+                const uint16_t joint_owner = (uint16_t) (i + 1);
+                if (owner->source_dynamic_line_joint[line] &&
+                    owner->source_dynamic_line_joint[line] != joint_owner)
+                    return collision_fail(error, size, "Source dynamic collision joints have overlapping owned line ranges");
+                owner->source_dynamic_line_joint[line] = joint_owner;
+                if (category == 4) owner->source_dynamic_line_is_dynamic[line] = 1;
+            }
+        }
+    }
+    return 1;
+}
+
+/* Retail Stage_8022524C loads the DAT collision map before StageData::on_init.
+ * A dynamic descriptor may be deliberately deferred only in the exact source
+ * state produced by removing its joint: correct loaded ownership, disabled and
+ * unlinked joint, and every owned category line disabled. */
+static int collision_source_dynamic_state(const MeleeWebCollision* owner,
+                                         int* all_joints_bound,
+                                         char* error, size_t size)
+{
+    const MapCollData* expected = &owner->map;
     MapCollData* source = stage_info.coll_data;
-    if (!stage_info.on_touch_line)
+    if (all_joints_bound) *all_joints_bound = 0;
+    if (!expected->dynamic_count) return 1;
+    if (!owner->source_touch_line || !stage_info.on_touch_line)
         return collision_fail(error, size, "Source dynamic collision has no authored touch-line callback");
-    if (!source || source != mpLib_804D64B4 || !source->lines || !source->joints ||
-        source->vert_count != (int) in->vertex_count ||
-        source->line_count != (int) in->line_count ||
-        source->joint_count != (int) in->joint_count ||
-        source->dynamic_start != in->ranges[4].start ||
-        source->dynamic_count != in->ranges[4].count)
+    if (stage_info.on_touch_line != owner->source_touch_line)
+        return collision_fail(error, size, "Source dynamic collision touch-line callback changed");
+    if (!expected->joints || !source || source != owner->source_map || source != mpLib_804D64B4 ||
+        stage_info.grkind != owner->source_stage_kind ||
+        !source->verts || !source->lines || !source->joints ||
+        source->verts != owner->source_vertices || source->lines != owner->source_lines ||
+        source->joints != owner->source_joints ||
+        source->vert_count != expected->vert_count ||
+        source->line_count != expected->line_count ||
+        source->joint_count != expected->joint_count ||
+        source->floor_start != expected->floor_start ||
+        source->floor_count != expected->floor_count ||
+        source->ceiling_start != expected->ceiling_start ||
+        source->ceiling_count != expected->ceiling_count ||
+        source->right_wall_start != expected->right_wall_start ||
+        source->right_wall_count != expected->right_wall_count ||
+        source->left_wall_start != expected->left_wall_start ||
+        source->left_wall_count != expected->left_wall_count ||
+        source->dynamic_start != expected->dynamic_start ||
+        source->dynamic_count != expected->dynamic_count ||
+        source->x2C != expected->x2C ||
+        !groundCollVtx || !groundCollLine || !groundCollJoint)
         return collision_fail(error, size, "Source dynamic collision lost its original loaded map descriptor");
 
-    unsigned char dynamic_line_owners[1536] = {0};
-    for (size_t i = 0; i < in->joint_count; ++i) {
-        const MeleeWebCollisionRange authored = in->joints[i].ranges[4];
+    if (source->line_count > COLLISION_SOURCE_MAX_LINES ||
+        source->joint_count > COLLISION_SOURCE_MAX_JOINTS)
+        return collision_fail(error, size, "Source dynamic collision dimensions exceed the original fixed capacities");
+    unsigned char linked[COLLISION_SOURCE_MAX_JOINTS] = {0};
+    if (!collision_source_joint_list((size_t) source->joint_count, linked, error, size)) return 0;
+    unsigned char dynamic_line_owners[COLLISION_SOURCE_MAX_LINES] = {0};
+    unsigned char joint_must_disable[COLLISION_SOURCE_MAX_JOINTS] = {0};
+    int every_dynamic_joint_bound = 1;
+    for (size_t i = 0; i < (size_t) source->joint_count; ++i) {
         const MapJoint* loaded = &source->joints[i];
-        if (!authored.count) continue;
+        const MapJoint* authored = &expected->joints[i];
+        if (memcmp(loaded, authored, sizeof(*loaded)) != 0)
+            return collision_fail(error, size, "Source dynamic collision joint descriptor or range changed");
+        if (!loaded->dynamic_count) continue;
         const CollJoint* bound = &groundCollJoint[i];
-        if (bound->inner != loaded || loaded->dynamic_start != authored.start ||
-            loaded->dynamic_count != authored.count || !bound->x20)
-            return collision_fail(error, size, "Source dynamic collision joint is not bound to its authored stage JObj");
-        for (int line = authored.start; line < authored.start + authored.count; ++line) {
-            if (line < in->ranges[4].start ||
-                line >= in->ranges[4].start + in->ranges[4].count ||
+        if (bound->inner != loaded)
+            return collision_fail(error, size, "Source dynamic collision joint lost its loaded MapJoint owner");
+        if (!!(bound->flags & CollJoint_Enabled) != !!linked[i])
+            return collision_fail(error, size, "Source dynamic collision joint enabled flag disagrees with active-list membership");
+        if (!bound->x20) {
+            every_dynamic_joint_bound = 0;
+            if (bound->flags & CollJoint_Enabled || linked[i])
+                return collision_fail(error, size, "Source dynamic collision joint is active without its authored stage JObj");
+            joint_must_disable[i] = 1;
+        } else if (!(bound->flags & CollJoint_Enabled)) {
+            joint_must_disable[i] = 1;
+        }
+        for (int line = loaded->dynamic_start;
+             line < loaded->dynamic_start + loaded->dynamic_count; ++line) {
+            if (line < expected->dynamic_start ||
+                line >= expected->dynamic_start + expected->dynamic_count ||
+                owner->source_dynamic_line_joint[line] != i + 1 ||
+                !owner->source_dynamic_line_is_dynamic[line] ||
                 groundCollLine[line].x0 != &source->lines[line])
                 return collision_fail(error, size, "Source dynamic collision line has no original joint-owned descriptor");
             if (dynamic_line_owners[line]++)
                 return collision_fail(error, size, "Source dynamic collision line is owned by overlapping stage joints");
         }
     }
-    for (int line = in->ranges[4].start;
-         line < in->ranges[4].start + in->ranges[4].count; ++line)
+    for (int line = expected->dynamic_start;
+         line < expected->dynamic_start + expected->dynamic_count; ++line)
         if (dynamic_line_owners[line] != 1)
             return collision_fail(error, size, "Source dynamic collision ranges do not cover every authored dynamic line");
+    for (int line = 0; line < source->line_count; ++line) {
+        const uint16_t encoded_joint = owner->source_dynamic_line_joint[line];
+        if (!encoded_joint) continue;
+        if (groundCollLine[line].x0 != &source->lines[line])
+            return collision_fail(error, size, "Source dynamic collision line has no original joint-owned descriptor");
+        const size_t joint = encoded_joint - 1;
+        const int enabled = (groundCollLine[line].flags & LINE_FLAG_ENABLED) != 0;
+        if (joint_must_disable[joint] && enabled)
+            return collision_fail(error, size, "Removed source dynamic collision joint retains an enabled owned line");
+    }
+    if (all_joints_bound) *all_joints_bound = every_dynamic_joint_bound;
+    return 1;
+}
+
+static int collision_source_line_descriptor(const MeleeWebCollision* owner,
+                                            int line, char* error, size_t size)
+{
+    const MapLine* descriptors = owner->source_lines ? owner->source_lines : owner->map.lines;
+    if (line < 0 || line >= owner->map.line_count || !descriptors ||
+        !groundCollLine || !groundCollVtx ||
+        groundCollLine[line].x0 != &descriptors[line])
+        return collision_fail(error, size, "Collision line descriptor escaped its loaded source map");
+    const MapLine* descriptor = &descriptors[line];
+    if (descriptor->v0_idx < 0 || descriptor->v0_idx >= owner->map.vert_count ||
+        descriptor->v1_idx < 0 || descriptor->v1_idx >= owner->map.vert_count)
+        return collision_fail(error, size, "Collision line descriptor has invalid source vertices");
+    return 1;
+}
+
+/* Retail mpLineGetNext/Prev inspect the alternate id1 line's flags and, when
+ * enabled, its descriptor and endpoint vertices before returning either id1
+ * or the raw id0 fallback. Validate every raw alternative and its descriptor
+ * first so the unchanged retail selector never dereferences outside this map. */
+static int collision_source_line_selection(const MeleeWebCollision* owner,
+                                           int line, char* error, size_t size)
+{
+    if (!collision_source_line_descriptor(owner, line, error, size)) return 0;
+    const MapLine* descriptors = owner->source_lines ? owner->source_lines : owner->map.lines;
+    const MapLine* descriptor = &descriptors[line];
+    const int alternatives[4] = {
+        descriptor->prev_id0, descriptor->prev_id1,
+        descriptor->next_id0, descriptor->next_id1,
+    };
+    for (size_t i = 0; i < sizeof(alternatives) / sizeof(alternatives[0]); ++i) {
+        if (!collision_adjacency(alternatives[i], (size_t) owner->map.line_count))
+            return collision_fail(error, size, "Retail line adjacency escaped the loaded source map");
+        if (alternatives[i] != -1 &&
+            !collision_source_line_descriptor(owner, alternatives[i], error, size))
+            return 0;
+    }
+    return 1;
+}
+
+static int collision_resolved_floor_chains(MeleeWebCollision* owner,
+                                           char* error, size_t size)
+{
+    for (int start = 0; start < owner->map.line_count; ++start) {
+        if (!(groundCollLine[start].flags & LINE_FLAG_ENABLED) ||
+            mpLineGetKind(start) != CollLine_Floor) continue;
+        for (int direction = 0; direction < 2; ++direction) {
+            int current = start;
+            size_t steps = 0;
+            while (current != -1) {
+                if (current < 0 || current >= owner->map.line_count)
+                    return collision_fail(error, size, "Resolved floor adjacency escaped its loaded source map");
+                if (!collision_source_line_selection(owner, current, error, size)) return 0;
+                if (mpLineGetKind(current) != CollLine_Floor) break;
+                if (++steps > (size_t) owner->map.line_count)
+                    return collision_fail(error, size, "Cyclic resolved floor-query chains are unsupported");
+                current = direction ? mpLineGetPrev(current) : mpLineGetNext(current);
+            }
+        }
+    }
     return 1;
 }
 
@@ -355,19 +541,13 @@ MeleeWebCollision* melee_web_collision_create(const MeleeWebCollisionInput* in, 
      * object's userdata lifetime prevents updates after collision storage dies. */
     owner->object = mpLib_80058820_owned();
     GObj_InitUserData(owner->object, 0, collision_release, owner);
-    /* Static adjacency selection can use alternate links. Check those actual
-     * original selections before allowing an unbounded floor traversal. */
-    for (int start = 0; start < owner->map.line_count; ++start)
-        for (int direction = 0; direction < 2; ++direction) {
-            int current = start, steps = 0;
-            while (current != -1 && mpLineGetKind(current) == CollLine_Floor) {
-                if (++steps > owner->map.line_count) {
-                    melee_web_collision_destroy(owner, NULL, 0);
-                    collision_fail(error, size, "Cyclic resolved floor-query chains are unsupported"); return NULL;
-                }
-                current = direction ? mpLineGetPrev(current) : mpLineGetNext(current);
-            }
-        }
+    /* Only enabled floor lines can seed an executable query. A walk still
+     * follows original adjacency across disabled boundaries; the query itself
+     * rejects any disabled node before calling retail floor arithmetic. */
+    if (!collision_resolved_floor_chains(owner, error, size)) {
+        melee_web_collision_destroy(owner, NULL, 0);
+        return NULL;
+    }
     collision_success(error, size);
     return owner;
 }
@@ -384,8 +564,7 @@ MeleeWebCollision* melee_web_collision_adopt_loaded(
         collision_fail(error, size, "Loaded source collision has no exclusive active stage context");
         return NULL;
     }
-    if (!collision_input(in, 1, error, size) ||
-        !collision_source_dynamic_ready(in, error, size)) return NULL;
+    if (!collision_input(in, 1, error, size)) return NULL;
     for (HSD_GObj* candidate = ((HSD_GObj**) HSD_GObj_Entities)[6];
          candidate; candidate = candidate->next) {
         if (candidate->classifier != 1 || !candidate->proc ||
@@ -406,6 +585,16 @@ MeleeWebCollision* melee_web_collision_adopt_loaded(
     if (!owner || !collision_map_copy(owner, in, error, size)) {
         free(owner); return NULL;
     }
+    if (!collision_source_build_line_owners(owner, error, size)) {
+        collision_map_clear(owner); free(owner);
+        return NULL;
+    }
+    owner->source_map = mpLib_804D64B4;
+    owner->source_vertices = owner->source_map->verts;
+    owner->source_lines = owner->source_map->lines;
+    owner->source_joints = owner->source_map->joints;
+    owner->source_stage_kind = stage_info.grkind;
+    owner->source_touch_line = stage_info.on_touch_line;
     for (int i = 0; i < owner->map.line_count; ++i) {
         if (!groundCollLine[i].x0) {
             collision_map_clear(owner); free(owner);
@@ -414,24 +603,17 @@ MeleeWebCollision* melee_web_collision_adopt_loaded(
         }
         owner->map.lines[i] = *groundCollLine[i].x0;
     }
-    owner->generation = generation; owner->object = object; collision_owner = owner;
-    if (in->ranges[4].count) {
-        owner->stage_joint_bindings_ready = 1;
-        owner->stage_callbacks_ready = 1;
+    if (owner->map.dynamic_count &&
+        !collision_source_dynamic_state(owner, NULL, error, size)) {
+        collision_map_clear(owner); free(owner);
+        return NULL;
     }
+    owner->generation = generation; owner->object = object; collision_owner = owner;
     GObj_InitUserData(object, 0, collision_release, owner);
-    for (int start = 0; start < owner->map.line_count; ++start)
-        for (int direction = 0; direction < 2; ++direction) {
-            int current = start, steps = 0;
-            while (current != -1 && mpLineGetKind(current) == CollLine_Floor) {
-                if (++steps > owner->map.line_count) {
-                    melee_web_collision_destroy(owner, NULL, 0);
-                    collision_fail(error, size, "Cyclic resolved source floor-query chains are unsupported");
-                    return NULL;
-                }
-                current = direction ? mpLineGetPrev(current) : mpLineGetNext(current);
-            }
-        }
+    if (!collision_resolved_floor_chains(owner, error, size)) {
+        melee_web_collision_destroy(owner, NULL, 0);
+        return NULL;
+    }
     collision_success(error, size);
     return owner;
 }
@@ -444,8 +626,11 @@ int melee_web_collision_readiness(MeleeWebCollision* owner, MeleeWebCollisionRea
     MeleeWebCollisionReadiness result = {0};
     result.vertices = owner->map.vert_count; result.lines = owner->map.line_count; result.joints = owner->map.joint_count;
     result.storage_owned = result.original_indices_initialized = 1;
-    result.stage_joint_bindings_ready = owner->stage_joint_bindings_ready;
-    result.stage_callbacks_ready = owner->stage_callbacks_ready;
+    if (owner->map.dynamic_count) {
+        if (!collision_source_dynamic_state(owner, &result.stage_joint_bindings_ready,
+                                            error, size)) return 0;
+        result.stage_callbacks_ready = 1;
+    }
     for (mp_UnkStruct0* segment = mpIsland_80458E88.next; segment; segment = segment->next) ++result.floor_islands;
     for (mp_UnkStruct0* segment = mpIsland_80458E88.x4; segment; segment = segment->next) ++result.ceiling_islands;
     for (int i = 0; i < owner->map.line_count; ++i) if (owner->map.lines[i].hi_flags & LINE_FLAG_EMPTY) ++result.empty_lines;
@@ -457,6 +642,9 @@ int melee_web_collision_line(MeleeWebCollision* owner, int32_t index, MeleeWebCo
     if (!collision_live(owner, error, size)) return 0;
     if (!out || index < 0 || index >= owner->map.line_count)
         return collision_fail(error, size, "Collision line query index or output is invalid");
+    if (owner->map.dynamic_count &&
+        !collision_source_dynamic_state(owner, NULL, error, size)) return 0;
+    if (!collision_source_line_selection(owner, index, error, size)) return 0;
     MeleeWebCollisionLineResult result = {0}; Vec3 v0, v1, normal;
     mpLineGetV0Pos(index, &v0); mpLineGetV1Pos(index, &v1);
     memcpy(result.v0, &v0, sizeof(v0)); memcpy(result.v1, &v1, sizeof(v1));
@@ -474,14 +662,38 @@ int melee_web_collision_floor(MeleeWebCollision* owner, int32_t index, float x, 
                               MeleeWebCollisionFloorResult* out, char* error, size_t size)
 {
     if (!collision_live(owner, error, size)) return 0;
-    if (!out || index < 0 || index >= owner->map.line_count || !isfinite(x) || !isfinite(y) ||
-        mpLineGetKind(index) != CollLine_Floor || (groundCollLine[index].flags & LINE_FLAG_EMPTY))
-        return collision_fail(error, size, "Floor query requires a finite point and a nonempty static floor line");
+    if (!out || index < 0 || index >= owner->map.line_count || !isfinite(x) || !isfinite(y))
+        return collision_fail(error, size, "Floor query requires a valid line and finite point");
+    if (owner->map.dynamic_count &&
+        !collision_source_dynamic_state(owner, NULL, error, size)) return 0;
+    if (!collision_source_line_selection(owner, index, error, size)) return 0;
+    if (mpLineGetKind(index) != CollLine_Floor ||
+        (groundCollLine[index].flags & LINE_FLAG_EMPTY))
+        return collision_fail(error, size, "Floor query requires a nonempty source floor line");
     for (int direction = 0; direction < 2; ++direction) {
         int current = index;
-        while (current != -1 && mpLineGetKind(current) == CollLine_Floor) {
+        size_t steps = 0;
+        while (current != -1) {
+            if (current < 0 || current >= owner->map.line_count)
+                return collision_fail(error, size, "Floor query adjacency escaped its loaded source map");
+            if (!collision_source_line_selection(owner, current, error, size)) return 0;
+            if (mpLineGetKind(current) != CollLine_Floor) break;
+            if (++steps > (size_t) owner->map.line_count)
+                return collision_fail(error, size, "Floor query resolved floor chain is cyclic");
+            if (!(groundCollLine[current].flags & LINE_FLAG_ENABLED))
+                return collision_fail(error, size, "Floor query crosses a disabled source floor line");
+            if (groundCollLine[current].flags & LINE_FLAG_EMPTY)
+                return collision_fail(error, size, "Floor query crosses an empty source floor line");
             const MapLine* line = groundCollLine[current].x0;
-            if (groundCollVtx[line->v1_idx].pos.x <= groundCollVtx[line->v0_idx].pos.x)
+            if (!line || line->v0_idx >= owner->map.vert_count ||
+                line->v1_idx >= owner->map.vert_count)
+                return collision_fail(error, size, "Floor query line lost its loaded source vertices");
+            const Vec2 v0 = groundCollVtx[line->v0_idx].pos;
+            const Vec2 v1 = groundCollVtx[line->v1_idx].pos;
+            if (!isfinite(v0.x) || !isfinite(v0.y) ||
+                !isfinite(v1.x) || !isfinite(v1.y))
+                return collision_fail(error, size, "Floor query source endpoints are nonfinite");
+            if (v1.x <= v0.x)
                 return collision_fail(error, size, "Floor query chain contains a degenerate line retained by source stage policy");
             current = direction ? mpLineGetPrev(current) : mpLineGetNext(current);
         }
