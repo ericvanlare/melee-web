@@ -171,6 +171,26 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
                 self.assertIn(expected, run.stderr)
                 self.assertNotIn("Unknown transition input recipe", run.stderr)
 
+    def test_sparse_css_observer_dispatch_without_assets(self):
+        target = ROOT / "build/browser-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("The native menu host trace has not been built")
+        absent = self.scratch / "absent-sparse-css-observer-fixtures"
+        self.assertFalse(absent.exists())
+        revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        for stage, expected in ((32, "Missing owned menu host fixture: MnSlChr.usd"),
+                                (31, "Explicit FD recipes require Final Destination")):
+            with self.subTest(stage=stage):
+                run = subprocess.run([str(node_runtime()), str(target), str(absent),
+                    str(absent), str(stage), str(self.scratch / f"sparse-css-observer-{stage}.jsonl"),
+                    revision, "sparse-css-observer-preflight-v1"], cwd=ROOT,
+                    capture_output=True, text=True, timeout=30)
+                (self.scratch / f"sparse-css-observer-{stage}.stdout").write_text(run.stdout)
+                (self.scratch / f"sparse-css-observer-{stage}.stderr").write_text(run.stderr)
+                self.assertNotEqual(run.returncode, 0)
+                self.assertIn(expected, run.stderr)
+                self.assertNotIn("Unknown transition input recipe", run.stderr)
+
     def test_sudden_death_natural_timeout_dispatch_without_assets(self):
         target = ROOT / "build/browser-release/native_menu_host_trace.js"
         if not target.is_file():

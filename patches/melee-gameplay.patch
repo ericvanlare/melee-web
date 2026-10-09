@@ -9119,7 +9119,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..850bb56f27b76d2cd4a817e896ada991
          mnCharSel_804D6CF6 = 5;
          sfxForward();
          break;
-@@ -5528,3 +5573,104 @@ void mnCharSel_Scene_OnExit(void* unused)
+@@ -5528,3 +5573,137 @@ void mnCharSel_Scene_OnExit(void* unused)
      lbAudioAx_8002702C(4, tmp);
      lbAudioAx_80027168();
  }
@@ -9177,23 +9177,56 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..850bb56f27b76d2cd4a817e896ada991
 +/* Observation only: report the authored four-door CSS state needed by an
 + * ordinary single-cursor browser recipe. Every value is copied from the live
 + * source structs; this function never writes guest state or drives input. */
++/* Internal one-shot test binding, never exported to the browser API. The
++ * native reducer owns reporting; ordinary observations produce no logging. */
++typedef void (*MeleeWebCssObserveFailure)(int, int, int, const void*,
++    const void*, const void*, const void*, const void*, unsigned);
++static MeleeWebCssObserveFailure melee_web_css_observe_failure_once;
++void melee_web_css_observe_setup_diagnostic_once(MeleeWebCssObserveFailure callback)
++{
++    melee_web_css_observe_failure_once = callback;
++}
++static int melee_web_css_observe_failed(MeleeWebCssObserveFailure callback,
++    int guard, int port, int joint, const void* cursor, const void* model,
++    HSD_JObj* slider)
++{
++    if (callback) callback(guard, port, joint, mnCharSel_804D6CB0,
++        mnCharSel_804D6CC0, cursor, model, slider, slider ? slider->flags : 0);
++    return 0;
++}
++
 +int melee_web_css_observe_setup(int cursors[4][4], int doors[4][10],
 +                                float geometry[4][12])
 +{
 +    int i;
-+    if (!mnCharSel_804D6CB0 || !mnCharSel_804D6CC0 || !cursors || !doors ||
-+        !geometry) return 0;
++    MeleeWebCssObserveFailure diagnostic = melee_web_css_observe_failure_once;
++    melee_web_css_observe_failure_once = NULL;
++    if (!mnCharSel_804D6CB0)
++        return melee_web_css_observe_failed(diagnostic, 1, -1, -1, NULL, NULL, NULL);
++    if (!mnCharSel_804D6CC0)
++        return melee_web_css_observe_failed(diagnostic, 2, -1, -1, NULL, NULL, NULL);
++    if (!cursors || !doors || !geometry)
++        return melee_web_css_observe_failed(diagnostic, 3, -1, -1, NULL, NULL, NULL);
 +    for (i = 0; i < 4; ++i) {
 +        struct CSSCursorData* cursor = mnCharSel_804A0BC0[i];
 +        struct CSSCharModel* model = mnCharSel_804A0BD0[i];
 +        CSSDoor* door = &mnCharSel_803F0DFC.doors[i];
 +        HSD_JObj* slider = NULL;
-+        if (!cursor || !model) return 0;
++        if (!cursor)
++            return melee_web_css_observe_failed(diagnostic, 4, i,
++                door->cpuslider_joint, cursor, model, NULL);
++        if (!model)
++            return melee_web_css_observe_failed(diagnostic, 5, i,
++                door->cpuslider_joint, cursor, model, NULL);
 +        /* Resolve the authored joint without asking HSD to rebuild matrices.
 +         * A dirty published matrix is explicitly reported as not ready. */
 +        lb_80011E24(mnCharSel_804D6CC0, &slider, door->cpuslider_joint, -1);
-+        if (!slider || (!(slider->flags & JOBJ_USER_DEF_MTX) &&
-+                        (slider->flags & JOBJ_MTX_DIRTY))) return 0;
++        if (!slider)
++            return melee_web_css_observe_failed(diagnostic, 6, i,
++                door->cpuslider_joint, cursor, model, slider);
++        if (!(slider->flags & JOBJ_USER_DEF_MTX) && (slider->flags & JOBJ_MTX_DIRTY))
++            return melee_web_css_observe_failed(diagnostic, 7, i,
++                door->cpuslider_joint, cursor, model, slider);
 +        cursors[i][0] = cursor->x4;
 +        cursors[i][1] = cursor->x5;
 +        cursors[i][2] = cursor->x6;
