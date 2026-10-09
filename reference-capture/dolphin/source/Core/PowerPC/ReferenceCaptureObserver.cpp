@@ -2487,7 +2487,7 @@ struct Observer::Impl
     return true;
   }
 
-  void SdEvent(const char* name, u32 pc, u32 tick)
+  void SdEvent(const char* name, u32 pc, u32 tick, Event event = Event::Progress)
   {
     std::string json = "{\"diagnostic\":\"sd_initialization_prefix\",\"name\":\"" +
                        std::string(name) + "\",\"consumed\":" +
@@ -2511,11 +2511,19 @@ struct Observer::Impl
       const size_t cap = event_name == "menu" ? 6144 :
                          (event_name == "input" || event_name == "menu_input" || event_name == "vs_retired") ? 512 :
                          event_name == "tick" ? 2048 : event_name == "vs_setup" ? 4096 :
-                         event_name == "vs_exit" ? 8192 : 65536;
+                         (event_name == "vs_exit" || event_name == "terminal_rejected") ? 8192 : 65536;
       if (json.size() > cap)
         return SetInvalid("Ordinary timeout event exceeds its serialized ceiling"), void();
     }
-    PushJson(Event::Progress, json, pc, tick);
+    PushJson(event, json, pc, tick);
+  }
+
+  void OrdinaryTerminalFailure(const char* reason, u32 pc, u32 tick)
+  {
+    // Preserve the actual slices already read at this failed publication.
+    // This is an error record, never a successful vs_exit or input completion.
+    SdEvent("terminal_rejected", pc, tick, Event::Error);
+    SetInvalid(reason);
   }
 
   void ObserveSdInit(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
@@ -2871,17 +2879,19 @@ struct Observer::Impl
             raw[13] != 1 || raw[16] != 1 || !AddOrdinaryLive(system, &stocks, &positions) ||
             !ordinary_timeout.Exit(tick, ReadBE32(clock + 0x24), ReadBE32(clock + 0x28),
                                    (clock[0x2c] << 8) | clock[0x2d], stocks[0], stocks[1]))
-          return SetInvalid("Ordinary canonical timeout/live terminal differs"), void();
+          return OrdinaryTerminalFailure("Ordinary canonical timeout/live terminal differs", pc, tick);
         for (u32 slot = 0; slot < 2; ++slot)
         {
           const size_t base = 0x58 + slot * 0xa8;
+          // gm_80166378/fn_80165AC0 ranks stock scores3:4 as1:0.
+          // MatchPlayerData+5 is is_big_loser, not a setup/team field.
           if (raw[base] != 0 || raw[base+1] != 8 || (raw[base+3] >> 2) != (slot == 0 ? 1 : 0) ||
-              raw[base+5] != 0 || raw[base+8] != (slot == 0 ? 3 : 4) || raw[base+12] || raw[base+13])
-            return SetInvalid("Ordinary MatchEnd participant/stock/damage differs"), void();
+              raw[base+5] != (slot == 0 ? 1 : 0) || raw[base+8] != (slot == 0 ? 3 : 4) || raw[base+12] || raw[base+13])
+            return OrdinaryTerminalFailure("Ordinary MatchEnd participant/stock/damage differs", pc, tick);
         }
         for (u32 slot = 2; slot < 6; ++slot)
           if (raw[0x58 + slot * 0xa8] != 3)
-            return SetInvalid("Ordinary MatchEnd inactive roster differs"), void();
+            return OrdinaryTerminalFailure("Ordinary MatchEnd inactive roster differs", pc, tick);
         SdEvent("vs_exit", pc, tick);
         return;
       }

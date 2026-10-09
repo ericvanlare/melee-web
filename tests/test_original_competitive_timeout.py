@@ -51,7 +51,7 @@ def result():
     b=bytearray(0x448);b[4:7]=bytes((1,1,0));b[8:12]=(28800).to_bytes(4,"big")
     b[13]=1;b[16]=1
     for slot,base in enumerate((0x58,0x100)):
-        b[base+1]=8;b[base+3]=(1,0)[slot]<<2;b[base+8]=(3,4)[slot]
+        b[base+1]=8;b[base+3]=(1,0)[slot]<<2;b[base+5]=(1,0)[slot];b[base+8]=(3,4)[slot]
     for slot in range(2,6):b[0x58+slot*0xa8]=3
     return bytes(b)
 
@@ -75,7 +75,7 @@ class OriginalTimeoutTests(unittest.TestCase):
         self.assertEqual(len(make_input_plan(6)["frames"]),4323)
         self.assertEqual(policy()["entry_recipe_sha256"],make_input_plan(6)["authored_recipe_sha256"])
         b=serialized_budget()
-        self.assertEqual((b["observer_records"],b["observer_bytes"]),(73455,126894356))
+        self.assertEqual((b["observer_records"],b["observer_bytes"]),(73456,126902592))
         self.assertLess(b["observer_bytes"],CAPS["observer_bytes"])
         self.assertEqual(b["native_mwri_bytes"],67108856)
         with tempfile.TemporaryDirectory() as tmp:
@@ -174,7 +174,7 @@ class OriginalTimeoutTests(unittest.TestCase):
             with self.subTest(change=change),self.assertRaises(ValueError):live_fighters(slices(bad),bad)
 
     def test_canonical_terminal_and_retirement_negatives(self):
-        for name in ("premature","wrongoutcome","wrongwinner","wrongstock","setupstock","wrongdamage","inactivehuman","inactivecpu","retire"):
+        for name in ("premature","wrongoutcome","wrongwinner","wrongstock","setupstock","wrongdamage","inactivehuman","inactivecpu","rank00","rank01","rank11","retire"):
             with self.subTest(name=name),self.assertRaises(ValueError):
                 s=loss();s.input(bank());s.phase="neutral-timeout";s.frame=28800
                 b=bytearray(result());v=live([3,4])
@@ -186,6 +186,9 @@ class OriginalTimeoutTests(unittest.TestCase):
                 elif name=="wrongdamage":b[0x64]=1
                 elif name=="inactivehuman":b[0x58+2*0xa8]=0
                 elif name=="inactivecpu":b[0x58+5*0xa8]=1
+                elif name=="rank00":b[0x5d]=0
+                elif name=="rank01":b[0x5d]=0;b[0x105]=1
+                elif name=="rank11":b[0x105]=1
                 else:s.retire()
                 s.exit(s.ticks,clock(28800),v,b)
 
@@ -232,6 +235,17 @@ class OriginalTimeoutTests(unittest.TestCase):
             else:row.update(event="end",payload=dict(status="interrupted",natural=False))
             with self.subTest(change=change),self.assertRaises(ValueError):bad.accept(row)
         r.accept(progress("tick",fields,1,0));self.assertEqual(r.ordinary.ticks,1)
+        # Synthetic failed-publication snapshots remain Error events. They
+        # cannot replace a successful vs_exit or activate native completion.
+        rejected=deepcopy(r)
+        row=progress("vs_exit",fields,1,0)
+        row.update(event="error")
+        row["payload"]["name"]="terminal_rejected"
+        with self.assertRaisesRegex(ValueError,"Ordinary event/scope/PC differs"):
+            rejected.accept(row)
+        self.assertEqual(rejected.order,2)
+        self.assertIsNone(rejected.terminal)
+        self.assertFalse(rejected.ended)
         for probe in ("competitive_entry","sd_prefix","rules_ready","ordinary_timeout"):
             payload=deepcopy(rows[0]["payload"]);payload["menu_probe"]=probe
             if probe=="ordinary_timeout":payload["ordinary_policy_sha256"]="0"*64
