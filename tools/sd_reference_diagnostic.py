@@ -59,6 +59,18 @@ class Receiver:
         self.ended = False
         self.records = {}
         self.tick = None
+        self.tick_count = 0
+        self.tick_consumed = 0
+        self.timeout_clock = None
+        self.last_clock_frame = 0
+        self.vs_inventory = None
+
+    def clock(self, data):
+        raw = data.get((14, 0), b"")
+        require(len(raw) == 0x2e, "SD observed match clock is missing")
+        return (int.from_bytes(raw[0x24:0x28], "big"),
+                int.from_bytes(raw[0x28:0x2c], "big"),
+                int.from_bytes(raw[0x2c:0x2e], "big"))
 
     def accept(self, row):
         require(not self.ended and row["seq"] == self.seq, "SD sequence gap, repeat or trailing event")
@@ -102,29 +114,61 @@ class Receiver:
             return
         require(payload["consumed"] == self.consumed, "SD event skipped consumed input")
         if name == "tick":
-            require(0 < self.order < len(ORDER), "SD tick escaped declared prefix")
+            require(self.order == 2, "SD tick escaped declared VS active scene")
             current = row["source_tick"]
-            require(type(current) is int and (self.tick is None or current == self.tick + 1),
+            require(type(current) is int and current == self.tick_count,
                     "SD source counter skipped/repeated within a scene")
+            require(self.consumed > self.tick_consumed,
+                    "SD scheduled iteration lacks observed preceding source consumption")
+            frame, seconds, subframe = self.clock(data)
+            require(frame in (self.last_clock_frame, self.last_clock_frame + 1) and
+                    seconds == max(0, 60 - (frame + 59) // 60) and
+                    subframe == (frame + 59) % 60,
+                    "SD observed match clock skipped or escaped declared countdown")
+            if (frame, seconds, subframe) == (3600, 0, 59):
+                self.timeout_clock = {"scene_tick": current, "frame_count": frame,
+                                      "timer_seconds": seconds, "timer_frames": subframe}
             self.tick = current
+            self.tick_count += 1
+            self.tick_consumed = self.consumed
+            self.last_clock_frame = frame
             return
         require(self.order < len(ORDER) and name == ORDER[self.order], "SD phase order differs")
         self.order += 1
         self.records[name] = data
         if name in ("vs_entry", "sd_entry"):
             self.tick = None  # scene counter resets are explicit, never global ticks
+        if name == "vs_setup":
+            # Setup-time samples cannot satisfy the first active iteration.
+            self.tick_consumed = self.consumed
         if name == "vs_entry":
             normal, persistent = data.get((4, 0), b""), data.get((4, 1), b"")
             verify_entry(self.plan, normal.hex())
+            require(normal[0x14] == 0, "SD recipe requires original default timer subframe initialization")
             require(len(persistent) == 0x138, "SD persistent VS payload is missing")
+            require(data.get((54, 0)) == b"\0" * 4,
+                    "SD original profile requires all four port rumble settings disabled")
             normalized = bytearray(persistent)
             normalized[2] |= 0x80
             normalized[4] |= 0x40
+            for slot in range(6):
+                base = 0x60 + slot * 0x24
+                if slot < 2:
+                    require(persistent[base + 0xa] == 120,
+                            "SD profile contract requires original unnamed human ports")
+                normalized[base + 0xc] &= ~0x80  # gm_LoadRumbleEnabled, exact owned bit
             require(bytes(normalized) == normal, "Normal VS setup differs from source rule normalization")
         if name == "vs_exit":
             raw = data.get((15, 0), b"")
             require(len(raw) == 0x448 and raw[4:7] == bytes((1, 1, 0)) and raw[0xd] == 2,
                     "SD requires an observed tied stock timeout")
+            frame, seconds, subframe = self.clock(data)
+            require(self.tick_count > 0 and row["source_tick"] == self.tick_count and
+                    self.timeout_clock is not None and frame == self.last_clock_frame and
+                    int.from_bytes(raw[8:12], "big") == frame and seconds == 0,
+                    "SD timeout lacks contiguous source inventory and observed natural clock/frame evidence")
+            self.vs_inventory = {"first": 0, "last": self.tick, "count": self.tick_count,
+                                 "exit_counter": row["source_tick"], "exit_match_frames": frame}
             for base in (0x58, 0x100):
                 require(raw[base] == 0 and raw[base + 1] == 8 and raw[base + 5] == 0 and
                         raw[base + 8] == 4 and raw[base + 12:base + 14] == b"\0\0",
@@ -161,4 +205,7 @@ class Receiver:
         return {"schema": "melee-web-sd-initialization-prefix", "version": 1,
                 "scope": SCOPE, "recipe_sha256": self.plan["authored_recipe_sha256"],
                 "consumed_samples": self.consumed, "native_input": native,
+                "source_inventory": {"vs": self.vs_inventory,
+                                     "sd": {"count": 0, "scope": "setup-before-loop"}},
+                "natural_timeout_clock": self.timeout_clock,
                 "observer_completion": "interrupted-prefix", "whole_session_admission": False}

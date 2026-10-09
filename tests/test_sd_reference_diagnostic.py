@@ -16,16 +16,21 @@ sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "scripts"))
 from authored_sd_reference_plan import make_input_plan
 from sd_reference_diagnostic import Receiver, SdDiagnosticError, SCOPE, PCS
-from capture_sd_reference_prefix import menu_actions
+from capture_sd_reference_prefix import menu_actions, wait_terminal_statuses
 from test_authored_sd_reference_plan import setup_bytes
 
 
 def events():
     plan = make_input_plan()
     normal = setup_bytes()
+    for slot in range(2):
+        normal[0x60 + slot * 0x24 + 0xa] = 120
     persistent = bytearray(normal)
     persistent[2] &= ~0x80
     persistent[4] &= ~0x40
+    # Persistent settings need not have been normalized by the last match.
+    for slot in (0, 2):
+        persistent[0x60 + slot * 0x24 + 0xc] |= 0x80
     sd = bytearray(persistent)
     sd[0] &= ~2
     sd[2] &= ~4
@@ -36,6 +41,7 @@ def events():
     end = bytearray(0x448)
     end[4:7] = bytes((1, 1, 0))
     end[0xd] = 2
+    end[8:12] = (3600).to_bytes(4, "big")
     for base in (0x58, 0x100):
         end[base + 1] = 8
         end[base + 8] = 4
@@ -48,15 +54,28 @@ def events():
                       "dolphin_commit": "c77bbaa0f372c3f72281602a8b087206706542cb",
                       "cpu": "JITARM64", "writes_guest_memory": False})
     row("start", {"status": "recording"})
-    def progress(name, data=(), count=1):
+    consumed = 0
+    def progress(name, data=(), count=None):
         row("progress", {"diagnostic": SCOPE, "name": name, "pc": PCS[name], "consumed": count,
                          "slices": [{"tag": tag, "flags": flags, "address": 0x80001000,
                                      "hex": bytes(raw).hex()} for tag, flags, raw in data]})
-    progress("vs_entry", ((4, 0, normal), (4, 1, persistent)), count=0)
+        rows[-1]["payload"]["consumed"] = consumed if count is None else count
+    progress("vs_entry", ((4, 0, normal), (4, 1, persistent), (54, 0, b"\0" * 4)), count=0)
     pad = b"".join(bytes.fromhex(value) + b"\0" for value in plan["frames"][0])
+    consumed += 1
     progress("input", ((3, 0, pad),))
     progress("vs_setup", ((4, 0, normal),))
-    progress("vs_exit", ((15, 0, end),))
+    for frame in range(1, 3601):
+        consumed += 1
+        progress("input", ((3, 0, pad),))
+        clock = bytearray(0x2e)
+        clock[0x24:0x28] = frame.to_bytes(4, "big")
+        clock[0x28:0x2c] = (60 - (frame + 59) // 60).to_bytes(4, "big")
+        clock[0x2c:0x2e] = ((frame + 59) % 60).to_bytes(2, "big")
+        progress("tick", ((14, 0, clock),))
+        rows[-1]["source_tick"] = frame - 1
+    progress("vs_exit", ((15, 0, end), (14, 0, clock)))
+    rows[-1]["source_tick"] = 3600
     progress("vs_retired")
     progress("sd_entry", ((4, 0, sd), (4, 1, persistent)))
     sd[6] = 1
@@ -70,7 +89,70 @@ def events():
     return rows
 
 
+def index(rows, name):
+    return next(i for i, row in enumerate(rows) if row["payload"].get("name") == name)
+
+
 class SdReferenceDiagnosticTests(unittest.TestCase):
+    def test_cli_requires_explicit_inputs_and_does_not_succeed_as_a_noop(self):
+        result = subprocess.run([sys.executable, str(ROOT / "scripts/capture_sd_reference_prefix.py")],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("--menu-recipe", result.stderr)
+
+    def test_independent_status_writer_race_and_invalid_native_status(self):
+        primary = {"state": "interrupted", "invalid": False, "error": None}
+        with mock.patch("capture_sd_reference_prefix.Path.is_file", return_value=True), \
+                mock.patch("capture_sd_reference_prefix.read_status", return_value=primary), \
+                mock.patch("capture_sd_reference_prefix.validate_status", side_effect=[
+                    {"complete": False}, {"complete": True}]) as status, \
+                mock.patch("capture_sd_reference_prefix.time.sleep") as sleep:
+            wait_terminal_statuses("observer", "native", float("inf"))
+            self.assertEqual(status.call_count, 2)
+            sleep.assert_called_once_with(0.02)
+        with mock.patch("capture_sd_reference_prefix.Path.is_file", return_value=True), \
+                mock.patch("capture_sd_reference_prefix.read_status", return_value=primary), \
+                mock.patch("capture_sd_reference_prefix.validate_status", side_effect=ValueError("invalid native")), \
+                mock.patch("capture_sd_reference_prefix.time.sleep") as sleep:
+            with self.assertRaisesRegex(ValueError, "invalid native"):
+                wait_terminal_statuses("observer", "native", float("inf"))
+            sleep.assert_not_called()
+
+    def test_missing_ticks_clock_jump_or_missing_iteration_consumption_fail(self):
+        for name in ("no_ticks", "skip_tick", "no_consumption", "clock_jump"):
+            rows = events()
+            if name == "no_ticks":
+                rows = [r for i, r in enumerate(rows) if i < 5 or
+                        r["payload"].get("name") not in ("input", "tick")]
+                for row in rows[5:]:
+                    if "consumed" in row["payload"]:
+                        row["payload"]["consumed"] = 1
+            elif name == "skip_tick":
+                rows.pop(index(rows, "tick"))
+            elif name == "no_consumption":
+                rows.pop(5)
+                for row in rows[5:]:
+                    if "consumed" in row["payload"]:
+                        row["payload"]["consumed"] -= 1
+            else:
+                raw = bytearray.fromhex(rows[index(rows, "tick")]["payload"]["slices"][0]["hex"])
+                raw[0x24:0x28] = (3600).to_bytes(4, "big")
+                rows[index(rows, "tick")]["payload"]["slices"][0]["hex"] = raw.hex()
+            for i, row in enumerate(rows):
+                row["seq"] = i
+            with self.subTest(name=name), self.assertRaises(SdDiagnosticError):
+                self.accept(rows)
+
+    def test_profile_rumble_and_unnamed_ports_are_exact_supported_requirements(self):
+        for field, offset, value in ((2, 0, 1), (1, 0x6a, 0)):
+            rows = events()
+            item = rows[2]["payload"]["slices"][field]
+            raw = bytearray.fromhex(item["hex"])
+            raw[offset] = value
+            item["hex"] = raw.hex()
+            with self.assertRaises(SdDiagnosticError):
+                self.accept(rows)
+
     def test_menu_packets_are_predeclared_bounded_and_finish_in_original_sss(self):
         value = {"schema": "melee-web-sd-original-menu-inputs", "version": 1,
                  "actions": [{"label": "confirm", "scene": 9, "p1": "0000000000000000000000",
@@ -96,7 +178,9 @@ class SdReferenceDiagnosticTests(unittest.TestCase):
     def test_declared_unit_prefix_keeps_legacy_completion_interrupted(self):
         receiver = self.accept(events())
         self.assertTrue(receiver.ended)
-        self.assertEqual(receiver.consumed, 1)
+        self.assertEqual(receiver.consumed, 3601)
+        self.assertEqual(receiver.tick_count, 3600)
+        self.assertEqual(receiver.vs_inventory["last"], 3599)
         for payload in ({"status": "completed", "natural": True},
                         {"status": "interrupted", "natural": True}):
             rows = events()
@@ -105,9 +189,9 @@ class SdReferenceDiagnosticTests(unittest.TestCase):
                 self.accept(rows)
 
     def test_missing_reordered_duplicate_and_wrong_pc_fail(self):
-        for mutate in (lambda r: r.pop(5), lambda r: r.insert(5, deepcopy(r[4])),
-                       lambda r: r[7]["payload"].__setitem__("name", "sd_setup"),
-                       lambda r: r[8]["payload"].__setitem__("pc", 0x8016e9c4)):
+        for mutate in (lambda r: r.pop(index(r, "vs_exit")), lambda r: r.insert(5, deepcopy(r[4])),
+                       lambda r: r[index(r, "sd_entry")]["payload"].__setitem__("name", "sd_setup"),
+                       lambda r: r[index(r, "sd_setup")]["payload"].__setitem__("pc", 0x8016e9c4)):
             rows = events()
             mutate(rows)
             with self.assertRaises(SdDiagnosticError):
@@ -129,15 +213,15 @@ class SdReferenceDiagnosticTests(unittest.TestCase):
         receiver = self.accept(events()[:-1])
         bad = {"seq": receiver.seq, "event": "progress", "source_tick": 1,
                "payload": {"diagnostic": SCOPE, "name": "tick", "pc": PCS["tick"],
-                           "consumed": 1, "slices": []}}
+                           "consumed": receiver.consumed, "slices": []}}
         with self.assertRaisesRegex(SdDiagnosticError, "escaped declared"):
             receiver.accept(bad)
 
     def test_non_tie_sd_flag_normalization_and_wrong_damage_fail(self):
-        for index, field, offset, value in ((5, 0, 0xd, 1), (7, 0, 4, 0x40),
-                                           (8, 0, 6, 0), (8, 2, 0, 0)):
+        for name, field, offset, value in (("vs_exit", 0, 0xd, 1), ("sd_entry", 0, 4, 0x40),
+                                           ("sd_setup", 0, 6, 0), ("sd_setup", 2, 0, 0)):
             rows = events()
-            item = rows[index]["payload"]["slices"][field]
+            item = rows[index(rows, name)]["payload"]["slices"][field]
             raw = bytearray.fromhex(item["hex"])
             raw[offset] = value
             item["hex"] = raw.hex()

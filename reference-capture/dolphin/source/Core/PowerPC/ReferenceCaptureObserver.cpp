@@ -218,6 +218,7 @@ enum class SliceTag : u16
   MenuCssKoCounts = 51,
   PlayerEntities = 52,
   PlayerEntityUserData = 53,
+  SdRumblePorts = 54,  // Opt-in Progress JSON only; never a full save-data slice.
 };
 
 struct SliceRef
@@ -2376,7 +2377,8 @@ struct Observer::Impl
     }
     if (pc == 0x80390eb4 && sd_init.phase != SdInitState::Phase::Menu)
     {
-      if (!BoundaryInstructionMatches(system, pc))
+      if (!BoundaryInstructionMatches(system, pc) ||
+          !AddSlice(system, SliceTag::MatchClock, 0x8046b6a0, 0x2e))
         return SetInvalid("SD prefix scheduler return instruction differs"), void();
       SdEvent("tick", pc, tick);
       return;
@@ -2405,6 +2407,7 @@ struct Observer::Impl
           !AddSlice(system, SliceTag::MatchSetup, sd_init.setup_pointer, 0x138) ||
           !AddSlice(system, SliceTag::MatchSetup, root + 0x598, 0x138, 1) ||
           !AddSlice(system, SliceTag::ProfileGameRules, root + 0x1850, 0x18) ||
+          !AddSlice(system, SliceTag::SdRumblePorts, root + 0x1cc0, 4) ||
           !AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358) || !AddProfileSlices(system) ||
           !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6) || !AddSceneKindSlice(system))
         return SetInvalid("SD prefix setup/persistent VS payload is invalid"), void();
@@ -2475,7 +2478,8 @@ struct Observer::Impl
     if (pc == 0x8016ebbc && sd_init.phase == SdInitState::Phase::VsActive)
     {
       if (!BoundaryInstructionMatches(system, pc) || !sd_init.Exit() ||
-          !AddSlice(system, SliceTag::Result, 0x80479d98 + 0xc, 0x448))
+          !AddSlice(system, SliceTag::Result, 0x80479d98 + 0xc, 0x448) ||
+          !AddSlice(system, SliceTag::MatchClock, 0x8046b6a0, 0x2e))
         return SetInvalid("SD prefix normal timeout exit is invalid"), void();
       // Original outcome and participant decision remain outputs, never inputs.
       if (raw[4] != 1 || raw[5] != 1 || raw[6] != 0 || raw[0xd] != 2 ||
