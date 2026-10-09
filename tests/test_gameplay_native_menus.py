@@ -192,7 +192,8 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         revision = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
         for recipe in ("returned-menu-results-control-v1",
-                       "returned-menu-two-human-results-input-control-v1"):
+                       "returned-menu-two-human-results-input-control-v1",
+                       "returned-menu-two-human-timeout-results-control-v1"):
             for stage, expected in (
                     (32, "Missing owned menu host fixture: MnSlChr.usd"),
                     (31, "Explicit FD recipes require Final Destination")):

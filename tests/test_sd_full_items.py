@@ -111,7 +111,20 @@ class FullItemsTests(unittest.TestCase):
             if row['event']=='progress' and row['payload'].get('name')=='menu':
                 row['payload']['menu_consumed']=r.menu_consumed
             r.accept(row)
+            if row['payload'].get('name')=='menu' and any(s['tag']==55 for s in row['payload']['slices']):
+                self.confirm(r,row)
         self.assertTrue(r.ended)
+
+    def confirm(self,r,stage_row):
+        # Explicit synthetic accepted-selection transition and complete countdown.
+        self.pad(r,'A')
+        for value in range(30,-1,-1):
+            row=deepcopy(stage_row);row['seq']=r.seq;row['source_tick']=31-value
+            row['payload']['menu_consumed']=r.menu_consumed
+            row['payload']['slices'].append({'tag':17,'flags':0,'address':0x80479d30,'hex':'020201010000'})
+            next(s for s in row['payload']['slices'] if s['tag']==55)['hex']=value.to_bytes(4,'big').hex()
+            r.accept(row)
+            if value==30:self.pad(r)
 
     def test_later_vs_requires_commit_and_exact_normalized_payload(self):
         for mutation in ('missingcommit','wrongrumble'):
@@ -126,3 +139,5 @@ class FullItemsTests(unittest.TestCase):
                         field=next(s for s in row['payload']['slices'] if s['tag']==4 and s['flags']==0)
                         raw=bytearray.fromhex(field['hex']);raw[0x6c]^=0x80;field['hex']=raw.hex()
                     r.accept(row)
+                    if row['payload'].get('name')=='menu' and any(s['tag']==55 for s in row['payload']['slices']):
+                        self.confirm(r,row)

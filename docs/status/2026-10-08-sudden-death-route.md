@@ -1,9 +1,16 @@
 # Sudden Death routing
 
-**Compiled / Source identified / Native traced**
+**Browser exercised / Compiled / Source identified / Native traced**
 
-The [scoped receipt](../evidence/sudden-death-route-v1.json) records a native
-functional pass at source `8b6ad349`: original CSS/SSS, natural one-minute VS
+The [scoped receipt](../evidence/sudden-death-route-v1.json) records the V11
+headless browser functional pass at harness `3285f344` and runtime `e13647cb`:
+original one-minute Rules/CSS/SSS input, natural tied VS → active Sudden Death
+with P2 winner → original two-Human Results confirmation → CSS → SSS/FD →
+fresh ordinary VS frame 1 → 15 → checked Eject. It is functional evidence only,
+with both later V3 native ordinary controls passed at `849b02e7`. Original
+comparison and final validation gates remain open.
+
+The earlier native functional pass at source `8b6ad349` covered: original CSS/SSS, natural one-minute VS
 timeout, active Sudden Death resolved through raw controller input, original
 typed Results, returned CSS/SSS selection, and owner/application cleanup.
 The persistent one-minute GameRules fixture is authored before CSS/SSS;
@@ -20,7 +27,8 @@ unobserved separately from the later recorded Results-entry state.
 The returned menu uses the existing Stages hydration path and preserves menu
 audio ownership. Supported normalized SSS selection, immutable archives,
 host/VS lease release, caller GameRules restoration, application close and
-fresh application reacquisition passed. A second matchworld was not run.
+fresh application reacquisition passed. That native control did not run a second matchworld; later V11 exercised a
+fresh ordinary match prefix only.
 PCM processing continued throughout; rendering, PCM equivalence and timing
 acceptance are outside this native control.
 
@@ -57,9 +65,11 @@ retained 271 complete observed rows: phase 0 → 1 → 2, P1 presentation Start,
 stats readiness, and P1-only confirmation. After the issued P2 End, the host
 entered deferred next-scene preparation (phase 5, running 0); the checked
 observer failed before reading the following trace. P2's consumed Start,
-all-confirmed state and original exit remain unobserved in this run. The shared
-helper and callsite need a reduced checked transition control before another
-long route. Both runs passed Eject and exact child/browser/socket cleanup;
+all-confirmed state and original exit remain unobserved in this run. At that
+historical boundary the shared
+helper and callsite required a reduced checked transition control before another
+long route; later V11 passed the route. Both runs passed Eject and exact
+child/browser/socket cleanup;
 all failures and producer identities remain retained.
 
 V6 retained 288 complete Results rows, including P2’s raw and copied Start at
@@ -69,7 +79,7 @@ running 0; active returned CSS was not reached. Exact cleanup passed. A reduced
 readiness control now distinguishes loading, constructed destination and
 first-use render settling from active CSS/Prize. V6 did not retain Pause-control
 state; synthetic readiness fields are separate from its actual trace and host
-observation. The browser route remains failed until a changed run passes.
+observation. That V6 attempt remained failed; later V11 passed the route.
 
 V7 and V8 retained 290 Results rows with P2’s raw/copied Start at frame 279
 and all-confirmed phase 4. V7 rejected loading UI text during phase 5; V8
@@ -117,28 +127,40 @@ and SD comparison remain unrun.
 The consolidated executable head `fd55b378` passed all 2,163 unittest cases
 with 154 skips. It includes the reference toolset and shared Results helper;
 the earlier browser route failures remain retained. V11 passes the declared
-functional SD/Results/returned-menu/subsequent-prefix route; remaining ordinary
-non-tied/elimination regressions and original-comparison gates stay separate. The later executable
-phase/readiness and reference-toolset deltas have focused checks only; a current full suite is still required
-before integration. Frozen runtime `5308a80c` and
+functional SD/Results/returned-menu/subsequent-prefix route; later native V3
+non-tied timeout and elimination controls passed separately. Original-comparison
+gates stay open. The later executable
+phase/readiness and reference-toolset deltas were subsequently covered by the
+full suite at `cf8cbd88`; later reference-only changes remain separate. Frozen runtime `5308a80c` and
 native producers remain distinct from this tested source. Current-head CI and
 root integration review remain required.
 
 [Issue #291](https://github.com/ericvanlare/melee-web/issues/291) remains open for
-the corrected full browser route, original comparison, non-tied
-timeout/elimination controls and subsequent-match validation. Physical
+original comparison, later reference-focused checks/current-head CI and
+integration review. The
+subsequent ordinary
+entry/prefix passed in V11; a second whole match remains unrun. Physical
 input, pixels, uninterrupted audio, foreground timing and competitive-set
 acceptance keep their separate gates.
 
-The final-source native ordinary controls compiled in Release and passed the
-asset-free recipe/FD negatives and source callback/cache controls. The first
-non-tied one-minute attempt completed natural timeout and canonical public
-finish, then failed a new test assertion requiring publication after the match
-owner had closed. That API intentionally rejects closed owners. The correction
-separately checks rejection and retained terminal byte identity; its build/run
-is pending. The existing ordinary elimination control did not run after this
-first failure. No ordinary-control pass or emitted numeric terminal/PAD/seed
-claim is made from that failed attempt.
+Both V3 native ordinary controls passed at executable/build source `849b02e7`.
+The one-minute non-tied timeout used 3,838 input ticks and 3,600 source frames;
+P1's first stock loss took 111 movement ticks, followed by neutral input and
+stocks 3:4. Public finish published the actual single P2 winner before capturing
+final VS PAD/RNG and closing its owner. Final VS seed was 4,182,878,774;
+live Results observations used seed 3,408,458,326. Original two-Human Results
+confirmation, returned CSS/SSS, post-VS cache, GameRules/preferences and
+host/VS/application cleanup checks passed. The unchanged `results-mario-v1`
+control also passed No Contest and actual elimination through original Results
+to CSS, including 124 Ready/Go ticks and 114 frozen GAME ticks. These are
+native functional controls, distinct from browser runtime `e13647cb`.
+
+Two earlier non-tied attempts remain failed: V1 incorrectly required publication
+after owner close; V2 reused an elimination-only Results test precondition for
+a genuine timeout. V2 emitted the actual timeout terminal and final PAD but not
+its Results-entry payload or seed. A reduced constructed TIMEOUT/stocks 3:4
+Results-only control passed before V3; it did not play gameplay or replay V2's
+native bytes. All historical failures and superseded producers remain retained.
 
 The reviewed `23b9ff37` original-reference Items receiver/toolset extension
 is integrated as source only, preserving the earlier equivalent `6ade1bf4`
@@ -146,3 +168,31 @@ baseline and SD work. All ten imported files match the reviewed source;
 46 cheap Python controls passed. The reference native producer is built in
 its own checkout. This integration does not establish an original full-prefix,
 SD or strict cross-producer comparison result.
+
+The reviewed `a051c52a` five-file original CSS autojoin extension is integrated
+exactly as source only. Reference native producer and SD integration head remain
+separate; this import does not establish original SD comparison.
+
+The latest original campaign at source `a051c52a` with retained native producer
+`23b9ff37`/binary `b6ea` completed Items and CSS autojoin, then failed the first
+SSS cooldown guard. This is a bounded menu-prefix outcome; original gameplay,
+SD and comparison remain unrun. The receipt retains the exact campaign
+failure and cleanup, with incomplete MWRI rather than a complete input trace.
+
+The reviewed `7d2adb67` reference receiver correction is integrated as exact
+source/test/fixture bytes. Constructor cooldown stays bounded at 20; observed
+FD/zero/new A after neutral arms the original 30-frame selection countdown,
+with exact source ticks, owner and release required. Actual retained controls
+cover 30 → 18; completion to zero remains synthetic until the changed original
+campaign is observed. Native `849b02e7` and browser `e13647cb` artifacts remain
+unchanged. That imported executable head was covered by the later full suite
+at `cf8cbd88`.
+
+The frozen `cf8cbd88` executable passed 2,193 unittest cases with 154 skips in
+482.195 seconds. Exact suite/supervisor processes retired and all frozen browser
+and native artifact hashes stayed unchanged. The later `5e136a78` receiver-only
+retirement correction is imported as exact bytes: it retains frozen SSS
+observations after both OnExits and routing advance, without counting them as
+source steps or admitting VS. This later delta is outside the full-suite
+identity; imported focused controls and current-head CI remain required. No
+new runtime build or original comparison is claimed by that import.

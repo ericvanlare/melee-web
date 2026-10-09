@@ -316,6 +316,13 @@ class RulesMenuReceiver(Receiver):
         self.items_right_pending = False
         self.items_commit_seen = False
         self.items_committed = False
+        self.sss_confirmation = None
+        self.sss_countdown = None
+        self.sss_countdown_tick = None
+        self.sss_confirmation_neutral = False
+        self.sss_countdown_inventory = []
+        self.sss_retirement = None
+        self.sss_retirement_inventory = []
         require(not items_probe or full_route, "Reduced Items probe requires its recipe-five owner")
         self.menu_consumed = 0
         self.menu_polls = 0
@@ -361,6 +368,9 @@ class RulesMenuReceiver(Receiver):
             if payload.get("name") == "vs_entry":
                 require(not self.guarded_items or self.items_committed,
                         "VS entry lacks observed committed Items progression")
+                require(not self.guarded_items or (self.sss_confirmation is not None and
+                        self.sss_countdown == 0 and self.sss_confirmation_neutral),
+                        "VS entry lacks observed SSS confirmation countdown/release")
                 require(self.final_css is not None and self.final_stage is not None and
                         [p["character"] for p in self.final_css["players"]] == [8, 8] and
                         [p["kind"] for p in self.final_css["players"]] == [0, 0] and
@@ -402,6 +412,7 @@ class RulesMenuReceiver(Receiver):
             self.latest_menu = menu_state(data)
             self.scene_owner_seen = True
         if name == "menu_input":
+            require(self.sss_retirement is None, "SSS retirement consumed new input")
             require(count == self.menu_consumed + 1 and count <= 7200,
                     "Rules probe source input gap/repeat/cap")
             raw = data.get((3, 0), b"")
@@ -413,6 +424,23 @@ class RulesMenuReceiver(Receiver):
             from retail_input_plan import DISCONNECTED_PAD, NEUTRAL_PAD
             require(self.last_pad[2:] == [DISCONNECTED_PAD] * 2,
                     "Rules probe inactive controllers changed")
+            if self.guarded_items and self.latest_menu.get("scene") == 9:
+                from reference_versus_sequence_capture import raw_pad
+                select = [raw_pad(buttons=["A"]), NEUTRAL_PAD]
+                if self.sss_confirmation is not None:
+                    require(self.last_pad[:2] == [NEUTRAL_PAD]*2 or
+                            (not self.sss_confirmation_neutral and self.last_pad[:2] == select and
+                             previous_pad == self.last_pad),
+                            "SSS consumed a new continuation after confirmation")
+                    if self.last_pad[:2] == [NEUTRAL_PAD]*2:
+                        self.sss_confirmation_neutral = True
+                elif self.last_pad[:2] == select:
+                    require(self.stage is not None and self.stage["kind"] == 32 and
+                            self.stage["cooldown"] == 0 and previous_pad is not None and
+                            previous_pad[:2] == [NEUTRAL_PAD]*2,
+                            "SSS confirmation lacks observed FD/zero/neutral predicate")
+                    self.sss_confirmation = {"seq":row["seq"], "source_tick":row["source_tick"],
+                                             "menu_consumed":count, "stage":self.stage.copy()}
             if self.items_guard and self.latest_menu.get("kind") == 16:
                 from reference_versus_sequence_capture import raw_pad
                 up = [raw_pad(buttons=["D_UP"]), NEUTRAL_PAD]
@@ -519,8 +547,10 @@ class RulesMenuReceiver(Receiver):
                 self.items_ready = True
                 return
         if self.full_route and not self.items_probe and name == "menu":
+            require(self.sss_confirmation is None or self.latest_menu["scene"] == 9,
+                    "SSS retirement owner changed before VS entry")
             self.css = css_state(data) if self.latest_menu["scene"] == 8 else None
-            self.stage = stage_state(data, payload) if self.latest_menu["scene"] == 9 else None
+            self.stage = stage_state(data, payload, confirmation=self.sss_confirmation is not None) if self.latest_menu["scene"] == 9 else None
             require(self.latest_menu["scene"] != 8 or self.final_css is None or self.css is not None,
                     "CSS typed owner disappeared after construction")
             require(self.latest_menu["scene"] != 9 or self.final_stage is None or self.stage is not None,
@@ -528,7 +558,45 @@ class RulesMenuReceiver(Receiver):
             if self.css is not None:
                 self.final_css = self.css
             if self.stage is not None:
-                self.final_stage = self.stage
+                if self.sss_confirmation is not None:
+                    require(self.stage["index"] == self.sss_confirmation["stage"]["index"] and
+                            self.stage["kind"] == 32,
+                            "SSS confirmed FD owner changed")
+                    # gm_801A4014 advances routing after OnExit, before the next
+                    # gm_801A4B88 replaces SceneInfo. PADRead observations in
+                    # that interval retain the old owner and frozen scene tick.
+                    route = next((s for s in payload["slices"] if s["tag"] == 17 and s["flags"] == 0), None)
+                    require(route is not None and route["address"] == 0x80479d30 and
+                            len(data[(17, 0)]) == 6, "SSS routing observation differs")
+                    retiring = data[(17, 0)] == bytes((2, 2, 1, 2, 1, 0))
+                    if retiring or self.sss_retirement is not None:
+                        require(retiring and self.sss_countdown == 0 and self.sss_confirmation_neutral and
+                                type(row["source_tick"]) is int and
+                                row["source_tick"] == self.sss_countdown_tick and
+                                self.stage["cooldown"] == 0 and count == self.menu_consumed,
+                                "SSS retirement frozen state differs")
+                        frozen = {"source_tick": row["source_tick"], "menu_consumed": count,
+                                  "stage": self.stage.copy(), "routing": route["hex"]}
+                        require(self.sss_retirement is None or frozen == self.sss_retirement,
+                                "SSS retirement snapshot changed")
+                        self.sss_retirement = frozen
+                        self.sss_retirement_inventory.append(dict(frozen, seq=row["seq"]))
+                        self.menu_polls += 1
+                        require(self.menu_polls <= 7200, "Rules probe menu polling cap exhausted")
+                        return  # Retained observation, never source advancement.
+                    require(data[(17, 0)] == bytes((2, 2, 1, 1, 0, 0)),
+                            "SSS active routing differs")
+                    prior_tick = (self.sss_confirmation["source_tick"] if self.sss_countdown is None else
+                                  self.sss_countdown_tick)
+                    expected = 30 if self.sss_countdown is None else max(0,self.sss_countdown-1)
+                    require(row["source_tick"] == prior_tick+1 and self.stage["cooldown"] == expected,
+                            "SSS confirmation countdown gap/repeat/value differs")
+                    self.sss_countdown = expected
+                    self.sss_countdown_tick = row["source_tick"]
+                    self.sss_countdown_inventory.append({"seq":row["seq"], "source_tick":row["source_tick"],
+                                                         "cooldown":expected})
+                else:
+                    self.final_stage = self.stage
         if name == "menu":
             self.menu_polls += 1
             require(self.menu_polls <= 7200, "Rules probe menu polling cap exhausted")
@@ -618,6 +686,10 @@ class GciRulesMenuReceiver(RulesMenuReceiver):
                           items_frequency_right_pulses=self.items_rights,
                           opening_entry_drain_samples=self.items_entry_drain_samples,
                           opening_entry_neutral=self.items_entry_neutral)
+            report.update(sss_confirmation=self.sss_confirmation,
+                          sss_confirmation_countdown=self.sss_countdown_inventory,
+                          sss_confirmation_neutral=self.sss_confirmation_neutral,
+                          sss_retirement_observations=self.sss_retirement_inventory)
         return report
 
 
@@ -635,10 +707,10 @@ def css_state(data):
         mx, my = struct.unpack(">ff", model[8:16])
         import math
         require(all(math.isfinite(v) for v in (x, y, mx, my)), "CSS coordinate is invalid")
-        result["cursors"].append({"state": cursor[5], "held": cursor[6], "x": x, "y": y})
-        result["models"].append({"x": mx, "y": my})
+        result["cursors"].append({"port": cursor[4], "state": cursor[5], "held": cursor[6], "x": x, "y": y})
+        result["models"].append({"owner": model[5], "x": mx, "y": my})
         base = 0x70 + slot * 0x24
-        result["players"].append({"character": live[base], "kind": live[base+1]})
+        result["players"].append({"character": live[base], "kind": live[base+1], "slot": live[base+4]})
         base = slot * 0x24
         result["doors"].append({"kind": doors[base+11], "costume": doors[base+13],
                                 "icon": doors[base+14]})
@@ -647,7 +719,7 @@ def css_state(data):
     return result
 
 
-def stage_state(data, payload):
+def stage_state(data, payload, *, confirmation=False):
     if (55, 0) not in data:
         require((41, 0) not in data and (42, 0) not in data,
                 "SSS highlight preceded constructor-owned cooldown")
@@ -662,5 +734,7 @@ def stage_state(data, payload):
              addresses[(42, 0)] == 0x803f06d0 + index[0]*0x1c + 0xb),
             "SSS authored random/highlight row differs")
     value = int.from_bytes(cooldown, "big")
-    require(value <= 20, "SSS constructor cooldown escaped its authored bound")
+    require(value <= (30 if confirmation else 20),
+            "SSS selection cooldown escaped its authored bound" if confirmation else
+            "SSS constructor cooldown escaped its authored bound")
     return {"index": index[0], "kind": kind[0] if kind else None, "cooldown": value}

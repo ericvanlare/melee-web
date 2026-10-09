@@ -437,7 +437,48 @@ frequency change without its declared pulse or leaving Items before commit.
 The original CSS/FD route and strict normalized VS/tied-timeout/SD payload
 checks remain; the stop is still SD setup, without resolution inputs. Tag56
 uses its existing verified byte reader for `sd_prefix` as well as the reduced
-`items_row` probe. The ed97 producer lacks the full-prefix tag scope and must
-be preserved; this source change needs a new compiled producer before capture.
-Actual reduced passing menu/PAD/lock fields are retained as a control; later
-frequency/CSS/tie/SD controls are explicitly synthetic, not original validation.
+`items_row` probe. The preserved ed97 producer lacks that full-prefix scope;
+source23b9/binaryb6ea compiled it. The actual menu7 attempt observed lock-clear,
+row31/value3, the three Right decrements and B commit back to Rules, then failed
+at first CSS inventory because the driver required Human before moving either
+cursor. Its raw prefix/cleanup is retained in the scoped
+`original-sd-prefix-boundary-failure-v3.json` receipt (SHA14924194…). Both initial
+doors were NA, their cursors were at y=-21.5, and no CSS input was authored.
+
+The corrected menu7 driver admits only that initialized vacant owner or a
+coherent own-Human owner. It reuses the declared move-to-Mario axes: original
+`mnCharSel_CursorThink` joins the own NA door when the cursor enters
+0.2<y<22, as already used by `retail_cpu_menu_prepare.select`. The driver then
+requires observed own-Human before A placement; CPU, foreign ownership and
+unconstructed inventory fail. Historical menu5 retains its immediate Human
+precondition. Menu7, recipe5, action bytes and caps are unchanged. Observer
+overlay/nativeb6ea remain unchanged; the receiver/driver checkpoint is separate.
+The changed a051 campaign actually observed both own-Human joins and the final
+two-Mario colors1/0 lineup, then FD highlighting and consumed confirmation A.
+It failed on the shared SSS counter's accepted-selection value30, not the
+constructor's initial19. The scoped `original-sd-prefix-boundary-failure-v4.json`
+receipt (SHA91125a42…) retains that progression and incomplete MWRI/cleanup.
+
+The receiver now distinguishes constructor countdown<=20 from accepted
+selection: only observed FD/cooldown0 and a new declared P1 A after neutral arm
+the source-authored30-frame counter. It requires first30 and consecutive source
+ticks/decrements, the same selected FD owner, and an observed neutral release;
+another A after neutral or other continuation fails. The FD/cooldown0 selection
+snapshot remains frozen, and VS admission requires observed countdown0 plus
+all existing strict setup checks. The actual fixture retains30→18 only; later
+countdown0/VS/tie/SD controls are explicitly synthetic. No native observer,
+menu7, recipe5, controller bytes or caps change for this decoder correction.
+
+The changed 7d2 campaign observed the exact30→0 countdown, then neutral zero
+progress through source tick239/menu count539. It failed at seq1689: the same
+SSS/FD/zero snapshot and frozen counters remained, while authored routing changed
+from SSS state1 to VS state2 (previous state1). `gm_801A4014` changes routing
+after OnExit; the SceneInfo pointer remains installed until the next
+`gm_801A4B88`. PADRead polls during this interval are observations, not source
+ticks. The receiver correction retains only that exact retiring route and
+unchanged owner/FD/zero/tick/input-count snapshot after observed countdown0 and
+neutral. It forbids any consumed input or return to active routing. Active
+duplicate/gapped ticks still fail, and strict VS entry remains separate. The
+offline actual replay accepts the buffered prefix through seq1698, without
+admitting VS/SD or the interrupted terminal as success. The failed run and
+incomplete MWRI remain preserved; no native observer, inputs or caps changed.
