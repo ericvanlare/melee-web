@@ -1,6 +1,6 @@
 # Sparse source-port routing
 
-**Browser exercised / Compiled / Native traced / Source identified**
+**Browser exercised / Retail compared (declared setup and port fields) / Compiled / Native traced / Source identified**
 
 The fresh combined candidate at `282fbddb` passes all three browser controls:
 P1/P3 singles, dense P1/P2 Sudden Death, and four-CPU Team Battle. The
@@ -46,13 +46,39 @@ unchanged eight-total/six-prepress sample caps. Mixed input, missing release,
 cap exhaustion and input after release remain rejected; hypothetical future
 neutral controls are explicitly synthetic. Both failed captures, complete raw
 PAD bytes, incomplete input recordings and exact owned teardown are retained.
-A reviewed native/receiver correction is in progress before another capture.
+The reviewed native/receiver correction produced the passing third capture recorded below.
 
 The integrated full suite at `42b22284` passed 2,253 tests with 153 skips and
 zero failures. The current-main ancestry merge at `07b451f8` preserves that exact
 source tree. The earlier 2,266-test run with two stale source-shape failures and
-the narrow fixture corrections remain retained. These checks are separate from
-the pending original comparison and final-head CI.
+the narrow fixture corrections remain retained. This predecessor validation remains distinct from
+the final source and comparison below.
+
+
+The bounded original comparison now passes at `83e31b8e`. Actual original
+source ports 0/2 and inactive ports 1/3 match the browser's declared setup,
+including the selected rules, character/costume, Human identity, initial stocks
+and damage. The original consumed five full retained PAD samples: neutral,
+distinct P1 A/right and P3 B/down presses, two identical held samples, then
+neutral release. All source counters and circular queue slots are retained;
+PAD errors remain `[0,-1,0,-1]`. No samples were coalesced and the unchanged
+eight-total/six-prepress caps were respected. Root independently replayed the
+strict comparison, found no mismatch, and verified all 24 retained artifacts
+and exact recorded process retirement.
+
+This is an intentionally interrupted original observer prefix with 1,722
+records and a clean complete 4,976-event native input recording. It does not
+establish original sparse ending/Results/CSS, RNG/input schedule equivalence,
+pixels, PCM or timing. The input poll stream is not joined to consumed samples.
+The inner guarded Python PID was not separately recorded; the supervisor,
+guard runner and direct native process were checked absent.
+
+The final integrated suite at `03df43e8` passed 2,256 tests with 153 skips and
+zero failures. All 18 original-observer build inputs equal the frozen native
+producer, and the browser runtime remains identical to `282fbddb`. A mistaken
+suite launch on the preceding documentation head was stopped and retained as
+an operator error, not counted as validation. Final-head CI remains before
+integration; the same receipt preserves every earlier failure and producer.
 
 The following predecessor results and failures retain their original producers.
 
@@ -99,5 +125,6 @@ A native authored source-port 0/2 component passed at `6a327ada`; the current
 runtime build and Kirby after-gap controls are separately identified in the
 receipt. Historical dense P1/P2 and four-player Teams route passes have different
 producers and do not establish current-producer whole-route regression.
-The original sparse state/port comparison and final integration checks remain
-separate milestone gates; current browser regressions are recorded above.
+The declared original sparse setup/port comparison and current browser
+regressions are recorded above. Broader original sparse state/Results and
+whole-session acceptance remain separate from this milestone.

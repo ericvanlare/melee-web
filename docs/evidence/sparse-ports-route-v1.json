@@ -1,7 +1,7 @@
 {
   "schema": "sparse-ports-route-v1",
   "issue": 293,
-  "scope": "headless virtual-device functional route; original sparse comparison open",
+  "scope": "Headless virtual-device browser route and strict declared original initialized setup/source-port input prefix comparison; whole-session acceptance remains open.",
   "browser": {
     "harness": "87129df4e17082d850a1dec44b0652f3991e53d9",
     "runtime": "1264b74c5fb68e3ae4a83522004b4f78f9a28680",
@@ -165,7 +165,7 @@
     "native no-draw CSS renderer guard",
     "full suite three stale fixture/metadata failures"
   ],
-  "integration": "held pending original comparison and final validation",
+  "integration": "Source and independent evidence review passed; final integrated suite and affected builds passed. Complete final-head CI remains before merge.",
   "combined_candidate_browser_regressions": {
     "producer": "282fbddb4cc397f9a0f34f31dd7f1fb921dbc2b2",
     "tree": "cd938e8b4053bcea119590134b581db57cb9b14b",
@@ -273,7 +273,6 @@
     "dedicated Prize edge"
   ],
   "gaps": [
-    "original sparse setup/source-port comparison pending",
     "original sparse terminal/Results/CSS comparison unrun",
     "physical input",
     "numeric HUD export",
@@ -299,66 +298,6 @@
       "run": "original-sparse-p1-p3-probe-20261009-v1",
       "manifest": "native-build-reviewed-source-v1/artifact/build-manifest.json",
       "review": "root-canonical-sparse-native-build-result-review-v1.json"
-    }
-  },
-  "final_integrated_suite": {
-    "state": "pass",
-    "retained_attempt_v1": {
-      "producer": "a928c1babba98bddee60f1fa40f43fb2351e6140",
-      "tree": "bc00d00a334cf346e99dfdf6e6a01f0edf54bb08",
-      "tests": 2266,
-      "skipped": 153,
-      "failures": 2,
-      "seconds": 525.412,
-      "log_sha256": "a89a61a0d4e2e033c74ddce18d5700d4745b55d5e6fa388079fb83580d717bb4",
-      "failures_description": [
-        "Exact CSS context predicate assertion omitted sparse opt-in",
-        "Old direct context-close assertion predated owned bounded cleanup helper"
-      ],
-      "exact_owned_pids_absent": true
-    },
-    "repair": {
-      "producer": "43a09f37033ec8945615e4f2ac0329d906deb3b1",
-      "scope": "Only the two stale tests; production and browser/native producers unchanged",
-      "focused_tests": 32,
-      "skipped": 1,
-      "failures": 0,
-      "log_sha256": "e37cd88395f70de91f3876b2c9428c4c1c4a2ffc0fe05876d22a11cea4132c7a",
-      "root_review_sha256": "61afe4f8b7ba35eeab91062caa23f1551e414ee27680eb825156288fa5f72f71"
-    },
-    "private_locator": {
-      "run": "original-sparse-p1-p3-probe-20261009-v1",
-      "first_log": "integrated-sparse-fullsuite-v1.log",
-      "repair_log": "integrated-sparse-fixture-focused-v1.log",
-      "repair_review": "root-sparse-fixture-repair-review-v1.json",
-      "final_log": "integrated-sparse-fullsuite-v2.log",
-      "final_process": "integrated-sparse-fullsuite-v2-process.json",
-      "final_review": "root-integrated-sparse-fullsuite-v2-review.json",
-      "main_merge": "current-main-squash-integration-review-v1.json"
-    },
-    "current_result": {
-      "result": "pass",
-      "source": "42b222840e0927f04bf429cf719e73bf2f2ca800",
-      "tree": "1ac2e939a232364f562a15ede46d5a93bece2668",
-      "tests": 2253,
-      "seconds": 514.031,
-      "skipped": 153,
-      "failures": 0,
-      "log_sha256": "6f12197b023d8451643003c8e3df66df5949c7a227adb9ba2b3fe5afdc2a6ddc",
-      "process_receipt_sha256": "99af8ef9c760b579c412a03cc2d56a8b5c9233e0b37f098ee3f8ea37d8962d98",
-      "exact_owned_pids_absent": [
-        55630,
-        55639,
-        55642
-      ],
-      "source_clean_unchanged": true,
-      "root_review_sha256": "c9cdc5809f9ab62ca7dea2b82c332bcc1ecbb307c78ca699385b5555eeed1117"
-    },
-    "current_main_merge": {
-      "head": "07b451f8126c09f65d0aaf8b0ca3282266b652c8",
-      "main": "df92e1ae496cd53a602997c064547f2f0e61f423",
-      "tree_equal_to_tested_source": true,
-      "review_sha256": "25054ce7001850f58eecee94b23dec62a6e312b37392aa6dd8f0706e9a8694c1"
     }
   },
   "original_sparse_first_capture": {
@@ -487,5 +426,275 @@
     "same_tree_as_tested_source": "42b222840e0927f04bf429cf719e73bf2f2ca800",
     "review_sha256": "25054ce7001850f58eecee94b23dec62a6e312b37392aa6dd8f0706e9a8694c1",
     "scope": "History-only integration of already-contained source; no code/test/doc delta."
+  },
+  "historical_integrated_suite_v2": {
+    "state": "pass",
+    "retained_attempt_v1": {
+      "producer": "a928c1babba98bddee60f1fa40f43fb2351e6140",
+      "tree": "bc00d00a334cf346e99dfdf6e6a01f0edf54bb08",
+      "tests": 2266,
+      "skipped": 153,
+      "failures": 2,
+      "seconds": 525.412,
+      "log_sha256": "a89a61a0d4e2e033c74ddce18d5700d4745b55d5e6fa388079fb83580d717bb4",
+      "failures_description": [
+        "Exact CSS context predicate assertion omitted sparse opt-in",
+        "Old direct context-close assertion predated owned bounded cleanup helper"
+      ],
+      "exact_owned_pids_absent": true
+    },
+    "repair": {
+      "producer": "43a09f37033ec8945615e4f2ac0329d906deb3b1",
+      "scope": "Only the two stale tests; production and browser/native producers unchanged",
+      "focused_tests": 32,
+      "skipped": 1,
+      "failures": 0,
+      "log_sha256": "e37cd88395f70de91f3876b2c9428c4c1c4a2ffc0fe05876d22a11cea4132c7a",
+      "root_review_sha256": "61afe4f8b7ba35eeab91062caa23f1551e414ee27680eb825156288fa5f72f71"
+    },
+    "private_locator": {
+      "run": "original-sparse-p1-p3-probe-20261009-v1",
+      "first_log": "integrated-sparse-fullsuite-v1.log",
+      "repair_log": "integrated-sparse-fixture-focused-v1.log",
+      "repair_review": "root-sparse-fixture-repair-review-v1.json",
+      "final_log": "integrated-sparse-fullsuite-v2.log",
+      "final_process": "integrated-sparse-fullsuite-v2-process.json",
+      "final_review": "root-integrated-sparse-fullsuite-v2-review.json",
+      "main_merge": "current-main-squash-integration-review-v1.json"
+    },
+    "current_result": {
+      "result": "pass",
+      "source": "42b222840e0927f04bf429cf719e73bf2f2ca800",
+      "tree": "1ac2e939a232364f562a15ede46d5a93bece2668",
+      "tests": 2253,
+      "seconds": 514.031,
+      "skipped": 153,
+      "failures": 0,
+      "log_sha256": "6f12197b023d8451643003c8e3df66df5949c7a227adb9ba2b3fe5afdc2a6ddc",
+      "process_receipt_sha256": "99af8ef9c760b579c412a03cc2d56a8b5c9233e0b37f098ee3f8ea37d8962d98",
+      "exact_owned_pids_absent": [
+        55630,
+        55639,
+        55642
+      ],
+      "source_clean_unchanged": true,
+      "root_review_sha256": "c9cdc5809f9ab62ca7dea2b82c332bcc1ecbb307c78ca699385b5555eeed1117"
+    },
+    "current_main_merge": {
+      "head": "07b451f8126c09f65d0aaf8b0ca3282266b652c8",
+      "main": "df92e1ae496cd53a602997c064547f2f0e61f423",
+      "tree_equal_to_tested_source": true,
+      "review_sha256": "25054ce7001850f58eecee94b23dec62a6e312b37392aa6dd8f0706e9a8694c1"
+    }
+  },
+  "final_integrated_suite": {
+    "producer": "03df43e8bf17ab5067c6bf3ff2ea95fac4b5af4e",
+    "tree": "d527187274a46d7a7de0eb3189d6f2c3f798f8ac",
+    "tests": 2256,
+    "skips": 153,
+    "failures": 0,
+    "elapsed_seconds": 521.07714041695,
+    "log_sha256": "0da805e0da4b069b07026fc32f74d7ddf11b597c2d3fb3719ba675100cf2ecc5",
+    "review_sha256": "e60988d73b0887e24d35d8cba81eb9fd29455eeb9aa853d137a72641b783356c",
+    "exact_owned_pids_absent": [
+      91774,
+      91781,
+      91784
+    ],
+    "source_clean": true,
+    "private_locator": {
+      "run": "original-sparse-p1-p3-probe-20261009-v1",
+      "log": "integrated-sparse-fullsuite-v4.log",
+      "review": "root-integrated-sparse-fullsuite-v4-review.json"
+    },
+    "retained_operator_error": {
+      "scope": "A predecessor suite started before the reviewed commit was fetched. It was stopped after24.042s and is not validation evidence.",
+      "producer": "e1eb77b5c1d17c819b73ea976dce916fc0b9e09a",
+      "log_sha256": "d1a4a8d4aeb2faab3988c0e1bd8827752b07e8b42c27f73d6a95e23da5ea1027",
+      "exact_owned_pids_absent": [
+        90668,
+        90680,
+        90683
+      ],
+      "receipt": "integrated-sparse-fullsuite-v3-launch-error.json"
+    }
+  },
+  "native_and_browser_source_equivalence": {
+    "review_sha256": "10b7057be3ade8c8dd9add8bd89362dedb03fe6023a8b03d537c943388c63462",
+    "integrated_source": "03df43e8bf17ab5067c6bf3ff2ea95fac4b5af4e",
+    "original_producer": "83e31b8e5b00d96fa98d17c4d6541a304490bb1f",
+    "equal_original_build_inputs": 18,
+    "browser_runtime_source": "282fbddb4cc397f9a0f34f31dd7f1fb921dbc2b2",
+    "scope": "Exact source equality preserves the named producer identities; captures are not relabeled as later documentation heads."
+  },
+  "original_sparse_comparison": {
+    "result": "pass",
+    "source": "83e31b8e5b00d96fa98d17c4d6541a304490bb1f",
+    "tree": "db45b3953ea7937fb4774364f4ef10a20bab660a",
+    "browser_source": "282fbddb4cc397f9a0f34f31dd7f1fb921dbc2b2",
+    "build": {
+      "binary_sha256": "779c66fd27d957b97bcceca40000d237e08c1ad19b42f518a3c2aa2c74b64335",
+      "manifest_sha256": "eb054bded663cadb1ff8b06f27ed40bebc35b22152975a234c20644a725d6d9f",
+      "build_elapsed_seconds": 779.317,
+      "log_sha256": "282a8e84247e7919ecfe6c0d76c7e4465d348fd840a5eeeb4a90d9c2d06cf413",
+      "root_review_sha256": "6c1a7eef8b7f4d5fc8d8a8535e191642a01e6226666cc51b4cbeb8deb4cfc4a2"
+    },
+    "capture_elapsed_seconds": 21.902967542177066,
+    "capture_packet_sha256": "5c75697628161105b621ae86dd2d891bfe8f206347856f27963498f6ba062d45",
+    "report_sha256": "1a582240a6e0f41eece8e54c42742c01daa2d83661e50dac300d75236b6b270b",
+    "observer_sha256": "968ca156820b3852245a671f65a7e21a34b13466a37aa56cd6e56326f545f433",
+    "input_sha256": "021d0d57477497e0a4a4c9306456acccd1aeb7e1e06ca9448b8c42184f8ea458",
+    "comparison_sha256": "bb3b1dac0e7aa46f8f91c0079a19661c09ef8e50923b42c2291b706e7fc3dd98",
+    "root_review_sha256": "4007526dfea8c9df20b6e5c8ff0e568e100f2378c05c7482a19adf16912cd0b4",
+    "first_mismatch": null,
+    "compared_projection": {
+      "original_source_indices": [
+        0,
+        2
+      ],
+      "copied_pad_errors": [
+        0,
+        -1,
+        0,
+        -1
+      ],
+      "rules": {
+        "match_kind": 1,
+        "stage": 32,
+        "timer_enabled": 0,
+        "time_limit": 0,
+        "disable_pausing": 0,
+        "damage_ratio_bits": "3f800000",
+        "is_stock": 1,
+        "is_vs": 1,
+        "source_sudden_death_flag": 0,
+        "item_frequency": -1,
+        "item_mask_hex": "ffffffffffffffff",
+        "is_teams": 0,
+        "friendly_fire": 0
+      },
+      "participants": [
+        {
+          "source_player_index": 0,
+          "raw_payload_slot": 0,
+          "resolved_source_port": 0,
+          "character": 8,
+          "costume": 1,
+          "human": true,
+          "slot_type": 0,
+          "initial_stocks": 4,
+          "initial_damage": 0
+        },
+        {
+          "source_player_index": 2,
+          "raw_payload_slot": 0,
+          "resolved_source_port": 2,
+          "character": 8,
+          "costume": 0,
+          "human": true,
+          "slot_type": 0,
+          "initial_stocks": 4,
+          "initial_damage": 0
+        }
+      ],
+      "inactive_source_indices": [
+        1,
+        3
+      ]
+    },
+    "source_sample_count": 5,
+    "prepress_neutral_samples": 1,
+    "consumed_source_indices": [
+      0,
+      2
+    ],
+    "inactive_source_indices": [
+      1,
+      3
+    ],
+    "pad_errors": [
+      0,
+      -1,
+      0,
+      -1
+    ],
+    "sample_sequences": [
+      1716,
+      1717,
+      1718,
+      1719,
+      1720
+    ],
+    "sample_kinds": [
+      "neutral",
+      "distinct_press",
+      "held_press",
+      "held_press",
+      "verified_release"
+    ],
+    "source_cursors": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "consumed_counters": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "queue_slot_indices": [
+      1,
+      2,
+      3,
+      4,
+      0
+    ],
+    "raw_source_sample_retention": "All five full48-byte PAD slots and12-byte queue rows retained; semantic bytes0..10 per12-byte PAD stride checked. No row coalescing.",
+    "observer_completion": "intentionally interrupted bounded prefix,1722 records; not a natural game or whole-session ending",
+    "input_completion": {
+      "complete": true,
+      "events": 4976,
+      "per_source_port_events": 2488,
+      "source_ports": [
+        0,
+        2
+      ],
+      "poll_to_consume_join": "not asserted"
+    },
+    "cleanup": {
+      "recorded_exact_pids_absent": [
+        25319,
+        25329,
+        25334
+      ],
+      "inner_guarded_python_pid_recorded": false,
+      "native_returncode": 0,
+      "terminate_sent": true,
+      "kill_sent": false,
+      "error": null,
+      "source_profile_and_gci_unchanged": true
+    },
+    "excluded": [
+      "natural terminal/elimination and Results/CSS on original",
+      "RNG",
+      "physical device or raw PAD schedule equality",
+      "pixels/magentaFD rendering gap",
+      "PCM",
+      "live timing",
+      "whole-session acceptance",
+      "positions/motion: current browser cursor4 differs from original initializer boundary",
+      "source frame count equality between sampled browser and original setup return"
+    ],
+    "private_locator": {
+      "run": "original-sparse-p1-p3-probe-20261009-v1",
+      "capture": "original-sparse-coldboot-v3",
+      "comparison": "actual-original-sparse-comparison-v3.json",
+      "root_review": "root-original-sparse-v3-result-review.json",
+      "result": "original-sparse-third-result-v1.json"
+    }
   }
 }
