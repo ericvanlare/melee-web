@@ -5547,6 +5547,45 @@ void run_stadium_sis_allocator_lifecycle_control()
     check(melee_web_diagnostic_sis_capture(&retired, error, sizeof(error)), error);
     HSD_SisLib_803A5FBC();
     check(melee_web_diagnostic_sis_verify_retired(&retired, error, sizeof(error)), error);
+    // Actual original capture/drain/verify above produces immutable one-shot
+    // evidence. A copied verified token must refuse without changing owners.
+    const auto verified_token=retired;
+    auto duplicate_token=retired;
+    const auto verified_epoch=HSD_SisLib_HeapEpoch();
+    const auto verified_heap=HSD_SisLib_HeapOwner();
+    const auto verified_active=HSD_SisLib_HeapActive();
+    const auto verified_used_head=used_head;
+    const auto verified_text=HSD_SisLib_804D7978;
+    const auto verified_context=HSD_SisLib_804D797C;
+    const auto verified_fonts_empty=HSD_SisLib_AllFontSlotsEmpty();
+    MeleeWebSourceMemoryAllocation allocation_before{},allocation_after{};
+    const auto status_before=melee_web_source_memory_allocation_read(retired.prior.heap,&allocation_before);
+    const auto duplicate_accepted=melee_web_diagnostic_sis_verify_retired(&duplicate_token,error,sizeof(error));
+    const auto status_after=melee_web_source_memory_allocation_read(retired.prior.heap,&allocation_after);
+    std::fprintf(stderr,"C1_SIS_VERIFY_REPEAT accepted=%d verified_before=%d verified_after=%d epoch_before=%llu epoch_after=%llu heap_before=%p heap_after=%p active_before=%d active_after=%d status_before=%d status_after=%d live_before=%u live_after=%u world_before=%llu world_after=%llu source_heap_before=%d source_heap_after=%d allocation_before=%llu allocation_after=%llu requested_before=%u requested_after=%u used_head_before=%p used_head_after=%p text_before=%p text_after=%p context_before=%p context_after=%p fonts_empty_before=%d fonts_empty_after=%d copied_token_equal=%d original_token_equal=%d\n",
+        duplicate_accepted,verified_token.retirement_verified,duplicate_token.retirement_verified,
+        (unsigned long long)verified_epoch,(unsigned long long)HSD_SisLib_HeapEpoch(),
+        verified_heap,HSD_SisLib_HeapOwner(),verified_active,HSD_SisLib_HeapActive(),
+        int(status_before),int(status_after),allocation_before.live,allocation_after.live,
+        (unsigned long long)allocation_before.world_generation,(unsigned long long)allocation_after.world_generation,
+        allocation_before.source_heap_handle,allocation_after.source_heap_handle,
+        (unsigned long long)allocation_before.allocation_generation,(unsigned long long)allocation_after.allocation_generation,
+        allocation_before.requested_bytes,allocation_after.requested_bytes,
+        (void*)verified_used_head,(void*)used_head,
+        (void*)verified_text,(void*)HSD_SisLib_804D7978,(void*)verified_context,(void*)HSD_SisLib_804D797C,
+        verified_fonts_empty,HSD_SisLib_AllFontSlotsEmpty(),
+        std::memcmp(&duplicate_token,&verified_token,sizeof(verified_token))==0,
+        std::memcmp(&retired,&verified_token,sizeof(verified_token))==0);
+    std::fflush(stderr);
+    check(!duplicate_accepted && std::memcmp(&duplicate_token,&verified_token,sizeof(verified_token))==0 &&
+          std::memcmp(&retired,&verified_token,sizeof(verified_token))==0 &&
+          HSD_SisLib_HeapEpoch()==verified_epoch && HSD_SisLib_HeapOwner()==verified_heap &&
+          HSD_SisLib_HeapActive()==verified_active && used_head==verified_used_head &&
+          HSD_SisLib_804D7978==verified_text &&
+          HSD_SisLib_804D797C==verified_context && HSD_SisLib_AllFontSlotsEmpty()==verified_fonts_empty &&
+          status_before==MELEE_WEB_SOURCE_MEMORY_READ_OK && status_after==status_before &&
+          std::memcmp(&allocation_before,&allocation_after,sizeof(allocation_before))==0,
+          "Repeated SIS retirement verification changed the verified token/source owner or lease");
     check(HSD_SisLib_AllFontSlotsEmpty() && !HSD_SisLib_804D7978 &&
               !HSD_SisLib_804D797C,
           "Retired-menu SIS baseline retained live roots");
@@ -7657,8 +7696,22 @@ void run_stadium_c1_context_preflight(
         if(ready_session){
             check(perform_on_init && retired_sis,
                   "Stadium Ready requires the original menu leave/SIS retirement boundary");
-            auto prior_sis=*retired_sis;
-            check(melee_web_diagnostic_sis_verify_retired(&prior_sis,error,sizeof(error)),error);
+            // Menu leave already verified this one-shot token while its source
+            // allocation registry was live. MenuWorld.close has since retired
+            // that world; consume the immutable evidence without re-verifying
+            // or reading the old allocation through a replaced registry.
+            std::fprintf(stderr,"C1_SIS_READY_EVIDENCE verified=%d prior_heap=%p prior_world=%llu prior_source_heap=%d prior_allocation=%llu prior_epoch=%llu requested=%zu expected_requested=%u world_exists=%d\n",
+                retired_sis->retirement_verified,retired_sis->prior.heap,
+                (unsigned long long)retired_sis->prior.world_generation,retired_sis->prior.source_heap_handle,
+                (unsigned long long)retired_sis->prior.allocation_generation,
+                (unsigned long long)retired_sis->prior.source_epoch,retired_sis->requested_bytes,
+                MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES,melee_web_gameplay_world_exists());
+            std::fflush(stderr);
+            check(retired_sis->retirement_verified && retired_sis->prior.heap &&
+                  retired_sis->prior.world_generation && retired_sis->prior.allocation_generation &&
+                  retired_sis->prior.source_epoch &&
+                  retired_sis->requested_bytes==MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES,
+                  "Stadium Ready requires the already verified original menu SIS retirement evidence");
             check(!melee_web_gameplay_world_exists(),"Stadium Ready would double-own a source world");
             const auto parent_seed_owner=seed_ptr;
             check(parent_seed_owner && *parent_seed_owner==selected.random_seed,
