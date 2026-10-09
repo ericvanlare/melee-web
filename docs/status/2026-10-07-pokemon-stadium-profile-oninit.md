@@ -5,9 +5,9 @@
 **Historical October 7 checkpoint.** The
 [zero-tick two-world lifecycle](#october-9-two-zero-tick-stadium-world-lifetimes)
 passed. The latest [source-session preparation attempts](#october-9-source-session-ready-preparation)
-now reach match construction, which refuses a marker binding before a new world
-or gameplay tick. The smaller input handoff test passes; Ready/GO and C3 remain
-unrun.
+now reach match construction, which refuses a marker binding and returns a
+zero-world/zero-tick failure observation. The smaller input handoff test passes;
+Ready/GO and C3 remain unrun.
 
 The diagnostic-only Stadium profile and profile-to-`DatNativeMapContract`
 adapter compile in the C1 trace target. Focused profile and borrowed-yakumono
@@ -305,8 +305,11 @@ handoff and cleanup evidence, with no MatchSession construction.
 The next Ready attempt on `e2ff861b` passes the PAD and SIS handoffs and reaches
 `before-construction`. Deferred match construction then refuses
 `Invalid or duplicate marker binding`. The specific marker was not logged.
-The new match world and tick count remain zero; no OnInit/OnLoad, HUD or Ready
-is observed. All 357 bound files and 98 fixtures remain unchanged. Exact owned
+The emitted before/after world and tick counts are zero; no OnInit/OnLoad, HUD
+or Ready is observed. Source inspection shows SDK startup precedes this marker
+guard and the world storage destructor performs cleanup during exception
+unwinding. Zero after failure does not establish that no world was acquired
+between observations; that interval was not separately logged. All 357 bound files and 98 fixtures remain unchanged. Exact owned
 unittest and Node children exit and are reaped naturally. The diagnostic still
 reports its 32 MiB session arena at the failure; process exit is not checked
 match/session teardown. The next experiment is a source-led reduction of the

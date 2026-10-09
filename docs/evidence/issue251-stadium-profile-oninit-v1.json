@@ -319,7 +319,7 @@
   },
   "subsequent_c3_component_2026_10_09": {
     "claim_boundary": "Existing October7 profile receipt remains historical. This update preserves V26 and identifies the exact later producer; componentcontrols do not pass C3.",
-    "current_result": "Two zero-tick world lifetimes pass on3d032f74. SIS and PAD caller handoffs corrected; smaller original PAD reducer passes one changed run on e2ff861b after retained phase-assertion failure. Ready attempt now refuses marker binding during construction before a new world/tick. C3 remains unrun.",
+    "current_result": "Two zero-tick world lifetimes pass on3d032f74. SIS and PAD caller handoffs corrected; smaller original PAD reducer passes one changed run on e2ff861b after retained phase-assertion failure. Ready attempt now refuses marker binding during construction with zero-world/zero-tick before/after observations; source startup/unwind occurs between them. C3 remains unrun.",
     "prior_v26": {
       "source_commit": "b8c272c44a94bcb03f0371008851e468200d4496",
       "first_failure": "heap_free_bytes",
@@ -940,7 +940,7 @@
       },
       "remaining": "Shared source-session seam compiled; caller SIS/PAD preparation reduced and corrected. Full composition now refuses marker binding. Reduce exact marker source/owner before further Ready. Ready/GO, idle lifetimes, retirement and original per-owner RNG ledger remain open.",
       "c3_original_ledger_requirement": "Reuse existing RNG draw observer; C3 notes604-608 require per-tick/per-owner original comparison, separately from broader C8 transformation comparison.",
-      "claim_boundary": "First two Ready attempts stopped before construction. Smaller PAD handoff/cleanup reducer passes on e2ff861b; third Ready attempt enters deferred construction and refuses before newworld/OnInit/OnLoad/HUD/ticks. Priorzero-tick result retains its scope. No C3 acceptance.",
+      "claim_boundary": "First two Ready attempts stopped before construction. Smaller PAD handoff/cleanup reducer passes on e2ff861b; third Ready attempt enters deferred construction and refuses before OnInit/OnLoad/HUD/ticks; source world startup and exception cleanup occur between zero-world observations. Priorzero-tick result retains its scope. No C3 acceptance.",
       "pad_input_reducer": {
         "caller_source": "8e087161fcc5a62f6f82cb333a812d0f4eff448f",
         "phase_correction_source": "e2ff861b3f290714d4c6aaa1a19158d4e7f8e59a",
@@ -976,7 +976,8 @@
         "artifact": "root-ready-third-frozen-result-v1.json",
         "sha256": "66c2fdf85fa07a46fea58d439224e9854c36e3627b4e2298888c5a2444832a94"
       },
-      "third_failure": "PAD/SIS handoffs pass; before-construction emitted, then Invalid or duplicate marker binding. Specificmarker unlogged; match_retained0, newworld0/ticks0, no Ready. Diagnostic32MiB sessionarena remains at failure, so processcleanup is not checkedscene/sessionteardown."
+      "third_failure": "PAD/SIS handoffs pass; before-construction emitted, then Invalid or duplicate marker binding. Specificmarker unlogged; match_retained0, world0/ticks0 at emitted observations, no Ready. Diagnostic32MiB sessionarena remains at failure, so processcleanup is not checkedscene/sessionteardown.",
+      "third_failure_observation_clarification": "The retained raw report only observes world0 before and after construction failure. GameplayWorld::start invokes SDK startup before marker decode; Storage destructor close/shutdown unwinds before constructor error reaches caller. No claim that a world was never acquired. Intermediate world/owner values were not emitted."
     }
   }
 }
