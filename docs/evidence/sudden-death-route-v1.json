@@ -1,0 +1,182 @@
+{
+  "schema": "melee-web-sudden-death-route-v1",
+  "date": "2026-10-08",
+  "issue": 291,
+  "labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "status": "native_fixture_controlled_natural_route_passed_browser_original_open",
+  "scope": "Native traced; fixture-controlled functional route",
+  "producer": {
+    "source": "8b6ad34914c9e955a0aba8f6cc1e75a952fb6bc3",
+    "tree": "3b47f21d59e0233c6a475bfc1b928984c3a2a3be",
+    "main_base": "41e7ae2bf0b54c49cbb2b1b9ae79c9c63a2c76cb",
+    "target": "native_menu_host_trace",
+    "configuration": "Release",
+    "fixture_recipe": "sudden-death-natural-resolution-control-v1",
+    "fixture_manifest_sha256": "0972aabd178aa9d37b8b9b262d0352f48c5eee39bc60669adab540c57c60b655",
+    "required_fixture_files": 115,
+    "runtime_artifacts": [
+      {
+        "name": "native_menu_host_trace.js",
+        "bytes": 234364,
+        "sha256": "258faa3b80cd41667fe071857f8a61e97b8aa6d9fa63de05f5ae4f2a12b39b95"
+      },
+      {
+        "name": "native_menu_host_trace.wasm",
+        "bytes": 13754936,
+        "sha256": "e7c654c66016e9588e88ce46b91825f98eeb5f8989645a9106fca77757efe33c"
+      },
+      {
+        "name": "CMakeCache.txt",
+        "bytes": 61253,
+        "sha256": "25cdc134594840a01d4a4528a8fd0600ee1afcdda3775d6c03d8097aed604868"
+      },
+      {
+        "name": "node",
+        "bytes": 121306800,
+        "sha256": "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1"
+      }
+    ]
+  },
+  "scenario": {
+    "initial_rules": "Authored24-byte persistent GameRules fixture before original CSS/SSS; Stock4, one-minute timer. No writes to live gameplay clocks, stock, RNG or result.",
+    "initial_players": "Two human Mario players, source slots/derivedports0and1, colors1and0, original selectedFD.",
+    "natural_timeout": "Neutral raw PAD until original VS timeout produces tied winners0and1.",
+    "sd_resolution": "Original typed SD continuation, one stock/300percent/timeroff; waitReady thenP1rawstick80, P2neutral untiloriginalelimination.",
+    "results": "Originalflowend andcheckedpublication beforelivehandoffcapture, typedoverallResults fromoriginalmerge, originalResults->CSS->SSS supportedselection.",
+    "audio": "PCMdrained on every native tick; no audible/rendered/PCM-equivalence claim."
+  },
+  "metrics": {
+    "vs_input_ticks": 3838,
+    "vs_active_frames": 3600,
+    "vs_final_rng": 3436040290,
+    "sd_ready_input_ticks": 125,
+    "sd_active_entry_cursor": 1,
+    "sd_departure_input_ticks": 304,
+    "sd_final_cursor": 191,
+    "sd_ending_frozen_ticks": 114,
+    "sd_winner_source_slot": 1,
+    "results_entry_rng": 454679794
+  },
+  "observed_bytes": {
+    "stock_timer_fixture_initial_GameRules": {
+      "bytes": 24,
+      "sha256": "72f936d4c2de5e9998fd289400a5505a3bb7f9ebd1fec878ad498d2a4d7f228f"
+    },
+    "natural_vs_terminal": {
+      "bytes": 8840,
+      "sha256": "87376c0b2c805b495fa43e9368c29e6db2cbf2ef618a744f3caeb84665a9e761"
+    },
+    "natural_vs_final_pad": {
+      "bytes": 822,
+      "sha256": "cfcd8ba1669ff600b0041e04810a1da35bd47a33741802745f9d052d336307eb"
+    },
+    "natural_sd_terminal": {
+      "bytes": 8840,
+      "sha256": "38c016eca9cf6d4dbf3573686bb2ba4abecf8f50a2d3a134ee7d8d19257527df"
+    },
+    "natural_overall_results": {
+      "bytes": 8836,
+      "sha256": "e43b733406b131e3aa435ed68385215a59bbac6bb475617f3daabf618ba81a16"
+    },
+    "typed_results_scene_entry_pad": {
+      "bytes": 822,
+      "sha256": "e212573cc71c62ef89990baaa38af5d397b7c0e23d8fdeafe72ae4c0a9f7855f"
+    },
+    "returned_sss_normalized_start": {
+      "bytes": 312,
+      "sha256": "f7c845b71738f2917029013d870a0a93aad4d125111fd7d6706de76e120fa99c"
+    }
+  },
+  "cleanup": "Owned menu world, typed host, VS lease, caller GameRules/global state and application close/reacquisition assertions passed. Exact direct Node reaped normally.",
+  "boundaries": {
+    "actual_terminal_source_identity": true,
+    "returned_menu_scene_and_normalized_selection": true,
+    "fresh_application_reacquisition": true,
+    "second_match_world": false,
+    "browser": false,
+    "original_comparison": false,
+    "internal_final_sd_numeric_seed_and_pad": "unobserved; actualruntimeorder andcompiledmutatingpublisher control are distinct from laterResultsentry observations"
+  },
+  "retained_evidence": {
+    "locator": "Private verifiedexternal run issue291-sd-source-checkpoint-20261008-v1",
+    "root_review_sha256": "c92084bfa32dc726ad6dcdc26fad5c9b3a7f79f5dfe0db9660a055bd937ca60e",
+    "files": [
+      {
+        "relative_path": "sd-natural-resolution-launch-packet-v4.json",
+        "bytes": 19812,
+        "sha256": "f3299958bcdd50ab2447051ccc5c41a95a642b733bb094e5507c8725e0da7100"
+      },
+      {
+        "relative_path": "run-sd-natural-resolution-v4-once.py",
+        "bytes": 3264,
+        "sha256": "77ec1d98e08934df60e4418fe6beb1fe3151650e523a8c15bb9a8582791dc10a"
+      },
+      {
+        "relative_path": "sd-natural-resolution-v4-execution-receipt.json",
+        "bytes": 442,
+        "sha256": "9ff318b85793550574ad440eda120509807483d3c709800999d1ce11a90c2672"
+      },
+      {
+        "relative_path": "run-sd-natural-resolution-v4b-once.py",
+        "bytes": 3265,
+        "sha256": "50e26ebf6e4d2d25f1661704a84c363407d83fabddea0a12bb5eee6fa4a15676"
+      },
+      {
+        "relative_path": "sd-natural-resolution-v4b-execution-receipt.json",
+        "bytes": 2174,
+        "sha256": "be16756517bd155fb16e592f1937fe92ac21e0d1f74d655e0e85b4a517e8cd0d"
+      },
+      {
+        "relative_path": "sd-natural-resolution-v4.stdout-stderr.log",
+        "bytes": 60322,
+        "sha256": "71d91a9a108e6822d64bc51953df120b75ff98966146aaab314074127ec60464"
+      },
+      {
+        "relative_path": "sd-natural-resolution-v4.trace.jsonl",
+        "bytes": 12616,
+        "sha256": "faad2ad5590e05508c7305f892ecf22f13ecc4c26bbeaab4a066e5bbee806fd3"
+      },
+      {
+        "relative_path": "returned-menu-v1-execution-receipt.json",
+        "bytes": 2126,
+        "sha256": "bc91491f046a0c1d46381309d5ce6b29addfdbc3f218a19ea626c835891ba8d0"
+      }
+    ]
+  },
+  "prior_failures": [
+    {
+      "attempt": "resolutionv2",
+      "source": "9ce61be24b4ef298180f103142009dc425d34b8b",
+      "first_failure": "Returned CSS rejected source-retained post-VS rules against fresh defaults; cleanup error also retained. ActualSD/typedResults reached, nofullroutepass.",
+      "analysis_sha256": "74c1d01f2da604ac622d36e5dad1d0ab8f3cc1ab9be2b99cc01fda8eaefdb29b"
+    },
+    {
+      "attempt": "resolutionv3",
+      "source": "da0e520df26d3c4584c25b85ce2bde21022b1a3e",
+      "first_failure": "ReturnedSSS test used default Characters world and aborted on missing MnSlMap publicsymbols. CSS passed; nofinalcleanupclaim.",
+      "analysis_sha256": "78f3c4ff3751ba2385f77beafe3a0a675787b58707c024bc6e1b79507733726e"
+    },
+    {
+      "attempt": "reducedreturnedmenuv1",
+      "source": "8b6ad34914c9e955a0aba8f6cc1e75a952fb6bc3",
+      "result": "Passed constructednon-tied originalResults->CSS->SSS beforechangedfullresolutionrun; notnaturalgameplayevidence.",
+      "receipt_sha256": "bc91491f046a0c1d46381309d5ce6b29addfdbc3f218a19ea626c835891ba8d0"
+    },
+    {
+      "attempt": "resolutionv4preflight",
+      "first_failure": "Supervisor referenced oldpacket filename; rejectedhashbeforeanychild. V4b correctedonlypacketpath/separatereceipt; oneactualrunpassed."
+    }
+  ],
+  "open_gates": [
+    "One-minute persistent GameRules fixture authored before original CSS/SSS, not Rules-menu input.",
+    "Final SD internal numeric seed/PAD unobserved; actual runtime ordering + compiled mutating-publisher control are distinct evidence from post-callback Results entry observations.",
+    "No browser, original comparison, physical input, audio/rendering equivalence, timing acceptance or subsequent matchworld. Returned SSS normalized supported selection only.",
+    "Current browser typedcontinuation integration and tied/non-tied/eliminationcontrols.",
+    "Verified originalroute andstrictdeclaredfieldcomparison.",
+    "Prepared currentcandidate fullsuite, affectedbuild, independentreview andcurrentheadCI."
+  ]
+}

@@ -37,6 +37,9 @@ public:
     // Requires source completion; retires flow and publishes original terminal
     // data before capturing live RNG/PAD, closing the world and handing off.
     void finish_sudden_death(MeleeWebMenuMatchContinuation& results);
+    // Completed ordinary VS only: canonical publication then live RNG/PAD
+    // capture, then teardown. Typed menu routing belongs to the closed host.
+    void finish_vs(uint32_t& seed, uint8_t input[MELEE_WEB_PAD_STATE_BYTES]);
     int outcome(int& winner) const;
     bool ready() const;
     bool ending() const;

@@ -444,6 +444,22 @@ GameplayMatchSession::GameplayMatchSession(
         storage_->start(files,unused,&archive_cache,&initial_input,host,&continuation);
 }
 void GameplayMatchSession::close(){if(storage_){storage_->close();storage_.reset();}}
+void GameplayMatchSession::finish_vs(
+    uint32_t& seed,uint8_t input[MELEE_WEB_PAD_STATE_BYTES]){
+    check(input&&storage_&&storage_->match&&storage_->flow&&
+          !storage_->selected.opening_demo&&!storage_->selected.sudden_death&&
+          !storage_->sudden_death_claimed,
+          "VS handoff requires its live ordinary match owner and complete PAD output");
+    check(complete(),"VS handoff requires completed original source flow");
+    storage_->end_flow();
+    check(melee_web_match_rules_publish_result(),
+          "Original VS could not publish its complete terminal data");
+    char error[256]{};MeleeWebMatchStats stats{};
+    check(melee_web_match_stats(storage_->match,&stats,error,sizeof(error)),error);
+    seed=stats.random_seed;
+    melee_web_pad_state_capture(input);
+    storage_->close();storage_.reset();
+}
 void GameplayMatchSession::finish_sudden_death(
     MeleeWebMenuMatchContinuation& results){
     std::memset(&results,0,sizeof(results));
