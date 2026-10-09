@@ -120,7 +120,7 @@
       ]
     },
     "jigglypuff": {
-      "status": "original_source_interval_present_browser_comparison_missing",
+      "status": "new_independent_ready_entry_prefix_compared_active_gameplay_missing",
       "match_index": 1,
       "slot": 0,
       "port": 1,
@@ -142,7 +142,9 @@
         "first_difference": "match 0, match_frame 5239, rng actual 2352289036 versus expected 2495929788",
         "policy": "keep parked under #274; do not bypass or reopen"
       },
-      "next_design_prerequisite": "independent short same-setup source/browser path reusing historical PR86 v2 all-entity producer/comparator contract"
+      "next_design_prerequisite": "independent short same-setup source/browser path reusing historical PR86 v2 all-entity producer/comparator contract",
+      "historical_inventory_status": "original_source_interval_present_browser_comparison_missing",
+      "current_comparison_ref": "entity_prefix_ready_comparison"
     },
     "peach": {
       "status": "current_candidate_184_tick_comparison_equivalent_incomplete",
@@ -285,7 +287,7 @@
       }
     },
     "ice_climbers": {
-      "status": "original_two_entity_interval_present_current_browser_comparison_missing",
+      "status": "new_independent_ready_entry_prefix_compared_active_gameplay_missing",
       "match_index": 2,
       "slot": 1,
       "port": 2,
@@ -320,7 +322,9 @@
         "first_strict_rejection": "Nana motion/input at tick 105; signed-byte repair moved the first rejection to Nana position at tick 609",
         "later_a_interval_first_difference": "Popo screen-KO X at source seq 33740 / tick 5606, bits 42810a45 vs 42810a46",
         "individual_private_report_hashes_available_in_portable_receipt": false
-      }
+      },
+      "historical_inventory_status": "original_two_entity_interval_present_current_browser_comparison_missing",
+      "current_comparison_ref": "entity_prefix_ready_comparison"
     }
   },
   "superseded_inventory_claims": [
@@ -338,7 +342,7 @@
     }
   ],
   "scope_limits": [
-    "The source inventory itself made no new captures. The current Peach-containing match-0 browser prefix and harness cleanup are separately bound below; no new original recording was acquired.",
+    "Historical source inventory and Peach work acquired no new original recording. The later independently captured Jiggly/Ice Ready prefix and paired browser comparison are separately bound in entity_prefix_ready_comparison.",
     "Jigglypuff and Ice Climbers source intervals are not browser comparisons.",
     "Both historical and current Peach results are setup-plus-184-tick incomplete comparisons; neither covers a full fighter, match or session.",
     "Sheik has no native capture or browser replay.",
@@ -458,6 +462,231 @@
       "No Jigglypuff or paired Ice Climbers browser comparison yet",
       "No active Sheik interval",
       "No natural match ending, Results/CSS return, pixels, PCM, physical input, performance or whole-session acceptance"
-    ]
+    ],
+    "checkpoint_scope": "Historical compiled-only checkpoint; superseded by entity_prefix_ready_comparison for the new original/browser Ready interval. Its build/fullsuite identities remain valid only for that named source."
+  },
+  "entity_prefix_ready_comparison": {
+    "status": "exact_declared_setup_and_ready_entry_prefix_compared_active_gameplay_unrun",
+    "profile": "jiggly-ice-mario-fox-v1",
+    "original_collector": "ef9441784dc7077ef1e3c4c478de0ddcc18c3a8c",
+    "original_native": "a66db44fdb3d06cba8784b3fa94355d8dee82270",
+    "harness_source": "44593ed26d26952c8290b3064378e6bf76ee150a",
+    "harness_tree": "83872c3c51ad75b2e485ce27bddfd7968fc46c58",
+    "runtime_source": "1f9681e0a6bb15bf2626754ae9e7623f1af6901b",
+    "runtime_tree": "e29d6746a37531253428ce11c0939f8036dadc84",
+    "original": {
+      "source_ticks": 60,
+      "draw_returns": 60,
+      "one_tick_batches": true,
+      "input_events": 9746,
+      "recipe_frames": 1164,
+      "setup_entry_sequence": 4064,
+      "comparison_setup_sequence": 4090,
+      "first_source_tick_sequence": 4093,
+      "last_source_tick_sequence": 4387,
+      "recipe_sha256": "b30936fad87fe0b3a90375872dbd10074d535f7edde15987fc17cda6a549811e",
+      "recipe_artifacts_admitted": true,
+      "whole_session_equivalent": false
+    },
+    "browser": {
+      "result": "pass",
+      "recipe_frames": 1164,
+      "source_steps": 1164,
+      "source_draws": 1164,
+      "exported_rows": 1167,
+      "exported_match_rows": 60,
+      "port_first_index": 1104,
+      "port_last_index": 1163,
+      "diagnostic_prefix_complete": true,
+      "complete": false,
+      "whole_session_equivalent": false,
+      "auto_resumes": 0,
+      "trace_sha256": "914cdaddc215d4436a53b7706c36292c5bc384f7f3f7f14e58fea02b73afaf55"
+    },
+    "comparison": {
+      "result": "prefix_unverified",
+      "compared_ticks": 60,
+      "first_difference": null,
+      "complete": false,
+      "fields": [
+        "rng",
+        "match_frame",
+        "pad_state_hex",
+        "fighters",
+        "fighter_entities"
+      ],
+      "source_setup_seq": 4090,
+      "source_first_tick": {
+        "seq": 4093,
+        "source_tick": 0
+      },
+      "source_last_tick": {
+        "seq": 4387,
+        "source_tick": 59
+      },
+      "port_first_index": 1104,
+      "port_last_index": 1163
+    },
+    "gameplay_clock": {
+      "setup_match_frame": 0,
+      "first_match_frame": 0,
+      "last_match_frame": 0,
+      "unique_observed_match_frames": [
+        0
+      ],
+      "classification": "Ready/entry prefix; no active-gameplay-clock progression proved.60 SourceTick observations are not60 active gameplay frames."
+    },
+    "primary_motion_range": {
+      "first": [
+        322,
+        322,
+        322,
+        322
+      ],
+      "last": [
+        324,
+        324,
+        324,
+        324
+      ]
+    },
+    "observation_scope": "Original setup and first60 source traversals cover Entry/Ready only: gameplay match_frame remains0 throughout. Exact declared RNG, PAD and all5entities including Nana match; no active gameplay tick or CPU-decision equivalence is established.",
+    "original_first_failure": {
+      "collector": "91848039a5049f0aac6006db1ce6c487fba1d5af",
+      "status": "setup_admission_failed_no_recipe_admitted",
+      "only_rule_difference": "item mask bit18 off due to non-Team row0 toggle",
+      "source_correction": "ef9441784dc7077ef1e3c4c478de0ddcc18c3a8c restricts row0 action to declared Team route; actual menu controls cover prefix/nonTeam/Team",
+      "reduction_review": {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/original-entity-prefix-launch-v1/root-setup-rule-reduction-review-v1.json",
+        "bytes": 749,
+        "sha256": "5a5bc54b47752529bc7236c5f031b174f8de5d665930b91aede29b863c2c76a3"
+      }
+    },
+    "harness_completion": {
+      "source": "05d56a4a538e295050ca8f96f45ddd9203cd5543",
+      "integrated_source": "44593ed26d26952c8290b3064378e6bf76ee150a",
+      "scope": "Requested v8 context flag/version/hash/interval bound before replay; strict diagnostic completion retained as completefalse/wholefalse, ordinary gate unchanged; native/comparator unchanged",
+      "root_review": {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-prefix-completion-controls-v2/root-integrated-source-review-v1.json",
+        "bytes": 781,
+        "sha256": "f6ac3b0b64a46566834366516648710299eb0794a19e181cce28c687c1d54427"
+      },
+      "retained_preparation_failure": "Initial metadata helper expected context version1; actual original recipe rejected it. Corrected to pinned version2 before capture; original log retained."
+    },
+    "reviews": {
+      "original": {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/original-entity-prefix-launch-v2/root-second-result-review-v1.json",
+        "bytes": 1015,
+        "sha256": "5de747ae2fe90f37ab743765d2b4f9900ec251ada3f95e9250b38207471bd762"
+      },
+      "browser_result": {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/result-receipt-v2.json",
+        "bytes": 9115,
+        "sha256": "c04708856d97039708feb8fde3cbb4f949d0e4d997f00104fe090f84c8fcb2b7"
+      },
+      "root": {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/root-result-review-v1.json",
+        "bytes": 993,
+        "sha256": "678928b9adab4b71ba4f65394bb76d4983863dea25e96820110cbf951032916a"
+      },
+      "comparison": {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/comparison-v1.json",
+        "bytes": 1947,
+        "sha256": "1349deeeae1facd3a3c733a66bdc46814440cdf814dcd47ae412ea6c8e2145b3"
+      }
+    },
+    "cleanup": "All89 bound inputs and all46served files unchanged; inventory is40standard plus6namedauxiliary. Owned runner/server/comparator and five retained CDP process IDs absent; owned Browser.close awaited, port18863 reusable. No complete process-inventory claim.",
+    "artifacts": [
+      {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/browser-output-v1/cpu-item-events.jsonl",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/browser-output-v1/final.png",
+        "bytes": 16269,
+        "sha256": "0ff3d4470079e1f7d401b09d674e3d16323c0962e0455ad5f8d6f0f1d3e39438"
+      },
+      {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/browser-output-v1/page.txt",
+        "bytes": 38721,
+        "sha256": "1436d4a897d4bfc8a49d67e8bab1af4f2642108380cbc9305cfd34549ade1a61"
+      },
+      {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/browser-output-v1/progress.json",
+        "bytes": 2014,
+        "sha256": "a07a60ffc3351755e6694f938e902b33ed708d6767827f6e07565548fe766346"
+      },
+      {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/browser-output-v1/report.json",
+        "bytes": 1370972,
+        "sha256": "2adbc389c37fb60589cd45eb2d1cc1c6d901760367e80b1ba1785b20e68896ee"
+      },
+      {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/browser-output-v1/retail-browser-report.json",
+        "bytes": 18783,
+        "sha256": "ae84be3d2f3a189c0c99b12348753508349543d3568e0a611e98500c59bb9189"
+      },
+      {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/browser-output-v1/retail-port.jsonl",
+        "bytes": 2494922,
+        "sha256": "914cdaddc215d4436a53b7706c36292c5bc384f7f3f7f14e58fea02b73afaf55"
+      },
+      {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/browser-output-v1/source-main-allocation-trace.json",
+        "bytes": 33,
+        "sha256": "4678d2badb17d3c8fda30bea9dbde5d7375d48bf5c06410c5d408455ae896672"
+      },
+      {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/browser-output-v1/source-owner-trace.json",
+        "bytes": 3,
+        "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+      },
+      {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/packet-v1.json",
+        "bytes": 46563,
+        "sha256": "fa1770b31f9fe63459bdc070809f74d16ad6c5e480d4067d2ea81aa4d488915b"
+      },
+      {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/supervisor-v1.py",
+        "bytes": 5351,
+        "sha256": "fdb4fba54b8a96d424e5d0feac05a0d5a42a0fa0db9a20c981ea526bdff42c8a"
+      },
+      {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/node-v1.log",
+        "bytes": 64,
+        "sha256": "96816f82659b824dc57355e906b552a63d2af71a9fe7279496c976af61f1825a"
+      },
+      {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/server-v1.log",
+        "bytes": 10661,
+        "sha256": "3a0abdd0dd300391fd566d603be2a5e0c9c43c7938f02cbe423c0d2a2fad4eeb"
+      },
+      {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/comparison-v1.json",
+        "bytes": 1947,
+        "sha256": "1349deeeae1facd3a3c733a66bdc46814440cdf814dcd47ae412ea6c8e2145b3"
+      },
+      {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/comparison-v1.log",
+        "bytes": 1919,
+        "sha256": "052e68d372ce29628e395b0d00927520f389658cfb7095a7d0793916c92e1e7e"
+      },
+      {
+        "path": "runs/all-entity-observer-20261009-072410-d492b90d/browser-entity-prefix-launch-v1/comparison-process-v1.json",
+        "bytes": 959,
+        "sha256": "0bfd4293462831cc00c2ca755228cda7acf0b0b9ad308cbe0c6d62f48d98bc68"
+      }
+    ],
+    "next": "Review/integrate bounded Sheik source readiness closure, then prepare its first original active-owner experiment. Plan a separately identified Jiggly/Ice active-clock prefix; preserve this Ready-only recipe and its success scope.",
+    "unrun": [
+      "Active gameplay for Jigglypuff/Ice Climbers",
+      "Active Sheik original/browser comparison",
+      "Natural ending/Results/CSS return",
+      "CPU decisions and draw scheduling equivalence",
+      "Pixels/PCM/physical input/timing/performance",
+      "Whole-session acceptance"
+    ],
+    "current_head_validation": "Fullsuite/build records above belong to runtime1f; final milestone source fullsuite/current-head CI pending."
   }
 }
