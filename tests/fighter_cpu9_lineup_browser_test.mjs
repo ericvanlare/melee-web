@@ -323,28 +323,27 @@ report.campaign_wall_bound=campaignRequested?{
   failure_code:null,evidence_status:'pending'}:null;
 const artifactReads=[];
 let browser,browserContext,page,driver,browserCdp,activeMatchIndex=null,contentionWorker=null;
-let ownedClosePromise=null;
+const ownedClosePromises=new Map();
 async function closeOwnedBrowserResources(){
-  if(ownedClosePromise)return ownedClosePromise;
-  ownedClosePromise=(async()=>{
   report.cleanup??={};
   for(const [name,resource,close] of [
-    ['driver',driver,()=>driver.dispose()],
-    ['cdp',browserCdp,()=>browserCdp.detach()],
-    ['context',browserContext,()=>browserContext.close()],
-    ['browser',browser,()=>browser.close()],
+    ['driver',driver,owner=>owner.dispose()],
+    ['cdp',browserCdp,owner=>owner.detach()],
+    ['context',browserContext,owner=>owner.close()],
+    ['browser',browser,owner=>owner.close()],
   ]){
     if(!resource)continue;
-    try{await close();report.cleanup[name]={status:name==='driver'?'disposed':'closed'};}
-    catch(error){
-      const message=String(error?.message||error);
-      report.cleanup[name]={status:'failed',error:message};
-      report.result='fail';process.exitCode=1;
-      report.failure??={message:`Owned ${name} cleanup failed: ${message}`};
-    }
+    if(!ownedClosePromises.has(resource))ownedClosePromises.set(resource,(async()=>{
+      try{await close(resource);report.cleanup[name]={status:name==='driver'?'disposed':'closed'};}
+      catch(error){
+        const message=String(error?.message||error);
+        report.cleanup[name]={status:'failed',error:message};
+        report.result='fail';process.exitCode=1;
+        report.failure??={message:`Owned ${name} cleanup failed: ${message}`};
+      }
+    })());
+    await ownedClosePromises.get(resource);
   }
-  })();
-  return ownedClosePromise;
 }
 const onOwnedInterrupt=signal=>{
   report.interruption??={signal,observed_at:new Date().toISOString()};
@@ -2652,6 +2651,7 @@ try{
     await page.locator('body').textContent().then(text=>fs.writeFile(path.join(output,'page.txt'),text)).catch(()=>{});
   }
 }finally{
+  if(report.interruption){report.result='fail';process.exitCode=1;}
   try{
   await stopControlledContention();
   if(campaignWallBoundTimer!==null){

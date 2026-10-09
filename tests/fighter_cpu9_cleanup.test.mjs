@@ -9,7 +9,7 @@ const actualClose=source.slice(begin,end);
 for(const failed of [null,'context','browser'])test(`actual owned cleanup independently retires context/browser: ${failed}`,async()=>{
  const calls=[],primary={message:'original route failure'};
  const resource=name=>({close:async()=>{calls.push(name);if(name===failed)throw Error(name+' refused');}});
- const scope={report:{result:'pass',failure:primary},process:{exitCode:0,off(){}},ownedClosePromise:null,driver:null,browserCdp:null,
+ const scope={report:{result:'pass',failure:primary},process:{exitCode:0,off(){}},ownedClosePromises:new Map(),driver:null,browserCdp:null,
   browserContext:resource('context'),browser:resource('browser')};
  vm.runInNewContext(actualClose+';globalThis.closeActual=closeOwnedBrowserResources;',scope);
  await scope.closeActual();assert.deepEqual(calls,['context','browser']);assert.equal(scope.report.failure,primary);
@@ -18,12 +18,12 @@ for(const failed of [null,'context','browser'])test(`actual owned cleanup indepe
  if(failed){assert.equal(scope.report.result,'fail');assert.equal(scope.process.exitCode,1);}
 });
 test('actual finally preserves primary evidence error and closes both before report write',async()=>{
- const start=source.indexOf('}finally{\n  try{')+'}finally{'.length;
+ const start=source.indexOf('}finally{\n  if(report.interruption)')+'}finally{'.length;
  const finish=source.indexOf("\nif(!['pass'",start);
  const body=source.slice(start,finish).trim().slice(0,-1);
  for(const withPrimary of [false,true]){
   const calls=[],primary=withPrimary?{message:'original route error'}:null;
-  const scope={report:{result:'pass',...(primary?{failure:primary}:{})},process:{exitCode:0,off(){}},ownedClosePromise:null,
+  const scope={report:{result:'pass',...(primary?{failure:primary}:{})},process:{exitCode:0,off(){}},ownedClosePromises:new Map(),
    stopControlledContention:async()=>{throw Error('evidence unavailable');},driver:null,browserCdp:null,
    browserContext:{close:async()=>calls.push('context')},browser:{close:async()=>calls.push('browser')},
    onSigint(){},onSigterm(){},output:'/owned',path:{join:()=>'/owned/report.json'},fs:{writeFile:async()=>calls.push('write')}};
@@ -38,7 +38,7 @@ test('actual signal cleanup preserves interruption and only closes each owner on
  const calls=[],handlers={};
  const stop=source.indexOf("process.on('SIGINT',onSigint);process.on('SIGTERM',onSigterm);",begin);
  const signalCode=source.slice(begin,stop+"process.on('SIGINT',onSigint);process.on('SIGTERM',onSigterm);".length);
- const scope={report:{result:'pass'},process:{exitCode:0,on(name,fn){handlers[name]=fn;}},ownedClosePromise:null,
+ const scope={report:{result:'pass'},process:{exitCode:0,on(name,fn){handlers[name]=fn;}},ownedClosePromises:new Map(),
  driver:null,browserCdp:null,browserContext:{close:async()=>{calls.push('context');throw Error('context close failed');}},
  browser:{close:async()=>calls.push('browser')}};
  vm.runInNewContext(signalCode+';globalThis.closeActual=closeOwnedBrowserResources;',scope);
@@ -49,13 +49,13 @@ test('actual signal cleanup preserves interruption and only closes each owner on
 });
 
 test('actual finally independently closes owners after retained-input or capture rejection',async()=>{
- const start=source.indexOf('}finally{\n  try{')+'}finally{'.length;
+ const start=source.indexOf('}finally{\n  if(report.interruption)')+'}finally{'.length;
  const finish=source.indexOf("\nif(!['pass'",start);
  const body=source.slice(start,finish).trim().slice(0,-1);
  for(const rejected of ['retainResultsInputEvents','retainRuntimeDiagnosticsCapture','sourceProvenance']){
   const calls=[],primary={message:'first route error'};
   const scope={report:{result:'fail',failure:primary,controller_inputs:[],provenance:{}},
-   process:{exitCode:1,off(){}},ownedClosePromise:null,onSigint(){},onSigterm(){},
+   process:{exitCode:1,off(){}},ownedClosePromises:new Map(),onSigint(){},onSigterm(){},
    stopControlledContention:async()=>{},campaignWallBoundTimer:null,wallBoundTask:null,campaignWallBoundExceeded:false,
    page:{isClosed:()=>false},activeMatchIndex:null,
    retainResultsInputEvents:async()=>{if(rejected==='retainResultsInputEvents')throw Error(rejected);},
@@ -68,4 +68,25 @@ test('actual finally independently closes owners after retained-input or capture
   await scope.finishActual();assert.deepEqual(calls,['driver','cdp','context','browser','write']);
   assert.equal(scope.report.failure,primary);assert.equal(scope.report.final_evidence_error,rejected);
  }
+});
+
+test('actual early interrupt does not cache absent owners and closes late acquired identities',async()=>{
+ const calls=[],handlers={};
+ const stop=source.indexOf("process.on('SIGINT',onSigint);process.on('SIGTERM',onSigterm);",begin);
+ const code=source.slice(begin,stop+"process.on('SIGINT',onSigint);process.on('SIGTERM',onSigterm);".length);
+ const scope={report:{result:'pass'},process:{exitCode:0,on(name,fn){handlers[name]=fn;}},ownedClosePromises:new Map(),
+ driver:null,browserCdp:null,browserContext:null,browser:null};
+ vm.runInNewContext(code+';globalThis.closeActual=closeOwnedBrowserResources;',scope);
+ handlers.SIGINT();await scope.closeActual();assert.deepEqual(calls,[]);
+ scope.browserContext={close:async()=>calls.push('context')};scope.browser={close:async()=>calls.push('browser')};
+ await scope.closeActual();await scope.closeActual();assert.deepEqual(calls,['context','browser']);
+ assert.equal(scope.report.failure.code,'owned_interruption');
+ const start=source.indexOf('}finally{\n  if(report.interruption)')+'}finally{'.length;
+ const finish=source.indexOf("\nif(!['pass'",start);const body=source.slice(start,finish).trim().slice(0,-1);
+ Object.assign(scope,{stopControlledContention:async()=>{throw Error('later evidence failure');},onSigint(){},onSigterm(){},
+ output:'/owned',path:{join:()=>'/owned/report.json'},fs:{writeFile:async()=>calls.push('write')}});
+ scope.process.off=()=>{};scope.report.result='pass';
+ vm.runInNewContext('globalThis.finishActual=async()=>{'+body+'};',scope);await scope.finishActual();
+ assert.equal(scope.report.result,'fail');assert.equal(scope.report.failure.code,'owned_interruption');
+ assert.deepEqual(calls,['context','browser','write']);
 });
