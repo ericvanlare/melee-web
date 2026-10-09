@@ -266,6 +266,8 @@ class RulesMenuReceiver(Receiver):
         self.last_pad = None
         self.latest_menu = None
         self.ready = False
+        self.scene_owner_seen = False
+        self.pre_owner_polls = 0
         from sd_original_menu_plan import rules_ready_packet
         from retail_input_plan import NEUTRAL_PAD
         packet = rules_ready_packet()
@@ -289,13 +291,26 @@ class RulesMenuReceiver(Receiver):
             self.ended = True
             return
         require(event == "progress" and payload.get("diagnostic") == SCOPE and
-                payload.get("consumed") == 0, "Rules probe escaped menu-only scope")
+                type(payload.get("consumed")) is int and payload["consumed"] == 0,
+                "Rules probe escaped menu-only scope")
         name = payload.get("name")
         require(name in ("menu", "menu_input", "rules_ready") and payload.get("pc") == PCS[name],
                 "Rules probe event owner differs")
         data = slices(payload)
         count = payload.get("menu_consumed")
         require(type(count) is int, "Rules probe source input inventory missing")
+        if not self.scene_owner_seen:
+            require(name == "menu", "Rules probe input/readiness preceded its first scene owner")
+            if (40, 0) not in data:
+                require(data == {(17, 0): b"\0" * 6} and count == 0 and self.menu_consumed == 0 and
+                        type(row["source_tick"]) is int and row["source_tick"] == 0,
+                        "Rules probe pre-owner poll escaped exact cold routing")
+                self.menu_polls += 1
+                self.pre_owner_polls += 1
+                require(self.menu_polls <= 7200, "Rules probe menu polling cap exhausted")
+                return  # No guessed scene, PAD intention or readiness is produced.
+            self.latest_menu = menu_state(data)
+            self.scene_owner_seen = True
         if name == "menu_input":
             require(count == self.menu_consumed + 1 and count <= 7200,
                     "Rules probe source input gap/repeat/cap")
@@ -334,5 +349,6 @@ class RulesMenuReceiver(Receiver):
         return {"schema": "melee-web-original-rules-ready-probe", "version": 1,
                 "scope": "rules_ready", "recipe_sha256": self.plan["authored_recipe_sha256"],
                 "menu_source_samples": self.menu_consumed, "menu_polls": self.menu_polls,
+                "pre_owner_polls": self.pre_owner_polls,
                 "native_input": native, "cold_port_preferences": [1, 1, 1, 1],
                 "full_sd_prefix_admission": False, "whole_session_admission": False}
