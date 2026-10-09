@@ -266,6 +266,11 @@ class RulesMenuReceiver(Receiver):
         self.last_pad = None
         self.latest_menu = None
         self.ready = False
+        from sd_original_menu_plan import rules_ready_packet
+        from retail_input_plan import NEUTRAL_PAD
+        packet = rules_ready_packet()
+        self.declared_menu_pads = {(NEUTRAL_PAD, NEUTRAL_PAD)} | {
+            (action["p1"], action["p2"]) for action in packet["boot"] + packet["actions"]}
 
     def accept(self, row):
         event, payload = row["event"], row["payload"]
@@ -297,6 +302,8 @@ class RulesMenuReceiver(Receiver):
             raw = data.get((3, 0), b"")
             require(len(raw) == 48, "Rules probe source PAD missing")
             self.last_pad = [raw[p:p + 11].hex() for p in range(0, 48, 12)]
+            require(tuple(self.last_pad[:2]) in self.declared_menu_pads,
+                    "Rules probe consumed undeclared menu PAD intent")
             from retail_input_plan import DISCONNECTED_PAD
             require(self.last_pad[2:] == [DISCONNECTED_PAD] * 2,
                     "Rules probe inactive controllers changed")
