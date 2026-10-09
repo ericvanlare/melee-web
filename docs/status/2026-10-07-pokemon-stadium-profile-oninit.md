@@ -29,3 +29,36 @@ binds the corrected source/tree, focused C1 producer, suite and ordinary build
 logs, cache options, affected object/output hashes, retained failures, and the
 source-only cleanup audit. Raw logs and the prior-artifact preservation
 manifest remain under external run ID `issue251-oninit-profile-20261007`.
+
+
+The October 7 profile result above remains historical. The retained V26 OnInit
+experiment on `b8c272c4` later failed heap return with **88,576 bytes** outstanding.
+After the collision component and reviewed feature integration, the canonical
+Release diagnostic build on `21b60e83` passed. One authorized experiment using
+the same 98 inputs reached all eight initialization taps, completed actual
+StageLast and light destruction, and retired the exact Ground and owned map-2
+buffer leases. Its fifth teardown predicate failed: free heap was **33,373,120**
+versus **33,459,040**, leaving **85,920 bytes**. The remaining 16 acceptance
+predicates were not executed. Both children exited and were reaped naturally;
+all 98 input hashes matched afterward. No fixture retry followed.
+
+The reduced queue producer `3bd7cf0f` passed its canonical diagnostic build.
+Its actual SDK control enqueued two original Ground callback headers, each
+requesting 12 bytes, then executed the explicitly bounded StageLast restoration
+assignment fragment. Free heap changed **8,331,328 → 8,331,200** and remained
+there after restoration: both exact leases remained live, no callback ran, and
+the borrowed GObjs stayed unchanged. Native ASan/UBSan controls executed the
+original queue bodies with synthetic service witnesses, verifying stage
+OnStart before LIFO callbacks, each header release after its callback, and two
+repeat lifetimes. The fragment is not a full StageLast execution, and these
+controls do not validate actual Stadium OnStart services. Both preparation
+failures remain retained separately.
+
+C3 remains blocked. The selected progression is required original OnLoad and
+OnStart while map owners are live, including checked generator and camera
+ownership. Header-only cancellation would cover an early diagnostic abort;
+it would not establish that source lifecycle. No runtime cancellation,
+generator/camera implementation, full fixture rerun, idle-world loop, or
+whole-session acceptance is included. The existing portable receipt records
+both historical producers and these exact later build/control identities;
+raw evidence remains under run ID `stadium-c3-lifetime-20261009-074216-4d7cf7d1`.

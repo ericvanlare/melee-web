@@ -293,5 +293,182 @@
     "artifact_names_are_relative_to_run": true,
     "raw_logs_and_preservation_manifest_retained": true,
     "no_machine_specific_path_required": true
+  },
+  "subsequent_c3_component_2026_10_09": {
+    "claim_boundary": "Existing October7 profile receipt remains historical. This update preserves V26 and identifies the exact later producer; componentcontrols do not pass C3.",
+    "current_result": "blocked_at_heap_return_after_actual_StageLast",
+    "prior_v26": {
+      "source_commit": "b8c272c44a94bcb03f0371008851e468200d4496",
+      "first_failure": "heap_free_bytes",
+      "expected": 33459040,
+      "observed": 33370464,
+      "gap": 88576,
+      "run_id": "issue251-source-order-journal-20261008-v1/original-oninit-packet-v26",
+      "fixture_manifest": {
+        "name": "issue251-source-oninit-v26.fixture-pre.json",
+        "bytes": 22841,
+        "sha256": "ce67c90c21aa3a1a9d823b2c9a3b5a9824d54dee66606526ab4f4d229f03806d"
+      }
+    },
+    "collision_component": {
+      "commit": "9e7e877629b3a144dac80d2e6147d6034415a9f4",
+      "scope": "Release five disjoint collision roots; borrowed active-tail/suffix aliases notfreed separately",
+      "actual_sdk_lifetimes": [
+        {
+          "free_before": 991328,
+          "free_after": 991328
+        },
+        {
+          "free_before": 991328,
+          "free_after": 991328
+        }
+      ],
+      "native_control": "ASan/UBSan actual production release + pinned island partition/reuse source, native allocator shim ledger only"
+    },
+    "integrated_oninit": {
+      "source_commit": "21b60e83238a425b6a9e09033e06844ccc5d7f4c",
+      "source_tree": "796dc4fd578742b510807beb4300e8a48cddfb06",
+      "diagnostic_build": {
+        "name": "integrated-diagnostic-build.log",
+        "bytes": 1084256,
+        "sha256": "701b6dc4c7b1c50d08c523d122b735d6256cfcff653329797d39ace5a76b2a8e"
+      },
+      "build_receipt": {
+        "name": "integrated-diagnostic-build-result-v2.json",
+        "bytes": 6542,
+        "sha256": "b22008907d4b47e80e20af88bd78b2a5845cc7cea7a4757163265e9d8f2bf9a8"
+      },
+      "packet": {
+        "name": "integrated-oninit-preflight-packet-v2.json",
+        "bytes": 32025,
+        "sha256": "9b7a57a6f400463e07dc31e6e356633c637d251ca200e412a1fe1bea9ab77e59"
+      },
+      "result_receipt": {
+        "name": "integrated-oninit-result-review-v2.json",
+        "bytes": 11625,
+        "sha256": "be8d4aee0992f248d75f069be3b9d97082e377736754e69744fad403a03c7da6"
+      },
+      "first_failed_predicate": {
+        "index": 5,
+        "field": "heap_free_bytes",
+        "expected": 33459040,
+        "observed": 33373120,
+        "gap": 85920
+      },
+      "before_failure": "Eight original initialization taps; actual StageLast/lightdestroy; exact Ground64 and ownedmap2 fallback327680 lease retirement; generation/ticks/objects/processes restored",
+      "later_acceptance": "Remaining16 teardown acceptance predicates not executed; later copied observations diagnostic only",
+      "fixture_pre_post": "98 exact retainedV26 inputs rehashed identically before/after, children reaped naturally, no timeout/signal/retry",
+      "phase_exclusions": "OnLoad/OnStart, x6A4 normalconsumption, scheduledprocs, idleworld loop, originalcomparison, capture and whole-session acceptance"
+    },
+    "reduced_queue": {
+      "producer_commit": "3bd7cf0f5787f4f541eaee521eed8eeddc32ecf0",
+      "producer_tree": "1c4a1d73412516e48a84d9095931c16e3fbffacf",
+      "canonical_build_argv": [
+        "python3",
+        "scripts/build.py",
+        "--trace-target",
+        "native_menu_host_trace",
+        "--configuration",
+        "Release",
+        "--stadium-c1a-diagnostic"
+      ],
+      "result_receipt": {
+        "name": "ground-queue-reduced-result-v1.json",
+        "bytes": 5913,
+        "sha256": "644a4e1b6a9c91fd4d8f106a41cb91928a2926c44aab348dcbb63d2f3a27929f"
+      },
+      "build_log": {
+        "name": "ground-queue-diagnostic-build-2.log",
+        "bytes": 12244,
+        "sha256": "47b5877e8aa3f87fcbf1270713dcb84804c34c8b48ae429245820d6471392181"
+      },
+      "native_controls": {
+        "name": "ground-queue-native-source-controls-2.log",
+        "bytes": 369,
+        "sha256": "8ed6298fb735b2bd5a5887417aa1740f480d27374ee5fbaa90cbc0e6cc03e746"
+      },
+      "sdk_control": {
+        "name": "ground-queue-sdk-control-2.log",
+        "bytes": 550,
+        "sha256": "3ff7639ff2b1be8b48c0180340ec0a51eff1327c94a3750c01ad816415532e13"
+      },
+      "source_objects": [
+        {
+          "name": "native_menu_host_trace.js",
+          "bytes": 237024,
+          "sha256": "3a9c485cad6c4b8bd6a8b7df5189004080d1fe6dd087e7e3ebcb0d17225f4c15",
+          "repository_relative": "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        },
+        {
+          "name": "native_menu_host_trace.wasm",
+          "bytes": 14529825,
+          "sha256": "bde6edf014b41584617f29b9461bd35b6e2b168f4b5bc900829fcd188837121f",
+          "repository_relative": "build/browser-stadium-c1a-release/native_menu_host_trace.wasm"
+        },
+        {
+          "name": "compile_commands.json",
+          "bytes": 4311638,
+          "sha256": "d9d7915b055d7813b004512da70006737a0a8ff6f2c86b7832fe4e29492e25d4",
+          "repository_relative": "build/browser-stadium-c1a-release/compile_commands.json"
+        },
+        {
+          "name": "CMakeCache.txt",
+          "bytes": 60976,
+          "sha256": "5f5bcc61802ab35caa2f3359c335d27e988676911cb35217567320e85c7083e7",
+          "repository_relative": "build/browser-stadium-c1a-release/CMakeCache.txt"
+        },
+        {
+          "name": "build.ninja",
+          "bytes": 5685770,
+          "sha256": "19d6e62bb25896f3db38dd12f6266979fb28d024d6d5575a0d60e7c08b18fd08",
+          "repository_relative": "build/browser-stadium-c1a-release/build.ninja"
+        },
+        {
+          "name": "ground.c",
+          "bytes": 94618,
+          "sha256": "11a7350cb593fcefb95020e6b6c9d5e1c92e94959d7f6a842d608b8e4103f721",
+          "repository_relative": "build/gameplay-source/src/melee/gr/ground.c"
+        },
+        {
+          "name": "stadium_c1_stage_state_probe.c",
+          "bytes": 27473,
+          "sha256": "7a31f3e96fd8d81eba2ca3f424b2d566f42cdae7469fe7d900fb02bbf9f6a2ab",
+          "repository_relative": "tests/stadium_c1_stage_state_probe.c"
+        },
+        {
+          "name": "native_menu_host_trace.cpp",
+          "bytes": 474788,
+          "sha256": "c1b45beb0f665dd0465c2b5b3c91e84e94b551281ed1c7f90a7ef1e5278fe8df",
+          "repository_relative": "tests/native_menu_host_trace.cpp"
+        },
+        {
+          "name": "test_ground_pending_callbacks.py",
+          "bytes": 8886,
+          "sha256": "46ff17b7df54692e24338c9d9fae2b2457fd7882cd84175f5cd06100b26826c7",
+          "repository_relative": "tests/test_ground_pending_callbacks.py"
+        }
+      ],
+      "expected_loss": {
+        "actual_sdk_header_count": 2,
+        "requested_each": 12,
+        "free_before": 8331328,
+        "free_after_enqueue": 8331200,
+        "free_after_restoration_fragment": 8331200,
+        "gap": 128,
+        "callbacks": 0,
+        "borrowed_gobjs_unchanged": true
+      },
+      "scope": "Actual SDK enqueue and explicitly source-bound production-assignment fragment; not fullStageLast or actualStadiumOnStart. Nativeoriginal queue-drain ordering/repeat uses syntheticservicewitnesses, not port service replacements. No runtimecancellation added.",
+      "preparation_failures_retained": [
+        "RawPPC callbackargs nativecompile failure; switched to existing checkedTARGET_PC preparedsource",
+        "SDK unittest moduleimport failure beforeNode; fixedexplicit scriptsimport and retainedoutput"
+      ]
+    },
+    "next_progression": "Required original OnLoad/OnStart while maps stilllive, with checked source generator/camera owners. Header-only diagnostic cancellation would repair earlyabort only; it is not selected as the C3 lifecycle progression.",
+    "private_evidence": {
+      "external_run_id": "stadium-c3-lifetime-20261009-074216-4d7cf7d1",
+      "artifact_names_relative_to_run": true,
+      "no_machine_specific_paths_required": true
+    }
   }
 }
