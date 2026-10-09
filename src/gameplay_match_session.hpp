@@ -34,8 +34,8 @@ public:
     GameplayMatchSession& operator=(const GameplayMatchSession&)=delete;
     void tick(const PADStatus[4]);
     void draw();
-    // Requires the original source flow to complete before capturing final
-    // RNG/PAD, closing the Sudden Death world and scene owner, and handing off.
+    // Requires source completion; retires flow and publishes original terminal
+    // data before capturing live RNG/PAD, closing the world and handing off.
     void finish_sudden_death(MeleeWebMenuMatchContinuation& results);
     int outcome(int& winner) const;
     bool ready() const;

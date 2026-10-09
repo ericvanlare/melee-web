@@ -484,7 +484,8 @@ void run_vs_sudden_death_source_control()
 }
 
 void run_typed_results_source_smoke(const melee_web::RuntimeFiles&,MeleeWebMenuHost*,
-    const ResultsMatchInfo&,std::uint32_t&,std::uint8_t[MELEE_WEB_PAD_STATE_BYTES]);
+    const ResultsMatchInfo&,std::uint32_t&,std::uint8_t[MELEE_WEB_PAD_STATE_BYTES],
+    const MeleeWebPadState* initial_input=nullptr);
 std::vector<std::string> sd_resolution_asset_names(const MeleeWebMenuMatchSelection& selection)
 {
     auto names=melee_web::menu_asset_names();
@@ -802,21 +803,21 @@ void run_sudden_death_host_control(
                     }
                 }
                 check(match.complete()&&ending_ticks>0&&match.player_stats(0).stocks==0&&
-                      match.outcome(winner)==OUTCOME_ELIMINATION&&winner==1,
+                      match.outcome(winner)==OUTCOME_ELIMINATION,
                       "Input-driven SD did not complete its original P2 elimination winner");
                 const auto sd_final_frames=match.source_frames();
-                const auto* live_sd_rng_owner=seed_ptr;
-                check(melee_web_match_rules_publish_result(),"Completed SD could not publish source terminal");
+                // Exercise the public finish directly: no test-only terminal
+                // prepublication or pre-close capture can mask its ordering.
+                MeleeWebMenuMatchContinuation results{};match.finish_sudden_death(results);
                 MatchExitInfo sd_exit{};
-                check(melee_web_match_rules_terminal_data(&sd_exit)&&seed_ptr==live_sd_rng_owner,
-                      "SD terminal publication lost payload or live RNG owner");
-                std::uint32_t final_sd_seed=0;std::uint8_t final_sd_pad[MELEE_WEB_PAD_STATE_BYTES];
-                match.capture_handoff(final_sd_seed,final_sd_pad);
+                check(melee_web_match_rules_terminal_data(&sd_exit)&&
+                      sd_exit.match_end.outcome==OUTCOME_ELIMINATION&&
+                      sd_exit.match_end.n_winners==1&&sd_exit.match_end.winners[0]==1,
+                      "Direct SD finish did not retain original P2 elimination terminal");
+                winner=sd_exit.match_end.winners[0];
                 emit_native_bytes("natural_sd_terminal",&sd_exit,sizeof(sd_exit));
-                emit_native_bytes("natural_sd_final_pad",final_sd_pad,sizeof(final_sd_pad));
                 MatchEnd expected_result=tied_timeout.match_end;MatchEnd sd_merge=sd_exit.match_end;
                 gm_80166CCC(&expected_result,&sd_merge);
-                MeleeWebMenuMatchContinuation results{};match.finish_sudden_death(results);
                 check(results.kind==MELEE_WEB_MENU_MATCH_CONTINUATION_RESULTS&&
                       std::memcmp(&results.payload.results.match_end,&expected_result,sizeof(expected_result))==0&&
                       !melee_web_gameplay_generation()&&!melee_web_gameplay_world_exists(),
@@ -825,11 +826,15 @@ void run_sudden_death_host_control(
                 std::cout<<"Natural SD elimination: ready input ticks "<<ready_ticks
                          <<", departure input ticks "<<elimination_ticks<<", active cursor "<<sd_active_start
                          <<", final SD cursor "<<sd_final_frames<<", frozen ending ticks "<<ending_ticks
-                         <<", winner source slot "<<winner<<", final SD RNG "<<final_sd_seed
-                         <<", Results entry RNG "<<results_entry_seed<<'\n';
+                         <<", winner source slot "<<winner
+                         <<", final SD internal RNG/PAD unobserved, Results entry RNG "<<results_entry_seed<<'\n';
                 emit_native_bytes("natural_overall_results",&results.payload.results,sizeof(ResultsMatchInfo));
                 auto result_seed=results_entry_seed;
-                run_typed_results_source_smoke(*world_files,host,results.payload.results,result_seed,final_sd_pad);
+                std::uint8_t results_pad[MELEE_WEB_PAD_STATE_BYTES]{};
+                const auto* results_input=melee_web_menu_host_input(host);
+                check(results_input!=nullptr,"Typed Results did not retain the actual source handoff bank");
+                run_typed_results_source_smoke(*world_files,host,results.payload.results,
+                                               result_seed,results_pad,results_input);
                 auto css=std::make_unique<melee_web::GameplayMenuWorld>(*world_files);
                 check(melee_web_menu_host_enter(host,css->audio(),error,error_size),error);
                 for(unsigned tick=0;tick<120;++tick){
@@ -1985,14 +1990,17 @@ void run_results_source_smoke(const melee_web::RuntimeFiles& files,
 }
 void run_typed_results_source_smoke(const melee_web::RuntimeFiles& files,
     MeleeWebMenuHost* host,const ResultsMatchInfo& result,
-    std::uint32_t& seed,std::uint8_t input_bytes[MELEE_WEB_PAD_STATE_BYTES])
+    std::uint32_t& seed,std::uint8_t input_bytes[MELEE_WEB_PAD_STATE_BYTES],
+    const MeleeWebPadState* initial_input)
 {
     char error[256]{};
     std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)> decoded(
-        melee_web_pad_state_decode(input_bytes,MELEE_WEB_PAD_STATE_BYTES,error,sizeof(error)),
+        initial_input?nullptr:melee_web_pad_state_decode(input_bytes,MELEE_WEB_PAD_STATE_BYTES,error,sizeof(error)),
         melee_web_pad_state_free);
-    check(decoded!=nullptr,error);
-    melee_web::GameplayResultsSession session(files,result,seed,*decoded);
+    check(initial_input||decoded!=nullptr,error);
+    melee_web::GameplayResultsSession session(files,result,seed,initial_input?*initial_input:*decoded);
+    melee_web_pad_state_capture(input_bytes);
+    emit_native_bytes("typed_results_scene_entry_pad",input_bytes,MELEE_WEB_PAD_STATE_BYTES);
     check(!melee_web_menu_host_results_exit(host,error,sizeof(error)),
           "Mode exit was accepted before Results scene OnExit");
     float pcm[1068];unsigned audio_phase=0;

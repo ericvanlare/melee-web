@@ -344,9 +344,13 @@ struct GameplayMatchSession::Storage {
         begin(files,selection,archive_cache,initial_input,sd_host,sd_continuation);
         while(!advance_construction()){}
     }
-    void close(){
+    void end_flow(){
         char error[256]{};
         if(flow){check(melee_web_match_flow_end(flow,error,sizeof(error)),error);flow=nullptr;}
+    }
+    void close(){
+        char error[256]{};
+        end_flow();
         /* The browser's final source draw has completed before close(). Keep
          * the original fighter state resident while publishing MatchEnd, then
          * let melee_web_match_end tear down the source objects. The rules
@@ -448,6 +452,11 @@ void GameplayMatchSession::finish_sudden_death(
           "Sudden Death Results handoff requires its live typed match owner");
     check(complete(),
           "Sudden Death Results handoff requires the completed original source flow");
+    // Keep canonical close order through publication while the match-owned
+    // RNG/PAD are still live. OnExit may change either; capture afterward.
+    storage_->end_flow();
+    check(melee_web_match_rules_publish_result(),
+          "Original Sudden Death could not publish its complete terminal data");
     uint32_t final_seed=0;
     uint8_t final_input[MELEE_WEB_PAD_STATE_BYTES];
     capture_handoff(final_seed,final_input);
