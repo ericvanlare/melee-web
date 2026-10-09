@@ -403,6 +403,7 @@ void run_vs_sudden_death_source_control()
         check(melee_web_vs_mode_end(),
               "Reacquired Original VS source-mode lease did not retire");
 
+        const GameRules caller_rules=*gmMainLib_GetGameRules();
         auto* host = melee_web_menu_host_create(error, sizeof(error));
         check(host != nullptr, error);
         MeleeWebMenuMatchContinuation rejected_continuation{};
@@ -446,7 +447,7 @@ void run_vs_sudden_death_source_control()
               std::memcmp(gmMainLib_GetGameRules(),&before_fixture,sizeof(before_fixture))==0,
               "Initial native fixture changed resident rules early or admitted repeated/net ownership");
         check(melee_web_menu_host_destroy(host, error, sizeof(error)), error);
-        check(std::memcmp(gmMainLib_GetGameRules(),&before_fixture,sizeof(before_fixture))==0,
+        check(std::memcmp(gmMainLib_GetGameRules(),&caller_rules,sizeof(caller_rules))==0,
               "Unentered fixture destruction changed resident GameRules");
 
         MeleeWebMenuMatchContinuation unowned_sudden_death{};
@@ -4138,9 +4139,9 @@ int main(int argc,char** argv){try{
  for(unsigned cycle=0;cycle<cycle_count;cycle++){
   trace.begin_run(cycle);
   if((retail_fd_recipe||results_mario_recipe)&&cycle==0)*seed_ptr=1840631306u;
+  const GameRules pre_native_rules=*gmMainLib_GetGameRules();
   char error[256]{};auto* host=melee_web_menu_host_create(error,sizeof(error));check(host!=nullptr,error);
   if(natural_sd_recipe)check(melee_web_menu_host_initialize_profile_baseline(host,error,sizeof(error)),error);
-  const GameRules pre_native_rules=*gmMainLib_GetGameRules();
   if(natural_sd_recipe){
    GameRules rules=gmMainLib_803D4A48;rules.mode=1;rules.stock_count=4;rules.stock_time_limit=1;
    emit_native_bytes("stock_timer_fixture_initial_GameRules",&rules,sizeof(rules));
