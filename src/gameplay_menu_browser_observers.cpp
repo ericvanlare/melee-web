@@ -3,7 +3,9 @@
 // std::string append per field) so that adding a field is a one-line change.
 #include "gameplay_menu_browser_state.hpp"
 #include "fixed_format_writer.hpp"
+#include <bit>
 using namespace melee_web_menu_browser;
+extern "C" unsigned char mnItemSw_803ED438[32];
 namespace {
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
 void append_pointer_json(std::string& json,const void* pointer){
@@ -391,14 +393,20 @@ const char* melee_web_native_menu_source_observe(){
  static char text[3072];
  MeleeWebMenuSourceObservation observed{};
  StartMeleeData start{};
+ StartMeleeData selection{};
+ uint8_t selection_header[6]{};
  int source_valid=0,start_valid=0;
+ int selection_kind=0;
  int live_items_valid=0,live_item_cursor=-1,live_item_enabled=-1,live_item_frequency=-1;
+ int live_item_preference_bit=-1;
  char error[256]{};
  if(host&&host_entered&&melee_web_menu_host_source_observe(
        host,&observed,error,sizeof(error)))source_valid=1;
+ if(host&&host_entered)
+  selection_kind=melee_web_menu_host_selection_state(host,&selection,selection_header);
  if(host&&!host_entered&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY&&
     melee_web_menu_host_raw_selection(host,&start,error,sizeof(error)))start_valid=1;
- if(!source_valid&&!start_valid)return "{}";
+ if(!source_valid&&!start_valid&&!selection_kind)return "{}";
  /* The item mask is copied into global match preferences when the original
   * Items routine commits its private MnItemSwData. Observe that live row
   * separately so a source-confirmed A input is not mistaken for that commit. */
@@ -410,7 +418,10 @@ const char* melee_web_native_menu_source_observe(){
      item_data->cursor==static_cast<uint8_t>(observed.hovered_selection)){
    live_items_valid=1;
    live_item_cursor=item_data->cursor;
-   if(item_data->cursor<0x1f)live_item_enabled=item_data->items[item_data->cursor];
+   if(item_data->cursor<0x1f){
+    live_item_enabled=item_data->items[item_data->cursor];
+    live_item_preference_bit=mnItemSw_803ED438[item_data->cursor];
+   }
    else live_item_frequency=item_data->x21;
   }
  }
@@ -459,6 +470,7 @@ const char* melee_web_native_menu_source_observe(){
  out.add(",\"handicap\":%d",observed.handicap);
  out.add(",\"damage_ratio\":%d",observed.damage_ratio);
  out.add(",\"friendly_fire\":%d",observed.friendly_fire);
+ out.add(",\"pause\":%d",observed.pause);
  out.add("}");
  out.add(",\"items\":{");
  out.add("\"frequency\":%d",observed.item_frequency);
@@ -471,10 +483,32 @@ const char* melee_web_native_menu_source_observe(){
  out.add(",\"door_teams\":[%d,%d,%d,%d]",observed.css_player_teams[0],observed.css_player_teams[1],observed.css_player_teams[2],observed.css_player_teams[3]);
  out.add("}");
  out.add("}");
+ out.add(",\"selection\":{");
+ out.add("\"valid\":%s",selection_kind?"true":"false");
+ out.add(",\"scene\":%d",selection_kind);
+ if(selection_kind)
+  out.add(",\"provenance\":\"%s\"",selection_kind==1?"raw_css_vs_start":"raw_sss_vs_start");
+ if(selection_kind){
+  const auto& rules=selection.rules;
+  out.add(",\"match_kind\":%d",(int)rules.match_kind);
+  out.add(",\"timer_enabled\":%u",(unsigned)rules.timer_enabled);
+  out.add(",\"time_limit_seconds\":%u",(unsigned)rules.time_limit);
+  out.add(",\"friendly_fire\":%u",(unsigned)rules.friendly_fire);
+  out.add(",\"disable_pausing\":%u",(unsigned)rules.disable_pausing);
+  out.add(",\"damage_ratio_bits\":\"%08x\"",
+          (unsigned)std::bit_cast<uint32_t>(rules.x30));
+  out.add(",\"item_frequency\":%d",(int)(int8_t)rules.xB);
+  out.add(",\"item_mask_hex\":\"%016llx\"",
+          (unsigned long long)rules.x20);
+  out.add(",\"player_stocks\":[%d,%d]",
+          (int)selection.players[0].stocks,(int)selection.players[1].stocks);
+ }
+ out.add("}");
  out.add(",\"items_menu\":{");
  out.add("\"valid\":%s",live_items_valid?"true":"false");
  out.add(",\"cursor\":%d",live_item_cursor);
  out.add(",\"selected_item_enabled\":%d",live_item_enabled);
+ out.add(",\"selected_item_preference_bit\":%d",live_item_preference_bit);
  out.add(",\"frequency_selector\":%d",live_item_frequency);
  out.add("}");
  out.add(",\"start\":{");
@@ -487,6 +521,9 @@ const char* melee_web_native_menu_source_observe(){
  out.add(",\"players\":%s",start_players);
  out.add("}");
  out.add("}");
+ const int written=out.result();
+ if(written<0||static_cast<size_t>(written)>=sizeof(text))
+  return "{\"observer_error\":true,\"observer_error_reason\":\"Source observation buffer overflow\"}";
  return text;
 }
 const char* melee_web_native_menu_memory(){

@@ -10,6 +10,11 @@ import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
+import {
+  ITEM_ROW_TO_PREFERENCE_BIT,
+  competitiveProfileFailures,
+  deriveAllOffItemMasks,
+} from './vs_rules_competitive_profile_helpers.mjs';
 
 const options = Object.fromEntries(['url', 'disc', 'out', 'playwright']
   .map(name => [name, {type: 'string'}]));
@@ -20,18 +25,23 @@ options['stage-only'] = {type: 'boolean', default: false};
 options['no-contest-only'] = {type: 'boolean', default: false};
 options['team-battle'] = {type: 'boolean', default: false};
 options['team-setup-only'] = {type: 'boolean', default: false};
+options['competitive-profile-only'] = {type: 'boolean', default: false};
 const {values} = parseArgs({options, strict: true});
 const menuOnly = values['menu-only'];
 const rulesItemsOnly = values['rules-items-only'];
 const cssSssOnly = values['css-sss-only'];
 const stageOnly = values['stage-only'];
 const noContestOnly = values['no-contest-only'];
+const competitiveProfileOnly = values['competitive-profile-only'];
 const teamSetupOnly = values['team-setup-only'];
 const teamBattle = values['team-battle'] || teamSetupOnly;
 if (teamSetupOnly && values['team-battle'])
   throw Error('--team-setup-only and --team-battle select different route lengths');
-if (teamBattle && (menuOnly || rulesItemsOnly || cssSssOnly || stageOnly || noContestOnly))
+if (teamBattle && (menuOnly || rulesItemsOnly || cssSssOnly || stageOnly || noContestOnly || competitiveProfileOnly))
   throw Error('--team-battle runs the full Rules/Items/match route and cannot be combined with a reduced-route flag');
+if (competitiveProfileOnly &&
+    (menuOnly || rulesItemsOnly || cssSssOnly || stageOnly || noContestOnly || teamSetupOnly))
+  throw Error('--competitive-profile-only is a dedicated source Rules/Items-to-CSS route');
 for (const name of ['url', 'disc', 'out'])
   if (!values[name]) throw Error('Use --url DEVELOPMENT_RUNTIME_URL --disc OWNED_DISC --out NEW_DIRECTORY [--playwright PACKAGE_DIR]');
 const output = path.resolve(values.out);
@@ -52,14 +62,17 @@ const sha256File = file => new Promise((resolve, reject) => {
 let browser, context, page, driver, browserPath, playwrightPath;
 const report = {
   schema: 'melee-web-vs-rules-item-menu-browser-v1',
-  mode: noContestOnly ? 'source-no-contest-results-reproducer'
+  mode: competitiveProfileOnly ? 'source-competitive-rules-profile-preflight'
+    : noContestOnly ? 'source-no-contest-results-reproducer'
     : teamSetupOnly ? 'source-team-setup-cancel-reentry-reproducer'
     : teamBattle ? 'source-two-player-team-battle-results-route'
     : stageOnly ? 'source-sss-stage-driver-reproducer'
     : rulesItemsOnly ? 'source-rules-items-entry-reproducer'
     : cssSssOnly ? 'source-css-to-sss-cooldown-reproducer'
     : menuOnly ? 'source-menu-boundary-reproducer' : 'source-rules-items-match-route',
-  scope: noContestOnly
+  scope: competitiveProfileOnly
+    ? 'Headless original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS; B0XX P1 inputs set and verify the exact GameRules profile and preserve raw CSS StartMeleeData for provenance. CSS data is not treated as normalized before SSS. No match, timeout, Results, retail comparison, or acceptance claim.'
+    : noContestOnly
     ? 'Headless rendered original CSS -> SSS -> Final Destination -> match; P1 Start opens the original source pause, then the held LRAS+Start No Contest chord enters Results and Eject verifies teardown.'
     : teamSetupOnly
     ? 'Headless rendered original CSS -> Main/VS/Rules/Items -> CSS; original CSS Teams toggle and P2 team-color input configure the two existing players, SSS B cancellation returns to CSS with Rules retained, SSS re-entry and a second B cancellation return to CSS, then Eject verifies teardown.'
@@ -94,12 +107,14 @@ const report = {
     rulesToItems: 'fn_8022F538 selection 5 calls mnItemSw_802358C0',
     rulesToRulesPlus: 'fn_8022F538 selection 6 calls mn_802339FC; mn_802339FC sets MENU_KIND_RULES_EXTRA=15 and enters the source Rules Plus GObj',
     rulesPlusInput: 'fn_8023201C uses D-pad left/right on option 0, saves stock_time_limit in minutes, B commits and returns through mn_8023164C, and Start commits before mn_80229860(GM_VS)',
+    rulesPlusProfileRows: 'Rules Plus rows 0/1/2 are stock timer minutes, friendly_fire, and pause; the source GameRules observation reports the committed values, while normalized StartMeleeData fields are produced later by gm_80167BC8 on original VS entry after SSS',
     rulesPlusMatchHandoff: 'gm_80167BC8 converts nonzero stock_time_limit minutes to StartMeleeRules.time_limit seconds and enables the match timer',
     itemInput: 'fn_80233E10: MenuInput_Back commits the item table and returns to Rules; MenuInput_A toggles the selected item; MenuInput_Start commits and returns to VS',
     itemThink: 'fn_80234C24: animates Items entry/exit, observes cursor/value changes, and commits the source item settings after confirmed changes',
     itemInputGate: 'Observer reads mnItemSw_804D6BEC so the harness waits for the original transition lock before navigation inputs',
     itemCancelCommit: 'fn_80233E10 MenuInput_Back -> mnItemSw_CommitItems -> lbCardGame_UpdatePowerTime -> mn_8023164C',
-    itemSaveEffect: 'mnItemSw_CommitItems writes 31 authored item flags to gmMainLib_8015CC58()->item_mask and x21 - 1 to item_freq; B/Start then call lbCardGame_UpdatePowerTime',
+    itemSaveEffect: 'mnItemSw_CommitItems writes 31 authored item flags through MnItemSwTable.item_order (mnItemSw_803ED438) to gmMainLib_8015CC58()->item_mask and x21 - 1 to item_freq; the observer reports the live row-to-preference bit',
+    selectionPayload: 'melee_web_menu_host_selection_state copies raw session-owned CSS VsModeData.start; gm_80167BC8 converts GameRules later when original VS enters gameplay after SSS, so this preflight records CSS provenance without treating raw StartMeleeData as normalized settings',
     rulesMatchHandoff: 'fn_8022F538 Start in GM_MENU commits GameRules then calls mn_80229860(GM_VS)',
     sourceModeHandoff: 'gmmenumode.c:onExit passes MenuExitData.pending_mode to gm_SetPendingGameMode and gm_SetNewGameModePending; host snapshots source globals after this callback',
     cssToMain: 'mnCharSel_Scene_OnFrame checks mn_8022F218 for PAD_LR_START; B0XX q+9+7 follows the original CSS parent route to GM_MENU',
@@ -124,6 +139,17 @@ const report = {
     physicalInput: {status: 'not_run', reason: 'browser PAD keyboard routing only'},
     performance: {status: 'not_run', reason: 'functional route capture is not a performance campaign'},
   },
+  competitiveProfile: competitiveProfileOnly ? {
+    requested: {mode: 'stock', stocks: 4, timer_minutes: 8, item_frequency: -1,
+      all_31_item_switches_off: true, pause_enabled: false, friendly_fire: true,
+      damage_ratio_menu_value: 10, handicap: 0},
+    raw_css_selection_stage: 'CSS-owned VsModeData.start before SSS and gm_80167BC8 conversion',
+    source_item_row_preference_bits: ITEM_ROW_TO_PREFERENCE_BIT,
+    initial_css_selection: null,
+    item_rows_after_original_inputs: [],
+    derived_masks: null,
+    final_css_selection: null,
+  } : null,
   checks: [], screenshots: {}, input: [], sourcePadSamples: [], timingPauses: [], timingPauseRecovery: [],
   sourceObservations: [], cssObservations: [], matchObservations: [],
   lifecycleObservations: [], errors: [],
@@ -222,6 +248,10 @@ const resumeTimingPause = async label => {
   const pause = {label, phase: state.phase, message: state.message,
     observedAt: new Date().toISOString()};
   report.timingPauses.push(pause);
+  if (competitiveProfileOnly) {
+    pause.status = 'failed_preflight';
+    throw Error(`${label}: competitive profile preflight stops on a runtime timing disruption: ${state.message}`);
+  }
   const control = await page.evaluate(() => {
     const button = document.querySelector('#pause');
     return {found: Boolean(button), enabled: Boolean(button && !button.disabled),
@@ -373,6 +403,27 @@ const waitRulesPlusTimer = async (expected, label) => {
   report.sourceObservations.push({label, ...observation});
   return observation;
 };
+const waitRulesPlusValue = async (row, expected, label, sourceField = null) => {
+  const deadline = Date.now() + 15000;
+  let observation;
+  while (Date.now() < deadline) {
+    await resumeTimingPause(label);
+    observation = await observeSource();
+    const source = observation.source;
+    if (source?.valid && source.scene === 4 && source.menu_kind === RULES_PLUS_MENU_KIND &&
+        source.hovered_selection === row && source.confirmed_selection === expected &&
+        (sourceField === null || source.rules[sourceField] === expected)) break;
+    await ensureNoError(label);
+    await page.waitForTimeout(50);
+  }
+  const source = observation?.source;
+  assert(source?.valid && source.scene === 4 && source.menu_kind === RULES_PLUS_MENU_KIND &&
+    source.hovered_selection === row && source.confirmed_selection === expected &&
+    (sourceField === null || source.rules[sourceField] === expected),
+    `Timed out waiting for Rules Plus row ${row} value ${expected}: ${JSON.stringify(observation)}`);
+  report.sourceObservations.push({label, ...observation});
+  return observation;
+};
 const waitItemInputReady = async label => {
   const deadline = Date.now() + 15000;
   let observation;
@@ -390,39 +441,39 @@ const waitItemInputReady = async label => {
   report.sourceObservations.push({label, ...observation});
   return observation;
 };
-const waitItemConfirmed = async (expected, label) => {
+const waitItemConfirmed = async (expected, label, row = 0) => {
   const deadline = Date.now() + 15000;
   let observation;
   while (Date.now() < deadline) {
     await resumeTimingPause(label);
     observation = await observeSource();
     if (observation.source?.valid && observation.source.menu_kind === ITEMS_MENU_KIND &&
-        observation.source.hovered_selection === 0 &&
+        observation.source.hovered_selection === row &&
         observation.source.confirmed_selection === expected) break;
     await ensureNoError(label);
     await page.waitForTimeout(50);
   }
   assert(observation?.source?.valid && observation.source.menu_kind === ITEMS_MENU_KIND &&
-    observation.source.hovered_selection === 0 &&
+    observation.source.hovered_selection === row &&
     observation.source.confirmed_selection === expected,
     `Timed out waiting for original item row confirmation ${expected}: ${JSON.stringify(observation)}`);
   report.sourceObservations.push({label, ...observation});
   return observation;
 };
-const waitLiveItemState = async (expected, label) => {
+const waitLiveItemState = async (expected, label, row = 0) => {
   const deadline = Date.now() + 15000;
   let observation;
   while (Date.now() < deadline) {
     await resumeTimingPause(label);
     observation = await observeSource();
     if (observation.source?.valid && observation.source.menu_kind === ITEMS_MENU_KIND &&
-        observation.items_menu?.valid && observation.items_menu.cursor === 0 &&
+        observation.items_menu?.valid && observation.items_menu.cursor === row &&
         observation.items_menu.selected_item_enabled === expected) break;
     await ensureNoError(label);
     await page.waitForTimeout(50);
   }
   assert(observation?.source?.valid && observation.source.menu_kind === ITEMS_MENU_KIND &&
-    observation.items_menu?.valid && observation.items_menu.cursor === 0 &&
+    observation.items_menu?.valid && observation.items_menu.cursor === row &&
     observation.items_menu.selected_item_enabled === expected,
     `Timed out waiting for source MnItemSwData row value ${expected}: ${JSON.stringify(observation)}`);
   report.sourceObservations.push({label, ...observation});
@@ -445,6 +496,48 @@ const waitItemsCursor = async (expected, label) => {
     observation.items_menu.cursor === expected,
     `Timed out waiting for source Items cursor ${expected}: ${JSON.stringify(observation)}`);
   report.sourceObservations.push({label, ...observation});
+  return observation;
+};
+const moveItemsCursor = async target => {
+  const current = await observeSource();
+  assert.equal(current.source?.valid, true, 'Source Items owner must be live before row navigation');
+  assert.equal(current.source.menu_kind, ITEMS_MENU_KIND, 'Original Items menu must own row navigation');
+  const start = current.items_menu?.cursor;
+  assert(Number.isInteger(start) && start >= 0 && start < 31 && target >= 0 && target < 31,
+    `Items row navigation requires source item rows 0..30: ${JSON.stringify({start, target})}`);
+  if (start === target) return current;
+
+  const nextByInput = cursor => {
+    const up = cursor === 0 ? 31 : cursor === 16 ? 32 : cursor === 31 ? 15 : cursor === 32 ? 30 : cursor - 1;
+    const down = cursor === 15 ? 31 : cursor === 30 ? 32 : cursor === 31 ? 0 : cursor === 32 ? 16 : cursor + 1;
+    const left = cursor >= 16 && cursor < 31 ? cursor - 16 : cursor;
+    const right = cursor < 16 ? Math.min(cursor + 16, 30) : cursor;
+    return [[']', up], ['3', down], ['2', left], ['4', right]];
+  };
+  const previous = new Map([[start, null]]);
+  const queue = [start];
+  for (let offset = 0; offset < queue.length && !previous.has(target); offset++) {
+    const cursor = queue[offset];
+    for (const [key, next] of nextByInput(cursor)) {
+      if (next >= 31 || next === cursor || previous.has(next)) continue;
+      previous.set(next, {cursor, key});
+      queue.push(next);
+    }
+  }
+  assert(previous.has(target), `Original Items directional graph cannot reach row ${target} from ${start}`);
+  const steps = [];
+  for (let cursor = target; cursor !== start;) {
+    const step = previous.get(cursor);
+    steps.push({key: step.key, next: cursor});
+    cursor = step.cursor;
+  }
+  steps.reverse();
+  let observation = current;
+  for (const [index, step] of steps.entries()) {
+    await press(step.key);
+    observation = await waitItemsCursor(step.next,
+      `source Items navigation ${index + 1}/${steps.length} reaches row ${step.next}`);
+  }
   return observation;
 };
 const waitItemFrequency = async (expected, label) => {
@@ -500,6 +593,147 @@ const enterVsRules = async label => {
   const rules = await waitMenu(RULES_MENU_KIND, 0, `${label}: open original VS Rules`);
   await shot(`${label}-rules`);
   return rules;
+};
+const runCompetitiveProfilePreflight = async initial => {
+  assert.equal(initial.source?.valid, true, 'Initial source CSS owner must be observable');
+  assert.equal(initial.source.scene, 1, 'Profile baseline must come from original CSS');
+  assert.equal(initial.selection?.valid, true, 'CSS-owned StartMeleeData selection must be observable');
+  assert.equal(initial.selection.scene, 1, 'Profile baseline must use the CSS selection-state API');
+  assert.equal(initial.selection.provenance, 'raw_css_vs_start',
+    'Profile baseline must retain the raw CSS payload before SSS conversion');
+  const initialPreferenceMaskHex = initial.source.items.mask_hex;
+  report.competitiveProfile.initial_css_selection = {
+    rules: initial.source.rules,
+    items: initial.source.items,
+    selection: initial.selection,
+  };
+
+  await moveMenuCursor(RULES_MENU_KIND, 7, 5);
+  await press('m');
+  await waitMenu(ITEMS_MENU_KIND, 0, 'competitive profile opens original Items');
+  await waitItemInputReady('competitive profile Items transition lock released');
+  await shot('03-competitive-items-entry');
+
+  const itemRows = [];
+  for (let cursor = 0; cursor < ITEM_ROW_TO_PREFERENCE_BIT.length; cursor++) {
+    const row = await moveItemsCursor(cursor);
+    const item = row.items_menu;
+    assert.equal(item?.valid, true, `Original Items row ${cursor} must expose its live source value`);
+    assert.equal(item.cursor, cursor);
+    const preferenceBit = item.selected_item_preference_bit;
+    assert(Number.isInteger(preferenceBit) && preferenceBit >= 0 && preferenceBit < 32,
+      `Original Items row ${cursor} has no live preference-bit mapping: ${JSON.stringify(item)}`);
+    assert(item.selected_item_enabled === 0 || item.selected_item_enabled === 1,
+      `Original Items row ${cursor} has a non-binary source switch value: ${JSON.stringify(item)}`);
+    const initialEnabled = item.selected_item_enabled;
+    let finalItem = row;
+    if (initialEnabled !== 0) {
+      await press('m');
+      await waitItemConfirmed(0, `source Items A confirms row ${cursor} off`, cursor);
+      finalItem = await waitLiveItemState(0, `source Items applies row ${cursor} off`, cursor);
+      finalItem = await waitItemInputReady(`source Items accepts the next profile input after row ${cursor}`);
+    }
+    assert.equal(finalItem.items_menu.selected_item_preference_bit, preferenceBit,
+      `Original Items row ${cursor} must keep the same source preference mapping after A`);
+    assert.equal(finalItem.items_menu.selected_item_enabled, 0,
+      `Original Items row ${cursor} must be off before the menu commits`);
+    itemRows.push({cursor, preference_bit: preferenceBit, enabled: 0, initial_enabled: initialEnabled});
+  }
+  report.competitiveProfile.item_rows_after_original_inputs = itemRows;
+
+  await moveItemsCursor(0);
+  await press(']');
+  let frequency = await waitItemsCursor(31, 'source Items Up enters the original frequency selector');
+  let frequencyValue = frequency.items_menu.frequency_selector;
+  assert(Number.isInteger(frequencyValue) && frequencyValue >= 0 && frequencyValue <= 5,
+    `Original Items frequency selector is outside its source range: ${JSON.stringify(frequency.items_menu)}`);
+  while (frequencyValue > 0) {
+    await press('4');
+    frequencyValue--;
+    frequency = await waitItemFrequency(frequencyValue,
+      `source Items frequency selector moves to None (${frequencyValue})`);
+  }
+  assert.equal(frequency.items_menu.frequency_selector, 0,
+    'Original Items frequency selector must be None before B commits the profile');
+  await shot('04-competitive-items-none');
+  await press('o');
+  let rules = await waitMenu(RULES_MENU_KIND, 5, 'original Items B commits all switches and returns to Rules');
+  const masks = deriveAllOffItemMasks({
+    initialPreferenceMaskHex,
+    rows: itemRows,
+  });
+  assert.equal(rules.source.items.frequency, -1,
+    'Original Items B must commit None as the source -1 frequency');
+  assert.equal(rules.source.items.mask_hex, masks.preferenceMaskHex,
+    'Original Items B must save the exact preferences cleared by the 31 observed source rows');
+  report.competitiveProfile.derived_masks = masks;
+  report.sourceObservations.push({label: 'all 31 original item switches committed off', ...rules});
+
+  const stock = await moveMenuCursor(RULES_MENU_KIND, 7, 1);
+  assert.equal(stock.source.confirmed_selection, 4,
+    'Original VS Rules selection must retain the four-stock setting');
+  assert.equal(stock.source.rules.mode, 1, 'Original VS Rules must remain in stock mode');
+  assert.equal(stock.source.rules.stock_count, 4, 'Original VS Rules must store four stocks');
+  assert.equal(stock.source.rules.handicap, 0, 'Original VS Rules must leave handicap off');
+  assert.equal(stock.source.rules.damage_ratio, 10,
+    'Original VS Rules must retain the source 1.0 damage-ratio setting');
+
+  await moveMenuCursor(RULES_MENU_KIND, 7, 6);
+  await press('m');
+  const timerEntry = await waitRulesPlusTimer(stock.source.rules.stock_time_limit,
+    'Rules selection 6 opens original Rules Plus');
+  assert.equal(timerEntry.source.previous_menu_kind, RULES_MENU_KIND);
+  assert.equal(timerEntry.source.rules.stock_time_limit, 0,
+    'Fresh Everything context must enter Rules Plus at its source zero-minute timer');
+  for (let minute = 1; minute <= 8; minute++) {
+    await press('4');
+    await waitRulesPlusTimer(minute,
+      `original Rules Plus right input sets timer to ${minute} minute${minute === 1 ? '' : 's'}`);
+  }
+  const friendlyFireEntry = await moveMenuCursor(RULES_PLUS_MENU_KIND, 6, 1);
+  let friendlyFireValue = friendlyFireEntry.source.confirmed_selection;
+  assert(friendlyFireValue === 0 || friendlyFireValue === 1,
+    `Original Rules Plus friendly-fire value is not binary: ${JSON.stringify(friendlyFireEntry.source)}`);
+  if (friendlyFireValue !== 1) {
+    assert.equal(friendlyFireValue, 0, 'Friendly fire can be set from its source off value');
+    await press('4');
+    friendlyFireValue = 1;
+  }
+  await waitRulesPlusValue(1, friendlyFireValue,
+    'original Rules Plus row 1 sets friendly fire on', 'friendly_fire');
+
+  const pauseEntry = await moveMenuCursor(RULES_PLUS_MENU_KIND, 6, 2);
+  let pauseValue = pauseEntry.source.confirmed_selection;
+  assert(pauseValue === 0 || pauseValue === 1,
+    `Original Rules Plus pause value is not binary: ${JSON.stringify(pauseEntry.source)}`);
+  if (pauseValue !== 0) {
+    assert.equal(pauseValue, 1, 'Pause can be disabled from its source enabled value');
+    await press('2');
+    pauseValue = 0;
+  }
+  await waitRulesPlusValue(2, pauseValue, 'original Rules Plus row 2 sets pause off');
+  assert.equal(pauseValue, 0);
+  await shot('05-competitive-rules-plus-profile');
+  await press('7');
+  await waitMessage('Original character select', 'Rules Plus Start commits the profile through original GM_VS');
+  const finalCss = await observeSource();
+  assert.equal(finalCss.source?.valid, true);
+  assert.equal(finalCss.source.scene, 1);
+  const failures = competitiveProfileFailures({
+    source: finalCss.source,
+    rawCssSelection: finalCss.selection,
+    expectedPreferenceMaskHex: masks.preferenceMaskHex,
+  });
+  assert.deepEqual(failures, [],
+    `CSS-owned competitive profile differs from the requested values: ${JSON.stringify({failures, finalCss})}`);
+  report.competitiveProfile.final_css_selection = {
+    rules: finalCss.source.rules,
+    items: finalCss.source.items,
+    selection: finalCss.selection,
+  };
+  report.sourceObservations.push({label: 'raw CSS-owned StartMeleeData provenance after source Rules commit', ...finalCss});
+  await shot('06-competitive-profile-css');
+  report.checks.push('Original Rules, Items, and Rules Plus PAD inputs set the exact GameRules profile; all 31 mapped item switches are off, pause is disabled, and raw CSS StartMeleeData provenance is retained without treating it as post-SSS normalized match data. No match or timeout was run.');
 };
 const moveCssCursor = async (label, isInside, directionFor) => {
   for (let step = 0; step < 240; step++) {
@@ -568,6 +802,9 @@ route: {
   await driver.launch();
   await waitMessage('Original character select', 'initial CSS');
   await shot('00-initial-css');
+  const initialProfileCss = competitiveProfileOnly ? await observeSource() : null;
+  if (competitiveProfileOnly)
+    report.sourceObservations.push({label: 'initial CSS profile baseline', ...initialProfileCss});
 
   if (noContestOnly) {
     await page.waitForTimeout(800);
@@ -626,6 +863,15 @@ route: {
   await waitMenu(MAIN_MENU_KIND, 0, 'source Main root');
   await shot('01-main-root');
   let rules = await enterVsRules('02-first');
+
+  if (competitiveProfileOnly) {
+    await runCompetitiveProfilePreflight(initialProfileCss);
+    await driver.unload();
+    nativeSessionActive = false;
+    await verifyTeardown('Eject after competitive Rules profile preflight');
+    report.checks.push('Source profile preflight stops at CSS; no SSS, match, timeout, Results, or full-route acceptance was exercised');
+    break route;
+  }
 
   if (rulesItemsOnly) {
     await moveMenuCursor(RULES_MENU_KIND, 7, 5);

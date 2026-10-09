@@ -47,6 +47,7 @@ typedef struct MeleeWebMenuSourceObservation {
     int handicap;
     int damage_ratio;
     int friendly_fire;
+    int pause;
     int item_frequency;
     uint64_t item_mask;
     int css_setup_valid;
