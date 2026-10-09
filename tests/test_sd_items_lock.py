@@ -107,3 +107,22 @@ class ItemsLockTests(unittest.TestCase):
         self.assertTrue(r.items_up_seen)
         self.assertFalse(r.items_ready)  # Actual trace never reached row31.
         self.assertEqual(r.last_pad[:2],[NEUTRAL_PAD]*2)
+
+    def test_actual_held_opening_a_exposes_current_entry_drain_rejection(self):
+        fixture=json.loads((Path(__file__).parent/'fixtures/sd-items-held-entry-order.json').read_text())
+        r=receiver(self.profile)
+        baseline=fixture['initial_rules_ready_menu_consumed']-1
+        # Actual menu/PAD/lock bytes and order are unchanged. Only the portable
+        # profile lead-in and sequence/count rebasing are reconstructed.
+        for actual in fixture['rows']:
+            row=deepcopy(actual);row['seq']=r.seq;row['payload']['menu_consumed']-=baseline
+            if actual['seq']==657:
+                self.assertEqual(r.latest_menu['kind'],16)
+                self.assertEqual(r.latest_menu['items_locked'],1)
+                self.assertEqual(r.last_pad[:2],[raw_pad(buttons=['A']),NEUTRAL_PAD])
+                with self.assertRaisesRegex(SdDiagnosticError,'undeclared continuation'):
+                    r.accept(row)
+                self.assertFalse(r.items_up_seen)
+                return
+            r.accept(row)
+        self.fail('Actual failing entry sample missing from retained control')
