@@ -1,6 +1,6 @@
 {
   "schema": "melee-web-competitive-rules-profile-preflight-v1",
-  "status": "passed_combined_sd_runtime_natural_eight_minute_browser_route_final_regression_open",
+  "status": "passed_combined_natural_eight_minute_browser_route_and_full_suite_final_review_ci_open",
   "issue": 292,
   "date": "2026-10-08",
   "labels": [
@@ -441,7 +441,7 @@
   ],
   "open_gates": [
     "Matching original-route input/state comparison for the declared competitive eight-minute setup and non-tied terminal; earlier one-minute Rules Plus receipt is different workload provenance only.",
-    "Full current-candidate regression suite, independent integration review and current-head CI.",
+    "Independent final integration review and current-head CI; combined suite passed tested9fcf7771.",
     "Physical input, foreground timing, audible output, pixel/PCM equivalence and competitive-set acceptance."
   ],
   "natural_timeout_browser_route": {
@@ -721,6 +721,26 @@
       "tree_unchanged": "2a0b58fe609a2e77b637754810d62c67ec5562f1",
       "producer_not_relabelled": true
     },
-    "open": "Final combined full suite/current-head CI and independent milestone integration review; broader gates remain separate."
+    "open": "Independent milestone integration review/current-head CI and matching original competitive comparison remain; combined full suite passed at9fcf7771."
+  },
+  "final_combined_validation": {
+    "tested_head": "9fcf7771790a3a40fad8e0d728725a90e8e7707e",
+    "tested_tree": "e087e2191073f16bb32461fa0c2ffcf41f70fb40",
+    "full_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "tests": 2202,
+      "skipped": 159,
+      "seconds": 486.092,
+      "failed": 0,
+      "errors": 0,
+      "exit": 0,
+      "raw_log_sha256": "5068284ca4f0693aaddea076ffd6b6554328752dc540602ae0e002c07ae9c979",
+      "process_receipt_sha256": "a23e897ff337934dc88c1186f9c6067d0d2c0ed612345e4428bd3ffba3fec332",
+      "result_receipt_sha256": "e44e43560b2d097e59d18283aacce64afc43a2a0a825488722e299356950d20b"
+    },
+    "cleanup": "Exact suite/supervisor retired; source clean; all46served hashes unchanged.",
+    "skip_scope": "159 skips include native_menu_host_trace dispatch/manifest controls because that target is not built in this checkout, and optional local asset checks. Separate SD native controls retain their own producer; no combined native run claimed.",
+    "runtime_capture_producer": "87d89c2759e2fac9441e87a45024ca4573ea8822",
+    "subsequent_delta": "This validation recording is documentation only; exact-head CI remains before integration."
   }
 }

@@ -15,8 +15,11 @@ Exact owned Node/server processes retired and the socket rebound.
 
 The merged SD main `bedc15ec` has the exact reviewed SD candidate tree. The
 Rules refresh preserves the exact premerge combined tree; it does not relabel
-the V9 build/capture producer. Final combined full regression/current-head CI
-and owner integration review remain open. Original competitive field/route
+the V9 build/capture producer. The clean `9fcf7771` combined source passed 2,202 unittest cases with 159
+skips in 486.092 seconds. Exact suite/supervisor processes retired, and all
+46 served hashes stayed unchanged. Skips include native-host trace controls
+whose target is not built in this checkout; separate SD native evidence keeps
+its own producer. Exact-head CI and owner integration review remain open. Original competitive field/route
 comparison, physical input, foreground timing, pixels/PCM, uninterrupted audio
 and competitive-set acceptance remain separate gates.
 
@@ -50,9 +53,8 @@ This is **Compiled / Source identified / Browser exercised** evidence. It does
 not supply a matching original-game comparison. The SD candidate changes post-VS
 mode and returned CSS cache ownership; this ordinary `365c6b31` result does not
 validate those changes. The later SD ordinary native controls and combined V9 browser route cover
-those ownership changes under their distinct producers. Final combined
-full suite/current-head CI remains open, as do
-physical input, foreground timing, pixel/PCM, audio and performance gates.
+those ownership changes under their distinct producers. The later combined suite passed at `9fcf7771`; current-head CI remains
+open, along with physical input, foreground timing, pixel/PCM, audio and performance gates.
 The private receipt preserves the historical unavailable original preflight stderr
 and first readiness-control failure raw-log gaps explicitly.
 
