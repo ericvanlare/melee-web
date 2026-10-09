@@ -3667,7 +3667,7 @@ index fea468cc6c89d7d4c6c8a1a81e31f99eec07bc63..6d0819f60ef4c12cdf80b1ea29bbd805
  
  void gm_80168C5C(u32 arg0)
 diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
-index cd7e31a0636e4e1a48d6a870e09319e887345ed1..58431b636c022f3df3ddf068f312ba829ddbeb77 100644
+index cd7e31a0636e4e1a48d6a870e09319e887345ed1..d241ab7966e445d9f6c87992b6801a34c9008255 100644
 --- a/src/melee/gm/gm_16AE.c
 +++ b/src/melee/gm/gm_16AE.c
 @@ -1,4 +1,6 @@
@@ -8528,7 +8528,7 @@ index 5917d53b6f0b12dabfcef9a5fe30109caf75f784..eab242fb0bb95c7538be3ad9cf9d5d2f
  ASSERT_SIZE(union ColorOverlay_x8_t, 0x4);
  
 diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
-index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..850bb56f27b76d2cd4a817e896ada9911ca9fd18 100644
+index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..584b42bc259efd9dc9ced13dbcd7121d01a480c7 100644
 --- a/src/melee/mn/mncharsel.c
 +++ b/src/melee/mn/mncharsel.c
 @@ -1,4 +1,18 @@
