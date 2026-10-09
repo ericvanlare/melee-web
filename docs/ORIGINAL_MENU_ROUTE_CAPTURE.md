@@ -512,4 +512,6 @@ This scope rejects active gameplay, SD and legacy whole-session completion.
 The prior SD native producer is preserved and rejects this new scope; a new
 canonical observer build and reviewed original run are required. Source/unit
 controls do not establish runtime settings or eight-minute outcome equivalence.
-Natural non-tied timeout and Results/CSS comparison remain separate gates.
+Natural non-tied timeout comparison remains a separate #292 gate. This prefix
+makes no original Results/CSS lifecycle claim; that continuation is not required
+unless the terminal source fields need it.
