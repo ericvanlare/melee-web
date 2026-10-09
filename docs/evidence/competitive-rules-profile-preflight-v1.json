@@ -798,5 +798,26 @@
       "native_overlays_unchanged": true,
       "scope": "First retiring cursor may include original final+1, later cursor/counters/stage freeze. Active/input/ownership guards unchanged. No retry result yet."
     }
+  },
+  "original_natural_terminal_attempt_v2": {
+    "result": "native Metal abort before timeout; no comparison",
+    "receiver": "2d98cb381604e21f499c672f84f2c32df6286886",
+    "native_producer": "00ef116f341f7961bd832b436e1760efc7328ddf",
+    "native_binary_sha256": "5ae29c6142bf80b287011d6733886e0608818e51df52ff738ff41dcfaabbe6ed",
+    "last_source_tick": 11552,
+    "observer_records": 25266,
+    "mwri_events": 52004,
+    "mwri_complete": false,
+    "supervisor_seconds": 371.24611808289774,
+    "native_exit": -6,
+    "supervisor_exit": 254,
+    "failure": "IOGPUDeviceShmem Metal allocation assertion; actual abort instant and host GPU/memory metrics unobserved.",
+    "raw_sha256": "0f9f3872d2fd3edc8af54b98a737cae52321ef120fa2c95f3de1015480ab822e",
+    "mwri_sha256": "c624f6582d6d5306b596065c2ff7d946ebb0d004af01480317c2e38d645855db",
+    "native_log_sha256": "03dd741d983479c0b4d9e09038bc20b613d06de79e96564f2f06484c85523785",
+    "supervisor_result_sha256": "ac3ccd2eb52d8ad64b7c90d0a86461b68e4694aa2d0f13f57166cdd3a1bc7538",
+    "root_review_sha256": "ea195a028bb464f6d10eb1cfc4af0fdacfebe45844524d5e36662f49e77c5cc1",
+    "cleanup": "Exact owned runner interrupted to execute existingfinally after nativeabort; native reaped without further signal, log drain joined,4exactPIDsabsent. Originalprofile/GCI unchanged.",
+    "open": "Fatal child detection and explicit renderer-config reduction before anotherlongrun. No terminal/originalfull-session acceptance."
   }
 }

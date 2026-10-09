@@ -33,6 +33,17 @@ retained buffered prefix replays without admitting its interrupted ending as
 completion. Native overlay bytes are unchanged. The original natural terminal
 comparison remains pending; the failed trace and incomplete MWRI are retained.
 
+The second original attempt passed setup, readiness and one input-driven P1
+stock loss, then stopped at source frame 11,552 when Dolphin's Metal backend
+aborted with an IOGPUDeviceShmem allocation assertion. The exact abort instant
+and host GPU/memory state were not observed, so no leak or resource root cause
+is claimed. The receiver was waiting for another record; an interrupt to its
+exact owned process ran the existing cleanup and reaped the aborted native child.
+All four owned processes are absent. The raw stream and incomplete MWRI remain
+retained, with stale recording sidecars explicitly not treated as success.
+No comparison ran on this attempt. Fatal-child detection and an explicitly scoped
+renderer configuration are being investigated before another long capture.
+
 The combined Rules/SD runtime passed the eight-minute functional route in V9.
 The [same scoped receipt](../evidence/competitive-rules-profile-preflight-v1.json)
 binds producer `87d89c27` and its fresh ordinary Release build: original menus
