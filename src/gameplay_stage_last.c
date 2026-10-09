@@ -22,6 +22,9 @@
 #include <stdio.h>
 #include <string.h>
 extern int melee_web_stage_selection_begin(int);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+extern int melee_web_stage_selection_preflight(int);
+#endif
 extern int melee_web_stage_selection_end(void);
 extern int melee_web_ground_remove_unmapped(HSD_GObj*);
 extern void melee_web_ground_remove_camera(HSD_GObj*);
@@ -214,6 +217,9 @@ int melee_web_stage_last_stadium_start(MeleeWebStageLast* h,
     h->definition->stage_kind!=St_Kind_PStadium||!h->source_ordered||
     h->stadium_started||HSD_GObj_804D781C||HSD_GObj_804D7814)
   return fail(e,n,"Stadium continuation requires its idle, unstarted diagnostic owner");
+ if(!melee_web_stage_selection_preflight(h->definition->stage_kind)||
+    stage_info.grkind!=h->definition->ground_kind)
+  return fail(e,n,"Stadium selected source dispatch pair changed");
  if(!stadium_maps_live(h,e,n)||
     !melee_web_match_camera_available(camera_owner,e,n))return 0;
  Ground* display=h->stadium_map2_buffer_owner.display_ground->user_data;
@@ -285,6 +291,9 @@ int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
   * A partial original start retains its graph for reduction, never cancellation. */
  if(h->stadium_started){
   if(h->stadium_started!=2)return fail(e,n,"Partial Stadium OnStart ownership must remain reachable");
+  if(!melee_web_stage_selection_preflight(h->definition->stage_kind)||
+     stage_info.grkind!=h->definition->ground_kind)
+   return fail(e,n,"Stadium selected source dispatch pair changed before retirement");
   if(!stadium_maps_live(h,e,n))return 0;
   if(((Ground*)h->stadium_map2_buffer_owner.display_ground->user_data)->u.display.xF4!=h->stadium_subject)
    return fail(e,n,"Stadium display camera borrower changed before retirement");

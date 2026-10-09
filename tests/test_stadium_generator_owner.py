@@ -262,3 +262,75 @@ int main(void)
         finally:
             if passed:shutil.rmtree(scratch)
             else:print(f"Retained camera native reducer: {scratch}",flush=True)
+
+    def test_actual_selected_stage_guard_positive_and_foreign_pair(self):
+        import re
+        compiler=shutil.which("clang") or shutil.which("cc")
+        if not compiler:self.skipTest("Native compiler required")
+        original=(ROOT/".deps/melee/src/melee/gr/stage.c").read_text()
+        table=original[original.index("struct StageIdMapEntry stage_id_map[] = {"):]
+        table=table[:table.index("};")+2]
+        # Keep the authored initializer and its bound. Synthetic enum values
+        # only make this pointer-identity test independent of unrelated enums.
+        names=sorted(set(re.findall(r"Gr_Kind_\w+",table)))
+        enums="enum {"+",".join(names)+"};\n"
+        patch=(ROOT/"patches/melee-gameplay.patch").read_text()
+        block=patch[patch.index("+static struct StageSelection melee_web_saved_stage_selection;"):]
+        block=block[:block.index(" GrKind Stage_8022519C")]
+        helpers="\n".join(line[1:] for line in block.splitlines() if line.startswith("+") and not line.startswith("+#"))
+        self.assertIn("int melee_web_stage_selection_preflight",helpers)
+        program=r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
+#define ARRAY_SIZE(a) (sizeof(a)/sizeof((a)[0]))
+struct StageIdMapEntry {int grkind,flag0,flag1;};
+struct StageSelection {int stkind;struct StageIdMapEntry* entry;};
+static struct StageSelection selected_stage;
+'''+enums+table+helpers+r'''
+int main(void)
+{
+ for(unsigned i=0;i<ARRAY_SIZE(stage_id_map);++i){
+  assert(melee_web_stage_selection_begin(i));
+  assert(melee_web_stage_selection_preflight(i));
+  struct StageSelection saved=selected_stage;
+  struct StageIdMapEntry foreign=*selected_stage.entry;
+  selected_stage.entry=&foreign;
+  struct StageSelection altered=selected_stage;
+  assert(!melee_web_stage_selection_preflight(i));
+  assert(!memcmp(&altered,&selected_stage,sizeof(altered)));
+  selected_stage=saved;selected_stage.stkind=(int)ARRAY_SIZE(stage_id_map);
+  altered=selected_stage;
+  assert(!melee_web_stage_selection_preflight(i));
+  assert(!memcmp(&altered,&selected_stage,sizeof(altered)));
+  selected_stage=saved;
+  assert(!melee_web_stage_selection_preflight(-1));
+  assert(!melee_web_stage_selection_preflight(ARRAY_SIZE(stage_id_map)));
+  assert(!memcmp(&saved,&selected_stage,sizeof(saved)));
+  assert(melee_web_stage_selection_end());
+  saved=selected_stage;assert(!melee_web_stage_selection_preflight(i));
+  assert(!memcmp(&saved,&selected_stage,sizeof(saved)));
+ }
+ puts("Actual selected-stage ownership guard: authored bounds, positive identity, foreign equal-value pair and unowned/refusal preserve state");return 0;
+}
+'''
+        scratch=Path(tempfile.mkdtemp(prefix="stadium-selection-native-",dir=ROOT/"work"));passed=False
+        try:
+            path=scratch/"selection.c";path.write_text(program);binary=scratch/"selection"
+            # Existing selection_begin uses an int/sizeof comparison. Keep that
+            # original source warning visible rather than rewrite its body.
+            command=[compiler,"-std=c11","-O1","-Wall","-Wextra","-Werror",
+                     "-Wno-error=sign-compare","-fsanitize=address,undefined",str(path),"-o",str(binary)]
+            (scratch/"command.txt").write_text(" ".join(command)+"\n")
+            build=subprocess.run(command,capture_output=True,text=True,timeout=60)
+            (scratch/"compile.stdout").write_text(build.stdout);(scratch/"compile.stderr").write_text(build.stderr)
+            if build.stderr:print(build.stderr,end="",flush=True)
+            self.assertEqual(build.returncode,0,build.stdout+build.stderr)
+            run=subprocess.run([str(binary)],capture_output=True,text=True,timeout=30)
+            (scratch/"stdout").write_text(run.stdout);(scratch/"stderr").write_text(run.stderr)
+            self.assertEqual(run.returncode,0,run.stdout+run.stderr)
+            print(run.stdout,end="",flush=True);passed=True
+        finally:
+            if passed:shutil.rmtree(scratch)
+            else:print(f"Retained selected-stage native control: {scratch}",flush=True)

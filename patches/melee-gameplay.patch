@@ -8739,7 +8739,7 @@ index 5a63015df51b87fa22d8e474b10c7047692e0e3e..8c99ea5dfd13251c175b1196b7813abe
  
  StKind Stage_80225194(void)
  {
-@@ -483,6 +516,28 @@ struct StageIdMapEntry stage_id_map[] = {
+@@ -483,6 +516,38 @@ struct StageIdMapEntry stage_id_map[] = {
      { Gr_Kind_Shrine, 0, 0 },       { Gr_Kind_Battle, 0, 0 },
  };
  
@@ -8747,6 +8747,16 @@ index 5a63015df51b87fa22d8e474b10c7047692e0e3e..8c99ea5dfd13251c175b1196b7813abe
 + * stage preparation. Original Ready completion still calls Stage_802252E4. */
 +static struct StageSelection melee_web_saved_stage_selection;
 +static bool melee_web_stage_selection_owned;
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++int melee_web_stage_selection_preflight(int stkind)
++{
++    return melee_web_stage_selection_owned && stkind >= 0 &&
++        (size_t)stkind < ARRAY_SIZE(stage_id_map) &&
++        selected_stage.stkind == stkind &&
++        selected_stage.entry == &stage_id_map[stkind];
++}
++#endif
++
 +int melee_web_stage_selection_begin(int stkind)
 +{
 +    if (melee_web_stage_selection_owned || stkind < 0 ||
