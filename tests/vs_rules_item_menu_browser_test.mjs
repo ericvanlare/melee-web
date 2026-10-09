@@ -1241,7 +1241,10 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
   const resultsDeadline = resultsEnteredAt + COMPETITIVE_TIMEOUT_BOUNDS.resultsReturnWallMs;
   const observeResultsHost = async label => {
     await resumeTimingPause(label);
-    return ensureNoError(label);
+    const state = await ensureNoError(label);
+    if (state.phase === 5)
+      await checkRuntimeDiagnosticCounters(`${label} stopped preparation health`, false);
+    return state;
   };
   const resultsPresentationDeadline = Math.min(Date.now() + 4500, resultsDeadline);
   while (Date.now() < resultsPresentationDeadline) {
@@ -1261,7 +1264,9 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
   route.prize_return = await returnFromCompetitivePrize({
     deadlineAt: resultsDeadline,
     observeHost: observeResultsHost,
+    observeTrace: observeResultsPadTrace,
     press,
+    wait: milliseconds => page.waitForTimeout(milliseconds),
   });
   const postResultsState = await waitPhase(1, 'original CSS after timeout Results',
     Math.max(0, resultsDeadline - Date.now()));

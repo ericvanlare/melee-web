@@ -5,6 +5,7 @@ import {
   RESULTS_TRACE_CAPACITY,
   RESULTS_TRACE_START_MASK,
   RESULTS_CONNECTED_PAD_ERRORS,
+  RESULTS_NEXT_SCENE_PREPARATION_MESSAGE,
   resultsPadTraceFailures,
 } from './vs_rules_results_confirmation_driver.mjs';
 
@@ -171,4 +172,132 @@ test('Results driver does not continue after the source exits before a required 
     wait: async () => {},
   }), /exited before this confirmation boundary/);
   assert.deepEqual(presses, ['Enter']);
+});
+
+test('Results trace is retained before a rejected host observation', async () => {
+  const order = [];
+  let retainedTrace = null;
+  const trace = makeTrace([makeTraceRow(0, {phase: 2, statsPhase: 0, confirmed: [0, 0, 0, 0]})]);
+  await assert.rejects(confirmTwoHumanResults({
+    deadlineAt: Date.now() + 1000,
+    observeTrace: async () => { order.push('trace'); retainedTrace = trace; return trace; },
+    observeHost: async () => { order.push('host'); throw Error('checked host rejected stopped state'); },
+    press: async () => assert.fail('host rejection occurs before an input action'),
+    wait: async () => {},
+  }), /checked host rejected stopped state/);
+  assert.deepEqual(order, ['trace', 'host']);
+  assert.equal(retainedTrace.retained, 1, 'the latest source ring remains available when host admission fails');
+});
+
+test('Results observer completion cannot accept a sample after the shared deadline', async () => {
+  const originalNow = Date.now;
+  let now = 100;
+  const order = [];
+  const trace = makeTrace([makeTraceRow(0, {phase: 2, statsPhase: 0, confirmed: [0, 0, 0, 0]})]);
+  Date.now = () => now;
+  try {
+    await assert.rejects(confirmTwoHumanResults({
+      deadlineAt: 200,
+      observeTrace: async () => { order.push('trace'); now = 150; return trace; },
+      observeHost: async () => { order.push('host'); now = 201; return {phase: 8, running: 1}; },
+      press: async () => assert.fail('expired observation must not issue input'),
+      wait: async () => {},
+    }), /exceeded its shared wall deadline during observation/);
+    assert.deepEqual(order, ['trace', 'host']);
+  } finally {
+    Date.now = originalNow;
+  }
+});
+
+test('Results next-scene phase 5 requires the actual P2 edge and waits for an active terminal route', async () => {
+  const samples = [
+    makeTraceRow(0, {phase: 0, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+    makeTraceRow(1, {phase: 1, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+    makeTraceRow(2, {phase: 2, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+  ];
+  const order = [];
+  const presses = [];
+  let host = {phase: 8, running: 1, message: 'Original Results'};
+  const append = options => samples.push(makeTraceRow(samples.length, options));
+  const result = await confirmTwoHumanResults({
+    deadlineAt: Date.now() + 5000,
+    observeTrace: async () => { order.push('trace'); return makeTrace(samples); },
+    observeHost: async () => { order.push('host'); return host; },
+    press: async key => {
+      presses.push(key);
+      if (presses.length === 1) {
+        append({phase: 3, statsPhase: 0, confirmed: [0, 0, 1, 1], startPorts: [0]});
+        append({phase: 3, statsPhase: 2, confirmed: [0, 0, 1, 1]});
+      } else if (presses.length === 2) {
+        append({phase: 3, statsPhase: 2, confirmed: [1, 0, 1, 1], startPorts: [0]});
+      } else {
+        append({phase: 4, statsPhase: 2, confirmed: [1, 1, 1, 1], startPorts: [1]});
+        host = {phase: 5, running: 0, message: RESULTS_NEXT_SCENE_PREPARATION_MESSAGE, error: null};
+      }
+    },
+    wait: async () => { host = {phase: 9, running: 1, message: 'Original unlock notification'}; },
+  });
+  assert.deepEqual(presses, ['Enter', 'Enter', 'End']);
+  assert.equal(result.p2_confirmation.phase, 4);
+  assert.deepEqual(result.p2_confirmation.confirmed, [1, 1, 1, 1]);
+  assert.equal(result.original_exit.host_phase, 9,
+    'phase 5 is only an intermediate stopped transfer; the helper returns on actual Prize phase 9');
+  assert.deepEqual(result.post_confirmation_preparation, {
+    message: RESULTS_NEXT_SCENE_PREPARATION_MESSAGE, running: 0, observations: 2,
+  });
+  assert(order.length % 2 === 0);
+  for (let index = 0; index < order.length; index += 2)
+    assert.deepEqual(order.slice(index, index + 2), ['trace', 'host']);
+});
+
+test('Results phase 5 rejects a synthetic P1-only prefix and malformed P2 completion rows', async () => {
+  const run = async ({p2Phase = 4, p2Stats = 2, p2Flags = [1, 1, 1, 1],
+    finalFlags = p2Flags, rawP2Start = true, message = RESULTS_NEXT_SCENE_PREPARATION_MESSAGE,
+    running = 0, p2Edge = true, hostError = null} = {}) => {
+    const samples = [
+      makeTraceRow(0, {phase: 0, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+      makeTraceRow(1, {phase: 1, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+      makeTraceRow(2, {phase: 2, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+    ];
+    const presses = [];
+    let host = {phase: 8, running: 1, message: 'Original Results'};
+    const append = options => samples.push(makeTraceRow(samples.length, options));
+    return confirmTwoHumanResults({
+      deadlineAt: Date.now() + 3000,
+      observeTrace: async () => makeTrace(samples),
+      observeHost: async () => host,
+      press: async key => {
+        presses.push(key);
+        if (presses.length === 1) {
+          append({phase: 3, statsPhase: 0, confirmed: [0, 0, 1, 1], startPorts: [0]});
+          append({phase: 3, statsPhase: 2, confirmed: [0, 0, 1, 1]});
+        } else if (presses.length === 2) {
+          append({phase: 3, statsPhase: 2, confirmed: [1, 0, 1, 1], startPorts: [0]});
+          if (!p2Edge)
+            host = {phase: 5, running: 0, message: RESULTS_NEXT_SCENE_PREPARATION_MESSAGE, error: null};
+        } else {
+          append({phase: p2Phase, statsPhase: p2Stats, confirmed: p2Flags, startPorts: [1]});
+          if (!rawP2Start) samples.at(-1).pads[1].button = 0;
+          if (finalFlags !== p2Flags)
+            append({phase: 4, statsPhase: 2, confirmed: finalFlags});
+          host = {phase: 5, running, message, error: hostError};
+        }
+      },
+      wait: async () => { host = {phase: 1, running: 1, message: 'Original character select'}; },
+    });
+  };
+  await assert.rejects(run({p2Edge: false}), /exited before this confirmation boundary.*phase 5/,
+    'a source-derived prefix without a P2 edge cannot authorize phase 5');
+  for (const [label, options, pattern] of [
+    ['wrong Results phase', {p2Phase: 3}, /source edge: source Results did not retain phase 4/],
+    ['wrong stats phase', {p2Stats: 1}, /regressed the original stats phase/],
+    ['missing P2 confirmation', {p2Flags: [1, 0, 1, 1]}, /source edge: source Results did not retain phase 4/],
+    ['final row loses a confirmation', {finalFlags: [1, 0, 1, 1]}, /final retained row: source Results did not retain phase 4/],
+    ['raw P2 Start missing', {rawP2Start: false}, /no matching raw PAD Start sample/],
+    ['wrong preparation message', {message: 'Preparing original character select...'}, /phase 5 is admitted only/],
+    ['preparation still running', {running: 1}, /phase 5 is admitted only/],
+    ['host error during preparation', {hostError: 'native source error'}, /phase 5 is admitted only/],
+  ]) {
+    await assert.rejects(run(options), pattern, label);
+  }
 });

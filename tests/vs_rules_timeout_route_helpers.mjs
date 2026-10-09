@@ -1,3 +1,5 @@
+import {resultsPadTraceFailures} from './vs_rules_results_confirmation_driver.mjs';
+
 export const COMPETITIVE_TIMEOUT_BOUNDS = Object.freeze({
   stockLossWallMs: 120000,
   noSourceProgressWallMs: 15000,
@@ -12,26 +14,62 @@ export const COMPETITIVE_TIMEOUT_BOUNDS = Object.freeze({
 });
 
 export const COMPETITIVE_PRIZE_MAX_CONFIRMATIONS = 60;
+export const COMPETITIVE_RESULTS_RETURN_POLL_MS = 250;
+
+const PRIZE_NEXT_SCENE_PREPARATION_MESSAGE = 'Preparing original character select...';
 
 // Results confirmation owns phase 8 and stops at its first source exit. The
 // original Prize screen is a separate phase-9 route back to CSS; only it may
 // receive these bounded follow-up Start inputs.
-export async function returnFromCompetitivePrize({deadlineAt, observeHost, press}) {
+export async function returnFromCompetitivePrize({
+  deadlineAt, observeHost, observeTrace, press, wait,
+  pollMs = COMPETITIVE_RESULTS_RETURN_POLL_MS,
+}) {
   if (!Number.isFinite(deadlineAt) || deadlineAt <= Date.now() ||
-      typeof observeHost !== 'function' || typeof press !== 'function')
-    throw Error('Original Prize return requires a live shared deadline and checked host/input functions');
-  const initial = await observeHost('original Results exit before Prize return');
-  if (Date.now() >= deadlineAt)
-    throw Error('Original Results route exceeded the shared 45-second deadline while observing its exit');
-  if (!initial || initial.running !== 1 || !Number.isSafeInteger(initial.phase))
-    throw Error(`Original Results exit has invalid host state: ${JSON.stringify(initial)}`);
+      typeof observeHost !== 'function' || typeof observeTrace !== 'function' ||
+      typeof press !== 'function' || typeof wait !== 'function' ||
+      !Number.isFinite(pollMs) || pollMs <= 0)
+    throw Error('Original Prize return requires a live shared deadline and checked trace/host/input/wait functions');
+  const initialBudgetMs = deadlineAt - Date.now();
+  const maxPolls = Math.ceil(initialBudgetMs / pollMs) + 2;
+  let pollCount = 0;
+  const sample = async label => {
+    if (Date.now() >= deadlineAt)
+      throw Error(`${label}: original Results route exceeded the shared 45-second deadline`);
+    if (++pollCount > maxPolls)
+      throw Error(`${label}: Results/Prize trace polling exceeded its time-derived bound ${maxPolls}`);
+    // The Results trace remains available after its owner closes. Read and
+    // retain that bounded source witness before a stopped host can be rejected.
+    const trace = await observeTrace();
+    const traceFailures = resultsPadTraceFailures(trace);
+    if (traceFailures.length)
+      throw Error(`${label}: retained original Results trace is invalid: ${JSON.stringify(traceFailures)}`);
+    const final = trace.samples.at(-1)?.results_state_after_tick;
+    if (final?.phase !== 4 || final.stats_phase !== 2 ||
+        JSON.stringify(final.players?.map(player => player.confirmed)) !== JSON.stringify([1, 1, 1, 1]))
+      throw Error(`${label}: retained Results trace lacks final phase-4/two-Human confirmation: ${JSON.stringify(final)}`);
+    const state = await observeHost(label);
+    if (Date.now() >= deadlineAt)
+      throw Error(`${label}: original Results route exceeded the shared 45-second deadline while observing host state`);
+    if (!state || !Number.isSafeInteger(state.phase) || state.error)
+      throw Error(`${label}: original Results/Prize host state is invalid: ${JSON.stringify(state)}`);
+    if (state.phase === 9 && state.running !== 1)
+      throw Error(`${label}: original Prize must be active before another confirmation: ${JSON.stringify(state)}`);
+    return state;
+  };
+  const initial = await sample('original Results exit before Prize return');
+  if (initial.running !== 1)
+    throw Error(`Original Results exit has invalid host running state: ${JSON.stringify(initial)}`);
   if (initial.phase === 1)
-    return {initial_phase: 1, final_phase: 1, prize_confirmations: 0};
+    return {initial_phase: 1, final_phase: 1, prize_confirmations: 0,
+      deferred_preparation: null,
+      prize_source_exit_witness: 'unavailable: no dedicated Prize PAD source trace is exported'};
   if (initial.phase !== 9)
     throw Error(`Original Results exited into unsupported host phase ${initial.phase}; Prize Start is not allowed`);
 
   let state = initial;
   let confirmations = 0;
+  let deferredPreparation = null;
   while (state.phase === 9 && confirmations < COMPETITIVE_PRIZE_MAX_CONFIRMATIONS) {
     if (Date.now() >= deadlineAt)
       throw Error('Original Prize return exceeded the shared 45-second Results deadline');
@@ -39,17 +77,33 @@ export async function returnFromCompetitivePrize({deadlineAt, observeHost, press
     confirmations++;
     if (Date.now() >= deadlineAt)
       throw Error('Original Prize return exceeded the shared 45-second Results deadline during input');
-    state = await observeHost(`original Prize confirmation ${confirmations}`);
-    if (Date.now() >= deadlineAt)
-      throw Error('Original Prize return exceeded the shared 45-second Results deadline while observing input');
-    if (!state || state.running !== 1 || !Number.isSafeInteger(state.phase))
-      throw Error(`Original Prize confirmation ${confirmations} has invalid host state: ${JSON.stringify(state)}`);
-    if (state.phase !== 9 && state.phase !== 1)
+    state = await sample(`original Prize confirmation ${confirmations}`);
+    if (state.phase === 5) {
+      if (state.running !== 0 || state.message !== PRIZE_NEXT_SCENE_PREPARATION_MESSAGE)
+        throw Error(`Original Prize phase 5 is admitted only after Prize input during stopped character-select preparation: ${JSON.stringify(state)}`);
+      deferredPreparation = {phase: 5, running: 0, message: state.message,
+        after_confirmation: confirmations};
+      while (Date.now() < deadlineAt) {
+        const remaining = deadlineAt - Date.now();
+        await wait(Math.min(pollMs, remaining));
+        state = await sample('original Prize-to-CSS preparation');
+        if (state.phase === 1 && state.running === 1) break;
+        if (state.phase !== 5 || state.running !== 0 ||
+            state.message !== PRIZE_NEXT_SCENE_PREPARATION_MESSAGE)
+          throw Error(`Original Prize preparation reached an unexpected host state before CSS: ${JSON.stringify(state)}`);
+      }
+      if (state.phase !== 1 || state.running !== 1)
+        throw Error('Original Prize did not return to CSS before the shared 45-second deadline');
+      break;
+    }
+    if (state.phase !== 9 && !(state.phase === 1 && state.running === 1))
       throw Error(`Original Prize reached unsupported host phase ${state.phase} after confirmation ${confirmations}`);
   }
   if (state.phase !== 1)
     throw Error(`Original Prize did not return to CSS within ${COMPETITIVE_PRIZE_MAX_CONFIRMATIONS} confirmations`);
-  return {initial_phase: initial.phase, final_phase: state.phase, prize_confirmations: confirmations};
+  return {initial_phase: initial.phase, final_phase: state.phase, prize_confirmations: confirmations,
+    deferred_preparation: deferredPreparation,
+    prize_source_exit_witness: 'unavailable: Prize transition is bounded by declared Enter input and checked host phases; no dedicated Prize PAD source trace is exported'};
 }
 
 function expect(failures, label, actual, wanted) {

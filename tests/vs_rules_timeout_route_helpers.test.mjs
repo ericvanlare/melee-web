@@ -13,6 +13,17 @@ import {
   COMPETITIVE_PRIZE_MAX_CONFIRMATIONS,
   returnFromCompetitivePrize,
 } from './vs_rules_timeout_route_helpers.mjs';
+import {RESULTS_TRACE_CAPACITY, RESULTS_CONNECTED_PAD_ERRORS} from './vs_rules_results_confirmation_driver.mjs';
+
+const completedResultsTrace = () => ({
+  schema: 'melee-web-results-pad-trace-v1', attempts: 1, retained: 1,
+  capacity: RESULTS_TRACE_CAPACITY, overflow: false,
+  samples: [{source_frame: 0, tick_returned: true,
+    pads: RESULTS_CONNECTED_PAD_ERRORS.map(err => ({button: 0, err})),
+    source_consumed_pads: RESULTS_CONNECTED_PAD_ERRORS.map(err => ({trigger: 0, err})),
+    results_state_after_tick: {source_frame: 1, phase: 4, stats_phase: 2,
+      players: [1, 1, 1, 1].map(confirmed => ({confirmed}))}}],
+});
 
 const match = ({frame = 180, stocks = [4, 4], paused = false, ending = false,
   complete = false, observerError = false} = {}) => ({
@@ -36,13 +47,20 @@ test('Prize return sends Start only in phase 9 and remains inside the shared bou
   const presses = [];
   const states = [9, 9, 1];
   let observations = 0;
+  const order = [];
   const result = await returnFromCompetitivePrize({
     deadlineAt: Date.now() + 5000,
-    observeHost: async () => ({phase: states[observations++], running: 1}),
+    observeTrace: async () => { order.push('trace'); return completedResultsTrace(); },
+    observeHost: async () => { order.push('host'); return {phase: states[observations++], running: 1}; },
     press: async (key, timing) => { presses.push({key, timing}); },
+    wait: async () => {},
   });
-  assert.deepEqual(result, {initial_phase: 9, final_phase: 1, prize_confirmations: 2});
+  assert.deepEqual(result, {initial_phase: 9, final_phase: 1, prize_confirmations: 2,
+    deferred_preparation: null,
+    prize_source_exit_witness: 'unavailable: Prize transition is bounded by declared Enter input and checked host phases; no dedicated Prize PAD source trace is exported'});
   assert.equal(observations, 3, 'observe the initial Prize state and each post-input phase through the checked route callback');
+  for (let index = 0; index < order.length; index += 2)
+    assert.deepEqual(order.slice(index, index + 2), ['trace', 'host']);
   assert.deepEqual(presses, [
     {key: 'Enter', timing: {releaseMs: 380}},
     {key: 'Enter', timing: {releaseMs: 380}},
@@ -51,9 +69,13 @@ test('Prize return sends Start only in phase 9 and remains inside the shared bou
   const alreadyCss = await returnFromCompetitivePrize({
     deadlineAt: Date.now() + 1000,
     observeHost: async () => ({phase: 1, running: 1}),
+    observeTrace: async () => completedResultsTrace(),
     press: async () => assert.fail('CSS return must not send a Prize Start'),
+    wait: async () => {},
   });
-  assert.deepEqual(alreadyCss, {initial_phase: 1, final_phase: 1, prize_confirmations: 0});
+  assert.equal(alreadyCss.initial_phase, 1);
+  assert.equal(alreadyCss.final_phase, 1);
+  assert.equal(alreadyCss.prize_confirmations, 0);
 });
 
 test('Prize return rejects non-Prize phases and stops at the exact confirmation cap', async () => {
@@ -62,23 +84,96 @@ test('Prize return rejects non-Prize phases and stops at the exact confirmation 
   await assert.rejects(returnFromCompetitivePrize({
     deadlineAt: Date.now() + 1000,
     observeHost: async () => ({phase, running: 1}),
+    observeTrace: async () => completedResultsTrace(),
     press: async () => { presses++; },
+    wait: async () => {},
   }), /Start is not allowed/);
   assert.equal(presses, 0);
 
   phase = 9;
   await assert.rejects(returnFromCompetitivePrize({
-    deadlineAt: Date.now() + 5000,
+    deadlineAt: Date.now() + 45000,
     observeHost: async () => ({phase, running: 1}),
+    observeTrace: async () => completedResultsTrace(),
     press: async () => { presses++; },
+    wait: async () => {},
   }), /within 60 confirmations/);
   assert.equal(presses, COMPETITIVE_PRIZE_MAX_CONFIRMATIONS);
 
   await assert.rejects(returnFromCompetitivePrize({
     deadlineAt: Date.now() - 1,
     observeHost: async () => assert.fail('expired route must not poll the host'),
+    observeTrace: async () => assert.fail('expired route must not read the retained trace'),
     press: async () => assert.fail('expired route must not send input'),
+    wait: async () => assert.fail('expired route must not wait'),
   }), /live shared deadline/);
+});
+
+test('Prize phase 5 is admitted only after a declared Prize input and exact character-select preparation', async () => {
+  const states = [
+    {phase: 9, running: 1, message: 'Original unlock notification'},
+    {phase: 5, running: 0, message: 'Preparing original character select...'},
+    {phase: 5, running: 0, message: 'Preparing original character select...'},
+    {phase: 1, running: 1, message: 'Original character select'},
+  ];
+  let observation = 0;
+  let traceReads = 0;
+  let waitCount = 0;
+  const presses = [];
+  const result = await returnFromCompetitivePrize({
+    deadlineAt: Date.now() + 5000,
+    observeTrace: async () => { traceReads++; return completedResultsTrace(); },
+    observeHost: async () => states[observation++],
+    press: async (key, timing) => presses.push({key, timing}),
+    wait: async () => { waitCount++; },
+  });
+  assert.deepEqual(presses, [{key: 'Enter', timing: {releaseMs: 380}}]);
+  assert.equal(traceReads, 4, 'the retained Results ring is read before each host status check');
+  assert.equal(waitCount, 2);
+  assert.equal(result.final_phase, 1, 'the route only completes on observed active CSS');
+  assert.deepEqual(result.deferred_preparation, {
+    phase: 5, running: 0, message: 'Preparing original character select...', after_confirmation: 1,
+  });
+  assert.match(result.prize_source_exit_witness, /no dedicated Prize PAD source trace/);
+});
+
+test('Prize route rejects phase 5 without prior Prize input, with wrong preparation message, or with invalid retained Results trace', async () => {
+  const common = {
+    deadlineAt: Date.now() + 3000,
+    observeTrace: async () => completedResultsTrace(),
+    press: async () => {},
+    wait: async () => {},
+  };
+  await assert.rejects(returnFromCompetitivePrize({...common,
+    observeHost: async () => ({phase: 5, running: 0, message: 'Preparing original character select...'}),
+  }), /invalid host running state/);
+
+  await assert.rejects(returnFromCompetitivePrize({...common,
+    observeHost: async () => ({phase: 9, running: 0, message: 'Original unlock notification'}),
+  }), /Prize must be active before another confirmation/);
+
+  let phaseNineReads = 0;
+  let phaseNinePresses = 0;
+  await assert.rejects(returnFromCompetitivePrize({...common,
+    observeHost: async () => phaseNineReads++ === 0
+      ? {phase: 9, running: 1, message: 'Original unlock notification'}
+      : {phase: 9, running: 0, message: 'Original unlock notification'},
+    press: async () => { phaseNinePresses++; },
+  }), /Prize must be active before another confirmation/);
+  assert.equal(phaseNinePresses, 1, 'a stopped Prize never receives a repeated Enter');
+
+  let afterPress = false;
+  await assert.rejects(returnFromCompetitivePrize({...common,
+    observeHost: async () => afterPress
+      ? {phase: 5, running: 0, message: 'Preparing original next scene...'}
+      : {phase: 9, running: 1, message: 'Original unlock notification'},
+    press: async () => { afterPress = true; },
+  }), /phase 5 is admitted only/);
+
+  await assert.rejects(returnFromCompetitivePrize({...common,
+    observeTrace: async () => ({schema: 'missing'}),
+    observeHost: async () => assert.fail('invalid retained trace must be rejected before host read'),
+  }), /retained original Results trace is invalid/);
 });
 
 test('stock-loss policy accepts only the first P1 decrement with P2 unchanged', () => {
