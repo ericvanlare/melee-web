@@ -5,9 +5,9 @@
 **Historical October 7 checkpoint.** The
 [zero-tick two-world lifecycle](#october-9-two-zero-tick-stadium-world-lifetimes)
 passed. The latest [source-session preparation attempts](#october-9-source-session-ready-preparation)
-now reach match construction, which refuses a marker binding and returns a
-zero-world/zero-tick failure observation. The smaller input handoff test passes;
-Ready/GO and C3 remain unrun.
+pass the marker and static-collision checks, then retain a world at zero ticks
+when dynamic collision-joint binding is refused. The smaller input, marker and
+collision controls pass; Ready/GO and C3 remain unrun.
 
 The diagnostic-only Stadium profile and profile-to-`DatNativeMapContract`
 adapter compile in the C1 trace target. Focused profile and borrowed-yakumono
@@ -341,11 +341,42 @@ original `use dummy CamRange ...!` branch. It then stops at
 `Static floor queries require source left-to-right nonvertical lines`.
 The failure observation retains match ownership and world 3, with zero ticks,
 17 objects and 17 processes. No Ready/GO is observed. The exact offending line
-and source callback phase were not emitted; the next step is a source-led
-caller and collision-ownership reduction. All 420 bound files and 98 fixtures
+and source callback phase were not emitted; a source-led
+caller and collision-ownership reduction followed. All 420 bound files and 98 fixtures
 remain unchanged. The unittest and Node children exit naturally and are reaped;
 the retained world is released only by process exit, not checked Session close.
 The prior marker failure and all earlier failed producers remain retained.
+
+The retained original Stadium collision data explains the static guard failure:
+all 16 rejected directions belong to the dynamic range. Its 24 dynamic lines
+also form two authored floor-hint cycles. No static floor fails the direction
+check, and all static floor/ceiling seeds terminate. Original static island
+construction seeds only the static ranges; the original dynamic updater
+classifies moving edges from current endpoints. The shared correction at
+`7068afdc` applies direction checks to the static floor range and seeds raw
+cycle checks from static floor/ceiling ranges, while retaining full link
+traversal across category boundaries. Arithmetic, authored geometry, update
+timing, ownership and live-query guards are unchanged.
+
+The first small SDK test failed because its expanded four-edge fixture restored
+a temporarily cleared dynamic count to the old value of one. That failed
+producer and output remain retained. The test-only correction at `0d3ccd01`
+restores the saved count and checks each negative's specific diagnostic. Both
+canonical builds and the corrected SDK test pass. The test uses original map
+loading, joint binding and dynamic updates to assert all four resolved edge
+kinds, live vertex movement, invalid static geometry/cycle refusal, descriptor
+preservation and cleanup. It also rejects a static seed that enters a non-root
+dynamic cycle. These are synthetic original-SDK controls; their individual
+dynamic coordinates are assertions, not printed numeric observations.
+
+The changed Ready attempt on `0d3ccd01` passes the prior static checks, then
+refuses `Source dynamic collision joint is not bound to its authored stage JObj`.
+World 3 remains retained at zero ticks with 17 objects and 17 processes.
+The raw log does not identify the joint or failed guard subpredicate. All 477
+bound files and 98 fixtures match after execution; the owned unittest and Node
+children exit naturally and are reaped, without signals. There is no Ready/GO
+or checked Session close. The next bounded step traces original joint binding
+and callback timing; no further run is authorized at this checkpoint.
 
 The existing RNG observer can be reused afterward, but the Stadium notes require
 C3's per-tick, per-owner ledger to be compared with the original. C8's broader

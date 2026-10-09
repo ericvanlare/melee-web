@@ -947,11 +947,17 @@
           6143,
           6146,
           6147
-        ]
+        ],
+        "fifth_ready_owned_pids_absent": [
+          13768,
+          13774
+        ],
+        "fifth_ready_bound_files": 477,
+        "collision_control_owned_pid_absent": 13411
       },
-      "remaining": "Reduce the source collision adoption caller and static-floor guard; no extra Ready run authorized yet. Full Ready/GO, two idle lifetimes, retirement and original per-owner RNG ledger remain open.",
+      "remaining": "Source-led original dynamic-joint binding and callback timing reduction. No additional Ready run authorized at this checkpoint. Full Ready/GO, two idle lifetimes, retirement and original per-owner RNG ledger remain open.",
       "c3_original_ledger_requirement": "Reuse existing RNG draw observer; C3 notes604-608 require per-tick/per-owner original comparison, separately from broader C8 transformation comparison.",
-      "claim_boundary": "First two Ready attempts stopped before construction; PAD reducer passed; third marker failure started and unwound a world between zero observations. Fourth marker-corrected attempt retains a match/world at zero ticks and refuses static-floor geometry. Four small marker/FD SDK controls pass on8b0973d2, not Stadium Ready/C3. Prior zero-tick result retains its scope.",
+      "claim_boundary": "Synthetic marker and collision controls pass; latest Ready attempt retains actual world3 at zero ticks and refuses dynamic-joint binding. Prior zero-tick lifecycle result keeps its original scope. No Ready/GO, checked full Session close or C3 pass.",
       "pad_input_reducer": {
         "caller_source": "8e087161fcc5a62f6f82cb333a812d0f4eff448f",
         "phase_correction_source": "e2ff861b3f290714d4c6aaa1a19158d4e7f8e59a",
@@ -1030,7 +1036,60 @@
       "fourth_result_review": {
         "artifact": "sol-ready-fourth-lifetime-review-v1.json",
         "sha256": "d3181d2e666919dfb75e37ca932d99a1684706bb5180c5dd2e02f36da4d24694"
-      }
+      },
+      "collision_validator": {
+        "production_source": "7068afdc916d43a1da880d06c3e04567c67941cb",
+        "fixture_correction_source": "0d3ccd01361ddcb80a342360981c8fb6b93f7581",
+        "tree": "874bd6d845cc02bb400349cbc4e297c016bcc035",
+        "source_review": {
+          "artifact": "root-collision-source-review-v2.json",
+          "sha256": "cd673bb5bb12b59f1af5d577f211bd9f6dbf7a8cf83a831c942d4ef1c77d41f2"
+        },
+        "independent_source_review": {
+          "artifact": "sol-collision-applicability-source-review-v2.json",
+          "sha256": "024d3f42280cf089b7c4c9eead4744f58fd7ee14aa9480dbc753657757fe0ac5"
+        },
+        "independent_fixture_correction_review": {
+          "artifact": "sol-collision-fixture-count-correction-review-v1.json",
+          "sha256": "c6697be069107a8513192c6dbbe3e42878bff009cfb0094212a9dd90abec35cd"
+        },
+        "original_data_review": {
+          "artifact": "root-collision-data-review-v1.json",
+          "sha256": "e6798ea248526f7f6269751af895f56d610ffbdacafa31246c2f3175688afc91"
+        },
+        "first_failed_sdk_control": {
+          "artifact": "root-collision-controls-v1/result.json",
+          "sha256": "83a091d1e60c3ef17fc6372e00058b7fb53dd7767ca0ec88c8a4e6d52c365416"
+        },
+        "changed_sdk_control": {
+          "artifact": "root-collision-controls-v2/result.json",
+          "sha256": "41692f581f58bab9fca50abe3f6219ab76ee8ef6fa373ab03b9e738b269fcce5"
+        },
+        "independent_result_review": {
+          "artifact": "sol-collision-controls-result-review-v1.json",
+          "sha256": "ef71f3e1d2f75524de2d46acfae8a585bd7ba62f091f62cb4219f9f1c0e15805"
+        },
+        "ordinary_producer": {
+          "artifact": "collision-ordinary-producer-0d3ccd01-v1/identity.json",
+          "sha256": "bd6bc150d1f7a2d6757c3106882aaef2e276fc596241623840d553c9ed3606fc"
+        },
+        "diagnostic_producer": {
+          "artifact": "collision-diagnostic-producer-0d3ccd01-v1/identity.json",
+          "sha256": "fad65ce9e36183ee8a2fde990478df6442132c76586de3ad1921f92f4fab32fe"
+        },
+        "scope": "Shared static direction range0 and raw-cycle static0/1 seeds corrected; full same-kind raw traversal retained. Original geometry, arithmetic, dynamic update timing and ownership/live query guards unchanged. Synthetic original-SDK resolved-kind, movement, refusals and teardown assertions pass; not Stadium Ready.",
+        "retained_failure": "First SDK fixture restored dynamic_count to stale1 after expanding polygon to4; descriptor guard refused. Saved-count restoration and exact negative diagnostics corrected only test source."
+      },
+      "fifth_failed_run": {
+        "artifact": "root-ready-fifth-frozen-result-v1.json",
+        "sha256": "40785d529b0d144419edce50b71538d86a037bfd4c68dfbaf837137c90b5d6cf"
+      },
+      "fifth_failure": "Prior static collision checks pass; source dynamic joint guard refuses. Raw world3/ticks0/objects17/processes17, match retained. Exact joint and failed guard subpredicate not emitted. No Ready/GO or checked Session close; natural process exit only.",
+      "fifth_result_review": {
+        "artifact": "sol-ready-fifth-lifetime-review-v2.json",
+        "sha256": "9ba1e6cce2a3adbb608fa003c7633cdd62f8eb1a81efbc52691a49e29a7d8833"
+      },
+      "fifth_review_attribution": "Independent v1 mistakenly treated nested historical changed_bindings.before values as current requirements; v2 verifies direct477 v5 bindings and98 fixtures, only two subsequently edited docs differ. V5 current WASM/archive exactly match; prior v1 retained."
     }
   }
 }
