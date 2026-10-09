@@ -255,8 +255,53 @@ static void setup(CSSData* css)
     }
 }
 
+static int sparse_port_rejection_reproducer(void)
+{
+    CSSData dense, sparse, unchanged;
+    SSSData dense_sss = { 0 }, sparse_sss = { 0 };
+    setup(&dense);
+    dense.vs.start.players[0].slot = 1;
+    dense.vs.start.players[1].slot = 2;
+    dense_sss.force_stage_id = -1;
+    dense_sss.vs = dense.vs;
+    if (melee_web_menu_active_player_count(&dense.vs.start) != 2 ||
+        !melee_web_menu_css_selection_valid(&dense) ||
+        !melee_web_menu_sss_selection_valid(&dense_sss)) {
+        fprintf(stderr, "Sparse-port reproducer: dense control rejected\n");
+        return 0;
+    }
+
+    memcpy(&sparse, &dense, sizeof(sparse));
+    sparse.vs.start.players[2] = dense.vs.start.players[1];
+    sparse.vs.start.players[2].slot = 3;
+    sparse.vs.start.players[1] = dense.vs.start.players[2];
+    memcpy(&unchanged, &sparse, sizeof(unchanged));
+    sparse_sss.force_stage_id = -1;
+    sparse_sss.vs = sparse.vs;
+    /* Issue #293's first failure, not sparse-port support: the current count
+     * gate rejects the hole before the port mapping is inspected. Keep P3 at
+     * source index 2/controller 2 and do not normalize the payload to P2. */
+    int count = melee_web_menu_active_player_count(&sparse.vs.start);
+    int css_valid = melee_web_menu_css_selection_valid(&sparse);
+    int sss_valid = melee_web_menu_sss_selection_valid(&sparse_sss);
+    if (count != 0 || css_valid || sss_valid ||
+        memcmp(&sparse, &unchanged, sizeof(sparse)) != 0 ||
+        sparse.vs.start.players[1].slot_type != Gm_PKind_NA ||
+        sparse.vs.start.players[2].slot_type != Gm_PKind_Human ||
+        sparse.vs.start.players[2].slot != 3 ||
+        sparse.vs.start.players[3].slot_type != Gm_PKind_NA) {
+        fprintf(stderr, "Sparse-port reproducer: unexpected gate or mutation\n");
+        return 0;
+    }
+    printf("sparse-port gate reproduced: dense count=2 CSS=1 SSS=1; "
+           "P1+P3 count=%d CSS=%d SSS=%d; source ports 0/2 retained\n",
+           count, css_valid, sss_valid);
+    return 1;
+}
+
 int main(void)
 {
+    if (!sparse_port_rejection_reproducer()) return 1;
     /* Reduced owner-lifetime check; source callbacks here are fixtures. The
      * owned-asset recipe separately exercises original SSS confirmation. */
     if (melee_web_menu_stage_available(St_Kind_PStadium) ||
