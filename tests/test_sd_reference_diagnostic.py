@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from authored_sd_reference_plan import make_input_plan
 from sd_reference_diagnostic import Receiver, RulesMenuReceiver, SdDiagnosticError, SCOPE, PCS
 from sd_original_menu_plan import rules_ready_packet, matches
-from capture_sd_reference_prefix import menu_actions, wait_terminal_statuses
+from capture_sd_reference_prefix import cleanup_process, menu_actions, wait_terminal_statuses
 from test_authored_sd_reference_plan import setup_bytes
 
 
@@ -98,6 +98,21 @@ def index(rows, name):
 
 
 class SdReferenceDiagnosticTests(unittest.TestCase):
+    def test_direct_process_cleanup_retains_reaping_and_failed_wait_receipts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            process = mock.Mock(pid=12345)
+            process.poll.return_value = None
+            process.wait.side_effect = [subprocess.TimeoutExpired("owned", 5), -9]
+            receipt = cleanup_process(process, directory)
+            self.assertEqual(receipt["ownership"], "direct-Popen")
+            self.assertEqual(receipt["returncode"], -9)
+            process.terminate.assert_called_once_with()
+            process.kill.assert_called_once_with()
+            self.assertEqual(json.loads((Path(directory) / "cleanup.json").read_text()), receipt)
+            process.wait.side_effect = subprocess.TimeoutExpired("owned", 5)
+            with self.assertRaises(SdDiagnosticError): cleanup_process(process, directory)
+            self.assertIsNotNone(json.loads((Path(directory) / "cleanup.json").read_text())["error"])
+
     def test_cli_requires_explicit_inputs_and_does_not_succeed_as_a_noop(self):
         result = subprocess.run([sys.executable, str(ROOT / "scripts/capture_sd_reference_prefix.py")],
                                 capture_output=True, text=True)
