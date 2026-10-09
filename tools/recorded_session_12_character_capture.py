@@ -1038,6 +1038,47 @@ def _consume_row(row: dict[str, Any], latest: dict[str, Any],
         raise CaptureFailure(f"reference observer error: {payload}")
 
 
+def _retain_final_capture_diagnostics(report, proc, stream, input_stream, status, input_status):
+    report["process_exit"] = proc.returncode if proc is not None else None
+    report["raw_observer_sha256"] = _sha256(stream) if stream.exists() else None
+    report["raw_input_sha256"] = _sha256(input_stream) if input_stream.exists() else None
+    if status.exists():
+        report["final_observer_status"] = json.loads(status.read_text(encoding="utf-8"))
+    if input_status.exists():
+        report["final_input_status"] = json.loads(input_status.read_text(encoding="utf-8"))
+
+
+def _validate_entity_prefix_input(stream: Path, status: Path) -> dict[str, Any]:
+    from reference_input_stream import validate_stream, validate_status
+    record = validate_stream(stream)
+    validate_status(status, mode="record", events=record["events"])
+    return record
+
+
+def _close_entity_prefix(proc, thread, stop, log, output, report) -> None:
+    """Independent owned retirements; preserve source failure over cleanup."""
+    from capture_sd_reference_prefix import cleanup_process
+    stop.set()
+    operations = []
+    if thread is not None:
+        def retire_driver():
+            thread.join(2)
+            if thread.is_alive():
+                raise CaptureFailure("entity prefix input driver did not retire")
+        operations.append(("driver", retire_driver))
+    if proc is not None:
+        operations.append(("native", lambda: cleanup_process(proc, output, scope="entity_prefix")))
+    operations.append(("log", log.close))
+    for owner, close in operations:
+        try:
+            close()
+        except BaseException as error:
+            reason = str(error) or type(error).__name__
+            report.setdefault("cleanup_errors", []).append({"owner": owner, "error": reason})
+            report["result"] = "fail"
+            report.setdefault("error", reason)
+
+
 def _finish_entity_prefix(records: list[dict[str, Any]], latest: dict[str, Any],
                           output_dir: Path | None = None) -> dict[str, Any]:
     """Validate the actual retained prefix; unsupported draw batches fail preparation."""
@@ -1182,9 +1223,11 @@ def main() -> int:
     version = subprocess.run([str(dolphin), "--version"], capture_output=True,
                              text=True, check=True).stdout.strip()
     log = log_path.open("w", encoding="utf-8")
-    proc = subprocess.Popen(command, env=env, stdout=log, stderr=subprocess.STDOUT)
+    proc = (None if args.entity_prefix else
+            subprocess.Popen(command, env=env, stdout=log, stderr=subprocess.STDOUT))
     stop = threading.Event()
-    controller = capture.DualPipeController(p1, p2, out / "input-intentions.jsonl")
+    controller = (None if args.entity_prefix else
+                  capture.DualPipeController(p1, p2, out / "input-intentions.jsonl"))
     latest: dict[str, Any] = {
         "cursors": {}, "cursor_revisions": {}, "models": {}, "sliders": {},
         "doors": [], "players": [], "boundaries": {}, "boundary_match_indices": {},
@@ -1221,10 +1264,15 @@ def main() -> int:
         report.update(route=args.entity_prefix, diagnostic_prefix=args.entity_prefix,
                       whole_session_equivalent=False, complete=False,
                       scope="one original four-CPU setup and first 60 SourceTicks at first qualifying DrawReturn; no outcome/Results, timing/pixel/PCM claim")
-    driver = Driver(controller, latest, stop, readiness_only=args.readiness_only,
-                    team_route_only=args.team_route, entity_prefix=bool(args.entity_prefix))
+    driver = (None if args.entity_prefix else
+              Driver(controller, latest, stop, readiness_only=args.readiness_only,
+                     team_route_only=args.team_route))
     ended = False
     try:
+        if args.entity_prefix:
+            proc = subprocess.Popen(command, env=env, stdout=log, stderr=subprocess.STDOUT)
+            controller = capture.DualPipeController(p1, p2, out / "input-intentions.jsonl")
+            driver = Driver(controller, latest, stop, readiness_only=False, entity_prefix=True)
         timeout = time.monotonic() + (180 if args.entity_prefix else
                                      900 if args.readiness_only or args.team_route else 2400)
         announcements: list[dict[str, Any]] = []
@@ -1264,10 +1312,6 @@ def main() -> int:
                 _consume_row(row, latest, report)
                 if row.get("event") == "end":
                     observer.require_completed_status()
-                    if args.entity_prefix:
-                        metadata = _finish_entity_prefix(prefix_records, latest, out)
-                        report.update(metadata)
-                        latest["entity_prefix_complete"] = True
                     if args.team_route:
                         # The final return_css boundary and the observer end
                         # record can arrive before the driver has appended its
@@ -1284,6 +1328,11 @@ def main() -> int:
                     if (not input_data.get("complete") or input_data.get("invalid") or
                             input_data.get("error")):
                         raise CaptureFailure(f"source-consumed input record is incomplete: {input_data}")
+                    if args.entity_prefix:
+                        _validate_entity_prefix_input(input_stream, input_status)
+                        # Native End follows InputStream::WaitComplete; still
+                        # validate the independent raw footer and status here.
+                        latest["entity_prefix_complete"] = True
                     expected_setups = 1 if args.entity_prefix else 3
                     if len(latest.get("setup_records", [])) != expected_setups:
                         raise CaptureFailure(
@@ -1321,6 +1370,8 @@ def main() -> int:
             thread.join(10)
             if thread.is_alive():
                 raise CaptureFailure("ordinary-input driver did not stop after the declared outcome")
+        if args.entity_prefix and latest.get("driver_error"):
+            raise CaptureFailure(latest["driver_error"])
         report["steps"] = driver.steps
         report["setup_records"] = latest.get("setup_records", [])
         report["observer_counts"] = observer.counts
@@ -1331,10 +1382,12 @@ def main() -> int:
         }
         if not args.readiness_only and not ended:
             raise CaptureFailure("full source capture did not reach the observer end record")
-    except Exception as error:
+    except BaseException as error:
+        if not args.entity_prefix and not isinstance(error, Exception):
+            raise
         report["result"] = "fail"
-        report["error"] = str(error)
-        report["steps"] = driver.steps
+        report.setdefault("error", str(error) or type(error).__name__)
+        report["steps"] = driver.steps if driver is not None else []
         report["setup_records"] = latest.get("setup_records", [])
         report["latest_state"] = {
             key: latest.get(key) for key in
@@ -1343,30 +1396,55 @@ def main() -> int:
         }
         print(f"recorded-session source capture failed: {error}", file=sys.stderr)
     finally:
-        stop.set()
-        if "thread" in locals():
-            thread.join(2)
-        if proc.poll() is None:
-            proc.terminate()
+        if args.entity_prefix:
+            _close_entity_prefix(proc, locals().get("thread"), stop, log, out, report)
+        else:
+            stop.set()
+            if "thread" in locals():
+                thread.join(2)
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+            log.close()
+        if args.entity_prefix:
             try:
-                proc.wait(5)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait()
-        log.close()
-        if args.entity_prefix and "thread" in locals() and thread.is_alive():
-            report["result"] = "fail"
-            report.setdefault("error", "entity prefix driver did not retire during owned cleanup")
-        report["process_exit"] = proc.returncode
-        report["raw_observer_sha256"] = _sha256(stream) if stream.exists() else None
-        report["raw_input_sha256"] = _sha256(input_stream) if input_stream.exists() else None
-        if status.exists():
-            report["final_observer_status"] = json.loads(status.read_text(encoding="utf-8"))
-        if input_status.exists():
-            report["final_input_status"] = json.loads(input_status.read_text(encoding="utf-8"))
-        if args.entity_prefix and report.get("result") == "fail":
+                _retain_final_capture_diagnostics(report, proc, stream, input_stream, status, input_status)
+            except BaseException as error:
+                report["result"] = "fail"
+                report.setdefault("error", str(error) or type(error).__name__)
+                report.setdefault("cleanup_errors", []).append({"owner": "diagnostics", "error": str(error)})
+        else:
+            _retain_final_capture_diagnostics(report, proc, stream, input_stream, status, input_status)
+        if args.entity_prefix:
             report["diagnostic_prefix_complete"] = False
-        _write_json(report_path, report)
+            report["recipe_artifacts_admitted"] = False
+            if report.get("result") == "diagnostic_entity_prefix_complete":
+                try:
+                    # No recipe publication before validated source/input End,
+                    # the input driver retirement and direct-child cleanup.
+                    report.update(_finish_entity_prefix(prefix_records, latest, out))
+                    report["recipe_artifacts_admitted"] = True
+                except BaseException as error:
+                    report["result"] = "fail"
+                    report.setdefault("error", str(error) or type(error).__name__)
+                    report["diagnostic_prefix_complete"] = False
+                    # Any partial files are retained candidates, never admitted.
+            report["recipe_admission_contract"] = "Requires this final report pass, recipe_artifacts_admitted and successful owned cleanup; files alone do not establish admission"
+        try:
+            _write_json(report_path, report)
+        except BaseException as error:
+            if not args.entity_prefix:
+                raise
+            report["result"] = "fail"
+            report["diagnostic_prefix_complete"] = False
+            report["recipe_artifacts_admitted"] = False
+            report.setdefault("error", str(error) or type(error).__name__)
+            print(f"entity prefix primary failure: {report['error']}; final report write: {error}", file=sys.stderr)
+            raise CaptureFailure(report["error"]) from error
     print(json.dumps({"result": report.get("result"), "error": report.get("error"),
                       "out": str(out)}, sort_keys=True))
     return _capture_exit_code(report.get("result"))

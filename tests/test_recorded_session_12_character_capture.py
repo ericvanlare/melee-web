@@ -397,31 +397,143 @@ class EntityPrefixMenuCaptureTests(unittest.TestCase):
         Driver(None, {}, threading.Event(), readiness_only=False)._require_prefix_held_puck(2, 0)
 
 
-    def test_actual_finally_rejects_live_driver_and_preserves_first_failure(self):
+    @staticmethod
+    def _actual_owned_try():
         import ast
         from pathlib import Path
-        from types import SimpleNamespace
-        from unittest.mock import Mock
         import tools.recorded_session_12_character_capture as implementation
         tree = ast.parse(Path(implementation.__file__).read_text())
         main = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main")
-        owned = next(n for n in main.body if isinstance(n, ast.Try) and n.finalbody)
+        return next(n for n in main.body if isinstance(n, ast.Try) and n.finalbody)
+
+    def _owned_context(self, output):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        import tools.recorded_session_12_character_capture as implementation
+        context = dict(implementation.__dict__)
+        process = Mock(pid=424242, returncode=0)
+        process.poll.return_value = 0
+        process.wait.return_value = 0
+        absent = Mock(); absent.exists.return_value = False
+        context.update(args=SimpleNamespace(entity_prefix=True), proc=process, stop=Mock(),
+                       log=Mock(), out=output, report={"result": "diagnostic_entity_prefix_complete"},
+                       stream=absent, input_stream=absent, status=absent, input_status=absent,
+                       report_path=output / "report.json", latest={"setup_records": []},
+                       driver=None, prefix_records=[])
+        return context
+
+    def test_actual_finally_rejects_live_driver_and_preserves_first_failure(self):
+        import ast
+        from pathlib import Path
+        from unittest.mock import Mock
+        from test_retail_entity_prefix import owned_scratch
+        owned = self._actual_owned_try()
         block = ast.fix_missing_locations(ast.Module(body=owned.finalbody, type_ignores=[]))
         for primary in (None, "retained source mismatch"):
-            report = {"result": "diagnostic_entity_prefix_complete", "diagnostic_prefix_complete": True}
-            if primary:
-                report.update(result="fail", error=primary)
-            thread = Mock(); thread.is_alive.return_value = True
-            absent = Mock(); absent.exists.return_value = False
-            log = Mock()
-            context = {"stop": Mock(), "thread": thread,
-                       "proc": SimpleNamespace(poll=lambda: 0, returncode=0), "log": log,
-                       "report": report, "args": SimpleNamespace(entity_prefix=True),
-                       "stream": absent, "input_stream": absent, "status": absent,
-                       "input_status": absent, "report_path": absent, "_write_json": Mock()}
-            exec(compile(block, implementation.__file__, "exec"), context)
-            self.assertEqual(report["result"], "fail")
-            self.assertFalse(report["diagnostic_prefix_complete"])
-            if primary: self.assertEqual(report["error"], primary)
-            log.close.assert_called_once()
-            thread.join.assert_called_once_with(2)
+            with owned_scratch("prefix-owned-close-") as output:
+                context = self._owned_context(output)
+                thread = Mock(); thread.is_alive.return_value = True
+                context["thread"] = thread
+                if primary: context["report"].update(result="fail", error=primary)
+                exec(compile(block, "actual-main-finally", "exec"), context)
+                report = context["report"]
+                self.assertEqual(report["result"], "fail")
+                self.assertFalse(report["diagnostic_prefix_complete"])
+                self.assertFalse(report["recipe_artifacts_admitted"])
+                if primary: self.assertEqual(report["error"], primary)
+                context["log"].close.assert_called_once()
+                context["proc"].wait.assert_called_once_with(timeout=5)
+                thread.join.assert_called_once_with(2)
+                self.assertFalse((output / "entity-prefix.mwrc").exists())
+
+    def test_actual_protected_setup_failure_retires_direct_child_without_recipe(self):
+        import ast
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        from test_retail_entity_prefix import owned_scratch
+        owned = self._actual_owned_try()
+        block = ast.fix_missing_locations(ast.Module(body=[owned], type_ignores=[]))
+        with owned_scratch("prefix-setup-failure-") as output:
+            context = self._owned_context(output)
+            process = context["proc"]
+            context.update(proc=None, command=["synthetic-owned-child"], env={}, p1=None, p2=None)
+            context["subprocess"] = SimpleNamespace(Popen=Mock(return_value=process), STDOUT=-2)
+            context["capture"] = SimpleNamespace(DualPipeController=Mock(side_effect=RuntimeError("controller setup rejected")))
+            exec(compile(block, "actual-main-try", "exec"), context)
+            self.assertEqual(context["report"]["error"], "controller setup rejected")
+            self.assertEqual(context["report"]["result"], "fail")
+            self.assertFalse(context["report"]["recipe_artifacts_admitted"])
+            process.wait.assert_called_once_with(timeout=5)
+            context["log"].close.assert_called_once()
+            self.assertFalse((output / "entity-prefix.mwrc").exists())
+
+    def test_actual_driver_error_path_never_publishes_candidate(self):
+        import ast
+        from unittest.mock import Mock
+        from test_retail_entity_prefix import owned_scratch
+        owned = self._actual_owned_try()
+        gate = next(n for n in owned.body if isinstance(n, ast.If) and
+                    "driver_error" in ast.unparse(n.test))
+        reduced = ast.Try(body=[gate], handlers=owned.handlers, orelse=[], finalbody=owned.finalbody)
+        block = ast.fix_missing_locations(ast.Module(body=[reduced], type_ignores=[]))
+        with owned_scratch("prefix-driver-failure-") as output:
+            context = self._owned_context(output)
+            context["latest"]["driver_error"] = "declared driver source failure"
+            context["driver"] = Mock(steps=[])
+            exec(compile(block, "actual-driver-error-try", "exec"), context)
+            self.assertEqual(context["report"]["error"], "declared driver source failure")
+            self.assertFalse(context["report"]["recipe_artifacts_admitted"])
+            self.assertFalse((output / "entity-prefix.mwrc").exists())
+
+    def test_reused_direct_process_cleanup_timeout_is_bounded_and_retained(self):
+        import subprocess
+        import json
+        from test_retail_entity_prefix import owned_scratch
+        from tools.recorded_session_12_character_capture import _close_entity_prefix
+        with owned_scratch("prefix-cleanup-timeout-") as output:
+            context = self._owned_context(output)
+            process = context["proc"]
+            process.poll.return_value = None
+            process.wait.side_effect = subprocess.TimeoutExpired("synthetic-owned-child", 5)
+            context["report"].update(result="fail", error="primary source failure")
+            _close_entity_prefix(process, None, context["stop"], context["log"], output, context["report"])
+            self.assertEqual([c.kwargs for c in process.wait.call_args_list], [{"timeout": 5}, {"timeout": 5}])
+            process.terminate.assert_called_once(); process.kill.assert_called_once()
+            self.assertEqual(context["report"]["error"], "primary source failure")
+            self.assertEqual(context["report"]["cleanup_errors"][0]["owner"], "native")
+            self.assertIsNotNone(json.loads((output / "cleanup.json").read_text())["error"])
+            context["log"].close.assert_called_once()
+
+    def test_actual_input_footer_and_independent_sidecar_are_both_required(self):
+        import json
+        from test_reference_input_stream import event
+        from reference_input_stream import HEADER, InputStreamError
+        from tools.recorded_session_12_character_capture import _validate_entity_prefix_input
+        from test_retail_entity_prefix import owned_scratch
+        with owned_scratch("prefix-input-finalization-") as output:
+            stream, status = output / "inputs.mwri", output / "inputs.json"
+            good = HEADER.pack(b"MWRI", 1, 16, 40, 0) + event(0, 100, 0) + event(1, 100, 0xffffffff, 2)
+            schema = {"version": 1, "mode": "record", "events": 1, "complete": True, "invalid": False, "error": None}
+            stream.write_bytes(good); status.write_text(json.dumps(schema))
+            self.assertTrue(_validate_entity_prefix_input(stream, status)["complete"])
+            for patch in ({"complete": False}, {"events": 2}, {"invalid": True}):
+                status.write_text(json.dumps(dict(schema, **patch)))
+                with self.assertRaises(InputStreamError): _validate_entity_prefix_input(stream, status)
+            status.write_text(json.dumps(schema)); stream.write_bytes(good[:-40] + event(1, 100, 0xffffffff, 3))
+            with self.assertRaises(InputStreamError): _validate_entity_prefix_input(stream, status)
+
+    def test_actual_final_report_write_failure_preserves_primary_after_close(self):
+        import ast
+        from unittest.mock import Mock
+        from test_retail_entity_prefix import owned_scratch
+        owned = self._actual_owned_try()
+        block = ast.fix_missing_locations(ast.Module(body=owned.finalbody, type_ignores=[]))
+        with owned_scratch("prefix-report-write-") as output:
+            context = self._owned_context(output)
+            context["report"].update(result="fail", error="first source error")
+            context["_write_json"] = Mock(side_effect=OSError("final report write rejected"))
+            with self.assertRaisesRegex(CaptureFailure, "first source error"):
+                exec(compile(block, "actual-report-write-finally", "exec"), context)
+            context["proc"].wait.assert_called_once_with(timeout=5)
+            context["log"].close.assert_called_once()
+            self.assertFalse(context["report"]["recipe_artifacts_admitted"])
