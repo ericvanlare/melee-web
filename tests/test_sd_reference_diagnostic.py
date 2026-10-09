@@ -288,6 +288,9 @@ class SdReferenceDiagnosticTests(unittest.TestCase):
         gameplay = deepcopy(rows)
         gameplay[3] = events(2)[2]
         variants.append(gameplay)
+        undeclared = deepcopy(rows)
+        undeclared[2]["payload"]["slices"][0]["hex"] = "0400" + pad[2:].hex()  # X
+        variants.append(undeclared)
         for bad in variants:
             for seq, row in enumerate(bad): row["seq"] = seq
             receiver = RulesMenuReceiver(make_input_plan(3))
