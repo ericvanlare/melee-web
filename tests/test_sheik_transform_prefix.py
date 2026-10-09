@@ -568,6 +568,8 @@ int main(int argc, char** argv) {
                                        source.index("  bool RegisterFighterEntity(")]
         pad_status_helper = source[source.index("bool TransformPrefixPadStatusMatches("):
                                    source.index("u32 WholeSessionMatchCount()")]
+        byte_readers = source[source.index("constexpr u16 ReadBE16("):
+                              source.index("void PutU16(")]
         read_u32 = source[source.index("  bool ReadU32("):
                           source.index("  bool TransformPrefixRosterValid(")]
         owner_methods = source[source.index("  bool TransformPrefixRosterValid("):
@@ -589,8 +591,7 @@ using u16 = uint16_t;
 using u32 = uint32_t;
 using u64 = uint64_t;
 using s8 = int8_t;
-constexpr u16 ReadBE16(const u8* p) { return static_cast<u16>((p[0] << 8) | p[1]); }
-""" + pad_status_helper + r"""
+""" + byte_readers + pad_status_helper + r"""
 namespace Core { struct System {}; }
 """ + slice_tags + r"""
 static_assert(static_cast<u16>(SliceTag::PlayerIdentity) == 57);
@@ -623,10 +624,6 @@ struct Reader {
     if (!ReadBytes(system, address, size, bytes.data())) return false;
     slices.push_back({tag, flags, address, static_cast<u32>(size), bytes});
     return true;
-  }
-  static u16 ReadBE16(const u8* p) { return static_cast<u16>((p[0] << 8) | p[1]); }
-  static u32 ReadBE32(const u8* p) {
-    return (u32(p[0]) << 24) | (u32(p[1]) << 16) | (u32(p[2]) << 8) | p[3];
   }
   void byte(u32 address, u8 value) { memory[address] = value; }
   void word(u32 address, u32 value) {

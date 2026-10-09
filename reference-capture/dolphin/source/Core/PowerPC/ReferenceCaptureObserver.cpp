@@ -534,6 +534,11 @@ constexpr bool IsMem1Range(u32 address, size_t size)
   return address >= 0x80000000U && end <= 0x81800000U;
 }
 
+constexpr u16 ReadBE16(const u8* bytes)
+{
+  return (static_cast<u16>(bytes[0]) << 8) | static_cast<u16>(bytes[1]);
+}
+
 constexpr u32 ReadBE32(const u8* bytes)
 {
   return (static_cast<u32>(bytes[0]) << 24) | (static_cast<u32>(bytes[1]) << 16) |
