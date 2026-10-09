@@ -80,3 +80,40 @@ test('actual serialized active PAD reader never performs a lifecycle heap audit'
   assert.throws(()=>checkSparsePadVectors(readSparsePadVectors({activeMatch:true})));
  }finally{globalThis.Module=original;}
 });
+
+
+import {configureSparseControllerSettings} from './sparse_controller_settings_driver.mjs';
+function controlsPage({selectorError=null,closeError=null}={}){
+ let open=false,advanced=false,port=0;const sources=['auto','auto','auto','auto'],events=[];
+ const rows=()=>[{port,active:!advanced,output:{buttons:0,stick:[0,0],cstick:[0,0],triggers:[0,0]}}];
+ return {events,locateOpen:()=>open,manager:{inspect:rows,getPortSource:p=>sources[p]},
+  locator(selector){return {
+   async click(){events.push(selector);if(selector==='#controls-open')open=true;
+    if(selector==='#controller-advanced > summary')advanced=true;
+    if(selector==='#controls-close'){if(closeError)throw closeError;open=advanced=false;}},
+   async selectOption(value){const names=['one','two','three','four'];const i=names.findIndex(n=>selector===`#player-${n}-source`);if(i>=0)sources[i]=value;},
+   async waitFor(){if(!advanced)throw Error('Advanced not mounted');},
+   async evaluate(fn){return fn({open:selector==='#controls-dialog'?open:advanced});},
+   async count(){return advanced?1:0;}
+  };},
+  getByLabel(_label,options){assert.equal(options.exact,true);return {async selectOption(value){assert(advanced);if(selectorError)throw selectorError;port=Number(value);}};},
+  async evaluate(){return rows();},
+  async waitForFunction(fn){events.push('active-wait');assert(!open&&!advanced);assert(fn());}
+ };
+}
+test('actual Controls helper mounts assignment then unmounts before active readiness',async()=>{
+ const previous=globalThis.Module,p=controlsPage(),retention={};globalThis.Module={meleeControllers:p.manager};
+ try{await configureSparseControllerSettings({page:p,retention});assert.equal(retention.advancedRows[0].active,false);
+  assert.equal(retention.activeRows[0].active,true);assert.equal(retention.dialogClosed,true);
+  assert(p.events.indexOf('#controls-close')<p.events.indexOf('active-wait'));
+ }finally{globalThis.Module=previous;}
+});
+test('actual Controls helper closes on selector failure and preserves primary over cleanup error',async()=>{
+ const primary=Error('deliberate selector failure'),secondary=Error('deliberate close failure');
+ for(const closeError of [null,secondary]){
+  const p=controlsPage({selectorError:primary,closeError}),retention={};
+  await assert.rejects(configureSparseControllerSettings({page:p,retention}),error=>error===primary);
+  assert(p.events.includes('#controls-close'));assert(!p.events.includes('active-wait'));
+  if(closeError)assert.equal(retention.closeError,String(secondary));else assert.equal(p.locateOpen(),false);
+ }
+});

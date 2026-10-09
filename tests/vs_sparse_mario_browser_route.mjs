@@ -1,6 +1,7 @@
 /* Renderer-backed sparse original-menu prefix. All changes are browser input;
  * no source state or normalized payload is written by this workload. */
 import assert from 'node:assert/strict';
+import {configureSparseControllerSettings} from './sparse_controller_settings_driver.mjs';
 import {standardPad} from './controller-fixtures.mjs';
 import {createCssHumanJoinDriver} from './vs_css_two_human_driver.mjs';
 import {observeRuntimeOwner} from './runtime_owner_observation.mjs';
@@ -104,15 +105,8 @@ export async function runSparseMarioBrowserPrefix(d){
   await press('7');await waitMessage('Original character select','Sparse committed CSS');
   const inputCss=await observeSource();assert.equal(inputCss.source.rules.stock_time_limit,0);
   assert.equal(inputCss.source.items.frequency,-1);report.sourceObservations.push({label:'Sparse committed CSS',...inputCss});
-  await page.locator('#controls-open').click();
-  await page.locator('#keyboard-layout').selectOption('two');
-  for(const [name,mode] of [['one','keyboard'],['two','off'],['three','controller'],['four','off']])
-    await page.locator(`#player-${name}-source`).selectOption(mode);
-  await page.getByLabel('Player port for Sparse Mario authored standard Gamepad',{exact:true}).selectOption('2');
-  await page.waitForFunction(()=>{const rows=Module.meleeControllers.inspect();
-    return rows.length===1&&rows[0].port===2&&rows[0].active&&rows[0].output.buttons===0;});
-  route.controllerAssignment=await page.evaluate(()=>Module.meleeControllers.inspect());
-  await page.locator('#controls-close').click();
+  route.controllerConfiguration={};
+  route.controllerAssignment=await configureSparseControllerSettings({page,retention:route.controllerConfiguration});
   const cssDriver=createCssHumanJoinDriver({page,report,shot,observeCssSetup,sourcePadSample,
     sourcePadTap,resumeTimingPause,ensureNoError});
   const toggle=async port=>{
