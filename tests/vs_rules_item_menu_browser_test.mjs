@@ -680,7 +680,7 @@ route: {
   await waitMessage('Original character select', 'initial CSS');
   await shot('00-initial-css');
   if(sparseMarioPrefix){
-    await runSparseMarioBrowserPrefix({cssOnly:sparseCssOnly,page,report,press,chord,current,ensureNoError,resumeTimingPause,
+    await runSparseMarioBrowserPrefix({cssOnly:sparseCssOnly,page,report,driver,press,chord,current,ensureNoError,resumeTimingPause,
       observeSource,observeCssSetup,sourcePadSample,sourcePadTap,waitForNoQueuedPad,waitMessage,waitPhase,
       waitMenu,enterVsRules,moveMenuCursor,waitItemInputReady,waitItemsCursor,waitItemFrequency,shot,verifyTeardown});
     nativeSessionActive=false;break route;

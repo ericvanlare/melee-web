@@ -104,7 +104,7 @@ export function validateFinalSparseCapture(capture,{cssOnly=false}={}){
   return steps;
 }
 export async function runSparseMarioBrowserPrefix(d){
-  const {page,report,press,chord,observeSource,observeCssSetup,sourcePadSample,sourcePadTap,
+  const {page,report,driver,press,chord,observeSource,observeCssSetup,sourcePadSample,sourcePadTap,
     resumeTimingPause,ensureNoError,waitPhase,waitMenu,enterVsRules,moveMenuCursor,
     waitItemInputReady,waitItemsCursor,waitItemFrequency,waitMessage,waitForNoQueuedPad,shot,verifyTeardown}=d;
   report.inputConfiguration={playerOne:'Keyboard P1 with declared original-menu raw diagnostic PAD0 samples',
@@ -187,7 +187,7 @@ export async function runSparseMarioBrowserPrefix(d){
   await padVectors('Sparse committed CSS raw/copied PAD profile');
   route.css.push({label:'closed sparse CSS selection',setup});await shot('sparse-css-p1-p3');
   if(d.cssOnly){
-    await page.locator('#unload').click();await verifyTeardown('Sparse CSS-only Eject');
+    await driver.unload();await verifyTeardown('Sparse CSS-only Eject');
     report.result='pass';report.checks.push('Original sparse CSS selection, exact raw/copied PAD ports0/2 and Eject only; no SSS/world');return;
   }
   await press('Enter');await waitPhase(3,'Sparse original SSS');await waitForNoQueuedPad('Sparse CSS Start released');
@@ -218,6 +218,6 @@ export async function runSparseMarioBrowserPrefix(d){
   }
   assert(last&&last.match.frame-first.match.frame>=SPARSE_PREFIX_LIMITS.prefixFrames,'Sparse source prefix cap');
   route.observations.push(last);route.actualSourceFramesAdvanced=last.match.frame-first.match.frame;
-  await shot('sparse-ordinary-mario-hud');await page.locator('#unload').click();await verifyTeardown('Sparse prefix Eject');
+  await shot('sparse-ordinary-mario-hud');await driver.unload();await verifyTeardown('Sparse prefix Eject');
   report.result='pass';report.checks.push('Rendered original sparse CSS/SSS, normalized source ports0/2, ordinary neutral source prefix and Eject; no ending/Results acceptance');
 }
