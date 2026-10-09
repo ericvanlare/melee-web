@@ -266,7 +266,7 @@ class OriginalTimeoutTests(unittest.TestCase):
         from sd_original_menu_plan import gci_competitive_entry_packet
         helper=helpers.ItemsLockTests();helper.setUp();self.addCleanup(helper.doCleanups)
         root=Path(__file__).resolve().parents[1]
-        for mode in ("initialization","cleanup"):
+        for mode in ("initialization","cleanup","receipt_write"):
             with self.subTest(mode=mode),tempfile.TemporaryDirectory() as directory:
                 out=Path(directory)/"output";out.mkdir()
                 manifest=Path(directory)/"manifest.json"
@@ -284,6 +284,11 @@ class OriginalTimeoutTests(unittest.TestCase):
                 drain=mock.Mock(size=0);drain.thread.is_alive.return_value=False
                 drain.check.side_effect=SdDiagnosticError("primary source control")
                 drain.finish.side_effect=RuntimeError("drain cleanup control")
+                original_write=Path.write_bytes
+                def write(path,payload):
+                    if mode=="receipt_write" and path.name=="cleanup.json":
+                        raise OSError("cleanup receipt control")
+                    return original_write(path,payload)
                 with mock.patch.object(runner,"validate_reference_build_manifest",return_value={
                         "sha256":hashlib.sha256(manifest.read_bytes()).hexdigest()}), \
                      mock.patch.object(runner,"load_plan",return_value=(make_input_plan(6),"entry-only")), \
@@ -292,18 +297,21 @@ class OriginalTimeoutTests(unittest.TestCase):
                      mock.patch.object(runner,"prepare_rules_profile",side_effect=prepare), \
                      mock.patch.object(runner.subprocess,"Popen",return_value=child), \
                      mock.patch.object(runner,"BoundedLog",side_effect=RuntimeError("drain init control")
-                                       if mode=="initialization" else None,return_value=drain):
+                                       if mode=="initialization" else None,return_value=drain), \
+                     mock.patch.object(Path,"write_bytes",new=write):
                     with self.assertRaisesRegex((RuntimeError,SdDiagnosticError),
                         "drain init control" if mode=="initialization" else "primary source control"):
                         runner._run(dolphin=Path("unlaunched"),disc=Path("unread"),profile=Path("unused"),
                             input_plan=Path("unused"),menu_recipe=Path("unused"),output=out,
                             build_manifest=manifest,timeout=600,gci=Path("unread"),ordinary_policy=policy_path)
                 child.terminate.assert_called_once();child.wait.assert_called_once()
-                self.assertEqual(json.loads((out/"cleanup.json").read_text())["pid"],404)
+                if mode=="receipt_write":self.assertFalse((out/"cleanup.json").exists())
+                else:self.assertEqual(json.loads((out/"cleanup.json").read_text())["pid"],404)
                 log_cleanup=json.loads((out/"owned-log-cleanup.json").read_text())
-                if mode=="cleanup":
+                if mode in ("cleanup","receipt_write"):
                     drain.finish.assert_called_once()
                     self.assertEqual(log_cleanup["error"],"drain cleanup control")
                     self.assertIn("primary source control",json.loads((out/"failure.json").read_text())["error"])
+                    if mode=="receipt_write":self.assertEqual(log_cleanup["native_cleanup_error"],"cleanup receipt control")
                 else:
                     self.assertFalse(log_cleanup["initialized"]);self.assertTrue(child.stdout.closed)

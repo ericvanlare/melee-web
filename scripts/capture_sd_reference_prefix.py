@@ -367,7 +367,7 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
             log_error=None
             try:
                 cleanup_process(process, output, scope=scope)
-            except SdDiagnosticError as error:
+            except Exception as error:
                 cleanup_error=error
             # Independently finalize the owned drain even if PID cleanup failed.
             if ordinary:
@@ -382,6 +382,7 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                     scope=scope,initialized=bounded_log is not None,
                     bytes=bounded_log.size if bounded_log else 0,
                     thread_alive=bounded_log.thread.is_alive() if bounded_log else False,
+                    native_cleanup_error=str(cleanup_error) if cleanup_error else None,
                     error=str(log_error) if log_error else None)))
             if cleanup_error or log_error:
                 error=cleanup_error or log_error
