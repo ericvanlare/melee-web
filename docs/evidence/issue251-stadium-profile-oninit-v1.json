@@ -319,7 +319,7 @@
   },
   "subsequent_c3_component_2026_10_09": {
     "claim_boundary": "Existing October7 profile receipt remains historical. This update preserves V26 and identifies the exact later producer; componentcontrols do not pass C3.",
-    "current_result": "passed_zero_tick_two_world_stage_lifecycle; ReadyGO_and_C3_unrun",
+    "current_result": "Two zero-tick world lifetimes pass on3d032f74. Full source-session preparation fails before construction on62fd69b8(SIS token) and094782e6(PAD snapshot); SIS consumer corrected with actual SDK control. C3 remains unrun.",
     "prior_v26": {
       "source_commit": "b8c272c44a94bcb03f0371008851e468200d4496",
       "first_failure": "heap_free_bytes",
@@ -857,6 +857,64 @@
         "artifact_names_relative_to_run": true,
         "no_machine_specific_path_required": true
       }
+    },
+    "ready_session_boundary": {
+      "source_seam": "62fd69b82c9de394a8667acdaca68b2011732cc7",
+      "source_caller_correction": "094782e6262a834c5c67ba9703c4eca64df2cfda",
+      "source_review": {
+        "artifact": "root-ready-session-source-review-v1.json",
+        "sha256": "7dadfdf7500d99599fefb1f57a027acbee0b15471953657c55b1ae3a489e5a55"
+      },
+      "source_correction_review": {
+        "artifact": "root-ready-sis-consumer-source-review-v1.json",
+        "sha256": "98d777a91fccbf103898f1c0b9a883da8f16e4960942f01991eb395fd990bdbd"
+      },
+      "first_failed_run": {
+        "artifact": "ready-first-frozen-result-v1.json",
+        "sha256": "fc23875feec6cbf36d1bb7fa50c4a6c43ca5f54d0ba84874520aa5ba9ae7a55a"
+      },
+      "first_root_review": {
+        "artifact": "root-ready-first-result-review-v1.json",
+        "sha256": "e4edae0fa271e2b33ec21b94e0ed0909e6210f7caebda71146ac16ac04e2c1f7"
+      },
+      "preparation_failure": {
+        "artifact": "ready-producer-preparation-failure-v1/receipt.json",
+        "sha256": "1c587c27fe0b38d60b9c152861d0b81641184b8324e4c4414c5cb0d6ce397de1"
+      },
+      "recovered_producer": {
+        "artifact": "ready-producer-094782e6-root-v3/identity.json",
+        "sha256": "b47727ebbcec63a606231e72071ea3e44bc8a618eaddfc9a523d0ca7cc01dab3"
+      },
+      "actual_sdk_control": {
+        "artifact": "root-ready-sis-sdk-v1/result.json",
+        "sha256": "813602bb2e1fab3932db5ad64175440233106e5a69de8eb4d5fb1848ff6c4b9c"
+      },
+      "second_failed_run": {
+        "artifact": "root-ready-second-frozen-result-v1.json",
+        "sha256": "dff40762a4aade3091c17a682cf70df8ee5d1d5c6143ad0bb0cc33e2eace91bf"
+      },
+      "first_failure": "Caller repeated deliberately one-use SIS verification after original menu leave had already set retirement_verified=true. Refused before Session construction; other current SIS predicate subfields unlogged.",
+      "sdk_result": "PASS actual original capture/drain/verify then repeat refusal; token, epoch, owner, roots and allocation record unchanged. Two allocator lifetimes/foreign-owner controls pass. No Stadium callbacks.",
+      "preparation_error": "Expected wrong build-result filename;26partial producer files retained. Erroneously queued missing launcher command exited before any SDK Node launch. Root fresh producer completed before separate SDK invocation.",
+      "second_failure": "SIS verified evidence consumed; PAD snapshot decode refuses invalid processing configuration or nonfinite history before first Session observation/construction. Raw snapshot and exact invalid subfield unlogged.",
+      "post_run_integrity": {
+        "first_bound_files": 240,
+        "second_bound_files": 284,
+        "fixtures_each": 98,
+        "first_owned_pids_absent": [
+          95430,
+          95436
+        ],
+        "second_owned_pids_absent": [
+          97447,
+          97453
+        ],
+        "sdk_owned_pid_absent": 97391,
+        "signals_sent": false
+      },
+      "remaining": "First of seven source-to-Ready steps implemented/compiled; full composition and other six runtime-unverified. Smaller actual PAD handoff reducer before third full run.",
+      "c3_original_ledger_requirement": "Reuse existing RNG draw observer; C3 notes604-608 require per-tick/per-owner original comparison, separately from broader C8 transformation comparison.",
+      "claim_boundary": "No match construction, new Session VS/world/OnInit/OnLoad, HUD, Ready/GO or source tick observed in either attempt. Earlier zero-tick pass and every failed predicate retain their original scopes. No C3 acceptance."
     }
   }
 }

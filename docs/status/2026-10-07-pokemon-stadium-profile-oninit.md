@@ -2,11 +2,10 @@
 
 **Compiled / Synthetic controls / Source identified**
 
-**Historical October 7 checkpoint.** The current scoped result is the
-[October 9 zero-tick two-world lifecycle](#october-9-two-zero-tick-stadium-world-lifetimes)
-below. It supersedes only the earlier statement that no actual OnInit/OnStart
-or second-world lifecycle had run; Ready/GO, gameplay ticks, and C3 remain
-unrun.
+**Historical October 7 checkpoint.** The
+[zero-tick two-world lifecycle](#october-9-two-zero-tick-stadium-world-lifetimes)
+passed. The latest [source-session preparation attempts](#october-9-source-session-ready-preparation)
+stopped before match construction. Ready/GO, gameplay ticks, and C3 remain unrun.
 
 The diagnostic-only Stadium profile and profile-to-`DatNativeMapContract`
 adapter compile in the C1 trace target. Focused profile and borrowed-yakumono
@@ -196,7 +195,7 @@ match services, observe Ready/GO, dispatch a source scheduler tick, or reach
 the 3,500-tick interval. The retained evidence still excludes C3 acceptance,
 rendering, browser behavior, and original-equivalence claims.
 
-The source-to-Ready work has seven explicit next steps under C3's existing
+At the zero-tick checkpoint, the source-to-Ready work had seven explicit next steps under C3's existing
 prerequisite groups; these steps do not replace or redefine those groups:
 
 1. Add an exact diagnostic-only prepared-stage seam to the existing
@@ -230,4 +229,67 @@ prerequisite groups; these steps do not replace or redefine those groups:
 
 The receipt records the zero-tick result and these remaining steps.
 Earlier OnInit, generator, and fixture failures remain retained with their
-original scopes; no source-to-Ready or 3,500-tick runtime attempt has run.
+original scopes. The subsequent source-to-Ready attempts below stop before match
+construction; no 3,500-tick runtime attempt has run.
+
+
+## October 9 source-session Ready preparation
+
+**Compiled / Synthetic controls / Native traced failure / C3 not passed**
+
+Source `62fd69b8` adds a diagnostic-only route through the existing
+`GameplayMatchSession` and `GameplayWorld`. It preserves ordinary stage admission
+and brackets the untouched original OnStart dispatch with the exact HUD Ready
+object/process identity. Original rules, camera, generator and pending-header
+owners remain checked. Root and independent review passed; focused controls and
+the canonical diagnostic Release build passed. This implements and compiles the
+first of the seven steps above; full composition and the other six remain
+runtime-unverified.
+
+The first one-shot stopped before constructing a match. Original SSS leave had
+already drained and verified the prior SIS allocator (epoch 3 → 4, world 2,
+18,432-byte prior lease). The new caller passed a copy of that verified token to
+the deliberately one-use verifier, which correctly refused it. The trace records
+`retirement_verified=true`; the refused call's other current root/epoch fields
+were not emitted. No Ready-session observation, OnInit, OnLoad, HUD or gameplay
+tick was reached. The first producer, three trace rows and failed output remain
+retained.
+
+The caller-only correction at `094782e6` consumes that immutable verified token
+after checked menu-world shutdown. It neither clears the token nor reads an old
+allocation through the retired registry. The actual linked SDK control passes:
+original capture → drain → verification, followed by duplicate verification
+refusal with unchanged token bytes, epoch, heap owner, roots and allocation
+record. Its existing two allocator lifetimes and foreign-owner controls also
+pass. The production SIS guard is unchanged.
+
+Preparation for that control first failed because an inventory script expected
+the wrong build-result filename. A queued launcher command was also attempted
+after that failure; its file was absent, so no SDK process started. The partial
+26-file inventory and sequencing error remain retained. Root then completed a
+fresh inventory before a separately invoked SDK control. That recovery does not
+relabel the failed preparation as successful.
+
+The changed Ready attempt on `094782e6` passed the SIS evidence check, with no
+source world active, then failed decoding the captured PAD snapshot:
+`PAD snapshot has invalid processing configuration or nonfinite history`.
+The raw snapshot and exact rejected subfield were not emitted. No match Session,
+VS owner, new world, OnInit/OnLoad, HUD or Ready state was reached. Both attempts
+used the same 600-tick cap and retained audio-processing path; neither reached
+the tick loop. All 240 first-run and 284 second-run bound files, plus 98 fixtures
+for each run, matched after execution. Exact owned children exited naturally and
+were reaped; root independently checked their absence.
+
+After these two attempts, the next work is a smaller actual PAD snapshot
+handoff reproducer around original menu leave, using existing browser/session
+handoff code. Preserve the decoder and original input history; do not retry the
+full session until the first invalid boundary is reduced and reviewed. The
+existing RNG observer can be reused afterward, but the Stadium notes require
+C3's per-tick, per-owner ledger to be compared with the original. C8's broader
+transformation comparison does not defer that C3 requirement. No C3, original
+equivalence, rendering, browser, physical-input, audible-output or timing
+acceptance follows from these checks.
+
+The same [boundary receipt](../evidence/issue251-stadium-profile-oninit-v1.json)
+records the exact source, build, failed attempts, reducer and retained preparation
+error under `ready_session_boundary`.
