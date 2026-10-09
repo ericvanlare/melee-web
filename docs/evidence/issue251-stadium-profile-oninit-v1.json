@@ -936,11 +936,22 @@
           1343
         ],
         "pad_second_bound_files": 356,
-        "third_ready_bound_files": 357
+        "third_ready_bound_files": 357,
+        "fourth_ready_owned_pids_absent": [
+          6585,
+          6591
+        ],
+        "fourth_ready_bound_files": 420,
+        "marker_control_owned_pids_absent": [
+          6142,
+          6143,
+          6146,
+          6147
+        ]
       },
-      "remaining": "Shared source-session seam compiled; caller SIS/PAD preparation reduced and corrected. Full composition now refuses marker binding. Reduce exact marker source/owner before further Ready. Ready/GO, idle lifetimes, retirement and original per-owner RNG ledger remain open.",
+      "remaining": "Reduce the source collision adoption caller and static-floor guard; no extra Ready run authorized yet. Full Ready/GO, two idle lifetimes, retirement and original per-owner RNG ledger remain open.",
       "c3_original_ledger_requirement": "Reuse existing RNG draw observer; C3 notes604-608 require per-tick/per-owner original comparison, separately from broader C8 transformation comparison.",
-      "claim_boundary": "First two Ready attempts stopped before construction. Smaller PAD handoff/cleanup reducer passes on e2ff861b; third Ready attempt enters deferred construction and refuses before OnInit/OnLoad/HUD/ticks; source world startup and exception cleanup occur between zero-world observations. Priorzero-tick result retains its scope. No C3 acceptance.",
+      "claim_boundary": "First two Ready attempts stopped before construction; PAD reducer passed; third marker failure started and unwound a world between zero observations. Fourth marker-corrected attempt retains a match/world at zero ticks and refuses static-floor geometry. Four small marker/FD SDK controls pass on8b0973d2, not Stadium Ready/C3. Prior zero-tick result retains its scope.",
       "pad_input_reducer": {
         "caller_source": "8e087161fcc5a62f6f82cb333a812d0f4eff448f",
         "phase_correction_source": "e2ff861b3f290714d4c6aaa1a19158d4e7f8e59a",
@@ -977,7 +988,49 @@
         "sha256": "66c2fdf85fa07a46fea58d439224e9854c36e3627b4e2298888c5a2444832a94"
       },
       "third_failure": "PAD/SIS handoffs pass; before-construction emitted, then Invalid or duplicate marker binding. Specificmarker unlogged; match_retained0, world0/ticks0 at emitted observations, no Ready. Diagnostic32MiB sessionarena remains at failure, so processcleanup is not checkedscene/sessionteardown.",
-      "third_failure_observation_clarification": "The retained raw report only observes world0 before and after construction failure. GameplayWorld::start invokes SDK startup before marker decode; Storage destructor close/shutdown unwinds before constructor error reaches caller. No claim that a world was never acquired. Intermediate world/owner values were not emitted."
+      "third_failure_observation_clarification": "The retained raw report only observes world0 before and after construction failure. GameplayWorld::start invokes SDK startup before marker decode; Storage destructor close/shutdown unwinds before constructor error reaches caller. No claim that a world was never acquired. Intermediate world/owner values were not emitted.",
+      "marker_contract": {
+        "source": "8b0973d25b69e2ef36ac4dc8780d90f6bac81ced",
+        "tree": "5ef1ae2c3da7fc9c83d412dff926d3afbb1b96a3",
+        "source_review": {
+          "artifact": "root-marker-source-review-v1.json",
+          "sha256": "41fcc728b4263fb0f0b67550c4ef617c5b0da50ccfacf5d8e71530eb1f3a8ff8"
+        },
+        "independent_source_review": {
+          "artifact": "sol-ready-marker-source-review-v1.json",
+          "sha256": "0c469372efc4db4d09ffc0be7255db06eee8fa1f8a04899254c08183e3a3bb69"
+        },
+        "independent_controls_review": {
+          "artifact": "sol-ready-marker-readiness-controls-review-v2.json",
+          "sha256": "46b5501d7a6ebdc57940dc345122065950dbfb99440927e7e8fe4fd2940dfdfd"
+        },
+        "ordinary_producer": {
+          "artifact": "marker-ordinary-producer-8b0973d2-v1/identity.json",
+          "sha256": "6c9baa1bfd0f5762047e886e85acc61dc2a004911364480da062e84df48fccd6"
+        },
+        "diagnostic_producer": {
+          "artifact": "marker-diagnostic-producer-8b0973d2-v1/identity.json",
+          "sha256": "e046e22a4e2bf152796ad1faf48bc48647d3b64dd0334d1f08994613a7264b67"
+        },
+        "controls": {
+          "artifact": "root-marker-controls-v1/result.json",
+          "sha256": "fe90fe3b7ef31d62a939884d67761beecefaeeafb928a84e9e2a65edfa955bce"
+        },
+        "build_preparation_failure": {
+          "artifact": "marker-ordinary-build-v1/result.json",
+          "sha256": "575ee9532d0da4dcb0cf6b51ce12338909a984986bbc3c6f275f8abaf5695618"
+        },
+        "scope": "Exact retained C0 twenty ordered pairs, duplicate135/no148 preserved at both complete-stage consumers. Ordinary strict contract and original camera calculations unchanged. Four actual SDK controls PASS; FD readiness negatives do not establish Stadium numeric readiness. Copied profiles prove unregistered identity rejection, not malformed field branches."
+      },
+      "fourth_failed_run": {
+        "artifact": "root-ready-fourth-frozen-result-v1.json",
+        "sha256": "86567c0ba4a27ef1c9ca54ee5477a5704ac710cc0ab1e97569fbfa9cc3b61445"
+      },
+      "fourth_failure": "Marker guard passed; original dummy CamRange logged. Static-floor direction guard refuses; match and world3 retained at ticks0, objects17/processes17. Offending line and exact callback phase unlogged. No Ready/GO or normal Session close; natural process exit only.",
+      "fourth_result_review": {
+        "artifact": "sol-ready-fourth-lifetime-review-v1.json",
+        "sha256": "d3181d2e666919dfb75e37ca932d99a1684706bb5180c5dd2e02f36da4d24694"
+      }
     }
   }
 }

@@ -312,9 +312,40 @@ unwinding. Zero after failure does not establish that no world was acquired
 between observations; that interval was not separately logged. All 357 bound files and 98 fixtures remain unchanged. Exact owned
 unittest and Node children exit and are reaped naturally. The diagnostic still
 reports its 32 MiB session arena at the failure; process exit is not checked
-match/session teardown. The next experiment is a source-led reduction of the
-marker binding against existing Stadium catalog support, before another Ready
-attempt. No bounds or duplicate-identity exemption is authorized.
+match/session teardown. The next step was a source-led reduction of the
+marker binding against the retained Stadium catalog, described below.
+
+Source `8b0973d2` reuses the same-asset C0 marker inventory in an explicit
+immutable stage profile: the exact 20 ordered bindings include marker 135 twice
+and omit marker 148. Both complete-stage consumers use the existing structural
+decoder with that exact contract; ordinary stages retain unique IDs and their
+existing required set. Numeric readiness uses the profile's required published
+slots. Original camera arithmetic and its dummy-CamRange branch are unchanged.
+Root and independent source review passed. The first build command incorrectly
+named existing CMake fixtures as CLI trace targets and was rejected before any
+compiler ran; the failed preparation is retained. Canonical ordinary
+configuration followed by the guarded existing targets, and the canonical
+Stadium diagnostic build, both passed.
+
+Four focused SDK checks pass on the frozen producer: synthetic profile and
+structural negatives, actual FD readiness and unchanged-state controls, the
+retained Stadium C0 marker/map owner, and the complete FD map/restart control.
+The FD readiness controls cover missing spawn, camera 148 and blast 152 slots,
+nonfinite/inverted ranges, null/wrong owners and repeated readiness, while
+preserving lazy matrix evaluation. Copied-profile negatives establish
+unregistered-profile refusal, not individual malformed-field branch coverage.
+These controls do not establish Stadium numeric readiness.
+
+The changed Ready attempt on `8b0973d2` gets past the marker decoder and logs the
+original `use dummy CamRange ...!` branch. It then stops at
+`Static floor queries require source left-to-right nonvertical lines`.
+The failure observation retains match ownership and world 3, with zero ticks,
+17 objects and 17 processes. No Ready/GO is observed. The exact offending line
+and source callback phase were not emitted; the next step is a source-led
+caller and collision-ownership reduction. All 420 bound files and 98 fixtures
+remain unchanged. The unittest and Node children exit naturally and are reaped;
+the retained world is released only by process exit, not checked Session close.
+The prior marker failure and all earlier failed producers remain retained.
 
 The existing RNG observer can be reused afterward, but the Stadium notes require
 C3's per-tick, per-owner ledger to be compared with the original. C8's broader
