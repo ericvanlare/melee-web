@@ -135,7 +135,7 @@ def menu_actions(path):
     raw = Path(path).read_bytes()
     require(len(raw) <= 1024 * 1024, "SD menu recipe exceeds its bound")
     value = json.loads(raw)
-    if isinstance(value, dict) and value.get("version") in (2, 3, 4, 5, 6, 7, 8):
+    if isinstance(value, dict) and value.get("version") in (2, 3, 4, 5, 6, 7, 8, 9):
         validate_packet(value)
         return value, hashlib.sha256(raw).hexdigest()
     require(isinstance(value, dict) and set(value) == {"schema", "version", "actions"} and
@@ -156,7 +156,7 @@ def menu_actions(path):
     return value, hashlib.sha256(raw).hexdigest()
 
 
-def prepare_rules_profile(profile, user):
+def prepare_rules_profile(profile, user, *, source_slots=(0, 1)):
     """Customize only a fresh owned copy; retain the shared atomic writer's 0400 freeze."""
     profile = Path(profile)
     require(profile.is_dir(), "SD cold boot requires an existing original profile")
@@ -170,7 +170,9 @@ def prepare_rules_profile(profile, user):
     _copy_tree(profile, user, skip={"Pipes"})
     config = user / "Config" / "Dolphin.ini"
     require(config.is_file(), "SD cold boot requires Dolphin.ini")
-    p1, p2 = prepare_dual_pipe(user)
+    from original_source_ports import declared_source_slots, inactive_source_slots
+    source_slots = declared_source_slots(source_slots)
+    p1, p2 = prepare_dual_pipe(user, source_slots=source_slots)
     # Inactive source PAD ports must remain disconnected, not extra Pipe devices.
     import configparser
     ini = configparser.ConfigParser(interpolation=None)
@@ -178,7 +180,7 @@ def prepare_rules_profile(profile, user):
     ini.read(config)
     require(not ini.get("General", "GDBSocket", fallback="").strip(),
             "SD cold boot must not attach a debugger")
-    for port in (2, 3):
+    for port in inactive_source_slots(source_slots):
         ini.set("Core", "SIDevice" + str(port), "0")
     _atomic_ini(config, ini)
     return p1, p2, source_inventory
@@ -212,9 +214,11 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
     menus, menu_hash = menu_actions(menu_recipe)
     items_probe = menus["scope"] == "items_row_gci"
     competitive_entry = menus["scope"] == "competitive_entry_gci"
-    full_route = menus["scope"] == "sd_prefix_gci" or items_probe or competitive_entry
+    sparse_pair = menus["scope"] == "sparse_pair_gci"
+    full_route = menus["scope"] == "sd_prefix_gci" or items_probe or competitive_entry or sparse_pair
     guarded_items = (menus["scope"] == "sd_prefix_gci" and menus["version"] == 7) or competitive_entry
-    campaign = menus["scope"] in ("rules_ready_gci", "sd_prefix_gci", "items_row_gci", "competitive_entry_gci")
+    campaign = menus["scope"] in ("rules_ready_gci", "sd_prefix_gci", "items_row_gci",
+                                    "competitive_entry_gci", "sparse_pair_gci")
     scope = menus["scope"]
     ordinary = ordinary_policy is not None
     if ordinary:
@@ -225,8 +229,8 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                 hashlib.sha256(canonical(menus)).hexdigest()==policy["menu_sha256"],
                 "Ordinary policy must retain exact competitive entry/menu provenance")
         scope="ordinary_timeout_gci"
-    require(plan["authored_recipe"]["version"] == (6 if competitive_entry else 5 if full_route else 4 if campaign else 3) and
-            menus["version"] == (8 if competitive_entry else 6 if items_probe else 7 if guarded_items else 5 if full_route else 4 if campaign else 2) and (gci is not None) == campaign and
+    require(plan["authored_recipe"]["version"] == (7 if sparse_pair else 6 if competitive_entry else 5 if full_route else 4 if campaign else 3) and
+            menus["version"] == (9 if sparse_pair else 8 if competitive_entry else 6 if items_probe else 7 if guarded_items else 5 if full_route else 4 if campaign else 2) and (gci is not None) == campaign and
             menus["authored_recipe_sha256"] == plan["authored_recipe_sha256"],
             "Runnable original diagnostic requires the exact current scoped recipe/menu versions")
     loaded_profile = None
@@ -240,14 +244,16 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                 "Loaded-profile observer producer is stale or unbound")
         loaded_profile, owned_gci = prepare_gci_folder(gci, output / "gci-folder")
     receiver = GciRulesMenuReceiver(plan, loaded_profile, full_route=full_route, items_probe=items_probe,
-                                   guarded_items=guarded_items, competitive_entry=competitive_entry) if campaign else RulesMenuReceiver(plan)
+                                   guarded_items=guarded_items, competitive_entry=competitive_entry,
+                                   sparse_pair=sparse_pair) if campaign else RulesMenuReceiver(plan)
     if ordinary:
         from ordinary_timeout_receiver import OrdinaryTimeoutReceiver
         receiver=OrdinaryTimeoutReceiver(plan,loaded_profile)
     require(type(timeout) in (int, float) and 0 < timeout <= (600 if ordinary else 180 if full_route else 600),
             "Original diagnostic deadline is unbounded")
     user = output / "user"
-    p1, p2, source_inventory = prepare_rules_profile(profile, user)
+    p1, p2, source_inventory = prepare_rules_profile(profile, user,
+        source_slots=(0, 2) if sparse_pair else (0, 1))
     raw, status = output / "observer.bin", output / "observer-status.json"
     native, native_status = output / "inputs.mwri", output / "input-status.json"
     environment = {k: v for k, v in os.environ.items()
@@ -256,7 +262,7 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                        MWRC_DOL_SHA256="dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
                        MWRC_OUTPUT=str(raw), MWRC_STATUS=str(status), MWRC_SD_INIT="1",
                        MWRC_SD_RECIPE_SHA256=plan["authored_recipe_sha256"],
-                       MWRC_SD_MENU_PROBE="competitive_entry" if competitive_entry else "items_row" if items_probe else "sd_prefix" if full_route else "rules_ready",
+                       MWRC_SD_MENU_PROBE="sparse_pair" if sparse_pair else "competitive_entry" if competitive_entry else "items_row" if items_probe else "sd_prefix" if full_route else "rules_ready",
                        MWRC_INPUT_RECORD=str(native), MWRC_INPUT_STATUS=str(native_status))
     if ordinary:
         environment.update(MWRC_SD_MENU_PROBE="ordinary_timeout",MWRC_ORDINARY_POLICY_SHA256=policy_hash)
@@ -345,6 +351,23 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                                 action["label"] + ":observed", action["max_polls"])
                 if full_route and not items_probe:
                     drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, tap)
+                if sparse_pair:
+                    while not receiver.setup_seen:
+                        next_row()
+                    press, release = plan["frames"]
+                    controller.set_both(press[0], press[2], action="sparse-source-0-2-press")
+                    samples_left = plan["authored_recipe"]["input_witness"]["max_source_samples"]
+                    while receiver.witness_phase == 0:
+                        require(receiver.sparse_source_samples < samples_left and not receiver.ended,
+                                "Sparse source input press witness cap exhausted")
+                        next_row()
+                    require(receiver.witness_phase == 1,
+                            "Sparse source input press witness was not observed")
+                    controller.set_both(release[0], release[2], action="sparse-source-0-2-release")
+                    while not receiver.ended:
+                        require(receiver.sparse_source_samples < samples_left,
+                                "Sparse source input release witness cap exhausted")
+                        next_row()
                 while not receiver.ended:
                     next_row()
                     if ordinary and receiver.order==2:
@@ -409,17 +432,18 @@ def require_css_join_owner(css, port, *, initial=False):
     mnCharSel_CursorThink joins an NA door when its own cursor enters
     0.2 < y < 22. Movement remains the existing source-owned Mario policy.
     """
+    source_slot = css.get("source_slots", [0, 1])[port]
     player, door, cursor = css["players"][port], css["doors"][port], css["cursors"][port]
     model = css["models"][port]
-    require(player["slot"] == 0 and cursor["port"] == port and
+    require(player["slot"] == 0 and cursor["port"] == source_slot and
             cursor["state"] in (0, 1, 2) and
-            model["owner"] in (0, port+1) and
-            (cursor["state"] != 1 or (cursor["held"] == port and model["owner"] == port+1)),
+            model["owner"] in (0, source_slot+1) and
+            (cursor["state"] != 1 or (cursor["held"] == source_slot and model["owner"] == source_slot+1)),
             "CSS join has foreign slot/cursor ownership")
     if initial and player["kind"] == 3:
         require(player["character"] == 26 and door["kind"] == 3 and door["icon"] == 25 and
-                door["costume"] == 0 and cursor["state"] == 0 and cursor["held"] == 0 and
-                cursor["x"] == 15.0*port-31.0 and cursor["y"] == -21.5 and
+                door["costume"] == 0 and cursor["state"] == 0 and cursor["held"] == source_slot and
+                cursor["x"] == 15.0*source_slot-31.0 and cursor["y"] == -21.5 and
                 model["owner"] == 0,
                 "CSS vacant door is not the observed initialized owner")
     else:
@@ -474,14 +498,14 @@ def drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, t
             controller.set_both(intent["p1"], intent["p2"], action=label)
             wait_source(lambda: receiver.menu_polls > before, label+":cursor", 600)
     wait_source(lambda: receiver.css is not None, "CSS constructor-owned inventory", 600)
-    if menus["version"] in (7, 8):
+    if menus["version"] in (7, 8, 9):
         for port in policy["ports"]:
             require_css_join_owner(receiver.css, port, initial=True)
     else:
         require([p["kind"] for p in receiver.css["players"]] == [0, 0], "CSS requires two original humans")
     for port, costume in enumerate(policy["costumes"]):
         move(port, policy["point"], f"Mario-P{port+1}")
-        if menus["version"] in (7, 8):
+        if menus["version"] in (7, 8, 9):
             wait_source(lambda: receiver.css["players"][port]["kind"] == 0 and
                         receiver.css["doors"][port]["kind"] == 0,
                         f"CSS own Human join P{port+1}", 600)
@@ -493,7 +517,9 @@ def drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, t
             move(port, (model["x"]-2, model["y"]+1.6), "pickup-human-puck")
             tap(pair(port, raw_pad(buttons=["A"])), "pickup-human-puck", 600)
             wait_source(lambda: receiver.css["cursors"][port]["state"] == 1 and
-                        receiver.css["cursors"][port]["held"] == port, "held human puck", 600)
+                        receiver.css["cursors"][port]["held"] ==
+                        receiver.css.get("source_slots", [0, 1])[port],
+                        "held human puck", 600)
             move(port, policy["point"], "Mario-costume-hover")
             wait_source(lambda: receiver.css["doors"][port]["icon"] == policy["icon"], "Mario icon", 600)
             for attempt in range(policy["max_costume_taps"]):

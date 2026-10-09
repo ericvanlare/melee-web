@@ -36,6 +36,8 @@ def validate_packet(value):
     from authored_sd_reference_plan import canonical
     if canonical(value) == canonical(gci_competitive_entry_packet()):
         return value
+    if canonical(value) == canonical(gci_sparse_pair_packet()):
+        return value
     if canonical(value) == canonical(gci_items_row_packet()):
         return value
     if canonical(value) == canonical(gci_sd_prefix_packet()):
@@ -218,4 +220,30 @@ def gci_competitive_entry_packet():
         6,2,15,0,17,11,31,26,20,25,16,22,19,29,12], "frequency_row":32,
         "unmapped_bit":28, "expected_preference_mask_hex":"0000000010000000"}
     value["stop"] = "observed vs_setup; interrupted primary with complete native MWRI"
+    return value
+
+
+def gci_sparse_pair_packet():
+    """Default Rules route into a strict original source-slot pair 0/2 probe."""
+    value = gci_rules_ready_packet()
+    value.update(version=9, scope="sparse_pair_gci",
+                 authored_recipe_sha256=recipe_sha256(recipe(7)))
+    value["actions"] = value["actions"][:6]
+    value["actions"].append({
+        "label": "Rules-start-CSS", "p1": raw_pad(buttons=["START"]),
+        "p2": NEUTRAL_PAD, "before": {"scene": 1, "kind": 13, "row": 0,
+            "value": 0, "entering": 1, "cooldown": 0},
+        "after": {"scene": 8}, "max_polls": 600,
+    })
+    value["css"] = {"character": 8, "icon": 1, "point": [-20.9, 16.5],
+        "costumes": [1, 0], "ports": [0, 1], "source_slots": [0, 2],
+        "human_kind": 0, "axis_values": [-70, -35, 0, 35, 70],
+        "tolerance": 0.6, "stable_cursor_polls": 2,
+        "max_move_polls": 600, "max_costume_taps": 8,
+        "idle_polls_before_start": 12}
+    value["sss"] = {"stage_kind": 32, "initial_idle_polls": 120,
+        "column_x": 40, "column_polls": 18, "scan_y": 40,
+        "max_scan_polls": 600, "confirm_requires_cooldown": 0}
+    value["stop"] = ("observed exact VS setup, distinct source PAD0/PAD2 consume and release; "
+                      "interrupted before terminal")
     return value

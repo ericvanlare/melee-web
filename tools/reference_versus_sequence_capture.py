@@ -245,8 +245,11 @@ def _ensure_fifo(path: Path) -> None:
         raise CaptureError(f"cannot create controller FIFO {path}: {exc}") from exc
 
 
-def prepare_dual_pipe(user: Path) -> tuple[Path, Path]:
-    """Prepare two ordinary Dolphin Pipe devices without deleting profile data."""
+def prepare_dual_pipe(user: Path, *, source_slots=(0, 1)) -> tuple[Path, Path]:
+    """Prepare two Pipe lanes bound to the exact declared original source slots."""
+
+    from original_source_ports import declared_source_slots
+    source_slots = declared_source_slots(source_slots)
 
     user = Path(user)
     user.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -261,11 +264,10 @@ def prepare_dual_pipe(user: Path) -> tuple[Path, Path]:
     pad_path = user / "Config" / "GCPadNew.ini"
     if pad_path.exists():
         pad.read(pad_path)
-    # Dolphin assigns Pipe device IDs per (source, name), not globally.  Both
-    # named FIFOs therefore receive ControllerInterface ID 0; the port is
-    # selected by the distinct Pipe name.  Binding P2 to Pipe/1 leaves the
-    # second controller disconnected in the source observer.
-    for section, device in (("GCPad1", "Pipe/0/pad1"), ("GCPad2", "Pipe/0/pad2")):
+    # Dolphin assigns Pipe device IDs per (source, name), not globally.  The
+    # FIFO lane stays 0/1; only its owning original GCPad source slot varies.
+    for lane, source_slot in enumerate(source_slots):
+        section, device = f"GCPad{source_slot + 1}", f"Pipe/0/pad{lane + 1}"
         if not pad.has_section(section):
             pad.add_section(section)
         for key, value in _controller_section(device).items():
@@ -279,8 +281,8 @@ def prepare_dual_pipe(user: Path) -> tuple[Path, Path]:
         core.read(core_path)
     if not core.has_section("Core"):
         core.add_section("Core")
-    core.set("Core", "SIDevice0", "6")
-    core.set("Core", "SIDevice1", "6")
+    for source_slot in source_slots:
+        core.set("Core", f"SIDevice{source_slot}", "6")
     _atomic_ini(core_path, core)
     return p1, p2
 

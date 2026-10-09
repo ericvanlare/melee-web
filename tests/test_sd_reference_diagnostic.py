@@ -525,6 +525,9 @@ class SdReferenceDiagnosticTests(unittest.TestCase):
         observer = (ROOT / "reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp").read_text()
         methods = observer[observer.index("  bool AddOrdinaryLive("):observer.index("  enum class SceneResetAction")]
         enum = observer[observer.index("enum class SliceTag"):observer.index("struct Slot")]
+        sparse_pad_checks = observer[observer.index("bool SparsePadErrorsValid("):
+                                     observer.index("\nbool ActivationRequested()",
+                                                    observer.index("bool SparsePadErrorsValid("))]
         harness = r"""
 #include <array>
 #include <cassert>
@@ -540,15 +543,21 @@ struct System { Memory m; Memory& GetMemory() { return m; } }; }
 namespace PowerPC { struct PowerPCState { std::array<u32,32> gpr{}; }; }
 constexpr u32 CSS_ENTER_RETURN=0x802669f0, PAD_READ_HSD_CALLER=0x80376a28;
 constexpr u32 PROFILE_SAVE_DATA_OFFSET=0x1868, PROFILE_SAVE_DATA_SIZE=0x55e8;
+bool SparsePairRequested() { return false; }
 enum class Event { Progress };
 bool AppendHexBytes(std::string*, const u8*, size_t) { return true; }
-""" + enum + r"""
+""" + enum + sparse_pad_checks + r"""
 struct Reader {
   SdInitState sd_init;
   OrdinaryTimeoutState ordinary_timeout;
   u32 sd_menu_polls=0;
   u32 sd_menu_consumed=0;
   bool sd_menu_neutral=false;
+  bool sparse_setup_seen=false;
+  u32 sparse_setup_consumed=0;
+  u32 sparse_source_samples=0;
+  u32 sparse_prepress_neutral_samples=0;
+  u8 sparse_witness_phase=0;
   bool css_steering_ready=false;
   bool sd_sss_ready=false;
   bool sd_rules_observed=false;
@@ -578,6 +587,33 @@ struct Reader {
 """ + methods + r"""
 };
 int main() {
+  std::array<u8, 60> captured{};
+  for (u32 i=0;i<12;++i) captured[i]=static_cast<u8>(0x80+i); // nonzero PadQueue descriptor
+  std::array<u8,48> neutral{};
+  neutral[10]=neutral[34]=0;
+  neutral[22]=neutral[46]=0xff;
+  std::memcpy(captured.data()+12, neutral.data(), neutral.size());
+  const std::array<SliceRef,2> sparse_slices{{
+      {SliceTag::PadQueue,0,0x804c1f78,12,0},
+      {SliceTag::PadSlot,0,0x804c1f84,0x30,12}}};
+  const u8* slot=SparsePadSlotBytes(captured.data(),captured.size(),sparse_slices.data(),sparse_slices.size());
+  assert(slot==captured.data()+12);
+  assert(SparsePadErrorsValid(slot) && SparsePadStatusMatches(slot,false));
+  std::array<u8,48> pressed=neutral;
+  pressed[0]=0x01; pressed[2]=35; pressed[24]=0x02; pressed[27]=static_cast<u8>(-35);
+  std::memcpy(captured.data()+12,pressed.data(),pressed.size());
+  slot=SparsePadSlotBytes(captured.data(),captured.size(),sparse_slices.data(),sparse_slices.size());
+  assert(SparsePadErrorsValid(slot) && SparsePadStatusMatches(slot,true));
+  std::memcpy(captured.data()+12,neutral.data(),neutral.size()); // verified release
+  slot=SparsePadSlotBytes(captured.data(),captured.size(),sparse_slices.data(),sparse_slices.size());
+  assert(SparsePadErrorsValid(slot) && SparsePadStatusMatches(slot,false));
+  captured[12+10]=1;
+  assert(!SparsePadErrorsValid(SparsePadSlotBytes(captured.data(),captured.size(),
+                                                  sparse_slices.data(),sparse_slices.size())));
+  auto malformed=sparse_slices;
+  malformed[1].size=0x2f;
+  assert(SparsePadSlotBytes(captured.data(),captured.size(),malformed.data(),malformed.size())==nullptr);
+
   SdInitState state;
   assert(!state.Entry(0x80001000,true));
   assert(state.Entry(0x80001000,false));
@@ -640,7 +676,18 @@ int main() {
                     (retained/"compiler.stdout").write_text(result.stdout)
                     (retained/"compiler.stderr").write_text(result.stderr)
                 self.fail("Native API-stub compilation failed:\n"+result.stdout+result.stderr)
-            subprocess.run([str(executable)], check=True, capture_output=True)
+            run = subprocess.run([str(executable)], capture_output=True, text=True)
+            if run.returncode:
+                import os
+                failure_root = os.environ.get("REFERENCE_NATIVE_CONTROL_FAILURE_ROOT")
+                if failure_root:
+                    retained = Path(failure_root)
+                    retained.mkdir(parents=True, exist_ok=False)
+                    shutil.copy2(cpp, retained / "probe.cpp")
+                    shutil.copy2(executable, retained / "probe")
+                    (retained / "runtime.stdout").write_text(run.stdout)
+                    (retained / "runtime.stderr").write_text(run.stderr)
+                self.fail("Native API-stub execution failed:\n" + run.stdout + run.stderr)
 
 
 if __name__ == "__main__":
