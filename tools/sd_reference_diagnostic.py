@@ -728,15 +728,21 @@ class RulesMenuReceiver(Receiver):
                             "SSS confirmed FD owner changed")
                     # gm_801A4014 advances routing after OnExit, before the next
                     # gm_801A4B88 replaces SceneInfo. PADRead observations in
-                    # that interval retain the old owner and frozen scene tick.
+                    # that interval retain the old owner. gm_801A4D34 increments
+                    # the scene tick after on_frame, so the first retirement
+                    # may expose that final +1. Later retirement stays frozen.
                     route = next((s for s in payload["slices"] if s["tag"] == 17 and s["flags"] == 0), None)
                     require(route is not None and route["address"] == 0x80479d30 and
                             len(data[(17, 0)]) == 6, "SSS routing observation differs")
                     retiring = data[(17, 0)] == bytes((2, 2, 1, 2, 1, 0))
                     if retiring or self.sss_retirement is not None:
+                        retirement_ticks = ((self.sss_countdown_tick, self.sss_countdown_tick+1)
+                                            if self.sss_retirement is None and self.sss_countdown_tick is not None
+                                            else (self.sss_retirement["source_tick"],)
+                                            if self.sss_retirement is not None else ())
                         require(retiring and self.sss_countdown == 0 and self.sss_confirmation_neutral and
                                 type(row["source_tick"]) is int and
-                                row["source_tick"] == self.sss_countdown_tick and
+                                row["source_tick"] in retirement_ticks and
                                 self.stage["cooldown"] == 0 and count == self.menu_consumed,
                                 "SSS retirement frozen state differs")
                         frozen = {"source_tick": row["source_tick"], "menu_consumed": count,
