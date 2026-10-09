@@ -110,6 +110,7 @@ class NativeStageOriginalRuntime(unittest.TestCase):
     def test_structural_marker_pairs_preserve_authored_order_and_checks(self):
         output=self.run_trace("dat_native_stage_map_trace","--marker-fixture")
         self.assertIn("Structural marker pairs preserve duplicates/order",output)
+        self.assertIn("profile contracts",output)
 
     def test_original_oninit_scheduler_and_teardown(self):
         assets=ROOT/"assets-local/next-gate"

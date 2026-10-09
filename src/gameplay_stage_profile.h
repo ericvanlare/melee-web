@@ -66,6 +66,21 @@ typedef struct MeleeWebStageMapOwnership {
     size_t flagged_object_count;
 } MeleeWebStageMapOwnership;
 
+/* Complete native stages must explicitly select how their source marker table
+ * is admitted. The historical policy preserves the shared unique-ID set;
+ * source-authored order is reserved for profiles whose exact binding rows are
+ * part of the checked source contract. */
+typedef enum MeleeWebStageMarkerContractPolicy {
+    MELEE_WEB_STAGE_MARKER_CONTRACT_UNSPECIFIED = 0,
+    MELEE_WEB_STAGE_MARKER_CONTRACT_STRICT_UNIQUE = 1,
+    MELEE_WEB_STAGE_MARKER_CONTRACT_AUTHORED_ORDER = 2,
+} MeleeWebStageMarkerContractPolicy;
+
+typedef struct MeleeWebStageMarkerBinding {
+    uint16_t joint_index;
+    uint16_t marker_id;
+} MeleeWebStageMarkerBinding;
+
 /* Source callback and object-layout details live here. Content names and
  * archive filenames remain in gameplay_content.h; this profile only describes
  * the source runtime boundary that consumes those assets. */
@@ -107,6 +122,14 @@ typedef struct MeleeWebStageProfile {
     /* Diagnostic profiles are available only in a guarded development build
      * and are rejected by the ordinary stage-begin API. */
     int diagnostic_only;
+    /* Exact source readiness slots and marker-table admission policy. An
+     * unspecified policy is invalid; profiles may not inherit a permissive
+     * structural-only default. */
+    MeleeWebStageMarkerContractPolicy marker_contract_policy;
+    const uint16_t* required_marker_ids;
+    size_t required_marker_count;
+    const MeleeWebStageMarkerBinding* authored_marker_bindings;
+    size_t authored_marker_binding_count;
 } MeleeWebStageProfile;
 
 /* NULL means that this stage has no complete source callback profile yet. */

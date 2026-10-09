@@ -15,8 +15,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-struct MeleeWebStageMarkers {HSD_Joint* root;uint32_t offsets[261],joint_count,pair_count;uint16_t pairs[261][2];};
-struct MeleeWebStageNumeric {StageInfo saved;HSD_GObj* owner;DynamicModelDesc* quake;MeleeWebStageMarkers* markers;int source_stage,source_stage_ready;};
+struct MeleeWebStageMarkers {HSD_Joint* root;uint32_t offsets[261],joint_count,pair_count;uint16_t pairs[261][2];const MeleeWebStageProfile* profile;};
+struct MeleeWebStageNumeric {StageInfo saved;HSD_GObj* owner;DynamicModelDesc* quake;MeleeWebStageMarkers* markers;const MeleeWebStageProfile* profile;int source_stage,source_stage_ready;};
 extern void melee_web_ground_quakes_clear(void);
 static MeleeWebStageNumeric* active;
 /* Original numeric stage-row consumer, private in ground.h. */
@@ -73,6 +73,78 @@ MeleeWebStageMarkers* melee_web_stage_markers_decode(const MeleeWebNativeDat* r,
     for(unsigned i=148;i<=152;i++)REQUIRE(seen[i],"Missing source camera or blast marker");
     return m;
 }
+static int registered_profile(const MeleeWebStageProfile* profile){
+    if(!profile)return 0;
+    if(melee_web_stage_profile(profile->stage_kind)==profile)return 1;
+    /* The immutable Stadium C0 metadata accessor is always present for map
+     * inspection, while source-stage admission remains guarded separately by
+     * melee_web_stage_profile and DatNativeStage's profile mode. */
+    return profile==melee_web_stage_stadium_profile_data();
+}
+static int marker_profile_valid(const MeleeWebStageProfile* profile){
+    if(!registered_profile(profile)||!profile->required_marker_ids||
+       !profile->required_marker_count||profile->required_marker_count>261)
+        return 0;
+    unsigned char required[261]={0};
+    for(size_t i=0;i<profile->required_marker_count;i++){
+        const uint16_t id=profile->required_marker_ids[i];
+        if(id>=261||required[id])return 0;
+        required[id]=1;
+    }
+    if(profile->marker_contract_policy==MELEE_WEB_STAGE_MARKER_CONTRACT_STRICT_UNIQUE){
+        static const uint16_t expected[]={0,1,2,3,148,149,150,151,152};
+        if(profile->required_marker_count!=sizeof(expected)/sizeof(expected[0])||
+           profile->authored_marker_bindings||profile->authored_marker_binding_count)
+            return 0;
+        for(size_t i=0;i<sizeof(expected)/sizeof(expected[0]);i++)
+            if(profile->required_marker_ids[i]!=expected[i])return 0;
+        return 1;
+    }
+    if(profile->marker_contract_policy!=MELEE_WEB_STAGE_MARKER_CONTRACT_AUTHORED_ORDER||
+       profile!=melee_web_stage_stadium_profile_data()||
+       profile->required_marker_count!=8||!profile->authored_marker_bindings||
+       profile->authored_marker_binding_count!=20)
+        return 0;
+    static const uint16_t stadium_required[]={0,1,2,3,149,150,151,152};
+    for(size_t i=0;i<sizeof(stadium_required)/sizeof(stadium_required[0]);i++)
+        if(profile->required_marker_ids[i]!=stadium_required[i])return 0;
+    for(size_t i=0;i<profile->authored_marker_binding_count;i++)
+        if(profile->authored_marker_bindings[i].joint_index>=261||
+           profile->authored_marker_bindings[i].marker_id>=261)return 0;
+    return 1;
+}
+MeleeWebStageMarkers* melee_web_stage_markers_decode_profile(
+    const MeleeWebNativeDat* r,uint32_t head,const MeleeWebStageProfile* profile){
+    if(!r)return NULL;
+    if(!marker_profile_valid(profile)){
+        r->reject(r->context,"Unknown or malformed source marker profile");
+        return NULL;
+    }
+    MeleeWebStageMarkers* m=NULL;
+    if(profile->marker_contract_policy==MELEE_WEB_STAGE_MARKER_CONTRACT_STRICT_UNIQUE){
+        m=melee_web_stage_markers_decode(r,head);
+    }else{
+        m=melee_web_stage_markers_decode_structural(r,head);
+        if(!m)return NULL;
+        REQUIRE(m->pair_count==profile->authored_marker_binding_count,
+                "Source marker bindings differ from the authored profile count");
+        for(unsigned i=0;i<m->pair_count;i++){
+            const MeleeWebStageMarkerBinding* expected=&profile->authored_marker_bindings[i];
+            REQUIRE(m->pairs[i][0]==expected->joint_index&&
+                    m->pairs[i][1]==expected->marker_id,
+                    "Source marker binding order differs from the authored profile");
+        }
+    }
+    if(!m)return NULL;
+    for(size_t i=0;i<profile->required_marker_count;i++){
+        int found=0;
+        for(unsigned pair=0;pair<m->pair_count;pair++)
+            if(m->pairs[pair][1]==profile->required_marker_ids[i]){found=1;break;}
+        REQUIRE(found,"Missing required source marker for profile");
+    }
+    m->profile=profile;
+    return m;
+}
 static int fail(char* e,size_t n,const char* s){if(e&&n)snprintf(e,n,"%s",s);return 0;}
 static void removed(void* p){((MeleeWebStageNumeric*)p)->owner=NULL;}
 static void collect(HSD_JObj* j,HSD_JObj** list,unsigned* count){for(;j;j=j->next){if(*count>=261)abort();list[(*count)++]=j;if(j->child)collect(j->child,list,count);}}
@@ -89,6 +161,11 @@ static void initialize_numeric_state(const MeleeWebStageProfile* profile){
 static MeleeWebStageNumeric* begin_kind(MeleeWebStageMarkers* m,int stage_kind,int source_stage,char* e,size_t n){
     const MeleeWebStageProfile* profile=melee_web_stage_profile(stage_kind);
     if(!profile||!m||active||!stage_info.param){fail(e,n,"Missing supported stage marker/ground data or active stage scope");return NULL;}
+    if(!marker_profile_valid(profile)||
+       (m->profile&&m->profile!=profile)||
+       (!m->profile&&profile->marker_contract_policy!=MELEE_WEB_STAGE_MARKER_CONTRACT_STRICT_UNIQUE)){
+        fail(e,n,"Stage markers do not match the selected source profile");return NULL;
+    }
     if(melee_web_stage_map_archives()){fail(e,n,"Initialize source ground state before publishing map archives");return NULL;}
     for(unsigned i=0;i<sizeof(stage_info.map_gobjs)/sizeof(stage_info.map_gobjs[0]);i++)
         if(stage_info.map_gobjs[i]){fail(e,n,"Initialize source ground state before creating stage objects");return NULL;}
@@ -98,7 +175,7 @@ static MeleeWebStageNumeric* begin_kind(MeleeWebStageMarkers* m,int stage_kind,i
     if(!has_row){fail(e,n,"Ground parameters have no selected stage row");return NULL;}
     if(!melee_web_native_world_enable(e,n))return NULL;
     MeleeWebStageNumeric* h=calloc(1,sizeof(*h));if(!h){fail(e,n,"Cannot allocate stage numeric scope");return NULL;}
-    h->saved=stage_info;h->markers=m;
+    h->saved=stage_info;h->markers=m;h->profile=profile;
     if(source_stage){
         h->source_stage=1;
         reset_ground_state();
@@ -149,8 +226,14 @@ MeleeWebStageNumeric* melee_web_stage_numeric_begin_source_stage_kind(MeleeWebSt
 int melee_web_stage_numeric_source_stage_ready(MeleeWebStageNumeric* h,char* e,size_t n){
     if(!h||active!=h||!h->source_stage||h->source_stage_ready)
         return fail(e,n,"Source marker readiness requires a pending source-stage numeric context");
-    for(unsigned i=0;i<4;i++)if(!stage_info.x280[i])return fail(e,n,"Source stage did not publish every player spawn marker");
-    for(unsigned i=148;i<=152;i++)if(!stage_info.x280[i])return fail(e,n,"Source stage did not publish every camera/blast marker");
+    if(!marker_profile_valid(h->profile))
+        return fail(e,n,"Source marker readiness has no valid selected profile");
+    for(size_t i=0;i<h->profile->required_marker_count;i++){
+        const uint16_t id=h->profile->required_marker_ids[i];
+        if(!stage_info.x280[id])
+            return fail(e,n,id<4?"Source stage did not publish every player spawn marker":
+                                 "Source stage did not publish every camera/blast marker");
+    }
     /* Ground_801C2D24 lazily builds matrices and allocates their scale vectors.
      * Player_80036DA4 initializes fighters before fn_8016DEEC first reads the
      * spawn positions. Readiness must not pull those allocations forward;

@@ -116,6 +116,15 @@ static const MeleeWebStageMapOwnership stadium_map_ownership = {
     sizeof(stadium_flag_expectations) / sizeof(stadium_flag_expectations[0]),
 };
 static const uint8_t stadium_map_ids[] = {0, 1, 2, 5};
+static const uint16_t stage_marker_ids[] = {0, 1, 2, 3, 148, 149, 150, 151, 152};
+static const uint16_t stadium_marker_ids[] = {0, 1, 2, 3, 149, 150, 151, 152};
+static const MeleeWebStageMarkerBinding stadium_marker_bindings[] = {
+    {1, 149}, {2, 150}, {3, 151}, {4, 152},
+    {5, 127}, {6, 128}, {7, 129}, {8, 130},
+    {9, 131}, {10, 132}, {11, 133}, {12, 134},
+    {13, 135}, {14, 135}, {15, 136},
+    {16, 0}, {17, 1}, {18, 2}, {19, 3}, {20, 4},
+};
 static const MeleeWebStagePublic stadium_public[] = {
     {"GrdPStadiumBG_OVDummy_mat6962_GrdPStadiumDummy_0_image_desc",
      MELEE_WEB_STAGE_PUBLIC_IMAGE},
@@ -140,6 +149,11 @@ static const MeleeWebStageProfile stadium = {
     .map_ownership_policy = MELEE_WEB_STAGE_MAP_OWNERSHIP_AUTHORED,
     .map_ownership = &stadium_map_ownership,
     .diagnostic_only = 1,
+    .marker_contract_policy = MELEE_WEB_STAGE_MARKER_CONTRACT_AUTHORED_ORDER,
+    .required_marker_ids = stadium_marker_ids,
+    .required_marker_count = sizeof(stadium_marker_ids) / sizeof(stadium_marker_ids[0]),
+    .authored_marker_bindings = stadium_marker_bindings,
+    .authored_marker_binding_count = sizeof(stadium_marker_bindings) / sizeof(stadium_marker_bindings[0]),
 };
 
 static const uint8_t final_destination_map_ids[] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
@@ -163,6 +177,11 @@ static const MeleeWebStageProfile final_destination = {
     MELEE_WEB_STAGE_MAP_OWNERSHIP_CURRENT_ALL_RESIDENT,
     NULL,
     0,
+    MELEE_WEB_STAGE_MARKER_CONTRACT_STRICT_UNIQUE,
+    stage_marker_ids,
+    sizeof(stage_marker_ids) / sizeof(stage_marker_ids[0]),
+    NULL,
+    0,
 };
 static const MeleeWebStageProfile battlefield = {
     St_Kind_Battle, Gr_Kind_Battle, &grNBa_StageData,
@@ -178,6 +197,11 @@ static const MeleeWebStageProfile battlefield = {
     NULL,
     0,
     MELEE_WEB_STAGE_MAP_OWNERSHIP_CURRENT_ALL_RESIDENT,
+    NULL,
+    0,
+    MELEE_WEB_STAGE_MARKER_CONTRACT_STRICT_UNIQUE,
+    stage_marker_ids,
+    sizeof(stage_marker_ids) / sizeof(stage_marker_ids[0]),
     NULL,
     0,
 };
@@ -198,6 +222,11 @@ static const MeleeWebStageProfile yoshis_story = {
     MELEE_WEB_STAGE_MAP_OWNERSHIP_CURRENT_ALL_RESIDENT,
     NULL,
     0,
+    MELEE_WEB_STAGE_MARKER_CONTRACT_STRICT_UNIQUE,
+    stage_marker_ids,
+    sizeof(stage_marker_ids) / sizeof(stage_marker_ids[0]),
+    NULL,
+    0,
 };
 static const uint8_t dream_land_map_ids[] = {0, 1, 3, 4, 5, 6, 7, 8};
 static const MeleeWebStageProfile dream_land = {
@@ -212,6 +241,11 @@ static const MeleeWebStageProfile dream_land = {
     NULL,
     0,
     MELEE_WEB_STAGE_MAP_OWNERSHIP_CURRENT_ALL_RESIDENT,
+    NULL,
+    0,
+    MELEE_WEB_STAGE_MARKER_CONTRACT_STRICT_UNIQUE,
+    stage_marker_ids,
+    sizeof(stage_marker_ids) / sizeof(stage_marker_ids[0]),
     NULL,
     0,
 };
@@ -233,6 +267,11 @@ static const MeleeWebStageProfile shrine = {
     MELEE_WEB_STAGE_MAP_OWNERSHIP_CURRENT_ALL_RESIDENT,
     NULL,
     0,
+    MELEE_WEB_STAGE_MARKER_CONTRACT_STRICT_UNIQUE,
+    stage_marker_ids,
+    sizeof(stage_marker_ids) / sizeof(stage_marker_ids[0]),
+    NULL,
+    0,
 };
 
 static const uint8_t fountain_map_ids[] = {0, 1, 2, 3, 4};
@@ -250,6 +289,11 @@ static const MeleeWebStageProfile fountain = {
     MELEE_WEB_STAGE_MAP_OWNERSHIP_CURRENT_ALL_RESIDENT,
     NULL,
     0,
+    MELEE_WEB_STAGE_MARKER_CONTRACT_STRICT_UNIQUE,
+    stage_marker_ids,
+    sizeof(stage_marker_ids) / sizeof(stage_marker_ids[0]),
+    NULL,
+    0,
 };
 
 static const uint8_t old_yoshi_map_ids[] = {0, 1, 4, 5, 2, 3};
@@ -263,6 +307,11 @@ static const MeleeWebStageProfile old_yoshi = {
     NULL,
     0,
     MELEE_WEB_STAGE_MAP_OWNERSHIP_CURRENT_ALL_RESIDENT,
+    NULL,
+    0,
+    MELEE_WEB_STAGE_MARKER_CONTRACT_STRICT_UNIQUE,
+    stage_marker_ids,
+    sizeof(stage_marker_ids) / sizeof(stage_marker_ids[0]),
     NULL,
     0,
 };

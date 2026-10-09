@@ -543,7 +543,10 @@ struct GameplayWorld::Storage {
         if(stage){
             stage_arena=std::make_unique<NativeDatArena>(archive(stage->archive));
             auto* ground=melee_web_ground_data_decode(stage_arena->reader(),symbol(*archive(stage->archive),"grGroundParam"));
-            auto* markers=melee_web_stage_markers_decode(stage_arena->reader(),symbol(*archive(stage->archive),"map_head"));
+            const auto* marker_profile=melee_web_stage_profile(stage->stage_kind);
+            if(!marker_profile)throw DatError("Source stage has no admitted marker profile");
+            auto* markers=melee_web_stage_markers_decode_profile(
+                stage_arena->reader(),symbol(*archive(stage->archive),"map_head"),marker_profile);
             collision_data=std::make_unique<DatCollision>(*archive(stage->archive));
             DatLights light_data(*archive(stage->archive),"map_plit",true);
             lights=melee_web_stage_lights_create(light_data.lights.data(),light_data.lights.size(),error,sizeof(error));check(lights!=nullptr,error);

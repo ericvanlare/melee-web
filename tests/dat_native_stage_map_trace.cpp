@@ -52,9 +52,13 @@ template<class F>void expect_error(F&& operation,std::string_view expected){
 std::vector<uint8_t> marker_fixture(uint32_t node_count=13,bool null_flag=false,
                                     bool external_map_field=false,bool local_flag=false,
                                     bool external_flag=false,bool light_override=false,
-                                    bool light_animation=false,bool unterminated_animation=false){
- constexpr uint32_t data_size=0x600,root=0x100,references=0x140,entries=0x160;
+                                    bool light_animation=false,bool unterminated_animation=false,
+                                    const std::vector<std::array<uint16_t,2>>* authored_override=nullptr){
+ constexpr uint32_t root=0x100,references=0x140,entries=0x160;
  constexpr uint32_t pairs=0x1a0,flagged=0x1c0,tree=0x200;
+ const uint32_t data_size=std::max<uint32_t>(0x600,tree+node_count*64);
+ static constexpr std::array<std::array<uint16_t,2>,8> default_authored={{{3,0},{0,1},{2,2},{1,3},{12,135},{4,135},{9,134},{9,134}}};
+ const size_t pair_count=authored_override?authored_override->size():default_authored.size();
  check(!light_animation||light_override,"synthetic animation requires an authored light row");
  check(!unterminated_animation||light_animation,"synthetic unterminated table requires animation");
  check(!(local_flag&&external_flag),"synthetic flagged slot has one authored kind");
@@ -79,7 +83,7 @@ std::vector<uint8_t> marker_fixture(uint32_t node_count=13,bool null_flag=false,
   }
   write_be32(data,light_overrides,light);data[light_overrides+4]=0xe0;
  }
- write_be32(data,references,tree);write_be32(data,references+4,pairs);write_be32(data,references+8,8);
+ write_be32(data,references,tree);write_be32(data,references+4,pairs);write_be32(data,references+8,uint32_t(pair_count));
  if(null_flag||local_flag||external_flag){
   write_be32(data,root+40,flagged);write_be32(data,root+44,1);
   if(local_flag)write_be32(data,flagged,tree);
@@ -92,9 +96,9 @@ std::vector<uint8_t> marker_fixture(uint32_t node_count=13,bool null_flag=false,
   if(i+1<node_count)write_be32(data,node+8,node+64);
   write_be32(data,node+32,0x3f800000);write_be32(data,node+36,0x3f800000);write_be32(data,node+40,0x3f800000);
  }
- constexpr std::array<std::array<uint16_t,2>,8> authored={{{3,0},{0,1},{2,2},{1,3},{12,135},{4,135},{9,134},{9,134}}};
- for(uint32_t i=0;i<authored.size();i++){
-  write_be16(data,pairs+4*i,authored[i][0]);write_be16(data,pairs+4*i+2,authored[i][1]);
+ for(size_t i=0;i<pair_count;i++){
+  const auto& binding=authored_override?(*authored_override)[i]:default_authored[i];
+  write_be16(data,pairs+4*uint32_t(i),binding[0]);write_be16(data,pairs+4*uint32_t(i)+2,binding[1]);
  }
  std::vector<uint32_t> relocations={root,root+8,references,references+4,entries};
  if(light_override){
@@ -142,6 +146,121 @@ std::vector<uint8_t> marker_fixture(uint32_t node_count=13,bool null_flag=false,
  }
  std::copy(names.begin(),names.end(),archive.begin()+static_cast<std::ptrdiff_t>(cursor));
  return archive;
+}
+void profile_marker_contract_controls(){
+ using namespace melee_web;
+ static constexpr std::array<MeleeWebStageMarkerBinding,20> stadium_expected={{
+     {1,149},{2,150},{3,151},{4,152},{5,127},{6,128},{7,129},{8,130},
+     {9,131},{10,132},{11,133},{12,134},{13,135},{14,135},{15,136},
+     {16,0},{17,1},{18,2},{19,3},{20,4},
+ }};
+ const auto* stadium=melee_web_stage_stadium_profile_data();
+ check(stadium&&stadium->marker_contract_policy==MELEE_WEB_STAGE_MARKER_CONTRACT_AUTHORED_ORDER&&
+           stadium->required_marker_count==8&&stadium->authored_marker_binding_count==stadium_expected.size(),
+       "Stadium profile declares the exact authored-order marker contract and required IDs");
+ for(size_t i=0;i<stadium_expected.size();i++)
+  check(stadium->authored_marker_bindings[i].joint_index==stadium_expected[i].joint_index&&
+            stadium->authored_marker_bindings[i].marker_id==stadium_expected[i].marker_id,
+        "Stadium source profile retains every C0-authoritative ordered binding");
+
+ std::vector<std::array<uint16_t,2>> stadium_pairs;
+ for(const auto& binding:stadium_expected)stadium_pairs.push_back({binding.joint_index,binding.marker_id});
+ const auto stadium_bytes=marker_fixture(21,false,false,false,false,false,false,false,&stadium_pairs);
+ auto stadium_archive=std::make_shared<DatArchive>(stadium_bytes);
+ NativeDatArena stadium_arena(stadium_archive);
+ auto* accepted=melee_web_stage_markers_decode_profile(
+     stadium_arena.reader(),0x100,stadium);
+ check(accepted&&melee_web_stage_markers_descriptor(accepted),
+       "profile-backed structural decode accepts Stadium's ordered duplicate pair and absent 148");
+
+ const auto expect_stadium_reject=[&](const std::vector<uint8_t>& bytes,std::string_view reason){
+  auto archive=std::make_shared<DatArchive>(bytes);
+  expect_error([&]{
+   NativeDatArena arena(archive);
+   (void)melee_web_stage_markers_decode_profile(arena.reader(),0x100,stadium);
+  },reason);
+ };
+ const auto replace_pair=[&](std::vector<uint8_t>& bytes,size_t index,uint16_t joint,uint16_t id){
+  write_be16(bytes,uint32_t(0x20+0x1a0+4*index),joint);
+  write_be16(bytes,uint32_t(0x20+0x1a0+4*index+2),id);
+ };
+ auto missing=stadium_bytes;write_be32(missing,0x20+0x140+8,19);
+ expect_stadium_reject(missing,"authored profile count");
+ auto extra=stadium_bytes;write_be32(extra,0x20+0x140+8,21);
+ expect_stadium_reject(extra,"authored profile count");
+ auto reordered=stadium_bytes;
+ replace_pair(reordered,12,stadium_expected[13].joint_index,stadium_expected[13].marker_id);
+ replace_pair(reordered,13,stadium_expected[12].joint_index,stadium_expected[12].marker_id);
+ expect_stadium_reject(reordered,"binding order differs");
+ auto changed_index=stadium_bytes;replace_pair(changed_index,0,261,149);
+ expect_stadium_reject(changed_index,"Invalid marker binding");
+ auto changed_binding=stadium_bytes;replace_pair(changed_binding,0,1,150);
+ expect_stadium_reject(changed_binding,"binding order differs");
+ auto unexpected_duplicate=stadium_bytes;replace_pair(unexpected_duplicate,15,16,135);
+ expect_stadium_reject(unexpected_duplicate,"binding order differs");
+ auto missing_spawn=stadium_bytes;replace_pair(missing_spawn,15,16,10);
+ expect_stadium_reject(missing_spawn,"binding order differs");
+ auto missing_blast=stadium_bytes;replace_pair(missing_blast,0,1,148);
+ expect_stadium_reject(missing_blast,"binding order differs");
+ auto bad_id=stadium_bytes;replace_pair(bad_id,0,1,261);
+ expect_stadium_reject(bad_id,"Invalid marker binding");
+
+ auto ordinary_pairs=std::vector<std::array<uint16_t,2>>{
+     {0,0},{1,1},{2,2},{3,3},{4,148},{5,149},{6,150},{7,151},{8,152}};
+ const auto ordinary_bytes=marker_fixture(13,false,false,false,false,false,false,false,&ordinary_pairs);
+ const auto* ordinary=melee_web_stage_profile(St_Kind_Last);
+ check(ordinary&&ordinary->marker_contract_policy==MELEE_WEB_STAGE_MARKER_CONTRACT_STRICT_UNIQUE,
+       "ordinary Final Destination profile retains strict unique marker policy");
+ auto ordinary_archive=std::make_shared<DatArchive>(ordinary_bytes);
+ NativeDatArena ordinary_arena(ordinary_archive);
+ auto* strict=melee_web_stage_markers_decode_profile(
+     ordinary_arena.reader(),0x100,ordinary);
+ check(strict&&melee_web_stage_markers_descriptor(strict),
+       "profile-backed ordinary decoder accepts the existing unique required marker set");
+ auto duplicate_ordinary=ordinary_bytes;replace_pair(duplicate_ordinary,5,5,148);
+ auto duplicate_archive=std::make_shared<DatArchive>(duplicate_ordinary);
+ expect_error([&]{
+  NativeDatArena arena(duplicate_archive);
+  (void)melee_web_stage_markers_decode_profile(arena.reader(),0x100,ordinary);
+ },"Invalid or duplicate marker binding");
+ auto missing_ordinary=ordinary_bytes;replace_pair(missing_ordinary,8,8,147);
+ auto missing_archive=std::make_shared<DatArchive>(missing_ordinary);
+ expect_error([&]{
+  NativeDatArena arena(missing_archive);
+  (void)melee_web_stage_markers_decode_profile(arena.reader(),0x100,ordinary);
+ },"Missing source camera or blast marker");
+ auto missing_ordinary_camera=ordinary_bytes;replace_pair(missing_ordinary_camera,4,4,147);
+ auto missing_camera_archive=std::make_shared<DatArchive>(missing_ordinary_camera);
+ expect_error([&]{
+  NativeDatArena arena(missing_camera_archive);
+  (void)melee_web_stage_markers_decode_profile(arena.reader(),0x100,ordinary);
+ },"Missing source camera or blast marker");
+
+ auto unknown=*stadium;unknown.stage_kind=999;
+ auto unknown_archive=std::make_shared<DatArchive>(stadium_bytes);
+ expect_error([&]{
+  NativeDatArena arena(unknown_archive);
+  (void)melee_web_stage_markers_decode_profile(arena.reader(),0x100,&unknown);
+ },"Unknown or malformed source marker profile");
+ auto malformed=*stadium;malformed.authored_marker_bindings=nullptr;
+ auto malformed_archive=std::make_shared<DatArchive>(stadium_bytes);
+ expect_error([&]{
+  NativeDatArena arena(malformed_archive);
+  (void)melee_web_stage_markers_decode_profile(arena.reader(),0x100,&malformed);
+ },"Unknown or malformed source marker profile");
+ auto malformed_count=*stadium;malformed_count.authored_marker_binding_count=19;
+ auto malformed_count_archive=std::make_shared<DatArchive>(stadium_bytes);
+ expect_error([&]{
+  NativeDatArena arena(malformed_count_archive);
+  (void)melee_web_stage_markers_decode_profile(arena.reader(),0x100,&malformed_count);
+ },"Unknown or malformed source marker profile");
+ auto unspecified=*stadium;unspecified.marker_contract_policy=MELEE_WEB_STAGE_MARKER_CONTRACT_UNSPECIFIED;
+ auto unspecified_archive=std::make_shared<DatArchive>(stadium_bytes);
+ expect_error([&]{
+  NativeDatArena arena(unspecified_archive);
+  (void)melee_web_stage_markers_decode_profile(arena.reader(),0x100,&unspecified);
+ },"Unknown or malformed source marker profile");
+ std::cout<<"Immutable profile marker contracts, Stadium ordered duplicate/absent marker set, and strict ordinary controls passed\n";
 }
 const melee_web::DatNativeMapContract& marker_contract(){
  static constexpr std::array<uint8_t,1> animation_counts={1};
@@ -411,6 +530,7 @@ void profile_map_contract_controls(const std::vector<uint8_t>& legacy_bytes){
  std::cout<<"Explicit stage-profile map policies and authored ownership adapter controls passed\n";
 }
 void marker_fixture_trace(){
+ profile_marker_contract_controls();
  const auto original=marker_fixture();
  auto archive=std::make_shared<melee_web::DatArchive>(original);
  const auto data_section=archive->data();
@@ -543,13 +663,18 @@ void marker_fixture_trace(){
  auto nonfinite=original;write_be32(nonfinite,0x20+0x200+20,0x7fc00000);
  expect_marker_map_error(nonfinite,"Nonfinite marker transform");
  check(melee_web_gameplay_shutdown(error,sizeof(error)),error);
- std::cout<<"Structural marker pairs preserve duplicates/order, strict stage requirements and checked negatives passed\n";
+ std::cout<<"Structural marker pairs preserve duplicates/order, profile contracts, strict stage requirements and checked negatives passed\n";
 }
 void stadium_map_trace(const char* path){
  auto bytes=read_bytes(path);
  auto archive=std::make_shared<melee_web::DatArchive>(bytes,melee_web::DatExternalPolicy::ResolveNull);
   const auto original_data_section=std::vector<uint8_t>(archive->data().begin(),archive->data().end());
   melee_web::DatStage metadata(*archive);
+  melee_web::NativeDatArena marker_arena(archive);
+  auto* stadium_markers=melee_web_stage_markers_decode_profile(
+      marker_arena.reader(),metadata.root_offset,melee_web_stage_stadium_profile_data());
+  check(stadium_markers&&melee_web_stage_markers_descriptor(stadium_markers),
+        "retained original C0 Stadium marker table satisfies its exact source-profile contract");
   auto contract_data=stadium_contract_data(*archive,metadata);
   const auto stadium_contract=contract_data.view();
   check(metadata.entries.size()==10&&metadata.flagged_object_table.count==44,

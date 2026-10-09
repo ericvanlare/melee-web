@@ -581,8 +581,8 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive,
    s.random_item_scripts=std::make_unique<DatStageYaku>(archive,symbol.data_offset);
  auto contract_data=dat_native_stage_map_contract_from_profile(*profile,a,meta);
  const DatNativeMapContract contract=contract_data.view();
- auto* markers=melee_web_stage_markers_decode(s.arena.reader(),meta.root_offset);
- require(markers,"Native stage strict marker decoder returned null");
+ auto* markers=melee_web_stage_markers_decode_profile(s.arena.reader(),meta.root_offset,profile);
+ require(markers,"Native stage profile marker decoder returned null");
  s.hydrate_map(contract,markers);
 
  for(const auto& symbol:a.public_symbols())if(symbol.name=="yakumono_param"){

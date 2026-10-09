@@ -1,6 +1,7 @@
 #ifndef MELEE_WEB_GAMEPLAY_STAGE_NUMERIC_H
 #define MELEE_WEB_GAMEPLAY_STAGE_NUMERIC_H
 #include "native_dat.h"
+#include "gameplay_stage_profile.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -14,6 +15,10 @@ MeleeWebStageMarkers* melee_web_stage_markers_decode_structural(
 /* Strict legacy stage marker contract, including unique IDs and the current
  * player/camera marker set. No rendering/stage on_init is invoked. */
 MeleeWebStageMarkers* melee_web_stage_markers_decode(const MeleeWebNativeDat*,uint32_t map_head);
+/* Complete-stage marker admission. Selects the immutable profile's exact
+ * marker policy while reusing the structural decoder above. */
+MeleeWebStageMarkers* melee_web_stage_markers_decode_profile(
+    const MeleeWebNativeDat*,uint32_t map_head,const MeleeWebStageProfile*);
 /* Borrowed original HSD_Joint descriptor for a complete native map owner. */
 void* melee_web_stage_markers_descriptor(MeleeWebStageMarkers*);
 /* Requires the decoded GroundParam already published. Retains a full StageInfo
