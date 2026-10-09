@@ -69,7 +69,11 @@ guard/serializer controls; a separate unchanged original ranking routine also
 passes three synthetic score cases. Rejected terminal publications now retain
 typed slices as Error records before invalidation, without admitting successful
 exit or input completion. The existing workload and resource caps are unchanged.
-A fresh native build and original capture remain required.
+A fresh native build and original capture remain required. The next integrated
+suite at `b140a721` ran 2,248 tests with 159 skips and one failure in the existing
+native API-stub fixture: its synthetic Event enum omitted the newly used Error
+value. The fixture-only correction passes all 22 tests in that module; the full
+suite retry remains pending. No production source changed for that repair.
 
 The combined Rules/SD runtime passed the eight-minute functional route in V9.
 The [same scoped receipt](../evidence/competitive-rules-profile-preflight-v1.json)

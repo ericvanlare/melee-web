@@ -910,5 +910,20 @@
     "workload_policy_sha256": "c58eb6635d8f7115db86bc3601372fcf685ccecbd6c15d59d570a207e6d4d91d",
     "open": "Fresh native build and original natural-timeout capture/comparison; controls are synthetic.",
     "private_locator": "sd-reference-source-tests / terminal-rank-correction-v1"
+  },
+  "final_integrated_suite_attempt_v3": {
+    "source": "b140a7212f154964d72cdd42207f5dc620d74774",
+    "tree": "18363df85ed3843185f09dbc9e6ab0fb68eefc8b",
+    "tests": 2248,
+    "skipped": 159,
+    "failures": 1,
+    "seconds": 520.309,
+    "failure": "Existing extracted native API-stub Event enum omitted Error; actual terminal diagnostic now references Error. Production source unchanged by fixture repair.",
+    "log_sha256": "3f2373944a3b6c4dbf259afaee9e9dfe988f7e43602c4df6160301150e14f760",
+    "process_receipt_sha256": "b67139c38fc3b19239e66391efd84e744e176961eb1baf81e3cb6c45d1a2c865",
+    "focused_repair_tests": 22,
+    "focused_repair_log_sha256": "e2a8578d5734b022cf79952f877875a6cb22ac400c146c2ce369475113b464d1",
+    "cleanup": "All exact wrapper88012/supervisor88061/suite88068 absent independently; test retained original failed compiler diagnostic in full log.",
+    "open": "Final fullsuite retry required after fixture-only repair."
   }
 }
