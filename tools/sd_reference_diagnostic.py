@@ -404,6 +404,7 @@ class RulesMenuReceiver(Receiver):
                 require(self.latest_menu.get("items_locked") == 0 or
                         self.last_pad[:2] == [NEUTRAL_PAD] * 2,
                         "Items input consumed while locked")
+                require(previous_pad is not None, "Items input preceded its observed entry PAD")
                 if self.last_pad[:2] == up and previous_pad[:2] != up:
                     require(not self.items_up_seen, "Items consumed a second Up pulse")
                     self.items_up_seen = True

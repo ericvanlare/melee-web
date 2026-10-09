@@ -2,6 +2,7 @@
 from copy import deepcopy
 import unittest
 import hashlib
+import json
 import tempfile
 from pathlib import Path
 from unittest import mock
@@ -87,3 +88,22 @@ class ItemsLockTests(unittest.TestCase):
         with self.assertRaises(SdDiagnosticError):r.accept(menu_row(r.seq,name="items_ready"))
         r=receiver(self.profile);row=menu_row(r.seq);row["payload"].update(name="vs_entry",pc=PCS["vs_entry"])
         with self.assertRaises(SdDiagnosticError):r.accept(row)
+
+    def test_retained_actual_post_rules_order_with_explicit_injected_lock(self):
+        fixture=json.loads((Path(__file__).parent/'fixtures/sd-items-entry-order.json').read_text())
+        # The portable lead-in/profile above is reconstructed. Preserve every
+        # actual PAD/menu byte and its ordering; rebase seq/count solely to
+        # compose that lead-in. The new lock byte is explicitly injected.
+        r=receiver(self.profile)
+        for actual in fixture['rows']:
+            row=deepcopy(actual);row['seq']=r.seq
+            row['payload']['menu_consumed']-=71
+            if row['payload']['name']=='menu':
+                state=next(s for s in row['payload']['slices'] if s['tag']==45)
+                if bytes.fromhex(state['hex'])[0]==16:
+                    row['payload']['slices'].append({'tag':56,'flags':0,
+                        'address':0x804d6bec,'hex':'00'})
+            r.accept(row)
+        self.assertTrue(r.items_up_seen)
+        self.assertFalse(r.items_ready)  # Actual trace never reached row31.
+        self.assertEqual(r.last_pad[:2],[NEUTRAL_PAD]*2)
