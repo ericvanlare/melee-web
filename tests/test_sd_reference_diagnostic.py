@@ -32,6 +32,8 @@ def events():
     for slot in (0, 2):
         persistent[0x60 + slot * 0x24 + 0xc] |= 0x80
     sd = bytearray(persistent)
+    for slot in range(6):
+        sd[0x60 + slot * 0x24 + 0xc] &= ~0x80
     sd[0] &= ~2
     sd[2] &= ~4
     for slot in range(2):
@@ -151,6 +153,22 @@ class SdReferenceDiagnosticTests(unittest.TestCase):
             raw[offset] = value
             item["hex"] = raw.hex()
             with self.assertRaises(SdDiagnosticError):
+                self.accept(rows)
+
+    def test_sd_rumble_normalizes_owned_bit_and_preserves_every_other_bit(self):
+        rows = events()
+        persistent = bytes.fromhex(rows[2]["payload"]["slices"][1]["hex"])
+        sd = bytes.fromhex(rows[index(rows, "sd_entry")]["payload"]["slices"][0]["hex"])
+        self.assertEqual(persistent[0x6c] & 0x80, 0x80)
+        self.assertEqual(sd[0x6c] & 0x80, 0)
+        self.accept(rows)
+        for mask in (0x80, 1):
+            rows = events()
+            item = rows[index(rows, "sd_entry")]["payload"]["slices"][0]
+            raw = bytearray.fromhex(item["hex"])
+            raw[0x6c] ^= mask
+            item["hex"] = raw.hex()
+            with self.assertRaisesRegex(SdDiagnosticError, "SD setup differs"):
                 self.accept(rows)
 
     def test_menu_packets_are_predeclared_bounded_and_finish_in_original_sss(self):
