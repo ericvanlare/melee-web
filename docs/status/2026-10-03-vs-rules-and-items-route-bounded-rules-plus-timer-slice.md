@@ -18,8 +18,8 @@ whole remainder of the observer source after `AddSessionSlices`, so it rejected
 the intentional opt-in profile slice. The corrected assertion limits that
 exclusion to the normal session helper and separately checks the opt-in and
 first-CSS guards; no runtime bytes changed. The fresh canonical original
-reference build at `00ef116f` also passed. Those native overlays exactly match
-the integrated source; this does not relabel browser V9's producer.
+reference build at `00ef116f` also passed. Those native overlays matched
+the integrated source at that checkpoint; this does not relabel browser V9's producer.
 
 The first original natural-timeout attempt stopped before gameplay on the
 SSS retirement guard after 28.085 seconds. The reduced raw boundary is last
@@ -54,7 +54,22 @@ ends intentionally at setup with 2,167 records. Exact owned processes are absent
 and the original profile/GCI remain unchanged. Only the copied renderer setting
 changed. This establishes the scoped initialization comparison, not rendered
 output equivalence or the Metal failure's cause. The separate natural-timeout
-attempt has not yet supplied a terminal result.
+attempt failed its native MatchEnd participant-field guard after 509.338 seconds.
+The last retained source observation has match frame 28,800, clock zero with
+subframe 59, live stocks `[3,4]` and zero damage. The rejected MatchEnd bytes
+were not serialized, so the exact failing field is unobserved. The raw error and
+incomplete input stream remain retained, and all four owned processes are absent.
+No terminal comparator ran. The reduced source boundary identified a checker
+error: original `fn_80165AC0` ranks stock scores `[3,4]` as `is_big_loser`
+`[1,0]`; the guard required `[0,0]`. This establishes a faulty expectation,
+not the exact missing field bytes from the rejected recording. The correction
+at source `a8416142`, integrated as `5fd9a87f`, requires `[1,0]` in both native
+and Python checks. Fourteen focused controls pass, including extracted native
+guard/serializer controls; a separate unchanged original ranking routine also
+passes three synthetic score cases. Rejected terminal publications now retain
+typed slices as Error records before invalidation, without admitting successful
+exit or input completion. The existing workload and resource caps are unchanged.
+A fresh native build and original capture remain required.
 
 The combined Rules/SD runtime passed the eight-minute functional route in V9.
 The [same scoped receipt](../evidence/competitive-rules-profile-preflight-v1.json)
