@@ -5945,7 +5945,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..3492cd22f052a658e060a4ab3847a9b4
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c308e8c849f9585682d9e4de38a44eab67ceabd1 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..82c1b17e7a04c744db598b4bfc69352a7415b6b0 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,15 @@
@@ -6099,7 +6099,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c308e8c849f9585682d9e4de38a44eab
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -920,6 +1000,2939 @@ typedef struct TextWrapper {
+@@ -920,6 +1000,3169 @@ typedef struct TextWrapper {
      HSD_Text* win_dynamic_p;
  } TextWrapper;
  
@@ -6159,6 +6159,9 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c308e8c849f9585682d9e4de38a44eab
 +};
 +
 +static MeleeWebStadiumDisplayOwner* stadium_display_owner_current;
++static MeleeWebDiagnosticSisOwner stadium_text_membership_snapshot_token;
++static uint32_t stadium_text_membership_snapshot_requested_bytes;
++static int stadium_text_membership_snapshot_active;
 +static int stadium_owner_error(char* error, size_t error_size,
 +                               const char* message);
 +
@@ -6479,55 +6482,217 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c308e8c849f9585682d9e4de38a44eab
 +
 +/* This asset-free control observes only texts it creates. SIS blocks are
 + * suballocations; the source-memory generation belongs to the backing heap. */
++typedef enum StadiumTextMembershipStatus {
++    STADIUM_TEXT_MEMBERSHIP_UNAVAILABLE_BACKING,
++    STADIUM_TEXT_MEMBERSHIP_UNAVAILABLE_USED_HEAD,
++    STADIUM_TEXT_MEMBERSHIP_UNAVAILABLE_PAYLOAD_SIZE,
++    STADIUM_TEXT_MEMBERSHIP_ABSENT,
++    STADIUM_TEXT_MEMBERSHIP_PRESENT,
++} StadiumTextMembershipStatus;
++
++static int stadium_text_control_backing_observe(
++    const MeleeWebDiagnosticSisOwner* token,
++    MeleeWebSourceMemoryContext* context,
++    MeleeWebSourceMemoryAllocation* allocation,
++    int* context_status, int* allocation_status)
++{
++    int valid = 1;
++    if (context != NULL) memset(context, 0, sizeof(*context));
++    if (allocation != NULL) memset(allocation, 0, sizeof(*allocation));
++    if (context_status != NULL)
++        *context_status = MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
++    if (allocation_status != NULL)
++        *allocation_status = MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
++    if (token == NULL || token->heap == NULL ||
++        !token->world_generation || !token->allocation_generation ||
++        !token->source_epoch)
++        return 0;
++    if (HSD_SisLib_HeapOwner() != token->heap || !HSD_SisLib_HeapActive() ||
++        HSD_SisLib_HeapEpoch() != token->source_epoch)
++        valid = 0;
++    MeleeWebSourceMemoryContext observed_context;
++    MeleeWebSourceMemoryAllocation observed_allocation;
++    const int observed_context_status =
++        melee_web_source_memory_context_read(&observed_context);
++    const int observed_allocation_status =
++        melee_web_source_memory_allocation_read(token->heap,
++                                                &observed_allocation);
++    if (context_status != NULL) *context_status = observed_context_status;
++    if (allocation_status != NULL)
++        *allocation_status = observed_allocation_status;
++    if (observed_context_status == MELEE_WEB_SOURCE_MEMORY_READ_OK) {
++        if (context != NULL) *context = observed_context;
++        if (observed_context.world_generation != token->world_generation ||
++            observed_context.source_heap_handle != token->source_heap_handle)
++            valid = 0;
++    } else {
++        valid = 0;
++    }
++    if (observed_allocation_status == MELEE_WEB_SOURCE_MEMORY_READ_OK) {
++        if (allocation != NULL) *allocation = observed_allocation;
++        if (!observed_allocation.live ||
++            observed_allocation.world_generation != token->world_generation ||
++            observed_allocation.source_heap_handle != token->source_heap_handle ||
++            observed_allocation.allocation_generation !=
++                token->allocation_generation ||
++            observed_allocation.requested_bytes !=
++                MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES)
++            valid = 0;
++    } else {
++        valid = 0;
++    }
++    return valid;
++}
++
++static StadiumTextMembershipStatus stadium_text_control_membership_state_from_head(
++    const MeleeWebDiagnosticSisOwner* token, const HSD_Text* text,
++    SisBlock* head,
++    MeleeWebSourceMemoryContext* context,
++    MeleeWebSourceMemoryAllocation* allocation,
++    int* context_status, int* allocation_status, size_t* payload_size)
++{
++    if (payload_size != NULL) *payload_size = 0;
++    if (!stadium_text_control_backing_observe(
++            token, context, allocation, context_status, allocation_status))
++        return STADIUM_TEXT_MEMBERSHIP_UNAVAILABLE_BACKING;
++    const uintptr_t begin = (uintptr_t) token->heap;
++    const size_t bytes = MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES;
++    if (begin > UINTPTR_MAX - bytes)
++        return STADIUM_TEXT_MEMBERSHIP_UNAVAILABLE_USED_HEAD;
++    const uintptr_t end = begin + bytes;
++    SisBlock* block = head;
++    size_t remaining = bytes / sizeof(SisBlock);
++    int found = 0;
++    size_t found_size = 0;
++    while (block != NULL) {
++        const uintptr_t address = (uintptr_t) block;
++        if (remaining-- == 0 || address < begin || address > end ||
++            end - address < sizeof(*block) || (address & 3) != 0)
++            return STADIUM_TEXT_MEMBERSHIP_UNAVAILABLE_USED_HEAD;
++        const uintptr_t payload = (uintptr_t) block->data;
++        if (payload != address + sizeof(*block) || payload > end ||
++            block->size > end - payload)
++            return STADIUM_TEXT_MEMBERSHIP_UNAVAILABLE_USED_HEAD;
++        if (block->data == text) {
++            if (found)
++                return STADIUM_TEXT_MEMBERSHIP_UNAVAILABLE_USED_HEAD;
++            found = 1;
++            found_size = block->size;
++        }
++        block = block->next;
++    }
++    if (found) {
++        if (payload_size != NULL) *payload_size = found_size;
++        return found_size == ((sizeof(HSD_Text) + 3) & ~(size_t)3)
++            ? STADIUM_TEXT_MEMBERSHIP_PRESENT
++            : STADIUM_TEXT_MEMBERSHIP_UNAVAILABLE_PAYLOAD_SIZE;
++    }
++    return STADIUM_TEXT_MEMBERSHIP_ABSENT;
++}
++
++static StadiumTextMembershipStatus stadium_text_control_membership_state(
++    const MeleeWebDiagnosticSisOwner* token, const HSD_Text* text,
++    MeleeWebSourceMemoryContext* context,
++    MeleeWebSourceMemoryAllocation* allocation,
++    int* context_status, int* allocation_status, size_t* payload_size)
++{
++    return stadium_text_control_membership_state_from_head(
++        token, text, used_head, context, allocation, context_status,
++        allocation_status, payload_size);
++}
++
 +static int stadium_text_control_backing_live(
 +    const MeleeWebDiagnosticSisOwner* token)
 +{
-+    MeleeWebSourceMemoryContext context;
-+    MeleeWebSourceMemoryAllocation allocation;
-+    return token != NULL && token->heap != NULL &&
-+        HSD_SisLib_HeapOwner() == token->heap && HSD_SisLib_HeapActive() &&
-+        HSD_SisLib_HeapEpoch() == token->source_epoch &&
-+        melee_web_source_memory_context_read(&context) ==
-+            MELEE_WEB_SOURCE_MEMORY_READ_OK &&
-+        context.world_generation == token->world_generation &&
-+        context.source_heap_handle == token->source_heap_handle &&
-+        melee_web_source_memory_allocation_read(token->heap, &allocation) ==
-+            MELEE_WEB_SOURCE_MEMORY_READ_OK && allocation.live &&
-+        allocation.world_generation == token->world_generation &&
-+        allocation.source_heap_handle == token->source_heap_handle &&
-+        allocation.allocation_generation == token->allocation_generation &&
-+        allocation.requested_bytes == MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES;
++    return stadium_text_control_backing_observe(token, NULL, NULL, NULL, NULL);
 +}
 +
 +static int stadium_text_control_membership(
 +    const MeleeWebDiagnosticSisOwner* token, const HSD_Text* text,
 +    int expected_present)
 +{
-+    if (!stadium_text_control_backing_live(token)) return 0;
-+    const uintptr_t begin = (uintptr_t) token->heap;
-+    const size_t bytes = MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES;
-+    if (begin > UINTPTR_MAX - bytes) return 0;
-+    const uintptr_t end = begin + bytes;
-+    SisBlock* block = used_head;
-+    size_t remaining = bytes / sizeof(SisBlock);
-+    int found = 0;
-+    while (block != NULL) {
-+        const uintptr_t address = (uintptr_t) block;
-+        if (remaining-- == 0 || address < begin || address > end ||
-+            end - address < sizeof(*block) || (address & 3) != 0)
-+            return 0;
-+        const uintptr_t payload = (uintptr_t) block->data;
-+        if (payload != address + sizeof(*block) || payload > end ||
-+            block->size > end - payload)
-+            return 0;
-+        if (block->data == text) {
-+            if (found || block->size != ((sizeof(HSD_Text) + 3) & ~(size_t)3))
-+                return 0;
-+            found = 1;
-+        }
-+        block = block->next;
++    const StadiumTextMembershipStatus status =
++        stadium_text_control_membership_state(token, text, NULL, NULL, NULL,
++                                               NULL, NULL);
++    return expected_present
++        ? status == STADIUM_TEXT_MEMBERSHIP_PRESENT
++        : status == STADIUM_TEXT_MEMBERSHIP_ABSENT;
++}
++
++int melee_web_stadium_text_membership_snapshot_begin(
++    const MeleeWebDiagnosticSisOwner* token, char* error, size_t error_size)
++{
++    MeleeWebSourceMemoryAllocation allocation;
++    if (stadium_text_membership_snapshot_active)
++        return stadium_owner_error(error, error_size,
++                                   "SIS text membership snapshot is already active");
++    if (!stadium_text_control_backing_observe(token, NULL, &allocation, NULL,
++                                               NULL))
++        return stadium_owner_error(error, error_size,
++                                   "SIS text membership snapshot lacks the exact live backing lease");
++    stadium_text_membership_snapshot_token = *token;
++    stadium_text_membership_snapshot_requested_bytes =
++        allocation.requested_bytes;
++    stadium_text_membership_snapshot_active = 1;
++    if (error != NULL && error_size != 0) error[0] = '\0';
++    return 1;
++}
++
++void melee_web_stadium_text_membership_snapshot_end(void)
++{
++    memset(&stadium_text_membership_snapshot_token, 0,
++           sizeof(stadium_text_membership_snapshot_token));
++    stadium_text_membership_snapshot_requested_bytes = 0;
++    stadium_text_membership_snapshot_active = 0;
++}
++
++static void stadium_owner_text_membership_observe(
++    const StadiumTextTopologyObservation* observation)
++{
++    if (observation == NULL || observation->clause == NULL) return;
++    if (!stadium_text_membership_snapshot_active) {
++        fprintf(stderr,"STADIUM_TEXT_MEMBERSHIP_OBSERVATION status=unavailable reason=no-snapshot clause=%s index=%zu actual=%p expected=%p\n",
++            observation->clause,observation->index,observation->actual,
++            observation->expected);
++        fflush(stderr);
++        return;
 +    }
-+    return found == expected_present;
++    MeleeWebSourceMemoryContext context;
++    MeleeWebSourceMemoryAllocation allocation;
++    int context_status;
++    int allocation_status;
++    size_t payload_size = 0;
++    const StadiumTextMembershipStatus status =
++        stadium_text_control_membership_state(
++            &stadium_text_membership_snapshot_token, observation->actual,
++            &context, &allocation, &context_status, &allocation_status,
++            &payload_size);
++    const char* status_name = status == STADIUM_TEXT_MEMBERSHIP_PRESENT
++        ? "present" : status == STADIUM_TEXT_MEMBERSHIP_ABSENT
++        ? "absent" : "unavailable";
++    const char* reason = status == STADIUM_TEXT_MEMBERSHIP_UNAVAILABLE_BACKING
++        ? "backing-lease-mismatch" :
++        status == STADIUM_TEXT_MEMBERSHIP_UNAVAILABLE_USED_HEAD
++        ? "used-head-invalid" :
++        status == STADIUM_TEXT_MEMBERSHIP_UNAVAILABLE_PAYLOAD_SIZE
++        ? "expected-payload-size-mismatch" : "none";
++    fprintf(stderr,"STADIUM_TEXT_MEMBERSHIP_OBSERVATION status=%s reason=%s clause=%s index=%zu actual=%p expected=%p snapshot_heap=%p snapshot_world=%llu snapshot_source_heap=%d snapshot_allocation=%llu snapshot_epoch=%llu snapshot_requested=%u current_heap=%p current_active=%d current_epoch=%llu current_context_status=%d current_world=%llu current_source_heap=%d current_allocation_status=%d current_allocation=%llu current_requested=%u current_live=%u payload_size=%zu expected_payload_size=%zu\n",
++        status_name,reason,observation->clause,observation->index,
++        observation->actual,observation->expected,
++        stadium_text_membership_snapshot_token.heap,
++        (unsigned long long)stadium_text_membership_snapshot_token.world_generation,
++        stadium_text_membership_snapshot_token.source_heap_handle,
++        (unsigned long long)stadium_text_membership_snapshot_token.allocation_generation,
++        (unsigned long long)stadium_text_membership_snapshot_token.source_epoch,
++        stadium_text_membership_snapshot_requested_bytes,
++        HSD_SisLib_HeapOwner(),HSD_SisLib_HeapActive(),
++        (unsigned long long)HSD_SisLib_HeapEpoch(),context_status,
++        (unsigned long long)context.world_generation,context.source_heap_handle,
++        allocation_status,(unsigned long long)allocation.allocation_generation,
++        allocation.requested_bytes,allocation.live,payload_size,
++        (sizeof(HSD_Text)+3)&~(size_t)3);
++    fflush(stderr);
++    melee_web_stadium_text_membership_snapshot_end();
 +}
 +
 +int melee_web_stadium_text_topology_controls(
@@ -6536,12 +6701,60 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c308e8c849f9585682d9e4de38a44eab
 +    MeleeWebStadiumDisplayOwner owner;
 +    StadiumTextNodeIdentity baseline_identity;
 +    StadiumTextTopologyObservation observation;
++    char snapshot_error[128];
++    MeleeWebSourceMemoryContext observed_context;
++    MeleeWebSourceMemoryAllocation observed_allocation;
++    int context_status;
++    int allocation_status;
++    size_t observed_payload_size = 0;
 +    memset(&owner, 0, sizeof(owner));
 +    if (!stadium_text_control_backing_live(token) || used_head != NULL ||
 +        HSD_SisLib_804D7978 != NULL || HSD_SisLib_804D797C != NULL)
 +        return 0;
++    MeleeWebDiagnosticSisOwner stale_snapshot = *token;
++    stale_snapshot.source_epoch ^= 1;
++    if (melee_web_stadium_text_membership_snapshot_begin(
++            &stale_snapshot, snapshot_error, sizeof(snapshot_error))) {
++        melee_web_stadium_text_membership_snapshot_end();
++        return 0;
++    }
++    stale_snapshot = *token;
++    stale_snapshot.allocation_generation ^= 1;
++    if (melee_web_stadium_text_membership_snapshot_begin(
++            &stale_snapshot, snapshot_error, sizeof(snapshot_error))) {
++        melee_web_stadium_text_membership_snapshot_end();
++        return 0;
++    }
++    stale_snapshot = *token;
++    stale_snapshot.world_generation ^= 1;
++    if (melee_web_stadium_text_membership_snapshot_begin(
++            &stale_snapshot, snapshot_error, sizeof(snapshot_error))) {
++        melee_web_stadium_text_membership_snapshot_end();
++        return 0;
++    }
++    stale_snapshot = *token;
++    stale_snapshot.source_heap_handle ^= 1;
++    if (melee_web_stadium_text_membership_snapshot_begin(
++            &stale_snapshot, snapshot_error, sizeof(snapshot_error))) {
++        melee_web_stadium_text_membership_snapshot_end();
++        return 0;
++    }
++    if (!melee_web_stadium_text_membership_snapshot_begin(
++            token, snapshot_error, sizeof(snapshot_error)) ||
++        melee_web_stadium_text_membership_snapshot_begin(
++            token, snapshot_error, sizeof(snapshot_error))) {
++        melee_web_stadium_text_membership_snapshot_end();
++        return 0;
++    }
++    melee_web_stadium_text_membership_snapshot_end();
 +    HSD_Text* baseline = HSD_SisLib_803A5ACC(0, -1, 0, 0, 0, 1, 1);
-+    if (baseline == NULL || !stadium_text_control_membership(token, baseline, 1))
++    const StadiumTextMembershipStatus baseline_status =
++        stadium_text_control_membership_state(
++            token, baseline, &observed_context, &observed_allocation,
++            &context_status, &allocation_status, &observed_payload_size);
++    if (baseline == NULL || baseline_status != STADIUM_TEXT_MEMBERSHIP_PRESENT ||
++        observed_payload_size != ((sizeof(HSD_Text) + 3) & ~(size_t)3) ||
++        !stadium_text_control_membership(token, baseline, 1))
 +        return 0;
 +    baseline_identity.node = baseline;
 +    baseline_identity.next = baseline->next;
@@ -6564,6 +6777,12 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c308e8c849f9585682d9e4de38a44eab
 +        !stadium_text_control_membership(token, baseline, 1) ||
 +        !stadium_text_control_membership(token, owner.texts[0], 1) ||
 +        !stadium_text_control_membership(token, owner.texts[1], 1))
++        return 0;
++    SisBlock malformed_head = { 0 };
++    const StadiumTextMembershipStatus malformed_head_status =
++        stadium_text_control_membership_state_from_head(
++            token, baseline, &malformed_head, NULL, NULL, NULL, NULL, NULL);
++    if (malformed_head_status != STADIUM_TEXT_MEMBERSHIP_UNAVAILABLE_USED_HEAD)
 +        return 0;
 +    HSD_Text* const head_before = HSD_SisLib_804D7978;
 +    SisBlock* const blocks_before = used_head;
@@ -6597,7 +6816,12 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c308e8c849f9585682d9e4de38a44eab
 +        token->heap,(unsigned long long)token->source_epoch,
 +        (unsigned long long)token->allocation_generation);
 +    HSD_SisLib_803A5CC4(baseline);
-+    if (!stadium_text_control_membership(token, baseline, 0) ||
++    const StadiumTextMembershipStatus removed_baseline_status =
++        stadium_text_control_membership_state(
++            token, baseline, NULL, NULL, NULL, NULL, &observed_payload_size);
++    if (removed_baseline_status != STADIUM_TEXT_MEMBERSHIP_ABSENT ||
++        observed_payload_size != 0 ||
++        !stadium_text_control_membership(token, baseline, 0) ||
 +        !stadium_text_control_membership(token, owner.texts[0], 1) ||
 +        !stadium_text_control_membership(token, owner.texts[1], 1))
 +        return 0;
@@ -6625,6 +6849,9 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c308e8c849f9585682d9e4de38a44eab
 +        HSD_SisLib_804D797C != NULL)
 +        return 0;
 +    fprintf(stderr,"C1_SIS_TEXT_TOPOLOGY phase=cleanup texts=0 suballocations=0 backing_live=1\n");
++    fprintf(stderr,"C1_SIS_TEXT_MEMBERSHIP_CONTROL snapshot_duplicate=refused stale_epoch=refused stale_world=refused stale_source_heap=refused stale_allocation=refused present_payload=%zu removed_payload=absent malformed_used_head=refused\n",
++        (sizeof(HSD_Text)+3)&~(size_t)3);
++    fflush(stderr);
 +    return 1;
 +}
 +
@@ -8400,10 +8627,13 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c308e8c849f9585682d9e4de38a44eab
 +    if (!stadium_owner_capture_matches(owner, owner->display_ground,
 +                                       &failed_clause, &failed_index,
 +                                       &failed_index_valid, &text_observation)) {
-+        if (text_observation.clause != NULL)
++        if (text_observation.clause != NULL) {
 +            fprintf(stderr,"STADIUM_TEXT_TOPOLOGY_REJECT primitive=%s index=%zu actual=%p expected=%p operand_lifetime=unverified\n",
 +                text_observation.clause, text_observation.index,
 +                text_observation.actual, text_observation.expected);
++            if (stadium_text_membership_snapshot_active)
++                stadium_owner_text_membership_observe(&text_observation);
++        }
 +        fprintf(stderr,"STADIUM_DISPLAY_PREFLIGHT_REJECT clause=%s index_valid=%d index=%zu map2_journal=%u map2_proc_dispatch=%u map2_buffer_use=%u\n",
 +            failed_clause != NULL ? failed_clause : "unspecified",
 +            failed_index_valid,failed_index,owner->map2_buffer_journal_count,
@@ -9039,7 +9269,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c308e8c849f9585682d9e4de38a44eab
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
  {
-@@ -1185,22 +4198,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +4428,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -9081,7 +9311,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c308e8c849f9585682d9e4de38a44eab
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +4246,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +4476,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -9103,7 +9333,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c308e8c849f9585682d9e4de38a44eab
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +4268,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +4498,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
@@ -9126,7 +9356,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c308e8c849f9585682d9e4de38a44eab
      wrapper->flag = false;
      return gobj;
  }
-@@ -1896,6 +4948,9 @@ bool grStadium_801D42B8(void)
+@@ -1896,6 +5178,9 @@ bool grStadium_801D42B8(void)
      if (gp->u.stadium.xC4_b1) {
          return false;
      }
@@ -9136,7 +9366,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c308e8c849f9585682d9e4de38a44eab
      gp->u.stadium.xD0 =
          grDatFiles_801C6478(gp->u.stadium.xCC, gp->u.stadium.xC8);
      return true;
-@@ -2093,6 +5148,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2093,6 +5378,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
              gp = GET_GROUND(map_gobj);
              HSD_ASSERT(0x99B, gp);
              gp->u.stadium.xC4_b1 = true;
@@ -9146,7 +9376,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c308e8c849f9585682d9e4de38a44eab
              lbFile_80016580(datfiles[var_r29], gp->u.stadium.xCC,
                              &gp->u.stadium.xC8, fn_801D4220, NULL);
              temp_r31->u.stadium.xDC = 1;
-@@ -2221,6 +5279,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2221,6 +5509,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
          if (temp_r31->u.stadium.xDE == 5) {
              temp_r31->u.stadium.xD8 =
                  randi_between_2(yakumono_param->x0, yakumono_param->x4);

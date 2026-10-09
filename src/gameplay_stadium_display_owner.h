@@ -111,6 +111,14 @@ int melee_web_stadium_map2_buffer_owner_end(
 int melee_web_stadium_image_release(
     MeleeWebStadiumImageProvenance*, MeleeWebStadiumBufferFree, void* context);
 
+/* A short-lived diagnostic snapshot lets the existing first text-topology
+ * refusal report SIS payload membership against one exact live backing lease.
+ * It does not add ownership to the Stadium display record. */
+struct MeleeWebDiagnosticSisOwner;
+int melee_web_stadium_text_membership_snapshot_begin(
+    const struct MeleeWebDiagnosticSisOwner*, char* error, size_t error_size);
+void melee_web_stadium_text_membership_snapshot_end(void);
+
 /* Focused asset-free controls for the shared source buffer branch and exact
  * owned-versus-borrowed release behavior. */
 int melee_web_stadium_display_provenance_controls(void);
