@@ -34,6 +34,23 @@ def disabled_rumble_copy(persistent):
     return result
 
 
+def profile_rumble_copy(persistent, preferences):
+    """gm_LoadRumbleEnabled/getPort for the declared unnamed two-human setup."""
+    require(len(persistent) == 0x138 and len(preferences) == 4 and
+            all(value in (0, 1) for value in preferences), "Original rumble context is invalid")
+    result = disabled_rumble_copy(persistent)
+    for slot in range(4):
+        base = 0x60 + slot * 0x24
+        if persistent[base + 1] == 0:
+            require(slot < 2 and persistent[base + 0xa] == 120,
+                    "Original rumble derivation requires declared unnamed humans")
+            raw_slot = persistent[base + 4]
+            port = slot if raw_slot == 0 else raw_slot - 1
+            require(port in range(4), "Original rumble source port is invalid")
+            result[base + 0xc] |= preferences[port] << 7
+    return result
+
+
 def slices(payload):
     fields = {"diagnostic", "name", "consumed", "pc", "slices"}
     require(set(payload) in (fields, fields | {"menu_consumed"}), "SD event fields differ")
@@ -166,7 +183,8 @@ class Receiver:
             preferences = bytes(context["port_rumble_preferences"]) if context else b"\0" * 4
             require(data.get((54, 0)) == preferences,
                     "SD original profile port rumble preferences differ from declared recipe")
-            normalized = disabled_rumble_copy(persistent)
+            normalized = (profile_rumble_copy(persistent, preferences) if
+                          self.plan["authored_recipe"]["version"] == 5 else disabled_rumble_copy(persistent))
             normalized[2] |= 0x80
             normalized[4] |= 0x40
             for slot in range(6):
@@ -207,7 +225,8 @@ class Receiver:
         if name == "sd_entry":
             persistent = self.records["vs_entry"][(4, 1)]
             require(data.get((4, 1)) == persistent, "SD persistent rules changed after normal VS")
-            expected = disabled_rumble_copy(persistent)
+            expected = (profile_rumble_copy(persistent, self.records["vs_entry"][(54, 0)]) if
+                        self.plan["authored_recipe"]["version"] == 5 else disabled_rumble_copy(persistent))
             expected[0] &= ~2  # original gm_SetupSuddenDeath disables timer
             expected[2] &= ~4  # original x2_5
             for slot in range(2):
@@ -262,10 +281,11 @@ class RulesMenuReceiver(Receiver):
     SceneKind omission does not attest a null pointer: the native producer also
     omits it on a failed pointer read. No steering or readiness precedes an owner.
     """
-    def __init__(self, plan, *, profile_campaign=False):
+    def __init__(self, plan, *, profile_campaign=False, full_route=False):
         super().__init__(plan)
-        require(plan["authored_recipe"]["version"] == (4 if profile_campaign else 3),
+        require(plan["authored_recipe"]["version"] == (5 if full_route else 4 if profile_campaign else 3),
                 "Rules probe recipe/profile campaign differs")
+        self.full_route = full_route
         self.menu_consumed = 0
         self.menu_polls = 0
         self.last_pad = None
@@ -278,18 +298,39 @@ class RulesMenuReceiver(Receiver):
         from sd_original_menu_plan import rules_ready_packet
         from retail_input_plan import NEUTRAL_PAD
         packet = rules_ready_packet()
+        if full_route:
+            from sd_original_menu_plan import gci_sd_prefix_packet, route_pads
+            packet = gci_sd_prefix_packet()
+            self.declared_menu_pads = route_pads(packet)
+            self.css = None
+            self.stage = None
+            self.final_css = None
+            self.final_stage = None
+            return
         self.declared_menu_pads = {(NEUTRAL_PAD, NEUTRAL_PAD)} | {
             (action["p1"], action["p2"]) for action in packet["boot"] + packet["actions"]}
 
     def accept(self, row):
         event, payload = row["event"], row["payload"]
         if event == "handshake":
-            require(payload.get("menu_probe") == "rules_ready", "Rules probe scope differs")
+            require(payload.get("menu_probe") == ("sd_prefix" if self.full_route else "rules_ready"),
+                    "Rules probe scope differs")
             require(payload.get("profile_gci_sha256", "") == getattr(self, "profile_sha256", ""),
                     "Rules probe loaded-profile identity differs")
             forwarded = dict(row, payload=dict(payload, menu_probe=""))
             return super().accept(forwarded)
         if event == "start":
+            return super().accept(row)
+        if self.full_route and (event == "end" or self.order or
+                (event == "progress" and payload.get("name") not in ("menu", "menu_input", "rules_ready"))):
+            require(self.ready, "Gameplay preceded verified loaded Rules readiness")
+            if payload.get("name") == "vs_entry":
+                require(self.final_css is not None and self.final_stage is not None and
+                        [p["character"] for p in self.final_css["players"]] == [8, 8] and
+                        [p["kind"] for p in self.final_css["players"]] == [0, 0] and
+                        [d["costume"] for d in self.final_css["doors"]] == [1, 0] and
+                        self.final_stage["kind"] == 32 and self.final_stage["cooldown"] == 0,
+                        "VS entry lacks observed final human CSS/FD acceptance prerequisites")
             return super().accept(row)
         require(not self.ended and self.started and row["seq"] == self.seq,
                 "Rules probe sequence/start differs")
@@ -338,6 +379,17 @@ class RulesMenuReceiver(Receiver):
             return
         require(count == self.menu_consumed, "Rules probe skipped observed input")
         self.latest_menu = menu_state(data)
+        if self.full_route and name == "menu":
+            self.css = css_state(data) if self.latest_menu["scene"] == 8 else None
+            self.stage = stage_state(data, payload) if self.latest_menu["scene"] == 9 else None
+            require(self.latest_menu["scene"] != 8 or self.final_css is None or self.css is not None,
+                    "CSS typed owner disappeared after construction")
+            require(self.latest_menu["scene"] != 9 or self.final_stage is None or self.stage is not None,
+                    "SSS typed owner disappeared after construction")
+            if self.css is not None:
+                self.final_css = self.css
+            if self.stage is not None:
+                self.final_stage = self.stage
         if name == "menu":
             self.menu_polls += 1
             require(self.menu_polls <= 7200, "Rules probe menu polling cap exhausted")
@@ -370,7 +422,7 @@ class RulesMenuReceiver(Receiver):
 
 class GciRulesMenuReceiver(RulesMenuReceiver):
     """New profile campaign, with observed loaded fields at the reduced ready gate."""
-    def __init__(self, plan, profile):
+    def __init__(self, plan, profile, *, full_route=False):
         import hashlib
         from sd_gci_profile import GCI_SHA256
         require(profile["sha256"] == GCI_SHA256 and
@@ -379,7 +431,7 @@ class GciRulesMenuReceiver(RulesMenuReceiver):
         self.profile_sha256 = GCI_SHA256
         self.profile = profile
         self.loaded_context = None
-        super().__init__(plan, profile_campaign=True)
+        super().__init__(plan, profile_campaign=True, full_route=full_route)
 
     def accept(self, row):
         if row["event"] == "progress" and row["payload"].get("name") == "rules_ready":
@@ -409,7 +461,56 @@ class GciRulesMenuReceiver(RulesMenuReceiver):
 
     def finish(self, observer_status, input_path, input_status):
         require(self.loaded_context is not None, "Loaded profile was not observed")
-        report = super().finish(observer_status, input_path, input_status)
-        report.update(scope="rules_ready_gci", profile_gci_sha256=self.profile_sha256,
+        report = (Receiver.finish(self, observer_status, input_path, input_status) if self.full_route
+                  else super().finish(observer_status, input_path, input_status))
+        report.update(scope="sd_prefix_gci" if self.full_route else "rules_ready_gci", profile_gci_sha256=self.profile_sha256,
                       loaded_context=self.loaded_context)
+        if self.full_route:
+            report.update(menu_source_samples=self.menu_consumed, menu_polls=self.menu_polls,
+                          pre_owner_polls=self.pre_owner_polls, bootstrap_routes=self.bootstrap_routes)
         return report
+
+
+def css_state(data):
+    """Existing generic typed CSS inventory; absent during OnEnter is not readiness."""
+    if (48, 0) not in data:
+        return None
+    live, doors = data[(48, 0)], data.get((44, 0), b"")
+    require(len(live) == 0x148 and len(doors) == 0x90, "CSS typed owner extent differs")
+    result = {"players": [], "doors": [], "cursors": [], "models": []}
+    for slot in range(2):
+        cursor, model = data.get((43, slot), b""), data.get((47, slot), b"")
+        require(len(cursor) == 0x14 and len(model) == 0x18, "Human CSS cursor/model is missing")
+        x, y = struct.unpack(">ff", cursor[12:20])
+        mx, my = struct.unpack(">ff", model[8:16])
+        import math
+        require(all(math.isfinite(v) for v in (x, y, mx, my)), "CSS coordinate is invalid")
+        result["cursors"].append({"state": cursor[5], "held": cursor[6], "x": x, "y": y})
+        result["models"].append({"x": mx, "y": my})
+        base = 0x70 + slot * 0x24
+        result["players"].append({"character": live[base], "kind": live[base+1]})
+        base = slot * 0x24
+        result["doors"].append({"kind": doors[base+11], "costume": doors[base+13],
+                                "icon": doors[base+14]})
+    require(live[0x18] == 0 and all(live[0x70 + slot*0x24 + 1] == 3 for slot in (2, 3)),
+            "CSS Teams/inactive-player contract differs")
+    return result
+
+
+def stage_state(data, payload):
+    if (55, 0) not in data:
+        require((41, 0) not in data and (42, 0) not in data,
+                "SSS highlight preceded constructor-owned cooldown")
+        return None
+    cooldown, index, kind = data[(55, 0)], data.get((41, 0), b""), data.get((42, 0), b"")
+    addresses = {(s["tag"], s["flags"]): s["address"] for s in payload["slices"]}
+    require(len(cooldown) == 4 and len(index) == 1 and index[0] <= 30 and
+            addresses[(55, 0)] == 0x804d6ca4 and addresses[(41, 0)] == 0x804d6cae,
+            "SSS cooldown/highlight source binding differs")
+    require((index[0] == 30 and (42, 0) not in data) or
+            (index[0] < 30 and len(kind) == 1 and
+             addresses[(42, 0)] == 0x803f06d0 + index[0]*0x1c + 0xb),
+            "SSS authored random/highlight row differs")
+    value = int.from_bytes(cooldown, "big")
+    require(value <= 20, "SSS constructor cooldown escaped its authored bound")
+    return {"index": index[0], "kind": kind[0] if kind else None, "cooldown": value}
