@@ -438,7 +438,9 @@ struct GameplayWorld::Storage {
                 if(selection.source_start_data){
                     const auto& source=selection.source_start_data->players[player.slot];
                     const unsigned port=source.slot?source.slot-1u:player.slot;
+                    const auto* fighter=melee_web_fighter_content(source.ckind);
                     if(source.slot_type==Gm_PKind_NA||port!=player.slot||
+                       !fighter||fighter->fighter_kind!=player.fighter_kind||
                        player.controller!=port||source.stocks!=player.stocks||
                        source.color!=player.costume||source.sub_color!=player.sub_color)
                         throw DatError("Source player context changed its original port identity");

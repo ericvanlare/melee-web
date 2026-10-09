@@ -331,7 +331,7 @@ sudden_death_asset_names(const MeleeWebMenuHost* host,
     if (!melee_web_menu_host_sudden_death_selection(
             host,&continuation,&selection,error,sizeof(error))) reject(error);
     if (!selection.sudden_death) reject("Host did not resolve a Sudden Death selection");
-    check_selection_common(selection,true);
+    check_selection_common(selection);
     const auto* stage = melee_web_stage_content(selection.start.rules.stkind);
     if (!stage) reject("Sudden Death stage has no admitted source content");
     auto result = common_match_asset_names(selection);

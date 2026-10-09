@@ -95,6 +95,12 @@ int main(){
   assert(world.source_players[0].slot==0&&world.source_players[1].slot==second);
   assert(world.source_players[1].controller==second&&world.fighter_kinds[1]==20);
   validate_world(world);
+  auto legacy=world;legacy.source_start_data=nullptr;
+  if(second==1)validate_world(legacy);
+  else{bool refused=false;try{validate_world(legacy);}catch(const DatError&){refused=true;}assert(refused);}
+  auto foreign=world;foreign.source_players[1].fighter_kind=10;foreign.fighter_kinds[1]=10;
+  bool foreign_refused=false;try{validate_world(foreign);}catch(const DatError&){foreign_refused=true;}
+  assert(foreign_refused); // Array/context agree, but original source ckind still owns fighter20.
   Results result;result.match_end.player_standings[0]={0,0,0};
   result.match_end.player_standings[second]={0,1,2};const auto retained=result;
   const auto display=make_results(result);
@@ -106,7 +112,7 @@ int main(){
    assert(!host_selection_from_vs(&host,&wrong,&selected,error,sizeof(error)));
    wrong=vs;wrong.start.players[4]=wrong.start.players[2];
    assert(!host_selection_from_vs(&host,&wrong,&selected,error,sizeof(error)));
-   world.source_players[1].controller=1;
+   world.source_start_data=&vs.start;world.source_players[1].controller=1;
    bool refused=false;try{validate_world(world);}catch(const DatError&){refused=true;}assert(refused);
   }
  }
