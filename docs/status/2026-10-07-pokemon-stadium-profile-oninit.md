@@ -2,6 +2,12 @@
 
 **Compiled / Synthetic controls / Source identified**
 
+**Historical October 7 checkpoint.** The current scoped result is the
+[October 9 zero-tick two-world lifecycle](#october-9-two-zero-tick-stadium-world-lifetimes)
+below. It supersedes only the earlier statement that no actual OnInit/OnStart
+or second-world lifecycle had run; Ready/GO, gameplay ticks, and C3 remain
+unrun.
+
 The diagnostic-only Stadium profile and profile-to-`DatNativeMapContract`
 adapter compile in the C1 trace target. Focused profile and borrowed-yakumono
 controls passed. The prototype parser accepts only the explicitly scoped,
@@ -125,3 +131,103 @@ contract; they are not a successful real Stage continuation. The guard
 correction is approved source; its build and real-fixture validation remain
 pending. Ready/GO, scheduler ticks, the second real world
 lifetime and C3 acceptance remain unrun.
+
+
+## October 9: two zero-tick Stadium world lifetimes
+
+**Native traced / zero-tick Stage and MenuWorld lifecycle / C3 not passed**
+
+The source sequence leading to this pass remains scoped. Commit `30798af0`
+added the exact started-manager GObj/proc and separate SDK allocation leases
+to the checked private Ground map-set; its actual SDK manager/map-set control
+passed once, accepting the expected manager and refusing an unknown fifth
+object or wrong callback. That control had an incomplete prelaunch
+object/archive inventory: JS/WASM were hashed and copied before the run, but a
+wrong StageLast object path raised `FileNotFoundError`; the missing
+object/archive provenance and complete inventory were recovered after SDK
+exit. No rerun or pristine-preparation claim is made. The fourth real fixture
+on that source returned original OnStart and checked StageLast/light
+destruction, then its caller rejected the Ground lease before MatchContext
+end, world shutdown, or a second lifetime. Its stale pre-OnLoad watermark
+changed from **3021 to 3026** during construction; the compound check did not
+emit every subpredicate, so this remains a retained bounded failure. Commit
+`3d032f74` then recorded the post-OnStart, pre-retirement Ground/map2 baseline
+and ran a frozen SDK phase control: the unchanged strict helper rejected stale
+watermark **10** and accepted the observed post-construction baseline **12**
+after Ground end, with negative copies refused. That control was not a full
+Stage fixture. The portable receipt binds the producer, result receipts, and
+reviews for each step.
+
+The fifth authorized real fixture, produced from `3d032f74` (tree
+`3add40ed`), passed two sequential original Stadium stage lifetimes at zero
+source/scheduler ticks. Each lifetime reached original OnInit, original
+OnLoad/OnStart and the two queued callback drains, then completed checked
+StageLast/light retirement, MatchContext end, SIS retirement, and owned-world
+shutdown. World generations were **3** and **4**. Both began from the same
+fresh heap/object/process baseline; after the first world's retirement, the
+new second world matched that baseline. Both world closures were inactive at
+retirement and the final owned session closed with zero bytes. No third-world
+recreation was observed. The [frozen result receipt](../evidence/issue251-stadium-profile-oninit-v1.json)
+binds this result to the independently reviewed 98-file fixture inventory
+and 136 input bindings; both sets matched before and after. The 98 files are
+the verified fixture inventory, not proof of complete full-match asset
+closure. The next match seam must reuse this inventory and fail on any missing
+required asset or service. Root independently verified 160 unique bound
+files, all 98 fixtures, and 15 trace rows. Result and review identities are
+recorded in the portable receipt.
+
+The Stage-only same-world heap observation was **33,451,424 → 33,365,248**
+bytes, a retained **86,176** bytes. Whole-world object/process counts and used
+GObj/proc pool counts remained **2/2** across the Stage interval while
+MatchContext stayed live; the Stage registry and markers were empty after
+retirement. This is distinct from the earlier
+85,920-byte failed OnInit teardown predicate and from the retained generator
+same-world SDK predicate failure. Neither earlier failure is waived or
+resolved by this different zero-tick whole-world result. The first retirement
+and new second-world initialization restored the fresh baseline; no third
+world was observed. The generic E8 subprobe
+still reports `stage_objects_started=false` because it describes the E8
+request sub-scope; separate `stadium_source_onstart_returned` events and
+numeric rows record actual OnStart in both lifetimes.
+
+This is a successful zero-tick Stage/MatchContext/MenuWorld lifecycle, not a
+gameplay or C3 pass. It did not construct active fighters/items/HUD/audio
+match services, observe Ready/GO, dispatch a source scheduler tick, or reach
+the 3,500-tick interval. The retained evidence still excludes C3 acceptance,
+rendering, browser behavior, and original-equivalence claims.
+
+The source-to-Ready work has seven explicit next steps under C3's existing
+prerequisite groups; these steps do not replace or redefine those groups:
+
+1. Add an exact diagnostic-only prepared-stage seam to the existing
+   `GameplayMatchSession`/`GameplayWorld` path. Keep ordinary Stadium content
+   and player admission closed; do not add a parallel match driver.
+2. Reuse the complete source scene owners and verified 98-file fixture
+   inventory as known inputs, not as a claim that full-match closure is
+   complete. Require and validate every full-match asset; fail on any missing
+   asset or service. Cover rules, save/RNG/PAD, common and fighter data,
+   effects, item runtime, refraction, camera/render, audio, and HUD; add no
+   success stubs.
+3. Use the Stadium collision/map markers and authored spawn matrices/facing
+   for the selected two Human Marios; verify source slot, costume, and fighter
+   identity before Entry/Ready.
+4. Reach exactly one original OnStart at the original intro boundary. The
+   direct zero-tick helper must not start it a second time when HUD Ready/GO
+   dispatches the source callback.
+5. Keep the live Stadium display/screen path valid through the match, including
+   canonical IMAGE/preload/fallback, SIS and slot swaps, item consumers,
+   scheduled display procedures, and the source camera owner. Check the screen
+   countdown, GO, mode, timers, and scratch title along the original path.
+6. Observe original Ready/GO, then run at least 3,500 neutral-input, no-draw
+   source ticks in each world before the first transformation. Retain a
+   per-tick RNG ledger by owner and check source cursor, fighter/map/generator/
+   item state, and borrowers; also exercise the required stock-out and
+   standings observations without skipping their source path.
+7. Complete checked Stage/component retirement and whole-world shutdown,
+   require both world closures inactive, verify the recreated world's exact
+   fresh baseline, then repeat the full lifecycle in a second world. Record
+   final session closure; do not infer a third recreation unless observed.
+
+The receipt records the zero-tick result and these remaining steps.
+Earlier OnInit, generator, and fixture failures remain retained with their
+original scopes; no source-to-Ready or 3,500-tick runtime attempt has run.

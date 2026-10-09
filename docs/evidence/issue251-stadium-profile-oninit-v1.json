@@ -319,7 +319,7 @@
   },
   "subsequent_c3_component_2026_10_09": {
     "claim_boundary": "Existing October7 profile receipt remains historical. This update preserves V26 and identifies the exact later producer; componentcontrols do not pass C3.",
-    "current_result": "blocked_at_heap_return_after_actual_StageLast",
+    "current_result": "passed_zero_tick_two_world_stage_lifecycle; ReadyGO_and_C3_unrun",
     "prior_v26": {
       "source_commit": "b8c272c44a94bcb03f0371008851e468200d4496",
       "first_failure": "heap_free_bytes",
@@ -487,7 +487,7 @@
         "SDK unittest moduleimport failure beforeNode; fixedexplicit scriptsimport and retainedoutput"
       ]
     },
-    "next_progression": "Required original OnLoad/OnStart while maps stilllive, with checked source generator/camera owners. Header-only diagnostic cancellation would repair earlyabort only; it is not selected as the C3 lifecycle progression.",
+    "next_progression": "Within the existing seven C3 prerequisite groups, build a diagnostic-only prepared-stage seam into the existing GameplayMatchSession/GameplayWorld owner path without changing ordinary Stadium admission. Reach original Ready/GO with complete owners; verify screen countdown, GO, mode, timers, scratch title and SIS slot swaps; then run at least 3500 neutral no-draw ticks before first transformation in each of two worlds while retaining a per-tick RNG ledger by owner and required stock-out/standings observations; verify checked retirement, fresh-world baseline and final session closure.",
     "private_evidence": {
       "external_run_id": "stadium-c3-lifetime-20261009-074216-4d7cf7d1",
       "artifact_names_relative_to_run": true,
@@ -565,6 +565,7 @@
       "private_evidence_run_id": "stadium-c3-lifetime-20261009-074216-4d7cf7d1"
     },
     "later_owned_world_and_callback_reduction": {
+      "checkpoint": "Historical reducer state before the fifth actual zero-tick two-world fixture; its unrun OnStart/retirement limits are superseded only by the following fifth_fixture_pass record.",
       "evidence_labels": [
         "actual asset-free SDK reduced controls",
         "actual real-fixture first refusals retained",
@@ -677,6 +678,185 @@
         "No successful real OnLoad/OnStart/drain or full Stage/world retirement",
         "No Ready/GO, scheduler ticks or C3 acceptance"
       ]
+    },
+    "intervening_native_traces": [
+      {
+        "producer_commit": "30798af0a949f3be0e897a2b9c9e204035ad6f27",
+        "producer_tree": "248e36787e14fe3efe743173af7ed147dbe89974",
+        "scope": "Added the exact started-manager GObj/proc to the checked private Ground map-set; actual SDK reduced manager/map-set control with synthetic four-map identities.",
+        "result": "PASS once; not a real Stage or C3 pass.",
+        "result_receipt": {
+          "artifact": "started-manager-sdk-frozen-result-v1.json",
+          "sha256": "13eeabd7e5750e6c9ea417ca2126491bf7ab04fac0bbaaa9040f15f96af411e1"
+        },
+        "root_review": {
+          "artifact": "root-started-manager-sdk-review-v1.json",
+          "sha256": "36d40b9fccd10b181ce768b9f62e2d9d042a0090262c63703bfdee62f9b8b655"
+        },
+        "preparation_limit": "Prelaunch object/archive inventory was incomplete: wrong StageLast object path raised FileNotFoundError. JS/WASM were hashed and copied before launch; missing object/archive provenance and complete inventory were recovered after SDK exit. No rerun or pristine-preparation claim."
+      },
+      {
+        "producer_commit": "30798af0a949f3be0e897a2b9c9e204035ad6f27",
+        "producer_tree": "248e36787e14fe3efe743173af7ed147dbe89974",
+        "scope": "Fourth zero-tick real fixture; original OnStart and checked StageLast/light destruction returned, then caller refused before MatchContext end, world shutdown, or a second lifetime.",
+        "result": "FAIL retained once; no retry.",
+        "failure": "Caller Ground storage lease assertion used a pre-OnLoad baseline after original construction advanced its allocation watermark from 3021 to 3026. The compound predicate did not emit all subfields, so other predicate conclusions remain unclaimed.",
+        "result_receipt": {
+          "artifact": "real-world-fourth-frozen-result-v1.json",
+          "sha256": "f550daf63193c3abf3b130753e0c043539cbf538fd9ae1bf224144a825c41682"
+        },
+        "root_review": {
+          "artifact": "root-real-world-fourth-result-review-v1.json",
+          "sha256": "1c81bcfbea2b358e524cbd0dd03f1fc899fc45d8aeded2d71582e75d689c3225"
+        }
+      },
+      {
+        "producer_commit": "3d032f743d93b45bbe2a8036d4b2896924af7295",
+        "producer_tree": "3add40edea75991a55187c6476595cab17688a8d",
+        "scope": "Actual SDK retirement-phase control after original manager construction; not a full Stage fixture.",
+        "result": "PASS once: rejected stale watermark 10 and accepted the observed post-construction baseline 12 after Ground end; negative copies refused. The strict retirement helper and historical OnInit-only baseline/predicate were unchanged.",
+        "fixture_launched": false,
+        "result_receipt": {
+          "artifact": "retirement-phase-sdk-frozen-result-v1.json",
+          "sha256": "15297e2adc0cd06e182e6a615a2c877b7684aa47746b9e56484bb4f96db94b00"
+        },
+        "root_review": {
+          "artifact": "root-retirement-phase-sdk-review-v1.json",
+          "sha256": "80b1df819f084f580e02cee036942aefab9a9281c88055f455aaa0b3faad2cdb"
+        },
+        "unresolved_failures": [
+          "Earlier 85920-byte same-world OnInit gap",
+          "Separate compound generator heap/object/process predicate failure"
+        ]
+      }
+    ],
+    "fifth_fixture_pass": {
+      "source_producer_commit": "3d032f743d93b45bbe2a8036d4b2896924af7295",
+      "source_tree": "3add40edea75991a55187c6476595cab17688a8d",
+      "source_clean": true,
+      "result": "PASS two sequential complete owned Stadium Stage/MenuWorld lifetimes at zero source/scheduler ticks; not ReadyGO or C3",
+      "scope": "Original OnInit, original OnLoad/OnStart and pending callback drain, checked StageLast/light retirement, checked MatchContext end/parent host export, exact SIS retirement, and complete world shutdown. The first world's retirement is followed by a fresh second world at the same baseline; the second world is then closed. No third-world recreation, active match, or scheduler tick was observed.",
+      "result_receipt": {
+        "artifact": "real-world-fifth-frozen-result-v1.json",
+        "bytes": 74793,
+        "sha256": "d5a6a9cc4cb2bd07fc95f38edfa6a5b20d67457881a115807a184e4743345f04"
+      },
+      "root_review": {
+        "artifact": "root-real-world-fifth-result-review-v1.json",
+        "bytes": 1398,
+        "sha256": "36c5e821ebe50d2f825050e4ef022c712d1a0fd3e7bfc2c51906eaeba8099e96",
+        "binding_verification_sha256": "3c20e18f7f70b86d93f696286f48de7cb9e513a4625812dae0b072f43c00610f",
+        "unique_bound_files_verified": 160,
+        "fixture_files_verified": 98,
+        "trace_rows": 15,
+        "independently_inspected_events": [
+          "stadium_source_oninit_returned",
+          "stadium_source_onstart_returned",
+          "stadium_source_oninit_cleaned",
+          "stadium_source_oninit_returned",
+          "stadium_source_onstart_returned",
+          "stadium_source_oninit_cleaned"
+        ],
+        "owned_children": {
+          "natural_exit_and_reaped": true,
+          "freshly_absent": true,
+          "terminate_or_kill_sent": false
+        }
+      },
+      "fixture_and_bindings": {
+        "fixture_count": 98,
+        "fixture_inventory_is_full_match_asset_closure": false,
+        "required_missing_assets_must_fail_at_match_seam": true,
+        "fixture_pre_post_equal": true,
+        "binding_count": 136,
+        "bindings_post_equal": true
+      },
+      "lifetimes": [
+        {
+          "ordinal": 0,
+          "world_generation": 3,
+          "source_ticks": 0,
+          "fresh_heap_bytes": 33497344,
+          "ground_allocation_generation": 2751,
+          "map2_allocation_generation": 2986,
+          "post_oninit_watermark": 3021,
+          "pre_retirement_watermark": 3026,
+          "actual_onload_onstart_and_callbacks": true,
+          "checked_stage_retirement": true,
+          "world_shutdown": true,
+          "followed_by_fresh_world_generation": 4
+        },
+        {
+          "ordinal": 1,
+          "world_generation": 4,
+          "source_ticks": 0,
+          "fresh_heap_bytes": 33497344,
+          "ground_allocation_generation": 3044,
+          "map2_allocation_generation": 3279,
+          "post_oninit_watermark": 3314,
+          "pre_retirement_watermark": 3319,
+          "actual_onload_onstart_and_callbacks": true,
+          "checked_stage_retirement": true,
+          "world_shutdown": true,
+          "followed_by_fresh_world_generation": null
+        }
+      ],
+      "stage_same_world_observation": {
+        "heap_before": 33451424,
+        "heap_after_stage_retirement": 33365248,
+        "retained_bytes": 86176,
+        "objects_before_after": [2, 2],
+        "processes_before_after": [2, 2],
+        "used_gobj_before_after": [2, 2],
+        "used_proc_before_after": [2, 2],
+        "count_scope": "Whole-world object/process counts and used GObj/proc pool counts across the Stage interval while MatchContext remained live; stage registry and markers were empty after retirement.",
+        "stage_registry_markers_empty": true,
+        "source_roots_pools_classes_devices_restored": true,
+        "interpretation": "Observed Stage-scope retention for this OnInit+OnStart fixture; after the first world retired, the fresh second world matched the same baseline. The final world closed without a third-world recreation. Not a substitute for or resolution of the earlier 85920-byte OnInit-only failure or the separate generator same-world predicate failure."
+      },
+      "generic_e8_flag_interpretation": "The generic stadium-e8-request JSON still says stage_objects_started=false because that subprobe records E8 request scope. The separate actual stadium_source_onstart_returned events and numeric source records establish OnStart in both full-world lifetimes.",
+      "retained_failures_and_reducers": [
+        {
+          "producer": "21b60e83238a425b6a9e09033e06844ccc5d7f4c",
+          "scope": "Earlier actual OnInit-only teardown first failed its heap predicate by 85920 bytes; unchanged and not waived by this later whole-world pass."
+        },
+        {
+          "producer": "b016f3c638d55b1453532d95ca9fb9cb269a40bf",
+          "scope": "Separate generator SDK two-lifetime strict heap/object/process predicate failure; no completed lifetime. The 86176-byte Stage-scope observation does not resolve it."
+        },
+        {
+          "producer": "d89df9bc8a855eed7991dee777682d67686ded89",
+          "scope": "Two-world GObj/proc pool reducer passed; 160 bytes remained in same-world rooted allocator caches, then full world shutdown/recreation restored baseline."
+        },
+        {
+          "producer": "31a91e5baffbcea0bd617aaa4a192c74ba0cc2bc",
+          "scope": "Actual SDK queue pair reducer passed for map2/fn_801D13C8 and map1/fn_801D11E4, with 12-byte headers; it did not dispatch callbacks or run full Stage."
+        }
+      ],
+      "not_established": [
+        "GameplayMatchSession diagnostic prepared-stage seam",
+        "active fighter/item/audio/rules/HUD services",
+        "original Ready/GO",
+        "source scheduler ticks",
+        "3500 post-GO ticks per world",
+        "first transformation boundary",
+        "C3 acceptance or rendering/browser/original-equivalence claims"
+      ],
+      "next_ready_go_steps": [
+        "Add an exact diagnostic-only prepared-stage seam to existing GameplayMatchSession/GameplayWorld; keep ordinary Stadium content/player admission closed and do not add a parallel driver.",
+        "Reuse and validate complete source scene owners for rules, save/RNG/PAD, common/fighters, effects, items, refraction, camera/render, audio, and HUD. The verified 98 files are fixture inputs, not proof of complete full-match asset closure; require every needed asset and fail on any missing asset or service, with no success stubs.",
+        "Use Stadium collision/map markers and authored spawn matrices/facing; verify selected two-Human-Mario source slots, costumes, fighter identities, and ownership before Entry/Ready.",
+        "Dispatch exactly one original OnStart at the original intro boundary; do not direct-start and then allow HUD Ready/GO to dispatch OnStart a second time.",
+        "Keep active Stadium display/screen services live through gameplay, including canonical IMAGE/preload/fallback, SIS slot swaps, item consumers, scheduled display procedures, and source camera ownership; check screen countdown, GO, mode, timers, and scratch title.",
+        "Observe original Ready/GO, then run at least 3500 neutral-input no-draw source ticks in each world before first transformation. Retain a per-tick RNG ledger by owner and check cursor, fighters, map/generator/item state, and borrowers; observe stock-out and standings through the source path.",
+        "Complete checked Stage/component retirement and whole-world shutdown, require both world closures inactive, verify the next fresh world's baseline, repeat the lifecycle in the second world, and record final session closure. Do not infer a third recreation unless observed."
+      ],
+      "claim_boundary": "This pass closes the retained zero-tick original OnInit/OnLoad/OnStart and two-world retirement/recreation boundary only. It does not pass C3. All earlier failed predicates and their scopes remain retained.",
+      "private_evidence": {
+        "external_run_id": "stadium-c3-lifetime-20261009-074216-4d7cf7d1",
+        "artifact_names_relative_to_run": true,
+        "no_machine_specific_path_required": true
+      }
     }
   }
 }
