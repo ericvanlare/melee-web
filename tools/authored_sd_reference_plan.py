@@ -50,7 +50,7 @@ def recipe(version=1):
         "exclusions": ["SD resolution", "Results/CSS return", "pixels", "PCM", "live timing"],
         "setup_policy": "original menus only; no game, RNG, fighter or winner writes",
     }
-    if version in (2, 3, 4) and type(version) is int:
+    if version in (2, 3, 4, 5) and type(version) is int:
         declaration["version"] = version
         declaration["cold_original_context"] = {
             "port_rumble_preferences": [0, 0, 1, 1],
@@ -59,10 +59,10 @@ def recipe(version=1):
             "port_mapping": "slot zero uses player index; otherwise slot minus one",
             "preparation": "original Options Rumble: P1/P2 off; P3/P4 untouched defaults",
         }
-        if version in (3, 4):
+        if version in (3, 4, 5):
             del declaration["cold_original_context"]["human_source_slots"]
             declaration["cold_original_context"]["human_source_ports_zero_based"] = [0, 1]
-        if version == 4:
+        if version in (4, 5):
             from sd_gci_profile import GCI_SHA256, GAME_WRITTEN_SHA256
             declaration["original_profile"] = {
                 "id": "game-written-save-browser-reexport-original-load",
@@ -72,6 +72,14 @@ def recipe(version=1):
                 "initial_characters_mask": "07ff", "initial_stages_mask": "07ff",
                 "first_gate": "reduced Rules readiness and loaded context only; later settings preparation separate",
             }
+        if version == 5:
+            declaration["cold_original_context"].update(
+                port_rumble_preferences=[1, 1, 1, 1],
+                preparation="unchanged original loaded profile; unnamed human ports retain rumble on")
+            declaration["original_profile"]["first_gate"] = "loaded Rules context, then original menus through neutral tied timeout and SD setup"
+            declaration["expected_setup"]["disable_pausing"] = False
+            for player, costume in zip(declaration["expected_setup"]["players"], (1, 0)):
+                player.update(costume=costume, rumble_enabled=True)
     elif version != 1 or type(version) is not int:
         raise ValueError("Unsupported authored SD recipe version")
     return declaration
@@ -80,7 +88,7 @@ def recipe(version=1):
 def validate_recipe(value):
     # Byte comparison also rejects bool-for-int and int-for-float substitutions.
     version = value.get("version") if isinstance(value, dict) else None
-    if version not in (1, 2, 3, 4) or canonical(value) != canonical(recipe(version)):
+    if version not in (1, 2, 3, 4, 5) or canonical(value) != canonical(recipe(version)):
         raise ValueError("Unsupported or changed authored SD reference recipe")
     return value
 

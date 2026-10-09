@@ -547,6 +547,8 @@ struct Reader {
   u32 sd_menu_consumed=0;
   bool sd_menu_neutral=false;
   bool css_steering_ready=false;
+  bool sd_sss_ready=false;
+  bool sd_rules_observed=false;
   size_t slice_count=0, raw_size=0;
   std::array<SliceRef,64> slices{};
   std::array<u8,192*1024> raw{};

@@ -1,5 +1,22 @@
 # Original menu route
 
+The separate `capture_sd_reference_prefix.py` diagnostic accepts an explicit
+recipe-five/menu-five GCI campaign for original Rules → Items → two-human Mario
+CSS → Final Destination → natural one-minute tie → SD initialization. Its fixed
+input plan declares neutral P1/P2 and disconnected P3/P4 through the bounded
+gameplay prefix. Earlier authored recipes and reduced Rules probes remain
+distinct contracts; ordinary replay collectors still reject authored plans.
+
+The route reuses MenuFlow values, generic CSS cursor/door/live-state slices and
+the highlighted stage kind. Its sole added steering field is the original SSS
+acceptance cooldown, read only after the verified constructor return. Every
+menu motion and source-consumed input has a declared cap. Final VS setup and SD
+normalization remain exact byte comparisons. The final SSS A is released after
+observed consumption; any A leaking into gameplay fails the neutral plan.
+An interrupted observer prefix requires independently complete native MWRI.
+Neither portable controls nor a compiled producer establish that this extended
+original route ran, or that it matches native gameplay, pixels, PCM or timing.
+
 ## Observed retail route
 
 The title/main-menu route is now implemented with the recovered title and menu

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Owned cold-boot Rules-ready probe; opt-in diagnostic, never SD admission.
+"""Owned cold-boot Rules gate or authored SD initialization prefix diagnostic.
 
 Menu intents and bounded source predicates must be authored before launch. This runner
 cannot synthesize native MWRI input, recover missed samples, or force a result.
@@ -75,7 +75,7 @@ def menu_actions(path):
     raw = Path(path).read_bytes()
     require(len(raw) <= 1024 * 1024, "SD menu recipe exceeds its bound")
     value = json.loads(raw)
-    if isinstance(value, dict) and value.get("version") in (2, 3, 4):
+    if isinstance(value, dict) and value.get("version") in (2, 3, 4, 5):
         validate_packet(value)
         return value, hashlib.sha256(raw).hexdigest()
     require(isinstance(value, dict) and set(value) == {"schema", "version", "actions"} and
@@ -145,10 +145,12 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
     build = validate_reference_build_manifest(Path(build_manifest), Path(dolphin))
     plan, plan_hash = load_plan(input_plan, allow_authored=True)
     menus, menu_hash = menu_actions(menu_recipe)
-    campaign = menus["scope"] == "rules_ready_gci"
+    full_route = menus["scope"] == "sd_prefix_gci"
+    campaign = menus["scope"] in ("rules_ready_gci", "sd_prefix_gci")
     scope = menus["scope"]
-    require(plan["authored_recipe"]["version"] == (4 if campaign else 3) and
-            menus["version"] == (4 if campaign else 2) and (gci is not None) == campaign,
+    require(plan["authored_recipe"]["version"] == (5 if full_route else 4 if campaign else 3) and
+            menus["version"] == (5 if full_route else 4 if campaign else 2) and (gci is not None) == campaign and
+            menus["authored_recipe_sha256"] == plan["authored_recipe_sha256"],
             "Runnable original diagnostic requires the exact current scoped recipe/menu versions")
     loaded_profile = None
     if campaign:
@@ -160,8 +162,9 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                     "Core/PowerPC/ReferenceCaptureObserver.cpp") == hashlib.sha256(overlay.read_bytes()).hexdigest(),
                 "Loaded-profile observer producer is stale or unbound")
         loaded_profile, owned_gci = prepare_gci_folder(gci, output / "gci-folder")
-    receiver = GciRulesMenuReceiver(plan, loaded_profile) if campaign else RulesMenuReceiver(plan)
-    require(type(timeout) in (int, float) and 0 < timeout <= 600, "Rules deadline is unbounded")
+    receiver = GciRulesMenuReceiver(plan, loaded_profile, full_route=full_route) if campaign else RulesMenuReceiver(plan)
+    require(type(timeout) in (int, float) and 0 < timeout <= (180 if full_route else 600),
+            "Original diagnostic deadline is unbounded")
     user = output / "user"
     p1, p2, source_inventory = prepare_rules_profile(profile, user)
     raw, status = output / "observer.bin", output / "observer-status.json"
@@ -172,7 +175,7 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                        MWRC_DOL_SHA256="dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
                        MWRC_OUTPUT=str(raw), MWRC_STATUS=str(status), MWRC_SD_INIT="1",
                        MWRC_SD_RECIPE_SHA256=plan["authored_recipe_sha256"],
-                       MWRC_SD_MENU_PROBE="rules_ready",
+                       MWRC_SD_MENU_PROBE="sd_prefix" if full_route else "rules_ready",
                        MWRC_INPUT_RECORD=str(native), MWRC_INPUT_STATUS=str(native_status))
     command = rules_dolphin_command(dolphin, user, disc)
     if campaign:
@@ -237,6 +240,8 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                     tap(action, action["label"], action["max_polls"])
                     wait_source(lambda: matches(receiver.latest_menu, action["after"]),
                                 action["label"] + ":observed", action["max_polls"])
+                if full_route:
+                    drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, tap)
                 while not receiver.ended:
                     next_row()
                 # MWRO End is flushed before the writer publishes final status.
@@ -260,6 +265,102 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                 raise
 
 
+def drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, tap):
+    """Reuse the original Pipe driver's bounded cursor/door/highlight policy.
+
+    All axes, targets and limits are frozen in the canonical packet. Observer
+    input events prove actual consumption; host sleep never proves readiness.
+    This is an initialization prefix, with no Results/resolution continuation.
+    """
+    from reference_versus_sequence_capture import raw_pad
+    policy = menus["css"]
+    def pair(port, pad):
+        pads = [NEUTRAL_PAD] * 2
+        pads[port] = pad
+        return {"p1": pads[0], "p2": pads[1]}
+    def neutral(label):
+        before = receiver.menu_consumed
+        controller.set_both(NEUTRAL_PAD, NEUTRAL_PAD, action=label)
+        wait_source(lambda: receiver.menu_consumed > before and
+                    receiver.last_pad[:2] == [NEUTRAL_PAD]*2, label, 600)
+    def move(port, point, label):
+        first = receiver.menu_polls
+        while True:
+            require(receiver.css is not None and receiver.menu_polls-first < policy["max_move_polls"],
+                    "CSS cursor owner/movement cap: " + label)
+            cursor = receiver.css["cursors"][port]
+            dx, dy = point[0]-cursor["x"], point[1]-cursor["y"]
+            if abs(dx) < policy["tolerance"] and abs(dy) < policy["tolerance"]:
+                neutral(label + ":neutral")
+                stable, previous = 0, receiver.css["cursors"][port].copy()
+                while stable < policy["stable_cursor_polls"]:
+                    before = receiver.menu_polls
+                    wait_source(lambda: receiver.menu_polls > before, label+":settle", 600)
+                    require(receiver.css is not None, "CSS cursor lost while settling")
+                    current = receiver.css["cursors"][port]
+                    stable = stable+1 if all(abs(current[k]-previous[k]) < 0.02 for k in ("x", "y")) else 0
+                    previous = current.copy()
+                    require(receiver.menu_polls-first < policy["max_move_polls"], "CSS settle cap")
+                if all(abs(point[i]-previous[k]) < policy["tolerance"] for i,k in enumerate(("x","y"))):
+                    return
+                continue
+            def axis(delta):
+                return 0 if abs(delta) < 0.5 else (70 if abs(delta)>5 else 35)*(1 if delta>0 else -1)
+            intent = pair(port, raw_pad(x=axis(dx), y=axis(dy)))
+            before = receiver.menu_polls
+            controller.set_both(intent["p1"], intent["p2"], action=label)
+            wait_source(lambda: receiver.menu_polls > before, label+":cursor", 600)
+    wait_source(lambda: receiver.css is not None, "CSS constructor-owned inventory", 600)
+    require([p["kind"] for p in receiver.css["players"]] == [0, 0], "CSS requires two original humans")
+    for port, costume in enumerate(policy["costumes"]):
+        move(port, policy["point"], f"Mario-P{port+1}")
+        tap(pair(port, raw_pad(buttons=["A"])), f"Mario-place-P{port+1}", 600)
+        wait_source(lambda: receiver.css["players"][port]["character"] == policy["character"], "Mario selected", 600)
+        if receiver.css["doors"][port]["costume"] != costume:
+            model = receiver.css["models"][port]
+            move(port, (model["x"]-2, model["y"]+1.6), "pickup-human-puck")
+            tap(pair(port, raw_pad(buttons=["A"])), "pickup-human-puck", 600)
+            wait_source(lambda: receiver.css["cursors"][port]["state"] == 1 and
+                        receiver.css["cursors"][port]["held"] == port, "held human puck", 600)
+            move(port, policy["point"], "Mario-costume-hover")
+            wait_source(lambda: receiver.css["doors"][port]["icon"] == policy["icon"], "Mario icon", 600)
+            for attempt in range(policy["max_costume_taps"]):
+                if receiver.css["doors"][port]["costume"] == costume:
+                    break
+                before = receiver.css["doors"][port]["costume"]
+                tap(pair(port, raw_pad(buttons=["X"])), "Mario-costume", 600)
+                wait_source(lambda: receiver.css["doors"][port]["costume"] != before, "costume changed", 600)
+            require(receiver.css["doors"][port]["costume"] == costume, "Mario costume cap")
+            tap(pair(port, raw_pad(buttons=["A"])), "place-colored-Mario", 600)
+        wait_source(lambda: receiver.css["cursors"][port]["state"] != 1, "human puck placed", 600)
+    require([p["character"] for p in receiver.css["players"]] == [8,8] and
+            [d["costume"] for d in receiver.css["doors"]] == policy["costumes"], "CSS final lineup differs")
+    before = receiver.menu_polls
+    wait_source(lambda: receiver.menu_polls >= before+policy["idle_polls_before_start"], "CSS source idle", 600)
+    tap(pair(0, raw_pad(buttons=["START"])), "CSS-start-SSS", 600)
+    wait_source(lambda: receiver.stage is not None, "SSS constructor-owned readiness", 600)
+    stage = menus["sss"]
+    before = receiver.menu_polls
+    wait_source(lambda: receiver.menu_polls >= before+stage["initial_idle_polls"], "SSS source idle", 600)
+    if receiver.stage["kind"] != stage["stage_kind"]:
+        before = receiver.menu_polls
+        controller.set_both(raw_pad(x=stage["column_x"]), NEUTRAL_PAD, action="FD-column")
+        wait_source(lambda: receiver.menu_polls >= before+stage["column_polls"], "FD column", 600)
+        neutral("FD-column-neutral")
+        controller.set_both(raw_pad(y=stage["scan_y"]), NEUTRAL_PAD, action="FD-scan-up")
+        wait_source(lambda: receiver.stage["kind"] == stage["stage_kind"], "FD highlight", stage["max_scan_polls"])
+        neutral("FD-highlight-neutral")
+    wait_source(lambda: receiver.stage["kind"] == 32 and receiver.stage["cooldown"] == 0,
+                "FD original confirmation predicate", 600)
+    # Release immediately after observed menu consumption. If an A sample
+    # reaches VS instead, the unchanged native/receiver neutral checks fail.
+    before = receiver.menu_consumed
+    controller.set_both(raw_pad(buttons=["A"]), NEUTRAL_PAD, action="choose-FD")
+    wait_source(lambda: receiver.menu_consumed > before and receiver.last_pad[:2] ==
+                [raw_pad(buttons=["A"]), NEUTRAL_PAD], "choose-FD:consumed", 600)
+    controller.set_both(NEUTRAL_PAD, NEUTRAL_PAD, action="choose-FD:release")
+
+
 def main(argv=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
@@ -271,7 +372,7 @@ def main(argv=None):
     try:
         report = run(**vars(args))
     except (OSError, ValueError) as error:
-        parser.exit(1, f"Rules-ready diagnostic failed: {error}\n")
+        parser.exit(1, f"Original menu/SD diagnostic failed: {error}\n")
     print(json.dumps(report, sort_keys=True))
     return 0
 

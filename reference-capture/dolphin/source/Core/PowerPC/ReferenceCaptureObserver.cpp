@@ -219,6 +219,7 @@ enum class SliceTag : u16
   PlayerEntities = 52,
   PlayerEntityUserData = 53,
   SdRumblePorts = 54,  // Opt-in Progress JSON only; never a full save-data slice.
+  SdStageCooldown = 55,  // Recipe-five menu route only; original acceptance gate.
 };
 
 struct SliceRef
@@ -898,7 +899,8 @@ struct Observer::Impl
       return false;
     }
     if (!Env("MWRC_SD_PROFILE_GCI_SHA256").empty() &&
-        (!SdInitRequested() || Env("MWRC_SD_MENU_PROBE") != "rules_ready" ||
+        (!SdInitRequested() || (Env("MWRC_SD_MENU_PROBE") != "rules_ready" &&
+                              Env("MWRC_SD_MENU_PROBE") != "sd_prefix") ||
          Env("MWRC_SD_PROFILE_GCI_SHA256") !=
              "5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729"))
     {
@@ -914,7 +916,9 @@ struct Observer::Impl
           !Env("MWRC_WHOLE_SESSION_MATCHES").empty() ||
           !Env("MWRC_CPU_PROBE_OUTPUT").empty() || !Env("MWRC_ITEM_PROBE_OUTPUT").empty() ||
           !Env("MWRC_ALLOCATION_OUTPUT").empty() ||
-          (!Env("MWRC_SD_MENU_PROBE").empty() && Env("MWRC_SD_MENU_PROBE") != "rules_ready"))
+          (!Env("MWRC_SD_MENU_PROBE").empty() && Env("MWRC_SD_MENU_PROBE") != "rules_ready" &&
+           Env("MWRC_SD_MENU_PROBE") != "sd_prefix") ||
+          (Env("MWRC_SD_MENU_PROBE") == "sd_prefix" && Env("MWRC_SD_PROFILE_GCI_SHA256").empty()))
       {
         SetInvalid("SD prefix requires a recipe hash, native input recording and exclusive scope");
         return false;
@@ -2100,6 +2104,22 @@ struct Observer::Impl
     // Menu globals retain pointers after their scene arena is reclaimed.
     // Observe each steering owner only in its live source menu scene.
     u8 stage_index = 0;
+    if (scene_kind == 9 && Env("MWRC_SD_MENU_PROBE") == "sd_prefix")
+    {
+      if (!sd_sss_ready)
+        return true;
+      // mnStageSel_80259C28 tests lwz r0,-0x49fc(r13), cmpwi, bne
+      // before accepting confirmation. Original GALE01r2 r13 is 0x804db6a0.
+      const std::array<u32, 3> words = {0x800db604, 0x28000000, 0x40820128};
+      for (size_t i = 0; i < words.size(); ++i)
+      {
+        u32 word = 0;
+        if (!ReadU32(system, 0x80259c3c + static_cast<u32>(i * 4), &word) || word != words[i])
+          return false;
+      }
+      if (!AddSlice(system, SliceTag::SdStageCooldown, 0x804d6ca4, 4))
+        return false;
+    }
     if (scene_kind == 9 && ReadBytes(system, STAGE_SELECT_INDEX, 1, &stage_index))
     {
       if (!AddSlice(system, SliceTag::StageSelectIndex, STAGE_SELECT_INDEX, 1))
@@ -2367,6 +2387,15 @@ struct Observer::Impl
       return SetInvalid("SD prefix source counter is invalid"), void();
     raw_size = 0;
     slice_count = 0;
+    if (Env("MWRC_SD_MENU_PROBE") == "sd_prefix" &&
+        (pc == 0x8025a998 || pc == 0x8025b84c))
+    {
+      u32 word = 0;
+      if (!ReadU32(system, pc, &word) || word != (pc == 0x8025a998 ? 0x7c0802a6 : 0x4e800020))
+        return SetInvalid("SD prefix SSS readiness instruction differs"), void();
+      sd_sss_ready = pc == 0x8025b84c;
+      return;
+    }
     if (pc == CSS_ENTER_RETURN)
     {
       u32 word = 0;
@@ -2390,7 +2419,7 @@ struct Observer::Impl
         if (++sd_menu_polls > 7200)
           return SetInvalid("SD prefix menu polling cap exhausted"), void();
         SdEvent("menu", pc, tick);
-        if (Env("MWRC_SD_MENU_PROBE") == "rules_ready" && sd_menu_consumed && sd_menu_neutral)
+        if (!sd_rules_observed && !Env("MWRC_SD_MENU_PROBE").empty() && sd_menu_consumed && sd_menu_neutral)
         {
           std::array<u8, 0x18> flow{};
           std::array<u8, 8> input{};
@@ -2423,9 +2452,13 @@ struct Observer::Impl
                 return SetInvalid("SD loaded-profile context is missing"), void();
             }
             SdEvent("rules_ready", pc, tick);
-            InputStream::RequestFinish(true);
-            natural_completion.store(false);
-            finish_requested.store(true);
+            sd_rules_observed = true;
+            if (Env("MWRC_SD_MENU_PROBE") == "rules_ready")
+            {
+              InputStream::RequestFinish(true);
+              natural_completion.store(false);
+              finish_requested.store(true);
+            }
           }
         }
       }
@@ -3919,6 +3952,8 @@ struct Observer::Impl
   u32 cpu_probe_samus_effect_palette_address = 0;
   std::array<bool, 4> cpu_slots{};
   SdInitState sd_init;
+  bool sd_sss_ready = false;
+  bool sd_rules_observed = false;
   u32 sd_menu_polls = 0;
   u32 sd_menu_consumed = 0;
   bool sd_menu_neutral = false;
@@ -4095,7 +4130,8 @@ static bool IsCaptureBoundary(u32 guest_pc)
     // Diagnostic CPU PCs are JIT boundaries only for the fully validated,
     // opt-in companion configuration.  The normal observer boundary set and
     // its disabled path remain unchanged.
-    return (SdInitRequested() && (guest_pc == 0x8016ebc0 || guest_pc == 0x8016ec24)) ||
+    return (SdInitRequested() && (guest_pc == 0x8016ebc0 || guest_pc == 0x8016ec24 ||
+            (Env("MWRC_SD_MENU_PROBE") == "sd_prefix" && guest_pc == 0x8025b84c))) ||
            (CpuProbeEnabled() && FindCpuProbePoint(guest_pc) != nullptr &&
             (CpuProbeEnvironment().rng_return_pc == 0 ||
              CpuProbeEnvironment().rng_return_pc == guest_pc)) ||
