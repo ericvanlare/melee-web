@@ -115,10 +115,13 @@ test('competitive profile predicates use GameRules and validate raw CSS provenan
 
 const normalizedCompetitiveMatch = () => ({
   ready: true,
+  paused: false,
+  ending: false,
+  complete: false,
   frame: 180,
   rules: {
     match_kind: 1, stage: 0x20, timer_enabled: 1, time_limit: 480,
-    disable_pausing: 1, damage_ratio_bits: '3f800000', item_frequency: -1,
+    disable_pausing: 1, friendly_fire: 1, damage_ratio_bits: '3f800000', item_frequency: -1,
     item_mask_hex: 'fffffff80000000f', is_teams: 0,
     player_teams: [0, 0], player_stocks: [4, 4], player_source_slots: [0, 0],
     resolved_controller_ports: [0, 1],
@@ -157,7 +160,7 @@ test('normalized match oracle binds the source 8-minute conversion and binary32 
     message.startsWith('source-frame observation is within the bounded 180–240-frame prefix:')));
 });
 
-test('normalized match oracle rejects wrong stage, non-human port mapping, and incomplete player ownership', () => {
+test('normalized match oracle rejects wrong rules, phase state, non-human ports, and incomplete ownership', () => {
   const wrongStage = structuredClone(normalizedCompetitiveMatch());
   wrongStage.rules.stage = 0;
   assert(competitiveMatchStartFailures(wrongStage, {sourcePreferenceMaskHex: '0000000010000000'}).some(message =>
@@ -167,6 +170,23 @@ test('normalized match oracle rejects wrong stage, non-human port mapping, and i
   wrongPort.players[1].source_port = 0;
   assert(competitiveMatchStartFailures(wrongPort, {sourcePreferenceMaskHex: '0000000010000000'}).some(message =>
     message.startsWith('P2 resolved controller port:')));
+
+  const wrongFriendlyFire = structuredClone(normalizedCompetitiveMatch());
+  wrongFriendlyFire.rules.friendly_fire = 0;
+  assert(competitiveMatchStartFailures(wrongFriendlyFire, {sourcePreferenceMaskHex: '0000000010000000'}).some(message =>
+    message.startsWith('normalized friendly fire is enabled:')));
+
+  for (const [field, expectedMessage] of [
+    ['paused', 'active match is not paused:'],
+    ['ending', 'active match is not ending:'],
+    ['complete', 'active match is not complete:'],
+    ['observer_error', 'no match observer error:'],
+  ]) {
+    const invalidState = structuredClone(normalizedCompetitiveMatch());
+    invalidState[field] = true;
+    assert(competitiveMatchStartFailures(invalidState,
+      {sourcePreferenceMaskHex: '0000000010000000'}).some(message => message.startsWith(expectedMessage)));
+  }
 
   const wrongOwner = structuredClone(normalizedCompetitiveMatch());
   wrongOwner.rules.player_slot_types[1] = 1;

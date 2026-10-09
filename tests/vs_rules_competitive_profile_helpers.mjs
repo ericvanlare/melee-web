@@ -127,10 +127,15 @@ export function competitiveMatchStartFailures(match, {sourcePreferenceMaskHex} =
   };
 
   expect('match ready', match?.ready, true);
+  expect('no match observer error', match?.observer_error ?? false, false);
+  expect('active match is not paused', match?.paused, false);
+  expect('active match is not ending', match?.ending, false);
+  expect('active match is not complete', match?.complete, false);
   expect('source-frame observation is within the bounded 180–240-frame prefix',
     Number.isInteger(match?.frame) && match.frame >= 180 && match.frame <= 240, true);
   expect('normalized stock match kind', match?.rules?.match_kind, 1);
   expect('source-selected Final Destination', match?.rules?.stage, 0x20);
+  expect('normalized friendly fire is enabled', match?.rules?.friendly_fire, 1);
   expect('8-minute stock timer enabled by original conversion', match?.rules?.timer_enabled, 1);
   expect('8-minute stock timer seconds from original conversion', match?.rules?.time_limit, 480);
   expect('original Rules Plus pause-off conversion', match?.rules?.disable_pausing, 1);
