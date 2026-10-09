@@ -33,3 +33,37 @@ for(const [prefix,teardown,observations,bound] of [[true,true,60,60],[true,false
  assert.equal(scope.retailRun,null);
 }
 console.log('actual prefix report/awaited teardown controls passed');
+
+// Execute the actual header/owner initialization and callback, so a failure
+// before menuReplayCompleted cannot silently become a whole-session report.
+const requestedBlock=page.slice(page.indexOf('  const header=new DataView('),page.indexOf('  const run=retailRun;',page.indexOf('  const header=new DataView(')));
+const completionBlock=page.slice(page.indexOf('window.menuReplayCompleted='),page.indexOf('window.menuReplayPoll='));
+for(const [requested,completed] of [[true,null],[true,false],[false,true]]){
+ const bytes=new Uint8Array(328);const header=new DataView(bytes.buffer);
+ header.setUint32(0,0x4d575243);header.setUint32(4,8);header.setUint16(20,2);header.setUint16(22,requested?1:0);
+ const callbacks=[];let unloads=0;
+ const element={disabled:false,querySelectorAll:()=>[],replaceChildren(){}};
+ const scope={window:{},retailRun:null,bytes,hash:'synthetic',observe:true,
+  owner:{handle:{getState:()=>({state:'prepared'})}},$:()=>element,URL:{revokeObjectURL(){}},
+  resetTiming(){},prepareAudio:async()=>{},pauseAudioForPreparation:async()=>{},
+  performance:{now:()=>0},Module:{},clearRenderCacheOnLoad:false,replayEvidence:[],
+  replayMemorySnapshot:()=>({available:true}),replayMetrics:()=>({sourceFrames:0,sourceSteps:0,sourceDraws:0}),
+  unloadAndSave:async()=>{unloads++;return true;},status:()=>'',latestAudio:{},diagnosticCaptureInvalid:false,
+  navigator:{userAgent:'synthetic'},devicePixelRatio:1,TextEncoder,replayHash:async()=> 'synthetic',
+  replayDownload(){},syncAudio(){},fatal:false,bundle:true,importing:false,
+  setTimeout:fn=>callbacks.push(fn)};
+ vm.createContext(scope);vm.runInContext(finish,scope);
+ await vm.runInContext('(async()=>{'+requestedBlock+'})()',scope);
+ assert.equal(scope.retailRun.diagnosticEntityPrefix,requested);
+ if(completed!==null){vm.runInContext(completionBlock,scope);scope.window.menuReplayCompleted(0,false,0,-1,3,completed,60,0,59,60);
+  assert.equal(scope.retailRun.diagnosticEntityPrefix,requested,'Callback cannot overwrite requested identity');
+  assert.match(scope.retailRun.failure,/mode disagrees/);
+  await callbacks[0]();await scope.retailRun?.finishPromise;
+ }else await scope.finishRetailReplay('Replay exceeded bounded wall time');
+ const report=scope.window.lastRetailReplayReport;assert.equal(report.pass,false);assert.equal(unloads,1);
+ if(requested){assert.equal(report.diagnostic_prefix,'jiggly-ice-mario-fox-v1');assert.equal(report.diagnostic_prefix_complete,false);
+  assert.equal(report.whole_session_equivalent,false);assert.equal(report.complete,false);
+  assert(!report.failures.includes('whole-session final CSS was not entered'));
+ }else assert.equal(report.diagnostic_prefix,undefined);
+}
+console.log('actual requested-mode early failure/mismatch controls passed');
