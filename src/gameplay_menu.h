@@ -158,6 +158,9 @@ int melee_web_menu_apply_reference_css_context(
 /* Returns the separate VS-entry payload after the original source adapter has
  * applied persistent rules, stocks, item settings and rumble. */
 const VsModeData* melee_web_menu_ready_vs(const MeleeWebMenuSession*);
+/* Exact persistent mode state after the same one VS preparation callback;
+ * distinct from raw menus and the separately normalized Start output. */
+const VsModeData* melee_web_menu_post_vs_mode(const MeleeWebMenuSession*);
 /* Commit the ordinary VS Results callback's persistent menu payload. */
 int melee_web_menu_commit_results(MeleeWebMenuSession*, const VsModeData*,
     const uint8_t ko_counts[GM_MAX_PLAYERS], char*, size_t);
@@ -174,6 +177,9 @@ int melee_web_menu_character_available(int ckind);
 int melee_web_menu_stage_available(int stkind);
 /* Source explicit-tile confirmation only; never use for random or admission. */
 int melee_web_menu_stage_explicit_confirm_available(int stkind);
+/* Pure validation predicate, not a route/admission API. Live scene gates use
+ * only their owning session's checked Results-commit expectation. */
+int melee_web_menu_css_cache_selection_valid(const CSSData*, const StartMeleeRules*);
 int melee_web_menu_css_selection_valid(const CSSData*);
 int melee_web_menu_sss_selection_valid(const SSSData*);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)

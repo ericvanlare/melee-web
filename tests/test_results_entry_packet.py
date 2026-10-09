@@ -4,7 +4,6 @@ from pathlib import Path
 import struct
 import subprocess
 import sys
-import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,9 +11,15 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 from check_gameplay import node_runtime
 
 from menu_browser_source import menu_browser_source
+from test_gameplay_sd_handoff_order import function
+from owned_test_workspace import OwnedWorkspaceTests
 
 
-class ResultsEntryPacketTests(unittest.TestCase):
+class ResultsEntryPacketTests(OwnedWorkspaceTests):
+    @classmethod
+    def setUpClass(cls):
+        cls.scratch = cls.new_workspace(ROOT, "results-entry-packet-")
+
     def test_wasm_copy_retains_pre_teardown_pad_and_full_typed_payload(self):
         compiler = ROOT / '.deps/emsdk/upstream/emscripten/em++'
         emcc = compiler.with_name('emcc')
@@ -23,24 +28,25 @@ class ResultsEntryPacketTests(unittest.TestCase):
             self.skipTest('Pinned Emscripten and prepared gameplay headers required')
         includes = ['-I' + str(p) for p in (ROOT / 'src', source, ROOT / '.deps/aurora/include')]
         common = [*includes, '-DTARGET_PC', '-DAURORA', '-O1']
-        with tempfile.TemporaryDirectory(prefix='results-entry-packet-') as directory:
-            out = Path(directory)
-            commands = [
-                [emcc, *common, '-include', ROOT / 'src/gameplay_compat.h', '-c',
-                 ROOT / 'src/gameplay_pad_state.c', '-o', out / 'pad.o'],
-                [compiler, *common, '-std=c++20', ROOT / 'tests/gameplay_results_entry_packet_test.cpp',
-                 out / 'pad.o', '-sENVIRONMENT=node', '-sEXIT_RUNTIME=1', '-sASSERTIONS=2',
-                 '-o', out / 'packet.js'],
-            ]
-            for command in commands:
-                result = subprocess.run(list(map(str, command)), capture_output=True, text=True, timeout=60)
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            result = subprocess.run([str(node_runtime()), str(out / 'packet.js')],
-                                    capture_output=True, text=True, timeout=30)
+        out = self.scratch
+        commands = [
+            [emcc, *common, '-include', ROOT / 'src/gameplay_compat.h', '-c',
+             ROOT / 'src/gameplay_pad_state.c', '-o', out / 'pad.o'],
+            [compiler, *common, '-std=c++20', ROOT / 'tests/gameplay_results_entry_packet_test.cpp',
+             out / 'pad.o', '-sENVIRONMENT=node', '-sEXIT_RUNTIME=1', '-sASSERTIONS=2',
+             '-o', out / 'packet.js'],
+        ]
+        for command in commands:
+            result = subprocess.run(list(map(str, command)), capture_output=True, text=True, timeout=60)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        result = subprocess.run([str(node_runtime()), str(out / 'packet.js')],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         first, second = map(json.loads, result.stdout.splitlines())
         self.assertEqual(first['abi'], {'target': 'wasm32', 'byte_order': 'little-endian', 'pointer_bytes': 4})
         self.assertEqual(first['entry_seed'], 0xfedcba98)
+        self.assertEqual(first['entry_seed_origin'], 'post-mode-callbacks Results entry')
+        self.assertEqual(first['pad_origin'], 'ordinary VS post-publication before teardown')
         self.assertEqual(first['summary']['players'][2]['ckind'], 19)
         self.assertEqual(first['summary']['players'][2]['ftkind'], 7)
         self.assertEqual(first['summary']['players'][2]['stocks'], -1)
@@ -67,20 +73,17 @@ class ResultsEntryPacketTests(unittest.TestCase):
 
     def test_capture_site_uses_existing_buffer_before_deferred_assets_return(self):
         source = menu_browser_source()
-        # Opening VS demos use a separate MatchEnd path. Anchor this contract
-        # at the ordinary results-producing branch so its deferred asset
-        # handoff is checked without depending on the surrounding branch
-        # layout.
-        start = source.index('terminal_match_observation=melee_web_native_menu_match_observe();')
-        body = source[start:source.index('results_input.reset();', start)]
-        order = ['melee_web_pad_state_capture(final_input)', 'match->close()',
-                 'melee_web_menu_host_results_begin(', 'results_seed=seed;',
-                 'results_entry_packet.capture(completed_matches,terminal,results_info,results_seed,final_input)',
-                 'request_assets(AssetDestination::Results)']
-        positions = [body.index(token) for token in order]
-        self.assertEqual(positions, sorted(positions))
-        self.assertEqual(body.count('melee_web_pad_state_capture('), 1)
+        # The actual method/order regression covers the mutating publisher;
+        # this guard ties the retained packet to its caller and deferred scope.
+        finish = function(source, 'void dispatch_vs_continuation(')
+        self.assertIn('melee_web_menu_host_match_continuation_begin(', finish)
+        self.assertIn('begin_typed_results(continuation,terminal,*seed_ptr,&final_input)', finish)
+        entry = function(source, 'void begin_typed_results(')
+        self.assertLess(entry.index('results_seed=seed;'), entry.index('results_entry_packet.capture('))
+        self.assertLess(entry.index('results_entry_packet.capture('), entry.index('request_assets(AssetDestination::Results)'))
+        self.assertIn('results_entry_packet.clear()', entry)
         self.assertEqual(source.count('results_entry_packet.capture('), 1)
+        self.assertIn('match->finish_vs(seed,final_input)', source)
         self.assertIn('EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_entry_packet()', source)
         harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text()
         self.assertIn('await retainResultsEntry(`match-${matchIndex}-results-entry`)', harness)
@@ -419,18 +422,14 @@ class ResultsEntryPacketTests(unittest.TestCase):
 
     def test_results_trace_resets_before_scoped_asset_early_return(self):
         source = menu_browser_source()
-        # Keep the assertion scoped to the ordinary Results entry. The
-        # Opening-demo branch now precedes it and intentionally bypasses this
-        # Results trace lifecycle.
-        start = source.index('terminal_match_observation=melee_web_native_menu_match_observe();')
-        end = source.index('results=std::make_unique<melee_web::GameplayResultsSession>', start)
-        body = source[start:end]
+        body = function(source, 'void begin_typed_results(')
         trace_reset = body.index('results_pad_trace_count=0;results_pad_trace_attempts=0;')
         camera_reset = body.index('results_camera_entry_snapshot={};')
         scoped_return = body.index('if(scoped_assets){pending=false;request_assets(AssetDestination::Results);return;}')
         self.assertLess(trace_reset, scoped_return)
         self.assertLess(camera_reset, scoped_return)
-        handoff = source[source.index('bool finish_asset_handoff()'):]
+        handoff = function(source, 'void enter_typed_results_world()')
+        self.assertIn('if(destination==AssetDestination::Results){enter_typed_results_world();return true;}', source)
         constructor = handoff.index('results=std::make_unique<melee_web::GameplayResultsSession>')
         snapshot = handoff.index('results_camera_entry_snapshot=results->camera_entry_snapshot();')
         release_input = handoff.index('results_input.reset();', constructor)
@@ -478,11 +477,13 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('++melee_web_camera_pool_allocation_generation;', camera_patch)
 
         browser = menu_browser_source()
-        reset = browser.index('results_camera_entry_snapshot={};')
-        construct = browser.index('results=std::make_unique<melee_web::GameplayResultsSession>')
-        capture = browser.index('results_camera_entry_snapshot=results->camera_entry_snapshot();',
-                                construct)
-        self.assertLess(reset, construct)
+        entry = function(browser, 'void begin_typed_results(')
+        construction = function(browser, 'void enter_typed_results_world()')
+        reset = entry.index('results_camera_entry_snapshot={};')
+        self.assertLess(reset, entry.index('enter_typed_results_world();'))
+        self.assertLess(reset, entry.index('request_assets(AssetDestination::Results)'))
+        construct = construction.index('results=std::make_unique<melee_web::GameplayResultsSession>')
+        capture = construction.index('results_camera_entry_snapshot=results->camera_entry_snapshot();')
         self.assertLess(construct, capture)
         trace = browser.index('melee_web_native_menu_results_pad_trace()')
         serialize = browser.index('append_camera_entry_json(json);', trace)

@@ -89,7 +89,7 @@ static int check_named(const char* name, int is_teams, const int teams[4],
 {
     StartMeleeData start;
     build_start(&start, is_teams, teams, count);
-    if (melee_web_match_validate_source_start(&start, 0) != accepted) {
+    if (melee_web_match_validate_source_start(&start, 0, 0) != accepted) {
         fprintf(stderr, "patched validator %s: expected %s\n", name,
                 accepted ? "accept" : "refuse");
         return 0;
@@ -143,13 +143,13 @@ int main(void)
     /* A gap between active doors is not a source CSS roster the port owns. */
     build_start(&start, 1, two_v_two, 4);
     start.players[1].slot_type = Gm_PKind_NA;
-    if (melee_web_match_validate_source_start(&start, 0)) {
+    if (melee_web_match_validate_source_start(&start, 0, 0)) {
         fprintf(stderr, "validator accepted a non-contiguous Team Battle\n");
         return 2;
     }
     /* Team flag values other than the source boolean are refused. */
     build_start(&start, 2, two_v_two, 4);
-    if (melee_web_match_validate_source_start(&start, 0) ||
+    if (melee_web_match_validate_source_start(&start, 0, 0) ||
         melee_web_team_setup_supported(&start, 4, 1)) {
         fprintf(stderr, "validator accepted an out-of-range team flag\n");
         return 3;
@@ -161,7 +161,7 @@ int main(void)
     start.rules.disable_pausing = 1;
     start.rules.xB = 2;
     start.rules.on_match_start = gm_80183218;
-    if (melee_web_match_validate_source_start(&start, 1)) {
+    if (melee_web_match_validate_source_start(&start, 1, 0)) {
         fprintf(stderr, "opening demo validator accepted a Team Battle\n");
         return 4;
     }
@@ -185,7 +185,7 @@ int main(void)
                 if (count >= 1 && count <= 4) {
                     const int accepted = count >= 2 &&
                         expected_supported(is_teams, teams, count, 1);
-                    if (melee_web_match_validate_source_start(&start, 0) !=
+                    if (melee_web_match_validate_source_start(&start, 0, 0) !=
                         accepted) {
                         fprintf(stderr,
                                 "patched validator: teams=%d count=%d code=%d\n",

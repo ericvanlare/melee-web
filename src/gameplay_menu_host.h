@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <dolphin/pad.h>
+#include <melee/gm/types.h>
 #include <melee/mn/types.h>
 #include "gameplay_audio.h"
 #include "gameplay_pad_state.h"
@@ -31,7 +32,27 @@ typedef struct MeleeWebMenuMatchSelection {
     /* Set only for the source Title attract demo. This keeps its authored
      * mode/callback and 99-stock payload separate from ordinary VS rules. */
     uint8_t opening_demo;
+    /* The original Sudden Death scene callback adds rules.x6 before entering
+     * fn_8016E730. Its active source players may occupy sparse original ports. */
+    uint8_t sudden_death;
 } MeleeWebMenuMatchSelection;
+typedef enum MeleeWebMenuMatchContinuationKind {
+    MELEE_WEB_MENU_MATCH_CONTINUATION_RESULTS = 1,
+    MELEE_WEB_MENU_MATCH_CONTINUATION_SUDDEN_DEATH = 2,
+} MeleeWebMenuMatchContinuationKind;
+typedef struct MeleeWebMenuMatchContinuation {
+    MeleeWebMenuMatchContinuationKind kind;
+    /* Nonzero only while this host owns the matching original SD continuation. */
+    uint64_t owner_id;
+    union {
+        /* The exact StartMeleeData produced by the original VS Sudden Death
+         * on_enter callback. The source may change its participants/rules. */
+        StartMeleeData sudden_death_start;
+        /* The exact ResultsMatchInfo produced by the original Results
+         * on_enter callback after either VS or Sudden Death. */
+        struct ResultsMatchInfo results;
+    } payload;
+} MeleeWebMenuMatchContinuation;
 typedef struct MeleeWebMenuSourceObservation {
     int source_scene;
     int menu_kind;
@@ -125,6 +146,11 @@ int melee_web_menu_host_apply_replay_context(
  * the canonical Everything mode, no personal profile and default PAD history. */
 int melee_web_menu_host_apply_net_context(MeleeWebMenuHost*, uint32_t random_seed,
                                           char*, size_t);
+/* Explicit native four-stock canonical setup fixture with the existing supported
+ * stock timer. Copies rules on a fresh host, applied before original CSS; ordinary context restoration
+ * retires it. This does not represent original Rules-menu input. */
+int melee_web_menu_host_apply_initial_native_rules(
+    MeleeWebMenuHost*, const GameRules*, char*, size_t);
 /* Read-only copy of the session-owned CSS (returns 1) or SSS (returns 2)
  * selection payload and its small scalar header; 0 outside those scenes. */
 int melee_web_menu_host_selection_state(const MeleeWebMenuHost*, StartMeleeData*,
@@ -182,6 +208,32 @@ int melee_web_menu_host_match_finished(MeleeWebMenuHost*,uint32_t random_seed,
 int melee_web_menu_host_results_begin(MeleeWebMenuHost*,
     const struct MatchExitInfo*,uint32_t random_seed,
     struct ResultsMatchInfo*,char*,size_t);
+/* Follow original VS/Sudden Death callbacks. A Sudden Death continuation
+ * retains the VS mode lease until sudden_death_finish and Results teardown. */
+int melee_web_menu_host_match_continuation_begin(MeleeWebMenuHost*,
+    const struct MatchExitInfo*,uint32_t random_seed,
+    MeleeWebMenuMatchContinuation*,char*,size_t);
+int melee_web_menu_host_sudden_death_finish(MeleeWebMenuHost*,
+    uint64_t owner_id,const struct MatchExitInfo*,uint32_t random_seed,
+    const uint8_t input[MELEE_WEB_PAD_STATE_BYTES],
+    MeleeWebMenuMatchContinuation*,char*,size_t);
+/* Read or claim the exact source SD continuation while its VS mode lease stays
+ * with the host. The match owner must release its claim after world teardown. */
+int melee_web_menu_host_sudden_death_selection(
+    const MeleeWebMenuHost*,const MeleeWebMenuMatchContinuation*,
+    MeleeWebMenuMatchSelection*,char*,size_t);
+int melee_web_menu_host_sudden_death_match_claim(
+    MeleeWebMenuHost*,const MeleeWebMenuMatchContinuation*,
+    MeleeWebMenuMatchSelection*,char*,size_t);
+int melee_web_menu_host_sudden_death_match_release(
+    MeleeWebMenuHost*,uint64_t owner_id,char*,size_t);
+/* Temporarily assigns the original GS_SUDDEN_DEATH scene-info identity while
+ * its claimed native match owns the world. The matching end restores the exact
+ * prior host-owned CSS/SSS scene-info pointer after teardown. */
+int melee_web_menu_host_sudden_death_scene_begin(
+    MeleeWebMenuHost*,uint64_t owner_id,char*,size_t);
+int melee_web_menu_host_sudden_death_scene_end(
+    MeleeWebMenuHost*,uint64_t owner_id,char*,size_t);
 int melee_web_menu_host_results_exit(MeleeWebMenuHost*,char*,size_t);
 int melee_web_menu_host_results_end(MeleeWebMenuHost*,uint32_t random_seed,
     const uint8_t input[MELEE_WEB_PAD_STATE_BYTES],char*,size_t);
@@ -193,6 +245,8 @@ int melee_web_menu_host_prize_enter(MeleeWebMenuHost*,char*,size_t);
 int melee_web_menu_host_prize_exit(MeleeWebMenuHost*,char*,size_t);
 int melee_web_menu_host_prize_end(MeleeWebMenuHost*,uint32_t random_seed,
     const uint8_t input[MELEE_WEB_PAD_STATE_BYTES],char*,size_t);
+/* Borrowed exact post-VS mode state, only while the owned menus are closed. */
+const VsModeData* melee_web_menu_host_post_vs_mode(const MeleeWebMenuHost*);
 int melee_web_menu_host_destroy(MeleeWebMenuHost*,char*,size_t);
 /* Same phase values as the checked source session: CSS=1, SSS-ready=2,
  * SSS=3, CSS-ready=4, match-ready=5, closed=6. */

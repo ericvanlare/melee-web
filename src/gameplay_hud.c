@@ -33,6 +33,8 @@ static void intro_finished(int unused)
     (void) unused;
     fn_8016B7F8();
 }
+static MeleeWebHud* melee_web_hud_begin_source_status(unsigned,
+    int (*)(void*, char*, size_t), void*, int, int, char*, size_t);
 MeleeWebHud* melee_web_hud_begin(unsigned layout, char* error, size_t size)
 {
     return melee_web_hud_begin_with_music(layout, NULL, NULL, error, size);
@@ -41,8 +43,30 @@ MeleeWebHud* melee_web_hud_begin_with_music(unsigned layout,
     int (*prepare_music)(void*, char*, size_t), void* context,
     char* error, size_t size)
 {
+    return melee_web_hud_begin_source_status(layout,prepare_music,context,3,
+                                              0,error,size);
+}
+MeleeWebHud* melee_web_hud_begin_sudden_death_with_music(unsigned layout,
+    int (*prepare_music)(void*, char*, size_t), void* context,
+    char* error, size_t size)
+{
+    return melee_web_hud_begin_source_status(layout,prepare_music,context,1,
+                                              1,error,size);
+}
+static MeleeWebHud* melee_web_hud_begin_source_status(unsigned layout,
+    int (*prepare_music)(void*, char*, size_t), void* context,
+    int source_status, int sparse_source_players,
+    char* error, size_t size)
+{
     const uint64_t generation = melee_web_gameplay_stats().generation;
-    if (owner || !generation || layout < 1 || layout > 6 || !Player_GetEntity(0) || !Player_GetEntity(1)) {
+    unsigned active_players=0;
+    if(sparse_source_players){
+        for(unsigned slot=0;slot<4;++slot)
+            if(Player_GetEntity(slot))++active_players;
+    }
+    if (owner || !generation || layout < 1 || layout > 6 ||
+        (sparse_source_players?active_players<2:
+         (!Player_GetEntity(0)||!Player_GetEntity(1)))) {
         fail(error, size, "Original HUD requires the owned two-player match");
         return NULL;
     }
@@ -70,7 +94,7 @@ MeleeWebHud* melee_web_hud_begin_with_music(unsigned layout,
         melee_web_hud_end(hud, NULL, 0);
         return NULL;
     }
-    ifStatus_802F6EA4(3, -1, -1, 0, (Event) fn_8016B7B4,
+    ifStatus_802F6EA4(source_status, -1, -1, 0, (Event) fn_8016B7B4,
                     (Event) intro_finished);
     ifTime_CreateTimers();
     if (!melee_web_pause_screen_begin()) {
@@ -93,7 +117,7 @@ int melee_web_hud_ready(const MeleeWebHud* hud)
 }
 int melee_web_hud_damage(const MeleeWebHud* hud, unsigned player)
 {
-    if (!hud || hud != owner || player >= 2 ||
+    if (!hud || hud != owner || player >= 4 ||
         hud->generation != melee_web_gameplay_stats().generation) return -1;
     const IfDamageState* state = &ifStatus_GetHUDInfo()->players[player];
     return state->HUD_parent_entity ? state->damage_percent : -1;

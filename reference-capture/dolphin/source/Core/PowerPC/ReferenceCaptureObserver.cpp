@@ -5,6 +5,7 @@
 #include "Core/PowerPC/ReferenceAllocationObserver.h"
 #include "Core/PowerPC/ReferenceAllocationProfile.h"
 #include "Core/PowerPC/ReferenceInputStream.h"
+#include "Core/PowerPC/ReferenceSdInitState.h"
 
 #include <array>
 #include <algorithm>
@@ -217,6 +218,9 @@ enum class SliceTag : u16
   MenuCssKoCounts = 51,
   PlayerEntities = 52,
   PlayerEntityUserData = 53,
+  SdRumblePorts = 54,  // Opt-in Progress JSON only; never a full save-data slice.
+  SdStageCooldown = 55,  // Recipe-five menu route only; original acceptance gate.
+  SdItemsLock = 56,  // Reduced Items owner only; original u8 animation lock.
 };
 
 struct SliceRef
@@ -489,6 +493,12 @@ std::string Env(const char* name)
 {
   const char* value = std::getenv(name);
   return value ? std::string(value) : std::string();
+}
+
+bool SdInitRequested()
+{
+  static const bool requested = !Env("MWRC_SD_INIT").empty();
+  return requested;
 }
 
 bool ActivationRequested()
@@ -884,6 +894,38 @@ struct Observer::Impl
     // Dolphin builds with exceptions disabled.  std::thread reports an
     // unavailable worker by terminating; there is no catchable error path.
     writer = std::thread([this] { WriterMain(); });
+    if (!Env("MWRC_SD_MENU_PROBE").empty() && !SdInitRequested())
+    {
+      SetInvalid("SD menu probe requires the opt-in SD diagnostic owner");
+      return false;
+    }
+    if (!Env("MWRC_SD_PROFILE_GCI_SHA256").empty() &&
+        (!SdInitRequested() || (Env("MWRC_SD_MENU_PROBE") != "rules_ready" &&
+                              Env("MWRC_SD_MENU_PROBE") != "sd_prefix" &&
+                              Env("MWRC_SD_MENU_PROBE") != "items_row") ||
+         Env("MWRC_SD_PROFILE_GCI_SHA256") !=
+             "5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729"))
+    {
+      SetInvalid("SD loaded-profile diagnostic identity/scope differs");
+      return false;
+    }
+    if (SdInitRequested())
+    {
+      const std::string hash = Env("MWRC_SD_RECIPE_SHA256");
+      if (Env("MWRC_SD_INIT") != "1" || hash.size() != 64 ||
+          hash.find_first_not_of("0123456789abcdef") != std::string::npos ||
+          hash == std::string(64, '0') || !InputStream::IsRecording() ||
+          !Env("MWRC_WHOLE_SESSION_MATCHES").empty() ||
+          !Env("MWRC_CPU_PROBE_OUTPUT").empty() || !Env("MWRC_ITEM_PROBE_OUTPUT").empty() ||
+          !Env("MWRC_ALLOCATION_OUTPUT").empty() ||
+          (!Env("MWRC_SD_MENU_PROBE").empty() && Env("MWRC_SD_MENU_PROBE") != "rules_ready" &&
+           Env("MWRC_SD_MENU_PROBE") != "sd_prefix" && Env("MWRC_SD_MENU_PROBE") != "items_row") ||
+          ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "items_row") && Env("MWRC_SD_PROFILE_GCI_SHA256").empty()))
+      {
+        SetInvalid("SD prefix requires a recipe hash, native input recording and exclusive scope");
+        return false;
+      }
+    }
     if (!Env("MWRC_WHOLE_SESSION_MATCHES").empty() && whole_session_matches == 0)
     {
       SetInvalid("MWRC_WHOLE_SESSION_MATCHES must be a decimal count from 3 through 64");
@@ -946,6 +988,12 @@ struct Observer::Impl
                    std::to_string(whole_session_matches) + ",\"capture_id\":\"" +
                    JsonEscape(capture_id) + "\",\"sequence_id\":\"" +
                    JsonEscape(sequence_id) + "\"";
+    if (SdInitRequested())
+      handshake += ",\"diagnostic\":\"sd_initialization_prefix\",\"recipe_sha256\":\"" +
+                   Env("MWRC_SD_RECIPE_SHA256") + "\",\"menu_probe\":\"" +
+                   Env("MWRC_SD_MENU_PROBE") + "\"";
+    if (!Env("MWRC_SD_PROFILE_GCI_SHA256").empty())
+      handshake += ",\"profile_gci_sha256\":\"" + Env("MWRC_SD_PROFILE_GCI_SHA256") + "\"";
     handshake += "}";
     PushJson(Event::Handshake, handshake);
     std::string start =
@@ -2048,16 +2096,53 @@ struct Observer::Impl
         (!AddSlice(system, SliceTag::MenuMainFlow, 0x804a04f0, 0x18) ||
          !AddSlice(system, SliceTag::MenuMainInput, 0x804d6bc8, 8)))
       return false;
+    if (scene_kind == 1 && (Env("MWRC_SD_MENU_PROBE") == "items_row" ||
+                            Env("MWRC_SD_MENU_PROBE") == "sd_prefix"))
+    {
+      u8 menu_kind = 0;
+      if (!ReadBytes(system, 0x804a04f0, 1, &menu_kind))
+        return false;
+      if (menu_kind == 16)
+      {
+        // fn_80233E10: lbz r0,-0x4ab4(r13), cmpwi, bne.
+        // Verified original r13=0x804db6a0 derives u8 0x804d6bec.
+        const std::array<u32, 3> words = {0x880db54c, 0x28000000, 0x40820180};
+        for (size_t i = 0; i < words.size(); ++i)
+        {
+          u32 word = 0;
+          if (!ReadU32(system, 0x80233ec0 + static_cast<u32>(i * 4), &word) || word != words[i])
+            return false;
+        }
+        if (!AddSlice(system, SliceTag::SdItemsLock, 0x804d6bec, 1))
+          return false;
+      }
+    }
     // Source menu globals survive arena teardown. PAD interrupts can run
     // inside OnEnter while those globals still point into the old arena.
     // Publish CSS steering only after the verified OnEnter return.
-    if (scene_kind == 8 && whole_session_enabled() && !css_steering_ready)
+    if (scene_kind == 8 && (whole_session_enabled() || SdInitRequested()) && !css_steering_ready)
       return true;
     if (scene_kind == 8 && !AddCssCpuSteeringSlices(system))
       return false;
     // Menu globals retain pointers after their scene arena is reclaimed.
     // Observe each steering owner only in its live source menu scene.
     u8 stage_index = 0;
+    if (scene_kind == 9 && Env("MWRC_SD_MENU_PROBE") == "sd_prefix")
+    {
+      if (!sd_sss_ready)
+        return true;
+      // mnStageSel_80259C28 tests lwz r0,-0x49fc(r13), cmpwi, bne
+      // before accepting confirmation. Original GALE01r2 r13 is 0x804db6a0.
+      const std::array<u32, 3> words = {0x800db604, 0x28000000, 0x40820128};
+      for (size_t i = 0; i < words.size(); ++i)
+      {
+        u32 word = 0;
+        if (!ReadU32(system, 0x80259c3c + static_cast<u32>(i * 4), &word) || word != words[i])
+          return false;
+      }
+      if (!AddSlice(system, SliceTag::SdStageCooldown, 0x804d6ca4, 4))
+        return false;
+    }
     if (scene_kind == 9 && ReadBytes(system, STAGE_SELECT_INDEX, 1, &stage_index))
     {
       if (!AddSlice(system, SliceTag::StageSelectIndex, STAGE_SELECT_INDEX, 1))
@@ -2297,6 +2382,266 @@ struct Observer::Impl
     }
   }
 
+  void SdEvent(const char* name, u32 pc, u32 tick)
+  {
+    std::string json = "{\"diagnostic\":\"sd_initialization_prefix\",\"name\":\"" +
+                       std::string(name) + "\",\"consumed\":" +
+                       std::to_string(sd_init.consumed) + ",\"menu_consumed\":" +
+                       std::to_string(sd_menu_consumed) + ",\"pc\":" + std::to_string(pc) + ",\"slices\":[";
+    for (size_t index = 0; index < slice_count; ++index)
+    {
+      const auto& slice = slices[index];
+      if (index) json += ",";
+      json += "{\"tag\":" + std::to_string(static_cast<u16>(slice.tag)) +
+              ",\"flags\":" + std::to_string(slice.flags) + ",\"address\":" +
+              std::to_string(slice.address) + ",\"hex\":\"";
+      if (!AppendHexBytes(&json, raw.data() + slice.offset, slice.size))
+        return SetInvalid("SD prefix hex payload exceeds its bound"), void();
+      json += "\"}";
+    }
+    json += "]}";
+    PushJson(Event::Progress, json, pc, tick);
+  }
+
+  void ObserveSdInit(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
+  {
+    u32 tick = 0;
+    if (!ReadU32(system, 0x80479d58, &tick))
+      return SetInvalid("SD prefix source counter is invalid"), void();
+    raw_size = 0;
+    slice_count = 0;
+    if (Env("MWRC_SD_MENU_PROBE") == "sd_prefix" &&
+        (pc == 0x8025a998 || pc == 0x8025b84c))
+    {
+      u32 word = 0;
+      if (!ReadU32(system, pc, &word) || word != (pc == 0x8025a998 ? 0x7c0802a6 : 0x4e800020))
+        return SetInvalid("SD prefix SSS readiness instruction differs"), void();
+      sd_sss_ready = pc == 0x8025b84c;
+      return;
+    }
+    if (pc == CSS_ENTER_RETURN)
+    {
+      u32 word = 0;
+      if (!ReadU32(system, pc, &word) || word != 0x4e800020)
+        return SetInvalid("SD prefix CSS readiness instruction differs"), void();
+      css_steering_ready = true;
+      return;
+    }
+    if (pc == 0x8026688c) css_steering_ready = false;
+    if (pc == 0x8034dd8c)
+    {
+      u32 caller = 0;
+      if (!ReadU32(system, state->gpr[1] + 0x54, &caller) || caller != PAD_READ_HSD_CALLER)
+        return;
+      if (!BoundaryInstructionMatches(system, pc) || !AddSceneKindSlice(system) ||
+          !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6) ||
+          !AddMenuSteeringSlices(system))
+        return SetInvalid("SD prefix menu polling owner is invalid"), void();
+      if (sd_init.phase == SdInitState::Phase::Menu)
+      {
+        if (++sd_menu_polls > 7200)
+          return SetInvalid("SD prefix menu polling cap exhausted"), void();
+        SdEvent("menu", pc, tick);
+        if (Env("MWRC_SD_MENU_PROBE") == "items_row" && sd_rules_observed && sd_menu_neutral)
+        {
+          std::array<u8, 0x18> flow{};
+          std::array<u8, 8> input{};
+          u8 lock = 1;
+          if (raw[0] == 1 && ReadBytes(system, 0x804a04f0, flow.size(), flow.data()) &&
+              ReadBytes(system, 0x804d6bc8, input.size(), input.data()) &&
+              ReadBytes(system, 0x804d6bec, 1, &lock) && flow[0] == 16 &&
+              flow[2] == 0 && flow[3] == 31 && flow[4] == 3 && flow[0x11] == 1 &&
+              input[0] == 0 && input[1] == 0 && lock == 0)
+          {
+            SdEvent("items_ready", pc, tick);
+            InputStream::RequestFinish(true);
+            natural_completion.store(false);
+            finish_requested.store(true);
+          }
+        }
+        if (!sd_rules_observed && !Env("MWRC_SD_MENU_PROBE").empty() && sd_menu_consumed && sd_menu_neutral)
+        {
+          std::array<u8, 0x18> flow{};
+          std::array<u8, 8> input{};
+          u32 profile = 0;
+          const u8* scene = raw.data();
+          if (scene[0] == 1 && ReadBytes(system, 0x804a04f0, flow.size(), flow.data()) &&
+              ReadBytes(system, 0x804d6bc8, input.size(), input.data()) &&
+              flow[0] == 13 && flow[2] == 0 && flow[3] == 0 && flow[4] == 0 &&
+              // Original Confirm preserves forward-entry direction after
+              // cooldown; only the exact GCI campaign takes this route.
+              flow[0x11] == (Env("MWRC_SD_PROFILE_GCI_SHA256").empty() ? 0 : 1) &&
+              input[0] == 0 && input[1] == 0)
+          {
+            if (!ReadProfileRoot(system, &profile) ||
+                !AddSlice(system, SliceTag::SdRumblePorts, profile + 0x1cc0, 4))
+              return SetInvalid("SD Rules probe profile is invalid"), void();
+            if (!Env("MWRC_SD_PROFILE_GCI_SHA256").empty())
+            {
+              // Existing typed profile ranges, now observed at this reduced
+              // gate. Actual getter words bind both roots before reading them.
+              const std::array<u32, 6> words = {0x806d8840, 0x38631868, 0x4e800020,
+                                               0x806d8840, 0x38632ff8, 0x4e800020};
+              for (size_t i = 0; i < words.size(); ++i)
+              {
+                u32 word = 0;
+                if (!ReadU32(system, 0x8015cc40 + static_cast<u32>(i * 4), &word) || word != words[i])
+                  return SetInvalid("SD loaded-profile getter identity differs"), void();
+              }
+              if (!AddProfileSlices(system) || !AddProfileContextSlices(system))
+                return SetInvalid("SD loaded-profile context is missing"), void();
+            }
+            SdEvent("rules_ready", pc, tick);
+            sd_rules_observed = true;
+            if (Env("MWRC_SD_MENU_PROBE") == "rules_ready")
+            {
+              InputStream::RequestFinish(true);
+              natural_completion.store(false);
+              finish_requested.store(true);
+            }
+          }
+        }
+      }
+      return;
+    }
+    if (pc == 0x80390eb4 && sd_init.phase != SdInitState::Phase::Menu)
+    {
+      if (!BoundaryInstructionMatches(system, pc) ||
+          !AddSlice(system, SliceTag::MatchClock, 0x8046b6a0, 0x2e))
+        return SetInvalid("SD prefix scheduler return instruction differs"), void();
+      SdEvent("tick", pc, tick);
+      return;
+    }
+    if (pc == 0x8016e934 || pc == 0x8016ebc0)
+    {
+      const bool sudden = pc == 0x8016ebc0;
+      u32 word = 0, root = 0, scene = 0;
+      std::array<u8, 6> route{};
+      if (!ReadU32(system, pc, &word) || word != 0x7c0802a6 ||
+          !ReadU32(system, 0x804d6720, &scene) || !scene ||
+          !ReadBytes(system, 0x80479d30, route.size(), route.data()))
+        return SetInvalid("SD prefix entry instruction/routing is invalid"), void();
+      const auto* kind = system->GetMemory().GetPointerForRange(scene, 1);
+      // Opening demos also use the VS initializer. They are outside this recipe.
+      if (!sudden && sd_init.phase == SdInitState::Phase::Menu && route[0] == 0x18) return;
+      if (Env("MWRC_SD_MENU_PROBE") == "rules_ready" || Env("MWRC_SD_MENU_PROBE") == "items_row")
+        return SetInvalid("SD Rules probe entered undeclared gameplay"), void();
+      if (!kind || *kind != (sudden ? 3 : 2) || route[0] != 2 ||
+          !sd_init.Entry(state->gpr[3], sudden))
+        return SetInvalid("SD prefix entry is missing its declared phase"), void();
+      // Actual getter words load gmMainLib_804D3EE0 and add +0x590.
+      const std::array<u32, 3> getter = {0x806d8840, 0x38630590, 0x4e800020};
+      for (size_t i = 0; i < getter.size(); ++i)
+        if (!ReadU32(system, 0x801a5244 + static_cast<u32>(i * 4), &word) || word != getter[i])
+          return SetInvalid("SD prefix VS payload getter differs from verified DOL"), void();
+      if (!ReadProfileRoot(system, &root) || root > UINT32_MAX - 0x1868 ||
+          !AddSlice(system, SliceTag::MatchSetup, sd_init.setup_pointer, 0x138) ||
+          !AddSlice(system, SliceTag::MatchSetup, root + 0x598, 0x138, 1) ||
+          !AddSlice(system, SliceTag::ProfileGameRules, root + 0x1850, 0x18) ||
+          !AddSlice(system, SliceTag::SdRumblePorts, root + 0x1cc0, 4) ||
+          !AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358) || !AddProfileSlices(system) ||
+          !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6) || !AddSceneKindSlice(system))
+        return SetInvalid("SD prefix setup/persistent VS payload is invalid"), void();
+      u32 rng = 0;
+      if (!ReadU32(system, 0x804d5f94, &rng) || !rng ||
+          !AddSlice(system, SliceTag::RngPointer, 0x804d5f94, 4) ||
+          !AddSlice(system, SliceTag::RngValue, rng, 4))
+        return SetInvalid("SD prefix RNG context is invalid"), void();
+      fighter_present.fill(false);
+      fighter_pointers.fill(0);
+      SdEvent(sudden ? "sd_entry" : "vs_entry", pc, tick);
+      return;
+    }
+    if (pc == 0x800693a8 &&
+        (sd_init.phase == SdInitState::Phase::VsSetup || sd_init.phase == SdInitState::Phase::SdSetup))
+    {
+      u32 pointer = 0;
+      u8 slot = 0xff;
+      if (!BoundaryInstructionMatches(system, pc) ||
+          !ReadU32(system, state->gpr[3] + 0x2c, &pointer) ||
+          !ReadFighterSourceSlot(system, pointer, &slot) || slot > 1 || fighter_present[slot])
+        return SetInvalid("SD prefix fighter creation is missing, repeated or outside P1/P2"), void();
+      fighter_present[slot] = true;
+      fighter_pointers[slot] = pointer;
+      return;
+    }
+    if (pc == 0x80377584)
+    {
+      std::array<u8, 0xc> queue{};
+      const bool menu = sd_init.phase == SdInitState::Phase::Menu;
+      if (!BoundaryInstructionMatches(system, pc) || (!menu && !sd_init.Consume()) ||
+          !ReadBytes(system, 0x804c1f78, queue.size(), queue.data()) || !queue[0] ||
+          state->gpr[6] >= queue[0] || ReadBE32(queue.data() + 8) + state->gpr[6] * 0x30 != state->gpr[25] ||
+          !AddSlice(system, SliceTag::PadSlot, state->gpr[25], 0x30))
+        return SetInvalid("SD prefix input queue or declared sample cap is invalid"), void();
+      const u8* pad = raw.data();
+      if (menu)
+      {
+        if (++sd_menu_consumed > 7200)
+          return SetInvalid("SD menu consumed input cap exhausted"), void();
+        sd_menu_neutral = true;
+        for (u32 port = 0; port < 4; ++port)
+          for (u32 byte = 0; byte < 11; ++byte)
+            sd_menu_neutral &= pad[port * 12 + byte] == (port >= 2 && byte == 10 ? 0xff : 0);
+        SdEvent("menu_input", pc, tick);
+        return;
+      }
+      for (u32 port = 0; port < 4; ++port)
+        for (u32 byte = 0; byte < 11; ++byte)
+          if (pad[port * 12 + byte] != (port >= 2 && byte == 10 ? 0xff : 0))
+            return SetInvalid("SD prefix consumed undeclared controller input"), void();
+      SdEvent("input", pc, tick);
+      return;
+    }
+    if (pc == 0x8016e9c4 || pc == 0x8016ec24)
+    {
+      const bool sudden = pc == 0x8016ec24;
+      if (!sudden && sd_init.phase == SdInitState::Phase::Menu) return;
+      u32 word = 0;
+      if (!ReadU32(system, pc, &word) || word != 0x4e800020 ||
+          !fighter_present[0] || !fighter_present[1] || !sd_init.Ready(sudden) ||
+          !AddSlice(system, SliceTag::MatchSetup, sd_init.setup_pointer, 0x138))
+        return SetInvalid("SD prefix setup return lacks its retained entry owner"), void();
+      for (u32 slot = 0; slot < 2; ++slot)
+        if (!AddSlice(system, SliceTag::FighterHead, fighter_pointers[slot], 0x100, slot) ||
+            !AddSlice(system, SliceTag::FighterDamageShield, fighter_pointers[slot] + 0x1830, 4, slot) ||
+            !AddSlice(system, SliceTag::FighterStocks, 0x80453080 + slot * 0xe90 + 0x8e, 1, slot))
+          return SetInvalid("SD prefix initialized fighter snapshot is invalid"), void();
+      SdEvent(sudden ? "sd_setup" : "vs_setup", pc, tick);
+      if (sudden)
+      {
+        // The native input footer completes THIS declared prefix. The primary
+        // observer remains interrupted, never a successful match/scene teardown.
+        InputStream::RequestFinish(true);
+        natural_completion.store(false);
+        finish_requested.store(true);
+      }
+      return;
+    }
+    if (pc == 0x8016ebbc && sd_init.phase == SdInitState::Phase::VsActive)
+    {
+      if (!BoundaryInstructionMatches(system, pc) || !sd_init.Exit() ||
+          !AddSlice(system, SliceTag::Result, 0x80479d98 + 0xc, 0x448) ||
+          !AddSlice(system, SliceTag::MatchClock, 0x8046b6a0, 0x2e))
+        return SetInvalid("SD prefix normal timeout exit is invalid"), void();
+      // Original outcome and participant decision remain outputs, never inputs.
+      if (raw[4] != 1 || raw[5] != 1 || raw[6] != 0 || raw[0xd] != 2 ||
+          raw[0x58] != 0 || raw[0x100] != 0 ||
+          raw[0x60] != 4 || raw[0x108] != 4)
+        return SetInvalid("SD prefix normal match did not produce its declared tied timeout"), void();
+      SdEvent("vs_exit", pc, tick);
+      return;
+    }
+    if (pc == 0x8039157c && sd_init.phase != SdInitState::Phase::Menu)
+    {
+      if (!BoundaryInstructionMatches(system, pc) || !sd_init.Retire())
+        return SetInvalid("SD prefix arena retirement is out of order"), void();
+      fighter_present.fill(false);
+      fighter_pointers.fill(0);
+      SdEvent("vs_retired", pc, tick);
+    }
+  }
+
   enum class SceneResetAction { Ignore, BeginResults, FinishResults, Invalid };
 
   SceneResetAction ClassifyWholeSceneReset() const
@@ -2327,6 +2672,11 @@ struct Observer::Impl
   {
     if (!Start() || invalid.load() || finish_requested.load())
       return;
+    if (SdInitRequested())
+    {
+      ObserveSdInit(system, pc, state);
+      return;
+    }
     if (pc == cpu_probe_rng_return_pc && cpu_probe_rng_return_pc != 0)
       RecordSelectedRngCallback(system, pc);
     if (const ItemProbePoint* item_probe = FindItemProbePoint(pc))
@@ -3641,6 +3991,12 @@ struct Observer::Impl
   std::array<u8, 4> fighter_entity_count{};
   u32 cpu_probe_samus_effect_palette_address = 0;
   std::array<bool, 4> cpu_slots{};
+  SdInitState sd_init;
+  bool sd_sss_ready = false;
+  bool sd_rules_observed = false;
+  u32 sd_menu_polls = 0;
+  u32 sd_menu_consumed = 0;
+  bool sd_menu_neutral = false;
   u32 setup_pointer = 0;
   u32 active_slot_count = 0;
   bool match_active = false;
@@ -3814,7 +4170,9 @@ static bool IsCaptureBoundary(u32 guest_pc)
     // Diagnostic CPU PCs are JIT boundaries only for the fully validated,
     // opt-in companion configuration.  The normal observer boundary set and
     // its disabled path remain unchanged.
-    return (CpuProbeEnabled() && FindCpuProbePoint(guest_pc) != nullptr &&
+    return (SdInitRequested() && (guest_pc == 0x8016ebc0 || guest_pc == 0x8016ec24 ||
+            (Env("MWRC_SD_MENU_PROBE") == "sd_prefix" && guest_pc == 0x8025b84c))) ||
+           (CpuProbeEnabled() && FindCpuProbePoint(guest_pc) != nullptr &&
             (CpuProbeEnvironment().rng_return_pc == 0 ||
              CpuProbeEnvironment().rng_return_pc == guest_pc)) ||
            (ItemProbeEnabled() && FindItemProbePoint(guest_pc) != nullptr);
