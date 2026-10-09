@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import vm from 'node:vm';
-import {installRuntimeDiagnosticsCapture} from './runtime_callback_recorder.mjs';
+import {installRuntimeDiagnosticsCapture, readRuntimeDiagnosticsCapture, readRuntimeDiagnosticCounters} from './runtime_callback_recorder.mjs';
 import {createCssHumanJoinDriver} from './vs_css_two_human_driver.mjs';
 
 function cssFixture({connected=true,wrongSlot=false,foreignJoin=false}={}) {
@@ -70,7 +70,7 @@ async function recorderFixture({throwSample=false,throwIncident=false}={}) {
     const row=Array(19).fill(0);row[1]=1;row[2]=phase;row[16]=steps;row[18]=1;
     return context.menuDiagnosticSample(...row);
   };
-  return {context,sample,capture:()=>JSON.parse(JSON.stringify(context.__meleeWebRuntimeIncidentCampaignCapture))};
+  return {context,sample,page:fakePage,capture:()=>JSON.parse(JSON.stringify(context.__meleeWebRuntimeIncidentCampaignCapture))};
 }
 
 test('shared recorder preserves callbacks, bounded rings and every phase-tagged source-step count',async()=>{
@@ -94,4 +94,19 @@ test('original sample and incident exceptions remain primary while finally retai
   const recorded=capture();
   assert.equal(recorded.callback_count,1);assert.equal(recorded.phase_source_steps[14],2);
   assert.equal(recorded.reason_counts[7],1);assert.equal(recorded.incidents.length,1);
+});
+
+
+test('counter polling omits retained rings while full snapshot preserves bounded records',async()=>{
+  const {page,sample}=await recorderFixture();
+  sample();
+  const counters=JSON.parse(JSON.stringify(await readRuntimeDiagnosticCounters(page)));
+  const snapshot=JSON.parse(JSON.stringify(await readRuntimeDiagnosticsCapture(page)));
+  assert.equal(counters.phase_source_steps[14],2);
+  assert.equal('samples' in counters,false);assert.equal('incidents' in counters,false);
+  assert.equal(snapshot.samples.length,1);assert.equal(snapshot.phase_source_steps[14],2);
+  assert.equal(snapshot.status,'installed');
+  const emptyPage={evaluate:async fn=>vm.runInNewContext(`(${fn.toString()})()`,{})};
+  assert.deepEqual(JSON.parse(JSON.stringify(await readRuntimeDiagnosticCounters(emptyPage))),{status:'unavailable'});
+  assert.equal((await readRuntimeDiagnosticsCapture(emptyPage)).status,'unavailable');
 });

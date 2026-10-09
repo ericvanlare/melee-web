@@ -89,3 +89,41 @@ export async function installRuntimeDiagnosticsCapture(identity,identityScope,ta
     globalThis.__meleeWebRuntimeIncidentCampaignCapture=capture;
   },{identity,identityScope});
 }
+
+// Read the bounded records only when retaining evidence. Poll counters through
+// the smaller accessor below so ordinary route observation does not copy rings.
+export async function readRuntimeDiagnosticsCapture(targetPage) {
+  return targetPage.evaluate(()=>{
+      const value=globalThis.__meleeWebRuntimeIncidentCampaignCapture;
+      if(!value)return {schema:'melee-web-runtime-callback-capture-v1',status:'unavailable',
+        samples:[],incidents:[],dropped_samples:0,dropped_incidents:0,
+        reason_counts:Array(10).fill(0),unknown_reason_count:0,
+        dropped_reason_counts:Array(10).fill(0),dropped_unknown_reason_count:0,
+        invalid_preparation_count:0,dropped_invalid_preparation_count:0};
+      return {schema:value.schema,identity:value.identity,identity_scope:value.identity_scope,
+        max_samples:value.max_samples,
+        max_incidents:value.max_incidents,samples:value.samples.slice(),incidents:value.incidents.slice(),
+        dropped_samples:value.dropped_samples,dropped_incidents:value.dropped_incidents,
+        reason_counts:value.reason_counts.slice(),unknown_reason_count:value.unknown_reason_count,
+        dropped_reason_counts:value.dropped_reason_counts.slice(),
+        dropped_unknown_reason_count:value.dropped_unknown_reason_count,
+        invalid_preparation_count:value.invalid_preparation_count,
+        dropped_invalid_preparation_count:value.dropped_invalid_preparation_count,
+        callback_count:value.callback_count,phase_source_steps:value.phase_source_steps.slice(),
+        invalid_phase_steps:value.invalid_phase_steps,max_callback_ms:value.max_callback_ms,
+        max_interval_ms:value.max_interval_ms,max_update_ms:value.max_update_ms,max_draw_ms:value.max_draw_ms,
+        max_total_ms:value.max_total_ms,max_preparation_ms:value.max_preparation_ms,status:value.status};
+    });
+}
+
+export async function readRuntimeDiagnosticCounters(targetPage) {
+  return targetPage.evaluate(()=>{
+    const value=globalThis.__meleeWebRuntimeIncidentCampaignCapture;
+    if(!value)return {status:'unavailable'};
+    return {status:value.status,callback_count:value.callback_count,
+      phase_source_steps:value.phase_source_steps.slice(),
+      invalid_phase_steps:value.invalid_phase_steps,
+      reason_counts:value.reason_counts.slice(),unknown_reason_count:value.unknown_reason_count,
+      invalid_preparation_count:value.invalid_preparation_count};
+  });
+}
