@@ -194,6 +194,16 @@ int main(void)
         self.assertIn("Ground_801C10B8(gobj, fn_801D13C8);", map2)
         self.assertNotIn("gobj =", map2)
 
+    def test_original_ground_manager_constructor_order(self):
+        path = ROOT / "build/gameplay-source/src/melee/gr/ground.c"
+        if not path.is_file():
+            self.skipTest("Prepared pinned Ground source required")
+        body = function_body(path.read_text(), "void Ground_801C0FB8(")
+        self.assertLess(body.index("stage_datas[pair->grkind]->on_start();"), body.index("for (cur = stage_info.x6A4"))
+        self.assertLess(body.index("stage_info.x6A4 = NULL;"), body.index("HSD_GObj_SetupProc(GObj_Create"))
+        self.assertIn("HSD_GObj_SetupProc(GObj_Create(HSD_GOBJ_CLASS_STAGE, 5, 0),", body)
+        self.assertIn("Ground_801C0C2C, 10);", body)
+
     def test_sdk_queue_loss_control(self):
         target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
         if not target.is_file():

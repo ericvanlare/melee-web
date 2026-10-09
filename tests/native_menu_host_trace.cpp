@@ -8028,6 +8028,10 @@ int main(int argc,char** argv){try{
    check(melee_web_stadium_c1_generator_lifetime_control(), "Stadium generator lifetime control failed");
    return 0;
   }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-manager-mapset-controls"){
+   check(melee_web_stadium_c1_manager_mapset_control(), "Stadium manager mapset control failed");
+   return 0;
+  }
   if(argc==2&&std::string_view(argv[1])=="--ground-pending-callback-controls"){
    check(melee_web_stadium_c1_pending_queue_loss_control(), "Ground queue root-loss control failed");
    std::cout.flush();std::cerr.flush();

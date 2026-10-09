@@ -736,6 +736,98 @@ int melee_web_stadium_c1_generator_lifetime_control(void)
  return 1;
 }
 
+/* Test-only link seams, not gameplay entry points. The guard bridge is
+ * proposed in the downstream diagnostic patch and keeps its predicate intact. */
+extern int melee_web_stadium_c1_exact_map_set_control(
+    HSD_GObj*, HSD_GObj*, HSD_GObj*, HSD_GObj*);
+extern HSD_GObj* melee_web_stadium_c1_manager_create_control(void);
+extern HSD_GObjEvent melee_web_stadium_c1_manager_callback_control(void);
+
+static void mapset_numeric_owner(const char* phase, HSD_GObj* object)
+{
+    MeleeWebGameplayStats stats=melee_web_gameplay_stats();
+    printf("STADIUM_MAPSET_STATS phase=%s heap=%d objects=%u processes=%u ticks=%llu root=%p\n",
+           phase,stats.heap_free_bytes,stats.objects,stats.processes,(unsigned long long)stats.ticks,((HSD_GObj**)HSD_GObj_Entities)[5]);
+    MeleeWebSourceMemoryAllocation lease = {0};
+    int status = melee_web_source_memory_allocation_read(object, &lease);
+    printf("STADIUM_MAPSET_OWNER phase=%s object=%p classifier=%u link=%u "
+           "next=%p userdata=%p proc=%p status=%d world=%llu heap=%d "
+           "generation=%llu requested=%u live=%u\n",
+           phase, (void*)object, object->classifier, object->p_link,
+           (void*)object->next, object->user_data, (void*)object->proc, status,
+           (unsigned long long)lease.world_generation, lease.source_heap_handle,
+           (unsigned long long)lease.allocation_generation, lease.requested_bytes, lease.live);
+    if(object->proc){
+        MeleeWebSourceMemoryAllocation proc = {0};
+        int proc_status = melee_web_source_memory_allocation_read(object->proc, &proc);
+        printf("STADIUM_MAPSET_PROC phase=%s proc=%p object=%p callback=%p expected_callback=%p "
+               "priority=%u child=%p status=%d world=%llu heap=%d generation=%llu requested=%u live=%u\n",
+               phase, (void*)object->proc, (void*)object->proc->gobj,
+               (void*)object->proc->on_invoke, (void*)melee_web_stadium_c1_manager_callback_control(), object->proc->s_link,
+               (void*)object->proc->child, proc_status,
+               (unsigned long long)proc.world_generation, proc.source_heap_handle,
+               (unsigned long long)proc.allocation_generation, proc.requested_bytes, proc.live);
+        fflush(stdout);
+        queue_control_require(proc_status==MELEE_WEB_SOURCE_MEMORY_READ_OK && proc.live &&
+            proc.requested_bytes==sizeof(HSD_GObjProc) && proc.world_generation==lease.world_generation &&
+            proc.source_heap_handle==lease.source_heap_handle,"exact manager proc SDK lease");
+    }
+    fflush(stdout);
+    queue_control_require(status == MELEE_WEB_SOURCE_MEMORY_READ_OK && lease.live &&
+                          lease.requested_bytes == sizeof(HSD_GObj), "exact mapset GObj SDK lease");
+}
+
+int melee_web_stadium_c1_manager_mapset_control(void)
+{
+    char error[256] = {0};
+    queue_control_require(melee_web_gameplay_startup(8U * 1024U * 1024U, error, sizeof(error)), error);
+    queue_control_require(melee_web_native_world_enable(error, sizeof(error)), error);
+    struct StageInfo saved = stage_info;
+    for(size_t i=0;i<ARRAY_SIZE(stage_info.map_gobjs);++i)
+        queue_control_require(stage_info.map_gobjs[i]==NULL,"fresh map registry must be empty");
+    const unsigned ids[] = {0, 1, 2, 5};
+    HSD_GObj* maps[ARRAY_SIZE(ids)];
+    for(size_t i=0;i<ARRAY_SIZE(ids);++i){
+        /* Explicit synthetic map identities with real SDK GObj allocation. */
+        maps[i]=GObj_Create(HSD_GOBJ_CLASS_STAGE,5,0);
+        queue_control_require(maps[i]!=NULL,"mapset witness allocation");
+        stage_info.map_gobjs[ids[i]]=maps[i];
+        mapset_numeric_owner("four-map-baseline",maps[i]);
+    }
+    int four=melee_web_stadium_c1_exact_map_set_control(maps[0],maps[1],maps[2],maps[3]);
+    printf("STADIUM_MAPSET_PREDICATE phase=four-maps actual=%d expected=1 root=%p\n",four,((HSD_GObj**)HSD_GObj_Entities)[5]);fflush(stdout);
+    queue_control_require(four,"unchanged exactfour predicate accepts four maps");
+    /* Exact original Ground801C0FB8 final constructor arguments/order.
+     * No OnStart service or callback is simulated, and no proc is dispatched. */
+    HSD_GObj* manager=melee_web_stadium_c1_manager_create_control();
+    queue_control_require(manager!=NULL,"original manager allocation");
+    mapset_numeric_owner("original-manager",manager);
+    queue_control_require(manager->proc && manager->proc->gobj==manager &&
+        manager->proc->on_invoke==melee_web_stadium_c1_manager_callback_control() && manager->proc->s_link==10 && !manager->proc->child,
+        "exact original manager proc identity");
+    int with_manager=melee_web_stadium_c1_exact_map_set_control(maps[0],maps[1],maps[2],maps[3]);
+    printf("STADIUM_MAPSET_PREDICATE phase=with-original-manager actual=%d expected=0 manager=%p\n",with_manager,(void*)manager);fflush(stdout);
+    queue_control_require(!with_manager,"unchanged map-only guard refuses source manager");
+    HSD_GObjPLink_80390228(manager);
+    queue_control_require(melee_web_stadium_c1_exact_map_set_control(maps[0],maps[1],maps[2],maps[3]),"exactfour restored after owned manager release");
+    HSD_GObj* foreign=GObj_Create(HSD_GOBJ_CLASS_STAGE,5,0);
+    queue_control_require(foreign!=NULL,"foreign fifth witness allocation");
+    mapset_numeric_owner("unknown-fifth",foreign);
+    HSD_GObj snapshots[ARRAY_SIZE(ids)];
+    for(size_t i=0;i<ARRAY_SIZE(ids);++i)snapshots[i]=*maps[i];
+    HSD_GObj foreign_before=*foreign;
+    int unknown=melee_web_stadium_c1_exact_map_set_control(maps[0],maps[1],maps[2],maps[3]);
+    printf("STADIUM_MAPSET_PREDICATE phase=unknown-fifth actual=%d expected=0 foreign=%p\n",unknown,(void*)foreign);fflush(stdout);
+    queue_control_require(!unknown && memcmp(foreign,&foreign_before,sizeof(*foreign))==0,"unknown fifth refused without mutation");
+    for(size_t i=0;i<ARRAY_SIZE(ids);++i)queue_control_require(memcmp(maps[i],&snapshots[i],sizeof(*maps[i]))==0 && stage_info.map_gobjs[ids[i]]==maps[i],"mapset refusal preserves maps/roots");
+    HSD_GObjPLink_80390228(foreign);
+    for(size_t i=0;i<ARRAY_SIZE(ids);++i)HSD_GObjPLink_80390228(maps[i]);
+    stage_info=saved;
+    queue_control_require(melee_web_gameplay_shutdown(error,sizeof(error)),error);
+    puts("STADIUM_MAPSET_CONTROL exactfour=1 original_manager_refused=1 unknown_fifth_refused=1 pure=1 ticks=0 full_StageLast=0 raw_borrowed_shutdown=0");
+    return 1;
+}
+
 int melee_web_stadium_c1_pending_queue_loss_control(void)
 {
     char error[256] = {0};

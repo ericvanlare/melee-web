@@ -5690,7 +5690,7 @@ index 116be3d41cc321eefbd5c71c9de7282e92220bbc..3d5a61476b4327b7f321704dceb7e8d2
  
  void grOldYoshi_8020E79C(void)
 diff --git a/src/melee/gr/ground.c b/src/melee/gr/ground.c
-index 6c26c029432e5a07f6c0a34343d87f9fd3364367..192404b5e89227bab1bb611994c81ba48d7b58e8 100644
+index 6c26c029432e5a07f6c0a34343d87f9fd3364367..ccfeb680180377cd394b200af292b6f7f5885810 100644
 --- a/src/melee/gr/ground.c
 +++ b/src/melee/gr/ground.c
 @@ -1,5 +1,13 @@
@@ -5784,7 +5784,28 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..192404b5e89227bab1bb611994c81ba4
      }* cur;
      void* next;
      stage_datas[pair->grkind]->on_start();
-@@ -1187,6 +1240,19 @@ static inline bool find_light_override(UnkArchiveStruct* archive,
+@@ -709,6 +762,20 @@ void Ground_801C0FB8(StageIdPair* pair)
+                        Ground_801C0C2C, 10);
+ }
+ 
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++/* Test-only construction of the original private Ground manager. No proc tick. */
++HSD_GObj* melee_web_stadium_c1_manager_create_control(void)
++{
++    HSD_GObj* manager = GObj_Create(HSD_GOBJ_CLASS_STAGE, 5, 0);
++    HSD_GObj_SetupProc(manager, Ground_801C0C2C, 10);
++    return manager;
++}
++HSD_GObjEvent melee_web_stadium_c1_manager_callback_control(void)
++{
++    return Ground_801C0C2C;
++}
++#endif
++
+ void Ground_DemoInit(StageIdPair* pair, s32 arg1)
+ {
+     stage_datas[pair->grkind]->on_demo_init(arg1);
+@@ -1187,6 +1254,19 @@ static inline bool find_light_override(UnkArchiveStruct* archive,
                                         HSD_LightDesc* desc, bool* b6, bool* b7,
                                         bool* b5)
  {
@@ -5804,7 +5825,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..192404b5e89227bab1bb611994c81ba4
      UnkStageDat* dat = archive->unk4;
      s32 count = dat->unk1C;
      s32 i;
-@@ -1210,6 +1276,19 @@ static inline bool find_light_override_in_dat(UnkStageDat* dat,
+@@ -1210,6 +1290,19 @@ static inline bool find_light_override_in_dat(UnkStageDat* dat,
                                                HSD_LightDesc* desc, bool* b6,
                                                bool* b7, bool* b5)
  {
@@ -5824,7 +5845,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..192404b5e89227bab1bb611994c81ba4
      s32 count = dat->unk1C;
      s32 i;
  
-@@ -1523,6 +1602,13 @@ void Ground_801C28CC(s32* arg0, StKind stkind)
+@@ -1523,6 +1616,13 @@ void Ground_801C28CC(s32* arg0, StKind stkind)
      panicMissingStageParam(stkind, count);
  }
  
@@ -5838,7 +5859,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..192404b5e89227bab1bb611994c81ba4
  s32* Ground_801C2AD8(void)
  {
      return &stage_info.xA0;
-@@ -2646,6 +2732,7 @@ void Ground_801C466C(void)
+@@ -2646,6 +2746,7 @@ void Ground_801C466C(void)
      int i;
      int count;
      HSD_GObj* temp_r3;
@@ -5846,7 +5867,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..192404b5e89227bab1bb611994c81ba4
      HSD_LObj* temp_r3_2;
      LightList** var_r27_2;
      HSD_LObj* var_r27;
-@@ -2666,6 +2753,7 @@ void Ground_801C466C(void)
+@@ -2666,6 +2767,7 @@ void Ground_801C466C(void)
          if (callbacks->flags_b0 == 1) {
              archive = grDatFiles_801C6330(i);
              selected = Ground_801C20E0(archive, archive->unk4->unk8[i].x18);
@@ -5854,12 +5875,12 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..192404b5e89227bab1bb611994c81ba4
              goto light_selected;
          }
          callbacks++;
-@@ -2674,7 +2762,18 @@ void Ground_801C466C(void)
+@@ -2674,7 +2776,18 @@ void Ground_801C466C(void)
  light_selected:
      if ((r28_carrier.lights = selected) == NULL) {
          r28_carrier.lights = Ground_803E06C8;
 +        selected_entry = -1;
-     }
++    }
 +#if defined(TARGET_PC)
 +    /* The selected source row is bounded by its authored LightList** table in
 +     * map_head. Compare Ground's live HSD chain to that entry count instead of
@@ -5868,12 +5889,12 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..192404b5e89227bab1bb611994c81ba4
 +        OSReport("%s:%d: source Ground light entry has no checked bound\n",
 +                 __FILE__, __LINE__);
 +        while (true) {}
-+    }
+     }
 +#endif
      temp_r3 = GObj_Create(0xD, 3, 0);
      if (temp_r3 == NULL) {
          OSReport("%s:%d: couldn t get gobj\n", __FILE__, 0xEAF);
-@@ -3356,3 +3455,34 @@ void Ground_801C5AEC(Vec3* v, Vec3* arg1, Vec3* arg2, Vec3* arg3)
+@@ -3356,3 +3469,34 @@ void Ground_801C5AEC(Vec3* v, Vec3* arg1, Vec3* arg2, Vec3* arg3)
  
  /// @todo Is this used by base pointer anywhere? Not stripped by mwcc.
  static int unused_ints[] = { 1, 1, 0, 0, 0, 180, 0, 0, 0 };
@@ -5909,7 +5930,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..192404b5e89227bab1bb611994c81ba4
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c56902aa123037aad4f2d3806ac0277fe90f3558 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..80a5db46b29d224bc56588eba7ab5c3634c21d3d 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,15 @@
@@ -6063,7 +6084,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c56902aa123037aad4f2d3806ac0277f
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -920,6 +1000,2412 @@ typedef struct TextWrapper {
+@@ -920,6 +1000,2419 @@ typedef struct TextWrapper {
      HSD_Text* win_dynamic_p;
  } TextWrapper;
  
@@ -6861,6 +6882,13 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c56902aa123037aad4f2d3806ac0277f
 +        if (++found > 4) return 0;
 +    }
 +    return found == 4;
++}
++
++/* Diagnostic reducer bridge: execute the unchanged map-only guard. */
++int melee_web_stadium_c1_exact_map_set_control(
++    HSD_GObj* map0, HSD_GObj* display, HSD_GObj* map2, HSD_GObj* map5)
++{
++    return stadium_owner_map2_exact_stage_set_matches(map0, display, map2, map5);
 +}
 +
 +static int stadium_owner_map2_output_is_empty(
@@ -8476,7 +8504,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c56902aa123037aad4f2d3806ac0277f
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
  {
-@@ -1185,22 +3671,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +3678,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -8518,7 +8546,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c56902aa123037aad4f2d3806ac0277f
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +3719,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +3726,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -8540,7 +8568,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c56902aa123037aad4f2d3806ac0277f
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +3741,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +3748,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
@@ -8563,7 +8591,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c56902aa123037aad4f2d3806ac0277f
      wrapper->flag = false;
      return gobj;
  }
-@@ -1896,6 +4421,9 @@ bool grStadium_801D42B8(void)
+@@ -1896,6 +4428,9 @@ bool grStadium_801D42B8(void)
      if (gp->u.stadium.xC4_b1) {
          return false;
      }
@@ -8573,7 +8601,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c56902aa123037aad4f2d3806ac0277f
      gp->u.stadium.xD0 =
          grDatFiles_801C6478(gp->u.stadium.xCC, gp->u.stadium.xC8);
      return true;
-@@ -2093,6 +4621,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2093,6 +4628,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
              gp = GET_GROUND(map_gobj);
              HSD_ASSERT(0x99B, gp);
              gp->u.stadium.xC4_b1 = true;
@@ -8583,7 +8611,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..c56902aa123037aad4f2d3806ac0277f
              lbFile_80016580(datfiles[var_r29], gp->u.stadium.xCC,
                              &gp->u.stadium.xC8, fn_801D4220, NULL);
              temp_r31->u.stadium.xDC = 1;
-@@ -2221,6 +4752,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2221,6 +4759,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
          if (temp_r31->u.stadium.xDE == 5) {
              temp_r31->u.stadium.xD8 =
                  randi_between_2(yakumono_param->x0, yakumono_param->x4);
@@ -8637,9 +8665,10 @@ index 98700a79819d50c89fce0b030538a94af4ea0136..aaff533e48f1da7e4262847f864ba1d4
  static u32 _[] = {
      0xC3920000, 0x42D20000, 0xC3920000, 0x42960000, 0xC3920000, 0x42480000,
 diff --git a/src/melee/gr/grzakogenerator.c b/src/melee/gr/grzakogenerator.c
+index 8c69f209f6e2a9a44d22398f0beda7da6bac3535..ab3986ed0442b573356f57e5e1c85f0659df60b4 100644
 --- a/src/melee/gr/grzakogenerator.c
 +++ b/src/melee/gr/grzakogenerator.c
-@@ -371,3 +371,36 @@
+@@ -371,3 +371,36 @@ void grZakoGenerator_801CAF08(void)
          cur = next;
      }
  }
@@ -8677,7 +8706,7 @@ diff --git a/src/melee/gr/grzakogenerator.c b/src/melee/gr/grzakogenerator.c
 +}
 +#endif
 diff --git a/src/melee/gr/stage.c b/src/melee/gr/stage.c
-index 5a63015df51b87fa22d8e474b10c7047692e0e3e..8c99ea5dfd13251c175b1196b7813abe8bf471ea 100644
+index 5a63015df51b87fa22d8e474b10c7047692e0e3e..acf369c83215f2f9812c214d2225309fb64cd2e9 100644
 --- a/src/melee/gr/stage.c
 +++ b/src/melee/gr/stage.c
 @@ -1,5 +1,9 @@
@@ -8704,7 +8733,7 @@ index 5a63015df51b87fa22d8e474b10c7047692e0e3e..8c99ea5dfd13251c175b1196b7813abe
  {
      s32 r31;
      s32 spC;
-@@ -325,11 +335,34 @@ s32 Stage_80225074(s32 arg0)
+@@ -325,12 +335,35 @@ s32 Stage_80225074(s32 arg0)
      }
  
      tmp = Ground_801C28AC(selected_stage.stkind, r31, &spC);
@@ -8716,9 +8745,9 @@ index 5a63015df51b87fa22d8e474b10c7047692e0e3e..8c99ea5dfd13251c175b1196b7813abe
      Ground_801C5A84(spC);
      Ground_801C5AA4(tmp);
 +#endif
-+    return arg0;
-+}
-+
+     return arg0;
+ }
+ 
 +#if defined(MELEE_WEB_GAMEPLAY)
 +void melee_web_stage_commit_music(s32 music, int alternate)
 +{
@@ -8733,12 +8762,13 @@ index 5a63015df51b87fa22d8e474b10c7047692e0e3e..8c99ea5dfd13251c175b1196b7813abe
 +    int alternate;
 +    melee_web_stage_select_music(arg0, &music, &alternate);
 +    melee_web_stage_commit_music(music, alternate);
-     return arg0;
- }
++    return arg0;
++}
 +#endif
- 
++
  StKind Stage_80225194(void)
  {
+     return selected_stage.stkind;
 @@ -483,6 +516,38 @@ struct StageIdMapEntry stage_id_map[] = {
      { Gr_Kind_Shrine, 0, 0 },       { Gr_Kind_Battle, 0, 0 },
  };
@@ -8778,7 +8808,7 @@ index 5a63015df51b87fa22d8e474b10c7047692e0e3e..8c99ea5dfd13251c175b1196b7813abe
  GrKind Stage_8022519C(StKind stkind)
  {
      return stage_id_map[stkind].grkind;
-@@ -497,6 +552,11 @@ void Stage_802251E8(StKind stkind, s32* _)
+@@ -497,6 +562,11 @@ void Stage_802251E8(StKind stkind, s32* _)
  {
      StageIdPair local_data;
  
@@ -8790,7 +8820,7 @@ index 5a63015df51b87fa22d8e474b10c7047692e0e3e..8c99ea5dfd13251c175b1196b7813abe
      selected_stage.stkind = stkind;
      selected_stage.entry = &stage_id_map[stkind];
  
-@@ -512,6 +572,11 @@ void Stage_8022524C(void)
+@@ -512,6 +582,11 @@ void Stage_8022524C(void)
  {
      StageIdPair local_data;
  
@@ -10998,7 +11028,7 @@ index fde58837b1a2b93a05f6b737959b8537a8bd1703..961cdbbc251c1fd72241dcb5881c0b62
  }
  
 diff --git a/src/melee/lb/lbspdisplay.c b/src/melee/lb/lbspdisplay.c
-index 2f9d9a1c..64518f5c 100644
+index 2f9d9a1c14fddf436bf8f5c22c1c371ae6efd131..64518f5c63b8b2705ca73165fec01cee5177bc02 100644
 --- a/src/melee/lb/lbspdisplay.c
 +++ b/src/melee/lb/lbspdisplay.c
 @@ -1,4 +1,5 @@
