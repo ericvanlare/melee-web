@@ -2,6 +2,8 @@
 #include "gameplay_bootstrap.h"
 #include "gameplay_stage_context.h"
 #include "gameplay_stage_map.h"
+#include "gameplay_source_memory_runtime.h"
+#include "hsd_native_joint.h"
 
 #include <melee/gr/grdatfiles.h>
 #include <melee/gr/grpstadium.h>
@@ -543,4 +545,103 @@ int melee_web_stadium_c1_cache_live_control(
     return map_light_adoption_control(observer,user,error,size);
 }
 #undef LIGHT_CONTROL_CHECK
+#endif
+
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* A source-bound restoration fragment, not the full StageLast function.  The
+ * focused test checks this assignment against the production restoration. */
+static void queue_restore_stage_last_fragment(
+    struct MeleeWebStadiumC1StageInfoSnapshot* h)
+{
+    stage_info=h->saved;
+}
+
+static unsigned queue_control_callback_count;
+static void queue_control_callback(HSD_GObj* borrowed)
+{
+    (void) borrowed;
+    ++queue_control_callback_count;
+}
+
+static void queue_control_require(int condition, const char* message)
+{
+    if (!condition) {
+        fprintf(stderr, "GROUND_QUEUE_CONTROL failure=%s\n", message);
+        fflush(stderr);
+        _Exit(1); /* Never raw-shutdown a partially owned source graph. */
+    }
+}
+
+int melee_web_stadium_c1_pending_queue_loss_control(void)
+{
+    char error[256] = {0};
+    queue_control_require(melee_web_gameplay_startup(8U * 1024U * 1024U,
+                                                   error, sizeof(error)), error);
+    queue_control_require(melee_web_native_world_enable(error, sizeof(error)), error);
+    queue_control_require(stage_info.x6A4 == NULL && active_snapshot == NULL,
+                          "requires an unowned pending queue");
+    struct MeleeWebStadiumC1StageInfoSnapshot snapshot = {stage_info, 0};
+    HSD_GObj* borrowed[2] = {
+        GObj_Create(HSD_GOBJ_CLASS_STAGE, 5, 0),
+        GObj_Create(HSD_GOBJ_CLASS_STAGE, 5, 0),
+    };
+    queue_control_require(borrowed[0] && borrowed[1], "owned witness GObj allocation");
+    HSD_GObj saved_gobjs[2];
+    memcpy(&saved_gobjs[0], borrowed[0], sizeof(HSD_GObj));
+    memcpy(&saved_gobjs[1], borrowed[1], sizeof(HSD_GObj));
+    MeleeWebGameplayStats before = melee_web_gameplay_stats();
+    MeleeWebSourceMemoryContext context;
+    queue_control_require(melee_web_source_memory_context_read(&context) ==
+                          MELEE_WEB_SOURCE_MEMORY_READ_OK, "source memory owner");
+    struct PendingShape { void* next; HSD_GObj* gobj; HSD_GObjEvent callback; };
+    void* payloads[2];
+    MeleeWebSourceMemoryAllocation leases[2];
+    queue_control_callback_count = 0;
+    for (unsigned i = 0; i != 2; ++i) {
+        Ground_801C10B8(borrowed[i], queue_control_callback);
+        payloads[i] = stage_info.x6A4;
+        queue_control_require(melee_web_source_memory_allocation_read(
+            payloads[i], &leases[i]) == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+            leases[i].live && leases[i].requested_bytes == sizeof(struct PendingShape) &&
+            leases[i].source_heap_handle == context.source_heap_handle &&
+            leases[i].world_generation == context.world_generation,
+            "exact owned queue header lease");
+        const struct PendingShape* node = payloads[i];
+        queue_control_require(node->gobj == borrowed[i] &&
+            node->callback == queue_control_callback &&
+            node->next == (i ? payloads[0] : NULL), "actual enqueue LIFO and borrowed fields");
+    }
+    MeleeWebGameplayStats queued = melee_web_gameplay_stats();
+    queue_control_require(queued.heap_free_bytes < before.heap_free_bytes,
+                          "queue must have an observed SDK heap cost");
+    queue_restore_stage_last_fragment(&snapshot);
+    queue_control_require(stage_info.x6A4 == NULL && !queue_control_callback_count,
+                          "partial OnInit restoration loses queue without callbacks");
+    for (unsigned i = 0; i != 2; ++i) {
+        MeleeWebSourceMemoryAllocation after;
+        queue_control_require(melee_web_source_memory_allocation_read(payloads[i], &after) ==
+            MELEE_WEB_SOURCE_MEMORY_READ_OK && after.live &&
+            after.requested_bytes == leases[i].requested_bytes &&
+            after.source_heap_handle == leases[i].source_heap_handle &&
+            after.world_generation == leases[i].world_generation &&
+            after.allocation_generation == leases[i].allocation_generation,
+            "root loss leaves the exact original SDK header live");
+        queue_control_require(memcmp(borrowed[i], &saved_gobjs[i], sizeof(HSD_GObj)) == 0,
+                              "borrowed GObj changed during fragment");
+    }
+    MeleeWebGameplayStats lost = melee_web_gameplay_stats();
+    queue_control_require(lost.heap_free_bytes == queued.heap_free_bytes &&
+        lost.generation == before.generation && lost.ticks == before.ticks &&
+        lost.objects == before.objects && lost.processes == before.processes &&
+        melee_web_source_memory_healthy(), "unchanged partial source world after root loss");
+    printf("GROUND_QUEUE_CONTROL scope=actual-SDK-enqueue-and-StageLast-assignment-fragment "
+           "headers=2 requested_each=%zu free_before=%d free_queued=%d free_after_restore=%d "
+           "observed_gap=%d callbacks=0 borrowed_gobjs_unchanged=1 "
+           "expected_root_loss_reproduced=1 full_StageLast_executed=0 "
+           "Stadium_OnStart_executed=0 raw_shutdown=0\n",
+           sizeof(struct PendingShape), before.heap_free_bytes, queued.heap_free_bytes,
+           lost.heap_free_bytes, before.heap_free_bytes - lost.heap_free_bytes);
+    fflush(stdout);
+    return 1;
+}
 #endif

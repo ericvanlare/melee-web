@@ -7661,6 +7661,11 @@ int main(int argc,char** argv){try{
   run_vs_sudden_death_source_control();return 0;
  }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(argc==2&&std::string_view(argv[1])=="--ground-pending-callback-controls"){
+   check(melee_web_stadium_c1_pending_queue_loss_control(), "Ground queue root-loss control failed");
+   std::cout.flush();std::cerr.flush();
+   std::_Exit(0); // Retained expected partial owner; no raw source-world shutdown.
+  }
   if(argc==2&&std::string_view(argv[1])=="--stadium-profile-controls"){
    run_stadium_profile_controls();return 0;
   }

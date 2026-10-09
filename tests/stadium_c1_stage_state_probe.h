@@ -18,6 +18,12 @@ enum {
 extern "C" {
 #endif
 
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* Actual SDK enqueue + source-bound restoration fragment; deliberately retains
+ * the reproduced partial owner until process exit. No full StageLast/OnStart. */
+int melee_web_stadium_c1_pending_queue_loss_control(void);
+#endif
+
 /* Read source stage registries without copying or mutating their state. */
 uint32_t melee_web_stadium_c1_stage_state_failures(void);
 /* Observe stage instances and published StageInfo roots while a diagnostic
