@@ -177,3 +177,11 @@ The latest original campaign at source `a051c52a` with retained native producer
 SSS cooldown guard. This is a bounded menu-prefix outcome; original gameplay,
 SD and comparison remain unrun. The receipt retains the exact campaign
 failure and cleanup, with incomplete MWRI rather than a complete input trace.
+
+The reviewed `7d2adb67` reference receiver correction is integrated as exact
+source/test/fixture bytes. Constructor cooldown stays bounded at 20; observed
+FD/zero/new A after neutral arms the original 30-frame selection countdown,
+with exact source ticks, owner and release required. Actual retained controls
+cover 30 → 18; completion to zero remains synthetic until the changed original
+campaign is observed. Native `849b02e7` and browser `e13647cb` artifacts remain
+unchanged. Current executable full-suite validation is still pending.

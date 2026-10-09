@@ -662,5 +662,19 @@
       "tools/sd_reference_diagnostic.py"
     ],
     "scope": "Exact source/tool/fixture integration; no SD reference native build or comparison promotion"
+  },
+  "reference_toolset_sss_integration": {
+    "source_head": "7d2adb67edbfd4c1af6a51dfc2e3e55576f5ebb7",
+    "files": [
+      "docs/ORIGINAL_MENU_ROUTE_CAPTURE.md",
+      "tests/fixtures/sd-sss-confirmation-order.json",
+      "tests/test_sd_full_items.py",
+      "tests/test_sd_sss_confirmation.py",
+      "tools/sd_reference_diagnostic.py"
+    ],
+    "independent_review_sha256": "1852c852dc0c4c4969c76eec261e92d592661cb6c4a5d6633a39ee5e70b381ff",
+    "scope": "Exact reference receiver/test/fixture import; strict observed FD/A cooldown contract. Actual fixture30\u219218; synthetic completion separate. No capture/native build/current-suite pass claimed by import.",
+    "native_tested_producer": "849b02e77c1f33b13fa8b6eeb0a4f3689a17485e",
+    "browser_runtime_producer": "e13647cb1a1b7a6309592f5a53f16051f4d0b7fb"
   }
 }
