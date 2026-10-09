@@ -177,6 +177,7 @@ static void source_dynamic_case(void)
         .joints = source_joints,
         .joint_count = 1,
     };
+    const int original_dynamic_count = source_map.dynamic_count;
     const MeleeWebCollisionVertex input_vertices[] = {
         {-10, 0}, {0, 0}, {0, 10}, {10, 10},
         {-2, -1}, {2, -1}, {2, 1}, {-2, 1},
@@ -229,14 +230,17 @@ static void source_dynamic_case(void)
     mpLibLoad(&source_map);
     mpLib_80058820();
     stage_info.on_touch_line = NULL;
-    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)),
+    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)) &&
+              error_contains("Source dynamic collision has no authored touch-line callback"),
           "source dynamic collision rejects a missing authored touch-line callback");
     stage_info.on_touch_line = source_dynamic_touch_line;
     source_map.dynamic_count = 0;
-    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)),
+    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)) &&
+              error_contains("Source dynamic collision lost its original loaded map descriptor"),
           "source dynamic collision rejects a changed loaded-map descriptor");
-    source_map.dynamic_count = 1;
-    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)),
+    source_map.dynamic_count = original_dynamic_count;
+    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)) &&
+              error_contains("Source dynamic collision joint is not bound to its authored stage JObj"),
           "source dynamic collision rejects an unbound authored joint");
     mpLib_800552B0(0, &root, 0);
     CollJoint* const source_joint_bindings = mpGetGroundCollJoint();
