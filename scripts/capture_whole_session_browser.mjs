@@ -16,7 +16,7 @@ import {parseArgs} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {loadBrowserTools, browserLaunchOptions} from '../scripts/browser_tools.mjs';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
-import {finalizeSessionCapture, validateRuntimeDataAbort, boundedCaptureOperation,
+import {finalizeSessionCapture, sessionReplayReportCompleted, readRequestedEntityPrefix, validateRuntimeDataAbort, boundedCaptureOperation,
   retainFirstCaptureError, FIRST_REPLAY_BOUNDARY_MARKER_NAMES, parseFirstReplayBoundaryMarker,
   FIRST_REPLAY_BOUNDARY_MARKER_PREFIX, inspectFirstReplayBoundaryMarkers} from './whole_session_capture_result.mjs';
 import {parseRngDrawProbe, validateRngDrawProbeRows, parseHitTransitionProbe, validateHitTransitionProbeRows} from './rng_draw_probe.mjs';
@@ -707,6 +707,14 @@ try {
   if (![8, 9, 10].includes(report.recipe_header.version) ||
       report.recipe_header.frames < 1 || report.recipe_header.frames > 108000)
     throw Error('Whole-session replay requires a valid MWRC v8/v9/v10 frame count');
+  report.requested_entity_prefix = readRequestedEntityPrefix(recipeBytes, report.inputs.recipe.sha256);
+  if (report.requested_entity_prefix) {
+    if (diagnostic || stopAfter || resumeTimingPauses || firstReplayCallbackProbe ||
+        captureCpuObservations || rngDrawProbe || hitTransitionProbe || report.mode !== 'state')
+      throw Error('Named entity prefix requires unmodified state capture without diagnostic stopping or resume');
+    report.scope = 'Requested independent entity prefix; whole-session equivalence false, exact comparison separate';
+    report.whole_session_equivalent = false;
+  }
   if (diagnostic && (report.recipe_header.version !== diagnosticManifest.inputs.recipe.header.version ||
       report.recipe_header.seed !== diagnosticManifest.inputs.recipe.header.seed ||
       report.recipe_header.frames !== diagnosticManifest.inputs.recipe.header.frames ||
@@ -1079,7 +1087,7 @@ try {
       const links = last?.replay_downloads || [];
       if (links.includes('retail-browser-report.json')) {
         report.browser_report = last.replay_report;
-        if (last.replay_report?.complete && last.replay_report?.pass) return;
+        if (sessionReplayReportCompleted(last.replay_report, report.requested_entity_prefix)) return;
         if (!report.first_mismatch && last.replay_report?.failures?.length)
           report.first_mismatch = {phase: currentPhase, failure: last.replay_report.failures[0], snapshot: last};
         throw Error(`Browser replay report failed: ${JSON.stringify(last.replay_report?.failures || [])}`);
