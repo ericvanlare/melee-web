@@ -62,3 +62,28 @@ generator/camera implementation, full fixture rerun, idle-world loop, or
 whole-session acceptance is included. The existing portable receipt records
 both historical producers and these exact later build/control identities;
 raw evidence remains under run ID `stadium-c3-lifetime-20261009-074216-4d7cf7d1`.
+
+
+The later Stadium start-owner component on `b016f3c6` adds a separate checked
+original OnLoad/OnStart continuation, generator data/scheduler retirement and
+return of the borrowed map-1 camera subject to its existing match pool. The
+old OnInit caller and its **85,920-byte** failure remain unchanged. The
+canonical Release diagnostic builds passed; four native ASan/UBSan controls
+passed actual constructor, Camera, owner/selection and tracker bodies with
+explicit synthetic services or context construction.
+
+The first asset-free SDK generator control stopped on a mistaken observer
+expectation: freed allocation records are erased rather than kept with their
+old generation. The consumers were corrected to that established API. The
+second control observed the generator data's generation **10 → 0**, with
+zero requested bytes and live flag afterward in world 1 / heap 0, then failed
+its strict heap/object/process return predicate during the first lifetime.
+Its second lifetime did not run, and the compound check did not separately
+print those three numerical values. Original GObj/proc release returns cells
+to allocator free chains; cache retention is the next source-derived
+hypothesis to isolate with a smaller actual allocator control. Neither SDK
+failure is waived. Both exact producers and raw failures remain retained.
+
+No full Stage continuation fixture, source proc tick, idle-world loop or C3
+acceptance has run for this component. The next reducer must distinguish
+component retirement from complete owned-world retirement between lifetimes.

@@ -469,6 +469,77 @@
       "external_run_id": "stadium-c3-lifetime-20261009-074216-4d7cf7d1",
       "artifact_names_relative_to_run": true,
       "no_machine_specific_paths_required": true
+    },
+    "stadium_start_owner_component": {
+      "source_producer": "b016f3c638d55b1453532d95ca9fb9cb269a40bf",
+      "evidence_labels": [
+        "source-owner component",
+        "native sanitizer controls with explicit synthetic witnesses",
+        "actual asset-free SDK control failure"
+      ],
+      "implemented_boundary": "Separate checked original OnLoad/OnStart continuation; exact generator data/scheduler owner; borrowed map1 subject returned to existing MatchContext pool; authored selected-stage pair checked; prior OnInit caller unchanged",
+      "canonical_diagnostic_build": {
+        "result": "passed",
+        "argv": [
+          "python3",
+          "scripts/build.py",
+          "--trace-target",
+          "native_menu_host_trace",
+          "--configuration",
+          "Release",
+          "--stadium-c1a-diagnostic"
+        ],
+        "default_toolchain_and_jobs": true,
+        "build_log_sha256": "fa0bf8de635173de68c2cbd419f930fb89e60eb33e04213430a04341f65c3ba2",
+        "producer_hashes": {
+          "node": "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1",
+          "native_menu_host_trace.js": "9d36048fa02272a17556dffbc286e24dc25d89a0a5e9ac3951aa02b34a9bef77",
+          "native_menu_host_trace.wasm": "4b775c0d6734e1982addb6185b824f4f54b43e852644952930f737608ee7b818"
+        }
+      },
+      "native_controls": {
+        "result": "four passed",
+        "log_sha256": "87f5958f0a6864f292750371ab492b0000e8ed96accbc237e64be6d8220d105d",
+        "scope": "Actual original constructor/Camera bodies and downstream owner/selection bodies; actual source-memory tracker linked to source contexts; explicit synthetic HSD services, pool/context construction or allocation events; no proc dispatch or full fixture"
+      },
+      "sdk_attempts": [
+        {
+          "source_producer": "eea2dc9e85cb4b1c663100f02e8982b99cdead58",
+          "result": "failed",
+          "first_predicate": "exact generator SDK data retired",
+          "correction": "Consumer incorrectly expected erased record to retain old generation; corrected to established tracker API",
+          "complete_receipt": "stadium-start-build-first-sdk-complete-v1.json",
+          "complete_receipt_sha256": "e1cabf2141637760fe475fc91624f7f3f45c9ca6850c9c1f6d1e50e61e03bc07"
+        },
+        {
+          "source_producer": "b016f3c638d55b1453532d95ca9fb9cb269a40bf",
+          "result": "failed",
+          "first_predicate": "generator two-lifetime exact heap/object/process return",
+          "actual_lifetimes_completed": 0,
+          "first_generator_data_retired": {
+            "status": 0,
+            "before_generation": 10,
+            "after_generation": 0,
+            "after_requested_bytes": 0,
+            "after_live": 0,
+            "world": 1,
+            "heap": 0
+          },
+          "separate_heap_object_process_values": "not printed by compound predicate; next smaller reducer required",
+          "complete_receipt": "stadium-start-build-second-sdk-complete-v1.json",
+          "complete_receipt_sha256": "0561543f5387a5e11133c7b3541ba5e6379e1eab2b75285576c994f5a45fabab"
+        }
+      ],
+      "next_hypothesis": "Original GObj/proc ObjFree returns cells to rooted allocator caches without freeing SDK backing cells; separate smallest actual GObj/proc reducer with numeric heap/object/process and pool/root/lease observations before owned-world retirement",
+      "limits": [
+        "No third unchanged SDK generator run",
+        "Strict heap acceptance unchanged",
+        "No per-cell frees or broad allocator drain",
+        "No full Stage continuation fixture or source proc ticks",
+        "Prior 21b OnInit 85920-byte failure unchanged",
+        "Component is not C3 or whole-session acceptance"
+      ],
+      "private_evidence_run_id": "stadium-c3-lifetime-20261009-074216-4d7cf7d1"
     }
   }
 }
