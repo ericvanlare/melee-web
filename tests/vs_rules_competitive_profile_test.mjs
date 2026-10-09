@@ -4,6 +4,7 @@ import {
   ITEM_ROW_TO_PREFERENCE_BIT,
   competitiveProfileFailures,
   deriveAllOffItemMasks,
+  sourceItemClearMask,
 } from './vs_rules_competitive_profile_helpers.mjs';
 
 const rows = () => ITEM_ROW_TO_PREFERENCE_BIT.map((preference_bit, cursor) => ({
@@ -21,7 +22,29 @@ test('the 31 source Items rows cover their pinned preference bits without guessi
     rows: rows(),
   });
   assert.equal(masks.clearedPreferenceMaskHex, '00000000efffffff');
-  assert.equal(masks.preferenceMaskHex, 'ffffffff10000000');
+  assert.equal(masks.preferenceMaskHex, '0000000010000000');
+});
+
+test('original PPC setter sign-widens the complemented 32-bit mask, including bit 31', () => {
+  assert.equal(sourceItemClearMask(30), 0xffffffffbfffffffn);
+  assert.equal(sourceItemClearMask(31), 0x000000007fffffffn);
+  const initial = 0x12345678ffffffffn;
+  assert.equal(initial & sourceItemClearMask(30), 0x12345678bfffffffn);
+  assert.equal(initial & sourceItemClearMask(31), 0x000000007fffffffn);
+  for (const bit of [-1, 32, 1.5, '31'])
+    assert.throws(() => sourceItemClearMask(bit), /integer in 0..31/);
+});
+
+test('all-off source commits preserve only the initial unmapped bit 28 and clear the high word', () => {
+  for (const [initialPreferenceMaskHex, expected] of [
+    ['12345678ffffffff', '0000000010000000'],
+    ['ffffffffefffffff', '0000000000000000'],
+    ['ffffffff10000000', '0000000010000000'],
+    ['abcdef0100000000', '0000000000000000'],
+  ]) {
+    assert.equal(deriveAllOffItemMasks({initialPreferenceMaskHex, rows: rows()}).preferenceMaskHex,
+      expected);
+  }
 });
 
 test('all-off mask derivation rejects incomplete, reordered, duplicated, or still-enabled source rows', () => {
@@ -52,14 +75,14 @@ test('competitive profile predicates use GameRules and validate raw CSS provenan
       mode: 1, stock_count: 4, stock_time_limit: 8, handicap: 0,
       damage_ratio: 10, friendly_fire: 1, pause: 0,
     },
-    items: {frequency: -1, mask_hex: 'ffffffff10000000'},
+    items: {frequency: -1, mask_hex: '0000000010000000'},
   };
   const rawCssSelection = {
     valid: true, scene: 1, provenance: 'raw_css_vs_start',
     match_kind: 0, timer_enabled: 0, time_limit_seconds: 0,
     disable_pausing: 0, damage_ratio_bits: '00000000', player_stocks: [0, 0],
   };
-  const expectedPreferenceMaskHex = 'ffffffff10000000';
+  const expectedPreferenceMaskHex = '0000000010000000';
   assert.deepEqual(competitiveProfileFailures({source, rawCssSelection, expectedPreferenceMaskHex}), []);
 
   const changed = structuredClone(source);

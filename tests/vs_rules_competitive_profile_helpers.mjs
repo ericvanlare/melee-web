@@ -17,11 +17,21 @@ function formatMask(value) {
   return (value & UINT64_MASK).toString(16).padStart(16, '0');
 }
 
+// Original mn_8022E978: slw -> nor -> srawi 31 widens the signed
+// 32-bit complement into the high word of GameRules.item_mask (u64).
+// Clearing bit 31 therefore clears the high word; other rows retain it.
+export function sourceItemClearMask(preferenceBit) {
+  if (!Number.isInteger(preferenceBit) || preferenceBit < 0 || preferenceBit > 31)
+    throw new Error('source item preference bit must be an integer in 0..31');
+  return BigInt.asUintN(64, BigInt.asIntN(32, ~(1n << BigInt(preferenceBit))));
+}
+
 export function deriveAllOffItemMasks({initialPreferenceMaskHex, rows}) {
   if (!Array.isArray(rows) || rows.length !== ITEM_ROW_TO_PREFERENCE_BIT.length)
     throw new Error(`expected ${ITEM_ROW_TO_PREFERENCE_BIT.length} observed item rows`);
 
   let switchMask = 0n;
+  let preferenceMask = parseMask(initialPreferenceMaskHex, 'initial preference mask');
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index];
     if (row?.cursor !== index)
@@ -34,10 +44,9 @@ export function deriveAllOffItemMasks({initialPreferenceMaskHex, rows}) {
     if (switchMask & bit)
       throw new Error(`item preference bit ${row.preference_bit} appears more than once`);
     switchMask |= bit;
+    preferenceMask &= sourceItemClearMask(row.preference_bit);
   }
 
-  const initialPreferences = parseMask(initialPreferenceMaskHex, 'initial preference mask');
-  const preferenceMask = initialPreferences & ~switchMask & UINT64_MASK;
   return {
     preferenceMaskHex: formatMask(preferenceMask),
     clearedPreferenceMaskHex: formatMask(switchMask),
