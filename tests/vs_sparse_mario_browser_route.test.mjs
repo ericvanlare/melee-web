@@ -117,3 +117,43 @@ test('actual Controls helper closes on selector failure and preserves primary ov
   if(closeError)assert.equal(retention.closeError,String(secondary));else assert.equal(p.locateOpen(),false);
  }
 });
+
+
+import fs from 'node:fs';
+import {sparseP3FighterDecision} from './vs_sparse_mario_browser_route.mjs';
+const actualCursorRows=JSON.parse(fs.readFileSync(new URL('./fixtures/sparse-p3-actual-cursor-geometry.json',import.meta.url)));
+function syntheticP3Owner(){
+ const setup={doors:Array(40).fill(0),cursors:Array(16).fill(0)};
+ setup.cursors[8]=2;setup.doors[22]=25;setup.doors[23]=26;
+ return setup;
+}
+test('eight captured geometry rows require no-A fresh board entry with synthetic checked owner context',()=>{
+ assert.equal(actualCursorRows.observations.length,8);
+ for(const row of actualCursorRows.observations){
+  const decision=sparseP3FighterDecision(row,syntheticP3Owner());
+  assert.deepEqual(decision,{kind:'fresh-board-entry',button:0,x:0,y:80});
+ }
+ const o=actualCursorRows.observations.at(-1),[x,y,mx,my]=o.geometry;
+ assert((x-(mx-3.8))**2+(y-(my+2.6))**2<9,'Captured prior distance-only policy would send A');
+});
+test('source P3 decision rejects foreign ownership and unsupported slot/type, and gates selected pickup by board',()=>{
+ const o=structuredClone(actualCursorRows.observations.at(-1));
+ for(const change of [s=>s.doors[20]=1,s=>s.doors[24]=3,s=>s.doors[26]=3,
+  s=>s.cursors[8]=1,s=>s.cursors[9]=1,s=>s.cursors[9]=3,s=>{s.cursors[1]=1;s.cursors[2]=2;}]){
+  const setup=syntheticP3Owner();change(setup);assert.throws(()=>sparseP3FighterDecision(o,setup));
+ }
+ const setup=syntheticP3Owner();setup.doors[22]=1;setup.doors[23]=8;o.ids[2]=8;
+ assert.equal(sparseP3FighterDecision(o,setup).button,0,'Distance-only A below source board must be rejected');
+ o.geometry[1]=.3;assert.equal(sparseP3FighterDecision(o,setup).button,1,'Actual original board and distance prerequisites admit pickup');
+ o.ids[1]=1;assert.throws(()=>sparseP3FighterDecision(o,setup));
+ o.ids[1]=2;setup.cursors[9]=1;setup.cursors[10]=2;
+ assert.equal(sparseP3FighterDecision(o,setup).kind,'owned-puck-placement');
+});
+test('CSS-only final diagnostic gate requires CSS steps without inventing ordinary match coverage',()=>{
+ const capture={status:'installed',invalid_phase_steps:0,invalid_preparation_count:0,unknown_reason_count:0,
+  reason_counts:Array(10).fill(0),phase_source_steps:Array(15).fill(0),dropped_incidents:0};
+ capture.phase_source_steps[1]=10;
+ assert.equal(validateFinalSparseCapture(capture,{cssOnly:true}),10);
+ assert.throws(()=>validateFinalSparseCapture(capture));capture.phase_source_steps[1]=0;
+ assert.throws(()=>validateFinalSparseCapture(capture,{cssOnly:true}));
+});

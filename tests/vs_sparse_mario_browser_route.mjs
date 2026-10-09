@@ -64,10 +64,43 @@ export function checkSparseMatch(state,match,prior=null){
   assert(Number.isSafeInteger(match.frame)&&match.frame>0);
   if(prior)assert(match.frame>=prior.frame,'Original source cursor regressed');
 }
-export function validateFinalSparseCapture(capture){
+// Original CursorThink: type toggle precedes pickup; fresh unselected doors
+// attach automatically on entering the board, without an A edge.
+export function sparseP3FighterDecision(observation,setup){
+ assert.equal(setup?.doors?.length,40);assert.equal(setup?.cursors?.length,16);
+ const row=setup.doors.slice(20,30),cursor=setup.cursors.slice(8,12);
+ const [port,held,selectedKind]=observation.ids;
+ const [x,y,mx,my,left,right,top,bottom]=observation.geometry;
+ assert.equal(port,2);assert.equal(cursor[0],2);assert.equal(row[0],0);assert.equal(row[4],0);
+ assert.equal(row[6],0);assert(observation.geometry.length===8&&observation.geometry.every(Number.isFinite));
+ for(let other=0;other<4;other++)if(other!==2)
+  assert(!(setup.cursors[other*4+1]===1&&setup.cursors[other*4+2]===2),'Foreign cursor owns P3 puck');
+ const icon=row[2],inside=mx>left&&mx<right&&my<top&&my>bottom;
+ const axis=(value,target)=>value<target-.62?80:value>target+.62?-80:0;
+ if(held<0&&icon>=25){
+  assert([0,2].includes(cursor[1]),'Fresh door cursor must be unheld and connected');
+  assert.equal(selectedKind,-1);assert.equal(row[3],26);
+  assert(y<22,'Fresh unselected cursor must enter the source board');
+  return {kind:'fresh-board-entry',button:0,x:0,y:y<=.2?80:0};
+ }
+ assert(icon>=0&&icon<25,'Selected pickup requires a source icon');
+ if(held<0){
+  assert([0,2].includes(cursor[1]),'Pickup cursor must be unheld and connected');assert.equal(row[3],selectedKind);
+  if(row[3]===8&&inside)return {kind:'selected',button:0,x:0,y:0};
+  const tx=mx-3.8,ty=my+2.6;
+  const board=y>=.2&&y<=22,ready=board&&(tx-x)**2+(ty-y)**2<9;
+  // Reach original board eligibility before any valid-puck pickup A edge.
+  return {kind:'placed-puck-pickup',button:ready?1:0,x:ready?0:axis(x,tx),
+   y:ready?0:axis(y,Math.max(.2,Math.min(22,ty)))};
+ }
+ assert.equal(held,2);assert.equal(cursor[1],1);assert.equal(cursor[2],2);
+ return {kind:'owned-puck-placement',button:inside?1:0,
+  x:inside?0:axis(x,(left+right)/2-2.7),y:inside?0:axis(y,(top+bottom)/2+2)};
+}
+export function validateFinalSparseCapture(capture,{cssOnly=false}={}){
   const steps=callbackSteps(capture);
   assert.equal(capture.dropped_incidents,0,'Incident retention overflow');
-  assert(capture.phase_source_steps[7]>0,'No ordinary match callback steps retained');
+  assert(capture.phase_source_steps[cssOnly?1:7]>0,cssOnly?'No CSS callback steps retained':'No ordinary match callback steps retained');
   return steps;
 }
 export async function runSparseMarioBrowserPrefix(d){
@@ -144,20 +177,19 @@ export async function runSparseMarioBrowserPrefix(d){
   for(let n=0;n<SPARSE_PREFIX_LIMITS.fighterSamples;n++){
     const o=await page.evaluate(()=>window.menuObserveFighterPort(2,8));assert(o);
     route.css.push({label:'P3 original Mario geometry',observation:o});
-    const [port,held]=o.ids,[x,y,mx,my,left,right,top,bottom]=o.geometry;
-    assert.equal(port,2);assert(o.geometry.every(Number.isFinite));
-    const inside=mx>left&&mx<right&&my<top&&my>bottom;
     setup=await observeCssSetup();
-    if(cssDriver.cssDoor(setup,2).character===8&&held<0&&inside){selected=true;break;}
-    let tx,ty,ready;
-    if(held<0){tx=mx-3.8;ty=my+2.6;ready=(tx-x)**2+(ty-y)**2<9;}
-    else{assert.equal(held,2);tx=(left+right)/2-2.7;ty=(top+bottom)/2+2;ready=inside;}
-    const axis=(value,target)=>value<target-.62?80:value>target+.62?-80:0;
-    await pulse(ready?1:0,ready?0:axis(x,tx),ready?0:axis(y,ty),'P3 original Mario cursor');
+    const decision=sparseP3FighterDecision(o,setup);
+    route.css.push({label:'P3 checked source decision',setup,observation:o,decision});
+    if(decision.kind==='selected'){selected=true;break;}
+    await pulse(decision.button,decision.x,decision.y,'P3 original Mario cursor');
   }
   assert(selected,'P3 original Mario selection cap');checkSparseCss(setup);
   await padVectors('Sparse committed CSS raw/copied PAD profile');
   route.css.push({label:'closed sparse CSS selection',setup});await shot('sparse-css-p1-p3');
+  if(d.cssOnly){
+    await page.locator('#unload').click();await verifyTeardown('Sparse CSS-only Eject');
+    report.result='pass';report.checks.push('Original sparse CSS selection, exact raw/copied PAD ports0/2 and Eject only; no SSS/world');return;
+  }
   await press('Enter');await waitPhase(3,'Sparse original SSS');await waitForNoQueuedPad('Sparse CSS Start released');
   let stage=1;
   for(let n=0;n<SPARSE_PREFIX_LIMITS.sssSamples;n++){
