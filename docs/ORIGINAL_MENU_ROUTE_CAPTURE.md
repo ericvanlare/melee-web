@@ -482,3 +482,15 @@ duplicate/gapped ticks still fail, and strict VS entry remains separate. The
 offline actual replay accepts the buffered prefix through seq1698, without
 admitting VS/SD or the interrupted terminal as success. The failed run and
 incomplete MWRI remain preserved; no native observer, inputs or caps changed.
+
+The single changed campaign at receiver5e136/native23b9-b6ea passed the existing
+strict receiver through original normal VS, natural tied timeout and SD setup.
+The scoped `original-sd-prefix-boundary-result-v6.json` receipt (SHAf71945e0…)
+binds the raw streams, complete native MWRI, intentionally interrupted primary
+observer, immutable profile and exact owned cleanup. The predeclared offline
+V11 comparison (`declared-v11-initialization-comparison-v2.json`, SHA1df30ced…)
+passed the retained normalized participant, port, color, stock, damage, rule,
+scene-order and natural-timeout fields. These receipts are under the retained
+`menu-tie-extension-v1/sss-retirement-launch-v1` campaign. This remains an
+initialization comparison: original SD resolution/Results, raw PAD/RNG equality,
+pixels, PCM, physical input and live timing are excluded.

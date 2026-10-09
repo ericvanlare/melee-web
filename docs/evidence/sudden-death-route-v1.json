@@ -8,8 +8,8 @@
     "Source identified",
     "Native traced"
   ],
-  "status": "browser_v11_and_native_ordinary_v3_functional_passed_original_comparison_and_final_validation_open",
-  "scope": "Browser V11 SD/Results/returned-menu/subsequent-prefix functional pass; native SD and ordinary non-tied/elimination functional controls; original comparison remains open",
+  "status": "browser_v11_native_ordinary_v3_and_scoped_original_sd_initialization_compared_current_head_ci_open",
+  "scope": "Browser functional SD resolution/Results/next-entry; native ordinary regressions; original initialization-only declared field comparison",
   "producer": {
     "source": "8b6ad34914c9e955a0aba8f6cc1e75a952fb6bc3",
     "tree": "3b47f21d59e0233c6a475bfc1b928984c3a2a3be",
@@ -274,7 +274,7 @@
   ],
   "open_gates": [
     "Full suite passed cf8; later reference-only delta needs focused checks/current-head CI and root integration review.",
-    "Original full settings/SD reference and strict comparison with matching recipe5 colors [1,0], pause-enabled and declared fields.",
+    "Original SD resolution/Results/RNG/input equivalence/pixels/PCM/live timing excluded from passed initialization comparison; broader acceptance remains separate.",
     "Internal final SD numeric PAD/RNG remain separately unobserved; Results-entry observations do not substitute for that boundary.",
     "Second whole ordinary match, sparse/four-player browser coverage, physical input, pixels/PCM equivalence, uninterrupted audio and foreground timing remain unrun."
   ],
@@ -355,42 +355,8 @@
     "component_recheck": "Passed again alongside native harness preparation; component producer is distinct from native ff405bca."
   },
   "original_reference": {
-    "producer_source": "8f944a09c422a960ce7773f29dafb980d09f5137",
-    "binary_sha256": "c22d23c2eee8cefee08ea87a651ebcc8a8a9b7a1f121929deebf329e02e4bf14",
-    "status": "reduced original Rules-ready boundary passed",
-    "ready_predicate": {
-      "cooldown": 0,
-      "entering": 1,
-      "kind": 13,
-      "row": 0,
-      "scene": 1,
-      "value": 0
-    },
-    "selected_gci_sha256": "5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729",
-    "completed_mwri_events": 2018,
-    "primary_observer": "intentionally interrupted; no terminal/full-route completion claim",
-    "cleanup": "exact native, supervisor and guarded runner reaped; original profile/GCI unchanged",
-    "receipt_sha256": "82c4366d7d676508bc2a6cfdb96b0cb11eb06f4392608ea5e2bda6023b693e36",
-    "root_review_sha256": "5bbb2a3ae716bdf9d98bfd1362dda3739ddc6a66fec4185fab9b27c0e08c4beb",
-    "prior_first_failure": {
-      "producer": "New 7a3a20ac binary built",
-      "status": "first GCI Rules-ready run failed main-select-VS after passing the earlier memory-card startup boundary",
-      "unrun": [
-        "Rules-ready/loaded-field observation",
-        "Sudden Death reference",
-        "Cross-producer strict comparison"
-      ],
-      "root_review_sha256": "b990923c029a9c35a0cb9aee1c704d0772f5438530ad0d1de9ee57b094d72283",
-      "scope": "Bounded original-route preparation failure only; no reference simulation agreement claim.",
-      "source": "7a3a20ac1d3b9f1c469f5555332f19efad5b38c2"
-    },
-    "unrun": [
-      "full settings verification",
-      "Sudden Death reference",
-      "cross-producer strict comparison"
-    ],
-    "scope": "Original functional readiness only; no original simulation agreement.",
-    "current_recipe_alignment": "Earlier plan colors [0,1]/pause-off superseded by recipe 5 colors [1,0]/pause-enabled; Items prefix failed, revised original producer built; aligned full settings/SD comparison unrun.",
+    "status": "original natural one-minute tie through SD initialization passed; declared V11 initialization comparison passed",
+    "current_recipe_alignment": "Current original recipe5 and V11 use Mario colors [1,0], pause enabled, four stock/one minute/FD/declared Items; earlier [0,1]/pause-off plan remains historical.",
     "toolset_extension_23b9": {
       "reviewed_source": "23b9ff37",
       "integrated_base_equivalent": "6ade1bf4 equals 0e8caada tools before import",
@@ -398,7 +364,7 @@
       "focused": "46 cheap Python source tests passed in 3.687s; no native compiler/assets/browser launched",
       "native_reference_build": "owned separately by reference checkout; no new comparison claim from SD integration"
     },
-    "latest_campaign": {
+    "historical_css_sss_v4": {
       "source_head": "a051c52ada9889e5931b11835ef89b36a70ab851",
       "native_producer": "23b9ff374e889541452559d89b710fec682a71fc",
       "bounded_result": "Items and CSS autojoin reached; first SSS cooldown guard failed",
@@ -434,7 +400,79 @@
       },
       "cleanup": "Exact native/supervisor/guarded PIDs37748/37751/37755 absent",
       "binary_sha256": "b6ea2fe3d8731c28b77fd0b561651bfebee73ec86536322172d1654aa7bdfb17"
-    }
+    },
+    "v6": {
+      "receiver_head": "5e136a78c1a939b38aee4920c90711532ae7dc6b",
+      "native_producer": "23b9ff374e889541452559d89b710fec682a71fc",
+      "binary_sha256": "b6ea2fe3d8731c28b77fd0b561651bfebee73ec86536322172d1654aa7bdfb17",
+      "result": "PASS natural original one-minute tied VS through actual SD initialization",
+      "result_sha256": "f71945e015cd685595d1abe39cdc9f9ac79e5780e223366c8ebd1aa7f8736cbb",
+      "raw_report_sha256": "4924f0a1e167e01407d5455565fd89ce766f9753a0672fa48bce5c02fb7c9126",
+      "supervisor_sha256": "c06a8fb168b23bbbb7c6afaa3d60c6f385d6dd62c87c844bd2cb052f38c8ae45",
+      "source_consumed_inputs": 3838,
+      "source_cap": 4323,
+      "MWRI": "complete 20416 events",
+      "primary_observer": "intentionally interrupted after declared prefix, 9423 events",
+      "cleanup": "Exact supervisor/guarded/Python/native PIDs53328/53331/53334/53335 absent; original profile/GCI unchanged",
+      "scope": "Original VS tie and SD initialization only; not SD resolution/Results/RNG/pixels/PCM/timing acceptance"
+    },
+    "declared_v11_comparison": {
+      "result": "PASS no first mismatch",
+      "comparison_sha256": "1df30cedf2697359be86930bc0f00a34c25cbbabd73bb6764471c31d5e417323",
+      "root_review_sha256": "62e5ca06c0b23d8c3f1565012d931fe40aeb0256a1d375c59db7ac46adc234aa",
+      "browser_runtime_head": "e13647cb1a1b7a6309592f5a53f16051f4d0b7fb",
+      "browser_harness_head": "3285f34413e3dc775b9ba16fc62321be52a00c92",
+      "fields": [
+        "VS-entry and SD-setup participants/source ports/raw slots/colors [1,0]",
+        "stocks 4 to 1 and initial damage 0 to 300",
+        "FD32/timer1 to 0/time60/is_stock-is_vs1 to 0/SDflag0 to 1/declared Items",
+        "VS MatchEnd frame3600/outcome1/tied winners [0,1]",
+        "actual typed SD fighters stock1/damage300"
+      ],
+      "excluded": [
+        "Original SD resolution and Results",
+        "internal SD RNG and physical PAD equivalence",
+        "pixels/PCM/uninterrupted audio/live timing"
+      ],
+      "scope": "Predeclared initialization-only field agreement; no whole-session original-comparison claim"
+    },
+    "historical_rules_ready": {
+      "producer_source": "8f944a09c422a960ce7773f29dafb980d09f5137",
+      "binary_sha256": "c22d23c2eee8cefee08ea87a651ebcc8a8a9b7a1f121929deebf329e02e4bf14",
+      "ready_predicate": {
+        "cooldown": 0,
+        "entering": 1,
+        "kind": 13,
+        "row": 0,
+        "scene": 1,
+        "value": 0
+      },
+      "selected_gci_sha256": "5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729",
+      "completed_mwri_events": 2018,
+      "primary_observer": "intentionally interrupted; no terminal/full-route completion claim",
+      "cleanup": "exact native, supervisor and guarded runner reaped; original profile/GCI unchanged",
+      "receipt_sha256": "82c4366d7d676508bc2a6cfdb96b0cb11eb06f4392608ea5e2bda6023b693e36",
+      "root_review_sha256": "5bbb2a3ae716bdf9d98bfd1362dda3739ddc6a66fec4185fab9b27c0e08c4beb",
+      "prior_first_failure": {
+        "producer": "New 7a3a20ac binary built",
+        "status": "first GCI Rules-ready run failed main-select-VS after passing the earlier memory-card startup boundary",
+        "unrun": [
+          "Rules-ready/loaded-field observation",
+          "Sudden Death reference",
+          "Cross-producer strict comparison"
+        ],
+        "root_review_sha256": "b990923c029a9c35a0cb9aee1c704d0772f5438530ad0d1de9ee57b094d72283",
+        "scope": "Bounded original-route preparation failure only; no reference simulation agreement claim.",
+        "source": "7a3a20ac1d3b9f1c469f5555332f19efad5b38c2"
+      },
+      "unrun": [
+        "full settings verification",
+        "Sudden Death reference",
+        "cross-producer strict comparison"
+      ],
+      "scope": "Original functional readiness only; no original simulation agreement."
+    },
+    "scope": "Current original natural tie/SD initialization and declared V11 initialization-only comparison; historical Rules-ready and failure receipts retained separately"
   },
   "validation": {
     "tested_executable_head": "fd55b378941b2ecd4cc4f1d8df84515ffab0b29a",
@@ -706,5 +744,14 @@
     "reported_D_controls": "59 tests passed; final8 focused passed after type negative; SD-import focused checks held during capture",
     "runtime_producer": "e13647cb1a1b7a6309592f5a53f16051f4d0b7fb",
     "native_tested_producer": "849b02e77c1f33b13fa8b6eeb0a4f3689a17485e"
+  },
+  "fixture_content_reduction": {
+    "file": "tests/fixtures/sd-css-initial-na-order.json",
+    "actual_seq": 899,
+    "retained": "one exact actual row;328byte CSSData as authored112byte prefix and six36byte PlayerInitData records",
+    "row_sha256": "69f437fd0cecc39cba365f4283d05be2796295a38081d93784cf2bb6f2db5f50",
+    "checks": "Five CSS tests and staged content check passed; no checker/policy/production decoder change. Full external28rows retained.",
+    "first_content_failure": "Long encoded payload finding retained in external log",
+    "receipt_sha256": "0248c4005d80c3eb5e7730bb6dfd387421c22a7b301090d6f613087e9c46af06"
   }
 }
