@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from authored_sd_reference_plan import make_input_plan
 from sd_reference_diagnostic import Receiver, RulesMenuReceiver, SdDiagnosticError, SCOPE, PCS
 from sd_original_menu_plan import rules_ready_packet, matches
-from capture_sd_reference_prefix import cleanup_process, menu_actions, wait_terminal_statuses
+from capture_sd_reference_prefix import cleanup_process, menu_actions, rules_dolphin_command, wait_terminal_statuses
 from test_authored_sd_reference_plan import setup_bytes
 
 
@@ -98,6 +98,15 @@ def index(rows, name):
 
 
 class SdReferenceDiagnosticTests(unittest.TestCase):
+    def test_rules_launch_uses_explicit_headless_cold_boot_and_shared_speaker_mute(self):
+        command = rules_dolphin_command("owned-dolphin", "owned-user", "owned-disc")
+        self.assertEqual(command[command.index("-p") + 1], "headless")
+        self.assertIn("Dolphin.DSP.Backend=No Audio Output", command)
+        self.assertIn("Dolphin.DSP.Muted=True", command)
+        self.assertIn("Session.Core.SaveDataWritable=False", command)
+        self.assertIn("Dolphin.Core.CPUThread=False", command)
+        self.assertNotIn("-s", command)
+
     def test_direct_process_cleanup_retains_reaping_and_failed_wait_receipts(self):
         with tempfile.TemporaryDirectory() as directory:
             process = mock.Mock(pid=12345)
