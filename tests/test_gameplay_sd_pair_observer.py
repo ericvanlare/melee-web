@@ -25,6 +25,8 @@ FIXTURE = r'''
 #include <stdexcept>
 #include <string>
 constexpr int Gm_PKind_Human=0, GM_MAX_PLAYERS=6;
+struct CopiedPad { signed char err; };
+CopiedPad HSD_PadCopyStatus[4]={{0},{-1},{-2},{-3}};
 struct Rules {
  int match_kind=1, stkind=32, timer_enabled=0, time_limit=60;
  int is_stock=0, is_vs=0, x6=1, xB=-1, is_teams=0, friendly_fire=1;
@@ -75,8 +77,11 @@ int main(int argc,char**) {
  storage.start.players[3].slot=4;
  storage.start.players[3].color=1;
  const auto before=storage.start;
+ CopiedPad pads_before[4];
+ std::memcpy(pads_before,HSD_PadCopyStatus,sizeof(pads_before));
  std::cout<<melee_web_native_menu_match_observe()<<'\n';
- if(std::memcmp(&before,&storage.start,sizeof(before))!=0||storage.random_seed()!=123)
+ if(std::memcmp(&before,&storage.start,sizeof(before))!=0||storage.random_seed()!=123||
+    std::memcmp(pads_before,HSD_PadCopyStatus,sizeof(pads_before))!=0)
   return 2;
  if(argc==1) {
   storage.throw_stats=true;
@@ -115,6 +120,7 @@ class GameplaySdPairObserverTests(OwnedWorkspaceTests):
 
     def test_actual_live_damage_and_sparse_original_payload_are_distinct_readonly(self):
         live, unavailable, preparing, retained = self.compile_case()
+        self.assertEqual(live["source_pad_errors"], [0, -1, -2, -3])
         self.assertEqual(live["observed_player_source_slots"], [0, 3])
         self.assertEqual(live["prior_vs_terminal"], {"outcome": 1, "winners": [0, 3]})
         self.assertEqual([p["damage_percent"] for p in live["players"]], [300, 301.5])
