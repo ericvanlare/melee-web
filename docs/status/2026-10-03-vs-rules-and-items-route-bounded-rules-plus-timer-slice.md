@@ -46,9 +46,15 @@ No comparison ran on this attempt. The receiver now detects an exited owned
 native child while waiting for a missing record; four focused child/wait controls
 and 12 legacy-reader controls pass. Complete buffered records remain readable
 after child exit. This receiver-only change leaves native overlay bytes unchanged.
-A separate Null-renderer profile-entry experiment is being prepared before any
-further long capture. It changes only the copied renderer configuration and
-cannot establish rendered output equivalence or the Metal failure's cause.
+A separate Null-renderer entry capture passed in 25.044 seconds. Its own raw
+profile/setup projection matches every predeclared browser V9 field, independently
+replayed by the lead. Actual native output and owned configuration both identify
+Null; the input recording completes with 5,830 events and the primary observer
+ends intentionally at setup with 2,167 records. Exact owned processes are absent,
+and the original profile/GCI remain unchanged. Only the copied renderer setting
+changed. This establishes the scoped initialization comparison, not rendered
+output equivalence or the Metal failure's cause. The separate natural-timeout
+attempt has not yet supplied a terminal result.
 
 The combined Rules/SD runtime passed the eight-minute functional route in V9.
 The [same scoped receipt](../evidence/competitive-rules-profile-preflight-v1.json)

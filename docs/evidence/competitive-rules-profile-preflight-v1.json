@@ -836,5 +836,33 @@
     "focused_log_sha256": "7173c39a84ce7a7bd919e6acf799b5723055b8858b0e79488d355ed7e10cdb82",
     "legacy_log_sha256": "51c1d7ced3567a2bbcd70643b79dacc030c3cbaf6e9ce9fd598e68259a550a33",
     "source_review_sha256": "0898a61860508da2d6be6d45dfed278055e8f4a0028fc06d56190f1a61e0e879"
+  },
+  "original_null_renderer_entry_v1": {
+    "result": "PASS scoped original menu/profile/setup and complete declared V9 comparison",
+    "receiver": "6e3ad12f7de3b876c9f0342485163957ce01dd2c",
+    "native_producer": "00ef116f341f7961bd832b436e1760efc7328ddf",
+    "native_binary_sha256": "5ae29c6142bf80b287011d6733886e0608818e51df52ff738ff41dcfaabbe6ed",
+    "seconds": 25.043977500172332,
+    "renderer": "Null",
+    "renderer_attestation": "Actual native banner plus owned prepared config; only Core.GFXBackend changed from immutable Config-only template",
+    "raw_sha256": "bb51d9702a309682da21836c4321946d891ad168880167c51657a10cd11c1844",
+    "native_input_sha256": "55ff2b7638492f9498593445a9d8e6fe2e9b024f15fd4f5f61d1dae7d53b2e69",
+    "native_input_events": 5830,
+    "native_input_complete": true,
+    "observer_records": 2167,
+    "observer_completion": "intentionally interrupted at normal VS setup",
+    "supervisor_result_sha256": "b274ea4a816ef09b867eb5e1e776945034b9618225a801a1cf827d506f72d581",
+    "root_result_review_sha256": "f732d1e0b732b42a464c32cfe23debe52ef7abbdfda511234b5d13e4d01d0c54",
+    "comparison_sha256": "09cdbc021900123392d1287eaaf590167153143aa1751ad891a505204b287751",
+    "root_comparison_review_sha256": "e64ea8b66688b0384c718202f3f1deca57afd4a7aca3c4d471a4f7e04759b816",
+    "exclusions": [
+      "No natural terminal result",
+      "No renderer/pixel equivalence",
+      "No Metal failure cause",
+      "No RNG/PAD schedule comparison",
+      "No physical/audio/foreground timing acceptance"
+    ],
+    "cleanup": "All four exact owned PIDs absent; source profile/GCI unchanged; owned Config modes0400 before launch and0644 after native shutdown.",
+    "private_locator": "sd-reference-source-tests / competitive-original-null-entry-launch-v1"
   }
 }
