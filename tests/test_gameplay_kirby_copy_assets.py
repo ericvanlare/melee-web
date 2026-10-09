@@ -40,6 +40,18 @@ class GameplayKirbyCopyAssetsTests(OwnedWorkspaceTests):
         ], cwd=ROOT, env=env, capture_output=True, text=True, timeout=120)
         if result.returncode:
             raise RuntimeError(result.stdout + result.stderr)
+        effect_tables = Path(cls.temp.name) / "effect-source-tables.o"
+        result = subprocess.run([
+            sys.executable, str(sdk / "upstream/emscripten/emcc.py"),
+            "-O1", "-DTARGET_PC", "-ffunction-sections", "-fdata-sections",
+            "-I", str(ROOT / "src"), "-I", str(source),
+            "-I", str(ROOT / ".deps/aurora/include"),
+            "-include", str(ROOT / "src/gameplay_compat.h"),
+            "-c", str(source / "melee/ef/efasync.c"),
+            "-o", str(effect_tables),
+        ], cwd=ROOT, env=env, capture_output=True, text=True, timeout=120)
+        if result.returncode:
+            raise RuntimeError(result.stdout + result.stderr)
         command = [
             sys.executable, str(compiler), "-std=c++20", "-O1", "-fexceptions",
             "-DTARGET_PC", "-ffunction-sections", "-fdata-sections",
@@ -47,7 +59,7 @@ class GameplayKirbyCopyAssetsTests(OwnedWorkspaceTests):
             "-I", str(ROOT / ".deps/aurora/include"),
             str(ROOT / "src/dat_archive.cpp"),
             str(ROOT / "tests/gameplay_kirby_copy_assets_test.cpp"),
-            str(source_tables),
+            str(source_tables), str(effect_tables),
             "-sENVIRONMENT=node", "-sNODERAWFS=1", "-sEXIT_RUNTIME=1",
             "-Wl,--gc-sections", "-o", str(cls.binary),
         ]
@@ -84,6 +96,9 @@ class GameplayKirbyCopyAssetsTests(OwnedWorkspaceTests):
 
     def test_source_costume_cache_rows_and_archive_manifest(self):
         self.run_case("source_costume_cache_rows")
+
+    def test_sparse_kirby_and_donor_resources_follow_source_rows(self):
+        self.run_case("sparse_selection_resources")
 
     def test_borrowed_rows_require_empty_original_signed_loops(self):
         self.run_case("borrowed_signed_visibility_tail")
