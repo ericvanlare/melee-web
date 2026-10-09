@@ -13,6 +13,7 @@ extern "C" int melee_web_retail_setup(const uint8_t*, uint32_t,
     MeleeWebMenuMatchSelection*, char*, size_t);
 extern "C" void melee_web_retail_state(void);
 extern "C" void melee_web_retail_entities_index(uint32_t);
+extern "C" void melee_web_retail_entities_checked(void);
 extern "C" uint32_t melee_web_retail_rng(void);
 extern "C" uint32_t gm_GetFrameCount(void);
 extern "C" uint32_t gm_8016AEEC(void);
@@ -96,6 +97,7 @@ bool whole_session_cpu_observation_finished = false;
 uint32_t whole_session_match_index = 0;
 bool whole_session_primary_identity_active = false;
 bool whole_session_setup_table_active = false;
+bool whole_session_entity_prefix_active = false;
 
 constexpr std::array<uint8_t, 0x60> kMilestoneRules = {
     0x30,0x00,0x86,0x4c,0xc3,0x00,0x00,0x00,0x00,0x00,0x00,0xff,
@@ -498,6 +500,7 @@ void retail_replay_session_initial(const RetailReplayRecipe& recipe) {
     whole_session_cpu_observation_started = false;
     whole_session_cpu_observation_finished = false;
     whole_session_match_index = 0;
+    whole_session_entity_prefix_active = recipe.diagnostic_entity_prefix;
     whole_session_primary_identity_active =
         recipe.version == kRetailReplayVersion ||
         recipe.version == kRetailReplayFighterVersion;
@@ -505,7 +508,10 @@ void retail_replay_session_initial(const RetailReplayRecipe& recipe) {
                                        recipe.version == kRetailReplayFighterVersion;
     if (whole_session_primary_identity_active) melee_web_retail_entities_reset();
     std::cout << "{\"record\":\"header\",\"schema\":\"melee-web-port-session-diagnostic\","
-        "\"version\":1,\"frames_requested\":" << recipe.frames.size()
+        "\"version\":" << (recipe.diagnostic_entity_prefix ? 2 : 1);
+    if (recipe.diagnostic_entity_prefix)
+        std::cout << ",\"fighter_entities\":\"all_player_entity_slots\"";
+    std::cout << ",\"frames_requested\":" << recipe.frames.size()
         << ",\"comparison\":\"not_run\",\"cpu_observations\":\""
         << (whole_session_cpu_observation_requested &&
             recipe.version == kRetailReplayVersion ? "second_match_only" : "not_captured") << "\","
@@ -568,6 +574,8 @@ void retail_replay_initial(const RetailReplayRecipe& recipe, bool source_drawing
         retail_replay_validate_match_setup(recipe, whole_session_match_index, actual_setup);
         std::cout << "{\"record\":\"session_match_enter_complete\",";
         melee_web_retail_state();
+        if (recipe.diagnostic_entity_prefix)
+            melee_web_retail_entities_checked();
         if (whole_session_primary_identity_active)
             melee_web_retail_entities_index(whole_session_match_index);
         history(recipe);
@@ -576,6 +584,7 @@ void retail_replay_initial(const RetailReplayRecipe& recipe, bool source_drawing
             declared_setup_json(actual_setup);
             ++whole_session_match_index;
         }
+        if (recipe.diagnostic_entity_prefix) ++whole_session_match_index;
         std::cout << "}\n";
         if (whole_session_cpu_observation_requested &&
             !whole_session_cpu_observation_started &&
@@ -634,6 +643,11 @@ void retail_replay_frame(const RetailReplayRecipe& recipe, size_t index, unsigne
         melee_web_retail_state();
     else
         std::cout << "\"rng\":" << melee_web_retail_rng();
+    if (recipe.diagnostic_entity_prefix && scene == kRetailReplayMatch) {
+        check(whole_session_match_index == 1,
+              "Entity prefix tick preceded its single checked setup record");
+        melee_web_retail_entities_checked();
+    }
     if ((recipe.version == kRetailReplayVersion ||
          recipe.version == kRetailReplayFighterVersion) &&
         scene == kRetailReplayMatch) {
@@ -666,6 +680,8 @@ void retail_replay_preparation_draw(const RetailReplayRecipe& recipe) {
 }
 void retail_replay_end(size_t frames, bool whole_session) {
     if (whole_session) {
+        check(!whole_session_entity_prefix_active || whole_session_match_index == 1,
+              "Entity prefix did not enter its single checked match");
         check(!whole_session_setup_table_active || whole_session_match_index == 3,
               "Whole-session replay did not enter exactly three matches");
         if (whole_session_cpu_observation_started)
@@ -673,6 +689,7 @@ void retail_replay_end(size_t frames, bool whole_session) {
         whole_session_cpu_observation_requested = false;
         whole_session_cpu_observation_started = false;
         whole_session_cpu_observation_finished = false;
+        whole_session_entity_prefix_active = false;
     } else {
         melee_web_cpu_observation_end(frames);
     }
