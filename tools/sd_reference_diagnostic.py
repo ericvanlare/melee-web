@@ -321,6 +321,8 @@ class RulesMenuReceiver(Receiver):
         self.sss_countdown_tick = None
         self.sss_confirmation_neutral = False
         self.sss_countdown_inventory = []
+        self.sss_retirement = None
+        self.sss_retirement_inventory = []
         require(not items_probe or full_route, "Reduced Items probe requires its recipe-five owner")
         self.menu_consumed = 0
         self.menu_polls = 0
@@ -410,6 +412,7 @@ class RulesMenuReceiver(Receiver):
             self.latest_menu = menu_state(data)
             self.scene_owner_seen = True
         if name == "menu_input":
+            require(self.sss_retirement is None, "SSS retirement consumed new input")
             require(count == self.menu_consumed + 1 and count <= 7200,
                     "Rules probe source input gap/repeat/cap")
             raw = data.get((3, 0), b"")
@@ -544,6 +547,8 @@ class RulesMenuReceiver(Receiver):
                 self.items_ready = True
                 return
         if self.full_route and not self.items_probe and name == "menu":
+            require(self.sss_confirmation is None or self.latest_menu["scene"] == 9,
+                    "SSS retirement owner changed before VS entry")
             self.css = css_state(data) if self.latest_menu["scene"] == 8 else None
             self.stage = stage_state(data, payload, confirmation=self.sss_confirmation is not None) if self.latest_menu["scene"] == 9 else None
             require(self.latest_menu["scene"] != 8 or self.final_css is None or self.css is not None,
@@ -557,6 +562,30 @@ class RulesMenuReceiver(Receiver):
                     require(self.stage["index"] == self.sss_confirmation["stage"]["index"] and
                             self.stage["kind"] == 32,
                             "SSS confirmed FD owner changed")
+                    # gm_801A4014 advances routing after OnExit, before the next
+                    # gm_801A4B88 replaces SceneInfo. PADRead observations in
+                    # that interval retain the old owner and frozen scene tick.
+                    route = next((s for s in payload["slices"] if s["tag"] == 17 and s["flags"] == 0), None)
+                    require(route is not None and route["address"] == 0x80479d30 and
+                            len(data[(17, 0)]) == 6, "SSS routing observation differs")
+                    retiring = data[(17, 0)] == bytes((2, 2, 1, 2, 1, 0))
+                    if retiring or self.sss_retirement is not None:
+                        require(retiring and self.sss_countdown == 0 and self.sss_confirmation_neutral and
+                                type(row["source_tick"]) is int and
+                                row["source_tick"] == self.sss_countdown_tick and
+                                self.stage["cooldown"] == 0 and count == self.menu_consumed,
+                                "SSS retirement frozen state differs")
+                        frozen = {"source_tick": row["source_tick"], "menu_consumed": count,
+                                  "stage": self.stage.copy(), "routing": route["hex"]}
+                        require(self.sss_retirement is None or frozen == self.sss_retirement,
+                                "SSS retirement snapshot changed")
+                        self.sss_retirement = frozen
+                        self.sss_retirement_inventory.append(dict(frozen, seq=row["seq"]))
+                        self.menu_polls += 1
+                        require(self.menu_polls <= 7200, "Rules probe menu polling cap exhausted")
+                        return  # Retained observation, never source advancement.
+                    require(data[(17, 0)] == bytes((2, 2, 1, 1, 0, 0)),
+                            "SSS active routing differs")
                     prior_tick = (self.sss_confirmation["source_tick"] if self.sss_countdown is None else
                                   self.sss_countdown_tick)
                     expected = 30 if self.sss_countdown is None else max(0,self.sss_countdown-1)
@@ -659,7 +688,8 @@ class GciRulesMenuReceiver(RulesMenuReceiver):
                           opening_entry_neutral=self.items_entry_neutral)
             report.update(sss_confirmation=self.sss_confirmation,
                           sss_confirmation_countdown=self.sss_countdown_inventory,
-                          sss_confirmation_neutral=self.sss_confirmation_neutral)
+                          sss_confirmation_neutral=self.sss_confirmation_neutral,
+                          sss_retirement_observations=self.sss_retirement_inventory)
         return report
 
 

@@ -32,6 +32,52 @@ class SssConfirmationTests(unittest.TestCase):
         for row in fixture()['rows'][:4]:r.accept(deepcopy(row))
         return r
 
+    def retirement(self):
+        rows=json.loads((Path(__file__).parent/'fixtures/sd-sss-retirement-order.json').read_text())['rows']
+        r=self.receiver()
+        # Actual three rows, injected earlier countdown/route context only.
+        r.seq=1687;r.menu_consumed=538;r.sss_countdown=0;r.sss_countdown_tick=238
+        r.sss_confirmation={'source_tick':149,'stage':{'index':25,'kind':32,'cooldown':0}}
+        r.sss_confirmation_neutral=True;r.stage=r.final_stage=r.sss_confirmation['stage'].copy()
+        return r,deepcopy(rows)
+
+    def test_actual_retirement_is_observation_not_countdown_progress(self):
+        r,rows=self.retirement()
+        for row in rows:r.accept(row)
+        self.assertEqual(r.sss_countdown_inventory,[{'seq':1688,'source_tick':239,'cooldown':0}])
+        self.assertEqual(r.sss_retirement_inventory[0]['seq'],1689)
+        self.assertEqual(r.sss_retirement['routing'],'020201020100')
+        self.assertEqual(r.sss_countdown_tick,239)
+        self.assertFalse(r.ended)
+
+    def test_retirement_requires_frozen_completed_own_state(self):
+        for mutation in ('active_duplicate','tick','ticktype','count','cooldown','index','owner','route','address','missing','early','release'):
+            r,rows=self.retirement()
+            for row in rows[:2]:r.accept(row)
+            row=rows[2]
+            field=lambda tag:next(s for s in row['payload']['slices'] if s['tag']==tag)
+            if mutation=='active_duplicate':field(17)['hex']='020201010000'
+            if mutation=='tick':row['source_tick']+=1
+            if mutation=='ticktype':row['source_tick']=239.0
+            if mutation=='count':row['payload']['menu_consumed']+=1
+            if mutation=='cooldown':field(55)['hex']='00000001'
+            if mutation=='index':field(41)['hex']='18';field(42)['address']-=0x1c
+            if mutation=='owner':field(40)['hex']='08'
+            if mutation=='route':field(17)['hex']='020201020000'
+            if mutation=='address':field(17)['address']+=1
+            if mutation=='missing':row['payload']['slices'].remove(field(17))
+            if mutation=='early':r.sss_countdown=1
+            if mutation=='release':r.sss_confirmation_neutral=False
+            with self.subTest(mutation=mutation),self.assertRaises(SdDiagnosticError):r.accept(row)
+
+    def test_retirement_rejects_new_input_or_return_to_active(self):
+        for mutation in ('input','active'):
+            r,rows=self.retirement()
+            for row in rows:r.accept(row)
+            row=deepcopy(rows[0 if mutation=='input' else 1]);row['seq']=r.seq
+            if mutation=='input':row['payload']['menu_consumed']+=1
+            with self.subTest(mutation=mutation),self.assertRaises(SdDiagnosticError):r.accept(row)
+
     def test_actual_constructor_and_confirmation_prefix(self):
         first=fixture()['initial_constructor_row']
         self.assertEqual(stage_state(slices(first['payload']),first['payload'])['cooldown'],19)

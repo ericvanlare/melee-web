@@ -130,13 +130,14 @@ the earlier browser route failures remain retained. V11 passes the declared
 functional SD/Results/returned-menu/subsequent-prefix route; later native V3
 non-tied timeout and elimination controls passed separately. Original-comparison
 gates stay open. The later executable
-phase/readiness and reference-toolset deltas have focused checks only; a current full suite is still required
-before integration. Frozen runtime `5308a80c` and
+phase/readiness and reference-toolset deltas were subsequently covered by the
+full suite at `cf8cbd88`; later reference-only changes remain separate. Frozen runtime `5308a80c` and
 native producers remain distinct from this tested source. Current-head CI and
 root integration review remain required.
 
 [Issue #291](https://github.com/ericvanlare/melee-web/issues/291) remains open for
-original comparison, current-head full suite/CI and integration review. The
+original comparison, later reference-focused checks/current-head CI and
+integration review. The
 subsequent ordinary
 entry/prefix passed in V11; a second whole match remains unrun. Physical
 input, pixels, uninterrupted audio, foreground timing and competitive-set
@@ -184,4 +185,14 @@ FD/zero/new A after neutral arms the original 30-frame selection countdown,
 with exact source ticks, owner and release required. Actual retained controls
 cover 30 → 18; completion to zero remains synthetic until the changed original
 campaign is observed. Native `849b02e7` and browser `e13647cb` artifacts remain
-unchanged. Current executable full-suite validation is still pending.
+unchanged. That imported executable head was covered by the later full suite
+at `cf8cbd88`.
+
+The frozen `cf8cbd88` executable passed 2,193 unittest cases with 154 skips in
+482.195 seconds. Exact suite/supervisor processes retired and all frozen browser
+and native artifact hashes stayed unchanged. The later `5e136a78` receiver-only
+retirement correction is imported as exact bytes: it retains frozen SSS
+observations after both OnExits and routing advance, without counting them as
+source steps or admitting VS. This later delta is outside the full-suite
+identity; imported focused controls and current-head CI remain required. No
+new runtime build or original comparison is claimed by that import.

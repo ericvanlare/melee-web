@@ -273,7 +273,7 @@
     }
   ],
   "open_gates": [
-    "Current-head full unittest suite, CI and root integration review; prior consolidated suite passed at fd55b378.",
+    "Full suite passed cf8; later reference-only delta needs focused checks/current-head CI and root integration review.",
     "Original full settings/SD reference and strict comparison with matching recipe5 colors [1,0], pause-enabled and declared fields.",
     "Internal final SD numeric PAD/RNG remain separately unobserved; Results-entry observations do not substitute for that boundary.",
     "Second whole ordinary match, sparse/four-player browser coverage, physical input, pixels/PCM equivalence, uninterrupted audio and foreground timing remain unrun."
@@ -676,5 +676,35 @@
     "scope": "Exact reference receiver/test/fixture import; strict observed FD/A cooldown contract. Actual fixture30\u219218; synthetic completion separate. No capture/native build/current-suite pass claimed by import.",
     "native_tested_producer": "849b02e77c1f33b13fa8b6eeb0a4f3689a17485e",
     "browser_runtime_producer": "e13647cb1a1b7a6309592f5a53f16051f4d0b7fb"
+  },
+  "validation_cf8": {
+    "head": "cf8cbd88192841dd2f0bb9c763b23e8fceeff8a8",
+    "tree": "dc66ba513d73dea16fe33b84a87dd93659c41b76",
+    "full_unittest": {
+      "tests": 2193,
+      "skipped": 154,
+      "seconds": 482.195,
+      "exit_code": 0,
+      "result_receipt_sha256": "d08d3c16010c5e7b37b35be9e719a0dcfdbf8475d888ee154bda85b09df365f5",
+      "raw_log_sha256": "9df9e2eb549261367c28585e1466057dc227d804caa65faefa3dc2adee9985e2",
+      "root_review_sha256": "84d3e6c3e89937c4e6009afb4e0c732848d00859e65412da66484dfc4d59a57f"
+    },
+    "cleanup": "Exact suite/supervisor PIDs absent; browser46/native artifacts unchanged",
+    "subsequent_delta": "5e136a78 reference receiver/controls imported after suite; not covered by this full result; own focused checks/current-head CI remain gates"
+  },
+  "reference_toolset_sss_retirement_integration": {
+    "source_head": "5e136a78c1a939b38aee4920c90711532ae7dc6b",
+    "files": [
+      "docs/ORIGINAL_MENU_ROUTE_CAPTURE.md",
+      "tests/fixtures/sd-sss-retirement-order.json",
+      "tests/test_sd_full_items.py",
+      "tests/test_sd_sss_confirmation.py",
+      "tools/sd_reference_diagnostic.py"
+    ],
+    "peer_review_sha256": "84960121aedf834de913296059ca45d14fa13d486295437fee043276db80a650",
+    "scope": "Receiver-only exact retiring observation after countdown0/neutral; frozen owner/tick/count/FD/routing required. Actual fixture three rows; offline actual replay1699 records, no VS/SD/comparison promotion.",
+    "reported_D_controls": "59 tests passed; final8 focused passed after type negative; SD-import focused checks held during capture",
+    "runtime_producer": "e13647cb1a1b7a6309592f5a53f16051f4d0b7fb",
+    "native_tested_producer": "849b02e77c1f33b13fa8b6eeb0a4f3689a17485e"
   }
 }
