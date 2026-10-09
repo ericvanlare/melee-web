@@ -302,6 +302,11 @@ class RulesMenuReceiver(Receiver):
         self.items_probe = items_probe
         self.items_ready = False
         self.items_up_seen = False
+        self.items_entry_drain = False
+        self.items_entry_drain_closed = False
+        self.items_entry_drain_start = None
+        self.items_entry_drain_samples = []
+        self.items_entry_neutral = None
         require(not items_probe or full_route, "Reduced Items probe requires its recipe-five owner")
         self.menu_consumed = 0
         self.menu_polls = 0
@@ -400,7 +405,23 @@ class RulesMenuReceiver(Receiver):
             if self.items_probe and self.latest_menu.get("kind") == 16:
                 from reference_versus_sequence_capture import raw_pad
                 up = [raw_pad(buttons=["D_UP"]), NEUTRAL_PAD]
+                opening = [raw_pad(buttons=["A"]), NEUTRAL_PAD]
+                if self.last_pad[:2] == opening:
+                    require(self.items_entry_drain and not self.items_entry_drain_closed and
+                            self.latest_menu.get("items_locked") == 1 and
+                            previous_pad == self.last_pad and
+                            self.menu_polls - self.items_entry_drain_start < 600,
+                            "Items opening A escaped its locked entry drain")
+                    self.items_entry_drain_samples.append({"seq":row["seq"], "menu_consumed":count})
+                    self.menu_consumed = count
+                    return
                 require(self.last_pad[:2] in ([NEUTRAL_PAD]*2, up), "Items consumed undeclared continuation")
+                if self.items_entry_drain:
+                    require(self.last_pad[:2] == [NEUTRAL_PAD]*2,
+                            "Items entry drain lacks a neutral ending")
+                    self.items_entry_drain = False
+                    self.items_entry_drain_closed = True
+                    self.items_entry_neutral = {"seq":row["seq"], "menu_consumed":count}
                 require(self.latest_menu.get("items_locked") == 0 or
                         self.last_pad[:2] == [NEUTRAL_PAD] * 2,
                         "Items input consumed while locked")
@@ -411,9 +432,28 @@ class RulesMenuReceiver(Receiver):
             self.menu_consumed = count
             return
         require(count == self.menu_consumed, "Rules probe skipped observed input")
+        previous_menu = self.latest_menu
         self.latest_menu = menu_state(data)
         if self.items_probe:
             self.latest_menu = items_lock_state(data, payload, self.latest_menu)
+            if self.items_entry_drain:
+                require(self.latest_menu.get("scene") == 1 and self.latest_menu.get("kind") == 16 and
+                        self.latest_menu.get("row") == 0 and self.latest_menu.get("value") == 1 and
+                        self.latest_menu.get("entering") == 1 and self.latest_menu.get("items_locked") == 1 and
+                        self.menu_polls - self.items_entry_drain_start < 600,
+                        "Items locked entry drain owner/poll cap differs")
+            elif not self.items_entry_drain_closed and not self.items_up_seen and previous_menu == {
+                    "scene":1,"kind":13,"row":5,"value":0,"entering":0,"cooldown":0}:
+                from reference_versus_sequence_capture import raw_pad
+                from retail_input_plan import NEUTRAL_PAD
+                if (self.latest_menu.get("scene"), self.latest_menu.get("kind"),
+                        self.latest_menu.get("row"), self.latest_menu.get("value"),
+                        self.latest_menu.get("entering"), self.latest_menu.get("items_locked")) == (1,16,0,1,1,1):
+                    require(self.last_pad is not None and
+                            self.last_pad[:2] == [raw_pad(buttons=["A"]),NEUTRAL_PAD],
+                            "Items locked entry lacks its declared opening A")
+                    self.items_entry_drain = True
+                    self.items_entry_drain_start = self.menu_polls
             if name == "items_ready":
                 from retail_input_plan import NEUTRAL_PAD
                 require(self.ready and self.items_up_seen and not self.items_ready and self.last_pad[:2] == [NEUTRAL_PAD]*2 and
@@ -509,7 +549,9 @@ class GciRulesMenuReceiver(RulesMenuReceiver):
                       loaded_context=self.loaded_context)
         if self.items_probe:
             report.update(schema="melee-web-original-items-row-probe",
-                          items_ready=self.items_ready, stop=self.latest_menu)
+                          items_ready=self.items_ready, stop=self.latest_menu,
+                          opening_entry_drain_samples=self.items_entry_drain_samples,
+                          opening_entry_neutral=self.items_entry_neutral)
         if self.full_route:
             report.update(menu_source_samples=self.menu_consumed, menu_polls=self.menu_polls,
                           pre_owner_polls=self.pre_owner_polls, bootstrap_routes=self.bootstrap_routes)

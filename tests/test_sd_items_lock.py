@@ -108,7 +108,7 @@ class ItemsLockTests(unittest.TestCase):
         self.assertFalse(r.items_ready)  # Actual trace never reached row31.
         self.assertEqual(r.last_pad[:2],[NEUTRAL_PAD]*2)
 
-    def test_actual_held_opening_a_exposes_current_entry_drain_rejection(self):
+    def actual_held_entry(self, change=None):
         fixture=json.loads((Path(__file__).parent/'fixtures/sd-items-held-entry-order.json').read_text())
         r=receiver(self.profile)
         baseline=fixture['initial_rules_ready_menu_consumed']-1
@@ -116,13 +116,52 @@ class ItemsLockTests(unittest.TestCase):
         # profile lead-in and sequence/count rebasing are reconstructed.
         for actual in fixture['rows']:
             row=deepcopy(actual);row['seq']=r.seq;row['payload']['menu_consumed']-=baseline
-            if actual['seq']==657:
-                self.assertEqual(r.latest_menu['kind'],16)
-                self.assertEqual(r.latest_menu['items_locked'],1)
-                self.assertEqual(r.last_pad[:2],[raw_pad(buttons=['A']),NEUTRAL_PAD])
-                with self.assertRaisesRegex(SdDiagnosticError,'undeclared continuation'):
-                    r.accept(row)
-                self.assertFalse(r.items_up_seen)
-                return
+            if change is not None:change(actual['seq'],row)
             r.accept(row)
-        self.fail('Actual failing entry sample missing from retained control')
+        return r
+
+    def test_actual_held_opening_a_drains_to_observed_neutral(self):
+        r=self.actual_held_entry()
+        self.assertTrue(r.items_entry_drain_closed)
+        self.assertFalse(r.items_entry_drain)
+        self.assertEqual(r.latest_menu['items_locked'],1)
+        self.assertEqual(r.last_pad[:2],[NEUTRAL_PAD]*2)
+        self.assertFalse(r.items_up_seen)
+        self.assertFalse(r.items_ready)  # No actual lock-clear or row31 occurred.
+        self.assertEqual(len(r.items_entry_drain_samples),1)
+        self.assertEqual(r.items_entry_neutral['menu_consumed'],r.menu_consumed)
+
+    def test_actual_entry_drain_mutations_reject(self):
+        def field(row,tag):return next(s for s in row['payload']['slices'] if s['tag']==tag)
+        def flow(row,offset,value):
+            s=field(row,45);b=bytearray.fromhex(s['hex']);b[offset]=value;s['hex']=b.hex()
+        changes=[
+            lambda seq,row:flow(row,3,4) if seq==654 else None,
+            lambda seq,row:field(row,56).update(hex='00') if seq==656 else None,
+            lambda seq,row:field(row,56).update(hex='00') if seq==658 else None,
+            lambda seq,row:flow(row,3,1) if seq==658 else None,
+            lambda seq,row:row['payload']['slices'].remove(field(row,56)) if seq==656 else None,
+            lambda seq,row:row['payload'].update(menu_consumed=row['payload']['menu_consumed']+1) if seq==657 else None,
+            lambda seq,row:field(row,3).update(hex=raw_pad(buttons=['D_UP'])+field(row,3)['hex'][22:]) if seq==657 else None,
+            lambda seq,row:field(row,3).update(hex=raw_pad(buttons=['D_RIGHT'])+field(row,3)['hex'][22:]) if seq==657 else None,
+            lambda seq,row:field(row,3).update(hex=raw_pad(buttons=['D_UP'])+field(row,3)['hex'][22:]) if seq==655 else None,
+        ]
+        for change in changes:
+            with self.subTest(change=changes.index(change)),self.assertRaises(SdDiagnosticError):
+                self.actual_held_entry(change)
+        r=self.actual_held_entry()
+        row=deepcopy(json.loads((Path(__file__).parent/'fixtures/sd-items-held-entry-order.json').read_text())['rows'][-1])
+        row['seq']=r.seq;row['payload']['menu_consumed']=r.menu_consumed+1
+        field(row,3)['hex']=raw_pad(buttons=['A'])+field(row,3)['hex'][22:]
+        with self.assertRaisesRegex(SdDiagnosticError,'escaped'):r.accept(row)
+
+    def test_actual_drain_then_synthetic_lockclear_one_up_ready(self):
+        r=self.actual_held_entry()
+        r.accept(menu_row(r.seq,lock=0,count=r.menu_consumed))  # Explicitly synthetic.
+        template=deepcopy(json.loads((Path(__file__).parent/'fixtures/sd-items-held-entry-order.json').read_text())['rows'][-1])
+        for pad in (raw_pad(buttons=['D_UP']),NEUTRAL_PAD):
+            row=deepcopy(template);row['seq']=r.seq;row['payload']['menu_consumed']=r.menu_consumed+1
+            row['payload']['slices'][0]['hex']=pad+row['payload']['slices'][0]['hex'][22:]
+            r.accept(row)
+        r.accept(menu_row(r.seq,row=31,value=3,count=r.menu_consumed,name='items_ready'))
+        self.assertTrue(r.items_ready)

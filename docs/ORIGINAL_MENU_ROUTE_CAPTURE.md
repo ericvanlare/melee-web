@@ -417,3 +417,13 @@ Portable reconstructed positive/negative controls do not establish native
 behavior. The failed original stream has no lock slice, so it establishes
 ignored normalized Up, not the actual runtime lock value. Prior full-prefix
 packets, producer binaries and failure evidence remain preserved.
+
+The reduced lock probe subsequently observed the opening A still held for one
+copied source sample after the Items owner appeared with lock1. Its receiver
+therefore recognizes an entry drain only after exact Rules row5/declared A to
+Items row0/value1/entering1/lock1 ownership. Only the identical held A bank can
+drain while that locked owner persists, within the existing polling/sample
+caps. The first copied neutral permanently closes this allowance. New A,
+unlocked A, another input or owner, and Up before lock0 are fatal. The runner
+still releases after first copied A and waits for copied neutral; no input is
+added or replaced and no queue is flushed. Entry samples remain reported.
