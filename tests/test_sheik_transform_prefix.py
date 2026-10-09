@@ -316,6 +316,75 @@ def _capture(path: Path, *, swap=True, mutations=None, ticks=4) -> Path:
 
 
 class SheikTransformPrefixTests(unittest.TestCase):
+    def test_actual_dispatch_reaches_transform_returns_without_enabling_other_probes(self):
+        compiler = shutil.which("clang++") or shutil.which("g++")
+        if compiler is None:
+            self.skipTest("A native C++ compiler is not installed")
+        source = OBSERVER_SOURCE.read_text(encoding="utf-8")
+        dispatcher = source[source.index("static bool IsCaptureBoundary("):
+                            source.index("bool Observer::IsRngReturnBoundary(")]
+        request_helpers = source[source.index("bool SdInitRequested()"):
+                                 source.index("bool SparsePadErrorsValid(")]
+        harness = r'''
+#include <cassert>
+#include <cstdint>
+#include <map>
+#include <string>
+using u32 = uint32_t;
+constexpr u32 SSS_ENTER_RETURN = 0x8025B84C;
+std::map<std::string, std::string> environment;
+std::string Env(const char* name) { return environment[name]; }
+bool CpuProbeEnabled() { return false; }
+bool ItemProbeEnabled() { return false; }
+const void* FindCpuProbePoint(u32) { return nullptr; }
+const void* FindItemProbePoint(u32) { return nullptr; }
+struct Settings { u32 rng_return_pc = 0; } settings;
+const Settings& CpuProbeEnvironment() { return settings; }
+''' + request_helpers + dispatcher + r'''
+int main(int argc, char** argv) {
+  assert(argc == 2);
+  const std::string mode = argv[1];
+  bool sss = false, sd = false;
+  if (mode == "transform") { environment["MWRC_TRANSFORM_PREFIX"] = "1"; sss = true; }
+  else if (mode == "invalid-transform") environment["MWRC_TRANSFORM_PREFIX"] = "0";
+  else if (mode == "ordinary-without-sd") environment["MWRC_SD_MENU_PROBE"] = "ordinary_timeout";
+  else if (mode != "default") {
+    environment["MWRC_SD_INIT"] = "1"; sd = true;
+    environment["MWRC_SD_MENU_PROBE"] = mode;
+    sss = mode == "ordinary_timeout" || mode == "sd_prefix" ||
+          mode == "competitive_entry" || mode == "sparse_pair";
+  }
+  // Every transform-required existing PC remains reachable under all scopes.
+  for (u32 pc : {0x8026688Cu, 0x802669F0u, 0x8025A998u, 0x8034DD8Cu,
+                 0x80377584u, 0x800693A8u, 0x8016E934u, 0x8016E9C4u,
+                 0x80390EB4u, 0x80390FC0u, 0x80391040u, 0x8039157Cu})
+    assert(IsCaptureBoundary(pc));
+  assert(IsCaptureBoundary(SSS_ENTER_RETURN) == sss);
+  assert(IsCaptureBoundary(0x8016EBC0) == sd);
+  assert(IsCaptureBoundary(0x8016EC24) == sd);
+  assert(!IsCaptureBoundary(0x8025B850));
+  assert(!IsCaptureBoundary(0xDEADBEEF));
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            (path / "owner.cpp").write_text(harness, encoding="utf-8")
+            command = [compiler, "-std=c++17", "-Wall", "-Werror",
+                       str(path / "owner.cpp"), "-o", str(path / "owner")]
+            built = subprocess.run(command, capture_output=True, text=True)
+            if built.returncode:
+                _retain_cpp_failure(path, command, built)
+            self.assertEqual(built.returncode, 0, built.stderr)
+            for mode in ("default", "transform", "invalid-transform", "ordinary-without-sd",
+                         "ordinary_timeout", "sd_prefix", "competitive_entry", "sparse_pair",
+                         "rules_ready"):
+                with self.subTest(mode=mode):
+                    command = [str(path / "owner"), mode]
+                    checked = subprocess.run(command, capture_output=True, text=True)
+                    if checked.returncode:
+                        _retain_cpp_failure(path, command, checked)
+                    self.assertEqual(checked.returncode, 0, checked.stderr)
+
     def test_entity_identity_and_transform_tags_remain_distinct_in_actual_namespace(self):
         source = OBSERVER_SOURCE.read_text(encoding="utf-8")
         enum = source[source.index("enum class SliceTag : u16"):
