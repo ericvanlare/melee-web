@@ -75,7 +75,7 @@ def menu_actions(path):
     raw = Path(path).read_bytes()
     require(len(raw) <= 1024 * 1024, "SD menu recipe exceeds its bound")
     value = json.loads(raw)
-    if isinstance(value, dict) and value.get("version") in (2, 3):
+    if isinstance(value, dict) and value.get("version") in (2, 3, 4):
         validate_packet(value)
         return value, hashlib.sha256(raw).hexdigest()
     require(isinstance(value, dict) and set(value) == {"schema", "version", "actions"} and
@@ -148,8 +148,8 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
     campaign = menus["scope"] == "rules_ready_gci"
     scope = menus["scope"]
     require(plan["authored_recipe"]["version"] == (4 if campaign else 3) and
-            menus["version"] == (3 if campaign else 2) and (gci is not None) == campaign,
-            "Runnable original diagnostic requires corrected recipe v3 and guarded reduced menu packet v2")
+            menus["version"] == (4 if campaign else 2) and (gci is not None) == campaign,
+            "Runnable original diagnostic requires the exact current scoped recipe/menu versions")
     loaded_profile = None
     if campaign:
         from sd_gci_profile import prepare_gci_folder

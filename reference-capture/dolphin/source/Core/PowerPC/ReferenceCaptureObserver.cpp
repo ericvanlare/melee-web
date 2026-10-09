@@ -2399,7 +2399,10 @@ struct Observer::Impl
           if (scene[0] == 1 && ReadBytes(system, 0x804a04f0, flow.size(), flow.data()) &&
               ReadBytes(system, 0x804d6bc8, input.size(), input.data()) &&
               flow[0] == 13 && flow[2] == 0 && flow[3] == 0 && flow[4] == 0 &&
-              flow[0x11] == 0 && input[0] == 0 && input[1] == 0)
+              // Original Confirm preserves forward-entry direction after
+              // cooldown; only the exact GCI campaign takes this route.
+              flow[0x11] == (Env("MWRC_SD_PROFILE_GCI_SHA256").empty() ? 0 : 1) &&
+              input[0] == 0 && input[1] == 0)
           {
             if (!ReadProfileRoot(system, &profile) ||
                 !AddSlice(system, SliceTag::SdRumblePorts, profile + 0x1cc0, 4))

@@ -271,6 +271,7 @@ class RulesMenuReceiver(Receiver):
         self.last_pad = None
         self.latest_menu = None
         self.ready = False
+        self.rules_entering = 1 if profile_campaign else 0
         self.scene_owner_seen = False
         self.pre_owner_polls = 0
         self.bootstrap_routes = []
@@ -344,7 +345,8 @@ class RulesMenuReceiver(Receiver):
             from retail_input_plan import NEUTRAL_PAD
             require(not self.ready and self.last_pad is not None and
                     self.last_pad[:2] == [NEUTRAL_PAD] * 2 and self.latest_menu ==
-                    {"scene": 1, "kind": 13, "row": 0, "value": 0, "entering": 0, "cooldown": 0},
+                    {"scene": 1, "kind": 13, "row": 0, "value": 0,
+                     "entering": self.rules_entering, "cooldown": 0},
                     "Rules probe lacks observed neutral Rules-ready owner")
             require(data.get((54, 0)) == bytes((1, 1, 1, 1)),
                     "Rules probe cold original preferences differ before Options preparation")

@@ -13,8 +13,8 @@ from reference_capture_save import encode_block
 from retail_input_plan import NEUTRAL_PAD, DISCONNECTED_PAD
 from sd_gci_profile import load_profile, prepare_gci_folder, SAVE_BYTES, BANK_BYTES
 from sd_original_menu_plan import gci_rules_ready_packet, validate_packet
-from sd_reference_diagnostic import GciRulesMenuReceiver, RulesMenuReceiver, SdDiagnosticError, SCOPE, PCS
-from capture_sd_reference_prefix import run, prepare_rules_profile
+from sd_reference_diagnostic import GciRulesMenuReceiver, RulesMenuReceiver, SdDiagnosticError, SCOPE, PCS, slices, menu_state
+from capture_sd_reference_prefix import run
 
 
 def fixture():
@@ -52,7 +52,7 @@ def ready_rows(profile):
     pad = b"".join(bytes.fromhex(p) + b"\0" for p in
                    (NEUTRAL_PAD, NEUTRAL_PAD, DISCONNECTED_PAD, DISCONNECTED_PAD))
     add("menu_input", 1, [(3, 0x8046b908, pad)])
-    flow = bytearray(24); flow[0] = 13
+    flow = bytearray(24); flow[0] = 13; flow[0x11] = 1
     menu = [(40, 0x803dfde4, b"\1"), (45, 0x804a04f0, flow), (46, 0x804d6bc8, b"\0" * 8)]
     add("menu", 1, menu)
     save = bytearray(profile["save"] + b"".join(profile["banks"][:2]))
@@ -126,3 +126,37 @@ class GciProfileTests(unittest.TestCase):
                     menu_recipe=menu, output=self.base / "failed", build_manifest=manifest, gci=self.source)
             launch.assert_not_called()
         self.assertEqual(json.loads((self.base / "failed/failure.json").read_text())["scope"], "rules_ready_gci")
+
+    def test_actual_forward_prefix_and_exact_guards(self):
+        from sd_original_menu_plan import matches
+        value = json.loads((ROOT / "tests/fixtures/sd_gci_forward_menu_retained.json").read_text())
+        states = [menu_state(slices(r["payload"])) for r in value["records"]
+                  if r["payload"]["name"] == "menu"]
+        packet = gci_rules_ready_packet()
+        before, after = packet["actions"][1]["before"], packet["actions"][1]["after"]
+        self.assertTrue(any(matches(state, before) for state in states))
+        self.assertTrue(matches(states[-1], after))
+        self.assertFalse(matches(states[-1], gci_rules_ready_packet(3)["actions"][1]["after"]))
+        validate_packet(gci_rules_ready_packet(3))  # Immutable historical packet.
+        for field, bad in (("entering", 0), ("entering", 2), ("cooldown", 1),
+                           ("row", 1), ("kind", 13), ("scene", 0)):
+            self.assertFalse(matches(dict(states[-1], **{field: bad}), after))
+
+    def test_rules_forward_direction_strict_and_legacy_packet_declined(self):
+        profile = load_profile(self.source)
+        for bad in (0, 2):
+            rows = ready_rows(profile)
+            flow = next(s for s in rows[5]["payload"]["slices"] if s["tag"] == 45)
+            raw = bytearray.fromhex(flow["hex"]); raw[0x11] = bad; flow["hex"] = raw.hex()
+            with self.assertRaises(SdDiagnosticError):
+                receiver = GciRulesMenuReceiver(make_input_plan(4), profile)
+                for row in rows: receiver.accept(row)
+        plan, menu = self.base / "plan.json", self.base / "old-menu.json"
+        plan.write_text(json.dumps(make_input_plan(4)))
+        menu.write_text(json.dumps(gci_rules_ready_packet(3)))
+        with mock.patch("capture_sd_reference_prefix.validate_reference_build_manifest", return_value={}), \
+             mock.patch("capture_sd_reference_prefix.subprocess.Popen") as launch:
+            with self.assertRaisesRegex(SdDiagnosticError, "scoped recipe/menu"):
+                run(dolphin="unused", disc="unused", profile="unused", input_plan=plan,
+                    menu_recipe=menu, output=self.base / "old-declined", build_manifest="unused", gci=self.source)
+            launch.assert_not_called()

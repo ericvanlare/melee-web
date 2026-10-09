@@ -34,7 +34,7 @@ def rules_ready_packet():
 def validate_packet(value):
     # Only this reduced route is supported. No guessed/default continuation.
     from authored_sd_reference_plan import canonical
-    if canonical(value) == canonical(gci_rules_ready_packet()):
+    if any(canonical(value) == canonical(gci_rules_ready_packet(version)) for version in (3, 4)):
         return value
     if canonical(value) != canonical(rules_ready_packet()):
         raise ValueError("Unsupported or changed bounded Rules-ready menu packet")
@@ -44,12 +44,22 @@ def validate_packet(value):
     return value
 
 
-def gci_rules_ready_packet():
+def gci_rules_ready_packet(version=4):
     """Distinct profile campaign; card confirmation is deliberately undeclared."""
     from sd_gci_profile import GCI_SHA256
     value = rules_ready_packet()
-    value.update(version=3, scope="rules_ready_gci", profile_gci_sha256=GCI_SHA256,
+    if type(version) is not int or version not in (3, 4):
+        raise ValueError("Unsupported GCI menu packet version")
+    value.update(version=version, scope="rules_ready_gci", profile_gci_sha256=GCI_SHA256,
                  authored_recipe_sha256=recipe_sha256(recipe(4)))
+    if version == 4:
+        # Forward/back direction survives the animation cooldown. Original
+        # Main/VS Confirm sets it to one; Rules construction does not clear it.
+        for action in value["actions"]:
+            for boundary in (action["before"], action["after"]):
+                if boundary["kind"] != 0:
+                    boundary["entering"] = 1
+        value["stop"]["entering"] = 1
     return value
 
 
