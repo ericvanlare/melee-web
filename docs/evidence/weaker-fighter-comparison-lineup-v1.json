@@ -1,0 +1,384 @@
+{
+  "schema": "melee-web-weaker-fighter-comparison-lineup-v1",
+  "issue": 295,
+  "date": "2026-10-09",
+  "status": "partial_bounded_evidence_issue_open",
+  "portable_locator_root": "runs/",
+  "source_bundle": {
+    "private_run_id": "fighter-accuracy-v10-origin-main-20261003-20261003-110505-57263165",
+    "mwro": {
+      "path": "runs/fighter-accuracy-v10-origin-main-20261003-20261003-110505-57263165/source-full-v10-r1/capture.mwro",
+      "bytes": 2137257881,
+      "recorded_sha256": "81f8a0a3c8cac644e86be2e07451a5876be08b60ebb4295290a35c8a187c5580",
+      "full_sha256_recomputed_for_this_inventory": false
+    },
+    "mwrc": {
+      "path": "runs/fighter-accuracy-v10-origin-main-20261003-20261003-110505-57263165/candidate-v10-caf9465.mwrc",
+      "bytes": 2241622,
+      "recorded_sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b"
+    },
+    "manifest": {
+      "path": "runs/fighter-accuracy-v10-origin-main-20261003-20261003-110505-57263165/candidate-v10-caf9465.json",
+      "recorded_sha256": "c88f0e2cbd1fd79d28cb9cd554ce1b34ca2b858262d6032a327c08c46b941da7"
+    },
+    "source_report": {
+      "path": "runs/fighter-accuracy-v10-origin-main-20261003-20261003-110505-57263165/source-full-v10-r1/report.json",
+      "recorded_sha256": "88a8ca551d2077f200fbcf4670836357e508fdb503d7b360e8b3b67654911913"
+    },
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "dolphin_commit": "c77bbaa0f372c3f72281602a8b087206706542cb"
+  },
+  "source_scan": {
+    "private_run_id": "weaker-lineup-inventory-20261009-030652-bf6fe926",
+    "output": {
+      "path": "runs/weaker-lineup-inventory-20261009-030652-bf6fe926/scan-jiggly-ice-v10-prefix-output-v2.json",
+      "sha256": "115afd3acb3ffa367f5551d8fd0f01e3872144f9ffc32bb63c748ae139c46cfd"
+    },
+    "reproducer": {
+      "path": "runs/weaker-lineup-inventory-20261009-030652-bf6fe926/scan-jiggly-ice-v10-prefix.py",
+      "sha256": "140ffe94439ed504686a8e221a35fa65ad06bb757e631fb0d077b5559525660b"
+    },
+    "stat_bracketed_reproducer": {
+      "path": "runs/weaker-lineup-inventory-20261009-030652-bf6fe926/scan-jiggly-ice-v10-prefix-v2.py",
+      "sha256": "c72d7edbed38b15dc827c306ce24d7ff88bf5ba3303af4e5e3fd23ac5c894e35"
+    },
+    "source_checkout_commit": "0b3847ee3f69ef031decc3f2ccc9c37227bd4302",
+    "source_checkout_tree": "3fe9fc0b8de2300cf7735e477b60605ff3bb2737",
+    "parser": {
+      "path": "reference-capture/dolphin/reference_observer_stream.py",
+      "sha256": "993b882bb92615d897903ebd5b1bc7ac8db8ab9cd2de3fd60079d1404cacc13f"
+    },
+    "source_decoder_and_comparator": {
+      "path": "tools/character_state_compare.py",
+      "sha256": "f9675d7d52652c126c96ed0dd19e8a6262681aa4782fdbfa56a66094ff597880"
+    },
+    "records_read": 155821,
+    "last_record_sequence": 155820,
+    "scan_scope": "through match 2 source tick 59; selected source ticks checked for contiguous 0-based index and scene-frame agreement",
+    "source_stat": {
+      "stable_before_after": true,
+      "bytes": 2137257881,
+      "mtime_ns_unchanged": true,
+      "full_mwro_sha256_recomputed": false
+    },
+    "independent_root_scan": {
+      "path": "runs/weaker-lineup-inventory-20261009-030652-bf6fe926/root-source-scan-review-v2.json",
+      "sha256": "f3570ac98cfed19d4f30f9b2f80989ee6ef0a2dd7f0a6415c1a5102c0208905b",
+      "result": "all JSON fields identical; source stat stable; 155821 records; no full-trace rehash"
+    },
+    "historical_evidence_gap": {
+      "original_source_sha256": "1763fef09bc6635c6ce6093ac4062f7f13702247d22b9d7e1f03959bbe9408cd",
+      "original_source_copy": "Reconstructed from retained text and verified against the previously recorded hash; not an independently retained original copy",
+      "reconstructed_path": "runs/weaker-lineup-inventory-20261009-030652-bf6fe926/scan-jiggly-ice-v10-prefix-executed-reconstructed.py",
+      "original_raw_stdout": "not separately retained; neither output-v1 nor output-v2 is the original no-stat stdout",
+      "current_support": "Enhanced stat-bracketed v2 source and output independently rerun by root and match exactly"
+    }
+  },
+  "producer_and_comparator_contracts": {
+    "inspected_v10_source_snapshot": {
+      "commit": "0b3847ee3f69ef031decc3f2ccc9c37227bd4302",
+      "recipe_path": "src/gameplay_retail_recipe.cpp",
+      "recipe_sha256": "88215c6cf04605d48637d617305bf842d07a979e5ff7fc7d715350d3ac80ccd5",
+      "state_path": "src/gameplay_retail_state.c",
+      "state_sha256": "a3ac858528cd0ee4699cba6b82d594b0486bd269280db008a402f11cb84767a9",
+      "observed_route": "v10 uses the primary-only entity-index writer and requires player_entity[1] to be null"
+    },
+    "historical_pr86_all_entity_candidate": {
+      "commit": "e91cc7e98e5e85864fc18b88b6539d55e6b8e90c",
+      "tree": "1a71287a7699ff3a84714467bdf77d15e0620120",
+      "recipe_path": "src/gameplay_retail_recipe.cpp",
+      "recipe_sha256": "6cf03b7fce142d28b790c8c904c906136106fcba03c1a8e5590cb1c1065aeb2e",
+      "state_path": "src/gameplay_retail_state.c",
+      "state_sha256": "155dda47717755ffb86d4165d0ff133a6e43541078244c3aac828ece0c258568",
+      "diagnostic_contract": "version 2; fighter_entities=all_player_entity_slots; serializes non-null player_entity[] entries and entity_index",
+      "historical_comparator_sha256": "f9675d7d52652c126c96ed0dd19e8a6262681aa4782fdbfa56a66094ff597880",
+      "commit_scope": "comparator/wrapper/tests; full snapshot includes earlier producer",
+      "producer_introduced_by": "2444564b7d36ff3910e4e472a94ab637acda0605",
+      "current_reuse": "full-state melee_web_retail_entities writer remains present; do not import historical commit wholesale"
+    },
+    "strict_current_comparator": {
+      "path": "tools/character_state_compare.py",
+      "sha256": "f9675d7d52652c126c96ed0dd19e8a6262681aa4782fdbfa56a66094ff597880",
+      "requires": "PORT_VERSION=2 and fighter_entities=all_player_entity_slots; supports source entity indexes 0 and 1 and match-index selection",
+      "one_tick_invocation_hashes_whole_inputs": true
+    }
+  },
+  "fighters": {
+    "sheik": {
+      "status": "source_only_checkpoint_unbuilt_uncaptured",
+      "source_checkpoint_commit": "0b3847ee3f69ef031decc3f2ccc9c37227bd4302",
+      "checkpoint_tree": "3fe9fc0b8de2300cf7735e477b60605ff3bb2737",
+      "plan": {
+        "path": "runs/weaker-lineup-inventory-20261009-030652-bf6fe926/sheik-source-observation-plan-v2.md",
+        "sha256": "182c2668f3e677f4288d35efee2a50ff28a93ff0322da24f3269cac1da77760e"
+      },
+      "source_identity": "CSS CKIND Zelda 18 creates distinct FTKIND Zelda 19 and Sheik 7 entities; pass requires transformed-index active-owner transition 19->7, not dormant kind 7",
+      "gaps": [
+        "transform mode is not wired to CSS/SSS live-owner readiness barriers",
+        "cold-boot pre-match/attract teardown must not fail before accepted VS entry; in-match teardown must still fail before prefix completion",
+        "no native original capture, browser replay, or comparison"
+      ]
+    },
+    "jigglypuff": {
+      "status": "original_source_interval_present_browser_comparison_missing",
+      "match_index": 1,
+      "slot": 0,
+      "port": 1,
+      "ckind": 15,
+      "ftkind": 15,
+      "interval": {
+        "tick_start": 0,
+        "tick_end_inclusive": 59,
+        "setup_sequence": 83249,
+        "tick0_sequence": 83251,
+        "tick1_sequence": 83256,
+        "tick59_sequence": 83546,
+        "scene_frames_contiguous": true
+      },
+      "entity_inventory": "slot 0/entity 0 kind 15; other primary kinds 16,23,19; slot 3 also has Zelda/Sheik kinds 19/7",
+      "browser_route_blocker": {
+        "path": "runs/fighter-accuracy-v10-origin-main-20261003-20261003-110505-57263165/compare-v10-bowser-callback-fix-r1-prefix.json",
+        "sha256": "6fdcf2ecea141820a3193f3e5c305eb15b3b4c0a9e04ee4a91a766a94e88251f",
+        "first_difference": "match 0, match_frame 5239, rng actual 2352289036 versus expected 2495929788",
+        "policy": "keep parked under #274; do not bypass or reopen"
+      },
+      "next_design_prerequisite": "independent short same-setup source/browser path reusing historical PR86 v2 all-entity producer/comparator contract"
+    },
+    "peach": {
+      "status": "current_candidate_184_tick_comparison_equivalent_incomplete",
+      "historical_receipt": {
+        "path": "docs/evidence/b4-v10-first-match-clock60-comparison-v1.json",
+        "sha256": "51d7d8b4923ab8f8af77bdec560e35848a2a802b8049bc5eb310bdc0b42517f9"
+      },
+      "private_capture_run_id": "b4-clock60-browser-capture-prep-20261007-90289a2",
+      "source_capture_sha256_recorded": "81f8a0a3c8cac644e86be2e07451a5876be08b60ebb4295290a35c8a187c5580",
+      "historical_producer": {
+        "commit": "90289a29b57a8008ee8fd801754100867c718536",
+        "tree": "feb7ed9a3a013e64ff4027f9009ff88d09878914",
+        "runtime_manifest_sha256": "420272aa6500cf3317c0cd9d1e7b6c61fc015a42a6f429edfd1643d2fcf6b814",
+        "port_trace_sha256": "88bdc33f1ed82409a6e263a1bf24a5e4453c2c0ac634740e4c76efb6206d69e9",
+        "browser_report_sha256": "873b0efd41f2eb680fa6ee2833359da98ff47b3bc5337f677de36f7308f3d571",
+        "capture_report_sha256": "d38e1309570a7c438ca9b3e9972b34b2fd4c421182614ca4d6ed45d0424e8142"
+      },
+      "comparison": {
+        "match_index": 0,
+        "slot": 3,
+        "setup_compared": true,
+        "ticks_compared_inclusive": [
+          0,
+          183
+        ],
+        "match_ticks_compared": 184,
+        "first_match_clock_target": 60,
+        "boundary_result": "equivalent",
+        "result": "incomplete",
+        "complete": false,
+        "whole_session_equivalent": false,
+        "all_declared_fields_matched": true,
+        "full_source_sha256_recomputed": false,
+        "ckind": 12,
+        "ftkind": 9
+      },
+      "current_candidate_replay": {
+        "status": "equivalent_bounded_prefix_incomplete_session",
+        "private_run_id": "peach-current-clock60-preparation-20261009-064514-1abbebb3",
+        "capture_producer": "52926e138756d8c43047e0ec7017f07eb492078a",
+        "integrated_same_tree_producer": "fbb38519829123841ed6e570e5c664cc60a42423",
+        "runtime_producer": "282fbddb4cc397f9a0f34f31dd7f1fb921dbc2b2",
+        "runtime_tree": "cd938e8b4053bcea119590134b581db57cb9b14b",
+        "source_tree": "7b6aee8af13b4e5b9d2dcc7f5ab552a8e883c3c0",
+        "base_main": "35d789775ece5c18c2c80b33f018317a33358671",
+        "result": "incomplete",
+        "boundary_result": "equivalent",
+        "complete": false,
+        "whole_session_equivalent": false,
+        "setup_records_compared": 1,
+        "match_ticks_compared": 184,
+        "match_tick_interval": [
+          0,
+          183
+        ],
+        "fields_compared": [
+          "rng",
+          "match_frame",
+          "pad_state_hex",
+          "fighters",
+          "fighter_entities"
+        ],
+        "nonmatch_frames_input_ordered": 1184,
+        "nonmatch_fields_compared": [],
+        "requested_cursor": 1368,
+        "observed_cursor": 1382,
+        "exported_cursor": 1384,
+        "export_tail_scope": "16 match frames beyond the compared boundary receive shape/order checks only",
+        "source_prefix": {
+          "bytes_read": 12780628,
+          "first_entry_seq": 4088,
+          "first_setup_seq": 4113,
+          "first_setup_source_tick": 247,
+          "first_source_tick": 0,
+          "first_source_tick_seq": 4115,
+          "hash_basis": "fresh SHA-256 over exactly the raw bytes consumed through the first match_frame 60 boundary",
+          "last_source_sequence": 5030,
+          "records_read": 5031,
+          "sha256": "32b763453688c6335b90c9807b71c79d919b85e6e7435a3c2abccd1792f00e77"
+        },
+        "root_replay_byte_identical": true,
+        "artifact_count": 46,
+        "artifact_pre_post_equal": true,
+        "exact_owned_cleanup_verified": true,
+        "comparison_exit_code": 1,
+        "capture_exit_code": 1,
+        "supervisor_exit_code": 0,
+        "elapsed_seconds": 37.55790291703306,
+        "timing_resumes": 0,
+        "browser_errors_before_stop": 0,
+        "manifest_locator_erratum": {
+          "field": "inputs.disc.identity_carried_from.path",
+          "frozen": "launch-review-packet-v3.json",
+          "correct": "launch-review-packet-v2.json",
+          "correct_record_verified_sha256": "ecbc554ed0b08cc98cc080b9e6a18fc5be15def510885d0d84b62cc130b1bd54",
+          "scope": "Unused carried-provenance filename typo, frozen manifest retained. Actual capture independently hashes disc; exact path/bytes/hash unchanged."
+        },
+        "artifacts": {
+          "launch-packet-v3.json": {
+            "path": "runs/peach-current-clock60-preparation-20261009-064514-1abbebb3/launch-packet-v3.json",
+            "sha256": "dd38f5b68157ca124eae0851216dd1e6e873e700bf458c52297f3de28783489e"
+          },
+          "producer-source-manifest-v3.json": {
+            "path": "runs/peach-current-clock60-preparation-20261009-064514-1abbebb3/producer-source-manifest-v3.json",
+            "sha256": "be8b8d08bb885e7a62660dfd3a543bfb9f0dd8788808c377b19b93fca8530740"
+          },
+          "supervisor-result-v3.json": {
+            "path": "runs/peach-current-clock60-preparation-20261009-064514-1abbebb3/supervisor-result-v3.json",
+            "sha256": "cdaf658e7c66d09f2b7b2a0ac9c4522503217e9dc4ea35cc483f1b536539d4e2"
+          },
+          "expectations-fresh-binding-v3.json": {
+            "path": "runs/peach-current-clock60-preparation-20261009-064514-1abbebb3/expectations-fresh-binding-v3.json",
+            "sha256": "7284da175d2f2aea87296d1525c9ccd9750b67785aecb66a724ee9c87b429271"
+          },
+          "comparison-report-v3.json": {
+            "path": "runs/peach-current-clock60-preparation-20261009-064514-1abbebb3/comparison-report-v3.json",
+            "sha256": "fa4f839d987c81cc3b314d5ab0f020e6137e2fbb04cd714911e0db1cd40a9534"
+          },
+          "root-result-review-v3.json": {
+            "path": "runs/peach-current-clock60-preparation-20261009-064514-1abbebb3/root-result-review-v3.json",
+            "sha256": "b2f4ed0f14fc58018f5022882ddff282eefdedbe07a20dfd7f07f33740687784"
+          },
+          "current-result-receipt-v3.json": {
+            "path": "runs/peach-current-clock60-preparation-20261009-064514-1abbebb3/current-result-receipt-v3.json",
+            "sha256": "c89e3d629424c1b9cf9fe810d59357b3c06f4617094a5b2cd25dcdd1e941af72"
+          },
+          "capture-output-v3/report.json": {
+            "path": "runs/peach-current-clock60-preparation-20261009-064514-1abbebb3/capture-output-v3/report.json",
+            "sha256": "c125ff186a1235e47e15dc7f793c6697351dc826139eff3d1c48bea2ed5bd796"
+          },
+          "capture-output-v3/retail-browser-report.json": {
+            "path": "runs/peach-current-clock60-preparation-20261009-064514-1abbebb3/capture-output-v3/retail-browser-report.json",
+            "sha256": "917faf7878c38ac6496dd2ca19f09baafd106b61a6d5a7a0d704b68df633c0fb"
+          },
+          "capture-output-v3/retail-port.jsonl": {
+            "path": "runs/peach-current-clock60-preparation-20261009-064514-1abbebb3/capture-output-v3/retail-port.jsonl",
+            "sha256": "20cbb47ecda673b9af0f003d2e0b526ee1ddc07cf03fdff8800e60bcdc976870"
+          }
+        }
+      }
+    },
+    "ice_climbers": {
+      "status": "original_two_entity_interval_present_current_browser_comparison_missing",
+      "match_index": 2,
+      "slot": 1,
+      "port": 2,
+      "ckind": 14,
+      "entity_inventory": [
+        {
+          "entity_index": 0,
+          "ftkind": 10,
+          "name": "Popo"
+        },
+        {
+          "entity_index": 1,
+          "ftkind": 11,
+          "name": "Nana"
+        }
+      ],
+      "interval": {
+        "tick_start": 0,
+        "tick_end_inclusive": 59,
+        "setup_sequence": 155523,
+        "tick0_sequence": 155525,
+        "tick1_sequence": 155530,
+        "tick59_sequence": 155820,
+        "scene_frames_contiguous": true
+      },
+      "strict_browser_gap": "current v10 trace contract is primary-only; strict comparator requires v2 all_player_entity_slots; reuse e91cc7e9 all-entity producer rather than inventing a new producer framework",
+      "historical_pr86_pair_evidence": {
+        "supporting_document": "docs/content/REMAINING_FIGHTERS_PORT_NOTES.md",
+        "supporting_document_sha256": "71429ae6877f37bebacbcd9bd1374cb3bf2cbbe7e867fdb2699b1919b303974e",
+        "recipe_locator": "work/fighter-reference-a-valid-pair.mwrc",
+        "source_locator": "work/pr86-nana-correction-a-state-compare-r2.json",
+        "first_strict_rejection": "Nana motion/input at tick 105; signed-byte repair moved the first rejection to Nana position at tick 609",
+        "later_a_interval_first_difference": "Popo screen-KO X at source seq 33740 / tick 5606, bits 42810a45 vs 42810a46",
+        "individual_private_report_hashes_available_in_portable_receipt": false
+      }
+    }
+  },
+  "superseded_inventory_claims": [
+    {
+      "path": "runs/weaker-lineup-inventory-20261009-030652-bf6fe926/inventory.md",
+      "sha256": "9f88acb38e957b03925f2ca949ca3e793eb1499be5f1584b43e0e4ec0d2b76c5",
+      "superseded_by": "runs/weaker-lineup-inventory-20261009-030652-bf6fe926/inventory-v2.md",
+      "correction": "primary-only B inventory did not observe a Sheik primary; it is not evidence that a dormant Sheik entity was absent or that a transformation occurred"
+    },
+    {
+      "path": "runs/weaker-lineup-inventory-20261009-030652-bf6fe926/inventory-v3.md",
+      "sha256": "16fe4509f0eb8587a46222d7d8e419a79e02880766542de4f2ed420301652cfd",
+      "superseded_by": "runs/weaker-lineup-inventory-20261009-030652-bf6fe926/jiggly-ice-v10-source-inventory-v1.md",
+      "correction": "retained v10 MWRO/MWRC includes Jigglypuff in match 1; source presence does not establish a browser comparison"
+    }
+  ],
+  "scope_limits": [
+    "The source inventory itself made no new captures. The current Peach-containing match-0 browser prefix and harness cleanup are separately bound below; no new original recording was acquired.",
+    "Jigglypuff and Ice Climbers source intervals are not browser comparisons.",
+    "Both historical and current Peach results are setup-plus-184-tick incomplete comparisons; neither covers a full fighter, match or session.",
+    "Sheik has no native capture or browser replay.",
+    "No full-fighter or whole-session acceptance is established."
+  ],
+  "harness_cleanup": {
+    "source": "52926e138756d8c43047e0ec7017f07eb492078a",
+    "integrated_source": "fbb38519829123841ed6e570e5c664cc60a42423",
+    "scope": "Existing bounded final diagnostics use lazy calls after a timeout; owned close is protected by finally. No source gameplay/comparator change.",
+    "focused_report_controls": 64,
+    "fullsuite": {
+      "source": "fbb38519829123841ed6e570e5c664cc60a42423",
+      "tests": 2256,
+      "skipped": 153,
+      "failures": 0,
+      "seconds": 488.23006308311597,
+      "log_sha256": "a6084d2a0c49ec731915a784219700e5f1219319e14557123edc63d7b9f1d295",
+      "private_locator": "runs/peach-current-clock60-preparation-20261009-064514-1abbebb3/integrated-weaker-fullsuite-v1.log"
+    },
+    "affected_runtime_build": "All src/web/patches/CMake/build and allowlist inputs equal actual Release282; no runtime rebuild needed for harness-only changes.",
+    "retained_preparation_findings": [
+      "Initial source syntax placement error, then corrected",
+      "Root review caught remaining unbounded CPU getter and eager operations after timeout; corrected before capture",
+      "Two unlaunched packet predecessors retained; copied stale build/cache provenance corrected before v3",
+      "Post-capture non-semantic carried-provenance locator typo disclosed without altering frozen bytes"
+    ],
+    "root_source_review_sha256": "9db7dd80752fcfcd41e71df0e1d4d46596452ae4a4d6b8e1a6a4006618f1690b",
+    "root_packet_review_sha256": "ecfd8ef6568d8b1a6dc0cf38b752cb0429d99f0e295e832cdbabf8255057256a"
+  },
+  "next_interface_review": {
+    "path": "runs/peach-current-clock60-preparation-20261009-064514-1abbebb3/all-entity-independent-route-review-v1.json",
+    "sha256": "fc9ec67731a752262a43eb3577ea90d9a8f931b9195a6c03ba6a6df0fd730b48",
+    "remaining": [
+      "explicit four-primary profile; current comparator is not a two-player or standalone recipe3 comparator",
+      "original secondary-entity admission with exact checked owners, not bare removal of rejection",
+      "browser profile must reuse existing full-state writer while preserving primary-only v9/v10 defaults",
+      "independent CSS/SSS input/save/RNG initialization; later v10 setup cannot be moved to match0",
+      "active transformed[] and generations are separate from dormant entity presence"
+    ],
+    "next_source_component": "Checked original all-entity admission for declared Jigglypuff/Ice Climbers/Mario/Fox four-slot diagnostic profile, focused ownership negatives before any build/capture",
+    "capture_or_browser_implementation_authorized": false
+  }
+}

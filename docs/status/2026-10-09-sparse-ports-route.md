@@ -1,6 +1,6 @@
 # Sparse source-port routing
 
-**Browser exercised / Retail compared (declared setup and port fields) / Compiled / Native traced / Source identified**
+**Browser exercised / Retail compared / Compiled / Native traced / Source identified**
 
 The fresh combined candidate at `282fbddb` passes all three browser controls:
 P1/P3 singles, dense P1/P2 Sudden Death, and four-CPU Team Battle. The
@@ -77,8 +77,9 @@ The final integrated suite at `03df43e8` passed 2,256 tests with 153 skips and
 zero failures. All 18 original-observer build inputs equal the frozen native
 producer, and the browser runtime remains identical to `282fbddb`. A mistaken
 suite launch on the preceding documentation head was stopped and retained as
-an operator error, not counted as validation. Final-head CI remains before
-integration; the same receipt preserves every earlier failure and producer.
+an operator error, not counted as validation. PR #299 merged as `35d78977` after all 14 final-head checks (12 successful,
+two expected skips). The merged tree equals reviewed `9b5ebcc6`; the same receipt
+preserves every earlier failure and producer.
 
 The following predecessor results and failures retain their original producers.
 
