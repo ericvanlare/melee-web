@@ -60,7 +60,9 @@ extern "C" {
 #include <melee/gm/gmvsmode.h>
 #include <melee/gm/gmvsmelee.h>
 #include <melee/gm/gmresultplayer.h>
-#include <melee/pl/player.h>
+#include <sysdolphin/baselib/forward.h>
+// Exact pinned player.h ABI without its C-only fighter type definitions.
+HSD_GObj* Player_GetEntity(int slot);
 #include <melee/gm/gmmain_lib.h>
 #include <melee/gm/types.h>
 #include <sysdolphin/baselib/controller.h>
