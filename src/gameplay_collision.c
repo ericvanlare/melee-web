@@ -179,8 +179,16 @@ static int collision_source_dynamic_ready(const MeleeWebCollisionInput* in,
 
 static void collision_release_storage(void)
 {
-    mp_UnkStruct0* lists[] = {mpIsland_80458E88.next, mpIsland_80458E88.x4};
-    for (unsigned i = 0; i < 2; ++i)
+    /* B334 attaches dynamic x10/x14 chains to active next/x4; x8/xC
+     * are borrowed tails. AE1C partitions static nodes into active and
+     * disabled x18/x1C chains; B004 retains unused dynamic nodes in x20.
+     * Only these five roots own disjoint allocations. */
+    mp_UnkStruct0* lists[] = {
+        mpIsland_80458E88.next, mpIsland_80458E88.x4,
+        mpIsland_80458E88.x18, mpIsland_80458E88.x1C,
+        mpIsland_80458E88.x20,
+    };
+    for (unsigned i = 0; i < sizeof(lists) / sizeof(lists[0]); ++i)
         while (lists[i]) { mp_UnkStruct0* next = lists[i]->next; HSD_Free(lists[i]); lists[i] = next; }
     mpIsland_8005A6F8();
     HSD_Free(groundCollVtx); HSD_Free(groundCollLine); HSD_Free(groundCollJoint);

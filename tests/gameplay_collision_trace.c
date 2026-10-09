@@ -5,6 +5,7 @@
 #include <melee/gr/ground.h>
 #include <melee/gr/types.h>
 #include <melee/mp/mplib.h>
+#include <melee/mp/mpisland.h>
 #include <melee/gr/grdynamicattr.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjplink.h>
@@ -77,21 +78,52 @@ static void source_loaded_case(void)
               mpGetGroundCollLine() == NULL && mpGetGroundCollJoint() == NULL,
           "adopted source teardown clears original collision globals");
     const MeleeWebGameplayStats before=melee_web_gameplay_stats();
-    mpLibLoad(&source_map);
-    mpLib_80058820();
-    MeleeWebCollisionInput invalid=input; invalid.stage_scale=INFINITY;
-    check(!melee_web_collision_adopt_loaded(&invalid,error,sizeof(error)),
-          "invalid input rejects after original source loading");
-    check(!melee_web_collision_retire_unadopted(&input,error,sizeof(error)),
-          "rollback rejects a different source map identity");
-    check(melee_web_collision_retire_unadopted(&source_map,error,sizeof(error)),
-          "failed source adoption rolls back original storage and updater");
-    check(melee_web_collision_source_available()&&
-              melee_web_gameplay_stats().objects==before.objects&&
-              melee_web_gameplay_stats().processes==before.processes,
-          "rollback leaves collision ready for another construction");
-    check(melee_web_collision_retire_unadopted(&source_map,error,sizeof(error)),
-          "already retired source collision rollback is idempotent");
+    for (int lifetime = 0; lifetime < 2; ++lifetime) {
+        mpLibLoad(&source_map);
+        mpLib_80058820();
+        mp_UnkStruct0* const floor = mpIsland_8005AB54(0);
+        const int loaded_free = melee_web_gameplay_stats().heap_free_bytes;
+        check(floor != NULL, "source floor island exists before joint disable");
+        mpLib_80057BC0(0);
+        check(mpIsland_80458E88.next == NULL && mpIsland_80458E88.x4 == NULL &&
+                  mpIsland_80458E88.x18 != NULL && mpIsland_80458E88.x1C != NULL,
+              "original joint disable moves floor and ceiling islands to side lists");
+        mpJointListAdd(0);
+        check(mpIsland_8005AB54(0) == floor &&
+                  mpIsland_80458E88.x18 == NULL && mpIsland_80458E88.x1C == NULL &&
+                  melee_web_gameplay_stats().heap_free_bytes == loaded_free,
+              "original reenable reuses the disabled islands without allocation");
+        CollVtx* const loaded_vertices = mpGetGroundCollVtx();
+        loaded_vertices[floor->x4].pos.x += 7.0F;
+        mpIsland_8005B334(0, source_joints[0].vtx_start,
+                         source_joints[0].vtx_count, true);
+        check(mpIsland_8005AB54(0) == floor &&
+                  floor->x8.x == loaded_vertices[floor->x4].pos.x &&
+                  melee_web_gameplay_stats().heap_free_bytes == loaded_free,
+              "original island movement updates the same allocation");
+        mpLib_80057BC0(0);
+        MeleeWebCollisionInput invalid=input; invalid.stage_scale=INFINITY;
+        check(!melee_web_collision_adopt_loaded(&invalid,error,sizeof(error)),
+              "invalid input rejects after original source loading");
+        check(!melee_web_collision_retire_unadopted(&input,error,sizeof(error)),
+              "rollback rejects a different source map identity");
+        check(melee_web_collision_retire_unadopted(&source_map,error,sizeof(error)),
+              "failed source adoption rolls back original storage and updater");
+        const int side_list_free_after = melee_web_gameplay_stats().heap_free_bytes;
+        fprintf(stderr,
+                "COLLISION_SIDE_LIST_RETIRE free_before=%d free_after=%d\n",
+                before.heap_free_bytes, side_list_free_after);
+        check(side_list_free_after == before.heap_free_bytes,
+              "source collision retirement returns disabled island side-list storage");
+        check(melee_web_collision_source_available()&&
+                  melee_web_gameplay_stats().objects==before.objects&&
+                  melee_web_gameplay_stats().processes==before.processes,
+              "rollback leaves collision ready for another construction");
+        check(melee_web_collision_retire_unadopted(&source_map,error,sizeof(error)),
+              "already retired source collision rollback is idempotent");
+        check(melee_web_gameplay_stats().heap_free_bytes == before.heap_free_bytes,
+              "repeated retirement does not free collision storage twice");
+    }
     stage_info.param = prior_param;
     stage_info.coll_data = prior_data;
     stage_info.grkind = prior_kind;
