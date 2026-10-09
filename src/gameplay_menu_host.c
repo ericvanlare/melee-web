@@ -1,5 +1,6 @@
 #include "gameplay_menu_host.h"
 #include "gameplay_menu.h"
+#include "gameplay_match_rules.h"
 #include "gameplay_save_profile.h"
 #include "gameplay_content.h"
 #include "gameplay_bootstrap.h"
@@ -106,6 +107,8 @@ struct MeleeWebMenuHost {
     uint8_t initial_save_data[0x55E8];
     int initial_replay_context;
     int net_start_context;
+    int initial_native_rules;
+    GameRules native_rules;
     VsModeData route_saved_vs;
     MatchExitInfo route_saved_exit;
     ResultsMatchInfo route_saved_result;
@@ -647,7 +650,7 @@ int melee_web_menu_host_apply_replay_context(
     char* e, size_t n)
 {
     MeleeWebPadState* input;
-    if(!h||h!=owner||h->entered||h->audio||h->initial_replay_context||
+    if(!h||h!=owner||h->entered||h->audio||h->initial_replay_context||h->initial_native_rules||
        !pad_state||!css_data||!ko_counts||!game_rules||!save_data||
        melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_CREATED||
        seed_ptr!=&h->seed)
@@ -674,13 +677,33 @@ int melee_web_menu_host_apply_replay_context(
     h->seed=random_seed;h->initial_replay_context=1;
     return ok(e,n);
 }
+/* Explicit native preparation fixture; not a Rules-menu input path. */
+int melee_web_menu_host_apply_initial_native_rules(
+    MeleeWebMenuHost* h, const GameRules* rules, char* e, size_t n)
+{
+    GameRules expected = gmMainLib_803D4A48;
+    expected.mode = 1; expected.stock_count = 4;
+    if (rules) expected.stock_time_limit = rules->stock_time_limit;
+    StartMeleeRules timer_rules = {0};
+    timer_rules.timer_enabled = rules && rules->stock_time_limit != 0;
+    timer_rules.time_limit = rules ? rules->stock_time_limit * 60 : 0;
+    if (!h || h != owner || !rules || h->entered || h->audio || h->input ||
+        h->initial_replay_context || h->net_start_context || h->initial_native_rules ||
+        melee_web_menu_phase(h->session) != MELEE_WEB_MENU_CREATED ||
+        seed_ptr != &h->seed || h->save_mode != MELEE_WEB_SAVE_MODE_EVERYTHING ||
+        h->configured_profile_size || !melee_web_match_timer_supported(&timer_rules) ||
+        memcmp(rules, &expected, sizeof(expected)))
+        return fail(e,n,"Native initial rules require supported canonical four-stock rules and a fresh host");
+    h->native_rules = *rules; h->initial_native_rules = 1;
+    return ok(e,n);
+}
 /* Networked sessions use the canonical Everything mode and the fresh host's
  * default rules, preferences and PAD history; only the agreed seed is
  * installed. Personal save preferences change gameplay and are rejected. */
 int melee_web_menu_host_apply_net_context(
     MeleeWebMenuHost* h, uint32_t random_seed, char* e, size_t n)
 {
-    if(!h||h!=owner||h->entered||h->audio||h->initial_replay_context||
+    if(!h||h!=owner||h->entered||h->audio||h->initial_replay_context||h->initial_native_rules||
        h->net_start_context||h->input||
        melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_CREATED||
        seed_ptr!=&h->seed)
@@ -762,7 +785,8 @@ static int host_prepare_world(MeleeWebMenuHost* h, MeleeWebAudio* audio,
                 restore_context(h);return 0;
             }
         }else{
-            *gmMainLib_GetGameRules()=gmMainLib_803D4A48;
+            *gmMainLib_GetGameRules()=h->initial_native_rules?
+                h->native_rules:gmMainLib_803D4A48;
             gmMainLib_GetGameRules()->mode=1;gmMainLib_GetGameRules()->stock_count=4;
         }
         if(!h->initial_replay_context){

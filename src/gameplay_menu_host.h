@@ -146,6 +146,11 @@ int melee_web_menu_host_apply_replay_context(
  * the canonical Everything mode, no personal profile and default PAD history. */
 int melee_web_menu_host_apply_net_context(MeleeWebMenuHost*, uint32_t random_seed,
                                           char*, size_t);
+/* Explicit native four-stock canonical setup fixture with the existing supported
+ * stock timer. Copies rules on a fresh host, applied before original CSS; ordinary context restoration
+ * retires it. This does not represent original Rules-menu input. */
+int melee_web_menu_host_apply_initial_native_rules(
+    MeleeWebMenuHost*, const GameRules*, char*, size_t);
 /* Read-only copy of the session-owned CSS (returns 1) or SSS (returns 2)
  * selection payload and its small scalar header; 0 outside those scenes. */
 int melee_web_menu_host_selection_state(const MeleeWebMenuHost*, StartMeleeData*,

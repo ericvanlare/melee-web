@@ -130,6 +130,13 @@ extern "C" int melee_web_stage_selection_end(void);
 static void check(int value,const char* error){if(!value){std::cerr<<"Check failed before teardown: "<<error<<"\n";throw std::runtime_error(error);}}
 
 namespace {
+void emit_native_bytes(const char* record,const void* data,std::size_t size)
+{
+    const auto* bytes=static_cast<const unsigned char*>(data);
+    std::cout<<"{\"record\":\""<<record<<"\",\"native_abi_bytes\":[";
+    for(std::size_t i=0;i<size;++i){if(i)std::cout<<',';std::cout<<unsigned(bytes[i]);}
+    std::cout<<"]}\n"<<std::flush;
+}
 void run_post_vs_mode_asset_free_contract()
 {
     const GameRules saved_rules=*gmMainLib_GetGameRules();
@@ -418,7 +425,28 @@ void run_vs_sudden_death_source_control()
               "Rejected typed continuation leaked its original VS owner");
         check(melee_web_vs_mode_end(),
               "Typed continuation ownership control could not retire the VS lease");
+        const GameRules before_fixture=*gmMainLib_GetGameRules();
+        GameRules fixture=gmMainLib_803D4A48;fixture.mode=1;fixture.stock_count=4;
+        GameRules invalid=fixture;invalid.stock_time_limit=100;
+        check(!melee_web_menu_host_apply_initial_native_rules(nullptr,&fixture,error,sizeof(error))&&
+              !melee_web_menu_host_apply_initial_native_rules(host,nullptr,error,sizeof(error))&&
+              !melee_web_menu_host_apply_initial_native_rules(host,&invalid,error,sizeof(error)),
+              "Initial native rules accepted missing owner/payload or unsupported timer");
+        invalid=fixture;invalid.stock_count=3;
+        check(!melee_web_menu_host_apply_initial_native_rules(host,&invalid,error,sizeof(error)),
+              "Initial native rules weakened supported four-stock admission");
+        invalid=fixture;invalid.damage_ratio^=1;
+        check(!melee_web_menu_host_apply_initial_native_rules(host,&invalid,error,sizeof(error)),
+              "Initial native rules admitted a foreign canonical field");
+        fixture.stock_time_limit=99;
+        check(melee_web_menu_host_apply_initial_native_rules(host,&fixture,error,sizeof(error))&&
+              !melee_web_menu_host_apply_initial_native_rules(host,&fixture,error,sizeof(error))&&
+              !melee_web_menu_host_apply_net_context(host,1,error,sizeof(error))&&
+              std::memcmp(gmMainLib_GetGameRules(),&before_fixture,sizeof(before_fixture))==0,
+              "Initial native fixture changed resident rules early or admitted repeated/net ownership");
         check(melee_web_menu_host_destroy(host, error, sizeof(error)), error);
+        check(std::memcmp(gmMainLib_GetGameRules(),&before_fixture,sizeof(before_fixture))==0,
+              "Unentered fixture destruction changed resident GameRules");
 
         MeleeWebMenuMatchContinuation unowned_sudden_death{};
         unowned_sudden_death.kind=MELEE_WEB_MENU_MATCH_CONTINUATION_SUDDEN_DEATH;
@@ -456,7 +484,7 @@ void run_vs_sudden_death_source_control()
 void run_sudden_death_host_control(
     MeleeWebMenuHost* host, const MeleeWebMenuMatchSelection& selection,
     char* error, std::size_t error_size,
-    const melee_web::RuntimeFiles* world_files = nullptr)
+    const melee_web::RuntimeFiles* world_files = nullptr, bool natural_timeout = false)
 {
     check(host != nullptr && selection.player_count >= 2 &&
               selection.player_count <= GM_MAX_PLAYERS,
@@ -479,6 +507,61 @@ void run_sudden_death_host_control(
         gmVsMelee_SuddenDeathExitInfo;
 
     MatchExitInfo tied_timeout{};
+    std::uint8_t natural_final_pad[MELEE_WEB_PAD_STATE_BYTES]{};
+    if(natural_timeout){
+        check(world_files&&selection.player_count==2&&
+              selection.start.rules.timer_enabled&&selection.start.rules.time_limit==60,
+              "Natural timeout requires original one-minute stock preparation");
+        try{
+        melee_web::GameplayMatchSession prior(*world_files,selection,
+                                              *melee_web_menu_host_input(host));
+        float pcm[1068];unsigned audio_phase=0,input_ticks=0;
+        for(;input_ticks<4800&&!prior.complete();++input_ticks){
+            PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
+            prior.tick(pads);
+            audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
+            check(melee_web_audio_render(prior.audio(),pcm,count,error,error_size),error);
+            for(unsigned slot=0;slot<2;++slot){
+                const auto stats=prior.player_stats(slot);
+                check(stats.stocks==4&&stats.damage_percent==0.0f,
+                      "Neutral natural timeout changed player stocks or damage");
+            }
+        }
+        int winner=-1;
+        check(input_ticks<4800&&prior.complete()&&prior.source_frames()>0&&
+              prior.outcome(winner)==OUTCOME_TIMEOUT,
+              "Neutral original VS did not reach its natural timeout boundary");
+        melee_web_pad_state_capture(natural_final_pad);vs_final_seed=prior.random_seed();
+        const auto cursor=prior.source_frames();
+        check(melee_web_match_rules_publish_result()&&
+              melee_web_match_rules_terminal_data(&tied_timeout),
+              "Natural timeout did not publish original terminal data");
+        check(tied_timeout.match_end.outcome==OUTCOME_TIMEOUT&&
+              tied_timeout.match_end.match_kind==selection.start.rules.match_kind&&
+              tied_timeout.match_end.n_winners==2&&
+              tied_timeout.match_end.winners[0]==0&&tied_timeout.match_end.winners[1]==1,
+              "Natural timeout did not retain the exact two-player tie");
+        for(unsigned slot=0;slot<2;++slot){
+            const auto& standing=tied_timeout.match_end.player_standings[slot];
+            check(standing.slot_type==route_start.players[slot].slot_type&&
+                  standing.ckind==route_start.players[slot].ckind&&
+                  standing.x3==route_start.players[slot].color&&standing.stocks==4,
+                  "Natural timeout lost active source player identity");
+        }
+        emit_native_bytes("natural_vs_terminal",&tied_timeout,sizeof(tied_timeout));
+        emit_native_bytes("natural_vs_final_pad",natural_final_pad,sizeof(natural_final_pad));
+        std::cout<<"Natural neutral VS timeout: input ticks "<<input_ticks
+                 <<", source cursor "<<cursor<<", final RNG "<<vs_final_seed<<'\n';
+        prior.close();prior.close();
+        MatchExitInfo after_close{};
+        check(melee_web_match_rules_terminal_data(&after_close)&&
+              std::memcmp(&after_close,&tied_timeout,sizeof(after_close))==0,
+              "Natural terminal data changed at source close");
+        }catch(...){
+            check(melee_web_menu_host_destroy(host,error,error_size),error);
+            throw;
+        }
+    }else{
     tied_timeout.match_end.outcome = OUTCOME_TIMEOUT;
     tied_timeout.match_end.match_kind = selection.start.rules.match_kind;
     tied_timeout.match_end.n_winners =
@@ -496,6 +579,8 @@ void run_sudden_death_host_control(
         standing.stocks = 1;
         standing.is_big_loser = false;
         tied_timeout.match_end.winners[i] = static_cast<u8>(i);
+    }
+
     }
 
     StartMeleeData expected_sudden_death{};
@@ -527,11 +612,14 @@ void run_sudden_death_host_control(
               sudden_death_selection.start.rules.x6,
           "Typed Sudden Death selection did not preserve original scene setup");
     if(world_files){
-        // There is no played prior VS in this control. Retain an owned copy of
-        // the closed SSS PAD bank and label that synthetic entry explicitly.
-        melee_web_pad_state_apply(melee_web_menu_host_input(host));
+        // Retain the exact final prior-VS bank for natural handoff; the older
+        // constructed control explicitly uses synthetic closed-SSS input.
         std::uint8_t entry_bytes[MELEE_WEB_PAD_STATE_BYTES];
-        melee_web_pad_state_capture(entry_bytes);
+        if(natural_timeout)std::memcpy(entry_bytes,natural_final_pad,sizeof(entry_bytes));
+        else{
+            melee_web_pad_state_apply(melee_web_menu_host_input(host));
+            melee_web_pad_state_capture(entry_bytes);
+        }
         std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)> entry(
             melee_web_pad_state_decode(entry_bytes,sizeof(entry_bytes),error,error_size),
             melee_web_pad_state_free);
@@ -669,9 +757,10 @@ void run_sudden_death_host_control(
                   replacement,&continuation,&stale,error,error_size),
               "Replacement host accepted stale SD continuation");
         check(melee_web_menu_host_destroy(replacement,error,error_size),error);
-        std::cout<<"Original CSS/SSS constructed tie -> actual SD world, early finish rejection, "
-                     "neutral prefix and abort/reacquisition passed; synthetic SSS PAD origin, "
-                     "no natural tie, winner, rendered or equivalence claim\n";
+        std::cout<<(natural_timeout?"Fixture-controlled original CSS/SSS natural VS tie -> actual SD world, early finish rejection, ":"Original CSS/SSS constructed tie -> actual SD world, early finish rejection, ")
+                  <<"neutral prefix and abort/reacquisition passed; "
+                  <<(natural_timeout?"actual final VS PAD origin, ":"synthetic SSS PAD origin, ")
+                  <<"no winner, rendered or equivalence claim\n";
         return;
     }
     check(melee_web_menu_host_sudden_death_match_claim(
@@ -3917,8 +4006,10 @@ int main(int argc,char** argv){try{
  const bool sound_settings_recipe=input_recipe&&std::string(input_recipe)=="main-settings-sound-v1";
  const bool sd_menu_setup_recipe=input_recipe&&
      std::string(input_recipe)=="sudden-death-menu-setup-control-v1";
- const bool sudden_death_world_recipe=input_recipe&&
-     std::string(input_recipe)=="sudden-death-world-control-v1";
+ const bool natural_sd_recipe=input_recipe&&
+     std::string(input_recipe)=="sudden-death-natural-timeout-control-v1";
+ const bool sudden_death_world_recipe=natural_sd_recipe||(input_recipe&&
+     std::string(input_recipe)=="sudden-death-world-control-v1");
  const bool sudden_death_host_recipe=input_recipe&&
      std::string(input_recipe)=="sudden-death-host-control-v1";
  const bool v10_css_replay_start_recipe=input_recipe&&
@@ -4047,8 +4138,22 @@ int main(int argc,char** argv){try{
   trace.begin_run(cycle);
   if((retail_fd_recipe||results_mario_recipe)&&cycle==0)*seed_ptr=1840631306u;
   char error[256]{};auto* host=melee_web_menu_host_create(error,sizeof(error));check(host!=nullptr,error);
+  if(natural_sd_recipe)check(melee_web_menu_host_initialize_profile_baseline(host,error,sizeof(error)),error);
+  const GameRules pre_native_rules=*gmMainLib_GetGameRules();
+  if(natural_sd_recipe){
+   GameRules rules=gmMainLib_803D4A48;rules.mode=1;rules.stock_count=4;rules.stock_time_limit=1;
+   emit_native_bytes("stock_timer_fixture_initial_GameRules",&rules,sizeof(rules));
+   check(melee_web_menu_host_apply_initial_native_rules(host,&rules,error,sizeof(error)),error);
+  }
   auto world=std::make_unique<melee_web::GameplayMenuWorld>(files);
   check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
+  if(natural_sd_recipe){
+   check(gmMainLib_GetGameRules()->stock_time_limit==1,
+         "Initial CSS lost authored persistent one-minute fixture");
+   GameRules invalid=*gmMainLib_GetGameRules();
+   check(!melee_web_menu_host_apply_initial_native_rules(host,&invalid,error,sizeof(error)),
+         "Entered host accepted setup fixture mutation");
+  }
   trace.event("capture_begin",world->audio());
   PADStatus raw[4]{};raw[2].err=raw[3].err=-1;float pcm[1068];unsigned audio_phase=0;
   auto tick=[&](){
@@ -4243,12 +4348,14 @@ int main(int argc,char** argv){try{
     trace.menu_selection(raw_start,selection,*prepared,pad);
    }
    run_sudden_death_host_control(host,selection,error,sizeof(error),
-                                sudden_death_world_recipe?&files:nullptr);
+                                sudden_death_world_recipe?&files:nullptr,natural_sd_recipe);
    const auto retained=melee_web_gameplay_allocation();
    check(retained.identity==session_allocation.identity&&
          retained.generation==session_allocation.generation&&
          retained.bytes==session_allocation.bytes&&!melee_web_gameplay_world_exists(),
          "Typed Sudden Death host control changed the retained application arena");
+   if(natural_sd_recipe)check(std::memcmp(gmMainLib_GetGameRules(),&pre_native_rules,sizeof(pre_native_rules))==0,
+         "Natural SD fixture failed to restore initial persistent rules");
    continue;
   }
   for(const auto& name:melee_web::match_asset_names(selection)){
@@ -4594,7 +4701,8 @@ int main(int argc,char** argv){try{
   check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
   std::cout<<"Native actual SD lifecycle prefix and application session reacquisition passed; "
-             "constructed tie only, no Results or gameplay acceptance claim\n";
+           <<(natural_sd_recipe?"fixture-controlled natural VS timeout only, ":"constructed tie only, ")
+             <<"no Results or gameplay acceptance claim\n";
  }else if(link_css_unload_recipe)
   std::cout<<"Native Link/Young Link CSS audio registry and unload smoke passed; no match/rendered claim\n";
  else if(sudden_death_host_recipe)
