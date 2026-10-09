@@ -1,4 +1,7 @@
 #include "stadium_c1_stage_state_probe.h"
+#include "gameplay_bootstrap.h"
+#include "gameplay_stage_context.h"
+#include "gameplay_stage_map.h"
 
 #include <melee/gr/grdatfiles.h>
 #include <melee/gr/grpstadium.h>
@@ -7,6 +10,9 @@
 #include <melee/ft/ftdevice.h>
 #include <melee/it/it_3F14.h>
 #include <sysdolphin/baselib/gobj.h>
+#include <sysdolphin/baselib/gobjplink.h>
+#include <sysdolphin/baselib/objalloc.h>
+#include <sysdolphin/baselib/jobj.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -192,6 +198,11 @@ int melee_web_stadium_c1_stage_info_current_view(
     if (!view) return 0;
     copy_stage_info_view(&stage_info, view);
     return 1;
+}
+
+void* melee_web_stadium_c1_stage_info_x6A4_root(void)
+{
+    return stage_info.x6A4;
 }
 
 int melee_web_stadium_c1_stage_info_snapshot_restore(
@@ -406,3 +417,130 @@ size_t melee_web_stadium_c1_ft_device_snapshot_addresses(
     memcpy(addresses, snapshot->addresses, sizeof(snapshot->addresses));
     return sizeof(snapshot->addresses) / sizeof(snapshot->addresses[0]);
 }
+
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+extern HSD_ObjAllocData gobj_alloc_data;
+extern HSD_ObjAllocData gobjproc_alloc_data;
+static int map_light_control_fail(char* error,size_t size,const char* message)
+{
+    if(error&&size&&message!=error)snprintf(error,size,"%s",message);
+    return 0;
+}
+#define LIGHT_CONTROL_CHECK(condition,message) \
+    do { if(!(condition))return map_light_control_fail(error,size,message); } while(0)
+static int map_light_adoption_control(
+    MeleeWebStadiumC1CacheLiveObserver observer,void* user,char* error,size_t size)
+{
+    if(!error||!size)return 0;
+    /* Keep borrowed synthetic map/row storage alive even after a failed check.
+     * No failed ownership graph is drained or silently detached by this control. */
+    static struct StageInfo saved;
+    static struct UnkStageDat_x8_t entry;
+    static UnkStageDat map;
+    static HSD_GObj foreign;
+    static MeleeWebStageLights* context;
+    static MeleeWebStageMap* publication;
+    const MeleeWebGameplayStats before=melee_web_gameplay_stats();
+    const int scheduler_before=HSD_GObj_804D783C;
+    const uint32_t gobj_before=HSD_ObjAllocGetUsing(&gobj_alloc_data);
+    const uint32_t proc_before=HSD_ObjAllocGetUsing(&gobjproc_alloc_data);
+    saved=stage_info;
+    LIGHT_CONTROL_CHECK(!Ground_801C498C()&&!stage_info.map_plit,
+                        "Map-light reducer requires an unowned source baseline");
+    LIGHT_CONTROL_CHECK(!melee_web_stage_lights_adopt_source(NULL,error,size)&&
+        strcmp(error,"Source map-light adoption has no published descriptor context")==0,
+        "Missing publication did not report its exact adoption condition");
+    for(unsigned cycle=0;cycle<2;++cycle){
+        LIGHT_CONTROL_CHECK(!observer||observer("ground-light",cycle?"warm":"cold",cycle,NULL,user),
+                            "Map-light cold/warm snapshot refused");
+        MeleeWebStageLightDesc descriptor={0};descriptor.flags=0x20;
+        memset(descriptor.color,255,sizeof(descriptor.color));
+        context=melee_web_stage_lights_create(&descriptor,1,error,size);
+        LIGHT_CONTROL_CHECK(context!=NULL,error);
+        LIGHT_CONTROL_CHECK(melee_web_stage_lights_set_override(context,0,0,0,error,size),error);
+        LIGHT_CONTROL_CHECK(melee_web_stage_lights_attach(context,error,size),error);
+        /* Synthetic callback row0 has no light flag: original Ground selects
+         * its authored two-row static list, not a fabricated source owner. */
+        memset(&entry,0,sizeof(entry));memset(&map,0,sizeof(map));
+        map.unk8=&entry;map.unkC=1;
+        publication=melee_web_stage_map_publish(&map,error,size);
+        LIGHT_CONTROL_CHECK(publication!=NULL,error);
+        const uint32_t row_count=1;
+        LIGHT_CONTROL_CHECK(melee_web_stage_lights_set_source_counts(context,&row_count,1,error,size),error);
+        stage_info.grkind=Gr_Kind_PStadium;stage_info.param=NULL;
+        extern void melee_web_ground_load_map_lights(void);
+        melee_web_ground_load_map_lights();
+        HSD_GObj* const owner=Ground_801C498C();
+        LIGHT_CONTROL_CHECK(owner&&owner->classifier==HSD_GOBJ_CLASS_GROUND&&owner->hsd_obj,
+                            "Original Ground did not create its own source light owner");
+        memset(&foreign,0,sizeof(foreign));foreign.classifier=HSD_GOBJ_CLASS_GROUND;
+        LIGHT_CONTROL_CHECK(!melee_web_stage_lights_adopt_source(&foreign,error,size)&&
+            strcmp(error,"Source map-light adoption requires Ground's current original owner")==0,
+            "Foreign Ground-class owner was accepted");
+        LightList** const published_list=stage_info.map_plit;
+        stage_info.map_plit=NULL;
+        LIGHT_CONTROL_CHECK(!melee_web_stage_lights_adopt_source(owner,error,size)&&
+            strcmp(error,"Source map-light adoption descriptor publication was replaced")==0,
+            "Replaced descriptor publication was accepted");
+        LIGHT_CONTROL_CHECK(!melee_web_stage_lights_detach(context,error,size),
+                            "Detach overwrote a replaced descriptor publication");
+        stage_info.map_plit=published_list;
+        LIGHT_CONTROL_CHECK(melee_web_stage_lights_select_source_entry(0),"Synthetic row selection failed");
+        LIGHT_CONTROL_CHECK(!melee_web_stage_lights_adopt_source(owner,error,size)&&
+            strcmp(error,"Original Ground light chain exceeds its selected DAT entry count")==0,
+            "Wrong authored row bound did not refuse the actual chain");
+        LIGHT_CONTROL_CHECK(melee_web_stage_lights_select_source_entry(-1),"Original static-list bound selection failed");
+        LIGHT_CONTROL_CHECK(melee_web_stage_lights_adopt_source(owner,error,size),error);
+        uint32_t count=0;uint16_t flags[2]={0};uint8_t colors[8]={0};
+        LIGHT_CONTROL_CHECK(melee_web_stage_lights_stats(context,&count,flags,colors,2,error,size)&&count==2,
+                            "Adopted original static-list chain differs from its authored bound");
+        LIGHT_CONTROL_CHECK(!melee_web_stage_lights_adopt_source(owner,error,size),"Duplicate adoption succeeded");
+        LIGHT_CONTROL_CHECK(!melee_web_stage_lights_detach(context,error,size),"Live source context detached before retirement");
+        LIGHT_CONTROL_CHECK(!melee_web_stage_lights_destroy(context,error,size),"Live source context destroyed before retirement");
+        LIGHT_CONTROL_CHECK(!melee_web_stage_lights_retire_source(&foreign,error,size),"Foreign owner retirement succeeded");
+        LIGHT_CONTROL_CHECK(!observer||observer("ground-light","live",cycle,owner,user),
+                            "Map-light live snapshot refused");
+        LIGHT_CONTROL_CHECK(melee_web_stage_lights_retire_source(owner,error,size),error);
+        HSD_GObjPLink_80390228(owner);
+        LIGHT_CONTROL_CHECK(!Ground_801C498C(),"Original Ground owner survived its exact teardown");
+        LIGHT_CONTROL_CHECK(melee_web_stage_lights_destroy(context,error,size),error);context=NULL;
+        LIGHT_CONTROL_CHECK(melee_web_stage_map_close(publication,error,size),error);publication=NULL;
+        stage_info=saved;
+        LIGHT_CONTROL_CHECK(melee_web_gameplay_stats().generation==before.generation&&
+            melee_web_gameplay_stats().ticks==before.ticks&&HSD_GObj_804D783C==scheduler_before&&
+            HSD_ObjAllocGetUsing(&gobj_alloc_data)==gobj_before&&
+            HSD_ObjAllocGetUsing(&gobjproc_alloc_data)==proc_before,
+            "Map-light reducer advanced scheduling or retained original GObj/proc owners");
+        LIGHT_CONTROL_CHECK(!observer||observer("ground-light","removed",cycle,NULL,user),
+                            "Map-light removed snapshot refused");
+    }
+    if(error&&size)*error=0;
+    return 1;
+}
+
+int melee_web_stadium_c1_map_light_adoption_control(char* error,size_t size)
+{
+    return map_light_adoption_control(NULL,NULL,error,size);
+}
+int melee_web_stadium_c1_cache_live_control(
+    MeleeWebStadiumC1CacheLiveObserver observer,void* user,char* error,size_t size)
+{
+    /* Do not drain an unexpected graph. Retain its actual pointer on failure. */
+    static HSD_JObj* owned;
+    LIGHT_CONTROL_CHECK(observer&&error&&size&&!owned,
+                        "Cache/live reducer requires a fresh owned control");
+    for(unsigned cycle=0;cycle<2;++cycle){
+        LIGHT_CONTROL_CHECK(observer("jobj",cycle?"warm":"cold",cycle,NULL,user),
+                            "JObj cold/warm snapshot refused");
+        owned=HSD_JObjAlloc();
+        LIGHT_CONTROL_CHECK(owned!=NULL,"Original JObj allocation failed");
+        LIGHT_CONTROL_CHECK(observer("jobj","live",cycle,owned,user),
+                            "JObj live snapshot refused");
+        HSD_JObjRemoveAll(owned);owned=NULL;
+        LIGHT_CONTROL_CHECK(observer("jobj","removed",cycle,NULL,user),
+                            "JObj removed snapshot refused");
+    }
+    return map_light_adoption_control(observer,user,error,size);
+}
+#undef LIGHT_CONTROL_CHECK
+#endif

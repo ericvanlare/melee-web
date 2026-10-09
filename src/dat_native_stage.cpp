@@ -4,6 +4,7 @@
 #include "dat_shape_animation.hpp"
 #include "dat_stage.hpp"
 #include "dat_lights.hpp"
+#include "dat_sis.hpp"
 #include "gameplay_stage_numeric.h"
 #include "gameplay_stage_profile.h"
 #include "gameplay_content.h"
@@ -55,6 +56,7 @@ struct NativeMapStorage {
     std::map<uint32_t,HSD_AObjDesc*> aobjects;
     std::map<uint32_t,HSD_Spline*> splines;
     std::map<uint32_t,HSD_LightAnim*> light_animations;
+    std::map<uint32_t,HSD_LightAnim**> light_animation_tables;
     std::set<uint32_t> active;
     MeleeWebMapInput map{};void* native_map=nullptr;void* native_collision=nullptr;
     explicit NativeMapStorage(std::shared_ptr<const DatArchive> a):archive(a),arena(a),metadata(*a){}
@@ -129,6 +131,11 @@ struct NativeMapStorage {
         for(uint32_t i=0;i<=64;i++){require(o+4*i<end,"Native scene pointer table lacks bounded terminator");auto p=archive->pointer(o+4*i,4);if(!p){auto** out=make<T*>(values.size()+1);std::copy(values.begin(),values.end(),out);return out;}require(i<64,"Native scene pointer table exceeds budget");values.push_back(hydrate(*p));}
         throw DatError("Native scene table is unterminated");
     }
+    HSD_LightAnim** light_animation_table(uint32_t o){
+        if(light_animation_tables.contains(o))return light_animation_tables.at(o);
+        auto** out=table<HSD_LightAnim>(o,[&](uint32_t root){return light_anim(root);});
+        light_animation_tables[o]=out;return out;
+    }
     void** light_table(uint32_t o,uint32_t* count){
         std::vector<void*> values;uint32_t end=archive->next_target_offset(o);
         for(uint32_t i=0;i<=64;i++){
@@ -142,7 +149,7 @@ struct NativeMapStorage {
             require(i<64,"Native stage light table exceeds its descriptor budget");
             record(*p,8);auto* desc=light(pointer(*p,28));HSD_LightAnim** anims=nullptr;
             if(auto a=archive->pointer(*p+4,4))
-                anims=table<HSD_LightAnim>(*a,[&](uint32_t q){return light_anim(q);});
+                anims=light_animation_table(*a);
             values.push_back(melee_web_stage_map_light_list(arena.reader(),desc,anims));
         }
         throw DatError("Native stage light table is unterminated");
@@ -383,6 +390,13 @@ struct NativeMapStorage {
         // original Ground light queries use a bounded identity resolver.
         map.unk1C=metadata.light_override_table.count;map.unk18=nullptr;
     }
+    void populate_light_overrides(){
+        overrides.clear();overrides.reserve(lights.size());
+        for(const auto& [offset,descriptor]:lights){
+            auto flags=read_dat_light_override(*archive,offset);
+            overrides.push_back({descriptor,flags.has_value(),flags.value_or(0)});
+        }
+    }
     void build_map(){
         native_map=melee_web_stage_map_build(arena.reader(),&map);
         require(native_map,"Native source map builder returned null");
@@ -393,6 +407,7 @@ struct DatNativeMap::Storage : NativeMapStorage {
 };
 struct DatNativeStage::Storage : NativeMapStorage {
     std::unique_ptr<DatStageYaku> random_item_scripts;
+    std::vector<std::unique_ptr<DatSis>> sis_owners;
     std::vector<MeleeWebArchiveSymbol> public_symbols;
     void* yaku=nullptr;
     using NativeMapStorage::NativeMapStorage;
@@ -405,6 +420,7 @@ DatNativeMap::DatNativeMap(std::shared_ptr<const DatArchive> archive,
         storage_->arena.reader(),storage_->metadata.root_offset);
     require(markers,"Native map structural marker decoder returned null");
     storage_->hydrate_map(contract,markers);
+    storage_->populate_light_overrides();
     storage_->build_map();
 }
 DatNativeMap::~DatNativeMap()=default;
@@ -417,7 +433,9 @@ void* DatNativeMap::collision(){
  if(!storage_->native_collision)storage_->native_collision=storage_->collision();
  return storage_->native_collision;
 }
+const std::vector<MeleeWebMapLightOverride>& DatNativeMap::light_overrides()const noexcept{return storage_->overrides;}
 std::span<const uint32_t> DatNativeMap::source_light_counts()const noexcept{return storage_->source_light_counts;}
+void* DatNativeMap::light_animation_table(uint32_t offset){return storage_->light_animation_table(offset);}
 
 DatNativeMapContract DatNativeStageMapContractData::view() const noexcept
 {
@@ -544,13 +562,20 @@ DatNativeStageMapContractData dat_native_stage_map_contract_from_profile(
 }
 
 DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive)
-    : DatNativeStage(std::move(archive), St_Kind_Last) {}
+    : DatNativeStage(std::move(archive), St_Kind_Last, ProfileMode::Complete) {}
 
 DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int stage_kind)
+    : DatNativeStage(std::move(archive), stage_kind, ProfileMode::Complete) {}
+
+DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive,
+                               int stage_kind, ProfileMode profile_mode)
     : storage_(std::make_unique<Storage>(archive)){
- auto& s=*storage_;const auto& a=*archive;const auto& meta=s.metadata;
- const auto* profile=melee_web_stage_profile(stage_kind);
- require(profile,"Native stage has no complete source callback profile");
+  auto& s=*storage_;const auto& a=*archive;const auto& meta=s.metadata;
+  const auto* profile=melee_web_stage_profile(stage_kind);
+  require(profile,"Native stage has no complete source callback profile");
+  require(profile->diagnostic_only ==
+              (profile_mode == ProfileMode::DiagnosticOnly),
+          "Native stage profile mode does not match its admission scope");
  for(const auto& symbol:a.public_symbols())
   if(symbol.name=="ALDYakuAll")
    s.random_item_scripts=std::make_unique<DatStageYaku>(archive,symbol.data_offset);
@@ -597,11 +622,11 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
   }
   s.yaku=programs;
  }
- for(const auto& [offset,light]:s.lights){auto flags=read_dat_light_override(a,offset);s.overrides.push_back({light,flags.has_value(),flags.value_or(0)});}
+ s.populate_light_overrides();
  require(s.yaku,"Native stage yakumono symbol absent");
  s.build_map();
  s.native_collision=s.collision();
- const auto* content=melee_web_stage_content(stage_kind);
+  const auto* content=melee_web_stage_content_for_profile(stage_kind);
  require(content,"Native stage public catalog has no archive identity");
  for(const auto& symbol:a.public_symbols()){
   void* value=nullptr;
@@ -625,6 +650,11 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
      s.joints.emplace(symbol.data_offset,descriptor);s.graphs.push_back(std::move(graph));
     }
     value=s.joints.at(symbol.data_offset);
+   }else if(request.kind==MELEE_WEB_STAGE_PUBLIC_SIS){
+    auto owner=std::make_unique<DatSis>(archive,symbol.name);
+    value=owner->descriptor();
+    require(value,"Stage public SIS owner returned a null descriptor");
+    s.sis_owners.push_back(std::move(owner));
    }else require(false,"Unknown native stage public descriptor kind");
   }
   // Retain unhydrated public names as explicit unsupported capabilities.
@@ -663,7 +693,6 @@ std::span<const uint32_t> DatNativeStage::source_light_counts()const noexcept{re
 const std::vector<DatParticleEvent>& DatNativeStage::particle_events()const noexcept{return storage_->events;}
 const std::vector<MeleeWebArchiveSymbol>& DatNativeStage::public_symbols()const noexcept{return storage_->public_symbols;}
 void* DatNativeStage::light_animation_table(uint32_t offset){
- auto& s=*storage_;
- return s.table<HSD_LightAnim>(offset,[&](uint32_t root){return s.light_anim(root);});
+ return storage_->light_animation_table(offset);
 }
 }

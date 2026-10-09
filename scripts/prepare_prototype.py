@@ -31,14 +31,39 @@ def content_manifest(source):
             raise ValueError(f'Native {kind} content table was not found')
         table_body = re.sub(r'/\*.*?\*/', '', match[1], flags=re.S)
         lines = [line.strip() for line in table_body.splitlines() if line.strip()]
-        pattern = (r'\{\s*(CKIND_\w+),\s*FTKIND_\w+,\s*\d+,\s*"([^"]+)".*\},'
-                   if kind == 'Fighter' else r'\{\s*(St_Kind_\w+),\s*Gr_Kind_\w+,\s*"([^"]+)".*\},')
+        if kind == 'Fighter':
+            pattern = r'\{\s*(CKIND_\w+),\s*FTKIND_\w+,\s*\d+,\s*"([^"]+)".*\},'
+        else:
+            # Diagnostic-only source rows are not playable prototype content.
+            # Parse the marker explicitly and omit those rows from the menu.
+            pattern = (r'\{\s*(St_Kind_\w+),\s*Gr_Kind_\w+,\s*"([^"]+)"'
+                       r',\s*"[^"]+",\s*"[^"]+",\s*\d+,\s*'
+                       r'(?:NULL|"[^"]+"),\s*([01])\s*\},')
         rows = []
+        diagnostic_stage_scope = False
         for line in lines:
+            if kind == 'Stage' and line == '#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)':
+                if diagnostic_stage_scope:
+                    raise ValueError('Nested diagnostic Stage content scope')
+                diagnostic_stage_scope = True
+                continue
+            if kind == 'Stage' and line == '#endif':
+                if not diagnostic_stage_scope:
+                    raise ValueError('Unmatched Stage content preprocessor scope')
+                diagnostic_stage_scope = False
+                continue
             row = re.fullmatch(pattern, line)
             if not row:
                 raise ValueError(f'Unrecognized native {kind} row; update the prototype bridge')
+            if kind == 'Stage':
+                is_diagnostic = row[3] == '1'
+                if is_diagnostic != diagnostic_stage_scope:
+                    raise ValueError('Stage diagnostic content marker and source guard disagree')
+                if is_diagnostic:
+                    continue
             rows.append({'sourceName': row[1], 'name': row[2]})
+        if diagnostic_stage_scope:
+            raise ValueError('Unclosed diagnostic Stage content scope')
         if not rows or len({row['sourceName'] for row in rows}) != len(rows):
             raise ValueError(f'Empty or duplicate native {kind} inventory')
         tables['fighters' if kind == 'Fighter' else 'stages'] = rows

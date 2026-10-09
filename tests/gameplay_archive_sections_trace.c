@@ -7,8 +7,58 @@ MeleeWebGameplayStats melee_web_gameplay_stats(void){MeleeWebGameplayStats s={0}
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 static void load(void* archive,const char* file,void* destination,...) {
     va_list args;va_start(args,destination);melee_web_archive_sections_load(archive,file,destination,args);va_end(args);
+}
+static void stadium_sis_catalog_controls(void) {
+    char error[128];
+    int roots[8]={0};
+    unsigned char text[]={0};
+    void** sis=calloc(3,sizeof(*sis));assert(sis);
+    sis[2]=text;
+    MeleeWebArchiveSymbol symbols[]={
+        {"GrPs.usd","map_head",&roots[0]},
+        {"GrPs.usd","coll_data",&roots[1]},
+        {"GrPs.usd","grGroundParam",&roots[2]},
+        {"GrPs.usd","ALDYakuAll",&roots[3]},
+        {"GrPs.usd","map_ptcl",&roots[4]},
+        {"GrPs.usd","map_texg",&roots[5]},
+        {"GrPs.usd","yakumono_param",&roots[6]},
+        {"GrPs.usd","quake_model_set",&roots[7]},
+        {"GrPs.usd","SIS_GrPStadiumData",sis},
+    };
+    /* Asset-free owned table; test catalog borrowing, not DAT hydration. */
+    MeleeWebArchiveSections* missing=melee_web_archive_sections_register(
+        symbols,8,error,sizeof(error));assert(missing);
+    void* handle=melee_web_archive_sections_open("GrPs.usd");
+    assert(melee_web_archive_sections_public(handle,"SIS_GrPStadiumData")==NULL);
+    assert(!melee_web_archive_sections_close(missing,error,sizeof(error)));
+    assert(melee_web_archive_sections_close_owned(missing,handle,error,sizeof(error)));
+    assert(!melee_web_archive_sections_is_handle(handle));
+
+    MeleeWebArchiveSections* complete=melee_web_archive_sections_register(
+        symbols,9,error,sizeof(error));assert(complete);
+    handle=melee_web_archive_sections_open("GrPs.usd");
+    assert(melee_web_archive_sections_public(handle,"SIS_GrPStadiumData")==sis);
+    assert(melee_web_archive_sections_public(handle,"SIS_GrPStadiumDat")==NULL);
+    assert(!melee_web_archive_sections_open_preloaded("GrPStadium.usd"));
+    int wrong_file=0;
+    assert(!melee_web_archive_sections_attach_source(&wrong_file,"GrPStadium.usd"));
+    assert(!melee_web_archive_sections_is_handle(&wrong_file));
+    void* consumer=melee_web_archive_sections_open("GrPs.usd");
+    assert(!melee_web_archive_sections_close(complete,error,sizeof(error)));
+    assert(!melee_web_archive_sections_close_owned(complete,handle,error,sizeof(error)));
+    assert(melee_web_archive_sections_is_handle(handle));
+    assert(melee_web_archive_sections_public(consumer,"SIS_GrPStadiumData")==sis);
+    assert(((void**)melee_web_archive_sections_public(handle,"SIS_GrPStadiumData"))[2]==text);
+    melee_web_archive_sections_release(consumer);
+    assert(melee_web_archive_sections_close_owned(complete,handle,error,sizeof(error)));
+    assert(!melee_web_archive_sections_is_handle(handle));
+    assert(sis[2]==text && *(unsigned char*)sis[2]==0);
+    /* Catalog removal releases handles, never the borrowed descriptor graph. */
+    free(sis);
+    puts("Stadium eight-entry missing SIS and nine-entry owned SIS catalog controls passed");
 }
 int main(int argc,char** argv) {
     char error[128];int a=17,b=29;char filename[]="Authored.dat",symbol[]="first";
@@ -120,5 +170,6 @@ int main(int argc,char** argv) {
     test_heap_exists=0;
     assert(melee_web_archive_sections_close(source_scope,error,sizeof(error)));
     assert(!melee_web_archive_sections_is_handle(&source_archive_storage));
+    stadium_sis_catalog_controls();
     puts("Typed archive sections copied names, resolved aliases, rejected duplicates and restarted");
 }

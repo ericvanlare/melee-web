@@ -1,0 +1,297 @@
+{
+  "schema": "melee-web-issue251-stadium-profile-oninit-v1",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/251",
+  "result": "passed_scoped_profile_gating_and_builds",
+  "evidence_labels": [
+    "Compiled",
+    "Synthetic controls",
+    "Source identified"
+  ],
+  "boundary": "Add an explicit diagnostic-only canonical Stadium profile and profile-to-DatNativeMapContract adapter, keep the diagnostic content row out of ordinary prototype admission, and expose a source-ordered OnInit boundary that returns before the camera and OnStart calls. This receipt covers source, focused controls, the standard suite, and an ordinary Release build; it does not report an actual Stadium OnInit execution.",
+  "source": {
+    "validation_commit": "718cfd4dabb9a1a48cb81e71e96f7a5c3849b02a",
+    "validation_tree": "0f570735596f7684b553a5e46c823ba71c378b6f",
+    "validation_parent": "73ccfb410a084b8e1b62aaab7780d37d6dfb1021",
+    "base_commit": "5443482b3019e99e5797380e4f8b432027ff767e",
+    "base_tree": "02bcf582bd2f40f483bdeb5b4cfa1122a758b2ed",
+    "base_to_validation_binary_diff_sha256": "7b3b03c08c4efb32092d0b167a5b4149420c677dfe04b64d0bb404455715ba0b",
+    "tracked_worktree_clean_at_validation": true,
+    "profile_policy": "All seven existing profiles explicitly use current_all_resident. Stadium uses a diagnostic-only authored declaration with four resident rows, 26 external references, 10 animation consumers, and 44 flagged-object declarations. Unspecified/contradictory policy and incomplete authored declarations reject.",
+    "ordinary_content_policy": "The parser accepts only the explicitly marked Stadium diagnostic row in its exact diagnostic preprocessor scope. The generated ordinary manifest retains the existing seven-stage inventory and excludes Stadium; malformed or unmarked rows still reject."
+  },
+  "focused_diagnostic_validation": {
+    "producer_commit": "73ccfb410a084b8e1b62aaab7780d37d6dfb1021",
+    "producer_tree": "0eae944be01381845526de4fb93b4e34a031063d",
+    "producer_note": "This focused C1 producer precedes the parser-only correction in validation commit 718cfd4. It is recorded under its actual producer and is not relabeled as the final source commit.",
+    "build": {
+      "target": "native_menu_host_trace",
+      "configuration": "Release; MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=ON; other nine MELEE_WEB boolean options OFF",
+      "command": [
+        "python3", "scripts/agent_workspace.py", "run", "--",
+        "python3", "scripts/build.py", "--trace-target", "native_menu_host_trace",
+        "--configuration", "Release", "--stadium-c1a-diagnostic"
+      ],
+      "exit_code": 0,
+      "warnings": 160,
+      "log": {
+        "external_run": "issue251-oninit-profile-20261007/validation-v1/c1-diagnostic-build.log",
+        "bytes": 192430,
+        "sha256": "c2328f20c67476e0ca578a5733a6d68aa3d68b0de5ce379bce89cf9d77c8892b"
+      },
+      "cache": {
+        "path": "build/browser-stadium-c1a-release/CMakeCache.txt",
+        "bytes": 61252,
+        "sha256": "59b26ab9d7f1414fd337c83e8dc3f009655dad37c38dbd6e7434268b69e7d9e6"
+      },
+      "outputs": {
+        "native_menu_host_trace.js": {
+          "bytes": 233346,
+          "sha256": "f7aa83f7e18eec81c8fc46b90c4ec0131322174ef9fe5a9a181c837447fceb9a"
+        },
+        "native_menu_host_trace.wasm": {
+          "bytes": 13935690,
+          "sha256": "bd1b4e134fe25ecd313893afbe1099304924e7cbdaa000c26dfbec3487eddaf4"
+        }
+      },
+      "objects": {
+        "tests/native_menu_host_trace.cpp.o": {
+          "bytes": 597547,
+          "sha256": "197d4894e291946547b68aec8a3c2ae9f62e014c99785803f8e98abf41b6fe12"
+        },
+        "src/gameplay_stage_profile.c.o": {
+          "bytes": 11292,
+          "sha256": "509520fda1d88d6486d6bdae74ab48d3364ab70ddfc99cfb61c2739a9cad6490"
+        },
+        "src/gameplay_stage_last.c.o": {
+          "bytes": 8529,
+          "sha256": "c20ff6ddd4a2378de6c8248cb70a31844f797f12dd6c74c10794105706e35e14"
+        },
+        "src/dat_native_stage.cpp.o": {
+          "bytes": 313566,
+          "sha256": "294db83796480357db12e12287803ce9b111eb8ec045681706f412585a4289c3"
+        },
+        "generated-src/melee/gr/grpstadium.c.o": {
+          "bytes": 32276,
+          "sha256": "16e59304c59bc713ac328be07f52f759e940a8cc819722f715ccadfa2bb612d2"
+        }
+      }
+    },
+    "profile_controls": {
+      "command": "pinned Node 24.19.0 build/browser-stadium-c1a-release/native_menu_host_trace.js --stadium-profile-controls",
+      "exit_code": 0,
+      "success_line": "Diagnostic Stadium profile/content gate and source-state rejection controls passed",
+      "log": {
+        "external_run": "issue251-oninit-profile-20261007/validation-v1/stadium-profile-controls.log",
+        "bytes": 759,
+        "sha256": "1d265118206f82537b45bd4383fbb1a486d4b7b36dffe90cfbb817dd672d2156"
+      }
+    },
+    "exchange_control": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_gameplay_native_menus.py -k stadium_yakumono_exchange_round_trip_without_assets -v",
+      "exit_code": 0,
+      "tests_run": 1,
+      "log": {
+        "external_run": "issue251-oninit-profile-20261007/validation-v1/stadium-yakumono-exchange-control.log",
+        "bytes": 269,
+        "sha256": "6a2ffea2e18a1468f27ba6ac6fb360fec15845d341e81a501cb1a6ef8b3fe0cf"
+      }
+    },
+    "prototype_parser_control": {
+      "producer_commit": "718cfd4dabb9a1a48cb81e71e96f7a5c3849b02a",
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest tests.test_prototype -v",
+      "exit_code": 0,
+      "tests_run": 3,
+      "log": {
+        "external_run": "issue251-oninit-profile-20261007/validation-v1/prototype-focused-v2.log",
+        "bytes": 803,
+        "sha256": "8a2df1edc5ae7c7fbde3eebf6c1f5b5156e9157155d919f84e481b2caa52bd7d6"
+      }
+    }
+  },
+  "integration_validation": {
+    "full_suite": {
+      "command": [
+        "python3", "scripts/agent_workspace.py", "run", "--",
+        "python3", "-m", "unittest", "discover", "-s", "tests", "-v"
+      ],
+      "producer_commit": "718cfd4dabb9a1a48cb81e71e96f7a5c3849b02a",
+      "exit_code": 0,
+      "tests_run": 2049,
+      "skipped": 133,
+      "elapsed_seconds": 412.868,
+      "result_line": "OK (skipped=133)",
+      "log": {
+        "external_run": "issue251-oninit-profile-20261007/validation-v1/full-suite-v2.log",
+        "bytes": 373930,
+        "sha256": "3402396617a2821129e57809dde26185825082845c62d0a40babc526245530af"
+      },
+      "observations": [
+        "The existing retained C0 Stadium map-owner regression passed.",
+        "The two OnInit source-boundary tests passed.",
+        "test_stadium_ground_map1_owner_lifetime was skipped because its explicit one-run constructor gate was unset.",
+        "The retained 98-file fixture remains present in its owned local resource location; this suite did not select or configure it."
+      ]
+    },
+    "ordinary_release": {
+      "command": [
+        "python3", "scripts/agent_workspace.py", "run", "--",
+        "python3", "scripts/build.py", "--configuration", "Release"
+      ],
+      "producer_commit": "718cfd4dabb9a1a48cb81e71e96f7a5c3849b02a",
+      "exit_code": 0,
+      "target": "gameplay_menu_browser",
+      "all_diagnostic_options": "OFF",
+      "options": {
+        "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+        "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+        "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+        "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+        "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+        "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+        "MELEE_WEB_RESULTS_RENDERED_TRACE": "OFF",
+        "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+        "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF",
+        "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF"
+      },
+      "cache": {
+        "path": "build/browser-release/CMakeCache.txt",
+        "bytes": 60977,
+        "sha256": "de0c1275f03b2fd5b618fbbe59e3d7d16a251176ad41c68db9939100d6356bdc"
+      },
+      "outputs": {
+        "gameplay_menu_browser.js": {
+          "bytes": 300352,
+          "sha256": "99f2d842997929e3076bdbf304ba44dfa76e8a13969d3b20863bddf6be0ba296"
+        },
+        "gameplay_menu_browser.wasm": {
+          "bytes": 15751174,
+          "sha256": "1f0a0c60f41d5582693e805c6da774cbaaf740452fbb90cf675dd210d9e6b7a9"
+        },
+        "gameplay_menu_browser.data": {
+          "bytes": 3674112,
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+        }
+      },
+      "affected_objects": {
+        "src/dat_native_stage.cpp.o": {
+          "bytes": 313267,
+          "sha256": "9ab840e4dc607710cee27aded6bdcb8ead8fa007697a21a7b06f29e8744c3fae"
+        },
+        "src/gameplay_stage_profile.c.o": {
+          "bytes": 11287,
+          "sha256": "ae9b1af190b3bf51e3e5302e20cc4418b110da97621fd38d9fed52d84c75290a"
+        },
+        "src/gameplay_stage_last.c.o": {
+          "bytes": 7751,
+          "sha256": "46cf2ca6ea54136595517b55014fb3f73f6b3504a4b61fe229520faca3fcd88e"
+        },
+        "src/gameplay_menu_browser.cpp.o": {
+          "bytes": 3255242,
+          "sha256": "581cc68a9c41958143999c872f28a4e016168230276be2e65fc76e618ed61cfa"
+        }
+      },
+      "generated_source": {
+        "path": "build/gameplay-source/src/melee/gr/grpstadium.c",
+        "bytes": 64106,
+        "sha256": "37a1ebff60e8be7e4227c53638d7d524c91b0b49b68819471a61226a0923dfa7"
+      },
+      "log": {
+        "external_run": "issue251-oninit-profile-20261007/validation-v1/ordinary-release-build-v1.log",
+        "bytes": 1223658,
+        "sha256": "ccfbba3698fc0970aea2fef60395c1214b7f05b43d0b360b3721f0d1d4dc4437"
+      }
+    }
+  },
+  "preserved_prebuild_artifacts": {
+    "purpose": "Retain the prior #261 C1 and ordinary Release artifacts before #251 build-tree updates.",
+    "manifest_external_run": "issue251-oninit-profile-20261007/prebuild-artifact-retention-v1/manifest.json",
+    "manifest_bytes": 4597,
+    "manifest_sha256": "b243d7d15f7f642c987ecc6b0a252897a2295adec8295be9662e11349000473c",
+    "verified_files": 11,
+    "total_bytes": 34677801,
+    "original_build_outputs_left_in_place": true
+  },
+  "failures_and_corrections": [
+    {
+      "attempt": "full-suite-v1",
+      "producer_commit": "73ccfb410a084b8e1b62aaab7780d37d6dfb1021",
+      "result": "failed",
+      "cause": "The existing prototype manifest parser rejected the new diagnostic Stadium row in two tests. The correction added an exact explicit scope/marker rule and kept the Stadium row out of ordinary admission.",
+      "log": {
+        "external_run": "issue251-oninit-profile-20261007/validation-v1/full-suite.log",
+        "bytes": 375868,
+        "sha256": "2cf53bb45fa1530c838c05476b86dbf7d29f23abc5f7cf64c5b48300fb2c45e5"
+      }
+    },
+    {
+      "attempt": "prototype-focused-v1",
+      "producer_commit": "73ccfb410a084b8e1b62aaab7780d37d6dfb1021",
+      "result": "failed",
+      "cause": "A first reduced parser check found that the diagnostic row spanned two physical lines, while the existing parser associates scope and marker with one row. The row was normalized to one line, and the explicit validation was retained.",
+      "log": {
+        "external_run": "issue251-oninit-profile-20261007/validation-v1/prototype-focused-v1.log",
+        "bytes": 2761,
+        "sha256": "d1de7acc2df6e43ddc8e6dbb3f5fad3da415895db1d3b64188811330e1c5ba53"
+      }
+    }
+  ],
+  "source_only_cleanup_audit": {
+    "findings": "Map-1 callback row 1 uses grStadium_801D1290 as on_init and grStadium_801D13C4 (empty) as callback3. grStadium_801D1290 calls grStadium_801D2278, which creates and stores xD4/xD8/xDC TEXT-class (0x11) GObjs; xD4 additionally creates a SIS text-renderer GObj of class 0x9 and writes the borrowed Stadium SIS descriptor to HSD_SisLib_804D1124[1]. Ground_801C4A08 invokes the empty callback3 and performs its normal Ground/audio/collision/asset/camera cleanup, but does not touch xD4/xD8/xDC or SIS slot 1. melee_web_stage_last_end removes HSD_GOBJ_CLASS_STAGE (0x3) objects, cameras, lights, and collision ownership, not those TEXT/SIS GObjs or font-slot publication.",
+    "reusable_api": "HSD_SisLib_803A5F50(1) drains font-1 SIS text/context GObjs through HSD_SisLib_803A5DA0. Its archive/descriptor clearing is conditional on the private static HSD_SisLib_804D1110[1] being non-NULL; Stadium assigns a borrowed descriptor directly and does not establish that archive owner. The existing HSD_SisLib_FontSlotBorrowable and melee_web_gameplay_vs_sis validate/retire operations offer a fail-closed borrowed-slot path, but they do not own xD4/xD8/xDC.",
+    "first_missing_boundary": "Before an actual OnInit fixture, add or identify an explicit diagnostic owner for the exact xD4/xD8/xDC children and borrowed SIS slot. It must verify exclusive pre-state, capture exact post-OnInit identities before Ground map teardown, use the SIS library's own drain for SIS-created objects, unlink only the three owned TEXT GObjs, retire/restore the exact descriptor, and prove no foreign class-0x11/class-0x9 objects or slot owner changed. No such Stadium lifecycle owner is present in this source audit.",
+    "source_locations": [
+      ".deps/melee/src/melee/gr/grpstadium.c:72-86,163-184,249-270,816-838,1178-1237",
+      ".deps/melee/src/melee/gr/ground.c:2791-2826,3127-3135",
+      ".deps/melee/src/sysdolphin/baselib/sislib.c:378-443,493-549",
+      ".deps/melee/src/sysdolphin/baselib/gobj.h:11,19,24",
+      "src/gameplay_stage_last.c:102-165",
+      "src/gameplay_vs_sis.c:12-40"
+    ]
+  },
+  "proposed_next_ownership_boundary": {
+    "status": "source_review_proposal_only_not_implemented_or_run",
+    "scope": "Extend the existing diagnostic Stadium stage scope with one exact map-1 display/SIS child owner. Keep original source calls, order, archive selection, and screen arithmetic unchanged. Do not add a global GObj sweep or use the world-shutdown SIS registration as a stage owner.",
+    "borrowed_sis_api": {
+      "signature": "int melee_web_gameplay_vs_sis(MeleeWebGameplayVSSisOperation operation, int font_slot, void* expected, char* error, size_t error_size)",
+      "operations": {
+        "MELEE_WEB_VS_SIS_VALIDATE_BORROW": "Requires a non-null expected pointer, a borrowable slot (the private SIS archive owner is null), and HSD_SisLib_804D1124[slot] == NULL; no mutation.",
+        "MELEE_WEB_VS_SIS_PREFLIGHT_BORROW": "Requires a non-null expected pointer and borrowable slot; accepts the descriptor slot only when it is NULL or exactly expected; no mutation.",
+        "MELEE_WEB_VS_SIS_RETIRE_BORROW": "Uses the same checks and clears the slot only if it still equals expected; an already-NULL slot is accepted and a foreign pointer is refused."
+      },
+      "expected_descriptor": "After Stage_802251E8 has executed Ground_801C0754 and loaded the Stadium DAT, resolve the exact `SIS_GrPStadiumData` pointer from grDatFiles_GetArchive()->unk0 using HSD_ArchiveGetPublicAddress, the same source archive and symbol used by grStadium_801D2BEC. Require it non-null and pass that identity to VALIDATE_BORROW before Stage_8022524C invokes OnInit.",
+      "font_list_precondition": "FontSlotBorrowable checks the internal static archive owner, not existing SIS list entries. Also require the existing HSD_SisLib_804D7978 text list and HSD_SisLib_804D797C context list to contain no font-1 entries before OnInit, so HSD_SisLib_803A5F50(1) cannot drain a prior owner. Check the two linked lists by their authored next links and font_idx/xA fields; do not scan or remove unrelated GObj classes.",
+      "registration_reuse": "Do not use melee_web_gameplay_vs_register_borrowed_sis for this stage-local scope: its recorded owner is retired only during gameplay-world shutdown. Reuse the stateless VALIDATE/PREFLIGHT/RETIRE operations above."
+    },
+    "ownership_order": {
+      "before_oninit": "After Stage_802251E8 has loaded the source DAT and before Stage_8022524C, validate the exact non-null SIS descriptor, a null/borrowable font slot 1, and empty pre-existing font-1 text/context lists. If any owner exists, refuse before original OnInit.",
+      "capture": "Immediately after Stage_8022524C returns, before checking required maps/lights or removing Ground objects, read the real map-1 Ground and capture its exact xD4/xD8/xDC pointers plus the exact SIS descriptor written to slot 1. Validate class/link and live identity for those captured handles. Bind the two SIS text nodes to the map-1 TextWrapper win_static_p/win_dynamic_p fields and the single font-1 context entry created by the authored 803A611C call; refuse unexpected extra or missing entries.",
+      "normal_cleanup": [
+        "Before any Ground_801C4A08 call, verify the captured map-1 Ground and child identities remain live, the SIS slot is still the captured source descriptor (PREFLIGHT_BORROW), and all font-1 text/context entries are exactly the ones captured for this stage.",
+        "Call original HSD_SisLib_803A5F50(1) once to drain only the now-exclusive font-1 SIS text/context owners; confirm the captured SIS entries are gone.",
+        "Call RETIRE_BORROW for the exact descriptor; because FontSlotBorrowable preflight requires no internal archive owner, restore the borrowed public slot to NULL without closing a foreign archive.",
+        "Unlink only the captured xD4/xD8/xDC text-class GObjs while their Ground fields and archive owner are still valid, then continue the existing stage_last_end reverse-map/camera/light/collision cleanup."
+      ],
+      "post_oninit_failure": "Any ordinary failure after Stage_8022524C returns must use the same captured-owner cleanup before stage_last_end removes Ground. If the callback did not return normally, or the captured pointers/list delta cannot be matched exactly, stop and retain the active owner; do not attempt a broad class sweep or a second SIS drain."
+    },
+    "first_experiment_and_criteria": {
+      "asset_free": "Focused synthetic controls for exact descriptor validation/preflight/retirement (null, exact, foreign, and private-archive-owned slot cases), ordered font-1 list ownership, exact xD4/xD8/xDC child capture, normal cleanup, and post-OnInit validation failure. Demonstrate that foreign list entries and unrelated GObjs survive refusal.",
+      "real_asset": "Only after separate source/packet review and authorization, one retained 98-file source-ordered Stadium OnInit lifetime: exact authored source descriptor and map-1 children appear; OnInit returns with the live owner before Stage_80225298 camera and Stage_802252E4/OnStart; no scheduled Stadium proc/update/render callback is dispatched; the single cleanup restores slot 1, font-1 lists, captured child identities, StageInfo/devices/storage, and stage/collision ownership.",
+      "stop": "Refuse before OnInit on a preexisting font-1 owner. On any descriptor/list/child mismatch, preserve evidence and stop before destructive cleanup. No retry after an incomplete source drain, no browser, no second lifetime, and no claim of stage admission or rendering."
+    }
+  },
+  "limits": {
+    "not_run": [
+      "Original Stadium OnInit or any retained 98-file constructor fixture",
+      "Camera Stage_80225298 or OnStart grStadium_OnStart",
+      "Scheduled Stadium proc/update/render callbacks",
+      "Browser, visual, collision-session, or whole-stage acceptance"
+    ],
+    "claim_boundary": "The profile adapter, explicit diagnostic gating, focused synthetic controls, standard suite, and default-off ordinary Release build passed. The source boundary is not actual stage admission or runtime initialization; secondary map-1 screen/text ownership remains a prerequisite to a retained OnInit fixture."
+  },
+  "private_evidence": {
+    "external_run_id": "issue251-oninit-profile-20261007",
+    "artifact_names_are_relative_to_run": true,
+    "raw_logs_and_preservation_manifest_retained": true,
+    "no_machine_specific_path_required": true
+  }
+}

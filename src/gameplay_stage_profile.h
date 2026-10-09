@@ -16,6 +16,9 @@ typedef void* (*MeleeWebStageYakumonoDecode)(const MeleeWebNativeDat*, uint32_t 
 typedef enum MeleeWebStagePublicKind {
     MELEE_WEB_STAGE_PUBLIC_JOINT,
     MELEE_WEB_STAGE_PUBLIC_IMAGE,
+    /* Hydrate an archive-owned SIS pointer table with DatSis and retain its
+     * owner for the complete native stage lifetime. */
+    MELEE_WEB_STAGE_PUBLIC_SIS,
 } MeleeWebStagePublicKind;
 typedef struct MeleeWebStagePublic {
     const char* name;
@@ -101,10 +104,16 @@ typedef struct MeleeWebStageProfile {
     size_t public_symbol_count;
     MeleeWebStageMapOwnershipPolicy map_ownership_policy;
     const MeleeWebStageMapOwnership* map_ownership;
+    /* Diagnostic profiles are available only in a guarded development build
+     * and are rejected by the ordinary stage-begin API. */
+    int diagnostic_only;
 } MeleeWebStageProfile;
 
 /* NULL means that this stage has no complete source callback profile yet. */
 const MeleeWebStageProfile* melee_web_stage_profile(int stage_kind);
+/* Immutable C0 source-map contract data. This getter exposes no stage-content
+ * row and does not make Stadium available to source-stage construction. */
+const MeleeWebStageProfile* melee_web_stage_stadium_profile_data(void);
 
 #ifdef __cplusplus
 }

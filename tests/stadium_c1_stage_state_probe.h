@@ -26,6 +26,21 @@ uint32_t melee_web_stadium_c1_stage_object_failures(void);
 /* The isolated exchange control requires a fresh source stage/GObj baseline. */
 int melee_web_stadium_c1_yakumono_exchange_baseline_empty(void);
 
+/* Asset-free diagnostic control: original Ground-created owner, exact checked
+ * publication/bounds and retirement. Retains its static fixture on failure;
+ * does not dispatch a source proc, camera, OnInit or simulation tick. */
+int melee_web_stadium_c1_map_light_adoption_control(char* error, size_t error_size);
+/* This callback only snapshots the existing checked test roots/classes/pools.
+ * A false result stops immediately and retains the current owned graph. The
+ * numeric owned pointer is an observation, never a removal authority. */
+typedef int (*MeleeWebStadiumC1CacheLiveObserver)(
+    const char* consumer, const char* phase, unsigned cycle,
+    const void* owned, void* user);
+int melee_web_stadium_c1_cache_live_control(
+    MeleeWebStadiumC1CacheLiveObserver observer, void* user,
+    char* error, size_t error_size);
+
+
 /* Keep the authored Ground/StageInfo layouts inside this C translation unit.
  * The native harness is C++ and these upstream declarations contain C-only
  * anonymous structures and reserved-word members. */
@@ -126,6 +141,9 @@ int melee_web_stadium_c1_stage_info_snapshot_view(
     MeleeWebStadiumC1StageInfoView* view);
 int melee_web_stadium_c1_stage_info_current_view(
     MeleeWebStadiumC1StageInfoView* view);
+/* Read the authored Ground start-callback root while keeping StageInfo's C-only
+ * layout inside this probe translation unit. */
+void* melee_web_stadium_c1_stage_info_x6A4_root(void);
 int melee_web_stadium_c1_stage_info_snapshot_restore(
     MeleeWebStadiumC1StageInfoSnapshot* snapshot, char* error,
     size_t error_size);
