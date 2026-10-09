@@ -46,9 +46,21 @@ off, and P1 re-confirm plus P2 Start yields all-confirmed and original exit.
 The actual scene requested exit at cursor 359 within 240 neutral ticks and the 600-tick confirmation
 bound, then returned CSS/SSS and cleanup/reacquisition checks passed. This
 control uses a constructed P2 outcome and closed-SSS menu PAD, with no gameplay;
-it does not prove browser key scheduling. The shared browser correction remains
-unrun. Internal final SD numeric PAD/RNG and browser SD Results-entry bytes remain
+it does not prove browser key scheduling. Later diagnostic browser results are
+recorded below. Internal final SD numeric PAD/RNG and browser SD Results-entry bytes remain
 unobserved separately from later Results/source observations.
+
+Two later diagnostic browser attempts also reached actual SD and canonical P2
+Results but failed before returned CSS. V4 rejected legitimate initial Results
+phase 0 and retained only a trace summary. V5 corrected that validator and
+retained 271 complete observed rows: phase 0 → 1 → 2, P1 presentation Start,
+stats readiness, and P1-only confirmation. After the issued P2 End, the host
+entered deferred next-scene preparation (phase 5, running 0); the checked
+observer failed before reading the following trace. P2's consumed Start,
+all-confirmed state and original exit remain unobserved in this run. The shared
+helper and callsite need a reduced checked transition control before another
+long route. Both runs passed Eject and exact child/browser/socket cleanup;
+all failures and producer identities remain retained.
 
 The original-reference producer `8f944a09` (binary digest `c22d23c2`) passed a
 reduced Rules-ready control using the exact selected GCI profile: menu kind 13,
@@ -61,7 +73,9 @@ colors [1, 0] and pause-enabled setup differ from the planned original colors
 
 The consolidated executable head `fd55b378` passed all 2,163 unittest cases
 with 154 skips. It includes the reference toolset and shared Results helper;
-that helper's corrected browser route remains unrun. Frozen runtime `5308a80c` and
+the current corrected browser route remains failed. The later executable
+`8173e69e` delta has focused checks only; a current full suite is still required
+before integration. Frozen runtime `5308a80c` and
 native producers remain distinct from this tested source. Current-head CI and
 root integration review remain required.
 

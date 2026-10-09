@@ -179,6 +179,26 @@
         "relative_path": "results-two-human-native-v1.trace.jsonl",
         "bytes": 12773,
         "sha256": "2eee5af05fd35945cb4d7aba0bec44a9dc1369ef9b480fa6349ee3baff57ef88"
+      },
+      {
+        "relative_path": "browser-natural-sd-route-v1/browser-result-v4.json",
+        "bytes": 87419,
+        "sha256": "535a1bcb02ef325b85f3b480e45772f33b8ba41134c3dfed46bf1227e23d87dc"
+      },
+      {
+        "relative_path": "browser-natural-sd-route-v1/browser-result-v5.json",
+        "bytes": 13976,
+        "sha256": "3ba6a99f52b5d932b3553218ad3abe952eca710c29145965ea027cdb266bc300"
+      },
+      {
+        "relative_path": "browser-natural-sd-route-v1/browser-result-v5-v2.json",
+        "bytes": 14387,
+        "sha256": "8e984eed006501f176e88cac22d42bac7a9c5fee9d75bbbd2e8c0c73db2c6165"
+      },
+      {
+        "relative_path": "browser-natural-sd-route-v1/results-pad-trace-v5-retained.json",
+        "bytes": 616543,
+        "sha256": "fa2a6f48e5dfc520bae1bb7306a96ccb86eab0747bc155e85901587d748cfb57"
       }
     ]
   },
@@ -350,6 +370,62 @@
       "raw_log_sha256": "89ff3fc6f6c271bbbfa38666efae9df1cef1d78b44dc6611bf35e0001a5a735a"
     },
     "runtime_build": "Frozen ordinary Release5308; no rebuild for helper/reference-toolset integration",
-    "integration": "root review/current-head CI and playable/original gates remain separate"
+    "integration": "root review/current-head CI and playable/original gates remain separate",
+    "subsequent_executable_delta": "8173e69e shared original phase0 validator/trace-retention changes focused-tested; 2163 full-suite result remains fd55b378 only. Current executable suite remains required before integration."
+  },
+  "browser_results_diagnostics": {
+    "runtime_source": "5308a80c3fe0d14b48f7c920a14e83010e19c85c",
+    "v4": {
+      "source": "f15c8ac940d6c95fb4194f07f71f3d7f6b3aa74d",
+      "first_failure": "Shared validator rejected original initial Results phase0 before presentation input. Actual SD/canonical P2 Results reached; CSS not reached.",
+      "trace_scope": "Summary only: seven initial phase0 rows reported, latest frame7. Full samples were not retained; no synthesized actual rows.",
+      "result_sha256": "535a1bcb02ef325b85f3b480e45772f33b8ba41134c3dfed46bf1227e23d87dc"
+    },
+    "v5": {
+      "source": "8173e69e1968cd91e61bb7d774abcd41f1932b6f",
+      "first_failure": "After P2 End action, checked observer rejected deferred next-scene phase5/running0 before reading a new trace. Actual P2 consumed Start/allconfirmed/exit not retained; returned CSS not reached.",
+      "observed_trace_rows": 271,
+      "source_transitions": [
+        {
+          "frame": 1,
+          "phase": 0
+        },
+        {
+          "frame": 161,
+          "phase": 1
+        },
+        {
+          "frame": 201,
+          "phase": 2
+        },
+        {
+          "frame": 221,
+          "phase": 3,
+          "source_start_port": 0
+        },
+        {
+          "frame": 231,
+          "phase": 3,
+          "stats_phase": 2
+        },
+        {
+          "frame": 251,
+          "phase": 3,
+          "stats_phase": 2,
+          "source_start_port": 0,
+          "confirmed": [
+            1,
+            0,
+            1,
+            1
+          ]
+        }
+      ],
+      "trace_sha256": "fa2a6f48e5dfc520bae1bb7306a96ccb86eab0747bc155e85901587d748cfb57",
+      "result_sha256": "8e984eed006501f176e88cac22d42bac7a9c5fee9d75bbbd2e8c0c73db2c6165",
+      "metadata_note": "Initial extraction receipt mistakenly recorded a PAD port as the socket port; retained corrected v2 receipt binds actual supervisor socket61124. No raw run was altered."
+    },
+    "cleanup": "Both runs: Eject zero source/asset owners, driver disposed, context/browser closed, exact Node/server reaped and absent, owned socket rebind/immediateclose passed.",
+    "scope": "Headless functional diagnostic failures, not full browser Results/CSS pass or original comparison."
   }
 }
