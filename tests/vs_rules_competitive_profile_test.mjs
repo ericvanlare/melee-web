@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   ITEM_ROW_TO_PREFERENCE_BIT,
+  SOURCE_ITEM_IDS_BY_PREFERENCE_BIT,
+  competitiveMatchStartFailures,
   competitiveProfileFailures,
   deriveAllOffItemMasks,
+  deriveNormalizedAllOffItemMask,
   sourceItemClearMask,
 } from './vs_rules_competitive_profile_helpers.mjs';
 
@@ -66,6 +69,24 @@ test('all-off mask derivation rejects incomplete, reordered, duplicated, or stil
   assert.throws(() => deriveAllOffItemMasks({...input, rows: enabled}), /row 30 remains enabled/);
 });
 
+test('normalized all-off item mask follows original full-width defaults and authored conversion table', () => {
+  assert.deepEqual(SOURCE_ITEM_IDS_BY_PREFERENCE_BIT, [
+    0x06, 0x0b, 0x07, 0x19, 0x14, 0x12, 0x11, 0x0e,
+    0x1c, 0x18, 0x08, 0x1a, 0x04, 0x10, 0x17, 0x22,
+    0x20, 0x13, 0x09, 0x21, 0x0d, 0x0f, 0x1f, 0x16,
+    0x15, 0x1e, 0x0a, 0x0c, 0x23, 0x05, 0x1d, 0x1b,
+  ]);
+  assert.equal(deriveNormalizedAllOffItemMask({
+    initialRulesMaskHex: 'ffffffffffffffff', preferenceMaskHex: '0000000010000000',
+  }), 'fffffff80000000f');
+  assert.equal(deriveNormalizedAllOffItemMask({
+    initialRulesMaskHex: '0000000000000000', preferenceMaskHex: '0000000010000000',
+  }), '0000000000000000', 'Unmapped bits retain their actual initialized value');
+  assert.notEqual(deriveNormalizedAllOffItemMask({
+    initialRulesMaskHex: 'ffffffffffffffff', preferenceMaskHex: '0000000010000010',
+  }), 'fffffff80000000f', 'An enabled source preference restores its authored destination bit');
+});
+
 test('competitive profile predicates use GameRules and validate raw CSS provenance without normalized assumptions', () => {
   const source = {
     valid: true,
@@ -90,4 +111,72 @@ test('competitive profile predicates use GameRules and validate raw CSS provenan
   const failures = competitiveProfileFailures({source: changed, rawCssSelection, expectedPreferenceMaskHex});
   assert.equal(failures.length, 1);
   assert.match(failures[0], /^pause setting: expected 0, got 1$/);
+});
+
+const normalizedCompetitiveMatch = () => ({
+  ready: true,
+  frame: 180,
+  rules: {
+    match_kind: 1, stage: 0x20, timer_enabled: 1, time_limit: 480,
+    disable_pausing: 1, damage_ratio_bits: '3f800000', item_frequency: -1,
+    item_mask_hex: 'fffffff80000000f', is_teams: 0,
+    player_teams: [0, 0], player_stocks: [4, 4], player_source_slots: [0, 0],
+    resolved_controller_ports: [0, 1],
+    player_slot_types: [0, 0], player_source_stocks: [4, 4],
+    player_source_characters: [8, 8],
+    player_attack_ratio_bits: ['3f800000', '3f800000'],
+    player_defense_ratio_bits: ['3f800000', '3f800000'],
+  },
+  players: [0, 1].map(index => ({fighter: 0, source_slot: 0, source_port: index,
+    source_character: 8, slot_type: 0, human: true, stocks: 4, source_stocks: 4})),
+});
+
+test('normalized match oracle binds the source 8-minute conversion and binary32 ratio', () => {
+  const match = normalizedCompetitiveMatch();
+  const sourcePreferenceMaskHex = '0000000010000000';
+  assert.deepEqual(competitiveMatchStartFailures(match, {sourcePreferenceMaskHex}), []);
+
+  const wrongTimer = structuredClone(match);
+  wrongTimer.rules.time_limit = 8;
+  assert(competitiveMatchStartFailures(wrongTimer, {sourcePreferenceMaskHex}).some(message =>
+    message.startsWith('8-minute stock timer seconds from original conversion:')));
+
+  const wrongFloat = structuredClone(match);
+  wrongFloat.rules.damage_ratio_bits = '3f7fffff';
+  assert(competitiveMatchStartFailures(wrongFloat, {sourcePreferenceMaskHex}).some(message =>
+    message.startsWith('original 1.0 damage ratio binary32:')));
+
+  const wrongItemMask = structuredClone(match);
+  wrongItemMask.rules.item_mask_hex = '0000000000000000';
+  assert(competitiveMatchStartFailures(wrongItemMask, {sourcePreferenceMaskHex}).some(message =>
+    message.startsWith('normalized item mask derived from source defaults and preference table:')));
+
+  const outsidePrefix = structuredClone(match);
+  outsidePrefix.frame = 241;
+  assert(competitiveMatchStartFailures(outsidePrefix, {sourcePreferenceMaskHex}).some(message =>
+    message.startsWith('source-frame observation is within the bounded 180–240-frame prefix:')));
+});
+
+test('normalized match oracle rejects wrong stage, non-human port mapping, and incomplete player ownership', () => {
+  const wrongStage = structuredClone(normalizedCompetitiveMatch());
+  wrongStage.rules.stage = 0;
+  assert(competitiveMatchStartFailures(wrongStage, {sourcePreferenceMaskHex: '0000000010000000'}).some(message =>
+    message.startsWith('source-selected Final Destination:')));
+
+  const wrongPort = structuredClone(normalizedCompetitiveMatch());
+  wrongPort.players[1].source_port = 0;
+  assert(competitiveMatchStartFailures(wrongPort, {sourcePreferenceMaskHex: '0000000010000000'}).some(message =>
+    message.startsWith('P2 resolved controller port:')));
+
+  const wrongOwner = structuredClone(normalizedCompetitiveMatch());
+  wrongOwner.rules.player_slot_types[1] = 1;
+  wrongOwner.players[1].human = false;
+  const failures = competitiveMatchStartFailures(wrongOwner, {sourcePreferenceMaskHex: '0000000010000000'});
+  assert(failures.some(message => message.startsWith('source player kinds remain Human[1]:')));
+  assert(failures.some(message => message.startsWith('P2 live owner is Human:')));
+
+  const missingPlayer = structuredClone(normalizedCompetitiveMatch());
+  missingPlayer.players.pop();
+  assert(competitiveMatchStartFailures(missingPlayer, {sourcePreferenceMaskHex: '0000000010000000'}).some(message =>
+    message.startsWith('live players: expected two entries, got ')));
 });

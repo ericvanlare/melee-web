@@ -12,6 +12,7 @@ import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 import {
   ITEM_ROW_TO_PREFERENCE_BIT,
+  competitiveMatchStartFailures,
   competitiveProfileFailures,
   deriveAllOffItemMasks,
 } from './vs_rules_competitive_profile_helpers.mjs';
@@ -26,6 +27,7 @@ options['no-contest-only'] = {type: 'boolean', default: false};
 options['team-battle'] = {type: 'boolean', default: false};
 options['team-setup-only'] = {type: 'boolean', default: false};
 options['competitive-profile-only'] = {type: 'boolean', default: false};
+options['competitive-match-start-only'] = {type: 'boolean', default: false};
 const {values} = parseArgs({options, strict: true});
 const menuOnly = values['menu-only'];
 const rulesItemsOnly = values['rules-items-only'];
@@ -33,15 +35,22 @@ const cssSssOnly = values['css-sss-only'];
 const stageOnly = values['stage-only'];
 const noContestOnly = values['no-contest-only'];
 const competitiveProfileOnly = values['competitive-profile-only'];
+const competitiveMatchStartOnly = values['competitive-match-start-only'];
 const teamSetupOnly = values['team-setup-only'];
 const teamBattle = values['team-battle'] || teamSetupOnly;
 if (teamSetupOnly && values['team-battle'])
   throw Error('--team-setup-only and --team-battle select different route lengths');
-if (teamBattle && (menuOnly || rulesItemsOnly || cssSssOnly || stageOnly || noContestOnly || competitiveProfileOnly))
+if (teamBattle && (menuOnly || rulesItemsOnly || cssSssOnly || stageOnly || noContestOnly ||
+    competitiveProfileOnly || competitiveMatchStartOnly))
   throw Error('--team-battle runs the full Rules/Items/match route and cannot be combined with a reduced-route flag');
 if (competitiveProfileOnly &&
-    (menuOnly || rulesItemsOnly || cssSssOnly || stageOnly || noContestOnly || teamSetupOnly))
+    (menuOnly || rulesItemsOnly || cssSssOnly || stageOnly || noContestOnly || teamSetupOnly ||
+      competitiveMatchStartOnly))
   throw Error('--competitive-profile-only is a dedicated source Rules/Items-to-CSS route');
+if (competitiveMatchStartOnly &&
+    (menuOnly || rulesItemsOnly || cssSssOnly || stageOnly || noContestOnly || teamSetupOnly ||
+      competitiveProfileOnly))
+  throw Error('--competitive-match-start-only runs the competitive profile through a short normalized match prefix');
 for (const name of ['url', 'disc', 'out'])
   if (!values[name]) throw Error('Use --url DEVELOPMENT_RUNTIME_URL --disc OWNED_DISC --out NEW_DIRECTORY [--playwright PACKAGE_DIR]');
 const output = path.resolve(values.out);
@@ -67,7 +76,8 @@ const cleanupResults = new Map();
 let reportWriteError = null;
 const report = {
   schema: 'melee-web-vs-rules-item-menu-browser-v1',
-  mode: competitiveProfileOnly ? 'source-competitive-rules-profile-preflight'
+  mode: competitiveMatchStartOnly ? 'source-competitive-normalized-match-start-prefix'
+    : competitiveProfileOnly ? 'source-competitive-rules-profile-preflight'
     : noContestOnly ? 'source-no-contest-results-reproducer'
     : teamSetupOnly ? 'source-team-setup-cancel-reentry-reproducer'
     : teamBattle ? 'source-two-player-team-battle-results-route'
@@ -75,7 +85,9 @@ const report = {
     : rulesItemsOnly ? 'source-rules-items-entry-reproducer'
     : cssSssOnly ? 'source-css-to-sss-cooldown-reproducer'
     : menuOnly ? 'source-menu-boundary-reproducer' : 'source-rules-items-match-route',
-  scope: competitiveProfileOnly
+  scope: competitiveMatchStartOnly
+    ? 'Headless original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS; enable P2 through Controls and require the original CSS CPU/empty/Human transitions before Start; select Final Destination through original SSS, check normalized two-human Mario stock settings once at the first available observation in the bounded 180–240 source-frame window (about a 3-second prefix), then Eject. No 8-minute match, timeout, Results, retail comparison, or full-route acceptance claim.'
+    : competitiveProfileOnly
     ? 'Headless original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS; B0XX P1 inputs set and verify the exact GameRules profile and preserve raw CSS StartMeleeData for provenance. CSS data is not treated as normalized before SSS. No match, timeout, Results, retail comparison, or acceptance claim.'
     : noContestOnly
     ? 'Headless rendered original CSS -> SSS -> Final Destination -> match; P1 Start opens the original source pause, then the held LRAS+Start No Contest chord enters Results and Eject verifies teardown.'
@@ -144,7 +156,7 @@ const report = {
     physicalInput: {status: 'not_run', reason: 'browser PAD keyboard routing only'},
     performance: {status: 'not_run', reason: 'functional route capture is not a performance campaign'},
   },
-  competitiveProfile: competitiveProfileOnly ? {
+  competitiveProfile: competitiveProfileOnly || competitiveMatchStartOnly ? {
     requested: {mode: 'stock', stocks: 4, timer_minutes: 8, item_frequency: -1,
       all_31_item_switches_off: true, pause_enabled: false, friendly_fire: true,
       damage_ratio_menu_value: 10, handicap: 0},
@@ -154,6 +166,16 @@ const report = {
     item_rows_after_original_inputs: [],
     derived_masks: null,
     final_css_selection: null,
+  } : null,
+  competitiveMatchStart: competitiveMatchStartOnly ? {
+    requested: {players: ['Mario', 'Mario'], css_port_identities: [1, 2],
+      raw_match_payload_slot_fields: [0, 0], resolved_controller_ports: [0, 1],
+      stage: 'Final Destination', normalized_stock_timer_seconds: 480,
+      source_frame_observation_window: [180, 240]},
+    controls_change: null,
+    css_roster: [],
+    normalized_match: null,
+    last_observation_before_eject: null,
   } : null,
   checks: [], screenshots: {}, input: [], sourcePadSamples: [], timingPauses: [], timingPauseRecovery: [],
   sourceObservations: [], cssObservations: [], matchObservations: [],
@@ -302,6 +324,22 @@ const waitCssTeams = async (isTeams, teams, label) => {
 const observeCssSetup = () => page.evaluate(() => window.menuObserveCssSetup?.() ?? null);
 const observeMatch = () => page.evaluate(() => JSON.parse(
   Module.UTF8ToString(Module._melee_web_native_menu_match_observe())));
+const waitForMatchSourceFrames = async (target, maximum) => {
+  const deadline = Date.now() + 30000;
+  let observation;
+  while (Date.now() < deadline) {
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+    await resumeTimingPause(`competitive match source frame ${target}`);
+    observation = await observeMatch();
+    if (observation?.ready && observation.frame >= target) {
+      if (observation.frame > maximum)
+        throw Error(`First ready match observation passed frame ${maximum}: ${JSON.stringify(observation)}`);
+      return observation;
+    }
+    await ensureNoError(`competitive match source frame ${target}`);
+  }
+  throw Error(`Competitive match did not reach source frame ${target}: ${JSON.stringify(observation)}`);
+};
 const observeLifecycle = () => page.evaluate(() => JSON.parse(
   Module.UTF8ToString(Module._melee_web_native_menu_memory())));
 const ensureNoError = async label => {
@@ -327,7 +365,7 @@ const resumeTimingPause = async label => {
   const pause = {label, phase: state.phase, message: state.message,
     observedAt: new Date().toISOString()};
   report.timingPauses.push(pause);
-  if (competitiveProfileOnly) {
+  if (competitiveProfileOnly || competitiveMatchStartOnly) {
     pause.status = 'failed_preflight';
     throw Error(`${label}: competitive profile preflight stops on a runtime timing disruption: ${state.message}`);
   }
@@ -396,18 +434,18 @@ const chord = async keys => {
   await ensureNoError(`after ${keys.join('+')}`);
   await resumeTimingPause(`after ${keys.join('+')}`);
 };
-const sourcePadSample = async (buttons, stickX, stickY, label) => {
+const sourcePadSample = async (buttons, stickX, stickY, label, port = 0) => {
   await ensureNoError(`before source PAD ${label}`);
   const accepted = await page.evaluate(args => window.menuDiagnosticPad(...args),
-    [0, buttons, stickX, stickY, 1]);
+    [port, buttons, stickX, stickY, 1]);
   assert.equal(accepted, 1, `Source PAD rejected ${label}`);
-  report.sourcePadSamples.push({port: 0, buttons, stickX, stickY, duration: 1, label});
+  report.sourcePadSamples.push({port, buttons, stickX, stickY, duration: 1, label});
   await waitForNoQueuedPad(`source PAD ${label} drains`);
 };
-const sourcePadTap = async (button, label) => {
-  await sourcePadSample(button, 0, 0, label);
-  await page.evaluate(args => window.menuDiagnosticPad(...args), [0, 0, 0, 0, 2]);
-  report.sourcePadSamples.push({port: 0, buttons: 0, stickX: 0, stickY: 0,
+const sourcePadTap = async (button, label, port = 0) => {
+  await sourcePadSample(button, 0, 0, label, port);
+  await page.evaluate(args => window.menuDiagnosticPad(...args), [port, 0, 0, 0, 2]);
+  report.sourcePadSamples.push({port, buttons: 0, stickX: 0, stickY: 0,
     duration: 2, label: `${label}:release`});
   await waitForNoQueuedPad(`source PAD ${label} release drains`);
 };
@@ -829,6 +867,109 @@ const moveCssCursor = async (label, isInside, directionFor) => {
   throw Error(`${label} cursor did not reach its authored source bounds: ${JSON.stringify({
     cursor: setup?.geometry?.slice(0, 2), door1: setup?.geometry?.slice(12, 24)})}`);
 };
+const cssDoor = (setup, port) => ({
+  p_kind: setup.doors[port * 10],
+  slot_type: setup.doors[port * 10 + 4],
+  character: setup.doors[port * 10 + 3],
+  slot: setup.doors[port * 10 + 6],
+  source_port: setup.doors[port * 10 + 6]
+    ? setup.doors[port * 10 + 6] - 1 : port,
+});
+const waitCssDoor = async (port, predicate, label) => {
+  const deadline = Date.now() + 15000;
+  let setup;
+  while (Date.now() < deadline) {
+    await resumeTimingPause(label);
+    setup = await observeCssSetup();
+    if (setup?.doors?.length === 40 && setup?.geometry?.length === 48) {
+      const door = cssDoor(setup, port);
+      if (predicate(door)) return {setup, door};
+    }
+    await ensureNoError(label);
+    await page.waitForTimeout(40);
+  }
+  throw Error(`${label}: source CSS door ${port} did not reach the required state: ${JSON.stringify({
+    door: setup?.doors?.length === 40 ? cssDoor(setup, port) : null,
+    geometry: setup?.geometry?.slice(port * 12, port * 12 + 12)})}`);
+};
+const configureCompetitiveSecondHuman = async () => {
+  await page.locator('#controls-open').click();
+  await page.locator('#keyboard-layout').selectOption('two');
+  await page.locator('#player-two-source').selectOption('keyboard');
+  await page.waitForFunction(() => {
+    const layout = document.querySelector('#keyboard-layout')?.value;
+    const source = document.querySelector('#player-two-source')?.value;
+    const status = document.querySelector('#player-two-source-status')?.textContent?.trim();
+    return layout === 'two' && source === 'keyboard' && status === 'Keyboard';
+  }, null, {timeout: 5000});
+  const controlsChange = await page.evaluate(() => ({
+    layout: document.querySelector('#keyboard-layout')?.value,
+    playerOneSource: document.querySelector('#player-one-source')?.value,
+    playerTwoSource: document.querySelector('#player-two-source')?.value,
+    playerTwoStatus: document.querySelector('#player-two-source-status')?.textContent?.trim(),
+  }));
+  assert.deepEqual(controlsChange, {
+    layout: 'two', playerOneSource: 'keyboard', playerTwoSource: 'keyboard',
+    playerTwoStatus: 'Keyboard',
+  }, 'Controls must enable the actual two-player keyboard source before CSS joins P2');
+  await page.locator('#controls-close').click();
+  report.inputConfiguration.playerTwoAfterProfile = 'keyboard';
+  report.inputConfiguration.layoutAfterProfile = 'two';
+  report.competitiveMatchStart.controls_change = controlsChange;
+
+  let setup = await observeCssSetup();
+  assert(setup?.cursors?.length === 16 && setup?.doors?.length === 40 &&
+    setup?.geometry?.length === 48, 'Live CSS source roster is unavailable after Controls change');
+  const initialRoster = [0, 1, 2, 3].map(port => cssDoor(setup, port));
+  assert.deepEqual(initialRoster.map(door => [door.p_kind, door.slot_type]),
+    [[0, 0], [1, 1], [3, 3], [3, 3]],
+    'Original CSS must expose P1 Human, P2 CPU, and two empty doors before the source join');
+  assert.deepEqual(initialRoster.slice(0, 2).map(door => door.character), [8, 8],
+    'The source CSS roster must already contain Mario on both active doors');
+  assert.deepEqual(initialRoster.slice(0, 2).map(door => door.slot), [0, 0],
+    'Original CSS StartMeleeData keeps its authored zero-valued raw slot fields');
+  assert.deepEqual(initialRoster.slice(0, 2).map(door => door.source_port), [0, 1],
+    'When raw slot fields are zero, source player order resolves the P1/P2 ports');
+  report.competitiveMatchStart.css_roster.push({label: 'CSS after P2 keyboard selection', doors: initialRoster});
+  await shot('07-css-before-p2-source-join');
+
+  const bounds = setup.geometry.slice(12, 24);
+  const left = bounds[4], right = bounds[5];
+  assert(Number.isFinite(left) && Number.isFinite(right) && right > left,
+    `Original P2 CPU/Human toggle bounds are invalid: ${JSON.stringify(bounds)}`);
+  await moveCssCursor('original P2 CPU/Human toggle',
+    (x, y, current) => {
+      const doorBounds = current.geometry.slice(12, 24);
+      return x > doorBounds[4] + 0.2 && x < doorBounds[5] - 0.2 && y > -4.4 && y < 0;
+    },
+    (x, y, current) => {
+      const doorBounds = current.geometry.slice(12, 24);
+      const centerX = (doorBounds[4] + doorBounds[5]) / 2;
+      return [x < centerX - 0.5 ? 80 : x > centerX + 0.5 ? -80 : 0,
+        y < -2.2 ? 80 : y > -2.2 ? -80 : 0];
+    });
+  await sourcePadTap(0x0100, 'original CSS P2 CPU to empty');
+  const empty = await waitCssDoor(1,
+    door => door.p_kind === 3 && door.slot_type === 3,
+    'original CSS P2 CPU-to-empty source transition');
+  report.competitiveMatchStart.css_roster.push({label: 'original CSS P2 empty transition', door: empty.door});
+  await sourcePadTap(0x0100, 'original CSS P2 empty to Human');
+  const human = await waitCssDoor(1,
+    door => door.p_kind === 0 && door.slot_type === 0,
+    'original CSS P2 empty-to-Human source transition');
+  assert.equal(human.door.character, 8,
+    'Original CSS P2 Human transition must retain Mario without selecting another character');
+  assert.deepEqual([0, 1, 2, 3].map(port => {
+    const door = cssDoor(human.setup, port);
+    return [door.p_kind, door.slot_type];
+  }), [[0, 0], [0, 0], [3, 3], [3, 3]],
+  'Original CSS must retain both Human doors and both empty doors after P2 joins');
+  assert.deepEqual([0, 1].map(port => cssDoor(human.setup, port).source_port), [0, 1],
+    'The two active source doors must retain their resolved controller ports');
+  report.competitiveMatchStart.css_roster.push({label: 'original CSS P2 Human transition', door: human.door});
+  await shot('08-css-two-human-mario');
+  report.checks.push('Controls enables P2 keyboard; original CSS confirms door 1 CPU -> empty -> Human, raw slot fields remain zero, source-order fallback resolves ports 0/1, and doors 2/3 remain empty');
+};
 const configureCssTeamBattle = async () => {
   // Follow the live original cursor and door bounds through the existing
   // read-only CSS observer. Only single-tick raw PAD samples feed source input.
@@ -880,8 +1021,8 @@ route: {
   await driver.launch();
   await waitMessage('Original character select', 'initial CSS');
   await shot('00-initial-css');
-  const initialProfileCss = competitiveProfileOnly ? await observeSource() : null;
-  if (competitiveProfileOnly)
+  const initialProfileCss = competitiveProfileOnly || competitiveMatchStartOnly ? await observeSource() : null;
+  if (competitiveProfileOnly || competitiveMatchStartOnly)
     report.sourceObservations.push({label: 'initial CSS profile baseline', ...initialProfileCss});
 
   if (noContestOnly) {
@@ -942,12 +1083,54 @@ route: {
   await shot('01-main-root');
   let rules = await enterVsRules('02-first');
 
-  if (competitiveProfileOnly) {
+  if (competitiveProfileOnly || competitiveMatchStartOnly) {
     await runCompetitiveProfilePreflight(initialProfileCss);
+    if (competitiveProfileOnly) {
+      await driver.unload();
+      nativeSessionActive = false;
+      await verifyTeardown('Eject after competitive Rules profile preflight');
+      report.checks.push('Source profile preflight stops at CSS; no SSS, match, timeout, Results, or full-route acceptance was exercised');
+      break route;
+    }
+
+    await configureCompetitiveSecondHuman();
+    await press('Enter');
+    await waitPhase(3, 'original SSS after P2 joins as a source Human');
+    report.checks.push('P1 Start on the two-player keyboard layout enters the original SSS after CSS confirmed P2 Human');
+    await shot('09-original-sss');
+    await waitForNoQueuedPad('CSS Start sample drains before source SSS stage driver');
+    let selectedStage = 1;
+    for (let sample = 0; sample < 600; sample++) {
+      selectedStage = await page.evaluate(() => Module._melee_web_native_menu_drive_stage(32));
+      if (selectedStage === 2) break;
+      if (selectedStage !== 1)
+        throw Error(`Original SSS source stage driver returned ${selectedStage}`);
+      await waitForNoQueuedPad(`competitive source SSS direction sample ${sample + 1} drains`);
+    }
+    assert.equal(selectedStage, 2,
+      'Competitive match-start route must select Final Destination through the original SSS PAD driver');
+    await press('j');
+    await waitPhase(7, 'two-human Mario Final Destination source match', 60000);
+    const liveMatch = await waitForMatchSourceFrames(180, 240);
+    const sourcePreferenceMaskHex = report.competitiveProfile.derived_masks.preferenceMaskHex;
+    const matchFailures = competitiveMatchStartFailures(liveMatch, {sourcePreferenceMaskHex});
+    assert.deepEqual(matchFailures, [],
+      `Normalized source match differs from the competitive profile: ${JSON.stringify({matchFailures, liveMatch})}`);
+    report.competitiveMatchStart.normalized_match = liveMatch;
+    report.matchObservations.push({label: 'normalized source match at its first ready observation from frame 180 through 240', ...liveMatch});
+    const lastBeforeEject = await observeMatch();
+    assert.equal(lastBeforeEject?.ready, true,
+      'The match observer must remain available immediately before Eject');
+    assert(Number.isInteger(lastBeforeEject.frame),
+      `The pre-Eject source frame must be observable: ${JSON.stringify(lastBeforeEject)}`);
+    report.competitiveMatchStart.last_observation_before_eject = {
+      ready: lastBeforeEject.ready,
+      frame: lastBeforeEject.frame,
+    };
     await driver.unload();
     nativeSessionActive = false;
-    await verifyTeardown('Eject after competitive Rules profile preflight');
-    report.checks.push('Source profile preflight stops at CSS; no SSS, match, timeout, Results, or full-route acceptance was exercised');
+    await verifyTeardown('Eject after the bounded normalized match-start prefix');
+    report.checks.push(`Original two-human Mario match selected Final Destination; normalized settings were checked once at frame ${liveMatch.frame}, the last pre-Eject observation was frame ${report.competitiveMatchStart.last_observation_before_eject.frame}, and Eject ended the roughly 3-second prefix before timeout or Results`);
     break route;
   }
 

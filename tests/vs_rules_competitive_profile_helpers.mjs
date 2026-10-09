@@ -5,6 +5,16 @@ export const ITEM_ROW_TO_PREFERENCE_BIT = Object.freeze([
   0x14, 0x19, 0x10, 0x16, 0x13, 0x1d, 0x0c,
 ]);
 
+// Original gm_80167BC8's preference-index -> StartMeleeRules::x20 bit table
+// (gm_1601.static.h: lbl_803B7844). Index 28 is the 0x23 sentinel and is
+// skipped by the source conversion loop.
+export const SOURCE_ITEM_IDS_BY_PREFERENCE_BIT = Object.freeze([
+  0x06, 0x0b, 0x07, 0x19, 0x14, 0x12, 0x11, 0x0e,
+  0x1c, 0x18, 0x08, 0x1a, 0x04, 0x10, 0x17, 0x22,
+  0x20, 0x13, 0x09, 0x21, 0x0d, 0x0f, 0x1f, 0x16,
+  0x15, 0x1e, 0x0a, 0x0c, 0x23, 0x05, 0x1d, 0x1b,
+]);
+
 const UINT64_MASK = (1n << 64n) - 1n;
 
 function parseMask(value, label) {
@@ -53,6 +63,27 @@ export function deriveAllOffItemMasks({initialPreferenceMaskHex, rows}) {
   };
 }
 
+export function deriveNormalizedAllOffItemMask({initialRulesMaskHex, preferenceMaskHex}) {
+  const initialRulesMask = parseMask(initialRulesMaskHex, 'initial normalized item mask');
+  const preferenceMask = parseMask(preferenceMaskHex, 'source item preference mask');
+  if (SOURCE_ITEM_IDS_BY_PREFERENCE_BIT.length !== 32 ||
+      new Set(SOURCE_ITEM_IDS_BY_PREFERENCE_BIT).size !== 32 ||
+      SOURCE_ITEM_IDS_BY_PREFERENCE_BIT.some(item => !Number.isInteger(item) || item < 0 || item > 63))
+    throw new Error('pinned source preference-to-item table is invalid');
+
+  let normalizedMask = initialRulesMask;
+  for (let preferenceBit = 0; preferenceBit < SOURCE_ITEM_IDS_BY_PREFERENCE_BIT.length; preferenceBit++) {
+    const item = SOURCE_ITEM_IDS_BY_PREFERENCE_BIT[preferenceBit];
+    if (item === 0x23) continue;
+    const itemMask = 1n << BigInt(item);
+    if (preferenceMask & (1n << BigInt(preferenceBit)))
+      normalizedMask |= itemMask;
+    else
+      normalizedMask &= ~itemMask;
+  }
+  return formatMask(normalizedMask);
+}
+
 export function competitiveProfileFailures({source, rawCssSelection, expectedPreferenceMaskHex}) {
   const failures = [];
   const expect = (label, actual, expected) => {
@@ -77,5 +108,69 @@ export function competitiveProfileFailures({source, rawCssSelection, expectedPre
   expect('raw CSS selection validity', rawCssSelection?.valid, true);
   expect('raw CSS selection scene', rawCssSelection?.scene, 1);
   expect('raw CSS selection provenance', rawCssSelection?.provenance, 'raw_css_vs_start');
+  return failures;
+}
+
+export function competitiveMatchStartFailures(match, {sourcePreferenceMaskHex} = {}) {
+  const failures = [];
+  const expect = (label, actual, expected) => {
+    if (actual !== expected)
+      failures.push(`${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+  };
+  const expectArray = (label, actual, expected) => {
+    if (!Array.isArray(actual) || actual.length !== expected.length) {
+      failures.push(`${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+      return;
+    }
+    for (let index = 0; index < expected.length; index++)
+      expect(`${label}[${index}]`, actual[index], expected[index]);
+  };
+
+  expect('match ready', match?.ready, true);
+  expect('source-frame observation is within the bounded 180–240-frame prefix',
+    Number.isInteger(match?.frame) && match.frame >= 180 && match.frame <= 240, true);
+  expect('normalized stock match kind', match?.rules?.match_kind, 1);
+  expect('source-selected Final Destination', match?.rules?.stage, 0x20);
+  expect('8-minute stock timer enabled by original conversion', match?.rules?.timer_enabled, 1);
+  expect('8-minute stock timer seconds from original conversion', match?.rules?.time_limit, 480);
+  expect('original Rules Plus pause-off conversion', match?.rules?.disable_pausing, 1);
+  expect('original 1.0 damage ratio binary32', match?.rules?.damage_ratio_bits, '3f800000');
+  expect('all-off normalized item frequency', match?.rules?.item_frequency, -1);
+  const expectedNormalizedItemMask = sourcePreferenceMaskHex
+    ? deriveNormalizedAllOffItemMask({
+      initialRulesMaskHex: 'ffffffffffffffff',
+      preferenceMaskHex: sourcePreferenceMaskHex,
+    })
+    : null;
+  expect('normalized item mask derived from source defaults and preference table',
+    match?.rules?.item_mask_hex, expectedNormalizedItemMask);
+  expect('source CSS Teams setting', match?.rules?.is_teams, 0);
+  expectArray('normalized source player teams', match?.rules?.player_teams, [0, 0]);
+  expectArray('normalized source player stocks', match?.rules?.player_stocks, [4, 4]);
+  expectArray('raw source player slot fields', match?.rules?.player_source_slots, [0, 0]);
+  expectArray('resolved controller ports retain original player indices',
+    match?.rules?.resolved_controller_ports, [0, 1]);
+  expectArray('source player kinds remain Human', match?.rules?.player_slot_types, [0, 0]);
+  expectArray('source normalized player stocks', match?.rules?.player_source_stocks, [4, 4]);
+  expectArray('source normalized characters are Mario', match?.rules?.player_source_characters, [8, 8]);
+  expectArray('handicap-off source conversion attack ratios',
+    match?.rules?.player_attack_ratio_bits, ['3f800000', '3f800000']);
+  expectArray('handicap-off source conversion defense ratios',
+    match?.rules?.player_defense_ratio_bits, ['3f800000', '3f800000']);
+  if (!Array.isArray(match?.players) || match.players.length !== 2) {
+    failures.push(`live players: expected two entries, got ${JSON.stringify(match?.players)}`);
+    return failures;
+  }
+  for (let index = 0; index < 2; index++) {
+    const player = match.players[index];
+    expect(`P${index + 1} live fighter is Mario`, player?.fighter, 0);
+    expect(`P${index + 1} raw source slot`, player?.source_slot, 0);
+    expect(`P${index + 1} resolved controller port`, player?.source_port, index);
+    expect(`P${index + 1} source character`, player?.source_character, 8);
+    expect(`P${index + 1} source slot is Human`, player?.slot_type, 0);
+    expect(`P${index + 1} live owner is Human`, player?.human, true);
+    expect(`P${index + 1} live stocks`, player?.stocks, 4);
+    expect(`P${index + 1} source stocks`, player?.source_stocks, 4);
+  }
   return failures;
 }

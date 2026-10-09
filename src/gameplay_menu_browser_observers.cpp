@@ -330,7 +330,7 @@ EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_pad_trace(){
 }
 #endif
 const char* melee_web_native_menu_match_observe(){
- static char text[1536];
+ static char text[2048];
  if(!match)return terminal_match_observation.empty()?"{}":terminal_match_observation.c_str();
  if(!match->construction_complete())return "{}";
  try{
@@ -353,6 +353,9 @@ const char* melee_web_native_menu_match_observe(){
  out.add(",\"stage\":%u",(unsigned) start.rules.stkind);
  out.add(",\"timer_enabled\":%u",(unsigned) start.rules.timer_enabled);
  out.add(",\"time_limit\":%u",(unsigned) start.rules.time_limit);
+ out.add(",\"disable_pausing\":%u",(unsigned) start.rules.disable_pausing);
+ out.add(",\"damage_ratio_bits\":\"%08x\"",
+         (unsigned)std::bit_cast<uint32_t>(start.rules.x30));
  out.add(",\"item_frequency\":%d",(int) (int8_t) start.rules.xB);
  out.add(",\"item_mask_hex\":\"%016llx\"",(unsigned long long) start.rules.x20);
  out.add(",\"is_teams\":%u",(unsigned) start.rules.is_teams);
@@ -360,11 +363,35 @@ const char* melee_web_native_menu_match_observe(){
  out.add(",\"player_stocks\":[%d,%d]",(int) start.players[0].stocks,(int) start.players[1].stocks);
  out.add(",\"door_teams\":[%d,%d,%d,%d]",(int) start.players[0].team,(int) start.players[1].team,(int) start.players[2].team,(int) start.players[3].team);
  out.add(",\"friendly_fire\":%u",(unsigned) start.rules.friendly_fire);
+ out.add(",\"player_source_slots\":[%u,%u]",(unsigned) start.players[0].slot,
+         (unsigned) start.players[1].slot);
+ out.add(",\"resolved_controller_ports\":[%u,%u]",
+         (unsigned)(start.players[0].slot ? start.players[0].slot - 1u : 0u),
+         (unsigned)(start.players[1].slot ? start.players[1].slot - 1u : 1u));
+ out.add(",\"player_slot_types\":[%u,%u]",
+         (unsigned) start.players[0].slot_type,
+         (unsigned) start.players[1].slot_type);
+ out.add(",\"player_source_stocks\":[%d,%d]",
+         (int) start.players[0].stocks,(int) start.players[1].stocks);
+ out.add(",\"player_source_characters\":[%d,%d]",
+         (int) start.players[0].ckind,(int) start.players[1].ckind);
+ out.add(",\"player_attack_ratio_bits\":[\"%08x\",\"%08x\"]",
+         (unsigned)std::bit_cast<uint32_t>(start.players[0].attack_ratio),
+         (unsigned)std::bit_cast<uint32_t>(start.players[1].attack_ratio));
+ out.add(",\"player_defense_ratio_bits\":[\"%08x\",\"%08x\"]",
+         (unsigned)std::bit_cast<uint32_t>(start.players[0].defense_ratio),
+         (unsigned)std::bit_cast<uint32_t>(start.players[1].defense_ratio));
  out.add("}");
  out.add(",\"players\":[");
  out.add("{");
  out.add("\"fighter\":%d",p0.fighter_kind);
  out.add(",\"human\":%s",start.players[0].slot_type==Gm_PKind_Human?"true":"false");
+ out.add(",\"slot_type\":%u",(unsigned)start.players[0].slot_type);
+ out.add(",\"source_slot\":%u",(unsigned)start.players[0].slot);
+ out.add(",\"source_port\":%u",
+         (unsigned)(start.players[0].slot ? start.players[0].slot - 1u : 0u));
+ out.add(",\"source_character\":%d",(int)start.players[0].ckind);
+ out.add(",\"source_stocks\":%d",(int)start.players[0].stocks);
  out.add(",\"stocks\":%d",p0.stocks);
  out.add(",\"motion\":%d",p0.motion_id);
  out.add(",\"groundAir\":%d",p0.ground_or_air);
@@ -374,6 +401,12 @@ const char* melee_web_native_menu_match_observe(){
  out.add(",{");
  out.add("\"fighter\":%d",p1.fighter_kind);
  out.add(",\"human\":%s",start.players[1].slot_type==Gm_PKind_Human?"true":"false");
+ out.add(",\"slot_type\":%u",(unsigned)start.players[1].slot_type);
+ out.add(",\"source_slot\":%u",(unsigned)start.players[1].slot);
+ out.add(",\"source_port\":%u",
+         (unsigned)(start.players[1].slot ? start.players[1].slot - 1u : 1u));
+ out.add(",\"source_character\":%d",(int)start.players[1].ckind);
+ out.add(",\"source_stocks\":%d",(int)start.players[1].stocks);
  out.add(",\"stocks\":%d",p1.stocks);
  out.add(",\"motion\":%d",p1.motion_id);
  out.add(",\"groundAir\":%d",p1.ground_or_air);
@@ -382,6 +415,10 @@ const char* melee_web_native_menu_match_observe(){
  out.add("}");
  out.add("]");
  out.add("}");
+ if(out.result()<0||out.result()>=static_cast<int>(sizeof(text))){
+  std::snprintf(text,sizeof(text),
+                "{\"ready\":false,\"observer_error\":true,\"observer_error_reason\":\"match observation overflow\"}");
+ }
  return text;
  }catch(const std::exception& e){
   match_observer_error=e.what();
