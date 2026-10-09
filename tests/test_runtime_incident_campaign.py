@@ -14,7 +14,7 @@ RUNNER = ROOT / "scripts" / "runtime_incident_campaign.mjs"
 class RuntimeIncidentCampaignTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.harness = HARNESS.read_text(encoding="utf-8")
+        cls.harness = HARNESS.read_text(encoding="utf-8") + (ROOT / "tests/runtime_callback_recorder.mjs").read_text(encoding="utf-8")
         cls.runner = RUNNER.read_text(encoding="utf-8")
 
     def test_cpu_conversion_reselects_every_requested_fighter(self):
