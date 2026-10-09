@@ -64,6 +64,8 @@ ROSTER: dict[str, tuple[int, tuple[float, float]]] = {
     "GANONDORF": (25, (26.0, 16.5)),
     "LUIGI": (7, (-13.9, 16.5)),
     "PIKACHU": (13, (-13.9, 2.5)),
+    "JIGGLYPUFF": (15, (-6.9, 2.5)),
+    "ICE_CLIMBERS": (14, (-6.9, 9.5)),
 }
 ROSTER_ICON: dict[str, int] = {
     "MARIO": 1,
@@ -78,6 +80,8 @@ ROSTER_ICON: dict[str, int] = {
     "GANONDORF": 8,
     "LUIGI": 2,
     "PIKACHU": 19,
+    "JIGGLYPUFF": 20,
+    "ICE_CLIMBERS": 12,
 }
 LINEUPS: tuple[tuple[str, ...], ...] = (
     ("MARIO", "FOX", "FALCO", "MARTH"),
@@ -85,6 +89,7 @@ LINEUPS: tuple[tuple[str, ...], ...] = (
     ("CAPTAIN_FALCON", "GANONDORF", "LUIGI", "PIKACHU"),
 )
 EXPECTED_ROSTER = tuple(tuple(ROSTER[name][0] for name in lineup) for lineup in LINEUPS)
+ENTITY_PREFIX_LINEUP = ("JIGGLYPUFF", "ICE_CLIMBERS", "MARIO", "FOX")
 # The original team's color for Mario comes from
 # ``gm_801692BC(8) -> lbl_803D51A0[8].x2``.  The pinned table row is
 # ``{ 0x05, 0x00, 0x03, 0x04 }``: team 0 uses x1 (0), and team 1 uses x2
@@ -119,12 +124,13 @@ def _write_json(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def _validate_setup(raw_hex: str, match_index: int) -> dict[str, Any]:
+def _validate_setup(raw_hex: str, match_index: int, *, entity_prefix: bool = False) -> dict[str, Any]:
     try:
         setup = _decode_setup(raw_hex)
     except (KeyError, TypeError, ValueError) as error:
         raise CaptureFailure(f"match {match_index} source setup is unsupported: {error}") from error
-    if not 0 <= match_index < len(EXPECTED_ROSTER):
+    roster = (replay.ENTITY_PREFIX_ROSTER,) if entity_prefix else EXPECTED_ROSTER
+    if not 0 <= match_index < len(roster):
         raise CaptureFailure(f"unexpected source match index {match_index}")
     if {key: value for key, value in setup.items() if key != "players"} != replay.V9_MILESTONE_RULES:
         raise CaptureFailure(f"match {match_index} rules differ from the accepted stock-match profile")
@@ -135,7 +141,7 @@ def _validate_setup(raw_hex: str, match_index: int) -> dict[str, Any]:
     for slot, player in enumerate(players):
         expected = {
             "port": slot + 1,
-            "character_kind": EXPECTED_ROSTER[match_index][slot],
+            "character_kind": roster[match_index][slot],
             "costume": slot,
             "stocks": 4,
             "player_type": 1,
@@ -149,7 +155,7 @@ def _validate_setup(raw_hex: str, match_index: int) -> dict[str, Any]:
                 f"expected {expected}, received {player}"
             )
         actual.append(player["character_kind"])
-    if tuple(actual) != EXPECTED_ROSTER[match_index]:
+    if tuple(actual) != roster[match_index]:
         raise CaptureFailure(f"match {match_index} source roster mismatch")
     return setup
 
@@ -251,18 +257,22 @@ SUCCESS_RESULTS = frozenset({
 
 
 def _capture_exit_code(result: Any) -> int:
-    return 0 if result in SUCCESS_RESULTS else 1
+    return 0 if result in SUCCESS_RESULTS or result == "diagnostic_entity_prefix_complete" else 1
 
 
 class Driver:
     def __init__(self, controller: capture.DualPipeController,
                  latest: dict[str, Any], stop: threading.Event,
-                 *, readiness_only: bool, team_route_only: bool = False) -> None:
+                 *, readiness_only: bool, team_route_only: bool = False,
+                 entity_prefix: bool = False) -> None:
         self.controller = controller
         self.latest = latest
         self.stop = stop
         self.readiness_only = readiness_only
         self.team_route_only = team_route_only
+        self.entity_prefix = entity_prefix
+        if entity_prefix and (readiness_only or team_route_only):
+            raise CaptureFailure("entity prefix is separate from historical route modes")
         self.steps: list[dict[str, Any]] = []
 
     def wait(self, predicate: Callable[[], bool], label: str,
@@ -415,6 +425,15 @@ class Driver:
                 f"observed {self.latest['doors'][slot]['costume']} after 8 changes"
             )
 
+    def _require_prefix_held_puck(self, slot: int, port: int) -> None:
+        if not self.entity_prefix:
+            return
+        cursor, model = self.latest["cursors"][port], self.latest["models"][slot]
+        if (cursor.get("port") != port or cursor["state"] != 1 or
+                cursor["held"] != slot or model.get("source_slot") != slot or
+                model["state"] != port + 1):
+            raise CaptureFailure("entity prefix puck has a foreign source cursor/model owner")
+
     def select_human(self, slot: int, name: str, *, initial: bool) -> None:
         character, point = ROSTER[name]
         if not initial:
@@ -432,6 +451,7 @@ class Driver:
             port = slot
         if initial:
             self.move(*point, f"select-{name}-slot-{slot}", port)
+            self._require_prefix_held_puck(slot, port)
             self.tap(port, "A", label=f"place-{name}-slot-{slot}")
             self.wait(lambda: self.latest["players"][slot]["character"] == character,
                       f"source confirmed {name} in slot {slot}")
@@ -447,6 +467,7 @@ class Driver:
                           f"human slot {slot} puck pickup for costume")
         self.move(*point, f"select-{name}-slot-{slot}", port)
         self.set_costume(slot, name, port)
+        self._require_prefix_held_puck(slot, port)
         self.tap(port, "A", label=f"place-{name}-slot-{slot}")
         if (self.latest["cursors"][port]["state"] == 1 and
                 self.latest["cursors"][port]["held"] == slot):
@@ -467,14 +488,25 @@ class Driver:
         if self.latest["players"][slot]["kind"] != 1:
             self.set_door_kind(slot, 1)
         model = self.latest["models"][slot]
+        if self.entity_prefix:
+            cursor, door = self.latest["cursors"][0], self.latest["doors"][slot]
+            if (self.latest["players"][slot]["kind"] != 1 or door["kind"] != 1 or
+                    not 0 <= door["icon"] < 25 or model["state"] != 0 or
+                    model.get("source_slot") != slot or cursor.get("port") != 0 or
+                    cursor["state"] == 1):
+                raise CaptureFailure("CPU pickup lacks its source-owned selected puck")
         self.move(model["x"] - 3.8, model["y"] + 2.6,
                   f"pickup-cpu-slot-{slot}")
+        if self.entity_prefix and not 0.2 < self.latest["cursors"][0]["y"] < 22.0:
+            raise CaptureFailure("CPU pickup cursor is outside the source board")
         self.tap(0, "A", label=f"pickup-cpu-slot-{slot}")
         self.wait(lambda: self.latest["cursors"][0]["state"] == 1 and
                   self.latest["cursors"][0]["held"] == slot,
                   f"CPU slot {slot} puck pickup")
+        self._require_prefix_held_puck(slot, 0)
         self.move(*point, f"select-{name}-slot-{slot}")
         self.set_costume(slot, name, 0)
+        self._require_prefix_held_puck(slot, 0)
         self.tap(0, "A", label=f"place-{name}-slot-{slot}")
         if (self.latest["cursors"][0]["state"] == 1 and
                 self.latest["cursors"][0]["held"] == slot):
@@ -513,7 +545,7 @@ class Driver:
                   f"CPU slider {slot} released")
 
     def configure_lineup(self, match_index: int, *, initial: bool) -> None:
-        lineup = LINEUPS[match_index]
+        lineup = ENTITY_PREFIX_LINEUP if self.entity_prefix else LINEUPS[match_index]
         self.latest["expected_match_index"] = 0 if self.readiness_only else match_index
         self.wait(lambda: len(self.latest["models"]) == 4 and
                   self.latest.get("css_polls", 0) >= 240,
@@ -532,7 +564,7 @@ class Driver:
             self.select_cpu(3, lineup[3])
         for slot in range(4):
             self.set_cpu9(slot)
-        expected = EXPECTED_ROSTER[match_index]
+        expected = replay.ENTITY_PREFIX_ROSTER if self.entity_prefix else EXPECTED_ROSTER[match_index]
         current = self.latest["players"][:4]
         if any(row["kind"] != 1 or row["cpu"] != 9 or row["character"] != expected[index]
                for index, row in enumerate(current)):
@@ -578,6 +610,19 @@ class Driver:
     def boot_and_drive(self) -> None:
         try:
             self._boot_menus()
+            if self.entity_prefix:
+                self.configure_lineup(0, initial=True)
+                before = self.latest["boundaries"].get("sss_enter", 0)
+                self.enter_fd(choose_stage=True, before=before)
+                self.wait(lambda: len(self.latest.get("setup_records", [])) == 1 and
+                          self.latest["boundaries"].get("sss_exit", 0) > before and
+                          self.latest["boundaries"].get("setup", 0) > before,
+                          "single original SSS exit and checked VS setup", seconds=30.0)
+                self.state("entity-prefix-checked-source-setup")
+                self.wait(lambda: self.latest.get("entity_prefix_complete", False),
+                          "passive qualifying source draw completion", seconds=30.0)
+                self.latest["driver_complete"] = True
+                return
             if self.team_route_only:
                 self.play_team_battle()
                 self.latest["driver_complete"] = True
@@ -856,6 +901,8 @@ def _consume_row(row: dict[str, Any], latest: dict[str, Any],
             latest["expected_match_index"] = min(
                 match_index + 1, len(EXPECTED_ROSTER) - 1
             )
+    if latest.get("entity_prefix") and boundary in {"exit", "results_gobj", "return_css"}:
+        raise CaptureFailure("entity prefix crossed an undeclared terminal/Results boundary")
     if boundary == "sss_enter":
         latest["stage_kind"] = None
     if boundary == "pad_poll":
@@ -891,10 +938,14 @@ def _consume_row(row: dict[str, Any], latest: dict[str, Any],
         if name == "menu_css_cursor":
             x, y = struct.unpack(">ff", raw[12:20])
             latest["cursors"][slot] = {"state": raw[5], "held": raw[6], "x": x, "y": y}
+            if latest.get("entity_prefix"):
+                latest["cursors"][slot]["port"] = raw[4]
             latest["cursor_revisions"][slot] = latest["cursor_revisions"].get(slot, 0) + 1
         elif name == "menu_css_model":
             x, y = struct.unpack(">ff", raw[8:16])
             latest["models"][slot] = {"state": raw[5], "x": x, "y": y}
+            if latest.get("entity_prefix"):
+                latest["models"][slot]["source_slot"] = raw[4]
         elif name == "menu_css_slider":
             latest["sliders"][slot] = {
                 "dirty": bool(int.from_bytes(raw[20:24], "big") & 64),
@@ -953,7 +1004,8 @@ def _consume_row(row: dict[str, Any], latest: dict[str, Any],
         setup_hex = setup_slice["hex"]
         normalized = (_validate_team_setup(setup_hex, match_index)
                       if latest.get("team_route") else
-                      _validate_setup(setup_hex, match_index))
+                      _validate_setup(setup_hex, match_index,
+                                      entity_prefix=latest.get("entity_prefix", False)))
         latest.setdefault("setup_records", []).append({
             "match_index": match_index,
             "source_sequence": row["seq"],
@@ -986,6 +1038,71 @@ def _consume_row(row: dict[str, Any], latest: dict[str, Any],
         raise CaptureFailure(f"reference observer error: {payload}")
 
 
+def _retain_final_capture_diagnostics(report, proc, stream, input_stream, status, input_status):
+    report["process_exit"] = proc.returncode if proc is not None else None
+    report["raw_observer_sha256"] = _sha256(stream) if stream.exists() else None
+    report["raw_input_sha256"] = _sha256(input_stream) if input_stream.exists() else None
+    if status.exists():
+        report["final_observer_status"] = json.loads(status.read_text(encoding="utf-8"))
+    if input_status.exists():
+        report["final_input_status"] = json.loads(input_status.read_text(encoding="utf-8"))
+
+
+def _validate_entity_prefix_input(stream: Path, status: Path) -> dict[str, Any]:
+    from reference_input_stream import validate_stream, validate_status
+    record = validate_stream(stream)
+    validate_status(status, mode="record", events=record["events"])
+    return record
+
+
+def _close_entity_prefix(proc, thread, stop, log, output, report) -> None:
+    """Independent owned retirements; preserve source failure over cleanup."""
+    from capture_sd_reference_prefix import cleanup_process
+    stop.set()
+    operations = []
+    if thread is not None:
+        def retire_driver():
+            thread.join(2)
+            if thread.is_alive():
+                raise CaptureFailure("entity prefix input driver did not retire")
+        operations.append(("driver", retire_driver))
+    if proc is not None:
+        operations.append(("native", lambda: cleanup_process(proc, output, scope="entity_prefix")))
+    operations.append(("log", log.close))
+    for owner, close in operations:
+        try:
+            close()
+        except BaseException as error:
+            reason = str(error) or type(error).__name__
+            report.setdefault("cleanup_errors", []).append({"owner": owner, "error": reason})
+            report["result"] = "fail"
+            report.setdefault("error", reason)
+
+
+def _finish_entity_prefix(records: list[dict[str, Any]], latest: dict[str, Any],
+                          output_dir: Path | None = None) -> dict[str, Any]:
+    """Validate the actual retained prefix; unsupported draw batches fail preparation."""
+    identity = replay._capture_identity(records, entity_prefix=True)
+    setups, declared = replay._match_setups(records, 1)
+    frames, spans = replay._timeline(records, 1, entity_prefix=True)
+    _validate_setup(setups[0], 0, entity_prefix=True)
+    candidate = {"identity": identity, "first_css": replay._first_css_context(records),
+                 "setup_hex": setups[0], "setup_hexes": setups,
+                 "declared_setup": declared[0], "frames": frames, "spans": spans}
+    # Encoder checks actual context, full interval, source entities and batching;
+    # the recipe is not an independent source observation.
+    payload, metadata = replay.encode_v8_entity_prefix(candidate, records)
+    if len(latest.get("setup_records", [])) != 1:
+        raise CaptureFailure("entity prefix omitted its single observed setup")
+    if output_dir is not None:
+        with (output_dir / "entity-prefix.mwrc").open("xb") as output:
+            output.write(payload)
+        _write_json(output_dir / "entity-prefix.json", metadata)
+    return {"diagnostic_prefix_complete": True, "complete": False,
+            "whole_session_equivalent": False, "prefix_interval": metadata,
+            "replay_recipe_sha256": hashlib.sha256(payload).hexdigest()}
+
+
 def _args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dolphin", required=True, type=Path,
@@ -1004,11 +1121,15 @@ def _args() -> argparse.Namespace:
                         help="cycle three source-confirmed CPU9 lineups through CSS/SSS without matches")
     parser.add_argument("--team-route", action="store_true",
                         help="capture three original VS Rules/Items Teams matches through Results/CSS returns")
+    parser.add_argument("--entity-prefix", choices=(replay.ENTITY_PREFIX_PROFILE,),
+                        help="one four-CPU original setup and passive first qualifying draw prefix")
     return parser.parse_args()
 
 
 def main() -> int:
     args = _args()
+    if args.entity_prefix and (args.readiness_only or args.team_route):
+        raise CaptureFailure("entity prefix is separate from historical capture modes")
     if args.readiness_only and args.team_route:
         raise CaptureFailure("--readiness-only and --team-route are separate capture modes")
     out = args.out.expanduser().resolve()
@@ -1081,6 +1202,8 @@ def main() -> int:
         "MWRC_INPUT_STATUS": str(input_status),
         "LANG": "en_US.UTF-8",
     })
+    if args.entity_prefix:
+        env.update(MWRC_WHOLE_SESSION_MATCHES="1", MWRC_ENTITY_PROFILE=args.entity_prefix)
     command = [str(dolphin), "-p", "headless", "-v", "Null", "-u", str(user), "-e", str(disc)]
     settings = (
         "Dolphin.Interface.ConfirmStop=False",
@@ -1100,14 +1223,17 @@ def main() -> int:
     version = subprocess.run([str(dolphin), "--version"], capture_output=True,
                              text=True, check=True).stdout.strip()
     log = log_path.open("w", encoding="utf-8")
-    proc = subprocess.Popen(command, env=env, stdout=log, stderr=subprocess.STDOUT)
+    proc = (None if args.entity_prefix else
+            subprocess.Popen(command, env=env, stdout=log, stderr=subprocess.STDOUT))
     stop = threading.Event()
-    controller = capture.DualPipeController(p1, p2, out / "input-intentions.jsonl")
+    controller = (None if args.entity_prefix else
+                  capture.DualPipeController(p1, p2, out / "input-intentions.jsonl"))
     latest: dict[str, Any] = {
         "cursors": {}, "cursor_revisions": {}, "models": {}, "sliders": {},
         "doors": [], "players": [], "boundaries": {}, "boundary_match_indices": {},
         "expected_match_index": 0, "setup_records": [], "polls": 0,
         "team_route": args.team_route,
+        "entity_prefix": bool(args.entity_prefix),
     }
     report: dict[str, Any] = {
         "schema": "melee-web-recorded-session-12-character-capture-v1",
@@ -1118,7 +1244,8 @@ def main() -> int:
                   if args.readiness_only else
                   "one continuous three-match original CPU9 session; Null video; no pixels, PCM, or performance claim"),
         "route": "team-battle-results-css-roundtrips" if args.team_route else "three-lineup-cpu9",
-        "lineups": ([ ["MARIO", "MARIO"] for _ in range(3)] if args.team_route else
+        "lineups": ([list(ENTITY_PREFIX_LINEUP)] if args.entity_prefix else
+                    [ ["MARIO", "MARIO"] for _ in range(3)] if args.team_route else
                     [list(lineup) for lineup in LINEUPS]),
         "dolphin_executable_sha256": _sha256(dolphin),
         "build_manifest_sha256": _sha256(manifest_path),
@@ -1133,19 +1260,32 @@ def main() -> int:
         "team_route": args.team_route,
         "audio_policy": "host output muted; DSP generation retained",
     }
-    driver = Driver(controller, latest, stop, readiness_only=args.readiness_only,
-                    team_route_only=args.team_route)
+    if args.entity_prefix:
+        report.update(route=args.entity_prefix, diagnostic_prefix=args.entity_prefix,
+                      whole_session_equivalent=False, complete=False,
+                      scope="one original four-CPU setup and first 60 SourceTicks at first qualifying DrawReturn; no outcome/Results, timing/pixel/PCM claim")
+    driver = (None if args.entity_prefix else
+              Driver(controller, latest, stop, readiness_only=args.readiness_only,
+                     team_route_only=args.team_route))
     ended = False
     try:
-        timeout = time.monotonic() + (900 if args.readiness_only or args.team_route else 2400)
+        if args.entity_prefix:
+            proc = subprocess.Popen(command, env=env, stdout=log, stderr=subprocess.STDOUT)
+            controller = capture.DualPipeController(p1, p2, out / "input-intentions.jsonl")
+            driver = Driver(controller, latest, stop, readiness_only=False, entity_prefix=True)
+        timeout = time.monotonic() + (180 if args.entity_prefix else
+                                     900 if args.readiness_only or args.team_route else 2400)
         announcements: list[dict[str, Any]] = []
+        prefix_records: list[dict[str, Any]] = []
 
         def retain_announcement(row: dict[str, Any]) -> None:
+            if args.entity_prefix:
+                prefix_records.append(row)
             if row.get("event") in {"handshake", "start"}:
                 announcements.append(row)
 
         with capture.ObserverTail(stream, status, sink=retain_announcement) as observer:
-            observer.require_announcements(3, timeout, capture_id=args.capture_id,
+            observer.require_announcements(1 if args.entity_prefix else 3, timeout, capture_id=args.capture_id,
                                             sequence_id=args.capture_id)
             identity = observer.identity or {}
             handshake = announcements[0]["payload"] if announcements else {}
@@ -1156,6 +1296,8 @@ def main() -> int:
                     handshake.get("dol_sha256") != DOL_SHA256 or
                     handshake.get("writes_guest_memory") is not False):
                 raise CaptureFailure("observer handshake does not match requested capture identity")
+            if args.entity_prefix and handshake.get("entity_profile") != args.entity_prefix:
+                raise CaptureFailure("entity prefix handshake lacks its exact named profile")
             report["observer_identity"] = identity
             report["observer_handshake"] = handshake
             thread = threading.Thread(target=driver.boot_and_drive, name="original-css-driver")
@@ -1186,14 +1328,19 @@ def main() -> int:
                     if (not input_data.get("complete") or input_data.get("invalid") or
                             input_data.get("error")):
                         raise CaptureFailure(f"source-consumed input record is incomplete: {input_data}")
-                    expected_setups = 3
+                    if args.entity_prefix:
+                        _validate_entity_prefix_input(input_stream, input_status)
+                        # Native End follows InputStream::WaitComplete; still
+                        # validate the independent raw footer and status here.
+                        latest["entity_prefix_complete"] = True
+                    expected_setups = 1 if args.entity_prefix else 3
                     if len(latest.get("setup_records", [])) != expected_setups:
                         raise CaptureFailure(
                             f"completed source session omitted setups: expected {expected_setups}")
-                    if not args.team_route:
+                    if not args.team_route and not args.entity_prefix:
                         replay.validate_milestone_setups(
                             [entry["raw_hex"] for entry in latest["setup_records"]])
-                    else:
+                    elif args.team_route:
                         result_rows = latest.get("team_result_gobj_rows", [])
                         team_results = latest.get("team_results", [])
                         team_setups = latest.get("team_match_setups", [])
@@ -1210,7 +1357,8 @@ def main() -> int:
                         report["css_rules_after_results"] = css_returns[-1]["start_data"]
                     report["observer_status"] = status_data
                     report["input_status"] = input_data
-                    report["result"] = ("original_vs_team_results_css_capture_complete"
+                    report["result"] = ("diagnostic_entity_prefix_complete" if args.entity_prefix else
+                                         "original_vs_team_results_css_capture_complete"
                                          if args.team_route else
                                          "three_match_source_capture_complete")
                     report["end"] = row
@@ -1222,6 +1370,8 @@ def main() -> int:
             thread.join(10)
             if thread.is_alive():
                 raise CaptureFailure("ordinary-input driver did not stop after the declared outcome")
+        if args.entity_prefix and latest.get("driver_error"):
+            raise CaptureFailure(latest["driver_error"])
         report["steps"] = driver.steps
         report["setup_records"] = latest.get("setup_records", [])
         report["observer_counts"] = observer.counts
@@ -1232,10 +1382,12 @@ def main() -> int:
         }
         if not args.readiness_only and not ended:
             raise CaptureFailure("full source capture did not reach the observer end record")
-    except Exception as error:
+    except BaseException as error:
+        if not args.entity_prefix and not isinstance(error, Exception):
+            raise
         report["result"] = "fail"
-        report["error"] = str(error)
-        report["steps"] = driver.steps
+        report.setdefault("error", str(error) or type(error).__name__)
+        report["steps"] = driver.steps if driver is not None else []
         report["setup_records"] = latest.get("setup_records", [])
         report["latest_state"] = {
             key: latest.get(key) for key in
@@ -1244,25 +1396,55 @@ def main() -> int:
         }
         print(f"recorded-session source capture failed: {error}", file=sys.stderr)
     finally:
-        stop.set()
-        if "thread" in locals():
-            thread.join(2)
-        if proc.poll() is None:
-            proc.terminate()
+        if args.entity_prefix:
+            _close_entity_prefix(proc, locals().get("thread"), stop, log, out, report)
+        else:
+            stop.set()
+            if "thread" in locals():
+                thread.join(2)
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+            log.close()
+        if args.entity_prefix:
             try:
-                proc.wait(5)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait()
-        log.close()
-        report["process_exit"] = proc.returncode
-        report["raw_observer_sha256"] = _sha256(stream) if stream.exists() else None
-        report["raw_input_sha256"] = _sha256(input_stream) if input_stream.exists() else None
-        if status.exists():
-            report["final_observer_status"] = json.loads(status.read_text(encoding="utf-8"))
-        if input_status.exists():
-            report["final_input_status"] = json.loads(input_status.read_text(encoding="utf-8"))
-        _write_json(report_path, report)
+                _retain_final_capture_diagnostics(report, proc, stream, input_stream, status, input_status)
+            except BaseException as error:
+                report["result"] = "fail"
+                report.setdefault("error", str(error) or type(error).__name__)
+                report.setdefault("cleanup_errors", []).append({"owner": "diagnostics", "error": str(error)})
+        else:
+            _retain_final_capture_diagnostics(report, proc, stream, input_stream, status, input_status)
+        if args.entity_prefix:
+            report["diagnostic_prefix_complete"] = False
+            report["recipe_artifacts_admitted"] = False
+            if report.get("result") == "diagnostic_entity_prefix_complete":
+                try:
+                    # No recipe publication before validated source/input End,
+                    # the input driver retirement and direct-child cleanup.
+                    report.update(_finish_entity_prefix(prefix_records, latest, out))
+                    report["recipe_artifacts_admitted"] = True
+                except BaseException as error:
+                    report["result"] = "fail"
+                    report.setdefault("error", str(error) or type(error).__name__)
+                    report["diagnostic_prefix_complete"] = False
+                    # Any partial files are retained candidates, never admitted.
+            report["recipe_admission_contract"] = "Requires this final report pass, recipe_artifacts_admitted and successful owned cleanup; files alone do not establish admission"
+        try:
+            _write_json(report_path, report)
+        except BaseException as error:
+            if not args.entity_prefix:
+                raise
+            report["result"] = "fail"
+            report["diagnostic_prefix_complete"] = False
+            report["recipe_artifacts_admitted"] = False
+            report.setdefault("error", str(error) or type(error).__name__)
+            print(f"entity prefix primary failure: {report['error']}; final report write: {error}", file=sys.stderr)
+            raise CaptureFailure(report["error"]) from error
     print(json.dumps({"result": report.get("result"), "error": report.get("error"),
                       "out": str(out)}, sort_keys=True))
     return _capture_exit_code(report.get("result"))
