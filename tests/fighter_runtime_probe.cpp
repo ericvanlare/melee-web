@@ -21,10 +21,7 @@ void check(int ok,const char* error){if(!ok)throw DatError(error);}
 int main(int argc,char** argv){
     try{
         melee_web_fighter_link_gate();
-        if(argc<2||argc>4)throw DatError("Usage: fighter_runtime_probe.js LOCAL_ASSET_DIRECTORY [--movement | --sparse-ports | --action KIND]");
-        const bool sparse=argc==3&&std::string(argv[2])=="--sparse-ports";
-        if(argc==3&&!sparse&&std::string(argv[2])!="--movement")
-            throw DatError("Unknown source context probe");
+        if(argc<2||argc>4)throw DatError("Usage: fighter_runtime_probe.js LOCAL_ASSET_DIRECTORY [--movement | --action KIND]");
         RuntimeFiles files;
         for(const char* name:{"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","TyDatai.usd","TyDatai.dat","sislib_font.bin"})
             files[name]=bytes(std::filesystem::path(argv[1])/name);
@@ -35,10 +32,8 @@ int main(int argc,char** argv){
             settings.camera_subjects=70;settings.random_seed=0x13579bdf;
             check(melee_web_match_context_trace(world.collision(),&settings,120,error,sizeof(error)),error);
             MeleeWebPlayerSettings players[2]={{0,0,4,{-20,world.floor_height(-20)+1,0},1},{1,1,4,{20,world.floor_height(20)+1,0},-1}};
-            if(sparse){players[1].slot=2;players[1].controller=2;}
             PADStatus movement{};movement.stickX=48;movement.err=0;
-            check(melee_web_match_two_player_trace(world.collision(),players,120,
-                argc==3&&!sparse?&movement:nullptr,error,sizeof(error)),error);
+            check(melee_web_match_two_player_trace(world.collision(),players,120,argc==3?&movement:nullptr,error,sizeof(error)),error);
             if(argc==4){
                 MeleeWebActionTraceKind kind;
                 const std::string requested=argv[3];

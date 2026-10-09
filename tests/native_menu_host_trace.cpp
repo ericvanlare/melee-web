@@ -60,6 +60,7 @@ extern "C" {
 #include <melee/gm/gmvsmode.h>
 #include <melee/gm/gmvsmelee.h>
 #include <melee/gm/gmresultplayer.h>
+#include <melee/pl/player.h>
 #include <melee/gm/gmmain_lib.h>
 #include <melee/gm/types.h>
 #include <sysdolphin/baselib/controller.h>
@@ -714,6 +715,71 @@ void emit_sd_resolution_fixture_manifest(bool include_match=true)
     for(unsigned i=0;i<names.size();++i){if(i)std::cout<<',';std::cout<<'"'<<names[i]<<'"';}
     std::cout<<"]}\n";
 }
+// Authored component fixture: retains source rows/controllers 0/2. This is
+// not evidence that original CSS joined P3, nor a Results/full-route check.
+void run_sparse_source_pad(const melee_web::RuntimeFiles& files,
+    MeleeWebMenuHost* host,const MeleeWebMenuMatchSelection& selection,
+    char* error,std::size_t error_size)
+{
+    const auto* input=melee_web_menu_host_input(host);
+    check(input&&selection.player_count==2&&selection.start.rules.stkind==St_Kind_Last&&
+          selection.start.players[0].ckind==CKIND_MARIO&&selection.start.players[2].ckind==CKIND_MARIO&&
+          selection.start.players[0].stocks==4&&selection.start.players[2].stocks==4&&
+          selection.start.players[0].color==1&&selection.start.players[2].color==0&&
+          selection.start.players[0].slot_type==Gm_PKind_Human&&
+          selection.start.players[2].slot_type==Gm_PKind_Human&&
+          selection.start.players[1].slot_type==Gm_PKind_NA&&
+          selection.start.players[3].slot_type==Gm_PKind_NA&&
+          selection.players[0].controller==0&&selection.players[2].controller==2,
+          "Sparse PAD fixture lost original source/controller identities");
+    const auto* saved_rng=seed_ptr;const auto saved_seed=*seed_ptr;
+    melee_web::GameplayMatchSession match(files,selection,*input);
+    check(std::memcmp(&match.start_data(),&selection.start,sizeof(selection.start))==0,
+          "Sparse source-start owner changed authored payload at construction");
+    float pcm[1068];unsigned phase=0,ready_ticks=0;
+    auto tick=[&](const PADStatus (&pads)[4]){
+        match.tick(pads);
+        check(std::memcmp(&match.start_data(),&selection.start,sizeof(selection.start))==0,
+              "Sparse owner changed its copied authored source payload");
+        phase+=32000;const unsigned count=phase/60;phase%=60;
+        check(melee_web_audio_render(match.audio(),pcm,count,error,error_size),error);
+    };
+    PADStatus neutral[4]{};neutral[1].err=neutral[3].err=-1;
+    for(;ready_ticks<600&&!match.ready();++ready_ticks)tick(neutral);
+    check(match.ready(),"Sparse source Ready/Go exceeded existing 600-tick cap");
+    PADStatus distinct[4]{};distinct[1].err=distinct[3].err=-1;
+    distinct[0].stickX=-48;distinct[0].button=PAD_BUTTON_LEFT;
+    distinct[2].stickX=48;distinct[2].button=PAD_BUTTON_RIGHT;
+    MeleeWebMatchStats observed[2]{};unsigned input_ticks=0;bool consumed=false;
+    for(;input_ticks<3&&!consumed;++input_ticks){
+        tick(distinct);observed[0]=match.player_stats(0);observed[1]=match.player_stats(1);
+        emit_native_bytes("sparse_input_observed_stats",observed,sizeof(observed));
+        emit_native_bytes("sparse_input_observed_copy_pad",HSD_PadCopyStatus,sizeof(HSD_PadCopyStatus));
+        std::cout.flush(); // Retain actual observations before any assertion.
+        check(observed[0].player_slot==0&&observed[1].player_slot==2&&
+              Player_GetEntity(0)&&Player_GetEntity(2)&&
+              !Player_GetEntity(1)&&!Player_GetEntity(3)&&
+              HSD_PadCopyStatus[1].err==-1&&HSD_PadCopyStatus[3].err==-1,
+              "Sparse source fighters or absent ports were renumbered");
+        consumed=observed[0].source_stick[0]<0&&observed[1].source_stick[0]>0&&
+            (HSD_PadCopyStatus[0].button&(PAD_BUTTON_LEFT|PAD_BUTTON_RIGHT))==PAD_BUTTON_LEFT&&
+            (HSD_PadCopyStatus[2].button&(PAD_BUTTON_LEFT|PAD_BUTTON_RIGHT))==PAD_BUTTON_RIGHT;
+    }
+    check(consumed,"Distinct ports0/2 did not reach their own source fighters within three ticks");
+    tick(neutral);
+    check(!match.player_stats(0).source_stick[0]&&!match.player_stats(1).source_stick[0]&&
+          !((HSD_PadCopyStatus[0].button|HSD_PadCopyStatus[2].button)&
+            (PAD_BUTTON_LEFT|PAD_BUTTON_RIGHT)),"Sparse source input did not release");
+    const auto cursor=match.source_frames();
+    std::cout<<"Sparse authored source PAD: ready ticks "<<ready_ticks
+             <<", input ticks "<<input_ticks<<", source cursor "<<cursor
+             <<", source slots "<<observed[0].player_slot<<'/'<<observed[1].player_slot
+             <<", source stick "<<observed[0].source_stick[0]<<'/'<<observed[1].source_stick[0]<<'\n';
+    match.close();match.close();
+    check(seed_ptr==saved_rng&&*seed_ptr==saved_seed&&!melee_web_gameplay_world_exists(),
+          "Sparse checked interrupted-match close lost RNG/world ownership");
+}
+
 void run_ordinary_nontied_timeout(const melee_web::RuntimeFiles& files,
     MeleeWebMenuHost* host,const MeleeWebMenuMatchSelection& selection,
     char* error,std::size_t error_size)
@@ -4509,6 +4575,8 @@ int main(int argc,char** argv){try{
  const bool sound_settings_recipe=input_recipe&&std::string(input_recipe)=="main-settings-sound-v1";
  const bool sd_menu_setup_recipe=input_recipe&&
      std::string(input_recipe)=="sudden-death-menu-setup-control-v1";
+ const bool sparse_pad_recipe=input_recipe&&
+     std::string(input_recipe)=="sparse-source-pad-control-v1";
  const bool ordinary_timeout_recipe=input_recipe&&
      std::string(input_recipe)=="ordinary-nontied-timeout-control-v1";
  const bool timeout_results_recipe=input_recipe&&
@@ -4547,7 +4615,7 @@ int main(int argc,char** argv){try{
  const bool stadium_e8_request_recipe=false;
  const bool stadium_ground_map1_owner_recipe=false;
 #endif
- if(input_recipe&&!ordinary_timeout_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
+ if(input_recipe&&!sparse_pad_recipe&&!ordinary_timeout_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
     !sound_settings_recipe&&!sudden_death_host_recipe&&!sudden_death_world_recipe&&
     !sd_menu_setup_recipe&&!returned_menu_recipe&&
@@ -4562,7 +4630,7 @@ int main(int argc,char** argv){try{
    throw std::runtime_error("MWRC v10 CSS replay-start reducer requires trace, source revision and exact recipe path");
  if(!v10_css_replay_start_recipe&&argc==8)
    throw std::runtime_error("Only the MWRC v10 CSS replay-start reducer accepts an exact recipe path");
- if((ordinary_timeout_recipe||retail_fd_recipe||results_mario_recipe||sudden_death_host_recipe||
+ if((sparse_pad_recipe||ordinary_timeout_recipe||retail_fd_recipe||results_mario_recipe||sudden_death_host_recipe||
      sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe||
      v10_css_replay_start_recipe)&&
     stage_kind!=St_Kind_Last)
@@ -4575,7 +4643,7 @@ int main(int argc,char** argv){try{
  TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
  std::vector<std::string> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"};
- if(ordinary_timeout_recipe||sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe||stadium_c1a_recipe||
+ if(sparse_pad_recipe||ordinary_timeout_recipe||sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe||stadium_c1a_recipe||
     stadium_c1_context_preflight_recipe||
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
@@ -4646,7 +4714,7 @@ int main(int argc,char** argv){try{
   std::cout<<"Native Main Settings Sound source route passed; no browser or retail-route claim\n";
   return 0;
  }
- const unsigned cycle_count=(ordinary_timeout_recipe||results_mario_recipe||sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe)?1:2;
+ const unsigned cycle_count=(sparse_pad_recipe||ordinary_timeout_recipe||results_mario_recipe||sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe)?1:2;
  for(unsigned cycle=0;cycle<cycle_count;cycle++){
   trace.begin_run(cycle);
   if((retail_fd_recipe||results_mario_recipe)&&cycle==0)*seed_ptr=1840631306u;
@@ -4811,6 +4879,40 @@ int main(int argc,char** argv){try{
   raw_selection.random_seed=selection_rng;
   trace.event("sss_exit_complete",world->audio(),"match",&raw_selection,&selection_rng);
   world->close();world.reset();audio_phase=0;
+  if(sparse_pad_recipe){
+   // Preserve the observed closed source payload except the explicitly authored
+   // Human membership/row relocation. Do not promote this to a CSS joining claim.
+   check(selection.player_count==2&&selection.start.players[2].slot_type==Gm_PKind_NA&&
+         selection.start.players[3].slot_type==Gm_PKind_NA,
+         "Sparse fixture requires the existing dense two-player source selection");
+   selection.start.players[0].slot_type=Gm_PKind_Human;
+   selection.start.players[2]=selection.start.players[1];
+   selection.start.players[2].slot_type=Gm_PKind_Human;
+   selection.players[2]=selection.players[1];selection.players[2].controller=2;
+   selection.start.players[1]={};selection.start.players[1].slot_type=Gm_PKind_NA;
+   selection.players[1]={};
+   emit_native_bytes("authored_sparse_source_start",&selection.start,sizeof(selection.start));
+   for(const auto& name:melee_web::match_asset_names(selection)){
+    if(files.contains(name))continue;
+    auto path=std::filesystem::path(argv[1])/name;
+    if(!std::filesystem::is_regular_file(path))path=std::filesystem::path(argv[2])/name;
+    std::ifstream input(path,std::ios::binary);
+    if(!input)throw std::runtime_error("Missing sparse source match fixture: "+name);
+    files[name]={(std::istreambuf_iterator<char>(input)),{}};
+   }
+   try{run_sparse_source_pad(files,host,selection,error,sizeof(error));}
+   catch(...){const auto primary=std::current_exception();
+    if(!melee_web_menu_host_destroy(host,error,sizeof(error)))std::cerr<<"Secondary sparse host destroy: "<<error<<'\n';
+    std::rethrow_exception(primary);}
+   check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);host=nullptr;
+   check(melee_web_vs_mode_begin()&&melee_web_vs_mode_end(),"Sparse component leaked VS lease");
+   const auto retained=melee_web_gameplay_allocation();
+   check(retained.identity==session_allocation.identity&&retained.generation==session_allocation.generation&&
+         retained.bytes==session_allocation.bytes&&!melee_web_gameplay_world_exists()&&
+         std::memcmp(gmMainLib_GetGameRules(),&pre_native_rules,sizeof(pre_native_rules))==0,
+         "Sparse component lost retained arena or persistent rules restoration");
+   continue;
+  }
   if(ordinary_timeout_recipe){
    const auto* prepared=melee_web_menu_host_post_vs_mode(host);
    check(prepared!=nullptr,"Ordinary timeout has no retained post-VS mode");
@@ -5285,6 +5387,10 @@ int main(int argc,char** argv){try{
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
   trace.event("menu_setup_application_cleanup_complete",nullptr);
   std::cout<<"Native closed CSS/SSS raw and normalized selection diagnostic with host/VS/application cleanup passed; no tie or SD world\n";
+ }else if(sparse_pad_recipe){
+  check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
+  check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
+  std::cout<<"Native authored sparse source PAD/checked owner cleanup passed; no CSS joining, Results, browser or original comparison claim\n";
  }else if(ordinary_timeout_recipe){
   check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
