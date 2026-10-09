@@ -210,13 +210,17 @@ melee_web::GameplayMenuScene pending_menu_scene=melee_web::GameplayMenuScene::Ch
 enum class MenuRouteEntry { Session, Main, Title, ParentCss, TrainingCss };
 MenuRouteEntry pending_menu_entry=MenuRouteEntry::Session;
 const char* source_menu_message(){
- switch(pending_menu_scene){
- case melee_web::GameplayMenuScene::Characters:
-  return host&&melee_web_menu_host_mode_kind(host)==GM_TRAINING?
+ // Construction targets survive teardown. Read the entered source owner so
+ // preparation settling and resume cannot relabel returned CSS as prior SSS.
+ if(!host||!host_entered)return "Original menu";
+ switch(melee_web_menu_host_source_scene(host)){
+ case MELEE_WEB_MENU_HOST_SCENE_CSS:
+  return melee_web_menu_host_mode_kind(host)==GM_TRAINING?
       "Original Training character select":"Original character select";
- case melee_web::GameplayMenuScene::Stages:return "Original stage select";
- case melee_web::GameplayMenuScene::Main:return "Original main menu";
- case melee_web::GameplayMenuScene::Title:return "Original title";
+ case MELEE_WEB_MENU_HOST_SCENE_SSS:return "Original stage select";
+ case MELEE_WEB_MENU_HOST_SCENE_MAIN:return "Original main menu";
+ case MELEE_WEB_MENU_HOST_SCENE_TITLE:return "Original title";
+ case MELEE_WEB_MENU_HOST_SCENE_OPENING:return "Original Opening movie";
  }
  return "Original menu";
 }
