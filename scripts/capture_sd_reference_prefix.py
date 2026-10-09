@@ -252,8 +252,10 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
     require(type(timeout) in (int, float) and 0 < timeout <= (600 if ordinary else 180 if full_route else 600),
             "Original diagnostic deadline is unbounded")
     user = output / "user"
-    p1, p2, source_inventory = prepare_rules_profile(profile, user,
-        source_slots=(0, 2) if sparse_pair else (0, 1))
+    if sparse_pair:
+        p1, p2, source_inventory = prepare_rules_profile(profile, user, source_slots=(0, 2))
+    else:
+        p1, p2, source_inventory = prepare_rules_profile(profile, user)
     raw, status = output / "observer.bin", output / "observer-status.json"
     native, native_status = output / "inputs.mwri", output / "input-status.json"
     environment = {k: v for k, v in os.environ.items()
