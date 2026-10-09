@@ -20,8 +20,8 @@ from capture_sd_reference_prefix import menu_actions, wait_terminal_statuses
 from test_authored_sd_reference_plan import setup_bytes
 
 
-def events():
-    plan = make_input_plan()
+def events(recipe_version=1):
+    plan = make_input_plan(recipe_version)
     normal = setup_bytes()
     for slot in range(2):
         normal[0x60 + slot * 0x24 + 0xa] = 120
@@ -62,7 +62,8 @@ def events():
                          "slices": [{"tag": tag, "flags": flags, "address": 0x80001000,
                                      "hex": bytes(raw).hex()} for tag, flags, raw in data]})
         rows[-1]["payload"]["consumed"] = consumed if count is None else count
-    progress("vs_entry", ((4, 0, normal), (4, 1, persistent), (54, 0, b"\0" * 4)), count=0)
+    preferences = bytes((0, 0, 1, 1)) if recipe_version == 2 else b"\0" * 4
+    progress("vs_entry", ((4, 0, normal), (4, 1, persistent), (54, 0, preferences)), count=0)
     pad = b"".join(bytes.fromhex(value) + b"\0" for value in plan["frames"][0])
     consumed += 1
     progress("input", ((3, 0, pad),))
@@ -170,6 +171,26 @@ class SdReferenceDiagnosticTests(unittest.TestCase):
             item["hex"] = raw.hex()
             with self.assertRaisesRegex(SdDiagnosticError, "SD setup differs"):
                 self.accept(rows)
+
+    def test_versioned_cold_profile_preserves_inactive_preferences_and_port_mapping(self):
+        original = make_input_plan()
+        corrected = make_input_plan(2)
+        self.assertNotEqual(original["authored_recipe_sha256"], corrected["authored_recipe_sha256"])
+        self.assertNotIn("cold_original_context", original["authored_recipe"])
+        receiver = Receiver(corrected)
+        for row in events(2):
+            receiver.accept(row)
+        self.assertTrue(receiver.ended)
+        for field, offset, value in ((2, 2, 0), (2, 0, 1), (1, 0x64, 0), (1, 0x6a, 119)):
+            rows = events(2)
+            item = rows[2]["payload"]["slices"][field]
+            raw = bytearray.fromhex(item["hex"])
+            raw[offset] = value
+            item["hex"] = raw.hex()
+            receiver = Receiver(corrected)
+            with self.assertRaises(SdDiagnosticError):
+                for row in rows:
+                    receiver.accept(row)
 
     def test_menu_packets_are_predeclared_bounded_and_finish_in_original_sss(self):
         value = {"schema": "melee-web-sd-original-menu-inputs", "version": 1,
