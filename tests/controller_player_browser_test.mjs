@@ -177,7 +177,7 @@ try{
   console.log(`${development?'Development':'Public'} player shared controller settings pass.`);
  }
 }catch(error){
-  primaryError=error;reducedReport.result='fail';reducedReport.failure=String(error);
+  primaryError??=error;reducedReport.result='fail';reducedReport.failure=String(primaryError);
   if(values['sparse-controls-only']){
    try{await fs.writeFile(path.join(values.out,'failure.txt'),String(error)+'\n'+await page.locator('body').innerText());}
    catch(diagnosticError){reducedReport.bodyError=String(diagnosticError);}
