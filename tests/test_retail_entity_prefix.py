@@ -204,7 +204,7 @@ class RetailEntityPrefixTests(unittest.TestCase):
 #include <vector>
 #include <stdexcept>
 #include <string>
-struct Recipe { bool diagnostic_entity_prefix=true; std::vector<int> frames=std::vector<int>(62); bool whole_session(){return true;} unsigned diagnostic_source_observations(){return 60;} };
+struct Recipe { bool diagnostic_entity_prefix=true, diagnostic_active_entity_prefix=false; std::vector<int> frames=std::vector<int>(62); bool whole_session(){return true;} unsigned diagnostic_source_observations(){return 60;} };
 struct Clock { bool pending(){return true;} void reset(){} };
 int observed_replay_scene(){return 3;}
 int melee_web_match_rules_publish_result(){throw std::runtime_error("prefix published terminal");}
@@ -278,7 +278,16 @@ static void entity_prefix_checks(){
  for(int mode=1;mode<=6;++mode){fake::prefix_override=mode;require_error(bytes,"CPU9 roster","wrong_prefix_player");}
  fake::prefix_override=7;require_error(bytes,"foreign active tail","wrong_prefix_tail");
  fake::prefix_override=0;
- auto wrong=bytes;wrong[23]=2;require_error(wrong,"context flags","unknown_prefix");
+ auto wrong=bytes;wrong[23]=3;require_error(wrong,"context flags","unknown_prefix");
+ auto active=bytes;active[23]=2;
+ require_error(active,"batching is unsupported","active_prefix_short_interval");
+ active.insert(active.begin()+spans,44,0);
+ auto set_active32=[&](size_t offset,unsigned value){active[offset]=value>>24;active[offset+1]=value>>16;active[offset+2]=value>>8;active[offset+3]=value;};
+ set_active32(12,new_count+1);set_active32(last+44,new_count);
+ auto active_prefix=read_retail_replay(active);
+ if(!active_prefix.diagnostic_active_entity_prefix||active_prefix.diagnostic_source_observations()!=61)
+  throw std::runtime_error("active prefix did not bind actual interval");
+ for(uint32_t v:{9U,10U}){auto other=recipe_fixture(v);other[23]=2;require_error(other,"context flags","wrong_version_active_prefix");}
  wrong=bytes;wrong[setup+0x130]=8;require_error(wrong,"CPU9 roster","wrong_prefix_roster");
  wrong=bytes;wrong[setup]^=1;require_error(wrong,"stock rules","wrong_prefix_rules");
  wrong=bytes;wrong[spans+2+kRetailReplaySpanBytes]=kRetailReplayCss;require_error(wrong,"CSS/SSS/Match","wrong_prefix_scene");

@@ -38,7 +38,8 @@ class ReferenceEntityProfileTests(unittest.TestCase):
         from test_reference_observer_stream import frame,stream
         for count,profile,accepted in ((1,'jiggly-ice-mario-fox-v1',True),(1,None,False),
                                        (3,None,True),(3,'jiggly-ice-mario-fox-v1',False),
-                                       (1,'unknown',False)):
+                                       (1,'unknown',False), (1,'jiggly-ice-mario-fox-active60-v1',True),
+                                       (3,'jiggly-ice-mario-fox-active60-v1',False)):
             payload={'whole_session':True,'match_count':count}
             if profile is not None:payload['entity_profile']=profile
             with tempfile.TemporaryDirectory() as td:
@@ -69,7 +70,7 @@ constexpr unsigned WHOLE_SESSION_MIN_MATCHES=3,WHOLE_SESSION_MAX_MATCHES=64;
 '''+count_function+r'''
 bool SdInitRequested(){return !Env("MWRC_SD_INIT").empty();}
 struct Reader {
- unsigned whole_session_matches=0;bool checked_entity_profile=false;std::string error;
+ unsigned whole_session_matches=0;bool checked_entity_profile=false,active_entity_profile=false;std::string error;
  bool SetInvalid(const char* s){error=s;return false;}
  bool configure(){
 ''' + gate + r'''
@@ -85,6 +86,10 @@ int main(){
  environment["MWRC_ENTITY_PROFILE"]="jiggly-ice-mario-fox-v1";
  r=Reader{};assert(r.configure()&&r.checked_entity_profile);
  assert(r.identity()=="base,\"entity_profile\":\"jiggly-ice-mario-fox-v1\"");
+ environment["MWRC_ENTITY_PROFILE"]="jiggly-ice-mario-fox-active60-v1";
+ r=Reader{};assert(r.configure()&&r.checked_entity_profile&&r.active_entity_profile);
+ assert(r.identity()=="base,\"entity_profile\":\"jiggly-ice-mario-fox-active60-v1\"");
+ environment["MWRC_ENTITY_PROFILE"]="jiggly-ice-mario-fox-v1";
  environment["MWRC_WHOLE_SESSION_MATCHES"]="3";r=Reader{};assert(!r.configure());
  environment["MWRC_WHOLE_SESSION_MATCHES"]="1";
  for(const char* other:{"MWRC_SD_INIT","MWRC_CPU_PROBE_OUTPUT","MWRC_ITEM_PROBE_OUTPUT","MWRC_ALLOCATION_OUTPUT"}){

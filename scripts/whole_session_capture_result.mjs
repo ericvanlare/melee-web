@@ -190,7 +190,8 @@ export function validateRuntimeDataAbort(evidence) {
 // 20-byte envelope + 8-byte v2 context header + context + StartMeleeData (0x138)
 // + full PAD (822) + 44 bytes/input frame + u16 span count + 12 bytes/span.
 export function readRequestedEntityPrefix(bytes, recipeSha256) {
-  if (bytes.length < 24 || bytes.readUInt16BE(22) !== 1) return null;
+  if (bytes.length < 24 || ![1, 2].includes(bytes.readUInt16BE(22))) return null;
+  const activeClock = bytes.readUInt16BE(22) === 2;
   if (bytes.readUInt32BE(4) !== 8 || bytes.length < 28 ||
       bytes.readUInt16BE(20) !== 2 ||
       bytes.readUInt32BE(24) !== 0x18 + 0x55e8 + 0x148 + 6 ||
@@ -211,9 +212,10 @@ export function readRequestedEntityPrefix(bytes, recipeSha256) {
     next = last + 1;
     if (index === 2) observations = last - first + 1;
   }
-  if (next !== frames || observations < 60 || observations > 64)
+  if (next !== frames || observations < (activeClock ? 61 : 60) || observations > (activeClock ? 604 : 64))
     throw Error('Entity prefix Match interval is outside its observed-source bound');
-  return {name: 'jiggly-ice-mario-fox-v1', frames, observations, recipe_sha256: recipeSha256};
+  return {name: activeClock ? 'jiggly-ice-mario-fox-active60-v1' : 'jiggly-ice-mario-fox-v1',
+    frames, observations, recipe_sha256: recipeSha256};
 }
 
 export function sessionReplayReportCompleted(value, requestedPrefix = null) {
@@ -221,16 +223,20 @@ export function sessionReplayReportCompleted(value, requestedPrefix = null) {
       (value.errors !== undefined && (!Array.isArray(value.errors) || value.errors.length))) return false;
   if (!requestedPrefix)
     return value.complete === true && ['diagnostic_prefix', 'diagnostic_prefix_complete',
-      'whole_session_equivalent', 'comparison_source_ticks', 'source_progress'].every(key => value[key] === undefined);
+      'whole_session_equivalent', 'comparison_source_ticks', 'comparison_active_clock_ticks',
+      'source_progress'].every(key => value[key] === undefined);
   const progress = value.source_progress, metrics = value.metrics;
+  const activeClock = requestedPrefix.name === 'jiggly-ice-mario-fox-active60-v1';
   return value.schema === 'melee-web-browser-retail-replay' && value.version === 1 &&
-    requestedPrefix.name === 'jiggly-ice-mario-fox-v1' &&
+    (requestedPrefix.name === 'jiggly-ice-mario-fox-v1' || activeClock) &&
     Number.isSafeInteger(requestedPrefix.frames) && requestedPrefix.frames >= 1 &&
     /^[a-f0-9]{64}$/.test(requestedPrefix.recipe_sha256 || '') &&
-    Number.isInteger(requestedPrefix.observations) && requestedPrefix.observations >= 60 &&
-    requestedPrefix.observations <= 64 && value.diagnostic_prefix === requestedPrefix.name &&
+    Number.isInteger(requestedPrefix.observations) && requestedPrefix.observations >= (activeClock ? 61 : 60) &&
+    requestedPrefix.observations <= (activeClock ? 604 : 64) && value.diagnostic_prefix === requestedPrefix.name &&
     value.diagnostic_prefix_complete === true && value.complete === false &&
-    value.whole_session_equivalent === false && value.comparison_source_ticks === 60 &&
+    value.whole_session_equivalent === false &&
+    value.comparison_source_ticks === (activeClock ? requestedPrefix.observations : 60) &&
+    (activeClock ? value.comparison_active_clock_ticks === 60 : value.comparison_active_clock_ticks === undefined) &&
     value.mode === 'state_capture' && value.final_scene === 3 &&
     value.recipe_sha256 === requestedPrefix.recipe_sha256 && value.frames === requestedPrefix.frames &&
     progress?.observations === requestedPrefix.observations &&

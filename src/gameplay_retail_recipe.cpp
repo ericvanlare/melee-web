@@ -328,9 +328,12 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
               "Unsupported whole-session first-CSS context header");
         const auto context_flags = input.u16();
         check(context_flags == 0 || (result.version == kRetailReplayV8Version &&
-              context_flags == kRetailReplayEntityPrefixFlag),
+              (context_flags == kRetailReplayEntityPrefixFlag ||
+               context_flags == kRetailReplayActiveEntityPrefixFlag)),
               "Unsupported whole-session first-CSS context flags");
-        result.diagnostic_entity_prefix = context_flags == kRetailReplayEntityPrefixFlag;
+        result.diagnostic_entity_prefix = context_flags == kRetailReplayEntityPrefixFlag ||
+                                           context_flags == kRetailReplayActiveEntityPrefixFlag;
+        result.diagnostic_active_entity_prefix = context_flags == kRetailReplayActiveEntityPrefixFlag;
         check(input.u32() == kRetailReplayContextBytes,
               "Whole-session first-CSS context size disagrees with its transport");
         result.initial_css = std::make_unique<RetailReplayInitialCssContext>();
@@ -474,7 +477,10 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
                   result.spans[1].scene == kRetailReplaySss &&
                   result.spans[2].scene == kRetailReplayMatch,
                   "Entity prefix requires one CSS/SSS/Match route ending in Match");
-            check(result.diagnostic_source_observations() == 60,
+            check(result.diagnostic_active_entity_prefix ?
+                  (result.diagnostic_source_observations() >= 61 &&
+                   result.diagnostic_source_observations() <= 604) :
+                  result.diagnostic_source_observations() == 60,
                   "Entity prefix captured batching is unsupported by per-tick browser draws");
         } else {
         check(result.spans.back().scene == kRetailReplayResults ||

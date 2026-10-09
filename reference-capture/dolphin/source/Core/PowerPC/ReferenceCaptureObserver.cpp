@@ -202,6 +202,46 @@ struct EntityPrefixBoundaryProgress
   }
 };
 
+// Independent named diagnostic: retain Entry/Ready plus sixty observed unit
+// MatchClock advances. At DrawReturn, qualification precedes the diagnostic
+// 600-observation stop: the finishing capacity-five batch may reach 604, and
+// may include the sixtieth advance. This is not an authored Ready duration.
+struct ActiveEntityPrefixBoundaryProgress
+{
+  static constexpr u32 queue_capacity = 5, maximum_ticks = 604;
+  u32 observations = 0, batch_ticks = 0, active_advances = 0, last_clock = 0;
+  bool drawing = false, qualified = false;
+  int Observe(Boundary boundary, u32 tick, u8 qnum, u32 clock = 0)
+  {
+    if (qualified || qnum != queue_capacity) return -1;
+    if (boundary == Boundary::SourceTick)
+    {
+      if (drawing || tick != observations || observations >= maximum_ticks ||
+          batch_ticks >= queue_capacity || (!observations && clock != 0) ||
+          clock < last_clock || clock - last_clock > 1) return -1;
+      active_advances += clock - last_clock;
+      last_clock = clock;
+      ++observations;
+      ++batch_ticks;
+    }
+    else if (boundary == Boundary::DrawEnter)
+    {
+      if (drawing || tick != observations) return -1;
+      drawing = true;
+    }
+    else if (boundary == Boundary::DrawReturn)
+    {
+      if (!drawing || tick != observations) return -1;
+      drawing = false;
+      batch_ticks = 0;
+      if (active_advances >= 60) { qualified = true; return 1; }
+      if (observations >= 600) return -1;
+    }
+    else return -1;
+    return 0;
+  }
+};
+
 enum class SliceTag : u16
 {
   PadStatusAll4 = 1,
@@ -703,7 +743,8 @@ u32 WholeSessionMatchCount()
       return 0;
   }
   return result >= WHOLE_SESSION_MIN_MATCHES ||
-         (result == 1 && Env("MWRC_ENTITY_PROFILE") == "jiggly-ice-mario-fox-v1") ? result : 0;
+         (result == 1 && (Env("MWRC_ENTITY_PROFILE") == "jiggly-ice-mario-fox-v1" ||
+                         Env("MWRC_ENTITY_PROFILE") == "jiggly-ice-mario-fox-active60-v1")) ? result : 0;
 }
 
 bool ValidIdentity(std::string_view value)
@@ -1026,7 +1067,8 @@ struct Observer::Impl
     }
     whole_session_matches = WholeSessionMatchCount();
     const std::string entity_profile = Env("MWRC_ENTITY_PROFILE");
-    checked_entity_profile = entity_profile == "jiggly-ice-mario-fox-v1";
+    active_entity_profile = entity_profile == "jiggly-ice-mario-fox-active60-v1";
+    checked_entity_profile = entity_profile == "jiggly-ice-mario-fox-v1" || active_entity_profile;
     if ((!entity_profile.empty() && !checked_entity_profile) ||
         (checked_entity_profile && (whole_session_matches != 1 || SdInitRequested() ||
           !Env("MWRC_CPU_PROBE_OUTPUT").empty() || !Env("MWRC_ITEM_PROBE_OUTPUT").empty() ||
@@ -1214,7 +1256,7 @@ struct Observer::Impl
     if (OrdinaryTimeoutRequested())
       handshake += ",\"ordinary_policy_sha256\":\"" + Env("MWRC_ORDINARY_POLICY_SHA256") + "\"";
     if (checked_entity_profile)
-      handshake += ",\"entity_profile\":\"jiggly-ice-mario-fox-v1\"";
+      handshake += ",\"entity_profile\":\"" + Env("MWRC_ENTITY_PROFILE") + "\"";
     handshake += "}";
     PushJson(Event::Handshake, handshake);
     std::string start =
@@ -1228,7 +1270,7 @@ struct Observer::Impl
     else
       start += "\"";
     if (checked_entity_profile)
-      start += ",\"entity_profile\":\"jiggly-ice-mario-fox-v1\"";
+      start += ",\"entity_profile\":\"" + Env("MWRC_ENTITY_PROFILE") + "\"";
     if (transform_prefix_enabled)
       start += ",\"diagnostic\":\"sheik_transform_prefix\",\"max_active_source_ticks\":600"
                ",\"completion_boundary\":\"active_sheik_grounded_neutral_source_tick_after_owner_change\"";
@@ -3804,7 +3846,13 @@ struct Observer::Impl
         u8 qnum = 0;
         if (!ReadBytes(system, 0x804c1f78, 1, &qnum))
           return SetInvalid("entity prefix queue capacity is unreadable"), void();
-        const int admission = entity_prefix_progress.Observe(boundary, source_tick, qnum);
+        u32 clock = 0;
+        if (active_entity_profile && boundary == Boundary::SourceTick &&
+            !ReadU32(system, 0x8046B6C4, &clock))
+          return SetInvalid("active entity prefix MatchClock is unreadable"), void();
+        const int admission = active_entity_profile ?
+            active_entity_prefix_progress.Observe(boundary, source_tick, qnum, clock) :
+            entity_prefix_progress.Observe(boundary, source_tick, qnum);
         if (admission < 0)
           return SetInvalid("entity prefix source/draw batch boundary differs"), void();
         entity_prefix_final_draw = admission == 1;
@@ -4770,6 +4818,14 @@ struct Observer::Impl
                    (complete ? "true" : "false") + ",\"whole_session_equivalent\":false," +
                    "\"comparison_source_ticks\":60,\"observed_source_ticks\":" +
                    std::to_string(entity_prefix_progress.observations) + "}";
+          if (active_entity_profile)
+            json = "{\"status\":\"" + std::string(complete ? "completed" : "interrupted") +
+                   "\",\"natural\":false,\"diagnostic_prefix_complete\":" +
+                   (complete ? "true" : "false") + ",\"whole_session_equivalent\":false," +
+                   "\"comparison_source_ticks\":" + std::to_string(active_entity_prefix_progress.observations) +
+                   ",\"observed_source_ticks\":" + std::to_string(active_entity_prefix_progress.observations) +
+                   ",\"comparison_active_clock_ticks\":60,\"observed_active_clock_advances\":" +
+                   std::to_string(active_entity_prefix_progress.active_advances) + "}";
           if (complete && transform_prefix_enabled)
           {
             json = "{\"status\":\"completed\",\"natural\":true,"
@@ -4845,10 +4901,17 @@ struct Observer::Impl
         (completed ? "true" : "false") + ",\"invalid\":" +
         (invalid.load() ? "true" : "false") + ",\"error\":" +
         (error_text.empty() ? "null" : "\"" + error_text + "\"");
-    if (checked_entity_profile && force && state != "starting")
+    if (checked_entity_profile && !active_entity_profile && force && state != "starting")
       json += ",\"diagnostic_prefix_complete\":" + std::string(completed ? "true" : "false") +
               ",\"whole_session_equivalent\":false,\"comparison_source_ticks\":60," +
               "\"observed_source_ticks\":" + std::to_string(entity_prefix_progress.observations);
+    if (active_entity_profile && force && state != "starting")
+      json += ",\"diagnostic_prefix_complete\":" + std::string(completed ? "true" : "false") +
+              ",\"whole_session_equivalent\":false,\"comparison_source_ticks\":" +
+              std::to_string(active_entity_prefix_progress.observations) +
+              ",\"observed_source_ticks\":" + std::to_string(active_entity_prefix_progress.observations) +
+              ",\"comparison_active_clock_ticks\":60,\"observed_active_clock_advances\":" +
+              std::to_string(active_entity_prefix_progress.active_advances);
     json += CpuProbeCloseStatusJson();
     json += "}\n";
     if (!status.Write(reinterpret_cast<const u8*>(json.data()), json.size()) || !status.Flush() ||
@@ -4965,6 +5028,8 @@ struct Observer::Impl
   std::array<bool, 16> item_probe_pair_active{};
   std::array<u32, 16> item_probe_pair_lr{};
   bool checked_entity_profile = false;
+  bool active_entity_profile = false;
+  ActiveEntityPrefixBoundaryProgress active_entity_prefix_progress;
   EntityPrefixBoundaryProgress entity_prefix_progress;
   bool entity_prefix_final_draw = false;
   u32 whole_session_matches = 0;

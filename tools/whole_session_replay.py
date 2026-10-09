@@ -186,11 +186,19 @@ def _record_envelope(
         _fail("whole-session observer stream must end with an end record")
     end = _payload(records[-1], len(records) - 1)
     if entity_prefix:
+        active_clock = records[0].get("payload", {}).get("entity_profile") == ENTITY_ACTIVE_PREFIX_PROFILE
         if (end.get("status") != "completed" or end.get("natural") is not False or
                 end.get("diagnostic_prefix_complete") is not True or
                 end.get("whole_session_equivalent") is not False or
-                end.get("comparison_source_ticks") != 60):
+                (not active_clock and end.get("comparison_source_ticks") != 60)):
             _fail("observer stream did not complete its declared diagnostic prefix")
+        if active_clock:
+            count = _integer(end.get("observed_source_ticks"), "active prefix observations", 61, 604)
+            if (end.get("comparison_source_ticks") != count or
+                    end.get("comparison_active_clock_ticks") != 60 or
+                    type(end.get("observed_active_clock_advances")) is not int or
+                    end["observed_active_clock_advances"] < 60):
+                _fail("observer active-clock prefix footer differs from its declared scope")
     elif end.get("status") != "completed" or end.get("natural") is not True:
         _fail("observer stream did not complete naturally")
     return _payload(records[0], 0), _payload(records[1], 1), end
@@ -214,7 +222,7 @@ def _capture_identity(records: list[Mapping[str, Any]], *, entity_prefix: bool =
         if announcement.get("whole_session") is not True:
             _fail(f"{context} does not declare whole_session=true")
         if entity_prefix:
-            if announcement.get("entity_profile") != ENTITY_PREFIX_PROFILE:
+            if announcement.get("entity_profile") not in (ENTITY_PREFIX_PROFILE, ENTITY_ACTIVE_PREFIX_PROFILE):
                 _fail(f"{context} does not bind the declared entity profile")
             _integer(announcement.get("match_count"), f"{context} match_count", 1, 1)
         else:
@@ -228,6 +236,8 @@ def _capture_identity(records: list[Mapping[str, Any]], *, entity_prefix: bool =
     for field in ("match_count", "capture_id", "sequence_id"):
         if handshake.get(field) != start.get(field):
             _fail(f"observer {field} disagrees between handshake and start")
+    if entity_prefix and handshake.get("entity_profile") != start.get("entity_profile"):
+        _fail("observer entity profile disagrees between handshake and start")
     if start.get("source_revision") != "GALE01r2":
         _fail("observer start is not for GALE01r2")
     return {
@@ -689,7 +699,8 @@ def _recipe_key(capture: Mapping[str, Any]) -> tuple[Any, ...]:
     )
 
 
-def _encode_whole_session(capture: Mapping[str, Any], version: int, *, entity_prefix: bool = False) -> tuple[bytes, dict[str, Any]]:
+def _encode_whole_session(capture: Mapping[str, Any], version: int, *, entity_prefix: bool = False,
+                          entity_prefix_flag: int = 1) -> tuple[bytes, dict[str, Any]]:
     frames = capture["frames"]
     spans = capture["spans"]
     if not 1 <= len(frames) <= V8_MAX_FRAMES:
@@ -751,7 +762,9 @@ def _encode_whole_session(capture: Mapping[str, Any], version: int, *, entity_pr
         _fail("whole-session timeline must end in Results or Prize")
     payload = bytearray(HEADER.pack(MAGIC, version, seed, len(frames),
                                     characters, stages))
-    payload += CONTEXT_HEADER.pack(CONTEXT_VERSION, 1 if entity_prefix else 0, CONTEXT_BYTES)
+    if entity_prefix_flag not in (1, 2):
+        _fail("unsupported named entity prefix flag")
+    payload += CONTEXT_HEADER.pack(CONTEXT_VERSION, entity_prefix_flag if entity_prefix else 0, CONTEXT_BYTES)
     payload += game_rules + save_data + css_data + ko_counts
     if version == MWRC_V8_VERSION:
         payload += setup
@@ -773,10 +786,11 @@ def _encode_whole_session(capture: Mapping[str, Any], version: int, *, entity_pr
 
 
 ENTITY_PREFIX_PROFILE = "jiggly-ice-mario-fox-v1"
+ENTITY_ACTIVE_PREFIX_PROFILE = "jiggly-ice-mario-fox-active60-v1"
 ENTITY_PREFIX_ROSTER = (15, 14, 8, 2)
 
 
-def entity_prefix_interval(records: list[dict]) -> dict[str, Any]:
+def entity_prefix_interval(records: list[dict], *, active_clock: bool = False) -> dict[str, Any]:
     """Retain the passive first qualifying draw, including its complete batch.
 
     Capacity five is authored by gmMain's HSD_PadInit, and is verified in each
@@ -790,6 +804,8 @@ def entity_prefix_interval(records: list[dict]) -> dict[str, Any]:
     pending_pad = None
     previous_seq = None
     setup_seen = False
+    last_clock = 0
+    active_advances = 0
     for row in records:
         seq = row.get("seq")
         if type(seq) is not int or (previous_seq is not None and seq != previous_seq + 1):
@@ -832,8 +848,17 @@ def entity_prefix_interval(records: list[dict]) -> dict[str, Any]:
             _consumed_ports(row, seq)
             pads.append(row)
         elif boundary == "source_tick":
-            if drawing or pending_pad is None or batch >= 5 or len(ticks) >= 64:
+            if drawing or pending_pad is None or batch >= 5 or len(ticks) >= (604 if active_clock else 64):
                 _fail("entity prefix source batch exceeds its authored bounds")
+            if active_clock:
+                clock_owner, clock_slice = _slice(row, "match_clock", 0x2e, "active prefix MatchClock")
+                if clock_owner.get("address") != 0x8046b6a0 or clock_owner.get("flags", 0) != 0:
+                    _fail("active prefix MatchClock escaped its original semantic owner")
+                clock = int.from_bytes(clock_slice[0x24:0x28], "big")
+                if (not ticks and clock != 0) or clock < last_clock or clock - last_clock > 1:
+                    _fail("active prefix MatchClock lacks its initial zero or unit advances")
+                active_advances += clock - last_clock
+                last_clock = clock
             ticks.append(row)
             pending_pad = None
             batch += 1
@@ -847,14 +872,18 @@ def entity_prefix_interval(records: list[dict]) -> dict[str, Any]:
             drawing = False
             batches.append(batch)
             batch = 0
-            if len(ticks) >= 60:
+            if (active_advances >= 60 if active_clock else len(ticks) >= 60):
                 final = row
+            elif active_clock and len(ticks) >= 600:
+                _fail("active prefix diagnostic observation cap ended before sixty clock advances")
     if final is None or drawing or pending_pad is not None:
         _fail("entity prefix lacks its first qualifying checked DrawReturn")
     return {"source_rows": ticks, "pad_rows": pads, "draw_batches": batches,
             "retained_records": [row for row in records if row["seq"] <= final["seq"]],
-            "comparison_source_ticks": 60, "observed_source_ticks": len(ticks),
-            "final_draw_seq": final["seq"], "final_source_cursor": final["source_tick"]}
+            "comparison_source_ticks": len(ticks) if active_clock else 60, "observed_source_ticks": len(ticks),
+            "final_draw_seq": final["seq"], "final_source_cursor": final["source_tick"],
+            **({"comparison_active_clock_ticks": 60, "observed_active_clock_advances": active_advances,
+                "first_gameplay_clock": 0, "last_gameplay_clock": last_clock} if active_clock else {})}
 
 
 def encode_v8_entity_prefix(capture: Mapping[str, Any], interval_records: list[dict]) -> tuple[bytes, dict[str, Any]]:
@@ -866,6 +895,8 @@ def encode_v8_entity_prefix(capture: Mapping[str, Any], interval_records: list[d
     """
     from character_state_compare import _source_state, ComparisonError
     identity = _capture_identity(interval_records, entity_prefix=True)
+    profile = interval_records[0]["payload"]["entity_profile"]
+    active_clock = profile == ENTITY_ACTIVE_PREFIX_PROFILE
     first_css = _first_css_context(interval_records)
     for key in ("rng", "pad_state_hex", "profile_masks", "game_rules_hex", "save_data_hex", "css_data_hex", "ko_counts_hex"):
         if capture["first_css"].get(key) != first_css[key]:
@@ -890,7 +921,7 @@ def encode_v8_entity_prefix(capture: Mapping[str, Any], interval_records: list[d
         if (p["port"], p["character_kind"], p["costume"], p["stocks"],
             p["player_type"], p.get("cpu_kind"), p.get("cpu_level"), p["rumble_enabled"]) != (slot+1, kind, slot, 4, 1, 4, 9, False):
             _fail("entity prefix differs from its declared CPU9 roster")
-    interval = entity_prefix_interval(interval_records)
+    interval = entity_prefix_interval(interval_records, active_clock=active_clock)
     # Existing v8 renders every input tick. Preserve the original interval as
     # failure evidence; never convert a multi-tick original draw into v8.
     if any(batch != 1 for batch in interval["draw_batches"]):
@@ -898,6 +929,8 @@ def encode_v8_entity_prefix(capture: Mapping[str, Any], interval_records: list[d
     source_observations = interval["source_rows"]
     if interval_records[-1]["payload"].get("observed_source_ticks") != len(source_observations):
         _fail("entity prefix final count disagrees with its retained source interval")
+    if active_clock and interval_records[-1]["payload"].get("observed_active_clock_advances") != interval["observed_active_clock_advances"]:
+        _fail("active prefix clock count differs from its actual retained MatchClock fields")
     previous = None
     ticks = []
     for row in source_observations:
@@ -921,12 +954,15 @@ def encode_v8_entity_prefix(capture: Mapping[str, Any], interval_records: list[d
         _fail("entity prefix PAD history is not bound to its actual source observations")
     if [frame["pads"] for frame in match_frames] != [_consumed_ports(row, row["seq"]) for row in interval["pad_rows"]]:
         _fail("entity prefix PAD values differ from actual retained consumed slots")
-    payload, metadata = _encode_whole_session(capture, MWRC_V8_VERSION, entity_prefix=True)
-    return payload, {**metadata, "source_identity": identity, "diagnostic_prefix": ENTITY_PREFIX_PROFILE,
-                     "comparison_source_ticks": 60, "source_observations": len(ticks),
+    payload, metadata = _encode_whole_session(capture, MWRC_V8_VERSION, entity_prefix=True,
+                                             entity_prefix_flag=2 if active_clock else 1)
+    return payload, {**metadata, "source_identity": identity, "diagnostic_prefix": profile,
+                     "comparison_source_ticks": len(ticks) if active_clock else 60, "source_observations": len(ticks),
                      "final_draw_seq": interval["final_draw_seq"],
                      "draw_batches": interval["draw_batches"], "first_source_tick": ticks[0],
-                     "last_source_tick": ticks[-1], "whole_session_equivalent": False}
+                     "last_source_tick": ticks[-1], "whole_session_equivalent": False,
+                     **({key: interval[key] for key in ("comparison_active_clock_ticks",
+                         "observed_active_clock_advances", "first_gameplay_clock", "last_gameplay_clock")} if active_clock else {})}
 
 
 def encode_v8(capture: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:

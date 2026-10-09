@@ -50,6 +50,7 @@ struct RetailReplayInitialCssContext {
 struct RetailReplayRecipe {
     uint32_t version = 0, seed = 0;
     bool diagnostic_entity_prefix = false;
+    bool diagnostic_active_entity_prefix = false;
     std::array<uint8_t, 0x138> setup{};
     std::array<uint8_t, MELEE_WEB_PAD_STATE_BYTES> pad_bytes{};
     MeleeWebMenuMatchSelection selection{};
@@ -101,6 +102,7 @@ constexpr uint32_t kRetailReplayFighterVersion = 10;
 constexpr uint16_t kRetailReplayContextVersion = 2;
 // Named opt-in: jiggly-ice-mario-fox-v1, one bounded diagnostic prefix.
 constexpr uint16_t kRetailReplayEntityPrefixFlag = 1;
+constexpr uint16_t kRetailReplayActiveEntityPrefixFlag = 2;
 constexpr size_t kRetailReplayGameRulesBytes = 0x18;
 constexpr size_t kRetailReplaySaveDataBytes = 0x55E8;
 constexpr size_t kRetailReplayCssDataBytes = 0x148;

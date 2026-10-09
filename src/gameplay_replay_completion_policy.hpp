@@ -13,8 +13,8 @@ struct DiagnosticPrefixProgress {
     static constexpr std::uint32_t comparison_ticks = 60, authored_queue_capacity = 5;
     static constexpr std::uint32_t maximum_ticks = comparison_ticks + authored_queue_capacity - 1;
     std::uint32_t observations = 0, first_source_tick = 0, last_source_tick = 0;
-    bool observe(std::uint32_t before, std::uint32_t after) noexcept {
-        if (observations >= maximum_ticks || (!observations && before != 0) ||
+    bool observe(std::uint32_t before, std::uint32_t after, bool active_clock_prefix = false) noexcept {
+        if (observations >= (active_clock_prefix ? 604u : maximum_ticks) || (!observations && before != 0) ||
             before == UINT32_MAX || after != before + 1 ||
             (observations && before != last_source_tick + 1)) return false;
         if (!observations) first_source_tick = before;
@@ -23,8 +23,9 @@ struct DiagnosticPrefixProgress {
         return true;
     }
     bool ready(std::uint32_t bound_observations, bool input_consumed, bool final_draw, bool live_match,
-               bool pending, bool complete, int outcome) const noexcept {
-        return bound_observations >= comparison_ticks && bound_observations <= maximum_ticks &&
+               bool pending, bool complete, int outcome, bool active_clock_prefix = false) const noexcept {
+        return bound_observations >= (active_clock_prefix ? 61u : comparison_ticks) &&
+               bound_observations <= (active_clock_prefix ? 604u : maximum_ticks) &&
                observations == bound_observations && input_consumed && final_draw && live_match &&
                !pending && !complete && outcome == 0;
     }

@@ -1448,7 +1448,7 @@ void tick(){
     replay_completion.final_input_owner=static_cast<melee_web::ReplayCompletionOwner>(observed_replay_scene());
     if(replay->diagnostic_entity_prefix){
      check(replay_prefix_progress.ready(replay->diagnostic_source_observations(),true,true,match!=nullptr,pending,
-           replay_match_complete,replay_outcome),
+           replay_match_complete,replay_outcome,replay->diagnostic_active_entity_prefix),
            "Diagnostic entity prefix did not consume its bound live source interval and final draw");
      replay_final_draw=true;replay_completed_now=true;running=false;menu_clock.reset();
      message="Diagnostic entity prefix complete; whole-session comparison remains incomplete.";
@@ -1730,7 +1730,7 @@ void tick(){
     const auto prefix_tick_before=replay&&replay->diagnostic_entity_prefix?gm_801A4BA8():0;
     match->tick(sample);
     if(replay&&replay->diagnostic_entity_prefix)
-     check(replay_prefix_progress.observe(prefix_tick_before,gm_801A4BA8()) &&
+     check(replay_prefix_progress.observe(prefix_tick_before,gm_801A4BA8(),replay->diagnostic_active_entity_prefix) &&
            !match->paused()&&!match->complete()&&!match->ending(),
            "Diagnostic entity prefix lost its original live source boundary");
     if(replay_whole)melee_web_cpu_observation_scheduler_return();
@@ -2004,10 +2004,10 @@ void tick(){
 #else
  ++render_frame;
 #endif
- if(replay_completed_now)EM_ASM({window.menuReplayCompleted?.($0,!!$1,$2,$3,$4,!!$5,$6,$7,$8,$9);},
+ if(replay_completed_now)EM_ASM({window.menuReplayCompleted?.($0,!!$1,$2,$3,$4,$5,$6,$7,$8,$9);},
                                 replay_cursor,replay_match_complete?1:0,
                                 replay_outcome,replay_winner,observed_replay_scene(),
-                                replay&&replay->diagnostic_entity_prefix?1:0,
+                                replay&&replay->diagnostic_entity_prefix?(replay->diagnostic_active_entity_prefix?2:1):0,
                                 replay_prefix_progress.observations,
                                 replay_prefix_progress.first_source_tick,
                                 replay_prefix_progress.last_source_tick,

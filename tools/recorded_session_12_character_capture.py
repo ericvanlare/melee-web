@@ -1123,7 +1123,7 @@ def _args() -> argparse.Namespace:
                         help="cycle three source-confirmed CPU9 lineups through CSS/SSS without matches")
     parser.add_argument("--team-route", action="store_true",
                         help="capture three original VS Rules/Items Teams matches through Results/CSS returns")
-    parser.add_argument("--entity-prefix", choices=(replay.ENTITY_PREFIX_PROFILE,),
+    parser.add_argument("--entity-prefix", choices=(replay.ENTITY_PREFIX_PROFILE, replay.ENTITY_ACTIVE_PREFIX_PROFILE),
                         help="one four-CPU original setup and passive first qualifying draw prefix")
     return parser.parse_args()
 
