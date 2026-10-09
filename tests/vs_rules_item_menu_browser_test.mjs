@@ -11,7 +11,10 @@ import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 import {createCssHumanJoinDriver} from './vs_css_two_human_driver.mjs';
-import {confirmTwoHumanResults} from './vs_rules_results_confirmation_driver.mjs';
+import {
+  classifyResultsOwnerReadiness,
+  confirmTwoHumanResults,
+} from './vs_rules_results_confirmation_driver.mjs';
 import {
   installRuntimeDiagnosticsCapture,
   readRuntimeDiagnosticCounters,
@@ -361,6 +364,8 @@ const current = () => page.evaluate(() => ({
   message: Module?._melee_web_native_menu_message ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : null,
   phase: Module?._melee_web_native_menu_phase?.() ?? null,
   running: Module?._melee_web_native_menu_running?.() ?? null,
+  pause_present: Boolean(document.querySelector('#pause')),
+  pause_disabled: document.querySelector('#pause')?.disabled ?? null,
   status: document.querySelector('#status')?.textContent || '',
   error: document.querySelector('#status')?.dataset.runtimeError || null,
   diagnostics: Module?._melee_web_native_menu_diagnostics
@@ -1242,16 +1247,32 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
   const observeResultsHost = async label => {
     await resumeTimingPause(label);
     const state = await ensureNoError(label);
-    if (state.phase === 5)
+    if ((state.phase === 5 || state.running === 0 || state.pause_disabled === true) &&
+        Date.now() - lastRuntimeCounterPollAt >= 1000)
       await checkRuntimeDiagnosticCounters(`${label} stopped preparation health`, false);
     return state;
   };
-  const resultsPresentationDeadline = Math.min(Date.now() + 4500, resultsDeadline);
-  while (Date.now() < resultsPresentationDeadline) {
-    await ensureNoError('original Results presentation');
-    await resumeTimingPause('original Results presentation remains active');
-    await page.waitForTimeout(Math.min(250, resultsPresentationDeadline - Date.now()));
+  let resultsPresentationReadyAt = null;
+  let resultsPresentationReady = false;
+  let lastResultsHostState = null;
+  while (Date.now() < resultsDeadline) {
+    lastResultsHostState = await observeResultsHost('original Results presentation readiness');
+    const readiness = classifyResultsOwnerReadiness(lastResultsHostState);
+    if (readiness.kind === 'invalid')
+      throw Error(`Original Results presentation reached an unsupported host state: ${JSON.stringify({readiness, state: lastResultsHostState})}`);
+    if (readiness.kind === 'active') {
+      resultsPresentationReadyAt ??= Date.now();
+      if (Date.now() - resultsPresentationReadyAt >= 4500) {
+        resultsPresentationReady = true;
+        break;
+      }
+    } else {
+      resultsPresentationReadyAt = null;
+    }
+    await page.waitForTimeout(Math.min(250, Math.max(0, resultsDeadline - Date.now())));
   }
+  assert(resultsPresentationReady,
+    `Original Results did not remain active/UI-ready for the presentation interval: ${JSON.stringify(lastResultsHostState)}`);
   await shot('13-original-timeout-results');
   route.results_confirmation = await confirmTwoHumanResults({
     deadlineAt: resultsDeadline,

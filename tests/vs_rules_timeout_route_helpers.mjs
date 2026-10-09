@@ -1,4 +1,8 @@
-import {resultsPadTraceFailures} from './vs_rules_results_confirmation_driver.mjs';
+import {
+  classifyPrizeReturnReadiness,
+  classifyResultsDestinationReadiness,
+  resultsPadTraceFailures,
+} from './vs_rules_results_confirmation_driver.mjs';
 
 export const COMPETITIVE_TIMEOUT_BOUNDS = Object.freeze({
   stockLossWallMs: 120000,
@@ -16,8 +20,6 @@ export const COMPETITIVE_TIMEOUT_BOUNDS = Object.freeze({
 export const COMPETITIVE_PRIZE_MAX_CONFIRMATIONS = 60;
 export const COMPETITIVE_RESULTS_RETURN_POLL_MS = 250;
 
-const PRIZE_NEXT_SCENE_PREPARATION_MESSAGE = 'Preparing original character select...';
-
 // Results confirmation owns phase 8 and stops at its first source exit. The
 // original Prize screen is a separate phase-9 route back to CSS; only it may
 // receive these bounded follow-up Start inputs.
@@ -33,6 +35,7 @@ export async function returnFromCompetitivePrize({
   const initialBudgetMs = deadlineAt - Date.now();
   const maxPolls = Math.ceil(initialBudgetMs / pollMs) + 2;
   let pollCount = 0;
+  const deferredPreparation = [];
   const sample = async label => {
     if (Date.now() >= deadlineAt)
       throw Error(`${label}: original Results route exceeded the shared 45-second deadline`);
@@ -53,56 +56,78 @@ export async function returnFromCompetitivePrize({
       throw Error(`${label}: original Results route exceeded the shared 45-second deadline while observing host state`);
     if (!state || !Number.isSafeInteger(state.phase) || state.error)
       throw Error(`${label}: original Results/Prize host state is invalid: ${JSON.stringify(state)}`);
-    if (state.phase === 9 && state.running !== 1)
-      throw Error(`${label}: original Prize must be active before another confirmation: ${JSON.stringify(state)}`);
     return state;
   };
-  const initial = await sample('original Results exit before Prize return');
-  if (initial.running !== 1)
-    throw Error(`Original Results exit has invalid host running state: ${JSON.stringify(initial)}`);
-  if (initial.phase === 1)
-    return {initial_phase: 1, final_phase: 1, prize_confirmations: 0,
-      deferred_preparation: null,
-      prize_source_exit_witness: 'unavailable: no dedicated Prize PAD source trace is exported'};
-  if (initial.phase !== 9)
-    throw Error(`Original Results exited into unsupported host phase ${initial.phase}; Prize Start is not allowed`);
+  const recordPreparation = (readiness, afterConfirmation) => {
+    const row = deferredPreparation.find(item => item.phase === readiness.phase &&
+      item.reason === readiness.reason && item.preparation_label === readiness.preparation_label);
+    if (row) row.observations++;
+    else deferredPreparation.push({phase: readiness.phase, reason: readiness.reason,
+      preparation_label: readiness.preparation_label, message: readiness.message,
+      after_confirmation: afterConfirmation, observations: 1});
+  };
+  const waitForReadiness = async (label, classify, {afterConfirmation = null, cssOnlyAfterPrep = false} = {}) => {
+    let state;
+    let cssTransferCommitted = false;
+    while (Date.now() < deadlineAt) {
+      state = await sample(label);
+      const readiness = classify(state);
+      if (readiness.kind === 'invalid')
+        throw Error(`${label}: ${readiness.reason}: ${JSON.stringify(state)}`);
+      if (readiness.kind === 'active') {
+        if (cssOnlyAfterPrep && cssTransferCommitted && readiness.owner !== 'css')
+          throw Error(`${label}: preparation returned to an unexpected active owner: ${JSON.stringify({readiness, state})}`);
+        return {state, readiness};
+      }
+      if (cssOnlyAfterPrep && cssTransferCommitted && readiness.phase === 9)
+        throw Error(`${label}: CSS transfer entered an unexpected Prize preparation state: ${JSON.stringify({readiness, state})}`);
+      if (readiness.phase === 5 || readiness.phase === 1)
+        cssTransferCommitted = true;
+      recordPreparation(readiness, afterConfirmation);
+      const remaining = deadlineAt - Date.now();
+      if (remaining <= 0) break;
+      await wait(Math.min(pollMs, remaining));
+    }
+    throw Error(`${label}: destination did not become active/UI-ready before the shared 45-second deadline`);
+  };
 
-  let state = initial;
+  const firstState = await sample('original Results exit before destination readiness');
+  const initialPhase = firstState.phase;
+  const firstReadiness = classifyResultsDestinationReadiness(firstState);
+  if (firstReadiness.kind === 'invalid')
+    throw Error(`Original Results exit reached an unsupported host state: ${firstReadiness.reason}: ${JSON.stringify(firstState)}`);
+  let state = firstState;
+  let readiness = firstReadiness;
+  if (readiness.kind === 'preparing') {
+    recordPreparation(readiness, null);
+    ({state, readiness} = await waitForReadiness('original Results destination preparation',
+      classifyResultsDestinationReadiness));
+  }
+  if (readiness.owner === 'css')
+    return {initial_phase: initialPhase, final_phase: 1, prize_confirmations: 0,
+      deferred_preparation: deferredPreparation.length ? deferredPreparation : null,
+      prize_source_exit_witness: 'unavailable: no dedicated Prize PAD source trace is exported'};
+  if (readiness.owner !== 'prize')
+    throw Error(`Original Results reached unsupported active destination ${readiness.owner}`);
+
   let confirmations = 0;
-  let deferredPreparation = null;
-  while (state.phase === 9 && confirmations < COMPETITIVE_PRIZE_MAX_CONFIRMATIONS) {
+  while (readiness.owner === 'prize' && confirmations < COMPETITIVE_PRIZE_MAX_CONFIRMATIONS) {
     if (Date.now() >= deadlineAt)
       throw Error('Original Prize return exceeded the shared 45-second Results deadline');
     await press('Enter', {releaseMs: 380});
     confirmations++;
     if (Date.now() >= deadlineAt)
       throw Error('Original Prize return exceeded the shared 45-second Results deadline during input');
-    state = await sample(`original Prize confirmation ${confirmations}`);
-    if (state.phase === 5) {
-      if (state.running !== 0 || state.message !== PRIZE_NEXT_SCENE_PREPARATION_MESSAGE)
-        throw Error(`Original Prize phase 5 is admitted only after Prize input during stopped character-select preparation: ${JSON.stringify(state)}`);
-      deferredPreparation = {phase: 5, running: 0, message: state.message,
-        after_confirmation: confirmations};
-      while (Date.now() < deadlineAt) {
-        const remaining = deadlineAt - Date.now();
-        await wait(Math.min(pollMs, remaining));
-        state = await sample('original Prize-to-CSS preparation');
-        if (state.phase === 1 && state.running === 1) break;
-        if (state.phase !== 5 || state.running !== 0 ||
-            state.message !== PRIZE_NEXT_SCENE_PREPARATION_MESSAGE)
-          throw Error(`Original Prize preparation reached an unexpected host state before CSS: ${JSON.stringify(state)}`);
-      }
-      if (state.phase !== 1 || state.running !== 1)
-        throw Error('Original Prize did not return to CSS before the shared 45-second deadline');
-      break;
-    }
-    if (state.phase !== 9 && !(state.phase === 1 && state.running === 1))
-      throw Error(`Original Prize reached unsupported host phase ${state.phase} after confirmation ${confirmations}`);
+    const transition = await waitForReadiness(`original Prize confirmation ${confirmations}`,
+      classifyPrizeReturnReadiness, {afterConfirmation: confirmations, cssOnlyAfterPrep: true});
+    state = transition.state;
+    readiness = transition.readiness;
+    if (readiness.owner === 'css') break;
   }
-  if (state.phase !== 1)
+  if (readiness.owner !== 'css')
     throw Error(`Original Prize did not return to CSS within ${COMPETITIVE_PRIZE_MAX_CONFIRMATIONS} confirmations`);
-  return {initial_phase: initial.phase, final_phase: state.phase, prize_confirmations: confirmations,
-    deferred_preparation: deferredPreparation,
+  return {initial_phase: initialPhase, final_phase: 1, prize_confirmations: confirmations,
+    deferred_preparation: deferredPreparation.length ? deferredPreparation : null,
     prize_source_exit_witness: 'unavailable: Prize transition is bounded by declared Enter input and checked host phases; no dedicated Prize PAD source trace is exported'};
 }
 
