@@ -7661,6 +7661,10 @@ int main(int argc,char** argv){try{
   run_vs_sudden_death_source_control();return 0;
  }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(argc==2&&std::string_view(argv[1])=="--stadium-generator-lifetime-controls"){
+   check(melee_web_stadium_c1_generator_lifetime_control(), "Stadium generator lifetime control failed");
+   return 0;
+  }
   if(argc==2&&std::string_view(argv[1])=="--ground-pending-callback-controls"){
    check(melee_web_stadium_c1_pending_queue_loss_control(), "Ground queue root-loss control failed");
    std::cout.flush();std::cerr.flush();

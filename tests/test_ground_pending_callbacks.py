@@ -193,3 +193,35 @@ int main(void)
                 shutil.rmtree(scratch)
             else:
                 print(f"Retained SDK queue reducer: {scratch}", flush=True)
+
+    def test_sdk_generator_lifetime_control(self):
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("Build the reviewed diagnostic native menu trace first")
+        from check_gameplay import node_runtime
+        scratch = Path(tempfile.mkdtemp(prefix="stadium-generator-sdk-", dir=ROOT / "work"))
+        passed = False
+        try:
+            command = [str(node_runtime()), str(target), "--stadium-generator-lifetime-controls"]
+            (scratch / "command.txt").write_text(" ".join(command) + "\n")
+            try:
+                run = subprocess.run(command, cwd=ROOT, capture_output=True,
+                                     text=True, timeout=30)
+            except subprocess.TimeoutExpired as failure:
+                for stream in ("stdout", "stderr"):
+                    value = getattr(failure, stream)
+                    (scratch / stream).write_bytes(
+                        value.encode() if isinstance(value, str) else (value or b""))
+                raise
+            (scratch / "stdout").write_text(run.stdout)
+            (scratch / "stderr").write_text(run.stderr)
+            self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+            self.assertIn("STADIUM_GENERATOR_CONTROL lifetimes=2", run.stdout)
+            self.assertIn("borrowed_refusals=2 original_onload_onstart=1 ticks=0", run.stdout)
+            print(run.stdout, end="", flush=True)
+            passed = True
+        finally:
+            if passed:
+                shutil.rmtree(scratch)
+            else:
+                print(f"Retained SDK generator control: {scratch}", flush=True)

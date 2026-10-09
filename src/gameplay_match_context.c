@@ -2,6 +2,9 @@
 #include "gameplay_match_rules.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_crowd.h"
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#include "gameplay_source_memory_runtime.h"
+#endif
 #include "fighter_binding.h"
 #include "hsd_native_joint.h"
 #include <melee/cm/camera.h>
@@ -52,6 +55,9 @@ struct MeleeWebMatchContext {
     HSD_RumbleData saved_rumble[4];
     HSD_PadRumbleListData rumble_lists[12];
     CmSubject* pool;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    MeleeWebSourceMemoryAllocation camera_lease;
+#endif
     uint8_t start_published[MELEE_WEB_MATCH_MAX_PLAYERS];
     int crowd_started,input_restored;
 };
@@ -76,6 +82,66 @@ static int owned(MeleeWebMatchContext* h,char* e,size_t n)
         return fail(e,n,"Match source RNG or camera ownership changed");
     return 1;
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+static int camera_index(MeleeWebMatchContext* h,const CmSubject* p)
+{
+    uintptr_t base=(uintptr_t)h->pool, address=(uintptr_t)p;
+    if(!p||address<base||address-base>=h->camera_count*sizeof(*h->pool)||
+       (address-base)%sizeof(*h->pool))return -1;
+    return (int)((address-base)/sizeof(*h->pool));
+}
+static int camera_partition(MeleeWebMatchContext* h,const CmSubject* subject,
+                            int need_free,char* e,size_t n)
+{
+    MeleeWebSourceMemoryAllocation lease;
+    MeleeWebSourceMemoryContext context;
+    if(!owned(h,e,n))return 0;
+    if(HSD_GObj_804D781C||HSD_GObj_804D7814)
+        return fail(e,n,"Camera subject ownership requires idle source callbacks");
+    if(melee_web_source_memory_context_read(&context)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+       melee_web_source_memory_allocation_read(h->pool,&lease)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+       !lease.live||!h->camera_lease.live||
+       lease.allocation_generation!=h->camera_lease.allocation_generation||
+       lease.world_generation!=h->camera_lease.world_generation||
+       lease.source_heap_handle!=h->camera_lease.source_heap_handle||
+       lease.world_generation!=context.world_generation||
+       lease.source_heap_handle!=context.source_heap_handle||
+       lease.requested_bytes!=h->camera_count*sizeof(*h->pool))
+        return fail(e,n,"Match camera pool lost its exact source allocation");
+    /* Match begin already checks the source maximum (70); this count follows
+     * the owned allocation, not a guessed traversal allowance. */
+    unsigned char seen[h->camera_count];memset(seen,0,sizeof(seen));
+    CmSubject* previous=NULL;int found=0;uint32_t count=0;
+    for(CmSubject* p=cm_804D6460;p;p=p->next){
+        int i=camera_index(h,p);
+        if(i<0||seen[i]||p->prev!=previous)
+            return fail(e,n,"Match active camera partition changed");
+        seen[i]=1;++count;if(p==subject)found=1;previous=p;
+    }
+    if(previous!=cm_804D6468)return fail(e,n,"Match active camera tail changed");
+    for(CmSubject* p=cm_804D6458;p;p=p->prev){
+        int i=camera_index(h,p);
+        if(i<0||seen[i])return fail(e,n,"Match free camera partition changed");
+        seen[i]=1;++count;
+    }
+    if(count!=h->camera_count)return fail(e,n,"Match camera pool partition lost a subject");
+    if(need_free&&!cm_804D6458)return fail(e,n,"Stadium OnStart needs an owned free camera subject");
+    if(subject&&!found)return fail(e,n,"Stadium camera subject is not active in its borrowed pool");
+    return ok(e,n);
+}
+int melee_web_match_camera_available(MeleeWebMatchContext* h,char* e,size_t n)
+{return camera_partition(h,NULL,1,e,n);}
+int melee_web_match_camera_subject_preflight(MeleeWebMatchContext* h,const void* p,char* e,size_t n)
+{
+    if(!p)return fail(e,n,"Stadium camera subject is missing");
+    return camera_partition(h,p,0,e,n);
+}
+int melee_web_match_camera_subject_return(MeleeWebMatchContext* h,void* p,char* e,size_t n)
+{
+    if(!melee_web_match_camera_subject_preflight(h,p,e,n))return 0;
+    Camera_800290D4(p);return ok(e,n);
+}
+#endif
 MeleeWebMatchContext* melee_web_match_begin(const MeleeWebMatchSettings* s,
     MeleeWebCollision* collision,char* e,size_t n)
 {
@@ -152,6 +218,9 @@ MeleeWebMatchContext* melee_web_match_begin_players(const MeleeWebPlayerSettings
      * event field. No prior fighters may survive into this exclusive context. */
     mpColl_80041C78();
     Camera_80028B9C(camera_subjects);h->pool=cm_804D645C;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    melee_web_source_memory_allocation_read(h->pool,&h->camera_lease);
+#endif
     owner=h;ok(e,n);return h;
 }
 int melee_web_match_attach_collision(MeleeWebMatchContext* h,MeleeWebCollision* collision,char* e,size_t n)

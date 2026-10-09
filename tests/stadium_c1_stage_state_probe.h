@@ -22,6 +22,9 @@ extern "C" {
 /* Actual SDK enqueue + source-bound restoration fragment; deliberately retains
  * the reproduced partial owner until process exit. No full StageLast/OnStart. */
 int melee_web_stadium_c1_pending_queue_loss_control(void);
+/* Actual original OnLoad/OnStart + generator SDK retirement, two lifetimes;
+ * no map callbacks, scheduler tick, fixture, or full StageLast acceptance. */
+int melee_web_stadium_c1_generator_lifetime_control(void);
 #endif
 
 /* Read source stage registries without copying or mutating their state. */

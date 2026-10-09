@@ -8636,6 +8636,46 @@ index 98700a79819d50c89fce0b030538a94af4ea0136..aaff533e48f1da7e4262847f864ba1d4
  #ifdef MUST_MATCH
  static u32 _[] = {
      0xC3920000, 0x42D20000, 0xC3920000, 0x42960000, 0xC3920000, 0x42480000,
+diff --git a/src/melee/gr/grzakogenerator.c b/src/melee/gr/grzakogenerator.c
+--- a/src/melee/gr/grzakogenerator.c
++++ b/src/melee/gr/grzakogenerator.c
+@@ -371,3 +371,36 @@
+         cur = next;
+     }
+ }
++
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++/* Checked downstream ownership bridge for the original OnStart generator.
++ * Preserve the private typed storage instead of exporting a mirrored ABI.
++ * None of the original allocation/scheduling/arithmetic above is changed. */
++#include "gameplay_stadium_start.h"
++#include <string.h>
++size_t melee_web_stadium_zako_snapshot_size(void)
++{
++    return sizeof(lbl_8049F030);
++}
++int melee_web_stadium_zako_snapshot_read(void* out, size_t size)
++{
++    if (out == NULL || size != sizeof(lbl_8049F030)) return 0;
++    memcpy(out, &lbl_8049F030, size);
++    return 1;
++}
++int melee_web_stadium_zako_view(void** descs, void** data)
++{
++    if (descs == NULL || data == NULL) return 0;
++    *descs = lbl_8049F030.x0;
++    *data = lbl_8049F030.x4;
++    return 1;
++}
++int melee_web_stadium_zako_restore(const void* saved, size_t size,
++                                  const void* owned_data)
++{
++    if (saved == NULL || size != sizeof(lbl_8049F030) ||
++        lbl_8049F030.x4 != owned_data || lbl_8049F030.x0 != NULL) return 0;
++    memcpy(&lbl_8049F030, saved, size);
++    return 1;
++}
++#endif
 diff --git a/src/melee/gr/stage.c b/src/melee/gr/stage.c
 index 5a63015df51b87fa22d8e474b10c7047692e0e3e..8c99ea5dfd13251c175b1196b7813abe8bf471ea 100644
 --- a/src/melee/gr/stage.c

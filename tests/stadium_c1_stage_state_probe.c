@@ -4,6 +4,8 @@
 #include "gameplay_stage_map.h"
 #include "gameplay_source_memory_runtime.h"
 #include "hsd_native_joint.h"
+#include "gameplay_stadium_start.h"
+#include <melee/gr/grzakogenerator.h>
 
 #include <melee/gr/grdatfiles.h>
 #include <melee/gr/grpstadium.h>
@@ -570,6 +572,58 @@ static void queue_control_require(int condition, const char* message)
         fflush(stderr);
         _Exit(1); /* Never raw-shutdown a partially owned source graph. */
     }
+}
+
+int melee_web_stadium_c1_generator_lifetime_control(void)
+{
+ char error[256]={0};
+ queue_control_require(melee_web_gameplay_startup(8U*1024U*1024U,error,sizeof(error)),error);
+ queue_control_require(melee_web_native_world_enable(error,sizeof(error)),error);
+ MeleeWebGameplayStats baseline=melee_web_gameplay_stats();
+ size_t size=melee_web_stadium_zako_snapshot_size();
+ void* before=malloc(size);void* after=malloc(size);
+ queue_control_require(before&&after,"generator snapshot witness allocation");
+ queue_control_require(melee_web_stadium_zako_snapshot_read(before,size),"initial private source root snapshot");
+ for(unsigned lifetime=0;lifetime<2;++lifetime){
+  MeleeWebStadiumGenerator* owner=melee_web_stadium_generator_prepare(error,sizeof(error));
+  queue_control_require(owner!=NULL,error);
+  /* These are actual original stage callbacks. Ground/Stage dispatch and map
+   * callbacks remain outside this asset-free generator-owner control. */
+  grStadium_OnLoad();grStadium_OnStart();
+  queue_control_require(melee_web_stadium_generator_capture(owner,error,sizeof(error)),error);
+  void *descs,*data;
+  queue_control_require(melee_web_stadium_zako_view(&descs,&data)&&!descs&&data,"original NULL generator root");
+  MeleeWebSourceMemoryAllocation lease;
+  queue_control_require(melee_web_source_memory_allocation_read(data,&lease)==MELEE_WEB_SOURCE_MEMORY_READ_OK&&lease.live,"generator SDK lease");
+  grZakoGenerator_Data* original=data;
+  /* Borrowed item witness is never dereferenced or dispatched. The control
+   * must refuse before freeing any source data/scheduler; restore afterward. */
+  HSD_GObj* borrowed=GObj_Create(HSD_GOBJ_CLASS_STAGE,5,0);
+  queue_control_require(borrowed!=NULL,"borrowed witness GObj");
+  original->entries[ARRAY_SIZE(original->entries)-1].x4=(Item_GObj*)borrowed;
+  MeleeWebGameplayStats refusal_before=melee_web_gameplay_stats();
+  queue_control_require(!melee_web_stadium_generator_end(owner,error,sizeof(error))&&
+                       strstr(error,"item borrowers")!=NULL,"live item borrower must refuse generator retirement");
+  MeleeWebGameplayStats refusal_after=melee_web_gameplay_stats();
+  queue_control_require(refusal_after.heap_free_bytes==refusal_before.heap_free_bytes&&
+                       refusal_after.objects==refusal_before.objects&&
+                       refusal_after.processes==refusal_before.processes,"refusal preserves source owners");
+  original->entries[ARRAY_SIZE(original->entries)-1].x4=NULL;
+  HSD_GObjPLink_80390228(borrowed);
+  queue_control_require(melee_web_stadium_generator_end(owner,error,sizeof(error)),error);
+  MeleeWebSourceMemoryAllocation retired;
+  queue_control_require(melee_web_source_memory_allocation_read(data,&retired)==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+                       !retired.live&&retired.allocation_generation==lease.allocation_generation,"exact generator SDK data retired");
+  queue_control_require(melee_web_stadium_zako_snapshot_read(after,size)&&memcmp(before,after,size)==0,"original private roots restored");
+  MeleeWebGameplayStats current=melee_web_gameplay_stats();
+  queue_control_require(current.heap_free_bytes==baseline.heap_free_bytes&&
+                       current.objects==baseline.objects&&
+                       current.processes==baseline.processes,"generator two-lifetime exact heap/object/process return");
+ }
+ free(before);free(after);
+ printf("STADIUM_GENERATOR_CONTROL lifetimes=2 heap_before=%d heap_after=%d borrowed_refusals=2 original_onload_onstart=1 ticks=0\n",baseline.heap_free_bytes,melee_web_gameplay_stats().heap_free_bytes);
+ queue_control_require(melee_web_gameplay_shutdown(error,sizeof(error)),error);
+ return 1;
 }
 
 int melee_web_stadium_c1_pending_queue_loss_control(void)

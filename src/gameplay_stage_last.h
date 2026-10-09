@@ -4,6 +4,7 @@
 #include "gameplay_effect_banks.h"
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include "gameplay_stadium_display_owner.h"
+#include "gameplay_match_context.h"
 #endif
 #ifdef __cplusplus
 extern "C" {
@@ -25,6 +26,10 @@ MeleeWebStageLast* melee_web_stage_begin_kind(int stage_kind, void* yakumono,
 MeleeWebStageLast* melee_web_stage_begin_kind_on_init_diagnostic(
     int stage_kind, void* yakumono, MeleeWebEffectBank*,
     MeleeWebStageLast** owner_out, char*, size_t);
+/* Separate continuation of the retained diagnostic OnInit owner. Original
+ * OnLoad/OnStart run once while maps and the borrowed match camera pool live.
+ * On refusal the caller must retain both owners; no cancellation is applied. */
+int melee_web_stage_last_stadium_start(MeleeWebStageLast*,MeleeWebMatchContext*,char*,size_t);
 /* Asset-free reducer for the diagnostic bind-refusal reporting path. It
  * injects the bind failure and E8 journal event, then exercises the real
  * display-owner cancellation guard. The partial owner remains live until the
