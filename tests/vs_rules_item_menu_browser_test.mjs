@@ -852,7 +852,7 @@ const runCompetitiveProfilePreflight = async initial => {
   };
   report.sourceObservations.push({label: 'raw CSS-owned StartMeleeData provenance after source Rules commit', ...finalCss});
   await shot('06-competitive-profile-css');
-  report.checks.push('Original Rules, Items, and Rules Plus PAD inputs set the exact GameRules profile; all 31 mapped item switches are off, pause is disabled, and raw CSS StartMeleeData provenance is retained without treating it as post-SSS normalized match data. No match or timeout was run.');
+  report.checks.push('Original Rules, Items, and Rules Plus PAD inputs set the exact GameRules profile; all 31 mapped item switches are off, pause is disabled, and raw CSS StartMeleeData provenance is retained without treating it as post-SSS normalized match data. This menu-profile checkpoint ends at CSS; subsequent route evidence is recorded separately.');
 };
 const moveCssCursor = async (label, isInside, directionFor) => {
   for (let step = 0; step < 240; step++) {

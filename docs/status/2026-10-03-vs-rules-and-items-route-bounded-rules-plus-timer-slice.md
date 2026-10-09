@@ -7,8 +7,10 @@ fire on, damage ratio 1.0 and handicap off through original menu inputs. The
 headless Chrome run returned to CSS and Ejected with source owners and assets
 cleared. Source producer `21ac2ff4` used unchanged Release runtime `049f9a5b`;
 the receipt binds the full identities, screenshots, retained failure and cleanup.
-The raw CSS payload is not the normalized match-start oracle. SSS, gameplay,
-natural timeout, Results and original comparison remain unrun for this profile.
+The raw CSS payload is not the normalized match-start oracle. The earlier
+menu-only receipt ends at CSS; subsequent route evidence is recorded separately.
+
+The later 2026-10-08 [normalized match-start prefix](../evidence/competitive-rules-profile-preflight-v1.json) continues through original SSS to a live two-Human Mario match on Final Destination. At source frame 180 it observed the normalized 480-second timer, four stocks each, all item switches off, pause disabled, friendly fire on and damage 1.0, then Ejected with owners cleared. It stops before any stock loss, timeout, Results or Results-to-CSS return. The raw output retains one stale reused check string that says no match ran; the structured observation and final route check show the short prefix. The hash-bound private run receipt is named in the evidence JSON. This is not a full competitive route or original-game comparison.
 
 The first preflight stopped on an incorrect test expectation for the item mask.
 The original DOL's setter instructions confirm that clearing preference bit 31

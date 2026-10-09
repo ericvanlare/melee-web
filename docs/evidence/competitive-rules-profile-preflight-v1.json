@@ -277,6 +277,54 @@
     "source_observations": 175,
     "match_observations": 0
   },
+  "match_start_prefix": {
+    "status": "passed_bounded_normalized_match_start_prefix",
+    "scope": "Original CSS \u2192 Main/VS/Rules/Items/Rules Plus \u2192 CSS \u2192 original SSS Final Destination \u2192 two-Human Mario match; read-only normalized observation at source frame 180, then Eject. No stock loss, timeout, Results, or CSS return after Results.",
+    "producer": {
+      "source_head": "01802d219fd659ac0db94216c01bc4b2db67d7c6",
+      "source_tree": "ca336347821b27cae4b3749353fe029c100ef519",
+      "runtime_producer": "f35cedbc8df3a8377d849e9177d188aada308b69",
+      "configuration": "Release",
+      "browser": "Headless installed Chrome 154.0.8037.99"
+    },
+    "observed": {
+      "source_frame": 180,
+      "match_kind": "stock",
+      "stage": "Final Destination",
+      "timer_seconds": 480,
+      "stocks": [
+        4,
+        4
+      ],
+      "players": [
+        "Human Mario",
+        "Human Mario"
+      ],
+      "source_ports": [
+        0,
+        1
+      ],
+      "raw_source_slot_fields": [
+        0,
+        0
+      ],
+      "pause_disabled": true,
+      "friendly_fire": true,
+      "damage_ratio_bits": "3f800000",
+      "item_frequency": -1,
+      "normalized_item_mask_hex": "fffffff80000000f",
+      "match_active": true,
+      "timing_pause_events": 0,
+      "browser_errors": 0,
+      "screenshots_rehashed": 11,
+      "eject_cleanup": "source owners, scoped assets, audio banks and browser resources cleared"
+    },
+    "private_result_receipt": {
+      "locator": "Private verified external NVMe run rules-normalized-match-start-20261008-v2; normalized-match-start-prefix-result-receipt-v1.json",
+      "sha256": "530526447fc451d4dd2fb3d1c3fbb9b8154a1aaeeba43d44c121b6992593a614"
+    },
+    "raw_report_wording_defect": "The reused profile-preflight check text still says no match or timeout ran. The structured normalized_match and final check record the active frame-180 prefix. Raw report is preserved; see the private receipt."
+  },
   "cleanup": {
     "eject": "Source owner/menu/match/Results/prize/scopedassets false; objects/processes/files/bytes/caches zero.",
     "playwright": {
@@ -392,9 +440,8 @@
     }
   ],
   "open_gates": [
-    "Normalized post-SSS match-start rules and player identities.",
-    "Natural eight-minute non-tied timeout through Results/CSS with settings retained.",
-    "Matching original route/input-state comparison and incident recording for long run.",
+    "Natural eight-minute non-tied timeout, original Results \u2192 CSS, and exact settings retention through that route.",
+    "Matching original-route input/state comparison and bounded incident recording for the long run.",
     "Full current-candidate regression suite, independent integration review and current-head CI.",
     "Physical input, foreground timing, audible output, pixel/PCM equivalence and competitive-set acceptance."
   ]
