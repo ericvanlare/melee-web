@@ -453,5 +453,18 @@ requires observed own-Human before A placement; CPU, foreign ownership and
 unconstructed inventory fail. Historical menu5 retains its immediate Human
 precondition. Menu7, recipe5, action bytes and caps are unchanged. Observer
 overlay/nativeb6ea remain unchanged; the receiver/driver checkpoint is separate.
-Actual initial CSS fields are a retained control; later autojoin/CSS/tie/SD
-controls are explicitly synthetic until a changed capture passes.
+The changed a051 campaign actually observed both own-Human joins and the final
+two-Mario colors1/0 lineup, then FD highlighting and consumed confirmation A.
+It failed on the shared SSS counter's accepted-selection value30, not the
+constructor's initial19. The scoped `original-sd-prefix-boundary-failure-v4.json`
+receipt (SHA91125a42…) retains that progression and incomplete MWRI/cleanup.
+
+The receiver now distinguishes constructor countdown<=20 from accepted
+selection: only observed FD/cooldown0 and a new declared P1 A after neutral arm
+the source-authored30-frame counter. It requires first30 and consecutive source
+ticks/decrements, the same selected FD owner, and an observed neutral release;
+another A after neutral or other continuation fails. The FD/cooldown0 selection
+snapshot remains frozen, and VS admission requires observed countdown0 plus
+all existing strict setup checks. The actual fixture retains30→18 only; later
+countdown0/VS/tie/SD controls are explicitly synthetic. No native observer,
+menu7, recipe5, controller bytes or caps change for this decoder correction.
