@@ -331,6 +331,8 @@ const waitForMatchSourceFrames = async (target, maximum) => {
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
     await resumeTimingPause(`competitive match source frame ${target}`);
     observation = await observeMatch();
+    if (observation?.observer_error)
+      throw Error(`Match observer failed while waiting for source frame ${target}: ${JSON.stringify(observation)}`);
     if (observation?.ready && observation.frame >= target) {
       if (observation.frame > maximum)
         throw Error(`First ready match observation passed frame ${maximum}: ${JSON.stringify(observation)}`);
