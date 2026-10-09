@@ -20,6 +20,26 @@ melee_web::ReplayCompletionState whole(
 
 int main()
 {
+    melee_web::DiagnosticPrefixProgress prefix;
+    assert(!prefix.observe(9,10)); // a later scene cannot become cold match zero.
+    assert(!prefix.observe(0,0)); // a PAD call alone proves no source traversal.
+    for (unsigned tick=0; tick<60; ++tick) assert(prefix.observe(tick,tick+1));
+    assert(prefix.first_source_tick==0 && prefix.last_source_tick==59);
+    assert(prefix.ready(60,true,true,true,false,false,0));
+    auto extra=prefix; assert(extra.observe(60,61));
+    assert(extra.ready(61,true,true,true,false,false,0));
+    assert(!extra.ready(60,true,true,true,false,false,0));
+    assert(!prefix.ready(60,false,true,true,false,false,0));
+    assert(!prefix.ready(60,true,false,true,false,false,0));
+    assert(!prefix.ready(60,true,true,false,false,false,0));
+    assert(!prefix.ready(60,true,true,true,true,false,0));
+    assert(!prefix.ready(60,true,true,true,false,true,0));
+    assert(!prefix.ready(60,true,true,true,false,false,1));
+    melee_web::DiagnosticPrefixProgress missing;
+    for(unsigned tick=0;tick<59;++tick)assert(missing.observe(tick,tick+1));
+    assert(!missing.ready(60,true,true,true,false,false,0));
+    assert(!missing.observe(60,61));
+
     // The old single-match route remains complete on its final source draw;
     // it has no whole-session return-to-CSS prerequisites.
     melee_web::ReplayCompletionState legacy;

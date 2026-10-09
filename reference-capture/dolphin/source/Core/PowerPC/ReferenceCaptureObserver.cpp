@@ -162,6 +162,43 @@ enum class Boundary : u16
   StartupPrizeModeExit = 30,
 };
 
+// gmMain calls HSD_PadInit(5,...). gm_1A45 drains the entire snapshot of
+// that queue before one DrawReturn; never interrupt its authored batch.
+struct EntityPrefixBoundaryProgress
+{
+  static constexpr u32 comparison_ticks = 60;
+  static constexpr u32 queue_capacity = 5;
+  static constexpr u32 maximum_ticks = comparison_ticks + queue_capacity - 1;
+  u32 observations = 0, batch_ticks = 0;
+  bool drawing = false, qualified = false;
+  // -1 rejects, 0 retains, 1 is the first qualifying checked draw.
+  int Observe(Boundary boundary, u32 tick, u8 qnum)
+  {
+    if (qualified || qnum != queue_capacity) return -1;
+    if (boundary == Boundary::SourceTick)
+    {
+      if (drawing || tick != observations || observations >= maximum_ticks ||
+          batch_ticks >= queue_capacity) return -1;
+      ++observations;
+      ++batch_ticks;
+    }
+    else if (boundary == Boundary::DrawEnter)
+    {
+      if (drawing || tick != observations) return -1;
+      drawing = true;
+    }
+    else if (boundary == Boundary::DrawReturn)
+    {
+      if (!drawing || tick != observations) return -1;
+      drawing = false;
+      batch_ticks = 0;
+      if (observations >= comparison_ticks) { qualified = true; return 1; }
+    }
+    else return -1;
+    return 0;
+  }
+};
+
 enum class SliceTag : u16
 {
   PadStatusAll4 = 1,
@@ -580,7 +617,8 @@ u32 WholeSessionMatchCount()
     if (result > WHOLE_SESSION_MAX_MATCHES)
       return 0;
   }
-  return result >= WHOLE_SESSION_MIN_MATCHES ? result : 0;
+  return result >= WHOLE_SESSION_MIN_MATCHES ||
+         (result == 1 && Env("MWRC_ENTITY_PROFILE") == "jiggly-ice-mario-fox-v1") ? result : 0;
 }
 
 bool ValidIdentity(std::string_view value)
@@ -905,7 +943,7 @@ struct Observer::Impl
     const std::string entity_profile = Env("MWRC_ENTITY_PROFILE");
     checked_entity_profile = entity_profile == "jiggly-ice-mario-fox-v1";
     if ((!entity_profile.empty() && !checked_entity_profile) ||
-        (checked_entity_profile && (SdInitRequested() ||
+        (checked_entity_profile && (whole_session_matches != 1 || SdInitRequested() ||
           !Env("MWRC_CPU_PROBE_OUTPUT").empty() || !Env("MWRC_ITEM_PROBE_OUTPUT").empty() ||
           !Env("MWRC_ALLOCATION_OUTPUT").empty())))
       return SetInvalid("Entity profile requires its exact exclusive diagnostic scope"), false;
@@ -1983,7 +2021,7 @@ struct Observer::Impl
         return SetInvalid("Entity profile player ownership escaped its source range"), false;
       const u32 type = ReadBE32(identity.data() + 8);
       const u32 count = slot == 1 ? 2 : 1;
-      if (ReadBE32(identity.data() + 4) != characters[slot] || type > 1 ||
+      if (ReadBE32(identity.data() + 4) != characters[slot] || type != 1 ||
           identity[0xc] != 0 || identity[0xd] != 1 ||
           !fighter_present[slot] || fighter_entity_count[slot] != count ||
           fighter_pointers[slot] != fighter_entity_pointers[slot][0])
@@ -3344,6 +3382,16 @@ struct Observer::Impl
         return;
       if (!AddMatchSlices(system))
         return SetInvalid("match semantic slice escaped the pinned ranges"), void();
+      if (checked_entity_profile)
+      {
+        u8 qnum = 0;
+        if (!ReadBytes(system, 0x804c1f78, 1, &qnum))
+          return SetInvalid("entity prefix queue capacity is unreadable"), void();
+        const int admission = entity_prefix_progress.Observe(boundary, source_tick, qnum);
+        if (admission < 0)
+          return SetInvalid("entity prefix source/draw batch boundary differs"), void();
+        entity_prefix_final_draw = admission == 1;
+      }
     }
     else if (boundary == Boundary::ResultEnter || boundary == Boundary::ResultReturn)
     {
@@ -3589,6 +3637,13 @@ struct Observer::Impl
     Publish(slot);
     if (boundary == Boundary::DrawReturn)
       ++draw_ordinal;
+    if (checked_entity_profile && entity_prefix_final_draw)
+    {
+      // Publish every tick/PAD/draw row first. This only closes the diagnostic
+      // stream at a passive hook; it never breaks the guest loop or creates Results.
+      RequestComplete();
+      return;
+    }
     if (boundary == Boundary::SceneTeardown && result_seen)
     {
       if (!whole_session_enabled())
@@ -4267,9 +4322,15 @@ struct Observer::Impl
                   std::chrono::steady_clock::now().time_since_epoch())
                   .count());
           const bool complete = natural_completion.load() && !invalid.load();
-          const std::string json = complete
+          std::string json = complete
                                        ? "{\"status\":\"completed\",\"natural\":true}"
                                        : "{\"status\":\"interrupted\",\"natural\":false}";
+          if (checked_entity_profile)
+            json = "{\"status\":\"" + std::string(complete ? "completed" : "interrupted") +
+                   "\",\"natural\":false,\"diagnostic_prefix_complete\":" +
+                   (complete ? "true" : "false") + ",\"whole_session_equivalent\":false," +
+                   "\"comparison_source_ticks\":60,\"observed_source_ticks\":" +
+                   std::to_string(entity_prefix_progress.observations) + "}";
           end_slot.payload_size = static_cast<u32>(json.size());
           std::memcpy(end_slot.payload.data(), json.data(), json.size());
           end_slot.checksum = CRC32(end_slot.payload.data(), end_slot.payload_size);
@@ -4334,6 +4395,10 @@ struct Observer::Impl
         (completed ? "true" : "false") + ",\"invalid\":" +
         (invalid.load() ? "true" : "false") + ",\"error\":" +
         (error_text.empty() ? "null" : "\"" + error_text + "\"");
+    if (checked_entity_profile && force && state != "starting")
+      json += ",\"diagnostic_prefix_complete\":" + std::string(completed ? "true" : "false") +
+              ",\"whole_session_equivalent\":false,\"comparison_source_ticks\":60," +
+              "\"observed_source_ticks\":" + std::to_string(entity_prefix_progress.observations);
     json += CpuProbeCloseStatusJson();
     json += "}\n";
     if (!status.Write(reinterpret_cast<const u8*>(json.data()), json.size()) || !status.Flush() ||
@@ -4450,6 +4515,8 @@ struct Observer::Impl
   std::array<bool, 16> item_probe_pair_active{};
   std::array<u32, 16> item_probe_pair_lr{};
   bool checked_entity_profile = false;
+  EntityPrefixBoundaryProgress entity_prefix_progress;
+  bool entity_prefix_final_draw = false;
   u32 whole_session_matches = 0;
   u32 audio_owner_epoch = 0;
   u32 match_index = 0;

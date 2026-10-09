@@ -1,4 +1,5 @@
 #include "gameplay_menu_browser_state.hpp"
+extern "C" uint32_t gm_801A4BA8(void);
 #if defined(MELEE_WEB_NET_SESSION)
 extern "C" int melee_web_net_publish_local_input(
     uint32_t source_tick, unsigned local_port, uint64_t poll_serial,
@@ -73,6 +74,7 @@ std::unique_ptr<melee_web::RetailReplayRecipe> replay;
 size_t replay_cursor=0;
 melee_web::SourceFrameSequence replay_source_frames;
 melee_web::ReplayCompletionState replay_completion;
+melee_web::DiagnosticPrefixProgress replay_prefix_progress;
 bool replay_trace=false,replay_pending=false,replay_started=false,replay_final_draw=false;
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
 std::array<ResultsPadTraceRow,kResultsPadTraceCapacity> results_pad_trace{};
@@ -490,9 +492,15 @@ if(scoped_assets){
   check(melee_web_gameplay_session_end(error,sizeof(error)),error);
   source_session_owned=false;
  }
+ // The end record remains after successful checked owner/session retirement.
+ // Diagnostic completion is not a terminal result or whole-session claim.
+ if(replay&&replay->diagnostic_entity_prefix&&replay_final_draw&&!faulted)
+  std::fprintf(stderr,"ENTITY_PREFIX_END observations=%u first_source_tick=%u last_source_tick=%u diagnostic_prefix_complete=true whole_session_equivalent=false\n",
+      replay_prefix_progress.observations,replay_prefix_progress.first_source_tick,
+      replay_prefix_progress.last_source_tick);
  if(replay&&replay_trace&&replay_final_draw&&!faulted)
   melee_web::retail_replay_end(replay->frames.size(),replay->whole_session());
- replay.reset();melee_web_net_reset();replay_completion={};replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
+ replay.reset();melee_web_net_reset();replay_completion={};replay_prefix_progress={};replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
  replay_match_complete=false;replay_outcome=0;replay_winner=-1;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  stadium_c1a_armed=false;stadium_c1a_observation.clear();stadium_c1a_raw_stkind=-1;
@@ -1438,7 +1446,13 @@ void tick(){
     replay_completion.input_consumed=true;
     replay_completion.final_input_drawn=true;
     replay_completion.final_input_owner=static_cast<melee_web::ReplayCompletionOwner>(observed_replay_scene());
-    if(replay->whole_session()){
+    if(replay->diagnostic_entity_prefix){
+     check(replay_prefix_progress.ready(replay->diagnostic_source_observations(),true,true,match!=nullptr,pending,
+           replay_match_complete,replay_outcome),
+           "Diagnostic entity prefix did not consume its bound live source interval and final draw");
+     replay_final_draw=true;replay_completed_now=true;running=false;menu_clock.reset();
+     message="Diagnostic entity prefix complete; whole-session comparison remains incomplete.";
+    }else if(replay->whole_session()){
      check(pending&&(results||prize),
            "Whole-session timeline must end at the final Results or Prize return request");
     }else{
@@ -1711,7 +1725,14 @@ void tick(){
     else if(replay_whole)
      check(!match->paused(),"Whole-session replay reached an unsupported source pause");
     if(replay_whole)melee_web_cpu_observation_set_event_cursor(replay_cursor);
+    // gm_801A4BA8 is the original scene traversal cursor (MWRO80479d58),
+    // not the gameplay timer returned by source_frames()/gm_GetFrameCount.
+    const auto prefix_tick_before=replay&&replay->diagnostic_entity_prefix?gm_801A4BA8():0;
     match->tick(sample);
+    if(replay&&replay->diagnostic_entity_prefix)
+     check(replay_prefix_progress.observe(prefix_tick_before,gm_801A4BA8()) &&
+           !match->paused()&&!match->complete()&&!match->ending(),
+           "Diagnostic entity prefix lost its original live source boundary");
     if(replay_whole)melee_web_cpu_observation_scheduler_return();
     source_frames.did_step(!replay||replay->closes_draw_batch(replay_cursor));
     int winner=-1;const int outcome=match->outcome(winner);
@@ -1862,7 +1883,7 @@ void tick(){
 #endif
   check(!replay||source_frames.draws()==replay_draw_boundaries,
         "Reference replay source draws disagree with clock batch boundaries");
-  if(replay&&replay->whole_session()&&replay_completion.final_input_drawn){
+  if(replay&&replay->whole_session()&&!replay->diagnostic_entity_prefix&&replay_completion.final_input_drawn){
    replay_completion.live_css_entered=world&&host&&host_entered&&!match&&!results&&!prize&&
        melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CSS;
    replay_completion.preparation_settled=!preparation.busy()&&!pending&&
@@ -1983,9 +2004,14 @@ void tick(){
 #else
  ++render_frame;
 #endif
- if(replay_completed_now)EM_ASM({window.menuReplayCompleted?.($0,!!$1,$2,$3,$4);},
+ if(replay_completed_now)EM_ASM({window.menuReplayCompleted?.($0,!!$1,$2,$3,$4,!!$5,$6,$7,$8,$9);},
                                 replay_cursor,replay_match_complete?1:0,
-                                replay_outcome,replay_winner,observed_replay_scene());
+                                replay_outcome,replay_winner,observed_replay_scene(),
+                                replay&&replay->diagnostic_entity_prefix?1:0,
+                                replay_prefix_progress.observations,
+                                replay_prefix_progress.first_source_tick,
+                                replay_prefix_progress.last_source_tick,
+                                replay?replay->diagnostic_source_observations():0);
  EM_ASM({window.menuFrame?.(!!$0);},running_at_callback_start?1:0);
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
  // Preserve lifecycle records from callbacks that did not draw a source frame.

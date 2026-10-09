@@ -33,6 +33,21 @@ class ReferenceEntityProfileTests(unittest.TestCase):
                          [('player_identity', 1, identity.hex()),
                           ('player_entity_user_data', 0x101, userdata.hex())])
 
+    def test_profile_count_one_decoder_preserves_default_scope(self):
+        import json
+        from test_reference_observer_stream import frame,stream
+        for count,profile,accepted in ((1,'jiggly-ice-mario-fox-v1',True),(1,None,False),
+                                       (3,None,True),(3,'jiggly-ice-mario-fox-v1',False),
+                                       (1,'unknown',False)):
+            payload={'whole_session':True,'match_count':count}
+            if profile is not None:payload['entity_profile']=profile
+            with tempfile.TemporaryDirectory() as td:
+                path=Path(td)/'count.mwro'
+                path.write_bytes(frame(1,0,json.dumps(payload).encode())+frame(2,1,json.dumps(payload).encode()))
+                if accepted:self.assertEqual(len(list(stream.iter_records(path))),2)
+                else:
+                    with self.assertRaises(stream.ObserverStreamError):list(stream.iter_records(path))
+
     def test_actual_profile_startup_gate_and_identity(self):
         compiler = shutil.which('clang++') or shutil.which('g++')
         if compiler is None:
@@ -42,13 +57,16 @@ class ReferenceEntityProfileTests(unittest.TestCase):
                       source.index('    capture_id = Env("MWRC_CAPTURE_ID");')]
         start = source.index('    if (checked_entity_profile)\n      handshake +=')
         metadata = source[start:source.index('    handshake += "}";', start)]
+        count_function=source[source.index('u32 WholeSessionMatchCount()'):source.index('bool ValidIdentity(')]
         harness = r'''
 #include <cassert>
 #include <map>
 #include <string>
 std::map<std::string,std::string> environment;
 std::string Env(const char* name){return environment[name];}
-unsigned WholeSessionMatchCount(){return 0;}
+using u32=unsigned;
+constexpr unsigned WHOLE_SESSION_MIN_MATCHES=3,WHOLE_SESSION_MAX_MATCHES=64;
+'''+count_function+r'''
 bool SdInitRequested(){return !Env("MWRC_SD_INIT").empty();}
 struct Reader {
  unsigned whole_session_matches=0;bool checked_entity_profile=false;std::string error;
@@ -62,9 +80,13 @@ return handshake;}
 };
 int main(){
  Reader r;assert(r.configure());assert(!r.checked_entity_profile);assert(r.identity()=="base");
+ environment["MWRC_WHOLE_SESSION_MATCHES"]="1";
+ r=Reader{};assert(!r.configure()||r.whole_session_matches==0);
  environment["MWRC_ENTITY_PROFILE"]="jiggly-ice-mario-fox-v1";
  r=Reader{};assert(r.configure()&&r.checked_entity_profile);
  assert(r.identity()=="base,\"entity_profile\":\"jiggly-ice-mario-fox-v1\"");
+ environment["MWRC_WHOLE_SESSION_MATCHES"]="3";r=Reader{};assert(!r.configure());
+ environment["MWRC_WHOLE_SESSION_MATCHES"]="1";
  for(const char* other:{"MWRC_SD_INIT","MWRC_CPU_PROBE_OUTPUT","MWRC_ITEM_PROBE_OUTPUT","MWRC_ALLOCATION_OUTPUT"}){
   environment[other]="1";r=Reader{};assert(!r.configure());assert(!r.error.empty());environment.erase(other);
  }
@@ -87,6 +109,52 @@ int main(){
             raise
         else:
             shutil.rmtree(scratch)
+
+    def test_actual_passive_prefix_draw_tracker(self):
+        compiler=shutil.which('clang++') or shutil.which('g++')
+        self.assertIsNotNone(compiler)
+        source=SOURCE.read_text()
+        tracker=source[source.index('struct EntityPrefixBoundaryProgress'):source.index('enum class SliceTag')]
+        harness=r'''
+#include <cassert>
+#include <cstdint>
+using u32=uint32_t;using u8=uint8_t;
+enum class Boundary { SourceTick,DrawEnter,DrawReturn,Setup };
+'''+tracker+r'''
+int main(){
+ EntityPrefixBoundaryProgress p;
+ for(unsigned t=0;t<59;++t){assert(p.Observe(Boundary::SourceTick,t,5)==0);
+  assert(p.Observe(Boundary::DrawEnter,t+1,5)==0);
+  assert(p.Observe(Boundary::DrawReturn,t+1,5)==0);}
+ for(unsigned t=59;t<64;++t)assert(p.Observe(Boundary::SourceTick,t,5)==0);
+ assert(p.observations==64&&!p.qualified);
+ assert(p.Observe(Boundary::DrawEnter,64,5)==0);
+ assert(p.Observe(Boundary::DrawReturn,64,5)==1);
+ assert(p.qualified&&p.observations==64);
+ assert(p.Observe(Boundary::SourceTick,64,5)==-1); // no post-qualified rows accepted.
+ for(unsigned mode=0;mode<5;++mode){EntityPrefixBoundaryProgress q;
+  if(mode==0)assert(q.Observe(Boundary::SourceTick,1,5)==-1);
+  if(mode==1)assert(q.Observe(Boundary::SourceTick,0,4)==-1);
+  if(mode==2)assert(q.Observe(Boundary::DrawReturn,0,5)==-1);
+  if(mode==3){assert(q.Observe(Boundary::DrawEnter,0,5)==0);assert(q.Observe(Boundary::SourceTick,0,5)==-1);}
+  if(mode==4){for(unsigned t=0;t<5;++t)assert(q.Observe(Boundary::SourceTick,t,5)==0);assert(q.Observe(Boundary::SourceTick,5,5)==-1);}}
+ EntityPrefixBoundaryProgress exact;
+ for(unsigned t=0;t<60;++t){assert(exact.Observe(Boundary::SourceTick,t,5)==0);
+  assert(exact.Observe(Boundary::DrawEnter,t+1,5)==0);
+  assert(exact.Observe(Boundary::DrawReturn,t+1,5)==(t==59?1:0));}
+}
+'''
+        parent=Path(os.environ.get('MELEE_ENTITY_TEST_OUTPUT',ROOT/'work'));parent.mkdir(parents=True,exist_ok=True)
+        scratch=Path(tempfile.mkdtemp(prefix='prefix-native-',dir=parent))
+        (scratch/'control.cpp').write_text(harness)
+        try:
+            for argv in ([compiler,'-std=c++17','-Wall','-Werror',str(scratch/'control.cpp'),'-o',str(scratch/'control')],[str(scratch/'control')]):
+                run=subprocess.run(argv,capture_output=True,text=True,timeout=30)
+                (scratch/('compiler.log' if argv[0]==compiler else 'execution.log')).write_text(run.stdout+run.stderr)
+                self.assertEqual(run.returncode,0,run.stdout+run.stderr)
+        except BaseException:
+            print('Retained native prefix failure:',scratch);raise
+        else:shutil.rmtree(scratch)
 
     def test_actual_checked_pair_and_default_admission(self):
         compiler = shutil.which('clang++') or shutil.which('g++')
@@ -170,6 +238,7 @@ int main(){
  r=valid();r.fighter_entity_count[0]=2;rejected(r);
  r=valid();r.word(p+4,18);rejected(r);
  r=valid();r.word(p+8,3);rejected(r);
+ r=valid();r.word(p+8,0);rejected(r); // declared profile is four CPU players.
  r=valid();r.memory[p+0xc]=1;r.memory[p+0xd]=0;rejected(r);
  r=valid();r.word(0x80453080+4*0xe90+8,0);rejected(r);
  r=valid();r.word(0x80453080+4*0xe90+0xb0,0x80500000);rejected(r);

@@ -364,7 +364,10 @@ def iter_records(path: str | Path, *,
                 announcement = decoded["payload"]
                 if announcement.get("whole_session") is True:
                     count = announcement.get("match_count")
-                    if type(count) is not int or not 3 <= count <= 64:
+                    profile = announcement.get("entity_profile")
+                    if type(count) is not int or not (
+                            (profile is None and 3 <= count <= 64) or
+                            (profile == "jiggly-ice-mario-fox-v1" and count == 1)):
                         raise ObserverStreamError(
                             f"{context}: invalid whole-session match_count")
                     if whole_session_count is not None and count != whole_session_count:

@@ -322,8 +322,13 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
         result.draw_boundaries = retail_queue_boundaries(events, count);
     }
     if (result.version >= kRetailReplayV8Version) {
-        check(input.u16() == kRetailReplayContextVersion && input.u16() == 0,
+        check(input.u16() == kRetailReplayContextVersion,
               "Unsupported whole-session first-CSS context header");
+        const auto context_flags = input.u16();
+        check(context_flags == 0 || (result.version == kRetailReplayV8Version &&
+              context_flags == kRetailReplayEntityPrefixFlag),
+              "Unsupported whole-session first-CSS context flags");
+        result.diagnostic_entity_prefix = context_flags == kRetailReplayEntityPrefixFlag;
         check(input.u32() == kRetailReplayContextBytes,
               "Whole-session first-CSS context size disagrees with its transport");
         result.initial_css = std::make_unique<RetailReplayInitialCssContext>();
@@ -382,6 +387,22 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
                 validate_fighter_v10_setup(result.match_setups[index], decoded, index);
         }
         result.selection = result.match_selections.front();
+    }
+    if (result.diagnostic_entity_prefix) {
+        constexpr uint8_t roster[] = {15, 14, 8, 2};
+        check(std::equal(kMilestoneRules.begin(), kMilestoneRules.end(), result.setup.begin()),
+              "Entity prefix requires the declared ordinary stock rules");
+        check(result.selection.player_count == 4 && result.selection.start.rules.stkind == 0x20,
+              "Entity prefix requires four source players on Final Destination");
+        for (unsigned slot = 0; slot < 4; ++slot) {
+            const auto& p = result.selection.start.players[slot];
+            check(p.slot_type == Gm_PKind_Cpu && p.cpu_kind == 4 && p.cpu_level == 9 &&
+                  p.stocks == 4 && p.color == slot && !p.rumble_enabled && p.ckind == roster[slot],
+                  "Entity prefix differs from its declared CPU9 roster");
+        }
+        for (unsigned slot = 4; slot < GM_MAX_PLAYERS; ++slot)
+            check(result.selection.start.players[slot].slot_type == Gm_PKind_NA,
+                  "Entity prefix has a foreign active tail player");
     }
     check(result.version >= 3 || result.selection.player_count == 2,
           "Multiplayer input requires reference version 3");
@@ -446,9 +467,18 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
         check(next_frame == count, "Whole-session spans must cover every input frame");
         check(result.spans.front().scene == kRetailReplayCss,
               "Whole-session timeline must start in CSS");
+        if (result.diagnostic_entity_prefix) {
+            check(result.spans.size() == 3 && result.spans[0].scene == kRetailReplayCss &&
+                  result.spans[1].scene == kRetailReplaySss &&
+                  result.spans[2].scene == kRetailReplayMatch,
+                  "Entity prefix requires one CSS/SSS/Match route ending in Match");
+            check(result.diagnostic_source_observations() == 60,
+                  "Entity prefix captured batching is unsupported by per-tick browser draws");
+        } else {
         check(result.spans.back().scene == kRetailReplayResults ||
               result.spans.back().scene == kRetailReplayPrize,
               "Whole-session timeline must end in Results or Prize");
+        }
         if (result.version == kRetailReplayVersion ||
             result.version == kRetailReplayFighterVersion) {
             const auto match_spans = std::count_if(result.spans.begin(), result.spans.end(),
@@ -485,6 +515,11 @@ void retail_replay_session_initial(const RetailReplayRecipe& recipe) {
 void retail_replay_validate_match_setup(const RetailReplayRecipe& recipe,
                                         unsigned match_index,
                                         const StartMeleeData& actual_setup) {
+    if (recipe.diagnostic_entity_prefix) {
+        check(match_index == 0 && same_setup(actual_setup, recipe.selection.start),
+              "Entity prefix actual source setup differs from its declared setup");
+        return;
+    }
     if (recipe.version != kRetailReplayVersion &&
         recipe.version != kRetailReplayFighterVersion) return;
     check(match_index < recipe.match_selections.size(),
