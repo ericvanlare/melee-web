@@ -1069,5 +1069,33 @@
     },
     "browser_build": "Aggregate correctly failed because unit-0 and graphics failed; no separate browser compile failure.",
     "next": "One corrected-head full CI run; no retry of the superseded source head."
+  },
+  "second_pr_ci_attempt": {
+    "producer": "0184d2108a2da14c177523bc25898ff15a61a081",
+    "run": 37930238978,
+    "result": "failed aggregate inventory",
+    "partitions": "All unit and build partitions passed",
+    "failure": "Two helper TestCase classes imported into the competitive entry test module caused14 duplicate discovery IDs. Strict aggregate correctly refused them.",
+    "retained_log_sha256": "8a1a96cc73066e7885baf17e032b3cfaeb5c9bb507b9800573859033d0f75fee",
+    "repair": "Import the helper modules and qualify the same three helper methods; no test assertions, runtime code or aggregate guard changed.",
+    "focused_tests": 33,
+    "focused_failures": 0,
+    "focused_log_sha256": "0b962f6344ef1ad1393f57f018f4381210c12d8cfbe742efa5b3a7e568a9e2d8",
+    "discovery": {
+      "unique_ids": 2239,
+      "before_ids_including_duplicates": 2253,
+      "missing_ids": 0,
+      "added_ids": 0,
+      "duplicate_ids": 0,
+      "receipt_sha256": "21fbcb0f0c92dea2f79abd9a0c3ddf3f04068215009eb99ad2451dc1505ca389"
+    },
+    "independent_review_sha256": "0e848b1eac19bbe2be523556496cc24fa71fa4800daecadf8e259e95d3bff9a4",
+    "private_locator": {
+      "run": "autonomous-roadmap-20261006-154157-ec099c21",
+      "log": "pr298-corrected-head-ci-failure-v1.log",
+      "reports": "pr298-corrected-head-reports-v1",
+      "discovery": "pr298-discovery-unique-inventory-v1.json",
+      "review": "pr298-discovery-fix-independent-review-v1.json"
+    }
   }
 }
