@@ -1,0 +1,401 @@
+{
+  "schema": "melee-web-competitive-rules-profile-preflight-v1",
+  "status": "passed_menu_profile_only",
+  "issue": 292,
+  "date": "2026-10-08",
+  "labels": [
+    "Compiled",
+    "Source identified",
+    "Browser exercised"
+  ],
+  "scope": "Original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS, followed by Eject. Exact GameRules and31 item row mappings; raw CSS payload is provenance only. No SSS, gameplay, timeout or Results.",
+  "producer": {
+    "source": "21ac2ff43855e4a27b937aa474bdc46141028754",
+    "runtime_source": "049f9a5bec9da99cda2e04f31fb269ebcb4db04c",
+    "main_base": "41e7ae2bf0b54c49cbb2b1b9ae79c9c63a2c76cb",
+    "configuration": "Release",
+    "browser": "Headless installed Chrome154.0.8037.99",
+    "playwright": "1.62.1",
+    "machine": "Apple Silicon desktop Mac mini",
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "build_manifest_sha256": "f9165b654f0599123997bbb53e1b9ff659343d33626cfaad8215d470a4ef83c6",
+    "build_file_count": 46,
+    "runtime_build_log_sha256": "a65793cb39bf8d52ba9bba35bc03b0380a81c337101e1ab37a8f711e7115c649"
+  },
+  "profile": {
+    "mode": "stock",
+    "stocks": 4,
+    "timer_minutes": 8,
+    "item_frequency": -1,
+    "all_31_item_switches_off": true,
+    "pause_enabled": false,
+    "friendly_fire": true,
+    "damage_ratio_menu_value": 10,
+    "handicap": 0
+  },
+  "observed_final_css": {
+    "rules": {
+      "mode": 1,
+      "stock_count": 4,
+      "time_limit": 2,
+      "stock_time_limit": 8,
+      "handicap": 0,
+      "damage_ratio": 10,
+      "friendly_fire": 1,
+      "pause": 0
+    },
+    "items": {
+      "frequency": -1,
+      "mask_hex": "0000000010000000"
+    },
+    "selection": {
+      "valid": true,
+      "scene": 1,
+      "provenance": "raw_css_vs_start",
+      "match_kind": 0,
+      "timer_enabled": 0,
+      "time_limit_seconds": 0,
+      "friendly_fire": 0,
+      "disable_pausing": 0,
+      "damage_ratio_bits": "3f800000",
+      "item_frequency": 2,
+      "item_mask_hex": "ffffffffffffffff",
+      "player_stocks": [
+        0,
+        0
+      ]
+    }
+  },
+  "item_rows": [
+    {
+      "cursor": 0,
+      "preference_bit": 5,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 1,
+      "preference_bit": 18,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 2,
+      "preference_bit": 10,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 3,
+      "preference_bit": 30,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 4,
+      "preference_bit": 13,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 5,
+      "preference_bit": 24,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 6,
+      "preference_bit": 3,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 7,
+      "preference_bit": 14,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 8,
+      "preference_bit": 23,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 9,
+      "preference_bit": 27,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 10,
+      "preference_bit": 1,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 11,
+      "preference_bit": 9,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 12,
+      "preference_bit": 8,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 13,
+      "preference_bit": 7,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 14,
+      "preference_bit": 21,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 15,
+      "preference_bit": 4,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 16,
+      "preference_bit": 6,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 17,
+      "preference_bit": 2,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 18,
+      "preference_bit": 15,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 19,
+      "preference_bit": 0,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 20,
+      "preference_bit": 17,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 21,
+      "preference_bit": 11,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 22,
+      "preference_bit": 31,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 23,
+      "preference_bit": 26,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 24,
+      "preference_bit": 20,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 25,
+      "preference_bit": 25,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 26,
+      "preference_bit": 16,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 27,
+      "preference_bit": 22,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 28,
+      "preference_bit": 19,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 29,
+      "preference_bit": 29,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 30,
+      "preference_bit": 12,
+      "enabled": 0,
+      "initial_enabled": 1
+    }
+  ],
+  "item_mask": {
+    "observed_preference_hex": "0000000010000000",
+    "authored_switch_bits_hex": "00000000efffffff",
+    "unmapped_bit28": "Preserved from initial preferences; not a selectable row.",
+    "source": "Pinned b43912cc mn_8022E978 applies a signed32 complemented mask per authored row. The verified original DOL clear path uses slw/nor/srawi31 to widen it; clearing row22/preferencebit31 also clears upper32.",
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "static_receipt_sha256": "b86b3d563fac07fa7913c05a10813416e1c3ddb4c254b9c4800dfa1010ce1dd5",
+    "limit": "Static original setter arithmetic only, not a whole-route original comparison."
+  },
+  "validation": {
+    "focused_helper_tests": {
+      "passed": 5,
+      "failed": 0
+    },
+    "supervisor_mocked_main_tests": 12,
+    "harness_cleanup_mock_controls": 4,
+    "actual_browser_result": "pass",
+    "browser_errors": 0,
+    "timing_pause_events": 0,
+    "timing_resume_events": 0,
+    "source_observations": 175,
+    "match_observations": 0
+  },
+  "cleanup": {
+    "eject": "Source owner/menu/match/Results/prize/scopedassets false; objects/processes/files/bytes/caches zero.",
+    "playwright": {
+      "driver": {
+        "status": "disposed"
+      },
+      "context": {
+        "status": "closed"
+      },
+      "browser": {
+        "status": "closed"
+      }
+    },
+    "node_exit": 0,
+    "exact_owned_server_exit": -15,
+    "server_port_reusable": true,
+    "method": "Owned direct subprocess handles and Playwright only; no process groups or process-name scans.",
+    "audio": "Speakers muted; Web Audio processing retained."
+  },
+  "retained_evidence": {
+    "locator": "Private verified external storage run rules-profile-browser-profile-only-20261008-EWqoLS",
+    "root_review_sha256": "26f2caa95ba3d1df0f53fd8f5d013e9dc419b233423ec7a13ec97453c076242d",
+    "files": [
+      {
+        "relative_path": "browser-profile-packet-v5.json",
+        "bytes": 12365,
+        "sha256": "9bb4fd9cecf6b7c52aeaed41d7b6d27632e4fb00b2e84473921d5a11758aa61e"
+      },
+      {
+        "relative_path": "supervisor-v5.py",
+        "bytes": 21793,
+        "sha256": "3ff1e89b831b88d24975df5163cf30ce232f36d0ac9543264e10981adeb870c7"
+      },
+      {
+        "relative_path": "supervisor-v5.json",
+        "bytes": 3174,
+        "sha256": "3f202fe69a10e19d4eab7ae92080bc25ffbf08888ba2f8624791620fcce22925"
+      },
+      {
+        "relative_path": "harness-v5.stdout.log",
+        "bytes": 1054,
+        "sha256": "37350d5b004bffc762532953402833d9c390ec340f71c31d42f39a4add0775c8"
+      },
+      {
+        "relative_path": "harness-v5.stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "relative_path": "browser-output-v5/report.json",
+        "bytes": 278672,
+        "sha256": "2d38cad41349bb26f1dd997d184098ee8bdb941f2239c6468e64c55e71b1fab1"
+      },
+      {
+        "relative_path": "browser-output-v3/report.json",
+        "bytes": 259262,
+        "sha256": "ffba97783e6b41599006e38003c3eda1bf4a75b80512c6506d7921d561ad348b"
+      },
+      {
+        "relative_path": "item-mask-original-source-disassembly-v4.json",
+        "bytes": 3056,
+        "sha256": "b86b3d563fac07fa7913c05a10813416e1c3ddb4c254b9c4800dfa1010ce1dd5"
+      },
+      {
+        "relative_path": "v4-preflight-failure.json",
+        "bytes": 363,
+        "sha256": "01c8877787f085be707e89264608e699133073ff27b050e941c465ada15f6d61"
+      }
+    ],
+    "screenshots": [
+      {
+        "name": "00-initial-css",
+        "sha256": "128afb9b0bbfb26d82b61b8083ef8ac0bc2e3ed03ab7da327a960162b35026f7"
+      },
+      {
+        "name": "01-main-root",
+        "sha256": "284d0a6d5689b17996858fa18ad99604600cfed8ea9b430adf6bf5a6a912dc3b"
+      },
+      {
+        "name": "02-first-vs-rules-choice",
+        "sha256": "97f59029b80c92aa237f6ac03a3ff377bb0388743ee8244b4c37a013eda92916"
+      },
+      {
+        "name": "02-first-rules",
+        "sha256": "b36ec1d2217329422e03fc477434b462fc37a9bafa05851187216c85d562bb75"
+      },
+      {
+        "name": "03-competitive-items-entry",
+        "sha256": "4465423be5686ac363eb3a4e0b2014448f6169446eb21abd3e665e7d6561c3c1"
+      },
+      {
+        "name": "04-competitive-items-none",
+        "sha256": "a2b1090ee2d74e9a2bcf8da6472c710cf59683b04949048b60242675c59cc9a1"
+      },
+      {
+        "name": "05-competitive-rules-plus-profile",
+        "sha256": "25978c40e7197b5883712f0852f0f566ed7b7faf5c088f02bdb84cdd83380b89"
+      },
+      {
+        "name": "06-competitive-profile-css",
+        "sha256": "9a120aba8321aeede07036eeffbd2bff8b91ecf14dc5f22a5f87b57e60ee34a9"
+      }
+    ]
+  },
+  "historical_failures": [
+    {
+      "attempt": "v3",
+      "result": "Stopped at exact saved Items-mask assertion. All31rows off; helper incorrectly retained upper32. Independent original instruction review preceded test-only correction. Eject and process cleanup passed."
+    },
+    {
+      "attempt": "v4",
+      "result": "Immutable supervisor hash mismatch rejected before any child launch. Corrected v5 guard passed before real launch; original files retained."
+    }
+  ],
+  "open_gates": [
+    "Normalized post-SSS match-start rules and player identities.",
+    "Natural eight-minute non-tied timeout through Results/CSS with settings retained.",
+    "Matching original route/input-state comparison and incident recording for long run.",
+    "Full current-candidate regression suite, independent integration review and current-head CI.",
+    "Physical input, foreground timing, audible output, pixel/PCM equivalence and competitive-set acceptance."
+  ]
+}

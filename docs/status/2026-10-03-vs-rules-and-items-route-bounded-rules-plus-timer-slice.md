@@ -1,5 +1,25 @@
 # VS Rules and Items route — bounded Rules Plus timer slice
 
+The 2026-10-08 [competitive-profile preflight receipt](../evidence/competitive-rules-profile-preflight-v1.json)
+adds **Compiled / Source identified / Browser exercised** evidence for setting
+four stocks, 8:00, all 31 item switches off, None frequency, pause off, friendly
+fire on, damage ratio 1.0 and handicap off through original menu inputs. The
+headless Chrome run returned to CSS and Ejected with source owners and assets
+cleared. Source producer `21ac2ff4` used unchanged Release runtime `049f9a5b`;
+the receipt binds the full identities, screenshots, retained failure and cleanup.
+The raw CSS payload is not the normalized match-start oracle. SSS, gameplay,
+natural timeout, Results and original comparison remain unrun for this profile.
+
+The first preflight stopped on an incorrect test expectation for the item mask.
+The original DOL's setter instructions confirm that clearing preference bit 31
+also clears the upper 32 bits through signed mask widening. The corrected test
+preserves that arithmetic and the unmapped preference bit 28; the observed saved
+mask is `0000000010000000`. All 31 selectable rows are independently observed
+off. This static instruction check establishes setter arithmetic only.
+
+The following October 3 result remains historical evidence for its different
+rules, input route and producers:
+
 **Source identified / Native traced / Browser exercised / Compiled** for the
 original Main → VS → Rules → Items → Rules Plus route, one item-row toggle,
 None item frequency, one-minute stock timer, three-stock Final Destination
