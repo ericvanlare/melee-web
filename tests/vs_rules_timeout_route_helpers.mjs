@@ -11,6 +11,47 @@ export const COMPETITIVE_TIMEOUT_BOUNDS = Object.freeze({
   snapshotPeriodFrames: 3600,
 });
 
+export const COMPETITIVE_PRIZE_MAX_CONFIRMATIONS = 60;
+
+// Results confirmation owns phase 8 and stops at its first source exit. The
+// original Prize screen is a separate phase-9 route back to CSS; only it may
+// receive these bounded follow-up Start inputs.
+export async function returnFromCompetitivePrize({deadlineAt, observeHost, press}) {
+  if (!Number.isFinite(deadlineAt) || deadlineAt <= Date.now() ||
+      typeof observeHost !== 'function' || typeof press !== 'function')
+    throw Error('Original Prize return requires a live shared deadline and checked host/input functions');
+  const initial = await observeHost('original Results exit before Prize return');
+  if (Date.now() >= deadlineAt)
+    throw Error('Original Results route exceeded the shared 45-second deadline while observing its exit');
+  if (!initial || initial.running !== 1 || !Number.isSafeInteger(initial.phase))
+    throw Error(`Original Results exit has invalid host state: ${JSON.stringify(initial)}`);
+  if (initial.phase === 1)
+    return {initial_phase: 1, final_phase: 1, prize_confirmations: 0};
+  if (initial.phase !== 9)
+    throw Error(`Original Results exited into unsupported host phase ${initial.phase}; Prize Start is not allowed`);
+
+  let state = initial;
+  let confirmations = 0;
+  while (state.phase === 9 && confirmations < COMPETITIVE_PRIZE_MAX_CONFIRMATIONS) {
+    if (Date.now() >= deadlineAt)
+      throw Error('Original Prize return exceeded the shared 45-second Results deadline');
+    await press('Enter', {releaseMs: 380});
+    confirmations++;
+    if (Date.now() >= deadlineAt)
+      throw Error('Original Prize return exceeded the shared 45-second Results deadline during input');
+    state = await observeHost(`original Prize confirmation ${confirmations}`);
+    if (Date.now() >= deadlineAt)
+      throw Error('Original Prize return exceeded the shared 45-second Results deadline while observing input');
+    if (!state || state.running !== 1 || !Number.isSafeInteger(state.phase))
+      throw Error(`Original Prize confirmation ${confirmations} has invalid host state: ${JSON.stringify(state)}`);
+    if (state.phase !== 9 && state.phase !== 1)
+      throw Error(`Original Prize reached unsupported host phase ${state.phase} after confirmation ${confirmations}`);
+  }
+  if (state.phase !== 1)
+    throw Error(`Original Prize did not return to CSS within ${COMPETITIVE_PRIZE_MAX_CONFIRMATIONS} confirmations`);
+  return {initial_phase: initial.phase, final_phase: state.phase, prize_confirmations: confirmations};
+}
+
 function expect(failures, label, actual, wanted) {
   if (actual !== wanted)
     failures.push(`${label}: expected ${JSON.stringify(wanted)}, got ${JSON.stringify(actual)}`);

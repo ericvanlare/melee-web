@@ -4,6 +4,7 @@ import {
   confirmTwoHumanResults,
   RESULTS_TRACE_CAPACITY,
   RESULTS_TRACE_START_MASK,
+  RESULTS_CONNECTED_PAD_ERRORS,
   resultsPadTraceFailures,
 } from './vs_rules_results_confirmation_driver.mjs';
 
@@ -13,9 +14,11 @@ function makeTraceRow(sourceFrame, {phase, statsPhase, confirmed, startPorts = [
     tick_returned: true,
     pads: Array.from({length: 4}, (_, port) => ({
       button: startPorts.includes(port) ? RESULTS_TRACE_START_MASK : 0,
+      err: RESULTS_CONNECTED_PAD_ERRORS[port],
     })),
     source_consumed_pads: Array.from({length: 4}, (_, port) => ({
       trigger: startPorts.includes(port) ? RESULTS_TRACE_START_MASK : 0,
+      err: RESULTS_CONNECTED_PAD_ERRORS[port],
     })),
     results_state_after_tick: {
       source_frame: sourceFrame + 1,
@@ -52,6 +55,23 @@ test('Results PAD trace rejects incomplete rows, overflow, failed ticks and unkn
     makeTraceRow(0, {phase: 2, statsPhase: 1, confirmed: [0, 0, 1, 1]}),
     makeTraceRow(2, {phase: 3, statsPhase: 2, confirmed: [0, 0, 1, 1]}),
   ])).some(row => row.includes('out of source-frame order')));
+});
+
+test('Results PAD trace requires the two-connected/two-disconnected raw and copied PAD error profile', () => {
+  const valid = makeTrace([makeTraceRow(0, {phase: 2, statsPhase: 0, confirmed: [0, 0, 0, 0]})]);
+  assert.deepEqual(resultsPadTraceFailures(valid), []);
+  const rawDisconnectedHuman = structuredClone(valid);
+  rawDisconnectedHuman.samples[0].pads[1].err = -1;
+  assert(resultsPadTraceFailures(rawDisconnectedHuman).some(row => row.includes('raw PAD error profile')));
+  const copiedDisconnectedHuman = structuredClone(valid);
+  copiedDisconnectedHuman.samples[0].source_consumed_pads[0].err = -1;
+  assert(resultsPadTraceFailures(copiedDisconnectedHuman).some(row => row.includes('copied PAD error profile')));
+  const missingRawError = structuredClone(valid);
+  delete missingRawError.samples[0].pads[2].err;
+  assert(resultsPadTraceFailures(missingRawError).some(row => row.includes('lacks four raw PAD samples')));
+  const missingCopiedError = structuredClone(valid);
+  delete missingCopiedError.samples[0].source_consumed_pads[3].err;
+  assert(resultsPadTraceFailures(missingCopiedError).some(row => row.includes('lacks four source-consumed PAD states')));
 });
 
 test('two-Human Results driver gates presentation and each port confirmation on copied source state', async () => {

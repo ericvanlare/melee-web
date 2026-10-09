@@ -10,6 +10,8 @@ import {
   competitiveTimeoutTerminalFailures,
   runtimeDiagnosticCounterFailures,
   runtimeDiagnosticsFailures,
+  COMPETITIVE_PRIZE_MAX_CONFIRMATIONS,
+  returnFromCompetitivePrize,
 } from './vs_rules_timeout_route_helpers.mjs';
 
 const match = ({frame = 180, stocks = [4, 4], paused = false, ending = false,
@@ -27,6 +29,56 @@ test('timeout input and wait bounds stay finite and source-tick based', () => {
   });
   assert.equal(COMPETITIVE_TIMEOUT_BOUNDS.outwardPulseFrames *
     COMPETITIVE_TIMEOUT_BOUNDS.maximumOutwardPulses, 600);
+});
+
+test('Prize return sends Start only in phase 9 and remains inside the shared bounded route', async () => {
+  assert.equal(COMPETITIVE_PRIZE_MAX_CONFIRMATIONS, 60);
+  const presses = [];
+  const states = [9, 9, 1];
+  let observations = 0;
+  const result = await returnFromCompetitivePrize({
+    deadlineAt: Date.now() + 5000,
+    observeHost: async () => ({phase: states[observations++], running: 1}),
+    press: async (key, timing) => { presses.push({key, timing}); },
+  });
+  assert.deepEqual(result, {initial_phase: 9, final_phase: 1, prize_confirmations: 2});
+  assert.equal(observations, 3, 'observe the initial Prize state and each post-input phase through the checked route callback');
+  assert.deepEqual(presses, [
+    {key: 'Enter', timing: {releaseMs: 380}},
+    {key: 'Enter', timing: {releaseMs: 380}},
+  ]);
+
+  const alreadyCss = await returnFromCompetitivePrize({
+    deadlineAt: Date.now() + 1000,
+    observeHost: async () => ({phase: 1, running: 1}),
+    press: async () => assert.fail('CSS return must not send a Prize Start'),
+  });
+  assert.deepEqual(alreadyCss, {initial_phase: 1, final_phase: 1, prize_confirmations: 0});
+});
+
+test('Prize return rejects non-Prize phases and stops at the exact confirmation cap', async () => {
+  let phase = 8;
+  let presses = 0;
+  await assert.rejects(returnFromCompetitivePrize({
+    deadlineAt: Date.now() + 1000,
+    observeHost: async () => ({phase, running: 1}),
+    press: async () => { presses++; },
+  }), /Start is not allowed/);
+  assert.equal(presses, 0);
+
+  phase = 9;
+  await assert.rejects(returnFromCompetitivePrize({
+    deadlineAt: Date.now() + 5000,
+    observeHost: async () => ({phase, running: 1}),
+    press: async () => { presses++; },
+  }), /within 60 confirmations/);
+  assert.equal(presses, COMPETITIVE_PRIZE_MAX_CONFIRMATIONS);
+
+  await assert.rejects(returnFromCompetitivePrize({
+    deadlineAt: Date.now() - 1,
+    observeHost: async () => assert.fail('expired route must not poll the host'),
+    press: async () => assert.fail('expired route must not send input'),
+  }), /live shared deadline/);
 });
 
 test('stock-loss policy accepts only the first P1 decrement with P2 unchanged', () => {

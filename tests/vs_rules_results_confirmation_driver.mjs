@@ -5,6 +5,7 @@
 export const RESULTS_TRACE_START_MASK = 0x1000;
 export const RESULTS_TRACE_CAPACITY = 8192;
 export const RESULTS_CONFIRMATION_POLL_MS = 250;
+export const RESULTS_CONNECTED_PAD_ERRORS = Object.freeze([0, 0, -1, -1]);
 
 function confirmationState(row) {
   return row?.results_state_after_tick ?? null;
@@ -27,6 +28,9 @@ function rowSummary(row) {
     stats_phase: state?.stats_phase ?? null,
     confirmed: Array.isArray(state?.players) ? state.players.map(player => player.confirmed) : null,
     consumed_start_ports: startedPorts(row),
+    raw_pad_errors: Array.isArray(row?.pads) ? row.pads.map(pad => pad?.err ?? null) : null,
+    copied_pad_errors: Array.isArray(row?.source_consumed_pads)
+      ? row.source_consumed_pads.map(pad => pad?.err ?? null) : null,
   };
 }
 
@@ -95,12 +99,20 @@ export function resultsPadTraceFailures(trace) {
         state.players.some(player => !player || ![0, 1].includes(player.confirmed)))
       failures.push(`original Results PAD trace row ${index} lacks four binary confirmation states`);
     if (!Array.isArray(row.pads) || row.pads.length !== 4 ||
-        row.pads.some(pad => !pad || !Number.isSafeInteger(pad.button) || pad.button < 0 || pad.button > 0xffff))
+        row.pads.some(pad => !pad || !Number.isSafeInteger(pad.button) || pad.button < 0 || pad.button > 0xffff ||
+          !Number.isSafeInteger(pad.err))) {
       failures.push(`original Results PAD trace row ${index} lacks four raw PAD samples`);
+    } else if (JSON.stringify(row.pads.map(pad => pad.err)) !== JSON.stringify(RESULTS_CONNECTED_PAD_ERRORS)) {
+      failures.push(`original Results PAD trace row ${index} has an unexpected raw PAD error profile: ${JSON.stringify(row.pads.map(pad => pad.err))}`);
+    }
     if (!Array.isArray(row.source_consumed_pads) || row.source_consumed_pads.length !== 4 ||
         row.source_consumed_pads.some(pad => !pad || !Number.isSafeInteger(pad.trigger) ||
-          pad.trigger < 0 || pad.trigger > 0xffff))
+          pad.trigger < 0 || pad.trigger > 0xffff || !Number.isSafeInteger(pad.err))) {
       failures.push(`original Results PAD trace row ${index} lacks four source-consumed PAD states`);
+    } else if (JSON.stringify(row.source_consumed_pads.map(pad => pad.err)) !==
+        JSON.stringify(RESULTS_CONNECTED_PAD_ERRORS)) {
+      failures.push(`original Results PAD trace row ${index} has an unexpected copied PAD error profile: ${JSON.stringify(row.source_consumed_pads.map(pad => pad.err))}`);
+    }
   }
   return failures;
 }

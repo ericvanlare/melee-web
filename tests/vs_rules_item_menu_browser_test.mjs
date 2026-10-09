@@ -31,6 +31,7 @@ import {
   competitiveTimeoutReadinessFailures,
   competitiveTimeoutStableFailures,
   competitiveTimeoutTerminalFailures,
+  returnFromCompetitivePrize,
   runtimeDiagnosticCounterFailures,
   runtimeDiagnosticsFailures,
 } from './vs_rules_timeout_route_helpers.mjs';
@@ -447,7 +448,7 @@ const ensureNoError = async label => {
   if (state.error) throw Error(`${label}: ${state.error}`);
   if (competitiveTimeoutRoute && report.errors.length)
     throw Error(`${label}: browser emitted errors: ${JSON.stringify(report.errors)}`);
-  if (competitiveTimeoutRoute && (state.phase === 7 || state.phase === 8) &&
+  if (competitiveTimeoutRoute && (state.phase === 7 || state.phase === 8 || state.phase === 9) &&
       Date.now() - lastRuntimeCounterPollAt >= 1000)
     await checkRuntimeDiagnosticCounters(`phase-${state.phase} runtime diagnostic poll`, false);
   return state;
@@ -1232,6 +1233,10 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
   report.checks.push(`Original MatchEnd produced OUTCOME_TIMEOUT with its exact unique P2 source winner list after ${terminal.frame} source frames`);
   await checkRuntimeDiagnosticCounters('original timeout Results entry');
   const resultsDeadline = resultsEnteredAt + COMPETITIVE_TIMEOUT_BOUNDS.resultsReturnWallMs;
+  const observeResultsHost = async label => {
+    await resumeTimingPause(label);
+    return ensureNoError(label);
+  };
   const resultsPresentationDeadline = Math.min(Date.now() + 4500, resultsDeadline);
   while (Date.now() < resultsPresentationDeadline) {
     await ensureNoError('original Results presentation');
@@ -1241,12 +1246,17 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
   await shot('13-original-timeout-results');
   route.results_confirmation = await confirmTwoHumanResults({
     deadlineAt: resultsDeadline,
-    observeHost: label => ensureNoError(label),
+    observeHost: observeResultsHost,
     observeTrace: observeResultsPadTrace,
     press,
     wait: milliseconds => page.waitForTimeout(milliseconds),
   });
   report.checks.push('Original Results phase/readiness trace gated one P1 presentation Start and separate P1/P2 statistics Starts; source-consumed PAD and each participant confirmation were retained before the first Results exit');
+  route.prize_return = await returnFromCompetitivePrize({
+    deadlineAt: resultsDeadline,
+    observeHost: observeResultsHost,
+    press,
+  });
   const postResultsState = await waitPhase(1, 'original CSS after timeout Results',
     Math.max(0, resultsDeadline - Date.now()));
   if (Date.now() - resultsEnteredAt > COMPETITIVE_TIMEOUT_BOUNDS.resultsReturnWallMs)
