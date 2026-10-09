@@ -240,7 +240,7 @@ window.menuReplayStarted=(frames,observe,draws=frames,scheduling=0)=>{
  run.lastProgress=performance.now();
  markFirstReplayBoundary('menu_replay_started_js_returned',frames,draws,scheduling);
 };
-window.menuReplayCompleted=(frames,matchComplete,outcome,winner,finalScene,diagnosticEntityPrefix=false,observations=0,firstSourceTick=0,lastSourceTick=0,boundObservations=0)=>{if(retailRun){retailRun.diagnosticEntityPrefix=diagnosticEntityPrefix;retailRun.prefixProgress={observations,bound_observations:boundObservations,first_source_tick:firstSourceTick,last_source_tick:lastSourceTick};retailRun.finalScene=finalScene;retailRun.consumed=frames;retailRun.completed=true;retailRun.sourceMatch={complete:!!matchComplete,outcome:Number.isInteger(outcome)?outcome:null,winner:Number.isInteger(winner)?winner:null};setTimeout(()=>finishRetailReplay(null),0);}};
+window.menuReplayCompleted=(frames,matchComplete,outcome,winner,finalScene,diagnosticEntityPrefix=false,observations=0,firstSourceTick=0,lastSourceTick=0,boundObservations=0)=>{if(retailRun){if(!!retailRun.diagnosticEntityPrefix!==diagnosticEntityPrefix){const run=retailRun;run.failure=run.failure||'Native completion prefix mode disagrees with requested recipe';setTimeout(()=>{if(retailRun===run)return finishRetailReplay(run.failure);},0);return;}retailRun.prefixProgress={observations,bound_observations:boundObservations,first_source_tick:firstSourceTick,last_source_tick:lastSourceTick};retailRun.finalScene=finalScene;retailRun.consumed=frames;retailRun.completed=true;retailRun.sourceMatch={complete:!!matchComplete,outcome:Number.isInteger(outcome)?outcome:null,winner:Number.isInteger(winner)?winner:null};setTimeout(()=>finishRetailReplay(null),0);}};
 window.menuReplayPoll=()=>{
  $('retail-replay-start').disabled=!ready||fatal||!bundle||replayLoading||!!retailRun||!$('retail-replay-file').files[0];
  const run=retailRun;if(!run||run.finishing||run.completed)return;
@@ -365,10 +365,13 @@ $('retail-replay-start').onclick=async()=>{
   const header=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
   const wholeVersion=bytes.length>=8&&header.getUint32(0,false)===0x4d575243?header.getUint32(4,false):0;
   const wholeSession=wholeVersion===8||wholeVersion===9||wholeVersion===10;
+  // Requested scope survives native preparation failure/time-out. This probe
+  // is not admission: the native decoder still validates the complete recipe.
+  const diagnosticEntityPrefix=wholeVersion===8&&bytes.length>=24&&header.getUint16(22,false)===1;
   if(wholeSession&&owner.handle.getState().state!=='prepared')throw Error('Whole-session replay requires a freshly imported disc before opening character select.');
   if(!wholeSession&&!await unloadAndSave())throw Error(status());resetTiming(false);await prepareAudio();await pauseAudioForPreparation();
   for(const old of $('retail-replay-downloads').querySelectorAll('a'))URL.revokeObjectURL(old.href);$('retail-replay-downloads').replaceChildren();replayEvidence=[];$('save-replay-evidence').disabled=true;
-  retailRun={hash,observe,wholeSession,rows:[],timerRows:[],memory:{before_preparation:replayMemorySnapshot()},frames:0,started:performance.now(),lastProgress:performance.now(),lastCursor:0,focusLost:false,cache:{state:Module.runtimeCacheState?.state||'unknown',bytes:Number(Module.runtimeCacheState?.fileBytes||0),cleared_on_startup:clearRenderCacheOnLoad,driver_cache:'uncontrolled'}};
+  retailRun={hash,observe,wholeSession,diagnosticEntityPrefix,rows:[],timerRows:[],memory:{before_preparation:replayMemorySnapshot()},frames:0,started:performance.now(),lastProgress:performance.now(),lastCursor:0,focusLost:false,cache:{state:Module.runtimeCacheState?.state||'unknown',bytes:Number(Module.runtimeCacheState?.fileBytes||0),cleared_on_startup:clearRenderCacheOnLoad,driver_cache:'uncontrolled'}};
   const run=retailRun;
   uiMessage='';$('retail-replay-report').textContent='Preparing reference replay…';$('launch').disabled=true;$('pause').disabled=$('unload').disabled=false;
   retailRun.paintControl=beginReplayPaintControl();
