@@ -1386,6 +1386,117 @@
           "artifact": "sol-ready-text-membership-result-review-v1.json",
           "sha256": "be58c4e0d67093b1051d8730539d6395835daaab8dbad3ac763b60af478301d2"
         }
+      },
+      "scheduled_sis_retirement": {
+        "source": "157430b424475a1e5e1b774889ee7762b48d20e7",
+        "source_tree": "bd38b4ee0b9fdd961ed755c873bd7fb51bf041cc",
+        "source_review": {
+          "artifact": "root-scheduled-sis-retirement-source-review-v3.json",
+          "sha256": "0c8781601d6bdf661353f370350864b84e38e617d85efac9b30f1c8144a2e92d"
+        },
+        "source_proposal_review": {
+          "artifact": "root-scheduled-sis-retirement-v3-proposal-review-v1.json",
+          "sha256": "5248ff59400ee34e67bf27595d0683eb8b6197cadaa0c139cc529d678d8713ea"
+        },
+        "fixture_correction_review": {
+          "artifact": "root-scheduled-sis-retirement-v5-proposal-review-v1.json",
+          "sha256": "ade3222e2153dc62d6d9cd349db809a4834fb49c6d5f248156fa0162e9e11ebb"
+        },
+        "diagnostic_build": {
+          "artifact": "scheduled-sis-retirement-build-v3/result.json",
+          "sha256": "4ac6c58fff18811ef18b022c8c049872a796f0ea155874a3aee2886cb54f2dc9"
+        },
+        "producer": {
+          "artifact": "scheduled-sis-retirement-producer-157430b4-v1/identity.json",
+          "sha256": "35626fa2baa6804861a5f783880bf4fbc66d51179b4e01644d15d480b6552645"
+        },
+        "strict_component_tests": {
+          "artifact": "root-scheduled-sis-retirement-strict-controls-v1.log",
+          "sha256": "5cc80060cc29cc7456efb877dadf300b1b8ae09d80e2ac89251f252b61eba15b"
+        },
+        "earlier_boundary_tests": {
+          "source": "34e2da833a0e8c253851ec9b593b8df2b2ee3778",
+          "tests": 6,
+          "artifact": "root-scheduled-sis-retirement-python-controls-v1.log",
+          "sha256": "1a89db3cd0815d06c0d079f9b9001ca67e905415190cb388fb8eee7bd8cd0dbc"
+        },
+        "retained_control_failures": [
+          {
+            "source": "34e2da833a0e8c253851ec9b593b8df2b2ee3778",
+            "result": {
+              "artifact": "root-scheduled-sis-retirement-controls-v1/result.json",
+              "sha256": "6a9904f8d10077f7888fb29e3e600eb6521f1209f16e3058fade88a810761aa9"
+            },
+            "review": {
+              "artifact": "luna-scheduled-sis-retirement-controls-result-review-v1/review.json",
+              "sha256": "736ffc293e31da6f1db9b424f977fc04f1436fdbe41f18916a8aae882ab39323"
+            },
+            "observation": "Natural exit1 before first layout positive snapshot; exact failing predicate not yet observed."
+          },
+          {
+            "source": "d378d99e22daf2711253e7af34b5fdf2c9769089",
+            "result": {
+              "artifact": "root-scheduled-sis-retirement-controls-v2/result.json",
+              "sha256": "4b2360033f0130bed3ed0c5b578ffc3d4c90f92912ecbca4332600b88dac4063"
+            },
+            "review": {
+              "artifact": "luna-scheduled-sis-retirement-v4-free-list-review-v1/review.json",
+              "sha256": "cbf2bbe457ab18c00400acb8c51c79e56190e9b6ea72036dc49beab7cd384877"
+            },
+            "observation": "Positive context snapshot refuses actual160-byte block versus expected16, same address previously used for original text. Valid unsplit original allocation/testsetup mismatch, not corruption. Bounded original allocator review preceded third experiment."
+          }
+        ],
+        "sdk_controls": {
+          "artifact": "root-scheduled-sis-retirement-controls-v3/result.json",
+          "sha256": "418b73689a692796dbdba57913c60f7ab40137a208282d5b2dd8b0d7037f1914"
+        },
+        "independent_control_review": {
+          "artifact": "luna-scheduled-sis-retirement-controls-pass-review-v1/review.json",
+          "sha256": "12ad842fc6f666432e4c098a5e41e13d50d85ba650cd0d44242f8cdbc5f0f614"
+        },
+        "control_scope": "Two actual allocator lifetimes; original selective font1 drain at three list positions, exact foreign bytes/order, owned payload/renderer absence, unchanged negative states, exact cached text+renderer reuse and restored list order rejected by permanent successful-original-free destruction latch. No full Session claim.",
+        "packet": {
+          "artifact": "scheduled-sis-ready-preflight-packet-v1.json",
+          "sha256": "542bb0819bff877ecdfc8a6a2f1224f42326b0201be844c48d0ff9a4f48b9e88"
+        },
+        "frozen_result": {
+          "artifact": "root-scheduled-sis-ready-frozen-result-v1.json",
+          "sha256": "7cf32922101d746d781645615767be6d52cb9273790c17f9fe35e616193ce740"
+        },
+        "independent_result_review": {
+          "artifact": "sol-scheduled-sis-ready-result-review-v1.json",
+          "sha256": "2d457c291a973582585c70b7a9b3394c66ecdb4786eeaaf100d2df88f5c16534"
+        },
+        "observations": {
+          "construction_ticks": 0,
+          "original_ready_ticks": 124,
+          "world": 3,
+          "ready_objects": 59,
+          "ready_processes": 73,
+          "started_sis_snapshot": "passes before map2 clause",
+          "first_refusal": "map2-graph: initialization predicate requires zero proc dispatches; observed124",
+          "map2_journal": 1,
+          "map2_proc_dispatch": 124,
+          "map2_buffer_use_observed": 0,
+          "later_map2_predicates": "short-circuited and unverified",
+          "runtime_selective_sis_drain": "not reached",
+          "retained_objects": 29,
+          "retained_processes": 53
+        },
+        "verification": {
+          "direct_bindings_unchanged": 800,
+          "fixtures_unchanged": 98,
+          "raw_files": 17,
+          "before_docs_edits": true,
+          "owned_pids_natural_exit_reaped_absent": [
+            44218,
+            44224
+          ],
+          "unittest_returncode": 1,
+          "native_returncode": 1
+        },
+        "next": "Source-led reduction of map2 scheduled callback, unchanged buffer provenance and exact owner lifetime; define a started-phase contract preserving strict initialization. No counter-only waiver or repeat original run before reviewed smaller controls.",
+        "scope": "Component reducer pass and one retained Ready-session failure. No successful runtime selective drain, complete Session retirement,3500postGO worlds, original per-owner RNG comparison, C3, browser or human gate acceptance."
       }
     }
   }

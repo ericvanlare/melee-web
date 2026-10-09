@@ -511,12 +511,48 @@ changes. The unittest passes observation assertions; native exit 1 still records
 failed partial shutdown. Both exact children exit naturally, are reaped and are
 absent. The later map-2 guard remains unevaluated.
 
-Next, reduce the scheduled-retirement contract against the original font-1 drain:
-retain strict initialization checks, prove the exact stage-owned objects, and
-preserve the current foreign SIS list through owned removal. Review the live
-text/context memberships and source GObj ownership before any guard change.
-No nametag exemption, whole-list drain, cleanup reorder or completed Session
-retirement follows from this observation.
+The scheduled-retirement correction on `34e2da83` retains strict initialization
+checks and adds a checked path for a started source session. Successful original
+SIS frees permanently record destruction of the two owned texts and one owned
+context, so a replacement at the same address cannot restore ownership. The
+unchanged original font-1 drain must destroy all three exact owners while
+preserving current foreign text/context bytes and order. Foreign renderer and
+camera pointers remain opaque; no nametag exemption or runtime global drain is
+added.
+
+The first small allocator run fails before its initial positive snapshot. The
+observation-only follow-up on `d378d99e` identifies a valid 160-byte retained
+text block reused for a 16-byte context request. Original non-head best-fit
+allocation does not split that block; this is a test-setup failure, not allocator
+corruption. Both failures are retained. After bounded source review, `157430b4`
+uses original all-text/context cleanup only between verified-empty test-owned
+scenarios and qualifies the intact fixture before injecting faults. Production
+checks and allocator behavior remain unchanged.
+
+The corrected actual allocator reducer passes two lifetimes, with owned selective
+retirement at all three list positions, unchanged foreign contents/order, and
+refusal of stale backing, extra matching objects, changed renderers and cyclic
+lists. It also removes and recreates texts and renderers at the exact same cells,
+restores the original list order, and still refuses the destroyed identities.
+Independent review verifies the raw results and all 32 frozen/live producer
+files. The diagnostic build and two strict initialization/Ready component tests
+pass; six focused boundary checks passed on `34e2da83` before the observation
+and fixture-only corrections. These are component results.
+
+The unchanged original Ready-session test on `157430b4` again reaches Ready at
+124 ticks. Its current SIS snapshot succeeds, then the first refusal is
+**`map2-graph`**: the initialization guard requires zero map-2 proc dispatches,
+while this run records 124 dispatches and zero buffer uses. Later graph predicates
+are short-circuited and remain unverified. Selective SIS retirement has not run
+in this session; partial close retains world 3 with 29 objects and 53 processes.
+All 800 direct bindings, 98 fixtures and 17 raw files were independently verified
+before docs edits. Both exact children exit naturally with failure, are reaped,
+and are absent.
+
+Next, reduce the original map-2 scheduled callback and buffer-owner contract to a
+checked started-phase retirement path. Preserve the strict initialization path,
+source ordering and all still-required owner checks; do not turn the dispatch
+counter into an exemption. No complete Session retirement or C3 pass follows.
 
 The existing RNG observer can be reused afterward, but the Stadium notes require
 C3's per-tick, per-owner ledger to be compared with the original. C8's broader
