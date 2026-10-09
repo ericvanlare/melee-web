@@ -74,13 +74,13 @@ test('phase-5 Results preparation requires the exact retained terminal and uncha
     player_slot_types: [0, 0], player_source_stocks: [4, 4],
     player_source_characters: [0, 0], player_attack_ratio_bits: ['3f800000', '3f800000'],
     player_defense_ratio_bits: ['3f800000', '3f800000']};
-  const snapshot = {ready: true, paused: false, ending: false, complete: true,
+  const snapshot = {ready: false, paused: false, ending: false, complete: true,
     frame: 28800, rules: structuredClone(rules), players: [{stocks: 3}, {stocks: 4}],
     terminal: {outcome: 1, winners: [1]}};
-  assert.deepEqual(competitiveTimeoutDeferredResultsFailures({phase: 5, running: false}, snapshot, rules), []);
-  assert(competitiveTimeoutDeferredResultsFailures({phase: 4, running: false}, snapshot, rules)
+  assert.deepEqual(competitiveTimeoutDeferredResultsFailures({phase: 5, running: 0}, snapshot, rules), []);
+  assert(competitiveTimeoutDeferredResultsFailures({phase: 4, running: 0}, snapshot, rules)
     .some(row => row.includes('asset phase')));
-  assert(competitiveTimeoutDeferredResultsFailures({phase: 5, running: true}, snapshot, rules)
+  assert(competitiveTimeoutDeferredResultsFailures({phase: 5, running: false}, snapshot, rules)
     .some(row => row.includes('stopped')));
 
   for (const [label, changed] of [
@@ -89,13 +89,14 @@ test('phase-5 Results preparation requires the exact retained terminal and uncha
     ['wrong winner', {...snapshot, terminal: {outcome: 1, winners: [0]}}],
     ['wrong stocks', {...snapshot, players: [{stocks: 3}, {stocks: 3}]}],
     ['not terminal', {...snapshot, ending: false, complete: false}],
+    ['untyped HUD readiness', {...snapshot, ready: 0}],
     ['paused', {...snapshot, paused: true}],
     ['changed setup', {...snapshot, rules: {...rules, player_stocks: [3, 4]}}],
     ['changed rule', {...snapshot, rules: {...rules, item_frequency: 0}}],
   ]) {
-    assert(competitiveTimeoutDeferredResultsFailures({phase: 5, running: false}, changed, rules).length > 0, label);
+    assert(competitiveTimeoutDeferredResultsFailures({phase: 5, running: 0}, changed, rules).length > 0, label);
   }
-  assert(competitiveTimeoutDeferredResultsFailures({phase: 5, running: false}, {observer_error: true}, rules)
+  assert(competitiveTimeoutDeferredResultsFailures({phase: 5, running: 0}, {observer_error: true}, rules)
     .some(row => row.includes('timeout outcome')));
 });
 

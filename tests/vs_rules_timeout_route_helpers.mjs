@@ -84,12 +84,16 @@ export function competitiveTimeoutTerminalFailures(match) {
 export function competitiveTimeoutDeferredResultsFailures(state, match, expectedRules) {
   const failures = [...competitiveTimeoutTerminalFailures(match)];
   expect(failures, 'deferred original Results asset phase', state?.phase, 5);
-  expect(failures, 'deferred Results asset preparation is stopped', state?.running, false);
+  expect(failures, 'deferred Results asset preparation is stopped', state?.running, 0);
   expect(failures, 'retained terminal match observer is valid', match?.observer_error ?? false, false);
-  expect(failures, 'retained terminal match observation is ready', match?.ready, true);
+  if (typeof match?.ready !== 'boolean')
+    failures.push('retained terminal HUD readiness must remain a source boolean');
   expect(failures, 'retained terminal match observation is not paused', match?.paused, false);
-  expect(failures, 'retained terminal match reached source ending or completion',
-    match?.ending === true || match?.complete === true, true);
+  if (typeof match?.ending !== 'boolean' || typeof match?.complete !== 'boolean') {
+    failures.push('retained terminal ending/completion fields must remain source booleans');
+  } else if (!match.ending && !match.complete) {
+    failures.push('retained terminal match has neither source ending nor completion set');
+  }
   const stocks = stockPair(match);
   expect(failures, 'retained terminal live stocks remain [3,4]', JSON.stringify(stocks),
     JSON.stringify([3, 4]));

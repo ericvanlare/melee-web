@@ -1129,7 +1129,9 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
       const deferredFailures = competitiveTimeoutDeferredResultsFailures(state, latest, initialMatch.rules);
       assert.deepEqual(deferredFailures, [],
         `Stopped source phase 5 is accepted only for the retained unique P2 timeout during Results asset preparation: ${JSON.stringify({deferredFailures, state, latest})}`);
-      const identity = JSON.stringify({frame: latest.frame, rules: latest.rules,
+      const identity = JSON.stringify({frame: latest.frame, ready: latest.ready,
+        paused: latest.paused, ending: latest.ending, complete: latest.complete,
+        outcome: latest.outcome, winner: latest.winner, rules: latest.rules,
         stocks: latest.players.map(player => player.stocks), terminal: latest.terminal});
       if (deferredResultsIdentity === null) {
         deferredResultsIdentity = identity;
@@ -1140,7 +1142,9 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
           first_observed_at: new Date().toISOString(),
           last_observed_at: null,
           observations: 0,
-          retained_terminal: {frame: latest.frame, rules: latest.rules,
+          retained_terminal: {frame: latest.frame, ready: latest.ready,
+            ending: latest.ending, complete: latest.complete, outcome: latest.outcome,
+            winner: latest.winner, rules: latest.rules,
             stocks: latest.players.map(player => player.stocks), terminal: latest.terminal},
           phase8_observed_at: null,
           transition_wall_ms: null,
