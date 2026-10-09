@@ -12,6 +12,29 @@ menu-only receipt ends at CSS; subsequent route evidence is recorded separately.
 
 The later 2026-10-08 [normalized match-start prefix](../evidence/competitive-rules-profile-preflight-v1.json) continues through original SSS to a live two-Human Mario match on Final Destination. At source frame 180 it observed the normalized 480-second timer, four stocks each, all item switches off, pause disabled, friendly fire on and damage 1.0, then Ejected with owners cleared. It stops before any stock loss, timeout, Results or Results-to-CSS return. The raw output retains one stale reused check string that says no match ran; the structured observation and final route check show the short prefix. The hash-bound private run receipt is named in the evidence JSON. This is not a full competitive route or original-game comparison.
 
+The first natural eight-minute browser route passed on 2026-10-08. The same
+[scoped evidence receipt](../evidence/competitive-rules-profile-preflight-v1.json)
+binds harness `1801061d` to ordinary Release runtime `365c6b31` and its 46 served
+files. Input produced exactly one P1 stock loss; both ports then remained neutral.
+Original MatchEnd reached source frame 28,800 with `OUTCOME_TIMEOUT`, live stocks
+`[3,4]`, unchanged four-stock setup and unique terminal winner `[1]`. Original
+Results consumed separate P1 presentation/P1 confirmation/P2 confirmation edges;
+the P2 row had phase 4, statistics phase 2 and all four confirmation flags set.
+All 368 trace attempts were retained without overflow. Active CSS retained the
+exact competitive GameRules and item preferences before Eject cleared the owners
+and assets. Browser errors and timing pauses were zero; all 17 preparation
+incidents were retained, with no invalid or dropped incidents. Node and supervisor
+exited 0, Playwright closed, and the exact owned HTTP server was reaped.
+
+This is **Compiled / Source identified / Browser exercised** evidence. It does
+not supply a matching original-game comparison. The SD candidate changes post-VS
+mode and returned CSS cache ownership; this ordinary `365c6b31` result does not
+validate those changes. Combined native timeout/Results/CSS controls and a final
+combined-runtime browser route remain open, as do the full suite/current-head CI
+and physical input, foreground timing, pixel/PCM, audio and performance gates.
+The private receipt preserves the historical unavailable original preflight stderr
+and first readiness-control failure raw-log gaps explicitly.
+
 The first preflight stopped on an incorrect test expectation for the item mask.
 The original DOL's setter instructions confirm that clearing preference bit 31
 also clears the upper 32 bits through signed mask widening. The corrected test

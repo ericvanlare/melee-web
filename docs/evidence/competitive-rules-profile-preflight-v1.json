@@ -440,9 +440,118 @@
     }
   ],
   "open_gates": [
-    "Natural eight-minute non-tied timeout, original Results \u2192 CSS, and exact settings retention through that route.",
-    "Matching original-route input/state comparison and bounded incident recording for the long run.",
+    "Matching original-route input/state comparison for the declared competitive eight-minute setup and non-tied terminal; earlier one-minute Rules Plus receipt is different workload provenance only.",
+    "Final combined SD-runtime ordinary-timeout/post-VS/returned-cache seam controls and final combined-runtime eight-minute browser route; this pass binds365c only.",
     "Full current-candidate regression suite, independent integration review and current-head CI.",
     "Physical input, foreground timing, audible output, pixel/PCM equivalence and competitive-set acceptance."
-  ]
+  ],
+  "natural_timeout_browser_route": {
+    "status": "passed_first_natural_eight_minute_browser_route",
+    "scope": "Original competitive menus -> two-Human Mario/Final Destination -> input-driven first P1 loss -> neutral natural eight-minute non-tied timeout -> original Results -> active CSS profile retention -> Eject. Ordinary365c runtime only.",
+    "producer": {
+      "source_head": "1801061d2d6f12f1d10c13d1547f7f76e056548e",
+      "source_tree": "00ff6c899901ab45c29890a213acae538d04eafa",
+      "runtime_producer": "365c6b31bdc12befe0204e5b309c2afd34352789",
+      "configuration": "Release",
+      "browser": "Headless installed Chrome154.0.8037.99",
+      "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+      "served_file_count": 46,
+      "served_manifest_sha256": "7f55d702a636f1fcbc8919761eaf43a09f99a27d3aeb3a6af41154d07864755e"
+    },
+    "observed": {
+      "source_terminal_frame": 28800,
+      "outcome": 1,
+      "terminal_winners": [
+        1
+      ],
+      "normalized_setup_stocks": [
+        4,
+        4
+      ],
+      "terminal_live_stocks": [
+        3,
+        4
+      ],
+      "normalized_timer_seconds": 480,
+      "timer_acceleration": false,
+      "forced_outcome": false,
+      "results_entered_wall_ms": 486197,
+      "full_run_wall_seconds": 546.2849209308624,
+      "directional_input_scope": "At most600P1 outwardsourcePADframes; firstsingleloss thenbothports120neutralframes",
+      "p1_presentation_tick": 298,
+      "p1_confirmation_tick": 330,
+      "p2_confirmation_tick": 357,
+      "p2_phase": 4,
+      "p2_stats_phase": 2,
+      "p2_confirmed": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "results_trace_rows": 368,
+      "results_trace_attempts": 368,
+      "results_trace_overflow": false,
+      "active_css_return": true,
+      "prize_confirmations": 0,
+      "retained_css_rules": {
+        "damage_ratio": 10,
+        "friendly_fire": 1,
+        "handicap": 0,
+        "mode": 1,
+        "pause": 0,
+        "stock_count": 4,
+        "stock_time_limit": 8,
+        "time_limit": 2
+      },
+      "retained_css_items": {
+        "frequency": -1,
+        "mask_hex": "0000000010000000"
+      },
+      "browser_errors": 0,
+      "timing_pauses": 0,
+      "preparation_incidents": 17,
+      "dropped_incidents": 0,
+      "invalid_preparation_incidents": 0,
+      "lossy_sample_drops": 32241,
+      "screenshots_retained": 16
+    },
+    "cleanup": {
+      "node_exit": 0,
+      "owned_server_exit": -15,
+      "supervisor_exit": 0,
+      "playwright": {
+        "browser": {
+          "status": "closed"
+        },
+        "context": {
+          "status": "closed"
+        },
+        "driver": {
+          "status": "disposed"
+        }
+      },
+      "exact_owned_pids_absent": true,
+      "server_port_reusable": true,
+      "eject": "Source owners, match/menu/Results/Prize, objects/processes, scopedassets/audio banks cleared"
+    },
+    "private_result_receipt": {
+      "locator": "Private verified external NVMe run r292-natural-timeout-route-v8-20261008-1801061d; browser-result-receipt-v1.json",
+      "sha256": "20050befc62f7dc3307af8a726d2db38adfd1908549e45274082cb22b2028423",
+      "report_sha256": "b12c492047f6aba791335b696e23c9f488c53fc6274212e0fd11b52e8abfc8dd",
+      "trace_sha256": "b35408b2b99df802bb43ba600ccc1b9e33f7c8f7d8b5b70a0b8feecb0cccca58",
+      "packet_sha256": "36030627bbb72f4e6f8559f7421754cd94fb4cbfa9974fc756042a6a4c03e210",
+      "supervisor_sha256": "45f6846b485f0aff56d98c01e34973b106be9772a2b207b25005471af16a147b",
+      "root_review": "root-first-result-review-v2.json",
+      "root_review_sha256": "3ed78249ae4abbe7066e8bada37d9b3db753187a2d0db2a1edd17f69806e47f5",
+      "artifact_count": 33
+    },
+    "limits": [
+      "No original-game matching-route comparison",
+      "No physical/foreground/audio/pixel/PCM/performance/competitive acceptance",
+      "365c ordinary runtime only; does not validate SD post-VS/returned-cache production changes",
+      "No full suite/current-head CI"
+    ],
+    "historical_log_gaps": "Original preflight stderr and first readiness-focused failure raw log unavailable; no substitution claimed"
+  }
 }
