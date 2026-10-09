@@ -112,26 +112,42 @@
     "retained_first_failure": "new test incorrectly expected bank 32; production unchanged by correction"
   },
   "suite": {
-    "producer": "87129df4e17082d850a1dec44b0652f3991e53d9",
-    "result": "failed",
+    "producer": "7c2274479fb6ea0a1606b972e2a8d2166aa5341d",
+    "result": "pass",
     "tests": 2208,
     "skipped": 153,
-    "failures": 3,
-    "seconds": 560.895,
-    "log_sha256": "46f500c81f6730d92047e057624f30bb9d4e42ca84600d846b04bd09db199c75",
-    "repair": "7ec76d14",
-    "focused_pass": [
-      "SD actual recipe controls",
-      "canonical patch check",
-      "actual native item-mask admission control"
-    ],
-    "pending": [
-      "full suite retry"
-    ],
+    "failures": 0,
+    "seconds": 484.203,
+    "log_sha256": "bf10b90bb31d70ea093c74780f8e0845002e4fb8e9d3f962205539d1b1fd8156",
+    "exact_supervisor_and_wrapper_absent": true,
+    "wait_reaped": true,
+    "unit_child_pid": "not separately recorded",
     "private_locator": {
       "run": "sparse-mario-full-route-20261009-87129df4-v1",
-      "log": "full-unittest-87129-v1.stdout-stderr.log",
-      "process": "full-unittest-87129-v1.process.json"
+      "log": "full-unittest-7c227-v2.stdout-stderr.log",
+      "process": "full-unittest-7c227-v2.process.json",
+      "cleanup": "full-unittest-7c227-v2-cleanup.json"
+    },
+    "retained_previous_failure": {
+      "producer": "87129df4e17082d850a1dec44b0652f3991e53d9",
+      "result": "failed",
+      "tests": 2208,
+      "skipped": 153,
+      "failures": 3,
+      "seconds": 560.895,
+      "log_sha256": "46f500c81f6730d92047e057624f30bb9d4e42ca84600d846b04bd09db199c75",
+      "repair": "7ec76d14",
+      "focused_pass": [
+        "SD actual recipe controls",
+        "canonical patch check",
+        "actual native item-mask admission control"
+      ],
+      "pending": [],
+      "private_locator": {
+        "run": "sparse-mario-full-route-20261009-87129df4-v1",
+        "log": "full-unittest-87129-v1.stdout-stderr.log",
+        "process": "full-unittest-87129-v1.process.json"
+      }
     }
   },
   "historical_regressions": {

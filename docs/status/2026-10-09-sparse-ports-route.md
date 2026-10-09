@@ -33,11 +33,13 @@ awaited unload driver resolved those harness boundaries before the prefix and
 full-route passes. The native no-draw CSS observer failed separately at a
 renderer-dependent joint guard; it is not a CSS route pass.
 
-The required full suite at `87129df4` failed: 2,208 tests, 153 skipped, three
-failures. Repair `7ec76d14` corrects only stale Team refusal text, two SD-only VM
-bindings and canonical patch blob metadata; effective patched source is unchanged.
-The SD recipe, canonical check and actual native item-mask admission control
-pass. A subsequent full-suite retry remains pending.
+The required full-suite retry at `7c227447` passed: 2,208 tests, 153 skipped,
+zero failures in 484.203 seconds. The earlier suite at `87129df4` failed three
+checks and remains retained. Repair `7ec76d14` corrected only stale Team refusal
+text, two SD-only VM bindings and canonical patch blob metadata; effective
+patched source is unchanged. The SD recipe, canonical check and actual native
+item-mask admission control also pass. The later documentation head is distinct
+from this tested executable head.
 
 A native authored source-port 0/2 component passed at `6a327ada`; the current
 runtime build and Kirby after-gap controls are separately identified in the
