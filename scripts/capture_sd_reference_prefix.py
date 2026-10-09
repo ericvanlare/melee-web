@@ -19,7 +19,8 @@ sys.path.insert(0, str(ROOT / "tools"))
 from authored_sd_reference_plan import canonical
 from retail_input_plan import load_plan, NEUTRAL_PAD, pipe_commands
 from reference_versus_sequence_capture import prepare_dual_pipe, DualPipeController, ObserverTail
-from sd_reference_diagnostic import Receiver, SdDiagnosticError, require
+from sd_reference_diagnostic import Receiver, RulesMenuReceiver, SdDiagnosticError, require
+from sd_original_menu_plan import validate_packet, matches
 from capture_retail_replay import dolphin_command, _copy_tree
 from capture_allocation_history import validate_reference_build_manifest
 from reference_observer_stream import read_status
@@ -44,6 +45,9 @@ def menu_actions(path):
     raw = Path(path).read_bytes()
     require(len(raw) <= 1024 * 1024, "SD menu recipe exceeds its bound")
     value = json.loads(raw)
+    if isinstance(value, dict) and value.get("version") == 2:
+        validate_packet(value)
+        return value, hashlib.sha256(raw).hexdigest()
     require(isinstance(value, dict) and set(value) == {"schema", "version", "actions"} and
             value["schema"] == "melee-web-sd-original-menu-inputs" and value["version"] == 1,
             "SD original menu recipe schema differs")
@@ -66,8 +70,10 @@ def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manife
     """Not called by legacy capture paths; caller supplies reviewed original inputs."""
     build = validate_reference_build_manifest(Path(build_manifest), Path(dolphin))
     plan, plan_hash = load_plan(input_plan, allow_authored=True)
-    receiver = Receiver(plan)
     menus, menu_hash = menu_actions(menu_recipe)
+    require(plan["authored_recipe"]["version"] == 3 and menus["version"] == 2,
+            "Runnable original diagnostic requires corrected recipe v3 and guarded reduced menu packet v2")
+    receiver = RulesMenuReceiver(plan)
     require(type(timeout) in (int, float) and 0 < timeout <= 600, "SD deadline is unbounded")
     output = Path(output)
     output.mkdir()  # A collision never overwrites another run.
@@ -102,13 +108,14 @@ def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manife
                        MWRC_DOL_SHA256="dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
                        MWRC_OUTPUT=str(raw), MWRC_STATUS=str(status), MWRC_SD_INIT="1",
                        MWRC_SD_RECIPE_SHA256=plan["authored_recipe_sha256"],
+                       MWRC_SD_MENU_PROBE="rules_ready",
                        MWRC_INPUT_RECORD=str(native), MWRC_INPUT_STATUS=str(native_status))
     command = dolphin_command(Path(dolphin), user, Path("unused"), Path(disc),
                               cpu="JITARM64", cold_boot=True, audible=False)
     command += ["-C", "Session.Core.SaveDataWritable=False", "-C", "Dolphin.Interface.ConfirmStop=False"]
     (output / "input-plan.json").write_bytes(canonical(plan))
     (output / "menu-recipe.json").write_bytes(canonical(menus))
-    (output / "launch.json").write_bytes(canonical({"scope": "sd_initialization_prefix",
+    (output / "launch.json").write_bytes(canonical({"scope": "rules_ready",
         "input_plan_sha256": plan_hash, "menu_recipe_sha256": menu_hash,
         "profile_sha256": source_inventory, "build": build, "command": command}))
     controller = DualPipeController(p1, p2, output / "input-intentions.jsonl")
@@ -124,26 +131,41 @@ def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manife
                     row = tail.next(deadline)
                     receiver.accept(row)
                     return row
-                def next_menu(scene=None):
-                    while True:
-                        row = next_row()
-                        require(receiver.order == 0, "SD match entered before menu recipe/release completed")
-                        payload = row["payload"]
-                        if row["event"] == "progress" and payload["name"] == "menu":
-                            if scene is None or any(s["tag"] == 40 and s["hex"] == f"{scene:02x}"
-                                                   for s in payload["slices"]):
-                                return row
+                def wait_source(predicate, label, max_polls):
+                    first = receiver.menu_polls
+                    while not predicate():
+                        require(not receiver.ended and receiver.menu_polls - first < max_polls,
+                                "Rules menu source predicate/cap failed: " + label)
+                        next_row()
+                def tap(action, label, max_polls):
+                    before = receiver.menu_consumed
+                    controller.set_both(action["p1"], action["p2"], action=label)
+                    wait_source(lambda: receiver.menu_consumed > before and receiver.last_pad[:2] ==
+                                [action["p1"], action["p2"]], label + ":consumed", max_polls)
+                    before = receiver.menu_consumed
+                    controller.set_both(NEUTRAL_PAD, NEUTRAL_PAD, action=label + ":release")
+                    wait_source(lambda: receiver.menu_consumed > before and receiver.last_pad[:2] ==
+                                [NEUTRAL_PAD] * 2, label + ":neutral-consumed", max_polls)
+                boot_actions = 0
+                while not matches(receiver.latest_menu, menus["actions"][0]["before"]):
+                    require(receiver.menu_polls < menus["boot_max_polls"], "Rules cold startup polling cap")
+                    next_row()
+                    scene = (receiver.latest_menu or {}).get("scene")
+                    for action in menus["boot"]:
+                        if scene == action["scene"]:
+                            boot_actions += 1
+                            require(boot_actions <= menus["boot_max_actions"], "Rules cold startup action cap")
+                            tap(action, "cold-scene-" + str(scene), 600)
+                            # Consume a new poll before considering another boot action.
+                            first = receiver.menu_polls
+                            wait_source(lambda: receiver.menu_polls > first, "cold-source-poll", 600)
+                            break
                 for action in menus["actions"]:
-                    next_menu(action["scene"])
-                    controller.set_both(action["p1"], action["p2"], action=action["label"])
-                    for _ in range(action["polls"]):
-                        next_menu()
-                    controller.set_both(NEUTRAL_PAD, NEUTRAL_PAD, action=action["label"] + ":release")
-                    # The final SSS confirmation can transition as soon as the
-                    # release is sent. Its first source sample must verify neutral.
-                    if action is not menus["actions"][-1]:
-                        for _ in range(action["settle_polls"]):
-                            next_menu()
+                    wait_source(lambda: matches(receiver.latest_menu, action["before"]),
+                                action["label"] + ":ready", action["max_polls"])
+                    tap(action, action["label"], action["max_polls"])
+                    wait_source(lambda: matches(receiver.latest_menu, action["after"]),
+                                action["label"] + ":observed", action["max_polls"])
                 while not receiver.ended:
                     next_row()
                 # MWRO End is flushed before the writer publishes final status.

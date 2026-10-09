@@ -892,6 +892,11 @@ struct Observer::Impl
     // Dolphin builds with exceptions disabled.  std::thread reports an
     // unavailable worker by terminating; there is no catchable error path.
     writer = std::thread([this] { WriterMain(); });
+    if (!Env("MWRC_SD_MENU_PROBE").empty() && !SdInitRequested())
+    {
+      SetInvalid("SD menu probe requires the opt-in SD diagnostic owner");
+      return false;
+    }
     if (SdInitRequested())
     {
       const std::string hash = Env("MWRC_SD_RECIPE_SHA256");
@@ -900,7 +905,8 @@ struct Observer::Impl
           hash == std::string(64, '0') || !InputStream::IsRecording() ||
           !Env("MWRC_WHOLE_SESSION_MATCHES").empty() ||
           !Env("MWRC_CPU_PROBE_OUTPUT").empty() || !Env("MWRC_ITEM_PROBE_OUTPUT").empty() ||
-          !Env("MWRC_ALLOCATION_OUTPUT").empty())
+          !Env("MWRC_ALLOCATION_OUTPUT").empty() ||
+          (!Env("MWRC_SD_MENU_PROBE").empty() && Env("MWRC_SD_MENU_PROBE") != "rules_ready"))
       {
         SetInvalid("SD prefix requires a recipe hash, native input recording and exclusive scope");
         return false;
@@ -970,7 +976,8 @@ struct Observer::Impl
                    JsonEscape(sequence_id) + "\"";
     if (SdInitRequested())
       handshake += ",\"diagnostic\":\"sd_initialization_prefix\",\"recipe_sha256\":\"" +
-                   Env("MWRC_SD_RECIPE_SHA256") + "\"";
+                   Env("MWRC_SD_RECIPE_SHA256") + "\",\"menu_probe\":\"" +
+                   Env("MWRC_SD_MENU_PROBE") + "\"";
     handshake += "}";
     PushJson(Event::Handshake, handshake);
     std::string start =
@@ -2326,7 +2333,8 @@ struct Observer::Impl
   {
     std::string json = "{\"diagnostic\":\"sd_initialization_prefix\",\"name\":\"" +
                        std::string(name) + "\",\"consumed\":" +
-                       std::to_string(sd_init.consumed) + ",\"pc\":" + std::to_string(pc) + ",\"slices\":[";
+                       std::to_string(sd_init.consumed) + ",\"menu_consumed\":" +
+                       std::to_string(sd_menu_consumed) + ",\"pc\":" + std::to_string(pc) + ",\"slices\":[";
     for (size_t index = 0; index < slice_count; ++index)
     {
       const auto& slice = slices[index];
@@ -2372,6 +2380,26 @@ struct Observer::Impl
         if (++sd_menu_polls > 7200)
           return SetInvalid("SD prefix menu polling cap exhausted"), void();
         SdEvent("menu", pc, tick);
+        if (Env("MWRC_SD_MENU_PROBE") == "rules_ready" && sd_menu_consumed && sd_menu_neutral)
+        {
+          std::array<u8, 0x18> flow{};
+          std::array<u8, 8> input{};
+          u32 profile = 0;
+          const u8* scene = raw.data();
+          if (scene[0] == 1 && ReadBytes(system, 0x804a04f0, flow.size(), flow.data()) &&
+              ReadBytes(system, 0x804d6bc8, input.size(), input.data()) &&
+              flow[0] == 13 && flow[2] == 0 && flow[3] == 0 && flow[4] == 0 &&
+              flow[0x11] == 0 && input[0] == 0 && input[1] == 0)
+          {
+            if (!ReadProfileRoot(system, &profile) ||
+                !AddSlice(system, SliceTag::SdRumblePorts, profile + 0x1cc0, 4))
+              return SetInvalid("SD Rules probe profile is invalid"), void();
+            SdEvent("rules_ready", pc, tick);
+            InputStream::RequestFinish(true);
+            natural_completion.store(false);
+            finish_requested.store(true);
+          }
+        }
       }
       return;
     }
@@ -2395,6 +2423,8 @@ struct Observer::Impl
       const auto* kind = system->GetMemory().GetPointerForRange(scene, 1);
       // Opening demos also use the VS initializer. They are outside this recipe.
       if (!sudden && sd_init.phase == SdInitState::Phase::Menu && route[0] == 0x18) return;
+      if (Env("MWRC_SD_MENU_PROBE") == "rules_ready")
+        return SetInvalid("SD Rules probe entered undeclared gameplay"), void();
       if (!kind || *kind != (sudden ? 3 : 2) || route[0] != 2 ||
           !sd_init.Entry(state->gpr[3], sudden))
         return SetInvalid("SD prefix entry is missing its declared phase"), void();
@@ -2434,15 +2464,27 @@ struct Observer::Impl
       fighter_pointers[slot] = pointer;
       return;
     }
-    if (pc == 0x80377584 && sd_init.phase != SdInitState::Phase::Menu)
+    if (pc == 0x80377584)
     {
       std::array<u8, 0xc> queue{};
-      if (!BoundaryInstructionMatches(system, pc) || !sd_init.Consume() ||
+      const bool menu = sd_init.phase == SdInitState::Phase::Menu;
+      if (!BoundaryInstructionMatches(system, pc) || (!menu && !sd_init.Consume()) ||
           !ReadBytes(system, 0x804c1f78, queue.size(), queue.data()) || !queue[0] ||
           state->gpr[6] >= queue[0] || ReadBE32(queue.data() + 8) + state->gpr[6] * 0x30 != state->gpr[25] ||
           !AddSlice(system, SliceTag::PadSlot, state->gpr[25], 0x30))
         return SetInvalid("SD prefix input queue or declared sample cap is invalid"), void();
       const u8* pad = raw.data();
+      if (menu)
+      {
+        if (++sd_menu_consumed > 7200)
+          return SetInvalid("SD menu consumed input cap exhausted"), void();
+        sd_menu_neutral = true;
+        for (u32 port = 0; port < 4; ++port)
+          for (u32 byte = 0; byte < 11; ++byte)
+            sd_menu_neutral &= pad[port * 12 + byte] == (port >= 2 && byte == 10 ? 0xff : 0);
+        SdEvent("menu_input", pc, tick);
+        return;
+      }
       for (u32 port = 0; port < 4; ++port)
         for (u32 byte = 0; byte < 11; ++byte)
           if (pad[port * 12 + byte] != (port >= 2 && byte == 10 ? 0xff : 0))
@@ -3850,6 +3892,8 @@ struct Observer::Impl
   std::array<bool, 4> cpu_slots{};
   SdInitState sd_init;
   u32 sd_menu_polls = 0;
+  u32 sd_menu_consumed = 0;
+  bool sd_menu_neutral = false;
   u32 setup_pointer = 0;
   u32 active_slot_count = 0;
   bool match_active = false;

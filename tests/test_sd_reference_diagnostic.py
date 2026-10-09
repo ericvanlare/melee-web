@@ -15,7 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "scripts"))
 from authored_sd_reference_plan import make_input_plan
-from sd_reference_diagnostic import Receiver, SdDiagnosticError, SCOPE, PCS
+from sd_reference_diagnostic import Receiver, RulesMenuReceiver, SdDiagnosticError, SCOPE, PCS
+from sd_original_menu_plan import rules_ready_packet, matches
 from capture_sd_reference_prefix import menu_actions, wait_terminal_statuses
 from test_authored_sd_reference_plan import setup_bytes
 
@@ -62,7 +63,7 @@ def events(recipe_version=1):
                          "slices": [{"tag": tag, "flags": flags, "address": 0x80001000,
                                      "hex": bytes(raw).hex()} for tag, flags, raw in data]})
         rows[-1]["payload"]["consumed"] = consumed if count is None else count
-    preferences = bytes((0, 0, 1, 1)) if recipe_version == 2 else b"\0" * 4
+    preferences = bytes((0, 0, 1, 1)) if recipe_version >= 2 else b"\0" * 4
     progress("vs_entry", ((4, 0, normal), (4, 1, persistent), (54, 0, preferences)), count=0)
     pad = b"".join(bytes.fromhex(value) + b"\0" for value in plan["frames"][0])
     consumed += 1
@@ -208,6 +209,91 @@ class SdReferenceDiagnosticTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     menu_actions(path)
 
+    def test_reduced_guarded_packet_binds_recipe_and_exact_source_predicates(self):
+        packet = rules_ready_packet()
+        self.assertEqual(packet["authored_recipe_sha256"], make_input_plan(3)["authored_recipe_sha256"])
+        self.assertEqual(packet["scope"], "rules_ready")
+        state = dict(packet["stop"])
+        self.assertTrue(matches(state, packet["stop"]))
+        for field in ("value", "cooldown", "entering", "row", "kind", "scene"):
+            changed = dict(state)
+            changed[field] += 1
+            self.assertFalse(matches(changed, packet["stop"]))
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "menu.json"
+            path.write_text(json.dumps(packet))
+            self.assertEqual(menu_actions(path)[0], packet)
+            for change in ("scope", "guard", "pad", "recipe"):
+                value = deepcopy(packet)
+                if change == "scope": value["scope"] = "sd_initialization_prefix"
+                elif change == "guard": value["actions"][0]["before"]["cooldown"] = 1
+                elif change == "pad": value["actions"][0]["p2"] = value["actions"][0]["p1"]
+                else: value["authored_recipe_sha256"] = make_input_plan()["authored_recipe_sha256"]
+                path.write_text(json.dumps(value))
+                with self.assertRaises(ValueError): menu_actions(path)
+
+    def test_recipe_v3_binds_source_get_port_without_discarding_raw_slot_bytes(self):
+        plan = make_input_plan(3)
+        for source_slots in ((0, 0), (1, 2)):
+            rows = events(3)
+            for row in rows:
+                for item in row["payload"].get("slices", []):
+                    if item["tag"] == 4:
+                        raw = bytearray.fromhex(item["hex"])
+                        for slot, source in enumerate(source_slots): raw[0x64 + slot * 0x24] = source
+                        item["hex"] = raw.hex()
+            receiver = Receiver(plan)
+            for row in rows: receiver.accept(row)
+            self.assertTrue(receiver.ended)
+        rows = events(3)
+        item = rows[2]["payload"]["slices"][1]
+        raw = bytearray.fromhex(item["hex"])
+        raw[0x88] = 1  # P2 now resolves to P1 port, not a valid encoding.
+        item["hex"] = raw.hex()
+        receiver = Receiver(plan)
+        with self.assertRaisesRegex(SdDiagnosticError, "source port mapping"):
+            for row in rows: receiver.accept(row)
+
+    def test_rules_receiver_requires_observed_input_neutral_owner_and_reduced_scope(self):
+        rows = events(3)[:2]
+        rows[0]["payload"]["menu_probe"] = "rules_ready"
+        pad = b"".join(bytes.fromhex(v) + b"\0" for v in make_input_plan(2)["frames"][0])
+        def add(name, count, data):
+            rows.append({"seq": len(rows), "event": "progress", "source_tick": 0,
+                         "payload": {"diagnostic": SCOPE, "name": name, "pc": PCS[name],
+                         "consumed": 0, "menu_consumed": count,
+                         "slices": [{"tag": tag, "flags": 0, "address": 0x80001000,
+                                     "hex": bytes(raw).hex()} for tag, raw in data]}})
+        add("menu_input", 1, [(3, pad)])
+        flow = bytearray(0x18)
+        flow[0] = 13
+        data = [(40, b"\1"), (45, flow), (46, b"\0" * 8)]
+        add("menu", 1, data)
+        add("rules_ready", 1, data + [(54, b"\1" * 4)])
+        rows.append({"seq": len(rows), "event": "end", "source_tick": 0,
+                     "payload": {"status": "interrupted", "natural": False}})
+        receiver = RulesMenuReceiver(make_input_plan(3))
+        for row in rows: receiver.accept(row)
+        self.assertTrue(receiver.ended)
+        with self.assertRaises(SdDiagnosticError): Receiver(make_input_plan(3)).accept(rows[0])
+        variants = []
+        missing = deepcopy(rows)
+        del missing[2]
+        variants.append(missing)
+        for tag, changed in ((54, "00000101"), (46, "0001" + "00" * 6),
+                             (45, "0d" + "00" * 3 + "01" + "00" * 19)):
+            bad = deepcopy(rows)
+            next(s for s in bad[4]["payload"]["slices"] if s["tag"] == tag)["hex"] = changed
+            variants.append(bad)
+        gameplay = deepcopy(rows)
+        gameplay[3] = events(2)[2]
+        variants.append(gameplay)
+        for bad in variants:
+            for seq, row in enumerate(bad): row["seq"] = seq
+            receiver = RulesMenuReceiver(make_input_plan(3))
+            with self.assertRaises(SdDiagnosticError):
+                for row in bad: receiver.accept(row)
+
     def accept(self, rows):
         receiver = Receiver(make_input_plan())
         for row in rows:
@@ -307,6 +393,8 @@ bool AppendHexBytes(std::string*, const u8*, size_t) { return true; }
 struct Reader {
   SdInitState sd_init;
   u32 sd_menu_polls=0;
+  u32 sd_menu_consumed=0;
+  bool sd_menu_neutral=false;
   bool css_steering_ready=false;
   size_t slice_count=0, raw_size=0;
   std::array<SliceRef,64> slices{};
@@ -327,6 +415,7 @@ struct Reader {
   u32 ReadBE32(const u8*) { return 0; }
   struct Flag { void store(bool) {} } natural_completion,finish_requested;
   struct InputStream { static void RequestFinish(bool) {} };
+  std::string Env(const char*) { return ""; }
 """ + methods + r"""
 };
 int main() {
