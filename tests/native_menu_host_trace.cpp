@@ -2491,6 +2491,19 @@ StadiumSelectionDifference stadium_selection_difference(
     return {};
 }
 
+// The active match compares its immutable copied handoff separately from its
+// live RNG. This is never an export from the menu-owned source seed.
+bool stadium_active_match_selection_witness_matches(
+    const MeleeWebMenuMatchSelection& copied_selection,
+    const MeleeWebMenuMatchSelection& current_selection,
+    const StadiumSelectionRngWitness& active_match_rng)
+{
+    return !stadium_selection_difference(current_selection, copied_selection,
+                                         copied_selection.random_seed).field &&
+           current_selection.sudden_death == copied_selection.sudden_death &&
+           stadium_rng_witness_matches(active_match_rng, copied_selection);
+}
+
 void run_stadium_selection_rng_controls()
 {
     // Execute the linked original random.c body; no cloned LCG or map2 body.
@@ -2567,7 +2580,7 @@ void run_stadium_selection_rng_controls()
     std::cout << "C1 asset-free original HSD_Randi and immutable selection/live-owner phase controls passed; two lifetimes and every compared field refused\n";
 }
 
-void check_stadium_selection_preserved(
+MeleeWebMenuMatchSelection check_stadium_selection_preserved(
     MeleeWebMenuHost* host,
     const MeleeWebMenuMatchSelection& expected,
     const std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES>&
@@ -2608,6 +2621,7 @@ void check_stadium_selection_preserved(
               sizeof(error)), error);
     check(baseline == expected_baseline,
           "C1 context preflight changed the retained save-owner baseline");
+    return observed; // The actual checked host export, while its RNG is owned.
 }
 #endif
 void run_results_source_smoke(const melee_web::RuntimeFiles& files,
@@ -5833,12 +5847,40 @@ void run_stadium_e8_request(
     StadiumSelectionRngWitness& selection_rng,
     TransitionTrace& trace,
     MeleeWebMatchContext* stage_start_context = nullptr,
-    MeleeWebRetiredSisLease* next_retired_sis = nullptr)
+    MeleeWebRetiredSisLease* next_retired_sis = nullptr,
+    const MeleeWebMenuMatchSelection* active_match_copied_selection = nullptr)
 {
     using namespace melee_web;
     char error[256]{};
     check(host && world && reopened_files.contains("GrPs.usd"),
           "E8 request requires its retained source host and exact GrPs.usd entry");
+    auto verify_selection_boundary = [&](const char* boundary, bool source_return) {
+        if (!stage_start_context) {
+            check_stadium_selection_preserved(host, selected, baseline,
+                                              source_return ? &selection_rng : nullptr);
+            return;
+        }
+        // These are active-match RNG + immutable copied-selection observations.
+        // The host export requires its own seed and is deliberately not called.
+        check(active_match_copied_selection &&
+                  stadium_active_match_selection_witness_matches(
+                      *active_match_copied_selection, selected, selection_rng),
+              "Active-match RNG or immutable copied selection changed");
+        check(melee_web_match_camera_available(stage_start_context, error, sizeof(error)), error);
+        check(melee_web_menu_host_phase(host) == MELEE_WEB_MENU_READY &&
+                  melee_web_menu_host_source_scene(host) == 0,
+              "Active match changed its retained closed menu host phase");
+        std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES> observed_baseline{};
+        check(melee_web_menu_host_snapshot_card_data(host, 1, observed_baseline.data(),
+                  observed_baseline.size(), error, sizeof(error)), error);
+        check(observed_baseline == baseline,
+              "Active match changed its observed retained save-owner baseline");
+        std::fprintf(stderr,
+            "C3_ACTIVE_MATCH_SELECTION boundary=%s host_reexport=0 copied_selection_equal=1 active_match_rng_verified=1 save_baseline_observed_equal=1 match=%p rng_owner=%p initial=%u expected_live=%u live=%u\n",
+            boundary, static_cast<void*>(stage_start_context), static_cast<const void*>(selection_rng.owner),
+            selection_rng.initial, selection_rng.expected_live, *selection_rng.owner);
+        std::fflush(stderr);
+    };
     const auto& raw_bytes = reopened_files.at("GrPs.usd");
     const std::vector<std::uint8_t> raw_before = raw_bytes;
     auto archive = std::make_shared<const DatArchive>(
@@ -6173,7 +6215,7 @@ void run_stadium_e8_request(
                   lbLang_GetLanguageSetting() == LANG_US &&
                   lbLang_GetSavedLanguage() == LANG_US,
               "E8 request lost its source VS and two-language scopes");
-        check_stadium_selection_preserved(host, selected, baseline);
+        verify_selection_boundary("before-e8", false);
 
         if (perform_on_init) {
             auto& on_init = on_init_observation;
@@ -6468,7 +6510,7 @@ void run_stadium_e8_request(
                       on_init.ground_storage_before_end,
                       on_init.memory_before_init, 64),
                   "OnInit Ground storage did not retain its exact new 64-byte lease");
-            check_stadium_selection_preserved(host, selected, baseline, &selection_rng);
+            verify_selection_boundary("after-oninit", true);
             check(seed_ptr == seed_owner &&
                       gm_GetCurrentGameMode() == GM_VS && !gm_IsCurrently1PMode() &&
                       lbLang_GetLanguageSetting() == LANG_US &&
@@ -6755,7 +6797,7 @@ void run_stadium_e8_request(
                         "original-stage-last-end", &selected,
                         &on_init.seed_after_end);
         }
-        check_stadium_selection_preserved(host, selected, baseline, &selection_rng);
+        verify_selection_boundary("after-stage-retirement", true);
         check(seed_ptr == seed_owner &&
                   *seed_ptr == selection_rng.expected_live,
               "E8 request changed the source seed owner or value");
@@ -7550,6 +7592,11 @@ void run_stadium_c1_context_preflight(
                 }
                 check(count == selected.player_count,
                       "Stadium continuation changed original active source player count");
+                const auto active_match_copied_selection = check_stadium_selection_preserved(
+                    host, selected, baseline, &selection_rng);
+                std::fprintf(stderr, "C3_HOST_SELECTION_EXPORTED boundary=before-match-begin lifetime=%u owner=%p seed=%u\n",
+                    lifetime, static_cast<void*>(seed_ptr), *seed_ptr);
+                std::fflush(stderr);
                 MeleeWebMatchContext* match = melee_web_match_begin_players(
                     players.data(), count, 70, selected.random_seed, nullptr,
                     error, sizeof(error));
@@ -7561,7 +7608,8 @@ void run_stadium_c1_context_preflight(
                     check(melee_web_match_camera_available(match, error, sizeof(error)), error);
                     MeleeWebRetiredSisLease next_sis{};
                     run_stadium_e8_request(reopened_files, host, world.get(), selected,
-                        baseline, save_before, false, true, &previous_sis, match_rng, trace, match, &next_sis);
+                        baseline, save_before, false, true, &previous_sis, match_rng, trace, match, &next_sis,
+                        &active_match_copied_selection);
                     check(next_sis.retirement_verified && next_sis.prior.world_generation == fresh.generation,
                           "Stadium world did not verify its own next SIS retirement lease before shutdown");
                     previous_sis = next_sis;
@@ -7569,6 +7617,10 @@ void run_stadium_c1_context_preflight(
                     match = nullptr;
                     check(seed_ptr == parent_seed_owner && *seed_ptr == parent_seed,
                           "Stadium MatchContext did not restore the original parent seed owner/value");
+                    check_stadium_selection_preserved(host, selected, baseline, &selection_rng);
+                    std::fprintf(stderr, "C3_HOST_SELECTION_EXPORTED boundary=after-match-end lifetime=%u owner=%p seed=%u\n",
+                        lifetime, static_cast<void*>(seed_ptr), *seed_ptr);
+                    std::fflush(stderr);
                 } catch (...) {
                     // Refusal retains this world's partial source owners. Do not
                     // allow a raw heap sweep to disguise failed checked retirement.
