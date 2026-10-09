@@ -68,6 +68,95 @@ def parse_c1_record(line, prefix):
     return result
 
 
+def parse_pad_snapshot_wire(raw):
+    import math
+    import struct
+
+    if len(raw) != 822:
+        raise AssertionError(f"PAD wire length was {len(raw)}, expected 822")
+
+    def u32(offset):
+        return struct.unpack_from(">I", raw, offset)[0]
+
+    def i32(offset):
+        return struct.unpack_from(">i", raw, offset)[0]
+
+    def i8(offset):
+        return struct.unpack_from("b", raw, offset)[0]
+
+    config = {
+        "repeat_start": i32(0), "repeat_interval": i32(4),
+        "adc_type": i8(8), "adc_th": i8(9), "adc_angle_bits": u32(10),
+        "clamp_stick_type": raw[14], "clamp_stick_shift": raw[15],
+        "clamp_stick_max": i8(16), "clamp_stick_min": i8(17),
+        "clamp_lr": (raw[18], raw[19], raw[20]),
+        "clamp_ab": (raw[21], raw[22], raw[23]),
+        "scale": (i8(24), raw[25], raw[26]),
+        "cross_dir": raw[27], "reset": (raw[28], raw[29]),
+    }
+    adc_angle = struct.unpack(">f", config["adc_angle_bits"].to_bytes(4, "big"))[0]
+    invalid = []
+
+    def require(condition, field):
+        if not condition:
+            invalid.append(field)
+
+    require(config["repeat_start"] > 0, f"repeat_start={config['repeat_start']}")
+    require(config["repeat_interval"] > 0,
+            f"repeat_interval={config['repeat_interval']}")
+    require(0 <= config["adc_type"] <= 3, f"adc_type={config['adc_type']}")
+    require(config["adc_th"] >= 0, f"adc_th={config['adc_th']}")
+    require(math.isfinite(adc_angle), f"adc_angle_bits={config['adc_angle_bits']:08x}")
+    require(config["clamp_stick_type"] <= 1,
+            f"clamp_stick_type={config['clamp_stick_type']}")
+    require(config["clamp_stick_shift"] <= 1,
+            f"clamp_stick_shift={config['clamp_stick_shift']}")
+    require(config["clamp_stick_min"] >= 0,
+            f"clamp_stick_min={config['clamp_stick_min']}")
+    require(config["clamp_stick_max"] > config["clamp_stick_min"],
+            f"clamp_stick_max={config['clamp_stick_max']}<=clamp_stick_min={config['clamp_stick_min']}")
+    require(config["clamp_lr"][0] <= 1, f"clamp_lr_shift={config['clamp_lr'][0]}")
+    require(config["clamp_lr"][1] > config["clamp_lr"][2],
+            f"clamp_lr_max={config['clamp_lr'][1]}<=clamp_lr_min={config['clamp_lr'][2]}")
+    require(config["clamp_ab"][0] <= 1, f"clamp_ab_shift={config['clamp_ab'][0]}")
+    require(config["clamp_ab"][1] > config["clamp_ab"][2],
+            f"clamp_ab_max={config['clamp_ab'][1]}<=clamp_ab_min={config['clamp_ab'][2]}")
+    require(config["scale"][0] > 0, f"scale_stick={config['scale'][0]}")
+    require(config["scale"][1] > 0, f"scale_analog_lr={config['scale'][1]}")
+    require(config["scale"][2] > 0, f"scale_analog_ab={config['scale'][2]}")
+    require(config["cross_dir"] <= 3, f"cross_dir={config['cross_dir']}")
+    require(config["reset"][0] <= 1,
+            f"reset_switch_status={config['reset'][0]}")
+    require(config["reset"][1] <= 1, f"reset_switch={config['reset'][1]}")
+    config_invalid = list(invalid)
+
+    histories = []
+    float_names = ("nml_stickX", "nml_stickY", "nml_subStickX", "nml_subStickY",
+                   "nml_analogL", "nml_analogR", "nml_analogA", "nml_analogB")
+    for bank in range(3):
+        for slot in range(4):
+            base = 30 + (bank * 4 + slot) * 66
+            bits = [u32(base + 32 + index * 4) for index in range(8)]
+            finite_count = 0
+            for name, value_bits in zip(float_names, bits):
+                value = struct.unpack(">f", value_bits.to_bytes(4, "big"))[0]
+                if math.isfinite(value):
+                    finite_count += 1
+                else:
+                    invalid.append(
+                        f"history[{bank}][{slot}].{name}=0x{value_bits:08x}")
+            histories.append({
+                "bank": bank, "slot": slot,
+                "buttons": [u32(base + offset) for offset in (0, 4, 8, 12, 16)],
+                "repeat_count": i32(base + 20),
+                "sticks": [i8(base + offset) for offset in (24, 25, 26, 27)],
+                "analog": list(raw[base + 28:base + 32]),
+                "normalized_bits": bits, "finite_count": finite_count,
+                "cross_dir": raw[base + 64], "err": i8(base + 65),
+            })
+    return config, histories, config_invalid, invalid
+
+
 def parse_c1_heap_owner_records(stderr, scope, expected_phases=()):
     metadata = []
     results = []
@@ -1979,6 +2068,245 @@ int main(void)
             run.stdout,
         )
         self.assertNotIn("OnInit lifetime", run.stdout)
+
+    def test_stadium_pad_leave_probe_one_shot(self):
+        if os.environ.get("MELEE_RUN_STADIUM_PAD_LEAVE_PROBE") != "1":
+            self.skipTest("Real Stadium PAD leave probe requires its reviewed run gate")
+        import hashlib
+        import re
+        from capture_sd_reference_prefix import cleanup_process
+
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        fixture_value = os.environ.get("MELEE_MENU_FIXTURE_ROOT")
+        self.assertTrue(fixture_value, "Retained Stadium fixture root is required")
+        fixture = Path(fixture_value)
+        self.assertTrue(fixture.is_absolute(), "Use the frozen absolute fixture root")
+        menu, game = fixture / "native-menus", fixture / "next-gate"
+        self.assertTrue(target.is_file())
+        self.assertTrue(target.with_suffix(".wasm").is_file())
+        menu_script = (
+            "import {NATIVE_MENU_DISC_FILES} from './web/runtime-assets.mjs'; "
+            "console.log(JSON.stringify([...Object.keys(NATIVE_MENU_DISC_FILES), "
+            "'dsp_coef.bin', 'sislib_font.bin']))"
+        )
+        menu_names = json.loads(subprocess.check_output(
+            [str(node_runtime()), "--input-type=module", "-e", menu_script],
+            cwd=ROOT, text=True))
+        selected_names = stadium_c1_selected_file_names()
+        names = sorted(set(menu_names) | set(selected_names))
+        self.assertEqual((len(menu_names), len(selected_names), len(names)), (76, 36, 98))
+        paths = {name: (menu / name if (menu / name).is_file() else game / name)
+                 for name in names}
+        self.assertTrue(all(path.is_file() for path in paths.values()),
+                        "Retained exact Stadium source fixture union is incomplete")
+        before = {name: hashlib.sha256(path.read_bytes()).hexdigest()
+                  for name, path in paths.items()}
+        source = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        tree = subprocess.check_output(
+            ["git", "rev-parse", "HEAD^{tree}"], cwd=ROOT, text=True).strip()
+        trace = self.scratch / "stadium-pad-leave-probe.jsonl"
+        command = [str(node_runtime()), str(target), str(menu), str(game), "3",
+                   str(trace), source, "stadium-pad-leave-probe-v1"]
+        output = self.scratch / "stadium-pad-leave-node-owner"
+        output.mkdir(exist_ok=False)
+        identity = {
+            "scope": "stadium-pad-leave-probe-v1", "ownership": "direct-Popen",
+            "source_revision": source, "source_tree": tree,
+            "argv": command, "cwd": str(ROOT), "timeout_seconds": 120,
+            "outer_timeout_seconds": 180,
+            "observation_caps": {"max_bytes": 16 * 1024 * 1024, "max_rows": 4096},
+            "fixture_sha256_before": before,
+            "binary_sha256": {str(path): hashlib.sha256(path.read_bytes()).hexdigest()
+                              for path in [Path(command[0]).resolve(), target,
+                                           target.with_suffix(".wasm")]},
+        }
+        stdout_path = self.scratch / "stadium-pad-leave.stdout"
+        stderr_path = self.scratch / "stadium-pad-leave.stderr"
+        process = None
+        try:
+            with stdout_path.open("xb") as stdout, stderr_path.open("xb") as stderr:
+                process = subprocess.Popen(command, cwd=ROOT, stdout=stdout, stderr=stderr)
+                try:
+                    identity["pid"] = process.pid
+                    with (output / "identity.json").open("x", encoding="utf-8") as receipt:
+                        receipt.write(json.dumps(identity, indent=2) + "\n")
+                    process.wait(timeout=120)
+                finally:
+                    cleanup_process(process, output, scope="stadium-pad-leave-probe-v1")
+        finally:
+            after = {name: hashlib.sha256(path.read_bytes()).hexdigest()
+                     for name, path in paths.items()}
+            with (output / "fixture-after.json").open("x", encoding="utf-8") as receipt:
+                receipt.write(json.dumps(after, indent=2) + "\n")
+            self.assertEqual(after, before,
+                             "Real Stadium PAD leave probe changed a retained source fixture")
+
+        stdout, stderr = stdout_path.read_text(), stderr_path.read_text()
+        trace_bytes = trace.stat().st_size if trace.is_file() else -1
+        trace_lines = trace.read_text(encoding="utf-8").splitlines() if trace.is_file() else []
+        self.assertLessEqual(stdout_path.stat().st_size + stderr_path.stat().st_size +
+                             max(trace_bytes, 0), 16 * 1024 * 1024,
+                             "PAD leave probe exceeded its 16 MiB observation cap")
+        self.assertLessEqual(len(trace_lines), 4096,
+                             "PAD leave probe exceeded its 4096-row trace cap")
+        self.assertIsNotNone(process)
+        self.assertEqual(process.returncode, 0, (stdout + stderr)[-12000:])
+
+        cleanup = json.loads((output / "cleanup.json").read_text(encoding="utf-8"))
+        self.assertEqual(cleanup, {
+            "scope": "stadium-pad-leave-probe-v1", "pid": process.pid,
+            "ownership": "direct-Popen", "terminate_sent": False,
+            "kill_sent": False, "returncode": 0, "error": None,
+        })
+        self.assertEqual(json.loads((output / "identity.json").read_text())["pid"],
+                         process.pid)
+        self.assertEqual(json.loads((output / "fixture-after.json").read_text()), before)
+
+        trace_rows = [json.loads(line) for line in trace_lines]
+        self.assertTrue(trace_rows, "PAD leave probe produced no transition trace")
+        header = trace_rows[0]
+        self.assertEqual((header.get("record"), header.get("schema"),
+                          header.get("source_revision"), header.get("input_recipe")),
+                         ("header", "melee-web-transition-trace", source,
+                          "stadium-pad-leave-probe-v1"))
+        leases = [row for row in trace_rows if row.get("record") == "sis_lease"]
+        self.assertEqual([row.get("boundary") for row in leases],
+                         ["captured_before_menu_leave",
+                          "verified_retired_before_world_shutdown"])
+
+        def records(prefix):
+            result = []
+            for line in stderr.splitlines():
+                if line.startswith(prefix + " "):
+                    # A decode failure's human-readable suffix contains spaces;
+                    # the structured fields before it remain unambiguous.
+                    structured = re.sub(r" decode_error=.*$", "", line)
+                    result.append(parse_c1_record(structured, prefix))
+            return result
+
+        snapshots = records("C1_PAD_SNAPSHOT")
+        self.assertEqual([row.get("boundary") for row in snapshots],
+                         ["before-menu-leave", "after-menu-leave"], stderr[-12000:])
+        raw_rows = records("C1_PAD_RAW")
+        self.assertEqual([row.get("boundary") for row in raw_rows],
+                         ["before-menu-leave", "after-menu-leave"])
+        raw_by_boundary = {row["boundary"]: bytes.fromhex(row["hex"]) for row in raw_rows}
+        self.assertTrue(all(len(raw) == 822 for raw in raw_by_boundary.values()))
+        config_rows = records("C1_PAD_CONFIG")
+        self.assertEqual([row.get("boundary") for row in config_rows],
+                         ["before-menu-leave", "after-menu-leave"])
+        histories = records("C1_PAD_HISTORY")
+        self.assertEqual(len(histories), 24)
+
+        def fnv64(raw):
+            value = 14695981039346656037
+            for byte in raw:
+                value = ((value ^ byte) * 1099511628211) & 0xFFFFFFFFFFFFFFFF
+            return value
+
+        invalid_by_boundary = {}
+        for boundary, meta, config_row in zip(
+                ("before-menu-leave", "after-menu-leave"), snapshots, config_rows):
+            raw = raw_by_boundary[boundary]
+            config, parsed_history, config_invalid, invalid = parse_pad_snapshot_wire(raw)
+            self.assertEqual(int(meta["bytes"]), 822)
+            self.assertEqual(meta["fnv64"], f"{fnv64(raw):016x}")
+            self.assertEqual(int(meta["config_valid"]), not config_invalid)
+            self.assertEqual(int(meta["decode"]), not invalid,
+                             f"{boundary}: production decode disagrees with raw wire semantics; "
+                             f"invalid={invalid}; raw={raw.hex()}")
+            expected_config = {
+                "repeat_start": str(config["repeat_start"]),
+                "repeat_interval": str(config["repeat_interval"]),
+                "adc_type": str(config["adc_type"]), "adc_th": str(config["adc_th"]),
+                "adc_angle_bits": f"{config['adc_angle_bits']:08x}",
+                "clamp_stick_type": str(config["clamp_stick_type"]),
+                "clamp_stick_shift": str(config["clamp_stick_shift"]),
+                "clamp_stick_max": str(config["clamp_stick_max"]),
+                "clamp_stick_min": str(config["clamp_stick_min"]),
+                "clamp_lr": ",".join(map(str, config["clamp_lr"])),
+                "clamp_ab": ",".join(map(str, config["clamp_ab"])),
+                "scale": ",".join(map(str, config["scale"])),
+                "cross_dir": str(config["cross_dir"]),
+                "reset": ",".join(map(str, config["reset"])),
+            }
+            self.assertEqual({key: config_row[key] for key in expected_config},
+                             expected_config, f"{boundary} raw config field mismatch")
+            observed_history = [row for row in histories if row.get("boundary") == boundary]
+            self.assertEqual(len(observed_history), 12)
+            for observed, expected in zip(observed_history, parsed_history):
+                self.assertEqual((int(observed["bank"]), int(observed["slot"])),
+                                 (expected["bank"], expected["slot"]))
+                self.assertEqual([observed[key] for key in
+                                  ("button", "last", "trigger", "repeat", "release")],
+                                 [f"{value:08x}" for value in expected["buttons"]])
+                self.assertEqual(int(observed["repeat_count"]), expected["repeat_count"])
+                self.assertEqual(list(map(int, observed["sticks"].split(","))),
+                                 expected["sticks"])
+                self.assertEqual(list(map(int, observed["analog"].split(","))),
+                                 expected["analog"])
+                self.assertEqual(observed["normalized_bits"],
+                                 ",".join(f"{value:08x}" for value in
+                                          expected["normalized_bits"]))
+                self.assertEqual(observed["finite"], f"{expected['finite_count']}/8")
+                self.assertEqual(int(observed["cross_dir"]), expected["cross_dir"])
+                self.assertEqual(int(observed["err"]), expected["err"])
+            invalid_by_boundary[boundary] = invalid
+
+        self.assertEqual(int(snapshots[0]["previous_equal"]), -1)
+        self.assertEqual(int(snapshots[1]["previous_equal"]),
+                         raw_by_boundary["before-menu-leave"] ==
+                         raw_by_boundary["after-menu-leave"])
+        self.assertFalse(invalid_by_boundary["before-menu-leave"],
+                         f"Pre-leave captured PAD was invalid: "
+                         f"{invalid_by_boundary['before-menu-leave']}; "
+                         f"raw={raw_by_boundary['before-menu-leave'].hex()}")
+        post_invalid = invalid_by_boundary["after-menu-leave"]
+        self.assertTrue(post_invalid,
+                        "Post-leave PAD wire unexpectedly decoded cleanly; raw="
+                        f"{raw_by_boundary['after-menu-leave'].hex()}")
+        self.assertTrue(any("=" in field for field in post_invalid),
+                        f"Post-leave strict refusal lacks a numeric invalid field: {post_invalid}")
+        (self.scratch / "stadium-pad-leave-wire-validation.json").write_text(
+            json.dumps({"schema": "stadium-pad-leave-wire-validation-v1",
+                        "snapshots": {boundary: {"raw_hex": raw_by_boundary[boundary].hex(),
+                                                  "strict_decode": not invalid_by_boundary[boundary],
+                                                  "numeric_invalid": invalid_by_boundary[boundary]}
+                                      for boundary in raw_by_boundary}},
+                       indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+        retained = records("C1_PAD_LEAVE_RETAINED")
+        self.assertEqual(len(retained), 1)
+        self.assertEqual({key: int(retained[0][key]) for key in
+                          ("host_input", "host_phase", "source_scene", "source_world_exists")},
+                         {"host_input": 1, "host_phase": 5, "source_scene": 0,
+                          "source_world_exists": 0})
+        close = records("C1_PAD_CLOSE")
+        self.assertEqual(len(close), 1)
+        self.assertEqual({key: int(close[0][key]) for key in
+                          ("retained_equal", "host_phase", "source_scene", "world_exists")},
+                         {"retained_equal": 1, "host_phase": 5,
+                          "source_scene": 0, "world_exists": 0})
+        self.assertNotIn(close[0].get("input"), {None, "0x0", "(nil)"}, close[0])
+        selection_rng = [row for row in records("C1_SELECTION_RNG")
+                         if row.get("boundary") == "reopened-context-start"]
+        self.assertEqual(len(selection_rng), 1)
+        self.assertEqual(retained[0]["rng_owner"], selection_rng[0]["owner"])
+        self.assertEqual(int(retained[0]["rng_value"]), int(selection_rng[0]["initial"]))
+        self.assertEqual((selection_rng[0]["live_available"], selection_rng[0]["live"]),
+                         ("1", selection_rng[0]["initial"]))
+
+        closed = records("C3_SESSION_CLOSED")
+        self.assertEqual(len(closed), 1)
+        self.assertEqual({key: int(closed[0][key]) for key in
+                          ("identity", "generation", "bytes", "world_exists")},
+                         {"identity": 0, "generation": 0, "bytes": 0, "world_exists": 0})
+        self.assertIn("Stadium source PAD leave probe captured pre/post menu-leave wire state",
+                      stdout)
+        self.assertIn("no MatchSession or Ready construction", stdout)
+        self.assertNotIn("STADIUM_READY_SESSION", stderr)
+        self.assertNotIn("STADIUM_READY_CONSTRUCTION", stderr)
 
     def test_stadium_source_ready_session_one_shot(self):
         if os.environ.get("MELEE_RUN_STADIUM_SOURCE_READY_SESSION") != "1":

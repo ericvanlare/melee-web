@@ -1515,6 +1515,92 @@ void run_sudden_death_host_control(
 
 std::string hex32(uint32_t value){std::ostringstream out;out<<std::hex<<std::setfill('0')<<std::setw(8)<<value;return out.str();}
 std::string hex64(uint64_t value){std::ostringstream out;out<<std::hex<<std::setfill('0')<<std::setw(16)<<value;return out.str();}
+uint32_t pad_wire_u32(const uint8_t* bytes,size_t offset){
+ return (uint32_t(bytes[offset])<<24)|(uint32_t(bytes[offset+1])<<16)|
+        (uint32_t(bytes[offset+2])<<8)|uint32_t(bytes[offset+3]);
+}
+int32_t pad_wire_i32(const uint8_t* bytes,size_t offset){
+ const uint32_t bits=pad_wire_u32(bytes,offset);int32_t value;std::memcpy(&value,&bits,sizeof(value));return value;
+}
+int8_t pad_wire_i8(const uint8_t* bytes,size_t offset){
+ int8_t value;std::memcpy(&value,bytes+offset,sizeof(value));return value;
+}
+float pad_wire_f32(const uint8_t* bytes,size_t offset){
+ const uint32_t bits=pad_wire_u32(bytes,offset);float value;std::memcpy(&value,&bits,sizeof(value));return value;
+}
+uint64_t pad_wire_identity(const uint8_t* bytes){
+ uint64_t hash=14695981039346656037ULL;
+ for(size_t i=0;i<MELEE_WEB_PAD_STATE_BYTES;++i){hash^=bytes[i];hash*=1099511628211ULL;}
+ return hash;
+}
+void report_pad_snapshot(const char* boundary,const uint8_t* bytes,const uint8_t* previous=nullptr){
+ char error[128]{};
+ std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)> decoded(
+     melee_web_pad_state_decode(bytes,MELEE_WEB_PAD_STATE_BYTES,error,sizeof(error)),
+     melee_web_pad_state_free);
+ const int32_t repeat_start=pad_wire_i32(bytes,0),repeat_interval=pad_wire_i32(bytes,4);
+ const int8_t adc_type=pad_wire_i8(bytes,8),adc_th=pad_wire_i8(bytes,9);
+ const float adc_angle=pad_wire_f32(bytes,10);
+ const uint8_t clamp_stick_type=bytes[14],clamp_stick_shift=bytes[15];
+ const int8_t clamp_stick_max=pad_wire_i8(bytes,16),clamp_stick_min=pad_wire_i8(bytes,17);
+ const uint8_t clamp_lr_shift=bytes[18],clamp_lr_max=bytes[19],clamp_lr_min=bytes[20];
+ const uint8_t clamp_ab_shift=bytes[21],clamp_ab_max=bytes[22],clamp_ab_min=bytes[23];
+ const int8_t scale_stick=pad_wire_i8(bytes,24);
+ const uint8_t scale_lr=bytes[25],scale_ab=bytes[26],cross_dir=bytes[27];
+ const uint8_t reset_switch_status=bytes[28],reset_switch=bytes[29];
+ const bool config_valid=repeat_start>0&&repeat_interval>0&&adc_type>=0&&adc_type<=3&&
+     adc_th>=0&&std::isfinite(adc_angle)&&clamp_stick_type<=1&&clamp_stick_shift<=1&&
+     clamp_stick_min>=0&&clamp_stick_max>clamp_stick_min&&clamp_lr_shift<=1&&
+     clamp_lr_max>clamp_lr_min&&clamp_ab_shift<=1&&clamp_ab_max>clamp_ab_min&&
+     scale_stick>0&&scale_lr&&scale_ab&&cross_dir<=3&&reset_switch_status<=1&&reset_switch<=1;
+ const uint64_t identity=pad_wire_identity(bytes);
+ std::cerr<<"C1_PAD_SNAPSHOT boundary="<<boundary<<" bytes="<<MELEE_WEB_PAD_STATE_BYTES
+          <<" fnv64="<<hex64(identity)<<" decode="<<bool(decoded)
+          <<" config_valid="<<config_valid<<" previous_equal="
+          <<(previous?std::memcmp(bytes,previous,MELEE_WEB_PAD_STATE_BYTES)==0:-1);
+ if(!decoded)std::cerr<<" decode_error="<<error;
+ std::cerr<<'\n';
+ std::ostringstream raw_hex;raw_hex<<std::hex<<std::setfill('0');
+ for(size_t i=0;i<MELEE_WEB_PAD_STATE_BYTES;++i)raw_hex<<std::setw(2)<<unsigned(bytes[i]);
+ std::cerr<<"C1_PAD_RAW boundary="<<boundary<<" hex="<<raw_hex.str()<<'\n';
+ std::cerr<<"C1_PAD_CONFIG boundary="<<boundary<<" repeat_start="<<repeat_start
+          <<" repeat_interval="<<repeat_interval<<" adc_type="<<int(adc_type)
+          <<" adc_th="<<int(adc_th)<<" adc_angle="<<adc_angle
+          <<" adc_angle_bits="<<hex32(pad_wire_u32(bytes,10))
+          <<" clamp_stick_type="<<unsigned(clamp_stick_type)
+          <<" clamp_stick_shift="<<unsigned(clamp_stick_shift)
+          <<" clamp_stick_max="<<int(clamp_stick_max)<<" clamp_stick_min="<<int(clamp_stick_min)
+          <<" clamp_lr="<<unsigned(clamp_lr_shift)<<','<<unsigned(clamp_lr_max)<<','<<unsigned(clamp_lr_min)
+          <<" clamp_ab="<<unsigned(clamp_ab_shift)<<','<<unsigned(clamp_ab_max)<<','<<unsigned(clamp_ab_min)
+          <<" scale="<<int(scale_stick)<<','<<unsigned(scale_lr)<<','<<unsigned(scale_ab)
+          <<" cross_dir="<<unsigned(cross_dir)<<" reset="<<unsigned(reset_switch_status)
+          <<','<<unsigned(reset_switch)<<'\n';
+ for(unsigned bank=0;bank<3;++bank)for(unsigned slot=0;slot<4;++slot){
+  const size_t base=30+(bank*4+slot)*66;
+  std::ostringstream normalized;
+  unsigned finite_count=0;
+  for(unsigned i=0;i<8;++i){
+   const uint32_t bits=pad_wire_u32(bytes,base+32+i*4);
+   if(i)normalized<<',';
+   normalized<<hex32(bits);
+   if(std::isfinite(pad_wire_f32(bytes,base+32+i*4)))++finite_count;
+  }
+  std::cerr<<"C1_PAD_HISTORY boundary="<<boundary<<" bank="<<bank<<" slot="<<slot
+           <<" button="<<hex32(pad_wire_u32(bytes,base))
+           <<" last="<<hex32(pad_wire_u32(bytes,base+4))
+           <<" trigger="<<hex32(pad_wire_u32(bytes,base+8))
+           <<" repeat="<<hex32(pad_wire_u32(bytes,base+12))
+           <<" release="<<hex32(pad_wire_u32(bytes,base+16))
+           <<" repeat_count="<<pad_wire_i32(bytes,base+20)
+           <<" sticks="<<int(pad_wire_i8(bytes,base+24))<<','<<int(pad_wire_i8(bytes,base+25))
+           <<','<<int(pad_wire_i8(bytes,base+26))<<','<<int(pad_wire_i8(bytes,base+27))
+           <<" analog="<<unsigned(bytes[base+28])<<','<<unsigned(bytes[base+29])
+           <<','<<unsigned(bytes[base+30])<<','<<unsigned(bytes[base+31])
+           <<" normalized_bits="<<normalized.str()<<" finite="<<finite_count<<"/8"
+           <<" cross_dir="<<unsigned(bytes[base+64])<<" err="<<int(pad_wire_i8(bytes,base+65))<<'\n';
+ }
+ std::cerr.flush();
+}
 std::string stream_name(MeleeWebAudio* audio){
  const char* path=melee_web_audio_stream_path(audio);if(!path)return {};
  std::string result(path);const auto slash=result.find_last_of("/\\");return slash==std::string::npos?result:result.substr(slash+1);
@@ -7610,7 +7696,8 @@ void run_stadium_c1_context_preflight(
     const MeleeWebRetiredSisLease* retired_sis,
     TransitionTrace& trace,
     bool full_world_lifecycle = false,
-    bool ready_session = false)
+    bool ready_session = false,
+    bool pad_leave_probe = false)
 {
     char error[256]{};
     const int previous_mode = gm_GetCurrentGameMode();
@@ -7638,11 +7725,41 @@ void run_stadium_c1_context_preflight(
     check((Toy_804A284C[3] & 4) != 0,
           "C1 source handoff lost the retained Toy category baseline");
     check_stadium_preflight_stage_empty();
-    std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> ready_input_bytes{};
-    if(ready_session)melee_web_pad_state_capture(ready_input_bytes.data());
+    const MeleeWebPadState* ready_input=nullptr;
+    if(ready_session||pad_leave_probe){
+        ready_input=melee_web_menu_host_input(host);
+        check(ready_input!=nullptr,
+              "Closed Stadium SSS did not retain its decoded source PAD input");
+    }
     world->verify_immutable_archives();
     world->close();
     world.reset();
+
+    if(ready_session||pad_leave_probe){
+        const MeleeWebPadState* after_close_input=melee_web_menu_host_input(host);
+        std::fprintf(stderr,"C1_PAD_CLOSE retained_equal=%d host_phase=%d source_scene=%d world_exists=%d input=%p\n",
+            after_close_input==ready_input,melee_web_menu_host_phase(host),
+            melee_web_menu_host_source_scene(host),melee_web_gameplay_world_exists(),
+            static_cast<const void*>(after_close_input));
+        std::fflush(stderr);
+        check(after_close_input==ready_input,
+              "MenuWorld close replaced the host-retained source PAD input");
+    }
+
+    if(pad_leave_probe){
+        check(!melee_web_source_files_active()&&_Toy_sbss_804D6ED0==nullptr,
+              "PAD leave probe did not close the selected SSS world");
+        check(melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY&&
+                  melee_web_menu_host_source_scene(host)==0&&
+                  melee_web_menu_host_input(host)==ready_input,
+              "PAD leave probe lost the closed host's retained source input");
+        check(!melee_web_gameplay_world_exists(),
+              "PAD leave probe unexpectedly started a match world");
+        check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);
+        host=nullptr;
+        std::cout<<"Stadium source PAD leave probe captured pre/post menu-leave wire state and retained host input; no MatchSession or Ready construction\n";
+        return;
+    }
 
     bool vs_mode_owned = false;
     bool language_scope_owned = false;
@@ -7732,17 +7849,15 @@ void run_stadium_c1_context_preflight(
                     (void*)HSD_GObj_804D7838,(void*)HSD_GObj_804D7814);
                 std::fflush(stderr);
             };
-            std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)> input(
-                melee_web_pad_state_decode(ready_input_bytes.data(),ready_input_bytes.size(),error,sizeof(error)),
-                melee_web_pad_state_free);
-            check(input!=nullptr,error);
+            check(ready_input!=nullptr,
+                  "Stadium Ready lost the closed host's retained source PAD input");
             melee_web::RuntimeArchiveCache cache(reopened_files);
             std::unique_ptr<melee_web::GameplayMatchSession> match;
             try{
                 observe("before-construction");
                 match=std::make_unique<melee_web::GameplayMatchSession>(
                     reopened_files,selected,cache,melee_web::GameplayMatchConstruction::Deferred,
-                    *input,melee_web::GameplayMatchDiagnostic::StadiumReady);
+                    *ready_input,melee_web::GameplayMatchDiagnostic::StadiumReady);
                 while(!match->advance_construction()){}
                 observe("construction-complete-before-source-ticks");
                 PADStatus pads[4]{};pads[2].err=pads[3].err=PAD_ERR_NO_CONTROLLER;
@@ -8116,7 +8231,8 @@ void run_stadium_c1a_selection_smoke(
     const std::filesystem::path& menu_dir,
     const std::filesystem::path& game_dir,
     TransitionTrace& trace,
-    bool ready_session=false)
+    bool ready_session=false,
+    bool pad_leave_probe=false)
 {
     char error[256]{};
     MeleeWebRetiredSisLease retired_sis{};
@@ -8143,6 +8259,7 @@ void run_stadium_c1a_selection_smoke(
     auto transition = [&]() {
         const bool capture_sis = source_on_init &&
             melee_web_menu_host_phase(host) == MELEE_WEB_MENU_SSS;
+        std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> pad_before_leave{};
         melee_web_stage_input_button(raw, PAD_BUTTON_START);
         int result = tick();
         melee_web_stage_input_neutral(raw);
@@ -8168,7 +8285,24 @@ void run_stadium_c1a_selection_smoke(
             check(melee_web_diagnostic_sis_capture(&retired_sis, error, sizeof(error)), error);
             trace.sis_lease("captured_before_menu_leave", &retired_sis);
         }
+        if(capture_sis&&pad_leave_probe){
+            melee_web_pad_state_capture(pad_before_leave.data());
+            report_pad_snapshot("before-menu-leave",pad_before_leave.data());
+        }
         check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
+        if(capture_sis&&pad_leave_probe){
+            std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> pad_after_leave{};
+            melee_web_pad_state_capture(pad_after_leave.data());
+            report_pad_snapshot("after-menu-leave",pad_after_leave.data(),pad_before_leave.data());
+            const MeleeWebPadState* retained=melee_web_menu_host_input(host);
+            std::fprintf(stderr,"C1_PAD_LEAVE_RETAINED host_input=%d host_phase=%d source_scene=%d source_world_exists=%d rng_owner=%p rng_value=%u\n",
+                retained!=nullptr,melee_web_menu_host_phase(host),melee_web_menu_host_source_scene(host),
+                melee_web_gameplay_world_exists(),static_cast<const void*>(seed_ptr),
+                seed_ptr?*seed_ptr:0U);
+            std::fflush(stderr);
+            check(retained!=nullptr,
+                  "Original SSS leave did not retain its decoded source PAD input");
+        }
         if (capture_sis) {
             check(melee_web_diagnostic_sis_verify_retired(&retired_sis, error, sizeof(error)), error);
             trace.sis_lease("verified_retired_before_world_shutdown", &retired_sis);
@@ -8249,7 +8383,8 @@ void run_stadium_c1a_selection_smoke(
             files, host, world, selected, names, menu_dir, game_dir,
             e8_request_trace, item_state_preflight, screen_roots_preflight,
             ground_map1_owner, source_on_init,
-            source_on_init ? &retired_sis : nullptr, trace, full_world_lifecycle, ready_session);
+            source_on_init ? &retired_sis : nullptr, trace, full_world_lifecycle, ready_session,
+            pad_leave_probe);
     } else {
         world->verify_immutable_archives();
         world->close();
@@ -8259,7 +8394,7 @@ void run_stadium_c1a_selection_smoke(
     }
     check(!melee_web_menu_stage_explicit_confirm_available(St_Kind_PStadium),
           "C1a explicit-confirm permission survived unload");
-    if(ready_session)return;
+    if(ready_session||pad_leave_probe)return;
     if (full_world_lifecycle) {
         std::cout << "Stadium original OnInit/OnLoad/OnStart two owned-world lifetimes passed; Ready/GO and ticks remain unrun\n";
     } else if (source_on_init) {
@@ -8402,6 +8537,8 @@ int main(int argc,char** argv){try{
      std::string(input_recipe)=="stadium-source-ready-session-v1";
  const bool stadium_source_world_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-source-world-lifecycle-v1";
+ const bool stadium_pad_leave_probe_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-pad-leave-probe-v1";
 #else
  const bool stadium_c1a_recipe=false;
  const bool stadium_c1_context_preflight_recipe=false;
@@ -8412,6 +8549,7 @@ int main(int argc,char** argv){try{
  const bool stadium_source_on_init_recipe=false;
  const bool stadium_source_world_recipe=false;
  const bool stadium_ready_session_recipe=false;
+ const bool stadium_pad_leave_probe_recipe=false;
 #endif
  if(input_recipe&&!css_observer_recipe&&!sparse_css_recipe&&!sparse_pad_recipe&&!ordinary_timeout_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
@@ -8422,6 +8560,7 @@ int main(int argc,char** argv){try{
     !stadium_c1_item_state_preflight_recipe&&!stadium_screen_roots_recipe&&
     !stadium_e8_request_recipe&&!stadium_ground_map1_owner_recipe&&
     !stadium_source_on_init_recipe&&!stadium_source_world_recipe&&!stadium_ready_session_recipe&&
+    !stadium_pad_leave_probe_recipe&&
     !v10_css_replay_start_recipe)
     throw std::runtime_error("Unknown transition input recipe");
  if(v10_css_replay_start_recipe&&
@@ -8437,7 +8576,8 @@ int main(int argc,char** argv){try{
  if((stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
      stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
      stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
-     stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe)&&
+     stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
+     stadium_pad_leave_probe_recipe)&&
     stage_kind!=St_Kind_PStadium)
    throw std::runtime_error("C1a recipes require source StKind 3");
  TransitionTrace trace(trace_path,source_revision,input_recipe);
@@ -8448,6 +8588,7 @@ int main(int argc,char** argv){try{
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
     stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
+    stadium_pad_leave_probe_recipe||
     v10_css_replay_start_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
     trophy_baseline_recipe||sound_settings_recipe)
   keys=melee_web::menu_asset_names();
@@ -8479,19 +8620,22 @@ int main(int argc,char** argv){try{
  if(stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
-    stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe){
+    stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
+    stadium_pad_leave_probe_recipe){
   run_stadium_c1a_selection_smoke(
       files, stadium_c1_context_preflight_recipe||
           stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
           stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
-          stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe,
+          stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
+          stadium_pad_leave_probe_recipe,
       stadium_e8_request_recipe||stadium_ground_map1_owner_recipe,
       stadium_c1_item_state_preflight_recipe, stadium_screen_roots_recipe,
-          stadium_ground_map1_owner_recipe, stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe,
+          stadium_ground_map1_owner_recipe, stadium_source_on_init_recipe||stadium_source_world_recipe||
+              stadium_ready_session_recipe||stadium_pad_leave_probe_recipe,
       stadium_source_world_recipe,
-      argv[1], argv[2], trace,stadium_ready_session_recipe);
+      argv[1], argv[2], trace,stadium_ready_session_recipe,stadium_pad_leave_probe_recipe);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
-  if(stadium_source_world_recipe||stadium_ready_session_recipe){
+  if(stadium_source_world_recipe||stadium_ready_session_recipe||stadium_pad_leave_probe_recipe){
    const auto released=melee_web_gameplay_allocation();
    std::fprintf(stderr,"C3_SESSION_CLOSED identity=%llu generation=%llu bytes=%llu world_exists=%d\n",
        static_cast<unsigned long long>(released.identity),static_cast<unsigned long long>(released.generation),

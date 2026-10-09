@@ -129,10 +129,11 @@ The next Stadium milestone is [C3 idle in-match lifetime #251](https://github.co
 with its remaining prerequisites counted and tracked inside that issue and PR.
 Use the existing source-ordered stage harness for two sequential native no-draw
 lifetimes through OnInit/OnLoad/OnStart/Ready/GO, each with at least 3,500
-post-GO ticks before the first transformation, checked state/RNG ownership and
-full retirement/recreation. Prerequisite fixes are
-commits within C3, not isolated ownership PRs. Transformation, rendering,
-browser admission and original-comparison gates remain separate. Source-only
+post-GO ticks before the first transformation, checked state/RNG ownership,
+per-tick per-owner RNG ledger comparison with a verified original, and full
+retirement/recreation. Prerequisite fixes are commits within C3, not isolated
+ownership PRs. Transformation, rendering, browser admission and broader
+original-stage comparison gates remain separate. Source-only
 and documentation work may overlap when ownership permits; Track A retains
 priority for shared capture resources.
 
