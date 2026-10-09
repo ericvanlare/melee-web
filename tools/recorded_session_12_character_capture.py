@@ -702,7 +702,9 @@ class Driver:
         item_entry_poll = self.latest.get("polls", 0)
         self.wait(lambda: self.latest.get("polls", 0) >= item_entry_poll + 60,
                   "original Items transition animation")
-        menu_tap("A", "toggle-source-item-row-zero")
+        if not self.entity_prefix:
+            # The diagnostic prefix retains the declared all-ones item mask.
+            menu_tap("A", "toggle-source-item-row-zero")
         menu_tap("D_UP", "item-frequency-row")
         self.wait(lambda: self.latest.get("main_selection") == 31, "item frequency row")
         if self.latest.get("main_confirmed") != 3:
