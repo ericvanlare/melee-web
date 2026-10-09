@@ -3,11 +3,12 @@
   "date": "2026-10-08",
   "issue": 291,
   "labels": [
+    "Browser exercised",
     "Compiled",
     "Source identified",
     "Native traced"
   ],
-  "status": "native_route_passed_browser_sd_to_results_partial_css_failed_original_open",
+  "status": "browser_v11_functional_route_and_subsequent_prefix_passed_ordinary_controls_and_original_comparison_open",
   "scope": "Native fixture-controlled route pass; browser original-menu SD-to-Results partial route; source/native Results confirmation control",
   "producer": {
     "source": "8b6ad34914c9e955a0aba8f6cc1e75a952fb6bc3",
@@ -272,11 +273,11 @@
     }
   ],
   "open_gates": [
-    "Corrected shared two-Human Results keyboard confirmation and full browser Results-to-CSS/selection route.",
-    "Current-head CI and root integration review remain required; the consolidated executable full suite passed at fd55b378.",
-    "Original full settings/SD reference route and strict comparison with matching colors, pause and declared fields.",
-    "Internal final SD numeric PAD/RNG and browser SD Results-entry bytes remain separately unobserved.",
-    "Subsequent matchworld, sparse/four-player browser coverage, physical input, pixels/PCM equivalence, uninterrupted audio and foreground timing remain unrun."
+    "Corrected ordinary non-tied timeout and existing ordinary elimination controls on final native producer.",
+    "Current-head full unittest suite, CI and root integration review; prior consolidated suite passed at fd55b378.",
+    "Original full settings/SD reference and strict comparison with matching recipe5 colors [1,0], pause-enabled and declared fields.",
+    "Internal final SD numeric PAD/RNG remain separately unobserved; Results-entry observations do not substitute for that boundary.",
+    "Second whole ordinary match, sparse/four-player browser coverage, physical input, pixels/PCM equivalence, uninterrupted audio and foreground timing remain unrun."
   ],
   "browser_partial_v3": {
     "source": "8ccdb002864eefc707d061b7530dc9b2fe8a7154",

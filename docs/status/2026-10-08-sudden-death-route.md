@@ -1,9 +1,15 @@
 # Sudden Death routing
 
-**Compiled / Source identified / Native traced**
+**Browser exercised / Compiled / Source identified / Native traced**
 
-The [scoped receipt](../evidence/sudden-death-route-v1.json) records a native
-functional pass at source `8b6ad349`: original CSS/SSS, natural one-minute VS
+The [scoped receipt](../evidence/sudden-death-route-v1.json) records the V11
+headless browser functional pass at harness `3285f344` and runtime `e13647cb`:
+original one-minute Rules/CSS/SSS input, natural tied VS → active Sudden Death
+with P2 winner → original two-Human Results confirmation → CSS → SSS/FD →
+fresh ordinary VS frame 1 → 15 → checked Eject. It is functional evidence only,
+with original comparison and ordinary control/final validation gates still open.
+
+The earlier native functional pass at source `8b6ad349` covered: original CSS/SSS, natural one-minute VS
 timeout, active Sudden Death resolved through raw controller input, original
 typed Results, returned CSS/SSS selection, and owner/application cleanup.
 The persistent one-minute GameRules fixture is authored before CSS/SSS;
@@ -20,7 +26,8 @@ unobserved separately from the later recorded Results-entry state.
 The returned menu uses the existing Stages hydration path and preserves menu
 audio ownership. Supported normalized SSS selection, immutable archives,
 host/VS lease release, caller GameRules restoration, application close and
-fresh application reacquisition passed. A second matchworld was not run.
+fresh application reacquisition passed. That native control did not run a second matchworld; later V11 exercised a
+fresh ordinary match prefix only.
 PCM processing continued throughout; rendering, PCM equivalence and timing
 acceptance are outside this native control.
 
@@ -125,8 +132,9 @@ native producers remain distinct from this tested source. Current-head CI and
 root integration review remain required.
 
 [Issue #291](https://github.com/ericvanlare/melee-web/issues/291) remains open for
-the corrected full browser route, original comparison, non-tied
-timeout/elimination controls and subsequent-match validation. Physical
+original comparison, corrected ordinary non-tied timeout/elimination controls,
+current-head full suite/CI and integration review. The subsequent ordinary
+entry/prefix passed in V11; a second whole match remains unrun. Physical
 input, pixels, uninterrupted audio, foreground timing and competitive-set
 acceptance keep their separate gates.
 
