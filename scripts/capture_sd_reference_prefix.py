@@ -86,6 +86,14 @@ def rules_dolphin_command(dolphin, user, disc):
                       "-C", "Dolphin.Interface.ConfirmStop=False"]
 
 
+def check_owned_native_wait(process, bounded_log):
+    """Check only the direct child while an ordinary observer record is absent."""
+    returncode = process.poll()
+    require(returncode is None,
+            "Owned original native child exited before observer record: returncode " + str(returncode))
+    bounded_log.check()
+
+
 def cleanup_process(process, output, scope="rules_ready"):
     """Stop and reap only this runner's direct Popen; always retain the outcome."""
     receipt = {"scope": scope, "pid": process.pid, "ownership": "direct-Popen",
@@ -283,7 +291,8 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                 bounded_log=BoundedLog(process.stdout,log,CAPS["log_bytes"])
             # The dedicated receiver expects an interrupted primary ending, so
             # do not use the whole-session Tail's completion-status policy.
-            with ObserverTail(raw, None) as tail:
+            with ObserverTail(raw, None, wait_check=(lambda: check_owned_native_wait(process, bounded_log))
+                              if ordinary else None) as tail:
                 def next_row():
                     if ordinary:
                         bounded_log.check()
