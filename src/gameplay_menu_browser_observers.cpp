@@ -584,6 +584,9 @@ const auto allocation=melee_web_gameplay_allocation();
  out.add(",\"model\":[%.3f,%.3f]",last_css_fighter_observation.model_x,last_css_fighter_observation.model_y);
  out.add(",\"target_bounds\":[%.3f,%.3f,%.3f,%.3f]",last_css_fighter_observation.target_left,last_css_fighter_observation.target_right,last_css_fighter_observation.target_top,last_css_fighter_observation.target_bottom);
  out.add("}");
+ out.add(",\"source_pad_errors\":[%d,%d,%d,%d]",
+   HSD_PadCopyStatus[0].err,HSD_PadCopyStatus[1].err,
+   HSD_PadCopyStatus[2].err,HSD_PadCopyStatus[3].err);
  out.add(",\"source_pad0\":{");
  out.add("\"err\":%d",HSD_PadCopyStatus[0].err);
  out.add(",\"button\":%u",static_cast<unsigned>(HSD_PadCopyStatus[0].button));

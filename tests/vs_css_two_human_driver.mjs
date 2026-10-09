@@ -122,5 +122,5 @@ const configureCompetitiveSecondHuman = async () => {
   await shot('08-css-two-human-mario');
   report.checks.push('Controls enables P2 keyboard; original CSS confirms door 1 CPU -> empty -> Human, raw slot fields remain zero, source-order fallback resolves ports 0/1, and doors 2/3 remain empty');
 };
-  return {configureSecondHuman: configureCompetitiveSecondHuman, cssDoor};
+  return {configureSecondHuman: configureCompetitiveSecondHuman, cssDoor, moveCssCursor, waitCssDoor};
 }

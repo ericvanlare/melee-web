@@ -11,6 +11,7 @@ import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 import {runSuddenDeathBrowserRoute,validateFinalSdCapture} from './vs_sudden_death_browser_route.mjs';
+import {runSparseMarioBrowserPrefix,installSparseVirtualController,validateFinalSparseCapture} from './vs_sparse_mario_browser_route.mjs';
 import {installRuntimeDiagnosticsCapture,readRuntimeDiagnosticsCapture} from './runtime_callback_recorder.mjs';
 
 const options = Object.fromEntries(['url', 'disc', 'out', 'playwright', 'runtime-wasm-sha256']
@@ -22,13 +23,17 @@ options['stage-only'] = {type: 'boolean', default: false};
 options['no-contest-only'] = {type: 'boolean', default: false};
 options['team-battle'] = {type: 'boolean', default: false};
 options['team-setup-only'] = {type: 'boolean', default: false};
+options['sparse-mario-prefix'] = {type: 'boolean', default: false};
 options['sudden-death-route'] = {type: 'boolean', default: false};
 const {values} = parseArgs({options, strict: true});
 const suddenDeathRoute = values['sudden-death-route'];
+const sparseMarioPrefix = values['sparse-mario-prefix'];
+if(sparseMarioPrefix && ['sudden-death-route','menu-only','rules-items-only','css-sss-only','stage-only','no-contest-only','team-battle','team-setup-only'].some(name=>values[name]))
+  throw Error('Sparse prefix selects one exclusive route');
 if(suddenDeathRoute && ['menu-only','rules-items-only','css-sss-only','stage-only','no-contest-only','team-battle','team-setup-only'].some(name=>values[name]))
   throw Error('SD selects one full route; reduced/team route flags are incompatible');
-if(suddenDeathRoute && !/^[a-f0-9]{64}$/.test(values['runtime-wasm-sha256']||''))
-  throw Error('SD requires the frozen --runtime-wasm-sha256 identity');
+if((suddenDeathRoute||sparseMarioPrefix) && !/^[a-f0-9]{64}$/.test(values['runtime-wasm-sha256']||''))
+  throw Error('Declared route requires the frozen --runtime-wasm-sha256 identity');
 const menuOnly = values['menu-only'];
 const rulesItemsOnly = values['rules-items-only'];
 const cssSssOnly = values['css-sss-only'];
@@ -60,14 +65,14 @@ const sha256File = file => new Promise((resolve, reject) => {
 let browser, context, page, driver, browserPath, playwrightPath;
 const report = {
   schema: 'melee-web-vs-rules-item-menu-browser-v1',
-  mode: suddenDeathRoute ? 'source-natural-timeout-sudden-death-results-css' : noContestOnly ? 'source-no-contest-results-reproducer'
+  mode: sparseMarioPrefix ? 'source-sparse-mario-rendered-prefix' : suddenDeathRoute ? 'source-natural-timeout-sudden-death-results-css' : noContestOnly ? 'source-no-contest-results-reproducer'
     : teamSetupOnly ? 'source-team-setup-cancel-reentry-reproducer'
     : teamBattle ? 'source-two-player-team-battle-results-route'
     : stageOnly ? 'source-sss-stage-driver-reproducer'
     : rulesItemsOnly ? 'source-rules-items-entry-reproducer'
     : cssSssOnly ? 'source-css-to-sss-cooldown-reproducer'
     : menuOnly ? 'source-menu-boundary-reproducer' : 'source-rules-items-match-route',
-  scope: suddenDeathRoute
+  scope: sparseMarioPrefix ? 'Virtual Browser Gamepad P3 and keyboard P1; original sparse CSS/SSS to a short ordinary Mario/FD prefix and Eject. No Results, original comparison, physical input or timing acceptance.' : suddenDeathRoute
     ? 'Original Rules one-minute four-stock two-human Mario/FD; natural timeout, active SD live input elimination, typed original Results and CSS/Eject. Zero timing-pause recovery. Functional only; no reference, timing, physical input or PCM acceptance.'
     : noContestOnly
     ? 'Headless rendered original CSS -> SSS -> Final Destination -> match; P1 Start opens the original source pause, then the held LRAS+Start No Contest chord enters Results and Eject verifies teardown.'
@@ -315,7 +320,7 @@ const resumeTimingPause = async label => {
   const pause = {label, phase: state.phase, message: state.message,
     observedAt: new Date().toISOString()};
   report.timingPauses.push(pause);
-  if(suddenDeathRoute)throw Error(`${label}: timing disruption; SD route forbids recovery`);
+  if(suddenDeathRoute||sparseMarioPrefix)throw Error(`${label}: timing disruption; declared route forbids recovery`);
   const control = await page.evaluate(() => {
     const button = document.querySelector('#pause');
     return {found: Boolean(button), enabled: Boolean(button && !button.disabled),
@@ -646,10 +651,11 @@ const configureCssTeamBattle = async () => {
 let nativeSessionActive = false;
 try {
 route: {
+  if(sparseMarioPrefix)await installSparseVirtualController(page);
   const response = await page.goto(values.url, {timeout: 30000});
   assert.equal(response?.status(), 200);
   await driver.waitForImport();
-  if(suddenDeathRoute){
+  if(suddenDeathRoute||sparseMarioPrefix){
     const response=await page.request.get(new URL('gameplay_menu_browser.wasm',values.url).href);
     assert.equal(response.status(),200);
     const hash=createHash('sha256').update(await response.body()).digest('hex');
@@ -670,6 +676,12 @@ route: {
   await driver.launch();
   await waitMessage('Original character select', 'initial CSS');
   await shot('00-initial-css');
+  if(sparseMarioPrefix){
+    await runSparseMarioBrowserPrefix({page,report,press,chord,current,ensureNoError,resumeTimingPause,
+      observeSource,observeCssSetup,sourcePadSample,sourcePadTap,waitForNoQueuedPad,waitMessage,waitPhase,
+      waitMenu,enterVsRules,moveMenuCursor,waitItemInputReady,waitItemsCursor,waitItemFrequency,shot,verifyTeardown});
+    nativeSessionActive=false;break route;
+  }
   if(suddenDeathRoute){
     await runSuddenDeathBrowserRoute({page,report,driver,press,chord,current,ensureNoError,
       resumeTimingPause,observeSource,observeMatch,observeCssSetup,sourcePadSample,sourcePadTap,
@@ -1203,10 +1215,11 @@ route: {
       report.failureCleanup = {status: 'failed', message: redactDiscPath(error.message)};
     }
   }
-  if(suddenDeathRoute){
+  if(suddenDeathRoute||sparseMarioPrefix){
     try{
       report.callbackCapture=await readRuntimeDiagnosticsCapture(page);
-      validateFinalSdCapture(report.callbackCapture);
+      if(sparseMarioPrefix)validateFinalSparseCapture(report.callbackCapture);
+      else validateFinalSdCapture(report.callbackCapture);
     }catch(error){
       report.callback_capture_error=redactDiscPath(error.message);
       if(!report.callbackCapture)report.callbackCapture={status:'unavailable',error:report.callback_capture_error};
