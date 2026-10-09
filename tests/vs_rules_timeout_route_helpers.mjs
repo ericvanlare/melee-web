@@ -81,6 +81,29 @@ export function competitiveTimeoutTerminalFailures(match) {
   return failures;
 }
 
+export function competitiveTimeoutDeferredResultsFailures(state, match, expectedRules) {
+  const failures = [...competitiveTimeoutTerminalFailures(match)];
+  expect(failures, 'deferred original Results asset phase', state?.phase, 5);
+  expect(failures, 'deferred Results asset preparation is stopped', state?.running, false);
+  expect(failures, 'retained terminal match observer is valid', match?.observer_error ?? false, false);
+  expect(failures, 'retained terminal match observation is ready', match?.ready, true);
+  expect(failures, 'retained terminal match observation is not paused', match?.paused, false);
+  expect(failures, 'retained terminal match reached source ending or completion',
+    match?.ending === true || match?.complete === true, true);
+  const stocks = stockPair(match);
+  expect(failures, 'retained terminal live stocks remain [3,4]', JSON.stringify(stocks),
+    JSON.stringify([3, 4]));
+  if (!expectedRules || typeof expectedRules !== 'object' || Array.isArray(expectedRules)) {
+    failures.push('normalized source rules baseline is unavailable');
+  } else {
+    expect(failures, 'normalized source rules remain unchanged during Results preparation',
+      JSON.stringify(match?.rules), JSON.stringify(expectedRules));
+  }
+  if (!Number.isInteger(match?.frame) || match.frame < 0)
+    failures.push(`retained terminal source frame is invalid: ${JSON.stringify(match?.frame)}`);
+  return failures;
+}
+
 export function runtimeDiagnosticsFailures(capture, {identity, identityScope} = {}) {
   const failures = [];
   expect(failures, 'runtime recorder schema', capture?.schema, 'melee-web-runtime-callback-capture-v1');

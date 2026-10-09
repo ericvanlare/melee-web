@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   COMPETITIVE_TIMEOUT_BOUNDS,
+  competitiveTimeoutDeferredResultsFailures,
   competitiveTimeoutFirstLossFailures,
   competitiveTimeoutProgressFailures,
   competitiveTimeoutStableFailures,
@@ -62,6 +63,40 @@ test('terminal acceptance uses the original timeout result and unique source win
     terminal: {outcome: 1, winners: [0]}}).some(row => row.includes('unique winner is P2')));
   assert(competitiveTimeoutTerminalFailures({...terminal,
     rules: {...terminal.rules, player_stocks: [3, 4]}}).some(row => row.includes('setup stocks')));
+});
+
+test('phase-5 Results preparation requires the exact retained terminal and unchanged normalized rules', () => {
+  const rules = {match_kind: 1, stage: 0x20, timer_enabled: 1, time_limit: 480,
+    disable_pausing: 0, damage_ratio_bits: '3f800000', item_frequency: -1,
+    item_mask_hex: 'fffffff80000000f', is_teams: 0, player_teams: [0, 0],
+    player_stocks: [4, 4], door_teams: [0, 0, 0, 0], friendly_fire: 1,
+    player_source_slots: [0, 0], resolved_controller_ports: [0, 1],
+    player_slot_types: [0, 0], player_source_stocks: [4, 4],
+    player_source_characters: [0, 0], player_attack_ratio_bits: ['3f800000', '3f800000'],
+    player_defense_ratio_bits: ['3f800000', '3f800000']};
+  const snapshot = {ready: true, paused: false, ending: false, complete: true,
+    frame: 28800, rules: structuredClone(rules), players: [{stocks: 3}, {stocks: 4}],
+    terminal: {outcome: 1, winners: [1]}};
+  assert.deepEqual(competitiveTimeoutDeferredResultsFailures({phase: 5, running: false}, snapshot, rules), []);
+  assert(competitiveTimeoutDeferredResultsFailures({phase: 4, running: false}, snapshot, rules)
+    .some(row => row.includes('asset phase')));
+  assert(competitiveTimeoutDeferredResultsFailures({phase: 5, running: true}, snapshot, rules)
+    .some(row => row.includes('stopped')));
+
+  for (const [label, changed] of [
+    ['missing terminal', {...snapshot, terminal: undefined}],
+    ['wrong outcome', {...snapshot, terminal: {outcome: 2, winners: [1]}}],
+    ['wrong winner', {...snapshot, terminal: {outcome: 1, winners: [0]}}],
+    ['wrong stocks', {...snapshot, players: [{stocks: 3}, {stocks: 3}]}],
+    ['not terminal', {...snapshot, ending: false, complete: false}],
+    ['paused', {...snapshot, paused: true}],
+    ['changed setup', {...snapshot, rules: {...rules, player_stocks: [3, 4]}}],
+    ['changed rule', {...snapshot, rules: {...rules, item_frequency: 0}}],
+  ]) {
+    assert(competitiveTimeoutDeferredResultsFailures({phase: 5, running: false}, changed, rules).length > 0, label);
+  }
+  assert(competitiveTimeoutDeferredResultsFailures({phase: 5, running: false}, {observer_error: true}, rules)
+    .some(row => row.includes('timeout outcome')));
 });
 
 const identity = {scenario: 'rules-timeout-route-v1'};

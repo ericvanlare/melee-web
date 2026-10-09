@@ -24,6 +24,7 @@ import {
 } from './vs_rules_competitive_profile_helpers.mjs';
 import {
   COMPETITIVE_TIMEOUT_BOUNDS,
+  competitiveTimeoutDeferredResultsFailures,
   competitiveTimeoutFirstLossFailures,
   competitiveTimeoutProgressFailures,
   competitiveTimeoutStableFailures,
@@ -112,7 +113,7 @@ const report = {
   scope: competitiveMatchStartOnly
     ? 'Headless original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS; enable P2 through Controls and require the original CSS CPU/empty/Human transitions before Start; select Final Destination through original SSS, check normalized two-human Mario stock settings once at the first available observation in the bounded 180–240 source-frame window (about a 3-second prefix), then Eject. No 8-minute match, timeout, Results, retail comparison, or full-route acceptance claim.'
     : competitiveTimeoutRoute
-    ? 'Headless original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS -> original SSS -> two-human Mario/Final Destination match. A bounded P1 outward-left schedule from the authored x=-60 spawn must cause exactly one source stock loss; both players then remain neutral until the original 8-minute timer reaches a unique P2 timeout result, followed by original Results -> CSS, a read-only check of committed Rules and item mask/frequency, then Eject. The route does not re-enter the Rules/Items row menus after Results. Runtime callbacks are retained through a bounded recorder: sample rows are thinned/ring-bounded, incident rows are lossless only when dropped_incidents is zero, and publication-phase source-step totals can include transition-spanning callbacks. A counter poll fails as soon as cumulative incidents exceed the 24-row ring. Stops on timing/runtime/browser/observer errors, invalid or lost incident diagnostics, wrong stocks/outcome, 15 seconds without source-frame progress, or the 660-second gameplay wall bound from phase-7 entry. This is a single headless functional route, not a retail comparison, physical-input, timing, visual/audio-equivalence or performance claim.'
+    ? 'Headless original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS -> original SSS -> two-human Mario/Final Destination match. A bounded P1 outward-left schedule from the authored x=-60 spawn must cause exactly one source stock loss; both players then remain neutral until the original 8-minute timer reaches a unique P2 timeout result, followed by original Results -> CSS, a read-only check of committed Rules and item mask/frequency, then Eject. The route permits host phase 5 only while stopped for Results asset preparation and only with the retained exact timeout winner, [3,4] live stocks, and every normalized setup rule unchanged; otherwise the phase is an error. It does not re-enter the Rules/Items row menus after Results. Runtime callbacks are retained through a bounded recorder: sample rows are thinned/ring-bounded, incident rows are lossless only when dropped_incidents is zero, and publication-phase source-step totals can include transition-spanning callbacks. A counter poll fails as soon as cumulative incidents exceed the 24-row ring. Stops on timing/runtime/browser/observer errors, invalid or lost incident diagnostics, wrong stocks/outcome, 15 seconds without source-frame progress, or the 660-second gameplay wall bound from phase-7 entry. This is a single headless functional route, not a retail comparison, physical-input, timing, visual/audio-equivalence or performance claim.'
     : competitiveProfileOnly
     ? 'Headless original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS; B0XX P1 inputs set and verify the exact GameRules profile and preserve raw CSS StartMeleeData for provenance. CSS data is not treated as normalized before SSS. No match, timeout, Results, retail comparison, or acceptance claim.'
     : noContestOnly
@@ -217,9 +218,10 @@ const report = {
     terminal: {outcome: 1, winner_ports: [1], meaning: 'original OUTCOME_TIMEOUT and original source ranking gives P2 uniquely'},
     match_snapshots: [],
     stock_loss_samples: [],
+    results_asset_preparation: null,
     terminal_observation: null,
     retained_css_profile: null,
-    runtime_diagnostics_scope: 'One callback sample every >=100ms, rolling 100-row sample ring, fixed 24-row incident ring; all callback counts, source-step aggregates, reason totals and drop counts are retained separately. Counter polls run at least once per second during active input and timeout waiting, and cumulative incident counts above24 fail immediately. dropped_samples is expected bounded thinning and does not fail. Any dropped_incidents, unknown/non-preparation reason, malformed preparation row, invalid phase-step observation, missing recorder, or browser/runtime/timing/observer error fails the route.',
+    runtime_diagnostics_scope: 'One callback sample every >=100ms, rolling 100-row sample ring, fixed 24-row incident ring; callbacks may be observed in host phase 5 during validated Results asset preparation and in source phases 7 and 8. All callback counts, source-step aggregates, reason totals and drop counts are retained separately. Counter polls run at least once per second during active input, timeout waiting, and stopped Results asset preparation; cumulative incident counts above24 fail immediately. dropped_samples is expected bounded thinning and does not fail. Any dropped_incidents, unknown/non-preparation reason, malformed preparation row, invalid phase-step observation, missing recorder, or browser/runtime/timing/observer error fails the route.',
     runtime_diagnostics: null,
   } : null,
   checks: [], screenshots: {}, input: [], sourcePadSamples: [], timingPauses: [], timingPauseRecovery: [],
@@ -227,12 +229,12 @@ const report = {
   lifecycleObservations: [], errors: [],
 };
 const runtimeCaptureIdentity = competitiveTimeoutRoute ? {
-  scenario: 'competitive-eight-minute-natural-timeout-results-v1',
+  scenario: 'competitive-eight-minute-natural-timeout-results-v2',
   output_directory: path.basename(output),
   disc_sha256: expectedDiscSha256,
 } : null;
 const runtimeCaptureIdentityScope = competitiveTimeoutRoute ? {
-  source_phases: [7, 8],
+  source_phases: [5, 7, 8],
   callbacks: ['menuDiagnosticSample', 'menuDiagnosticIncident'],
   sample_ring: {capacity: 100, interval_ms: 100, lossy: true},
   incident_ring: {capacity: 24, dropped_records_fail: true},
@@ -1103,6 +1105,7 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
   let lastFrame = neutralObservation.frame;
   let lastFrameProgressAt = Date.now();
   let terminalTransitionAt = null;
+  let deferredResultsIdentity = null;
   let nextSnapshotFrame = neutralObservation.frame + COMPETITIVE_TIMEOUT_BOUNDS.snapshotPeriodFrames;
   lastCounterRead = Date.now();
   while (Date.now() < gameplayDeadline) {
@@ -1111,7 +1114,54 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
     await resumeTimingPause('competitive timeout match remains unpaused');
     if (report.errors.length)
       throw Error(`Browser emitted errors during the natural timeout route: ${JSON.stringify(report.errors)}`);
-    if (state.phase === 8) break;
+    if (state.phase === 8) {
+      if (terminalTransitionAt !== null &&
+          Date.now() - terminalTransitionAt > COMPETITIVE_TIMEOUT_BOUNDS.resultsTransitionWallMs)
+        throw Error('Original timeout outcome did not enter Results within the declared 30-second transition bound');
+      if (route.results_asset_preparation) {
+        route.results_asset_preparation.phase8_observed_at = new Date().toISOString();
+        route.results_asset_preparation.transition_wall_ms = Date.now() - terminalTransitionAt;
+      }
+      break;
+    }
+    if (state.phase === 5) {
+      latest = await observeMatch();
+      const deferredFailures = competitiveTimeoutDeferredResultsFailures(state, latest, initialMatch.rules);
+      assert.deepEqual(deferredFailures, [],
+        `Stopped source phase 5 is accepted only for the retained unique P2 timeout during Results asset preparation: ${JSON.stringify({deferredFailures, state, latest})}`);
+      const identity = JSON.stringify({frame: latest.frame, rules: latest.rules,
+        stocks: latest.players.map(player => player.stocks), terminal: latest.terminal});
+      if (deferredResultsIdentity === null) {
+        deferredResultsIdentity = identity;
+        if (terminalTransitionAt === null) terminalTransitionAt = Date.now();
+        route.results_asset_preparation = {
+          phase: 5,
+          status: 'stopped_for_original_results_asset_preparation',
+          first_observed_at: new Date().toISOString(),
+          last_observed_at: null,
+          observations: 0,
+          retained_terminal: {frame: latest.frame, rules: latest.rules,
+            stocks: latest.players.map(player => player.stocks), terminal: latest.terminal},
+          phase8_observed_at: null,
+          transition_wall_ms: null,
+        };
+      } else {
+        assert.equal(identity, deferredResultsIdentity,
+          'Retained terminal payload or normalized setup rules changed during Results asset preparation');
+      }
+      route.results_asset_preparation.last_observed_at = new Date().toISOString();
+      route.results_asset_preparation.observations++;
+      if (Date.now() - terminalTransitionAt > COMPETITIVE_TIMEOUT_BOUNDS.resultsTransitionWallMs)
+        throw Error('Original timeout outcome did not enter Results within the declared 30-second transition bound');
+      if (Date.now() - lastCounterRead >= 1000) {
+        await checkRuntimeDiagnosticCounters('stopped Results asset preparation', false);
+        lastCounterRead = Date.now();
+      }
+      await page.waitForTimeout(250);
+      continue;
+    }
+    if (deferredResultsIdentity !== null)
+      throw Error(`Source left deferred Results asset preparation for unexpected phase ${state.phase}`);
     assert.equal(state.phase, 7,
       `Source left gameplay before original Results (phase ${state.phase}): ${state.message}`);
     latest = await observeMatch();
@@ -1158,6 +1208,8 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
   const terminalFailures = competitiveTimeoutTerminalFailures(terminal);
   assert.deepEqual(terminalFailures, [],
     `Original source timeout result is not the unique P2 win: ${JSON.stringify({terminalFailures, terminal})}`);
+  assert.deepEqual(terminal.rules, initialMatch.rules,
+    'Original terminal snapshot changed normalized match settings from the live match start');
   assert.deepEqual(terminal.players?.map(player => player.stocks), [3, 4],
     `Source terminal observation changed the controlled stock pair: ${JSON.stringify(terminal)}`);
   route.terminal_observation = terminal;
