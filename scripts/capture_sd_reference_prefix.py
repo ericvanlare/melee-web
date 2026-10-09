@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Owned cold-boot SD prefix runner; opt-in diagnostic, never legacy admission.
+"""Owned cold-boot Rules-ready probe; opt-in diagnostic, never SD admission.
 
-Menu packets and polling counts must be authored before launch. This runner
+Menu intents and bounded source predicates must be authored before launch. This runner
 cannot synthesize native MWRI input, recover missed samples, or force a result.
 No default menu recipe is guessed. The separate original experiment must first
-verify that its final menu release reaches the neutral source boundary.
+verify its consumed neutral release and original Rules-ready source owner.
 """
 from pathlib import Path
 import hashlib
@@ -18,8 +18,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from authored_sd_reference_plan import canonical
 from retail_input_plan import load_plan, NEUTRAL_PAD, pipe_commands
-from reference_versus_sequence_capture import prepare_dual_pipe, DualPipeController, ObserverTail
-from sd_reference_diagnostic import Receiver, RulesMenuReceiver, SdDiagnosticError, require
+from reference_versus_sequence_capture import _atomic_ini, prepare_dual_pipe, DualPipeController, ObserverTail
+from sd_reference_diagnostic import RulesMenuReceiver, SdDiagnosticError, require
 from sd_original_menu_plan import validate_packet, matches
 from capture_retail_replay import dolphin_command, _copy_tree
 from capture_allocation_history import validate_reference_build_manifest
@@ -96,17 +96,8 @@ def menu_actions(path):
     return value, hashlib.sha256(raw).hexdigest()
 
 
-def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manifest, timeout=180):
-    """Not called by legacy capture paths; caller supplies reviewed original inputs."""
-    build = validate_reference_build_manifest(Path(build_manifest), Path(dolphin))
-    plan, plan_hash = load_plan(input_plan, allow_authored=True)
-    menus, menu_hash = menu_actions(menu_recipe)
-    require(plan["authored_recipe"]["version"] == 3 and menus["version"] == 2,
-            "Runnable original diagnostic requires corrected recipe v3 and guarded reduced menu packet v2")
-    receiver = RulesMenuReceiver(plan)
-    require(type(timeout) in (int, float) and 0 < timeout <= 600, "SD deadline is unbounded")
-    output = Path(output)
-    output.mkdir()  # A collision never overwrites another run.
+def prepare_rules_profile(profile, user):
+    """Customize only a fresh owned copy; retain the shared atomic writer's 0400 freeze."""
     profile = Path(profile)
     require(profile.is_dir(), "SD cold boot requires an existing original profile")
     source_inventory = {}
@@ -114,7 +105,8 @@ def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manife
         require(not item.is_symlink(), "SD profile must not redirect files")
         if item.is_file():
             source_inventory[item.relative_to(profile).as_posix()] = hashlib.sha256(item.read_bytes()).hexdigest()
-    user = output / "user"
+    user = Path(user)
+    require(not user.exists(), "Rules probe profile copy already exists")
     _copy_tree(profile, user, skip={"Pipes"})
     config = user / "Config" / "Dolphin.ini"
     require(config.is_file(), "SD cold boot requires Dolphin.ini")
@@ -128,8 +120,35 @@ def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manife
             "SD cold boot must not attach a debugger")
     for port in (2, 3):
         ini.set("Core", "SIDevice" + str(port), "0")
-    with config.open("w") as stream:
-        ini.write(stream)
+    _atomic_ini(config, ini)
+    return p1, p2, source_inventory
+
+
+def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manifest, timeout=180):
+    """Own fresh output before preparation so failures cannot vanish before launch."""
+    output = Path(output)
+    output.mkdir()  # A collision never overwrites another run or its evidence.
+    try:
+        return _run(dolphin=dolphin, disc=disc, profile=profile, input_plan=input_plan,
+                    menu_recipe=menu_recipe, output=output, build_manifest=build_manifest, timeout=timeout)
+    except Exception as error:
+        failure = output / "failure.json"
+        if not failure.exists():
+            failure.write_bytes(canonical({"scope": "rules_ready", "stage": "prelaunch",
+                                           "native_launched": False, "error": str(error)}))
+        raise
+
+
+def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manifest, timeout):
+    build = validate_reference_build_manifest(Path(build_manifest), Path(dolphin))
+    plan, plan_hash = load_plan(input_plan, allow_authored=True)
+    menus, menu_hash = menu_actions(menu_recipe)
+    require(plan["authored_recipe"]["version"] == 3 and menus["version"] == 2,
+            "Runnable original diagnostic requires corrected recipe v3 and guarded reduced menu packet v2")
+    receiver = RulesMenuReceiver(plan)
+    require(type(timeout) in (int, float) and 0 < timeout <= 600, "Rules deadline is unbounded")
+    user = output / "user"
+    p1, p2, source_inventory = prepare_rules_profile(profile, user)
     raw, status = output / "observer.bin", output / "observer-status.json"
     native, native_status = output / "inputs.mwri", output / "input-status.json"
     environment = {k: v for k, v in os.environ.items()
@@ -203,7 +222,8 @@ def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manife
                 (output / "report.json").write_bytes(canonical(report))
                 return report
         except Exception as error:
-            (output / "failure.json").write_bytes(canonical({"scope": "rules_ready", "error": str(error)}))
+            (output / "failure.json").write_bytes(canonical({"scope": "rules_ready", "stage": "native",
+                "native_launched": True, "pid": process.pid, "error": str(error)}))
             raise
         finally:
             try:
@@ -211,7 +231,8 @@ def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manife
             except SdDiagnosticError as error:
                 failure = output / "failure.json"
                 if not failure.exists():
-                    failure.write_bytes(canonical({"scope": "rules_ready", "error": str(error)}))
+                    failure.write_bytes(canonical({"scope": "rules_ready", "stage": "cleanup",
+                        "native_launched": True, "pid": process.pid, "error": str(error)}))
                 raise
 
 
@@ -225,7 +246,7 @@ def main(argv=None):
     try:
         report = run(**vars(args))
     except (OSError, ValueError) as error:
-        parser.exit(1, f"SD prefix diagnostic failed: {error}\n")
+        parser.exit(1, f"Rules-ready diagnostic failed: {error}\n")
     print(json.dumps(report, sort_keys=True))
     return 0
 
