@@ -2791,9 +2791,12 @@ struct Observer::Impl
         }
         else if (sparse_witness_phase == 1)
         {
-          if (!SparsePadStatusMatches(pad, false))
-            return SparseInputFailure("Sparse original PAD release did not restore neutral active ports", pc, tick), void();
-          sparse_witness_phase = 2;
+          // Pipe release cannot retract an already queued identical press.
+          // Retain every sample within the existing total cap until neutral.
+          if (SparsePadStatusMatches(pad, false))
+            sparse_witness_phase = 2;
+          else if (!SparsePadStatusMatches(pad, true))
+            return SparseInputFailure("Sparse original PAD release differs from held press or neutral", pc, tick), void();
         }
         else
         {

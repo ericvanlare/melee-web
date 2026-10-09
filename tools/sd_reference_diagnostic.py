@@ -140,6 +140,7 @@ class Receiver:
         self.sparse_prepress_neutral_samples = 0
         self.witness_phase = 0
         self.witness_records = []
+        self.sparse_source_records = []
 
     def clock(self, data):
         raw = data.get((14, 0), b"")
@@ -209,6 +210,12 @@ class Receiver:
                     self.sparse_source_samples += 1
                     require(self.sparse_source_samples <= witness["max_source_samples"],
                             "Sparse post-setup source PAD sample cap exhausted")
+                    sample = {"seq": row["seq"], "source_tick": row["source_tick"],
+                              "source_consumed": payload["consumed"],
+                              "menu_consumed": payload["menu_consumed"], "pc": payload["pc"],
+                              "raw_pad_slot_hex": raw.hex(), "raw_queue_hex": data[(2, 0)].hex(),
+                              "pads": vector, "pad_errors": signed_pad_errors(raw), **queue_identity}
+                    self.sparse_source_records.append(sample)
                     if self.witness_phase == 0 and vector == release:
                         self.sparse_prepress_neutral_samples += 1
                         require(self.sparse_prepress_neutral_samples <= witness["max_prepress_neutral_samples"],
@@ -222,11 +229,14 @@ class Receiver:
                     else:
                         require(self.witness_phase == 1,
                                 "Sparse source emitted input after its release witness")
-                        verify_tick(self.plan, 1, vector)
-                        self.witness_phase = 2
-                        self.witness_records.append({"kind": "verified_release", "seq": row["seq"],
-                            "source_tick": row["source_tick"], "source_consumed": payload["consumed"],
-                            "pads": vector, "pad_errors": signed_pad_errors(raw), **queue_identity})
+                        if vector == self.plan["frames"][0]:
+                            # Only the identical authored press may drain before
+                            # neutral; retain it without advancing the witness.
+                            self.witness_records.append({"kind": "held_press", **sample})
+                        else:
+                            verify_tick(self.plan, 1, vector)
+                            self.witness_phase = 2
+                            self.witness_records.append({"kind": "verified_release", **sample})
             else:
                 verify_tick(self.plan, self.consumed, vector)
             self.consumed += 1
@@ -1060,6 +1070,7 @@ class GciRulesMenuReceiver(RulesMenuReceiver):
                 sparse_prepress_neutral_samples=self.sparse_prepress_neutral_samples,
                 input_witness_phase=self.witness_phase,
                 input_witness=self.witness_records,
+                source_input_samples=self.sparse_source_records,
                 natural_terminal_admission=False, results_css_admission=False,
                 full_sd_prefix_admission=False, whole_session_admission=False)
         return report
