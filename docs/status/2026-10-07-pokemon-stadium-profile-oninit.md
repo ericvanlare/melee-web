@@ -5,7 +5,9 @@
 **Historical October 7 checkpoint.** The
 [zero-tick two-world lifecycle](#october-9-two-zero-tick-stadium-world-lifetimes)
 passed. The latest [source-session preparation attempts](#october-9-source-session-ready-preparation)
-stopped before match construction. Ready/GO, gameplay ticks, and C3 remain unrun.
+now reach match construction, which refuses a marker binding before a new world
+or gameplay tick. The smaller input handoff test passes; Ready/GO and C3 remain
+unrun.
 
 The diagnostic-only Stadium profile and profile-to-`DatNativeMapContract`
 adapter compile in the C1 trace target. Focused profile and borrowed-yakumono
@@ -229,8 +231,8 @@ prerequisite groups; these steps do not replace or redefine those groups:
 
 The receipt records the zero-tick result and these remaining steps.
 Earlier OnInit, generator, and fixture failures remain retained with their
-original scopes. The subsequent source-to-Ready attempts below stop before match
-construction; no 3,500-tick runtime attempt has run.
+original scopes. The source-to-Ready attempts below now reach a constructor
+refusal; no 3,500-tick runtime attempt has run.
 
 
 ## October 9 source-session Ready preparation
@@ -280,15 +282,43 @@ the tick loop. All 240 first-run and 284 second-run bound files, plus 98 fixture
 for each run, matched after execution. Exact owned children exited naturally and
 were reaped; root independently checked their absence.
 
-After these two attempts, the next work is a smaller actual PAD snapshot
-handoff reproducer around original menu leave, using existing browser/session
-handoff code. Preserve the decoder and original input history; do not retry the
-full session until the first invalid boundary is reduced and reviewed. The
-existing RNG observer can be reused afterward, but the Stadium notes require
+After those two attempts, the smaller original-menu PAD handoff reducer at
+`8e087161` observed the failure precisely. The pre-leave 822-byte snapshot passes
+the unchanged strict decoder. The post-leave globals are all zero: eight
+processing-configuration constraints fail, while all 96 normalized history
+floats remain finite. Original host leave had already saved the valid decoded
+input before restoring the caller's external globals. The corrected Ready
+caller uses `melee_web_menu_host_input`, as the browser already does, and keeps
+that owner alive through deferred construction.
+
+The native reducer completed, but its first Python check incorrectly expected
+no SDK world immediately after host leave. MenuWorld still owns that world
+until its separate close. This failed test remains retained. The phase-only
+correction at `e2ff861b` expects that live menu world, while preserving the
+strict zero-after-close and final zero-arena checks. The changed reducer passes:
+raw fields agree with strict decoding, the retained input pointer survives
+MenuWorld close, the exact seed/owner remains unchanged, and the final session
+allocation is zero. Both canonical diagnostic builds pass; the second run's
+356 bound files and 98 fixtures match afterward. This is **Native traced** input
+handoff and cleanup evidence, with no MatchSession construction.
+
+The next Ready attempt on `e2ff861b` passes the PAD and SIS handoffs and reaches
+`before-construction`. Deferred match construction then refuses
+`Invalid or duplicate marker binding`. The specific marker was not logged.
+The new match world and tick count remain zero; no OnInit/OnLoad, HUD or Ready
+is observed. All 357 bound files and 98 fixtures remain unchanged. Exact owned
+unittest and Node children exit and are reaped naturally. The diagnostic still
+reports its 32 MiB session arena at the failure; process exit is not checked
+match/session teardown. The next experiment is a source-led reduction of the
+marker binding against existing Stadium catalog support, before another Ready
+attempt. No bounds or duplicate-identity exemption is authorized.
+
+The existing RNG observer can be reused afterward, but the Stadium notes require
 C3's per-tick, per-owner ledger to be compared with the original. C8's broader
-transformation comparison does not defer that C3 requirement. No C3, original
-equivalence, rendering, browser, physical-input, audible-output or timing
-acceptance follows from these checks.
+transformation comparison does not defer that C3 requirement; the roadmap now
+makes this explicit. Full match composition, Ready/GO and the remaining C3
+steps stay runtime-unverified. No C3, original equivalence, rendering, browser,
+physical-input, audible-output or timing acceptance follows from these checks.
 
 The same [boundary receipt](../evidence/issue251-stadium-profile-oninit-v1.json)
 records the exact source, build, failed attempts, reducer and retained preparation

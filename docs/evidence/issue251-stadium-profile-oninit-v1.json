@@ -319,7 +319,7 @@
   },
   "subsequent_c3_component_2026_10_09": {
     "claim_boundary": "Existing October7 profile receipt remains historical. This update preserves V26 and identifies the exact later producer; componentcontrols do not pass C3.",
-    "current_result": "Two zero-tick world lifetimes pass on3d032f74. Full source-session preparation fails before construction on62fd69b8(SIS token) and094782e6(PAD snapshot); SIS consumer corrected with actual SDK control. C3 remains unrun.",
+    "current_result": "Two zero-tick world lifetimes pass on3d032f74. SIS and PAD caller handoffs corrected; smaller original PAD reducer passes one changed run on e2ff861b after retained phase-assertion failure. Ready attempt now refuses marker binding during construction before a new world/tick. C3 remains unrun.",
     "prior_v26": {
       "source_commit": "b8c272c44a94bcb03f0371008851e468200d4496",
       "first_failure": "heap_free_bytes",
@@ -805,10 +805,22 @@
         "heap_before": 33451424,
         "heap_after_stage_retirement": 33365248,
         "retained_bytes": 86176,
-        "objects_before_after": [2, 2],
-        "processes_before_after": [2, 2],
-        "used_gobj_before_after": [2, 2],
-        "used_proc_before_after": [2, 2],
+        "objects_before_after": [
+          2,
+          2
+        ],
+        "processes_before_after": [
+          2,
+          2
+        ],
+        "used_gobj_before_after": [
+          2,
+          2
+        ],
+        "used_proc_before_after": [
+          2,
+          2
+        ],
         "count_scope": "Whole-world object/process counts and used GObj/proc pool counts across the Stage interval while MatchContext remained live; stage registry and markers were empty after retirement.",
         "stage_registry_markers_empty": true,
         "source_roots_pools_classes_devices_restored": true,
@@ -910,11 +922,61 @@
           97453
         ],
         "sdk_owned_pid_absent": 97391,
-        "signals_sent": false
+        "signals_sent": false,
+        "pad_first_owned_pids_absent": [
+          140,
+          146
+        ],
+        "pad_second_owned_pids_absent": [
+          1287,
+          1293
+        ],
+        "third_ready_owned_pids_absent": [
+          1337,
+          1343
+        ],
+        "pad_second_bound_files": 356,
+        "third_ready_bound_files": 357
       },
-      "remaining": "First of seven source-to-Ready steps implemented/compiled; full composition and other six runtime-unverified. Smaller actual PAD handoff reducer before third full run.",
+      "remaining": "Shared source-session seam compiled; caller SIS/PAD preparation reduced and corrected. Full composition now refuses marker binding. Reduce exact marker source/owner before further Ready. Ready/GO, idle lifetimes, retirement and original per-owner RNG ledger remain open.",
       "c3_original_ledger_requirement": "Reuse existing RNG draw observer; C3 notes604-608 require per-tick/per-owner original comparison, separately from broader C8 transformation comparison.",
-      "claim_boundary": "No match construction, new Session VS/world/OnInit/OnLoad, HUD, Ready/GO or source tick observed in either attempt. Earlier zero-tick pass and every failed predicate retain their original scopes. No C3 acceptance."
+      "claim_boundary": "First two Ready attempts stopped before construction. Smaller PAD handoff/cleanup reducer passes on e2ff861b; third Ready attempt enters deferred construction and refuses before newworld/OnInit/OnLoad/HUD/ticks. Priorzero-tick result retains its scope. No C3 acceptance.",
+      "pad_input_reducer": {
+        "caller_source": "8e087161fcc5a62f6f82cb333a812d0f4eff448f",
+        "phase_correction_source": "e2ff861b3f290714d4c6aaa1a19158d4e7f8e59a",
+        "phase_correction_tree": "b3c335bd435dd2a195b90402b021e286d8e0c537",
+        "source_review": {
+          "artifact": "root-pad-leave-source-review-v1.json",
+          "sha256": "d4bd1148450ee5023fb036115a2eb533a9e246331be254c13fc7f984ca482855"
+        },
+        "independent_source_review": {
+          "artifact": "sol-pad-leave-final-source-review-v2.json",
+          "sha256": "e9a8a9cc91472e12c54eaad992a63c373fa0113887b57bb581a3f03e3c2313a9"
+        },
+        "phase_review": {
+          "artifact": "sol-pad-leave-phase-correction-review-v1.json",
+          "sha256": "27b6713cf4247a31ed15ea99d55396c9abbac62194b65855c394259cd0055a36"
+        },
+        "first_failed_test": {
+          "artifact": "root-pad-leave-first-frozen-result-v1.json",
+          "sha256": "75432dcf40f466efc7bd30b174e15200adf43f2289f32b7d0d37b2093c235379"
+        },
+        "changed_pass": {
+          "artifact": "root-pad-leave-second-frozen-result-v1.json",
+          "sha256": "7dcfbefc9275e130ddec966b8d90a2f006bf1f3167832788357563fa2c82bc05"
+        },
+        "producer": {
+          "artifact": "pad-leave-producer-e2ff861b-v2/identity.json",
+          "sha256": "a717be2dea4a657a8862ca815c908f5ac6d72d9cad70ad00f0e389d5eb86f666"
+        },
+        "observation": "Actual preleave822 strictvalid; restored postleave822allzero, eight invalid config constraints and all96 normalized floatsfinite. Existing host input pointer survives close; exactseedowner preserved; finalarena0. First Python expected menuworld0 beforeclose incorrectly, retained failure; changed phaseassertion1 passes allchecks.",
+        "scope": "No MatchSession or Ready construction. No serialized opaque hostinput export; existing production strict decode and checked owner path reused."
+      },
+      "third_failed_run": {
+        "artifact": "root-ready-third-frozen-result-v1.json",
+        "sha256": "66c2fdf85fa07a46fea58d439224e9854c36e3627b4e2298888c5a2444832a94"
+      },
+      "third_failure": "PAD/SIS handoffs pass; before-construction emitted, then Invalid or duplicate marker binding. Specificmarker unlogged; match_retained0, newworld0/ticks0, no Ready. Diagnostic32MiB sessionarena remains at failure, so processcleanup is not checkedscene/sessionteardown."
     }
   }
 }
