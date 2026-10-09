@@ -247,13 +247,17 @@ export async function confirmTwoHumanResults({
   deadlineAt,
   observeHost,
   observeTrace,
+  observeSample,
   press,
   wait,
   pollMs = RESULTS_CONFIRMATION_POLL_MS,
 }) {
   if (![deadlineAt, pollMs].every(Number.isFinite) || deadlineAt <= Date.now() || pollMs <= 0)
     throw Error('Original Results confirmation needs a live deadline and positive poll interval');
-  if (![observeHost, observeTrace, press, wait].every(value => typeof value === 'function'))
+  if (![press, wait].every(value => typeof value === 'function') ||
+      (observeSample !== undefined && typeof observeSample !== 'function') ||
+      (typeof observeSample !== 'function' &&
+       ![observeHost, observeTrace].every(value => typeof value === 'function')))
     throw Error('Original Results confirmation requires native observers and checked input/wait functions');
 
   const initialBudgetMs = deadlineAt - Date.now();
@@ -266,11 +270,12 @@ export async function confirmTwoHumanResults({
       throw Error(`${label}: original Results trace polling exceeded its time-derived bound ${maxPolls}`);
     // Retain the source-owned ring before the host callback can reject a
     // stopped asset-transfer boundary. This is a snapshot read, not a tick.
-    const trace = await observeTrace();
+    const coherent = observeSample ? await observeSample(label) : null;
+    const trace = observeSample ? coherent?.trace : await observeTrace();
     const failures = resultsPadTraceFailures(trace);
     if (failures.length)
       throw Error(`${label}: original Results trace is incomplete: ${JSON.stringify({failures, trace: traceSummary(trace)})}`);
-    const host = await observeHost(label);
+    const host = observeSample ? coherent?.host : await observeHost(label);
     if (Date.now() >= deadlineAt)
       throw Error(`${label}: original Results route exceeded its shared wall deadline during observation`);
     if (!host || !Number.isSafeInteger(host.phase))

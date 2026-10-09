@@ -71,6 +71,22 @@ first-use render settling from active CSS/Prize. V6 did not retain Pause-control
 state; synthetic readiness fields are separate from its actual trace and host
 observation. The browser route remains failed until a changed run passes.
 
+V7 and V8 retained 290 Results rows with P2’s raw/copied Start at frame 279
+and all-confirmed phase 4. V7 rejected loading UI text during phase 5; V8
+observed valid active CSS but rejected a stale “Original stage select” native
+message. Runtime `e13647cb` fixes that label from the entered source owner,
+with a passing asset-free production-function control and ordinary Release
+build. The earlier `5308a80c` artifact bank remains intact.
+
+V9 used the new runtime but failed earlier during VS-to-SD observation. Its
+separate awaited host and match reads could span ownership replacement; the
+exact failed pair was not retained. Later phase 14/preparing and empty match
+reads are not that pair. No actual SD setup, Results or new subsequent-match
+tail ran in V9. A source-only coherent reader now captures and retains native
+host/match or host/Results trace in one synchronous evaluation before strict
+validation. Its serialized-reader controls passed; the changed browser gate
+is unrun. All three failures and exact cleanup evidence remain retained.
+
 The original-reference producer `8f944a09` (binary digest `c22d23c2`) passed a
 reduced Rules-ready control using the exact selected GCI profile: menu kind 13,
 row 0/value 0, entering 1 and cooldown 0. Its 2,018-event MWRI recording completed;

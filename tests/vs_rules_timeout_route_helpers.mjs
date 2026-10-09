@@ -24,11 +24,13 @@ export const COMPETITIVE_RESULTS_RETURN_POLL_MS = 250;
 // original Prize screen is a separate phase-9 route back to CSS; only it may
 // receive these bounded follow-up Start inputs.
 export async function returnFromCompetitivePrize({
-  deadlineAt, observeHost, observeTrace, press, wait,
+  deadlineAt, observeHost, observeTrace, observeSample, press, wait,
   pollMs = COMPETITIVE_RESULTS_RETURN_POLL_MS,
 }) {
   if (!Number.isFinite(deadlineAt) || deadlineAt <= Date.now() ||
-      typeof observeHost !== 'function' || typeof observeTrace !== 'function' ||
+      (observeSample !== undefined && typeof observeSample !== 'function') ||
+      (typeof observeSample !== 'function' &&
+       (typeof observeHost !== 'function' || typeof observeTrace !== 'function')) ||
       typeof press !== 'function' || typeof wait !== 'function' ||
       !Number.isFinite(pollMs) || pollMs <= 0)
     throw Error('Original Prize return requires a live shared deadline and checked trace/host/input/wait functions');
@@ -43,7 +45,8 @@ export async function returnFromCompetitivePrize({
       throw Error(`${label}: Results/Prize trace polling exceeded its time-derived bound ${maxPolls}`);
     // The Results trace remains available after its owner closes. Read and
     // retain that bounded source witness before a stopped host can be rejected.
-    const trace = await observeTrace();
+    const coherent = observeSample ? await observeSample(label) : null;
+    const trace = observeSample ? coherent?.trace : await observeTrace();
     const traceFailures = resultsPadTraceFailures(trace);
     if (traceFailures.length)
       throw Error(`${label}: retained original Results trace is invalid: ${JSON.stringify(traceFailures)}`);
@@ -51,7 +54,7 @@ export async function returnFromCompetitivePrize({
     if (final?.phase !== 4 || final.stats_phase !== 2 ||
         JSON.stringify(final.players?.map(player => player.confirmed)) !== JSON.stringify([1, 1, 1, 1]))
       throw Error(`${label}: retained Results trace lacks final phase-4/two-Human confirmation: ${JSON.stringify(final)}`);
-    const state = await observeHost(label);
+    const state = observeSample ? coherent?.host : await observeHost(label);
     if (Date.now() >= deadlineAt)
       throw Error(`${label}: original Results route exceeded the shared 45-second deadline while observing host state`);
     if (!state || !Number.isSafeInteger(state.phase) || state.error)

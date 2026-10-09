@@ -209,6 +209,31 @@
         "relative_path": "browser-natural-sd-route-v1/results-pad-trace-v6-retained.json",
         "bytes": 659563,
         "sha256": "904bda8fc4a43041bb8ec2d4c65abd70ff4cf4ce52f44b55d7d35b4879697ba3"
+      },
+      {
+        "relative_path": "browser-natural-sd-route-v1/browser-result-v7.json",
+        "bytes": 11567,
+        "sha256": "8495e1e91eb29a667a7843c3087ba1a0c1d4da68a839867111cfa0458e0f81bc"
+      },
+      {
+        "relative_path": "browser-natural-sd-route-v1/results-pad-trace-v7-retained.json",
+        "bytes": 664079,
+        "sha256": "64eba3da11703e312da3268e879c65281c8f3a6fc1210f2fa9a83f2867d5fe89"
+      },
+      {
+        "relative_path": "browser-natural-sd-route-v1/browser-result-v8.json",
+        "bytes": 12572,
+        "sha256": "be64fbfff0efb56d6d719d01fe6d9664b8f553fe06ba4fd0d0371c4b71031398"
+      },
+      {
+        "relative_path": "browser-natural-sd-route-v1/results-pad-trace-v8-retained.json",
+        "bytes": 664085,
+        "sha256": "aedc28dd1622621b5ddbc0435f1f76fbe63c43aa1c23f1e70f60ae3bde9d9388"
+      },
+      {
+        "relative_path": "browser-natural-sd-route-v1/browser-result-v9.json",
+        "bytes": 12281,
+        "sha256": "010528bc034cb07bf98d10688bbef6861d3190f1629046db1827083c75b18e5e"
       }
     ]
   },
@@ -453,6 +478,41 @@
       "trace_sha256": "904bda8fc4a43041bb8ec2d4c65abd70ff4cf4ce52f44b55d7d35b4879697ba3",
       "result_sha256": "79973618e2e1ba3c01b5d296287bb0651fab879467bfe9ba8ccd0358d193b8ba",
       "readiness_gap": "Pause-control state was not captured. Synthetic pause fields in reduced controls are explicitly separate from actual trace/host data."
-    }
+    },
+    "v7": {
+      "source": "3455db7c135a8971721bf54edf69467f27fdeeb5",
+      "runtime_source": "5308a80c3fe0d14b48f7c920a14e83010e19c85c",
+      "first_failure": "P2 statistics confirmation: host is not active CSS/Prize or an exact Results-destination preparation state: {\"message\":\"Preparing original next scene...\",\"phase\":5,\"running\":0,\"status\":\"Reading local data 76/76\",\"pause_present\":true,\"pause_disabled\":true,\"error\":null,\"diagnostics\":\"Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none\"}",
+      "result_sha256": "8495e1e91eb29a667a7843c3087ba1a0c1d4da68a839867111cfa0458e0f81bc",
+      "source_scope": "Actual P2 raw/copied Start after frame279 and phase4/stats2/allconfirmed retained; V7 stopped READY5 loading, V8 valid activeCSS source1 with wrong native stage-select message. Overall route failed.",
+      "cleanup": "Eject zero source/asset owners, owned browser resources closed, exact four child/wrapper PIDs absent and owned socket rebind/close passed.",
+      "trace_sha256": "64eba3da11703e312da3268e879c65281c8f3a6fc1210f2fa9a83f2867d5fe89",
+      "observed_trace_rows": 290
+    },
+    "v8": {
+      "source": "d5ac613f45dc63073ba81ec9f02fbe7077d48933",
+      "runtime_source": "5308a80c3fe0d14b48f7c920a14e83010e19c85c",
+      "first_failure": "P2 statistics confirmation: host is not active CSS/Prize or an exact Results-destination preparation state: {\"message\":\"Original stage select\",\"phase\":1,\"running\":1,\"status\":\"Original stage select\",\"pause_present\":true,\"pause_disabled\":false,\"error\":null,\"diagnostics\":\"Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 3 \u00b7 revisits: 0\"}",
+      "result_sha256": "be64fbfff0efb56d6d719d01fe6d9664b8f553fe06ba4fd0d0371c4b71031398",
+      "source_scope": "Actual P2 raw/copied Start after frame279 and phase4/stats2/allconfirmed retained; V7 stopped READY5 loading, V8 valid activeCSS source1 with wrong native stage-select message. Overall route failed.",
+      "cleanup": "Eject zero source/asset owners, owned browser resources closed, exact four child/wrapper PIDs absent and owned socket rebind/close passed.",
+      "trace_sha256": "aedc28dd1622621b5ddbc0435f1f76fbe63c43aa1c23f1e70f60ae3bde9d9388",
+      "observed_trace_rows": 290
+    },
+    "v9": {
+      "source": "16b4e2802a42d5046d5300576d5dfeb89a66aa24",
+      "runtime_source": "e13647cb1a1b7a6309592f5a53f16051f4d0b7fb",
+      "first_failure": "Expected values to be strictly equal:\n\nundefined !== 'vs'\n",
+      "result_sha256": "010528bc034cb07bf98d10688bbef6861d3190f1629046db1827083c75b18e5e",
+      "source_scope": "Failed during VS-to-SD polling before setup/Results/tail. Exact failed poll pair not retained; later failure reread phase14/running0/empty match is not the failing pair. No subsequent-entry claim.",
+      "cleanup": "Eject zero source/asset owners, owned browser resources closed, exact four child/wrapper PIDs absent and owned socket rebind/close passed."
+    },
+    "entered_owner_message_fix": {
+      "source": "e13647cb1a1b7a6309592f5a53f16051f4d0b7fb",
+      "scope": "Compiled ordinaryRelease plus asset-free actual-function regression; active source owner replaces stale construction target for menu messages. No transition/input/RNG changes or native-message oracle relaxation. All46 older5308 artifacts retained.",
+      "wasm_sha256": "1679396663ad5c32ad8463edbfcb9f322c8ae4746564185e19c695314d0e8eaf",
+      "runtime_browser_gate": "V9 stopped before exercising fixed returned-CSS message or subsequent entry."
+    },
+    "coherent_observation_fix": "Focused source controls use actual serialized synchronous reader for host+match and host+Results trace, retaining exact pair before assertions. Scheduling/Pause augmentations are synthetic; V9 exact failing pair remains missing. Browser changed run unrun."
   }
 }

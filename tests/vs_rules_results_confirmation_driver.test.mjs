@@ -3,6 +3,7 @@ import test from 'node:test';
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import vm from 'node:vm';
+import {observeRuntimeOwner} from './runtime_owner_observation.mjs';
 import {
   confirmTwoHumanResults,
   RESULTS_TRACE_CAPACITY,
@@ -122,10 +123,28 @@ test('two-Human Results driver gates presentation and each port confirmation on 
   let hostPhase = 8;
   const snapshot = () => makeTrace(samples);
   const append = (options) => samples.push(makeTraceRow(samples.length, options));
+  const retention={};
+  const page={evaluate:async(reader,options)=>{
+    const context=vm.createContext({Module:{UTF8ToString:value=>value,
+      _melee_web_native_menu_message:()=>activeHost(hostPhase).message,
+      _melee_web_native_menu_phase:()=>hostPhase,
+      _melee_web_native_menu_running:()=>1,
+      _melee_web_native_menu_diagnostics:()=>'',
+      _melee_web_native_menu_match_observe:()=>assert.fail('Results sample must not read match'),
+      _melee_web_native_menu_results_pad_trace:()=>JSON.stringify(snapshot())},
+      document:{querySelector:selector=>selector==='#status'?
+        {textContent:activeHost(hostPhase).message,dataset:{runtimeError:null}}:
+        selector==='#pause'?{disabled:false}:null}});
+    return JSON.parse(JSON.stringify(vm.runInContext(`(${reader.toString()})(${JSON.stringify(options)})`,context)));
+  }};
   const result = await confirmTwoHumanResults({
     deadlineAt: Date.now() + 5000,
-    observeHost: async () => activeHost(hostPhase),
-    observeTrace: async () => snapshot(),
+    observeHost: async () => assert.fail('coherent callback must replace split host read'),
+    observeTrace: async () => assert.fail('coherent callback must replace split trace read'),
+    observeSample: async label => {
+      const sample=await observeRuntimeOwner(page,retention,label,{includeMatch:false,includeResultsTrace:true});
+      return {host:sample.state,trace:sample.trace};
+    },
     press: async key => {
       presses.push(key);
       if (presses.length === 1) {

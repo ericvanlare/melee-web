@@ -6,6 +6,7 @@ import {createCssHumanJoinDriver} from './vs_css_two_human_driver.mjs';
 import {readRuntimeDiagnosticCounters} from './runtime_callback_recorder.mjs';
 import {confirmTwoHumanResults} from './vs_rules_results_confirmation_driver.mjs';
 import {returnFromCompetitivePrize} from './vs_rules_timeout_route_helpers.mjs';
+import {observeRuntimeOwner} from './runtime_owner_observation.mjs';
 
 export const SD_BROWSER_LIMITS = Object.freeze({vsSteps:4800,vsWallMs:120000,
   readySteps:600,readyWallMs:20000,departureSteps:2400,departureWallMs:45000,
@@ -109,8 +110,9 @@ export async function runSuddenDeathBrowserRoute(d) {
     assert.equal(report.errors.length,0,`${label}: browser errors observed`);
     return callbackSteps(await counters());
   };
-  const record=async label=>{
-    const state=await current(),match=await observeMatch(),count=await counters();
+  const observeOwner=label=>observeRuntimeOwner(page,report.suddenDeath,label);
+  const record=async(label,snapshot=null)=>{
+    const {state,match}=snapshot??await observeOwner(label),count=await counters();
     checkMatchObservation(match);
     report.suddenDeath.observations.push({label,state,match,counters:count});
     return {state,match};
@@ -120,9 +122,9 @@ export async function runSuddenDeathBrowserRoute(d) {
     while(Date.now()-start<=limitMs){
       const now=await checked(label);
       assert(now-steps<=limitSteps,`${label}: callback step cap exceeded`);
-      const state=await current(),match=await observeMatch();
+      const snapshot=await observeOwner(label),{state,match}=snapshot;
       checkMatchObservation(match);invariant(state,match);
-      if(predicate(state,match))return record(label);
+      if(predicate(state,match))return record(label,snapshot);
       await page.waitForTimeout(50);
     }
     throw Error(`${label}: wall-clock cap exceeded`);
@@ -175,7 +177,7 @@ export async function runSuddenDeathBrowserRoute(d) {
   const ready=(await poll('SD active source cursor',SD_BROWSER_LIMITS.readyWallMs,
     SD_BROWSER_LIMITS.readySteps,(state,match)=>state.phase===14&&match.ready&&match.frame>0)).match;
   checkDeclaredPair(ready,true,prior);assert.equal(ready.paused,false);assert(ready.frame>0);await shot('sd-active-before-input');
-  await runBoundedSdDeparture({driver,report,checked,current,observeMatch,record});
+  await runBoundedSdDeparture({driver,report,checked,observeOwner,record});
   await waitPhase(8,'SD typed original Results',30000);
   const terminal=await record('SD canonical terminal at Results');
   assert.deepEqual(terminal.match.terminal,{outcome:2,winners:[1]});
@@ -183,29 +185,19 @@ export async function runSuddenDeathBrowserRoute(d) {
   assert.equal(terminal.match.players[0].stocks,0);assert.equal(terminal.match.players[1].stocks,1);
   await shot('sd-original-results');
   const resultsDeadline=Date.now()+45000;
-  const observeResultsHost=async label=>{
-    await checked(label); // No recovery: any timing/incident/error stops polling.
-    return current(); // Shared guard checks active or exact witnessed preparation state.
-  };
-  const observeResultsTrace=async()=>{
-    const trace=await page.evaluate(()=>{
-      if(typeof Module?._melee_web_native_menu_results_pad_trace!=='function')return null;
-      const pointer=Module._melee_web_native_menu_results_pad_trace();
-      return pointer?JSON.parse(Module.UTF8ToString(pointer)):null;
-    });
-    // Retain the latest already-observed bounded trace, including failed validation.
-    // This adds no source ticks or native samples and does not reconstruct older runs.
-    report.suddenDeath.resultsPadTraceLatest=trace;
-    return trace;
+  const observeResultsSample=async label=>{
+    const snapshot=await observeRuntimeOwner(page,report.suddenDeath,label,
+      {includeMatch:false,includeResultsTrace:true});
+    report.suddenDeath.resultsPadTraceLatest=snapshot.trace;
+    await checked(label); // Cumulative health remains strict; no recovery.
+    return {host:snapshot.state,trace:snapshot.trace};
   };
   report.suddenDeath.resultsConfirmation=await confirmTwoHumanResults({
-    deadlineAt:resultsDeadline,observeHost:observeResultsHost,
-    observeTrace:observeResultsTrace,press,
+    deadlineAt:resultsDeadline,observeSample:observeResultsSample,press,
     wait:milliseconds=>page.waitForTimeout(milliseconds),
   });
   report.suddenDeath.prizeReturn=await returnFromCompetitivePrize({
-    deadlineAt:resultsDeadline,observeHost:observeResultsHost,
-    observeTrace:observeResultsTrace,press,
+    deadlineAt:resultsDeadline,observeSample:observeResultsSample,press,
     wait:milliseconds=>page.waitForTimeout(milliseconds),
   });
   const returned=await observeSource();
@@ -213,8 +205,8 @@ export async function runSuddenDeathBrowserRoute(d) {
   assert.equal(returned.source.rules.stock_time_limit,1);
   report.sourceObservations.push({label:'SD original CSS return',...returned});
   await shot('sd-returned-css');
-  await runSubsequentOrdinaryEntry({page,report,press,current,observeSource,
-    observeMatch,checked,waitForNoQueuedPad,shot,prior});
+  await runSubsequentOrdinaryEntry({page,report,press,observeOwner,observeSource,
+    checked,waitForNoQueuedPad,shot,prior});
   await driver.unload();await verifyTeardown('SD subsequent VS Eject');
   report.checks.push('Original one-minute four-stock two-human Mario/FD timeout -> active 300-damage SD -> P1 live departure -> source P2 winner -> typed original Results -> CSS -> SSS/FD -> fresh ordinary VS prefix -> checked Eject');
 }
@@ -233,8 +225,8 @@ export function checkFreshOrdinaryEntry(state,match,prior) {
   assert.match(state.diagnostics,/Completed matches: 1(?: ·|$)/);
 }
 
-export async function runSubsequentOrdinaryEntry({page,report,press,current,
-  observeSource,observeMatch,checked,waitForNoQueuedPad,shot,prior}) {
+export async function runSubsequentOrdinaryEntry({page,report,press,observeOwner,
+  observeSource,checked,waitForNoQueuedPad,shot,prior}) {
   const limits=SD_SUBSEQUENT_LIMITS;
   const observations=[];
   report.suddenDeath.subsequentEntry={limits,observations,
@@ -247,13 +239,13 @@ export async function runSubsequentOrdinaryEntry({page,report,press,current,
     assert(Date.now()<stageDeadline,`${label}: returned CSS/SSS wall cap`);
     return steps;
   };
-  const returned=await current();await stageCheck('Subsequent CSS Start');
+  const {state:returned}=await observeOwner('Subsequent CSS Start');await stageCheck('Subsequent CSS Start');
   assert(active(returned,1));assert.equal(returned.message,'Original character select');
   assert.match(returned.diagnostics,/Completed matches: 1(?: ·|$)/);
   await press('Enter');
   let state;
   while(Date.now()<stageDeadline){
-    await stageCheck('Subsequent source SSS entry');state=await current();
+    await stageCheck('Subsequent source SSS entry');({state}=await observeOwner('Subsequent source SSS entry'));
     if(active(state,3))break;
     await page.waitForTimeout(50);
   }
@@ -289,7 +281,8 @@ export async function runSubsequentOrdinaryEntry({page,report,press,current,
   while(Date.now()-readyStart<=limits.readyWallMs){
     const steps=await checked('Subsequent ordinary VS readiness');
     assert(steps-readySteps<=limits.readySteps,'Subsequent VS readiness callback cap');
-    state=await current();const match=await observeMatch();checkMatchObservation(match);
+    const snapshot=await observeOwner('Subsequent ordinary VS readiness'),match=snapshot.match;
+    state=snapshot.state;checkMatchObservation(match);
     if(active(state,7)&&match.ready&&match.frame>0){
       checkFreshOrdinaryEntry(state,match,prior);first={state,match,steps};break;
     }
@@ -300,7 +293,8 @@ export async function runSubsequentOrdinaryEntry({page,report,press,current,
   while(Date.now()-prefixAt<=limits.prefixWallMs){
     const steps=await checked('Subsequent ordinary neutral prefix');
     assert(steps-first.steps<=limits.prefixSteps,'Subsequent neutral prefix callback cap');
-    state=await current();const match=await observeMatch();checkFreshOrdinaryEntry(state,match,prior);
+    const snapshot=await observeOwner('Subsequent ordinary neutral prefix'),match=snapshot.match;
+    state=snapshot.state;checkFreshOrdinaryEntry(state,match,prior);
     assert(match.frame>=first.match.frame,'Subsequent source cursor regressed');
     final={state,match,steps};
     if(match.frame-first.match.frame>=limits.prefixFrames)break;
@@ -310,14 +304,14 @@ export async function runSubsequentOrdinaryEntry({page,report,press,current,
   observations.push(final);await shot('sd-subsequent-ordinary-vs');
 }
 
-export async function runBoundedSdDeparture({driver,report,checked,current,observeMatch,record}) {
+export async function runBoundedSdDeparture({driver,report,checked,observeOwner,record}) {
   const departureStart=Date.now(),departureSteps=await checked('SD departure begins');
   let ending=false;
   for(let pulse=0;pulse<SD_BROWSER_LIMITS.departurePulses;pulse++){
     const steps=await checked('SD before departure pulse');
     assert(steps-departureSteps<=SD_BROWSER_LIMITS.departureSteps,'SD departure step cap');
     assert(Date.now()-departureStart<=SD_BROWSER_LIMITS.departureWallMs,'SD departure wall cap');
-    const before=await current(),match=await observeMatch();
+    const {state:before,match}=await observeOwner('SD before departure pulse');
     checkMatchObservation(match);
     assert.equal(match.paused??false,false,'SD paused before departure');
     if(before.phase!==14||match.ending||match.complete){ending=true;break;}

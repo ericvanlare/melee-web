@@ -48,8 +48,8 @@ function subsequentFixture({badSelection=false,badDrain=false,noProgress=false,s
   const report={suddenDeath:{},sourceObservations:[]};
   return {calls,report,page:{evaluate:async()=>{calls.push('drive-FD');return 2;},
       waitForTimeout:async()=>{}},press:async key=>{calls.push(key);phase=key==='Enter'?3:7;},
-    current:async()=>({...freshState,phase,message:phase===1?'Original character select':'source menu'}),
-    observeSource:async()=>selection,observeMatch:async()=>freshPair(noProgress?1:(frame+=6)),
+    observeOwner:async()=>({state:{...freshState,phase,message:phase===1?'Original character select':'source menu'},
+      match:freshPair(noProgress?1:(frame+=6))}),observeSource:async()=>selection,
     checked:async()=>{steps+=stepJump&&phase===7?601:4;return steps;},
     waitForNoQueuedPad:async()=>{calls.push('drain');if(badDrain)throw Error('PAD release rejected');},
     shot:async label=>calls.push(label),prior:freshPair()};
@@ -88,8 +88,7 @@ function departure(states){
   return {report,get pulses(){return pulses;},args:{report,
     driver:{pressChord:async(keys,timing)=>{assert.deepEqual(keys,['d']);
       assert.equal(timing.holdMs,250);assert.equal(timing.releaseMs,25);pulses++;index++;}},
-    checked:async()=>index*10,current:async()=>states[Math.min(index,states.length-1)].state,
-    observeMatch:async()=>states[Math.min(index,states.length-1)].match,
+    checked:async()=>index*10,observeOwner:async()=>states[Math.min(index,states.length-1)],
     record:async()=>states[Math.min(index,states.length-1)]}};
 }
 test('actual departure stops at source ending/phase transition and never sends another pulse',async()=>{
