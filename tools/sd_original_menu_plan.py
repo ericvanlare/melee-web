@@ -34,11 +34,22 @@ def rules_ready_packet():
 def validate_packet(value):
     # Only this reduced route is supported. No guessed/default continuation.
     from authored_sd_reference_plan import canonical
+    if canonical(value) == canonical(gci_rules_ready_packet()):
+        return value
     if canonical(value) != canonical(rules_ready_packet()):
         raise ValueError("Unsupported or changed bounded Rules-ready menu packet")
     for action in value["boot"] + value["actions"]:
         pipe_commands(action["p1"])
         pipe_commands(action["p2"])
+    return value
+
+
+def gci_rules_ready_packet():
+    """Distinct profile campaign; card confirmation is deliberately undeclared."""
+    from sd_gci_profile import GCI_SHA256
+    value = rules_ready_packet()
+    value.update(version=3, scope="rules_ready_gci", profile_gci_sha256=GCI_SHA256,
+                 authored_recipe_sha256=recipe_sha256(recipe(4)))
     return value
 
 

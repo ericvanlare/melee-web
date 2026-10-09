@@ -262,9 +262,10 @@ class RulesMenuReceiver(Receiver):
     SceneKind omission does not attest a null pointer: the native producer also
     omits it on a failed pointer read. No steering or readiness precedes an owner.
     """
-    def __init__(self, plan):
+    def __init__(self, plan, *, profile_campaign=False):
         super().__init__(plan)
-        require(plan["authored_recipe"]["version"] == 3, "Rules probe requires corrected recipe v3")
+        require(plan["authored_recipe"]["version"] == (4 if profile_campaign else 3),
+                "Rules probe recipe/profile campaign differs")
         self.menu_consumed = 0
         self.menu_polls = 0
         self.last_pad = None
@@ -283,6 +284,8 @@ class RulesMenuReceiver(Receiver):
         event, payload = row["event"], row["payload"]
         if event == "handshake":
             require(payload.get("menu_probe") == "rules_ready", "Rules probe scope differs")
+            require(payload.get("profile_gci_sha256", "") == getattr(self, "profile_sha256", ""),
+                    "Rules probe loaded-profile identity differs")
             forwarded = dict(row, payload=dict(payload, menu_probe=""))
             return super().accept(forwarded)
         if event == "start":
@@ -361,3 +364,50 @@ class RulesMenuReceiver(Receiver):
                 "bootstrap_routes": self.bootstrap_routes,
                 "native_input": native, "cold_port_preferences": [1, 1, 1, 1],
                 "full_sd_prefix_admission": False, "whole_session_admission": False}
+
+
+class GciRulesMenuReceiver(RulesMenuReceiver):
+    """New profile campaign, with observed loaded fields at the reduced ready gate."""
+    def __init__(self, plan, profile):
+        import hashlib
+        from sd_gci_profile import GCI_SHA256
+        require(profile["sha256"] == GCI_SHA256 and
+                hashlib.sha256(profile["raw"]).hexdigest() == GCI_SHA256,
+                "Rules profile input identity differs")
+        self.profile_sha256 = GCI_SHA256
+        self.profile = profile
+        self.loaded_context = None
+        super().__init__(plan, profile_campaign=True)
+
+    def accept(self, row):
+        if row["event"] == "progress" and row["payload"].get("name") == "rules_ready":
+            import hashlib
+            from sd_gci_profile import SAVE_BYTES, BANK_BYTES
+            data = slices(row["payload"])
+            save, rules = data.get((39, 0), b""), data.get((38, 0), b"")
+            require(len(save) == 0x55e8 and len(rules) == 0x18 and
+                    data.get((36, 0)) == bytes.fromhex("07ff") and
+                    data.get((37, 0)) == bytes.fromhex("07ff"), "Loaded profile extents/unlocks differ")
+            addresses = {(s["tag"], s["flags"]): s["address"] for s in row["payload"]["slices"]}
+            root = addresses[(39, 0)] - 0x1868
+            require(all(addresses[key] == root + offset for key, offset in
+                        (((36, 0), 0x1868), ((37, 0), 0x186a), ((38, 0), 0x1850), ((54, 0), 0x1cc0))),
+                    "Loaded profile source roots differ")
+            require(save[:5] == self.profile["save"][:5] and
+                    save[0x448:0x468] == self.profile["save"][0x448:0x468] and
+                    save[SAVE_BYTES:] == b"".join(self.profile["banks"][:2]),
+                    "Loaded profile declared preferences/name extents differ")
+            self.loaded_context = {"seq": row["seq"], "save_address": addresses[(39, 0)],
+                "save_hex": save.hex(), "game_rules_hex": rules.hex(),
+                "verified_ranges": ["SaveData0..4", "SaveData0x448..0x467", "two complete source name banks"],
+                "name_bank_sha256": [hashlib.sha256(save[SAVE_BYTES + i * BANK_BYTES:
+                        SAVE_BYTES + (i + 1) * BANK_BYTES]).hexdigest() for i in range(2)],
+                "other_source_progress_bytes": "retained observations; no equality or gameplay claim"}
+        return super().accept(row)
+
+    def finish(self, observer_status, input_path, input_status):
+        require(self.loaded_context is not None, "Loaded profile was not observed")
+        report = super().finish(observer_status, input_path, input_status)
+        report.update(scope="rules_ready_gci", profile_gci_sha256=self.profile_sha256,
+                      loaded_context=self.loaded_context)
+        return report
