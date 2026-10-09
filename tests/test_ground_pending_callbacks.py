@@ -8,10 +8,12 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+import sys
 
 from test_stadium_on_init_boundary import function_body
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
 
 
 class GroundPendingCallbackTests(unittest.TestCase):
@@ -164,10 +166,30 @@ int main(void)
         if not target.is_file():
             self.skipTest("Build the reviewed diagnostic native menu trace first")
         from check_gameplay import node_runtime
-        run = subprocess.run([str(node_runtime()), str(target), "--ground-pending-callback-controls"],
-                             cwd=ROOT, capture_output=True, text=True, timeout=30)
-        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
-        self.assertIn("scope=actual-SDK-enqueue-and-StageLast-assignment-fragment", run.stdout)
-        self.assertIn("expected_root_loss_reproduced=1", run.stdout)
-        self.assertIn("full_StageLast_executed=0 Stadium_OnStart_executed=0 raw_shutdown=0", run.stdout)
-        print(run.stdout, end="", flush=True)
+        scratch = Path(tempfile.mkdtemp(prefix="ground-pending-sdk-", dir=ROOT / "work"))
+        passed = False
+        try:
+            command = [str(node_runtime()), str(target), "--ground-pending-callback-controls"]
+            (scratch / "command.txt").write_text(" ".join(command) + "\n")
+            try:
+                run = subprocess.run(command, cwd=ROOT, capture_output=True,
+                                     text=True, timeout=30)
+            except subprocess.TimeoutExpired as failure:
+                for stream in ("stdout", "stderr"):
+                    value = getattr(failure, stream)
+                    (scratch / stream).write_bytes(
+                        value.encode() if isinstance(value, str) else (value or b""))
+                raise
+            (scratch / "stdout").write_text(run.stdout)
+            (scratch / "stderr").write_text(run.stderr)
+            self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+            self.assertIn("scope=actual-SDK-enqueue-and-StageLast-assignment-fragment", run.stdout)
+            self.assertIn("expected_root_loss_reproduced=1", run.stdout)
+            self.assertIn("full_StageLast_executed=0 Stadium_OnStart_executed=0 raw_shutdown=0", run.stdout)
+            print(run.stdout, end="", flush=True)
+            passed = True
+        finally:
+            if passed:
+                shutil.rmtree(scratch)
+            else:
+                print(f"Retained SDK queue reducer: {scratch}", flush=True)
