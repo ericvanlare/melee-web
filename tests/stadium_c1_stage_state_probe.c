@@ -5,6 +5,7 @@
 #include "gameplay_source_memory_runtime.h"
 #include "hsd_native_joint.h"
 #include "gameplay_stadium_start.h"
+#include "gameplay_stadium_display_owner.h"
 #include <melee/gr/grzakogenerator.h>
 
 #include <melee/gr/grdatfiles.h>
@@ -740,6 +741,10 @@ int melee_web_stadium_c1_generator_lifetime_control(void)
  * proposed in the downstream diagnostic patch and keeps its predicate intact. */
 extern int melee_web_stadium_c1_exact_map_set_control(
     HSD_GObj*, HSD_GObj*, HSD_GObj*, HSD_GObj*);
+extern int melee_web_stadium_c1_started_map_set_control(
+    HSD_GObj*,HSD_GObj*,HSD_GObj*,HSD_GObj*,const MeleeWebStadiumManagerView*);
+extern int melee_web_stadium_c1_manager_journal_control(
+ HSD_GObj*,HSD_GObj*,HSD_GObj*,HSD_GObj*,MeleeWebStadiumManagerView*);
 extern HSD_GObj* melee_web_stadium_c1_manager_create_control(void);
 extern HSD_GObjEvent melee_web_stadium_c1_manager_callback_control(void);
 
@@ -799,7 +804,9 @@ int melee_web_stadium_c1_manager_mapset_control(void)
     queue_control_require(four,"unchanged exactfour predicate accepts four maps");
     /* Exact original Ground801C0FB8 final constructor arguments/order.
      * No OnStart service or callback is simulated, and no proc is dispatched. */
-    HSD_GObj* manager=melee_web_stadium_c1_manager_create_control();
+    MeleeWebStadiumManagerView logical={0};
+    queue_control_require(melee_web_stadium_c1_manager_journal_control(maps[0],maps[1],maps[2],maps[3],&logical),"actual original manager event/capture with synthetic display phase");
+    HSD_GObj* manager=logical.object;
     queue_control_require(manager!=NULL,"original manager allocation");
     mapset_numeric_owner("original-manager",manager);
     queue_control_require(manager->proc && manager->proc->gobj==manager &&
@@ -808,11 +815,31 @@ int melee_web_stadium_c1_manager_mapset_control(void)
     int with_manager=melee_web_stadium_c1_exact_map_set_control(maps[0],maps[1],maps[2],maps[3]);
     printf("STADIUM_MAPSET_PREDICATE phase=with-original-manager actual=%d expected=0 manager=%p\n",with_manager,(void*)manager);fflush(stdout);
     queue_control_require(!with_manager,"unchanged map-only guard refuses source manager");
+    queue_control_require(melee_web_stadium_c1_started_map_set_control(maps[0],maps[1],maps[2],maps[3],&logical),"started phase exact manager accepted");
+    HSD_GObj* unrelated=GObj_Create(HSD_GOBJ_CLASS_FIGHTER,5,0);
+    queue_control_require(unrelated!=NULL && melee_web_stadium_c1_started_map_set_control(maps[0],maps[1],maps[2],maps[3],&logical),"unrelated non-stage construction remains allowed");
+    HSD_GObjPLink_80390228(unrelated);
+    HSD_GObj manager_before=*manager;
+    HSD_GObjProc proc_before=*manager->proc;
+    HSD_GObjEvent callback=manager->proc->on_invoke;
+    manager->proc->on_invoke=queue_control_callback;
+    queue_control_require(!melee_web_stadium_c1_started_map_set_control(maps[0],maps[1],maps[2],maps[3],&logical) && manager->proc->on_invoke==queue_control_callback,"foreign callback refused without mutation");
+    manager->proc->on_invoke=callback;
+    manager->proc->child=manager->proc;
+    queue_control_require(!melee_web_stadium_c1_started_map_set_control(maps[0],maps[1],maps[2],maps[3],&logical) && manager->proc->child==manager->proc,"proc alias/cycle refused without mutation");
+    manager->proc->child=NULL;
+    MeleeWebStadiumManagerView alias=logical;alias.object=maps[0];
+    queue_control_require(!melee_web_stadium_c1_started_map_set_control(maps[0],maps[1],maps[2],maps[3],&alias),"manager cannot alias independent map");
+    manager->next=manager;
+    queue_control_require(!melee_web_stadium_c1_started_map_set_control(maps[0],maps[1],maps[2],maps[3],&logical) && manager->next==manager,"registry cycle refuses without mutation");
+    manager->next=manager_before.next;
+    queue_control_require(memcmp(manager,&manager_before,sizeof(*manager))==0 && memcmp(manager->proc,&proc_before,sizeof(proc_before))==0,"restored manager/proc witnesses unchanged");
     HSD_GObjPLink_80390228(manager);
     queue_control_require(melee_web_stadium_c1_exact_map_set_control(maps[0],maps[1],maps[2],maps[3]),"exactfour restored after owned manager release");
     HSD_GObj* foreign=GObj_Create(HSD_GOBJ_CLASS_STAGE,5,0);
     queue_control_require(foreign!=NULL,"foreign fifth witness allocation");
     mapset_numeric_owner("unknown-fifth",foreign);
+    queue_control_require(!melee_web_stadium_c1_started_map_set_control(maps[0],maps[1],maps[2],maps[3],&logical),"cached foreign GObj with no proc refuses old manager view");
     HSD_GObj snapshots[ARRAY_SIZE(ids)];
     for(size_t i=0;i<ARRAY_SIZE(ids);++i)snapshots[i]=*maps[i];
     HSD_GObj foreign_before=*foreign;
@@ -824,7 +851,7 @@ int melee_web_stadium_c1_manager_mapset_control(void)
     for(size_t i=0;i<ARRAY_SIZE(ids);++i)HSD_GObjPLink_80390228(maps[i]);
     stage_info=saved;
     queue_control_require(melee_web_gameplay_shutdown(error,sizeof(error)),error);
-    puts("STADIUM_MAPSET_CONTROL exactfour=1 original_manager_refused=1 unknown_fifth_refused=1 pure=1 ticks=0 full_StageLast=0 raw_borrowed_shutdown=0");
+    puts("STADIUM_MAPSET_CONTROL exactfour=1 original_manager_refused=1 unknown_fifth_refused=1 pure=1 started_manager=1 unrelated_nonstage=1 wrong_callback=1 aliases_cycles=1 cached_no_proc_refused=1 ticks=0 full_StageLast=0 raw_borrowed_shutdown=0");
     return 1;
 }
 

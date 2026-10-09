@@ -17,6 +17,7 @@
 #include "gameplay_stadium_start.h"
 #include "gameplay_source_memory_runtime.h"
 #include <melee/gr/grpstadium.h>
+#include <sysdolphin/baselib/gobjproc.h>
 #endif
 #include <stdlib.h>
 #include <stdio.h>
@@ -48,6 +49,9 @@ struct MeleeWebStageLast {
     MeleeWebMatchContext* stadium_camera_owner;
     CmSubject* stadium_subject;
     int stadium_started;
+    MeleeWebStadiumManagerView stadium_manager;
+    MeleeWebSourceMemoryAllocation stadium_manager_lease;
+    MeleeWebSourceMemoryAllocation stadium_manager_proc_lease;
     MeleeWebStadiumMap2BufferOwner stadium_map2_buffer_owner;
 #endif
 };
@@ -209,6 +213,41 @@ static int stadium_maps_live(MeleeWebStageLast* h,char* e,size_t n)
  }
  return 1;
 }
+/* SDK leases describe backing storage; source-journal/proc/root checks
+ * independently identify the original manager's logical lifetime. */
+static int stadium_manager_storage_preflight(MeleeWebStageLast* h,char* e,size_t n){
+ MeleeWebSourceMemoryAllocation object={0},proc={0};
+ MeleeWebSourceMemoryContext context;
+ if(melee_web_source_memory_context_read(&context)!=MELEE_WEB_SOURCE_MEMORY_READ_OK)
+  return fail(e,n,"Stadium manager source context is unavailable");
+ MeleeWebSourceMemoryReadStatus os=melee_web_source_memory_allocation_read(h->stadium_manager.object,&object);
+ MeleeWebSourceMemoryReadStatus ps=melee_web_source_memory_allocation_read(h->stadium_manager.proc,&proc);
+ fprintf(stderr,"STADIUM_MANAGER_LEASE object=%p proc=%p object_status=%d proc_status=%d "
+  "object_live=%u proc_live=%u world=%llu/%llu heap=%d/%d requested=%u/%u generation=%llu/%llu "
+  "expected_world=%llu expected_heap=%d expected_requested=%u/%u expected_generation=%llu/%llu\n",
+  (void*)h->stadium_manager.object,(void*)h->stadium_manager.proc,os,ps,object.live,proc.live,
+  (unsigned long long)object.world_generation,(unsigned long long)proc.world_generation,
+  object.source_heap_handle,proc.source_heap_handle,object.requested_bytes,proc.requested_bytes,
+  (unsigned long long)object.allocation_generation,(unsigned long long)proc.allocation_generation,
+  (unsigned long long)h->stadium_manager_lease.world_generation,h->stadium_manager_lease.source_heap_handle,
+  h->stadium_manager_lease.requested_bytes,h->stadium_manager_proc_lease.requested_bytes,
+  (unsigned long long)h->stadium_manager_lease.allocation_generation,
+  (unsigned long long)h->stadium_manager_proc_lease.allocation_generation);
+ if(os!=MELEE_WEB_SOURCE_MEMORY_READ_OK||ps!=MELEE_WEB_SOURCE_MEMORY_READ_OK||!object.live||!proc.live||
+    object.requested_bytes!=sizeof(HSD_GObj)||proc.requested_bytes!=sizeof(HSD_GObjProc)||
+    object.world_generation!=context.world_generation||proc.world_generation!=context.world_generation||
+    object.source_heap_handle!=context.source_heap_handle||proc.source_heap_handle!=context.source_heap_handle||
+    object.world_generation!=h->stadium_manager_lease.world_generation||
+    proc.world_generation!=h->stadium_manager_proc_lease.world_generation||
+    object.source_heap_handle!=h->stadium_manager_lease.source_heap_handle||
+    proc.source_heap_handle!=h->stadium_manager_proc_lease.source_heap_handle||
+    object.requested_bytes!=h->stadium_manager_lease.requested_bytes||
+    proc.requested_bytes!=h->stadium_manager_proc_lease.requested_bytes||
+    object.allocation_generation!=h->stadium_manager_lease.allocation_generation||
+    proc.allocation_generation!=h->stadium_manager_proc_lease.allocation_generation)
+  return fail(e,n,"Original Stadium manager storage lease changed");
+ return melee_web_stadium_manager_view_preflight(&h->stadium_manager,e,n);
+}
 int melee_web_stage_last_stadium_start(MeleeWebStageLast* h,
         MeleeWebMatchContext* camera_owner,char* e,size_t n)
 {
@@ -268,6 +307,10 @@ int melee_web_stage_last_stadium_start(MeleeWebStageLast* h,
      (after.live&&after.allocation_generation<=context.allocation_generation_watermark))
    return fail(e,n,"Original Stadium OnStart did not retire its exact pending header lease");
  }
+ if(!melee_web_stadium_display_owner_capture_manager(h->stadium_display_owner,&h->stadium_manager,e,n))return 0;
+ if(melee_web_source_memory_allocation_read(h->stadium_manager.object,&h->stadium_manager_lease)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    melee_web_source_memory_allocation_read(h->stadium_manager.proc,&h->stadium_manager_proc_lease)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    !stadium_manager_storage_preflight(h,e,n))return 0;
  h->stadium_started=2;return ok(e,n);
 }
 int melee_web_stage_last_stadium_map2_buffer_snapshot(const MeleeWebStageLast* h,MeleeWebStadiumMap2BufferOwner* out){
@@ -300,6 +343,8 @@ int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
   if(!stadium_maps_live(h,e,n))return 0;
   if(((Ground*)h->stadium_map2_buffer_owner.display_ground->user_data)->u.display.xF4!=h->stadium_subject)
    return fail(e,n,"Stadium display camera borrower changed before retirement");
+  if(!stadium_manager_storage_preflight(h,e,n)||
+     !melee_web_stadium_display_owner_preflight(h->stadium_display_owner,e,n))return 0;
   if(!melee_web_stadium_generator_preflight(h->stadium_generator,e,n)||
      !melee_web_match_camera_subject_preflight(h->stadium_camera_owner,h->stadium_subject,e,n))return 0;
   if(!melee_web_stadium_generator_end(h->stadium_generator,e,n))return 0;
@@ -316,6 +361,12 @@ int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
  /* Ready completion owns creation of this source scheduler. Early unload
   * before Ready is allowed to have none; multiple schedulers are an error. */
  h->manager=NULL;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(h->stadium_manager.object){
+  if(!stadium_manager_storage_preflight(h,e,n))return 0;
+  h->manager=h->stadium_manager.object;
+ }else
+#endif
  for(HSD_GObj* obj=((HSD_GObj**)HSD_GObj_Entities)[5];obj;obj=obj->next){
   if(obj->classifier==HSD_GOBJ_CLASS_STAGE&&!obj->user_data){
    if(h->manager)return fail(e,n,"Original stage started more than once");
@@ -323,6 +374,15 @@ int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
   }
  }
  if(h->manager){HSD_GObjPLink_80390228(h->manager);h->manager=NULL;}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(h->stadium_manager.object){
+  for(HSD_GObj* object=((HSD_GObj**)HSD_GObj_Entities)[5];object;object=object->next)
+   if(object==h->stadium_manager.object)return fail(e,n,"Original Stadium manager remained in its object root");
+  for(HSD_GObjProc* proc=HSD_GObj_804D7840[10];proc;proc=proc->next)
+   if(proc==h->stadium_manager.proc)return fail(e,n,"Original Stadium manager remained in its process root");
+ }
+ memset(&h->stadium_manager,0,sizeof(h->stadium_manager));
+#endif
  /* x18 is a shared camera reference on some stages: Fountain's two
   * platforms and reflection surface all reference the same camera. End its
   * lifetime once after all consumers; never let per-map removal free it

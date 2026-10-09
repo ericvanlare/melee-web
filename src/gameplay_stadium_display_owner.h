@@ -22,6 +22,14 @@ typedef struct MeleeWebStadiumImageProvenance {
 
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 typedef struct HSD_GObj HSD_GObj;
+typedef struct HSD_GObjProc HSD_GObjProc;
+/* Borrowed identities from exactly one original Ground manager construction.
+ * Source heap leases remain with StageLast, separate from logical identity. */
+typedef struct MeleeWebStadiumManagerView {
+    HSD_GObj* object;
+    HSD_GObjProc* proc;
+    void (*callback)(HSD_GObj*);
+} MeleeWebStadiumManagerView;
 typedef struct MeleeWebStadiumDisplayOwner MeleeWebStadiumDisplayOwner;
 typedef void (*MeleeWebStadiumBufferFree)(void* image_ptr, void* context);
 
@@ -85,6 +93,13 @@ int melee_web_stadium_display_owner_capture(
     MeleeWebStadiumDisplayOwner*, HSD_GObj* display_ground,
     MeleeWebStadiumMap2BufferOwner* map2_buffer_owner,
     char* error, size_t error_size);
+void melee_web_stadium_display_owner_note_manager(HSD_GObj*, HSD_GObjProc*);
+int melee_web_stadium_display_owner_capture_manager(
+    MeleeWebStadiumDisplayOwner*, MeleeWebStadiumManagerView*, char*, size_t);
+int melee_web_stadium_manager_view_preflight(
+    const MeleeWebStadiumManagerView*, char*, size_t);
+int melee_web_stadium_display_owner_preflight(
+    MeleeWebStadiumDisplayOwner*, char*, size_t);
 int melee_web_stadium_display_owner_cancel(
     MeleeWebStadiumDisplayOwner*, char* error, size_t error_size);
 int melee_web_stadium_display_owner_retire(
