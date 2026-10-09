@@ -11,6 +11,7 @@ import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 import {createCssHumanJoinDriver} from './vs_css_two_human_driver.mjs';
+import {confirmTwoHumanResults} from './vs_rules_results_confirmation_driver.mjs';
 import {
   installRuntimeDiagnosticsCapture,
   readRuntimeDiagnosticCounters,
@@ -388,6 +389,11 @@ const waitCssTeams = async (isTeams, teams, label) => {
 const observeCssSetup = () => page.evaluate(() => window.menuObserveCssSetup?.() ?? null);
 const observeMatch = () => page.evaluate(() => JSON.parse(
   Module.UTF8ToString(Module._melee_web_native_menu_match_observe())));
+const observeResultsPadTrace = () => page.evaluate(() => {
+  if (typeof Module?._melee_web_native_menu_results_pad_trace !== 'function') return null;
+  const pointer = Module._melee_web_native_menu_results_pad_trace();
+  return pointer ? JSON.parse(Module.UTF8ToString(pointer)) : null;
+});
 const checkRuntimeDiagnosticCounters = async (label, retainCheckpoint = true) => {
   const counters = await readRuntimeDiagnosticCounters(page);
   lastRuntimeCounterPollAt = Date.now();
@@ -1225,26 +1231,24 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
   retainTimeoutSnapshot('original source timeout and unique P2 ranking', terminal);
   report.checks.push(`Original MatchEnd produced OUTCOME_TIMEOUT with its exact unique P2 source winner list after ${terminal.frame} source frames`);
   await checkRuntimeDiagnosticCounters('original timeout Results entry');
-  const resultsPresentationDeadline = Date.now() + 4500;
+  const resultsDeadline = resultsEnteredAt + COMPETITIVE_TIMEOUT_BOUNDS.resultsReturnWallMs;
+  const resultsPresentationDeadline = Math.min(Date.now() + 4500, resultsDeadline);
   while (Date.now() < resultsPresentationDeadline) {
     await ensureNoError('original Results presentation');
     await resumeTimingPause('original Results presentation remains active');
     await page.waitForTimeout(Math.min(250, resultsPresentationDeadline - Date.now()));
   }
   await shot('13-original-timeout-results');
-
-  for (let confirmation = 0; confirmation < 8; confirmation++) {
-    const state = await current();
-    if (state.phase !== 8) break;
-    await press('Enter', {releaseMs: 1380});
-  }
-  let postResultsState = await current();
-  if (postResultsState.phase === 9) {
-    for (let confirmation = 0; confirmation < 60 && (await current()).phase === 9; confirmation++)
-      await press('Enter', {releaseMs: 380});
-  }
-  postResultsState = await waitPhase(1, 'original CSS after timeout Results',
-    Math.max(0, COMPETITIVE_TIMEOUT_BOUNDS.resultsReturnWallMs - (Date.now() - resultsEnteredAt)));
+  route.results_confirmation = await confirmTwoHumanResults({
+    deadlineAt: resultsDeadline,
+    observeHost: label => ensureNoError(label),
+    observeTrace: observeResultsPadTrace,
+    press,
+    wait: milliseconds => page.waitForTimeout(milliseconds),
+  });
+  report.checks.push('Original Results phase/readiness trace gated one P1 presentation Start and separate P1/P2 statistics Starts; source-consumed PAD and each participant confirmation were retained before the first Results exit');
+  const postResultsState = await waitPhase(1, 'original CSS after timeout Results',
+    Math.max(0, resultsDeadline - Date.now()));
   if (Date.now() - resultsEnteredAt > COMPETITIVE_TIMEOUT_BOUNDS.resultsReturnWallMs)
     throw Error(`Original Results did not return to CSS within the ${COMPETITIVE_TIMEOUT_BOUNDS.resultsReturnWallMs}ms route bound`);
   const cssAfterResults = await observeSource();
