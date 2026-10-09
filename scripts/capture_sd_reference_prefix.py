@@ -27,6 +27,29 @@ from reference_observer_stream import read_status
 from reference_input_stream import validate_status
 
 
+def cleanup_process(process, output):
+    """Stop and reap only this runner's direct Popen; always retain the outcome."""
+    receipt = {"scope": "rules_ready", "pid": process.pid, "ownership": "direct-Popen",
+               "terminate_sent": False, "kill_sent": False, "returncode": None, "error": None}
+    try:
+        if process.poll() is None:
+            process.terminate()
+            receipt["terminate_sent"] = True
+        try:
+            receipt["returncode"] = process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            receipt["kill_sent"] = True
+            receipt["returncode"] = process.wait(timeout=5)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        receipt["error"] = str(error)
+    finally:
+        (Path(output) / "cleanup.json").write_bytes(canonical(receipt))
+    require(receipt["error"] is None and receipt["returncode"] is not None,
+            "Rules probe direct process cleanup failed")
+    return receipt
+
+
 def wait_terminal_statuses(observer, native, deadline):
     """Two independently published writers; neither status stands in for the other."""
     while time.monotonic() < deadline:
@@ -175,15 +198,16 @@ def run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manife
                 (output / "report.json").write_bytes(canonical(report))
                 return report
         except Exception as error:
-            (output / "failure.json").write_bytes(canonical({"scope": "sd_initialization_prefix", "error": str(error)}))
+            (output / "failure.json").write_bytes(canonical({"scope": "rules_ready", "error": str(error)}))
             raise
         finally:
-            process.terminate()
             try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=5)
+                cleanup_process(process, output)
+            except SdDiagnosticError as error:
+                failure = output / "failure.json"
+                if not failure.exists():
+                    failure.write_bytes(canonical({"scope": "rules_ready", "error": str(error)}))
+                raise
 
 
 def main(argv=None):
