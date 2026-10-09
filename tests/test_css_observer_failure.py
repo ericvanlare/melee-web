@@ -11,6 +11,10 @@ from owned_test_workspace import OwnedWorkspaceTests
 
 
 class CssObserverFailureTests(OwnedWorkspaceTests):
+    @classmethod
+    def setUpClass(cls):
+        cls.scratch = cls.new_workspace(ROOT, "css-observer-failure-")
+
     def test_actual_observer_guard_order_and_private_one_shot(self):
         patch = (ROOT / "patches/melee-gameplay.patch").read_text()
         start = patch.index("+/* Internal one-shot test binding")
@@ -93,7 +97,7 @@ int main(void){
  puts("Actual observer seven guards, source order, one-shot/reentry, silent normal path and immutable source passed");return 0;
 }
 '''
-        scratch = self.new_workspace(ROOT, "css-observer-failure-")
+        scratch = self.scratch
         source = scratch / "observer.c"
         source.write_text(flags + "\n" + declarations + "\n" + actual + "\n" + controls)
         output = scratch / "observer"
