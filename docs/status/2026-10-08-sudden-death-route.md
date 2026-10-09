@@ -175,5 +175,5 @@ separate; this import does not establish original SD comparison.
 The latest original campaign at source `a051c52a` with retained native producer
 `23b9ff37`/binary `b6ea` completed Items and CSS autojoin, then failed the first
 SSS cooldown guard. This is a bounded menu-prefix outcome; original gameplay,
-SD and comparison remain unrun. The exact campaign receipt is awaiting
-consolidation; no strict original-comparison claim is made.
+SD and comparison remain unrun. The receipt retains the exact campaign
+failure and cleanup, with incomplete MWRI rather than a complete input trace.

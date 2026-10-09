@@ -400,12 +400,40 @@
     },
     "latest_campaign": {
       "source_head": "a051c52ada9889e5931b11835ef89b36a70ab851",
-      "native_producer": "23b9ff37",
-      "binary_identity_prefix": "b6ea",
+      "native_producer": "23b9ff374e889541452559d89b710fec682a71fc",
       "bounded_result": "Items and CSS autojoin reached; first SSS cooldown guard failed",
-      "receipt": "awaiting exact campaign receipt consolidation",
-      "authority": "coordinator observed-result handoff; no invented campaign hash",
-      "scope": "Original menu prefix only; original gameplay/SD/comparison unrun"
+      "scope": "Original menu prefix only; original gameplay/SD/comparison unrun",
+      "receipt_sha256": "91125a42ed7b134c1c978d1d13b7dc4e88a7e0a8068a4ba1d966bc0d80ccceea",
+      "observations": {
+        "human_join_source_polls": [
+          952,
+          1106
+        ],
+        "final_css_poll": 1208,
+        "characters": [
+          8,
+          8
+        ],
+        "kind": [
+          0,
+          0
+        ],
+        "colors": [
+          1,
+          0
+        ],
+        "raw_slots": [
+          0,
+          0
+        ],
+        "FD_before_confirm_cooldown": 0,
+        "P1_A_poll": 1537,
+        "post_selection_cooldown": 30,
+        "failure_poll": 1538,
+        "MWRI": "incomplete; 4406 events (not byte length)"
+      },
+      "cleanup": "Exact native/supervisor/guarded PIDs37748/37751/37755 absent",
+      "binary_sha256": "b6ea2fe3d8731c28b77fd0b561651bfebee73ec86536322172d1654aa7bdfb17"
     }
   },
   "validation": {
