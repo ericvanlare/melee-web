@@ -10,7 +10,7 @@ import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
-import {runSuddenDeathBrowserRoute} from './vs_sudden_death_browser_route.mjs';
+import {runSuddenDeathBrowserRoute,validateFinalSdCapture} from './vs_sudden_death_browser_route.mjs';
 import {installRuntimeDiagnosticsCapture,readRuntimeDiagnosticsCapture} from './runtime_callback_recorder.mjs';
 
 const options = Object.fromEntries(['url', 'disc', 'out', 'playwright', 'runtime-wasm-sha256']
@@ -1200,8 +1200,15 @@ route: {
     }
   }
   if(suddenDeathRoute){
-    try{report.callbackCapture=await readRuntimeDiagnosticsCapture(page);}
-    catch(error){report.callbackCapture={status:'unavailable',error:redactDiscPath(error.message)};}
+    try{
+      report.callbackCapture=await readRuntimeDiagnosticsCapture(page);
+      validateFinalSdCapture(report.callbackCapture);
+    }catch(error){
+      report.callback_capture_error=redactDiscPath(error.message);
+      if(!report.callbackCapture)report.callbackCapture={status:'unavailable',error:report.callback_capture_error};
+      if(!failure)failure=error;
+      report.result='fail';
+    }
   }
   try{report.diagnostics=await driver.diagnostics();}
   catch(error){report.diagnostics_error=redactDiscPath(error.message);}

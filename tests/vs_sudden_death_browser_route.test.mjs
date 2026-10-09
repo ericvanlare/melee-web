@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {spawnSync} from 'node:child_process';
-import {callbackSteps,checkDeclaredPair,checkNeutralTimeout,checkMatchObservation,runBoundedSdDeparture,SD_BROWSER_LIMITS} from './vs_sudden_death_browser_route.mjs';
+import {callbackSteps,validateFinalSdCapture,checkDeclaredPair,checkNeutralTimeout,checkMatchObservation,runBoundedSdDeparture,SD_BROWSER_LIMITS} from './vs_sudden_death_browser_route.mjs';
 const counter={status:'installed',invalid_phase_steps:0,invalid_preparation_count:0,
   unknown_reason_count:0,reason_counts:Array(10).fill(0),phase_source_steps:Array(16).fill(0)};
 function pair(sd=false){return {leg:sd?'sudden_death':'vs',observed_player_source_slots:[0,1],
@@ -102,7 +102,7 @@ test('actual harness finally preserves primary failure and closes after capture/
     const calls=[];const scope={failure:primary,nativeSessionActive:false,suddenDeathRoute:true,
       report:{result:primary?'fail':'pass'},page:{},redactDiscPath:String,reportWriteError:null,
       driver:{diagnostics:async()=>{throw Error('diagnostic failure');}},
-      readRuntimeDiagnosticsCapture:async()=>{throw Error('capture unavailable');},
+      readRuntimeDiagnosticsCapture:async()=>{throw Error('capture unavailable');},validateFinalSdCapture,
       persistReport:async()=>{calls.push('report');},
       closeOwnedResources:async()=>{calls.push('close');scope.report.cleanup={browser:{status:'failed'}};},
       process:{off(){}},onSigint(){},onSigterm(){}};
@@ -111,6 +111,37 @@ test('actual harness finally preserves primary failure and closes after capture/
     assert.equal(scope.report.result,'fail');assert.equal(scope.report.diagnostics_error,'diagnostic failure');
     assert.equal(scope.report.callbackCapture.status,'unavailable');
     assert.deepEqual(calls,['report','close','report']);
-    if(primary)assert.equal(returned,primary);else assert.match(returned.message,/cleanup failed/);
+    if(primary)assert.equal(returned,primary);else assert.match(returned.message,/capture unavailable/);
+  }
+});
+
+test('final cumulative capture requires all route phases and rejects missing or late incidents',()=>{
+  const good=structuredClone(counter);for(const phase of [7,14,8])good.phase_source_steps[phase]=1;
+  assert.equal(validateFinalSdCapture(good),3);
+  assert.throws(()=>validateFinalSdCapture({status:'unavailable'}));
+  for(const phase of [7,14,8]){
+    const absent=structuredClone(good);absent.phase_source_steps[phase]=0;
+    assert.throws(()=>validateFinalSdCapture(absent),/no observed phase/);
+  }
+  const late=structuredClone(good);late.reason_counts[8]=1;
+  assert.throws(()=>validateFinalSdCapture(late),/Runtime incident/);
+});
+test('actual finally retains late failing capture and still closes without replacing primary',async()=>{
+  const source=fs.readFileSync(new URL('./vs_rules_item_menu_browser_test.mjs',import.meta.url),'utf8');
+  const start=source.lastIndexOf('} finally {')+'} finally {'.length;
+  const body=source.slice(start,source.indexOf('\n}\nconsole.log',start));
+  for(const primary of [null,Error('primary source failure')]){
+    const capture=structuredClone(counter);for(const phase of [7,14,8])capture.phase_source_steps[phase]=1;
+    capture.reason_counts[3]=1;let closed=0;
+    const scope={failure:primary,nativeSessionActive:false,suddenDeathRoute:true,
+      report:{result:'pass'},page:{},redactDiscPath:String,reportWriteError:null,
+      driver:{diagnostics:async()=>({})},validateFinalSdCapture,
+      readRuntimeDiagnosticsCapture:async()=>capture,persistReport:async()=>{},
+      closeOwnedResources:async()=>{closed++;scope.report.cleanup={browser:{status:'closed'}};},
+      process:{off(){}},onSigint(){},onSigterm(){}};
+    vm.runInNewContext('globalThis.finish=async()=>{'+body+';return failure;};',scope);
+    const failure=await scope.finish();assert.equal(closed,1);assert.equal(scope.report.result,'fail');
+    assert.equal(scope.report.callbackCapture,capture);assert.match(scope.report.callback_capture_error,/Runtime incident/);
+    if(primary)assert.equal(failure,primary);else assert.match(failure.message,/Runtime incident/);
   }
 });

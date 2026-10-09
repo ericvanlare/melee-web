@@ -23,6 +23,12 @@ export function callbackSteps(counters) {
   assert(Number.isSafeInteger(total));
   return total;
 }
+export function validateFinalSdCapture(capture) {
+  const total=callbackSteps(capture);
+  for(const phase of [7,14,8])
+    assert(capture.phase_source_steps[phase]>0,`Final capture has no observed phase ${phase} steps`);
+  return total;
+}
 export function checkMatchObservation(match) {
   assert(!match.observer_error&&!match.observer_error_reason,
     `Match observer failed: ${JSON.stringify(match)}`);
