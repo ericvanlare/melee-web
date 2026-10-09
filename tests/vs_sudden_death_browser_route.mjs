@@ -35,6 +35,22 @@ export function checkMatchObservation(match) {
 }
 export function checkNeutralTimeout(state,match) {
   checkMatchObservation(match);
+  assert(!state.error,`Natural tie runtime error: ${state.error}`);
+  if(state.phase===5){
+    // advance_match publishes/retains the completed VS terminal, closes its
+    // owner, then checked typed dispatch requests scoped SD assets. With no
+    // match yet, public phase falls through to the host's completed phase5.
+    // This admission is only that declared neutral timeout, not any phase5.
+    assert.equal(state.running,0,'Deferred SD must stop source ticking');
+    assert.equal(state.message,'Preparing original match continuation...');
+    checkDeclaredPair(match,false);
+    assert.equal(match.frame,3600);assert.equal(match.prior_vs_source_frames,3600);
+    assert.equal(match.complete,true);assert.equal(match.ending,true);
+    assert.equal(match.ready,false);assert.equal(match.paused,false);
+    assert.equal(match.outcome,1);
+    assert.deepEqual(match.terminal,{outcome:1,winners:[0,1]});
+    return;
+  }
   assert(state.phase===7||state.phase===14,'Natural tie unexpectedly left VS/SD');
   if(!match.leg)return; // Only declared deferred construction may be empty.
   if(state.phase===14){assert.equal(match.leg,'sudden_death');return;}

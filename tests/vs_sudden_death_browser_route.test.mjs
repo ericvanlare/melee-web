@@ -145,3 +145,19 @@ test('actual finally retains late failing capture and still closes without repla
     if(primary)assert.equal(failure,primary);else assert.match(failure.message,/Runtime incident/);
   }
 });
+
+test('actual captured deferred SD phase5 admits only completed neutral published tie',()=>{
+  const fixture=JSON.parse(fs.readFileSync(new URL('./fixtures/sd_deferred_continuation_observation.json',import.meta.url),'utf8'));
+  checkNeutralTimeout(fixture.state,fixture.match);
+  for(const change of [f=>f.state.running=1,f=>f.state.message='Preparing original next scene...',
+    f=>f.state.error='asset loading failed',f=>f.match.observer_error=true,
+    f=>f.match.complete=false,f=>f.match.ending=false,f=>f.match.ready=true,
+    f=>f.match.frame=3599,f=>f.match.prior_vs_source_frames=0,
+    f=>f.match.terminal.winners=[1],f=>f.match.terminal.outcome=2,
+    f=>delete f.match.terminal,f=>f.match.outcome=0,
+    f=>f.match.players[0].stocks=3,f=>f.match.players[1].damage_percent=1]){
+    const bad=structuredClone(fixture);change(bad);
+    assert.throws(()=>checkNeutralTimeout(bad.state,bad.match));
+  }
+  assert.throws(()=>checkNeutralTimeout({phase:5,running:0,message:'Preparing original match continuation...'},{}));
+});
