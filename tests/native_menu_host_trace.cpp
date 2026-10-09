@@ -5771,6 +5771,8 @@ void run_stadium_sis_allocator_lifecycle_control()
         check(!melee_web_diagnostic_sis_begin(&contender, error, sizeof(error)) &&
                   !contender.heap && HSD_SisLib_HeapOwner() == owner.heap,
               "Diagnostic SIS accepted a second allocator owner");
+        check(melee_web_stadium_text_topology_controls(&owner),
+              "Original SIS append/remove topology control failed (partial owner retained)");
         HSD_SisLib_804D7978 = &foreign_text;
         check(!melee_web_diagnostic_sis_end(&owner, error, sizeof(error)) &&
                   HSD_SisLib_804D7978 == &foreign_text,

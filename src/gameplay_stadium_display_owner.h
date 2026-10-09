@@ -118,6 +118,11 @@ int melee_web_stadium_display_list_controls(void);
 int melee_web_stadium_display_owner_retirement_controls(void);
 int melee_web_stadium_map2_buffer_controls(void);
 int melee_web_stadium_source_journal_controls(void);
+/* Actual text-only SIS append/remove controls, under a live backing-heap
+ * token. Per-text identity is checked SIS suballocation membership. */
+struct MeleeWebDiagnosticSisOwner;
+int melee_web_stadium_text_topology_controls(
+    const struct MeleeWebDiagnosticSisOwner*);
 #endif
 
 #ifdef __cplusplus
