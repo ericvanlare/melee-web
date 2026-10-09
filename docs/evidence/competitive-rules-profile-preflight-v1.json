@@ -804,8 +804,6 @@
     "receiver": "2d98cb381604e21f499c672f84f2c32df6286886",
     "native_producer": "00ef116f341f7961bd832b436e1760efc7328ddf",
     "native_binary_sha256": "5ae29c6142bf80b287011d6733886e0608818e51df52ff738ff41dcfaabbe6ed",
-    "last_source_tick": 11552,
-    "observer_records": 25266,
     "mwri_events": 52004,
     "mwri_complete": false,
     "supervisor_seconds": 371.24611808289774,
@@ -818,6 +816,25 @@
     "supervisor_result_sha256": "ac3ccd2eb52d8ad64b7c90d0a86461b68e4694aa2d0f13f57166cdd3a1bc7538",
     "root_review_sha256": "ea195a028bb464f6d10eb1cfc4af0fdacfebe45844524d5e36662f49e77c5cc1",
     "cleanup": "Exact owned runner interrupted to execute existingfinally after nativeabort; native reaped without further signal, log drain joined,4exactPIDsabsent. Originalprofile/GCI unchanged.",
-    "open": "Fatal child detection and explicit renderer-config reduction before anotherlongrun. No terminal/originalfull-session acceptance."
+    "open": "Separate Null renderer profile-entry preparation only; no new launch, terminal comparison or full-session acceptance.",
+    "stale_sidecar": {
+      "last_source_tick": 11552,
+      "observer_records": 25266,
+      "completion": false
+    },
+    "last_raw_source_tick": 11561,
+    "last_match_frame": 11438,
+    "last_raw_seq": 25284,
+    "raw_prefix_inventory_sha256": "15180ffdc6b23f81671f35216991cc755d4e9588cf73b05ca9748abde013ec2b"
+  },
+  "owned_native_wait_correction": {
+    "source": "6e3ad12f7de3b876c9f0342485163957ce01dd2c",
+    "integrated_source": "0ed52b041cd4c8f35014301bed93860254be1117",
+    "scope": "Ordinary receiver checks its direct child only while waiting for missing observer records. Available complete records/footer remain readable; legacy default reader unchanged. Native overlays unchanged.",
+    "focused_tests": 4,
+    "legacy_tests": 12,
+    "focused_log_sha256": "7173c39a84ce7a7bd919e6acf799b5723055b8858b0e79488d355ed7e10cdb82",
+    "legacy_log_sha256": "51c1d7ced3567a2bbcd70643b79dacc030c3cbaf6e9ce9fd598e68259a550a33",
+    "source_review_sha256": "0898a61860508da2d6be6d45dfed278055e8f4a0028fc06d56190f1a61e0e879"
   }
 }
