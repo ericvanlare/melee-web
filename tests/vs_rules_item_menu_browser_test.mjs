@@ -60,6 +60,11 @@ const sha256File = file => new Promise((resolve, reject) => {
   stream.on('end', () => resolve(hash.digest('hex')));
 });
 let browser, context, page, driver, browserPath, playwrightPath;
+let failure;
+let interruptionSignal = null;
+const cleanupPromises = new Map();
+const cleanupResults = new Map();
+let reportWriteError = null;
 const report = {
   schema: 'melee-web-vs-rules-item-menu-browser-v1',
   mode: competitiveProfileOnly ? 'source-competitive-rules-profile-preflight'
@@ -156,28 +161,102 @@ const report = {
 };
 const serializeReport = () => JSON.stringify(report, (_key, value) =>
   typeof value === 'string' ? redactDiscPath(value) : value, 2) + '\n';
+const closeOnce = (name, resource, close) => {
+  if (!resource) return null;
+  if (!cleanupPromises.has(name)) {
+    cleanupPromises.set(name, Promise.resolve().then(close).then(() => {
+      cleanupResults.set(name, {status: 'closed'});
+    }, error => {
+      cleanupResults.set(name, {status: 'failed', error: String(error?.message || error)});
+    }));
+  }
+  return cleanupPromises.get(name);
+};
+const closeOwnedResources = async () => {
+  if (driver) {
+    if (!cleanupPromises.has('driver')) {
+      cleanupPromises.set('driver', Promise.resolve().then(() => driver.dispose()).then(() => {
+        cleanupResults.set('driver', {status: 'disposed'});
+      }, error => {
+        cleanupResults.set('driver', {status: 'failed', error: String(error?.message || error)});
+      }));
+    }
+  }
+  closeOnce('context', context, () => context.close());
+  closeOnce('browser', browser, () => browser.close());
+  await Promise.all([...cleanupPromises.values()]);
+  report.cleanup = Object.fromEntries(cleanupResults);
+  return report.cleanup;
+};
+const checkInterruption = () => {
+  if (!interruptionSignal) return;
+  const error = new Error(`Browser profile preflight interrupted by ${interruptionSignal}`);
+  error.code = 'PROFILE_PREFLIGHT_INTERRUPTED';
+  throw error;
+};
+const onOwnedInterrupt = signal => {
+  if (interruptionSignal) return;
+  interruptionSignal = signal;
+  const error = new Error(`Browser profile preflight interrupted by ${signal}`);
+  error.code = 'PROFILE_PREFLIGHT_INTERRUPTED';
+  failure = failure || error;
+  report.result = 'interrupted';
+  report.interruption = {signal, receivedAt: new Date().toISOString(), cleanup: 'started'};
+  report.failure = report.failure || {message: error.message, code: error.code};
+  // Closing the owned Browser forces an in-flight Playwright operation to
+  // reject into the normal catch/finally path; the signal itself never exits
+  // Node before that cleanup can run.
+  void closeOwnedResources().then(cleanup => {
+    if (report.interruption) {
+      report.interruption.cleanup = Object.values(cleanup).every(item =>
+        item.status === 'closed' || item.status === 'disposed') ? 'completed' : 'partial';
+    }
+  }).catch(error => {
+    if (report.interruption) report.interruption.cleanup = `failed: ${error.message}`;
+  });
+};
+const onSigint = () => onOwnedInterrupt('SIGINT');
+const onSigterm = () => onOwnedInterrupt('SIGTERM');
+process.on('SIGINT', onSigint);
+process.on('SIGTERM', onSigterm);
+const persistReport = async () => {
+  try {
+    await fs.writeFile(path.join(output, 'report.json'), serializeReport());
+  } catch (error) {
+    reportWriteError = error;
+    console.error(`Could not persist browser profile report: ${error.message}`);
+  }
+};
 try {
   const loaded = await loadBrowserTools(values.playwright);
+  checkInterruption();
   browserPath = loaded.browserPath;
   playwrightPath = loaded.playwrightPath;
   browser = await loaded.chromium.launch(browserLaunchOptions(loaded.browser, {headed: false}));
+  checkInterruption();
   context = await browser.newContext({viewport: {width: 1280, height: 960}});
+  checkInterruption();
   page = await context.newPage();
+  checkInterruption();
   driver = createBrowserDriver(page, {surface: 'development', timeoutMs: 90000,
     deadline: Date.now() + 15 * 60 * 1000});
+  checkInterruption();
   report.browser = {executable: path.basename(browserPath), version: browser.version(), playwright: playwrightPath};
   report.discSha256 = await sha256File(discPath);
   assert.equal(report.discSha256, expectedDiscSha256,
     'Browser route requires the owned USA Rev. 2 source image identity');
 } catch (error) {
-  report.result = 'fail';
+  failure = error;
+  report.result = interruptionSignal ? 'interrupted' : 'fail';
   report.evidenceClaims.renderedBrowser.status = 'failed';
   report.evidenceClaims.sourceStateAndNavigation.status = 'not_started';
   report.failure = {message: redactDiscPath(error.message), stack: redactDiscPath(error.stack)};
-  try { driver?.dispose(); } catch {}
-  try { await context?.close(); } catch {}
-  try { await browser?.close(); } catch {}
-  await fs.writeFile(path.join(output, 'report.json'), serializeReport());
+  try { await closeOwnedResources(); } catch (cleanupError) {
+    report.cleanup_error = cleanupError.message;
+  }
+  await persistReport();
+  process.off('SIGINT', onSigint);
+  process.off('SIGTERM', onSigterm);
   throw Error(redactDiscPath(error.message));
 }
 const MAIN_MENU_KIND = 0;
@@ -782,7 +861,6 @@ const configureCssTeamBattle = async () => {
   await shot('11-css-team-battle-configured');
   report.checks.push('Original CSS Teams toggle and P2 color control use source predicates, live CSS geometry, and single-tick source PAD samples');
 };
-let failure;
 let nativeSessionActive = false;
 try {
 route: {
@@ -1308,7 +1386,7 @@ route: {
   report.result = 'pass';
 } catch (error) {
   failure = error;
-  report.result = 'fail';
+  report.result = interruptionSignal ? 'interrupted' : 'fail';
   report.evidenceClaims.renderedBrowser.status = browser ? 'partial' : 'failed';
   report.evidenceClaims.sourceStateAndNavigation.status = nativeSessionActive ? 'partial' : 'not_started';
   report.failure = {message: redactDiscPath(error.message), stack: redactDiscPath(error.stack), diagnostics: error.diagnostics || null,
@@ -1340,14 +1418,30 @@ route: {
       report.failureCleanup = {status: 'failed', message: redactDiscPath(error.message)};
     }
   }
-  report.diagnostics = await driver.diagnostics();
-  await fs.writeFile(path.join(output, 'report.json'), serializeReport());
-  driver.dispose();
-  await context.close();
-  await browser.close();
+  try {
+    if (driver) report.diagnostics = await driver.diagnostics();
+  } catch (error) {
+    report.diagnostics = {status: 'unavailable', error: redactDiscPath(error.message)};
+  }
+  try {
+    await closeOwnedResources();
+  } catch (error) {
+    report.cleanup_error = redactDiscPath(error.message);
+  }
+  process.off('SIGINT', onSigint);
+  process.off('SIGTERM', onSigterm);
+  const cleanupFailures = Object.entries(report.cleanup || {})
+    .filter(([, value]) => value.status === 'failed');
+  if (cleanupFailures.length) {
+    failure = failure || new Error(`Owned browser cleanup failed: ${JSON.stringify(cleanupFailures)}`);
+    report.result = interruptionSignal ? 'interrupted' : 'fail';
+    report.cleanupFailures = cleanupFailures;
+  }
+  await persistReport();
 }
 console.log(JSON.stringify({result: report.result, checks: report.checks,
   sourceObservations: report.sourceObservations.length,
   matchObservations: report.matchObservations.length,
-  failure: report.failure?.message, report: path.join(output, 'report.json')}));
-if (failure) process.exitCode = 1;
+  failure: report.failure?.message || (failure ? redactDiscPath(failure.message) : null),
+  report: path.join(output, 'report.json')}));
+if (failure || reportWriteError) process.exitCode = 1;
