@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 import json
 import struct
+import re
 import shutil
 import subprocess
 from unittest.mock import patch
@@ -295,6 +296,76 @@ class OriginalSparsePairTests(unittest.TestCase):
         self.assertEqual(receiver.sss_retirement_inventory[0]["stage"]["kind"], 32)
 
 
+    def test_actual_held_press_prefix_is_retained_but_requires_real_release(self):
+        fixture = json.loads((ROOT / "tests/fixtures/original-sparse-held-press-failure.json").read_text())
+        actual = fixture["rows"]
+        self.assertEqual([row["seq"] for row in actual], [1721, 1722, 1723])
+        self.assertEqual(actual[2]["event"], "error")
+        self.assertEqual(actual[2]["payload"]["name"], "input_rejected")
+        plan = make_input_plan(7)
+
+        def receiver():
+            r = Receiver(plan, sparse_pair=True)
+            r.started = True; r.order = len(r.phase_order); r.seq = actual[0]["seq"]
+            return r
+
+        failed = receiver()
+        for row in actual[:2]: failed.accept(deepcopy(row))
+        with self.assertRaisesRegex(SdDiagnosticError, "Unexpected SD observer event"):
+            failed.accept(deepcopy(actual[2]))
+        # Explicit hypothetical corrected-producer progress event, using exact
+        # observed third-row bytes/counters. The actual error fixture stays intact.
+        drain = deepcopy(actual[2])
+        drain["event"] = "progress"; drain["payload"]["name"] = "input"
+        r = receiver()
+        for row in [*actual[:2], drain]: r.accept(deepcopy(row))
+        self.assertEqual((r.witness_phase, r.sparse_source_samples, r.consumed), (1, 3, 3))
+        self.assertEqual([w["kind"] for w in r.witness_records], ["distinct_press", "held_press"])
+        self.assertEqual([w["queue_slot_index"] for w in r.sparse_source_records], [3, 4, 0])
+        for row, sample in zip(actual, r.sparse_source_records):
+            slices = {s["tag"]: s for s in row["payload"]["slices"]}
+            self.assertEqual(sample["raw_pad_slot_hex"], slices[3]["hex"])
+            self.assertEqual(sample["raw_queue_hex"], slices[2]["hex"])
+            self.assertEqual(sample["source_consumed"], row["payload"]["consumed"])
+        end = {"seq": r.seq, "event": "end", "payload": {"status": "interrupted", "natural": False}}
+        with self.assertRaisesRegex(SdDiagnosticError, "before its exact press/release"):
+            r.accept(end)
+        # Synthetic future neutral: not a captured release or successful session.
+        r = receiver()
+        for row in [*actual[:2], drain]: r.accept(deepcopy(row))
+        release = sparse_input_progress(r.seq, 3, 4, plan["frames"][1], 1)
+        r.accept(release)
+        self.assertEqual(r.witness_phase, 2)
+        self.assertEqual(r.witness_records[-1]["kind"], "verified_release")
+        with self.assertRaisesRegex(SdDiagnosticError, "after its release"):
+            r.accept(sparse_input_progress(r.seq, 4, 5, plan["frames"][1], 0))
+
+    def test_held_press_drain_rejects_semantic_changes_and_unchanged_caps(self):
+        plan = make_input_plan(7)
+        def receiver():
+            r = Receiver(plan, sparse_pair=True); r.started = True; r.order = len(r.phase_order)
+            return r
+        press = plan["frames"][0]
+        raw = status_vector(press)
+        for port in range(4):
+            for byte in range(11):
+                r = receiver(); r.accept(sparse_input_progress(0, 0, 1, press, 0))
+                altered = bytearray(raw); altered[port*12+byte] ^= 1
+                row = sparse_input_progress(1, 1, 2, press, 1)
+                row["payload"]["slices"][0]["hex"] = altered.hex()
+                with self.assertRaises((SdDiagnosticError, ValueError)):
+                    r.accept(row)
+        r = receiver()
+        for i in range(8): r.accept(sparse_input_progress(i, i, i+1, press, i%2))
+        self.assertEqual((r.witness_phase, len(r.sparse_source_records)), (1, 8))
+        with self.assertRaisesRegex(SdDiagnosticError, "sample cap"):
+            r.accept(sparse_input_progress(8, 8, 9, plan["frames"][1], 0))
+        r = receiver()
+        for i in range(6): r.accept(sparse_input_progress(i, i, i+1, plan["frames"][1], i%2))
+        with self.assertRaisesRegex(SdDiagnosticError, "too many neutral"):
+            r.accept(sparse_input_progress(6, 6, 7, plan["frames"][1], 0))
+
+
 class OriginalSparsePadPredicateTests(OwnedWorkspaceTests):
     @classmethod
     def setUpClass(cls):
@@ -357,6 +428,62 @@ int main() {
         checked = subprocess.run([str(path / "predicate")], capture_output=True, text=True)
         (path / "run.stdout-stderr.log").write_text(checked.stdout + checked.stderr)
         self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+
+
+    def test_actual_native_held_press_branch_requires_neutral_with_original_caps(self):
+        compiler = shutil.which("clang++") or shutil.which("g++")
+        if compiler is None: self.skipTest("A native C++ compiler is not installed")
+        source = (ROOT / "reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp").read_text()
+        funcs = source[source.index("bool SparsePadErrorsValid("):source.index("bool ActivationRequested()")]
+        start = source.index("        ++sparse_source_samples;")
+        branch = source[start:source.index('        SdEvent("input", pc, tick);', start)]
+        # Diagnostic returns become test rejection only; state branches are exact.
+        branch = re.sub(r'return SparseInputFailure\([^;]+, pc, tick\), void\(\);', 'return false;', branch)
+        self.assertNotIn("SparseInputFailure", branch)
+        fixture = json.loads((ROOT / "tests/fixtures/original-sparse-held-press-failure.json").read_text())
+        pads = [bytes.fromhex(next(s["hex"] for s in row["payload"]["slices"] if s["tag"] == 3))
+                for row in fixture["rows"]]
+        arrays = ["{" + ",".join(str(b) for b in pad) + "}" for pad in pads]
+        harness = "#include <array>\n#include <cassert>\n#include <cstdint>\nusing u8=uint8_t; using u32=uint32_t;\n" + funcs
+        harness += """
+struct State {
+ u32 sparse_source_samples=0, sparse_prepress_neutral_samples=0, sparse_witness_phase=0;
+ bool consume(const u8* pad) {
+  if(sparse_source_samples>=SPARSE_SOURCE_SAMPLE_CAP || !SparsePadErrorsValid(pad)) return false;
+""" + branch + """
+  return true;
+ }
+};
+"""
+        harness += "const std::array<std::array<u8,48>,3> actual={{" + ",".join(arrays) + "}};\n"
+        harness += """
+int main() {
+ State real; for(const auto& row:actual) assert(real.consume(row.data()));
+ assert(real.sparse_source_samples==3 && real.sparse_prepress_neutral_samples==1);
+ assert(real.sparse_witness_phase==1); // No actual neutral release; no acceptance.
+ assert(real.consume(actual[0].data())); // Synthetic future neutral only.
+ assert(real.sparse_witness_phase==2); assert(!real.consume(actual[0].data()));
+ for(u32 port=0;port<4;++port) for(u32 byte=0;byte<11;++byte) {
+  State bad; assert(bad.consume(actual[1].data()));
+  auto mixed=actual[2]; mixed[12*port+byte]^=1; assert(!bad.consume(mixed.data()));
+ }
+ State missing; for(u32 i=0;i<8;++i) assert(missing.consume(actual[1].data()));
+ assert(missing.sparse_witness_phase==1); assert(!missing.consume(actual[0].data()));
+ State prepress; for(u32 i=0;i<6;++i) assert(prepress.consume(actual[0].data()));
+ assert(!prepress.consume(actual[0].data()));
+ State bounded; for(u32 i=0;i<6;++i) assert(bounded.consume(actual[0].data()));
+ assert(bounded.consume(actual[1].data())); assert(bounded.consume(actual[0].data()));
+ assert(bounded.sparse_source_samples==8 && bounded.sparse_witness_phase==2);
+}
+"""
+        path = self.workspace
+        (path / "held.cpp").write_text(harness)
+        built = subprocess.run([compiler,"-std=c++17","-Wall","-Werror",str(path/"held.cpp"),"-o",str(path/"held")],capture_output=True,text=True)
+        (path/"held-compile.log").write_text(built.stdout+built.stderr)
+        self.assertEqual(built.returncode,0,built.stdout+built.stderr)
+        checked = subprocess.run([str(path/"held")],capture_output=True,text=True)
+        (path/"held-run.log").write_text(checked.stdout+checked.stderr)
+        self.assertEqual(checked.returncode,0,checked.stdout+checked.stderr)
 
 
 if __name__ == "__main__":
