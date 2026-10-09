@@ -112,6 +112,7 @@ extern HSD_RumbleData HSD_Rumble_804C22E0[4];
 #include <stdexcept>
 #include <string_view>
 #include <vector>
+extern "C" GameRules gmMainLib_803D4A48;
 extern "C" int melee_web_vs_prepare_start_source(StartMeleeData*,const VsModeData*,VsModeData*);
 extern "C" int melee_web_match_validate_source_start(StartMeleeData*,int,int);
 extern "C" int melee_web_match_source_scene_supported(int,int,const void*,const void*,int,const StartMeleeRules*);
