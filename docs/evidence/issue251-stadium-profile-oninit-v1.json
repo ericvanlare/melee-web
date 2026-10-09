@@ -961,7 +961,7 @@
         "sixth_ready_bound_files": 531,
         "deferred_control_owned_pid_absent": 19570
       },
-      "remaining": "After two Ready attempts at displayteardown, reduce original SIS/HUD text-list lifecycle and live Stadium text roots with a smaller reproducer before another fullReady. No guard waiver. Complete Session retirement, two3500post-GO lives, screen/stock-out/standings and original per-owner RNG ledger remain open.",
+      "remaining": "Reduce actual successor ownership against original SIS callers and Session close order before a correction or another full Ready attempt. No list-tail waiver. Complete Session retirement, two3500 post-GO lifetimes, screen/stock-out/standings and original per-owner RNG ledger remain open.",
       "c3_original_ledger_requirement": "Reuse existing RNG draw observer; C3 notes604-608 require per-tick/per-owner original comparison, separately from broader C8 transformation comparison.",
       "claim_boundary": "Native traced original HUD readiness after124source ticks observed; sixth run fails checked displayteardown. Synthetic marker/collision/deferred lifecycle controls pass. No checked fullSessionclose, postGOidle or C3pass.",
       "pad_input_reducer": {
@@ -1202,6 +1202,64 @@
         "direct_bindings_unchanged": 583,
         "fixtures_unchanged": 98,
         "owned_children_natural_exit_reaped_absent": true,
+        "fixed_pre_OnStart_label_is_phase_evidence": false
+      },
+      "text_topology_reducer": {
+        "source": "6eaf092fdb28e6c911f7145cc9ca1017c097b965",
+        "source_tree": "259d510d202776d0035bccb1d09a6547df88e2c6",
+        "scope": "Caller-local exact first-predicate text diagnostic; unchanged guard order and refusal. Smaller control uses original SIS text creation/removal with context=-1, verifying backing lease separately from used-list suballocation membership. No full HUD or stage match validation.",
+        "source_review": {
+          "artifact": "root-text-topology-source-review-v1.json",
+          "sha256": "b20ed0c1311008c52db2638bc2a07cb4e62809ef172623d348e8545d6cb03640"
+        },
+        "source_freeze": {
+          "artifact": "text-topology-append-remove-proposal-v2/source-freeze.json",
+          "sha256": "324f055d255ed37a3f23c7a4d7e650c62cf2da0beda36ec616697f4ef422c9de"
+        },
+        "diagnostic_build": {
+          "artifact": "text-topology-build-v1/result.json",
+          "sha256": "dff3e34142944b2a9eae0454cb7cb1b979d7dcf25736b5df033980a11cbb7d2e"
+        },
+        "producer": {
+          "artifact": "text-topology-producer-6eaf092f-v1/identity.json",
+          "sha256": "da1b007e6d486466b6c938b62d3f5a1651f4e98e3acd6da3e713d0863c3c4fde"
+        },
+        "python_controls": {
+          "artifact": "root-text-topology-python-controls-v1.log",
+          "sha256": "f26683fbede1246b3749d985c9f2448d21aae462e1a2bf8728f7096480d144e9"
+        },
+        "sdk_controls": {
+          "artifact": "root-text-topology-controls-v1/result.json",
+          "sha256": "e412c63528172f1dcb9080d4c38b5cfd64b1ab6ae250080e0dea47a21657a7a4"
+        },
+        "independent_result_review": {
+          "artifact": "root-text-topology-luna-independent-review-v1/result.json",
+          "sha256": "4814f9616678b4a88b26a103e6d46a825e50b2e7b2306bac54001e8d3f7a1db6"
+        },
+        "result": "Canonical diagnostic build, six Python controls, and actual two-lifetime SDK SIS controls pass. Append is refused at owned-second-next; original tail removal restores topology; baseline removal is refused at baseline-head before dereferencing the retired node. Final text/used-list roots clear while backing remains live, then existing world cleanup passes.",
+        "close_order_correction": {
+          "artifact": "ready-seventh-text-topology-close-order-correction-v1.md",
+          "sha256": "b3acb26f57daa734f9981e511859ca6dab67c4790aaa3e92a8561dd6f8d491a4"
+        },
+        "retained_preparation_error": {
+          "artifact": "root-text-topology-v8-preparation-schema-failure.json",
+          "sha256": "15ae7a07e82b4b61a02869b38eb845f5ee76dc19ef15349e0caf4fe8e0a129ba"
+        }
+      },
+      "eighth_failed_run": {
+        "artifact": "root-ready-eighth-frozen-result-v1.json",
+        "sha256": "039e00cad5a52dac3316cbb169c4c1b1796b4c746469d3ac90370fb397061b9c"
+      },
+      "eighth_failure": "Ready124 then owned-second-next at index1 observes successor 0x3b604fc where NULL is required. Operand lifetime/identity remains unverified. World3/ticks124/29objects53processes retained after partial close; no complete Session retirement.",
+      "eighth_observation_scope": {
+        "first_rejected_group": "text-topology",
+        "first_rejected_primitive": "owned-second-next",
+        "index": 1,
+        "operand_lifetime": "unverified",
+        "direct_bindings_unchanged": 636,
+        "fixtures_unchanged": 98,
+        "owned_children_natural_exit_reaped_absent": true,
+        "map2_guard_evaluated": false,
         "fixed_pre_OnStart_label_is_phase_evidence": false
       }
     }

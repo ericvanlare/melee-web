@@ -6,9 +6,10 @@
 [zero-tick two-world lifecycle](#october-9-two-zero-tick-stadium-world-lifetimes)
 passed. The latest [source-session preparation attempts](#october-9-source-session-ready-preparation)
 now complete match construction and reach the original HUD Ready predicate at
-124 source ticks, then fail the display owner’s text-list topology check during
-teardown. The smaller input, marker
-and collision controls pass; a complete lifetime and C3 remain unverified.
+124 source ticks, then fail because the display owner’s second text node has
+a non-null successor during teardown. That successor’s ownership remains
+unverified. The smaller input, marker, collision and SIS text controls pass;
+a complete lifetime and C3 remain unverified.
 
 The diagnostic-only Stadium profile and profile-to-`DatNativeMapContract`
 adapter compile in the C1 trace target. Focused profile and borrowed-yakumono
@@ -444,11 +445,37 @@ All 583 direct bindings and 98 fixtures match before documentation changes;
 the exact unittest and Node children exit naturally, are reaped and are absent.
 Independent review also verifies the build, focused controls and raw records.
 
-Two complete Ready attempts have now reached the teardown boundary. The next
-step is a smaller source/SIS text-lifecycle reproducer that distinguishes the
-captured list layout from live owned Stadium text roots, using the original
-HUD and close order. No further full Ready run follows until that reduction and
-its ownership contract are reviewed. No complete Session retirement is claimed.
+After the sixth and seventh attempts, the smaller original SIS text-lifecycle
+reducer on `6eaf092f` passed two allocator lifetimes. It verifies the backing
+heap lease separately from each text's SIS suballocation membership. Original
+text creation appends a third node and triggers the unchanged
+`owned-second-next` refusal; original removal of that tail restores the check.
+Removing a captured baseline node triggers `baseline-head` before the retired
+node can be dereferenced. Text and used-allocation roots clear at cleanup.
+The canonical diagnostic build and six Python boundary controls also pass;
+independent review confirms the retained results. This asset-free control uses
+context -1, without camera, renderer or full HUD behavior.
+
+The corrected source-order review also establishes that `Session.close` calls
+HUD teardown before stage retirement. Therefore close-time HUD text mutations
+cannot be ruled out merely from the later `World.close` order. The earlier
+contrary inference is explicitly withdrawn in the retained review note.
+
+The eighth Ready attempt on the same source again reaches the original Ready
+predicate at 124 ticks. The exact first rejection is now
+**`owned-second-next`, index 1**: the evaluated successor is `0x3b604fc`, where
+the guard requires NULL. The diagnostic explicitly reports that operand's
+lifetime as unverified. It does not dereference the unexpected successor or
+establish who created it. The later map-2 guard remains unevaluated. Partial
+close again retains world 3 with 29 objects and 53 processes. All 636 direct
+bindings and 98 fixtures match before documentation changes; both exact child
+processes exit naturally, are reaped and are absent. The preparation script's
+initial review-schema lookup error is retained separately; no packet, output
+directory or native run had been created before it was corrected.
+
+Next, reduce this successor's ownership against the original SIS callers and
+Session close order before changing the owner contract or running another full
+Ready attempt. No text-list exemption or completed Session retirement is claimed.
 
 The existing RNG observer can be reused afterward, but the Stadium notes require
 C3's per-tick, per-owner ledger to be compared with the original. C8's broader
