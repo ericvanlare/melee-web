@@ -1,0 +1,101 @@
+{
+  "schema": "melee-web-sd-deferred-observer-control-v1",
+  "origin": "First authored browser route: canonical prior VS tied timeout during original scoped continuation asset preparation. Reduced read-only public observations; not a source setup fixture.",
+  "state": {
+    "message": "Preparing original match continuation...",
+    "phase": 5,
+    "running": 0,
+    "status": "Reading local data 3/31",
+    "error": null,
+    "diagnostics": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none"
+  },
+  "match": {
+    "leg": "vs",
+    "prior_vs_source_frames": 3600,
+    "observed_player_source_slots": [
+      0,
+      1
+    ],
+    "ready": false,
+    "paused": false,
+    "ending": true,
+    "complete": true,
+    "frame": 3600,
+    "rng": 3101454324,
+    "outcome": 1,
+    "winner": -1,
+    "rules": {
+      "match_kind": 1,
+      "stage": 32,
+      "timer_enabled": 1,
+      "time_limit": 60,
+      "is_stock": 1,
+      "is_vs": 1,
+      "source_sudden_death_flag": 0,
+      "item_frequency": -1,
+      "item_mask_hex": "ffffffffffffffff",
+      "is_teams": 0,
+      "player_teams": [
+        0,
+        0
+      ],
+      "player_stocks": [
+        4,
+        4
+      ],
+      "door_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "friendly_fire": 0
+    },
+    "players": [
+      {
+        "fighter": 0,
+        "human": true,
+        "damage_percent": 0,
+        "source_player_index": 0,
+        "source_slot": 0,
+        "source_port": 0,
+        "source_character": 8,
+        "source_color": 1,
+        "source_initial_damage": 0,
+        "slot_type": 0,
+        "source_stocks": 4,
+        "stocks": 4,
+        "motion": 14,
+        "groundAir": 0,
+        "x": -60,
+        "y": 9.99999975e-05
+      },
+      {
+        "fighter": 0,
+        "human": true,
+        "damage_percent": 0,
+        "source_player_index": 1,
+        "source_slot": 0,
+        "source_port": 1,
+        "source_character": 8,
+        "source_color": 0,
+        "source_initial_damage": 0,
+        "slot_type": 0,
+        "source_stocks": 4,
+        "stocks": 4,
+        "motion": 14,
+        "groundAir": 0,
+        "x": 60,
+        "y": 9.99999975e-05
+      }
+    ],
+    "terminal": {
+      "outcome": 1,
+      "winners": [
+        0,
+        1
+      ]
+    },
+    "sd_source_frames": 0
+  }
+}

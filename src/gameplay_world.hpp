@@ -50,6 +50,9 @@ struct GameplayWorldSelection {
     // Opening demos retain their authored four-CPU/99-stock setup and
     // gm_80183218 source callback. This never applies to public VS matches.
     bool opening_demo=false;
+    // Original Sudden Death scene setup uses source-indexed survivors, which
+    // may be sparse after the authored winner filter.
+    bool sudden_death=false;
     std::array<MeleeWebPlayerSettings,4> source_players{};
 };
 // Shared by the browser and source regression harness. Owns one original SDK

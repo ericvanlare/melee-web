@@ -56,6 +56,221 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
     def setUpClass(cls):
         cls.scratch = cls.new_workspace(ROOT, "stadium-c1a-native-menu-")
 
+    def test_vs_sudden_death_source_callbacks_without_assets(self):
+        target = ROOT / "build/browser-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("The native menu host trace has not been built")
+        command = [str(node_runtime()), str(target),
+                   "--vs-sudden-death-source-control"]
+        (self.scratch / "sudden-death-source-command.txt").write_text(
+            " ".join(command) + "\n", encoding="utf-8")
+        try:
+            run = subprocess.run(
+                command, cwd=ROOT, capture_output=True, text=True, timeout=30)
+        except subprocess.TimeoutExpired as failure:
+            (self.scratch / "sudden-death-source.stdout").write_bytes(
+                failure.stdout.encode() if isinstance(failure.stdout, str)
+                else (failure.stdout or b""))
+            (self.scratch / "sudden-death-source.stderr").write_bytes(
+                failure.stderr.encode() if isinstance(failure.stderr, str)
+                else (failure.stderr or b""))
+            raise
+        (self.scratch / "sudden-death-source.stdout").write_text(
+            run.stdout, encoding="utf-8")
+        (self.scratch / "sudden-death-source.stderr").write_text(
+            run.stderr, encoding="utf-8")
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-4000:])
+        self.assertIn(
+            "Original VS timeout/tie and Sudden Death-to-Results source callbacks passed",
+            run.stdout,
+        )
+
+    def test_sudden_death_world_dispatch_without_assets(self):
+        target = ROOT / "build/browser-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("The native menu host trace has not been built")
+        absent = self.scratch / "absent-sd-fixtures"
+        self.assertFalse(absent.exists())
+        revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        for stage, expected in (
+                (32, "Missing owned menu host fixture: MnSlChr.usd"),
+                (31, "Explicit FD recipes require Final Destination")):
+            with self.subTest(stage=stage):
+                trace = self.scratch / f"sd-dispatch-{stage}.jsonl"
+                command = [str(node_runtime()), str(target), str(absent),
+                           str(absent), str(stage), str(trace), revision,
+                           "sudden-death-world-control-v1"]
+                run = subprocess.run(command, cwd=ROOT, capture_output=True,
+                                     text=True, timeout=30)
+                (self.scratch / f"sd-dispatch-{stage}.stdout").write_text(
+                    run.stdout, encoding="utf-8")
+                (self.scratch / f"sd-dispatch-{stage}.stderr").write_text(
+                    run.stderr, encoding="utf-8")
+                self.assertNotEqual(run.returncode, 0)
+                self.assertIn(expected, run.stderr)
+                self.assertNotIn("Unknown transition input recipe", run.stderr)
+
+    def test_ordinary_nontied_timeout_dispatch_without_assets(self):
+        target = ROOT / "build/browser-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("The native menu host trace has not been built")
+        absent = self.scratch / "absent-ordinary-timeout-fixtures"
+        self.assertFalse(absent.exists())
+        revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        for stage, expected in ((32, "Missing owned menu host fixture: MnSlChr.usd"),
+                                (31, "Explicit FD recipes require Final Destination")):
+            with self.subTest(stage=stage):
+                run = subprocess.run([str(node_runtime()), str(target), str(absent),
+                    str(absent), str(stage), str(self.scratch / f"ordinary-timeout-{stage}.jsonl"),
+                    revision, "ordinary-nontied-timeout-control-v1"], cwd=ROOT,
+                    capture_output=True, text=True, timeout=30)
+                (self.scratch / f"ordinary-timeout-{stage}.stdout").write_text(run.stdout)
+                (self.scratch / f"ordinary-timeout-{stage}.stderr").write_text(run.stderr)
+                self.assertNotEqual(run.returncode, 0)
+                self.assertIn(expected, run.stderr)
+                self.assertNotIn("Unknown transition input recipe", run.stderr)
+
+    def test_sudden_death_natural_timeout_dispatch_without_assets(self):
+        target = ROOT / "build/browser-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("The native menu host trace has not been built")
+        absent = self.scratch / "absent-natural-sd-fixtures"
+        self.assertFalse(absent.exists())
+        revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        for stage, expected in (
+                (32, "Missing owned menu host fixture: MnSlChr.usd"),
+                (31, "Explicit FD recipes require Final Destination")):
+            with self.subTest(stage=stage):
+                trace = self.scratch / f"natural-sd-dispatch-{stage}.jsonl"
+                command = [str(node_runtime()), str(target), str(absent),
+                           str(absent), str(stage), str(trace), revision,
+                           "sudden-death-natural-timeout-control-v1"]
+                run = subprocess.run(command, cwd=ROOT, capture_output=True,
+                                     text=True, timeout=30)
+                (self.scratch / f"natural-sd-dispatch-{stage}.stdout").write_text(
+                    run.stdout, encoding="utf-8")
+                (self.scratch / f"natural-sd-dispatch-{stage}.stderr").write_text(
+                    run.stderr, encoding="utf-8")
+                self.assertNotEqual(run.returncode, 0)
+                self.assertIn(expected, run.stderr)
+                self.assertNotIn("Unknown transition input recipe", run.stderr)
+
+    def test_sudden_death_natural_resolution_dispatch_without_assets(self):
+        target = ROOT / "build/browser-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("The native menu host trace has not been built")
+        absent = self.scratch / "absent-resolution-sd-fixtures"
+        self.assertFalse(absent.exists())
+        revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        for stage, expected in (
+                (32, "Missing owned menu host fixture: MnSlChr.usd"),
+                (31, "Explicit FD recipes require Final Destination")):
+            with self.subTest(stage=stage):
+                trace = self.scratch / f"resolution-sd-dispatch-{stage}.jsonl"
+                command = [str(node_runtime()), str(target), str(absent),
+                           str(absent), str(stage), str(trace), revision,
+                           "sudden-death-natural-resolution-control-v1"]
+                run = subprocess.run(command, cwd=ROOT, capture_output=True,
+                                     text=True, timeout=30)
+                (self.scratch / f"resolution-sd-dispatch-{stage}.stdout").write_text(
+                    run.stdout, encoding="utf-8")
+                (self.scratch / f"resolution-sd-dispatch-{stage}.stderr").write_text(
+                    run.stderr, encoding="utf-8")
+                self.assertNotEqual(run.returncode, 0)
+                self.assertIn(expected, run.stderr)
+                self.assertNotIn("Unknown transition input recipe", run.stderr)
+
+    def test_sudden_death_returned_menu_reducer_dispatch_without_assets(self):
+        target = ROOT / "build/browser-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("The native menu host trace has not been built")
+        absent = self.scratch / "absent-returned-menu-fixtures"
+        self.assertFalse(absent.exists())
+        revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        for recipe in ("returned-menu-results-control-v1",
+                       "returned-menu-two-human-results-input-control-v1"):
+            for stage, expected in (
+                    (32, "Missing owned menu host fixture: MnSlChr.usd"),
+                    (31, "Explicit FD recipes require Final Destination")):
+                with self.subTest(stage=stage, recipe=recipe):
+                    trace = self.scratch / f"returned-menu-dispatch-{recipe}-{stage}.jsonl"
+                    command = [str(node_runtime()), str(target), str(absent),
+                               str(absent), str(stage), str(trace), revision,
+                               recipe]
+                    run = subprocess.run(command, cwd=ROOT, capture_output=True,
+                                         text=True, timeout=30)
+                    (self.scratch / f"returned-menu-dispatch-{recipe}-{stage}.stdout").write_text(
+                        run.stdout, encoding="utf-8")
+                    (self.scratch / f"returned-menu-dispatch-{recipe}-{stage}.stderr").write_text(
+                        run.stderr, encoding="utf-8")
+                    self.assertNotEqual(run.returncode, 0)
+                    self.assertIn(expected, run.stderr)
+                    self.assertNotIn("Unknown transition input recipe", run.stderr)
+
+    def test_sudden_death_resolution_manifest_without_assets(self):
+        target = ROOT / "build/browser-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("The native menu host trace has not been built")
+        run = subprocess.run([str(node_runtime()), str(target),
+                              "--sd-resolution-fixture-manifest"], cwd=ROOT,
+                             capture_output=True, text=True, timeout=30)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        records = [json.loads(line) for line in run.stdout.splitlines()
+                   if line.startswith('{')]
+        self.assertEqual(len(records), 1)
+        names = records[0]["required"]
+        self.assertEqual(len(names), len(set(names)))
+        self.assertTrue({"PlMrNr.dat", "PlMrYe.dat", "GrNLa.dat",
+                         "GmRst.usd", "GmRstMMr.dat", "ff_mario.hps",
+                         "IfPrize.usd", "SdPrize.usd", "s_info1.hps"}.issubset(names))
+    def test_sudden_death_returned_menu_manifest_without_assets(self):
+        target = ROOT / "build/browser-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("The native menu host trace has not been built")
+        run = subprocess.run([str(node_runtime()), str(target),
+                              "--returned-menu-fixture-manifest"], cwd=ROOT,
+                             capture_output=True, text=True, timeout=30)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        records = [json.loads(line) for line in run.stdout.splitlines()
+                   if line.startswith('{')]
+        self.assertEqual(len(records), 1)
+        names = records[0]["required"]
+        self.assertEqual(len(names), len(set(names)))
+        self.assertTrue({"PlMrNr.dat", "PlMrYe.dat",
+                         "GmRst.usd", "GmRstMMr.dat", "ff_mario.hps",
+                         "IfPrize.usd", "SdPrize.usd", "s_info1.hps"}.issubset(names))
+        self.assertNotIn("GrNLa.dat", names)
+
+    def test_sudden_death_menu_setup_dispatch_without_assets(self):
+        target = ROOT / "build/browser-release/native_menu_host_trace.js"
+        if not target.is_file():
+            self.skipTest("The native menu host trace has not been built")
+        absent = self.scratch / "absent-sd-menu-fixtures"
+        self.assertFalse(absent.exists())
+        revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        for stage, expected in (
+                (32, "Missing owned menu host fixture: MnSlChr.usd"),
+                (31, "Explicit FD recipes require Final Destination")):
+            with self.subTest(stage=stage):
+                command = [str(node_runtime()), str(target), str(absent),
+                           str(absent), str(stage),
+                           str(self.scratch / f"sd-menu-dispatch-{stage}.jsonl"),
+                           revision, "sudden-death-menu-setup-control-v1"]
+                run = subprocess.run(command, cwd=ROOT, capture_output=True,
+                                     text=True, timeout=30)
+                (self.scratch / f"sd-menu-dispatch-{stage}.stdout").write_text(
+                    run.stdout, encoding="utf-8")
+                (self.scratch / f"sd-menu-dispatch-{stage}.stderr").write_text(
+                    run.stderr, encoding="utf-8")
+                self.assertNotEqual(run.returncode, 0)
+                self.assertIn(expected, run.stderr)
+                self.assertNotIn("Unknown transition input recipe", run.stderr)
+
     def test_stadium_yakumono_exchange_round_trip_without_assets(self):
         target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
         if not target.is_file():

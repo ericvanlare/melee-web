@@ -54,6 +54,7 @@ extern "C" {
 }
 #pragma GCC diagnostic pop
 #include <melee/ty/types.h>
+#include <melee/pl/forward.h>
 #include "gameplay_trophy_roots.hpp"
 #include "gameplay_fighter_assets.hpp"
 #include <iostream>
@@ -422,15 +423,26 @@ struct GameplayWorld::Storage {
             if(purpose!=GameplayWorldPurpose::Match||!stage||
                selection.player_count<MELEE_WEB_MENU_MIN_PLAYERS||
                selection.player_count>MELEE_WEB_MENU_MAX_PLAYERS||
-               !selection.source_camera_subjects)
+               !selection.source_camera_subjects||
+               (selection.sudden_death&&(!selection.source_start_data||
+                                         !selection.source_start_data->rules.x6)))
                 throw DatError("Source match context requires an active VS world and camera pool");
             for(unsigned i=0;i<selection.player_count;i++){
                 const auto& player=selection.source_players[i];
-                if(player.slot!=i||player.controller>=4||player.stocks<1||
+                if(player.slot>=4||(!selection.sudden_death&&player.slot!=i)||
+                   player.controller>=4||player.stocks<1||
                    player.stocks>(selection.opening_demo?99u:5u)||
                    player.fighter_kind!=selection.fighter_kinds[i]||
                    player.costume!=selection.costume_indices[i])
                     throw DatError("Source match settings differ from the selected VS players");
+                if(selection.sudden_death){
+                    const auto& source=selection.source_start_data->players[player.slot];
+                    const unsigned port=source.slot?source.slot-1u:player.slot;
+                    if(source.slot_type==Gm_PKind_NA||port!=player.slot||
+                       player.controller!=port||source.stocks!=player.stocks||
+                       source.color!=player.costume||source.sub_color!=player.sub_color)
+                        throw DatError("Sudden Death player context changed its source port identity");
+                }
             }
             match_context=melee_web_match_begin_players(selection.source_players.data(),
                 selection.player_count,selection.source_camera_subjects,
@@ -442,9 +454,13 @@ struct GameplayWorld::Storage {
             render_context=melee_web_render_prepare_match_camera(error,sizeof(error));
             check(render_context!=nullptr,error);
             if(source_start_data){
-                check(melee_web_match_rules_prepare_from_menu(
-                    rules,source_start_data,selection.opening_demo,
-                    error,sizeof(error)),error);
+                const int prepared=selection.sudden_death?
+                    melee_web_match_rules_prepare_sudden_death_from_menu(
+                        rules,source_start_data,error,sizeof(error)):
+                    melee_web_match_rules_prepare_from_menu(
+                        rules,source_start_data,selection.opening_demo,
+                        error,sizeof(error));
+                check(prepared,error);
             }
             const MeleeWebArchiveSymbol refract_symbol={
                 "LbRf.dat","lbRefData",&refract_data};

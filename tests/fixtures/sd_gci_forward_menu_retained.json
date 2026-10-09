@@ -1,0 +1,731 @@
+{
+  "raw_identity": {
+    "bytes": 618679,
+    "sha256": "41b9b0e6a584b7ca5d3c0149415851e1072f331c0fbb6bcf719644733d7cef95"
+  },
+  "records": [
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 45,
+        "name": "menu",
+        "pc": 2150948236,
+        "slices": [
+          {
+            "address": 2151536836,
+            "flags": 0,
+            "hex": "01",
+            "tag": 40
+          },
+          {
+            "address": 2152176944,
+            "flags": 0,
+            "hex": "010100000000",
+            "tag": 17
+          },
+          {
+            "address": 2152334576,
+            "flags": 0,
+            "hex": "0000000000000000000000000000000000000000804d4b50",
+            "tag": 45
+          },
+          {
+            "address": 2152557512,
+            "flags": 0,
+            "hex": "0000000000000000",
+            "tag": 46
+          }
+        ]
+      },
+      "seq": 501,
+      "source_tick": 20,
+      "timestamp_ns": 2031708529536375
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 46,
+        "name": "menu_input",
+        "pc": 2151118212,
+        "slices": [
+          {
+            "address": 2152116680,
+            "flags": 0,
+            "hex": "00000000000000000000009c0000000000000000000000a000000000000000000000ff2800000000000000000000ff01",
+            "tag": 3
+          }
+        ]
+      },
+      "seq": 502,
+      "source_tick": 20,
+      "timestamp_ns": 2031708529548250
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 46,
+        "name": "menu",
+        "pc": 2150948236,
+        "slices": [
+          {
+            "address": 2151536836,
+            "flags": 0,
+            "hex": "01",
+            "tag": 40
+          },
+          {
+            "address": 2152176944,
+            "flags": 0,
+            "hex": "010100000000",
+            "tag": 17
+          },
+          {
+            "address": 2152334576,
+            "flags": 0,
+            "hex": "0000000000000000000000000000000000000000804d4b50",
+            "tag": 45
+          },
+          {
+            "address": 2152557512,
+            "flags": 0,
+            "hex": "0000000000000000",
+            "tag": 46
+          }
+        ]
+      },
+      "seq": 503,
+      "source_tick": 21,
+      "timestamp_ns": 2031708546207583
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 47,
+        "name": "menu_input",
+        "pc": 2151118212,
+        "slices": [
+          {
+            "address": 2152116488,
+            "flags": 0,
+            "hex": "00000000000000000000009c0000000000000000000000c800000000000000000000ff6800000000000000000000ff01",
+            "tag": 3
+          }
+        ]
+      },
+      "seq": 504,
+      "source_tick": 21,
+      "timestamp_ns": 2031708546218083
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 47,
+        "name": "menu",
+        "pc": 2150948236,
+        "slices": [
+          {
+            "address": 2151536836,
+            "flags": 0,
+            "hex": "01",
+            "tag": 40
+          },
+          {
+            "address": 2152176944,
+            "flags": 0,
+            "hex": "010100000000",
+            "tag": 17
+          },
+          {
+            "address": 2152334576,
+            "flags": 0,
+            "hex": "0000000000000000000000000000000000000000804d4b50",
+            "tag": 45
+          },
+          {
+            "address": 2152557512,
+            "flags": 0,
+            "hex": "0000000000000000",
+            "tag": 46
+          }
+        ]
+      },
+      "seq": 505,
+      "source_tick": 22,
+      "timestamp_ns": 2031708564572000
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 48,
+        "name": "menu_input",
+        "pc": 2151118212,
+        "slices": [
+          {
+            "address": 2152116536,
+            "flags": 0,
+            "hex": "00040000000000000000009c0000000000000000000000c000000000000000000000ffbc00000000000000000000ff01",
+            "tag": 3
+          }
+        ]
+      },
+      "seq": 506,
+      "source_tick": 22,
+      "timestamp_ns": 2031708564587708
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 48,
+        "name": "menu",
+        "pc": 2150948236,
+        "slices": [
+          {
+            "address": 2151536836,
+            "flags": 0,
+            "hex": "01",
+            "tag": 40
+          },
+          {
+            "address": 2152176944,
+            "flags": 0,
+            "hex": "010100000000",
+            "tag": 17
+          },
+          {
+            "address": 2152334576,
+            "flags": 0,
+            "hex": "0000000100000000000000000000000200000f00804d4b54",
+            "tag": 45
+          },
+          {
+            "address": 2152557512,
+            "flags": 0,
+            "hex": "0000000000000000",
+            "tag": 46
+          }
+        ]
+      },
+      "seq": 507,
+      "source_tick": 23,
+      "timestamp_ns": 2031708579571916
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 49,
+        "name": "menu_input",
+        "pc": 2151118212,
+        "slices": [
+          {
+            "address": 2152116584,
+            "flags": 0,
+            "hex": "00000000000000000000009c00000000000000000000003000000000000000000000ff0000000000000000000000ff30",
+            "tag": 3
+          }
+        ]
+      },
+      "seq": 508,
+      "source_tick": 23,
+      "timestamp_ns": 2031708579585375
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 49,
+        "name": "menu",
+        "pc": 2150948236,
+        "slices": [
+          {
+            "address": 2151536836,
+            "flags": 0,
+            "hex": "01",
+            "tag": 40
+          },
+          {
+            "address": 2152176944,
+            "flags": 0,
+            "hex": "010100000000",
+            "tag": 17
+          },
+          {
+            "address": 2152334576,
+            "flags": 0,
+            "hex": "0000000100000000000000000000000000000e00804d4b54",
+            "tag": 45
+          },
+          {
+            "address": 2152557512,
+            "flags": 0,
+            "hex": "0000000000000000",
+            "tag": 46
+          }
+        ]
+      },
+      "seq": 509,
+      "source_tick": 24,
+      "timestamp_ns": 2031708596245833
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 50,
+        "name": "menu_input",
+        "pc": 2151118212,
+        "slices": [
+          {
+            "address": 2152116632,
+            "flags": 0,
+            "hex": "00000000000000000000009c00000000000000000000009800000000000000000000ff2c00000000000000000000ff01",
+            "tag": 3
+          }
+        ]
+      },
+      "seq": 510,
+      "source_tick": 24,
+      "timestamp_ns": 2031708596257166
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 50,
+        "name": "menu",
+        "pc": 2150948236,
+        "slices": [
+          {
+            "address": 2151536836,
+            "flags": 0,
+            "hex": "01",
+            "tag": 40
+          },
+          {
+            "address": 2152176944,
+            "flags": 0,
+            "hex": "010100000000",
+            "tag": 17
+          },
+          {
+            "address": 2152334576,
+            "flags": 0,
+            "hex": "0000000100000000000000000000000000000d00804d4b54",
+            "tag": 45
+          },
+          {
+            "address": 2152557512,
+            "flags": 0,
+            "hex": "0000000000000000",
+            "tag": 46
+          }
+        ]
+      },
+      "seq": 511,
+      "source_tick": 25,
+      "timestamp_ns": 2031708614187375
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 51,
+        "name": "menu_input",
+        "pc": 2151118212,
+        "slices": [
+          {
+            "address": 2152116680,
+            "flags": 0,
+            "hex": "01000000000000000000009c0000000000000000000000c000000000000000000000ff0000000000000000000000ff01",
+            "tag": 3
+          }
+        ]
+      },
+      "seq": 512,
+      "source_tick": 25,
+      "timestamp_ns": 2031708614201458
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 51,
+        "name": "menu",
+        "pc": 2150948236,
+        "slices": [
+          {
+            "address": 2151536836,
+            "flags": 0,
+            "hex": "01",
+            "tag": 40
+          },
+          {
+            "address": 2152176944,
+            "flags": 0,
+            "hex": "010100000000",
+            "tag": 17
+          },
+          {
+            "address": 2152334576,
+            "flags": 0,
+            "hex": "0200000000000000000000000000021000010c00804d4b54",
+            "tag": 45
+          },
+          {
+            "address": 2152557512,
+            "flags": 0,
+            "hex": "0005000000000000",
+            "tag": 46
+          }
+        ]
+      },
+      "seq": 513,
+      "source_tick": 26,
+      "timestamp_ns": 2031708630555458
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 52,
+        "name": "menu_input",
+        "pc": 2151118212,
+        "slices": [
+          {
+            "address": 2152116488,
+            "flags": 0,
+            "hex": "00000000000000000000009c00000000000000000000007800000000000000000000ff2c00000000000000000000ff30",
+            "tag": 3
+          }
+        ]
+      },
+      "seq": 514,
+      "source_tick": 26,
+      "timestamp_ns": 2031708630567291
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 52,
+        "name": "menu",
+        "pc": 2150948236,
+        "slices": [
+          {
+            "address": 2151536836,
+            "flags": 0,
+            "hex": "01",
+            "tag": 40
+          },
+          {
+            "address": 2152176944,
+            "flags": 0,
+            "hex": "010100000000",
+            "tag": 17
+          },
+          {
+            "address": 2152334576,
+            "flags": 0,
+            "hex": "0200000000000000000000000000000000010b00804d4b54",
+            "tag": 45
+          },
+          {
+            "address": 2152557512,
+            "flags": 0,
+            "hex": "0004000000000000",
+            "tag": 46
+          }
+        ]
+      },
+      "seq": 515,
+      "source_tick": 27,
+      "timestamp_ns": 2031708646775208
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 53,
+        "name": "menu_input",
+        "pc": 2151118212,
+        "slices": [
+          {
+            "address": 2152116536,
+            "flags": 0,
+            "hex": "00000000000000000000009c0000000000000000000000c000000000000000000000ff6000000000000000000000ff01",
+            "tag": 3
+          }
+        ]
+      },
+      "seq": 516,
+      "source_tick": 27,
+      "timestamp_ns": 2031708646786166
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 53,
+        "name": "menu",
+        "pc": 2150948236,
+        "slices": [
+          {
+            "address": 2151536836,
+            "flags": 0,
+            "hex": "01",
+            "tag": 40
+          },
+          {
+            "address": 2152176944,
+            "flags": 0,
+            "hex": "010100000000",
+            "tag": 17
+          },
+          {
+            "address": 2152334576,
+            "flags": 0,
+            "hex": "0200000000000000000000000000000000010a00804d4b54",
+            "tag": 45
+          },
+          {
+            "address": 2152557512,
+            "flags": 0,
+            "hex": "0003000000000000",
+            "tag": 46
+          }
+        ]
+      },
+      "seq": 517,
+      "source_tick": 28,
+      "timestamp_ns": 2031708663396375
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 54,
+        "name": "menu_input",
+        "pc": 2151118212,
+        "slices": [
+          {
+            "address": 2152116584,
+            "flags": 0,
+            "hex": "00000000000000000000009c0000000000000000000000c000000000000000000000ffbc00000000000000000000ff30",
+            "tag": 3
+          }
+        ]
+      },
+      "seq": 518,
+      "source_tick": 28,
+      "timestamp_ns": 2031708663407625
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 54,
+        "name": "menu",
+        "pc": 2150948236,
+        "slices": [
+          {
+            "address": 2151536836,
+            "flags": 0,
+            "hex": "01",
+            "tag": 40
+          },
+          {
+            "address": 2152176944,
+            "flags": 0,
+            "hex": "010100000000",
+            "tag": 17
+          },
+          {
+            "address": 2152334576,
+            "flags": 0,
+            "hex": "0200000000000000000000000000000000010900804d4b54",
+            "tag": 45
+          },
+          {
+            "address": 2152557512,
+            "flags": 0,
+            "hex": "0002000000000000",
+            "tag": 46
+          }
+        ]
+      },
+      "seq": 519,
+      "source_tick": 29,
+      "timestamp_ns": 2031708679736583
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 55,
+        "name": "menu_input",
+        "pc": 2151118212,
+        "slices": [
+          {
+            "address": 2152116632,
+            "flags": 0,
+            "hex": "00000000000000000000009c00000000000000000000003000000000000000000000ffc800000000000000000000ff30",
+            "tag": 3
+          }
+        ]
+      },
+      "seq": 520,
+      "source_tick": 29,
+      "timestamp_ns": 2031708679746375
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 55,
+        "name": "menu",
+        "pc": 2150948236,
+        "slices": [
+          {
+            "address": 2151536836,
+            "flags": 0,
+            "hex": "01",
+            "tag": 40
+          },
+          {
+            "address": 2152176944,
+            "flags": 0,
+            "hex": "010100000000",
+            "tag": 17
+          },
+          {
+            "address": 2152334576,
+            "flags": 0,
+            "hex": "0200000000000000000000000000000000010800804d4b54",
+            "tag": 45
+          },
+          {
+            "address": 2152557512,
+            "flags": 0,
+            "hex": "0001000000000000",
+            "tag": 46
+          }
+        ]
+      },
+      "seq": 521,
+      "source_tick": 30,
+      "timestamp_ns": 2031708697775541
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 56,
+        "name": "menu_input",
+        "pc": 2151118212,
+        "slices": [
+          {
+            "address": 2152116680,
+            "flags": 0,
+            "hex": "00000000000000000000009c0000000000000000000000c000000000000000000000ffbc00000000000000000000ff30",
+            "tag": 3
+          }
+        ]
+      },
+      "seq": 522,
+      "source_tick": 30,
+      "timestamp_ns": 2031708697786958
+    },
+    {
+      "draw_ordinal": 0,
+      "event": "progress",
+      "payload": {
+        "consumed": 0,
+        "diagnostic": "sd_initialization_prefix",
+        "menu_consumed": 56,
+        "name": "menu",
+        "pc": 2150948236,
+        "slices": [
+          {
+            "address": 2151536836,
+            "flags": 0,
+            "hex": "01",
+            "tag": 40
+          },
+          {
+            "address": 2152176944,
+            "flags": 0,
+            "hex": "010100000000",
+            "tag": 17
+          },
+          {
+            "address": 2152334576,
+            "flags": 0,
+            "hex": "0200000000000000000000000000000000010700804d4b54",
+            "tag": 45
+          },
+          {
+            "address": 2152557512,
+            "flags": 0,
+            "hex": "0000000000000000",
+            "tag": 46
+          }
+        ]
+      },
+      "seq": 523,
+      "source_tick": 31,
+      "timestamp_ns": 2031708714274666
+    }
+  ],
+  "scope": "Selected exact raw observer records, not a complete original run or synthetic readiness admission"
+}
