@@ -67,7 +67,7 @@ export function resultsPadTraceFailures(trace) {
   if (trace.samples.length !== trace.retained)
     failures.push('original Results PAD trace row count does not match retained count');
 
-  let priorPhase = 0;
+  let priorPhase = null;
   let priorStatsPhase = 0;
   for (const [index, row] of trace.samples.entries()) {
     if (!row || typeof row !== 'object' || Array.isArray(row)) {
@@ -85,10 +85,12 @@ export function resultsPadTraceFailures(trace) {
     }
     if (!Number.isSafeInteger(state.source_frame) || state.source_frame !== row.source_frame + 1)
       failures.push(`original Results PAD trace row ${index} has an invalid after-tick source frame`);
-    if (!Number.isInteger(state.phase) || state.phase < 1 || state.phase > 4)
+    if (!Number.isInteger(state.phase) || state.phase < 0 || state.phase > 4)
       failures.push(`original Results PAD trace row ${index} has an unsupported original phase`);
-    else if (state.phase < priorPhase)
+    else if (priorPhase !== null && state.phase < priorPhase)
       failures.push(`original Results PAD trace row ${index} regressed the original Results phase`);
+    else if (priorPhase !== null && state.phase > priorPhase + 1)
+      failures.push(`original Results PAD trace row ${index} skipped an authored Results phase`);
     else priorPhase = state.phase;
     if (!Number.isInteger(state.stats_phase) || state.stats_phase < 0 || state.stats_phase > 2)
       failures.push(`original Results PAD trace row ${index} has an unsupported original stats phase`);

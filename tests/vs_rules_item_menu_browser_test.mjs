@@ -222,6 +222,7 @@ const report = {
     match_snapshots: [],
     stock_loss_samples: [],
     results_asset_preparation: null,
+    results_pad_trace_latest: null,
     terminal_observation: null,
     retained_css_profile: null,
     runtime_diagnostics_scope: 'One callback sample every >=100ms, rolling 100-row sample ring, fixed 24-row incident ring; callbacks may be observed in host phase 5 during validated Results asset preparation and in source phases 7 and 8. All callback counts, source-step aggregates, reason totals and drop counts are retained separately. Counter polls run at least once per second during active input, timeout waiting, and stopped Results asset preparation; cumulative incident counts above24 fail immediately. dropped_samples is expected bounded thinning and does not fail. Any dropped_incidents, unknown/non-preparation reason, malformed preparation row, invalid phase-step observation, missing recorder, or browser/runtime/timing/observer error fails the route.',
@@ -390,11 +391,16 @@ const waitCssTeams = async (isTeams, teams, label) => {
 const observeCssSetup = () => page.evaluate(() => window.menuObserveCssSetup?.() ?? null);
 const observeMatch = () => page.evaluate(() => JSON.parse(
   Module.UTF8ToString(Module._melee_web_native_menu_match_observe())));
-const observeResultsPadTrace = () => page.evaluate(() => {
-  if (typeof Module?._melee_web_native_menu_results_pad_trace !== 'function') return null;
-  const pointer = Module._melee_web_native_menu_results_pad_trace();
-  return pointer ? JSON.parse(Module.UTF8ToString(pointer)) : null;
-});
+const observeResultsPadTrace = async () => {
+  const trace = await page.evaluate(() => {
+    if (typeof Module?._melee_web_native_menu_results_pad_trace !== 'function') return null;
+    const pointer = Module._melee_web_native_menu_results_pad_trace();
+    return pointer ? JSON.parse(Module.UTF8ToString(pointer)) : null;
+  });
+  // Keep only the latest already-observed bounded trace; no additional native sampling.
+  report.competitiveTimeoutRoute.results_pad_trace_latest = trace;
+  return trace;
+};
 const checkRuntimeDiagnosticCounters = async (label, retainCheckpoint = true) => {
   const counters = await readRuntimeDiagnosticCounters(page);
   lastRuntimeCounterPollAt = Date.now();
