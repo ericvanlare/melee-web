@@ -196,6 +196,23 @@ let page;
 let driver;
 let browserCdp;
 let pageCdp;
+async function closeOwnedCaptureBrowser() {
+  try { driver?.dispose(); } catch (error) { report.close_error = String(error); }
+  // Quiesce browser callbacks before deciding whether diagnostics permit success.
+  try {
+    if (diagnostic && browserContext) {
+      await boundedCaptureOperation(browserContext.close(), observationTimeoutMs, 'owned browser context close');
+      report.cleanup ||= {};
+      report.cleanup.browser_context_closed = true;
+    }
+    else if (browser) await boundedCaptureOperation(browser.close(), observationTimeoutMs, 'owned browser close');
+  } catch (error) { report.close_error = String(error); }
+  try {
+    if (diagnosticCdp)
+      await boundedCaptureOperation(diagnosticCdp.detach(), observationTimeoutMs, 'CDP detach');
+  } catch (error) { report.cdp_close_error = String(error); }
+}
+
 const boundaryMarkers = [];
 const boundaryMarkerErrors = [];
 let resolveBoundaryPause;
@@ -313,7 +330,7 @@ function firstError(kind, message, details = null) {
 async function observePageOperation(label, operation) {
   if (pageObservationTimedOut) throw Error('Page observation already timed out; renderer evidence is unknown');
   try {
-    return await boundedCaptureOperation(operation, observationTimeoutMs, label);
+    return await boundedCaptureOperation(typeof operation === 'function' ? operation() : operation, observationTimeoutMs, label);
   } catch (error) {
     if (error.captureOperationTimeout) {
       pageObservationTimedOut = true;
@@ -1106,6 +1123,7 @@ try {
 } finally {
   if (firstReplayCallbackProbe) await finalizeFirstReplayCallbackProbe();
   else {
+  try {
   if (diagnostic) {
     if (pageObservationTimedOut) {
       report.natural_pause_terminal ||= {outcome: 'observation_timeout', source_cursor: null,
@@ -1350,7 +1368,7 @@ try {
       report.page_exports_skipped = 'Renderer observation timed out; last successful snapshot retained and page exports were skipped.';
     } else {
     try {
-      const artifacts = await page.locator('#retail-replay-downloads a').evaluateAll(async links => {
+      const artifacts = await observePageOperation('final replay artifacts', () => page.locator('#retail-replay-downloads a').evaluateAll(async links => {
         const retained = [];
         for (const link of links) {
           if (!['retail-port.jsonl', 'retail-timer.jsonl', 'retail-browser-report.json'].includes(link.download) || !link.href.startsWith('blob:')) continue;
@@ -1359,7 +1377,7 @@ try {
           retained.push({name: link.download, text: await response.text()});
         }
         return retained;
-      });
+      }));
       report.saved_downloads = [];
       for (const artifact of artifacts) {
         if (report.saved_downloads.some(row => row.name === artifact.name))
@@ -1368,11 +1386,11 @@ try {
         report.saved_downloads.push({name: artifact.name, bytes: Buffer.byteLength(artifact.text), sha256: createHash('sha256').update(artifact.text).digest('hex')});
       }
     } catch (error) { report.download_error = String(error?.message || error); }
-    try { const rows = await page.evaluate(() => window.__cpuPrefixRows || []); if(rows.length) await write('cpu-prefix.jsonl',rows.join('\n')+'\n'); } catch(error) { report.cpu_download_error = String(error); }
-    try { const rows = await page.evaluate(() => window.__cpuItemEventRows || []); await write('cpu-item-events.jsonl',rows.length ? rows.join('\n')+'\n' : ''); report.cpu_item_event_count = rows.length; } catch(error) { report.cpu_item_event_error = String(error); }
+    try { const rows = await observePageOperation('final CPU prefix rows', () => page.evaluate(() => window.__cpuPrefixRows || [])); if(rows.length) await write('cpu-prefix.jsonl',rows.join('\n')+'\n'); } catch(error) { report.cpu_download_error = String(error); }
+    try { const rows = await observePageOperation('final CPU item rows', () => page.evaluate(() => window.__cpuItemEventRows || [])); await write('cpu-item-events.jsonl',rows.length ? rows.join('\n')+'\n' : ''); report.cpu_item_event_count = rows.length; } catch(error) { report.cpu_item_event_error = String(error); }
     if (rngDrawProbe) {
       try {
-        const rows = await page.evaluate(() => window.__rngDrawProbeRows || []);
+        const rows = await observePageOperation('final RNG draw rows', () => page.evaluate(() => window.__rngDrawProbeRows || []));
         const validation = validateRngDrawProbeRows(rows, rngDrawProbe, {
           observedCursor: report.final_snapshot?.source_cursor,
           deliberateStop: report.deliberate_prefix_stop,
@@ -1392,7 +1410,7 @@ try {
     }
     if (hitTransitionProbe) {
       try {
-        const rows = await page.evaluate(() => window.__hitTransitionProbeRows || []);
+        const rows = await observePageOperation('final hit transition rows', () => page.evaluate(() => window.__hitTransitionProbeRows || []));
         // Retain the raw bounded artifact even if its strict validation fails.
         const text = rows.length ? rows.join('\n') + '\n' : '';
         await write('hit-transition-probe.jsonl', text);
@@ -1412,26 +1430,15 @@ try {
         retainFirstCaptureError(report, 'hit_transition_probe', report.hit_transition_probe_error, 'artifact validation');
       }
     }
-    try { await write('source-owner-trace.json', await page.evaluate(() => window.__meleeSourceOwnerTrace || [])); } catch(error) { report.owner_trace_error = String(error); }
-    try { await write('source-main-allocation-trace.json', {total: await page.evaluate(() => window.__meleeSourceAllocationTraceTotal || 0), events: await page.evaluate(() => window.__meleeSourceAllocationTrace || [])}); } catch(error) { report.source_allocation_trace_error = String(error); }
-    try { await write('page.txt', await page.locator('body').innerText()); } catch (error) { report.page_dump_error = String(error); }
-    try { await page.screenshot({path: path.join(output, 'final.png'), fullPage: false}); } catch (error) { report.screenshot_error = String(error); }
+    try { await write('source-owner-trace.json', await observePageOperation('final source owner trace', () => page.evaluate(() => window.__meleeSourceOwnerTrace || []))); } catch(error) { report.owner_trace_error = String(error); }
+    try { await write('source-main-allocation-trace.json', {total: await observePageOperation('final source allocation total', () => page.evaluate(() => window.__meleeSourceAllocationTraceTotal || 0)), events: await observePageOperation('final source allocation trace', () => page.evaluate(() => window.__meleeSourceAllocationTrace || []))}); } catch(error) { report.source_allocation_trace_error = String(error); }
+    try { await write('page.txt', await observePageOperation('final page text', () => page.locator('body').innerText())); } catch (error) { report.page_dump_error = String(error); }
+    try { await observePageOperation('final screenshot', () => page.screenshot({path: path.join(output, 'final.png'), fullPage: false})); } catch (error) { report.screenshot_error = String(error); }
     }
   }
-  try { driver?.dispose(); } catch (error) { report.close_error = String(error); }
-  // Quiesce browser callbacks before deciding whether diagnostics permit success.
-  try {
-    if (diagnostic && browserContext) {
-      await boundedCaptureOperation(browserContext.close(), observationTimeoutMs, 'owned browser context close');
-      report.cleanup ||= {};
-      report.cleanup.browser_context_closed = true;
-    }
-    else if (browser) await boundedCaptureOperation(browser.close(), observationTimeoutMs, 'owned browser close');
-  } catch (error) { report.close_error = String(error); }
-  try {
-    if (diagnosticCdp)
-      await boundedCaptureOperation(diagnosticCdp.detach(), observationTimeoutMs, 'CDP detach');
-  } catch (error) { report.cdp_close_error = String(error); }
+  } finally {
+    await closeOwnedCaptureBrowser();
+  }
   for (const candidate of runtimeDataAbortCandidates) {
     const expected = report.inputs?.runtime_data;
     const actual = report.runtime_data_load;

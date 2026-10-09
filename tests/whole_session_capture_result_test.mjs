@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import vm from 'node:vm';
 import {finalizeSessionCapture, REQUIRED_SESSION_DOWNLOADS,
   validateRuntimeDataAbort, boundedCaptureOperation, retainFirstCaptureError,
   FIRST_REPLAY_BOUNDARY_MARKER_PREFIX, FIRST_REPLAY_BOUNDARY_MARKER_NAMES,
@@ -170,3 +172,60 @@ assert.equal(missingReturn.first_unmatched_marker.marker, 'first_replay_callback
 const sequenceGap = markerRows.map(row => ({...row}));sequenceGap[4].sequence++;
 assert(inspectFirstReplayBoundaryMarkers(sequenceGap).errors.some(reason => reason.includes('sequence gap')));
 console.log('First replay callback marker protocol validates source order, paired boundaries, and pause state.');
+
+// Execute the actual production final-collection try/finally with stubbed renderer handles.
+const captureSource = await fs.readFile(new URL('../scripts/capture_whole_session_browser.mjs', import.meta.url), 'utf8');
+function extractBetween(start, end) {
+  const a = captureSource.indexOf(start), b = captureSource.indexOf(end, a);
+  assert(a >= 0 && b > a, `${start} production boundary missing`);
+  return captureSource.slice(a, b);
+}
+const closeSource = extractBetween('async function closeOwnedCaptureBrowser() {', 'const boundaryMarkers = [];');
+const observeSource = extractBetween('async function observePageOperation(label, operation) {', 'async function pauseTraceStatus');
+const collectSource = extractBetween('  try {\n  if (diagnostic) {\n    if (pageObservationTimedOut)', '  for (const candidate of runtimeDataAbortCandidates)');
+async function actualCollection(failure) {
+  const calls = [], primary = {kind: 'existing primary', message: 'keep first failure'};
+  const report = {first_error: primary};
+  const pending = () => new Promise(() => {});
+  const page = {
+    isClosed: () => false,
+    locator: name => ({
+      evaluateAll: () => { calls.push('artifacts'); return failure === 'artifacts stall' ? pending() : Promise.resolve([{name: 'retail-port.jsonl', text: 'raw'}]); },
+      innerText: () => { calls.push('text'); return Promise.resolve('page'); },
+    }),
+    evaluate: fn => {
+      const text = String(fn);
+      if (text.includes('__cpuPrefixRows')) {calls.push('cpu prefix'); return failure === 'CPU prefix stall' ? pending() : Promise.resolve([]);}
+      if (text.includes('TraceTotal')) {calls.push('allocation total'); return Promise.resolve(0);}
+      calls.push('other evaluate'); return Promise.resolve([]);
+    },
+    screenshot: () => {calls.push('screenshot'); return Promise.resolve();},
+  };
+  const scope = vm.createContext({report, page, diagnostic: false, pageObservationTimedOut: false,
+    observationTimeoutMs: 5, currentPhase: 'finally', boundedCaptureOperation,
+    firstError: (kind, message) => {report.first_error ||= {kind, message};},
+    snapshot: async () => ({}), rngDrawProbe: null, hitTransitionProbe: null,
+    write: async () => {calls.push('write'); if (failure === 'write failure') throw Error('owned write failed');},
+    Buffer, createHash: (await import('node:crypto')).createHash, path: (await import('node:path')).default,
+    output: 'unused', driver: {dispose: () => calls.push('dispose')},
+    browser: {close: async () => {calls.push('close'); if (failure === 'close failure') throw Error('owned close failed');}},
+    browserContext: null, diagnosticCdp: null,
+  });
+  vm.runInContext(observeSource + closeSource, scope);
+  await vm.runInContext(`(async () => {${collectSource}})()`, scope);
+  assert.equal(report.first_error, primary, 'later failures must preserve primary');
+  assert.equal(calls.at(-1), 'close', 'actual final collection must close its browser last');
+  if (failure === 'artifacts stall') {
+    assert.deepEqual(calls, ['artifacts', 'dispose', 'close']);
+    assert.equal(scope.pageObservationTimedOut, true);
+  }
+  if (failure === 'CPU prefix stall') {
+    assert.deepEqual(calls, ['artifacts', 'write', 'cpu prefix', 'dispose', 'close']);
+    assert.equal(scope.pageObservationTimedOut, true);
+  }
+  if (failure === 'write failure') assert.match(report.download_error, /owned write failed/);
+  if (failure === 'close failure') assert.match(report.close_error, /owned close failed/);
+  checks++;
+}
+for (const failure of ['artifacts stall', 'CPU prefix stall', 'write failure', 'close failure']) await actualCollection(failure);
+console.log(`Owned capture final collection controls passed: ${checks} total report/ownership controls.`);
