@@ -121,6 +121,7 @@ class FullItemsTests(unittest.TestCase):
         for value in range(30,-1,-1):
             row=deepcopy(stage_row);row['seq']=r.seq;row['source_tick']=31-value
             row['payload']['menu_consumed']=r.menu_consumed
+            row['payload']['slices'].append({'tag':17,'flags':0,'address':0x80479d30,'hex':'020201010000'})
             next(s for s in row['payload']['slices'] if s['tag']==55)['hex']=value.to_bytes(4,'big').hex()
             r.accept(row)
             if value==30:self.pad(r)

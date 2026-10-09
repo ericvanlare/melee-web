@@ -468,3 +468,17 @@ snapshot remains frozen, and VS admission requires observed countdown0 plus
 all existing strict setup checks. The actual fixture retains30→18 only; later
 countdown0/VS/tie/SD controls are explicitly synthetic. No native observer,
 menu7, recipe5, controller bytes or caps change for this decoder correction.
+
+The changed 7d2 campaign observed the exact30→0 countdown, then neutral zero
+progress through source tick239/menu count539. It failed at seq1689: the same
+SSS/FD/zero snapshot and frozen counters remained, while authored routing changed
+from SSS state1 to VS state2 (previous state1). `gm_801A4014` changes routing
+after OnExit; the SceneInfo pointer remains installed until the next
+`gm_801A4B88`. PADRead polls during this interval are observations, not source
+ticks. The receiver correction retains only that exact retiring route and
+unchanged owner/FD/zero/tick/input-count snapshot after observed countdown0 and
+neutral. It forbids any consumed input or return to active routing. Active
+duplicate/gapped ticks still fail, and strict VS entry remains separate. The
+offline actual replay accepts the buffered prefix through seq1698, without
+admitting VS/SD or the interrupted terminal as success. The failed run and
+incomplete MWRI remain preserved; no native observer, inputs or caps changed.
