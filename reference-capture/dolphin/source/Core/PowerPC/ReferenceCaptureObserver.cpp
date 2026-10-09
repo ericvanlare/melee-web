@@ -162,6 +162,43 @@ enum class Boundary : u16
   StartupPrizeModeExit = 30,
 };
 
+// gmMain calls HSD_PadInit(5,...). gm_1A45 drains the entire snapshot of
+// that queue before one DrawReturn; never interrupt its authored batch.
+struct EntityPrefixBoundaryProgress
+{
+  static constexpr u32 comparison_ticks = 60;
+  static constexpr u32 queue_capacity = 5;
+  static constexpr u32 maximum_ticks = comparison_ticks + queue_capacity - 1;
+  u32 observations = 0, batch_ticks = 0;
+  bool drawing = false, qualified = false;
+  // -1 rejects, 0 retains, 1 is the first qualifying checked draw.
+  int Observe(Boundary boundary, u32 tick, u8 qnum)
+  {
+    if (qualified || qnum != queue_capacity) return -1;
+    if (boundary == Boundary::SourceTick)
+    {
+      if (drawing || tick != observations || observations >= maximum_ticks ||
+          batch_ticks >= queue_capacity) return -1;
+      ++observations;
+      ++batch_ticks;
+    }
+    else if (boundary == Boundary::DrawEnter)
+    {
+      if (drawing || tick != observations) return -1;
+      drawing = true;
+    }
+    else if (boundary == Boundary::DrawReturn)
+    {
+      if (!drawing || tick != observations) return -1;
+      drawing = false;
+      batch_ticks = 0;
+      if (observations >= comparison_ticks) { qualified = true; return 1; }
+    }
+    else return -1;
+    return 0;
+  }
+};
+
 enum class SliceTag : u16
 {
   PadStatusAll4 = 1,
@@ -222,6 +259,7 @@ enum class SliceTag : u16
   SdRumblePorts = 54,  // Opt-in Progress JSON only; never a full save-data slice.
   SdStageCooldown = 55,  // Recipe-five menu route only; original acceptance gate.
   SdItemsLock = 56,  // Reduced Items owner only; original u8 animation lock.
+  PlayerIdentity = 57,  // Opt-in entity profile: authored StaticPlayer header.
 };
 
 struct SliceRef
@@ -579,7 +617,8 @@ u32 WholeSessionMatchCount()
     if (result > WHOLE_SESSION_MAX_MATCHES)
       return 0;
   }
-  return result >= WHOLE_SESSION_MIN_MATCHES ? result : 0;
+  return result >= WHOLE_SESSION_MIN_MATCHES ||
+         (result == 1 && Env("MWRC_ENTITY_PROFILE") == "jiggly-ice-mario-fox-v1") ? result : 0;
 }
 
 bool ValidIdentity(std::string_view value)
@@ -901,6 +940,13 @@ struct Observer::Impl
       return false;
     }
     whole_session_matches = WholeSessionMatchCount();
+    const std::string entity_profile = Env("MWRC_ENTITY_PROFILE");
+    checked_entity_profile = entity_profile == "jiggly-ice-mario-fox-v1";
+    if ((!entity_profile.empty() && !checked_entity_profile) ||
+        (checked_entity_profile && (whole_session_matches != 1 || SdInitRequested() ||
+          !Env("MWRC_CPU_PROBE_OUTPUT").empty() || !Env("MWRC_ITEM_PROBE_OUTPUT").empty() ||
+          !Env("MWRC_ALLOCATION_OUTPUT").empty())))
+      return SetInvalid("Entity profile requires its exact exclusive diagnostic scope"), false;
     capture_id = Env("MWRC_CAPTURE_ID");
     sequence_id = Env("MWRC_SEQUENCE_ID");
     const CpuProbeSettings& cpu_probe = CpuProbeEnvironment();
@@ -1066,6 +1112,8 @@ struct Observer::Impl
       handshake += ",\"profile_gci_sha256\":\"" + Env("MWRC_SD_PROFILE_GCI_SHA256") + "\"";
     if (OrdinaryTimeoutRequested())
       handshake += ",\"ordinary_policy_sha256\":\"" + Env("MWRC_ORDINARY_POLICY_SHA256") + "\"";
+    if (checked_entity_profile)
+      handshake += ",\"entity_profile\":\"jiggly-ice-mario-fox-v1\"";
     handshake += "}";
     PushJson(Event::Handshake, handshake);
     std::string start =
@@ -1078,6 +1126,8 @@ struct Observer::Impl
                JsonEscape(sequence_id) + "\"";
     else
       start += "\"";
+    if (checked_entity_profile)
+      start += ",\"entity_profile\":\"jiggly-ice-mario-fox-v1\"";
     start += "}";
     PushJson(Event::Start, start);
     return !invalid.load();
@@ -1949,8 +1999,90 @@ struct Observer::Impl
     return true;
   }
 
+  // Only the explicit diagnostic profile admits a follower. These source
+  // identities come from player.h/ft/types.h and ftMapping_list in player.c.
+  // No guest pointer is accepted merely because it was seen by Fighter_Create.
+  bool AddCheckedPlayerEntitySlices(Core::System* system, u32 requested_slot)
+  {
+    if (requested_slot >= 4 || active_slot_count != 4)
+      return SetInvalid("Entity profile requires four declared source slots"), false;
+    constexpr std::array<u32, 4> characters{15, 14, 8, 2};
+    constexpr std::array<std::array<u32, 2>, 4> kinds{{{15, 0}, {10, 11}, {0, 0}, {1, 0}}};
+    std::array<u32, 5> seen_gobjs{}, seen_fighters{};
+    size_t seen_count = 0;
+    std::array<std::array<u32, 2>, 4> gobjs{};
+    for (u32 slot = 0; slot < 4; ++slot)
+    {
+      const u32 player = 0x80453080 + slot * 0xe90;
+      std::array<u8, 0x10> identity{};
+      std::array<u8, 8> entities{};
+      if (!ReadBytes(system, player, identity.size(), identity.data()) ||
+          !ReadBytes(system, player + 0xb0, entities.size(), entities.data()))
+        return SetInvalid("Entity profile player ownership escaped its source range"), false;
+      const u32 type = ReadBE32(identity.data() + 8);
+      const u32 count = slot == 1 ? 2 : 1;
+      if (ReadBE32(identity.data() + 4) != characters[slot] || type != 1 ||
+          identity[0xc] != 0 || identity[0xd] != 1 ||
+          !fighter_present[slot] || fighter_entity_count[slot] != count ||
+          fighter_pointers[slot] != fighter_entity_pointers[slot][0])
+        return SetInvalid("Entity profile character/type/form/ordinal inventory differs"), false;
+      for (u32 ordinal = 0; ordinal < 2; ++ordinal)
+      {
+        const u32 gobj = ReadBE32(entities.data() + ordinal * 4);
+        gobjs[slot][ordinal] = gobj;
+        if (ordinal >= count)
+        {
+          if (gobj || fighter_entity_pointers[slot][ordinal])
+            return SetInvalid("Entity profile has an undeclared follower"), false;
+          continue;
+        }
+        u32 fighter = 0;
+        std::array<u8, 0x10> head{};
+        if (!gobj || !IsMem1Range(gobj, 0x30) ||
+            !ReadU32(system, gobj + 0x2c, &fighter) ||
+            !fighter || !IsMem1Range(fighter, 0x100) ||
+            !ReadBytes(system, fighter, head.size(), head.data()) ||
+            fighter == gobj || fighter != fighter_entity_pointers[slot][ordinal] ||
+            ReadBE32(head.data()) != gobj || head[0xc] != slot ||
+            ReadBE32(head.data() + 4) != kinds[slot][ordinal] ||
+            fighter_entity_kinds[slot][ordinal] != kinds[slot][ordinal])
+          return SetInvalid("Entity profile GObj/Fighter/registered owner differs"), false;
+        for (size_t earlier = 0; earlier < seen_count; ++earlier)
+          if (seen_gobjs[earlier] == gobj || seen_fighters[earlier] == fighter ||
+              seen_gobjs[earlier] == fighter || seen_fighters[earlier] == gobj)
+            return SetInvalid("Entity profile aliases another source entity owner"), false;
+        seen_gobjs[seen_count] = gobj;
+        seen_fighters[seen_count++] = fighter;
+      }
+    }
+    for (u32 slot = 4; slot < 6; ++slot)
+    {
+      u32 type = 0;
+      std::array<u8, 8> entities{};
+      const u32 player = 0x80453080 + slot * 0xe90;
+      if (!ReadU32(system, player + 8, &type) || type != 3 ||
+          !ReadBytes(system, player + 0xb0, entities.size(), entities.data()) ||
+          ReadBE32(entities.data()) || ReadBE32(entities.data() + 4))
+        return SetInvalid("Entity profile has an undeclared active source slot"), false;
+    }
+    const u32 player = 0x80453080 + requested_slot * 0xe90;
+    if (!AddSlice(system, SliceTag::PlayerIdentity, player, 0x10,
+                  static_cast<u16>(requested_slot)) ||
+        !AddSlice(system, SliceTag::PlayerEntities, player + 0xb0, 8,
+                  static_cast<u16>(requested_slot)))
+      return SetInvalid("Entity profile relationship slices escaped source ranges"), false;
+    for (u32 ordinal = 0; ordinal < fighter_entity_count[requested_slot]; ++ordinal)
+      if (!AddSlice(system, SliceTag::PlayerEntityUserData,
+                    gobjs[requested_slot][ordinal] + 0x2c, 4,
+                    FighterEntitySliceFlags(requested_slot, ordinal)))
+        return SetInvalid("Entity profile user-data slice escaped source ranges"), false;
+    return true;
+  }
+
   bool AddPlayerEntitySlices(Core::System* system, u32 slot)
   {
+    if (checked_entity_profile)
+      return AddCheckedPlayerEntitySlices(system, slot);
     // StaticPlayer is the pinned GALE01r2 source table at 0x80453080 with
     // 0xe90-byte records. Its two HSD_GObj* player_entity fields begin at
     // +0xb0 (melee/pl/player.h). HSD_GObj::user_data is at +0x2c
@@ -3250,6 +3382,16 @@ struct Observer::Impl
         return;
       if (!AddMatchSlices(system))
         return SetInvalid("match semantic slice escaped the pinned ranges"), void();
+      if (checked_entity_profile)
+      {
+        u8 qnum = 0;
+        if (!ReadBytes(system, 0x804c1f78, 1, &qnum))
+          return SetInvalid("entity prefix queue capacity is unreadable"), void();
+        const int admission = entity_prefix_progress.Observe(boundary, source_tick, qnum);
+        if (admission < 0)
+          return SetInvalid("entity prefix source/draw batch boundary differs"), void();
+        entity_prefix_final_draw = admission == 1;
+      }
     }
     else if (boundary == Boundary::ResultEnter || boundary == Boundary::ResultReturn)
     {
@@ -3495,6 +3637,13 @@ struct Observer::Impl
     Publish(slot);
     if (boundary == Boundary::DrawReturn)
       ++draw_ordinal;
+    if (checked_entity_profile && entity_prefix_final_draw)
+    {
+      // Publish every tick/PAD/draw row first. This only closes the diagnostic
+      // stream at a passive hook; it never breaks the guest loop or creates Results.
+      RequestComplete();
+      return;
+    }
     if (boundary == Boundary::SceneTeardown && result_seen)
     {
       if (!whole_session_enabled())
@@ -4173,9 +4322,15 @@ struct Observer::Impl
                   std::chrono::steady_clock::now().time_since_epoch())
                   .count());
           const bool complete = natural_completion.load() && !invalid.load();
-          const std::string json = complete
+          std::string json = complete
                                        ? "{\"status\":\"completed\",\"natural\":true}"
                                        : "{\"status\":\"interrupted\",\"natural\":false}";
+          if (checked_entity_profile)
+            json = "{\"status\":\"" + std::string(complete ? "completed" : "interrupted") +
+                   "\",\"natural\":false,\"diagnostic_prefix_complete\":" +
+                   (complete ? "true" : "false") + ",\"whole_session_equivalent\":false," +
+                   "\"comparison_source_ticks\":60,\"observed_source_ticks\":" +
+                   std::to_string(entity_prefix_progress.observations) + "}";
           end_slot.payload_size = static_cast<u32>(json.size());
           std::memcpy(end_slot.payload.data(), json.data(), json.size());
           end_slot.checksum = CRC32(end_slot.payload.data(), end_slot.payload_size);
@@ -4240,6 +4395,10 @@ struct Observer::Impl
         (completed ? "true" : "false") + ",\"invalid\":" +
         (invalid.load() ? "true" : "false") + ",\"error\":" +
         (error_text.empty() ? "null" : "\"" + error_text + "\"");
+    if (checked_entity_profile && force && state != "starting")
+      json += ",\"diagnostic_prefix_complete\":" + std::string(completed ? "true" : "false") +
+              ",\"whole_session_equivalent\":false,\"comparison_source_ticks\":60," +
+              "\"observed_source_ticks\":" + std::to_string(entity_prefix_progress.observations);
     json += CpuProbeCloseStatusJson();
     json += "}\n";
     if (!status.Write(reinterpret_cast<const u8*>(json.data()), json.size()) || !status.Flush() ||
@@ -4355,6 +4514,9 @@ struct Observer::Impl
   std::string item_probe_error;
   std::array<bool, 16> item_probe_pair_active{};
   std::array<u32, 16> item_probe_pair_lr{};
+  bool checked_entity_profile = false;
+  EntityPrefixBoundaryProgress entity_prefix_progress;
+  bool entity_prefix_final_draw = false;
   u32 whole_session_matches = 0;
   u32 audio_owner_epoch = 0;
   u32 match_index = 0;
