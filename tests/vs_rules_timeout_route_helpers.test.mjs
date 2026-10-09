@@ -1,5 +1,14 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
 import test from 'node:test';
+import {
+  classifyPrizeReturnReadiness,
+  classifyResultsDestinationReadiness,
+  classifyResultsOwnerReadiness,
+  resultsPadTraceFailures,
+  RESULTS_TRACE_START_MASK,
+} from './vs_rules_results_confirmation_driver.mjs';
 import {
   COMPETITIVE_TIMEOUT_BOUNDS,
   competitiveTimeoutDeferredResultsFailures,
@@ -31,6 +40,16 @@ const match = ({frame = 180, stocks = [4, 4], paused = false, ending = false,
   players: stocks.map(value => ({stocks: value})), rules: {player_stocks: [4, 4]},
 });
 
+const activeHost = (phase, message = phase === 8 ? 'Original Results' :
+  phase === 9 ? 'Original unlock notification' : 'Original character select') => ({
+  phase, running: 1, message, status: message, error: null,
+  pause_present: true, pause_disabled: false,
+});
+const preparationHost = (phase, message, label = message) => ({
+  phase, running: 0, message, status: `${label} · 25 ms · audio paused`, error: null,
+  pause_present: true, pause_disabled: true,
+});
+
 test('timeout input and wait bounds stay finite and source-tick based', () => {
   assert.deepEqual(COMPETITIVE_TIMEOUT_BOUNDS, {
     stockLossWallMs: 120000, noSourceProgressWallMs: 15000,
@@ -42,16 +61,77 @@ test('timeout input and wait bounds stay finite and source-tick based', () => {
     COMPETITIVE_TIMEOUT_BOUNDS.maximumOutwardPulses, 600);
 });
 
+test('finite source-backed Results and destination readiness matrix requires the live pause control', () => {
+  for (const host of [
+    activeHost(8),
+    preparationHost(8, 'Preparing original Results...'),
+    preparationHost(8, 'Original Results', 'Preparing original Results...'),
+    preparationHost(8, 'Preparing first-use rendering...'),
+  ]) assert.notEqual(classifyResultsOwnerReadiness(host).kind, 'invalid', JSON.stringify(host));
+  assert.equal(classifyResultsOwnerReadiness(
+    preparationHost(8, 'Original Results', 'Preparing original Results...')).reason,
+  'constructed-results-preparation');
+  assert.equal(classifyResultsOwnerReadiness(
+    preparationHost(8, 'Original Results', 'Preparing original match continuation...')).reason,
+  'constructed-results-preparation', 'the finite SD producer label is retained for shared-helper reuse');
+  for (const host of [
+    preparationHost(8, 'Preparing original Results...', 'Preparing original next scene...'),
+    preparationHost(8, 'Paused.'),
+    {...activeHost(8), pause_present: false},
+    {...activeHost(8), pause_disabled: true},
+    {...preparationHost(8, 'Preparing original Results...'), pause_disabled: false},
+    {...activeHost(8), error: 'native failure'},
+  ]) assert.equal(classifyResultsOwnerReadiness(host).kind, 'invalid', JSON.stringify(host));
+
+  for (const host of [
+    activeHost(1), activeHost(9),
+    preparationHost(5, 'Preparing original next scene...'),
+    preparationHost(1, 'Original character select', 'Preparing original next scene...'),
+    preparationHost(9, 'Original unlock notification', 'Preparing original next scene...'),
+    preparationHost(1, 'Preparing first-use rendering...'),
+    preparationHost(9, 'Preparing first-use rendering...'),
+  ]) assert.notEqual(classifyResultsDestinationReadiness(host).kind, 'invalid', JSON.stringify(host));
+  assert.equal(classifyResultsDestinationReadiness(
+    preparationHost(9, 'Preparing first-use rendering...')).reason,
+  'prize-first-use-render-settle');
+  for (const host of [
+    preparationHost(1, 'Original character select'),
+    preparationHost(9, 'Original unlock notification', 'Preparing original character select...'),
+    preparationHost(5, 'Preparing original character select...'),
+    {...preparationHost(1, 'Original character select', 'Preparing original next scene...'), pause_present: false},
+    {...activeHost(1), pause_disabled: true},
+    {...activeHost(9), status: 'Preparing first-use rendering...'},
+  ]) assert.equal(classifyResultsDestinationReadiness(host).kind, 'invalid', JSON.stringify(host));
+
+  for (const host of [
+    activeHost(1), activeHost(9),
+    preparationHost(5, 'Preparing original character select...'),
+    preparationHost(1, 'Original character select', 'Preparing original character select...'),
+    preparationHost(1, 'Preparing first-use rendering...'),
+    preparationHost(9, 'Preparing first-use rendering...'),
+  ]) assert.notEqual(classifyPrizeReturnReadiness(host).kind, 'invalid', JSON.stringify(host));
+  assert.equal(classifyPrizeReturnReadiness(
+    preparationHost(9, 'Preparing first-use rendering...')).reason,
+  'prize-first-use-render-settle');
+  for (const host of [
+    preparationHost(1, 'Original character select', 'Preparing original next scene...'),
+    preparationHost(5, 'Preparing original next scene...'),
+    {...activeHost(1), pause_present: false},
+    {...activeHost(1), pause_disabled: true},
+    {...preparationHost(1, 'Original character select', 'Preparing original character select...'), pause_disabled: false},
+  ]) assert.equal(classifyPrizeReturnReadiness(host).kind, 'invalid', JSON.stringify(host));
+});
+
 test('Prize return sends Start only in phase 9 and remains inside the shared bounded route', async () => {
   assert.equal(COMPETITIVE_PRIZE_MAX_CONFIRMATIONS, 60);
   const presses = [];
-  const states = [9, 9, 1];
+  const states = [activeHost(9), activeHost(9), activeHost(1)];
   let observations = 0;
   const order = [];
   const result = await returnFromCompetitivePrize({
     deadlineAt: Date.now() + 5000,
     observeTrace: async () => { order.push('trace'); return completedResultsTrace(); },
-    observeHost: async () => { order.push('host'); return {phase: states[observations++], running: 1}; },
+    observeHost: async () => { order.push('host'); return states[observations++]; },
     press: async (key, timing) => { presses.push({key, timing}); },
     wait: async () => {},
   });
@@ -68,7 +148,7 @@ test('Prize return sends Start only in phase 9 and remains inside the shared bou
 
   const alreadyCss = await returnFromCompetitivePrize({
     deadlineAt: Date.now() + 1000,
-    observeHost: async () => ({phase: 1, running: 1}),
+    observeHost: async () => activeHost(1),
     observeTrace: async () => completedResultsTrace(),
     press: async () => assert.fail('CSS return must not send a Prize Start'),
     wait: async () => {},
@@ -83,17 +163,17 @@ test('Prize return rejects non-Prize phases and stops at the exact confirmation 
   let presses = 0;
   await assert.rejects(returnFromCompetitivePrize({
     deadlineAt: Date.now() + 1000,
-    observeHost: async () => ({phase, running: 1}),
+    observeHost: async () => activeHost(phase),
     observeTrace: async () => completedResultsTrace(),
     press: async () => { presses++; },
     wait: async () => {},
-  }), /Start is not allowed/);
+  }), /unsupported host state/);
   assert.equal(presses, 0);
 
   phase = 9;
   await assert.rejects(returnFromCompetitivePrize({
     deadlineAt: Date.now() + 45000,
-    observeHost: async () => ({phase, running: 1}),
+    observeHost: async () => activeHost(phase),
     observeTrace: async () => completedResultsTrace(),
     press: async () => { presses++; },
     wait: async () => {},
@@ -109,12 +189,15 @@ test('Prize return rejects non-Prize phases and stops at the exact confirmation 
   }), /live shared deadline/);
 });
 
-test('Prize phase 5 is admitted only after a declared Prize input and exact character-select preparation', async () => {
+test('Prize return waits through Prize render settle, CSS transfer, construction and first-use before active CSS', async () => {
   const states = [
-    {phase: 9, running: 1, message: 'Original unlock notification'},
-    {phase: 5, running: 0, message: 'Preparing original character select...'},
-    {phase: 5, running: 0, message: 'Preparing original character select...'},
-    {phase: 1, running: 1, message: 'Original character select'},
+    activeHost(9),
+    preparationHost(9, 'Preparing first-use rendering...'),
+    activeHost(9),
+    preparationHost(5, 'Preparing original character select...'),
+    preparationHost(1, 'Original character select', 'Preparing original character select...'),
+    preparationHost(1, 'Preparing first-use rendering...'),
+    activeHost(1),
   ];
   let observation = 0;
   let traceReads = 0;
@@ -127,48 +210,75 @@ test('Prize phase 5 is admitted only after a declared Prize input and exact char
     press: async (key, timing) => presses.push({key, timing}),
     wait: async () => { waitCount++; },
   });
-  assert.deepEqual(presses, [{key: 'Enter', timing: {releaseMs: 380}}]);
-  assert.equal(traceReads, 4, 'the retained Results ring is read before each host status check');
-  assert.equal(waitCount, 2);
+  assert.deepEqual(presses, [
+    {key: 'Enter', timing: {releaseMs: 380}},
+    {key: 'Enter', timing: {releaseMs: 380}},
+  ]);
+  assert.equal(traceReads, 7, 'the retained Results ring is read before each host readiness check');
+  assert.equal(waitCount, 4);
   assert.equal(result.final_phase, 1, 'the route only completes on observed active CSS');
-  assert.deepEqual(result.deferred_preparation, {
-    phase: 5, running: 0, message: 'Preparing original character select...', after_confirmation: 1,
-  });
+  assert.deepEqual(result.deferred_preparation, [
+    {phase: 9, reason: 'prize-first-use-render-settle', preparation_label: 'Preparing first-use rendering...',
+      message: 'Preparing first-use rendering...', after_confirmation: 1, observations: 1},
+    {phase: 5, reason: 'asset-transfer', preparation_label: 'Preparing original character select...',
+      message: 'Preparing original character select...', after_confirmation: 2, observations: 1},
+    {phase: 1, reason: 'destination-construction', preparation_label: 'Preparing original character select...',
+      message: 'Original character select', after_confirmation: 2, observations: 1},
+    {phase: 1, reason: 'first-use-render-settle', preparation_label: 'Preparing first-use rendering...',
+      message: 'Preparing first-use rendering...', after_confirmation: 2, observations: 1},
+  ]);
   assert.match(result.prize_source_exit_witness, /no dedicated Prize PAD source trace/);
 });
 
 test('Prize route rejects phase 5 without prior Prize input, with wrong preparation message, or with invalid retained Results trace', async () => {
   const common = {
-    deadlineAt: Date.now() + 3000,
+    deadlineAt: Date.now() + 45000,
     observeTrace: async () => completedResultsTrace(),
     press: async () => {},
     wait: async () => {},
   };
   await assert.rejects(returnFromCompetitivePrize({...common,
-    observeHost: async () => ({phase: 5, running: 0, message: 'Preparing original character select...'}),
-  }), /invalid host running state/);
+    observeHost: async () => preparationHost(5, 'Preparing original character select...'),
+  }), /not active CSS\/Prize or an exact Results-destination preparation state/);
 
   await assert.rejects(returnFromCompetitivePrize({...common,
-    observeHost: async () => ({phase: 9, running: 0, message: 'Original unlock notification'}),
-  }), /Prize must be active before another confirmation/);
+    observeHost: async () => preparationHost(9, 'Original unlock notification'),
+  }), /not active CSS\/Prize or an exact Results-destination preparation state/);
 
   let phaseNineReads = 0;
   let phaseNinePresses = 0;
   await assert.rejects(returnFromCompetitivePrize({...common,
-    observeHost: async () => phaseNineReads++ === 0
-      ? {phase: 9, running: 1, message: 'Original unlock notification'}
-      : {phase: 9, running: 0, message: 'Original unlock notification'},
+    observeHost: async () => {
+      const index = phaseNineReads++;
+      return index === 0 ? activeHost(9) : index === 1
+        ? preparationHost(9, 'Preparing first-use rendering...') : activeHost(9);
+    },
     press: async () => { phaseNinePresses++; },
-  }), /Prize must be active before another confirmation/);
-  assert.equal(phaseNinePresses, 1, 'a stopped Prize never receives a repeated Enter');
+  }), /within 60 confirmations/,
+  'a Prize first-use settle waits for the active Prize owner instead of inputting while stopped');
+  assert.equal(phaseNinePresses, COMPETITIVE_PRIZE_MAX_CONFIRMATIONS,
+    'only the active Prize owner receives bounded Enter confirmations');
+
+  const afterCssCommit = [
+    activeHost(9),
+    preparationHost(5, 'Preparing original character select...'),
+    preparationHost(9, 'Preparing first-use rendering...'),
+    activeHost(9),
+  ];
+  let afterCssIndex = 0;
+  await assert.rejects(returnFromCompetitivePrize({...common,
+    observeHost: async () => afterCssCommit[afterCssIndex++],
+    press: async () => {},
+  }), /CSS transfer entered an unexpected Prize preparation state/,
+  'a Prize render settle is valid only before CSS transfer has committed');
 
   let afterPress = false;
   await assert.rejects(returnFromCompetitivePrize({...common,
     observeHost: async () => afterPress
-      ? {phase: 5, running: 0, message: 'Preparing original next scene...'}
-      : {phase: 9, running: 1, message: 'Original unlock notification'},
+      ? preparationHost(5, 'Preparing original next scene...')
+      : activeHost(9),
     press: async () => { afterPress = true; },
-  }), /phase 5 is admitted only/);
+  }), /not active CSS\/Prize or an exact Prize-return preparation state/);
 
   await assert.rejects(returnFromCompetitivePrize({...common,
     observeTrace: async () => ({schema: 'missing'}),
@@ -326,4 +436,83 @@ test('live recorder counter polling stops on invalid observations and runtime in
     .some(row => row.includes('invalid publication-phase')));
   assert(runtimeDiagnosticCounterFailures({...counters, status: 'unavailable'})
     .some(row => row.includes('status')));
+});
+
+const retainedV5TracePath = process.env.MELEE_SD_V5_RESULTS_TRACE;
+const retainedV6TracePath = process.env.MELEE_SD_V6_RESULTS_TRACE;
+const retainedV6ReportPath = process.env.MELEE_SD_V6_BROWSER_REPORT;
+test('retained v5/v6 Results traces and v6 stopped-CSS host projection preserve the readiness boundary', {
+  skip: !retainedV5TracePath || !retainedV6TracePath || !retainedV6ReportPath,
+}, async () => {
+  const [v5Bytes, v6Bytes, reportBytes] = await Promise.all([
+    readFile(retainedV5TracePath), readFile(retainedV6TracePath), readFile(retainedV6ReportPath),
+  ]);
+  assert.equal(createHash('sha256').update(v5Bytes).digest('hex'),
+    'fa2a6f48e5dfc520bae1bb7306a96ccb86eab0747bc155e85901587d748cfb57');
+  assert.equal(createHash('sha256').update(v6Bytes).digest('hex'),
+    '904bda8fc4a43041bb8ec2d4c65abd70ff4cf4ce52f44b55d7d35b4879697ba3');
+  assert.equal(createHash('sha256').update(reportBytes).digest('hex'),
+    '548372db6963970c98cddd767db42817460a42ed5bce36d445113b43cf16b537');
+  const v5 = JSON.parse(v5Bytes.toString('utf8'));
+  const v6 = JSON.parse(v6Bytes.toString('utf8'));
+  const report = JSON.parse(reportBytes.toString('utf8'));
+  assert.deepEqual(resultsPadTraceFailures(v5), []);
+  assert.deepEqual(resultsPadTraceFailures(v6), []);
+  assert.equal(v5.retained, 271);
+  assert.equal(v6.retained, 288);
+  assert.equal(v6.attempts, 288);
+  assert.equal(v6.overflow, false);
+
+  const starts = (trace, port) => trace.samples.flatMap((row, index) =>
+    row.source_consumed_pads[port].trigger & RESULTS_TRACE_START_MASK ? [index] : []);
+  assert.deepEqual(starts(v5, 1), [], 'retained v5 is an actual no-P2-completion negative');
+  assert.deepEqual(v5.samples.at(-1).results_state_after_tick,
+    {source_frame: 271, phase: 3, stats_phase: 2, num_pages: 3,
+      players: [{page: 0, confirmed: 1}, {page: 0, confirmed: 0},
+        {page: 0, confirmed: 1}, {page: 0, confirmed: 1}]});
+  assert.deepEqual(starts(v6, 1), [276]);
+  const p2Row = v6.samples[276];
+  assert.equal(p2Row.pads[1].button & RESULTS_TRACE_START_MASK, RESULTS_TRACE_START_MASK);
+  assert.equal(p2Row.source_consumed_pads[1].trigger & RESULTS_TRACE_START_MASK, RESULTS_TRACE_START_MASK);
+  assert.deepEqual(p2Row.results_state_after_tick,
+    {source_frame: 277, phase: 4, stats_phase: 2, num_pages: 3,
+      players: [1, 1, 1, 1].map(confirmed => ({page: 0, confirmed}))});
+  const {source_frame: finalFrame, ...finalState} = v6.samples.at(-1).results_state_after_tick;
+  const {source_frame: p2Frame, ...p2State} = p2Row.results_state_after_tick;
+  assert(finalFrame > p2Frame, 'captured retained trace continued after the P2 edge');
+  assert.deepEqual(finalState, p2State,
+    'all later captured Results rows preserve the authored phase, stats and four confirmation flags');
+
+  const capturedHost = report.failure?.state;
+  assert.deepEqual({phase: capturedHost?.phase, running: capturedHost?.running,
+    message: capturedHost?.message, status: capturedHost?.status, error: capturedHost?.error}, {
+    phase: 1, running: 0, message: 'Original character select',
+    status: 'Preparing original next scene... · 493 ms · audio paused', error: null,
+  });
+  assert.equal(Object.hasOwn(capturedHost, 'pause_present'), false,
+    'the actual v6 report did not retain pause-control state');
+
+  // Only this test projection adds the unrecorded pause-control fields and
+  // post-failure completion states; those fields are synthetic, not v6 output.
+  const syntheticStoppedCss = {...capturedHost, pause_present: true, pause_disabled: true};
+  const syntheticFirstUseSettle = preparationHost(1, 'Preparing first-use rendering...');
+  const syntheticActiveCss = activeHost(1);
+  const hosts = [syntheticStoppedCss, syntheticFirstUseSettle, syntheticActiveCss];
+  let hostIndex = 0;
+  let traceReads = 0;
+  let waits = 0;
+  const continuation = await returnFromCompetitivePrize({
+    deadlineAt: Date.now() + 5000,
+    observeTrace: async () => { traceReads++; return v6; },
+    observeHost: async () => hosts[hostIndex++],
+    press: async () => assert.fail('captured route already returned to CSS; no Prize input is allowed'),
+    wait: async () => { waits++; },
+  });
+  assert.equal(continuation.initial_phase, 1);
+  assert.equal(continuation.final_phase, 1);
+  assert.equal(continuation.prize_confirmations, 0);
+  assert.equal(traceReads, 3);
+  assert.equal(waits, 1);
+  assert.deepEqual(continuation.deferred_preparation.map(row => row.reason),
+    ['destination-construction', 'first-use-render-settle']);
 });

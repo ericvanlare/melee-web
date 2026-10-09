@@ -62,6 +62,15 @@ helper and callsite need a reduced checked transition control before another
 long route. Both runs passed Eject and exact child/browser/socket cleanup;
 all failures and producer identities remain retained.
 
+V6 retained 288 complete Results rows, including P2’s raw and copied Start at
+frame 277 and phase 4/stats phase 2 with all four confirmation flags set. It
+failed when original CSS was constructed (phase 1) but still preparing with
+running 0; active returned CSS was not reached. Exact cleanup passed. A reduced
+readiness control now distinguishes loading, constructed destination and
+first-use render settling from active CSS/Prize. V6 did not retain Pause-control
+state; synthetic readiness fields are separate from its actual trace and host
+observation. The browser route remains failed until a changed run passes.
+
 The original-reference producer `8f944a09` (binary digest `c22d23c2`) passed a
 reduced Rules-ready control using the exact selected GCI profile: menu kind 13,
 row 0/value 0, entering 1 and cooldown 0. Its 2,018-event MWRI recording completed;
@@ -74,7 +83,7 @@ colors [1, 0] and pause-enabled setup differ from the planned original colors
 The consolidated executable head `fd55b378` passed all 2,163 unittest cases
 with 154 skips. It includes the reference toolset and shared Results helper;
 the current corrected browser route remains failed. The later executable
-`8173e69e` delta has focused checks only; a current full suite is still required
+phase/readiness and reference-toolset deltas have focused checks only; a current full suite is still required
 before integration. Frozen runtime `5308a80c` and
 native producers remain distinct from this tested source. Current-head CI and
 root integration review remain required.

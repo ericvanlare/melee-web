@@ -175,7 +175,7 @@ test('actual v5 271-row P1-only prefix cannot admit next-scene preparation',asyn
     attempts:length,retained:length,samples:actual.samples.slice(0,length)};};
   await assert.rejects(confirmTwoHumanResults({deadlineAt:Date.now()+45000,
     observeTrace:async()=>prefix(),
-    observeHost:async()=>actions===3?{phase:5,running:0,message:'Preparing original next scene...',error:null}:{phase:8,running:1,error:null},
+    observeHost:async()=>actions===3?{phase:5,running:0,message:'Preparing original next scene...',status:'Preparing original next scene... · 56 ms · audio paused',pause_present:true,pause_disabled:true,error:null}:{phase:8,running:1,message:'Original Results',status:'Original Results',pause_present:true,pause_disabled:false,error:null},
     press:async key=>{keys.push(key);++actions;},wait:async()=>{},
   }),/P2 statistics confirmation.*(?:exactly one|one consumed|Start)/);
   assert.deepEqual(keys,['Enter','Enter','End']);

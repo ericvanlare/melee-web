@@ -9,6 +9,16 @@ import {
   resultsPadTraceFailures,
 } from './vs_rules_results_confirmation_driver.mjs';
 
+const activeHost = (phase, message = phase === 8 ? 'Original Results' :
+  phase === 9 ? 'Original unlock notification' : 'Original character select') => ({
+  phase, running: 1, message, status: message, error: null,
+  pause_present: true, pause_disabled: false,
+});
+const preparationHost = (phase, message, label = message) => ({
+  phase, running: 0, message, status: `${label} · 25 ms · audio paused`, error: null,
+  pause_present: true, pause_disabled: true,
+});
+
 function makeTraceRow(sourceFrame, {phase, statsPhase, confirmed, startPorts = []}) {
   return {
     source_frame: sourceFrame,
@@ -111,7 +121,7 @@ test('two-Human Results driver gates presentation and each port confirmation on 
   const append = (options) => samples.push(makeTraceRow(samples.length, options));
   const result = await confirmTwoHumanResults({
     deadlineAt: Date.now() + 5000,
-    observeHost: async () => ({phase: hostPhase, running: 1, message: null}),
+    observeHost: async () => activeHost(hostPhase),
     observeTrace: async () => snapshot(),
     press: async key => {
       presses.push(key);
@@ -136,12 +146,67 @@ test('two-Human Results driver gates presentation and each port confirmation on 
   assert.equal(result.original_exit.host_phase, 1);
 });
 
+test('Results waits for constructed/preparing owner readiness and an asynchronous P2 source edge', async () => {
+  const samples = [
+    makeTraceRow(0, {phase: 0, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+    makeTraceRow(1, {phase: 1, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+    makeTraceRow(2, {phase: 2, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+  ];
+  const presses = [];
+  const inputReadiness = [];
+  const waits = [];
+  let host = preparationHost(8, 'Original Results', 'Preparing original Results...');
+  let p2Waits = 0;
+  const append = options => samples.push(makeTraceRow(samples.length, options));
+  const result = await confirmTwoHumanResults({
+    deadlineAt: Date.now() + 5000,
+    observeHost: async () => host,
+    observeTrace: async () => makeTrace(samples),
+    press: async key => {
+      presses.push(key);
+      inputReadiness.push(host.running);
+      if (presses.length === 1) {
+        append({phase: 3, statsPhase: 0, confirmed: [0, 0, 1, 1], startPorts: [0]});
+        append({phase: 3, statsPhase: 2, confirmed: [0, 0, 1, 1]});
+      } else if (presses.length === 2) {
+        append({phase: 3, statsPhase: 2, confirmed: [1, 0, 1, 1], startPorts: [0]});
+      } else if (presses.length === 3) {
+        host = preparationHost(8, 'Preparing first-use rendering...');
+      }
+    },
+    wait: async () => {
+      waits.push(presses.length);
+      if (presses.length === 0) {
+        host = waits.length === 1
+          ? preparationHost(8, 'Preparing first-use rendering...')
+          : activeHost(8);
+      } else if (presses.length === 3) {
+        if (p2Waits++ === 0) {
+          append({phase: 4, statsPhase: 2, confirmed: [1, 1, 1, 1], startPorts: [1]});
+          host = preparationHost(5, RESULTS_NEXT_SCENE_PREPARATION_MESSAGE);
+        } else {
+          host = activeHost(1);
+        }
+      }
+    },
+  });
+  assert.deepEqual(presses, ['Enter', 'Enter', 'End']);
+  assert.deepEqual(inputReadiness, [1, 1, 1], 'no input is sent while Results or a destination is stopped');
+  assert.equal(waits.filter(count => count === 0).length, 2,
+    'constructed Results and first-use preparation are observed before any input');
+  assert.deepEqual(result.p2_confirmation.consumed_start_ports, [1]);
+  assert.equal(result.original_exit.host_phase, 1);
+  assert.deepEqual(result.post_confirmation_preparation.map(row => [row.phase, row.reason]), [
+    [8, 'first-use-render-settle'], [5, 'asset-transfer'],
+  ]);
+});
+
 test('Results driver fails on a misrouted P1 presentation Start and stops before statistics inputs', async () => {
   const samples = [makeTraceRow(0, {phase: 2, statsPhase: 0, confirmed: [0, 0, 0, 0]})];
   const presses = [];
   await assert.rejects(confirmTwoHumanResults({
     deadlineAt: Date.now() + 1000,
-    observeHost: async () => ({phase: 8, running: 1}),
+    observeHost: async () => activeHost(8),
     observeTrace: async () => makeTrace(samples),
     press: async key => {
       presses.push(key);
@@ -160,7 +225,7 @@ test('Results driver does not continue after the source exits before a required 
   let hostPhase = 8;
   await assert.rejects(confirmTwoHumanResults({
     deadlineAt: Date.now() + 1000,
-    observeHost: async () => ({phase: hostPhase, running: 1}),
+    observeHost: async () => activeHost(hostPhase),
     observeTrace: async () => makeTrace(samples),
     press: async key => {
       presses.push(key);
@@ -199,7 +264,7 @@ test('Results observer completion cannot accept a sample after the shared deadli
     await assert.rejects(confirmTwoHumanResults({
       deadlineAt: 200,
       observeTrace: async () => { order.push('trace'); now = 150; return trace; },
-      observeHost: async () => { order.push('host'); now = 201; return {phase: 8, running: 1}; },
+      observeHost: async () => { order.push('host'); now = 201; return activeHost(8); },
       press: async () => assert.fail('expired observation must not issue input'),
       wait: async () => {},
     }), /exceeded its shared wall deadline during observation/);
@@ -217,7 +282,7 @@ test('Results next-scene phase 5 requires the actual P2 edge and waits for an ac
   ];
   const order = [];
   const presses = [];
-  let host = {phase: 8, running: 1, message: 'Original Results'};
+  let host = activeHost(8);
   const append = options => samples.push(makeTraceRow(samples.length, options));
   const result = await confirmTwoHumanResults({
     deadlineAt: Date.now() + 5000,
@@ -232,19 +297,21 @@ test('Results next-scene phase 5 requires the actual P2 edge and waits for an ac
         append({phase: 3, statsPhase: 2, confirmed: [1, 0, 1, 1], startPorts: [0]});
       } else {
         append({phase: 4, statsPhase: 2, confirmed: [1, 1, 1, 1], startPorts: [1]});
-        host = {phase: 5, running: 0, message: RESULTS_NEXT_SCENE_PREPARATION_MESSAGE, error: null};
+        host = preparationHost(5, RESULTS_NEXT_SCENE_PREPARATION_MESSAGE);
       }
     },
-    wait: async () => { host = {phase: 9, running: 1, message: 'Original unlock notification'}; },
+    wait: async () => { host = activeHost(9); },
   });
   assert.deepEqual(presses, ['Enter', 'Enter', 'End']);
   assert.equal(result.p2_confirmation.phase, 4);
   assert.deepEqual(result.p2_confirmation.confirmed, [1, 1, 1, 1]);
   assert.equal(result.original_exit.host_phase, 9,
     'phase 5 is only an intermediate stopped transfer; the helper returns on actual Prize phase 9');
-  assert.deepEqual(result.post_confirmation_preparation, {
-    message: RESULTS_NEXT_SCENE_PREPARATION_MESSAGE, running: 0, observations: 2,
-  });
+  assert.deepEqual(result.post_confirmation_preparation, [{
+    phase: 5, reason: 'asset-transfer',
+    preparation_label: RESULTS_NEXT_SCENE_PREPARATION_MESSAGE,
+    message: RESULTS_NEXT_SCENE_PREPARATION_MESSAGE, observations: 1,
+  }]);
   assert(order.length % 2 === 0);
   for (let index = 0; index < order.length; index += 2)
     assert.deepEqual(order.slice(index, index + 2), ['trace', 'host']);
@@ -260,7 +327,7 @@ test('Results phase 5 rejects a synthetic P1-only prefix and malformed P2 comple
       makeTraceRow(2, {phase: 2, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
     ];
     const presses = [];
-    let host = {phase: 8, running: 1, message: 'Original Results'};
+    let host = activeHost(8);
     const append = options => samples.push(makeTraceRow(samples.length, options));
     return confirmTwoHumanResults({
       deadlineAt: Date.now() + 3000,
@@ -271,22 +338,23 @@ test('Results phase 5 rejects a synthetic P1-only prefix and malformed P2 comple
         if (presses.length === 1) {
           append({phase: 3, statsPhase: 0, confirmed: [0, 0, 1, 1], startPorts: [0]});
           append({phase: 3, statsPhase: 2, confirmed: [0, 0, 1, 1]});
-        } else if (presses.length === 2) {
-          append({phase: 3, statsPhase: 2, confirmed: [1, 0, 1, 1], startPorts: [0]});
-          if (!p2Edge)
-            host = {phase: 5, running: 0, message: RESULTS_NEXT_SCENE_PREPARATION_MESSAGE, error: null};
-        } else {
+      } else if (presses.length === 2) {
+        append({phase: 3, statsPhase: 2, confirmed: [1, 0, 1, 1], startPorts: [0]});
+      } else {
+        if (p2Edge) {
           append({phase: p2Phase, statsPhase: p2Stats, confirmed: p2Flags, startPorts: [1]});
           if (!rawP2Start) samples.at(-1).pads[1].button = 0;
           if (finalFlags !== p2Flags)
             append({phase: 4, statsPhase: 2, confirmed: finalFlags});
-          host = {phase: 5, running, message, error: hostError};
         }
+        host = {...preparationHost(5, message), running, error: hostError,
+          pause_disabled: running === 0};
+      }
       },
-      wait: async () => { host = {phase: 1, running: 1, message: 'Original character select'}; },
+      wait: async () => { host = activeHost(1); },
     });
   };
-  await assert.rejects(run({p2Edge: false}), /exited before this confirmation boundary.*phase 5/,
+  await assert.rejects(run({p2Edge: false}), /expected exactly one consumed source Start edge/,
     'a source-derived prefix without a P2 edge cannot authorize phase 5');
   for (const [label, options, pattern] of [
     ['wrong Results phase', {p2Phase: 3}, /source edge: source Results did not retain phase 4/],
@@ -294,9 +362,9 @@ test('Results phase 5 rejects a synthetic P1-only prefix and malformed P2 comple
     ['missing P2 confirmation', {p2Flags: [1, 0, 1, 1]}, /source edge: source Results did not retain phase 4/],
     ['final row loses a confirmation', {finalFlags: [1, 0, 1, 1]}, /final retained row: source Results did not retain phase 4/],
     ['raw P2 Start missing', {rawP2Start: false}, /no matching raw PAD Start sample/],
-    ['wrong preparation message', {message: 'Preparing original character select...'}, /phase 5 is admitted only/],
-    ['preparation still running', {running: 1}, /phase 5 is admitted only/],
-    ['host error during preparation', {hostError: 'native source error'}, /phase 5 is admitted only/],
+    ['wrong preparation message', {message: 'Preparing original character select...'}, /not active CSS\/Prize/],
+    ['preparation still running', {running: 1}, /not active CSS\/Prize/],
+    ['host error during preparation', {hostError: 'native source error'}, /native runtime error/],
   ]) {
     await assert.rejects(run(options), pattern, label);
   }

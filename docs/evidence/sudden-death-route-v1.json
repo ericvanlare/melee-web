@@ -199,6 +199,16 @@
         "relative_path": "browser-natural-sd-route-v1/results-pad-trace-v5-retained.json",
         "bytes": 616543,
         "sha256": "fa2a6f48e5dfc520bae1bb7306a96ccb86eab0747bc155e85901587d748cfb57"
+      },
+      {
+        "relative_path": "browser-natural-sd-route-v1/browser-result-v6.json",
+        "bytes": 15016,
+        "sha256": "79973618e2e1ba3c01b5d296287bb0651fab879467bfe9ba8ccd0358d193b8ba"
+      },
+      {
+        "relative_path": "browser-natural-sd-route-v1/results-pad-trace-v6-retained.json",
+        "bytes": 659563,
+        "sha256": "904bda8fc4a43041bb8ec2d4c65abd70ff4cf4ce52f44b55d7d35b4879697ba3"
       }
     ]
   },
@@ -425,7 +435,24 @@
       "result_sha256": "8e984eed006501f176e88cac22d42bac7a9c5fee9d75bbbd2e8c0c73db2c6165",
       "metadata_note": "Initial extraction receipt mistakenly recorded a PAD port as the socket port; retained corrected v2 receipt binds actual supervisor socket61124. No raw run was altered."
     },
-    "cleanup": "Both runs: Eject zero source/asset owners, driver disposed, context/browser closed, exact Node/server reaped and absent, owned socket rebind/immediateclose passed.",
-    "scope": "Headless functional diagnostic failures, not full browser Results/CSS pass or original comparison."
+    "cleanup": "V4/V5/V6: Eject zero source/asset owners, driver disposed, context/browser closed, exact owned children absent and owned socket rebind/immediate close passed.",
+    "scope": "Headless functional diagnostic failures, not full browser Results/CSS pass or original comparison.",
+    "v6": {
+      "source": "e35bbb8e099a651bcd6ca11a234443fb892fc9c3",
+      "first_failure": "After actual P2 raw/copied Start and phase4/stats2/allconfirmed, helper rejected constructed CSS phase1/running0 while DOM still reported declared next-scene preparation. Active CSS not reached.",
+      "observed_trace_rows": 288,
+      "p2_source_start_after_frame": 277,
+      "final_results_phase": 4,
+      "final_stats_phase": 2,
+      "final_confirmed": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "trace_sha256": "904bda8fc4a43041bb8ec2d4c65abd70ff4cf4ce52f44b55d7d35b4879697ba3",
+      "result_sha256": "79973618e2e1ba3c01b5d296287bb0651fab879467bfe9ba8ccd0358d193b8ba",
+      "readiness_gap": "Pause-control state was not captured. Synthetic pause fields in reduced controls are explicitly separate from actual trace/host data."
+    }
   }
 }
