@@ -166,6 +166,31 @@ int melee_web_match_two_player_trace(MeleeWebCollision* collision,
                 }
             }
         }
+        if(players[0].slot==0&&players[0].controller==0&&
+           players[1].slot==2&&players[1].controller==2){
+            PADStatus distinct[4]={{0}};
+            distinct[1].err=distinct[3].err=-1;
+            distinct[0].button=PAD_BUTTON_LEFT;
+            distinct[2].button=PAD_BUTTON_RIGHT;
+            if(!melee_web_match_step_raw(context,distinct,error,size))goto cleanup;
+            for(unsigned i=0;i<2;++i){
+                const unsigned slot=players[i].slot;
+                const unsigned expected=i?PAD_BUTTON_RIGHT:PAD_BUTTON_LEFT;
+                if(!melee_web_match_player_stats(context,i,&stats[i],error,size))goto cleanup;
+                if(stats[i].player_slot!=slot||
+                   (HSD_PadCopyStatus[slot].button&(PAD_BUTTON_LEFT|PAD_BUTTON_RIGHT))!=expected||
+                   Player_GetEntity(1)||Player_GetEntity(3)||
+                   HSD_PadCopyStatus[1].err!=-1||HSD_PadCopyStatus[3].err!=-1){
+                    snprintf(error,size,"Sparse source PAD witness renumbered or coupled ports0/2");goto cleanup;
+                }
+            }
+            if(!melee_web_match_step_raw(context,neutral_raw,error,size))goto cleanup;
+            if((HSD_PadCopyStatus[0].button|HSD_PadCopyStatus[2].button)&
+               (PAD_BUTTON_LEFT|PAD_BUTTON_RIGHT)){
+                snprintf(error,size,"Sparse source PAD witnesses did not release");goto cleanup;
+            }
+            printf("Sparse independent raw PAD witnesses: source/controller0 left, source/controller2 right; slots1/3 empty\n");
+        }
         printf("Two-player cycle%u: slots%u/%u source Wait14 after%u settle ticks, positions %.9g/%.9g, %u neutral ticks, two subjects and 8/8 extra DObjs\n",
             cycle,players[0].slot,players[1].slot,settle,stats[0].position[0],stats[1].position[0],neutral_ticks);
         if(!melee_web_match_end(context,error,size))goto cleanup;

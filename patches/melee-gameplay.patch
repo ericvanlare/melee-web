@@ -3880,7 +3880,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..58431b636c022f3df3ddf068f312ba82
      }
      un_802FD428();
      ifStatus_802F665C(data->rules.x0_3);
-@@ -2277,3 +2324,252 @@ int fn_8016F160(int arg0, int arg1)
+@@ -2277,3 +2324,254 @@ int fn_8016F160(int arg0, int arg1)
  {
      return pl_80039418(arg0, arg1);
  }
@@ -4061,8 +4061,10 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..58431b636c022f3df3ddf068f312ba82
 +    for (i = 0; i < 6; ++i)
 +        if (Player_GetEntity(i) != NULL) return 0;
 +    for (i = 0; i < 4; ++i) {
-+        if (!sudden_death && start->players[i].slot_type == Gm_PKind_NA) break;
-+        if (start->players[i].slot_type == Gm_PKind_NA) continue;
++        if (start->players[i].slot_type == Gm_PKind_NA) {
++            if (!sudden_death && start->players[i].rumble_enabled) return 0;
++            continue;
++        }
 +        const PlayerInitData* player = &start->players[i];
 +        const int player_id = player->slot == 0 ? i : (int) player->slot - 1;
 +        const MeleeWebFighterContent* content = melee_web_fighter_content(player->ckind);
@@ -4086,7 +4088,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..58431b636c022f3df3ddf068f312ba82
 +    /* Sudden Death preserves source slots, so validate the same authored
 +     * three team colours across active rows without compacting the payload. */
 +    if (sudden_death && rules->is_teams && !opposing_teams) return 0;
-+    /* Ordinary VS still uses CSS's contiguous team layout and shared gate. */
++    /* Ordinary VS uses CSS's original source indices and shared team gate. */
 +    if (!opening_demo && !sudden_death &&
 +        !melee_web_team_setup_supported(start, active, 1)) return 0;
 +    for (; i < 6; ++i)

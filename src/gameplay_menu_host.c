@@ -1757,14 +1757,16 @@ int melee_web_menu_host_provenance(const MeleeWebMenuHost* h,MeleeWebPipelineSou
     int count=melee_web_menu_active_player_count(start);
     if(count<0||count>4)return 0;
     out->active_player_count=(uint32_t)count;
-    for(int i=0;i<count;++i){
+    for(int i=0, compact=0;i<MELEE_WEB_MENU_MAX_PLAYERS;++i){
         const PlayerInitData* source=&start->players[i];
+        if(source->slot_type==Gm_PKind_NA)continue;
         const MeleeWebFighterContent* fighter=melee_web_fighter_content(source->ckind);
-        out->players[i].character=source->ckind;
-        out->players[i].fighter_kind=fighter?fighter->fighter_kind:UINT32_MAX;
-        out->players[i].costume=source->color;out->players[i].subcolor=source->sub_color;
-        out->players[i].effect_bank=fighter?fighter->effect_bank:UINT32_MAX;
-        out->players[i].motion_id=-1;out->players[i].stocks=source->stocks;
+        out->players[compact].character=source->ckind;
+        out->players[compact].fighter_kind=fighter?fighter->fighter_kind:UINT32_MAX;
+        out->players[compact].costume=source->color;out->players[compact].subcolor=source->sub_color;
+        out->players[compact].effect_bank=fighter?fighter->effect_bank:UINT32_MAX;
+        out->players[compact].motion_id=-1;out->players[compact].stocks=source->stocks;
+        ++compact;
     }
     return 1;
 }
@@ -1779,8 +1781,9 @@ static int host_selection_from_vs(const MeleeWebMenuHost* h,
         return fail(e,n,"Original menu did not commit two through four active players");
     memset(out->players,0,sizeof(out->players));
     out->player_count=(uint32_t)count;
-    for(unsigned i=0;i<(unsigned)count;i++){
+    for(unsigned i=0;i<MELEE_WEB_MENU_MAX_PLAYERS;i++){
         const PlayerInitData* p=&vs->start.players[i];
+        if(p->slot_type==Gm_PKind_NA)continue;
         const unsigned port=p->slot?p->slot-1:i;
         const MeleeWebFighterContent* content=melee_web_fighter_content(p->ckind);
         if(!content||port!=i||p->color>=content->costumes||p->sub_color>4)

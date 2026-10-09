@@ -92,13 +92,8 @@ struct GameplayMatchSession::Storage {
         const MeleeWebMenuMatchSelection& selected_input=*resolved_selection;
         const bool opening_demo = selected_input.opening_demo != 0;
         unsigned active_source_players=0;
-        if(sudden_death){
-            for(unsigned slot=0;slot<MELEE_WEB_MENU_MAX_PLAYERS;++slot)
-                active_source_players+=selected_input.start.players[slot].slot_type!=Gm_PKind_NA;
-        }else{
-            active_source_players=static_cast<unsigned>(
-                melee_web_menu_active_player_count(&selected_input.start));
-        }
+        active_source_players=static_cast<unsigned>(
+            melee_web_menu_active_player_count(&selected_input.start));
         unsigned player_count = selected_input.player_count != 0
                                     ? selected_input.player_count
                                     : active_source_players;
@@ -108,11 +103,11 @@ struct GameplayMatchSession::Storage {
         check(active_source_players==player_count,
               sudden_death?
                 "Sudden Death player count does not match its active source slots":
-                "Match player count does not match contiguous source slots");
+                "Match player count does not match active source slots");
         if(!sudden_death)
             check(melee_web_menu_active_player_count(&selected_input.start)==
                   static_cast<int>(player_count),
-                  "Match player count does not match contiguous source slots");
+                  "Match player count does not match active source slots");
         check(selected_input.hud_layout == selected_input.start.rules.x0_3,
               "Match compatibility settings differ from source payload");
         if(sudden_death)
@@ -141,10 +136,7 @@ struct GameplayMatchSession::Storage {
         unsigned compact_player=0;
         for(unsigned source_slot=0;source_slot<MELEE_WEB_MENU_MAX_PLAYERS;++source_slot){
             const auto& source=selected_input.start.players[source_slot];
-            if(source.slot_type==Gm_PKind_NA){
-                if(!sudden_death)break;
-                continue;
-            }
+            if(source.slot_type==Gm_PKind_NA)continue;
             const auto& settings=selected_input.players[source_slot];
             const unsigned source_port=source.slot?source.slot-1u:source_slot;
             check(settings.controller == source_port &&
@@ -164,8 +156,7 @@ struct GameplayMatchSession::Storage {
                       source.stocks==settings.stocks,
                       "Opening demo player differs from its source four-CPU setup");
             }
-            check(sudden_death?source_port==source_slot:
-                  settings.controller==compact_player,
+            check(source_port==source_slot,
                   "Match controller mapping changed its source slot identity");
             content.fighter_kinds[compact_player]=fighter->fighter_kind;
             content.costume_indices[compact_player]=settings.costume;

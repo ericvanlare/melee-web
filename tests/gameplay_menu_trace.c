@@ -258,7 +258,7 @@ static void setup(CSSData* css)
     }
 }
 
-static int sparse_port_rejection_reproducer(void)
+static int sparse_port_mapping_contract(void)
 {
     CSSData dense, sparse, unchanged;
     SSSData dense_sss = { 0 }, sparse_sss = { 0 };
@@ -281,22 +281,32 @@ static int sparse_port_rejection_reproducer(void)
     memcpy(&unchanged, &sparse, sizeof(unchanged));
     sparse_sss.force_stage_id = -1;
     sparse_sss.vs = sparse.vs;
-    /* Issue #293's first failure, not sparse-port support: the current count
-     * gate rejects the hole before the port mapping is inspected. Keep P3 at
-     * source index 2/controller 2 and do not normalize the payload to P2. */
+    /* Admission only: retain P3 at source index 2/controller 2. The original
+     * failed gate remains in historical checkpoint 5c57373b. */
     int count = melee_web_menu_active_player_count(&sparse.vs.start);
     int css_valid = melee_web_menu_css_selection_valid(&sparse);
     int sss_valid = melee_web_menu_sss_selection_valid(&sparse_sss);
-    if (count != 0 || css_valid || sss_valid ||
+    if (count != 2 || !css_valid || !sss_valid ||
         memcmp(&sparse, &unchanged, sizeof(sparse)) != 0 ||
         sparse.vs.start.players[1].slot_type != Gm_PKind_NA ||
         sparse.vs.start.players[2].slot_type != Gm_PKind_Human ||
         sparse.vs.start.players[2].slot != 3 ||
         sparse.vs.start.players[3].slot_type != Gm_PKind_NA) {
-        fprintf(stderr, "Sparse-port reproducer: unexpected gate or mutation\n");
+        fprintf(stderr, "Sparse-port contract: rejected mapping or source mutation\n");
         return 0;
     }
-    printf("sparse-port gate reproduced: dense count=2 CSS=1 SSS=1; "
+    CSSData invalid = sparse;
+    invalid.vs.start.players[2].slot = 2;
+    if (melee_web_menu_css_selection_valid(&invalid)) return 0;
+    invalid = sparse;
+    invalid.vs.start.players[4] = sparse.vs.start.players[2];
+    if (melee_web_menu_active_player_count(&invalid.vs.start) ||
+        melee_web_menu_css_selection_valid(&invalid)) return 0;
+    /* Original slot zero uses its record index, not compact ordinal 1. */
+    invalid = sparse;
+    invalid.vs.start.players[2].slot = 0;
+    if (!melee_web_menu_css_selection_valid(&invalid)) return 0;
+    printf("sparse-port admission: dense count=2 CSS=1 SSS=1; "
            "P1+P3 count=%d CSS=%d SSS=%d; source ports 0/2 retained\n",
            count, css_valid, sss_valid);
     return 1;
@@ -304,7 +314,7 @@ static int sparse_port_rejection_reproducer(void)
 
 int main(void)
 {
-    if (!sparse_port_rejection_reproducer()) return 1;
+    if (!sparse_port_mapping_contract()) return 1;
     /* Reduced owner-lifetime check; source callbacks here are fixtures. The
      * owned-asset recipe separately exercises original SSS confirmation. */
     if (melee_web_menu_stage_available(St_Kind_PStadium) ||

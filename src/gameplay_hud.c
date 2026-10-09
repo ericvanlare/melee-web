@@ -44,7 +44,7 @@ MeleeWebHud* melee_web_hud_begin_with_music(unsigned layout,
     char* error, size_t size)
 {
     return melee_web_hud_begin_source_status(layout,prepare_music,context,3,
-                                              0,error,size);
+                                              1,error,size);
 }
 MeleeWebHud* melee_web_hud_begin_sudden_death_with_music(unsigned layout,
     int (*prepare_music)(void*, char*, size_t), void* context,
@@ -67,7 +67,7 @@ static MeleeWebHud* melee_web_hud_begin_source_status(unsigned layout,
     if (owner || !generation || layout < 1 || layout > 6 ||
         (sparse_source_players?active_players<2:
          (!Player_GetEntity(0)||!Player_GetEntity(1)))) {
-        fail(error, size, "Original HUD requires the owned two-player match");
+        fail(error, size, "Original HUD requires the owned source participants");
         return NULL;
     }
     MeleeWebHud* hud = calloc(1, sizeof(*hud));

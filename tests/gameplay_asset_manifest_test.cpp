@@ -499,6 +499,32 @@ void print_descriptor_stage(int stage)
 
 } // namespace
 
+void source_sparse_ordinary_descriptor()
+{
+    const auto dense = selection(St_Kind_Last, CKIND_MARIO, CKIND_FOX);
+    auto sparse = dense;
+    sparse.start.players[2] = dense.start.players[1];
+    sparse.start.players[2].slot = 3;
+    sparse.players[2] = dense.players[1];
+    sparse.players[2].controller = 2;
+    sparse.start.players[1] = {};
+    sparse.start.players[1].slot_type = Gm_PKind_NA;
+    sparse.players[1] = {};
+    const auto before = sparse;
+    check(match_asset_names(sparse) == match_asset_names(dense),
+          "Sparse P3 lost its distinct Fox match assets");
+    check(results_asset_names(sparse) == results_asset_names(dense),
+          "Sparse P3 lost its distinct Fox Results motion assets");
+    check(std::memcmp(&sparse, &before, sizeof(sparse)) == 0,
+          "Sparse descriptor renumbered or changed the original payload");
+    sparse.players[2].controller = 1;
+    rejects([&] { (void)match_asset_names(sparse); });
+    rejects([&] { (void)results_asset_names(sparse); });
+    sparse = before;
+    sparse.start.players[4] = sparse.start.players[2];
+    rejects([&] { (void)match_asset_names(sparse); });
+}
+
 void source_sudden_death_descriptor(){
     descriptor_continuation={};
     descriptor_continuation.kind=MELEE_WEB_MENU_MATCH_CONTINUATION_SUDDEN_DEATH;
@@ -563,6 +589,7 @@ int main(int argc, char** argv)
 #endif
         rejects_invalid_without_mutation();
         source_sudden_death_descriptor();
+        source_sparse_ordinary_descriptor();
         std::cout << "Source menu/match/results asset descriptors, fighter/archive closure, authored music candidates, and rejection boundaries: passed\n";
         return 0;
     } catch (const std::exception& error) {
