@@ -63,6 +63,50 @@ def recipe(version=1):
         declaration["exclusions"] = ["natural match terminal", "elimination", "Results/CSS return",
             "physical-device path equality", "RNG", "pixels", "PCM", "live timing"]
         return declaration
+    if type(version) is int and version == 8:
+        from reference_versus_sequence_capture import raw_pad
+        from retail_input_plan import DISCONNECTED_PAD, NEUTRAL_PAD
+        declaration = recipe(7)
+        declaration.update(version=8, id="original-sheik-transform-prefix-p1-p2",
+                           purpose="observe Zelda/Mario original setup and one consumed down-B transform prefix")
+        declaration["source_slots"] = [0, 1]
+        declaration["cold_original_context"] = {
+            "human_source_ports_zero_based": [0, 1],
+            "preparation": "unchanged supplied original profile; only source ports 0 and 1 join",
+            "profile_binding": "launch inventory hashes every supplied source-profile file before the owned Pipe copy is prepared",
+        }
+        declaration["timeline"] = {
+            "first_source_tick": 0,
+            "max_source_tick_observations_after_setup": 600,
+            "input": "wait for consumed neutral and grounded neutral Zelda; consume one B/Y=-80 episode; consume neutral release; retain actual source queue samples",
+            "exhaustion": "fail at 600 observations; never append, repeat or synthesize samples",
+        }
+        declaration["original_profile"] = {
+            "id": "supplied-original-dolphin-profile",
+            "provenance": "unchanged user-supplied original profile directory, bound by per-file SHA-256 inventory in launch.json; no GCI injected and no source-profile bytes rewritten",
+            "first_gate": "original two-human Zelda/Mario CSS/SSS setup, then consumed down-B and neutral release",
+        }
+        declaration["expected_setup"]["players"] = [
+            {"port": 1, "character_kind": 18, "costume": 1, "stocks": 4,
+             "player_type": 0, "rumble_enabled": True},
+            {"port": 2, "character_kind": 8, "costume": 0, "stocks": 4,
+             "player_type": 0, "rumble_enabled": True},
+        ]
+        press = [raw_pad(buttons=["B"], y=-80), NEUTRAL_PAD,
+                 DISCONNECTED_PAD, DISCONNECTED_PAD]
+        release = [NEUTRAL_PAD, NEUTRAL_PAD, DISCONNECTED_PAD, DISCONNECTED_PAD]
+        declaration["input_witness"] = {
+            "source_slots": [0, 1], "inactive_source_slots": [2, 3],
+            "press": press, "release": release,
+            "max_prepress_neutral_samples": 600, "max_source_samples": 600,
+            "expected_pad_errors": [0, 0, -1, -1],
+        }
+        declaration["stop"] = (
+            "observed exact VS setup, consumed P1 B/Y=-80, neutral release, active Sheik owner, "
+            "and grounded neutral Sheik source tick; no terminal match claim")
+        declaration["exclusions"] = ["natural match terminal", "elimination", "Results/CSS return",
+            "physical-device path equality", "pixels", "PCM", "draw boundaries", "live timing"]
+        return declaration
     if type(version) is int and version == 6:
         declaration = recipe(5)
         declaration.update(version=6, id="two-human-mario-fd-competitive-profile-entry",
@@ -145,7 +189,7 @@ def recipe(version=1):
 def validate_recipe(value):
     # Byte comparison also rejects bool-for-int and int-for-float substitutions.
     version = value.get("version") if isinstance(value, dict) else None
-    if version not in (1, 2, 3, 4, 5, 6, 7) or canonical(value) != canonical(recipe(version)):
+    if version not in (1, 2, 3, 4, 5, 6, 7, 8) or canonical(value) != canonical(recipe(version)):
         raise ValueError("Unsupported or changed authored SD reference recipe")
     return value
 
@@ -160,10 +204,10 @@ def make_input_plan(recipe_version=1):
     from retail_input_plan import (AUTHORED_PLAN_VERSION, SCHEMA, POLICY,
                                    NEUTRAL_PAD, DISCONNECTED_PAD, validate_plan)
     declaration = recipe(recipe_version)
-    if recipe_version == 7:
+    if recipe_version in (7, 8):
         witness = declaration["input_witness"]
         frames = [witness["press"], witness["release"]]
-        controlled_ports = [1, 3]
+        controlled_ports = [port + 1 for port in witness["source_slots"]]
     else:
         frames = [[NEUTRAL_PAD, NEUTRAL_PAD, DISCONNECTED_PAD, DISCONNECTED_PAD]
                   for _ in range(STARTUP_TICKS + MATCH_TICKS)]
@@ -172,7 +216,9 @@ def make_input_plan(recipe_version=1):
         "schema": SCHEMA, "version": AUTHORED_PLAN_VERSION, "policy": POLICY,
         "provenance": PROVENANCE, "authored_recipe": declaration,
         "authored_recipe_sha256": recipe_sha256(declaration),
-        "first_frame": -123, "source_stage": 32, "source_characters": [8, 8],
+        # Legacy plan-format coordinate; this is not an observed Ready duration.
+        "first_frame": -123, "source_stage": 32,
+        "source_characters": [18, 8] if recipe_version == 8 else [8, 8],
         "active_player_count": 2, "source_player_types": [0, 0],
         "controlled_ports": controlled_ports,
         "frames": frames,

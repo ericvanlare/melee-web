@@ -164,7 +164,7 @@ def _gpr(payload: Mapping[str, Any], index: int, context: str) -> int:
 
 
 def _record_envelope(
-        records: list[Mapping[str, Any]]
+        records: list[Mapping[str, Any]], *, entity_prefix: bool = False
 ) -> tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]]:
     if len(records) < 3:
         _fail("whole-session observer stream is truncated before its end record")
@@ -185,13 +185,27 @@ def _record_envelope(
     if records[-1].get("event") != "end":
         _fail("whole-session observer stream must end with an end record")
     end = _payload(records[-1], len(records) - 1)
-    if end.get("status") != "completed" or end.get("natural") is not True:
+    if entity_prefix:
+        active_clock = records[0].get("payload", {}).get("entity_profile") == ENTITY_ACTIVE_PREFIX_PROFILE
+        if (end.get("status") != "completed" or end.get("natural") is not False or
+                end.get("diagnostic_prefix_complete") is not True or
+                end.get("whole_session_equivalent") is not False or
+                (not active_clock and end.get("comparison_source_ticks") != 60)):
+            _fail("observer stream did not complete its declared diagnostic prefix")
+        if active_clock:
+            count = _integer(end.get("observed_source_ticks"), "active prefix observations", 61, 604)
+            if (end.get("comparison_source_ticks") != count or
+                    end.get("comparison_active_clock_ticks") != 60 or
+                    type(end.get("observed_active_clock_advances")) is not int or
+                    end["observed_active_clock_advances"] < 60):
+                _fail("observer active-clock prefix footer differs from its declared scope")
+    elif end.get("status") != "completed" or end.get("natural") is not True:
         _fail("observer stream did not complete naturally")
     return _payload(records[0], 0), _payload(records[1], 1), end
 
 
-def _capture_identity(records: list[Mapping[str, Any]]) -> dict[str, Any]:
-    handshake, start, _ = _record_envelope(records)
+def _capture_identity(records: list[Mapping[str, Any]], *, entity_prefix: bool = False) -> dict[str, Any]:
+    handshake, start, _ = _record_envelope(records, entity_prefix=entity_prefix)
     if handshake.get("schema") != EXPECTED_OBSERVER_SCHEMA or handshake.get("version") != 1:
         _fail("observer handshake is not the pinned passive observer schema")
     for field, expected in (
@@ -207,7 +221,12 @@ def _capture_identity(records: list[Mapping[str, Any]]) -> dict[str, Any]:
     for announcement, context in ((handshake, "handshake"), (start, "start")):
         if announcement.get("whole_session") is not True:
             _fail(f"{context} does not declare whole_session=true")
-        _integer(announcement.get("match_count"), f"{context} match_count", 3, 64)
+        if entity_prefix:
+            if announcement.get("entity_profile") not in (ENTITY_PREFIX_PROFILE, ENTITY_ACTIVE_PREFIX_PROFILE):
+                _fail(f"{context} does not bind the declared entity profile")
+            _integer(announcement.get("match_count"), f"{context} match_count", 1, 1)
+        else:
+            _integer(announcement.get("match_count"), f"{context} match_count", 3, 64)
         capture_id = announcement.get("capture_id")
         sequence_id = announcement.get("sequence_id")
         if not isinstance(capture_id, str) or IDENTITY.fullmatch(capture_id) is None:
@@ -217,6 +236,8 @@ def _capture_identity(records: list[Mapping[str, Any]]) -> dict[str, Any]:
     for field in ("match_count", "capture_id", "sequence_id"):
         if handshake.get(field) != start.get(field):
             _fail(f"observer {field} disagrees between handshake and start")
+    if entity_prefix and handshake.get("entity_profile") != start.get("entity_profile"):
+        _fail("observer entity profile disagrees between handshake and start")
     if start.get("source_revision") != "GALE01r2":
         _fail("observer start is not for GALE01r2")
     return {
@@ -454,7 +475,7 @@ def _scene_transition(boundary: str, current: str | None) -> str | None:
 
 
 def _timeline(
-        records: list[Mapping[str, Any]], match_count: int
+        records: list[Mapping[str, Any]], match_count: int, *, entity_prefix: bool = False
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     frames: list[dict[str, Any]] = []
     spans: list[dict[str, Any]] = []
@@ -549,7 +570,10 @@ def _timeline(
                               "last_frame": frame_index})
     if not started:
         _fail("whole-session stream never entered first CSS")
-    if not finished:
+    if entity_prefix:
+        if match_count != 1 or finished or scene != "match":
+            _fail("entity prefix must retain its one live Match owner")
+    elif not finished:
         _fail("whole-session stream did not return to CSS after its final match")
     if not frames:
         _fail("whole-session stream contains no source-consumed PAD samples")
@@ -675,7 +699,8 @@ def _recipe_key(capture: Mapping[str, Any]) -> tuple[Any, ...]:
     )
 
 
-def _encode_whole_session(capture: Mapping[str, Any], version: int) -> tuple[bytes, dict[str, Any]]:
+def _encode_whole_session(capture: Mapping[str, Any], version: int, *, entity_prefix: bool = False,
+                          entity_prefix_flag: int = 1) -> tuple[bytes, dict[str, Any]]:
     frames = capture["frames"]
     spans = capture["spans"]
     if not 1 <= len(frames) <= V8_MAX_FRAMES:
@@ -730,11 +755,16 @@ def _encode_whole_session(capture: Mapping[str, Any], version: int) -> tuple[byt
         _fail("whole-session spans do not cover every frame at encoding")
     if spans[0]["scene"] != SCENES["css"]:
         _fail("whole-session timeline must start in CSS")
-    if spans[-1]["scene"] not in (SCENES["results"], SCENES["prize"]):
+    if entity_prefix:
+        if version != MWRC_V8_VERSION or [s["scene"] for s in spans] != [1, 2, 3]:
+            _fail("entity prefix requires v8 and one CSS/SSS/Match route")
+    elif spans[-1]["scene"] not in (SCENES["results"], SCENES["prize"]):
         _fail("whole-session timeline must end in Results or Prize")
     payload = bytearray(HEADER.pack(MAGIC, version, seed, len(frames),
                                     characters, stages))
-    payload += CONTEXT_HEADER.pack(CONTEXT_VERSION, 0, CONTEXT_BYTES)
+    if entity_prefix_flag not in (1, 2):
+        _fail("unsupported named entity prefix flag")
+    payload += CONTEXT_HEADER.pack(CONTEXT_VERSION, entity_prefix_flag if entity_prefix else 0, CONTEXT_BYTES)
     payload += game_rules + save_data + css_data + ko_counts
     if version == MWRC_V8_VERSION:
         payload += setup
@@ -753,6 +783,186 @@ def _encode_whole_session(capture: Mapping[str, Any], version: int) -> tuple[byt
         "input_bytes_sha256": hashlib.sha256(input_bytes).hexdigest(),
         "output_sha256": hashlib.sha256(payload).hexdigest(),
     }
+
+
+ENTITY_PREFIX_PROFILE = "jiggly-ice-mario-fox-v1"
+ENTITY_ACTIVE_PREFIX_PROFILE = "jiggly-ice-mario-fox-active60-v1"
+ENTITY_PREFIX_ROSTER = (15, 14, 8, 2)
+
+
+def entity_prefix_interval(records: list[dict], *, active_clock: bool = False) -> dict[str, Any]:
+    """Retain the passive first qualifying draw, including its complete batch.
+
+    Capacity five is authored by gmMain's HSD_PadInit, and is verified in each
+    actual consumed queue. This selector does not make a browser recipe and
+    does not discard extra source/PAD observations to manufacture tick 60.
+    """
+    ticks, pads, batches = [], [], []
+    batch = 0
+    drawing = False
+    final = None
+    pending_pad = None
+    previous_seq = None
+    setup_seen = False
+    last_clock = 0
+    active_advances = 0
+    for row in records:
+        seq = row.get("seq")
+        if type(seq) is not int or (previous_seq is not None and seq != previous_seq + 1):
+            _fail("entity prefix retained record sequence is not contiguous")
+        previous_seq = seq
+        payload = row.get("payload", {})
+        boundary = payload.get("boundary")
+        if row.get("event") == "boundary" and boundary == "setup":
+            if setup_seen or payload.get("match_index") != 0 or payload.get("whole_session") is not True:
+                _fail("entity prefix requires one original match-zero setup return")
+            setup_seen = True
+            continue
+        if not setup_seen:
+            continue
+        if row.get("event") != "boundary":
+            continue
+        if boundary in {"result_enter", "result_return", "vs_exit", "vs_exit_return", "scene_teardown", "results_enter", "entry"}:
+            _fail("entity prefix crossed a terminal or foreign match owner")
+        if boundary not in {"pad_consume", "source_tick", "draw_enter", "draw_return"}:
+            continue
+        if payload.get("match_index") != 0:
+            _fail("entity prefix has a foreign source match")
+        if payload.get("whole_session") is not True:
+            _fail("entity prefix boundary lacks its original session owner")
+        if final is not None:
+            _fail("entity prefix continued beyond its first qualifying DrawReturn")
+        ordinal = row.get("draw_ordinal")
+        if type(ordinal) is not int or ordinal != len(batches):
+            _fail("entity prefix draw ordinal gap or mismatched batch owner")
+        tick = row.get("source_tick")
+        if type(tick) is not int or tick != len(ticks):
+            _fail("entity prefix source/draw counter gap")
+        if boundary == "pad_consume":
+            if drawing or pending_pad is not None:
+                _fail("entity prefix PAD/source ordering differs")
+            _, queue = _slice(row, "pad_queue", 0xC, "entity prefix queue")
+            if queue[0] != 5 or queue[3] > 5:
+                _fail("entity prefix differs from authored queue capacity five")
+            pending_pad = row
+            _consumed_ports(row, seq)
+            pads.append(row)
+        elif boundary == "source_tick":
+            if drawing or pending_pad is None or batch >= 5 or len(ticks) >= (604 if active_clock else 64):
+                _fail("entity prefix source batch exceeds its authored bounds")
+            if active_clock:
+                clock_owner, clock_slice = _slice(row, "match_clock", 0x2e, "active prefix MatchClock")
+                if clock_owner.get("address") != 0x8046b6a0 or clock_owner.get("flags", 0) != 0:
+                    _fail("active prefix MatchClock escaped its original semantic owner")
+                clock = int.from_bytes(clock_slice[0x24:0x28], "big")
+                if (not ticks and clock != 0) or clock < last_clock or clock - last_clock > 1:
+                    _fail("active prefix MatchClock lacks its initial zero or unit advances")
+                active_advances += clock - last_clock
+                last_clock = clock
+            ticks.append(row)
+            pending_pad = None
+            batch += 1
+        elif boundary == "draw_enter":
+            if drawing or pending_pad is not None:
+                _fail("entity prefix DrawEnter ordering differs")
+            drawing = True
+        else:
+            if not drawing or pending_pad is not None:
+                _fail("entity prefix DrawReturn lacks its checked draw owner")
+            drawing = False
+            batches.append(batch)
+            batch = 0
+            if (active_advances >= 60 if active_clock else len(ticks) >= 60):
+                final = row
+            elif active_clock and len(ticks) >= 600:
+                _fail("active prefix diagnostic observation cap ended before sixty clock advances")
+    if final is None or drawing or pending_pad is not None:
+        _fail("entity prefix lacks its first qualifying checked DrawReturn")
+    return {"source_rows": ticks, "pad_rows": pads, "draw_batches": batches,
+            "retained_records": [row for row in records if row["seq"] <= final["seq"]],
+            "comparison_source_ticks": len(ticks) if active_clock else 60, "observed_source_ticks": len(ticks),
+            "final_draw_seq": final["seq"], "final_source_cursor": final["source_tick"],
+            **({"comparison_active_clock_ticks": 60, "observed_active_clock_advances": active_advances,
+                "first_gameplay_clock": 0, "last_gameplay_clock": last_clock} if active_clock else {})}
+
+
+def encode_v8_entity_prefix(capture: Mapping[str, Any], interval_records: list[dict]) -> tuple[bytes, dict[str, Any]]:
+    """Encode actual first-CSS context and one independently captured prefix.
+
+    The caller supplies the full retained decoded original interval, not a PAD-row
+    count or a later match relabeled as cold entry. Existing v8/v9 exporters
+    still require their complete Results/Prize lifecycle.
+    """
+    from character_state_compare import _source_state, ComparisonError
+    identity = _capture_identity(interval_records, entity_prefix=True)
+    profile = interval_records[0]["payload"]["entity_profile"]
+    active_clock = profile == ENTITY_ACTIVE_PREFIX_PROFILE
+    first_css = _first_css_context(interval_records)
+    for key in ("rng", "pad_state_hex", "profile_masks", "game_rules_hex", "save_data_hex", "css_data_hex", "ko_counts_hex"):
+        if capture["first_css"].get(key) != first_css[key]:
+            _fail("entity prefix context differs from actual first CSS")
+    actual_setups, _ = _match_setups(interval_records, 1)
+    actual_frames, actual_spans = _timeline(interval_records, 1, entity_prefix=True)
+    if actual_spans != capture["spans"] or [
+            (row["scene_code"], row["source_tick"], row["pads"]) for row in actual_frames] != [
+            (row["scene_code"], row["source_tick"], row["pads"]) for row in capture["frames"]]:
+        _fail("entity prefix input timeline differs from retained original consumes")
+    setups = capture.get("setup_hexes", [capture["setup_hex"]])
+    if len(setups) != 1:
+        _fail("entity prefix requires exactly one declared source setup")
+    if setups != actual_setups:
+        _fail("entity prefix setup differs from actual source entry")
+    setup = _decode_setup(setups[0])
+    if any(setup[key] != value for key, value in V9_MILESTONE_RULES.items()):
+        _fail("entity prefix rules differ from the ordinary stock profile")
+    if len(setup["players"]) != 4:
+        _fail("entity prefix requires exactly four CPU9 players")
+    for slot, (p, kind) in enumerate(zip(setup["players"], ENTITY_PREFIX_ROSTER)):
+        if (p["port"], p["character_kind"], p["costume"], p["stocks"],
+            p["player_type"], p.get("cpu_kind"), p.get("cpu_level"), p["rumble_enabled"]) != (slot+1, kind, slot, 4, 1, 4, 9, False):
+            _fail("entity prefix differs from its declared CPU9 roster")
+    interval = entity_prefix_interval(interval_records, active_clock=active_clock)
+    # Existing v8 renders every input tick. Preserve the original interval as
+    # failure evidence; never convert a multi-tick original draw into v8.
+    if any(batch != 1 for batch in interval["draw_batches"]):
+        _fail("entity prefix captured batching is unsupported by per-tick browser draws")
+    source_observations = interval["source_rows"]
+    if interval_records[-1]["payload"].get("observed_source_ticks") != len(source_observations):
+        _fail("entity prefix final count disagrees with its retained source interval")
+    if active_clock and interval_records[-1]["payload"].get("observed_active_clock_advances") != interval["observed_active_clock_advances"]:
+        _fail("active prefix clock count differs from its actual retained MatchClock fields")
+    previous = None
+    ticks = []
+    for row in source_observations:
+        payload = row.get("payload", {})
+        tick = row.get("source_tick")
+        if row.get("event") != "boundary" or payload.get("boundary") != "source_tick" or payload.get("match_index") != 0 or payload.get("whole_session") is not True or type(tick) is not int:
+            _fail("entity prefix requires actual match-zero SourceTick records")
+        try:
+            state, scene_tick = _source_state(payload, f"source observation {row.get('seq')}")
+        except (ComparisonError, TypeError, ValueError) as error:
+            _fail(f"entity prefix source observation is invalid: {error}")
+        expected_entities = [(0, 0, 15), (1, 0, 10), (1, 1, 11), (2, 0, 0), (3, 0, 1)]
+        if [(p["slot"], p["entity_index"], p["kind"]) for p in state["fighter_entities"]] != expected_entities:
+            _fail("entity prefix source entities differ from its declared profile")
+        if tick != scene_tick or (previous is None and tick != 0) or (previous is not None and tick != previous + 1):
+            _fail("entity prefix source scene boundaries are not contiguous")
+        previous = tick
+        ticks.append(tick)
+    match_frames = [frame for frame in capture["frames"] if frame["scene_code"] == SCENES["match"]]
+    if [frame["source_tick"] for frame in match_frames] != ticks:
+        _fail("entity prefix PAD history is not bound to its actual source observations")
+    if [frame["pads"] for frame in match_frames] != [_consumed_ports(row, row["seq"]) for row in interval["pad_rows"]]:
+        _fail("entity prefix PAD values differ from actual retained consumed slots")
+    payload, metadata = _encode_whole_session(capture, MWRC_V8_VERSION, entity_prefix=True,
+                                             entity_prefix_flag=2 if active_clock else 1)
+    return payload, {**metadata, "source_identity": identity, "diagnostic_prefix": profile,
+                     "comparison_source_ticks": len(ticks) if active_clock else 60, "source_observations": len(ticks),
+                     "final_draw_seq": interval["final_draw_seq"],
+                     "draw_batches": interval["draw_batches"], "first_source_tick": ticks[0],
+                     "last_source_tick": ticks[-1], "whole_session_equivalent": False,
+                     **({key: interval[key] for key in ("comparison_active_clock_ticks",
+                         "observed_active_clock_advances", "first_gameplay_clock", "last_gameplay_clock")} if active_clock else {})}
 
 
 def encode_v8(capture: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:

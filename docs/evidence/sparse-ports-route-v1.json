@@ -696,5 +696,29 @@
       "root_review": "root-original-sparse-v3-result-review.json",
       "result": "original-sparse-third-result-v1.json"
     }
+  },
+  "final_integration": {
+    "result": "merged",
+    "pr": 299,
+    "merge_commit": "35d789775ece5c18c2c80b33f018317a33358671",
+    "reviewed_head": "9b5ebcc6301a11e5468692733f5ff33f8ce3b081",
+    "reviewed_and_merged_tree": "f2d997db2655a40d4b499b5dca3790db47d79b12",
+    "tree_equal": true,
+    "final_ci_run": 37938605944,
+    "checks": 14,
+    "expected_skips": 2,
+    "merge_path": "Normal owner-authenticated pull-request REST merge; no admin flag or ruleset change.",
+    "squash_body_clean": true,
+    "issue293": "CLOSED",
+    "final_review_sha256": "394056122b020c798198ebadc31519233e68dde11fc6b4fcae8e451faeb85c8d",
+    "base": "df92e1ae496cd53a602997c064547f2f0e61f423",
+    "ci_summary": {
+      "result": "success",
+      "checks": 14,
+      "success": 12,
+      "expected_skips": 2,
+      "run": 37938605944
+    },
+    "scope": "Integration receipt only; original/browser evidence retains its producer identities and exclusions."
   }
 }
