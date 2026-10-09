@@ -26,6 +26,7 @@ export const COMPETITIVE_RESULTS_RETURN_POLL_MS = 250;
 export async function returnFromCompetitivePrize({
   deadlineAt, observeHost, observeTrace, observeSample, press, wait,
   pollMs = COMPETITIVE_RESULTS_RETURN_POLL_MS,
+  sourcePorts = [0, 1],
 }) {
   if (!Number.isFinite(deadlineAt) || deadlineAt <= Date.now() ||
       (observeSample !== undefined && typeof observeSample !== 'function') ||
@@ -47,7 +48,7 @@ export async function returnFromCompetitivePrize({
     // retain that bounded source witness before a stopped host can be rejected.
     const coherent = observeSample ? await observeSample(label) : null;
     const trace = observeSample ? coherent?.trace : await observeTrace();
-    const traceFailures = resultsPadTraceFailures(trace);
+    const traceFailures = resultsPadTraceFailures(trace, sourcePorts);
     if (traceFailures.length)
       throw Error(`${label}: retained original Results trace is invalid: ${JSON.stringify(traceFailures)}`);
     const final = trace.samples.at(-1)?.results_state_after_tick;

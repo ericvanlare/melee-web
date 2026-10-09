@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {checkSparseCss,checkSparseMatch,validateFinalSparseCapture,installSparseVirtualController,readSparsePadVectors,checkSparsePadVectors} from './vs_sparse_mario_browser_route.mjs';
+import {checkSparseLoss,checkSparseTerminal,checkSparseCss,checkSparseMatch,validateFinalSparseCapture,installSparseVirtualController,readSparsePadVectors,checkSparsePadVectors} from './vs_sparse_mario_browser_route.mjs';
 import {observeRuntimeOwner} from './runtime_owner_observation.mjs';
 function pair(){return {leg:'vs',ready:true,complete:false,ending:false,paused:false,outcome:0,frame:180,
  observed_player_source_slots:[0,2],rules:{stage:32,match_kind:1,is_teams:0,timer_enabled:0,is_stock:1,is_vs:1,source_sudden_death_flag:0,item_frequency:-1,player_stocks:[4,4]},
@@ -156,4 +156,16 @@ test('CSS-only final diagnostic gate requires CSS steps without inventing ordina
  assert.equal(validateFinalSparseCapture(capture,{cssOnly:true}),10);
  assert.throws(()=>validateFinalSparseCapture(capture));capture.phase_source_steps[1]=0;
  assert.throws(()=>validateFinalSparseCapture(capture,{cssOnly:true}));
+});
+
+test('live sparse stock observation admits one loss at a time and canonical source2 winner only',()=>{
+ let before=pair();
+ for(let stocks=3;stocks>=0;stocks--){const after=structuredClone(before);after.frame++;after.players[0].stocks=stocks;
+   assert.equal(checkSparseLoss(before,after),true);before=after;}
+ before.terminal={outcome:2,winners:[2]};checkSparseTerminal(before);
+ for(const terminal of [{outcome:2,winners:[1]},{outcome:1,winners:[2]},{outcome:2,winners:[0,2]}]){
+   const wrong=structuredClone(before);wrong.terminal=terminal;assert.throws(()=>checkSparseTerminal(wrong));}
+ const skipped=pair();skipped.frame++;skipped.players[0].stocks=2;assert.throws(()=>checkSparseLoss(pair(),skipped));
+ const foreign=pair();foreign.frame++;foreign.players[1].stocks=3;assert.throws(()=>checkSparseLoss(pair(),foreign));
+ const identity=pair();identity.frame++;identity.players[1].source_port=1;assert.throws(()=>checkSparseLoss(pair(),identity));
 });

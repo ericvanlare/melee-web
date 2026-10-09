@@ -23,14 +23,16 @@ options['stage-only'] = {type: 'boolean', default: false};
 options['no-contest-only'] = {type: 'boolean', default: false};
 options['team-battle'] = {type: 'boolean', default: false};
 options['team-setup-only'] = {type: 'boolean', default: false};
+options['sparse-mario-route'] = {type: 'boolean', default: false};
 options['sparse-mario-css-only'] = {type: 'boolean', default: false};
 options['sparse-mario-prefix'] = {type: 'boolean', default: false};
 options['sudden-death-route'] = {type: 'boolean', default: false};
 const {values} = parseArgs({options, strict: true});
 const suddenDeathRoute = values['sudden-death-route'];
 const sparseCssOnly=values['sparse-mario-css-only'];
-assert(!(sparseCssOnly&&values['sparse-mario-prefix']),'Sparse CSS-only and prefix modes are exclusive');
-const sparseMarioPrefix = values['sparse-mario-prefix']||sparseCssOnly;
+const sparseFullRoute=values['sparse-mario-route'];
+assert([sparseCssOnly,values['sparse-mario-prefix'],sparseFullRoute].filter(Boolean).length<=1,'Sparse modes are exclusive');
+const sparseMarioPrefix = values['sparse-mario-prefix']||sparseCssOnly||sparseFullRoute;
 if(sparseMarioPrefix && ['sudden-death-route','menu-only','rules-items-only','css-sss-only','stage-only','no-contest-only','team-battle','team-setup-only'].some(name=>values[name]))
   throw Error('Sparse prefix selects one exclusive route');
 if(suddenDeathRoute && ['menu-only','rules-items-only','css-sss-only','stage-only','no-contest-only','team-battle','team-setup-only'].some(name=>values[name]))
@@ -68,14 +70,14 @@ const sha256File = file => new Promise((resolve, reject) => {
 let browser, context, page, driver, browserPath, playwrightPath;
 const report = {
   schema: 'melee-web-vs-rules-item-menu-browser-v1',
-  mode: sparseCssOnly ? 'source-sparse-mario-css-only-reducer' : sparseMarioPrefix ? 'source-sparse-mario-rendered-prefix' : suddenDeathRoute ? 'source-natural-timeout-sudden-death-results-css' : noContestOnly ? 'source-no-contest-results-reproducer'
+  mode: sparseFullRoute ? 'source-sparse-mario-elimination-results-css' : sparseCssOnly ? 'source-sparse-mario-css-only-reducer' : sparseMarioPrefix ? 'source-sparse-mario-rendered-prefix' : suddenDeathRoute ? 'source-natural-timeout-sudden-death-results-css' : noContestOnly ? 'source-no-contest-results-reproducer'
     : teamSetupOnly ? 'source-team-setup-cancel-reentry-reproducer'
     : teamBattle ? 'source-two-player-team-battle-results-route'
     : stageOnly ? 'source-sss-stage-driver-reproducer'
     : rulesItemsOnly ? 'source-rules-items-entry-reproducer'
     : cssSssOnly ? 'source-css-to-sss-cooldown-reproducer'
     : menuOnly ? 'source-menu-boundary-reproducer' : 'source-rules-items-match-route',
-  scope: sparseCssOnly ? 'Rendered original sparse CSS and exact copied/raw PAD observation then Eject only; no SSS/world, physical input or timing acceptance.' : sparseMarioPrefix ? 'Virtual Browser Gamepad P3 and keyboard P1; original sparse CSS/SSS to a short ordinary Mario/FD prefix and Eject. No Results, original comparison, physical input or timing acceptance.' : suddenDeathRoute
+  scope: sparseFullRoute ? 'Virtual Gamepad P3/keyboard P1; original sparse Mario CSS/SSS, live elimination and canonical Results/CSS. Functional only; no physical input, original comparison, pixels/PCM or timing acceptance.' : sparseCssOnly ? 'Rendered original sparse CSS and exact copied/raw PAD observation then Eject only; no SSS/world, physical input or timing acceptance.' : sparseMarioPrefix ? 'Virtual Browser Gamepad P3 and keyboard P1; original sparse CSS/SSS to a short ordinary Mario/FD prefix and Eject. No Results, original comparison, physical input or timing acceptance.' : suddenDeathRoute
     ? 'Original Rules one-minute four-stock two-human Mario/FD; natural timeout, active SD live input elimination, typed original Results and CSS/Eject. Zero timing-pause recovery. Functional only; no reference, timing, physical input or PCM acceptance.'
     : noContestOnly
     ? 'Headless rendered original CSS -> SSS -> Final Destination -> match; P1 Start opens the original source pause, then the held LRAS+Start No Contest chord enters Results and Eject verifies teardown.'
@@ -671,7 +673,7 @@ route: {
   await page.locator('#player-two-source').selectOption('off');
   await page.locator('#keyboard-layout').selectOption('boxx');
   await page.locator('#controls-close').click();
-  report.checks.push('fresh isolated browser context has no user profile; native source runtime defaults to Everything unlocked; B0XX P1 and no physical controller');
+  report.checks.push(sparseMarioPrefix?'Fresh isolated browser context; Everything unlocked; declared P1 keyboard/raw diagnostic PAD0 and P3 virtual Gamepad through Controls, ports1/3 Off; no physical hardware claim':'fresh isolated browser context has no user profile; native source runtime defaults to Everything unlocked; B0XX P1 and no physical controller');
 
   await driver.selectDisc(discPath);
   await driver.waitForStart();
@@ -680,7 +682,7 @@ route: {
   await waitMessage('Original character select', 'initial CSS');
   await shot('00-initial-css');
   if(sparseMarioPrefix){
-    await runSparseMarioBrowserPrefix({cssOnly:sparseCssOnly,page,report,driver,press,chord,current,ensureNoError,resumeTimingPause,
+    await runSparseMarioBrowserPrefix({cssOnly:sparseCssOnly,fullRoute:sparseFullRoute,page,report,driver,press,chord,current,ensureNoError,resumeTimingPause,
       observeSource,observeCssSetup,sourcePadSample,sourcePadTap,waitForNoQueuedPad,waitMessage,waitPhase,
       waitMenu,enterVsRules,moveMenuCursor,waitItemInputReady,waitItemsCursor,waitItemFrequency,shot,verifyTeardown});
     nativeSessionActive=false;break route;
@@ -1221,7 +1223,7 @@ route: {
   if(suddenDeathRoute||sparseMarioPrefix){
     try{
       report.callbackCapture=await readRuntimeDiagnosticsCapture(page);
-      if(sparseMarioPrefix)validateFinalSparseCapture(report.callbackCapture,{cssOnly:sparseCssOnly});
+      if(sparseMarioPrefix)validateFinalSparseCapture(report.callbackCapture,{cssOnly:sparseCssOnly,fullRoute:sparseFullRoute});
       else validateFinalSdCapture(report.callbackCapture);
     }catch(error){
       report.callback_capture_error=redactDiscPath(error.message);
