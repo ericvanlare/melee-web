@@ -635,10 +635,10 @@ def css_state(data):
         mx, my = struct.unpack(">ff", model[8:16])
         import math
         require(all(math.isfinite(v) for v in (x, y, mx, my)), "CSS coordinate is invalid")
-        result["cursors"].append({"state": cursor[5], "held": cursor[6], "x": x, "y": y})
-        result["models"].append({"x": mx, "y": my})
+        result["cursors"].append({"port": cursor[4], "state": cursor[5], "held": cursor[6], "x": x, "y": y})
+        result["models"].append({"owner": model[5], "x": mx, "y": my})
         base = 0x70 + slot * 0x24
-        result["players"].append({"character": live[base], "kind": live[base+1]})
+        result["players"].append({"character": live[base], "kind": live[base+1], "slot": live[base+4]})
         base = slot * 0x24
         result["doors"].append({"kind": doors[base+11], "costume": doors[base+13],
                                 "icon": doors[base+14]})
