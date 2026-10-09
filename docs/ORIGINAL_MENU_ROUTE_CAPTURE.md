@@ -437,7 +437,21 @@ frequency change without its declared pulse or leaving Items before commit.
 The original CSS/FD route and strict normalized VS/tied-timeout/SD payload
 checks remain; the stop is still SD setup, without resolution inputs. Tag56
 uses its existing verified byte reader for `sd_prefix` as well as the reduced
-`items_row` probe. The ed97 producer lacks the full-prefix tag scope and must
-be preserved; this source change needs a new compiled producer before capture.
-Actual reduced passing menu/PAD/lock fields are retained as a control; later
-frequency/CSS/tie/SD controls are explicitly synthetic, not original validation.
+`items_row` probe. The preserved ed97 producer lacks that full-prefix scope;
+source23b9/binaryb6ea compiled it. The actual menu7 attempt observed lock-clear,
+row31/value3, the three Right decrements and B commit back to Rules, then failed
+at first CSS inventory because the driver required Human before moving either
+cursor. Its raw prefix/cleanup is retained in the scoped
+`original-sd-prefix-boundary-failure-v3.json` receipt (SHA14924194…). Both initial
+doors were NA, their cursors were at y=-21.5, and no CSS input was authored.
+
+The corrected menu7 driver admits only that initialized vacant owner or a
+coherent own-Human owner. It reuses the declared move-to-Mario axes: original
+`mnCharSel_CursorThink` joins the own NA door when the cursor enters
+0.2<y<22, as already used by `retail_cpu_menu_prepare.select`. The driver then
+requires observed own-Human before A placement; CPU, foreign ownership and
+unconstructed inventory fail. Historical menu5 retains its immediate Human
+precondition. Menu7, recipe5, action bytes and caps are unchanged. Observer
+overlay/nativeb6ea remain unchanged; the receiver/driver checkpoint is separate.
+Actual initial CSS fields are a retained control; later autojoin/CSS/tie/SD
+controls are explicitly synthetic until a changed capture passes.

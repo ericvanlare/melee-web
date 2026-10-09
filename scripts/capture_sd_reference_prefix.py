@@ -268,6 +268,29 @@ def _run(*, dolphin, disc, profile, input_plan, menu_recipe, output, build_manif
                 raise
 
 
+def require_css_join_owner(css, port, *, initial=False):
+    """Menu7's original vacant door, or its observed own-Human join.
+
+    mnCharSel_CursorThink joins an NA door when its own cursor enters
+    0.2 < y < 22. Movement remains the existing source-owned Mario policy.
+    """
+    player, door, cursor = css["players"][port], css["doors"][port], css["cursors"][port]
+    model = css["models"][port]
+    require(player["slot"] == 0 and cursor["port"] == port and
+            cursor["state"] in (0, 1, 2) and
+            model["owner"] in (0, port+1) and
+            (cursor["state"] != 1 or (cursor["held"] == port and model["owner"] == port+1)),
+            "CSS join has foreign slot/cursor ownership")
+    if initial and player["kind"] == 3:
+        require(player["character"] == 26 and door["kind"] == 3 and door["icon"] == 25 and
+                door["costume"] == 0 and cursor["state"] == 0 and cursor["held"] == 0 and
+                cursor["x"] == 15.0*port-31.0 and cursor["y"] == -21.5 and
+                model["owner"] == 0,
+                "CSS vacant door is not the observed initialized owner")
+    else:
+        require(player["kind"] == door["kind"] == 0, "CSS requires observed own Human join")
+
+
 def drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, tap):
     """Reuse the original Pipe driver's bounded cursor/door/highlight policy.
 
@@ -314,9 +337,18 @@ def drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, t
             controller.set_both(intent["p1"], intent["p2"], action=label)
             wait_source(lambda: receiver.menu_polls > before, label+":cursor", 600)
     wait_source(lambda: receiver.css is not None, "CSS constructor-owned inventory", 600)
-    require([p["kind"] for p in receiver.css["players"]] == [0, 0], "CSS requires two original humans")
+    if menus["version"] == 7:
+        for port in policy["ports"]:
+            require_css_join_owner(receiver.css, port, initial=True)
+    else:
+        require([p["kind"] for p in receiver.css["players"]] == [0, 0], "CSS requires two original humans")
     for port, costume in enumerate(policy["costumes"]):
         move(port, policy["point"], f"Mario-P{port+1}")
+        if menus["version"] == 7:
+            wait_source(lambda: receiver.css["players"][port]["kind"] == 0 and
+                        receiver.css["doors"][port]["kind"] == 0,
+                        f"CSS own Human join P{port+1}", 600)
+            require_css_join_owner(receiver.css, port)
         tap(pair(port, raw_pad(buttons=["A"])), f"Mario-place-P{port+1}", 600)
         wait_source(lambda: receiver.css["players"][port]["character"] == policy["character"], "Mario selected", 600)
         if receiver.css["doors"][port]["costume"] != costume:
@@ -336,7 +368,8 @@ def drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, t
             require(receiver.css["doors"][port]["costume"] == costume, "Mario costume cap")
             tap(pair(port, raw_pad(buttons=["A"])), "place-colored-Mario", 600)
         wait_source(lambda: receiver.css["cursors"][port]["state"] != 1, "human puck placed", 600)
-    require([p["character"] for p in receiver.css["players"]] == [8,8] and
+    require([p["kind"] for p in receiver.css["players"]] == [0,0] and
+            [p["character"] for p in receiver.css["players"]] == [8,8] and
             [d["costume"] for d in receiver.css["doors"]] == policy["costumes"], "CSS final lineup differs")
     before = receiver.menu_polls
     wait_source(lambda: receiver.menu_polls >= before+policy["idle_polls_before_start"], "CSS source idle", 600)

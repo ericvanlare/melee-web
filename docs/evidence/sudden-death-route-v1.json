@@ -8,8 +8,8 @@
     "Source identified",
     "Native traced"
   ],
-  "status": "browser_v11_functional_route_and_subsequent_prefix_passed_ordinary_controls_and_original_comparison_open",
-  "scope": "Native fixture-controlled route pass; browser original-menu SD-to-Results partial route; source/native Results confirmation control",
+  "status": "browser_v11_and_native_ordinary_v3_functional_passed_original_comparison_and_final_validation_open",
+  "scope": "Browser V11 SD/Results/returned-menu/subsequent-prefix functional pass; native SD and ordinary non-tied/elimination functional controls; original comparison remains open",
   "producer": {
     "source": "8b6ad34914c9e955a0aba8f6cc1e75a952fb6bc3",
     "tree": "3b47f21d59e0233c6a475bfc1b928984c3a2a3be",
@@ -273,7 +273,6 @@
     }
   ],
   "open_gates": [
-    "Corrected ordinary non-tied timeout and existing ordinary elimination controls on final native producer.",
     "Current-head full unittest suite, CI and root integration review; prior consolidated suite passed at fd55b378.",
     "Original full settings/SD reference and strict comparison with matching recipe5 colors [1,0], pause-enabled and declared fields.",
     "Internal final SD numeric PAD/RNG remain separately unobserved; Results-entry observations do not substitute for that boundary.",
@@ -398,6 +397,15 @@
       "integration": "exact ten-file source/doc/fixture delta imported; SD work preserved",
       "focused": "46 cheap Python source tests passed in 3.687s; no native compiler/assets/browser launched",
       "native_reference_build": "owned separately by reference checkout; no new comparison claim from SD integration"
+    },
+    "latest_campaign": {
+      "source_head": "a051c52ada9889e5931b11835ef89b36a70ab851",
+      "native_producer": "23b9ff37",
+      "binary_identity_prefix": "b6ea",
+      "bounded_result": "Items and CSS autojoin reached; first SSS cooldown guard failed",
+      "receipt": "awaiting exact campaign receipt consolidation",
+      "authority": "coordinator observed-result handoff; no invented campaign hash",
+      "scope": "Original menu prefix only; original gameplay/SD/comparison unrun"
     }
   },
   "validation": {
@@ -580,14 +588,51 @@
     }
   },
   "ordinary_controls": {
-    "source_head": "6c5a6f8f89f0c30c01423d637da8f675901eab8b",
     "build": "native Release passed; browser e13646assets unchanged",
     "asset_free": "new absentfixture/wrongFD dispatch + existing source callback/cache controls passed2tests",
     "non_tied_timeout_v1": "failed new post-close publication assertion after natural3600frame non-tiedtimeout and canonicalpublicfinish/exactP2terminal checks; API requiresliveowner and deliberatelyreturnsfalse afterclose",
     "first_failure_receipt_sha256": "9f1ddc42a6d131cddef2f8e2567929f36305697836ce78c6c35b0a7355b9a3e4",
     "correction": "Test-only split: reject publication on closed owner, independently verify retained terminal byteidentity; keep live-owner idempotence test and publicfinish ordering unchanged",
-    "results_mario_v1": "not launched at firstfailure stop",
-    "current_corrected_asset_run": "unrun",
-    "numeric_terminal_pad_seed": "unobserved; assertion failed before emission"
+    "results_mario_v1": "Historically unrun after V1/V2 stops; unchanged workload passed in V3",
+    "current_corrected_asset_run": "V3 non-tied and existing results-mario both passed",
+    "numeric_terminal_pad_seed": "V2 actual terminal/final PAD emitted, Results entry payload/seed unobserved. V3 emitted declared Results payload/PAD and observed live Results seed separately.",
+    "historical_source_head": "6c5a6f8f89f0c30c01423d637da8f675901eab8b",
+    "source_head": "849b02e77c1f33b13fa8b6eeb0a4f3689a17485e",
+    "non_tied_timeout_v2": {
+      "result": "failed elimination-only test-helper precondition after natural timeout/public finish",
+      "receipt_sha256": "6b65966e8e61690e4e5e222779238a73aaef04878c94e0e044987dd081f80221"
+    },
+    "v3": {
+      "result": "both passed",
+      "result_receipt_sha256": "7d9a5adb85c538cc468ccdec2896601029267062dc17af06b8f776dc854a3ceb",
+      "root_review_sha256": "132d92517f9f67fc59e369e62fed99670fb9107ae585a1d4e9255058702767b4",
+      "source_cursor": 3600,
+      "input_ticks": 3838,
+      "movement_ticks": 111,
+      "stocks": [
+        3,
+        4
+      ],
+      "winner_slot": 1,
+      "final_vs_seed": 4182878774,
+      "live_results_seed": 3408458326,
+      "cleanup": "Both direct Node children reaped exit0; all four exact supervisor/Node PIDs absent. Returned menu/host/VS/application cleanup checks passed.",
+      "scope": "Native authored functional only; not original comparison/browser/pixels/PCM/physical/timing acceptance"
+    },
+    "reduced_timeout_results": {
+      "result": "passed constructed TIMEOUT3:4 Results-only control; no gameplay/V2 ABI replay",
+      "receipt_sha256": "3070d727539c8015dcf9684f31413843afd38f85345975cb79075fd7a90e2651"
+    }
+  },
+  "reference_toolset_a051_integration": {
+    "reference_head": "a051c52ada9889e5931b11835ef89b36a70ab851",
+    "files": [
+      "docs/ORIGINAL_MENU_ROUTE_CAPTURE.md",
+      "scripts/capture_sd_reference_prefix.py",
+      "tests/fixtures/sd-css-initial-na-order.json",
+      "tests/test_sd_css_join.py",
+      "tools/sd_reference_diagnostic.py"
+    ],
+    "scope": "Exact source/tool/fixture integration; no SD reference native build or comparison promotion"
   }
 }
