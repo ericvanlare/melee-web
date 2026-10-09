@@ -1265,7 +1265,7 @@ def main() -> int:
     if args.entity_prefix:
         report.update(route=args.entity_prefix, diagnostic_prefix=args.entity_prefix,
                       whole_session_equivalent=False, complete=False,
-                      scope="one original four-CPU setup and first 60 SourceTicks at first qualifying DrawReturn; no outcome/Results, timing/pixel/PCM claim")
+                      scope="one original four-CPU setup and all SourceTicks through the named prefix first qualifying DrawReturn; exact interval in prefix_interval; no outcome/Results, timing/pixel/PCM claim")
     driver = (None if args.entity_prefix else
               Driver(controller, latest, stop, readiness_only=args.readiness_only,
                      team_route_only=args.team_route))
