@@ -1,0 +1,163 @@
+{
+  "schema": "sparse-ports-route-v1",
+  "issue": 293,
+  "scope": "headless virtual-device functional route; original sparse comparison open",
+  "browser": {
+    "harness": "87129df4e17082d850a1dec44b0652f3991e53d9",
+    "runtime": "1264b74c5fb68e3ae4a83522004b4f78f9a28680",
+    "result": "pass",
+    "report_sha256": "3206d078e45c1ef34a4e1e51120fb4a0cd1048ac5cf3331bb58605ba26cd1b75",
+    "supervisor_sha256": "42a82c7bd6e70a06d96a7bbaec574f4cc7c195a1f9eb7092103dfdca449af49e",
+    "root_review_sha256": "0a7edfe05029603a6ac8d6af4149c3bd3a115fccdfe2972af2235369da8d753b",
+    "served_manifest_sha256": "94dd37ff2adfb60c8bf13c9306f7e03a172ddcf6a18d907b52cee7fbd6d2d037",
+    "source_ports": [
+      0,
+      2
+    ],
+    "inactive_ports": [
+      1,
+      3
+    ],
+    "raw_and_copied_pad_errors": [
+      0,
+      -1,
+      0,
+      -1
+    ],
+    "initial_stocks": [
+      4,
+      4
+    ],
+    "losses": [
+      {
+        "frame": 316,
+        "stocks": [
+          3,
+          4
+        ]
+      },
+      {
+        "frame": 645,
+        "stocks": [
+          2,
+          4
+        ]
+      },
+      {
+        "frame": 981,
+        "stocks": [
+          1,
+          4
+        ]
+      },
+      {
+        "frame": 1303,
+        "stocks": [
+          0,
+          4
+        ]
+      }
+    ],
+    "terminal": {
+      "outcome": 2,
+      "winners": [
+        2
+      ]
+    },
+    "results_rows": 286,
+    "results_overflow": false,
+    "returned_css": true,
+    "checked_eject": true,
+    "exact_children_absent": true,
+    "listener_rebind": true,
+    "preparation_incidents": 8,
+    "dropped_incidents": 0,
+    "thinned_callback_samples": 2416,
+    "gameplay_callback_steps": 1541,
+    "gameplay_source_terminal_frame": 1303,
+    "private_locator": {
+      "run": "sparse-mario-full-route-20261009-87129df4-v1",
+      "report": "browser-output-v1/report.json",
+      "supervisor": "supervisor-v1.json",
+      "root_review": "root-full-route-result-review-v1.json"
+    }
+  },
+  "build": {
+    "producer": "1264b74c5fb68e3ae4a83522004b4f78f9a28680",
+    "configuration": "ordinary Release",
+    "diagnostic_flags_enabled": 0,
+    "compiled_review_sha256": "d400a1123646087a6e429a4d15aa653ca89ba224956dd2b970a39103d490a512",
+    "private_locator": {
+      "run": "issue293-checked-native-owner-build-20261009-003617-5c058e80",
+      "record": "runtime-compiled-review-v2.json"
+    }
+  },
+  "native": {
+    "producer": "6a327adac5468053e6f51eecc63ca6358362dfd5",
+    "recipe": "sparse-source-pad-control-v1",
+    "result": "pass",
+    "scope": "authored asset-backed session input/ownership; no original CSS or Results",
+    "compiled_review_sha256": "11ad01c91577926d81d9d965f42616e5daeeeebfb0a0d592223bdb18004fc76d",
+    "private_locator": {
+      "run": "issue293-checked-native-owner-build-20261009-003617-5c058e80",
+      "result": "authored-sparse-result-receipt-v1.json",
+      "compiled_review": "compiled-review-receipt-v1.json"
+    }
+  },
+  "kirby": {
+    "producer": "0b8cd084235c758d69afef2fb269dab3e56bad6c",
+    "actual_translation_unit_controls": 11,
+    "result": "pass",
+    "copy_bank": 33,
+    "retained_first_failure": "new test incorrectly expected bank 32; production unchanged by correction"
+  },
+  "suite": {
+    "producer": "87129df4e17082d850a1dec44b0652f3991e53d9",
+    "result": "failed",
+    "tests": 2208,
+    "skipped": 153,
+    "failures": 3,
+    "seconds": 560.895,
+    "log_sha256": "46f500c81f6730d92047e057624f30bb9d4e42ca84600d846b04bd09db199c75",
+    "repair": "7ec76d14",
+    "focused_pass": [
+      "SD actual recipe controls",
+      "canonical patch check",
+      "actual native item-mask admission control"
+    ],
+    "pending": [
+      "full suite retry"
+    ],
+    "private_locator": {
+      "run": "sparse-mario-full-route-20261009-87129df4-v1",
+      "log": "full-unittest-87129-v1.stdout-stderr.log",
+      "process": "full-unittest-87129-v1.process.json"
+    }
+  },
+  "historical_regressions": {
+    "dense_native": "849b02e77c1f33b13fa8b6eeb0a4f3689a17485e",
+    "dense_receipt": "sudden-death-route-v1.json",
+    "teams_browser": "11ad9701d964f231793160b8ff267869614b86cb",
+    "teams_receipt": "four-player-team-battle-admission-v1.json",
+    "scope": "different producers; not current runtime whole-route regression"
+  },
+  "retained_failures": [
+    "prefix V1 Controls mount/app cleanup gap",
+    "Controls reducer UI pass with supervisor cleanup failure",
+    "prefix V2 Human-to-CPU selection",
+    "CSS reducer unawaited unload",
+    "native no-draw CSS renderer guard",
+    "full suite three stale fixture/metadata failures"
+  ],
+  "gaps": [
+    "original sparse state/port comparison unrun",
+    "current-producer dense/Teams whole-route regression",
+    "physical input",
+    "numeric HUD export",
+    "pixel equivalence and magenta FD geometry",
+    "PCM/uninterrupted audio",
+    "live timing/performance",
+    "dedicated Prize edge"
+  ],
+  "integration": "held pending original comparison and final validation"
+}
