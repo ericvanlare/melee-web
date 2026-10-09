@@ -154,8 +154,10 @@ class Receiver:
             verify_entry(self.plan, normal.hex())
             require(normal[0x14] == 0, "SD recipe requires original default timer subframe initialization")
             require(len(persistent) == 0x138, "SD persistent VS payload is missing")
-            require(data.get((54, 0)) == b"\0" * 4,
-                    "SD original profile requires all four port rumble settings disabled")
+            context = self.plan["authored_recipe"].get("cold_original_context")
+            preferences = bytes(context["port_rumble_preferences"]) if context else b"\0" * 4
+            require(data.get((54, 0)) == preferences,
+                    "SD original profile port rumble preferences differ from declared recipe")
             normalized = disabled_rumble_copy(persistent)
             normalized[2] |= 0x80
             normalized[4] |= 0x40
@@ -164,6 +166,9 @@ class Receiver:
                 if slot < 2:
                     require(persistent[base + 0xa] == 120,
                             "SD profile contract requires original unnamed human ports")
+                    if context:
+                        require(persistent[base + 4] == context["human_source_slots"][slot],
+                                "SD original human source port mapping differs")
             require(bytes(normalized) == normal, "Normal VS setup differs from source rule normalization")
         if name == "vs_exit":
             raw = data.get((15, 0), b"")

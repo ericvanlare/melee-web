@@ -18,9 +18,9 @@ def canonical(value):
                        allow_nan=False) + "\n").encode("utf-8")
 
 
-def recipe():
+def recipe(version=1):
     """Return a fresh copy of the single fixed, wholly authored experiment."""
-    return {
+    declaration = {
         "schema": RECIPE_SCHEMA,
         "version": 1,
         "id": "two-human-mario-fd-neutral-timeout-sd-prefix",
@@ -50,11 +50,24 @@ def recipe():
         "exclusions": ["SD resolution", "Results/CSS return", "pixels", "PCM", "live timing"],
         "setup_policy": "original menus only; no game, RNG, fighter or winner writes",
     }
+    if version == 2 and type(version) is int:
+        declaration["version"] = 2
+        declaration["cold_original_context"] = {
+            "port_rumble_preferences": [0, 0, 1, 1],
+            "human_source_slots": [1, 2],
+            "human_nametags": [120, 120],
+            "port_mapping": "slot zero uses player index; otherwise slot minus one",
+            "preparation": "original Options Rumble: P1/P2 off; P3/P4 untouched defaults",
+        }
+    elif version != 1 or type(version) is not int:
+        raise ValueError("Unsupported authored SD recipe version")
+    return declaration
 
 
 def validate_recipe(value):
     # Byte comparison also rejects bool-for-int and int-for-float substitutions.
-    if canonical(value) != canonical(recipe()):
+    version = value.get("version") if isinstance(value, dict) else None
+    if version not in (1, 2) or canonical(value) != canonical(recipe(version)):
         raise ValueError("Unsupported or changed authored SD reference recipe")
     return value
 
@@ -64,11 +77,11 @@ def recipe_sha256(value):
     return hashlib.sha256(canonical(value)).hexdigest()
 
 
-def make_input_plan():
+def make_input_plan(recipe_version=1):
     """Build all samples before execution; there is no length/extension option."""
     from retail_input_plan import (AUTHORED_PLAN_VERSION, SCHEMA, POLICY,
                                    NEUTRAL_PAD, DISCONNECTED_PAD, validate_plan)
-    declaration = recipe()
+    declaration = recipe(recipe_version)
     return validate_plan({
         "schema": SCHEMA, "version": AUTHORED_PLAN_VERSION, "policy": POLICY,
         "provenance": PROVENANCE, "authored_recipe": declaration,
