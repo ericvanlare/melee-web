@@ -537,3 +537,89 @@ class EntityPrefixMenuCaptureTests(unittest.TestCase):
             context["proc"].wait.assert_called_once_with(timeout=5)
             context["log"].close.assert_called_once()
             self.assertFalse(context["report"]["recipe_artifacts_admitted"])
+
+
+class EntityPrefixRulesMenuTests(unittest.TestCase):
+    """Exercise the actual menu method with synthetic source-ready progression."""
+    def test_actual_boot_preserves_prefix_mask_and_existing_route_actions(self):
+        from unittest.mock import patch
+        import tools.recorded_session_12_character_capture as implementation
+
+        for mode in ("prefix", "default", "team"):
+            with self.subTest(mode=mode):
+                latest = {"scene_kind": "01", "main_kind": 0, "main_selection": 0,
+                          "main_confirmed": 0, "main_cooldown": 0, "main_polls": 60,
+                          "polls": 60, "models": {}, "css_polls": 0}
+                driver = Driver(None, latest, threading.Event(), readiness_only=False,
+                                entity_prefix=mode == "prefix", team_route_only=mode == "team")
+                observed = {"mask": (1 << 64) - 1, "stocks": 3, "frequency": 3}
+                actions = []
+                waits = []
+
+                def wait(predicate, label, seconds=12.0):
+                    # Sleep does not advance these observations. Only source
+                    # samples satisfy cooldown and animation predicates.
+                    for _ in range(250):
+                        if predicate():
+                            waits.append(label)
+                            return
+                        latest["polls"] += 1
+                        latest["main_polls"] += 1
+                        latest["main_cooldown"] = max(0, latest["main_cooldown"] - 1)
+                        if latest["models"]:
+                            latest["css_polls"] += 1
+                    raise CaptureFailure("synthetic source readiness did not progress: " + label)
+
+                def tap(port, button, *, label):
+                    self.assertEqual(port, 0)
+                    self.assertEqual(latest["main_cooldown"], 0)
+                    kind, row = latest["main_kind"], latest["main_selection"]
+                    actions.append((kind, row, button, label))
+                    if kind == 0 and button == "D_DOWN":
+                        latest["main_selection"] = 1
+                    elif kind == 0 and row == 1 and button == "A":
+                        latest.update(main_kind=2, main_selection=0)
+                    elif kind == 2 and button == "D_DOWN":
+                        latest["main_selection"] += 1
+                    elif kind == 2 and row == 3 and button == "A":
+                        latest.update(main_kind=13, main_selection=0, main_confirmed=0)
+                    elif kind == 13 and row == 0 and button == "D_RIGHT":
+                        latest["main_confirmed"] = 1
+                    elif kind == 13 and button == "D_DOWN":
+                        latest["main_selection"] += 1
+                        if latest["main_selection"] == 1:
+                            latest["main_confirmed"] = observed["stocks"]
+                    elif kind == 13 and row == 1 and button == "D_RIGHT":
+                        observed["stocks"] += 1
+                        latest["main_confirmed"] = observed["stocks"]
+                    elif kind == 13 and row == 5 and button == "A":
+                        latest.update(main_kind=16, main_selection=0)
+                    elif kind == 16 and row == 0 and button == "A":
+                        observed["mask"] ^= 1 << 18
+                    elif kind == 16 and row == 0 and button == "D_UP":
+                        latest.update(main_selection=31, main_confirmed=observed["frequency"])
+                    elif kind == 16 and row == 31 and button == "D_RIGHT":
+                        observed["frequency"] -= 1
+                        latest["main_confirmed"] = observed["frequency"]
+                    elif kind == 16 and button == "B":
+                        latest.update(main_kind=13, main_selection=5, main_polls=0)
+                    elif kind == 13 and button == "START":
+                        latest["models"] = {i: {} for i in range(4)}
+                    else:
+                        self.fail(f"undeclared synthetic source action: {(kind, row, button)}")
+                    latest["main_cooldown"] = 2
+
+                driver.wait = wait
+                driver.tap = tap
+                with patch.object(implementation.time, "sleep"):
+                    driver._boot_menus()
+                toggles = [a for a in actions if a[:3] == (16, 0, "A")]
+                self.assertEqual(len(toggles), 1 if mode == "team" else 0)
+                self.assertEqual(observed["mask"], int("fffffffffffbffff", 16) if mode == "team"
+                                 else (1 << 64) - 1)
+                self.assertEqual(observed["frequency"], 0)
+                self.assertEqual(observed["stocks"], 3 if mode == "team" else 4)
+                self.assertIn("original Items transition animation", waits)
+                self.assertGreater(latest["css_polls"], 240)
+                self.assertEqual([a[2] for a in actions if a[:2] == (16, 31)],
+                                 ["D_RIGHT", "D_RIGHT", "D_RIGHT", "B"])
