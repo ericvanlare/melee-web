@@ -281,7 +281,7 @@ if(EMSCRIPTEN)
     -sALLOW_MEMORY_GROWTH=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
   set_target_properties(gameplay_probe PROPERTIES SUFFIX ".js")
   include(cmake/FighterRuntime.cmake)
-  target_link_libraries(gameplay_collision_trace PRIVATE hsd_native_runtime)
+  target_link_libraries(gameplay_collision_trace PRIVATE fighter_source_runtime)
   add_executable(gameplay_fighter_input_trace tests/gameplay_fighter_trace.cpp
     src/gameplay_fighter_probe.c src/dat_archive.cpp src/dat_common.cpp)
   target_link_libraries(gameplay_fighter_input_trace PRIVATE fighter_source_runtime)
