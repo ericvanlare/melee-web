@@ -212,16 +212,17 @@ def _validate_authored_plan(value):
     _integer(value['active_player_count'], 2, 2)
     source_slots = declaration.get('source_slots', [0, 1])
     controlled_ports = [slot + 1 for slot in source_slots]
-    for key, expected in (('source_characters', [8, 8]),
+    expected_characters = [18, 8] if declaration['version'] == 8 else [8, 8]
+    for key, expected in (('source_characters', expected_characters),
                           ('source_player_types', [0, 0]), ('controlled_ports', controlled_ports)):
         if (not isinstance(value[key], list) or
                 any(type(item) is not int for item in value[key]) or value[key] != expected):
             raise ValueError('Authored input plan differs from its declared ' + key)
     frames = value['frames']
-    if declaration['version'] == 7:
+    if declaration['version'] in (7, 8):
         witness = declaration['input_witness']
         if (not isinstance(frames, list) or frames != [witness['press'], witness['release']]):
-            raise ValueError('Sparse input plan differs from its fixed press/release witness')
+            raise ValueError('Authored input plan differs from its fixed press/release witness')
         return value
     if not isinstance(frames, list) or len(frames) != STARTUP_TICKS + MATCH_TICKS:
         raise ValueError('Authored input plan requires its complete fixed sample cap')
@@ -352,11 +353,13 @@ def verify_entry(plan, start_hex):
         # second packed-bit interpretation or accepting only a matchup subset.
         from retail_setup_validation import _decode_setup
         recipe = plan['authored_recipe']
-        source_slots = recipe.get('source_slots')
+        # The transform-prefix roster is dense P1/P2. The explicit source-slot
+        # decoder extension remains reserved for the existing sparse P1/P3 case.
+        source_slots = recipe.get('source_slots') if recipe['version'] == 7 else None
         actual = _decode_setup(start_hex,
-            competitive_profile=recipe['version'] in (6, 7), source_slots=source_slots)
+            competitive_profile=recipe['version'] in (6, 7, 8), source_slots=source_slots)
         raw = bytes.fromhex(start_hex)
-        active = set(source_slots or (0, 1))
+        active = set(recipe.get('source_slots') or (0, 1))
         if any(raw[0x61 + slot * 0x24] != 3 for slot in range(6) if slot not in active):
             raise ValueError('Authored setup requires every undeclared source slot to be NA')
         if actual != recipe['expected_setup']:

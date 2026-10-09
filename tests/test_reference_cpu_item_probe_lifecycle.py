@@ -32,7 +32,10 @@ class ReferenceCpuItemProbeLifecycleTests(unittest.TestCase):
             source.index("enum class ItemProbeEvent"):
             source.index("constexpr bool IsGuestRange", source.index("enum class ItemProbeEvent"))
         ]
-        ranges = _method(source, "constexpr bool IsGuestRange", "void PutU16")
+        ranges = "\n".join((
+            _method(source, "constexpr bool IsGuestRange", "constexpr u16 ReadBE16"),
+            _method(source, "constexpr u32 ReadBE32", "void PutU16"),
+        ))
         json_helpers = "\n".join((
             _method(source, "std::string JsonEscape", "std::string Env"),
             _method(source, "bool AppendBounded", "bool AppendHex"),

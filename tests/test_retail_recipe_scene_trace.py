@@ -62,6 +62,7 @@ int cpu_draw = 0;
 int cpu_preparation_draw = 0;
 int cpu_end = 0;
 int entity_resets = 0;
+int checked_entities = 0;
 std::vector<uint32_t> entity_indices;
 bool state_allowed = false;
 bool cpu_available = true;
@@ -69,6 +70,7 @@ void reset() {
     state = rng = cpu_begin = cpu_tick = cpu_draw =
         cpu_preparation_draw = cpu_end = 0;
     entity_resets = 0;
+    checked_entities = 0;
     entity_indices.clear();
     state_allowed = false;
     cpu_available = true;
@@ -125,6 +127,10 @@ extern "C" void melee_web_retail_state(void) { fake::write_state(); }
 extern "C" void melee_web_retail_entities(void) {
     if (!fake::state_allowed) std::abort();
     std::cout << ",\"fighter_entities\":[]";
+}
+extern "C" void melee_web_retail_entities_checked(void) {
+    ++fake::checked_entities;
+    melee_web_retail_entities();
 }
 extern "C" void melee_web_retail_entities_index(uint32_t match_index) {
     if (!fake::state_allowed) std::abort();
@@ -335,6 +341,33 @@ static void identity_observation_case(uint32_t version) {
     print_entity_counts(version == 9 ? "v9" : "v10");
 }
 
+static void checked_prefix_case() {
+    fake::reset();
+    RetailReplayRecipe recipe;
+    recipe.version = 8;
+    recipe.diagnostic_entity_prefix = true;
+    recipe.frames.resize(3);
+    retail_replay_session_initial(recipe);
+    bool refused = false;
+    try { retail_replay_end(3, true); }
+    catch (const std::runtime_error&) { refused = true; }
+    if (!refused) throw std::runtime_error("prefix closed before checked setup");
+    retail_replay_frame(recipe, 0, kRetailReplayCss);
+    retail_replay_frame(recipe, 1, kRetailReplaySss);
+    fake::state_allowed = true;
+    retail_replay_initial(recipe, true, recipe.selection.start);
+    refused = false;
+    try { retail_replay_initial(recipe, true, recipe.selection.start); }
+    catch (const std::runtime_error&) { refused = true; }
+    if (!refused) throw std::runtime_error("prefix accepted duplicate setup");
+    retail_replay_frame(recipe, 2, kRetailReplayMatch);
+    fake::state_allowed = false;
+    retail_replay_end(3, true);
+    if (fake::checked_entities != 2 || fake::entity_resets != 0 ||
+        !fake::entity_indices.empty() || fake::cpu_begin != 0)
+        throw std::runtime_error("prefix changed its entity observer scope");
+}
+
 int main() {
     using namespace melee_web;
     RetailReplayRecipe whole;
@@ -400,6 +433,8 @@ int main() {
     identity_observation_case(9);
     std::cout << "IDENTITY_CASE_BEGIN v10\n";
     identity_observation_case(10);
+    std::cout << "IDENTITY_CASE_BEGIN prefix\n";
+    checked_prefix_case();
 }
 '''
 
@@ -510,6 +545,22 @@ class RetailRecipeSceneTraceTests(unittest.TestCase):
         self.assertEqual(identity_counts["v8"], (0, 0))
         self.assertEqual(identity_counts["v9"], (1, 2, 0, 0))
         self.assertEqual(identity_counts["v10"], (1, 2, 0, 0))
+        prefix = identity_records["prefix"]
+        self.assertEqual(prefix[0], {
+            "record": "header", "schema": "melee-web-port-session-diagnostic",
+            "version": 2, "fighter_entities": "all_player_entity_slots",
+            "frames_requested": 3, "comparison": "not_run",
+            "cpu_observations": "not_captured", "draw_state": "not_captured",
+        })
+        self.assertEqual([r["record"] for r in prefix[1:]], [
+            "session_frame", "session_frame", "session_match_enter_complete",
+            "session_frame", "end",
+        ])
+        self.assertNotIn("fighter_entities", prefix[1])
+        self.assertNotIn("fighter_entities", prefix[2])
+        self.assertEqual(prefix[3]["fighter_entities"], [])
+        self.assertEqual(prefix[4]["fighter_entities"], [])
+        self.assertEqual(prefix[5], {"record": "end", "frames": 3, "status": "captured"})
         for version in ("v9", "v10"):
             rows = identity_records[version]
             self.assertEqual(rows[0]["record"], "header")

@@ -38,6 +38,8 @@ def validate_packet(value):
         return value
     if canonical(value) == canonical(gci_sparse_pair_packet()):
         return value
+    if canonical(value) == canonical(sheik_transform_prefix_packet()):
+        return value
     if canonical(value) == canonical(gci_items_row_packet()):
         return value
     if canonical(value) == canonical(gci_sd_prefix_packet()):
@@ -148,6 +150,84 @@ def route_pads(packet):
                 pads.add(tuple(pair))
     pads |= {(raw_pad(x=40), NEUTRAL_PAD), (raw_pad(y=40), NEUTRAL_PAD)}
     return pads
+
+
+def sheik_transform_prefix_packet():
+    """Exact original-menu route for Zelda/Mario's bounded Sheik prefix.
+
+    This reuses the original Rules-ready route and declares its stock/Items
+    choreography, while using dense P1/P2 ownership and no GCI injection.
+    Zelda's authored icon-table row (15) is distinct from its HUD icon value
+    (18); the frozen cursor point is the strict-interior midpoint of row 15.
+    """
+    value = rules_ready_packet()
+    value.update(version=10, scope="sheik_transform_prefix",
+                 authored_recipe_sha256=recipe_sha256(recipe(8)))
+    # The existing v4 rules route observes forward navigation through each
+    # original menu owner. Reuse those exact guards without its save injection.
+    for action in value["actions"]:
+        for boundary in (action["before"], action["after"]):
+            if boundary["kind"] != 0:
+                boundary["entering"] = 1
+    def state(kind, row, confirmed=None, entering=1):
+        result = guard(kind, row, confirmed)
+        result["entering"] = entering
+        return result
+    steps = [("stock-mode", "D_RIGHT", state(13, 0, 0), state(13, 0, 1)),
+             ("stock-row", "D_DOWN", state(13, 0, 1), state(13, 1, 3)),
+             ("four-stocks", "D_RIGHT", state(13, 1, 3), state(13, 1, 4))]
+    steps += [(f"Rules-row-{row}", "D_DOWN", state(13, row - 1), state(13, row))
+              for row in range(2, 6)]
+    steps += [("open-items", "A", state(13, 5), state(16, 0, 1))]
+    steps += [("items-frequency-row", "D_UP", state(16, 0, 1), state(16, 31, 3))]
+    steps += [(f"items-frequency-{after}", "D_RIGHT", state(16, 31, after + 1),
+               state(16, 31, after)) for after in (2, 1, 0)]
+    steps += [("commit-items-none", "B", state(16, 31, 0), state(13, 5, entering=0)),
+              ("Rules-start-CSS", "START", state(13, 5, entering=0), {"scene": 8})]
+    value["actions"] += [{"label": label, "p1": raw_pad(buttons=[button]),
+                          "p2": NEUTRAL_PAD, "before": before, "after": after,
+                          "max_polls": 600}
+                         for label, button, before, after in steps]
+    value["css"] = {
+        "characters": [18, 8],
+        "icon_table_indices": [15, 1],
+        "hud_icons": [18, 1],
+        "points": [[14.1, 9.5], [-20.9, 16.5]],
+        "geometry_source": {
+            "dependency_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+            "file": "src/melee/mn/mncharsel.c",
+            "sha256": "7d8ab4fd55c5904bb05065a5b1e57b00693998d2446894d9b0b6a695d1cb77de",
+            "rows": [
+                {"character_kind": 18, "icon_table_ordinal": 15,
+                 "row_address": "803f0cc8", "hud_icon": 18,
+                 "bounds": {"x": [10.6, 17.6], "y": [6.0, 13.0]},
+                 "point": [14.1, 9.5]},
+                {"character_kind": 8, "icon_table_ordinal": 1,
+                 "row_address": "803f0b40", "hud_icon": 1,
+                 "bounds": {"x": [-24.4, -17.4], "y": [13.0, 20.0]},
+                 "point": [-20.9, 16.5]},
+            ],
+            "hit_test": "strict interior of the source ICONBNDS/ICONROWHT bounds",
+        },
+        "costumes": [1, 0], "ports": [0, 1], "source_slots": [0, 1],
+        "human_kind": 0, "axis_values": [-70, -35, 0, 35, 70],
+        "tolerance": 0.6, "stable_cursor_polls": 2,
+        "max_move_polls": 600, "max_costume_taps": 8,
+        "idle_polls_before_start": 12,
+    }
+    value["sss"] = {"stage_kind": 32, "initial_idle_polls": 120,
+        "column_x": 40, "column_polls": 18, "scan_y": 40,
+        "max_scan_polls": 600, "confirm_requires_cooldown": 0}
+    # Items lock is an SD/GCI observer owner. The transform profile still
+    # observes original MenuFlow values and consumed PADs, so this route does
+    # not make lock-tag presence part of its readiness predicate.
+    for action in value["actions"]:
+        for boundary in (action.get("before"), action.get("after")):
+            if isinstance(boundary, dict):
+                boundary.pop("items_locked", None)
+    value["stop"] = (
+        "observed exact Zelda/Mario four-stock FD setup and completed grounded neutral Sheik prefix")
+    return value
 
 
 def gci_items_row_packet():

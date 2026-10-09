@@ -55,7 +55,12 @@ class ReferenceCpuProbeLifecycleTests(unittest.TestCase):
         ]
         ranges = source[
             source.index("constexpr bool IsGuestRange") : source.index(
-                "void PutU16", source.index("constexpr bool IsGuestRange")
+                "constexpr u16 ReadBE16", source.index("constexpr bool IsGuestRange")
+            )
+        ]
+        ranges += source[
+            source.index("constexpr u32 ReadBE32") : source.index(
+                "void PutU16", source.index("constexpr u32 ReadBE32")
             )
         ]
         points = source[
@@ -74,7 +79,7 @@ class ReferenceCpuProbeLifecycleTests(unittest.TestCase):
         read_methods = "\n".join(
             [
                 _method(source, "  bool ReadBytes", "  bool ReadU32"),
-                _method(source, "  bool ReadU32", "  bool ReadMem1"),
+                _method(source, "  bool ReadU32", "  bool TransformPrefixRosterValid"),
                 _method(source, "  bool ReadMem1", "  void CloseCpuProbe"),
                 _method(source, "  void CloseCpuProbe", "  void RecordCpuProbe"),
                 _method(source, "  void RecordCpuProbe", "  void CloseItemProbe"),
