@@ -40,17 +40,41 @@ function makeTrace(samples) {
   };
 }
 
-test('Results PAD trace rejects incomplete rows, overflow, failed ticks and unknown phases', () => {
-  const valid = makeTrace([makeTraceRow(0, {phase: 2, statsPhase: 1, confirmed: [0, 0, 1, 1]})]);
+test('Results PAD trace accepts authored 0-to-1-to-2 entry and rejects malformed phase/state progress', () => {
+  const valid = makeTrace([
+    makeTraceRow(0, {phase: 0, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+    makeTraceRow(1, {phase: 1, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+    makeTraceRow(2, {phase: 2, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+  ]);
   assert.deepEqual(resultsPadTraceFailures(valid), []);
   assert(resultsPadTraceFailures(null).length > 0);
   assert(resultsPadTraceFailures({...valid, overflow: true}).some(row => row.includes('overflow')));
   assert(resultsPadTraceFailures({...valid, attempts: 2}).some(row => row.includes('accounting')));
   assert(resultsPadTraceFailures({...valid, samples: [{...valid.samples[0], tick_returned: false}]})
     .some(row => row.includes('did not complete')));
+  for (const phase of [-1, 5]) {
+    assert(resultsPadTraceFailures(makeTrace([makeTraceRow(0, {
+      phase, statsPhase: 0, confirmed: [0, 0, 0, 0],
+    })])).some(row => row.includes('unsupported original phase')));
+  }
+  assert(resultsPadTraceFailures(makeTrace([
+    makeTraceRow(0, {phase: 1, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+    makeTraceRow(1, {phase: 0, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+  ])).some(row => row.includes('regressed the original Results phase')));
+  assert(resultsPadTraceFailures(makeTrace([
+    makeTraceRow(0, {phase: 0, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+    makeTraceRow(1, {phase: 2, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+  ])).some(row => row.includes('skipped an authored Results phase')));
+  assert(resultsPadTraceFailures(makeTrace([
+    makeTraceRow(0, {phase: 0, statsPhase: 2, confirmed: [0, 0, 0, 0]}),
+    makeTraceRow(1, {phase: 1, statsPhase: 1, confirmed: [0, 0, 0, 0]}),
+  ])).some(row => row.includes('regressed the original stats phase')));
   assert(resultsPadTraceFailures(makeTrace([makeTraceRow(0, {
-    phase: 5, statsPhase: 1, confirmed: [0, 0, 1, 1],
-  })])).some(row => row.includes('unsupported original phase')));
+    phase: 0, statsPhase: 3, confirmed: [0, 0, 0, 0],
+  })])).some(row => row.includes('unsupported original stats phase')));
+  assert(resultsPadTraceFailures(makeTrace([makeTraceRow(0, {
+    phase: 0, statsPhase: 0, confirmed: [0, 2, 0, 0],
+  })])).some(row => row.includes('four binary confirmation states')));
   assert(resultsPadTraceFailures(makeTrace([
     makeTraceRow(0, {phase: 2, statsPhase: 1, confirmed: [0, 0, 1, 1]}),
     makeTraceRow(2, {phase: 3, statsPhase: 2, confirmed: [0, 0, 1, 1]}),
@@ -75,7 +99,11 @@ test('Results PAD trace requires the two-connected/two-disconnected raw and copi
 });
 
 test('two-Human Results driver gates presentation and each port confirmation on copied source state', async () => {
-  const samples = [makeTraceRow(0, {phase: 2, statsPhase: 0, confirmed: [0, 0, 0, 0]})];
+  const samples = [
+    makeTraceRow(0, {phase: 0, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+    makeTraceRow(1, {phase: 1, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+    makeTraceRow(2, {phase: 2, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
+  ];
   const presses = [];
   let hostPhase = 8;
   const snapshot = () => makeTrace(samples);
@@ -87,7 +115,7 @@ test('two-Human Results driver gates presentation and each port confirmation on 
     press: async key => {
       presses.push(key);
       if (presses.length === 1) {
-        append({phase: 3, statsPhase: 1, confirmed: [0, 0, 1, 1], startPorts: [0]});
+        append({phase: 3, statsPhase: 0, confirmed: [0, 0, 1, 1], startPorts: [0]});
         append({phase: 3, statsPhase: 2, confirmed: [0, 0, 1, 1]});
       } else if (presses.length === 2) {
         append({phase: 3, statsPhase: 2, confirmed: [1, 0, 1, 1], startPorts: [0]});

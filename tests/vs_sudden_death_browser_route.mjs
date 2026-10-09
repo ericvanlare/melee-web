@@ -95,6 +95,7 @@ export async function runSuddenDeathBrowserRoute(d) {
     waitItemInputReady,waitItemsCursor,waitItemFrequency,waitRulesPlusTimer,
     shot,verifyTeardown}=d;
   report.suddenDeath={limits:SD_BROWSER_LIMITS,observations:[],departurePulses:[],
+    resultsPadTraceLatest:null,
     stepSemantics:'Sum of source steps at callback publication; transition callbacks may include work from the preceding phase. Source cursors are reported separately.',
     internalFinalSdPadAndSeed:'unobserved at the internal publication boundary',
     comparison:'authored functional route only; no original/reference, physical input, PCM or timing equivalence'};
@@ -185,11 +186,17 @@ export async function runSuddenDeathBrowserRoute(d) {
     assert.equal(state.running,1,`${label}: original Results/Prize stopped running`);
     return state;
   };
-  const observeResultsTrace=()=>page.evaluate(()=>{
-    if(typeof Module?._melee_web_native_menu_results_pad_trace!=='function')return null;
-    const pointer=Module._melee_web_native_menu_results_pad_trace();
-    return pointer?JSON.parse(Module.UTF8ToString(pointer)):null;
-  });
+  const observeResultsTrace=async()=>{
+    const trace=await page.evaluate(()=>{
+      if(typeof Module?._melee_web_native_menu_results_pad_trace!=='function')return null;
+      const pointer=Module._melee_web_native_menu_results_pad_trace();
+      return pointer?JSON.parse(Module.UTF8ToString(pointer)):null;
+    });
+    // Retain the latest already-observed bounded trace, including failed validation.
+    // This adds no source ticks or native samples and does not reconstruct older runs.
+    report.suddenDeath.resultsPadTraceLatest=trace;
+    return trace;
+  };
   report.suddenDeath.resultsConfirmation=await confirmTwoHumanResults({
     deadlineAt:resultsDeadline,observeHost:observeResultsHost,
     observeTrace:observeResultsTrace,press,
