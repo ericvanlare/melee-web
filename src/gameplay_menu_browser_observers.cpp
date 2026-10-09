@@ -328,7 +328,7 @@ EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_pad_trace(){
 }
 #endif
 const char* melee_web_native_menu_match_observe(){
- static char text[1536];
+ static char text[2048];
  if(!match)return terminal_match_observation.empty()?"{}":terminal_match_observation.c_str();
  if(!match->construction_complete())return "{}";
  try{
@@ -364,6 +364,9 @@ const char* melee_web_native_menu_match_observe(){
  out.add(",\"stage\":%u",(unsigned) start.rules.stkind);
  out.add(",\"timer_enabled\":%u",(unsigned) start.rules.timer_enabled);
  out.add(",\"time_limit\":%u",(unsigned) start.rules.time_limit);
+ out.add(",\"is_stock\":%u",(unsigned)start.rules.is_stock);
+ out.add(",\"is_vs\":%u",(unsigned)start.rules.is_vs);
+ out.add(",\"source_sudden_death_flag\":%u",(unsigned)start.rules.x6);
  out.add(",\"item_frequency\":%d",(int) (int8_t) start.rules.xB);
  out.add(",\"item_mask_hex\":\"%016llx\"",(unsigned long long) start.rules.x20);
  out.add(",\"is_teams\":%u",(unsigned) start.rules.is_teams);
@@ -376,6 +379,16 @@ const char* melee_web_native_menu_match_observe(){
  out.add("{");
  out.add("\"fighter\":%d",p0.fighter_kind);
  out.add(",\"human\":%s",start.players[slots[0]].slot_type==Gm_PKind_Human?"true":"false");
+ out.add(",\"damage_percent\":%.9g",p0.damage_percent);
+ out.add(",\"source_player_index\":%u",slots[0]);
+ out.add(",\"source_slot\":%u",(unsigned)start.players[slots[0]].slot);
+ out.add(",\"source_port\":%u",(unsigned)(start.players[slots[0]].slot?
+         start.players[slots[0]].slot-1u:slots[0]));
+ out.add(",\"source_character\":%d",(int)start.players[slots[0]].ckind);
+ out.add(",\"source_color\":%u",(unsigned)start.players[slots[0]].color);
+ out.add(",\"source_initial_damage\":%u",(unsigned)start.players[slots[0]].x12);
+ out.add(",\"slot_type\":%u",(unsigned)start.players[slots[0]].slot_type);
+ out.add(",\"source_stocks\":%d",(int)start.players[slots[0]].stocks);
  out.add(",\"stocks\":%d",p0.stocks);
  out.add(",\"motion\":%d",p0.motion_id);
  out.add(",\"groundAir\":%d",p0.ground_or_air);
@@ -385,6 +398,16 @@ const char* melee_web_native_menu_match_observe(){
  out.add(",{");
  out.add("\"fighter\":%d",p1.fighter_kind);
  out.add(",\"human\":%s",start.players[slots[1]].slot_type==Gm_PKind_Human?"true":"false");
+ out.add(",\"damage_percent\":%.9g",p1.damage_percent);
+ out.add(",\"source_player_index\":%u",slots[1]);
+ out.add(",\"source_slot\":%u",(unsigned)start.players[slots[1]].slot);
+ out.add(",\"source_port\":%u",(unsigned)(start.players[slots[1]].slot?
+         start.players[slots[1]].slot-1u:slots[1]));
+ out.add(",\"source_character\":%d",(int)start.players[slots[1]].ckind);
+ out.add(",\"source_color\":%u",(unsigned)start.players[slots[1]].color);
+ out.add(",\"source_initial_damage\":%u",(unsigned)start.players[slots[1]].x12);
+ out.add(",\"slot_type\":%u",(unsigned)start.players[slots[1]].slot_type);
+ out.add(",\"source_stocks\":%d",(int)start.players[slots[1]].stocks);
  out.add(",\"stocks\":%d",p1.stocks);
  out.add(",\"motion\":%d",p1.motion_id);
  out.add(",\"groundAir\":%d",p1.ground_or_air);
@@ -393,6 +416,10 @@ const char* melee_web_native_menu_match_observe(){
  out.add("}");
  out.add("]");
  out.add("}");
+ if(out.result()<0||out.result()>=static_cast<int>(sizeof(text))){
+  match_observer_error="Match observation overflow";
+  std::snprintf(text,sizeof(text),"{\"ready\":false,\"observer_error\":true,\"observer_error_reason\":\"match observation overflow\"}");
+ }
  return text;
  }catch(const std::exception& e){
   match_observer_error=e.what();
