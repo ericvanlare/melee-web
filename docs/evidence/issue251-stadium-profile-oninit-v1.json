@@ -953,11 +953,17 @@
           13774
         ],
         "fifth_ready_bound_files": 477,
-        "collision_control_owned_pid_absent": 13411
+        "collision_control_owned_pid_absent": 13411,
+        "sixth_ready_owned_pids_absent": [
+          19701,
+          19707
+        ],
+        "sixth_ready_bound_files": 531,
+        "deferred_control_owned_pid_absent": 19570
       },
-      "remaining": "Source-led original dynamic-joint binding and callback timing reduction. No additional Ready run authorized at this checkpoint. Full Ready/GO, two idle lifetimes, retirement and original per-owner RNG ledger remain open.",
+      "remaining": "Source-led display-owner teardown reduction with retained actualfullmatch/Ready state and priorzero-tick controls. Complete Session retirement, two3500post-GO lives, screen/stock-out/standings and original per-owner RNG ledger remain open.",
       "c3_original_ledger_requirement": "Reuse existing RNG draw observer; C3 notes604-608 require per-tick/per-owner original comparison, separately from broader C8 transformation comparison.",
-      "claim_boundary": "Synthetic marker and collision controls pass; latest Ready attempt retains actual world3 at zero ticks and refuses dynamic-joint binding. Prior zero-tick lifecycle result keeps its original scope. No Ready/GO, checked full Session close or C3 pass.",
+      "claim_boundary": "Native traced original HUD readiness after124source ticks observed; sixth run fails checked displayteardown. Synthetic marker/collision/deferred lifecycle controls pass. No checked fullSessionclose, postGOidle or C3pass.",
       "pad_input_reducer": {
         "caller_source": "8e087161fcc5a62f6f82cb333a812d0f4eff448f",
         "phase_correction_source": "e2ff861b3f290714d4c6aaa1a19158d4e7f8e59a",
@@ -1089,7 +1095,59 @@
         "artifact": "sol-ready-fifth-lifetime-review-v2.json",
         "sha256": "9ba1e6cce2a3adbb608fa003c7633cdd62f8eb1a81efbc52691a49e29a7d8833"
       },
-      "fifth_review_attribution": "Independent v1 mistakenly treated nested historical changed_bindings.before values as current requirements; v2 verifies direct477 v5 bindings and98 fixtures, only two subsequently edited docs differ. V5 current WASM/archive exactly match; prior v1 retained."
+      "fifth_review_attribution": "Independent v1 mistakenly treated nested historical changed_bindings.before values as current requirements; v2 verifies direct477 v5 bindings and98 fixtures, only two subsequently edited docs differ. V5 current WASM/archive exactly match; prior v1 retained.",
+      "deferred_dynamic_joint": {
+        "source": "66f917f7f084b4cd5ea45b89f95c9368a439f7a3",
+        "link_correction_source": "c706f13386d9d6591b9c6a63e2dbbc977266d4a9",
+        "tree": "b2df6c6c15c22ee9d6f2eec955fd5fc7bcec11b3",
+        "source_plan": {
+          "artifact": "dynamic-joint-binding-review-v1.md",
+          "sha256": "6f444139ed5f59db4b95fb91c0c8e4d4ca8b32a44eb08757085e8ca0806e19ed"
+        },
+        "source_review": {
+          "artifact": "root-collision-deferred-source-review-v2.json",
+          "sha256": "c29db4ca368f26cc4bc9a2b0ea0f1aaba961f91a68edd6f0df8dca14e3042a9c"
+        },
+        "independent_source_review": {
+          "artifact": "sol-collision-deferred-source-review-v2.json",
+          "sha256": "af36cdb23f401c03b62ac8927d4854c077ec647a0ad3d600ddd820f1d709d40c"
+        },
+        "link_review": {
+          "artifact": "sol-collision-deferred-link-review-v1.json",
+          "sha256": "97a05d81a55a344755360c8e7e5632e1a47422fd89975fdd4be59ddda733555e"
+        },
+        "retained_link_failure": {
+          "artifact": "collision-deferred-link-failure-66f917f7-v1/identity.json",
+          "sha256": "990cc2f4711351b7ee89f9947cd2f32f4132b04697ee235f05da44ee61cebde4"
+        },
+        "ordinary_producer": {
+          "artifact": "collision-deferred-ordinary-producer-c706f133-v1/identity.json",
+          "sha256": "cda2b6a681591e62318c35d87540fd63338706b0ccb32fc42509c188adfa2b52"
+        },
+        "diagnostic_producer": {
+          "artifact": "collision-deferred-diagnostic-producer-c706f133-v1/identity.json",
+          "sha256": "7766b0c9b4c1cfba3c8d1a8bbba4e29aed62a8ad126f2efe64ca8d07cfd3dc0b"
+        },
+        "sdk_controls": {
+          "artifact": "root-collision-deferred-controls-v1/result.json",
+          "sha256": "2b7efe6c65bef1881c8d3c849c48b87d9a2bb68f5caba3ef8fa3189f9d5e46b6"
+        },
+        "independent_result_review": {
+          "artifact": "sol-collision-deferred-controls-result-review-v1.json",
+          "sha256": "0c0b1cbb0baaae5b138943347f0fea7ae7bfaeaca3e982fcae2e438459bcdde9"
+        },
+        "scope": "Exact shared removed/unlinked/all-owned-lines-disabled dynamic state accepted, active-bound per-line disables preserved. Readiness revalidates identities and reports absent JObj truthfully; guarded floor traversal and descriptor inspection preserve original helper selection/arithmetic. Original-SDK lifecycle/refusal controls pass; no water transformation or C3 claim."
+      },
+      "sixth_failed_run": {
+        "artifact": "root-ready-sixth-frozen-result-v1.json",
+        "sha256": "c67c971b8d269a435f6139e716a3e64d9e2cf85cf7200d9e347b3a140e3423e8"
+      },
+      "sixth_failure": "Construction completes ticks0/58objects72procs; first-ready-before-close at124source ticks/59objects73procs. ready() uses originalHUD-enabled flag, Ready and actualMario identity predicates pass before close. Checkeddisplayteardown refuses generic mismatchedliveowner, leavingworld3/ticks124/29objects53procs. Exactdisplay subpredicate unlogged; no fullSessionclose.",
+      "sixth_diagnostic_clarification": "Catch unconditionally prints pre_OnStart_close_unsupported1, even after Ready/closeattempt. Not phase evidence.",
+      "sixth_result_review": {
+        "artifact": "sol-ready-sixth-lifetime-review-v1.json",
+        "sha256": "b69d119bd51ded838cdb781cb7bdc9a263391c0e71b63838f86547f366beb5b8"
+      }
     }
   }
 }

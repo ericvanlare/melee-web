@@ -5,9 +5,9 @@
 **Historical October 7 checkpoint.** The
 [zero-tick two-world lifecycle](#october-9-two-zero-tick-stadium-world-lifetimes)
 passed. The latest [source-session preparation attempts](#october-9-source-session-ready-preparation)
-pass the marker and static-collision checks, then retain a world at zero ticks
-when dynamic collision-joint binding is refused. The smaller input, marker and
-collision controls pass; Ready/GO and C3 remain unrun.
+now complete match construction and reach the original HUD Ready predicate at
+124 source ticks, then fail checked display teardown. The smaller input, marker
+and collision controls pass; a complete lifetime and C3 remain unverified.
 
 The diagnostic-only Stadium profile and profile-to-`DatNativeMapContract`
 adapter compile in the C1 trace target. Focused profile and borrowed-yakumono
@@ -231,8 +231,8 @@ prerequisite groups; these steps do not replace or redefine those groups:
 
 The receipt records the zero-tick result and these remaining steps.
 Earlier OnInit, generator, and fixture failures remain retained with their
-original scopes. The source-to-Ready attempts below now reach a constructor
-refusal; no 3,500-tick runtime attempt has run.
+original scopes. The source-to-Ready attempts below now reach original HUD
+readiness and a checked teardown refusal; no 3,500-tick runtime attempt has run.
 
 
 ## October 9 source-session Ready preparation
@@ -375,15 +375,59 @@ World 3 remains retained at zero ticks with 17 objects and 17 processes.
 The raw log does not identify the joint or failed guard subpredicate. All 477
 bound files and 98 fixtures match after execution; the owned unittest and Node
 children exit naturally and are reaped, without signals. There is no Ready/GO
-or checked Session close. The next bounded step traces original joint binding
-and callback timing; no further run is authorized at this checkpoint.
+or checked Session close. Original joint binding and callback timing were
+reduced before the following changed attempt.
+
+The source reduction reused the existing Stadium plan: joint 0 belongs to
+water map 9 and is deliberately removed and unbound during default startup.
+The exact failed fifth-run subpredicate remains unlogged. Shared source
+`66f917f7` accepts only a descriptor-correct, disabled, unlinked dynamic joint
+whose owned lines are all disabled. Existing readiness calls revalidate that
+state and distinguish an absent JObj from a valid source callback. Active bound
+joints may retain original per-line disables. Descriptor inspection remains
+available; executable floor queries validate raw alternate links before the
+original getters, then require a finite, enabled, bounded, cycle-free chain.
+Original binding, update order, arithmetic and source geometry are unchanged.
+
+Independent review caught the original getters' internal alternate-neighbor
+dereference before their return-value check; the correction and focused
+post-adoption refusal controls were reviewed before compilation. The first
+ordinary build compiled both changed C files but failed linking the original
+`mpColl_804D64AC` counter used by `mpLib_80055E9C`. The retained failure is
+separate from the corrected build. The one-line target dependency at
+`c706f133` reuses the existing fighter-source library and its original counter;
+both canonical builds then pass. The actual SDK fixture passes original
+remove → deferred adoption → bind/update/enable → movement → remove → retirement,
+plus disabled-line inspection, unsafe-query refusals, output preservation and
+live descriptor/callback/owner refusal/restoration controls. This is synthetic
+SDK evidence, without a real water transformation claim.
+
+The sixth changed Ready attempt on `c706f133` completes construction at zero
+ticks, then reaches `first-ready-before-close` at 124 source ticks. Source
+inspection ties `ready()` to the original HUD-enabled flag; the subsequent
+Ready and two-Mario identity checks pass before close is attempted. The run
+retains audio processing and performs no draw. Ready observes world 3 with
+59 objects and 73 processes. Close then refuses
+`Stadium display teardown refused a mismatched live owner`, retaining world 3
+at tick 124 with 29 objects and 53 processes. The exact failed display
+subpredicate remains unlogged. All 531 bound files and 98 fixtures matched
+before subsequent documentation edits; exact owned children exit and are reaped
+naturally, without signals.
+
+The catch prints `pre_OnStart_close_unsupported=1` unconditionally, including
+this teardown failure; that field does not establish a pre-OnStart failure
+phase. This result observes original HUD readiness, not a checked full Session
+close, post-GO idle interval, second lifetime, or original RNG comparison.
+The next bounded step reduces the display-owner teardown contract using the
+retained full-match state and the prior zero-tick controls.
 
 The existing RNG observer can be reused afterward, but the Stadium notes require
 C3's per-tick, per-owner ledger to be compared with the original. C8's broader
 transformation comparison does not defer that C3 requirement; the roadmap now
-makes this explicit. Full match composition, Ready/GO and the remaining C3
-steps stay runtime-unverified. No C3, original equivalence, rendering, browser,
-physical-input, audible-output or timing acceptance follows from these checks.
+makes this explicit. Original HUD readiness is now observed; complete retirement
+and the remaining C3 steps stay unverified. No C3, original equivalence,
+rendering, browser, physical-input, audible-output or timing acceptance follows
+from these checks.
 
 The same [boundary receipt](../evidence/issue251-stadium-profile-oninit-v1.json)
 records the exact source, build, failed attempts, reducer and retained preparation
