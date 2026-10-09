@@ -257,7 +257,11 @@ def menu_state(data):
 
 
 class RulesMenuReceiver(Receiver):
-    """Reduced cold routing experiment; cannot accept gameplay or SD completion."""
+    """Reduced Rules probe; unowned routing is observation, never scene admission.
+
+    SceneKind omission does not attest a null pointer: the native producer also
+    omits it on a failed pointer read. No steering or readiness precedes an owner.
+    """
     def __init__(self, plan):
         super().__init__(plan)
         require(plan["authored_recipe"]["version"] == 3, "Rules probe requires corrected recipe v3")
@@ -268,6 +272,7 @@ class RulesMenuReceiver(Receiver):
         self.ready = False
         self.scene_owner_seen = False
         self.pre_owner_polls = 0
+        self.bootstrap_routes = []
         from sd_original_menu_plan import rules_ready_packet
         from retail_input_plan import NEUTRAL_PAD
         packet = rules_ready_packet()
@@ -302,12 +307,15 @@ class RulesMenuReceiver(Receiver):
         if not self.scene_owner_seen:
             require(name == "menu", "Rules probe input/readiness preceded its first scene owner")
             if (40, 0) not in data:
-                require(data == {(17, 0): b"\0" * 6} and count == 0 and self.menu_consumed == 0 and
+                require(set(data) == {(17, 0)} and len(data[(17, 0)]) == 6 and
+                        payload["slices"][0]["address"] == 0x80479d30 and
+                        count == 0 and self.menu_consumed == 0 and
                         type(row["source_tick"]) is int and row["source_tick"] == 0,
-                        "Rules probe pre-owner poll escaped exact cold routing")
+                        "Rules probe unowned bootstrap observation differs")
                 self.menu_polls += 1
                 self.pre_owner_polls += 1
                 require(self.menu_polls <= 7200, "Rules probe menu polling cap exhausted")
+                self.bootstrap_routes.append({"seq": row["seq"], "hex": data[(17, 0)].hex()})
                 return  # No guessed scene, PAD intention or readiness is produced.
             self.latest_menu = menu_state(data)
             self.scene_owner_seen = True
@@ -350,5 +358,6 @@ class RulesMenuReceiver(Receiver):
                 "scope": "rules_ready", "recipe_sha256": self.plan["authored_recipe_sha256"],
                 "menu_source_samples": self.menu_consumed, "menu_polls": self.menu_polls,
                 "pre_owner_polls": self.pre_owner_polls,
+                "bootstrap_routes": self.bootstrap_routes,
                 "native_input": native, "cold_port_preferences": [1, 1, 1, 1],
                 "full_sd_prefix_admission": False, "whole_session_admission": False}

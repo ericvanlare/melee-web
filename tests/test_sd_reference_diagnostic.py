@@ -371,7 +371,7 @@ class SdReferenceDiagnosticTests(unittest.TestCase):
             with self.assertRaises(SdDiagnosticError):
                 for row in bad: receiver.accept(row)
 
-    def test_pre_owner_menu_polls_have_exact_routing_counters_and_no_intent(self):
+    def test_unowned_bootstrap_keeps_raw_routes_without_intent(self):
         prefix = events(3)[:2]
         prefix[0]["payload"]["menu_probe"] = "rules_ready"
         poll = {"seq": 2, "event": "progress", "source_tick": 0,
@@ -389,17 +389,34 @@ class SdReferenceDiagnosticTests(unittest.TestCase):
         self.assertIsNone(good.latest_menu)
         self.assertIsNone(good.last_pad)
         self.assertFalse(good.scene_owner_seen or good.ready)
+        for seq, route in enumerate(("28002d000000", "02ffffffffff"), 3):
+            observed = deepcopy(poll)
+            observed["seq"] = seq
+            observed["payload"]["slices"][0]["hex"] = route
+            good.accept(observed)
+        self.assertEqual(good.bootstrap_routes, [
+            {"seq": 2, "hex": "000000000000"}, {"seq": 3, "hex": "28002d000000"},
+            {"seq": 4, "hex": "02ffffffffff"}])
+        self.assertIsNone(good.latest_menu)
+        self.assertIsNone(good.last_pad)
+        self.assertFalse(good.scene_owner_seen or good.ready)
         variants = []
-        for key, value in (("menu_consumed", 1), ("consumed", 1), ("consumed", False)):
+        for key, value in (("menu_consumed", 1), ("menu_consumed", False),
+                           ("consumed", 1), ("consumed", False)):
             bad = deepcopy(poll);bad["payload"][key] = value;variants.append(bad)
         for tick in (1, False):
             bad = deepcopy(poll);bad["source_tick"] = tick;variants.append(bad)
-        for data in ([], [{"tag": 17, "flags": 0, "address": 0x80479d30, "hex": "010000000000"}],
+        for data in ([], [{"tag": 17, "flags": 0, "address": 0x80479d30, "hex": "00" * 5}],
                      poll["payload"]["slices"] + [{"tag": 54, "flags": 0,
                                                    "address": 0x80001000, "hex": "01010101"}]):
             bad = deepcopy(poll);bad["payload"]["slices"] = data;variants.append(bad)
-        for name in ("menu_input", "rules_ready"):
+        for name in ("menu_input", "rules_ready", "input", "tick", "vs_entry"):
             bad = deepcopy(poll);bad["payload"].update(name=name, pc=PCS[name]);variants.append(bad)
+        for key, value in (("tag", 18), ("flags", 1), ("address", 0x80479d31)):
+            bad = deepcopy(poll)
+            bad["payload"]["slices"][0][key] = value
+            variants.append(bad)
+        bad = deepcopy(poll);bad["payload"]["pc"] += 4;variants.append(bad)
         for bad in variants:
             with self.assertRaises(SdDiagnosticError): receiver().accept(bad)
         owned = deepcopy(poll)
@@ -409,6 +426,24 @@ class SdReferenceDiagnosticTests(unittest.TestCase):
         with self.assertRaisesRegex(SdDiagnosticError, "scene owner"): good.accept(missing)
         capped = receiver();capped.menu_polls = 7199;capped.accept(poll)
         with self.assertRaisesRegex(SdDiagnosticError, "cap"): capped.accept(missing)
+
+    def test_actual_retained_bootstrap_prefixes_never_admit_completion(self):
+        fixture = json.loads((ROOT / "tests" / "fixtures" /
+                              "sd_rules_bootstrap_retained.json").read_text())
+        for capture in fixture["captures"]:
+            with self.subTest(capture=capture["version"]):
+                receiver = RulesMenuReceiver(make_input_plan(3))
+                rows = capture["decoded_records"]
+                for row in rows[:-1]:
+                    receiver.accept(row)
+                self.assertEqual(receiver.pre_owner_polls, capture["unowned_polls"])
+                self.assertEqual(receiver.scene_owner_seen, capture["owner_seen"])
+                self.assertEqual(receiver.latest_menu, capture["last_menu"])
+                self.assertEqual(receiver.menu_consumed, 0)
+                self.assertIsNone(receiver.last_pad)
+                self.assertFalse(receiver.ready)
+                with self.assertRaisesRegex(SdDiagnosticError, "readiness"):
+                    receiver.accept(rows[-1])
 
     def accept(self, rows):
         receiver = Receiver(make_input_plan())
