@@ -1750,6 +1750,97 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         )
         self.assertNotIn("OnInit lifetime", run.stdout)
 
+    def test_stadium_source_world_lifecycle_one_shot(self):
+        if os.environ.get("MELEE_RUN_STADIUM_SOURCE_WORLD_LIFECYCLE") != "1":
+            self.skipTest("Real Stadium two-world continuation requires its reviewed run gate")
+        import hashlib
+        from capture_sd_reference_prefix import cleanup_process
+
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        fixture_value = os.environ.get("MELEE_MENU_FIXTURE_ROOT")
+        self.assertTrue(fixture_value, "Retained Stadium fixture root is required")
+        fixture = Path(fixture_value)
+        self.assertTrue(fixture.is_absolute(), "Use the frozen absolute fixture root")
+        menu, game = fixture / "native-menus", fixture / "next-gate"
+        self.assertTrue(target.is_file())
+        menu_script = (
+            "import {NATIVE_MENU_DISC_FILES} from './web/runtime-assets.mjs'; "
+            "console.log(JSON.stringify([...Object.keys(NATIVE_MENU_DISC_FILES), "
+            "'dsp_coef.bin', 'sislib_font.bin']))"
+        )
+        menu_names = json.loads(subprocess.check_output(
+            [str(node_runtime()), "--input-type=module", "-e", menu_script],
+            cwd=ROOT, text=True))
+        selected_names = stadium_c1_selected_file_names()
+        names = sorted(set(menu_names) | set(selected_names))
+        self.assertEqual((len(menu_names), len(selected_names), len(names)), (76, 36, 98))
+        paths = {name: (menu / name if (menu / name).is_file() else game / name)
+                 for name in names}
+        self.assertTrue(all(path.is_file() for path in paths.values()))
+        before = {name: hashlib.sha256(path.read_bytes()).hexdigest()
+                  for name, path in paths.items()}
+        source = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        trace = self.scratch / "stadium-source-world-lifecycle.jsonl"
+        command = [str(node_runtime()), str(target), str(menu), str(game), "3",
+                   str(trace), source, "stadium-source-world-lifecycle-v1"]
+        output = self.scratch / "stadium-source-world-node-owner"
+        output.mkdir(exist_ok=False)
+        identity = {
+            "scope": "stadium-source-world-lifecycle-v1", "ownership": "direct-Popen",
+            "source_revision": source,
+            "source_tree": subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"],
+                                                     cwd=ROOT, text=True).strip(),
+            "argv": command, "cwd": str(ROOT), "timeout_seconds": 120,
+            "fixture_sha256_before": before,
+            "binary_sha256": {str(path): hashlib.sha256(path.read_bytes()).hexdigest()
+                              for path in [Path(command[0]).resolve(), target,
+                                           target.with_suffix(".wasm")]},
+        }
+        stdout_path = self.scratch / "stadium-source-world.stdout"
+        stderr_path = self.scratch / "stadium-source-world.stderr"
+        try:
+            with stdout_path.open("xb") as stdout, stderr_path.open("xb") as stderr:
+                process = subprocess.Popen(command, cwd=ROOT, stdout=stdout, stderr=stderr)
+                try:
+                    identity["pid"] = process.pid
+                    with (output / "identity.json").open("x", encoding="utf-8") as receipt:
+                        receipt.write(json.dumps(identity, indent=2) + "\n")
+                    process.wait(timeout=120)
+                finally:
+                    cleanup_process(process, output, scope="stadium-source-world-lifecycle-v1")
+        finally:
+            after = {name: hashlib.sha256(path.read_bytes()).hexdigest()
+                     for name, path in paths.items()}
+            with (output / "fixture-after.json").open("x", encoding="utf-8") as receipt:
+                receipt.write(json.dumps(after, indent=2) + "\n")
+            self.assertEqual(after, before, "Real Stadium fixture changed during continuation")
+        stdout, stderr = stdout_path.read_text(), stderr_path.read_text()
+        self.assertEqual(process.returncode, 0, (stdout + stderr)[-12000:])
+        rows = [json.loads(line) for line in stdout.splitlines() if line.startswith('{"probe":')]
+        started = [row for row in rows if row["probe"] == "stadium-source-start-retired"]
+        pending = [row for row in rows if row["probe"] == "stadium-owned-world-before-close"]
+        closed = [row for row in rows if row["probe"] == "stadium-owned-world-closed"]
+        self.assertEqual([row["lifetime"] for row in pending], [0, 1])
+        self.assertEqual([row["lifetime"] for row in closed], [0, 1])
+        self.assertEqual(len(started), 2)
+        self.assertEqual([row["world"] for row in started], [row["world"] for row in pending])
+        self.assertEqual([row["retired_world"] for row in closed], [row["world"] for row in pending])
+        self.assertGreater(pending[1]["world"], pending[0]["world"])
+        self.assertEqual(pending[1]["fresh_heap"], pending[0]["fresh_heap"])
+        self.assertEqual(closed[1]["session_identity"], closed[0]["session_identity"])
+        self.assertTrue(all(row["inactive"] for row in closed))
+        self.assertTrue(all(row["onload_onstart_called"] and row["checked_retirement"]
+                            and row["ticks"] == 0 for row in started))
+        self.assertTrue(all(row["objects"] == row["processes"] == row["ticks"] == 0
+                            for row in pending))
+        self.assertNotIn('"probe":"stadium-source-oninit"', stdout)
+        self.assertIn("Ready/GO and ticks remain unrun", stdout)
+        events = [row["event"] for row in map(json.loads, trace.read_text().splitlines())
+                  if row.get("record") == "event"]
+        self.assertEqual(events, ["stadium_source_oninit_returned",
+                                  "stadium_source_onstart_returned",
+                                  "stadium_source_oninit_cleaned"] * 2)
+
     def test_stadium_source_oninit_one_shot(self):
         if os.environ.get("MELEE_RUN_STADIUM_SOURCE_ONINIT") != "1":
             self.skipTest(
