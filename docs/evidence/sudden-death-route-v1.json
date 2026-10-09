@@ -389,7 +389,8 @@
       "Sudden Death reference",
       "cross-producer strict comparison"
     ],
-    "scope": "Original functional readiness only; no original simulation agreement."
+    "scope": "Original functional readiness only; no original simulation agreement.",
+    "current_recipe_alignment": "Earlier plan colors [0,1]/pause-off superseded by recipe 5 colors [1,0]/pause-enabled; Items prefix failed, revised original producer built; aligned full settings/SD comparison unrun."
   },
   "validation": {
     "tested_executable_head": "fd55b378941b2ecd4cc4f1d8df84515ffab0b29a",
@@ -511,8 +512,30 @@
       "source": "e13647cb1a1b7a6309592f5a53f16051f4d0b7fb",
       "scope": "Compiled ordinaryRelease plus asset-free actual-function regression; active source owner replaces stale construction target for menu messages. No transition/input/RNG changes or native-message oracle relaxation. All46 older5308 artifacts retained.",
       "wasm_sha256": "1679396663ad5c32ad8463edbfcb9f322c8ae4746564185e19c695314d0e8eaf",
-      "runtime_browser_gate": "V9 stopped before exercising fixed returned-CSS message or subsequent entry."
+      "runtime_browser_gate": "V10 exercised correctly labeled active CSS; overall subsequent-entry tail failed before SSS confirmation."
     },
-    "coherent_observation_fix": "Focused source controls use actual serialized synchronous reader for host+match and host+Results trace, retaining exact pair before assertions. Scheduling/Pause augmentations are synthetic; V9 exact failing pair remains missing. Browser changed run unrun."
+    "coherent_observation_fix": "Focused controls use actual serialized synchronous reader and retain exact pairs before strict assertions. V10 passed the scoped core route and failed only the premature pre-confirmation SSS start check; V9 exact failed pair remains missing. Subsequent ordinary VS remains unrun.",
+    "v10": {
+      "result": "overall fail; scoped core route pass",
+      "source_head": "d2dbff17040ff7e611b93140bab18ab7b987525f",
+      "runtime_producer": "e13647cb1a1b7a6309592f5a53f16051f4d0b7fb",
+      "receipt_sha256": "4d4a149fa512224455908ce1b017aa063441a20960b99438959ffbaad3a82d61",
+      "results_rows": 286,
+      "p2_start_before_after": [
+        274,
+        275
+      ],
+      "reached": [
+        "natural VS tie",
+        "actual SD P2 winner",
+        "original Results",
+        "both Human source confirmations",
+        "active correctly labeled CSS",
+        "active SSS"
+      ],
+      "failure": "pre-confirmation start.valid expected true; source contract only exposes it after closed committed SSS",
+      "subsequent_ordinary_vs": "unrun",
+      "cleanup": "exact four PIDs absent; port 63796 rebound; owned driver/context/browser closed; Eject source owners zero"
+    }
   }
 }

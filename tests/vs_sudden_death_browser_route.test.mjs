@@ -9,7 +9,7 @@ const counter={status:'installed',invalid_phase_steps:0,invalid_preparation_coun
 function pair(sd=false){return {leg:sd?'sudden_death':'vs',observed_player_source_slots:[0,1],
   prior_vs_source_frames:3600,prior_vs_terminal:{outcome:1,winners:[0,1]},
   rules:{stage:32,match_kind:1,is_teams:0,item_frequency:-1,timer_enabled:sd?0:1,
-    time_limit:60,is_stock:sd?0:1,is_vs:sd?0:1,source_sudden_death_flag:sd?1:0,
+    time_limit:60,item_mask_hex:'ffffffffffffffff',is_stock:sd?0:1,is_vs:sd?0:1,source_sudden_death_flag:sd?1:0,
     player_stocks:sd?[1,1]:[4,4]},
   players:[0,1].map(i=>({source_player_index:i,source_port:i,source_character:8,fighter:0,
     human:true,slot_type:0,source_stocks:sd?1:4,stocks:sd?1:4,
@@ -29,7 +29,7 @@ test('fresh ordinary entry rejects retained SD, wrong identities/rules and non-r
   for(const mutate of [m=>m.leg='sudden_death',m=>m.terminal={outcome:2,winners:[1]},
     m=>m.prior_vs_terminal={outcome:1,winners:[0,1]},m=>m.prior_vs_source_frames=3600,
     m=>m.players[1].source_port=0,m=>m.players[0].source_slot=1,
-    m=>m.players[1].source_color=0,m=>m.rules.is_vs=0,m=>m.rules.time_limit=480,
+    m=>m.players[1].source_color=0,m=>m.rules.is_vs=0,m=>m.rules.time_limit=480,m=>m.rules.item_mask_hex='0000000000000000',
     m=>m.players[0].stocks=1,m=>m.complete=true,m=>m.ending=true,m=>m.outcome=2]){
     const bad=freshPair();mutate(bad);assert.throws(()=>checkFreshOrdinaryEntry(freshState,bad,prior));
   }
@@ -39,17 +39,15 @@ test('fresh ordinary entry rejects retained SD, wrong identities/rules and non-r
     assert.throws(()=>checkFreshOrdinaryEntry(state,freshPair(),prior));
 });
 
-function subsequentFixture({badSelection=false,badDrain=false,noProgress=false,stepJump=false}={}) {
+function subsequentFixture({badSelection=false,badDrain=false,noProgress=false,stepJump=false,selectionOverride=null,badReady=false}={}) {
   const calls=[];let phase=1,frame=0,steps=0;
-  const selection={source:{valid:true,scene:2,rules:{stock_count:4,stock_time_limit:1}},
-    start:{valid:true,stage:badSelection?31:32,match_kind:1,item_frequency:-1,
-      player_stocks:[4,4],players:[0,1].map(i=>({character_kind:8,slot_type:0,stocks:4,color:i}))
-        .concat([{slot_type:3},{slot_type:3}])}};
+  const selection={source:{valid:true,scene:2,rules:{stock_count:badSelection?3:4,stock_time_limit:1},
+    items:{frequency:-1,mask_hex:'ffffffffffffffff'}},start:{valid:false}};
   const report={suddenDeath:{},sourceObservations:[]};
   return {calls,report,page:{evaluate:async()=>{calls.push('drive-FD');return 2;},
       waitForTimeout:async()=>{}},press:async key=>{calls.push(key);phase=key==='Enter'?3:7;},
     observeOwner:async()=>({state:{...freshState,phase,message:phase===1?'Original character select':'source menu'},
-      match:freshPair(noProgress?1:(frame+=6))}),observeSource:async()=>selection,
+      match:phase===7?(badReady?{}:freshPair(noProgress?1:(frame+=6))):{}}),observeSource:async()=>selectionOverride??selection,
     checked:async()=>{steps+=stepJump&&phase===7?601:4;return steps;},
     waitForNoQueuedPad:async()=>{calls.push('drain');if(badDrain)throw Error('PAD release rejected');},
     shot:async label=>calls.push(label),prior:freshPair()};
@@ -61,12 +59,27 @@ test('subsequent tail uses original CSS/SSS inputs and a bounded advancing fresh
   assert.equal(observations.length,2);assert.equal(observations[1].match.frame-observations[0].match.frame,12);
   assert(observations[1].steps>observations[0].steps);
 });
-test('subsequent tail stops on source selection, PAD release, progress and callback cap failures',async()=>{
+test('subsequent tail stops on source rules, PAD release, progress and callback cap failures',async()=>{
   for(const options of [{badSelection:true},{badDrain:true},{noProgress:true},{stepJump:true}]){
     const fixture=subsequentFixture(options);
     await assert.rejects(runSubsequentOrdinaryEntry(fixture));
     assert(!fixture.calls.includes('sd-subsequent-ordinary-vs'));
   }
+});
+test('actual V10 entered SSS invalid start is not a ready match; original confirm precedes normalized acceptance',async()=>{
+  const captured=JSON.parse(fs.readFileSync(new URL('./fixtures/sd_v10_precommit_sss_observation.json',import.meta.url),'utf8'));
+  assert.equal(captured.source.start.valid,false);
+  assert.equal(captured.owner.state.phase,3);assert.equal(captured.owner.state.running,1);
+  assert.throws(()=>checkFreshOrdinaryEntry(captured.owner.state,captured.owner.match,freshPair()));
+  // Only the following authored scheduling/ready match is synthetic; raw SSS
+  // fields above are retained actual V10 data, not a manufactured committed start.
+  const fixture=subsequentFixture({selectionOverride:captured.source});
+  await runSubsequentOrdinaryEntry(fixture);
+  assert(fixture.calls.indexOf('j')<fixture.calls.indexOf('sd-subsequent-ordinary-vs'));
+  assert.equal(fixture.report.sourceObservations[0].start.valid,false);
+  const unready=subsequentFixture({selectionOverride:captured.source,badReady:true,stepJump:true});
+  await assert.rejects(runSubsequentOrdinaryEntry(unready));
+  assert(unready.calls.includes('j'));assert(!unready.calls.includes('sd-subsequent-ordinary-vs'));
 });
 test('actual pair oracle separates original SD payload/live damage, slots and preserved flags',()=>{
   const prior=pair();checkDeclaredPair(prior,false);checkDeclaredPair(pair(true),true,prior);

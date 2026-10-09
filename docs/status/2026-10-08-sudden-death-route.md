@@ -85,16 +85,27 @@ reads are not that pair. No actual SD setup, Results or new subsequent-match
 tail ran in V9. A source-only coherent reader now captures and retains native
 host/match or host/Results trace in one synchronous evaluation before strict
 validation. Its serialized-reader controls passed; the changed browser gate
-is unrun. All three failures and exact cleanup evidence remain retained.
+was exercised in V10. All earlier failures and exact cleanup evidence remain retained.
+
+V10 passed the scoped core browser route: natural 3,600-frame VS tie, actual
+SD with P2 winner, original Results, both Human source confirmations, and
+correctly labeled active CSS. All 286 Results rows were retained; P2’s raw/copied
+Start at frame 274 → 275 produced phase 4 and all-confirmed flags. The overall
+experiment failed after active SSS entry because the new tail expected a
+committed start payload before confirmation. The test now checks raw SSS
+rules/items before `j` and normalized original identities from ready ordinary
+VS afterward. That subsequent VS/prefix remains unrun. Exact owned children
+were reaped, socket rebind passed, and Eject cleared source owners.
 
 The original-reference producer `8f944a09` (binary digest `c22d23c2`) passed a
 reduced Rules-ready control using the exact selected GCI profile: menu kind 13,
 row 0/value 0, entering 1 and cooldown 0. Its 2,018-event MWRI recording completed;
 the primary observer was intentionally interrupted and exact owned children
 were reaped. The first `7a3a20ac` Main → VS failure remains retained. Full
-settings, SD reference and cross-producer comparison remain unrun. Native
-colors [1, 0] and pause-enabled setup differ from the planned original colors
-[0, 1] and pause-off setup.
+settings, SD reference and cross-producer comparison remain unrun. The earlier original plan used colors [0, 1] and pause-off; the current recipe 5
+extension aligns colors [1, 0] and pause-enabled with native setup. Its Items
+prefix failed and the revised original producer was built; aligned full settings
+and SD comparison remain unrun.
 
 The consolidated executable head `fd55b378` passed all 2,163 unittest cases
 with 154 skips. It includes the reference toolset and shared Results helper;

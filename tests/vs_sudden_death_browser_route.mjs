@@ -216,6 +216,7 @@ export function checkFreshOrdinaryEntry(state,match,prior) {
   assert.equal(state.phase,7);assert.equal(state.running,1);
   assert.equal(state.pause_present,true);assert.equal(state.pause_disabled,false);
   checkDeclaredPair(match,false,prior);
+  assert.equal(match.rules.item_mask_hex,prior.rules.item_mask_hex);
   assert.equal(match.ready,true);assert.equal(match.paused,false);
   assert.equal(match.ending,false);assert.equal(match.complete,false);assert.equal(match.outcome,0);
   assert.equal(match.prior_vs_source_frames,0);
@@ -265,15 +266,12 @@ export async function runSubsequentOrdinaryEntry({page,report,press,observeOwner
   assert.equal(selection.source.valid,true);assert.equal(selection.source.scene,2);
   assert.equal(selection.source.rules.stock_count,4);
   assert.equal(selection.source.rules.stock_time_limit,1);
-  assert.equal(selection.start.valid,true);assert.equal(selection.start.stage,32);
-  assert.equal(selection.start.match_kind,1);assert.equal(selection.start.item_frequency,-1);
-  assert.deepEqual(selection.start.player_stocks,[4,4]);
-  selection.start.players.slice(0,2).forEach((player,i)=>{
-    assert.equal(player.character_kind,8);assert.equal(player.slot_type,0);
-    assert.equal(player.stocks,4);assert.equal(player.color,prior.players[i].source_color);
-  });
-  assert(selection.start.players.slice(2).every(player=>player.slot_type===3));
-  report.sourceObservations.push({label:'Subsequent original SSS/normalized start',...selection});
+  assert.equal(selection.source.items.frequency,-1);
+  assert.equal(selection.source.items.mask_hex,'ffffffffffffffff');
+  // start.valid is only exposed after original SSS commits and closes. The
+  // entered pre-confirmation scene supplies raw rules/items; the ready VS
+  // observer below supplies the normalized payload and original identities.
+  report.sourceObservations.push({label:'Subsequent original SSS before confirmation',...selection});
   await shot('sd-subsequent-sss-fd');
   const readyStart=Date.now(),readySteps=await checked('Subsequent ordinary VS begins');
   await press('j');
