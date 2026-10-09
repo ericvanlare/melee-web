@@ -745,14 +745,20 @@ int melee_web_stadium_c1_pending_queue_loss_control(void)
     queue_control_require(stage_info.x6A4 == NULL && active_snapshot == NULL,
                           "requires an unowned pending queue");
     struct MeleeWebStadiumC1StageInfoSnapshot snapshot = {stage_info, 0};
-    HSD_GObj* borrowed[2] = {
+    /* Explicit synthetic identity witnesses: source map1, map2, nested map5.
+     * Pinned row2 initializer enqueues its own map2 gobj after creating map5.
+     * Actual source callbacks are identities only; they are never dispatched. */
+    HSD_GObj* borrowed[3] = {
+        GObj_Create(HSD_GOBJ_CLASS_STAGE, 5, 0),
         GObj_Create(HSD_GOBJ_CLASS_STAGE, 5, 0),
         GObj_Create(HSD_GOBJ_CLASS_STAGE, 5, 0),
     };
-    queue_control_require(borrowed[0] && borrowed[1], "owned witness GObj allocation");
-    HSD_GObj saved_gobjs[2];
+    queue_control_require(borrowed[0] && borrowed[1] && borrowed[2], "owned witness GObj allocation");
+    HSD_GObj saved_gobjs[3];
     memcpy(&saved_gobjs[0], borrowed[0], sizeof(HSD_GObj));
     memcpy(&saved_gobjs[1], borrowed[1], sizeof(HSD_GObj));
+    memcpy(&saved_gobjs[2], borrowed[2], sizeof(HSD_GObj));
+    HSD_GObjEvent callbacks[2] = {fn_801D11E4, fn_801D13C8};
     MeleeWebGameplayStats before = melee_web_gameplay_stats();
     MeleeWebSourceMemoryContext context;
     queue_control_require(melee_web_source_memory_context_read(&context) ==
@@ -762,7 +768,7 @@ int melee_web_stadium_c1_pending_queue_loss_control(void)
     MeleeWebSourceMemoryAllocation leases[2];
     queue_control_callback_count = 0;
     for (unsigned i = 0; i != 2; ++i) {
-        Ground_801C10B8(borrowed[i], queue_control_callback);
+        Ground_801C10B8(borrowed[i], callbacks[i]);
         payloads[i] = stage_info.x6A4;
         queue_control_require(melee_web_source_memory_allocation_read(
             payloads[i], &leases[i]) == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
@@ -772,9 +778,46 @@ int melee_web_stadium_c1_pending_queue_loss_control(void)
             "exact owned queue header lease");
         const struct PendingShape* node = payloads[i];
         queue_control_require(node->gobj == borrowed[i] &&
-            node->callback == queue_control_callback &&
+            node->callback == callbacks[i] &&
             node->next == (i ? payloads[0] : NULL), "actual enqueue LIFO and borrowed fields");
     }
+    const struct PendingShape* head = stage_info.x6A4;
+    const struct PendingShape* tail = head->next;
+    struct PendingShape saved_headers[2] = {*head, *tail};
+    const HSD_GObj* expected_objects[2] = {borrowed[1], borrowed[0]};
+    HSD_GObjEvent expected_callbacks[2] = {fn_801D13C8, fn_801D11E4};
+    const struct PendingShape* observed[2] = {head, tail};
+    for (unsigned i = 0; i != 2; ++i) {
+        const unsigned lease_index = 1 - i;
+        printf("GROUND_QUEUE_PAIR index=%u map=%u header=%p next=%p "
+               "actual_object=%p expected_object=%p actual_callback=%p expected_callback=%p "
+               "lease_world=%llu lease_heap=%d lease_generation=%llu requested=%u live=%u\n",
+               i, i ? 1U : 2U, (const void*)observed[i], observed[i]->next,
+               (void*)observed[i]->gobj, (const void*)expected_objects[i],
+               (void*)observed[i]->callback, (void*)expected_callbacks[i],
+               (unsigned long long)leases[lease_index].world_generation,
+               leases[lease_index].source_heap_handle,
+               (unsigned long long)leases[lease_index].allocation_generation,
+               leases[lease_index].requested_bytes, leases[lease_index].live);
+    }
+    printf("GROUND_QUEUE_MAP5_NEGATIVE actual_head_object=%p wrong_expected_map5=%p "
+           "actual_callback=%p expected_callback=%p refused=%d\n",
+           (void*)head->gobj, (void*)borrowed[2], (void*)head->callback,
+           (void*)fn_801D13C8, head->gobj != borrowed[2]);
+    fflush(stdout); /* Keep numeric identities even if the next predicate fails. */
+    queue_control_require(head->gobj == expected_objects[0] &&
+                          head->callback == expected_callbacks[0] &&
+                          tail->gobj == expected_objects[1] &&
+                          tail->callback == expected_callbacks[1] && !tail->next,
+                          "independent source map2 then map1 callback borrowers");
+    queue_control_require(head->gobj != borrowed[2] &&
+                          memcmp(head, &saved_headers[0], sizeof(*head)) == 0 &&
+                          memcmp(tail, &saved_headers[1], sizeof(*tail)) == 0 &&
+                          stage_info.x6A4 == head,
+                          "wrong nested-map5 expectation refuses without queue mutation");
+    for (unsigned i = 0; i != 3; ++i)
+        queue_control_require(memcmp(borrowed[i], &saved_gobjs[i], sizeof(HSD_GObj)) == 0,
+                              "pair checks preserve all borrowed map witnesses");
     MeleeWebGameplayStats queued = melee_web_gameplay_stats();
     queue_control_require(queued.heap_free_bytes < before.heap_free_bytes,
                           "queue must have an observed SDK heap cost");
@@ -801,6 +844,7 @@ int melee_web_stadium_c1_pending_queue_loss_control(void)
     printf("GROUND_QUEUE_CONTROL scope=actual-SDK-enqueue-and-StageLast-assignment-fragment "
            "headers=2 requested_each=%zu free_before=%d free_queued=%d free_after_restore=%d "
            "observed_gap=%d callbacks=0 borrowed_gobjs_unchanged=1 "
+           "source_pair_order=map2-map1 nested_map5_refused=1 pair_checks_pure=1 "
            "expected_root_loss_reproduced=1 full_StageLast_executed=0 "
            "Stadium_OnStart_executed=0 raw_shutdown=0\n",
            sizeof(struct PendingShape), before.heap_free_bytes, queued.heap_free_bytes,

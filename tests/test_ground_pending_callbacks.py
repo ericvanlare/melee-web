@@ -161,6 +161,39 @@ int main(void)
             else:
                 print(f"Retained queue reducer: {scratch}", flush=True)
 
+    def test_pinned_stadium_callback_registration_borrowers(self):
+        source_path = ROOT / "build/gameplay-source/src/melee/gr/grpstadium.c"
+        if not source_path.is_file():
+            self.skipTest("Prepared pinned Stadium source required")
+        source = source_path.read_text()
+        # Extract the balanced initializer and its top-level callback rows.
+        opening = source.index("{", source.index("static StageCallbacks grPs_StageCallbacks[]"))
+        depth, row_start, rows = 0, None, []
+        for offset in range(opening, len(source)):
+            character = source[offset]
+            if character == "{":
+                depth += 1
+                if depth == 2:
+                    row_start = offset + 1
+            elif character == "}":
+                if depth == 2:
+                    rows.append([field.strip() for field in source[row_start:offset].split(",") if field.strip()])
+                depth -= 1
+                if depth == 0:
+                    break
+        self.assertEqual(depth, 0, "Balanced callback table initializer required")
+        self.assertEqual(rows[1], ["grStadium_801D1290", "grStadium_801D1388",
+                                   "grStadium_801D1390", "grStadium_801D13C4", "0"])
+        self.assertEqual(rows[2], ["grStadium_801D13E0", "grStadium_801D1518",
+                                   "grStadium_801D1520", "grStadium_801D156C", "0xC0000000"])
+        display = function_body(source, "void grStadium_801D1290(")
+        map2 = function_body(source, "void grStadium_801D13E0(")
+        self.assertIn("Ground_801C10B8(gobj, fn_801D11E4);", display)
+        self.assertIn("gr->u.stadium.xE4 = grStadium_801D10F8(gr->u.stadium.xDE);", map2)
+        self.assertIn("gr->u.stadium.xDE = 5;", map2)
+        self.assertIn("Ground_801C10B8(gobj, fn_801D13C8);", map2)
+        self.assertNotIn("gobj =", map2)
+
     def test_sdk_queue_loss_control(self):
         target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
         if not target.is_file():
@@ -185,6 +218,9 @@ int main(void)
             self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
             self.assertIn("scope=actual-SDK-enqueue-and-StageLast-assignment-fragment", run.stdout)
             self.assertIn("expected_root_loss_reproduced=1", run.stdout)
+            self.assertIn("source_pair_order=map2-map1 nested_map5_refused=1 pair_checks_pure=1", run.stdout)
+            self.assertEqual(run.stdout.count("GROUND_QUEUE_PAIR index="), 2)
+            self.assertIn("GROUND_QUEUE_MAP5_NEGATIVE", run.stdout)
             self.assertIn("full_StageLast_executed=0 Stadium_OnStart_executed=0 raw_shutdown=0", run.stdout)
             print(run.stdout, end="", flush=True)
             passed = True
