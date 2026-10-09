@@ -60,6 +60,12 @@ extern "C" {
 #include <melee/gm/gmvsmode.h>
 #include <melee/gm/gmvsmelee.h>
 #include <melee/gm/gmresultplayer.h>
+#include <sysdolphin/baselib/forward.h>
+// Exact pinned player.h ABI without its C-only fighter type definitions.
+HSD_GObj* Player_GetEntity(int slot);
+int melee_web_css_observe_setup(int cursors[4][4],int doors[4][10],float geometry[4][12]);
+void melee_web_css_observe_setup_diagnostic_once(
+    void (*)(int,int,int,const void*,const void*,const void*,const void*,const void*,unsigned));
 #include <melee/gm/gmmain_lib.h>
 #include <melee/gm/types.h>
 #include <sysdolphin/baselib/controller.h>
@@ -714,6 +720,166 @@ void emit_sd_resolution_fixture_manifest(bool include_match=true)
     for(unsigned i=0;i<names.size();++i){if(i)std::cout<<',';std::cout<<'"'<<names[i]<<'"';}
     std::cout<<"]}\n";
 }
+static unsigned css_observer_failure_count;
+static void css_observer_failure_diagnostic(int guard,int port,int joint,
+    const void* data,const void* root,const void* cursor,const void* model,
+    const void* slider,unsigned flags)
+{
+    ++css_observer_failure_count;
+    std::cout<<"{\"record\":\"css_observer_first_failure\",\"guard\":"<<guard
+        <<",\"port\":"<<port<<",\"slider_joint\":"<<joint
+        <<",\"data\":"<<reinterpret_cast<uintptr_t>(data)
+        <<",\"root\":"<<reinterpret_cast<uintptr_t>(root)
+        <<",\"cursor\":"<<reinterpret_cast<uintptr_t>(cursor)
+        <<",\"model\":"<<reinterpret_cast<uintptr_t>(model)
+        <<",\"slider\":"<<reinterpret_cast<uintptr_t>(slider)
+        <<",\"flags\":"<<flags<<"}\n";std::cout.flush();
+}
+
+// Actual source door transitions only. No menu payload mutation.
+template<class Tick>
+void drive_sparse_source_css(PADStatus (&raw)[4],Tick&& tick)
+{
+    int cursors[4][4]{},doors[4][10]{};float geometry[4][12]{};
+    auto neutral=[&](){
+        for(auto& pad:raw)pad={};
+        raw[1].err=raw[3].err=-1; // Original ports0/2 remain connected.
+    };
+    auto observe=[&](const char* label){
+        check(melee_web_css_observe_setup(cursors,doors,geometry),
+              "Actual sparse CSS four-door source observation is unavailable");
+        emit_native_bytes(label,doors,sizeof(doors));
+        emit_native_bytes("actual_sparse_css_cursors",cursors,sizeof(cursors));
+        emit_native_bytes("actual_sparse_css_geometry",geometry,sizeof(geometry));
+        std::cout.flush();
+    };
+    auto step=[&](){check(tick()==1,"Sparse CSS input unexpectedly transitioned");};
+    auto tap=[&](unsigned port){
+        neutral();raw[port].button=PAD_BUTTON_A;step();neutral();step();
+    };
+    auto move_toggle=[&](unsigned door){
+        bool inside=false;
+        for(unsigned t=0;t<240;++t){
+            observe("actual_sparse_css_toggle_step");
+            const float x=geometry[0][0],y=geometry[0][1];
+            const float left=geometry[door][4],right=geometry[door][5];
+            check(std::isfinite(x)&&std::isfinite(y)&&std::isfinite(left)&&
+                  std::isfinite(right)&&right>left,"Sparse CSS toggle bounds invalid");
+            if(x>left+0.2f&&x<right-0.2f&&y>-4.4f&&y<0){inside=true;break;}
+            const float center=(left+right)/2;
+            neutral();raw[0].stickX=x<center-0.5f?80:x>center+0.5f?-80:0;
+            raw[0].stickY=y<-2.2f?80:y>-2.2f?-80:0;
+            check(raw[0].stickX||raw[0].stickY,"Sparse CSS cursor made no progress");step();
+        }
+        check(inside,"Sparse CSS toggle exceeded existing 240 source-step cap");
+    };
+    neutral();step();observe("actual_sparse_css_initial");
+    check(doors[0][0]==Gm_PKind_Human&&doors[2][0]==Gm_PKind_NA&&
+          doors[3][0]==Gm_PKind_NA&&(doors[1][0]==Gm_PKind_Human||doors[1][0]==Gm_PKind_Cpu),
+          "Actual sparse CSS initial source roster differs");
+    move_toggle(1);
+    for(unsigned changes=0;doors[1][0]!=Gm_PKind_NA&&changes<2;++changes){
+        const int before=doors[1][0];tap(0);observe("actual_sparse_css_p2_transition");
+        check(doors[1][0]==(before==Gm_PKind_Human?Gm_PKind_Cpu:Gm_PKind_NA)&&
+              doors[1][4]==doors[1][0],"P2 source toggle did not follow Human/CPU/NA order");
+    }
+    check(doors[1][0]==Gm_PKind_NA,"P2 source did not become NA");
+    move_toggle(2);tap(0);observe("actual_sparse_css_p3_transition");
+    check(doors[2][0]==Gm_PKind_Human&&doors[2][4]==Gm_PKind_Human,
+          "Connected original port2 did not join source door2 as Human");
+    bool selected=false;
+    for(unsigned t=0;t<180;++t){
+        MeleeWebFighterInputObservation observed{};
+        check(melee_web_fighter_input_observe_port(2,CKIND_MARIO,&observed),
+              "Actual P3 source cursor observation unavailable");
+        emit_native_bytes("actual_sparse_css_p3_fighter",&observed,sizeof(observed));
+        const int state=melee_web_fighter_input_drive(raw,&observed,CKIND_MARIO);
+        check(state!=MELEE_WEB_FIGHTER_INPUT_INVALID&&observed.cursor_port==2,
+              "Actual P3 source fighter cursor lost port2");
+        // The shared dense helper deliberately disconnects2/3. Restore only
+        // this recipe's declared connected ports, without changing its default.
+        raw[1].err=raw[3].err=-1;raw[2].err=0;
+        if(state==MELEE_WEB_FIGHTER_INPUT_ALREADY_SELECTED){selected=true;break;}
+        if(state==MELEE_WEB_FIGHTER_INPUT_PICKUP_READY||state==MELEE_WEB_FIGHTER_INPUT_TARGET_READY)
+            raw[2].button=PAD_BUTTON_A;
+        step();neutral();step();
+    }
+    check(selected,"Actual P3 Mario selection exceeded existing 180-step cap");
+    neutral();for(unsigned t=0;t<30;++t)step();observe("actual_sparse_css_committed");
+    for(unsigned port=0;port<4;++port){
+        const int expected=(port==0||port==2)?Gm_PKind_Human:Gm_PKind_NA;
+        check(doors[port][0]==expected&&doors[port][4]==expected&&doors[port][6]==0,
+              "Actual CSS lost sparse roster or original zero-slot encoding");
+    }
+    check(doors[0][3]==CKIND_MARIO&&doors[2][3]==CKIND_MARIO,
+          "Actual CSS lost Mario source identity");
+}
+
+// Authored component fixture: retains source rows/controllers 0/2. This is
+// not evidence that original CSS joined P3, nor a Results/full-route check.
+void run_sparse_source_pad(const melee_web::RuntimeFiles& files,
+    MeleeWebMenuHost* host,const MeleeWebMenuMatchSelection& selection,
+    char* error,std::size_t error_size)
+{
+    const auto* input=melee_web_menu_host_input(host);
+    check(input&&selection.player_count==2&&selection.start.rules.stkind==St_Kind_Last&&
+          selection.start.players[0].ckind==CKIND_MARIO&&selection.start.players[2].ckind==CKIND_MARIO&&
+          selection.start.players[0].stocks==4&&selection.start.players[2].stocks==4&&
+          selection.start.players[0].color==1&&selection.start.players[2].color==0&&
+          selection.start.players[0].slot_type==Gm_PKind_Human&&
+          selection.start.players[2].slot_type==Gm_PKind_Human&&
+          selection.start.players[1].slot_type==Gm_PKind_NA&&
+          selection.start.players[3].slot_type==Gm_PKind_NA&&
+          selection.players[0].controller==0&&selection.players[2].controller==2,
+          "Sparse PAD fixture lost original source/controller identities");
+    const auto* saved_rng=seed_ptr;const auto saved_seed=*seed_ptr;
+    melee_web::GameplayMatchSession match(files,selection,*input);
+    check(std::memcmp(&match.start_data(),&selection.start,sizeof(selection.start))==0,
+          "Sparse source-start owner changed authored payload at construction");
+    float pcm[1068];unsigned phase=0,ready_ticks=0;
+    auto tick=[&](const PADStatus (&pads)[4]){
+        match.tick(pads);
+        check(std::memcmp(&match.start_data(),&selection.start,sizeof(selection.start))==0,
+              "Sparse owner changed its copied authored source payload");
+        phase+=32000;const unsigned count=phase/60;phase%=60;
+        check(melee_web_audio_render(match.audio(),pcm,count,error,error_size),error);
+    };
+    PADStatus neutral[4]{};neutral[1].err=neutral[3].err=-1;
+    for(;ready_ticks<600&&!match.ready();++ready_ticks)tick(neutral);
+    check(match.ready(),"Sparse source Ready/Go exceeded existing 600-tick cap");
+    PADStatus distinct[4]{};distinct[1].err=distinct[3].err=-1;
+    distinct[0].stickX=-48;distinct[0].button=PAD_BUTTON_LEFT;
+    distinct[2].stickX=48;distinct[2].button=PAD_BUTTON_RIGHT;
+    MeleeWebMatchStats observed[2]{};unsigned input_ticks=0;bool consumed=false;
+    for(;input_ticks<3&&!consumed;++input_ticks){
+        tick(distinct);observed[0]=match.player_stats(0);observed[1]=match.player_stats(1);
+        emit_native_bytes("sparse_input_observed_stats",observed,sizeof(observed));
+        emit_native_bytes("sparse_input_observed_copy_pad",HSD_PadCopyStatus,sizeof(HSD_PadCopyStatus));
+        std::cout.flush(); // Retain actual observations before any assertion.
+        check(observed[0].player_slot==0&&observed[1].player_slot==2&&
+              Player_GetEntity(0)&&Player_GetEntity(2)&&
+              !Player_GetEntity(1)&&!Player_GetEntity(3)&&
+              HSD_PadCopyStatus[1].err==-1&&HSD_PadCopyStatus[3].err==-1,
+              "Sparse source fighters or absent ports were renumbered");
+        consumed=observed[0].source_stick[0]<0&&observed[1].source_stick[0]>0&&
+            (HSD_PadCopyStatus[0].button&(PAD_BUTTON_LEFT|PAD_BUTTON_RIGHT))==PAD_BUTTON_LEFT&&
+            (HSD_PadCopyStatus[2].button&(PAD_BUTTON_LEFT|PAD_BUTTON_RIGHT))==PAD_BUTTON_RIGHT;
+    }
+    check(consumed,"Distinct ports0/2 did not reach their own source fighters within three ticks");
+    tick(neutral);
+    check(!match.player_stats(0).source_stick[0]&&!match.player_stats(1).source_stick[0]&&
+          !((HSD_PadCopyStatus[0].button|HSD_PadCopyStatus[2].button)&
+            (PAD_BUTTON_LEFT|PAD_BUTTON_RIGHT)),"Sparse source input did not release");
+    const auto cursor=match.source_frames();
+    std::cout<<"Sparse authored source PAD: ready ticks "<<ready_ticks
+             <<", input ticks "<<input_ticks<<", source cursor "<<cursor
+             <<", source slots "<<observed[0].player_slot<<'/'<<observed[1].player_slot
+             <<", source stick "<<observed[0].source_stick[0]<<'/'<<observed[1].source_stick[0]<<'\n';
+    match.close();match.close();
+    check(seed_ptr==saved_rng&&*seed_ptr==saved_seed&&!melee_web_gameplay_world_exists(),
+          "Sparse checked interrupted-match close lost RNG/world ownership");
+}
+
 void run_ordinary_nontied_timeout(const melee_web::RuntimeFiles& files,
     MeleeWebMenuHost* host,const MeleeWebMenuMatchSelection& selection,
     char* error,std::size_t error_size)
@@ -4509,6 +4675,12 @@ int main(int argc,char** argv){try{
  const bool sound_settings_recipe=input_recipe&&std::string(input_recipe)=="main-settings-sound-v1";
  const bool sd_menu_setup_recipe=input_recipe&&
      std::string(input_recipe)=="sudden-death-menu-setup-control-v1";
+ const bool css_observer_recipe=input_recipe&&
+     std::string(input_recipe)=="sparse-css-observer-preflight-v1";
+ const bool sparse_css_recipe=input_recipe&&
+     std::string(input_recipe)=="sparse-actual-css-sss-control-v1";
+ const bool sparse_pad_recipe=input_recipe&&
+     std::string(input_recipe)=="sparse-source-pad-control-v1";
  const bool ordinary_timeout_recipe=input_recipe&&
      std::string(input_recipe)=="ordinary-nontied-timeout-control-v1";
  const bool timeout_results_recipe=input_recipe&&
@@ -4547,7 +4719,7 @@ int main(int argc,char** argv){try{
  const bool stadium_e8_request_recipe=false;
  const bool stadium_ground_map1_owner_recipe=false;
 #endif
- if(input_recipe&&!ordinary_timeout_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
+ if(input_recipe&&!css_observer_recipe&&!sparse_css_recipe&&!sparse_pad_recipe&&!ordinary_timeout_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
     !sound_settings_recipe&&!sudden_death_host_recipe&&!sudden_death_world_recipe&&
     !sd_menu_setup_recipe&&!returned_menu_recipe&&
@@ -4562,7 +4734,7 @@ int main(int argc,char** argv){try{
    throw std::runtime_error("MWRC v10 CSS replay-start reducer requires trace, source revision and exact recipe path");
  if(!v10_css_replay_start_recipe&&argc==8)
    throw std::runtime_error("Only the MWRC v10 CSS replay-start reducer accepts an exact recipe path");
- if((ordinary_timeout_recipe||retail_fd_recipe||results_mario_recipe||sudden_death_host_recipe||
+ if((css_observer_recipe||sparse_css_recipe||sparse_pad_recipe||ordinary_timeout_recipe||retail_fd_recipe||results_mario_recipe||sudden_death_host_recipe||
      sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe||
      v10_css_replay_start_recipe)&&
     stage_kind!=St_Kind_Last)
@@ -4575,7 +4747,7 @@ int main(int argc,char** argv){try{
  TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
  std::vector<std::string> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"};
- if(ordinary_timeout_recipe||sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe||stadium_c1a_recipe||
+ if(css_observer_recipe||sparse_css_recipe||sparse_pad_recipe||ordinary_timeout_recipe||sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe||stadium_c1a_recipe||
     stadium_c1_context_preflight_recipe||
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
@@ -4646,7 +4818,7 @@ int main(int argc,char** argv){try{
   std::cout<<"Native Main Settings Sound source route passed; no browser or retail-route claim\n";
   return 0;
  }
- const unsigned cycle_count=(ordinary_timeout_recipe||results_mario_recipe||sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe)?1:2;
+ const unsigned cycle_count=(css_observer_recipe||sparse_css_recipe||sparse_pad_recipe||ordinary_timeout_recipe||results_mario_recipe||sudden_death_host_recipe||sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe)?1:2;
  for(unsigned cycle=0;cycle<cycle_count;cycle++){
   trace.begin_run(cycle);
   if((retail_fd_recipe||results_mario_recipe)&&cycle==0)*seed_ptr=1840631306u;
@@ -4711,6 +4883,7 @@ int main(int argc,char** argv){try{
     check(observed.selected_stage_kind==stage_kind,"Cursor target and source selected tile differ");
     at_target=true;break;
    }
+   if(sparse_css_recipe){raw[1].err=-1;raw[2].err=0;raw[3].err=-1;}
    check(tick()==1,"SSS cursor input unexpectedly transitioned");
   }
   check(at_target,"Original SSS cursor did not reach requested stage");
@@ -4735,6 +4908,30 @@ int main(int argc,char** argv){try{
                                          &initial_music_revisited)&&
         initial_music_completed>0,
         "Original CSS music did not load an HPS payload");
+  if(css_observer_recipe){
+   // Same startup and single raw neutral sample as the failed first observer.
+   for(auto& pad:raw)pad={};raw[1].err=raw[3].err=-1;
+   check(tick()==1,"CSS observer reducer left active CSS");
+   int cursors[4][4]{},doors[4][10]{};float geometry[4][12]{};
+   css_observer_failure_count=0;
+   melee_web_css_observe_setup_diagnostic_once(css_observer_failure_diagnostic);
+   const int observed=melee_web_css_observe_setup(cursors,doors,geometry);
+   std::cout<<"{\"record\":\"css_observer_reducer_observation\",\"observed\":"<<observed
+       <<",\"failure_callbacks\":"<<css_observer_failure_count<<"}\n";std::cout.flush();
+   check((observed==0&&css_observer_failure_count==1)||
+         (observed==1&&css_observer_failure_count==0),"CSS observer reducer lost one-shot diagnostics");
+   check(melee_web_menu_host_leave(host,1,error,sizeof(error)),error);
+   world->verify_immutable_archives();world->close();world.reset();
+   check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);host=nullptr;
+   check(melee_web_vs_mode_begin()&&melee_web_vs_mode_end(),"CSS observer reducer leaked VS lease");
+   const auto retained=melee_web_gameplay_allocation();
+   check(retained.identity==session_allocation.identity&&retained.generation==session_allocation.generation&&
+         retained.bytes==session_allocation.bytes&&!melee_web_gameplay_world_exists()&&
+         std::memcmp(gmMainLib_GetGameRules(),&pre_native_rules,sizeof(pre_native_rules))==0,
+         "CSS observer reducer cleanup lost world/arena/rules");
+   continue; // No cursor movement, door taps, SSS or match.
+  }
+  if(sparse_css_recipe)drive_sparse_source_css(raw,tick);
   if(cycle==1||link_css_unload_recipe){
    const int target_kind=link_css_unload_recipe?(cycle==0?CKIND_LINK:CKIND_CLINK):CKIND_FALCO;
    bool target_selected=false;
@@ -4799,6 +4996,7 @@ int main(int argc,char** argv){try{
                                          &continued_music_revisited)&&
         continued_music_completed>initial_music_completed,
         "Original menu music did not continue loading across CSS/SSS scenes");
+  if(sparse_css_recipe){raw[1].err=-1;raw[2].err=0;raw[3].err=-1;}
   transition();check(melee_web_menu_host_phase(host)==5,"SSS did not complete original selection");
   StartMeleeData raw_start{};
   check(melee_web_menu_host_raw_selection(host,&raw_start,error,sizeof(error)),error);
@@ -4811,6 +5009,62 @@ int main(int argc,char** argv){try{
   raw_selection.random_seed=selection_rng;
   trace.event("sss_exit_complete",world->audio(),"match",&raw_selection,&selection_rng);
   world->close();world.reset();audio_phase=0;
+  if(sparse_css_recipe){
+   emit_native_bytes("actual_sparse_sss_raw_start",&raw_start,sizeof(raw_start));
+   emit_native_bytes("actual_sparse_sss_normalized_start",&selection.start,sizeof(selection.start));
+   check(selection.player_count==2,"Actual sparse SSS lost two-player count");
+   for(unsigned port=0;port<4;++port){
+    const int expected=(port==0||port==2)?Gm_PKind_Human:Gm_PKind_NA;
+    check(raw_start.players[port].slot_type==expected&&selection.start.players[port].slot_type==expected&&
+          raw_start.players[port].slot==0&&selection.start.players[port].slot==0,
+          "Closed source SSS renumbered sparse player identities");
+    if(expected==Gm_PKind_Human)check(raw_start.players[port].ckind==CKIND_MARIO&&
+        selection.start.players[port].ckind==CKIND_MARIO&&selection.players[port].controller==port,
+        "Closed source SSS lost sparse Mario/controller identity");
+   }
+   check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);host=nullptr;
+   check(melee_web_vs_mode_begin()&&melee_web_vs_mode_end(),"Actual sparse CSS/SSS leaked VS lease");
+   const auto retained=melee_web_gameplay_allocation();
+   check(retained.identity==session_allocation.identity&&retained.generation==session_allocation.generation&&
+         retained.bytes==session_allocation.bytes&&!melee_web_gameplay_world_exists()&&
+         std::memcmp(gmMainLib_GetGameRules(),&pre_native_rules,sizeof(pre_native_rules))==0,
+         "Actual sparse CSS/SSS cleanup lost world/arena/rules");
+   continue; // No match construction or post-SSS payload mutation.
+  }
+  if(sparse_pad_recipe){
+   // Preserve the observed closed source payload except the explicitly authored
+   // Human membership/row relocation. Do not promote this to a CSS joining claim.
+   check(selection.player_count==2&&selection.start.players[2].slot_type==Gm_PKind_NA&&
+         selection.start.players[3].slot_type==Gm_PKind_NA,
+         "Sparse fixture requires the existing dense two-player source selection");
+   selection.start.players[0].slot_type=Gm_PKind_Human;
+   selection.start.players[2]=selection.start.players[1];
+   selection.start.players[2].slot_type=Gm_PKind_Human;
+   selection.players[2]=selection.players[1];selection.players[2].controller=2;
+   selection.start.players[1]={};selection.start.players[1].slot_type=Gm_PKind_NA;
+   selection.players[1]={};
+   emit_native_bytes("authored_sparse_source_start",&selection.start,sizeof(selection.start));
+   for(const auto& name:melee_web::match_asset_names(selection)){
+    if(files.contains(name))continue;
+    auto path=std::filesystem::path(argv[1])/name;
+    if(!std::filesystem::is_regular_file(path))path=std::filesystem::path(argv[2])/name;
+    std::ifstream input(path,std::ios::binary);
+    if(!input)throw std::runtime_error("Missing sparse source match fixture: "+name);
+    files[name]={(std::istreambuf_iterator<char>(input)),{}};
+   }
+   try{run_sparse_source_pad(files,host,selection,error,sizeof(error));}
+   catch(...){const auto primary=std::current_exception();
+    if(!melee_web_menu_host_destroy(host,error,sizeof(error)))std::cerr<<"Secondary sparse host destroy: "<<error<<'\n';
+    std::rethrow_exception(primary);}
+   check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);host=nullptr;
+   check(melee_web_vs_mode_begin()&&melee_web_vs_mode_end(),"Sparse component leaked VS lease");
+   const auto retained=melee_web_gameplay_allocation();
+   check(retained.identity==session_allocation.identity&&retained.generation==session_allocation.generation&&
+         retained.bytes==session_allocation.bytes&&!melee_web_gameplay_world_exists()&&
+         std::memcmp(gmMainLib_GetGameRules(),&pre_native_rules,sizeof(pre_native_rules))==0,
+         "Sparse component lost retained arena or persistent rules restoration");
+   continue;
+  }
   if(ordinary_timeout_recipe){
    const auto* prepared=melee_web_menu_host_post_vs_mode(host);
    check(prepared!=nullptr,"Ordinary timeout has no retained post-VS mode");
@@ -5285,6 +5539,18 @@ int main(int argc,char** argv){try{
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
   trace.event("menu_setup_application_cleanup_complete",nullptr);
   std::cout<<"Native closed CSS/SSS raw and normalized selection diagnostic with host/VS/application cleanup passed; no tie or SD world\n";
+ }else if(css_observer_recipe){
+  check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
+  check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
+  std::cout<<"Native single CSS observer reducer and checked application cleanup completed; no route claim\n";
+ }else if(sparse_css_recipe){
+  check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
+  check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
+  std::cout<<"Native actual source CSS P1/P3 join and closed SSS identity/cleanup passed; no match/browser/original comparison claim\n";
+ }else if(sparse_pad_recipe){
+  check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
+  check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
+  std::cout<<"Native authored sparse source PAD/checked owner cleanup passed; no CSS joining, Results, browser or original comparison claim\n";
  }else if(ordinary_timeout_recipe){
   check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);

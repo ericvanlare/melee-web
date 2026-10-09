@@ -258,8 +258,74 @@ static void setup(CSSData* css)
     }
 }
 
+static int sparse_port_mapping_contract(void)
+{
+    CSSData dense, sparse, unchanged;
+    SSSData dense_sss = { 0 }, sparse_sss = { 0 };
+    setup(&dense);
+    dense.vs.start.players[0].slot = 1;
+    dense.vs.start.players[1].slot = 2;
+    dense_sss.force_stage_id = -1;
+    dense_sss.vs = dense.vs;
+    if (melee_web_menu_active_player_count(&dense.vs.start) != 2 ||
+        !melee_web_menu_css_selection_valid(&dense) ||
+        !melee_web_menu_sss_selection_valid(&dense_sss)) {
+        fprintf(stderr, "Sparse-port reproducer: dense control rejected\n");
+        return 0;
+    }
+
+    memcpy(&sparse, &dense, sizeof(sparse));
+    sparse.vs.start.players[2] = dense.vs.start.players[1];
+    sparse.vs.start.players[2].slot = 3;
+    sparse.vs.start.players[1] = dense.vs.start.players[2];
+    memcpy(&unchanged, &sparse, sizeof(unchanged));
+    sparse_sss.force_stage_id = -1;
+    sparse_sss.vs = sparse.vs;
+    /* Admission only: retain P3 at source index 2/controller 2. The original
+     * failed gate remains in historical checkpoint 5c57373b. */
+    int count = melee_web_menu_active_player_count(&sparse.vs.start);
+    int css_valid = melee_web_menu_css_selection_valid(&sparse);
+    int sss_valid = melee_web_menu_sss_selection_valid(&sparse_sss);
+    if (count != 2 || !css_valid || !sss_valid ||
+        memcmp(&sparse, &unchanged, sizeof(sparse)) != 0 ||
+        sparse.vs.start.players[1].slot_type != Gm_PKind_NA ||
+        sparse.vs.start.players[2].slot_type != Gm_PKind_Human ||
+        sparse.vs.start.players[2].slot != 3 ||
+        sparse.vs.start.players[3].slot_type != Gm_PKind_NA) {
+        fprintf(stderr, "Sparse-port contract: rejected mapping or source mutation\n");
+        return 0;
+    }
+    CSSData invalid = sparse;
+    invalid.vs.start.players[2].slot = 2;
+    if (melee_web_menu_css_selection_valid(&invalid)) return 0;
+    invalid = sparse;
+    invalid.vs.start.players[4] = sparse.vs.start.players[2];
+    if (melee_web_menu_active_player_count(&invalid.vs.start) ||
+        melee_web_menu_css_selection_valid(&invalid)) return 0;
+    /* Original slot zero uses its record index, not compact ordinal 1. */
+    invalid = sparse;
+    invalid.vs.start.players[2].slot = 0;
+    if (!melee_web_menu_css_selection_valid(&invalid)) return 0;
+    printf("sparse-port admission: dense count=2 CSS=1 SSS=1; "
+           "P1+P3 count=%d CSS=%d SSS=%d; source ports 0/2 retained\n",
+           count, css_valid, sss_valid);
+    return 1;
+}
+
+/* Synthetic reader routing control only; actual CSS assets are a separate gate. */
+static unsigned observed_port_calls;
+static int foreign_cursor;
+int melee_web_css_observe_port(unsigned port,int kind,int ids[14],float geometry[8])
+{
+    (void)kind;++observed_port_calls;
+    const int fields[14]={(int)(foreign_cursor?3:port),-1,CKIND_DRMARIO,0,0,0,1,0,1,0,0,0,0,0};
+    const float bounds[8]={0,1,10,2,-1,1,1,-1};
+    memcpy(ids,fields,sizeof(fields));memcpy(geometry,bounds,sizeof(bounds));return 1;
+}
+
 int main(void)
 {
+    if (!sparse_port_mapping_contract()) return 1;
     /* Reduced owner-lifetime check; source callbacks here are fixtures. The
      * owned-asset recipe separately exercises original SSS confirmation. */
     if (melee_web_menu_stage_available(St_Kind_PStadium) ||
@@ -300,6 +366,19 @@ int main(void)
         if(!melee_web_fighter_input_observe_valid(&observed,kind))return 100;
     if(melee_web_fighter_input_observe_valid(&observed,-1)||
        melee_web_fighter_input_observe_valid(&observed,CKIND_PLAYABLE_COUNT))return 101;
+    MeleeWebFighterInputObservation p3={0};PADStatus input_ports[4]={0};
+    if(!melee_web_fighter_input_observe_port(2,CKIND_MARIO,&p3)||p3.cursor_port!=2||
+       melee_web_fighter_input_drive(input_ports,&p3,CKIND_MARIO)==MELEE_WEB_FIGHTER_INPUT_INVALID||
+       input_ports[0].stickX||input_ports[1].stickX||!input_ports[2].stickX||input_ports[3].stickX||
+       input_ports[2].err!=PAD_ERR_NO_CONTROLLER)return 126;
+    /* The caller must explicitly connect its sparse port; dense default unchanged. */
+    const unsigned calls=observed_port_calls;
+    if(melee_web_fighter_input_observe_port(4,CKIND_MARIO,&p3)||observed_port_calls!=calls)return 127;
+    foreign_cursor=1;
+    if(melee_web_fighter_input_observe_port(2,CKIND_MARIO,&p3))return 128;
+    foreign_cursor=0;
+    if(!melee_web_fighter_input_observe(CKIND_MARIO,&p3)||p3.cursor_port!=0)return 129;
+    printf("CSS reader routing: original port2 retained, foreign cursor/port4 rejected, dense neutral unchanged\n");
     CSSData css;
     SSSData sss;
     setup(&css);

@@ -127,7 +127,14 @@ function traceSummary(trace) {
   };
 }
 
-export function resultsPadTraceFailures(trace) {
+export function resultsConnectedPadErrors(sourcePorts = [0, 1]) {
+  if (JSON.stringify(sourcePorts) !== '[0,1]' && JSON.stringify(sourcePorts) !== '[0,2]')
+    throw Error('Results requires explicitly supported original source ports [0,1] or [0,2]');
+  return Array.from({length:4}, (_, port) => sourcePorts.includes(port) ? 0 : -1);
+}
+
+export function resultsPadTraceFailures(trace, sourcePorts = [0, 1]) {
+  const connectedErrors = resultsConnectedPadErrors(sourcePorts);
   const failures = [];
   if (!trace || typeof trace !== 'object' || Array.isArray(trace))
     return ['original Results PAD trace is missing or malformed'];
@@ -185,7 +192,7 @@ export function resultsPadTraceFailures(trace) {
         row.pads.some(pad => !pad || !Number.isSafeInteger(pad.button) || pad.button < 0 || pad.button > 0xffff ||
           !Number.isSafeInteger(pad.err))) {
       failures.push(`original Results PAD trace row ${index} lacks four raw PAD samples`);
-    } else if (JSON.stringify(row.pads.map(pad => pad.err)) !== JSON.stringify(RESULTS_CONNECTED_PAD_ERRORS)) {
+    } else if (JSON.stringify(row.pads.map(pad => pad.err)) !== JSON.stringify(connectedErrors)) {
       failures.push(`original Results PAD trace row ${index} has an unexpected raw PAD error profile: ${JSON.stringify(row.pads.map(pad => pad.err))}`);
     }
     if (!Array.isArray(row.source_consumed_pads) || row.source_consumed_pads.length !== 4 ||
@@ -193,7 +200,7 @@ export function resultsPadTraceFailures(trace) {
           pad.trigger < 0 || pad.trigger > 0xffff || !Number.isSafeInteger(pad.err))) {
       failures.push(`original Results PAD trace row ${index} lacks four source-consumed PAD states`);
     } else if (JSON.stringify(row.source_consumed_pads.map(pad => pad.err)) !==
-        JSON.stringify(RESULTS_CONNECTED_PAD_ERRORS)) {
+        JSON.stringify(connectedErrors)) {
       failures.push(`original Results PAD trace row ${index} has an unexpected copied PAD error profile: ${JSON.stringify(row.source_consumed_pads.map(pad => pad.err))}`);
     }
   }
@@ -236,8 +243,8 @@ function assertCompletedTwoHumanResultsRow(row, label) {
     throw Error(`${label}: source Results did not retain phase 4, statistics phase 2, and all four confirmations: ${JSON.stringify(rowSummary(row))}`);
 }
 
-function assertP2CompletionTrace(trace, fromIndex, label) {
-  const event = assertOnePortStart(trace, fromIndex, 1, label);
+function assertP2CompletionTrace(trace, fromIndex, label, secondPort = 1) {
+  const event = assertOnePortStart(trace, fromIndex, secondPort, label);
   assertCompletedTwoHumanResultsRow(event.row, `${label} source edge`);
   assertCompletedTwoHumanResultsRow(trace.samples.at(-1), `${label} final retained row`);
   return event;
@@ -251,7 +258,16 @@ export async function confirmTwoHumanResults({
   press,
   wait,
   pollMs = RESULTS_CONFIRMATION_POLL_MS,
+  sourcePorts = [0, 1],
+  pressSecond,
 }) {
+  resultsConnectedPadErrors(sourcePorts);
+  const secondPort = sourcePorts[1];
+  const secondLabel = `P${secondPort + 1}`;
+  if (secondPort === 2 && typeof pressSecond !== 'function')
+    throw Error('Sparse Results requires an explicit source2 input callback');
+  const readyFlags = Array.from({length:4}, (_, port) => sourcePorts.includes(port) ? 0 : 1);
+  const firstFlags = readyFlags.map((value, port) => port === 0 ? 1 : value);
   if (![deadlineAt, pollMs].every(Number.isFinite) || deadlineAt <= Date.now() || pollMs <= 0)
     throw Error('Original Results confirmation needs a live deadline and positive poll interval');
   if (![press, wait].every(value => typeof value === 'function') ||
@@ -272,7 +288,7 @@ export async function confirmTwoHumanResults({
     // stopped asset-transfer boundary. This is a snapshot read, not a tick.
     const coherent = observeSample ? await observeSample(label) : null;
     const trace = observeSample ? coherent?.trace : await observeTrace();
-    const failures = resultsPadTraceFailures(trace);
+    const failures = resultsPadTraceFailures(trace, sourcePorts);
     if (failures.length)
       throw Error(`${label}: original Results trace is incomplete: ${JSON.stringify({failures, trace: traceSummary(trace)})}`);
     const host = observeSample ? coherent?.host : await observeHost(label);
@@ -307,7 +323,7 @@ export async function confirmTwoHumanResults({
       // polling Results, including its checked preparation states, until that
       // edge arrives; require it before leaving Results for a destination.
       if (allowResultsPreparationFromIndex !== null && observed.host.phase !== 8)
-        assertP2CompletionTrace(observed.trace, allowResultsPreparationFromIndex, label);
+        assertP2CompletionTrace(observed.trace, allowResultsPreparationFromIndex, label, secondPort);
       if (readiness.kind === 'preparing' && allowResultsPreparationFromIndex !== null) {
         const existing = postConfirmationPreparation.find(row => row.phase === readiness.phase &&
           row.reason === readiness.reason && row.message === readiness.message);
@@ -328,10 +344,10 @@ export async function confirmTwoHumanResults({
     if (events.length > 1)
       throw Error(`${label}: repeated source Start edges exceeded the one-action contract`);
     if (events.length !== 1) return false;
-    if (port === 1) assertP2CompletionTrace(observed.trace, fromIndex, label);
+    if (port === secondPort) assertP2CompletionTrace(observed.trace, fromIndex, label, secondPort);
     return true;
-  }, label, {allowHostExit: port === 1,
-    allowResultsPreparationFromIndex: port === 1 ? fromIndex : null})
+  }, label, {allowHostExit: port === secondPort,
+    allowResultsPreparationFromIndex: port === secondPort ? fromIndex : null})
     .then(observed => ({observed, event: assertOnePortStart(observed.trace, fromIndex, port, label)}));
 
   let observed = await waitFor(snapshot => {
@@ -349,7 +365,7 @@ export async function confirmTwoHumanResults({
   }, 'original Results statistics-ready gate');
   const statisticsReadyRow = observed.trace.samples.at(-1);
   const readyState = confirmationState(statisticsReadyRow);
-  if (JSON.stringify(readyState.players.map(player => player.confirmed)) !== JSON.stringify([0, 0, 1, 1]))
+  if (JSON.stringify(readyState.players.map(player => player.confirmed)) !== JSON.stringify(readyFlags))
     throw Error(`original Results statistics-ready state changed connected/empty-port confirmations: ${JSON.stringify(rowSummary(observed.trace.samples.at(-1)))}`);
 
   const p1StartIndex = observed.trace.retained;
@@ -357,13 +373,14 @@ export async function confirmTwoHumanResults({
   const p1 = await eventFor(p1StartIndex, 0, 'P1 statistics confirmation');
   const p1State = confirmationState(p1.event.row);
   if (p1State.phase !== 3 || p1State.stats_phase !== 2 ||
-      JSON.stringify(p1State.players.map(player => player.confirmed)) !== JSON.stringify([1, 0, 1, 1]))
+      JSON.stringify(p1State.players.map(player => player.confirmed)) !== JSON.stringify(firstFlags))
     throw Error(`P1 source Start did not confirm only P1 during original statistics phase: ${JSON.stringify(rowSummary(p1.event.row))}`);
   assertHostInResults(p1.observed.host, 'after P1-only Results confirmation');
 
   p2StartIndex = p1.observed.trace.retained;
-  await press('End');
-  const p2 = await eventFor(p2StartIndex, 1, 'P2 statistics confirmation');
+  if (pressSecond) await pressSecond();
+  else await press('End');
+  const p2 = await eventFor(p2StartIndex, secondPort, `${secondLabel} statistics confirmation`);
   const p2State = confirmationState(p2.event.row);
   if (p2State.phase !== 4 || p2State.stats_phase !== 2 ||
       JSON.stringify(p2State.players.map(player => player.confirmed)) !== JSON.stringify([1, 1, 1, 1]))
@@ -377,6 +394,7 @@ export async function confirmTwoHumanResults({
 
   return {
     schema: 'melee-web-two-human-results-confirmation-v1',
+    source_ports: [...sourcePorts],
     source_trace_capacity: observed.trace.capacity,
     source_trace_rows: observed.trace.retained,
     source_trace_attempts: observed.trace.attempts,

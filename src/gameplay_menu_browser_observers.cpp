@@ -345,6 +345,9 @@ const char* melee_web_native_menu_match_observe(){
  out.add("\"leg\":\"%s\"",match->sudden_death()?"sudden_death":"vs");
  out.add(",\"prior_vs_source_frames\":%u",prior_vs_source_frames);
  out.add(",\"observed_player_source_slots\":[%u,%u]",slots[0],slots[1]);
+ out.add(",\"source_pad_errors\":[%d,%d,%d,%d]",
+         (int)HSD_PadCopyStatus[0].err,(int)HSD_PadCopyStatus[1].err,
+         (int)HSD_PadCopyStatus[2].err,(int)HSD_PadCopyStatus[3].err);
  if(match->sudden_death()){
   const auto& prior=prior_vs_terminal.match_end;
   out.add(",\"prior_vs_terminal\":{\"outcome\":%d,\"winners\":[",(int)prior.outcome);
@@ -642,6 +645,9 @@ const auto allocation=melee_web_gameplay_allocation();
  out.add(",\"model\":[%.3f,%.3f]",last_css_fighter_observation.model_x,last_css_fighter_observation.model_y);
  out.add(",\"target_bounds\":[%.3f,%.3f,%.3f,%.3f]",last_css_fighter_observation.target_left,last_css_fighter_observation.target_right,last_css_fighter_observation.target_top,last_css_fighter_observation.target_bottom);
  out.add("}");
+ out.add(",\"source_pad_errors\":[%d,%d,%d,%d]",
+   HSD_PadCopyStatus[0].err,HSD_PadCopyStatus[1].err,
+   HSD_PadCopyStatus[2].err,HSD_PadCopyStatus[3].err);
  out.add(",\"source_pad0\":{");
  out.add("\"err\":%d",HSD_PadCopyStatus[0].err);
  out.add(",\"button\":%u",static_cast<unsigned>(HSD_PadCopyStatus[0].button));

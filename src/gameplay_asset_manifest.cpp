@@ -103,21 +103,15 @@ const FighterCostume* source_costume(std::uint32_t fighter_kind,
 unsigned active_player_count(const MeleeWebMenuMatchSelection& selection)
 {
     unsigned active = 0;
-    while (active < MELEE_WEB_MENU_MAX_PLAYERS &&
-           selection.start.players[active].slot_type != Gm_PKind_NA)
-        ++active;
+    for (unsigned slot = 0; slot < MELEE_WEB_MENU_MAX_PLAYERS; ++slot)
+        active += selection.start.players[slot].slot_type != Gm_PKind_NA;
     return active;
 }
 
-void check_selection_common(const MeleeWebMenuMatchSelection& selection, bool sparse = false)
+void check_selection_common(const MeleeWebMenuMatchSelection& selection)
 {
     const auto& rules = selection.start.rules;
     unsigned active = active_player_count(selection);
-    if (sparse) {
-        active = 0;
-        for (unsigned i = 0; i < MELEE_WEB_MENU_MAX_PLAYERS; ++i)
-            active += selection.start.players[i].slot_type != Gm_PKind_NA;
-    }
     const unsigned player_count = selection.player_count != 0
                                       ? selection.player_count : active;
     if (player_count < MELEE_WEB_MENU_MIN_PLAYERS ||
@@ -129,12 +123,12 @@ void check_selection_common(const MeleeWebMenuMatchSelection& selection, bool sp
     // rule normalization or consume any source state here.
     if (selection.hud_layout != rules.x0_3)
         reject("Match selection has an unsupported HUD layout");
-    for (unsigned i = sparse ? MELEE_WEB_MENU_MAX_PLAYERS : active; i < GM_MAX_PLAYERS; ++i) {
+    for (unsigned i = MELEE_WEB_MENU_MAX_PLAYERS; i < GM_MAX_PLAYERS; ++i) {
         if (selection.start.players[i].slot_type != Gm_PKind_NA)
             reject("Match selection has an inactive source slot with data");
     }
 
-    for (unsigned i = 0; i < (sparse ? MELEE_WEB_MENU_MAX_PLAYERS : active); ++i) {
+    for (unsigned i = 0; i < MELEE_WEB_MENU_MAX_PLAYERS; ++i) {
         if (selection.start.players[i].slot_type == Gm_PKind_NA) continue;
         const auto& source = selection.start.players[i];
         const auto& compatibility = selection.players[i];
@@ -337,7 +331,7 @@ sudden_death_asset_names(const MeleeWebMenuHost* host,
     if (!melee_web_menu_host_sudden_death_selection(
             host,&continuation,&selection,error,sizeof(error))) reject(error);
     if (!selection.sudden_death) reject("Host did not resolve a Sudden Death selection");
-    check_selection_common(selection,true);
+    check_selection_common(selection);
     const auto* stage = melee_web_stage_content(selection.start.rules.stkind);
     if (!stage) reject("Sudden Death stage has no admitted source content");
     auto result = common_match_asset_names(selection);
@@ -487,8 +481,8 @@ results_asset_names(const MeleeWebMenuMatchSelection& selection)
                              "LbMcGame.usd", "NtMemAc.usd"})
         add_unique(result, name);
     {
-        const unsigned active = active_player_count(selection);
-        for (unsigned i = 0; i < active; ++i) {
+        for (unsigned i = 0; i < MELEE_WEB_MENU_MAX_PLAYERS; ++i) {
+            if (selection.start.players[i].slot_type == Gm_PKind_NA) continue;
             const auto* content =
                 melee_web_fighter_content(selection.start.players[i].ckind);
             for (unsigned identity = 0;

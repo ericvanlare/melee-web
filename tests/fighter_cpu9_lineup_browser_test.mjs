@@ -323,6 +323,38 @@ report.campaign_wall_bound=campaignRequested?{
   failure_code:null,evidence_status:'pending'}:null;
 const artifactReads=[];
 let browser,browserContext,page,driver,browserCdp,activeMatchIndex=null,contentionWorker=null;
+const ownedClosePromises=new Map();
+async function closeOwnedBrowserResources(){
+  report.cleanup??={};
+  for(const [name,resource,close] of [
+    ['driver',driver,owner=>owner.dispose()],
+    ['cdp',browserCdp,owner=>owner.detach()],
+    ['context',browserContext,owner=>owner.close()],
+    ['browser',browser,owner=>owner.close()],
+  ]){
+    if(!resource)continue;
+    if(!ownedClosePromises.has(resource))ownedClosePromises.set(resource,(async()=>{
+      try{await close(resource);report.cleanup[name]={status:name==='driver'?'disposed':'closed'};}
+      catch(error){
+        const message=String(error?.message||error);
+        report.cleanup[name]={status:'failed',error:message};
+        report.result='fail';process.exitCode=1;
+        report.failure??={message:`Owned ${name} cleanup failed: ${message}`};
+      }
+    })());
+    await ownedClosePromises.get(resource);
+  }
+}
+const onOwnedInterrupt=signal=>{
+  report.interruption??={signal,observed_at:new Date().toISOString()};
+  report.result='fail';process.exitCode=1;
+  report.failure??={message:`Browser route interrupted by ${signal}`,code:'owned_interruption'};
+  void closeOwnedBrowserResources();
+};
+const onSigint=()=>onOwnedInterrupt('SIGINT');
+const onSigterm=()=>onOwnedInterrupt('SIGTERM');
+process.on('SIGINT',onSigint);process.on('SIGTERM',onSigterm);
+
 let campaignWallBoundExceeded=false,campaignWallBoundTimer=null,wallBoundTask=null;
 function startControlledContention(){
   if(!controlledContention||contentionWorker)return;
@@ -2606,7 +2638,7 @@ try{
   if(!values['setup-only']&&!stageSetupOnly)report.result=resultsObserveAfterConfirmation?
     'results-observation-pass':'pass';
 }catch(error){
-  report.failure=campaignWallBoundExceeded?{
+  report.failure??=campaignWallBoundExceeded?{
     code:'campaign_wall_bound_exceeded',
     message:campaignWallBoundError().message,stack:error.stack}: {
     message:error.message,stack:error.stack};
@@ -2619,6 +2651,8 @@ try{
     await page.locator('body').textContent().then(text=>fs.writeFile(path.join(output,'page.txt'),text)).catch(()=>{});
   }
 }finally{
+  if(report.interruption){report.result='fail';process.exitCode=1;}
+  try{
   await stopControlledContention();
   if(campaignWallBoundTimer!==null){
     clearTimeout(campaignWallBoundTimer);campaignWallBoundTimer=null;
@@ -2654,11 +2688,16 @@ try{
     report.result='fail';process.exitCode=1;
     report.failure??={message:'Failed to retain served artifact provenance'};
   }
-  if(page&&!page.isClosed())driver?.dispose();
-  if(browserCdp)await browserCdp.detach().catch(()=>{});
-  if(browserContext)await browserContext.close();
-  else if(browser)await browser.close();
-  await fs.writeFile(path.join(output,'report.json'),JSON.stringify(report,null,2)+'\n');
+  }catch(error){
+    const message=String(error?.message||error);
+    report.final_evidence_error=message;
+    report.result='fail';process.exitCode=1;
+    report.failure??={message:`Final evidence collection failed: ${message}`};
+  }finally{
+    await closeOwnedBrowserResources();
+    process.off('SIGINT',onSigint);process.off('SIGTERM',onSigterm);
+    await fs.writeFile(path.join(output,'report.json'),JSON.stringify(report,null,2)+'\n');
+  }
 }
 if(!['pass','setup-only-pass','stage-setup-pass','results-observation-pass'].includes(report.result))
   throw Error(report.failure?.message||'Headless CPU9 lineup scenario failed');

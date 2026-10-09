@@ -462,3 +462,40 @@ test('actual competitive host observer checks the explicit runtime and open-dial
     assert.equal(value.error, expected);
   }
 });
+
+// Synthetic original source2 rows; no actual sparse Results run has occurred.
+async function syntheticSparseResults({wrongPort=false,missingRaw=false,wrongInactive=false}={}) {
+  const sparseRow=(options)=>{const row=makeTraceRow(rows.length,options);
+    for(const field of ['pads','source_consumed_pads'])row[field].forEach((pad,port)=>pad.err=[0,-1,0,-1][port]);
+    return row;};
+  const rows=[];rows.push(sparseRow({phase:2,statsPhase:0,confirmed:[0,0,0,0]}));
+  let phase=8,actions=0;
+  const append=options=>rows.push(sparseRow(options));
+  return confirmTwoHumanResults({sourcePorts:[0,2],deadlineAt:Date.now()+1000,
+    observeSample:async()=>({host:activeHost(phase),trace:makeTrace(rows)}),
+    wait:async()=>{},press:async key=>{
+      assert.equal(key,'Enter');actions++;
+      if(actions===1){append({phase:3,statsPhase:0,confirmed:[0,1,0,1],startPorts:[0]});
+        append({phase:3,statsPhase:2,confirmed:[0,1,0,1]});}
+      else append({phase:3,statsPhase:2,confirmed:[1,1,0,1],startPorts:[0]});},
+    pressSecond:async()=>{
+      append({phase:4,statsPhase:2,confirmed:[1,1,1,1],startPorts:[wrongPort?1:2]});
+      if(missingRaw)rows.at(-1).pads[2].button=0;
+      if(wrongInactive)rows.at(-1).source_consumed_pads[1].err=0;
+      phase=1;
+    }});
+}
+test('explicit sparse source0/2 Results retains source2 raw and copied Start and dense default stays strict',async()=>{
+ const result=await syntheticSparseResults();
+ assert.deepEqual(result.source_ports,[0,2]);
+ assert.deepEqual(result.statistics_ready.confirmed,[0,1,0,1]);
+ assert.deepEqual(result.p1_confirmation.confirmed,[1,1,0,1]);
+ assert.deepEqual(result.p2_confirmation.consumed_start_ports,[2]);
+ for(const args of [{wrongPort:true},{missingRaw:true},{wrongInactive:true}])await assert.rejects(syntheticSparseResults(args));
+ const row=makeTraceRow(0,{phase:2,statsPhase:0,confirmed:[0,0,0,0]});
+ for(const f of ['pads','source_consumed_pads'])row[f].forEach((p,i)=>p.err=[0,-1,0,-1][i]);
+ assert.deepEqual(resultsPadTraceFailures(makeTrace([row]),[0,2]),[]);
+ assert(resultsPadTraceFailures(makeTrace([row])).length>0,'Dense default must reject sparse connectivity');
+ assert.throws(()=>resultsPadTraceFailures(makeTrace([row]),[0,3]));
+ await assert.rejects(confirmTwoHumanResults({sourcePorts:[0,2]}),/source2 input/);
+});

@@ -8,12 +8,15 @@ sys.path.insert(0, str(ROOT / "reference-capture" / "dolphin"))
 from reference_observer_stream import read_status
 from reference_input_stream import validate_stream, validate_status
 from retail_input_plan import AUTHORED_PLAN_VERSION, validate_plan, verify_entry, verify_tick
+from original_source_ports import (DEFAULT_SOURCE_SLOTS, SPARSE_SOURCE_SLOTS,
+    declared_source_slots, inactive_source_slots, project_sources, signed_pad_errors)
 
 SCOPE = "sd_initialization_prefix"
 PCS = {"vs_entry": 0x8016e934, "vs_setup": 0x8016e9c4, "vs_exit": 0x8016ebbc,
        "vs_retired": 0x8039157c, "sd_entry": 0x8016ebc0, "sd_setup": 0x8016ec24,
        "input": 0x80377584, "menu_input": 0x80377584, "tick": 0x80390eb4,
-       "menu": 0x8034dd8c, "rules_ready": 0x8034dd8c, "items_ready": 0x8034dd8c}
+       "menu": 0x8034dd8c, "rules_ready": 0x8034dd8c,
+       "items_ready": 0x8034dd8c}
 ORDER = ("vs_entry", "vs_setup", "vs_exit", "vs_retired", "sd_entry", "sd_setup")
 
 
@@ -34,20 +37,33 @@ def disabled_rumble_copy(persistent):
     return result
 
 
-def profile_rumble_copy(persistent, preferences):
+def profile_rumble_copy(persistent, preferences, source_slots=DEFAULT_SOURCE_SLOTS):
     """gm_LoadRumbleEnabled/getPort for the declared unnamed two-human setup."""
     require(len(persistent) == 0x138 and len(preferences) == 4 and
             all(value in (0, 1) for value in preferences), "Original rumble context is invalid")
     result = disabled_rumble_copy(persistent)
-    for slot in range(4):
+    source_slots = declared_source_slots(source_slots)
+    if source_slots == DEFAULT_SOURCE_SLOTS:
+        # Preserve the accepted original 0/1 branch byte-for-byte in scope and
+        # permissiveness; sparse mapping is isolated below.
+        for slot in range(4):
+            base = 0x60 + slot * 0x24
+            if persistent[base + 1] == 0:
+                require(slot < 2 and persistent[base + 0xa] == 120,
+                        "Original rumble derivation requires declared unnamed humans")
+                raw_slot = persistent[base + 4]
+                port = slot if raw_slot == 0 else raw_slot - 1
+                require(port in range(4), "Original rumble source port is invalid")
+                result[base + 0xc] |= preferences[port] << 7
+        return result
+    for slot in source_slots:
         base = 0x60 + slot * 0x24
-        if persistent[base + 1] == 0:
-            require(slot < 2 and persistent[base + 0xa] == 120,
-                    "Original rumble derivation requires declared unnamed humans")
-            raw_slot = persistent[base + 4]
-            port = slot if raw_slot == 0 else raw_slot - 1
-            require(port in range(4), "Original rumble source port is invalid")
-            result[base + 0xc] |= preferences[port] << 7
+        require(persistent[base + 1] == 0 and persistent[base + 0xa] == 120,
+                "Original rumble derivation requires declared unnamed humans")
+        raw_slot = persistent[base + 4]
+        port = slot if raw_slot == 0 else raw_slot - 1
+        require(port == slot, "Original rumble source-slot mapping differs")
+        result[base + 0xc] |= preferences[port] << 7
     return result
 
 
@@ -73,15 +89,38 @@ def slices(payload):
     return result
 
 
+def consumed_queue_identity(payload, data):
+    """Bind a consumed PADStatus slot to its observed source queue location."""
+    metadata = {(item["tag"], item["flags"]): item for item in payload["slices"]}
+    queue_meta, slot_meta = metadata.get((2, 0)), metadata.get((3, 0))
+    queue = data.get((2, 0), b"")
+    require(queue_meta is not None and slot_meta is not None and
+            queue_meta["address"] == 0x804c1f78 and len(queue) == 0x0c and
+            len(data.get((3, 0), b"")) == 0x30,
+            "Sparse consumed PAD lacks its exact queue/slot observation")
+    count = queue[0]
+    base = int.from_bytes(queue[8:12], "big")
+    offset = slot_meta["address"] - base
+    require(count > 0 and base > 0 and offset >= 0 and offset % 0x30 == 0 and
+            offset // 0x30 < count,
+            "Sparse consumed PAD slot is outside its observed queue bounds")
+    return {"queue_base": base, "queue_count": count,
+            "queue_slot_index": offset // 0x30,
+            "queue_slot_address": slot_meta["address"]}
+
+
 class Receiver:
     """Consume every event in order; original phase decisions remain observed outputs."""
-    def __init__(self, plan, *, competitive_entry=False):
+    def __init__(self, plan, *, competitive_entry=False, sparse_pair=False):
         validate_plan(plan)
         require(plan["version"] == AUTHORED_PLAN_VERSION, "SD receiver requires authored v4")
-        require((plan["authored_recipe"]["version"] == 6) == competitive_entry,
-                "Competitive entry requires its separate explicit receiver scope")
+        require((plan["authored_recipe"]["version"] == 6) == competitive_entry and
+                (plan["authored_recipe"]["version"] == 7) == sparse_pair,
+                "Original entry receiver requires its separate explicit scope")
         self.competitive_entry = competitive_entry
-        self.phase_order = ("vs_entry", "vs_setup") if competitive_entry else ORDER
+        self.sparse_pair = sparse_pair
+        self.source_slots = (SPARSE_SOURCE_SLOTS if sparse_pair else DEFAULT_SOURCE_SLOTS)
+        self.phase_order = ("vs_entry", "vs_setup") if competitive_entry or sparse_pair else ORDER
         self.plan = plan
         self.seq = 0
         self.order = 0
@@ -96,6 +135,12 @@ class Receiver:
         self.last_clock_frame = 0
         self.vs_inventory = None
         self.cold_context_observed = None
+        self.setup_seen = False
+        self.sparse_source_samples = 0
+        self.sparse_prepress_neutral_samples = 0
+        self.witness_phase = 0
+        self.witness_records = []
+        self.sparse_source_records = []
 
     def clock(self, data):
         raw = data.get((14, 0), b"")
@@ -126,6 +171,8 @@ class Receiver:
         if event == "end":
             require(self.order == len(self.phase_order) and payload == {"status": "interrupted", "natural": False},
                     "SD prefix must end interrupted after SD setup, never legacy completion")
+            require(not self.sparse_pair or self.witness_phase == 2,
+                    "Sparse prefix ended before its exact press/release witness")
             require((getattr(self, "menu_consumed", 0) > 0) if self.competitive_entry else self.consumed > 0,
                     "Declared prefix lacks observed source input consumption")
             self.ended = True
@@ -143,11 +190,55 @@ class Receiver:
                     "SD menu input escaped preparation")
             return
         if name == "input":
-            require(0 < self.order < len(self.phase_order), "SD input escaped declared prefix")
+            require(0 < self.order < len(self.phase_order) or
+                    (self.sparse_pair and self.order == len(self.phase_order)),
+                    "SD input escaped declared prefix")
             raw = data.get((3, 0), b"")
             require(len(raw) == 0x30 and payload["consumed"] == self.consumed + 1,
                     "SD consumed sample is missing or repeated")
-            verify_tick(self.plan, self.consumed, [raw[p:p + 11].hex() for p in range(0, 48, 12)])
+            vector = [raw[p:p + 11].hex() for p in range(0, 48, 12)]
+            if self.sparse_pair:
+                witness = self.plan["authored_recipe"]["input_witness"]
+                release = witness["release"]
+                queue_identity = consumed_queue_identity(payload, data)
+                require(signed_pad_errors(raw) == witness["expected_pad_errors"],
+                        "Sparse consumed PAD error vector differs from source slots 0/2")
+                if self.order < len(self.phase_order):
+                    require(vector == release,
+                            "Sparse original VS setup consumed a non-neutral source vector")
+                else:
+                    self.sparse_source_samples += 1
+                    require(self.sparse_source_samples <= witness["max_source_samples"],
+                            "Sparse post-setup source PAD sample cap exhausted")
+                    sample = {"seq": row["seq"], "source_tick": row["source_tick"],
+                              "source_consumed": payload["consumed"],
+                              "menu_consumed": payload["menu_consumed"], "pc": payload["pc"],
+                              "raw_pad_slot_hex": raw.hex(), "raw_queue_hex": data[(2, 0)].hex(),
+                              "pads": vector, "pad_errors": signed_pad_errors(raw), **queue_identity}
+                    self.sparse_source_records.append(sample)
+                    if self.witness_phase == 0 and vector == release:
+                        self.sparse_prepress_neutral_samples += 1
+                        require(self.sparse_prepress_neutral_samples <= witness["max_prepress_neutral_samples"],
+                                "Sparse source press was preceded by too many neutral samples")
+                    elif self.witness_phase == 0:
+                        verify_tick(self.plan, 0, vector)
+                        self.witness_phase = 1
+                        self.witness_records.append({"kind": "distinct_press", "seq": row["seq"],
+                            "source_tick": row["source_tick"], "source_consumed": payload["consumed"],
+                            "pads": vector, "pad_errors": signed_pad_errors(raw), **queue_identity})
+                    else:
+                        require(self.witness_phase == 1,
+                                "Sparse source emitted input after its release witness")
+                        if vector == self.plan["frames"][0]:
+                            # Only the identical authored press may drain before
+                            # neutral; retain it without advancing the witness.
+                            self.witness_records.append({"kind": "held_press", **sample})
+                        else:
+                            verify_tick(self.plan, 1, vector)
+                            self.witness_phase = 2
+                            self.witness_records.append({"kind": "verified_release", **sample})
+            else:
+                verify_tick(self.plan, self.consumed, vector)
             self.consumed += 1
             return
         require(payload["consumed"] == self.consumed, "SD event skipped consumed input")
@@ -180,6 +271,8 @@ class Receiver:
         if name == "vs_setup":
             # Setup-time samples cannot satisfy the first active iteration.
             self.tick_consumed = self.consumed
+            if self.sparse_pair:
+                self.setup_seen = True
         if name == "vs_entry":
             normal, persistent = data.get((4, 0), b""), data.get((4, 1), b"")
             verify_entry(self.plan, normal.hex())
@@ -189,13 +282,14 @@ class Receiver:
             preferences = bytes(context["port_rumble_preferences"]) if context else b"\0" * 4
             require(data.get((54, 0)) == preferences,
                     "SD original profile port rumble preferences differ from declared recipe")
-            normalized = (profile_rumble_copy(persistent, preferences) if
+            source_slots = self.plan["authored_recipe"].get("source_slots", [0, 1])
+            normalized = (profile_rumble_copy(persistent, preferences, source_slots) if
                           self.plan["authored_recipe"]["version"] >= 5 else disabled_rumble_copy(persistent))
             normalized[2] |= 0x80
             normalized[4] |= 0x40
             for slot in range(6):
                 base = 0x60 + slot * 0x24
-                if slot < 2:
+                if slot in source_slots:
                     require(persistent[base + 0xa] == 120,
                             "SD profile contract requires original unnamed human ports")
                     if context:
@@ -203,15 +297,18 @@ class Receiver:
                         port = slot if source_slot == 0 else source_slot - 1
                         require((source_slot == context["human_source_slots"][slot])
                                 if "human_source_slots" in context else
-                                (port == context["human_source_ports_zero_based"][slot]),
+                                (port == context["human_source_ports_zero_based"][list(source_slots).index(slot)]),
                                 "SD original human source port mapping differs")
+                elif self.sparse_pair and slot < 4:
+                    require(persistent[base + 1] == 3,
+                            "Sparse original profile contains an undeclared active source slot")
             require(bytes(normalized) == normal, "Normal VS setup differs from source rule normalization")
-            raw_slots = [persistent[0x64 + slot * 0x24] for slot in range(2)]
+            raw_slots = [persistent[0x64 + slot * 0x24] for slot in source_slots]
             self.cold_context_observed = {
                 "port_rumble_preferences": list(preferences), "human_raw_slots": raw_slots,
                 "human_ports_zero_based": [slot if raw == 0 else raw - 1
-                                           for slot, raw in enumerate(raw_slots)],
-                "human_nametags": [persistent[0x6a + slot * 0x24] for slot in range(2)],
+                                           for slot, raw in zip(source_slots, raw_slots)],
+                "human_nametags": [persistent[0x6a + slot * 0x24] for slot in source_slots],
             }
         if self.competitive_entry and name == "vs_setup":
             # Ordinary VS initialization has no SD-only rules.x6=true write.
@@ -222,6 +319,17 @@ class Receiver:
                 require(len(head) == 0x100 and head[12] == slot and head[4:8] == b"\0"*4 and
                         data.get((8, slot)) == b"\4" and data.get((7, slot)) == struct.pack(">f",0),
                         "Competitive initialized fighter identity/stocks/damage differ")
+        if self.sparse_pair and name == "vs_setup":
+            require(data.get((4, 0)) == self.records["vs_entry"][(4, 0)],
+                    "Sparse setup-return payload differs from its exact entry setup")
+            for slot in self.source_slots:
+                head = data.get((5, slot), b"")
+                require(len(head) == 0x100 and head[12] == slot and head[4:8] == b"\0"*4 and
+                        data.get((8, slot)) == b"\4" and data.get((7, slot)) == struct.pack(">f", 0),
+                        "Sparse initialized source fighter/stocks/damage differ")
+            for slot in inactive_source_slots(self.source_slots):
+                require((5, slot) not in data and (8, slot) not in data and (7, slot) not in data,
+                        "Sparse setup emitted fighter state for an inactive source slot")
         if name == "vs_exit":
             raw = data.get((15, 0), b"")
             require(len(raw) == 0x448 and raw[4:7] == bytes((1, 1, 0)) and raw[0xd] == 2,
@@ -267,7 +375,10 @@ class Receiver:
                 not status["invalid"] and not status["error"], "SD observer prefix ending differs")
         native = validate_stream(input_path)
         validate_status(input_status, mode="record", events=native["events"])
-        return {"schema": "melee-web-sd-initialization-prefix", "version": 1,
+        if self.sparse_pair:
+            require(set(native["ports"]) == {"0", "2"},
+                    "Sparse native MWRI does not contain exactly original input channels 0/2")
+        report = {"schema": "melee-web-sd-initialization-prefix", "version": 1,
                 "scope": SCOPE, "recipe_sha256": self.plan["authored_recipe_sha256"],
                 "consumed_samples": self.consumed, "native_input": native,
                 "source_inventory": {"vs": self.vs_inventory,
@@ -275,6 +386,13 @@ class Receiver:
                 "natural_timeout_clock": self.timeout_clock,
                 "cold_original_context_observed": self.cold_context_observed,
                 "observer_completion": "interrupted-prefix", "whole_session_admission": False}
+        if self.sparse_pair:
+            report["input_provenance"] = {
+                    "mwri_channel_counts": native["ports"],
+                    "channel_to_source_slot": {"0": 0, "2": 2},
+                    "consumed_source": "full four-slot PadConsume queue record",
+                    "raw_poll_to_consume_correspondence": "unproven; no pairing asserted"}
+        return report
 
 
 def menu_state(data):
@@ -422,16 +540,19 @@ class RulesMenuReceiver(Receiver):
     omits it on a failed pointer read. No steering or readiness precedes an owner.
     """
     def __init__(self, plan, *, profile_campaign=False, full_route=False, items_probe=False,
-                 guarded_items=False, competitive_entry=False):
-        super().__init__(plan, competitive_entry=competitive_entry)
-        require(plan["authored_recipe"]["version"] == (6 if competitive_entry else 5 if full_route else 4 if profile_campaign else 3),
+                 guarded_items=False, competitive_entry=False, sparse_pair=False):
+        super().__init__(plan, competitive_entry=competitive_entry, sparse_pair=sparse_pair)
+        require(plan["authored_recipe"]["version"] == (7 if sparse_pair else 6 if competitive_entry else 5 if full_route else 4 if profile_campaign else 3),
                 "Rules probe recipe/profile campaign differs")
         self.full_route = full_route
         self.items_probe = items_probe
-        self.guarded_items = guarded_items
-        self.items_guard = items_probe or guarded_items
+        self.guarded_items = guarded_items or sparse_pair
+        self.sss_guard = guarded_items or sparse_pair
+        self.items_guard = items_probe or guarded_items or sparse_pair
         require(not competitive_entry or (profile_campaign and full_route and guarded_items and not items_probe),
                 "Competitive entry scope must own the full guarded original menu")
+        require(not sparse_pair or (profile_campaign and full_route and not items_probe and not competitive_entry),
+                "Sparse pair scope must own only its original full menu route")
         self.competitive_items = CompetitiveItemsProgress() if competitive_entry else None
         require(not guarded_items or (full_route and not items_probe), "Guarded full Items scope differs")
         self.items_ready = False
@@ -469,6 +590,9 @@ class RulesMenuReceiver(Receiver):
         if full_route:
             from sd_original_menu_plan import gci_sd_prefix_packet, route_pads
             packet = gci_sd_prefix_packet(7 if guarded_items else 5)
+            if sparse_pair:
+                from sd_original_menu_plan import gci_sparse_pair_packet
+                packet = gci_sparse_pair_packet()
             if competitive_entry:
                 from sd_original_menu_plan import gci_competitive_entry_packet
                 packet = gci_competitive_entry_packet()
@@ -487,7 +611,7 @@ class RulesMenuReceiver(Receiver):
     def accept(self, row):
         event, payload = row["event"], row["payload"]
         if event == "handshake":
-            require(payload.get("menu_probe") == ("competitive_entry" if self.competitive_entry else "items_row" if self.items_probe else "sd_prefix" if self.full_route else "rules_ready"),
+            require(payload.get("menu_probe") == ("sparse_pair" if self.sparse_pair else "competitive_entry" if self.competitive_entry else "items_row" if self.items_probe else "sd_prefix" if self.full_route else "rules_ready"),
                     "Rules probe scope differs")
             require(payload.get("profile_gci_sha256", "") == getattr(self, "profile_sha256", ""),
                     "Rules probe loaded-profile identity differs")
@@ -501,7 +625,7 @@ class RulesMenuReceiver(Receiver):
             if payload.get("name") == "vs_entry":
                 require(not self.guarded_items or self.items_committed,
                         "VS entry lacks observed committed Items progression")
-                require(not self.guarded_items or (self.sss_confirmation is not None and
+                require(not self.sss_guard or (self.sss_confirmation is not None and
                         self.sss_countdown == 0 and self.sss_confirmation_neutral),
                         "VS entry lacks observed SSS confirmation countdown/release")
                 require(self.final_css is not None and self.final_stage is not None and
@@ -510,6 +634,10 @@ class RulesMenuReceiver(Receiver):
                         [d["costume"] for d in self.final_css["doors"]] == [1, 0] and
                         self.final_stage["kind"] == 32 and self.final_stage["cooldown"] == 0,
                         "VS entry lacks observed final human CSS/FD acceptance prerequisites")
+                if self.sparse_pair:
+                    require(self.final_css["source_slots"] == [0, 2] and
+                            [player["source_slot"] for player in self.final_css["players"]] == [0, 2],
+                            "VS entry CSS lineup does not retain original source slots 0/2")
             return super().accept(row)
         require(not self.ended and self.started and row["seq"] == self.seq,
                 "Rules probe sequence/start differs")
@@ -551,18 +679,28 @@ class RulesMenuReceiver(Receiver):
             raw = data.get((3, 0), b"")
             require(len(raw) == 48, "Rules probe source PAD missing")
             previous_pad = self.last_pad
-            self.last_pad = [raw[p:p + 11].hex() for p in range(0, 48, 12)]
+            source_pad = [raw[p:p + 11].hex() for p in range(0, 48, 12)]
+            self.last_source_pad = source_pad
+            if self.sparse_pair:
+                from retail_input_plan import DISCONNECTED_PAD
+                require(all(source_pad[slot] == DISCONNECTED_PAD
+                            for slot in inactive_source_slots(self.source_slots)),
+                        "Sparse menu consumed input on inactive source slot 1 or 3")
+                self.last_pad = project_sources(source_pad, self.source_slots)
+            else:
+                self.last_pad = source_pad
             require(tuple(self.last_pad[:2]) in self.declared_menu_pads,
                     "Rules probe consumed undeclared menu PAD intent")
             from retail_input_plan import DISCONNECTED_PAD, NEUTRAL_PAD
-            require(self.last_pad[2:] == [DISCONNECTED_PAD] * 2,
-                    "Rules probe inactive controllers changed")
+            if not self.sparse_pair:
+                require(self.last_pad[2:] == [DISCONNECTED_PAD] * 2,
+                        "Rules probe inactive controllers changed")
             if self.competitive_entry and self.competitive_items.return_state is not None:
                 require(previous_pad is not None, "Competitive Items return lacks preceding PAD")
                 self.competitive_items.return_input(self.last_pad[:2], previous_pad[:2], row["source_tick"])
                 self.menu_consumed = count
                 return
-            if self.guarded_items and self.latest_menu.get("scene") == 9:
+            if self.sss_guard and self.latest_menu.get("scene") == 9:
                 from reference_versus_sequence_capture import raw_pad
                 select = [raw_pad(buttons=["A"]), NEUTRAL_PAD]
                 if self.sss_confirmation is not None:
@@ -653,7 +791,7 @@ class RulesMenuReceiver(Receiver):
                         self.menu_polls - self.items_entry_drain_start < 600,
                         "Items locked entry drain owner/poll cap differs")
             elif not self.items_entry_drain_closed and not self.items_up_seen and previous_menu == {
-                    "scene":1,"kind":13,"row":5,"value":0,"entering":0,"cooldown":0}:
+                    "scene":1,"kind":13,"row":5,"value":0,"entering":1 if self.sparse_pair else 0,"cooldown":0}:
                 from reference_versus_sequence_capture import raw_pad
                 from retail_input_plan import NEUTRAL_PAD
                 if (self.latest_menu.get("scene"), self.latest_menu.get("kind"),
@@ -713,8 +851,9 @@ class RulesMenuReceiver(Receiver):
         if self.full_route and not self.items_probe and name == "menu":
             require(self.sss_confirmation is None or self.latest_menu["scene"] == 9,
                     "SSS retirement owner changed before VS entry")
-            self.css = css_state(data) if self.latest_menu["scene"] == 8 else None
-            self.stage = stage_state(data, payload, confirmation=self.sss_confirmation is not None) if self.latest_menu["scene"] == 9 else None
+            self.css = css_state(data, self.source_slots) if self.latest_menu["scene"] == 8 else None
+            self.stage = stage_state(data, payload,
+                                     confirmation=self.sss_confirmation is not None) if self.latest_menu["scene"] == 9 else None
             require(self.latest_menu["scene"] != 8 or self.final_css is None or self.css is not None,
                     "CSS typed owner disappeared after construction")
             require(self.latest_menu["scene"] != 9 or self.final_stage is None or self.stage is not None,
@@ -800,7 +939,7 @@ class RulesMenuReceiver(Receiver):
 class GciRulesMenuReceiver(RulesMenuReceiver):
     """New profile campaign, with observed loaded fields at the reduced ready gate."""
     def __init__(self, plan, profile, *, full_route=False, items_probe=False, guarded_items=False,
-                 competitive_entry=False):
+                 competitive_entry=False, sparse_pair=False):
         import hashlib
         from sd_gci_profile import GCI_SHA256
         require(profile["sha256"] == GCI_SHA256 and
@@ -810,9 +949,34 @@ class GciRulesMenuReceiver(RulesMenuReceiver):
         self.profile = profile
         self.loaded_context = None
         super().__init__(plan, profile_campaign=True, full_route=full_route, items_probe=items_probe,
-                         guarded_items=guarded_items, competitive_entry=competitive_entry)
+                         guarded_items=guarded_items, competitive_entry=competitive_entry,
+                         sparse_pair=sparse_pair)
 
     def accept(self, row):
+        if self.sparse_pair and row["event"] == "progress" and row["payload"].get("name") == "vs_entry":
+            data = slices(row["payload"])
+            rules = data.get((38, 0), b"")
+            fields = {"mode": 2, "time_limit": 3, "stock_count": 4, "handicap": 5,
+                      "damage_ratio": 6, "stock_time_limit": 8,
+                      "friendly_fire": 9, "pause": 10}
+            address = next((s["address"] for s in row["payload"]["slices"]
+                            if s["tag"] == 38 and s["flags"] == 0), None)
+            expected_rules = self.plan["authored_recipe"]["expected_game_rules"]
+            require(self.loaded_context is not None and len(rules) == 0x18 and
+                    address == self.loaded_context["save_address"] - 0x18 and
+                    {key: rules[offset] for key, offset in fields.items()} == expected_rules,
+                    "Sparse original committed Rules fields differ from the frozen browser comparison")
+            save = data.get((39, 0), b"")
+            expected_setup = self.plan["authored_recipe"]["expected_setup"]
+            save_address = next((s["address"] for s in row["payload"]["slices"]
+                                 if s["tag"] == 39 and s["flags"] == 0), None)
+            require(len(save) == 0x55e8 and save_address == self.loaded_context["save_address"] and
+                    save[:5] == self.profile["save"][:5] and
+                    save[0x449:0x468] == self.profile["save"][0x449:0x468] and
+                    save[0x448] == (expected_setup["item_frequency"] & 0xff) and
+                    save[0x450:0x458].hex() == expected_setup["item_mask_hex"],
+                    "Sparse original entry changed loaded save/item preferences")
+            self.sparse_game_rules_hex = rules.hex()
         if self.competitive_entry and row["payload"].get("name") == "vs_entry":
             data = slices(row["payload"])
             rules = data.get((38,0), b"")
@@ -839,6 +1003,12 @@ class GciRulesMenuReceiver(RulesMenuReceiver):
             require(len(save) == 0x55e8 and len(rules) == 0x18 and
                     data.get((36, 0)) == bytes.fromhex("07ff") and
                     data.get((37, 0)) == bytes.fromhex("07ff"), "Loaded profile extents/unlocks differ")
+            if self.sparse_pair:
+                # Actual cold GCI Rules-ready bytes, before declared menu settings.
+                # The target stock/Items policy is checked separately at VS entry.
+                from sd_original_menu_plan import SPARSE_LOADED_RULES_HEX
+                require(rules.hex() == SPARSE_LOADED_RULES_HEX,
+                        "Sparse initial loaded GameRules differ from retained original profile")
             addresses = {(s["tag"], s["flags"]): s["address"] for s in row["payload"]["slices"]}
             root = addresses[(39, 0)] - 0x1868
             require(all(addresses[key] == root + offset for key, offset in
@@ -875,6 +1045,7 @@ class GciRulesMenuReceiver(RulesMenuReceiver):
                           items_frequency_right_pulses=self.items_rights,
                           opening_entry_drain_samples=self.items_entry_drain_samples,
                           opening_entry_neutral=self.items_entry_neutral)
+        if self.sss_guard:
             report.update(sss_confirmation=self.sss_confirmation,
                           sss_confirmation_countdown=self.sss_countdown_inventory,
                           sss_confirmation_neutral=self.sss_confirmation_neutral,
@@ -889,31 +1060,53 @@ class GciRulesMenuReceiver(RulesMenuReceiver):
                 natural_timeout_admission=False, results_css_admission=False,
                 source_inventory={"vs":{"count":0,"scope":"setup-before-loop"}},
                 full_sd_prefix_admission=False)
+        if self.sparse_pair:
+            report.update(schema="melee-web-original-sparse-p1-p3-setup-input-witness",
+                scope="sparse_pair_gci", menu_version=9,
+                source_slots=[0, 2], inactive_source_slots=[1, 3],
+                committed_game_rules_hex=self.sparse_game_rules_hex,
+                compared_setup=self.plan["authored_recipe"]["expected_setup"],
+                sparse_source_samples=self.sparse_source_samples,
+                sparse_prepress_neutral_samples=self.sparse_prepress_neutral_samples,
+                input_witness_phase=self.witness_phase,
+                input_witness=self.witness_records,
+                source_input_samples=self.sparse_source_records,
+                natural_terminal_admission=False, results_css_admission=False,
+                full_sd_prefix_admission=False, whole_session_admission=False)
         return report
 
 
-def css_state(data):
+def css_state(data, source_slots=DEFAULT_SOURCE_SLOTS):
     """Existing generic typed CSS inventory; absent during OnEnter is not readiness."""
     if (48, 0) not in data:
         return None
     live, doors = data[(48, 0)], data.get((44, 0), b"")
     require(len(live) == 0x148 and len(doors) == 0x90, "CSS typed owner extent differs")
+    source_slots = declared_source_slots(source_slots)
     result = {"players": [], "doors": [], "cursors": [], "models": []}
-    for slot in range(2):
+    if source_slots != DEFAULT_SOURCE_SLOTS:
+        result["source_slots"] = list(source_slots)
+    for slot in source_slots:
         cursor, model = data.get((43, slot), b""), data.get((47, slot), b"")
         require(len(cursor) == 0x14 and len(model) == 0x18, "Human CSS cursor/model is missing")
         x, y = struct.unpack(">ff", cursor[12:20])
         mx, my = struct.unpack(">ff", model[8:16])
         import math
         require(all(math.isfinite(v) for v in (x, y, mx, my)), "CSS coordinate is invalid")
-        result["cursors"].append({"port": cursor[4], "state": cursor[5], "held": cursor[6], "x": x, "y": y})
+        result["cursors"].append({"port": cursor[4],
+            "state": cursor[5], "held": cursor[6], "x": x, "y": y})
         result["models"].append({"owner": model[5], "x": mx, "y": my})
         base = 0x70 + slot * 0x24
-        result["players"].append({"character": live[base], "kind": live[base+1], "slot": live[base+4]})
+        result["players"].append({"character": live[base], "kind": live[base+1],
+                                   "slot": live[base+4]})
+        if source_slots != DEFAULT_SOURCE_SLOTS:
+            result["cursors"][-1]["source_slot"] = slot
+            result["players"][-1]["source_slot"] = slot
         base = slot * 0x24
         result["doors"].append({"kind": doors[base+11], "costume": doors[base+13],
                                 "icon": doors[base+14]})
-    require(live[0x18] == 0 and all(live[0x70 + slot*0x24 + 1] == 3 for slot in (2, 3)),
+    require(live[0x18] == 0 and all(live[0x70 + slot*0x24 + 1] == 3
+            for slot in inactive_source_slots(source_slots)),
             "CSS Teams/inactive-player contract differs")
     return result
 

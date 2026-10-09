@@ -429,19 +429,21 @@ struct GameplayWorld::Storage {
                 throw DatError("Source match context requires an active VS world and camera pool");
             for(unsigned i=0;i<selection.player_count;i++){
                 const auto& player=selection.source_players[i];
-                if(player.slot>=4||(!selection.sudden_death&&player.slot!=i)||
+                if(player.slot>=4||(!selection.source_start_data&&player.slot!=i)||
                    player.controller>=4||player.stocks<1||
                    player.stocks>(selection.opening_demo?99u:5u)||
                    player.fighter_kind!=selection.fighter_kinds[i]||
                    player.costume!=selection.costume_indices[i])
                     throw DatError("Source match settings differ from the selected VS players");
-                if(selection.sudden_death){
+                if(selection.source_start_data){
                     const auto& source=selection.source_start_data->players[player.slot];
                     const unsigned port=source.slot?source.slot-1u:player.slot;
+                    const auto* fighter=melee_web_fighter_content(source.ckind);
                     if(source.slot_type==Gm_PKind_NA||port!=player.slot||
+                       !fighter||fighter->fighter_kind!=player.fighter_kind||
                        player.controller!=port||source.stocks!=player.stocks||
                        source.color!=player.costume||source.sub_color!=player.sub_color)
-                        throw DatError("Sudden Death player context changed its source port identity");
+                        throw DatError("Source player context changed its original port identity");
                 }
             }
             match_context=melee_web_match_begin_players(selection.source_players.data(),

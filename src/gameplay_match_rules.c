@@ -36,8 +36,8 @@ static int fail(char* e,size_t n,const char* message){if(e&&n)snprintf(e,n,"%s",
 static int supported_team_setup(const StartMeleeData* start){
     if(!start)return 0;
     int count=0;
-    while(count<MELEE_WEB_VS_TEAM_MAX_PLAYERS&&
-          start->players[count].slot_type!=Gm_PKind_NA)count++;
+    for(int slot=0;slot<MELEE_WEB_VS_TEAM_MAX_PLAYERS;++slot)
+        count+=start->players[slot].slot_type!=Gm_PKind_NA;
     return melee_web_team_setup_supported(start,count,1);
 }
 int melee_web_match_timer_supported(const struct StartMeleeRules* rules)
@@ -51,7 +51,7 @@ int melee_web_match_timer_supported(const struct StartMeleeRules* rules)
            rules->time_limit % 60 == 0 && rules->x14 == 0;
 }
 static const char team_setup_refusal[]=
-    "Team Battle payload is outside the supported setups: two to four contiguous players, team colours 0-2, and at least two players on different teams";
+    "Team Battle payload is outside the supported setups: two to four active source players, team colours 0-2, and at least two players on different teams";
 static int supported_stock_rules(const StartMeleeData* start){
     return start->rules.match_kind==MatchKind_Stock&&start->rules.is_stock&&
            start->rules.is_vs&&melee_web_match_timer_supported(&start->rules)&&

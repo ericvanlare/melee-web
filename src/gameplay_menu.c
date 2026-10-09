@@ -559,14 +559,13 @@ int melee_web_menu_active_player_count(const StartMeleeData* start)
     if (start == NULL) {
         return 0;
     }
-    while (count < MELEE_WEB_MENU_MAX_PLAYERS &&
-           start->players[count].slot_type != Gm_PKind_NA) {
-        ++count;
+    for (int i = 0; i < MELEE_WEB_MENU_MAX_PLAYERS; ++i) {
+        if (start->players[i].slot_type != Gm_PKind_NA) ++count;
     }
     if (count < MELEE_WEB_MENU_MIN_PLAYERS) {
         return 0;
     }
-    for (int i = count; i < GM_MAX_PLAYERS; ++i) {
+    for (int i = MELEE_WEB_MENU_MAX_PLAYERS; i < GM_MAX_PLAYERS; ++i) {
         if (start->players[i].slot_type != Gm_PKind_NA) {
             return 0;
         }
@@ -642,8 +641,9 @@ static int css_selection_valid_internal(const CSSData* css,
         return 0;
     }
     if (!team_selection_valid(&css->vs.start, count, allow_same_team)) return 0;
-    for (i = 0; i < count; i++) {
+    for (i = 0; i < MELEE_WEB_MENU_MAX_PLAYERS; i++) {
         const PlayerInitData* player=&css->vs.start.players[i];
+        if (player->slot_type == Gm_PKind_NA) continue;
         const MeleeWebFighterContent* content=melee_web_fighter_content(player->ckind);
         if (!melee_web_player_selection_supported(player) ||
             (retained ? (player->stocks < 1 || player->stocks > 5)
@@ -672,7 +672,7 @@ static int css_selection_valid_internal(const CSSData* css,
             return 0;
         }
     }
-    for (i = count; i < GM_MAX_PLAYERS; i++) {
+    for (i = MELEE_WEB_MENU_MAX_PLAYERS; i < GM_MAX_PLAYERS; i++) {
         if (css->vs.start.players[i].slot_type != Gm_PKind_NA) {
             return 0;
         }
@@ -772,8 +772,12 @@ static int match_selection_valid(const StartMeleeData* start)
         return 0;
     }
     if (!team_selection_valid(start, count, 0)) return 0;
-    for (i = 0; i < count; ++i) {
+    for (i = 0; i < MELEE_WEB_MENU_MAX_PLAYERS; ++i) {
         const PlayerInitData* player = &start->players[i];
+        if (player->slot_type == Gm_PKind_NA) {
+            if (player->rumble_enabled) return 0;
+            continue;
+        }
         const MeleeWebFighterContent* content =
             melee_web_fighter_content(player->ckind);
         if (!melee_web_player_selection_supported(player) || player->stocks < 1 ||

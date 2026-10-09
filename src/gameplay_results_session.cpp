@@ -141,13 +141,11 @@ struct GameplayResultsSession::Storage {
         for (unsigned i = 0; i < 4; ++i) {
             const auto& player = result.match_end.player_standings[i];
             if (player.slot_type == Gm_PKind_NA) continue;
-            check(i == selection.player_count,
-                  "Results participants are not contiguous in source standings");
             const auto* fighter = melee_web_fighter_content(player.ckind);
             check(fighter && player.x3 < fighter->costumes,
                   "Results costume is unavailable");
-            selection.fighter_kinds[i] = fighter->fighter_kind;
-            selection.costume_indices[i] = player.x3;
+            selection.fighter_kinds[selection.player_count] = fighter->fighter_kind;
+            selection.costume_indices[selection.player_count] = player.x3;
             ++selection.player_count;
             for(unsigned identity_index=0;
                 identity_index<melee_web_fighter_kind_count(player.ckind);++identity_index){

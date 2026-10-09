@@ -210,12 +210,19 @@ def _validate_authored_plan(value):
     _integer(value['first_frame'], -123, -123)
     _integer(value['source_stage'], 32, 32)
     _integer(value['active_player_count'], 2, 2)
+    source_slots = declaration.get('source_slots', [0, 1])
+    controlled_ports = [slot + 1 for slot in source_slots]
     for key, expected in (('source_characters', [8, 8]),
-                          ('source_player_types', [0, 0]), ('controlled_ports', [1, 2])):
+                          ('source_player_types', [0, 0]), ('controlled_ports', controlled_ports)):
         if (not isinstance(value[key], list) or
                 any(type(item) is not int for item in value[key]) or value[key] != expected):
             raise ValueError('Authored input plan differs from its declared ' + key)
     frames = value['frames']
+    if declaration['version'] == 7:
+        witness = declaration['input_witness']
+        if (not isinstance(frames, list) or frames != [witness['press'], witness['release']]):
+            raise ValueError('Sparse input plan differs from its fixed press/release witness')
+        return value
     if not isinstance(frames, list) or len(frames) != STARTUP_TICKS + MATCH_TICKS:
         raise ValueError('Authored input plan requires its complete fixed sample cap')
     expected = [NEUTRAL_PAD, NEUTRAL_PAD, DISCONNECTED_PAD, DISCONNECTED_PAD]
@@ -344,11 +351,15 @@ def verify_entry(plan, start_hex):
         # Reuse the checked ordinary-VS setup decoder rather than inventing a
         # second packed-bit interpretation or accepting only a matchup subset.
         from retail_setup_validation import _decode_setup
-        actual = _decode_setup(start_hex, competitive_profile=plan['authored_recipe']['version'] == 6)
+        recipe = plan['authored_recipe']
+        source_slots = recipe.get('source_slots')
+        actual = _decode_setup(start_hex,
+            competitive_profile=recipe['version'] in (6, 7), source_slots=source_slots)
         raw = bytes.fromhex(start_hex)
-        if any(raw[0x61 + slot * 0x24] != 3 for slot in range(2, 6)):
-            raise ValueError('Authored setup requires all inactive source slots to be NA')
-        if actual != plan['authored_recipe']['expected_setup']:
+        active = set(source_slots or (0, 1))
+        if any(raw[0x61 + slot * 0x24] != 3 for slot in range(6) if slot not in active):
+            raise ValueError('Authored setup requires every undeclared source slot to be NA')
+        if actual != recipe['expected_setup']:
             raise ValueError('Retail menu selection differs from the authored setup declaration')
         return
     raw = bytes.fromhex(start_hex)

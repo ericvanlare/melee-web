@@ -70,6 +70,9 @@ class GameplayMenuContractTests(OwnedWorkspaceTests):
             capture_output=True, text=True, timeout=20,
         )
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("CSS reader routing: original port2 retained, foreign cursor/port4 rejected, dense neutral unchanged", run.stdout)
+        self.assertIn("sparse-port admission: dense count=2 CSS=1 SSS=1; "
+                      "P1+P3 count=2 CSS=1 SSS=1; source ports 0/2 retained", run.stdout)
         self.assertIn("native menu lifecycle contract trace: passed", run.stdout)
 
 

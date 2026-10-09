@@ -40,6 +40,7 @@ import {
   runtimeDiagnosticsFailures,
 } from './vs_rules_timeout_route_helpers.mjs';
 import {runSuddenDeathBrowserRoute,validateFinalSdCapture} from './vs_sudden_death_browser_route.mjs';
+import {runSparseMarioBrowserPrefix,installSparseVirtualController,validateFinalSparseCapture} from './vs_sparse_mario_browser_route.mjs';
 
 const options = Object.fromEntries(['url', 'disc', 'out', 'playwright', 'runtime-wasm-sha256']
   .map(name => [name, {type: 'string'}]));
@@ -50,16 +51,25 @@ options['stage-only'] = {type: 'boolean', default: false};
 options['no-contest-only'] = {type: 'boolean', default: false};
 options['team-battle'] = {type: 'boolean', default: false};
 options['team-setup-only'] = {type: 'boolean', default: false};
+options['sparse-mario-route'] = {type: 'boolean', default: false};
+options['sparse-mario-css-only'] = {type: 'boolean', default: false};
+options['sparse-mario-prefix'] = {type: 'boolean', default: false};
 options['competitive-profile-only'] = {type: 'boolean', default: false};
 options['competitive-match-start-only'] = {type: 'boolean', default: false};
 options['competitive-timeout-route'] = {type: 'boolean', default: false};
 options['sudden-death-route'] = {type: 'boolean', default: false};
 const {values} = parseArgs({options, strict: true});
 const suddenDeathRoute = values['sudden-death-route'];
+const sparseCssOnly=values['sparse-mario-css-only'];
+const sparseFullRoute=values['sparse-mario-route'];
+assert([sparseCssOnly,values['sparse-mario-prefix'],sparseFullRoute].filter(Boolean).length<=1,'Sparse modes are exclusive');
+const sparseMarioPrefix = values['sparse-mario-prefix']||sparseCssOnly||sparseFullRoute;
+if(sparseMarioPrefix && ['sudden-death-route','menu-only','rules-items-only','css-sss-only','stage-only','no-contest-only','team-battle','team-setup-only','competitive-profile-only','competitive-match-start-only','competitive-timeout-route'].some(name=>values[name]))
+  throw Error('Sparse prefix selects one exclusive route');
 if(suddenDeathRoute && ['menu-only','rules-items-only','css-sss-only','stage-only','no-contest-only','team-battle','team-setup-only','competitive-profile-only','competitive-match-start-only','competitive-timeout-route'].some(name=>values[name]))
   throw Error('SD selects one full route; reduced/team route flags are incompatible');
-if(suddenDeathRoute && !/^[a-f0-9]{64}$/.test(values['runtime-wasm-sha256']||''))
-  throw Error('SD requires the frozen --runtime-wasm-sha256 identity');
+if((suddenDeathRoute||sparseMarioPrefix) && !/^[a-f0-9]{64}$/.test(values['runtime-wasm-sha256']||''))
+  throw Error('Declared route requires the frozen --runtime-wasm-sha256 identity');
 const menuOnly = values['menu-only'];
 const rulesItemsOnly = values['rules-items-only'];
 const cssSssOnly = values['css-sss-only'];
@@ -69,6 +79,8 @@ const competitiveProfileOnly = values['competitive-profile-only'];
 const competitiveMatchStartOnly = values['competitive-match-start-only'];
 const competitiveTimeoutRoute = values['competitive-timeout-route'];
 const competitiveSourceRoute = competitiveMatchStartOnly || competitiveTimeoutRoute;
+if(sparseMarioPrefix && (competitiveProfileOnly || competitiveSourceRoute))
+  throw Error('Sparse and competitive modes are exclusive');
 const teamSetupOnly = values['team-setup-only'];
 const teamBattle = values['team-battle'] || teamSetupOnly;
 if (teamSetupOnly && values['team-battle'])
@@ -114,7 +126,7 @@ const cleanupResults = new Map();
 let reportWriteError = null;
 const report = {
   schema: 'melee-web-vs-rules-item-menu-browser-v1',
-  mode: suddenDeathRoute ? 'source-natural-timeout-sudden-death-results-css'
+  mode: sparseFullRoute ? 'source-sparse-mario-elimination-results-css' : sparseCssOnly ? 'source-sparse-mario-css-only-reducer' : sparseMarioPrefix ? 'source-sparse-mario-rendered-prefix' : suddenDeathRoute ? 'source-natural-timeout-sudden-death-results-css'
     : competitiveMatchStartOnly ? 'source-competitive-normalized-match-start-prefix'
     : competitiveTimeoutRoute ? 'source-competitive-natural-timeout-results-route'
     : competitiveProfileOnly ? 'source-competitive-rules-profile-preflight'
@@ -125,7 +137,7 @@ const report = {
     : rulesItemsOnly ? 'source-rules-items-entry-reproducer'
     : cssSssOnly ? 'source-css-to-sss-cooldown-reproducer'
     : menuOnly ? 'source-menu-boundary-reproducer' : 'source-rules-items-match-route',
-  scope: suddenDeathRoute
+  scope: sparseFullRoute ? 'Virtual Gamepad P3/keyboard P1; original sparse Mario CSS/SSS, live elimination and canonical Results/CSS. Functional only; no physical input, original comparison, pixels/PCM or timing acceptance.' : sparseCssOnly ? 'Rendered original sparse CSS and exact copied/raw PAD observation then Eject only; no SSS/world, physical input or timing acceptance.' : sparseMarioPrefix ? 'Virtual Browser Gamepad P3 and keyboard P1; original sparse CSS/SSS to a short ordinary Mario/FD prefix and Eject. No Results, original comparison, physical input or timing acceptance.' : suddenDeathRoute
     ? 'Original Rules one-minute four-stock two-human Mario/FD; natural timeout, active SD live input elimination, typed original Results and CSS/Eject. Zero timing-pause recovery. Functional only; no reference, timing, physical input or PCM acceptance.'
     : competitiveMatchStartOnly
     ? 'Headless original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS; enable P2 through Controls and require the original CSS CPU/empty/Human transitions before Start; select Final Destination through original SSS, check normalized two-human Mario stock settings once at the first available observation in the bounded 180–240 source-frame window (about a 3-second prefix), then Eject. No 8-minute match, timeout, Results, retail comparison, or full-route acceptance claim.'
@@ -509,7 +521,7 @@ const resumeTimingPause = async label => {
     pause.status = 'failed_route';
     throw Error(`${label}: competitive route stops on a runtime timing disruption: ${state.message}`);
   }
-  if(suddenDeathRoute)throw Error(`${label}: timing disruption; SD route forbids recovery`);
+  if(suddenDeathRoute||sparseMarioPrefix)throw Error(`${label}: timing disruption; SD route forbids recovery`);
   const control = await page.evaluate(() => {
     const button = document.querySelector('#pause');
     return {found: Boolean(button), enabled: Boolean(button && !button.disabled),
@@ -1335,10 +1347,11 @@ const runCompetitiveTimeoutRoute = async (initialMatch, sourcePreferenceMaskHex,
 let nativeSessionActive = false;
 try {
 route: {
+  if(sparseMarioPrefix)await installSparseVirtualController(page);
   const response = await page.goto(values.url, {timeout: 30000});
   assert.equal(response?.status(), 200);
   await driver.waitForImport();
-  if(suddenDeathRoute){
+  if(suddenDeathRoute||sparseMarioPrefix){
     const response=await page.request.get(new URL('gameplay_menu_browser.wasm',values.url).href);
     assert.equal(response.status(),200);
     const hash=createHash('sha256').update(await response.body()).digest('hex');
@@ -1351,7 +1364,7 @@ route: {
   await page.locator('#player-two-source').selectOption('off');
   await page.locator('#keyboard-layout').selectOption('boxx');
   await page.locator('#controls-close').click();
-  report.checks.push('fresh isolated browser context has no user profile; native source runtime defaults to Everything unlocked; B0XX P1 and no physical controller');
+  report.checks.push(sparseMarioPrefix?'Fresh isolated browser context; Everything unlocked; declared P1 keyboard/raw diagnostic PAD0 and P3 virtual Gamepad through Controls, ports1/3 Off; no physical hardware claim':'fresh isolated browser context has no user profile; native source runtime defaults to Everything unlocked; B0XX P1 and no physical controller');
 
   await driver.selectDisc(discPath);
   await driver.waitForStart();
@@ -1370,6 +1383,12 @@ route: {
   await driver.launch();
   await waitMessage('Original character select', 'initial CSS');
   await shot('00-initial-css');
+  if(sparseMarioPrefix){
+    await runSparseMarioBrowserPrefix({cssOnly:sparseCssOnly,fullRoute:sparseFullRoute,page,report,driver,press,chord,current,ensureNoError,resumeTimingPause,
+      observeSource,observeCssSetup,sourcePadSample,sourcePadTap,waitForNoQueuedPad,waitMessage,waitPhase,
+      waitMenu,enterVsRules,moveMenuCursor,waitItemInputReady,waitItemsCursor,waitItemFrequency,shot,verifyTeardown});
+    nativeSessionActive=false;break route;
+  }
   if(suddenDeathRoute){
     await runSuddenDeathBrowserRoute({page,report,driver,press,chord,current,ensureNoError,
       resumeTimingPause,observeSource,observeMatch,observeCssSetup,sourcePadSample,sourcePadTap,
@@ -1964,10 +1983,11 @@ route: {
       report.failureCleanup = {status: 'failed', message: redactDiscPath(error.message)};
     }
   }
-  if(suddenDeathRoute){
+  if(suddenDeathRoute||sparseMarioPrefix){
     try{
       report.callbackCapture=await readRuntimeDiagnosticsCapture(page);
-      validateFinalSdCapture(report.callbackCapture);
+      if(sparseMarioPrefix)validateFinalSparseCapture(report.callbackCapture,{cssOnly:sparseCssOnly,fullRoute:sparseFullRoute});
+      else validateFinalSdCapture(report.callbackCapture);
     }catch(error){
       report.callback_capture_error=redactDiscPath(error.message);
       if(!report.callbackCapture)report.callbackCapture={status:'unavailable',error:report.callback_capture_error};

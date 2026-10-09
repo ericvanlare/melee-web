@@ -3,18 +3,21 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {parseArgs} from 'node:util';
+import {configureSparseControllerSettings,readSparseControllerReady} from './sparse_controller_settings_driver.mjs';
 import {mayflashMacPad, standardPad} from './controller-fixtures.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 const {values}=parseArgs({options:{
   ...Object.fromEntries(['url','playwright','out'].map(n=>[n,{type:'string'}])),
   headed:{type:'boolean',default:false},
+  'sparse-controls-only':{type:'boolean',default:false},
 }});
 if(!values.url||!values.playwright||!values.out)throw Error('Use --url ORIGIN --playwright PACKAGE_DIR --out LOCAL_DIR [--headed]');
 const {chromium,browser:launchOptions}=await loadBrowserTools(values.playwright);
 const browser=await chromium.launch(browserLaunchOptions(launchOptions,{headed:values.headed}));
 const page=await browser.newPage({viewport:{width:1100,height:800}}),errors=[];
 page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);
-const pad=mayflashMacPad();pad.axes[3]=32*2/255-1;pad.axes[4]=34*2/255-1;
+const pad=values['sparse-controls-only']?standardPad(0,'Sparse Mario authored standard Gamepad'):mayflashMacPad();
+if(!values['sparse-controls-only']){pad.axes[3]=32*2/255-1;pad.axes[4]=34*2/255-1;}
 await page.addInitScript(p=>{
   window.testPad=p;
   Object.defineProperty(navigator,'platform',{value:'MacIntel'});
@@ -25,8 +28,35 @@ const ready=()=>page.locator(development?'#disc:not([disabled])':'#choose-disc:n
 const rows=()=>page.evaluate(()=>Module.meleeControllers.inspect());
 const choose=(port,source)=>page.getByLabel(`Player ${port} input source`,{exact:true}).selectOption(source);
 const waitSource=(port,mode)=>page.waitForFunction(({port,mode})=>Module.meleeControllers.getPortSource(port)===mode,{port,mode});
+const reducedReport={scope:'Before-disc actual Controls sparse virtual-device assignment and deliberate absent-selector cleanup only; no disc/gameplay/physical-input claim',result:'pending',checks:{},cleanup:{}};
+let primaryError,closing;
+function closeReducedResources(){
+ return closing??=(async()=>{
+  for(const [name,resource] of [['context',page.context()],['browser',browser]]){
+   try{await resource.close();reducedReport.cleanup[name]='closed';}
+   catch(error){reducedReport.cleanup[name]=String(error);reducedReport.result='fail';if(!primaryError)primaryError=error;}
+  }
+ })();
+}
+const onReducedSignal=()=>{primaryError??=Error('Reduced Controls interrupted by owned supervisor');
+ reducedReport.result='fail';void closeReducedResources();};
+if(values['sparse-controls-only'])for(const signal of ['SIGTERM','SIGINT'])process.once(signal,onReducedSignal);
 try{
+ route:{
   await fs.mkdir(values.out,{recursive:true});await page.goto(values.url);await ready();await page.locator('canvas').focus();
+  if(values['sparse-controls-only']){
+   assert(development,'Reduced sparse Controls requires the development player');
+   reducedReport.checks.assignment={};
+   await configureSparseControllerSettings({page,retention:reducedReport.checks.assignment});
+   await page.screenshot({path:path.join(values.out,'sparse-controls-assigned.png'),fullPage:true});
+   reducedReport.checks.deliberateFailure={};
+   await assert.rejects(configureSparseControllerSettings({page,retention:reducedReport.checks.deliberateFailure,
+     deviceLabel:'Player port for deliberately absent reducer device',selectorTimeout:1000}),/Timeout/);
+   assert.equal(reducedReport.checks.deliberateFailure.dialogClosed,true);
+   await page.waitForFunction(readSparseControllerReady,undefined,{timeout:10000});
+   reducedReport.checks.afterFailureRows=await rows();
+   assert.deepEqual(errors,[]);reducedReport.result='pass';break route;
+  }
   assert(await page.locator('#controls-dialog').isHidden());
   assert.equal(await page.locator('[data-controller-panel]').count(),0,'do not mount the detailed setup UI during normal play');
   assert.equal((await rows())[0].active,true,'nonzero Mayflash trigger rest still auto-activates');
@@ -145,7 +175,25 @@ try{
   assert.deepEqual(errors,[]);
   await fs.writeFile(path.join(values.out,'report.json'),JSON.stringify({scope:`${development?'Development':'Public'} player default controller activation, shared compact settings, four independent controller ports, off and reconnect, persisted four-port choice, two-player legacy compatibility, B0XX and restored input; authored Gamepad samples, no disc/gameplay or physical-controller acceptance`,result:'pass',browser_mode:values.headed?'headed':'headless',errors},null,2));
   console.log(`${development?'Development':'Public'} player shared controller settings pass.`);
+ }
 }catch(error){
-  await fs.writeFile(path.join(values.out,'failure.txt'),String(error)+'\n'+await page.locator('body').innerText());
-  await page.screenshot({path:path.join(values.out,'failure.png'),fullPage:true});throw error;
-}finally{await browser.close();}
+  primaryError??=error;reducedReport.result='fail';reducedReport.failure=String(primaryError);
+  if(values['sparse-controls-only']){
+   try{await fs.writeFile(path.join(values.out,'failure.txt'),String(error)+'\n'+await page.locator('body').innerText());}
+   catch(diagnosticError){reducedReport.bodyError=String(diagnosticError);}
+   try{await page.screenshot({path:path.join(values.out,'failure.png'),fullPage:true});}
+   catch(diagnosticError){reducedReport.screenshotError=String(diagnosticError);}
+  }else{
+   await fs.writeFile(path.join(values.out,'failure.txt'),String(error)+'\n'+await page.locator('body').innerText());
+   await page.screenshot({path:path.join(values.out,'failure.png'),fullPage:true});
+  }
+  throw error;
+}finally{
+ if(values['sparse-controls-only']){
+  await closeReducedResources();
+  for(const signal of ['SIGTERM','SIGINT'])process.removeListener(signal,onReducedSignal);
+  try{await fs.writeFile(path.join(values.out,'report.json'),JSON.stringify(reducedReport,null,2));}
+  catch(error){if(!primaryError)primaryError=error;}
+  if(primaryError)throw primaryError;
+ }else await browser.close();
+}
