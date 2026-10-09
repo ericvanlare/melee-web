@@ -1,0 +1,1101 @@
+{
+  "schema": "melee-web-competitive-rules-profile-preflight-v1",
+  "status": "competitive-profile-and-natural-timeout-browser-route-with-scoped-original-comparison",
+  "issue": 292,
+  "date": "2026-10-08",
+  "labels": [
+    "Compiled",
+    "Source identified",
+    "Browser exercised"
+  ],
+  "scope": "Original CSS -> Main/VS/Rules/Items/Rules Plus -> CSS, followed by Eject. Exact GameRules and31 item row mappings; raw CSS payload is provenance only. No SSS, gameplay, timeout or Results.",
+  "producer": {
+    "source": "21ac2ff43855e4a27b937aa474bdc46141028754",
+    "runtime_source": "049f9a5bec9da99cda2e04f31fb269ebcb4db04c",
+    "main_base": "41e7ae2bf0b54c49cbb2b1b9ae79c9c63a2c76cb",
+    "configuration": "Release",
+    "browser": "Headless installed Chrome154.0.8037.99",
+    "playwright": "1.62.1",
+    "machine": "Apple Silicon desktop Mac mini",
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "build_manifest_sha256": "f9165b654f0599123997bbb53e1b9ff659343d33626cfaad8215d470a4ef83c6",
+    "build_file_count": 46,
+    "runtime_build_log_sha256": "a65793cb39bf8d52ba9bba35bc03b0380a81c337101e1ab37a8f711e7115c649"
+  },
+  "profile": {
+    "mode": "stock",
+    "stocks": 4,
+    "timer_minutes": 8,
+    "item_frequency": -1,
+    "all_31_item_switches_off": true,
+    "pause_enabled": false,
+    "friendly_fire": true,
+    "damage_ratio_menu_value": 10,
+    "handicap": 0
+  },
+  "observed_final_css": {
+    "rules": {
+      "mode": 1,
+      "stock_count": 4,
+      "time_limit": 2,
+      "stock_time_limit": 8,
+      "handicap": 0,
+      "damage_ratio": 10,
+      "friendly_fire": 1,
+      "pause": 0
+    },
+    "items": {
+      "frequency": -1,
+      "mask_hex": "0000000010000000"
+    },
+    "selection": {
+      "valid": true,
+      "scene": 1,
+      "provenance": "raw_css_vs_start",
+      "match_kind": 0,
+      "timer_enabled": 0,
+      "time_limit_seconds": 0,
+      "friendly_fire": 0,
+      "disable_pausing": 0,
+      "damage_ratio_bits": "3f800000",
+      "item_frequency": 2,
+      "item_mask_hex": "ffffffffffffffff",
+      "player_stocks": [
+        0,
+        0
+      ]
+    }
+  },
+  "item_rows": [
+    {
+      "cursor": 0,
+      "preference_bit": 5,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 1,
+      "preference_bit": 18,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 2,
+      "preference_bit": 10,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 3,
+      "preference_bit": 30,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 4,
+      "preference_bit": 13,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 5,
+      "preference_bit": 24,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 6,
+      "preference_bit": 3,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 7,
+      "preference_bit": 14,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 8,
+      "preference_bit": 23,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 9,
+      "preference_bit": 27,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 10,
+      "preference_bit": 1,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 11,
+      "preference_bit": 9,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 12,
+      "preference_bit": 8,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 13,
+      "preference_bit": 7,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 14,
+      "preference_bit": 21,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 15,
+      "preference_bit": 4,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 16,
+      "preference_bit": 6,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 17,
+      "preference_bit": 2,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 18,
+      "preference_bit": 15,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 19,
+      "preference_bit": 0,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 20,
+      "preference_bit": 17,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 21,
+      "preference_bit": 11,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 22,
+      "preference_bit": 31,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 23,
+      "preference_bit": 26,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 24,
+      "preference_bit": 20,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 25,
+      "preference_bit": 25,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 26,
+      "preference_bit": 16,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 27,
+      "preference_bit": 22,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 28,
+      "preference_bit": 19,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 29,
+      "preference_bit": 29,
+      "enabled": 0,
+      "initial_enabled": 1
+    },
+    {
+      "cursor": 30,
+      "preference_bit": 12,
+      "enabled": 0,
+      "initial_enabled": 1
+    }
+  ],
+  "item_mask": {
+    "observed_preference_hex": "0000000010000000",
+    "authored_switch_bits_hex": "00000000efffffff",
+    "unmapped_bit28": "Preserved from initial preferences; not a selectable row.",
+    "source": "Pinned b43912cc mn_8022E978 applies a signed32 complemented mask per authored row. The verified original DOL clear path uses slw/nor/srawi31 to widen it; clearing row22/preferencebit31 also clears upper32.",
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "static_receipt_sha256": "b86b3d563fac07fa7913c05a10813416e1c3ddb4c254b9c4800dfa1010ce1dd5",
+    "limit": "Static original setter arithmetic only, not a whole-route original comparison."
+  },
+  "validation": {
+    "focused_helper_tests": {
+      "passed": 5,
+      "failed": 0
+    },
+    "supervisor_mocked_main_tests": 12,
+    "harness_cleanup_mock_controls": 4,
+    "actual_browser_result": "pass",
+    "browser_errors": 0,
+    "timing_pause_events": 0,
+    "timing_resume_events": 0,
+    "source_observations": 175,
+    "match_observations": 0
+  },
+  "match_start_prefix": {
+    "status": "passed_bounded_normalized_match_start_prefix",
+    "scope": "Original CSS \u2192 Main/VS/Rules/Items/Rules Plus \u2192 CSS \u2192 original SSS Final Destination \u2192 two-Human Mario match; read-only normalized observation at source frame 180, then Eject. No stock loss, timeout, Results, or CSS return after Results.",
+    "producer": {
+      "source_head": "01802d219fd659ac0db94216c01bc4b2db67d7c6",
+      "source_tree": "ca336347821b27cae4b3749353fe029c100ef519",
+      "runtime_producer": "f35cedbc8df3a8377d849e9177d188aada308b69",
+      "configuration": "Release",
+      "browser": "Headless installed Chrome 154.0.8037.99"
+    },
+    "observed": {
+      "source_frame": 180,
+      "match_kind": "stock",
+      "stage": "Final Destination",
+      "timer_seconds": 480,
+      "stocks": [
+        4,
+        4
+      ],
+      "players": [
+        "Human Mario",
+        "Human Mario"
+      ],
+      "source_ports": [
+        0,
+        1
+      ],
+      "raw_source_slot_fields": [
+        0,
+        0
+      ],
+      "pause_disabled": true,
+      "friendly_fire": true,
+      "damage_ratio_bits": "3f800000",
+      "item_frequency": -1,
+      "normalized_item_mask_hex": "fffffff80000000f",
+      "match_active": true,
+      "timing_pause_events": 0,
+      "browser_errors": 0,
+      "screenshots_rehashed": 11,
+      "eject_cleanup": "source owners, scoped assets, audio banks and browser resources cleared"
+    },
+    "private_result_receipt": {
+      "locator": "Private verified external NVMe run rules-normalized-match-start-20261008-v2; normalized-match-start-prefix-result-receipt-v1.json",
+      "sha256": "530526447fc451d4dd2fb3d1c3fbb9b8154a1aaeeba43d44c121b6992593a614"
+    },
+    "raw_report_wording_defect": "The reused profile-preflight check text still says no match or timeout ran. The structured normalized_match and final check record the active frame-180 prefix. Raw report is preserved; see the private receipt."
+  },
+  "cleanup": {
+    "eject": "Source owner/menu/match/Results/prize/scopedassets false; objects/processes/files/bytes/caches zero.",
+    "playwright": {
+      "driver": {
+        "status": "disposed"
+      },
+      "context": {
+        "status": "closed"
+      },
+      "browser": {
+        "status": "closed"
+      }
+    },
+    "node_exit": 0,
+    "exact_owned_server_exit": -15,
+    "server_port_reusable": true,
+    "method": "Owned direct subprocess handles and Playwright only; no process groups or process-name scans.",
+    "audio": "Speakers muted; Web Audio processing retained."
+  },
+  "retained_evidence": {
+    "locator": "Private verified external storage run rules-profile-browser-profile-only-20261008-EWqoLS",
+    "root_review_sha256": "26f2caa95ba3d1df0f53fd8f5d013e9dc419b233423ec7a13ec97453c076242d",
+    "files": [
+      {
+        "relative_path": "browser-profile-packet-v5.json",
+        "bytes": 12365,
+        "sha256": "9bb4fd9cecf6b7c52aeaed41d7b6d27632e4fb00b2e84473921d5a11758aa61e"
+      },
+      {
+        "relative_path": "supervisor-v5.py",
+        "bytes": 21793,
+        "sha256": "3ff1e89b831b88d24975df5163cf30ce232f36d0ac9543264e10981adeb870c7"
+      },
+      {
+        "relative_path": "supervisor-v5.json",
+        "bytes": 3174,
+        "sha256": "3f202fe69a10e19d4eab7ae92080bc25ffbf08888ba2f8624791620fcce22925"
+      },
+      {
+        "relative_path": "harness-v5.stdout.log",
+        "bytes": 1054,
+        "sha256": "37350d5b004bffc762532953402833d9c390ec340f71c31d42f39a4add0775c8"
+      },
+      {
+        "relative_path": "harness-v5.stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "relative_path": "browser-output-v5/report.json",
+        "bytes": 278672,
+        "sha256": "2d38cad41349bb26f1dd997d184098ee8bdb941f2239c6468e64c55e71b1fab1"
+      },
+      {
+        "relative_path": "browser-output-v3/report.json",
+        "bytes": 259262,
+        "sha256": "ffba97783e6b41599006e38003c3eda1bf4a75b80512c6506d7921d561ad348b"
+      },
+      {
+        "relative_path": "item-mask-original-source-disassembly-v4.json",
+        "bytes": 3056,
+        "sha256": "b86b3d563fac07fa7913c05a10813416e1c3ddb4c254b9c4800dfa1010ce1dd5"
+      },
+      {
+        "relative_path": "v4-preflight-failure.json",
+        "bytes": 363,
+        "sha256": "01c8877787f085be707e89264608e699133073ff27b050e941c465ada15f6d61"
+      }
+    ],
+    "screenshots": [
+      {
+        "name": "00-initial-css",
+        "sha256": "128afb9b0bbfb26d82b61b8083ef8ac0bc2e3ed03ab7da327a960162b35026f7"
+      },
+      {
+        "name": "01-main-root",
+        "sha256": "284d0a6d5689b17996858fa18ad99604600cfed8ea9b430adf6bf5a6a912dc3b"
+      },
+      {
+        "name": "02-first-vs-rules-choice",
+        "sha256": "97f59029b80c92aa237f6ac03a3ff377bb0388743ee8244b4c37a013eda92916"
+      },
+      {
+        "name": "02-first-rules",
+        "sha256": "b36ec1d2217329422e03fc477434b462fc37a9bafa05851187216c85d562bb75"
+      },
+      {
+        "name": "03-competitive-items-entry",
+        "sha256": "4465423be5686ac363eb3a4e0b2014448f6169446eb21abd3e665e7d6561c3c1"
+      },
+      {
+        "name": "04-competitive-items-none",
+        "sha256": "a2b1090ee2d74e9a2bcf8da6472c710cf59683b04949048b60242675c59cc9a1"
+      },
+      {
+        "name": "05-competitive-rules-plus-profile",
+        "sha256": "25978c40e7197b5883712f0852f0f566ed7b7faf5c088f02bdb84cdd83380b89"
+      },
+      {
+        "name": "06-competitive-profile-css",
+        "sha256": "9a120aba8321aeede07036eeffbd2bff8b91ecf14dc5f22a5f87b57e60ee34a9"
+      }
+    ]
+  },
+  "historical_failures": [
+    {
+      "attempt": "v3",
+      "result": "Stopped at exact saved Items-mask assertion. All31rows off; helper incorrectly retained upper32. Independent original instruction review preceded test-only correction. Eject and process cleanup passed."
+    },
+    {
+      "attempt": "v4",
+      "result": "Immutable supervisor hash mismatch rejected before any child launch. Corrected v5 guard passed before real launch; original files retained."
+    }
+  ],
+  "open_gates": [
+    "Complete current-head CI before integration.",
+    "Original Results/CSS, whole-session RNG/PAD-schedule equality, pixels/PCM, physical input, foreground timing, audible output and competitive-set acceptance."
+  ],
+  "natural_timeout_browser_route": {
+    "status": "passed_first_natural_eight_minute_browser_route",
+    "scope": "Original competitive menus -> two-Human Mario/Final Destination -> input-driven first P1 loss -> neutral natural eight-minute non-tied timeout -> original Results -> active CSS profile retention -> Eject. Ordinary365c runtime only.",
+    "producer": {
+      "source_head": "1801061d2d6f12f1d10c13d1547f7f76e056548e",
+      "source_tree": "00ff6c899901ab45c29890a213acae538d04eafa",
+      "runtime_producer": "365c6b31bdc12befe0204e5b309c2afd34352789",
+      "configuration": "Release",
+      "browser": "Headless installed Chrome154.0.8037.99",
+      "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+      "served_file_count": 46,
+      "served_manifest_sha256": "7f55d702a636f1fcbc8919761eaf43a09f99a27d3aeb3a6af41154d07864755e"
+    },
+    "observed": {
+      "source_terminal_frame": 28800,
+      "outcome": 1,
+      "terminal_winners": [
+        1
+      ],
+      "normalized_setup_stocks": [
+        4,
+        4
+      ],
+      "terminal_live_stocks": [
+        3,
+        4
+      ],
+      "normalized_timer_seconds": 480,
+      "timer_acceleration": false,
+      "forced_outcome": false,
+      "results_entered_wall_ms": 486197,
+      "full_run_wall_seconds": 546.2849209308624,
+      "directional_input_scope": "At most600P1 outwardsourcePADframes; firstsingleloss thenbothports120neutralframes",
+      "p1_presentation_tick": 298,
+      "p1_confirmation_tick": 330,
+      "p2_confirmation_tick": 357,
+      "p2_phase": 4,
+      "p2_stats_phase": 2,
+      "p2_confirmed": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "results_trace_rows": 368,
+      "results_trace_attempts": 368,
+      "results_trace_overflow": false,
+      "active_css_return": true,
+      "prize_confirmations": 0,
+      "retained_css_rules": {
+        "damage_ratio": 10,
+        "friendly_fire": 1,
+        "handicap": 0,
+        "mode": 1,
+        "pause": 0,
+        "stock_count": 4,
+        "stock_time_limit": 8,
+        "time_limit": 2
+      },
+      "retained_css_items": {
+        "frequency": -1,
+        "mask_hex": "0000000010000000"
+      },
+      "browser_errors": 0,
+      "timing_pauses": 0,
+      "preparation_incidents": 17,
+      "dropped_incidents": 0,
+      "invalid_preparation_incidents": 0,
+      "lossy_sample_drops": 32241,
+      "screenshots_retained": 16
+    },
+    "cleanup": {
+      "node_exit": 0,
+      "owned_server_exit": -15,
+      "supervisor_exit": 0,
+      "playwright": {
+        "browser": {
+          "status": "closed"
+        },
+        "context": {
+          "status": "closed"
+        },
+        "driver": {
+          "status": "disposed"
+        }
+      },
+      "exact_owned_pids_absent": true,
+      "server_port_reusable": true,
+      "eject": "Source owners, match/menu/Results/Prize, objects/processes, scopedassets/audio banks cleared"
+    },
+    "private_result_receipt": {
+      "locator": "Private verified external NVMe run r292-natural-timeout-route-v8-20261008-1801061d; browser-result-receipt-v1.json",
+      "sha256": "20050befc62f7dc3307af8a726d2db38adfd1908549e45274082cb22b2028423",
+      "report_sha256": "b12c492047f6aba791335b696e23c9f488c53fc6274212e0fd11b52e8abfc8dd",
+      "trace_sha256": "b35408b2b99df802bb43ba600ccc1b9e33f7c8f7d8b5b70a0b8feecb0cccca58",
+      "packet_sha256": "36030627bbb72f4e6f8559f7421754cd94fb4cbfa9974fc756042a6a4c03e210",
+      "supervisor_sha256": "45f6846b485f0aff56d98c01e34973b106be9772a2b207b25005471af16a147b",
+      "root_review": "root-first-result-review-v2.json",
+      "root_review_sha256": "3ed78249ae4abbe7066e8bada37d9b3db753187a2d0db2a1edd17f69806e47f5",
+      "artifact_count": 33
+    },
+    "limits": [
+      "No original-game matching-route comparison",
+      "No physical/foreground/audio/pixel/PCM/performance/competitive acceptance",
+      "365c ordinary runtime only; does not validate SD post-VS/returned-cache production changes",
+      "No full suite/current-head CI"
+    ],
+    "historical_log_gaps": "Original preflight stderr and first readiness-focused failure raw log unavailable; no substitution claimed"
+  },
+  "combined_timeout_browser_route_v9": {
+    "status": "pass",
+    "scope": "Original competitive menus -> two-Human Mario/FD -> source-input one P1 loss -> natural eight-minute unique P2 timeout -> per-Human original Results confirmation -> active CSS exact profile retained -> Eject. Combined SD/runtime owner and post-VS cache path; no original competitive comparison.",
+    "source": {
+      "head": "87d89c2759e2fac9441e87a45024ca4573ea8822",
+      "tree": "2a0b58fe609a2e77b637754810d62c67ec5562f1",
+      "sd_candidate_parent": "35d7a2391e6916f191f2eaa3ac61437b18426ba9",
+      "wasm_sha256": "e82b93fc2f19c6c0f1726b0ba4f95159b73c18504cec3b618636c578e47ae593"
+    },
+    "terminal": {
+      "source_frames": 28800,
+      "outcome": 1,
+      "winners": [
+        1
+      ],
+      "live_stocks": [
+        3,
+        4
+      ],
+      "initial_stocks": [
+        4,
+        4
+      ],
+      "colors": [
+        1,
+        0
+      ],
+      "ports": [
+        0,
+        1
+      ],
+      "timer_seconds": 480,
+      "pause_disabled": 1,
+      "normalized_item_mask": "fffffff80000000f"
+    },
+    "first_loss_source_frame": 301,
+    "neutral_stable_source_frame": 548,
+    "results": {
+      "retained_rows": 361,
+      "attempts": 361,
+      "overflow": false,
+      "presentation_before_after": [
+        290,
+        291
+      ],
+      "p1_confirmation_before_after": [
+        322,
+        323
+      ],
+      "p2_confirmation_before_after": [
+        349,
+        350
+      ],
+      "p2_phase": 4,
+      "p2_stats_phase": 2,
+      "p2_confirmed": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "source_pad_errors": [
+        0,
+        0,
+        -1,
+        -1
+      ],
+      "native_destination_preparation": [
+        "phase5 asset transfer",
+        "phase1 constructed CSS before ready"
+      ],
+      "prize_confirmations": 0
+    },
+    "returned_css": {
+      "phase": 1,
+      "rules": {
+        "mode": 1,
+        "stock_count": 4,
+        "time_limit": 2,
+        "stock_time_limit": 8,
+        "handicap": 0,
+        "damage_ratio": 10,
+        "friendly_fire": 1,
+        "pause": 0
+      },
+      "items": {
+        "frequency": -1,
+        "mask_hex": "0000000010000000"
+      },
+      "selection": {
+        "valid": true,
+        "scene": 1,
+        "provenance": "raw_css_vs_start",
+        "match_kind": 1,
+        "timer_enabled": 1,
+        "time_limit_seconds": 480,
+        "friendly_fire": 1,
+        "disable_pausing": 1,
+        "damage_ratio_bits": "3f800000",
+        "item_frequency": -1,
+        "item_mask_hex": "fffffff80000000f",
+        "player_stocks": [
+          4,
+          4
+        ]
+      }
+    },
+    "diagnostics": {
+      "browser_errors": 0,
+      "timing_pauses": 0,
+      "reason_counts": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        17,
+        0,
+        0
+      ],
+      "phase_source_steps": [
+        0,
+        126,
+        0,
+        124,
+        0,
+        0,
+        0,
+        29038,
+        361,
+        0,
+        0,
+        2546,
+        0,
+        0,
+        0,
+        0
+      ],
+      "dropped_incidents": 0,
+      "thinned_samples": 32230,
+      "scope": "Callback publication-phase source steps may span transitions; do not equate callback totals with terminal source frames. Sample thinning is expected, incidents loss checked independently."
+    },
+    "cleanup": {
+      "node_exit": 0,
+      "server_exit": -15,
+      "driver": "disposed",
+      "context": "closed",
+      "browser": "closed",
+      "exact_owned_pids_absent": 4,
+      "port_rebind": true,
+      "eject": "source owners/objects/processes/assets/audio banks cleared"
+    },
+    "evidence": {
+      "private_locator": "r292-combined-sd-source-integration-20261009-v1/combined-timeout-v9",
+      "result_receipt_sha256": "f8ef2fadc5ca0cff32be51de3bbb034eb37d1acf12a5bec3341b06931aa479cd",
+      "raw_report_sha256": "c7bd474ca23ddcee51e3e8adc1edfbd66f5cbefce001904433ccb3c8211d0a75",
+      "trace_sha256": "1b58833173aea34af8ef02d9360e708a7798de25f0c7b8add48e58c1354e21f0",
+      "supervisor_sha256": "617619a80620bea372a08b711de43aefe4868aa363558cac09d90a16d78ccde9",
+      "root_review_sha256": "433e62a9591d17508f1451446ad1f31a95203612caa4ab9f2a898fb5417bebda"
+    },
+    "subsequent_main_refresh": {
+      "merged_main": "bedc15ec1c6f80e9ec2e9fbf3828359ea67fc7cf",
+      "head": "471dcb5f7e6b08ab91dccc19bd18a6c15257e9f6",
+      "tree_unchanged": "2a0b58fe609a2e77b637754810d62c67ec5562f1",
+      "producer_not_relabelled": true
+    },
+    "open": "Independent milestone integration review/current-head CI and matching original competitive comparison remain; combined full suite passed at9fcf7771."
+  },
+  "final_combined_validation": {
+    "tested_head": "9fcf7771790a3a40fad8e0d728725a90e8e7707e",
+    "tested_tree": "e087e2191073f16bb32461fa0c2ffcf41f70fb40",
+    "full_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "tests": 2202,
+      "skipped": 159,
+      "seconds": 486.092,
+      "failed": 0,
+      "errors": 0,
+      "exit": 0,
+      "raw_log_sha256": "5068284ca4f0693aaddea076ffd6b6554328752dc540602ae0e002c07ae9c979",
+      "process_receipt_sha256": "a23e897ff337934dc88c1186f9c6067d0d2c0ed612345e4428bd3ffba3fec332",
+      "result_receipt_sha256": "e44e43560b2d097e59d18283aacce64afc43a2a0a825488722e299356950d20b"
+    },
+    "cleanup": "Exact suite/supervisor retired; source clean; all46served hashes unchanged.",
+    "skip_scope": "159 skips include native_menu_host_trace dispatch/manifest controls because that target is not built in this checkout, and optional local asset checks. Separate SD native controls retain their own producer; no combined native run claimed.",
+    "runtime_capture_producer": "87d89c2759e2fac9441e87a45024ca4573ea8822",
+    "subsequent_delta": "This validation recording is documentation only; exact-head CI remains before integration."
+  },
+  "original_profile_comparison": {
+    "receipt": "original-competitive-profile-entry-comparison-v1.json",
+    "result": "pass for all predeclared profile/setup fields",
+    "raw_comparison_sha256": "45c42e55aeee4cd9a7f78bc2a442d7d04f1daca84301b8ac43da348c8f5ffa36",
+    "root_independent_replay_review_sha256": "c42d62e26c8d51328eb02c4a336be19b90b25262c4f6273543befa6781a91f1f",
+    "scope": "Actual original profile/VS entry and initialized setup versus browser V9 declared config/initialized values. Different source epochs; no PAD-schedule, RNG, position, natural-terminal, pixels, PCM or timing comparison."
+  },
+  "integrated_reference_validation_v2": {
+    "tested_head": "d19fd07d6969cd8c5ef54d2e50b424b8b2155dc9",
+    "tested_tree": "1017eb2921332b9b4b8dcdefa5daea54aee661fd",
+    "tests": 2240,
+    "skipped": 159,
+    "failed": 0,
+    "errors": 0,
+    "seconds": 501.325,
+    "log_sha256": "604b40f3e1d01c1bea3b4870c7aad2ec97206c3e675448bc7114a402ba360874",
+    "root_review_sha256": "1983412235af90ce2887bfc6c0426b4363328ab94dd327b1bf5f476da3dad22e",
+    "cleanup": "Exact wrapper/suite processes absent; source clean at completion. Successful disposable test scratch removed by existing owner policy.",
+    "prior_failure": {
+      "head": "0751744b896af3540e6ed3864ec2de9cc66239dc",
+      "tests": 2240,
+      "failures": 1,
+      "skipped": 159,
+      "log_sha256": "8d24a5a16d8445d55cc743651a654a3dae560dd7eb0e414dea323e321cae6761",
+      "cause": "Unbounded source-string assertion included later opt-in profile slices. Test-only correction preserves normal-session exclusion and explicit profile gates."
+    },
+    "native_build": {
+      "producer": "00ef116f341f7961bd832b436e1760efc7328ddf",
+      "binary_sha256": "5ae29c6142bf80b287011d6733886e0608818e51df52ff738ff41dcfaabbe6ed",
+      "manifest_sha256": "52509b8547e0a9531c569822b4b3aea08b5111c7e3c7bf26f4a0ed6565bbeae0",
+      "log_sha256": "517c33d894b1da6441d1a6205b27162e9b92868ae889ea55af4cd27ce1278391",
+      "root_review_sha256": "67cf27e5b8769fbb0a5885944df961b1d342a91707fd41c8311b78fa53669e9a",
+      "overlay_identity": "All nine overlay files match both native producer and integrated checkout; old650 binary preserved",
+      "seconds": 779.7596938749775,
+      "capture": "original natural terminal still unrun at validation checkpoint"
+    }
+  },
+  "original_natural_terminal_attempt_v1": {
+    "result": "failed before gameplay at SSS retirement frozen state guard",
+    "receiver": "00ef116f341f7961bd832b436e1760efc7328ddf",
+    "native_binary_sha256": "5ae29c6142bf80b287011d6733886e0608818e51df52ff738ff41dcfaabbe6ed",
+    "seconds": 28.085,
+    "supervisor_result_sha256": "ad28b04354b9cf0586d84cf92f1c2bba1681c0137ceda08ca0b7adcac908a965",
+    "reducer_sha256": "42c6895b32117398b9b06c10ce30eb42b1fc606ef1b3445e86a29619451c4a43",
+    "root_review": "Verified all12 bound evidence/source identities and4 exact owned processes absent; source final increment explains238\u2192239 at first exact retirement.",
+    "retained": "Interrupted2136-event primary trace; incomplete5570-event MWRI; no VS setup, gameplay or terminal comparison.",
+    "receiver_correction": {
+      "source": "2d98cb381604e21f499c672f84f2c32df6286886",
+      "review_sha256": "70b4f4161d75876ddbacd3b05d55784476a62203d1d3f979b32f8f1126f6dafc",
+      "focused_tests": 11,
+      "focused_log_sha256": "9711dcb169eda07d277aa2c10ad0e4a80c251e674c1a1ee099c3bf41f13c38d2",
+      "actual_replay_sha256": "3efd277c88f5f2ac762088b970b36e4c3055241724696030fa24b82857732992",
+      "native_overlays_unchanged": true,
+      "scope": "First retiring cursor may include original final+1, later cursor/counters/stage freeze. Active/input/ownership guards unchanged. No retry result yet."
+    }
+  },
+  "original_natural_terminal_attempt_v2": {
+    "result": "native Metal abort before timeout; no comparison",
+    "receiver": "2d98cb381604e21f499c672f84f2c32df6286886",
+    "native_producer": "00ef116f341f7961bd832b436e1760efc7328ddf",
+    "native_binary_sha256": "5ae29c6142bf80b287011d6733886e0608818e51df52ff738ff41dcfaabbe6ed",
+    "mwri_events": 52004,
+    "mwri_complete": false,
+    "supervisor_seconds": 371.24611808289774,
+    "native_exit": -6,
+    "supervisor_exit": 254,
+    "failure": "IOGPUDeviceShmem Metal allocation assertion; actual abort instant and host GPU/memory metrics unobserved.",
+    "raw_sha256": "0f9f3872d2fd3edc8af54b98a737cae52321ef120fa2c95f3de1015480ab822e",
+    "mwri_sha256": "c624f6582d6d5306b596065c2ff7d946ebb0d004af01480317c2e38d645855db",
+    "native_log_sha256": "03dd741d983479c0b4d9e09038bc20b613d06de79e96564f2f06484c85523785",
+    "supervisor_result_sha256": "ac3ccd2eb52d8ad64b7c90d0a86461b68e4694aa2d0f13f57166cdd3a1bc7538",
+    "root_review_sha256": "ea195a028bb464f6d10eb1cfc4af0fdacfebe45844524d5e36662f49e77c5cc1",
+    "cleanup": "Exact owned runner interrupted to execute existingfinally after nativeabort; native reaped without further signal, log drain joined,4exactPIDsabsent. Originalprofile/GCI unchanged.",
+    "open": "Separate Null renderer profile-entry preparation only; no new launch, terminal comparison or full-session acceptance.",
+    "stale_sidecar": {
+      "last_source_tick": 11552,
+      "observer_records": 25266,
+      "completion": false
+    },
+    "last_raw_source_tick": 11561,
+    "last_match_frame": 11438,
+    "last_raw_seq": 25284,
+    "raw_prefix_inventory_sha256": "15180ffdc6b23f81671f35216991cc755d4e9588cf73b05ca9748abde013ec2b"
+  },
+  "owned_native_wait_correction": {
+    "source": "6e3ad12f7de3b876c9f0342485163957ce01dd2c",
+    "integrated_source": "0ed52b041cd4c8f35014301bed93860254be1117",
+    "scope": "Ordinary receiver checks its direct child only while waiting for missing observer records. Available complete records/footer remain readable; legacy default reader unchanged. Native overlays unchanged.",
+    "focused_tests": 4,
+    "legacy_tests": 12,
+    "focused_log_sha256": "7173c39a84ce7a7bd919e6acf799b5723055b8858b0e79488d355ed7e10cdb82",
+    "legacy_log_sha256": "51c1d7ced3567a2bbcd70643b79dacc030c3cbaf6e9ce9fd598e68259a550a33",
+    "source_review_sha256": "0898a61860508da2d6be6d45dfed278055e8f4a0028fc06d56190f1a61e0e879"
+  },
+  "original_null_renderer_entry_v1": {
+    "result": "PASS scoped original menu/profile/setup and complete declared V9 comparison",
+    "receiver": "6e3ad12f7de3b876c9f0342485163957ce01dd2c",
+    "native_producer": "00ef116f341f7961bd832b436e1760efc7328ddf",
+    "native_binary_sha256": "5ae29c6142bf80b287011d6733886e0608818e51df52ff738ff41dcfaabbe6ed",
+    "seconds": 25.043977500172332,
+    "renderer": "Null",
+    "renderer_attestation": "Actual native banner plus owned prepared config; only Core.GFXBackend changed from immutable Config-only template",
+    "raw_sha256": "bb51d9702a309682da21836c4321946d891ad168880167c51657a10cd11c1844",
+    "native_input_sha256": "55ff2b7638492f9498593445a9d8e6fe2e9b024f15fd4f5f61d1dae7d53b2e69",
+    "native_input_events": 5830,
+    "native_input_complete": true,
+    "observer_records": 2167,
+    "observer_completion": "intentionally interrupted at normal VS setup",
+    "supervisor_result_sha256": "b274ea4a816ef09b867eb5e1e776945034b9618225a801a1cf827d506f72d581",
+    "root_result_review_sha256": "f732d1e0b732b42a464c32cfe23debe52ef7abbdfda511234b5d13e4d01d0c54",
+    "comparison_sha256": "09cdbc021900123392d1287eaaf590167153143aa1751ad891a505204b287751",
+    "root_comparison_review_sha256": "e64ea8b66688b0384c718202f3f1deca57afd4a7aca3c4d471a4f7e04759b816",
+    "exclusions": [
+      "No natural terminal result",
+      "No renderer/pixel equivalence",
+      "No Metal failure cause",
+      "No RNG/PAD schedule comparison",
+      "No physical/audio/foreground timing acceptance"
+    ],
+    "cleanup": "All four exact owned PIDs absent; source profile/GCI unchanged; owned Config modes0400 before launch and0644 after native shutdown.",
+    "private_locator": "sd-reference-source-tests / competitive-original-null-entry-launch-v1"
+  },
+  "original_null_natural_attempt_v1": {
+    "result": "FAIL native terminal participant guard; no comparator ran",
+    "receiver": "6e3ad12f7de3b876c9f0342485163957ce01dd2c",
+    "native_producer": "00ef116f341f7961bd832b436e1760efc7328ddf",
+    "renderer": "Null",
+    "seconds": 509.3381921250839,
+    "error": "Ordinary MatchEnd participant/stock/damage differs",
+    "last_raw_tick": 29037,
+    "last_match_frame": 28800,
+    "clock_seconds": 0,
+    "clock_subframe": 59,
+    "last_live_stocks": [
+      3,
+      4
+    ],
+    "last_live_damage_bits": [
+      "00000000",
+      "00000000"
+    ],
+    "last_progress_seq": 60243,
+    "error_seq": 60244,
+    "interrupted_end_seq": 60245,
+    "rejected_terminal_bytes_observed": false,
+    "raw_sha256": "0de18f3d5d7e5f12dc5eac6a91bf2de8be8b31a225abd72eec5b615618f0462b",
+    "native_input_sha256": "cdd31667b2263db857ab7fb234d09e15db1263ccfccc6396fd05e65752b02a4a",
+    "native_input_events": 121904,
+    "native_input_complete": false,
+    "supervisor_sha256": "dad66da48f90100b176227989776a51dec0a631367ebd77074df1ffc8e6e3c4b",
+    "root_review_sha256": "eecae4c90f82c63bbaa8d01c6330de039b8b1cf52b92447105ec12b8fa42235c",
+    "cleanup": "Exact four owned PIDs absent; native terminate/wait exit0, no kill/error; owned log drain joined. Original profile/GCI unchanged.",
+    "open": "Terminal field/source reduction before any repeat. No successful terminal/MWRI or whole-session admission.",
+    "private_locator": "sd-reference-source-tests / competitive-original-null-natural-launch-v1"
+  },
+  "original_terminal_rank_correction": {
+    "source": "a84161429c018575a00e4f516be42a2123e35d2e",
+    "integrated_source": "5fd9a87f",
+    "scope": "Original fn_80165AC0 requires is_big_loser1/0 for3:4; strict native/Python correction and failure-only typed Error snapshot. Actual prior rejected MatchEnd bytes unobserved. No successful exit or completion on rejected snapshot.",
+    "focused_tests": 14,
+    "focused_log_sha256": "d6ff1b88b095d657811a3a3ba5d289f02729b704e05fce36eb7744df7fed2c45",
+    "extracted_original_ranking_sha256": "5279c324bce7907714ae2f811e7ac3bfc7adb1e01a839f8e9244984fa1ee420d",
+    "retained_host_compile_failure_sha256": "32a8e1cbf02cad364e7345d7fb33cf79e3b7ce0b0d4439049d02ed402f3c694c",
+    "source_review_sha256": "8acca87c20740fec4f4f2104e754a9b5fbbc31ec534c0f815a5cd71257a6e025",
+    "workload_policy_sha256": "c58eb6635d8f7115db86bc3601372fcf685ccecbd6c15d59d570a207e6d4d91d",
+    "open": "Fresh canonical build and original natural-timeout comparison subsequently passed; see original_null_natural_attempt_v2.",
+    "private_locator": "sd-reference-source-tests / terminal-rank-correction-v1",
+    "fresh_native_build": {
+      "result": "passed",
+      "producer": "a84161429c018575a00e4f516be42a2123e35d2e",
+      "tree": "e0e3a7f2241c88876237a8f17287e331d459daa7",
+      "seconds": 777.086,
+      "binary_sha256": "eb15cbb942a411ffa940caa3e74ba4cbc2226a2dcc04ae4dbfde8c56abd526ff",
+      "manifest_sha256": "67959541a29a932de816df3812ae33b78e4b439c04d38f9d286314dafd56a974",
+      "log_sha256": "f3f248530a32b578a615eb861143850f925dfed01b073bb9788f77494b1c1224",
+      "process_receipt_sha256": "90b570a15ea8b0d6158b7cc2d9a582423a3e2499a3a1ddf1ee4fc93c9ece6c98",
+      "root_review_sha256": "8b9e635567d44bbb5276a74998230727352d1fa319eb5f3adc98204b5e5ee914",
+      "cleanup": "Exact owned supervisor and builder absent; old binary retained unchanged.",
+      "scope": "Canonical pinned original observer build; no capture or comparison implied."
+    }
+  },
+  "final_integrated_suite_attempt_v3": {
+    "source": "b140a7212f154964d72cdd42207f5dc620d74774",
+    "tree": "18363df85ed3843185f09dbc9e6ab0fb68eefc8b",
+    "tests": 2248,
+    "skipped": 159,
+    "failures": 1,
+    "seconds": 520.309,
+    "failure": "Existing extracted native API-stub Event enum omitted Error; actual terminal diagnostic now references Error. Production source unchanged by fixture repair.",
+    "log_sha256": "3f2373944a3b6c4dbf259afaee9e9dfe988f7e43602c4df6160301150e14f760",
+    "process_receipt_sha256": "b67139c38fc3b19239e66391efd84e744e176961eb1baf81e3cb6c45d1a2c865",
+    "focused_repair_tests": 22,
+    "focused_repair_log_sha256": "e2a8578d5734b022cf79952f877875a6cb22ac400c146c2ce369475113b464d1",
+    "cleanup": "All exact wrapper88012/supervisor88061/suite88068 absent independently; test retained original failed compiler diagnostic in full log.",
+    "open": "Fixture-only repair and final fullsuite subsequently passed at ab2f707b; prior failure retained."
+  },
+  "final_integrated_validation_v4": {
+    "tested_head": "ab2f707b76105baa2d864cc1588a3ca5e0653695",
+    "tested_tree": "a8012b65c7da49f4d61109a35469920cfec05e5a",
+    "full_suite": {
+      "tests": 2248,
+      "skipped": 159,
+      "failures": 0,
+      "errors": 0,
+      "seconds": 493.169,
+      "log_sha256": "792d94d431afaca15acab0e99e539e47a02ce58400c9a1839f1e8e461e6d3914",
+      "process_receipt_sha256": "debfe9a697a7ac0d30bb9409743d85ad364edcd9ec92b4514b3f6765a7f5ab23",
+      "exit_code": 0
+    },
+    "cleanup": "Exact wrapper, supervisor and suite processes absent; source clean and unchanged.",
+    "source_review_sha256": "077426289967886e9421a83b77eb643f991e54d264f64392862ca66a101b3702",
+    "fixture_review_sha256": "3f064d70b0ae1a0fd9447a6900536a6bb618051bdd113cbf780e056dc8026908",
+    "skip_scope": "159 explicit skips retain the earlier native-target and optional asset limitations; no skipped gate is promoted.",
+    "remaining": "Complete current-head CI before integration."
+  },
+  "original_null_natural_attempt_v2": {
+    "result": "PASS for declared profile/setup and natural-terminal fields",
+    "producer": "a84161429c018575a00e4f516be42a2123e35d2e",
+    "browser_producer": "87d89c2759e2fac9441e87a45024ca4573ea8822",
+    "renderer": "Null; observed owned config and native banner",
+    "seconds": 509.452,
+    "capture_result_sha256": "e109c9b78b452f99034e832ad0222a5d45b110f90057b132ada984aeb5e74166",
+    "raw_sha256": "afcff2ad19190f755ca151847f804a7a2e9549a0d2d9364dca544f5bf9ac6a9b",
+    "mwri_sha256": "8e01aa1740b1e96e9ae436605ebaaedf9dafa0ea490863c9f399fc14bd20ee14",
+    "observer": {
+      "events": 60229,
+      "end": "intentional interrupted prefix after strict VS retirement",
+      "invalid": false,
+      "error": null
+    },
+    "native_input": {
+      "events": 121860,
+      "complete": true,
+      "invalid": false,
+      "error": null
+    },
+    "source_samples": 29038,
+    "menu_source_samples": 742,
+    "first_stock_loss": {
+      "frame": 291,
+      "counter": 414,
+      "directional_samples_at_loss": 111,
+      "total_directional_samples": 114
+    },
+    "terminal": {
+      "is_teams": 0,
+      "match_kind": 1,
+      "outcome": 1,
+      "players": [
+        {
+          "character_kind": 8,
+          "color": 1,
+          "damage_percent": 0,
+          "fighter_kind": 0,
+          "initial_stocks": 4,
+          "live_stocks": 3,
+          "slot_type": 0,
+          "source_player_index": 0
+        },
+        {
+          "character_kind": 8,
+          "color": 0,
+          "damage_percent": 0,
+          "fighter_kind": 0,
+          "initial_stocks": 4,
+          "live_stocks": 4,
+          "slot_type": 0,
+          "source_player_index": 1
+        }
+      ],
+      "source_frame": 28800,
+      "winners": [
+        1
+      ]
+    },
+    "comparisons": {
+      "profile": {
+        "sha256": "e932b63e3ed36307af17dc908780c2ae0dfce4a62dffe0c530ee3e37ffed5a4e",
+        "root_replay_sha256": "bdca719579f6abbd2fd9216b87b05bfaa51f7f0dac90f0e4d812ffcd27731789"
+      },
+      "terminal": {
+        "sha256": "15c164fdec0deff12522f02693f9b65570584e73a274a227f58edd069aed0e90",
+        "root_replay_sha256": "2aa9af4d6542971aa2fa1a3b26500cb6743e92b7d020a2057a3389eb300e06d1"
+      }
+    },
+    "root_review_sha256": "905f1262ef104b5cfa69849247635167e294b0568c901ad8b467d84dbb5c5aea",
+    "cleanup": "Exact4owned PIDs absent; direct native Popen terminated and waited exit0 without kill/error; originalprofile/GCI unchanged",
+    "offline_path_correction": {
+      "original_script_sha256": "efbcf8be22a20936060fb8d242c44834e858f6eb2184eb50475d79fe8dd6ce37",
+      "used_script_sha256": "c4d64f910ce731ae11c701de9b4c712d9b8048d181d8c610e11e2481bbd46b66",
+      "scope": "Reviewed comparator successor changes one missing packet filename v1\u2192v2 only; original frozen script retained/unrun. Root replay changes output names only."
+    },
+    "exclusions": [
+      "PAD schedule equality",
+      "RNG",
+      "terminal position/motion",
+      "Results confirmations/CSS return",
+      "pixels",
+      "PCM",
+      "live timing",
+      "physical input"
+    ],
+    "private_locator": "sd-reference-source-tests / competitive-original-null-natural-launch-v2 and original-competitive-null-natural-coldboot-v2"
+  },
+  "first_pr_ci_attempt": {
+    "head": "4369fd12188bae7a1800293788e51f1b6b25d659",
+    "run": "https://github.com/ericvanlare/melee-web/actions/runs/37928600043",
+    "result": "failed",
+    "unit_0": {
+      "tests": 1211,
+      "skipped": 113,
+      "failures": 2,
+      "seconds": 544.232,
+      "failure": "Extracted SD pair observer API fixture omitted cstdint; Linux compiler rejects uint32_t at exact damage/ratio bit casts. Existing macOS transitive headers masked the missing direct include.",
+      "log_sha256": "3a535e435b994f82dfbf2bd60de857ecdf2786054de712e2012b5e95ff32c391",
+      "remote_failed_source_gap": "Compiler diagnostics retained; hosted runner work/sd-pair-observer source directories were not included in the bounded CI artifact upload.",
+      "repair": "Add explicit cstdint to extracted fixture only; production observer and assertions unchanged.",
+      "focused_tests": 2,
+      "focused_seconds": 1.259,
+      "focused_log_sha256": "299df4f726683f8a85c5cc6e18dc3bce1fcbe0531b3345f57f264c799b525513"
+    },
+    "graphics": {
+      "failure": "Fresh pinned Emscripten Node24.19.0 arm64 archive truncated during download/extraction before graphics tests. Other seven shards passed the same dependency preparation.",
+      "log_sha256": "f0c3e27d150913cb9b4625668057f0be4764283cc0d77b18af0def16a95fa1c7"
+    },
+    "browser_build": "Aggregate correctly failed because unit-0 and graphics failed; no separate browser compile failure.",
+    "next": "One corrected-head full CI run; no retry of the superseded source head."
+  },
+  "second_pr_ci_attempt": {
+    "producer": "0184d2108a2da14c177523bc25898ff15a61a081",
+    "run": 37930238978,
+    "result": "failed aggregate inventory",
+    "partitions": "All unit and build partitions passed",
+    "failure": "Two helper TestCase classes imported into the competitive entry test module caused14 duplicate discovery IDs. Strict aggregate correctly refused them.",
+    "retained_log_sha256": "8a1a96cc73066e7885baf17e032b3cfaeb5c9bb507b9800573859033d0f75fee",
+    "repair": "Import the helper modules and qualify the same three helper methods; no test assertions, runtime code or aggregate guard changed.",
+    "focused_tests": 33,
+    "focused_failures": 0,
+    "focused_log_sha256": "0b962f6344ef1ad1393f57f018f4381210c12d8cfbe742efa5b3a7e568a9e2d8",
+    "discovery": {
+      "unique_ids": 2239,
+      "before_ids_including_duplicates": 2253,
+      "missing_ids": 0,
+      "added_ids": 0,
+      "duplicate_ids": 0,
+      "receipt_sha256": "21fbcb0f0c92dea2f79abd9a0c3ddf3f04068215009eb99ad2451dc1505ca389"
+    },
+    "independent_review_sha256": "0e848b1eac19bbe2be523556496cc24fa71fa4800daecadf8e259e95d3bff9a4",
+    "private_locator": {
+      "run": "autonomous-roadmap-20261006-154157-ec099c21",
+      "log": "pr298-corrected-head-ci-failure-v1.log",
+      "reports": "pr298-corrected-head-reports-v1",
+      "discovery": "pr298-discovery-unique-inventory-v1.json",
+      "review": "pr298-discovery-fix-independent-review-v1.json"
+    }
+  }
+}

@@ -20,6 +20,20 @@ def canonical(value):
 
 def recipe(version=1):
     """Return a fresh copy of the single fixed, wholly authored experiment."""
+    if type(version) is int and version == 6:
+        declaration = recipe(5)
+        declaration.update(version=6, id="two-human-mario-fd-competitive-profile-entry",
+                           purpose="observe exact competitive original menu/profile and normalized VS setup",
+                           stop="observed VS setup return; no active match or timeout admission")
+        declaration["expected_setup"].update(time_limit_seconds=480, disable_pausing=True,
+            friendly_fire=True, item_mask_hex="fffffff80000000f")
+        declaration["expected_game_rules"] = {"mode": 1, "stock_count": 4, "handicap": 0,
+            "damage_ratio": 10, "stock_time_limit": 8, "friendly_fire": 1, "pause": 0}
+        declaration["expected_item_preference_mask_hex"] = "0000000010000000"
+        declaration["original_profile"]["first_gate"] = "exact competitive original menu through VS setup only"
+        declaration["exclusions"] = ["active gameplay", "natural eight-minute outcome", "Results/CSS return",
+                                     "pixels", "PCM", "live timing"]
+        return declaration
     declaration = {
         "schema": RECIPE_SCHEMA,
         "version": 1,
@@ -88,7 +102,7 @@ def recipe(version=1):
 def validate_recipe(value):
     # Byte comparison also rejects bool-for-int and int-for-float substitutions.
     version = value.get("version") if isinstance(value, dict) else None
-    if version not in (1, 2, 3, 4, 5) or canonical(value) != canonical(recipe(version)):
+    if version not in (1, 2, 3, 4, 5, 6) or canonical(value) != canonical(recipe(version)):
         raise ValueError("Unsupported or changed authored SD reference recipe")
     return value
 

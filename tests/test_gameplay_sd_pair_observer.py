@@ -19,6 +19,8 @@ def observer_source():
 
 FIXTURE = r'''
 #include "fixed_format_writer.hpp"
+#include <bit>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
@@ -27,10 +29,11 @@ FIXTURE = r'''
 constexpr int Gm_PKind_Human=0, GM_MAX_PLAYERS=6;
 struct Rules {
  int match_kind=1, stkind=32, timer_enabled=0, time_limit=60;
- int is_stock=0, is_vs=0, x6=1, xB=-1, is_teams=0, friendly_fire=1;
+ int is_stock=0, is_vs=0, x6=1, xB=-1, is_teams=0, friendly_fire=1, disable_pausing=1;
+ float x30=1.0f;
  unsigned long long x20=~0ULL;
 };
-struct Player { int team=0, stocks=0, slot_type=3, slot=0, ckind=-1, color=0, x12=0; };
+struct Player { int team=0, stocks=0, slot_type=3, slot=0, ckind=-1, color=0, x12=0; float attack_ratio=1.0f, defense_ratio=1.0f; };
 struct StartMeleeData { Rules rules; Player players[6]; };
 struct Stats {
  unsigned player_slot=0;
@@ -128,6 +131,12 @@ class GameplaySdPairObserverTests(OwnedWorkspaceTests):
         self.assertEqual([p["source_stocks"] for p in live["players"]], [1, 1])
         self.assertEqual([p["slot_type"] for p in live["players"]], [0, 0])
         self.assertEqual([p["human"] for p in live["players"]], [True, True])
+        self.assertEqual(live["rules"]["player_source_slots"], [0, 4])
+        self.assertEqual(live["rules"]["resolved_controller_ports"], [0, 3])
+        self.assertEqual(live["rules"]["player_source_characters"], [8, 8])
+        self.assertEqual(live["rules"]["disable_pausing"], 1)
+        self.assertEqual(live["rules"]["damage_ratio_bits"], "3f800000")
+        self.assertEqual(live["rules"]["player_attack_ratio_bits"], ["3f800000"]*2)
         self.assertEqual(live["rules"]["is_stock"], 0)
         self.assertEqual(live["rules"]["is_vs"], 0)
         self.assertEqual(live["rules"]["source_sudden_death_flag"], 1)

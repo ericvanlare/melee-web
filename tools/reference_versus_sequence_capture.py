@@ -336,11 +336,13 @@ class ObserverTail:
     """Fail-closed live reader for the immutable MWRO file."""
 
     def __init__(self, stream_path: Path, status_path: Path | None,
-                 *, poll: float = 0.02, sink: Callable[[dict[str, Any]], None] | None = None) -> None:
+                 *, poll: float = 0.02, sink: Callable[[dict[str, Any]], None] | None = None,
+                 wait_check: Callable[[], None] | None = None) -> None:
         self.stream_path = Path(stream_path)
         self.status_path = Path(status_path) if status_path else None
         self.poll = poll
         self.sink = sink
+        self.wait_check = wait_check
         self.stream = None
         self.offset = 0
         self.expected_seq = 0
@@ -397,6 +399,8 @@ class ObserverTail:
                     return
                 except OSError as exc:
                     raise CaptureError(f"cannot open observer stream: {exc}") from exc
+            if self.wait_check is not None:
+                self.wait_check()
             error = self._status_error()
             if error:
                 raise CaptureError(error)
@@ -412,6 +416,8 @@ class ObserverTail:
             self.stream.seek(self.offset)
             raw_header = self.stream.read(HEADER.size)
             if len(raw_header) != HEADER.size:
+                if self.wait_check is not None:
+                    self.wait_check()
                 error = self._status_error()
                 if error:
                     raise CaptureError(error)
@@ -424,6 +430,8 @@ class ObserverTail:
                 raise CaptureError("observer payload exceeds pinned bound")
             payload = self.stream.read(header[8])
             if len(payload) != header[8]:
+                if self.wait_check is not None:
+                    self.wait_check()
                 error = self._status_error()
                 if error:
                     raise CaptureError(error)

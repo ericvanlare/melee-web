@@ -338,10 +338,16 @@ int main() {
         # The save block already carries the persistent fighter records and
         # name banks, so the context captures each authored range once.
         self.assertNotIn("ProfileNameBank", source)
+        session = source.split("bool AddSessionSlices", 1)[1].split("bool AddMenuSlices", 1)[0]
+        self.assertNotIn("ProfileSaveData", session)
         # Only CSS entry publishes the typed context, and the observer copies
         # the authored ranges instead of reinterpreting their fields.
         self.assertIn("(css && entering && !AddProfileContextSlices(system))", source)
-        self.assertNotIn("ProfileSaveData", source.split("bool AddSessionSlices", 1)[1])
+        self.assertIn(
+            'if ((Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested()) &&\n'
+            "          !AddSlice(system, SliceTag::ProfileSaveData, root + PROFILE_SAVE_DATA_OFFSET, PROFILE_SAVE_DATA_SIZE))",
+            source,
+        )
 
     def test_whole_session_is_opt_in_and_has_pinned_source_boundaries(self) -> None:
         source = SOURCE.read_text(encoding="utf-8")

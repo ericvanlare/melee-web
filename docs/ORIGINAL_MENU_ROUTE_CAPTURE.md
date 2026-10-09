@@ -494,3 +494,95 @@ scene-order and natural-timeout fields. These receipts are under the retained
 `menu-tie-extension-v1/sss-retirement-launch-v1` campaign. This remains an
 initialization comparison: original SD resolution/Results, raw PAD/RNG equality,
 pixels, PCM, physical input and live timing are excluded.
+
+### Separate competitive profile-entry diagnostic
+
+Authored recipe6/menu8 uses the same verified GCI and original menu, CSS,
+SSS and normalized VS ownership boundaries for a separate competitive profile.
+It observes stock4, handicap0, damage10, Rules Plus timer8/FF1/pause0,
+every selectable Items row0..30 off and frequency None. The Items path follows
+the original two-column navigation: Down0..15, Right15->30, Up30..16,
+Up16->32; each conditional A requires an observed on value and unlocked owner.
+The unmapped preference bit28 is retained. Committed preference bytes and
+normalized setup are both checked; a None frequency alone cannot pass.
+
+`MWRC_SD_MENU_PROBE=competitive_entry` stops at the verified normal VS setup
+return with a complete native MWRI footer and interrupted primary observer.
+This scope rejects active gameplay, SD and legacy whole-session completion.
+The prior SD native producer is preserved and rejects this new scope. The
+650caaf1/e4634a74 canonical producer compiled, and its first original attempt
+observed every switch off and the three frequency decrements. It failed at the
+first Items-to-Rules snapshot (seq1127): the receiver required cooldown0,
+while original `fn_80233E10` commits and sets cooldown5. The retained
+`competitive-original-profile-entry-launch-v1/first-items-boundary-reduction-v1.json`
+(SHA2595d314…) binds the actual return, held B release and countdown5→0.
+The receiver correction requires exactly that committed return and consecutive
+source countdown, allowing only the already consumed held B until neutral.
+Readiness remains cooldown0 before any new action. Native producer, recipe,
+menu and inputs are unchanged.
+The second attempt passed the return lifecycle and reached typed CSS seq1299.
+Its exact initialized NA-door/cursor ownership equals the prior SD join
+projection, but menu8 incorrectly selected the historical immediate-Human guard.
+The driver now explicitly reuses the same bounded menu7 join policy for menu8:
+source movement precedes observed own-Human admission and A placement. CPU,
+foreign and unconstructed ownership still fail; final two-Human Mario checks
+remain strict. Native/menu/input identities and caps are unchanged. The third
+attempt passed original profile-entry at receiver8a522536/native650caaf1/e4634a74.
+Both failed streams remain incomplete and cannot establish acceptance.
+The actual `vs_entry`/`vs_setup` slices match every predeclared browserV9
+profile/setup field, including all four door-team bytes; the projection asserts
+exact key coverage. The retained comparison is
+`competitive-original-profile-entry-launch-v3/declared-v9-profile-entry-comparison-v3.json`
+(SHA256 `45c42e55aeee4cd9a7f78bc2a442d7d04f1daca84301b8ac43da348c8f5ffa36`),
+independently replayed in `root-profile-comparison-review-v1.json`
+(SHA256 `c42d62e26c8d51328eb02c4a336be19b90b25262c4f6273543befa6781a91f1f`).
+The superseded partial projection that omitted door teams is retained, not used.
+Original constructor state and browser frame180 establish declared configuration
+agreement only, not equal samples, positions or RNG. Natural non-tied timeout
+comparison remains a separate #292 gate. This prefix
+makes no original Results/CSS lifecycle claim; that continuation is not required
+unless the terminal source fields need it.
+
+### Separate original competitive natural terminal policy
+
+`--ordinary-policy` selects a separate canonical authored policy while reusing
+recipe6/menu8, the exact GCI, bounded source menu/CSS/SSS controller, and native
+MWRI recording. Fixed v4 stays neutral entry/setup provenance; it does not
+describe the adaptive gameplay inputs. Default receivers reject this scope.
+The preserved650caaf1 native binary is stale for this extension. Source controls
+and the API-stub compiler control do not establish an original eight-minute run.
+
+The declared policy waits for source frame180, live4:4/zero damage and original
+positions-60/+60. It then holds only P1 raw x-80 until the first observed3:4,
+releases neutral, permits only that previously held bank to drain until the
+first actual neutral, and never restarts direction. Directional consumption is
+bounded600. The total source budget29523 includes setup (at most123); active
+PAD and scheduled source iterations are counted independently. The source
+counter starts0 and the match clock can repeat or advance one frame, reaching
+28800/seconds0/subframe59 naturally. Those counter/clock lifetime predicates
+are bound to retained original SD V6 observations;480 seconds is the new
+authored setting, not evidence inferred from that60-second capture.
+
+Every active and terminal live snapshot revalidates the source
+StaticPlayer→primary GObj→recorded Fighter relation before reading only its
+head, damage and stock. The pinned VS exit callback publishes without destroying
+fighters. The canonical return must independently publish timeout1/winner[1],
+two Human Mario participants/colors1/0/stocks3:4/zero damage and inactive slots2..5.
+The required final event is VS arena retirement, then a complete native MWRI
+footer and interrupted primary observer. Results confirmations are excluded.
+
+Native-enforced event ceilings include boot/menu/setup and writer endings:
+at most73455 serialized MWRO records/126894356 bytes, beneath73500/128MiB.
+The independent MWRI producer limit includes its header/footer and both PAD
+channels: at most1677721 records/67108856 bytes; no PAD-per-frame ratio is
+assumed. Intent writes are capped16000 records/8192000 bounded bytes; the
+owned native log is hard-capped16MiB. The600-second wall limit,7200 menu limits
+and all existing cursor/action bounds remain. First predicate, field, writer or
+resource failure stops the run and retains evidence; only the exact owned child
+is terminated/reaped, and its log drain is finalized independently. No forced
+outcome, guest write, source-clock acceleration or missing input repair exists.
+
+Older original Rules-route evidence establishes observed No Contest
+Results/CSS lifecycle only. It cannot close this natural timeout comparison.
+Original/browser PAD schedules, RNG, pixels, PCM, physical input and timing
+remain excluded; whole-session acceptance is not claimed.

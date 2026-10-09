@@ -50,6 +50,54 @@ class SssConfirmationTests(unittest.TestCase):
         self.assertEqual(r.sss_countdown_tick,239)
         self.assertFalse(r.ended)
 
+    def final_increment_retirement(self):
+        rows=json.loads((Path(__file__).parent/'fixtures/competitive-sss-retirement-final-increment.json').read_text())['rows']
+        r=self.receiver()
+        # Exact captured rows2124..2127; only preceding unit context is injected.
+        r.seq=2124;r.menu_consumed=757;r.sss_countdown=0;r.sss_countdown_tick=237
+        r.sss_confirmation={'source_tick':150,'stage':{'index':25,'kind':32,'cooldown':0}}
+        r.sss_confirmation_neutral=True;r.stage=r.final_stage=r.sss_confirmation['stage'].copy()
+        return r,deepcopy(rows)
+
+    def test_actual_final_increment_freezes_observed_retirement_tick(self):
+        r,rows=self.final_increment_retirement()
+        for row in rows:r.accept(row)
+        self.assertEqual(r.sss_countdown_tick,238)  # Last active callback, unchanged.
+        self.assertEqual(r.sss_retirement['source_tick'],239)
+        self.assertEqual(r.menu_consumed,758)
+        self.assertEqual([v['source_tick'] for v in r.sss_retirement_inventory],[239,239])
+        self.assertFalse(r.ended)
+
+    def test_same_tick_first_retirement_remains_valid(self):
+        r,rows=self.final_increment_retirement()
+        # Explicit reconstructed callback timing, separate from actual+1 rows.
+        for row in rows[2:]:row['source_tick']=238
+        for row in rows:r.accept(row)
+        self.assertEqual(r.sss_retirement['source_tick'],238)
+
+    def test_final_increment_does_not_relax_retirement_guards(self):
+        for mutation in ('plus2','laterdrift','count','cooldown','stage','route','address','owner','release','early','ticktype','newinput'):
+            r,rows=self.final_increment_retirement()
+            for row in rows[:2]:r.accept(row)
+            row=rows[2]
+            if mutation in ('laterdrift','newinput'):
+                r.accept(row)
+                row=rows[3] if mutation=='laterdrift' else deepcopy(rows[1])
+                row['seq']=r.seq
+            field=lambda tag:next(s for s in row['payload']['slices'] if s['tag']==tag)
+            if mutation=='plus2':row['source_tick']=240
+            if mutation=='laterdrift':row['source_tick']+=1
+            if mutation in ('count','newinput'):row['payload']['menu_consumed']+=1
+            if mutation=='cooldown':field(55)['hex']='00000001'
+            if mutation=='stage':field(41)['hex']='18';field(42)['address']-=0x1c
+            if mutation=='route':field(17)['hex']='020201020000'
+            if mutation=='address':field(17)['address']+=1
+            if mutation=='owner':field(40)['hex']='08'
+            if mutation=='release':r.sss_confirmation_neutral=False
+            if mutation=='early':r.sss_countdown=1
+            if mutation=='ticktype':row['source_tick']=239.0
+            with self.subTest(mutation=mutation),self.assertRaises(SdDiagnosticError):r.accept(row)
+
     def test_retirement_requires_frozen_completed_own_state(self):
         for mutation in ('active_duplicate','tick','ticktype','count','cooldown','index','owner','route','address','missing','early','release'):
             r,rows=self.retirement()
@@ -57,7 +105,7 @@ class SssConfirmationTests(unittest.TestCase):
             row=rows[2]
             field=lambda tag:next(s for s in row['payload']['slices'] if s['tag']==tag)
             if mutation=='active_duplicate':field(17)['hex']='020201010000'
-            if mutation=='tick':row['source_tick']+=1
+            if mutation=='tick':row['source_tick']+=2  # First final+1 is source-proven.
             if mutation=='ticktype':row['source_tick']=239.0
             if mutation=='count':row['payload']['menu_consumed']+=1
             if mutation=='cooldown':field(55)['hex']='00000001'
