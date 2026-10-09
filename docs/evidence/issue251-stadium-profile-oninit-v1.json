@@ -27,9 +27,17 @@
       "target": "native_menu_host_trace",
       "configuration": "Release; MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=ON; other nine MELEE_WEB boolean options OFF",
       "command": [
-        "python3", "scripts/agent_workspace.py", "run", "--",
-        "python3", "scripts/build.py", "--trace-target", "native_menu_host_trace",
-        "--configuration", "Release", "--stadium-c1a-diagnostic"
+        "python3",
+        "scripts/agent_workspace.py",
+        "run",
+        "--",
+        "python3",
+        "scripts/build.py",
+        "--trace-target",
+        "native_menu_host_trace",
+        "--configuration",
+        "Release",
+        "--stadium-c1a-diagnostic"
       ],
       "exit_code": 0,
       "warnings": 160,
@@ -111,8 +119,17 @@
   "integration_validation": {
     "full_suite": {
       "command": [
-        "python3", "scripts/agent_workspace.py", "run", "--",
-        "python3", "-m", "unittest", "discover", "-s", "tests", "-v"
+        "python3",
+        "scripts/agent_workspace.py",
+        "run",
+        "--",
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
       ],
       "producer_commit": "718cfd4dabb9a1a48cb81e71e96f7a5c3849b02a",
       "exit_code": 0,
@@ -134,8 +151,14 @@
     },
     "ordinary_release": {
       "command": [
-        "python3", "scripts/agent_workspace.py", "run", "--",
-        "python3", "scripts/build.py", "--configuration", "Release"
+        "python3",
+        "scripts/agent_workspace.py",
+        "run",
+        "--",
+        "python3",
+        "scripts/build.py",
+        "--configuration",
+        "Release"
       ],
       "producer_commit": "718cfd4dabb9a1a48cb81e71e96f7a5c3849b02a",
       "exit_code": 0,
@@ -540,6 +563,120 @@
         "Component is not C3 or whole-session acceptance"
       ],
       "private_evidence_run_id": "stadium-c3-lifetime-20261009-074216-4d7cf7d1"
+    },
+    "later_owned_world_and_callback_reduction": {
+      "evidence_labels": [
+        "actual asset-free SDK reduced controls",
+        "actual real-fixture first refusals retained",
+        "source-identified callback borrower correction"
+      ],
+      "gobj_proc": {
+        "source_producer": "d89df9bc8a855eed7991dee777682d67686ded89",
+        "receipt": {
+          "artifact": "gobj-proc-pool-sdk-complete-result-v1.json",
+          "sha256": "63f25355f061c0837b17dc409f0c41838bce25fa0ce861c692358bde428e528f"
+        },
+        "result": "two owned world lifetimes passed",
+        "each_lifetime": {
+          "fresh_heap": 8331520,
+          "constructed_heap": 8331360,
+          "released_heap": 8331360,
+          "constructed_objects_processes": [
+            1,
+            1
+          ],
+          "released_objects_processes": [
+            0,
+            0
+          ],
+          "retained_cache_bytes": 160,
+          "allocator_used": 0,
+          "allocator_free": 1,
+          "backing_leases_unchanged": true
+        },
+        "full_world": "tracker inactive, heap -1, registry NULL; fresh original startup clears stale numeric freeheads before allocation and restores exact baseline; final session bytes0"
+      },
+      "real_zero_tick_attempts": [
+        {
+          "source_producer": "4e49c485dcb2452ef380795540fd2959eed157c8",
+          "receipt": {
+            "artifact": "real-world-frozen-result-v2.json",
+            "sha256": "4336d543c010bdbf426f079d0718037eaf1acec88a19a7139309cfd9a47538fc"
+          },
+          "result": "refused before original E8/OnInit",
+          "first_exception": "Stadium C1a requires its source-selected prepared SSS payload",
+          "cause": "Host selection re-export invoked while active MatchContext deliberately owns source RNG; host guard preserved"
+        },
+        {
+          "source_producer": "3e8bdf8c62eb47859ca06221868c55fa14e1bcc0",
+          "receipt": {
+            "artifact": "real-world-second-frozen-result-v1.json",
+            "sha256": "9d50e4d3d4bac23b32e026bf8f24a964913ad780f1ec060942fa769cd7bc102d"
+          },
+          "result": "original OnInit8taps passed; refused before OnLoad/OnStart",
+          "first_exception": "Stadium pending callback source order/borrower changed",
+          "source_rng_before": 1425827233,
+          "source_rng_after": 1024668128,
+          "fixture_count": 98,
+          "fixture_and_all_73_bindings_post_equal": true,
+          "partial_owner": "retained until process exit; no raw world shutdown or destructive retirement",
+          "direct_children_reaped": true
+        }
+      ],
+      "caller_owner_bracket": {
+        "producer": "3e8bdf8c62eb47859ca06221868c55fa14e1bcc0",
+        "receipt": {
+          "artifact": "active-match-selection-component-v1.json",
+          "sha256": "c72970257897934bcf9b94e6858a60ed1115279f8e3e3f588aee1f1518afd36c"
+        },
+        "actual_host_export": "before each MatchContext begin and after checked end restores parent",
+        "during_active_match": "explicit copied-selection/actual MatchContext RNG and observed save witness; host_reexport=0",
+        "host_guard_unchanged": true,
+        "temporary_seed_swap": false
+      },
+      "callback_pair_reducer": {
+        "source_producer": "31a91e5baffbcea0bd617aaa4a192c74ba0cc2bc",
+        "receipt": {
+          "artifact": "queue-pair-sdk-frozen-result-v1.json",
+          "sha256": "66dcfbca03884488eab951ba5fbc4171ace4df9437548ca65afb5e843469a2f3"
+        },
+        "result": "PASS",
+        "scope": "Actual original Ground enqueue/SDK allocation; explicit synthetic map1/map2/map5 GObj identity witnesses and actual callback pointers, never dispatched",
+        "independent_pairs": [
+          "map2 / fn_801D13C8",
+          "map1 / fn_801D11E4"
+        ],
+        "header_requests": [
+          12,
+          12
+        ],
+        "header_world": 1,
+        "header_heap": 0,
+        "header_generations": [
+          14,
+          13
+        ],
+        "negative": "distinct map5 witness refused; both headers/all3borrowed GObjs unchanged",
+        "retained_root_loss": {
+          "free_before": 8331232,
+          "free_queued": 8331104,
+          "free_after_restore": 8331104,
+          "gap": 128,
+          "callbacks": 0,
+          "full_StageLast": false,
+          "Stadium_OnStart": false,
+          "raw_shutdown": false
+        },
+        "source_cause": "Pinned callback row2 initializer creates nested map5 but enqueues its local original map2 gobj; expected nestedmap5 borrower was incorrect",
+        "guard_correction": "Minimal map2 expectation/comment approved source; not yet built or fixture validated"
+      },
+      "limits": [
+        "Historical V26/21b exact producers and OnInit88576/85920 failures retained",
+        "Same-world generator predicate/result unchanged",
+        "No third full fixture attempt",
+        "No successful real OnLoad/OnStart/drain or full Stage/world retirement",
+        "No Ready/GO, scheduler ticks or C3 acceptance"
+      ]
     }
   }
 }

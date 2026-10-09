@@ -54,7 +54,7 @@ repeat lifetimes. The fragment is not a full StageLast execution, and these
 controls do not validate actual Stadium OnStart services. Both preparation
 failures remain retained separately.
 
-C3 remains blocked. The selected progression is required original OnLoad and
+At that checkpoint C3 remained blocked. The selected progression is required original OnLoad and
 OnStart while map owners are live, including checked generator and camera
 ownership. Header-only cancellation would cover an early diagnostic abort;
 it would not establish that source lifecycle. No runtime cancellation,
@@ -84,6 +84,44 @@ to allocator free chains; cache retention is the next source-derived
 hypothesis to isolate with a smaller actual allocator control. Neither SDK
 failure is waived. Both exact producers and raw failures remain retained.
 
-No full Stage continuation fixture, source proc tick, idle-world loop or C3
-acceptance has run for this component. The next reducer must distinguish
+At the `b016f3c6` checkpoint no full Stage continuation fixture, source proc
+tick, idle-world loop or C3 acceptance had run. The next reducer had to distinguish
 component retirement from complete owned-world retirement between lifetimes.
+
+
+The smaller actual SDK GObj/proc reducer on `d89df9bc` completed two owned
+world lifetimes. Original construction/release left **160 bytes** in rooted
+GObj/proc allocator caches: free heap was **8,331,520 → 8,331,360**, while
+objects/processes returned from **1/1 to 0/0** and both allocators reported
+used **0**, free **1**, with unchanged exact backing leases. Complete owned
+world shutdown made the tracker inactive and cleared the heap/session owners;
+fresh original startup reset the caches and restored the exact initial heap.
+This distinguishes source cache lifetime from component release. It does not
+waive the retained generator same-world failure or the OnInit teardown gap.
+
+Two later zero-tick real-fixture attempts used the same 98 frozen inputs. On
+`4e49c485`, the first stopped before original E8/OnInit because the caller tried
+to re-export menu selection after MatchContext had acquired the RNG owner.
+The production host guard remained intact. Caller-only `3e8bdf8c` now exports
+before each match acquisition and after checked release, and observes named
+active-match RNG/copied-selection/save witnesses while the match owns source.
+Its focused linked-original-RNG sanitizer control and diagnostic build passed.
+The second fixture reached all eight original OnInit taps and observed RNG
+**1,425,827,233 → 1,024,668,128**, then refused before OnLoad/OnStart at the
+pending callback borrower guard. Both failed processes were reaped; all input
+and producer bindings were unchanged. Partial stage/world owners were retained
+until process exit. Neither attempt completed StageLast or world retirement.
+
+Pinned callback row 2 initializes map2, constructs nested map5, and then
+registers its own map2 GObj with `fn_801D13C8`; map1 registers
+`fn_801D11E4`. Ground prepends these headers, giving **map2 → map1**. The
+`31a91e5b` actual SDK enqueue reducer confirmed two exact 12-byte header
+leases and both independent expected object/callback pairs. A distinct map5
+witness was refused without header or borrowed-GObj mutation. The original
+restoration-fragment control still reproduced **128 bytes** of live root loss
+without executing callbacks, Stadium OnStart or full StageLast. Synthetic map
+identities and actual source callback pointers establish the reduced pair
+contract; they are not a successful real Stage continuation. The guard
+correction is approved source; its build and real-fixture validation remain
+pending. Ready/GO, scheduler ticks, the second real world
+lifetime and C3 acceptance remain unrun.

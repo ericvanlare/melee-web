@@ -224,10 +224,11 @@ int melee_web_stage_last_stadium_start(MeleeWebStageLast* h,
     !melee_web_match_camera_available(camera_owner,e,n))return 0;
  Ground* display=h->stadium_map2_buffer_owner.display_ground->user_data;
  if(display->u.display.xF4)return fail(e,n,"Stadium display already borrows a camera subject");
- /* Exact two source enqueue sites; Ground prepends, so drain is map5,map1.
+ /* Exact two source enqueue sites; Ground prepends, so drain is map2,map1.
+  * Map2 creates nested map5 but enqueues its original map2 GObj.
   * Header ownership is independent of its borrowed object/callback fields. */
  const struct {HSD_GObj* object;HSD_GObjEvent callback;} expected[]={
-  {h->stadium_map2_buffer_owner.nested_map5_ground,fn_801D13C8},
+  {h->stadium_map2_buffer_owner.map2_ground,fn_801D13C8},
   {h->stadium_map2_buffer_owner.display_ground,fn_801D11E4}};
  struct Pending {void* next;HSD_GObj* object;HSD_GObjEvent callback;};
  void* headers[ARRAY_SIZE(expected)];
