@@ -1941,6 +1941,85 @@
         "validation_limits": "Current diagnostic build and6focusedtests plus actual1tickrecipe PASS. Fullsuite2346 andordinaryruntimebuild belong to dc88442c; subsequent2testfile change needs finalcurrentheadintegration validation.",
         "scope": "One postReady tick only. Exact GO alignment, two3500postGO lifetimes, original per-owner RNG comparison, screen/stock-out/standings, rendering/audio/browser/performance acceptance remain unrun.",
         "next": "Source review exact original GO dispatch/map2gateclear/HUDenable phase and existingowner; bounded observation before counting longpostGO interval."
+      },
+      "go_alignment": {
+        "runtime_status": "UNOBSERVED_DIAGNOSTIC_ARM_REFUSED_AT_ZERO_TICKS",
+        "source_design": "Four diagnostic StageLast latches observe original Stage gate-clear bracket, GO and HUD callback; containing tick and immediate next full tick observed independently inside Ready progression. Original fixed construction journal, calls, input, RNG and PCM processing unchanged.",
+        "first_attempt": {
+          "source": "3f26515abee9428344060eac81c461feb0b73d9a",
+          "source_tree": "757cde5766f3b1950774749a9bb7e1347589fbe9",
+          "producer": {
+            "artifact": "go-alignment-producer-3f26515a-v1/identity.json",
+            "sha256": "1b88de40ce6c17acac1b4c14502dec9f781f94d62636685c57f3401752f0c717"
+          },
+          "build": {
+            "artifact": "go-alignment-build-v1/result.json",
+            "sha256": "5ba19953bb9007e0216733566e0a260ab721c14f83641da884688b4a921b1354"
+          },
+          "focused_controls": {
+            "artifact": "root-go-alignment-prelaunch-controls-v1.json",
+            "sha256": "0f874f6193d1241fa59f117108481c271319252b38a4551af0b6b345555de5f5"
+          },
+          "frozen_result": {
+            "artifact": "root-go-alignment-frozen-result-v1.json",
+            "sha256": "e3253c203d50d985e849367beede0f80b1c6be72b43ea50bdd4315e230bd6148"
+          },
+          "independent_raw_review": {
+            "artifact": "sol-go-alignment-arm-failure-independent-review-v1.json",
+            "sha256": "d58b76ddf6fe1447b3f9791e41268a08efe043408ae457c6938ce36870c2e2d2"
+          },
+          "result": "Construction succeeds at world3/tick0; exact-live-display-owner arm check refuses. Specific predicate unobserved in this attempt.",
+          "verification": {
+            "bindings": 1092,
+            "fixtures": 98,
+            "raw_files": 17,
+            "natural_child_exit_codes": [
+              1,
+              1
+            ],
+            "children_reaped_absent": true
+          }
+        },
+        "second_attempt": {
+          "source": "b8170af45515ca6c5f51612b49ff8985f3518639",
+          "source_tree": "c6de94dc16ea6da15466b3f6ea3f93be27dec565",
+          "changed_hypothesis": "Getter-only first-rejected-predicate diagnostic; every predicate/order/return unchanged.",
+          "producer": {
+            "artifact": "go-alignment-producer-b8170af4-v1/identity.json",
+            "sha256": "c3221bb9bd576153404c0cbda2272451a2c2cc4e35e3202b892a343e8a038016"
+          },
+          "build": {
+            "artifact": "go-alignment-build-v2/result.json",
+            "sha256": "052aec2a7c85a7982b00214591aa89bc44b3ad3cde326e74704a6cb55a572a86"
+          },
+          "focused_controls": {
+            "artifact": "root-go-alignment-prelaunch-controls-v2.json",
+            "sha256": "b4269c655eb706767c9c93d3a73fdc83cbd6dae554fb5025a47337667677f299"
+          },
+          "prelaunch_review": {
+            "artifact": "sol-go-alignment-prelaunch-review-v2.json",
+            "sha256": "b3836d4ebe262ad4b40bd9d66eff57db10c010140a258a1bfdb48175315a0101"
+          },
+          "frozen_result": {
+            "artifact": "root-go-alignment-frozen-result-v2.json",
+            "sha256": "e21b16379060b15f30d5ea8104b902873497c461eb6ada2322d365dbe0345a64"
+          },
+          "result": "First rejection map2->proc->child != NULL at world3/tick0; earlier current-owner/phase/journal8/fallback lease/exact4stage roots and head-process predicates pass; later predicates unevaluated.",
+          "verification": {
+            "bindings": 1137,
+            "fixtures": 98,
+            "raw_files": 17,
+            "natural_child_exit_codes": [
+              1,
+              1
+            ],
+            "children_reaped_absent": true
+          }
+        },
+        "retirement_scope": "Both failures retain the armed pre-OnStart match, with a 32MiB arena. Process exit/reaping is not checked world or Session retirement. Earlier Ready/postReady close passes retain their separate source identities.",
+        "source_reduction": "Original Ground_GetStageGObj installs Ground_801C1CD0 priority1 then Ground_801C1D38 priority4; Stadium installs grStadium_801D1520 priority4. SDK SetupProc prepends each through child. The new observer child-null expectation contradicts this authored chain. Runtime identities of the two child nodes are not yet observed.",
+        "next": "Smaller checked original-process-chain positive/negative reproducer and source review before another lifetime; preserve exact registry/callback/priority/owner/terminal checks, not arbitrary-child acceptance.",
+        "validation_limits": "Both diagnostic builds and six focused controls per source pass. Full suite and ordinary runtime build remain bound to dc88442c. No GO tick, original RNG comparison, long C3 or acceptance established by these attempts."
       }
     }
   }

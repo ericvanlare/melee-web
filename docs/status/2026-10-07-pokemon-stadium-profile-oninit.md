@@ -666,9 +666,32 @@ The full-suite and ordinary-runtime build result above belongs to `dc88442c`;
 those checks have not been rerun on the subsequent two-file test harness
 extension. Current-head integration validation remains required for the final
 milestone. This is one tick after HUD Ready, not a measured first post-GO tick.
-Next, source-review the exact GO dispatch, map-2 gate release and later HUD-enable
-events using the existing lifetime owner before adding a bounded observation.
-Keep the fixed construction journal and original callback order unchanged.
+The subsequent source review places GO inside the original Ready scheduler
+callback. A diagnostic observer now distinguishes its containing tick from the
+immediately following complete tick, with separate HUD callback and gate-clear
+bracket observations. It preserves the fixed construction journal and source
+callback order.
+
+The first actual observer attempt on `3f26515a` stops immediately after successful
+construction at world 3, tick zero: its exact live-display-owner arm check
+refuses, before any GO event or source tick. A getter-only diagnostic on
+`b8170af4` preserves every predicate and identifies the first rejection as
+`map2->proc->child != NULL`. Earlier current-owner, phase, eight-event journal,
+fallback allocation, four stage roots and head-process checks pass; later
+predicates are unevaluated. Both attempts retain their armed pre-OnStart match
+and 32 MiB arena. Their processes naturally exit with failure and are reaped;
+that is not checked world or Session retirement.
+
+Both exact diagnostic builds and their six focused controls pass. Root verifies
+1,092 and 1,137 bindings respectively, each with 98 fixtures and 17 raw files;
+the first failure also has an independent raw-result review. Original source
+construction installs `Ground_801C1CD0` at priority 1, then `Ground_801C1D38` at
+priority 4, before Stadium adds its priority-4 callback. SDK process insertion
+links these through `child`, contradicting the new observer's child-null
+assumption. The two child identities remain unobserved in these traces. After
+two attempts, the next step is a smaller positive/negative chain reproducer and
+source review before another lifetime. No arbitrary child acceptance, original
+callback change or longer replay is justified by this result.
 
 The existing RNG observer can be reused afterward, but the Stadium notes require
 C3's per-tick, per-owner ledger to be compared with the original. C8's broader
