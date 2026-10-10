@@ -2,6 +2,9 @@
 #define MELEE_WEB_GAMEPLAY_STADIUM_DISPLAY_OWNER_H
 
 #include <stddef.h>
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#include "gameplay_source_memory_runtime.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -74,6 +77,12 @@ typedef struct MeleeWebStadiumMap2BufferOwner {
     void* buffer;
     MeleeWebStadiumMap2BufferOrigin origin;
     int captured;
+    /* The OnInit fallback allocation lease travels with this source owner
+     * until its exact post-Ground-retirement free. This is backing identity,
+     * separate from the logical map-2/Ground owner fields above. */
+    MeleeWebSourceMemoryAllocation buffer_allocation_lease;
+    int buffer_allocation_lease_captured;
+    int started_allocation_lease_required;
 } MeleeWebStadiumMap2BufferOwner;
 
 /* The owner is opaque so the private grpstadium TextWrapper ABI stays in its
@@ -128,6 +137,9 @@ int melee_web_stadium_display_provenance_controls(void);
 int melee_web_stadium_display_list_controls(void);
 int melee_web_stadium_display_owner_retirement_controls(void);
 int melee_web_stadium_map2_buffer_controls(void);
+/* Phase-specific map-2 graph and exact fallback-allocation lease controls.
+ * Called only inside an already-started source-memory world. */
+int melee_web_stadium_map2_started_buffer_controls(void);
 int melee_web_stadium_source_journal_controls(void);
 /* Actual text-only SIS append/remove controls, under a live backing-heap
  * token. Current payload membership is separate from source lifetime events. */

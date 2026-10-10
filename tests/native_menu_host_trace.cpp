@@ -4042,6 +4042,44 @@ void run_stadium_profile_controls()
     std::cout << "Diagnostic Stadium profile/content gate and source-state rejection controls passed\n";
 }
 
+void run_stadium_started_map2_buffer_controls()
+{
+    char error[256]{};
+    if (!melee_web_gameplay_startup(8U * 1024U * 1024U,
+                                    error, sizeof(error))) {
+        std::fprintf(stderr, "C1_STARTED_MAP2_CONTROL startup_refused=%s\n",
+                     error);
+        std::fflush(stderr);
+        std::_Exit(1);
+    }
+    /* The C control restores the bootstrap-owned roots before returning. If it
+     * refuses or leaves an uncertain partial fixture, retain the process. */
+    if (!melee_web_stadium_map2_started_buffer_controls()) {
+        std::fprintf(stderr,
+                     "C1_STARTED_MAP2_CONTROL retained_partial_fixture=1\n");
+        std::fflush(stderr);
+        std::_Exit(1);
+    }
+    if (!melee_web_gameplay_shutdown(error, sizeof(error))) {
+        std::fprintf(stderr, "C1_STARTED_MAP2_CONTROL shutdown_refused=%s\n",
+                     error);
+        std::fflush(stderr);
+        std::_Exit(1);
+    }
+    MeleeWebSourceMemoryContext inactive{};
+    if (melee_web_source_memory_context_read(&inactive) !=
+        MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE ||
+        melee_web_gameplay_world_exists() || melee_web_gameplay_session_active() ||
+        melee_web_gameplay_allocation().identity || HSD_GObj_Entities != nullptr ||
+        HSD_GetHeap() != -1) {
+        std::fprintf(stderr,
+                     "C1_STARTED_MAP2_CONTROL shutdown_context_still_active=1\n");
+        std::fflush(stderr);
+        std::_Exit(1);
+    }
+    std::cout << "C1 started map-2 graph/buffer lease controls passed; synthetic graph, real HSD fallback allocation, no Stadium OnInit/dispatch/ticks\n";
+}
+
 void run_stadium_effect_runtime_lifecycle_control()
 {
     char error[256]{};
@@ -8555,6 +8593,10 @@ int main(int argc,char** argv){try{
   }
   if(argc==2&&std::string_view(argv[1])=="--stadium-profile-controls"){
    run_stadium_profile_controls();return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-started-map2-buffer-controls"){
+   run_stadium_profile_controls();
+   run_stadium_started_map2_buffer_controls();return 0;
   }
   if(argc==2&&std::string_view(argv[1])=="--stadium-on-init-controls"){
    run_stadium_profile_controls();

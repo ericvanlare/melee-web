@@ -5945,7 +5945,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..3492cd22f052a658e060a4ab3847a9b4
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f1193491956d8b 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3afdd600692 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,16 @@
@@ -5980,15 +5980,18 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
  #include <melee/gm/gm_unsplit.h>
  #include <melee/lb/lb_00B0.h>
  #include <melee/lb/lb_00F9.h>
-@@ -29,6 +46,7 @@
+@@ -29,8 +46,10 @@
  #include <sysdolphin/baselib/fog.h>
  #include <sysdolphin/baselib/gobjgxlink.h>
  #include <sysdolphin/baselib/gobjobject.h>
 +#include <sysdolphin/baselib/gobjplink.h>
  #include <sysdolphin/baselib/gobjproc.h>
  #include <sysdolphin/baselib/gobjuserdata.h>
++#include <sysdolphin/baselib/initialize.h>
  #include <sysdolphin/baselib/jobj.h>
-@@ -38,6 +56,13 @@
+ #include <sysdolphin/baselib/memory.h>
+ #include <sysdolphin/baselib/mobj.h>
+@@ -38,6 +57,14 @@
  #include <sysdolphin/baselib/sislib.h>
  #include <sysdolphin/baselib/wobj.h>
  
@@ -5996,13 +5999,14 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
 +static void stadium_owner_journal_map2_buffer(
 +    HSD_GObj* gobj, const void* lookup_result, const void* stored_result);
 +static void stadium_owner_note_map2_proc_dispatch(void);
++static void stadium_owner_note_map2_proc(HSD_GObj* gobj, HSD_GObjProc* proc);
 +static void stadium_owner_note_map2_buffer_use(const void* buffer);
 +#endif
 +
  static struct grPStadium_YakumonoParam {
      int x0;
      int x4;
-@@ -64,6 +89,16 @@ static struct grPStadium_YakumonoParam {
+@@ -64,6 +91,16 @@ static struct grPStadium_YakumonoParam {
      s16 x50;
  }* yakumono_param;
  
@@ -6019,7 +6023,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
  GrJoint grPs_803E1248[] = {
      { 1, 3, 0 }, { 2, 3, 0 }, { 3, 4, 0 },
      { 4, 5, 0 }, { 5, 6, 0 }, { 7, 9, 0 },
-@@ -162,6 +197,10 @@ void grStadium_OnDemoInit(int unused) {}
+@@ -162,6 +199,10 @@ void grStadium_OnDemoInit(int unused) {}
  
  void grStadium_OnInit(void)
  {
@@ -6030,7 +6034,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
      yakumono_param = Ground_GetYakumonoParam();
  
      stage_info.unk8C.b4 = false;
-@@ -206,6 +245,10 @@ Ground_GObj* grStadium_801D10F8(StadiumGrType id)
+@@ -206,6 +247,10 @@ Ground_GObj* grStadium_801D10F8(StadiumGrType id)
  
      cb = &grPs_StageCallbacks[id];
      gobj = Ground_GetStageGObj(id);
@@ -6041,7 +6045,20 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
  
      if (gobj != NULL) {
          Ground* gp = GET_GROUND(gobj);
-@@ -315,6 +358,9 @@ void grStadium_801D13E0(Ground_GObj* gobj)
+@@ -219,7 +264,12 @@ Ground_GObj* grStadium_801D10F8(StadiumGrType id)
+             cb->on_init(gobj);
+         }
+         if (cb->gobj_proc != NULL) {
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++            HSD_GObjProc* proc = HSD_GObj_SetupProc(gobj, cb->gobj_proc, 4);
++            if ((int) id == 2) stadium_owner_note_map2_proc(gobj, proc);
++#else
+             HSD_GObj_SetupProc(gobj, cb->gobj_proc, 4);
++#endif
+         }
+     } else {
+         OSReport("%s:%d: couldn t get gobj(id=%d)\n", __FILE__, 288, id);
+@@ -315,6 +365,9 @@ void grStadium_801D13E0(Ground_GObj* gobj)
      if (mobj == NULL) {
          gr->u.stadium.xCC = HSD_MemAlloc(0x50000);
      }
@@ -6051,7 +6068,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
      gr->u.stadium.xC4_b1 = false;
      gr->u.stadium.xD0 = NULL;
      gr->u.stadium.xD4 = 0.0F;
-@@ -346,6 +392,9 @@ bool grStadium_801D1518(Ground_GObj* gobj)
+@@ -346,6 +399,9 @@ bool grStadium_801D1518(Ground_GObj* gobj)
  
  void grStadium_801D1520(Ground_GObj* gobj)
  {
@@ -6061,7 +6078,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
      Ground* gp = GET_GROUND(gobj);
      if (!gp->u.stadium.xC4_b0) {
          grStadium_801D4548(gobj);
-@@ -652,6 +701,38 @@ typedef struct ImageDescWrapper {
+@@ -652,6 +708,38 @@ typedef struct ImageDescWrapper {
      u16 x1A, x1C;
  } ImageDescWrapper;
  
@@ -6100,7 +6117,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -788,137 +869,4243 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
+@@ -788,137 +876,4720 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
              }
              break;
          }
@@ -6290,6 +6307,9 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
 +    HSD_GObj* nested_map5_ground;
 +    void* map2_buffer;
 +    MeleeWebStadiumMap2BufferOrigin map2_buffer_origin;
++    MeleeWebSourceMemoryAllocation map2_buffer_allocation_lease;
++    int map2_buffer_allocation_lease_captured;
++    HSD_GObjProc* map2_proc;
 +    unsigned map2_buffer_journal_count;
 +    unsigned map2_proc_dispatch_count;
 +    unsigned map2_buffer_use_count;
@@ -6509,6 +6529,28 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
 +    owner->map2_buffer_origin = lookup_result != NULL
 +        ? MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_BORROWED_PRELOAD
 +        : MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK;
++    memset(&owner->map2_buffer_allocation_lease, 0,
++           sizeof(owner->map2_buffer_allocation_lease));
++    owner->map2_buffer_allocation_lease_captured = 0;
++    /* The source fallback is the exact 0x50000-byte HSD allocation above.
++     * Keep the initial capture valid if the observer is unavailable; only a
++     * later started-retirement path requires this continuity witness. */
++    if (owner->map2_buffer_origin ==
++        MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK) {
++        MeleeWebSourceMemoryAllocation lease = { 0 };
++        MeleeWebSourceMemoryContext context = { 0 };
++        if (melee_web_source_memory_allocation_read(
++                stored_result, &lease) == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
++            melee_web_source_memory_context_read(&context) ==
++                MELEE_WEB_SOURCE_MEMORY_READ_OK &&
++            lease.live && lease.requested_bytes == 0x50000 &&
++            lease.allocation_generation != 0 &&
++            lease.source_heap_handle == context.source_heap_handle &&
++            lease.world_generation == context.world_generation) {
++            owner->map2_buffer_allocation_lease = lease;
++            owner->map2_buffer_allocation_lease_captured = 1;
++        }
++    }
 +}
 +
 +static void stadium_owner_note_map2_proc_dispatch(void)
@@ -6516,6 +6558,17 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
 +    MeleeWebStadiumDisplayOwner* owner = stadium_display_owner_current;
 +    if (owner != NULL && owner->map2_proc_dispatch_count != UINT_MAX)
 +        ++owner->map2_proc_dispatch_count;
++}
++
++/* Record only the exact source SetupProc return on the journaled map-2 GObj.
++ * This is a current rooted pointer observation, not an SDK allocation epoch. */
++static void stadium_owner_note_map2_proc(HSD_GObj* gobj, HSD_GObjProc* proc)
++{
++    MeleeWebStadiumDisplayOwner* owner = stadium_display_owner_current;
++    if (owner != NULL && owner->state == STADIUM_DISPLAY_OWNER_BOUND &&
++        gobj != NULL && gobj == owner->map2_ground && proc != NULL &&
++        owner->map2_proc == NULL)
++        owner->map2_proc = proc;
 +}
 +
 +static void stadium_owner_note_map2_buffer_use(const void* buffer)
@@ -8386,6 +8439,8 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
 +        return stadium_owner_error(error,size,"Stadium original manager phase binding refused");
 +    owner->manager_bound=1;
 +    owner->source_started=1;
++    if (owner->map2_buffer_output != NULL)
++        owner->map2_buffer_output->started_allocation_lease_required = 1;
 +    *out=owner->manager;
 +    if(error && size)error[0]='\0';return 1;
 +}
@@ -8427,7 +8482,47 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
 +           output->display_ground == NULL && output->map2_ground == NULL &&
 +           output->nested_map5_ground == NULL && output->buffer == NULL &&
 +           output->origin == MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_UNKNOWN &&
-+           output->captured == 0;
++           output->captured == 0 &&
++           output->buffer_allocation_lease_captured == 0 &&
++           output->started_allocation_lease_required == 0 &&
++           output->buffer_allocation_lease.source_heap_handle == 0 &&
++           output->buffer_allocation_lease.requested_bytes == 0 &&
++           output->buffer_allocation_lease.world_generation == 0 &&
++           output->buffer_allocation_lease.allocation_generation == 0 &&
++           output->buffer_allocation_lease.live == 0;
++}
++
++static int stadium_owner_source_allocation_equal(
++    const MeleeWebSourceMemoryAllocation* left,
++    const MeleeWebSourceMemoryAllocation* right)
++{
++    return left != NULL && right != NULL &&
++           left->source_heap_handle == right->source_heap_handle &&
++           left->requested_bytes == right->requested_bytes &&
++           left->world_generation == right->world_generation &&
++           left->allocation_generation == right->allocation_generation &&
++           left->live == right->live;
++}
++
++/* allocation_read is an exact-payload lookup. The current context and all
++ * lease fields must still match the OnInit fallback record. */
++static int stadium_owner_map2_buffer_allocation_matches(
++    const void* buffer, const MeleeWebSourceMemoryAllocation* expected)
++{
++    MeleeWebSourceMemoryContext context = { 0 };
++    MeleeWebSourceMemoryAllocation current = { 0 };
++    if (buffer == NULL || expected == NULL || !expected->live ||
++        expected->source_heap_handle < 0 || expected->requested_bytes != 0x50000 ||
++        expected->world_generation == 0 || expected->allocation_generation == 0 ||
++        melee_web_source_memory_context_read(&context) !=
++            MELEE_WEB_SOURCE_MEMORY_READ_OK ||
++        melee_web_source_memory_allocation_read(buffer, &current) !=
++            MELEE_WEB_SOURCE_MEMORY_READ_OK)
++        return 0;
++    return context.source_heap_handle == expected->source_heap_handle &&
++           context.world_generation == expected->world_generation &&
++           current.live && current.requested_bytes == 0x50000 &&
++           stadium_owner_source_allocation_equal(&current, expected);
 +}
 +
 +static int stadium_owner_map2_output_matches(
@@ -8441,19 +8536,28 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
 +           output->map2_ground == owner->map2_ground &&
 +           output->nested_map5_ground == owner->nested_map5_ground &&
 +           output->buffer == owner->map2_buffer &&
-+           output->origin == owner->map2_buffer_origin;
++           output->origin == owner->map2_buffer_origin &&
++           output->buffer_allocation_lease_captured ==
++               owner->map2_buffer_allocation_lease_captured &&
++           stadium_owner_source_allocation_equal(
++               &output->buffer_allocation_lease,
++               &owner->map2_buffer_allocation_lease) &&
++           output->started_allocation_lease_required ==
++               (owner->source_started != 0);
 +}
 +
-+static int stadium_owner_map2_graph_matches(
-+    const MeleeWebStadiumDisplayOwner* owner, HSD_GObj* display_ground)
++static int stadium_owner_map2_graph_matches_phase(
++    const MeleeWebStadiumDisplayOwner* owner, HSD_GObj* display_ground,
++    int started_retirement)
 +{
 +    HSD_GObj* map0 = Ground_GetMapGObj(0);
 +    HSD_GObj* display = Ground_GetMapGObj(PsType_Display);
 +    HSD_GObj* map2 = Ground_GetMapGObj(2);
 +    HSD_GObj* map5 = Ground_GetMapGObj(5);
 +    Ground* map2_data;
-+    if (owner->map2_buffer_journal_count != 1 || owner->journal_failed ||
-+        owner->map2_proc_dispatch_count != 0 ||
++    if (owner == NULL || owner->map2_buffer_journal_count != 1 ||
++        owner->journal_failed ||
++        (!started_retirement && owner->map2_proc_dispatch_count != 0) ||
 +        owner->map2_buffer_use_count != 0 || owner->map2_buffer == NULL ||
 +        (owner->map2_buffer_origin !=
 +             MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_BORROWED_PRELOAD &&
@@ -8472,7 +8576,34 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
 +    if (map2_data == NULL || map2_data->u.stadium.xCC != owner->map2_buffer ||
 +        map2_data->u.stadium.xE4 != map5)
 +        return 0;
++    if (started_retirement) {
++        HSD_GObjProc* proc = map2->proc;
++        if (!owner->source_started ||
++            owner->map2_buffer_origin !=
++                MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK ||
++            owner->map2_buffer_allocation_lease_captured != 1 ||
++            proc == NULL || proc != owner->map2_proc ||
++            !stadium_owner_map2_proc_root_contains_once(proc) ||
++            proc->gobj != map2 || proc->on_invoke != grStadium_801D1520 ||
++            proc->s_link != 4 ||
++            !stadium_owner_map2_buffer_allocation_matches(
++                owner->map2_buffer, &owner->map2_buffer_allocation_lease) ||
++            map2_data->u.stadium.xC4_b0 ||
++            map2_data->u.stadium.xC4_b1 ||
++            map2_data->u.stadium.xD0 != NULL ||
++            map2_data->u.stadium.xD8 < 0 ||
++            map2_data->u.stadium.xDC != 0 ||
++            map2_data->u.stadium.xDE != 5 ||
++            map2_data->u.stadium.xE8 != NULL)
++            return 0;
++    }
 +    return 1;
++}
++
++static int stadium_owner_map2_graph_matches(
++    const MeleeWebStadiumDisplayOwner* owner, HSD_GObj* display_ground)
++{
++    return stadium_owner_map2_graph_matches_phase(owner, display_ground, 0);
 +}
 +
 +static int stadium_owner_capture_matches(
@@ -8529,7 +8660,8 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
 +        STADIUM_OWNER_CAPTURE_REJECT("font1-slot-identity");
 +    if (!stadium_owner_display_ground_matches(owner, display_ground))
 +        STADIUM_OWNER_CAPTURE_REJECT("display-ground-identity");
-+    if (!stadium_owner_map2_graph_matches(owner, display_ground))
++    if (!stadium_owner_map2_graph_matches_phase(
++            owner, display_ground, started_retirement))
 +        STADIUM_OWNER_CAPTURE_REJECT("map2-graph");
 +    if (owner->state == STADIUM_DISPLAY_OWNER_CAPTURED &&
 +        !stadium_owner_map2_output_matches(owner))
@@ -8625,6 +8757,11 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
 +    map2_buffer_owner->nested_map5_ground = owner->nested_map5_ground;
 +    map2_buffer_owner->buffer = owner->map2_buffer;
 +    map2_buffer_owner->origin = owner->map2_buffer_origin;
++    map2_buffer_owner->buffer_allocation_lease =
++        owner->map2_buffer_allocation_lease;
++    map2_buffer_owner->buffer_allocation_lease_captured =
++        owner->map2_buffer_allocation_lease_captured;
++    map2_buffer_owner->started_allocation_lease_required = 0;
 +    map2_buffer_owner->captured = 1;
 +    owner->state = STADIUM_DISPLAY_OWNER_CAPTURED;
 +    if (error != NULL && error_size != 0) error[0] = '\0';
@@ -9761,7 +9898,8 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
 +                !stadium_owner_context_topology_matches(owner, 1) ||
 +                stadium_owner_has_font1_before(owner))) ||
 +        HSD_SisLib_804D1124[1] != owner->source_sis ||
-+        !stadium_owner_map2_graph_matches(owner, owner->display_ground) ||
++        !stadium_owner_map2_graph_matches_phase(
++            owner, owner->display_ground, started_retirement) ||
 +        !stadium_owner_map2_output_matches(owner))
 +        return stadium_owner_error(error, error_size,
 +                                   "Foreign SIS state changed before the original font-1 drain");
@@ -9878,6 +10016,29 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
 +        return stadium_owner_error(error, error_size,
 +                                   "Stadium map-2 fallback retirement needs its exact free operation");
 +
++    /* A started source boundary carries the exact OnInit fallback lease to
++     * this final free. Recheck it after Ground retirement and immediately
++     * before invoking the unchanged original HSD_Free operation. */
++    if ((owner->started_allocation_lease_required != 0 &&
++         owner->started_allocation_lease_required != 1) ||
++        (owner->buffer_allocation_lease_captured != 0 &&
++         owner->buffer_allocation_lease_captured != 1) ||
++        (owner->started_allocation_lease_required == 1 &&
++         owner->buffer_allocation_lease_captured != 1) ||
++        (owner->buffer_allocation_lease_captured == 1 &&
++         (owner->origin !=
++              MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK ||
++          !stadium_owner_map2_buffer_allocation_matches(
++              owner->buffer, &owner->buffer_allocation_lease))) ||
++        (owner->buffer_allocation_lease_captured == 0 &&
++         (owner->buffer_allocation_lease.source_heap_handle != 0 ||
++          owner->buffer_allocation_lease.requested_bytes != 0 ||
++          owner->buffer_allocation_lease.world_generation != 0 ||
++          owner->buffer_allocation_lease.allocation_generation != 0 ||
++          owner->buffer_allocation_lease.live != 0)))
++        return stadium_owner_error(error, error_size,
++                                   "Started Stadium map-2 fallback lost its exact live source allocation lease");
++
 +    if (owner->origin ==
 +        MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK)
 +        free_fn(owner->buffer, context);
@@ -9888,6 +10049,10 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
 +    owner->map2_ground = NULL;
 +    owner->nested_map5_ground = NULL;
 +    owner->origin = MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_RETIRED;
++    memset(&owner->buffer_allocation_lease, 0,
++           sizeof(owner->buffer_allocation_lease));
++    owner->buffer_allocation_lease_captured = 0;
++    owner->started_allocation_lease_required = 0;
 +    if (error != NULL && error_size != 0) error[0] = '\0';
 +    return 1;
 +}
@@ -9926,6 +10091,10 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
 +    fixture->owner.map2_buffer = NULL;
 +    fixture->owner.map2_buffer_origin =
 +        MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_UNKNOWN;
++    memset(&fixture->owner.map2_buffer_allocation_lease, 0,
++           sizeof(fixture->owner.map2_buffer_allocation_lease));
++    fixture->owner.map2_buffer_allocation_lease_captured = 0;
++    fixture->owner.map2_proc = NULL;
 +    fixture->owner.map2_buffer_journal_count = 0;
 +    fixture->owner.map2_proc_dispatch_count = 0;
 +    fixture->owner.map2_buffer_use_count = 0;
@@ -10276,13 +10445,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
          }
 -        break;
      }
--}
- 
--typedef struct TextWrapper {
--    HSD_ImageDesc desc;
--    HSD_Text* win_static_p;
--    HSD_Text* win_dynamic_p;
--} TextWrapper;
++
 +    /* Exercise both manually observed branch outcomes, carry the captured record beyond
 +     * display retirement, and free only a fallback after reverse removal. */
 +    for (unsigned branch = 0; branch < 2; ++branch) {
@@ -10450,12 +10613,342 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
 +    HSD_GObj_Entities = original_entities;
 +    HSD_GObjLibInitData = original_init;
 +    return success;
+ }
+ 
+-typedef struct TextWrapper {
+-    HSD_ImageDesc desc;
+-    HSD_Text* win_static_p;
+-    HSD_Text* win_dynamic_p;
+-} TextWrapper;
++/* Refusal purity for this known synthetic graph and real live payload only.
++ * Copies preserve padding; no unexpected source pointer is dereferenced. */
++static int stadium_owner_control_started_map2_refuses_unchanged(
++    StadiumDisplayOwnerControlFixture* fixture,
++    MeleeWebStadiumMap2BufferOwner* output, HSD_GObjProc* proc)
++{
++    MeleeWebStadiumDisplayOwner owner_before;
++    MeleeWebStadiumMap2BufferOwner output_before;
++    Ground ground_before;
++    HSD_GObjProc proc_before;
++    MeleeWebSourceMemoryAllocation lease_before = { 0 }, lease_after = { 0 };
++    memcpy(&owner_before, &fixture->owner, sizeof(owner_before));
++    memcpy(&output_before, output, sizeof(output_before));
++    memcpy(&ground_before, &fixture->map2_ground_data, sizeof(ground_before));
++    memcpy(&proc_before, proc, sizeof(proc_before));
++    if (melee_web_source_memory_allocation_read(output->buffer, &lease_before) !=
++            MELEE_WEB_SOURCE_MEMORY_READ_OK || !lease_before.live)
++        return 0;
++    return !stadium_owner_map2_graph_matches_phase(
++               &fixture->owner, &fixture->display_ground, 1) &&
++           memcmp(&owner_before, &fixture->owner, sizeof(owner_before)) == 0 &&
++           memcmp(&output_before, output, sizeof(output_before)) == 0 &&
++           memcmp(&ground_before, &fixture->map2_ground_data,
++                  sizeof(ground_before)) == 0 &&
++           memcmp(&proc_before, proc, sizeof(proc_before)) == 0 &&
++           melee_web_source_memory_allocation_read(output->buffer, &lease_after) ==
++               MELEE_WEB_SOURCE_MEMORY_READ_OK &&
++           stadium_owner_source_allocation_equal(&lease_before, &lease_after);
++}
++
++/* This focused control runs only after gameplay_startup has created the real
++ * source heap and source-memory observer. Its map/GObj graph is synthetic; the
++ * 0x50000-byte fallback and its lease are actual HSD allocations. */
++int melee_web_stadium_map2_started_buffer_controls(void)
++{
++    HSD_GObjList* const original_entities = HSD_GObj_Entities;
++    HSD_GObjLibInitDataType const original_init = HSD_GObjLibInitData;
++    HSD_GObjProc** const original_process_roots = HSD_GObj_804D7840;
++    HSD_Text* const original_text_head = HSD_SisLib_804D7978;
++    sislib_UnkAlloc3* const original_context_head = HSD_SisLib_804D797C;
++    SIS* const original_font1 = HSD_SisLib_804D1124[1];
++    MeleeWebStadiumDisplayOwner* const original_owner =
++        stadium_display_owner_current;
++    HSD_GObj* original_maps[ARRAY_SIZE(stage_info.map_gobjs)];
++    HSD_GObjProc* process_roots[16] = { NULL };
++    StadiumDisplayOwnerControlFixture fixture;
++    MeleeWebStadiumMap2BufferOwner output = { 0 };
++    MeleeWebStadiumMap2BufferOwner stale_output = { 0 };
++    MeleeWebSourceMemoryContext memory_context = { 0 };
++    MeleeWebSourceMemoryContext after_free_context = { 0 };
++    MeleeWebSourceMemoryAllocation lease = { 0 };
++    MeleeWebSourceMemoryAllocation after_free = { 0 };
++    MeleeWebSourceMemoryAllocation successor_lease = { 0 };
++    MeleeWebSourceMemoryAllocation successor_before = { 0 };
++    HSD_GObjProc map2_proc = { 0 };
++    char error[192] = { 0 };
++    void* buffer = NULL;
++    void* successor = NULL;
++    const void* freed_buffer = NULL;
++    int success = 0;
++
++    memcpy(original_maps, stage_info.map_gobjs, sizeof(original_maps));
++    if (stadium_display_owner_current != NULL || HSD_GetHeap() < 0 ||
++        original_entities == NULL || original_process_roots == NULL ||
++        original_text_head != NULL || original_context_head != NULL ||
++        original_font1 != NULL ||
++        melee_web_source_memory_context_read(&memory_context) !=
++            MELEE_WEB_SOURCE_MEMORY_READ_OK ||
++        !melee_web_source_memory_healthy())
++        return 0;
++    for (size_t i = 0; i < ARRAY_SIZE(original_maps); ++i)
++        if (original_maps[i] != NULL) return 0;
++
++    stadium_owner_control_fixture_init(&fixture, 0);
++    stadium_owner_control_reset_map2_journal(&fixture);
++    fixture.owner.state = STADIUM_DISPLAY_OWNER_BOUND;
++    buffer = HSD_MemAlloc(0x50000);
++    if (buffer == NULL) goto cleanup;
++    fixture.map2_ground_data.u.stadium.xCC = buffer;
++    fixture.map2_ground_data.u.stadium.xDE = 5;
++
++    HSD_GObjLibInitData.p_link_max = 63;
++    HSD_GObjLibInitData.gproc_pri_max = 4;
++    HSD_GObj_Entities = (HSD_GObjList*) fixture.entities;
++    HSD_GObj_804D7840 = process_roots;
++    stadium_owner_control_activate(&fixture);
++    stadium_owner_journal_map2_buffer(&fixture.map2_ground, NULL, buffer);
++    if (fixture.owner.journal_failed ||
++        fixture.owner.map2_buffer_journal_count != 1 ||
++        fixture.owner.map2_buffer != buffer ||
++        fixture.owner.map2_buffer_origin !=
++            MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK ||
++        !fixture.owner.map2_buffer_allocation_lease_captured ||
++        melee_web_source_memory_allocation_read(buffer, &lease) !=
++            MELEE_WEB_SOURCE_MEMORY_READ_OK ||
++        !lease.live || lease.requested_bytes != 0x50000 ||
++        !stadium_owner_source_allocation_equal(
++            &lease, &fixture.owner.map2_buffer_allocation_lease))
++        goto cleanup;
++
++    map2_proc.gobj = &fixture.map2_ground;
++    map2_proc.on_invoke = grStadium_801D1520;
++    map2_proc.s_link = 4;
++    fixture.map2_ground.proc = &map2_proc;
++    process_roots[4] = &map2_proc;
++    fixture.owner.map2_proc = &map2_proc;
++    fixture.owner.nested_map5_ground = &fixture.map5_ground;
++    fixture.owner.map2_proc_dispatch_count = 124;
++    fixture.owner.source_started = 1;
++    fixture.owner.map2_buffer_output = &output;
++
++    output.map0_ground = &fixture.map0_ground;
++    output.display_ground = &fixture.display_ground;
++    output.map2_ground = &fixture.map2_ground;
++    output.nested_map5_ground = &fixture.map5_ground;
++    output.buffer = buffer;
++    output.origin = MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK;
++    output.captured = 1;
++    output.buffer_allocation_lease =
++        fixture.owner.map2_buffer_allocation_lease;
++    output.buffer_allocation_lease_captured = 1;
++    output.started_allocation_lease_required = 1;
++
++    if (!stadium_owner_map2_graph_matches_phase(
++            &fixture.owner, &fixture.display_ground, 1) ||
++        stadium_owner_map2_graph_matches(&fixture.owner,
++                                          &fixture.display_ground) ||
++        !stadium_owner_map2_output_matches(&fixture.owner))
++        goto cleanup;
++
++    /* Newly admitted started state is intentionally limited to idle default
++     * map-2. Each mutation refuses without changing known owner/source state. */
++#define STADIUM_STARTED_MAP2_REFUSAL() \
++    do { if (!stadium_owner_control_started_map2_refuses_unchanged( \
++        &fixture, &output, &map2_proc)) goto cleanup; } while (0)
++    fixture.map2_ground_data.u.stadium.xDC = 1;
++    STADIUM_STARTED_MAP2_REFUSAL();
++    fixture.map2_ground_data.u.stadium.xDC = 0;
++    fixture.map2_ground_data.u.stadium.xDE = 4;
++    STADIUM_STARTED_MAP2_REFUSAL();
++    fixture.map2_ground_data.u.stadium.xDE = 5;
++    fixture.map2_ground_data.u.stadium.xD8 = -1;
++    STADIUM_STARTED_MAP2_REFUSAL();
++    fixture.map2_ground_data.u.stadium.xD8 = 0;
++    fixture.map2_ground_data.u.stadium.xC4_b0 = 1;
++    STADIUM_STARTED_MAP2_REFUSAL();
++    fixture.map2_ground_data.u.stadium.xC4_b0 = 0;
++    fixture.map2_ground_data.u.stadium.xC4_b1 = 1;
++    STADIUM_STARTED_MAP2_REFUSAL();
++    fixture.map2_ground_data.u.stadium.xC4_b1 = 0;
++    fixture.map2_ground_data.u.stadium.xD0 = (void*) &fixture.source_sis;
++    STADIUM_STARTED_MAP2_REFUSAL();
++    fixture.map2_ground_data.u.stadium.xD0 = NULL;
++    fixture.map2_ground_data.u.stadium.xE8 = &fixture.map5_ground;
++    STADIUM_STARTED_MAP2_REFUSAL();
++    fixture.map2_ground_data.u.stadium.xE8 = NULL;
++    fixture.map2_ground_data.u.stadium.xCC = (void*) &fixture.source_sis;
++    STADIUM_STARTED_MAP2_REFUSAL();
++    fixture.map2_ground_data.u.stadium.xCC = buffer;
++    fixture.map2_ground_data.u.stadium.xE4 = &fixture.map0_ground;
++    STADIUM_STARTED_MAP2_REFUSAL();
++    fixture.map2_ground_data.u.stadium.xE4 = &fixture.map5_ground;
++    fixture.owner.map2_buffer_allocation_lease_captured = 0;
++    STADIUM_STARTED_MAP2_REFUSAL();
++    fixture.owner.map2_buffer_allocation_lease_captured = 1;
++    fixture.owner.map2_buffer_origin = MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_BORROWED_PRELOAD;
++    STADIUM_STARTED_MAP2_REFUSAL();
++    fixture.owner.map2_buffer_origin = MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK;
++    ++fixture.owner.map2_buffer_allocation_lease.world_generation;
++    STADIUM_STARTED_MAP2_REFUSAL();
++    --fixture.owner.map2_buffer_allocation_lease.world_generation;
++    ++fixture.owner.map2_buffer_allocation_lease.source_heap_handle;
++    STADIUM_STARTED_MAP2_REFUSAL();
++    --fixture.owner.map2_buffer_allocation_lease.source_heap_handle;
++    --fixture.owner.map2_buffer_allocation_lease.requested_bytes;
++    STADIUM_STARTED_MAP2_REFUSAL();
++    ++fixture.owner.map2_buffer_allocation_lease.requested_bytes;
++    fixture.owner.map2_buffer_allocation_lease.live = 0;
++    STADIUM_STARTED_MAP2_REFUSAL();
++    fixture.owner.map2_buffer_allocation_lease.live = 1;
++#undef STADIUM_STARTED_MAP2_REFUSAL
++
++    output.started_allocation_lease_required = 0;
++    if (stadium_owner_map2_output_matches(&fixture.owner)) goto cleanup;
++    output.started_allocation_lease_required = 1;
++
++    ++output.buffer_allocation_lease.allocation_generation;
++    if (stadium_owner_map2_output_matches(&fixture.owner)) goto cleanup;
++    --output.buffer_allocation_lease.allocation_generation;
++
++    ++fixture.owner.map2_buffer_allocation_lease.allocation_generation;
++    if (!stadium_owner_control_started_map2_refuses_unchanged(
++            &fixture, &output, &map2_proc))
++        goto cleanup;
++    --fixture.owner.map2_buffer_allocation_lease.allocation_generation;
++
++    fixture.owner.map2_buffer_use_count = 1;
++    if (!stadium_owner_control_started_map2_refuses_unchanged(
++            &fixture, &output, &map2_proc))
++        goto cleanup;
++    fixture.owner.map2_buffer_use_count = 0;
++
++    map2_proc.on_invoke = NULL;
++    if (!stadium_owner_control_started_map2_refuses_unchanged(
++            &fixture, &output, &map2_proc))
++        goto cleanup;
++    map2_proc.on_invoke = grStadium_801D1520;
++
++    process_roots[4] = NULL;
++    if (!stadium_owner_control_started_map2_refuses_unchanged(
++            &fixture, &output, &map2_proc))
++        goto cleanup;
++    process_roots[4] = &map2_proc;
++
++    /* Remove the original map-2/map-5 GObj roots before the delayed free, as
++     * StageLast does. A stale copied lease must refuse without invoking free. */
++    stage_info.map_gobjs[2] = NULL;
++    stage_info.map_gobjs[5] = NULL;
++    stadium_owner_control_remove_from_link(&fixture, 5,
++                                           &fixture.map2_ground);
++    stadium_owner_control_remove_from_link(&fixture, 5,
++                                           &fixture.map5_ground);
++    ++output.buffer_allocation_lease.allocation_generation;
++    StadiumMap2BufferControlFree free_state = { 0 };
++    if (stadium_map2_buffer_owner_end_with_free(
++            &output, stadium_owner_control_free_map2_buffer, &free_state,
++            error, sizeof(error)) ||
++        free_state.calls != 0 || free_state.freed != NULL ||
++        output.captured != 1 || output.buffer != buffer)
++        goto cleanup;
++    output.started_allocation_lease_required = 0;
++    if (stadium_map2_buffer_owner_end_with_free(
++            &output, stadium_owner_control_free_map2_buffer, &free_state,
++            error, sizeof(error)) || free_state.calls != 0 ||
++        output.captured != 1 || output.buffer != buffer)
++        goto cleanup;
++    output.started_allocation_lease_required = 1;
++    --output.buffer_allocation_lease.allocation_generation;
++
++    output.buffer_allocation_lease_captured = 0;
++    if (stadium_map2_buffer_owner_end_with_free(
++            &output, stadium_owner_control_free_map2_buffer, &free_state,
++            error, sizeof(error)) || free_state.calls != 0 ||
++        output.captured != 1 || output.buffer != buffer)
++        goto cleanup;
++    output.buffer_allocation_lease_captured = 1;
++
++    stale_output = output;
++    freed_buffer = buffer;
++    if (!melee_web_stadium_map2_buffer_owner_end(
++            &output, error, sizeof(error)))
++        goto cleanup;
++    buffer = NULL;
++    if (output.captured != 0 || output.buffer != NULL ||
++        output.origin != MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_RETIRED ||
++        output.buffer_allocation_lease_captured != 0 ||
++        output.started_allocation_lease_required != 0 ||
++        melee_web_source_memory_allocation_read(freed_buffer, &after_free) !=
++            MELEE_WEB_SOURCE_MEMORY_READ_OK || after_free.live ||
++        after_free.requested_bytes != 0 || after_free.allocation_generation != 0 ||
++        after_free.source_heap_handle != memory_context.source_heap_handle ||
++        after_free.world_generation != memory_context.world_generation ||
++        melee_web_source_memory_context_read(&after_free_context) !=
++            MELEE_WEB_SOURCE_MEMORY_READ_OK ||
++        after_free_context.source_heap_handle !=
++            memory_context.source_heap_handle ||
++        after_free_context.world_generation != memory_context.world_generation ||
++        !melee_web_source_memory_healthy())
++        goto cleanup;
++    /* Erased current allocation must refuse before any same-address reuse. */
++    if (stadium_map2_buffer_owner_end_with_free(
++            &stale_output, stadium_owner_control_free_map2_buffer, &free_state,
++            error, sizeof(error)) || free_state.calls != 0 ||
++        stale_output.captured != 1 || stale_output.buffer != freed_buffer)
++        goto cleanup;
++    successor = HSD_MemAlloc(0x50000);
++    if (successor != freed_buffer || successor == NULL) goto cleanup;
++    memset(successor, 0xA5, 32);
++    if (melee_web_source_memory_allocation_read(successor,
++                                                &successor_lease) !=
++            MELEE_WEB_SOURCE_MEMORY_READ_OK ||
++        !successor_lease.live || successor_lease.requested_bytes != 0x50000 ||
++        successor_lease.world_generation !=
++            stale_output.buffer_allocation_lease.world_generation ||
++        successor_lease.source_heap_handle !=
++            stale_output.buffer_allocation_lease.source_heap_handle ||
++        successor_lease.allocation_generation ==
++            stale_output.buffer_allocation_lease.allocation_generation)
++        goto cleanup;
++    successor_before = successor_lease;
++    free_state = (StadiumMap2BufferControlFree) { 0 };
++    if (stadium_map2_buffer_owner_end_with_free(
++            &stale_output, stadium_owner_control_free_map2_buffer, &free_state,
++            error, sizeof(error)) ||
++        free_state.calls != 0 || free_state.freed != NULL ||
++        stale_output.captured != 1 || stale_output.buffer != successor ||
++        !stadium_owner_source_allocation_equal(
++            &successor_lease, &successor_before) ||
++        melee_web_source_memory_allocation_read(successor, &after_free) !=
++            MELEE_WEB_SOURCE_MEMORY_READ_OK ||
++        !stadium_owner_source_allocation_equal(&successor_before, &after_free))
++        goto cleanup;
++    for (size_t i = 0; i < 32; ++i)
++        if (((const unsigned char*) successor)[i] != 0xA5) goto cleanup;
++    buffer = successor;
++    successor = NULL;
++    fprintf(stderr,"STADIUM_MAP2_STARTED_BUFFER_CONTROL real_hsd_fallback=1 strict_dispatch_rejected=1 started_dispatch_retained=124 owner_lease_refused=1 output_lease_refused=1 idle_fields_refused=1 missing_capture_refused=1 borrowed_started_refused=1 wrong_world_heap_size_refused=1 required_bit_bypass_refused=1 erased_allocation_refused=1 proc_root_refused=1 callback_refused=1 stale_final_free_refused=1 exact_final_free=1 reused_payload_old_lease_refused=1 successor_lease_and_bytes_preserved=1 synthetic_graph=1 ticks=0\n");
++    fflush(stderr);
++    success = 1;
++
++cleanup:
++    /* Restore every process/GObj/SIS/map root saved from the live bootstrap
++     * before freeing a failed fixture allocation or returning to C++. */
++    stadium_display_owner_current = original_owner;
++    HSD_SisLib_804D7978 = original_text_head;
++    HSD_SisLib_804D797C = original_context_head;
++    HSD_SisLib_804D1124[1] = original_font1;
++    memcpy(stage_info.map_gobjs, original_maps, sizeof(original_maps));
++    HSD_GObj_804D7840 = original_process_roots;
++    HSD_GObj_Entities = original_entities;
++    HSD_GObjLibInitData = original_init;
++    if (buffer != NULL) HSD_Free(buffer);
++    return success;
 +}
 +#endif
  
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
-@@ -1185,22 +5372,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +5856,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -10497,7 +10990,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +5420,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +5904,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -10519,7 +11012,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +5442,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +5926,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
@@ -10542,7 +11035,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
      wrapper->flag = false;
      return gobj;
  }
-@@ -1896,6 +6122,9 @@ bool grStadium_801D42B8(void)
+@@ -1896,6 +6606,9 @@ bool grStadium_801D42B8(void)
      if (gp->u.stadium.xC4_b1) {
          return false;
      }
@@ -10552,7 +11045,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
      gp->u.stadium.xD0 =
          grDatFiles_801C6478(gp->u.stadium.xCC, gp->u.stadium.xC8);
      return true;
-@@ -2093,6 +6322,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2093,6 +6806,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
              gp = GET_GROUND(map_gobj);
              HSD_ASSERT(0x99B, gp);
              gp->u.stadium.xC4_b1 = true;
@@ -10562,7 +11055,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..8afb2456d113b67113ecb67556f11934
              lbFile_80016580(datfiles[var_r29], gp->u.stadium.xCC,
                              &gp->u.stadium.xC8, fn_801D4220, NULL);
              temp_r31->u.stadium.xDC = 1;
-@@ -2221,6 +6453,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2221,6 +6937,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
          if (temp_r31->u.stadium.xDE == 5) {
              temp_r31->u.stadium.xD8 =
                  randi_between_2(yakumono_param->x0, yakumono_param->x4);
