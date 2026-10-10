@@ -2626,6 +2626,12 @@ int main(void)
             self.skipTest("Original GO/HUD source canary requires its separately reviewed run gate")
         self._run_stadium_source_ready_session_one_shot(go_alignment_probe=True)
 
+    def test_stadium_source_functional_idle_3500_one_shot(self):
+        if os.environ.get("MELEE_RUN_STADIUM_SOURCE_FUNCTIONAL_IDLE_3500") != "1":
+            self.skipTest("One-world 3,500-post-GO functional interval requires its separately reviewed run gate")
+        self._run_stadium_source_ready_session_one_shot(
+            go_alignment_probe=True, functional_idle_probe=True)
+
     def test_stadium_source_setup_one_shot(self):
         if os.environ.get("MELEE_RUN_STADIUM_SOURCE_SETUP") != "1":
             self.skipTest("Original CSS/SSS setup receipt requires its separately reviewed run gate")
@@ -2638,7 +2644,7 @@ int main(void)
 
     def _run_stadium_source_ready_session_one_shot(
             self, toy_owner_controls=False, post_ready_tick=False, go_alignment_probe=False,
-            setup_only=False):
+            setup_only=False, functional_idle_probe=False):
         import hashlib
         from capture_sd_reference_prefix import cleanup_process
 
@@ -2666,12 +2672,14 @@ int main(void)
         before = {name: hashlib.sha256(path.read_bytes()).hexdigest()
                   for name, path in paths.items()}
         source = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-        scope = ("stadium-source-toy-owner-controls-v1" if toy_owner_controls
+        scope = ("stadium-source-functional-idle-v1" if functional_idle_probe
+                 else "stadium-source-toy-owner-controls-v1" if toy_owner_controls
                  else "stadium-source-post-ready-tick-v1" if post_ready_tick
                  else "stadium-source-go-alignment-v1" if go_alignment_probe
                  else "stadium-source-setup-v1" if setup_only
                  else "stadium-source-ready-session-v1")
-        prefix = ("stadium-toy-owner" if toy_owner_controls
+        prefix = ("stadium-functional-idle" if functional_idle_probe
+                  else "stadium-toy-owner" if toy_owner_controls
                   else "stadium-post-ready" if post_ready_tick
                   else "stadium-go-alignment" if go_alignment_probe
                   else "stadium-source-setup" if setup_only
@@ -2686,7 +2694,8 @@ int main(void)
             "source_revision": source,
             "source_tree": subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"],
                                                      cwd=ROOT, text=True).strip(),
-            "argv": command, "cwd": str(ROOT), "timeout_seconds": 120,
+            "argv": command, "cwd": str(ROOT),
+            "timeout_seconds": 120,
             "fixture_sha256_before": before,
             "binary_sha256": {str(path): hashlib.sha256(path.read_bytes()).hexdigest()
                               for path in [Path(command[0]).resolve(), target,
@@ -2840,7 +2849,50 @@ int main(void)
         self.assertGreater(int(phases[2][2]), 0)
         self.assertGreater(int(phases[2][3]), 0)
         self.assertEqual([int(phases[3][i]) for i in (1, 2, 3, 5, 6)], [0, 0, 0, 0, 0])
-        if toy_owner_controls:
+        if functional_idle_probe:
+            self.assertIn(
+                "Stadium one-world neutral no-draw interval reached exactly 3,500 ticks after the GO-containing tick, with PCM processing and checked close; timer/transform state unobserved; no C3 claim",
+                stdout)
+            event_rows = re.findall(
+                r"STADIUM_SOURCE_GO_EVENT event=(\S+) sequence=(\d+) generation=(\d+) world_ticks=(\d+) source_frame=(\d+) object=(\d+) proc=(\d+) callback_index=(-?\d+) source_branch=(-?\d+) map2_gate=(-?\d+) display_mode=(-?\d+) remap_branch=(-?\d+) callback_identity=(-?\d+) hud_enabled=(-?\d+)",
+                stderr)
+            self.assertEqual([row[0] for row in event_rows],
+                             ["StageBefore", "StageAfter", "GoAfter", "HudAfter"], stderr)
+            self.assertEqual([int(row[1]) for row in event_rows], [1, 2, 3, 4])
+            self.assertEqual(len({int(row[2]) for row in event_rows}), 1)
+            self.assertEqual((int(event_rows[0][9]), int(event_rows[1][9])), (1, 0))
+            self.assertEqual((int(event_rows[2][3]), int(event_rows[2][9]),
+                              int(event_rows[2][10])), (84, 0, 0xB))
+            self.assertEqual((int(event_rows[3][3]), int(event_rows[3][10]),
+                              int(event_rows[3][12])), (123, 1, 1))
+            steps = re.findall(
+                r"STADIUM_FUNCTIONAL_IDLE_STEP ordinal=(\d+) world_before=(\d+) world_after=(\d+) session_before=(\d+) session_after=(\d+) source_frame_before=(\d+) source_frame_after=(\d+) generation=(\d+) memory_status_before=(\d+) memory_status_after=(\d+) memory_world_before=(\d+) memory_world_after=(\d+) source_heap_before=(-?\d+) source_heap_after=(-?\d+) ready=(\d+) ending=(\d+) complete=(\d+) draw=0 audio=rendered",
+                stderr)
+            self.assertEqual(len(steps), 3500, stderr[-5000:])
+            generation = int(event_rows[0][2])
+            go_after = int(event_rows[2][3]) + 1
+            for ordinal, row in enumerate(steps, 1):
+                values = tuple(map(int, row))
+                self.assertEqual(values[0], ordinal, row)
+                self.assertEqual(values[2], values[1] + 1, row)
+                self.assertEqual(values[4], values[3] + 1, row)
+                self.assertEqual(values[2] - go_after, ordinal, row)
+                self.assertEqual(values[7], generation, row)
+                self.assertEqual((values[8], values[9]), (0, 0), row)
+                self.assertEqual((values[10], values[11]), (generation, generation), row)
+                self.assertGreaterEqual(values[12], 0, row)
+                self.assertEqual(values[13], values[12], row)
+                self.assertEqual((values[15], values[16]), (0, 0), row)
+                if ordinal >= 40:
+                    self.assertEqual(values[14], 1, row)
+            complete = re.findall(
+                r"STADIUM_FUNCTIONAL_IDLE phase=complete go_world_after=(\d+) ready_world_tick=(\d+) target_world_tick=(\d+) observed_post_go_ticks=(\d+) final_session_ticks=(\d+) final_source_frame=(\d+) draw=0 timer=unobserved transform=unobserved",
+                stderr)
+            self.assertEqual(len(complete), 1, stderr)
+            go_tick, ready_tick, target_tick, post_go, _session, _frames = map(int, complete[0])
+            self.assertEqual((go_tick, ready_tick, target_tick, post_go), (85, 124, 3585, 3500))
+            self.assertIn("STADIUM_SOURCE_GO phase=checked-close snapshot_unavailable=1", stderr)
+        elif toy_owner_controls:
             self.assertIn("Stadium bounded Toy owner controls passed; one Ready plus no-acquisition and unarmed OnInit lifetimes, no C3 claim", stdout)
             self.assertIn("STADIUM_TOY_OWNER phase=entry-null-archive-table-refused unchanged=1", stderr)
             self.assertIn("STADIUM_TOY_OWNER phase=no-acquisition-close null_archive_table_refused=1 foreign_archive_refused=1 reset=1 ticks=0", stderr)
