@@ -26,12 +26,15 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['css-sss-reducer', {type: 'boolean', default: false}],
       ['first-css-browser-draw', {type: 'boolean', default: false}],
       ['first-css-browser-stream', {type: 'boolean', default: false}],
+      ['first-css-browser-final-draw', {type: 'boolean', default: false}],
     ])), strict: true});
 const cssSssReducer = values['css-sss-reducer'];
-const firstCssBrowserStream = values['first-css-browser-stream'];
+const firstCssBrowserFinalDraw = values['first-css-browser-final-draw'];
+const firstCssBrowserStream = values['first-css-browser-stream'] || firstCssBrowserFinalDraw;
 const firstCssBrowserDraw = values['first-css-browser-draw'] || firstCssBrowserStream;
 if ((cssSssReducer && firstCssBrowserDraw) ||
-    (values['first-css-browser-draw'] && firstCssBrowserStream))
+    (values['first-css-browser-draw'] && firstCssBrowserStream) ||
+    (values['first-css-browser-stream'] && firstCssBrowserFinalDraw))
   throw Error('Choose one private C1a diagnostic route');
 const LIMITS = Object.freeze({
   serverStartMs: 10000,
@@ -99,7 +102,8 @@ const report = {
   browser: null,
   local_http_artifacts: {count: 0, before: null, after: null, unchanged: false},
   scenario: {
-    route_mode: firstCssBrowserStream ? 'first-css-browser-postdraw-stream' :
+    route_mode: firstCssBrowserFinalDraw ? 'first-css-browser-final-pending-draw' :
+      firstCssBrowserStream ? 'first-css-browser-postdraw-stream' :
       firstCssBrowserDraw ? 'first-css-browser-draw' :
       values['css-sss-reducer'] ? 'css-sss-reducer' : 'full-c1a',
     armed_before_css_entry: false,
@@ -698,6 +702,142 @@ async function runFirstCssBrowserPostdrawStream(baseline) {
   return evidence.native;
 }
 
+async function readFirstCssBrowserFinalDrawObservation() {
+  return page.evaluate(() => {
+    const module = globalThis.Module;
+    const pointer = module?._melee_web_native_menu_stadium_first_css_draw_observe?.();
+    const observation = pointer ? JSON.parse(module.UTF8ToString(pointer)) : null;
+    return {native: observation ? {...observation,
+      native_phase: module._melee_web_native_menu_phase(),
+      running: module._melee_web_native_menu_running()} : null,
+      host: globalThis.__meleeWebStadiumFirstCssFinalDrawRead?.() ?? null};
+  });
+}
+
+function assertFirstCssBrowserFinalDraw(evidence, stoppedStream) {
+  const observation = evidence?.native;
+  const final = observation?.final_pending_css_draw;
+  const host = evidence?.host;
+  assert.ok(final && host, 'Final pending-CSS draw evidence is absent');
+  assert.deepEqual(observation.postdraw_stream, stoppedStream,
+    'Separate final draw changed the retained terminal stream');
+  assert.equal(observation.native_phase, 1);
+  assert.equal(observation.running, 0);
+  for (const key of ['armed', 'kicked', 'attempted', 'captured', 'compared',
+    'complete', 'frame_end_returned']) assert.equal(final[key], true, key);
+  assert.equal(final.failed, false, final.error || 'Final CSS draw failed');
+  assert.equal(final.error, null);
+  assert.equal(final.input_ordinal, 148);
+  assert.equal(final.consumed_pad_sequence, 1574);
+  assert.equal(final.terminal_tick_sequence, 1575);
+  assert.equal(final.draw_enter_sequence, 1576);
+  assert.equal(final.draw_return_sequence, 1577);
+  assert.equal(final.source_steps, 0);
+  assert.equal(final.source_draws, 0);
+  assert.equal(final.source_pending, false);
+  assert.equal(final.host_draw_calls, 1);
+  assert.equal(final.aurora_begin_calls, 1);
+  assert.equal(final.aurora_end_calls, 1);
+  assert.equal(host.hook_error, null);
+  assert.deepEqual(host.status, {attempted: true, approved: true, failed: false});
+  assert.equal(host.rows.length, 1);
+  assert.equal(host.rows[0].phase, 'final_draw');
+  assert.equal(host.rows[0].approved, true);
+  assert.deepEqual(host.rows[0].actual, final.actual_draw);
+  const wanted = firstCssBrowserStreamInputs.expected.expected_pairs[147].expected_draw_return;
+  for (const key of firstCssBrowserDrawInputs.drawExpected.comparison_fields)
+    assert.deepEqual(final.actual_draw[key], wanted[key], `Final CSS draw differs at ${key}`);
+  assert.equal(final.actual_draw.world_generation, stoppedStream.transition_snapshot.world_generation);
+  for (const key of ['world_generation_stable', 'scene_owner_stable', 'seed_owner_stable'])
+    assert.equal(final.actual_draw[key], true, key);
+  assert.equal(final.actual_draw.source_scene, 1);
+  assert.equal(final.actual_draw.menu_phase, 1);
+  assert.equal(final.actual_draw.scene_kind, 8);
+}
+
+async function runFirstCssBrowserFinalPendingDraw() {
+  // Preserve and assert the completed stream before authorizing any final draw.
+  const stopped = report.scenario.first_css_browser_stream;
+  assertFirstCssBrowserStreamTerminal(stopped);
+  assert.equal(stopped.native.postdraw_stream.outcome, 'stop_after_last_input_request',
+    'Final pending draw requires the retained result3 boundary, not the pair cap');
+  const stoppedStream = structuredClone(stopped.native.postdraw_stream);
+  await persistReport();
+  await timeout(page.evaluate(async ({moduleUrl, expectedPair, terminal}) => {
+    if (globalThis.__meleeWebStadiumFirstCssFinalDrawCompare ||
+        globalThis.__meleeWebStadiumFirstCssFinalDrawRead)
+      throw Error('Final CSS draw host comparator was already registered');
+    const {createFirstCssFinalDrawComparator, requestSynchronousApproval} = await import(moduleUrl);
+    const comparator = createFirstCssFinalDrawComparator(expectedPair, terminal);
+    const rows = [];
+    let hookError = null;
+    globalThis.__meleeWebStadiumFirstCssFinalDrawRead = () => ({
+      status: comparator.status(), rows, hook_error: hookError});
+    globalThis.__meleeWebStadiumFirstCssFinalDrawCompare = (phase, actualJson) => {
+      if (rows.length >= 1) { hookError = 'Final CSS draw callback repeated'; return false; }
+      let actual;
+      try { actual = JSON.parse(actualJson); }
+      catch { actual = {malformed_json: String(actualJson).slice(0, 6000)}; }
+      const approved = requestSynchronousApproval(comparator.compare, phase, actualJson);
+      rows.push({phase, actual, approved});
+      return approved === true;
+    };
+  }, {moduleUrl: 'data:text/javascript;base64,' +
+      Buffer.from(firstCssBrowserStreamInputs.helperSource).toString('base64'),
+    expectedPair: firstCssBrowserStreamInputs.expected.expected_pairs[147],
+    terminal: stoppedStream.transition_snapshot}), Math.min(5000, remaining()),
+  'Register separate host-only final CSS draw comparison');
+  // No input or expected state is allocated/copied into WASM here.
+  const arm = await timeout(page.evaluate(() => {
+    const module = globalThis.Module;
+    const fn = module?._melee_web_native_menu_stadium_first_css_final_draw_arm;
+    if (typeof fn !== 'function') throw Error('Final CSS draw arm export is absent');
+    const result = fn();
+    if (result !== 1) {
+      const pointer = module._melee_web_native_menu_message();
+      throw Error(pointer ? module.UTF8ToString(pointer) : 'Final CSS draw arm refused');
+    }
+    return result;
+  }), Math.min(5000, remaining()), 'Arm one checked final pending-CSS draw');
+  assert.equal(arm, 1);
+  report.scenario.first_css_final_draw_armed = await timeout(
+    readFirstCssBrowserFinalDrawObservation(), Math.min(5000, remaining()),
+    'Final CSS draw evidence before kick');
+  await persistReport();
+  assert.deepEqual(report.scenario.first_css_final_draw_armed.native.postdraw_stream, stoppedStream);
+  assert.equal(report.scenario.first_css_final_draw_armed.native.running, 0);
+  assert.equal(report.scenario.first_css_final_draw_armed.native.final_pending_css_draw.armed, true);
+  assert.equal(report.scenario.first_css_final_draw_armed.host.rows.length, 0);
+  const kick = await timeout(page.evaluate(() => {
+    const module = globalThis.Module;
+    const fn = module?._melee_web_native_menu_stadium_first_css_final_draw_kick;
+    if (typeof fn !== 'function') throw Error('Final CSS draw kick export is absent');
+    const result = fn();
+    if (result !== 1) {
+      const pointer = module._melee_web_native_menu_message();
+      throw Error(pointer ? module.UTF8ToString(pointer) : 'Final CSS draw kick refused');
+    }
+    return result;
+  }), Math.min(5000, remaining()), 'Release one source draw without another tick');
+  assert.equal(kick, 1);
+  await timeout(page.waitForFunction(() => {
+    const module = globalThis.Module;
+    const pointer = module?._melee_web_native_menu_stadium_first_css_draw_observe?.();
+    if (!pointer) return false;
+    const final = JSON.parse(module.UTF8ToString(pointer)).final_pending_css_draw;
+    return final?.complete === true || final?.failed === true;
+  }, null, {timeout: Math.min(30000, remaining())}), Math.min(30000, remaining()),
+  'Final CSS draw comparison and paired Aurora end');
+  const evidence = await timeout(readFirstCssBrowserFinalDrawObservation(),
+    Math.min(5000, remaining()), 'Retain final CSS draw actual comparison before cleanup');
+  report.scenario.first_css_final_pending_draw = evidence;
+  await persistReport();
+  assertFirstCssBrowserFinalDraw(evidence, stoppedStream);
+  report.scenario.css_final_draw_claim =
+    'Original final CSS DrawReturn1577 seven fields compared after147 additional pairs; terminal scheduler snapshot and raw pending/next remain unpaired. No SSS admission.';
+  return evidence.native;
+}
+
 async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   const prearm = await timeout(page.evaluate(() => {
     const module = globalThis.Module;
@@ -827,6 +967,7 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   if (firstCssBrowserStream) {
     await saveScreenshot('stadium-first-css-browser-draw');
     observation = await runFirstCssBrowserPostdrawStream(observation);
+    if (firstCssBrowserFinalDraw) observation = await runFirstCssBrowserFinalPendingDraw();
   }
   report.scenario.final_phase = observation.native_phase;
   report.scenario.final_running = observation.running;
@@ -846,8 +987,8 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   }), Math.min(10000, remaining()), 'First-CSS browser WebGPU snapshot');
   assert.equal(report.scenario.gpu.cross_origin_isolated, true);
   assert.equal(report.scenario.gpu.adapter_available, true);
-  await saveScreenshot(firstCssBrowserStream
-    ? 'stadium-first-css-browser-postdraw-stream' : 'stadium-first-css-browser-draw');
+  await saveScreenshot(firstCssBrowserFinalDraw ? 'stadium-first-css-browser-final-pending-draw' :
+    firstCssBrowserStream ? 'stadium-first-css-browser-postdraw-stream' : 'stadium-first-css-browser-draw');
   report.scenario.page_errors = pageErrors;
   report.scenario.console_errors = consoleErrors;
   assert.deepEqual(pageErrors, []);
@@ -1087,7 +1228,8 @@ async function main() {
   assert.equal(preflight.schema, 'melee-web-stadium-c1a-browser-preflight-v1');
   if (firstCssBrowserDraw)
     assert.equal(preflight.route_mode, firstCssBrowserStream
-      ? 'first-css-browser-postdraw-stream' : 'first-css-browser-draw',
+      ? (firstCssBrowserFinalDraw ? 'first-css-browser-final-pending-draw' :
+        'first-css-browser-postdraw-stream') : 'first-css-browser-draw',
       'First-CSS diagnostic command requires its exact frozen preflight route');
   else if (values['css-sss-reducer'])
     assert.equal(preflight.route_mode, 'css-sss-reducer', 'Reducer command requires a frozen CSS-to-SSS preflight');
@@ -1468,6 +1610,12 @@ async function cleanupOwnedProcesses() {
   cleanupDeadline = Date.now() + LIMITS.cleanupTotalMs;
   const cleanupFailures = report.cleanup.failures;
   if (report.result !== 'pass' && page && !page.isClosed()) {
+    if (firstCssBrowserFinalDraw) {
+      try { report.scenario.first_css_final_draw_failure = await timeout(
+        readFirstCssBrowserFinalDrawObservation(), Math.min(2000, cleanupRemaining()),
+        'Final CSS draw failure evidence before unload'); }
+      catch (error) { cleanupFailures.push({step: 'final-draw-failure-snapshot', error: errorText(error)}); }
+    }
     if (firstCssBrowserStream) {
       try { report.scenario.first_css_stream_failure = await timeout(
         readFirstCssBrowserStreamObservation(), Math.min(2000, cleanupRemaining()),

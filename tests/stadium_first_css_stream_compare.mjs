@@ -175,3 +175,47 @@ export function requestSynchronousApproval(callback, phase, actualJson) {
     return false;
   }
 }
+
+// A separate one-use comparison after the stream has already stopped. The
+// terminal scheduler snapshot remains unpaired; only raw DrawReturn1577 is
+// compared here. Neither expected state nor this callback enters WASM.
+export function createFirstCssFinalDrawComparator(expectedPair, terminal) {
+  const wanted = expectedPair?.expected_draw_return;
+  if (!plainObject(expectedPair) || expectedPair.index !== 147 ||
+      expectedPair.consumed_pad_sequence !== 1574 ||
+      expectedPair.source_tick_sequence !== 1575 ||
+      expectedPair.draw_enter_sequence !== 1576 ||
+      expectedPair.draw_return_sequence !== 1577 || !plainObject(wanted) ||
+      wanted.source_tick !== 149 || wanted.draw_ordinal !== 148 ||
+      wanted.scene_kind !== SCENE_KIND_CSS || !Number.isInteger(wanted.scene_frame) ||
+      !validHex(wanted.pad_state_hex, 822) || !validHex(wanted.random_seed_hex, 4) ||
+      !exactRoute(wanted.scene_routing_getters, wanted.scene_routing_getters))
+    throw new TypeError('Final CSS draw requires the exact original row1577');
+  if (!plainObject(terminal) || !stableCssOwner(terminal) ||
+      !Number.isInteger(terminal.world_generation) || terminal.world_generation <= 0 ||
+      terminal.source_tick !== 148 || terminal.draw_ordinal !== 148 ||
+      terminal.consumed_pad_sequence !== 1574 || terminal.stream_input_ordinal !== 148 ||
+      terminal.executed_host_ticks !== 149 || terminal.tick_result !== 3 ||
+      terminal.terminal_transition !== true)
+    throw new TypeError('Final CSS draw requires the retained last-input terminal owner');
+  const generation = terminal.world_generation;
+  let attempted = false;
+  let approved = false;
+  let failed = false;
+  const compare = (phase, actualJson) => {
+    if (attempted) { failed = true; return false; }
+    attempted = true;
+    if (phase !== 'final_draw' || typeof actualJson !== 'string') {
+      failed = true; return false;
+    }
+    let actual;
+    try { actual = JSON.parse(actualJson); }
+    catch { failed = true; return false; }
+    approved = plainObject(actual) && compareDraw(actual, wanted) &&
+      actual.world_generation === generation;
+    failed = !approved;
+    return approved === true;
+  };
+  return Object.freeze({compare,
+    status: () => Object.freeze({attempted, approved, failed})});
+}

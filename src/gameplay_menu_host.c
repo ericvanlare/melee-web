@@ -147,6 +147,22 @@ struct MeleeWebMenuHost {
     uint64_t first_css_return_generation;
     MeleeWebMenuCssReturnSnapshot first_css_return;
     char first_css_return_error[160];
+    /* Result-3 CSS handoff witness, followed by a single-use terminal-draw
+     * authorization. The witness records only native owner identities and
+     * the exact raw PAD values consumed by the immediately preceding tick. */
+    int final_pending_css_draw_witness;
+    int final_pending_css_draw_state; /* 0 unused, 1 armed, 2 consumed/invalid */
+    int final_pending_css_draw_tick_result;
+    int final_pending_css_draw_request;
+    unsigned final_pending_css_draw_input_ordinal;
+    unsigned final_pending_css_draw_pad_sequence;
+    PADStatus final_pending_css_draw_raw[4];
+    uint64_t final_pending_css_draw_generation;
+    MeleeWebMenuSession* final_pending_css_draw_session;
+    CSSData* final_pending_css_draw_css;
+    struct GameSceneInfo* final_pending_css_draw_scene_info;
+    uint32_t* final_pending_css_draw_seed_owner;
+    uint32_t final_pending_css_draw_seed;
     int stadium_c1a_enabled;
 #endif
     int results_active,results_exited,results_committed,prize_active;
@@ -197,6 +213,93 @@ static int live(MeleeWebMenuHost* h,char* e,size_t n){
     return melee_web_save_profile_owner_live(h->profile,e,n);
 }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+static void final_pending_css_draw_invalidate(MeleeWebMenuHost* h)
+{
+    if (h != NULL && h == owner) {
+        h->final_pending_css_draw_witness = 0;
+        if (h->final_pending_css_draw_state == 1)
+            h->final_pending_css_draw_state = 2;
+    }
+}
+
+static int final_pending_css_pad_equal(const PADStatus* a,
+                                       const PADStatus* b)
+{
+    return a != NULL && b != NULL &&
+        a->button == b->button && a->stickX == b->stickX &&
+        a->stickY == b->stickY && a->substickX == b->substickX &&
+        a->substickY == b->substickY && a->triggerLeft == b->triggerLeft &&
+        a->triggerRight == b->triggerRight && a->analogA == b->analogA &&
+        a->analogB == b->analogB && a->err == b->err
+#ifdef TARGET_PC
+        && a->extButton == b->extButton
+#endif
+        ;
+}
+
+static void final_pending_css_pad_copy(PADStatus* destination,
+                                       const PADStatus* source)
+{
+    memset(destination, 0, sizeof(*destination));
+    destination->button = source->button;
+    destination->stickX = source->stickX;
+    destination->stickY = source->stickY;
+    destination->substickX = source->substickX;
+    destination->substickY = source->substickY;
+    destination->triggerLeft = source->triggerLeft;
+    destination->triggerRight = source->triggerRight;
+    destination->analogA = source->analogA;
+    destination->analogB = source->analogB;
+    destination->err = source->err;
+#ifdef TARGET_PC
+    destination->extButton = source->extButton;
+#endif
+}
+
+static int final_pending_css_draw_owner_live(MeleeWebMenuHost* h,
+                                             char* e, size_t n)
+{
+    const CSSData* css;
+    unsigned port;
+    if (!live(h, e, n) || !h->entered || h->drawing ||
+        h->source_scene != MELEE_WEB_HOST_SCENE_CSS ||
+        h->source_mode_kind != GM_VS || !h->vs_mode_owned ||
+        !h->session || gm_GetCurrentGameMode() != GM_VS ||
+        HSD_GObj_804D781C || HSD_GObj_804D7838 || HSD_GObj_804D7830 ||
+        HSD_GObj_804D7814 || HSD_GObj_804D7818 ||
+        melee_web_menu_phase(h->session) != MELEE_WEB_MENU_CSS ||
+        h->transition == 0 || h->transition != h->final_pending_css_draw_request ||
+        h->generation != h->final_pending_css_draw_generation ||
+        h->session != h->final_pending_css_draw_session ||
+        seed_ptr == NULL || seed_ptr != h->final_pending_css_draw_seed_owner ||
+        seed_ptr != &h->seed || h->seed != h->final_pending_css_draw_seed ||
+        h->final_pending_css_draw_scene_info != &h->source_scene_info ||
+        melee_web_current_scene_info() != &h->source_scene_info ||
+        h->source_scene_info.scene_kind != GS_CSS) {
+        return fail(e, n,
+                    "Final CSS draw lost its retained live transition owner");
+    }
+    css = melee_web_menu_css(h->session);
+    if (css == NULL || css != h->final_pending_css_draw_css ||
+        h->source_scene_info.enter_data != css ||
+        h->source_scene_info.exit_data != css ||
+        css->pending_scene_change != 1 ||
+        h->final_pending_css_draw_tick_result !=
+            MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED ||
+        HSD_PadLibData.queue != &h->queue || HSD_PadLibData.qcount != 0) {
+        return fail(e, n,
+                    "Final CSS draw lost the exact retained result-3 input");
+    }
+    for (port = 0; port < 4; ++port) {
+        if (!final_pending_css_pad_equal(&h->final_pending_css_draw_raw[port],
+                                         &h->queue.stat[port])) {
+            return fail(e, n,
+                        "Final CSS draw PAD no longer matches its consumed input");
+        }
+    }
+    return ok(e, n);
+}
+
 static void first_css_return_note(void* data, MeleeWebMenuSession* session,
     const CSSData* css, const uint8_t* ko_counts)
 {
@@ -1404,9 +1507,11 @@ int melee_web_menu_host_opening_match_abort(MeleeWebMenuHost* h,
 }
 
 int melee_web_menu_host_tick(MeleeWebMenuHost* h,const PADStatus raw[4],char* e,size_t n){
+    int result;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     if (h && h == owner && h->first_css_return_state)
         h->first_css_return_state = 3;
+    final_pending_css_draw_invalidate(h);
 #endif
     if(!live(h,e,n)||!h->entered||h->drawing||!raw)return fail(e,n,"Native menu tick requires an idle live scene and four raw ports");
     if(HSD_PadLibData.queue!=&h->queue||HSD_PadLibData.qcount)return fail(e,n,"Native menu raw PAD queue is not idle");
@@ -1421,13 +1526,40 @@ int melee_web_menu_host_tick(MeleeWebMenuHost* h,const PADStatus raw[4],char* e,
     gm_EvaluateAllControllerInputs();
     if (h->source_scene == MELEE_WEB_HOST_SCENE_TITLE ||
         h->source_scene == MELEE_WEB_HOST_SCENE_MAIN) {
-        return source_scene_tick(h, e, n);
+        result = source_scene_tick(h, e, n);
+    } else {
+        result = melee_web_menu_tick(h->session,e,n);
     }
-    return melee_web_menu_tick(h->session,e,n);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (result == MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED &&
+        h->source_scene == MELEE_WEB_HOST_SCENE_CSS && h->transition != 0 &&
+        melee_web_menu_phase(h->session) == MELEE_WEB_MENU_CSS) {
+        const CSSData* css = melee_web_menu_css(h->session);
+        if (css != NULL && css->pending_scene_change == 1) {
+            h->final_pending_css_draw_witness = 1;
+            h->final_pending_css_draw_tick_result = result;
+            h->final_pending_css_draw_request = h->transition;
+            h->final_pending_css_draw_generation = h->generation;
+            h->final_pending_css_draw_session = h->session;
+            h->final_pending_css_draw_css = (CSSData*) css;
+            h->final_pending_css_draw_scene_info = &h->source_scene_info;
+            h->final_pending_css_draw_seed_owner = seed_ptr;
+            h->final_pending_css_draw_seed = h->seed;
+            {
+                unsigned port;
+                for (port = 0; port < 4; ++port) {
+                    final_pending_css_pad_copy(
+                        &h->final_pending_css_draw_raw[port], &raw[port]);
+                }
+            }
+        }
+    }
+#endif
+    return result;
 }
-int melee_web_menu_host_draw(MeleeWebMenuHost* h,char* e,size_t n){
-    if(!live(h,e,n)||!h->entered||h->drawing)return fail(e,n,"Native menu draw requires an idle live scene");
-    if(h->transition!=0)return ok(e,n);
+
+static int host_draw_render(MeleeWebMenuHost* h,char* e,size_t n)
+{
     h->drawing=1;
     /* The source screen camera scales its authored viewport by the current
      * VI mode. Bootstrap owns HSD objects; Aurora owns display startup. Supply
@@ -1442,6 +1574,66 @@ int melee_web_menu_host_draw(MeleeWebMenuHost* h,char* e,size_t n){
     if(!melee_web_menu_clock_present())return fail(e,n,"Original scene presentation clock lost ownership");
     return ok(e,n);
 }
+
+int melee_web_menu_host_draw(MeleeWebMenuHost* h,char* e,size_t n){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    final_pending_css_draw_invalidate(h);
+#endif
+    if(!live(h,e,n)||!h->entered||h->drawing)return fail(e,n,"Native menu draw requires an idle live scene");
+    if(h->transition!=0)return ok(e,n);
+    return host_draw_render(h,e,n);
+}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+int melee_web_menu_host_arm_final_pending_css_draw(MeleeWebMenuHost* h,
+    unsigned input_ordinal, unsigned consumed_pad_sequence,
+    const PADStatus raw[4], char* e, size_t n)
+{
+    unsigned port;
+    if (!h || h != owner || h->final_pending_css_draw_state != 0 ||
+        h->final_pending_css_draw_witness != 1 || raw == NULL ||
+        input_ordinal != 148 || consumed_pad_sequence != 1574 ||
+        h->final_pending_css_draw_tick_result !=
+            MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED) {
+        if (h && h == owner) h->final_pending_css_draw_state = 2;
+        return fail(e, n,
+                    "Final CSS draw arm requires its exact retained final input");
+    }
+    for (port = 0; port < 4; ++port) {
+        if (!final_pending_css_pad_equal(&h->final_pending_css_draw_raw[port],
+                                         &raw[port])) {
+            h->final_pending_css_draw_state = 2;
+            return fail(e, n,
+                        "Final CSS draw arm PAD differs from the consumed input");
+        }
+    }
+    if (!final_pending_css_draw_owner_live(h, e, n)) {
+        h->final_pending_css_draw_state = 2;
+        return 0;
+    }
+    h->final_pending_css_draw_input_ordinal = input_ordinal;
+    h->final_pending_css_draw_pad_sequence = consumed_pad_sequence;
+    h->final_pending_css_draw_state = 1;
+    return ok(e, n);
+}
+
+int melee_web_menu_host_draw_final_pending_css(MeleeWebMenuHost* h,
+                                                char* e, size_t n)
+{
+    if (!h || h != owner || h->final_pending_css_draw_state != 1 ||
+        h->final_pending_css_draw_witness != 1 ||
+        h->final_pending_css_draw_input_ordinal != 148 ||
+        h->final_pending_css_draw_pad_sequence != 1574) {
+        if (h && h == owner) h->final_pending_css_draw_state = 2;
+        return fail(e, n,
+                    "Final CSS draw requires its one-use retained host authorization");
+    }
+    /* Consume before any HSD/GX work. A failed renderer or clock check cannot
+     * retry the same terminal transition draw. */
+    h->final_pending_css_draw_state = 2;
+    if (!final_pending_css_draw_owner_live(h, e, n)) return 0;
+    return host_draw_render(h,e,n);
+}
+#endif
 
 static int host_leave_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
 {
@@ -1701,6 +1893,7 @@ static int host_abort_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
 
 int melee_web_menu_host_leave(MeleeWebMenuHost* h,int abort_scene,char* e,size_t n){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    final_pending_css_draw_invalidate(h);
     if (h && h == owner && h->first_css_return_state)
         h->first_css_return_state = 3;
 #endif
@@ -2328,6 +2521,9 @@ int melee_web_menu_host_prize_end(MeleeWebMenuHost* h,uint32_t seed,
     return melee_web_menu_host_match_finished(h,seed,input,e,n);
 }
 int melee_web_menu_host_destroy(MeleeWebMenuHost* h,char* e,size_t n){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    final_pending_css_draw_invalidate(h);
+#endif
     if(!h||h!=owner||h->entered||h->source_scene!=MELEE_WEB_HOST_SCENE_NONE||
        h->transition||h->audio||h->opening_active||h->opening_match_suspended||
        h->sudden_death_claimed||h->sudden_death_scene_active||

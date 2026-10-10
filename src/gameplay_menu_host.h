@@ -160,6 +160,13 @@ typedef struct MeleeWebMenuCssReturnSnapshot {
 int melee_web_menu_host_arm_first_css_return(MeleeWebMenuHost*, char*, size_t);
 int melee_web_menu_host_first_css_return(MeleeWebMenuHost*,
     MeleeWebMenuCssReturnSnapshot*, char*, size_t);
+/* One-shot diagnostic draw after the exact last retained CSS input requested
+ * a transition. The ordinal/sequence and PAD must match the retained result-3
+ * host tick; the authorization does not clear or rewrite that request. */
+int melee_web_menu_host_arm_final_pending_css_draw(MeleeWebMenuHost*,
+    unsigned input_ordinal, unsigned consumed_pad_sequence,
+    const PADStatus raw[4], char*, size_t);
+int melee_web_menu_host_draw_final_pending_css(MeleeWebMenuHost*,char*,size_t);
 #endif
 
 /* Install only the agreed networked seed on a fresh unentered host. Requires

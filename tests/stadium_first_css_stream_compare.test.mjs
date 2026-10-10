@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {createFirstCssStreamComparator, requestSynchronousApproval}
+import {createFirstCssStreamComparator, createFirstCssFinalDrawComparator, requestSynchronousApproval}
   from './stadium_first_css_stream_compare.mjs';
 
 const COUNT = 148;
@@ -131,4 +131,78 @@ test('malformed callbacks and unexpected routing fields are terminal refusals', 
   assert.equal(routeExtra.compare('tick', JSON.stringify({...actualTick(0),
     scene_routing_getters: {...route, pending_mode: 0}})), false);
   assert.equal(routeExtra.status().failed, true);
+});
+
+
+function finalFixture() {
+  const pair = expectedPairs()[147];
+  pair.expected_draw_return.scene_kind = 8;
+  const owner = {...transition(147), world_generation: 1};
+  const actual = {...actualDraw(147), world_generation: 1};
+  return {pair, owner, actual};
+}
+
+test('separate final CSS draw approves exact row1577 once without reviving the stream', () => {
+  const {pair, owner, actual} = finalFixture();
+  const comparator = createFirstCssFinalDrawComparator(pair, owner);
+  assert.equal(comparator.compare('final_draw', JSON.stringify(actual)), true);
+  assert.deepEqual(comparator.status(), {attempted: true, approved: true, failed: false});
+  assert.equal(comparator.compare('final_draw', JSON.stringify(actual)), false);
+  assert.equal(comparator.status().failed, true);
+  const stream = createFirstCssStreamComparator(expectedPairs());
+  for (let i = 0; i < 147; ++i) {
+    assert.equal(stream.compare('tick', JSON.stringify(actualTick(i))), true);
+    assert.equal(stream.compare('draw', JSON.stringify(actualDraw(i))), true);
+  }
+  assert.equal(stream.compare('transition', JSON.stringify(owner)), false);
+  const stopped = stream.status();
+  assert.equal(stream.compare('draw', JSON.stringify(actual)), false);
+  assert.deepEqual(stream.status(), stopped);
+});
+
+test('final CSS draw rejects every changed authority field and foreign or missing owner', () => {
+  const {pair, owner, actual} = finalFixture();
+  const changes = {source_tick: 148, draw_ordinal: 147, scene_frame: 150,
+    pad_state_hex: 'bb'.repeat(822), random_seed_hex: '312151c4', scene_kind: 9,
+    scene_routing_getters: {...route, current_scene_index: 1},
+    source_scene: 2, menu_phase: 2, world_generation: 2,
+    world_generation_stable: false, scene_owner_stable: false, seed_owner_stable: false};
+  for (const [key, value] of Object.entries(changes)) {
+    const comparator = createFirstCssFinalDrawComparator(pair, owner);
+    assert.equal(comparator.compare('final_draw', JSON.stringify({...actual, [key]: value})), false, key);
+    assert.equal(comparator.status().failed, true, key);
+    const missing = {...actual}; delete missing[key];
+    assert.equal(createFirstCssFinalDrawComparator(pair, owner)
+      .compare('final_draw', JSON.stringify(missing)), false, 'missing '+key);
+  }
+  assert.equal(createFirstCssFinalDrawComparator(pair, owner).compare('final_draw',
+    JSON.stringify({...actual, scene_routing_getters: {...route, pending_mode: 0}})), false);
+});
+
+test('final CSS draw malformed phase/data and foreign raw provenance cannot authorize', () => {
+  const {pair, owner, actual} = finalFixture();
+  for (const [phase, data] of [['draw', JSON.stringify(actual)], ['final_draw', '{'],
+    ['final_draw', null], ['final_draw', 'null'], ['final_draw', '[]']]) {
+    const comparator = createFirstCssFinalDrawComparator(pair, owner);
+    assert.equal(comparator.compare(phase, data), false);
+    assert.equal(comparator.compare('final_draw', JSON.stringify(actual)), false);
+    assert.equal(comparator.status().failed, true);
+  }
+  for (const [key, value] of Object.entries({index: 146, consumed_pad_sequence: 1569,
+    source_tick_sequence: 1570, draw_enter_sequence: 1571, draw_return_sequence: 1572}))
+    assert.throws(() => createFirstCssFinalDrawComparator({...pair, [key]: value}, owner), /exact original row1577/);
+  for (const [key, value] of Object.entries({world_generation: 0, source_tick: 147,
+    consumed_pad_sequence: 1569, executed_host_ticks: 148, tick_result: 1,
+    terminal_transition: false, scene_owner_stable: false}))
+    assert.throws(() => createFirstCssFinalDrawComparator(pair, {...owner, [key]: value}), /terminal owner/);
+});
+
+test('final CSS draw callback absence, exception, Promise and nontrue results fail closed', () => {
+  const {pair, owner, actual} = finalFixture();
+  const data = JSON.stringify(actual);
+  for (const callback of [undefined, null, () => {throw Error('refuse');},
+    () => Promise.resolve(true), () => 1, () => 'true', () => false])
+    assert.equal(requestSynchronousApproval(callback, 'final_draw', data), false);
+  const comparator = createFirstCssFinalDrawComparator(pair, owner);
+  assert.equal(requestSynchronousApproval(comparator.compare, 'final_draw', data), true);
 });
