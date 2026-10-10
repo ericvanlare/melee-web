@@ -1,6 +1,6 @@
 # Pokémon Stadium diagnostic profile and OnInit boundary
 
-**Compiled / Synthetic controls / Source identified / Native traced**
+**Compiled / Synthetic controls / Source identified / Native traced / one-world functional interval passed**
 
 **Current boundary:** the separately reviewed native source CSS→SSS setup observation
 on `a29f8d69` records the first-CSS seed and the distinct SSS-selected seed,
@@ -11,10 +11,16 @@ the source Stage gate clear and GO in world tick 84, the next complete tick 85,
 HUD Ready at tick 124, and checked world/Session close.
 Its trace does not emit the typed setup receipt or bind the first-CSS seed
 context to match construction, so it cannot be paired with the separate setup
-receipt. The original per-owner RNG comparison and two 3,500-post-GO lifetimes
-remain unrun. The `a29f8d69` full suite and ordinary Release build passed; those
-checks do not execute the separately gated long interval. Earlier failures
-below remain historical evidence with their original scopes.
+receipt. A separate native functional run on `ee2f3ab9` then completed one
+neutral-input, no-draw lifetime through exactly 3,500 post-GO world ticks and
+checked full close. It is not a second lifetime or an original comparison; the
+per-owner RNG ledger, matched original context, and C3 gates remain open. The
+ordinary Results regression on the same source also passed after a source-audited
+fixture correction, including two actual original Results entries and checked
+Session end. The initial missing-`LbRf.dat` preparation failure remains retained. The `a29f8d69` full suite and
+ordinary Release build passed; those checks do not execute the separate long
+interval. Earlier failures below remain historical evidence with their
+original scopes.
 
 The diagnostic-only Stadium profile and profile-to-`DatNativeMapContract`
 adapter compile in the C1 trace target. Focused profile and borrowed-yakumono
@@ -740,28 +746,69 @@ candidate is source-only: it has not been integrated, compiled or captured, and
 its planned capture does not include CSS/SSS steering or setup context; its
 attract-GO guard also remains unresolved. It is not original-result evidence.
 
-A separate one-world functional recipe is proposed to reuse the passing GO and
-Ready path and then continue neutral no-draw ticks until exactly 3,500 ticks
-have elapsed from the GO-containing tick, with the existing PCM cadence and
-checked close. Ready at world tick 124 is already 39 ticks after the GO boundary
-at world tick 85, so the remaining 3,461 ticks would end at 3,585. The source
-notes derive the earliest default-form transformation at post-GO ordinal 3,602
-(`xD8 = 3600 + HSD_Randi(200)`, followed by the source's two-tick trigger); the
-3,500-tick endpoint is therefore 102 ticks earlier by source arithmetic. This
-is a derived bound, not an observed live countdown. Current safe APIs do not
-expose the per-tick Stadium countdown, transform state, crowd events, scratch
-title or SIS slot, so this proposal does not claim those observations. Stock-out
-and standings also remain later source-path work.
+A separate functional native run on `ee2f3ab9` continued the reviewed GO path
+through one neutral-input, no-draw lifetime. The GO-containing world tick was
+`84→85`; exactly 3,500 complete ticks followed, from `85→86` through
+`3584→3585`. HUD Ready occurred on post-GO ordinal 39 at world tick 124, leaving
+3,461 ticks after Ready. The source cursor stayed at 0 through that Ready step,
+then advanced `0→3461` one per post-Ready tick. Normal PCM rendering ran once per
+tick. The match did not end or complete, and no draw occurred.
 
-This one-world functional experiment does not require original-context pairing
-to run, and cannot satisfy C3 acceptance by itself. C3 comparison still requires
-a matched original setup/state context and the original per-tick, per-owner RNG
-ledger, plus two 3,500-post-GO lifetimes, screen/title/SIS observations,
-stock-out/standings, and checked retirement/recreation. Ordinary public Stadium
+Checked close observed world, objects, processes, current object/proc and Toy
+aliases at zero, an inactive source-memory tracker, and final Session arena
+identity, generation and bytes all zero. Independent review verified 1,238
+packet bindings, all 98 fixture files, 17 raw files, 32 producer files plus
+their live copies, and all 3,500 step rows. Both owned children exited naturally
+with code zero and were reaped. This is one functional lifetime only; no
+same-process second lifetime or recreation was observed.
+
+The source notes derive the earliest default-form transformation at post-GO
+ordinal 3,602 (`xD8 = 3600 + HSD_Randi(200)`, followed by the source's two-tick
+trigger). The run ended at ordinal 3,500, 102 ticks before that source-derived
+lower bound. It did not read a live countdown or transformation state. Crowd
+events, scratch title/SIS slot, stock-out and standings remain unobserved.
+
+The original GO observer v3 and same-process second-lifetime path remain source
+review only; they have not supplied original comparison or second-world runtime
+evidence. C3 still requires matched original setup/state, the original
+per-tick, per-owner RNG ledger, two full lifetimes, screen/title/SIS observations,
+stock-out/standings and checked retirement/recreation. Ordinary public Stadium
 admission remains closed.
 
-The `a29f8d69` full suite passed **2,350 tests, 171 skipped, 0 failures** and
-its ordinary Release build passed. The functional recipe remains an external
-source-only proposal and has not been integrated, built or run. The canaries do
-not establish C3, original equivalence, rendering, browser behavior,
-physical-input, audible-output or timing acceptance.
+The `a29f8d69` full suite passed 2,350 tests with 171 skips and zero failures.
+This is the recorded production baseline; final current-head integration
+validation is still required before a milestone merge.
+
+These results do not establish C3, original equivalence, rendering, browser
+behavior, physical-input, audible-output or timing acceptance.
+
+## October 10 UTC: native source Results-route regression
+
+**Native functional source route / checked Session end / C3 not passed**
+
+The first `results-mario-v1` attempt on `ee2f3ab9` reached CSS→SSS and the
+selected Final Destination route, then stopped before Match construction on the
+exact error `Missing source match fixture: LbRf.dat`. It made no Results or
+elimination observation. The failure and its 171 unchanged input bindings
+remain retained. A source-only audit of the complete selected Match and typed
+Results recipe identified `LbRf.dat` as required and corrected the recipe
+inventory to 124 files. That audit is an input-closure review, not runtime
+evidence or a general asset manifest.
+
+The rerun used the corrected 124-file fixture. It completed a No Contest Match
+through Results and back to CSS/SSS, then a recreated four-stock Mario/Final
+Destination Match through the source GAME ending, Results and CSS. The retained stdout
+contains two actual Results-entry PAD records of 822 bytes each; the recreated
+Match reached Ready in 124 ticks and observed 114 frozen GAME ticks. All 172
+immutable bindings matched before and after. The existing recipe's checked
+`gameplay_session_end` succeeded and its success marker was emitted. It does
+not emit a numeric post-close arena snapshot; no numeric zero-arena claim is
+made. The producer is bound to `ee2f3ab9`; production source
+is unchanged from the `a29f8d69` regression baseline.
+
+This is a functional native source-route regression with scripted PAD and a
+fixture seed. It does not establish original-game equivalence, rendering,
+browser behavior, physical-input, uninterrupted audio, PCM equivalence or
+timing. The run did not traverse Prize. It does not pass C3. The independent
+result review and exact raw receipts are bound in the
+[portable receipt](../evidence/issue251-stadium-profile-oninit-v1.json).
