@@ -318,8 +318,8 @@
     "no_machine_specific_path_required": true
   },
   "subsequent_c3_component_2026_10_09": {
-    "claim_boundary": "The a8503b8c browser stream has 147 matched additional tick/draw pairs and terminal SourceTick 1575 remains unpaired. The be6ee4d9 retry compares its final draw against original DrawReturn 1577; raw DrawEnter 1576 is paired provenance, not a second independent comparison. This is a scoped CSS final-draw result only: no SSS tick/draw or later progression, VS Setup/GO, per-owner RNG, full match, or C3 acceptance is established; ordinary public Stadium admission remains closed.",
-    "current_result": "The retained ef9eaf38 attempt failed before kick/draw and its 44-artifact producer remains preserved. Source-phase inspection and focused controls identify the pre-OnExit pending_scene_change value as authored 0; the failed browser report did not expose that scalar. The be6ee4d9 repair preserves and checks the actual value without writing it or calling OnExit early. On be6ee4d9, the browser retry matched the final original DrawReturn 1577 after the unchanged 147-pair stream; terminal SourceTick 1575 remains unpaired. Thirteen owned PIDs are absent, all 40 HTTP artifacts are unchanged, unload/clear passed, both Release builds passed, and the exact-head full suite passed 2,422 tests with 163 skips and no failures/errors. An independent recomputation of the retained runner assertions and strict comparator confirmed the same bounded comparison and cleanup; this is not a second gameplay run.",
+    "claim_boundary": "The c44425c6 diagnostic retains both actual SSS constructor notes after unchanged first-CSS/final-draw prerequisites. Strict entry-first comparison fails at scene_frame: original149 versus native0. Both notes also expose current_scene_index0 versus original1. The original pair does not match; no SSS tick/draw, later VS/GO/per-owner RNG or C3 acceptance. Public Stadium admission remains closed.",
+    "current_result": "Actual SSS entry/return capture completed on c44425c6 with world generation2 and retained audio generation1. The first mismatch is retained, constructor and host entry complete, then zero SSS ticks/draws and running0. Prior CSS snapshots and semantic checks remain unchanged. Checked unload/clear succeeds and all12 owned PIDs are absent. Both Release builds and the exact-head full suite pass (2428 tests,163 skips); these do not turn the browser comparison failure into acceptance.",
     "first_css_browser_draw_4d6c0b37_d949a0b8_v1": {
       "status": "FAIL_BEFORE_ARM; NO_BROWSER_CSS_COMPARISON; NO_TICK; NO_DRAW",
       "scope": "One headless browser attempt with the existing captured first-CSS context and one consumed sample. The diagnostic did not arm; this is not a source draw or Stadium/C3 acceptance result.",
@@ -586,7 +586,7 @@
         "SDK unittest moduleimport failure beforeNode; fixedexplicit scriptsimport and retainedoutput"
       ]
     },
-    "next_progression": "Before instrumenting the reviewed passive SSS-constructor comparison, reduce the source clock ordering: the native host begins the SSS clock before the constructor, while original gm_801A4014 calls OnEnter before gm_801A4D34 resets the frame. This is a source-level ordering gap, not a measured native runtime mismatch; do not normalize the clock. Then compare only SSS constructor entry at sequence 1579 and return at 1603 after the passing CSS DrawReturn 1577, and stop with zero SSS ticks, draws, owner polls, exit, or later progression. Keep terminal CSS SourceTick 1575 unpaired. This does not establish SSS behavior or whole-route acceptance.",
+    "next_progression": "Reduce the confirmed native SSS constructor clock reset with a MENU-only continuation composition: capture actual pointer-free predecessor counters, preserve caller restoration and fresh world capabilities, run constructor before the authored reset/PAD flush/lb sequence exactly once. Fixture controls cannot establish runtime correctness. Keep the additional scene-routing discrepancy explicit, never normalize comparisons or write expected values. Stop on first missing ownership/order proof; source repair and any further passive browser comparison require review. No SSS tick/draw or later VS/GO/per-owner/C3 acceptance yet.",
     "first_css_context_return_1fad54ff_v1": {
       "source_head": "1fad54ff964f80b263b91a77cf25a25b0ee08603",
       "source_tree": "adfff70b0f357d4c66bd89f1f1c3a30c9202b2a9",
@@ -4733,6 +4733,290 @@
         },
         "scope": "Reduce native-host SSS clock begin versus original gm_801A4014 OnEnter / gm_801A4D34 frame-reset source ordering before deciding whether to instrument the passive entry1579/return1603 pair; if instrumented, stop with zero SSS ticks/draws/owner polls/exit."
       }
+    },
+    "clock_sss_constructor_reducer_9713085f_v1": {
+      "status": "PASS_SCOPED_SOURCE_REDUCER; INDEPENDENT_REVIEW_PASS; ACTUAL_SSS_PAIR_UNRUN",
+      "source": {
+        "checkout_revision": "9713085f4b72e3a338b8651bfef59e2c031087bc",
+        "checkout_tree": "91baabe26046ab48bec9b99ef07df437dc3fba16",
+        "executable_inputs": "Unchanged be6ee4d9 inputs, plus hash-pinned original SDK/source excerpts; 9713085f changes documentation only.",
+        "source_bindings": 11
+      },
+      "control": {
+        "tests": 1,
+        "skips": 0,
+        "failures": 0,
+        "compile_exit": 0,
+        "control_exit": 0,
+        "original_fixture": {
+          "constructor_entry_frame": 149,
+          "constructor_return_frame": 149,
+          "post_authored_reset_frame": 0
+        },
+        "native_fixture": {
+          "prelease_frame": 1001,
+          "css_live_frame": 149,
+          "post_end_frame": 1001,
+          "move_begin_only_constructor_frame": 1001,
+          "post_begin_frame": 0,
+          "constructor_entry_frame": 0,
+          "constructor_return_frame": 0
+        },
+        "scope": "Extracted original scene-driver/reset prefixes and native clock begin/end/pre plus controller-map lease bodies; fixture callbacks record phase. Typed clock/controller restoration and duplicate-owner, active-callback, GObj and changed-controller-owner refusal controls pass.",
+        "conclusion": "Lease-end restoration and early next-begin reset are separate effects. Moving begin alone does not retain the predecessor frame."
+      },
+      "limits": [
+        "Original lookup/mode/manager/constructor hooks are event-only fixtures and selector kind2 is synthetic; actual SSS constructor/services and scheduler suffix unexecuted.",
+        "Zero-prelease control absent; not needed to distinguish the demonstrated effects. This is not completion of all initially proposed packet controls.",
+        "Active callback control proves end refusal/continued lease, not nonmutation by source pre(), which legitimately updates clock state.",
+        "No actual native SSS state mismatch or state/RNG/gameplay equivalence established; clock implementation unchanged."
+      ],
+      "retained_preparation": "The initial extractor matched a prototype and stopped before compilation; a definition anchor corrected it. Precompile review also corrected fixture declarations and missing controller lease globals. Superseded generated preview and preparation error retained.",
+      "metadata_correction": "compile.json labels scratch as its cwd, but compilation inherited the checkout cwd; all compiler argv paths are absolute. result-v2 records the correct wrapper cwd. This does not change the compilation outcome.",
+      "cleanup": "Wrapper returned normally; explicitly retained owned scratch and external binary/source/logs remain for review. No browser/server was started.",
+      "evidence": {
+        "source_packet": {
+          "artifact": "sol-clock-sss-constructor-phase-packet-v1/packet.json",
+          "bytes": 9299,
+          "sha256": "c792d5e3db1eb86f478de6054b1e68d33e29e3cdc4460f48060b51d76e0d263a"
+        },
+        "pre_control_freeze": {
+          "artifact": "clock-sss-constructor-reducer-v1/freeze-pre-control.json",
+          "bytes": 3643,
+          "sha256": "33c6c50259fd1c750ee8b650a99f15f8b2f264306d92cc4794e58c9a9f6e88e2"
+        },
+        "freeze": {
+          "artifact": "clock-sss-constructor-reducer-v1/freeze-v2.json",
+          "bytes": 2959,
+          "sha256": "82080e53fd6debe4c27a907cd81978a70a531b75b9c2304d687f882a9c4303d8"
+        },
+        "result": {
+          "artifact": "clock-sss-constructor-reducer-v1/evidence/control-v1/result-v2.json",
+          "bytes": 6035,
+          "sha256": "ea279ad4e830d4b208318a86b4031276e95441eac6930d606a0e0e6d2fa4300d"
+        },
+        "generated_source": {
+          "artifact": "clock-sss-constructor-reducer-v1/evidence/control-v1/generated-clock-to-sss-reducer.c",
+          "bytes": 25280,
+          "sha256": "8afdd542a34eb567f5c2c46f7bf4760dd04ddea11855169ad92017623126206d"
+        },
+        "control_stdout": {
+          "artifact": "clock-sss-constructor-reducer-v1/evidence/control-v1/control.stdout",
+          "bytes": 346,
+          "sha256": "cfb931aa1b4224503e6a9c723d8e776141471b73609240c33dc8c887399de869"
+        },
+        "root_review": {
+          "artifact": "root-clock-sss-source-reducer-review-v1.json",
+          "bytes": 2280,
+          "sha256": "a775665efaba07d9f898139c2b85ec4b43fc18e7a6c27ad20967a71eecd67662"
+        },
+        "independent_review": {
+          "artifact": "sol-clock-sss-reducer-review-v1/review-v2.json",
+          "bytes": 9713,
+          "sha256": "1e4ad22312312039554082bff4ca9b7e1aeb183ea9e135428d06200361885f4f"
+        },
+        "next_plan": {
+          "artifact": "original-stadium-sss-entry-boundary-plan-v6/plan.json",
+          "bytes": 31050,
+          "sha256": "ccc3a4b3c2f5cd47f4a2fceb4f043b12071eb8a736b57458be56c660eefe95dd"
+        },
+        "implementation_contract": {
+          "artifact": "first-sss-constructor-pair-interface-v1/contract.json",
+          "bytes": 5370,
+          "sha256": "1037ba64eb7ffb45b9f8dbe398905b6ba272d845e71bc91147f1430bfba76f07"
+        }
+      },
+      "next": "At the source-only checkpoint before the actual c44425c6 run, the independently reviewed plan was to implement diagnostic-only passive SSS entry1579/return1603 observations after the unchanged first-CSS and finalDrawReturn1577 prerequisites, using ordinary CSS leave/world rebuild and the same host/session. Keep runtime clock behavior unchanged. Complete the actual constructor and phase updates, then compare entry first with every declared available field, retaining actual pairs and the first mismatch. Suppress all SSS ticks/draws, including the same browser callback, before checked cleanup. No normalization, reseed, expected-state write, production clock repair or SSS/C3 acceptance follows from the source reducer."
+    },
+    "first_sss_constructor_pair_c44425c6_v1": {
+      "status": "STRICT_COMPARISON_FAILURE_RETAINED; CONSTRUCTOR_PAIR_CAPTURED; CLEANUP_VERIFIED",
+      "source": {
+        "revision": "c44425c6beaada60cf8ab07d3c2fc8b129662319",
+        "tree": "5d4c384ceee06c9bb05a8025751ae223f78e05a7",
+        "runtime_clock_behavior": "unchanged",
+        "diagnostic_only": true
+      },
+      "validation": {
+        "focused_python_tests": 45,
+        "focused_node_tests": 17,
+        "focused_skips": 0,
+        "focused_failures": 0,
+        "diagnostic_release_build_exit": 0,
+        "ordinary_release_build_exit": 0,
+        "full_suite": {
+          "tests": 2428,
+          "skipped": 163,
+          "failures": 0,
+          "errors": 0,
+          "elapsed_seconds": 521.745
+        }
+      },
+      "result": {
+        "wrapper_exit_code": 1,
+        "first_mismatch": {
+          "path": "entry.scene_frame",
+          "expected": 149,
+          "actual": 0,
+          "reason": "value differs"
+        },
+        "notes_retained": [
+          "entry",
+          "returned"
+        ],
+        "native_entry_frame": 0,
+        "native_return_frame": 0,
+        "original_entry_frame": 149,
+        "original_return_frame": 149,
+        "additional_observed_difference": {
+          "path": "scene_routing_getters.current_scene_index",
+          "native_entry_and_return": 0,
+          "original_entry_and_return": 1,
+          "scope": "Additional raw discrepancy; first mismatch unchanged, no all-field match claim."
+        },
+        "constructor_note_phase": 2,
+        "after_host_enter_phase": 3,
+        "native_scene_kind": 9,
+        "postcapture": {
+          "world_generation": 2,
+          "audio_generation": 1,
+          "host_entered": true,
+          "session_phase": 3,
+          "sss_host_tick_calls": 0,
+          "sss_host_draw_calls": 0,
+          "audio_render_calls_before_rebuild": 149,
+          "audio_render_frames_before_rebuild": 79466,
+          "audio_render_calls_after_sss_enter": 149,
+          "audio_render_frames_after_sss_enter": 79466
+        },
+        "native_running": 0,
+        "old_css_snapshots_unchanged": true,
+        "first_css_baseline_and_final_draw_checks": "passed before nativePair.failed assertion",
+        "terminal_css_tick_1575": "unpaired"
+      },
+      "cleanup": {
+        "owned_pids_absent": 12,
+        "unload_completed": true,
+        "observation_cleared": true,
+        "after_unload_phase": 0,
+        "after_unload_running": 0,
+        "after_unload_error": null,
+        "import_enabled": true,
+        "empty_owned_tmp_removed": true,
+        "page_errors": 0,
+        "console_errors": 0,
+        "external_http_requests": 0
+      },
+      "artifact_check": {
+        "http_before_matches_frozen_producer": 40,
+        "current_local_files_match_frozen_producer": 40,
+        "http_after_check": "not reached after semantic failure; report.after=null and report.unchanged=false retained",
+        "fresh_explicit_gpu_probe": "not reached; top-level gpu=null",
+        "visual_review": "Retained failure screenshot shows previous CSS Ready to Fight image and transition message, consistent with no SSS draw. This is not pixel comparison."
+      },
+      "retained_preparation_failures": [
+        "Producer preparer v1 referenced retained instead of historical retained_path; v2 corrected the key before creating the frozen packet.",
+        "Control helper v2 extracted an earlier conditional rather than main parser; v3 restricted scope but invented a refusal for a redundant implied stream flag. Smaller exact CLI reducer preserved valid redundancy and tested actual draw conflict.",
+        "Control v4 omitted the firstSssConstructorPair lexical variable from its extracted loader; v5 injected it. All failures retained, no canonical/runtime/packet change from helper repairs."
+      ],
+      "known_cleanup_limit": "Pre-existing remember_runtime_preferences failure after session SSS entry but before host/global entered flags has a separate unchecked teardown path; this run did not encounter it. No generic failure-path cleanup claim.",
+      "evidence": {
+        "source_integration": {
+          "artifact": "first-sss-pair-integration-v1/review.json",
+          "bytes": 9093,
+          "sha256": "a3d1de7dd235f9abaef7d44c15e07c7456eca1d3bfdf6c60d54f77db958847c0"
+        },
+        "focused": {
+          "artifact": "first-sss-pair-integration-v1/focused.json",
+          "bytes": 3482,
+          "sha256": "746bd3b4eb09c953d0cf9bdede5015613cc5afaf598af69c115f65b4b4ca12d7"
+        },
+        "diagnostic_build": {
+          "artifact": "first-sss-pair-builds-c44425c6-v1/diagnostic-runtime/result.json",
+          "bytes": 418,
+          "sha256": "9ed331634ac579d6351775c67875fa858cc00320c590164568548a303018fd53"
+        },
+        "ordinary_build": {
+          "artifact": "first-sss-pair-builds-c44425c6-v1/ordinary-runtime/result.json",
+          "bytes": 418,
+          "sha256": "5974af9d0362595b324245e6d7e32dcfa73e86adfdc3a289675353f70f6e8531"
+        },
+        "full_suite": {
+          "artifact": "full-regression-c44425c6-v1/result.json",
+          "bytes": 511,
+          "sha256": "e1e130d1df571e446bdd94db2df342fe54f1559740c69f27fbeb37947a44c4e3"
+        },
+        "full_suite_log": {
+          "artifact": "full-regression-c44425c6-v1/suite.log",
+          "bytes": 454647,
+          "sha256": "8a7eee1bf1f8aaa7e2e5310c3d5b528d9925f0bd45f0c95f37154b85d8a16e21"
+        },
+        "producer": {
+          "artifact": "first-sss-constructor-pair-producer-c44425c6-v1/identity.json",
+          "bytes": 11183,
+          "sha256": "3e0a4904d8436cb9d33ea25e23f842202e2b09884b5ef77f366b6a54ebe970c6"
+        },
+        "preflight": {
+          "artifact": "first-sss-constructor-pair-preflight-c44425c6-v1/preflight.json",
+          "bytes": 61782,
+          "sha256": "81269dc056e285ad787037ed4bb0e68c544bea4295ddf888041582e98d970c6c"
+        },
+        "prelaunch_independent_review": {
+          "artifact": "sss-pair-pre-server-control-v5/review.json",
+          "bytes": 35832,
+          "sha256": "51e79b47b14e5a66cb20070cffe4fd27521543952b5d17ef208b79632ca09f7a"
+        },
+        "launch": {
+          "artifact": "first-sss-constructor-pair-preflight-c44425c6-v1/launch.json",
+          "bytes": 38517,
+          "sha256": "5765c27b3505daa2689685ce40d69bbc721f8a6b804ac15447741f68ffb135af"
+        },
+        "result": {
+          "artifact": "first-sss-constructor-pair-preflight-c44425c6-v1/result.json",
+          "bytes": 1860,
+          "sha256": "83f3e254ae73b724efa041ad96c1c31abd9d081dbb4dae9f66c24354713abc27"
+        },
+        "report": {
+          "artifact": "first-sss-constructor-pair-preflight-c44425c6-v1/browser-run/report.json",
+          "bytes": 2059318,
+          "sha256": "8b1acb2185e6f8ec4027c2acd779f6949acb99ed9f1b3b6100d94de40f27cf89"
+        },
+        "owner": {
+          "artifact": "first-sss-constructor-pair-preflight-c44425c6-v1/owner.json",
+          "bytes": 95732,
+          "sha256": "14c7d6e40cd2a387739470d37150372e5968d3fc51b188fbe9986211a04ec61f"
+        },
+        "root_result_review": {
+          "artifact": "root-first-sss-c444-result-review-v1.json",
+          "bytes": 15256,
+          "sha256": "2b9f2ef1653bd160a41dbed531df76d43bebf9f8d293c76a161c2b1c802c224b"
+        },
+        "expected_pair": {
+          "artifact": "first-sss-constructor-pair-companion-v1/expected/first-sss-constructor-pair-expected-v2.json",
+          "bytes": 20753,
+          "sha256": "b1778ab4fecb7f08f96fc705fb2244065864c24836ad0614d3f50a57a3716d54"
+        },
+        "conditional_clock_design": {
+          "artifact": "sol-clock-sss-conditional-continuation-note-v1.json",
+          "bytes": 5792,
+          "sha256": "d36c0f8b2345c1738788a516871e40a40168ca24f1230a4876ff6b412c3aa638"
+        },
+        "independent_result_review": {
+          "artifact": "sol-first-sss-c444-result-review-v1/review.json",
+          "bytes": 17739,
+          "sha256": "4b4596df5c09e651be616befd8736ce7148e126ced593b91c5cd6ea76bf05154"
+        },
+        "retained_producer": {
+          "artifact": "first-sss-constructor-pair-producer-c44425c6-retained-v1/identity.json",
+          "bytes": 22080,
+          "sha256": "f16aaed9d71c87db348b3f27d5b16a4407e624409bd3caf61cc58fb60cb41424"
+        }
+      },
+      "limits": [
+        "Actual pair failed strict comparison; equal observed seed values do not establish all-field or whole-session equivalence.",
+        "No SSS tick/draw, selection, VS Setup/GO comparison, per-owner RNG ledger, C3, pixel, PCM, live timing, physical-input or foreground acceptance."
+      ],
+      "next": "Reduce the confirmed native SSS constructor clock reset with a MENU-only continuation composition: capture actual pointer-free predecessor counters, preserve caller restoration and fresh world capabilities, run constructor before the authored reset/PAD flush/lb sequence exactly once. Fixture controls cannot establish runtime correctness. Keep the additional scene-routing discrepancy explicit, never normalize comparisons or write expected values. Stop on first missing ownership/order proof; source repair and any further passive browser comparison require review. No SSS tick/draw or later VS/GO/per-owner/C3 acceptance yet.",
+      "independent_review": "Unchanged strict comparator replay rejects first entry.scene_frame149 vs0; canonical baseline/final/invariance assertions and all295 stream rows pass. Reviewer verifies113 bound launch rows and40 current local artifacts; cleanup/owner attribution passes. This is review of one retained failed run, not another capture."
     }
   }
 }
