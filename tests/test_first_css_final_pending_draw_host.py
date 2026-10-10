@@ -112,6 +112,7 @@ struct MeleeWebMenuHost {
   int first_css_return_state;
   int final_pending_css_draw_witness,final_pending_css_draw_state;
   int final_pending_css_draw_tick_result,final_pending_css_draw_request;
+  int final_pending_css_draw_pending_scene_change;
   unsigned final_pending_css_draw_input_ordinal,final_pending_css_draw_pad_sequence;
   PADStatus final_pending_css_draw_raw[4]; uint64_t final_pending_css_draw_generation;
   MeleeWebMenuSession* final_pending_css_draw_session;
@@ -128,7 +129,7 @@ static GXRenderModeObj render_mode, GXNtsc480IntDf;
 static void* HSD_GObj_804D781C,*HSD_GObj_804D7838,*HSD_GObj_804D7830;
 static void* HSD_GObj_804D7814,*HSD_GObj_804D7818;
 static int gobj_draws, clock_presents, configured_result=3, configured_request=19;
-static int configured_pending=1, clock_present_ok=1;
+static int clock_present_ok=1;
 enum { MELEE_WEB_HOST_SCENE_CSS=1, MELEE_WEB_HOST_SCENE_TITLE=3,
        MELEE_WEB_HOST_SCENE_MAIN=4 };
 
@@ -179,7 +180,7 @@ static void gm_EvaluateAllControllerInputs(void) { }
 static int source_scene_tick(MeleeWebMenuHost* h,char* e,size_t n)
 { (void)h;(void)e;(void)n; return 0; }
 static int melee_web_menu_tick(MeleeWebMenuSession* s,char* e,size_t n)
-{ (void)e;(void)n; active_host->transition=s->request; s->css.pending_scene_change=configured_pending; return configured_result; }
+{ (void)e;(void)n; active_host->transition=s->request; return configured_result; }
 static GXRenderModeObj* HSD_VIGetRenderMode(void) { return &render_mode; }
 static void GXInvalidateVtxCache(void) { }
 static void GXInvalidateTexAll(void) { }
@@ -206,7 +207,7 @@ static void setup(MeleeWebMenuHost* h,MeleeWebMenuSession* s,
   HSD_GObj_804D781C=HSD_GObj_804D7838=HSD_GObj_804D7830=NULL;
   HSD_GObj_804D7814=HSD_GObj_804D7818=NULL;
   gobj_draws=clock_presents=0; clock_present_ok=1;
-  configured_result=3; configured_request=19; configured_pending=1;
+  configured_result=3; configured_request=19;
 }
 static void make_raw(PADStatus raw[4])
 {
@@ -284,11 +285,37 @@ static void test_live_owner_changes_and_later_tick_invalidate(void)
 
   setup(&h,&s,&a,&p); make_raw(raw); assert(produce_transition(&h,raw)==3);
   assert(melee_web_menu_host_arm_final_pending_css_draw(&h,148,1574,raw,error,sizeof(error))==1);
-  configured_result=1; s.request=0; configured_pending=0;
+  configured_result=1; s.request=0;
   assert(melee_web_menu_host_tick(&h,raw,error,sizeof(error))==1);
   assert(h.final_pending_css_draw_witness==0&&h.final_pending_css_draw_state==2);
   assert(melee_web_menu_host_draw_final_pending_css(&h,error,sizeof(error))==0);
   assert(gobj_draws==0);
+}
+
+static void test_preexit_pending_scalar_is_observed_and_bound(void)
+{
+  for(int initial=0;initial<=1;initial++) {
+    MeleeWebMenuHost h;MeleeWebMenuSession s;MeleeWebAudio a;
+    MeleeWebSaveProfileOwner p;PADStatus raw[4];char error[160]={0};
+    setup(&h,&s,&a,&p);make_raw(raw);s.css.pending_scene_change=initial;
+    assert(produce_transition(&h,raw)==3);
+    assert(s.css.pending_scene_change==initial);
+    assert(h.final_pending_css_draw_pending_scene_change==initial);
+    assert(melee_web_menu_host_arm_final_pending_css_draw(&h,148,1574,raw,error,sizeof(error))==1);
+    assert(melee_web_menu_host_draw_final_pending_css(&h,error,sizeof(error))==1);
+    assert(s.css.pending_scene_change==initial&&h.transition==19&&gobj_draws==1);
+    setup(&h,&s,&a,&p);make_raw(raw);s.css.pending_scene_change=initial;
+    assert(produce_transition(&h,raw)==3);
+    s.css.pending_scene_change=initial^1;
+    assert(melee_web_menu_host_arm_final_pending_css_draw(&h,148,1574,raw,error,sizeof(error))==0);
+    assert(gobj_draws==0);
+    setup(&h,&s,&a,&p);make_raw(raw);s.css.pending_scene_change=initial;
+    assert(produce_transition(&h,raw)==3);
+    assert(melee_web_menu_host_arm_final_pending_css_draw(&h,148,1574,raw,error,sizeof(error))==1);
+    s.css.pending_scene_change=initial^1;
+    assert(melee_web_menu_host_draw_final_pending_css(&h,error,sizeof(error))==0);
+    assert(gobj_draws==0);
+  }
 }
 
 static void test_failed_clock_consumes_authorization(void)
@@ -326,6 +353,7 @@ int main(void)
   test_one_use_success_and_normal_pending_noop();
   test_wrong_input_and_semantic_pad_fail_closed();
   test_live_owner_changes_and_later_tick_invalidate();
+  test_preexit_pending_scalar_is_observed_and_bound();
   test_failed_clock_consumes_authorization();
   test_active_source_callback_refuses_arm_and_draw();
   puts("actual-source final pending CSS host controls passed");

@@ -154,6 +154,7 @@ struct MeleeWebMenuHost {
     int final_pending_css_draw_state; /* 0 unused, 1 armed, 2 consumed/invalid */
     int final_pending_css_draw_tick_result;
     int final_pending_css_draw_request;
+    int final_pending_css_draw_pending_scene_change;
     unsigned final_pending_css_draw_input_ordinal;
     unsigned final_pending_css_draw_pad_sequence;
     PADStatus final_pending_css_draw_raw[4];
@@ -283,7 +284,7 @@ static int final_pending_css_draw_owner_live(MeleeWebMenuHost* h,
     if (css == NULL || css != h->final_pending_css_draw_css ||
         h->source_scene_info.enter_data != css ||
         h->source_scene_info.exit_data != css ||
-        css->pending_scene_change != 1 ||
+        css->pending_scene_change != h->final_pending_css_draw_pending_scene_change ||
         h->final_pending_css_draw_tick_result !=
             MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED ||
         HSD_PadLibData.queue != &h->queue || HSD_PadLibData.qcount != 0) {
@@ -1535,10 +1536,13 @@ int melee_web_menu_host_tick(MeleeWebMenuHost* h,const PADStatus raw[4],char* e,
         h->source_scene == MELEE_WEB_HOST_SCENE_CSS && h->transition != 0 &&
         melee_web_menu_phase(h->session) == MELEE_WEB_MENU_CSS) {
         const CSSData* css = melee_web_menu_css(h->session);
-        if (css != NULL && css->pending_scene_change == 1) {
+        if (css != NULL) {
             h->final_pending_css_draw_witness = 1;
             h->final_pending_css_draw_tick_result = result;
             h->final_pending_css_draw_request = h->transition;
+            /* Authored CSSData pending_scene_change is committed by OnExit,
+             * which has not run at this retained result-3 draw boundary. */
+            h->final_pending_css_draw_pending_scene_change = css->pending_scene_change;
             h->final_pending_css_draw_generation = h->generation;
             h->final_pending_css_draw_session = h->session;
             h->final_pending_css_draw_css = (CSSData*) css;
