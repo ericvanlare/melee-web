@@ -36,6 +36,81 @@ extern void melee_web_ground_remove_camera(HSD_GObj*);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 static const HSD_GObjEvent stadium_pending_callbacks[]={fn_801D13C8,fn_801D11E4};
 extern uint32_t melee_web_match_source_frames(void);
+extern int melee_web_stadium_c1_grdatfiles_copy(UnkArchiveStruct slots[4],
+        UnkArchiveStruct** ordinary_table, void** native_table,
+        UnkArchiveStruct** effective_table);
+static int stadium_c1_grdatfiles_lifetime_ordinal = -1;
+void melee_web_stadium_c1_grdatfiles_set_lifetime_ordinal(int ordinal)
+{
+    stadium_c1_grdatfiles_lifetime_ordinal = ordinal;
+}
+static int stadium_c1_grdatfiles_first_nonzero(
+        const UnkArchiveStruct slots[4], unsigned* slot, unsigned* field)
+{
+    for (unsigned i = 0; i < 4; ++i) {
+        if (slots[i].unk0) { *slot = i; *field = 0; return 1; }
+        if (slots[i].unk4) { *slot = i; *field = 1; return 1; }
+        if (slots[i].unk8) { *slot = i; *field = 2; return 1; }
+    }
+    return 0;
+}
+int melee_web_stadium_c1_grdatfiles_snapshot_control(void)
+{
+    UnkArchiveStruct slots[4] = {{0}};
+    unsigned slot = 99, field = 99;
+    if (stadium_c1_grdatfiles_first_nonzero(slots, &slot, &field)) return 0;
+    slots[2].unk0 = (HSD_Archive*) -1;
+    if (!stadium_c1_grdatfiles_first_nonzero(slots, &slot, &field) ||
+        slot != 2 || field != 0) return 0;
+    slots[2].unk0 = NULL;
+    slots[2].unk4 = (UnkStageDat*) -1;
+    if (!stadium_c1_grdatfiles_first_nonzero(slots, &slot, &field) ||
+        slot != 2 || field != 1) return 0;
+    slots[2].unk4 = NULL;
+    slots[3].unk8 = 1;
+    return stadium_c1_grdatfiles_first_nonzero(slots, &slot, &field) &&
+           slot == 3 && field == 2;
+}
+int melee_web_stadium_c1_grdatfiles_trace_snapshot(
+        const char* boundary, unsigned long long world_generation)
+{
+    if (stadium_c1_grdatfiles_lifetime_ordinal < 0) return 1;
+    UnkArchiveStruct slots[4] = {{0}};
+    UnkArchiveStruct* ordinary_table = NULL;
+    UnkArchiveStruct* effective_table = NULL;
+    void* native_table = NULL;
+    if (!boundary || !melee_web_stadium_c1_grdatfiles_copy(
+            slots, &ordinary_table, &native_table, &effective_table)) {
+        fprintf(stderr, "STADIUM_GRDATFILES snapshot=unavailable boundary=%s\n",
+                boundary ? boundary : "null");
+        fflush(stderr);
+        return 0;
+    }
+    fprintf(stderr,
+        "STADIUM_GRDATFILES_META boundary=%s ordinal=%d world_generation=%llu ordinary_table=%p native_table=%p effective_table=%p\n",
+        boundary, stadium_c1_grdatfiles_lifetime_ordinal, world_generation,
+        (void*) ordinary_table, native_table, (void*) effective_table);
+    for (unsigned i = 0; i < 4; ++i) {
+        fprintf(stderr,
+            "STADIUM_GRDATFILES_SLOT boundary=%s ordinal=%d slot=%u unk0=%p unk4=%p unk8=%u\n",
+            boundary, stadium_c1_grdatfiles_lifetime_ordinal, i,
+            (void*) slots[i].unk0, (void*) slots[i].unk4,
+            (unsigned) slots[i].unk8);
+    }
+    unsigned slot = 0, field = 0;
+    if (stadium_c1_grdatfiles_first_nonzero(slots, &slot, &field)) {
+        static const char* const names[] = {"unk0", "unk4", "unk8"};
+        fprintf(stderr,
+            "STADIUM_GRDATFILES_FIRST_NONZERO boundary=%s ordinal=%d nonzero=1 slot=%u field=%s\n",
+            boundary, stadium_c1_grdatfiles_lifetime_ordinal, slot, names[field]);
+    } else {
+        fprintf(stderr,
+            "STADIUM_GRDATFILES_FIRST_NONZERO boundary=%s ordinal=%d nonzero=0\n",
+            boundary, stadium_c1_grdatfiles_lifetime_ordinal);
+    }
+    fflush(stderr);
+    return 1;
+}
 #endif
 struct MeleeWebStageLast {
     StageInfo saved;
@@ -160,7 +235,17 @@ static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,voi
  if(source_ordered){
   /* The retail scene enters Ground's state buffer and stage archive before
    * Ground_801C0800 loads collision, lights and the stage callback. */
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(on_init_diagnostic)
+   melee_web_stadium_c1_grdatfiles_trace_snapshot(
+       "before-Stage_802251E8", (unsigned long long)h->generation);
+#endif
   Stage_802251E8((StKind)definition->stage_kind,NULL);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(on_init_diagnostic)
+   melee_web_stadium_c1_grdatfiles_trace_snapshot(
+       "after-Stage_802251E8", (unsigned long long)h->generation);
+#endif
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
   if(on_init_diagnostic&&!melee_web_stadium_display_owner_bind_source(h->stadium_display_owner,e,n)){
    char bind_error[160];snprintf(bind_error,sizeof(bind_error),"%s",e&&n?e:"Stadium source SIS bind failed");

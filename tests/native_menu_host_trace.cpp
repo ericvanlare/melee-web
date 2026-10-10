@@ -117,6 +117,10 @@ extern void* _Toy_sbss_804D6EA4;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 extern HSD_ObjAllocData gobj_alloc_data;
 extern HSD_ObjAllocData gobjproc_alloc_data;
+void melee_web_stadium_c1_grdatfiles_set_lifetime_ordinal(int ordinal);
+int melee_web_stadium_c1_grdatfiles_snapshot_control(void);
+int melee_web_stadium_c1_grdatfiles_trace_snapshot(
+    const char* boundary, unsigned long long world_generation);
 #endif
 }
 #include <melee/gr/forward.h>
@@ -8034,6 +8038,12 @@ void run_stadium_c1_context_preflight(
           "C1 source handoff retained a Toy archive alias past MenuWorld close");
     check((Toy_804A284C[3] & 4) != 0,
           "C1 source handoff lost the retained Toy category baseline");
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    check(melee_web_stadium_c1_grdatfiles_trace_snapshot(
+              "before-context-preflight", (unsigned long long)
+                  melee_web_gameplay_stats().generation),
+          "Could not snapshot ordinary grDatFiles before C1 preflight");
+#endif
     check_stadium_preflight_stage_empty();
     const MeleeWebPadState* ready_input=nullptr;
     if(ready_session||pad_leave_probe||source_text_lifetime_probe||
@@ -8667,6 +8677,12 @@ void run_stadium_c1_context_preflight(
                         int(match->ready()),int(match->ending()),int(match->complete()));
                     std::fflush(stderr);
                 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                check(melee_web_stadium_c1_grdatfiles_trace_snapshot(
+                          "ready-before-match-close", (unsigned long long)
+                              melee_web_gameplay_stats().generation),
+                      "Could not snapshot ordinary grDatFiles before match close");
+#endif
                 match->close();
                 if(go_probe){
                     MeleeWebStadiumGoAlignmentSnapshot closed_trace{};
@@ -8677,6 +8693,12 @@ void run_stadium_c1_context_preflight(
                     std::fflush(stderr);
                 }
                 match.reset();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                check(melee_web_stadium_c1_grdatfiles_trace_snapshot(
+                          "after-match-close", (unsigned long long)
+                              melee_web_gameplay_stats().generation),
+                      "Could not snapshot ordinary grDatFiles after match close");
+#endif
                 if(ready_text_membership_probe){
                     HSD_SisLib_C1TextProbeSet(0);
                     melee_web_stadium_text_membership_snapshot_end();
@@ -9536,6 +9558,8 @@ int main(int argc,char** argv){try{
      std::string(input_recipe)=="stadium-source-functional-idle-v1";
  const bool stadium_source_functional_idle_pair_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-source-functional-idle-pair-v1";
+ const bool stadium_grdatfiles_pair_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-grdatfiles-pair-v1";
  const bool stadium_source_setup_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-source-setup-v1";
  const bool stadium_source_world_recipe=input_recipe&&
@@ -9559,6 +9583,7 @@ int main(int argc,char** argv){try{
  const bool stadium_source_go_alignment_recipe=false;
  const bool stadium_source_functional_idle_recipe=false;
  const bool stadium_source_functional_idle_pair_recipe=false;
+ const bool stadium_grdatfiles_pair_recipe=false;
  const bool stadium_source_setup_recipe=false;
  const bool stadium_post_ready_tick_recipe=false;
  const bool stadium_toy_owner_recipe=false;
@@ -9576,7 +9601,8 @@ int main(int argc,char** argv){try{
     !stadium_e8_request_recipe&&!stadium_ground_map1_owner_recipe&&
     !stadium_source_on_init_recipe&&!stadium_source_world_recipe&&!stadium_ready_session_recipe&&
     !stadium_source_go_alignment_recipe&&!stadium_source_functional_idle_recipe&&
-    !stadium_source_functional_idle_pair_recipe&&!stadium_source_setup_recipe&&
+    !stadium_source_functional_idle_pair_recipe&&!stadium_grdatfiles_pair_recipe&&
+    !stadium_source_setup_recipe&&
     !stadium_pad_leave_probe_recipe&&!stadium_source_text_lifetime_recipe&&
     !stadium_ready_text_membership_recipe&&
     !v10_css_replay_start_recipe)
@@ -9596,8 +9622,9 @@ int main(int argc,char** argv){try{
      stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
      stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
      stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||
-     stadium_source_functional_idle_pair_recipe||stadium_source_setup_recipe||
-     stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
+     stadium_source_functional_idle_pair_recipe||stadium_grdatfiles_pair_recipe||
+     stadium_source_setup_recipe||stadium_pad_leave_probe_recipe||
+     stadium_source_text_lifetime_recipe||
      stadium_ready_text_membership_recipe)&&
     stage_kind!=St_Kind_PStadium)
    throw std::runtime_error("C1a recipes require source StKind 3");
@@ -9610,8 +9637,9 @@ int main(int argc,char** argv){try{
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
     stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
      stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||
-     stadium_source_functional_idle_pair_recipe||stadium_source_setup_recipe||
-    stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
+     stadium_source_functional_idle_pair_recipe||stadium_grdatfiles_pair_recipe||
+     stadium_source_setup_recipe||stadium_pad_leave_probe_recipe||
+     stadium_source_text_lifetime_recipe||
     stadium_ready_text_membership_recipe||
     v10_css_replay_start_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
     trophy_baseline_recipe||sound_settings_recipe)
@@ -9641,6 +9669,69 @@ int main(int argc,char** argv){try{
   return 0;
  }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(stadium_grdatfiles_pair_recipe){
+  check(melee_web_stadium_c1_grdatfiles_snapshot_control(),
+        "Synthetic grDatFiles slot/field first-occupancy control failed");
+  MeleeWebGameplayAllocation prior_session=session_allocation;
+  check(prior_session.identity&&prior_session.generation&&
+            prior_session.bytes==32U*1024U*1024U,
+        "First grDatFiles lifetime has no live 32 MiB Session arena");
+  for(unsigned lifetime=0;lifetime<2;++lifetime){
+   if(lifetime){
+    check(melee_web_gameplay_session_begin(32U*1024U*1024U,
+              session_error,sizeof(session_error)),session_error);
+    const auto next_session=melee_web_gameplay_allocation();
+    check(next_session.identity&&next_session.generation>prior_session.generation&&
+              next_session.bytes==32U*1024U*1024U,
+          "Second grDatFiles lifetime did not receive a newer Session arena");
+    prior_session=next_session;
+   }
+   melee_web_stadium_c1_grdatfiles_set_lifetime_ordinal((int)lifetime);
+   trace.begin_run(lifetime);
+   std::fprintf(stderr,
+       "STADIUM_GRDATFILES_LIFETIME phase=begin ordinal=%u session_identity=%llu session_generation=%llu session_bytes=%llu\n",
+       lifetime,static_cast<unsigned long long>(prior_session.identity),
+       static_cast<unsigned long long>(prior_session.generation),
+       static_cast<unsigned long long>(prior_session.bytes));
+   std::fflush(stderr);
+   if(lifetime==0){
+    // One checked source Ready, then immediate existing match/world teardown.
+    run_stadium_c1a_selection_smoke(
+        files,true,false,false,false,false,true,false,argv[1],argv[2],trace,
+        true,false,false,false,false,false,false,false,false,false,nullptr);
+    check(!melee_web_gameplay_world_exists(),
+          "First grDatFiles lifetime retained its match world after Ready close");
+    check(melee_web_stadium_c1_grdatfiles_trace_snapshot(
+              "before-session-close", 0ULL),
+          "Could not snapshot ordinary grDatFiles before Session close");
+    check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),
+          session_error);
+    check(melee_web_stadium_c1_grdatfiles_trace_snapshot(
+              "after-session-close", 0ULL),
+          "Could not snapshot ordinary grDatFiles after Session close");
+    std::fprintf(stderr,
+        "STADIUM_GRDATFILES_LIFETIME phase=closed ordinal=0 session_identity=%llu session_generation=%llu world_exists=%d\n",
+        static_cast<unsigned long long>(prior_session.identity),
+        static_cast<unsigned long long>(prior_session.generation),
+        melee_web_gameplay_world_exists());
+    std::fflush(stderr);
+   }else{
+    // Stop at the existing second SSS context preflight; do not construct a match.
+    run_stadium_c1a_selection_smoke(
+        files,true,false,false,false,false,true,false,argv[1],argv[2],trace,
+        false,true,false,false,false,false,false,false,false,false,nullptr);
+    check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),
+          session_error);
+    check(melee_web_stadium_c1_grdatfiles_trace_snapshot(
+              "after-second-preflight-close", 0ULL),
+          "Could not snapshot ordinary grDatFiles after second preflight");
+    std::cout<<"Stadium one-Ready grDatFiles teardown and second preflight passed; "
+                "no second match construction, idle interval, draw or C3 claim\n";
+    return 0;
+   }
+  }
+  return 0;
+ }
  if(stadium_source_functional_idle_pair_recipe){
   MeleeWebGameplayAllocation prior_session=session_allocation;
   check(prior_session.identity&&prior_session.generation&&

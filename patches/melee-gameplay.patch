@@ -5510,7 +5510,7 @@ index ff1989d3967ca50ccadd979e0636f5a9601a22ad..aa985edb6f4dad0869dd7c717524a088
          }
          grDatFiles_801C6228(temp_r3->unk4);
      } else {
-@@ -129,11 +165,19 @@ UnkArchiveStruct* grDatFiles_801C62B4(void)
+@@ -129,11 +165,38 @@ UnkArchiveStruct* grDatFiles_801C62B4(void)
  
  UnkArchiveStruct* grDatFiles_GetArchive(void)
  {
@@ -5521,6 +5521,25 @@ index ff1989d3967ca50ccadd979e0636f5a9601a22ad..aa985edb6f4dad0869dd7c717524a088
      return grDatFiles_8049EE10;
  }
  
++#if defined(TARGET_PC) && defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++int melee_web_stadium_c1_grdatfiles_copy(UnkArchiveStruct slots[4],
++        UnkArchiveStruct** ordinary_table, void** native_table,
++        UnkArchiveStruct** effective_table)
++{
++    if (!slots || !ordinary_table || !native_table || !effective_table)
++        return 0;
++    for (int i = 0; i < 4; ++i) {
++        slots[i].unk0 = grDatFiles_8049EE10[i].unk0;
++        slots[i].unk4 = grDatFiles_8049EE10[i].unk4;
++        slots[i].unk8 = grDatFiles_8049EE10[i].unk8;
++    }
++    *ordinary_table = grDatFiles_8049EE10;
++    *native_table = melee_web_stage_map_archives();
++    *effective_table = grDatFiles_GetArchive();
++    return 1;
++}
++#endif
++
  UnkArchiveStruct* grDatFiles_801C6330(s32 arg0)
  {
 +#ifdef TARGET_PC
