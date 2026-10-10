@@ -1,5 +1,6 @@
 #include "gameplay_menu_host.h"
 #include "gameplay_menu.h"
+#include "gameplay_match_clock.h"
 #include "gameplay_match_rules.h"
 #include "gameplay_save_profile.h"
 #include "gameplay_content.h"
@@ -78,6 +79,7 @@ enum {
     MELEE_WEB_HOST_SCENE_OPENING = 5,
     MELEE_WEB_HOST_SCENE_OPENING_VS = 6,
 };
+enum { HOST_SSS_CONTINUATION_EMPTY = 0, HOST_SSS_CONTINUATION_AVAILABLE = 1, HOST_SSS_CONTINUATION_USED = 2 };
 struct MeleeWebMenuHost {
     MeleeWebMenuSession* session;
     MeleeWebSaveProfileOwner* profile;
@@ -142,6 +144,12 @@ struct MeleeWebMenuHost {
     int aborted_source_scene;
     int css_parent_route_requested;
     int training_start_pending;
+    int sss_continuation_state;
+    MeleeWebMenuClockCounters sss_continuation_counters;
+    MeleeWebMenuSession* sss_continuation_session;
+    MeleeWebAudio* sss_continuation_audio;
+    uint64_t sss_continuation_audio_generation;
+    uint64_t sss_continuation_departed_world_generation;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     int first_css_return_state; /* 0 unarmed, 1 armed, 2 captured, 3 invalid */
     uint64_t first_css_return_generation;
@@ -222,6 +230,159 @@ static int live(MeleeWebMenuHost* h,char* e,size_t n){
        !melee_web_audio_is_active(h->audio)||!melee_web_audio_bank_transport_active())
         return fail(e,n,"Native menu world/audio ownership changed");
     return melee_web_save_profile_owner_live(h->profile,e,n);
+}
+static void host_sss_continuation_invalidate(MeleeWebMenuHost* h)
+{
+    if (h != NULL && h == owner &&
+        h->sss_continuation_state == HOST_SSS_CONTINUATION_AVAILABLE)
+        h->sss_continuation_state = HOST_SSS_CONTINUATION_USED;
+}
+
+static int host_sss_continuation_owner(MeleeWebMenuHost* h, char* e, size_t n)
+{
+    if (h == NULL || h != owner) {
+        host_sss_continuation_invalidate(owner);
+        return fail(e, n, "Native menu host is not the owned continuation host");
+    }
+    return 1;
+}
+
+static int host_sss_continuation_alternative_entry(MeleeWebMenuHost* h,
+                                                    char* e, size_t n)
+{
+    if (!host_sss_continuation_owner(h, e, n)) return 0;
+    host_sss_continuation_invalidate(h);
+    return 1;
+}
+
+static int host_sss_continuation_arm(MeleeWebMenuHost* h, char* e, size_t n)
+{
+    MeleeWebMenuClockCounters counters;
+    CSSData* css;
+    GameModeState* authored_sss;
+
+    if (!host_sss_continuation_owner(h, e, n)) return 0;
+    /* A new eligible CSS leave is the only operation that can rearm a used
+     * token. Invalidate first so any later read/capture failure stays closed. */
+    h->sss_continuation_state = HOST_SSS_CONTINUATION_USED;
+    if (!h->session)
+        return fail(e,n,"CSS-to-SSS counter continuation lost its menu session");
+    css = (CSSData*) melee_web_menu_css(h->session);
+    authored_sss = &gm_Mode_Vs_States[gmVsMode_State_Sss];
+    if (!h->audio || !h->generation || !h->audio_generation ||
+        h->source_mode_kind != GM_VS || !h->vs_mode_owned || h->entered ||
+        h->source_scene != MELEE_WEB_HOST_SCENE_NONE || h->transition ||
+        h->source_target_mode != -1 || css == NULL ||
+        css->pending_scene_change != 1 ||
+        h->source_scene_info.scene_kind != GS_CSS ||
+        h->source_scene_info.enter_data != css ||
+        h->source_scene_info.exit_data != css ||
+        melee_web_menu_phase(h->session) != MELEE_WEB_MENU_SSS_READY ||
+        gm_GetCurrentGameMode() != GM_VS ||
+        gm_GetCurrentSceneIndex() != gmVsMode_State_Sss ||
+        authored_sss->id != gmVsMode_State_Sss ||
+        authored_sss->info.scene_kind != GS_SSS ||
+        melee_web_vs_mode_pending_mode() != -1 ||
+        h->generation != melee_web_gameplay_stats().generation ||
+        !melee_web_audio_is_active(h->audio) ||
+        !melee_web_audio_bank_transport_active() ||
+        melee_web_audio_generation(h->audio) != h->audio_generation ||
+        !melee_web_menu_clock_capture_counters(&counters))
+        return fail(e, n, "CSS-to-SSS counter continuation could not be captured");
+
+    h->sss_continuation_counters = counters;
+    h->sss_continuation_session = h->session;
+    h->sss_continuation_audio = h->audio;
+    h->sss_continuation_audio_generation = h->audio_generation;
+    h->sss_continuation_departed_world_generation = h->generation;
+    h->sss_continuation_state = HOST_SSS_CONTINUATION_AVAILABLE;
+    return ok(e, n);
+}
+
+static int host_sss_continuation_claim(MeleeWebMenuHost* h,
+    MeleeWebAudio* audio, MeleeWebMenuPhase phase, uint64_t world_generation,
+    MeleeWebMenuClockCounters* out, char* e, size_t n)
+{
+    MeleeWebMenuClockCounters captured_counters;
+    MeleeWebMenuSession* expected_session;
+    MeleeWebAudio* expected_audio;
+    CSSData* css;
+    GameModeState* authored_sss;
+    uint64_t expected_audio_generation;
+    uint64_t departed_world_generation;
+
+    if (!host_sss_continuation_owner(h, e, n)) return 0;
+    if (h->sss_continuation_state != HOST_SSS_CONTINUATION_AVAILABLE)
+        return fail(e, n, "Ordinary VS SSS entry has no available CSS continuation");
+
+    /* Copy the real scalar boundary and permanently consume before checking
+     * the output pointer or any destination owner, so every attempt is one-use. */
+    captured_counters = h->sss_continuation_counters;
+    h->sss_continuation_state = HOST_SSS_CONTINUATION_USED;
+    expected_session = h->sss_continuation_session;
+    expected_audio = h->sss_continuation_audio;
+    expected_audio_generation = h->sss_continuation_audio_generation;
+    departed_world_generation = h->sss_continuation_departed_world_generation;
+    css = h->session != NULL ? (CSSData*) melee_web_menu_css(h->session) : NULL;
+    authored_sss = &gm_Mode_Vs_States[gmVsMode_State_Sss];
+
+    if (phase != MELEE_WEB_MENU_SSS_READY || h->session != expected_session ||
+        h->source_mode_kind != GM_VS || !h->vs_mode_owned ||
+        h->source_scene != MELEE_WEB_HOST_SCENE_NONE || h->entered ||
+        h->transition || h->source_target_mode != -1 || h->audio != NULL ||
+        h->generation != 0 || audio == NULL || audio != expected_audio ||
+        !h->audio_generation || h->audio_generation != expected_audio_generation ||
+        !world_generation || world_generation == departed_world_generation ||
+        !melee_web_audio_is_active(audio) ||
+        melee_web_audio_generation(audio) != expected_audio_generation ||
+        !melee_web_audio_bank_transport_active() || seed_ptr != &h->seed ||
+        gm_GetCurrentGameMode() != GM_VS ||
+        gm_GetCurrentSceneIndex() != gmVsMode_State_Sss ||
+        authored_sss->id != gmVsMode_State_Sss ||
+        authored_sss->info.scene_kind != GS_SSS || css == NULL ||
+        css->pending_scene_change != 1 ||
+        h->source_scene_info.scene_kind != GS_CSS ||
+        h->source_scene_info.enter_data != css ||
+        h->source_scene_info.exit_data != css ||
+        melee_web_vs_mode_pending_mode() != -1 || out == NULL)
+        return fail(e, n, "CSS-to-SSS continuation owner or fresh world changed");
+    *out = captured_counters;
+    return ok(e, n);
+}
+
+static int host_commit_vs_css_sss_route(MeleeWebMenuHost* h, CSSData* css,
+                                         char* e, size_t n)
+{
+    GameModeState* authored_css;
+    GameModeState* authored_sss;
+    int next;
+
+    if (h == NULL || h != owner || css == NULL || !h->session ||
+        h->source_mode_kind != GM_VS || !h->vs_mode_owned ||
+        h->source_scene != MELEE_WEB_HOST_SCENE_CSS ||
+        melee_web_menu_css(h->session) != css ||
+        h->source_scene_info.scene_kind != GS_CSS ||
+        h->source_scene_info.enter_data != css ||
+        h->source_scene_info.exit_data != css ||
+        gm_GetCurrentGameMode() != GM_VS ||
+        gm_GetCurrentSceneIndex() != gmVsMode_State_Css ||
+        css->pending_scene_change != 1 ||
+        melee_web_vs_mode_pending_mode() != -1)
+        return fail(e, n, "CSS SSS route has no exact live VS CSS owner");
+
+    authored_css = &gm_Mode_Vs_States[gmVsMode_State_Css];
+    if (authored_css->id != gmVsMode_State_Css ||
+        authored_css->info.scene_kind != GS_CSS)
+        return fail(e, n, "CSS SSS route has no authored CSS table row");
+    next = melee_web_vs_mode_resolve_next_state(gm_Mode_Vs_States);
+    authored_sss = &gm_Mode_Vs_States[gmVsMode_State_Sss];
+    if (next != gmVsMode_State_Sss || authored_sss->id != next ||
+        authored_sss->info.scene_kind != GS_SSS)
+        return fail(e, n, "CSS requested a non-authored SSS state");
+    if (!melee_web_vs_mode_select_state(next))
+        return fail(e, n, "CSS SSS state could not be committed to VS routing");
+    h->source_target_mode = -1;
+    return ok(e, n);
 }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 static void first_sss_pair_fail(MeleeWebMenuHost* h, const char* text)
@@ -825,8 +986,9 @@ static int source_scene_exit(void* data, MeleeWebMenuScene scene,
                                 "Original GM_MENU route owner could not set GM_VS provenance");
                 }
             } else if (css->pending_scene_change == 1) {
-                /* CSS -> SSS remains inside the same GM_VS owner. */
-                h->source_target_mode = -1;
+                /* Resolve authored nextState once after CSS OnExit and commit
+                 * the same route once before the browser rebuilds SSS. */
+                if (!host_commit_vs_css_sss_route(h,css,e,n)) return 0;
             } else if (h->vs_mode_owned) {
                 if (!melee_web_vs_mode_end()) {
                     return fail(e, n, "Original VS mode lease did not release after CSS");
@@ -1126,7 +1288,7 @@ int melee_web_menu_host_selection_state(const MeleeWebMenuHost* h,
     }
     return 0;
 }
-static void restore_context(MeleeWebMenuHost* h){
+static int restore_context_checked(MeleeWebMenuHost* h, char* e, size_t n){
     HSD_PadLibData=h->saved_library;
     memcpy(HSD_PadGameStatus,h->saved_game,sizeof(h->saved_game));
     memcpy(HSD_PadMasterStatus,h->saved_master,sizeof(h->saved_master));
@@ -1136,14 +1298,63 @@ static void restore_context(MeleeWebMenuHost* h){
     *gmMainLib_GetUnlockedCharactersBitmaskPtr()=h->saved_characters;
     *gmMainLib_8015EDA4()=h->saved_stages;
     lbLang_SetLanguageSetting(h->saved_language);lbLang_SetSavedLanguage(h->saved_saved_language);
-    if(!melee_web_menu_clock_end())abort();
+    if(!melee_web_menu_clock_end())
+        return fail(e,n,"Original scene clock refused checked caller restoration");
     h->audio=NULL;h->generation=0;
+    return ok(e,n);
 }
+static void restore_context(MeleeWebMenuHost* h){
+    if(!restore_context_checked(h,NULL,0))abort();
+}
+static int host_cleanup_failed_sss_entry(MeleeWebMenuHost* h,
+                                          const char* reason,
+                                          char* e, size_t n)
+{
+    char reason_copy[160] = {0};
+    char abort_error[160] = {0};
+    char cleanup_error[160] = {0};
+    snprintf(reason_copy,sizeof(reason_copy),"%s",
+        reason ? reason : "SSS constructor continuation failed");
+
+    if (!h || h != owner || !h->entered ||
+        h->source_scene != MELEE_WEB_HOST_SCENE_SSS ||
+        melee_web_menu_phase(h->session) != MELEE_WEB_MENU_SSS)
+        return fail(e,n,"Cannot clean up an unowned or inactive SSS entry");
+    if (!melee_web_menu_abort(h->session,abort_error,sizeof(abort_error))) {
+        if (e && n) snprintf(e,n,"%s; SSS abort refused: %s",
+            reason_copy, abort_error[0] ? abort_error : "no diagnostic");
+        return 0;
+    }
+    HSD_SisLib_803A5FBC();
+    h->entered=0;
+    h->source_scene=MELEE_WEB_HOST_SCENE_NONE;
+    h->transition=0;
+    if (!restore_context_checked(h,cleanup_error,sizeof(cleanup_error)))
+        return fail(e,n,cleanup_error);
+    return fail(e,n,reason_copy);
+}
+static int host_restore_failed_continuation(MeleeWebMenuHost* h,
+                                             const char* reason,
+                                             char* e, size_t n)
+{
+    char reason_copy[160] = {0};
+    char cleanup_error[160] = {0};
+    snprintf(reason_copy,sizeof(reason_copy),"%s",
+        reason ? reason : "CSS-to-SSS continuation failed");
+    if (!restore_context_checked(h,cleanup_error,sizeof(cleanup_error)))
+        return fail(e,n,cleanup_error);
+    return fail(e,n,reason_copy);
+}
+
 static int host_prepare_world(MeleeWebMenuHost* h, MeleeWebAudio* audio,
                               MeleeWebMenuPhase phase, int source_scene,
+                              const MeleeWebMenuClockCounters* continuation,
                               char* e, size_t n)
 {
-    const uint64_t audio_generation=melee_web_audio_generation(audio);
+    uint64_t audio_generation;
+    if (!h || h != owner)
+        return fail(e,n,"Native menu host is not the owner");
+    audio_generation=melee_web_audio_generation(audio);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     if (h && h == owner && h->first_sss_pair_state == 2 &&
         (phase != MELEE_WEB_MENU_SSS_READY || source_scene ||
@@ -1157,13 +1368,23 @@ static int host_prepare_world(MeleeWebMenuHost* h, MeleeWebAudio* audio,
     if(!h||h!=owner||h->entered||h->audio||h->results_active||seed_ptr!=&h->seed||!melee_web_audio_is_active(audio)||
        !audio_generation||!melee_web_audio_bank_transport_active()||!melee_web_gameplay_stats().generation)
         return fail(e,n,"Native menu enter requires a fresh owned world and source audio");
-    if(!melee_web_menu_host_initialize_profile_baseline(h,e,n))return 0;
     if(!source_scene&&(phase!=MELEE_WEB_MENU_CREATED&&phase!=MELEE_WEB_MENU_CSS_READY&&phase!=MELEE_WEB_MENU_SSS_READY&&phase!=MELEE_WEB_MENU_READY))
         return fail(e,n,"Native menu session cannot enter from this phase");
+    if (phase == MELEE_WEB_MENU_SSS_READY && h->source_mode_kind == GM_VS &&
+        (source_scene || continuation == NULL))
+        return fail(e,n,"Ordinary VS SSS entry requires its captured CSS clock continuation");
+    if (continuation != NULL &&
+        (source_scene || phase != MELEE_WEB_MENU_SSS_READY ||
+         h->source_mode_kind != GM_VS))
+        return fail(e,n,"CSS clock continuation is valid only for ordinary VS SSS entry");
+    if(!melee_web_menu_host_initialize_profile_baseline(h,e,n))return 0;
     if(!source_scene&&phase!=MELEE_WEB_MENU_CREATED&&!h->input)
         return fail(e,n,"Returning menu scene requires retained source PAD history");
     if(!melee_web_native_world_enable(e,n))return 0;
-    if(!melee_web_menu_clock_begin())return fail(e,n,"Original scene clock is already owned");
+    if (continuation != NULL
+            ? !melee_web_menu_clock_begin_with_counters(continuation)
+            : !melee_web_menu_clock_begin())
+        return fail(e,n,"Original scene clock is already owned");
     h->audio=audio;h->generation=melee_web_gameplay_stats().generation;h->transition=0;
     h->saved_rules=*gmMainLib_GetGameRules();
     h->saved_preferences=*gmMainLib_8015CC58();
@@ -1225,15 +1446,39 @@ static int host_prepare_world(MeleeWebMenuHost* h, MeleeWebAudio* audio,
         h->audio_generation=audio_generation;
     }
     HSD_SisLib_803A6048(source_scene||phase==MELEE_WEB_MENU_SSS_READY?0x4800:0x2400);
-    return remember_runtime_preferences(h,e,n)&&ok(e,n);
+    if (!remember_runtime_preferences(h,e,n)) {
+        if (continuation != NULL) {
+            char original_error[160] = {0};
+            if (e && n) snprintf(original_error,sizeof(original_error),"%s",e);
+            HSD_SisLib_803A5FBC();
+            return host_restore_failed_continuation(h,
+                original_error[0] ? original_error :
+                    "Cannot retain host preferences before SSS entry",e,n);
+        }
+        return 0;
+    }
+    return ok(e,n);
 }
 
 int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,size_t n){
-    const MeleeWebMenuPhase phase=melee_web_menu_phase(h?h->session:NULL);
+    MeleeWebMenuPhase phase;
+    MeleeWebMenuClockCounters continuation_counters;
+    const MeleeWebMenuClockCounters* continuation = NULL;
     int acquired_vs = 0;
-    if(!host_prepare_world(h,audio,phase,0,e,n)){
+
+    if (!host_sss_continuation_owner(h,e,n)) return 0;
+    phase=melee_web_menu_phase(h->session);
+    if (phase == MELEE_WEB_MENU_SSS_READY && h->source_mode_kind == GM_VS) {
+        if (!host_sss_continuation_claim(h,audio,phase,
+                melee_web_gameplay_stats().generation,
+                &continuation_counters,e,n)) return 0;
+        continuation = &continuation_counters;
+    } else {
+        host_sss_continuation_invalidate(h);
+    }
+    if(!host_prepare_world(h,audio,phase,0,continuation,e,n)){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-        if (h && h == owner && h->first_sss_pair_state == 2)
+        if (h->first_sss_pair_state == 2)
             first_sss_pair_fail(h, e && *e ? e :
                 "First SSS pair failed while preparing its retained world");
 #endif
@@ -1264,7 +1509,21 @@ int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,s
             if (!melee_web_vs_mode_end()) abort();
             h->vs_mode_owned = 0;
         }
-        HSD_SisLib_803A5FBC();restore_context(h);return 0;
+        HSD_SisLib_803A5FBC();
+        if (continuation != NULL)
+            return host_restore_failed_continuation(h,
+                e && *e ? e : "Authored SSS entry failed",e,n);
+        restore_context(h);
+        return 0;
+    }
+    if (phase == MELEE_WEB_MENU_SSS_READY && continuation != NULL) {
+        /* source_scene_enter has installed the persistent authored SSS
+         * payload. Mark local ownership before constructor finish or cleanup. */
+        h->source_scene=MELEE_WEB_HOST_SCENE_SSS;
+        h->entered=1;
+        if (!melee_web_menu_clock_finish_constructor())
+            return host_cleanup_failed_sss_entry(h,
+                "Original SSS constructor counter reset was refused",e,n);
     }
     if(!remember_runtime_preferences(h,e,n)){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
@@ -1272,6 +1531,9 @@ int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,s
             first_sss_pair_fail(h, e && *e ? e :
                 "First SSS pair failed while retaining host entry preferences");
 #endif
+        if (continuation != NULL)
+            return host_cleanup_failed_sss_entry(h,
+                e && *e ? e : "Cannot retain host preferences after SSS entry",e,n);
         return 0;
     }
     h->source_scene=phase==MELEE_WEB_MENU_SSS_READY?MELEE_WEB_HOST_SCENE_SSS:MELEE_WEB_HOST_SCENE_CSS;
@@ -1377,9 +1639,11 @@ static int host_enter_main_scene(MeleeWebMenuHost* h, char* e, size_t n)
 int melee_web_menu_host_enter_title(MeleeWebMenuHost* h, MeleeWebAudio* audio,
                                     char* e, size_t n)
 {
-    const MeleeWebMenuPhase phase = melee_web_menu_phase(h ? h->session : NULL);
+    MeleeWebMenuPhase phase;
+    if (!host_sss_continuation_alternative_entry(h,e,n)) return 0;
+    phase = melee_web_menu_phase(h->session);
 
-    if (!host_prepare_world(h, audio, phase, 1, e, n)) {
+    if (!host_prepare_world(h, audio, phase, 1, NULL, e, n)) {
         return 0;
     }
     if (!host_enter_title_scene(h, e, n)) {
@@ -1400,9 +1664,11 @@ int melee_web_menu_host_enter_title(MeleeWebMenuHost* h, MeleeWebAudio* audio,
 int melee_web_menu_host_enter_main(MeleeWebMenuHost* h, MeleeWebAudio* audio,
                                    char* e, size_t n)
 {
-    const MeleeWebMenuPhase phase = melee_web_menu_phase(h ? h->session : NULL);
+    MeleeWebMenuPhase phase;
+    if (!host_sss_continuation_alternative_entry(h,e,n)) return 0;
+    phase = melee_web_menu_phase(h->session);
 
-    if (!host_prepare_world(h, audio, phase, 1, e, n)) {
+    if (!host_prepare_world(h, audio, phase, 1, NULL, e, n)) {
         return 0;
     }
     if (!host_enter_main_scene(h, e, n)) {
@@ -1424,9 +1690,11 @@ int melee_web_menu_host_enter_training_css(MeleeWebMenuHost* h,
                                            MeleeWebAudio* audio,
                                            char* e, size_t n)
 {
-    const MeleeWebMenuPhase phase = melee_web_menu_phase(h ? h->session : NULL);
+    MeleeWebMenuPhase phase;
+    if (!host_sss_continuation_alternative_entry(h,e,n)) return 0;
+    phase = melee_web_menu_phase(h->session);
 
-    if (!h || h != owner || h->source_scene != MELEE_WEB_HOST_SCENE_NONE ||
+    if (h->source_scene != MELEE_WEB_HOST_SCENE_NONE ||
         h->entered || h->audio || !h->vs_mode_owned ||
         h->source_target_mode != GM_TRAINING ||
         h->source_mode_kind != GM_TRAINING) {
@@ -1439,7 +1707,7 @@ int melee_web_menu_host_enter_training_css(MeleeWebMenuHost* h,
             return fail(e, n,
                         "Original Training CSS cannot reopen without a completed GM_MENU parent route");
         }
-        if (!host_prepare_world(h, audio, MELEE_WEB_MENU_CSS_READY, 0, e, n)) {
+        if (!host_prepare_world(h, audio, MELEE_WEB_MENU_CSS_READY, 0, NULL, e, n)) {
             return 0;
         }
         if (!melee_web_menu_reopen_css_after_parent(h->session, e, n)) {
@@ -1504,17 +1772,20 @@ int melee_web_menu_host_enter_opening(MeleeWebMenuHost* h,
                                       MeleeWebAudio* audio,
                                       char* e, size_t n)
 {
-    const MeleeWebMenuPhase phase = melee_web_menu_phase(h ? h->session : NULL);
-    const int id = gm_GetCurrentSceneIndex();
+    MeleeWebMenuPhase phase;
+    int id;
     GameModeState* source;
     GameScene* scene;
-    if (!h || h != owner || !h->vs_mode_owned ||
+    if (!host_sss_continuation_alternative_entry(h,e,n)) return 0;
+    phase = melee_web_menu_phase(h->session);
+    id = gm_GetCurrentSceneIndex();
+    if (!h->vs_mode_owned ||
         gm_GetCurrentGameMode() != GM_OPENING_MV ||
         h->source_target_mode != GM_OPENING_MV || h->opening_active ||
         melee_web_gameplay_vs_startup_active() ||
         melee_web_gameplay_vs_manager_preparing() ||
         (source = melee_web_opening_mode_state(id)) == NULL ||
-        !host_prepare_world(h, audio, phase, 1, e, n)) {
+        !host_prepare_world(h, audio, phase, 1, NULL, e, n)) {
         return fail(e, n,
                     "Opening mode entry requires its selected source state, a fresh narrow world, and no live source VS preload owner");
     }
@@ -2147,6 +2418,8 @@ static int host_abort_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
 }
 
 int melee_web_menu_host_leave(MeleeWebMenuHost* h,int abort_scene,char* e,size_t n){
+    if (abort_scene)
+        host_sss_continuation_invalidate(h == owner ? h : owner);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     final_pending_css_draw_invalidate(h);
     if (h && h == owner && h->first_css_return_state)
@@ -2209,6 +2482,23 @@ int melee_web_menu_host_leave(MeleeWebMenuHost* h,int abort_scene,char* e,size_t
      * not retain a stale transition or parent-route request that prevents
      * owned teardown or contaminates a later scene entry. */
     h->transition=0;h->css_parent_route_requested=0;
+    if (!abort_scene && was_css && h->source_mode_kind == GM_VS &&
+        melee_web_menu_phase(h->session) == MELEE_WEB_MENU_SSS_READY) {
+        if (!host_sss_continuation_arm(h,e,n)) {
+            char arm_error[160] = {0};
+            if (e && n) snprintf(arm_error,sizeof(arm_error),"%s",e);
+            return host_restore_failed_continuation(h,
+                arm_error[0] ? arm_error :
+                    "CSS-to-SSS counter continuation capture failed",e,n);
+        }
+        if (!restore_context_checked(h,e,n)) {
+            host_sss_continuation_invalidate(h);
+            return 0;
+        }
+        if (h->sss_continuation_state != HOST_SSS_CONTINUATION_AVAILABLE)
+            return fail(e,n,"CSS-to-SSS counter continuation was not armed");
+        return ok(e,n);
+    }
     restore_context(h);return ok(e,n);
 }
 int melee_web_menu_host_phase(const MeleeWebMenuHost* h){return h&&h==owner?melee_web_menu_phase(h->session):MELEE_WEB_MENU_CLOSED;}
@@ -2282,15 +2572,17 @@ int melee_web_menu_host_reenter_css_after_parent(MeleeWebMenuHost* h,
                                                    MeleeWebAudio* audio,
                                                    char* e, size_t n)
 {
-    const MeleeWebMenuPhase actual = melee_web_menu_phase(h ? h->session : NULL);
+    MeleeWebMenuPhase actual;
+    if (!host_sss_continuation_alternative_entry(h,e,n)) return 0;
+    actual = melee_web_menu_phase(h->session);
 
-    if (!h || h != owner || h->source_scene != MELEE_WEB_HOST_SCENE_NONE ||
+    if (h->source_scene != MELEE_WEB_HOST_SCENE_NONE ||
         h->entered || h->audio || h->source_target_mode != GM_VS ||
         actual != MELEE_WEB_MENU_CLOSED || !h->vs_mode_owned) {
         return fail(e, n,
                     "CSS re-entry requires a completed checked GM_MENU -> GM_VS route");
     }
-    if (!host_prepare_world(h, audio, MELEE_WEB_MENU_CSS_READY, 0, e, n)) {
+    if (!host_prepare_world(h, audio, MELEE_WEB_MENU_CSS_READY, 0, NULL, e, n)) {
         return 0;
     }
     if (!melee_web_menu_reopen_css_after_parent(h->session, e, n)) {
@@ -2804,6 +3096,7 @@ int melee_web_menu_host_destroy(MeleeWebMenuHost* h,char* e,size_t n){
        (h->sudden_death_active&&melee_web_gameplay_generation())||
        seed_ptr!=&h->seed)
         return fail(e,n,"Close native menu scene and restore RNG before destroying host");
+    host_sss_continuation_invalidate(h);
     const int owns_scene_info =
         melee_web_current_scene_info() == &h->source_scene_info ||
         melee_web_current_scene_info() == &h->source_state.info;

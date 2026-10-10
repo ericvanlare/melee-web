@@ -4542,7 +4542,7 @@ index b7e470cfb7ffb2addf957104eb65b2e931996edb..f8797917dd8c1d9e13bbe059bff05b04
  /// @brief returns a pointer to the current scenes enter data
  void* gm_GetCurrentSceneEnterData(void)
  {
-@@ -376,3 +386,245 @@ void gm_801A4D34(void (*on_frame)(void), UNUSED GameSceneInfo* info)
+@@ -376,3 +386,295 @@ void gm_801A4D34(void (*on_frame)(void), UNUSED GameSceneInfo* info)
      }
      HSD_VIWaitXFBFlush();
  }
@@ -4559,6 +4559,7 @@ index b7e470cfb7ffb2addf957104eb65b2e931996edb..f8797917dd8c1d9e13bbe059bff05b04
 +static struct gm_80479D58_t melee_source_clock_saved;
 +static int melee_source_clock_owner;
 +static int melee_source_clock_prepared;
++static int melee_menu_clock_constructor_pending;
 +static u64 melee_source_clock_process_mask;
 +static u64* melee_source_clock_saved_mask_ptr;
 +static u64 melee_source_clock_saved_mask;
@@ -4613,6 +4614,7 @@ index b7e470cfb7ffb2addf957104eb65b2e931996edb..f8797917dd8c1d9e13bbe059bff05b04
 +    melee_source_clock_prepared = 0;
 +    melee_source_clock_in_callback = 0;
 +    melee_source_clock_end_failure = MELEE_WEB_SOURCE_CLOCK_END_FAILURE_NONE;
++    melee_menu_clock_constructor_pending = 0;
 +    melee_source_clock_owner = owner;
 +    HSD_GObjLibInitData.unk_2 = &melee_source_clock_process_mask;
 +    return 1;
@@ -4623,6 +4625,7 @@ index b7e470cfb7ffb2addf957104eb65b2e931996edb..f8797917dd8c1d9e13bbe059bff05b04
 +    u64 mask;
 +
 +    if (!melee_source_clock_owned() || melee_source_clock_prepared ||
++        melee_menu_clock_constructor_pending ||
 +        (melee_source_clock_owner == MELEE_WEB_SOURCE_CLOCK_MATCH &&
 +         on_frame == NULL))
 +        return 0;
@@ -4672,7 +4675,8 @@ index b7e470cfb7ffb2addf957104eb65b2e931996edb..f8797917dd8c1d9e13bbe059bff05b04
 +
 +int melee_web_source_clock_post(void)
 +{
-+    if (!melee_source_clock_owned()) return 0;
++    if (!melee_source_clock_owned() || melee_menu_clock_constructor_pending)
++        return 0;
 +
 +    /* Existing MENU ordering calls its scene callback before the host
 +     * scheduler and calls this compatibility path afterwards. Preserve that
@@ -4698,7 +4702,8 @@ index b7e470cfb7ffb2addf957104eb65b2e931996edb..f8797917dd8c1d9e13bbe059bff05b04
 +
 +int melee_web_source_clock_present(void)
 +{
-+    if (!melee_source_clock_owned()) return 0;
++    if (!melee_source_clock_owned() || melee_menu_clock_constructor_pending)
++        return 0;
 +    if (gm_80479D58.unk_4 != (u32) -2) gm_80479D58.unk_4++;
 +    return 1;
 +}
@@ -4750,6 +4755,7 @@ index b7e470cfb7ffb2addf957104eb65b2e931996edb..f8797917dd8c1d9e13bbe059bff05b04
 +    melee_source_clock_process_mask = 0;
 +    melee_source_clock_prepared = 0;
 +    melee_source_clock_in_callback = 0;
++    melee_menu_clock_constructor_pending = 0;
 +    melee_source_clock_owner = 0;
 +    return 1;
 +}
@@ -4757,6 +4763,50 @@ index b7e470cfb7ffb2addf957104eb65b2e931996edb..f8797917dd8c1d9e13bbe059bff05b04
 +int melee_web_source_clock_end_failure(void)
 +{
 +    return melee_source_clock_end_failure;
++}
++
++static int melee_menu_clock_counters_idle(void)
++{
++    return melee_source_clock_owner == MELEE_WEB_SOURCE_CLOCK_MENU &&
++           melee_source_clock_owned() && !melee_source_clock_prepared &&
++           !melee_source_clock_in_callback &&
++           !HSD_GObj_804D781C && !HSD_GObj_804D7838 &&
++           !HSD_GObj_804D7830 && !HSD_GObj_804D7814 && !HSD_GObj_804D7818;
++}
++
++int melee_web_menu_clock_capture_counters(MeleeWebMenuClockCounters* out)
++{
++    if (out == NULL || melee_menu_clock_constructor_pending ||
++        !melee_menu_clock_counters_idle()) return 0;
++    out->counter_0 = gm_80479D58.unk_0;
++    out->counter_4 = gm_80479D58.unk_4;
++    out->counter_8 = gm_80479D58.unk_8;
++    return 1;
++}
++
++int melee_web_menu_clock_begin_with_counters(
++    const MeleeWebMenuClockCounters* counters)
++{
++    MeleeWebMenuClockCounters captured;
++    if (counters == NULL || HSD_GObj_804D781C || HSD_GObj_804D7838 ||
++        HSD_GObj_804D7830 || HSD_GObj_804D7814 || HSD_GObj_804D7818)
++        return 0;
++    captured = *counters;
++    if (!melee_web_source_clock_begin(MELEE_WEB_SOURCE_CLOCK_MENU)) return 0;
++    gm_80479D58.unk_0 = captured.counter_0;
++    gm_80479D58.unk_4 = captured.counter_4;
++    gm_80479D58.unk_8 = captured.counter_8;
++    melee_menu_clock_constructor_pending = 1;
++    return 1;
++}
++
++int melee_web_menu_clock_finish_constructor(void)
++{
++    if (!melee_menu_clock_constructor_pending ||
++        !melee_menu_clock_counters_idle()) return 0;
++    gm_80479D58.unk_0 = gm_80479D58.unk_4 = gm_80479D58.unk_8 = 0;
++    melee_menu_clock_constructor_pending = 0;
++    return 1;
 +}
 +
 +int melee_web_menu_clock_begin(void)
