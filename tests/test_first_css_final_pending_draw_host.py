@@ -81,6 +81,8 @@ PRELUDE = r"""
 #define MELEE_WEB_SAVE_PROFILE_CARD_BYTES 8
 #define MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED 3
 #define MELEE_WEB_MENU_CSS 1
+#define MELEE_WEB_MENU_SSS 3
+#define MELEE_WEB_MENU_RESULT_TICKED 1
 #define GM_VS 7
 #define GS_CSS 8
 #define GM_MAX_PLAYERS 6
@@ -112,6 +114,12 @@ struct MeleeWebMenuHost {
   int first_css_return_state;
   int final_pending_css_draw_witness,final_pending_css_draw_state;
   int final_pending_css_draw_returned;
+  /* SSS_TICK_FIXTURE_BEGIN */
+  int first_sss_tick_state; unsigned first_sss_tick_host_tick_calls,first_sss_tick_host_draw_calls;
+  PADStatus first_sss_tick_input[4]; int first_sss_tick_result,first_sss_tick_clock_post_succeeded;
+  int first_sss_tick_transition_requested,first_sss_tick_post_host_frame_captured; uint32_t first_sss_tick_post_host_frame;
+  struct {int captured;} first_sss_tick_scheduler_end; char first_sss_tick_error[160];
+  /* SSS_TICK_FIXTURE_END */
   int first_sss_pair_state; unsigned first_sss_pair_host_tick_calls,first_sss_pair_host_draw_calls;
   char first_sss_pair_error[160];
   int final_pending_css_draw_tick_result,final_pending_css_draw_request;
@@ -153,6 +161,10 @@ static void HSD_PadRenewCopyStatus(void);
 static void HSD_PadRenewGameStatus(void);
 static void gm_EvaluateAllControllerInputs(void);
 static int source_scene_tick(MeleeWebMenuHost*,char*,size_t);
+static int gm_801A4BA8(void){assert(0);return 0;}
+static void first_sss_tick_fail(MeleeWebMenuHost*h,const char*t){h->first_sss_tick_state=4;snprintf(h->first_sss_tick_error,sizeof h->first_sss_tick_error,"%s",t);}
+static int first_sss_tick_owner_idle(MeleeWebMenuHost*h,int armed,char*e,size_t n){(void)h;(void)armed;(void)e;(void)n;assert(0);return 0;}
+static int melee_web_menu_arm_first_sss_tick(MeleeWebMenuSession*s,char*e,size_t n){(void)s;(void)e;(void)n;assert(0);return 0;}
 static int melee_web_menu_tick(MeleeWebMenuSession*,char*,size_t);
 static GXRenderModeObj* HSD_VIGetRenderMode(void);
 static void GXInvalidateVtxCache(void);

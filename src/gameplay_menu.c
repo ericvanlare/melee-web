@@ -42,6 +42,7 @@ struct MeleeWebMenuSession {
     int first_css_return_armed;
     const uint8_t* first_css_return_ko_owner;
     MeleeWebMenuFirstSssPairNote first_sss_pair_note;
+    int first_sss_tick_token; /* 0 unused, 1 armed, 2 consumed, 3 invalid */
     int first_sss_pair_state; /* 0 unused, 1 CSS armed, 2 SSS eligible, 3 entering, 4 noted, 5 invalid */
     int stadium_c1a_enabled;
     int stadium_c1a_ready;
@@ -1042,6 +1043,21 @@ int melee_web_menu_first_css_return_live(const MeleeWebMenuSession* session)
         session->css.ko_counts == session->first_css_return_ko_owner;
 }
 
+int melee_web_menu_arm_first_sss_tick(MeleeWebMenuSession* session,
+                                      char* error, size_t error_size)
+{
+    if (!session_live(session, error, error_size)) return 0;
+    if (session->first_sss_tick_token != 0 || session->first_sss_pair_state != 4 ||
+        session->phase != MELEE_WEB_MENU_SSS || !session->sss_open ||
+        session->transition_failed || session->selection_rejected ||
+        session->transition_requested != 0) {
+        session->first_sss_tick_token = 3;
+        return fail(error, error_size, "SSS one-tick session authorization was refused");
+    }
+    session->first_sss_tick_token = 1;
+    return ok(error, error_size);
+}
+
 int melee_web_menu_arm_first_sss_pair(MeleeWebMenuSession* session,
     MeleeWebMenuFirstSssPairNote note, char* error, size_t error_size)
 {
@@ -1259,10 +1275,17 @@ int melee_web_menu_tick(MeleeWebMenuSession* session, char* error,
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     if (session->first_css_return_armed) session->first_css_return_armed = 3;
     if (session->first_sss_pair_state != 0) {
-        if (session->first_sss_pair_state != 4)
-            session->first_sss_pair_state = 5;
-        return fail(error, error_size,
-                    "SSS constructor pair is terminal before any source tick");
+        if (session->first_sss_pair_state == 4 &&
+            session->first_sss_tick_token == 1 &&
+            session->phase == MELEE_WEB_MENU_SSS && session->sss_open) {
+            session->first_sss_tick_token = 2; /* Consume before original work. */
+        } else {
+            if (session->first_sss_pair_state != 4)
+                session->first_sss_pair_state = 5;
+            if (session->first_sss_tick_token) session->first_sss_tick_token = 3;
+            return fail(error, error_size,
+                        "SSS constructor pair is terminal before any source tick");
+        }
     }
 #endif
     if (session->selection_rejected || session->transition_failed ||
@@ -1450,6 +1473,9 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
     if (!session_live(session, error, error_size)) {
         return 0;
     }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_sss_tick_token) session->first_sss_tick_token = 3;
+#endif
     if (session->phase != MELEE_WEB_MENU_SSS || !session->sss_open) {
         return fail(error, error_size, "SSS is not the live menu scene");
     }
@@ -1559,6 +1585,7 @@ int melee_web_menu_abort(MeleeWebMenuSession* session, char* error,
         return 0;
     }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_sss_tick_token) session->first_sss_tick_token = 3;
     if (session->first_css_return_armed) session->first_css_return_armed = 3;
     if (session->first_sss_pair_state)
         session->first_sss_pair_state = 5;

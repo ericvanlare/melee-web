@@ -123,6 +123,29 @@ FIRST_SSS_SOURCE_INVENTORY = {
     (32, 0), (35, 0), (33, 0), (34, 0), (36, 0), (37, 0),
     (21, 0), (17, 0), (30, 0), (40, 0), (19, 0), (20, 0),
 }
+# One additional source row after the first SSS PAD consume. This is the
+# scheduler-return SourceTick at frame zero; it does not include typed SSS data.
+FIRST_SSS_CONSUMED_PAD_SEQUENCE = 1604
+FIRST_SSS_SCHEDULER_END_SEQUENCE = 1608
+FIRST_SSS_SCHEDULER_END_PC = 0x80390EB4
+FIRST_SSS_SCHEDULER_END_TICK = 0
+FIRST_SSS_SCHEDULER_END_ORDINAL = 149
+FIRST_SSS_TICK_SLICES = {
+    (2, 0): (0x804C1F78, 0x0C),
+    (36, 0): (0x8045BF28, 2),
+    (37, 0): (0x8045BF2A, 2),
+    (21, 0): (FIRST_SSS_PAD_ADDRESS, 0x358),
+    (17, 0): (FIRST_SSS_SCENE_ROUTING_ADDRESS, 6),
+    (30, 0): (FIRST_SSS_SCENE_FRAME_ADDRESS, 4),
+    (40, 0): (FIRST_SSS_SCENE_ADDRESS, 1),
+    (19, 0): (FIRST_SSS_RNG_POINTER_ADDRESS, 4),
+    (20, 0): (FIRST_SSS_RNG_VALUE_ADDRESS, 4),
+}
+FIRST_SSS_TICK_INVENTORY = set(FIRST_SSS_TICK_SLICES)
+FIRST_SSS_TICK_INPUT_MAGIC = b"STC1SSS1"
+FIRST_SSS_TICK_INPUT_VERSION = 1
+FIRST_SSS_TICK_INPUT_HEADER_BYTES = 52
+FIRST_SSS_TICK_INPUT_BYTES = FIRST_SSS_TICK_INPUT_HEADER_BYTES + 4 * 11
 FIRST_CSS_CONSUMED_PAD_MAGIC = b"STC1PAD1"
 FIRST_CSS_CONSUMED_PAD_VERSION = 1
 FIRST_CSS_CONSUMED_PAD_HEADER_BYTES = 8 + 4 + 32 + 4 + 4
@@ -733,6 +756,218 @@ def extract_stadium_first_sss_constructor_pair(
              status_file.stat().st_size == FIRST_SSS_STATUS_BYTES and
              hashlib.sha256(status_file.read_bytes()).hexdigest() == FIRST_SSS_STATUS_SHA256,
              "SSS source observer or status changed during extraction")
+    return result
+
+
+def _first_sss_scheduler_end_rows(
+        consume: dict[str, Any], tick: dict[str, Any],
+        stream_sha256: str) -> dict[str, Any]:
+    """Extract one SSS consume sample and its exact scheduler-end SourceTick."""
+    _require(stream_sha256 == FIRST_CSS_STREAM_SHA256,
+             "SSS consumed sample is not from the retained v6 observer")
+    _require(isinstance(consume, dict) and consume.get("event") == "boundary" and
+             consume.get("seq") == FIRST_SSS_CONSUMED_PAD_SEQUENCE,
+             "SSS consumed PAD sequence/event differs")
+    consume_payload = consume.get("payload")
+    _require(isinstance(consume_payload, dict) and
+             consume_payload.get("boundary") == "pad_consume" and
+             consume_payload.get("pc") == 0x80377584 and
+             consume_payload.get("source_tick") == FIRST_SSS_SCHEDULER_END_TICK and
+             consume_payload.get("draw_ordinal") == FIRST_SSS_SCHEDULER_END_ORDINAL and
+             consume.get("source_tick") == FIRST_SSS_SCHEDULER_END_TICK and
+             consume.get("draw_ordinal") == FIRST_SSS_SCHEDULER_END_ORDINAL,
+             "SSS consumed PAD boundary has wrong phase/counters")
+    _check_boundary_contract(consume_payload)
+
+    _require(isinstance(tick, dict) and tick.get("event") == "boundary" and
+             tick.get("seq") == FIRST_SSS_SCHEDULER_END_SEQUENCE and
+             tick.get("seq") - consume["seq"] == 4,
+             "SSS scheduler-end row sequence differs from retained source order")
+    tick_payload = tick.get("payload")
+    _require(isinstance(tick_payload, dict) and
+             tick_payload.get("boundary") == "source_tick" and
+             tick_payload.get("pc") == FIRST_SSS_SCHEDULER_END_PC and
+             tick_payload.get("source_tick") == FIRST_SSS_SCHEDULER_END_TICK and
+             tick_payload.get("draw_ordinal") == FIRST_SSS_SCHEDULER_END_ORDINAL and
+             tick.get("source_tick") == FIRST_SSS_SCHEDULER_END_TICK and
+             tick.get("draw_ordinal") == FIRST_SSS_SCHEDULER_END_ORDINAL,
+             "SSS scheduler-end row has wrong phase or outer/payload counters")
+    _check_boundary_contract(tick_payload)
+    _require_exact_slice_inventory(tick_payload, FIRST_SSS_TICK_INVENTORY,
+                                   "SSS scheduler-end SourceTick")
+
+    from whole_session_replay import (  # noqa: PLC0415
+        WholeSessionReplayError, _consumed_ports,
+    )
+    try:
+        ports = _consumed_ports(consume, FIRST_SSS_CONSUMED_PAD_SEQUENCE)
+    except (WholeSessionReplayError, KeyError, TypeError, ValueError) as error:
+        raise StadiumGoPrefixError(
+            f"SSS consumed PAD source slot is invalid: {error}") from error
+    _require(len(ports) == 4, "SSS consumed PAD sample does not contain four ports")
+    try:
+        port_bytes = [bytes.fromhex(value) for value in ports]
+    except ValueError as error:
+        raise StadiumGoPrefixError("SSS consumed PAD sample is malformed") from error
+    _require(all(len(value) == 11 for value in port_bytes),
+             "SSS consumed PAD port has an unexpected length")
+    input_bundle = b"".join((
+        FIRST_SSS_TICK_INPUT_MAGIC,
+        FIRST_SSS_TICK_INPUT_VERSION.to_bytes(4, "big"),
+        bytes.fromhex(stream_sha256),
+        FIRST_SSS_CONSUMED_PAD_SEQUENCE.to_bytes(4, "big"),
+        FIRST_SSS_SCHEDULER_END_SEQUENCE.to_bytes(4, "big"),
+        b"".join(port_bytes),
+    ))
+    _require(len(input_bundle) == FIRST_SSS_TICK_INPUT_BYTES,
+             "SSS consumed PAD input bundle has an unexpected fixed length")
+
+    read: dict[int, dict[str, Any]] = {}
+    for (tag, flags), (address, size) in FIRST_SSS_TICK_SLICES.items():
+        item = _slice(tick_payload, tag, "SSS scheduler-end SourceTick", size, flags)
+        _require(item["address"] == address,
+                 f"SSS scheduler-end tag={tag} escaped its pinned source address")
+        read[tag] = item
+    routing = read[17]["raw"]
+    _require(routing == bytes.fromhex("020201010000"),
+             "SSS scheduler-end routing differs from retained source getters")
+    scene_frame = int.from_bytes(read[30]["raw"], "big")
+    _require(scene_frame == 0,
+             "SSS scheduler-end SourceTick is not original frame zero")
+    _require(read[40]["raw"] == bytes([FIRST_SSS_KIND]),
+             "SSS scheduler-end SourceTick is not in the Stadium SSS scene")
+    _require(read[19]["raw"] == read[20]["address"].to_bytes(4, "big"),
+             "SSS scheduler-end RNG pointer does not bind the observed seed slice")
+    try:
+        from reference_capture_semantics import pad_snapshot_bytes  # noqa: PLC0415
+        pad_hex = pad_snapshot_bytes(read[21]["raw"])
+    except (ValueError, TypeError) as error:
+        raise StadiumGoPrefixError(
+            f"SSS scheduler-end PAD snapshot is invalid: {error}") from error
+    pad = bytes.fromhex(pad_hex)
+    _require(len(pad) == 822,
+             "SSS scheduler-end semantic PAD has an unexpected length")
+    route = read[17]["raw"]
+    expected = {
+        "scene_frame": scene_frame,
+        "scene_kind": read[40]["raw"][0],
+        "pad_state_hex": pad.hex(),
+        "random_seed_hex": read[20]["raw"].hex(),
+        "scene_routing_getters": {
+            "current_game_mode": route[0],
+            "previous_game_mode": route[2],
+            "current_scene_index": route[3],
+            "previous_scene_index": route[4],
+        },
+        "consumed_pad_status_hex": [item.hex() for item in port_bytes],
+        "required_owners": {
+            "host": True, "session": True, "world": True, "audio": True,
+            "vs_mode": True, "scene_info": True, "payload": True, "seed": True,
+        },
+    }
+    return {
+        "schema": "melee-web-stadium-first-sss-consumed-pad-tick-diagnostic",
+        "version": FIRST_SSS_TICK_INPUT_VERSION,
+        "scope": "one consumed SSS PAD and its scheduler-end SourceTick only",
+        "provenance": {
+            "observer_bytes": FIRST_CSS_STREAM_BYTES,
+            "observer_sha256": stream_sha256,
+            "observer_status_bytes": FIRST_SSS_STATUS_BYTES,
+            "observer_status_sha256": FIRST_SSS_STATUS_SHA256,
+            "consumed_pad_sequence": FIRST_SSS_CONSUMED_PAD_SEQUENCE,
+            "scheduler_end_sequence": FIRST_SSS_SCHEDULER_END_SEQUENCE,
+            "scheduler_end_pc": f"0x{FIRST_SSS_SCHEDULER_END_PC:08x}",
+            "source_tick": FIRST_SSS_SCHEDULER_END_TICK,
+            "draw_ordinal": FIRST_SSS_SCHEDULER_END_ORDINAL,
+            "original_source_frame": 0,
+        },
+        "source_scheduler_end": {
+            "source_slice_inventory": [
+                {"tag": tag, "flags": flags, "address": read[tag]["address"],
+                 "size": read[tag]["size"]}
+                for tag, flags in sorted(FIRST_SSS_TICK_SLICES)
+            ],
+            "source_slices_hex": {
+                f"{tag}:{flags}": read[tag]["raw"].hex()
+                for tag, flags in sorted(FIRST_SSS_TICK_SLICES)
+            },
+            "scene_routing_raw_hex": route.hex(),
+            "rng_pointer_hex": read[19]["raw"].hex(),
+            "setup_profile_verified_by_observer": False,
+            "expected": expected,
+        },
+        "input_bundle": {
+            "magic_hex": FIRST_SSS_TICK_INPUT_MAGIC.hex(),
+            "version": FIRST_SSS_TICK_INPUT_VERSION,
+            "bytes": len(input_bundle),
+            "sha256": hashlib.sha256(input_bundle).hexdigest(),
+            "contains_expected_state": False,
+            "port_status_hex": [item.hex() for item in port_bytes],
+        },
+        "input_bundle_bytes": input_bundle,
+        "comparison_fields": [
+            "scheduler_end.scene_frame", "scheduler_end.scene_kind",
+            "scheduler_end.pad_state_hex", "scheduler_end.random_seed_hex",
+            "scheduler_end.scene_routing_getters", "consumed_pad_status_hex",
+        ],
+        "native_protocol_requirements": {
+            "scheduler_sample_scene_frame": 0,
+            "post_host_frame_after_clock_post": 1,
+            "clock_post_succeeded": True,
+            "tick_result": 1,
+            "transition_requested": False,
+            "host_tick_calls": 1,
+            "host_draw_calls": 0,
+            "all_owners_true": True,
+        },
+        "whole_session_equivalent": False,
+        "source_admission": False,
+    }
+
+
+def extract_stadium_first_sss_consumed_pad_tick(
+        stream_path: str | Path, status_path: str | Path) -> dict[str, Any]:
+    """Extract the first consumed SSS PAD and its scheduler-return sample."""
+    source = Path(stream_path)
+    status_file = Path(status_path)
+    _require(source.is_file() and status_file.is_file(),
+             "configured SSS observer stream or status is missing")
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES,
+             "SSS observer stream byte length differs from retained v6")
+    status_bytes = status_file.read_bytes()
+    _require(len(status_bytes) == FIRST_SSS_STATUS_BYTES and
+             hashlib.sha256(status_bytes).hexdigest() == FIRST_SSS_STATUS_SHA256,
+             "SSS observer status identity differs from retained v6")
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    _require(digest == FIRST_CSS_STREAM_SHA256,
+             "SSS observer stream hash differs from retained v6")
+    try:
+        summary = validate_stadium_go_prefix(source, status_path=status_file)
+        _require(summary.get("decision") == "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY" and
+                 summary.get("stream_bytes") == FIRST_CSS_STREAM_BYTES and
+                 summary.get("stream_sha256") == digest,
+                 "SSS source stream no longer passes full GO-prefix validation")
+        consume_rows: list[dict[str, Any]] = []
+        tick_rows: list[dict[str, Any]] = []
+        for row in iter_records(source, max_bytes=MAX_STREAM_BYTES,
+                                max_records=MAX_STREAM_RECORDS):
+            if row.get("seq") == FIRST_SSS_CONSUMED_PAD_SEQUENCE:
+                consume_rows.append(row)
+            elif row.get("seq") == FIRST_SSS_SCHEDULER_END_SEQUENCE:
+                tick_rows.append(row)
+        _require(len(consume_rows) == 1 and len(tick_rows) == 1,
+                 "SSS source stream does not contain one exact consume/scheduler-end pair")
+        result = _first_sss_scheduler_end_rows(consume_rows[0], tick_rows[0], digest)
+    except StadiumGoPrefixError:
+        raise
+    except (OSError, ObserverStreamError) as error:
+        raise StadiumGoPrefixError(
+            f"cannot validate SSS consumed scheduler-end rows: {error}") from error
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES and
+             hashlib.sha256(source.read_bytes()).hexdigest() == digest and
+             status_file.stat().st_size == FIRST_SSS_STATUS_BYTES and
+             hashlib.sha256(status_file.read_bytes()).hexdigest() == FIRST_SSS_STATUS_SHA256,
+             "SSS source observer or status changed during scheduler-end extraction")
     return result
 
 

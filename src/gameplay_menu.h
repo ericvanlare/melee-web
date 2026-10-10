@@ -134,6 +134,7 @@ enum {
 /* Private diagnostic only: arm during the completed CSS scene and retain the
  * same session through its ordinary CSS -> SSS_READY transition. Notes are
  * passive and cannot interrupt either authored SSS constructor boundary. */
+int melee_web_menu_arm_first_sss_tick(MeleeWebMenuSession*, char*, size_t);
 int melee_web_menu_arm_first_sss_pair(MeleeWebMenuSession*,
     MeleeWebMenuFirstSssPairNote, char*, size_t);
 #endif

@@ -614,3 +614,212 @@ export function createFirstSssConstructorPairComparator(expectedPair) {
   return Object.freeze({compare, status: () => Object.freeze({attempted, approved, failed,
     first_mismatch: firstMismatch, actual_pair: actualPair, error})});
 }
+
+const FIRST_SSS_TICK_STREAM_SHA256 = FIRST_SSS_STREAM_SHA256;
+const FIRST_SSS_TICK_STATUS_SHA256 = FIRST_SSS_STATUS_SHA256;
+const FIRST_SSS_TICK_EXPECTED_KEYS = Object.freeze([
+  'schema', 'version', 'scope', 'provenance', 'source_scheduler_end', 'input_bundle',
+  'comparison_fields', 'native_protocol_requirements', 'whole_session_equivalent',
+  'source_admission',
+]);
+const FIRST_SSS_TICK_SOURCE_INVENTORY = Object.freeze([
+  {tag: 2, flags: 0, address: 0x804C1F78, size: 0x0C},
+  {tag: 17, flags: 0, address: 0x80479D30, size: 6},
+  {tag: 19, flags: 0, address: 0x804D5F94, size: 4},
+  {tag: 20, flags: 0, address: 0x804D5F90, size: 4},
+  {tag: 21, flags: 0, address: 0x804C1F84, size: 0x358},
+  {tag: 30, flags: 0, address: 0x80479D58, size: 4},
+  {tag: 36, flags: 0, address: 0x8045BF28, size: 2},
+  {tag: 37, flags: 0, address: 0x8045BF2A, size: 2},
+  {tag: 40, flags: 0, address: 0x803DD9C4, size: 1},
+]);
+const FIRST_SSS_TICK_ROUTE = Object.freeze({current_game_mode: 2,
+  previous_game_mode: 1, current_scene_index: 1, previous_scene_index: 0});
+const FIRST_SSS_TICK_PORT_STATUS = Object.freeze([
+  '0000000000000000000000', '0000000000000000000000',
+  '00000000000000000000ff', '00000000000000000000ff',
+]);
+const FIRST_SSS_TICK_COMPARISON_FIELDS = Object.freeze([
+  'scheduler_end.scene_frame', 'scheduler_end.scene_kind',
+  'scheduler_end.pad_state_hex', 'scheduler_end.random_seed_hex',
+  'scheduler_end.scene_routing_getters', 'consumed_pad_status_hex',
+]);
+const FIRST_SSS_TICK_OWNER_KEYS = Object.freeze(SSS_OWNER_KEYS);
+const FIRST_SSS_TICK_PROTOCOL = Object.freeze({
+  scheduler_sample_scene_frame: 0, post_host_frame_after_clock_post: 1,
+  clock_post_succeeded: true, tick_result: 1, transition_requested: false,
+  host_tick_calls: 1, host_draw_calls: 0, all_owners_true: true,
+});
+
+function sameJsonValue(actual, expected) {
+  if (actual === expected) return true;
+  if (Array.isArray(actual) || Array.isArray(expected))
+    return Array.isArray(actual) && Array.isArray(expected) &&
+      actual.length === expected.length && actual.every((value, index) =>
+        sameJsonValue(value, expected[index]));
+  if (!plainObject(actual) || !plainObject(expected)) return false;
+  const actualKeys = Object.keys(actual).sort();
+  const expectedKeys = Object.keys(expected).sort();
+  return actualKeys.join('|') === expectedKeys.join('|') &&
+    actualKeys.every(key => sameJsonValue(actual[key], expected[key]));
+}
+
+function validateFirstSssConsumedTickExpected(expected) {
+  const fail = () => { throw new TypeError('SSS tick comparison requires the exact retained row1604/1608 bundle'); };
+  if (!exactOwnKeys(expected, FIRST_SSS_TICK_EXPECTED_KEYS) ||
+      expected.schema !== 'melee-web-stadium-first-sss-consumed-pad-tick-diagnostic' ||
+      expected.version !== 1 || expected.scope !== 'one consumed SSS PAD and its scheduler-end SourceTick only' ||
+      expected.whole_session_equivalent !== false || expected.source_admission !== false ||
+      !plainObject(expected.provenance) || !plainObject(expected.source_scheduler_end) ||
+      !plainObject(expected.source_scheduler_end.expected) || !plainObject(expected.input_bundle)) fail();
+  const provenance = expected.provenance;
+  if (!sameJsonValue(provenance, {
+    observer_bytes: 4397889, observer_sha256: FIRST_SSS_TICK_STREAM_SHA256,
+    observer_status_bytes: 515, observer_status_sha256: FIRST_SSS_TICK_STATUS_SHA256,
+    consumed_pad_sequence: 1604, scheduler_end_sequence: 1608,
+    scheduler_end_pc: '0x80390eb4', source_tick: 0, draw_ordinal: 149,
+    original_source_frame: 0,
+  })) fail();
+  const source = expected.source_scheduler_end;
+  if (!Array.isArray(source.source_slice_inventory) ||
+      !sameJsonValue(source.source_slice_inventory, FIRST_SSS_TICK_SOURCE_INVENTORY) ||
+      !exactOwnKeys(source.source_slices_hex, FIRST_SSS_TICK_SOURCE_INVENTORY.map(
+        item => `${item.tag}:${item.flags}`)) || source.scene_routing_raw_hex !== '020201010000' ||
+      source.rng_pointer_hex !== '804d5f90' || source.setup_profile_verified_by_observer !== false)
+    fail();
+  for (const item of FIRST_SSS_TICK_SOURCE_INVENTORY) {
+    const raw = source.source_slices_hex[`${item.tag}:${item.flags}`];
+    if (!validHex(raw, item.size)) fail();
+  }
+  const raw = source.source_slices_hex;
+  const wanted = source.expected;
+  if (raw['17:0'] !== source.scene_routing_raw_hex || raw['30:0'] !== '00000000' ||
+      raw['40:0'] !== '09' || raw['19:0'] !== source.rng_pointer_hex ||
+      raw['20:0'] !== wanted.random_seed_hex ||
+      !validHex(wanted.pad_state_hex, 822) || wanted.scene_frame !== 0 || wanted.scene_kind !== 9 ||
+      wanted.random_seed_hex !== '3bb84c53' ||
+      !exactRoute(wanted.scene_routing_getters, FIRST_SSS_TICK_ROUTE) ||
+      !sameJsonValue(wanted.consumed_pad_status_hex, FIRST_SSS_TICK_PORT_STATUS) ||
+      !sameJsonValue(wanted.required_owners,
+        Object.fromEntries(FIRST_SSS_TICK_OWNER_KEYS.map(key => [key, true])))) fail();
+  const input = expected.input_bundle;
+  if (!sameJsonValue(input, {
+    magic_hex: '5354433153535331', version: 1, bytes: 96,
+    sha256: input.sha256, contains_expected_state: false,
+    port_status_hex: FIRST_SSS_TICK_PORT_STATUS,
+  }) || !/^[0-9a-f]{64}$/.test(input.sha256)) fail();
+  if (!sameJsonValue(expected.comparison_fields, FIRST_SSS_TICK_COMPARISON_FIELDS) ||
+      !sameJsonValue(expected.native_protocol_requirements, FIRST_SSS_TICK_PROTOCOL)) fail();
+  const route = {
+    current_game_mode: Number.parseInt(raw['17:0'].slice(0, 2), 16),
+    previous_game_mode: Number.parseInt(raw['17:0'].slice(4, 6), 16),
+    current_scene_index: Number.parseInt(raw['17:0'].slice(6, 8), 16),
+    previous_scene_index: Number.parseInt(raw['17:0'].slice(8, 10), 16),
+  };
+  if (!exactRoute(route, wanted.scene_routing_getters)) fail();
+  return expected;
+}
+
+export function validateFirstSssConsumedTickExpectedSource(expected) {
+  return validateFirstSssConsumedTickExpected(expected);
+}
+
+function validateFirstSssConsumedTickPair(pair) {
+  if (!plainObject(pair) || pair.complete !== true || pair.compared !== true ||
+      pair.failed !== false || pair.host_entered !== true || pair.session_phase !== 3 ||
+      pair.sss_host_tick_calls !== 0 || pair.sss_host_draw_calls !== 0 ||
+      !Number.isSafeInteger(pair.world_generation) || pair.world_generation <= 0 ||
+      !Number.isSafeInteger(pair.audio_generation) || pair.audio_generation < 0)
+    throw new TypeError('SSS tick requires an approved completed constructor pair');
+  return pair;
+}
+
+// The source sample is the exact frame-zero scheduler-end row1608. The
+// post-host frame-one counter is checked separately by the caller; it is not
+// normalized into this original comparison.
+export function createFirstSssConsumedPadTickComparator(expectedTick, constructorPair) {
+  const expected = validateFirstSssConsumedTickExpected(expectedTick);
+  const pair = validateFirstSssConsumedTickPair(constructorPair);
+  let attempted = false;
+  let approved = false;
+  let failed = false;
+  let actual = null;
+  let firstMismatch = null;
+  let error = null;
+  const compare = (phase, actualJson) => {
+    if (attempted) {
+      failed = true;
+      firstMismatch ||= mismatch('callback', 'exactly one call', phase,
+        'SSS consumed-tick comparator was called more than once');
+      return false;
+    }
+    attempted = true;
+    if (phase !== 'scheduler_end' || typeof actualJson !== 'string') {
+      failed = true;
+      firstMismatch = mismatch('callback', 'scheduler_end JSON string', phase,
+        'callback phase or payload type differs');
+      return false;
+    }
+    try { actual = JSON.parse(actualJson); }
+    catch (cause) {
+      error = String(cause?.message || cause).slice(0, 1000);
+      failed = true;
+      firstMismatch = mismatch('scheduler_end', 'valid JSON object', null,
+        'malformed native JSON');
+      return false;
+    }
+    const wanted = expected.source_scheduler_end.expected;
+    const fields = [
+      ['phase', 'scheduler_end'], ['source_scene', 2], ['scene_kind', wanted.scene_kind],
+      ['scene_frame', wanted.scene_frame], ['random_seed_hex', wanted.random_seed_hex],
+      ['pad_state_hex', wanted.pad_state_hex],
+    ];
+    for (const [key, value] of fields) {
+      const different = compareExpectedField(actual?.[key], value, `scheduler_end.${key}`);
+      if (different) { firstMismatch = different; failed = true; return false; }
+    }
+    if (!exactOwnKeys(actual, ['phase', 'source_scene', 'scene_kind', 'scene_frame',
+      'random_seed_hex', 'pad_state_hex', 'scene_routing_getters', 'owners',
+      'world_generation', 'audio_generation', 'consumed_pad_hex'])) {
+      firstMismatch = mismatch('scheduler_end', 'exact native tick snapshot fields', actual,
+        'native snapshot fields differ from the frozen interface');
+      failed = true;
+      return false;
+    }
+    if (!exactRoute(actual.scene_routing_getters, wanted.scene_routing_getters)) {
+      firstMismatch = mismatch('scheduler_end.scene_routing_getters',
+        wanted.scene_routing_getters, actual.scene_routing_getters,
+        'four established source routing getters differ');
+      failed = true;
+      return false;
+    }
+    const consumed = wanted.consumed_pad_status_hex.join('');
+    if (!validHex(actual.consumed_pad_hex, 44) || actual.consumed_pad_hex !== consumed) {
+      firstMismatch = mismatch('scheduler_end.consumed_pad_hex', consumed,
+        actual.consumed_pad_hex, 'four consumed PADStatus values differ');
+      failed = true;
+      return false;
+    }
+    if (!exactOwnKeys(actual.owners, FIRST_SSS_TICK_OWNER_KEYS) ||
+        FIRST_SSS_TICK_OWNER_KEYS.some(key => actual.owners[key] !== true)) {
+      firstMismatch = mismatch('scheduler_end.owners',
+        Object.fromEntries(FIRST_SSS_TICK_OWNER_KEYS.map(key => [key, true])),
+        actual.owners, 'required owner/liveness fields are not all true');
+      failed = true;
+      return false;
+    }
+    for (const [key, value] of [['world_generation', pair.world_generation],
+      ['audio_generation', pair.audio_generation]]) {
+      if (!Number.isSafeInteger(actual[key]) || actual[key] !== value) {
+        firstMismatch = mismatch(`scheduler_end.${key}`, value, actual[key],
+          'tick snapshot crossed the constructor pair owner generation');
+        failed = true;
+        return false;
+      }
+    }
+    approved = true;
+    return true;
+  };
+  return Object.freeze({compare, status: () => Object.freeze({attempted, approved, failed,
+    first_mismatch: firstMismatch, actual, error})});
+}

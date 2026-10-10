@@ -182,6 +182,24 @@ struct MeleeWebMenuHost {
     MeleeWebMenuFirstSssPairNoteSnapshot first_sss_pair_entry;
     MeleeWebMenuFirstSssPairNoteSnapshot first_sss_pair_returned;
     char first_sss_pair_error[160];
+    int first_sss_tick_state; /* 0 idle, 1 armed, 2 in tick, 3 complete, 4 failed */
+    PADStatus first_sss_tick_input[4];
+    MeleeWebMenuSession* first_sss_tick_session;
+    const SSSData* first_sss_tick_sss;
+    uint32_t* first_sss_tick_seed_owner;
+    MeleeWebAudio* first_sss_tick_audio;
+    uint64_t first_sss_tick_world_generation;
+    uint64_t first_sss_tick_audio_generation;
+    uint32_t first_sss_tick_seed;
+    unsigned first_sss_tick_host_tick_calls;
+    unsigned first_sss_tick_host_draw_calls;
+    int first_sss_tick_result;
+    int first_sss_tick_clock_post_succeeded;
+    int first_sss_tick_transition_requested;
+    uint32_t first_sss_tick_post_host_frame;
+    int first_sss_tick_post_host_frame_captured;
+    MeleeWebMenuFirstSssTickSnapshot first_sss_tick_scheduler_end;
+    char first_sss_tick_error[160];
     int stadium_c1a_enabled;
 #endif
     int results_active,results_exited,results_committed,prize_active;
@@ -800,16 +818,261 @@ int melee_web_menu_host_first_sss_pair(
     out->returned = h->first_sss_pair_returned;
     return ok(e, n);
 }
+
+static void first_sss_tick_fail(MeleeWebMenuHost* h, const char* text)
+{
+    if (h == NULL || h != owner) return;
+    h->first_sss_tick_state = 4;
+    if (h->first_sss_tick_error[0] == 0 && text != NULL)
+        snprintf(h->first_sss_tick_error, sizeof(h->first_sss_tick_error), "%s", text);
+}
+
+static int first_sss_tick_owner_idle(MeleeWebMenuHost* h, int armed,
+                                     char* e, size_t n)
+{
+    MeleeWebMenuClockCounters counters;
+    const SSSData* sss;
+    if (!h || h != owner || !live(h,e,n) || !h->session || !h->entered ||
+        h->drawing || h->source_scene != MELEE_WEB_HOST_SCENE_SSS ||
+        h->source_mode_kind != GM_VS || !h->vs_mode_owned || h->transition ||
+        melee_web_menu_phase(h->session) != MELEE_WEB_MENU_SSS ||
+        gm_GetCurrentGameMode() != GM_VS ||
+        gm_GetCurrentSceneIndex() != gmVsMode_State_Sss ||
+        melee_web_vs_mode_pending_mode() != -1 ||
+        melee_web_vs_mode_next_state() != -1 ||
+        melee_web_current_scene_info() != &h->source_scene_info ||
+        h->source_scene_info.scene_kind != GS_SSS || seed_ptr != &h->seed ||
+        h->generation != h->first_sss_pair_world_generation ||
+        h->generation != melee_web_gameplay_stats().generation ||
+        h->audio != h->first_sss_pair_audio_owner ||
+        h->audio_generation != h->first_sss_pair_audio_generation ||
+        melee_web_audio_generation(h->audio) != h->first_sss_pair_audio_generation ||
+        HSD_PadLibData.queue != &h->queue || HSD_PadLibData.qcount ||
+        !melee_web_menu_clock_capture_counters(&counters))
+        return fail(e,n,"First SSS tick lost its idle MENU/scene/world/audio owner");
+    sss=melee_web_menu_sss(h->session);
+    if (!sss || h->source_scene_info.enter_data != sss ||
+        h->source_scene_info.exit_data != sss || counters.counter_0 != 0 ||
+        (armed && (h->session != h->first_sss_tick_session ||
+         sss != h->first_sss_tick_sss || seed_ptr != h->first_sss_tick_seed_owner ||
+         h->seed != h->first_sss_tick_seed || h->audio != h->first_sss_tick_audio ||
+         h->generation != h->first_sss_tick_world_generation ||
+         h->audio_generation != h->first_sss_tick_audio_generation)))
+        return fail(e,n,"First SSS tick changed its bound payload/counter/seed owner");
+    return 1;
+}
+
+int melee_web_menu_host_arm_first_sss_tick(
+    MeleeWebMenuHost* h, const PADStatus raw[4], char* e, size_t n)
+{
+    const SSSData* sss;
+    unsigned i;
+    if (!h || h != owner || raw == NULL || h->first_sss_tick_state != 0 ||
+        h->first_sss_pair_state != 6 || h->first_sss_pair_host_tick_calls != 0 ||
+        h->first_sss_pair_host_draw_calls != 0 ||
+        !h->first_sss_pair_entry.captured ||
+        !h->first_sss_pair_returned.captured ||
+        !h->first_sss_pair_entry.owners[0] ||
+        !h->first_sss_pair_entry.owners[1] ||
+        !h->first_sss_pair_entry.owners[2] ||
+        !h->first_sss_pair_entry.owners[3] ||
+        !h->first_sss_pair_entry.owners[4] ||
+        !h->first_sss_pair_entry.owners[5] ||
+        !h->first_sss_pair_entry.owners[6] ||
+        !h->first_sss_pair_entry.owners[7] ||
+        !h->first_sss_pair_returned.owners[0] ||
+        !h->first_sss_pair_returned.owners[1] ||
+        !h->first_sss_pair_returned.owners[2] ||
+        !h->first_sss_pair_returned.owners[3] ||
+        !h->first_sss_pair_returned.owners[4] ||
+        !h->first_sss_pair_returned.owners[5] ||
+        !h->first_sss_pair_returned.owners[6] ||
+        !h->first_sss_pair_returned.owners[7] ||
+        !live(h, e, n) || !h->entered || h->drawing ||
+        h->source_scene != MELEE_WEB_HOST_SCENE_SSS ||
+        h->source_mode_kind != GM_VS || !h->vs_mode_owned || h->transition != 0 ||
+        melee_web_menu_phase(h->session) != MELEE_WEB_MENU_SSS ||
+        gm_GetCurrentGameMode() != GM_VS ||
+        gm_GetCurrentSceneIndex() != gmVsMode_State_Sss ||
+        melee_web_vs_mode_pending_mode() != -1 ||
+        melee_web_current_scene_info() != &h->source_scene_info ||
+        h->source_scene_info.scene_kind != GS_SSS ||
+        h->generation != h->first_sss_pair_world_generation ||
+        h->generation != melee_web_gameplay_stats().generation ||
+        h->audio != h->first_sss_pair_audio_owner ||
+        h->audio_generation != h->first_sss_pair_audio_generation ||
+        melee_web_audio_generation(h->audio) != h->first_sss_pair_audio_generation ||
+        seed_ptr != &h->seed ||
+        HSD_PadLibData.queue != &h->queue || HSD_PadLibData.qcount != 0) {
+        first_sss_tick_fail(h, "First SSS tick requires its exact compared constructor-pair owner");
+        return fail(e,n,h && h == owner ? h->first_sss_tick_error :
+                    "First SSS tick requires its exact compared constructor-pair owner");
+    }
+    if (!first_sss_tick_owner_idle(h,0,e,n)) {
+        first_sss_tick_fail(h,e); return 0;
+    }
+    sss = melee_web_menu_sss(h->session);
+    if (sss == NULL || h->source_scene_info.enter_data != sss ||
+        h->source_scene_info.exit_data != sss) {
+        first_sss_tick_fail(h,"First SSS tick lost its authored SSS payload owner");
+        return fail(e,n,h->first_sss_tick_error);
+    }
+    for (i = 0; i < 4; ++i) {
+        const int current = i == 0 ? gm_GetCurrentGameMode() :
+            i == 1 ? gm_GetPreviousGameMode() :
+            i == 2 ? gm_GetCurrentSceneIndex() : gm_GetPreviousSceneIndex();
+        if (current != h->first_sss_pair_returned.scene_routing_getters[i]) {
+            first_sss_tick_fail(h,"First SSS tick route changed after the constructor pair");
+            return fail(e,n,h->first_sss_tick_error);
+        }
+    }
+    for (i=0;i<4;++i) final_pending_css_pad_copy(&h->first_sss_tick_input[i],&raw[i]);
+    h->first_sss_tick_session=h->session;
+    h->first_sss_tick_sss=sss;
+    h->first_sss_tick_seed_owner=seed_ptr;
+    h->first_sss_tick_seed=h->seed;
+    h->first_sss_tick_audio=h->audio;
+    h->first_sss_tick_world_generation=h->generation;
+    h->first_sss_tick_audio_generation=h->audio_generation;
+    memset(&h->first_sss_tick_scheduler_end, 0,
+           sizeof(h->first_sss_tick_scheduler_end));
+    h->first_sss_tick_host_tick_calls = 0;
+    h->first_sss_tick_host_draw_calls = 0;
+    h->first_sss_tick_result = 0;
+    h->first_sss_tick_clock_post_succeeded = 0;
+    h->first_sss_tick_transition_requested = 0;
+    h->first_sss_tick_post_host_frame = 0;
+    h->first_sss_tick_error[0] = 0;
+    h->first_sss_tick_state = 1;
+    return ok(e, n);
+}
+
+int melee_web_menu_host_first_sss_tick(
+    const MeleeWebMenuHost* h, MeleeWebMenuFirstSssTickObservation* out,
+    char* e, size_t n)
+{
+    if (!h || h != owner || !out) {
+        return fail(e, n,
+                    "First SSS tick observation requires its exact host and output");
+    }
+    memset(out, 0, sizeof(*out));
+    out->state = h->first_sss_tick_state == 0 ? 0 :
+        h->first_sss_tick_state == 1 ? 1 :
+        h->first_sss_tick_state == 3 ? 2 : 3;
+    out->host_tick_calls = h->first_sss_tick_host_tick_calls;
+    out->host_draw_calls = h->first_sss_tick_host_draw_calls;
+    out->tick_result = h->first_sss_tick_result;
+    out->clock_post_succeeded = h->first_sss_tick_clock_post_succeeded;
+    out->transition_requested = h->first_sss_tick_transition_requested;
+    out->post_host_frame = h->first_sss_tick_post_host_frame;
+    out->post_host_frame_captured = h->first_sss_tick_post_host_frame_captured;
+    snprintf(out->error, sizeof(out->error), "%s", h->first_sss_tick_error);
+    out->scheduler_end = h->first_sss_tick_scheduler_end;
+    return ok(e, n);
+}
 #endif
 
 static int runtime_check(void* data,MeleeWebMenuScene scene,char* e,size_t n){
     (void)scene;return live(data,e,n);
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+
+static int first_sss_tick_capture_scheduler_end(MeleeWebMenuHost* h)
+{
+    MeleeWebMenuFirstSssTickSnapshot snapshot;
+    const SSSData* sss;
+    int info_matches;
+    int owners_ok;
+    if (h == NULL || h != owner ||
+        h->first_sss_tick_state != 2 ||
+        h->first_sss_tick_host_tick_calls != 1 ||
+        h->first_sss_tick_scheduler_end.captured) {
+        first_sss_tick_fail(h, "SSS scheduler sample arrived outside its one-use tick");
+        return 0;
+    }
+    if (!live(h, h->first_sss_tick_error, sizeof(h->first_sss_tick_error)) ||
+        h->session == NULL || !h->entered || h->drawing ||
+        h->source_scene != MELEE_WEB_HOST_SCENE_SSS ||
+        melee_web_menu_phase(h->session) != MELEE_WEB_MENU_SSS) {
+        first_sss_tick_fail(h, "SSS scheduler sample lost its live host/session owner");
+        return 0;
+    }
+    sss = melee_web_menu_sss(h->session);
+    info_matches = melee_web_current_scene_info() == &h->source_scene_info;
+    memset(&snapshot, 0, sizeof(snapshot));
+    snapshot.source_scene = h->source_scene;
+    snapshot.scene_kind = h->source_scene_info.scene_kind;
+    snapshot.world_generation = melee_web_gameplay_stats().generation;
+    snapshot.audio_generation = h->audio_generation;
+    snapshot.owners[0] = h == owner;
+    snapshot.owners[1] = h->session == h->first_sss_tick_session &&
+        melee_web_menu_phase(h->session) == MELEE_WEB_MENU_SSS;
+    snapshot.owners[2] = h->entered && h->generation != 0 &&
+        h->generation == snapshot.world_generation &&
+        h->generation == h->first_sss_tick_world_generation;
+    snapshot.owners[3] = h->audio != NULL &&
+        h->audio == h->first_sss_pair_audio_owner &&
+        h->audio_generation == h->first_sss_pair_audio_generation &&
+        melee_web_audio_generation(h->audio) == h->first_sss_pair_audio_generation &&
+        melee_web_audio_is_active(h->audio) && melee_web_audio_bank_transport_active();
+    snapshot.owners[4] = h->vs_mode_owned && h->source_mode_kind == GM_VS &&
+        gm_GetCurrentGameMode() == GM_VS;
+    snapshot.owners[5] = info_matches &&
+        h->source_scene_info.scene_kind == GS_SSS;
+    snapshot.owners[6] = sss != NULL && sss == h->first_sss_tick_sss &&
+        h->source_scene_info.enter_data == sss &&
+        h->source_scene_info.exit_data == sss;
+    snapshot.owners[7] = seed_ptr != NULL && seed_ptr == &h->seed &&
+        seed_ptr == h->first_sss_tick_seed_owner;
+    snapshot.scene_frame = gm_801A4BA8();
+    snapshot.random_seed = h->seed;
+    melee_web_pad_state_capture(snapshot.pad_state);
+    snapshot.scene_routing_getters[0] = gm_GetCurrentGameMode();
+    snapshot.scene_routing_getters[1] = gm_GetPreviousGameMode();
+    snapshot.scene_routing_getters[2] = gm_GetCurrentSceneIndex();
+    snapshot.scene_routing_getters[3] = gm_GetPreviousSceneIndex();
+    for (unsigned port=0;port<4;++port)
+        final_pending_css_pad_copy(&snapshot.consumed_pad[port], &h->first_sss_tick_input[port]);
+    snapshot.captured = 1;
+    h->first_sss_tick_scheduler_end = snapshot;
+    owners_ok = snapshot.owners[0] && snapshot.owners[1] &&
+        snapshot.owners[2] && snapshot.owners[3] && snapshot.owners[4] &&
+        snapshot.owners[5] && snapshot.owners[6] && snapshot.owners[7] &&
+        HSD_PadLibData.queue == &h->queue && HSD_PadLibData.qcount == 0 &&
+        !HSD_GObj_804D781C && !HSD_GObj_804D7838 && !HSD_GObj_804D7830 &&
+        !HSD_GObj_804D7814 && !HSD_GObj_804D7818;
+    if (!owners_ok) {
+        first_sss_tick_fail(h,
+            "SSS scheduler sample lost exact idle host/session/world/audio ownership");
+        return 0;
+    }
+    return 1;
+}
+
+static int first_sss_tick_scheduler_post(MeleeWebMenuHost* h, int capture_ok,
+                                          char* e, size_t n)
+{
+    if (!melee_web_menu_clock_tick()) {
+        first_sss_tick_fail(h, "SSS menu clock post was refused");
+        return fail(e, n, "Unsupported native menu pause/control state");
+    }
+    h->first_sss_tick_clock_post_succeeded = 1;
+    (void)capture_ok; /* Latch diagnostic failure, finish original session tick. */
+    return 1;
+}
+#endif
 static int runtime_scheduler(void* data,char* e,size_t n){
     if(!live(data,e,n))return 0;
     if(!melee_web_source_files_pump(e,n))return 0;
     lbAudioAx_80027DF8();
     if(!melee_web_gameplay_step(e,n))return 0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    MeleeWebMenuHost* h = data;
+    if (h != NULL && h == owner && h->first_sss_tick_state == 2) {
+        const int captured = first_sss_tick_capture_scheduler_end(h);
+        return first_sss_tick_scheduler_post(h, captured, e, n);
+    }
+#endif
     if(!melee_web_menu_clock_tick())return fail(e,n,"Unsupported native menu pause/control state");
     return 1;
 }
@@ -2091,12 +2354,40 @@ int melee_web_menu_host_opening_match_abort(MeleeWebMenuHost* h,
 int melee_web_menu_host_tick(MeleeWebMenuHost* h,const PADStatus raw[4],char* e,size_t n){
     int result;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    int first_sss_tick_authorized = 0;
     if (h && h == owner && h->first_sss_pair_state != 0) {
-        if (h->source_scene == MELEE_WEB_HOST_SCENE_SSS)
-            ++h->first_sss_pair_host_tick_calls;
-        first_sss_pair_fail(h,
-            "First SSS constructor pair refuses source ticks until checked cleanup");
-        return fail(e,n,h->first_sss_pair_error);
+        if (h->source_scene == MELEE_WEB_HOST_SCENE_SSS &&
+            h->first_sss_pair_state == 6 && h->first_sss_tick_state == 1) {
+            /* Consume before inspecting the raw sample or any other owner. */
+            h->first_sss_tick_state = 2;
+            h->first_sss_tick_host_tick_calls = 1;
+            first_sss_tick_authorized = 1;
+            if (!first_sss_tick_owner_idle(h,1,e,n)) {
+                first_sss_tick_fail(h,e); return 0;
+            }
+            int input_equal = raw != NULL;
+            for (unsigned port=0;input_equal && port<4;++port)
+                input_equal=final_pending_css_pad_equal(&raw[port], &h->first_sss_tick_input[port]);
+            if (!input_equal) {
+                first_sss_tick_fail(h,
+                    "First SSS tick raw input differs from its one-use arm");
+                return fail(e, n, h->first_sss_tick_error);
+            }
+            if (!melee_web_menu_arm_first_sss_tick(h->session,e,n)) {
+                first_sss_tick_fail(h,e); return 0;
+            }
+        } else {
+            if (h->first_sss_tick_state != 0) {
+                ++h->first_sss_tick_host_tick_calls;
+                first_sss_tick_fail(h,"First SSS tick is one-use and refuses another tick");
+                return fail(e,n,h->first_sss_tick_error);
+            }
+            if (h->source_scene == MELEE_WEB_HOST_SCENE_SSS)
+                ++h->first_sss_pair_host_tick_calls;
+            first_sss_pair_fail(h,
+                "First SSS constructor pair refuses source ticks until its one-use tick arm");
+            return fail(e,n,h->first_sss_pair_error);
+        }
     }
     if (h && h == owner && h->first_css_return_state)
         h->first_css_return_state = 3;
@@ -2120,6 +2411,28 @@ int melee_web_menu_host_tick(MeleeWebMenuHost* h,const PADStatus raw[4],char* e,
         result = melee_web_menu_tick(h->session,e,n);
     }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (first_sss_tick_authorized) {
+        h->first_sss_tick_result = result;
+        h->first_sss_tick_post_host_frame = gm_801A4BA8();
+        h->first_sss_tick_post_host_frame_captured = 1;
+        h->first_sss_tick_transition_requested = h->transition != 0 ||
+            result == MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED;
+        if (result != MELEE_WEB_MENU_RESULT_TICKED ||
+            !h->first_sss_tick_clock_post_succeeded ||
+            !h->first_sss_tick_scheduler_end.captured ||
+            melee_web_menu_phase(h->session) != MELEE_WEB_MENU_SSS ||
+            h->transition != 0) {
+            first_sss_tick_fail(h,
+                "First SSS host tick did not finish as one non-transition SSS tick");
+        } else if (h->first_sss_tick_state != 4) {
+            h->first_sss_tick_post_host_frame = gm_801A4BA8();
+            if (h->first_sss_tick_post_host_frame != 1)
+                first_sss_tick_fail(h,
+                    "First SSS host tick did not retain separate post-host frame one");
+            else
+                h->first_sss_tick_state = 3;
+        }
+    }
     if (result == MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED &&
         h->source_scene == MELEE_WEB_HOST_SCENE_CSS && h->transition != 0 &&
         melee_web_menu_phase(h->session) == MELEE_WEB_MENU_CSS) {
@@ -2170,6 +2483,11 @@ static int host_draw_render(MeleeWebMenuHost* h,char* e,size_t n)
 int melee_web_menu_host_draw(MeleeWebMenuHost* h,char* e,size_t n){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     if (h && h == owner && h->first_sss_pair_state != 0) {
+        if (h->first_sss_tick_state != 0) {
+            ++h->first_sss_tick_host_draw_calls;
+            first_sss_tick_fail(h,"First SSS tick diagnostic refuses source draws");
+            return fail(e,n,h->first_sss_tick_error);
+        }
         if (h->source_scene == MELEE_WEB_HOST_SCENE_SSS)
             ++h->first_sss_pair_host_draw_calls;
         first_sss_pair_fail(h,

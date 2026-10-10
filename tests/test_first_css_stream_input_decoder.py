@@ -122,6 +122,31 @@ int main() {
     decode_consumed_pad_statuses(old,old_ports);
     decode_postdraw_pad_statuses(input,0,stream_ports);
     assert(std::memcmp(old_ports,stream_ports,sizeof(old_ports))==0);
+
+    std::vector<uint8_t> sss(96); std::memcpy(sss.data(),"STC1SSS1",8);
+    sss[11]=1;std::memcpy(sss.data()+12,source,32);
+    sss[46]=6;sss[47]=0x44;sss[50]=6;sss[51]=0x48;
+    for(unsigned i=52;i<96;++i)sss[i]=uint8_t(i*29);
+    const auto saved_sss=sss;
+    const auto tick=decode_first_sss_tick_input(sss.data(),sss.size(),sha);
+    ConsumedPadInput tick_consumed{};tick_consumed.ports=tick.ports;
+    PADStatus tick_ports[4]{};decode_consumed_pad_statuses(tick_consumed,tick_ports);
+    for(unsigned i=0;i<4;++i){const auto&p=tick_ports[i];const uint8_t bytes[]={
+      uint8_t(p.button>>8),uint8_t(p.button),uint8_t(p.stickX),uint8_t(p.stickY),
+      uint8_t(p.substickX),uint8_t(p.substickY),p.triggerLeft,p.triggerRight,
+      p.analogA,p.analogB,uint8_t(p.err)};
+      assert(std::equal(std::begin(bytes),std::end(bytes),sss.begin()+52+11*i));}
+    unsigned tick_refused=0;
+    const auto reject_tick=[&](const uint8_t* data,size_t size,const std::string&id){
+      bool caught=false;try{(void)decode_first_sss_tick_input(data,size,id);}
+      catch(const std::runtime_error&){caught=true;}assert(caught);++tick_refused;};
+    for(size_t i=0;i<96;++i)reject_tick(sss.data(),i,sha);
+    reject_tick(nullptr,96,sha);auto long_sss=sss;long_sss.push_back(0);reject_tick(long_sss.data(),97,sha);
+    for(unsigned offset:{0u,11u,12u,47u,51u}){auto bad=sss;bad[offset]^=1;reject_tick(bad.data(),96,sha);}
+    reject_tick(sss.data(),96,std::string(64,'0'));
+    auto foreign_sss=sss;foreign_sss[12]^=1;reject_tick(foreign_sss.data(),96,hex(foreign_sss.data()+12,32));
+    assert(tick_refused==105&&sss==saved_sss);
+    std::cout<<"PASS SSS exact96/4ports;105 envelope refusals;input unchanged\n";
     std::cout << "PASS exact decoder 148 batches/592 ports; 6573 envelope refusals; 2 index refusals\n";
 }
 '''

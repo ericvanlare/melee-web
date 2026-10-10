@@ -179,6 +179,37 @@ typedef struct MeleeWebMenuFirstSssPairObservation {
     MeleeWebMenuFirstSssPairNoteSnapshot entry;
     MeleeWebMenuFirstSssPairNoteSnapshot returned;
 } MeleeWebMenuFirstSssPairObservation;
+typedef struct MeleeWebMenuFirstSssTickSnapshot {
+    int captured;
+    int source_scene;
+    int scene_kind;
+    uint32_t scene_frame;
+    uint32_t random_seed;
+    uint8_t pad_state[MELEE_WEB_PAD_STATE_BYTES];
+    int scene_routing_getters[4];
+    int owners[8]; /* host, session, world, audio, VS mode, scene info, payload, seed */
+    uint64_t world_generation;
+    uint64_t audio_generation;
+    PADStatus consumed_pad[4];
+} MeleeWebMenuFirstSssTickSnapshot;
+typedef struct MeleeWebMenuFirstSssTickObservation {
+    int state; /* 0 idle, 1 armed, 2 ticked, 3 failed */
+    unsigned host_tick_calls;
+    unsigned host_draw_calls;
+    int tick_result;
+    int clock_post_succeeded;
+    int post_host_frame_captured;
+    int transition_requested;
+    uint32_t post_host_frame;
+    char error[160];
+    MeleeWebMenuFirstSssTickSnapshot scheduler_end;
+} MeleeWebMenuFirstSssTickObservation;
+/* Arm and read one source-only SSS host tick after a JS-approved constructor
+ * pair. Input is raw consumed PAD data; no expected state crosses this API. */
+int melee_web_menu_host_arm_first_sss_tick(
+    MeleeWebMenuHost*, const PADStatus[4], char*, size_t);
+int melee_web_menu_host_first_sss_tick(
+    const MeleeWebMenuHost*, MeleeWebMenuFirstSssTickObservation*, char*, size_t);
 /* Arm once after reference context installation, before first host_enter.
  * Read only after successful enter, before any tick/leave; a failed note
  * remains explicit while original enter/phase updates finish for cleanup. */

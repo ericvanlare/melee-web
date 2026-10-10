@@ -17,7 +17,7 @@ class FirstSssConstructorPairHostTests(OwnedWorkspaceTests):
         source = (ROOT / "src/gameplay_menu_host.c").read_text()
         header = (ROOT / "src/gameplay_menu_host.h").read_text()
         start = header.index("typedef struct MeleeWebMenuFirstSssPairNoteSnapshot")
-        end = header.index("/* Arm once after reference", start)
+        end = header.index("typedef struct MeleeWebMenuFirstSssTickSnapshot", start)
         code = PRELUDE + header[start:end] + STUBS + _function(source,
             "static void first_sss_pair_fail(") + _function(source,
             "static void first_sss_pair_note(") + CONTROL

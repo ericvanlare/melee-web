@@ -22,16 +22,18 @@ const {values} = parseArgs({options: Object.fromEntries(
     'first-css-context', 'first-css-consumed-pad', 'first-css-return-expected',
     'first-css-tick-expected', 'first-css-draw-expected',
     'first-css-postdraw-input', 'first-css-postdraw-expected',
-    'first-sss-pair-expected']
+    'first-sss-pair-expected', 'first-sss-tick-expected', 'first-sss-tick-input']
     .map(name => [name, {type: 'string'}]).concat([
       ['css-sss-reducer', {type: 'boolean', default: false}],
       ['first-css-browser-draw', {type: 'boolean', default: false}],
       ['first-css-browser-stream', {type: 'boolean', default: false}],
       ['first-css-browser-final-draw', {type: 'boolean', default: false}],
       ['first-sss-constructor-pair', {type: 'boolean', default: false}],
+      ['first-sss-consumed-pad-tick', {type: 'boolean', default: false}],
     ])), strict: true});
 const cssSssReducer = values['css-sss-reducer'];
-const firstSssConstructorPair = values['first-sss-constructor-pair'];
+const firstSssConsumedPadTick = values['first-sss-consumed-pad-tick'];
+const firstSssConstructorPair = values['first-sss-constructor-pair'] || firstSssConsumedPadTick;
 const firstCssBrowserFinalDraw = values['first-css-browser-final-draw'] || firstSssConstructorPair;
 const firstCssBrowserStream = values['first-css-browser-stream'] || firstCssBrowserFinalDraw;
 const firstCssBrowserDraw = values['first-css-browser-draw'] || firstCssBrowserStream;
@@ -39,7 +41,11 @@ if ((cssSssReducer && firstCssBrowserDraw) ||
     (values['first-css-browser-draw'] && firstCssBrowserStream) ||
     (values['first-css-browser-stream'] && values['first-css-browser-final-draw']) ||
     (firstSssConstructorPair && !values['first-sss-pair-expected']) ||
-    (!firstSssConstructorPair && values['first-sss-pair-expected']))
+    (!firstSssConstructorPair && values['first-sss-pair-expected']) ||
+    (firstSssConsumedPadTick && (!values['first-sss-tick-expected'] ||
+      !values['first-sss-tick-input'])) ||
+    (!firstSssConsumedPadTick && (values['first-sss-tick-expected'] ||
+      values['first-sss-tick-input'])))
   throw Error('Choose one private C1a diagnostic route');
 const LIMITS = Object.freeze({
   serverStartMs: 10000,
@@ -107,7 +113,8 @@ const report = {
   browser: null,
   local_http_artifacts: {count: 0, before: null, after: null, unchanged: false},
   scenario: {
-    route_mode: firstSssConstructorPair ? 'first-sss-constructor-pair' :
+    route_mode: firstSssConsumedPadTick ? 'first-sss-consumed-pad-tick' :
+      firstSssConstructorPair ? 'first-sss-constructor-pair' :
       firstCssBrowserFinalDraw ? 'first-css-browser-final-pending-draw' :
       firstCssBrowserStream ? 'first-css-browser-postdraw-stream' :
       firstCssBrowserDraw ? 'first-css-browser-draw' :
@@ -123,6 +130,7 @@ const report = {
       'Original CSS -> original SSS only; one ordinary B0XX Start chord after observed source and input readiness. No SSS selection, stage, match, or source archive request.') : null,
     css_sss_transition: null,
     first_sss_constructor_pair: null,
+    first_sss_consumed_tick: null,
     requested_committed_manifest: null,
     native_observation: null,
     final_phase: null,
@@ -140,7 +148,9 @@ const report = {
     context_closed: false, browser_connection_closed: false, browser_process_terminated: false,
     browser_process_pid: null, server_process_terminated: false, server_process_pid: null,
     server_process_exit: null, failures: []},
-  source_request_scope: firstSssConstructorPair
+  source_request_scope: firstSssConsumedPadTick
+    ? 'Original CSS final draw, original SSS constructor pair, and one consumed SSS PAD/scheduler-end comparison. The run stops before any SSS draw or further input; no whole-session acceptance.'
+    : firstSssConstructorPair
     ? 'Original SSS constructor entry1579/return1603 pair after the approved first-CSS boundary. Stops before any SSS host tick/draw; no SSS selection, VS/GO equality or whole-session acceptance.'
     : firstCssBrowserStream
     ? 'CSS-only source-consumed input/tick/draw comparison; terminal transition snapshot and final original draw remain unpaired. No SSS admission, VS/GO equality or whole-session acceptance.'
@@ -214,6 +224,7 @@ async function waitForServer(baseUrl) {
 
 let firstCssBrowserDrawInputs = null;
 let firstSssConstructorPairInputs = null;
+let firstSssConsumedPadTickInputs = null;
 async function loadFirstCssBrowserDrawInputs() {
   if (!firstCssBrowserDraw) return null;
   const specs = {
@@ -375,6 +386,58 @@ async function loadFirstSssConstructorPairInputs() {
   assert.equal(expected.source_return.argument, '0x00000000');
   return {bytes, expected, expected_identity: {path: file, basename: path.basename(file),
     bytes: bytes.byteLength, sha256: digest(bytes)}};
+}
+
+async function loadFirstSssConsumedPadTickInputs() {
+  if (!firstSssConsumedPadTick) return null;
+  const specs = {
+    expected_json: values['first-sss-tick-expected'],
+    input_bundle: values['first-sss-tick-input'],
+  };
+  const frozen = preflight.first_sss_consumed_tick;
+  assert.ok(frozen && typeof frozen === 'object',
+    'SSS tick preflight omitted its exact expected/input identities');
+  const bytes = {};
+  const identities = {};
+  for (const [name, fileValue] of Object.entries(specs)) {
+    const file = path.resolve(fileValue);
+    const identity = frozen[name];
+    assert.ok(identity && typeof identity === 'object',
+      `SSS tick preflight omitted ${name} identity`);
+    assert.equal(path.resolve(identity.path), file,
+      `SSS tick ${name} path differs from the frozen preflight`);
+    assert.equal(path.basename(file), identity.basename,
+      `SSS tick ${name} basename differs from the frozen preflight`);
+    bytes[name] = await fs.readFile(file);
+    assert.equal(bytes[name].byteLength, identity.bytes,
+      `SSS tick ${name} byte count differs from the frozen preflight`);
+    assert.equal(digest(bytes[name]), identity.sha256,
+      `SSS tick ${name} hash differs from the frozen preflight`);
+    identities[name] = {path: file, basename: path.basename(file),
+      bytes: bytes[name].byteLength, sha256: digest(bytes[name])};
+  }
+  let expected;
+  try { expected = JSON.parse(bytes.expected_json.toString('utf8')); }
+  catch (error) { throw Error(`SSS tick expected JSON is malformed: ${errorText(error)}`); }
+  const helperPath = path.join(ROOT, 'tests/stadium_first_css_stream_compare.mjs');
+  const helper = await import(pathToFileURL(helperPath).href);
+  helper.validateFirstSssConsumedTickExpectedSource(expected);
+  const input = bytes.input_bundle;
+  assert.equal(input.byteLength, expected.input_bundle.bytes);
+  assert.equal(digest(input), expected.input_bundle.sha256);
+  assert.equal(input.subarray(0, 8).toString('ascii'), 'STC1SSS1');
+  assert.equal(input.readUInt32BE(8), 1);
+  assert.equal(input.subarray(12, 44).toString('hex'), expected.provenance.observer_sha256);
+  assert.equal(input.readUInt32BE(44), 1604);
+  assert.equal(input.readUInt32BE(48), 1608);
+  assert.equal(input.subarray(52).toString('hex'),
+    expected.source_scheduler_end.expected.consumed_pad_status_hex.join(''),
+    'SSS tick bundle differs from the exact four original PAD statuses');
+  assert.deepEqual(expected.input_bundle.port_status_hex,
+    expected.source_scheduler_end.expected.consumed_pad_status_hex);
+  assert.equal(expected.input_bundle.contains_expected_state, false,
+    'SSS tick input must contain only consumed PAD statuses and source bindings');
+  return {bytes, expected, identities};
 }
 
 async function buildArtifactInventory(baseUrl, names) {
@@ -766,6 +829,18 @@ async function readFirstSssConstructorPairObservation() {
   });
 }
 
+async function readFirstSssConsumedTickObservation() {
+  return page.evaluate(() => {
+    const module = globalThis.Module;
+    const pointer = module?._melee_web_native_menu_stadium_first_css_draw_observe?.();
+    const observation = pointer ? JSON.parse(module.UTF8ToString(pointer)) : null;
+    return {native: observation ? {...observation,
+      native_phase: module._melee_web_native_menu_phase(),
+      running: module._melee_web_native_menu_running()} : null,
+      host: globalThis.__meleeWebStadiumFirstSssTickRead?.() ?? null};
+  });
+}
+
 async function readFirstSssPairPostUnloadState() {
   return page.evaluate(() => {
     const module = globalThis.Module;
@@ -775,6 +850,7 @@ async function readFirstSssPairPostUnloadState() {
       running: module?._melee_web_native_menu_running?.() ?? null,
       observation: pointer ? module.UTF8ToString(pointer) : null,
       first_sss_constructor_pair: observation?.first_sss_constructor_pair ?? null,
+      first_sss_consumed_tick: observation?.first_sss_consumed_tick ?? null,
       error: document.querySelector('#status')?.dataset.runtimeError || null,
       import_enabled: !!document.querySelector('#disc') &&
         !document.querySelector('#disc').disabled};
@@ -1088,6 +1164,181 @@ async function runFirstSssConstructorPair() {
   return evidence.native;
 }
 
+function assertFirstSssConsumedTickStopState(evidence, cssBaseline, constructorPair) {
+  const native = evidence?.native;
+  const tick = native?.first_sss_consumed_tick;
+  assert.ok(tick, 'Native SSS consumed-tick observation is absent');
+  assert.equal(tick.attempted, true, 'The one authorized SSS host tick was not attempted');
+  assert.equal(tick.host_tick_calls, 1, 'The authorized SSS host tick count differs');
+  assert.equal(tick.host_draw_calls, 0, 'An SSS host draw ran after consumed-tick capture');
+  assert.equal(native.running, 0, 'Host source time continued after the one-shot SSS tick');
+  assert.equal(tick.post_host_frame_captured, true,
+    'The actual post-host frame was not captured after the scheduler sample');
+  assert.equal(tick.post_host_frame, 1,
+    'The one host tick did not finish at source frame one');
+  assert.deepEqual(native.first_sss_constructor_pair, constructorPair,
+    'The approved constructor pair or its zero-tick/draw counters changed during the tick');
+  assert.deepEqual(native.entry, cssBaseline.entry,
+    'Original typed CSS entry changed during SSS tick capture');
+  assert.deepEqual(native.tick, cssBaseline.tick,
+    'Original typed CSS tick changed during SSS tick capture');
+  assert.deepEqual(native.draw, cssBaseline.draw,
+    'Original typed CSS draw changed during SSS tick capture');
+  assert.deepEqual(native.postdraw_stream, cssBaseline.postdraw_stream,
+    'Original CSS postdraw stream changed during SSS tick capture');
+  assert.deepEqual(native.final_pending_css_draw, cssBaseline.final_pending_css_draw,
+    'Original final CSS draw changed during SSS tick capture');
+}
+
+function retainFirstSssConsumedTickEvidence(scenario, evidence, kickResult) {
+  scenario.kick_result = kickResult;
+  scenario.observation = evidence;
+  scenario.claim = 'One-shot SSS scheduler-end sample attempt retained; comparison and protocol gates are pending.';
+}
+
+function assertFirstSssConsumedTickCompared(evidence, kickResult) {
+  const nativeTick = evidence?.native?.first_sss_consumed_tick;
+  const host = evidence?.host;
+  assert.equal(kickResult?.result, 1,
+    kickResult?.message || 'SSS consumed-tick kick failed');
+  assert.equal(nativeTick?.captured, true, 'Scheduler-end SSS state was not captured');
+  assert.equal(nativeTick?.host_draw_calls, 0);
+  assert.equal(nativeTick?.clock_post_succeeded, true,
+    'The one SSS host tick did not complete its ordinary menu clock post');
+  assert.equal(nativeTick?.tick_result, 1, 'The ordinary SSS host tick did not return success');
+  assert.equal(nativeTick?.transition_requested, false,
+    'The single retained PAD input requested a scene transition');
+  assert.equal(nativeTick?.post_host_frame_captured, true);
+  assert.equal(nativeTick?.post_host_frame, 1);
+  assert.equal(nativeTick?.failed, false, nativeTick?.error || 'SSS consumed-tick host failed');
+  assert.equal(nativeTick?.compared, true);
+  assert.equal(nativeTick?.complete, true);
+  assert.equal(host?.hook_error, null);
+  assert.equal(host?.status?.attempted, true);
+  assert.equal(host?.status?.approved, true);
+  assert.equal(host?.status?.failed, false);
+  assert.equal(host?.status?.first_mismatch, null);
+  assert.equal(host?.rows?.length, 1);
+  assert.equal(host.rows[0].phase, 'scheduler_end');
+  assert.equal(host.rows[0].approved, true);
+  assert.deepEqual(host.status.actual, host.rows[0].actual);
+}
+
+async function runFirstSssConsumedPadTick(constructorNative) {
+  assert.ok(constructorNative?.first_sss_constructor_pair,
+    'First SSS consumed tick requires the retained constructor-pair observation');
+  const constructorPair = constructorNative.first_sss_constructor_pair;
+  assert.equal(constructorPair.complete, true);
+  assert.equal(constructorPair.compared, true);
+  assert.equal(constructorPair.failed, false);
+  assert.equal(constructorPair.host_entered, true);
+  assert.equal(constructorPair.sss_host_tick_calls, 0);
+  assert.equal(constructorPair.sss_host_draw_calls, 0);
+  const cssBaseline = report.scenario.first_sss_constructor_pair.postcapture_css_baseline.native;
+  assert.ok(cssBaseline, 'First SSS tick requires the retained postconstructor CSS baseline');
+  report.scenario.first_sss_consumed_tick = {
+    expected_json: firstSssConsumedPadTickInputs.identities.expected_json,
+    input_bundle: firstSssConsumedPadTickInputs.identities.input_bundle,
+    arm_snapshot: null,
+    kick_result: null,
+    observation: null,
+    claim: 'One-shot SSS scheduler-end sample attempt retained; comparison and protocol gates are pending.',
+  };
+  await persistReport();
+
+  await timeout(page.evaluate(async ({moduleUrl, expectedTick, pair}) => {
+    if (globalThis.__meleeWebStadiumFirstSssTickCompare ||
+        globalThis.__meleeWebStadiumFirstSssTickRead)
+      throw Error('SSS consumed-tick comparator was already registered');
+    const {createFirstSssConsumedPadTickComparator, requestSynchronousApproval} =
+      await import(moduleUrl);
+    const comparator = createFirstSssConsumedPadTickComparator(expectedTick, pair);
+    const rows = [];
+    let hookError = null;
+    globalThis.__meleeWebStadiumFirstSssTickRead = () => ({
+      status: comparator.status(), rows, hook_error: hookError});
+    globalThis.__meleeWebStadiumFirstSssTickCompare = (phase, actualJson) => {
+      if (rows.length >= 1) {
+        hookError = 'SSS consumed-tick comparison callback repeated';
+        return false;
+      }
+      let actual;
+      try { actual = JSON.parse(actualJson); }
+      catch { actual = {malformed_json: String(actualJson).slice(0, 6000)}; }
+      const row = {phase, actual, approved: null};
+      rows.push(row);
+      const approved = requestSynchronousApproval(comparator.compare, phase, actualJson);
+      row.approved = approved === true;
+      return approved === true;
+    };
+  }, {moduleUrl: 'data:text/javascript;base64,' +
+      Buffer.from(firstCssBrowserStreamInputs.helperSource).toString('base64'),
+    expectedTick: firstSssConsumedPadTickInputs.expected, pair: constructorPair}),
+  Math.min(5000, remaining()), 'Register exact original SSS frame-zero comparison');
+
+  const arm = await timeout(page.evaluate(bundle => {
+    const module = globalThis.Module;
+    const armFunction = module?._melee_web_native_menu_stadium_first_sss_tick_arm;
+    if (typeof armFunction !== 'function') throw Error('SSS consumed-tick arm export is absent');
+    if (module._melee_web_native_menu_running() !== 0)
+      throw Error('SSS consumed-tick arm requires the stopped constructor-only host');
+    const pointer = module._malloc(bundle.length);
+    if (!pointer) throw Error('SSS consumed-tick input allocation failed');
+    try {
+      module.HEAPU8.set(bundle, pointer);
+      const result = armFunction(pointer, bundle.length);
+      const messagePointer = result === 1 ? 0 : module._melee_web_native_menu_message?.();
+      return {result, message: messagePointer ? module.UTF8ToString(messagePointer) : null};
+    } finally { module._free(pointer); }
+  }, Array.from(firstSssConsumedPadTickInputs.bytes.input_bundle)),
+  Math.min(5000, remaining()), 'Arm one exact consumed SSS PAD input bundle');
+  const armSnapshot = await timeout(readFirstSssConsumedTickObservation(),
+    Math.min(5000, remaining()), 'Retain armed SSS consumed-tick state');
+  report.scenario.first_sss_consumed_tick.arm_snapshot = armSnapshot;
+  await persistReport();
+  assert.equal(arm.result, 1, arm.message || 'SSS consumed-tick arm refused');
+  assert.equal(armSnapshot.native?.first_sss_consumed_tick?.armed, true);
+  assert.equal(armSnapshot.native?.first_sss_consumed_tick?.kicked, false);
+  assert.deepEqual(armSnapshot.native?.first_sss_constructor_pair, constructorPair,
+    'SSS tick arm changed the approved constructor pair');
+  assert.deepEqual(armSnapshot.native?.entry, cssBaseline.entry,
+    'SSS tick arm changed the original typed CSS entry');
+  assert.deepEqual(armSnapshot.native?.tick, cssBaseline.tick,
+    'SSS tick arm changed the original typed CSS tick');
+  assert.deepEqual(armSnapshot.native?.draw, cssBaseline.draw,
+    'SSS tick arm changed the original typed CSS draw');
+  assert.deepEqual(armSnapshot.native?.postdraw_stream, cssBaseline.postdraw_stream,
+    'SSS tick arm changed the original CSS stream');
+  assert.deepEqual(armSnapshot.native?.final_pending_css_draw, cssBaseline.final_pending_css_draw,
+    'SSS tick arm changed the approved final CSS draw');
+
+  const kickResult = await timeout(page.evaluate(() => {
+    const module = globalThis.Module;
+    const kickFunction = module?._melee_web_native_menu_stadium_first_sss_tick_kick;
+    if (typeof kickFunction !== 'function') throw Error('SSS consumed-tick kick export is absent');
+    const result = kickFunction();
+    const messagePointer = result === 1 ? 0 : module._melee_web_native_menu_message?.();
+    return {result, message: messagePointer ? module.UTF8ToString(messagePointer) : null};
+  }), Math.min(10000, remaining()), 'Run exactly one ordinary SSS host tick and stop before draw');
+  report.scenario.first_sss_consumed_tick.kick_result = kickResult;
+  await persistReport();
+
+  const evidence = await timeout(readFirstSssConsumedTickObservation(),
+    Math.min(5000, remaining()), 'Retain scheduler-end sample before success checks');
+  retainFirstSssConsumedTickEvidence(report.scenario.first_sss_consumed_tick, evidence, kickResult);
+  await persistReport();
+
+  // Keep stop, counter and old-boundary checks independent from a source-state
+  // mismatch. A mismatch remains a failing comparison after these assertions.
+  assertFirstSssConsumedTickStopState(evidence, cssBaseline, constructorPair);
+  assertFirstSssConsumedTickCompared(evidence, kickResult);
+  report.scenario.first_sss_consumed_tick.claim =
+    'Original SSS consumed PAD row1604 and frame-zero scheduler-end row1608 matched; exactly one normal host tick completed to frame1 with no draw or transition. This is one bounded boundary comparison, not whole-session acceptance.';
+  await persistReport();
+  await saveScreenshot('stadium-first-sss-consumed-pad-tick');
+  return evidence.native;
+}
+
 async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   const prearm = await timeout(page.evaluate(() => {
     const module = globalThis.Module;
@@ -1219,7 +1470,11 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
     observation = await runFirstCssBrowserPostdrawStream(observation);
     if (firstCssBrowserFinalDraw) {
       observation = await runFirstCssBrowserFinalPendingDraw();
-      if (firstSssConstructorPair) observation = await runFirstSssConstructorPair();
+      if (firstSssConstructorPair) {
+        observation = await runFirstSssConstructorPair();
+        if (firstSssConsumedPadTick)
+          observation = await runFirstSssConsumedPadTick(observation);
+      }
     }
   }
   report.scenario.final_phase = observation.native_phase;
@@ -1259,6 +1514,7 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
     return {phase: module._melee_web_native_menu_phase(), running: module._melee_web_native_menu_running(),
       observation: pointer ? module.UTF8ToString(pointer) : null,
       first_sss_constructor_pair: observation?.first_sss_constructor_pair ?? null,
+      first_sss_consumed_tick: observation?.first_sss_consumed_tick ?? null,
       error: document.querySelector('#status')?.dataset.runtimeError || null,
       import_enabled: !!document.querySelector('#disc') && !document.querySelector('#disc').disabled};
   }), Math.min(5000, remaining()), 'First-CSS post-unload snapshot');
@@ -1270,6 +1526,9 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   if (firstSssConstructorPair)
     assert.equal(afterUnload.first_sss_constructor_pair, null,
       'SSS pair diagnostic ownership survived teardown');
+  if (firstSssConsumedPadTick)
+    assert.equal(afterUnload.first_sss_consumed_tick, null,
+      'SSS consumed-tick diagnostic ownership survived teardown');
   report.cleanup.native_after_unload = afterUnload;
   report.cleanup.observation_cleared = true;
   await saveScreenshot('stadium-first-css-browser-draw-after-unload');
@@ -1485,7 +1744,10 @@ async function cleanupServer() {
 async function main() {
   assert.equal(build, expectedBuild, 'Only the isolated C1a diagnostic runtime may be served');
   assert.equal(preflight.schema, 'melee-web-stadium-c1a-browser-preflight-v1');
-  if (firstSssConstructorPair)
+  if (firstSssConsumedPadTick)
+    assert.equal(preflight.route_mode, 'first-sss-consumed-pad-tick',
+      'SSS consumed-tick command requires its exact frozen preflight route');
+  else if (firstSssConstructorPair)
     assert.equal(preflight.route_mode, 'first-sss-constructor-pair',
       'SSS constructor-pair command requires its exact frozen preflight route');
   else if (firstCssBrowserDraw)
@@ -1523,6 +1785,7 @@ async function main() {
   firstCssBrowserDrawInputs = await loadFirstCssBrowserDrawInputs();
   firstCssBrowserStreamInputs = await loadFirstCssBrowserStreamInputs();
   firstSssConstructorPairInputs = await loadFirstSssConstructorPairInputs();
+  firstSssConsumedPadTickInputs = await loadFirstSssConsumedPadTickInputs();
   assert.deepEqual(preflight.limits_ms, LIMITS, 'Runtime bounds differ from frozen preflight');
   assert.equal(LIMITS.captureWorkMs,
     preflight.owner_deadline.overall_timeout_ms - preflight.owner_deadline.cleanup_reserve_ms,
@@ -1555,6 +1818,8 @@ async function main() {
 
   assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_first_css_postdraw_stream_arm'), false,
     'Ordinary default runtime unexpectedly exports the private CSS stream gate');
+  assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_first_sss_tick_arm'), false,
+    'Ordinary default runtime unexpectedly exports the private SSS tick diagnostic gate');
 
   const artifacts = JSON.parse(await fs.readFile(path.join(ROOT, 'tools/browser_build_artifacts.json'), 'utf8'));
   assert.equal(artifacts.length, 40, 'The checked-in browser artifact inventory changed; review the preflight');
@@ -1896,6 +2161,17 @@ async function cleanupOwnedProcesses() {
         cleanupFailures.push({step: 'sss-pair-failure-snapshot', error: errorText(error)});
       }
     }
+    if (firstSssConsumedPadTick) {
+      try {
+        report.scenario.first_sss_tick_failure_snapshot =
+          await timeout(readFirstSssConsumedTickObservation(),
+            Math.min(2000, cleanupRemaining()),
+            'SSS tick scheduler sample and first-mismatch evidence before unload');
+        await persistReport();
+      } catch (error) {
+        cleanupFailures.push({step: 'sss-tick-failure-snapshot', error: errorText(error)});
+      }
+    }
     try { report.scenario.failure_snapshot = await timeout(nativeSnapshot(),
       Math.min(2000, cleanupRemaining()), 'Failure-state native snapshot'); }
     catch (error) { cleanupFailures.push({step: 'failure-snapshot', error: errorText(error)}); }
@@ -1920,6 +2196,8 @@ async function cleanupOwnedProcesses() {
       assert.equal(afterUnload.running, 0);
       assert.equal(afterUnload.observation, null);
       assert.equal(afterUnload.first_sss_constructor_pair, null);
+      if (firstSssConsumedPadTick)
+        assert.equal(afterUnload.first_sss_consumed_tick, null);
       assert.equal(afterUnload.error, null);
       assert.equal(afterUnload.import_enabled, true);
       report.cleanup.observation_cleared = true;
