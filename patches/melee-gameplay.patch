@@ -5426,10 +5426,10 @@ index af393e2b880e946c7fb9f304e563815154196845..409c872346c80206e644b51fe802fc74
  /* 1CD4A0 */ void grCastle_801CD4A0(void);
  /* 1CD4A4 */ void grCastle_801CD4A4(void);
 diff --git a/src/melee/gr/grdatfiles.c b/src/melee/gr/grdatfiles.c
-index ff1989d3967ca50ccadd979e0636f5a9601a22ad..aa985edb6f4dad0869dd7c717524a08857fb544b 100644
+index ff1989d3967ca50ccadd979e0636f5a9601a22ad..9d5673d9001f107d62a4a9ea1ffeb71103858107 100644
 --- a/src/melee/gr/grdatfiles.c
 +++ b/src/melee/gr/grdatfiles.c
-@@ -1,4 +1,8 @@
+@@ -1,14 +1,20 @@
  #include "grdatfiles.h"
 +#ifdef TARGET_PC
 +#include "gameplay_stage_map.h"
@@ -5438,7 +5438,19 @@ index ff1989d3967ca50ccadd979e0636f5a9601a22ad..aa985edb6f4dad0869dd7c717524a088
  
  #include "ground.h"
  #include "types.h"
-@@ -28,7 +32,14 @@ void grDatFiles_801C5FC0(HSD_Archive* archive, void* data, size_t length)
+ #include <melee/lb/lb_00B0.h>
+ #include <melee/lb/lbarchive.h>
+ #include <melee/lb/lbheap.h>
++#include <melee/gr/granime.h>
+ #include <sysdolphin/baselib/archive.h>
+ #include <sysdolphin/baselib/debug.h>
+ #include <sysdolphin/baselib/particle.h>
+ #include <sysdolphin/baselib/psstructs.h>
++#include <stdint.h>
+ 
+ /* 1C6228 */ static void grDatFiles_801C6228(UnkStageDat*);
+ /* 1C62B4 */ static UnkArchiveStruct* grDatFiles_801C62B4(void);
+@@ -28,7 +34,14 @@ void grDatFiles_801C5FC0(HSD_Archive* archive, void* data, size_t length)
      map_texg = HSD_ArchiveGetPublicAddress(archive, "map_texg");
  
      if (map_ptcl != NULL && map_texg != NULL) {
@@ -5453,7 +5465,7 @@ index ff1989d3967ca50ccadd979e0636f5a9601a22ad..aa985edb6f4dad0869dd7c717524a088
      }
  }
  
-@@ -51,10 +62,22 @@ void grDatFiles_801C6038(void* arg0, s32 arg1, s32 arg2)
+@@ -51,10 +64,22 @@ void grDatFiles_801C6038(void* arg0, s32 arg1, s32 arg2)
          if (arg1 == 0) {
              stage_info.coll_data =
                  HSD_ArchiveGetPublicAddress(sp14, "coll_data");
@@ -5476,7 +5488,7 @@ index ff1989d3967ca50ccadd979e0636f5a9601a22ad..aa985edb6f4dad0869dd7c717524a088
              stage_info.ald_yaku_all =
                  HSD_ArchiveGetPublicAddress(sp14, "ALDYakuAll");
              stage_info.map_ptcl =
-@@ -63,13 +86,23 @@ void grDatFiles_801C6038(void* arg0, s32 arg1, s32 arg2)
+@@ -63,13 +88,23 @@ void grDatFiles_801C6038(void* arg0, s32 arg1, s32 arg2)
                  HSD_ArchiveGetPublicAddress(sp14, "map_texg");
              stage_info.yakumono_param =
                  HSD_ArchiveGetPublicAddress(sp14, "yakumono_param");
@@ -5500,7 +5512,7 @@ index ff1989d3967ca50ccadd979e0636f5a9601a22ad..aa985edb6f4dad0869dd7c717524a088
              if (phi_r28 != 0) {
                  psInitDataBankLoad(0x40, stage_info.map_ptcl,
                                     stage_info.map_texg, 0, 0);
-@@ -77,6 +110,9 @@ void grDatFiles_801C6038(void* arg0, s32 arg1, s32 arg2)
+@@ -77,6 +112,9 @@ void grDatFiles_801C6038(void* arg0, s32 arg1, s32 arg2)
                  psInitDataBank(0x40, stage_info.map_ptcl, stage_info.map_texg,
                                 0, 0);
              }
@@ -5510,7 +5522,76 @@ index ff1989d3967ca50ccadd979e0636f5a9601a22ad..aa985edb6f4dad0869dd7c717524a088
          }
          grDatFiles_801C6228(temp_r3->unk4);
      } else {
-@@ -129,11 +165,38 @@ UnkArchiveStruct* grDatFiles_801C62B4(void)
+@@ -111,6 +149,68 @@ void grDatFiles_801C6228(UnkStageDat* arg0)
+ 
+ static UnkArchiveStruct grDatFiles_8049EE10[4];
+ 
++#ifdef TARGET_PC
++UnkArchiveStruct* melee_web_grdatfiles_ordinary_table(void)
++{
++    return grDatFiles_8049EE10;
++}
++
++/* StageMap has already checked the archive registry identity for every
++ * populated row. Recheck the full four-slot snapshot before any original
++ * release call so a changed later row cannot cause partial retirement. */
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++int melee_web_grdatfiles_retire_captured(const void* captured_rows,
++                                         const uint64_t captured_identities[4])
++{
++    const UnkArchiveStruct* expected = captured_rows;
++    if (expected == NULL || captured_identities == NULL) {
++        return 0;
++    }
++
++    unsigned populated = 0;
++    for (int i = 0; i < 4; ++i) {
++        const UnkArchiveStruct* current = &grDatFiles_8049EE10[i];
++        const UnkArchiveStruct* captured = &expected[i];
++        if (current->unk0 != captured->unk0 || current->unk4 != captured->unk4 ||
++            current->unk8 != captured->unk8) {
++            return 0;
++        }
++        if (captured->unk0 == NULL && captured->unk4 == NULL && captured->unk8 == 0) {
++            if (captured_identities[i] != 0) return 0;
++            continue;
++        }
++        if (captured->unk0 == NULL || captured->unk4 == NULL ||
++            captured->unk8 != 0 || (uintptr_t) captured->unk0 == UINTPTR_MAX ||
++            captured_identities[i] == 0) {
++            return 0;
++        }
++        for (int j = 0; j < i; ++j) {
++            if (captured_identities[j] != 0 &&
++                captured_identities[j] == captured_identities[i]) {
++                return 0;
++            }
++        }
++        populated++;
++    }
++    if (populated == 0) return 0;
++
++    for (int i = 0; i < 4; ++i) {
++        if (expected[i].unk0 != NULL) {
++            grAnime_801C65B0(&grDatFiles_8049EE10[i]);
++        }
++    }
++    for (int i = 0; i < 4; ++i) {
++        if (grDatFiles_8049EE10[i].unk0 != NULL ||
++            grDatFiles_8049EE10[i].unk4 != NULL ||
++            grDatFiles_8049EE10[i].unk8 != 0) {
++            return 0;
++        }
++    }
++    return 1;
++}
++#endif
++#endif
++
+ void grDatFiles_801C6288(void)
+ {
+     memzero(&grDatFiles_8049EE10, sizeof(grDatFiles_8049EE10));
+@@ -129,11 +229,38 @@ UnkArchiveStruct* grDatFiles_801C62B4(void)
  
  UnkArchiveStruct* grDatFiles_GetArchive(void)
  {
@@ -5727,10 +5808,10 @@ index 116be3d41cc321eefbd5c71c9de7282e92220bbc..3d5a61476b4327b7f321704dceb7e8d2
  
  void grOldYoshi_8020E79C(void)
 diff --git a/src/melee/gr/ground.c b/src/melee/gr/ground.c
-index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4026a47bcd95d76e3edfc7ed6a991e1da02f8ee3 100644
+index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4758cbb258f22465f300cc543ff49bdd605ba515 100644
 --- a/src/melee/gr/ground.c
 +++ b/src/melee/gr/ground.c
-@@ -1,5 +1,13 @@
+@@ -1,8 +1,20 @@
  #include "ground.h"
  
 +#ifdef TARGET_PC
@@ -5744,7 +5825,14 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4026a47bcd95d76e3edfc7ed6a991e1d
  #include <Runtime/platform.h>
  
  #include <math.h>
-@@ -284,6 +292,35 @@ void Ground_801C0378(int arg0)
++#if defined(TARGET_PC) && defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++#include <stdio.h>
++#include <stdlib.h>
++#endif
+ 
+ #include "grbattle.h"
+ #include "grbigblue.h"
+@@ -284,6 +296,35 @@ void Ground_801C0378(int arg0)
      zeroBuffer();
  }
  
@@ -5780,7 +5868,33 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4026a47bcd95d76e3edfc7ed6a991e1d
  void mem_free(void* ptr)
  {
      HSD_Free(ptr);
-@@ -468,6 +505,10 @@ void Ground_801C0754(StageIdPair* pair)
+@@ -454,11 +495,25 @@ void Ground_801C0754(StageIdPair* pair)
+ {
+     StageData* stage;
+     s32 arg3;
++#if defined(TARGET_PC) && defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (melee_web_stage_map_archives() != NULL &&
++        !melee_web_stage_map_grdatfiles_begin()) {
++        fputs("C1 grDatFiles E8 began with an unowned or nonempty slot table\n", stderr);
++        abort();
++    }
++#endif
+     Ground_801BFFB0();
+     stage_info.grkind = pair->grkind;
+     stage = stage_datas[pair->grkind];
+     arg3 = (pair->stkind == St_Kind_Heal) ? 0 : 1;
+     grDatFiles_801C6038(stage->data1, 0, arg3);
++#if defined(TARGET_PC) && defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (melee_web_stage_map_archives() != NULL &&
++        !melee_web_stage_map_grdatfiles_capture()) {
++        fputs("C1 grDatFiles E8 produced an unowned or ambiguous slot table\n", stderr);
++        abort();
++    }
++#endif
+     Ground_801C28CC(&stage_info.xA0, pair->stkind);
+     stage_info.on_touch_line = stage->on_touch_line;
+     stage_info.on_check_shadow_render = stage->on_check_shadow_render;
+@@ -468,6 +523,10 @@ void Ground_801C0754(StageIdPair* pair)
  void Ground_801C0800(StageIdPair* pair)
  {
      StageData* stage_data = stage_datas[pair->grkind];
@@ -5791,7 +5905,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4026a47bcd95d76e3edfc7ed6a991e1d
      Ground_801C38D0(stage_info.param->x8, stage_info.param->x14,
                      stage_info.param->x1C, stage_info.param->x18);
      Ground_801C38EC(stage_info.param->x10, stage_info.param->xC);
-@@ -499,8 +540,15 @@ void Ground_801C0800(StageIdPair* pair)
+@@ -499,8 +558,15 @@ void Ground_801C0800(StageIdPair* pair)
          }
      }
      if (stage_info.map_ptcl != NULL && stage_info.map_texg != NULL) {
@@ -5807,7 +5921,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4026a47bcd95d76e3edfc7ed6a991e1d
      }
      mpLibLoad(stage_info.coll_data);
      mpLib_80058820();
-@@ -694,8 +742,13 @@ void Ground_801C0FB8(StageIdPair* pair)
+@@ -694,8 +760,13 @@ void Ground_801C0FB8(StageIdPair* pair)
  {
      struct {
          void* unk0;
@@ -5821,7 +5935,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4026a47bcd95d76e3edfc7ed6a991e1d
      }* cur;
      void* next;
      stage_datas[pair->grkind]->on_start();
-@@ -705,10 +758,39 @@ void Ground_801C0FB8(StageIdPair* pair)
+@@ -705,9 +776,38 @@ void Ground_801C0FB8(StageIdPair* pair)
          HSD_Free(cur);
      }
      stage_info.x6A4 = NULL;
@@ -5833,8 +5947,8 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4026a47bcd95d76e3edfc7ed6a991e1d
      HSD_GObj_SetupProc(GObj_Create(HSD_GOBJ_CLASS_STAGE, 5, 0),
                         Ground_801C0C2C, 10);
 +#endif
- }
- 
++}
++
 +#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 +/* Test-only construction of the original private Ground manager. No proc tick. */
 +HSD_GObj* melee_web_stadium_c1_manager_create_control(void)
@@ -5855,13 +5969,12 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4026a47bcd95d76e3edfc7ed6a991e1d
 +{
 +    return (priority == 4 && callback == Ground_801C1D38) ||
 +           (priority == 1 && callback == Ground_801C1CD0);
-+}
+ }
 +#endif
-+
+ 
  void Ground_DemoInit(StageIdPair* pair, s32 arg1)
  {
-     stage_datas[pair->grkind]->on_demo_init(arg1);
-@@ -1187,6 +1269,19 @@ static inline bool find_light_override(UnkArchiveStruct* archive,
+@@ -1187,6 +1287,19 @@ static inline bool find_light_override(UnkArchiveStruct* archive,
                                         HSD_LightDesc* desc, bool* b6, bool* b7,
                                         bool* b5)
  {
@@ -5881,7 +5994,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4026a47bcd95d76e3edfc7ed6a991e1d
      UnkStageDat* dat = archive->unk4;
      s32 count = dat->unk1C;
      s32 i;
-@@ -1210,6 +1305,19 @@ static inline bool find_light_override_in_dat(UnkStageDat* dat,
+@@ -1210,6 +1323,19 @@ static inline bool find_light_override_in_dat(UnkStageDat* dat,
                                                HSD_LightDesc* desc, bool* b6,
                                                bool* b7, bool* b5)
  {
@@ -5901,7 +6014,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4026a47bcd95d76e3edfc7ed6a991e1d
      s32 count = dat->unk1C;
      s32 i;
  
-@@ -1523,6 +1631,13 @@ void Ground_801C28CC(s32* arg0, StKind stkind)
+@@ -1523,6 +1649,13 @@ void Ground_801C28CC(s32* arg0, StKind stkind)
      panicMissingStageParam(stkind, count);
  }
  
@@ -5915,7 +6028,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4026a47bcd95d76e3edfc7ed6a991e1d
  s32* Ground_801C2AD8(void)
  {
      return &stage_info.xA0;
-@@ -2646,6 +2761,7 @@ void Ground_801C466C(void)
+@@ -2646,6 +2779,7 @@ void Ground_801C466C(void)
      int i;
      int count;
      HSD_GObj* temp_r3;
@@ -5923,7 +6036,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4026a47bcd95d76e3edfc7ed6a991e1d
      HSD_LObj* temp_r3_2;
      LightList** var_r27_2;
      HSD_LObj* var_r27;
-@@ -2666,6 +2782,7 @@ void Ground_801C466C(void)
+@@ -2666,6 +2800,7 @@ void Ground_801C466C(void)
          if (callbacks->flags_b0 == 1) {
              archive = grDatFiles_801C6330(i);
              selected = Ground_801C20E0(archive, archive->unk4->unk8[i].x18);
@@ -5931,12 +6044,12 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4026a47bcd95d76e3edfc7ed6a991e1d
              goto light_selected;
          }
          callbacks++;
-@@ -2674,7 +2791,18 @@ void Ground_801C466C(void)
+@@ -2674,7 +2809,18 @@ void Ground_801C466C(void)
  light_selected:
      if ((r28_carrier.lights = selected) == NULL) {
          r28_carrier.lights = Ground_803E06C8;
 +        selected_entry = -1;
-     }
++    }
 +#if defined(TARGET_PC)
 +    /* The selected source row is bounded by its authored LightList** table in
 +     * map_head. Compare Ground's live HSD chain to that entry count instead of
@@ -5945,12 +6058,12 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4026a47bcd95d76e3edfc7ed6a991e1d
 +        OSReport("%s:%d: source Ground light entry has no checked bound\n",
 +                 __FILE__, __LINE__);
 +        while (true) {}
-+    }
+     }
 +#endif
      temp_r3 = GObj_Create(0xD, 3, 0);
      if (temp_r3 == NULL) {
          OSReport("%s:%d: couldn t get gobj\n", __FILE__, 0xEAF);
-@@ -3356,3 +3484,34 @@ void Ground_801C5AEC(Vec3* v, Vec3* arg1, Vec3* arg2, Vec3* arg3)
+@@ -3356,3 +3502,34 @@ void Ground_801C5AEC(Vec3* v, Vec3* arg1, Vec3* arg2, Vec3* arg3)
  
  /// @todo Is this used by base pointer anywhere? Not stripped by mwcc.
  static int unused_ints[] = { 1, 1, 0, 0, 0, 180, 0, 0, 0 };

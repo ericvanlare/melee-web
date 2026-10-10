@@ -79,6 +79,31 @@ class NativeStageOriginalRuntime(unittest.TestCase):
         self.assertNotEqual(result.returncode,0,result.stdout+result.stderr)
         self.assertIn("Native stage light query names an unowned descriptor",result.stderr)
 
+    def test_original_grdatfiles_retirement_uses_stage_map_registry_once(self):
+        target=None
+        for directory in ("browser-stadium-c1a-release","browser","browser-release"):
+            build=ROOT/"build"/directory
+            candidate=build/"gameplay_stage_map_trace.js"
+            cache=build/"CMakeCache.txt"
+            if not candidate.is_file() or not cache.is_file():
+                continue
+            if "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC:BOOL=ON" not in cache.read_text():
+                continue
+            if candidate.stat().st_mtime < (ROOT/"tests/gameplay_stage_map_trace.c").stat().st_mtime:
+                continue
+            target=candidate
+            break
+        if target is None:
+            self.skipTest("Build the gameplay_stage_map_trace target with the C1 diagnostic option")
+        import sys
+        sys.path.insert(0,str(ROOT/"scripts"))
+        from check_gameplay import node_runtime
+        result=subprocess.run([str(node_runtime()),str(target),"--grdatfiles-retirement-control"],
+                              cwd=ROOT,capture_output=True,text=True,timeout=30)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn("Synthetic typed-catalog StageMap/original grDatFiles retirement control passed",
+                      result.stdout)
+
     def run_trace(self,name,*arguments):
         target=ROOT/"build/browser"/(name+".js")
         if not target.is_file():self.skipTest("Original stage trace target unavailable")

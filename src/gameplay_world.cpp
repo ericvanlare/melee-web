@@ -818,6 +818,10 @@ struct GameplayWorld::Storage {
         check(melee_web_stage_map_set_public(stage_map,symbols.data(),symbols.size(),error,sizeof(error)),error);
         const auto& overrides=full_stage->light_overrides();
         check(melee_web_stage_map_set_overrides(stage_map,overrides.data(),overrides.size(),error,sizeof(error)),error);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        if(stadium_diagnostic)
+            check(melee_web_stage_map_grdatfiles_arm(stage_map,error,sizeof(error)),error);
+#endif
         /* Non-ordered tooling retains its isolated collision seam. Match
          * startup leaves allocation and ownership to Stage_8022524C below. */
         if(!collision&&!collision_deferred){

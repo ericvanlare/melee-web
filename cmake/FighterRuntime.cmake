@@ -255,6 +255,10 @@ set_target_properties(gameplay_audio_fx_trace PROPERTIES SUFFIX ".js")
 
 add_executable(gameplay_stage_map_trace EXCLUDE_FROM_ALL tests/gameplay_stage_map_trace.c)
 target_link_libraries(gameplay_stage_map_trace PRIVATE fighter_asset_runtime)
+if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  target_compile_definitions(gameplay_stage_map_trace PRIVATE
+    MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
+endif()
 target_compile_options(gameplay_stage_map_trace PRIVATE -UNDEBUG
   "-include${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
 target_link_options(gameplay_stage_map_trace PRIVATE -sENVIRONMENT=node -sALLOW_MEMORY_GROWTH=1

@@ -98,6 +98,122 @@ static void stadium_sis_catalog_controls(void) {
     free(sis);
     puts("Stadium eight-entry missing SIS and nine-entry owned SIS catalog controls passed");
 }
+static void stage_map_preload_retirement_controls(void) {
+    char error[128];
+    int map_head=13,other_root=17,source_object=0;
+    typedef struct {void* archive;void* map;unsigned flags;} SlotWitness;
+    MeleeWebArchiveSymbol map_symbols[]={
+        {"GrPs.usd","map_head",&map_head},
+        {"GrPs.usd","grGroundParam",&other_root},
+    };
+    test_generation=71;test_heap_exists=1;
+    MeleeWebArchiveSections* scope=melee_web_archive_sections_register(
+        map_symbols,2,error,sizeof(error));assert(scope);
+    void* native_owner=melee_web_archive_sections_open("GrPs.usd");assert(native_owner);
+    void* preload=melee_web_archive_sections_open_preloaded("/GrPs.usd");assert(preload);
+    uint64_t identity=0,native_identity=0,native_out=0;
+    assert(melee_web_archive_sections_preloaded_stage_map_matches(
+        scope,71,preload,native_owner,&map_head,0,&identity,0,&native_out));
+    native_identity=native_out;
+    assert(identity!=0&&native_identity!=0);
+
+    /* Registry close preflight is read-only. This local row-shaped witness
+     * is not passed to StageMap and therefore does not test the armed
+     * StageMap retirement transaction; that needs its real composed trace. */
+    SlotWitness slots[4]={{preload,&map_head,0},{0},{0},{0}};
+    SlotWitness slots_before[4];memcpy(slots_before,slots,sizeof(slots));
+    void* extra_open=melee_web_archive_sections_open("GrPs.usd");assert(extra_open);
+    assert(!melee_web_archive_sections_close_owned_preflight(scope,native_owner));
+    assert(memcmp(slots,slots_before,sizeof(slots))==0);
+    uint64_t still_same=0;
+    assert(melee_web_archive_sections_preloaded_stage_map_matches(
+        scope,71,preload,native_owner,&map_head,identity,&still_same,0,&native_out));
+    assert(still_same==identity&&melee_web_archive_sections_is_handle(extra_open));
+    melee_web_archive_sections_release(extra_open);
+    assert(melee_web_archive_sections_close_owned_preflight(scope,native_owner));
+
+    uint64_t output_sentinel=UINT64_C(0xfeedbeef12345678);
+    assert(!melee_web_archive_sections_preloaded_stage_map_matches(
+        scope,72,preload,native_owner,&map_head,0,&output_sentinel,0,&native_out));
+    assert(output_sentinel==UINT64_C(0xfeedbeef12345678));
+    assert(!melee_web_archive_sections_preloaded_stage_map_matches(
+        scope,71,(void*)(uintptr_t)0x4321,native_owner,&map_head,0,&output_sentinel,0,&native_out));
+    assert(output_sentinel==UINT64_C(0xfeedbeef12345678));
+
+    void* owned_copy=melee_web_archive_sections_open("GrPs.usd");assert(owned_copy);
+    assert(!melee_web_archive_sections_preloaded_stage_map_matches(
+        scope,71,owned_copy,native_owner,&map_head,0,&output_sentinel,0,&native_out));
+    assert(output_sentinel==UINT64_C(0xfeedbeef12345678));
+    assert(melee_web_archive_sections_attach_source(&source_object,"GrPs.usd"));
+    assert(!melee_web_archive_sections_preloaded_stage_map_matches(
+        scope,71,&source_object,native_owner,&map_head,0,&output_sentinel,0,&native_out));
+    assert(output_sentinel==UINT64_C(0xfeedbeef12345678));
+
+    /* Both identities are required even when the current numeric pointer is
+     * valid. This rejects replacement ownership independently of malloc reuse. */
+    uint64_t native_sentinel=UINT64_C(0x12345678feedbeef);
+    assert(!melee_web_archive_sections_preloaded_stage_map_matches(
+        scope,71,preload,native_owner,&map_head,identity,&output_sentinel,
+        native_identity+1,&native_sentinel));
+    assert(output_sentinel==UINT64_C(0xfeedbeef12345678));
+    assert(native_sentinel==UINT64_C(0x12345678feedbeef));
+    melee_web_archive_sections_release(native_owner);
+    native_owner=melee_web_archive_sections_open("GrPs.usd");assert(native_owner);
+    assert(!melee_web_archive_sections_preloaded_stage_map_matches(
+        scope,71,preload,native_owner,&map_head,identity,&output_sentinel,
+        native_identity,&native_sentinel));
+    assert(output_sentinel==UINT64_C(0xfeedbeef12345678));
+    assert(native_sentinel==UINT64_C(0x12345678feedbeef));
+    assert(melee_web_archive_sections_preloaded_stage_map_matches(
+        scope,71,preload,native_owner,&map_head,identity,&output_sentinel,
+        0,&native_out));
+    assert(native_out!=native_identity);
+    native_identity=native_out;
+    output_sentinel=UINT64_C(0xfeedbeef12345678);
+
+    /* Reopen receives a new registry incarnation even if malloc reuses the
+     * released handle cell; a stale captured identity cannot pass. */
+    melee_web_archive_sections_release(preload);
+    void* replacement=melee_web_archive_sections_open_preloaded("GrPs.usd");
+    assert(replacement);
+    uint64_t replacement_identity=0;
+    assert(melee_web_archive_sections_preloaded_stage_map_matches(
+        scope,71,replacement,native_owner,&map_head,0,&replacement_identity,0,&native_out));
+    assert(replacement_identity!=identity);
+    assert(!melee_web_archive_sections_preloaded_stage_map_matches(
+        scope,71,replacement,native_owner,&map_head,identity,&output_sentinel,0,&native_out));
+    assert(output_sentinel==UINT64_C(0xfeedbeef12345678));
+    assert(melee_web_archive_sections_preloaded_stage_map_matches(
+        scope,71,replacement,native_owner,&map_head,replacement_identity,&output_sentinel,0,&native_out));
+    assert(output_sentinel==replacement_identity);
+
+    melee_web_archive_sections_release(replacement);
+    melee_web_archive_sections_release(owned_copy);
+    melee_web_archive_sections_release(&source_object);
+    assert(melee_web_archive_sections_close_owned(scope,native_owner,error,sizeof(error)));
+    assert(!melee_web_archive_sections_is_handle(replacement));
+
+    /* A second scope naming the same file invalidates unique map ownership.
+     * Keep this a separate subcontrol so its registry collision does not also
+     * prevent the replacement-incarnation test above from reopening a preload. */
+    MeleeWebArchiveSections* unique_scope=melee_web_archive_sections_register(
+        map_symbols,2,error,sizeof(error));assert(unique_scope);
+    void* unique_native=melee_web_archive_sections_open("GrPs.usd");assert(unique_native);
+    void* unique_preload=melee_web_archive_sections_open_preloaded("GrPs.usd");assert(unique_preload);
+    MeleeWebArchiveSymbol foreign_symbol={"GrPs.usd","other_public",&other_root};
+    MeleeWebArchiveSections* foreign=melee_web_archive_sections_register(
+        &foreign_symbol,1,error,sizeof(error));assert(foreign);
+    uint64_t foreign_out=UINT64_C(0xfeedbeef12345678);
+    assert(!melee_web_archive_sections_preloaded_stage_map_matches(
+        unique_scope,71,unique_preload,unique_native,&map_head,0,&foreign_out,0,&native_out));
+    assert(foreign_out==UINT64_C(0xfeedbeef12345678));
+    assert(melee_web_archive_sections_is_handle(unique_native));
+    assert(melee_web_archive_sections_is_handle(unique_preload));
+    assert(melee_web_archive_sections_close_owned(unique_scope,unique_native,error,sizeof(error)));
+    assert(melee_web_archive_sections_close(foreign,error,sizeof(error)));
+    test_heap_exists=0;
+    puts("StageMap preload registry proof rejected foreign/replaced handles and released once before owned-scope close");
+}
 int main(int argc,char** argv) {
     char error[128];int a=17,b=29;char filename[]="Authored.dat",symbol[]="first";
     MeleeWebArchiveSymbol symbols[]={{filename,symbol,&a},{filename,"alias",&a}};
@@ -210,5 +326,6 @@ int main(int argc,char** argv) {
     assert(!melee_web_archive_sections_is_handle(&source_archive_storage));
     heap_source_membership_controls();
     stadium_sis_catalog_controls();
+    stage_map_preload_retirement_controls();
     puts("Typed archive sections copied names, resolved aliases, rejected duplicates and restarted");
 }

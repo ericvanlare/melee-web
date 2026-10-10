@@ -12,11 +12,13 @@ typedef struct ArchiveHandle {
     char* filename;
     const void* object;
     MeleeWebArchiveSections* owner;
+    uint64_t identity;
     int source_archive;
     int preloaded;
 } ArchiveHandle;
 static ArchiveHandle* handles;
 static size_t handle_count;
+static uint64_t next_handle_identity=1;
 static int fail(char* e,size_t n,const char* s){if(e&&n)snprintf(e,n,"%s",s);return 0;}
 static const char* canonical_preload_name(const char* filename) {
     /* Retail DVD root paths use one leading slash; native asset catalogs use
@@ -70,6 +72,12 @@ static void remove_handle(ArchiveHandle* handle) {
     if(!*link)fatal(NULL,NULL,"Typed archive handle is not registered");
     *link=handle->next;--handle_count;free(handle->filename);free(handle);
 }
+static int assign_handle_identity(ArchiveHandle* handle) {
+    if(!handle||!next_handle_identity)return 0;
+    handle->identity=next_handle_identity;
+    next_handle_identity=next_handle_identity==UINT64_MAX?0:next_handle_identity+1;
+    return 1;
+}
 void* melee_web_archive_sections_open(const char* filename) {
     if(!has_archive(filename))fatal(filename,NULL,"Typed archive is not registered");
     if(handle_count>=256)fatal(filename,NULL,"Typed archive handle budget exceeded");
@@ -78,6 +86,7 @@ void* melee_web_archive_sections_open(const char* filename) {
     h->filename=strdup(filename);
     if(!h->filename){free(h);fatal(filename,NULL,"Typed archive name allocation failed");}
     h->object=h;h->owner=NULL;h->source_archive=0;h->preloaded=0;
+    if(!assign_handle_identity(h)){free(h->filename);free(h);fatal(filename,NULL,"Typed archive identity budget exhausted");}
     h->next=handles;handles=h;++handle_count;return h;
 }
 void* melee_web_archive_sections_open_preloaded(const char* filename) {
@@ -93,6 +102,7 @@ void* melee_web_archive_sections_open_preloaded(const char* filename) {
     h->filename=strdup(filename);
     if(!h->filename){free(h);fatal(filename,NULL,"Typed archive name allocation failed");}
     h->object=h;h->owner=owner;h->preloaded=1;
+    if(!assign_handle_identity(h)){free(h->filename);free(h);fatal(filename,NULL,"Typed archive identity budget exhausted");}
     h->next=handles;handles=h;++handle_count;return (void*)h->object;
 }
 int melee_web_archive_sections_attach_source(void* archive,const char* filename) {
@@ -103,6 +113,7 @@ int melee_web_archive_sections_attach_source(void* archive,const char* filename)
     h->filename=strdup(filename);
     if(!h->filename){free(h);return 0;}
     h->object=archive;h->owner=NULL;h->source_archive=1;h->preloaded=0;
+    if(!assign_handle_identity(h)){free(h->filename);free(h);return 0;}
     h->next=handles;handles=h;++handle_count;
     return 1;
 }
@@ -158,6 +169,58 @@ int melee_web_archive_sections_heap_source_matches(const MeleeWebArchiveSections
             matching_archive++;
         }
     return matching_archive==1;
+}
+static int same_preload_filename(const char* left,const char* right) {
+    const char* a=canonical_preload_name(left);
+    const char* b=canonical_preload_name(right);
+    return a&&b&&a[0]&&b[0]&&!strcmp(a,b);
+}
+int melee_web_archive_sections_preloaded_stage_map_matches(
+    const MeleeWebArchiveSections* candidate_scope,uint64_t generation,
+    const void* candidate_preload,const void* candidate_native_owner,
+    const void* map_head,uint64_t expected_identity,uint64_t* actual_identity,
+    uint64_t expected_native_identity,uint64_t* actual_native_identity) {
+    if(!candidate_scope||!generation||!candidate_preload||!candidate_native_owner||
+       !map_head||candidate_preload==candidate_native_owner||!actual_identity||!actual_native_identity)
+        return 0;
+    MeleeWebArchiveSections* scope=scopes;
+    while(scope&&scope!=candidate_scope)scope=scope->next;
+    if(!scope||scope->heap_generation)return 0;
+    const MeleeWebGameplayStats current=melee_web_gameplay_stats();
+    if(!melee_web_gameplay_world_exists()||current.generation!=generation)return 0;
+
+    ArchiveHandle* preload=NULL;
+    ArchiveHandle* native=NULL;
+    size_t preload_matches=0,native_matches=0;
+    for(ArchiveHandle* h=handles;h;h=h->next) {
+        if(h->object==candidate_preload){preload=h;preload_matches++;}
+        if(h->object==candidate_native_owner){native=h;native_matches++;}
+    }
+    if(preload_matches!=1||native_matches!=1||!preload||!native||
+       !preload->identity||!native->identity||
+       !preload->preloaded||preload->source_archive||preload->owner!=scope||
+       native->preloaded||native->source_archive||native->owner||
+       !same_preload_filename(preload->filename,native->filename))return 0;
+
+    size_t owned_file=0,map_head_symbol=0;
+    for(size_t i=0;i<scope->count;i++) {
+        if(!same_preload_filename(scope->entries[i].filename,preload->filename))continue;
+        owned_file++;
+        if(!strcmp(scope->entries[i].symbol,"map_head")) {
+            if(scope->entries[i].native_data!=map_head)return 0;
+            map_head_symbol++;
+        }
+    }
+    if(owned_file==0||map_head_symbol!=1)return 0;
+    for(MeleeWebArchiveSections* other=scopes;other;other=other->next)
+        if(other!=scope)for(size_t i=0;i<other->count;i++)
+            if(same_preload_filename(other->entries[i].filename,preload->filename))return 0;
+
+    if(expected_identity&&preload->identity!=expected_identity)return 0;
+    if(expected_native_identity&&native->identity!=expected_native_identity)return 0;
+    *actual_identity=preload->identity;
+    *actual_native_identity=native->identity;
+    return 1;
 }
 void* melee_web_archive_sections_public(void* candidate,const char* symbol) {
     ArchiveHandle* h=checked_handle(candidate);
@@ -245,7 +308,8 @@ int melee_web_archive_sections_close(MeleeWebArchiveSections* h,char* e,size_t n
     for(size_t i=0;i<h->count;i++){free((void*)h->entries[i].filename);free((void*)h->entries[i].symbol);}free(h);
     if(e&&n)*e=0;return 1;
 }
-int melee_web_archive_sections_close_owned(MeleeWebArchiveSections* scope,void* candidate,char* e,size_t n) {
+static int close_owned_preflight(MeleeWebArchiveSections* scope,const void* candidate,
+                                 ArchiveHandle** out_owned,char* e,size_t n) {
     MeleeWebArchiveSections* registered=scopes;while(registered&&registered!=scope)registered=registered->next;
     if(!registered||scope->heap_generation)return fail(e,n,"Owned-handle close requires a registered descriptor scope");
     ArchiveHandle* owned=handles;while(owned&&owned!=candidate)owned=owned->next;
@@ -257,6 +321,16 @@ int melee_web_archive_sections_close_owned(MeleeWebArchiveSections* scope,void* 
         for(size_t i=0;i<scope->count;i++)if(!strcmp(opened->filename,scope->entries[i].filename))
             if(!(opened->preloaded&&opened->owner==scope))
                 return fail(e,n,"Native archive scope still has other open handles");
+    if(out_owned)*out_owned=owned;
+    return 1;
+}
+int melee_web_archive_sections_close_owned_preflight(
+    MeleeWebArchiveSections* scope,const void* candidate) {
+    return close_owned_preflight(scope,candidate,NULL,NULL,0);
+}
+int melee_web_archive_sections_close_owned(MeleeWebArchiveSections* scope,void* candidate,char* e,size_t n) {
+    ArchiveHandle* owned=NULL;
+    if(!close_owned_preflight(scope,candidate,&owned,e,n))return 0;
     melee_web_archive_sections_release(owned);
     return melee_web_archive_sections_close(scope,e,n);
 }
