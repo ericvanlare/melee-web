@@ -915,7 +915,7 @@ class StadiumFirstCssContextTests(OwnedWorkspaceTests):
         self.assertEqual(result["expected_return"]["scene_kind"], 8)
         self.assertEqual(result["expected_return"]["random_seed_hex"], "312151c3")
         self.assertEqual(result["expected_return"]["css"]["ko_counts_owner"],
-                         "session_owned")
+                         "source_vs_owned")
         for player in result["expected_return"]["css"]["vs"]["start"]["players"]:
             self.assertIn("xB", player)
         self.assertEqual(len(result["expected_return"]["pad_state_hex"]), 822 * 2)

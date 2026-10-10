@@ -117,7 +117,8 @@ int melee_web_menu_session_destroy(MeleeWebMenuSession*, char* error,
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 /* One-shot first-CSS return note, after the source callback and before the
  * wrapper's phase updates. The note cannot abort original scene completion.
- * ko_counts is NULL if the source CSS no longer names this session's array. */
+ * ko_counts is opaque source payload state; the note must validate its
+ * exact source owner before reading any bytes. */
 typedef void (*MeleeWebMenuFirstCssReturnNote)(
     void*, MeleeWebMenuSession*, const CSSData*, const uint8_t* ko_counts);
 int melee_web_menu_arm_first_css_return(MeleeWebMenuSession*,

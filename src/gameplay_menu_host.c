@@ -206,7 +206,8 @@ static void first_css_return_note(void* data, MeleeWebMenuSession* session,
     if (!h || h != owner) return;
     if (h->first_css_return_state != 1 || !session || !css || session != h->session ||
         css != melee_web_menu_css(h->session) || !ko_counts ||
-        css->ko_counts != ko_counts || h->entered || h->drawing ||
+        css->ko_counts != ko_counts ||
+        ko_counts != gmVsMelee_GetKOCounts() || h->entered || h->drawing ||
         !h->initial_replay_context || seed_ptr != &h->seed ||
         melee_web_gameplay_stats().ticks != 0 ||
         HSD_GObj_804D781C || HSD_GObj_804D7838 || HSD_GObj_804D7830 ||
@@ -214,6 +215,7 @@ static void first_css_return_note(void* data, MeleeWebMenuSession* session,
         melee_web_menu_phase(h->session) != MELEE_WEB_MENU_CREATED ||
         h->source_scene != MELEE_WEB_HOST_SCENE_CSS ||
         h->source_mode_kind != GM_VS || !h->vs_mode_owned ||
+        gm_GetCurrentGameMode() != GM_VS ||
         melee_web_current_scene_info() != &h->source_scene_info ||
         h->source_scene_info.scene_kind != GS_CSS ||
         h->source_scene_info.enter_data != css ||
@@ -272,6 +274,9 @@ int melee_web_menu_host_first_css_return(MeleeWebMenuHost* h,
         seed_ptr != &h->seed ||
         h->source_scene != MELEE_WEB_HOST_SCENE_CSS ||
         !melee_web_menu_first_css_return_live(h->session) ||
+        h->source_mode_kind != GM_VS || !h->vs_mode_owned ||
+        gm_GetCurrentGameMode() != GM_VS ||
+        melee_web_menu_css(h->session)->ko_counts != gmVsMelee_GetKOCounts() ||
         melee_web_current_scene_info() != &h->source_scene_info ||
         h->source_scene_info.scene_kind != GS_CSS)
         return fail(e,n,"First CSS return snapshot is absent or no longer before the first tick");

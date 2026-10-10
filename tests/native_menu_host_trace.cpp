@@ -3745,7 +3745,7 @@ void run_stadium_first_css_context(const melee_web::RuntimeFiles& files,
                   << ",\"match_type\":" << unsigned(snapshot.css.match_type)
                   << ",\"pending_scene_change\":"
                   << unsigned(snapshot.css.pending_scene_change)
-                  << ",\"ko_counts_owner\":\"session_owned\",\"vs\":";
+                  << ",\"ko_counts_owner\":\"source_vs_owned\",\"vs\":";
         write_first_css_vs_mode(std::cout, snapshot.css.vs);
         std::cout << "},\"source_ticks\":0,\"draws\":0,"
                   << "\"full_session_comparison\":false,\"cleanup\":\"pending\"}\n"

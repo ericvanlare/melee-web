@@ -40,6 +40,7 @@ struct MeleeWebMenuSession {
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     MeleeWebMenuFirstCssReturnNote first_css_return_note;
     int first_css_return_armed;
+    const uint8_t* first_css_return_ko_owner;
     int stadium_c1a_enabled;
     int stadium_c1a_ready;
 #endif
@@ -1031,7 +1032,8 @@ int melee_web_menu_first_css_return_live(const MeleeWebMenuSession* session)
     return session && session == owner && session->first_css_return_armed == 2 &&
         session->phase == MELEE_WEB_MENU_CSS && session->css_open &&
         !session->sss_open && !session->ticks &&
-        session->css.ko_counts == session->css_ko_counts;
+        session->first_css_return_ko_owner &&
+        session->css.ko_counts == session->first_css_return_ko_owner;
 }
 #endif
 
@@ -1084,9 +1086,10 @@ static int enter_css(MeleeWebMenuSession* session, int after_match,
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     if (session->first_css_return_armed == 1) {
         session->first_css_return_armed = 2;
+        /* Opaque until the host validates the authored VS owner. */
+        session->first_css_return_ko_owner = session->css.ko_counts;
         session->first_css_return_note(session->runtime.user, session,
-            &session->css, session->css.ko_counts == session->css_ko_counts
-                ? session->css_ko_counts : NULL);
+            &session->css, session->first_css_return_ko_owner);
     }
 #endif
     session->css_open = 1;

@@ -898,7 +898,7 @@ def _first_css_return_summary(payload: dict[str, Any]) -> dict[str, Any]:
         "css": {
             "unk_0x0": int.from_bytes(raw[0:2], "big"),
             "match_type": raw[2], "pending_scene_change": raw[3],
-            "ko_counts_owner": "session_owned",
+            "ko_counts_owner": "source_vs_owned",
             "vs": {
                 "loser": int.from_bytes(vs[0:1], "big", signed=True),
                 "ordered_stage_index": int.from_bytes(vs[1:2], "big", signed=True),

@@ -32,6 +32,12 @@ class FirstCssReturnTests(OwnedWorkspaceTests):
         compiler = shutil.which("clang") or shutil.which("cc")
         if not compiler:
             self.skipTest("Native C compiler required")
+        original_path = ROOT / ".deps/melee/src/melee/gm/gmvsmelee.c"
+        if not original_path.is_file():
+            self.skipTest("Pinned original gmvsmelee source required")
+        original = original_path.read_text()
+        original_ko = function(original, "u8* gmVsMelee_GetKOCounts(")
+        original_enter = function(original, "void gmVsMelee_EnterCss(")
         menu = (ROOT / "src/gameplay_menu.c").read_text()
         host = (ROOT / "src/gameplay_menu_host.c").read_text()
         header = (ROOT / "src/gameplay_menu_host.h").read_text()
@@ -83,7 +89,7 @@ class FirstCssReturnTests(OwnedWorkspaceTests):
 #define VS_MELEE 0
 #define TRAINING_MODE 1
 typedef int MeleeWebMenuScene;
-typedef struct CSSData { int match_type,pending_scene_change; uint8_t* ko_counts; int field; } CSSData;
+typedef struct CSSData { int match_type,pending_scene_change; uint8_t* ko_counts; int field; int vs; } CSSData;
 typedef struct MeleeWebMenuSession MeleeWebMenuSession;
 typedef void (*MeleeWebMenuFirstCssReturnNote)(void*,MeleeWebMenuSession*,const CSSData*,const uint8_t*);
 typedef struct { void* user; int (*scene_enter)(void*,int,char*,size_t); } Runtime;
@@ -91,7 +97,7 @@ struct MeleeWebMenuSession {
  Runtime runtime; CSSData css; uint8_t css_ko_counts[6]; uint64_t ticks;
  int phase,css_open,sss_open,transition_requested,css_parent_route_requested;
  int selection_rejected,transition_failed,training_mode_scene;
- int first_css_return_armed; MeleeWebMenuFirstCssReturnNote first_css_return_note;
+ int first_css_return_armed; const uint8_t* first_css_return_ko_owner; MeleeWebMenuFirstCssReturnNote first_css_return_note;
 };
 ''' + snapshot + r'''
 typedef struct { int scene_kind; const void* enter_data; const void* exit_data; } Scene;
@@ -108,6 +114,17 @@ static uint32_t* seed_ptr;
 static Scene* current_scene;
 static void *HSD_GObj_804D781C,*HSD_GObj_804D7838,*HSD_GObj_804D7830,*HSD_GObj_804D7814,*HSD_GObj_804D7818;
 static int healthy=1,profile_live=1,poison_ko=0,source_calls=0;
+static uint8_t ko_counts[6], foreign_ko[6];
+#define vs_ko ko_counts
+typedef uint8_t u8;
+typedef int VsModeData;
+typedef int CSSMatchType;
+typedef struct { CSSData* enter_data; } GameModeState;
+static void* gm_GetGameModeStateEnterData(GameModeState* state){return state->enter_data;}
+static void lbDvd_SetupVsPreloadCache(void){}
+static int current_mode=GM_VS;
+''' + original_ko + '\n' + original_enter + r'''
+static int gm_GetCurrentGameMode(void){return current_mode;}
 static struct Stats { uint64_t ticks; } stats;
 static struct Stats melee_web_gameplay_stats(void){return stats;}
 static int fail(char* e,size_t n,const char* text){if(e&&n)snprintf(e,n,"%s",text);return 0;}
@@ -126,13 +143,15 @@ static int mode_enter(void* p,int scene,char* e,size_t n){
  MeleeWebMenuHost* h=p;(void)scene;(void)e;(void)n;
  h->source_scene=1;h->source_mode_kind=GM_VS;h->vs_mode_owned=1;
  h->source_scene_info=(Scene){GS_CSS,&h->session->css,&h->session->css};
+ GameModeState state={&h->session->css};VsModeData vs=0;
+ gmVsMelee_EnterCss(&state,&vs,VS_MELEE);
  current_scene=&h->source_scene_info;h->seed=11;h->session->css.field=21;return 1;
 }
 static void mnCharSel_Scene_OnEnter(CSSData* css){
  assert(css==&session_owner->css);assert(!session_owner->css_open);
  assert(session_owner->phase==MELEE_WEB_MENU_CREATED || session_owner->phase==MELEE_WEB_MENU_CSS_READY);
  source_calls++;owner->seed=12;css->field=22;
- if(poison_ko)css->ko_counts=NULL;
+ if(poison_ko)css->ko_counts=foreign_ko;
 }
 ''' + menu_code + '\n' + host_code + r'''
 static MeleeWebMenuHost h;
@@ -142,7 +161,8 @@ static void reset(void){
  memset(&h,0,sizeof(h));memset(&s,0,sizeof(s));owner=&h;session_owner=&s;
  h.session=&s;h.profile=&s;h.initial_replay_context=1;h.seed=10;seed_ptr=&h.seed;
  s.runtime=(Runtime){&h,mode_enter};s.css.ko_counts=s.css_ko_counts;
- for(int i=0;i<6;i++)s.css_ko_counts[i]=(uint8_t)(i+1);
+ for(int i=0;i<6;i++){s.css_ko_counts[i]=(uint8_t)(i+1);vs_ko[i]=(uint8_t)(i+1);foreign_ko[i]=(uint8_t)(i+1);}
+ current_mode=GM_VS;
  healthy=profile_live=1;poison_ko=0;stats.ticks=0;current_scene=NULL;error[0]=0;
 }
 static void enter(void){h.audio=&s;h.generation=7;assert(enter_css(&s,0,error,sizeof(error)));h.entered=1;}
@@ -157,6 +177,10 @@ int main(void){
  assert(out.source_scene==1&&out.source_scene_kind==GS_CSS);
  for(int i=0;i<6;i++)assert(out.ko_counts[i]==i+1);
  for(int i=0;i<822;i++)assert(out.pad_state[i]==0x37);
+ assert(s.css.ko_counts==gmVsMelee_GetKOCounts() && s.css.ko_counts!=s.css_ko_counts);
+ s.css.ko_counts=foreign_ko;assert(!read_snapshot());s.css.ko_counts=vs_ko;
+ h.vs_mode_owned=0;assert(!read_snapshot());h.vs_mode_owned=1;
+ current_mode=99;assert(!read_snapshot());current_mode=GM_VS;
  s.ticks=1;assert(!read_snapshot());s.ticks=0;
  stats.ticks=1;assert(!read_snapshot());stats.ticks=0;
  s.phase=MELEE_WEB_MENU_READY;assert(!read_snapshot());s.phase=MELEE_WEB_MENU_CSS;
@@ -186,10 +210,10 @@ int main(void){
  reset();profile_live=0;assert(!melee_web_menu_host_arm_first_css_return(&h,error,sizeof(error)));
  reset();h.initial_replay_context=0;assert(!melee_web_menu_host_arm_first_css_return(&h,error,sizeof(error)));
  /* Exact note rejects each changed owner operand without output mutation. */
- for(int i=0;i<13;i++){
+ for(int i=0;i<15;i++){
   reset();assert(melee_web_menu_host_arm_first_css_return(&h,error,sizeof(error)));
   h.audio=&s;h.generation=7;mode_enter(&h,0,error,sizeof(error));
-  const uint8_t* ko=s.css_ko_counts;
+  const uint8_t* ko=gmVsMelee_GetKOCounts();
   switch(i){
    case 0: seed_ptr=NULL;break;
    case 1: h.entered=1;break;
@@ -204,6 +228,8 @@ int main(void){
    case 10: h.source_scene_info.exit_data=NULL;break;
    case 11: ko=NULL;break;
    case 12: healthy=0;break;
+   case 13: current_mode=99;break;
+   case 14: ko=foreign_ko;s.css.ko_counts=foreign_ko;break;
   }
   first_css_return_note(&h,&s,&s.css,ko);
   assert(h.first_css_return_state==3&&h.first_css_return_generation==0);
