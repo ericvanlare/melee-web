@@ -2455,14 +2455,14 @@ int melee_web_native_menu_stadium_first_css_draw_arm(
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
  check(false,"First-CSS browser draw requires the reviewed complete-draw pipeline build");
 #endif
- check(!state.armed&&!stadium_c1a_armed&&scoped_assets==false&&
+ check(!state.armed&&!stadium_c1a_armed&&scoped_assets&&scoped_disc_import&&
        asset_destination==AssetDestination::None&&!asset_committed&&
        asset_scope.pending_generation()==0&&world&&host&&!host_entered&&
        !world_exposed&&!match&&!results&&!prize&&!pending&&!running&&
        !replay&&!melee_web_net_active()&&source_session_owned&&!preparation.busy()&&
        melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED&&
        melee_web_menu_host_mode_kind(host)==GM_VS,
-       "First-CSS draw arm requires one prepared, unentered original VS host");
+       "First-CSS draw arm requires one prepared, unentered imported-disc VS host");
  auto context=melee_web::stadium_first_css_diagnostic::decode_context(
      context_bytes,context_size);
  auto consumed=melee_web::stadium_first_css_diagnostic::decode_consumed_pad(

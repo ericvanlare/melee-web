@@ -441,6 +441,31 @@ async function readFirstCssBrowserDrawObservation() {
 }
 
 async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
+  const prearm = await timeout(page.evaluate(() => {
+    const module = globalThis.Module;
+    const memory = module?._melee_web_native_menu_memory;
+    if (typeof memory !== 'function')
+      throw Error('First-CSS preparation ownership observer is absent');
+    const pointer = memory();
+    if (!pointer) throw Error('First-CSS preparation ownership observation is absent');
+    return {phase: module._melee_web_native_menu_phase(),
+      running: module._melee_web_native_menu_running(),
+      memory: JSON.parse(module.UTF8ToString(pointer))};
+  }), Math.min(5000, remaining()), 'Prepared first-CSS imported-disc ownership');
+  report.scenario.first_css_prearm = prearm;
+  await persistReport();
+  assert.equal(prearm.phase, 0);
+  assert.equal(prearm.running, 0);
+  assert.equal(prearm.memory.scoped_assets, true,
+    'First-CSS diagnostic requires the canonical imported-disc asset scope');
+  assert.equal(prearm.memory.source_session_owned, true);
+  assert.equal(prearm.memory.menu_present, true);
+  assert.equal(prearm.memory.menu_host_entered, false);
+  assert.equal(prearm.memory.menu_phase, 0);
+  assert.equal(prearm.memory.staged_asset_files, 0);
+  assert.equal(prearm.memory.asset_generation, 0);
+  assert.ok(prearm.memory.asset_files > 0,
+    'First-CSS diagnostic requires the committed menu assets');
   const arm = await timeout(page.evaluate(({contextBytes, consumedBytes}) => {
     const module = globalThis.Module;
     const armFunction = module?._melee_web_native_menu_stadium_first_css_draw_arm;
