@@ -39,6 +39,16 @@ with 161 skips and zero failures/errors; PID 53748 exits naturally and is absent
 The prior `1f146dde` failure remains retained. This validates the test-only
 repair commit, not the proposed reader correction or C3 acceptance.
 
+Both Stadium-only reader corrections are integrated at `5f1faf8b`. The
+45-test focused run passed with no skips on source base `704ff6a4` plus the exact
+candidate files later committed at `5f1faf8b`; it was not a clean-head focused
+run. The canonical full suite then passed on clean exact `5f1faf8b`: 2,379 tests,
+161 skips, zero failures/errors in 520.490 seconds. The current original-prefix
+capture still fails before VS setup or GO at the finite SSS target policy. Its
+full retained outcome and the precise next boundary are recorded below; the
+successful 8f functional and ordinary Results producers remain bound to their
+original identities and prove no new setup/RNG agreement.
+
 The diagnostic-only Stadium profile and profile-to-`DatNativeMapContract`
 adapter compile in the C1 trace target. Focused profile and borrowed-yakumono
 controls passed. The prototype parser accepts only the explicitly scoped,
@@ -828,17 +838,40 @@ correction must accept absent scene observation only before that entry while
 retaining the complete original PAD contract and rejecting premature owners or
 match boundaries. Post-CSS scene and owner requirements remain strict.
 
-The source-only next step reuses the authored distinction between normal
-indices 0–29 with a table-row kind and Random index 30 without one, in a
-Stadium-only receiver/validator correction. Random must remain navigation only;
-confirmation still requires exact Stadium index 18/kind 3 and consumed PAD plus
-neutral release. Focused retained-prefix and negative controls precede any new
-capture. The three test-only harness repairs are integrated at `ee159395`;
-34 candidate focused tests pass with one optional skip, the
-canonical focused run passes 34 tests with one skip (3.697 seconds), and the full suite on exact `ee159395` passes 2,374 tests in 520.540 seconds
-with 161 skips and zero failures/errors. Its result/log and exact test identity
-are bound in the existing receipt. The failed `1f146dde` suite remains retained;
-the reader correction is still unintegrated and unrun. No C3 or merge claim follows.
+At the `ee159395` checkpoint, the source-only proposal was to reuse the
+authored distinction between normal indices 0–29 with a table-row kind and
+Random index 30 without one, while retaining exact Stadium index 18/kind 3 and
+consumed PAD plus neutral release for confirmation. The 34-test candidate and
+canonical focused runs and 2,374-test suite recorded there remain historical;
+the `1f146dde` failure remains retained. The reader correction was not yet
+integrated at that checkpoint; the later `5f1faf8b` result follows.
+
+The 45 focused controls pass with no skips on source base `704ff6a4` plus the
+exact candidate files later committed at `5f1faf8b`; the result is not a clean
+exact-5f focused run. Separately, the canonical full suite passes on clean exact
+`5f1faf8b` with 2,379 tests, 161 skips and zero failures/errors in 520.490
+seconds. The actual original-prefix attempt uses the same `1f146dde` native
+source, recipe and caps. It stops before VS setup or GO: across 113 SSS polls
+and 77 SSS PAD-consume records (distinct boundary counts), selected rows move
+from Random index 30/no kind to 17/kind 24, 15/kind 18, and 13/kind 15. All
+declared movement pulses and releases were consumed (right70: 16, up70: 9,
+left70: 15, down70: 16, neutral: 21), but exact index 18/kind 3 is never
+observed and no Stadium confirmation occurs. The MWRO/MWRI streams remain
+incomplete. All 123 immutable input hashes match, and owned PIDs 65289 and
+65291 are absent. The unchanged-driver offline replay independently reproduces
+the retained refusal at sequence 1989 with 11 actions and final index 13/kind
+15 stable for 33 polls; this is parser/driver replay evidence, not proof of
+input effects or current game GO. The portable receipt binds
+`root-original-stadium-go-failure-5f1faf8b-v4.json`,
+`sol-original-stadium-sss-navigation-reduction-review-v4.json`, the full-suite
+result, and the canonical replay result/stdout.
+
+The retained stream does not observe the live cursor position or target-row
+world geometry, so it cannot explain the missed hit or justify changing pulses.
+The reviewed next step is a narrowly bounded, read-only source geometry
+observation using proven original DOL anchors before any further capture.
+Original setup/per-owner RNG comparison and C3 remain open; ordinary public
+Stadium admission remains closed. No C3 or merge claim follows.
 
 The `a29f8d69` full suite passed 2,350 tests with 171 skips and zero failures.
 This remains the historical production baseline. The later exact `ee159395`
@@ -956,10 +989,13 @@ under their historical producer identities.
 This passes two functional source lifetimes only. Timer/transform state,
 screen/title/SIS, stock-out/standings and original setup/per-owner RNG comparison
 remain unobserved or unpaired. No draw/PCM equivalence, browser, physical-input,
-audible-output, timing or C3 acceptance follows. The next bounded source work is
-both retained reader gaps (pre-CSS absent scene and SSS Random navigation),
-with focused strict-negative controls before a changed capture. The existing
-full-suite PASS applies to `ee159395`, not that future correction. Ordinary public Stadium admission remains closed.
+audible-output, timing or C3 acceptance follows. Both retained reader contracts
+are integrated on `5f1faf8b`, with 45 focused controls and a passing 2,379-test
+full suite. The original-prefix run still stops at finite SSS navigation before
+VS/GO; the next bounded source work is read-only cursor/target geometry
+observation using proven original DOL anchors before any changed capture. The
+full retained evidence is recorded above. Ordinary public Stadium admission
+remains closed.
 
 The ordinary Results regression was also repeated on the exact `8f785fe5`
 ordinary Release producer with Stadium diagnostics off. It passed both original
