@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
+from unittest.mock import patch
 from pathlib import Path
 import struct
 import sys
@@ -12,7 +14,8 @@ import subprocess
 from owned_test_workspace import OwnedWorkspaceTests
 
 ROOT = Path(__file__).parents[1]
-sys.path[:0] = [str(ROOT / "tools"), str(ROOT / "reference-capture" / "dolphin")]
+sys.path[:0] = [str(ROOT / "tools"), str(ROOT / "reference-capture" / "dolphin"),
+                str(ROOT / "scripts")]
 
 import reference_observer_stream as observer_stream
 from stadium_go_prefix import (  # noqa: E402
@@ -20,6 +23,13 @@ from stadium_go_prefix import (  # noqa: E402
     EXPECTED_SETUP_RECEIPT_SHA256,
     StadiumGoPrefixError,
     validate_stadium_go_prefix,
+)
+from sd_reference_diagnostic import SdDiagnosticError, require  # noqa: E402
+from retail_input_plan import NEUTRAL_PAD  # noqa: E402
+from sd_original_menu_plan import (  # noqa: E402
+    matches,
+    stadium_go_prefix_packet,
+    validate_packet,
 )
 
 
@@ -356,6 +366,220 @@ class StadiumGoPrefixTests(unittest.TestCase):
         with self.assertRaises(StadiumGoPrefixError):
             self._validate(data, status)
 
+
+
+def _load_stadium_receiver_class():
+    """Execute exact receiver/decoder methods without unrelated CLI imports."""
+    import ast
+    import types
+    source_path = ROOT / "scripts/capture_sd_reference_prefix.py"
+    tree = ast.parse(source_path.read_text(encoding="utf-8"), filename=str(source_path))
+    selected = [node for node in tree.body
+                if isinstance(node, ast.FunctionDef) and node.name == "_transform_slices"
+                or isinstance(node, ast.ClassDef) and node.name in (
+                    "SheikTransformPrefixReceiver", "StadiumGoPrefixReceiver")]
+    names = {node.name for node in selected}
+    if names != {"_transform_slices", "SheikTransformPrefixReceiver", "StadiumGoPrefixReceiver"}:
+        raise AssertionError("production Stadium receiver extraction is incomplete")
+    module = ast.Module(body=[ast.ImportFrom(module="__future__", names=[
+        ast.alias(name="annotations")], level=0), *selected], type_ignores=[])
+    ast.fix_missing_locations(module)
+    namespace = {"__name__": "stadium_items_lock_receiver_control",
+                 "SdDiagnosticError": SdDiagnosticError,
+                 "require": require, "NEUTRAL_PAD": NEUTRAL_PAD}
+    exec(compile(module, str(source_path), "exec"), namespace)
+
+    # The receiver's inherited PADPoll path imports this pure source classifier.
+    # Extract its exact helper bodies rather than importing the unrelated
+    # transform validator and its whole-session dependencies.
+    helper_path = ROOT / "tools/sheik_transform_prefix.py"
+    helper_tree = ast.parse(helper_path.read_text(encoding="utf-8"), filename=str(helper_path))
+    helper_defs = {"TransformPrefixError", "_require", "_raw_slice", "_menu_owner_pad_poll"}
+    helper_constants = {"SCENE_KIND_TAG", "SCENE_ROUTING_TAG", "MENU_CSS_LIVE_STATE_TAG",
+                        "MENU_CSS_DOORS_TAG", "CSS_LIVE_STATE_SIZE", "CSS_DOORS_ADDRESS",
+                        "MEM1_BASE", "MEM1_END"}
+    helpers = []
+    for node in helper_tree.body:
+        if isinstance(node, ast.ClassDef) and node.name in helper_defs:
+            helpers.append(node)
+        elif isinstance(node, ast.FunctionDef) and node.name in helper_defs:
+            helpers.append(node)
+        elif isinstance(node, ast.Assign) and any(
+                isinstance(target, ast.Name) and target.id in helper_constants
+                for target in node.targets):
+            helpers.append(node)
+    found = {node.name for node in helpers if isinstance(node, (ast.ClassDef, ast.FunctionDef))}
+    found_constants = {target.id for node in helpers if isinstance(node, ast.Assign)
+                       for target in node.targets if isinstance(target, ast.Name)}
+    if found != helper_defs or not helper_constants <= found_constants:
+        raise AssertionError("production MenuOwnerPadPoll helper extraction is incomplete")
+    helper_module = ast.Module(body=[ast.ImportFrom(module="__future__", names=[
+        ast.alias(name="annotations")], level=0), *helpers], type_ignores=[])
+    ast.fix_missing_locations(helper_module)
+    helper_namespace = {"__name__": "stadium_items_lock_menu_helper_control"}
+    exec(compile(helper_module, str(helper_path), "exec"), helper_namespace)
+    helper_module_obj = types.ModuleType("sheik_transform_prefix")
+    helper_module_obj._menu_owner_pad_poll = helper_namespace["_menu_owner_pad_poll"]
+    return namespace["StadiumGoPrefixReceiver"], helper_module_obj
+
+
+@contextmanager
+def _stadium_receiver(packet):
+    receiver_type, helper_module = _load_stadium_receiver_class()
+    # The extracted class needs the real helper bodies only during this control;
+    # restore any preexisting module so this test cannot poison other imports.
+    with patch.dict(sys.modules, {"sheik_transform_prefix": helper_module}):
+        yield receiver_type(packet)
+
+
+class StadiumItemsLockGuardTests(unittest.TestCase):
+    @staticmethod
+    def _slice(tag: int, size: int, data: bytes, address: int) -> dict:
+        return {"name": observer_stream.SLICE_NAMES[tag], "tag": tag,
+                "flags": 0, "address": address, "size": size,
+                "hex": data.hex()}
+
+    def _poll(self, receiver, *, lock=None, kind=16, row=0, value=1,
+              lock_address=0x804D6BEC, duplicate=False):
+        flow = bytearray(0x18)
+        flow[0] = kind
+        flow[2:4] = row.to_bytes(2, "big")
+        flow[4] = value
+        flow[0x11] = 1
+        fields = [
+            self._slice(40, 1, b"\x01", 0x804A04C0),
+            self._slice(45, 0x18, bytes(flow), 0x804A04F0),
+            self._slice(46, 8, bytes(8), 0x804D6BC8),
+        ]
+        if lock is not None:
+            lock_field = self._slice(56, 1, bytes((lock,)), lock_address)
+            fields.append(lock_field)
+            if duplicate:
+                fields.append(dict(lock_field))
+        receiver._pad_poll({"seq": 0, "payload": {"slices": fields}})
+
+    def test_stadium_one_up_waits_for_observed_items_lock_zero(self):
+        packet = stadium_go_prefix_packet()
+        validate_packet(packet)
+        self.assertEqual(packet["version"], 11)
+        action = next(action for action in packet["actions"]
+                      if action["label"] == "items-frequency-row")
+        self.assertEqual(action["p1"], "0008000000000000000000")
+        self.assertEqual(action["before"]["items_locked"], 0)
+        self.assertEqual(action["after"]["items_locked"], 0)
+
+        for lock, expected_ready in ((1, False), (0, True)):
+            with _stadium_receiver(packet) as receiver:
+                self._poll(receiver, lock=lock)
+                self.assertEqual(receiver.latest_menu["items_locked"], lock)
+                self.assertEqual(matches(receiver.latest_menu, action["before"]), expected_ready)
+
+        self.assertEqual(action["after"]["row"], 31)
+        self.assertEqual(action["after"]["value"], 3)
+        for lock, expected_ready in ((1, False), (0, True)):
+            with _stadium_receiver(packet) as receiver:
+                self._poll(receiver, lock=lock, row=31, value=3)
+                self.assertEqual(receiver.latest_menu["items_locked"], lock)
+                self.assertEqual(matches(receiver.latest_menu, action["after"]), expected_ready)
+
+    def test_stadium_items_lock_owner_is_required_and_exact(self):
+        packet = stadium_go_prefix_packet()
+        cases = [
+            ({}, "Items lock owner is missing or unexpected"),
+            ({"lock": 0, "lock_address": 0x804D6BED}, "Items lock address/size/value differs"),
+            ({"lock": 2}, "Items lock address/size/value differs"),
+            ({"lock": 0, "duplicate": True}, "duplicate source slice"),
+        ]
+        for kwargs, message in cases:
+            with self.subTest(kwargs=kwargs), _stadium_receiver(packet) as receiver:
+                with self.assertRaisesRegex(SdDiagnosticError, message):
+                    self._poll(receiver, **kwargs)
+
+        with _stadium_receiver(packet) as receiver:
+            with self.assertRaisesRegex(SdDiagnosticError, "missing or unexpected"):
+                self._poll(receiver, lock=0, kind=13)
+
+
+class StadiumItemsLockSliceControl(OwnedWorkspaceTests):
+    @classmethod
+    def setUpClass(cls):
+        cls.compiler = shutil.which("clang++") or shutil.which("g++")
+        if cls.compiler is None:
+            raise unittest.SkipTest("A native C++ compiler is not installed")
+        cls.scratch = cls.new_workspace(ROOT, "stadium-items-lock-slice-")
+
+    def test_stadium_observer_emits_existing_checked_lock_slice_only_for_items(self):
+        observer = ROOT / "reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp"
+        source = observer.read_text()
+        marker = "    if (scene_kind == 1 && (Env(\"MWRC_SD_MENU_PROBE\")"
+        begin = source.index(marker)
+        end = source.index("    // Source menu globals survive arena teardown", begin)
+        gate = source[begin:end]
+        harness = r'''#include <array>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <string>
+namespace Core { struct System {}; }
+using u8 = uint8_t; using u16 = uint16_t; using u32 = uint32_t;
+enum class SliceTag { SdItemsLock = 56 };
+struct Probe {
+  Core::System system;
+  bool stadium_go_prefix_enabled = false;
+  bool read_bytes_ok = true, read_words_ok = true, add_ok = true;
+  u8 menu_kind = 16;
+  int byte_reads = 0, word_reads = 0, adds = 0;
+  SliceTag added_tag{}; u32 added_address = 0; size_t added_size = 0; u16 added_flags = 0;
+  std::string Env(const char*) { return {}; }
+  bool OrdinaryTimeoutRequested() { return false; }
+  bool SparsePairRequested() { return false; }
+  bool ReadBytes(Core::System*, u32 address, size_t size, u8* out) {
+    ++byte_reads;
+    if (!read_bytes_ok || address != 0x804a04f0 || size != 1) return false;
+    *out = menu_kind; return true;
+  }
+  bool ReadU32(Core::System*, u32 address, u32* out) {
+    static constexpr std::array<u32, 3> words{0x880db54c, 0x28000000, 0x40820180};
+    ++word_reads;
+    if (!read_words_ok || address < 0x80233ec0 || address > 0x80233ec8 ||
+        ((address - 0x80233ec0) & 3) != 0) return false;
+    *out = words[(address - 0x80233ec0) / 4]; return true;
+  }
+  bool AddSlice(Core::System*, SliceTag tag, u32 address, size_t size, u16 flags = 0) {
+    ++adds; added_tag = tag; added_address = address; added_size = size; added_flags = flags;
+    return add_ok;
+  }
+  bool Apply(u8 scene_kind) {
+    Core::System* system_pointer = &system;
+    Core::System* system = system_pointer;
+''' + gate + r'''
+    return true;
+  }
+};
+int main() {
+  Probe disabled; assert(disabled.Apply(1));
+  assert(disabled.byte_reads == 0 && disabled.word_reads == 0 && disabled.adds == 0);
+  Probe active; active.stadium_go_prefix_enabled = true; assert(active.Apply(1));
+  assert(active.byte_reads == 1 && active.word_reads == 3 && active.adds == 1);
+  assert(active.added_tag == SliceTag::SdItemsLock && active.added_address == 0x804d6bec &&
+         active.added_size == 1 && active.added_flags == 0);
+  Probe other_scene; other_scene.stadium_go_prefix_enabled = true; assert(other_scene.Apply(8));
+  assert(other_scene.byte_reads == 0 && other_scene.adds == 0);
+  Probe other_menu; other_menu.stadium_go_prefix_enabled = true; other_menu.menu_kind = 13;
+  assert(other_menu.Apply(1)); assert(other_menu.byte_reads == 1 && other_menu.word_reads == 0 && other_menu.adds == 0);
+  Probe bad_code; bad_code.stadium_go_prefix_enabled = true; bad_code.read_words_ok = false;
+  assert(!bad_code.Apply(1) && bad_code.adds == 0);
+  Probe add_failure; add_failure.stadium_go_prefix_enabled = true; add_failure.add_ok = false;
+  assert(!add_failure.Apply(1) && add_failure.adds == 1);
+}
+'''
+        source_path = self.scratch / "items_lock_gate.cpp"
+        executable = self.scratch / "items_lock_gate"
+        source_path.write_text(harness, encoding="utf-8")
+        subprocess.run([self.compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror",
+                        str(source_path), "-o", str(executable)],
+                       check=True, text=True, capture_output=True)
+        subprocess.run([str(executable)], check=True, text=True, capture_output=True)
 
 
 class StadiumBootGateControl(OwnedWorkspaceTests):

@@ -275,6 +275,15 @@ def stadium_go_prefix_packet():
         "max_pad_consume_wait_polls": 60,
         "max_vs_transition_polls": 600,
     }
+    # The original Items directional handler returns while its source lock is
+    # nonzero. Guard the existing single Up pulse on that exact byte; this does
+    # not alter the finite input alphabet or infer readiness from MenuFlow.
+    items_row = [action for action in value["actions"]
+                 if action["label"] == "items-frequency-row"]
+    if len(items_row) != 1:
+        raise ValueError("Stadium packet lost its single Items frequency-row action")
+    items_row[0]["before"]["items_locked"] = 0
+    items_row[0]["after"]["items_locked"] = 0
     value["stop"] = (
         "live SSS index 18/kind 3, consumed neutral and two stable target polls, "
         "consumed A and neutral release, then validated original Stadium GO prefix")

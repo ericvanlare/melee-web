@@ -2635,7 +2635,8 @@ struct Observer::Impl
       return false;
     if (scene_kind == 1 && (Env("MWRC_SD_MENU_PROBE") == "items_row" ||
                             Env("MWRC_SD_MENU_PROBE") == "sd_prefix" ||
-                            Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()))
+                            Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested() ||
+                            stadium_go_prefix_enabled))
     {
       u8 menu_kind = 0;
       if (!ReadBytes(system, 0x804a04f0, 1, &menu_kind))

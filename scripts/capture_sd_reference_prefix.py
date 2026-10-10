@@ -510,6 +510,10 @@ class StadiumGoPrefixReceiver(SheikTransformPrefixReceiver):
 
     def _pad_poll(self, row):
         super()._pad_poll(row)
+        if self.latest_menu is not None:
+            from sd_reference_diagnostic import items_lock_state
+            data, _ = _transform_slices(row["payload"])
+            self.latest_menu = items_lock_state(data, row["payload"], self.latest_menu)
         if (self.latest_menu or {}).get("scene") != 9 or self.stage is None:
             self.target_neutral_polls = 0
             return
