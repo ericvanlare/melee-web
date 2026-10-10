@@ -318,8 +318,107 @@
     "no_machine_specific_path_required": true
   },
   "subsequent_c3_component_2026_10_09": {
-    "claim_boundary": "Native 9e agrees at first CSS return704\u2192833 and one captured input834\u2192835 on the observed scalar fields, with explicit original frame 0/native post-tick frame 1 phases. No draw, SSS/history, VS Setup/GO native comparison, per-owner RNG ledger, full match or C3 acceptance. Earlier original7d/native8f/6e evidence keeps its exact source identities. Ordinary public Stadium admission remains closed.",
-    "current_result": "Exactly one native host update on clean 9e passes semantic PAD 822, seed 312151c3, scene 8 and four source routing getters; live owner identities remain stable. Checked teardown and Session cleanup pass; both owned processes naturally exit0 and are absent; 157 bindings unchanged. Current-head fullsuite passes 2413 tests/163 skips with zero failures/errors. See first_css_consumed_tick_9e4b0bb6_v1 for exact producer, input, expected state, reviews and retained6dd compile failure/correction; earlier evidence objects remain unchanged.",
+    "claim_boundary": "The original 7d capture and 8f functional-lifetime scopes remain unchanged. On clean 8cc72c16, the reviewed scoped-import arm correction and headless browser diagnostic pass one first-CSS return, one consumed input/tick and one actual source draw through the first CSS draw. This is a bounded original/browser comparison; it establishes no later CSS stream, SSS/history, original/native VS Setup or GO comparison, per-owner RNG ledger, full match or C3 acceptance. Ordinary public Stadium admission remains closed.",
+    "current_result": "The 8cc72c16 first-CSS browser diagnostic passes one full typed return, one consumed input/tick and one actual draw against the admitted original fields; the independent review verifies the compare and cleanup. The source-reviewed scoped-import correction, 31 focused controls, Node check, affected diagnostic/ordinary Release builds and clean 8cc72c16 full suite pass. The earlier 4d arm refusal and 8cc v3 prelaunch contract failure are retained as preparation history; the v4 source-extracted prelaunch contract control passes. See first_css_browser_draw_8cc72c16_v4 for the exact receipts and raw-only next-step reference. Earlier evidence objects are unchanged.",
+    "first_css_browser_draw_4d6c0b37_d949a0b8_v1": {
+      "status": "FAIL_BEFORE_ARM; NO_BROWSER_CSS_COMPARISON; NO_TICK; NO_DRAW",
+      "scope": "One headless browser attempt with the existing captured first-CSS context and one consumed sample. The diagnostic did not arm; this is not a source draw or Stadium/C3 acceptance result.",
+      "producer": {
+        "source_revision": "4d6c0b37632e224f7d8e66f4b875132a9731a20c",
+        "source_tree": "606151b86d0b06853a138ff31a8d4951330f9838",
+        "builds": [
+          {
+            "name": "diagnostic-runtime",
+            "artifact": "first-css-browser-builds-4d6c0b37-v2/diagnostic-runtime/result.json",
+            "sha256": "fac20c99bc9f706244a38ad5176b8de7a4632bfea1f38f11fb79594166710850"
+          },
+          {
+            "name": "diagnostic-native-trace",
+            "artifact": "first-css-browser-builds-4d6c0b37-v2/diagnostic-native/result.json",
+            "sha256": "18a6a1bf6fe386c1ec2e5e239ef09eaa1544415bbf0705a0fc2db483f009cc35"
+          },
+          {
+            "name": "ordinary-runtime",
+            "artifact": "first-css-browser-builds-4d6c0b37-v2/ordinary-runtime/result.json",
+            "sha256": "d95b80681761a4fa2521419afe5d8d7d2c2bc0916f64deec19fe3b7c8d44f538"
+          }
+        ],
+        "earlier_compile_failure": {
+          "source_revision": "c0a063b1c1f99a32ed64d4c097d824b5ddb20bd1",
+          "artifact": "first-css-browser-builds-c0a063b1-v1/diagnostic-runtime/result.json",
+          "result_sha256": "5bf19b1ddca815f494a5156e0fb6536aa819dff80f31ec1c61cb686ec89c4f74",
+          "log_sha256": "c665f95b1c428c16bf17d802d6c5dc989572e3e43d2006e69511c5b8e13e3d3a",
+          "failure": "check(int,const char*) rejected a std::string argument in the diagnostic error path"
+        },
+        "compile_repair": {
+          "artifact": "first-css-browser-compile-repair-v1/result.json",
+          "sha256": "14dc2ec6b221a7a222e8294e9f51b4a50ca976fc7ebaf0a5375ecc818d8c65b8",
+          "patch_sha256": "dab43b3bc37e039b3b9b9f2019e3a1f9476088a43cba7f12cb7a425a5d42b3ff",
+          "change": "one-line .c_str() passed to the existing synchronous check API"
+        }
+      },
+      "harness": {
+        "source_revision": "d949a0b82241ad57690c3200f35294b5a0d0663c",
+        "source_tree": "ea0edc9e2e6f6a3f509dcaaef6e4f87caf20ee7e",
+        "delta_from_producer": [
+          "tests/stadium_c1a_browser_test.mjs"
+        ],
+        "artifact_inventory_count": 40,
+        "artifact_inventory_sha256": "959be465807737f4b6856892321289d8ce0f3a2f86193318d5bdea8b120a727f",
+        "inventory_result": "first-css-browser-inventory-repair-v1/result.json",
+        "inventory_result_sha256": "8ce824f7d46700c9c1ed3098cb54c1c4185a356409095035dc9a927028429449"
+      },
+      "native_shared_helper_control": {
+        "result": "first-css-native-4d-control-v1/result.json",
+        "result_sha256": "9e2de617588fca923bbc3b831df8090e4734e096237a4f46635321aef1fef897",
+        "test_log_sha256": "0dabe63dc66fc17f96b800989e3374ab8977f96b501d73414ae94d8f4139e849",
+        "independent_review": "sol-first-css-native-shared-helper-result-review-v1.json",
+        "independent_review_sha256": "d395c3055960286e8a94df3dc1480e9feba59b14e84aff04ce1252e0be53624c",
+        "verified_unchanged_bindings": 172,
+        "scope": "Full typed first-CSS return and one captured consumed input; no source draw."
+      },
+      "full_suite": {
+        "result": "full-regression-d949a0b8-v1/result.json",
+        "result_sha256": "360be8c8f7dd95571f34888ecc32497d24ee6e7c162c1cd043876cbdac711d78",
+        "suite_log_sha256": "af4f205ce66affc7f4052c79151555201fa1b5d10f8259b429e07a51fc750300",
+        "summary": "2415 tests; 163 skips; 510.700 seconds; zero failures/errors",
+        "source_revision": "d949a0b82241ad57690c3200f35294b5a0d0663c"
+      },
+      "browser_attempt": {
+        "result": "first-css-browser-preflight-4d6c0b37-v2/result.json",
+        "result_sha256": "6552ca596645fce3d058a173ba8417858ac200e475559ef0ac40b4209d9d10d1",
+        "browser_report": "first-css-browser-preflight-4d6c0b37-v2/browser-run/report.json",
+        "browser_report_sha256": "5a32bac8a03f3930a95cbd6a926f708bfd24ac3fb3880ebf942b72e992ef459d",
+        "source_revision": "d949a0b82241ad57690c3200f35294b5a0d0663c",
+        "first_failure": "First-CSS draw arm requires one prepared, unentered original VS host",
+        "observed": {
+          "armed_before_css_entry": false,
+          "raw_pad_stage_drive_frames": 0,
+          "original_css_phase": null,
+          "original_sss_phase": null,
+          "source_selection": null,
+          "native_observation": null,
+          "final_phase": null,
+          "final_running": null
+        },
+        "cleanup": {
+          "unload_completed": true,
+          "browser_and_server_closed": true,
+          "reported_failures": []
+        },
+        "retained_failure_screenshot": {
+          "artifact": "first-css-browser-preflight-4d6c0b37-v2/browser-run/failure-state.png",
+          "sha256": "0585e9d5e4be9b076efcac63e7e2126360a9fa298863035709af1dbbf65f6003"
+        }
+      },
+      "source_reduction": {
+        "classification": "SOURCE_REVIEW; not an observation from the failed browser report",
+        "reference": "src/gameplay_menu_browser.cpp:2458-2465",
+        "finding": "The private draw-arm predicate requires scoped_assets == false, while the source-prepared VS host retains scoped_assets and scoped_disc_import ownership. This conflicts with the source-complete prepared-host boundary required by the arm.",
+        "proposed_next_step": "Review a diagnostic-only owner-predicate correction that requires the existing scoped asset/disc-import owners and retains all other arm checks; add a pre-arm native-memory receipt/assertion. Not integrated, rebuilt or rerun."
+      },
+      "claim_limit": "No browser first-CSS state comparison, tick, draw, pixels, PCM, full-session result or C3 acceptance is established."
+    },
     "prior_v26": {
       "source_commit": "b8c272c44a94bcb03f0371008851e468200d4496",
       "first_failure": "heap_free_bytes",
@@ -487,7 +586,7 @@
         "SDK unittest moduleimport failure beforeNode; fixedexplicit scriptsimport and retainedoutput"
       ]
     },
-    "next_progression": "Propose exactly one real source draw matching original836\u2192837 through the existing headless browser renderer, using the same proven input-only context and one consumed sample; stop before any second tick or draw. Compare only fields present in the original rows and retain GPU diagnostics/checked cleanup. No partial stream admitted as a whole-session recipe. First-draw runtime remains unrun; SSS/history, VS/GO, per-owner RNG and C3 remain pending.",
+    "next_progression": "Use the retained original-only post-draw timeline as preparation for a separately reviewed, bounded CSS-stream comparison: start with the 839\u2192840\u2192841/842 chain, cap at 148 additional consumed-tick/draw batches, and stop at the first mismatch or transition result 3 before draw, pending-input advancement or rebuild. The raw packet is not a port comparison and 148 is not a required completion. Keep DrawReturn 1577 unpaired if the stop boundary is reached; do not infer the source-tick reset cause. Do not continue into SSS or broaden C3 claims.",
     "first_css_context_return_1fad54ff_v1": {
       "source_head": "1fad54ff964f80b263b91a77cf25a25b0ee08603",
       "source_tree": "adfff70b0f357d4c66bd89f1f1c3a30c9202b2a9",
@@ -1446,9 +1545,9 @@
         "sixth_ready_bound_files": 531,
         "deferred_control_owned_pid_absent": 19570
       },
-      "remaining": "Native 9e first CSS return and one captured input 834\u2192835 now agree on their observed scalar fields; first source draw 836\u2192837 remains unrun. Compare that next through the existing headless browser renderer, with exact phase and owner guards and no second tick/draw. Full setup/per-owner RNG ledger, screen/title/SIS, stock-out/standings and C3 checks remain outstanding. Earlier 6e zero-tick return and 8f functional lifetimes retain their scoped identities; prior 1fad runtime and 6dd compile failures remain preserved.",
+      "remaining": "The scoped browser diagnostic now matches the captured original CSS-return state, one consumed input/tick and one actual first CSS draw. The next proposed experiment is a separately reviewed bounded CSS stream using only the retained raw timeline as preparation; it must stop at the first mismatch or native transition result 3 before any no-op draw, pending-input advancement or rebuild. A later CSS comparison, SSS/history, full setup/per-owner RNG, VS Setup/GO, full match, stock-out/standings and C3 gates remain outstanding. The earlier 6e/8f and 7d evidence retain their scoped identities.",
       "c3_original_ledger_requirement": "Reuse existing RNG draw observer; C3 notes604-608 require per-tick/per-owner original comparison, separately from broader C8 transformation comparison.",
-      "claim_boundary": "The separate `8f785fe5` producer retains two sequential 3,500-post-GO functional lifetimes and the ordinary Results regression within their recorded scopes. The original v6 capture on `7d406f63` passes the bounded CSS\u2192SSS\u2192selected Stadium\u2192VS Setup\u2192GO prefix, with C=84, F=85 and natural DrawReturn; its independent raw review extracted original-only phase-tagged setup/RNG observations. The first-CSS typed return comparison now passes on native source `6e46d57c`, at original sequences 704\u2192833. This establishes only the captured first-CSS context; no SSS/history, VS Setup/GO setup, per-owner RNG ledger, full match, gameplay or C3 acceptance is established. Browser, physical-input, audible-output, timing and other C3 gates remain open; ordinary public Stadium admission remains closed.",
+      "claim_boundary": "The separate 8f785fe5 producer retains two sequential 3,500-post-GO functional lifetimes and the ordinary Results regression within their recorded scopes. The original v6 capture on 7d406f63 passes the bounded CSS\u2192SSS\u2192selected Stadium\u2192VS Setup\u2192GO prefix, with C=84, F=85 and natural DrawReturn; its independent raw review extracted original-only phase-tagged setup/RNG observations. The first-CSS typed return, one consumed input/tick and one browser source draw now match their admitted original fields on the reviewed 8cc72c16 producer. This establishes only the first-CSS browser boundary; no later CSS stream, SSS/history, VS Setup/GO setup, per-owner RNG ledger, full match, gameplay or C3 acceptance is established. Physical-input, audible-output, live-timing and foreground gates remain open; ordinary public Stadium admission remains closed.",
       "pad_input_reducer": {
         "caller_source": "8e087161fcc5a62f6f82cb333a812d0f4eff448f",
         "phase_correction_source": "e2ff861b3f290714d4c6aaa1a19158d4e7f8e59a",
@@ -4086,6 +4185,106 @@
         "No posttick CSS/KO original observation; raw pending-mode and next-state bytes are preserved but not compared.",
         "No pixel/PCM/live input/foreground timing claim or public Stadium admission."
       ]
+    },
+    "first_css_browser_draw_8cc72c16_v4": {
+      "status": "PASS_SCOPED_FIRST_CSS_BROWSER_RETURN_TICK_DRAW",
+      "scope": "One original first-CSS return, one consumed input/tick and one actual browser source draw. No later CSS stream, second tick/draw, SSS/history, native VS Setup/GO, per-owner RNG, full match or C3 acceptance.",
+      "source": {
+        "revision": "8cc72c1662035d33a4cc3814376e6a0f03697ab7",
+        "tree": "9fc52a2d6c9317ce8a2d69cc0323d2ce3c3956a4",
+        "source_correction": "The diagnostic arm accepts the source-prepared host with its scoped-assets and scoped-disc-import owners while preserving the remaining exact ownership checks; original menu behavior and state arithmetic are unchanged.",
+        "independent_source_review": {
+          "artifact": "sol-first-css-browser-scoped-import-repair-review-v1.json",
+          "sha256": "b65ed3ad3f78731157f4e72d925f611d95c44c66c251537110d2187fb4a8bf4a"
+        }
+      },
+      "focused_controls": {
+        "artifact": "first-css-browser-scoped-import-repair-v1/focused-result.json",
+        "sha256": "ed5e7c4b3b443cf3354e6f0bc3e2b59546bf6ec7624670a6aa295d14cbdc05f0",
+        "tests": 31,
+        "result": "PASS; Node check also passed.",
+        "initial_invocation_error": {
+          "artifact": "first-css-browser-scoped-import-repair-v1/initial-focused-invocation-error.json",
+          "sha256": "5d652c42be742873d853d0cd5f119de366df1010edd26cbdfca64a7bc1a7ef12",
+          "cause": "The first command omitted PYTHONPATH=tests:tools and could not import owned_test_workspace; the corrected focused command passed."
+        }
+      },
+      "builds": [
+        {
+          "name": "diagnostic-runtime",
+          "artifact": "first-css-browser-builds-8cc72c16-v1/diagnostic-runtime/result.json",
+          "sha256": "f8da62b13c6acf726fec62f99e30a841e38df01667134923a65048fe065f35f0",
+          "exit_code": 0
+        },
+        {
+          "name": "ordinary-runtime",
+          "artifact": "first-css-browser-builds-8cc72c16-v1/ordinary-runtime/result.json",
+          "sha256": "81a6ccd0e6df835c4471838f7741f8e94013427897582d4fd6ead1ff71898aae",
+          "exit_code": 0
+        }
+      ],
+      "prelaunch_corrections": {
+        "v3_packet_shape_failure": {
+          "artifact": "first-css-browser-preflight-8cc72c16-v3/result.json",
+          "sha256": "cbb0866bb7f19ec171a82f4483c9edafb4218e07800e271c3f112d34c3d34845",
+          "failure": "The packet included owner-only overallTimeoutMs and cleanupReserveMs keys in the runner limits object; the exact runner assertion rejected it before server or Chrome launch. This was a preparation failure, not a browser experiment."
+        },
+        "v4_actual_contract_control": {
+          "artifact": "first-css-browser-preflight-8cc72c16-v4/contract-result.json",
+          "sha256": "1ea4ef73e21c301ff096bc93cf495da07c6831c58546ad23b34f9c7c1cc52d5f",
+          "result": "PASS using exact source-extracted runner assertions; the corrected packet passes and the retained v3 extra keys are rejected. The control starts no server, browser or guest code."
+        }
+      },
+      "browser_attempt": {
+        "preflight": {
+          "artifact": "first-css-browser-preflight-8cc72c16-v4/preflight.json",
+          "sha256": "e9981947f30f55f7eca613ee8332c93bf4d6cc46ca79fcab4f81304200c66c86"
+        },
+        "result": {
+          "artifact": "first-css-browser-preflight-8cc72c16-v4/result.json",
+          "sha256": "e46cf80fd90896e1d7e9a2f61dd2bfae9f5e5113f725b294afbeb8c3c16c1775"
+        },
+        "report": {
+          "artifact": "first-css-browser-preflight-8cc72c16-v4/browser-run/report.json",
+          "sha256": "8bd65f0c2caf73b2274d2db8d1f43c162cc6f392ca01b4a1dd10f78ba04c25f6"
+        },
+        "independent_result_review": {
+          "artifact": "sol-first-css-browser-result-review-8cc72c16-v4.json",
+          "sha256": "3543da6eed8d52d30e64e1c726249c9f3bc1c0822eb07f263d904dfe47688c6a"
+        },
+        "verified": {
+          "first_css_return": "Full typed CSS/VS/rules/six-player state, KO counts, live PAD, seed and scene fields match the captured original CSS-return state at original return sequence 833. The actual nine null pointer strings were checked; only explicit ABI padding pad_x5C was excluded.",
+          "consumed_tick": "One consumed PAD sample and SourceTick match the admitted original fields at sequences 834\u2192835; original frame 0 versus native post-host-tick frame 1 remains explicit. Only the four admitted routing getters are compared.",
+          "draw": "Exactly one actual browser source draw matches the admitted original DrawEnter/DrawReturn 836\u2192837 fields, including source tick 1, draw ordinal 0, PAD, seed, scene frame 1, scene kind 8 and the four routing getters.",
+          "counts": "One source tick, one source draw, one host tick and one host draw; no source tick or draw during preparation. Forty local/HTTP artifacts matched before/after/current. All eleven recorded owned PIDs were absent at review.",
+          "cleanup": "Unload cleared the observation and returned to phase 0/running 0; browser and server ownership cleanup passed with no reported failure.",
+          "visual_scope": "The retained screenshot displays the original CSS view and was visually inspected; no pixel comparison was performed."
+        },
+        "limitations": "No second tick/draw, later CSS stream, SSS/history, native VS Setup/GO comparison, per-owner RNG ledger, full match, C3, pixels, PCM, live performance or foreground acceptance."
+      },
+      "full_suite": {
+        "artifact": "full-regression-8cc72c16-v1/result.json",
+        "sha256": "68c404cdc0a258225f0c8de8c2fc4fec0961eb5788193a6071287d2c4a76597b",
+        "log_artifact": "full-regression-8cc72c16-v1/suite.log",
+        "log_sha256": "813b3dddb5ba33ff4a39429b16c3932d66c8fadde5fd62773d7540801b69e48a",
+        "source_revision": "8cc72c1662035d33a4cc3814376e6a0f03697ab7",
+        "exit_code": 0,
+        "tests": 2415,
+        "skipped": 163,
+        "elapsed_seconds": 514.881,
+        "summary": "Clean exact-source full suite; zero failures or errors; wrapper exited naturally and is absent."
+      },
+      "next_step_raw_timeline_only": {
+        "packet": "original-stadium-first-css-postdraw-timeline-v1/packet-v2.json",
+        "packet_sha256": "4158e4689c7e249379b9ec86abf0f376b57e57b26a121ae65da8b357b8819a10",
+        "independent_review": "sol-first-css-postdraw-timeline-review-v2.json",
+        "independent_review_sha256": "dc4c8c165c806723f60210b579426d20e96b86aed6a206bd3ce4633adcb0c0ce",
+        "decision": "PASS_RAW_TIMELINE_WITH_TRANSITION_LIMIT; this is original-only sequencing and not a port comparison or authorization.",
+        "first_following_chain": "PadConsume 839 \u2192 SourceTick 840 \u2192 DrawEnter/DrawReturn 841\u2013842.",
+        "cap": "At most 148 additional consumed-tick/draw batches before first SSS entry; a stopping limit, not a required completion.",
+        "stop_rule": "Stop on first mismatch or native transition result 3 before draw, advance_pending or rebuild. A host_draw success with transition nonzero may be a no-op and is not a source draw.",
+        "preservation": "Keep raw DrawReturn 1577 unpaired if the boundary is reached; do not assign a cause to the source-tick reset."
+      }
     }
   }
 }

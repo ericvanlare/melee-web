@@ -1,44 +1,16 @@
 # Pokémon Stadium diagnostic profile and OnInit boundary
 
-**Compiled / Synthetic controls / Source identified / Native traced / two same-process functional lifetimes passed**
+**Compiled / Synthetic controls / Source identified / Native traced / Retail compared (first-CSS fields) / Browser exercised (first-CSS diagnostic) / two same-process functional lifetimes passed**
 
-**Current boundary:** The reviewed `7d406f63` feedback driver completed one original
-CSS→SSS→selected Stadium→VS Setup→GO prefix. The complete streams contain 2,935
-MWRO records and 4,706 MWRI events; all 155 inputs remained unchanged. The strict
-validator accepted the consumed Stadium confirm/release, GO-containing tick C=84,
-first full post-GO tick F=85, and natural DrawReturn at sequence 2,933; both owned
-processes are absent. The focused native first-CSS context check on exact source
-`6e46d57c` now passes the typed return comparison at original sequences 704→833:
-CSS fields, six KO counters, the 822-byte live PAD state, seed, source scene and
-scene kind matched. The nine pointer fields were checked null; explicit ABI
-padding was excluded, and native/guest pointer numbers were not compared. The run
-observed zero source ticks or draws, then passed checked host/world teardown and
-Session cleanup; its child exited naturally and all 136 bound inputs were unchanged.
-The earlier `1fad54ff` refusal before snapshot remains retained. Its diagnostic
-expected a private KO array; the correction validates the array installed by the
-authored VS routine under the existing source lease, without changing source state.
-The subsequent native check on exact source `9e4b0bb6` also passes one captured
-CSS input: consume 834 → SourceTick 835. The 822-byte semantic PAD state, RNG seed,
-scene kind and four authored routing getters agree; exact scene/world/RNG owners
-remain stable. Original scheduler-return frame 0 and native post-host-tick frame 1
-are explicitly different observation phases. Pending-mode and next-state raw bytes
-have no paired getter; post-tick CSS/KO state is unobserved in the original row.
-The check makes one host-tick call and zero draws, passes checked teardown and
-Session cleanup, and leaves all 157 bindings unchanged. Both owned processes exited
-naturally and are absent. The first `6dd4e7f5` diagnostic compile failed on a C++
-nested type; its retained log and source-only qualification fix remain bound.
-The corrected build passed before this single runtime attempt.
+**Current boundary:** The reviewed `7d406f63` original CSS→SSS→selected Stadium→VS Setup→GO prefix remains unchanged: 2,935 MWRO records, 4,706 MWRI events, 155 inputs, GO tick C=84, first full post-GO tick F=85, and natural DrawReturn at sequence 2,933. The `8f785fe5` two-lifetime 3,500-tick functional run and ordinary Results regression retain their existing scopes.
 
-The clean `9e4b0bb6` full suite passes 2,413 tests with 163 skips and no
-failures/errors. The earlier `6e46d57c` return check and full suite, `7d406f63`
-original feedback capture, and `8f785fe5` two sequential 3,500-post-GO functional
-lifetimes and ordinary Results pass retain their exact producer identities.
-This is a first-CSS scalar prefix comparison. SSS/history, VS/GO setup, per-owner
-RNG, a full match and C3 acceptance remain open; ordinary public Stadium admission
-stays closed. The next prerequisite is exactly one real source draw corresponding
-to original DrawEnter 836 → DrawReturn 837 through the existing headless browser
-renderer, with the available PAD/RNG/scene observations and checked cleanup.
-That draw remains unrun. No pixel, PCM, live timing or foreground gate is established.
+The source-reviewed `8cc72c16` diagnostic arm correction preserves the prepared VS host’s scoped asset and disc-import owners. Its 31 focused controls and Node check pass; the affected diagnostic and ordinary Release builds pass. The clean `8cc72c16` full suite passes 2,415 tests with 163 skips and zero failures or errors. The earlier `4d6c0b37` arm refusal, an initial focused-command import-path error, and the `8cc72c16` v3 prelaunch limit-shape failure remain retained; the source correction, corrected focused run, and exact v4 prelaunch contract control are recorded in the evidence object below.
+
+The headless v4 browser run compares one first-CSS return, one consumed input and one actual source draw. The full typed CSS/VS/rules/six-player state and the associated KO/PAD/seed/scene values match the captured original CSS-return state. The consumed sample and tick match at original sequences 834→835; the single browser source draw matches the admitted original fields at DrawEnter/DrawReturn 836→837. One tick and one draw ran, no source tick or draw occurred during preparation, and browser/owner cleanup passed. The screenshot shows the original CSS view; this is not a pixel comparison.
+
+This does not establish later CSS streaming, SSS/history, original/native VS Setup or GO comparison, a per-owner RNG ledger, a full match, or C3 acceptance. Pixel, PCM, live-timing, physical-input and foreground gates remain open; ordinary public Stadium admission stays closed.
+
+The next bounded comparison is informed by a separate original-only raw timeline. It identifies the first following chain at PadConsume 839→SourceTick 840→DrawEnter/DrawReturn 841–842 and at most 148 additional consumed-tick/draw batches before first SSS entry; 148 is a cap, not a completion target. The packet is not a native comparison. A future stream should stop at the first mismatch or native transition result 3, before draw, pending-input advancement or rebuild; a successful no-op host draw is not a source draw. Preserve raw DrawReturn 1577 unpaired if that boundary is reached, and leave the source-tick reset cause unassigned.
 
 **Earlier checkpoint context:** the separately reviewed native source CSS→SSS setup observation
 on `a29f8d69` records the first-CSS seed and the distinct SSS-selected seed,
