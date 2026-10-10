@@ -318,8 +318,8 @@
     "no_machine_specific_path_required": true
   },
   "subsequent_c3_component_2026_10_09": {
-    "claim_boundary": "The separate `8f785fe5` producer still supports two sequential 3,500-post-GO functional lifetimes and the ordinary Results regression within their recorded scopes. The later exact `7d406f63` feedback capture passes one bounded original CSS→SSS→selected Stadium→VS Setup→GO prefix, with C=84, F=85 and natural DrawReturn; its native observer was built from `91fc1fb9`. The independent raw review verified the raw prefix and extracted phase-tagged original setup/RNG values. No corresponding native setup/RNG owner comparison, full match, gameplay, or C3 acceptance is established. Browser, physical-input, audible-output, timing, and other C3 gates remain open; ordinary public Stadium admission remains closed.",
-    "current_result": "The feedback driver v2 was source-reviewed and integrated at `7d406f63`. Its 67 focused controls passed with no skips on canonical working source after exact candidate application before commit; this is not a clean committed-head focused run. The clean exact `7d406f63` suite passed 2,401 tests with 161 skips, zero failures/errors, in 510.571 seconds. The v6 original capture completed 2,935 valid MWRO records and 4,706 MWRI events; all 155 launch inputs were unchanged. Strict prefix validation records consumed Stadium confirm/release, VS Setup, GO-containing tick C=84, first full tick F=85 and natural DrawReturn sequence 2,933. The native observer/build remains the unchanged `91fc1fb9` producer. The independent raw review passed the raw-prefix result and produced original-only typed VS Entry/VS Setup/GO snapshots; native same-phase setup and RNG owner/seed comparison remains unrun. No full match, original/native setup or RNG equality, or C3 acceptance follows.",
+    "claim_boundary": "The separate `8f785fe5` producer retains two sequential 3,500-post-GO functional lifetimes and the ordinary Results regression within their recorded scopes. The original v6 capture on `7d406f63` passes the bounded CSS→SSS→selected Stadium→VS Setup→GO prefix, with C=84, F=85 and natural DrawReturn; its independent raw review extracted original-only phase-tagged setup/RNG observations. The first-CSS typed return comparison now passes on native source `6e46d57c`, at original sequences 704→833. This establishes only the captured first-CSS context; no SSS/history, VS Setup/GO setup, per-owner RNG ledger, full match, gameplay or C3 acceptance is established. Browser, physical-input, audible-output, timing and other C3 gates remain open; ordinary public Stadium admission remains closed.",
+    "current_result": "The feedback driver v2 is integrated at `7d406f63`. Its 67 focused controls passed with no skips on canonical working source after exact candidate application before commit; this is not a clean committed-head focused run. The clean exact `7d406f63` suite passed 2,401 tests with 161 skips, zero failures/errors, in 510.571 seconds. The v6 original capture completed 2,935 valid MWRO records and 4,706 MWRI events; all 155 launch inputs were unchanged. Strict prefix validation records consumed Stadium confirm/release, VS Setup, GO-containing tick C=84, first full tick F=85 and natural DrawReturn sequence 2,933. The independent raw review passed the raw-prefix result and produced original-only typed VS Entry/VS Setup/GO snapshots. The first-CSS native context probe on exact source `6e46d57c` passed at source entry/return sequences 704/833: named CSS/VsMode/StartRules fields, float bits, six player scalars, six KO counters, the 822-byte live PAD state, seed and source scene matched. Nine pointer fields were checked null, explicit `pad_x5C` ABI padding was excluded and numeric guest/native pointer values were not compared. Checked host/world and Session cleanup passed; the native child exited naturally with code 0, no signal, and all 136 bound inputs remained unchanged. The preceding `1fad54ff` run is retained as a refusal before snapshot. The first-CSS result contains zero source ticks and draws; no SSS/menu history, VS Setup/GO native comparison, per-owner RNG ledger, full match or C3 acceptance follows. The separate clean 6e46d57c full regression passes 2,409 tests with 162 skips, zero failures/errors, in 515.337 seconds; source remains unchanged before and after.",
     "prior_v26": {
       "source_commit": "b8c272c44a94bcb03f0371008851e468200d4496",
       "first_failure": "heap_free_bytes",
@@ -487,7 +487,338 @@
         "SDK unittest moduleimport failure beforeNode; fixedexplicit scriptsimport and retainedoutput"
       ]
     },
-    "next_progression": "Initialize the native first-CSS context from the captured original CSS-entry bytes through the existing replay API, then observe original OnEnter return before any menu tick. Compare only observed CSS-return seed, defined CSS/KO/PAD fields and source scene, followed by checked teardown. Stop at the first mismatch. After agreement, replay the exact source-consumed menu history before matching VS Entry/Setup/GO phases and owner-bound seeds. Do not use independently defaulted inputs, later seed overwrites, cross-phase hash equality or numeric PPC/native pointer equality. Longer per-owner RNG and 3,500-tick comparison remain pending; public Stadium admission and C3 acceptance remain closed.",
+    "next_progression": "Replay one source-consumed CSS input (sequence834) after the proven first return833 and compare PAD, seed, scene kind and four routing getters against source scheduler return835, before any draw. Report original pre-increment frame0 and native post-increment frame1 explicitly; raw pending/next routing bytes and post-tick CSS/KO remain excluded. Source phase proof supports this limited comparison, which is not yet implemented or run. Stop at the first preparation/owner/input/state mismatch before a second tick or draw. Longer menu history, VS/GO setup, per-owner RNG and C3 remain pending.",
+    "first_css_context_return_1fad54ff_v1": {
+      "source_head": "1fad54ff964f80b263b91a77cf25a25b0ee08603",
+      "source_tree": "adfff70b0f357d4c66bd89f1f1c3a30c9202b2a9",
+      "status": "FAIL_BEFORE_SNAPSHOT; CSS_COMPARISON_NOT_RUN",
+      "scope": "One native first-CSS context probe using the captured original v6 CSS-entry input; no returned CSS/KO/PAD/seed/source-scene comparison was produced.",
+      "probe_result": {
+        "artifact": "first-css-native-1fad54ff-v1/result.json",
+        "bytes": 38390,
+        "sha256": "10c57dcaf7d8d1ebebfaa5e593c9089803dd6649166801e74699a59f7e5548af",
+        "test_log": {
+          "artifact": "first-css-native-1fad54ff-v1/test.log",
+          "bytes": 1573,
+          "sha256": "09a19ce6e1841b6a2499622b2fc4879fa9492ec2e93823274d45d9f8fed4cdf7"
+        },
+        "test": "tests.test_gameplay_native_menus.NativeMenuSourceTests.test_stadium_first_css_context_return_one_shot",
+        "outcome": "FAIL: expected one CSS-return snapshot row; observed zero.",
+        "refusal_stage": "read-immediate-css-return",
+        "snapshot_captured": false,
+        "guard_predicate": "unknown; bounded source reduction pending",
+        "native_stdout": {
+          "artifact": "first-css-native-1fad54ff-v1/retained-output/native.stdout",
+          "bytes": 546,
+          "sha256": "83afbf9036d7feef0ec4d213125341e15552af8488f82fa7828323c681283ce0"
+        },
+        "native_stderr": {
+          "artifact": "first-css-native-1fad54ff-v1/retained-output/native.stderr",
+          "bytes": 1519,
+          "sha256": "58975c77ea7c7e3039cc9b5c24f74a2cc528303b9d2cc9f7598f228a748241b2"
+        },
+        "native_process": {
+          "cleanup": {
+            "artifact": "first-css-native-1fad54ff-v1/retained-output/node-owner/cleanup.json",
+            "bytes": 149,
+            "sha256": "29699111a2f7485b7323eca8faeddeac7f7fc40fa64fb7d2d301c46659d469b9"
+          },
+          "pid": 29985,
+          "returncode": 1,
+          "natural_exit": true,
+          "terminate_sent": false,
+          "kill_sent": false,
+          "ownership": "direct-Popen"
+        },
+        "checked_cleanup": {
+          "host_leave_archive_verification_world_close_host_destroy": "PASS_CHECKED_TEARDOWN",
+          "session_end": "PASS",
+          "host_owned_remaining": false,
+          "world_owned_remaining": false
+        },
+        "wrapper": {
+          "pid": 29980,
+          "exit_code": 1,
+          "start_utc": "2026-10-10T10:56:16.412840+00:00",
+          "end_utc": "2026-10-10T10:56:17.347835+00:00",
+          "status_after": ""
+        }
+      },
+      "inputs": {
+        "source_capture": {
+          "observer": {
+            "artifact": "original-stadium-go-prefix-7d406f63-feedback-v6/observer.bin",
+            "bytes": 4397889,
+            "sha256": "361e8c1108cc2d02ba94d1f3b3be9612a80d0227672445cd4a2b0e2119917778"
+          },
+          "status": {
+            "artifact": "original-stadium-go-prefix-7d406f63-feedback-v6/observer-status.json",
+            "bytes": 515,
+            "sha256": "05a08641404bda9f87ac4c20b1a44a982ff0470ff3a9b04861c03ba542866c3f"
+          }
+        },
+        "native_input_bundle": {
+          "artifact": "first-css-native-1fad54ff-v1/retained-output/first-css-input.mwsc",
+          "bytes": 23228,
+          "sha256": "dee4305dd5cc65f35d6a48f21f4e176129efdc3d00f26b2dc31f6e666c04c6be"
+        },
+        "expected_return": {
+          "artifact": "first-css-native-1fad54ff-v1/retained-output/expected-return.json",
+          "bytes": 7884,
+          "sha256": "9f9ffe93a72d30a3256523a4d88a051f6a1efccaeae530797d855a40368854cc"
+        },
+        "context_header": {
+          "artifact": "first-css-native-1fad54ff-v1/retained-output/first-css-context.jsonl",
+          "bytes": 262,
+          "sha256": "6a1e9893256e10d813b08a1f671596d523a44f1ffa1432ea502d98120c740c6e"
+        },
+        "fixture_manifest": {
+          "artifact": "stadium-source-setup-a29f8d69-v1/fixture-pre.json",
+          "bytes": 16483,
+          "sha256": "b1acb69d01fe48047b883f83d63f5644ceb19de83077c07d592f3e02603ac61c",
+          "file_count": 98
+        },
+        "fixture_after": {
+          "artifact": "first-css-native-1fad54ff-v1/retained-output/node-owner/fixture-after.json",
+          "bytes": 8212,
+          "sha256": "ea2eafd17797f04e5ea2020a4f90f48c1a942269f645a2b336df6e89f35c5e9c"
+        },
+        "fixture_manifest_post_matches_pre": true,
+        "bound_input_count": 122,
+        "all_bound_inputs_unchanged": true,
+        "result_binds_full_input_inventory": true
+      },
+      "producer_and_build": {
+        "native_source_producer": {
+          "artifact": "first-css-producer-1fad54ff-v1/identity.json",
+          "sha256": "98a5b84a152dc08580bcb9c51033034accd3f5fcc760d180ebbeb47343cd249d"
+        },
+        "diagnostic_build": {
+          "artifact": "first-css-diagnostic-build-1fad54ff-v1/result.json",
+          "sha256": "87cc420839f947e589f4a2482060ecf856a0e10b95485d6889de3acd3f245651"
+        },
+        "launch_packet": {
+          "artifact": "first-css-launch-packet-1fad54ff-v1/packet.json",
+          "sha256": "00c29c32db14cb3dfb5c859048c32ccc5d33d8cf90ca8e85dea7c0bcee4af85d"
+        },
+        "prelaunch_review": {
+          "artifact": "sol-stadium-first-css-prelaunch-review-v1.json",
+          "sha256": "683c0bd61af24640a3cdc91186f37e7469dd00fef277e7fd590ea083bde54197"
+        }
+      },
+      "limits": [
+        "No CSS-return snapshot or comparison was produced.",
+        "The first-CSS owner-guard predicate remains unknown; this result does not justify a retry.",
+        "No VS/SSS/GO native context comparison, per-owner RNG comparison, full match, gameplay, or C3 acceptance."
+      ],
+      "next": "Complete the bounded source-level reduction of the refusal predicate. If a revised predicate is independently reviewed, prepare a changed-hypothesis one-shot probe; no retry is included here."
+    },
+    "first_css_context_return_6e46d57c_v2": {
+      "source_head": "6e46d57ca60dbfaa7e49c3664df550db39e3d619",
+      "source_tree": "a02466eeeb139efbd550b440136e8b7488c8532f",
+      "status": "PASS_FIRST_CSS_TYPED_RETURN_ONLY",
+      "scope": "One native first-CSS host entry/OnEnter return comparison using the captured original v6 CSS-entry context. No SSS, VS Setup, GO, match, or full-session comparison.",
+      "probe_result": {
+        "artifact": "first-css-native-6e46d57c-v2/result.json",
+        "bytes": 41849,
+        "sha256": "48004cc022472cb60872ff44c57f70288d4d1cc0ef75efe62f58965b0fb3159e",
+        "test_log": {
+          "artifact": "first-css-native-6e46d57c-v2/test.log",
+          "bytes": 404,
+          "sha256": "d7fecab257e29dcc216283b9be1842ac6afbb7d428f438ec868e5f8bac9c0f69"
+        },
+        "test": "tests.test_gameplay_native_menus.NativeMenuSourceTests.test_stadium_first_css_context_return_one_shot",
+        "test_outcome": "PASS: exactly one first-CSS return snapshot matched the expected typed first-CSS state.",
+        "independent_review": {
+          "artifact": "sol-stadium-first-css-result-review-v2.json",
+          "bytes": 5894,
+          "sha256": "d9cd752e98c080ad744cb812001241774d8b89b5b569555f9718a6200461aa4f",
+          "decision": "PASS_FIRST_CSS_TYPED_RETURN_ONLY"
+        },
+        "native_stdout": {
+          "artifact": "first-css-native-6e46d57c-v2/retained-output/native.stdout",
+          "bytes": 5805,
+          "sha256": "2b81ff7be670586ae8261178b6e06d89739d9a9daf0a94723e340df51c85c969"
+        },
+        "native_stderr": {
+          "artifact": "first-css-native-6e46d57c-v2/retained-output/native.stderr",
+          "bytes": 1370,
+          "sha256": "7371127e19978a3862c816fd6ff49cb7aee60be99461098f8fd8cd8f918cd7c3"
+        },
+        "comparison": {
+          "source_capture_sha256": "361e8c1108cc2d02ba94d1f3b3be9612a80d0227672445cd4a2b0e2119917778",
+          "css_entry_sequence": 704,
+          "css_return_sequence": 833,
+          "source_scene": 1,
+          "scene_kind": 8,
+          "random_seed_hex": "312151c3",
+          "live_pad_bytes": 822,
+          "ko_counts_hex": "000000000000",
+          "ko_owner": "source_vs_owned",
+          "named_css_vsmode_startrules_and_six_player_scalars_equal": true,
+          "float_bits_equal": true,
+          "pointer_fields_checked_null": 9,
+          "excluded_abi_padding": "StartMeleeRules.pad_x5C",
+          "native_guest_pointer_numbers_compared": false
+        },
+        "native_process": {
+          "cleanup": {
+            "artifact": "first-css-native-6e46d57c-v2/retained-output/node-owner/cleanup.json",
+            "bytes": 149,
+            "sha256": "b6f5b3454ea969c33db8f4120ca0aba0fd76cf64e5b11c0e6fac8afd64d5e3e9"
+          },
+          "pid": 31514,
+          "returncode": 0,
+          "natural_exit": true,
+          "terminate_sent": false,
+          "kill_sent": false,
+          "ownership": "direct-Popen"
+        },
+        "checked_cleanup": {
+          "host_leave_archive_verification_world_close_host_destroy": "PASS_CHECKED_TEARDOWN",
+          "session_end": "PASS",
+          "host_owned_remaining": false,
+          "world_owned_remaining": false
+        },
+        "wrapper": {
+          "pid": 31508,
+          "exit_code": 0,
+          "start_utc": "2026-10-10T11:07:26.803529+00:00",
+          "end_utc": "2026-10-10T11:07:27.786166+00:00",
+          "source_head_after": "6e46d57ca60dbfaa7e49c3664df550db39e3d619",
+          "status_after": ""
+        }
+      },
+      "inputs": {
+        "source_capture": {
+          "observer": {
+            "artifact": "original-stadium-go-prefix-7d406f63-feedback-v6/observer.bin",
+            "bytes": 4397889,
+            "sha256": "361e8c1108cc2d02ba94d1f3b3be9612a80d0227672445cd4a2b0e2119917778"
+          },
+          "status": {
+            "artifact": "original-stadium-go-prefix-7d406f63-feedback-v6/observer-status.json",
+            "bytes": 515,
+            "sha256": "05a08641404bda9f87ac4c20b1a44a982ff0470ff3a9b04861c03ba542866c3f"
+          }
+        },
+        "native_input_bundle": {
+          "artifact": "first-css-native-6e46d57c-v2/retained-output/first-css-input.mwsc",
+          "bytes": 23228,
+          "sha256": "dee4305dd5cc65f35d6a48f21f4e176129efdc3d00f26b2dc31f6e666c04c6be"
+        },
+        "expected_return": {
+          "artifact": "first-css-native-6e46d57c-v2/retained-output/expected-return.json",
+          "bytes": 7886,
+          "sha256": "ec960e12e382235fb3f010d36c60495dabbeef62daf50fb696a11d3b12dde435"
+        },
+        "context_header": {
+          "artifact": "first-css-native-6e46d57c-v2/retained-output/first-css-context.jsonl",
+          "bytes": 262,
+          "sha256": "ab115a400bfe3813423a240e2e1910ec57ecf5d399c1072dc0af43610a413421"
+        },
+        "fixture_manifest": {
+          "artifact": "stadium-source-setup-a29f8d69-v1/fixture-pre.json",
+          "bytes": 16483,
+          "sha256": "b1acb69d01fe48047b883f83d63f5644ceb19de83077c07d592f3e02603ac61c",
+          "file_count": 98
+        },
+        "fixture_after": {
+          "artifact": "first-css-native-6e46d57c-v2/retained-output/node-owner/fixture-after.json",
+          "bytes": 8212,
+          "sha256": "ea2eafd17797f04e5ea2020a4f90f48c1a942269f645a2b336df6e89f35c5e9c"
+        },
+        "fixture_manifest_post_matches_pre": true,
+        "bound_input_count": 136,
+        "all_bound_inputs_unchanged": true,
+        "result_binds_full_input_inventory": true
+      },
+      "limits": [
+        "First-CSS-return comparison only; source_ticks=0 and draws=0.",
+        "No SSS/menu-history replay, VS Setup/GO comparison, per-owner RNG ledger, full match, gameplay, or C3 acceptance."
+      ],
+      "next_proposal": {
+        "status": "PROPOSED_NOT_IMPLEMENTED_OR_RUN",
+        "artifact": "sol-stadium-first-css-consumed-tick-proposal-v2.json",
+        "bytes": 5827,
+        "sha256": "00aed8ec430c9eee43d7a61315a61d195487a2cf3900516a6c517620cb9e0f72",
+        "decision": "PROPOSE_EXISTING_POST_TICK_READ_WITH_DECLARED_PHASE_OFFSET",
+        "interval": "Original CSS return 833 → consumed PAD sample 834 → scheduler-end SourceTick 835; stop before DrawEnter 836.",
+        "compare": "PAD822, seed, scene kind and four authored routing getters. Original scheduler-return frame0 vs native public post-tick frame1 is explicit; intervening clock/transition code does not write the compared fields. Raw pending-mode and next-state bytes remain unpaired.",
+        "stopping_rule": "One tick only; stop on first preparation, owner, input or state mismatch. No draw or retry."
+      },
+      "preserved_prior_failure": {
+        "artifact": "first-css-native-1fad54ff-v1/result.json",
+        "sha256": "10c57dcaf7d8d1ebebfaa5e593c9089803dd6649166801e74699a59f7e5548af",
+        "status": "FAIL_BEFORE_SNAPSHOT; retained in first_css_context_return_1fad54ff_v1"
+      },
+      "producer_and_build": {
+        "native_source_producer": {
+          "artifact": "first-css-producer-6e46d57c-v1/identity.json",
+          "bytes": 2210,
+          "sha256": "8dd76df9ebbbd50eb5507b288636e29042e8b4175387b3462937f212a0dadfab"
+        },
+        "diagnostic_build": {
+          "artifact": "first-css-diagnostic-build-6e46d57c-v1/result.json",
+          "bytes": 1844,
+          "sha256": "7d03b57f66af7844befaf964d6e3ed30b805cd3d409724a75f81d76422249957"
+        },
+        "launch_delta": {
+          "artifact": "first-css-launch-delta-6e46d57c-v2/packet.json",
+          "bytes": 46880,
+          "sha256": "2f8b2041f956d1fb59da55d2522647af8ef856acfe7cf10e44b58e5fa458d6a4"
+        },
+        "canonical_source_review": {
+          "artifact": "root-first-css-ko-integration-v1/source-review.json",
+          "bytes": 1051,
+          "sha256": "5cc51ead11f8ec38f5480380f55f5f02fceb12bea170001008de686895d2fe1d"
+        },
+        "canonical_focused_checks": {
+          "artifact": "root-first-css-ko-integration-v1/focused-result.json",
+          "bytes": 591,
+          "sha256": "06c2f066dc2edba57e528782eab2b393231041fd580af83461e3825763a946c2"
+        }
+      },
+      "source_owner_correction": {
+        "prior_refusal_preserved": true,
+        "cause": "The diagnostic expected the session-private KO array, but authored gmVsMelee_EnterCss replaces CSSData.ko_counts with the source VS array returned by gmVsMelee_GetKOCounts. The corrected guard checks that exact source owner under the existing live VS-mode lease; it does not repoint or copy source globals.",
+        "same_input_bundle_bytes_and_hash": true,
+        "reduction_review": {
+          "artifact": "first-css-source-vs-ko-hook-proposal-v2/failure-review.json",
+          "bytes": 4066,
+          "sha256": "184171e21fa04253dd3d69e171e7b275e9ea3cffa6112b8710b3765a69916022"
+        },
+        "source_candidate": {
+          "artifact": "first-css-source-vs-ko-hook-proposal-v2/freeze.json",
+          "bytes": 7737,
+          "sha256": "90a28958311fbe444305c690d226c617c6f826cbe15e2802a00fd89ed9ff3415"
+        }
+      },
+      "validation": {
+        "source_head": "6e46d57ca60dbfaa7e49c3664df550db39e3d619",
+        "source_tree": "a02466eeeb139efbd550b440136e8b7488c8532f",
+        "result": "PASS",
+        "tests": 2409,
+        "skips": 162,
+        "failures": 0,
+        "errors": 0,
+        "seconds": 515.337,
+        "clean_head_before_and_after": true,
+        "wrapper_pid": 31629,
+        "wrapper_natural_exit": 0,
+        "wrapper_absent": true,
+        "result_binding": {
+          "artifact": "full-regression-6e46d57c-v1/result.json",
+          "bytes": 1575,
+          "sha256": "c88fd04f838f87360db91cb53a40b648c9e60a281addd42fe760c78b86a21814"
+        },
+        "log": {
+          "artifact": "full-regression-6e46d57c-v1/suite.log",
+          "bytes": 450903,
+          "sha256": "4e43203b7fbabe817b5e0c04758a95065ff890cbf3bfa53497b4fa2f8e600a8e"
+        }
+      }
+    },
     "latest_reader_capture_5f1faf8b_v4": {
       "source_head": "5f1faf8b4daf6d767e8590c5daf8e6a12db36ec6",
       "source_tree": "8df54355d1cea449986ef38f8687af8f69e99bf3",
@@ -1115,9 +1446,9 @@
         "sixth_ready_bound_files": 531,
         "deferred_control_owned_pid_absent": 19570
       },
-      "remaining": "For original comparison/C3 acceptance, bind the typed source CSS/SSS setup and actual match context to GO in one original run, preserving first-CSS and SSS-selected seeds separately, setup rules/player rows, and the per-tick RNG ledger by owner. The separately scoped exact 8f785fe5 producer now demonstrates two sequential 3,500-post-GO functional lifetimes; this does not pair original setup seeds or per-owner RNG. Screen/title/SIS observations, stock-out/standings and full C3 checks remain outstanding.",
+      "remaining": "The native first-CSS typed return comparison now passes on `6e46d57c`, using the captured original context at sequences 704/833 with zero source ticks or draws; the earlier `1fad54ff` refusal remains preserved. The next proposal is one consumed CSS tick (input 834 through scheduler-end 835) before draw 836, comparing only PAD, seed and source scene; it is not implemented or run. The full setup/per-owner RNG ledger, screen/title/SIS, stock-out/standings and C3 checks remain outstanding. The separate `8f785fe5` functional lifetimes do not establish those comparisons.",
       "c3_original_ledger_requirement": "Reuse existing RNG draw observer; C3 notes604-608 require per-tick/per-owner original comparison, separately from broader C8 transformation comparison.",
-      "claim_boundary": "The separate `8f785fe5` producer still supports two sequential 3,500-post-GO functional lifetimes and the ordinary Results regression within their recorded scopes. The later exact `7d406f63` feedback capture passes one bounded original CSS→SSS→selected Stadium→VS Setup→GO prefix, with C=84, F=85 and natural DrawReturn; its native observer was built from `91fc1fb9`. The independent raw review verified the raw prefix and extracted phase-tagged original setup/RNG values. No corresponding native setup/RNG owner comparison, full match, gameplay, or C3 acceptance is established. Browser, physical-input, audible-output, timing, and other C3 gates remain open; ordinary public Stadium admission remains closed.",
+      "claim_boundary": "The separate `8f785fe5` producer retains two sequential 3,500-post-GO functional lifetimes and the ordinary Results regression within their recorded scopes. The original v6 capture on `7d406f63` passes the bounded CSS→SSS→selected Stadium→VS Setup→GO prefix, with C=84, F=85 and natural DrawReturn; its independent raw review extracted original-only phase-tagged setup/RNG observations. The first-CSS typed return comparison now passes on native source `6e46d57c`, at original sequences 704→833. This establishes only the captured first-CSS context; no SSS/history, VS Setup/GO setup, per-owner RNG ledger, full match, gameplay or C3 acceptance is established. Browser, physical-input, audible-output, timing and other C3 gates remain open; ordinary public Stadium admission remains closed.",
       "pad_input_reducer": {
         "caller_source": "8e087161fcc5a62f6f82cb333a812d0f4eff448f",
         "phase_correction_source": "e2ff861b3f290714d4c6aaa1a19158d4e7f8e59a",
@@ -2249,10 +2580,10 @@
             "draw": false,
             "pcm_processing": true
           },
-          "scope": "One native no-draw neutral-input port-side canary that traversed the original CSS\u2192SSS route. It did not emit the full typed setup receipt or bind the first-CSS seed context to match construction; it is not paired with the separate setup observation, not an original comparison, and not a per-owner RNG result.",
+          "scope": "One native no-draw neutral-input port-side canary that traversed the original CSS→SSS route. It did not emit the full typed setup receipt or bind the first-CSS seed context to match construction; it is not paired with the separate setup observation, not an original comparison, and not a per-owner RNG result.",
           "limitations": [
             "source frame stayed0 across GO-containing and next full tick; no increment inferred",
-            "CSS\u2192SSS navigation occurred, but no same-run typed setup receipt/first-CSS-context binding",
+            "CSS→SSS navigation occurred, but no same-run typed setup receipt/first-CSS-context binding",
             "no long two-world3500tick C3, original draw/RNG equivalence, browser, physical input, foreground timing, audible output or whole-session acceptance"
           ]
         }
@@ -2327,7 +2658,7 @@
           },
           "normalized_equals_post_vs": false
         },
-        "scope": "Original source CSS\u2192SSS Stadium selection and checked menu/world/session retirement only. No OnInit, MatchSession, Ready/GO, draw or gameplay ticks; this is setup provenance, not complete replay context or matched original comparison.",
+        "scope": "Original source CSS→SSS Stadium selection and checked menu/world/session retirement only. No OnInit, MatchSession, Ready/GO, draw or gameplay ticks; this is setup provenance, not complete replay context or matched original comparison.",
         "unobserved": [
           "full 0x55E8 transient SaveData bytes",
           "private PAD queue slots and qcount snapshot",
@@ -2338,12 +2669,14 @@
         ]
       },
       "original_go_observer_candidate": {
-        "status": "PASS_ORIGINAL_RAW_GO_PREFIX_V6; SETUP_RNG_COMPARISON_PENDING",
+        "status": "PASS_ORIGINAL_RAW_GO_PREFIX_V6; PASS_FIRST_CSS_TYPED_RETURN_ONLY; SETUP_RNG_AND_C3_PENDING",
         "limitations": [
           "The earlier 91fc1fb9 source-position capture remains a retained finite-SSS-policy failure; its exact incomplete streams and 74-callback source reduction remain in current_position_observation.",
           "The v6 feedback capture passes the original raw Stadium GO-prefix validator only. Its driver is 7d406f63 and it reuses the native observer built from 91fc1fb9.",
           "The independent raw review verified the raw result and extracted original-only phase-tagged setup/RNG values. Matching native phases and explicit owner-to-seed mapping remain unobserved.",
-          "No per-owner RNG completeness, full match/Results, original/native setup or RNG equality, or C3 acceptance is established."
+          "No per-owner RNG completeness, full match/Results, VS/GO setup equality or C3 acceptance is established.",
+          "The initial `1fad54ff` refusal before snapshot remains retained as observed then. The later source reduction found the diagnostic KO-owner mismatch and the corrected 6e46d57c probe passed; no result is backdated to the failed producer.",
+          "The `6e46d57c` native result covers only first CSS return. It did not replay SSS history or compare VS Setup/GO, per-owner RNG, gameplay or C3."
         ],
         "compiler_result": {
           "artifact": "root-original-stadium-observer-compiler-result-v1.json",
@@ -2772,7 +3105,7 @@
             "bytes": 4706,
             "sha256": "b51baa7d3d3169d9ab98ac7de043ca88bbc0198b938e78c2b15ec0d447bc94bb",
             "status": "EXTERNAL_CANDIDATE_PREPARATION_ONLY; INTEGRATION_AND_FOCUSED_REVIEW_PENDING; NO_NEW_CAPTURE",
-            "summary": "Use a fresh completed same-call tuple correlated with consumed PAD; invalidate stale/absent target data. Permit at most four already-chosen same-direction callbacks only after a validated earlier-row hit omits the target tuple. Preserve current ownership, movement, input and stream caps, consumed neutral stability, exact index 18/kind 3 success, and CSS\u2192SSS\u2192VS\u2192GO guards. No native observer or binary change is proposed."
+            "summary": "Use a fresh completed same-call tuple correlated with consumed PAD; invalidate stale/absent target data. Permit at most four already-chosen same-direction callbacks only after a validated earlier-row hit omits the target tuple. Preserve current ownership, movement, input and stream caps, consumed neutral stability, exact index 18/kind 3 success, and CSS→SSS→VS→GO guards. No native observer or binary change is proposed."
           },
           "preparation_corrections": [
             {
@@ -3050,15 +3383,15 @@
         "observed": {
           "world_generation": 3,
           "source_heap": 0,
-          "go_containing_world_tick": "84\u219285",
-          "first_full_post_go_tick": "85\u219286",
+          "go_containing_world_tick": "84→85",
+          "first_full_post_go_tick": "85→86",
           "post_go_ticks": 3500,
           "ready_world_tick": 124,
           "ready_post_go_ordinal": 39,
           "ticks_after_ready": 3461,
-          "last_world_and_session_tick": "3584\u21923585",
-          "source_frames_through_ready": "0\u21920",
-          "post_ready_source_frames": "0\u21923461",
+          "last_world_and_session_tick": "3584→3585",
+          "source_frames_through_ready": "0→0",
+          "post_ready_source_frames": "0→3461",
           "world_and_session_advance_each_step": true,
           "source_frame_advances_each_post_ready_step": true,
           "source_memory_owner_healthy_same_world_heap": true,
@@ -3150,7 +3483,7 @@
             "artifact": "root-ordinary-results-frozen-failure-v1.json",
             "sha256": "0c1e0ca8dddd128959e44f474c419940306e1bb42ef1caf58ad0353edfc84040",
             "first_failure": "Missing source match fixture: LbRf.dat",
-            "boundary": "CSS\u2192SSS and selected Final Destination route; no Match construction, Results or elimination",
+            "boundary": "CSS→SSS and selected Final Destination route; no Match construction, Results or elimination",
             "immutable_bindings_unchanged": 171
           },
           "source_only_fixture_audit": {
@@ -3260,7 +3593,7 @@
                 "sha256": "ed61b1d9f55cf89901bc0d7cd49245d103ab9233f1bd65d0d6cae79c28b882f1"
               }
             ],
-            "scope": "Functional native source route using scripted source PAD and fixture seed: No Contest Match\u2192Results\u2192CSS/SSS, followed by a recreated four-stock Mario/Final Destination Match\u2192source GAME ending\u2192Results\u2192CSS and checked final Session end. No Prize traversal.",
+            "scope": "Functional native source route using scripted source PAD and fixture seed: No Contest Match→Results→CSS/SSS, followed by a recreated four-stock Mario/Final Destination Match→source GAME ending→Results→CSS and checked final Session end. No Prize traversal.",
             "limitations": [
               "No numeric post-close arena snapshot; checked session_end and natural process exit are the retirement evidence emitted by this recipe.",
               "No original-game comparison, browser, rendered-pixel, physical-input, uninterrupted-audio, PCM-equivalence or timing acceptance.",

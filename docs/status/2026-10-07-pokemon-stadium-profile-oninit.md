@@ -7,16 +7,26 @@ CSS→SSS→selected Stadium→VS Setup→GO prefix. The complete streams contai
 MWRO records and 4,706 MWRI events; all 155 inputs remained unchanged. The strict
 validator accepted the consumed Stadium confirm/release, GO-containing tick C=84,
 first full post-GO tick F=85, and natural DrawReturn at sequence 2,933; both owned
-processes are absent. The native observer producer remains `91fc1fb9`. The
-independent raw review extracted original-only phase-tagged setup/RNG
-observations; matching native phases and owner-to-seed values remain the next
-bounded comparison.
-Stop at the first mismatch. The clean exact `7d406f63` suite passed 2,401 tests
-with 161 skips; 67 focused controls passed on canonical working source after exact
-candidate application before commit. The separate `8f785fe5` producer retains its
-two sequential 3,500-post-GO functional lifetimes and ordinary Results pass. This
-prefix does not establish native setup/RNG equivalence, a full match, or C3;
-ordinary public Stadium admission stays closed.
+processes are absent. The focused native first-CSS context check on exact source
+`6e46d57c` now passes the typed return comparison at original sequences 704→833:
+CSS fields, six KO counters, the 822-byte live PAD state, seed, source scene and
+scene kind matched. The nine pointer fields were checked null; explicit ABI
+padding was excluded, and native/guest pointer numbers were not compared. The run
+observed zero source ticks or draws, then passed checked host/world teardown and
+Session cleanup; its child exited naturally and all 136 bound inputs were unchanged.
+The earlier `1fad54ff` refusal before snapshot remains retained. Its diagnostic
+expected a private KO array; the correction validates the array installed by the
+authored VS routine under the existing source lease, without changing source state.
+This is first-CSS-return evidence only; SSS/history, VS/GO setup, per-owner RNG,
+a full match and C3 acceptance remain open. The clean `6e46d57c` full suite
+passes 2,409 tests with 162 skips and no failures/errors. The earlier `7d406f63`
+suite and 67 focused feedback controls retain their exact earlier scopes. The separate `8f785fe5` producer retains its two sequential
+3,500-post-GO functional lifetimes and ordinary Results pass. Ordinary public
+Stadium admission stays closed. The next proposed reducer is one source-consumed
+CSS tick, stopping before the first draw. The source phase proof distinguishes
+original scheduler-return frame 0 from native post-tick frame 1 and limits the
+comparison to PAD, seed, scene kind and four routing getters. This next check
+is not yet implemented or run.
 
 **Earlier checkpoint context:** the separately reviewed native source CSS→SSS setup observation
 on `a29f8d69` records the first-CSS seed and the distinct SSS-selected seed,
