@@ -36,6 +36,30 @@ MAX_SOURCE_TICK_BATCH = 5
 MAX_TAIL_AFTER_F = MAX_SOURCE_TICK_BATCH - 1
 EXPECTED_SETUP_RECEIPT_SHA256 = "e6b15cececf103efeb9b7df2dd18908e9a66d37ebde68622ecd304f8eabcfcda"
 
+# One diagnostic-only, first-CSS source context from the retained original
+# v6 stream. This is not a replay recipe or whole-session admission boundary.
+FIRST_CSS_CONTEXT_ENV = "MELEE_WEB_STADIUM_FIRST_CSS_RAW"
+FIRST_CSS_STREAM_BYTES = 4_397_889
+FIRST_CSS_STREAM_SHA256 = "361e8c1108cc2d02ba94d1f3b3be9612a80d0227672445cd4a2b0e2119917778"
+FIRST_CSS_ENTRY_SEQUENCE = 704
+FIRST_CSS_RETURN_SEQUENCE = 833
+FIRST_CSS_ENTRY_PC = 0x8026688C
+FIRST_CSS_RETURN_PC = 0x802669F0
+FIRST_CSS_DATA_ADDRESS = 0x804807B0
+FIRST_CSS_KO_ADDRESS = 0x804D6730
+FIRST_CSS_PAD_ADDRESS = 0x804C1F84
+FIRST_CSS_RNG_POINTER_ADDRESS = 0x804D5F94
+FIRST_CSS_RNG_VALUE_ADDRESS = 0x804D5F90
+FIRST_CSS_RULES_ADDRESS = 0x8045BF10
+FIRST_CSS_SAVE_ADDRESS = 0x8045BF28
+FIRST_CSS_SCENE_ADDRESS = 0x803DD9AC
+FIRST_CSS_CONTEXT_MAGIC = b"STC1INPT"
+FIRST_CSS_CONTEXT_VERSION = 1
+FIRST_CSS_CONTEXT_HEADER_BYTES = 8 + 4 + 32 + 4 + 4
+FIRST_CSS_CONTEXT_PAYLOAD_BYTES = 4 + 822 + 0x148 + 6 + 0x18 + 0x55E8
+FIRST_CSS_CONTEXT_BYTES = (FIRST_CSS_CONTEXT_HEADER_BYTES +
+                           FIRST_CSS_CONTEXT_PAYLOAD_BYTES)
+
 CSS_ENTRY_PC = 0x8026688C
 CSS_ENTRY_WORD = 0x7C0802A6
 CSS_RETURN_PC = 0x802669F0
@@ -759,4 +783,329 @@ def validate_stadium_go_prefix(stream_path: str | Path,
         "stream_sha256": stats.prefix_sha256,
         "stream_bytes": stats.bytes_read,
         "stream_records": stats.records_read,
+    }
+
+
+_FIRST_CSS_ENTRY_SLICES = {
+    (31, 0), (33, 0), (34, 0), (38, 0), (39, 0), (36, 0), (37, 0),
+    (21, 0), (17, 0), (30, 0), (40, 0), (19, 0), (20, 0), (50, 0),
+    (51, 0),
+}
+_FIRST_CSS_RETURN_SLICES = {
+    (31, 0), (33, 0), (34, 0), (36, 0), (37, 0), (21, 0), (17, 0),
+    (30, 0), (40, 0), (19, 0), (20, 0), (50, 0), (51, 0),
+}
+
+
+def _first_css_slice_inventory(payload: dict[str, Any], phase: str) -> None:
+    items = payload.get("slices")
+    expected = (_FIRST_CSS_ENTRY_SLICES if phase == "css_entry"
+                else _FIRST_CSS_RETURN_SLICES)
+    _require(isinstance(items, list) and
+             all(isinstance(item, dict) for item in items) and
+             len(items) == len(expected) and
+             {(item.get("tag"), item.get("flags")) for item in items} == expected,
+             f"{phase}: first-CSS witness has an unexpected slice inventory")
+
+
+def _first_css_semantic_start(start: bytes) -> dict[str, Any]:
+    """Decode defined source StartMeleeData fields, omitting ABI padding."""
+    _require(len(start) == 0x138, "first-CSS StartMeleeData must be exactly 0x138 bytes")
+    rules = start[:0x60]
+    _require(not any(rules[0x38:0x5C]),
+             "first-CSS StartMeleeRules contains an unsupported callback/data pointer")
+
+    def bits(byte: int, index: int) -> int:
+        return (byte >> (7 - index)) & 1
+
+    rule_values: dict[str, Any] = {
+        "match_kind": rules[0] >> 5,
+        "x0_3": (rules[0] >> 2) & 7,
+        "timer_enabled": bits(rules[0], 6),
+        "timer_counts_up": bits(rules[0], 7),
+    }
+    for index in range(6):
+        rule_values[f"x1_{index}"] = bits(rules[1], index)
+    rule_values.update(timer_shows_hours=bits(rules[1], 6),
+                       friendly_fire=bits(rules[1], 7))
+    for name, index in (("is_stock", 0), ("x2_1", 1), ("x2_2", 2),
+                        ("single_button", 3), ("disable_pausing", 4),
+                        ("x2_5", 5), ("x2_6", 6), ("x2_7", 7)):
+        rule_values[name] = bits(rules[2], index)
+    for index in range(8):
+        rule_values[f"x3_{index}"] = bits(rules[3], index)
+    for name, index in (("x4_0", 0), ("is_vs", 1), ("x4_2", 2),
+                        ("x4_3", 3), ("x4_4", 4), ("x4_5", 5),
+                        ("x4_6", 6), ("x4_7", 7)):
+        rule_values[name] = bits(rules[4], index)
+    for index in range(8):
+        rule_values[f"x5_{index}"] = bits(rules[5], index)
+    rule_values.update({
+        "x6": rules[6], "x7": rules[7], "is_teams": rules[8],
+        "x9": rules[9], "xA": rules[10],
+        "xB": int.from_bytes(rules[11:12], "big", signed=True),
+        "xC": int.from_bytes(rules[12:13], "big", signed=True),
+        "xD": rules[13], "stage_kind": int.from_bytes(rules[14:16], "big"),
+        "time_limit": int.from_bytes(rules[16:20], "big"), "x14": rules[20],
+        "x18": int.from_bytes(rules[24:28], "big"),
+        "x1C_pad": [int.from_bytes(rules[28:32], "big")],
+        "item_mask": f"{int.from_bytes(rules[32:40], 'big'):016x}",
+        "x28": int.from_bytes(rules[40:44], "big", signed=True),
+        "x2C_bits": rules[44:48].hex(), "damage_ratio_bits": rules[48:52].hex(),
+        "game_speed_bits": rules[52:56].hex(),
+        "on_unpause_override": None, "on_pause_override": None,
+        "check_for_pauser_override": None, "on_match_start": None,
+        "on_frame_start": None, "on_frame_end": None,
+        "on_match_end": None, "x54_pointer": None, "x58_pointer": None,
+    })
+
+    from transition_trace_format import _player
+    players = [_player(start, 0x60 + index * 0x24) for index in range(6)]
+    # The established transition-trace decoder omits this defined player byte.
+    # Retain it in this diagnostic-only schema without changing that shared
+    # decoder's long-standing output contract.
+    for index, player in enumerate(players):
+        player["xB"] = start[0x60 + index * 0x24 + 0x0B]
+    return {"rules": rule_values, "players": players}
+
+
+def _first_css_return_summary(payload: dict[str, Any]) -> dict[str, Any]:
+    from reference_capture_semantics import pad_snapshot_bytes
+
+    css_item = _slice(payload, 50, "first-CSS return", 0x148)
+    ko_item = _slice(payload, 51, "first-CSS return", 6)
+    _require(css_item["address"] == FIRST_CSS_DATA_ADDRESS and
+             ko_item["address"] == FIRST_CSS_KO_ADDRESS and
+             int.from_bytes(css_item["raw"][4:8], "big") == ko_item["address"],
+             "first-CSS return KO pointer does not name its source slice")
+    raw = css_item["raw"]
+    vs = raw[8:16]
+    start = raw[16:]
+    _require(raw[2] == 0 and raw[3] == 0,
+             "first-CSS return left the original VS CSS phase")
+    try:
+        pad_hex = pad_snapshot_bytes(
+            _slice(payload, 21, "first-CSS return", 0x358)["raw"])
+    except ValueError as error:
+        raise StadiumGoPrefixError(f"first-CSS return PAD is invalid: {error}") from error
+    semantic = _first_css_semantic_start(start)
+    return {
+        "scene_kind": _slice(payload, 40, "first-CSS return", 1)["raw"][0],
+        "random_seed_hex": _slice(payload, RNG_VALUE_TAG,
+                                   "first-CSS return", 4)["raw"].hex(),
+        "pad_state_hex": pad_hex,
+        "ko_counts_hex": ko_item["raw"].hex(),
+        "css": {
+            "unk_0x0": int.from_bytes(raw[0:2], "big"),
+            "match_type": raw[2], "pending_scene_change": raw[3],
+            "ko_counts_owner": "session_owned",
+            "vs": {
+                "loser": int.from_bytes(vs[0:1], "big", signed=True),
+                "ordered_stage_index": int.from_bytes(vs[1:2], "big", signed=True),
+                "winner": int.from_bytes(vs[2:3], "big", signed=True),
+                "unk_0x3": vs[3], "unk_0x4": vs[4], "unk_0x5": vs[5],
+                "unk_0x6": vs[6], "unk_0x7": vs[7],
+                "start": semantic,
+            },
+        },
+    }
+
+
+def _extract_first_css_context_rows(entry_row: dict[str, Any],
+                                   return_row: dict[str, Any],
+                                   stream_sha256: str) -> dict[str, Any]:
+    _require(stream_sha256 == FIRST_CSS_STREAM_SHA256,
+             "first-CSS source identity is not the retained v6 observer")
+    _require(entry_row.get("event") == "progress" and
+             entry_row.get("seq") == FIRST_CSS_ENTRY_SEQUENCE and
+             return_row.get("event") == "progress" and
+             return_row.get("seq") == FIRST_CSS_RETURN_SEQUENCE,
+             "first-CSS source rows have unexpected event or sequence identities")
+    entry = _validate_progress(entry_row, "css_entry", EXPECTED_SETUP_RECEIPT_SHA256)
+    returned = _validate_progress(return_row, "css_return", EXPECTED_SETUP_RECEIPT_SHA256)
+    _first_css_slice_inventory(entry, "css_entry")
+    _first_css_slice_inventory(returned, "css_return")
+    _require(entry_row.get("source_tick") == return_row.get("source_tick") and
+             entry.get("source_tick") == returned.get("source_tick"),
+             "first-CSS entry and return are not from the same source tick")
+
+    def read(payload, tag, phase, size, address):
+        item = _slice(payload, tag, phase, size)
+        _require(item["address"] == address,
+                 f"{phase}: tag={tag} source address differs")
+        return item
+
+    entry_css = read(entry, 50, "css_entry", 0x148, FIRST_CSS_DATA_ADDRESS)
+    entry_ko = read(entry, 51, "css_entry", 6, FIRST_CSS_KO_ADDRESS)
+    entry_pad = read(entry, 21, "css_entry", 0x358, FIRST_CSS_PAD_ADDRESS)
+    entry_rng_pointer = read(entry, RNG_POINTER_TAG, "css_entry", 4,
+                             FIRST_CSS_RNG_POINTER_ADDRESS)
+    entry_rng_value = read(entry, RNG_VALUE_TAG, "css_entry", 4,
+                           FIRST_CSS_RNG_VALUE_ADDRESS)
+    entry_rules = read(entry, 38, "css_entry", 0x18, FIRST_CSS_RULES_ADDRESS)
+    entry_save = read(entry, 39, "css_entry", 0x55E8, FIRST_CSS_SAVE_ADDRESS)
+    entry_characters = read(entry, 36, "css_entry", 2, FIRST_CSS_SAVE_ADDRESS)
+    entry_stages = read(entry, 37, "css_entry", 2, FIRST_CSS_SAVE_ADDRESS + 2)
+    entry_route = read(entry, SCENE_ROUTING_TAG, "css_entry", 6,
+                       SCENE_ROUTING_ADDRESS)
+    entry_scene = read(entry, 40, "css_entry", 1, FIRST_CSS_SCENE_ADDRESS)
+    _require(_hex_address(entry.get("argument"), "css_entry.argument") ==
+             FIRST_CSS_DATA_ADDRESS and
+             int.from_bytes(entry_css["raw"][4:8], "big") == entry_ko["address"] and
+             entry_rng_pointer["raw"] == entry_rng_value["address"].to_bytes(4, "big") and
+             entry_characters["raw"] == entry_save["raw"][:2] and
+             entry_stages["raw"] == entry_save["raw"][2:4] and
+             entry_rules["address"] + entry_rules["size"] == entry_save["address"] and
+             entry_route["raw"][0] == 0x02 and entry_scene["raw"] == b"\x08",
+             "first-CSS entry context has inconsistent source owners")
+    _require(entry_css["raw"][2:4] == b"\x00\x00" and
+             not any(entry_css["raw"][0x10 + 0x38:0x10 + 0x5C]),
+             "first-CSS entry is not a pointer-safe initial ordinary VS context")
+
+    returned_css = read(returned, 50, "css_return", 0x148, FIRST_CSS_DATA_ADDRESS)
+    returned_ko = read(returned, 51, "css_return", 6, FIRST_CSS_KO_ADDRESS)
+    returned_pad = read(returned, 21, "css_return", 0x358, FIRST_CSS_PAD_ADDRESS)
+    returned_rng_pointer = read(returned, RNG_POINTER_TAG, "css_return", 4,
+                                FIRST_CSS_RNG_POINTER_ADDRESS)
+    returned_rng_value = read(returned, RNG_VALUE_TAG, "css_return", 4,
+                              FIRST_CSS_RNG_VALUE_ADDRESS)
+    returned_route = read(returned, SCENE_ROUTING_TAG, "css_return", 6,
+                          SCENE_ROUTING_ADDRESS)
+    returned_scene = read(returned, 40, "css_return", 1, FIRST_CSS_SCENE_ADDRESS)
+    _require(int.from_bytes(returned_css["raw"][4:8], "big") == returned_ko["address"] and
+             returned_rng_pointer["raw"] == returned_rng_value["address"].to_bytes(4, "big") and
+             returned_route["raw"] == entry_route["raw"] and
+             returned_scene["raw"] == entry_scene["raw"] == b"\x08" and
+             returned_rng_value["raw"] == entry_rng_value["raw"],
+             "first-CSS entry/return owner, route, scene or RNG changed")
+
+    # Reuse the existing typed profile and semantic PAD decoders. Add official
+    # slice labels only to this short-lived decoder view; MWRO Progress rows
+    # themselves remain unchanged and are not relabeled as session records.
+    from reference_observer_stream import SLICE_NAMES
+    from reference_capture_semantics import _whole_profile_context, _whole_profile_masks
+    named_payload = dict(entry)
+    named_payload["boundary"] = "css_entry"
+    named_payload["slices"] = [
+        {**item, "name": SLICE_NAMES[item["tag"]]} for item in entry["slices"]
+    ]
+    named_entry = {"payload": named_payload}
+    profile = _whole_profile_context(named_entry)
+    masks = _whole_profile_masks(named_entry)
+    _require(profile is not None and
+             masks["characters"] == int.from_bytes(entry_characters["raw"], "big") and
+             masks["stages"] == int.from_bytes(entry_stages["raw"], "big"),
+             "first-CSS source profile masks disagree with their typed save owner")
+    from reference_capture_semantics import pad_snapshot_bytes
+    try:
+        input_pad = bytes.fromhex(pad_snapshot_bytes(entry_pad["raw"]))
+    except ValueError as error:
+        raise StadiumGoPrefixError(f"first-CSS entry PAD is invalid: {error}") from error
+    seed = entry_rng_value["raw"]
+    _require(len(seed) == 4, "first-CSS entry seed has the wrong byte width")
+    bundle = b"".join((
+        FIRST_CSS_CONTEXT_MAGIC,
+        FIRST_CSS_CONTEXT_VERSION.to_bytes(4, "big"),
+        bytes.fromhex(stream_sha256),
+        FIRST_CSS_ENTRY_SEQUENCE.to_bytes(4, "big"),
+        FIRST_CSS_RETURN_SEQUENCE.to_bytes(4, "big"),
+        seed, input_pad, entry_css["raw"], entry_ko["raw"],
+        entry_rules["raw"], entry_save["raw"],
+    ))
+    _require(len(bundle) == FIRST_CSS_CONTEXT_BYTES,
+             "first-CSS diagnostic input bundle has an unexpected length")
+    expected = _first_css_return_summary(returned)
+    return {
+        "schema": "melee-web-stadium-first-css-context-diagnostic",
+        "version": FIRST_CSS_CONTEXT_VERSION,
+        "scope": "captured original first-CSS context and immediate CSS OnEnter return only",
+        "provenance": {
+            "stream_bytes": FIRST_CSS_STREAM_BYTES,
+            "stream_sha256": stream_sha256,
+            "css_entry_sequence": FIRST_CSS_ENTRY_SEQUENCE,
+            "css_return_sequence": FIRST_CSS_RETURN_SEQUENCE,
+            "source_tick": entry_row["source_tick"],
+        },
+        "input_bundle": {
+            "magic_hex": FIRST_CSS_CONTEXT_MAGIC.hex(),
+            "version": FIRST_CSS_CONTEXT_VERSION,
+            "bytes": len(bundle),
+            "sha256": hashlib.sha256(bundle).hexdigest(),
+            "has_return_expectations": False,
+        },
+        "expected_return": expected,
+        "input_bundle_bytes": bundle,
+    }
+
+
+def extract_stadium_first_css_context(stream_path: str | Path,
+                                      status_path: str | Path) -> dict[str, Any]:
+    """Extract only the exact original v6 CSS entry and return observations."""
+    source = Path(stream_path)
+    _require(source.is_file(), "configured first-CSS observer stream is missing")
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES,
+             "first-CSS observer stream byte length differs from the retained v6 source")
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    _require(digest == FIRST_CSS_STREAM_SHA256,
+             "first-CSS observer stream hash differs from the retained v6 source")
+    try:
+        summary = validate_stadium_go_prefix(source, status_path=status_path)
+    except StadiumGoPrefixError:
+        raise
+    except (OSError, ObserverStreamError) as error:
+        raise StadiumGoPrefixError(f"cannot validate first-CSS source stream: {error}") from error
+    _require(summary.get("decision") == "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY" and
+             summary.get("stream_bytes") == FIRST_CSS_STREAM_BYTES and
+             summary.get("stream_sha256") == digest,
+             "first-CSS source stream no longer passes its existing full GO-prefix validation")
+    entry_rows = []
+    return_rows = []
+    try:
+        for row in iter_records(source, max_bytes=MAX_STREAM_BYTES,
+                                max_records=MAX_STREAM_RECORDS):
+            payload = row.get("payload", {})
+            if row.get("event") == "progress" and payload.get("phase") == "css_entry":
+                entry_rows.append(row)
+            elif row.get("event") == "progress" and payload.get("phase") == "css_return":
+                return_rows.append(row)
+    except ObserverStreamError as error:
+        raise StadiumGoPrefixError(f"cannot read first-CSS source rows: {error}") from error
+    _require(len(entry_rows) == 1 and len(return_rows) == 1,
+             "first-CSS source stream must have exactly one entry and return row")
+    result = _extract_first_css_context_rows(entry_rows[0], return_rows[0], digest)
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES and
+             hashlib.sha256(source.read_bytes()).hexdigest() == digest,
+             "first-CSS source stream changed during extraction")
+    return result
+
+
+def decode_first_css_context_bundle(data: bytes) -> dict[str, Any]:
+    """Validate and decode the input-only fixed-layout diagnostic bundle."""
+    _require(isinstance(data, bytes) and len(data) == FIRST_CSS_CONTEXT_BYTES,
+             "first-CSS diagnostic bundle has an invalid exact length")
+    _require(data[:8] == FIRST_CSS_CONTEXT_MAGIC and
+             int.from_bytes(data[8:12], "big") == FIRST_CSS_CONTEXT_VERSION,
+             "first-CSS diagnostic bundle magic/version differs")
+    stream_sha = data[12:44].hex()
+    _require(stream_sha == FIRST_CSS_STREAM_SHA256,
+             "first-CSS diagnostic bundle source identity is not the retained v6 observer")
+    entry_seq = int.from_bytes(data[44:48], "big")
+    return_seq = int.from_bytes(data[48:52], "big")
+    _require((entry_seq, return_seq) ==
+             (FIRST_CSS_ENTRY_SEQUENCE, FIRST_CSS_RETURN_SEQUENCE),
+             "first-CSS diagnostic bundle sequence identities differ")
+    offset = FIRST_CSS_CONTEXT_HEADER_BYTES
+    return {
+        "source_stream_sha256": stream_sha,
+        "entry_sequence": entry_seq,
+        "return_sequence": return_seq,
+        "seed_hex": data[offset:offset + 4].hex(),
+        "pad_state_hex": data[offset + 4:offset + 4 + 822].hex(),
+        "css_data_hex": data[offset + 4 + 822:offset + 4 + 822 + 0x148].hex(),
+        "ko_counts_hex": data[offset + 4 + 822 + 0x148:
+                               offset + 4 + 822 + 0x148 + 6].hex(),
+        "game_rules_hex": data[offset + 4 + 822 + 0x148 + 6:
+                               offset + 4 + 822 + 0x148 + 6 + 0x18].hex(),
+        "save_data_hex": data[-0x55E8:].hex(),
+        "contains_expected_return": False,
     }

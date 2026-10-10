@@ -3382,6 +3382,419 @@ void run_v10_css_replay_start_prefix(const melee_web::RuntimeFiles& files,
     }
 }
 
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+namespace {
+constexpr size_t kFirstCssInputBytes = 23228;
+constexpr size_t kFirstCssInputHeaderBytes = 52;
+constexpr size_t kFirstCssPadBytes = MELEE_WEB_PAD_STATE_BYTES;
+constexpr size_t kFirstCssDataBytes = 0x148;
+constexpr size_t kFirstCssKoBytes = GM_MAX_PLAYERS;
+constexpr size_t kFirstCssRulesBytes = 0x18;
+constexpr size_t kFirstCssSaveBytes = 0x55E8;
+constexpr uint32_t kFirstCssEntrySequence = 704;
+constexpr uint32_t kFirstCssReturnSequence = 833;
+constexpr uint32_t kFirstCssObserverKoAddress = 0x804D6730;
+
+struct FirstCssContextInput {
+    std::array<uint8_t, kFirstCssPadBytes> pad{};
+    std::array<uint8_t, kFirstCssDataBytes> css{};
+    std::array<uint8_t, kFirstCssKoBytes> ko{};
+    std::array<uint8_t, kFirstCssRulesBytes> rules{};
+    std::array<uint8_t, kFirstCssSaveBytes> save{};
+    uint32_t seed = 0;
+    std::string source_sha256;
+};
+
+uint32_t first_css_be32(const uint8_t* bytes) {
+    return (uint32_t(bytes[0]) << 24) | (uint32_t(bytes[1]) << 16) |
+           (uint32_t(bytes[2]) << 8) | uint32_t(bytes[3]);
+}
+
+std::string first_css_hex(const uint8_t* bytes, size_t size) {
+    static constexpr char digits[] = "0123456789abcdef";
+    std::string result;
+    result.reserve(size * 2);
+    for (size_t i = 0; i < size; ++i) {
+        result.push_back(digits[bytes[i] >> 4]);
+        result.push_back(digits[bytes[i] & 0x0F]);
+    }
+    return result;
+}
+
+FirstCssContextInput read_first_css_context_input(const char* path) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) throw std::runtime_error("Cannot open Stadium diagnostic input bundle");
+    const std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(input)),
+                                     std::istreambuf_iterator<char>());
+    check(bytes.size() == kFirstCssInputBytes,
+          "Stadium diagnostic input bundle has an unexpected exact length");
+    check(std::memcmp(bytes.data(), "STC1INPT", 8) == 0 &&
+              first_css_be32(bytes.data() + 8) == 1,
+          "Stadium diagnostic input bundle magic/version differs");
+    static constexpr uint8_t expected_stream_sha[32] = {
+        0x36,0x1e,0x8c,0x11,0x08,0xcc,0x2d,0x02,
+        0xba,0x94,0xd1,0xf3,0xb3,0xbe,0x96,0x12,
+        0xa8,0x0d,0x02,0x27,0x67,0x24,0x45,0xcd,
+        0x4a,0x2b,0x0e,0x21,0x19,0x91,0x77,0x78
+    };
+    check(std::equal(std::begin(expected_stream_sha), std::end(expected_stream_sha),
+                     bytes.begin() + 12),
+          "Stadium diagnostic input source identity is not the retained v6 observer");
+    check(first_css_be32(bytes.data() + 44) == kFirstCssEntrySequence &&
+              first_css_be32(bytes.data() + 48) == kFirstCssReturnSequence,
+          "Stadium diagnostic input source sequence identities differ");
+
+    FirstCssContextInput result;
+    result.source_sha256 = first_css_hex(bytes.data() + 12, 32);
+    size_t offset = kFirstCssInputHeaderBytes;
+    result.seed = first_css_be32(bytes.data() + offset);
+    offset += 4;
+    std::copy_n(bytes.data() + offset, result.pad.size(), result.pad.begin());
+    offset += result.pad.size();
+    std::copy_n(bytes.data() + offset, result.css.size(), result.css.begin());
+    offset += result.css.size();
+    std::copy_n(bytes.data() + offset, result.ko.size(), result.ko.begin());
+    offset += result.ko.size();
+    std::copy_n(bytes.data() + offset, result.rules.size(), result.rules.begin());
+    offset += result.rules.size();
+    std::copy_n(bytes.data() + offset, result.save.size(), result.save.begin());
+    offset += result.save.size();
+    check(offset == bytes.size(), "Stadium diagnostic input bundle has trailing bytes");
+    check(result.css[2] == VS_MELEE && result.css[3] == 0 &&
+              first_css_be32(result.css.data() + 4) == kFirstCssObserverKoAddress &&
+              std::all_of(result.css.begin() + 0x48,
+                          result.css.begin() + 0x6C,
+                          [](uint8_t value) { return value == 0; }),
+          "Stadium diagnostic input has an invalid initial owner or callback region");
+    return result;
+}
+
+void write_first_css_player(std::ostream& out, const PlayerInitData& p) {
+    const unsigned flags_c = (unsigned(p.rumble_enabled) << 7) |
+        (unsigned(p.xC_b1) << 6) | (unsigned(p.xC_b2) << 5) |
+        (unsigned(p.xC_b3) << 4) | (unsigned(p.vs_invisible) << 3) |
+        (unsigned(p.xC_b5) << 2) | (unsigned(p.xC_b6) << 1) |
+        unsigned(p.xC_b7);
+    const unsigned flags_d = (unsigned(p.xD_b0) << 7) |
+        (unsigned(p.xD_b1) << 6) | (unsigned(p.xD_b2) << 5) |
+        (unsigned(p.xD_b3) << 4) | (unsigned(p.xD_b4) << 3) |
+        (unsigned(p.xD_b5) << 2) | (unsigned(p.xD_b6) << 1) |
+        unsigned(p.xD_b7);
+    out << "{\"ckind\":" << int(p.ckind)
+        << ",\"slot_type\":" << unsigned(p.slot_type)
+        << ",\"stocks\":" << int(p.stocks)
+        << ",\"color\":" << unsigned(p.color)
+        << ",\"slot\":" << unsigned(p.slot)
+        << ",\"spawn\":" << int(p.x5)
+        << ",\"spawn_direction\":" << int(p.spawn_dir)
+        << ",\"sub_color\":" << unsigned(p.sub_color)
+        << ",\"handicap\":" << int(p.handicap)
+        << ",\"team\":" << unsigned(p.team)
+        << ",\"nametag\":" << unsigned(p.nametag)
+        << ",\"xB\":" << unsigned(p.xB)
+        << ",\"flags_c\":" << flags_c << ",\"flags_d\":" << flags_d
+        << ",\"cpu_kind\":" << unsigned(p.cpu_kind)
+        << ",\"cpu_level\":" << unsigned(p.cpu_level)
+        << ",\"damage_10\":" << p.x10 << ",\"damage_12\":" << p.x12
+        << ",\"hp\":" << p.hp
+        << ",\"attack_ratio_bits\":\""
+        << hex32(std::bit_cast<uint32_t>(p.attack_ratio))
+        << "\",\"defense_ratio_bits\":\""
+        << hex32(std::bit_cast<uint32_t>(p.defense_ratio))
+        << "\",\"model_scale_bits\":\""
+        << hex32(std::bit_cast<uint32_t>(p.model_scale)) << "\"}";
+}
+
+void write_first_css_start(std::ostream& out, const StartMeleeData& start) {
+    out << "{\"rules\":";
+    write_source_rules(out, start.rules);
+    out << ",\"players\":[";
+    for (unsigned i = 0; i < GM_MAX_PLAYERS; ++i) {
+        if (i) out << ',';
+        write_first_css_player(out, start.players[i]);
+    }
+    out << "]}";
+}
+
+void write_first_css_vs_mode(std::ostream& out, const VsModeData& mode) {
+    out << "{\"loser\":" << int(mode.loser)
+        << ",\"ordered_stage_index\":" << int(mode.ordered_stage_index)
+        << ",\"winner\":" << int(mode.winner)
+        << ",\"unk_0x3\":" << unsigned(mode.unk_0x3)
+        << ",\"unk_0x4\":" << unsigned(mode.unk_0x4)
+        << ",\"unk_0x5\":" << unsigned(mode.unk_0x5)
+        << ",\"unk_0x6\":" << unsigned(mode.unk_0x6)
+        << ",\"unk_0x7\":" << unsigned(mode.unk_0x7)
+        << ",\"start\":";
+    write_first_css_start(out, mode.start);
+    out << '}';
+}
+
+std::string first_css_json_quote(const std::string& value) {
+    static constexpr char digits[] = "0123456789abcdef";
+    std::string result = "\"";
+    for (unsigned char c : value) {
+        if (c == '"' || c == '\\') {
+            result.push_back('\\');
+            result.push_back(static_cast<char>(c));
+        } else if (c == '\n') {
+            result += "\\n";
+        } else if (c == '\r') {
+            result += "\\r";
+        } else if (c == '\t') {
+            result += "\\t";
+        } else if (c < 0x20) {
+            result += "\\u00";
+            result.push_back(digits[c >> 4]);
+            result.push_back(digits[c & 0x0f]);
+        } else {
+            result.push_back(static_cast<char>(c));
+        }
+    }
+    result.push_back('"');
+    return result;
+}
+
+struct FirstCssCleanupResult {
+    bool leave_attempted = false;
+    bool leave_ok = false;
+    std::string leave_error;
+    bool archives_attempted = false;
+    bool archives_ok = false;
+    std::string archives_error;
+    bool world_close_attempted = false;
+    bool world_close_ok = false;
+    std::string world_close_error;
+    bool host_destroy_attempted = false;
+    bool host_destroy_ok = false;
+    std::string host_destroy_error;
+    bool complete = false;
+};
+
+void write_first_css_cleanup(const FirstCssCleanupResult& result,
+                             const MeleeWebMenuHost* host,
+                             const melee_web::GameplayMenuWorld* world) {
+    const auto boolean = [](bool value) { return value ? "true" : "false"; };
+    std::cout << "{\"record\":\"stadium_first_css_cleanup\",\"decision\":\""
+              << (result.complete ? "PASS_CHECKED_TEARDOWN" : "FAIL_CHECKED_TEARDOWN")
+              << "\",\"leave\":{\"attempted\":" << boolean(result.leave_attempted)
+              << ",\"ok\":" << boolean(result.leave_ok) << ",\"error\":"
+              << first_css_json_quote(result.leave_error)
+              << "},\"archive_verification\":{\"attempted\":"
+              << boolean(result.archives_attempted) << ",\"ok\":"
+              << boolean(result.archives_ok) << ",\"error\":"
+              << first_css_json_quote(result.archives_error)
+              << "},\"world_close\":{\"attempted\":"
+              << boolean(result.world_close_attempted) << ",\"ok\":"
+              << boolean(result.world_close_ok) << ",\"error\":"
+              << first_css_json_quote(result.world_close_error)
+              << "},\"host_destroy\":{\"attempted\":"
+              << boolean(result.host_destroy_attempted) << ",\"ok\":"
+              << boolean(result.host_destroy_ok) << ",\"error\":"
+              << first_css_json_quote(result.host_destroy_error)
+              << "},\"host_owned_remaining\":" << boolean(host != nullptr)
+              << ",\"world_owned_remaining\":" << boolean(world != nullptr) << "}\n"
+              << std::flush;
+}
+
+void run_stadium_first_css_context(const melee_web::RuntimeFiles& files,
+                                   const char* bundle_path) {
+    FirstCssContextInput source{};
+    try {
+        source = read_first_css_context_input(bundle_path);
+    } catch (...) {
+        std::cout << "{\"record\":\"stadium_first_css_return_refusal\","
+                     "\"stage\":\"read-input-bundle\",\"snapshot_captured\":false}\n"
+                  << std::flush;
+        char session_error[256]{};
+        const int ended = melee_web_gameplay_session_end(
+            session_error, sizeof(session_error));
+        std::cout << "{\"record\":\"stadium_first_css_session_cleanup\","
+                  << "\"attempted\":true,\"ok\":"
+                  << (ended ? "true" : "false") << ",\"error\":"
+                  << first_css_json_quote(session_error) << "}\n" << std::flush;
+        throw;
+    }
+    char error[256]{};
+    MeleeWebMenuHost* host = nullptr;
+    std::unique_ptr<melee_web::GameplayMenuWorld> world;
+    bool host_enter_attempted = false;
+    bool host_entered = false;
+    bool snapshot_captured = false;
+    bool cleanup_attempted = false;
+    const char* stage = "host-create";
+
+    auto checked_teardown = [&]() {
+        FirstCssCleanupResult result{};
+        char cleanup_error[256]{};
+
+        if (host && (host_entered || host_enter_attempted)) {
+            result.leave_attempted = true;
+            if (melee_web_menu_host_leave(host, 1, cleanup_error,
+                                          sizeof(cleanup_error))) {
+                result.leave_ok = true;
+                host_entered = false;
+            } else {
+                result.leave_error = cleanup_error;
+            }
+        }
+
+        /* A failed enter can leave an unentered but partially-owned host. Its
+         * public destroy guard is the only safe cleanup probe; preserve the
+         * host and its world unless that checked call proves retirement. */
+        if (host && host_enter_attempted && !result.leave_ok) {
+            cleanup_error[0] = '\0';
+            result.host_destroy_attempted = true;
+            if (melee_web_menu_host_destroy(host, cleanup_error,
+                                            sizeof(cleanup_error))) {
+                result.host_destroy_ok = true;
+                host = nullptr;
+            } else {
+                result.host_destroy_error = cleanup_error;
+            }
+        }
+
+        const bool host_released_or_safe =
+            host == nullptr || !host_enter_attempted || result.leave_ok;
+        if (world && host_released_or_safe) {
+            result.archives_attempted = true;
+            try {
+                world->verify_immutable_archives();
+                result.archives_ok = true;
+            } catch (const std::exception& failure) {
+                result.archives_error = failure.what();
+            } catch (...) {
+                result.archives_error = "unknown archive verification failure";
+            }
+            cleanup_error[0] = '\0';
+            result.world_close_attempted = true;
+            try {
+                world->close();
+                world.reset();
+                result.world_close_ok = true;
+            } catch (const std::exception& failure) {
+                result.world_close_error = failure.what();
+            } catch (...) {
+                result.world_close_error = "unknown world close failure";
+            }
+        }
+
+        if (host && (host_released_or_safe && !world)) {
+            cleanup_error[0] = '\0';
+            result.host_destroy_attempted = true;
+            if (melee_web_menu_host_destroy(host, cleanup_error,
+                                            sizeof(cleanup_error))) {
+                result.host_destroy_ok = true;
+                host = nullptr;
+            } else {
+                result.host_destroy_error = cleanup_error;
+            }
+        }
+
+        result.complete = host == nullptr && world == nullptr &&
+            (!result.archives_attempted || result.archives_ok) &&
+            (!result.world_close_attempted || result.world_close_ok) &&
+            (!result.host_destroy_attempted || result.host_destroy_ok);
+        write_first_css_cleanup(result, host, world.get());
+        return result;
+    };
+
+    try {
+        host = melee_web_menu_host_create(error, sizeof(error));
+        check(host != nullptr, error);
+        stage = "world-create";
+        world = std::make_unique<melee_web::GameplayMenuWorld>(files);
+        stage = "apply-captured-context";
+        check(melee_web_menu_host_apply_replay_context(
+                  host, source.seed, source.pad.data(), source.css.data(),
+                  source.ko.data(), source.rules.data(), source.save.data(),
+                  error, sizeof(error)), error);
+        stage = "arm-first-css-return";
+        check(melee_web_menu_host_arm_first_css_return(host, error,
+                                                        sizeof(error)), error);
+        stage = "original-css-enter";
+        host_enter_attempted = true;
+        check(melee_web_menu_host_enter(host, world->audio(), error,
+                                        sizeof(error)), error);
+        host_entered = true;
+        stage = "read-immediate-css-return";
+        MeleeWebMenuCssReturnSnapshot snapshot{};
+        check(melee_web_menu_host_first_css_return(host, &snapshot, error,
+                                                   sizeof(error)), error);
+        check(snapshot.source_scene == MELEE_WEB_MENU_HOST_SCENE_CSS &&
+                  snapshot.source_scene_kind == 8 &&
+                  snapshot.css.ko_counts == nullptr,
+              "Immediate first-CSS return snapshot lacks checked CSS/KO ownership");
+        snapshot_captured = true;
+
+        /* Preserve the captured return even if later teardown refuses. The
+         * separate cleanup record is the only authority for teardown status. */
+        std::cout << "{\"record\":\"stadium_first_css_return_snapshot\","
+                  << "\"schema\":\"melee-web-stadium-first-css-return-v1\","
+                  << "\"source_stream_sha256\":\"" << source.source_sha256 << "\","
+                  << "\"css_entry_sequence\":" << kFirstCssEntrySequence << ','
+                  << "\"css_return_sequence\":" << kFirstCssReturnSequence << ','
+                  << "\"source_scene\":" << snapshot.source_scene << ','
+                  << "\"scene_kind\":" << snapshot.source_scene_kind << ','
+                  << "\"random_seed_hex\":\"" << hex32(snapshot.random_seed) << "\","
+                  << "\"pad_state_hex\":\""
+                  << first_css_hex(snapshot.pad_state, sizeof(snapshot.pad_state))
+                  << "\",\"ko_counts_hex\":\""
+                  << first_css_hex(snapshot.ko_counts, sizeof(snapshot.ko_counts))
+                  << "\",\"css\":{\"unk_0x0\":" << snapshot.css.unk_0x0
+                  << ",\"match_type\":" << unsigned(snapshot.css.match_type)
+                  << ",\"pending_scene_change\":"
+                  << unsigned(snapshot.css.pending_scene_change)
+                  << ",\"ko_counts_owner\":\"session_owned\",\"vs\":";
+        write_first_css_vs_mode(std::cout, snapshot.css.vs);
+        std::cout << "},\"source_ticks\":0,\"draws\":0,"
+                  << "\"full_session_comparison\":false,\"cleanup\":\"pending\"}\n"
+                  << std::flush;
+
+        stage = "checked-teardown";
+        cleanup_attempted = true;
+        const FirstCssCleanupResult cleanup = checked_teardown();
+        check(cleanup.complete,
+              "First-CSS context diagnostic checked teardown failed");
+    } catch (...) {
+        if (!snapshot_captured) {
+            std::cout << "{\"record\":\"stadium_first_css_return_refusal\","
+                      << "\"stage\":" << first_css_json_quote(stage)
+                      << ",\"snapshot_captured\":false}\n" << std::flush;
+        }
+        if (!cleanup_attempted) {
+            cleanup_attempted = true;
+            (void)checked_teardown();
+        }
+        if (!host && !world && !melee_web_gameplay_world_exists()) {
+            char session_error[256]{};
+            const int ended = melee_web_gameplay_session_end(
+                session_error, sizeof(session_error));
+            std::cout << "{\"record\":\"stadium_first_css_session_cleanup\","
+                      << "\"attempted\":true,\"ok\":"
+                      << (ended ? "true" : "false") << ",\"error\":"
+                      << first_css_json_quote(session_error) << "}\n" << std::flush;
+        } else {
+            std::cout << "{\"record\":\"stadium_first_css_session_cleanup\","
+                      << "\"attempted\":false,\"ok\":false,"
+                      << "\"error\":\"owners remain; session end was not safe to attempt\"}\n"
+                      << std::flush;
+        }
+        if (world) {
+            std::cout << "{\"record\":\"stadium_first_css_retained_owner_refusal\","
+                         "\"world_disposition\":\"retained_until_process_exit\","
+                         "\"implicit_retry\":false}\n" << std::flush;
+            /* Storage::~Storage retries close_impl. A failed checked close
+             * must remain an explicit refusal, so keep the object alive until
+             * the fatal runner exit instead of silently retrying in unwinding. */
+            (void)world.release();
+        }
+        throw;
+    }
+}
+} // namespace
+#endif
+
 void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
 {
     char error[256]{};
@@ -9570,6 +9983,8 @@ int main(int argc,char** argv){try{
      std::string(input_recipe)=="stadium-source-text-lifetime-v1";
  const bool stadium_ready_text_membership_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-source-ready-text-membership-v1";
+ const bool stadium_first_css_context_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-first-css-context-v1";
 #else
  const bool stadium_c1a_recipe=false;
  const bool stadium_c1_context_preflight_recipe=false;
@@ -9590,6 +10005,7 @@ int main(int argc,char** argv){try{
  const bool stadium_pad_leave_probe_recipe=false;
  const bool stadium_source_text_lifetime_recipe=false;
  const bool stadium_ready_text_membership_recipe=false;
+ const bool stadium_first_css_context_recipe=false;
 #endif
  if(input_recipe&&!css_observer_recipe&&!sparse_css_recipe&&!sparse_pad_recipe&&!ordinary_timeout_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
@@ -9605,13 +10021,17 @@ int main(int argc,char** argv){try{
     !stadium_source_setup_recipe&&
     !stadium_pad_leave_probe_recipe&&!stadium_source_text_lifetime_recipe&&
     !stadium_ready_text_membership_recipe&&
+    !stadium_first_css_context_recipe&&
     !v10_css_replay_start_recipe)
     throw std::runtime_error("Unknown transition input recipe");
  if(v10_css_replay_start_recipe&&
     (argc!=8||!replay_recipe_path||!trace_path||!source_revision))
    throw std::runtime_error("MWRC v10 CSS replay-start reducer requires trace, source revision and exact recipe path");
- if(!v10_css_replay_start_recipe&&argc==8)
-   throw std::runtime_error("Only the MWRC v10 CSS replay-start reducer accepts an exact recipe path");
+ if(stadium_first_css_context_recipe&&
+    (argc!=8||!replay_recipe_path||!trace_path||!source_revision))
+   throw std::runtime_error("First-CSS context diagnostic requires trace, source revision and exact input bundle path");
+ if(!v10_css_replay_start_recipe&&!stadium_first_css_context_recipe&&argc==8)
+   throw std::runtime_error("Only exact replay/context reducers accept an input path");
  if((css_observer_recipe||sparse_css_recipe||sparse_pad_recipe||ordinary_timeout_recipe||retail_fd_recipe||results_mario_recipe||sudden_death_host_recipe||
      sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe||
      v10_css_replay_start_recipe)&&
@@ -9625,7 +10045,7 @@ int main(int argc,char** argv){try{
      stadium_source_functional_idle_pair_recipe||stadium_grdatfiles_pair_recipe||
      stadium_source_setup_recipe||stadium_pad_leave_probe_recipe||
      stadium_source_text_lifetime_recipe||
-     stadium_ready_text_membership_recipe)&&
+     stadium_ready_text_membership_recipe||stadium_first_css_context_recipe)&&
     stage_kind!=St_Kind_PStadium)
    throw std::runtime_error("C1a recipes require source StKind 3");
  TransitionTrace trace(trace_path,source_revision,input_recipe);
@@ -9638,9 +10058,10 @@ int main(int argc,char** argv){try{
     stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
      stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||
      stadium_source_functional_idle_pair_recipe||stadium_grdatfiles_pair_recipe||
-     stadium_source_setup_recipe||stadium_pad_leave_probe_recipe||
-     stadium_source_text_lifetime_recipe||
+    stadium_source_setup_recipe||stadium_pad_leave_probe_recipe||
+    stadium_source_text_lifetime_recipe||
     stadium_ready_text_membership_recipe||
+    stadium_first_css_context_recipe||
     v10_css_replay_start_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
     trophy_baseline_recipe||sound_settings_recipe)
   keys=melee_web::menu_asset_names();
@@ -9668,6 +10089,21 @@ int main(int argc,char** argv){try{
               "no draw or full-session comparison\n";
   return 0;
  }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(stadium_first_css_context_recipe){
+  run_stadium_first_css_context(files,replay_recipe_path);
+  const int session_ended = melee_web_gameplay_session_end(
+      session_error, sizeof(session_error));
+  std::cout << "{\"record\":\"stadium_first_css_session_cleanup\","
+            << "\"attempted\":true,\"ok\":"
+            << (session_ended ? "true" : "false") << ",\"error\":"
+            << first_css_json_quote(session_error) << "}\n" << std::flush;
+  check(session_ended, session_error);
+  std::cout<<"Original first-CSS return context diagnostic completed after one CSS OnEnter; "
+              "zero source ticks/draws, no SSS/GO/match/full-session comparison\n";
+  return 0;
+ }
+#endif
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  if(stadium_grdatfiles_pair_recipe){
   check(melee_web_stadium_c1_grdatfiles_snapshot_control(),

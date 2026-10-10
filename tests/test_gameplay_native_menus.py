@@ -519,6 +519,173 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
     def setUpClass(cls):
         cls.scratch = cls.new_workspace(ROOT, "stadium-c1a-native-menu-")
 
+    def test_stadium_first_css_context_return_one_shot(self):
+        if os.environ.get("MELEE_RUN_STADIUM_FIRST_CSS_CONTEXT") != "1":
+            self.skipTest("Original immediate first-CSS return comparison requires its reviewed run gate")
+        import hashlib
+        from capture_sd_reference_prefix import cleanup_process
+        from stadium_go_prefix import (
+            FIRST_CSS_CONTEXT_BYTES, FIRST_CSS_STREAM_BYTES,
+            FIRST_CSS_STREAM_SHA256, decode_first_css_context_bundle,
+            extract_stadium_first_css_context,
+        )
+
+        raw_value = os.environ.get("MELEE_WEB_STADIUM_FIRST_CSS_RAW")
+        self.assertTrue(raw_value, "Retained original first-CSS observer path is required")
+        raw_path = Path(raw_value).resolve()
+        status_value = os.environ.get("MELEE_WEB_STADIUM_FIRST_CSS_STATUS")
+        status_path = (Path(status_value).resolve() if status_value else
+                       raw_path.parent / "observer-status.json")
+        self.assertTrue(raw_path.is_file())
+        self.assertTrue(status_path.is_file())
+        extraction = extract_stadium_first_css_context(raw_path, status_path)
+        bundle = extraction.pop("input_bundle_bytes")
+        self.assertEqual(len(bundle), FIRST_CSS_CONTEXT_BYTES)
+        self.assertEqual(extraction["provenance"]["stream_bytes"], FIRST_CSS_STREAM_BYTES)
+        self.assertEqual(extraction["provenance"]["stream_sha256"], FIRST_CSS_STREAM_SHA256)
+        decoded = decode_first_css_context_bundle(bundle)
+        self.assertFalse(decoded["contains_expected_return"])
+        expected = extraction["expected_return"]
+
+        context_dir = self.scratch / "first-css-context-one-shot"
+        context_dir.mkdir(exist_ok=False)
+        bundle_path = context_dir / "first-css-input.mwsc"
+        expected_path = context_dir / "expected-return.json"
+        bundle_path.write_bytes(bundle)
+        expected_path.write_text(json.dumps(expected, indent=2, sort_keys=True) + "\n",
+                                 encoding="utf-8")
+        bundle_sha = hashlib.sha256(bundle_path.read_bytes()).hexdigest()
+        self.assertFalse((context_dir / "observer.bin").exists(),
+                         "Raw observer capture must remain outside native input scratch")
+
+        fixture_value = os.environ.get("MELEE_MENU_FIXTURE_ROOT")
+        self.assertTrue(fixture_value, "Retained Stadium fixture root is required")
+        fixture = Path(fixture_value)
+        self.assertTrue(fixture.is_absolute(), "Use the frozen absolute fixture root")
+        menu, game = fixture / "native-menus", fixture / "next-gate"
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        self.assertTrue(target.is_file(), "Reviewed Stadium diagnostic binary is required")
+        menu_script = (
+            "import {NATIVE_MENU_DISC_FILES} from './web/runtime-assets.mjs'; "
+            "console.log(JSON.stringify([...Object.keys(NATIVE_MENU_DISC_FILES), "
+            "'dsp_coef.bin', 'sislib_font.bin']))"
+        )
+        menu_names = json.loads(subprocess.check_output(
+            [str(node_runtime()), "--input-type=module", "-e", menu_script],
+            cwd=ROOT, text=True))
+        selected_names = stadium_c1_selected_file_names()
+        names = sorted(set(menu_names) | set(selected_names))
+        self.assertEqual((len(menu_names), len(selected_names), len(names)), (76, 36, 98))
+        paths = {name: (menu / name if (menu / name).is_file() else game / name)
+                 for name in names}
+        self.assertTrue(all(path.is_file() for path in paths.values()))
+        fixture_before = {name: hashlib.sha256(path.read_bytes()).hexdigest()
+                          for name, path in paths.items()}
+
+        source = subprocess.check_output(["git", "rev-parse", "HEAD"],
+                                         cwd=ROOT, text=True).strip()
+        trace = context_dir / "first-css-context.jsonl"
+        output = context_dir / "node-owner"
+        output.mkdir(exist_ok=False)
+        command = [str(node_runtime()), str(target), str(menu), str(game), "3",
+                   str(trace), source, "stadium-first-css-context-v1",
+                   str(bundle_path)]
+        self.assertNotIn(str(expected_path), command,
+                         "Expected return must not be supplied to the native input reader")
+        identity = {
+            "scope": "stadium-first-css-context-v1", "ownership": "direct-Popen",
+            "source_revision": source, "argv": command, "cwd": str(ROOT),
+            "timeout_seconds": 120, "input_bundle_sha256": bundle_sha,
+            "expected_return_sha256": hashlib.sha256(expected_path.read_bytes()).hexdigest(),
+            "observer_raw_in_native_scratch": False,
+            "fixture_sha256_before": fixture_before,
+        }
+        stdout_path = context_dir / "native.stdout"
+        stderr_path = context_dir / "native.stderr"
+        try:
+            with stdout_path.open("xb") as stdout, stderr_path.open("xb") as stderr:
+                process = subprocess.Popen(command, cwd=ROOT, stdout=stdout, stderr=stderr)
+                try:
+                    identity["pid"] = process.pid
+                    (output / "identity.json").write_text(
+                        json.dumps(identity, indent=2, sort_keys=True) + "\n",
+                        encoding="utf-8")
+                    process.wait(timeout=120)
+                finally:
+                    cleanup_process(process, output,
+                                    scope="stadium-first-css-context-v1")
+        finally:
+            fixture_after = {name: hashlib.sha256(path.read_bytes()).hexdigest()
+                             for name, path in paths.items()}
+            (output / "fixture-after.json").write_text(
+                json.dumps(fixture_after, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8")
+            self.assertEqual(fixture_after, fixture_before,
+                             "Real Stadium fixture changed during first-CSS context replay")
+
+        stdout = stdout_path.read_text(encoding="utf-8")
+        stderr = stderr_path.read_text(encoding="utf-8")
+        self.assertEqual(hashlib.sha256(bundle_path.read_bytes()).hexdigest(), bundle_sha)
+        self.assertFalse((context_dir / "observer.bin").exists())
+        trace_rows = [json.loads(line) for line in trace.read_text().splitlines()]
+        self.assertEqual(len(trace_rows), 1, "Context diagnostic must not record a source tick")
+        self.assertEqual(trace_rows[0]["record"], "header")
+        self.assertEqual(trace_rows[0]["input_recipe"], "stadium-first-css-context-v1")
+        result_rows = [json.loads(line) for line in stdout.splitlines()
+                       if line.startswith('{') and '"record":"stadium_first_css_return_snapshot"' in line]
+        self.assertEqual(len(result_rows), 1, stdout)
+        actual = result_rows[0]
+        self.assertEqual(actual["source_stream_sha256"], FIRST_CSS_STREAM_SHA256)
+        self.assertEqual((actual["css_entry_sequence"], actual["css_return_sequence"]),
+                         (704, 833))
+        self.assertEqual((actual["source_scene"], actual["scene_kind"]), (1, 8))
+        self.assertEqual((actual["source_ticks"], actual["draws"],
+                          actual["full_session_comparison"], actual["cleanup"]),
+                         (0, 0, False, "pending"))
+        for field in ("random_seed_hex", "pad_state_hex", "ko_counts_hex", "css"):
+            if field != "css":
+                self.assertEqual(actual[field], expected[field], field)
+
+        actual_css, expected_css = dict(actual["css"]), dict(expected["css"])
+        actual_vs, expected_vs = actual_css.pop("vs"), expected_css.pop("vs")
+        self.assertEqual(actual_css, expected_css)
+        actual_rules = actual_vs["start"]["rules"]
+        expected_rules = expected_vs["start"]["rules"]
+        actual_rules = dict(actual_rules)
+        actual_rules.pop("pad_x5C", None)  # Explicit ABI padding is not semantic state.
+        for pointer_field in (
+                "on_unpause_override", "on_pause_override", "check_for_pauser_override",
+                "on_match_start", "on_frame_start", "on_frame_end", "on_match_end",
+                "x54_pointer", "x58_pointer"):
+            self.assertEqual(actual_rules.get(pointer_field), "null",
+                             f"Returned source pointer field is not null: {pointer_field}")
+            actual_rules[pointer_field] = None
+        self.assertEqual(actual_rules, expected_rules, "Typed StartMeleeRules differs")
+        actual_start = dict(actual_vs["start"])
+        actual_start["rules"] = actual_rules
+        actual_vs["start"] = actual_start
+        self.assertEqual(actual_vs, expected_vs, "Typed VsModeData differs")
+
+        # Compare the captured OnEnter result before requiring checked teardown
+        # and process success; a cleanup refusal must not hide source evidence.
+        cleanup_rows = [json.loads(line) for line in stdout.splitlines()
+                        if line.startswith('{') and
+                        '"record":"stadium_first_css_cleanup"' in line]
+        self.assertEqual(len(cleanup_rows), 1, stdout)
+        cleanup = cleanup_rows[0]
+        self.assertEqual(cleanup["decision"], "PASS_CHECKED_TEARDOWN", cleanup)
+        self.assertFalse(cleanup["host_owned_remaining"], cleanup)
+        self.assertFalse(cleanup["world_owned_remaining"], cleanup)
+        for owner_step in ("leave", "archive_verification", "world_close", "host_destroy"):
+            self.assertTrue(cleanup[owner_step]["ok"], cleanup)
+        session_rows = [json.loads(line) for line in stdout.splitlines()
+                        if line.startswith('{') and
+                        '"record":"stadium_first_css_session_cleanup"' in line]
+        self.assertEqual(len(session_rows), 1, stdout)
+        self.assertEqual(session_rows[0]["attempted"], True)
+        self.assertEqual(session_rows[0]["ok"], True, session_rows[0])
+        self.assertEqual(process.returncode, 0, (stdout + stderr)[-12000:])
+
     def test_stadium_ready_rules_and_callback_owner_controls(self):
         """Actual adapter predicates with explicit synthetic service witnesses.
 

@@ -143,6 +143,25 @@ int melee_web_menu_host_apply_replay_context(
     const uint8_t css_data[0x148], const uint8_t ko_counts[GM_MAX_PLAYERS],
     const uint8_t game_rules[0x18], const uint8_t save_data[0x55E8],
     char*, size_t);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+typedef struct MeleeWebMenuCssReturnSnapshot {
+    /* Typed source fields; css.ko_counts is NULL in this copied snapshot.
+     * Pointer-valued fields are not guest/native equality authorities. */
+    CSSData css;
+    uint8_t ko_counts[GM_MAX_PLAYERS];
+    uint8_t pad_state[MELEE_WEB_PAD_STATE_BYTES];
+    uint32_t random_seed;
+    int source_scene;
+    int source_scene_kind;
+} MeleeWebMenuCssReturnSnapshot;
+/* Arm once after reference context installation, before first host_enter.
+ * Read only after successful enter, before any tick/leave; a failed note
+ * remains explicit while original enter/phase updates finish for cleanup. */
+int melee_web_menu_host_arm_first_css_return(MeleeWebMenuHost*, char*, size_t);
+int melee_web_menu_host_first_css_return(MeleeWebMenuHost*,
+    MeleeWebMenuCssReturnSnapshot*, char*, size_t);
+#endif
+
 /* Install only the agreed networked seed on a fresh unentered host. Requires
  * the canonical Everything mode, no personal profile and default PAD history. */
 int melee_web_menu_host_apply_net_context(MeleeWebMenuHost*, uint32_t random_seed,

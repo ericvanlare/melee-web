@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from contextlib import contextmanager
 from unittest.mock import patch
 from pathlib import Path
@@ -28,6 +29,26 @@ from stadium_go_prefix import (  # noqa: E402
     EXPECTED_SETUP_RECEIPT_SHA256,
     SCENE_ROUTING_TAG,
     StadiumGoPrefixError,
+    FIRST_CSS_CONTEXT_BYTES,
+    FIRST_CSS_CONTEXT_ENV,
+    FIRST_CSS_CONTEXT_MAGIC,
+    FIRST_CSS_CONTEXT_VERSION,
+    FIRST_CSS_DATA_ADDRESS,
+    FIRST_CSS_ENTRY_SEQUENCE,
+    FIRST_CSS_KO_ADDRESS,
+    FIRST_CSS_PAD_ADDRESS,
+    FIRST_CSS_RETURN_SEQUENCE,
+    FIRST_CSS_RNG_POINTER_ADDRESS,
+    FIRST_CSS_RNG_VALUE_ADDRESS,
+    FIRST_CSS_RULES_ADDRESS,
+    FIRST_CSS_SAVE_ADDRESS,
+    FIRST_CSS_SCENE_ADDRESS,
+    FIRST_CSS_STREAM_BYTES,
+    FIRST_CSS_STREAM_SHA256,
+    SCENE_ROUTING_ADDRESS,
+    _extract_first_css_context_rows,
+    decode_first_css_context_bundle,
+    extract_stadium_first_css_context,
     _check_boundary_contract,
     _classify_stadium_sss_owner,
     _slice as _read_source_slice,
@@ -806,6 +827,227 @@ int main() {
         ran = subprocess.run([str(binary)], capture_output=True, text=True, timeout=10)
         (self.scratch / "run.log").write_text(ran.stdout + ran.stderr)
         self.assertEqual(ran.returncode, 0, ran.stderr)
+
+class StadiumFirstCssContextTests(OwnedWorkspaceTests):
+    @classmethod
+    def setUpClass(cls):
+        cls.scratch = cls.new_workspace(ROOT, "stadium-first-css-context-")
+
+    @staticmethod
+    def _source_slice(tag, size, data, address):
+        return {"tag": tag, "flags": 0, "address": address,
+                "size": size, "hex": data.hex()}
+
+    @classmethod
+    def _rows(cls):
+        rules = bytes.fromhex("0036010204000a00000001000000080800000800ffffffff")
+        save = bytearray(0x55E8)
+        save[:4] = bytes.fromhex("07ff07ff")
+        css = bytearray(0x148)
+        css[4:8] = FIRST_CSS_KO_ADDRESS.to_bytes(4, "big")
+        pad = bytearray(0x358)
+        pad_config = struct.pack(
+            ">iibb fBBbbBBBBBBbBBBBB", 15, 4, 0, 0, 1.0, 0, 0, 80, 5,
+            0, 150, 30, 0, 150, 30, 80, 1, 1, 0, 0, 0)
+        pad[:10] = pad_config[:10]
+        pad[12:32] = pad_config[10:]
+        pad = bytes(pad)
+        seed_pointer = FIRST_CSS_RNG_VALUE_ADDRESS.to_bytes(4, "big")
+        route = bytes.fromhex("020201000000")
+
+        def make(phase, sequence):
+            common = [
+                cls._source_slice(31, 0xF0, bytes(0xF0), 0x804807C0),
+                cls._source_slice(33, 0x40, bytes(0x40), 0x803BB300),
+                cls._source_slice(34, 4, bytes(4), 0x804D6038),
+                cls._source_slice(36, 2, bytes(save[:2]), FIRST_CSS_SAVE_ADDRESS),
+                cls._source_slice(37, 2, bytes(save[2:4]), FIRST_CSS_SAVE_ADDRESS + 2),
+                cls._source_slice(21, 0x358, pad, FIRST_CSS_PAD_ADDRESS),
+                cls._source_slice(17, 6, route, SCENE_ROUTING_ADDRESS),
+                cls._source_slice(30, 4, bytes(4), 0x80479D58),
+                cls._source_slice(40, 1, b"\x08", FIRST_CSS_SCENE_ADDRESS),
+                cls._source_slice(19, 4, seed_pointer, FIRST_CSS_RNG_POINTER_ADDRESS),
+                cls._source_slice(20, 4, bytes.fromhex("312151c3"),
+                                  FIRST_CSS_RNG_VALUE_ADDRESS),
+                cls._source_slice(50, 0x148, bytes(css), FIRST_CSS_DATA_ADDRESS),
+                cls._source_slice(51, 6, bytes(6), FIRST_CSS_KO_ADDRESS),
+            ]
+            if phase == "css_entry":
+                common.extend([
+                    cls._source_slice(38, 0x18, rules, FIRST_CSS_RULES_ADDRESS),
+                    cls._source_slice(39, 0x55E8, bytes(save), FIRST_CSS_SAVE_ADDRESS),
+                ])
+                common.sort(key=lambda item: item["tag"])
+                pc, word, argument = "0x8026688c", "0x7c0802a6", "0x804807b0"
+            else:
+                pc, word, argument = "0x802669f0", "0x4e800020", "0x00000000"
+            return {"event": "progress", "seq": sequence, "source_tick": 101,
+                    "payload": {
+                        "diagnostic": DIAGNOSTIC, "phase": phase,
+                        "setup_receipt_sha256": EXPECTED_SETUP_RECEIPT_SHA256,
+                        "setup_profile_verified_by_observer": False,
+                        "pc": pc, "word": word, "argument": argument,
+                        "source_tick": 101, "draw_ordinal": 0, "slices": common,
+                    }}
+        return make("css_entry", FIRST_CSS_ENTRY_SEQUENCE), \
+               make("css_return", FIRST_CSS_RETURN_SEQUENCE)
+
+    def test_first_css_input_bundle_is_fixed_layout_and_input_only(self):
+        entry, returned = self._rows()
+        result = _extract_first_css_context_rows(
+            entry, returned, FIRST_CSS_STREAM_SHA256)
+        bundle = result["input_bundle_bytes"]
+        self.assertEqual(len(bundle), FIRST_CSS_CONTEXT_BYTES)
+        self.assertEqual(result["input_bundle"]["magic_hex"],
+                         FIRST_CSS_CONTEXT_MAGIC.hex())
+        self.assertEqual(result["input_bundle"]["version"], FIRST_CSS_CONTEXT_VERSION)
+        self.assertFalse(result["input_bundle"]["has_return_expectations"])
+        decoded = decode_first_css_context_bundle(bundle)
+        self.assertFalse(decoded["contains_expected_return"])
+        self.assertEqual(decoded["source_stream_sha256"], FIRST_CSS_STREAM_SHA256)
+        self.assertEqual(decoded["entry_sequence"], FIRST_CSS_ENTRY_SEQUENCE)
+        self.assertEqual(decoded["return_sequence"], FIRST_CSS_RETURN_SEQUENCE)
+        self.assertEqual(decoded["seed_hex"], "312151c3")
+        self.assertEqual(len(decoded["pad_state_hex"]), 822 * 2)
+        self.assertEqual(len(decoded["css_data_hex"]), 0x148 * 2)
+        self.assertEqual(len(decoded["game_rules_hex"]), 0x18 * 2)
+        self.assertEqual(len(decoded["save_data_hex"]), 0x55E8 * 2)
+        self.assertEqual(result["expected_return"]["scene_kind"], 8)
+        self.assertEqual(result["expected_return"]["random_seed_hex"], "312151c3")
+        self.assertEqual(result["expected_return"]["css"]["ko_counts_owner"],
+                         "session_owned")
+        for player in result["expected_return"]["css"]["vs"]["start"]["players"]:
+            self.assertIn("xB", player)
+        self.assertEqual(len(result["expected_return"]["pad_state_hex"]), 822 * 2)
+
+    def test_first_css_semantic_players_include_defined_xB_byte(self):
+        entry, returned = self._rows()
+        css = next(item for item in returned["payload"]["slices"]
+                   if item["tag"] == 50)
+        raw = bytearray.fromhex(css["hex"])
+        raw[16 + 0x60 + 0x0B] = 0xA6
+        css["hex"] = raw.hex()
+        result = _extract_first_css_context_rows(
+            entry, returned, FIRST_CSS_STREAM_SHA256)
+        player = result["expected_return"]["css"]["vs"]["start"]["players"][0]
+        self.assertEqual(player["xB"], 0xA6)
+
+    def test_first_css_cpp_source_pin_matches_exact_python_digest(self):
+        source = (ROOT / "tests/native_menu_host_trace.cpp").read_text()
+        match = re.search(
+            r"expected_stream_sha\[32\]\s*=\s*\{(.*?)\};", source, re.S)
+        self.assertIsNotNone(match)
+        raw = bytes(int(value, 16) for value in
+                    re.findall(r"0x([0-9a-fA-F]{2})", match.group(1)))
+        self.assertEqual(raw.hex(), FIRST_CSS_STREAM_SHA256)
+
+    def test_first_css_rows_reject_owner_phase_and_slice_mutations(self):
+        cases = []
+        entry, returned = self._rows()
+        duplicate = json.loads(json.dumps(entry))
+        extra_slice = dict(duplicate["payload"]["slices"][-1])
+        extra_slice["tag"] = 99
+        duplicate["payload"]["slices"].append(extra_slice)
+        cases.append((duplicate, returned, "slice inventory"))
+
+        entry, returned = self._rows()
+        foreign_pointer = json.loads(json.dumps(entry))
+        css = next(item for item in foreign_pointer["payload"]["slices"]
+                   if item["tag"] == 50)
+        changed = bytearray.fromhex(css["hex"])
+        changed[4:8] = (FIRST_CSS_KO_ADDRESS + 4).to_bytes(4, "big")
+        css["hex"] = changed.hex()
+        cases.append((foreign_pointer, returned, "inconsistent source owners"))
+
+        entry, returned = self._rows()
+        wrong_scene = json.loads(json.dumps(returned))
+        scene = next(item for item in wrong_scene["payload"]["slices"]
+                     if item["tag"] == 40)
+        scene["hex"] = "09"
+        cases.append((entry, wrong_scene, "route, scene or RNG changed"))
+
+        entry, returned = self._rows()
+        wrong_profile = json.loads(json.dumps(entry))
+        mask = next(item for item in wrong_profile["payload"]["slices"]
+                    if item["tag"] == 36)
+        mask["hex"] = "0000"
+        cases.append((wrong_profile, returned, "inconsistent source owners"))
+
+        entry, returned = self._rows()
+        bad_pointer = json.loads(json.dumps(entry))
+        css = next(item for item in bad_pointer["payload"]["slices"]
+                   if item["tag"] == 50)
+        changed = bytearray.fromhex(css["hex"])
+        changed[0x10 + 0x38] = 1
+        css["hex"] = changed.hex()
+        cases.append((bad_pointer, returned, "pointer-safe initial ordinary VS"))
+
+        entry, returned = self._rows()
+        bad_pad = json.loads(json.dumps(entry))
+        pad = next(item for item in bad_pad["payload"]["slices"]
+                   if item["tag"] == 21)
+        pad["size"] -= 1
+        pad["hex"] = pad["hex"][:-2]
+        cases.append((bad_pad, returned, "unexpected byte length"))
+
+        for bad_entry, bad_return, message in cases:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(StadiumGoPrefixError, message):
+                    _extract_first_css_context_rows(
+                        bad_entry, bad_return, FIRST_CSS_STREAM_SHA256)
+
+        entry, returned = self._rows()
+        with self.assertRaisesRegex(StadiumGoPrefixError,
+                                    "not the retained v6 observer"):
+            _extract_first_css_context_rows(entry, returned, "c" * 64)
+
+        entry, returned = self._rows()
+        bad_sequence = dict(returned, seq=FIRST_CSS_RETURN_SEQUENCE + 1)
+        with self.assertRaisesRegex(StadiumGoPrefixError, "sequence identities"):
+            _extract_first_css_context_rows(
+                entry, bad_sequence, FIRST_CSS_STREAM_SHA256)
+
+    def test_first_css_bundle_rejects_wrong_length_magic_and_sequences(self):
+        entry, returned = self._rows()
+        bundle = _extract_first_css_context_rows(
+            entry, returned, FIRST_CSS_STREAM_SHA256)[
+            "input_bundle_bytes"]
+        for changed in (bundle[:-1], bundle + b"\0",
+                        b"BADMAGIC" + bundle[8:],
+                        bundle[:44] + b"\0\0\0\0" + bundle[48:],
+                        bundle[:12] + bytes(32) + bundle[44:]):
+            with self.subTest(size=len(changed), header=changed[:52].hex()):
+                with self.assertRaises(StadiumGoPrefixError):
+                    decode_first_css_context_bundle(changed)
+
+    def test_retained_first_css_raw_is_optional_but_strict_when_configured(self):
+        source_value = os.environ.get(FIRST_CSS_CONTEXT_ENV)
+        if source_value is None:
+            self.skipTest(
+                "optional retained v6 first-CSS raw is not configured; "
+                f"set {FIRST_CSS_CONTEXT_ENV} to enable exact source replay")
+        source = Path(source_value)
+        result = extract_stadium_first_css_context(
+            source, source.with_name("observer-status.json"))
+        self.assertEqual(result["provenance"]["stream_bytes"], FIRST_CSS_STREAM_BYTES)
+        self.assertEqual(result["provenance"]["stream_sha256"], FIRST_CSS_STREAM_SHA256)
+        self.assertEqual(result["provenance"]["css_entry_sequence"],
+                         FIRST_CSS_ENTRY_SEQUENCE)
+        self.assertEqual(result["provenance"]["css_return_sequence"],
+                         FIRST_CSS_RETURN_SEQUENCE)
+        bundle_path = self.scratch / "first-css-input.mwsc"
+        expected_path = self.scratch / "first-css-return-expected.json"
+        bundle_path.write_bytes(result["input_bundle_bytes"])
+        expected_path.write_text(json.dumps({
+            key: value for key, value in result.items() if key != "input_bundle_bytes"
+        }, indent=2) + "\n")
+        self.assertEqual(bundle_path.stat().st_size, FIRST_CSS_CONTEXT_BYTES)
+        self.assertEqual(hashlib.sha256(bundle_path.read_bytes()).hexdigest(),
+                         result["input_bundle"]["sha256"])
+        self.assertEqual(json.loads(expected_path.read_text())["expected_return"],
+                         result["expected_return"])
+        self.assertFalse((self.scratch / source.name).exists(),
+                         "retained raw source must stay outside candidate scratch")
 
 if __name__ == "__main__":
     unittest.main()

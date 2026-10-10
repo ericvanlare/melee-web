@@ -143,6 +143,10 @@ struct MeleeWebMenuHost {
     int css_parent_route_requested;
     int training_start_pending;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    int first_css_return_state; /* 0 unarmed, 1 armed, 2 captured, 3 invalid */
+    uint64_t first_css_return_generation;
+    MeleeWebMenuCssReturnSnapshot first_css_return;
+    char first_css_return_error[160];
     int stadium_c1a_enabled;
 #endif
     int results_active,results_exited,results_committed,prize_active;
@@ -192,6 +196,90 @@ static int live(MeleeWebMenuHost* h,char* e,size_t n){
         return fail(e,n,"Native menu world/audio ownership changed");
     return melee_web_save_profile_owner_live(h->profile,e,n);
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+static void first_css_return_note(void* data, MeleeWebMenuSession* session,
+    const CSSData* css, const uint8_t* ko_counts)
+{
+    MeleeWebMenuHost* h = data;
+    /* Refuse foreign pointers before dereferencing; failure never interrupts
+     * the original callback return or the session's subsequent phase updates. */
+    if (!h || h != owner) return;
+    if (h->first_css_return_state != 1 || !session || !css || session != h->session ||
+        css != melee_web_menu_css(h->session) || !ko_counts ||
+        css->ko_counts != ko_counts || h->entered || h->drawing ||
+        !h->initial_replay_context || seed_ptr != &h->seed ||
+        melee_web_gameplay_stats().ticks != 0 ||
+        HSD_GObj_804D781C || HSD_GObj_804D7838 || HSD_GObj_804D7830 ||
+        HSD_GObj_804D7814 || HSD_GObj_804D7818 ||
+        melee_web_menu_phase(h->session) != MELEE_WEB_MENU_CREATED ||
+        h->source_scene != MELEE_WEB_HOST_SCENE_CSS ||
+        h->source_mode_kind != GM_VS || !h->vs_mode_owned ||
+        melee_web_current_scene_info() != &h->source_scene_info ||
+        h->source_scene_info.scene_kind != GS_CSS ||
+        h->source_scene_info.enter_data != css ||
+        h->source_scene_info.exit_data != css) {
+        h->first_css_return_state = 3;
+        fail(h->first_css_return_error, sizeof(h->first_css_return_error),
+             "First CSS return lost its exact session/scene/KO/RNG owner");
+        return;
+    }
+    if (!live(h, h->first_css_return_error, sizeof(h->first_css_return_error))) {
+        h->first_css_return_state = 3;
+        return;
+    }
+    h->first_css_return.css = *css;
+    h->first_css_return.css.ko_counts = NULL;
+    memcpy(h->first_css_return.ko_counts, ko_counts, GM_MAX_PLAYERS);
+    melee_web_pad_state_capture(h->first_css_return.pad_state);
+    h->first_css_return.random_seed = h->seed;
+    h->first_css_return.source_scene = h->source_scene;
+    h->first_css_return.source_scene_kind = h->source_scene_info.scene_kind;
+    h->first_css_return_generation = h->generation;
+    h->first_css_return_state = 2;
+}
+
+int melee_web_menu_host_arm_first_css_return(MeleeWebMenuHost* h,
+    char* e, size_t n)
+{
+    if (!h || h != owner || !h->session || h->entered || h->audio ||
+        h->drawing || h->source_scene != MELEE_WEB_HOST_SCENE_NONE ||
+        !h->initial_replay_context || seed_ptr != &h->seed ||
+        h->first_css_return_state ||
+        HSD_GObj_804D781C || HSD_GObj_804D7838 || HSD_GObj_804D7830 ||
+        HSD_GObj_804D7814 || HSD_GObj_804D7818 ||
+        melee_web_menu_phase(h->session) != MELEE_WEB_MENU_CREATED)
+        return fail(e,n,"First CSS return arm requires its unentered replay-context host");
+    if (!melee_web_save_profile_owner_live(h->profile,e,n) ||
+        !melee_web_menu_arm_first_css_return(h->session,first_css_return_note,e,n))
+        return 0;
+    h->first_css_return_state = 1;
+    return ok(e,n);
+}
+
+int melee_web_menu_host_first_css_return(MeleeWebMenuHost* h,
+    MeleeWebMenuCssReturnSnapshot* out, char* e, size_t n)
+{
+    if (!h || h != owner || !out)
+        return fail(e,n,"First CSS return read requires its exact host and output");
+    if (h->first_css_return_state == 3 && h->first_css_return_error[0])
+        return fail(e,n,h->first_css_return_error);
+    if (!live(h,e,n)) return 0;
+    if (h->first_css_return_state != 2 || !h->entered || h->drawing ||
+        h->generation != h->first_css_return_generation ||
+        melee_web_gameplay_stats().ticks != 0 ||
+        HSD_GObj_804D781C || HSD_GObj_804D7838 || HSD_GObj_804D7830 ||
+        HSD_GObj_804D7814 || HSD_GObj_804D7818 ||
+        seed_ptr != &h->seed ||
+        h->source_scene != MELEE_WEB_HOST_SCENE_CSS ||
+        !melee_web_menu_first_css_return_live(h->session) ||
+        melee_web_current_scene_info() != &h->source_scene_info ||
+        h->source_scene_info.scene_kind != GS_CSS)
+        return fail(e,n,"First CSS return snapshot is absent or no longer before the first tick");
+    *out = h->first_css_return;
+    return ok(e,n);
+}
+#endif
+
 static int runtime_check(void* data,MeleeWebMenuScene scene,char* e,size_t n){
     (void)scene;return live(data,e,n);
 }
@@ -1311,6 +1399,10 @@ int melee_web_menu_host_opening_match_abort(MeleeWebMenuHost* h,
 }
 
 int melee_web_menu_host_tick(MeleeWebMenuHost* h,const PADStatus raw[4],char* e,size_t n){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (h && h == owner && h->first_css_return_state)
+        h->first_css_return_state = 3;
+#endif
     if(!live(h,e,n)||!h->entered||h->drawing||!raw)return fail(e,n,"Native menu tick requires an idle live scene and four raw ports");
     if(HSD_PadLibData.queue!=&h->queue||HSD_PadLibData.qcount)return fail(e,n,"Native menu raw PAD queue is not idle");
     memset(&h->queue,0,sizeof(h->queue));memcpy(h->queue.stat,raw,sizeof(h->queue.stat));
@@ -1603,6 +1695,10 @@ static int host_abort_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
 }
 
 int melee_web_menu_host_leave(MeleeWebMenuHost* h,int abort_scene,char* e,size_t n){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (h && h == owner && h->first_css_return_state)
+        h->first_css_return_state = 3;
+#endif
     if(!live(h,e,n)||!h->entered||h->drawing)return fail(e,n,"Native menu leave requires an idle live scene");
     if (!sync_source_preference_changes(h,e,n)) return 0;
     if (h->source_scene == MELEE_WEB_HOST_SCENE_TITLE ||

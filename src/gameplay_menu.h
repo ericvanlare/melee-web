@@ -114,6 +114,17 @@ MeleeWebMenuSession* melee_web_menu_session_create(
 int melee_web_menu_session_destroy(MeleeWebMenuSession*, char* error,
                                    size_t error_size);
 
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* One-shot first-CSS return note, after the source callback and before the
+ * wrapper's phase updates. The note cannot abort original scene completion.
+ * ko_counts is NULL if the source CSS no longer names this session's array. */
+typedef void (*MeleeWebMenuFirstCssReturnNote)(
+    void*, MeleeWebMenuSession*, const CSSData*, const uint8_t* ko_counts);
+int melee_web_menu_arm_first_css_return(MeleeWebMenuSession*,
+    MeleeWebMenuFirstCssReturnNote, char*, size_t);
+int melee_web_menu_first_css_return_live(const MeleeWebMenuSession*);
+#endif
+
 /* Native scene lifecycle.  enter/leave are explicit so a host cannot create a
  * second SDK scene while a match still owns the source world. */
 int melee_web_menu_enter_css(MeleeWebMenuSession*, char* error,

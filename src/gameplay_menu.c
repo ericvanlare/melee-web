@@ -38,6 +38,8 @@ struct MeleeWebMenuSession {
     int css_parent_ready;
     int training_mode_scene;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    MeleeWebMenuFirstCssReturnNote first_css_return_note;
+    int first_css_return_armed;
     int stadium_c1a_enabled;
     int stadium_c1a_ready;
 #endif
@@ -1012,12 +1014,36 @@ int melee_web_menu_session_destroy(MeleeWebMenuSession* session, char* error,
     return ok(error, error_size);
 }
 
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+int melee_web_menu_arm_first_css_return(MeleeWebMenuSession* session,
+    MeleeWebMenuFirstCssReturnNote note, char* error, size_t error_size)
+{
+    if (!session_live(session, error, error_size)) return 0;
+    if (!note || session->phase != MELEE_WEB_MENU_CREATED || session->ticks ||
+        session->css_open || session->sss_open || session->first_css_return_armed)
+        return fail(error, error_size, "First CSS return note requires a fresh unarmed session");
+    session->first_css_return_note = note;
+    session->first_css_return_armed = 1;
+    return ok(error, error_size);
+}
+int melee_web_menu_first_css_return_live(const MeleeWebMenuSession* session)
+{
+    return session && session == owner && session->first_css_return_armed == 2 &&
+        session->phase == MELEE_WEB_MENU_CSS && session->css_open &&
+        !session->sss_open && !session->ticks &&
+        session->css.ko_counts == session->css_ko_counts;
+}
+#endif
+
 static int enter_css(MeleeWebMenuSession* session, int after_match,
                      char* error, size_t error_size)
 {
     if (!session_live(session, error, error_size)) {
         return 0;
     }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_css_return_armed >= 2) session->first_css_return_armed = 3;
+#endif
     if (session->phase != MELEE_WEB_MENU_CREATED &&
         session->phase != MELEE_WEB_MENU_CSS_READY &&
         (!after_match || session->phase != MELEE_WEB_MENU_READY))
@@ -1055,6 +1081,14 @@ static int enter_css(MeleeWebMenuSession* session, int after_match,
     }
     session->training_mode_scene = session->css.match_type == TRAINING_MODE;
     mnCharSel_Scene_OnEnter(&session->css);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_css_return_armed == 1) {
+        session->first_css_return_armed = 2;
+        session->first_css_return_note(session->runtime.user, session,
+            &session->css, session->css.ko_counts == session->css_ko_counts
+                ? session->css_ko_counts : NULL);
+    }
+#endif
     session->css_open = 1;
     session->phase = MELEE_WEB_MENU_CSS;
     return ok(error, error_size);
@@ -1176,6 +1210,9 @@ int melee_web_menu_tick(MeleeWebMenuSession* session, char* error,
     if (!session_live(session, error, error_size)) {
         return 0;
     }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_css_return_armed) session->first_css_return_armed = 3;
+#endif
     if (session->selection_rejected || session->transition_failed ||
         session->transition_requested != 0) {
         return fail(error, error_size,
@@ -1275,6 +1312,9 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
     if (!session_live(session, error, error_size)) {
         return 0;
     }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_css_return_armed) session->first_css_return_armed = 3;
+#endif
     if (session->phase != MELEE_WEB_MENU_CSS || !session->css_open) {
         return fail(error, error_size, "CSS is not the live menu scene");
     }
@@ -1446,6 +1486,9 @@ int melee_web_menu_abort(MeleeWebMenuSession* session, char* error,
     if (!session_live(session, error, error_size)) {
         return 0;
     }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_css_return_armed) session->first_css_return_armed = 3;
+#endif
     if (session->css_open) {
         mnCharSel_Scene_OnExit(NULL);
         if (session->runtime.scene_exit != NULL &&
