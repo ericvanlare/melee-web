@@ -3815,7 +3815,7 @@ void run_stadium_first_css_context(const melee_web::RuntimeFiles& files,
                   "First-CSS tick has no checked live source RNG owner");
             auto* const seed_owner = seed_ptr;
             const auto world_generation = melee_web_gameplay_generation();
-            const auto* scene_owner = static_cast<const GameSceneInfo*>(
+            const auto* scene_owner = static_cast<const GameModeState::GameSceneInfo*>(
                 melee_web_current_scene_info());
             check(world_generation != 0 && melee_web_gameplay_world_exists() &&
                       melee_web_source_memory_healthy() && scene_owner != nullptr &&
