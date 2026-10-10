@@ -318,8 +318,8 @@
     "no_machine_specific_path_required": true
   },
   "subsequent_c3_component_2026_10_09": {
-    "claim_boundary": "The repaired first-SSS constructor pair matches every declared original field after unchanged CSS prerequisites. The ordinary native cancellation/re-entry and Results regression and browser checked unload pass on53dc776f. Zero SSS ticks/draws; terminal CSS tick1575, original setup/GO/per-owner RNG and C3 acceptance remain open. Historical failures retain their exact producers. Public Stadium admission stays closed.",
-    "current_result": "Exact53dc776f repeats CSS baseline,147 additional tick/draw pairs,final DrawReturn1577 and SSS entry/return comparison. Both constructor notes show frame149,kind9,seed3bb84c53,route2/1/1/0 with declared typed fields matching; world generation2/audio1. Independent retained assertion replay passes. All12 attributed browser processes are absent,40HTTP files unchanged and checked unload clears owners. Three affected Release targets and2431-test fullsuite pass with163skips. Native ordinary Results regression passes after original SSS cancellation route composition.",
+    "claim_boundary": "Declared first-CSS and SSS constructor fields, followed by one original SSS input1604/scheduler-end1608 comparison on bd46d842. The actual scheduler sample is frame0; post-host frame1 remains a separate native protocol observation. One host tick, zero SSS draws; later SSS,VS setup,GO,per-owner RNG and C3 acceptance remain open.",
+    "current_result": "On bd46d842, original SSS consumed PAD1604 and scheduler-end1608 match after unchanged CSS and SSS-constructor prerequisites. The actual sample is frame0; native post-host frame1 is retained separately. One host tick, zero SSS draws and no transition. Independent replay, checked unload,12 attributed process exits and40 unchanged HTTP artifacts pass. Both Release builds,2434-test full suite with163 skips and complete exact-head CI pass. C3 remains open.",
     "first_css_browser_draw_4d6c0b37_d949a0b8_v1": {
       "status": "FAIL_BEFORE_ARM; NO_BROWSER_CSS_COMPARISON; NO_TICK; NO_DRAW",
       "scope": "One headless browser attempt with the existing captured first-CSS context and one consumed sample. The diagnostic did not arm; this is not a source draw or Stadium/C3 acceptance result.",
@@ -586,7 +586,7 @@
         "SDK unittest moduleimport failure beforeNode; fixedexplicit scriptsimport and retainedoutput"
       ]
     },
-    "next_progression": "Exactly one original consumed SSS PAD at1604 and one host tick. Capture after SSS OnFrame/full HSD scheduler and before menu-clock increment, comparing actual frame0 sample only to SourceTick1608. Retain post-host frame1 separately; no draw or normalization. Require the exact-build constructor pair first, stable owners, one consume/tick/sample, TICKED without transition and checked cleanup. Stop on first failure and reduce before another runtime. Draw1609/1610, later SSS/VS/GO and per-owner RNG remain outside this experiment.",
+    "next_progression": "First compare the original SSS draw1609/1610, then continue the remaining original SSS selection sequence as one bounded diagnostic batch using existing input/observation owners. Stop at the first mismatch or unsupported boundary before VS setup; retain exact phases and inputs. The source-only continuation plan is under review; no SSS draw or continuation has run. Original VS setup/GO/per-owner RNG and full C3 comparison remain open.",
     "first_css_context_return_1fad54ff_v1": {
       "source_head": "1fad54ff964f80b263b91a77cf25a25b0ee08603",
       "source_tree": "adfff70b0f357d4c66bd89f1f1c3a30c9202b2a9",
@@ -5372,6 +5372,194 @@
         "gpu": "Apple Metal3 adapter and640x480 canvas observed",
         "limits": "Terminal CSS tick1575,counter4/8,pause/service parity,original setup/GO/per-owner RNG,pixels/PCM,timing,C3 remain open. Audio processing counters are observations, not continuity evidence."
       }
+    },
+    "first_sss_consumed_tick_bd46d842_v1": {
+      "status": "PASS_ONE_ORIGINAL_SSS_INPUT_AND_SCHEDULER_END",
+      "source": {
+        "revision": "bd46d8423deaec02633261fd17bbc87d457ce33f",
+        "tree": "6019151b256b333e8a7ee6401d8dc45ca8333f28"
+      },
+      "change": "Diagnostic-only one-use input and passive scheduler-end observation after actual SSS OnFrame/full HSD scheduler, before menu clock increment. Ordinary exports stay disabled; prior snapshots and constructor refusal behavior are preserved.",
+      "comparison": {
+        "original_input_sequence": 1604,
+        "original_scheduler_sequence": 1608,
+        "original_and_native_scheduler_frame": 0,
+        "native_post_host_frame": 1,
+        "scene_kind": 9,
+        "random_seed_hex": "3bb84c53",
+        "routing": [
+          2,
+          1,
+          1,
+          0
+        ],
+        "pad_bytes": 822,
+        "pad_sha256": "2f0a7f1c2a79bd4dd8d31f4b265d0f77ae787e5fb65a1ccc76d77e867aafafce",
+        "consumed_port_bytes": 44,
+        "input_bundle_bytes": 96,
+        "native_input_contains_expected_state": false,
+        "host_ticks": 1,
+        "host_draws": 0,
+        "transition": false,
+        "world_generation": 2,
+        "audio_generation": 1,
+        "checked_owners": 8
+      },
+      "prerequisites": "The same run repeats typed first-CSS baseline,147 additional tick/draw pairs and295 retained stream rows, final CSS DrawReturn1577 and both first-SSS constructor notes. Exact retained canonical assertion/comparator replay passes.",
+      "validation": {
+        "focused_python_tests": 10,
+        "focused_node_tests": 21,
+        "partial_environment_control": "Expected exit5 with zero tests and setUpClass error when only one original-fixture variable is supplied. Original fixtures enabled for two extractor tests.",
+        "release_builds": [
+          "diagnostic runtime",
+          "ordinary runtime"
+        ],
+        "fullsuite": {
+          "tests": 2434,
+          "skips": 163,
+          "failures": 0,
+          "seconds": 528.4
+        },
+        "ci": {
+          "run": 38082294574,
+          "success_jobs": 12,
+          "expected_skips": 2,
+          "conclusion": "success"
+        }
+      },
+      "cleanup": {
+        "attributed_processes_absent": 12,
+        "http_artifacts_before_after_unchanged": 40,
+        "checked_unload": "phase0,running0,null old/new observations,null error,import re-enabled",
+        "gpu": "Apple Metal3 adapter;640x480 canvas;cross-origin isolated",
+        "speaker_output": "muted;audio processing retained",
+        "retained_producer_files": 44,
+        "retained_identity_scope": "43 capture-launch/bound-producer identities; ordinary WASM retention-time identity only."
+      },
+      "retained_failures_and_corrections": [
+        "f60 CI unit0 rejected an original C initializer under GCC missing-braces; focused test-only diagnostic pragma repair reviewed at76239ec6 and its CI passed. Original arithmetic/source unchanged.",
+        "Native fixture compilation and extractor serialization failures retained in their implementation freezes; earlier mutable draft source-identity gaps remain explicit.",
+        "Focused negative-control driver expected exit1 instead of installed unittest exit5 for zero-test setUpClass failure; reduced actual rerun passes with exact expected error and exit.",
+        "Root retained-review helper first used an unmapped expected/native JSON key; corrected field mapping passes. No runtime mismatch.",
+        "Independent replay first passed an aggregate instead of transition_snapshot, then guessed a callback phase; both helper errors retained. Reduced exact-tick replay and corrected complete canonical replay pass. No second capture."
+      ],
+      "evidence": {
+        "source_integration": {
+          "artifact": "root-first-sss-tick-integration-v1/review.json",
+          "bytes": 16108,
+          "sha256": "7ca4393183171dc8b84077904cdf7e71be05d8506bb8795c0ac8528ad55a7346"
+        },
+        "native_source_review": {
+          "artifact": "root-first-sss-tick-native-review-v1/review.json",
+          "bytes": 10930,
+          "sha256": "f6dd73b3056c5e0f3ac0af39fa1d4701925c5cdd531363066bdf23b6629d5692"
+        },
+        "browser_source_review": {
+          "artifact": "sol-first-sss-tick-browser-companion-review-v1/review.json",
+          "bytes": 5488,
+          "sha256": "960db1cd215e8ca6c6b36c92aec735ee6c6819e817d86dbb510f971820781f55"
+        },
+        "extractor_review": {
+          "artifact": "sol-first-sss-tick-extractor-source-review-v1/review.json",
+          "bytes": 4119,
+          "sha256": "a2247cbb4674cf91d46163b5447e249bcd6dc276b23ffcee004c5b3fea2109b0"
+        },
+        "focused": {
+          "artifact": "first-sss-tick-focused-bd46d842-v2/result.json",
+          "bytes": 3860,
+          "sha256": "93f7a0f610569884a82d37cf1ec18fc98f7ec1d7a75400ca44d59e0dbba33d12"
+        },
+        "fullsuite": {
+          "artifact": "full-regression-bd46d842-v1/result.json",
+          "bytes": 847,
+          "sha256": "f93ce1b2cf00a185f9dfc3d68623564c95cffd8cdeb6d7883ede864105878dc2"
+        },
+        "diagnostic_build": {
+          "artifact": "sss-cancel-reentry-builds-bd46d842-v1/diagnostic-runtime/result.json",
+          "bytes": 709,
+          "sha256": "00dcddb37b509234d69572db5e4dea68b99e07f9ae4f35e0b52cceb60b994535"
+        },
+        "ordinary_build": {
+          "artifact": "sss-cancel-reentry-builds-bd46d842-v1/ordinary-runtime/result.json",
+          "bytes": 677,
+          "sha256": "d358d9a2a66d2cd573de1f80c77ef21140c5a25280782a083a6b8700d266aa49"
+        },
+        "original_extraction": {
+          "artifact": "first-sss-tick-original-bd46d842-v1/receipt.json",
+          "bytes": 1963,
+          "sha256": "6a397ad011e23efb58e423d7d5a5222c46ac1305d6f33fad11af8c99ca3bdf7f"
+        },
+        "packet": {
+          "artifact": "first-sss-consumed-tick-preflight-bd46d842-v1/freeze.json",
+          "bytes": 1675,
+          "sha256": "997d7ec2cd287f6f8e0e3a262ea9dabaa4bb24afe7a9c85d8e97722dac18ad18"
+        },
+        "controls": {
+          "artifact": "first-sss-tick-pre-server-controls-bd46d842-v1/review.json",
+          "bytes": 54592,
+          "sha256": "c4903619107d2c305cf6fb9bfc3f40d70ad71c094dbeba06f8358dfe689fb2f8"
+        },
+        "independent_prelaunch_review": {
+          "artifact": "sol-first-sss-tick-bd46-prelaunch-review-v1/review.json",
+          "bytes": 6013,
+          "sha256": "4cccd6fb8aa9a51156e42d511e8af4b2ffedb7cf0e37a71a640821341f40adbc"
+        },
+        "browser_result": {
+          "artifact": "first-sss-consumed-tick-preflight-bd46d842-v1/result.json",
+          "bytes": 1940,
+          "sha256": "06cfbc5e4b624ff946dd8321a3d3c021c4752a1d370dc7404be34e510a6e045f"
+        },
+        "browser_report": {
+          "artifact": "first-sss-consumed-tick-preflight-bd46d842-v1/browser-run/report.json",
+          "bytes": 1254249,
+          "sha256": "51766077667b22f73323ea76e4f6a512c96a40b0b69474062574bcb62f9ef99f"
+        },
+        "browser_owner": {
+          "artifact": "first-sss-consumed-tick-preflight-bd46d842-v1/owner.json",
+          "bytes": 109734,
+          "sha256": "444db8efe64e9e7a24718064ca16fdf5395fc3abad6341f1c6622310c3807e08"
+        },
+        "root_result_review": {
+          "artifact": "root-first-sss-tick-bd46-result-review-v2.json",
+          "bytes": 5210,
+          "sha256": "8e62c99ff358af12e69880d7549f1d213fdc42c6059000105f5acc154e8bd255"
+        },
+        "independent_result_review": {
+          "artifact": "sol-first-sss-tick-bd46-result-review-v1/review.json",
+          "bytes": 11121,
+          "sha256": "72c4aa79cec091bf489d9d0f8e22b4e163cfb5c1f1cc22152fa665f37f854a32"
+        },
+        "retained_producer": {
+          "artifact": "first-sss-tick-producer-bd46d842-retained-v1/identity.json",
+          "bytes": 25011,
+          "sha256": "cd52c97c5ac991d08b81cd0c741b7d1c35cc044c27c25800de1f5eabe3815c66"
+        },
+        "ci": {
+          "artifact": "pr301-ci-bd46d842-v1/receipt.json",
+          "bytes": 622,
+          "sha256": "ef24797307884296a2996f2b3b15c5d528d37047c6ac427f80b07b45e6d5c218"
+        },
+        "prior_ci_failure": {
+          "artifact": "pr301-ci-f60ae8d0-v1/receipt.json",
+          "bytes": 2045,
+          "sha256": "35c711c0ae104e8b8c8567e35e4b11f077b1a9c0f5091ec64da9e46b9e6916eb"
+        },
+        "gcc_portability_review": {
+          "artifact": "clock-counter-gcc-portability-v1/sol-review.json",
+          "bytes": 1042,
+          "sha256": "a5b675c7b76d10cbace62b1d82f97b24f5886f6615274d10e8e984f4ba7dcb1b"
+        },
+        "prior_repaired_ci": {
+          "artifact": "pr301-ci-76239ec6-v1/receipt.json",
+          "bytes": 1271,
+          "sha256": "7113f51b9b3f2cc901beb510679e8795e3c224ca4703160597709aab228a5322"
+        }
+      },
+      "limits": [
+        "Exactly one SSS scheduler boundary; no SSS draw1609/1610 or later SSS/VS/GO comparison.",
+        "Terminal CSS SourceTick1575,counter4/8,pause/service parity and per-owner RNG remain unpaired.",
+        "No pixel,PCM,audio-continuity,physical-input,foreground-timing or whole-session acceptance. Public Stadium admission and C3 remain open."
+      ]
     }
   }
 }
