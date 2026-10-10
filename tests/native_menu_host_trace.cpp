@@ -7766,7 +7766,8 @@ void run_stadium_c1_context_preflight(
     bool pad_leave_probe = false,
     bool source_text_lifetime_probe = false,
     bool ready_text_membership_probe = false,
-    bool toy_owner_controls = false)
+    bool toy_owner_controls = false,
+    bool post_ready_tick_probe = false)
 {
     char error[256]{};
     const int previous_mode = gm_GetCurrentGameMode();
@@ -8119,6 +8120,51 @@ void run_stadium_c1_context_preflight(
                 check(match->ready(),"Stadium did not reach original source Ready within 600 ticks");
                 check(match->fighter_kind(0)==FTKIND_MARIO && match->fighter_kind(1)==FTKIND_MARIO,
                       "Stadium Ready lost actual selected Human Mario fighter identities");
+                if(post_ready_tick_probe){
+                    const auto before_tick=melee_web_gameplay_stats();
+                    MeleeWebSourceMemoryContext memory_before{};
+                    const auto memory_before_status=
+                        melee_web_source_memory_context_read(&memory_before);
+                    const auto frames_before=match->source_frames();
+                    check(before_tick.generation && before_tick.ticks &&
+                              memory_before_status==MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                              memory_before.world_generation==before_tick.generation &&
+                              memory_before.source_heap_handle>=0 &&
+                              melee_web_source_memory_healthy() && match->ready() &&
+                              !match->ending() && !match->complete(),
+                          "Post-Ready probe lost its live source-memory world boundary");
+                    match->tick(pads);
+                    audio_phase+=32000;const unsigned samples=audio_phase/60;audio_phase%=60;
+                    check(melee_web_audio_render(match->audio(),pcm,samples,error,sizeof(error)),error);
+                    const auto after_tick=melee_web_gameplay_stats();
+                    MeleeWebSourceMemoryContext memory_after{};
+                    const auto memory_after_status=
+                        melee_web_source_memory_context_read(&memory_after);
+                    const auto frames_after=match->source_frames();
+                    check(after_tick.generation==before_tick.generation &&
+                              after_tick.ticks==before_tick.ticks+1 &&
+                              frames_after==frames_before+1 &&
+                              memory_after_status==MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                              memory_after.world_generation==memory_before.world_generation &&
+                              memory_after.source_heap_handle==memory_before.source_heap_handle &&
+                              melee_web_source_memory_healthy() && match->ready() &&
+                              !match->ending() && !match->complete() &&
+                              match->fighter_kind(0)==FTKIND_MARIO &&
+                              match->fighter_kind(1)==FTKIND_MARIO,
+                          "One post-Ready source tick changed match/world ownership or phase");
+                    std::fprintf(stderr,
+                        "STADIUM_POST_READY_TICK ticks_before=%llu ticks_after=%llu frames_before=%u frames_after=%u world_before=%llu world_after=%llu memory_status_before=%d memory_status_after=%d memory_world_before=%llu memory_world_after=%llu source_heap_before=%d source_heap_after=%d ready=%d ending=%d complete=%d draw=0 go_alignment=unobserved\n",
+                        static_cast<unsigned long long>(before_tick.ticks),
+                        static_cast<unsigned long long>(after_tick.ticks),frames_before,frames_after,
+                        static_cast<unsigned long long>(before_tick.generation),
+                        static_cast<unsigned long long>(after_tick.generation),
+                        int(memory_before_status),int(memory_after_status),
+                        static_cast<unsigned long long>(memory_before.world_generation),
+                        static_cast<unsigned long long>(memory_after.world_generation),
+                        memory_before.source_heap_handle,memory_after.source_heap_handle,
+                        int(match->ready()),int(match->ending()),int(match->complete()));
+                    std::fflush(stderr);
+                }
                 match->close();match.reset();
                 if(ready_text_membership_probe){
                     HSD_SisLib_C1TextProbeSet(0);
@@ -8208,6 +8254,8 @@ void run_stadium_c1_context_preflight(
                 cleanup();
                 if(toy_owner_controls)
                     std::cout<<"Stadium bounded Toy owner controls passed; one Ready plus no-acquisition and unarmed OnInit lifetimes, no C3 claim\n";
+                else if(post_ready_tick_probe)
+                    std::cout<<"Stadium original source-session Ready plus one post-Ready source tick and checked owned-world retirement passed; exact GO alignment unobserved; no C3 claim\n";
                 else
                     std::cout<<"Stadium original source-session Ready and checked owned-world retirement passed; one lifetime, no draw/post-GO idle/C3 claim\n";
                 return;
@@ -8562,7 +8610,8 @@ void run_stadium_c1a_selection_smoke(
     bool pad_leave_probe=false,
     bool source_text_lifetime_probe=false,
     bool ready_text_membership_probe=false,
-    bool toy_owner_controls=false)
+    bool toy_owner_controls=false,
+    bool post_ready_tick_probe=false)
 {
     char error[256]{};
     MeleeWebRetiredSisLease retired_sis{};
@@ -8715,7 +8764,7 @@ void run_stadium_c1a_selection_smoke(
             ground_map1_owner, source_on_init,
             source_on_init ? &retired_sis : nullptr, trace, full_world_lifecycle, ready_session,
             pad_leave_probe, source_text_lifetime_probe,
-            ready_text_membership_probe,toy_owner_controls);
+            ready_text_membership_probe,toy_owner_controls,post_ready_tick_probe);
     } else {
         world->verify_immutable_archives();
         world->close();
@@ -8877,7 +8926,9 @@ int main(int argc,char** argv){try{
      std::string(input_recipe)=="stadium-source-oninit-v1";
  const bool stadium_toy_owner_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-source-toy-owner-controls-v1";
- const bool stadium_ready_session_recipe=stadium_toy_owner_recipe||(input_recipe&&
+ const bool stadium_post_ready_tick_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-source-post-ready-tick-v1";
+ const bool stadium_ready_session_recipe=stadium_toy_owner_recipe||stadium_post_ready_tick_recipe||(input_recipe&&
      std::string(input_recipe)=="stadium-source-ready-session-v1");
  const bool stadium_source_world_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-source-world-lifecycle-v1";
@@ -8897,6 +8948,7 @@ int main(int argc,char** argv){try{
  const bool stadium_source_on_init_recipe=false;
  const bool stadium_source_world_recipe=false;
  const bool stadium_ready_session_recipe=false;
+ const bool stadium_post_ready_tick_recipe=false;
  const bool stadium_toy_owner_recipe=false;
  const bool stadium_pad_leave_probe_recipe=false;
  const bool stadium_source_text_lifetime_recipe=false;
@@ -8993,7 +9045,8 @@ int main(int argc,char** argv){try{
       stadium_source_world_recipe,
       argv[1], argv[2], trace,stadium_ready_session_recipe,
       stadium_pad_leave_probe_recipe,stadium_source_text_lifetime_recipe,
-      stadium_ready_text_membership_recipe,stadium_toy_owner_recipe);
+      stadium_ready_text_membership_recipe,stadium_toy_owner_recipe,
+      stadium_post_ready_tick_recipe);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
   if(stadium_source_world_recipe||stadium_ready_session_recipe||
      stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||

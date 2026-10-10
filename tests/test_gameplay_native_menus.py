@@ -2616,12 +2616,17 @@ int main(void)
             self.skipTest("Real Stadium source Ready session requires its reviewed run gate")
         self._run_stadium_source_ready_session_one_shot()
 
+    def test_stadium_source_post_ready_tick_one_shot(self):
+        if os.environ.get("MELEE_RUN_STADIUM_SOURCE_POST_READY_TICK") != "1":
+            self.skipTest("One post-Ready tick requires its separately reviewed run gate")
+        self._run_stadium_source_ready_session_one_shot(post_ready_tick=True)
+
     def test_stadium_source_toy_owner_controls_one_shot(self):
         if os.environ.get("MELEE_RUN_STADIUM_SOURCE_TOY_OWNER_CONTROLS") != "1":
             self.skipTest("Toy owner controls require their separately reviewed run gate")
         self._run_stadium_source_ready_session_one_shot(toy_owner_controls=True)
 
-    def _run_stadium_source_ready_session_one_shot(self, toy_owner_controls=False):
+    def _run_stadium_source_ready_session_one_shot(self, toy_owner_controls=False, post_ready_tick=False):
         import hashlib
         from capture_sd_reference_prefix import cleanup_process
 
@@ -2650,8 +2655,11 @@ int main(void)
                   for name, path in paths.items()}
         source = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
         scope = ("stadium-source-toy-owner-controls-v1" if toy_owner_controls
+                 else "stadium-source-post-ready-tick-v1" if post_ready_tick
                  else "stadium-source-ready-session-v1")
-        prefix = "stadium-toy-owner" if toy_owner_controls else "stadium-source-ready"
+        prefix = ("stadium-toy-owner" if toy_owner_controls
+                  else "stadium-post-ready" if post_ready_tick
+                  else "stadium-source-ready")
         trace = self.scratch / (prefix + "-session.jsonl")
         command = [str(node_runtime()), str(target), str(menu), str(game), "3",
                    str(trace), source, scope]
@@ -2703,6 +2711,32 @@ int main(void)
             self.assertIn("STADIUM_TOY_OWNER phase=entry-null-archive-table-refused unchanged=1", stderr)
             self.assertIn("STADIUM_TOY_OWNER phase=no-acquisition-close null_archive_table_refused=1 foreign_archive_refused=1 reset=1 ticks=0", stderr)
             self.assertIn("STADIUM_TOY_OWNER phase=source-on-init-destructor-close wrong_locale_refused=1 reset=1 ticks=0", stderr)
+        elif post_ready_tick:
+            self.assertIn("Stadium original source-session Ready plus one post-Ready source tick and checked owned-world retirement passed; exact GO alignment unobserved; no C3 claim", stdout)
+            row = re.findall(
+                r"STADIUM_POST_READY_TICK ticks_before=(\d+) ticks_after=(\d+) frames_before=(\d+) frames_after=(\d+) world_before=(\d+) world_after=(\d+) memory_status_before=(\d+) memory_status_after=(\d+) memory_world_before=(\d+) memory_world_after=(\d+) source_heap_before=(-?\d+) source_heap_after=(-?\d+) ready=(\d+) ending=(\d+) complete=(\d+) draw=(\d+) go_alignment=(\S+)",
+                stderr)
+            self.assertEqual(len(row), 1, stderr)
+            values = row[0]
+            ticks_before, ticks_after, frames_before, frames_after = map(int, values[:4])
+            world_before, world_after = map(int, values[4:6])
+            memory_status_before, memory_status_after = map(int, values[6:8])
+            memory_world_before, memory_world_after = map(int, values[8:10])
+            source_heap_before, source_heap_after = map(int, values[10:12])
+            ready, ending, complete, draw = map(int, values[12:16])
+            self.assertGreater(ticks_before, 0)
+            self.assertEqual(ticks_after, ticks_before + 1)
+            self.assertEqual(frames_after, frames_before + 1)
+            self.assertEqual(world_before, int(phases[2][2]))
+            self.assertEqual(ticks_before, int(phases[2][3]))
+            self.assertEqual(world_after, world_before)
+            self.assertEqual((memory_status_before, memory_status_after), (0, 0))
+            self.assertEqual((memory_world_before, memory_world_after),
+                             (world_before, world_before))
+            self.assertGreaterEqual(source_heap_before, 0)
+            self.assertEqual(source_heap_after, source_heap_before)
+            self.assertEqual((ready, ending, complete, draw), (1, 0, 0, 0))
+            self.assertEqual(values[16], "unobserved")
         else:
             self.assertIn("Stadium original source-session Ready and checked owned-world retirement passed; one lifetime, no draw/post-GO idle/C3 claim", stdout)
         self.assertNotIn("STADIUM_READY_SESSION_FIRST_FAILURE", stderr)
