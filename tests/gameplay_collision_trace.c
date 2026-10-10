@@ -5,6 +5,7 @@
 #include <melee/gr/ground.h>
 #include <melee/gr/types.h>
 #include <melee/mp/mplib.h>
+#include <melee/mp/mpisland.h>
 #include <melee/gr/grdynamicattr.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjplink.h>
@@ -13,12 +14,14 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static char error[256];
 static void check(int value, const char* reason)
 {
     if (!value) { fprintf(stderr, "%s: %s\n", reason, error); exit(1); }
 }
+static int error_contains(const char* text) { return strstr(error, text) != NULL; }
 static int near(float a, float b) { return fabsf(a - b) < 0.0003F; }
 static MeleeWebCollisionVertex vertices[] = {{-10, 0}, {0, 0}, {0, 0}, {10, 5}};
 static MeleeWebCollisionLine lines[] = {
@@ -77,21 +80,52 @@ static void source_loaded_case(void)
               mpGetGroundCollLine() == NULL && mpGetGroundCollJoint() == NULL,
           "adopted source teardown clears original collision globals");
     const MeleeWebGameplayStats before=melee_web_gameplay_stats();
-    mpLibLoad(&source_map);
-    mpLib_80058820();
-    MeleeWebCollisionInput invalid=input; invalid.stage_scale=INFINITY;
-    check(!melee_web_collision_adopt_loaded(&invalid,error,sizeof(error)),
-          "invalid input rejects after original source loading");
-    check(!melee_web_collision_retire_unadopted(&input,error,sizeof(error)),
-          "rollback rejects a different source map identity");
-    check(melee_web_collision_retire_unadopted(&source_map,error,sizeof(error)),
-          "failed source adoption rolls back original storage and updater");
-    check(melee_web_collision_source_available()&&
-              melee_web_gameplay_stats().objects==before.objects&&
-              melee_web_gameplay_stats().processes==before.processes,
-          "rollback leaves collision ready for another construction");
-    check(melee_web_collision_retire_unadopted(&source_map,error,sizeof(error)),
-          "already retired source collision rollback is idempotent");
+    for (int lifetime = 0; lifetime < 2; ++lifetime) {
+        mpLibLoad(&source_map);
+        mpLib_80058820();
+        mp_UnkStruct0* const floor = mpIsland_8005AB54(0);
+        const int loaded_free = melee_web_gameplay_stats().heap_free_bytes;
+        check(floor != NULL, "source floor island exists before joint disable");
+        mpLib_80057BC0(0);
+        check(mpIsland_80458E88.next == NULL && mpIsland_80458E88.x4 == NULL &&
+                  mpIsland_80458E88.x18 != NULL && mpIsland_80458E88.x1C != NULL,
+              "original joint disable moves floor and ceiling islands to side lists");
+        mpJointListAdd(0);
+        check(mpIsland_8005AB54(0) == floor &&
+                  mpIsland_80458E88.x18 == NULL && mpIsland_80458E88.x1C == NULL &&
+                  melee_web_gameplay_stats().heap_free_bytes == loaded_free,
+              "original reenable reuses the disabled islands without allocation");
+        CollVtx* const loaded_vertices = mpGetGroundCollVtx();
+        loaded_vertices[floor->x4].pos.x += 7.0F;
+        mpIsland_8005B334(0, source_joints[0].vtx_start,
+                         source_joints[0].vtx_count, true);
+        check(mpIsland_8005AB54(0) == floor &&
+                  floor->x8.x == loaded_vertices[floor->x4].pos.x &&
+                  melee_web_gameplay_stats().heap_free_bytes == loaded_free,
+              "original island movement updates the same allocation");
+        mpLib_80057BC0(0);
+        MeleeWebCollisionInput invalid=input; invalid.stage_scale=INFINITY;
+        check(!melee_web_collision_adopt_loaded(&invalid,error,sizeof(error)),
+              "invalid input rejects after original source loading");
+        check(!melee_web_collision_retire_unadopted(&input,error,sizeof(error)),
+              "rollback rejects a different source map identity");
+        check(melee_web_collision_retire_unadopted(&source_map,error,sizeof(error)),
+              "failed source adoption rolls back original storage and updater");
+        const int side_list_free_after = melee_web_gameplay_stats().heap_free_bytes;
+        fprintf(stderr,
+                "COLLISION_SIDE_LIST_RETIRE free_before=%d free_after=%d\n",
+                before.heap_free_bytes, side_list_free_after);
+        check(side_list_free_after == before.heap_free_bytes,
+              "source collision retirement returns disabled island side-list storage");
+        check(melee_web_collision_source_available()&&
+                  melee_web_gameplay_stats().objects==before.objects&&
+                  melee_web_gameplay_stats().processes==before.processes,
+              "rollback leaves collision ready for another construction");
+        check(melee_web_collision_retire_unadopted(&source_map,error,sizeof(error)),
+              "already retired source collision rollback is idempotent");
+        check(melee_web_gameplay_stats().heap_free_bytes == before.heap_free_bytes,
+              "repeated retirement does not free collision storage twice");
+    }
     stage_info.param = prior_param;
     stage_info.coll_data = prior_data;
     stage_info.grkind = prior_kind;
@@ -103,31 +137,40 @@ static DynamicsDesc* source_dynamic_touch_line(int line_id)
     abort();
 }
 
-/* The shared owner may adopt a live dynamic range only after the retail map,
- * joint binding and stage touch-line callback exist. Keep the negative
- * synthetic-creation case above; this source-loaded fixture checks that an
- * adopted owner queries the current original collision vertices, not the
- * initial snapshot. The Kraid source-stage trace separately exercises the
- * real stage callback that moves its dynamic joints. */
+static DynamicsDesc* source_dynamic_touch_line_changed(int line_id)
+{
+    (void) line_id;
+    return NULL;
+}
+
+/* The shared owner accepts a safely removed dynamic joint while preserving
+ * its exact source descriptors, then revalidates original bind/update/remove
+ * transitions before executing live floor queries. */
 static void source_dynamic_case(void)
 {
     GroundParam param = {0};
     param.y = 1.0F;
-    Vec2 source_vertices[] = {{-10, 0}, {0, 0}, {0, 10}, {10, 10}};
+    Vec2 source_vertices[] = {
+        {-10, 0}, {0, 0}, {0, 10}, {10, 10},
+        {-2, -1}, {2, -1}, {2, 1}, {-2, 1},
+    };
     MapLine source_lines[] = {
-        {0, 1, -1, 1, -1, 1, 1, 0x104},
-        {1, 3, 0, 2, 0, 2, 1, 0x104},
-        {2, 3, 1, -1, 1, -1, 2, 0x205},
-        {1, 2, -1, -1, -1, -1, 0, 0},
+        {0, 1, -1, 1, -1, 1, 1, 0},
+        {1, 3, 0, -1, 0, -1, 1, 0},
+        {2, 3, -1, -1, -1, -1, 2, 0},
+        {4, 5, 6, 4, 6, 4, 1, 0},
+        {5, 6, 3, 5, 3, 5, 1, 0},
+        {6, 7, 4, 6, 4, 6, 1, 0},
+        {7, 4, 5, 3, 5, 3, 1, 0},
     };
     MapJoint source_joints[] = {
-        {0, 2, 2, 1, 3, 0, 3, 0, 3, 1, -10, 0, 10, 10, 0, 4},
+        {0, 2, 2, 1, 3, 0, 3, 0, 3, 4, -10, -1, 10, 10, 0, 8},
     };
     MapCollData source_map = {
         .verts = source_vertices,
-        .vert_count = 4,
+        .vert_count = 8,
         .lines = source_lines,
-        .line_count = 4,
+        .line_count = 7,
         .floor_start = 0,
         .floor_count = 2,
         .ceiling_start = 2,
@@ -135,34 +178,49 @@ static void source_dynamic_case(void)
         .right_wall_start = 3,
         .left_wall_start = 3,
         .dynamic_start = 3,
-        .dynamic_count = 1,
+        .dynamic_count = 4,
         .joints = source_joints,
         .joint_count = 1,
     };
+    const int original_dynamic_count = source_map.dynamic_count;
     const MeleeWebCollisionVertex input_vertices[] = {
         {-10, 0}, {0, 0}, {0, 10}, {10, 10},
+        {-2, -1}, {2, -1}, {2, 1}, {-2, 1},
     };
     const MeleeWebCollisionLine input_lines[] = {
-        {0, 1, -1, 1, -1, 1, 1, 0x104},
-        {1, 3, 0, 2, 0, 2, 1, 0x104},
-        {2, 3, 1, -1, 1, -1, 2, 0x205},
-        {1, 2, -1, -1, -1, -1, 0, 0},
+        {0, 1, -1, 1, -1, 1, 1, 0},
+        {1, 3, 0, -1, 0, -1, 1, 0},
+        {2, 3, -1, -1, -1, -1, 2, 0},
+        {4, 5, 6, 4, 6, 4, 1, 0},
+        {5, 6, 3, 5, 3, 5, 1, 0},
+        {6, 7, 4, 6, 4, 6, 1, 0},
+        {7, 4, 5, 3, 5, 3, 1, 0},
     };
     const MeleeWebCollisionJoint input_joints[] = {
-        {{{0, 2}, {2, 1}, {3, 0}, {3, 0}, {3, 1}}, -10, 0, 10, 10, {0, 4}},
+        {{{0, 2}, {2, 1}, {3, 0}, {3, 0}, {3, 4}}, -10, -1, 10, 10, {0, 8}},
     };
     const MeleeWebCollisionInput dynamic_input = {
         .vertices = input_vertices,
-        .vertex_count = 4,
+        .vertex_count = 8,
         .lines = input_lines,
-        .line_count = 4,
+        .line_count = 7,
         .joints = input_joints,
         .joint_count = 1,
-        .ranges = {{0, 2}, {2, 1}, {3, 0}, {3, 0}, {3, 1}},
+        .ranges = {{0, 2}, {2, 1}, {3, 0}, {3, 0}, {3, 4}},
         .stage_kind = Gr_Kind_Last,
         .stage_scale = 1.0F,
     };
+    MapLine source_lines_before[7];
+    Vec2 source_vertices_before[8];
+    MapJoint source_joints_before[1];
+    memcpy(source_lines_before, source_lines, sizeof(source_lines));
+    memcpy(source_vertices_before, source_vertices, sizeof(source_vertices));
+    memcpy(source_joints_before, source_joints, sizeof(source_joints));
+    const MeleeWebGameplayStats before = melee_web_gameplay_stats();
     HSD_JObj root = {0}, bound_joint = {0};
+    bound_joint.mtx[0][0] = 1.0F;
+    bound_joint.mtx[1][1] = 1.0F;
+    bound_joint.mtx[2][2] = 1.0F;
     root.child = &bound_joint;
     bound_joint.parent = &root;
     GroundParam* prior_param = stage_info.param;
@@ -174,41 +232,243 @@ static void source_dynamic_case(void)
     stage_info.coll_data = &source_map;
     stage_info.on_touch_line = source_dynamic_touch_line;
 
+    check(!melee_web_collision_create(&dynamic_input, error, sizeof(error)) &&
+              error_contains("Dynamic collision lines require pending stage bindings"),
+          "synthetic collision construction still rejects a valid dynamic range");
     mpLibLoad(&source_map);
     mpLib_80058820();
     stage_info.on_touch_line = NULL;
-    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)),
+    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)) &&
+              error_contains("Source dynamic collision has no authored touch-line callback"),
           "source dynamic collision rejects a missing authored touch-line callback");
     stage_info.on_touch_line = source_dynamic_touch_line;
     source_map.dynamic_count = 0;
-    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)),
+    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)) &&
+              error_contains("Source dynamic collision lost its original loaded map descriptor"),
           "source dynamic collision rejects a changed loaded-map descriptor");
-    source_map.dynamic_count = 1;
-    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)),
+    source_map.dynamic_count = original_dynamic_count;
+    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)) &&
+              error_contains("Source dynamic collision joint is active without its authored stage JObj"),
           "source dynamic collision rejects an unbound authored joint");
-    mpLib_800552B0(0, &root, 0);
+    mpLib_80057BC0(0);
     CollJoint* const source_joint_bindings = mpGetGroundCollJoint();
+    CollLine* const source_collision_lines = mpGetGroundCollLine();
     CollVtx* const source_collision_vertices = mpGetGroundCollVtx();
-    check(source_joint_bindings && source_joint_bindings[0].x20 == &bound_joint,
-          "original joint traversal binds the dynamic source JObj");
+    check(source_joint_bindings && source_collision_lines && source_collision_vertices &&
+              !(source_joint_bindings[0].flags & CollJoint_Enabled) &&
+              !source_joint_bindings[0].x20 &&
+              !(source_collision_lines[3].flags & LINE_FLAG_ENABLED),
+          "original removal leaves the source dynamic descriptor unbound, unlinked and disabled");
+    const int authored_dynamic_start = source_joints[0].dynamic_start;
+    source_joints[0].dynamic_start = 4;
+    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)) &&
+              error_contains("Source dynamic collision joint descriptor or range changed"),
+          "source dynamic collision rejects a changed loaded joint range");
+    source_joints[0].dynamic_start = authored_dynamic_start;
+
+    const uint32_t deferred_line_flags = source_collision_lines[3].flags;
+    source_collision_lines[3].flags |= LINE_FLAG_ENABLED;
+    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)) &&
+              error_contains("Removed source dynamic collision joint retains an enabled owned line"),
+          "deferred source dynamic adoption rejects a partially enabled owned range");
+    source_collision_lines[3].flags = deferred_line_flags;
+
+    mpJointListAdd(0);
+    source_joint_bindings[0].flags &= ~CollJoint_Enabled;
+    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)) &&
+              error_contains("enabled flag disagrees with active-list membership"),
+          "source dynamic adoption rejects a linked joint whose enabled flag was cleared");
+    source_joint_bindings[0].flags |= CollJoint_Enabled;
+    mpLib_80057BC0(0);
+
+    /* The four authored-floor hints form a closed dynamic-only next0 cycle.
+     * A static floor seed entering that same non-root cycle must still reject. */
+    MeleeWebCollisionLine mixed_cycle_lines[7];
+    memcpy(mixed_cycle_lines, input_lines, sizeof(mixed_cycle_lines));
+    mixed_cycle_lines[1].next0 = 3;
+    MeleeWebCollisionInput mixed_cycle = dynamic_input;
+    mixed_cycle.lines = mixed_cycle_lines;
+    check(!melee_web_collision_adopt_loaded(&mixed_cycle, error, sizeof(error)) &&
+              error_contains("Cyclic static island chains"),
+          "static floor seed reaching a non-root dynamic cycle still rejects before adoption");
+
     MeleeWebCollision* owner = melee_web_collision_adopt_loaded(
         &dynamic_input, error, sizeof(error));
     check(owner != NULL,
-          "source dynamic lines adopt only after map, joint and callback binding");
+          "source dynamic lines adopt in the original removed and disabled state");
     MeleeWebCollisionReadiness readiness;
     check(melee_web_collision_readiness(owner, &readiness, error, sizeof(error)) &&
+              !readiness.stage_joint_bindings_ready && readiness.stage_callbacks_ready,
+          "deferred readiness reports the absent JObj and retained callback separately");
+    MeleeWebCollisionLineResult dynamic_floor, dynamic_left_wall,
+        dynamic_ceiling, dynamic_right_wall;
+    check(melee_web_collision_line(owner, 3, &dynamic_floor, error, sizeof(error)) &&
+              dynamic_floor.kind == CollLine_Floor &&
+              !(dynamic_floor.runtime_flags & LINE_FLAG_ENABLED),
+          "deferred source line remains available for disabled descriptor inspection");
+    MeleeWebCollisionFloorResult floor_result;
+    check(!melee_web_collision_floor(owner, 3, 0.0F, 0.0F, &floor_result,
+                                     error, sizeof(error)) &&
+              error_contains("Floor query crosses a disabled source floor line"),
+          "floor execution refuses a deferred dynamic source line");
+
+    mpLib_800552B0(0, &root, 0);
+    check(source_joint_bindings[0].x20 == &bound_joint,
+          "original joint traversal binds the deferred dynamic source JObj");
+    check(melee_web_collision_readiness(owner, &readiness, error, sizeof(error)) &&
               readiness.stage_joint_bindings_ready && readiness.stage_callbacks_ready,
-          "dynamic readiness reports the checked source bindings and callback");
-    MeleeWebCollisionLineResult before, after;
-    check(melee_web_collision_line(owner, 3, &before, error, sizeof(error)),
-          "source dynamic line is queryable after adoption");
-    source_collision_vertices[2].pos.x = 6.0F;
+          "readiness observes the original JObj binding before line activation");
+    mpLib_80055E9C(0);
+    mpJointListAdd(0);
     mpJointUpdateDynamics(0);
-    check(melee_web_collision_line(owner, 3, &after, error, sizeof(error)) &&
-              before.v1[0] == 0.0F && after.v1[0] == 6.0F,
-          "adopted dynamic query reads the current original vertex array");
+    check(melee_web_collision_readiness(owner, &readiness, error, sizeof(error)) &&
+              readiness.stage_joint_bindings_ready && readiness.stage_callbacks_ready,
+          "readiness revalidates the original update and joint-enable transition");
+
+    unsigned char readiness_before[sizeof(readiness)];
+    MapJoint wrong_inner = source_joints[0];
+    MapJoint* const original_inner = source_joint_bindings[0].inner;
+    source_joint_bindings[0].inner = &wrong_inner;
+    memcpy(readiness_before, &readiness, sizeof(readiness));
+    check(!melee_web_collision_readiness(owner, &readiness, error, sizeof(error)) &&
+              error_contains("lost its loaded MapJoint owner") &&
+              memcmp(readiness_before, &readiness, sizeof(readiness)) == 0,
+          "readiness rejects a changed bound inner without changing output");
+    source_joint_bindings[0].inner = original_inner;
+    check(melee_web_collision_readiness(owner, &readiness, error, sizeof(error)),
+          "readiness recovers after restoring the original bound inner");
+
+    GrTouchLineCallback const original_touch_line = stage_info.on_touch_line;
+    stage_info.on_touch_line = source_dynamic_touch_line_changed;
+    memcpy(readiness_before, &readiness, sizeof(readiness));
+    check(!melee_web_collision_readiness(owner, &readiness, error, sizeof(error)) &&
+              error_contains("touch-line callback changed") &&
+              memcmp(readiness_before, &readiness, sizeof(readiness)) == 0,
+          "readiness rejects a changed callback identity without changing output");
+    stage_info.on_touch_line = original_touch_line;
+    check(melee_web_collision_readiness(owner, &readiness, error, sizeof(error)),
+          "readiness recovers after restoring the authored callback");
+
+    MapJoint original_descriptor = source_joints[0];
+    source_joints[0].dynamic_start = (s16) (original_descriptor.dynamic_start + 1);
+    memcpy(readiness_before, &readiness, sizeof(readiness));
+    check(!melee_web_collision_readiness(owner, &readiness, error, sizeof(error)) &&
+              error_contains("joint descriptor or range changed") &&
+              memcmp(readiness_before, &readiness, sizeof(readiness)) == 0,
+          "readiness rejects a changed source joint range without changing output");
+    source_joints[0] = original_descriptor;
+    check(melee_web_collision_readiness(owner, &readiness, error, sizeof(error)),
+          "readiness recovers after restoring the authored joint range");
+
+    HSD_JObj* const original_jobj = source_joint_bindings[0].x20;
+    source_joint_bindings[0].x20 = NULL;
+    memcpy(readiness_before, &readiness, sizeof(readiness));
+    check(!melee_web_collision_readiness(owner, &readiness, error, sizeof(error)) &&
+              error_contains("active without its authored stage JObj") &&
+              memcmp(readiness_before, &readiness, sizeof(readiness)) == 0,
+          "readiness rejects an active-unbound transition without changing output");
+    source_joint_bindings[0].x20 = original_jobj;
+    check(melee_web_collision_readiness(owner, &readiness, error, sizeof(error)),
+          "readiness recovers after restoring the bound JObj");
+
+    const s16 original_next1 = source_lines[3].next_id1;
+    source_lines[3].next_id1 = (s16) source_map.line_count;
+    MeleeWebCollisionLineResult guarded_line;
+    memset(&guarded_line, 0xA5, sizeof(guarded_line));
+    unsigned char guarded_line_before[sizeof(guarded_line)];
+    memcpy(guarded_line_before, &guarded_line, sizeof(guarded_line));
+    check(!melee_web_collision_line(owner, 3, &guarded_line, error, sizeof(error)) &&
+              error_contains("Retail line adjacency escaped the loaded source map") &&
+              memcmp(guarded_line_before, &guarded_line, sizeof(guarded_line)) == 0,
+          "line inspection rejects an out-of-range retail alternate before source dereference");
+    MeleeWebCollisionFloorResult guarded_floor;
+    memset(&guarded_floor, 0xA5, sizeof(guarded_floor));
+    unsigned char guarded_floor_before[sizeof(guarded_floor)];
+    memcpy(guarded_floor_before, &guarded_floor, sizeof(guarded_floor));
+    check(!melee_web_collision_floor(owner, 3, 0.0F, 0.0F, &guarded_floor,
+                                     error, sizeof(error)) &&
+              error_contains("Retail line adjacency escaped the loaded source map") &&
+              memcmp(guarded_floor_before, &guarded_floor, sizeof(guarded_floor)) == 0,
+          "floor query rejects an out-of-range retail alternate before source dereference");
+    source_lines[3].next_id1 = original_next1;
+    check(melee_web_collision_readiness(owner, &readiness, error, sizeof(error)) &&
+              melee_web_collision_line(owner, 3, &guarded_line, error, sizeof(error)),
+          "line selection recovers after restoring the authored alternate");
+
+    check(memcmp(source_lines_before, source_lines, sizeof(source_lines)) == 0 &&
+              memcmp(source_vertices_before, source_vertices, sizeof(source_vertices)) == 0 &&
+              memcmp(source_joints_before, source_joints, sizeof(source_joints)) == 0,
+          "original dynamic update preserves source map descriptors and authored bytes");
+    mpLib_800575B0(3);
+    check(melee_web_collision_readiness(owner, &readiness, error, sizeof(error)) &&
+              readiness.stage_joint_bindings_ready && readiness.stage_callbacks_ready,
+          "active bound readiness permits an original per-line disable");
+    check(!melee_web_collision_floor(owner, 3, 0.0F, 0.0F, &floor_result,
+                                     error, sizeof(error)) &&
+              error_contains("Floor query crosses a disabled source floor line"),
+          "floor execution refuses an actually disabled source floor line");
+    mpLib_80057528(3);
+    check(melee_web_collision_line(owner, 3, &dynamic_floor, error, sizeof(error)) &&
+              dynamic_floor.kind == CollLine_Floor &&
+              dynamic_floor.v0[0] == source_collision_vertices[4].pos.x &&
+              dynamic_floor.v1[0] == source_collision_vertices[5].pos.x,
+          "original updater resolves and queries the authored-floor edge from live source vertices");
+    check(melee_web_collision_line(owner, 4, &dynamic_left_wall, error, sizeof(error)) &&
+              dynamic_left_wall.kind == CollLine_LeftWall,
+          "original updater resolves the authored-floor vertical edge as a live left wall");
+    check(melee_web_collision_line(owner, 5, &dynamic_ceiling, error, sizeof(error)) &&
+              dynamic_ceiling.kind == CollLine_Ceiling,
+          "original updater resolves the reversed authored-floor edge as a live ceiling");
+    check(melee_web_collision_line(owner, 6, &dynamic_right_wall, error, sizeof(error)) &&
+              dynamic_right_wall.kind == CollLine_RightWall,
+          "original updater resolves the opposite vertical edge as a live right wall");
+    check(melee_web_collision_floor(owner, 3, 0.0F, 0.0F, &floor_result,
+                                    error, sizeof(error)) && floor_result.line == 3,
+          "live floor query accepts the dynamically resolved floor edge");
+    check(!melee_web_collision_floor(owner, 4, 0.0F, 0.0F, &floor_result,
+                                     error, sizeof(error)),
+          "live floor query refuses a dynamically resolved wall edge");
+    check(!melee_web_collision_floor(owner, 5, 0.0F, 0.0F, &floor_result,
+                                     error, sizeof(error)),
+          "live floor query refuses a dynamically resolved ceiling edge");
+    check(dynamic_floor.v1[0] == 2.0F && source_collision_vertices[5].pos.x == 2.0F,
+          "dynamic endpoint starts at the original loaded vertex");
+    bound_joint.mtx[0][3] = 1.0F;
+    mpLib_80055E9C(0);
+    MeleeWebCollisionLineResult moved_dynamic_floor;
+    check(melee_web_collision_line(owner, 3, &moved_dynamic_floor,
+                                   error, sizeof(error)) &&
+              moved_dynamic_floor.kind == CollLine_Floor &&
+              moved_dynamic_floor.v1[0] == 3.0F,
+          "original JObj update and query read the moved live vertex array");
+    check(memcmp(source_lines_before, source_lines, sizeof(source_lines)) == 0 &&
+              memcmp(source_vertices_before, source_vertices, sizeof(source_vertices)) == 0 &&
+              memcmp(source_joints_before, source_joints, sizeof(source_joints)) == 0,
+          "source descriptors remain byte-identical after live dynamic queries");
+    mpLib_80057BC0(0);
+    check(melee_web_collision_readiness(owner, &readiness, error, sizeof(error)) &&
+              readiness.stage_joint_bindings_ready && readiness.stage_callbacks_ready &&
+              !(source_collision_lines[3].flags & LINE_FLAG_ENABLED),
+          "readiness revalidates the original removed state while preserving the bound JObj");
+    check(melee_web_collision_line(owner, 3, &dynamic_floor, error, sizeof(error)) &&
+              !(dynamic_floor.runtime_flags & LINE_FLAG_ENABLED),
+          "line inspection retains the disabled original dynamic descriptor");
+    check(!melee_web_collision_floor(owner, 3, 0.0F, 0.0F, &floor_result,
+                                     error, sizeof(error)) &&
+              error_contains("Floor query crosses a disabled source floor line"),
+          "floor execution refuses an original removed dynamic joint");
     check(melee_web_collision_destroy(owner, error, sizeof(error)),
           "dynamic source collision teardown releases original storage");
+    check(melee_web_collision_source_available() && mpLib_8004D164() == NULL &&
+              mpGetGroundCollVtx() == NULL && mpGetGroundCollLine() == NULL &&
+              mpGetGroundCollJoint() == NULL &&
+              melee_web_gameplay_stats().objects == before.objects &&
+              melee_web_gameplay_stats().processes == before.processes,
+          "dynamic source teardown releases the original map, updater and collision storage");
+    check(memcmp(source_lines_before, source_lines, sizeof(source_lines)) == 0 &&
+              memcmp(source_vertices_before, source_vertices, sizeof(source_vertices)) == 0 &&
+              memcmp(source_joints_before, source_joints, sizeof(source_joints)) == 0,
+          "source map bytes remain unchanged after original collision teardown");
     stage_info.param = prior_param;
     stage_info.coll_data = prior_data;
     stage_info.grkind = prior_kind;
@@ -365,6 +625,43 @@ static void source_floor_carry_cases(void)
     check(melee_web_collision_destroy(owner,error,sizeof(error)), "floor carry teardown");
 }
 
+static void collision_static_preflight_cases(void)
+{
+    uint16_t saved_v0 = lines[0].v0;
+    uint16_t saved_v1 = lines[0].v1;
+    lines[0].v0 = 1;
+    lines[0].v1 = 0;
+    check(!melee_web_collision_create(&input, error, sizeof(error)) &&
+              error_contains("Static floor queries require source left-to-right"),
+          "reversed static floor remains rejected");
+    lines[0].v0 = saved_v0;
+    lines[0].v1 = saved_v1;
+
+    const float saved_x = vertices[1].x;
+    const float saved_y = vertices[1].y;
+    vertices[1].x = vertices[0].x;
+    vertices[1].y = vertices[0].y + 1.0F;
+    check(!melee_web_collision_create(&input, error, sizeof(error)) &&
+              error_contains("Static floor queries require source left-to-right"),
+          "nonzero vertical static floor remains rejected");
+    vertices[1].x = saved_x;
+    vertices[1].y = saved_y;
+
+    int16_t saved_next0 = lines[2].next0;
+    lines[2].next0 = 0;
+    check(!melee_web_collision_create(&input, error, sizeof(error)) &&
+              error_contains("Cyclic static island chains"),
+          "static floor cycle remains rejected");
+    lines[2].next0 = saved_next0;
+
+    int16_t saved_prev0 = lines[3].prev0;
+    lines[3].prev0 = 3;
+    check(!melee_web_collision_create(&input, error, sizeof(error)) &&
+              error_contains("Cyclic static island chains"),
+          "static ceiling cycle remains rejected");
+    lines[3].prev0 = saved_prev0;
+}
+
 int main(void)
 {
     check(!melee_web_collision_create(&input, error, sizeof(error)), "uninitialized world rejects");
@@ -374,7 +671,7 @@ int main(void)
     check(melee_web_gameplay_startup(1024 * 1024, error, sizeof(error)), "real original HSD heap startup");
     MeleeWebCollisionInput invalid = input;
     invalid.ranges[4].count = 1;
-    check(!melee_web_collision_create(&invalid, error, sizeof(error)), "dynamic ranges remain explicitly unsupported");
+    check(!melee_web_collision_create(&invalid, error, sizeof(error)), "synthetic dynamic-create refusal");
     invalid = input; invalid.stage_scale = INFINITY;
     check(!melee_web_collision_create(&invalid, error, sizeof(error)), "invalid scale rejects");
     invalid = input; invalid.stage_scale = 1.0e-21F;
@@ -387,9 +684,7 @@ int main(void)
     source_loaded_case();
     source_dynamic_case();
     source_floor_carry_cases();
-    lines[2].next0 = 0;
-    check(!melee_web_collision_create(&input, error, sizeof(error)), "cyclic island chains reject before original traversal");
-    lines[2].next0 = -1;
+    collision_static_preflight_cases();
     lines[0].prev0 = -2;
     check(!melee_web_collision_create(&input, error, sizeof(error)), "negative adjacency rejects before source dereference");
     lines[0].prev0 = -1;

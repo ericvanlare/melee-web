@@ -114,6 +114,37 @@ MeleeWebMenuSession* melee_web_menu_session_create(
 int melee_web_menu_session_destroy(MeleeWebMenuSession*, char* error,
                                    size_t error_size);
 
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* One-shot first-CSS return note, after the source callback and before the
+ * wrapper's phase updates. The note cannot abort original scene completion.
+ * ko_counts is opaque source payload state; the note must validate its
+ * exact source owner before reading any bytes. */
+typedef void (*MeleeWebMenuFirstCssReturnNote)(
+    void*, MeleeWebMenuSession*, const CSSData*, const uint8_t* ko_counts);
+int melee_web_menu_arm_first_css_return(MeleeWebMenuSession*,
+    MeleeWebMenuFirstCssReturnNote, char*, size_t);
+int melee_web_menu_first_css_return_live(const MeleeWebMenuSession*);
+typedef void (*MeleeWebMenuFirstSssPairNote)(
+    void*, MeleeWebMenuSession*, const SSSData*, uint64_t session_ticks,
+    int boundary);
+enum {
+    MELEE_WEB_MENU_SSS_PAIR_ENTRY = 1,
+    MELEE_WEB_MENU_SSS_PAIR_RETURN = 2,
+    MELEE_WEB_MENU_SSS_PREFIX_EXIT = 3,
+};
+/* Private diagnostic only: arm during the completed CSS scene and retain the
+ * same session through its ordinary CSS -> SSS_READY transition. Notes are
+ * passive and cannot interrupt either authored SSS constructor boundary. */
+int melee_web_menu_arm_first_sss_tick(MeleeWebMenuSession*, char*, size_t);
+/* Finite diagnostic permit; expected state remains outside the source session. */
+int melee_web_menu_arm_first_sss_prefix(MeleeWebMenuSession*,
+    MeleeWebMenuFirstSssPairNote, char*, size_t);
+int melee_web_menu_authorize_first_sss_prefix_tick(MeleeWebMenuSession*,
+    unsigned index, char*, size_t);
+int melee_web_menu_arm_first_sss_pair(MeleeWebMenuSession*,
+    MeleeWebMenuFirstSssPairNote, char*, size_t);
+#endif
+
 /* Native scene lifecycle.  enter/leave are explicit so a host cannot create a
  * second SDK scene while a match still owns the source world. */
 int melee_web_menu_enter_css(MeleeWebMenuSession*, char* error,

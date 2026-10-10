@@ -122,6 +122,18 @@ if(EMSCRIPTEN)
   add_library(hsd_native_runtime STATIC src/hsd_texture_bounds.c src/hsd_native_camera.c src/hsd_native_arrays.c src/hsd_native_pobj.c src/hsd_native_joint.c src/hsd_native_common.c
     src/gameplay_rng_draw_probe.c
     src/gameplay_stage_context.c src/gameplay_common_context.c "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lbspdisplay.c")
+  if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    # Keep C1 source observers limited to their original implementation units.
+    set_property(SOURCE "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/objalloc.c"
+      APPEND PROPERTY COMPILE_DEFINITIONS MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
+    set_property(SOURCE "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/class.c"
+      APPEND PROPERTY COMPILE_DEFINITIONS MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
+    set_property(SOURCE "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/gr/ground.c"
+      APPEND PROPERTY COMPILE_DEFINITIONS MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
+    set_property(SOURCE "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lbspdisplay.c"
+      APPEND PROPERTY COMPILE_DEFINITIONS MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
+    target_sources(gameplay_runtime PRIVATE src/stadium_c1_heap_owner_observer.c)
+  endif()
   foreach(unit class object hash id list jobj dobj mobj tobj texp texpdag tev sobjlib hsd_3924
       displayfunc state aobj fobj robj shadow wobj lobj spline mtx util quatlib
       bytecode perf random)
@@ -269,7 +281,7 @@ if(EMSCRIPTEN)
     -sALLOW_MEMORY_GROWTH=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
   set_target_properties(gameplay_probe PROPERTIES SUFFIX ".js")
   include(cmake/FighterRuntime.cmake)
-  target_link_libraries(gameplay_collision_trace PRIVATE hsd_native_runtime)
+  target_link_libraries(gameplay_collision_trace PRIVATE fighter_source_runtime)
   add_executable(gameplay_fighter_input_trace tests/gameplay_fighter_trace.cpp
     src/gameplay_fighter_probe.c src/dat_archive.cpp src/dat_common.cpp)
   target_link_libraries(gameplay_fighter_input_trace PRIVATE fighter_source_runtime)

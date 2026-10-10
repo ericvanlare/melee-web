@@ -130,6 +130,7 @@ SLICE_NAMES = {
     51: "menu_css_ko_counts",
     52: "player_entities",
     53: "player_entity_user_data",
+    56: "sd_items_lock",
     57: "player_identity",
     58: "player_transformed",
 }

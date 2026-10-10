@@ -63,6 +63,47 @@ class NativeStageOriginalRuntime(unittest.TestCase):
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         self.assertIn("Original native map publication/lookup/lifetime/restart passed",result.stdout)
 
+    def test_unregistered_map_light_identity_aborts_in_separate_process(self):
+        targets=[ROOT/"build"/directory/"gameplay_stage_map_trace.js"
+                 for directory in ("browser","browser-release")]
+        targets=[path for path in targets if path.is_file()]
+        if not targets:self.skipTest("Build the native stage-map publication trace")
+        target=max(targets,key=lambda path:path.stat().st_mtime)
+        if target.stat().st_mtime < (ROOT/"tests/gameplay_stage_map_trace.c").stat().st_mtime:
+            self.skipTest("Rebuild the native stage-map trace after its source changed")
+        import sys
+        sys.path.insert(0,str(ROOT/"scripts"))
+        from check_gameplay import node_runtime
+        result=subprocess.run([str(node_runtime()),str(target),"--unregistered-light"],
+                              cwd=ROOT,capture_output=True,text=True,timeout=30)
+        self.assertNotEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn("Native stage light query names an unowned descriptor",result.stderr)
+
+    def test_original_grdatfiles_retirement_uses_stage_map_registry_once(self):
+        target=None
+        for directory in ("browser-stadium-c1a-release","browser","browser-release"):
+            build=ROOT/"build"/directory
+            candidate=build/"gameplay_stage_map_trace.js"
+            cache=build/"CMakeCache.txt"
+            if not candidate.is_file() or not cache.is_file():
+                continue
+            if "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC:BOOL=ON" not in cache.read_text():
+                continue
+            if candidate.stat().st_mtime < (ROOT/"tests/gameplay_stage_map_trace.c").stat().st_mtime:
+                continue
+            target=candidate
+            break
+        if target is None:
+            self.skipTest("Build the gameplay_stage_map_trace target with the C1 diagnostic option")
+        import sys
+        sys.path.insert(0,str(ROOT/"scripts"))
+        from check_gameplay import node_runtime
+        result=subprocess.run([str(node_runtime()),str(target),"--grdatfiles-retirement-control"],
+                              cwd=ROOT,capture_output=True,text=True,timeout=30)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn("Synthetic typed-catalog StageMap/original grDatFiles retirement control passed",
+                      result.stdout)
+
     def run_trace(self,name,*arguments):
         target=ROOT/"build/browser"/(name+".js")
         if not target.is_file():self.skipTest("Original stage trace target unavailable")
@@ -94,6 +135,7 @@ class NativeStageOriginalRuntime(unittest.TestCase):
     def test_structural_marker_pairs_preserve_authored_order_and_checks(self):
         output=self.run_trace("dat_native_stage_map_trace","--marker-fixture")
         self.assertIn("Structural marker pairs preserve duplicates/order",output)
+        self.assertIn("profile contracts",output)
 
     def test_original_oninit_scheduler_and_teardown(self):
         assets=ROOT/"assets-local/next-gate"

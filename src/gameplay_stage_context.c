@@ -127,9 +127,15 @@ int melee_web_stage_lights_stats(MeleeWebStageLights* h,uint32_t* count,uint16_t
 }
 int melee_web_stage_lights_adopt_source(void* value,char* e,size_t n){
     MeleeWebStageLights* h=published;HSD_GObj* owner=value;
-    if(!h||!h->attached||h->loaded||h->owner||!owner||
-       owner->classifier!=HSD_GOBJ_CLASS_GROUND||!owner->hsd_obj||!h->source_bound)
-        return fail(e,n,"Source map-light adoption requires Ground's newly created original owner");
+    if(!h)return fail(e,n,"Source map-light adoption has no published descriptor context");
+    if(!h->attached||stage_info.map_plit!=h->list)
+        return fail(e,n,"Source map-light adoption descriptor publication was replaced");
+    if(h->loaded||h->owner)return fail(e,n,"Source map-light adoption context already owns lights");
+    if(!owner||Ground_801C498C()!=owner)
+        return fail(e,n,"Source map-light adoption requires Ground's current original owner");
+    if(owner->classifier!=HSD_GOBJ_CLASS_GROUND||!owner->hsd_obj)
+        return fail(e,n,"Source map-light adoption Ground owner lacks its original light object");
+    if(!h->source_bound)return fail(e,n,"Source map-light adoption lacks a selected authored bound");
     uint32_t count=0;
     for(HSD_LObj* l=owner->hsd_obj;l;l=l->next){
         if(++count>h->source_bound)return fail(e,n,"Original Ground light chain exceeds its selected DAT entry count");
@@ -159,6 +165,7 @@ int melee_web_stage_lights_attach(MeleeWebStageLights* h,char* e,size_t n){
 }
 int melee_web_stage_lights_detach(MeleeWebStageLights* h,char* e,size_t n){
     if(!h)return fail(e,n,"Stage light context missing");
+    if(h->source_owner)return fail(e,n,"Retire Ground's original map-light owner before detaching its descriptor context");
     if(h->attached){
         if(published!=h||stage_info.map_plit!=h->list)return fail(e,n,"Stage light publication was replaced by another owner");
         stage_info.map_plit=h->saved;h->saved=NULL;h->attached=0;published=NULL;

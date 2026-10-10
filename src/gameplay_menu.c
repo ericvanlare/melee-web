@@ -38,6 +38,16 @@ struct MeleeWebMenuSession {
     int css_parent_ready;
     int training_mode_scene;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    MeleeWebMenuFirstCssReturnNote first_css_return_note;
+    int first_css_return_armed;
+    const uint8_t* first_css_return_ko_owner;
+    MeleeWebMenuFirstSssPairNote first_sss_pair_note;
+    int first_sss_tick_token; /* 0 unused, 1 armed, 2 consumed, 3 invalid */
+    int first_sss_prefix_state; /* 0 unused, 1 finite lease, 2 exited, 3 invalid */
+    unsigned first_sss_prefix_remaining;
+    int first_sss_prefix_token; /* 1 armed, 2 consumed */
+    MeleeWebMenuFirstSssPairNote first_sss_prefix_exit_note;
+    int first_sss_pair_state; /* 0 unused, 1 CSS armed, 2 SSS eligible, 3 entering, 4 noted, 5 invalid */
     int stadium_c1a_enabled;
     int stadium_c1a_ready;
 #endif
@@ -1006,11 +1016,104 @@ int melee_web_menu_session_destroy(MeleeWebMenuSession* session, char* error,
         return fail(error, error_size,
                     "Leave or abort the live native menu scene before destroy");
     }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_sss_pair_state && session->first_sss_pair_state != 4)
+        session->first_sss_pair_state = 5;
+#endif
     session->phase = MELEE_WEB_MENU_CLOSED;
     owner = NULL;
     free(session);
     return ok(error, error_size);
 }
+
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+int melee_web_menu_arm_first_css_return(MeleeWebMenuSession* session,
+    MeleeWebMenuFirstCssReturnNote note, char* error, size_t error_size)
+{
+    if (!session_live(session, error, error_size)) return 0;
+    if (!note || session->phase != MELEE_WEB_MENU_CREATED || session->ticks ||
+        session->css_open || session->sss_open || session->first_css_return_armed)
+        return fail(error, error_size, "First CSS return note requires a fresh unarmed session");
+    session->first_css_return_note = note;
+    session->first_css_return_armed = 1;
+    return ok(error, error_size);
+}
+int melee_web_menu_first_css_return_live(const MeleeWebMenuSession* session)
+{
+    return session && session == owner && session->first_css_return_armed == 2 &&
+        session->phase == MELEE_WEB_MENU_CSS && session->css_open &&
+        !session->sss_open && !session->ticks &&
+        session->first_css_return_ko_owner &&
+        session->css.ko_counts == session->first_css_return_ko_owner;
+}
+
+int melee_web_menu_arm_first_sss_tick(MeleeWebMenuSession* session,
+                                      char* error, size_t error_size)
+{
+    if (!session_live(session, error, error_size)) return 0;
+    if (session->first_sss_tick_token != 0 || session->first_sss_pair_state != 4 ||
+        session->phase != MELEE_WEB_MENU_SSS || !session->sss_open ||
+        session->transition_failed || session->selection_rejected ||
+        session->transition_requested != 0) {
+        session->first_sss_tick_token = 3;
+        return fail(error, error_size, "SSS one-tick session authorization was refused");
+    }
+    session->first_sss_tick_token = 1;
+    return ok(error, error_size);
+}
+
+int melee_web_menu_arm_first_sss_prefix(MeleeWebMenuSession* session,
+    MeleeWebMenuFirstSssPairNote note, char* error, size_t error_size)
+{
+    if (!session_live(session,error,error_size)) return 0;
+    if (!note || session->first_sss_prefix_state ||
+        session->first_sss_pair_state != 4 || session->first_sss_tick_token != 2 ||
+        session->phase != MELEE_WEB_MENU_SSS || !session->sss_open ||
+        session->transition_failed || session->selection_rejected ||
+        session->transition_requested || session->ticks != 1) {
+        session->first_sss_prefix_state=3;
+        return fail(error,error_size,"SSS prefix requires its completed first tick");
+    }
+    session->first_sss_prefix_remaining=124;
+    session->first_sss_prefix_exit_note=note;
+    session->first_sss_prefix_state=1;
+    return ok(error,error_size);
+}
+
+int melee_web_menu_authorize_first_sss_prefix_tick(MeleeWebMenuSession* session,
+    unsigned index, char* error, size_t error_size)
+{
+    if (!session_live(session,error,error_size)) return 0;
+    if (session->first_sss_prefix_state != 1 ||
+        !session->first_sss_prefix_remaining || index >= 124 ||
+        index != 124-session->first_sss_prefix_remaining ||
+        session->first_sss_prefix_token == 1 || session->first_sss_pair_state != 4 ||
+        session->phase != MELEE_WEB_MENU_SSS || !session->sss_open ||
+        session->transition_failed || session->selection_rejected ||
+        session->transition_requested || session->ticks != index+1) {
+        session->first_sss_prefix_state=3;
+        return fail(error,error_size,"SSS finite prefix tick authorization refused");
+    }
+    session->first_sss_prefix_token=1;
+    return ok(error,error_size);
+}
+
+int melee_web_menu_arm_first_sss_pair(MeleeWebMenuSession* session,
+    MeleeWebMenuFirstSssPairNote note, char* error, size_t error_size)
+{
+    if (!session_live(session, error, error_size)) return 0;
+    if (!note || session->phase != MELEE_WEB_MENU_CSS || !session->css_open ||
+        session->sss_open || session->first_sss_pair_state ||
+        session->transition_failed || session->selection_rejected ||
+        session->css_parent_route_requested) {
+        return fail(error, error_size,
+                    "First SSS constructor pair requires its active ordinary CSS session");
+    }
+    session->first_sss_pair_note = note;
+    session->first_sss_pair_state = 1;
+    return ok(error, error_size);
+}
+#endif
 
 static int enter_css(MeleeWebMenuSession* session, int after_match,
                      char* error, size_t error_size)
@@ -1018,6 +1121,10 @@ static int enter_css(MeleeWebMenuSession* session, int after_match,
     if (!session_live(session, error, error_size)) {
         return 0;
     }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_css_return_armed >= 2) session->first_css_return_armed = 3;
+    if (session->first_sss_pair_state) session->first_sss_pair_state = 5;
+#endif
     if (session->phase != MELEE_WEB_MENU_CREATED &&
         session->phase != MELEE_WEB_MENU_CSS_READY &&
         (!after_match || session->phase != MELEE_WEB_MENU_READY))
@@ -1055,6 +1162,15 @@ static int enter_css(MeleeWebMenuSession* session, int after_match,
     }
     session->training_mode_scene = session->css.match_type == TRAINING_MODE;
     mnCharSel_Scene_OnEnter(&session->css);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_css_return_armed == 1) {
+        session->first_css_return_armed = 2;
+        /* Opaque until the host validates the authored VS owner. */
+        session->first_css_return_ko_owner = session->css.ko_counts;
+        session->first_css_return_note(session->runtime.user, session,
+            &session->css, session->first_css_return_ko_owner);
+    }
+#endif
     session->css_open = 1;
     session->phase = MELEE_WEB_MENU_CSS;
     return ok(error, error_size);
@@ -1158,10 +1274,30 @@ int melee_web_menu_enter_sss(MeleeWebMenuSession* session, char* error,
         !session->runtime.scene_enter(session->runtime.user,
                                       MELEE_WEB_MENU_SCENE_SSS, error,
                                       error_size)) {
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        if (session->first_sss_pair_state) session->first_sss_pair_state = 5;
+#endif
         melee_web_menu_gobj_snapshot_clear(session);
         return 0;
     }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_sss_pair_state == 2 && session->first_sss_pair_note) {
+        session->first_sss_pair_state = 3;
+        session->first_sss_pair_note(session->runtime.user, session,
+            &session->sss, session->ticks, MELEE_WEB_MENU_SSS_PAIR_ENTRY);
+    } else if (session->first_sss_pair_state) {
+        session->first_sss_pair_state = 5;
+    }
+#endif
     mnStageSel_Scene_OnEnter(&session->sss);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_sss_pair_state == 3 && session->first_sss_pair_note) {
+        session->first_sss_pair_note(session->runtime.user, session,
+            &session->sss, session->ticks, MELEE_WEB_MENU_SSS_PAIR_RETURN);
+        if (session->first_sss_pair_state == 3)
+            session->first_sss_pair_state = 4;
+    }
+#endif
     session->sss_open = 1;
     session->phase = MELEE_WEB_MENU_SSS;
     return ok(error, error_size);
@@ -1176,6 +1312,30 @@ int melee_web_menu_tick(MeleeWebMenuSession* session, char* error,
     if (!session_live(session, error, error_size)) {
         return 0;
     }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_css_return_armed) session->first_css_return_armed = 3;
+    if (session->first_sss_pair_state != 0) {
+        if (session->first_sss_pair_state == 4 &&
+            session->first_sss_tick_token == 1 &&
+            session->phase == MELEE_WEB_MENU_SSS && session->sss_open) {
+            session->first_sss_tick_token = 2; /* Consume before original work. */
+        } else if (session->first_sss_prefix_state == 1 &&
+                   session->first_sss_prefix_token == 1 &&
+                   session->first_sss_prefix_remaining &&
+                   session->first_sss_pair_state == 4 &&
+                   session->phase == MELEE_WEB_MENU_SSS && session->sss_open) {
+            session->first_sss_prefix_token=2;
+            --session->first_sss_prefix_remaining; /* Consume before source work. */
+        } else {
+            if (session->first_sss_prefix_state) session->first_sss_prefix_state=3;
+            if (session->first_sss_pair_state != 4)
+                session->first_sss_pair_state = 5;
+            if (session->first_sss_tick_token) session->first_sss_tick_token = 3;
+            return fail(error, error_size,
+                        "SSS constructor pair is terminal before any source tick");
+        }
+    }
+#endif
     if (session->selection_rejected || session->transition_failed ||
         session->transition_requested != 0) {
         return fail(error, error_size,
@@ -1275,6 +1435,11 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
     if (!session_live(session, error, error_size)) {
         return 0;
     }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_css_return_armed) session->first_css_return_armed = 3;
+    if (session->first_sss_pair_state && session->first_sss_pair_state != 1)
+        session->first_sss_pair_state = 5;
+#endif
     if (session->phase != MELEE_WEB_MENU_CSS || !session->css_open) {
         return fail(error, error_size, "CSS is not the live menu scene");
     }
@@ -1299,6 +1464,9 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
         !session->runtime.scene_exit(session->runtime.user,
                                      MELEE_WEB_MENU_SCENE_CSS, error,
                                      error_size)) {
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        if (session->first_sss_pair_state) session->first_sss_pair_state = 5;
+#endif
         session->phase = MELEE_WEB_MENU_CLOSED;
         return 0;
     }
@@ -1310,12 +1478,18 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
     }
     pending = session->css.pending_scene_change;
     if (pending == CSSPendingSceneChange_2 || parent_route) {
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        if (session->first_sss_pair_state) session->first_sss_pair_state = 5;
+#endif
         session->css_parent_route_requested = 0;
         session->css_parent_ready = 1;
         session->phase = MELEE_WEB_MENU_CLOSED;
         return ok(error, error_size);
     }
     if (pending != 1) {
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        if (session->first_sss_pair_state) session->first_sss_pair_state = 5;
+#endif
         session->phase = MELEE_WEB_MENU_CLOSED;
         return failf(error, error_size,
                      "CSS exited with unsupported pending scene %d", pending);
@@ -1325,9 +1499,18 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
     if (session->training_mode_scene
             ? !training_css_selection_valid_internal(&session->css, 1, 1)
             : !css_selection_valid_internal(&session->css, 1, 0, parent_route, returned_rules(&session->css))) {
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        if (session->first_sss_pair_state) session->first_sss_pair_state = 5;
+#endif
         session->phase = MELEE_WEB_MENU_CLOSED;
         return fail(error, error_size, "CSS published an unavailable selection");
     }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_sss_pair_state == 1)
+        session->first_sss_pair_state = 2;
+    else if (session->first_sss_pair_state)
+        session->first_sss_pair_state = 5;
+#endif
     session->phase = MELEE_WEB_MENU_SSS_READY;
     return ok(error, error_size);
 }
@@ -1338,6 +1521,9 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
     if (!session_live(session, error, error_size)) {
         return 0;
     }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_sss_tick_token) session->first_sss_tick_token = 3;
+#endif
     if (session->phase != MELEE_WEB_MENU_SSS || !session->sss_open) {
         return fail(error, error_size, "SSS is not the live menu scene");
     }
@@ -1356,6 +1542,15 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
                     "Cannot commit an unavailable stage selection");
     }
     mnStageSel_Scene_OnExit(NULL);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_sss_prefix_state == 1 &&
+        session->first_sss_prefix_remaining == 0 &&
+        session->first_sss_prefix_token == 2 && session->first_sss_prefix_exit_note) {
+        session->first_sss_prefix_state=2; /* Passive, one-use scene-epilogue note. */
+        session->first_sss_prefix_exit_note(session->runtime.user,session,
+            &session->sss,session->ticks,MELEE_WEB_MENU_SSS_PREFIX_EXIT);
+    } else if (session->first_sss_prefix_state) session->first_sss_prefix_state=3;
+#endif
     if (session->runtime.scene_exit != NULL &&
         !session->runtime.scene_exit(session->runtime.user,
                                      MELEE_WEB_MENU_SCENE_SSS, error,
@@ -1446,6 +1641,13 @@ int melee_web_menu_abort(MeleeWebMenuSession* session, char* error,
     if (!session_live(session, error, error_size)) {
         return 0;
     }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session->first_sss_tick_token) session->first_sss_tick_token = 3;
+    if (session->first_sss_prefix_state) session->first_sss_prefix_state=3;
+    if (session->first_css_return_armed) session->first_css_return_armed = 3;
+    if (session->first_sss_pair_state)
+        session->first_sss_pair_state = 5;
+#endif
     if (session->css_open) {
         mnCharSel_Scene_OnExit(NULL);
         if (session->runtime.scene_exit != NULL &&

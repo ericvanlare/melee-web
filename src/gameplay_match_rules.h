@@ -21,6 +21,14 @@ MeleeWebMatchRules* melee_web_match_rules_begin(char*,size_t);
 int melee_web_match_rules_prepare_from_menu(MeleeWebMatchRules*,
                                             const StartMeleeData*,int opening_demo,
                                             char*,size_t);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* Exact diagnostic Stadium source preparation; ordinary admission stays closed. */
+int melee_web_match_rules_prepare_stadium_from_menu(MeleeWebMatchRules*,
+    const StartMeleeData*,char*,size_t);
+/* True only inside that owner's synchronous original source preparation,
+ * for its exact retained Start pointer and original world/RNG owner. */
+int melee_web_match_rules_stadium_source_start(const StartMeleeData*);
+#endif
 /* Original Sudden Death admits only its source-selected survivors, which may
  * be sparse in their original port-indexed StartMeleeData rows. */
 int melee_web_match_rules_prepare_sudden_death_from_menu(

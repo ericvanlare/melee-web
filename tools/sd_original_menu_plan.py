@@ -38,6 +38,10 @@ def validate_packet(value):
         return value
     if canonical(value) == canonical(gci_sparse_pair_packet()):
         return value
+    if canonical(value) == canonical(stadium_go_feedback_packet()):
+        return value
+    if canonical(value) == canonical(stadium_go_prefix_packet()):
+        return value
     if canonical(value) == canonical(sheik_transform_prefix_packet()):
         return value
     if canonical(value) == canonical(gci_items_row_packet()):
@@ -149,6 +153,13 @@ def route_pads(packet):
                 pair[port] = raw_pad(x=x, y=y)
                 pads.add(tuple(pair))
     pads |= {(raw_pad(x=40), NEUTRAL_PAD), (raw_pad(y=40), NEUTRAL_PAD)}
+    if packet["scope"] == "stadium_go_prefix":
+        if packet["sss"].get("policy") == "same_call_feedback_v1":
+            for axis in packet["sss"]["axis_values"]:
+                pads |= {(raw_pad(x=axis), NEUTRAL_PAD), (raw_pad(y=axis), NEUTRAL_PAD)}
+        else:
+            for pulse in packet["sss"]["pulses"]:
+                pads.add((raw_pad(x=pulse["x"], y=pulse["y"]), NEUTRAL_PAD))
     return pads
 
 
@@ -227,6 +238,65 @@ def sheik_transform_prefix_packet():
                 boundary.pop("items_locked", None)
     value["stop"] = (
         "observed exact Zelda/Mario four-stock FD setup and completed grounded neutral Sheik prefix")
+    return value
+
+
+
+def stadium_go_prefix_packet():
+    """Finite exploratory original-menu path to the selected Stadium row.
+
+    The profile remains caller-supplied; an optional exact retained GCI is copied read-only.
+    This packet binds the observer setup receipt and declares a fixed, short
+    sequence of cardinal Pipe intents; it does not assert that the sequence
+    reaches Stadium or that the selected profile matches a port setup.
+    """
+    from stadium_go_prefix import EXPECTED_SETUP_RECEIPT_SHA256
+
+    value = sheik_transform_prefix_packet()
+    value.update(version=11, scope="stadium_go_prefix")
+    # The Sheik recipe hash describes a different route and must not survive
+    # this separate Stadium packet. The packet hash binds these menu actions.
+    value.pop("authored_recipe_sha256", None)
+    value["setup_receipt_sha256"] = EXPECTED_SETUP_RECEIPT_SHA256
+    value["css"] = {
+        "character": 8, "icon": 1, "point": [-20.9, 16.5],
+        "costumes": [1, 0], "ports": [0, 1], "source_slots": [0, 1],
+        "human_kind": 0, "axis_values": [-70, -35, 0, 35, 70],
+        "tolerance": 0.6, "stable_cursor_polls": 2,
+        "max_move_polls": 600, "max_costume_taps": 8,
+        "idle_polls_before_start": 12,
+    }
+    value["sss"] = {
+        "target_index": 18, "target_kind": 3,
+        "pulses": [
+            {"x": 70, "y": 0, "max_source_polls": 8},
+            {"x": 0, "y": 70, "max_source_polls": 8},
+            {"x": -70, "y": 0, "max_source_polls": 16},
+            {"x": 0, "y": -70, "max_source_polls": 16},
+            {"x": 70, "y": 0, "max_source_polls": 8},
+        ],
+        "max_movement_source_polls": 56,
+        "target_stable_neutral_polls": 2,
+        "max_owner_polls": 600,
+        "max_pad_consume_wait_polls": 60,
+        "max_vs_transition_polls": 600,
+    }
+    # The original Items directional handler returns while its source lock is
+    # nonzero. Guard the existing single Up pulse on that exact byte; this does
+    # not alter the finite input alphabet or infer readiness from MenuFlow.
+    items_row = [action for action in value["actions"]
+                 if action["label"] == "items-frequency-row"]
+    if len(items_row) != 1:
+        raise ValueError("Stadium packet lost its single Items frequency-row action")
+    items_row[0]["before"]["items_locked"] = 0
+    items_row[0]["after"]["items_locked"] = 0
+    value["stop"] = (
+        "live SSS index 18/kind 3, consumed neutral and two stable target polls, "
+        "consumed A and neutral release, then validated original Stadium GO prefix")
+    value["exclusions"] = [
+        "guaranteed cursor convergence", "profile/setup equivalence", "RNG equivalence",
+        "whole match", "Results/CSS return", "pixels", "PCM", "physical input",
+    ]
     return value
 
 
@@ -332,4 +402,14 @@ def gci_sparse_pair_packet():
         "max_scan_polls": 600, "confirm_requires_cooldown": 0}
     value["stop"] = ("observed exact VS setup, distinct source PAD0/PAD2 consume and release; "
                       "interrupted before terminal")
+    return value
+
+
+def stadium_go_feedback_packet():
+    """Separate bounded feedback experiment; the retained cardinal recipe is unchanged."""
+    value = stadium_go_prefix_packet()
+    value["sss"].pop("pulses")
+    value["sss"].update(policy="same_call_feedback_v1", axis_values=[-70,-35,35,70],
+                        near_center_distance=5, max_reacquire_callbacks=4,
+                        max_movement_callbacks=56)
     return value

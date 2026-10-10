@@ -16,6 +16,7 @@ class ArchiveSectionsTests(unittest.TestCase):
             result=subprocess.run([str(binary)],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stderr)
             self.assertIn('restarted',result.stdout)
+            self.assertIn('Stadium eight-entry missing SIS and nine-entry owned SIS catalog controls passed',result.stdout)
             for case,message in [('missing','Typed section is not registered'),('unknown','Typed archive is not registered'),('invalid','Unknown or released'),('released','Unknown or released'),('heap_released','Unknown or released'),('unhydrated','present but not hydrated')]:
                 result=subprocess.run([str(binary),case],capture_output=True,text=True)
                 self.assertNotEqual(result.returncode,0)

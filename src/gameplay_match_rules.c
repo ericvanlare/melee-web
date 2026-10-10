@@ -3,6 +3,10 @@
 #include "gameplay_content.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_player_selection.h"
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#include "gameplay_source_memory_runtime.h"
+#include <sysdolphin/baselib/random.h>
+#endif
 #include <melee/gm/gm_1601.h>
 #include <melee/gm/gm_16AE.h>
 #include <melee/gm/types.h>
@@ -21,7 +25,12 @@ extern int melee_web_match_source_publish_result(void);
 extern void melee_web_match_source_result_reset(void);
 extern int melee_web_match_source_result_winners(int*, int[6]);
 extern int melee_web_match_source_result_data(MatchExitInfo*);
-struct MeleeWebMatchRules {lbl_8046B6A0_t saved;StaticPlayer players[6];StartMeleeData start;uint64_t generation;int prepared;int initialized;int opening_demo;};
+struct MeleeWebMatchRules {lbl_8046B6A0_t saved;StaticPlayer players[6];StartMeleeData start;uint64_t generation;int prepared;int initialized;int opening_demo;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ int stadium_preparing; unsigned* stadium_seed_owner;
+ MeleeWebSourceMemoryContext stadium_context;
+#endif
+};
 static MeleeWebMatchRules* active;
 static struct {
     int valid;
@@ -91,6 +100,10 @@ MeleeWebMatchRules* melee_web_match_rules_begin(char* e,size_t n){
     if(active||!melee_web_gameplay_stats().generation){fail(e,n,"Match rules require an unowned live source world");return NULL;}
     for(int i=0;i<6;i++)if(Player_GetEntity(i)){fail(e,n,"Initialize rules before source fighters");return NULL;}
     MeleeWebMatchRules* h=malloc(sizeof(*h));if(!h){fail(e,n,"Cannot allocate original rules scope");return NULL;}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    h->stadium_preparing=0;h->stadium_seed_owner=NULL;
+    memset(&h->stadium_context,0,sizeof(h->stadium_context));
+#endif
     memset(&terminal,0,sizeof(terminal));
     melee_web_match_source_result_reset();
     lbl_8046B6A0_t* data=gm_16AE_GetUnkData_0();h->saved=*data;h->generation=melee_web_gameplay_stats().generation;h->prepared=0;h->initialized=0;
@@ -105,11 +118,14 @@ MeleeWebMatchRules* melee_web_match_rules_begin(char* e,size_t n){
     data->x24C.x5=MatchKind_Stock;data->x24C.is_teams=0;
     active=h;melee_web_match_source_refresh_ratio();if(e&&n)*e=0;return h;
 }
-int melee_web_match_rules_prepare_from_menu(MeleeWebMatchRules* h,
+static int prepare_from_menu(MeleeWebMatchRules* h,
                                             const StartMeleeData* menu,
-                                            int opening_demo,
+                                            int opening_demo,int stadium,
                                             char* e,size_t n)
 {
+#if !defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    (void)stadium;
+#endif
     if(!h||h!=active||h->generation!=melee_web_gameplay_stats().generation)
         return fail(e,n,"Original match rules scope is not active");
     if(h->initialized||h->prepared)
@@ -118,6 +134,19 @@ int melee_web_match_rules_prepare_from_menu(MeleeWebMatchRules* h,
     for(int i=0;i<6;i++)if(Player_GetEntity(i))
         return fail(e,n,"Initialize original match data before source fighters");
     StartMeleeData candidate=*menu;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(stadium){
+        if(opening_demo || candidate.rules.stkind!=St_Kind_PStadium ||
+           candidate.rules.is_teams || candidate.rules.x6)
+            return fail(e,n,"Diagnostic Stadium requires its exact ordinary two-Human-Mario profile");
+        for(int i=0;i<6;++i){
+            const PlayerInitData* p=&candidate.players[i];
+            if(i<2 ? (p->slot_type!=Gm_PKind_Human || p->ckind!=CKIND_MARIO ||
+                       (p->slot!=0 && p->slot!=i+1)) : p->slot_type!=Gm_PKind_NA)
+                return fail(e,n,"Diagnostic Stadium requires its exact ordinary two-Human-Mario profile");
+        }
+    }
+#endif
     if(opening_demo){
         const StartMeleeRules* rules=&candidate.rules;
         int active=0;
@@ -141,19 +170,63 @@ int melee_web_match_rules_prepare_from_menu(MeleeWebMatchRules* h,
         }
         if(active!=4||candidate.players[4].slot_type!=Gm_PKind_NA)
             return fail(e,n,"Opening source payload exceeds its authored four-player demo slots");
-    }else if(!supported_stock_rules(&candidate))
+    }else if(!supported_stock_rules(&candidate)
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+             && !(stadium && candidate.rules.stkind==St_Kind_PStadium &&
+                  candidate.rules.match_kind==MatchKind_Stock && candidate.rules.is_stock &&
+                  candidate.rules.is_vs && melee_web_match_timer_supported(&candidate.rules) &&
+                  candidate.rules.xB==-1 && !candidate.rules.x6)
+#endif
+             )
         return fail(e,n,"Menu payload does not match the supported stock/stage rules");
     else if(!supported_team_setup(&candidate))
         return fail(e,n,team_setup_refusal);
     h->start=candidate;
     h->opening_demo=opening_demo!=0;
-    if(!melee_web_match_prepare_source(&h->start,h->opening_demo)){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(stadium){
+        MeleeWebSourceMemoryContext context;
+        if(opening_demo || candidate.rules.stkind!=St_Kind_PStadium ||
+           melee_web_source_memory_context_read(&context)!=MELEE_WEB_SOURCE_MEMORY_READ_OK ||
+           context.world_generation!=h->generation || !seed_ptr ||
+           !melee_web_source_memory_healthy())
+            return fail(e,n,"Diagnostic Stadium preparation lost its exact source owner");
+        h->stadium_context=context;
+        h->stadium_seed_owner=seed_ptr;h->stadium_preparing=1;
+    }
+#endif
+    const int source_prepared=melee_web_match_prepare_source(&h->start,h->opening_demo);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    h->stadium_preparing=0;h->stadium_seed_owner=NULL;
+    memset(&h->stadium_context,0,sizeof(h->stadium_context));
+#endif
+    if(!source_prepared){
         memset(&h->start,0,sizeof(h->start));
         return fail(e,n,"Original per-match source preparation rejected menu payload");
     }
     h->prepared=1;
     if(e&&n)*e=0;return 1;
 }
+int melee_web_match_rules_prepare_from_menu(MeleeWebMatchRules* h,
+    const StartMeleeData* start,int demo,char* e,size_t n)
+{return prepare_from_menu(h,start,demo,0,e,n);}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+int melee_web_match_rules_prepare_stadium_from_menu(MeleeWebMatchRules* h,
+    const StartMeleeData* start,char* e,size_t n)
+{return prepare_from_menu(h,start,0,1,e,n);}
+int melee_web_match_rules_stadium_source_start(const StartMeleeData* start)
+{
+    MeleeWebSourceMemoryContext now;
+    return active && active->stadium_preparing==1 && !active->prepared && !active->initialized &&
+        start==&active->start && !active->opening_demo && start->rules.stkind==St_Kind_PStadium &&
+        !start->rules.x6 && active->stadium_seed_owner && seed_ptr==active->stadium_seed_owner &&
+        active->generation==melee_web_gameplay_stats().generation &&
+        melee_web_source_memory_context_read(&now)==MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+        now.world_generation==active->stadium_context.world_generation &&
+        now.source_heap_handle==active->stadium_context.source_heap_handle &&
+        melee_web_source_memory_healthy();
+}
+#endif
 int melee_web_match_rules_prepare_sudden_death_from_menu(
     MeleeWebMatchRules* h,const StartMeleeData* menu,char* e,size_t n)
 {

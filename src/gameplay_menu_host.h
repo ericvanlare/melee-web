@@ -143,6 +143,124 @@ int melee_web_menu_host_apply_replay_context(
     const uint8_t css_data[0x148], const uint8_t ko_counts[GM_MAX_PLAYERS],
     const uint8_t game_rules[0x18], const uint8_t save_data[0x55E8],
     char*, size_t);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+typedef struct MeleeWebMenuCssReturnSnapshot {
+    /* Typed source fields; css.ko_counts is NULL in this copied snapshot.
+     * Pointer-valued fields are not guest/native equality authorities. */
+    CSSData css;
+    uint8_t ko_counts[GM_MAX_PLAYERS];
+    uint8_t pad_state[MELEE_WEB_PAD_STATE_BYTES];
+    uint32_t random_seed;
+    int source_scene;
+    int source_scene_kind;
+} MeleeWebMenuCssReturnSnapshot;
+typedef struct MeleeWebMenuFirstSssPairNoteSnapshot {
+    int captured;
+    int phase; /* 1 entry before OnEnter, 2 return after OnEnter */
+    int host_entered;
+    int session_phase;
+    int source_scene;
+    int scene_kind;
+    uint32_t scene_frame;
+    uint32_t random_seed;
+    uint8_t pad_state[MELEE_WEB_PAD_STATE_BYTES];
+    int scene_routing_getters[4];
+    int owners[8]; /* host, session, world, audio, VS mode, scene info, payload, seed */
+    uint64_t world_generation;
+    uint64_t audio_generation;
+    uint64_t session_ticks;
+    SSSData sss;
+} MeleeWebMenuFirstSssPairNoteSnapshot;
+typedef struct MeleeWebMenuFirstSssPairObservation {
+    int state; /* 0 idle, 1 CSS armed, 2 captured, 3 failed */
+    unsigned host_tick_calls;
+    unsigned host_draw_calls;
+    char error[160];
+    MeleeWebMenuFirstSssPairNoteSnapshot entry;
+    MeleeWebMenuFirstSssPairNoteSnapshot returned;
+} MeleeWebMenuFirstSssPairObservation;
+typedef struct MeleeWebMenuFirstSssTickSnapshot {
+    int captured;
+    int source_scene;
+    int scene_kind;
+    uint32_t scene_frame;
+    uint32_t random_seed;
+    uint8_t pad_state[MELEE_WEB_PAD_STATE_BYTES];
+    int scene_routing_getters[4];
+    int owners[8]; /* host, session, world, audio, VS mode, scene info, payload, seed */
+    uint64_t world_generation;
+    uint64_t audio_generation;
+    PADStatus consumed_pad[4];
+} MeleeWebMenuFirstSssTickSnapshot;
+typedef struct MeleeWebMenuFirstSssTickObservation {
+    int state; /* 0 idle, 1 armed, 2 ticked, 3 failed */
+    unsigned host_tick_calls;
+    unsigned host_draw_calls;
+    int tick_result;
+    int clock_post_succeeded;
+    int post_host_frame_captured;
+    int transition_requested;
+    uint32_t post_host_frame;
+    char error[160];
+    MeleeWebMenuFirstSssTickSnapshot scheduler_end;
+} MeleeWebMenuFirstSssTickObservation;
+/* Private finite SSS continuation. The callback receives actual source data
+ * only and must synchronously approve. No expected bytes enter this API. */
+enum { MELEE_WEB_SSS_SAMPLE_TICK=1, MELEE_WEB_SSS_SAMPLE_DRAW_ENTER=2,
+       MELEE_WEB_SSS_SAMPLE_DRAW_RETURN=3, MELEE_WEB_SSS_SAMPLE_EXIT=4,
+       MELEE_WEB_SSS_SAMPLE_SELECTED_STAGE=5 };
+typedef int (*MeleeWebMenuSssSampleCallback)(void*, int,
+    const MeleeWebMenuFirstSssTickSnapshot*,
+    const MeleeWebMenuFirstSssPairNoteSnapshot*);
+typedef struct MeleeWebMenuSssSequenceObservation {
+    int state; /* 0 unused, 1 armed, 2 complete, 3 failed */
+    unsigned input_index, consumed_inputs, host_tick_calls, host_draw_calls;
+    unsigned matched_ticks, matched_draw_enters, matched_draw_returns;
+    int last_tick_result, transition_requested, exit_captured;
+    int selected_stage_captured, selected_stage_index, selected_stage_kind;
+    char error[160];
+    MeleeWebMenuFirstSssTickSnapshot scheduler_end, draw_enter, draw_return;
+    MeleeWebMenuFirstSssPairNoteSnapshot exit_note;
+} MeleeWebMenuSssSequenceObservation;
+int melee_web_menu_host_arm_first_sss_draw(MeleeWebMenuHost*,
+    MeleeWebMenuSssSampleCallback, void*, char*, size_t);
+int melee_web_menu_host_draw_first_sss(MeleeWebMenuHost*, char*, size_t);
+int melee_web_menu_host_arm_first_sss_prefix(MeleeWebMenuHost*,
+    MeleeWebMenuSssSampleCallback, void*, char*, size_t);
+int melee_web_menu_host_tick_first_sss_prefix(MeleeWebMenuHost*,
+    const PADStatus[4], unsigned index, char*, size_t);
+int melee_web_menu_host_draw_first_sss_prefix(MeleeWebMenuHost*,
+    unsigned index, char*, size_t);
+int melee_web_menu_host_leave_first_sss_prefix(MeleeWebMenuHost*,char*,size_t);
+int melee_web_menu_host_sss_sequence(const MeleeWebMenuHost*,int prefix,
+    MeleeWebMenuSssSequenceObservation*,char*,size_t);
+
+/* Arm and read one source-only SSS host tick after a JS-approved constructor
+ * pair. Input is raw consumed PAD data; no expected state crosses this API. */
+int melee_web_menu_host_arm_first_sss_tick(
+    MeleeWebMenuHost*, const PADStatus[4], char*, size_t);
+int melee_web_menu_host_first_sss_tick(
+    const MeleeWebMenuHost*, MeleeWebMenuFirstSssTickObservation*, char*, size_t);
+/* Arm once after reference context installation, before first host_enter.
+ * Read only after successful enter, before any tick/leave; a failed note
+ * remains explicit while original enter/phase updates finish for cleanup. */
+int melee_web_menu_host_arm_first_css_return(MeleeWebMenuHost*, char*, size_t);
+int melee_web_menu_host_first_css_return(MeleeWebMenuHost*,
+    MeleeWebMenuCssReturnSnapshot*, char*, size_t);
+/* Passive SSS constructor pair. Arm only after the one-use final CSS draw
+ * returned successfully. This keeps the exact ordinary CSS->SSS handoff. */
+int melee_web_menu_host_arm_first_sss_pair(MeleeWebMenuHost*, char*, size_t);
+int melee_web_menu_host_first_sss_pair(
+    const MeleeWebMenuHost*, MeleeWebMenuFirstSssPairObservation*, char*, size_t);
+/* One-shot diagnostic draw after the exact last retained CSS input requested
+ * a transition. The ordinal/sequence and PAD must match the retained result-3
+ * host tick; the authorization does not clear or rewrite that request. */
+int melee_web_menu_host_arm_final_pending_css_draw(MeleeWebMenuHost*,
+    unsigned input_ordinal, unsigned consumed_pad_sequence,
+    const PADStatus raw[4], char*, size_t);
+int melee_web_menu_host_draw_final_pending_css(MeleeWebMenuHost*,char*,size_t);
+#endif
+
 /* Install only the agreed networked seed on a fresh unentered host. Requires
  * the canonical Everything mode, no personal profile and default PAD history. */
 int melee_web_menu_host_apply_net_context(MeleeWebMenuHost*, uint32_t random_seed,

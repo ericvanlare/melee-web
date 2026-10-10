@@ -1,4 +1,5 @@
 #include "gameplay_menu_world.hpp"
+#include "gameplay_archive_sections.h"
 #include "gameplay_asset_manifest.hpp"
 #include "gameplay_content.h"
 #include <algorithm>
@@ -18,22 +19,35 @@
 #include "native_menu_fighter_input.h"
 #include "native_menu_stage_input.h"
 #include "stadium_c1_stage_state_probe.h"
+#include "gameplay_source_memory_runtime.h"
+#include "stadium_first_css_diagnostic_input.hpp"
+#include "../src/stadium_first_css_diagnostic_snapshot_json.hpp"
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#include "gameplay_stadium_display_owner.h"
+#include "gameplay_heap.h"
+#include "gameplay_match_context.h"
+#include "hsd_native_joint.h"
+#include "stadium_c1_heap_owner_observer.h"
 #include "dat_archive.hpp"
 #include "dat_color_animation.hpp"
 #include "dat_effect_banks.hpp"
 #include "dat_item_article.hpp"
+#include "dat_lights.hpp"
 #include "dat_item_registry.hpp"
 #include "dat_item_registry_native.hpp"
 #include "dat_native_stage.hpp"
 #include "dat_native_joint.hpp"
 #include "dat_scene.hpp"
+#include "dat_sis.hpp"
 #include "dat_stage.hpp"
 #include "dat_stage_items.hpp"
 #include "dat_stage_yaku.hpp"
 #include "gameplay_effect_banks.h"
+#include "gameplay_effect_runtime.h"
+#include "gameplay_vs_sis.h"
 #include "gameplay_ground_data.h"
 #include "gameplay_item_runtime.h"
+#include "gameplay_stage_last.h"
 #include "gameplay_stage_map.h"
 #include "native_dat.hpp"
 #include "stadium_c0_native_map_contract.hpp"
@@ -47,6 +61,7 @@
 #include "stadium_c0_native_map_contract.hpp"
 #include <limits>
 #include <optional>
+#include <cstdlib>
 #endif
 #include <melee/ft/forward.h>
 #include <melee/gm/forward.h>
@@ -76,16 +91,38 @@ extern ResultsData lbl_8046DBE8;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include <melee/gr/grdatfiles.h>
 #include <melee/gr/stage.h>
+#include <melee/mp/mpisland.h>
+#include <melee/ef/eflib.h>
+#include <sysdolphin/baselib/aobj.h>
 #include <sysdolphin/baselib/gobj.h>
+#include <sysdolphin/baselib/mtx.h>
 #include <sysdolphin/baselib/objalloc.h>
+#include <sysdolphin/baselib/robj.h>
+#include <sysdolphin/baselib/tev.h>
+#include <sysdolphin/baselib/sislib.h>
+#include <sysdolphin/baselib/memory.h>
+void HSD_SisLib_C1TextProbeSet(int enabled);
+#include <dolphin/os/OSAlloc.h>
 #endif
 #include <melee/ty/forward.h>
 #include <melee/ty/toy.h>
 #include <melee/ty/types.h>
 extern HSD_Archive* _Toy_sbss_804D6ED0;
+extern HSD_Archive* _Toy_sbss_804D6ECC;
+extern TrophyData* _Toy_sbss_804D6EC4;
+extern TrophyData* _Toy_sbss_804D6EC0;
+extern void* _Toy_sbss_804D6EBC;
+extern void* _Toy_sbss_804D6EB8;
+extern s16* _Toy_sbss_804D6EB4;
+extern void* _Toy_sbss_804D6EA8;
+extern void* _Toy_sbss_804D6EA4;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 extern HSD_ObjAllocData gobj_alloc_data;
 extern HSD_ObjAllocData gobjproc_alloc_data;
+void melee_web_stadium_c1_grdatfiles_set_lifetime_ordinal(int ordinal);
+int melee_web_stadium_c1_grdatfiles_snapshot_control(void);
+int melee_web_stadium_c1_grdatfiles_trace_snapshot(
+    const char* boundary, unsigned long long world_generation);
 #endif
 }
 #include <melee/gr/forward.h>
@@ -97,8 +134,8 @@ extern "C" {
 }
 #pragma GCC diagnostic pop
 #endif
-#include <sysdolphin/baselib/random.h>
 extern "C" {
+#include <sysdolphin/baselib/random.h>
 #include <melee/lb/lb_013B.h>
 #include <sysdolphin/baselib/rumble.h>
 extern HSD_RumbleData HSD_Rumble_804C22E0[4];
@@ -140,6 +177,21 @@ extern "C" int melee_web_stage_selection_end(void);
 static void check(int value,const char* error){if(!value){std::cerr<<"Check failed before teardown: "<<error<<"\n";throw std::runtime_error(error);}}
 
 namespace {
+std::array<void*,12> source_toy_alias_snapshot(){
+    return {_Toy_sbss_804D6ED0,_Toy_sbss_804D6ECC,_Toy_sbss_804D6EC4,
+            _Toy_sbss_804D6EC0,_Toy_sbss_804D6EBC,_Toy_sbss_804D6EB8,
+            _Toy_sbss_804D6EB4,Toy_sbss_804D6EB0,Toy_sbss_804D6EAC,
+            _Toy_sbss_804D6EA8,_Toy_sbss_804D6EA4,Toy_sbss_804D6EC8};
+}
+std::array<void*,7> source_toy_table_snapshot(){
+    return {_Toy_sbss_804D6EC4,_Toy_sbss_804D6EC0,_Toy_sbss_804D6EBC,
+            _Toy_sbss_804D6EB8,_Toy_sbss_804D6EB4,Toy_sbss_804D6EB0,
+            Toy_sbss_804D6EAC};
+}
+bool source_toy_aliases_empty(){
+    const auto aliases=source_toy_alias_snapshot();
+    return std::all_of(aliases.begin(),aliases.end(),[](void* alias){return alias==nullptr;});
+}
 void emit_native_bytes(const char* record,const void* data,std::size_t size)
 {
     const auto* bytes=static_cast<const unsigned char*>(data);
@@ -1495,6 +1547,92 @@ void run_sudden_death_host_control(
 
 std::string hex32(uint32_t value){std::ostringstream out;out<<std::hex<<std::setfill('0')<<std::setw(8)<<value;return out.str();}
 std::string hex64(uint64_t value){std::ostringstream out;out<<std::hex<<std::setfill('0')<<std::setw(16)<<value;return out.str();}
+uint32_t pad_wire_u32(const uint8_t* bytes,size_t offset){
+ return (uint32_t(bytes[offset])<<24)|(uint32_t(bytes[offset+1])<<16)|
+        (uint32_t(bytes[offset+2])<<8)|uint32_t(bytes[offset+3]);
+}
+int32_t pad_wire_i32(const uint8_t* bytes,size_t offset){
+ const uint32_t bits=pad_wire_u32(bytes,offset);int32_t value;std::memcpy(&value,&bits,sizeof(value));return value;
+}
+int8_t pad_wire_i8(const uint8_t* bytes,size_t offset){
+ int8_t value;std::memcpy(&value,bytes+offset,sizeof(value));return value;
+}
+float pad_wire_f32(const uint8_t* bytes,size_t offset){
+ const uint32_t bits=pad_wire_u32(bytes,offset);float value;std::memcpy(&value,&bits,sizeof(value));return value;
+}
+uint64_t pad_wire_identity(const uint8_t* bytes){
+ uint64_t hash=14695981039346656037ULL;
+ for(size_t i=0;i<MELEE_WEB_PAD_STATE_BYTES;++i){hash^=bytes[i];hash*=1099511628211ULL;}
+ return hash;
+}
+void report_pad_snapshot(const char* boundary,const uint8_t* bytes,const uint8_t* previous=nullptr){
+ char error[128]{};
+ std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)> decoded(
+     melee_web_pad_state_decode(bytes,MELEE_WEB_PAD_STATE_BYTES,error,sizeof(error)),
+     melee_web_pad_state_free);
+ const int32_t repeat_start=pad_wire_i32(bytes,0),repeat_interval=pad_wire_i32(bytes,4);
+ const int8_t adc_type=pad_wire_i8(bytes,8),adc_th=pad_wire_i8(bytes,9);
+ const float adc_angle=pad_wire_f32(bytes,10);
+ const uint8_t clamp_stick_type=bytes[14],clamp_stick_shift=bytes[15];
+ const int8_t clamp_stick_max=pad_wire_i8(bytes,16),clamp_stick_min=pad_wire_i8(bytes,17);
+ const uint8_t clamp_lr_shift=bytes[18],clamp_lr_max=bytes[19],clamp_lr_min=bytes[20];
+ const uint8_t clamp_ab_shift=bytes[21],clamp_ab_max=bytes[22],clamp_ab_min=bytes[23];
+ const int8_t scale_stick=pad_wire_i8(bytes,24);
+ const uint8_t scale_lr=bytes[25],scale_ab=bytes[26],cross_dir=bytes[27];
+ const uint8_t reset_switch_status=bytes[28],reset_switch=bytes[29];
+ const bool config_valid=repeat_start>0&&repeat_interval>0&&adc_type>=0&&adc_type<=3&&
+     adc_th>=0&&std::isfinite(adc_angle)&&clamp_stick_type<=1&&clamp_stick_shift<=1&&
+     clamp_stick_min>=0&&clamp_stick_max>clamp_stick_min&&clamp_lr_shift<=1&&
+     clamp_lr_max>clamp_lr_min&&clamp_ab_shift<=1&&clamp_ab_max>clamp_ab_min&&
+     scale_stick>0&&scale_lr&&scale_ab&&cross_dir<=3&&reset_switch_status<=1&&reset_switch<=1;
+ const uint64_t identity=pad_wire_identity(bytes);
+ std::cerr<<"C1_PAD_SNAPSHOT boundary="<<boundary<<" bytes="<<MELEE_WEB_PAD_STATE_BYTES
+          <<" fnv64="<<hex64(identity)<<" decode="<<bool(decoded)
+          <<" config_valid="<<config_valid<<" previous_equal="
+          <<(previous?std::memcmp(bytes,previous,MELEE_WEB_PAD_STATE_BYTES)==0:-1);
+ if(!decoded)std::cerr<<" decode_error="<<error;
+ std::cerr<<'\n';
+ std::ostringstream raw_hex;raw_hex<<std::hex<<std::setfill('0');
+ for(size_t i=0;i<MELEE_WEB_PAD_STATE_BYTES;++i)raw_hex<<std::setw(2)<<unsigned(bytes[i]);
+ std::cerr<<"C1_PAD_RAW boundary="<<boundary<<" hex="<<raw_hex.str()<<'\n';
+ std::cerr<<"C1_PAD_CONFIG boundary="<<boundary<<" repeat_start="<<repeat_start
+          <<" repeat_interval="<<repeat_interval<<" adc_type="<<int(adc_type)
+          <<" adc_th="<<int(adc_th)<<" adc_angle="<<adc_angle
+          <<" adc_angle_bits="<<hex32(pad_wire_u32(bytes,10))
+          <<" clamp_stick_type="<<unsigned(clamp_stick_type)
+          <<" clamp_stick_shift="<<unsigned(clamp_stick_shift)
+          <<" clamp_stick_max="<<int(clamp_stick_max)<<" clamp_stick_min="<<int(clamp_stick_min)
+          <<" clamp_lr="<<unsigned(clamp_lr_shift)<<','<<unsigned(clamp_lr_max)<<','<<unsigned(clamp_lr_min)
+          <<" clamp_ab="<<unsigned(clamp_ab_shift)<<','<<unsigned(clamp_ab_max)<<','<<unsigned(clamp_ab_min)
+          <<" scale="<<int(scale_stick)<<','<<unsigned(scale_lr)<<','<<unsigned(scale_ab)
+          <<" cross_dir="<<unsigned(cross_dir)<<" reset="<<unsigned(reset_switch_status)
+          <<','<<unsigned(reset_switch)<<'\n';
+ for(unsigned bank=0;bank<3;++bank)for(unsigned slot=0;slot<4;++slot){
+  const size_t base=30+(bank*4+slot)*66;
+  std::ostringstream normalized;
+  unsigned finite_count=0;
+  for(unsigned i=0;i<8;++i){
+   const uint32_t bits=pad_wire_u32(bytes,base+32+i*4);
+   if(i)normalized<<',';
+   normalized<<hex32(bits);
+   if(std::isfinite(pad_wire_f32(bytes,base+32+i*4)))++finite_count;
+  }
+  std::cerr<<"C1_PAD_HISTORY boundary="<<boundary<<" bank="<<bank<<" slot="<<slot
+           <<" button="<<hex32(pad_wire_u32(bytes,base))
+           <<" last="<<hex32(pad_wire_u32(bytes,base+4))
+           <<" trigger="<<hex32(pad_wire_u32(bytes,base+8))
+           <<" repeat="<<hex32(pad_wire_u32(bytes,base+12))
+           <<" release="<<hex32(pad_wire_u32(bytes,base+16))
+           <<" repeat_count="<<pad_wire_i32(bytes,base+20)
+           <<" sticks="<<int(pad_wire_i8(bytes,base+24))<<','<<int(pad_wire_i8(bytes,base+25))
+           <<','<<int(pad_wire_i8(bytes,base+26))<<','<<int(pad_wire_i8(bytes,base+27))
+           <<" analog="<<unsigned(bytes[base+28])<<','<<unsigned(bytes[base+29])
+           <<','<<unsigned(bytes[base+30])<<','<<unsigned(bytes[base+31])
+           <<" normalized_bits="<<normalized.str()<<" finite="<<finite_count<<"/8"
+           <<" cross_dir="<<unsigned(bytes[base+64])<<" err="<<int(pad_wire_i8(bytes,base+65))<<'\n';
+ }
+ std::cerr.flush();
+}
 std::string stream_name(MeleeWebAudio* audio){
  const char* path=melee_web_audio_stream_path(audio);if(!path)return {};
  std::string result(path);const auto slash=result.find_last_of("/\\");return slash==std::string::npos?result:result.substr(slash+1);
@@ -2107,9 +2245,17 @@ void run_stadium_ground_map1_owner(
               map_id < source_stage.entries.size() &&
               map_id < melee_web_stadium_c1_ground_map_slot_count(),
           "Stadium map1 is outside an authored map or StageInfo table bound");
-    check(std::find(melee_web::test::stadium_resident_ids.begin(),
-                    melee_web::test::stadium_resident_ids.end(), map_id) !=
-              melee_web::test::stadium_resident_ids.end(),
+    const auto* ownership =
+        melee_web::test::stadium_profile_data().map_ownership;
+    check(ownership &&
+              ownership->resident_entry_ids &&
+              ownership->resident_entry_count != 0 &&
+              std::find(ownership->resident_entry_ids,
+                        ownership->resident_entry_ids +
+                            ownership->resident_entry_count,
+                        static_cast<uint32_t>(map_id)) !=
+                  ownership->resident_entry_ids +
+                      ownership->resident_entry_count,
           "C0 Stadium contract does not retain map1 in this archive");
     const auto& map_entry = source_stage.entries[map_id];
     check(map_entry.index == map_id && map_entry.joint_offset.has_value() &&
@@ -2389,12 +2535,178 @@ melee_web::RuntimeFiles exact_stadium_runtime_union(
     return result;
 }
 
-void check_stadium_selection_preserved(
+// The selected handoff remains immutable. This witness belongs to its live
+// menu seed storage until the retained host is destroyed; only the immediate
+// return from the authorized source OnInit can advance its expected value.
+struct StadiumSelectionRngWitness {
+    const uint32_t* owner;
+    uint32_t initial;
+    uint32_t expected_live;
+    bool source_return_captured = false;
+};
+
+bool stadium_rng_witness_matches(const StadiumSelectionRngWitness& witness,
+                                 const MeleeWebMenuMatchSelection& selected)
+{
+    return witness.owner != nullptr && seed_ptr == witness.owner &&
+           selected.random_seed == witness.initial &&
+           *witness.owner == witness.expected_live;
+}
+
+void check_stadium_rng_witness(const StadiumSelectionRngWitness& witness,
+                               const MeleeWebMenuMatchSelection& selected,
+                               const char* boundary)
+{
+    // Do not dereference the retained pointer after ownership changes.
+    const bool owner_matches = witness.owner && seed_ptr == witness.owner;
+    std::fprintf(stderr,
+        "C1_SELECTION_RNG boundary=%s phase=%s owner=%p current_owner=%p "
+        "initial=%u expected_live=%u live_available=%u live=%u\n",
+        boundary, witness.source_return_captured ? "source-return" : "selected",
+        static_cast<const void*>(witness.owner), static_cast<void*>(seed_ptr),
+        witness.initial, witness.expected_live, owner_matches,
+        owner_matches ? *witness.owner : 0);
+    std::fflush(stderr);
+    check(stadium_rng_witness_matches(witness, selected),
+          "C1 selection RNG witness lost its initial seed, live owner or frozen phase value");
+}
+
+struct StadiumSelectionDifference {
+    const char* field = nullptr;
+    size_t byte_offset = 0;
+    uint64_t expected = 0;
+    uint64_t observed = 0;
+};
+
+StadiumSelectionDifference stadium_selection_difference(
+    const MeleeWebMenuMatchSelection& observed,
+    const MeleeWebMenuMatchSelection& expected, uint32_t expected_live_seed)
+{
+    auto bytes = [](const char* field, const void* actual, const void* initial,
+                    size_t count) -> StadiumSelectionDifference {
+        const auto* a = static_cast<const unsigned char*>(actual);
+        const auto* b = static_cast<const unsigned char*>(initial);
+        for (size_t i = 0; i < count; ++i)
+            if (a[i] != b[i]) return {field, i, b[i], a[i]};
+        return {};
+    };
+    if (auto d = bytes("start", &observed.start, &expected.start,
+                       sizeof(expected.start)); d.field) return d;
+    if (auto d = bytes("players", observed.players, expected.players,
+                       sizeof(expected.players)); d.field) return d;
+#define C1_COMPARE_FIELD(field) \
+    if (observed.field != expected.field) \
+        return {#field, 0, expected.field, observed.field}
+    C1_COMPARE_FIELD(player_count);
+    if (observed.random_seed != expected_live_seed)
+        return {"random_seed", 0, expected_live_seed, observed.random_seed};
+    C1_COMPARE_FIELD(hud_layout);
+    C1_COMPARE_FIELD(unlocked_characters);
+    C1_COMPARE_FIELD(unlocked_stages);
+    C1_COMPARE_FIELD(save_profile_present);
+    C1_COMPARE_FIELD(opening_demo);
+#undef C1_COMPARE_FIELD
+    return {};
+}
+
+// The active match compares its immutable copied handoff separately from its
+// live RNG. This is never an export from the menu-owned source seed.
+bool stadium_active_match_selection_witness_matches(
+    const MeleeWebMenuMatchSelection& copied_selection,
+    const MeleeWebMenuMatchSelection& current_selection,
+    const StadiumSelectionRngWitness& active_match_rng)
+{
+    return !stadium_selection_difference(current_selection, copied_selection,
+                                         copied_selection.random_seed).field &&
+           current_selection.sudden_death == copied_selection.sudden_death &&
+           stadium_rng_witness_matches(active_match_rng, copied_selection);
+}
+
+void run_stadium_selection_rng_controls()
+{
+    // Execute the linked original random.c body; no cloned LCG or map2 body.
+    struct RestoreSeedOwner {
+        uint32_t* prior = seed_ptr;
+        ~RestoreSeedOwner() { seed_ptr = prior; }
+    } restore;
+    auto is_field = [](StadiumSelectionDifference difference, const char* field) {
+        return difference.field && std::string_view(difference.field) == field;
+    };
+    for (unsigned lifetime = 0; lifetime < 2; ++lifetime) {
+        uint32_t local_seed = 0x12345678u + lifetime;
+        seed_ptr = &local_seed;
+        MeleeWebMenuMatchSelection selected{};
+        selected.random_seed = local_seed;
+        StadiumSelectionRngWitness witness{seed_ptr, local_seed, local_seed};
+        auto observed = selected;
+        check(stadium_rng_witness_matches(witness, selected) &&
+                  !stadium_selection_difference(observed, selected,
+                                                witness.expected_live).field,
+              "Selected-phase control rejected an unchanged selection");
+        auto no_draw_return = witness;
+        no_draw_return.source_return_captured = true;
+        check(stadium_rng_witness_matches(no_draw_return, selected) &&
+                  !stadium_selection_difference(observed, selected,
+                                                no_draw_return.expected_live).field,
+              "Source-return phase incorrectly required an RNG draw");
+        (void)HSD_Randi(13);
+        observed.random_seed = local_seed;
+        check(local_seed != selected.random_seed &&
+                  !stadium_rng_witness_matches(witness, selected) &&
+                  is_field(stadium_selection_difference(
+                      observed, selected, witness.expected_live), "random_seed"),
+              "Actual source RNG draw did not reject the stale selected phase");
+        witness.expected_live = local_seed;
+        witness.source_return_captured = true;
+        check(stadium_rng_witness_matches(witness, selected) &&
+                  !stadium_selection_difference(observed, selected,
+                                                witness.expected_live).field,
+              "Frozen source-return control rejected the same owned live seed");
+        uint32_t foreign_seed = local_seed;
+        seed_ptr = &foreign_seed;
+        check(!stadium_rng_witness_matches(witness, selected),
+              "Same-value foreign RNG owner was accepted");
+        seed_ptr = &local_seed;
+        auto changed_initial = selected;
+        changed_initial.random_seed ^= 1;
+        check(!stadium_rng_witness_matches(witness, changed_initial),
+              "Changed immutable selected seed was accepted");
+        auto changed = observed;
+        reinterpret_cast<unsigned char*>(&changed.start)[0] ^= 1;
+        check(is_field(stadium_selection_difference(changed, selected,
+                  witness.expected_live), "start"), "Start change was accepted");
+        changed = observed;
+        reinterpret_cast<unsigned char*>(changed.players)[0] ^= 1;
+        check(is_field(stadium_selection_difference(changed, selected,
+                  witness.expected_live), "players"), "Player change was accepted");
+#define C1_REFUSE_FIELD(field) \
+        changed = observed; changed.field ^= 1; \
+        check(is_field(stadium_selection_difference(changed, selected, \
+                  witness.expected_live), #field), "Selection field change was accepted")
+        C1_REFUSE_FIELD(player_count);
+        C1_REFUSE_FIELD(random_seed);
+        C1_REFUSE_FIELD(hud_layout);
+        C1_REFUSE_FIELD(unlocked_characters);
+        C1_REFUSE_FIELD(unlocked_stages);
+        C1_REFUSE_FIELD(save_profile_present);
+        C1_REFUSE_FIELD(opening_demo);
+#undef C1_REFUSE_FIELD
+        (void)HSD_Randi(13);
+        check(!stadium_rng_witness_matches(witness, selected),
+              "An additional cleanup-phase RNG draw was accepted");
+    }
+    std::cout << "C1 asset-free original HSD_Randi and immutable selection/live-owner phase controls passed; two lifetimes and every compared field refused\n";
+}
+
+MeleeWebMenuMatchSelection check_stadium_selection_preserved(
     MeleeWebMenuHost* host,
     const MeleeWebMenuMatchSelection& expected,
     const std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES>&
-        expected_baseline)
+        expected_baseline,
+    const StadiumSelectionRngWitness* rng_witness = nullptr)
 {
+    if (rng_witness)
+        check_stadium_rng_witness(*rng_witness, expected, "selection-export-before");
     check(host != nullptr &&
               melee_web_menu_host_phase(host) == MELEE_WEB_MENU_READY &&
               melee_web_menu_host_source_scene(host) == 0,
@@ -2403,26 +2715,31 @@ void check_stadium_selection_preserved(
     char error[256]{};
     check(melee_web_menu_host_stadium_c1a_selection(
               host, &observed, error, sizeof(error)), error);
-    check(observed.start.rules.stkind == St_Kind_PStadium &&
-              std::memcmp(&observed.start, &expected.start,
-                          sizeof(expected.start)) == 0,
-          "C1 context preflight changed the source-selected StKind 3 payload");
-    check(std::memcmp(observed.players, expected.players,
-                      sizeof(expected.players)) == 0 &&
-              observed.player_count == expected.player_count &&
-              observed.random_seed == expected.random_seed &&
-              observed.hud_layout == expected.hud_layout &&
-              observed.unlocked_characters == expected.unlocked_characters &&
-              observed.unlocked_stages == expected.unlocked_stages &&
-              observed.save_profile_present == expected.save_profile_present &&
-              observed.opening_demo == expected.opening_demo,
-          "C1 context preflight changed retained menu save or RNG provenance");
+    check(observed.start.rules.stkind == St_Kind_PStadium,
+          "C1 selection export changed source-selected StKind 3");
+    if (rng_witness)
+        check_stadium_rng_witness(*rng_witness, expected, "selection-export-after");
+    const auto difference = stadium_selection_difference(
+        observed, expected, rng_witness ? rng_witness->expected_live
+                                      : expected.random_seed);
+    if (difference.field) {
+        std::fprintf(stderr,
+            "C1_SELECTION_DIFFERENCE field=%s byte_offset=%zu expected=%llu observed=%llu initial_seed=%u exported_seed=%u\n",
+            difference.field, difference.byte_offset,
+            static_cast<unsigned long long>(difference.expected),
+            static_cast<unsigned long long>(difference.observed),
+            expected.random_seed, observed.random_seed);
+        std::fflush(stderr);
+    }
+    check(difference.field == nullptr,
+          "C1 selection export changed a retained field or its frozen live RNG phase");
     std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES> baseline{};
     check(melee_web_menu_host_snapshot_card_data(
               host, 1, baseline.data(), baseline.size(), error,
               sizeof(error)), error);
     check(baseline == expected_baseline,
           "C1 context preflight changed the retained save-owner baseline");
+    return observed; // The actual checked host export, while its RNG is owned.
 }
 #endif
 void run_results_source_smoke(const melee_web::RuntimeFiles& files,
@@ -2593,6 +2910,143 @@ void write_player(std::ostream& out,const PlayerInitData& player){
     <<"\",\"defense_ratio_bits\":\""<<hex32(std::bit_cast<uint32_t>(player.defense_ratio))
     <<"\",\"model_scale_bits\":\""<<hex32(std::bit_cast<uint32_t>(player.model_scale))<<"\"}";
 }
+template <typename Pointer>
+void write_pointer_identity(std::ostream& out, Pointer value) {
+ out << '"' << (value == nullptr ? "null" : "unresolved_nonnull") << '"';
+}
+void write_source_rules(std::ostream& out,const StartMeleeRules& r){
+ out << "{\"match_kind\":" << unsigned(r.match_kind)
+     << ",\"x0_3\":" << unsigned(r.x0_3)
+     << ",\"timer_enabled\":" << unsigned(r.timer_enabled)
+     << ",\"timer_counts_up\":" << unsigned(r.timer_counts_up)
+     << ",\"x1_0\":" << unsigned(r.x1_0) << ",\"x1_1\":" << unsigned(r.x1_1)
+     << ",\"x1_2\":" << unsigned(r.x1_2) << ",\"x1_3\":" << unsigned(r.x1_3)
+     << ",\"x1_4\":" << unsigned(r.x1_4) << ",\"x1_5\":" << unsigned(r.x1_5)
+     << ",\"timer_shows_hours\":" << unsigned(r.timer_shows_hours)
+     << ",\"friendly_fire\":" << unsigned(r.friendly_fire)
+     << ",\"is_stock\":" << unsigned(r.is_stock)
+     << ",\"x2_1\":" << unsigned(r.x2_1) << ",\"x2_2\":" << unsigned(r.x2_2)
+     << ",\"single_button\":" << unsigned(r.single_button)
+     << ",\"disable_pausing\":" << unsigned(r.disable_pausing)
+     << ",\"x2_5\":" << unsigned(r.x2_5) << ",\"x2_6\":" << unsigned(r.x2_6)
+     << ",\"x2_7\":" << unsigned(r.x2_7)
+     << ",\"x3_0\":" << unsigned(r.x3_0) << ",\"x3_1\":" << unsigned(r.x3_1)
+     << ",\"x3_2\":" << unsigned(r.x3_2) << ",\"x3_3\":" << unsigned(r.x3_3)
+     << ",\"x3_4\":" << unsigned(r.x3_4) << ",\"x3_5\":" << unsigned(r.x3_5)
+     << ",\"x3_6\":" << unsigned(r.x3_6) << ",\"x3_7\":" << unsigned(r.x3_7)
+     << ",\"x4_0\":" << unsigned(r.x4_0) << ",\"is_vs\":" << unsigned(r.is_vs)
+     << ",\"x4_2\":" << unsigned(r.x4_2) << ",\"x4_3\":" << unsigned(r.x4_3)
+     << ",\"x4_4\":" << unsigned(r.x4_4) << ",\"x4_5\":" << unsigned(r.x4_5)
+     << ",\"x4_6\":" << unsigned(r.x4_6) << ",\"x4_7\":" << unsigned(r.x4_7)
+     << ",\"x5_0\":" << unsigned(r.x5_0) << ",\"x5_1\":" << unsigned(r.x5_1)
+     << ",\"x5_2\":" << unsigned(r.x5_2) << ",\"x5_3\":" << unsigned(r.x5_3)
+     << ",\"x5_4\":" << unsigned(r.x5_4) << ",\"x5_5\":" << unsigned(r.x5_5)
+     << ",\"x5_6\":" << unsigned(r.x5_6) << ",\"x5_7\":" << unsigned(r.x5_7)
+     << ",\"x6\":" << unsigned(r.x6) << ",\"x7\":" << unsigned(r.x7)
+     << ",\"is_teams\":" << unsigned(r.is_teams) << ",\"x9\":" << unsigned(r.x9)
+     << ",\"xA\":" << unsigned(r.xA) << ",\"xB\":" << int(r.xB)
+     << ",\"xC\":" << int(r.xC) << ",\"xD\":" << unsigned(r.xD)
+     << ",\"stage_kind\":" << r.stkind << ",\"time_limit\":" << r.time_limit
+     << ",\"x14\":" << unsigned(r.x14) << ",\"x18\":" << r.x18
+     << ",\"x1C_pad\":[" << r.x1C_pad[0] << ']'
+     << ",\"item_mask\":\"" << hex64(r.x20) << "\",\"x28\":" << r.x28
+     << ",\"x2C_bits\":\"" << hex32(std::bit_cast<uint32_t>(r.x2C))
+     << "\",\"damage_ratio_bits\":\"" << hex32(std::bit_cast<uint32_t>(r.x30))
+     << "\",\"game_speed_bits\":\"" << hex32(std::bit_cast<uint32_t>(r.game_speed))
+     << "\",\"on_unpause_override\":";
+ write_pointer_identity(out,r.on_unpause_override);
+ out << ",\"on_pause_override\":"; write_pointer_identity(out,r.on_pause_override);
+ out << ",\"check_for_pauser_override\":"; write_pointer_identity(out,r.check_for_pauser_override);
+ out << ",\"on_match_start\":"; write_pointer_identity(out,r.on_match_start);
+ out << ",\"on_frame_start\":"; write_pointer_identity(out,r.on_frame_start);
+ out << ",\"on_frame_end\":"; write_pointer_identity(out,r.on_frame_end);
+ out << ",\"on_match_end\":"; write_pointer_identity(out,r.on_match_end);
+ out << ",\"x54_pointer\":"; write_pointer_identity(out,r.x54);
+ out << ",\"x58_pointer\":"; write_pointer_identity(out,r.x58);
+ out << ",\"pad_x5C\":\"";
+ const char digits[]="0123456789abcdef";
+ for(uint8_t byte:r.pad_x5C)out<<digits[byte>>4]<<digits[byte&15];
+ out << "\"}";
+}
+void write_source_player(std::ostream& out,const PlayerInitData& p){
+ out << "{\"ckind\":" << int(p.ckind) << ",\"slot_type\":" << unsigned(p.slot_type)
+     << ",\"stocks\":" << int(p.stocks) << ",\"color\":" << unsigned(p.color)
+     << ",\"slot\":" << unsigned(p.slot) << ",\"spawn\":" << int(p.x5)
+     << ",\"spawn_direction\":" << int(p.spawn_dir)
+     << ",\"sub_color\":" << unsigned(p.sub_color) << ",\"handicap\":" << int(p.handicap)
+     << ",\"team\":" << unsigned(p.team) << ",\"nametag\":" << unsigned(p.nametag)
+     << ",\"xB\":" << unsigned(p.xB) << ",\"rumble_enabled\":" << unsigned(p.rumble_enabled)
+     << ",\"xC_b1\":" << unsigned(p.xC_b1) << ",\"xC_b2\":" << unsigned(p.xC_b2)
+     << ",\"xC_b3\":" << unsigned(p.xC_b3) << ",\"vs_invisible\":" << unsigned(p.vs_invisible)
+     << ",\"xC_b5\":" << unsigned(p.xC_b5) << ",\"xC_b6\":" << unsigned(p.xC_b6)
+     << ",\"xC_b7\":" << unsigned(p.xC_b7)
+     << ",\"xD_b0\":" << unsigned(p.xD_b0) << ",\"xD_b1\":" << unsigned(p.xD_b1)
+     << ",\"xD_b2\":" << unsigned(p.xD_b2) << ",\"xD_b3\":" << unsigned(p.xD_b3)
+     << ",\"xD_b4\":" << unsigned(p.xD_b4) << ",\"xD_b5\":" << unsigned(p.xD_b5)
+     << ",\"xD_b6\":" << unsigned(p.xD_b6) << ",\"xD_b7\":" << unsigned(p.xD_b7)
+     << ",\"cpu_kind\":" << unsigned(p.cpu_kind) << ",\"cpu_level\":" << unsigned(p.cpu_level)
+     << ",\"damage_10\":" << p.x10 << ",\"damage_12\":" << p.x12 << ",\"hp\":" << p.hp
+     << ",\"attack_ratio_bits\":\"" << hex32(std::bit_cast<uint32_t>(p.attack_ratio))
+     << "\",\"defense_ratio_bits\":\"" << hex32(std::bit_cast<uint32_t>(p.defense_ratio))
+     << "\",\"model_scale_bits\":\"" << hex32(std::bit_cast<uint32_t>(p.model_scale)) << "\"}";
+}
+void write_source_start(std::ostream& out,const StartMeleeData& start){
+ out << "{\"rules\":"; write_source_rules(out,start.rules); out << ",\"players\":[";
+ for(unsigned i=0;i<GM_MAX_PLAYERS;++i){if(i)out<<',';write_source_player(out,start.players[i]);}
+ out << "]}";
+}
+void write_source_selection(std::ostream& out,const MeleeWebMenuMatchSelection& selection){
+ out << "{\"start\":"; write_source_start(out,selection.start);
+ out << ",\"player_count\":" << selection.player_count
+     << ",\"random_seed\":" << selection.random_seed
+     << ",\"hud_layout\":" << selection.hud_layout
+     << ",\"unlocked_characters\":" << selection.unlocked_characters
+     << ",\"unlocked_stages\":" << selection.unlocked_stages
+     << ",\"save_profile_present\":" << unsigned(selection.save_profile_present)
+     << ",\"opening_demo\":" << unsigned(selection.opening_demo)
+     << ",\"sudden_death\":" << unsigned(selection.sudden_death)
+     << ",\"players\":[";
+ for(unsigned i=0;i<4;++i){if(i)out<<',';const auto& p=selection.players[i];
+  out << "{\"controller\":" << p.controller << ",\"stocks\":" << p.stocks
+      << ",\"costume\":" << p.costume << ",\"sub_color\":" << p.sub_color << '}';}
+ out << "]}";
+}
+void write_source_observation(std::ostream& out,const MeleeWebMenuSourceObservation& o){
+ out << "{\"source_scene\":" << o.source_scene << ",\"menu_kind\":" << o.menu_kind
+     << ",\"previous_menu_kind\":" << o.previous_menu_kind
+     << ",\"hovered_selection\":" << o.hovered_selection
+     << ",\"confirmed_selection\":" << o.confirmed_selection
+     << ",\"menu_buttons\":\"" << hex64(o.menu_buttons) << "\",\"item_input_locked\":"
+     << o.item_input_locked << ",\"rule_mode\":" << o.rule_mode
+     << ",\"stock_count\":" << o.stock_count << ",\"time_limit\":" << o.time_limit
+     << ",\"stock_time_limit\":" << o.stock_time_limit << ",\"handicap\":" << o.handicap
+     << ",\"damage_ratio\":" << o.damage_ratio << ",\"friendly_fire\":" << o.friendly_fire
+     << ",\"pause\":" << o.pause << ",\"item_frequency\":" << o.item_frequency
+     << ",\"item_mask\":\"" << hex64(o.item_mask) << "\",\"css_setup_valid\":"
+     << o.css_setup_valid << ",\"css_is_teams\":" << o.css_is_teams << ",\"css_player_teams\":["
+     << o.css_player_teams[0] << ',' << o.css_player_teams[1] << ','
+     << o.css_player_teams[2] << ',' << o.css_player_teams[3] << "]}";
+}
+void write_pad_statuses(std::ostream& out,const PADStatus (&pads)[4]){
+ out << '[';
+ for(unsigned i=0;i<4;++i){if(i)out<<',';const auto& p=pads[i];
+  out << "{\"port\":" << i << ",\"button\":" << p.button
+      << ",\"stick_x\":" << int(p.stickX) << ",\"stick_y\":" << int(p.stickY)
+      << ",\"substick_x\":" << int(p.substickX) << ",\"substick_y\":" << int(p.substickY)
+      << ",\"trigger_left\":" << unsigned(p.triggerLeft)
+      << ",\"trigger_right\":" << unsigned(p.triggerRight)
+      << ",\"analog_a\":" << unsigned(p.analogA) << ",\"analog_b\":" << unsigned(p.analogB)
+      << ",\"err\":" << int(p.err) << '}';}
+ out << ']';
+}
+void write_source_vs_mode(std::ostream& out,const VsModeData& mode){
+ out << "{\"loser\":" << int(mode.loser) << ",\"ordered_stage_index\":"
+     << int(mode.ordered_stage_index) << ",\"winner\":" << int(mode.winner)
+     << ",\"unk_0x3\":" << unsigned(mode.unk_0x3) << ",\"unk_0x4\":" << unsigned(mode.unk_0x4)
+     << ",\"unk_0x5\":" << unsigned(mode.unk_0x5) << ",\"unk_0x6\":" << unsigned(mode.unk_0x6)
+     << ",\"unk_0x7\":" << unsigned(mode.unk_0x7) << ",\"start\":";
+ write_source_start(out,mode.start);out<<'}';
+}
 void write_selection(std::ostream& out,const MeleeWebMenuMatchSelection& selection){
  const auto& rules=selection.start.rules;
  out<<"{\"rules\":{\"match_kind\":"<<unsigned(rules.match_kind)
@@ -2665,6 +3119,132 @@ public:
   output<<"]}\n";output.flush();
  }
  void begin_run(unsigned run){run_=run;index_=0;epochs.clear();}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ void stadium_functional_idle_lifetime(unsigned ordinal,const char* phase,
+     const MeleeWebGameplayAllocation& session,uint64_t world_generation,
+     const MeleeWebGameplayAllocation& released){
+  check(output.is_open(),"Functional-idle lifetime marker requires retained trace output");
+  output<<"{\"record\":\"stadium_functional_idle_lifetime\",\"run\":"<<run_
+        <<",\"ordinal\":"<<ordinal<<",\"phase\":\""<<phase<<"\""
+        <<",\"session_identity\":"<<session.identity
+        <<",\"session_generation\":"<<session.generation
+        <<",\"session_bytes\":"<<session.bytes
+        <<",\"world_generation\":"<<world_generation
+        <<",\"released_identity\":"<<released.identity
+        <<",\"released_generation\":"<<released.generation
+        <<",\"released_bytes\":"<<released.bytes<<"}\n";
+  output.flush();
+ }
+ void sis_lease(const char* boundary, const MeleeWebRetiredSisLease* retired) {
+  if(!output)return;
+  const void* current_heap=HSD_SisLib_HeapOwner();
+  MeleeWebSourceMemoryAllocation current{};
+  const auto status=current_heap ? melee_web_source_memory_allocation_read(current_heap,&current)
+                                : MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
+  output<<"{\"record\":\"sis_lease\",\"boundary\":\""<<boundary
+        <<"\",\"source_epoch\":"<<HSD_SisLib_HeapEpoch()
+        <<",\"source_active\":"<<(HSD_SisLib_HeapActive()?"true":"false")
+        <<",\"current_heap\":"<<reinterpret_cast<uintptr_t>(current_heap)
+        <<",\"current_read_status\":"<<status
+        <<",\"current_world\":"<<current.world_generation
+        <<",\"current_allocation\":"<<current.allocation_generation
+        <<",\"current_heap_handle\":"<<current.source_heap_handle
+        <<",\"current_requested_bytes\":"<<current.requested_bytes
+        <<",\"current_live\":"<<(current.live?"true":"false");
+  if(retired)output<<",\"prior_heap\":"<<reinterpret_cast<uintptr_t>(retired->prior.heap)
+        <<",\"prior_world\":"<<retired->prior.world_generation
+        <<",\"prior_allocation\":"<<retired->prior.allocation_generation
+        <<",\"prior_heap_handle\":"<<retired->prior.source_heap_handle
+        <<",\"prior_requested_bytes\":"<<retired->requested_bytes
+        <<",\"prior_source_epoch\":"<<retired->prior.source_epoch
+        <<",\"retirement_verified\":"<<(retired->retirement_verified?"true":"false");
+  output<<"}\n";output.flush();
+ }
+#endif
+
+ void stadium_source_setup(
+     uint32_t first_css_seed,
+     const std::array<uint8_t,MELEE_WEB_SAVE_PROFILE_CARD_BYTES>& card_baseline,
+     const std::array<uint8_t,MELEE_WEB_SAVE_PROFILE_CARD_BYTES>& first_css_card,
+     const std::array<uint8_t,MELEE_WEB_SAVE_PROFILE_CARD_BYTES>& sss_card,
+     const MeleeWebMenuSourceObservation& first_css_observation,
+     const MeleeWebMenuSourceObservation& sss_observation,
+     const StartMeleeData& raw_start,
+     const MeleeWebMenuMatchSelection& selected,
+     const VsModeData& post_vs_mode,
+     const std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES>& pad_wire,
+     const PADStatus (&first_css_sample)[4],
+     const PADStatus (&confirmation_sample)[4],
+     const PADStatus (&completion_sample)[4],
+     int confirmation_first_result,unsigned completion_wait_ticks,
+     bool retained_input){
+  check(output.is_open(),"Stadium setup receipt requires retained trace output");
+  auto bytes=[&](const void* data,size_t size){
+   const auto* value=static_cast<const uint8_t*>(data);
+   const char digits[]="0123456789abcdef";
+   output<<'"';for(size_t i=0;i<size;++i)
+    output<<digits[value[i]>>4]<<digits[value[i]&15];output<<'"';
+  };
+  output<<"{\"record\":\"stadium_source_setup\",\"schema\":\"stadium-c3-source-setup-v1\""
+        <<",\"boundary\":\"closed_original_sss_after_selection_before_match_entry\""
+        <<",\"source_route\":\"original_css_to_original_sss\""
+        <<",\"stage\":{\"kind\":"<<selected.start.rules.stkind
+        <<",\"name\":\"Pokemon Stadium\"}"
+        <<",\"first_css_seed\":"<<first_css_seed
+        <<",\"sss_selected_seed\":"<<selected.random_seed
+        <<",\"seed_relationship\":\"separate source observations; equality is not assumed\""
+        <<",\"seed_sources\":{\"first_css_seed\":\"source seed_ptr sampled after original CSS entry and before its first source tick; native address omitted\""
+        <<",\"sss_selected_seed\":\"random_seed from checked original SSS selection\"}"
+        <<",\"first_css_source_observation\":";
+  write_source_observation(output,first_css_observation);
+  output<<",\"sss_source_observation_before_leave\":";
+  write_source_observation(output,sss_observation);
+  output<<",\"save_profile\":{\"schema\":\"melee-web-save-profile-card-v1\""
+        <<",\"bytes\":"<<MELEE_WEB_SAVE_PROFILE_CARD_BYTES
+        <<",\"immutable_pre_css_baseline_hex\":";
+  bytes(card_baseline.data(),card_baseline.size());
+  output<<",\"first_css_entry_current_hex\":";
+  bytes(first_css_card.data(),first_css_card.size());
+  output<<",\"post_sss_transition_current_hex\":";
+  bytes(sss_card.data(),sss_card.size());
+  output<<"}"
+        <<",\"setup_payloads\":{\"pointer_representation\":\"null or unresolved_nonnull; no native pointer values\""
+        <<",\"source_calls\":{\"raw_sss_start\":\"melee_web_menu_host_stadium_c1a_raw_selection after original SSS leave\""
+        <<",\"normalized_selection\":\"melee_web_menu_host_stadium_c1a_selection after original SSS leave\""
+        <<",\"post_vs_mode\":\"melee_web_menu_host_post_vs_mode after original SSS leave\"}"
+        <<",\"raw_sss_start\":";
+  write_source_start(output,raw_start);
+  output<<",\"normalized_selection\":";
+  write_source_selection(output,selected);
+  output<<",\"post_vs_mode\":";
+  write_source_vs_mode(output,post_vs_mode);
+  output<<"}"
+        <<",\"pad\":{\"wire_schema\":\"melee-web-pad-state-v1\""
+        <<",\"wire_bytes\":"<<MELEE_WEB_PAD_STATE_BYTES
+        <<",\"wire_origin\":\"source PAD history immediately after final SSS transition and before host leave\""
+        <<",\"wire_hex\":";
+  bytes(pad_wire.data(),pad_wire.size());
+  output<<",\"first_css_entry_sample\":";
+  write_pad_statuses(output,first_css_sample);
+  output<<",\"sss_confirmation_attempt_sample\":";
+  write_pad_statuses(output,confirmation_sample);
+  output<<",\"sss_completion_sample\":";
+  write_pad_statuses(output,completion_sample);
+  output<<",\"transition_ticks\":{\"first_css_sample_consumed_by_successful_tick\":true"
+        <<",\"confirmation_first_tick_result\":"
+        <<confirmation_first_result<<",\"completion_result\":3,\"neutral_completion_wait_ticks\":"
+        <<completion_wait_ticks<<",\"tick_returned_successfully\":true"
+        <<",\"completion_sample_source\":\""
+        <<(completion_wait_ticks?"neutral_completion_wait_tick":"confirmation_tick")<<'\"'
+        <<",\"queue_count_empty_before_enqueue_checked\":true"
+        <<",\"sample_consumed_before_tick_return_checked\":true}}"
+        <<",\"retained_closed_sss_input_available\":"<<(retained_input?"true":"false")
+        <<",\"scope\":{\"on_init\":false,\"match_session_constructed\":false"
+        <<",\"ready_or_go\":false,\"draw\":false,\"gameplay_ticks\":0}"
+        <<",\"unobserved\":[\"full 0x55E8 transient SaveData bytes\",\"private PAD queue slots and qcount snapshot\",\"full CSS-to-SSS PAD input history; only initial/confirmation/completion samples and final history wire are recorded\",\"raw StartMeleeData ABI padding and native pointer bit patterns\",\"unknown nonnull source callback identities\"]"
+        <<"}\n";
+  output.flush();
+ }
  void event(const char* name,MeleeWebAudio* audio,const char* route=nullptr,
             const MeleeWebMenuMatchSelection* selection=nullptr,const uint32_t* rng=nullptr){
   if(!output)return;const auto stream=stream_name(audio);
@@ -2803,6 +3383,427 @@ void run_v10_css_replay_start_prefix(const melee_web::RuntimeFiles& files,
         throw;
     }
 }
+
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+namespace {
+namespace first_css_input = melee_web::stadium_first_css_diagnostic;
+constexpr size_t kFirstCssInputBytes = first_css_input::kContextBytes;
+constexpr size_t kFirstCssInputHeaderBytes = first_css_input::kContextHeaderBytes;
+constexpr size_t kFirstCssPadBytes = first_css_input::kPadBytes;
+constexpr size_t kFirstCssDataBytes = first_css_input::kCssBytes;
+constexpr size_t kFirstCssKoBytes = first_css_input::kKoBytes;
+constexpr size_t kFirstCssRulesBytes = first_css_input::kRulesBytes;
+constexpr size_t kFirstCssSaveBytes = first_css_input::kSaveBytes;
+constexpr uint32_t kFirstCssEntrySequence = first_css_input::kEntrySequence;
+constexpr uint32_t kFirstCssReturnSequence = first_css_input::kReturnSequence;
+constexpr size_t kFirstCssConsumedPadHeaderBytes = first_css_input::kConsumedPadHeaderBytes;
+constexpr size_t kFirstCssConsumedPadBytes = first_css_input::kConsumedPadBytes;
+constexpr uint32_t kFirstCssPadConsumeSequence = first_css_input::kPadConsumeSequence;
+constexpr uint32_t kFirstCssSourceTickSequence = first_css_input::kSourceTickSequence;
+constexpr uint32_t kFirstCssObserverKoAddress = first_css_input::kKoAddress;
+using FirstCssContextInput = first_css_input::ContextInput;
+using FirstCssConsumedPadInput = first_css_input::ConsumedPadInput;
+
+uint32_t first_css_be32(const uint8_t* bytes) {
+    return first_css_input::read_be32(bytes);
+}
+
+std::string first_css_hex(const uint8_t* bytes, size_t size) {
+    return first_css_input::hex(bytes, size);
+}
+
+FirstCssContextInput read_first_css_context_input(const char* path) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) throw std::runtime_error("Cannot open Stadium diagnostic input bundle");
+    const std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(input)),
+                                     std::istreambuf_iterator<char>());
+    return first_css_input::decode_context(bytes.data(), bytes.size());
+}
+
+FirstCssConsumedPadInput read_first_css_consumed_pad_input(
+    const char* path, const std::string& expected_source_sha256) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) throw std::runtime_error(
+        "Cannot open exact first-CSS consumed PAD input bundle");
+    const std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(input)),
+                                     std::istreambuf_iterator<char>());
+    return first_css_input::decode_consumed_pad(
+        bytes.data(), bytes.size(), expected_source_sha256);
+}
+
+void decode_first_css_consumed_pad_input(const FirstCssConsumedPadInput& input,
+                                          PADStatus (&ports)[4]) {
+    first_css_input::decode_consumed_pad_statuses(input, ports);
+}
+
+std::string first_css_json_quote(const std::string& value) {
+    static constexpr char digits[] = "0123456789abcdef";
+    std::string result = "\"";
+    for (unsigned char c : value) {
+        if (c == '"' || c == '\\') {
+            result.push_back('\\');
+            result.push_back(static_cast<char>(c));
+        } else if (c == '\n') {
+            result += "\\n";
+        } else if (c == '\r') {
+            result += "\\r";
+        } else if (c == '\t') {
+            result += "\\t";
+        } else if (c < 0x20) {
+            result += "\\u00";
+            result.push_back(digits[c >> 4]);
+            result.push_back(digits[c & 0x0f]);
+        } else {
+            result.push_back(static_cast<char>(c));
+        }
+    }
+    result.push_back('"');
+    return result;
+}
+
+struct FirstCssCleanupResult {
+    bool leave_attempted = false;
+    bool leave_ok = false;
+    std::string leave_error;
+    bool archives_attempted = false;
+    bool archives_ok = false;
+    std::string archives_error;
+    bool world_close_attempted = false;
+    bool world_close_ok = false;
+    std::string world_close_error;
+    bool host_destroy_attempted = false;
+    bool host_destroy_ok = false;
+    std::string host_destroy_error;
+    bool complete = false;
+};
+
+void write_first_css_cleanup(const FirstCssCleanupResult& result,
+                             const MeleeWebMenuHost* host,
+                             const melee_web::GameplayMenuWorld* world) {
+    const auto boolean = [](bool value) { return value ? "true" : "false"; };
+    std::cout << "{\"record\":\"stadium_first_css_cleanup\",\"decision\":\""
+              << (result.complete ? "PASS_CHECKED_TEARDOWN" : "FAIL_CHECKED_TEARDOWN")
+              << "\",\"leave\":{\"attempted\":" << boolean(result.leave_attempted)
+              << ",\"ok\":" << boolean(result.leave_ok) << ",\"error\":"
+              << first_css_json_quote(result.leave_error)
+              << "},\"archive_verification\":{\"attempted\":"
+              << boolean(result.archives_attempted) << ",\"ok\":"
+              << boolean(result.archives_ok) << ",\"error\":"
+              << first_css_json_quote(result.archives_error)
+              << "},\"world_close\":{\"attempted\":"
+              << boolean(result.world_close_attempted) << ",\"ok\":"
+              << boolean(result.world_close_ok) << ",\"error\":"
+              << first_css_json_quote(result.world_close_error)
+              << "},\"host_destroy\":{\"attempted\":"
+              << boolean(result.host_destroy_attempted) << ",\"ok\":"
+              << boolean(result.host_destroy_ok) << ",\"error\":"
+              << first_css_json_quote(result.host_destroy_error)
+              << "},\"host_owned_remaining\":" << boolean(host != nullptr)
+              << ",\"world_owned_remaining\":" << boolean(world != nullptr) << "}\n"
+              << std::flush;
+}
+
+void run_stadium_first_css_context(const melee_web::RuntimeFiles& files,
+                                   const char* bundle_path,
+                                   const char* consumed_pad_path = nullptr) {
+    FirstCssContextInput source{};
+    std::optional<FirstCssConsumedPadInput> consumed_pad;
+    try {
+        source = read_first_css_context_input(bundle_path);
+        if (consumed_pad_path != nullptr) {
+            consumed_pad = read_first_css_consumed_pad_input(
+                consumed_pad_path, source.source_sha256);
+        }
+    } catch (...) {
+        std::cout << "{\"record\":\"stadium_first_css_return_refusal\","
+                     "\"stage\":\"read-input-bundle\",\"snapshot_captured\":false}\n"
+                  << std::flush;
+        char session_error[256]{};
+        const int ended = melee_web_gameplay_session_end(
+            session_error, sizeof(session_error));
+        std::cout << "{\"record\":\"stadium_first_css_session_cleanup\","
+                  << "\"attempted\":true,\"ok\":"
+                  << (ended ? "true" : "false") << ",\"error\":"
+                  << first_css_json_quote(session_error) << "}\n" << std::flush;
+        throw;
+    }
+    char error[256]{};
+    MeleeWebMenuHost* host = nullptr;
+    std::unique_ptr<melee_web::GameplayMenuWorld> world;
+    bool host_enter_attempted = false;
+    bool host_entered = false;
+    bool snapshot_captured = false;
+    bool tick_snapshot_captured = false;
+    bool cleanup_attempted = false;
+    const char* stage = "host-create";
+
+    auto checked_teardown = [&]() {
+        FirstCssCleanupResult result{};
+        char cleanup_error[256]{};
+
+        if (host && (host_entered || host_enter_attempted)) {
+            result.leave_attempted = true;
+            if (melee_web_menu_host_leave(host, 1, cleanup_error,
+                                          sizeof(cleanup_error))) {
+                result.leave_ok = true;
+                host_entered = false;
+            } else {
+                result.leave_error = cleanup_error;
+            }
+        }
+
+        /* A failed enter can leave an unentered but partially-owned host. Its
+         * public destroy guard is the only safe cleanup probe; preserve the
+         * host and its world unless that checked call proves retirement. */
+        if (host && host_enter_attempted && !result.leave_ok) {
+            cleanup_error[0] = '\0';
+            result.host_destroy_attempted = true;
+            if (melee_web_menu_host_destroy(host, cleanup_error,
+                                            sizeof(cleanup_error))) {
+                result.host_destroy_ok = true;
+                host = nullptr;
+            } else {
+                result.host_destroy_error = cleanup_error;
+            }
+        }
+
+        const bool host_released_or_safe =
+            host == nullptr || !host_enter_attempted || result.leave_ok;
+        if (world && host_released_or_safe) {
+            result.archives_attempted = true;
+            try {
+                world->verify_immutable_archives();
+                result.archives_ok = true;
+            } catch (const std::exception& failure) {
+                result.archives_error = failure.what();
+            } catch (...) {
+                result.archives_error = "unknown archive verification failure";
+            }
+            cleanup_error[0] = '\0';
+            result.world_close_attempted = true;
+            try {
+                world->close();
+                world.reset();
+                result.world_close_ok = true;
+            } catch (const std::exception& failure) {
+                result.world_close_error = failure.what();
+            } catch (...) {
+                result.world_close_error = "unknown world close failure";
+            }
+        }
+
+        if (host && (host_released_or_safe && !world)) {
+            cleanup_error[0] = '\0';
+            result.host_destroy_attempted = true;
+            if (melee_web_menu_host_destroy(host, cleanup_error,
+                                            sizeof(cleanup_error))) {
+                result.host_destroy_ok = true;
+                host = nullptr;
+            } else {
+                result.host_destroy_error = cleanup_error;
+            }
+        }
+
+        result.complete = host == nullptr && world == nullptr &&
+            (!result.archives_attempted || result.archives_ok) &&
+            (!result.world_close_attempted || result.world_close_ok) &&
+            (!result.host_destroy_attempted || result.host_destroy_ok);
+        write_first_css_cleanup(result, host, world.get());
+        return result;
+    };
+
+    try {
+        host = melee_web_menu_host_create(error, sizeof(error));
+        check(host != nullptr, error);
+        stage = "world-create";
+        world = std::make_unique<melee_web::GameplayMenuWorld>(files);
+        stage = "apply-captured-context";
+        check(melee_web_menu_host_apply_replay_context(
+                  host, source.seed, source.pad.data(), source.css.data(),
+                  source.ko.data(), source.rules.data(), source.save.data(),
+                  error, sizeof(error)), error);
+        stage = "arm-first-css-return";
+        check(melee_web_menu_host_arm_first_css_return(host, error,
+                                                        sizeof(error)), error);
+        stage = "original-css-enter";
+        host_enter_attempted = true;
+        check(melee_web_menu_host_enter(host, world->audio(), error,
+                                        sizeof(error)), error);
+        host_entered = true;
+        stage = "read-immediate-css-return";
+        MeleeWebMenuCssReturnSnapshot snapshot{};
+        check(melee_web_menu_host_first_css_return(host, &snapshot, error,
+                                                   sizeof(error)), error);
+        check(snapshot.source_scene == MELEE_WEB_MENU_HOST_SCENE_CSS &&
+                  snapshot.source_scene_kind == 8 &&
+                  snapshot.css.ko_counts == nullptr,
+              "Immediate first-CSS return snapshot lacks checked CSS/KO ownership");
+        snapshot_captured = true;
+
+        /* Preserve the captured return even if later teardown refuses. The
+         * separate cleanup record is the only authority for teardown status. */
+        std::cout << "{\"record\":\"stadium_first_css_return_snapshot\","
+                  << "\"schema\":\"melee-web-stadium-first-css-return-v1\","
+                  << "\"source_stream_sha256\":\"" << source.source_sha256 << "\","
+                  << "\"css_entry_sequence\":" << kFirstCssEntrySequence << ','
+                  << "\"css_return_sequence\":" << kFirstCssReturnSequence << ','
+                  << "\"source_scene\":" << snapshot.source_scene << ','
+                  << "\"scene_kind\":" << snapshot.source_scene_kind << ','
+                  << "\"random_seed_hex\":\"" << hex32(snapshot.random_seed) << "\","
+                  << "\"pad_state_hex\":\""
+                  << first_css_hex(snapshot.pad_state, sizeof(snapshot.pad_state))
+                  << "\",\"ko_counts_hex\":\""
+                  << first_css_hex(snapshot.ko_counts, sizeof(snapshot.ko_counts))
+                  << "\",\"css\":";
+        melee_web::stadium_first_css_diagnostic::write_css(
+            std::cout, snapshot.css, "source_vs_owned");
+        std::cout << ",\"abi_padding_excluded\":[\"pad_x5C\"],"
+                  << "\"source_ticks\":0,\"draws\":0,"
+                  << "\"full_session_comparison\":false,\"cleanup\":\"pending\"}\n"
+                  << std::flush;
+
+        if (consumed_pad.has_value()) {
+            stage = "before-consumed-source-tick";
+            check(seed_ptr != nullptr && *seed_ptr == snapshot.random_seed,
+                  "First-CSS tick has no checked live source RNG owner");
+            auto* const seed_owner = seed_ptr;
+            const auto world_generation = melee_web_gameplay_generation();
+            const auto* scene_owner = static_cast<const GameModeState::GameSceneInfo*>(
+                melee_web_current_scene_info());
+            check(world_generation != 0 && melee_web_gameplay_world_exists() &&
+                      melee_web_source_memory_healthy() && scene_owner != nullptr &&
+                      scene_owner->scene_kind == GS_CSS && ground_dispatch_quiet(),
+                  "First-CSS tick requires its idle live CSS/world owner");
+            const unsigned frame_before = gm_801A4BA8();
+            check(frame_before == 0, "First-CSS consumed tick did not start at frame zero");
+            PADStatus raw[4]{};
+            decode_first_css_consumed_pad_input(*consumed_pad, raw);
+            stage = "one-consumed-source-tick";
+            error[0] = '\0';
+            const int tick_result = melee_web_menu_host_tick(
+                host, raw, error, sizeof(error));
+            /* Refuse before reading any possibly replaced owner or live state. */
+            check(tick_result == MELEE_WEB_MENU_RESULT_TICKED, error);
+            check(seed_ptr == seed_owner,
+                  "First-CSS consumed tick replaced its source RNG owner");
+            check(melee_web_gameplay_world_exists() &&
+                      melee_web_gameplay_generation() == world_generation &&
+                      melee_web_source_memory_healthy() && ground_dispatch_quiet(),
+                  "First-CSS consumed tick replaced or faulted its idle world owner");
+            check(melee_web_current_scene_info() == scene_owner,
+                  "First-CSS consumed tick replaced its source scene owner");
+            check(scene_owner->scene_kind == GS_CSS &&
+                      melee_web_menu_host_source_scene(host) == MELEE_WEB_MENU_HOST_SCENE_CSS &&
+                      melee_web_menu_host_phase(host) == MELEE_WEB_MENU_CSS,
+                  "First-CSS consumed tick left its live CSS scene");
+            const int source_scene = melee_web_menu_host_source_scene(host);
+            const int menu_phase = melee_web_menu_host_phase(host);
+            const unsigned source_scene_kind = scene_owner->scene_kind;
+            const unsigned frame_after = gm_801A4BA8();
+            check(frame_after == 1,
+                  "First-CSS consumed tick did not complete exactly one scene frame");
+            const bool seed_owner_stable = true;
+            const uint32_t seed_after = *seed_owner;
+            const bool source_scene_stable = true;
+            const bool world_live = true;
+            std::array<uint8_t, MELEE_WEB_PAD_STATE_BYTES> pad_after{};
+            melee_web_pad_state_capture(pad_after.data());
+            const unsigned current_mode = gm_GetCurrentGameMode();
+            const unsigned previous_mode = gm_GetPreviousGameMode();
+            const unsigned current_scene_index = gm_GetCurrentSceneIndex();
+            const unsigned previous_scene_index = gm_GetPreviousSceneIndex();
+            const bool transition_absent = tick_result == 1 && source_scene_stable &&
+                frame_before == 0 && frame_after == 1;
+            std::cout << "{\"record\":\"stadium_first_css_consumed_tick_snapshot\","
+                      << "\"schema\":\"melee-web-stadium-first-css-consumed-tick-v1\","
+                      << "\"source_stream_sha256\":\"" << source.source_sha256 << "\","
+                      << "\"consumed_pad_sequence\":" << kFirstCssPadConsumeSequence << ','
+                      << "\"source_tick_sequence\":" << kFirstCssSourceTickSequence << ','
+                      << "\"original_source_tick\":0,\"original_draw_ordinal\":0,"
+                      << "\"original_source_frame\":0,\"scene_frame_before\":"
+                      << frame_before << ",\"scene_frame_after\":" << frame_after << ','
+                      << "\"native_post_host_tick_frame\":" << frame_after << ','
+                      << "\"phase_relation\":\"native post-host-tick frame 1 versus "
+                         "original scheduler-end SourceTick 835 pre-increment frame 0\","
+                      << "\"host_tick_calls\":1,\"host_tick_result\":" << tick_result << ','
+                      << "\"draw_calls\":0,\"transition_absent\":"
+                      << (transition_absent ? "true" : "false") << ','
+                      << "\"source_scene\":" << source_scene << ','
+                      << "\"menu_phase\":" << menu_phase << ','
+                      << "\"source_scene_kind\":" << source_scene_kind << ','
+                      << "\"world_generation\":" << world_generation << ','
+                      << "\"world_generation_stable\":true,"
+                      << "\"source_scene_stable\":"
+                      << (source_scene_stable ? "true" : "false") << ','
+                      << "\"world_live\":" << (world_live ? "true" : "false") << ','
+                      << "\"seed_owner_stable\":"
+                      << (seed_owner_stable ? "true" : "false") << ','
+                      << "\"random_seed_hex\":\""
+                      << (seed_ptr != nullptr ? hex32(seed_after) : std::string()) << "\","
+                      << "\"pad_state_hex\":\""
+                      << first_css_hex(pad_after.data(), pad_after.size()) << "\","
+                      << "\"scene_routing_getters\":{\"current_game_mode\":"
+                      << current_mode << ",\"previous_game_mode\":" << previous_mode
+                      << ",\"current_scene_index\":" << current_scene_index
+                      << ",\"previous_scene_index\":" << previous_scene_index << "},"
+                      << "\"routing_raw_fields_excluded\":[\"pending_mode\","
+                         "\"next_state_id\"],\"full_session_comparison\":false,"
+                      << "\"tick_error\":" << first_css_json_quote(error) << "}\n"
+                      << std::flush;
+            tick_snapshot_captured = true;
+            check(tick_result == 1, error);
+            check(transition_absent && world_live && seed_owner_stable,
+                  "First-CSS consumed tick left its source CSS/world/RNG owner");
+        }
+
+        stage = "checked-teardown";
+        cleanup_attempted = true;
+        const FirstCssCleanupResult cleanup = checked_teardown();
+        check(cleanup.complete,
+              "First-CSS context diagnostic checked teardown failed");
+    } catch (...) {
+        if (!snapshot_captured) {
+            std::cout << "{\"record\":\"stadium_first_css_return_refusal\","
+                      << "\"stage\":" << first_css_json_quote(stage)
+                      << ",\"snapshot_captured\":false}\n" << std::flush;
+        }
+        if (consumed_pad.has_value() && !tick_snapshot_captured) {
+            std::cout << "{\"record\":\"stadium_first_css_consumed_tick_refusal\","
+                         "\"stage\":" << first_css_json_quote(stage)
+                      << ",\"snapshot_captured\":false}\n" << std::flush;
+        }
+        if (!cleanup_attempted) {
+            cleanup_attempted = true;
+            (void)checked_teardown();
+        }
+        if (!host && !world && !melee_web_gameplay_world_exists()) {
+            char session_error[256]{};
+            const int ended = melee_web_gameplay_session_end(
+                session_error, sizeof(session_error));
+            std::cout << "{\"record\":\"stadium_first_css_session_cleanup\","
+                      << "\"attempted\":true,\"ok\":"
+                      << (ended ? "true" : "false") << ",\"error\":"
+                      << first_css_json_quote(session_error) << "}\n" << std::flush;
+        } else {
+            std::cout << "{\"record\":\"stadium_first_css_session_cleanup\","
+                      << "\"attempted\":false,\"ok\":false,"
+                      << "\"error\":\"owners remain; session end was not safe to attempt\"}\n"
+                      << std::flush;
+        }
+        if (world) {
+            std::cout << "{\"record\":\"stadium_first_css_retained_owner_refusal\","
+                         "\"world_disposition\":\"retained_until_process_exit\","
+                         "\"implicit_retry\":false}\n" << std::flush;
+            /* Storage::~Storage retries close_impl. A failed checked close
+             * must remain an explicit refusal, so keep the object alive until
+             * the fatal runner exit instead of silently retrying in unwinding. */
+            (void)world.release();
+        }
+        throw;
+    }
+}
+} // namespace
+#endif
 
 void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
 {
@@ -3555,6 +4556,2021 @@ void run_trophy_baseline_smoke(const melee_web::RuntimeFiles& files)
 }
 
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+// Diagnostic-only constructor-phase control in the existing SDK target.
+// Uses actual Ground owner and unchanged retirement predicate; no fixture/tick.
+extern "C" HSD_GObj* melee_web_stadium_c1_manager_create_control(void);
+void run_stadium_retirement_phase_controls()
+{
+    using namespace melee_web::test::stadium_buffer;
+    char error[256]{};
+    check(melee_web_gameplay_startup(8U * 1024U * 1024U,error,sizeof(error)),error);
+    check(melee_web_native_world_enable(error,sizeof(error)),error);
+    try {
+        const auto baseline = melee_web_gameplay_stats();
+        GroundStorageLease storage;
+        storage.begin();
+        MeleeWebSourceMemoryContext oninit{}, retirement{}, after{};
+        check(melee_web_source_memory_context_read(&oninit)==MELEE_WEB_SOURCE_MEMORY_READ_OK,"phase before constructor context");
+        const auto original = storage.allocation;
+        HSD_GObj* manager=melee_web_stadium_c1_manager_create_control();
+        check(manager && manager->proc,"phase original manager constructor");
+        auto* proc=manager->proc;
+        MeleeWebSourceMemoryAllocation manager_lease{},proc_lease{},live{};
+        check(melee_web_source_memory_context_read(&retirement)==MELEE_WEB_SOURCE_MEMORY_READ_OK,"phase after constructor context");
+        const auto live_status=melee_web_source_memory_allocation_read(storage.payload,&live);
+        const auto manager_status=melee_web_source_memory_allocation_read(manager,&manager_lease);
+        const auto proc_status=melee_web_source_memory_allocation_read(proc,&proc_lease);
+        auto numeric=[&](const char* phase,const MeleeWebSourceMemoryContext& context,
+                         MeleeWebSourceMemoryReadStatus status,const MeleeWebSourceMemoryAllocation& lease){
+            const auto stats=melee_web_gameplay_stats();
+            std::fprintf(stderr,"C3_PHASE_CONTROL phase=%s world=%llu heap=%d watermark=%llu status=%d live=%d requested=%u generation=%llu lease_world=%llu lease_heap=%d current_heap_free=%d current_objects=%u current_processes=%u current_ticks=%llu payload=%p manager=%p proc=%p\n",
+                phase,static_cast<unsigned long long>(context.world_generation),context.source_heap_handle,
+                static_cast<unsigned long long>(context.allocation_generation_watermark),status,lease.live,lease.requested_bytes,
+                static_cast<unsigned long long>(lease.allocation_generation),static_cast<unsigned long long>(lease.world_generation),
+                lease.source_heap_handle,stats.heap_free_bytes,stats.objects,stats.processes,
+                static_cast<unsigned long long>(stats.ticks),storage.payload,static_cast<void*>(manager),static_cast<void*>(proc));
+            std::fflush(stderr);
+        };
+        numeric("original-oninit",oninit,live_status,original);
+        numeric("after-original-manager-construction",retirement,live_status,live);
+        numeric("manager-object",retirement,manager_status,manager_lease);
+        numeric("manager-proc",retirement,proc_status,proc_lease);
+        check(retirement.world_generation==oninit.world_generation && retirement.source_heap_handle==oninit.source_heap_handle &&
+                  retirement.allocation_generation_watermark>oninit.allocation_generation_watermark &&
+                  exact_live_allocation_matches_context(live_status,live,retirement,64,original.allocation_generation) &&
+                  exact_new_allocation_supported(manager_status,manager_lease,oninit,sizeof(HSD_GObj)) &&
+                  exact_new_allocation_supported(proc_status,proc_lease,oninit,sizeof(HSD_GObjProc)) && melee_web_source_memory_healthy(),
+              "phase constructor changed owner or exact Ground lease");
+        HSD_GObjPLink_80390228(manager); // Exact direct original constructor owner.
+        storage.end(); // Existing checked owner restores original typed devices.
+        MeleeWebSourceMemoryAllocation dead{};
+        const auto dead_status=melee_web_source_memory_allocation_read(storage.payload,&dead);
+        const auto after_status=melee_web_source_memory_context_read(&after);
+        numeric("after-retirement",after,dead_status,dead);
+        const auto accepts=[&](MeleeWebSourceMemoryReadStatus status,const MeleeWebSourceMemoryAllocation& lease,
+                               const MeleeWebSourceMemoryContext& before,const MeleeWebSourceMemoryContext& finish){
+            return exact_retired_allocation_supported(status,lease,MELEE_WEB_SOURCE_MEMORY_READ_OK,before,after_status,finish);
+        };
+        check(!accepts(dead_status,dead,oninit,after),"unchanged old helper unexpectedly accepted stale construction baseline");
+        check(accepts(dead_status,dead,retirement,after),"unchanged helper refused actual pre-retirement baseline");
+        check(!accepts(live_status,live,retirement,after),"live exact Ground lease accepted as retired");
+        auto bad=dead;bad.requested_bytes=64;check(!accepts(dead_status,bad,retirement,after),"nonzero dead request accepted");
+        bad=dead;bad.allocation_generation=original.allocation_generation;check(!accepts(dead_status,bad,retirement,after),"nonzero dead generation accepted");
+        bad=dead;++bad.source_heap_handle;check(!accepts(dead_status,bad,retirement,after),"foreign heap accepted");
+        bad=dead;++bad.world_generation;check(!accepts(dead_status,bad,retirement,after),"foreign world accepted");
+        auto changed=after;++changed.allocation_generation_watermark;check(!accepts(dead_status,dead,retirement,changed),"watermark change accepted");
+        check(!accepts(MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT,dead,retirement,after),"allocation read failure accepted");
+        MeleeWebSourceMemoryContext pure{};MeleeWebSourceMemoryAllocation pure_dead{};
+        check(melee_web_source_memory_context_read(&pure)==after_status &&
+                  pure.world_generation==after.world_generation && pure.source_heap_handle==after.source_heap_handle &&
+                  pure.allocation_generation_watermark==after.allocation_generation_watermark &&
+                  melee_web_source_memory_allocation_read(storage.payload,&pure_dead)==dead_status &&
+                  pure_dead.live==dead.live && pure_dead.requested_bytes==dead.requested_bytes &&
+                  pure_dead.allocation_generation==dead.allocation_generation && storage.devices_before.matches(),
+              "pure phase/refusal controls mutated owner records");
+        const auto retired=melee_web_gameplay_stats();
+        check(retired.generation==baseline.generation && retired.ticks==baseline.ticks &&
+                  retired.objects==baseline.objects && retired.processes==baseline.processes &&
+                  source_stage_registry_empty() && source_stage_gobj_count()==0 && melee_web_ground_map_storage_available(),
+              "phase reducer left source owners live");
+        std::fprintf(stderr,"C3_PHASE_CONTROL_RESULT stale_refused=1 current_accepted=1 original_lease_preserved=1 negatives=1 pure=1 ticks=0 fullStage=0\n");
+    } catch (const std::exception& failure) {
+        std::fprintf(stderr,"C3_PHASE_CONTROL_RETAINED first_exception=%s\n",failure.what());std::fflush(stderr);
+        std::_Exit(1); // Explicit retained partial owner, no raw cleanup on refusal.
+    }
+    check(melee_web_gameplay_shutdown(error,sizeof(error)),error);
+    MeleeWebSourceMemoryContext inactive{};
+    check(melee_web_source_memory_context_read(&inactive)==MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE,"phase owned world remains active");
+}
+
+void run_stadium_profile_controls()
+{
+    using namespace melee_web;
+    check(melee_web_stadium_display_provenance_controls(),
+          "Shared Stadium image assignment lost mixed preload/fallback provenance");
+    check(melee_web_stadium_display_list_controls(),
+          "Stadium SIS owner list controls changed a foreign text/context chain");
+    check(melee_web_stadium_display_owner_retirement_controls(),
+          "Stadium display owner refused mixed-buffer retirement or lost partial ownership");
+    check(melee_web_stadium_map2_buffer_controls(),
+          "Stadium map-2 0x7D5 origin journal lost the nested Ground owner or released a borrowed buffer");
+    check(melee_web_stadium_source_journal_controls(),
+          "Synthetic source-event journal controls lost ordering, pointers, or sticky refusal state");
+    const auto* profile = melee_web_stage_stadium_profile_data();
+    check(profile && melee_web_stage_profile(St_Kind_PStadium) == profile &&
+              profile->diagnostic_only && profile->source != nullptr,
+          "Guarded Stadium source profile is not resolved by its canonical owner");
+    check(melee_web_stage_content(St_Kind_PStadium) == nullptr &&
+              !melee_web_menu_stage_available(St_Kind_PStadium),
+          "Diagnostic Stadium profile leaked into ordinary content admission");
+    const auto* content = melee_web_stage_content_for_profile(St_Kind_PStadium);
+    check(content && content->diagnostic_only &&
+              content->ground_kind == Gr_Kind_PStadium &&
+              std::string_view(content->archive) == "GrPs.usd" &&
+              std::string_view(content->music) == "pstadium.hps" &&
+              content->music_id == 64 &&
+              std::string_view(content->audio_bank) == "pstadium.ssm",
+          "Diagnostic Stadium content row differs from the prepared source identity");
+    check(profile->required_map_count == 4 && profile->required_map_ids &&
+              profile->required_map_ids[0] == 0 &&
+              profile->required_map_ids[1] == 1 &&
+              profile->required_map_ids[2] == 2 &&
+              profile->required_map_ids[3] == 5,
+          "Stadium profile omitted a source-ordered OnInit map owner");
+    const auto* ownership = profile->map_ownership;
+    check(profile->map_ownership_policy == MELEE_WEB_STAGE_MAP_OWNERSHIP_AUTHORED &&
+              ownership && ownership->resident_entry_count == 4 &&
+              ownership->external_reference_count == 26 &&
+              ownership->animation_flag_entry_count == 10 &&
+              ownership->flagged_object_count == 44 &&
+              profile->entry_count == 10 && profile->animation_count_count == 10,
+          "Stadium profile did not reuse the complete C0 authored map contract");
+    check(profile->public_symbol_count == 2 && profile->public_symbols &&
+              profile->public_symbols[0].kind == MELEE_WEB_STAGE_PUBLIC_IMAGE &&
+              std::string_view(profile->public_symbols[0].name) ==
+                  "GrdPStadiumBG_OVDummy_mat6962_GrdPStadiumDummy_0_image_desc" &&
+              profile->public_symbols[1].kind == MELEE_WEB_STAGE_PUBLIC_SIS &&
+              std::string_view(profile->public_symbols[1].name) ==
+                  "SIS_GrPStadiumData",
+          "Stadium profile omitted its map-owned IMAGE or DatSis-backed SIS public symbol");
+
+    char snapshot_error[160]{};
+    MeleeWebStadiumC1StageInfoSnapshot* const stage_snapshot =
+        melee_web_stadium_c1_stage_info_snapshot_begin(
+            snapshot_error, sizeof(snapshot_error));
+    check(stage_snapshot != nullptr, snapshot_error);
+    char error[256]{};
+    check(melee_web_stage_begin_kind(
+              St_Kind_PStadium, nullptr, nullptr, 0, 0, error, sizeof(error)) == nullptr &&
+              std::string_view(error) ==
+                  "Diagnostic-only stage profile requires its explicit OnInit boundary",
+          "Ordinary stage-begin API did not reject the diagnostic Stadium profile");
+    MeleeWebStageLast* rejected_stage =
+        reinterpret_cast<MeleeWebStageLast*>(uintptr_t{0x7008});
+    check(melee_web_stage_begin_kind_on_init_diagnostic(
+              St_Kind_Last, nullptr, nullptr, &rejected_stage, error, sizeof(error)) == nullptr &&
+              rejected_stage == reinterpret_cast<MeleeWebStageLast*>(uintptr_t{0x7008}) &&
+              std::string_view(error) ==
+                  "OnInit-only retained-owner output slot must be empty",
+          "Rejected OnInit begin erased the caller's retained-owner handle");
+    rejected_stage = nullptr;
+    check(melee_web_stage_begin_kind_on_init_diagnostic(
+              St_Kind_Last, nullptr, nullptr, &rejected_stage, error, sizeof(error)) == nullptr &&
+              rejected_stage == nullptr &&
+              std::string_view(error) ==
+                  "OnInit-only stage boundary is limited to the diagnostic Stadium profile",
+          "OnInit-only boundary accepted a non-Stadium source profile");
+    check(melee_web_stadium_c1_stage_info_snapshot_matches(stage_snapshot),
+          "Rejected diagnostic profile controls changed source StageInfo bytes");
+    check(melee_web_stadium_c1_stage_info_snapshot_release_unchanged(
+              stage_snapshot, snapshot_error, sizeof(snapshot_error)),
+          snapshot_error);
+    std::cout << "Diagnostic Stadium profile/content gate and source-state rejection controls passed\n";
+}
+
+void run_stadium_started_map2_buffer_controls()
+{
+    char error[256]{};
+    if (!melee_web_gameplay_startup(8U * 1024U * 1024U,
+                                    error, sizeof(error))) {
+        std::fprintf(stderr, "C1_STARTED_MAP2_CONTROL startup_refused=%s\n",
+                     error);
+        std::fflush(stderr);
+        std::_Exit(1);
+    }
+    /* The C control restores the bootstrap-owned roots before returning. If it
+     * refuses or leaves an uncertain partial fixture, retain the process. */
+    if (!melee_web_stadium_map2_started_buffer_controls()) {
+        std::fprintf(stderr,
+                     "C1_STARTED_MAP2_CONTROL retained_partial_fixture=1\n");
+        std::fflush(stderr);
+        std::_Exit(1);
+    }
+    if (!melee_web_gameplay_shutdown(error, sizeof(error))) {
+        std::fprintf(stderr, "C1_STARTED_MAP2_CONTROL shutdown_refused=%s\n",
+                     error);
+        std::fflush(stderr);
+        std::_Exit(1);
+    }
+    MeleeWebSourceMemoryContext inactive{};
+    if (melee_web_source_memory_context_read(&inactive) !=
+        MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE ||
+        melee_web_gameplay_world_exists() || melee_web_gameplay_session_active() ||
+        melee_web_gameplay_allocation().identity || HSD_GObj_Entities != nullptr ||
+        HSD_GetHeap() != -1) {
+        std::fprintf(stderr,
+                     "C1_STARTED_MAP2_CONTROL shutdown_context_still_active=1\n");
+        std::fflush(stderr);
+        std::_Exit(1);
+    }
+    std::cout << "C1 started map-2 graph/buffer lease controls passed; synthetic graph, real HSD fallback allocation, no Stadium OnInit/dispatch/ticks\n";
+}
+
+void run_stadium_effect_runtime_lifecycle_control()
+{
+    char error[256]{};
+    check(melee_web_gameplay_startup(8U * 1024U * 1024U,
+                                     error, sizeof(error)), error);
+    check(melee_web_native_world_enable(error, sizeof(error)), error);
+    HSD_GObj** const links = reinterpret_cast<HSD_GObj**>(HSD_GObj_Entities);
+    check(links != nullptr && !links[11] && !links[12] &&
+              !melee_web_effect_runtime_prepared() &&
+              !melee_web_effect_runtime_active(),
+          "Asset-free effect lifecycle requires an unowned runtime and empty source links");
+    const MeleeWebGameplayStats before = melee_web_gameplay_stats();
+    const int scheduler_cycle_before = HSD_GObj_804D783C;
+    const uint32_t gobj_pool_before = HSD_ObjAllocGetUsing(&gobj_alloc_data);
+    const uint32_t proc_pool_before = HSD_ObjAllocGetUsing(&gobjproc_alloc_data);
+    check(melee_web_effect_runtime_prepare(error, sizeof(error)), error);
+    check(melee_web_effect_runtime_prepared() &&
+              !melee_web_effect_runtime_active(),
+          "Original effect reservation must remain inactive before efLib_Init");
+    efLib_Init();
+    check(links[11] && links[12],
+          "Original efLib_Init did not create both source effect link owners");
+    check(melee_web_effect_runtime_complete_source_init(error, sizeof(error)), error);
+    check(melee_web_effect_runtime_active(),
+          "Original effect runtime did not activate after source scheduler validation");
+    check(melee_web_effect_runtime_end(error, sizeof(error)), error);
+    check(!melee_web_effect_runtime_prepared() &&
+              !melee_web_effect_runtime_active() && !links[11] && !links[12],
+          "Original effect runtime teardown did not retire both source link owners");
+    const MeleeWebGameplayStats after = melee_web_gameplay_stats();
+    check(after.generation == before.generation && after.ticks == before.ticks &&
+              HSD_GObj_804D783C == scheduler_cycle_before &&
+              HSD_ObjAllocGetUsing(&gobj_alloc_data) == gobj_pool_before &&
+              HSD_ObjAllocGetUsing(&gobjproc_alloc_data) == proc_pool_before,
+          "Asset-free effect lifecycle advanced the source cursor or retained scheduler owners");
+    check(melee_web_gameplay_shutdown(error, sizeof(error)), error);
+    std::cout << "C1 asset-free original effect prepare/efLib_Init/complete/end passed; no stage callbacks, proc dispatch, or ticks\n";
+}
+
+
+constexpr size_t kC1HeapCensusRowCapacity = 4096;
+constexpr size_t kC1HeapGraphCapacity = kC1HeapCensusRowCapacity;
+constexpr size_t kC1HeapGraphRootCount = 10;
+constexpr uint32_t kC1HeapGraphIslandRequestBytes = 0x2C;
+static_assert(kC1HeapGraphCapacity == kC1HeapCensusRowCapacity);
+static_assert(kC1HeapGraphRootCount <= 16);
+
+struct C1GroundStartCallbackShape {
+    // Mirrors Ground_801C10B8's local LIFO callback node; only `next` is read.
+    void* next;
+    HSD_GObj* gobj;
+    HSD_GObjEvent callback;
+};
+static_assert(sizeof(C1GroundStartCallbackShape) <=
+              std::numeric_limits<uint32_t>::max());
+constexpr uint32_t kC1HeapGraphCallbackRequestBytes =
+    static_cast<uint32_t>(sizeof(C1GroundStartCallbackShape));
+
+enum class C1HeapGraphNodeKind : uint8_t {
+    island_segment,
+    ground_start_callback,
+};
+
+struct C1HeapCensusRow {
+    uintptr_t payload{};
+    uint32_t visitor_capacity{};
+    uint32_t referent_capacity{};
+    MeleeWebSourceMemoryAllocation lease{};
+    MeleeWebSourceMemoryReadStatus lease_status =
+        MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
+    uintptr_t graph_next{};
+    uint16_t graph_root_mask{};
+    uint16_t graph_cycle_mask{};
+    uint8_t graph_kind{};
+};
+struct C1HeapCensus {
+    C1HeapCensusRow rows[kC1HeapCensusRowCapacity]{};
+    size_t count{};
+    size_t visited{};
+    bool overflow{};
+    bool invalid{};
+};
+C1HeapCensus c1_heap_census;
+
+enum class C1HeapGraphFailure : uint8_t {
+    none,
+    lease_query_refused,
+    exact_lease_absent_or_not_live,
+    lease_owner_mismatch,
+    requested_size_mismatch,
+    missing_census_cell,
+    census_lease_mismatch,
+    node_budget_exceeded,
+    node_capacity_exceeded,
+    invalid_node_kind,
+    node_kind_alias_mismatch,
+    same_path_cycle,
+};
+
+struct C1HeapGraphResolvedNode {
+    uintptr_t next{};
+};
+
+using C1HeapGraphResolver = bool (*)(
+    uintptr_t, C1HeapGraphNodeKind, C1HeapGraphResolvedNode*,
+    C1HeapGraphFailure*, void*);
+
+struct C1HeapGraphWalkState {
+    C1HeapCensusRow* rows{};
+    size_t row_count{};
+    size_t budget{};
+    size_t unique_nodes{};
+    size_t aliases{};
+    size_t cycles{};
+    bool unavailable{};
+};
+
+struct C1HeapGraphRoot {
+    const char* name{};
+    uintptr_t payload{};
+    C1HeapGraphNodeKind kind{};
+};
+
+struct C1HeapGraphRootResult {
+    uint32_t visited{};
+    uintptr_t failure_payload{};
+    C1HeapGraphFailure failure = C1HeapGraphFailure::none;
+    bool attempted{};
+};
+
+struct C1HeapGraphSavedIdentity {
+    uintptr_t payload{};
+    int32_t heap{};
+    uint32_t requested_bytes{};
+    uint64_t world_generation{};
+    uint64_t allocation_generation{};
+};
+
+bool c1_heap_graph_is_new_generation_reuse(
+    const C1HeapGraphSavedIdentity& prior,
+    const MeleeWebSourceMemoryAllocation& current)
+{
+    return current.live == 1 &&
+        current.allocation_generation > prior.allocation_generation;
+}
+
+struct C1HeapGraphSavedState {
+    C1HeapGraphSavedIdentity identities[kC1HeapGraphCapacity]{};
+    size_t count{};
+    bool complete{};
+};
+
+C1HeapGraphWalkState c1_heap_graph_walk_state;
+C1HeapGraphSavedState c1_heap_graph_saved_state;
+
+void c1_heap_census_visitor(void* payload, u32 visitor_capacity)
+{
+    ++c1_heap_census.visited;
+    if (c1_heap_census.count == kC1HeapCensusRowCapacity) {
+        c1_heap_census.overflow = true;
+        return;
+    }
+    auto& row = c1_heap_census.rows[c1_heap_census.count++];
+    row = C1HeapCensusRow{};
+    row.payload = reinterpret_cast<uintptr_t>(payload);
+    row.visitor_capacity = visitor_capacity;
+    row.referent_capacity = OSReferentSize(payload);
+    row.lease_status = melee_web_source_memory_allocation_read(payload, &row.lease);
+    if (!payload || !visitor_capacity ||
+        row.referent_capacity != visitor_capacity ||
+        row.lease_status != MELEE_WEB_SOURCE_MEMORY_READ_OK ||
+        (row.lease.live && (!row.lease.allocation_generation ||
+                            row.lease.requested_bytes > visitor_capacity)) ||
+        (!row.lease.live && (row.lease.requested_bytes ||
+                             row.lease.allocation_generation)))
+        c1_heap_census.invalid = true;
+}
+
+struct C1HeapGuard {
+    MeleeWebGameplayStats stats{};
+    MeleeWebSourceMemoryContext context{};
+    uintptr_t arena_identity{};
+    decltype(melee_web::test::stadium_screen::runtime_roots_snapshot()) roots;
+    decltype(melee_web::test::stadium_screen::live_class_counts()) classes;
+    decltype(melee_web::test::stadium_screen::live_pool_counts()) pools{};
+    uint32_t gobj_used{};
+    uint32_t proc_used{};
+};
+
+C1HeapGuard c1_heap_guard()
+{
+    namespace screen = melee_web::test::stadium_screen;
+    const MeleeWebGameplayAllocation allocation = melee_web_gameplay_allocation();
+    check(allocation.identity != 0 &&
+              allocation.identity <= std::numeric_limits<uintptr_t>::max(),
+          "C1 census cannot read the exact gameplay arena identity");
+    const auto arena_identity = static_cast<uintptr_t>(allocation.identity);
+    check(melee_web_gameplay_heap_owns(
+              reinterpret_cast<const void*>(arena_identity)),
+          "C1 census refuses traversal after gameplay heap ownership changes");
+    MeleeWebSourceMemoryContext context{};
+    check(melee_web_source_memory_context_read(&context) ==
+              MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+              context.source_heap_handle >= 0 && context.world_generation != 0,
+          "C1 census requires a healthy exact source-memory context");
+    const MeleeWebGameplayStats stats = melee_web_gameplay_stats();
+    check(stats.generation == context.world_generation &&
+              stats.heap_free_bytes >= 0 && melee_web_source_memory_healthy(),
+          "C1 census requires a healthy source heap and live gameplay world");
+    return {stats, context, arena_identity, screen::runtime_roots_snapshot(),
+            screen::live_class_counts(), screen::live_pool_counts(),
+            HSD_ObjAllocGetUsing(&gobj_alloc_data),
+            HSD_ObjAllocGetUsing(&gobjproc_alloc_data)};
+}
+
+bool c1_heap_guards_equal(const C1HeapGuard& a, const C1HeapGuard& b)
+{
+    return a.stats.ticks == b.stats.ticks &&
+           a.stats.objects == b.stats.objects &&
+           a.stats.processes == b.stats.processes &&
+           a.stats.object_peak == b.stats.object_peak &&
+           a.stats.process_peak == b.stats.process_peak &&
+           a.stats.heap_free_bytes == b.stats.heap_free_bytes &&
+           a.stats.generation == b.stats.generation &&
+           a.context.source_heap_handle == b.context.source_heap_handle &&
+           a.context.world_generation == b.context.world_generation &&
+           a.context.allocation_generation_watermark ==
+               b.context.allocation_generation_watermark &&
+           a.arena_identity == b.arena_identity && a.roots == b.roots &&
+           a.classes == b.classes && a.pools == b.pools &&
+           a.gobj_used == b.gobj_used && a.proc_used == b.proc_used &&
+           melee_web_source_memory_healthy();
+}
+
+void c1_heap_query_line(unsigned world, const char* consumer, unsigned cycle,
+                        const char* phase, const char* kind, uintptr_t payload,
+                        int status,
+                        const MeleeWebSourceMemoryAllocation& lease,
+                        uint64_t prior_generation = 0, int refused = 0,
+                        const char* relation = nullptr,
+                        const char* classification = nullptr)
+{
+    std::cerr << "C1_HEAP_QUERY world=" << world << " consumer=" << consumer
+              << " cycle=" << cycle << " phase=" << phase << " kind=" << kind
+              << " payload=0x" << std::hex << payload << std::dec
+              << " status=" << status
+              << " live=" << static_cast<unsigned>(lease.live)
+              << " generation=" << lease.allocation_generation
+              << " lease_world=" << lease.world_generation
+              << " prior_generation=" << prior_generation
+              << " refused=" << refused;
+    if (relation) std::cerr << " relation=" << relation;
+    if (classification) std::cerr << " classification=" << classification;
+    std::cerr << '\n';
+}
+
+void c1_emit_heap_census(unsigned world, const char* consumer, unsigned cycle,
+                         const char* phase, const C1HeapGuard& before,
+                         C1HeapGuard* after_out)
+{
+    c1_heap_census.count = 0;
+    c1_heap_census.visited = 0;
+    c1_heap_census.overflow = false;
+    c1_heap_census.invalid = false;
+    OSVisitAllocated(c1_heap_census_visitor);
+    check(!c1_heap_census.overflow &&
+              c1_heap_census.visited == c1_heap_census.count,
+          "C1 allocated-cell census overflowed its external 4096-row bound");
+    check(!c1_heap_census.invalid,
+          "C1 allocated-cell census found a missing lease or capacity mismatch");
+
+    // OSDumpHeap is the pinned SDK source of real allocated/free cell spans.
+    // The caller preserves the process logger policy; the host test parses its
+    // ordinary INFO output and fails if the rows are filtered.
+    std::cerr << "C1_HEAP_DUMP_BEGIN world=" << world << " consumer=" << consumer
+              << " cycle=" << cycle << " phase=" << phase << '\n';
+    std::cerr.flush();
+    OSDumpHeap(before.context.source_heap_handle);
+    std::cerr << "C1_HEAP_DUMP_END world=" << world << " consumer=" << consumer
+              << " cycle=" << cycle << " phase=" << phase << '\n';
+    std::cerr.flush();
+
+    const auto first_live = std::find_if(
+        c1_heap_census.rows, c1_heap_census.rows + c1_heap_census.count,
+        [](const C1HeapCensusRow& row) { return row.lease.live != 0; });
+    check(first_live != c1_heap_census.rows + c1_heap_census.count &&
+              first_live->visitor_capacity > 1,
+          "C1 census has no live exact payload for its interior-query control");
+    int unknown_marker = 0;
+    MeleeWebSourceMemoryAllocation unknown{};
+    const auto unknown_status = melee_web_source_memory_allocation_read(
+        &unknown_marker, &unknown);
+    check(unknown_status == MELEE_WEB_SOURCE_MEMORY_READ_OK && !unknown.live,
+          "C1 census unknown exact-payload query was not reported explicitly");
+    c1_heap_query_line(world, consumer, cycle, phase, "unknown",
+                       reinterpret_cast<uintptr_t>(&unknown_marker),
+                       unknown_status, unknown);
+    MeleeWebSourceMemoryAllocation interior{};
+    const auto interior_status = melee_web_source_memory_allocation_read(
+        reinterpret_cast<const void*>(first_live->payload + 1), &interior);
+    check(interior_status == MELEE_WEB_SOURCE_MEMORY_READ_OK && !interior.live &&
+              interior.allocation_generation == 0,
+          "C1 census interior pointer was mistaken for an exact allocation lease");
+    c1_heap_query_line(world, consumer, cycle, phase, "interior",
+                       first_live->payload + 1, interior_status, interior);
+
+    if (std::string_view(phase) == "cold") {
+        MeleeWebSourceMemoryAllocation invalid{};
+        const auto null_payload_status =
+            melee_web_source_memory_allocation_read(nullptr, &invalid);
+        const auto null_output_status = melee_web_source_memory_allocation_read(
+            reinterpret_cast<const void*>(first_live->payload), nullptr);
+        check(null_payload_status == MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT &&
+                  null_output_status == MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT,
+              "C1 census invalid query arguments were not refused explicitly");
+        c1_heap_query_line(world, consumer, cycle, phase, "null_payload", 0,
+                           null_payload_status, invalid, 0, 1);
+        c1_heap_query_line(world, consumer, cycle, phase, "null_output",
+                           first_live->payload, null_output_status, invalid, 0, 1);
+        uintptr_t foreign_identity = before.arena_identity ^ uintptr_t{0x20};
+        if (!foreign_identity || foreign_identity == before.arena_identity)
+            ++foreign_identity;
+        const int foreign_refused = !melee_web_gameplay_heap_owns(
+            reinterpret_cast<const void*>(foreign_identity));
+        check(foreign_refused,
+              "C1 census did not refuse a foreign arena identity before traversal");
+        c1_heap_query_line(world, consumer, cycle, phase, "foreign_owner",
+                           foreign_identity,
+                           -1, invalid, 0, 1);
+    }
+
+    C1HeapGuard after = c1_heap_guard();
+    check(c1_heap_guards_equal(before, after),
+          "C1 visitor/dump/query snapshot changed source owner, watermark, heap, roots, pools, classes, or ticks");
+    std::cerr << "C1_HEAP_GUARD world=" << world << " consumer=" << consumer
+              << " cycle=" << cycle << " phase=" << phase
+              << " equal=1 source_healthy=1 world_equal=1 heap_owner=1 watermark=1"
+              << " ticks=1 free_bytes=1 roots=1 classes=1 pools=1 gobj_used=1 proc_used=1\n";
+
+    std::cerr << "C1_HEAP_SNAPSHOT world=" << world
+              << " generation=" << before.context.world_generation
+              << " consumer=" << consumer << " cycle=" << cycle
+              << " phase=" << phase
+              << " heap=" << before.context.source_heap_handle
+              << " free=" << before.stats.heap_free_bytes
+              << " watermark=" << before.context.allocation_generation_watermark
+              << " rows=" << c1_heap_census.count << " overflow=0\n";
+    for (size_t i = 0; i < c1_heap_census.count; ++i) {
+        const auto& row = c1_heap_census.rows[i];
+        std::cerr << "C1_HEAP_ALLOC world=" << world
+                  << " generation=" << before.context.world_generation
+                  << " consumer=" << consumer << " cycle=" << cycle
+                  << " phase=" << phase << " payload=0x" << std::hex
+                  << row.payload << std::dec
+                  << " visitor_capacity=" << row.visitor_capacity
+                  << " referent_capacity=" << row.referent_capacity
+                  << " lease_status=" << static_cast<int>(row.lease_status)
+                  << " live=" << static_cast<unsigned>(row.lease.live)
+                  << " heap=" << row.lease.source_heap_handle
+                  << " lease_world=" << row.lease.world_generation
+                  << " requested=" << row.lease.requested_bytes
+                  << " allocation_generation=" << row.lease.allocation_generation
+                  << '\n';
+    }
+    std::cerr.flush();
+    if (after_out) *after_out = std::move(after);
+}
+
+const char* c1_heap_owner_phase_name(uint8_t phase)
+{
+    switch (phase) {
+    case MELEE_WEB_STADIUM_C1_HEAP_OWNER_PHASE_BEFORE_LIGHT:
+        return "before-light-preparation";
+    case MELEE_WEB_STADIUM_C1_HEAP_OWNER_PHASE_AFTER_LIGHT:
+        return "after-light-preparation-before-e8";
+    case MELEE_WEB_STADIUM_C1_HEAP_OWNER_PHASE_AFTER_ONINIT:
+        return "after-oninit";
+    case MELEE_WEB_STADIUM_C1_HEAP_OWNER_PHASE_AFTER_STAGE_LAST:
+        return "after-stage-last-and-light-destroy";
+    default:
+        return "unknown";
+    }
+}
+
+const char* c1_heap_owner_kind_name(uint8_t kind)
+{
+    switch (kind) {
+    case MELEE_WEB_STADIUM_C1_HEAP_OWNER_OBJALLOC_POOL:
+        return "objalloc_pool";
+    case MELEE_WEB_STADIUM_C1_HEAP_OWNER_CLASS_DIRECTORY:
+        return "class_directory";
+    case MELEE_WEB_STADIUM_C1_HEAP_OWNER_CLASS_BUCKET:
+        return "class_bucket_metadata";
+    case MELEE_WEB_STADIUM_C1_HEAP_OWNER_CLASS_SLAB:
+        return "class_slab";
+    default:
+        return "unknown";
+    }
+}
+
+const char* c1_heap_owner_objalloc_label(uintptr_t owner)
+{
+    if (owner == reinterpret_cast<uintptr_t>(HSD_AObjGetAllocData())) return "AObj";
+    if (owner == reinterpret_cast<uintptr_t>(HSD_RObjGetAllocData())) return "RObj";
+    if (owner == reinterpret_cast<uintptr_t>(HSD_RvalueObjGetAllocData())) return "RvalueObj";
+    if (owner == reinterpret_cast<uintptr_t>(HSD_VecGetAllocData())) return "Vec";
+    if (owner == reinterpret_cast<uintptr_t>(HSD_MtxGetAllocData())) return "Mtx";
+    if (owner == reinterpret_cast<uintptr_t>(HSD_RenderGetAllocData())) return "Render";
+    if (owner == reinterpret_cast<uintptr_t>(HSD_TevRegGetAllocData())) return "TevReg";
+    if (owner == reinterpret_cast<uintptr_t>(HSD_ChanGetAllocData())) return "Chan";
+    if (owner == reinterpret_cast<uintptr_t>(&gobj_alloc_data)) return "GObj";
+    if (owner == reinterpret_cast<uintptr_t>(&gobjproc_alloc_data)) return "GObjProc";
+    return "other_objalloc";
+}
+
+void c1_publish_heap_owner_observations(const char* scope,
+                                       bool require_v24_markers)
+{
+    const size_t count = melee_web_stadium_c1_heap_owner_count();
+    const size_t markers = melee_web_stadium_c1_heap_owner_marker_count();
+    const size_t pending = melee_web_stadium_c1_heap_owner_pending_count();
+    const size_t invalid = melee_web_stadium_c1_heap_owner_invalid_count();
+    const bool armed = melee_web_stadium_c1_heap_owner_armed() != 0;
+    const bool overflow = melee_web_stadium_c1_heap_owner_overflowed() != 0;
+    bool complete = armed && !overflow && pending == 0 && invalid == 0 &&
+        (!require_v24_markers || markers == 4);
+    uint8_t expected_phases[] = {
+        MELEE_WEB_STADIUM_C1_HEAP_OWNER_PHASE_BEFORE_LIGHT,
+        MELEE_WEB_STADIUM_C1_HEAP_OWNER_PHASE_AFTER_LIGHT,
+        MELEE_WEB_STADIUM_C1_HEAP_OWNER_PHASE_AFTER_ONINIT,
+        MELEE_WEB_STADIUM_C1_HEAP_OWNER_PHASE_AFTER_STAGE_LAST,
+    };
+    uint32_t prior_marker_count = 0;
+    for (size_t i = 0; i < markers; ++i) {
+        MeleeWebStadiumC1HeapOwnerMarker marker{};
+        if (!melee_web_stadium_c1_heap_owner_marker_read(i, &marker)) {
+            complete = false;
+            continue;
+        }
+        if (require_v24_markers &&
+            (i >= 4 || marker.phase != expected_phases[i] ||
+             marker.event_count < prior_marker_count || !marker.census_complete))
+            complete = false;
+        prior_marker_count = marker.event_count;
+    }
+    if (require_v24_markers && markers != 4) complete = false;
+    if (armed && count == 0) complete = false;
+    for (size_t i = 0; i < count; ++i) {
+        MeleeWebStadiumC1HeapOwnerEvent event{};
+        const bool readable = melee_web_stadium_c1_heap_owner_read(i, &event) != 0;
+        const bool exact_live_lease = readable &&
+            event.lease_status == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+            event.live == 1 && event.world_generation != 0 &&
+            event.allocation_generation != 0 && event.source_heap_handle >= 0 &&
+            event.hsd_requested_bytes == event.lease_requested_bytes;
+        if (!exact_live_lease || event.reserved != 0 || !event.payload ||
+            !event.owner_identity || !event.hsd_requested_bytes)
+            complete = false;
+    }
+    const char* result_status = !armed && !require_v24_markers
+        ? "disabled" : complete ? "complete" : "unavailable";
+    std::cerr << "C1_HEAP_OWNER_META scope=" << scope
+              << " status=" << result_status
+              << " armed=" << armed
+              << " rows=" << count
+              << " row_bytes=" << melee_web_stadium_c1_heap_owner_row_bytes()
+              << " capacity=" << MELEE_WEB_STADIUM_C1_HEAP_OWNER_CAPACITY
+              << " buffer_bytes=" << melee_web_stadium_c1_heap_owner_buffer_bytes()
+              << " overflow=" << overflow
+              << " overflow_count=" << melee_web_stadium_c1_heap_owner_overflow_count()
+              << " invalid_count=" << invalid
+              << " pending_rows=" << pending
+              << " markers=" << markers << '\n';
+    prior_marker_count = 0;
+    for (size_t i = 0; i < markers; ++i) {
+        MeleeWebStadiumC1HeapOwnerMarker marker{};
+        if (!melee_web_stadium_c1_heap_owner_marker_read(i, &marker)) continue;
+        const uint32_t next_sequence = marker.event_count + 1;
+        std::cerr << "C1_HEAP_OWNER_MARK scope=" << scope
+                  << " phase=" << c1_heap_owner_phase_name(marker.phase)
+                  << " first_sequence=" << prior_marker_count + 1
+                  << " next_sequence=" << next_sequence
+                  << " census_complete=" << static_cast<unsigned>(marker.census_complete)
+                  << '\n';
+        prior_marker_count = marker.event_count;
+    }
+    for (size_t i = 0; i < count; ++i) {
+        MeleeWebStadiumC1HeapOwnerEvent event{};
+        if (!melee_web_stadium_c1_heap_owner_read(i, &event)) {
+            complete = false;
+            continue;
+        }
+        const char* phase = require_v24_markers ? "before-light-preparation"
+                                                 : "asset-free-control";
+        if (require_v24_markers) {
+            for (size_t marker_index = 0; marker_index < markers; ++marker_index) {
+                MeleeWebStadiumC1HeapOwnerMarker marker{};
+                if (melee_web_stadium_c1_heap_owner_marker_read(marker_index,
+                                                                 &marker) &&
+                    i + 1 <= marker.event_count) {
+                    phase = c1_heap_owner_phase_name(marker.phase);
+                    break;
+                }
+                phase = "after-stage-last-and-light-destroy";
+            }
+        }
+        const char* owner_label = event.kind ==
+                MELEE_WEB_STADIUM_C1_HEAP_OWNER_OBJALLOC_POOL
+            ? c1_heap_owner_objalloc_label(event.owner_identity)
+            : c1_heap_owner_kind_name(event.kind);
+        std::cerr << "C1_HEAP_OWNER_EVENT scope=" << scope
+                  << " sequence=" << i + 1 << " phase=" << phase
+                  << " kind=" << c1_heap_owner_kind_name(event.kind)
+                  << " owner_label=" << owner_label
+                  << " owner=0x" << std::hex << event.owner_identity
+                  << " payload=0x" << event.payload << std::dec
+                  << " owner_size=" << event.owner_size
+                  << " auxiliary=" << event.auxiliary
+                  << " hsd_requested=" << event.hsd_requested_bytes
+                  << " lease_status=" << static_cast<unsigned>(event.lease_status)
+                  << " live=" << static_cast<unsigned>(event.live)
+                  << " heap=" << event.source_heap_handle
+                  << " lease_requested=" << event.lease_requested_bytes
+                  << " world=" << event.world_generation
+                  << " allocation_generation=" << event.allocation_generation
+                  << '\n';
+    }
+    std::cerr << "C1_HEAP_OWNER_RESULT scope=" << scope
+              << " status=" << result_status
+              << " rows=" << count << " markers=" << markers
+              << " overflow=" << overflow
+              << " overflow_count=" << melee_web_stadium_c1_heap_owner_overflow_count()
+              << " invalid_count=" << invalid
+              << " pending_rows=" << pending << '\n';
+    std::cerr.flush();
+}
+
+bool c1_gameplay_stats_equal(const MeleeWebGameplayStats& a,
+                             const MeleeWebGameplayStats& b)
+{
+    return a.ticks == b.ticks && a.objects == b.objects &&
+           a.processes == b.processes && a.object_peak == b.object_peak &&
+           a.process_peak == b.process_peak &&
+           a.heap_free_bytes == b.heap_free_bytes &&
+           a.generation == b.generation;
+}
+
+const char* c1_heap_graph_failure_name(C1HeapGraphFailure failure)
+{
+    switch (failure) {
+    case C1HeapGraphFailure::none: return "none";
+    case C1HeapGraphFailure::lease_query_refused: return "lease_query_refused";
+    case C1HeapGraphFailure::exact_lease_absent_or_not_live:
+        return "exact_lease_absent_or_not_live";
+    case C1HeapGraphFailure::lease_owner_mismatch: return "lease_owner_mismatch";
+    case C1HeapGraphFailure::requested_size_mismatch: return "requested_size_mismatch";
+    case C1HeapGraphFailure::missing_census_cell: return "missing_census_cell";
+    case C1HeapGraphFailure::census_lease_mismatch: return "census_lease_mismatch";
+    case C1HeapGraphFailure::node_budget_exceeded: return "node_budget_exceeded";
+    case C1HeapGraphFailure::node_capacity_exceeded: return "node_capacity_exceeded";
+    case C1HeapGraphFailure::invalid_node_kind: return "invalid_node_kind";
+    case C1HeapGraphFailure::node_kind_alias_mismatch: return "node_kind_alias_mismatch";
+    case C1HeapGraphFailure::same_path_cycle: return "same_path_cycle";
+    }
+    return "invalid_failure_code";
+}
+
+C1HeapCensusRow* c1_heap_graph_find_row(C1HeapGraphWalkState& state,
+                                        uintptr_t payload)
+{
+    for (size_t i = 0; i < state.row_count; ++i)
+        if (state.rows[i].payload == payload) return &state.rows[i];
+    return nullptr;
+}
+
+bool c1_heap_graph_request_bytes(C1HeapGraphNodeKind kind, uint32_t* bytes)
+{
+    if (!bytes) return false;
+    switch (kind) {
+    case C1HeapGraphNodeKind::island_segment:
+        *bytes = kC1HeapGraphIslandRequestBytes;
+        return true;
+    case C1HeapGraphNodeKind::ground_start_callback:
+        *bytes = kC1HeapGraphCallbackRequestBytes;
+        return true;
+    }
+    return false;
+}
+
+C1HeapGraphFailure c1_heap_graph_validate_live_lease(
+    MeleeWebSourceMemoryReadStatus status,
+    const MeleeWebSourceMemoryAllocation& lease,
+    int32_t expected_heap, uint64_t expected_world,
+    uint64_t generation_watermark, uint32_t expected_request_bytes)
+{
+    if (status != MELEE_WEB_SOURCE_MEMORY_READ_OK)
+        return C1HeapGraphFailure::lease_query_refused;
+    if (lease.live != 1 || !lease.allocation_generation ||
+        lease.allocation_generation > generation_watermark)
+        return C1HeapGraphFailure::exact_lease_absent_or_not_live;
+    for (uint8_t reserved : lease.reserved)
+        if (reserved) return C1HeapGraphFailure::census_lease_mismatch;
+    if (lease.source_heap_handle != expected_heap ||
+        lease.world_generation != expected_world)
+        return C1HeapGraphFailure::lease_owner_mismatch;
+    if (lease.requested_bytes != expected_request_bytes)
+        return C1HeapGraphFailure::requested_size_mismatch;
+    return C1HeapGraphFailure::none;
+}
+
+bool c1_heap_graph_walk_root(C1HeapGraphWalkState& state, size_t root_index,
+                             const C1HeapGraphRoot& root,
+                             C1HeapGraphResolver resolver, void* resolver_context,
+                             C1HeapGraphRootResult* result)
+{
+    if (!result || !resolver || !state.rows ||
+        root_index >= kC1HeapGraphRootCount) {
+        if (result) {
+            *result = {};
+            result->failure = C1HeapGraphFailure::node_capacity_exceeded;
+        }
+        state.unavailable = true;
+        return false;
+    }
+    *result = {};
+    if (root.kind != C1HeapGraphNodeKind::island_segment &&
+        root.kind != C1HeapGraphNodeKind::ground_start_callback) {
+        result->failure = C1HeapGraphFailure::invalid_node_kind;
+        result->failure_payload = root.payload;
+        state.unavailable = true;
+        return false;
+    }
+    result->attempted = true;
+    uintptr_t payload = root.payload;
+    if (!payload) return true;
+
+    const uint16_t root_bit = static_cast<uint16_t>(uint16_t{1} << root_index);
+    while (payload) {
+        C1HeapCensusRow* row = c1_heap_graph_find_row(state, payload);
+        if (!row) {
+            result->failure = C1HeapGraphFailure::missing_census_cell;
+            result->failure_payload = payload;
+            state.unavailable = true;
+            return false;
+        }
+        if (row->graph_root_mask == 0) {
+            if (state.unique_nodes >= state.budget) {
+                result->failure = C1HeapGraphFailure::node_budget_exceeded;
+                result->failure_payload = payload;
+                state.unavailable = true;
+                return false;
+            }
+            if (state.unique_nodes >= kC1HeapGraphCapacity) {
+                result->failure = C1HeapGraphFailure::node_capacity_exceeded;
+                result->failure_payload = payload;
+                state.unavailable = true;
+                return false;
+            }
+            C1HeapGraphResolvedNode resolved{};
+            C1HeapGraphFailure failure = C1HeapGraphFailure::none;
+            if (!resolver(payload, root.kind, &resolved, &failure,
+                          resolver_context)) {
+                result->failure = failure == C1HeapGraphFailure::none
+                    ? C1HeapGraphFailure::lease_query_refused : failure;
+                result->failure_payload = payload;
+                state.unavailable = true;
+                return false;
+            }
+            row->graph_next = resolved.next;
+            row->graph_kind = static_cast<uint8_t>(root.kind);
+            row->graph_root_mask = root_bit;
+            ++state.unique_nodes;
+        } else {
+            if (row->graph_kind != static_cast<uint8_t>(root.kind)) {
+                result->failure = C1HeapGraphFailure::node_kind_alias_mismatch;
+                result->failure_payload = payload;
+                state.unavailable = true;
+                return false;
+            }
+            if (row->graph_root_mask & root_bit) {
+                row->graph_cycle_mask |= root_bit;
+                ++state.cycles;
+                result->failure = C1HeapGraphFailure::same_path_cycle;
+                result->failure_payload = payload;
+                state.unavailable = true;
+                return false;
+            }
+            ++state.aliases;
+            row->graph_root_mask |= root_bit;
+        }
+        if (result->visited == UINT32_MAX) {
+            result->failure = C1HeapGraphFailure::node_budget_exceeded;
+            result->failure_payload = payload;
+            state.unavailable = true;
+            return false;
+        }
+        ++result->visited;
+        payload = row->graph_next;
+    }
+    return true;
+}
+
+std::array<C1HeapGraphRoot, kC1HeapGraphRootCount>
+c1_heap_graph_current_roots()
+{
+    // Source keeps independent list heads, tail cursors and repartition roots.
+    // B334 intentionally links some of those roots into next/x4, so the walk
+    // keeps a membership bit per field and treats only same-path repeats as cycles.
+    return {{
+        {"island.next", reinterpret_cast<uintptr_t>(mpIsland_80458E88.next),
+         C1HeapGraphNodeKind::island_segment},
+        {"island.x4", reinterpret_cast<uintptr_t>(mpIsland_80458E88.x4),
+         C1HeapGraphNodeKind::island_segment},
+        {"island.x8", reinterpret_cast<uintptr_t>(mpIsland_80458E88.x8),
+         C1HeapGraphNodeKind::island_segment},
+        {"island.xC", reinterpret_cast<uintptr_t>(mpIsland_80458E88.xC),
+         C1HeapGraphNodeKind::island_segment},
+        {"island.x10", reinterpret_cast<uintptr_t>(mpIsland_80458E88.x10),
+         C1HeapGraphNodeKind::island_segment},
+        {"island.x14", reinterpret_cast<uintptr_t>(mpIsland_80458E88.x14),
+         C1HeapGraphNodeKind::island_segment},
+        {"island.x18", reinterpret_cast<uintptr_t>(mpIsland_80458E88.x18),
+         C1HeapGraphNodeKind::island_segment},
+        {"island.x1C", reinterpret_cast<uintptr_t>(mpIsland_80458E88.x1C),
+         C1HeapGraphNodeKind::island_segment},
+        {"island.x20", reinterpret_cast<uintptr_t>(mpIsland_80458E88.x20),
+         C1HeapGraphNodeKind::island_segment},
+        {"stage_info.x6A4", reinterpret_cast<uintptr_t>(
+             melee_web_stadium_c1_stage_info_x6A4_root()),
+         C1HeapGraphNodeKind::ground_start_callback},
+    }};
+}
+
+bool c1_heap_graph_source_resolver(
+    uintptr_t payload, C1HeapGraphNodeKind kind,
+    C1HeapGraphResolvedNode* out, C1HeapGraphFailure* failure,
+    void* context)
+{
+    auto refuse = [failure](C1HeapGraphFailure reason) {
+        if (failure) *failure = reason;
+        return false;
+    };
+    if (!payload || !out || !failure || !context)
+        return refuse(C1HeapGraphFailure::lease_query_refused);
+
+    const auto& guard = *static_cast<const C1HeapGuard*>(context);
+    MeleeWebSourceMemoryAllocation lease{};
+    const auto status = melee_web_source_memory_allocation_read(
+        reinterpret_cast<const void*>(payload), &lease);
+    uint32_t expected_bytes = 0;
+    if (!c1_heap_graph_request_bytes(kind, &expected_bytes))
+        return refuse(C1HeapGraphFailure::invalid_node_kind);
+    const C1HeapGraphFailure lease_failure = c1_heap_graph_validate_live_lease(
+        status, lease, guard.context.source_heap_handle,
+        guard.context.world_generation,
+        guard.context.allocation_generation_watermark, expected_bytes);
+    if (lease_failure != C1HeapGraphFailure::none)
+        return refuse(lease_failure);
+
+    C1HeapCensusRow* row = nullptr;
+    for (size_t i = 0; i < c1_heap_census.count; ++i) {
+        if (c1_heap_census.rows[i].payload == payload) {
+            if (row) return refuse(C1HeapGraphFailure::census_lease_mismatch);
+            row = &c1_heap_census.rows[i];
+        }
+    }
+    if (!row) return refuse(C1HeapGraphFailure::missing_census_cell);
+    if (row->lease_status != MELEE_WEB_SOURCE_MEMORY_READ_OK ||
+        row->visitor_capacity != row->referent_capacity ||
+        row->lease.live != 1 ||
+        row->lease.source_heap_handle != lease.source_heap_handle ||
+        row->lease.world_generation != lease.world_generation ||
+        row->lease.allocation_generation != lease.allocation_generation ||
+        row->lease.requested_bytes != lease.requested_bytes)
+        return refuse(C1HeapGraphFailure::census_lease_mismatch);
+
+    uintptr_t next = 0;
+    if (kind == C1HeapGraphNodeKind::island_segment) {
+        const auto* node = reinterpret_cast<const mp_UnkStruct0*>(payload);
+        next = reinterpret_cast<uintptr_t>(node->next);
+    } else {
+        void* next_pointer = nullptr;
+        std::memcpy(&next_pointer, reinterpret_cast<const void*>(payload),
+                    sizeof(next_pointer));
+        next = reinterpret_cast<uintptr_t>(next_pointer);
+    }
+    *out = {next};
+    *failure = C1HeapGraphFailure::none;
+    return true;
+}
+
+bool c1_heap_graph_root_snapshots_equal(
+    const std::array<C1HeapGraphRoot, kC1HeapGraphRootCount>& a,
+    const std::array<C1HeapGraphRoot, kC1HeapGraphRootCount>& b)
+{
+    for (size_t i = 0; i < a.size(); ++i)
+        if (a[i].payload != b[i].payload || a[i].kind != b[i].kind)
+            return false;
+    return true;
+}
+
+void c1_heap_graph_emit_root_snapshots(
+    const char* phase,
+    const std::array<C1HeapGraphRoot, kC1HeapGraphRootCount>& before,
+    const std::array<C1HeapGraphRoot, kC1HeapGraphRootCount>& after,
+    bool valid,
+    const std::array<C1HeapGraphRootResult, kC1HeapGraphRootCount>* walks)
+{
+    for (size_t i = 0; i < before.size(); ++i) {
+        const C1HeapGraphRootResult walk = walks ? (*walks)[i]
+                                                  : C1HeapGraphRootResult{};
+        std::cerr << "C1_HEAP_GRAPH_ROOT phase=" << phase
+                  << " index=" << i << " name=" << before[i].name
+                  << " payload_before=0x" << std::hex << before[i].payload
+                  << " payload_after=0x" << after[i].payload << std::dec
+                  << " unchanged=" << (before[i].payload == after[i].payload)
+                  << " snapshot_valid=" << valid
+                  << " walk_attempted=" << walk.attempted
+                  << " walk_status=" << c1_heap_graph_failure_name(walk.failure)
+                  << " failure_payload=0x" << std::hex
+                  << walk.failure_payload << std::dec
+                  << " visited=" << walk.visited << '\n';
+    }
+}
+
+bool c1_heap_graph_save_reached_identities(
+    bool graph_complete, const char** reason)
+{
+    c1_heap_graph_saved_state.count = 0;
+    c1_heap_graph_saved_state.complete = false;
+    if (!reason) return false;
+    *reason = "identity_census_unavailable";
+    if (c1_heap_census.overflow || c1_heap_census.invalid ||
+        c1_heap_census.count > kC1HeapGraphCapacity) {
+        *reason = "census_incomplete_or_over_capacity";
+        return false;
+    }
+    if (!graph_complete) {
+        *reason = "root_graph_incomplete";
+        return false;
+    }
+    for (size_t i = 0; i < c1_heap_census.count; ++i) {
+        const auto& row = c1_heap_census.rows[i];
+        if (!row.graph_root_mask) continue;
+        if (!row.payload ||
+            c1_heap_graph_saved_state.count == kC1HeapGraphCapacity) {
+            *reason = "reached_identity_capacity_exceeded";
+            return false;
+        }
+        c1_heap_graph_saved_state.identities[
+            c1_heap_graph_saved_state.count++] = {
+                row.payload, row.lease.source_heap_handle,
+                row.lease.requested_bytes, row.lease.world_generation,
+                row.lease.allocation_generation};
+    }
+    *reason = "none";
+    return true;
+}
+
+void c1_heap_graph_emit_after_oninit(
+    bool census_complete, const MeleeWebGameplayStats& boundary_stats)
+{
+    const char* reason = "unknown_observer_error";
+    bool graph_complete = false;
+    bool identities_complete = false;
+    bool observer_failed = false;
+    bool pure = false;
+    C1HeapGuard before{};
+    C1HeapGuard after{};
+    bool have_before = false;
+    std::array<C1HeapGraphRoot, kC1HeapGraphRootCount> roots_before =
+        c1_heap_graph_current_roots();
+    std::array<C1HeapGraphRoot, kC1HeapGraphRootCount> roots_after = roots_before;
+    std::array<C1HeapGraphRootResult, kC1HeapGraphRootCount> results{};
+    c1_heap_graph_walk_state = {};
+    c1_heap_graph_saved_state.complete = false;
+    c1_heap_graph_saved_state.count = 0;
+
+    try {
+        before = c1_heap_guard();
+        have_before = true;
+        roots_before = c1_heap_graph_current_roots();
+        if (!c1_gameplay_stats_equal(before.stats, boundary_stats)) {
+            reason = "boundary_stats_changed_before_observation";
+        } else if (!census_complete) {
+            reason = "after_oninit_census_unavailable";
+        } else {
+            c1_heap_graph_walk_state.rows = c1_heap_census.rows;
+            c1_heap_graph_walk_state.row_count = c1_heap_census.count;
+            for (size_t i = 0; i < c1_heap_census.count; ++i) {
+                auto& row = c1_heap_census.rows[i];
+                row.graph_next = 0;
+                row.graph_root_mask = 0;
+                row.graph_cycle_mask = 0;
+                row.graph_kind = 0;
+                if (row.lease_status == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                    row.lease.live == 1 &&
+                    row.lease.source_heap_handle == before.context.source_heap_handle &&
+                    row.lease.world_generation == before.context.world_generation)
+                    ++c1_heap_graph_walk_state.budget;
+            }
+            bool roots_complete = true;
+            for (size_t i = 0; i < roots_before.size(); ++i) {
+                if (!c1_heap_graph_walk_root(
+                        c1_heap_graph_walk_state, i, roots_before[i],
+                        c1_heap_graph_source_resolver, &before, &results[i])) {
+                    roots_complete = false;
+                    if (std::strcmp(reason, "unknown_observer_error") == 0)
+                        reason = c1_heap_graph_failure_name(results[i].failure);
+                }
+            }
+            graph_complete = roots_complete &&
+                !c1_heap_graph_walk_state.unavailable;
+            const char* identity_reason = "none";
+            identities_complete = c1_heap_graph_save_reached_identities(
+                graph_complete, &identity_reason);
+            if (!identities_complete && graph_complete)
+                reason = identity_reason;
+        }
+        roots_after = c1_heap_graph_current_roots();
+        after = c1_heap_guard();
+        pure = c1_heap_guards_equal(before, after) &&
+            c1_heap_graph_root_snapshots_equal(roots_before, roots_after);
+        if (!pure) reason = "source_or_root_purity_guard_failed";
+        else if (graph_complete && identities_complete) reason = "none";
+    } catch (const std::exception&) {
+        observer_failed = true;
+        reason = "observer_exception";
+    } catch (...) {
+        observer_failed = true;
+        reason = "unknown_observer_exception";
+    }
+    if (!have_before) pure = false;
+    const bool complete = graph_complete && identities_complete && pure &&
+        have_before && !observer_failed;
+    c1_heap_graph_saved_state.complete = complete;
+    std::cerr << "C1_HEAP_GRAPH_RESULT phase=after-oninit status="
+              << (complete ? "complete" : "unavailable")
+              << " reason=" << (complete ? "none" : reason)
+              << " root_count=" << kC1HeapGraphRootCount
+              << " unique_nodes=" << c1_heap_graph_walk_state.unique_nodes
+              << " aliases=" << c1_heap_graph_walk_state.aliases
+              << " cycles=" << c1_heap_graph_walk_state.cycles
+              << " census_heap_row_budget=" << c1_heap_graph_walk_state.budget
+              << " identity_capacity=" << kC1HeapGraphCapacity
+              << " census_row_bytes=" << sizeof(C1HeapCensusRow)
+              << " census_storage_bytes=" << sizeof(c1_heap_census.rows)
+              << " census_state_bytes=" << sizeof(c1_heap_census)
+              << " graph_state_bytes=" << sizeof(c1_heap_graph_walk_state)
+              << " saved_identities=" << c1_heap_graph_saved_state.count
+              << " saved_identity_row_bytes=" << sizeof(C1HeapGraphSavedIdentity)
+              << " saved_identity_storage_bytes="
+              << sizeof(c1_heap_graph_saved_state.identities)
+              << " saved_state_bytes=" << sizeof(c1_heap_graph_saved_state)
+              << " graph_auxiliary_state_bytes="
+              << (sizeof(c1_heap_graph_walk_state) +
+                  sizeof(c1_heap_graph_saved_state))
+              << " census_and_graph_static_bytes="
+              << (sizeof(c1_heap_census) +
+                  sizeof(c1_heap_graph_walk_state) +
+                  sizeof(c1_heap_graph_saved_state))
+              << " identity_set_complete=" << complete
+              << " pure=" << pure << '\n';
+    c1_heap_graph_emit_root_snapshots(
+        "after-oninit", roots_before, roots_after, pure, &results);
+    for (size_t i = 0; i < c1_heap_census.count; ++i) {
+        const auto& row = c1_heap_census.rows[i];
+        if (!row.graph_root_mask) continue;
+        std::cerr << "C1_HEAP_GRAPH_NODE phase=after-oninit payload=0x"
+                  << std::hex << row.payload << std::dec
+                  << " requested=" << row.lease.requested_bytes
+                  << " heap=" << row.lease.source_heap_handle
+                  << " world=" << row.lease.world_generation
+                  << " allocation_generation="
+                  << row.lease.allocation_generation
+                  << " capacity=" << row.visitor_capacity
+                  << " root_mask=0x" << std::hex << row.graph_root_mask
+                  << " cycle_mask=0x" << row.graph_cycle_mask << std::dec
+                  << " membership=" << (complete ? "complete" : "partial")
+                  << '\n';
+    }
+    std::cerr.flush();
+}
+
+void c1_heap_graph_emit_after_stage_last(bool census_complete)
+{
+    const char* reason = "unknown_observer_error";
+    bool pure = false;
+    bool queries_complete = c1_heap_graph_saved_state.complete;
+    bool roots_stable = false;
+    C1HeapGuard before{};
+    C1HeapGuard after{};
+    std::array<C1HeapGraphRoot, kC1HeapGraphRootCount> roots_before =
+        c1_heap_graph_current_roots();
+    std::array<C1HeapGraphRoot, kC1HeapGraphRootCount> roots_after = roots_before;
+    bool have_before = false;
+    try {
+        before = c1_heap_guard();
+        have_before = true;
+        roots_before = c1_heap_graph_current_roots();
+        if (!c1_heap_graph_saved_state.complete) {
+            reason = "after_oninit_identity_set_unavailable";
+            queries_complete = false;
+        } else {
+            for (size_t i = 0; i < c1_heap_graph_saved_state.count; ++i) {
+                const auto& prior = c1_heap_graph_saved_state.identities[i];
+                MeleeWebSourceMemoryAllocation lease{};
+                const auto status = melee_web_source_memory_allocation_read(
+                    reinterpret_cast<const void*>(prior.payload), &lease);
+                const char* classification = "unavailable";
+                bool valid = status == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                    lease.live <= 1 &&
+                    lease.source_heap_handle == prior.heap &&
+                    lease.world_generation == prior.world_generation &&
+                    prior.heap == before.context.source_heap_handle &&
+                    prior.world_generation == before.context.world_generation &&
+                    (!lease.live || lease.allocation_generation <=
+                        before.context.allocation_generation_watermark) &&
+                    lease.reserved[0] == 0 && lease.reserved[1] == 0 &&
+                    lease.reserved[2] == 0 && lease.reserved[3] == 0 &&
+                    lease.reserved[4] == 0 && lease.reserved[5] == 0 &&
+                    lease.reserved[6] == 0;
+                if (valid && lease.live == 0 && !lease.requested_bytes &&
+                    !lease.allocation_generation) {
+                    classification = "absent_current_sdk_lease";
+                } else if (valid && lease.live == 1 &&
+                           lease.requested_bytes == prior.requested_bytes &&
+                           lease.allocation_generation ==
+                               prior.allocation_generation) {
+                    classification = "unchanged_live_sdk_lease";
+                } else if (valid &&
+                           c1_heap_graph_is_new_generation_reuse(prior, lease)) {
+                    classification = "new_generation_reuse";
+                } else {
+                    valid = false;
+                    queries_complete = false;
+                    reason = status == MELEE_WEB_SOURCE_MEMORY_READ_OK
+                        ? "saved_identity_lease_mismatch" : "saved_identity_query_refused";
+                }
+                std::cerr << "C1_HEAP_GRAPH_LEASE phase=after-stage-last"
+                          << " payload=0x" << std::hex << prior.payload << std::dec
+                          << " prior_requested=" << prior.requested_bytes
+                          << " prior_allocation_generation="
+                          << prior.allocation_generation
+                          << " status=" << static_cast<int>(status)
+                          << " live=" << static_cast<unsigned>(lease.live)
+                          << " requested=" << lease.requested_bytes
+                          << " heap=" << lease.source_heap_handle
+                          << " world=" << lease.world_generation
+                          << " allocation_generation=" << lease.allocation_generation
+                          << " classification=" << classification
+                          << " valid=" << valid << '\n';
+            }
+        }
+        roots_after = c1_heap_graph_current_roots();
+        after = c1_heap_guard();
+        roots_stable = c1_heap_graph_root_snapshots_equal(roots_before, roots_after);
+        pure = c1_heap_guards_equal(before, after) && roots_stable;
+        if (!pure) {
+            queries_complete = false;
+            reason = "source_or_root_purity_guard_failed";
+        } else if (!census_complete) {
+            queries_complete = false;
+            reason = "after_stage_last_census_unavailable";
+        } else if (queries_complete) {
+            reason = "none";
+        }
+    } catch (const std::exception&) {
+        queries_complete = false;
+        reason = "observer_exception";
+    } catch (...) {
+        queries_complete = false;
+        reason = "unknown_observer_exception";
+    }
+    if (!have_before) {
+        pure = false;
+        queries_complete = false;
+    }
+    const bool complete = queries_complete && pure && census_complete;
+    std::cerr << "C1_HEAP_GRAPH_RESULT phase=after-stage-last status="
+              << (complete ? "complete" : "unavailable")
+              << " reason=" << (complete ? "none" : reason)
+              << " saved_identities=" << c1_heap_graph_saved_state.count
+              << " identity_set_complete=" << c1_heap_graph_saved_state.complete
+              << " census_complete=" << census_complete
+              << " roots_stable=" << roots_stable << " pure=" << pure << '\n';
+    c1_heap_graph_emit_root_snapshots(
+        "after-stage-last", roots_before, roots_after, roots_stable, nullptr);
+    std::cerr.flush();
+}
+
+struct C1HeapGraphControlNode {
+    uintptr_t payload{};
+    uintptr_t next{};
+    int32_t heap{};
+    uint32_t requested_bytes{};
+    uint64_t world_generation{};
+    uint64_t allocation_generation{};
+    bool live{};
+};
+
+struct C1HeapGraphControlContext {
+    C1HeapGraphControlNode nodes[4]{};
+    size_t count{};
+    size_t queries{};
+    size_t dereferences{};
+    int32_t expected_heap{};
+    uint64_t expected_world_generation{};
+};
+
+bool c1_heap_graph_control_resolver(
+    uintptr_t payload, C1HeapGraphNodeKind kind,
+    C1HeapGraphResolvedNode* out, C1HeapGraphFailure* failure,
+    void* context)
+{
+    auto refuse = [failure](C1HeapGraphFailure reason) {
+        if (failure) *failure = reason;
+        return false;
+    };
+    if (!payload || !out || !failure || !context)
+        return refuse(C1HeapGraphFailure::lease_query_refused);
+    auto& state = *static_cast<C1HeapGraphControlContext*>(context);
+    ++state.queries;
+    C1HeapGraphControlNode* node = nullptr;
+    for (size_t i = 0; i < state.count; ++i)
+        if (state.nodes[i].payload == payload) {
+            node = &state.nodes[i];
+            break;
+        }
+    uint32_t expected_bytes = 0;
+    if (!c1_heap_graph_request_bytes(kind, &expected_bytes))
+        return refuse(C1HeapGraphFailure::invalid_node_kind);
+    MeleeWebSourceMemoryAllocation lease{};
+    if (node) {
+        lease.source_heap_handle = node->heap;
+        lease.requested_bytes = node->requested_bytes;
+        lease.world_generation = node->world_generation;
+        lease.allocation_generation = node->allocation_generation;
+        lease.live = node->live ? 1 : 0;
+    }
+    const C1HeapGraphFailure lease_failure = c1_heap_graph_validate_live_lease(
+        MELEE_WEB_SOURCE_MEMORY_READ_OK, lease, state.expected_heap,
+        state.expected_world_generation, UINT64_MAX, expected_bytes);
+    if (lease_failure != C1HeapGraphFailure::none)
+        return refuse(lease_failure);
+    ++state.dereferences;
+    *out = {node->next};
+    *failure = C1HeapGraphFailure::none;
+    return true;
+}
+
+void c1_heap_graph_control_copy_census(
+    std::array<C1HeapCensusRow, 4>& rows,
+    const C1HeapGraphControlContext& context)
+{
+    for (size_t i = 0; i < context.count; ++i) {
+        const auto& node = context.nodes[i];
+        auto& row = rows[i];
+        row = C1HeapCensusRow{};
+        row.payload = node.payload;
+        row.lease_status = MELEE_WEB_SOURCE_MEMORY_READ_OK;
+        row.lease.source_heap_handle = node.heap;
+        row.lease.requested_bytes = node.requested_bytes;
+        row.lease.world_generation = node.world_generation;
+        row.lease.allocation_generation = node.allocation_generation;
+        row.lease.live = node.live ? 1 : 0;
+    }
+}
+
+void c1_heap_graph_control_reset(
+    C1HeapGraphWalkState& walk, std::array<C1HeapCensusRow, 4>& rows,
+    size_t row_count, size_t budget)
+{
+    walk = {};
+    walk.rows = rows.data();
+    walk.row_count = row_count;
+    walk.budget = budget;
+    for (auto& row : rows) {
+        row.graph_next = 0;
+        row.graph_root_mask = 0;
+        row.graph_cycle_mask = 0;
+        row.graph_kind = 0;
+    }
+}
+
+void run_stadium_owner_graph_controls()
+{
+    constexpr int32_t heap = 3;
+    constexpr uint64_t world = 11;
+    constexpr uintptr_t first = 0x1000;
+    constexpr uintptr_t second = 0x2000;
+    constexpr uintptr_t mismatch = 0x3000;
+
+    std::array<C1HeapCensusRow, 4> rows{};
+    C1HeapGraphWalkState walk{};
+    C1HeapGraphControlContext fake{};
+    fake.expected_heap = heap;
+    fake.expected_world_generation = world;
+
+    fake.count = 2;
+    fake.nodes[0] = {first, second, heap, kC1HeapGraphIslandRequestBytes,
+                     world, 1, true};
+    fake.nodes[1] = {second, 0, heap, kC1HeapGraphIslandRequestBytes,
+                     world, 2, true};
+    c1_heap_graph_control_copy_census(rows, fake);
+    c1_heap_graph_control_reset(walk, rows, fake.count, fake.count);
+    C1HeapGraphRootResult first_result{}, alias_result{};
+    check(c1_heap_graph_walk_root(
+              walk, 0,
+              {"control.head", first, C1HeapGraphNodeKind::island_segment},
+              c1_heap_graph_control_resolver, &fake, &first_result) &&
+              c1_heap_graph_walk_root(
+                  walk, 1,
+                  {"control.tail", second,
+                   C1HeapGraphNodeKind::island_segment},
+                  c1_heap_graph_control_resolver, &fake, &alias_result) &&
+              walk.unique_nodes == 2 && walk.aliases == 1 && walk.cycles == 0 &&
+              rows[1].graph_root_mask == 3 && fake.dereferences == 2,
+          "Owner graph alias control counted a cross-root alias as a cycle");
+
+    fake = {};
+    fake.expected_heap = heap;
+    fake.expected_world_generation = world;
+    fake.count = 2;
+    fake.nodes[0] = {first, second, heap, kC1HeapGraphIslandRequestBytes,
+                     world, 1, true};
+    fake.nodes[1] = {second, first, heap, kC1HeapGraphIslandRequestBytes,
+                     world, 2, true};
+    c1_heap_graph_control_copy_census(rows, fake);
+    c1_heap_graph_control_reset(walk, rows, fake.count, fake.count);
+    C1HeapGraphRootResult cycle_result{};
+    check(!c1_heap_graph_walk_root(
+              walk, 0,
+              {"control.cycle", first,
+               C1HeapGraphNodeKind::island_segment},
+              c1_heap_graph_control_resolver, &fake, &cycle_result) &&
+              cycle_result.failure == C1HeapGraphFailure::same_path_cycle &&
+              walk.cycles == 1 && walk.unavailable &&
+              rows[0].graph_cycle_mask == 1 && fake.dereferences == 2,
+          "Owner graph same-path cycle was not rejected as unavailable");
+
+    fake = {};
+    fake.expected_heap = heap;
+    fake.expected_world_generation = world;
+    fake.count = 1;
+    fake.nodes[0] = {mismatch, 0, heap, kC1HeapGraphIslandRequestBytes,
+                     world + 1, 1, true};
+    c1_heap_graph_control_copy_census(rows, fake);
+    c1_heap_graph_control_reset(walk, rows, fake.count, fake.count);
+    C1HeapGraphRootResult lease_mismatch_result{};
+    check(!c1_heap_graph_walk_root(
+              walk, 0,
+              {"control.lease-mismatch", mismatch,
+               C1HeapGraphNodeKind::island_segment},
+              c1_heap_graph_control_resolver, &fake,
+              &lease_mismatch_result) &&
+              lease_mismatch_result.failure ==
+                  C1HeapGraphFailure::lease_owner_mismatch &&
+              fake.queries == 1 && fake.dereferences == 0,
+          "Owner graph dereferenced a lease from a different world");
+
+    fake = {};
+    fake.expected_heap = heap;
+    fake.expected_world_generation = world;
+    fake.count = 1;
+    fake.nodes[0] = {mismatch, 0, heap,
+                     kC1HeapGraphIslandRequestBytes + 1, world, 1, true};
+    c1_heap_graph_control_copy_census(rows, fake);
+    c1_heap_graph_control_reset(walk, rows, fake.count, fake.count);
+    C1HeapGraphRootResult size_mismatch_result{};
+    check(!c1_heap_graph_walk_root(
+              walk, 0,
+              {"control.size-mismatch", mismatch,
+               C1HeapGraphNodeKind::island_segment},
+              c1_heap_graph_control_resolver, &fake,
+              &size_mismatch_result) &&
+              size_mismatch_result.failure ==
+                  C1HeapGraphFailure::requested_size_mismatch &&
+              fake.queries == 1 && fake.dereferences == 0,
+          "Owner graph dereferenced a cell with a mismatched source request size");
+
+    fake = {};
+    fake.expected_heap = heap;
+    fake.expected_world_generation = world;
+    fake.count = 1;
+    fake.nodes[0] = {mismatch, 0, heap, kC1HeapGraphIslandRequestBytes,
+                     world, 1, true};
+    c1_heap_graph_control_reset(walk, rows, 0, fake.count);
+    C1HeapGraphRootResult absent_census_result{};
+    check(!c1_heap_graph_walk_root(
+              walk, 0,
+              {"control.absent-census-cell", mismatch,
+               C1HeapGraphNodeKind::island_segment},
+              c1_heap_graph_control_resolver, &fake,
+              &absent_census_result) &&
+              absent_census_result.failure ==
+                  C1HeapGraphFailure::missing_census_cell &&
+              fake.queries == 0 && fake.dereferences == 0,
+          "Owner graph queried or dereferenced a node absent from the allocation census");
+
+    const C1HeapGraphSavedIdentity prior_reuse{
+        mismatch, heap, kC1HeapGraphIslandRequestBytes, world, 1};
+    const MeleeWebSourceMemoryAllocation reused_with_new_size{
+        heap, kC1HeapGraphCallbackRequestBytes, world, 2, 1, {}};
+    check(c1_heap_graph_is_new_generation_reuse(
+              prior_reuse, reused_with_new_size),
+          "Owner graph did not classify a higher-generation same-payload lease with a changed request size as reuse");
+
+    std::cout << "C1 source-owner graph alias/cycle/lease-world/request-size/missing-cell/generation-reuse controls passed; no source world or fixture\n";
+}
+
+void c1_v23_census_unavailable(const char* phase, const char* reason) noexcept
+{
+    std::cerr << "C1_V23_CENSUS status=unavailable world=0 consumer=original-oninit"
+              << " cycle=0 phase=" << (phase ? phase : "unknown") << " error=";
+    const char* value = reason ? reason : "unknown_observer_error";
+    for (size_t i = 0; value[i] && i < 128; ++i) {
+        const unsigned char c = static_cast<unsigned char>(value[i]);
+        const bool safe = (c >= 'a' && c <= 'z') ||
+                          (c >= 'A' && c <= 'Z') ||
+                          (c >= '0' && c <= '9') || c == '_' || c == '-' ||
+                          c == '.' || c == ':';
+        std::cerr << (safe ? static_cast<char>(c) : '_');
+    }
+    std::cerr << '\n';
+    std::cerr.flush();
+}
+
+void c1_try_emit_v23_heap_census(bool& prior_failure, const char* phase,
+                                 const MeleeWebGameplayStats& boundary_stats) noexcept
+{
+    if (prior_failure) {
+        c1_v23_census_unavailable(phase, "prior_phase_failed");
+        return;
+    }
+    try {
+        const C1HeapGuard before = c1_heap_guard();
+        check(c1_gameplay_stats_equal(before.stats, boundary_stats),
+              "C1 V23 census boundary stats changed before observation");
+        C1HeapGuard after{};
+        c1_emit_heap_census(0, "original-oninit", 0, phase, before, &after);
+        std::cerr << "C1_V23_CENSUS status=complete world=0"
+                  << " consumer=original-oninit cycle=0 phase=" << phase
+                  << " rows=" << c1_heap_census.count << '\n';
+        std::cerr.flush();
+    } catch (const std::exception& failure) {
+        prior_failure = true;
+        c1_v23_census_unavailable(phase, failure.what());
+    } catch (...) {
+        prior_failure = true;
+        c1_v23_census_unavailable(phase, "unknown_observer_error");
+    }
+}
+
+void run_stadium_cache_live_control(bool capture_heap_owners)
+{
+    namespace screen = melee_web::test::stadium_screen;
+    struct Baseline {
+        MeleeWebGameplayStats stats{};
+        decltype(screen::runtime_roots_snapshot()) roots;
+        decltype(screen::live_class_counts()) classes;
+        decltype(screen::live_pool_counts()) pools{};
+        uint32_t gobj_used{}, proc_used{};
+    };
+    struct State {
+        unsigned world{};
+        Baseline baseline;
+        std::string consumer;
+        uintptr_t prior_object_payload{};
+        uint64_t prior_object_generation{};
+        bool prior_object_has_exact_lease{};
+        bool has_prior_object_payload{};
+        unsigned records{};
+        unsigned completed{};
+    };
+    auto observer = +[](const char* consumer, const char* phase, unsigned cycle,
+                        const void* owned, void* user) -> int {
+        auto& state = *static_cast<State*>(user);
+        try {
+            const std::string_view current_phase(phase);
+            if (current_phase == "cold") {
+                // The reducer starts the next consumer with a cold observation;
+                // never carry the prior consumer's object address into it.
+                state.prior_object_payload = 0;
+                state.prior_object_generation = 0;
+                state.prior_object_has_exact_lease = false;
+                state.has_prior_object_payload = false;
+            }
+            const C1HeapGuard census_before = c1_heap_guard();
+            C1HeapGuard census_after{};
+            c1_emit_heap_census(state.world, consumer, cycle, phase,
+                                census_before, &census_after);
+            Baseline now{census_after.stats, census_after.roots,
+                census_after.classes, census_after.pools,
+                census_after.gobj_used, census_after.proc_used};
+            const bool current_is_live = current_phase == "live";
+            const bool query_needed = state.has_prior_object_payload || current_is_live;
+            C1HeapGuard query_before{};
+            if (query_needed) query_before = c1_heap_guard();
+            if (state.has_prior_object_payload) {
+                MeleeWebSourceMemoryAllocation prior{};
+                const auto prior_status = melee_web_source_memory_allocation_read(
+                    reinterpret_cast<const void*>(state.prior_object_payload), &prior);
+                check(prior_status == MELEE_WEB_SOURCE_MEMORY_READ_OK,
+                      "C1 prior object payload query was refused");
+                const char* classification = "unknown_no_exact_lease_baseline";
+                if (state.prior_object_has_exact_lease) {
+                    check(prior.world_generation == now.stats.generation,
+                          "C1 prior exact payload moved to a different world generation");
+                    if (!prior.live) {
+                        classification = "freed_sdk_lease";
+                    } else if (prior.allocation_generation ==
+                               state.prior_object_generation) {
+                        classification = "unchanged_live_sdk_lease";
+                    } else {
+                        check(prior.allocation_generation >
+                                  state.prior_object_generation,
+                              "C1 prior exact payload generation moved backwards");
+                        classification = "new_generation_reuse";
+                    }
+                }
+                c1_heap_query_line(
+                    state.world, consumer, cycle, phase, "prior_object_payload",
+                    state.prior_object_payload, prior_status, prior,
+                    state.prior_object_generation, 0, "recheck", classification);
+            }
+            if (current_is_live) {
+                check(owned != nullptr,
+                      "C1 live cache phase omitted its owned object pointer");
+                const uintptr_t object_payload = reinterpret_cast<uintptr_t>(owned);
+                const auto object_row = std::find_if(
+                    c1_heap_census.rows,
+                    c1_heap_census.rows + c1_heap_census.count,
+                    [object_payload](const C1HeapCensusRow& row) {
+                        return row.payload == object_payload;
+                    });
+                MeleeWebSourceMemoryAllocation object_lease{};
+                const auto object_status = melee_web_source_memory_allocation_read(
+                    owned, &object_lease);
+                check(object_status == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                          object_lease.world_generation == now.stats.generation,
+                      "C1 object payload exact-lease query was refused or changed worlds");
+                const char* classification = nullptr;
+                if (object_row != c1_heap_census.rows + c1_heap_census.count) {
+                    check(object_row->lease.live == object_lease.live &&
+                              object_row->lease.allocation_generation ==
+                                  object_lease.allocation_generation,
+                          "C1 exact object payload query disagrees with its census row");
+                    classification = object_lease.live
+                        ? "captured_exact_live_sdk_lease"
+                        : "captured_exact_payload_without_source_lease";
+                } else {
+                    check(!object_lease.live,
+                          "C1 live object lease is missing from the allocated-cell census");
+                    classification = "captured_unknown_nonexact_or_unmapped";
+                }
+                c1_heap_query_line(
+                    state.world, consumer, cycle, phase, "prior_object_payload",
+                    object_payload, object_status, object_lease,
+                    object_lease.live ? object_lease.allocation_generation : 0,
+                    0, "capture", classification);
+                state.prior_object_payload = object_payload;
+                state.prior_object_generation = object_lease.live
+                    ? object_lease.allocation_generation : 0;
+                state.prior_object_has_exact_lease = object_lease.live;
+                state.has_prior_object_payload = true;
+            }
+            if (query_needed) {
+                const C1HeapGuard query_after = c1_heap_guard();
+                check(c1_heap_guards_equal(query_before, query_after),
+                      "C1 prior object payload query changed source allocation state");
+                std::cerr << "C1_HEAP_QUERY_GUARD world=" << state.world
+                          << " consumer=" << consumer << " cycle=" << cycle
+                          << " phase=" << phase
+                          << " equal=1 source_healthy=1 world_equal=1 heap_owner=1 watermark=1"
+                          << " ticks=1 free_bytes=1 roots=1 classes=1 pools=1"
+                          << " gobj_used=1 proc_used=1\n";
+            }
+            std::cerr << "C1_CACHE_LIVE world=" << state.world
+                      << " generation=" << now.stats.generation
+                      << " consumer=" << consumer << " phase=" << phase
+                      << " cycle=" << cycle << " owned=" << owned
+                      << " heap_free_bytes=" << now.stats.heap_free_bytes
+                      << " ticks=" << now.stats.ticks
+                      << " gobj_used=" << now.gobj_used
+                      << " gobj_free=" << HSD_ObjAllocGetFreed(&gobj_alloc_data)
+                      << " gobj_size=" << gobj_alloc_data.size
+                      << " proc_used=" << now.proc_used
+                      << " proc_free=" << HSD_ObjAllocGetFreed(&gobjproc_alloc_data)
+                      << " proc_size=" << gobjproc_alloc_data.size << " classes=";
+            for (const auto& [identity, count] : now.classes)
+                std::cerr << static_cast<const void*>(identity) << ':' << count << ',';
+            std::cerr << " pools=";
+            for (auto count : now.pools) std::cerr << count << ',';
+            std::cerr << '\n'; std::cerr.flush();
+            ++state.records;
+            if (std::string_view(phase) == "cold") {
+                check(cycle == 0 && owned == nullptr, "Invalid cold cache/live phase");
+                state.baseline = std::move(now);
+                state.consumer = consumer;
+            } else {
+                check(state.consumer == consumer && now.stats.generation == state.baseline.stats.generation &&
+                      now.stats.ticks == state.baseline.stats.ticks,
+                      "Cache/live control changed world or source ticks");
+                if (std::string_view(phase) == "live") {
+                    check(owned != nullptr && now.classes != state.baseline.classes,
+                          "Original allocation did not expose live class ownership");
+                } else {
+                    check(owned == nullptr && (std::string_view(phase) == "removed" ||
+                          std::string_view(phase) == "warm"), "Invalid cache/live phase");
+                    check(now.roots == state.baseline.roots && now.classes == state.baseline.classes &&
+                          now.pools == state.baseline.pools && now.gobj_used == state.baseline.gobj_used &&
+                          now.proc_used == state.baseline.proc_used && melee_web_source_memory_healthy(),
+                          "Original removal retained roots, live classes, used pools or unhealthy leases");
+                    if (std::string_view(phase) == "removed") ++state.completed;
+                }
+            }
+            return 1;
+        } catch (const std::exception& failure) {
+            std::cerr << "C1_CACHE_LIVE_REFUSAL " << failure.what() << '\n';
+            std::cerr.flush(); return 0;
+        }
+    };
+    uint64_t previous_generation = 0;
+    for (unsigned lifetime = 0; lifetime < 2; ++lifetime) {
+        char error[256]{};
+        check(melee_web_gameplay_startup(8U * 1024U * 1024U, error, sizeof(error)), error);
+        check(melee_web_native_world_enable(error, sizeof(error)), error);
+        check(melee_web_gameplay_stats().generation != previous_generation,
+              "Cache/live reducer reused a world generation");
+        previous_generation = melee_web_gameplay_stats().generation;
+        if (lifetime == 0 && capture_heap_owners) {
+            MeleeWebSourceMemoryContext context{};
+            check(melee_web_source_memory_context_read(&context) ==
+                      MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                      melee_web_source_memory_healthy(),
+                  "Heap-owner control requires a healthy active source-memory context");
+            melee_web_stadium_c1_heap_owner_arm();
+        }
+        State state{}; state.world = lifetime;
+        check(melee_web_stadium_c1_cache_live_control(observer, &state, error, sizeof(error)), error);
+        check(state.records == 12 && state.completed == 4,
+              "Cache/live reducer skipped a cold/live/removed/warm observation");
+        if (lifetime == 0) {
+            c1_publish_heap_owner_observations("asset-free-control", false);
+            melee_web_stadium_c1_heap_owner_disable();
+        }
+        check(melee_web_gameplay_shutdown(error, sizeof(error)), error);
+        MeleeWebSourceMemoryContext inactive_context{};
+        const auto inactive_status =
+            melee_web_source_memory_context_read(&inactive_context);
+        MeleeWebSourceMemoryAllocation inactive_allocation{};
+        const auto inactive_allocation_status =
+            melee_web_source_memory_allocation_read(
+                reinterpret_cast<const void*>(state.prior_object_payload),
+                &inactive_allocation);
+        check(inactive_status == MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE &&
+                  inactive_allocation_status ==
+                      MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE,
+              "C1 prior-object-payload query after shutdown was not refused as inactive");
+        c1_heap_query_line(lifetime, state.consumer.c_str(), 1, "removed",
+                           "prior_object_payload", state.prior_object_payload,
+                           inactive_allocation_status, inactive_allocation,
+                           state.prior_object_generation, 1, "after_shutdown",
+                           "inactive_owner");
+    }
+    std::cout << "C1 asset-free cache/live reducer passed; two worlds, 24 phase records, bounded original SDK allocation/free census, exact lease queries and source-state purity; no original Stadium callback, camera or source ticks\n";
+}
+
+void run_stadium_map_light_adoption_control()
+{
+    char error[256]{};
+    check(melee_web_gameplay_startup(8U * 1024U * 1024U, error, sizeof(error)), error);
+    check(melee_web_native_world_enable(error, sizeof(error)), error);
+    check(melee_web_stadium_c1_map_light_adoption_control(error, sizeof(error)), error);
+    check(melee_web_gameplay_shutdown(error, sizeof(error)), error);
+    std::cout << "C1 asset-free original Ground map-light creation/adoption, two retire-before-detach cycles and foreign/replaced/bound refusals passed; no camera, scheduled proc dispatch or source ticks\n";
+}
+
+void run_stadium_sis_allocator_lifecycle_control()
+{
+    char error[256]{};
+    // Reproduce the source menu lifecycle before a new diagnostic SDK heap.
+    check(melee_web_gameplay_startup(8U * 1024U * 1024U, error, sizeof(error)), error);
+    check(melee_web_native_world_enable(error, sizeof(error)), error);
+    HSD_SisLib_803A6048(MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES);
+    HSD_GObj parent{}; // Non-null parent prevents original611C creating a camera.
+    check(HSD_SisLib_803A611C(1, &parent, 9, 0xD, 0, 1, 0, 1) == 0,
+          "Retired-menu SIS baseline lost its first context index");
+    MeleeWebRetiredSisLease retired{};
+    check(melee_web_diagnostic_sis_capture(&retired, error, sizeof(error)), error);
+    HSD_SisLib_803A5FBC();
+    check(melee_web_diagnostic_sis_verify_retired(&retired, error, sizeof(error)), error);
+    // Actual original capture/drain/verify above produces immutable one-shot
+    // evidence. A copied verified token must refuse without changing owners.
+    const auto verified_token=retired;
+    auto duplicate_token=retired;
+    const auto verified_epoch=HSD_SisLib_HeapEpoch();
+    const auto verified_heap=HSD_SisLib_HeapOwner();
+    const auto verified_active=HSD_SisLib_HeapActive();
+    const auto verified_used_head=used_head;
+    const auto verified_text=HSD_SisLib_804D7978;
+    const auto verified_context=HSD_SisLib_804D797C;
+    const auto verified_fonts_empty=HSD_SisLib_AllFontSlotsEmpty();
+    MeleeWebSourceMemoryAllocation allocation_before{},allocation_after{};
+    const auto status_before=melee_web_source_memory_allocation_read(retired.prior.heap,&allocation_before);
+    const auto duplicate_accepted=melee_web_diagnostic_sis_verify_retired(&duplicate_token,error,sizeof(error));
+    const auto status_after=melee_web_source_memory_allocation_read(retired.prior.heap,&allocation_after);
+    std::fprintf(stderr,"C1_SIS_VERIFY_REPEAT accepted=%d verified_before=%d verified_after=%d epoch_before=%llu epoch_after=%llu heap_before=%p heap_after=%p active_before=%d active_after=%d status_before=%d status_after=%d live_before=%u live_after=%u world_before=%llu world_after=%llu source_heap_before=%d source_heap_after=%d allocation_before=%llu allocation_after=%llu requested_before=%u requested_after=%u used_head_before=%p used_head_after=%p text_before=%p text_after=%p context_before=%p context_after=%p fonts_empty_before=%d fonts_empty_after=%d copied_token_equal=%d original_token_equal=%d\n",
+        duplicate_accepted,verified_token.retirement_verified,duplicate_token.retirement_verified,
+        (unsigned long long)verified_epoch,(unsigned long long)HSD_SisLib_HeapEpoch(),
+        verified_heap,HSD_SisLib_HeapOwner(),verified_active,HSD_SisLib_HeapActive(),
+        int(status_before),int(status_after),allocation_before.live,allocation_after.live,
+        (unsigned long long)allocation_before.world_generation,(unsigned long long)allocation_after.world_generation,
+        allocation_before.source_heap_handle,allocation_after.source_heap_handle,
+        (unsigned long long)allocation_before.allocation_generation,(unsigned long long)allocation_after.allocation_generation,
+        allocation_before.requested_bytes,allocation_after.requested_bytes,
+        (void*)verified_used_head,(void*)used_head,
+        (void*)verified_text,(void*)HSD_SisLib_804D7978,(void*)verified_context,(void*)HSD_SisLib_804D797C,
+        verified_fonts_empty,HSD_SisLib_AllFontSlotsEmpty(),
+        std::memcmp(&duplicate_token,&verified_token,sizeof(verified_token))==0,
+        std::memcmp(&retired,&verified_token,sizeof(verified_token))==0);
+    std::fflush(stderr);
+    check(!duplicate_accepted && std::memcmp(&duplicate_token,&verified_token,sizeof(verified_token))==0 &&
+          std::memcmp(&retired,&verified_token,sizeof(verified_token))==0 &&
+          HSD_SisLib_HeapEpoch()==verified_epoch && HSD_SisLib_HeapOwner()==verified_heap &&
+          HSD_SisLib_HeapActive()==verified_active && used_head==verified_used_head &&
+          HSD_SisLib_804D7978==verified_text &&
+          HSD_SisLib_804D797C==verified_context && HSD_SisLib_AllFontSlotsEmpty()==verified_fonts_empty &&
+          status_before==MELEE_WEB_SOURCE_MEMORY_READ_OK && status_after==status_before &&
+          std::memcmp(&allocation_before,&allocation_after,sizeof(allocation_before))==0,
+          "Repeated SIS retirement verification changed the verified token/source owner or lease");
+    check(HSD_SisLib_AllFontSlotsEmpty() && !HSD_SisLib_804D7978 &&
+              !HSD_SisLib_804D797C,
+          "Retired-menu SIS baseline retained live roots");
+    check(melee_web_gameplay_shutdown(error, sizeof(error)), error);
+
+    check(melee_web_gameplay_startup(8U * 1024U * 1024U, error, sizeof(error)), error);
+    check(melee_web_native_world_enable(error, sizeof(error)), error);
+    const auto before = melee_web_gameplay_stats();
+    const auto scheduler = HSD_GObj_804D783C;
+    const auto gobj_count = HSD_ObjAllocGetUsing(&gobj_alloc_data);
+    const auto proc_count = HSD_ObjAllocGetUsing(&gobjproc_alloc_data);
+    // One real current-world allocation at the old size adds address pressure.
+    // Record reuse; never require a particular allocator address or fake a lease.
+    void* const pressure = HSD_MemAlloc(MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES);
+    MeleeWebSourceMemoryAllocation pressure_before{};
+    check(pressure && melee_web_source_memory_allocation_read(
+              pressure, &pressure_before) == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+              pressure_before.live, "SIS pressure allocation lacks its actual lease");
+    const bool reused_retired_address = pressure == retired.prior.heap;
+    // Synthetic same-address records use the same pure identity reducer as begin.
+    // A live record with the prior generation remains the same owner; replacing
+    // either generation is distinct only after verified original retirement.
+    auto synthetic_same = pressure_before;
+    synthetic_same.world_generation = retired.prior.world_generation;
+    synthetic_same.allocation_generation = retired.prior.allocation_generation;
+    check(!melee_web_diagnostic_sis_distinct_retired_lease(&retired, &synthetic_same),
+          "Retirement reducer accepted the same live SIS lease");
+    ++synthetic_same.allocation_generation;
+    check(melee_web_diagnostic_sis_distinct_retired_lease(&retired, &synthetic_same),
+          "Retirement reducer confused same-address replacement generation");
+    synthetic_same.allocation_generation = retired.prior.allocation_generation;
+    ++synthetic_same.world_generation;
+    check(melee_web_diagnostic_sis_distinct_retired_lease(&retired, &synthetic_same),
+          "Retirement reducer confused same-address replacement world");
+    auto unverified = retired;
+    unverified.retirement_verified = 0;
+    check(!melee_web_diagnostic_sis_distinct_retired_lease(&unverified, &synthetic_same),
+          "Unverified retirement authorized a replacement lease");
+
+    MeleeWebDiagnosticSisOwner pressure_owner{};
+    check(melee_web_diagnostic_sis_begin_retired(
+              &pressure_owner, &retired, error, sizeof(error)), error);
+    check(melee_web_diagnostic_sis_end(&pressure_owner, error, sizeof(error)), error);
+    MeleeWebSourceMemoryAllocation pressure_after{};
+    check(melee_web_source_memory_allocation_read(pressure, &pressure_after) ==
+              MELEE_WEB_SOURCE_MEMORY_READ_OK && pressure_after.live &&
+              pressure_after.world_generation == pressure_before.world_generation &&
+              pressure_after.allocation_generation == pressure_before.allocation_generation,
+          "Retired SIS handoff freed or replaced a current foreign allocation");
+    HSD_Free(pressure);
+
+    // A new original initializer is a genuine owner, even if its numeric address
+    // matches an old token. Model equal address explicitly, retaining old epoch.
+    HSD_SisLib_803A6048(MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES);
+    auto stale_equal_address = retired;
+    stale_equal_address.prior.heap = HSD_SisLib_HeapOwner();
+    MeleeWebDiagnosticSisOwner refused{};
+    check(!melee_web_diagnostic_sis_begin_retired(
+              &refused, &stale_equal_address, error, sizeof(error)) && !refused.heap &&
+              HSD_SisLib_HeapActive(),
+          "Retired token overwrote a genuine newly initialized SIS owner");
+    MeleeWebRetiredSisLease fresh_retired{};
+    check(melee_web_diagnostic_sis_capture(&fresh_retired, error, sizeof(error)), error);
+    HSD_SisLib_803A5FBC();
+    check(melee_web_diagnostic_sis_verify_retired(&fresh_retired, error, sizeof(error)), error);
+    check(!melee_web_diagnostic_sis_begin_retired(
+              &refused, &stale_equal_address, error, sizeof(error)) && !refused.heap,
+          "Old retirement token survived a later source startup/drain epoch");
+    std::cout << "C1 actual post-restart retired SIS address reuse="
+              << reused_retired_address << "; genuine-new-owner and later-epoch refusals passed\n";
+    HSD_Text foreign_text{};
+    sislib_UnkAlloc3 foreign_context{};
+    SIS foreign_sis_data{};
+    SIS* const foreign_sis = &foreign_sis_data;
+    for (unsigned cycle = 0; cycle < 2; ++cycle) {
+        MeleeWebDiagnosticSisOwner owner{};
+        const auto text_head = HSD_SisLib_804D7978;
+        const auto context_head = HSD_SisLib_804D797C;
+        HSD_SisLib_804D7978 = &foreign_text;
+        check(!melee_web_diagnostic_sis_begin(&owner, error, sizeof(error)) &&
+                  HSD_SisLib_804D7978 == &foreign_text && !owner.heap,
+              "Diagnostic SIS begin cleared a foreign text owner");
+        HSD_SisLib_804D7978 = text_head;
+        HSD_SisLib_804D797C = &foreign_context;
+        check(!melee_web_diagnostic_sis_begin(&owner, error, sizeof(error)) &&
+                  HSD_SisLib_804D797C == &foreign_context && !owner.heap,
+              "Diagnostic SIS begin cleared a foreign context owner");
+        HSD_SisLib_804D797C = context_head;
+        HSD_SisLib_804D1124[1] = foreign_sis;
+        check(!melee_web_diagnostic_sis_begin(&owner, error, sizeof(error)) &&
+                  HSD_SisLib_804D1124[1] == foreign_sis && !owner.heap,
+              "Diagnostic SIS begin cleared a foreign font slot");
+        HSD_SisLib_804D1124[1] = nullptr;
+        check(melee_web_diagnostic_sis_begin_retired(
+                  &owner, cycle == 0 ? &fresh_retired : nullptr, error, sizeof(error)), error);
+        MeleeWebDiagnosticSisOwner contender{};
+        check(!melee_web_diagnostic_sis_begin(&contender, error, sizeof(error)) &&
+                  !contender.heap && HSD_SisLib_HeapOwner() == owner.heap,
+              "Diagnostic SIS accepted a second allocator owner");
+        check(melee_web_stadium_text_topology_controls(&owner),
+              "Original SIS append/remove topology control failed (partial owner retained)");
+        HSD_SisLib_804D7978 = &foreign_text;
+        check(!melee_web_diagnostic_sis_end(&owner, error, sizeof(error)) &&
+                  HSD_SisLib_804D7978 == &foreign_text,
+              "Diagnostic SIS end swept a foreign text owner");
+        HSD_SisLib_804D7978 = text_head;
+        HSD_SisLib_804D797C = &foreign_context;
+        check(!melee_web_diagnostic_sis_end(&owner, error, sizeof(error)) &&
+                  HSD_SisLib_804D797C == &foreign_context,
+              "Diagnostic SIS end swept a foreign context owner");
+        HSD_SisLib_804D797C = context_head;
+        auto stale_world = owner;
+        ++stale_world.world_generation;
+        check(!melee_web_diagnostic_sis_end(&stale_world, error, sizeof(error)) &&
+                  HSD_SisLib_HeapOwner() == owner.heap,
+              "Diagnostic SIS end accepted a stale world token");
+        auto replaced = owner;
+        ++replaced.allocation_generation;
+        check(!melee_web_diagnostic_sis_end(&replaced, error, sizeof(error)) &&
+                  HSD_SisLib_HeapOwner() == owner.heap,
+              "Diagnostic SIS drained an altered allocation lease");
+        void* const raw_borrower = HSD_SisLib_Alloc(16);
+        check(raw_borrower && used_head &&
+                  !melee_web_diagnostic_sis_end(&owner, error, sizeof(error)),
+              "Diagnostic SIS end swept an outstanding allocator borrower");
+        HSD_SisLib_Free(raw_borrower);
+        check(HSD_SisLib_803A611C(1, &parent, 9, 0xD, 0, 1, 0, 1) == 0,
+              "Fresh diagnostic SIS allocation lost its first context index");
+        const auto live_context = HSD_SisLib_804D797C;
+        check(live_context && !live_context->x4 &&
+                  !melee_web_diagnostic_sis_end(&owner, error, sizeof(error)) &&
+                  HSD_SisLib_804D797C == live_context,
+              "Diagnostic SIS end swept a live context");
+        // Remove only this control's known611C context through original teardown.
+        HSD_SisLib_803A5E70();
+        check(melee_web_gameplay_vs_sis(MELEE_WEB_VS_SIS_VALIDATE_BORROW,
+                                       1, foreign_sis, error, sizeof(error)), error);
+        HSD_SisLib_804D1124[1] = foreign_sis;
+        check(!melee_web_diagnostic_sis_end(&owner, error, sizeof(error)) &&
+                  HSD_SisLib_804D1124[1] == foreign_sis,
+              "Diagnostic SIS end erased a borrowed font slot before retirement");
+        check(melee_web_gameplay_vs_sis(MELEE_WEB_VS_SIS_RETIRE_BORROW,
+                                       1, foreign_sis, error, sizeof(error)), error);
+        check(melee_web_diagnostic_sis_end(&owner, error, sizeof(error)), error);
+        check(!owner.heap && !melee_web_diagnostic_sis_end(&owner, error, sizeof(error)),
+              "Diagnostic SIS accepted a second drain of a retired owner");
+    }
+    const auto after = melee_web_gameplay_stats();
+    check(after.generation == before.generation && after.ticks == before.ticks &&
+              HSD_GObj_804D783C == scheduler &&
+              HSD_ObjAllocGetUsing(&gobj_alloc_data) == gobj_count &&
+              HSD_ObjAllocGetUsing(&gobjproc_alloc_data) == proc_count,
+          "SIS lifecycle control advanced source ticks or created scheduled/camera owners");
+    check(melee_web_gameplay_shutdown(error, sizeof(error)), error);
+    std::cout << "C1 asset-free SIS retired-menu baseline, two owned allocator lifetimes, foreign-root/lease refusals and single drain passed; no camera, scheduled procs or source ticks\n";
+}
+
+void run_stadium_bind_refusal_control()
+{
+    char error[256]{};
+    check(melee_web_gameplay_startup(8U * 1024U * 1024U,
+                                     error, sizeof(error)), error);
+    check(melee_web_native_world_enable(error, sizeof(error)), error);
+    check(melee_web_stage_last_on_init_bind_refusal_controls(),
+          "Asset-free bind-refusal reducer did not preserve the real cancellation refusal");
+    std::cout << "C1 asset-free bind-refusal reporter preserved the initiating bind error and "
+                 "real owner-cancel refusal; synthetic E8/bind adapter only, no archive lookup or "
+                 "original Stage routine/OnInit call; "
+                 "partial owner retained through process exit\n";
+    std::cout.flush();
+    std::_Exit(0);
+}
+
 uint32_t stadium_archive_symbol_offset(const melee_web::DatArchive& archive,
                                        const char* name)
 {
@@ -3567,6 +6583,197 @@ uint32_t stadium_archive_symbol_offset(const melee_web::DatArchive& archive,
     return found->data_offset;
 }
 
+const char* stadium_map2_buffer_origin_name(
+    MeleeWebStadiumMap2BufferOrigin origin)
+{
+    switch (origin) {
+    case MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_BORROWED_PRELOAD:
+        return "borrowed_preload";
+    case MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK:
+        return "owned_fallback";
+    case MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_RETIRED:
+        return "retired";
+    default:
+        return "unknown";
+    }
+}
+
+const char* stadium_source_event_kind_name(
+    MeleeWebStadiumSourceEventKind kind)
+{
+    switch (kind) {
+    case MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8:
+        return "stage_e8";
+    case MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_24C:
+        return "stage_24c";
+    case MELEE_WEB_STADIUM_SOURCE_EVENT_GROUND_0800:
+        return "ground_0800";
+    case MELEE_WEB_STADIUM_SOURCE_EVENT_ON_INIT:
+        return "stadium_on_init";
+    case MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ:
+        return "map_gobj";
+    default:
+        return "unknown";
+    }
+}
+
+struct StadiumSourceOnInitObservation {
+    MeleeWebStadiumMap2BufferOwner map2_owner{};
+    MeleeWebStadiumSourceJournal source_journal{};
+    MeleeWebSourceMemoryContext memory_before_init{};
+    MeleeWebSourceMemoryContext memory_before_end{};
+    MeleeWebSourceMemoryContext memory_after_end{};
+    MeleeWebSourceMemoryAllocation map2_before_end{};
+    MeleeWebSourceMemoryAllocation map2_after_end{};
+    MeleeWebSourceMemoryAllocation ground_storage_before_end{};
+    MeleeWebSourceMemoryAllocation ground_storage_after_end{};
+    MeleeWebGroundMapStorageView ground_storage_live{};
+    MeleeWebGroundMapStorageView ground_storage_ended{};
+    MeleeWebGameplayStats stats_before_init{};
+    MeleeWebGameplayStats stats_after_light_preparation{};
+    bool light_preparation_stats_captured = false;
+    MeleeWebGameplayStats stats_after_on_init{};
+    MeleeWebGameplayStats stats_after_end{};
+    bool census_observer_failed = false;
+    MeleeWebStadiumC1StageInfoView stage_info_before_init{};
+    decltype(melee_web::test::stadium_screen::runtime_roots_snapshot()) roots_before{};
+    decltype(melee_web::test::stadium_screen::live_class_counts()) class_counts_before{};
+    decltype(melee_web::test::stadium_screen::live_pool_counts()) pool_counts_before{};
+    MeleeWebStadiumC1FtDeviceSnapshot* device_snapshot = nullptr;
+    int map2_allocation_status_before_end =
+        MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
+    int map2_allocation_status_after_end =
+        MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
+    int ground_storage_allocation_status_before_end =
+        MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
+    int ground_storage_allocation_status_after_end =
+        MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
+    uint32_t gobj_pool_before = 0;
+    uint32_t proc_pool_before = 0;
+    uint32_t stage_gobj_count_before = 0;
+    int scheduler_cycle_before = 0;
+    uint32_t seed_after_on_init = 0;
+    uint32_t seed_after_end = 0;
+    bool cleanup_verified = false;
+};
+
+
+// Diagnostic reads only after the original first heap equality has failed.
+// Its 21 checks still own acceptance, order and baselines unchanged.
+void publish_stadium_heap_failure_observations(const StadiumSourceOnInitObservation& saved)
+{
+    auto stats = [](const char* phase, const MeleeWebGameplayStats& value) {
+        std::cerr << "C1_HEAP_PHASE phase=" << phase << " provenance=copied"
+                  << " generation=" << value.generation << " ticks=" << value.ticks
+                  << " objects=" << value.objects << " processes=" << value.processes
+                  << " heap_free_bytes=" << value.heap_free_bytes << '\n';
+    };
+    stats("before-light-preparation", saved.stats_before_init);
+    if (saved.light_preparation_stats_captured)
+        stats("after-light-preparation-before-e8", saved.stats_after_light_preparation);
+    else
+        std::cerr << "C1_HEAP_PHASE phase=after-light-preparation-before-e8 status=unavailable\n";
+    stats("after-oninit", saved.stats_after_on_init);
+    stats("after-stage-last-and-light-destroy", saved.stats_after_end);
+    std::cerr.flush();
+    MeleeWebSourceMemoryContext current{};
+    const auto status = melee_web_source_memory_context_read(&current);
+    const auto current_stats = melee_web_gameplay_stats();
+    std::cerr << "C1_POST_HEAP_CONTEXT read_status=" << status
+              << " heap=" << current.source_heap_handle << " world=" << current.world_generation
+              << " watermark=" << current.allocation_generation_watermark
+              << " current_gameplay_world=" << current_stats.generation
+              << " expected_heap=" << saved.memory_before_init.source_heap_handle
+              << " expected_world=" << saved.memory_before_init.world_generation
+              << " before_end_watermark=" << saved.memory_before_end.allocation_generation_watermark
+              << " captured_after_end_watermark=" << saved.memory_after_end.allocation_generation_watermark << '\n';
+    if (status != MELEE_WEB_SOURCE_MEMORY_READ_OK ||
+        current.source_heap_handle != saved.memory_before_init.source_heap_handle ||
+        current.world_generation != saved.memory_before_init.world_generation ||
+        !melee_web_gameplay_world_exists() ||
+        current_stats.generation != current.world_generation) {
+        std::cerr << "C1_POST_HEAP_OBSERVATION status=unavailable reason=current-owner-guard\n";
+        std::cerr.flush(); return;
+    }
+    // A diagnostic read failure never replaces the original first error.
+    auto observe = [](const char* field, auto read) {
+        try { read(); }
+        catch (const std::exception& failure) {
+            std::cerr << "C1_POST_HEAP_OBSERVATION field=" << field
+                      << " status=unavailable reason=" << failure.what() << '\n';
+        } catch (...) {
+            std::cerr << "C1_POST_HEAP_OBSERVATION field=" << field
+                      << " status=unavailable reason=unknown-read-error\n";
+        }
+        std::cerr.flush();
+    };
+    auto scalar = [](const char* field, auto actual, auto baseline) {
+        std::cerr << "C1_POST_HEAP_OBSERVATION field=" << field << " actual=" << actual
+                  << " baseline=" << baseline << " acceptance=not-executed\n";
+    };
+    observe("source-registries", [&] {
+        scalar("stage_registry_empty", source_stage_registry_empty(), true);
+        scalar("stage_gobj_count", source_stage_gobj_count(), saved.stage_gobj_count_before);
+        scalar("stage_markers_empty", source_stage_markers_empty(), true);
+        scalar("stage_object_failures", melee_web_stadium_c1_stage_object_failures(), uint32_t{0});
+    });
+    observe("gobj-proc-pools", [&] {
+        scalar("gobj_used", HSD_ObjAllocGetUsing(&gobj_alloc_data), saved.gobj_pool_before);
+        scalar("proc_used", HSD_ObjAllocGetUsing(&gobjproc_alloc_data), saved.proc_pool_before);
+        std::cerr << "C1_POST_HEAP_CAPACITY gobj_free=" << HSD_ObjAllocGetFreed(&gobj_alloc_data)
+                  << " gobj_size=" << gobj_alloc_data.size
+                  << " proc_free=" << HSD_ObjAllocGetFreed(&gobjproc_alloc_data)
+                  << " proc_size=" << gobjproc_alloc_data.size
+                  << " scope=public-pools-not-total-heap-accounting\n";
+    });
+    observe("live-classes", [&] {
+        const auto now = melee_web::test::stadium_screen::live_class_counts();
+        for (const auto& [identity, baseline] : saved.class_counts_before) {
+            const auto found = now.find(identity);
+            std::cerr << "C1_POST_HEAP_CLASS identity=" << static_cast<const void*>(identity)
+                      << " actual=" << (found == now.end() ? 0 : found->second)
+                      << " baseline=" << baseline << " acceptance=not-executed\n";
+        }
+        for (const auto& [identity, actual] : now)
+            if (!saved.class_counts_before.contains(identity))
+                std::cerr << "C1_POST_HEAP_CLASS identity=" << static_cast<const void*>(identity)
+                          << " actual=" << actual << " baseline=0 acceptance=not-executed\n";
+        std::cerr << "C1_POST_HEAP_OBSERVATION field=live_class_counts equal="
+                  << (now == saved.class_counts_before) << " acceptance=not-executed\n";
+    });
+    observe("live-pools", [&] {
+        const auto now = melee_web::test::stadium_screen::live_pool_counts();
+        for (size_t i = 0; i < now.size(); ++i)
+            std::cerr << "C1_POST_HEAP_POOL index=" << i << " actual=" << now[i]
+                      << " baseline=" << saved.pool_counts_before[i] << " acceptance=not-executed\n";
+    });
+    observe("runtime-roots", [&] {
+        const auto now = melee_web::test::stadium_screen::runtime_roots_snapshot();
+        std::cerr << "C1_POST_HEAP_ROOTS actual_bytes=" << now.size()
+                  << " baseline_bytes=" << saved.roots_before.size()
+                  << " equal=" << (now == saved.roots_before) << " acceptance=not-executed";
+        const auto common = std::min(now.size(), saved.roots_before.size());
+        size_t first = 0;
+        while (first < common && now[first] == saved.roots_before[first]) ++first;
+        if (first < common)
+            std::cerr << " first_offset=" << first << " actual=" << unsigned(now[first])
+                      << " baseline=" << unsigned(saved.roots_before[first]);
+        std::cerr << '\n';
+    });
+    observe("ft-device", [&] {
+        if (saved.device_snapshot == nullptr)
+            std::cerr << "C1_POST_HEAP_OBSERVATION field=ft_device status=unavailable reason=no-owned-copy\n";
+        else
+            scalar("ft_device_snapshot_matches",
+                melee_web_stadium_c1_ft_device_snapshot_matches(saved.device_snapshot), 1);
+    });
+    observe("scheduler-health", [&] {
+        scalar("scheduler_cycle", HSD_GObj_804D783C, saved.scheduler_cycle_before);
+        scalar("source_memory_healthy", melee_web_source_memory_healthy(), 1);
+        scalar("ground_dispatch_quiet", ground_dispatch_quiet(), true);
+    });
+}
+
 void run_stadium_e8_request(
     const melee_web::RuntimeFiles& reopened_files,
     MeleeWebMenuHost* host,
@@ -3575,16 +6782,51 @@ void run_stadium_e8_request(
     const std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES>& baseline,
     const std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES>& save_before,
     bool perform_ground_map1_owner,
-    TransitionTrace& trace)
+    bool perform_on_init,
+    const MeleeWebRetiredSisLease* retired_sis,
+    StadiumSelectionRngWitness& selection_rng,
+    TransitionTrace& trace,
+    MeleeWebMatchContext* stage_start_context = nullptr,
+    MeleeWebRetiredSisLease* next_retired_sis = nullptr,
+    const MeleeWebMenuMatchSelection* active_match_copied_selection = nullptr)
 {
     using namespace melee_web;
     char error[256]{};
     check(host && world && reopened_files.contains("GrPs.usd"),
           "E8 request requires its retained source host and exact GrPs.usd entry");
+    auto verify_selection_boundary = [&](const char* boundary, bool source_return) {
+        if (!stage_start_context) {
+            check_stadium_selection_preserved(host, selected, baseline,
+                                              source_return ? &selection_rng : nullptr);
+            return;
+        }
+        // These are active-match RNG + immutable copied-selection observations.
+        // The host export requires its own seed and is deliberately not called.
+        check(active_match_copied_selection &&
+                  stadium_active_match_selection_witness_matches(
+                      *active_match_copied_selection, selected, selection_rng),
+              "Active-match RNG or immutable copied selection changed");
+        check(melee_web_match_camera_available(stage_start_context, error, sizeof(error)), error);
+        check(melee_web_menu_host_phase(host) == MELEE_WEB_MENU_READY &&
+                  melee_web_menu_host_source_scene(host) == 0,
+              "Active match changed its retained closed menu host phase");
+        std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES> observed_baseline{};
+        check(melee_web_menu_host_snapshot_card_data(host, 1, observed_baseline.data(),
+                  observed_baseline.size(), error, sizeof(error)), error);
+        check(observed_baseline == baseline,
+              "Active match changed its observed retained save-owner baseline");
+        std::fprintf(stderr,
+            "C3_ACTIVE_MATCH_SELECTION boundary=%s host_reexport=0 copied_selection_equal=1 active_match_rng_verified=1 save_baseline_observed_equal=1 match=%p rng_owner=%p initial=%u expected_live=%u live=%u\n",
+            boundary, static_cast<void*>(stage_start_context), static_cast<const void*>(selection_rng.owner),
+            selection_rng.initial, selection_rng.expected_live, *selection_rng.owner);
+        std::fflush(stderr);
+    };
     const auto& raw_bytes = reopened_files.at("GrPs.usd");
     const std::vector<std::uint8_t> raw_before = raw_bytes;
     auto archive = std::make_shared<const DatArchive>(
         raw_bytes, DatExternalPolicy::ResolveNull);
+    const DatStage map_metadata(*archive);
+    auto map_contract = test::stadium_contract_data(*archive, map_metadata);
     const std::uint32_t ground_root =
         stadium_archive_symbol_offset(*archive, "grGroundParam");
     const std::uint32_t itemdata_root =
@@ -3596,6 +6838,8 @@ void run_stadium_e8_request(
     (void)stadium_archive_symbol_offset(*archive, "map_plit");
     const std::uint32_t quake_root =
         stadium_archive_symbol_offset(*archive, "quake_model_set");
+    const std::uint32_t image_root = stadium_archive_symbol_offset(
+        *archive, "GrdPStadiumBG_OVDummy_mat6962_GrdPStadiumDummy_0_image_desc");
 
     check(archive->be32(itemdata_root) == 0 &&
               !archive->has_relocation(itemdata_root) &&
@@ -3608,9 +6852,12 @@ void run_stadium_e8_request(
 
     MeleeWebStadiumC1StageInfoSnapshot* snapshot = nullptr;
     MeleeWebStageMap* stage_map = nullptr;
+    MeleeWebStageLights* light_context = nullptr;
     void* previous_ground_param = nullptr;
     bool ground_param_published = false;
     bool effect_bank_attached = false;
+    bool effect_runtime_owned = false;
+    MeleeWebDiagnosticSisOwner sis_owner{};
     bool stage_selection_owned = false;
     bool observer_window_owned = false;
     bool cleanup_complete = false;
@@ -3620,17 +6867,28 @@ void run_stadium_e8_request(
     std::unique_ptr<DatEffectBanks> effects;
     std::unique_ptr<DatScene> quake;
     std::unique_ptr<DatStageItems> items;
+    std::unique_ptr<DatSis> stadium_sis;
     MeleeWebStadiumE8CallObservation observed{};
     MeleeWebStadiumC1StageInfoView before_view{};
     MeleeWebStadiumC1StageInfoView after_view{};
+    MeleeWebStageLast* retained_stage_owner = nullptr;
+    MeleeWebStageLast* returned_stage_owner = nullptr;
+    StadiumSourceOnInitObservation on_init_observation{};
+    bool on_init_stage_end_succeeded = false;
     std::unique_ptr<GroundStorageLease> ground_storage;
     void* ground_data = nullptr;
     void* yakumono_data = nullptr;
+    void* native_map_head = nullptr;
+    void* native_collision = nullptr;
+    void* native_ald_yaku = nullptr;
     uint32_t seed_before = 0;
     const uint32_t* seed_owner = seed_ptr;
     check(seed_owner != nullptr,
           "E8 request lost the source seed owner before preparation");
     seed_before = *seed_owner;
+    check_stadium_rng_witness(selection_rng, selected, "e8-preparation");
+    check(!selection_rng.source_return_captured,
+          "E8 request cannot reuse a captured source-return RNG witness");
     const char* grps_resolved_name = lbFileGetFullName("/GrPs");
     check(grps_resolved_name &&
               std::strcmp(grps_resolved_name, "/GrPs.usd") == 0,
@@ -3643,7 +6901,37 @@ void run_stadium_e8_request(
                   "Could not close the E8 source-call observation window");
             observer_window_owned = false;
         }
+        if (on_init_observation.device_snapshot) {
+            check(melee_web_stadium_c1_ft_device_snapshot_release(
+                      on_init_observation.device_snapshot),
+                  "Could not release the source ftDevice observation snapshot");
+            on_init_observation.device_snapshot = nullptr;
+        }
         if (ground_storage) ground_storage->end();
+        if (effect_runtime_owned) {
+            check(melee_web_effect_runtime_end(error, sizeof(error)), error);
+            effect_runtime_owned = false;
+            HSD_GObj** const links =
+                reinterpret_cast<HSD_GObj**>(HSD_GObj_Entities);
+            check(!melee_web_effect_runtime_prepared() &&
+                      !melee_web_effect_runtime_active() && links &&
+                      !links[11] && !links[12],
+                  "OnInit cleanup did not retire the original effect runtime before map-bank detach");
+        }
+        if (sis_owner.heap) {
+            if (next_retired_sis) {
+                check(stage_start_context && !next_retired_sis->prior.heap &&
+                          !next_retired_sis->retirement_verified,
+                      "Full-world SIS continuation requires a fresh next-world retirement token");
+                check(melee_web_diagnostic_sis_capture(next_retired_sis, error, sizeof(error)), error);
+                trace.sis_lease("captured_before_stage_sis_drain", next_retired_sis);
+            }
+            check(melee_web_diagnostic_sis_end(&sis_owner, error, sizeof(error)), error);
+            if (next_retired_sis) {
+                check(melee_web_diagnostic_sis_verify_retired(next_retired_sis, error, sizeof(error)), error);
+                trace.sis_lease("verified_stage_sis_retired_before_world_shutdown", next_retired_sis);
+            }
+        }
         if (effect_bank_attached) {
             check(melee_web_effect_bank_detach(effects->bank(), error,
                                                 sizeof(error)), error);
@@ -3659,6 +6947,10 @@ void run_stadium_e8_request(
             ground_param_published = false;
             check(detached_ground_param == ground_data,
                   "Could not restore the prior source GroundParam owner");
+        }
+        if (light_context) {
+            check(melee_web_stage_lights_destroy(light_context, error, sizeof(error)), error);
+            light_context = nullptr;
         }
         if (stage_map) {
             grDatFiles_801C6288();
@@ -3678,6 +6970,8 @@ void run_stadium_e8_request(
                       snapshot, error, sizeof(error)), error);
             snapshot = nullptr;
         }
+        // The stage-map archive and light table borrow this owner's descriptors.
+        stadium_sis.reset();
         items.reset();
         quake.reset();
         effects.reset();
@@ -3705,17 +6999,26 @@ void run_stadium_e8_request(
         scalar_owner = std::make_unique<NativeDatArena>(archive);
         ground_data = melee_web_ground_data_decode(
             scalar_owner->reader(), ground_root);
+        check(ground_data != nullptr,
+              "C0 typed scalar owner did not decode GroundParam");
         yakumono_data = melee_web_stadium_yakumono_decode(
             scalar_owner->reader(), yakumono_root);
-        check(ground_data != nullptr && yakumono_data != nullptr,
-              "C0 typed scalar owners did not decode the Stadium roots");
-        map_owner = std::make_unique<DatNativeMap>(
-            archive, test::stadium_contract);
-        check(map_owner->map_head() != nullptr && map_owner->collision() != nullptr,
-              "C0 typed map owner did not decode map_head/coll_data");
+        map_owner = std::make_unique<DatNativeMap>(archive, map_contract.view());
+        native_map_head = map_owner->map_head();
+        native_collision = map_owner->collision();
         random_yaku = std::make_unique<DatStageYaku>(archive, yaku_root);
-        check(random_yaku->native_data() != nullptr,
-              "C0 ALDYakuAll typed owner is absent");
+        native_ald_yaku = random_yaku->native_data();
+        stadium_sis = std::make_unique<DatSis>(archive, "SIS_GrPStadiumData");
+        check(stadium_sis->descriptor() != nullptr,
+              "Stadium SIS typed owner returned a null descriptor");
+        void* const native_image = map_owner->image_descriptor(image_root);
+        check(yakumono_data != nullptr && native_map_head != nullptr &&
+                  native_collision != nullptr && native_ald_yaku != nullptr &&
+                  native_image != nullptr,
+              "C0 typed map/scalar owners did not decode the selected roots");
+        if (perform_on_init)
+            check(!map_owner->light_overrides().empty(),
+                  "Diagnostic map owner has no typed light identity table");
         effects = std::make_unique<DatEffectBanks>(
             archive, "map_ptcl", "map_texg", 0x40);
         check(effects->command_root() != nullptr &&
@@ -3730,23 +7033,112 @@ void run_stadium_e8_request(
               "C0 authored-null itemdata unexpectedly decoded stage items");
         check(melee_web_stadium_c1_stage_object_failures() == 0,
               "E8 typed preparation published a stage object or item/light root");
-
-        const std::vector<MeleeWebArchiveSymbol> symbols{
-            {"GrPs.usd", "map_head", map_owner->map_head()},
-            {"GrPs.usd", "coll_data", map_owner->collision()},
-            {"GrPs.usd", "grGroundParam", ground_data},
-            {"GrPs.usd", "ALDYakuAll", random_yaku->native_data()},
-            {"GrPs.usd", "map_ptcl", effects->command_root()},
-            {"GrPs.usd", "map_texg", effects->texture_root()},
-            {"GrPs.usd", "yakumono_param", yakumono_data},
-            {"GrPs.usd", "quake_model_set", quake->single_model()},
+        const auto* stadium_profile = melee_web_stage_profile(St_Kind_PStadium);
+        const auto* stadium_content =
+            melee_web_stage_content_for_profile(St_Kind_PStadium);
+        check(stadium_profile && stadium_profile->diagnostic_only &&
+                  stadium_profile->public_symbols && stadium_content &&
+                  stadium_profile->public_symbol_count == 2 &&
+                  stadium_content->archive &&
+                  std::strcmp(stadium_content->archive, "GrPs.usd") == 0,
+              "Diagnostic source catalog lost its checked profile/archive identity");
+        std::vector<MeleeWebArchiveSymbol> symbols;
+        const auto& source_symbols = archive->public_symbols();
+        symbols.reserve(source_symbols.size());
+        // Keep the source catalog's authored names/order. Any unhydrated source
+        // name remains null and the archive-section lookup rejects its use.
+        for (const auto& source_symbol : source_symbols) {
+            void* native_data = nullptr;
+            if (source_symbol.name == "map_head")
+                native_data = map_owner->map_head();
+            else if (source_symbol.name == "coll_data")
+                native_data = native_collision;
+            else if (source_symbol.name == "grGroundParam")
+                native_data = ground_data;
+            else if (source_symbol.name == "ALDYakuAll")
+                native_data = native_ald_yaku;
+            else if (source_symbol.name == "map_ptcl")
+                native_data = effects->command_root();
+            else if (source_symbol.name == "map_texg")
+                native_data = effects->texture_root();
+            else if (source_symbol.name == "yakumono_param")
+                native_data = yakumono_data;
+            else if (source_symbol.name == "quake_model_set")
+                native_data = quake->single_model();
+            for (size_t i = 0; i < stadium_profile->public_symbol_count; ++i) {
+                const auto& request = stadium_profile->public_symbols[i];
+                if (source_symbol.name != request.name) continue;
+                if (request.kind == MELEE_WEB_STAGE_PUBLIC_IMAGE) {
+                    check(source_symbol.data_offset == image_root,
+                          "Diagnostic public IMAGE source identity changed");
+                    native_data = map_owner->image_descriptor(source_symbol.data_offset);
+                } else if (request.kind == MELEE_WEB_STAGE_PUBLIC_SIS) {
+                    native_data = stadium_sis->descriptor();
+                } else {
+                    check(false, "Diagnostic public source descriptor kind is unsupported");
+                }
+            }
+            symbols.push_back({stadium_content->archive,
+                               source_symbol.name.c_str(), native_data});
+        }
+        check(symbols.size() == source_symbols.size(),
+              "Diagnostic source catalog lost an authored public row");
+        for (const auto& symbol : symbols)
+            check(symbol.filename && symbol.symbol &&
+                      std::strcmp(symbol.filename, stadium_content->archive) == 0,
+                  "Diagnostic source catalog lost an authored name or filename");
+        const auto find_owned_symbol = [&](const char* name) {
+            const auto count = std::count_if(
+                symbols.begin(), symbols.end(),
+                [&](const auto& symbol) {
+                    return std::strcmp(symbol.symbol, name) == 0;
+                });
+            check(count == 1,
+                  "Diagnostic source catalog must expose one requested public name");
+            const auto found = std::find_if(
+                symbols.begin(), symbols.end(),
+                [&](const auto& symbol) {
+                    return std::strcmp(symbol.symbol, name) == 0;
+                });
+            return &*found;
         };
+        check(find_owned_symbol("map_head")->native_data == map_owner->map_head() &&
+                  find_owned_symbol("coll_data")->native_data == native_collision &&
+                  find_owned_symbol("grGroundParam")->native_data == ground_data &&
+                  find_owned_symbol("ALDYakuAll")->native_data == native_ald_yaku &&
+                  find_owned_symbol("map_ptcl")->native_data == effects->command_root() &&
+                  find_owned_symbol("map_texg")->native_data == effects->texture_root() &&
+                  find_owned_symbol("yakumono_param")->native_data == yakumono_data &&
+                  find_owned_symbol("quake_model_set")->native_data == quake->single_model() &&
+                  find_owned_symbol("SIS_GrPStadiumData")->native_data == stadium_sis->descriptor() &&
+                  find_owned_symbol("GrdPStadiumBG_OVDummy_mat6962_GrdPStadiumDummy_0_image_desc")->native_data == native_image,
+              "Diagnostic catalog identities differ from their typed source owners");
+        if (perform_on_init) {
+            check(!melee_web_effect_runtime_prepared() &&
+                      !melee_web_effect_runtime_active(),
+                  "Source-ordered OnInit requires an unowned original effect runtime");
+            trace.sis_lease("before_begin", retired_sis);
+            check(melee_web_diagnostic_sis_begin_retired(
+                      &sis_owner, retired_sis, error, sizeof(error)), error);
+            const int effect_begin_succeeded =
+                melee_web_effect_runtime_begin(error, sizeof(error));
+            effect_runtime_owned = melee_web_effect_runtime_prepared();
+            check(effect_begin_succeeded, error);
+            check(effect_runtime_owned && melee_web_effect_runtime_active(),
+                  "Original effects were not initialized before stage-map and bank publication");
+        }
         stage_map = melee_web_stage_map_publish(
-            map_owner->map_head(), error, sizeof(error));
+            native_map_head, error, sizeof(error));
         check(stage_map != nullptr, error);
         check(melee_web_stage_map_set_public(
                   stage_map, symbols.data(), symbols.size(), error,
                   sizeof(error)), error);
+        if (perform_on_init) {
+            const auto& overrides = map_owner->light_overrides();
+            check(melee_web_stage_map_set_overrides(
+                      stage_map, overrides.data(), overrides.size(), error,
+                      sizeof(error)), error);
+        }
         previous_ground_param = melee_web_ground_data_publish(ground_data);
         ground_param_published = true;
         check(previous_ground_param == before_view.param,
@@ -3754,19 +7146,130 @@ void run_stadium_e8_request(
         check(melee_web_effect_bank_attach(
                   effects->bank(), error, sizeof(error)), error);
         effect_bank_attached = true;
-        check(melee_web_stage_selection_begin(St_Kind_PStadium),
-              "Could not scope original StageInfo selection for StKind 3");
-        stage_selection_owned = true;
+        if (!perform_on_init) {
+            check(melee_web_stage_selection_begin(St_Kind_PStadium),
+                  "Could not scope original StageInfo selection for StKind 3");
+            stage_selection_owned = true;
+        }
         check(gm_GetCurrentGameMode() == GM_VS && !gm_IsCurrently1PMode() &&
                   lbLang_GetLanguageSetting() == LANG_US &&
                   lbLang_GetSavedLanguage() == LANG_US,
               "E8 request lost its source VS and two-language scopes");
-        check_stadium_selection_preserved(host, selected, baseline);
+        verify_selection_boundary("before-e8", false);
 
+        if (perform_on_init) {
+            auto& on_init = on_init_observation;
+            check(melee_web_source_memory_context_read(
+                      &on_init.memory_before_init) ==
+                      MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                      melee_web_source_memory_healthy() &&
+                      melee_web_gameplay_world_exists(),
+                  "OnInit boundary lacks a healthy active source-memory/world owner");
+            on_init.stats_before_init = melee_web_gameplay_stats();
+            check(on_init.stats_before_init.generation ==
+                      on_init.memory_before_init.world_generation,
+                  "OnInit boundary source-memory/world generations disagree");
+            melee_web_stadium_c1_heap_owner_arm();
+            c1_try_emit_v23_heap_census(
+                on_init.census_observer_failed, "before-light-preparation",
+                on_init.stats_before_init);
+            melee_web_stadium_c1_heap_owner_mark(
+                MELEE_WEB_STADIUM_C1_HEAP_OWNER_PHASE_BEFORE_LIGHT,
+                !on_init.census_observer_failed);
+            check(melee_web_stadium_c1_stage_info_current_view(
+                      &on_init.stage_info_before_init),
+                  "OnInit boundary could not observe its typed pre-call StageInfo");
+            check(melee_web_ground_map_storage_available(),
+                  "OnInit boundary found pre-existing Ground storage ownership");
+            check(melee_web_stadium_c1_stage_object_failures() == 0 &&
+                      source_stage_registry_empty() &&
+                      source_stage_gobj_count() == 0 &&
+                      source_stage_markers_empty() && ground_dispatch_quiet(),
+                  "OnInit boundary requires an empty stage/Ground baseline");
+            on_init.roots_before = melee_web::test::stadium_screen::runtime_roots_snapshot();
+            on_init.class_counts_before = melee_web::test::stadium_screen::live_class_counts();
+            on_init.pool_counts_before = melee_web::test::stadium_screen::live_pool_counts();
+            on_init.gobj_pool_before = HSD_ObjAllocGetUsing(&gobj_alloc_data);
+            on_init.proc_pool_before = HSD_ObjAllocGetUsing(&gobjproc_alloc_data);
+            on_init.stage_gobj_count_before = source_stage_gobj_count();
+            on_init.scheduler_cycle_before = HSD_GObj_804D783C;
+            on_init.device_snapshot =
+                melee_web_stadium_c1_ft_device_snapshot_create();
+            check(on_init.device_snapshot != nullptr,
+                  "OnInit boundary could not snapshot typed ftDevice globals");
+        }
+
+        if (perform_on_init) {
+            // Reuse normal gameplay's CPU light context without constructing a
+            // strict full-stage owner. Both animation tables and authored entry
+            // counts borrow the retained structural map's checked storage.
+            const DatLights light_data(*archive, "map_plit", true);
+            light_context = melee_web_stage_lights_create(
+                light_data.lights.data(), light_data.lights.size(), error, sizeof(error));
+            check(light_context != nullptr, error);
+            for (uint32_t i = 0; i < light_data.lights.size(); ++i) {
+                const auto flags = read_dat_light_override(
+                    *archive, light_data.lights[i].source_offset);
+                check(melee_web_stage_lights_set_override(light_context, i,
+                          flags.has_value(), flags.value_or(0), error, sizeof(error)), error);
+                if (light_data.animation_tables[i]) {
+                    void* const table = map_owner->light_animation_table(
+                        *light_data.animation_tables[i]);
+                    check(table == map_owner->light_animation_table(
+                              *light_data.animation_tables[i]),
+                          "Borrowed map light animation table identity changed");
+                    check(melee_web_stage_lights_set_animations(
+                              light_context, i, table, error, sizeof(error)), error);
+                }
+            }
+            check(melee_web_stage_lights_attach(light_context, error, sizeof(error)), error);
+            const auto counts = map_owner->source_light_counts();
+            check(melee_web_stage_lights_set_source_counts(light_context,
+                      counts.data(), counts.size(), error, sizeof(error)), error);
+        }
+        if (perform_on_init) {
+            on_init_observation.stats_after_light_preparation = melee_web_gameplay_stats();
+            on_init_observation.light_preparation_stats_captured = true;
+            c1_try_emit_v23_heap_census(
+                on_init_observation.census_observer_failed,
+                "after-light-preparation-before-e8",
+                on_init_observation.stats_after_light_preparation);
+            melee_web_stadium_c1_heap_owner_mark(
+                MELEE_WEB_STADIUM_C1_HEAP_OWNER_PHASE_AFTER_LIGHT,
+                !on_init_observation.census_observer_failed);
+        }
         check(melee_web_stadium_e8_call_observer_begin(),
               "Could not open the bounded E8 source-call window");
         observer_window_owned = true;
-        Stage_802251E8(St_Kind_PStadium, NULL);
+        check_stadium_rng_witness(selection_rng, selected, "before-original-e8-oninit");
+        if (perform_on_init) {
+            returned_stage_owner = melee_web_stage_begin_kind_on_init_diagnostic(
+                    St_Kind_PStadium, yakumono_data, effects->bank(),
+                    &retained_stage_owner, error, sizeof(error));
+            if (returned_stage_owner != nullptr &&
+                retained_stage_owner == nullptr)
+                retained_stage_owner = returned_stage_owner;
+            check(returned_stage_owner != nullptr &&
+                      returned_stage_owner == retained_stage_owner,
+                  error[0] ? error
+                           : "Original Stadium OnInit did not return its retained owner");
+            check(seed_ptr == seed_owner && seed_owner == selection_rng.owner,
+                  "OnInit returned with a replaced retained menu RNG owner");
+            selection_rng.expected_live = *seed_owner;
+            selection_rng.source_return_captured = true;
+            on_init_observation.seed_after_on_init = selection_rng.expected_live;
+            check_stadium_rng_witness(selection_rng, selected, "on-init-return");
+            check(melee_web_stage_last_stadium_map2_buffer_snapshot(
+                      retained_stage_owner,
+                      &on_init_observation.map2_owner),
+                  "OnInit owner did not expose its captured map2 provenance record");
+            check(melee_web_stage_last_stadium_source_journal_snapshot(
+                      retained_stage_owner,
+                      &on_init_observation.source_journal),
+                  "OnInit owner did not expose its actual source-event journal");
+        } else {
+            Stage_802251E8(St_Kind_PStadium, NULL);
+        }
         check(melee_web_stadium_e8_call_observer_end(&observed),
               "Could not close the bounded E8 source-call window");
         observer_window_owned = false;
@@ -3789,13 +7292,13 @@ void run_stadium_e8_request(
               "E8 typed open did not preserve and resolve exact /GrPs.usd identity");
         check(observed.map_head_calls == 1 &&
                   observed.map_head_archive == observed.typed_archive_handle &&
-                  observed.map_head_value == map_owner->map_head() &&
+                  observed.map_head_value == native_map_head &&
                   observed.coll_data_calls == 1 &&
-                  observed.coll_data_value == map_owner->collision() &&
+                  observed.coll_data_value == native_collision &&
                   observed.ground_param_calls == 0 &&
                   observed.itemdata_calls == 0 &&
                   observed.ald_yaku_all_calls == 1 &&
-                  observed.ald_yaku_all_value == random_yaku->native_data() &&
+                  observed.ald_yaku_all_value == native_ald_yaku &&
                   observed.map_ptcl_calls == 1 &&
                   observed.map_ptcl_value == effects->command_root() &&
                   observed.map_texg_calls == 1 &&
@@ -3814,21 +7317,480 @@ void run_stadium_e8_request(
                   after_view.param == ground_data &&
                   after_view.x6E4[0] == -1 &&
                   after_view.x6E4[1] == before_view.x6E4[1] &&
-                  after_view.coll_data == map_owner->collision() &&
-                  after_view.ald_yaku_all == random_yaku->native_data() &&
+                  after_view.coll_data == native_collision &&
+                  after_view.ald_yaku_all == native_ald_yaku &&
                   after_view.map_ptcl == effects->command_root() &&
                   after_view.map_texg == effects->texture_root() &&
                   after_view.yakumono_param == yakumono_data &&
                   after_view.quake_model_set == quake->single_model(),
               "Source StageInfo did not retain the checked typed owner pointers");
-        check(after_view.itemdata == before_view.itemdata &&
-                  after_view.map_plit == before_view.map_plit &&
-                  after_view.itemdata == nullptr && after_view.map_plit == nullptr,
-              "E8 request changed the source-authored empty item/light roots");
-        check(melee_web_stadium_c1_stage_object_failures() == 0,
-              "E8 request entered stage objects, Ground, item, or light state");
-        check_stadium_selection_preserved(host, selected, baseline);
-        check(seed_ptr == seed_owner && *seed_ptr == seed_before,
+        check(after_view.itemdata == nullptr &&
+                  after_view.itemdata == before_view.itemdata &&
+                  after_view.map_plit == (perform_on_init
+                      ? melee_web_stage_lights_descriptors(light_context)
+                      : before_view.map_plit),
+              "E8 request replaced its authored item root or checked light context");
+        if (!perform_on_init) {
+            check(melee_web_stadium_c1_stage_object_failures() == 0,
+                  "E8 request entered stage objects, Ground, item, or light state");
+        } else {
+            auto& on_init = on_init_observation;
+            const uint32_t active_failures =
+                melee_web_stadium_c1_stage_object_failures();
+            check((active_failures & MELEE_WEB_STADIUM_C1_STAGE_LIST_UNAVAILABLE) == 0 &&
+                      (active_failures & MELEE_WEB_STADIUM_C1_STAGE_ITEMS) == 0 &&
+                      (active_failures & MELEE_WEB_STADIUM_C1_STAGE_LIGHTS) != 0,
+                  "OnInit did not retain a readable map graph and its checked published light context");
+            const std::array<int, 4> map_ids{0, 1, 2, 5};
+            const std::array<void*, 4> recorded_maps{
+                on_init.map2_owner.map0_ground,
+                on_init.map2_owner.display_ground,
+                on_init.map2_owner.map2_ground,
+                on_init.map2_owner.nested_map5_ground,
+            };
+            const std::array<MeleeWebStadiumSourceEventKind, 4> entry_events{
+                MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8,
+                MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_24C,
+                MELEE_WEB_STADIUM_SOURCE_EVENT_GROUND_0800,
+                MELEE_WEB_STADIUM_SOURCE_EVENT_ON_INIT,
+            };
+            check(on_init.source_journal.count ==
+                          MELEE_WEB_STADIUM_SOURCE_EVENT_CAPACITY &&
+                      !on_init.source_journal.failed &&
+                      !on_init.source_journal.overflowed,
+                  "OnInit source-event journal is incomplete, reordered, or overflowed");
+            for (size_t i = 0; i < entry_events.size(); ++i) {
+                const auto& event = on_init.source_journal.events[i];
+                check(event.kind == entry_events[i] && event.map_id == -1 &&
+                          event.gobj == nullptr,
+                      "OnInit source-entry taps differed from E8→24C→Ground→OnInit");
+            }
+            check(on_init.map2_owner.captured == 1 &&
+                      on_init.map2_owner.buffer != nullptr &&
+                      (on_init.map2_owner.origin ==
+                           MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_BORROWED_PRELOAD ||
+                       on_init.map2_owner.origin ==
+                           MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK),
+                  "OnInit map2 journal lacks a captured exact source buffer origin");
+            check(melee_web_stadium_c1_ground_map_slot_count() > 5,
+                  "OnInit observer cannot address the authored map5 StageInfo slot");
+            for (size_t i = 0; i < map_ids.size(); ++i) {
+                check(recorded_maps[i] != nullptr &&
+                          recorded_maps[i] ==
+                              melee_web_stadium_c1_ground_map_slot(
+                                  static_cast<size_t>(map_ids[i])),
+                      "OnInit map2 owner record differs from an actual StageInfo map slot");
+                const auto& event = on_init.source_journal.events[4 + i];
+                check(event.kind == MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ &&
+                          event.map_id == map_ids[i] &&
+                          event.gobj == recorded_maps[i],
+                      "OnInit actual map return journal differs from its owner/slot pointer");
+            }
+            on_init.stats_after_on_init = melee_web_gameplay_stats();
+            c1_try_emit_v23_heap_census(
+                on_init.census_observer_failed, "after-oninit",
+                on_init.stats_after_on_init);
+            melee_web_stadium_c1_heap_owner_mark(
+                MELEE_WEB_STADIUM_C1_HEAP_OWNER_PHASE_AFTER_ONINIT,
+                !on_init.census_observer_failed);
+            c1_heap_graph_emit_after_oninit(
+                !on_init.census_observer_failed,
+                on_init.stats_after_on_init);
+            check_stadium_rng_witness(selection_rng, selected, "on-init-verified");
+            check(on_init.stats_after_on_init.generation ==
+                      on_init.stats_before_init.generation &&
+                      on_init.stats_after_on_init.ticks ==
+                          on_init.stats_before_init.ticks &&
+                      HSD_GObj_804D783C == on_init.scheduler_cycle_before &&
+                      ground_dispatch_quiet(),
+                  "OnInit driver advanced a source tick or dispatched a scheduled callback");
+            check(melee_web_source_memory_context_read(
+                      &on_init.memory_before_end) ==
+                      MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                      on_init.memory_before_end.source_heap_handle ==
+                          on_init.memory_before_init.source_heap_handle &&
+                      on_init.memory_before_end.world_generation ==
+                          on_init.memory_before_init.world_generation,
+                  "OnInit changed the source-memory context before teardown");
+            on_init.map2_allocation_status_before_end =
+                melee_web_source_memory_allocation_read(
+                    on_init.map2_owner.buffer, &on_init.map2_before_end);
+            check(on_init.map2_allocation_status_before_end ==
+                      MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                      on_init.map2_before_end.world_generation ==
+                          on_init.memory_before_init.world_generation,
+                  "Map2 buffer allocation observer lost the active source world");
+            if (on_init.map2_owner.origin ==
+                MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK) {
+                check(on_init.map2_before_end.live == 1 &&
+                          on_init.map2_before_end.requested_bytes == 0x50000 &&
+                          on_init.map2_before_end.allocation_generation >
+                              on_init.memory_before_init.allocation_generation_watermark &&
+                          on_init.map2_before_end.source_heap_handle ==
+                              on_init.memory_before_init.source_heap_handle,
+                      "Authored map2 fallback is not the exact live 0x50000 source allocation");
+            } else if (on_init.map2_before_end.live) {
+                check(on_init.map2_before_end.allocation_generation != 0 &&
+                          on_init.map2_before_end.source_heap_handle ==
+                              on_init.memory_before_init.source_heap_handle,
+                      "Tracked preloaded map2 buffer has an invalid source allocation identity");
+            }
+            check(melee_web_ground_map_storage_read(
+                      &on_init.ground_storage_live) &&
+                      on_init.ground_storage_live.payload != nullptr &&
+                      on_init.ground_storage_live.requested_bytes == 64,
+                  "OnInit did not retain its exact original 64-byte Ground storage owner");
+            on_init.ground_storage_allocation_status_before_end =
+                melee_web_source_memory_allocation_read(
+                    on_init.ground_storage_live.payload,
+                    &on_init.ground_storage_before_end);
+            check(melee_web::test::stadium_buffer::exact_new_allocation_supported(
+                      static_cast<MeleeWebSourceMemoryReadStatus>(
+                          on_init.ground_storage_allocation_status_before_end),
+                      on_init.ground_storage_before_end,
+                      on_init.memory_before_init, 64),
+                  "OnInit Ground storage did not retain its exact new 64-byte lease");
+            verify_selection_boundary("after-oninit", true);
+            check(seed_ptr == seed_owner &&
+                      gm_GetCurrentGameMode() == GM_VS && !gm_IsCurrently1PMode() &&
+                      lbLang_GetLanguageSetting() == LANG_US &&
+                      lbLang_GetSavedLanguage() == LANG_US,
+                  "OnInit changed its retained source seed owner or scoped VS/language state");
+            std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES> save_after_init{};
+            check(melee_web_menu_host_snapshot_card_data(
+                      host, 0, save_after_init.data(), save_after_init.size(),
+                      error, sizeof(error)), error);
+            check(save_after_init == save_before && raw_bytes == raw_before &&
+                      std::equal(archive_data_before.begin(),
+                                 archive_data_before.end(), archive->data().begin(),
+                                 archive->data().end()),
+                  "OnInit changed the selected save or immutable GrPs owner bytes");
+            trace.event("stadium_source_oninit_returned", world->audio(),
+                        "diagnostic-source-ordered-pstadium", &selected,
+                        &on_init.seed_after_on_init);
+
+            // Publish the already checked copied observations before retirement.
+            // Pointer values below are historical identities only: never follow
+            // them after StageLast has removed the corresponding source objects.
+            std::fprintf(stderr,
+                "C1_ONINIT_CAPTURE count=%u failed=%d overflowed=%d map2_origin=%d map2_buffer=%p map2_read=%d map2_live=%d map2_bytes=%u map2_world=%llu map2_allocation=%llu ground_buffer=%p ground_read=%d ground_bytes=%u ground_world=%llu ground_allocation=%llu\n",
+                on_init.source_journal.count, on_init.source_journal.failed,
+                on_init.source_journal.overflowed, static_cast<int>(on_init.map2_owner.origin),
+                on_init.map2_owner.buffer, on_init.map2_allocation_status_before_end,
+                on_init.map2_before_end.live, on_init.map2_before_end.requested_bytes,
+                static_cast<unsigned long long>(on_init.map2_before_end.world_generation),
+                static_cast<unsigned long long>(on_init.map2_before_end.allocation_generation),
+                on_init.ground_storage_live.payload,
+                on_init.ground_storage_allocation_status_before_end,
+                on_init.ground_storage_before_end.requested_bytes,
+                static_cast<unsigned long long>(on_init.ground_storage_before_end.world_generation),
+                static_cast<unsigned long long>(on_init.ground_storage_before_end.allocation_generation));
+            for (size_t i = 0; i < on_init.source_journal.count; ++i) {
+                const auto& event = on_init.source_journal.events[i];
+                std::fprintf(stderr, "C1_ONINIT_CAPTURE_TAP index=%zu kind=%s map_id=%d gobj=%p\n",
+                    i, stadium_source_event_kind_name(event.kind), event.map_id,
+                    static_cast<void*>(event.gobj));
+            }
+            std::fflush(stderr);
+
+            const auto class_counts_before_end = on_init.class_counts_before;
+            const auto pool_counts_before_end = on_init.pool_counts_before;
+            const auto roots_before_end = on_init.roots_before;
+            const uint32_t gobj_pool_before_end = on_init.gobj_pool_before;
+            const uint32_t proc_pool_before_end = on_init.proc_pool_before;
+            const uint32_t stage_gobj_count_before_end =
+                on_init.stage_gobj_count_before;
+            const int scheduler_cycle_before_end =
+                on_init.scheduler_cycle_before;
+            // OnInit-only assertions retain their original construction boundary.
+            auto retirement_memory_before_end = on_init.memory_before_end;
+            if (stage_start_context) {
+                check(melee_web_stage_last_stadium_start(
+                          retained_stage_owner, stage_start_context,
+                          error, sizeof(error)), error);
+                check(seed_ptr == seed_owner && *seed_owner == on_init.seed_after_on_init &&
+                          melee_web_gameplay_stats().ticks == on_init.stats_before_init.ticks &&
+                          HSD_GObj_804D783C == scheduler_cycle_before_end,
+                      "Stadium source OnLoad/OnStart changed RNG or dispatched a scheduler tick");
+                trace.event("stadium_source_onstart_returned", world->audio(),
+                            "original-onload-onstart-and-owned-header-drain", &selected,
+                            &on_init.seed_after_on_init);
+                check(melee_web_source_memory_context_read(&retirement_memory_before_end) ==
+                          MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                          retirement_memory_before_end.world_generation == on_init.memory_before_end.world_generation &&
+                          retirement_memory_before_end.source_heap_handle == on_init.memory_before_end.source_heap_handle &&
+                          melee_web_source_memory_healthy(),
+                      "Started Stage construction changed its retirement memory owner");
+                MeleeWebSourceMemoryAllocation ground_at_retirement{}, map2_at_retirement{};
+                const auto ground_status = melee_web_source_memory_allocation_read(
+                    on_init.ground_storage_live.payload, &ground_at_retirement);
+                const auto map2_status = melee_web_source_memory_allocation_read(
+                    on_init.map2_owner.buffer, &map2_at_retirement);
+                std::fprintf(stderr,
+                    "C3_RETIREMENT_BASELINE world=%llu heap=%d oninit_watermark=%llu retirement_watermark=%llu ground_status=%d ground_live=%d ground_requested=%u ground_generation=%llu map2_status=%d map2_live=%d map2_requested=%u map2_generation=%llu\n",
+                    static_cast<unsigned long long>(retirement_memory_before_end.world_generation),
+                    retirement_memory_before_end.source_heap_handle,
+                    static_cast<unsigned long long>(on_init.memory_before_end.allocation_generation_watermark),
+                    static_cast<unsigned long long>(retirement_memory_before_end.allocation_generation_watermark),
+                    ground_status, ground_at_retirement.live, ground_at_retirement.requested_bytes,
+                    static_cast<unsigned long long>(ground_at_retirement.allocation_generation),
+                    map2_status, map2_at_retirement.live, map2_at_retirement.requested_bytes,
+                    static_cast<unsigned long long>(map2_at_retirement.allocation_generation));
+                std::fflush(stderr);
+                check(melee_web::test::stadium_buffer::exact_live_allocation_matches_context(
+                          ground_status, ground_at_retirement, retirement_memory_before_end, 64,
+                          on_init.ground_storage_before_end.allocation_generation),
+                      "Started construction changed the original Ground lease before retirement");
+                if (on_init.map2_owner.origin == MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK)
+                    check(melee_web::test::stadium_buffer::exact_live_allocation_matches_context(
+                              map2_status, map2_at_retirement, retirement_memory_before_end,
+                              on_init.map2_before_end.requested_bytes, on_init.map2_before_end.allocation_generation),
+                          "Started construction changed the original owned map2 lease before retirement");
+            }
+            check(melee_web_stage_last_end(retained_stage_owner, error,
+                                           sizeof(error)), error);
+            on_init_stage_end_succeeded = true;
+            check(melee_web_stage_lights_destroy(light_context, error, sizeof(error)), error);
+            light_context = nullptr;
+            retained_stage_owner = nullptr;
+            returned_stage_owner = nullptr;
+            on_init.stats_after_end = melee_web_gameplay_stats();
+            c1_try_emit_v23_heap_census(
+                on_init.census_observer_failed,
+                "after-stage-last-and-light-destroy",
+                on_init.stats_after_end);
+            melee_web_stadium_c1_heap_owner_mark(
+                MELEE_WEB_STADIUM_C1_HEAP_OWNER_PHASE_AFTER_STAGE_LAST,
+                !on_init.census_observer_failed);
+            c1_heap_graph_emit_after_stage_last(
+                !on_init.census_observer_failed);
+            check_stadium_rng_witness(selection_rng, selected, "stage-last-end");
+            on_init.seed_after_end = *seed_owner;
+            on_init.map2_allocation_status_after_end =
+                melee_web_source_memory_allocation_read(
+                    on_init.map2_owner.buffer, &on_init.map2_after_end);
+            on_init.ground_storage_allocation_status_after_end =
+                melee_web_source_memory_allocation_read(
+                    on_init.ground_storage_live.payload,
+                    &on_init.ground_storage_after_end);
+            check(melee_web_source_memory_context_read(
+                      &on_init.memory_after_end) ==
+                      MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                      melee_web_ground_map_storage_read(
+                          &on_init.ground_storage_ended) &&
+                      on_init.ground_storage_ended.payload == nullptr &&
+                      on_init.ground_storage_ended.requested_bytes == 64 &&
+                      melee_web_ground_map_storage_available(),
+                  "Original OnInit teardown did not release Ground storage ownership");
+            std::fprintf(stderr,
+                "C3_RETIRED_LEASES before_world=%llu after_world=%llu before_heap=%d after_heap=%d before_watermark=%llu after_watermark=%llu ground_status=%d ground_live=%d ground_requested=%u ground_generation=%llu ground_world=%llu ground_heap=%d map2_status=%d map2_live=%d map2_requested=%u map2_generation=%llu map2_world=%llu map2_heap=%d\n",
+                static_cast<unsigned long long>(retirement_memory_before_end.world_generation),
+                static_cast<unsigned long long>(on_init.memory_after_end.world_generation),
+                retirement_memory_before_end.source_heap_handle, on_init.memory_after_end.source_heap_handle,
+                static_cast<unsigned long long>(retirement_memory_before_end.allocation_generation_watermark),
+                static_cast<unsigned long long>(on_init.memory_after_end.allocation_generation_watermark),
+                on_init.ground_storage_allocation_status_after_end, on_init.ground_storage_after_end.live,
+                on_init.ground_storage_after_end.requested_bytes,
+                static_cast<unsigned long long>(on_init.ground_storage_after_end.allocation_generation),
+                static_cast<unsigned long long>(on_init.ground_storage_after_end.world_generation),
+                on_init.ground_storage_after_end.source_heap_handle,
+                on_init.map2_allocation_status_after_end, on_init.map2_after_end.live,
+                on_init.map2_after_end.requested_bytes,
+                static_cast<unsigned long long>(on_init.map2_after_end.allocation_generation),
+                static_cast<unsigned long long>(on_init.map2_after_end.world_generation),
+                on_init.map2_after_end.source_heap_handle);
+            std::fflush(stderr);
+            check(melee_web::test::stadium_buffer::exact_retired_allocation_supported(
+                      static_cast<MeleeWebSourceMemoryReadStatus>(
+                          on_init.ground_storage_allocation_status_after_end),
+                      on_init.ground_storage_after_end,
+                      MELEE_WEB_SOURCE_MEMORY_READ_OK,
+                      retirement_memory_before_end,
+                      MELEE_WEB_SOURCE_MEMORY_READ_OK,
+                      on_init.memory_after_end),
+                  "Original OnInit teardown did not retire its exact Ground storage lease");
+            if (on_init.map2_owner.origin ==
+                MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK) {
+                check(melee_web::test::stadium_buffer::exact_retired_allocation_supported(
+                          static_cast<MeleeWebSourceMemoryReadStatus>(
+                              on_init.map2_allocation_status_after_end),
+                          on_init.map2_after_end,
+                          static_cast<MeleeWebSourceMemoryReadStatus>(
+                              on_init.map2_allocation_status_before_end),
+                          retirement_memory_before_end,
+                          MELEE_WEB_SOURCE_MEMORY_READ_OK,
+                          on_init.memory_after_end),
+                      "Original OnInit teardown did not retire the exact owned map2 fallback");
+            } else {
+                check(on_init.map2_allocation_status_after_end ==
+                          on_init.map2_allocation_status_before_end &&
+                          on_init.map2_after_end.source_heap_handle ==
+                              on_init.map2_before_end.source_heap_handle &&
+                          on_init.map2_after_end.requested_bytes ==
+                              on_init.map2_before_end.requested_bytes &&
+                          on_init.map2_after_end.world_generation ==
+                              on_init.map2_before_end.world_generation &&
+                          on_init.map2_after_end.allocation_generation ==
+                              on_init.map2_before_end.allocation_generation &&
+                          on_init.map2_after_end.live ==
+                              on_init.map2_before_end.live,
+                      "Original OnInit teardown changed a borrowed preload buffer lease");
+            }
+            if (stage_start_context) {
+                std::fprintf(stderr,
+                    "C3_STAGE_RETIRED before_world=%llu after_world=%llu before_ticks=%llu after_ticks=%llu before_heap=%d after_heap=%d before_objects=%u after_objects=%u before_processes=%u after_processes=%u before_gobj_used=%u after_gobj_used=%u before_proc_used=%u after_proc_used=%u before_cycle=%d after_cycle=%d\n",
+                    static_cast<unsigned long long>(on_init.stats_before_init.generation),
+                    static_cast<unsigned long long>(on_init.stats_after_end.generation),
+                    static_cast<unsigned long long>(on_init.stats_before_init.ticks),
+                    static_cast<unsigned long long>(on_init.stats_after_end.ticks),
+                    on_init.stats_before_init.heap_free_bytes, on_init.stats_after_end.heap_free_bytes,
+                    on_init.stats_before_init.objects, on_init.stats_after_end.objects,
+                    on_init.stats_before_init.processes, on_init.stats_after_end.processes,
+                    gobj_pool_before_end, HSD_ObjAllocGetUsing(&gobj_alloc_data),
+                    proc_pool_before_end, HSD_ObjAllocGetUsing(&gobjproc_alloc_data),
+                    scheduler_cycle_before_end, HSD_GObj_804D783C);
+                std::fprintf(stderr,
+                    "C3_STAGE_OWNERS registry_empty=%d markers_empty=%d stage_count_before=%u stage_count_after=%u stage_failures=%u device_matches=%d memory_healthy=%d quiet=%d gobj_free=%u gobj_freehead=%p proc_free=%u proc_freehead=%p\n",
+                    source_stage_registry_empty(), source_stage_markers_empty(),
+                    stage_gobj_count_before_end, source_stage_gobj_count(),
+                    melee_web_stadium_c1_stage_object_failures(),
+                    melee_web_stadium_c1_ft_device_snapshot_matches(on_init.device_snapshot),
+                    melee_web_source_memory_healthy(), ground_dispatch_quiet(),
+                    gobj_alloc_data.free, static_cast<void*>(gobj_alloc_data.freehead),
+                    gobjproc_alloc_data.free, static_cast<void*>(gobjproc_alloc_data.freehead));
+                std::fflush(stderr);
+                const auto classes_retired = melee_web::test::stadium_screen::live_class_counts();
+                const auto pools_retired = melee_web::test::stadium_screen::live_pool_counts();
+                const auto roots_retired = melee_web::test::stadium_screen::runtime_roots_snapshot();
+                for (const auto& [identity, expected] : class_counts_before_end) {
+                    const auto found = classes_retired.find(identity);
+                    std::cerr << "C3_CLASS identity=" << static_cast<void*>(identity)
+                              << " before=" << expected << " after="
+                              << (found == classes_retired.end() ? 0 : found->second) << '\n';
+                }
+                for (const auto& [identity, actual] : classes_retired)
+                    if (!class_counts_before_end.contains(identity))
+                        std::cerr << "C3_CLASS identity=" << static_cast<void*>(identity)
+                                  << " before=0 after=" << actual << '\n';
+                for (size_t i = 0; i < pools_retired.size(); ++i)
+                    std::cerr << "C3_POOL index=" << i << " before=" << pool_counts_before_end[i]
+                              << " after=" << pools_retired[i] << '\n';
+                std::cerr << "C3_ROOTS before_bytes=" << roots_before_end.size()
+                          << " after_bytes=" << roots_retired.size()
+                          << " equal=" << (roots_retired == roots_before_end) << '\n';
+                for (size_t i = 0; i < std::min(roots_retired.size(), roots_before_end.size()); ++i)
+                    if (roots_retired[i] != roots_before_end[i])
+                        std::cerr << "C3_ROOT_DIFFERENCE offset=" << i
+                                  << " before=" << unsigned(roots_before_end[i])
+                                  << " after=" << unsigned(roots_retired[i]) << '\n';
+                std::cerr.flush();
+                // Full-world scope reports component heap/cache retention without
+                // substituting a threshold for the old same-world predicate.
+                check(on_init.stats_after_end.generation == on_init.stats_before_init.generation &&
+                          on_init.stats_after_end.ticks == on_init.stats_before_init.ticks &&
+                          on_init.stats_after_end.objects == on_init.stats_before_init.objects &&
+                          on_init.stats_after_end.processes == on_init.stats_before_init.processes,
+                      "Started Stadium retirement changed world/ticks or left source objects/processes live");
+                check(source_stage_registry_empty() && source_stage_markers_empty() &&
+                          source_stage_gobj_count() == stage_gobj_count_before_end &&
+                          melee_web_stadium_c1_stage_object_failures() == 0 &&
+                          HSD_ObjAllocGetUsing(&gobj_alloc_data) == gobj_pool_before_end &&
+                          HSD_ObjAllocGetUsing(&gobjproc_alloc_data) == proc_pool_before_end &&
+                          HSD_GObj_804D783C == scheduler_cycle_before_end &&
+                          classes_retired == class_counts_before_end &&
+                          pools_retired == pool_counts_before_end &&
+                          roots_retired == roots_before_end &&
+                          melee_web_stadium_c1_ft_device_snapshot_matches(on_init.device_snapshot) == 1 &&
+                          melee_web_source_memory_healthy() && ground_dispatch_quiet(),
+                      "Started Stadium retirement left source roots, used pools, devices or callbacks live");
+                std::cout << "{\"probe\":\"stadium-source-start-retired\",\"world\":"
+                          << on_init.stats_after_end.generation
+                          << ",\"heap_before_init\":" << on_init.stats_before_init.heap_free_bytes
+                          << ",\"heap_after_stage_retirement\":" << on_init.stats_after_end.heap_free_bytes
+                          << ",\"ticks\":0,\"onload_onstart_called\":true,\"checked_retirement\":true}\n";
+            } else {
+            // Keep the original left-to-right, fail-first conjunction order.
+            // Every baseline and exact equality remains unchanged; do not read
+            // later runtime graphs when an earlier scalar condition has failed.
+            const char* const teardown_error =
+                "Original OnInit teardown did not restore source lists, pools, ticks, leases, or typed devices";
+            auto equal = [&](const char* field, auto actual, auto expected) {
+                if (actual != expected) {
+                    std::cerr << "C1_TEARDOWN_DIFFERENCE field=" << field
+                              << " expected=" << expected << " observed=" << actual << '\n';
+                    std::cerr.flush();
+                }
+                check(actual == expected, teardown_error);
+            };
+            equal("generation", on_init.stats_after_end.generation, on_init.stats_before_init.generation);
+            equal("ticks", on_init.stats_after_end.ticks, on_init.stats_before_init.ticks);
+            equal("objects", on_init.stats_after_end.objects, on_init.stats_before_init.objects);
+            equal("processes", on_init.stats_after_end.processes, on_init.stats_before_init.processes);
+            equal("heap_free_bytes", on_init.stats_after_end.heap_free_bytes, on_init.stats_before_init.heap_free_bytes);
+            equal("allocation_generation_watermark", on_init.memory_after_end.allocation_generation_watermark,
+                  on_init.memory_before_end.allocation_generation_watermark);
+            equal("source_heap_handle", on_init.memory_after_end.source_heap_handle, on_init.memory_before_init.source_heap_handle);
+            equal("world_generation", on_init.memory_after_end.world_generation, on_init.memory_before_init.world_generation);
+            equal("stage_registry_empty", source_stage_registry_empty(), true);
+            equal("stage_gobj_count", source_stage_gobj_count(), stage_gobj_count_before_end);
+            equal("stage_markers_empty", source_stage_markers_empty(), true);
+            equal("stage_object_failures", melee_web_stadium_c1_stage_object_failures(), uint32_t{0});
+            equal("gobj_pool_used", HSD_ObjAllocGetUsing(&gobj_alloc_data), gobj_pool_before_end);
+            equal("proc_pool_used", HSD_ObjAllocGetUsing(&gobjproc_alloc_data), proc_pool_before_end);
+            equal("scheduler_cycle", HSD_GObj_804D783C, scheduler_cycle_before_end);
+            const auto classes_after_end = melee_web::test::stadium_screen::live_class_counts();
+            if (classes_after_end != class_counts_before_end) {
+                // Compare copied map keys/counts without dereferencing class identities.
+                for (const auto& [identity, expected] : class_counts_before_end) {
+                    const auto found = classes_after_end.find(identity);
+                    const auto actual = found == classes_after_end.end() ? 0 : found->second;
+                    if (actual != expected)
+                        std::cerr << "C1_TEARDOWN_DIFFERENCE field=live_class_counts identity="
+                                  << static_cast<void*>(identity) << " expected=" << expected << " observed=" << actual << '\n';
+                }
+                for (const auto& [identity, actual] : classes_after_end)
+                    if (!class_counts_before_end.contains(identity))
+                        std::cerr << "C1_TEARDOWN_DIFFERENCE field=live_class_counts identity="
+                                  << static_cast<void*>(identity) << " expected=0 observed=" << actual << '\n';
+                std::cerr.flush();
+            }
+            check(classes_after_end == class_counts_before_end, teardown_error);
+            const auto pools_after_end = melee_web::test::stadium_screen::live_pool_counts();
+            for (size_t i = 0; i < pools_after_end.size(); ++i)
+                if (pools_after_end[i] != pool_counts_before_end[i])
+                    std::cerr << "C1_TEARDOWN_DIFFERENCE field=live_pool_counts index=" << i
+                              << " expected=" << pool_counts_before_end[i] << " observed=" << pools_after_end[i] << '\n';
+            std::cerr.flush();
+            check(pools_after_end == pool_counts_before_end, teardown_error);
+            const auto roots_after_end = melee_web::test::stadium_screen::runtime_roots_snapshot();
+            if (roots_after_end != roots_before_end) {
+                std::cerr << "C1_TEARDOWN_DIFFERENCE field=runtime_roots bytes_expected=" << roots_before_end.size()
+                          << " bytes_observed=" << roots_after_end.size();
+                for (size_t i = 0; i < std::min(roots_before_end.size(), roots_after_end.size()); ++i)
+                    if (roots_before_end[i] != roots_after_end[i]) {
+                        std::cerr << " first_byte_offset=" << i << " expected=" << unsigned(roots_before_end[i])
+                                  << " observed=" << unsigned(roots_after_end[i]);
+                        break;
+                    }
+                std::cerr << '\n';std::cerr.flush();
+            }
+            check(roots_after_end == roots_before_end, teardown_error);
+            equal("ft_device_snapshot_matches", melee_web_stadium_c1_ft_device_snapshot_matches(on_init.device_snapshot), 1);
+            equal("source_memory_healthy", melee_web_source_memory_healthy(), 1);
+            equal("ground_dispatch_quiet", ground_dispatch_quiet(), true);
+            }
+            check(melee_web_stadium_c1_ft_device_snapshot_release(
+                      on_init.device_snapshot),
+                  "Could not release restored OnInit ftDevice snapshot");
+            on_init.device_snapshot = nullptr;
+            on_init.cleanup_verified = true;
+            trace.event("stadium_source_oninit_cleaned", world->audio(),
+                        "original-stage-last-end", &selected,
+                        &on_init.seed_after_end);
+        }
+        verify_selection_boundary("after-stage-retirement", true);
+        check(seed_ptr == seed_owner &&
+                  *seed_ptr == selection_rng.expected_live,
               "E8 request changed the source seed owner or value");
         check(gm_GetCurrentGameMode() == GM_VS && !gm_IsCurrently1PMode() &&
                   lbLang_GetLanguageSetting() == LANG_US &&
@@ -3854,11 +7816,13 @@ void run_stadium_e8_request(
                       source_stage_registry_empty(),
                   "Ground map1 component did not restore its empty StageInfo owner");
         }
-        trace.event("stadium_e8_request_returned", world->audio(),
-                    perform_ground_map1_owner
-                        ? "typed-catalog-request-plus-map1-owner-component"
-                        : "typed-catalog-request-only",
-                    &selected, &seed_before);
+        if (!perform_on_init) {
+            trace.event("stadium_e8_request_returned", world->audio(),
+                        perform_ground_map1_owner
+                            ? "typed-catalog-request-plus-map1-owner-component"
+                            : "typed-catalog-request-only",
+                        &selected, &seed_before);
+        }
         cleanup();
         check(cleanup_complete && stage_map == nullptr && snapshot == nullptr &&
                   !melee_web_stage_map_archives(),
@@ -3872,33 +7836,191 @@ void run_stadium_e8_request(
         check(melee_web_menu_host_source_scene(host) == 0 &&
                   melee_web_menu_host_phase(host) == MELEE_WEB_MENU_READY,
               "E8 request entered an original source menu scene");
-        check(seed_ptr == seed_owner && *seed_ptr == seed_before,
+        check(seed_ptr == seed_owner &&
+                  *seed_ptr == selection_rng.expected_live,
               "E8 teardown changed the retained source seed owner or value");
-        std::cout << "{\"probe\":\"stadium-e8-request\","
-                     "\"scope\":\""
-                  << (perform_ground_map1_owner
-                          ? "one original E8 request plus one Ground map1 lifetime"
-                          : "one original E8 request and checked typed teardown only")
-                  << "\","
-                     "\"source_size_name\":\""
-                  << observed.source_size_name
-                  << "\",\"typed_open_name\":\""
-                  << observed.typed_open_name
-                  << "\",\"source_size_bytes\":" << observed.source_size_bytes
-                  << ",\"map_head\":true,\"coll_data\":true,"
-                     "\"grGroundParam\":true,\"ALDYakuAll\":true,"
-                     "\"map_ptcl\":true,\"map_texg\":true,"
-                     "\"yakumono_param\":true,\"quake_model_set\":true,"
-                     "\"itemdata_public_calls\":0,\"map_plit_public_calls\":0,"
-                     "\"stage_info_xA0_observed_only\":"
-                  << after_view.xA0 << ",\"stage_info_x6E4\":["
-                  << after_view.x6E4[0] << ',' << after_view.x6E4[1]
-                  << "],\"source_seed_unchanged\":true,"
-                     "\"save_owner_unchanged\":true,"
-                     "\"stage_objects_started\":"
-                  << (perform_ground_map1_owner ? "true" : "false")
-                  << ",\"checked_teardown\":true}\n";
+        if (perform_on_init && !stage_start_context) {
+            const auto& on_init = on_init_observation;
+            std::cout << "{\"probe\":\"stadium-source-oninit\","
+                         "\"scope\":\"one original source-ordered OnInit and one StageLast teardown\","
+                         "\"source_size_name\":\""
+                      << observed.source_size_name
+                      << "\",\"typed_open_name\":\""
+                      << observed.typed_open_name
+                      << "\",\"source_size_bytes\":" << observed.source_size_bytes
+                      << ",\"source_calls\":1,\"map_head\":true,\"coll_data\":true,"
+                         "\"typed_ground_param\":true,\"ald_yaku_all\":true,"
+                         "\"map_ptcl\":true,\"map_texg\":true,"
+                         "\"yakumono_param\":true,\"quake_model_set\":true,"
+                         "\"itemdata_null\":true,\"map_plit_context_owned_during_oninit\":true,"
+                         "\"map_plit_null_after_teardown\":true,"
+                         "\"stage_info_xA0_observed_only\":"
+                      << after_view.xA0
+                      << ",\"authored_map_sequence\":[0,1,2,5],"
+                         "\"runtime_map_call_order_observed\":true,"
+                         "\"map_slots_match_owner_record\":true,"
+                         "\"runtime_source_events\":[";
+            for (size_t i = 0; i < on_init.source_journal.count; ++i) {
+                const auto& event = on_init.source_journal.events[i];
+                if (i != 0) std::cout << ",";
+                std::cout << "{\"kind\":\""
+                          << stadium_source_event_kind_name(event.kind)
+                          << "\",\"map_id\":";
+                if (event.kind == MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ)
+                    std::cout << event.map_id;
+                else
+                    std::cout << "null";
+                std::cout << ",\"gobj\":";
+                if (event.gobj != nullptr)
+                    std::cout << reinterpret_cast<uintptr_t>(event.gobj);
+                else
+                    std::cout << "null";
+                std::cout << "}";
+            }
+            std::cout << "],\"map0_gobj\":"
+                      << reinterpret_cast<uintptr_t>(on_init.map2_owner.map0_ground)
+                      << ",\"display_gobj\":"
+                      << reinterpret_cast<uintptr_t>(on_init.map2_owner.display_ground)
+                      << ",\"map2_gobj\":"
+                      << reinterpret_cast<uintptr_t>(on_init.map2_owner.map2_ground)
+                      << ",\"nested_map5_gobj\":"
+                      << reinterpret_cast<uintptr_t>(on_init.map2_owner.nested_map5_ground)
+                      << ",\"map2_buffer_origin\":\""
+                      << stadium_map2_buffer_origin_name(on_init.map2_owner.origin)
+                      << "\",\"map2_buffer_pointer\":"
+                      << reinterpret_cast<uintptr_t>(on_init.map2_owner.buffer)
+                      << ",\"map2_allocation_tracked\":"
+                      << (on_init.map2_before_end.live ? "true" : "false")
+                      << ",\"map2_requested_bytes\":"
+                      << on_init.map2_before_end.requested_bytes
+                      << ",\"map2_allocation_generation\":"
+                      << on_init.map2_before_end.allocation_generation
+                      << ",\"map2_fallback_retired\":"
+                      << (on_init.map2_owner.origin ==
+                                  MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK
+                              ? "true" : "false")
+                      << ",\"borrowed_preload_preserved\":"
+                      << (on_init.map2_owner.origin ==
+                                  MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_BORROWED_PRELOAD
+                              ? "true" : "false")
+                      << ",\"ground_storage_requested_bytes\":64,"
+                         "\"ground_storage_retired\":true,"
+                         "\"ft_device_bytes_restored\":true,"
+                         "\"source_tick_delta\":0,"
+                         "\"map2_scheduled_proc_dispatch_absent\":true,"
+                         "\"camera_called\":false,\"onstart_called\":false,"
+                         "\"rendered\":false,\"ordinary_admission_closed\":true,"
+                         "\"source_seed_before\":"
+                      << seed_before << ",\"source_seed_after_oninit\":"
+                      << on_init.seed_after_on_init
+                      << ",\"source_seed_after_cleanup\":"
+                      << on_init.seed_after_end
+                      << ",\"save_owner_unchanged\":true,"
+                         "\"checked_teardown\":true}\n";
+        } else {
+            std::cout << "{\"probe\":\"stadium-e8-request\","
+                         "\"scope\":\""
+                      << (perform_ground_map1_owner
+                              ? "one original E8 request plus one Ground map1 lifetime"
+                              : "one original E8 request and checked typed teardown only")
+                      << "\","
+                         "\"source_size_name\":\""
+                      << observed.source_size_name
+                      << "\",\"typed_open_name\":\""
+                      << observed.typed_open_name
+                      << "\",\"source_size_bytes\":" << observed.source_size_bytes
+                      << ",\"map_head\":true,\"coll_data\":true,"
+                         "\"grGroundParam\":true,\"ALDYakuAll\":true,"
+                         "\"map_ptcl\":true,\"map_texg\":true,"
+                         "\"yakumono_param\":true,\"quake_model_set\":true,"
+                         "\"itemdata_public_calls\":0,\"map_plit_public_calls\":0,"
+                         "\"stage_info_xA0_observed_only\":"
+                      << after_view.xA0 << ",\"stage_info_x6E4\":["
+                      << after_view.x6E4[0] << ',' << after_view.x6E4[1]
+                      << "],\"source_seed_unchanged\":true,"
+                         "\"save_owner_unchanged\":true,"
+                         "\"stage_objects_started\":"
+                      << (perform_ground_map1_owner ? "true" : "false")
+                      << ",\"checked_teardown\":true}\n";
+        }
     } catch (...) {
+        bool original_heap_failure = false;
+        try { throw; }
+        catch (const std::exception& original) {
+            const auto& observation = on_init_observation;
+            original_heap_failure = perform_on_init && !stage_start_context && on_init_stage_end_succeeded &&
+                retained_stage_owner == nullptr && returned_stage_owner == nullptr &&
+                light_context == nullptr && !observation.cleanup_verified &&
+                std::string_view(original.what()) ==
+                    "Original OnInit teardown did not restore source lists, pools, ticks, leases, or typed devices" &&
+                observation.stats_after_end.generation == observation.stats_before_init.generation &&
+                observation.stats_after_end.ticks == observation.stats_before_init.ticks &&
+                observation.stats_after_end.objects == observation.stats_before_init.objects &&
+                observation.stats_after_end.processes == observation.stats_before_init.processes &&
+                observation.stats_after_end.heap_free_bytes != observation.stats_before_init.heap_free_bytes;
+        } catch (...) { /* Unknown original failure remains without new reads. */ }
+        if (original_heap_failure) {
+            try { publish_stadium_heap_failure_observations(on_init_observation); }
+            catch (...) {
+                std::cerr << "C1_POST_HEAP_OBSERVATION status=unavailable reason=diagnostic-publication-error\n";
+                std::cerr.flush();
+            }
+            try {
+                c1_publish_heap_owner_observations("original-oninit", true);
+            } catch (...) {
+                std::cerr << "C1_HEAP_OWNER_RESULT scope=original-oninit"
+                             " status=unavailable reason=publication-error\n";
+                std::cerr.flush();
+            }
+        }
+        if (retained_stage_owner != nullptr || returned_stage_owner != nullptr ||
+            (perform_on_init && on_init_stage_end_succeeded &&
+             !on_init_observation.cleanup_verified)) {
+            if (retained_stage_owner != nullptr &&
+                !on_init_stage_end_succeeded) {
+                MeleeWebStadiumSourceJournal failure_journal{};
+                if (melee_web_stage_last_stadium_source_journal_snapshot(
+                        retained_stage_owner, &failure_journal)) {
+                    std::cerr << "failure_source_journal={count="
+                              << failure_journal.count
+                              << ",failed=" << failure_journal.failed
+                              << ",overflowed=" << failure_journal.overflowed;
+                    for (size_t i = 0; i < failure_journal.count; ++i) {
+                        const auto& event = failure_journal.events[i];
+                        std::cerr << ",event[" << i << "]={kind="
+                                  << stadium_source_event_kind_name(event.kind)
+                                  << ",map_id=" << event.map_id
+                                  << ",gobj="
+                                  << static_cast<const void*>(event.gobj) << '}';
+                    }
+                    std::cerr << "}\n";
+                } else {
+                    std::cerr << "failure_source_journal=snapshot_unavailable\n";
+                }
+            }
+            if (stage_start_context) {
+                try { throw; }
+                catch (const std::exception& first) {
+                    std::cerr << "C3_WORLD_RETAINED phase=stage-boundary first_exception=" << first.what()
+                              << " stage_owner=" << retained_stage_owner
+                              << " returned_owner=" << returned_stage_owner
+                              << " error_buffer=" << error << '\n';
+                } catch (...) { std::cerr << "C3_WORLD_RETAINED first_exception=unknown\n"; }
+            }
+            std::cerr << (stage_start_context
+                ? "C3 Stadium source lifecycle refused while its source owner graph must be retained; stage_owner="
+                : "C1 Stadium OnInit failed while its source owner graph must be retained; stage_owner=")
+                      << static_cast<const void*>(retained_stage_owner)
+                      << " returned_owner="
+                      << static_cast<const void*>(returned_stage_owner)
+                      << " diagnostic=" << (error[0] ? error : "post-OnInit verification failed")
+                      << '\n';
+            std::cerr.flush();
+            std::cout.flush();
+            // Do not run stack or fixture cleanup against a partially owned
+            // source graph; retain it until process termination for diagnosis.
+            std::_Exit(1);
+        }
         if (!cleanup_complete) {
             try {
                 cleanup();
@@ -4202,6 +8324,9 @@ void run_stadium_screen_roots_preflight(
     const auto& raw = files.at("GrPs.usd");
     const auto raw_before = raw;
     auto archive = std::make_shared<const DatArchive>(raw, DatExternalPolicy::ResolveNull);
+    const DatStage map_metadata(*archive);
+    auto map_contract = melee_web::test::stadium_contract_data(
+        *archive, map_metadata);
     // ResolveNull clears validated external-link slots in the archive's owned
     // copy. Preserve that decoded baseline separately from immutable input.
     const std::vector<std::uint8_t> archive_before(archive->data().begin(), archive->data().end());
@@ -4247,11 +8372,11 @@ void run_stadium_screen_roots_preflight(
     invariants();
     for (unsigned lifetime=0; lifetime<2; ++lifetime) {
         {
-            DatNativeMap map(archive, melee_web::test::stadium_contract);
+            DatNativeMap map(archive, map_contract.view());
             DatSis sis(archive, screen::sis_name);
             check(sis.entry_count() == 22, "Screen SIS changed authored 22-slot count");
             {
-                DatNativeMap foreign(archive, melee_web::test::stadium_contract);
+                DatNativeMap foreign(archive, map_contract.view());
                 screen::synthetic::rejects([&] {
                     screen::identity(map, 1, foreign.image_descriptor(image_offset));
                 }, "unique map descriptor");
@@ -4269,7 +8394,7 @@ void run_stadium_screen_roots_preflight(
             check(stadium_screen_source_public(catalog.handle, screen::image_name) == image &&
                       stadium_screen_source_public(catalog.handle, screen::sis_name) == sis.descriptor(),
                   "Live consumer catalog lost canonical IMAGE/SIS owners");
-            DatNativeMap foreign(archive, melee_web::test::stadium_contract);
+            DatNativeMap foreign(archive, map_contract.view());
             auto* foreign_image = static_cast<HSD_ImageDesc*>(foreign.image_descriptor(image_offset));
             auto* descriptor = static_cast<HSD_Joint*>(
                 stadium_screen_map_entry_joint(map.map_head(), 1));
@@ -4295,8 +8420,22 @@ void run_stadium_c1_context_preflight(
     bool perform_item_state_preflight,
     bool perform_screen_roots_preflight,
     bool perform_ground_map1_owner,
-    TransitionTrace& trace)
+    bool perform_on_init,
+    const MeleeWebRetiredSisLease* retired_sis,
+    TransitionTrace& trace,
+    bool full_world_lifecycle = false,
+    bool ready_session = false,
+    bool pad_leave_probe = false,
+    bool source_text_lifetime_probe = false,
+    bool ready_text_membership_probe = false,
+    bool toy_owner_controls = false,
+    bool post_ready_tick_probe = false,
+    bool go_alignment_probe = false,
+    bool functional_idle_probe = false,
+    bool functional_idle_pair_probe = false,
+    uint64_t* functional_idle_world_generation = nullptr)
 {
+    const bool go_probe = go_alignment_probe || functional_idle_probe;
     char error[256]{};
     const int previous_mode = gm_GetCurrentGameMode();
     const int previous_language = lbLang_GetLanguageSetting();
@@ -4310,6 +8449,9 @@ void run_stadium_c1_context_preflight(
               host, 1, baseline.data(), baseline.size(), error,
               sizeof(error)), error);
     check_stadium_selection_preserved(host, selected, baseline);
+    StadiumSelectionRngWitness selection_rng{
+        seed_ptr, selected.random_seed, selected.random_seed};
+    check_stadium_rng_witness(selection_rng, selected, "reopened-context-start");
     check(melee_web_menu_host_snapshot_card_data(
               host, 0, save_before.data(), save_before.size(), error,
               sizeof(error)), error);
@@ -4319,10 +8461,49 @@ void run_stadium_c1_context_preflight(
           "C1 source handoff retained a Toy archive alias past MenuWorld close");
     check((Toy_804A284C[3] & 4) != 0,
           "C1 source handoff lost the retained Toy category baseline");
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    check(melee_web_stadium_c1_grdatfiles_trace_snapshot(
+              "before-context-preflight", (unsigned long long)
+                  melee_web_gameplay_stats().generation),
+          "Could not snapshot ordinary grDatFiles before C1 preflight");
+#endif
     check_stadium_preflight_stage_empty();
+    const MeleeWebPadState* ready_input=nullptr;
+    if(ready_session||pad_leave_probe||source_text_lifetime_probe||
+       ready_text_membership_probe||go_probe){
+        ready_input=melee_web_menu_host_input(host);
+        check(ready_input!=nullptr,
+              "Closed Stadium SSS did not retain its decoded source PAD input");
+    }
     world->verify_immutable_archives();
     world->close();
     world.reset();
+
+    if(ready_session||pad_leave_probe||ready_text_membership_probe||go_probe){
+        const MeleeWebPadState* after_close_input=melee_web_menu_host_input(host);
+        std::fprintf(stderr,"C1_PAD_CLOSE retained_equal=%d host_phase=%d source_scene=%d world_exists=%d input=%p\n",
+            after_close_input==ready_input,melee_web_menu_host_phase(host),
+            melee_web_menu_host_source_scene(host),melee_web_gameplay_world_exists(),
+            static_cast<const void*>(after_close_input));
+        std::fflush(stderr);
+        check(after_close_input==ready_input,
+              "MenuWorld close replaced the host-retained source PAD input");
+    }
+
+    if(pad_leave_probe){
+        check(!melee_web_source_files_active()&&_Toy_sbss_804D6ED0==nullptr,
+              "PAD leave probe did not close the selected SSS world");
+        check(melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY&&
+                  melee_web_menu_host_source_scene(host)==0&&
+                  melee_web_menu_host_input(host)==ready_input,
+              "PAD leave probe lost the closed host's retained source input");
+        check(!melee_web_gameplay_world_exists(),
+              "PAD leave probe unexpectedly started a match world");
+        check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);
+        host=nullptr;
+        std::cout<<"Stadium source PAD leave probe captured pre/post menu-leave wire state and retained host input; no MatchSession or Ready construction\n";
+        return;
+    }
 
     bool vs_mode_owned = false;
     bool language_scope_owned = false;
@@ -4373,6 +8554,682 @@ void run_stadium_c1_context_preflight(
         check(reopened_files.contains("GrPs.usd"),
               "Exact C1 RuntimeFiles union omitted GrPs.usd");
 
+        if(source_text_lifetime_probe){
+            check(perform_on_init && retired_sis,
+                  "Stadium text lifetime probe requires original menu leave/SIS retirement evidence");
+            check(retired_sis->retirement_verified && retired_sis->prior.heap &&
+                  retired_sis->prior.world_generation && retired_sis->prior.allocation_generation &&
+                  retired_sis->prior.source_epoch &&
+                  retired_sis->requested_bytes==MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES,
+                  "Stadium text lifetime probe requires already verified menu SIS retirement evidence");
+            check(!melee_web_gameplay_world_exists(),
+                  "Stadium text lifetime probe would double-own a source world");
+            check(ready_input!=nullptr,
+                  "Stadium text lifetime probe lost the closed host's retained source PAD input");
+            const auto parent_seed_owner=seed_ptr;
+            check(parent_seed_owner && *parent_seed_owner==selected.random_seed,
+                  "Stadium text lifetime probe lost the actual host selected seed");
+            melee_web::RuntimeArchiveCache cache(reopened_files);
+            std::unique_ptr<melee_web::GameplayMatchSession> match;
+            HSD_SisLib_C1TextProbeSet(1);
+            std::fprintf(stderr,"STADIUM_SOURCE_TEXT_LIFETIME phase=probe-armed\n");
+            std::fflush(stderr);
+            try{
+                match=std::make_unique<melee_web::GameplayMatchSession>(
+                    reopened_files,selected,cache,melee_web::GameplayMatchConstruction::Deferred,
+                    *ready_input,melee_web::GameplayMatchDiagnostic::StadiumReady);
+                while(!match->advance_construction()){}
+                const auto constructed=melee_web_gameplay_stats();
+                check(constructed.ticks==0,
+                      "Stadium text lifetime probe unexpectedly advanced a source match tick");
+                std::fprintf(stderr,
+                    "STADIUM_SOURCE_TEXT_LIFETIME phase=construction-complete world_exists=%d ticks=%llu match_retained=%d\n",
+                    melee_web_gameplay_world_exists(),
+                    static_cast<unsigned long long>(constructed.ticks),int(bool(match)));
+                std::fflush(stderr);
+                // Run normal Session.close at the source boundary, before any match tick.
+                // A refusal remains a failed lifecycle, not treated as success.
+                match->close();
+                match.reset();
+                HSD_SisLib_C1TextProbeSet(0);
+                const auto closed=melee_web_gameplay_stats();
+                std::fprintf(stderr,
+                    "STADIUM_SOURCE_TEXT_LIFETIME phase=normal-close-returned world_exists=%d ticks=%llu\n",
+                    melee_web_gameplay_world_exists(),
+                    static_cast<unsigned long long>(closed.ticks));
+                std::fflush(stderr);
+                check(closed.ticks==0,
+                      "Stadium text lifetime probe changed source tick count during normal close");
+                check(seed_ptr==parent_seed_owner && *parent_seed_owner==selected.random_seed,
+                      "Stadium text lifetime probe failed to restore exact parent host RNG owner/value");
+                cleanup();
+                std::cout<<"Stadium zero-tick source text-owner observation returned from normal Session.close; lifecycle acceptance remains unproven\n";
+                return;
+            }catch(const std::exception& first){
+                const auto failed=melee_web_gameplay_stats();
+                std::fprintf(stderr,
+                    "STADIUM_SOURCE_TEXT_LIFETIME_FIRST_FAILURE diagnostic=%s world_exists=%d ticks=%llu match_retained=%d lifecycle=failed\n",
+                    first.what(),melee_web_gameplay_world_exists(),
+                    static_cast<unsigned long long>(failed.ticks),int(bool(match)));
+                std::fflush(stderr);std::cout.flush();std::_Exit(1);
+            }
+        }
+
+        if(ready_session||ready_text_membership_probe||go_probe){
+            check(perform_on_init && retired_sis,
+                  "Stadium Ready requires the original menu leave/SIS retirement boundary");
+            // Menu leave already verified this one-shot token while its source
+            // allocation registry was live. MenuWorld.close has since retired
+            // that world; consume the immutable evidence without re-verifying
+            // or reading the old allocation through a replaced registry.
+            std::fprintf(stderr,"C1_SIS_READY_EVIDENCE verified=%d prior_heap=%p prior_world=%llu prior_source_heap=%d prior_allocation=%llu prior_epoch=%llu requested=%zu expected_requested=%u world_exists=%d\n",
+                retired_sis->retirement_verified,retired_sis->prior.heap,
+                (unsigned long long)retired_sis->prior.world_generation,retired_sis->prior.source_heap_handle,
+                (unsigned long long)retired_sis->prior.allocation_generation,
+                (unsigned long long)retired_sis->prior.source_epoch,retired_sis->requested_bytes,
+                MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES,melee_web_gameplay_world_exists());
+            std::fflush(stderr);
+            check(retired_sis->retirement_verified && retired_sis->prior.heap &&
+                  retired_sis->prior.world_generation && retired_sis->prior.allocation_generation &&
+                  retired_sis->prior.source_epoch &&
+                  retired_sis->requested_bytes==MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES,
+                  "Stadium Ready requires the already verified original menu SIS retirement evidence");
+            check(!melee_web_gameplay_world_exists(),"Stadium Ready would double-own a source world");
+            const auto parent_seed_owner=seed_ptr;
+            check(parent_seed_owner && *parent_seed_owner==selected.random_seed,
+                  "Stadium Ready lost the actual host selected seed");
+            const auto session_before=melee_web_gameplay_allocation();
+            auto observe=[](const char* phase){
+                const auto stats=melee_web_gameplay_stats();
+                const auto allocation=melee_web_gameplay_allocation();
+                MeleeWebSourceMemoryContext memory{};
+                const auto status=melee_web_source_memory_context_read(&memory);
+                std::fprintf(stderr,"STADIUM_READY_SESSION phase=%s world_exists=%d world=%llu ticks=%llu heap=%d objects=%u processes=%u memory_status=%d memory_world=%llu memory_heap=%d watermark=%llu arena_identity=%llu arena_generation=%llu arena_bytes=%llu current_object=%p current_proc=%p gx=%p toy_archive=%p\n",
+                    phase,melee_web_gameplay_world_exists(),(unsigned long long)stats.generation,
+                    (unsigned long long)stats.ticks,stats.heap_free_bytes,stats.objects,stats.processes,
+                    int(status),(unsigned long long)memory.world_generation,memory.source_heap_handle,
+                    (unsigned long long)memory.allocation_generation_watermark,
+                    (unsigned long long)allocation.identity,(unsigned long long)allocation.generation,
+                    (unsigned long long)allocation.bytes,(void*)HSD_GObj_804D781C,
+                    (void*)HSD_GObj_804D7838,(void*)HSD_GObj_804D7814,
+                    (void*)_Toy_sbss_804D6ED0);
+                std::fflush(stderr);
+            };
+            check(ready_input!=nullptr,
+                  "Stadium Ready lost the closed host's retained source PAD input");
+            melee_web::RuntimeArchiveCache cache(reopened_files);
+            if(toy_owner_controls){
+                check(source_toy_aliases_empty(),
+                      "Toy owner controls require the original menu reset baseline");
+                const auto empty_world=melee_web_gameplay_stats();
+                const auto* const empty_seed_owner=seed_ptr;
+                check(empty_seed_owner&&*empty_seed_owner==selected.random_seed,
+                      "Toy owner controls lost the selected source RNG owner");
+                auto* const foreign_root=reinterpret_cast<TrophyData*>(uintptr_t{0x7100});
+                _Toy_sbss_804D6EC4=foreign_root;
+                bool entry_refused=false;
+                std::fprintf(stderr,
+                    "STADIUM_TOY_OWNER phase=expected-entry-refusal-begin\n");
+                std::fflush(stderr);
+                try{
+                    auto rejected=std::make_unique<melee_web::GameplayMatchSession>(
+                        reopened_files,selected,cache,melee_web::GameplayMatchConstruction::Deferred,
+                        *ready_input,melee_web::GameplayMatchDiagnostic::StadiumReady);
+                }catch(const std::exception& refusal){
+                    entry_refused=std::string_view(refusal.what())==
+                        "Match world requires a clean original Toy archive/table baseline";
+                }
+                check(entry_refused&&_Toy_sbss_804D6ED0==nullptr&&
+                          _Toy_sbss_804D6EC4==foreign_root&&
+                          !melee_web_gameplay_world_exists()&&
+                          melee_web_gameplay_stats().generation==empty_world.generation&&
+                          seed_ptr==empty_seed_owner&&*empty_seed_owner==selected.random_seed,
+                      "NULL Toy archive plus a foreign table root was not refused unchanged before startup");
+                std::fprintf(stderr,
+                    "STADIUM_TOY_OWNER phase=expected-entry-refusal-end\n");
+                std::fflush(stderr);
+                std::fprintf(stderr,
+                    "STADIUM_TOY_OWNER phase=entry-null-archive-table-refused unchanged=1\n");
+                std::fflush(stderr);
+                _Toy_sbss_804D6EC4=nullptr;
+                check(source_toy_aliases_empty(),
+                      "Toy entry refusal did not restore its synthetic control input");
+
+                auto no_acquisition=std::make_unique<melee_web::GameplayMatchSession>(
+                    reopened_files,selected,cache,melee_web::GameplayMatchConstruction::Deferred,
+                    *ready_input,melee_web::GameplayMatchDiagnostic::StadiumReady);
+                check(!no_acquisition->advance_construction(),
+                      "Toy no-acquisition control advanced beyond its first pre-OnInit boundary");
+                const auto no_acquisition_stats=melee_web_gameplay_stats();
+                const auto no_acquisition_heap=HSD_GetHeap();
+                const auto* const no_acquisition_seed=seed_ptr;
+                check(melee_web_gameplay_world_exists()&&no_acquisition_stats.ticks==0&&
+                          source_toy_aliases_empty()&&no_acquisition_seed&&
+                          *no_acquisition_seed==selected.random_seed,
+                      "Toy no-acquisition control reached source aliases or a match tick unexpectedly");
+                check(no_acquisition->diagnostic_toy_owner_preflight(),
+                      "Toy no-acquisition state failed its actual owner preflight");
+                auto* const foreign_table=reinterpret_cast<TrophyData*>(uintptr_t{0x7200});
+                _Toy_sbss_804D6EC4=foreign_table;
+                const auto null_archive_bad_table=source_toy_alias_snapshot();
+                check(!no_acquisition->diagnostic_toy_owner_preflight()&&
+                          source_toy_alias_snapshot()==null_archive_bad_table&&
+                          !_Toy_sbss_804D6ED0&&_Toy_sbss_804D6EC4==foreign_table&&
+                          melee_web_gameplay_world_exists()&&
+                          melee_web_gameplay_stats().generation==no_acquisition_stats.generation&&
+                          melee_web_gameplay_stats().ticks==0&&
+                          HSD_GetHeap()==no_acquisition_heap&&seed_ptr==no_acquisition_seed&&
+                          *no_acquisition_seed==selected.random_seed,
+                      "Toy owner preflight accepted or changed a table alias without its source archive");
+                _Toy_sbss_804D6EC4=nullptr;
+                _Toy_sbss_804D6ECC=reinterpret_cast<HSD_Archive*>(uintptr_t{0x7300});
+                const auto foreign_alias=source_toy_alias_snapshot();
+                check(!no_acquisition->diagnostic_toy_owner_preflight()&&
+                          source_toy_alias_snapshot()==foreign_alias&&
+                          _Toy_sbss_804D6ECC==reinterpret_cast<HSD_Archive*>(uintptr_t{0x7300})&&
+                          melee_web_gameplay_world_exists()&&
+                          melee_web_gameplay_stats().generation==no_acquisition_stats.generation&&
+                          HSD_GetHeap()==no_acquisition_heap&&seed_ptr==no_acquisition_seed&&
+                          *no_acquisition_seed==selected.random_seed,
+                      "Toy owner preflight accepted or changed a foreign archive alias");
+                _Toy_sbss_804D6ECC=nullptr;
+                check(no_acquisition->diagnostic_toy_owner_preflight(),
+                      "Toy owner preflight did not recover after restoring its exact empty baseline");
+                no_acquisition->close();no_acquisition.reset();
+                check(!melee_web_gameplay_world_exists()&&source_toy_aliases_empty()&&
+                          HSD_GetHeap()==-1&&seed_ptr==empty_seed_owner&&
+                          *empty_seed_owner==selected.random_seed,
+                      "Owned no-acquisition source world did not close through the Toy owner helper");
+                std::fprintf(stderr,
+                    "STADIUM_TOY_OWNER phase=no-acquisition-close null_archive_table_refused=1 foreign_archive_refused=1 reset=1 ticks=%llu\n",
+                    static_cast<unsigned long long>(melee_web_gameplay_stats().ticks));
+                std::fflush(stderr);
+            }
+            std::unique_ptr<melee_web::GameplayMatchSession> match;
+            try{
+                observe("before-construction");
+                if(ready_text_membership_probe){
+                    HSD_SisLib_C1TextProbeSet(1);
+                    std::fprintf(stderr,
+                        "STADIUM_READY_TEXT_MEMBERSHIP phase=probe-armed tick_cap=600 draw=0\n");
+                    std::fflush(stderr);
+                }
+                match=std::make_unique<melee_web::GameplayMatchSession>(
+                    reopened_files,selected,cache,melee_web::GameplayMatchConstruction::Deferred,
+                    *ready_input,melee_web::GameplayMatchDiagnostic::StadiumReady);
+                while(!match->advance_construction()){}
+                observe("construction-complete-before-source-ticks");
+                MeleeWebStadiumGoAlignmentSnapshot go_snapshot{};
+                if(go_probe){
+                    const int expected_branch=selected.start.rules.x1_3?1:0;
+                    match->diagnostic_stadium_go_alignment_arm(
+                        expected_branch,error,sizeof(error));
+                    check(match->diagnostic_stadium_go_alignment_snapshot(
+                              &go_snapshot,error,sizeof(error)),error);
+                    check(go_snapshot.armed&&go_snapshot.generation==melee_web_gameplay_stats().generation&&
+                              go_snapshot.armed_world_ticks==0&&
+                              go_snapshot.expected_branch==(unsigned)expected_branch&&
+                              !go_snapshot.stage_before.sequence&&!go_snapshot.stage_after.sequence&&
+                              !go_snapshot.go_after.sequence&&!go_snapshot.hud_after.sequence,
+                          "Stadium GO trace did not arm its empty zero-tick StageLast record");
+                    std::fprintf(stderr,
+                        "STADIUM_SOURCE_GO phase=armed generation=%llu world_ticks=%llu source_frame=%u expected_branch=%d draw=0 tick_cap=600\n",
+                        static_cast<unsigned long long>(go_snapshot.generation),
+                        static_cast<unsigned long long>(go_snapshot.armed_world_ticks),
+                        go_snapshot.armed_source_frame,expected_branch);
+                    std::fflush(stderr);
+                }
+                if(ready_text_membership_probe){
+                    MeleeWebRetiredSisLease text_snapshot{};
+                    const auto construction=melee_web_gameplay_stats();
+                    check(construction.ticks==0,
+                          "Ready text membership snapshot was not taken at zero source ticks");
+                    check(melee_web_diagnostic_sis_capture(
+                              &text_snapshot,error,sizeof(error)),error);
+                    check(text_snapshot.retirement_verified==0 &&
+                              text_snapshot.requested_bytes==MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES &&
+                              text_snapshot.prior.world_generation==construction.generation,
+                          "Ready text membership snapshot lacks the current exact live SIS allocation");
+                    check(melee_web_stadium_text_membership_snapshot_begin(
+                              &text_snapshot.prior,error,sizeof(error)),error);
+                    std::fprintf(stderr,
+                        "STADIUM_READY_TEXT_MEMBERSHIP phase=snapshot-captured tick=0 heap=%p world=%llu source_heap=%d allocation=%llu epoch=%llu requested_bytes=%zu retirement_verified=%d\n",
+                        text_snapshot.prior.heap,
+                        static_cast<unsigned long long>(text_snapshot.prior.world_generation),
+                        text_snapshot.prior.source_heap_handle,
+                        static_cast<unsigned long long>(text_snapshot.prior.allocation_generation),
+                        static_cast<unsigned long long>(text_snapshot.prior.source_epoch),
+                        text_snapshot.requested_bytes,text_snapshot.retirement_verified);
+                    std::fflush(stderr);
+                }
+                PADStatus pads[4]{};pads[2].err=pads[3].err=PAD_ERR_NO_CONTROLLER;
+                float pcm[1068]{};unsigned audio_phase=0;
+                bool go_containing_tick_seen=false,go_post_tick_seen=false;
+                uint64_t go_containing_world_after=0,go_containing_session_after=0;
+                uint32_t go_containing_frames_after=0,emitted_go_sequence=0;
+                auto emit_go_event=[&](const char* name,const MeleeWebStadiumGoAlignmentEvent& event){
+                    if(!event.sequence||event.sequence<=emitted_go_sequence)return;
+                    std::fprintf(stderr,
+                        "STADIUM_SOURCE_GO_EVENT event=%s sequence=%u generation=%llu world_ticks=%llu source_frame=%u object=%llu proc=%llu callback_index=%d source_branch=%d map2_gate=%d display_mode=%d remap_branch=%d callback_identity=%d hud_enabled=%d\n",
+                        name,event.sequence,static_cast<unsigned long long>(event.generation),
+                        static_cast<unsigned long long>(event.world_ticks),event.source_frame,
+                        static_cast<unsigned long long>(event.object_identity),
+                        static_cast<unsigned long long>(event.proc_identity),event.callback_index,
+                        event.source_branch,event.map2_gate,event.display_mode,event.remap_branch,
+                        event.callback_identity,event.hud_enabled);
+                    std::fflush(stderr);emitted_go_sequence=event.sequence;
+                };
+                bool first_ready_observed=false;
+                for(unsigned tick=0;tick<=600;++tick){
+                    if(go_probe&&first_ready_observed&&go_post_tick_seen)break;
+                    const bool ready_at_entry=match->ready();
+                    if(ready_at_entry){
+                        if(!first_ready_observed){
+                            observe("first-ready-before-close");
+                            first_ready_observed=true;
+                        }
+                        if(!(go_probe&&go_containing_tick_seen&&!go_post_tick_seen))
+                            break;
+                    }else if(tick==600){
+                        break;
+                    }
+                    const bool go_was_seen=go_probe&&go_snapshot.go_after.sequence!=0;
+                    const auto world_before=melee_web_gameplay_stats();
+                    const auto session_before=go_probe?match->player_stats(0).ticks:0;
+                    const auto frames_before=go_probe?match->source_frames():0;
+                    MeleeWebSourceMemoryContext idle_memory_before{};
+                    const auto idle_memory_status_before = functional_idle_probe && go_was_seen
+                        ? melee_web_source_memory_context_read(&idle_memory_before) :
+                          MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE;
+                    if(functional_idle_probe && go_was_seen)
+                        check(idle_memory_status_before==MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                                  idle_memory_before.world_generation==world_before.generation &&
+                                  idle_memory_before.source_heap_handle>=0 &&
+                                  melee_web_source_memory_healthy(),
+                              "Post-GO source-memory owner was not healthy before a tick");
+                    match->tick(pads);
+                    audio_phase+=32000;const unsigned samples=audio_phase/60;audio_phase%=60;
+                    check(melee_web_audio_render(match->audio(),pcm,samples,error,sizeof(error)),error);
+                    if(go_probe){
+                        const auto world_after=melee_web_gameplay_stats();
+                        const auto session_after=match->player_stats(0).ticks;
+                        const auto frames_after=match->source_frames();
+                        check(world_after.generation==world_before.generation&&
+                                  world_after.ticks==world_before.ticks+1&&
+                                  session_after==session_before+1,
+                              "Stadium GO canary did not observe one independent world and session tick");
+                        MeleeWebStadiumGoAlignmentSnapshot next{};
+                        check(match->diagnostic_stadium_go_alignment_snapshot(
+                                  &next,error,sizeof(error)),error);
+                        emit_go_event("StageBefore",next.stage_before);
+                        emit_go_event("StageAfter",next.stage_after);
+                        emit_go_event("GoAfter",next.go_after);
+                        emit_go_event("HudAfter",next.hud_after);
+                        if(!go_was_seen&&next.go_after.sequence){
+                            check(next.go_after.world_ticks==world_before.ticks&&
+                                      next.go_after.generation==world_before.generation&&
+                                      next.go_after.sequence==3&&
+                                      emitted_go_sequence>=next.go_after.sequence,
+                                  "GO event did not identify its containing original scheduler tick");
+                            go_containing_tick_seen=true;
+                            go_containing_world_after=world_after.ticks;
+                            go_containing_session_after=session_after;
+                            go_containing_frames_after=frames_after;
+                            std::fprintf(stderr,
+                                "STADIUM_SOURCE_GO_TICK kind=containing world_before=%llu world_after=%llu session_before=%llu session_after=%llu source_frame_before=%u source_frame_after=%u ready_after=%d draw=0\n",
+                                static_cast<unsigned long long>(world_before.ticks),
+                                static_cast<unsigned long long>(world_after.ticks),
+                                static_cast<unsigned long long>(session_before),
+                                static_cast<unsigned long long>(session_after),frames_before,frames_after,
+                                int(match->ready()));
+                            std::fflush(stderr);
+                        }else if(go_was_seen&&!go_post_tick_seen){
+                            check(world_before.ticks==go_containing_world_after&&
+                                      session_before==go_containing_session_after&&
+                                      world_after.ticks==world_before.ticks+1&&
+                                      session_after==session_before+1&&
+                                      world_before.generation==next.generation,
+                                  "First full post-GO tick was not the immediately following source tick");
+                            go_post_tick_seen=true;
+                            std::fprintf(stderr,
+                                "STADIUM_SOURCE_GO_TICK kind=first-full-post-go world_before=%llu world_after=%llu session_before=%llu session_after=%llu source_frame_before=%u source_frame_after=%u go_containing_source_frame_after=%u ready_after=%d draw=0\n",
+                                static_cast<unsigned long long>(world_before.ticks),
+                                static_cast<unsigned long long>(world_after.ticks),
+                                static_cast<unsigned long long>(session_before),
+                                static_cast<unsigned long long>(session_after),frames_before,frames_after,
+                                go_containing_frames_after,int(match->ready()));
+                            std::fflush(stderr);
+                        }
+                        go_snapshot=next;
+                        if(functional_idle_probe && go_was_seen){
+                            MeleeWebSourceMemoryContext idle_memory_after{};
+                            const auto idle_memory_status_after=
+                                melee_web_source_memory_context_read(&idle_memory_after);
+                            const auto ordinal=world_after.ticks-go_containing_world_after;
+                            check(go_containing_tick_seen && ordinal>0 && ordinal<=3500 &&
+                                      idle_memory_status_after==MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                                      idle_memory_after.world_generation==world_after.generation &&
+                                      idle_memory_after.source_heap_handle==idle_memory_before.source_heap_handle &&
+                                      melee_web_source_memory_healthy() && !match->ending() &&
+                                      !match->complete(),
+                                  "A post-GO tick lost its source owner or entered an ending state");
+                            std::fprintf(stderr,
+                                "STADIUM_FUNCTIONAL_IDLE_STEP ordinal=%llu world_before=%llu world_after=%llu session_before=%llu session_after=%llu source_frame_before=%u source_frame_after=%u generation=%llu memory_status_before=%d memory_status_after=%d memory_world_before=%llu memory_world_after=%llu source_heap_before=%d source_heap_after=%d ready=%d ending=%d complete=%d draw=0 audio=rendered\n",
+                                static_cast<unsigned long long>(ordinal),
+                                static_cast<unsigned long long>(world_before.ticks),
+                                static_cast<unsigned long long>(world_after.ticks),
+                                static_cast<unsigned long long>(session_before),
+                                static_cast<unsigned long long>(session_after),frames_before,frames_after,
+                                static_cast<unsigned long long>(world_after.generation),
+                                int(idle_memory_status_before),int(idle_memory_status_after),
+                                static_cast<unsigned long long>(idle_memory_before.world_generation),
+                                static_cast<unsigned long long>(idle_memory_after.world_generation),
+                                idle_memory_before.source_heap_handle,idle_memory_after.source_heap_handle,
+                                int(match->ready()),int(match->ending()),int(match->complete()));
+                            std::fflush(stderr);
+                        }
+                    }
+                }
+                if(!first_ready_observed)observe("first-ready-before-close");
+                check(match->ready(),"Stadium did not reach original source Ready within 600 ticks");
+                check(match->fighter_kind(0)==FTKIND_MARIO && match->fighter_kind(1)==FTKIND_MARIO,
+                      "Stadium Ready lost actual selected Human Mario fighter identities");
+                if(go_probe){
+                    check(go_containing_tick_seen&&go_post_tick_seen&&go_snapshot.armed&&
+                              go_snapshot.generation==melee_web_gameplay_stats().generation&&
+                              go_snapshot.stage_before.sequence==1&&
+                              go_snapshot.stage_after.sequence==2&&
+                              go_snapshot.go_after.sequence==3&&
+                              go_snapshot.hud_after.sequence==4&&
+                              go_snapshot.stage_before.sequence<go_snapshot.stage_after.sequence&&
+                              go_snapshot.stage_after.sequence<go_snapshot.go_after.sequence&&
+                              go_snapshot.go_after.sequence<go_snapshot.hud_after.sequence&&
+                              go_snapshot.stage_before.map2_gate==1&&
+                              go_snapshot.stage_after.map2_gate==0&&
+                              go_snapshot.go_after.map2_gate==0&&
+                              go_snapshot.go_after.display_mode==0xB&&
+                              go_snapshot.go_after.remap_branch==0&&
+                              go_snapshot.go_after.source_branch==(int)go_snapshot.expected_branch&&
+                              go_snapshot.hud_after.display_mode==1&&
+                              go_snapshot.hud_after.remap_branch==0&&
+                              go_snapshot.hud_after.callback_identity==1&&
+                              go_snapshot.hud_after.hud_enabled==1,
+                          "Stadium GO/HUD source owner or ordered latch record changed");
+                    std::fprintf(stderr,
+                        "STADIUM_SOURCE_GO phase=complete generation=%llu expected_branch=%u go_branch=%d hud_index=%d stage_before_world=%llu stage_after_world=%llu go_world=%llu hud_world=%llu stage_before_frame=%u stage_after_frame=%u go_frame=%u hud_frame=%u first_post_go_tick=1 draw=0 hud_ready_at_observation=%d\n",
+                        static_cast<unsigned long long>(go_snapshot.generation),
+                        go_snapshot.expected_branch,go_snapshot.go_after.source_branch,
+                        go_snapshot.hud_after.callback_index,
+                        static_cast<unsigned long long>(go_snapshot.stage_before.world_ticks),
+                        static_cast<unsigned long long>(go_snapshot.stage_after.world_ticks),
+                        static_cast<unsigned long long>(go_snapshot.go_after.world_ticks),
+                        static_cast<unsigned long long>(go_snapshot.hud_after.world_ticks),
+                        go_snapshot.stage_before.source_frame,go_snapshot.stage_after.source_frame,
+                        go_snapshot.go_after.source_frame,go_snapshot.hud_after.source_frame,
+                        int(match->ready()));
+                    std::fflush(stderr);
+                }
+                if(functional_idle_probe){
+                    const auto ready_world=melee_web_gameplay_stats();
+                    const auto already_post_go=ready_world.ticks-go_containing_world_after;
+                    const bool ready_span_in_scope = functional_idle_pair_probe
+                        ? already_post_go>0&&already_post_go<=600 : already_post_go==39;
+                    check(go_containing_tick_seen&&go_post_tick_seen&&ready_world.ticks>=go_containing_world_after&&
+                              ready_span_in_scope&&match->ready()&&!match->ending()&&!match->complete(),
+                          "Functional idle recipe did not retain its checked Ready/GO boundary");
+                    const auto target_world=go_containing_world_after+3500;
+                    std::fprintf(stderr,
+                        "STADIUM_FUNCTIONAL_IDLE phase=begin go_world_after=%llu ready_world_tick=%llu already_post_go_ticks=%llu target_world_tick=%llu draw=0 timer=unobserved transform=unobserved\n",
+                        static_cast<unsigned long long>(go_containing_world_after),
+                        static_cast<unsigned long long>(ready_world.ticks),
+                        static_cast<unsigned long long>(already_post_go),
+                        static_cast<unsigned long long>(target_world));
+                    std::fflush(stderr);
+                    while(melee_web_gameplay_stats().ticks<target_world){
+                        const auto before_tick=melee_web_gameplay_stats();
+                        const auto session_before=match->player_stats(0).ticks;
+                        const auto frames_before=match->source_frames();
+                        MeleeWebSourceMemoryContext memory_before{},memory_after{};
+                        const auto memory_status_before=
+                            melee_web_source_memory_context_read(&memory_before);
+                        check(before_tick.generation==ready_world.generation&&
+                                  before_tick.ticks<target_world&&memory_status_before==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+                                  memory_before.world_generation==before_tick.generation&&
+                                  memory_before.source_heap_handle>=0&&melee_web_source_memory_healthy()&&
+                                  match->ready()&&!match->ending()&&!match->complete()&&
+                                  match->fighter_kind(0)==FTKIND_MARIO&&
+                                  match->fighter_kind(1)==FTKIND_MARIO,
+                              "Post-Ready idle lifetime lost its checked live owner or phase");
+                        match->tick(pads);
+                        audio_phase+=32000;const unsigned samples=audio_phase/60;audio_phase%=60;
+                        check(melee_web_audio_render(match->audio(),pcm,samples,error,sizeof(error)),error);
+                        const auto after_tick=melee_web_gameplay_stats();
+                        const auto session_after=match->player_stats(0).ticks;
+                        const auto frames_after=match->source_frames();
+                        const auto memory_status_after=
+                            melee_web_source_memory_context_read(&memory_after);
+                        const auto ordinal=after_tick.ticks-go_containing_world_after;
+                        const bool ordinal_after_ready = functional_idle_pair_probe
+                            ? ordinal>already_post_go : ordinal>39;
+                        check(after_tick.generation==before_tick.generation&&
+                                  after_tick.ticks==before_tick.ticks+1&&session_after==session_before+1&&
+                                  frames_after==frames_before+1&&
+                                  ordinal_after_ready&&ordinal<=3500&&
+                                  memory_status_after==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+                                  memory_after.world_generation==memory_before.world_generation&&
+                                  memory_after.source_heap_handle==memory_before.source_heap_handle&&
+                                  melee_web_source_memory_healthy()&&match->ready()&&
+                                  !match->ending()&&!match->complete()&&
+                                  match->fighter_kind(0)==FTKIND_MARIO&&
+                                  match->fighter_kind(1)==FTKIND_MARIO,
+                              "Post-Ready idle tick changed the owner, tick order, or match phase");
+                        std::fprintf(stderr,
+                            "STADIUM_FUNCTIONAL_IDLE_STEP ordinal=%llu world_before=%llu world_after=%llu session_before=%llu session_after=%llu source_frame_before=%u source_frame_after=%u generation=%llu memory_status_before=%d memory_status_after=%d memory_world_before=%llu memory_world_after=%llu source_heap_before=%d source_heap_after=%d ready=%d ending=%d complete=%d draw=0 audio=rendered\n",
+                            static_cast<unsigned long long>(ordinal),
+                            static_cast<unsigned long long>(before_tick.ticks),
+                            static_cast<unsigned long long>(after_tick.ticks),
+                            static_cast<unsigned long long>(session_before),
+                            static_cast<unsigned long long>(session_after),frames_before,frames_after,
+                            static_cast<unsigned long long>(after_tick.generation),
+                            int(memory_status_before),int(memory_status_after),
+                            static_cast<unsigned long long>(memory_before.world_generation),
+                            static_cast<unsigned long long>(memory_after.world_generation),
+                            memory_before.source_heap_handle,memory_after.source_heap_handle,
+                            int(match->ready()),int(match->ending()),int(match->complete()));
+                        std::fflush(stderr);
+                    }
+                    const auto final_world=melee_web_gameplay_stats();
+                    check(final_world.generation==ready_world.generation&&final_world.ticks==target_world&&
+                              final_world.ticks-go_containing_world_after==3500&&
+                              match->ready()&&!match->ending()&&!match->complete(),
+                          "Functional idle interval did not finish at exactly 3,500 post-GO ticks");
+                    std::fprintf(stderr,
+                        "STADIUM_FUNCTIONAL_IDLE phase=complete go_world_after=%llu ready_world_tick=%llu target_world_tick=%llu observed_post_go_ticks=%llu final_session_ticks=%llu final_source_frame=%u draw=0 timer=unobserved transform=unobserved\n",
+                        static_cast<unsigned long long>(go_containing_world_after),
+                        static_cast<unsigned long long>(ready_world.ticks),
+                        static_cast<unsigned long long>(target_world),
+                        static_cast<unsigned long long>(final_world.ticks-go_containing_world_after),
+                        static_cast<unsigned long long>(match->player_stats(0).ticks),
+                        match->source_frames());
+                    std::fflush(stderr);
+                    if(functional_idle_world_generation)
+                        *functional_idle_world_generation=final_world.generation;
+                }
+                if(post_ready_tick_probe){
+                    const auto before_tick=melee_web_gameplay_stats();
+                    MeleeWebSourceMemoryContext memory_before{};
+                    const auto memory_before_status=
+                        melee_web_source_memory_context_read(&memory_before);
+                    const auto frames_before=match->source_frames();
+                    check(before_tick.generation && before_tick.ticks &&
+                              memory_before_status==MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                              memory_before.world_generation==before_tick.generation &&
+                              memory_before.source_heap_handle>=0 &&
+                              melee_web_source_memory_healthy() && match->ready() &&
+                              !match->ending() && !match->complete(),
+                          "Post-Ready probe lost its live source-memory world boundary");
+                    match->tick(pads);
+                    audio_phase+=32000;const unsigned samples=audio_phase/60;audio_phase%=60;
+                    check(melee_web_audio_render(match->audio(),pcm,samples,error,sizeof(error)),error);
+                    const auto after_tick=melee_web_gameplay_stats();
+                    MeleeWebSourceMemoryContext memory_after{};
+                    const auto memory_after_status=
+                        melee_web_source_memory_context_read(&memory_after);
+                    const auto frames_after=match->source_frames();
+                    check(after_tick.generation==before_tick.generation &&
+                              after_tick.ticks==before_tick.ticks+1 &&
+                              frames_after==frames_before+1 &&
+                              memory_after_status==MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                              memory_after.world_generation==memory_before.world_generation &&
+                              memory_after.source_heap_handle==memory_before.source_heap_handle &&
+                              melee_web_source_memory_healthy() && match->ready() &&
+                              !match->ending() && !match->complete() &&
+                              match->fighter_kind(0)==FTKIND_MARIO &&
+                              match->fighter_kind(1)==FTKIND_MARIO,
+                          "One post-Ready source tick changed match/world ownership or phase");
+                    std::fprintf(stderr,
+                        "STADIUM_POST_READY_TICK ticks_before=%llu ticks_after=%llu frames_before=%u frames_after=%u world_before=%llu world_after=%llu memory_status_before=%d memory_status_after=%d memory_world_before=%llu memory_world_after=%llu source_heap_before=%d source_heap_after=%d ready=%d ending=%d complete=%d draw=0 go_alignment=unobserved\n",
+                        static_cast<unsigned long long>(before_tick.ticks),
+                        static_cast<unsigned long long>(after_tick.ticks),frames_before,frames_after,
+                        static_cast<unsigned long long>(before_tick.generation),
+                        static_cast<unsigned long long>(after_tick.generation),
+                        int(memory_before_status),int(memory_after_status),
+                        static_cast<unsigned long long>(memory_before.world_generation),
+                        static_cast<unsigned long long>(memory_after.world_generation),
+                        memory_before.source_heap_handle,memory_after.source_heap_handle,
+                        int(match->ready()),int(match->ending()),int(match->complete()));
+                    std::fflush(stderr);
+                }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                check(melee_web_stadium_c1_grdatfiles_trace_snapshot(
+                          "ready-before-match-close", (unsigned long long)
+                              melee_web_gameplay_stats().generation),
+                      "Could not snapshot ordinary grDatFiles before match close");
+#endif
+                match->close();
+                if(go_probe){
+                    MeleeWebStadiumGoAlignmentSnapshot closed_trace{};
+                    check(!match->diagnostic_stadium_go_alignment_snapshot(
+                              &closed_trace,error,sizeof(error)),
+                          "Closed Stadium Session still exposed its retired StageLast trace");
+                    std::fprintf(stderr,"STADIUM_SOURCE_GO phase=checked-close snapshot_unavailable=1\n");
+                    std::fflush(stderr);
+                }
+                match.reset();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                check(melee_web_stadium_c1_grdatfiles_trace_snapshot(
+                          "after-match-close", (unsigned long long)
+                              melee_web_gameplay_stats().generation),
+                      "Could not snapshot ordinary grDatFiles after match close");
+#endif
+                if(ready_text_membership_probe){
+                    HSD_SisLib_C1TextProbeSet(0);
+                    melee_web_stadium_text_membership_snapshot_end();
+                }
+                observe("checked-session-close");
+                const auto closed=melee_web_gameplay_stats();
+                MeleeWebSourceMemoryContext closed_memory{};
+                const auto closed_status=melee_web_source_memory_context_read(&closed_memory);
+                const auto allocation=melee_web_gameplay_allocation();
+                check(!melee_web_gameplay_world_exists() && !closed.generation && !closed.objects && !closed.processes &&
+                      closed_status==MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE &&
+                      HSD_GetHeap()==-1 && allocation.identity==session_before.identity &&
+                      allocation.generation==session_before.generation && allocation.bytes==session_before.bytes,
+                      "Stadium Ready did not retire its complete owned source world");
+                check(seed_ptr==parent_seed_owner && *parent_seed_owner==selected.random_seed,
+                      "Stadium Ready failed to restore the exact parent host RNG owner");
+                check_stadium_selection_preserved(host,selected,baseline);
+                std::fprintf(stderr,
+                    "STADIUM_TOY_ALIAS phase=post-session-selection-preserved archive=%p\n",
+                    (void*)_Toy_sbss_804D6ED0);
+                std::fflush(stderr);
+                if(toy_owner_controls){
+                    check(source_toy_aliases_empty(),
+                          "Second Toy lifetime did not begin from a clean reset baseline");
+                    const auto* const repeat_parent_seed=seed_ptr;
+                    const auto repeat_parent_value=*repeat_parent_seed;
+                    auto repeat=std::make_unique<melee_web::GameplayMatchSession>(
+                        reopened_files,selected,cache,melee_web::GameplayMatchConstruction::Deferred,
+                        *ready_input,melee_web::GameplayMatchDiagnostic::StadiumReady);
+                    for(unsigned step=0;step<128&&!_Toy_sbss_804D6ED0;++step)
+                        check(!repeat->advance_construction(),
+                              "Toy partial control unexpectedly completed all Session construction");
+                    check(_Toy_sbss_804D6ED0&&melee_web_gameplay_world_exists()&&
+                              melee_web_gameplay_stats().ticks==0,
+                          "Second Toy lifetime did not reach original OnInit before a source tick");
+                    const char* foreign_locale=lbLang_IsSavedLanguageJP()?"TyDatai.usd":"TyDatai.dat";
+                    void* foreign_handle=melee_web_archive_sections_open_preloaded(foreign_locale);
+                    check(foreign_handle!=nullptr,
+                          "Second Toy lifetime could not inspect its registered alternate-locale root");
+                    void* foreign_root=melee_web_archive_sections_public(
+                        foreign_handle,"tyInitModelTbl");
+                    check(foreign_root!=nullptr,
+                          "Second Toy lifetime alternate-locale root was not registered");
+                    check(repeat->diagnostic_toy_owner_preflight(),
+                          "Original Toy loader state failed its actual source owner preflight");
+                    const auto archive_before=_Toy_sbss_804D6ED0;
+                    const auto table_before=source_toy_table_snapshot();
+                    const auto all_before=source_toy_alias_snapshot();
+                    const auto source_before=melee_web_gameplay_stats();
+                    const auto source_heap_before=HSD_GetHeap();
+                    const auto* const source_seed_before=seed_ptr;
+                    check(source_seed_before!=nullptr,
+                          "Second Toy lifetime lost the original source RNG owner");
+                    const auto source_seed_value=*source_seed_before;
+                    check(foreign_root!=table_before[0],
+                          "Alternate-locale table unexpectedly aliases the active locale root");
+                    _Toy_sbss_804D6EC4=static_cast<TrophyData*>(foreign_root);
+                    const bool locale_refused=!repeat->diagnostic_toy_owner_preflight();
+                    auto expected_after=all_before;
+                    expected_after[2]=foreign_root;
+                    const auto source_after=melee_web_gameplay_stats();
+                    check(locale_refused&&source_toy_alias_snapshot()==expected_after&&
+                          _Toy_sbss_804D6ED0==archive_before&&
+                          melee_web_gameplay_world_exists()&&
+                          source_after.generation==source_before.generation&&
+                          source_after.ticks==source_before.ticks&&
+                          HSD_GetHeap()==source_heap_before&&
+                          seed_ptr==source_seed_before&&
+                          *source_seed_before==source_seed_value,
+                          "Wrong-locale Toy root was not refused with source ownership unchanged");
+                    _Toy_sbss_804D6EC4=static_cast<TrophyData*>(table_before[0]);
+                    check(repeat->diagnostic_toy_owner_preflight(),
+                          "Toy owner preflight did not recover after restoring its exact owned root");
+                    // Destroy a partially constructed Session so its existing
+                    // Storage destructor executes the same checked close path.
+                    repeat.reset();
+                    check(!melee_web_gameplay_world_exists()&&source_toy_aliases_empty()&&
+                              HSD_GetHeap()==-1&&melee_web_gameplay_stats().ticks==0&&
+                              seed_ptr==repeat_parent_seed&&
+                              *repeat_parent_seed==repeat_parent_value,
+                          "Partially constructed source Session destructor did not reset Toy aliases before shutdown");
+                    std::fprintf(stderr,
+                        "STADIUM_TOY_OWNER phase=source-on-init-destructor-close wrong_locale_refused=1 reset=1 ticks=0\n");
+                    std::fflush(stderr);
+                }
+                cleanup();
+                if(toy_owner_controls)
+                    std::cout<<"Stadium bounded Toy owner controls passed; one Ready plus no-acquisition and unarmed OnInit lifetimes, no C3 claim\n";
+                else if(post_ready_tick_probe)
+                    std::cout<<"Stadium original source-session Ready plus one post-Ready source tick and checked owned-world retirement passed; exact GO alignment unobserved; no C3 claim\n";
+                else if(functional_idle_probe)
+                    std::cout<<"Stadium one-world neutral no-draw interval reached exactly 3,500 ticks after the GO-containing tick, with PCM processing and checked close; timer/transform state unobserved; no C3 claim\n";
+                else if(go_probe)
+                    std::cout<<"Stadium source GO containing tick and immediately following full tick observed through HUD and checked close; source-frame values retained without ordinal inference; no C3 claim\n";
+                else
+                    std::cout<<"Stadium original source-session Ready and checked owned-world retirement passed; one lifetime, no draw/post-GO idle/C3 claim\n";
+                return;
+            }catch(const std::exception& first){
+                if(ready_text_membership_probe){
+                    HSD_SisLib_C1TextProbeSet(0);
+                    melee_web_stadium_text_membership_snapshot_end();
+                }
+                observe("first-failure-retained");
+                std::fprintf(stderr,"STADIUM_READY_SESSION_FIRST_FAILURE diagnostic=%s match_retained=%d pre_OnStart_close_unsupported=1\n",first.what(),int(bool(match)));
+                std::fflush(stderr);std::cout.flush();std::_Exit(1);
+            }
+        }
+
         check(melee_web_vs_mode_begin(),
               "C1 context preflight could not acquire the source VS mode lease");
         vs_mode_owned = true;
@@ -4385,6 +9242,199 @@ void run_stadium_c1_context_preflight(
                   lbLang_GetSavedLanguage() == LANG_US,
               "Reopened C1 context did not set both source language scopes to US");
         check_stadium_selection_preserved(host, selected, baseline);
+
+        if (full_world_lifecycle) {
+            check(perform_on_init && retired_sis,
+                  "Full-world Stadium continuation requires the existing real OnInit fixture");
+            const auto session_before = melee_web_gameplay_allocation();
+            const auto* const parent_seed_owner = seed_ptr;
+            check(parent_seed_owner && *parent_seed_owner == selected.random_seed,
+                  "Full-world continuation lost its original selected seed owner");
+            const uint32_t parent_seed = *parent_seed_owner;
+            MeleeWebGameplayStats fresh_baseline{};
+            uint64_t previous_world = 0;
+            MeleeWebRetiredSisLease previous_sis = *retired_sis;
+            for (unsigned lifetime = 0; lifetime < 2; ++lifetime) {
+                world = std::make_unique<melee_web::GameplayMenuWorld>(reopened_files);
+                check(melee_web_native_world_enable(error, sizeof(error)), error);
+                const auto fresh = melee_web_gameplay_stats();
+                MeleeWebSourceMemoryContext fresh_memory{};
+                const auto fresh_status = melee_web_source_memory_context_read(&fresh_memory);
+                std::fprintf(stderr,
+                    "C3_FRESH lifetime=%u world=%llu previous_world=%llu ticks=%llu heap=%d objects=%u processes=%u status=%d source_world=%llu source_heap=%d watermark=%llu baseline_heap=%d baseline_objects=%u baseline_processes=%u gobj_used=%u gobj_free=%u proc_used=%u proc_free=%u\n",
+                    lifetime, static_cast<unsigned long long>(fresh.generation),
+                    static_cast<unsigned long long>(previous_world), static_cast<unsigned long long>(fresh.ticks),
+                    fresh.heap_free_bytes, fresh.objects, fresh.processes, int(fresh_status),
+                    static_cast<unsigned long long>(fresh_memory.world_generation), fresh_memory.source_heap_handle,
+                    static_cast<unsigned long long>(fresh_memory.allocation_generation_watermark),
+                    fresh_baseline.heap_free_bytes, fresh_baseline.objects, fresh_baseline.processes,
+                    gobj_alloc_data.used, gobj_alloc_data.free, gobjproc_alloc_data.used, gobjproc_alloc_data.free);
+                std::fflush(stderr);
+                check(fresh_status == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+                          fresh.generation == fresh_memory.world_generation &&
+                          fresh.generation > previous_world && fresh.ticks == 0 &&
+                          melee_web_source_memory_healthy(),
+                      "Fresh owned Stadium world did not reset source generation/ticks/heap");
+                if (lifetime == 0) fresh_baseline = fresh;
+                else check(fresh.heap_free_bytes == fresh_baseline.heap_free_bytes &&
+                               fresh.objects == fresh_baseline.objects &&
+                               fresh.processes == fresh_baseline.processes,
+                           "Recreated Stadium world differs from its exact fresh heap/object/process baseline");
+                check_stadium_preflight_stage_empty();
+                check(HSD_ObjAllocGetUsing(&gobj_alloc_data) == 0 &&
+                          HSD_ObjAllocGetUsing(&gobjproc_alloc_data) == 0,
+                      "Fresh prepared world contains source objects/processes in used pools");
+                const auto fresh_roots = melee_web::test::stadium_screen::runtime_roots_snapshot();
+                const auto fresh_classes = melee_web::test::stadium_screen::live_class_counts();
+                const auto fresh_pools = melee_web::test::stadium_screen::live_pool_counts();
+                Toy_803124BC();
+                check(_Toy_sbss_804D6ED0 && (Toy_804A284C[3] & 4) != 0,
+                      "Full-world continuation lost original source Toy aliases");
+                std::array<MeleeWebPlayerSettings, MELEE_WEB_MATCH_MAX_PLAYERS> players{};
+                unsigned count = 0;
+                for (unsigned slot = 0; slot < MELEE_WEB_MENU_MAX_PLAYERS; ++slot) {
+                    const auto& source = selected.start.players[slot];
+                    if (source.slot_type == Gm_PKind_NA) continue;
+                    const auto& compatibility = selected.players[slot];
+                    const auto* fighter = melee_web_fighter_content(source.ckind);
+                    const unsigned port = source.slot ? source.slot - 1u : slot;
+                    check(fighter && source.slot_type == Gm_PKind_Human && port == slot &&
+                              compatibility.controller == port &&
+                              compatibility.stocks == source.stocks &&
+                              compatibility.costume == source.color &&
+                              compatibility.sub_color == source.sub_color && count < players.size(),
+                          "Stadium continuation differs from selected original human player identities");
+                    players[count++] = {slot, port, compatibility.stocks, {0, 0, 0}, 1.0f,
+                                        compatibility.costume, compatibility.sub_color, static_cast<uint32_t>(fighter->fighter_kind)};
+                }
+                check(count == selected.player_count,
+                      "Stadium continuation changed original active source player count");
+                const auto active_match_copied_selection = check_stadium_selection_preserved(
+                    host, selected, baseline, &selection_rng);
+                std::fprintf(stderr, "C3_HOST_SELECTION_EXPORTED boundary=before-match-begin lifetime=%u owner=%p seed=%u\n",
+                    lifetime, static_cast<void*>(seed_ptr), *seed_ptr);
+                std::fflush(stderr);
+                MeleeWebMatchContext* match = melee_web_match_begin_players(
+                    players.data(), count, 70, selected.random_seed, nullptr,
+                    error, sizeof(error));
+                check(match != nullptr, error);
+                try {
+                    StadiumSelectionRngWitness match_rng{
+                        seed_ptr, selected.random_seed, selected.random_seed};
+                    check_stadium_rng_witness(match_rng, selected, "owned-camera-before-stage");
+                    check(melee_web_match_camera_available(match, error, sizeof(error)), error);
+                    MeleeWebRetiredSisLease next_sis{};
+                    run_stadium_e8_request(reopened_files, host, world.get(), selected,
+                        baseline, save_before, false, true, &previous_sis, match_rng, trace, match, &next_sis,
+                        &active_match_copied_selection);
+                    check(next_sis.retirement_verified && next_sis.prior.world_generation == fresh.generation,
+                          "Stadium world did not verify its own next SIS retirement lease before shutdown");
+                    previous_sis = next_sis;
+                    check(melee_web_match_end(match, error, sizeof(error)), error);
+                    match = nullptr;
+                    check(seed_ptr == parent_seed_owner && *seed_ptr == parent_seed,
+                          "Stadium MatchContext did not restore the original parent seed owner/value");
+                    check_stadium_selection_preserved(host, selected, baseline, &selection_rng);
+                    std::fprintf(stderr, "C3_HOST_SELECTION_EXPORTED boundary=after-match-end lifetime=%u owner=%p seed=%u\n",
+                        lifetime, static_cast<void*>(seed_ptr), *seed_ptr);
+                    std::fflush(stderr);
+                } catch (...) {
+                    // Refusal retains this world's partial source owners. Do not
+                    // allow a raw heap sweep to disguise failed checked retirement.
+                    try { throw; }
+                    catch (const std::exception& first) {
+                        std::cerr << "C3_WORLD_RETAINED lifetime=" << lifetime
+                                  << " world=" << fresh.generation << " match=" << match
+                                  << " first_exception=" << first.what()
+                                  << " error_buffer=" << error << '\n';
+                    } catch (...) { std::cerr << "C3_WORLD_RETAINED first_exception=unknown\n"; }
+                    std::cerr.flush(); std::cout.flush(); std::_Exit(1);
+                }
+                const auto retired = melee_web_gameplay_stats();
+                std::cout << "{\"probe\":\"stadium-owned-world-before-close\",\"lifetime\":" << lifetime
+                          << ",\"world\":" << fresh.generation << ",\"fresh_heap\":" << fresh.heap_free_bytes
+                          << ",\"retired_heap\":" << retired.heap_free_bytes
+                          << ",\"objects\":" << retired.objects << ",\"processes\":" << retired.processes
+                          << ",\"ticks\":" << retired.ticks << "}\n";
+                std::cout.flush();
+                const auto retired_roots = melee_web::test::stadium_screen::runtime_roots_snapshot();
+                const auto retired_classes = melee_web::test::stadium_screen::live_class_counts();
+                const auto retired_pools = melee_web::test::stadium_screen::live_pool_counts();
+                std::cerr << "C3_PREWORLD lifetime=" << lifetime << " gobj_used=" << gobj_alloc_data.used
+                          << " proc_used=" << gobjproc_alloc_data.used
+                          << " before_root_bytes=" << fresh_roots.size() << " after_root_bytes=" << retired_roots.size()
+                          << " roots_equal=" << (retired_roots == fresh_roots) << '\n';
+                for (size_t i = 0; i < std::min(fresh_roots.size(), retired_roots.size()); ++i)
+                    if (fresh_roots[i] != retired_roots[i])
+                        std::cerr << "C3_PREWORLD_ROOT offset=" << i << " before=" << unsigned(fresh_roots[i])
+                                  << " after=" << unsigned(retired_roots[i]) << '\n';
+                for (const auto& [identity, expected] : fresh_classes) {
+                    const auto found = retired_classes.find(identity);
+                    std::cerr << "C3_PREWORLD_CLASS identity=" << static_cast<void*>(identity)
+                              << " before=" << expected << " after="
+                              << (found == retired_classes.end() ? 0 : found->second) << '\n';
+                }
+                for (const auto& [identity, actual] : retired_classes)
+                    if (!fresh_classes.contains(identity))
+                        std::cerr << "C3_PREWORLD_CLASS identity=" << static_cast<void*>(identity)
+                                  << " before=0 after=" << actual << '\n';
+                for (size_t i = 0; i < retired_pools.size(); ++i)
+                    std::cerr << "C3_PREWORLD_POOL index=" << i << " before=" << fresh_pools[i]
+                              << " after=" << retired_pools[i] << '\n';
+                std::cerr.flush();
+                check(retired.generation == fresh.generation && retired.ticks == fresh.ticks &&
+                          retired.objects == fresh.objects && retired.processes == fresh.processes &&
+                          retired_roots == fresh_roots && retired_classes == fresh_classes &&
+                          retired_pools == fresh_pools &&
+                          melee_web_source_memory_healthy(),
+                      "Stadium checked component retirement left source owners before whole-world close");
+                world->verify_immutable_archives();
+                world->close_prepared();
+                world.reset();
+                MeleeWebSourceMemoryContext inactive{};
+                const auto session_after = melee_web_gameplay_allocation();
+                const auto inactive_status = melee_web_source_memory_context_read(&inactive);
+                const auto inactive_stats = melee_web_gameplay_stats();
+                std::fprintf(stderr,
+                    "C3_WORLD_CLOSED lifetime=%u retired_world=%llu world_exists=%d generation=%llu hsd_heap=%d registry=%p status=%d source_world=%llu source_heap=%d objects=%u processes=%u session_before=%llu session_after=%llu session_generation_before=%llu session_generation_after=%llu session_bytes_before=%llu session_bytes_after=%llu files_active=%d toy=%p\n",
+                    lifetime, static_cast<unsigned long long>(fresh.generation), melee_web_gameplay_world_exists(),
+                    static_cast<unsigned long long>(melee_web_gameplay_generation()), HSD_GetHeap(),
+                    HSD_GObj_Entities, int(inactive_status), static_cast<unsigned long long>(inactive.world_generation),
+                    inactive.source_heap_handle, inactive_stats.objects, inactive_stats.processes,
+                    static_cast<unsigned long long>(session_before.identity), static_cast<unsigned long long>(session_after.identity),
+                    static_cast<unsigned long long>(session_before.generation), static_cast<unsigned long long>(session_after.generation),
+                    static_cast<unsigned long long>(session_before.bytes), static_cast<unsigned long long>(session_after.bytes),
+                    melee_web_source_files_active(), static_cast<void*>(_Toy_sbss_804D6ED0));
+                std::fflush(stderr);
+                check(!melee_web_gameplay_world_exists() &&
+                          melee_web_gameplay_generation() == 0 && HSD_GObj_Entities == nullptr &&
+                          HSD_GetHeap() == -1 && !melee_web_gameplay_stats().objects &&
+                          !melee_web_gameplay_stats().processes &&
+                          inactive_status == MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE &&
+                          !melee_web_source_files_active() && _Toy_sbss_804D6ED0 == nullptr &&
+                          session_after.identity == session_before.identity &&
+                          session_after.generation == session_before.generation &&
+                          session_after.bytes == session_before.bytes,
+                      "Owned MenuWorld close did not retire the complete SDK world and preserve its session arena");
+                // HSD cache heads may contain numeric addresses into the retired
+                // heap here. Do not traverse them; fresh startup must reset them.
+                std::cout << "{\"probe\":\"stadium-owned-world-closed\",\"lifetime\":" << lifetime
+                          << ",\"retired_world\":" << fresh.generation
+                          << ",\"session_identity\":" << session_after.identity
+                          << ",\"inactive\":true}\n";
+                previous_world = fresh.generation;
+            }
+            restore_context();
+            check_stadium_selection_preserved(host, selected, baseline, &selection_rng);
+            std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES> final_save{};
+            check(melee_web_menu_host_snapshot_card_data(host, 0, final_save.data(),
+                      final_save.size(), error, sizeof(error)), error);
+            check(final_save == save_before, "Full-world Stadium continuation changed source save bytes");
+            cleanup();
+            check(cleanup_complete && !host && !world,
+                  "Full-world Stadium continuation retained host or world ownership");
+            return;
+        }
 
         world = std::make_unique<melee_web::GameplayMenuWorld>(reopened_files);
         check(melee_web_source_files_active(),
@@ -4441,10 +9491,11 @@ void run_stadium_c1_context_preflight(
         world->verify_immutable_archives();
         check_stadium_preflight_stage_empty();
 
-        if (perform_e8_request || perform_ground_map1_owner) {
+        if (perform_e8_request || perform_ground_map1_owner || perform_on_init) {
             run_stadium_e8_request(reopened_files, host, world.get(), selected,
                                    baseline, save_before,
-                                   perform_ground_map1_owner, trace);
+                                   perform_ground_map1_owner, perform_on_init,
+                                   retired_sis, selection_rng, trace);
             check_stadium_preflight_stage_empty();
         }
 
@@ -4460,7 +9511,7 @@ void run_stadium_c1_context_preflight(
                   sizeof(error)), error);
         check(save_after == save_before,
               "C1 reopened-context preflight changed the live source save owner");
-        check_stadium_selection_preserved(host, selected, baseline);
+        check_stadium_selection_preserved(host, selected, baseline, &selection_rng);
         check((Toy_804A284C[3] & 4) != 0,
               "C1 context teardown changed the retained Toy category baseline");
         cleanup();
@@ -4470,6 +9521,9 @@ void run_stadium_c1_context_preflight(
             std::cout << "C1 reopened-context lifecycle and one E8 typed request, "
                          "plus one isolated Ground map1 lifetime passed; "
                          "no rendered stage entry or source menu entry\n";
+        } else if (perform_on_init && !full_world_lifecycle) {
+            std::cout << "C1 reopened-context lifecycle and one source-ordered Stadium OnInit lifetime passed; "
+                         "returned before camera/OnStart and rendered entry\n";
         } else if (perform_e8_request) {
             std::cout << "C1 reopened-context lifecycle preflight and one E8 typed request passed; "
                          "no stage object or source menu entry\n";
@@ -4481,6 +9535,14 @@ void run_stadium_c1_context_preflight(
                          "stage publication, or source menu entry\n";
         }
     } catch (...) {
+        if (full_world_lifecycle && !cleanup_complete) {
+            try { throw; }
+            catch (const std::exception& first) {
+                std::cerr << "C3_WORLD_FIRST_FAILURE diagnostic=" << first.what()
+                          << " world_retained=" << bool(world) << '\n';
+            } catch (...) { std::cerr << "C3_WORLD_FIRST_FAILURE diagnostic=unknown\n"; }
+            std::cerr.flush(); std::cout.flush(); std::_Exit(1);
+        }
         if (!cleanup_complete) {
             try {
                 cleanup();
@@ -4499,11 +9561,25 @@ void run_stadium_c1a_selection_smoke(
     bool item_state_preflight,
     bool screen_roots_preflight,
     bool ground_map1_owner,
+    bool source_on_init,
+    bool full_world_lifecycle,
     const std::filesystem::path& menu_dir,
     const std::filesystem::path& game_dir,
-    TransitionTrace& trace)
+    TransitionTrace& trace,
+    bool ready_session=false,
+    bool pad_leave_probe=false,
+    bool source_text_lifetime_probe=false,
+    bool ready_text_membership_probe=false,
+    bool toy_owner_controls=false,
+    bool post_ready_tick_probe=false,
+    bool go_alignment_probe=false,
+    bool setup_only_probe=false,
+    bool functional_idle_probe=false,
+    bool functional_idle_pair_probe=false,
+    uint64_t* functional_idle_world_generation=nullptr)
 {
     char error[256]{};
+    MeleeWebRetiredSisLease retired_sis{};
     MeleeWebMenuHost* host = melee_web_menu_host_create(error, sizeof(error));
     check(host != nullptr, error);
     check(melee_web_menu_host_enable_stadium_c1a(host, error, sizeof(error)), error);
@@ -4512,6 +9588,31 @@ void run_stadium_c1a_selection_smoke(
 
     PADStatus raw[4]{};
     melee_web_stage_input_neutral(raw);
+    std::array<uint8_t,MELEE_WEB_SAVE_PROFILE_CARD_BYTES> setup_card_baseline{};
+    std::array<uint8_t,MELEE_WEB_SAVE_PROFILE_CARD_BYTES> setup_first_css_card{};
+    std::array<uint8_t,MELEE_WEB_SAVE_PROFILE_CARD_BYTES> setup_sss_card{};
+    std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> setup_pad_wire{};
+    MeleeWebMenuSourceObservation setup_first_css_observation{};
+    MeleeWebMenuSourceObservation setup_sss_observation{};
+    PADStatus setup_first_css_sample[4]{};
+    PADStatus setup_confirmation_sample[4]{};
+    PADStatus setup_completion_sample[4]{};
+    int setup_confirmation_first_result=-1;
+    unsigned setup_completion_wait_ticks=0;
+    bool setup_retained_input=false;
+    uint32_t first_css_seed=0;
+    if(setup_only_probe){
+        check(seed_ptr!=nullptr,"Stadium setup has no original source RNG owner at first CSS");
+        first_css_seed=*seed_ptr;
+        check(melee_web_menu_host_snapshot_card_data(host,1,setup_card_baseline.data(),
+                  setup_card_baseline.size(),error,sizeof(error)),error);
+        check(melee_web_menu_host_snapshot_card_data(host,0,setup_first_css_card.data(),
+                  setup_first_css_card.size(),error,sizeof(error)),error);
+        check(melee_web_menu_host_source_observe(host,&setup_first_css_observation,
+                  error,sizeof(error)),error);
+        check(setup_first_css_observation.source_scene==MELEE_WEB_MENU_HOST_SCENE_CSS,
+              "Stadium setup first-CSS snapshot came from a different source scene");
+    }
     float pcm[1068]{};
     unsigned audio_phase = 0;
     auto tick = [&]() {
@@ -4525,11 +9626,24 @@ void run_stadium_c1a_selection_smoke(
         return result;
     };
     auto transition = [&]() {
+        const bool capture_sis = source_on_init &&
+            melee_web_menu_host_phase(host) == MELEE_WEB_MENU_SSS;
+        const bool capture_setup = setup_only_probe &&
+            melee_web_menu_host_phase(host) == MELEE_WEB_MENU_SSS;
+        std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> pad_before_leave{};
         melee_web_stage_input_button(raw, PAD_BUTTON_START);
+        if(capture_setup)std::memcpy(setup_confirmation_sample,raw,sizeof(raw));
         int result = tick();
+        if(capture_setup){
+            setup_confirmation_first_result=result;
+            std::memcpy(setup_completion_sample,setup_confirmation_sample,sizeof(raw));
+        }
         melee_web_stage_input_neutral(raw);
-        for (unsigned wait = 0; result != 3 && wait < 120; ++wait)
+        for (unsigned wait = 0; result != 3 && wait < 120; ++wait){
+            if(capture_setup)std::memcpy(setup_completion_sample,raw,sizeof(raw));
             result = tick();
+            if(capture_setup)++setup_completion_wait_ticks;
+        }
         if (result != 3) {
             std::string detail = "Original menu input did not complete its C1a transition: phase=" +
                 std::to_string(melee_web_menu_host_phase(host)) +
@@ -4546,11 +9660,57 @@ void run_stadium_c1a_selection_smoke(
             }
             check(0, detail.c_str());
         }
+        if(capture_setup){
+            check(setup_confirmation_first_result==1||setup_confirmation_first_result==3,
+                  "Stadium SSS confirmation tick did not return a checked source result");
+            check(melee_web_menu_host_snapshot_card_data(host,0,setup_sss_card.data(),
+                      setup_sss_card.size(),error,sizeof(error)),error);
+            check(melee_web_menu_host_source_observe(host,&setup_sss_observation,
+                      error,sizeof(error)),error);
+            check(setup_sss_observation.source_scene==MELEE_WEB_MENU_HOST_SCENE_SSS,
+                  "Final Stadium setup observation did not belong to the live source SSS");
+            melee_web_pad_state_capture(setup_pad_wire.data());
+            MeleeWebPadState* decoded=melee_web_pad_state_decode(
+                setup_pad_wire.data(),setup_pad_wire.size(),error,sizeof(error));
+            check(decoded!=nullptr,error);
+            melee_web_pad_state_free(decoded);
+        }
+        if (capture_sis) {
+            check(melee_web_diagnostic_sis_capture(&retired_sis, error, sizeof(error)), error);
+            trace.sis_lease("captured_before_menu_leave", &retired_sis);
+        }
+        if(capture_sis&&pad_leave_probe){
+            melee_web_pad_state_capture(pad_before_leave.data());
+            report_pad_snapshot("before-menu-leave",pad_before_leave.data());
+        }
         check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
+        if(capture_setup){
+            setup_retained_input=melee_web_menu_host_input(host)!=nullptr;
+            check(setup_retained_input,
+                  "Closed original SSS did not retain its source PAD history owner");
+        }
+        if(capture_sis&&pad_leave_probe){
+            std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> pad_after_leave{};
+            melee_web_pad_state_capture(pad_after_leave.data());
+            report_pad_snapshot("after-menu-leave",pad_after_leave.data(),pad_before_leave.data());
+            const MeleeWebPadState* retained=melee_web_menu_host_input(host);
+            std::fprintf(stderr,"C1_PAD_LEAVE_RETAINED host_input=%d host_phase=%d source_scene=%d source_world_exists=%d rng_owner=%p rng_value=%u\n",
+                retained!=nullptr,melee_web_menu_host_phase(host),melee_web_menu_host_source_scene(host),
+                melee_web_gameplay_world_exists(),static_cast<const void*>(seed_ptr),
+                seed_ptr?*seed_ptr:0U);
+            std::fflush(stderr);
+            check(retained!=nullptr,
+                  "Original SSS leave did not retain its decoded source PAD input");
+        }
+        if (capture_sis) {
+            check(melee_web_diagnostic_sis_verify_retired(&retired_sis, error, sizeof(error)), error);
+            trace.sis_lease("verified_retired_before_world_shutdown", &retired_sis);
+        }
     };
 
     // The armed SSS still begins on an admitted stage. Its existing validation
     // remains live while the source cursor navigates toward Stadium.
+    if(setup_only_probe)std::memcpy(setup_first_css_sample,raw,sizeof(raw));
     for (unsigned frame = 0; frame < 120; ++frame)
         check(tick() == 1, "C1a SSS navigation rejected its initial admitted stage");
     transition();
@@ -4618,11 +9778,38 @@ void run_stadium_c1a_selection_smoke(
     check(!melee_web_stage_content(St_Kind_PStadium),
           "C1a diagnostic unexpectedly registered Stadium as playable");
 
+    if(setup_only_probe){
+        const auto* prepared=melee_web_menu_host_post_vs_mode(host);
+        check(prepared!=nullptr,"Closed SSS setup has no checked post-VS state");
+        check(raw_selection.rules.stkind==St_Kind_PStadium&&
+                  selected.start.rules.stkind==St_Kind_PStadium&&
+                  prepared->start.rules.stkind==St_Kind_PStadium,
+              "Raw, normalized and post-VS setup do not identify the selected Stadium stage");
+        trace.stadium_source_setup(first_css_seed,setup_card_baseline,setup_first_css_card,
+            setup_sss_card,setup_first_css_observation,setup_sss_observation,raw_selection,
+            selected,*prepared,setup_pad_wire,setup_first_css_sample,
+            setup_confirmation_sample,setup_completion_sample,
+            setup_confirmation_first_result,setup_completion_wait_ticks,setup_retained_input);
+        world->verify_immutable_archives();
+        world->close();
+        world.reset();
+        check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);
+        host=nullptr;
+        check(!melee_web_gameplay_world_exists()&&!melee_web_gameplay_generation(),
+              "Stadium setup-only cleanup retained its source menu world");
+        std::cout<<"Stadium source CSS/SSS setup receipt emitted; no OnInit, match construction, Ready/GO, draw or gameplay claim\n";
+        return;
+    }
     if (reopened_context_preflight) {
         run_stadium_c1_context_preflight(
             files, host, world, selected, names, menu_dir, game_dir,
             e8_request_trace, item_state_preflight, screen_roots_preflight,
-            ground_map1_owner, trace);
+            ground_map1_owner, source_on_init,
+            source_on_init ? &retired_sis : nullptr, trace, full_world_lifecycle, ready_session,
+            pad_leave_probe, source_text_lifetime_probe,
+            ready_text_membership_probe,toy_owner_controls,post_ready_tick_probe,
+            go_alignment_probe,functional_idle_probe,functional_idle_pair_probe,
+            functional_idle_world_generation);
     } else {
         world->verify_immutable_archives();
         world->close();
@@ -4632,7 +9819,14 @@ void run_stadium_c1a_selection_smoke(
     }
     check(!melee_web_menu_stage_explicit_confirm_available(St_Kind_PStadium),
           "C1a explicit-confirm permission survived unload");
-    if (ground_map1_owner) {
+    if(ready_session||pad_leave_probe||source_text_lifetime_probe||
+       ready_text_membership_probe||go_alignment_probe||functional_idle_probe)return;
+    if (full_world_lifecycle) {
+        std::cout << "Stadium original OnInit/OnLoad/OnStart two owned-world lifetimes passed; Ready/GO and ticks remain unrun\n";
+    } else if (source_on_init) {
+        std::cout << "C1a raw PAD CSS->SSS selection and one source-ordered Stadium OnInit lifetime passed; "
+                     "admission remains closed\n";
+    } else if (ground_map1_owner) {
         std::cout << "C1a raw PAD CSS->SSS selection, one E8 typed request, and one "
                      "Ground map1 constructor/removal passed; admission remains closed\n";
     } else if (e8_request_trace) {
@@ -4656,16 +9850,79 @@ int main(int argc,char** argv){try{
   run_vs_sudden_death_source_control();return 0;
  }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
- if(argc==2&&std::string_view(argv[1])=="--stadium-yakumono-exchange"){
+  if(argc==2&&std::string_view(argv[1])=="--stadium-gobj-proc-pool-controls"){
+   check(melee_web_stadium_c1_gobj_proc_pool_control(), "Stadium GObj/proc pool control failed");
+   return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-generator-lifetime-controls"){
+   check(melee_web_stadium_c1_generator_lifetime_control(), "Stadium generator lifetime control failed");
+   return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-retirement-phase-controls"){
+   run_stadium_retirement_phase_controls();return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-manager-mapset-controls"){
+   check(melee_web_stadium_c1_manager_mapset_control(), "Stadium manager mapset control failed");
+   return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--ground-pending-callback-controls"){
+   check(melee_web_stadium_c1_pending_queue_loss_control(), "Ground queue root-loss control failed");
+   std::cout.flush();std::cerr.flush();
+   std::_Exit(0); // Retained expected partial owner; no raw source-world shutdown.
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-profile-controls"){
+   run_stadium_profile_controls();return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-started-map2-buffer-controls"){
+   run_stadium_profile_controls();
+   run_stadium_started_map2_buffer_controls();return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-on-init-controls"){
+   run_stadium_profile_controls();
+   run_stadium_effect_runtime_lifecycle_control();
+   run_stadium_selection_rng_controls();
+   std::cout<<"C1 source OnInit refusal and synthetic event-journal controls passed; no Stadium stage initialization invoked\n";
+   return 0;
+  }
+  if (argc == 2 &&
+      (std::string_view(argv[1]) == "--stadium-cache-live-controls" ||
+       std::string_view(argv[1]) == "--stadium-cache-live-controls=0")) {
+   run_stadium_cache_live_control(false);return 0;
+  }
+  if (argc == 2 &&
+      (std::string_view(argv[1]) == "--stadium-cache-live-controls-owner" ||
+       std::string_view(argv[1]) == "--stadium-cache-live-controls=1")) {
+   run_stadium_cache_live_control(true);return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-map-light-adoption-controls"){
+   run_stadium_map_light_adoption_control();return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-sis-allocator-controls"){
+   run_stadium_sis_allocator_lifecycle_control();return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-sis-text-event-controls"){
+   HSD_SisLib_C1TextProbeSet(1);
+   run_stadium_sis_allocator_lifecycle_control();
+   HSD_SisLib_C1TextProbeSet(0);
+   return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-bind-refusal-controls"){
+   run_stadium_bind_refusal_control();return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-owner-graph-controls"){
+   run_stadium_owner_graph_controls();return 0;
+  }
+  if(argc==2&&std::string_view(argv[1])=="--stadium-yakumono-exchange"){
   run_stadium_yakumono_exchange_control();return 0;
  }
 #endif
- if(argc<3||argc>8)throw std::runtime_error("Expected menu/audio directories, optional stage kind, transition trace path, source revision and input recipe");
+ if(argc<3||argc>9)throw std::runtime_error("Expected menu/audio directories, optional stage kind, transition trace path, source revision and input recipe");
  const int stage_kind=argc>=4?std::stoi(argv[3]):St_Kind_Last;
  const char* trace_path=argc>=5?argv[4]:nullptr;
  const char* source_revision=argc>=6?argv[5]:nullptr;
  const char* input_recipe=argc>=7?argv[6]:nullptr;
- const char* replay_recipe_path=argc==8?argv[7]:nullptr;
+ const char* replay_recipe_path=argc>=8?argv[7]:nullptr;
+ const char* consumed_pad_path=argc==9?argv[8]:nullptr;
  const bool retail_fd_recipe=input_recipe&&std::string(input_recipe)=="retail-stock-fd-v1";
  const bool results_mario_recipe=input_recipe&&std::string(input_recipe)=="results-mario-v1";
  const bool link_css_unload_recipe=input_recipe&&std::string(input_recipe)=="link-css-unload-v1";
@@ -4711,6 +9968,36 @@ int main(int argc,char** argv){try{
      std::string(input_recipe)=="stadium-e8-request-v1";
  const bool stadium_ground_map1_owner_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-ground-map1-owner-v1";
+ const bool stadium_source_on_init_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-source-oninit-v1";
+ const bool stadium_toy_owner_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-source-toy-owner-controls-v1";
+ const bool stadium_post_ready_tick_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-source-post-ready-tick-v1";
+ const bool stadium_ready_session_recipe=stadium_toy_owner_recipe||stadium_post_ready_tick_recipe||(input_recipe&&
+     std::string(input_recipe)=="stadium-source-ready-session-v1");
+ const bool stadium_source_go_alignment_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-source-go-alignment-v1";
+ const bool stadium_source_functional_idle_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-source-functional-idle-v1";
+ const bool stadium_source_functional_idle_pair_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-source-functional-idle-pair-v1";
+ const bool stadium_grdatfiles_pair_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-grdatfiles-pair-v1";
+ const bool stadium_source_setup_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-source-setup-v1";
+ const bool stadium_source_world_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-source-world-lifecycle-v1";
+ const bool stadium_pad_leave_probe_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-pad-leave-probe-v1";
+ const bool stadium_source_text_lifetime_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-source-text-lifetime-v1";
+ const bool stadium_ready_text_membership_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-source-ready-text-membership-v1";
+ const bool stadium_first_css_context_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-first-css-context-v1";
+ const bool stadium_first_css_consumed_tick_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-first-css-consumed-tick-v1";
 #else
  const bool stadium_c1a_recipe=false;
  const bool stadium_c1_context_preflight_recipe=false;
@@ -4718,6 +10005,21 @@ int main(int argc,char** argv){try{
  const bool stadium_screen_roots_recipe=false;
  const bool stadium_e8_request_recipe=false;
  const bool stadium_ground_map1_owner_recipe=false;
+ const bool stadium_source_on_init_recipe=false;
+ const bool stadium_source_world_recipe=false;
+ const bool stadium_ready_session_recipe=false;
+ const bool stadium_source_go_alignment_recipe=false;
+ const bool stadium_source_functional_idle_recipe=false;
+ const bool stadium_source_functional_idle_pair_recipe=false;
+ const bool stadium_grdatfiles_pair_recipe=false;
+ const bool stadium_source_setup_recipe=false;
+ const bool stadium_post_ready_tick_recipe=false;
+ const bool stadium_toy_owner_recipe=false;
+ const bool stadium_pad_leave_probe_recipe=false;
+ const bool stadium_source_text_lifetime_recipe=false;
+ const bool stadium_ready_text_membership_recipe=false;
+ const bool stadium_first_css_context_recipe=false;
+ const bool stadium_first_css_consumed_tick_recipe=false;
 #endif
  if(input_recipe&&!css_observer_recipe&&!sparse_css_recipe&&!sparse_pad_recipe&&!ordinary_timeout_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
@@ -4727,13 +10029,29 @@ int main(int argc,char** argv){try{
     !stadium_c1_context_preflight_recipe&&
     !stadium_c1_item_state_preflight_recipe&&!stadium_screen_roots_recipe&&
     !stadium_e8_request_recipe&&!stadium_ground_map1_owner_recipe&&
+    !stadium_source_on_init_recipe&&!stadium_source_world_recipe&&!stadium_ready_session_recipe&&
+    !stadium_source_go_alignment_recipe&&!stadium_source_functional_idle_recipe&&
+    !stadium_source_functional_idle_pair_recipe&&!stadium_grdatfiles_pair_recipe&&
+    !stadium_source_setup_recipe&&
+    !stadium_pad_leave_probe_recipe&&!stadium_source_text_lifetime_recipe&&
+    !stadium_ready_text_membership_recipe&&
+    !stadium_first_css_context_recipe&&
+    !stadium_first_css_consumed_tick_recipe&&
     !v10_css_replay_start_recipe)
     throw std::runtime_error("Unknown transition input recipe");
  if(v10_css_replay_start_recipe&&
     (argc!=8||!replay_recipe_path||!trace_path||!source_revision))
    throw std::runtime_error("MWRC v10 CSS replay-start reducer requires trace, source revision and exact recipe path");
- if(!v10_css_replay_start_recipe&&argc==8)
-   throw std::runtime_error("Only the MWRC v10 CSS replay-start reducer accepts an exact recipe path");
+ if(stadium_first_css_context_recipe&&
+    (argc!=8||!replay_recipe_path||!trace_path||!source_revision))
+   throw std::runtime_error("First-CSS context diagnostic requires trace, source revision and exact input bundle path");
+ if(stadium_first_css_consumed_tick_recipe&&
+    (argc!=9||!replay_recipe_path||!consumed_pad_path||!trace_path||!source_revision))
+   throw std::runtime_error("First-CSS consumed-tick diagnostic requires trace, source revision and both exact input bundle paths");
+ if(argc==8&&!v10_css_replay_start_recipe&&!stadium_first_css_context_recipe)
+   throw std::runtime_error("Only exact replay/context reducers accept an input path");
+ if(argc==9&&!stadium_first_css_consumed_tick_recipe)
+   throw std::runtime_error("Only the exact first-CSS consumed-tick reducer accepts a second input path");
  if((css_observer_recipe||sparse_css_recipe||sparse_pad_recipe||ordinary_timeout_recipe||retail_fd_recipe||results_mario_recipe||sudden_death_host_recipe||
      sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe||
      v10_css_replay_start_recipe)&&
@@ -4741,7 +10059,14 @@ int main(int argc,char** argv){try{
    throw std::runtime_error("Explicit FD recipes require Final Destination");
  if((stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
      stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
-     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe)&&
+     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
+     stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
+     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||
+     stadium_source_functional_idle_pair_recipe||stadium_grdatfiles_pair_recipe||
+     stadium_source_setup_recipe||stadium_pad_leave_probe_recipe||
+     stadium_source_text_lifetime_recipe||
+     stadium_ready_text_membership_recipe||stadium_first_css_context_recipe||
+     stadium_first_css_consumed_tick_recipe)&&
     stage_kind!=St_Kind_PStadium)
    throw std::runtime_error("C1a recipes require source StKind 3");
  TransitionTrace trace(trace_path,source_revision,input_recipe);
@@ -4751,6 +10076,13 @@ int main(int argc,char** argv){try{
     stadium_c1_context_preflight_recipe||
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
+    stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
+     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||
+     stadium_source_functional_idle_pair_recipe||stadium_grdatfiles_pair_recipe||
+    stadium_source_setup_recipe||stadium_pad_leave_probe_recipe||
+    stadium_source_text_lifetime_recipe||
+    stadium_ready_text_membership_recipe||
+    stadium_first_css_context_recipe||stadium_first_css_consumed_tick_recipe||
     v10_css_replay_start_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
     trophy_baseline_recipe||sound_settings_recipe)
   keys=melee_web::menu_asset_names();
@@ -4779,18 +10111,201 @@ int main(int argc,char** argv){try{
   return 0;
  }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(stadium_first_css_context_recipe){
+  run_stadium_first_css_context(files,replay_recipe_path);
+  const int session_ended = melee_web_gameplay_session_end(
+      session_error, sizeof(session_error));
+  std::cout << "{\"record\":\"stadium_first_css_session_cleanup\","
+            << "\"attempted\":true,\"ok\":"
+            << (session_ended ? "true" : "false") << ",\"error\":"
+            << first_css_json_quote(session_error) << "}\n" << std::flush;
+  check(session_ended, session_error);
+  std::cout<<"Original first-CSS return context diagnostic completed after one CSS OnEnter; "
+              "zero source ticks/draws, no SSS/GO/match/full-session comparison\n";
+  return 0;
+ }
+ if(stadium_first_css_consumed_tick_recipe){
+  run_stadium_first_css_context(files,replay_recipe_path,consumed_pad_path);
+  const int session_ended = melee_web_gameplay_session_end(
+      session_error, sizeof(session_error));
+  std::cout << "{\"record\":\"stadium_first_css_session_cleanup\","
+            << "\"attempted\":true,\"ok\":"
+            << (session_ended ? "true" : "false") << ",\"error\":"
+            << first_css_json_quote(session_error) << "}\n" << std::flush;
+  check(session_ended, session_error);
+  std::cout << "Original first-CSS context diagnostic completed after one consumed PAD host tick; "
+               "no draw, SSS/GO/match/full-session comparison\n";
+  return 0;
+ }
+#endif
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(stadium_grdatfiles_pair_recipe){
+  check(melee_web_stadium_c1_grdatfiles_snapshot_control(),
+        "Synthetic grDatFiles slot/field first-occupancy control failed");
+  MeleeWebGameplayAllocation prior_session=session_allocation;
+  check(prior_session.identity&&prior_session.generation&&
+            prior_session.bytes==32U*1024U*1024U,
+        "First grDatFiles lifetime has no live 32 MiB Session arena");
+  for(unsigned lifetime=0;lifetime<2;++lifetime){
+   if(lifetime){
+    check(melee_web_gameplay_session_begin(32U*1024U*1024U,
+              session_error,sizeof(session_error)),session_error);
+    const auto next_session=melee_web_gameplay_allocation();
+    check(next_session.identity&&next_session.generation>prior_session.generation&&
+              next_session.bytes==32U*1024U*1024U,
+          "Second grDatFiles lifetime did not receive a newer Session arena");
+    prior_session=next_session;
+   }
+   melee_web_stadium_c1_grdatfiles_set_lifetime_ordinal((int)lifetime);
+   trace.begin_run(lifetime);
+   std::fprintf(stderr,
+       "STADIUM_GRDATFILES_LIFETIME phase=begin ordinal=%u session_identity=%llu session_generation=%llu session_bytes=%llu\n",
+       lifetime,static_cast<unsigned long long>(prior_session.identity),
+       static_cast<unsigned long long>(prior_session.generation),
+       static_cast<unsigned long long>(prior_session.bytes));
+   std::fflush(stderr);
+   if(lifetime==0){
+    // One checked source Ready, then immediate existing match/world teardown.
+    run_stadium_c1a_selection_smoke(
+        files,true,false,false,false,false,true,false,argv[1],argv[2],trace,
+        true,false,false,false,false,false,false,false,false,false,nullptr);
+    check(!melee_web_gameplay_world_exists(),
+          "First grDatFiles lifetime retained its match world after Ready close");
+    check(melee_web_stadium_c1_grdatfiles_trace_snapshot(
+              "before-session-close", 0ULL),
+          "Could not snapshot ordinary grDatFiles before Session close");
+    check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),
+          session_error);
+    check(melee_web_stadium_c1_grdatfiles_trace_snapshot(
+              "after-session-close", 0ULL),
+          "Could not snapshot ordinary grDatFiles after Session close");
+    std::fprintf(stderr,
+        "STADIUM_GRDATFILES_LIFETIME phase=closed ordinal=0 session_identity=%llu session_generation=%llu world_exists=%d\n",
+        static_cast<unsigned long long>(prior_session.identity),
+        static_cast<unsigned long long>(prior_session.generation),
+        melee_web_gameplay_world_exists());
+    std::fflush(stderr);
+   }else{
+    // Stop at the existing second SSS context preflight; do not construct a match.
+    run_stadium_c1a_selection_smoke(
+        files,true,false,false,false,false,true,false,argv[1],argv[2],trace,
+        false,true,false,false,false,false,false,false,false,false,nullptr);
+    check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),
+          session_error);
+    check(melee_web_stadium_c1_grdatfiles_trace_snapshot(
+              "after-second-preflight-close", 0ULL),
+          "Could not snapshot ordinary grDatFiles after second preflight");
+    std::cout<<"Stadium one-Ready grDatFiles teardown and second preflight passed; "
+                "no second match construction, idle interval, draw or C3 claim\n";
+    return 0;
+   }
+  }
+  return 0;
+ }
+ if(stadium_source_functional_idle_pair_recipe){
+  MeleeWebGameplayAllocation prior_session=session_allocation;
+  check(prior_session.identity&&prior_session.generation&&
+            prior_session.bytes==32U*1024U*1024U,
+        "First functional-idle lifetime has no live 32 MiB Session arena");
+  uint64_t world_generations[2]{};
+  for(unsigned lifetime=0;lifetime<2;++lifetime){
+   MeleeWebGameplayAllocation session=prior_session;
+   if(lifetime){
+    check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
+    session=melee_web_gameplay_allocation();
+    check(session.identity&&session.generation>prior_session.generation&&
+              session.bytes==32U*1024U*1024U,
+          "Second functional-idle lifetime did not receive a newer live Session arena");
+   }
+   trace.begin_run(lifetime);
+   const MeleeWebGameplayAllocation no_release{};
+   trace.stadium_functional_idle_lifetime(lifetime,"begin",session,0,no_release);
+   std::fprintf(stderr,
+       "STADIUM_FUNCTIONAL_IDLE_LIFETIME phase=begin ordinal=%u session_identity=%llu session_generation=%llu session_bytes=%llu world_generation=0\n",
+       lifetime,static_cast<unsigned long long>(session.identity),
+       static_cast<unsigned long long>(session.generation),
+       static_cast<unsigned long long>(session.bytes));
+   std::fflush(stderr);
+   uint64_t world_generation=0;
+   run_stadium_c1a_selection_smoke(
+       files,true,false,false,false,false,true,false,argv[1],argv[2],trace,
+       true,false,false,false,false,false,true,false,true,true,&world_generation);
+   check(world_generation!=0,
+         "Functional-idle lifetime completed without returning its world generation");
+   world_generations[lifetime]=world_generation;
+   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
+   const auto released=melee_web_gameplay_allocation();
+   check(!released.identity&&!released.generation&&!released.bytes&&
+             !melee_web_gameplay_world_exists(),
+         "Functional-idle lifetime did not release its Session arena and world");
+   trace.stadium_functional_idle_lifetime(lifetime,"closed",session,world_generation,released);
+   std::fprintf(stderr,
+       "STADIUM_FUNCTIONAL_IDLE_LIFETIME phase=closed ordinal=%u session_identity=%llu session_generation=%llu session_bytes=%llu world_generation=%llu released_identity=%llu released_generation=%llu released_bytes=%llu world_exists=%d\n",
+       lifetime,static_cast<unsigned long long>(session.identity),
+       static_cast<unsigned long long>(session.generation),
+       static_cast<unsigned long long>(session.bytes),
+       static_cast<unsigned long long>(world_generation),
+       static_cast<unsigned long long>(released.identity),
+       static_cast<unsigned long long>(released.generation),
+       static_cast<unsigned long long>(released.bytes),melee_web_gameplay_world_exists());
+   std::fprintf(stderr,"C3_SESSION_CLOSED identity=%llu generation=%llu bytes=%llu world_exists=%d\n",
+       static_cast<unsigned long long>(released.identity),
+       static_cast<unsigned long long>(released.generation),
+       static_cast<unsigned long long>(released.bytes),melee_web_gameplay_world_exists());
+   std::fflush(stderr);
+   prior_session=session;
+  }
+  check(world_generations[1]>world_generations[0],
+        "Second functional-idle lifetime did not receive a newer world generation");
+  std::cout<<"Two same-process Stadium functional-idle lifetimes each reached 3,500 post-GO no-draw PCM ticks and fully retired their owners; no C3 claim\n";
+  return 0;
+ }
+#endif
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  if(stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
-    stadium_e8_request_recipe||stadium_ground_map1_owner_recipe){
+    stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
+    stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
+     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||
+     stadium_source_setup_recipe||
+    stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
+    stadium_ready_text_membership_recipe){
   run_stadium_c1a_selection_smoke(
       files, stadium_c1_context_preflight_recipe||
           stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
-          stadium_e8_request_recipe||stadium_ground_map1_owner_recipe,
+          stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
+          stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
+     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||
+          stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
+              stadium_ready_text_membership_recipe,
       stadium_e8_request_recipe||stadium_ground_map1_owner_recipe,
       stadium_c1_item_state_preflight_recipe, stadium_screen_roots_recipe,
-      stadium_ground_map1_owner_recipe,
-      argv[1], argv[2], trace);
+          stadium_ground_map1_owner_recipe, stadium_source_on_init_recipe||stadium_source_world_recipe||
+              stadium_ready_session_recipe||stadium_source_go_alignment_recipe||
+              stadium_source_functional_idle_recipe||stadium_pad_leave_probe_recipe||
+                  stadium_source_text_lifetime_recipe||
+                  stadium_ready_text_membership_recipe,
+      stadium_source_world_recipe,
+      argv[1], argv[2], trace,
+      stadium_ready_session_recipe||stadium_source_go_alignment_recipe,
+      stadium_pad_leave_probe_recipe,stadium_source_text_lifetime_recipe,
+      stadium_ready_text_membership_recipe,stadium_toy_owner_recipe,
+      stadium_post_ready_tick_recipe,stadium_source_go_alignment_recipe,
+      stadium_source_setup_recipe,stadium_source_functional_idle_recipe);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
+  if(stadium_source_world_recipe||stadium_ready_session_recipe||
+     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||
+     stadium_source_setup_recipe||
+     stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
+     stadium_ready_text_membership_recipe){
+   const auto released=melee_web_gameplay_allocation();
+   std::fprintf(stderr,"C3_SESSION_CLOSED identity=%llu generation=%llu bytes=%llu world_exists=%d\n",
+       static_cast<unsigned long long>(released.identity),static_cast<unsigned long long>(released.generation),
+       static_cast<unsigned long long>(released.bytes),melee_web_gameplay_world_exists());
+   std::fflush(stderr);
+   check(!released.identity&&!released.generation&&!released.bytes&&!melee_web_gameplay_world_exists(),
+         "Stadium full-world continuation did not retire its complete owned session arena");
+  }
   return 0;
  }
 #endif

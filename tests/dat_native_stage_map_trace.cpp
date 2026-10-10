@@ -21,6 +21,8 @@ extern "C" const uint8_t* melee_web_test_native_stadium_flags(void*,int);
 extern "C" void* melee_web_test_native_stadium_flag(void*,int);
 extern "C" int melee_web_test_native_marker_pairs(void*,const uint16_t*,int);
 extern "C" int melee_web_test_ground_marker_last_write(void*);
+extern "C" int melee_web_test_native_map_light_identity(void*,void*);
+extern "C" void* melee_web_test_native_map_light_animation_identity(void*,void*);
 static void check(bool c,const char* e){if(!c)throw std::runtime_error(e);}
 namespace {
 using namespace melee_web::test;
@@ -49,15 +51,39 @@ template<class F>void expect_error(F&& operation,std::string_view expected){
 }
 std::vector<uint8_t> marker_fixture(uint32_t node_count=13,bool null_flag=false,
                                     bool external_map_field=false,bool local_flag=false,
-                                    bool external_flag=false){
- constexpr uint32_t data_size=0x600,root=0x100,references=0x140,entries=0x160;
+                                    bool external_flag=false,bool light_override=false,
+                                    bool light_animation=false,bool unterminated_animation=false,
+                                    const std::vector<std::array<uint16_t,2>>* authored_override=nullptr){
+ constexpr uint32_t root=0x100,references=0x140,entries=0x160;
  constexpr uint32_t pairs=0x1a0,flagged=0x1c0,tree=0x200;
+ const uint32_t data_size=std::max<uint32_t>(0x600,tree+node_count*64);
+ static constexpr std::array<std::array<uint16_t,2>,8> default_authored={{{3,0},{0,1},{2,2},{1,3},{12,135},{4,135},{9,134},{9,134}}};
+ const size_t pair_count=authored_override?authored_override->size():default_authored.size();
+ check(!light_animation||light_override,"synthetic animation requires an authored light row");
+ check(!unterminated_animation||light_animation,"synthetic unterminated table requires animation");
  check(!(local_flag&&external_flag),"synthetic flagged slot has one authored kind");
  check(node_count>=13&&tree+node_count*64<=data_size,"synthetic marker tree fits bounded fixture");
+ check(!light_override||tree+node_count*64<=0x540,
+       "synthetic marker tree does not overlap its typed light fixture");
  std::vector<uint8_t> data(data_size,0);
+ constexpr uint32_t light_table=0x540,light_list=0x548,light=0x550;
+ constexpr uint32_t light_overrides=0x570;
  write_be32(data,root,references);write_be32(data,root+4,1);
  write_be32(data,root+8,entries);write_be32(data,root+12,1);
- write_be32(data,references,tree);write_be32(data,references+4,pairs);write_be32(data,references+8,8);
+ if(light_override){
+  write_be32(data,root+24,light_overrides);write_be32(data,root+28,1);
+  write_be32(data,entries+24,light_table);
+  write_be32(data,light_table,light_list);
+  write_be32(data,light_list,light);
+  if(light_animation){
+   // The valid table has one relocated descriptor and one authored null word.
+   // Its bad variant starts one word later and ends at the referenced record.
+   const uint32_t table=unterminated_animation?0x584:0x580;
+   write_be32(data,light_list+4,table);write_be32(data,table,0x588);
+  }
+  write_be32(data,light_overrides,light);data[light_overrides+4]=0xe0;
+ }
+ write_be32(data,references,tree);write_be32(data,references+4,pairs);write_be32(data,references+8,uint32_t(pair_count));
  if(null_flag||local_flag||external_flag){
   write_be32(data,root+40,flagged);write_be32(data,root+44,1);
   if(local_flag)write_be32(data,flagged,tree);
@@ -70,11 +96,20 @@ std::vector<uint8_t> marker_fixture(uint32_t node_count=13,bool null_flag=false,
   if(i+1<node_count)write_be32(data,node+8,node+64);
   write_be32(data,node+32,0x3f800000);write_be32(data,node+36,0x3f800000);write_be32(data,node+40,0x3f800000);
  }
- constexpr std::array<std::array<uint16_t,2>,8> authored={{{3,0},{0,1},{2,2},{1,3},{12,135},{4,135},{9,134},{9,134}}};
- for(uint32_t i=0;i<authored.size();i++){
-  write_be16(data,pairs+4*i,authored[i][0]);write_be16(data,pairs+4*i+2,authored[i][1]);
+ for(size_t i=0;i<pair_count;i++){
+  const auto& binding=authored_override?(*authored_override)[i]:default_authored[i];
+  write_be16(data,pairs+4*uint32_t(i),binding[0]);write_be16(data,pairs+4*uint32_t(i)+2,binding[1]);
  }
  std::vector<uint32_t> relocations={root,root+8,references,references+4,entries};
+ if(light_override){
+  relocations.push_back(root+24);relocations.push_back(entries+24);
+  relocations.push_back(light_table);relocations.push_back(light_list);
+  relocations.push_back(light_overrides);
+  if(light_animation){
+   relocations.push_back(light_list+4);
+   relocations.push_back(unterminated_animation?0x584:0x580);
+  }
+ }
  if(null_flag||local_flag||external_flag)relocations.push_back(root+40);
  if(local_flag)relocations.push_back(flagged);
  for(uint32_t i=0;i+1<node_count;i++)relocations.push_back(tree+64*i+8);
@@ -111,6 +146,121 @@ std::vector<uint8_t> marker_fixture(uint32_t node_count=13,bool null_flag=false,
  }
  std::copy(names.begin(),names.end(),archive.begin()+static_cast<std::ptrdiff_t>(cursor));
  return archive;
+}
+void profile_marker_contract_controls(){
+ using namespace melee_web;
+ static constexpr std::array<MeleeWebStageMarkerBinding,20> stadium_expected={{
+     {1,149},{2,150},{3,151},{4,152},{5,127},{6,128},{7,129},{8,130},
+     {9,131},{10,132},{11,133},{12,134},{13,135},{14,135},{15,136},
+     {16,0},{17,1},{18,2},{19,3},{20,4},
+ }};
+ const auto* stadium=melee_web_stage_stadium_profile_data();
+ check(stadium&&stadium->marker_contract_policy==MELEE_WEB_STAGE_MARKER_CONTRACT_AUTHORED_ORDER&&
+           stadium->required_marker_count==8&&stadium->authored_marker_binding_count==stadium_expected.size(),
+       "Stadium profile declares the exact authored-order marker contract and required IDs");
+ for(size_t i=0;i<stadium_expected.size();i++)
+  check(stadium->authored_marker_bindings[i].joint_index==stadium_expected[i].joint_index&&
+            stadium->authored_marker_bindings[i].marker_id==stadium_expected[i].marker_id,
+        "Stadium source profile retains every C0-authoritative ordered binding");
+
+ std::vector<std::array<uint16_t,2>> stadium_pairs;
+ for(const auto& binding:stadium_expected)stadium_pairs.push_back({binding.joint_index,binding.marker_id});
+ const auto stadium_bytes=marker_fixture(21,false,false,false,false,false,false,false,&stadium_pairs);
+ auto stadium_archive=std::make_shared<DatArchive>(stadium_bytes);
+ NativeDatArena stadium_arena(stadium_archive);
+ auto* accepted=melee_web_stage_markers_decode_profile(
+     stadium_arena.reader(),0x100,stadium);
+ check(accepted&&melee_web_stage_markers_descriptor(accepted),
+       "profile-backed structural decode accepts Stadium's ordered duplicate pair and absent 148");
+
+ const auto expect_stadium_reject=[&](const std::vector<uint8_t>& bytes,std::string_view reason){
+  auto archive=std::make_shared<DatArchive>(bytes);
+  expect_error([&]{
+   NativeDatArena arena(archive);
+   (void)melee_web_stage_markers_decode_profile(arena.reader(),0x100,stadium);
+  },reason);
+ };
+ const auto replace_pair=[&](std::vector<uint8_t>& bytes,size_t index,uint16_t joint,uint16_t id){
+  write_be16(bytes,uint32_t(0x20+0x1a0+4*index),joint);
+  write_be16(bytes,uint32_t(0x20+0x1a0+4*index+2),id);
+ };
+ auto missing=stadium_bytes;write_be32(missing,0x20+0x140+8,19);
+ expect_stadium_reject(missing,"authored profile count");
+ auto extra=stadium_bytes;write_be32(extra,0x20+0x140+8,21);
+ expect_stadium_reject(extra,"authored profile count");
+ auto reordered=stadium_bytes;
+ replace_pair(reordered,12,stadium_expected[13].joint_index,stadium_expected[13].marker_id);
+ replace_pair(reordered,13,stadium_expected[12].joint_index,stadium_expected[12].marker_id);
+ expect_stadium_reject(reordered,"binding order differs");
+ auto changed_index=stadium_bytes;replace_pair(changed_index,0,261,149);
+ expect_stadium_reject(changed_index,"Invalid marker binding");
+ auto changed_binding=stadium_bytes;replace_pair(changed_binding,0,1,150);
+ expect_stadium_reject(changed_binding,"binding order differs");
+ auto unexpected_duplicate=stadium_bytes;replace_pair(unexpected_duplicate,15,16,135);
+ expect_stadium_reject(unexpected_duplicate,"binding order differs");
+ auto missing_spawn=stadium_bytes;replace_pair(missing_spawn,15,16,10);
+ expect_stadium_reject(missing_spawn,"binding order differs");
+ auto missing_blast=stadium_bytes;replace_pair(missing_blast,0,1,148);
+ expect_stadium_reject(missing_blast,"binding order differs");
+ auto bad_id=stadium_bytes;replace_pair(bad_id,0,1,261);
+ expect_stadium_reject(bad_id,"Invalid marker binding");
+
+ auto ordinary_pairs=std::vector<std::array<uint16_t,2>>{
+     {0,0},{1,1},{2,2},{3,3},{4,148},{5,149},{6,150},{7,151},{8,152}};
+ const auto ordinary_bytes=marker_fixture(13,false,false,false,false,false,false,false,&ordinary_pairs);
+ const auto* ordinary=melee_web_stage_profile(St_Kind_Last);
+ check(ordinary&&ordinary->marker_contract_policy==MELEE_WEB_STAGE_MARKER_CONTRACT_STRICT_UNIQUE,
+       "ordinary Final Destination profile retains strict unique marker policy");
+ auto ordinary_archive=std::make_shared<DatArchive>(ordinary_bytes);
+ NativeDatArena ordinary_arena(ordinary_archive);
+ auto* strict=melee_web_stage_markers_decode_profile(
+     ordinary_arena.reader(),0x100,ordinary);
+ check(strict&&melee_web_stage_markers_descriptor(strict),
+       "profile-backed ordinary decoder accepts the existing unique required marker set");
+ auto duplicate_ordinary=ordinary_bytes;replace_pair(duplicate_ordinary,5,5,148);
+ auto duplicate_archive=std::make_shared<DatArchive>(duplicate_ordinary);
+ expect_error([&]{
+  NativeDatArena arena(duplicate_archive);
+  (void)melee_web_stage_markers_decode_profile(arena.reader(),0x100,ordinary);
+ },"Invalid or duplicate marker binding");
+ auto missing_ordinary=ordinary_bytes;replace_pair(missing_ordinary,8,8,147);
+ auto missing_archive=std::make_shared<DatArchive>(missing_ordinary);
+ expect_error([&]{
+  NativeDatArena arena(missing_archive);
+  (void)melee_web_stage_markers_decode_profile(arena.reader(),0x100,ordinary);
+ },"Missing source camera or blast marker");
+ auto missing_ordinary_camera=ordinary_bytes;replace_pair(missing_ordinary_camera,4,4,147);
+ auto missing_camera_archive=std::make_shared<DatArchive>(missing_ordinary_camera);
+ expect_error([&]{
+  NativeDatArena arena(missing_camera_archive);
+  (void)melee_web_stage_markers_decode_profile(arena.reader(),0x100,ordinary);
+ },"Missing source camera or blast marker");
+
+ auto unknown=*stadium;unknown.stage_kind=999;
+ auto unknown_archive=std::make_shared<DatArchive>(stadium_bytes);
+ expect_error([&]{
+  NativeDatArena arena(unknown_archive);
+  (void)melee_web_stage_markers_decode_profile(arena.reader(),0x100,&unknown);
+ },"Unknown or malformed source marker profile");
+ auto malformed=*stadium;malformed.authored_marker_bindings=nullptr;
+ auto malformed_archive=std::make_shared<DatArchive>(stadium_bytes);
+ expect_error([&]{
+  NativeDatArena arena(malformed_archive);
+  (void)melee_web_stage_markers_decode_profile(arena.reader(),0x100,&malformed);
+ },"Unknown or malformed source marker profile");
+ auto malformed_count=*stadium;malformed_count.authored_marker_binding_count=19;
+ auto malformed_count_archive=std::make_shared<DatArchive>(stadium_bytes);
+ expect_error([&]{
+  NativeDatArena arena(malformed_count_archive);
+  (void)melee_web_stage_markers_decode_profile(arena.reader(),0x100,&malformed_count);
+ },"Unknown or malformed source marker profile");
+ auto unspecified=*stadium;unspecified.marker_contract_policy=MELEE_WEB_STAGE_MARKER_CONTRACT_UNSPECIFIED;
+ auto unspecified_archive=std::make_shared<DatArchive>(stadium_bytes);
+ expect_error([&]{
+  NativeDatArena arena(unspecified_archive);
+  (void)melee_web_stage_markers_decode_profile(arena.reader(),0x100,&unspecified);
+ },"Unknown or malformed source marker profile");
+ std::cout<<"Immutable profile marker contracts, Stadium ordered duplicate/absent marker set, and strict ordinary controls passed\n";
 }
 const melee_web::DatNativeMapContract& marker_contract(){
  static constexpr std::array<uint8_t,1> animation_counts={1};
@@ -380,6 +530,7 @@ void profile_map_contract_controls(const std::vector<uint8_t>& legacy_bytes){
  std::cout<<"Explicit stage-profile map policies and authored ownership adapter controls passed\n";
 }
 void marker_fixture_trace(){
+ profile_marker_contract_controls();
  const auto original=marker_fixture();
  auto archive=std::make_shared<melee_web::DatArchive>(original);
  const auto data_section=archive->data();
@@ -416,6 +567,89 @@ void marker_fixture_trace(){
   expect_error([&]{(void)owner.collision();},
                "Collision public coll_data descriptor is missing");
  }
+ auto light_bytes=marker_fixture(13,false,false,false,false,true,true);
+ auto light_archive=std::make_shared<melee_web::DatArchive>(light_bytes);
+ const std::vector<uint8_t> light_data_before(
+     light_archive->data().begin(),light_archive->data().end());
+ melee_web::DatStage light_metadata(*light_archive);
+ check(light_metadata.light_override_table.count==1&&
+           light_metadata.light_override_table.data_offset&&
+           light_metadata.entries[0].light_table_offset,
+       "synthetic source identity includes one map light and one override row");
+ const uint32_t source_override_slot=*light_metadata.light_override_table.data_offset;
+ const auto source_light_offset=light_archive->pointer(source_override_slot,28);
+ check(source_light_offset&&*source_light_offset==0x550&&
+           light_archive->range(source_override_slot+4,1)[0]==0xe0,
+       "synthetic override table retains the exact light source offset and flags");
+ const auto& source_symbols=light_archive->public_symbols();
+ const auto source_map_symbol=std::find_if(
+     source_symbols.begin(),source_symbols.end(),
+     [](const auto& symbol){return symbol.name=="map_head";});
+ check(source_map_symbol!=source_symbols.end()&&
+           source_map_symbol->data_offset==light_metadata.root_offset&&
+           std::count_if(source_symbols.begin(),source_symbols.end(),
+                         [](const auto& symbol){return symbol.name=="map_head";})==1,
+       "synthetic source catalog retains one exact map_head root identity");
+ for(unsigned lifetime=0;lifetime<2;++lifetime){
+  melee_web::DatNativeMap owner(light_archive,marker_contract());
+  const auto& overrides=owner.light_overrides();
+  check(overrides.size()==1&&overrides[0].descriptor&&
+            overrides[0].found==1&&overrides[0].flags==0xe0,
+        "structural map owner exposes the typed source light identity and override");
+  check(melee_web_test_native_map_light_identity(
+            owner.map_head(),overrides[0].descriptor),
+        "typed override descriptor is the exact light used by its map row");
+  void* const animation_table=owner.light_animation_table(0x580);
+  void* const animation_descriptor=melee_web_test_native_map_light_animation_identity(
+      owner.map_head(),animation_table);
+  check(animation_descriptor&&owner.light_animation_table(0x580)==animation_table&&
+            melee_web_test_native_map_light_animation_identity(
+                owner.map_head(),owner.light_animation_table(0x580))==animation_descriptor,
+        "cached borrowed accessor preserves exact hydrated row table and descriptor identity");
+  expect_error([&]{(void)owner.light_animation_table(0x600);},
+               "DAT range is outside its section");
+  expect_error([&]{(void)owner.light_animation_table(0x581);},
+               "DAT pointer slot is not four-byte aligned");
+  check(melee_web_test_native_marker_pairs(owner.map_head(),authored.data(),8)&&
+            melee_web_test_ground_marker_last_write(owner.map_head()),
+        "typed light publication retains duplicate marker order and last-write semantics");
+  char error[256];
+  auto* publication=melee_web_stage_map_publish(owner.map_head(),error,sizeof(error));
+  check(publication!=nullptr,error);
+  MeleeWebArchiveSymbol public_symbols[]={{
+      "SyntheticStage.dat",source_map_symbol->name.c_str(),owner.map_head()}};
+  check(melee_web_stage_map_set_public(
+            publication,public_symbols,1,error,sizeof(error)),error);
+  check(melee_web_stage_map_set_overrides(
+            publication,overrides.data(),overrides.size(),error,sizeof(error)),error);
+  auto* source_archive=melee_web_archive_sections_open("SyntheticStage.dat");
+  check(source_archive&&
+            melee_web_archive_sections_public(source_archive,
+                                              source_map_symbol->name.c_str())==owner.map_head(),
+        "synthetic public source identity retains the map-owner pointer");
+  int found=0;uint8_t flags=0;
+  check(melee_web_stage_map_lookup_override(
+            overrides[0].descriptor,&found,&flags)&&found==1&&flags==0xe0,
+        "registered exact source light identity returns its authored override");
+  check(!melee_web_stage_map_close(publication,error,sizeof(error)),
+        "live source archive handle retains the map and typed light owners");
+  melee_web_archive_sections_release(source_archive);
+  check(melee_web_stage_map_close(publication,error,sizeof(error)),error);
+  check(owner.light_animation_table(0x580)==animation_table&&
+            melee_web_test_native_map_light_animation_identity(
+                owner.map_head(),animation_table)==animation_descriptor,
+        "borrowed animation storage remains identical through source catalog close");
+  check(owner.light_overrides()[0].descriptor==overrides[0].descriptor&&
+            melee_web_test_native_map_light_identity(
+                owner.map_head(),overrides[0].descriptor),
+        "typed map light descriptors remain owned until after source catalog close");
+ }
+ check(std::equal(light_data_before.begin(),light_data_before.end(),
+                   light_archive->data().begin(),light_archive->data().end()),
+       "typed light identity hydration leaves authored DAT bytes unchanged");
+ expect_marker_map_error(marker_fixture(13,false,false,false,false,true,true,true),
+                         "Native scene pointer table lacks bounded terminator");
+ std::cout<<"Synthetic authored light animation table/accessor identity, two storage lifetimes and bounded offset/terminator refusals passed\n";
  auto bad_pair_index=original;write_be16(bad_pair_index,0x20+0x1a0+4,13);
  expect_marker_map_error(bad_pair_index,"Invalid marker binding");
  auto bad_marker_id=original;write_be16(bad_marker_id,0x20+0x1a0+2,261);
@@ -429,16 +663,23 @@ void marker_fixture_trace(){
  auto nonfinite=original;write_be32(nonfinite,0x20+0x200+20,0x7fc00000);
  expect_marker_map_error(nonfinite,"Nonfinite marker transform");
  check(melee_web_gameplay_shutdown(error,sizeof(error)),error);
- std::cout<<"Structural marker pairs preserve duplicates/order, strict stage requirements and checked negatives passed\n";
+ std::cout<<"Structural marker pairs preserve duplicates/order, profile contracts, strict stage requirements and checked negatives passed\n";
 }
 void stadium_map_trace(const char* path){
  auto bytes=read_bytes(path);
  auto archive=std::make_shared<melee_web::DatArchive>(bytes,melee_web::DatExternalPolicy::ResolveNull);
- const auto original_data_section=std::vector<uint8_t>(archive->data().begin(),archive->data().end());
- melee_web::DatStage metadata(*archive);
- check(metadata.entries.size()==10&&metadata.flagged_object_table.count==44,
+  const auto original_data_section=std::vector<uint8_t>(archive->data().begin(),archive->data().end());
+  melee_web::DatStage metadata(*archive);
+  melee_web::NativeDatArena marker_arena(archive);
+  auto* stadium_markers=melee_web_stage_markers_decode_profile(
+      marker_arena.reader(),metadata.root_offset,melee_web_stage_stadium_profile_data());
+  check(stadium_markers&&melee_web_stage_markers_descriptor(stadium_markers),
+        "retained original C0 Stadium marker table satisfies its exact source-profile contract");
+  auto contract_data=stadium_contract_data(*archive,metadata);
+  const auto stadium_contract=contract_data.view();
+  check(metadata.entries.size()==10&&metadata.flagged_object_table.count==44,
        "C0 authored Stadium map row/flag counts");
- for(const auto& expected:stadium_external_references){
+ for(const auto& expected:stadium_contract.external_references){
   const auto& row=metadata.entries[expected.entry_index];
   const uint32_t slot=row.descriptor_offset+expected.field_offset;
   bool found=false;
@@ -463,7 +704,7 @@ void stadium_map_trace(const char* path){
           "C0 map light row matches source table");
     if(entry.animation_flags_offset){
      const auto* flags=melee_web_test_native_stadium_flags(map,int(entry.index));
-     const auto source=archive->range(*entry.animation_flags_offset,stadium_animation_counts[entry.index]);
+     const auto source=archive->range(*entry.animation_flags_offset,stadium_contract.animation_consumer_counts[entry.index]);
      check(flags&&std::equal(source.begin(),source.end(),flags),
            "C0 local animation flags remain present on imported rows");
     }
@@ -499,21 +740,21 @@ void stadium_map_trace(const char* path){
  // widen the owner into a stage profile.
  auto wrong_count=stadium_contract;wrong_count.entry_count=9;
  expect_error([&]{melee_web::DatNativeMap rejected(archive,wrong_count);},"entry count");
- auto bad_counts=stadium_animation_counts;bad_counts[3]=65;
+ std::vector<uint8_t> bad_counts(stadium_contract.animation_consumer_counts.begin(),stadium_contract.animation_consumer_counts.end());bad_counts[3]=65;
  auto bad_bound=stadium_contract;bad_bound.animation_consumer_counts=bad_counts;
  expect_error([&]{melee_web::DatNativeMap rejected(archive,bad_bound);},"animation consumer count");
  constexpr std::array<uint32_t,3> missing_resident={0,1,2};
  auto missing=stadium_contract;missing.resident_entry_ids=missing_resident;
  expect_error([&]{melee_web::DatNativeMap rejected(archive,missing);},"Unexpected local joint");
- auto wrong_imports=stadium_external_references;
+ std::vector<melee_web::DatNativeMapExternalReference> wrong_imports(stadium_contract.external_references.begin(),stadium_contract.external_references.end());
  wrong_imports[0].symbol="GrdPStadiumWrong_TopN_joint";
  auto wrong_import=stadium_contract;wrong_import.external_references=wrong_imports;
  expect_error([&]{melee_web::DatNativeMap rejected(archive,wrong_import);},"symbol differs");
- auto wrong_flag_name=stadium_flag_expectations;
+ std::vector<melee_web::DatNativeMapFlagExpectation> wrong_flag_name(stadium_contract.flagged_objects.begin(),stadium_contract.flagged_objects.end());
  wrong_flag_name[2].symbol="GrdPStadiumWrong_FShadowmat3_mobjdesc";
  auto wrong_flag_identity=stadium_contract;wrong_flag_identity.flagged_objects=wrong_flag_name;
  expect_error([&]{melee_web::DatNativeMap rejected(archive,wrong_flag_identity);},"flagged external slot or name");
- auto wrong_flag_slot=stadium_flag_expectations;wrong_flag_slot[2].index=3;
+ std::vector<melee_web::DatNativeMapFlagExpectation> wrong_flag_slot(stadium_contract.flagged_objects.begin(),stadium_contract.flagged_objects.end());wrong_flag_slot[2].index=3;
  auto wrong_flag_order=stadium_contract;wrong_flag_order.flagged_objects=wrong_flag_slot;
  expect_error([&]{melee_web::DatNativeMap rejected(archive,wrong_flag_order);},"expectations changed authored order");
 
@@ -524,7 +765,7 @@ void stadium_map_trace(const char* path){
  size_t external_index=archive->external_symbols().size();
  for(size_t i=0;i<archive->external_symbols().size();i++){
   const auto& symbol=archive->external_symbols()[i];
-  if(symbol.name==stadium_flag_expectations[2].symbol&&
+  if(symbol.name==stadium_contract.flagged_objects[2].symbol&&
      std::find(symbol.slots.begin(),symbol.slots.end(),external_flag_slot)!=symbol.slots.end())
    external_index=i;
  }
@@ -564,7 +805,7 @@ void stadium_map_trace(const char* path){
  auto unowned_flag=bytes;
  write_be32(unowned_flag,32+local_flag_slot,metadata.root_offset);
  auto unowned_archive=std::make_shared<melee_web::DatArchive>(unowned_flag,melee_web::DatExternalPolicy::ResolveNull);
- auto unowned_expectations=stadium_flag_expectations;
+ std::vector<melee_web::DatNativeMapFlagExpectation> unowned_expectations(stadium_contract.flagged_objects.begin(),stadium_contract.flagged_objects.end());
  unowned_expectations[0].target_offset=metadata.root_offset;
  auto unowned_contract=stadium_contract;unowned_contract.flagged_objects=unowned_expectations;
  expect_error([&]{melee_web::DatNativeMap rejected(unowned_archive,unowned_contract);},"flag mutation");
