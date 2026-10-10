@@ -575,12 +575,34 @@ cold difference remains retained; no delta allowance or production allocator
 change was introduced. Canonical diagnostic build and focused controls pass;
 the full suite on `b63dfb45` passes 2,345 tests with 167 skips and no failures.
 
-Next, add a separate checked started-idle map-2 retirement path using the
-source state machine and an exact fallback allocation lease captured at OnInit
-and revalidated before final free. Preserve strict initialization, source order
-and all graph checks; refuse pending loads, transformed states and a borrowed
-buffer without its own lifetime token. No complete Session retirement or C3
-pass follows from the current controls.
+The checked started-idle path on `ec9a38a9` captures the actual fallback
+allocation at original OnInit and preserves its world, heap, size and generation
+through final free. Strict initialization remains separate. Pending loads,
+transformed states, missing leases and borrowed buffers without a lifetime token
+refuse. The actual SDK allocation control passes invalid-state checks, erased
+allocation and same-address reuse refusals, unchanged successor bytes/lease and
+complete bootstrap shutdown. Its map/GObj/proc graph is synthetic. The first
+control failure remains retained; review found an omitted fixture display
+identity, which was corrected without changing a runtime predicate.
+
+The unchanged original Ready-session test reaches Ready at 124 ticks, passes
+both started display preflights and advances through checked world retirement.
+The world, objects and processes are absent and the source-memory tracker is
+inactive. The test then fails **`C1 context preflight left Toy aliases past
+MenuWorld close`**; the 32 MiB Session arena remains allocated. This is progress
+past the map-2 refusal, not successful Session closure. Source inspection
+identifies the non-null Toy archive pointer
+`_Toy_sbss_804D6ED0`; its address, liveness and first rebinding site remain
+unobserved. Both owned children exit naturally with failure, are reaped and absent; all 893 bindings, 98 fixtures and 17 raw files
+match before documentation edits. Independent review confirms these results
+and the checked retirement control flow.
+
+The canonical diagnostic build and actual focused controls pass at `ec9a38a9`.
+Six boundary tests passed on `a46297cf` before the fixture-only correction.
+The 2,345-test full-suite pass above belongs to `b63dfb45`; the current source
+still needs its full regression run before integration. Next, reduce the exact
+Toy alias predicate and its lifetime owner before retrying Session closure.
+Do not clear unknown aliases or weaken the check.
 
 The existing RNG observer can be reused afterward, but the Stadium notes require
 C3's per-tick, per-owner ledger to be compared with the original. C8's broader

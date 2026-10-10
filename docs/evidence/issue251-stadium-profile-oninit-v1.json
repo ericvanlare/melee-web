@@ -1626,6 +1626,90 @@
           "seconds": 504.963,
           "source": "b63dfb457ed97dbc9b2b87957e3f8b60ef9a57ae"
         }
+      },
+      "map2_started_idle_retirement": {
+        "source": "ec9a38a953050424e2aed92083499e735576a88a",
+        "source_tree": "867c8b738cd75ec6ef332c87dc9c2cc963bfc903",
+        "runtime_status": "RETAINED_NATIVE_FAILURE_AFTER_WORLD_RETIREMENT",
+        "source_review": {
+          "artifact": "root-map2-started-source-review-v2.json",
+          "sha256": "91ae9a5e80ea6164887bf1ccc7ab2d356515107ea9dece56642ad97fd50e6ba4"
+        },
+        "corrected_proposal": {
+          "artifact": "map2-started-idle-proposal-v2/source-freeze-v2.json",
+          "sha256": "ff02e9b543b8c96aec10eae6cf0460011a55430f1c5e0b6e43e21d2abea4f8db"
+        },
+        "fixture_correction": {
+          "artifact": "map2-started-idle-proposal-v3/source-freeze-v3.json",
+          "sha256": "097a35faea8b4c510ac67360f7c7a365b687d10e8406679102d068b701091672"
+        },
+        "diagnostic_build": {
+          "artifact": "map2-started-build-v2/result.json",
+          "sha256": "565f4326e64bf9c4c8021a9e209d1a19c0bf96a31fbd8134acfe2ca14c96f1a4"
+        },
+        "producer": {
+          "artifact": "map2-started-producer-ec9a38a9-v1/identity.json",
+          "sha256": "88d2134eb987423a6809aa041375d6c961454c0640c2d400e7c8b054bad192aa"
+        },
+        "focused_controls": {
+          "artifact": "root-map2-started-controls-v2/result.json",
+          "sha256": "57b57ff9751f29ea5474919b2ed08ceb4ee283724cd7688630f3beced0176f4d"
+        },
+        "independent_control_review": {
+          "artifact": "sol-map2-started-controls-review-v1.json",
+          "sha256": "6c9ceaece5e36c32e42fd3556926bf94aa21156dbb61552030ab95d8378e6dc9"
+        },
+        "retained_small_control_failure": {
+          "artifact": "root-map2-started-controls-v1/result.json",
+          "sha256": "55b662e7b86b8427c5a37fe246be2a8a2ee3ca6e7bf3b85f56138c2d775ed921"
+        },
+        "source_boundary_checks": {
+          "artifact": "root-map2-started-source-tests-v1/result.json",
+          "sha256": "5bc5e4ddf076ff2016f72ff538cf8d64e8f04e562f5b1db5b2207c93d1cc6d19",
+          "source": "a46297cff304cb0fa5d31f989090e60027396563",
+          "tests": 6,
+          "failures": 0
+        },
+        "packet": {
+          "artifact": "map2-started-ready-preflight-packet-v1.json",
+          "sha256": "7ea81b0e9a7de840ce73bee90622097c2d2c5d9b4bb6b9338c624aa527f8de6b"
+        },
+        "frozen_result": {
+          "artifact": "root-map2-started-ready-frozen-result-v1.json",
+          "sha256": "84f0d2dcb26c19f11c5f34c779a2a63a10302d2f74f0eda86f838168bbabd93a"
+        },
+        "independent_result_review": {
+          "artifact": "sol-map2-started-ready-result-review-v1.json",
+          "sha256": "3cc07cf6ba5d515545eb1b23e10bc93e865a94b9fdb7fa7f9a37c1dc04e8b91e"
+        },
+        "observations": {
+          "construction_ticks": 0,
+          "ready_ticks": 124,
+          "ready_world": 3,
+          "ready_objects": 59,
+          "ready_processes": 73,
+          "checked_close_world_exists": 0,
+          "checked_close_objects": 0,
+          "checked_close_processes": 0,
+          "checked_close_memory_status": 1,
+          "session_arena_bytes_retained": 33554432,
+          "first_refusal": "C1 context preflight left Toy aliases past MenuWorld close",
+          "failed_scalar": "_Toy_sbss_804D6ED0 == NULL",
+          "alias_address_liveness_rebinding": "unobserved",
+          "selective_sis_map2_ground_world_retirement": "checked paths returned success; individual free events not separately printed"
+        },
+        "verification": {
+          "bindings": 893,
+          "fixtures": 98,
+          "raw_files": 17,
+          "before_docs_edits": true,
+          "owned_children_natural_exit_reaped_absent": true,
+          "unittest_returncode": 1,
+          "native_returncode": 1
+        },
+        "regression_scope": "Prior full2345/167skip/0failure source is b63dfb45; current source requires full suite before integration. Current diagnostic build and actual focused control pass.",
+        "next": "Reduce Toy archive alias acquisition/retirement and post-close selection re-export without dereference, blind clear, reordering or guard waiver; complete Session close before longer C3 experiment.",
+        "scope": "World retirement advance after original Ready; full Session arena closure still fails. No second world/3500postGO/original RNG/C3/browser/human acceptance."
       }
     }
   }
