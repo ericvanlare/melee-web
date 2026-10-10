@@ -684,6 +684,7 @@ int melee_web_stadium_c1_generator_lifetime_control(void)
  queue_control_require(melee_web_gameplay_startup(8U*1024U*1024U,error,sizeof(error)),error);
  queue_control_require(melee_web_native_world_enable(error,sizeof(error)),error);
  MeleeWebGameplayStats baseline=melee_web_gameplay_stats();
+ gobj_pool_phase("generator_baseline",0,NULL,NULL);
  size_t size=melee_web_stadium_zako_snapshot_size();
  void* before=malloc(size);void* after=malloc(size);
  queue_control_require(before&&after,"generator snapshot witness allocation");
@@ -727,6 +728,10 @@ int melee_web_stadium_c1_generator_lifetime_control(void)
                        retired.source_heap_handle==lease.source_heap_handle,"exact generator SDK data retired");
   queue_control_require(melee_web_stadium_zako_snapshot_read(after,size)&&memcmp(before,after,size)==0,"original private roots restored");
   MeleeWebGameplayStats current=melee_web_gameplay_stats();
+  printf("STADIUM_GENERATOR_COMPARE lifetime=%u heap_before=%d heap_after=%d objects_before=%u objects_after=%u processes_before=%u processes_after=%u\n",
+         lifetime,baseline.heap_free_bytes,current.heap_free_bytes,baseline.objects,current.objects,
+         baseline.processes,current.processes);fflush(stdout);
+  gobj_pool_phase("generator_returned",0,NULL,NULL);
   queue_control_require(current.heap_free_bytes==baseline.heap_free_bytes&&
                        current.objects==baseline.objects&&
                        current.processes==baseline.processes,"generator two-lifetime exact heap/object/process return");

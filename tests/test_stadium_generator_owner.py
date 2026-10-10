@@ -96,6 +96,10 @@ static void HSD_GObjPLink_80390228(HSD_GObj* g)
 {assert(g==entities[4]&&allocation.live);entities[4]=NULL;free(g->proc);free(g);++object_frees;}
 static void OSReport(const char* format,const char* file,int line)
 {(void)format;(void)file;(void)line;abort();}
+/* These extracted cold-lifecycle controls never enter the HUD-ready path. */
+static unsigned hud_ready_context_calls;
+static int melee_web_hud_stadium_ready_context(void* object,void* proc)
+{(void)object;(void)proc;++hud_ready_context_calls;return 0;}
 int melee_web_stadium_generator_preflight(MeleeWebStadiumGenerator*,char*,size_t);
 '''
         program += "grZakoGenerator_Data* grZakoGenerator_801CA67C(void){" + function_body(original, "grZakoGenerator_Data* grZakoGenerator_801CA67C(") + "}\n"
@@ -131,6 +135,7 @@ int main(void)
   assert(data_frees==before_data+1&&object_frees==before_object+1);
   assert(!memcmp(snapshot,&lbl_8049F030,sizeof(snapshot)));
  }
+ assert(hud_ready_context_calls==0);
  puts("Actual original generator constructor/owner repeated; synthetic HSD services; item/lease/proc/root refusal preserves owners");
  return 0;
 }
@@ -198,6 +203,10 @@ MeleeWebSourceMemoryReadStatus melee_web_source_memory_context_read(MeleeWebSour
 MeleeWebSourceMemoryReadStatus melee_web_source_memory_allocation_read(const void* p,MeleeWebSourceMemoryAllocation* l)
 {assert(p==owner->pool);*l=lease;return MELEE_WEB_SOURCE_MEMORY_READ_OK;}
 static void OSReport(const char* format,int arg){(void)format;(void)arg;abort();}
+/* This synthetic pool control checks non-ready owner paths only. */
+static unsigned hud_ready_context_calls;
+static int melee_web_hud_stadium_ready_context(void* object,void* proc)
+{(void)object;(void)proc;++hud_ready_context_calls;return 0;}
 '''
         program += "static int owned(MeleeWebMatchContext* h,char* e,size_t n){"+function_body(match,"static int owned(")+"}\n"
         program += "void Camera_80028F5C(CmSubject* subject,CmSubjectState state){"+function_body(original,"void Camera_80028F5C(")+"}\n"
@@ -243,6 +252,7 @@ int main(void)
   assert(melee_web_match_camera_subject_return(&h,other,error,sizeof(error)));
   assert(!cm_804D6460&&!cm_804D6468&&melee_web_match_camera_available(&h,error,sizeof(error)));
  }
+ assert(hud_ready_context_calls==0);
  puts("Actual original Camera allocate/reset/return and MatchContext partition guards repeated; synthetic context construction; foreign/cycle/alias/lease refusal preserves pool");
  return 0;
 }
