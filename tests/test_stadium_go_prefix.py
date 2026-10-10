@@ -7,6 +7,9 @@ import sys
 import tempfile
 import unittest
 import zlib
+import shutil
+import subprocess
+from owned_test_workspace import OwnedWorkspaceTests
 
 ROOT = Path(__file__).parents[1]
 sys.path[:0] = [str(ROOT / "tools"), str(ROOT / "reference-capture" / "dolphin")]
@@ -164,6 +167,8 @@ def _fixture(*, route: int = 1, gap_f: bool = False, tail: int = 1,
              setup: bytes | None = None,
              go_setup: bytes | None = None,
              draw_between_c_f: bool = False,
+             boot_pad: bool = False,
+             boot_match: bool = False,
              sss_navigation: tuple[tuple[int, int, int | None, int | None], ...] =
              ((0, 4, None, None), (18, 3, None, None))) -> tuple[bytes, dict]:
     receipt = EXPECTED_SETUP_RECEIPT_SHA256
@@ -183,6 +188,17 @@ def _fixture(*, route: int = 1, gap_f: bool = False, tail: int = 1,
             "setup_profile_verified_by_observer": False,
         }, separators=(",", ":")).encode()),
     ]
+    if boot_pad or boot_match:
+        boot = _pad_poll(1)
+        boot += [_slice(45, 0x18, address=0x804A04F0),
+                 _slice(46, 8, address=0x804D6BC8)]
+        records.extend([
+            _boundary(1, 2, pc=0x8034DD8C, source_tick=0, slices=boot),
+            _boundary(2, 3, pc=0x80377584, source_tick=0, slices=_pad_consume()),
+        ])
+        if boot_match:
+            records.append(_boundary(4, 4, pc=0x8016E934, source_tick=0,
+                                     slices=[_slice(4, 0x138, data=_setup())]))
     setup = setup or _setup()
     records.extend([
         _progress("css_entry", 2),
@@ -246,6 +262,14 @@ def _fixture(*, route: int = 1, gap_f: bool = False, tail: int = 1,
         "finishing_draw_return_seen": True,
         "tail_ticks_before_draw_return": tail,
     }, separators=(",", ":")).encode(), source_tick=f_tick + tail))
+    if boot_pad or boot_match:
+        rebased = []
+        for sequence, record in enumerate(records):
+            values = list(observer_stream.HEADER.unpack(record[:observer_stream.HEADER.size]))
+            values[3] = sequence
+            values[4] = sequence + 100
+            rebased.append(observer_stream.HEADER.pack(*values) + record[observer_stream.HEADER.size:])
+        records = rebased
     status = {"state": "completed", "event_count": len(records),
               "last_seq": len(records) - 1, "completed": True,
               "source_tick": f_tick + tail, "draw_ordinal": 0,
@@ -272,6 +296,15 @@ class StadiumGoPrefixTests(unittest.TestCase):
         self.assertEqual(result["sss_navigation_poll_rows"], 1)
         self.assertTrue(result["sss_selected_stadium_at_exit"])
         self.assertEqual(result["rng_equality"], "not_compared")
+
+    def test_boot_pad_precedes_first_css_but_cannot_admit_a_match(self):
+        data, status = _fixture(boot_pad=True)
+        result = self._validate(data, status)
+        self.assertEqual(result["decision"], "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY")
+        self.assertTrue(result["sss_selected_stadium_at_exit"])
+        data, status = _fixture(boot_match=True)
+        with self.assertRaisesRegex(StadiumGoPrefixError, "pre-CSS source boundary"):
+            self._validate(data, status)
 
     def test_rejects_sss_cancel_and_counter_gap(self):
         cancelled, cancelled_status = _fixture(route=0)
@@ -323,6 +356,65 @@ class StadiumGoPrefixTests(unittest.TestCase):
         with self.assertRaises(StadiumGoPrefixError):
             self._validate(data, status)
 
+
+
+class StadiumBootGateControl(OwnedWorkspaceTests):
+    @classmethod
+    def setUpClass(cls):
+        cls.compiler = shutil.which("clang++") or shutil.which("g++")
+        if cls.compiler is None:
+            raise unittest.SkipTest("A native C++ compiler is not installed")
+        cls.scratch = cls.new_workspace(ROOT, "stadium-boot-gate-")
+
+    def test_exact_observe_gate_admits_only_boot_pad_before_css(self):
+        observer = ROOT / "reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp"
+        source = observer.read_text()
+        enums = source[source.index("enum class Boundary : u16"):
+                       source.index("// gmMain calls HSD_PadInit")]
+        observe = source.index("  void Observe(Core::System*")
+        begin = source.index("      if (stadium_go_prefix_phase ==", observe)
+        end = source.index("    if (SdInitRequested())", begin)
+        gate = source[begin:end].rsplit("    }", 1)[0]
+        # Execute the exact production filter with a finite boundary-PC seam.
+        # No guest memory, Observe implementation or match admission is mocked.
+        harness = """#include <cassert>
+#include <cstdint>
+using u8 = uint8_t; using u16 = uint16_t; using u32 = uint32_t;
+""" + enums + """
+bool BoundaryForPC(u32 pc, bool whole, Boundary* out) {
+  assert(!whole);
+  if (pc == 0) return false;
+  *out = static_cast<Boundary>(pc); return true;
+}
+bool admitted(StadiumGoPrefixPhase stadium_go_prefix_phase,
+              bool stadium_go_prefix_sss_exit_seen, u32 pc) {
+""" + gate.replace("return;", "return false;") + """
+  return true;
+}
+int main() {
+  for (u32 boundary=1; boundary<=30; ++boundary) {
+    const bool pad = boundary == 1 || boundary == 2;
+    assert(admitted(StadiumGoPrefixPhase::AwaitCss, false, boundary) == pad);
+    assert(admitted(StadiumGoPrefixPhase::AwaitCss, true, boundary) == pad);
+    assert(!admitted(StadiumGoPrefixPhase::Complete, true, boundary));
+  }
+  assert(!admitted(StadiumGoPrefixPhase::AwaitCss, false, 0));
+  for (u32 boundary : {3u,4u,5u}) {
+    assert(!admitted(StadiumGoPrefixPhase::AwaitSss, false, boundary));
+    assert(admitted(StadiumGoPrefixPhase::AwaitVsEntry, true, boundary));
+  }
+}
+"""
+        harness = harness.replace("#include <cassert>", "#include <cassert>\n#include <initializer_list>")
+        cpp, binary = self.scratch / "gate.cpp", self.scratch / "gate"
+        cpp.write_text(harness)
+        compiled = subprocess.run([self.compiler, "-std=c++17", str(cpp), "-o", str(binary)],
+                                  capture_output=True, text=True, timeout=30)
+        (self.scratch / "compile.log").write_text(compiled.stdout + compiled.stderr)
+        self.assertEqual(compiled.returncode, 0, compiled.stderr)
+        ran = subprocess.run([str(binary)], capture_output=True, text=True, timeout=10)
+        (self.scratch / "run.log").write_text(ran.stdout + ran.stderr)
+        self.assertEqual(ran.returncode, 0, ran.stderr)
 
 if __name__ == "__main__":
     unittest.main()

@@ -401,12 +401,20 @@ def validate_stadium_go_prefix(stream_path: str | Path,
                     elif phase == "sss_return":
                         sss_return_sequence = row["seq"]
             elif row["event"] == "boundary":
-                _require(header is not None and start is not None and phases,
-                         "source boundary preceded the observed CSS setup context")
+                _require(header is not None and start is not None,
+                         "source boundary preceded observer handshake/start")
                 payload = row["payload"]
                 _require(not payload.get("whole_session"),
                          "GO-prefix stream unexpectedly entered whole-session mode")
                 boundary = payload.get("boundary")
+                # Before the accepted first CSS entry only original boot PAD
+                # observations are admitted; none qualify a match or menu owner.
+                if not phases:
+                    _require(boundary in ("pad_poll", "pad_consume"),
+                             "pre-CSS source boundary is not boot PAD")
+                    _require(not any(item.get("tag") in (41, 42, 43, 44, 47, 48)
+                                     for item in payload.get("slices", [])),
+                             "pre-CSS PAD exposed a premature live CSS/SSS owner")
                 raw_rows += 1
                 _check_boundary_contract(payload)
                 if boundary == "pad_poll" and not go_seen:

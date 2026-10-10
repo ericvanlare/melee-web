@@ -3660,11 +3660,15 @@ struct Observer::Impl
       if (pc == CSS_ENTER || pc == CSS_ENTER_RETURN || pc == SSS_ENTER ||
           pc == SSS_ENTER_RETURN || pc == 0x8025bbd0)
         return ObserveStadiumMenuHook(system, pc, state), void();
-      if (stadium_go_prefix_phase == StadiumGoPrefixPhase::AwaitCss ||
-          stadium_go_prefix_phase == StadiumGoPrefixPhase::Complete)
+      if (stadium_go_prefix_phase == StadiumGoPrefixPhase::Complete)
         return;
       Boundary scoped_boundary;
       if (!BoundaryForPC(pc, false, &scoped_boundary))
+        return;
+      // Boot steering needs original PAD/menu rows before the accepted CSS
+      // entry. Attract/demo gameplay must not arm or enter this match scope.
+      if (stadium_go_prefix_phase == StadiumGoPrefixPhase::AwaitCss &&
+          scoped_boundary != Boundary::PadPoll && scoped_boundary != Boundary::PadConsume)
         return;
       if (scoped_boundary != Boundary::PadPoll && scoped_boundary != Boundary::PadConsume &&
           scoped_boundary != Boundary::Entry && scoped_boundary != Boundary::Setup &&
