@@ -23,6 +23,7 @@
 #include <string_view>
 #include <thread>
 #include <vector>
+#include <utility>
 
 #include "Common/DirectIOFile.h"
 #include "Common/Crypto/SHA1.h"
@@ -329,6 +330,14 @@ enum class SliceTag : u16
   SdItemsLock = 56,  // Reduced Items owner only; original u8 animation lock.
   PlayerIdentity = 57,  // Opt-in entity profile: authored StaticPlayer header.
   PlayerTransformed = 58,  // Opt-in Zelda/Sheik active-entity indexes.
+  SssPositionCursorWorld = 59,  // Stadium-only named Progress; original computed Vec3.
+  SssPositionTargetWorld = 60,
+  SssPositionGObj = 61,
+  SssPositionProc = 62,
+  SssPositionTargetRow = 63,
+  SssPositionScheduler = 64,
+  SssPositionAxes = 65,
+  SssPositionCursorLocal = 66,
 };
 
 struct SliceRef
@@ -3505,6 +3514,27 @@ struct Observer::Impl
     if (!AppendHex(&json, state->spr[8], 8))
       return SetInvalid("Stadium named Progress LR serialization exceeded its bound"), void();
     json += "\"";
+    if (std::string(phase).rfind("sss_position_", 0) == 0)
+    {
+      json += ",\"position_call\":" + std::to_string(stadium_sss_position.id);
+      const std::array<std::pair<const char*, u32>, 4> owners = {{{"cursor_gobj", stadium_sss_position.gobj},
+          {"cursor_jobj", stadium_sss_position.jobj}, {"cursor_proc", stadium_sss_position.proc},
+          {"frame_sp", stadium_sss_position.frame_sp}}};
+      for (const auto& owner : owners)
+      {
+        json += ",\"" + std::string(owner.first) + "\":\"0x";
+        if (!AppendHex(&json, owner.second, 8))
+          return SetInvalid("Stadium position owner serialization exceeded its bound"), void();
+        json += "\"";
+      }
+      json += ",\"entry_cursor_state\":" + std::to_string(stadium_sss_position.entry_cursor_state);
+      if (std::string(phase) == "sss_position_end" && stadium_sss_position.cursor_seen)
+        json += ",\"end_row_index\":" + std::to_string(state->gpr[30]);
+      else
+        json += ",\"end_row_index\":null";
+      json += std::string(",\"cursor_observed\":") + (stadium_sss_position.cursor_seen ? "true" : "false") +
+              ",\"target_observed\":" + (stadium_sss_position.target_seen ? "true" : "false");
+    }
     if (std::string(phase) == "go_after")
       json += ",\"callsite_pc\":\"0x8016b820\",\"callsite_word\":\"0x48068821\"";
     json += ",\"source_tick\":" + std::to_string(source_tick) +
@@ -3526,6 +3556,143 @@ struct Observer::Impl
     if (json.size() > RING_PAYLOAD)
       return SetInvalid("Stadium named Progress exceeds its bounded payload"), void();
     PushJson(Event::Progress, json, pc, source_tick, draw_ordinal);
+  }
+
+  // Pinned fn_8025A310 entry, original lb_8000B1CC returns, and epilogue.
+  // Observer state records one bound callback only. Guest arithmetic/memory are never written.
+  bool StadiumSssPositionOwner(Core::System* system, u32 gobj, u32 jobj, u32 proc)
+  {
+    u32 current_gobj = 0, current_proc = 0, owner = 0, callback = 0, hsd_obj = 0;
+    return IsMem1Range(gobj, 0x38) && IsMem1Range(jobj, 0x44) && IsMem1Range(proc, 0x18) &&
+           ReadU32(system, 0x804d781c, &current_gobj) && current_gobj == gobj &&
+           ReadU32(system, 0x804d7838, &current_proc) && current_proc == proc &&
+           ReadU32(system, proc + 0x10, &owner) && owner == gobj &&
+           ReadU32(system, proc + 0x14, &callback) && callback == 0x8025a310 &&
+           ReadU32(system, gobj + 0x28, &hsd_obj) && hsd_obj == jobj;
+  }
+
+  void ObserveStadiumSssPosition(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
+  {
+    const bool live_phase = stadium_go_prefix_phase == StadiumGoPrefixPhase::AwaitSssExit &&
+                            stadium_go_prefix_sss_ready && !stadium_go_prefix_sss_exit_seen;
+    if (!live_phase)
+    {
+      stadium_sss_position = {};
+      return;
+    }
+    u32 word = 0, scene_pointer = 0, target_jobj = 0, source_tick = 0;
+    u8 scene_kind = 0, mode = 0, cursor_state = 0;
+    if (!ReadBytes(system, 0x804d6caf, 1, &cursor_state) || cursor_state > 2 ||
+        !ReadU32(system, pc, &word) ||
+        !ReadU32(system, 0x804d6720, &scene_pointer) || !scene_pointer ||
+        !ReadBytes(system, scene_pointer, 1, &scene_kind) || scene_kind != 9 ||
+        !ReadBytes(system, 0x80479d30, 1, &mode) || mode != 2 ||
+        !ReadU32(system, 0x803f08c8, &target_jobj) || !IsMem1Range(target_jobj, 0x44) ||
+        !ReadU32(system, 0x80479d58, &source_tick))
+      return SetInvalid("Stadium position lacks its live source scene or target row owner"), void();
+    const std::array<std::pair<u32, u32>, 27> anchors = {{{0x8025a310, 0x7c0802a6},
+        {0x8025a318, 0x9421ffc8}, {0x8025a328, 0x83e30028},
+        {0x8025a324, 0x880db60f}, {0x8025a32c, 0x28000000},
+        {0x8025a330, 0x41820014}, {0x8025a33c, 0x481179c5},
+        {0x8025a340, 0x48000208}, {0x8025a530, 0x9bcdb60e}, {0x8025a534, 0x48000014},
+        {0x8025a4b0, 0x387f0000}, {0x8025a4b4, 0x38a1001c},
+        {0x8025a4b8, 0x38800000}, {0x8025a4bc, 0x4bdb0d11},
+        {0x8025a4c0, 0x3c60803f}, {0x8025a4d8, 0x807f0000},
+        {0x8025a4dc, 0x38a10010}, {0x8025a4e0, 0x38800000},
+        {0x8025a4e4, 0x4bdb0ce9}, {0x8025a4e8, 0xc0410010},
+        {0x8025a548, 0x8001003c}, {0x80390de8, 0x930dc17c},
+        {0x80390dec, 0x936dc198}, {0x80390df0, 0x819b0014},
+        {0x80390df4, 0x807b0010}, {0x80390df8, 0x7d8803a6}, {0x80390dfc, 0x4e800021}}};
+    for (const auto& anchor : anchors)
+    {
+      u32 actual = 0;
+      if (!ReadU32(system, anchor.first, &actual) || actual != anchor.second)
+        return SetInvalid("Stadium position differs from its pinned original instructions"), void();
+    }
+    if (pc == 0x8025a310)
+    {
+      u32 jobj = 0, proc = 0;
+      if (stadium_sss_position.active || state->spr[8] != 0x80390e00 ||
+          state->gpr[13] != 0x804db6a0 || !IsMem1Range(state->gpr[3], 0x38) ||
+          !ReadU32(system, state->gpr[3] + 0x28, &jobj) ||
+          !ReadU32(system, 0x804d7838, &proc) ||
+          !StadiumSssPositionOwner(system, state->gpr[3], jobj, proc) ||
+          state->gpr[1] < 0x80000038 || !IsMem1Range(state->gpr[1] - 0x38, 0x40) ||
+          stadium_sss_position_calls == UINT32_MAX)
+        return SetInvalid("Stadium position entry lacks its exact scheduler/cursor owner"), void();
+      stadium_sss_position = {true, false, false, ++stadium_sss_position_calls,
+          state->gpr[3], jobj, proc, state->gpr[1] - 0x38, target_jobj, cursor_state, scene_pointer};
+      return;
+    }
+    if (!stadium_sss_position.active || state->gpr[1] != stadium_sss_position.frame_sp ||
+        target_jobj != stadium_sss_position.target_jobj ||
+        scene_pointer != stadium_sss_position.scene_pointer ||
+        !StadiumSssPositionOwner(system, stadium_sss_position.gobj,
+                                stadium_sss_position.jobj, stadium_sss_position.proc))
+      return SetInvalid("Stadium position callback owner or stack changed within its call"), void();
+    const char* phase = nullptr;
+    if (pc == 0x8025a4c0)
+    {
+      if (stadium_sss_position.entry_cursor_state != 0 || cursor_state != 0 ||
+          stadium_sss_position.cursor_seen || state->gpr[31] != stadium_sss_position.jobj ||
+          state->spr[8] != pc)
+        return SetInvalid("Stadium cursor world sample lacks its original transform return"), void();
+      stadium_sss_position.cursor_seen = true;
+      phase = "sss_position_cursor";
+    }
+    else if (pc == 0x8025a4e8)
+    {
+      if (state->gpr[30] != 18)
+        return;
+      if (!stadium_sss_position.cursor_seen || stadium_sss_position.target_seen ||
+          state->gpr[31] != 0x803f08c8 || state->spr[8] != pc)
+        return SetInvalid("Stadium target world sample lacks its exact original row18 return"), void();
+      stadium_sss_position.target_seen = true;
+      phase = "sss_position_target";
+    }
+    else if (pc == 0x8025a548)
+    {
+      u8 selected = 0;
+      if (!ReadBytes(system, 0x804d6cae, 1, &selected))
+        return SetInvalid("Stadium position end lacks its source-selected row"), void();
+      if (!stadium_sss_position.cursor_seen)
+      {
+        if (stadium_sss_position.entry_cursor_state == 0 ||
+            cursor_state != stadium_sss_position.entry_cursor_state || state->spr[8] != 0x8025a340)
+          return SetInvalid("Stadium normal cursor call missed its original transform hook"), void();
+      }
+      else if (stadium_sss_position.entry_cursor_state != 0 || cursor_state != 0 ||
+               state->spr[8] != 0x8025a4e8 || state->gpr[30] > 30 ||
+               state->gpr[31] != 0x803f06d0 + state->gpr[30] * 0x1c ||
+               (state->gpr[30] < 30 && selected != state->gpr[30]) ||
+               (!stadium_sss_position.target_seen && state->gpr[30] >= 18) ||
+               (stadium_sss_position.target_seen && state->gpr[30] < 18))
+        return SetInvalid("Stadium end lacks its authored earlier-hit or row18 transform path"), void();
+      phase = "sss_position_end";
+    }
+    else
+      return SetInvalid("Stadium position reached an unauthored hook"), void();
+    raw_size = 0;
+    slice_count = 0;
+    u8 target_enabled = 0, target_kind = 0;
+    if (!ReadBytes(system, 0x803f08d0, 1, &target_enabled) || target_enabled == 0 || target_enabled > 2 ||
+        !ReadBytes(system, 0x803f08d3, 1, &target_kind) || target_kind != 3 ||
+        !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6) || !AddSceneKindSlice(system) ||
+        !AddSlice(system, SliceTag::SssPositionGObj, stadium_sss_position.gobj, 0x38) ||
+        !AddSlice(system, SliceTag::SssPositionProc, stadium_sss_position.proc, 0x18) ||
+        !AddSlice(system, SliceTag::SssPositionScheduler, 0x804d781c, 4) ||
+        !AddSlice(system, SliceTag::SssPositionScheduler, 0x804d7838, 4, 1) ||
+        !AddSlice(system, SliceTag::SssPositionTargetRow, 0x803f08c8, 0x1c) ||
+        !AddSlice(system, SliceTag::SssPositionAxes, 0x804d6cac, 4) ||
+        !AddSlice(system, SliceTag::SssPositionCursorLocal, stadium_sss_position.jobj + 0x38, 12) ||
+        (stadium_sss_position.cursor_seen &&
+         !AddSlice(system, SliceTag::SssPositionCursorWorld, state->gpr[1] + 0x1c, 12)) ||
+        (pc == 0x8025a4e8 &&
+         !AddSlice(system, SliceTag::SssPositionTargetWorld, state->gpr[1] + 0x10, 12)))
+      return SetInvalid("Stadium position could not expose its exact typed source operands"), void();
+    PublishStadiumProgress(phase, pc, word, stadium_sss_position.gobj, state, source_tick);
+    if (pc == 0x8025a548)
+      stadium_sss_position = {};
   }
 
   void ObserveStadiumMenuHook(Core::System* system, u32 pc,
@@ -3589,6 +3756,9 @@ struct Observer::Impl
     }
     if (pc == 0x8025bbd0)
     {
+      if (stadium_sss_position.active)
+        return SetInvalid("Stadium SSS exit interrupted its source position callback"), void();
+      stadium_sss_position = {};
       u32 sss_pointer = 0;
       u8 route = 0;
       if (stadium_go_prefix_phase != StadiumGoPrefixPhase::AwaitSssExit ||
@@ -3652,6 +3822,8 @@ struct Observer::Impl
       return;
     if (stadium_go_prefix_enabled)
     {
+      if (pc == 0x8025a310 || pc == 0x8025a4c0 || pc == 0x8025a4e8 || pc == 0x8025a548)
+        return ObserveStadiumSssPosition(system, pc, state), void();
       if (pc == STADIUM_GO_AFTER_PC)
       {
         if (!stadium_go_prefix_sss_exit_seen || !stadium_go_prefix_vs_entry_seen)
@@ -4592,6 +4764,7 @@ struct Observer::Impl
 
   void SetInvalid(std::string reason)
   {
+    stadium_sss_position = {};
     bool expected = false;
     if (invalid.compare_exchange_strong(expected, true))
     {
@@ -5512,6 +5685,14 @@ struct Observer::Impl
   bool prize_mode_exit_seen = false;
   std::string capture_id;
   std::string sequence_id;
+  struct StadiumSssPositionCall
+  {
+    bool active = false;
+    bool cursor_seen = false;
+    bool target_seen = false;
+    u32 id = 0, gobj = 0, jobj = 0, proc = 0, frame_sp = 0, target_jobj = 0, entry_cursor_state = 0, scene_pointer = 0;
+  } stadium_sss_position;
+  u32 stadium_sss_position_calls = 0;
   bool stadium_go_prefix_enabled = false;
   std::string stadium_go_prefix_setup_receipt_sha256;
   StadiumGoPrefixPhase stadium_go_prefix_phase = StadiumGoPrefixPhase::Disabled;
@@ -5652,7 +5833,9 @@ static bool IsCaptureBoundary(u32 guest_pc)
     // opt-in companion configuration.  The normal observer boundary set and
     // its disabled path remain unchanged.
     return (Env("MWRC_STADIUM_GO_PREFIX") == "1" &&
-            (guest_pc == STADIUM_GO_AFTER_PC || guest_pc == SSS_ENTER_RETURN)) ||
+            (guest_pc == STADIUM_GO_AFTER_PC || guest_pc == SSS_ENTER_RETURN ||
+             guest_pc == 0x8025a310 || guest_pc == 0x8025a4c0 ||
+             guest_pc == 0x8025a4e8 || guest_pc == 0x8025a548)) ||
            (Env("MWRC_TRANSFORM_PREFIX") == "1" && guest_pc == SSS_ENTER_RETURN) ||
            (SdInitRequested() && (guest_pc == 0x8016ebc0 || guest_pc == 0x8016ec24 ||
             ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()) && guest_pc == 0x8025b84c))) ||

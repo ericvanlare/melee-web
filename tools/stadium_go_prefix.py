@@ -7,6 +7,8 @@ prefix. It preserves source boundaries and makes no port RNG-equality claim.
 from __future__ import annotations
 
 import hashlib
+import math
+import struct
 import re
 from pathlib import Path
 import sys
@@ -105,6 +107,132 @@ def _slice(record: dict[str, Any], tag: int, context: str,
              address + len(raw) <= 0x81800000,
              f"{context}: tag={tag} escaped pinned source MEM1")
     return {**item, "raw": raw}
+
+
+SSS_POSITION_PHASES = {"sss_position_cursor", "sss_position_target", "sss_position_end"}
+
+
+class StadiumSssPositionObservations:
+    """One original callback's observations; no cross-call geometry cache."""
+    def __init__(self):
+        self.active = None
+        self.last_call = 0
+
+    def accept(self, row, *, route_ready, expected_receipt=EXPECTED_SETUP_RECEIPT_SHA256):
+        p = row["payload"]
+        phase = p.get("phase")
+        _require(route_ready and phase in SSS_POSITION_PHASES,
+                 "SSS position is outside its accepted live source route")
+        _require(p.get("diagnostic") == DIAGNOSTIC and
+                 p.get("setup_receipt_sha256") == expected_receipt and
+                 p.get("setup_profile_verified_by_observer") is False,
+                 "SSS position has a foreign diagnostic/receipt")
+        pcs = {"sss_position_cursor": (0x8025A4C0, 0x3C60803F),
+               "sss_position_target": (0x8025A4E8, 0xC0410010),
+               "sss_position_end": (0x8025A548, 0x8001003C)}
+        pc, word = pcs[phase]
+        _require(row.get("event") == "progress" and
+                 _hex_address(p.get("pc"), "SSS position PC") == pc and
+                 _hex_address(p.get("word"), "SSS position word") == word and
+                 p.get("source_tick") == row.get("source_tick") and
+                 p.get("draw_ordinal") == row.get("draw_ordinal"),
+                 "SSS position header/PC/word differs")
+        if phase != "sss_position_end":
+            _require(_hex_address(p.get("lr"), "SSS position LR") == pc,
+                     "SSS position is not the original transform return")
+        keys = ("cursor_gobj", "cursor_jobj", "cursor_proc", "frame_sp")
+        gobj, jobj, proc, sp = [_hex_address(p.get(k), "SSS position " + k) for k in keys]
+        _require(all(0x80000000 <= v < 0x81800000 and v % 4 == 0 for v in (gobj,jobj,proc,sp)) and
+                 _hex_address(p.get("argument"), "SSS position argument") == gobj,
+                 "SSS position owner is outside source memory")
+        call = p.get("position_call")
+        cursor = p.get("cursor_observed")
+        target = p.get("target_observed")
+        _require(type(call) is int and 0 < call <= 0xFFFFFFFF and
+                 type(cursor) is bool and type(target) is bool and (not target or cursor),
+                 "SSS position call/observation flags differ")
+        expected = {(17,0),(40,0),(61,0),(62,0),(63,0),(64,0),(64,1),(65,0),(66,0)}
+        if cursor:
+            expected.add((59,0))
+        if phase == "sss_position_target":
+            expected.add((60,0))
+        items = p.get("slices")
+        _require(isinstance(items,list) and len(items) == len(expected) and
+                 {(x.get("tag"),x.get("flags")) for x in items if isinstance(x,dict)} == expected,
+                 "SSS position has missing, duplicate or unauthored operands")
+        def read(tag,size,address,flags=0):
+            item = _slice(p,tag,"SSS position",size,flags)
+            _require(item["address"] == address,"SSS position operand address differs")
+            return item["raw"]
+        route = read(17,6,SCENE_ROUTING_ADDRESS)
+        scene = _slice(p,40,"SSS position scene",1)
+        _require(route[0] == 2 and scene["raw"] == b"\x09", "SSS position lost ordinary SSS scene")
+        owner = read(61,0x38,gobj)
+        process = read(62,0x18,proc)
+        target_row = read(63,0x1C,0x803F08C8)
+        u32 = lambda raw,off=0: int.from_bytes(raw[off:off+4],"big")
+        _require(u32(owner,0x28) == jobj and u32(process,0x10) == gobj and
+                 u32(process,0x14) == 0x8025A310 and
+                 u32(read(64,4,0x804D781C)) == gobj and
+                 u32(read(64,4,0x804D7838,1)) == proc,
+                 "SSS position lacks its exact current scheduler/cursor owner")
+        target_jobj = u32(target_row)
+        _require(0x80000000 <= target_jobj <= 0x817FFFBC and target_jobj % 4 == 0 and
+                 target_row[8] in (1,2) and target_row[11] == 3 and
+                 target_row[12:20] == bytes.fromhex("40466666402ccccd"),
+                 "SSS position target18 owner/kind/authored extents differ")
+        axes = read(65,4,0x804D6CAC)
+        entry_state = p.get("entry_cursor_state")
+        end_index = p.get("end_row_index")
+        _require(type(entry_state) is int and entry_state in (0,1,2) and
+                 axes[2] <= 30 and axes[3] == entry_state and
+                 (not cursor or entry_state == 0),
+                 "SSS position cursor control state differs from its entry")
+        if phase == "sss_position_end":
+            if cursor:
+                _require(type(end_index) is int and 0 <= end_index <= 30 and
+                         _hex_address(p.get("lr"),"SSS position epilogue LR") == 0x8025A4E8 and
+                         (end_index == 30 or axes[2] == end_index) and
+                         ((target and end_index >= 18) or (not target and end_index < 18)),
+                         "SSS position target absence lacks its source earlier-row hit")
+            else:
+                _require(entry_state != 0 and end_index is None and
+                         _hex_address(p.get("lr"),"SSS hidden cursor LR") == 0x8025A340,
+                         "SSS normal-path end missed the cursor transform")
+        else:
+            _require(end_index is None,"SSS non-end observation has an epilogue row")
+        local = read(66,12,jobj+0x38)
+        world = read(59,12,sp+0x1C) if cursor else None
+        target_world = read(60,12,sp+0x10) if phase == "sss_position_target" else None
+        for raw in (local,world,target_world):
+            _require(raw is None or all(math.isfinite(v) for v in struct.unpack(">3f",raw)),
+                     "SSS position contains non-finite source float bits")
+        identity = (call,gobj,jobj,proc,sp,target_jobj,scene["address"],target_row,entry_state)
+        if phase == "sss_position_cursor":
+            _require(self.active is None and call == self.last_call + 1 and cursor and not target,
+                     "SSS cursor observation is duplicate/reordered")
+            self.active = (identity,world,False)
+        elif phase == "sss_position_target":
+            _require(self.active is not None and self.active[0] == identity and
+                     self.active[1] == world and not self.active[2] and cursor and target,
+                     "SSS target sample is stale, foreign or not from this cursor call")
+            self.active = (identity,world,True)
+        else:
+            if cursor:
+                _require(self.active is not None and self.active[0] == identity and
+                         self.active[1] == world and self.active[2] == target,
+                         "SSS position end disagrees with the bound call")
+            else:
+                _require(self.active is None and call == self.last_call + 1 and not target,
+                         "SSS hidden cursor end overlaps another call")
+            self.last_call = call
+            self.active = None
+        return {"call":call,"complete_tuple":phase == "sss_position_target",
+                "cursor_world_hex":world.hex() if world is not None else None,
+                "target_world_hex":target_world.hex() if target_world is not None else None}
+
+    def require_closed(self):
+        _require(self.active is None,"SSS position callback did not reach its original epilogue")
 
 
 def _check_boundary_contract(payload: dict[str, Any], *,
@@ -358,6 +486,7 @@ def validate_stadium_go_prefix(stream_path: str | Path,
     sss_return_sequence = None
     raw_rows = 0
     last_sequence = -1
+    sss_positions = StadiumSssPositionObservations()
     expected_phases = ["css_entry", "css_return", "sss_entry", "sss_return",
                        "sss_exit", "go_after"]
 
@@ -403,6 +532,12 @@ def validate_stadium_go_prefix(stream_path: str | Path,
                          "named setup Progress is outside the pre-GO source setup")
                 payload = row["payload"]
                 phase = payload.get("phase")
+                if phase in SSS_POSITION_PHASES:
+                    sss_positions.accept(row, route_ready=phases == expected_phases[:4],
+                                         expected_receipt=expected_setup_receipt_sha256)
+                    continue
+                if phase == "sss_exit":
+                    sss_positions.require_closed()
                 if phase == "go_after":
                     _require(phases == expected_phases[:-1] and setup_result is not None and
                              vs_entry_count == 1 and setup_count == 1 and

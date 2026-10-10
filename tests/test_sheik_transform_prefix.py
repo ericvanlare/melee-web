@@ -412,7 +412,15 @@ int main(int argc, char** argv) {
                       source.index("struct SliceRef")]
         entries = re.findall(r"^\s+(\w+) = (\d+),", enum, re.MULTILINE)
         tags = {name: int(value) for name, value in entries}
-        self.assertEqual(sorted(tags.values()), list(range(1, 59)))
+        self.assertEqual(sorted(tags.values()), list(range(1, 67)))
+        self.assertEqual({name: tags[name] for name in (
+            "SssPositionCursorWorld", "SssPositionTargetWorld", "SssPositionGObj",
+            "SssPositionProc", "SssPositionTargetRow", "SssPositionScheduler",
+            "SssPositionAxes", "SssPositionCursorLocal")}, {
+                "SssPositionCursorWorld": 59, "SssPositionTargetWorld": 60,
+                "SssPositionGObj": 61, "SssPositionProc": 62,
+                "SssPositionTargetRow": 63, "SssPositionScheduler": 64,
+                "SssPositionAxes": 65, "SssPositionCursorLocal": 66})
         self.assertEqual(tags["PlayerIdentity"], 57)
         self.assertEqual(tags["PlayerTransformed"], 58)
         identity = struct.pack(">III", 2, 18, 0) + bytes((0, 0, 0, 0))

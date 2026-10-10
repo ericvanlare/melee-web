@@ -505,6 +505,9 @@ class StadiumGoPrefixReceiver(SheikTransformPrefixReceiver):
         self.source_tick_rows = 0
         self.draw_return_rows = 0
         self.progress_rows = []
+        from stadium_go_prefix import StadiumSssPositionObservations
+        self.sss_positions = StadiumSssPositionObservations()
+        self.sss_position_route_ready = False
         self.stadium_target_sequence = None
         self.target_neutral_release_sequence = None
         self.target_neutral_polls = 0
@@ -586,6 +589,15 @@ class StadiumGoPrefixReceiver(SheikTransformPrefixReceiver):
         if event == "error":
             raise SdDiagnosticError("Stadium observer error: " + str(payload.get("error")))
         if event == "progress":
+            from stadium_go_prefix import SSS_POSITION_PHASES
+            phase = payload.get("phase")
+            if phase in SSS_POSITION_PHASES:
+                self.sss_positions.accept(row, route_ready=self.sss_position_route_ready)
+            elif phase == "sss_return":
+                self.sss_position_route_ready = True
+            elif phase == "sss_exit":
+                self.sss_positions.require_closed()
+                self.sss_position_route_ready = False
             self.progress_rows.append({"sequence": row["seq"], "phase": payload.get("phase"),
                                        "source_tick": payload.get("source_tick")})
             return
