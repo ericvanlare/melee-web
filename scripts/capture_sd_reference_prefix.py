@@ -508,12 +508,57 @@ class StadiumGoPrefixReceiver(SheikTransformPrefixReceiver):
         from stadium_go_prefix import StadiumSssPositionObservations
         self.sss_positions = StadiumSssPositionObservations()
         self.sss_position_route_ready = False
+        self.sss_feedback = menus["sss"].get("policy") == "same_call_feedback_v1"
+        self.sss_geometry_token = None
+        self.sss_geometry_pending = None
+        self.sss_callback_count = 0
+        self.sss_completed_input = None
         self.stadium_target_sequence = None
         self.target_neutral_release_sequence = None
         self.target_neutral_polls = 0
         self.confirm_sequence = None
         self.confirm_release_sequence = None
         self.consumed_samples = []
+
+    def take_sss_geometry(self, after_consume):
+        """Consume one completed current-call token, never carry a target across calls."""
+        token = self.sss_geometry_token
+        self.sss_geometry_token = None
+        require(token is not None and token["consumed_sample"]["sequence"] >= after_consume and
+                self.consumed_samples and token["consumed_sample"] == self.consumed_samples[-1] and
+                token["call"] == self.sss_positions.last_call and self.sss_positions.active is None and
+                self.sss_position_route_ready and not self.setup_seen and not self.ended and
+                (self.latest_menu or {}).get("scene") == 9 and self.stage is not None,
+                "SSS feedback lacks a fresh completed call after exact consumed input")
+        return token
+
+    def _feedback_position(self, row, observation):
+        phase = row["payload"]["phase"]
+        if phase == "sss_position_cursor" or (phase == "sss_position_end" and
+                                              not row["payload"]["cursor_observed"]):
+            self.sss_geometry_token = None
+            require(self.consumed_samples and not self.setup_seen,
+                    "SSS feedback callback lacks preceding consumed source PAD")
+            sample = self.consumed_samples[-1]
+            require(sample["sequence"] < row["seq"] and sample["phase"] == "menu",
+                    "SSS feedback callback has a foreign consumed input")
+            # Copy arrays: later input observations cannot mutate this witness.
+            self.sss_geometry_pending = (dict(sample, ports=list(sample["ports"]),
+                                              errors=list(sample["errors"])),
+                                         row["source_tick"], row["draw_ordinal"])
+        pending = self.sss_geometry_pending
+        require(pending is not None and pending[0] == self.consumed_samples[-1] and
+                pending[1:] == (row["source_tick"],row["draw_ordinal"]),
+                "SSS feedback input/source cursor changed inside callback")
+        if phase == "sss_position_end":
+            self.sss_callback_count += 1
+            self.sss_completed_input = {"call":row["payload"]["position_call"],
+                                        "cursor_observed":row["payload"]["cursor_observed"],
+                                        "consumed_sample":pending[0]}
+            completed = observation["completed_tuple"]
+            self.sss_geometry_token = (dict(completed, end_sequence=row["seq"],
+                                           consumed_sample=pending[0]) if completed else None)
+            self.sss_geometry_pending = None
 
     def _menu_owner_pad_poll(self, payload):
         scene_rows = [item for item in payload.get("slices", [])
@@ -531,6 +576,9 @@ class StadiumGoPrefixReceiver(SheikTransformPrefixReceiver):
             data, _ = _transform_slices(row["payload"])
             self.latest_menu = items_lock_state(data, row["payload"], self.latest_menu)
         if (self.latest_menu or {}).get("scene") != 9 or self.stage is None:
+            self.sss_geometry_token = None
+            self.sss_geometry_pending = None
+            self.sss_completed_input = None
             self.target_neutral_polls = 0
             return
         target = (self.stage.get("index") == self.menus["sss"]["target_index"] and
@@ -558,6 +606,8 @@ class StadiumGoPrefixReceiver(SheikTransformPrefixReceiver):
         sample = {"sequence": row["seq"], "phase": "post-setup-neutral" if self.setup_seen else "menu",
                   "ports": ports, "errors": errors, **queue_record}
         self.consumed_samples.append(sample)
+        if self.sss_feedback:
+            self.sss_geometry_token = None
         if (not self.setup_seen and (self.latest_menu or {}).get("scene") == 9 and
                 self.stage is not None and
                 self.stage.get("index") == self.menus["sss"]["target_index"] and
@@ -587,21 +637,44 @@ class StadiumGoPrefixReceiver(SheikTransformPrefixReceiver):
                     "Observer handshake/start escaped the declared Stadium-prefix profile")
             return
         if event == "error":
+            self.sss_geometry_token = None
+            self.sss_geometry_pending = None
+            self.sss_completed_input = None
             raise SdDiagnosticError("Stadium observer error: " + str(payload.get("error")))
         if event == "progress":
             from stadium_go_prefix import SSS_POSITION_PHASES
             phase = payload.get("phase")
             if phase in SSS_POSITION_PHASES:
-                self.sss_positions.accept(row, route_ready=self.sss_position_route_ready)
+                if self.sss_feedback:
+                    self.sss_geometry_token = None  # Any new call/operand precedes reuse.
+                try:
+                    observation = self.sss_positions.accept(row, route_ready=self.sss_position_route_ready)
+                    if self.sss_feedback:
+                        self._feedback_position(row, observation)
+                except ValueError:
+                    self.sss_geometry_token = None
+                    self.sss_geometry_pending = None
+                    self.sss_completed_input = None
+                    raise
             elif phase == "sss_return":
                 self.sss_position_route_ready = True
             elif phase == "sss_exit":
                 self.sss_positions.require_closed()
                 self.sss_position_route_ready = False
+                self.sss_geometry_token = None
+                self.sss_geometry_pending = None
+                self.sss_completed_input = None
+            elif self.sss_feedback:
+                self.sss_geometry_token = None
+                self.sss_geometry_pending = None
+                self.sss_completed_input = None
             self.progress_rows.append({"sequence": row["seq"], "phase": payload.get("phase"),
                                        "source_tick": payload.get("source_tick")})
             return
         if event == "end":
+            self.sss_geometry_token = None
+            self.sss_geometry_pending = None
+            self.sss_completed_input = None
             require(payload.get("status") == "completed" and payload.get("natural") is True and
                     payload.get("setup_receipt_sha256") == self.menus["setup_receipt_sha256"] and
                     payload.get("setup_profile_verified_by_observer") is False,
@@ -1278,7 +1351,9 @@ def drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, t
 
 
 def drive_stadium_sss(receiver, menus, controller, next_row, wait_source):
-    """Use only the packet's finite cardinal pulses and observed source owner."""
+    """Use only the packet's declared finite policy and observed source owner."""
+    if menus["sss"].get("policy") == "same_call_feedback_v1":
+        return drive_stadium_sss_feedback(receiver, menus, controller, next_row, wait_source)
     from reference_versus_sequence_capture import raw_pad
     policy = menus["sss"]
     neutral_pair = [NEUTRAL_PAD, NEUTRAL_PAD]
@@ -1342,6 +1417,142 @@ def drive_stadium_sss(receiver, menus, controller, next_row, wait_source):
                 "SSS-Stadium-confirm:consumed", policy["max_pad_consume_wait_polls"])
     release_sequence = set_neutral_and_wait("SSS-Stadium-confirm:neutral-release")
     require(receiver.confirm_sequence is not None and receiver.confirm_release_sequence == release_sequence,
+            "SSS Stadium confirm/release did not retain exact consumed PAD rows")
+
+
+def drive_stadium_sss_feedback(receiver, menus, controller, next_row, wait_source):
+    """Choose bounded Pipe inputs from complete original calls; never simulate guest motion."""
+    import struct
+    from reference_versus_sequence_capture import raw_pad
+    policy = menus["sss"]
+    neutral_pair = [NEUTRAL_PAD]*2
+    owner_start = receiver.menu_polls
+    last_polls, last_calls = receiver.menu_polls, receiver.sss_callback_count
+    last_consumes = len(receiver.consumed_samples)
+    movement_polls = movement_calls = movement_consumes = 0
+    moving = False
+    release_only = False
+    confirmed_sequence = None
+
+    def budget():
+        nonlocal last_polls, last_calls, last_consumes, movement_polls, movement_calls, movement_consumes
+        if moving:
+            movement_polls += receiver.menu_polls-last_polls
+            movement_calls += receiver.sss_callback_count-last_calls
+            movement_consumes += len(receiver.consumed_samples)-last_consumes
+        last_consumes = len(receiver.consumed_samples)
+        last_polls, last_calls = receiver.menu_polls, receiver.sss_callback_count
+        require(not receiver.ended and
+                (receiver.sss_position_route_ready or
+                 (release_only and receiver.confirm_sequence == confirmed_sequence)) and
+                receiver.menu_polls-owner_start < policy["max_owner_polls"],
+                "SSS feedback live-owner observation cap")
+        require(movement_polls <= policy["max_movement_source_polls"] and
+                movement_calls <= policy["max_movement_callbacks"] and
+                movement_consumes <= policy["max_movement_callbacks"],
+                "SSS feedback movement cap")
+
+    def wait(predicate, label, cap):
+        before_consumes = len(receiver.consumed_samples)
+        def checked():
+            budget()
+            require(len(receiver.consumed_samples)-before_consumes <= policy["max_pad_consume_wait_polls"],
+                    "SSS feedback consumed-input wait cap")
+            return predicate()
+        wait_source(checked, label, cap)
+        budget()
+
+    def consumed(pair, after):
+        return next((s for s in receiver.consumed_samples[after:]
+                     if s["ports"][:2] == pair), None)
+
+    def neutral(label):
+        nonlocal moving
+        before = len(receiver.consumed_samples)
+        controller.set_both(*neutral_pair, action=label)
+        wait(lambda: consumed(neutral_pair,before) is not None,
+             label+":consumed",policy["max_pad_consume_wait_polls"])
+        moving = False  # The original has now consumed the release.
+        sequence = consumed(neutral_pair,before)["sequence"]
+        receiver.target_neutral_release_sequence = sequence
+        receiver.target_neutral_polls = 0
+        return sequence
+
+    def completed(after_consume, pair):
+        before = receiver.sss_callback_count
+        wait(lambda: receiver.sss_callback_count > before,
+             "SSS-feedback:completed-call",policy["max_pad_consume_wait_polls"])
+        witness = receiver.sss_completed_input
+        require(receiver.sss_callback_count == before+1 and witness is not None and
+                witness["consumed_sample"]["sequence"] >= after_consume and
+                witness["consumed_sample"] == receiver.consumed_samples[-1] and
+                witness["consumed_sample"]["ports"][:2] == pair,
+                "SSS feedback completed call lacks its exact consumed command")
+        return witness
+
+    def target_stable():
+        return (receiver.stage is not None and receiver.stage.get("index") == policy["target_index"] and
+                receiver.stage.get("kind") == policy["target_kind"] and
+                receiver.stage.get("stable_polls",0) >= 2)
+
+    command_sequence = neutral("SSS-feedback:neutral-entry")
+    command_pair = neutral_pair
+    witness = completed(command_sequence,command_pair)
+    reacquire = 0
+    while True:
+        budget()
+        if receiver.sss_geometry_token is None:
+            require(movement_polls < policy["max_movement_source_polls"] and
+                    movement_calls < policy["max_movement_callbacks"] and
+                    movement_consumes < policy["max_movement_callbacks"], "SSS feedback movement cap")
+            require(moving and witness["cursor_observed"] and
+                    reacquire < policy["max_reacquire_callbacks"],
+                    "SSS feedback target not observed within bounded reacquisition")
+            # Fixed input exploration only. Do not reuse a prior target or calculate an error.
+            reacquire += 1
+            witness = completed(command_sequence,command_pair)
+            continue
+        token = receiver.take_sss_geometry(command_sequence)
+        reacquire = 0
+        cursor = struct.unpack(">3f",bytes.fromhex(token["cursor_world_hex"]))
+        target = struct.unpack(">3f",bytes.fromhex(token["target_world_hex"]))
+        extent = struct.unpack(">2f",bytes.fromhex(token["extent_hex"]))
+        inside = [target[i]-extent[i] < cursor[i] < target[i]+extent[i] for i in (0,1)]
+        if all(inside):
+            neutral("SSS-feedback:target-neutral")
+            wait(lambda: target_stable() and
+                 receiver.target_neutral_polls >= policy["target_stable_neutral_polls"],
+                 "SSS-feedback:target-stability",policy["max_owner_polls"])
+            break
+        axis = 0 if not inside[0] else 1
+        delta = target[axis]-cursor[axis]
+        magnitude = 35 if abs(delta) <= policy["near_center_distance"] else 70
+        value = magnitude if delta>0 else -magnitude
+        pad = raw_pad(x=value if axis==0 else 0,y=value if axis==1 else 0)
+        command_pair = [pad,NEUTRAL_PAD]
+        before = len(receiver.consumed_samples)
+        require(movement_polls < policy["max_movement_source_polls"] and
+                movement_calls < policy["max_movement_callbacks"] and
+                movement_consumes < policy["max_movement_callbacks"], "SSS feedback movement cap")
+        moving = True
+        controller.set_both(*command_pair,action="SSS-feedback:cardinal")
+        wait(lambda: consumed(command_pair,before) is not None,
+             "SSS-feedback:cardinal-consumed",policy["max_pad_consume_wait_polls"])
+        command_sequence = consumed(command_pair,before)["sequence"]
+        witness = completed(command_sequence,command_pair)
+
+    before = len(receiver.consumed_samples)
+    controller.set_both(raw_pad(buttons=["A"]),NEUTRAL_PAD,action="SSS-Stadium-confirm")
+    wait(lambda: consumed([raw_pad(buttons=["A"]),NEUTRAL_PAD],before) is not None,
+         "SSS-Stadium-confirm:consumed",policy["max_pad_consume_wait_polls"])
+    confirmed_sequence = consumed([raw_pad(buttons=["A"]),NEUTRAL_PAD],before)["sequence"]
+    require(receiver.confirm_sequence == confirmed_sequence,
+            "SSS feedback A sample did not qualify as the original confirm")
+    # Source confirmation may exit SSS before the Pipe neutral is consumed.
+    # From this point the only permitted operation is bounded neutral release.
+    release_only = True
+    release = neutral("SSS-Stadium-confirm:neutral-release")
+    require(receiver.confirm_release_sequence == release,
             "SSS Stadium confirm/release did not retain exact consumed PAD rows")
 
 

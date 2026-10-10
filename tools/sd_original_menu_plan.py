@@ -38,6 +38,8 @@ def validate_packet(value):
         return value
     if canonical(value) == canonical(gci_sparse_pair_packet()):
         return value
+    if canonical(value) == canonical(stadium_go_feedback_packet()):
+        return value
     if canonical(value) == canonical(stadium_go_prefix_packet()):
         return value
     if canonical(value) == canonical(sheik_transform_prefix_packet()):
@@ -152,8 +154,12 @@ def route_pads(packet):
                 pads.add(tuple(pair))
     pads |= {(raw_pad(x=40), NEUTRAL_PAD), (raw_pad(y=40), NEUTRAL_PAD)}
     if packet["scope"] == "stadium_go_prefix":
-        for pulse in packet["sss"]["pulses"]:
-            pads.add((raw_pad(x=pulse["x"], y=pulse["y"]), NEUTRAL_PAD))
+        if packet["sss"].get("policy") == "same_call_feedback_v1":
+            for axis in packet["sss"]["axis_values"]:
+                pads |= {(raw_pad(x=axis), NEUTRAL_PAD), (raw_pad(y=axis), NEUTRAL_PAD)}
+        else:
+            for pulse in packet["sss"]["pulses"]:
+                pads.add((raw_pad(x=pulse["x"], y=pulse["y"]), NEUTRAL_PAD))
     return pads
 
 
@@ -396,4 +402,14 @@ def gci_sparse_pair_packet():
         "max_scan_polls": 600, "confirm_requires_cooldown": 0}
     value["stop"] = ("observed exact VS setup, distinct source PAD0/PAD2 consume and release; "
                       "interrupted before terminal")
+    return value
+
+
+def stadium_go_feedback_packet():
+    """Separate bounded feedback experiment; the retained cardinal recipe is unchanged."""
+    value = stadium_go_prefix_packet()
+    value["sss"].pop("pulses")
+    value["sss"].update(policy="same_call_feedback_v1", axis_values=[-70,-35,35,70],
+                        near_center_distance=5, max_reacquire_callbacks=4,
+                        max_movement_callbacks=56)
     return value

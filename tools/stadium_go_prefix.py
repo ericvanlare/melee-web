@@ -208,15 +208,16 @@ class StadiumSssPositionObservations:
             _require(raw is None or all(math.isfinite(v) for v in struct.unpack(">3f",raw)),
                      "SSS position contains non-finite source float bits")
         identity = (call,gobj,jobj,proc,sp,target_jobj,scene["address"],target_row,entry_state)
+        completed = None
         if phase == "sss_position_cursor":
             _require(self.active is None and call == self.last_call + 1 and cursor and not target,
                      "SSS cursor observation is duplicate/reordered")
-            self.active = (identity,world,False)
+            self.active = (identity,world,False,None)
         elif phase == "sss_position_target":
             _require(self.active is not None and self.active[0] == identity and
                      self.active[1] == world and not self.active[2] and cursor and target,
                      "SSS target sample is stale, foreign or not from this cursor call")
-            self.active = (identity,world,True)
+            self.active = (identity,world,True,target_world)
         else:
             if cursor:
                 _require(self.active is not None and self.active[0] == identity and
@@ -225,11 +226,17 @@ class StadiumSssPositionObservations:
             else:
                 _require(self.active is None and call == self.last_call + 1 and not target,
                          "SSS hidden cursor end overlaps another call")
+            if cursor and target:
+                completed = {"call":call, "identity":identity,
+                             "cursor_world_hex":world.hex(),
+                             "target_world_hex":self.active[3].hex(),
+                             "extent_hex":target_row[12:20].hex()}
             self.last_call = call
             self.active = None
         return {"call":call,"complete_tuple":phase == "sss_position_target",
                 "cursor_world_hex":world.hex() if world is not None else None,
-                "target_world_hex":target_world.hex() if target_world is not None else None}
+                "target_world_hex":target_world.hex() if target_world is not None else None,
+                "completed_tuple":completed}
 
     def require_closed(self):
         _require(self.active is None,"SSS position callback did not reach its original epilogue")
