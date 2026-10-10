@@ -4515,7 +4515,7 @@ index 9fc7d6b09a3f0881a23881b758adc65103d025b4..c2f7519ad4be10e92f22d53876f3cf9a
 +}
 +#endif
 diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
-index b7e470cfb7ffb2addf957104eb65b2e931996edb..f8797917dd8c1d9e13bbe059bff05b042e54d131 100644
+index b7e470cfb7ffb2addf957104eb65b2e931996edb..6f63ffa1d9c3fefdde01dcd2626cdf3c587ea00e 100644
 --- a/src/melee/gm/gm_1A45.c
 +++ b/src/melee/gm/gm_1A45.c
 @@ -15,6 +15,7 @@
