@@ -97,7 +97,7 @@ struct MeleeWebMenuSession {
  Runtime runtime; CSSData css; uint8_t css_ko_counts[6]; uint64_t ticks;
  int phase,css_open,sss_open,transition_requested,css_parent_route_requested;
  int selection_rejected,transition_failed,training_mode_scene;
- int first_css_return_armed; const uint8_t* first_css_return_ko_owner; MeleeWebMenuFirstCssReturnNote first_css_return_note;
+ int first_sss_pair_state; int first_css_return_armed; const uint8_t* first_css_return_ko_owner; MeleeWebMenuFirstCssReturnNote first_css_return_note;
 };
 ''' + snapshot + r'''
 typedef struct { int scene_kind; const void* enter_data; const void* exit_data; } Scene;

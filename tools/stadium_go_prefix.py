@@ -79,6 +79,50 @@ FIRST_CSS_DRAW_SLICES = {
     (37, 0): (FIRST_CSS_SAVE_ADDRESS + 2, 2),
     (40, 0): (FIRST_CSS_SCENE_ADDRESS, 1),
 }
+
+# The next scope is a private source-side pair around the original Stadium SSS
+# constructor. These identities come from the retained v6 passive observer;
+# they are provenance for this exact source stream, not a general SSS schema.
+FIRST_SSS_ENTRY_SEQUENCE = 1579
+FIRST_SSS_RETURN_SEQUENCE = 1603
+FIRST_SSS_ENTRY_PC = 0x8025A998
+FIRST_SSS_ENTRY_WORD = 0x7C0802A6
+FIRST_SSS_RETURN_PC = 0x8025B84C
+FIRST_SSS_RETURN_WORD = 0x4E800020
+FIRST_SSS_SOURCE_LR = 0x801A40E8
+FIRST_SSS_SOURCE_TICK = 149
+FIRST_SSS_DRAW_ORDINAL = 149
+FIRST_SSS_SCENE_FRAME = 149
+FIRST_SSS_DATA_ADDRESS = 0x80480668
+FIRST_SSS_START_ADDRESS = FIRST_SSS_DATA_ADDRESS + 0x10
+FIRST_SSS_START_GAME_ADDRESS = FIRST_SSS_DATA_ADDRESS + 4
+FIRST_SSS_SCENE_ROUTING_ADDRESS = 0x80479D30
+FIRST_SSS_SCENE_FRAME_ADDRESS = 0x80479D58
+FIRST_SSS_PAD_ADDRESS = 0x804C1F84
+FIRST_SSS_RNG_POINTER_ADDRESS = 0x804D5F94
+FIRST_SSS_RNG_VALUE_ADDRESS = 0x804D5F90
+FIRST_SSS_SCENE_ADDRESS = 0x803DD9C4
+FIRST_SSS_KIND = 9
+FIRST_SSS_STATUS_BYTES = 515
+FIRST_SSS_STATUS_SHA256 = "05a08641404bda9f87ac4c20b1a44a982ff0470ff3a9b04861c03ba542866c3f"
+FIRST_SSS_SOURCE_SLICES = {
+    (32, 0): (FIRST_SSS_START_ADDRESS, 0xF0),
+    (35, 0): (FIRST_SSS_START_GAME_ADDRESS, 1),
+    (33, 0): (0x803BB300, 0x40),
+    (34, 0): (0x804D6038, 4),
+    (36, 0): (0x8045BF28, 2),
+    (37, 0): (0x8045BF2A, 2),
+    (21, 0): (FIRST_SSS_PAD_ADDRESS, 0x358),
+    (17, 0): (FIRST_SSS_SCENE_ROUTING_ADDRESS, 6),
+    (30, 0): (FIRST_SSS_SCENE_FRAME_ADDRESS, 4),
+    (40, 0): (FIRST_SSS_SCENE_ADDRESS, 1),
+    (19, 0): (FIRST_SSS_RNG_POINTER_ADDRESS, 4),
+    (20, 0): (FIRST_SSS_RNG_VALUE_ADDRESS, 4),
+}
+FIRST_SSS_SOURCE_INVENTORY = {
+    (32, 0), (35, 0), (33, 0), (34, 0), (36, 0), (37, 0),
+    (21, 0), (17, 0), (30, 0), (40, 0), (19, 0), (20, 0),
+}
 FIRST_CSS_CONSUMED_PAD_MAGIC = b"STC1PAD1"
 FIRST_CSS_CONSUMED_PAD_VERSION = 1
 FIRST_CSS_CONSUMED_PAD_HEADER_BYTES = 8 + 4 + 32 + 4 + 4
@@ -491,6 +535,205 @@ def _validate_progress(row: dict[str, Any], phase: str,
         _slice(payload, RNG_POINTER_TAG, phase, 4)
         _slice(payload, RNG_VALUE_TAG, phase, 4)
     return payload
+
+
+def _first_sss_constructor_snapshot(row: dict[str, Any], phase: str) -> dict[str, Any]:
+    sequence = (FIRST_SSS_ENTRY_SEQUENCE if phase == "sss_entry"
+                else FIRST_SSS_RETURN_SEQUENCE)
+    pc = FIRST_SSS_ENTRY_PC if phase == "sss_entry" else FIRST_SSS_RETURN_PC
+    word = FIRST_SSS_ENTRY_WORD if phase == "sss_entry" else FIRST_SSS_RETURN_WORD
+    payload = _validate_progress(row, phase, EXPECTED_SETUP_RECEIPT_SHA256)
+    _require(row.get("event") == "progress" and row.get("seq") == sequence and
+             payload.get("pc") == f"0x{pc:08x}" and
+             payload.get("word") == f"0x{word:08x}" and
+             payload.get("lr") == f"0x{FIRST_SSS_SOURCE_LR:08x}" and
+             row.get("source_tick") == FIRST_SSS_SOURCE_TICK and
+             payload.get("source_tick") == FIRST_SSS_SOURCE_TICK and
+             row.get("draw_ordinal") == FIRST_SSS_DRAW_ORDINAL and
+             payload.get("draw_ordinal") == FIRST_SSS_DRAW_ORDINAL,
+             f"{phase}: original SSS constructor phase/counters differ")
+
+    expected_argument = (f"0x{FIRST_SSS_DATA_ADDRESS:08x}"
+                         if phase == "sss_entry" else "0x00000000")
+    _require(payload.get("argument") == expected_argument,
+             f"{phase}: original observer argument provenance differs")
+    _require_exact_slice_inventory(payload, FIRST_SSS_SOURCE_INVENTORY, phase)
+
+    read: dict[int, dict[str, Any]] = {}
+    for (tag, flags), (address, size) in FIRST_SSS_SOURCE_SLICES.items():
+        item = _slice(payload, tag, phase, size, flags)
+        _require(item["address"] == address,
+                 f"{phase}: tag={tag} source address differs")
+        read[tag] = item
+
+    _require(read[32]["address"] == FIRST_SSS_DATA_ADDRESS + 0x10 and
+             read[35]["address"] == FIRST_SSS_DATA_ADDRESS + 4,
+             f"{phase}: SSSData slices differ from the pinned entry owner")
+
+    from reference_capture_semantics import pad_snapshot_bytes
+    try:
+        pad_state_hex = pad_snapshot_bytes(
+            _slice(payload, 21, phase, 0x358)["raw"])
+    except ValueError as error:
+        raise StadiumGoPrefixError(f"{phase}: source PAD snapshot is invalid: {error}") from error
+
+    source_start = read[32]["raw"]
+    try:
+        from transition_trace_format import decode_start_melee_data
+        semantic_start = decode_start_melee_data(source_start)
+    except ValueError as error:
+        raise StadiumGoPrefixError(f"{phase}: source StartMeleeData is invalid: {error}") from error
+    start_game = read[35]["raw"][0]
+    _require(start_game in (0, 1),
+             f"{phase}: source SSS start_game is not a boolean byte")
+
+    routing = read[17]["raw"]
+    _require(routing[0] == 0x02,
+             f"{phase}: original source routing is not ordinary VS")
+    rng_pointer = int.from_bytes(read[19]["raw"], "big")
+    _require(rng_pointer == read[20]["address"],
+             f"{phase}: original RNG pointer does not name the observed seed slice")
+    scene_frame = int.from_bytes(read[30]["raw"], "big")
+    scene_kind = read[40]["raw"][0]
+    _require(scene_kind == FIRST_SSS_KIND,
+             f"{phase}: original scene kind is not SSS")
+    _require(scene_frame == FIRST_SSS_SCENE_FRAME,
+             f"{phase}: original SSS frame differs from the retained constructor boundary")
+
+    # Only the decoder's declared semantic fields are compared. The source
+    # slice is 0xf0 bytes (rules plus four players), while native SSSData owns
+    # six players; the last two native rows and all source padding stay open.
+    expected = {
+        "phase": phase,
+        "scene_frame": scene_frame,
+        "scene_kind": scene_kind,
+        "random_seed_hex": read[20]["raw"].hex(),
+        "pad_state_hex": pad_state_hex,
+        "scene_routing_getters": {
+            "current_game_mode": routing[0],
+            "previous_game_mode": routing[2],
+            "current_scene_index": routing[3],
+            "previous_scene_index": routing[4],
+        },
+        "sss": {
+            "header": {"start_game": start_game},
+            "vs": {"start": semantic_start},
+        },
+    }
+    inventory = [
+        {"tag": item["tag"], "flags": item["flags"],
+         "address": item["address"], "size": item["size"]}
+        for item in payload["slices"]
+    ]
+    return {
+        "sequence": sequence,
+        "source_tick": FIRST_SSS_SOURCE_TICK,
+        "draw_ordinal": FIRST_SSS_DRAW_ORDINAL,
+        "pc": f"0x{pc:08x}",
+        "word": f"0x{word:08x}",
+        "lr": f"0x{FIRST_SSS_SOURCE_LR:08x}",
+        "argument": payload.get("argument"),
+        "source_slice_inventory": inventory,
+        "source_slices_hex": {
+            f"{tag}:0": item["raw"].hex() for tag, item in sorted(read.items())
+        },
+        "setup_receipt_sha256": payload["setup_receipt_sha256"],
+        "setup_profile_verified_by_observer": payload["setup_profile_verified_by_observer"],
+        "scene_routing_raw_hex": routing.hex(),
+        "rng_pointer_hex": f"{rng_pointer:08x}",
+        "expected": expected,
+    }
+
+
+def _extract_first_sss_constructor_pair_rows(
+        entry_row: dict[str, Any], returned_row: dict[str, Any],
+        stream_sha256: str) -> dict[str, Any]:
+    _require(stream_sha256 == FIRST_CSS_STREAM_SHA256,
+             "SSS constructor pair is not from the retained v6 observer")
+    entry = _first_sss_constructor_snapshot(entry_row, "sss_entry")
+    returned = _first_sss_constructor_snapshot(returned_row, "sss_return")
+    return {
+        "schema": "melee-web-stadium-first-sss-constructor-pair-diagnostic",
+        "version": 1,
+        "scope": "original SSS OnEnter entry1579 and return1603 only",
+        "provenance": {
+            "observer_bytes": FIRST_CSS_STREAM_BYTES,
+            "observer_sha256": stream_sha256,
+            "observer_status_bytes": FIRST_SSS_STATUS_BYTES,
+            "observer_status_sha256": FIRST_SSS_STATUS_SHA256,
+            "entry_sequence": FIRST_SSS_ENTRY_SEQUENCE,
+            "entry_pc": f"0x{FIRST_SSS_ENTRY_PC:08x}",
+            "entry_word": f"0x{FIRST_SSS_ENTRY_WORD:08x}",
+            "entry_lr": f"0x{FIRST_SSS_SOURCE_LR:08x}",
+            "return_sequence": FIRST_SSS_RETURN_SEQUENCE,
+            "return_pc": f"0x{FIRST_SSS_RETURN_PC:08x}",
+            "return_word": f"0x{FIRST_SSS_RETURN_WORD:08x}",
+            "return_lr": f"0x{FIRST_SSS_SOURCE_LR:08x}",
+            "source_tick": FIRST_SSS_SOURCE_TICK,
+            "draw_ordinal": FIRST_SSS_DRAW_ORDINAL,
+            "scene_frame": FIRST_SSS_SCENE_FRAME,
+            "source_scene_kind": FIRST_SSS_KIND,
+        },
+        "expected_entry": entry["expected"],
+        "expected_return": returned["expected"],
+        "source_entry": {key: value for key, value in entry.items() if key != "expected"},
+        "source_return": {key: value for key, value in returned.items() if key != "expected"},
+        "comparison_fields": [
+            "sss.header.start_game", "sss.vs.start.rules", "sss.vs.start.players[0:4]",
+            "scene_frame", "scene_kind", "random_seed_hex", "pad_state_hex",
+            "scene_routing_getters",
+        ],
+        "unpaired_routing_fields": ["pending_mode", "next_state_id"],
+        "unobserved_native_player_slots": [4, 5],
+        "whole_session_equivalent": False,
+        "source_admission": False,
+    }
+
+
+def extract_stadium_first_sss_constructor_pair(
+        stream_path: str | Path, status_path: str | Path) -> dict[str, Any]:
+    """Extract the retained original SSS constructor entry/return pair."""
+    source = Path(stream_path)
+    status_file = Path(status_path)
+    _require(source.is_file() and status_file.is_file(),
+             "configured SSS observer stream or status is missing")
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES,
+             "SSS observer stream byte length differs from retained v6 source")
+    status_bytes = status_file.read_bytes()
+    _require(len(status_bytes) == FIRST_SSS_STATUS_BYTES and
+             hashlib.sha256(status_bytes).hexdigest() == FIRST_SSS_STATUS_SHA256,
+             "SSS observer status identity differs from retained v6 source")
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    _require(digest == FIRST_CSS_STREAM_SHA256,
+             "SSS observer stream hash differs from retained v6 source")
+    try:
+        summary = validate_stadium_go_prefix(source, status_path=status_file)
+        _require(summary.get("decision") == "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY" and
+                 summary.get("stream_bytes") == FIRST_CSS_STREAM_BYTES and
+                 summary.get("stream_sha256") == digest,
+                 "SSS source stream no longer passes full GO-prefix validation")
+        entry_rows: list[dict[str, Any]] = []
+        return_rows: list[dict[str, Any]] = []
+        for row in iter_records(source, max_bytes=MAX_STREAM_BYTES,
+                                max_records=MAX_STREAM_RECORDS):
+            if row.get("seq") == FIRST_SSS_ENTRY_SEQUENCE:
+                entry_rows.append(row)
+            elif row.get("seq") == FIRST_SSS_RETURN_SEQUENCE:
+                return_rows.append(row)
+        _require(len(entry_rows) == 1 and len(return_rows) == 1,
+                 "SSS source stream does not contain one exact entry/return pair")
+        result = _extract_first_sss_constructor_pair_rows(
+            entry_rows[0], return_rows[0], digest)
+    except StadiumGoPrefixError:
+        raise
+    except (OSError, ObserverStreamError) as error:
+        raise StadiumGoPrefixError(f"cannot validate SSS constructor rows: {error}") from error
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES and
+             hashlib.sha256(source.read_bytes()).hexdigest() == digest and
+             status_file.stat().st_size == FIRST_SSS_STATUS_BYTES and
+             hashlib.sha256(status_file.read_bytes()).hexdigest() == FIRST_SSS_STATUS_SHA256,
+             "SSS source observer or status changed during extraction")
+    return result
 
 
 def _decode_setup(payload: dict[str, Any]) -> dict[str, Any]:

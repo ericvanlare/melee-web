@@ -63,7 +63,13 @@ from stadium_go_prefix import (  # noqa: E402
     FIRST_CSS_DRAW_RETURN_PC,
     FIRST_CSS_DRAW_RETURN_SEQUENCE,
     FIRST_CSS_DRAW_SLICES,
+    FIRST_SSS_DATA_ADDRESS,
+    FIRST_SSS_ENTRY_SEQUENCE,
+    FIRST_SSS_RETURN_SEQUENCE,
+    FIRST_SSS_SOURCE_INVENTORY,
+    FIRST_SSS_SOURCE_SLICES,
     SCENE_ROUTING_ADDRESS,
+    _extract_first_sss_constructor_pair_rows,
     _extract_first_css_first_draw_rows,
     _extract_first_css_consumed_tick_rows,
     _extract_first_css_context_rows,
@@ -74,6 +80,7 @@ from stadium_go_prefix import (  # noqa: E402
     extract_stadium_first_css_consumed_tick,
     extract_stadium_first_css_context,
     extract_stadium_first_css_postdraw_stream,
+    extract_stadium_first_sss_constructor_pair,
     _extract_first_css_postdraw_stream_rows,
     _check_boundary_contract,
     _classify_stadium_sss_owner,
@@ -129,15 +136,48 @@ def _menu_slices(phase: str, route: int = 1) -> list[dict]:
     if phase == "css_return":
         return common + [_slice(31, 0xF0)]
     if phase == "sss_entry":
-        return common + [
-            _slice(32, 0xF0, address=0x80420010),
-            _slice(35, 1, data=route_bytes, address=0x80420004),
-        ]
+        return _first_sss_slices(route)
+    if phase == "sss_return":
+        return _first_sss_slices(route)
     return common + [_slice(32, 0xF0), _slice(35, 1, data=route_bytes)]
 
 
-def _progress(phase: str, seq: int, *, source_tick: int = 40,
-              route: int = 1, setup: bytes | None = None) -> bytes:
+def _valid_sss_pad_snapshot() -> bytes:
+    pad = bytearray(0x358)
+    config = struct.pack(
+        ">iibb fBBbbBBBBBBbBBBBB", 15, 4, 0, 0, 1.0, 0, 0, 80, 5,
+        0, 150, 30, 0, 150, 30, 80, 1, 1, 0, 0, 0)
+    pad[:10] = config[:10]
+    pad[12:32] = config[10:]
+    return bytes(pad)
+
+
+def _first_sss_slices(start_game: int = 1, *, start: bytes | None = None,
+                      pad: bytes | None = None, route: bytes | None = None,
+                      rng_pointer: bytes = bytes.fromhex("804d5f90"),
+                      rng_value: bytes = bytes.fromhex("3bb84c53"),
+                      scene_frame: int = 149, scene_kind: int = 9) -> list[dict]:
+    start = (start or _setup()[:0xF0])
+    pad = _valid_sss_pad_snapshot() if pad is None else pad
+    route = bytes.fromhex("020001000000") if route is None else route
+    return [
+        _slice(32, 0xF0, data=start, address=0x80480678),
+        _slice(35, 1, data=bytes((start_game,)), address=0x8048066C),
+        _slice(33, 0x40, address=0x803BB300),
+        _slice(34, 4, address=0x804D6038),
+        _slice(36, 2, address=0x8045BF28),
+        _slice(37, 2, address=0x8045BF2A),
+        _slice(21, 0x358, data=pad, address=0x804C1F84),
+        _slice(17, 6, data=route, address=0x80479D30),
+        _slice(30, 4, data=struct.pack(">I", scene_frame), address=0x80479D58),
+        _slice(40, 1, data=bytes((scene_kind,)), address=0x803DD9C4),
+        _slice(19, 4, data=rng_pointer, address=0x804D5F94),
+        _slice(20, 4, data=rng_value, address=0x804D5F90),
+    ]
+
+
+def _progress_payload(phase: str, *, source_tick: int = 40,
+                      route: int = 1, setup: bytes | None = None) -> dict:
     pcs = {"css_entry": 0x8026688C, "css_return": 0x802669F0,
            "sss_entry": 0x8025A998, "sss_return": 0x8025B84C,
            "sss_exit": 0x8025BBD0, "go_after": 0x8016B824}
@@ -152,10 +192,11 @@ def _progress(phase: str, seq: int, *, source_tick: int = 40,
         "pc": f"0x{pcs[phase]:08x}",
         "word": f"0x{words[phase]:08x}",
         "argument": ("0x80410000" if phase == "css_entry" else
-                     "0x80420000" if phase == "sss_entry" else "0x00000000"),
-        "lr": "0x8016b824" if phase == "go_after" else "0x00000000",
+                     "0x80480668" if phase == "sss_entry" else "0x00000000"),
+        "lr": ("0x8016b824" if phase == "go_after" else
+               "0x801a40e8" if phase in ("sss_entry", "sss_return") else "0x00000000"),
         "source_tick": source_tick,
-        "draw_ordinal": 0,
+        "draw_ordinal": 149 if phase in ("sss_entry", "sss_return") and source_tick == 149 else 0,
         "slices": _menu_slices(phase, route),
     }
     if phase == "go_after":
@@ -169,6 +210,16 @@ def _progress(phase: str, seq: int, *, source_tick: int = 40,
                 *_menu_slices("sss_exit", route)[1:3],
             ],
         })
+    return payload
+
+
+def _progress(phase: str, seq: int, *, source_tick: int = 40,
+              route: int = 1, setup: bytes | None = None) -> bytes:
+    pcs = {"css_entry": 0x8026688C, "css_return": 0x802669F0,
+           "sss_entry": 0x8025A998, "sss_return": 0x8025B84C,
+           "sss_exit": 0x8025BBD0, "go_after": 0x8016B824}
+    payload = _progress_payload(phase, source_tick=source_tick,
+                                route=route, setup=setup)
     return _frame(4, seq, json.dumps(payload, separators=(",", ":")).encode(),
                   pc=pcs[phase], source_tick=source_tick)
 
@@ -1553,6 +1604,109 @@ class StadiumFirstCssContextTests(OwnedWorkspaceTests):
                          postdraw_result["input_bundle"]["sha256"])
         self.assertFalse((self.scratch / source.name).exists(),
                          "retained raw source must stay outside test scratch")
+
+
+class StadiumFirstSssConstructorPairTests(unittest.TestCase):
+    @staticmethod
+    def _rows():
+        return ({"event": "progress", "seq": FIRST_SSS_ENTRY_SEQUENCE,
+                 "source_tick": 149, "draw_ordinal": 149,
+                 "payload": _progress_payload("sss_entry", source_tick=149)},
+                {"event": "progress", "seq": FIRST_SSS_RETURN_SEQUENCE,
+                 "source_tick": 149, "draw_ordinal": 149,
+                 "payload": _progress_payload("sss_return", source_tick=149)})
+
+    def test_pair_extracts_only_the_pinned_entry_first_semantic_state(self):
+        entry, returned = self._rows()
+        pair = _extract_first_sss_constructor_pair_rows(
+            entry, returned, FIRST_CSS_STREAM_SHA256)
+        self.assertEqual(pair["schema"],
+                         "melee-web-stadium-first-sss-constructor-pair-diagnostic")
+        self.assertEqual(pair["source_entry"]["argument"], "0x80480668")
+        self.assertEqual(pair["source_return"]["argument"], "0x00000000")
+        self.assertEqual(pair["source_entry"]["lr"], "0x801a40e8")
+        self.assertEqual(pair["source_return"]["lr"], "0x801a40e8")
+        self.assertFalse(pair["source_entry"]["setup_profile_verified_by_observer"])
+        self.assertFalse(pair["source_return"]["setup_profile_verified_by_observer"])
+        self.assertEqual(pair["source_entry"]["setup_receipt_sha256"],
+                         pair["source_return"]["setup_receipt_sha256"])
+        self.assertEqual(pair["source_entry"]["source_slice_inventory"],
+                         pair["source_return"]["source_slice_inventory"])
+        self.assertEqual(len(pair["source_entry"]["source_slices_hex"]["32:0"]), 0xF0 * 2)
+        self.assertEqual(len(pair["source_return"]["source_slices_hex"]["21:0"]), 0x358 * 2)
+        self.assertEqual(pair["expected_entry"]["scene_frame"], 149)
+        self.assertEqual(pair["expected_entry"]["scene_kind"], 9)
+        self.assertEqual(pair["expected_entry"]["random_seed_hex"], "3bb84c53")
+        self.assertEqual(pair["expected_entry"]["sss"]["vs"]["start"]["rules"]["match_kind"], 1)
+        self.assertEqual(len(pair["expected_entry"]["sss"]["vs"]["start"]["players"]), 4)
+        self.assertEqual(pair["unobserved_native_player_slots"], [4, 5])
+        self.assertFalse(pair["whole_session_equivalent"])
+        self.assertFalse(pair["source_admission"])
+
+    def test_pair_is_strict_about_return_owner_without_using_its_zero_argument(self):
+        for edit in (
+            lambda row: row["payload"].update(argument="0x80480668"),
+            lambda row: next(s for s in row["payload"]["slices"] if s["tag"] == 32)
+                .update(address=0x80480688),
+            lambda row: next(s for s in row["payload"]["slices"] if s["tag"] == 35)
+                .update(address=0x8048066D),
+        ):
+            entry, returned = self._rows()
+            edit(returned)
+            with self.assertRaises(StadiumGoPrefixError):
+                _extract_first_sss_constructor_pair_rows(
+                    entry, returned, FIRST_CSS_STREAM_SHA256)
+
+    def test_pair_rejects_reusing_entry_row_as_return(self):
+        entry, _ = self._rows()
+        returned = json.loads(json.dumps(entry))
+        with self.assertRaises(StadiumGoPrefixError):
+            _extract_first_sss_constructor_pair_rows(
+                entry, returned, FIRST_CSS_STREAM_SHA256)
+
+    def test_pair_rejects_changed_phase_provenance_and_authored_slices(self):
+        controls = (
+            ("seq", FIRST_SSS_ENTRY_SEQUENCE + 1),
+            ("source_tick", 148),
+            ("draw_ordinal", 148),
+        )
+        for key, value in controls:
+            entry, returned = self._rows()
+            entry[key] = value
+            with self.subTest(key=key):
+                with self.assertRaises(StadiumGoPrefixError):
+                    _extract_first_sss_constructor_pair_rows(
+                        entry, returned, FIRST_CSS_STREAM_SHA256)
+
+        for key, value in (("lr", "0x801a40ec"),
+                           ("draw_ordinal", 148),
+                           ("word", "0x4e800020")):
+            entry, returned = self._rows()
+            entry["payload"][key] = value
+            with self.subTest(payload_key=key):
+                with self.assertRaises(StadiumGoPrefixError):
+                    _extract_first_sss_constructor_pair_rows(
+                        entry, returned, FIRST_CSS_STREAM_SHA256)
+
+        entry, returned = self._rows()
+        next(s for s in entry["payload"]["slices"] if s["tag"] == 35)["hex"] = "02"
+        with self.assertRaises(StadiumGoPrefixError):
+            _extract_first_sss_constructor_pair_rows(
+                entry, returned, FIRST_CSS_STREAM_SHA256)
+
+    def test_pair_rejects_unexpected_duplicate_or_foreign_source_slices(self):
+        for mutation in ("duplicate", "foreign"):
+            entry, returned = self._rows()
+            if mutation == "duplicate":
+                entry["payload"]["slices"].append(
+                    dict(entry["payload"]["slices"][0]))
+            else:
+                entry["payload"]["slices"].append(_slice(99, 4))
+            with self.subTest(mutation=mutation):
+                with self.assertRaises(StadiumGoPrefixError):
+                    _extract_first_sss_constructor_pair_rows(
+                        entry, returned, FIRST_CSS_STREAM_SHA256)
+
 
 if __name__ == "__main__":
     unittest.main()

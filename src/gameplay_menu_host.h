@@ -154,12 +154,42 @@ typedef struct MeleeWebMenuCssReturnSnapshot {
     int source_scene;
     int source_scene_kind;
 } MeleeWebMenuCssReturnSnapshot;
+typedef struct MeleeWebMenuFirstSssPairNoteSnapshot {
+    int captured;
+    int phase; /* 1 entry before OnEnter, 2 return after OnEnter */
+    int host_entered;
+    int session_phase;
+    int source_scene;
+    int scene_kind;
+    uint32_t scene_frame;
+    uint32_t random_seed;
+    uint8_t pad_state[MELEE_WEB_PAD_STATE_BYTES];
+    int scene_routing_getters[4];
+    int owners[8]; /* host, session, world, audio, VS mode, scene info, payload, seed */
+    uint64_t world_generation;
+    uint64_t audio_generation;
+    uint64_t session_ticks;
+    SSSData sss;
+} MeleeWebMenuFirstSssPairNoteSnapshot;
+typedef struct MeleeWebMenuFirstSssPairObservation {
+    int state; /* 0 idle, 1 CSS armed, 2 captured, 3 failed */
+    unsigned host_tick_calls;
+    unsigned host_draw_calls;
+    char error[160];
+    MeleeWebMenuFirstSssPairNoteSnapshot entry;
+    MeleeWebMenuFirstSssPairNoteSnapshot returned;
+} MeleeWebMenuFirstSssPairObservation;
 /* Arm once after reference context installation, before first host_enter.
  * Read only after successful enter, before any tick/leave; a failed note
  * remains explicit while original enter/phase updates finish for cleanup. */
 int melee_web_menu_host_arm_first_css_return(MeleeWebMenuHost*, char*, size_t);
 int melee_web_menu_host_first_css_return(MeleeWebMenuHost*,
     MeleeWebMenuCssReturnSnapshot*, char*, size_t);
+/* Passive SSS constructor pair. Arm only after the one-use final CSS draw
+ * returned successfully. This keeps the exact ordinary CSS->SSS handoff. */
+int melee_web_menu_host_arm_first_sss_pair(MeleeWebMenuHost*, char*, size_t);
+int melee_web_menu_host_first_sss_pair(
+    const MeleeWebMenuHost*, MeleeWebMenuFirstSssPairObservation*, char*, size_t);
 /* One-shot diagnostic draw after the exact last retained CSS input requested
  * a transition. The ordinal/sequence and PAD must match the retained result-3
  * host tick; the authorization does not clear or rewrite that request. */

@@ -111,6 +111,9 @@ struct MeleeWebMenuHost {
   int entered,drawing,transition;
   int first_css_return_state;
   int final_pending_css_draw_witness,final_pending_css_draw_state;
+  int final_pending_css_draw_returned;
+  int first_sss_pair_state; unsigned first_sss_pair_host_tick_calls,first_sss_pair_host_draw_calls;
+  char first_sss_pair_error[160];
   int final_pending_css_draw_tick_result,final_pending_css_draw_request;
   int final_pending_css_draw_pending_scene_change;
   unsigned final_pending_css_draw_input_ordinal,final_pending_css_draw_pad_sequence;
@@ -131,7 +134,7 @@ static void* HSD_GObj_804D7814,*HSD_GObj_804D7818;
 static int gobj_draws, clock_presents, configured_result=3, configured_request=19;
 static int clock_present_ok=1;
 enum { MELEE_WEB_HOST_SCENE_CSS=1, MELEE_WEB_HOST_SCENE_TITLE=3,
-       MELEE_WEB_HOST_SCENE_MAIN=4 };
+       MELEE_WEB_HOST_SCENE_MAIN=4, MELEE_WEB_HOST_SCENE_SSS=2 };
 
 static int fail(char*,size_t,const char*);
 static int ok(char*,size_t);
@@ -230,11 +233,13 @@ static void test_one_use_success_and_normal_pending_noop(void)
   assert(melee_web_menu_host_arm_final_pending_css_draw(&h,148,1574,raw,error,sizeof(error))==1);
   assert(melee_web_menu_host_draw_final_pending_css(&h,error,sizeof(error))==1);
   assert(h.final_pending_css_draw_state==2&&gobj_draws==1&&clock_presents==1);
+  assert(h.final_pending_css_draw_returned==1);
   assert(melee_web_menu_host_draw_final_pending_css(&h,error,sizeof(error))==0);
   assert(gobj_draws==1&&clock_presents==1);
   /* The ordinary public draw stays a successful no-op on a pending transition. */
   assert(melee_web_menu_host_draw(&h,error,sizeof(error))==1);
   assert(gobj_draws==1&&clock_presents==1&&h.final_pending_css_draw_witness==0);
+  assert(h.final_pending_css_draw_returned==0);
 }
 
 static void test_wrong_input_and_semantic_pad_fail_closed(void)
@@ -259,6 +264,7 @@ static void test_wrong_input_and_semantic_pad_fail_closed(void)
   h.queue.stat[0].extButton^=1;
   assert(melee_web_menu_host_draw_final_pending_css(&h,error,sizeof(error))==0);
   assert(gobj_draws==0&&clock_presents==0);
+  assert(h.final_pending_css_draw_returned==0);
 }
 
 static void test_live_owner_changes_and_later_tick_invalidate(void)
@@ -327,6 +333,7 @@ static void test_failed_clock_consumes_authorization(void)
   clock_present_ok=0;
   assert(melee_web_menu_host_draw_final_pending_css(&h,error,sizeof(error))==0);
   assert(h.final_pending_css_draw_state==2&&gobj_draws==1&&clock_presents==1);
+  assert(h.final_pending_css_draw_returned==0);
   clock_present_ok=1;
   assert(melee_web_menu_host_draw_final_pending_css(&h,error,sizeof(error))==0);
   assert(gobj_draws==1&&clock_presents==1);
@@ -346,6 +353,7 @@ static void test_active_source_callback_refuses_arm_and_draw(void)
   HSD_GObj_804D7838=(void*)1;
   assert(melee_web_menu_host_draw_final_pending_css(&h,error,sizeof(error))==0);
   assert(gobj_draws==0&&clock_presents==0);
+  assert(h.final_pending_css_draw_returned==0);
 }
 
 int main(void)
@@ -446,6 +454,7 @@ class FinalPendingCssDrawHostTests(OwnedWorkspaceTests):
             _function(source, "static int fail("),
             _function(source, "static int ok("),
             _function(source, "static int live("),
+            _function(source, "static void first_sss_pair_fail("),
             _function(source, "static void final_pending_css_draw_invalidate("),
             _function(source, "static int final_pending_css_pad_equal("),
             _function(source, "static void final_pending_css_pad_copy("),

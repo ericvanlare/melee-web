@@ -93,9 +93,23 @@ struct FirstCssFinalPendingDrawState {
  unsigned host_draw_calls=0,aurora_begin_calls=0,aurora_end_calls=0;
 };
 FirstCssFinalPendingDrawState first_css_final_pending_draw;
+struct FirstSssConstructorPairState {
+ bool armed=false,kicked=false,attempted=false,captured=false,compared=false;
+ bool complete=false,failed=false,frame_terminal=false;
+ bool callback_attempted=false,audio_before_rebuild_captured=false;
+ std::string error,observation,actual_json;
+ uint64_t audio_render_calls_before_rebuild=0;
+ uint64_t audio_render_frames_before_rebuild=0;
+ uint64_t audio_render_calls_after_sss_enter=0;
+ uint64_t audio_render_frames_after_sss_enter=0;
+ MeleeWebMenuFirstSssPairObservation native{};
+};
+FirstSssConstructorPairState first_sss_constructor_pair;
 extern bool running;
+extern bool first_use_draw_pending;
 extern melee_web::FixedTickClock menu_clock;
 extern std::string message;
+extern uint64_t diagnostic_audio_render_calls,diagnostic_audio_render_frames;
 std::string first_css_browser_draw_json_quote(const std::string& value){
  std::string result="\"";
  for(unsigned char byte:value){
@@ -109,6 +123,154 @@ std::string first_css_browser_draw_json_quote(const std::string& value){
   }else result.push_back(static_cast<char>(byte));
  }
  result.push_back('\"');return result;
+}
+void first_css_browser_draw_refresh_observation();
+void first_sss_pair_fail(const std::string& error){
+ auto& state=first_sss_constructor_pair;
+ if(!state.failed){state.failed=true;state.error=error;}
+ state.frame_terminal=true;running=false;pending=false;menu_clock.reset();
+ first_use_draw_pending=false;
+ message=state.error;
+}
+void first_sss_pair_sync_native(){
+ auto& state=first_sss_constructor_pair;
+ if(!state.armed||!host)return;
+ MeleeWebMenuFirstSssPairObservation observed{};
+ char error[256]{};
+ if(melee_web_menu_host_first_sss_pair(host,&observed,error,sizeof(error))){
+  state.native=observed;
+  if(observed.state==3){
+   state.failed=true;state.frame_terminal=true;
+   if(state.error.empty())state.error=observed.error[0]?observed.error:
+       "Native SSS constructor pair failed its owner checks";
+  }
+ }else if(state.error.empty()){
+  state.failed=true;state.frame_terminal=true;state.error=error;
+ }
+}
+void first_sss_pair_write_note(std::ostream& out,
+    const MeleeWebMenuFirstSssPairNoteSnapshot& note){
+ out<<"{\"phase\":\""<<(note.phase==1?"sss_entry":"sss_return")
+    <<"\",\"host_entered\":"<<(note.host_entered?"true":"false")
+    <<",\"session_phase\":"<<note.session_phase
+    <<",\"source_scene\":"<<note.source_scene
+    <<",\"scene_kind\":"<<note.scene_kind
+    <<",\"scene_frame\":"<<note.scene_frame
+    <<",\"random_seed_hex\":\""
+    <<melee_web::stadium_first_css_diagnostic::hex32(note.random_seed)
+    <<"\",\"pad_state_hex\":\""
+    <<melee_web::stadium_first_css_diagnostic::hex(note.pad_state,sizeof(note.pad_state))
+    <<"\",\"scene_routing_getters\":{\"current_game_mode\":"
+    <<note.scene_routing_getters[0]
+    <<",\"previous_game_mode\":"<<note.scene_routing_getters[1]
+    <<",\"current_scene_index\":"<<note.scene_routing_getters[2]
+    <<",\"previous_scene_index\":"<<note.scene_routing_getters[3]
+    <<"},\"owners\":{\"host\":"<<(note.owners[0]?"true":"false")
+    <<",\"session\":"<<(note.owners[1]?"true":"false")
+    <<",\"world\":"<<(note.owners[2]?"true":"false")
+    <<",\"audio\":"<<(note.owners[3]?"true":"false")
+    <<",\"vs_mode\":"<<(note.owners[4]?"true":"false")
+    <<",\"scene_info\":"<<(note.owners[5]?"true":"false")
+    <<",\"payload\":"<<(note.owners[6]?"true":"false")
+    <<",\"seed\":"<<(note.owners[7]?"true":"false")
+    <<"},\"world_generation\":"<<note.world_generation
+    <<",\"audio_generation\":"<<note.audio_generation
+    <<",\"session_ticks\":"<<note.session_ticks
+    <<",\"sss\":{\"header\":{\"unk_stage\":"
+    <<unsigned(note.sss.unk_stage)<<",\"x1\":"<<unsigned(note.sss.x1)
+    <<",\"no_lras\":"<<unsigned(note.sss.no_lras)
+    <<",\"force_stage_id\":"<<int(note.sss.force_stage_id)
+    <<",\"start_game\":"<<unsigned(note.sss.start_game)
+    <<"},\"vs\":";
+ melee_web::stadium_first_css_diagnostic::write_vs_mode(out,note.sss.vs);
+ out<<"}}";
+}
+std::string first_sss_pair_actual_json(){
+ auto& state=first_sss_constructor_pair;
+ const auto& native=state.native;
+ const bool host_entered_now=host_entered&&host&&
+     melee_web_menu_host_phase(host)==MELEE_WEB_MENU_SSS;
+ const bool audio_live=native.entry.captured&&native.returned.captured&&
+     native.entry.owners[3]&&native.returned.owners[3];
+ const uint64_t world_generation=native.entry.captured?
+     native.entry.world_generation:native.returned.world_generation;
+ const uint64_t audio_generation=native.entry.captured?
+     native.entry.audio_generation:native.returned.audio_generation;
+ const char* status=state.failed?"failed":state.complete?"complete":
+     state.captured?"captured":state.kicked?"kicked":state.armed?"armed":"idle";
+ std::ostringstream out;
+ out<<"{\"status\":\""<<status<<"\",\"armed\":"<<(state.armed?"true":"false")
+    <<",\"kicked\":"<<(state.kicked?"true":"false")
+    <<",\"attempted\":"<<(state.attempted?"true":"false")
+    <<",\"captured\":"<<(state.captured?"true":"false")
+    <<",\"compared\":"<<(state.compared?"true":"false")
+    <<",\"complete\":"<<(state.complete?"true":"false")
+    <<",\"failed\":"<<(state.failed?"true":"false")
+    <<",\"error\":"<<(state.error.empty()?"null":
+       first_css_browser_draw_json_quote(state.error))
+    <<",\"host_entered\":"<<(host_entered_now?"true":"false")
+    <<",\"session_phase\":"<<(host?melee_web_menu_host_phase(host):0)
+    <<",\"world_generation\":"<<world_generation
+    <<",\"audio_generation\":"<<audio_generation
+    <<",\"audio_owner_live\":"<<(audio_live?"true":"false")
+    <<",\"audio_render_calls_before_rebuild\":"<<state.audio_render_calls_before_rebuild
+    <<",\"audio_render_frames_before_rebuild\":"<<state.audio_render_frames_before_rebuild
+    <<",\"audio_render_calls_after_sss_enter\":"<<state.audio_render_calls_after_sss_enter
+    <<",\"audio_render_frames_after_sss_enter\":"<<state.audio_render_frames_after_sss_enter
+    <<",\"sss_host_tick_calls\":"<<native.host_tick_calls
+    <<",\"sss_host_draw_calls\":"<<native.host_draw_calls
+    <<",\"entry\":";
+ if(native.entry.captured)first_sss_pair_write_note(out,native.entry);else out<<"null";
+ out<<",\"returned\":";
+ if(native.returned.captured)first_sss_pair_write_note(out,native.returned);else out<<"null";
+ out<<'}';
+ return out.str();
+}
+int first_sss_pair_compare(const std::string& actual_json){
+ if(actual_json.empty())return 0;
+ return EM_ASM_INT({
+  const callback=globalThis.__meleeWebStadiumFirstSssPairCompare;
+  if(typeof callback!=="function")return 0;
+  try{
+   const result=callback("sss_pair",UTF8ToString($0));
+   if(result&&typeof result.then==="function")return -3;
+   return result===true?1:-1;
+  }catch(_){return -2;}
+ },actual_json.c_str());
+}
+void first_sss_pair_capture_and_compare(){
+ auto& state=first_sss_constructor_pair;
+ if(!state.armed||!state.kicked||state.attempted)return;
+ state.attempted=true;
+ state.audio_render_calls_after_sss_enter=diagnostic_audio_render_calls;
+ state.audio_render_frames_after_sss_enter=diagnostic_audio_render_frames;
+ first_sss_pair_sync_native();
+ if(state.native.state!=2||!state.native.entry.captured||
+    !state.native.returned.captured||!host_entered||
+    melee_web_menu_host_phase(host)!=MELEE_WEB_MENU_SSS){
+  first_sss_pair_fail(state.error.empty()?
+      "Native SSS constructor pair did not retain both notes after host entry":state.error);
+  state.actual_json=first_sss_pair_actual_json();
+  first_css_browser_draw_refresh_observation();
+  return;
+ }
+ state.captured=true;
+ state.actual_json=first_sss_pair_actual_json();
+ const int approval=first_sss_pair_compare(state.actual_json);
+ state.callback_attempted=approval!=0;
+ state.compared=approval==1||approval==-1;
+ if(approval==1&&state.native.host_tick_calls==0&&
+    state.native.host_draw_calls==0){
+  state.complete=true;state.frame_terminal=true;
+ }else{
+  const char* reason=approval==0?"SSS pair host comparator is absent":
+      approval==-2?"SSS pair host comparator threw":
+      approval==-3?"SSS pair host comparator must be synchronous":
+      approval<0?"SSS pair host comparator refused the actual constructor pair":
+      "SSS host tick or draw was attempted during the constructor pair";
+  first_sss_pair_fail(reason);
+ }
+ first_css_browser_draw_refresh_observation();
 }
 void first_css_browser_draw_fail(const std::string& error){
  if(!first_css_browser_draw.failed){
@@ -497,6 +659,10 @@ void first_css_browser_draw_refresh_observation(){
       <<first_css_final_pending_draw_actual_json(final_draw.actual);
   out<<'}';
  }
+ if(first_sss_constructor_pair.armed){
+  first_sss_pair_sync_native();
+  out<<",\"first_sss_constructor_pair\":"<<first_sss_pair_actual_json();
+ }
  out<<'}';state.observation=out.str();
 }
 #endif
@@ -669,6 +835,10 @@ unsigned startup_pipeline_service_skip_frames=0;
 constexpr int kStartupPipelineServiceDelayMs=8;
 melee_web::MenuPreparationState preparation;
 unsigned audio_phase=0,diagnostic_start_ticks=0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+uint64_t diagnostic_audio_render_calls=0;
+uint64_t diagnostic_audio_render_frames=0;
+#endif
 int stock_check=0,stock_count=4,stock_respawns=0;
 unsigned stock_tick=0,completed_matches=0;
 bool stock_lost=false,stock_jump=false;
@@ -976,6 +1146,7 @@ if(scoped_assets){
  first_css_browser_draw=FirstCssBrowserDrawState{};
  first_css_browser_postdraw_stream=FirstCssBrowserPostdrawStreamState{};
  first_css_final_pending_draw=FirstCssFinalPendingDrawState{};
+ first_sss_constructor_pair=FirstSssConstructorPairState{};
 #endif
  audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;pending_menu_source_scene=0;pending_opening_state=-1;audio_clock.reset();clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();
  css_fighter_release_port=-1;last_css_fighter_observation_valid=false;
@@ -1714,6 +1885,12 @@ void finish_menu_scene_rebuild(){
   break;
  }
  pending_menu_entry=MenuRouteEntry::Session;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(first_sss_constructor_pair.armed&&first_sss_constructor_pair.kicked){
+  running=false;pending=false;first_use_draw_pending=false;menu_clock.reset();
+  first_sss_pair_capture_and_compare();
+ }
+#endif
 }
 
 void begin_transition_construction(double& preparation_ms,int& suppress_draw){
@@ -1740,6 +1917,10 @@ void log_message(AuroraLogLevel level,const char* module,const char* text,unsign
 void render_audio_tick(MeleeWebAudio* audio,char* error,size_t error_size){
  audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
  check(melee_web_audio_render(audio,pcm.data(),count,error,error_size),error);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ ++diagnostic_audio_render_calls;
+ diagnostic_audio_render_frames+=count;
+#endif
 #if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
  EM_ASM({window.menuAudio?.(HEAPF32.slice($0>>2,($0>>2)+$1*2));},pcm.data(),count);
 #endif
@@ -2257,7 +2438,9 @@ void tick(){
   }else if(audio_before_construction
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
            &&!(first_css_browser_postdraw_stream.armed&&
-               first_css_browser_postdraw_stream.terminal)
+               first_css_browser_postdraw_stream.terminal&&
+               !(first_sss_constructor_pair.armed&&first_sss_constructor_pair.kicked&&
+                 !first_sss_constructor_pair.frame_terminal))
 #endif
            ){
    for(unsigned step=0;step<audio_elapsed.steps;step++)
@@ -2270,12 +2453,22 @@ void tick(){
    const bool construction_complete=asset_destination!=AssetDestination::None?
        finish_asset_handoff():menu_scene_rebuild_pending?
        (finish_menu_scene_rebuild(),true):advance_match_construction();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+   if(first_sss_constructor_pair.armed&&first_sss_constructor_pair.frame_terminal){
+    preparation.reset();running=false;pending=false;first_use_draw_pending=false;
+    suppress_draw=1;
+   }else
+#endif
    if(construction_complete){
     preparation_profile.construction_finished(emscripten_get_now());
     preparation.finish_construction(true,preparation_uses_source_draws());running=false;
    }
    preparation_ms=emscripten_get_now()-preparation_started;preparation_started=0;
    suppress_draw=preparation.suppress_source_draw();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+   if(first_sss_constructor_pair.armed&&first_sss_constructor_pair.frame_terminal)
+    suppress_draw=1;
+#endif
   }else if(preparation.arming()){
    // The final preparation draw is already submitted. Keep its image and let
    // the browser deliver completion callbacks; never redraw or advance source
@@ -2751,7 +2944,9 @@ void tick(){
   if(!audio_before_construction&&!audio_elapsed.stalled
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
      &&!(first_css_browser_postdraw_stream.armed&&
-         first_css_browser_postdraw_stream.terminal)
+         first_css_browser_postdraw_stream.terminal&&
+         !(first_sss_constructor_pair.armed&&first_sss_constructor_pair.kicked&&
+           !first_sss_constructor_pair.frame_terminal))
 #endif
      )
    for(unsigned step=0;step<audio_elapsed.steps;step++){
@@ -2772,7 +2967,8 @@ void tick(){
   simulation_done=emscripten_get_now();
   simulation_cpu_ms=std::max(0.0,simulation_done-input_done-preparation_ms-render_total_ms);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-  if(first_css_final_pending_draw.armed&&first_css_final_pending_draw.kicked&&
+  if(!first_sss_constructor_pair.armed&&
+     first_css_final_pending_draw.armed&&first_css_final_pending_draw.kicked&&
      !first_css_final_pending_draw.attempted&&!first_css_final_pending_draw.failed&&
      !first_css_final_pending_draw.complete){
    check(source_frames.steps()==0&&source_frames.draws()==0&&
@@ -2898,7 +3094,12 @@ void tick(){
   abort_sudden_death_after_failure(primary);
   diagnostic_incident(4);running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();menu_clock.reset();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-  if(first_css_final_pending_draw.armed&&first_css_final_pending_draw.kicked){
+  if(first_sss_constructor_pair.armed&&first_sss_constructor_pair.kicked){
+   first_sss_pair_fail(e.what());first_sss_pair_sync_native();
+   first_sss_constructor_pair.actual_json=first_sss_pair_actual_json();
+   first_css_draw_terminal=true;
+   first_css_browser_draw_refresh_observation();
+  }else if(first_css_final_pending_draw.armed&&first_css_final_pending_draw.kicked){
    if(!first_css_final_pending_draw.complete)
     first_css_final_pending_draw_fail(e.what());
    first_css_draw_terminal=true;
@@ -3225,6 +3426,47 @@ int melee_web_native_menu_stadium_first_css_final_draw_kick(){try{
 }catch(const std::exception& error){
  first_css_final_pending_draw_fail(error.what());
  first_css_browser_draw_refresh_observation();return 0;}}
+int melee_web_native_menu_stadium_first_sss_pair_arm(){try{
+ auto& pair=first_sss_constructor_pair;
+ check(!pair.armed&&!pair.failed&&!pair.attempted&&!running&&!pending&&!faulted&&
+       !replay&&!melee_web_net_active()&&host&&world&&host_entered&&
+       !match&&!results&&!prize&&!menu_scene_rebuild_pending&&
+       asset_destination==AssetDestination::None&&!preparation.busy()&&
+       preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&
+       first_css_final_pending_draw.complete&&first_css_final_pending_draw.compared&&
+       first_css_final_pending_draw.approved&&first_css_final_pending_draw.frame_end_returned&&
+       !first_css_final_pending_draw.failed&&first_css_final_pending_draw.error.empty()&&
+       first_css_browser_postdraw_stream.terminal&&!first_css_browser_postdraw_stream.failed&&
+       first_css_browser_postdraw_stream.outcome=="stop_after_last_input_request"&&
+       first_css_browser_postdraw_stream.matched_ticks==147&&
+       first_css_browser_postdraw_stream.matched_draws==147&&
+       first_css_browser_postdraw_stream.consumed_inputs==148,
+       "First SSS pair arm requires the unchanged completed final CSS draw");
+ check(EM_ASM_INT({return typeof globalThis.__meleeWebStadiumFirstSssPairCompare===
+                    'function'?1:0;})==1,"First SSS pair host comparator is absent");
+ char error[256]{};
+ check(melee_web_menu_host_arm_first_sss_pair(host,error,sizeof(error)),error);
+ pair.armed=true;
+ first_css_browser_draw_refresh_observation();return 1;
+}catch(const std::exception& error){
+ first_sss_pair_fail(error.what());first_css_browser_draw_refresh_observation();return 0;}}
+int melee_web_native_menu_stadium_first_sss_pair_kick(){try{
+ auto& pair=first_sss_constructor_pair;
+ check(pair.armed&&!pair.kicked&&!pair.attempted&&!pair.failed&&!running&&!pending&&
+       host&&world&&host_entered&&!preparation.busy()&&!menu_scene_rebuild_pending&&
+       first_css_final_pending_draw.complete&&first_css_final_pending_draw.frame_end_returned&&
+       !first_css_final_pending_draw.failed,
+       "First SSS pair kick requires its unchanged armed CSS boundary");
+ pair.kicked=true;
+ pair.audio_render_calls_before_rebuild=diagnostic_audio_render_calls;
+ pair.audio_render_frames_before_rebuild=diagnostic_audio_render_frames;
+ pair.audio_before_rebuild_captured=true;
+ // Reuse ordinary CSS leave, audio acknowledgement and world reconstruction.
+ // The old stream stays terminal; no source tick/input is scheduled here.
+ pending=true;running=false;menu_clock.reset();audio_clock.reset();
+ first_css_browser_draw_refresh_observation();return 1;
+}catch(const std::exception& error){
+ first_sss_pair_fail(error.what());first_css_browser_draw_refresh_observation();return 0;}}
 #endif
 }
 int main(int argc,char** argv){
