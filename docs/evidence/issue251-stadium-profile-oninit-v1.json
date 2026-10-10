@@ -318,8 +318,8 @@
     "no_machine_specific_path_required": true
   },
   "subsequent_c3_component_2026_10_09": {
-    "claim_boundary": "On a8503b8c, the same browser lifetime repeats the full typed first-CSS return/input/draw baseline, then compares 147 additional source-consumed tick/draw pairs against the original. Its 148th additional input requests transition and stops before source presentation or pending transition advancement. The terminal tick and raw final draw1577 remain unpaired. No SSS admission, VS Setup/GO comparison, per-owner RNG ledger, full match or C3 acceptance. Original7d capture, functional8f lifetimes and prior8cc one-shot receipts retain their own scopes; ordinary public Stadium admission stays closed.",
-    "current_result": "The a8503b8c headless browser stream passes its bounded 147-pair prefix and stops at the final input request. Root and independent reviews verify declared fields, producer identities and cleanup. Focused16 controls, Node syntax, both affected Release builds and exact-head full suite2420 tests/163 skips pass. Historical nativev1 review defects and unlaunched preflight metadata corrections are retained; no runtime retry was needed.",
+    "claim_boundary": "The a8503b8c browser stream has 147 matched additional tick/draw pairs and terminal SourceTick 1575 remains unpaired. The be6ee4d9 retry compares its final draw against original DrawReturn 1577; raw DrawEnter 1576 is paired provenance, not a second independent comparison. This is a scoped CSS final-draw result only: no SSS tick/draw or later progression, VS Setup/GO, per-owner RNG, full match, or C3 acceptance is established; ordinary public Stadium admission remains closed.",
+    "current_result": "The retained ef9eaf38 attempt failed before kick/draw and its 44-artifact producer remains preserved. Source-phase inspection and focused controls identify the pre-OnExit pending_scene_change value as authored 0; the failed browser report did not expose that scalar. The be6ee4d9 repair preserves and checks the actual value without writing it or calling OnExit early. On be6ee4d9, the browser retry matched the final original DrawReturn 1577 after the unchanged 147-pair stream; terminal SourceTick 1575 remains unpaired. Thirteen owned PIDs are absent, all 40 HTTP artifacts are unchanged, unload/clear passed, both Release builds passed, and the exact-head full suite passed 2,422 tests with 163 skips and no failures/errors. An independent recomputation of the retained runner assertions and strict comparator confirmed the same bounded comparison and cleanup; this is not a second gameplay run.",
     "first_css_browser_draw_4d6c0b37_d949a0b8_v1": {
       "status": "FAIL_BEFORE_ARM; NO_BROWSER_CSS_COMPARISON; NO_TICK; NO_DRAW",
       "scope": "One headless browser attempt with the existing captured first-CSS context and one consumed sample. The diagnostic did not arm; this is not a source draw or Stadium/C3 acceptance result.",
@@ -586,7 +586,7 @@
         "SDK unittest moduleimport failure beforeNode; fixedexplicit scriptsimport and retainedoutput"
       ]
     },
-    "next_progression": "Review the retained CSS request-to-SSS entry source boundary before designing the next experiment. Preserve the final transition snapshot and raw draw1577 as unpaired, keep pending_mode/next_state_id and tags2/36/37 explicit, and do not infer why the source tick resets. Use the existing menu transition implementation and first SSS entry/return observations; do not reapply context or reseed to align the next stage.",
+    "next_progression": "Before instrumenting the reviewed passive SSS-constructor comparison, reduce the source clock ordering: the native host begins the SSS clock before the constructor, while original gm_801A4014 calls OnEnter before gm_801A4D34 resets the frame. This is a source-level ordering gap, not a measured native runtime mismatch; do not normalize the clock. Then compare only SSS constructor entry at sequence 1579 and return at 1603 after the passing CSS DrawReturn 1577, and stop with zero SSS ticks, draws, owner polls, exit, or later progression. Keep terminal CSS SourceTick 1575 unpaired. This does not establish SSS behavior or whole-route acceptance.",
     "first_css_context_return_1fad54ff_v1": {
       "source_head": "1fad54ff964f80b263b91a77cf25a25b0ee08603",
       "source_tree": "adfff70b0f357d4c66bd89f1f1c3a30c9202b2a9",
@@ -4457,6 +4457,282 @@
         "No pixels/PCM/physical-input/foreground/audible acceptance"
       ],
       "private_evidence_run": "stadium-c3-lifetime-20261009-074216-4d7cf7d1"
+    },
+    "first_css_final_pending_draw_ef9eaf38_v1": {
+      "status": "EF9_FAILURE_RETAINED; BE6_SCOPED_FINAL_CSS_DRAW_PASS; INDEPENDENT_REVIEW_PASS",
+      "scope": "Repeat the retained first-CSS browser stream and authorize one final pending CSS draw only; no CSS leave, SSS, VS Setup, GO, match, or C3 acceptance.",
+      "capture_source": {
+        "revision": "ef9eaf38b8409e48a7015bfef5173857054a5cb5",
+        "tree": "54f2d0a01a214a75577d0fefe5ddefda3d6215de",
+        "producer": "first-css-browser-finaldraw-producer-ef9eaf38-v1/identity.json",
+        "retained_inventory": "first-css-browser-producer-ef9eaf38-retained-v1/identity.json",
+        "artifact_count": 44,
+        "artifact_bytes": 37004292
+      },
+      "stream_boundary": {
+        "matched_additional_tick_draw_pairs": 147,
+        "additional_inputs_consumed": 148,
+        "total_executed_host_ticks_including_baseline": 149,
+        "last_input_ordinal": 148,
+        "consumed_pad_sequence": 1574,
+        "native_transition_result": 3,
+        "terminal_tick_compared": false,
+        "original_draw_enter_sequence": 1576,
+        "original_draw_return_sequence": 1577,
+        "final_draw_compared": false,
+        "prior_stream_object": "first_css_browser_stream_a8503b8c_v3"
+      },
+      "final_draw_attempt": {
+        "result": "FAIL_BEFORE_KICK_OR_DRAW",
+        "armed": true,
+        "kicked": false,
+        "attempted": false,
+        "captured": false,
+        "compared": false,
+        "host_draw_calls": 0,
+        "aurora_begin_calls": 0,
+        "aurora_end_calls": 0,
+        "error": "Final CSS draw arm requires its exact retained final input",
+        "interpretation": "The native arm rejected the retained final-input witness. No source draw or final-row comparison occurred."
+      },
+      "cleanup": {
+        "unload_attempted": true,
+        "unload_completed": true,
+        "browser_context_closed": true,
+        "browser_connection_closed": true,
+        "browser_process_terminated": true,
+        "server_process_terminated": true,
+        "known_owned_pids_absent": 13,
+        "cleanup_pass": true,
+        "failed_observation_cleared": false,
+        "retention_note": "The failed diagnostic observation was retained after unload; its clear gate is not claimed."
+      },
+      "source_repair": {
+        "revision": "be6ee4d90b8389f35149cc853b5558138e814b6f",
+        "tree": "dac7b46d46730f54cfe93cc2e69eccd79c5b6a6a",
+        "finding": "Source-phase inspection and focused controls indicate pending_scene_change is authored as 0 before CSS OnExit; the failed ef9 browser report did not expose this scalar. The old witness required 1 before OnExit. The be6 repair retains the actual value and requires it unchanged through final-draw authorization, without writing it or calling OnExit early.",
+        "focused_controls": {
+          "tests": 19,
+          "skipped": 1,
+          "failures": 0,
+          "errors": 0,
+          "result": "PASS; the single skip is the optional retained raw fixture.",
+          "old_before_new_after": "The exact old predicate refuses source-consistent pending=0; repaired controls pass unchanged 0 and 1 values and refuse changes before or after arm."
+        },
+        "builds": "PASS: diagnostic and ordinary Release builds on exact be6ee4d90b8389f35149cc853b5558138e814b6f/tree dac7b46d46730f54cfe93cc2e69eccd79c5b6a6a.",
+        "exact_head_full_suite": "PASS: 2,422 tests, 163 skipped, zero failures/errors, 529.358 seconds on exact be6ee4d90b8389f35149cc853b5558138e814b6f.",
+        "runtime_retry": "PASS_SCOPED_FINAL_CSS_DRAW_AND_CLEANUP; independently reviewed; terminal SourceTick 1575 remains unpaired."
+      },
+      "evidence": {
+        "failure_cleanup_review": {
+          "artifact": "root-final-css-arm-failure-cleanup-v1.json",
+          "bytes": 3786,
+          "sha256": "c1935c28400210d7c6656b9d9f7e71fd15707652bfe6cda2e5ec61a3daf51e4f"
+        },
+        "capture_result": {
+          "artifact": "first-css-browser-finaldraw-preflight-ef9eaf38-v1/result.json",
+          "bytes": 1825,
+          "sha256": "c1af81d55536f5214bb6eab8598bb6a22557ad340f63f67bea16955a1a20775f"
+        },
+        "capture_report": {
+          "artifact": "first-css-browser-finaldraw-preflight-ef9eaf38-v1/browser-run/report.json",
+          "bytes": 1690244,
+          "sha256": "c363ffe6006f350d2ec9831689b4b459354e55f2c561f3132fdb80ace1738254"
+        },
+        "capture_launch": {
+          "artifact": "first-css-browser-finaldraw-preflight-ef9eaf38-v1/launch.json",
+          "bytes": 36106,
+          "sha256": "9ab4e72b940b7f042a121df85906bbe91aafe3fa8ee896e00092b296a34601b1"
+        },
+        "capture_log": {
+          "artifact": "first-css-browser-finaldraw-preflight-ef9eaf38-v1/capture.log",
+          "bytes": 881,
+          "sha256": "68f7f7e8220ec528e3f46f4bc0fa98e48d288f1512acc21382c5577a5a47406b"
+        },
+        "capture_owner": {
+          "artifact": "first-css-browser-finaldraw-preflight-ef9eaf38-v1/owner.json",
+          "bytes": 99546,
+          "sha256": "94635a9ff34579b1a9fe76e2217b9b6084928ea7df70fc283a97328441e8c578"
+        },
+        "retained_producer_inventory": {
+          "artifact": "first-css-browser-producer-ef9eaf38-retained-v1/identity.json",
+          "bytes": 21475,
+          "sha256": "668a1f42aa916ef96a72c4defa360a97d4ce0165ea86a9faa9a43f2a9433cc01"
+        },
+        "producer_identity": {
+          "artifact": "first-css-browser-finaldraw-producer-ef9eaf38-v1/identity.json",
+          "bytes": 10934,
+          "sha256": "72f652dbe250ba09cb02f2451227c158f1a726a9a66a993803c06b02779f3aa4"
+        },
+        "repair_freeze": {
+          "artifact": "sol-final-css-preexit-owner-repair-v1/freeze.json",
+          "bytes": 3880,
+          "sha256": "ad93b5d5e4506619993fa43c68734292cf38af89205dcf40f0be96999b3ab6a0"
+        },
+        "repair_patch": {
+          "artifact": "sol-final-css-preexit-owner-repair-v1/candidate.patch",
+          "bytes": 6262,
+          "sha256": "5674b113c1cc2d3f5199bb6af093dd3e425a86c65e168d046e8c616394a265d8"
+        },
+        "independent_source_review": {
+          "artifact": "luna-final-css-preexit-owner-review-v1/review.json",
+          "bytes": 4173,
+          "sha256": "aa439c4918e006b4df44efaf0cb79372ef86b89965a0314a45efe6e86c86702a"
+        },
+        "root_integration_validation": {
+          "artifact": "root-final-css-preexit-repair-integration-v1/result.json",
+          "bytes": 2158,
+          "sha256": "52d0f0bb53367654cac9275bdf58b453f7e9f8f878e938ee006e3a02856c30ca"
+        },
+        "focused_log": {
+          "artifact": "root-final-css-preexit-repair-integration-v1/check-0.log",
+          "bytes": 3705,
+          "sha256": "ca35efa95698cc5c75999b8f935f666e718105dc219b38cee98eaeffad29699a"
+        },
+        "old_predicate_regression": {
+          "artifact": "sol-final-css-preexit-owner-repair-v1/evidence/old-source-regression.log",
+          "bytes": 1767,
+          "sha256": "887e2bd3f3d36b4ee576866d7d20b867ca912d180cf57f04dfed889715d2e70f"
+        },
+        "repaired_controls": {
+          "artifact": "sol-final-css-preexit-owner-repair-v1/evidence/control.log",
+          "bytes": 464,
+          "sha256": "8679fa7f92713c4b28d76c7dde50adaf0c24788d36a7b08f216bc55668311b5b"
+        },
+        "old_phase_reproducer": {
+          "artifact": "sol-final-css-arm-reduction-v1/old-phase-reproducer/result.log",
+          "bytes": 168,
+          "sha256": "40f6072365b33e71203e03eb8f69b6bd1a6fb95524f826dcc10047cb53e0bfce"
+        },
+        "diagnostic_build": {
+          "artifact": "first-css-finaldraw-builds-be6ee4d-v1/diagnostic-runtime/result.json",
+          "bytes": 418,
+          "sha256": "46b91137141aa23dfdf45f7d7a5e878faa226eb2c75563ed7910035c8078d59b"
+        },
+        "ordinary_build": {
+          "artifact": "first-css-finaldraw-builds-be6ee4d-v1/ordinary-runtime/result.json",
+          "bytes": 418,
+          "sha256": "78ce5765eee3132a3b01668936160a13dcb40d306b56261bbc9a1075e2f593b9"
+        },
+        "exact_head_full_suite": {
+          "artifact": "full-regression-be6ee4d-v1/result.json",
+          "bytes": 511,
+          "sha256": "0dd0b90222210996becdaa1e91086b747b1a32f7e52c32eb9c1e4bd74dfb0fe8",
+          "log_sha256": "a400b293fd61fef2903ab52154d3fd155064e423088955d559fc89cd499c4cf0",
+          "tests": 2422,
+          "skipped": 163,
+          "failures": 0,
+          "errors": 0,
+          "elapsed_seconds": 529.358
+        },
+        "independent_final_draw_review": {
+          "artifact": "sol-final-css-be6-result-review-v1/review.json",
+          "bytes": 6501,
+          "sha256": "82217f2f3faf9eebe4cfd27dc8d6998754913d76838d53187e81e148a36d0f4f"
+        }
+      },
+      "limits": [
+        "The browser final-draw comparison against original DrawReturn 1577 passed; raw DrawEnter 1576 is paired provenance. The preceding terminal SourceTick 1575 remains unpaired.",
+        "No CSS leave/SSS tick, SSS draw, owner poll, SSS exit, VS Setup/GO comparison, per-owner RNG ledger, full match, C3, pixel, PCM, live timing, physical-input, or foreground acceptance."
+      ],
+      "private_evidence_run": "stadium-c3-lifetime-20261009-074216-4d7cf7d1",
+      "retry_capture": {
+        "status": "PASS_SCOPED_FINAL_CSS_DRAW_AND_CLEANUP",
+        "source": {
+          "revision": "be6ee4d90b8389f35149cc853b5558138e814b6f",
+          "tree": "dac7b46d46730f54cfe93cc2e69eccd79c5b6a6a",
+          "producer": "first-css-browser-finaldraw-producer-be6ee4d-v1/identity.json",
+          "producer_bytes": 10962,
+          "producer_sha256": "d7f49ea5e091ffb48c9e827aade11f813764db37eacaf83b314ea19431e2a1ef"
+        },
+        "result": {
+          "artifact": "first-css-browser-finaldraw-preflight-be6ee4d-v2/result.json",
+          "bytes": 1820,
+          "sha256": "60ee5b9e73d583dce8b70fa3d6c913ed827e561aaf150dda51f8c6e22d6c7559"
+        },
+        "review": {
+          "artifact": "root-final-css-be6-result-review-v1.json",
+          "bytes": 3569,
+          "sha256": "1aed5dc06a6dfbc61d2c95739182b3ed5ec155acafaf5b7063d423759878f00f"
+        },
+        "report": {
+          "artifact": "first-css-browser-finaldraw-preflight-be6ee4d-v2/browser-run/report.json",
+          "bytes": 948327,
+          "sha256": "d6a30a600e0e79c5a381c4e6e015867929f9c8d3d7c425451207672658189517"
+        },
+        "owner": {
+          "artifact": "first-css-browser-finaldraw-preflight-be6ee4d-v2/owner.json",
+          "bytes": 125346,
+          "sha256": "d0f3a6345e2cb06d2abec1da551fe0a90f9b4c74a8ddd4c0f79c2cfcedc2a4b0"
+        },
+        "stream_boundary": {
+          "prior_matched_additional_pairs": 147,
+          "prior_stream_unchanged": true,
+          "terminal_tick_sequence": 1575,
+          "terminal_tick_compared": false,
+          "paired_raw_draw_enter_sequence": 1576,
+          "compared_draw_return_sequence": 1577,
+          "final_draw_compared": true
+        },
+        "final_draw": {
+          "compared_fields": [
+            "source_tick",
+            "draw_ordinal",
+            "scene_frame",
+            "scene_kind",
+            "pad_state_hex",
+            "random_seed_hex",
+            "scene_routing_getters"
+          ],
+          "host_draw_calls": 1,
+          "aurora_begin_calls": 1,
+          "aurora_end_calls": 1,
+          "source_steps": 0,
+          "source_draws": 0,
+          "source_pending": false,
+          "matched": true,
+          "compared_original_draw_return_sequence": 1577
+        },
+        "cleanup": {
+          "owned_pids_absent": 13,
+          "http_artifacts_unchanged": 40,
+          "unload_completed": true,
+          "observation_cleared": true,
+          "browser_connection_closed": true,
+          "browser_process_terminated": true,
+          "server_process_terminated": true,
+          "failures": []
+        },
+        "independent_result_review": {
+          "artifact": "sol-final-css-be6-result-review-v1/review.json",
+          "bytes": 6501,
+          "sha256": "82217f2f3faf9eebe4cfd27dc8d6998754913d76838d53187e81e148a36d0f4f",
+          "result": "PASS_SCOPED_FINAL_CSS_DRAW_AND_CLEANUP",
+          "verified_bindings": 102
+        },
+        "retained_producer_inventory": {
+          "artifact": "first-css-browser-producer-be6ee4d-retained-v1/identity.json",
+          "bytes": 21441,
+          "sha256": "fb51d4d50b7a115bb93d99bbda90e5a23dff15101d76a5e7a4ad73f78f38085a",
+          "artifact_count": 44,
+          "artifact_bytes": 37004292,
+          "composition": "40 served HTTP artifacts, 2 cache files, and ordinary runtime JS/WASM copies; ordinary WASM was not served."
+        }
+      },
+      "next_boundary_plan": {
+        "status": "REVIEWED_SOURCE_PLAN_ONLY; NEXT SOURCE-ORDER REDUCTION REQUIRED",
+        "plan": {
+          "artifact": "original-stadium-sss-entry-boundary-plan-v5/plan.json",
+          "bytes": 27844,
+          "sha256": "a77a227e533c043866a4fdce2319b7e555e75cca49730f521deef9c30d820407"
+        },
+        "review": {
+          "artifact": "original-stadium-sss-entry-boundary-plan-v5/review.json",
+          "bytes": 793,
+          "sha256": "a6379e76a576d3ce3ace913a756eb8a01fe12f3d90389905f769c2d557fcd2d0"
+        },
+        "scope": "Reduce native-host SSS clock begin versus original gm_801A4014 OnEnter / gm_801A4D34 frame-reset source ordering before deciding whether to instrument the passive entry1579/return1603 pair; if instrumented, stop with zero SSS ticks/draws/owner polls/exit."
+      }
     }
   }
 }
