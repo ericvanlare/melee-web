@@ -39,15 +39,28 @@ with 161 skips and zero failures/errors; PID 53748 exits naturally and is absent
 The prior `1f146dde` failure remains retained. This validates the test-only
 repair commit, not the proposed reader correction or C3 acceptance.
 
-Both Stadium-only reader corrections are integrated at `5f1faf8b`. The
-45-test focused run passed with no skips on source base `704ff6a4` plus the exact
-candidate files later committed at `5f1faf8b`; it was not a clean-head focused
-run. The canonical full suite then passed on clean exact `5f1faf8b`: 2,379 tests,
-161 skips, zero failures/errors in 520.490 seconds. The current original-prefix
-capture still fails before VS setup or GO at the finite SSS target policy. Its
-full retained outcome and the precise next boundary are recorded below; the
-successful 8f functional and ordinary Results producers remain bound to their
-original identities and prove no new setup/RNG agreement.
+Both Stadium-only reader corrections were integrated at `5f1faf8b`. Their
+45 focused controls passed on source base `704ff6a4` with the exact candidate
+files later committed there; this was not a clean-head focused run. The full
+suite passed on clean exact `5f1faf8b` with 2,379 tests and 161 skips. At the
+later `91fc1fb9` checkpoint, the five-file source-position observer passed 50
+focused controls with no skips on clean base `24c15ec2` plus the exact candidate
+before commit; the independent source reviews passed. The native observer
+compiled successfully with guest memory writes disabled, and the full suite
+passed on clean exact `91fc1fb9`: 2,384 tests, 161 skips, zero failures/errors
+in 534.888 seconds. The initial suite receipt parser selected a nested test
+footer; the corrected receipt binds the final discovery-suite footer.
+
+The actual original-menu capture on `91fc1fb9`, using the unchanged recipe and
+caps, still fails the finite SSS policy before VS or GO. The observer remained
+valid but incomplete with 2,193 records (last sequence 2,192); its input stream
+has 3,890 events and is incomplete. All 140 launch inputs were verified. Sol's
+read-only reduction now confirms 74 cursor callbacks: 60 complete same-call
+target tuples, 14 cursor-only tuples where the original routine hit an earlier
+row, and zero hidden-CAF calls. The retained offline driver reproducer fails at
+sequence 2,105 after 11 actions. The original setup/per-owner RNG comparison
+and C3 remain open. The two successful 8f functional lifetimes and ordinary
+Results regression remain bound to their original producer identities.
 
 The diagnostic-only Stadium profile and profile-to-`DatNativeMapContract`
 adapter compile in the C1 trace target. Focused profile and borrowed-yakumono
@@ -846,32 +859,35 @@ canonical focused runs and 2,374-test suite recorded there remain historical;
 the `1f146dde` failure remains retained. The reader correction was not yet
 integrated at that checkpoint; the later `5f1faf8b` result follows.
 
-The 45 focused controls pass with no skips on source base `704ff6a4` plus the
-exact candidate files later committed at `5f1faf8b`; the result is not a clean
-exact-5f focused run. Separately, the canonical full suite passes on clean exact
-`5f1faf8b` with 2,379 tests, 161 skips and zero failures/errors in 520.490
-seconds. The actual original-prefix attempt uses the same `1f146dde` native
-source, recipe and caps. It stops before VS setup or GO: across 113 SSS polls
-and 77 SSS PAD-consume records (distinct boundary counts), selected rows move
-from Random index 30/no kind to 17/kind 24, 15/kind 18, and 13/kind 15. All
-declared movement pulses and releases were consumed (right70: 16, up70: 9,
-left70: 15, down70: 16, neutral: 21), but exact index 18/kind 3 is never
-observed and no Stadium confirmation occurs. The MWRO/MWRI streams remain
-incomplete. All 123 immutable input hashes match, and owned PIDs 65289 and
-65291 are absent. The unchanged-driver offline replay independently reproduces
-the retained refusal at sequence 1989 with 11 actions and final index 13/kind
-15 stable for 33 polls; this is parser/driver replay evidence, not proof of
-input effects or current game GO. The portable receipt binds
-`root-original-stadium-go-failure-5f1faf8b-v4.json`,
-`sol-original-stadium-sss-navigation-reduction-review-v4.json`, the full-suite
-result, and the canonical replay result/stdout.
+At the `5f1faf8b` checkpoint, the 45 focused controls passed with no skips on
+source base `704ff6a4` plus the exact candidate files later committed there; the
+result is not a clean exact-5f focused run. Separately, the canonical full suite
+passed on clean exact `5f1faf8b` with 2,379 tests and 161 skips. That capture
+used the earlier native source and retained its distinct 113 SSS polls and 77
+SSS PAD-consume records; those boundary counts are not interchangeable. Its
+stream and 1,989-sequence replay remain historical evidence.
 
-The retained stream does not observe the live cursor position or target-row
-world geometry, so it cannot explain the missed hit or justify changing pulses.
-The reviewed next step is a narrowly bounded, read-only source geometry
-observation using proven original DOL anchors before any further capture.
-Original setup/per-owner RNG comparison and C3 remain open; ordinary public
-Stadium admission remains closed. No C3 or merge claim follows.
+The later exact `91fc1fb9` source-position observer capture still stops before
+VS setup or GO at the same finite index 18/kind 3 qualification. The observer
+is valid but incomplete (2,193 records); the input stream is incomplete (3,890
+events), with 140 launch inputs verified. Sol's measured reduction found 74
+cursor callbacks, including 60 complete same-call target tuples, 14 earlier-row
+cursor-only hits, and no hidden-CAF calls. The actual cursor path never entered
+the measured target rectangle; decoded host geometry is explanatory only, and
+the raw float bits remain in the retained evidence. The existing-driver offline
+reproducer retains the refusal at sequence 2,105 after 11 actions. These are
+source-observation and replay results, not a successful SSS selection, VS/GO,
+input-policy success, or original setup/RNG comparison. The full current
+receipt and scoped evidence identities are in the
+[issue 251 boundary receipt](../evidence/issue251-stadium-profile-oninit-v1.json).
+
+The next proposal is a bounded driver-only feedback loop using a fresh completed
+same-call position tuple and its consumed PAD input, with at most four
+same-direction callbacks after a validated earlier-row hit omits the target tuple. Existing movement,
+ownership, input-consumption, neutral-stability, stage 18/kind 3, CSS→SSS→VS
+and GO guards remain in force. This proposal has not been integrated or
+captured. Original setup/per-owner RNG comparison and C3 remain open; ordinary
+public Stadium admission remains closed.
 
 The `a29f8d69` full suite passed 2,350 tests with 171 skips and zero failures.
 This remains the historical production baseline. The later exact `ee159395`
@@ -989,13 +1005,15 @@ under their historical producer identities.
 This passes two functional source lifetimes only. Timer/transform state,
 screen/title/SIS, stock-out/standings and original setup/per-owner RNG comparison
 remain unobserved or unpaired. No draw/PCM equivalence, browser, physical-input,
-audible-output, timing or C3 acceptance follows. Both retained reader contracts
-are integrated on `5f1faf8b`, with 45 focused controls and a passing 2,379-test
-full suite. The original-prefix run still stops at finite SSS navigation before
-VS/GO; the next bounded source work is read-only cursor/target geometry
-observation using proven original DOL anchors before any changed capture. The
-full retained evidence is recorded above. Ordinary public Stadium admission
-remains closed.
+audible-output, timing or C3 acceptance follows. The 91fc source-position
+observer now provides valid, retained SSS cursor/target samples, but the original
+route still fails before VS/GO. Sol's final reduction confirms the missed target
+path and the existing-driver replay reproduces the failure at sequence 2,105
+after 11 actions. The next bounded work is an external driver-feedback proposal
+using fresh same-call observations and consumed input; it is not integrated or
+captured. The full retained evidence and exact scope are recorded in the
+[issue 251 boundary receipt](../evidence/issue251-stadium-profile-oninit-v1.json).
+Ordinary public Stadium admission remains closed.
 
 The ordinary Results regression was also repeated on the exact `8f785fe5`
 ordinary Release producer with Stadium diagnostics off. It passed both original
