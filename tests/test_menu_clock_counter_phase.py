@@ -91,7 +91,13 @@ static u64 gm_801A48A4(u8 mask) { return mask; }
 static void gm_EvaluateAllControllerInputs(void) { assert(0); }
 ''', _function(gm1601, 'void gm_801677C0('),
             _function(gm136, 'static void fn_801A396C('),
-            _function(gm136, 'void gm_801A3E88('), controller_globals,
+            # Keep the pinned original function byte-for-byte. GCC warns about
+            # its authored flattened aggregate initializer; downgrade only that
+            # diagnostic here, retaining -Werror for the clock API and controls.
+            '#pragma GCC diagnostic push\n'
+            '#pragma GCC diagnostic warning \"-Wmissing-braces\"\n',
+            _function(gm136, 'void gm_801A3E88('),
+            '#pragma GCC diagnostic pop\n', controller_globals,
             _function(patch, 'int melee_web_controller_map_begin(void)'),
             _function(patch, 'int melee_web_controller_map_end(void)'), clock_globals]
         parts.extend(_function(patch, signature) for signature in signatures)
