@@ -1,5 +1,16 @@
 #include "gameplay_menu_browser_state.hpp"
 extern "C" uint32_t gm_801A4BA8(void);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+extern "C" int gm_GetCurrentGameMode(void);
+extern "C" int gm_GetPreviousGameMode(void);
+extern "C" int gm_GetCurrentSceneIndex(void);
+extern "C" int gm_GetPreviousSceneIndex(void);
+#include "stadium_first_css_diagnostic_input.hpp"
+#include "stadium_first_css_diagnostic_snapshot_json.hpp"
+#include "gameplay_source_memory_runtime.h"
+#include <sstream>
+extern "C" void* melee_web_current_scene_info(void);
+#endif
 #if defined(MELEE_WEB_NET_SESSION)
 extern "C" int melee_web_net_publish_local_input(
     uint32_t source_tick, unsigned local_port, uint64_t poll_serial,
@@ -30,6 +41,198 @@ bool scoped_assets=false,asset_committed=false;
 bool stadium_c1a_armed=false;
 std::string stadium_c1a_observation;
 int stadium_c1a_raw_stkind=-1;
+struct FirstCssDrawSample {
+ std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> pad{};
+ uint32_t seed=0,scene_frame=0;
+ uint64_t world_generation=0;
+ int source_scene=0,menu_phase=0,scene_kind=0;
+ unsigned current_mode=0,previous_mode=0,current_scene_index=0,previous_scene_index=0;
+ bool seed_owner_stable=false,scene_owner_stable=false,world_generation_stable=false;
+};
+struct FirstCssBrowserDrawState {
+ bool armed=false,kicked=false,entry_captured=false,tick_captured=false;
+ bool draw_captured=false,frame_end_returned=false,complete=false,failed=false;
+ std::string error;
+ melee_web::stadium_first_css_diagnostic::ContextInput context{};
+ melee_web::stadium_first_css_diagnostic::ConsumedPadInput consumed{};
+ PADStatus consumed_status[4]{};
+ MeleeWebMenuCssReturnSnapshot entry{};
+ FirstCssDrawSample tick{},draw{};
+ const uint32_t* seed_owner=nullptr;
+ const GameModeState::GameSceneInfo* scene_owner=nullptr;
+ uint64_t world_generation=0;
+ uint32_t frame_before=0,frame_after_tick=0;
+ int tick_result=0;
+ unsigned source_callbacks_before_kick=0,host_tick_calls=0,host_draw_calls=0;
+ unsigned source_steps=0,source_draws=0,aurora_begin_calls=0,aurora_end_calls=0;
+ unsigned draw_source_tick=0,draw_ordinal=0;
+ unsigned preparation_source_callbacks=0;
+ std::string observation;
+};
+FirstCssBrowserDrawState first_css_browser_draw;
+extern bool running;
+extern melee_web::FixedTickClock menu_clock;
+extern std::string message;
+std::string first_css_browser_draw_json_quote(const std::string& value){
+ std::string result="\"";
+ for(unsigned char byte:value){
+  if(byte=='\"'||byte=='\\'){result.push_back('\\');result.push_back(static_cast<char>(byte));}
+  else if(byte=='\n')result+="\\n";
+  else if(byte=='\r')result+="\\r";
+  else if(byte=='\t')result+="\\t";
+  else if(byte<0x20){
+   static constexpr char digits[]="0123456789abcdef";
+   result+="\\u00";result.push_back(digits[byte>>4]);result.push_back(digits[byte&0x0f]);
+  }else result.push_back(static_cast<char>(byte));
+ }
+ result.push_back('\"');return result;
+}
+void first_css_browser_draw_fail(const std::string& error){
+ if(!first_css_browser_draw.failed){
+  first_css_browser_draw.failed=true;first_css_browser_draw.error=error;
+ }
+ running=false;menu_clock.reset();message=first_css_browser_draw.error;
+}
+void first_css_browser_draw_check_live(const char* boundary){
+ auto& state=first_css_browser_draw;
+ check(state.armed&&state.entry_captured&&host&&world&&host_entered,
+       "First-CSS draw lost its armed live menu owners");
+ check(melee_web_gameplay_world_exists()&&melee_web_source_memory_healthy()&&
+       melee_web_gameplay_generation()==state.world_generation&&state.world_generation!=0,
+       "First-CSS draw world owner/generation is no longer live");
+ check(seed_ptr!=nullptr&&seed_ptr==state.seed_owner,
+       "First-CSS draw RNG owner changed; refusing to read it");
+ const auto* const scene=static_cast<const GameModeState::GameSceneInfo*>(
+     melee_web_current_scene_info());
+ check(scene!=nullptr&&scene==state.scene_owner,
+       "First-CSS draw scene owner changed; refusing to read it");
+ check(scene->scene_kind==8&&
+       melee_web_menu_host_source_scene(host)==MELEE_WEB_MENU_HOST_SCENE_CSS&&
+       melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CSS,
+       std::string("First-CSS draw left its idle CSS owner at ")+boundary);
+}
+FirstCssDrawSample first_css_browser_draw_capture(const char* boundary){
+ auto& state=first_css_browser_draw;
+ first_css_browser_draw_check_live(boundary);
+ FirstCssDrawSample sample{};
+ sample.world_generation=melee_web_gameplay_generation();
+ sample.world_generation_stable=sample.world_generation==state.world_generation;
+ sample.scene_owner_stable=true;sample.seed_owner_stable=true;
+ sample.source_scene=melee_web_menu_host_source_scene(host);
+ sample.menu_phase=melee_web_menu_host_phase(host);
+ const auto* const scene=static_cast<const GameModeState::GameSceneInfo*>(
+     melee_web_current_scene_info());
+ check(scene==state.scene_owner,"First-CSS scene owner changed during snapshot");
+ sample.scene_kind=scene->scene_kind;
+ check(seed_ptr==state.seed_owner,"First-CSS RNG owner changed during snapshot");
+ sample.seed=*state.seed_owner;
+ sample.scene_frame=gm_801A4BA8();
+ melee_web_pad_state_capture(sample.pad.data());
+ sample.current_mode=static_cast<unsigned>(gm_GetCurrentGameMode());
+ sample.previous_mode=static_cast<unsigned>(gm_GetPreviousGameMode());
+ sample.current_scene_index=static_cast<unsigned>(gm_GetCurrentSceneIndex());
+ sample.previous_scene_index=static_cast<unsigned>(gm_GetPreviousSceneIndex());
+ return sample;
+}
+void first_css_browser_draw_write_route(std::ostream& out,const FirstCssDrawSample& sample){
+ out<<"{\"current_game_mode\":"<<sample.current_mode
+    <<",\"previous_game_mode\":"<<sample.previous_mode
+    <<",\"current_scene_index\":"<<sample.current_scene_index
+    <<",\"previous_scene_index\":"<<sample.previous_scene_index<<'}';
+}
+void first_css_browser_draw_write_sample(std::ostream& out,const FirstCssDrawSample& sample){
+ out<<"{\"source_scene\":"<<sample.source_scene
+    <<",\"menu_phase\":"<<sample.menu_phase
+    <<",\"scene_kind\":"<<sample.scene_kind
+    <<",\"scene_frame\":"<<sample.scene_frame
+    <<",\"world_generation\":"<<sample.world_generation
+    <<",\"world_generation_stable\":"<<(sample.world_generation_stable?"true":"false")
+    <<",\"scene_owner_stable\":"<<(sample.scene_owner_stable?"true":"false")
+    <<",\"seed_owner_stable\":"<<(sample.seed_owner_stable?"true":"false")
+    <<",\"random_seed_hex\":\""
+    <<melee_web::stadium_first_css_diagnostic::hex32(sample.seed)
+    <<"\",\"pad_state_hex\":\""
+    <<melee_web::stadium_first_css_diagnostic::hex(sample.pad.data(),sample.pad.size())
+    <<"\",\"scene_routing_getters\":";
+ first_css_browser_draw_write_route(out,sample);
+ out<<'}';
+}
+void first_css_browser_draw_refresh_observation(){
+ auto& state=first_css_browser_draw;
+ std::ostringstream out;
+ const char* status=state.failed?"failed":state.complete?"complete":
+     state.draw_captured?"draw-captured":state.tick_captured?"tick-captured":
+     state.kicked?"kicked":state.entry_captured?"entered":state.armed?"armed":"idle";
+ out<<"{\"schema\":\"melee-web-stadium-first-css-browser-draw-v1\",\"state\":\""
+    <<status<<"\",\"source_stream_sha256\":\""
+    <<state.context.source_sha256<<"\",\"error\":"
+    <<(state.error.empty()?"null":first_css_browser_draw_json_quote(state.error))
+    <<",\"source_callbacks_before_kick\":"<<state.source_callbacks_before_kick
+    <<",\"source_steps\":"<<state.source_steps<<",\"source_draws\":"<<state.source_draws
+    <<",\"host_tick_calls\":"<<state.host_tick_calls
+    <<",\"host_draw_calls\":"<<state.host_draw_calls
+    <<",\"aurora_begin_calls\":"<<state.aurora_begin_calls
+    <<",\"aurora_end_calls\":"<<state.aurora_end_calls
+    <<",\"frame_end_returned\":"<<(state.frame_end_returned?"true":"false")
+    <<",\"preparation_source_callbacks\":"<<state.preparation_source_callbacks
+    <<",\"full_session_comparison\":false";
+ if(state.entry_captured){
+  out<<",\"entry\":{\"source_scene\":"<<state.entry.source_scene
+     <<",\"scene_kind\":"<<state.entry.source_scene_kind
+     <<",\"random_seed_hex\":\""
+     <<melee_web::stadium_first_css_diagnostic::hex32(state.entry.random_seed)
+     <<"\",\"pad_state_hex\":\""
+     <<melee_web::stadium_first_css_diagnostic::hex(state.entry.pad_state,sizeof(state.entry.pad_state))
+     <<"\",\"ko_counts_hex\":\""
+     <<melee_web::stadium_first_css_diagnostic::hex(state.entry.ko_counts,sizeof(state.entry.ko_counts))
+     <<"\",\"css\":";
+  melee_web::stadium_first_css_diagnostic::write_css(out,state.entry.css,"source_vs_owned");
+  out<<",\"abi_padding_excluded\":[\"pad_x5C\"]}";
+ }
+ if(state.tick_captured){
+  out<<",\"tick\":{\"source_stream_sha256\":\""
+     <<state.context.source_sha256<<"\",\"consumed_pad_sequence\":834,\"source_tick_sequence\":835"
+     <<",\"source_tick_value\":0,\"source_draw_ordinal\":0,\"original_source_frame\":"
+     <<state.frame_before
+     <<",\"phase_relation\":\"native host post-tick sample at frame 1 versus original scheduler-end SourceTick 835 before frame increment at frame 0\""
+     <<",\"host_tick_calls\":"<<state.host_tick_calls<<",\"host_tick_result\":"<<state.tick_result
+     <<",\"source_scene_kind\":"<<state.tick.scene_kind
+     <<",\"host_source_scene\":"<<state.tick.source_scene
+     <<",\"host_menu_phase\":"<<state.tick.menu_phase
+     <<",\"native_post_host_tick_frame\":"<<state.tick.scene_frame
+     <<",\"world_generation\":"<<state.tick.world_generation
+     <<",\"world_generation_stable\":"<<(state.tick.world_generation_stable?"true":"false")
+     <<",\"source_scene_stable\":"<<(state.tick.scene_owner_stable?"true":"false")
+     <<",\"seed_owner_stable\":"<<(state.tick.seed_owner_stable?"true":"false")
+     <<",\"random_seed_hex\":\""
+     <<melee_web::stadium_first_css_diagnostic::hex32(state.tick.seed)
+     <<"\",\"pad_state_hex\":\""
+     <<melee_web::stadium_first_css_diagnostic::hex(state.tick.pad.data(),state.tick.pad.size())
+     <<"\",\"scene_routing_getters\":";
+  first_css_browser_draw_write_route(out,state.tick);
+  out<<",\"routing_raw_fields_excluded\":[\"pending_mode\",\"next_state_id\"]}";
+ }
+ if(state.draw_captured){
+  out<<",\"draw\":{\"boundary\":\"browser_host_draw_return\",\"source_tick\":"
+     <<state.draw_source_tick<<",\"draw_ordinal\":"<<state.draw_ordinal
+     <<",\"observation_phase\":\"after source host draw, before Aurora end-frame\",\"host_draw_calls\":"
+     <<state.host_draw_calls<<",\"aurora_begin_calls\":"<<state.aurora_begin_calls
+     <<",\"source_scene\":"<<state.draw.source_scene<<",\"menu_phase\":"<<state.draw.menu_phase
+     <<",\"scene_kind\":"<<state.draw.scene_kind<<",\"scene_frame\":"<<state.draw.scene_frame
+     <<",\"world_generation\":"<<state.draw.world_generation
+     <<",\"world_generation_stable\":"<<(state.draw.world_generation_stable?"true":"false")
+     <<",\"scene_owner_stable\":"<<(state.draw.scene_owner_stable?"true":"false")
+     <<",\"seed_owner_stable\":"<<(state.draw.seed_owner_stable?"true":"false")
+     <<",\"random_seed_hex\":\""
+     <<melee_web::stadium_first_css_diagnostic::hex32(state.draw.seed)
+     <<"\",\"pad_state_hex\":\""
+     <<melee_web::stadium_first_css_diagnostic::hex(state.draw.pad.data(),state.draw.pad.size())
+     <<"\",\"scene_routing_getters\":";
+  first_css_browser_draw_write_route(out,state.draw);
+  out<<'}';
+ }
+ out<<'}';state.observation=out.str();
+}
 #endif
 uint32_t asset_generation=0;
 std::vector<std::string> requested_assets;
@@ -504,6 +707,7 @@ if(scoped_assets){
  replay_match_complete=false;replay_outcome=0;replay_winner=-1;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  stadium_c1a_armed=false;stadium_c1a_observation.clear();stadium_c1a_raw_stkind=-1;
+ first_css_browser_draw=FirstCssBrowserDrawState{};
 #endif
  audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;pending_menu_source_scene=0;pending_opening_state=-1;audio_clock.reset();clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();
  css_fighter_release_port=-1;last_css_fighter_observation_valid=false;
@@ -595,7 +799,35 @@ void enter_world(){
  }
  if(melee_web_net_active()&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED)
   check(melee_web_net_apply_start_context(host,error,sizeof(error)),error);
- check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);host_entered=true;world_exposed=true;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ const bool capture_first_css_return=first_css_browser_draw.armed;
+#endif
+ check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(capture_first_css_return){
+  try{
+   auto& state=first_css_browser_draw;
+   check(melee_web_menu_host_first_css_return(host,&state.entry,error,sizeof(error)),error);
+   state.world_generation=melee_web_gameplay_generation();
+   state.seed_owner=seed_ptr;
+   state.scene_owner=static_cast<const GameModeState::GameSceneInfo*>(
+       melee_web_current_scene_info());
+   check(state.world_generation!=0&&melee_web_gameplay_world_exists()&&
+         melee_web_source_memory_healthy()&&state.seed_owner!=nullptr&&
+         state.scene_owner!=nullptr&&*state.seed_owner==state.entry.random_seed&&
+         state.entry.source_scene==MELEE_WEB_MENU_HOST_SCENE_CSS&&
+         state.entry.source_scene_kind==8&&state.entry.css.ko_counts==nullptr&&
+         state.scene_owner->scene_kind==8,
+         "Immediate first-CSS return did not retain checked CSS, RNG and world owners");
+   state.entry_captured=true;
+   first_css_browser_draw_refresh_observation();
+  }catch(const std::exception& failure){
+   first_css_browser_draw_fail(failure.what());
+   first_css_browser_draw_refresh_observation();
+  }
+ }
+#endif
+ host_entered=true;world_exposed=true;
  const double entered=emscripten_get_now();
  report_construction("scene-enter",started,constructed,entered,before,aurora_stats_snapshot());
  first_use_draw_pending=true;
@@ -1333,6 +1565,11 @@ void tick(){
  melee_web::SourceFrameSequence callback_source_frames;
  auto& source_frames=replay?replay_source_frames:callback_source_frames;
  source_frames.begin_callback();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(first_css_browser_draw.armed&&!first_css_browser_draw.kicked&&
+    !first_css_browser_draw.failed&&!first_css_browser_draw.complete)
+  ++first_css_browser_draw.source_callbacks_before_kick;
+#endif
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
  bool first_replay_callback_probe=false;
  unsigned replay_boundary_draw_index=0;
@@ -1347,6 +1584,7 @@ void tick(){
  // Keep the source presenter out of both the request and audio-ack waits.
  int suppress_draw=preparation.suppress_source_draw(pending)||replay_final_draw;
  bool actual_source_draw=false;
+ bool first_css_draw_terminal=false;
  bool replay_completed_now=false;
  const bool replay_input_already_drawn=replay_completion.final_input_drawn;
  unsigned replay_steps=0;
@@ -1373,6 +1611,20 @@ void tick(){
 #endif
   bool drew_source=false;
   bool began_this_frame=false;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(first_css_browser_draw.armed){
+   auto& state=first_css_browser_draw;
+   if(preparation.busy()&&preparation.preparation_draws_source())
+    ++state.preparation_source_callbacks;
+   check(state.kicked&&!state.failed&&!state.complete&&state.entry_captured&&
+         state.source_steps==1&&state.host_tick_calls==1&&state.tick_captured&&
+         state.tick_result==1&&!state.draw_captured&&state.host_draw_calls==0&&
+         state.aurora_begin_calls==0&&state.aurora_end_calls==0,
+         "First-CSS diagnostic attempted a draw outside its one tick/one draw boundary");
+   first_css_browser_draw_check_live("before browser source draw");
+   ++state.aurora_begin_calls;
+  }
+#endif
   const double render_started=emscripten_get_now();
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
   const unsigned boundary_draw_index=first_replay_callback_probe
@@ -1381,6 +1633,12 @@ void tick(){
                        static_cast<int>(source_frames.steps()),static_cast<int>(replay_cursor));
 #endif
   const bool frame_began=aurora_begin_frame();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(first_css_browser_draw.armed&&!frame_began){
+   first_css_browser_draw_fail("Aurora did not begin the one admitted first-CSS source draw");
+   first_css_browser_draw_refresh_observation();
+  }
+#endif
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
   replay_boundary_mark("aurora_begin_frame_returned",static_cast<int>(boundary_draw_index),
                        static_cast<int>(source_frames.steps()),frame_began?1:0);
@@ -1404,7 +1662,35 @@ void tick(){
       replay_boundary_mark("css_host_draw_begin",static_cast<int>(boundary_draw_index),
                            static_cast<int>(replay_cursor),melee_web_menu_host_phase(host));
 #endif
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+      if(first_css_browser_draw.armed){
+       ++first_css_browser_draw.host_draw_calls;
+       check(first_css_browser_draw.tick_result==1&&!pending&&
+             source_frames.steps()==1&&source_frames.draws()==0&&
+             preparation.phase()==melee_web::MenuPreparationState::Phase::Idle,
+             "First-CSS draw no longer follows one live non-transition CSS tick");
+       first_css_browser_draw.draw_source_tick=source_frames.steps();
+       first_css_browser_draw.draw_ordinal=source_frames.draws();
+       first_css_browser_draw_check_live("before host draw");
+      }
+#endif
       drawn=melee_web_menu_host_draw(host,error,sizeof(error));
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+      if(first_css_browser_draw.armed){
+       check(drawn==1,error[0]?error:"Original first-CSS host draw did not execute");
+       first_css_browser_draw_check_live("after host draw");
+       auto& state=first_css_browser_draw;
+       state.draw=first_css_browser_draw_capture("first browser source draw return");
+       check(state.draw.source_scene==MELEE_WEB_MENU_HOST_SCENE_CSS&&
+             state.draw.menu_phase==MELEE_WEB_MENU_CSS&&state.draw.scene_kind==8&&
+             state.draw.scene_frame==1&&state.draw.world_generation_stable&&
+             state.draw.scene_owner_stable&&state.draw.seed_owner_stable,
+             "First browser draw left the original idle CSS source boundary");
+       state.draw_captured=true;
+       ++state.source_draws;
+       first_css_browser_draw_refresh_observation();
+      }
+#endif
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
       replay_boundary_mark("css_host_draw_returned",static_cast<int>(boundary_draw_index),
                            drawn,static_cast<int>(source_frames.steps()));
@@ -1430,6 +1716,13 @@ void tick(){
                         static_cast<int>(source_frames.steps()),static_cast<int>(replay_cursor));
 #endif
    aurora_end_frame();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+   if(first_css_browser_draw.armed){
+    ++first_css_browser_draw.aurora_end_calls;
+    first_css_browser_draw.frame_end_returned=true;
+    first_css_browser_draw_refresh_observation();
+   }
+#endif
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
    replay_boundary_mark("aurora_end_frame_returned",static_cast<int>(boundary_draw_index),
                         static_cast<int>(source_frames.draws()),drew_source?1:0);
@@ -1605,15 +1898,27 @@ void tick(){
   // first active gameplay interval on the following callback.
   const double simulation_clock_now=emscripten_get_now();
   const bool local_capture_clock=melee_web_net_local_capture_pending();
-  const bool simulation_clock_running=running&&(world||match||results||prize)&&input->visible;
+  bool simulation_clock_running=running&&(world||match||results||prize)&&input->visible;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(first_css_browser_draw.armed)
+   simulation_clock_running=simulation_clock_running&&first_css_browser_draw.kicked&&
+       !first_css_browser_draw.failed&&!first_css_browser_draw.complete;
+#endif
   const auto observe_simulation_clock_stall=[](const auto& event) noexcept {
    diagnostic_clock_stall(event,1);
   };
-  const auto elapsed=local_capture_clock?
-      menu_clock.tick_with_budget(simulation_clock_now,simulation_clock_running,1,
-                                  observe_simulation_clock_stall):
-      menu_clock.tick(simulation_clock_now,simulation_clock_running,
-                      observe_simulation_clock_stall);
+  const auto elapsed=(local_capture_clock
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+      ||(first_css_browser_draw.armed&&first_css_browser_draw.kicked)
+#endif
+      )?menu_clock.tick_with_budget(simulation_clock_now,simulation_clock_running,1,
+                                    observe_simulation_clock_stall):
+       menu_clock.tick(simulation_clock_now,simulation_clock_running,
+                       observe_simulation_clock_stall);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(first_css_browser_draw.armed&&first_css_browser_draw.kicked&&elapsed.steps>1)
+   first_css_browser_draw_fail("First-CSS one-shot clock exceeded one source step");
+#endif
   if(elapsed.stalled){running=false;message="Paused after a timing disruption. Resume to continue.";}
   if(elapsed.steps&&transition_audio_continues){
    transition_audio_continues=false;
@@ -1633,8 +1938,25 @@ void tick(){
     }
    }
    source_frames.before_step(present_source);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+   if(first_css_browser_draw.armed){
+    check(first_css_browser_draw.kicked&&!first_css_browser_draw.failed&&
+          !first_css_browser_draw.complete&&first_css_browser_draw.source_steps==0&&
+          first_css_browser_draw.host_tick_calls==0&&first_css_browser_draw.host_draw_calls==0&&
+          source_frames.steps()==0&&source_frames.draws()==0,
+          "First-CSS diagnostic reached a second source step or draw boundary");
+    first_css_browser_draw_check_live("before one source tick");
+   }else
+#endif
    if(prepare_deferred_pipelines())break;
    PADStatus checked_input[4];const PADStatus* sample=input->raw;bool copied_input=false;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+   if(first_css_browser_draw.armed){
+    check(first_css_browser_draw.consumed_status[0].err==PAD_ERR_NONE,
+          "Retained first-CSS consumed PAD is not connected on P1");
+    sample=first_css_browser_draw.consumed_status;
+   }
+#endif
    bool diagnostic_start_pulse=false;
    if(results)activate_scheduled_results_pad(results->source_frames(),input->raw);
    if(diagnostic_start_ticks){
@@ -1785,13 +2107,46 @@ void tick(){
      replay_boundary_mark("css_tick_begin",static_cast<int>(source_frames.steps()),
                           static_cast<int>(replay_cursor),melee_web::kRetailReplayCss);
 #endif
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(first_css_browser_draw.armed){
+     auto& state=first_css_browser_draw;
+     ++state.host_tick_calls;
+     state.frame_before=gm_801A4BA8();
+     check(state.frame_before==0&&state.host_tick_calls==1&&
+           state.source_steps==0&&state.host_draw_calls==0,
+           "First-CSS source tick did not begin at exact frame-zero owner");
+     first_css_browser_draw_check_live("before original source tick");
+    }
+#endif
     result=melee_web_menu_host_tick(host,sample,error,sizeof(error));
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(first_css_browser_draw.armed){
+     auto& state=first_css_browser_draw;
+     state.tick_result=result;
+     check(result==1,"First-CSS retained source tick requested a transition or failed");
+     first_css_browser_draw_check_live("after original source tick");
+     state.frame_after_tick=gm_801A4BA8();
+     state.tick=first_css_browser_draw_capture("original source tick return");
+     check(state.frame_after_tick==1&&state.tick.scene_frame==1&&
+           state.tick.source_scene==MELEE_WEB_MENU_HOST_SCENE_CSS&&
+           state.tick.menu_phase==MELEE_WEB_MENU_CSS&&state.tick.scene_kind==8,
+           "First-CSS tick did not advance exactly one live CSS source frame");
+     state.tick_captured=true;
+     first_css_browser_draw_refresh_observation();
+    }
+#endif
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
     if(probe_css_tick)
      replay_boundary_mark("css_tick_returned",static_cast<int>(source_frames.steps()),
                           static_cast<int>(replay_cursor),result);
 #endif
     check(result==1||result==3,error);source_frames.did_step();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(first_css_browser_draw.armed){
+     check(result==1,"First-CSS source tick returned a transition result");
+     ++first_css_browser_draw.source_steps;
+    }
+#endif
    }
    if(melee_web_net_active())melee_web_net_after_step();
    if(replay_whole){
@@ -1864,16 +2219,37 @@ void tick(){
                        static_cast<int>(source_frames.draws()),static_cast<int>(replay_cursor));
 #endif
   source_frames.finish(present_source);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(first_css_browser_draw.armed&&
+     (first_css_browser_draw.complete||first_css_browser_draw.failed)){
+   check(source_frames.steps()==0&&source_frames.draws()==0,
+         "Terminal first-CSS diagnostic advanced source work in a later callback");
+   first_css_draw_terminal=true;
+  }else if(first_css_browser_draw.armed&&first_css_browser_draw.kicked&&
+           first_css_browser_draw.draw_captured){
+   auto& state=first_css_browser_draw;
+   check(source_frames.steps()==1&&source_frames.draws()==1&&state.source_steps==1&&
+         state.source_draws==1&&state.host_tick_calls==1&&state.host_draw_calls==1&&
+         state.aurora_begin_calls==1&&state.aurora_end_calls==1&&
+         state.frame_end_returned&&state.tick_result==1,
+         "First-CSS browser draw did not finish as exactly one tick and one presented draw");
+   state.complete=true;
+   first_css_draw_terminal=true;
+   running=false;menu_clock.reset();
+   first_css_browser_draw_refresh_observation();
+  }
+#endif
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
   replay_boundary_mark("source_frames_finish_returned",static_cast<int>(source_frames.steps()),
                        static_cast<int>(source_frames.draws()),static_cast<int>(replay_cursor));
 #endif
-  (void)prepare_deferred_pipelines();
+  if(!first_css_draw_terminal)(void)prepare_deferred_pipelines();
   // Camera callbacks mutate source state (including magnifier damage flags).
   // A callback without a source tick retains the last match image when the
   // renderer guarantees complete draws. Menu priming retains its existing path.
-  if(source_frames.steps()==0&&(preparation.preparation_draws_source()||(!world&&!match&&!results&&!prize)))present_source();
-  if(preparation.warming()&&!preparation.preparation_draws_source()){
+  if(!first_css_draw_terminal&&source_frames.steps()==0&&
+     (preparation.preparation_draws_source()||(!world&&!match&&!results&&!prize)))present_source();
+  if(!first_css_draw_terminal&&preparation.warming()&&!preparation.preparation_draws_source()){
    const double service_started=emscripten_get_now();
    check(aurora_pipeline_service_preparation(),"Renderer preparation overlapped an active frame");
    preparation_ms+=emscripten_get_now()-service_started;
@@ -1898,7 +2274,14 @@ void tick(){
  }catch(const std::exception& e){
   const std::string primary=e.what();
   abort_sudden_death_after_failure(primary);
-  diagnostic_incident(4);running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
+  diagnostic_incident(4);running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();menu_clock.reset();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(first_css_browser_draw.armed){
+   first_css_browser_draw_fail(e.what());first_css_draw_terminal=true;
+   first_css_browser_draw_refresh_observation();
+  }
+#endif
+  message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
   const double failed=emscripten_get_now();
   if(input_done<started)input_done=failed;
   if(simulation_done<input_done)simulation_done=failed;
@@ -1945,7 +2328,8 @@ void tick(){
  const bool complete_draws=aurora_pipeline_complete_draws_enabled()!=0;
  const bool created_gpu_pending=created_pipelines>0&&complete_draws&&
      aurora_browser_submission_status().pendingStagingBuffers!=0;
- if(preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&running&&actual_source_draw&&
+ if(!first_css_draw_terminal&&
+    preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&running&&actual_source_draw&&
     melee_web::MenuPreparationState::needs_live_render_settle(
         stats_after.queuedPipelines,created_pipelines,complete_draws,created_gpu_pending)){
   if(preparation.request_render_settle(created_gpu_pending?false:preparation_uses_source_draws())){
@@ -2063,6 +2447,62 @@ int melee_web_native_menu_phase(){
  }
  return host?melee_web_menu_host_phase(host):0;
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+int melee_web_native_menu_stadium_first_css_draw_arm(
+    const uint8_t* context_bytes,unsigned context_size,
+    const uint8_t* consumed_pad_bytes,unsigned consumed_pad_size){try{
+ auto& state=first_css_browser_draw;
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+ check(false,"First-CSS browser draw requires the reviewed complete-draw pipeline build");
+#endif
+ check(!state.armed&&!stadium_c1a_armed&&scoped_assets==false&&
+       asset_destination==AssetDestination::None&&!asset_committed&&
+       asset_scope.pending_generation()==0&&world&&host&&!host_entered&&
+       !world_exposed&&!match&&!results&&!prize&&!pending&&!running&&
+       !replay&&!melee_web_net_active()&&source_session_owned&&!preparation.busy()&&
+       melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED&&
+       melee_web_menu_host_mode_kind(host)==GM_VS,
+       "First-CSS draw arm requires one prepared, unentered original VS host");
+ auto context=melee_web::stadium_first_css_diagnostic::decode_context(
+     context_bytes,context_size);
+ auto consumed=melee_web::stadium_first_css_diagnostic::decode_consumed_pad(
+     consumed_pad_bytes,consumed_pad_size,context.source_sha256);
+ char error[256]{};
+ check(melee_web_menu_host_apply_replay_context(
+       host,context.seed,context.pad.data(),context.css.data(),context.ko.data(),
+       context.rules.data(),context.save.data(),error,sizeof(error)),error);
+ check(melee_web_menu_host_arm_first_css_return(host,error,sizeof(error)),error);
+ state.context=std::move(context);
+ state.consumed=std::move(consumed);
+ melee_web::stadium_first_css_diagnostic::decode_consumed_pad_statuses(
+     state.consumed,state.consumed_status);
+ state.armed=true;
+ first_css_browser_draw_refresh_observation();
+ message="Private first-CSS browser draw diagnostic armed.";
+ return 1;
+}catch(const std::exception& error){message=error.what();return 0;}}
+int melee_web_native_menu_stadium_first_css_draw_kick(){try{
+ auto& state=first_css_browser_draw;
+ check(state.armed&&state.entry_captured&&!state.kicked&&!state.complete&&!state.failed&&
+       host&&world&&host_entered&&state.source_steps==0&&state.host_tick_calls==0&&
+       state.host_draw_calls==0&&state.aurora_begin_calls==0&&state.aurora_end_calls==0,
+       "First-CSS draw kick requires its captured return before any source tick or draw");
+ first_css_browser_draw_check_live("pre-kick");
+ check(gm_801A4BA8()==0&&seed_ptr==state.seed_owner&&
+       *state.seed_owner==state.entry.random_seed,
+       "First-CSS draw kick lost the exact frame-zero RNG owner");
+ state.kicked=true;
+ menu_clock.reset();audio_clock.reset();running=true;
+ first_css_browser_draw_refresh_observation();
+ return 1;
+}catch(const std::exception& error){first_css_browser_draw_fail(error.what());
+ first_css_browser_draw_refresh_observation();return 0;}}
+const char* melee_web_native_menu_stadium_first_css_draw_observe(){
+ if(!first_css_browser_draw.armed)return nullptr;
+ first_css_browser_draw_refresh_observation();
+ return first_css_browser_draw.observation.c_str();
+}
+#endif
 }
 int main(int argc,char** argv){
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)

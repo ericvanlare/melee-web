@@ -62,6 +62,23 @@ FIRST_CSS_CONTEXT_BYTES = (FIRST_CSS_CONTEXT_HEADER_BYTES +
                            FIRST_CSS_CONTEXT_PAYLOAD_BYTES)
 FIRST_CSS_CONSUME_SEQUENCE = 834
 FIRST_CSS_SOURCE_TICK_SEQUENCE = 835
+FIRST_CSS_DRAW_ENTER_SEQUENCE = 836
+FIRST_CSS_DRAW_RETURN_SEQUENCE = 837
+FIRST_CSS_DRAW_ENTER_PC = 0x80390FC0
+FIRST_CSS_DRAW_RETURN_PC = 0x80391040
+FIRST_CSS_DRAW_SOURCE_TICK = 1
+FIRST_CSS_DRAW_ORDINAL = 0
+FIRST_CSS_DRAW_SLICES = {
+    (2, 0): (0x804C1F78, 0x0C),
+    (17, 0): (0x80479D30, 6),
+    (20, 0): (FIRST_CSS_RNG_VALUE_ADDRESS, 4),
+    (19, 0): (FIRST_CSS_RNG_POINTER_ADDRESS, 4),
+    (21, 0): (FIRST_CSS_PAD_ADDRESS, 0x358),
+    (30, 0): (FIRST_CSS_SCENE_FRAME_ADDRESS, 4),
+    (36, 0): (FIRST_CSS_SAVE_ADDRESS, 2),
+    (37, 0): (FIRST_CSS_SAVE_ADDRESS + 2, 2),
+    (40, 0): (FIRST_CSS_SCENE_ADDRESS, 1),
+}
 FIRST_CSS_CONSUMED_PAD_MAGIC = b"STC1PAD1"
 FIRST_CSS_CONSUMED_PAD_VERSION = 1
 FIRST_CSS_CONSUMED_PAD_HEADER_BYTES = 8 + 4 + 32 + 4 + 4
@@ -1295,6 +1312,158 @@ def decode_first_css_consumed_pad_bundle(data: bytes) -> dict[str, Any]:
         "port_status_hex": statuses,
         "contains_expected_post_tick_state": False,
     }
+
+
+def _first_css_draw_snapshot(row: dict[str, Any], *, sequence: int,
+                             pc: int, boundary: str) -> dict[str, Any]:
+    payload = row.get("payload")
+    _require(isinstance(payload, dict) and row.get("event") == "boundary" and
+             row.get("seq") == sequence and payload.get("boundary") == boundary and
+             payload.get("pc") == pc and
+             type(row.get("source_tick")) is int and
+             row.get("source_tick") == FIRST_CSS_DRAW_SOURCE_TICK and
+             payload.get("source_tick") == FIRST_CSS_DRAW_SOURCE_TICK and
+             payload.get("draw_ordinal") == FIRST_CSS_DRAW_ORDINAL,
+             f"first-CSS {boundary} row has wrong sequence, phase, PC, tick or ordinal")
+    _check_boundary_contract(payload)
+    slices = payload.get("slices")
+    _require(isinstance(slices, list) and len(slices) == len(FIRST_CSS_DRAW_SLICES) and
+             all(isinstance(item, dict) for item in slices) and
+             {(item.get("tag"), item.get("flags")) for item in slices} ==
+             set(FIRST_CSS_DRAW_SLICES),
+             f"first-CSS {boundary} has an unexpected exact slice inventory")
+    read: dict[int, dict[str, Any]] = {}
+    for (tag, flags), (address, size) in FIRST_CSS_DRAW_SLICES.items():
+        item = _slice(payload, tag, f"first-CSS {boundary}", size, flags)
+        _require(item["address"] == address,
+                 f"first-CSS {boundary}: tag={tag} escaped its pinned source address")
+        read[tag] = item
+    _require(read[19]["raw"] == FIRST_CSS_RNG_VALUE_ADDRESS.to_bytes(4, "big"),
+             f"first-CSS {boundary} RNG pointer does not own the observed seed")
+    _require(read[40]["raw"] == b"\x08",
+             f"first-CSS {boundary} left the original CSS scene")
+    _require(read[30]["raw"] == b"\x00\x00\x00\x01",
+             f"first-CSS {boundary} is not source scene frame one")
+    _require(read[17]["raw"] == bytes.fromhex("020201000000"),
+             f"first-CSS {boundary} source routing differs from retained v6")
+    from reference_capture_semantics import pad_snapshot_bytes
+    try:
+        pad_hex = pad_snapshot_bytes(read[21]["raw"])
+    except (ValueError, TypeError) as error:
+        raise StadiumGoPrefixError(
+            f"first-CSS {boundary} PAD snapshot is invalid: {error}") from error
+    pad = bytes.fromhex(pad_hex)
+    _require(len(pad) == 822,
+             f"first-CSS {boundary} PAD has an unexpected semantic byte length")
+    route = read[17]["raw"]
+    inventory = [
+        {"tag": tag, "flags": flags, "address": read[tag]["address"],
+         "size": read[tag]["size"]}
+        for tag, flags in sorted(FIRST_CSS_DRAW_SLICES)
+    ]
+    return {
+        "sequence": sequence,
+        "boundary": boundary,
+        "pc": f"0x{pc:08x}",
+        "source_tick": FIRST_CSS_DRAW_SOURCE_TICK,
+        "draw_ordinal": FIRST_CSS_DRAW_ORDINAL,
+        "source_slice_inventory": inventory,
+        "pad_state_hex": pad.hex(),
+        "random_seed_hex": read[20]["raw"].hex(),
+        "scene_frame": int.from_bytes(read[30]["raw"], "big"),
+        "scene_kind": read[40]["raw"][0],
+        "scene_routing_raw_hex": route.hex(),
+        "scene_routing_getters": {
+            "current_game_mode": route[0],
+            "previous_game_mode": route[2],
+            "current_scene_index": route[3],
+            "previous_scene_index": route[4],
+        },
+    }
+
+
+def _extract_first_css_first_draw_rows(
+        draw_enter_rows: list[dict[str, Any]],
+        draw_return_rows: list[dict[str, Any]],
+        stream_sha256: str) -> dict[str, Any]:
+    """Reduce only the retained original first CSS DrawEnter/DrawReturn pair."""
+    _require(stream_sha256 == FIRST_CSS_STREAM_SHA256,
+             "first-CSS first draw is not from the retained v6 observer")
+    _require(isinstance(draw_enter_rows, list) and len(draw_enter_rows) == 1 and
+             isinstance(draw_return_rows, list) and len(draw_return_rows) == 1,
+             "first-CSS first draw requires one exact enter/return row")
+    enter = _first_css_draw_snapshot(
+        draw_enter_rows[0], sequence=FIRST_CSS_DRAW_ENTER_SEQUENCE,
+        pc=FIRST_CSS_DRAW_ENTER_PC, boundary="draw_enter")
+    returned = _first_css_draw_snapshot(
+        draw_return_rows[0], sequence=FIRST_CSS_DRAW_RETURN_SEQUENCE,
+        pc=FIRST_CSS_DRAW_RETURN_PC, boundary="draw_return")
+    comparable = ("source_tick", "draw_ordinal", "pad_state_hex", "random_seed_hex",
+                  "scene_frame", "scene_kind", "scene_routing_getters")
+    _require(all(enter[key] == returned[key] for key in comparable),
+             "first-CSS tracked state changed during its original source draw")
+    return {
+        "schema": "melee-web-stadium-first-css-first-draw-diagnostic",
+        "version": 1,
+        "scope": "original first CSS DrawEnter 836 through DrawReturn 837 only",
+        "provenance": {
+            "stream_bytes": FIRST_CSS_STREAM_BYTES,
+            "stream_sha256": stream_sha256,
+            "css_entry_sequence": FIRST_CSS_ENTRY_SEQUENCE,
+            "css_return_sequence": FIRST_CSS_RETURN_SEQUENCE,
+            "consumed_pad_sequence": FIRST_CSS_CONSUME_SEQUENCE,
+            "source_tick_sequence": FIRST_CSS_SOURCE_TICK_SEQUENCE,
+            "draw_enter_sequence": FIRST_CSS_DRAW_ENTER_SEQUENCE,
+            "draw_return_sequence": FIRST_CSS_DRAW_RETURN_SEQUENCE,
+            "scheduler_end_source_tick_value": 0,
+            "draw_source_tick_value": FIRST_CSS_DRAW_SOURCE_TICK,
+        },
+        "expected_draw_enter": enter,
+        "expected_draw_return": returned,
+        "comparison_fields": list(comparable),
+        "excluded_source_tags": [36, 37, 2],
+        "unpaired_routing_fields": ["pending_mode", "next_state_id"],
+        "draw_return_observation_phase": "after source host draw, before Aurora end-frame",
+        "whole_session_equivalent": False,
+        "source_admission": False,
+    }
+
+
+def extract_stadium_first_css_first_draw(
+        stream_path: str | Path, status_path: str | Path) -> dict[str, Any]:
+    """Extract original first CSS draw fields after strict retained-prefix validation."""
+    source = Path(stream_path)
+    _require(source.is_file(), "configured first-CSS observer stream is missing")
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES,
+             "first-CSS observer stream byte length differs from retained v6 source")
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    _require(digest == FIRST_CSS_STREAM_SHA256,
+             "first-CSS observer stream hash differs from retained v6 source")
+    try:
+        summary = validate_stadium_go_prefix(source, status_path=status_path)
+        _require(summary.get("decision") == "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY" and
+                 summary.get("stream_bytes") == FIRST_CSS_STREAM_BYTES and
+                 summary.get("stream_sha256") == digest,
+                 "first-CSS source stream no longer passes full GO-prefix validation")
+        draw_enter_rows: list[dict[str, Any]] = []
+        draw_return_rows: list[dict[str, Any]] = []
+        for row in iter_records(source, max_bytes=MAX_STREAM_BYTES,
+                                max_records=MAX_STREAM_RECORDS):
+            if row.get("seq") == FIRST_CSS_DRAW_ENTER_SEQUENCE:
+                draw_enter_rows.append(row)
+            elif row.get("seq") == FIRST_CSS_DRAW_RETURN_SEQUENCE:
+                draw_return_rows.append(row)
+        result = _extract_first_css_first_draw_rows(
+            draw_enter_rows, draw_return_rows, digest)
+    except StadiumGoPrefixError:
+        raise
+    except (OSError, ObserverStreamError) as error:
+        raise StadiumGoPrefixError(
+            f"cannot validate first-CSS draw rows: {error}") from error
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES and
+             hashlib.sha256(source.read_bytes()).hexdigest() == digest,
+             "first-CSS observer stream changed during draw extraction")
+    return result
 
 
 def decode_first_css_context_bundle(data: bytes) -> dict[str, Any]:

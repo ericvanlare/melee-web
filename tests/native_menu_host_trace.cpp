@@ -20,6 +20,8 @@
 #include "native_menu_stage_input.h"
 #include "stadium_c1_stage_state_probe.h"
 #include "gameplay_source_memory_runtime.h"
+#include "stadium_first_css_diagnostic_input.hpp"
+#include "../src/stadium_first_css_diagnostic_snapshot_json.hpp"
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include "gameplay_stadium_display_owner.h"
 #include "gameplay_heap.h"
@@ -3384,45 +3386,30 @@ void run_v10_css_replay_start_prefix(const melee_web::RuntimeFiles& files,
 
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 namespace {
-constexpr size_t kFirstCssInputBytes = 23228;
-constexpr size_t kFirstCssInputHeaderBytes = 52;
-constexpr size_t kFirstCssPadBytes = MELEE_WEB_PAD_STATE_BYTES;
-constexpr size_t kFirstCssDataBytes = 0x148;
-constexpr size_t kFirstCssKoBytes = GM_MAX_PLAYERS;
-constexpr size_t kFirstCssRulesBytes = 0x18;
-constexpr size_t kFirstCssSaveBytes = 0x55E8;
-constexpr uint32_t kFirstCssEntrySequence = 704;
-constexpr uint32_t kFirstCssReturnSequence = 833;
-constexpr size_t kFirstCssConsumedPadHeaderBytes = 52;
-constexpr size_t kFirstCssConsumedPadBytes = kFirstCssConsumedPadHeaderBytes + 4 * 11;
-constexpr uint32_t kFirstCssPadConsumeSequence = 834;
-constexpr uint32_t kFirstCssSourceTickSequence = 835;
-constexpr uint32_t kFirstCssObserverKoAddress = 0x804D6730;
-
-struct FirstCssContextInput {
-    std::array<uint8_t, kFirstCssPadBytes> pad{};
-    std::array<uint8_t, kFirstCssDataBytes> css{};
-    std::array<uint8_t, kFirstCssKoBytes> ko{};
-    std::array<uint8_t, kFirstCssRulesBytes> rules{};
-    std::array<uint8_t, kFirstCssSaveBytes> save{};
-    uint32_t seed = 0;
-    std::string source_sha256;
-};
+namespace first_css_input = melee_web::stadium_first_css_diagnostic;
+constexpr size_t kFirstCssInputBytes = first_css_input::kContextBytes;
+constexpr size_t kFirstCssInputHeaderBytes = first_css_input::kContextHeaderBytes;
+constexpr size_t kFirstCssPadBytes = first_css_input::kPadBytes;
+constexpr size_t kFirstCssDataBytes = first_css_input::kCssBytes;
+constexpr size_t kFirstCssKoBytes = first_css_input::kKoBytes;
+constexpr size_t kFirstCssRulesBytes = first_css_input::kRulesBytes;
+constexpr size_t kFirstCssSaveBytes = first_css_input::kSaveBytes;
+constexpr uint32_t kFirstCssEntrySequence = first_css_input::kEntrySequence;
+constexpr uint32_t kFirstCssReturnSequence = first_css_input::kReturnSequence;
+constexpr size_t kFirstCssConsumedPadHeaderBytes = first_css_input::kConsumedPadHeaderBytes;
+constexpr size_t kFirstCssConsumedPadBytes = first_css_input::kConsumedPadBytes;
+constexpr uint32_t kFirstCssPadConsumeSequence = first_css_input::kPadConsumeSequence;
+constexpr uint32_t kFirstCssSourceTickSequence = first_css_input::kSourceTickSequence;
+constexpr uint32_t kFirstCssObserverKoAddress = first_css_input::kKoAddress;
+using FirstCssContextInput = first_css_input::ContextInput;
+using FirstCssConsumedPadInput = first_css_input::ConsumedPadInput;
 
 uint32_t first_css_be32(const uint8_t* bytes) {
-    return (uint32_t(bytes[0]) << 24) | (uint32_t(bytes[1]) << 16) |
-           (uint32_t(bytes[2]) << 8) | uint32_t(bytes[3]);
+    return first_css_input::read_be32(bytes);
 }
 
 std::string first_css_hex(const uint8_t* bytes, size_t size) {
-    static constexpr char digits[] = "0123456789abcdef";
-    std::string result;
-    result.reserve(size * 2);
-    for (size_t i = 0; i < size; ++i) {
-        result.push_back(digits[bytes[i] >> 4]);
-        result.push_back(digits[bytes[i] & 0x0F]);
-    }
-    return result;
+    return first_css_input::hex(bytes, size);
 }
 
 FirstCssContextInput read_first_css_context_input(const char* path) {
@@ -3430,53 +3417,8 @@ FirstCssContextInput read_first_css_context_input(const char* path) {
     if (!input) throw std::runtime_error("Cannot open Stadium diagnostic input bundle");
     const std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(input)),
                                      std::istreambuf_iterator<char>());
-    check(bytes.size() == kFirstCssInputBytes,
-          "Stadium diagnostic input bundle has an unexpected exact length");
-    check(std::memcmp(bytes.data(), "STC1INPT", 8) == 0 &&
-              first_css_be32(bytes.data() + 8) == 1,
-          "Stadium diagnostic input bundle magic/version differs");
-    static constexpr uint8_t expected_stream_sha[32] = {
-        0x36,0x1e,0x8c,0x11,0x08,0xcc,0x2d,0x02,
-        0xba,0x94,0xd1,0xf3,0xb3,0xbe,0x96,0x12,
-        0xa8,0x0d,0x02,0x27,0x67,0x24,0x45,0xcd,
-        0x4a,0x2b,0x0e,0x21,0x19,0x91,0x77,0x78
-    };
-    check(std::equal(std::begin(expected_stream_sha), std::end(expected_stream_sha),
-                     bytes.begin() + 12),
-          "Stadium diagnostic input source identity is not the retained v6 observer");
-    check(first_css_be32(bytes.data() + 44) == kFirstCssEntrySequence &&
-              first_css_be32(bytes.data() + 48) == kFirstCssReturnSequence,
-          "Stadium diagnostic input source sequence identities differ");
-
-    FirstCssContextInput result;
-    result.source_sha256 = first_css_hex(bytes.data() + 12, 32);
-    size_t offset = kFirstCssInputHeaderBytes;
-    result.seed = first_css_be32(bytes.data() + offset);
-    offset += 4;
-    std::copy_n(bytes.data() + offset, result.pad.size(), result.pad.begin());
-    offset += result.pad.size();
-    std::copy_n(bytes.data() + offset, result.css.size(), result.css.begin());
-    offset += result.css.size();
-    std::copy_n(bytes.data() + offset, result.ko.size(), result.ko.begin());
-    offset += result.ko.size();
-    std::copy_n(bytes.data() + offset, result.rules.size(), result.rules.begin());
-    offset += result.rules.size();
-    std::copy_n(bytes.data() + offset, result.save.size(), result.save.begin());
-    offset += result.save.size();
-    check(offset == bytes.size(), "Stadium diagnostic input bundle has trailing bytes");
-    check(result.css[2] == VS_MELEE && result.css[3] == 0 &&
-              first_css_be32(result.css.data() + 4) == kFirstCssObserverKoAddress &&
-              std::all_of(result.css.begin() + 0x48,
-                          result.css.begin() + 0x6C,
-                          [](uint8_t value) { return value == 0; }),
-          "Stadium diagnostic input has an invalid initial owner or callback region");
-    return result;
+    return first_css_input::decode_context(bytes.data(), bytes.size());
 }
-
-struct FirstCssConsumedPadInput {
-    std::array<uint8_t, 4 * 11> ports{};
-    std::string source_sha256;
-};
 
 FirstCssConsumedPadInput read_first_css_consumed_pad_input(
     const char* path, const std::string& expected_source_sha256) {
@@ -3485,100 +3427,13 @@ FirstCssConsumedPadInput read_first_css_consumed_pad_input(
         "Cannot open exact first-CSS consumed PAD input bundle");
     const std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(input)),
                                      std::istreambuf_iterator<char>());
-    check(bytes.size() == kFirstCssConsumedPadBytes,
-          "First-CSS consumed PAD bundle has an unexpected exact length");
-    check(std::memcmp(bytes.data(), "STC1PAD1", 8) == 0 &&
-              first_css_be32(bytes.data() + 8) == 1,
-          "First-CSS consumed PAD bundle magic/version differs");
-    check(first_css_be32(bytes.data() + 44) == kFirstCssPadConsumeSequence &&
-              first_css_be32(bytes.data() + 48) == kFirstCssSourceTickSequence,
-          "First-CSS consumed PAD source sequence identities differ");
-    FirstCssConsumedPadInput result;
-    result.source_sha256 = first_css_hex(bytes.data() + 12, 32);
-    check(result.source_sha256 == expected_source_sha256,
-          "First-CSS consumed PAD and context bundles name different source streams");
-    std::copy_n(bytes.data() + kFirstCssConsumedPadHeaderBytes,
-                result.ports.size(), result.ports.begin());
-    return result;
+    return first_css_input::decode_consumed_pad(
+        bytes.data(), bytes.size(), expected_source_sha256);
 }
 
 void decode_first_css_consumed_pad_input(const FirstCssConsumedPadInput& input,
                                           PADStatus (&ports)[4]) {
-    for (unsigned index = 0; index < 4; ++index) {
-        const uint8_t* raw = input.ports.data() + index * 11;
-        ports[index].button = static_cast<uint16_t>(
-            (uint16_t(raw[0]) << 8) | uint16_t(raw[1]));
-        ports[index].stickX = static_cast<int8_t>(raw[2]);
-        ports[index].stickY = static_cast<int8_t>(raw[3]);
-        ports[index].substickX = static_cast<int8_t>(raw[4]);
-        ports[index].substickY = static_cast<int8_t>(raw[5]);
-        ports[index].triggerLeft = raw[6];
-        ports[index].triggerRight = raw[7];
-        ports[index].analogA = raw[8];
-        ports[index].analogB = raw[9];
-        ports[index].err = static_cast<int8_t>(raw[10]);
-    }
-}
-
-void write_first_css_player(std::ostream& out, const PlayerInitData& p) {
-    const unsigned flags_c = (unsigned(p.rumble_enabled) << 7) |
-        (unsigned(p.xC_b1) << 6) | (unsigned(p.xC_b2) << 5) |
-        (unsigned(p.xC_b3) << 4) | (unsigned(p.vs_invisible) << 3) |
-        (unsigned(p.xC_b5) << 2) | (unsigned(p.xC_b6) << 1) |
-        unsigned(p.xC_b7);
-    const unsigned flags_d = (unsigned(p.xD_b0) << 7) |
-        (unsigned(p.xD_b1) << 6) | (unsigned(p.xD_b2) << 5) |
-        (unsigned(p.xD_b3) << 4) | (unsigned(p.xD_b4) << 3) |
-        (unsigned(p.xD_b5) << 2) | (unsigned(p.xD_b6) << 1) |
-        unsigned(p.xD_b7);
-    out << "{\"ckind\":" << int(p.ckind)
-        << ",\"slot_type\":" << unsigned(p.slot_type)
-        << ",\"stocks\":" << int(p.stocks)
-        << ",\"color\":" << unsigned(p.color)
-        << ",\"slot\":" << unsigned(p.slot)
-        << ",\"spawn\":" << int(p.x5)
-        << ",\"spawn_direction\":" << int(p.spawn_dir)
-        << ",\"sub_color\":" << unsigned(p.sub_color)
-        << ",\"handicap\":" << int(p.handicap)
-        << ",\"team\":" << unsigned(p.team)
-        << ",\"nametag\":" << unsigned(p.nametag)
-        << ",\"xB\":" << unsigned(p.xB)
-        << ",\"flags_c\":" << flags_c << ",\"flags_d\":" << flags_d
-        << ",\"cpu_kind\":" << unsigned(p.cpu_kind)
-        << ",\"cpu_level\":" << unsigned(p.cpu_level)
-        << ",\"damage_10\":" << p.x10 << ",\"damage_12\":" << p.x12
-        << ",\"hp\":" << p.hp
-        << ",\"attack_ratio_bits\":\""
-        << hex32(std::bit_cast<uint32_t>(p.attack_ratio))
-        << "\",\"defense_ratio_bits\":\""
-        << hex32(std::bit_cast<uint32_t>(p.defense_ratio))
-        << "\",\"model_scale_bits\":\""
-        << hex32(std::bit_cast<uint32_t>(p.model_scale)) << "\"}";
-}
-
-void write_first_css_start(std::ostream& out, const StartMeleeData& start) {
-    out << "{\"rules\":";
-    write_source_rules(out, start.rules);
-    out << ",\"players\":[";
-    for (unsigned i = 0; i < GM_MAX_PLAYERS; ++i) {
-        if (i) out << ',';
-        write_first_css_player(out, start.players[i]);
-    }
-    out << "]}";
-}
-
-void write_first_css_vs_mode(std::ostream& out, const VsModeData& mode) {
-    out << "{\"loser\":" << int(mode.loser)
-        << ",\"ordered_stage_index\":" << int(mode.ordered_stage_index)
-        << ",\"winner\":" << int(mode.winner)
-        << ",\"unk_0x3\":" << unsigned(mode.unk_0x3)
-        << ",\"unk_0x4\":" << unsigned(mode.unk_0x4)
-        << ",\"unk_0x5\":" << unsigned(mode.unk_0x5)
-        << ",\"unk_0x6\":" << unsigned(mode.unk_0x6)
-        << ",\"unk_0x7\":" << unsigned(mode.unk_0x7)
-        << ",\"start\":";
-    write_first_css_start(out, mode.start);
-    out << '}';
+    first_css_input::decode_consumed_pad_statuses(input, ports);
 }
 
 std::string first_css_json_quote(const std::string& value) {
@@ -3799,13 +3654,11 @@ void run_stadium_first_css_context(const melee_web::RuntimeFiles& files,
                   << first_css_hex(snapshot.pad_state, sizeof(snapshot.pad_state))
                   << "\",\"ko_counts_hex\":\""
                   << first_css_hex(snapshot.ko_counts, sizeof(snapshot.ko_counts))
-                  << "\",\"css\":{\"unk_0x0\":" << snapshot.css.unk_0x0
-                  << ",\"match_type\":" << unsigned(snapshot.css.match_type)
-                  << ",\"pending_scene_change\":"
-                  << unsigned(snapshot.css.pending_scene_change)
-                  << ",\"ko_counts_owner\":\"source_vs_owned\",\"vs\":";
-        write_first_css_vs_mode(std::cout, snapshot.css.vs);
-        std::cout << "},\"source_ticks\":0,\"draws\":0,"
+                  << "\",\"css\":";
+        melee_web::stadium_first_css_diagnostic::write_css(
+            std::cout, snapshot.css, "source_vs_owned");
+        std::cout << ",\"abi_padding_excluded\":[\"pad_x5C\"],"
+                  << "\"source_ticks\":0,\"draws\":0,"
                   << "\"full_session_comparison\":false,\"cleanup\":\"pending\"}\n"
                   << std::flush;
 

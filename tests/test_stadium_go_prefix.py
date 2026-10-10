@@ -52,11 +52,18 @@ from stadium_go_prefix import (  # noqa: E402
     FIRST_CSS_CONSUMED_PAD_BYTES,
     FIRST_CSS_CONSUMED_PAD_MAGIC,
     FIRST_CSS_CONSUMED_PAD_VERSION,
+    FIRST_CSS_DRAW_ENTER_PC,
+    FIRST_CSS_DRAW_ENTER_SEQUENCE,
+    FIRST_CSS_DRAW_RETURN_PC,
+    FIRST_CSS_DRAW_RETURN_SEQUENCE,
+    FIRST_CSS_DRAW_SLICES,
     SCENE_ROUTING_ADDRESS,
+    _extract_first_css_first_draw_rows,
     _extract_first_css_consumed_tick_rows,
     _extract_first_css_context_rows,
     decode_first_css_consumed_pad_bundle,
     decode_first_css_context_bundle,
+    extract_stadium_first_css_first_draw,
     extract_stadium_first_css_consumed_tick,
     extract_stadium_first_css_context,
     _check_boundary_contract,
@@ -943,9 +950,9 @@ class StadiumFirstCssContextTests(OwnedWorkspaceTests):
         self.assertEqual(player["xB"], 0xA6)
 
     def test_first_css_cpp_source_pin_matches_exact_python_digest(self):
-        source = (ROOT / "tests/native_menu_host_trace.cpp").read_text()
+        source = (ROOT / "src/stadium_first_css_diagnostic_input.hpp").read_text()
         match = re.search(
-            r"expected_stream_sha\[32\]\s*=\s*\{(.*?)\};", source, re.S)
+            r"kSourceSha256\s*=\s*\{(.*?)\};", source, re.S)
         self.assertIsNotNone(match)
         raw = bytes(int(value, 16) for value in
                     re.findall(r"0x([0-9a-fA-F]{2})", match.group(1)))
@@ -1184,6 +1191,144 @@ class StadiumFirstCssContextTests(OwnedWorkspaceTests):
             _extract_first_css_consumed_tick_rows(
                 consumes, ticks, FIRST_CSS_STREAM_SHA256)
 
+    @classmethod
+    def _first_draw_rows(cls):
+        _, returned = cls._rows()
+        pad = next(item for item in returned["payload"]["slices"]
+                   if item["tag"] == 21)
+        slices = {
+            2: bytes(0x0C),
+            17: bytes.fromhex("020201000000"),
+            19: FIRST_CSS_RNG_VALUE_ADDRESS.to_bytes(4, "big"),
+            20: bytes.fromhex("312151c3"),
+            21: bytes.fromhex(pad["hex"]),
+            30: bytes.fromhex("00000001"),
+            36: bytes.fromhex("07ff"),
+            37: bytes.fromhex("07ff"),
+            40: b"\x08",
+        }
+
+        def make(sequence, boundary, pc):
+            payload_slices = [
+                cls._source_slice(tag, size, slices[tag], address)
+                for (tag, _flags), (address, size) in FIRST_CSS_DRAW_SLICES.items()
+            ]
+            payload_slices.sort(key=lambda item: item["tag"])
+            return {
+                "event": "boundary", "seq": sequence, "pc": pc,
+                "source_tick": 1,
+                "payload": {"boundary": boundary, "pc": pc,
+                    "source_tick": 1, "draw_ordinal": 0,
+                    "slices": payload_slices},
+            }
+        return ([make(FIRST_CSS_DRAW_ENTER_SEQUENCE, "draw_enter",
+                      FIRST_CSS_DRAW_ENTER_PC)],
+                [make(FIRST_CSS_DRAW_RETURN_SEQUENCE, "draw_return",
+                      FIRST_CSS_DRAW_RETURN_PC)])
+
+    def test_first_css_first_draw_reduces_exact_original_boundaries(self):
+        enter, returned = self._first_draw_rows()
+        result = _extract_first_css_first_draw_rows(
+            enter, returned, FIRST_CSS_STREAM_SHA256)
+        self.assertEqual(result["provenance"]["draw_enter_sequence"], 836)
+        self.assertEqual(result["provenance"]["draw_return_sequence"], 837)
+        self.assertEqual(result["expected_draw_enter"]["boundary"], "draw_enter")
+        self.assertEqual(result["expected_draw_return"]["boundary"], "draw_return")
+        self.assertEqual(result["expected_draw_return"]["scene_frame"], 1)
+        self.assertEqual(result["expected_draw_return"]["scene_kind"], 8)
+        self.assertEqual(result["expected_draw_return"]["random_seed_hex"], "312151c3")
+        self.assertEqual(result["expected_draw_return"]["scene_routing_raw_hex"],
+                         "020201000000")
+        self.assertEqual(result["comparison_fields"], [
+            "source_tick", "draw_ordinal", "pad_state_hex", "random_seed_hex",
+            "scene_frame", "scene_kind", "scene_routing_getters"])
+        self.assertEqual(result["unpaired_routing_fields"],
+                         ["pending_mode", "next_state_id"])
+        self.assertEqual(result["provenance"]["scheduler_end_source_tick_value"], 0)
+        self.assertEqual(result["provenance"]["draw_source_tick_value"], 1)
+        self.assertEqual(result["draw_return_observation_phase"],
+                         "after source host draw, before Aurora end-frame")
+        self.assertEqual(len(result["expected_draw_return"]["pad_state_hex"]), 822 * 2)
+        self.assertEqual([(row["tag"], row["flags"], row["size"])
+                          for row in result["expected_draw_return"]["source_slice_inventory"]],
+                         [(2, 0, 12), (17, 0, 6), (19, 0, 4), (20, 0, 4),
+                          (21, 0, 0x358), (30, 0, 4), (36, 0, 2),
+                          (37, 0, 2), (40, 0, 1)])
+        self.assertEqual(result["excluded_source_tags"], [36, 37, 2])
+        self.assertFalse(result["whole_session_equivalent"])
+        self.assertFalse(result["source_admission"])
+
+    def test_first_css_first_draw_rejects_boundary_and_owner_mutations(self):
+        enter, returned = self._first_draw_rows()
+        with self.assertRaisesRegex(StadiumGoPrefixError, "one exact enter/return"):
+            _extract_first_css_first_draw_rows(enter + enter, returned,
+                                               FIRST_CSS_STREAM_SHA256)
+        cases = []
+        enter, returned = self._first_draw_rows()
+        changed = json.loads(json.dumps(enter))
+        changed[0]["seq"] += 1
+        cases.append((changed, returned, "wrong sequence, phase, PC, tick or ordinal"))
+        enter, returned = self._first_draw_rows()
+        changed = json.loads(json.dumps(returned))
+        changed[0]["payload"]["pc"] += 4
+        changed[0]["pc"] += 4
+        cases.append((enter, changed, "wrong sequence, phase, PC, tick or ordinal"))
+        enter, returned = self._first_draw_rows()
+        changed = json.loads(json.dumps(returned))
+        changed[0]["payload"]["slices"].pop()
+        cases.append((enter, changed, "unexpected exact slice inventory"))
+        enter, returned = self._first_draw_rows()
+        changed = json.loads(json.dumps(returned))
+        changed[0]["payload"]["slices"][0]["address"] += 4
+        cases.append((enter, changed, "escaped its pinned source address"))
+        enter, returned = self._first_draw_rows()
+        changed = json.loads(json.dumps(returned))
+        frame = next(item for item in changed[0]["payload"]["slices"]
+                     if item["tag"] == 30)
+        frame["hex"] = "00000002"
+        cases.append((enter, changed, "not source scene frame one"))
+        enter, returned = self._first_draw_rows()
+        changed = json.loads(json.dumps(returned))
+        route = next(item for item in changed[0]["payload"]["slices"]
+                     if item["tag"] == 17)
+        route["hex"] = "020201000001"
+        cases.append((enter, changed, "routing differs"))
+        enter, returned = self._first_draw_rows()
+        changed = json.loads(json.dumps(returned))
+        pad = next(item for item in changed[0]["payload"]["slices"]
+                   if item["tag"] == 21)
+        pad["size"] -= 1
+        pad["hex"] = pad["hex"][:-2]
+        cases.append((enter, changed, "unexpected byte length"))
+        enter, returned = self._first_draw_rows()
+        changed = json.loads(json.dumps(returned))
+        seed_pointer = next(item for item in changed[0]["payload"]["slices"]
+                            if item["tag"] == 19)
+        seed_pointer["hex"] = "804d5f94"
+        cases.append((enter, changed, "RNG pointer does not own"))
+        enter, returned = self._first_draw_rows()
+        changed = json.loads(json.dumps(returned))
+        changed[0]["payload"]["source_tick"] = 2
+        cases.append((enter, changed, "wrong sequence, phase, PC, tick or ordinal"))
+        for bad_enter, bad_return, message in cases:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(StadiumGoPrefixError, message):
+                    _extract_first_css_first_draw_rows(
+                        bad_enter, bad_return, FIRST_CSS_STREAM_SHA256)
+
+        enter, returned = self._first_draw_rows()
+        changed = json.loads(json.dumps(returned))
+        seed = next(item for item in changed[0]["payload"]["slices"]
+                    if item["tag"] == 20)
+        seed["hex"] = "312151c4"
+        with self.assertRaisesRegex(StadiumGoPrefixError,
+                                    "tracked state changed during its original source draw"):
+            _extract_first_css_first_draw_rows(enter, changed,
+                                               FIRST_CSS_STREAM_SHA256)
+        enter, returned = self._first_draw_rows()
+        with self.assertRaisesRegex(StadiumGoPrefixError, "retained v6 observer"):
+            _extract_first_css_first_draw_rows(enter, returned, "c" * 64)
+
     def test_retained_first_css_raw_is_optional_but_strict_when_configured(self):
         source_value = os.environ.get(FIRST_CSS_CONTEXT_ENV)
         if source_value is None:
@@ -1210,6 +1355,14 @@ class StadiumFirstCssContextTests(OwnedWorkspaceTests):
                          result["input_bundle"]["sha256"])
         self.assertEqual(json.loads(expected_path.read_text())["expected_return"],
                          result["expected_return"])
+        draw_result = extract_stadium_first_css_first_draw(
+            source, source.with_name("observer-status.json"))
+        self.assertEqual(draw_result["expected_draw_enter"]["sequence"], 836)
+        self.assertEqual(draw_result["expected_draw_return"]["sequence"], 837)
+        self.assertEqual(draw_result["expected_draw_return"]["scene_frame"], 1)
+        self.assertEqual(draw_result["expected_draw_return"]["scene_kind"], 8)
+        (self.scratch / "first-css-draw-expected.json").write_text(
+            json.dumps(draw_result, indent=2, sort_keys=True) + "\n")
         tick_result = extract_stadium_first_css_consumed_tick(
             source, source.with_name("observer-status.json"))
         tick_bundle = tick_result["input_bundle_bytes"]

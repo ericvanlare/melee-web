@@ -18,11 +18,17 @@ import {createCssSssTransitionCapture, CSS_SSS_TRANSITION_LIMITS,
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const {values} = parseArgs({options: Object.fromEntries(
-  ['build', 'disc', 'disc-sha256', 'out', 'playwright', 'preflight', 'source-revision']
+  ['build', 'disc', 'disc-sha256', 'out', 'playwright', 'preflight', 'source-revision',
+    'first-css-context', 'first-css-consumed-pad', 'first-css-return-expected',
+    'first-css-tick-expected', 'first-css-draw-expected']
     .map(name => [name, {type: 'string'}]).concat([
       ['css-sss-reducer', {type: 'boolean', default: false}],
+      ['first-css-browser-draw', {type: 'boolean', default: false}],
     ])), strict: true});
 const cssSssReducer = values['css-sss-reducer'];
+const firstCssBrowserDraw = values['first-css-browser-draw'];
+if (cssSssReducer && firstCssBrowserDraw)
+  throw Error('Choose one private C1a diagnostic route');
 const LIMITS = Object.freeze({
   serverStartMs: 10000,
   browserLaunchMs: 30000,
@@ -89,7 +95,8 @@ const report = {
   browser: null,
   local_http_artifacts: {count: 0, before: null, after: null, unchanged: false},
   scenario: {
-    route_mode: values['css-sss-reducer'] ? 'css-sss-reducer' : 'full-c1a',
+    route_mode: firstCssBrowserDraw ? 'first-css-browser-draw' :
+      values['css-sss-reducer'] ? 'css-sss-reducer' : 'full-c1a',
     armed_before_css_entry: false,
     controls: null,
     input_recipe: null,
@@ -183,6 +190,72 @@ async function waitForServer(baseUrl) {
     await sleep(100);
   }
   throw Error(`Local server did not become ready: ${errorText(lastError)}`);
+}
+
+let firstCssBrowserDrawInputs = null;
+async function loadFirstCssBrowserDrawInputs() {
+  if (!firstCssBrowserDraw) return null;
+  const specs = {
+    context_bundle: values['first-css-context'],
+    consumed_pad_bundle: values['first-css-consumed-pad'],
+    return_expected: values['first-css-return-expected'],
+    tick_expected: values['first-css-tick-expected'],
+    draw_expected: values['first-css-draw-expected'],
+  };
+  const frozen = preflight.first_css_browser_draw?.inputs;
+  assert.ok(frozen && typeof frozen === 'object',
+    'First-CSS browser-draw preflight omitted exact external input identities');
+  const bytes = {};
+  for (const [name, fileValue] of Object.entries(specs)) {
+    assert.ok(fileValue, `First-CSS browser-draw requires --${name.replaceAll('_', '-')}`);
+    const file = path.resolve(fileValue);
+    const binding = frozen[name];
+    assert.ok(binding && typeof binding === 'object', `Preflight omitted ${name}`);
+    assert.equal(path.resolve(binding.path), file, `Preflight path differs for ${name}`);
+    const data = await fs.readFile(file);
+    assert.equal(data.byteLength, binding.bytes, `Preflight byte count differs for ${name}`);
+    assert.equal(digest(data), binding.sha256, `Preflight hash differs for ${name}`);
+    bytes[name] = data;
+  }
+  const contextExpected = JSON.parse(bytes.return_expected.toString('utf8'));
+  const tickExpected = JSON.parse(bytes.tick_expected.toString('utf8'));
+  const drawExpected = JSON.parse(bytes.draw_expected.toString('utf8'));
+  assert.equal(contextExpected.schema, 'melee-web-stadium-first-css-context-diagnostic');
+  assert.equal(tickExpected.schema, 'melee-web-stadium-first-css-consumed-tick-diagnostic');
+  assert.equal(drawExpected.schema, 'melee-web-stadium-first-css-first-draw-diagnostic');
+  assert.equal(contextExpected.provenance.stream_bytes, 4397889);
+  assert.equal(contextExpected.provenance.stream_sha256,
+    '361e8c1108cc2d02ba94d1f3b3be9612a80d0227672445cd4a2b0e2119917778');
+  assert.equal(bytes.context_bundle.byteLength, contextExpected.input_bundle.bytes);
+  assert.equal(digest(bytes.context_bundle), contextExpected.input_bundle.sha256);
+  assert.equal(bytes.context_bundle.subarray(0, 8).toString('ascii'), 'STC1INPT');
+  assert.equal(bytes.context_bundle.readUInt32BE(8), 1);
+  assert.equal(bytes.context_bundle.subarray(12, 44).toString('hex'),
+    contextExpected.provenance.stream_sha256);
+  assert.equal(bytes.context_bundle.readUInt32BE(44), 704);
+  assert.equal(bytes.context_bundle.readUInt32BE(48), 833);
+  assert.equal(bytes.consumed_pad_bundle.byteLength, tickExpected.input_bundle.bytes);
+  assert.equal(digest(bytes.consumed_pad_bundle), tickExpected.input_bundle.sha256);
+  assert.equal(bytes.consumed_pad_bundle.subarray(0, 8).toString('ascii'), 'STC1PAD1');
+  assert.equal(bytes.consumed_pad_bundle.subarray(12, 44).toString('hex'),
+    tickExpected.provenance.stream_sha256);
+  assert.equal(tickExpected.provenance.stream_sha256,
+    contextExpected.provenance.stream_sha256);
+  assert.equal(bytes.consumed_pad_bundle.readUInt32BE(44), 834);
+  assert.equal(bytes.consumed_pad_bundle.readUInt32BE(48), 835);
+  assert.equal(tickExpected.expected_post_tick.source_tick_sequence, 835);
+  assert.equal(drawExpected.provenance.stream_sha256,
+    contextExpected.provenance.stream_sha256);
+  assert.equal(drawExpected.provenance.source_tick_sequence, 835);
+  assert.equal(drawExpected.provenance.draw_enter_sequence, 836);
+  assert.equal(drawExpected.provenance.draw_return_sequence, 837);
+  assert.equal(contextExpected.expected_return.scene_kind, 8);
+  assert.deepEqual(drawExpected.comparison_fields, [
+    'source_tick', 'draw_ordinal', 'pad_state_hex', 'random_seed_hex',
+    'scene_frame', 'scene_kind', 'scene_routing_getters']);
+  return {bytes, contextExpected, tickExpected, drawExpected,
+    bundle_hashes: Object.fromEntries(Object.entries(bytes).map(([name, data]) =>
+      [name, {bytes: data.byteLength, sha256: digest(data)}]))};
 }
 
 async function buildArtifactInventory(baseUrl, names) {
@@ -286,6 +359,243 @@ async function observeCssInputFrame(label, operationDeadline = deadline) {
       runtime_error: document.querySelector('#status')?.dataset.runtimeError || null,
       hidden: document.hidden, focused: document.hasFocus(), css, input, observer_error: observerError});
   }))), operationTimeout, label);
+}
+
+function assertFirstCssBrowserEntry(observation, expected) {
+  assert.ok(observation?.entry, 'First-CSS browser entry was not captured');
+  assert.equal(observation.source_stream_sha256, expected.provenance.stream_sha256);
+  const actual = observation.entry;
+  const wanted = expected.expected_return;
+  assert.equal(actual.source_scene, 1, 'Native first-CSS return is not the original CSS scene');
+  assert.equal(actual.scene_kind, wanted.scene_kind);
+  assert.equal(actual.random_seed_hex, wanted.random_seed_hex);
+  assert.equal(actual.pad_state_hex, wanted.pad_state_hex);
+  assert.equal(actual.ko_counts_hex, wanted.ko_counts_hex);
+  const actualCss = structuredClone(actual.css);
+  const wantedCss = structuredClone(wanted.css);
+  assert.ok(actualCss?.vs?.start?.rules &&
+    Object.prototype.hasOwnProperty.call(actualCss.vs.start.rules, 'pad_x5C'),
+  'Native first-CSS typed rules omitted the explicit ABI-padding field');
+  delete actualCss.vs.start.rules.pad_x5C;
+  for (const field of ['on_unpause_override', 'on_pause_override',
+    'check_for_pauser_override', 'on_match_start', 'on_frame_start',
+    'on_frame_end', 'on_match_end', 'x54_pointer', 'x58_pointer']) {
+    assert.equal(actualCss.vs.start.rules[field], 'null',
+      `Returned source pointer field is not null: ${field}`);
+    actualCss.vs.start.rules[field] = null;
+  }
+  assert.deepEqual(actualCss, wantedCss,
+    'Full typed first-CSS return differs from the captured original CSS return');
+  assert.deepEqual(actual.abi_padding_excluded, ['pad_x5C']);
+}
+
+function assertFirstCssBrowserTick(observation, expected) {
+  const actual = observation?.tick;
+  const wanted = expected.expected_post_tick;
+  assert.ok(actual, 'The one native first-CSS tick was not captured');
+  for (const key of ['source_stream_sha256', 'consumed_pad_sequence', 'source_tick_sequence',
+    'source_tick_value', 'source_draw_ordinal', 'original_source_frame',
+    'phase_relation', 'source_scene_kind', 'host_source_scene', 'host_menu_phase',
+    'native_post_host_tick_frame', 'random_seed_hex', 'pad_state_hex'])
+    assert.equal(actual[key], wanted[key], `First-CSS tick differs at ${key}`);
+  assert.deepEqual(actual.scene_routing_getters, wanted.scene_routing_getters,
+    'First-CSS tick scene-routing getters differ');
+  assert.equal(actual.host_tick_calls, 1);
+  assert.equal(actual.host_tick_result, 1);
+  assert.equal(actual.world_generation_stable, true);
+  assert.equal(actual.source_scene_stable, true);
+  assert.equal(actual.seed_owner_stable, true);
+  assert.deepEqual(actual.routing_raw_fields_excluded, ['pending_mode', 'next_state_id']);
+}
+
+function assertFirstCssBrowserDraw(observation, expected) {
+  const actual = observation?.draw;
+  const wanted = expected.expected_draw_return;
+  assert.ok(actual, 'The original first-CSS host draw return was not captured');
+  for (const key of expected.comparison_fields)
+    assert.deepEqual(actual[key], wanted[key], `First-CSS browser draw differs at ${key}`);
+  assert.equal(actual.boundary, 'browser_host_draw_return');
+  assert.equal(actual.observation_phase,
+    'after source host draw, before Aurora end-frame');
+  assert.equal(actual.host_draw_calls, 1);
+  assert.equal(actual.aurora_begin_calls, 1);
+  assert.equal(actual.source_scene, 1);
+  assert.equal(actual.menu_phase, 1);
+  assert.equal(actual.scene_kind, 8);
+  assert.equal(actual.world_generation_stable, true);
+  assert.equal(actual.scene_owner_stable, true);
+  assert.equal(actual.seed_owner_stable, true);
+  assert.equal(actual.world_generation, observation.tick.world_generation);
+}
+
+async function readFirstCssBrowserDrawObservation() {
+  return page.evaluate(() => {
+    const module = globalThis.Module;
+    const observe = module?._melee_web_native_menu_stadium_first_css_draw_observe;
+    if (typeof observe !== 'function') throw Error('First-CSS browser-draw observer export is absent');
+    const pointer = observe();
+    return pointer ? {...JSON.parse(module.UTF8ToString(pointer)),
+      native_phase: module._melee_web_native_menu_phase(),
+      running: module._melee_web_native_menu_running()} : null;
+  });
+}
+
+async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
+  const arm = await timeout(page.evaluate(({contextBytes, consumedBytes}) => {
+    const module = globalThis.Module;
+    const armFunction = module?._melee_web_native_menu_stadium_first_css_draw_arm;
+    const observe = module?._melee_web_native_menu_stadium_first_css_draw_observe;
+    if (typeof armFunction !== 'function' || typeof observe !== 'function')
+      throw Error('Private first-CSS browser-draw exports are absent');
+    if (module._melee_web_native_menu_phase() !== 0 || module._melee_web_native_menu_running() !== 0)
+      throw Error('First-CSS bundles must be applied to the fresh, unentered VS owner');
+    const context = module._malloc(contextBytes.length);
+    const consumed = module._malloc(consumedBytes.length);
+    if (!context || !consumed) {
+      if (context) module._free(context);
+      if (consumed) module._free(consumed);
+      throw Error('First-CSS input bundle allocation failed');
+    }
+    try {
+      module.HEAPU8.set(contextBytes, context);
+      module.HEAPU8.set(consumedBytes, consumed);
+      const result = armFunction(context, contextBytes.length, consumed, consumedBytes.length);
+      if (result !== 1) {
+        const pointer = module._melee_web_native_menu_message();
+        throw Error(pointer ? module.UTF8ToString(pointer) : 'First-CSS source context arm was rejected');
+      }
+      return {result, phase: module._melee_web_native_menu_phase(),
+        running: module._melee_web_native_menu_running()};
+    } finally {
+      module._free(context);
+      module._free(consumed);
+    }
+  }, {contextBytes: [...firstCssBrowserDrawInputs.bytes.context_bundle],
+      consumedBytes: [...firstCssBrowserDrawInputs.bytes.consumed_pad_bundle]}),
+  Math.min(10000, remaining()), 'Arm retained first-CSS browser draw inputs');
+  assert.equal(arm.result, 1);
+  assert.equal(arm.phase, 0);
+  assert.equal(arm.running, 0);
+  report.scenario.armed_before_css_entry = true;
+  report.scenario.first_css_input_bundles = firstCssBrowserDrawInputs.bundle_hashes;
+
+  await timeout(driver.launch(1), Math.min(LIMITS.sourceTransitionMs, remaining()),
+    'Original CSS launch with source time held before the retained tick');
+  report.scenario.original_css_phase = await sourceSnapshot('Original first-CSS phase before retained tick');
+  assert.equal(report.scenario.original_css_phase.phase, 1);
+  assert.equal(report.scenario.original_css_phase.running, 1);
+  let observation = await timeout(readFirstCssBrowserDrawObservation(),
+    Math.min(5000, remaining()), 'Immediate first-CSS browser entry observation');
+  assert.equal(observation?.state, 'entered',
+    'First-CSS browser entry was not captured before a tick');
+  assert.equal(observation.native_phase, 1);
+  assert.equal(observation.running, 1);
+  assertFirstCssBrowserEntry(observation, firstCssBrowserDrawInputs.contextExpected);
+  assert.equal(observation.source_steps, 0);
+  assert.equal(observation.source_draws, 0);
+  assert.equal(observation.host_tick_calls, 0);
+  assert.equal(observation.host_draw_calls, 0);
+  report.scenario.first_css_browser_draw = observation;
+  await persistReport();
+
+  const kick = await timeout(page.evaluate(() => {
+    const module = globalThis.Module;
+    const kickFunction = module?._melee_web_native_menu_stadium_first_css_draw_kick;
+    if (typeof kickFunction !== 'function') throw Error('First-CSS one-shot kick export is absent');
+    const result = kickFunction();
+    if (result !== 1) {
+      const pointer = module._melee_web_native_menu_message();
+      throw Error(pointer ? module.UTF8ToString(pointer) : 'First-CSS one-shot kick was rejected');
+    }
+    return result;
+  }), Math.min(5000, remaining()), 'Release one retained CSS source tick');
+  assert.equal(kick, 1);
+  await timeout(page.waitForFunction(() => {
+    const module = globalThis.Module;
+    const pointer = module?._melee_web_native_menu_stadium_first_css_draw_observe?.();
+    if (!pointer) return false;
+    const state = JSON.parse(module.UTF8ToString(pointer)).state;
+    return state === 'complete' || state === 'failed';
+  }, null, {timeout: Math.min(60000, remaining())}),
+  Math.min(60000, remaining()), 'One native CSS tick and one browser source draw');
+  observation = await timeout(readFirstCssBrowserDrawObservation(),
+    Math.min(5000, remaining()), 'Final first-CSS browser draw observation');
+  report.scenario.first_css_browser_draw = observation;
+  await persistReport();
+  assert.equal(observation.state, 'complete',
+    `First-CSS browser draw stopped at ${observation.state}: ${observation.error || 'no detail'}`);
+  assertFirstCssBrowserEntry(observation, firstCssBrowserDrawInputs.contextExpected);
+  assertFirstCssBrowserTick(observation, firstCssBrowserDrawInputs.tickExpected);
+  assertFirstCssBrowserDraw(observation, firstCssBrowserDrawInputs.drawExpected);
+  assert.ok(Number.isSafeInteger(observation.source_callbacks_before_kick) &&
+      observation.source_callbacks_before_kick >= 0,
+    'First-CSS pre-kick callback count is not a nonnegative integer');
+  assert.equal(observation.source_steps, 1);
+  assert.equal(observation.source_draws, 1);
+  assert.equal(observation.host_tick_calls, 1);
+  assert.equal(observation.host_draw_calls, 1);
+  assert.equal(observation.aurora_begin_calls, 1);
+  assert.equal(observation.aurora_end_calls, 1);
+  assert.equal(observation.frame_end_returned, true);
+  assert.equal(observation.preparation_source_callbacks, 0);
+  assert.equal(observation.native_phase, 1);
+  assert.equal(observation.running, 0,
+    'Completed one-shot CSS draw did not stop the native source clock');
+  report.scenario.final_phase = observation.native_phase;
+  report.scenario.final_running = observation.running;
+  report.scenario.native_observation = observation;
+  report.scenario.native_message = report.scenario.original_css_phase.message;
+  report.scenario.native_diagnostics = report.scenario.original_css_phase.diagnostics;
+  report.scenario.gpu = await timeout(page.evaluate(async () => {
+    let adapter = null, failure = null;
+    try { adapter = await navigator.gpu?.requestAdapter(); }
+    catch (error) { failure = String(error); }
+    const info = adapter?.info ? {vendor: adapter.info.vendor || null,
+      architecture: adapter.info.architecture || null, device: adapter.info.device || null,
+      description: adapter.info.description || null} : null;
+    return {cross_origin_isolated: crossOriginIsolated === true, webgpu_api: !!navigator.gpu,
+      adapter_available: !!adapter, adapter_info: info, failure,
+      canvas: [Module.canvas?.width ?? null, Module.canvas?.height ?? null]};
+  }), Math.min(10000, remaining()), 'First-CSS browser WebGPU snapshot');
+  assert.equal(report.scenario.gpu.cross_origin_isolated, true);
+  assert.equal(report.scenario.gpu.adapter_available, true);
+  await saveScreenshot('stadium-first-css-browser-draw');
+  report.scenario.page_errors = pageErrors;
+  report.scenario.console_errors = consoleErrors;
+  assert.deepEqual(pageErrors, []);
+  assert.deepEqual(externalRequests, []);
+
+  report.cleanup.unload_attempted = true;
+  unloadAttempted = true;
+  await timeout(driver.unload(), LIMITS.unloadMs, 'First-CSS diagnostic native menu unload');
+  report.cleanup.unload_completed = true;
+  const afterUnload = await timeout(page.evaluate(() => {
+    const module = globalThis.Module;
+    const pointer = module._melee_web_native_menu_stadium_first_css_draw_observe?.();
+    return {phase: module._melee_web_native_menu_phase(), running: module._melee_web_native_menu_running(),
+      observation: pointer ? module.UTF8ToString(pointer) : null,
+      error: document.querySelector('#status')?.dataset.runtimeError || null,
+      import_enabled: !!document.querySelector('#disc') && !document.querySelector('#disc').disabled};
+  }), Math.min(5000, remaining()), 'First-CSS post-unload snapshot');
+  assert.equal(afterUnload.phase, 0);
+  assert.equal(afterUnload.running, 0);
+  assert.equal(afterUnload.observation, null);
+  assert.equal(afterUnload.error, null);
+  assert.equal(afterUnload.import_enabled, true);
+  report.cleanup.native_after_unload = afterUnload;
+  report.cleanup.observation_cleared = true;
+  await saveScreenshot('stadium-first-css-browser-draw-after-unload');
+  report.profile.after = summarizeStorage(await timeout(context.storageState(),
+    Math.min(5000, remaining()), 'First-CSS post-run browser profile snapshot'));
+  const after = await buildArtifactInventory(baseUrl, artifacts);
+  assertProducerArtifacts(after, artifacts, 'After first-CSS run');
+  report.local_http_artifacts.after = after;
+  report.local_http_artifacts.unchanged = JSON.stringify(before) === JSON.stringify(after);
+  assert.equal(report.local_http_artifacts.unchanged, true);
+  report.scenario.http_requests = [...requestRows, ...responseRows];
+  report.scenario.external_http_requests = externalRequests;
+  assert.deepEqual(consoleErrors, []);
+  report.result = 'pass';
 }
 
 async function runCssSssTransition({startKey, capture, routeName}) {
@@ -487,7 +797,10 @@ async function cleanupServer() {
 async function main() {
   assert.equal(build, expectedBuild, 'Only the isolated C1a diagnostic runtime may be served');
   assert.equal(preflight.schema, 'melee-web-stadium-c1a-browser-preflight-v1');
-  if (values['css-sss-reducer'])
+  if (firstCssBrowserDraw)
+    assert.equal(preflight.route_mode, 'first-css-browser-draw',
+      'First-CSS diagnostic command requires its exact frozen preflight route');
+  else if (values['css-sss-reducer'])
     assert.equal(preflight.route_mode, 'css-sss-reducer', 'Reducer command requires a frozen CSS-to-SSS preflight');
   else if (preflight.route_mode)
     assert.equal(preflight.route_mode, 'full-c1a', 'Full C1a command differs from its frozen preflight route');
@@ -514,6 +827,7 @@ async function main() {
     assert.equal(await hashFile(helperPath), preflight.reducer_helper.sha256,
       'Reducer acceptance helper bytes differ from the frozen preflight');
   }
+  firstCssBrowserDrawInputs = await loadFirstCssBrowserDrawInputs();
   assert.deepEqual(preflight.limits_ms, LIMITS, 'Runtime bounds differ from frozen preflight');
   assert.equal(LIMITS.captureWorkMs,
     preflight.owner_deadline.overall_timeout_ms - preflight.owner_deadline.cleanup_reserve_ms,
@@ -541,6 +855,8 @@ async function main() {
   const defaultJs = await fs.readFile(path.join(defaultBuild, 'gameplay_menu_browser.js'), 'utf8');
   assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_c1a_arm'), false,
     'Ordinary default runtime unexpectedly exports the private C1a arm gate');
+  assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_first_css_draw_arm'), false,
+    'Ordinary default runtime unexpectedly exports the private first-CSS diagnostic gate');
 
   const artifacts = JSON.parse(await fs.readFile(path.join(ROOT, 'tools/browser_build_artifacts.json'), 'utf8'));
   assert.equal(artifacts.length, 32, 'The checked-in browser artifact inventory changed; review the preflight');
@@ -674,6 +990,10 @@ async function main() {
   await page.locator('#controls-close').click();
   await driver.selectDisc(values.disc);
   await timeout(driver.waitForStart(), Math.min(LIMITS.discImportMs, remaining()), 'Disc import and native prep');
+  if (firstCssBrowserDraw) {
+    await runFirstCssBrowserDraw({baseUrl, artifacts, before});
+    return;
+  }
 
   const arm = await timeout(page.evaluate(() => {
     const module = globalThis.Module;
