@@ -477,7 +477,28 @@ class FinalPendingCssDrawHostTests(OwnedWorkspaceTests):
             _function(source, "int melee_web_menu_host_arm_final_pending_css_draw("),
             _function(source, "int melee_web_menu_host_draw_final_pending_css("),
         ]
-        c_source = PRELUDE + "\n".join(functions) + STUBS_AND_TESTS
+        # These SSS branches are unreachable in this CSS-only fixture. Keep
+        # their declarations local so composed SSS fixtures can reuse PRELUDE
+        # with the actual SSS types/functions instead of duplicate stubs.
+        prelude = PRELUDE.replace(
+            "typedef struct MeleeWebMenuHost MeleeWebMenuHost;",
+            """typedef struct {
+  int state; char error[160]; int draw_enter,draw_return;
+} MeleeWebMenuSssSequenceObservation;
+enum { MELEE_WEB_SSS_SAMPLE_DRAW_ENTER=2, MELEE_WEB_SSS_SAMPLE_DRAW_RETURN=3 };
+typedef struct MeleeWebMenuHost MeleeWebMenuHost;""")
+        prelude = prelude.replace(
+            "  int first_sss_pair_state;",
+            "  MeleeWebMenuSssSequenceObservation first_sss_draw,first_sss_prefix;\n"
+            "  int first_sss_sequence_operation,first_sss_prefix_host_token;\n"
+            "  int first_sss_pair_state;")
+        prelude += r"""
+static void sss_sequence_fail(MeleeWebMenuHost* h,int prefix,const char* text)
+{ (void)h;(void)prefix;(void)text;assert(0); }
+static int sss_sequence_capture(MeleeWebMenuHost* h,int prefix,int phase,void* sample)
+{ (void)h;(void)prefix;(void)phase;(void)sample;assert(0);return 0; }
+"""
+        c_source = prelude + "\n".join(functions) + STUBS_AND_TESTS
         cc = shlex.split(os.environ.get("CC", "cc"))
         workspace = self.new_workspace(ROOT, "first-css-final-host-")
         c_path = workspace / "host_control.c"
