@@ -21,6 +21,12 @@ inline constexpr size_t kContextBytes = kContextHeaderBytes + 4 + kPadBytes +
     kCssBytes + kKoBytes + kRulesBytes + kSaveBytes;
 inline constexpr size_t kConsumedPadHeaderBytes = 52;
 inline constexpr size_t kConsumedPadBytes = kConsumedPadHeaderBytes + 4 * 11;
+inline constexpr uint32_t kPostdrawFirstConsumeSequence = 839;
+inline constexpr uint32_t kPostdrawBatchCount = 148;
+inline constexpr size_t kPostdrawInputHeaderBytes = 52;
+inline constexpr size_t kPostdrawStatusesPerBatch = 4 * 11;
+inline constexpr size_t kPostdrawInputBytes = kPostdrawInputHeaderBytes +
+    kPostdrawBatchCount * kPostdrawStatusesPerBatch;
 inline constexpr uint32_t kEntrySequence = 704;
 inline constexpr uint32_t kReturnSequence = 833;
 inline constexpr uint32_t kPadConsumeSequence = 834;
@@ -65,6 +71,35 @@ struct ConsumedPadInput {
     std::array<uint8_t, 4 * 11> ports{};
     std::string source_sha256;
 };
+
+struct PostdrawInput {
+    std::array<uint8_t, kPostdrawBatchCount * kPostdrawStatusesPerBatch> statuses{};
+    std::string source_sha256;
+    uint32_t first_consume_sequence = 0;
+};
+
+inline void decode_postdraw_pad_statuses(const PostdrawInput& input,
+                                          uint32_t batch_index,
+                                          PADStatus (&ports)[4]) {
+    if (batch_index >= kPostdrawBatchCount)
+        throw std::runtime_error("First-CSS post-draw input batch index is out of range");
+    const uint8_t* const batch = input.statuses.data() +
+        batch_index * kPostdrawStatusesPerBatch;
+    for (size_t index = 0; index < 4; ++index) {
+        const uint8_t* raw = batch + index * 11;
+        ports[index].button = static_cast<uint16_t>(
+            (uint16_t(raw[0]) << 8) | uint16_t(raw[1]));
+        ports[index].stickX = static_cast<int8_t>(raw[2]);
+        ports[index].stickY = static_cast<int8_t>(raw[3]);
+        ports[index].substickX = static_cast<int8_t>(raw[4]);
+        ports[index].substickY = static_cast<int8_t>(raw[5]);
+        ports[index].triggerLeft = raw[6];
+        ports[index].triggerRight = raw[7];
+        ports[index].analogA = raw[8];
+        ports[index].analogB = raw[9];
+        ports[index].err = static_cast<int8_t>(raw[10]);
+    }
+}
 
 inline void decode_consumed_pad_statuses(const ConsumedPadInput& input,
                                          PADStatus (&ports)[4]) {
@@ -139,6 +174,32 @@ inline ConsumedPadInput decode_consumed_pad(const uint8_t* bytes, size_t size,
         throw std::runtime_error(
             "First-CSS consumed PAD and context bundles name different source streams");
     std::copy_n(bytes + kConsumedPadHeaderBytes, result.ports.size(), result.ports.begin());
+    return result;
+}
+
+inline PostdrawInput decode_postdraw_input(
+    const uint8_t* bytes, size_t size,
+    const std::string& expected_source_sha256) {
+    if (!bytes || size != kPostdrawInputBytes)
+        throw std::runtime_error(
+            "First-CSS post-draw input bundle has an unexpected exact length");
+    if (std::string(reinterpret_cast<const char*>(bytes), 8) != "STC1PSTR" ||
+        read_be32(bytes + 8) != 1)
+        throw std::runtime_error(
+            "First-CSS post-draw input bundle magic/version differs");
+    PostdrawInput result{};
+    result.source_sha256 = hex(bytes + 12, kSourceSha256.size());
+    result.first_consume_sequence = read_be32(bytes + 44);
+    if (result.source_sha256 != expected_source_sha256 ||
+        !std::equal(kSourceSha256.begin(), kSourceSha256.end(), bytes + 12))
+        throw std::runtime_error(
+            "First-CSS post-draw input and context bundles name different source streams");
+    if (result.first_consume_sequence != kPostdrawFirstConsumeSequence ||
+        read_be32(bytes + 48) != kPostdrawBatchCount)
+        throw std::runtime_error(
+            "First-CSS post-draw input source sequence/count differs");
+    std::copy_n(bytes + kPostdrawInputHeaderBytes, result.statuses.size(),
+                result.statuses.begin());
     return result;
 }
 

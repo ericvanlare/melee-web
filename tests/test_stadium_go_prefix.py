@@ -52,6 +52,12 @@ from stadium_go_prefix import (  # noqa: E402
     FIRST_CSS_CONSUMED_PAD_BYTES,
     FIRST_CSS_CONSUMED_PAD_MAGIC,
     FIRST_CSS_CONSUMED_PAD_VERSION,
+    FIRST_CSS_POSTDRAW_BATCH_COUNT,
+    FIRST_CSS_POSTDRAW_FIRST_CONSUME_SEQUENCE,
+    FIRST_CSS_POSTDRAW_INPUT_BYTES,
+    FIRST_CSS_POSTDRAW_INPUT_MAGIC,
+    FIRST_CSS_POSTDRAW_INPUT_VERSION,
+    FIRST_CSS_POSTDRAW_TICK_SLICES,
     FIRST_CSS_DRAW_ENTER_PC,
     FIRST_CSS_DRAW_ENTER_SEQUENCE,
     FIRST_CSS_DRAW_RETURN_PC,
@@ -62,10 +68,13 @@ from stadium_go_prefix import (  # noqa: E402
     _extract_first_css_consumed_tick_rows,
     _extract_first_css_context_rows,
     decode_first_css_consumed_pad_bundle,
+    decode_first_css_postdraw_input_bundle,
     decode_first_css_context_bundle,
     extract_stadium_first_css_first_draw,
     extract_stadium_first_css_consumed_tick,
     extract_stadium_first_css_context,
+    extract_stadium_first_css_postdraw_stream,
+    _extract_first_css_postdraw_stream_rows,
     _check_boundary_contract,
     _classify_stadium_sss_owner,
     _slice as _read_source_slice,
@@ -1329,6 +1338,148 @@ class StadiumFirstCssContextTests(OwnedWorkspaceTests):
         with self.assertRaisesRegex(StadiumGoPrefixError, "retained v6 observer"):
             _extract_first_css_first_draw_rows(enter, returned, "c" * 64)
 
+    @classmethod
+    def _postdraw_rows(cls):
+        consumes, _ = cls._consumed_tick_rows()
+        enter_rows, return_rows = cls._first_draw_rows()
+        _, returned = cls._rows()
+        pad = next(item for item in returned["payload"]["slices"]
+                   if item["tag"] == 21)
+        seed = bytes.fromhex("312151c3")
+        route = bytes.fromhex("020201000000")
+        queue = next(item for item in consumes[0]["payload"]["slices"]
+                     if item["tag"] == 2)
+        port_slot = next(item for item in consumes[0]["payload"]["slices"]
+                         if item["tag"] == 3)
+        all_consumes, all_ticks, all_enters, all_returns = [], [], [], []
+        for index in range(FIRST_CSS_POSTDRAW_BATCH_COUNT):
+            consume_sequence = FIRST_CSS_POSTDRAW_FIRST_CONSUME_SEQUENCE + index * 5
+            consume_payload = {
+                "boundary": "pad_consume", "pc": 0x80377584,
+                "source_tick": index + 1, "draw_ordinal": index + 1,
+                "gprs": [0] * 32,
+                "slices": [dict(queue), dict(port_slot)],
+            }
+            consume_payload["gprs"][6] = 2
+            consume_payload["gprs"][25] = 0x8046B168
+            all_consumes.append({"event": "boundary", "seq": consume_sequence,
+                                 "payload": consume_payload})
+
+            tick_values = {
+                2: bytes.fromhex(queue["hex"]),
+                17: route,
+                19: FIRST_CSS_RNG_VALUE_ADDRESS.to_bytes(4, "big"),
+                20: seed,
+                21: bytes.fromhex(pad["hex"]),
+                30: (index + 1).to_bytes(4, "big"),
+                36: bytes.fromhex("07ff"),
+                37: bytes.fromhex("07ff"),
+                40: b"\x08",
+            }
+            tick_payload_slices = []
+            for (tag, _flags), (address, size) in FIRST_CSS_POSTDRAW_TICK_SLICES.items():
+                tick_payload_slices.append(cls._source_slice(
+                    tag, size, tick_values[tag], address))
+            tick_payload = {"boundary": "source_tick", "pc": SOURCE_TICK_PC,
+                            "source_tick": index + 1, "draw_ordinal": index + 1,
+                            "slices": tick_payload_slices}
+            all_ticks.append({"event": "boundary", "seq": consume_sequence + 1,
+                              "payload": tick_payload})
+
+            for source_rows, boundary, pc, target in (
+                    (enter_rows, "draw_enter", FIRST_CSS_DRAW_ENTER_PC, all_enters),
+                    (return_rows, "draw_return", FIRST_CSS_DRAW_RETURN_PC, all_returns)):
+                row = json.loads(json.dumps(source_rows[0]))
+                row["seq"] = consume_sequence + (2 if boundary == "draw_enter" else 3)
+                row["pc"] = pc
+                row["payload"]["pc"] = pc
+                row["payload"]["source_tick"] = index + 2
+                row["payload"]["draw_ordinal"] = index + 1
+                frame = next(item for item in row["payload"]["slices"]
+                             if item["tag"] == 30)
+                frame["hex"] = (index + 2).to_bytes(4, "big").hex()
+                target.append(row)
+        return all_consumes, all_ticks, all_enters, all_returns
+
+    def test_first_css_postdraw_stream_is_fixed_input_only_and_paired(self):
+        consumes, ticks, enters, returns = self._postdraw_rows()
+        result = _extract_first_css_postdraw_stream_rows(
+            consumes, ticks, enters, returns, FIRST_CSS_STREAM_SHA256)
+        bundle = result["input_bundle_bytes"]
+        self.assertEqual(len(bundle), FIRST_CSS_POSTDRAW_INPUT_BYTES)
+        self.assertEqual(result["input_bundle"]["magic_hex"],
+                         FIRST_CSS_POSTDRAW_INPUT_MAGIC.hex())
+        self.assertEqual(result["input_bundle"]["version"],
+                         FIRST_CSS_POSTDRAW_INPUT_VERSION)
+        self.assertFalse(result["input_bundle"]["contains_expected_post_tick_state"])
+        self.assertFalse(result["input_bundle"]["contains_expected_draw_state"])
+        decoded = decode_first_css_postdraw_input_bundle(bundle)
+        self.assertEqual(decoded["source_stream_sha256"], FIRST_CSS_STREAM_SHA256)
+        self.assertEqual(decoded["first_consumed_pad_sequence"], 839)
+        self.assertEqual(decoded["sample_count"], 148)
+        self.assertEqual(len(decoded["port_status_hex_by_sample"]), 148)
+        self.assertFalse(decoded["contains_expected_post_tick_state"])
+        self.assertFalse(decoded["contains_expected_draw_state"])
+        pairs = result["expected_pairs"]
+        self.assertEqual(len(pairs), 148)
+        self.assertEqual([(pairs[0][key]) for key in (
+            "consumed_pad_sequence", "source_tick_sequence", "draw_enter_sequence",
+            "draw_return_sequence")], [839, 840, 841, 842])
+        self.assertEqual([pairs[-1][key] for key in (
+            "consumed_pad_sequence", "source_tick_sequence", "draw_enter_sequence",
+            "draw_return_sequence")], [1574, 1575, 1576, 1577])
+        self.assertEqual(result["provenance"]["source_batch_count"], 148)
+        self.assertFalse(result["whole_session_equivalent"])
+        self.assertFalse(result["source_admission"])
+
+    def test_first_css_postdraw_stream_rejects_sequence_owner_and_pair_changes(self):
+        rows = self._postdraw_rows()
+        cases = []
+        bad = [list(group) for group in rows]
+        bad[0].pop()
+        cases.append((bad, "exactly 148 paired source batches"))
+        rows = self._postdraw_rows()
+        bad = [json.loads(json.dumps(group)) for group in rows]
+        bad[1][7]["seq"] += 1
+        cases.append((bad, "sequence/phase differs"))
+        rows = self._postdraw_rows()
+        bad = [json.loads(json.dumps(group)) for group in rows]
+        bad[2][11]["payload"]["slices"].pop()
+        cases.append((bad, "source slice inventory differs"))
+        rows = self._postdraw_rows()
+        bad = [json.loads(json.dumps(group)) for group in rows]
+        route = next(item for item in bad[3][0]["payload"]["slices"]
+                     if item["tag"] == 17)
+        route["address"] += 4
+        cases.append((bad, "escaped its pinned source address"))
+        rows = self._postdraw_rows()
+        bad = [json.loads(json.dumps(group)) for group in rows]
+        changed_seed = next(item for item in bad[3][3]["payload"]["slices"]
+                            if item["tag"] == 20)
+        changed_seed["hex"] = "312151c4"
+        cases.append((bad, "DrawEnter/DrawReturn tracked state changed"))
+        for case_rows, message in cases:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(StadiumGoPrefixError, message):
+                    _extract_first_css_postdraw_stream_rows(
+                        *case_rows, FIRST_CSS_STREAM_SHA256)
+        rows = self._postdraw_rows()
+        with self.assertRaisesRegex(StadiumGoPrefixError, "retained v6 observer"):
+            _extract_first_css_postdraw_stream_rows(*rows, "c" * 64)
+
+    def test_first_css_postdraw_input_rejects_foreign_or_malformed_envelopes(self):
+        rows = self._postdraw_rows()
+        bundle = _extract_first_css_postdraw_stream_rows(
+            *rows, FIRST_CSS_STREAM_SHA256)["input_bundle_bytes"]
+        changed = [bundle[:-1], bundle + b"\0", b"BADMAGIC" + bundle[8:],
+                   bundle[:12] + bytes(32) + bundle[44:],
+                   bundle[:44] + (840).to_bytes(4, "big") + bundle[48:],
+                   bundle[:48] + (147).to_bytes(4, "big") + bundle[52:]]
+        for invalid in changed:
+            with self.subTest(length=len(invalid), header=invalid[:52].hex()):
+                with self.assertRaises(StadiumGoPrefixError):
+                    decode_first_css_postdraw_input_bundle(invalid)
+
     def test_retained_first_css_raw_is_optional_but_strict_when_configured(self):
         source_value = os.environ.get(FIRST_CSS_CONTEXT_ENV)
         if source_value is None:
@@ -1381,6 +1532,25 @@ class StadiumFirstCssContextTests(OwnedWorkspaceTests):
         }, indent=2, sort_keys=True) + "\n")
         self.assertEqual(hashlib.sha256(tick_input_path.read_bytes()).hexdigest(),
                          tick_result["input_bundle"]["sha256"])
+        postdraw_result = extract_stadium_first_css_postdraw_stream(
+            source, source.with_name("observer-status.json"))
+        self.assertEqual(postdraw_result["provenance"]["source_batch_count"], 148)
+        self.assertEqual(postdraw_result["expected_pairs"][0]["consumed_pad_sequence"], 839)
+        self.assertEqual(postdraw_result["expected_pairs"][-1]["draw_return_sequence"], 1577)
+        postdraw_bundle = postdraw_result["input_bundle_bytes"]
+        decoded_postdraw = decode_first_css_postdraw_input_bundle(postdraw_bundle)
+        self.assertEqual(decoded_postdraw["sample_count"], 148)
+        self.assertFalse(decoded_postdraw["contains_expected_post_tick_state"])
+        self.assertFalse(decoded_postdraw["contains_expected_draw_state"])
+        postdraw_input_path = self.scratch / "first-css-postdraw-input.mwst"
+        postdraw_expected_path = self.scratch / "first-css-postdraw-expected.json"
+        postdraw_input_path.write_bytes(postdraw_bundle)
+        postdraw_expected_path.write_text(json.dumps({
+            key: value for key, value in postdraw_result.items()
+            if key != "input_bundle_bytes"
+        }, indent=2, sort_keys=True) + "\n")
+        self.assertEqual(hashlib.sha256(postdraw_input_path.read_bytes()).hexdigest(),
+                         postdraw_result["input_bundle"]["sha256"])
         self.assertFalse((self.scratch / source.name).exists(),
                          "retained raw source must stay outside test scratch")
 

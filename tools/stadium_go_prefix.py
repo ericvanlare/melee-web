@@ -85,6 +85,24 @@ FIRST_CSS_CONSUMED_PAD_HEADER_BYTES = 8 + 4 + 32 + 4 + 4
 FIRST_CSS_CONSUMED_PAD_PAYLOAD_BYTES = 4 * 11
 FIRST_CSS_CONSUMED_PAD_BYTES = (FIRST_CSS_CONSUMED_PAD_HEADER_BYTES +
                                 FIRST_CSS_CONSUMED_PAD_PAYLOAD_BYTES)
+FIRST_CSS_POSTDRAW_INPUT_MAGIC = b"STC1PSTR"
+FIRST_CSS_POSTDRAW_INPUT_VERSION = 1
+FIRST_CSS_POSTDRAW_INPUT_HEADER_BYTES = 52
+FIRST_CSS_POSTDRAW_FIRST_CONSUME_SEQUENCE = 839
+FIRST_CSS_POSTDRAW_BATCH_COUNT = 148
+FIRST_CSS_POSTDRAW_INPUT_BYTES = (FIRST_CSS_POSTDRAW_INPUT_HEADER_BYTES +
+                                  FIRST_CSS_POSTDRAW_BATCH_COUNT * 4 * 11)
+FIRST_CSS_POSTDRAW_TICK_SLICES = {
+    (2, 0): (0x804C1F78, 0x0C),
+    (17, 0): (0x80479D30, 6),
+    (19, 0): (FIRST_CSS_RNG_POINTER_ADDRESS, 4),
+    (20, 0): (FIRST_CSS_RNG_VALUE_ADDRESS, 4),
+    (21, 0): (FIRST_CSS_PAD_ADDRESS, 0x358),
+    (30, 0): (FIRST_CSS_SCENE_FRAME_ADDRESS, 4),
+    (36, 0): (FIRST_CSS_SAVE_ADDRESS, 2),
+    (37, 0): (FIRST_CSS_SAVE_ADDRESS + 2, 2),
+    (40, 0): (FIRST_CSS_SCENE_ADDRESS, 1),
+}
 
 CSS_ENTRY_PC = 0x8026688C
 CSS_ENTRY_WORD = 0x7C0802A6
@@ -1289,6 +1307,311 @@ def extract_stadium_first_css_consumed_tick(
     return result
 
 
+def _require_exact_slice_inventory(payload: dict[str, Any], expected: set[tuple[int, int]],
+                                    context: str) -> None:
+    slices = payload.get("slices")
+    _require(isinstance(slices, list) and all(isinstance(item, dict) for item in slices),
+             f"{context}: missing bounded slices")
+    keys = [(item.get("tag"), item.get("flags")) for item in slices]
+    _require(len(keys) == len(expected) and set(keys) == expected,
+             f"{context}: source slice inventory differs")
+
+
+def _first_css_postdraw_tick_snapshot(row: dict[str, Any], index: int) -> dict[str, Any]:
+    tick_value = index + 1
+    consume_sequence = FIRST_CSS_POSTDRAW_FIRST_CONSUME_SEQUENCE + index * 5
+    sequence = consume_sequence + 1
+    payload = row.get("payload")
+    _require(isinstance(payload, dict) and row.get("event") == "boundary" and
+             row.get("seq") == sequence and
+             payload.get("boundary") == "source_tick" and
+             payload.get("pc") == SOURCE_TICK_PC and
+             payload.get("source_tick") == tick_value and
+             payload.get("draw_ordinal") == tick_value,
+             "first-CSS post-draw SourceTick sequence/phase differs")
+    _check_boundary_contract(payload)
+    _require_exact_slice_inventory(payload, set(FIRST_CSS_POSTDRAW_TICK_SLICES),
+                                   "first-CSS post-draw SourceTick")
+    read: dict[int, dict[str, Any]] = {}
+    for (tag, flags), (address, size) in FIRST_CSS_POSTDRAW_TICK_SLICES.items():
+        item = _slice(payload, tag, "first-CSS post-draw SourceTick", size, flags)
+        _require(item["address"] == address,
+                 f"first-CSS post-draw SourceTick tag={tag} escaped its pinned source address")
+        read[tag] = item
+    _require(read[19]["raw"] == FIRST_CSS_RNG_VALUE_ADDRESS.to_bytes(4, "big") and
+             read[40]["raw"] == b"\x08",
+             "first-CSS post-draw SourceTick lost its live RNG or CSS owner")
+    original_frame = int.from_bytes(read[30]["raw"], "big")
+    _require(original_frame == tick_value,
+             "first-CSS post-draw SourceTick is not the exact pre-increment scene frame")
+    try:
+        from reference_capture_semantics import pad_snapshot_bytes  # noqa: PLC0415
+        pad_hex = pad_snapshot_bytes(read[21]["raw"])
+    except (ValueError, TypeError) as error:
+        raise StadiumGoPrefixError(
+            f"first-CSS post-draw SourceTick PAD snapshot is invalid: {error}") from error
+    pad = bytes.fromhex(pad_hex)
+    _require(len(pad) == 822,
+             "first-CSS post-draw SourceTick PAD has an unexpected semantic length")
+    route = read[17]["raw"]
+    return {
+        "source_stream_sha256": FIRST_CSS_STREAM_SHA256,
+        "consumed_pad_sequence": consume_sequence,
+        "source_tick_sequence": sequence,
+        "source_tick_value": tick_value,
+        "source_draw_ordinal": tick_value,
+        "original_source_frame": original_frame,
+        "native_post_host_tick_frame": original_frame + 1,
+        "phase_relation": (
+            "native host post-tick sample at frame N+1 versus original scheduler-end "
+            f"SourceTick {sequence} before frame increment at frame {original_frame}"),
+        "source_scene_kind": read[40]["raw"][0],
+        "pad_state_hex": pad.hex(),
+        "random_seed_hex": read[20]["raw"].hex(),
+        "host_source_scene": 1,
+        "host_menu_phase": 1,
+        "scene_routing_getters": {
+            "current_game_mode": route[0],
+            "previous_game_mode": route[2],
+            "current_scene_index": route[3],
+            "previous_scene_index": route[4],
+        },
+        "source_routing_raw_hex": route.hex(),
+        "routing_raw_fields_excluded": ["pending_mode", "next_state_id"],
+    }
+
+
+def _first_css_postdraw_draw_snapshot(row: dict[str, Any], index: int, *,
+                                      boundary: str) -> dict[str, Any]:
+    draw_source_tick = index + 2
+    draw_ordinal = index + 1
+    consume_sequence = FIRST_CSS_POSTDRAW_FIRST_CONSUME_SEQUENCE + index * 5
+    if boundary == "draw_enter":
+        sequence, pc = consume_sequence + 2, FIRST_CSS_DRAW_ENTER_PC
+    else:
+        _require(boundary == "draw_return", "first-CSS draw boundary name differs")
+        sequence, pc = consume_sequence + 3, FIRST_CSS_DRAW_RETURN_PC
+    payload = row.get("payload")
+    _require(isinstance(payload, dict) and row.get("event") == "boundary" and
+             row.get("seq") == sequence and
+             payload.get("boundary") == boundary and payload.get("pc") == pc and
+             payload.get("source_tick") == draw_source_tick and
+             payload.get("draw_ordinal") == draw_ordinal,
+             f"first-CSS post-draw {boundary} sequence/phase differs")
+    _check_boundary_contract(payload)
+    _require_exact_slice_inventory(payload, set(FIRST_CSS_DRAW_SLICES),
+                                   f"first-CSS post-draw {boundary}")
+    read: dict[int, dict[str, Any]] = {}
+    for (tag, flags), (address, size) in FIRST_CSS_DRAW_SLICES.items():
+        item = _slice(payload, tag, f"first-CSS post-draw {boundary}", size, flags)
+        _require(item["address"] == address,
+                 f"first-CSS post-draw {boundary} tag={tag} escaped its pinned source address")
+        read[tag] = item
+    _require(read[19]["raw"] == FIRST_CSS_RNG_VALUE_ADDRESS.to_bytes(4, "big") and
+             read[40]["raw"] == b"\x08",
+             f"first-CSS post-draw {boundary} lost its live RNG or CSS owner")
+    scene_frame = int.from_bytes(read[30]["raw"], "big")
+    _require(scene_frame == draw_source_tick,
+             f"first-CSS post-draw {boundary} is not the exact post-tick scene frame")
+    try:
+        from reference_capture_semantics import pad_snapshot_bytes  # noqa: PLC0415
+        pad_hex = pad_snapshot_bytes(read[21]["raw"])
+    except (ValueError, TypeError) as error:
+        raise StadiumGoPrefixError(
+            f"first-CSS post-draw {boundary} PAD snapshot is invalid: {error}") from error
+    pad = bytes.fromhex(pad_hex)
+    _require(len(pad) == 822,
+             f"first-CSS post-draw {boundary} PAD has an unexpected semantic length")
+    route = read[17]["raw"]
+    return {
+        "sequence": sequence,
+        "boundary": boundary,
+        "pc": f"0x{pc:08x}",
+        "source_tick": draw_source_tick,
+        "draw_ordinal": draw_ordinal,
+        "source_slice_inventory": [
+            {"tag": tag, "flags": flags, "address": read[tag]["address"],
+             "size": read[tag]["size"]}
+            for tag, flags in sorted(FIRST_CSS_DRAW_SLICES)
+        ],
+        "pad_state_hex": pad.hex(),
+        "random_seed_hex": read[20]["raw"].hex(),
+        "scene_frame": scene_frame,
+        "scene_kind": read[40]["raw"][0],
+        "scene_routing_raw_hex": route.hex(),
+        "scene_routing_getters": {
+            "current_game_mode": route[0],
+            "previous_game_mode": route[2],
+            "current_scene_index": route[3],
+            "previous_scene_index": route[4],
+        },
+    }
+
+
+def _extract_first_css_postdraw_stream_rows(
+        consume_rows: list[dict[str, Any]], tick_rows: list[dict[str, Any]],
+        draw_enter_rows: list[dict[str, Any]], draw_return_rows: list[dict[str, Any]],
+        stream_sha256: str) -> dict[str, Any]:
+    """Build input-only PAD bytes and host-only expectations for the next 148 CSS pairs."""
+    _require(stream_sha256 == FIRST_CSS_STREAM_SHA256,
+             "first-CSS post-draw stream is not from the retained v6 observer")
+    rows = (consume_rows, tick_rows, draw_enter_rows, draw_return_rows)
+    _require(all(isinstance(group, list) and len(group) == FIRST_CSS_POSTDRAW_BATCH_COUNT
+                 for group in rows),
+             "first-CSS post-draw stream requires exactly 148 paired source batches")
+    from whole_session_replay import (  # noqa: PLC0415
+        WholeSessionReplayError,
+        _consumed_ports,
+    )
+    input_statuses: list[bytes] = []
+    expected_pairs: list[dict[str, Any]] = []
+    fields = ("source_tick", "draw_ordinal", "pad_state_hex", "random_seed_hex",
+              "scene_frame", "scene_kind", "scene_routing_getters")
+    for index, (consume, tick, enter, returned) in enumerate(zip(*rows)):
+        consume_sequence = FIRST_CSS_POSTDRAW_FIRST_CONSUME_SEQUENCE + index * 5
+        _require(isinstance(consume, dict) and consume.get("event") == "boundary" and
+                 consume.get("seq") == consume_sequence,
+                 "first-CSS post-draw PAD consume sequence/phase differs")
+        consume_payload = consume.get("payload")
+        _require(isinstance(consume_payload, dict) and
+                 consume_payload.get("boundary") == "pad_consume" and
+                 consume_payload.get("pc") == 0x80377584 and
+                 consume_payload.get("source_tick") == index + 1 and
+                 consume_payload.get("draw_ordinal") == index + 1,
+                 "first-CSS post-draw PAD consume boundary differs")
+        _check_boundary_contract(consume_payload)
+        _require_exact_slice_inventory(consume_payload, {(2, 0), (3, 0)},
+                                       "first-CSS post-draw PAD consume")
+        try:
+            ports = _consumed_ports(consume, consume_sequence)
+            status_bytes = [bytes.fromhex(value) for value in ports]
+        except (WholeSessionReplayError, KeyError, TypeError, ValueError) as error:
+            raise StadiumGoPrefixError(
+                f"first-CSS post-draw consumed PAD source slot is invalid: {error}") from error
+        _require(len(status_bytes) == 4 and all(len(value) == 11 for value in status_bytes),
+                 "first-CSS post-draw consumed PAD does not have four exact port statuses")
+
+        tick_expected = _first_css_postdraw_tick_snapshot(tick, index)
+        enter_expected = _first_css_postdraw_draw_snapshot(
+            enter, index, boundary="draw_enter")
+        return_expected = _first_css_postdraw_draw_snapshot(
+            returned, index, boundary="draw_return")
+        _require(all(enter_expected[key] == return_expected[key] for key in fields),
+                 "first-CSS post-draw DrawEnter/DrawReturn tracked state changed")
+        _require(tick_expected["native_post_host_tick_frame"] ==
+                 return_expected["scene_frame"],
+                 "first-CSS post-draw SourceTick and enclosing draw frame differ")
+        input_statuses.extend(status_bytes)
+        expected_pairs.append({
+            "index": index,
+            "consumed_pad_sequence": consume_sequence,
+            "source_tick_sequence": consume_sequence + 1,
+            "draw_enter_sequence": consume_sequence + 2,
+            "draw_return_sequence": consume_sequence + 3,
+            "input_port_status_hex": [value.hex() for value in status_bytes],
+            "expected_post_tick": tick_expected,
+            "expected_draw_enter": enter_expected,
+            "expected_draw_return": return_expected,
+            "draw_comparison_fields": list(fields),
+        })
+    input_bundle = b"".join((
+        FIRST_CSS_POSTDRAW_INPUT_MAGIC,
+        FIRST_CSS_POSTDRAW_INPUT_VERSION.to_bytes(4, "big"),
+        bytes.fromhex(stream_sha256),
+        FIRST_CSS_POSTDRAW_FIRST_CONSUME_SEQUENCE.to_bytes(4, "big"),
+        FIRST_CSS_POSTDRAW_BATCH_COUNT.to_bytes(4, "big"),
+        b"".join(input_statuses),
+    ))
+    _require(len(input_bundle) == FIRST_CSS_POSTDRAW_INPUT_BYTES,
+             "first-CSS post-draw input bundle has an unexpected exact length")
+    return {
+        "schema": "melee-web-stadium-first-css-postdraw-stream-diagnostic",
+        "version": FIRST_CSS_POSTDRAW_INPUT_VERSION,
+        "scope": "the next 148 original CSS PAD-consume, SourceTick and actual draw pairs only",
+        "provenance": {
+            "stream_bytes": FIRST_CSS_STREAM_BYTES,
+            "stream_sha256": stream_sha256,
+            "baseline_draw_return_sequence": FIRST_CSS_DRAW_RETURN_SEQUENCE,
+            "first_consumed_pad_sequence": FIRST_CSS_POSTDRAW_FIRST_CONSUME_SEQUENCE,
+            "last_consumed_pad_sequence": (
+                FIRST_CSS_POSTDRAW_FIRST_CONSUME_SEQUENCE +
+                (FIRST_CSS_POSTDRAW_BATCH_COUNT - 1) * 5),
+            "first_draw_return_sequence": FIRST_CSS_POSTDRAW_FIRST_CONSUME_SEQUENCE + 3,
+            "last_draw_return_sequence": (
+                FIRST_CSS_POSTDRAW_FIRST_CONSUME_SEQUENCE +
+                (FIRST_CSS_POSTDRAW_BATCH_COUNT - 1) * 5 + 3),
+            "source_batch_count": FIRST_CSS_POSTDRAW_BATCH_COUNT,
+            "stop_before_sss_admission": True,
+        },
+        "input_bundle": {
+            "magic_hex": FIRST_CSS_POSTDRAW_INPUT_MAGIC.hex(),
+            "version": FIRST_CSS_POSTDRAW_INPUT_VERSION,
+            "bytes": len(input_bundle),
+            "sha256": hashlib.sha256(input_bundle).hexdigest(),
+            "sample_count": FIRST_CSS_POSTDRAW_BATCH_COUNT,
+            "first_consumed_pad_sequence": FIRST_CSS_POSTDRAW_FIRST_CONSUME_SEQUENCE,
+            "port_status_bytes_per_sample": 4 * 11,
+            "contains_expected_post_tick_state": False,
+            "contains_expected_draw_state": False,
+        },
+        "expected_pairs": expected_pairs,
+        "draw_comparison_fields": list(fields),
+        "unpaired_routing_fields": ["pending_mode", "next_state_id"],
+        "excluded_source_tags": [2, 36, 37],
+        "whole_session_equivalent": False,
+        "source_admission": False,
+        "input_bundle_bytes": input_bundle,
+    }
+
+
+def extract_stadium_first_css_postdraw_stream(
+        stream_path: str | Path, status_path: str | Path) -> dict[str, Any]:
+    """Extract only the next 148 CSS consumed-input/tick/draw pairs after 837."""
+    source = Path(stream_path)
+    _require(source.is_file(), "configured first-CSS observer stream is missing")
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES,
+             "first-CSS observer stream byte length differs from retained v6 source")
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    _require(digest == FIRST_CSS_STREAM_SHA256,
+             "first-CSS observer stream hash differs from retained v6 source")
+    try:
+        summary = validate_stadium_go_prefix(source, status_path=status_path)
+        _require(summary.get("decision") == "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY" and
+                 summary.get("stream_bytes") == FIRST_CSS_STREAM_BYTES and
+                 summary.get("stream_sha256") == digest,
+                 "first-CSS source stream no longer passes full GO-prefix validation")
+        wanted: dict[int, list[dict[str, Any]]] = {}
+        for index in range(FIRST_CSS_POSTDRAW_BATCH_COUNT):
+            base = FIRST_CSS_POSTDRAW_FIRST_CONSUME_SEQUENCE + index * 5
+            for offset in range(4):
+                wanted[base + offset] = []
+        for row in iter_records(source, max_bytes=MAX_STREAM_BYTES,
+                                max_records=MAX_STREAM_RECORDS):
+            sequence = row.get("seq")
+            if sequence in wanted:
+                wanted[sequence].append(row)
+        _require(all(len(rows) == 1 for rows in wanted.values()),
+                 "first-CSS post-draw raw sequence coverage has missing/duplicate rows")
+        consumes, ticks, enters, returns = [], [], [], []
+        for index in range(FIRST_CSS_POSTDRAW_BATCH_COUNT):
+            base = FIRST_CSS_POSTDRAW_FIRST_CONSUME_SEQUENCE + index * 5
+            consumes.append(wanted[base][0])
+            ticks.append(wanted[base + 1][0])
+            enters.append(wanted[base + 2][0])
+            returns.append(wanted[base + 3][0])
+        result = _extract_first_css_postdraw_stream_rows(
+            consumes, ticks, enters, returns, digest)
+    except StadiumGoPrefixError:
+        raise
+    except (OSError, ObserverStreamError) as error:
+        raise StadiumGoPrefixError(
+            f"cannot validate first-CSS post-draw source rows: {error}") from error
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES and
+             hashlib.sha256(source.read_bytes()).hexdigest() == digest,
+             "first-CSS observer stream changed during post-draw extraction")
+    return result
+
+
 def decode_first_css_consumed_pad_bundle(data: bytes) -> dict[str, Any]:
     """Validate the fixed input-only consumed-PAD record; no expected state is stored."""
     _require(isinstance(data, bytes) and len(data) == FIRST_CSS_CONSUMED_PAD_BYTES,
@@ -1311,6 +1634,36 @@ def decode_first_css_consumed_pad_bundle(data: bytes) -> dict[str, Any]:
         "source_tick_sequence": tick_seq,
         "port_status_hex": statuses,
         "contains_expected_post_tick_state": False,
+    }
+
+
+def decode_first_css_postdraw_input_bundle(data: bytes) -> dict[str, Any]:
+    """Validate the fixed input-only postdraw stream; expected rows stay host-side."""
+    _require(isinstance(data, bytes) and len(data) == FIRST_CSS_POSTDRAW_INPUT_BYTES,
+             "first-CSS post-draw input bundle has an invalid exact length")
+    _require(data[:8] == FIRST_CSS_POSTDRAW_INPUT_MAGIC and
+             int.from_bytes(data[8:12], "big") == FIRST_CSS_POSTDRAW_INPUT_VERSION,
+             "first-CSS post-draw input bundle magic/version differs")
+    stream_sha = data[12:44].hex()
+    _require(stream_sha == FIRST_CSS_STREAM_SHA256,
+             "first-CSS post-draw input bundle source identity is not retained v6")
+    first_consume = int.from_bytes(data[44:48], "big")
+    count = int.from_bytes(data[48:52], "big")
+    _require(first_consume == FIRST_CSS_POSTDRAW_FIRST_CONSUME_SEQUENCE and
+             count == FIRST_CSS_POSTDRAW_BATCH_COUNT,
+             "first-CSS post-draw input sequence/count differs")
+    statuses = data[FIRST_CSS_POSTDRAW_INPUT_HEADER_BYTES:]
+    return {
+        "source_stream_sha256": stream_sha,
+        "first_consumed_pad_sequence": first_consume,
+        "sample_count": count,
+        "port_status_bytes_per_sample": 4 * 11,
+        "port_status_hex_by_sample": [
+            statuses[offset:offset + 4 * 11].hex()
+            for offset in range(0, len(statuses), 4 * 11)
+        ],
+        "contains_expected_post_tick_state": False,
+        "contains_expected_draw_state": False,
     }
 
 

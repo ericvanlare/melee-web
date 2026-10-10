@@ -69,7 +69,22 @@ struct FirstCssBrowserDrawState {
  unsigned preparation_source_callbacks=0;
  std::string observation;
 };
+struct FirstCssBrowserPostdrawStreamState {
+ bool armed=false,kicked=false,terminal=false,failed=false,complete=false;
+ bool tick_captured=false,tick_approved=false,draw_captured=false,draw_approved=false;
+ bool transition_captured=false,frame_end_returned=false;
+ std::string error,outcome;
+ melee_web::stadium_first_css_diagnostic::PostdrawInput input{};
+ PADStatus input_status[4]{};
+ uint32_t next_input_index=0,current_input_index=0;
+ unsigned consumed_inputs=0,host_tick_calls=0,executed_host_ticks=0;
+ unsigned matched_ticks=0,matched_draws=0,host_draw_calls=0;
+ unsigned aurora_begin_calls=0,aurora_end_calls=0;
+ int tick_result=0;
+ FirstCssDrawSample tick{},draw{},transition{};
+};
 FirstCssBrowserDrawState first_css_browser_draw;
+FirstCssBrowserPostdrawStreamState first_css_browser_postdraw_stream;
 extern bool running;
 extern melee_web::FixedTickClock menu_clock;
 extern std::string message;
@@ -157,6 +172,75 @@ void first_css_browser_draw_write_sample(std::ostream& out,const FirstCssDrawSam
  first_css_browser_draw_write_route(out,sample);
  out<<'}';
 }
+std::string first_css_browser_postdraw_stream_actual_json(
+ const FirstCssDrawSample& sample,unsigned input_index,unsigned source_tick,
+ int tick_result,
+ bool terminal_transition){
+ std::ostringstream out;
+ const unsigned ordinal=input_index+1;
+ const uint32_t consume_sequence=
+     melee_web::stadium_first_css_diagnostic::kPostdrawFirstConsumeSequence+
+     input_index*5;
+ out<<"{\"source_tick\":"<<source_tick<<",\"draw_ordinal\":"<<ordinal
+    <<",\"scene_frame\":"<<sample.scene_frame
+    <<",\"tick_result\":"<<tick_result
+    <<",\"executed_host_ticks\":"
+    <<first_css_browser_postdraw_stream.executed_host_ticks
+    <<",\"stream_input_ordinal\":"<<ordinal
+    <<",\"consumed_pad_sequence\":"<<consume_sequence
+    <<",\"terminal_transition\":"<<(terminal_transition?"true":"false");
+ out<<",\"source_scene\":"<<sample.source_scene
+    <<",\"menu_phase\":"<<sample.menu_phase
+    <<",\"scene_kind\":"<<sample.scene_kind
+    <<",\"world_generation\":"<<sample.world_generation
+    <<",\"world_generation_stable\":"<<(sample.world_generation_stable?"true":"false")
+    <<",\"scene_owner_stable\":"<<(sample.scene_owner_stable?"true":"false")
+    <<",\"seed_owner_stable\":"<<(sample.seed_owner_stable?"true":"false")
+    <<",\"random_seed_hex\":\""
+    <<melee_web::stadium_first_css_diagnostic::hex32(sample.seed)
+    <<"\",\"pad_state_hex\":\""
+    <<melee_web::stadium_first_css_diagnostic::hex(sample.pad.data(),sample.pad.size())
+    <<"\",\"scene_routing_getters\":";
+ first_css_browser_draw_write_route(out,sample);
+ out<<'}';
+ return out.str();
+}
+void first_css_browser_postdraw_stream_fail(const std::string& error,
+                                            const char* outcome="mismatch"){
+ auto& state=first_css_browser_postdraw_stream;
+ if(!state.failed){state.failed=true;state.error=error;state.outcome=outcome;}
+ state.terminal=true;running=false;menu_clock.reset();message=state.error;
+}
+void first_css_browser_postdraw_stream_check_live(const char* boundary,
+                                                   uint32_t expected_frame){
+ auto& stream=first_css_browser_postdraw_stream;
+ auto& baseline=first_css_browser_draw;
+ check(stream.armed&&baseline.armed&&baseline.complete&&baseline.frame_end_returned&&
+       baseline.entry_captured&&baseline.tick_captured&&baseline.draw_captured&&
+       host&&world&&host_entered,
+       "First-CSS post-draw stream lost its completed one-shot baseline owners");
+ first_css_browser_draw_check_live(boundary);
+ check(stream.input.source_sha256==baseline.context.source_sha256&&
+       stream.input.first_consume_sequence==
+           melee_web::stadium_first_css_diagnostic::kPostdrawFirstConsumeSequence&&
+       melee_web_gameplay_generation()==baseline.world_generation&&
+       gm_801A4BA8()==expected_frame&&
+       seed_ptr==baseline.seed_owner&&
+       melee_web_current_scene_info()==baseline.scene_owner,
+       "First-CSS post-draw stream owner, frame or seed changed after baseline");
+}
+bool first_css_browser_postdraw_stream_compare(const char* phase,
+                                               const std::string& actual_json){
+ if(!phase||actual_json.empty())return false;
+ return EM_ASM_INT({
+  const callback=globalThis.__meleeWebStadiumFirstCssStreamCompare;
+  if(typeof callback!=="function")return 0;
+  try{
+   const result=callback(UTF8ToString($0),UTF8ToString($1));
+   return result===true?1:0;
+  }catch(_){return 0;}
+ },phase,actual_json.c_str())==1;
+}
 void first_css_browser_draw_refresh_observation(){
  auto& state=first_css_browser_draw;
  std::ostringstream out;
@@ -229,6 +313,51 @@ void first_css_browser_draw_refresh_observation(){
      <<melee_web::stadium_first_css_diagnostic::hex(state.draw.pad.data(),state.draw.pad.size())
      <<"\",\"scene_routing_getters\":";
   first_css_browser_draw_write_route(out,state.draw);
+  out<<'}';
+ }
+ auto& stream=first_css_browser_postdraw_stream;
+ if(stream.armed){
+  out<<",\"postdraw_stream\":{\"status\":\""
+     <<(stream.failed?"failed":stream.complete?"bounded-pair-cap":
+        stream.terminal?"terminal":stream.kicked?"running":"armed")
+     <<"\",\"error\":"
+     <<(stream.error.empty()?"null":first_css_browser_draw_json_quote(stream.error))
+     <<",\"outcome\":"
+     <<(stream.outcome.empty()?"null":first_css_browser_draw_json_quote(stream.outcome))
+     <<",\"failed\":"<<(stream.failed?"true":"false")
+     <<",\"terminal\":"<<(stream.terminal?"true":"false")
+     <<",\"complete\":"<<(stream.complete?"true":"false")
+     <<",\"input_index\":"<<stream.next_input_index
+     <<",\"current_input_index\":"<<stream.current_input_index
+     <<",\"current_input_ordinal\":"<<(stream.current_input_index+1)
+     <<",\"current_consumed_pad_sequence\":"
+     <<(melee_web::stadium_first_css_diagnostic::kPostdrawFirstConsumeSequence+
+        stream.current_input_index*5)
+     <<",\"consumed_inputs\":"<<stream.consumed_inputs
+     <<",\"host_tick_calls\":"<<stream.host_tick_calls
+     <<",\"executed_host_ticks\":"<<stream.executed_host_ticks
+     <<",\"matched_ticks\":"<<stream.matched_ticks
+     <<",\"matched_draws\":"<<stream.matched_draws
+     <<",\"host_draw_calls\":"<<stream.host_draw_calls
+     <<",\"aurora_begin_calls\":"<<stream.aurora_begin_calls
+     <<",\"aurora_end_calls\":"<<stream.aurora_end_calls
+     <<",\"tick_result\":"<<stream.tick_result
+     <<",\"frame_end_returned\":"<<(stream.frame_end_returned?"true":"false")
+     <<",\"input_source_stream_sha256\":\""<<stream.input.source_sha256<<"\"";
+  if(stream.tick_captured){
+   out<<",\"tick\":"<<first_css_browser_postdraw_stream_actual_json(
+       stream.tick,stream.current_input_index,stream.current_input_index+1,
+       stream.tick_result,false);
+  }
+  if(stream.draw_captured){
+   out<<",\"draw\":"<<first_css_browser_postdraw_stream_actual_json(
+       stream.draw,stream.current_input_index,stream.current_input_index+2,1,false);
+  }
+  if(stream.transition_captured){
+   out<<",\"transition_snapshot\":"
+      <<first_css_browser_postdraw_stream_actual_json(
+          stream.transition,stream.current_input_index,stream.current_input_index+1,3,true);
+  }
   out<<'}';
  }
  out<<'}';state.observation=out.str();
@@ -708,6 +837,7 @@ if(scoped_assets){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  stadium_c1a_armed=false;stadium_c1a_observation.clear();stadium_c1a_raw_stkind=-1;
  first_css_browser_draw=FirstCssBrowserDrawState{};
+ first_css_browser_postdraw_stream=FirstCssBrowserPostdrawStreamState{};
 #endif
  audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;pending_menu_source_scene=0;pending_opening_state=-1;audio_clock.reset();clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();
  css_fighter_release_port=-1;last_css_fighter_observation_valid=false;
@@ -1612,7 +1742,21 @@ void tick(){
   bool drew_source=false;
   bool began_this_frame=false;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-  if(first_css_browser_draw.armed){
+  if(first_css_browser_postdraw_stream.armed){
+   auto& stream=first_css_browser_postdraw_stream;
+   check(stream.kicked&&!stream.terminal&&!stream.failed&&
+         stream.tick_captured&&stream.tick_approved&&!stream.draw_captured&&
+         stream.current_input_index==stream.next_input_index&&
+         stream.matched_ticks==stream.current_input_index+1&&
+         stream.matched_draws==stream.current_input_index&&
+         stream.host_draw_calls==stream.matched_draws&&
+         stream.aurora_begin_calls==stream.aurora_end_calls,
+         "First-CSS stream draw is not paired with one approved current tick");
+   first_css_browser_postdraw_stream_check_live(
+       "before streamed browser source draw",
+       first_css_browser_draw.draw.scene_frame+stream.matched_ticks);
+   ++stream.aurora_begin_calls;
+  }else if(first_css_browser_draw.armed){
    auto& state=first_css_browser_draw;
    if(preparation.busy()&&preparation.preparation_draws_source())
     ++state.preparation_source_callbacks;
@@ -1634,7 +1778,13 @@ void tick(){
 #endif
   const bool frame_began=aurora_begin_frame();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-  if(first_css_browser_draw.armed&&!frame_began){
+  if(first_css_browser_postdraw_stream.armed&&!frame_began){
+   first_css_browser_postdraw_stream_fail(
+       "Aurora did not begin the admitted first-CSS stream draw");
+   first_css_draw_terminal=true;
+   first_css_browser_draw_refresh_observation();
+  }else if(first_css_browser_draw.armed&&
+           !first_css_browser_postdraw_stream.armed&&!frame_began){
    first_css_browser_draw_fail("Aurora did not begin the one admitted first-CSS source draw");
    first_css_browser_draw_refresh_observation();
   }
@@ -1663,7 +1813,21 @@ void tick(){
                            static_cast<int>(replay_cursor),melee_web_menu_host_phase(host));
 #endif
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-      if(first_css_browser_draw.armed){
+      if(first_css_browser_postdraw_stream.armed){
+       auto& stream=first_css_browser_postdraw_stream;
+       ++stream.host_draw_calls;
+       check(stream.kicked&&!stream.terminal&&!stream.failed&&
+             stream.tick_result==1&&stream.tick_approved&&!pending&&
+             stream.current_input_index==stream.next_input_index&&
+             stream.matched_ticks==stream.current_input_index+1&&
+             stream.matched_draws==stream.current_input_index&&
+             source_frames.steps()==1&&source_frames.draws()==0&&
+             preparation.phase()==melee_web::MenuPreparationState::Phase::Idle,
+             "First-CSS stream draw no longer follows one approved CSS tick");
+       first_css_browser_postdraw_stream_check_live(
+           "before streamed host draw",
+           first_css_browser_draw.draw.scene_frame+stream.matched_ticks);
+      }else if(first_css_browser_draw.armed){
        ++first_css_browser_draw.host_draw_calls;
        check(first_css_browser_draw.tick_result==1&&!pending&&
              source_frames.steps()==1&&source_frames.draws()==0&&
@@ -1676,7 +1840,19 @@ void tick(){
 #endif
       drawn=melee_web_menu_host_draw(host,error,sizeof(error));
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-      if(first_css_browser_draw.armed){
+      if(first_css_browser_postdraw_stream.armed&&drawn==1){
+       auto& stream=first_css_browser_postdraw_stream;
+       first_css_browser_postdraw_stream_check_live(
+           "after streamed host draw",
+           first_css_browser_draw.draw.scene_frame+stream.matched_ticks);
+       stream.draw=first_css_browser_draw_capture("postdraw stream browser draw return");
+       stream.draw_captured=true;
+       const std::string actual=first_css_browser_postdraw_stream_actual_json(
+           stream.draw,stream.current_input_index,stream.current_input_index+2,1,false);
+       stream.draw_approved=first_css_browser_postdraw_stream_compare("draw",actual);
+       first_css_browser_draw_refresh_observation();
+      }else if(first_css_browser_draw.armed&&
+               !first_css_browser_postdraw_stream.armed){
        check(drawn==1,error[0]?error:"Original first-CSS host draw did not execute");
        first_css_browser_draw_check_live("after host draw");
        auto& state=first_css_browser_draw;
@@ -1717,7 +1893,25 @@ void tick(){
 #endif
    aurora_end_frame();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-   if(first_css_browser_draw.armed){
+   if(first_css_browser_postdraw_stream.armed){
+    auto& stream=first_css_browser_postdraw_stream;
+    ++stream.aurora_end_calls;
+    stream.frame_end_returned=true;
+    if(!stream.draw_captured||!stream.draw_approved){
+     first_css_browser_postdraw_stream_fail(
+         "First-CSS stream DrawReturn comparator refused the completed browser draw");
+     first_css_draw_terminal=true;
+    }else{
+     ++stream.matched_draws;
+     ++stream.next_input_index;
+     if(stream.next_input_index==
+        melee_web::stadium_first_css_diagnostic::kPostdrawBatchCount){
+      stream.complete=true;stream.terminal=true;stream.outcome="bounded_pair_cap";
+      running=false;menu_clock.reset();
+     }
+    }
+    first_css_browser_draw_refresh_observation();
+   }else if(first_css_browser_draw.armed){
     ++first_css_browser_draw.aurora_end_calls;
     first_css_browser_draw.frame_end_returned=true;
     first_css_browser_draw_refresh_observation();
@@ -1843,7 +2037,12 @@ void tick(){
    // Its state capture may resume and records every resume; performance capture
    // still fails on the pause. The audio guard and clock policy are unchanged.
    running=false;message="Paused after a timing disruption in the audio clock. Resume to continue.";
-  }else if(audio_before_construction){
+  }else if(audio_before_construction
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+           &&!(first_css_browser_postdraw_stream.armed&&
+               first_css_browser_postdraw_stream.terminal)
+#endif
+           ){
    for(unsigned step=0;step<audio_elapsed.steps;step++)
     render_audio_tick(audio_owner,error,sizeof(error));
   }
@@ -1900,7 +2099,13 @@ void tick(){
   const bool local_capture_clock=melee_web_net_local_capture_pending();
   bool simulation_clock_running=running&&(world||match||results||prize)&&input->visible;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-  if(first_css_browser_draw.armed)
+  if(first_css_browser_postdraw_stream.armed)
+   simulation_clock_running=simulation_clock_running&&
+       first_css_browser_postdraw_stream.kicked&&
+       !first_css_browser_postdraw_stream.failed&&
+       !first_css_browser_postdraw_stream.terminal&&
+       !first_css_browser_postdraw_stream.complete;
+  else if(first_css_browser_draw.armed)
    simulation_clock_running=simulation_clock_running&&first_css_browser_draw.kicked&&
        !first_css_browser_draw.failed&&!first_css_browser_draw.complete;
 #endif
@@ -1909,14 +2114,23 @@ void tick(){
   };
   const auto elapsed=(local_capture_clock
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-      ||(first_css_browser_draw.armed&&first_css_browser_draw.kicked)
+      ||(first_css_browser_postdraw_stream.armed&&
+         first_css_browser_postdraw_stream.kicked)||
+        (first_css_browser_draw.armed&&first_css_browser_draw.kicked)
 #endif
       )?menu_clock.tick_with_budget(simulation_clock_now,simulation_clock_running,1,
                                     observe_simulation_clock_stall):
        menu_clock.tick(simulation_clock_now,simulation_clock_running,
                        observe_simulation_clock_stall);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-  if(first_css_browser_draw.armed&&first_css_browser_draw.kicked&&elapsed.steps>1)
+  if(first_css_browser_postdraw_stream.armed&&elapsed.steps>1)
+   first_css_browser_postdraw_stream_fail(
+       "First-CSS post-draw stream clock exceeded one source step");
+  if(first_css_browser_postdraw_stream.armed&&elapsed.stalled)
+   first_css_browser_postdraw_stream_fail(
+       "First-CSS post-draw stream clock stalled during its bounded run");
+  if(!first_css_browser_postdraw_stream.armed&&first_css_browser_draw.armed&&
+     first_css_browser_draw.kicked&&elapsed.steps>1)
    first_css_browser_draw_fail("First-CSS one-shot clock exceeded one source step");
 #endif
   if(elapsed.stalled){running=false;message="Paused after a timing disruption. Resume to continue.";}
@@ -1924,6 +2138,11 @@ void tick(){
    transition_audio_continues=false;
   }
   for(unsigned step=0;step<elapsed.steps;step++){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+   if(first_css_browser_postdraw_stream.armed&&
+      (first_css_browser_postdraw_stream.failed||
+       first_css_browser_postdraw_stream.terminal))break;
+#endif
    if(replay&&replay_cursor==replay->frames.size())break;
    if(results){
     const unsigned results_source_frame=results->source_frames();
@@ -1937,9 +2156,46 @@ void tick(){
      break;
     }
    }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+   if(first_css_browser_postdraw_stream.armed)
+    check(first_css_browser_postdraw_stream.kicked&&
+          !first_css_browser_postdraw_stream.failed&&
+          !first_css_browser_postdraw_stream.terminal&&
+          !first_css_browser_postdraw_stream.complete&&
+          !source_frames.pending()&&source_frames.steps()==0&&source_frames.draws()==0,
+          "First-CSS stream refused a callback with pending prior source work");
+#endif
    source_frames.before_step(present_source);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-   if(first_css_browser_draw.armed){
+   if(first_css_browser_postdraw_stream.armed){
+    auto& stream=first_css_browser_postdraw_stream;
+    check(stream.kicked&&!stream.failed&&!stream.terminal&&!stream.complete&&
+          stream.next_input_index<melee_web::stadium_first_css_diagnostic::kPostdrawBatchCount&&
+          stream.host_tick_calls==stream.matched_ticks&&
+          stream.executed_host_ticks==stream.matched_ticks+1&&
+          stream.consumed_inputs==stream.matched_ticks&&
+          stream.host_draw_calls==stream.matched_draws&&
+          stream.matched_ticks==stream.matched_draws&&
+          stream.aurora_begin_calls==stream.aurora_end_calls&&
+          !source_frames.pending()&&source_frames.steps()==0&&source_frames.draws()==0&&
+          !pending&&!faulted&&!replay&&!melee_web_net_active()&&
+          diagnostic_start_ticks==0&&diagnostic_pad_remaining==0&&
+          preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&
+          !preparation.busy(),
+          "First-CSS stream reached a source tick outside its exact idle draw-pair boundary");
+    stream.current_input_index=stream.next_input_index;
+    stream.tick_captured=false;stream.tick_approved=false;
+    stream.draw_captured=false;stream.draw_approved=false;
+    stream.transition_captured=false;stream.frame_end_returned=false;
+    stream.tick_result=0;
+    melee_web::stadium_first_css_diagnostic::decode_postdraw_pad_statuses(
+        stream.input,stream.current_input_index,stream.input_status);
+    check(stream.input_status[0].err==PAD_ERR_NONE,
+          "Retained post-draw stream PAD is not connected on P1");
+    first_css_browser_postdraw_stream_check_live(
+        "before streamed source tick",
+        first_css_browser_draw.draw.scene_frame+stream.matched_ticks);
+   }else if(first_css_browser_draw.armed){
     check(first_css_browser_draw.kicked&&!first_css_browser_draw.failed&&
           !first_css_browser_draw.complete&&first_css_browser_draw.source_steps==0&&
           first_css_browser_draw.host_tick_calls==0&&first_css_browser_draw.host_draw_calls==0&&
@@ -1951,7 +2207,9 @@ void tick(){
    if(prepare_deferred_pipelines())break;
    PADStatus checked_input[4];const PADStatus* sample=input->raw;bool copied_input=false;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-   if(first_css_browser_draw.armed){
+   if(first_css_browser_postdraw_stream.armed){
+    sample=first_css_browser_postdraw_stream.input_status;
+   }else if(first_css_browser_draw.armed){
     check(first_css_browser_draw.consumed_status[0].err==PAD_ERR_NONE,
           "Retained first-CSS consumed PAD is not connected on P1");
     sample=first_css_browser_draw.consumed_status;
@@ -2108,44 +2366,121 @@ void tick(){
                           static_cast<int>(replay_cursor),melee_web::kRetailReplayCss);
 #endif
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-    if(first_css_browser_draw.armed){
-     auto& state=first_css_browser_draw;
-     ++state.host_tick_calls;
-     state.frame_before=gm_801A4BA8();
-     check(state.frame_before==0&&state.host_tick_calls==1&&
-           state.source_steps==0&&state.host_draw_calls==0,
-           "First-CSS source tick did not begin at exact frame-zero owner");
-     first_css_browser_draw_check_live("before original source tick");
-    }
-#endif
-    result=melee_web_menu_host_tick(host,sample,error,sizeof(error));
-#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-    if(first_css_browser_draw.armed){
-     auto& state=first_css_browser_draw;
-     state.tick_result=result;
-     check(result==1,"First-CSS retained source tick requested a transition or failed");
-     first_css_browser_draw_check_live("after original source tick");
-     state.frame_after_tick=gm_801A4BA8();
-     state.tick=first_css_browser_draw_capture("original source tick return");
-     check(state.frame_after_tick==1&&state.tick.scene_frame==1&&
-           state.tick.source_scene==MELEE_WEB_MENU_HOST_SCENE_CSS&&
-           state.tick.menu_phase==MELEE_WEB_MENU_CSS&&state.tick.scene_kind==8,
-           "First-CSS tick did not advance exactly one live CSS source frame");
-     state.tick_captured=true;
+    if(first_css_browser_postdraw_stream.armed){
+     auto& stream=first_css_browser_postdraw_stream;
+     check(stream.current_input_index==stream.next_input_index&&
+           stream.current_input_index<melee_web::stadium_first_css_diagnostic::kPostdrawBatchCount&&
+           stream.consumed_inputs==stream.current_input_index&&
+           stream.host_tick_calls==stream.matched_ticks&&
+           stream.host_draw_calls==stream.matched_draws&&
+           stream.matched_ticks==stream.matched_draws&&
+           !stream.tick_captured&&!stream.transition_captured&&
+           source_frames.steps()==0&&source_frames.draws()==0&&!source_frames.pending(),
+           "First-CSS stream tick no longer owns the next exact retained input");
+     first_css_browser_postdraw_stream_check_live(
+         "before streamed host tick",
+         first_css_browser_draw.draw.scene_frame+stream.matched_ticks);
+     ++stream.host_tick_calls;
+     ++stream.consumed_inputs;
+     result=melee_web_menu_host_tick(host,sample,error,sizeof(error));
+     ++stream.executed_host_ticks;
+     stream.tick_result=result;
+     check(result==1||result==3,error[0]?error:
+           "First-CSS stream host tick returned an unsupported result");
+     if(result==3){
+      stream.transition=first_css_browser_draw_capture(
+          "first-CSS post-draw transition tick return");
+      stream.transition_captured=true;
+      const bool approved=first_css_browser_postdraw_stream_compare(
+          "transition",first_css_browser_postdraw_stream_actual_json(
+              stream.transition,stream.current_input_index,
+              stream.current_input_index+1,result,true));
+      check(!approved,
+            "First-CSS stream transition comparator unexpectedly approved a draw boundary");
+      stream.terminal=true;
+      if(stream.current_input_index==
+         melee_web::stadium_first_css_diagnostic::kPostdrawBatchCount-1){
+       stream.outcome="stop_after_last_input_request";
+       message="First-CSS stream stopped at its retained final transition input; final draw is unpaired.";
+      }else{
+       first_css_browser_postdraw_stream_fail(
+           "Original CSS requested transition before the retained input cap",
+           "early_source_transition_before_raw_pair_cap");
+      }
+      running=false;menu_clock.reset();
+      first_css_draw_terminal=true;
+      first_css_browser_draw_refresh_observation();
+      break;
+     }
+     const uint32_t expected_frame=first_css_browser_draw.draw.scene_frame+
+         stream.matched_ticks+1;
+     first_css_browser_postdraw_stream_check_live(
+         "after streamed host tick",expected_frame);
+     stream.tick=first_css_browser_draw_capture(
+         "first-CSS post-draw source tick return");
+     check(stream.tick.scene_frame==expected_frame,
+           "First-CSS stream source tick did not advance exactly one scene frame");
+     stream.tick_captured=true;
+     const bool approved=first_css_browser_postdraw_stream_compare(
+         "tick",first_css_browser_postdraw_stream_actual_json(
+             stream.tick,stream.current_input_index,
+             stream.current_input_index+1,result,false));
+     if(!approved){
+      first_css_browser_postdraw_stream_fail(
+          "First-CSS stream SourceTick comparator refused the actual source state");
+      first_css_draw_terminal=true;
+      first_css_browser_draw_refresh_observation();
+      break;
+     }
+     stream.tick_approved=true;
+     ++stream.matched_ticks;
      first_css_browser_draw_refresh_observation();
-    }
+     source_frames.did_step();
+    }else{
+     if(first_css_browser_draw.armed){
+      auto& state=first_css_browser_draw;
+      ++state.host_tick_calls;
+      state.frame_before=gm_801A4BA8();
+      check(state.frame_before==0&&state.host_tick_calls==1&&
+            state.source_steps==0&&state.host_draw_calls==0,
+            "First-CSS source tick did not begin at exact frame-zero owner");
+      first_css_browser_draw_check_live("before original source tick");
+     }
+     result=melee_web_menu_host_tick(host,sample,error,sizeof(error));
+     if(first_css_browser_draw.armed){
+      auto& state=first_css_browser_draw;
+      state.tick_result=result;
+      check(result==1,"First-CSS retained source tick requested a transition or failed");
+      first_css_browser_draw_check_live("after original source tick");
+      state.frame_after_tick=gm_801A4BA8();
+      state.tick=first_css_browser_draw_capture("original source tick return");
+      check(state.frame_after_tick==1&&state.tick.scene_frame==1&&
+            state.tick.source_scene==MELEE_WEB_MENU_HOST_SCENE_CSS&&
+            state.tick.menu_phase==MELEE_WEB_MENU_CSS&&state.tick.scene_kind==8,
+            "First-CSS tick did not advance exactly one live CSS source frame");
+      state.tick_captured=true;
+      first_css_browser_draw_refresh_observation();
+     }
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+     if(probe_css_tick)
+      replay_boundary_mark("css_tick_returned",static_cast<int>(source_frames.steps()),
+                           static_cast<int>(replay_cursor),result);
 #endif
+     check(result==1||result==3,error);
+     source_frames.did_step();
+     if(first_css_browser_draw.armed){
+      check(result==1,"First-CSS source tick returned a transition result");
+      ++first_css_browser_draw.source_steps;
+     }
+    }
+#else
+    result=melee_web_menu_host_tick(host,sample,error,sizeof(error));
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
     if(probe_css_tick)
      replay_boundary_mark("css_tick_returned",static_cast<int>(source_frames.steps()),
                           static_cast<int>(replay_cursor),result);
 #endif
     check(result==1||result==3,error);source_frames.did_step();
-#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-    if(first_css_browser_draw.armed){
-     check(result==1,"First-CSS source tick returned a transition result");
-     ++first_css_browser_draw.source_steps;
-    }
 #endif
    }
    if(melee_web_net_active())melee_web_net_after_step();
@@ -2196,7 +2531,12 @@ void tick(){
   replay_boundary_mark("ordinary_audio_boundary_begin",static_cast<int>(audio_elapsed.steps),
                        audio_elapsed.stalled?1:0,audio_before_construction?1:0);
 #endif
-  if(!audio_before_construction&&!audio_elapsed.stalled)
+  if(!audio_before_construction&&!audio_elapsed.stalled
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+     &&!(first_css_browser_postdraw_stream.armed&&
+         first_css_browser_postdraw_stream.terminal)
+#endif
+     )
    for(unsigned step=0;step<audio_elapsed.steps;step++){
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
     replay_boundary_mark("ordinary_audio_tick_begin",static_cast<int>(step),
@@ -2218,26 +2558,79 @@ void tick(){
   replay_boundary_mark("source_frames_finish_begin",static_cast<int>(source_frames.steps()),
                        static_cast<int>(source_frames.draws()),static_cast<int>(replay_cursor));
 #endif
-  source_frames.finish(present_source);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-  if(first_css_browser_draw.armed&&
-     (first_css_browser_draw.complete||first_css_browser_draw.failed)){
-   check(source_frames.steps()==0&&source_frames.draws()==0,
-         "Terminal first-CSS diagnostic advanced source work in a later callback");
+  auto& postdraw_stream=first_css_browser_postdraw_stream;
+  if(postdraw_stream.armed&&postdraw_stream.terminal){
+   check(source_frames.steps()==0&&source_frames.draws()==0&&!source_frames.pending(),
+         "Terminal first-CSS stream advanced or finished an unapproved source draw");
    first_css_draw_terminal=true;
-  }else if(first_css_browser_draw.armed&&first_css_browser_draw.kicked&&
-           first_css_browser_draw.draw_captured){
-   auto& state=first_css_browser_draw;
-   check(source_frames.steps()==1&&source_frames.draws()==1&&state.source_steps==1&&
-         state.source_draws==1&&state.host_tick_calls==1&&state.host_draw_calls==1&&
-         state.aurora_begin_calls==1&&state.aurora_end_calls==1&&
-         state.frame_end_returned&&state.tick_result==1,
-         "First-CSS browser draw did not finish as exactly one tick and one presented draw");
-   state.complete=true;
-   first_css_draw_terminal=true;
-   running=false;menu_clock.reset();
-   first_css_browser_draw_refresh_observation();
+  }else{
+   source_frames.finish(present_source);
+   if(postdraw_stream.armed){
+    if(postdraw_stream.terminal){
+     if(!postdraw_stream.failed){
+      check(source_frames.steps()==1&&source_frames.draws()==1&&
+            !source_frames.pending()&&postdraw_stream.tick_captured&&
+            postdraw_stream.tick_approved&&postdraw_stream.draw_captured&&
+             postdraw_stream.host_draw_calls==postdraw_stream.matched_draws&&
+            postdraw_stream.aurora_begin_calls==postdraw_stream.aurora_end_calls&&
+            postdraw_stream.frame_end_returned&&postdraw_stream.complete&&
+            postdraw_stream.outcome=="bounded_pair_cap"&&
+            postdraw_stream.next_input_index==
+                melee_web::stadium_first_css_diagnostic::kPostdrawBatchCount&&
+            postdraw_stream.matched_ticks==
+                melee_web::stadium_first_css_diagnostic::kPostdrawBatchCount&&
+            postdraw_stream.matched_draws==
+                melee_web::stadium_first_css_diagnostic::kPostdrawBatchCount,
+            "Terminal CSS stream cap did not retire all 148 actual Aurora frames exactly once");
+     }
+     first_css_draw_terminal=true;
+     running=false;menu_clock.reset();
+     first_css_browser_draw_refresh_observation();
+    }else if(postdraw_stream.kicked&&source_frames.steps()!=0&&
+             postdraw_stream.current_input_index<
+             melee_web::stadium_first_css_diagnostic::kPostdrawBatchCount){
+     check(source_frames.steps()==1&&source_frames.draws()==1&&
+           !source_frames.pending()&&postdraw_stream.tick_captured&&
+           postdraw_stream.tick_approved&&postdraw_stream.draw_captured&&
+           postdraw_stream.draw_approved&&postdraw_stream.host_tick_calls==
+               postdraw_stream.matched_ticks&&postdraw_stream.host_draw_calls==
+               postdraw_stream.matched_draws&&postdraw_stream.matched_ticks==
+               postdraw_stream.current_input_index+1&&postdraw_stream.matched_draws==
+               postdraw_stream.current_input_index+1&&postdraw_stream.consumed_inputs==
+               postdraw_stream.current_input_index+1&&postdraw_stream.next_input_index==
+               postdraw_stream.current_input_index+1&&postdraw_stream.aurora_begin_calls==
+               postdraw_stream.aurora_end_calls&&postdraw_stream.frame_end_returned,
+           "First-CSS stream pair did not finish as one approved tick and one presented draw");
+    }else if(postdraw_stream.armed){
+     check(source_frames.steps()==0&&source_frames.draws()==0&&
+           !source_frames.pending()&&postdraw_stream.host_tick_calls==
+               postdraw_stream.matched_ticks&&postdraw_stream.host_draw_calls==
+               postdraw_stream.matched_draws&&postdraw_stream.aurora_begin_calls==
+               postdraw_stream.aurora_end_calls,
+           "Idle first-CSS stream callback changed source or presentation ownership");
+    }
+   }else if(first_css_browser_draw.armed&&
+            (first_css_browser_draw.complete||first_css_browser_draw.failed)){
+    check(source_frames.steps()==0&&source_frames.draws()==0,
+          "Terminal first-CSS diagnostic advanced source work in a later callback");
+    first_css_draw_terminal=true;
+   }else if(first_css_browser_draw.armed&&first_css_browser_draw.kicked&&
+            first_css_browser_draw.draw_captured){
+    auto& state=first_css_browser_draw;
+    check(source_frames.steps()==1&&source_frames.draws()==1&&state.source_steps==1&&
+          state.source_draws==1&&state.host_tick_calls==1&&state.host_draw_calls==1&&
+          state.aurora_begin_calls==1&&state.aurora_end_calls==1&&
+          state.frame_end_returned&&state.tick_result==1,
+          "First-CSS browser draw did not finish as exactly one tick and one presented draw");
+    state.complete=true;
+    first_css_draw_terminal=true;
+    running=false;menu_clock.reset();
+    first_css_browser_draw_refresh_observation();
+   }
   }
+#else
+  source_frames.finish(present_source);
 #endif
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
   replay_boundary_mark("source_frames_finish_returned",static_cast<int>(source_frames.steps()),
@@ -2276,7 +2669,10 @@ void tick(){
   abort_sudden_death_after_failure(primary);
   diagnostic_incident(4);running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();menu_clock.reset();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-  if(first_css_browser_draw.armed){
+  if(first_css_browser_postdraw_stream.armed){
+   first_css_browser_postdraw_stream_fail(e.what());first_css_draw_terminal=true;
+   first_css_browser_draw_refresh_observation();
+  }else if(first_css_browser_draw.armed){
    first_css_browser_draw_fail(e.what());first_css_draw_terminal=true;
    first_css_browser_draw_refresh_observation();
   }
@@ -2459,7 +2855,8 @@ int melee_web_native_menu_stadium_first_css_draw_arm(
        asset_destination==AssetDestination::None&&!asset_committed&&
        asset_scope.pending_generation()==0&&world&&host&&!host_entered&&
        !world_exposed&&!match&&!results&&!prize&&!pending&&!running&&
-       !replay&&!melee_web_net_active()&&source_session_owned&&!preparation.busy()&&
+       !replay&&!melee_web_net_active()&&diagnostic_start_ticks==0&&
+       diagnostic_pad_remaining==0&&source_session_owned&&!preparation.busy()&&
        melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED&&
        melee_web_menu_host_mode_kind(host)==GM_VS,
        "First-CSS draw arm requires one prepared, unentered imported-disc VS host");
@@ -2502,6 +2899,60 @@ const char* melee_web_native_menu_stadium_first_css_draw_observe(){
  first_css_browser_draw_refresh_observation();
  return first_css_browser_draw.observation.c_str();
 }
+int melee_web_native_menu_stadium_first_css_postdraw_stream_arm(
+    const uint8_t* input_bytes,unsigned input_size){try{
+ auto& baseline=first_css_browser_draw;
+ auto& stream=first_css_browser_postdraw_stream;
+ check(!stream.armed&&baseline.armed&&baseline.complete&&!baseline.failed&&
+       baseline.entry_captured&&baseline.tick_captured&&baseline.draw_captured&&
+       baseline.frame_end_returned&&baseline.source_steps==1&&baseline.source_draws==1&&
+       baseline.host_tick_calls==1&&baseline.host_draw_calls==1&&
+       baseline.aurora_begin_calls==1&&baseline.aurora_end_calls==1&&
+       baseline.tick_result==1&&!running&&!faulted&&!pending&&!replay&&
+       !melee_web_net_active()&&preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&
+       !preparation.busy()&&asset_destination==AssetDestination::None&&
+       world&&host&&host_entered&&!match&&!results&&!prize,
+       "First-CSS post-draw stream arm requires the completed one-shot baseline");
+ first_css_browser_draw_check_live("postdraw stream arm");
+ check(gm_801A4BA8()==baseline.draw.scene_frame&&seed_ptr==baseline.seed_owner&&
+       *baseline.seed_owner==baseline.draw.seed&&
+       melee_web_current_scene_info()==baseline.scene_owner,
+       "First-CSS post-draw stream cannot continue after an intervening source change");
+ check(EM_ASM_INT({return typeof globalThis.__meleeWebStadiumFirstCssStreamCompare===
+                    'function'?1:0;})==1,
+       "First-CSS post-draw stream host comparator is absent");
+ auto input=melee_web::stadium_first_css_diagnostic::decode_postdraw_input(
+     input_bytes,input_size,baseline.context.source_sha256);
+ stream=FirstCssBrowserPostdrawStreamState{};
+ stream.input=std::move(input);
+ stream.armed=true;
+ stream.executed_host_ticks=1;
+ first_css_browser_draw_refresh_observation();
+ message="Private first-CSS post-draw stream armed after the matched one-shot baseline.";
+ return 1;
+}catch(const std::exception& error){message=error.what();return 0;}}
+int melee_web_native_menu_stadium_first_css_postdraw_stream_kick(){try{
+ auto& baseline=first_css_browser_draw;
+ auto& stream=first_css_browser_postdraw_stream;
+ check(stream.armed&&!stream.kicked&&!stream.terminal&&!stream.failed&&
+       baseline.armed&&baseline.complete&&!baseline.failed&&
+       baseline.frame_end_returned&&!running&&host&&world&&host_entered&&
+       stream.next_input_index==0&&stream.consumed_inputs==0&&
+       stream.host_tick_calls==0&&stream.executed_host_ticks==1&&
+       stream.matched_ticks==0&&stream.matched_draws==0,
+       "First-CSS post-draw stream kick requires its unchanged completed baseline");
+ first_css_browser_postdraw_stream_check_live(
+     "postdraw stream pre-kick",baseline.draw.scene_frame);
+ check(*baseline.seed_owner==baseline.draw.seed&&
+       gm_801A4BA8()==baseline.draw.scene_frame,
+       "First-CSS post-draw stream lost the baseline seed or scene frame");
+ stream.kicked=true;
+ menu_clock.reset();audio_clock.reset();running=true;
+ first_css_browser_draw_refresh_observation();
+ return 1;
+}catch(const std::exception& error){
+ first_css_browser_postdraw_stream_fail(error.what(),"kick-refused");
+ first_css_browser_draw_refresh_observation();return 0;}}
 #endif
 }
 int main(int argc,char** argv){
