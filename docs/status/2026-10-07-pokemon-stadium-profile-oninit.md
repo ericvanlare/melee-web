@@ -1,6 +1,6 @@
 # Pokémon Stadium diagnostic profile and OnInit boundary
 
-**Compiled / Synthetic controls / Source identified / Native traced / one-world functional interval passed**
+**Compiled / Synthetic controls / Source identified / Native traced / two same-process functional lifetimes passed**
 
 **Current boundary:** the separately reviewed native source CSS→SSS setup observation
 on `a29f8d69` records the first-CSS seed and the distinct SSS-selected seed,
@@ -11,18 +11,33 @@ the source Stage gate clear and GO in world tick 84, the next complete tick 85,
 HUD Ready at tick 124, and checked world/Session close.
 Its trace does not emit the typed setup receipt or bind the first-CSS seed
 context to match construction, so it cannot be paired with the separate setup
-receipt. A separate native functional run on `ee2f3ab9` then completed one
+receipt. A separate native functional run on `ee2f3ab9` completed one
 neutral-input, no-draw lifetime through exactly 3,500 post-GO world ticks and
-checked full close. It is not a second lifetime or an original comparison; the
-per-owner RNG ledger, matched original context, and C3 gates remain open. A later
-same-process pair on `266c9c44` completes and releases its first lifetime, then
-fails before second Match construction on an occupied `grDatFiles` slot; the
-failed evidence is retained. The ordinary Results regression on `ee2f3ab9` also passed after a source-audited
-fixture correction, including two actual original Results entries and checked
-Session end. The initial missing-`LbRf.dat` preparation failure remains retained. The `a29f8d69` full suite and
-ordinary Release build passed; those checks do not execute the separate long
-interval. Earlier failures below remain historical evidence with their
-original scopes.
+checked full close. The later corrected producer `8f785fe5` completes two such
+lifetimes sequentially in one Node process, each with PCM processing and full
+checked Session release before recreation. All 7,000 step records, 256 current
+bindings and 98 fixtures were independently verified. This is functional
+recreation evidence; original setup/per-owner RNG comparison and C3 remain open.
+The failed pair on `266c9c44` and shorter refusal on `9a1909d1` remain retained.
+The ordinary Results regression also passed on the exact `8f785fe5` ordinary
+producer after the archive ownership changes, including two original Results
+entries and checked Session end. The earlier `ee2f3ab9` pass and initial
+missing-`LbRf.dat` preparation failure are retained.
+The earlier original failures remain retained. The Items-lock observer on
+`1f146dde` passed its canonical original compiler. Its changed capture observes
+Items lock 1→0, the existing Up reaching row 31/value 3 and frequency 3→2→1→0,
+then live CSS and the verified SSS constructor return. It stops at SSS readiness:
+the authored Random index 30 has no stage-kind slice, while the inherited owner
+classifier requires one; the strict Stadium validator also rejects index 30.
+All 109 inputs remain unchanged; the driver exits 1 naturally and reaps its
+terminated Dolphin child (exit 0), with both absent. The streams are incomplete;
+no SSS steering/confirmation, VS setup or GO was reached. The three test-only
+harness repairs are integrated at `ee159395`; their retained candidate controls
+pass 34 tests with one optional skip, and the canonical focused run
+also passes 34 tests with one skip (3.697 seconds). The full suite on exact `ee159395` passes 2,374 tests in 520.540 seconds
+with 161 skips and zero failures/errors; PID 53748 exits naturally and is absent.
+The prior `1f146dde` failure remains retained. This validates the test-only
+repair commit, not the proposed reader correction or C3 acceptance.
 
 The diagnostic-only Stadium profile and profile-to-`DatNativeMapContract`
 adapter compile in the C1 trace target. Focused profile and borrowed-yakumono
@@ -782,13 +797,53 @@ shows SIGINT sent to the directly owned driver before the 180-second cap; the
 driver returned -2 and terminated/reaped its direct Dolphin child (exit 0). All
 23 launch inputs remained unchanged. No CSS, SSS, GO, original match or
 comparison was observed. This is a preparation failure, not original match
-evidence; the pre-CSS observation path needs a reviewed correction before a
-changed attempt. The original per-owner RNG comparison and all C3 gates remain
+evidence; the subsequent corrected pre-CSS attempt is recorded below.
+The original per-owner RNG comparison and all C3 gates remain
 open. Ordinary public Stadium admission remains closed.
 
+The corrected pre-CSS observer on `c2d5086f` passed ten focused controls and its
+canonical headless compiler build. A changed capture now observes boot PAD/menu
+progress, but stops before CSS at `items-frequency-row:observed`. The declared
+Up pulse was consumed while the expected row transition was not observed. This
+stream does not expose the Items-lock value; source and a separate retained
+reducer suggest the lock as the next hypothesis, not an observed fact for this
+run. All 33 launch inputs stayed unchanged; the driver and its owned Dolphin
+child were reaped. The reviewed `items-frequency-row-lock-proposal-v2` is integrated at
+`1f146dde` with 13+6 focused controls and a passing canonical original compiler.
+The next changed capture observes Items lock 1→0 and the authored row/frequency
+progress, reaches live CSS and the verified SSS constructor return, then fails
+at the receiver's SSS readiness predicate. Of 650 SSS polls, 38 precede the
+published index and 612 expose Random index 30 with no kind slice. The inherited
+Sheik owner classifier returns no owner for this valid shape; the Stadium
+validator independently rejects it. The raw stream is not an original setup or
+GO result. Its 109 inputs are unchanged; driver 53395 exits 1 naturally and reaps
+Dolphin 53396 after termination (exit 0), with both absent. The existing receipt
+binds `root-original-stadium-go-failure-1f146dde-v3.json` and
+`sol-original-stadium-go-result-sss-reduction-review-v1.json`.
+
+Offline validation also finds an earlier reader gap: raw sequence 2 lacks
+SceneKind tag 40 before the first source scene exists. The native observer
+authors that absence; 107 such boot polls precede accepted CSS entry. The
+correction must accept absent scene observation only before that entry while
+retaining the complete original PAD contract and rejecting premature owners or
+match boundaries. Post-CSS scene and owner requirements remain strict.
+
+The source-only next step reuses the authored distinction between normal
+indices 0–29 with a table-row kind and Random index 30 without one, in a
+Stadium-only receiver/validator correction. Random must remain navigation only;
+confirmation still requires exact Stadium index 18/kind 3 and consumed PAD plus
+neutral release. Focused retained-prefix and negative controls precede any new
+capture. The three test-only harness repairs are integrated at `ee159395`;
+34 candidate focused tests pass with one optional skip, the
+canonical focused run passes 34 tests with one skip (3.697 seconds), and the full suite on exact `ee159395` passes 2,374 tests in 520.540 seconds
+with 161 skips and zero failures/errors. Its result/log and exact test identity
+are bound in the existing receipt. The failed `1f146dde` suite remains retained;
+the reader correction is still unintegrated and unrun. No C3 or merge claim follows.
+
 The `a29f8d69` full suite passed 2,350 tests with 171 skips and zero failures.
-This is the recorded production baseline; final current-head integration
-validation is still required before a milestone merge.
+This remains the historical production baseline. The later exact `ee159395`
+full-suite PASS above covers the test-only repair; the original prefix gaps and
+remaining milestone gates stay open.
 
 These results do not establish C3, original equivalence, rendering, browser
 behavior, physical-input, audible-output or timing acceptance.
@@ -863,7 +918,58 @@ signal was sent. The reducer establishes where the slot first becomes populated
 and that it persists, but not which owner should retire it. Preserve the strict
 refusal and original source order; no blanket clear or unchanged pair rerun follows.
 
-The next step is a source ownership audit and focused owned/foreign/replaced-row
-control before another short lifecycle attempt. No second Match, second completed
-lifetime, original comparison or C3 acceptance is established. Ordinary public
-Stadium admission remains closed.
+The subsequent ownership audit found that the original ordinary preload row must
+retire before its checked StageMap archive scope. The diagnostic-only correction
+on `8f785fe5` captures all four row tuples and both archive identities, checks the
+complete table and downstream close preflight, then calls the original release
+routine only for populated owned rows. Foreign or replaced owners and extra
+consumers refuse before any release. Host controls and a composed real-SDK
+StageMap/registry/original-preload control passed; the latter uses a synthetic
+typed catalog and does not prove full E8 timing or allocator address reuse.
+
+The short game reducer then passed: it reached Ready, closed the first Match and
+Session, and completed the second strict SSS preflight and close. All four slots
+were zero after Match close and at every subsequent sampled boundary. Independent
+review verified all nine snapshots, 36 slot rows and 156 unchanged input bindings.
+The directly owned Node child exited naturally with code zero and was reaped
+without signals. The previous failed producers and observations remain retained.
+
+The subsequent same-process pair on the same `8f785fe5` producer passed.
+Session allocation generations 1 and 2 and gameplay world generations 3 and 6
+each completed exactly 3,500 post-GO neutral/no-draw ticks with PCM processing.
+Both observed GO endpoints were 85, Ready was 124, the interval ended at world
+tick 3,585 and the final source frame was 3,461. Those equal timings are observed,
+not assumed across lifetimes. Each close reports world, objects, processes,
+current context and Toy state zero, followed by Session identity, generation
+and bytes all zero. The numeric Session address was equal with a newer
+generation; no allocator-address reuse inference is needed.
+
+Independent review verified all 7,000 step rows, 256 current immutable bindings,
+98 fixtures and 17 raw files. The directly owned unittest PID 14516 and Node
+PID 14522 exited naturally with code zero, were reaped and were absent; no
+cleanup signal was sent. The exact tracked pair assertions and child/supervisor
+ownership remained unchanged. The evidence receipt binds
+`root-stadium-functional-idle-pair-frozen-result-v2.json` and
+`sol-stadium-functional-idle-pair-result-review-v2.json`; prior failures remain
+under their historical producer identities.
+
+This passes two functional source lifetimes only. Timer/transform state,
+screen/title/SIS, stock-out/standings and original setup/per-owner RNG comparison
+remain unobserved or unpaired. No draw/PCM equivalence, browser, physical-input,
+audible-output, timing or C3 acceptance follows. The next bounded source work is
+both retained reader gaps (pre-CSS absent scene and SSS Random navigation),
+with focused strict-negative controls before a changed capture. The existing
+full-suite PASS applies to `ee159395`, not that future correction. Ordinary public Stadium admission remains closed.
+
+The ordinary Results regression was also repeated on the exact `8f785fe5`
+ordinary Release producer with Stadium diagnostics off. It passed both original
+No Contest and Mario/FD four-stock elimination Results paths and returned to CSS.
+The trace observes Ready at 124 ticks and the GAME ending transition across 114
+frozen ticks; stdout retains two typed Results PAD records. The checked Session
+end returned success. This recipe does not emit numeric allocation-zero fields,
+so no such post-close snapshot is claimed. All 172 pre/post input bindings and
+124 fixture files matched; owned Node PID 16325 exited naturally with code zero,
+was reaped and was absent without cleanup signals. The unique
+`root-ordinary-results-8f785fe5-frozen-result-v1.json` and independent review bind
+this functional result. Subsequent `1f146dde` observer/driver edits do not change
+its recorded producer identity or establish a new original comparison.

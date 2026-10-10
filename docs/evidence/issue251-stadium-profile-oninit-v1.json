@@ -318,8 +318,8 @@
     "no_machine_specific_path_required": true
   },
   "subsequent_c3_component_2026_10_09": {
-    "claim_boundary": "Existing October7 profile receipt remains historical. This update preserves V26 and identifies the exact later producer; componentcontrols do not pass C3.",
-    "current_result": "One native Stadium lifetime and the ordinary Mario/FD Results regression pass on their exact recorded sources. The 266c9c44 same-process pair still fails before second Match construction. A reduced 9a1909d1 diagnostic locates first slot-0 population after Stage_802251E8 and observes the tuple persist through second preflight; owner/liveness remains unknown. The original observer compiles and its focused driver controls pass, but the first original capture stops before CSS with zero menu boundaries. No original comparison, second completed Match or C3 acceptance.",
+    "claim_boundary": "Native setup, GO/Ready, one postReady tick, two sequential 3,500 post-GO functional lifetimes and ordinary Results regression are scoped to their exact producers. The successful pair observes full release/recreation, but no original setup/per-owner RNG comparison, live timer/transform/title/SIS/screen/stock-out/standings or draw/PCM equivalence. Original c2 capture fails before CSS; browser, physical input, audible output, timing and C3 acceptance remain open. Runtime claims remain bound to 8f785fe5; subsequent 1f146dde changes are observer/driver source integration, with compiler/full-suite and changed capture pending.",
+    "current_result": "Two same-process native Stadium functional lifetimes and ordinary Mario/FD Results regression pass on exact8f785fe5 producers. Original Items-lock observer1f146dde compiler passes; its changed capture observes lock1\u21920, Items row31/frequency3\u21920, liveCSS and verifiedSSS constructor return, then fails SSS readiness because authoredRandomindex30 has no kind and existing receiver/validator reject that navigation shape. NoVSsetup/GO. Test-only harness repair integratedee159395; fullsuitePASS2374tests/161skips/0failures/errors520.540s onexactee159395; proposedreaderfixunintegrated/unrun. No original setup/per-owner RNG comparison or C3 acceptance.",
     "prior_v26": {
       "source_commit": "b8c272c44a94bcb03f0371008851e468200d4496",
       "first_failure": "heap_free_bytes",
@@ -487,7 +487,7 @@
         "SDK unittest moduleimport failure beforeNode; fixedexplicit scriptsimport and retainedoutput"
       ]
     },
-    "next_progression": "Audit the grDatFiles row owner and source retirement boundary; preserve the strict guard and original order. Separately correct and review the original observer pre-CSS PAD path before any changed capture. Keep the two prior failures and the pre-CSS failure retained. Original setup/RNG comparison and remaining C3 gates stay open; ordinary Stadium admission closed.",
+    "next_progression": "Current-head ee159395 full suite passes; review the same external Stadium-only receiver/validator correction for both verified gaps: pre-CSS scene-slice absence and authored Random-index navigation. Retained-prefix and synthetic strict-negative controls precede one changed bounded original capture. Preserve all prior failures; matched original setup/per-owner RNG and remaining C3 gates stay open; public Stadium admission closed.",
     "private_evidence": {
       "external_run_id": "stadium-c3-lifetime-20261009-074216-4d7cf7d1",
       "artifact_names_relative_to_run": true,
@@ -2018,8 +2018,8 @@
         },
         "retirement_scope": "Both failures retain the armed pre-OnStart match, with a 32MiB arena. Process exit/reaping is not checked world or Session retirement. Earlier Ready/postReady close passes retain their separate source identities.",
         "source_reduction": "The first two observer attempts rejected a child-null predicate. Original Ground_GetStageGObj installs Ground_801C1CD0 priority1 then Ground_801C1D38 priority4; Stadium installs grStadium_801D1520 priority4, and SDK SetupProc prepends each through child. The later successful GO canary resolves that child-null predicate operationally for its completed source route. The two child addresses were not captured; no address-identity or child-lifetime claim follows.",
-        "next": "The reduced grDatFiles diagnostic now locates slot-0 population immediately after Stage_802251E8 and confirms persistence through the second preflight; exact ownership remains unresolved. Preserve the strict refusal and audit the original row owner before a changed short lifecycle. The first original capture attempt also stopped before CSS because its AwaitCss observer suppressed the PAD rows required by the driver; correct and review that path before another capture. Original setup/state and per-owner RNG comparison, screen/title/SIS observations, stock-out/standings and C3 retirement/recreation remain open.",
-        "validation_limits": "The port-side GO canary remains a port-only trace and is not paired with the separate setup observation. The ee2f3ab9 recipe passed one 3,500-post-GO lifetime; the 266c9c44 pair still fails before second Match construction, with no second full lifetime or checked second Session close. The reduced grDatFiles diagnostic narrows the failure to a tuple populated after Stage_802251E8 and retained through second preflight, without proving owner or pointee liveness. The original observer compile-only build and 57 focused controls passed, but the first capture has only handshake/start/end and zero menu boundaries; no original comparison or per-owner RNG result exists. No C3 or acceptance is established.",
+        "next": "Current-head ee159395 full suite passes; review the same external Stadium-only receiver/validator correction for both verified gaps: pre-CSS scene-slice absence and authored Random-index navigation. Retained-prefix and synthetic strict-negative controls precede one changed bounded original capture. Preserve all prior failures; matched original setup/per-owner RNG and remaining C3 gates stay open; public Stadium admission closed.",
+        "validation_limits": "Port GO/setup receipts remain unpaired. Exact8f pair+ordinary regression are functional PASS. Original1f capture reaches CSS/SSS but receiver cannot admit Randomindex30 navigation; noVSsetup/GO, completeinput, per-ownerRNG orC3acceptance.",
         "successful_port_canary": {
           "source": "a92352ea5b3a89de22f615c52e8b08a9a8167dc8",
           "source_tree": "3697bf605a60721a5eab7e4b0a842e41b364fa55",
@@ -2184,12 +2184,11 @@
         ]
       },
       "original_go_observer_candidate": {
-        "status": "V3_COMPILER_ONLY_AND_FOCUSED_CONTROLS_PASS; FIRST_CAPTURE_FAILED_PRE_CSS",
+        "status": "ITEMS_LOCK_COMPILER_PASS; ORIGINAL_CAPTURE_FAILED_SSS_RANDOM_RECEIVER",
         "limitations": [
-          "compile-only observer build; no original runtime result from compilation",
-          "first capture stopped before CSS because ordinary PAD rows are suppressed while the observer awaits CSS and the driver needs a menu row to navigate from boot",
-          "retained observer trace has handshake/start/end only and zero menu boundaries; input stream is incomplete",
-          "no original CSS/SSS/GO/match or comparison; no per-owner RNG ledger"
+          "Earlier pre-CSS and Items-row failures are retained below with their original scopes.",
+          "Current1f capture observes Items-lock progress, liveCSS and verifiedSSSreturn but noVSsetup/GO.",
+          "Streams interrupted/incomplete; no matchedsetup/perownerRNG orC3acceptance."
         ],
         "compiler_result": {
           "artifact": "root-original-stadium-observer-compiler-result-v1.json",
@@ -2281,7 +2280,195 @@
           "freeze_sha256": "6a8de52d7b7cab3522149f11dddcbb75b3842e1e6fb9176c7d4fc503c7369775",
           "patch_sha256": "b0c825da67a126088a2b5a40a78d122bfd7beb14dc23e2e8123e0ee57b8bbb66"
         },
-        "current_observer_version": "v3"
+        "current_observer_version": "v3",
+        "corrected_boot_capture": {
+          "source_commit": "c2d5086f6db1b7010232a13a3bd93c55309ab77b",
+          "compiler": {
+            "artifact": "root-original-stadium-boot-compiler-result-v1.json",
+            "bytes": 1505,
+            "sha256": "b0ce6cae8198c05d1a286a9f6bbc80a9f73902d2b3f4e8c3a7729017ad49222c"
+          },
+          "controls": {
+            "artifact": "root-stadium-boot-observer-controls-v1/result.json",
+            "bytes": 504,
+            "sha256": "da71cf27443f5eb72590c2571d668b4f3a73140ce778ab83f975831c02f65b9e"
+          },
+          "failed_capture": {
+            "artifact": "root-original-stadium-go-failure-v2.json",
+            "bytes": 5406,
+            "sha256": "ce748f5547216952d65e069883b7907a7bdfbed2fbc32519e8b729eab9734271"
+          },
+          "result": "Boot PAD/menu rows now observed; stops before CSS at items-frequency-row:observed.33 inputs unchanged; driver11373exit1 and native11374exit0 reaped. GO prefix and native input stream incomplete.",
+          "gap": "This Stadium stream does not observe the Items lock. Source and a separate retained reduced capture suggest lock readiness, but this failed run does not establish its live value.",
+          "next": "Current-head ee159395 full suite passes; review the same external Stadium-only receiver/validator correction for both verified gaps: pre-CSS scene-slice absence and authored Random-index navigation. Retained-prefix and synthetic strict-negative controls precede one changed bounded original capture. Preserve all prior failures; matched original setup/per-owner RNG and remaining C3 gates stay open; public Stadium admission closed."
+        },
+        "items_lock_source_candidate": {
+          "status": "COMPILER_PASS_CAPTURE_FAILED_SSS_RANDOM_RECEIVER",
+          "source_head": "1f146ddef1c9696844fb178a86bd11342fe9274d",
+          "source_tree": "244fefac69d815ba57f5b46e13a32d4b12dbfe00",
+          "proposal": {
+            "artifact": "items-frequency-row-lock-proposal-v2/freeze.json",
+            "bytes": 3704,
+            "sha256": "0671b7988bbc5c75c52571def81e6bed68752248376363bddb1671cfd27b2a53"
+          },
+          "root_source_review": {
+            "artifact": "root-stadium-items-lock-source-review-v2.json",
+            "bytes": 2549,
+            "sha256": "f1574d31aee97a19ee9436fb840e7b276145f84c7654886cea5c370977507bd7"
+          },
+          "canonical_focused_controls": {
+            "stadium_go_prefix_passed": 13,
+            "original_stadium_go_driver_passed": 6,
+            "skipped": 0
+          },
+          "change": "Existing tag 56 Items-lock slice is enabled for Stadium capture; exact owner/byte validation retained. The existing one-Up action requires observed items_locked==0 before and after, without changing input alphabet or caps.",
+          "observed_failure_limit": "Actual retained c2 failure did not include lock tag; lock value and causal role remain unobserved.",
+          "runtime": "Changed1f capture advanced through observed Items-lock zero/row progress and CSS/SSS constructors; failed receiver readiness on exactRandomindex30/no kind. NoVSsetup/GO.",
+          "prior_external_v1": {
+            "status": "EXTERNAL_SOURCE_PROPOSAL_ONLY",
+            "freeze": {
+              "artifact": "items-frequency-row-lock-proposal-v1/freeze.json",
+              "bytes": 3096,
+              "sha256": "e58153bd40536623e2a24b803a8d9d534bb0203fdf18dfcac423bd54b346896d"
+            },
+            "change": "Reuse existing tag 56 SdItemsLock/items_lock_state; require exact items_locked==0 before/after the existing one-Up row action.",
+            "observed_failure_limit": "The c2 Stadium failure stream omitted tag 56; lock state and causal role remain unobserved. Source/retained reduction supports a hypothesis only.",
+            "runtime": "No changed capture or original CSS/SSS/GO result from this candidate.",
+            "next": "Independent source review, compiler and focused controls before any changed original capture."
+          },
+          "next": "Current-head ee159395 full suite passes; review the same external Stadium-only receiver/validator correction for both verified gaps: pre-CSS scene-slice absence and authored Random-index navigation. Retained-prefix and synthetic strict-negative controls precede one changed bounded original capture. Preserve all prior failures; matched original setup/per-owner RNG and remaining C3 gates stay open; public Stadium admission closed.",
+          "compiler": {
+            "result": {
+              "artifact": "stadium-items-lock-observer-build-20261009-20261009-235955-1702ecc2/attempt-v1/result.json",
+              "bytes": 2072,
+              "sha256": "d86842d8970912a38921f0f7b03c2363c1d73df630530665da0691d7a72b4933"
+            },
+            "manifest": {
+              "artifact": "stadium-items-lock-observer-build-20261009-20261009-235955-1702ecc2/attempt-v1/artifact/build-manifest.json",
+              "bytes": 4408,
+              "sha256": "d069934af7a4ae8d6b905778833a9e8d2f45d5106b38ff764a875d607ddff294"
+            },
+            "status": "PASS_COMPILER_ONLY",
+            "binary_sha256": "faf93b282319c36caa83686fefe648f0809c9d5edb2458edd691301655307efe",
+            "pid20148_absent": true
+          },
+          "changed_capture": {
+            "frozen_result": {
+              "artifact": "root-original-stadium-go-failure-1f146dde-v3.json",
+              "bytes": 6003,
+              "sha256": "4d65583ca64fe389867898358e83bd5da9904f1c3188cb86ff5d22819b511623"
+            },
+            "independent_review": {
+              "artifact": "sol-original-stadium-go-result-sss-reduction-review-v1.json",
+              "bytes": 10600,
+              "sha256": "213fa81e478fac52959bee31f644f6203462439b89d03b62f44b3566b6c327b2"
+            },
+            "status": "FAILED_RETAINED_SSS_READINESS",
+            "launch_inputs_unchanged": 109,
+            "observer_records": 4709,
+            "input_events": 6118,
+            "streams_complete": false,
+            "observed": "Itemslockzero seq625; row31/value3seq629 thenfrequency2/1/0. CSSliveowner847; SSSentry1608/return1647;612postreturnRandomindex30polls,no kind.",
+            "first_predicate": "receiver.stage is not None; inheritedownerclassifierrequireskind42, which authoredRandomindex30 intentionallyomits. StrictStadiumvalidatoralsoincorrectlyrequiresindex<30.",
+            "unobserved": [
+              "SSSsteering/confirm",
+              "VSsetup",
+              "GO",
+              "matchedportsetup/perownerRNG"
+            ],
+            "offline_earlier_validator_gap": {
+              "review": {
+                "artifact": "sol-original-pre-css-scene-contract-review-v1.json",
+                "bytes": 3542,
+                "sha256": "348cbb77a5445485cb0af94e9e0c8fd0a79d828f83c492e35e6622d5c2aee8d0"
+              },
+              "observed": "Rawseq2 first fails mandatorySceneKind40:107bootpollsseq2..108 have full nativebasePAD but no sourceSceneKind beforefirstCSSentry712. Nativeallowsabsentpre-scene pointer.",
+              "scope": "Phase-scoped absence onlybeforefirstCSS; no postCSS owner/match waiver. Same bounded Pythoncandidate asSSSRandomfix."
+            }
+          },
+          "test_only_regression_repair": {
+            "source_head": "ee159395823f93b9915fbdd07c614a09f95fe602",
+            "source_tree": "99b2e0fac7a143d2d68d96bc0451464ad9fcf4df",
+            "root_review": {
+              "artifact": "root-observer-regression-test-proposal-review-v1.json",
+              "bytes": 1723,
+              "sha256": "0a98e96d85327ad1a02da81ffd6cdcdfe61a49738fc8fd7b19d9df24e001a75d"
+            },
+            "independent_review": {
+              "artifact": "sol-observer-regression-test-proposal-review-v1.json",
+              "bytes": 4603,
+              "sha256": "d4f86902ce30f63d824d30a0c6e0d4585401883d8566f12e0f94396d22dd0f01"
+            },
+            "focused_candidate": {
+              "tests": 34,
+              "skipped": 1,
+              "failures": 0
+            },
+            "canonical_focused": {
+              "result": {
+                "artifact": "root-observer-regression-integrated-focused-v1/result.json",
+                "bytes": 1091,
+                "sha256": "3f11bcb6894f07624111f72437912350442998fb65ddd08d443d5f7c20ab4aa9"
+              },
+              "command": {
+                "artifact": "root-observer-regression-integrated-focused-v1/command.json",
+                "bytes": 942,
+                "sha256": "7760618d0dd92dd4c28b0f9edd01c02b9a12c49332c9c68e807150cec268c02a"
+              },
+              "log": {
+                "artifact": "root-observer-regression-integrated-focused-v1/focused.log",
+                "bytes": 6339,
+                "sha256": "314014694df530d53b4c082db49365d668c0f9a19f83812d13ed44ce75bca292"
+              },
+              "tests": 34,
+              "skipped": 1,
+              "failures": 0,
+              "seconds": 3.697,
+              "source_note": "Run on1f plus exact three candidate test hashes; identical test bytes committedee159395."
+            },
+            "prior_full_suite": {
+              "result": {
+                "artifact": "root-stadium-regression-1f146dde-v1/result.json",
+                "bytes": 616,
+                "sha256": "3f100131e7f856d4784396acdde04199b3e4222a549fe80cdf16deae3fb65528"
+              },
+              "status": "FAILED",
+              "tests": 2374,
+              "failures": 3,
+              "errors": 1,
+              "skipped": 161
+            },
+            "current_full_suite": {
+              "identity": {
+                "artifact": "root-stadium-regression-ee159395-v1/identity.json",
+                "bytes": 348,
+                "sha256": "340e1007fa5bd1644e4f437e99931035bfd6b07583cf2e2bf088a3e37f29b08e"
+              },
+              "status": "PASS",
+              "source_head": "ee159395823f93b9915fbdd07c614a09f95fe602",
+              "source_tree": "99b2e0fac7a143d2d68d96bc0451464ad9fcf4df",
+              "result": {
+                "artifact": "root-stadium-regression-ee159395-v1/result.json",
+                "bytes": 555,
+                "sha256": "73947aa714c4e52675ada7798b03137621008f407ca59c54df577e355d103c1c"
+              },
+              "log": {
+                "artifact": "root-stadium-regression-ee159395-v1/suite.log",
+                "bytes": 445114,
+                "sha256": "9386120c7286c8f626abaa24ce1bc1bb8603fcab37c2d142087d84853eb1c0a3"
+              },
+              "tests": 2374,
+              "seconds": 520.54,
+              "skipped": 161,
+              "failures": 0,
+              "errors": 0,
+              "pid": 53748,
+              "natural_exit": 0,
+              "reaped_absent": true
+            },
+            "scope": "Three tests only; runtime observer/driver unchangedfrom1f. SuitePASS applies exactlyee159395, not proposedreaderfix orC3acceptance."
+          }
+        }
       },
       "current_regression": {
         "source": "a29f8d6940df1c77d68e39da98068a73cbbc906a",
@@ -2406,293 +2593,451 @@
         ]
       },
       "ordinary_results_mario": {
-        "source_head": "ee2f3ab92c7ae99c76d3d3f2724c7835ce1fb371",
-        "source_tree": "147c8bbbf1985bbfc04a4c9a0eba11a2a5abefbf",
-        "production_source_relation": "The ee2f3ab9 extension adds the separately reviewed test recipe; production source is unchanged from the a29f8d69 baseline.",
+        "source_head": "8f785fe5d07ba1bbdca111f10b29cdbca70e6b6c",
+        "source_tree": "5916c6d37771ddd20ed041ce29d875a39d4c7f30",
         "status": "PASS_NATIVE_ORDINARY_RESULTS_REGRESSION",
-        "prior_failed_attempt": {
-          "status": "FAILED_PREPARATION_RETAINED",
-          "artifact": "root-ordinary-results-frozen-failure-v1.json",
-          "sha256": "0c1e0ca8dddd128959e44f474c419940306e1bb42ef1caf58ad0353edfc84040",
-          "first_failure": "Missing source match fixture: LbRf.dat",
-          "boundary": "CSS\u2192SSS and selected Final Destination route; no Match construction, Results or elimination",
-          "immutable_bindings_unchanged": 171
+        "result": {
+          "artifact": "root-ordinary-results-8f785fe5-frozen-result-v1.json",
+          "bytes": 3325,
+          "sha256": "fddea586e3393bf546e566ab99151bb62c9ba8f4a85eb569033bb44aa4713267"
         },
-        "source_only_fixture_audit": {
-          "artifact": "sol-stadium-results-fixture-source-map-v2.json",
-          "sha256": "7306a1ea9251f61712a91d2fbfab03d711a7d0ef4bd520245c5ac5711985ca03",
-          "decision": "COMPLETE_RETAINED_SOURCE_MAP_SOURCE_ONLY",
-          "required_recipe_files": 124,
-          "total_bytes": 71076209,
-          "correction": "LbRf.dat is part of the complete selected Match recipe and was absent from the failed fixture.",
-          "scope": "Source inventory only; the audit itself performed no runtime."
+        "independent_result_review": {
+          "artifact": "sol-ordinary-results-result-review-v3.json",
+          "bytes": 4012,
+          "sha256": "aa057cff132a45caff882de98faba614aeb97421c90a49f8653fe0083b7954a1"
         },
-        "successful_attempt": {
-          "frozen_result": {
-            "artifact": "root-ordinary-results-frozen-result-v2.json",
-            "bytes": 4521,
-            "sha256": "a3cfd820062a7408f25fa5815d12a85bc49861537a4918b0f9caadff685cc1a6"
+        "producer": {
+          "artifact": "stadium-ordinary-trace-producer-8f785fe5-v1/identity.json",
+          "bytes": 12741,
+          "sha256": "0e1df825c364c5305d318053b9a679ff4f5a766011959f57f32199b58da2bf1b"
+        },
+        "packet": {
+          "artifact": "ordinary-results-preflight-packet-v3.json",
+          "bytes": 4005,
+          "sha256": "9917de63b80415a6150a9a9a9e3fc470b17ed29ca2ed8b5f7ee95aad2096444d"
+        },
+        "observed": {
+          "typed_results_pad_records": 2,
+          "typed_results_pad_bytes_each": 822,
+          "ready_ticks": 124,
+          "game_ending_frozen_ticks": 114,
+          "routes": "Original No Contest and four-stock Mario/FD elimination Results, both returned to CSS.",
+          "session_end": "Checked Session end returned success; no numeric allocation-zero snapshot emitted."
+        },
+        "verification": {
+          "immutable_bindings": 172,
+          "pre_post_equal": true,
+          "fixture_files": 124,
+          "producer_files": 31,
+          "generated_sources": 6,
+          "node_pid": 16325,
+          "natural_returncode": 0,
+          "reaped_absent": true,
+          "signals_sent": false
+        },
+        "scope": "Native ordinary functional source Results-route regression only. No original comparison, rendered pixels/browser, PCM equivalence, timing or competitive/C3 acceptance.",
+        "historical_ee2f3ab9_regression": {
+          "source_head": "ee2f3ab92c7ae99c76d3d3f2724c7835ce1fb371",
+          "source_tree": "147c8bbbf1985bbfc04a4c9a0eba11a2a5abefbf",
+          "production_source_relation": "The ee2f3ab9 extension adds the separately reviewed test recipe; production source is unchanged from the a29f8d69 baseline.",
+          "status": "PASS_NATIVE_ORDINARY_RESULTS_REGRESSION",
+          "prior_failed_attempt": {
+            "status": "FAILED_PREPARATION_RETAINED",
+            "artifact": "root-ordinary-results-frozen-failure-v1.json",
+            "sha256": "0c1e0ca8dddd128959e44f474c419940306e1bb42ef1caf58ad0353edfc84040",
+            "first_failure": "Missing source match fixture: LbRf.dat",
+            "boundary": "CSS\u2192SSS and selected Final Destination route; no Match construction, Results or elimination",
+            "immutable_bindings_unchanged": 171
           },
-          "runner_result": {
-            "artifact": "ordinary-results-ee2f3ab9-v2/result.json",
-            "bytes": 2274,
-            "sha256": "5bbb37810ff7014d92f728ef31aea9eaa1dcc2d79845a7c1850d9a52fae9517d"
-          },
-          "independent_result_review": {
-            "artifact": "sol-ordinary-results-result-review-v2.json",
-            "bytes": 5225,
-            "sha256": "04fc42b0c69d7ef0005b2a46b7a7a309aa81da36109c0aaeb6766e5727ac8f46",
-            "decision": "PASS_NATIVE_ORDINARY_RESULTS_REGRESSION",
-            "unique_file_bindings_rehashed": 326,
-            "producer_files": 31
-          },
-          "producer_identity": {
-            "artifact": "stadium-ordinary-trace-producer-ee2f3ab9-v1/identity.json",
-            "bytes": 12479,
-            "sha256": "336d2b7f024fa5eb16aaab1730f8847120696fca5bd05a61411d0354c0bee9f0"
-          },
-          "preflight_packet": {
-            "artifact": "ordinary-results-preflight-packet-v2.json",
-            "bytes": 4005,
-            "sha256": "6f259e75865f5cdf87a304dae9312eaf66539903ae99e08c9c1541ba3d05ea31"
-          },
-          "fixture_receipt": {
-            "artifact": "root-ordinary-results-fixture-v2.json",
-            "bytes": 76445,
-            "sha256": "ab5b2e57d738bbbe5c6b3ae87059fdc8fe6771c5be236293403f1f1ce370a525",
-            "files": 124,
-            "total_bytes": 71076209
-          },
-          "fixture_source_map": {
+          "source_only_fixture_audit": {
             "artifact": "sol-stadium-results-fixture-source-map-v2.json",
             "sha256": "7306a1ea9251f61712a91d2fbfab03d711a7d0ef4bd520245c5ac5711985ca03",
-            "decision": "COMPLETE_RETAINED_SOURCE_MAP_SOURCE_ONLY"
+            "decision": "COMPLETE_RETAINED_SOURCE_MAP_SOURCE_ONLY",
+            "required_recipe_files": 124,
+            "total_bytes": 71076209,
+            "correction": "LbRf.dat is part of the complete selected Match recipe and was absent from the failed fixture.",
+            "scope": "Source inventory only; the audit itself performed no runtime."
           },
-          "immutable_bindings_reverified": 172,
-          "immutable_pre_post_equal": true,
-          "immutable_mismatches": [],
-          "observed": {
-            "no_contest_outcome": 7,
-            "no_contest_winners": 2,
-            "match_kind": 1,
-            "actual_results_entry_pad_records": 2,
-            "native_pad_bytes_each": 822,
-            "recreated_match_ready_ticks": 124,
-            "source_game_ending_frozen_ticks": 114,
-            "final_original_results_css_pass_marker": true,
-            "checked_session_end_success": true,
-            "numeric_post_close_arena_snapshot": "not emitted by this recipe"
-          },
-          "cleanup": {
-            "owned_node_natural_exit_reaped_absent": true,
-            "signals_sent": false,
-            "returncode": 0
-          },
-          "raw_files": [
-            {
-              "artifact": "ordinary-results-ee2f3ab9-v2/cleanup.json",
-              "bytes": 137,
-              "sha256": "7c17ac3608f2f1448d3f7e4efe7b7fc520f43c3d20572d404d9991abc2641320"
+          "successful_attempt": {
+            "frozen_result": {
+              "artifact": "root-ordinary-results-frozen-result-v2.json",
+              "bytes": 4521,
+              "sha256": "a3cfd820062a7408f25fa5815d12a85bc49861537a4918b0f9caadff685cc1a6"
             },
-            {
-              "artifact": "ordinary-results-ee2f3ab9-v2/identity.json",
+            "runner_result": {
+              "artifact": "ordinary-results-ee2f3ab9-v2/result.json",
+              "bytes": 2274,
+              "sha256": "5bbb37810ff7014d92f728ef31aea9eaa1dcc2d79845a7c1850d9a52fae9517d"
+            },
+            "independent_result_review": {
+              "artifact": "sol-ordinary-results-result-review-v2.json",
+              "bytes": 5225,
+              "sha256": "04fc42b0c69d7ef0005b2a46b7a7a309aa81da36109c0aaeb6766e5727ac8f46",
+              "decision": "PASS_NATIVE_ORDINARY_RESULTS_REGRESSION",
+              "unique_file_bindings_rehashed": 326,
+              "producer_files": 31
+            },
+            "producer_identity": {
+              "artifact": "stadium-ordinary-trace-producer-ee2f3ab9-v1/identity.json",
+              "bytes": 12479,
+              "sha256": "336d2b7f024fa5eb16aaab1730f8847120696fca5bd05a61411d0354c0bee9f0"
+            },
+            "preflight_packet": {
+              "artifact": "ordinary-results-preflight-packet-v2.json",
+              "bytes": 4005,
+              "sha256": "6f259e75865f5cdf87a304dae9312eaf66539903ae99e08c9c1541ba3d05ea31"
+            },
+            "fixture_receipt": {
+              "artifact": "root-ordinary-results-fixture-v2.json",
+              "bytes": 76445,
+              "sha256": "ab5b2e57d738bbbe5c6b3ae87059fdc8fe6771c5be236293403f1f1ce370a525",
+              "files": 124,
+              "total_bytes": 71076209
+            },
+            "fixture_source_map": {
+              "artifact": "sol-stadium-results-fixture-source-map-v2.json",
+              "sha256": "7306a1ea9251f61712a91d2fbfab03d711a7d0ef4bd520245c5ac5711985ca03",
+              "decision": "COMPLETE_RETAINED_SOURCE_MAP_SOURCE_ONLY"
+            },
+            "immutable_bindings_reverified": 172,
+            "immutable_pre_post_equal": true,
+            "immutable_mismatches": [],
+            "observed": {
+              "no_contest_outcome": 7,
+              "no_contest_winners": 2,
+              "match_kind": 1,
+              "actual_results_entry_pad_records": 2,
+              "native_pad_bytes_each": 822,
+              "recreated_match_ready_ticks": 124,
+              "source_game_ending_frozen_ticks": 114,
+              "final_original_results_css_pass_marker": true,
+              "checked_session_end_success": true,
+              "numeric_post_close_arena_snapshot": "not emitted by this recipe"
+            },
+            "cleanup": {
+              "owned_node_natural_exit_reaped_absent": true,
+              "signals_sent": false,
+              "returncode": 0
+            },
+            "raw_files": [
+              {
+                "artifact": "ordinary-results-ee2f3ab9-v2/cleanup.json",
+                "bytes": 137,
+                "sha256": "7c17ac3608f2f1448d3f7e4efe7b7fc520f43c3d20572d404d9991abc2641320"
+              },
+              {
+                "artifact": "ordinary-results-ee2f3ab9-v2/identity.json",
+                "bytes": 3440,
+                "sha256": "20b1a536de1c6742f1ecc4eeb0424a0807e7604cacbb3f7ec2b2c83d1bfde87b"
+              },
+              {
+                "artifact": "ordinary-results-ee2f3ab9-v2/immutable-pre.json",
+                "bytes": 67811,
+                "sha256": "d1cb1da051e32b1b1ccd62cc67429d8cf604a8c3356cfd97418b0ba9b7d86555"
+              },
+              {
+                "artifact": "ordinary-results-ee2f3ab9-v2/immutable-post.json",
+                "bytes": 67811,
+                "sha256": "d1cb1da051e32b1b1ccd62cc67429d8cf604a8c3356cfd97418b0ba9b7d86555"
+              },
+              {
+                "artifact": "ordinary-results-ee2f3ab9-v2/stdout.log",
+                "bytes": 3882,
+                "sha256": "bc8faed4e5b8d3a58d67b24796e34343c315085595c1d818298cdb8b4c049408"
+              },
+              {
+                "artifact": "ordinary-results-ee2f3ab9-v2/stderr.log",
+                "bytes": 1165,
+                "sha256": "eea33ebceaed3601c90d1c4442d7a734f937161d7f0cb345f4792facc4b17105"
+              },
+              {
+                "artifact": "ordinary-results-ee2f3ab9-v2/transitions.jsonl",
+                "bytes": 4851,
+                "sha256": "ed61b1d9f55cf89901bc0d7cd49245d103ab9233f1bd65d0d6cae79c28b882f1"
+              }
+            ],
+            "scope": "Functional native source route using scripted source PAD and fixture seed: No Contest Match\u2192Results\u2192CSS/SSS, followed by a recreated four-stock Mario/Final Destination Match\u2192source GAME ending\u2192Results\u2192CSS and checked final Session end. No Prize traversal.",
+            "limitations": [
+              "No numeric post-close arena snapshot; checked session_end and natural process exit are the retirement evidence emitted by this recipe.",
+              "No original-game comparison, browser, rendered-pixel, physical-input, uninterrupted-audio, PCM-equivalence or timing acceptance.",
+              "This result does not establish C3 or ordinary Stadium admission."
+            ]
+          },
+          "first_attempt": {
+            "result": {
+              "artifact": "ordinary-results-ee2f3ab9-v1/result.json",
+              "bytes": 1682,
+              "sha256": "5c04372c78484cc057694609c5bc1f09b102a9fead093cf7d8ceafddf44a5055"
+            },
+            "identity": {
+              "artifact": "ordinary-results-ee2f3ab9-v1/identity.json",
               "bytes": 3440,
-              "sha256": "20b1a536de1c6742f1ecc4eeb0424a0807e7604cacbb3f7ec2b2c83d1bfde87b"
+              "sha256": "f44fd935b114be912abe053f55c7f8dc673daac3408a8ea7bf370e36d836de1d"
             },
-            {
-              "artifact": "ordinary-results-ee2f3ab9-v2/immutable-pre.json",
-              "bytes": 67811,
-              "sha256": "d1cb1da051e32b1b1ccd62cc67429d8cf604a8c3356cfd97418b0ba9b7d86555"
+            "stderr": {
+              "artifact": "ordinary-results-ee2f3ab9-v1/stderr.log",
+              "bytes": 1205,
+              "sha256": "8d032fef6d251eca2fecf1953b8465a48360b76fd53490ee78a064e4f8d5c295"
             },
-            {
-              "artifact": "ordinary-results-ee2f3ab9-v2/immutable-post.json",
-              "bytes": 67811,
-              "sha256": "d1cb1da051e32b1b1ccd62cc67429d8cf604a8c3356cfd97418b0ba9b7d86555"
+            "stdout": {
+              "artifact": "ordinary-results-ee2f3ab9-v1/stdout.log",
+              "bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
             },
-            {
-              "artifact": "ordinary-results-ee2f3ab9-v2/stdout.log",
-              "bytes": 3882,
-              "sha256": "bc8faed4e5b8d3a58d67b24796e34343c315085595c1d818298cdb8b4c049408"
+            "transition_trace": {
+              "artifact": "ordinary-results-ee2f3ab9-v1/transitions.jsonl",
+              "bytes": 3068,
+              "sha256": "650697aade93b59b4c7637286aa457f834472d4c5a375bf177ce2708377829bf"
             },
-            {
-              "artifact": "ordinary-results-ee2f3ab9-v2/stderr.log",
-              "bytes": 1165,
-              "sha256": "eea33ebceaed3601c90d1c4442d7a734f937161d7f0cb345f4792facc4b17105"
+            "cleanup": {
+              "artifact": "ordinary-results-ee2f3ab9-v1/cleanup.json",
+              "bytes": 137,
+              "sha256": "f5d7e57e89e531e5f2916d25dd0e16e117aa3e61407970e5e1505b44907fab7c"
             },
-            {
-              "artifact": "ordinary-results-ee2f3ab9-v2/transitions.jsonl",
-              "bytes": 4851,
-              "sha256": "ed61b1d9f55cf89901bc0d7cd49245d103ab9233f1bd65d0d6cae79c28b882f1"
-            }
-          ],
-          "scope": "Functional native source route using scripted source PAD and fixture seed: No Contest Match\u2192Results\u2192CSS/SSS, followed by a recreated four-stock Mario/Final Destination Match\u2192source GAME ending\u2192Results\u2192CSS and checked final Session end. No Prize traversal.",
-          "limitations": [
-            "No numeric post-close arena snapshot; checked session_end and natural process exit are the retirement evidence emitted by this recipe.",
-            "No original-game comparison, browser, rendered-pixel, physical-input, uninterrupted-audio, PCM-equivalence or timing acceptance.",
-            "This result does not establish C3 or ordinary Stadium admission."
-          ]
+            "immutable_pre": {
+              "artifact": "ordinary-results-ee2f3ab9-v1/immutable-pre.json",
+              "bytes": 67448,
+              "sha256": "d9539a46a2648518b93114917b4301fede14aebb4a01cf9973bc43a9d7d7f699"
+            },
+            "immutable_post": {
+              "artifact": "ordinary-results-ee2f3ab9-v1/immutable-post.json",
+              "bytes": 67448,
+              "sha256": "d9539a46a2648518b93114917b4301fede14aebb4a01cf9973bc43a9d7d7f699"
+            },
+            "observed_failure": "Missing source match fixture: LbRf.dat",
+            "phase": "Stopped during match asset preparation, before match construction; neither Results route was tested.",
+            "returncode": 1,
+            "immutable_rows": 171,
+            "immutable_mismatches": 0,
+            "owned_node_pid": 37721,
+            "owned_node_exit": "natural code 1; no terminate/kill; reaped"
+          }
         },
-        "first_attempt": {
-          "result": {
-            "artifact": "ordinary-results-ee2f3ab9-v1/result.json",
-            "bytes": 1682,
-            "sha256": "5c04372c78484cc057694609c5bc1f09b102a9fead093cf7d8ceafddf44a5055"
+        "receipt_provenance_incident": {
+          "status": "RECOVERED_EXACT_HASH",
+          "receipt": {
+            "artifact": "root-ordinary-receipt-filename-recovery-v1.json",
+            "bytes": 1216,
+            "sha256": "693426d1c86ba5219c8ff72acd86265d8801f3345722980aad9311ccf0b6fa9a"
           },
-          "identity": {
-            "artifact": "ordinary-results-ee2f3ab9-v1/identity.json",
-            "bytes": 3440,
-            "sha256": "f44fd935b114be912abe053f55c7f8dc673daac3408a8ea7bf370e36d836de1d"
-          },
-          "stderr": {
-            "artifact": "ordinary-results-ee2f3ab9-v1/stderr.log",
-            "bytes": 1205,
-            "sha256": "8d032fef6d251eca2fecf1953b8465a48360b76fd53490ee78a064e4f8d5c295"
-          },
-          "stdout": {
-            "artifact": "ordinary-results-ee2f3ab9-v1/stdout.log",
-            "bytes": 0,
-            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-          },
-          "transition_trace": {
-            "artifact": "ordinary-results-ee2f3ab9-v1/transitions.jsonl",
-            "bytes": 3068,
-            "sha256": "650697aade93b59b4c7637286aa457f834472d4c5a375bf177ce2708377829bf"
-          },
-          "cleanup": {
-            "artifact": "ordinary-results-ee2f3ab9-v1/cleanup.json",
-            "bytes": 137,
-            "sha256": "f5d7e57e89e531e5f2916d25dd0e16e117aa3e61407970e5e1505b44907fab7c"
-          },
-          "immutable_pre": {
-            "artifact": "ordinary-results-ee2f3ab9-v1/immutable-pre.json",
-            "bytes": 67448,
-            "sha256": "d9539a46a2648518b93114917b4301fede14aebb4a01cf9973bc43a9d7d7f699"
-          },
-          "immutable_post": {
-            "artifact": "ordinary-results-ee2f3ab9-v1/immutable-post.json",
-            "bytes": 67448,
-            "sha256": "d9539a46a2648518b93114917b4301fede14aebb4a01cf9973bc43a9d7d7f699"
-          },
-          "observed_failure": "Missing source match fixture: LbRf.dat",
-          "phase": "Stopped during match asset preparation, before match construction; neither Results route was tested.",
-          "returncode": 1,
-          "immutable_rows": 171,
-          "immutable_mismatches": 0,
-          "owned_node_pid": 37721,
-          "owned_node_exit": "natural code 1; no terminate/kill; reaped"
+          "note": "Generic filename was accidentally reused for the new8f receipt; historical ee2 bytes restored to exact recorded SHA, new8f receipt retained under unique name. Independent hash verification confirms both; no runtime was repeated."
         }
       },
       "same_process_second_lifetime": {
-        "status": "FAIL_RETAINED_SECOND_LIFETIME_PREFLIGHT",
-        "source_head": "266c9c44fa7952741da07a948a8f2c095867a7f2",
-        "source_tree": "f0d29d73b09ee0a751f8a3adfad4cfb2d6a8b096",
+        "status": "PASS_FUNCTIONAL_NATIVE_STADIUM_IDLE_TWO_LIFETIMES",
+        "source_head": "8f785fe5d07ba1bbdca111f10b29cdbca70e6b6c",
+        "source_tree": "5916c6d37771ddd20ed041ce29d875a39d4c7f30",
         "runtime_observed": true,
         "result": {
-          "artifact": "root-stadium-functional-idle-pair-frozen-result-v1.json",
-          "bytes": 6931,
-          "sha256": "a13a7f90cea1f834c65837369419fd73fd7f097fb17eabec220525e22d8c5faa"
+          "artifact": "root-stadium-functional-idle-pair-frozen-result-v2.json",
+          "bytes": 7387,
+          "sha256": "3b360fafe208d910d37263106b6122265e09b9c7534d03fde106e77674c73048"
         },
         "independent_result_review": {
-          "artifact": "sol-stadium-functional-idle-pair-result-review-v1.json",
-          "bytes": 2404,
-          "sha256": "7eb1f595a23b8c7058b1acd236601a62bf77eeca798a43cc66cba951e67356c3"
+          "artifact": "sol-stadium-functional-idle-pair-result-review-v2.json",
+          "bytes": 7191,
+          "sha256": "41b9f90ce629b628dd2ee7b91f302b03ebc15bd76f00ef2e0064d072ebcdf9bf"
         },
         "producer": {
-          "artifact": "stadium-functional-idle-pair-producer-266c9c44-v1/identity.json",
-          "bytes": 12908,
-          "sha256": "5da09c4103d341ff573489beebdc7f94efe1db70f4d213ff56eea55515304f4f"
+          "artifact": "grdatfiles-diagnostic-producer-8f785fe5-v2/identity.json",
+          "bytes": 12968,
+          "sha256": "cf4db650e334fb1991c3056518af0a28cba291635ff5213b3e09b3596eb4bcd9"
         },
         "packet": {
-          "artifact": "functional-idle-pair-preflight-packet-v1.json",
-          "bytes": 400964,
-          "sha256": "c29ff94818dae679434499cca15cba7e1b3665c7395f2257a9de00482ecb083e"
+          "artifact": "functional-idle-pair-preflight-packet-v3.json",
+          "bytes": 99715,
+          "sha256": "8a395e192d10a4280827d8a7615db7b8df53d5805b2244148ee9146bb81ac7fe"
         },
         "observed": {
-          "first_lifetime": {
-            "world_generation": 3,
-            "allocation_generation": 1,
-            "post_go_ticks": 3500,
-            "go_world_after": 85,
-            "ready_world_tick": 124,
-            "end_world_tick": 3585,
-            "source_frames": 3461,
-            "released_identity": 0,
-            "released_generation": 0,
-            "released_bytes": 0,
-            "world_exists": 0
-          },
-          "second_lifetime": {
-            "allocation_generation": 2,
-            "same_allocation_address_is_valid": true,
-            "css_sss_menu_world_generation": 5,
-            "sis_retirement_verified": true,
-            "first_failure": "C1 context preflight stage-state bridge reported mask=64: ordinary grDatFiles slot occupied",
-            "second_match_construction_ready_ticks": "unobserved",
-            "session_close": "unobserved"
-          }
+          "total_post_go_steps": 7000,
+          "lifetimes": [
+            {
+              "ordinal": 0,
+              "session_identity": "62288224",
+              "session_generation": 1,
+              "world_generation": 3,
+              "go_world_after": 85,
+              "ready_world_tick": 124,
+              "target_world_tick": 3585,
+              "post_go_steps": 3500,
+              "final_source_frame": 3461,
+              "released_identity": 0,
+              "released_generation": 0,
+              "released_bytes": 0
+            },
+            {
+              "ordinal": 1,
+              "session_identity": "62288224",
+              "session_generation": 2,
+              "world_generation": 6,
+              "go_world_after": 85,
+              "ready_world_tick": 124,
+              "target_world_tick": 3585,
+              "post_go_steps": 3500,
+              "final_source_frame": 3461,
+              "released_identity": 0,
+              "released_generation": 0,
+              "released_bytes": 0
+            }
+          ],
+          "neutral_pads": true,
+          "draw": false,
+          "pcm_processing": "rendered per step; no PCM comparison",
+          "timer_state": "unobserved",
+          "transform_state": "unobserved"
         },
         "verification": {
-          "packet_bindings": 1288,
+          "packet_bindings": 256,
           "fixture_files": 98,
           "raw_files": 17,
-          "owned_pids_natural_exit_one_reaped_absent": [
-            44568,
-            44574
+          "owned_pids_natural_exit_zero_reaped_absent": [
+            14516,
+            14522
           ],
-          "signals_sent": false
+          "signals_sent": false,
+          "tracked_test_method_byte_identical_to_266c9c44": true
         },
-        "next": "The reduced diagnostic locates first slot-0 population after Stage_802251E8 and confirms it remains through second preflight. Audit exact original ownership/retirement, then run focused owned/foreign/replaced-row controls before another short lifecycle; preserve the strict guard and source order.",
-        "scope": "Functional diagnostic native same-process recreation failure. First life completes; the second-life preflight is refused. The reduced diagnostic observes slot 0 populated after Stage_802251E8 and retained through second preflight, but raw pointer bits do not identify owner, pointee liveness, alias equivalence or safe cleanup. No pair success, C3, original RNG, draw/audio comparison or performance claim.",
-        "reduced_diagnostic": {
-          "status": "FAIL_RETAINED_SECOND_PREFLIGHT_REDUCED",
-          "source_head": "9a1909d16991cd092eac04b0eb6881114da32ed0",
-          "source_tree": "462b023ba52316be876ee3312b55740f1cca0e45",
+        "next": "Current-head ee159395 full suite passes; review the same external Stadium-only receiver/validator correction for both verified gaps: pre-CSS scene-slice absence and authored Random-index navigation. Retained-prefix and synthetic strict-negative controls precede one changed bounded original capture. Preserve all prior failures; matched original setup/per-owner RNG and remaining C3 gates stay open; public Stadium admission closed.",
+        "scope": "Two sequential same-process functional native Stadium lifetimes, each3500postGO neutral/no-draw world ticks with PCM processing and complete checked Session release. This does not establish original per-owner RNG agreement, draw/PCM equivalence or C3 acceptance.",
+        "historical_failure": {
+          "status": "FAIL_RETAINED_SECOND_LIFETIME_PREFLIGHT",
+          "source_head": "266c9c44fa7952741da07a948a8f2c095867a7f2",
+          "source_tree": "f0d29d73b09ee0a751f8a3adfad4cfb2d6a8b096",
+          "runtime_observed": true,
           "result": {
-            "artifact": "root-grdatfiles-pair-frozen-result-v1.json",
-            "bytes": 4109,
-            "sha256": "a4e846c0632b09e05a03a9d619ff712c19b0f36ab74407fefcb4e8e9bd36476b"
+            "artifact": "root-stadium-functional-idle-pair-frozen-result-v1.json",
+            "bytes": 6931,
+            "sha256": "a13a7f90cea1f834c65837369419fd73fd7f097fb17eabec220525e22d8c5faa"
           },
           "independent_result_review": {
-            "artifact": "sol-grdatfiles-pair-result-review-v1.json",
-            "bytes": 3902,
-            "sha256": "8d5fa6ee2a0fac8ef5eddc4b691df17eade7d0da6d4bc28053e321f8cdab7838",
-            "decision": "PASS_RETAINED_FAILURE_REVIEW"
+            "artifact": "sol-stadium-functional-idle-pair-result-review-v1.json",
+            "bytes": 2404,
+            "sha256": "7eb1f595a23b8c7058b1acd236601a62bf77eeca798a43cc66cba951e67356c3"
+          },
+          "producer": {
+            "artifact": "stadium-functional-idle-pair-producer-266c9c44-v1/identity.json",
+            "bytes": 12908,
+            "sha256": "5da09c4103d341ff573489beebdc7f94efe1db70f4d213ff56eea55515304f4f"
+          },
+          "packet": {
+            "artifact": "functional-idle-pair-preflight-packet-v1.json",
+            "bytes": 400964,
+            "sha256": "c29ff94818dae679434499cca15cba7e1b3665c7395f2257a9de00482ecb083e"
           },
           "observed": {
-            "snapshots": 8,
-            "all_four_slots_zero_before_first_context_preflight_and_before_Stage_802251E8": true,
-            "first_populated_boundary": "after-Stage_802251E8",
-            "slot0": {
-              "unk0": "0xa6b07e8",
-              "unk4": "0xa6512d8",
-              "unk8": 0
+            "first_lifetime": {
+              "world_generation": 3,
+              "allocation_generation": 1,
+              "post_go_ticks": 3500,
+              "go_world_after": 85,
+              "ready_world_tick": 124,
+              "end_world_tick": 3585,
+              "source_frames": 3461,
+              "released_identity": 0,
+              "released_generation": 0,
+              "released_bytes": 0,
+              "world_exists": 0
             },
-            "slots1_to_3": "zero throughout",
-            "slot0_tuple_unchanged_through": "Ready124, checked Match close, Session close, second preflight in world generation 5",
-            "ordinary_table": "0x184b80 unchanged",
-            "native_table_after_close": "0",
-            "second_preflight": "strict mask64 refusal before second Match construction",
-            "native_table_during_first_world": "0xa6ae868",
-            "effective_lookup_after_close": "ordinary table 0x184b80"
+            "second_lifetime": {
+              "allocation_generation": 2,
+              "same_allocation_address_is_valid": true,
+              "css_sss_menu_world_generation": 5,
+              "sis_retirement_verified": true,
+              "first_failure": "C1 context preflight stage-state bridge reported mask=64: ordinary grDatFiles slot occupied",
+              "second_match_construction_ready_ticks": "unobserved",
+              "session_close": "unobserved"
+            }
           },
           "verification": {
-            "immutable_inputs": 157,
-            "fixtures": 98,
-            "raw_files": 8,
-            "producer_files": 32,
-            "generated_sources": 6,
-            "slot_rows": 32,
-            "snapshots": 8,
-            "native_exit_code": 1,
-            "pid_reaped_absent": true,
+            "packet_bindings": 1288,
+            "fixture_files": 98,
+            "raw_files": 17,
+            "owned_pids_natural_exit_one_reaped_absent": [
+              44568,
+              44574
+            ],
             "signals_sent": false
           },
-          "limitations": [
-            "Pointer bits do not prove pointee liveness, allocation owner, native map alias equivalence or safe retirement.",
-            "No second Match, second Ready/GO, second checked Session close, 3500 interval, draw, original comparison or C3 acceptance.",
-            "Strict initial-empty refusal and original source order remain unchanged; no blanket clear or guard relaxation."
-          ],
-          "next": "Audit the original grDatFiles row owner and retirement boundary; then use a focused owned/foreign/replaced-row control before another short lifecycle attempt."
+          "next": "The reduced diagnostic locates first slot-0 population after Stage_802251E8 and confirms it remains through second preflight. Audit exact original ownership/retirement, then run focused owned/foreign/replaced-row controls before another short lifecycle; preserve the strict guard and source order.",
+          "scope": "Functional diagnostic native same-process recreation failure. First life completes; the second-life preflight is refused. The reduced diagnostic observes slot 0 populated after Stage_802251E8 and retained through second preflight, but raw pointer bits do not identify owner, pointee liveness, alias equivalence or safe cleanup. No pair success, C3, original RNG, draw/audio comparison or performance claim.",
+          "reduced_diagnostic": {
+            "status": "FAIL_RETAINED_SECOND_PREFLIGHT_REDUCED",
+            "source_head": "9a1909d16991cd092eac04b0eb6881114da32ed0",
+            "source_tree": "462b023ba52316be876ee3312b55740f1cca0e45",
+            "result": {
+              "artifact": "root-grdatfiles-pair-frozen-result-v1.json",
+              "bytes": 4109,
+              "sha256": "a4e846c0632b09e05a03a9d619ff712c19b0f36ab74407fefcb4e8e9bd36476b"
+            },
+            "independent_result_review": {
+              "artifact": "sol-grdatfiles-pair-result-review-v1.json",
+              "bytes": 3902,
+              "sha256": "8d5fa6ee2a0fac8ef5eddc4b691df17eade7d0da6d4bc28053e321f8cdab7838",
+              "decision": "PASS_RETAINED_FAILURE_REVIEW"
+            },
+            "observed": {
+              "snapshots": 8,
+              "all_four_slots_zero_before_first_context_preflight_and_before_Stage_802251E8": true,
+              "first_populated_boundary": "after-Stage_802251E8",
+              "slot0": {
+                "unk0": "0xa6b07e8",
+                "unk4": "0xa6512d8",
+                "unk8": 0
+              },
+              "slots1_to_3": "zero throughout",
+              "slot0_tuple_unchanged_through": "Ready124, checked Match close, Session close, second preflight in world generation 5",
+              "ordinary_table": "0x184b80 unchanged",
+              "native_table_after_close": "0",
+              "second_preflight": "strict mask64 refusal before second Match construction",
+              "native_table_during_first_world": "0xa6ae868",
+              "effective_lookup_after_close": "ordinary table 0x184b80"
+            },
+            "verification": {
+              "immutable_inputs": 157,
+              "fixtures": 98,
+              "raw_files": 8,
+              "producer_files": 32,
+              "generated_sources": 6,
+              "slot_rows": 32,
+              "snapshots": 8,
+              "native_exit_code": 1,
+              "pid_reaped_absent": true,
+              "signals_sent": false
+            },
+            "limitations": [
+              "Pointer bits do not prove pointee liveness, allocation owner, native map alias equivalence or safe retirement.",
+              "No second Match, second Ready/GO, second checked Session close, 3500 interval, draw, original comparison or C3 acceptance.",
+              "Strict initial-empty refusal and original source order remain unchanged; no blanket clear or guard relaxation."
+            ],
+            "next": "Audit the original grDatFiles row owner and retirement boundary; then use a focused owned/foreign/replaced-row control before another short lifecycle attempt."
+          }
+        },
+        "checked_retirement_short_reducer": {
+          "source_commit": "8f785fe5d07ba1bbdca111f10b29cdbca70e6b6c",
+          "source_tree": "5916c6d37771ddd20ed041ce29d875a39d4c7f30",
+          "result": {
+            "artifact": "root-grdatfiles-pair-frozen-result-v2.json",
+            "bytes": 3454,
+            "sha256": "6289c3ea3c148e57a83c220b58703be75fefbe133224bb30ace3156f8da51dd2"
+          },
+          "independent_review": {
+            "artifact": "sol-grdatfiles-pair-result-review-v2.json",
+            "bytes": 4693,
+            "sha256": "f359fd5f5b416ae45691b4a18e37e5c284c8763ee7f22afefee3a16e6e21d86c"
+          },
+          "source_review": {
+            "artifact": "root-grdatfiles-source-integration-review-v2.json",
+            "bytes": 2090,
+            "sha256": "d045eba67a99406c35fc86de08015e226779cbf7efab7a3206e320abf4d80bf3"
+          },
+          "composed_control": {
+            "artifact": "root-grdatfiles-composed-control-v2/result.json",
+            "bytes": 1773,
+            "sha256": "5797ad79996af0568a6200de878608fe701c37b5423a16c09411a2aec106b245"
+          },
+          "observed": "One Ready lifetime closes; all four ordinary grDatFiles slots zero after Match close, through Session close and second strict SSS preflight and close. Nine snapshots/36 rows,156 immutable inputs unchanged; directly owned Node13703 natural exit0/reaped without signals.",
+          "scope": "Short lifecycle only; no second Match or second3500tick interval. Diagnostic retirement validates full row tuples and both registered archive identities before original release.",
+          "next": "Completed by the separately bound8f785fe5 two-lifetime functional pair; remaining original comparison and C3 gates stay open."
         }
       }
     }
