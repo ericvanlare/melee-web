@@ -319,7 +319,7 @@
   },
   "subsequent_c3_component_2026_10_09": {
     "claim_boundary": "Existing October7 profile receipt remains historical. This update preserves V26 and identifies the exact later producer; componentcontrols do not pass C3.",
-    "current_result": "Two zero-tick world lifetimes pass on3d032f74. SIS and PAD caller handoffs corrected; smaller original PAD reducer passes one changed run on e2ff861b after retained phase-assertion failure. Ready attempt now refuses marker binding during construction with zero-world/zero-tick before/after observations; source startup/unwind occurs between them. C3 remains unrun.",
+    "current_result": "One unchanged ordinary source Ready lifetime and full Session close PASS on dc88442c; separately reviewed actual Toy ownership controls PASS. Historical zero-tick and failed Ready attempts remain below. GO, longer post-GO lifetimes and original per-owner RNG comparison remain unverified.",
     "prior_v26": {
       "source_commit": "b8c272c44a94bcb03f0371008851e468200d4496",
       "first_failure": "heap_free_bytes",
@@ -961,9 +961,9 @@
         "sixth_ready_bound_files": 531,
         "deferred_control_owned_pid_absent": 19570
       },
-      "remaining": "Reduce a scheduled-retirement contract around the existing original font1 drain while retaining strict initialization capture. Prove current text/context membership and exact owned renderer identities; preserve current foreign SIS order/content through owned removal. No nametag exemption or whole-list drain. Complete Session retirement, two3500 post-GO lives, screen/stock-out/standings and original per-owner RNG ledger remain open.",
+      "remaining": "One neutral source tick after HUD Ready with strict close; exact GO callback alignment before counting two3500postGO lifetimes, screen/stock-out/standings and original per-owner RNG ledger comparison. Ordinary public Stadium admission remains closed.",
       "c3_original_ledger_requirement": "Reuse existing RNG draw observer; C3 notes604-608 require per-tick/per-owner original comparison, separately from broader C8 transformation comparison.",
-      "claim_boundary": "Native traced original HUD readiness after124source ticks observed; sixth run fails checked displayteardown. Synthetic marker/collision/deferred lifecycle controls pass. No checked fullSessionclose, postGOidle or C3pass.",
+      "claim_boundary": "Native traced ordinary HUD Ready at124source ticks and checked fullSessionclose observed on dc88442c; separate actual Toy owner controls pass. No GO, postGO idle pair, original RNG agreement or C3pass.",
       "pad_input_reducer": {
         "caller_source": "8e087161fcc5a62f6f82cb333a812d0f4eff448f",
         "phase_correction_source": "e2ff861b3f290714d4c6aaa1a19158d4e7f8e59a",
@@ -1779,6 +1779,95 @@
         },
         "next": "Identify the construction caller and original archive/scene lifetime reset owner before any correction or another runtime.",
         "scope": "Pointer-only diagnostic observation identifies the original lazy loader and interval, not its caller, ownership or allocation liveness. No complete Session closure, post-GO pair, original RNG comparison, C3 or acceptance."
+      },
+      "toy_owned_reset": {
+        "source": "dc88442c276884ae0c398745c544a89f4adf6f5b",
+        "source_tree": "b6cdf75fc7edcf9e3ec5e5cc2434a64bd7f7be9a",
+        "runtime_status": "PASS_ORDINARY_READY_AND_FULL_SESSION_CLOSE",
+        "source_review": {
+          "artifact": "root-toy-owned-reset-source-review-v1.json",
+          "sha256": "e923591cf643dfd2939c83de289f734632b68c6c7c2497b33a0bdc9fbd455211"
+        },
+        "proposal": {
+          "artifact": "toy-owned-reset-proposal-v3/source-freeze-v3.json",
+          "sha256": "5d1fc09c96af260e8a7c3011a56fac9d51d76895f8d7161b73caf3e39509ed7e"
+        },
+        "diagnostic_build": {
+          "artifact": "toy-owned-reset-build-v1/result.json",
+          "sha256": "830604d690cc544e3983a9338bf848af5d032378d45efbae80cd6259738aa04b"
+        },
+        "producer": {
+          "artifact": "toy-owned-reset-producer-dc88442c-v1/identity.json",
+          "sha256": "60455ccee3a5e6d9f1900fad33154b613e786075d99e1f88139a3c214c0d590b"
+        },
+        "synthetic_controls": {
+          "artifact": "root-toy-owned-reset-archive-controls-v1/result.json",
+          "sha256": "66f8c1e7d2f286e7c1eb31f678a49f27277494eeb5fe660d436fabf674f628f0"
+        },
+        "actual_toy_controls": {
+          "artifact": "root-toy-owned-reset-controls-frozen-result-v1.json",
+          "sha256": "12bf22fd6b2810be68205a686cbe611b369aa7c7aff18119024dffcf0470e57f"
+        },
+        "actual_toy_controls_review": {
+          "artifact": "sol-toy-owned-reset-controls-result-review-v1.json",
+          "sha256": "398f4424ce08d03ea463cd7d58f30b35a0bb6eab5ef71b2880d4e7e972ee5351"
+        },
+        "ordinary_ready_packet": {
+          "artifact": "toy-owned-reset-ready-preflight-packet-v1.json",
+          "sha256": "b78bdeeeb96d57639ee52d29150869c844d6e63dde16b9338691df7b97c8762b"
+        },
+        "ordinary_ready": {
+          "artifact": "root-toy-owned-reset-ready-frozen-result-v1.json",
+          "sha256": "e240cf6c5482d1e14db7de9edfac28725992115cbef8dd717ecc0252b3d0dc5f"
+        },
+        "ordinary_ready_review": {
+          "artifact": "sol-toy-owned-reset-ready-result-review-v1.json",
+          "sha256": "5a5b7c4fbda1c9f757df9c7e2a0f30a3a79b6924623cec8378d349786b81210a"
+        },
+        "observations": {
+          "construction_ticks": 0,
+          "ready_ticks": 124,
+          "world": 3,
+          "checked_close_world": 0,
+          "checked_close_objects": 0,
+          "checked_close_processes": 0,
+          "memory_tracker": "inactive",
+          "toy_archive_after_close": "0",
+          "preserved_selection": "PASS",
+          "final_arena_identity": 0,
+          "final_arena_generation": 0,
+          "final_arena_bytes": 0
+        },
+        "verification": {
+          "bindings": 1000,
+          "fixtures": 98,
+          "raw_files": 17,
+          "unittest_returncode": 0,
+          "native_returncode": 0,
+          "owned_children_natural_exit_reaped_absent": true
+        },
+        "full_suite": {
+          "artifact": "root-stadium-regression-dc88442c-v1/result.json",
+          "sha256": "47e5591d02a8dcccb9f0160ce2453dfd6494ae187d48303119f92d63fed1a9bd",
+          "source": "dc88442c276884ae0c398745c544a89f4adf6f5b",
+          "tests": 2346,
+          "skips": 168,
+          "failures": 0,
+          "seconds": 513.945,
+          "log_sha256": "d7a9ca4b13de4c0334c8b6b48904796117bacf17889a05f5e863b8bf9b8247c6",
+          "source_clean_unchanged": true,
+          "owned_child_natural_exit_reaped_absent": true
+        },
+        "next": "One neutral source tick after HUD Ready with strict close; exact GO callback alignment before counting two3500postGO lifetimes, screen/stock-out/standings and original per-owner RNG ledger comparison. Ordinary public Stadium admission remains closed.",
+        "scope": "One native no-draw ordinary Ready lifetime passes; separate composite Toy ownership controls pass. No GO, C3, original equivalence, browser, audio or timing acceptance.",
+        "ordinary_runtime_build": {
+          "artifact": "toy-owned-reset-ordinary-build-v1/result.json",
+          "sha256": "93d9370b51861492f20b812dbfe743979806179e80b790cfb964011b7bac7e72",
+          "source": "dc88442c276884ae0c398745c544a89f4adf6f5b",
+          "status": "PASS",
+          "log_sha256": "6cd7cb4f320b685d36a61b7f053734d6e435b729ba59d415e2d39786c92efeb6",
+          "owned_child_natural_exit_reaped_absent": true
+        }
       }
     }
   }

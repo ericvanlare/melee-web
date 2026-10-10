@@ -1,17 +1,15 @@
 # Pokémon Stadium diagnostic profile and OnInit boundary
 
-**Compiled / Synthetic controls / Source identified**
+**Compiled / Synthetic controls / Source identified / Native traced**
 
-**Historical October 7 checkpoint.** The
-[zero-tick two-world lifecycle](#october-9-two-zero-tick-stadium-world-lifetimes)
-passed. The latest [source-session preparation attempts](#october-9-source-session-ready-preparation)
-now complete match construction and reach the original HUD Ready predicate at
-124 source ticks, then fail because the display owner’s second text node has
-a non-null successor during teardown. The latest same-run observation matches
-that pointer to the original HUD nametag append and verifies its current SIS
-suballocation membership. This does not establish the full text/context/renderer
-ownership needed for safe retirement. The smaller input, marker, collision and
-SIS text controls pass; a complete lifetime and C3 remain unverified.
+**Current boundary:** the [source-session preparation](#october-9-source-session-ready-preparation)
+now passes the unchanged original Ready-and-close test on `dc88442c`.
+It reaches HUD Ready at 124 source ticks, retires the source world and releases
+the Session arena. Separately, the actual Toy ownership controls pass three
+bounded lifetimes, including rejected foreign aliases and a partial-construction
+destructor. These are native no-draw lifecycle results. GO, two 3,500-post-GO
+lifetimes and the original per-owner RNG comparison remain unverified.
+Earlier failures below are retained historical evidence.
 
 The diagnostic-only Stadium profile and profile-to-`DatNativeMapContract`
 adapter compile in the C1 trace target. Focused profile and borrowed-yakumono
@@ -616,11 +614,49 @@ The canonical diagnostic build and focused controls pass. Next, identify the
 construction caller and original archive/scene reset owner before a correction.
 Do not clear unknown aliases or weaken the check.
 
+The checked Toy scene cleanup on `dc88442c` resolves the retained alias
+failure. Source inspection follows full-stage construction through
+`Ground_801C5878 → tyDisplay_8031C2CC → Toy_803124BC`; the runtime observation
+identifies the original loader interval, not a captured call stack. Match close
+now uses the original `Toy_803127D4` reset after Ground consumers retire and
+before SDK heap shutdown. The preflight requires the current owning trophy
+scope/generation, exact source archive and locale roots. It rejects unknown or
+foreign aliases without freeing their storage. Archive registry retirement
+remains with its existing owner.
+
+The diagnostic build and focused synthetic archive controls pass. The separate
+actual Toy controls pass: an exact bracketed constructor refusal; no-acquisition
+alias refusals and zero-tick close; a Ready lifetime; and an unarmed OnInit
+partial-session destructor with a wrong-locale refusal. The refusals preserve
+the checked state; controls restore only their own injected values before normal
+close. This is not constructor-exception or armed-cancellation coverage.
+
+The unchanged ordinary Ready test also passes independently. Construction starts
+at zero source ticks in world 3; the original HUD Ready predicate is reached at
+124 ticks. Checked close observes zero world, objects and processes, an inactive
+source-memory tracker and cleared Toy aliases. The preserved-selection check
+passes, then complete Session close reports arena identity, generation and bytes
+all zero. Independent review verifies 1,000 direct bindings, 98 fixtures and 17 raw
+files before further changes; both owned children exit naturally with code zero,
+are reaped and absent. The composite Toy controls have their own separately
+verified 988-binding result and do not substitute for this ordinary test.
+
+The earlier full regression on `95cf1f5f` passed 2,345 tests with 167 skips.
+The cleanup source `dc88442c` separately passes 2,346 tests with 168 skips
+and no failures; the exact source remained clean and unchanged. Its ordinary
+`runtime` Release build also passes with Stadium admission still disabled.
+Next, extend the existing source
+Session by one neutral tick after HUD Ready, retaining strict close and
+stopping at the first new failure before longer idle lifetimes. The original
+GO callback precedes the HUD-ready flag; exact GO alignment remains to be
+observed before counting the C3 interval.
+
 The existing RNG observer can be reused afterward, but the Stadium notes require
 C3's per-tick, per-owner ledger to be compared with the original. C8's broader
 transformation comparison does not defer that C3 requirement; the roadmap now
-makes this explicit. Original HUD readiness is now observed; complete retirement
-and the remaining C3 steps stay unverified. No C3, original equivalence,
+makes this explicit. Original HUD readiness and one complete Ready lifetime
+are now observed; exact GO alignment, the longer post-GO pair and remaining C3
+steps stay unverified. No C3, original equivalence,
 rendering, browser, physical-input, audible-output or timing acceptance follows
 from these checks.
 
