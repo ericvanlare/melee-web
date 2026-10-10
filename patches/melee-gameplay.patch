@@ -5945,7 +5945,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..3492cd22f052a658e060a4ab3847a9b4
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3afdd600692 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..1f9e14e82413891b59d184318b208e55e071f5fd 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,16 @@
@@ -6117,7 +6117,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -788,137 +876,4720 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
+@@ -788,137 +876,4761 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
              }
              break;
          }
@@ -10680,6 +10680,12 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
 +    void* successor = NULL;
 +    const void* freed_buffer = NULL;
 +    int success = 0;
++    const int initial_heap = HSD_GetHeap();
++    const char* control_phase = "initial-preconditions";
++    int failure_line = 0;
++    size_t failure_map_index = (size_t) -1;
++#define STADIUM_MAP2_CONTROL_FAIL() \
++    do { failure_line = __LINE__; goto cleanup; } while (0)
 +
 +    memcpy(original_maps, stage_info.map_gobjs, sizeof(original_maps));
 +    if (stadium_display_owner_current != NULL || HSD_GetHeap() < 0 ||
@@ -10689,15 +10695,20 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
 +        melee_web_source_memory_context_read(&memory_context) !=
 +            MELEE_WEB_SOURCE_MEMORY_READ_OK ||
 +        !melee_web_source_memory_healthy())
-+        return 0;
++        STADIUM_MAP2_CONTROL_FAIL();
++    control_phase = "initial-map-slots";
 +    for (size_t i = 0; i < ARRAY_SIZE(original_maps); ++i)
-+        if (original_maps[i] != NULL) return 0;
++        if (original_maps[i] != NULL) {
++            failure_map_index = i;
++            STADIUM_MAP2_CONTROL_FAIL();
++        }
 +
 +    stadium_owner_control_fixture_init(&fixture, 0);
 +    stadium_owner_control_reset_map2_journal(&fixture);
 +    fixture.owner.state = STADIUM_DISPLAY_OWNER_BOUND;
++    control_phase = "allocate-fallback";
 +    buffer = HSD_MemAlloc(0x50000);
-+    if (buffer == NULL) goto cleanup;
++    if (buffer == NULL) STADIUM_MAP2_CONTROL_FAIL();
 +    fixture.map2_ground_data.u.stadium.xCC = buffer;
 +    fixture.map2_ground_data.u.stadium.xDE = 5;
 +
@@ -10706,6 +10717,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
 +    HSD_GObj_Entities = (HSD_GObjList*) fixture.entities;
 +    HSD_GObj_804D7840 = process_roots;
 +    stadium_owner_control_activate(&fixture);
++    control_phase = "capture-journal";
 +    stadium_owner_journal_map2_buffer(&fixture.map2_ground, NULL, buffer);
 +    if (fixture.owner.journal_failed ||
 +        fixture.owner.map2_buffer_journal_count != 1 ||
@@ -10718,7 +10730,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
 +        !lease.live || lease.requested_bytes != 0x50000 ||
 +        !stadium_owner_source_allocation_equal(
 +            &lease, &fixture.owner.map2_buffer_allocation_lease))
-+        goto cleanup;
++        STADIUM_MAP2_CONTROL_FAIL();
 +
 +    map2_proc.gobj = &fixture.map2_ground;
 +    map2_proc.on_invoke = grStadium_801D1520;
@@ -10727,6 +10739,8 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
 +    process_roots[4] = &map2_proc;
 +    fixture.owner.map2_proc = &map2_proc;
 +    fixture.owner.nested_map5_ground = &fixture.map5_ground;
++    /* Match the synthetic capture record to its already-known display GObj. */
++    fixture.owner.display_ground = &fixture.display_ground;
 +    fixture.owner.map2_proc_dispatch_count = 124;
 +    fixture.owner.source_started = 1;
 +    fixture.owner.map2_buffer_output = &output;
@@ -10743,18 +10757,20 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
 +    output.buffer_allocation_lease_captured = 1;
 +    output.started_allocation_lease_required = 1;
 +
++    control_phase = "started-positive";
 +    if (!stadium_owner_map2_graph_matches_phase(
 +            &fixture.owner, &fixture.display_ground, 1) ||
 +        stadium_owner_map2_graph_matches(&fixture.owner,
 +                                          &fixture.display_ground) ||
 +        !stadium_owner_map2_output_matches(&fixture.owner))
-+        goto cleanup;
++        STADIUM_MAP2_CONTROL_FAIL();
 +
++    control_phase = "idle-field-negatives";
 +    /* Newly admitted started state is intentionally limited to idle default
 +     * map-2. Each mutation refuses without changing known owner/source state. */
 +#define STADIUM_STARTED_MAP2_REFUSAL() \
 +    do { if (!stadium_owner_control_started_map2_refuses_unchanged( \
-+        &fixture, &output, &map2_proc)) goto cleanup; } while (0)
++        &fixture, &output, &map2_proc)) STADIUM_MAP2_CONTROL_FAIL(); } while (0)
 +    fixture.map2_ground_data.u.stadium.xDC = 1;
 +    STADIUM_STARTED_MAP2_REFUSAL();
 +    fixture.map2_ground_data.u.stadium.xDC = 0;
@@ -10802,38 +10818,40 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
 +    fixture.owner.map2_buffer_allocation_lease.live = 1;
 +#undef STADIUM_STARTED_MAP2_REFUSAL
 +
++    control_phase = "output-token-negatives";
 +    output.started_allocation_lease_required = 0;
-+    if (stadium_owner_map2_output_matches(&fixture.owner)) goto cleanup;
++    if (stadium_owner_map2_output_matches(&fixture.owner)) STADIUM_MAP2_CONTROL_FAIL();
 +    output.started_allocation_lease_required = 1;
 +
 +    ++output.buffer_allocation_lease.allocation_generation;
-+    if (stadium_owner_map2_output_matches(&fixture.owner)) goto cleanup;
++    if (stadium_owner_map2_output_matches(&fixture.owner)) STADIUM_MAP2_CONTROL_FAIL();
 +    --output.buffer_allocation_lease.allocation_generation;
 +
 +    ++fixture.owner.map2_buffer_allocation_lease.allocation_generation;
 +    if (!stadium_owner_control_started_map2_refuses_unchanged(
 +            &fixture, &output, &map2_proc))
-+        goto cleanup;
++        STADIUM_MAP2_CONTROL_FAIL();
 +    --fixture.owner.map2_buffer_allocation_lease.allocation_generation;
 +
 +    fixture.owner.map2_buffer_use_count = 1;
 +    if (!stadium_owner_control_started_map2_refuses_unchanged(
 +            &fixture, &output, &map2_proc))
-+        goto cleanup;
++        STADIUM_MAP2_CONTROL_FAIL();
 +    fixture.owner.map2_buffer_use_count = 0;
 +
 +    map2_proc.on_invoke = NULL;
 +    if (!stadium_owner_control_started_map2_refuses_unchanged(
 +            &fixture, &output, &map2_proc))
-+        goto cleanup;
++        STADIUM_MAP2_CONTROL_FAIL();
 +    map2_proc.on_invoke = grStadium_801D1520;
 +
 +    process_roots[4] = NULL;
 +    if (!stadium_owner_control_started_map2_refuses_unchanged(
 +            &fixture, &output, &map2_proc))
-+        goto cleanup;
++        STADIUM_MAP2_CONTROL_FAIL();
 +    process_roots[4] = &map2_proc;
 +
++    control_phase = "final-free-negatives";
 +    /* Remove the original map-2/map-5 GObj roots before the delayed free, as
 +     * StageLast does. A stale copied lease must refuse without invoking free. */
 +    stage_info.map_gobjs[2] = NULL;
@@ -10849,13 +10867,13 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
 +            error, sizeof(error)) ||
 +        free_state.calls != 0 || free_state.freed != NULL ||
 +        output.captured != 1 || output.buffer != buffer)
-+        goto cleanup;
++        STADIUM_MAP2_CONTROL_FAIL();
 +    output.started_allocation_lease_required = 0;
 +    if (stadium_map2_buffer_owner_end_with_free(
 +            &output, stadium_owner_control_free_map2_buffer, &free_state,
 +            error, sizeof(error)) || free_state.calls != 0 ||
 +        output.captured != 1 || output.buffer != buffer)
-+        goto cleanup;
++        STADIUM_MAP2_CONTROL_FAIL();
 +    output.started_allocation_lease_required = 1;
 +    --output.buffer_allocation_lease.allocation_generation;
 +
@@ -10864,14 +10882,15 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
 +            &output, stadium_owner_control_free_map2_buffer, &free_state,
 +            error, sizeof(error)) || free_state.calls != 0 ||
 +        output.captured != 1 || output.buffer != buffer)
-+        goto cleanup;
++        STADIUM_MAP2_CONTROL_FAIL();
 +    output.buffer_allocation_lease_captured = 1;
 +
++    control_phase = "exact-final-free";
 +    stale_output = output;
 +    freed_buffer = buffer;
 +    if (!melee_web_stadium_map2_buffer_owner_end(
 +            &output, error, sizeof(error)))
-+        goto cleanup;
++        STADIUM_MAP2_CONTROL_FAIL();
 +    buffer = NULL;
 +    if (output.captured != 0 || output.buffer != NULL ||
 +        output.origin != MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_RETIRED ||
@@ -10888,15 +10907,17 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
 +            memory_context.source_heap_handle ||
 +        after_free_context.world_generation != memory_context.world_generation ||
 +        !melee_web_source_memory_healthy())
-+        goto cleanup;
++        STADIUM_MAP2_CONTROL_FAIL();
++    control_phase = "erased-allocation";
 +    /* Erased current allocation must refuse before any same-address reuse. */
 +    if (stadium_map2_buffer_owner_end_with_free(
 +            &stale_output, stadium_owner_control_free_map2_buffer, &free_state,
 +            error, sizeof(error)) || free_state.calls != 0 ||
 +        stale_output.captured != 1 || stale_output.buffer != freed_buffer)
-+        goto cleanup;
++        STADIUM_MAP2_CONTROL_FAIL();
++    control_phase = "same-address-reuse";
 +    successor = HSD_MemAlloc(0x50000);
-+    if (successor != freed_buffer || successor == NULL) goto cleanup;
++    if (successor != freed_buffer || successor == NULL) STADIUM_MAP2_CONTROL_FAIL();
 +    memset(successor, 0xA5, 32);
 +    if (melee_web_source_memory_allocation_read(successor,
 +                                                &successor_lease) !=
@@ -10908,7 +10929,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
 +            stale_output.buffer_allocation_lease.source_heap_handle ||
 +        successor_lease.allocation_generation ==
 +            stale_output.buffer_allocation_lease.allocation_generation)
-+        goto cleanup;
++        STADIUM_MAP2_CONTROL_FAIL();
 +    successor_before = successor_lease;
 +    free_state = (StadiumMap2BufferControlFree) { 0 };
 +    if (stadium_map2_buffer_owner_end_with_free(
@@ -10921,9 +10942,9 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
 +        melee_web_source_memory_allocation_read(successor, &after_free) !=
 +            MELEE_WEB_SOURCE_MEMORY_READ_OK ||
 +        !stadium_owner_source_allocation_equal(&successor_before, &after_free))
-+        goto cleanup;
++        STADIUM_MAP2_CONTROL_FAIL();
 +    for (size_t i = 0; i < 32; ++i)
-+        if (((const unsigned char*) successor)[i] != 0xA5) goto cleanup;
++        if (((const unsigned char*) successor)[i] != 0xA5) STADIUM_MAP2_CONTROL_FAIL();
 +    buffer = successor;
 +    successor = NULL;
 +    fprintf(stderr,"STADIUM_MAP2_STARTED_BUFFER_CONTROL real_hsd_fallback=1 strict_dispatch_rejected=1 started_dispatch_retained=124 owner_lease_refused=1 output_lease_refused=1 idle_fields_refused=1 missing_capture_refused=1 borrowed_started_refused=1 wrong_world_heap_size_refused=1 required_bit_bypass_refused=1 erased_allocation_refused=1 proc_root_refused=1 callback_refused=1 stale_final_free_refused=1 exact_final_free=1 reused_payload_old_lease_refused=1 successor_lease_and_bytes_preserved=1 synthetic_graph=1 ticks=0\n");
@@ -10931,6 +10952,25 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
 +    success = 1;
 +
 +cleanup:
++    if (!success) {
++        MeleeWebSourceMemoryContext failure_context = { 0 };
++        int failure_context_status =
++            melee_web_source_memory_context_read(&failure_context);
++        fprintf(stderr,
++                "STADIUM_MAP2_STARTED_CONTROL_FAILURE phase=%s line=%d map_index=%zu initial_heap=%d current_heap=%d initial_entities=%p current_entities=%p initial_proc_roots=%p current_proc_roots=%p initial_owner=%p initial_text=%p initial_context=%p initial_font1=%p initial_map0=%p initial_map1=%p initial_map2=%p initial_map5=%p memory_status=%d memory_healthy=%d memory_world=%llu memory_heap=%d buffer=%p successor=%p\n",
++                control_phase, failure_line, failure_map_index, initial_heap,
++                HSD_GetHeap(), (void*) original_entities,
++                (void*) HSD_GObj_Entities, (void*) original_process_roots,
++                (void*) HSD_GObj_804D7840, (void*) original_owner,
++                (void*) original_text_head, (void*) original_context_head,
++                (void*) original_font1, (void*) original_maps[0],
++                (void*) original_maps[1], (void*) original_maps[2],
++                (void*) original_maps[5], failure_context_status,
++                melee_web_source_memory_healthy(),
++                (unsigned long long) failure_context.world_generation,
++                failure_context.source_heap_handle, buffer, successor);
++        fflush(stderr);
++    }
 +    /* Restore every process/GObj/SIS/map root saved from the live bootstrap
 +     * before freeing a failed fixture allocation or returning to C++. */
 +    stadium_display_owner_current = original_owner;
@@ -10942,13 +10982,14 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
 +    HSD_GObj_Entities = original_entities;
 +    HSD_GObjLibInitData = original_init;
 +    if (buffer != NULL) HSD_Free(buffer);
++#undef STADIUM_MAP2_CONTROL_FAIL
 +    return success;
 +}
 +#endif
  
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
-@@ -1185,22 +5856,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +5897,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -10990,7 +11031,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +5904,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +5945,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -11012,7 +11053,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +5926,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +5967,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
@@ -11035,7 +11076,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
      wrapper->flag = false;
      return gobj;
  }
-@@ -1896,6 +6606,9 @@ bool grStadium_801D42B8(void)
+@@ -1896,6 +6647,9 @@ bool grStadium_801D42B8(void)
      if (gp->u.stadium.xC4_b1) {
          return false;
      }
@@ -11045,7 +11086,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
      gp->u.stadium.xD0 =
          grDatFiles_801C6478(gp->u.stadium.xCC, gp->u.stadium.xC8);
      return true;
-@@ -2093,6 +6806,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2093,6 +6847,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
              gp = GET_GROUND(map_gobj);
              HSD_ASSERT(0x99B, gp);
              gp->u.stadium.xC4_b1 = true;
@@ -11055,7 +11096,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..24d32523cc5d5445939c8a85cc09f3af
              lbFile_80016580(datfiles[var_r29], gp->u.stadium.xCC,
                              &gp->u.stadium.xC8, fn_801D4220, NULL);
              temp_r31->u.stadium.xDC = 1;
-@@ -2221,6 +6937,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2221,6 +6978,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
          if (temp_r31->u.stadium.xDE == 5) {
              temp_r31->u.stadium.xD8 =
                  randi_between_2(yakumono_param->x0, yakumono_param->x4);
