@@ -549,10 +549,38 @@ All 800 direct bindings, 98 fixtures and 17 raw files were independently verifie
 before docs edits. Both exact children exit naturally with failure, are reaped,
 and are absent.
 
-Next, reduce the original map-2 scheduled callback and buffer-owner contract to a
-checked started-phase retirement path. Preserve the strict initialization path,
-source ordering and all still-required owner checks; do not turn the dispatch
-counter into an exemption. No complete Session retirement or C3 pass follows.
+The failure-only map-2 observation on `b63dfb45` reaches the same Ready boundary
+and refuses the unchanged initialization guard. Its bounded snapshot identifies
+the exact stage object and rooted original callback, plus the current owned
+fallback allocation: 327,680 bytes, world 3, heap 0, allocation generation 3004.
+The pointer matches, phase is 0/default 5, the timer is 3,607, no async load is
+active, and the archive pointer is null. These are current-state observations;
+the allocation was not captured at OnInit, so continuity is still unverified.
+The nonzero `xC8` value is retained without inventing an initialization invariant.
+Selective SIS drain and complete Session close still have not run past this
+refusal. Independent review verifies all 847 bindings, 98 fixtures and 17 raw
+files before docs edits. Both exact children exit naturally with failure, are
+reaped and absent.
+
+The full-suite checkpoint at `78184927` found three regressions. Two extracted
+cold-owner test harnesses lacked the new Ready-context declaration; their
+refusal-only test seam now compiles, with four focused tests passing. The SDK
+generator control compared retained reusable object/proc cells with a cold
+baseline. An explicit two-GObj/one-proc fixture now establishes that cache before
+the measured baseline. Both real generator lifetimes retain exact heap return
+at 8,331,264 bytes, zero active objects/processes, unchanged backing leases,
+freed generator data, private-root restoration and borrower refusal. Separate
+cold-pool controls retire and recreate two complete owned worlds. The earlier
+cold difference remains retained; no delta allowance or production allocator
+change was introduced. Canonical diagnostic build and focused controls pass;
+the full suite on `b63dfb45` passes 2,345 tests with 167 skips and no failures.
+
+Next, add a separate checked started-idle map-2 retirement path using the
+source state machine and an exact fallback allocation lease captured at OnInit
+and revalidated before final free. Preserve strict initialization, source order
+and all graph checks; refuse pending loads, transformed states and a borrowed
+buffer without its own lifetime token. No complete Session retirement or C3
+pass follows from the current controls.
 
 The existing RNG observer can be reused afterward, but the Stadium notes require
 C3's per-tick, per-owner ledger to be compared with the original. C8's broader

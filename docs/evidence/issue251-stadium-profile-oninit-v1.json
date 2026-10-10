@@ -1497,6 +1497,135 @@
         },
         "next": "Source-led reduction of map2 scheduled callback, unchanged buffer provenance and exact owner lifetime; define a started-phase contract preserving strict initialization. No counter-only waiver or repeat original run before reviewed smaller controls.",
         "scope": "Component reducer pass and one retained Ready-session failure. No successful runtime selective drain, complete Session retirement,3500postGO worlds, original per-owner RNG comparison, C3, browser or human gate acceptance."
+      },
+      "map2_started_observation": {
+        "source": "b63dfb457ed97dbc9b2b87957e3f8b60ef9a57ae",
+        "source_tree": "9b78f27c5b06ce241fccae3e36a1913651c905f2",
+        "source_review": {
+          "artifact": "root-map2-observation-source-review-v2.json",
+          "sha256": "fe95ed36c98db6e9140a9b17b038adef22bfb7d36f0312a225fca29ee6a3648e"
+        },
+        "map2_proposal_review": {
+          "artifact": "root-map2-observation-proposal-review-v2.json",
+          "sha256": "34fd08f6aa9f586e122126610a37394fbe373afb933219b44101e0819bb1c571"
+        },
+        "generator_fixture_review": {
+          "artifact": "root-generator-cache-fixture-source-review-v2.json",
+          "sha256": "3b235127a512d36dfe79f2e14658504889e9cb360539592394b0cb8e18f42354"
+        },
+        "diagnostic_build": {
+          "artifact": "map2-observation-build-v2/result.json",
+          "sha256": "f150e84542cf6dc4f0c1f9397a0472ea7038467898565bd533a0e18bbf2a96fe"
+        },
+        "producer": {
+          "artifact": "map2-observation-producer-b63dfb45-v1/identity.json",
+          "sha256": "1fc83eb7f5ba2c35083089660cd425a0eac1710f34f5f615f3cdebb803787563"
+        },
+        "profile_controls": {
+          "artifact": "root-map2-observation-controls-v2/result.json",
+          "sha256": "6c03d9a7b40d3a387d85c26690235a8a627747fa9c8369745a0ff5382dd39d8c"
+        },
+        "generator_controls": {
+          "artifact": "root-generator-cache-controls-v1/result.json",
+          "sha256": "e88c60896be603b1833ed4669c313921d37f1bea69b54fb54c2c058959774ad7"
+        },
+        "cold_pool_controls": {
+          "artifact": "root-gobj-pool-controls-v1/result.json",
+          "sha256": "f043226e1d398f153ac5efdc084935482407e1d5ec86eaea207e2ead7f9b59f7"
+        },
+        "independent_control_review": {
+          "artifact": "sol-map2-observation-controls-review-v2.json",
+          "sha256": "6b301c1dde30f221e0d98d938e385711fdbc2860fce29483a759fe52bf2f84a0"
+        },
+        "packet": {
+          "artifact": "map2-observation-ready-preflight-packet-v1.json",
+          "sha256": "821b743f236a4afe3c869ebec8d6404fc14cfcf83885e62d5a1e9d97b568a32d"
+        },
+        "frozen_result": {
+          "artifact": "root-map2-ready-frozen-result-v1.json",
+          "sha256": "debce08ee441ed44a4f68ceb1642496f9b9994af3ca04ef9239aeb808c167ad5"
+        },
+        "independent_result_review": {
+          "artifact": "sol-map2-ready-result-review-v1.json",
+          "sha256": "94649f6ac24ec19b4e166c5fa165084da9148bede015f119e39a0e7e7b57bed7"
+        },
+        "retained_regression_failure": {
+          "artifact": "root-stadium-regression-78184927-v1/result.json",
+          "sha256": "1b9b64cb5ffcb89de704c95753af555806f9d9dbd0769f2deec653d23d0fbf34"
+        },
+        "retained_cold_generator_failure": {
+          "artifact": "root-generator-return-operands-control-v1/result.json",
+          "sha256": "e9fd39114ef7630dec836e4ffed997ea5821c6ee55516693a1a1ef2b1d4d7dd5"
+        },
+        "bounded_cold_generator_review": {
+          "artifact": "sol-generator-return-operands-review-v1.json",
+          "sha256": "c836ab76e6c988cb2690f19ba51e5b308a3fa746ce6a2f842add8191bdc9deab"
+        },
+        "observations": {
+          "construction_ticks": 0,
+          "first_ready_ticks": 124,
+          "world": 3,
+          "ready_objects": 59,
+          "ready_processes": 73,
+          "first_refusal_clause": "map2-graph",
+          "journal": 1,
+          "dispatch": 124,
+          "buffer_use": 0,
+          "map2_snapshot": {
+            "status": "complete",
+            "class": "3",
+            "link": "5",
+            "map_id": "2",
+            "proc_linked": "1",
+            "proc_link": "4",
+            "buffer_origin": "2",
+            "buffer_matches": "1",
+            "buffer_lease_status": "0",
+            "buffer_live": "1",
+            "buffer_heap": "0",
+            "buffer_world": "3",
+            "buffer_bytes": "327680",
+            "buffer_generation": "3004",
+            "xC4b0": "0",
+            "xC4b1": "0",
+            "xC8": "50528256",
+            "xD8": "3607",
+            "xDC": "0",
+            "xDE": "5",
+            "xE0": "-1",
+            "xE2": "-1"
+          },
+          "retained_objects": 29,
+          "retained_processes": 53,
+          "runtime_selective_sis_drain": "not reached"
+        },
+        "verification": {
+          "direct_bindings_unchanged": 847,
+          "fixtures_unchanged": 98,
+          "raw_files": 17,
+          "before_docs_edits": true,
+          "owned_pids_natural_exit_reaped_absent": [
+            58444,
+            58450
+          ],
+          "unittest_returncode": 1,
+          "native_returncode": 1
+        },
+        "next_design": {
+          "artifact": "sol-map2-started-retirement-design-review-v1.json",
+          "sha256": "bb79d3e854229ce867826a728c1e2f86b810d88e89d941634b47391be2a73593"
+        },
+        "next": "Separate started idle graph predicate, exact fallback lease captured at original OnInit journal and revalidated before final free; keep strict initialization and refuse unsupported async/transformed/preload cases.",
+        "scope": "Current map2 snapshot and focused generator/cache control passes; complete Session retirement still fails. No C3, original RNG-ledger, rendering, browser or human gates.",
+        "regression": {
+          "artifact": "root-stadium-regression-b63dfb45-v1/result.json",
+          "sha256": "ac5fdb20fb638394f4b9e36da0c68d7d87027897454f18dacb06f9a7a8302bb2",
+          "tests": 2345,
+          "skipped": 167,
+          "failures": 0,
+          "seconds": 504.963,
+          "source": "b63dfb457ed97dbc9b2b87957e3f8b60ef9a57ae"
+        }
       }
     }
   }
