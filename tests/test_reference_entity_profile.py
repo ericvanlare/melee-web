@@ -9,6 +9,24 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp'
 
+
+def _extract_braced_declaration(source, marker):
+    start = source.index(marker)
+    opening = source.index("{", start)
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                end = index + 1
+                if source[end:].lstrip().startswith(";"):
+                    end = source.index(";", end) + 1
+                return source[start:end]
+    raise AssertionError(f"unterminated C++ block after {marker!r}")
+
+
 class ReferenceEntityProfileTests(unittest.TestCase):
     def test_typed_identity_and_secondary_relationship_decode(self):
         import json
@@ -56,21 +74,30 @@ class ReferenceEntityProfileTests(unittest.TestCase):
         source = SOURCE.read_text()
         gate = source[source.index('    whole_session_matches = WholeSessionMatchCount();'):
                       source.index('    capture_id = Env("MWRC_CAPTURE_ID");')]
+        stadium_receipt_start = source.index('constexpr char STADIUM_SETUP_RECEIPT_SHA256[]')
+        stadium_receipt = source[stadium_receipt_start:source.index(';', stadium_receipt_start) + 1]
+        stadium_phase = _extract_braced_declaration(source, 'enum class StadiumGoPrefixPhase')
+        stadium_state_start = source.index('  bool stadium_go_prefix_enabled = false;')
+        stadium_state_end = source.index('  bool stadium_go_prefix_css_ready = false;', stadium_state_start)
+        stadium_state = source[stadium_state_start:stadium_state_end]
         start = source.index('    if (checked_entity_profile)\n      handshake +=')
         metadata = source[start:source.index('    handshake += "}";', start)]
         count_function=source[source.index('u32 WholeSessionMatchCount()'):source.index('bool ValidIdentity(')]
         harness = r'''
 #include <cassert>
+#include <cstdint>
 #include <map>
 #include <string>
 std::map<std::string,std::string> environment;
 std::string Env(const char* name){return environment[name];}
+using u8=std::uint8_t;
 using u32=unsigned;
 constexpr unsigned WHOLE_SESSION_MIN_MATCHES=3,WHOLE_SESSION_MAX_MATCHES=64;
-'''+count_function+r'''
+'''+stadium_receipt+"\n"+stadium_phase+"\n"+count_function+r'''
 bool SdInitRequested(){return !Env("MWRC_SD_INIT").empty();}
 struct Reader {
  unsigned whole_session_matches=0;bool checked_entity_profile=false,active_entity_profile=false;std::string error;
+''' + stadium_state + r'''
  bool SetInvalid(const char* s){error=s;return false;}
  bool configure(){
 ''' + gate + r'''
@@ -96,6 +123,12 @@ int main(){
   environment[other]="1";r=Reader{};assert(!r.configure());assert(!r.error.empty());environment.erase(other);
  }
  environment["MWRC_ENTITY_PROFILE"]="unknown";r=Reader{};assert(!r.configure());
+ environment.clear();environment["MWRC_STADIUM_GO_PREFIX"]="0";r=Reader{};assert(!r.configure());
+ environment.clear();environment["MWRC_STADIUM_GO_PREFIX"]="1";r=Reader{};assert(!r.configure());
+ environment["MWRC_STADIUM_SETUP_RECEIPT_SHA256"]=STADIUM_SETUP_RECEIPT_SHA256;
+ r=Reader{};assert(r.configure()&&r.stadium_go_prefix_enabled);
+ assert(r.stadium_go_prefix_setup_receipt_sha256==STADIUM_SETUP_RECEIPT_SHA256);
+ assert(r.stadium_go_prefix_phase==StadiumGoPrefixPhase::AwaitCss);
 }
 '''
         scratch_parent = Path(os.environ.get('MELEE_ENTITY_TEST_OUTPUT', ROOT / 'work'))

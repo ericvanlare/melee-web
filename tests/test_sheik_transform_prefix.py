@@ -35,8 +35,23 @@ PAD_SLOT = 0x804C3000
 PAD_POLL_PC = 0x8034DD8C
 
 
+def _extract_braced_definition(source: str, marker: str) -> str:
+    start = source.index(marker)
+    opening = source.index("{", start)
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start:index + 1]
+    raise AssertionError(f"unterminated C++ block after {marker!r}")
+
+
 def _retain_cpp_failure(directory: Path, command: list[str], result: subprocess.CompletedProcess) -> None:
-    retained = os.environ.get("MWRC_SHEIK_FAILURE_DIR")
+    retained = (os.environ.get("MWRC_SHEIK_CPP_FAILURE_DIR")
+                or os.environ.get("MWRC_SHEIK_FAILURE_DIR"))
     if not retained:
         return
     target = Path(retained)
@@ -321,8 +336,9 @@ class SheikTransformPrefixTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("A native C++ compiler is not installed")
         source = OBSERVER_SOURCE.read_text(encoding="utf-8")
-        dispatcher = source[source.index("static bool IsCaptureBoundary("):
-                            source.index("bool Observer::IsRngReturnBoundary(")]
+        dispatcher = _extract_braced_definition(source, "static bool IsCaptureBoundary(")
+        stadium_after_pc_start = source.index("constexpr u32 STADIUM_GO_AFTER_PC =")
+        stadium_after_pc = source[stadium_after_pc_start:source.index(";", stadium_after_pc_start) + 1]
         request_helpers = source[source.index("bool SdInitRequested()"):
                                  source.index("bool SparsePadErrorsValid(")]
         harness = r'''
@@ -332,6 +348,7 @@ class SheikTransformPrefixTests(unittest.TestCase):
 #include <string>
 using u32 = uint32_t;
 constexpr u32 SSS_ENTER_RETURN = 0x8025B84C;
+''' + stadium_after_pc + r'''
 std::map<std::string, std::string> environment;
 std::string Env(const char* name) { return environment[name]; }
 bool CpuProbeEnabled() { return false; }
@@ -344,9 +361,12 @@ const Settings& CpuProbeEnvironment() { return settings; }
 int main(int argc, char** argv) {
   assert(argc == 2);
   const std::string mode = argv[1];
-  bool sss = false, sd = false;
+  bool sss = false, sd = false, stadium = false;
   if (mode == "transform") { environment["MWRC_TRANSFORM_PREFIX"] = "1"; sss = true; }
   else if (mode == "invalid-transform") environment["MWRC_TRANSFORM_PREFIX"] = "0";
+  else if (mode == "stadium-go") {
+    environment["MWRC_STADIUM_GO_PREFIX"] = "1"; stadium = true; sss = true;
+  }
   else if (mode == "ordinary-without-sd") environment["MWRC_SD_MENU_PROBE"] = "ordinary_timeout";
   else if (mode != "default") {
     environment["MWRC_SD_INIT"] = "1"; sd = true;
@@ -360,6 +380,7 @@ int main(int argc, char** argv) {
                  0x80390EB4u, 0x80390FC0u, 0x80391040u, 0x8039157Cu})
     assert(IsCaptureBoundary(pc));
   assert(IsCaptureBoundary(SSS_ENTER_RETURN) == sss);
+  assert(IsCaptureBoundary(STADIUM_GO_AFTER_PC) == stadium);
   assert(IsCaptureBoundary(0x8016EBC0) == sd);
   assert(IsCaptureBoundary(0x8016EC24) == sd);
   assert(!IsCaptureBoundary(0x8025B850));
@@ -375,9 +396,9 @@ int main(int argc, char** argv) {
             if built.returncode:
                 _retain_cpp_failure(path, command, built)
             self.assertEqual(built.returncode, 0, built.stderr)
-            for mode in ("default", "transform", "invalid-transform", "ordinary-without-sd",
-                         "ordinary_timeout", "sd_prefix", "competitive_entry", "sparse_pair",
-                         "rules_ready"):
+            for mode in ("default", "transform", "invalid-transform", "stadium-go",
+                         "ordinary-without-sd", "ordinary_timeout", "sd_prefix",
+                         "competitive_entry", "sparse_pair", "rules_ready"):
                 with self.subTest(mode=mode):
                     command = [str(path / "owner"), mode]
                     checked = subprocess.run(command, capture_output=True, text=True)
