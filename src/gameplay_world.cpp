@@ -1002,6 +1002,20 @@ void GameplayWorld::end_stage(){storage_->end_stage();}
 bool GameplayWorld::diagnostic_toy_owner_preflight()const{
     return storage_&&storage_->toy_owner_preflight();
 }
+void GameplayWorld::diagnostic_stadium_go_alignment_arm(
+    int expected_branch,char* error,size_t size){
+    check(storage_&&construction_complete()&&storage_->stadium_diagnostic&&
+              storage_->stage_last,
+          "Stadium GO trace requires a complete, exact diagnostic source owner");
+    check(melee_web_stage_last_stadium_go_alignment_arm(
+              storage_->stage_last,expected_branch,error,size),error);
+}
+bool GameplayWorld::diagnostic_stadium_go_alignment_snapshot(
+    MeleeWebStadiumGoAlignmentSnapshot* out,char* error,size_t size)const{
+    return storage_&&construction_complete()&&storage_->stadium_diagnostic&&
+        storage_->stage_last&&melee_web_stage_last_stadium_go_alignment_snapshot(
+            storage_->stage_last,out,error,size);
+}
 #endif
 MeleeWebMatchContext* GameplayWorld::take_match_context(){
     if(!storage_||!storage_->match_context)

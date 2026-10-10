@@ -18,6 +18,9 @@
 #include "gameplay_hud.h"
 #include "gameplay_source_memory_runtime.h"
 #include <melee/gr/grpstadium.h>
+#include <melee/gm/gm_1879.h>
+#include <melee/if/if_2F6E.h>
+#include <melee/if/if_2F72.h>
 #include <sysdolphin/baselib/gobjproc.h>
 #endif
 #include <stdlib.h>
@@ -32,6 +35,7 @@ extern int melee_web_ground_remove_unmapped(HSD_GObj*);
 extern void melee_web_ground_remove_camera(HSD_GObj*);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 static const HSD_GObjEvent stadium_pending_callbacks[]={fn_801D13C8,fn_801D11E4};
+extern uint32_t melee_web_match_source_frames(void);
 #endif
 struct MeleeWebStageLast {
     StageInfo saved;
@@ -63,6 +67,7 @@ struct MeleeWebStageLast {
     MeleeWebSourceMemoryAllocation stadium_manager_lease;
     MeleeWebSourceMemoryAllocation stadium_manager_proc_lease;
     MeleeWebStadiumMap2BufferOwner stadium_map2_buffer_owner;
+    MeleeWebStadiumGoAlignmentSnapshot stadium_go_alignment;
 #endif
 };
 static MeleeWebStageLast* active;
@@ -258,6 +263,240 @@ static int stadium_manager_storage_preflight(MeleeWebStageLast* h,char* e,size_t
   return fail(e,n,"Original Stadium manager storage lease changed");
  return melee_web_stadium_manager_view_preflight(&h->stadium_manager,e,n);
 }
+static void stadium_go_alignment_fail(MeleeWebStageLast* h,unsigned reason)
+{
+ if(h && h->stadium_go_alignment.armed && !h->stadium_go_alignment.failure)
+  h->stadium_go_alignment.failure=reason;
+}
+static void stadium_go_alignment_stamp(MeleeWebStageLast* h,
+        MeleeWebStadiumGoAlignmentEvent* event,int callback_index,int source_branch,
+        int gate,int mode,int remap,int callback_identity,int hud_enabled,
+        void* object,void* proc)
+{
+ MeleeWebGameplayStats stats=melee_web_gameplay_stats();
+ event->generation=stats.generation;event->world_ticks=stats.ticks;
+ event->source_frame=melee_web_match_source_frames();
+ event->sequence=++h->stadium_go_alignment.next_sequence;
+ event->object_identity=(uintptr_t)object;event->proc_identity=(uintptr_t)proc;
+ event->callback_index=callback_index;event->source_branch=source_branch;
+ event->map2_gate=gate;event->display_mode=mode;event->remap_branch=remap;
+ event->callback_identity=callback_identity;event->hud_enabled=hud_enabled;
+}
+static int stadium_go_alignment_has_no_events(const MeleeWebStageLast* h)
+{
+ return h && !h->stadium_go_alignment.stage_before.sequence &&
+        !h->stadium_go_alignment.stage_after.sequence &&
+        !h->stadium_go_alignment.go_after.sequence &&
+        !h->stadium_go_alignment.hud_after.sequence;
+}
+static int stadium_go_alignment_live(const MeleeWebStageLast* h)
+{
+ if(!h||h!=active||!h->stadium_go_alignment.armed||
+    h->generation!=melee_web_gameplay_stats().generation||
+    h->stadium_go_alignment.generation!=h->generation||
+    !h->stadium_ready_route||!h->definition||!h->definition->diagnostic_only||
+    h->definition->stage_kind!=St_Kind_PStadium||!h->source_ordered)return 0;
+ /* Before the first Ready callback, a completed tick may legitimately leave
+  * the exact OnInit owner unstarted. Keep that partial/zero-latch state
+  * observable; after original OnStart, require its captured owner phase. */
+ return (h->stadium_started==1&&h->stadium_ready_armed==1&&
+         stadium_go_alignment_has_no_events(h))||
+        (h->stadium_started==2&&h->stadium_ready_armed==0);
+}
+static int stadium_go_alignment_source_owner_live(
+        const MeleeWebStageLast* h,int source_started)
+{
+ MeleeWebSourceMemoryContext context={0};
+ MeleeWebSourceMemoryAllocation object={0},proc={0};
+ MeleeWebGameplayStats stats=melee_web_gameplay_stats();
+ if(!h||h!=active||!melee_web_gameplay_world_exists()||
+    !melee_web_source_memory_healthy()||
+    melee_web_source_memory_context_read(&context)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    context.world_generation!=stats.generation||context.world_generation!=h->generation||
+    context.world_generation!=h->stadium_start_context.world_generation||
+    context.source_heap_handle!=h->stadium_start_context.source_heap_handle)
+  return 0;
+ if(!source_started){
+  return h->stadium_started==1&&!h->stadium_manager.object&&
+         !h->stadium_manager.proc&&!h->stadium_manager_lease.live&&
+         !h->stadium_manager_proc_lease.live;
+ }
+ if(h->stadium_started!=2||
+    melee_web_source_memory_allocation_read(h->stadium_manager.object,&object)!=
+        MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    melee_web_source_memory_allocation_read(h->stadium_manager.proc,&proc)!=
+        MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    !object.live||!proc.live||
+    object.world_generation!=context.world_generation||
+    proc.world_generation!=context.world_generation||
+    object.world_generation!=h->stadium_manager_lease.world_generation||
+    proc.world_generation!=h->stadium_manager_proc_lease.world_generation||
+    object.source_heap_handle!=context.source_heap_handle||
+    proc.source_heap_handle!=context.source_heap_handle||
+    object.source_heap_handle!=h->stadium_manager_lease.source_heap_handle||
+    proc.source_heap_handle!=h->stadium_manager_proc_lease.source_heap_handle||
+    object.requested_bytes!=h->stadium_manager_lease.requested_bytes||
+    proc.requested_bytes!=h->stadium_manager_proc_lease.requested_bytes||
+    object.allocation_generation!=h->stadium_manager_lease.allocation_generation||
+    proc.allocation_generation!=h->stadium_manager_proc_lease.allocation_generation)
+  return 0;
+ return 1;
+}
+static int stadium_go_alignment_stage_note(MeleeWebStageLast* h,int after,
+        char* e,size_t n)
+{
+ if(!h)return fail(e,n,"Stadium GO trace lost its StageLast owner");
+ if(!h->stadium_go_alignment.armed)return 1;
+ MeleeWebStadiumGoAlignmentEvent* event=after?&h->stadium_go_alignment.stage_after:
+                                                    &h->stadium_go_alignment.stage_before;
+ const unsigned required_armed=after?2U:1U;
+ if(event->sequence||!h||h!=active||
+    h->generation!=melee_web_gameplay_stats().generation||
+    !h->stadium_ready_route||!h->definition||!h->definition->diagnostic_only||
+    h->definition->stage_kind!=St_Kind_PStadium||!h->source_ordered||
+    h->stadium_started!=(after?2:1)||h->stadium_ready_armed!=required_armed||
+    !h->stadium_ready_object||!h->stadium_ready_proc||
+    !melee_web_hud_stadium_ready_context(h->stadium_ready_object,h->stadium_ready_proc)||
+    !stadium_maps_live(h,e,n)){
+  stadium_go_alignment_fail(h,1);
+  if(e&&n&&!*e)snprintf(e,n,"Stadium GO trace lost its exact Stage Ready callback");
+  return 0;
+ }
+ const int gate=((Ground*)h->stadium_map2_buffer_owner.map2_ground->user_data)->u.stadium.xC4_b0;
+ if(gate!=(after?0:1)){
+  stadium_go_alignment_fail(h,2);
+  return fail(e,n,"Stadium GO trace did not observe the authored map-2 gate transition");
+ }
+ stadium_go_alignment_stamp(h,event,3,-1,gate,-1,-1,1,-1,
+                            h->stadium_ready_object,h->stadium_ready_proc);
+ return 1;
+}
+static int stadium_go_alignment_current_display(const MeleeWebStageLast* h,
+        int* gate,int* mode,int* remap)
+{
+ if(!stadium_go_alignment_source_owner_live(h,h&&h->stadium_started==2)||
+    !h->stadium_ready_route||!h->definition||!h->definition->diagnostic_only||
+    h->definition->stage_kind!=St_Kind_PStadium||!h->source_ordered||
+    !melee_web_stage_selection_preflight(St_Kind_PStadium)||
+    stage_info.grkind!=h->definition->ground_kind||
+    !melee_web_stadium_display_owner_go_alignment_view(
+        h->stadium_display_owner,&h->stadium_map2_buffer_owner,
+        h->stadium_started==2,gate,mode))return 0;
+ *remap=gm_8018841C()?1:0;
+ return 1;
+}
+int melee_web_stage_last_stadium_go_alignment_arm(
+        MeleeWebStageLast* h,int expected_branch,char* e,size_t n)
+{
+ if(!h||h!=active||h->generation!=melee_web_gameplay_stats().generation||
+    !h->definition||!h->definition->diagnostic_only||
+    h->definition->stage_kind!=St_Kind_PStadium||!h->source_ordered||
+    !h->stadium_ready_route||h->stadium_ready_armed!=1||h->stadium_started!=1||
+    h->stadium_go_alignment.armed||expected_branch<0||expected_branch>1||
+    HSD_GObj_804D781C||HSD_GObj_804D7838||HSD_GObj_804D7830||
+    HSD_GObj_804D7814||HSD_GObj_804D7818)
+  return fail(e,n,"Stadium GO trace arm requires the idle, started Ready owner");
+ MeleeWebGameplayStats stats=melee_web_gameplay_stats();
+ if(stats.ticks!=0||stats.generation!=h->generation||
+    !melee_web_stage_selection_preflight(St_Kind_PStadium)||
+    stage_info.grkind!=h->definition->ground_kind||
+    !stadium_go_alignment_source_owner_live(h,0))
+  return fail(e,n,"Stadium GO trace arm requires its zero-tick original map owner");
+ int gate=-1,mode=-1,remap=-1;
+ if(!stadium_go_alignment_current_display(h,&gate,&mode,&remap))
+  return fail(e,n,"Stadium GO trace arm requires its exact live display owner");
+ if(gate!=1)return fail(e,n,"Stadium GO trace arm requires the original closed map-2 gate");
+ memset(&h->stadium_go_alignment,0,sizeof(h->stadium_go_alignment));
+ h->stadium_go_alignment.armed=1;
+ h->stadium_go_alignment.generation=stats.generation;
+ h->stadium_go_alignment.armed_world_ticks=stats.ticks;
+ h->stadium_go_alignment.armed_source_frame=melee_web_match_source_frames();
+ h->stadium_go_alignment.expected_branch=(uint32_t)expected_branch;
+ return ok(e,n);
+}
+int melee_web_stage_last_stadium_go_alignment_snapshot(
+        const MeleeWebStageLast* h,MeleeWebStadiumGoAlignmentSnapshot* out,
+        char* e,size_t n)
+{
+ int gate=-1,mode=-1,remap=-1;
+ const MeleeWebGameplayStats stats=melee_web_gameplay_stats();
+ if(!h||h!=active||!out||h->generation!=melee_web_gameplay_stats().generation||
+    !h->stadium_go_alignment.armed||
+    (HSD_GObj_804D781C||HSD_GObj_804D7838||HSD_GObj_804D7830||
+     HSD_GObj_804D7814||HSD_GObj_804D7818))
+  return fail(e,n,"Stadium GO trace snapshot requires its live armed StageLast owner");
+ if(!stadium_go_alignment_live(h)||
+    stats.ticks<h->stadium_go_alignment.armed_world_ticks||
+    !stadium_go_alignment_current_display(h,&gate,&mode,&remap))
+  return fail(e,n,"Stadium GO trace snapshot lost its live idle Stadium owner/world phase");
+ if(h->stadium_go_alignment.failure){
+  static const char* const failures[]={"none","Stage Ready callback identity changed",
+   "map-2 gate phase changed","GO owner/display/mode changed","GO branch differed from the selected rules",
+   "HUD callback branch differed from GO","HUD owner/callback identity changed",
+   "HUD did not enable its original display"};
+  unsigned code=h->stadium_go_alignment.failure;
+  return fail(e,n,code<sizeof(failures)/sizeof(failures[0])?failures[code]:"Stadium GO trace failed");
+ }
+ *out=h->stadium_go_alignment;return ok(e,n);
+}
+void melee_web_stage_last_stadium_go_alignment_note_go(int source_branch)
+{
+ MeleeWebStageLast* h=active;
+ if(!h||!h->stadium_go_alignment.armed)return;
+ MeleeWebStadiumGoAlignmentEvent* event=&h->stadium_go_alignment.go_after;
+ void* object=HSD_GObj_804D781C;void* proc=HSD_GObj_804D7838;
+ int gate=-1,mode=-1,remap=-1;
+ if(event->sequence||!stadium_go_alignment_live(h)||
+    !h->stadium_go_alignment.stage_before.sequence||
+    !h->stadium_go_alignment.stage_after.sequence||
+    !object||!proc||!melee_web_hud_stadium_ready_context(object,proc)||
+    !melee_web_stage_selection_preflight(St_Kind_PStadium)||
+    stage_info.grkind!=h->definition->ground_kind||
+    !stadium_go_alignment_current_display(h,&gate,&mode,&remap)){
+  stadium_go_alignment_fail(h,3);return;
+ }
+ if(source_branch!=(int)h->stadium_go_alignment.expected_branch){
+  stadium_go_alignment_fail(h,4);return;
+ }
+ if(gate!=0||mode!=0xB||remap!=0){
+  stadium_go_alignment_fail(h,3);return;
+ }
+ stadium_go_alignment_stamp(h,event,3,source_branch,gate,mode,remap,1,-1,object,proc);
+}
+void melee_web_stage_last_stadium_go_alignment_note_hud(
+        int callback_index,MeleeWebStadiumGoAlignmentHudCallback callback,
+        int hud_enabled)
+{
+ MeleeWebStageLast* h=active;
+ if(!h||!h->stadium_go_alignment.armed)return;
+ MeleeWebStadiumGoAlignmentEvent* event=&h->stadium_go_alignment.hud_after;
+ void* object=HSD_GObj_804D781C;void* proc=HSD_GObj_804D7838;
+ int gate=-1,mode=-1,remap=-1,identity=0;
+ if(event->sequence||!stadium_go_alignment_live(h)||
+    !h->stadium_go_alignment.go_after.sequence||!callback||
+    !stadium_go_alignment_current_display(h,&gate,&mode,&remap)){
+  stadium_go_alignment_fail(h,5);return;
+ }
+ if(callback_index==-1 && h->stadium_go_alignment.go_after.source_branch==1){
+  identity=melee_web_hud_stadium_ready_context(object,proc);
+ }else if(callback_index==4 && h->stadium_go_alignment.go_after.source_branch==0){
+  const Element_803F9628* row=&ifStatus_803F9628[4];
+  HSD_GObj* current_object=HSD_GObj_804D781C;
+  HSD_GObjProc* current_proc=HSD_GObj_804D7838;
+  identity=current_object&&current_proc&&!HSD_GObj_804D7814&&
+      row->x0==current_object&&row->x8==if_802F73C4&&row->x1C==callback&&
+      current_object->proc==current_proc&&!current_proc->child&&
+      current_proc->gobj==current_object&&current_proc->on_invoke==if_802F73C4;
+ }else{
+  stadium_go_alignment_fail(h,5);return;
+ }
+ if(!identity||!object||!proc||gate!=0||mode!=1||remap!=0||hud_enabled!=1){
+  stadium_go_alignment_fail(h,6);return;
+ }
+ stadium_go_alignment_stamp(h,event,callback_index,
+      h->stadium_go_alignment.go_after.source_branch,gate,mode,remap,
+      identity,hud_enabled,object,proc);
+}
 static int stadium_prepare_start(MeleeWebStageLast* h,
         MeleeWebMatchContext* camera_owner,char* e,size_t n)
 {
@@ -401,6 +640,8 @@ int melee_web_stage_last_stadium_ready_before(int stage_kind,char* e,size_t n)
   node=p->next;
  }
  if(node)return fail(e,n,"Diagnostic Stadium Ready pending queue has a foreign owner");
+ if(h->stadium_go_alignment.armed &&
+    !stadium_go_alignment_stage_note(h,0,e,n))return 0;
  h->stadium_ready_armed=2;return ok(e,n);
 }
 int melee_web_stage_last_stadium_ready_after(int stage_kind,char* e,size_t n)
@@ -411,6 +652,8 @@ int melee_web_stage_last_stadium_ready_after(int stage_kind,char* e,size_t n)
     !melee_web_hud_stadium_ready_context(h->stadium_ready_object,h->stadium_ready_proc))
   return fail(e,n,"Diagnostic Stadium original OnStart changed its HUD callback identity");
  if(!stadium_capture_start(h,1,e,n))return 0;
+ if(h->stadium_go_alignment.armed &&
+    !stadium_go_alignment_stage_note(h,1,e,n))return 0;
  h->stadium_ready_armed=0;h->stadium_ready_object=NULL;h->stadium_ready_proc=NULL;
  return ok(e,n);
 }

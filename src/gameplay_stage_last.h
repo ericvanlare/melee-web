@@ -1,6 +1,7 @@
 #ifndef MELEE_WEB_GAMEPLAY_STAGE_LAST_H
 #define MELEE_WEB_GAMEPLAY_STAGE_LAST_H
 #include <stddef.h>
+#include <stdint.h>
 #include "gameplay_effect_banks.h"
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include "gameplay_stadium_display_owner.h"
@@ -10,6 +11,37 @@
 extern "C" {
 #endif
 typedef struct MeleeWebStageLast MeleeWebStageLast;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+typedef struct MeleeWebStadiumGoAlignmentEvent {
+    uint64_t generation;
+    uint64_t world_ticks;
+    uint32_t source_frame;
+    uint32_t sequence;
+    uintptr_t object_identity;
+    uintptr_t proc_identity;
+    int32_t callback_index;
+    int32_t source_branch;
+    int32_t map2_gate;
+    int32_t display_mode;
+    int32_t remap_branch;
+    int32_t callback_identity;
+    int32_t hud_enabled;
+} MeleeWebStadiumGoAlignmentEvent;
+typedef struct MeleeWebStadiumGoAlignmentSnapshot {
+    uint64_t generation;
+    uint64_t armed_world_ticks;
+    uint32_t armed_source_frame;
+    uint32_t armed;
+    uint32_t failure;
+    uint32_t expected_branch;
+    uint32_t next_sequence;
+    MeleeWebStadiumGoAlignmentEvent stage_before;
+    MeleeWebStadiumGoAlignmentEvent stage_after;
+    MeleeWebStadiumGoAlignmentEvent go_after;
+    MeleeWebStadiumGoAlignmentEvent hud_after;
+} MeleeWebStadiumGoAlignmentSnapshot;
+typedef void (*MeleeWebStadiumGoAlignmentHudCallback)(int);
+#endif
 /* Begin a source-owned stage callback scope for one supported StKind. The
  * caller must have published that stage's GroundParam, native map archive,
  * lights and effect bank first. source_ordered selects the original
@@ -36,6 +68,13 @@ int melee_web_stage_last_stadium_on_load(MeleeWebStageLast*,char*,size_t);
 int melee_web_stage_last_stadium_prepare_ready(MeleeWebStageLast*,MeleeWebMatchContext*,char*,size_t);
 int melee_web_stage_last_stadium_ready_before(int stage_kind,char*,size_t);
 int melee_web_stage_last_stadium_ready_after(int stage_kind,char*,size_t);
+int melee_web_stage_last_stadium_go_alignment_arm(
+    MeleeWebStageLast*,int expected_branch,char*,size_t);
+int melee_web_stage_last_stadium_go_alignment_snapshot(
+    const MeleeWebStageLast*,MeleeWebStadiumGoAlignmentSnapshot*,char*,size_t);
+void melee_web_stage_last_stadium_go_alignment_note_go(int source_branch);
+void melee_web_stage_last_stadium_go_alignment_note_hud(
+    int callback_index,MeleeWebStadiumGoAlignmentHudCallback,int hud_enabled);
 /* Asset-free reducer for the diagnostic bind-refusal reporting path. It
  * injects the bind failure and E8 journal event, then exercises the real
  * display-owner cancellation guard. The partial owner remains live until the

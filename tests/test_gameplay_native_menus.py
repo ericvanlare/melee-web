@@ -2621,12 +2621,18 @@ int main(void)
             self.skipTest("One post-Ready tick requires its separately reviewed run gate")
         self._run_stadium_source_ready_session_one_shot(post_ready_tick=True)
 
+    def test_stadium_source_go_alignment_one_shot(self):
+        if os.environ.get("MELEE_RUN_STADIUM_SOURCE_GO_ALIGNMENT") != "1":
+            self.skipTest("Original GO/HUD source canary requires its separately reviewed run gate")
+        self._run_stadium_source_ready_session_one_shot(go_alignment_probe=True)
+
     def test_stadium_source_toy_owner_controls_one_shot(self):
         if os.environ.get("MELEE_RUN_STADIUM_SOURCE_TOY_OWNER_CONTROLS") != "1":
             self.skipTest("Toy owner controls require their separately reviewed run gate")
         self._run_stadium_source_ready_session_one_shot(toy_owner_controls=True)
 
-    def _run_stadium_source_ready_session_one_shot(self, toy_owner_controls=False, post_ready_tick=False):
+    def _run_stadium_source_ready_session_one_shot(
+            self, toy_owner_controls=False, post_ready_tick=False, go_alignment_probe=False):
         import hashlib
         from capture_sd_reference_prefix import cleanup_process
 
@@ -2656,9 +2662,11 @@ int main(void)
         source = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
         scope = ("stadium-source-toy-owner-controls-v1" if toy_owner_controls
                  else "stadium-source-post-ready-tick-v1" if post_ready_tick
+                 else "stadium-source-go-alignment-v1" if go_alignment_probe
                  else "stadium-source-ready-session-v1")
         prefix = ("stadium-toy-owner" if toy_owner_controls
                   else "stadium-post-ready" if post_ready_tick
+                  else "stadium-go-alignment" if go_alignment_probe
                   else "stadium-source-ready")
         trace = self.scratch / (prefix + "-session.jsonl")
         command = [str(node_runtime()), str(target), str(menu), str(game), "3",
@@ -2711,6 +2719,56 @@ int main(void)
             self.assertIn("STADIUM_TOY_OWNER phase=entry-null-archive-table-refused unchanged=1", stderr)
             self.assertIn("STADIUM_TOY_OWNER phase=no-acquisition-close null_archive_table_refused=1 foreign_archive_refused=1 reset=1 ticks=0", stderr)
             self.assertIn("STADIUM_TOY_OWNER phase=source-on-init-destructor-close wrong_locale_refused=1 reset=1 ticks=0", stderr)
+        elif go_alignment_probe:
+            self.assertIn("Stadium source GO containing tick and immediately following full tick observed through HUD and checked close; source-frame values retained without ordinal inference; no C3 claim", stdout)
+            event_rows = re.findall(
+                r"STADIUM_SOURCE_GO_EVENT event=(\S+) sequence=(\d+) generation=(\d+) world_ticks=(\d+) source_frame=(\d+) object=(\d+) proc=(\d+) callback_index=(-?\d+) source_branch=(-?\d+) map2_gate=(-?\d+) display_mode=(-?\d+) remap_branch=(-?\d+) callback_identity=(-?\d+) hud_enabled=(-?\d+)",
+                stderr)
+            self.assertEqual([row[0] for row in event_rows],
+                             ["StageBefore", "StageAfter", "GoAfter", "HudAfter"], stderr)
+            self.assertEqual([int(row[1]) for row in event_rows], [1, 2, 3, 4])
+            self.assertEqual(len({int(row[2]) for row in event_rows}), 1)
+            stage_before, stage_after, go_event, hud_event = event_rows
+            self.assertEqual((int(stage_before[9]), int(stage_after[9])), (1, 0))
+            self.assertEqual((int(go_event[9]), int(go_event[10]), int(go_event[11])), (0, 0xB, 0))
+            self.assertEqual((int(hud_event[9]), int(hud_event[10]), int(hud_event[11])), (0, 1, 0))
+            self.assertEqual((int(go_event[12]), int(go_event[13])), (1, -1))
+            self.assertEqual(int(hud_event[12]), 1)
+            expected_branch = int(re.search(
+                r"STADIUM_SOURCE_GO phase=armed generation=\d+ world_ticks=0 source_frame=\d+ expected_branch=(\d+) draw=0 tick_cap=600",
+                stderr).group(1))
+            self.assertEqual(int(go_event[8]), expected_branch)
+            self.assertEqual(int(hud_event[8]), expected_branch)
+            self.assertEqual(int(hud_event[7]), 4 if expected_branch == 0 else -1)
+            containing = re.findall(
+                r"STADIUM_SOURCE_GO_TICK kind=containing world_before=(\d+) world_after=(\d+) session_before=(\d+) session_after=(\d+) source_frame_before=(\d+) source_frame_after=(\d+) ready_after=(\d+) draw=0",
+                stderr)
+            following = re.findall(
+                r"STADIUM_SOURCE_GO_TICK kind=first-full-post-go world_before=(\d+) world_after=(\d+) session_before=(\d+) session_after=(\d+) source_frame_before=(\d+) source_frame_after=(\d+) go_containing_source_frame_after=(\d+) ready_after=(\d+) draw=0",
+                stderr)
+            self.assertEqual(len(containing), 1, stderr)
+            self.assertEqual(len(following), 1, stderr)
+            c, f = tuple(map(int, containing[0])), tuple(map(int, following[0]))
+            self.assertEqual((c[1], c[3]), (c[0] + 1, c[2] + 1))
+            self.assertEqual((f[0], f[2]), (c[1], c[3]))
+            self.assertEqual((f[1], f[3]), (f[0] + 1, f[2] + 1))
+            self.assertEqual(f[6], c[5])
+            complete = re.findall(
+                r"STADIUM_SOURCE_GO phase=complete generation=(\d+) expected_branch=(\d+) go_branch=(\d+) hud_index=(-?\d+) stage_before_world=(\d+) stage_after_world=(\d+) go_world=(\d+) hud_world=(\d+) stage_before_frame=(\d+) stage_after_frame=(\d+) go_frame=(\d+) hud_frame=(\d+) first_post_go_tick=1 draw=0 hud_ready_at_observation=(\d+)",
+                stderr)
+            self.assertEqual(len(complete), 1, stderr)
+            self.assertEqual(int(complete[0][0]), int(event_rows[0][2]))
+            self.assertEqual(int(complete[0][3]), int(hud_event[7]))
+            self.assertIn("STADIUM_SOURCE_GO phase=checked-close snapshot_unavailable=1", stderr)
+            phase_position = stderr.index("STADIUM_READY_SESSION phase=first-ready-before-close")
+            follow_position = stderr.index("kind=first-full-post-go")
+            if c[6] == 1:
+                self.assertLess(phase_position, follow_position,
+                                "A Ready-triggered follow-up must be reported after first-ready")
+            elif f[7] == 1:
+                self.assertLess(follow_position, phase_position,
+                                "A follow-up that reaches Ready belongs before first-ready")
+            self.assertNotIn("STADIUM_POST_READY_TICK", stderr)
         elif post_ready_tick:
             self.assertIn("Stadium original source-session Ready plus one post-Ready source tick and checked owned-world retirement passed; exact GO alignment unobserved; no C3 claim", stdout)
             row = re.findall(

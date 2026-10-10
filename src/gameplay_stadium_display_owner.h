@@ -112,6 +112,13 @@ int melee_web_stadium_manager_view_preflight(
     const MeleeWebStadiumManagerView*, char*, size_t);
 int melee_web_stadium_display_owner_preflight(
     MeleeWebStadiumDisplayOwner*, char*, size_t);
+/* Allocation-free current source-display observation for the GO canary. This
+ * validates exact current owner/map identities and returns scalar gate/mode
+ * fields without entering SIS retirement or changing owner state. */
+int melee_web_stadium_display_owner_go_alignment_view(
+    const MeleeWebStadiumDisplayOwner*,
+    const MeleeWebStadiumMap2BufferOwner*, int source_started,
+    int* map2_gate, int* display_mode);
 int melee_web_stadium_display_owner_cancel(
     MeleeWebStadiumDisplayOwner*, char* error, size_t error_size);
 int melee_web_stadium_display_owner_retire(

@@ -628,5 +628,16 @@ bool GameplayMatchSession::construction_complete()const{return storage_&&storage
 bool GameplayMatchSession::diagnostic_toy_owner_preflight()const{
     return storage_&&storage_->world&&storage_->world->diagnostic_toy_owner_preflight();
 }
+void GameplayMatchSession::diagnostic_stadium_go_alignment_arm(
+    int expected_branch,char* error,size_t size){
+    check(storage_&&construction_complete()&&storage_->world,
+          "Stadium GO trace requires a complete live source match owner");
+    storage_->world->diagnostic_stadium_go_alignment_arm(expected_branch,error,size);
+}
+bool GameplayMatchSession::diagnostic_stadium_go_alignment_snapshot(
+    MeleeWebStadiumGoAlignmentSnapshot* out,char* error,size_t size)const{
+    return storage_&&construction_complete()&&storage_->world&&
+        storage_->world->diagnostic_stadium_go_alignment_snapshot(out,error,size);
+}
 #endif
 }

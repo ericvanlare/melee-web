@@ -3667,17 +3667,21 @@ index fea468cc6c89d7d4c6c8a1a81e31f99eec07bc63..6d0819f60ef4c12cdf80b1ea29bbd805
  
  void gm_80168C5C(u32 arg0)
 diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
-index cd7e31a0636e4e1a48d6a870e09319e887345ed1..2cf291e797065c1108b793a7408f92b9f06a5ef1 100644
+index cd7e31a0636e4e1a48d6a870e09319e887345ed1..954ae20a44e3948d46e733e9d3c0da8362a20e52 100644
 --- a/src/melee/gm/gm_16AE.c
 +++ b/src/melee/gm/gm_16AE.c
-@@ -1,4 +1,6 @@
+@@ -1,12 +1,18 @@
  #include "gm_16AE.h"
 +#include <stddef.h>
 +#include "gameplay_bootstrap.h"
  
  #include <string.h>
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++#include "gameplay_stage_last.h"
++#endif
  
-@@ -7,6 +9,7 @@
+ #include "forward.h"
+ #include "gm_16AE.static.h"
  #include "gm_1884.h"
  #include "gm_18A1.h"
  #include "gm_unsplit.h"
@@ -3685,7 +3689,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..2cf291e797065c1108b793a7408f92b9
  #include "gmmain_lib.h"
  #include "gmmultiman.h"
  #include "gmpause.h"
-@@ -355,6 +358,13 @@ static float get_unk_float(void)
+@@ -355,6 +361,13 @@ static float get_unk_float(void)
      }
  }
  
@@ -3699,7 +3703,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..2cf291e797065c1108b793a7408f92b9
  bool gm_IsCurrently1PMode(void)
  {
      return gm_Is1PMode(gm_GetCurrentGameMode());
-@@ -473,6 +483,20 @@ void fn_8016B784(void)
+@@ -473,6 +486,26 @@ void fn_8016B784(void)
      grStadium_801D4150();
  }
  
@@ -3707,8 +3711,14 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..2cf291e797065c1108b793a7408f92b9
 + * targets; Wasm requires the actual indirect-call signature to agree. */
 +static void melee_web_hud_enable(int unused)
 +{
++#if !defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 +    (void) unused;
++#endif
 +    fn_8016B784();
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    melee_web_stage_last_stadium_go_alignment_note_hud(
++        unused, melee_web_hud_enable, gm_16AE_GetUnkData_0()->hud_enabled);
++#endif
 +}
 +
 +static void melee_web_hud_intro_finished(int unused)
@@ -3720,9 +3730,13 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..2cf291e797065c1108b793a7408f92b9
  void fn_8016B7B4(int arg0)
  {
      Ground_801C1154();
-@@ -493,9 +517,9 @@ void fn_8016B7F8(void)
+@@ -492,10 +525,13 @@ void fn_8016B7F8(void)
+     ftLib_800868A4();
      Stage_802252E4(tmp->x24C8.stkind, NULL);
      grStadium_801D4040();
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    melee_web_stage_last_stadium_go_alignment_note_go(tmp->x24C8.x1_3);
++#endif
      if (!tmp->x24C8.x1_3) {
 -        ifStatus_802F6EA4(4, -1, -1, 0, NULL, fn_8016B784);
 +        ifStatus_802F6EA4(4, -1, -1, 0, NULL, (Event) melee_web_hud_enable);
@@ -3732,7 +3746,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..2cf291e797065c1108b793a7408f92b9
      }
      un_802FD428();
  }
-@@ -996,6 +1020,9 @@ int gm_8016C75C(HSD_GObj* arg0)
+@@ -996,6 +1032,9 @@ int gm_8016C75C(HSD_GObj* arg0)
      if (tmp->x0 != (UNK_T) gm_801A4BA8()) {
          tmp->x0 = (UNK_T) gm_801A4BA8();
          gm_80166378(tmp);
@@ -3742,7 +3756,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..2cf291e797065c1108b793a7408f92b9
      }
      return tmp->x58[ftLib_80086BE0(arg0)].x20;
  }
-@@ -1325,6 +1352,17 @@ static inline void fn_8016CFE0_inline(void)
+@@ -1325,6 +1364,17 @@ static inline void fn_8016CFE0_inline(void)
      }
  }
  
@@ -3760,7 +3774,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..2cf291e797065c1108b793a7408f92b9
  void fn_8016CFE0(void)
  {
      lbl_8046B6A0_t* tmp = &lbl_8046B6A0;
-@@ -1387,11 +1425,7 @@ void fn_8016CFE0(void)
+@@ -1387,11 +1437,7 @@ void fn_8016CFE0(void)
      }
      if (tmp->match_result != OUTCOME_NONE) {
      block_51:
@@ -3773,7 +3787,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..2cf291e797065c1108b793a7408f92b9
      } else {
          fn_8016CD98(tmp);
      }
-@@ -1661,7 +1695,11 @@ void fn_8016DCC0(StartMeleeData* arg0)
+@@ -1661,7 +1707,11 @@ void fn_8016DCC0(StartMeleeData* arg0)
      lbl_8046B6A0_t* tmp = &lbl_8046B6A0;
      int i;
  
@@ -3785,7 +3799,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..2cf291e797065c1108b793a7408f92b9
      lbl_8046B6A0.unk_D = 6;
      lbl_8046B6A0.unk_1C = (void*) &lbl_803D5630;
      lbl_8046B6A0.unk_20 = (void*) &lbl_803D5620;
-@@ -1871,6 +1909,33 @@ void fn_8016E124(void)
+@@ -1871,6 +1921,33 @@ void fn_8016E124(void)
      }
  }
  
@@ -3819,7 +3833,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..2cf291e797065c1108b793a7408f92b9
  /// @todo The loop's SFX flag load uses a different equivalent address form.
  void fn_8016E2BC(void)
  {
-@@ -1915,26 +1980,8 @@ void fn_8016E2BC(void)
+@@ -1915,26 +1992,8 @@ void fn_8016E2BC(void)
          fn_8016DEEC();
          for (i = 0; i < 6; i++) {
              if (Player_GetPlayerSlotType(i) != Gm_PKind_NA) {
@@ -3847,7 +3861,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..2cf291e797065c1108b793a7408f92b9
                  Player_80031AD0(i);
                  if (tmp->FighterMatchInfo[i].x4_b4) {
                      lbAudioAx_800237A8(0x41F4E, 0x7F, 0x40);
-@@ -2036,9 +2083,9 @@ void gm_Scene_Vs_OnEnter(void* arg0)
+@@ -2036,9 +2095,9 @@ void gm_Scene_Vs_OnEnter(void* arg0)
      StartMeleeData* tmp = arg0;
      fn_8016E730(tmp);
      if (tmp->rules.x1_2) {
@@ -3859,7 +3873,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..2cf291e797065c1108b793a7408f92b9
      }
      ifTime_CreateTimers();
      ifStatus_802F665C(tmp->rules.x0_3);
-@@ -2119,7 +2166,7 @@ void gm_Scene_SuddenDeath_OnEnter(void* user_data)
+@@ -2119,7 +2178,7 @@ void gm_Scene_SuddenDeath_OnEnter(void* user_data)
      StartMeleeData* data = user_data;
      data->rules.x6 = true;
      fn_8016E730(data);
@@ -3868,7 +3882,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..2cf291e797065c1108b793a7408f92b9
      ifTime_CreateTimers();
      ifStatus_802F665C(data->rules.x0_3);
  }
-@@ -2138,9 +2185,9 @@ void gm_Scene_Training_OnEnter(void* user_data)
+@@ -2138,9 +2197,9 @@ void gm_Scene_Training_OnEnter(void* user_data)
      Stage_802252E4(tmp2->x24C8.stkind, NULL);
      grStadium_801D4040();
      if (!lbl_8046B6A0.x24C8.x1_3) {
@@ -3880,7 +3894,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..2cf291e797065c1108b793a7408f92b9
      }
      un_802FD428();
      ifStatus_802F665C(data->rules.x0_3);
-@@ -2277,3 +2324,258 @@ int fn_8016F160(int arg0, int arg1)
+@@ -2277,3 +2336,258 @@ int fn_8016F160(int arg0, int arg1)
  {
      return pl_80039418(arg0, arg1);
  }
@@ -5945,7 +5959,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..3492cd22f052a658e060a4ab3847a9b4
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..1f9e14e82413891b59d184318b208e55e071f5fd 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..639215c6e9e7a85d92ad1f30730c9be4dad18668 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,16 @@
@@ -6117,7 +6131,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..1f9e14e82413891b59d184318b208e55
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -788,137 +876,4761 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
+@@ -788,137 +876,4910 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
              }
              break;
          }
@@ -8544,6 +8558,155 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..1f9e14e82413891b59d184318b208e55
 +               &owner->map2_buffer_allocation_lease) &&
 +           output->started_allocation_lease_required ==
 +               (owner->source_started != 0);
++}
++
++/* Read only the live scalar display state needed by the GO canary. This is
++ * deliberately narrower than retirement preflight: it proves current source
++ * owner/map/root and backing-allocation identity without traversing SIS lists,
++ * allocating retirement snapshots, or changing the display owner. */
++static int stadium_owner_go_manager_proc_root_contains_once(
++    const HSD_GObjProc* expected)
++{
++    HSD_GObjProc* node;
++    unsigned visited = 0;
++    unsigned found = 0;
++    if (expected == NULL || HSD_GObj_804D7840 == NULL ||
++        HSD_GObjLibInitData.gproc_pri_max < 10)
++        return 0;
++    node = HSD_GObj_804D7840[10];
++    while (node != NULL) {
++        if (visited++ == STADIUM_MAP2_SNAPSHOT_TRAVERSAL_LIMIT) return 0;
++        if (node == expected) ++found;
++        node = node->next;
++    }
++    return found == 1;
++}
++
++int melee_web_stadium_display_owner_go_alignment_view(
++    const MeleeWebStadiumDisplayOwner* owner,
++    const MeleeWebStadiumMap2BufferOwner* output, int source_started,
++    int* map2_gate, int* display_mode)
++{
++    HSD_GObj* map0;
++    HSD_GObj* display;
++    HSD_GObj* map2;
++    HSD_GObj* map5;
++    HSD_GObj* manager;
++    HSD_GObjProc* manager_proc;
++    Ground* map2_data;
++    Ground* display_data;
++    Ground* map0_data;
++    Ground* map5_data;
++    size_t stage_objects = 0;
++    unsigned visited = 0;
++
++    if (owner == NULL || output == NULL || map2_gate == NULL ||
++        display_mode == NULL || (source_started != 0 && source_started != 1) ||
++        owner != stadium_display_owner_current ||
++        owner->state != STADIUM_DISPLAY_OWNER_CAPTURED ||
++        owner->source_started != source_started ||
++        owner->manager_bound != source_started ||
++        owner->manager_events != (source_started ? 1U : 0U) ||
++        (!source_started && (owner->manager.object != NULL ||
++                             owner->manager.proc != NULL)) ||
++        !owner->source_journal_armed || owner->source_journal_failed ||
++        owner->source_journal_overflowed ||
++        !owner->map2_buffer_allocation_lease_captured ||
++        owner->map2_buffer_origin !=
++            MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK ||
++        owner->map2_buffer_output != output || output->captured != 1)
++        return 0;
++
++    map0 = Ground_GetMapGObj(0);
++    display = Ground_GetMapGObj(PsType_Display);
++    map2 = Ground_GetMapGObj(2);
++    map5 = Ground_GetMapGObj(5);
++    manager = source_started ? owner->manager.object : NULL;
++    manager_proc = source_started ? owner->manager.proc : NULL;
++    if (map0 != output->map0_ground || display != owner->display_ground ||
++        map2 != owner->map2_ground || map5 != owner->nested_map5_ground ||
++        owner->map2_ground == NULL || owner->nested_map5_ground == NULL ||
++        !stadium_owner_map2_stage_root_contains_once(map0) ||
++        !stadium_owner_map2_stage_root_contains_once(display) ||
++        !stadium_owner_map2_stage_root_contains_once(map2) ||
++        !stadium_owner_map2_stage_root_contains_once(map5) ||
++        (source_started &&
++         (!stadium_owner_map2_stage_root_contains_once(manager) ||
++          !stadium_owner_go_manager_proc_root_contains_once(manager_proc))) ||
++        !stadium_owner_map2_proc_root_contains_once(map2->proc))
++        return 0;
++
++    for (size_t i = 0; i < ARRAY_SIZE(stage_info.map_gobjs); ++i) {
++        HSD_GObj* expected = NULL;
++        if (i == 0) expected = map0;
++        else if (i == (size_t) PsType_Display) expected = display;
++        else if (i == 2) expected = map2;
++        else if (i == 5) expected = map5;
++        if (stage_info.map_gobjs[i] != expected) return 0;
++    }
++    /* Every stage root is reached through the live source list. Bound the
++     * walk and require only the exact OnInit set or the started manager too. */
++    for (HSD_GObj* object = ((HSD_GObj**) HSD_GObj_Entities)[5];
++         object != NULL; object = object->next) {
++        if (visited++ == STADIUM_MAP2_SNAPSHOT_TRAVERSAL_LIMIT) return 0;
++        if (object->classifier != HSD_GOBJ_CLASS_STAGE) continue;
++        if (object != map0 && object != display && object != map2 &&
++            object != map5 && object != manager)
++            return 0;
++        ++stage_objects;
++    }
++    if (stage_objects != (source_started ? 5U : 4U) ||
++        !stadium_owner_source_journal_matches(
++            owner, stage_info.map_gobjs, ARRAY_SIZE(stage_info.map_gobjs)) ||
++        !stadium_owner_map2_buffer_allocation_matches(
++            owner->map2_buffer, &owner->map2_buffer_allocation_lease) ||
++        !stadium_owner_map2_output_matches(owner))
++        return 0;
++
++    /* The bounded link-5 roots above are the membership proof for this
++     * observation. Do not call the retirement matchers here: they rescan all
++     * GObj links without a traversal budget. */
++    if (map0->p_link != 5 || display->p_link != 5 || map2->p_link != 5 ||
++        map5->p_link != 5 || map0->classifier != HSD_GOBJ_CLASS_STAGE ||
++        display->classifier != HSD_GOBJ_CLASS_STAGE ||
++        map2->classifier != HSD_GOBJ_CLASS_STAGE ||
++        map5->classifier != HSD_GOBJ_CLASS_STAGE)
++        return 0;
++    map0_data = HSD_GObjGetUserData(map0);
++    display_data = HSD_GObjGetUserData(display);
++    map2_data = HSD_GObjGetUserData(map2);
++    map5_data = HSD_GObjGetUserData(map5);
++    if (map0_data == NULL || display_data == NULL || map2_data == NULL ||
++        map5_data == NULL || map0_data->map_id != 0 ||
++        display_data->map_id != (enum GrKind) PsType_Display ||
++        map2_data->map_id != 2 || map5_data->map_id != 5 ||
++        display_data->u.display.xD4 != owner->children[0] ||
++        display_data->u.display.xD8 != owner->children[1] ||
++        display_data->u.display.xDC != owner->children[2])
++        return 0;
++
++    if (source_started &&
++        (manager->classifier != HSD_GOBJ_CLASS_STAGE || manager->p_link != 5 ||
++         manager->user_data != NULL || manager->hsd_obj != NULL ||
++         manager->p_priority != 0 || manager->gx_link != HSD_GOBJ_GXLINK_NONE ||
++         manager->proc != manager_proc ||
++         owner->manager.callback != melee_web_stadium_c1_manager_callback_control() ||
++         manager_proc->gobj != manager ||
++         manager_proc->on_invoke != owner->manager.callback ||
++         manager_proc->s_link != 10 || manager_proc->child != NULL))
++        return 0;
++    if (map2->proc == NULL || map2->proc != owner->map2_proc ||
++        map2->proc->gobj != map2 || map2->proc->on_invoke != grStadium_801D1520 ||
++        map2->proc->s_link != 4 || map2->proc->child != NULL)
++        return 0;
++
++    if (map2_data->u.stadium.xCC != owner->map2_buffer ||
++        map2_data->u.stadium.xE4 != map5 ||
++        display_data != owner->display_ground_data)
++        return 0;
++    *map2_gate = map2_data->u.stadium.xC4_b0;
++    *display_mode = display_data->u.display.xE4;
++    return 1;
 +}
 +
 +static int stadium_owner_map2_graph_matches_phase(
@@ -10989,7 +11152,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..1f9e14e82413891b59d184318b208e55
  
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
-@@ -1185,22 +5897,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +6046,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -11031,7 +11194,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..1f9e14e82413891b59d184318b208e55
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +5945,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +6094,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -11053,7 +11216,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..1f9e14e82413891b59d184318b208e55
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +5967,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +6116,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
@@ -11076,7 +11239,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..1f9e14e82413891b59d184318b208e55
      wrapper->flag = false;
      return gobj;
  }
-@@ -1896,6 +6647,9 @@ bool grStadium_801D42B8(void)
+@@ -1896,6 +6796,9 @@ bool grStadium_801D42B8(void)
      if (gp->u.stadium.xC4_b1) {
          return false;
      }
@@ -11086,7 +11249,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..1f9e14e82413891b59d184318b208e55
      gp->u.stadium.xD0 =
          grDatFiles_801C6478(gp->u.stadium.xCC, gp->u.stadium.xC8);
      return true;
-@@ -2093,6 +6847,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2093,6 +6996,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
              gp = GET_GROUND(map_gobj);
              HSD_ASSERT(0x99B, gp);
              gp->u.stadium.xC4_b1 = true;
@@ -11096,7 +11259,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..1f9e14e82413891b59d184318b208e55
              lbFile_80016580(datfiles[var_r29], gp->u.stadium.xCC,
                              &gp->u.stadium.xC8, fn_801D4220, NULL);
              temp_r31->u.stadium.xDC = 1;
-@@ -2221,6 +6978,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2221,6 +7127,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
          if (temp_r31->u.stadium.xDE == 5) {
              temp_r31->u.stadium.xD8 =
                  randi_between_2(yakumono_param->x0, yakumono_param->x4);
