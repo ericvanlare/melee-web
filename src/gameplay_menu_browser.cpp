@@ -109,7 +109,7 @@ void first_css_browser_draw_check_live(const char* boundary){
  check(scene->scene_kind==8&&
        melee_web_menu_host_source_scene(host)==MELEE_WEB_MENU_HOST_SCENE_CSS&&
        melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CSS,
-       std::string("First-CSS draw left its idle CSS owner at ")+boundary);
+       (std::string("First-CSS draw left its idle CSS owner at ")+boundary).c_str());
 }
 FirstCssDrawSample first_css_browser_draw_capture(const char* boundary){
  auto& state=first_css_browser_draw;
