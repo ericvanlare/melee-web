@@ -53,6 +53,7 @@ DRAW_RETURN_PC = 0x80391040
 MATCH_SETUP_TAG = 4
 PAD_QUEUE_TAG = 2
 SCENE_ROUTING_TAG = 17
+SCENE_ROUTING_ADDRESS = 0x80479D30
 MENU_SSS_ROUTE_TAG = 35
 RNG_POINTER_TAG = 19
 RNG_VALUE_TAG = 20
@@ -106,7 +107,8 @@ def _slice(record: dict[str, Any], tag: int, context: str,
     return {**item, "raw": raw}
 
 
-def _check_boundary_contract(payload: dict[str, Any]) -> None:
+def _check_boundary_contract(payload: dict[str, Any], *,
+                             allow_missing_scene: bool = False) -> None:
     boundary = payload.get("boundary")
     expected: dict[str, tuple[int, ...]] = {
         "pad_poll": (1, 2, 17, 21, 27, 40),
@@ -126,10 +128,55 @@ def _check_boundary_contract(payload: dict[str, Any]) -> None:
     for tag in expected[boundary]:
         matches = [item for item in payload.get("slices", [])
                    if isinstance(item, dict) and item.get("tag") == tag]
+        if (boundary == "pad_poll" and tag == 40 and allow_missing_scene and
+                not matches):
+            continue
         _require(matches, f"{boundary}: required source tag={tag} is missing")
         for item in matches:
             _slice(payload, tag, f"{boundary} boundary", required_sizes[tag],
                    item.get("flags"))
+
+
+def _classify_stadium_sss_owner(payload: dict[str, Any], *,
+                                allow_missing: bool = False) -> str | None:
+    """Validate authored SSS stage rows, including Random's absent kind slice."""
+    scene = _slice(payload, 40, "SSS owner PadPoll", 1)
+    routing = _slice(payload, SCENE_ROUTING_TAG, "SSS owner PadPoll", 6)
+    _require(routing["address"] == SCENE_ROUTING_ADDRESS,
+             "SSS owner PadPoll routing escaped its pinned source address")
+    if scene["raw"][0] != 9 or routing["raw"][0] != 0x02:
+        return None
+
+    slices = payload.get("slices")
+    _require(isinstance(slices, list), "SSS owner PadPoll: missing bounded slices")
+    index_rows = [item for item in slices
+                  if isinstance(item, dict) and item.get("tag") == STAGE_SELECT_INDEX_TAG]
+    kind_rows = [item for item in slices
+                 if isinstance(item, dict) and item.get("tag") == STAGE_SELECT_KIND_TAG]
+    _require(len(index_rows) <= 1 and len(kind_rows) <= 1,
+             "SSS PadPoll contains duplicate or ambiguous owner slices")
+    _require(not kind_rows or index_rows,
+             "SSS PadPoll exposes a stage kind without its owner index")
+    if not index_rows:
+        _require(allow_missing, "SSS live-owner PadPoll: expected one tag=41 flags=0")
+        return None
+
+    index = _slice(payload, STAGE_SELECT_INDEX_TAG, "SSS live-owner PadPoll", 1)
+    stage_index = index["raw"][0]
+    _require(index["address"] == STAGE_SELECT_INDEX_ADDRESS and stage_index <= 30,
+             "SSS stage owner index escaped its authored table")
+    if stage_index == 30:
+        _require(not kind_rows,
+                 "SSS random row unexpectedly has a stage owner")
+        return "sss_navigation"
+
+    kind = _slice(payload, STAGE_SELECT_KIND_TAG, "SSS live-owner PadPoll", 1)
+    expected_address = (STAGE_SELECT_TABLE + stage_index * STAGE_SELECT_STRIDE +
+                        STAGE_SELECT_KIND_OFFSET)
+    _require(kind["address"] == expected_address,
+             "SSS selected stage kind escaped its authored table row")
+    return ("sss" if stage_index == 18 and kind["raw"][0] == STADIUM_KIND
+            else "sss_navigation")
 
 
 def _validate_menu_pad_poll(payload: dict[str, Any], sequence: int,
@@ -166,18 +213,9 @@ def _validate_menu_pad_poll(payload: dict[str, Any], sequence: int,
             return None, css_owner_sequence
         _require(css_owner_sequence is not None and css_owner_sequence < sequence,
                  "SSS live owner preceded verified live CSS ownership")
-        index = _slice(payload, STAGE_SELECT_INDEX_TAG, "SSS live-owner PadPoll", 1)
-        stage_index = index["raw"][0]
-        _require(index["address"] == STAGE_SELECT_INDEX_ADDRESS and stage_index < 30,
-                 "SSS stage owner index escaped its authored table")
-        kind = _slice(payload, STAGE_SELECT_KIND_TAG, "SSS live-owner PadPoll", 1)
-        expected_address = (STAGE_SELECT_TABLE + stage_index * STAGE_SELECT_STRIDE +
-                            STAGE_SELECT_KIND_OFFSET)
-        _require(kind["address"] == expected_address,
-                 "SSS selected stage kind escaped its authored table row")
-        # A correct non-Stadium row is ordinary natural navigation. It is
-        # retained but cannot qualify the current selection for GO.
-        return ("sss" if kind["raw"][0] == STADIUM_KIND else "sss_navigation"), css_owner_sequence
+        # Random (index 30) is an authored navigation row without a kind byte.
+        # Only the exact Stadium row may qualify SSS exit and GO.
+        return _classify_stadium_sss_owner(payload), css_owner_sequence
     return None, css_owner_sequence
 
 
@@ -412,17 +450,26 @@ def validate_stadium_go_prefix(stream_path: str | Path,
                 if not phases:
                     _require(boundary in ("pad_poll", "pad_consume"),
                              "pre-CSS source boundary is not boot PAD")
-                    _require(not any(item.get("tag") in (41, 42, 43, 44, 47, 48)
+                    _require(not any(item.get("tag") in
+                                     (MATCH_SETUP_TAG, 41, 42, 43, 44, 47, 48, 50, 51)
                                      for item in payload.get("slices", [])),
                              "pre-CSS PAD exposed a premature live CSS/SSS owner")
                 raw_rows += 1
-                _check_boundary_contract(payload)
+                _check_boundary_contract(
+                    payload, allow_missing_scene=(not phases and boundary == "pad_poll"))
                 if boundary == "pad_poll" and not go_seen:
                     _require(payload.get("pc") == 0x8034DD8C,
                              "menu PAD polling is not at the pinned original HSD poll")
-                    owner, css_owner_sequence = _validate_menu_pad_poll(
-                        payload, row["seq"], css_return_sequence,
-                        sss_return_sequence, css_owner_sequence)
+                    scene_observed = any(
+                        isinstance(item, dict) and item.get("tag") == 40
+                        for item in payload.get("slices", []))
+                    if not phases and not scene_observed:
+                        _slice(payload, SCENE_ROUTING_TAG, "boot PAD routing", 6)
+                        owner = None
+                    else:
+                        owner, css_owner_sequence = _validate_menu_pad_poll(
+                            payload, row["seq"], css_return_sequence,
+                            sss_return_sequence, css_owner_sequence)
                     menu_pad_poll_count += 1
                     if owner in ("sss", "sss_navigation"):
                         sss_selected_stadium = owner == "sss"

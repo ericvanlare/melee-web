@@ -273,15 +273,18 @@ class SheikTransformPrefixReceiver:
         self.css_live_owner_sequence = None
         self.sss_live_owner_sequence = None
 
+    def _menu_owner_pad_poll(self, payload):
+        from sheik_transform_prefix import _menu_owner_pad_poll
+        return _menu_owner_pad_poll(payload)
+
     def _pad_poll(self, row):
         from sd_reference_diagnostic import menu_state, css_state
-        from sheik_transform_prefix import _menu_owner_pad_poll
         payload = row["payload"]
         data, _ = _transform_slices(payload)
         self.menu_polls += 1
         if (40, 0) in data:
             self.latest_menu = menu_state(data)
-            menu_owner = _menu_owner_pad_poll(payload)
+            menu_owner = self._menu_owner_pad_poll(payload)
             if self.latest_menu.get("scene") == 8:
                 if menu_owner == "css":
                     if self.css_live_owner_sequence is None:
@@ -293,7 +296,8 @@ class SheikTransformPrefixReceiver:
                     self.css = None
             else:
                 self.css = None
-            if self.latest_menu.get("scene") == 9 and menu_owner == "sss":
+            if (self.latest_menu.get("scene") == 9 and
+                    menu_owner in ("sss", "sss_navigation")):
                 index, kind = data.get((41, 0)), data.get((42, 0))
                 metadata = { (item["tag"], item["flags"]): item
                              for item in payload["slices"] }
@@ -507,6 +511,15 @@ class StadiumGoPrefixReceiver(SheikTransformPrefixReceiver):
         self.confirm_sequence = None
         self.confirm_release_sequence = None
         self.consumed_samples = []
+
+    def _menu_owner_pad_poll(self, payload):
+        scene_rows = [item for item in payload.get("slices", [])
+                      if isinstance(item, dict) and item.get("tag") == 40]
+        if (len(scene_rows) == 1 and scene_rows[0].get("flags") == 0 and
+                scene_rows[0].get("size") == 1 and scene_rows[0].get("hex") == "09"):
+            from stadium_go_prefix import _classify_stadium_sss_owner
+            return _classify_stadium_sss_owner(payload, allow_missing=True)
+        return super()._menu_owner_pad_poll(payload)
 
     def _pad_poll(self, row):
         super()._pad_poll(row)

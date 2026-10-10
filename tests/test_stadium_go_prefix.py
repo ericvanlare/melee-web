@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 from contextlib import contextmanager
 from unittest.mock import patch
 from pathlib import Path
@@ -14,6 +16,9 @@ import subprocess
 from owned_test_workspace import OwnedWorkspaceTests
 
 ROOT = Path(__file__).parents[1]
+RETAINED_RAW_REPLAY_ENV = "MELEE_WEB_STADIUM_GO_RAW_REPLAY"
+RETAINED_RAW_REPLAY_BYTES = 2_139_497
+RETAINED_RAW_REPLAY_SHA256 = "18575587bdf014d088a33d69f70a9e1c90d8f25044aa37d09426c32aadf9315c"
 sys.path[:0] = [str(ROOT / "tools"), str(ROOT / "reference-capture" / "dolphin"),
                 str(ROOT / "scripts")]
 
@@ -21,7 +26,11 @@ import reference_observer_stream as observer_stream
 from stadium_go_prefix import (  # noqa: E402
     DIAGNOSTIC,
     EXPECTED_SETUP_RECEIPT_SHA256,
+    SCENE_ROUTING_TAG,
     StadiumGoPrefixError,
+    _check_boundary_contract,
+    _classify_stadium_sss_owner,
+    _slice as _read_source_slice,
     validate_stadium_go_prefix,
 )
 from sd_reference_diagnostic import SdDiagnosticError, require  # noqa: E402
@@ -135,16 +144,20 @@ def _boundary(kind: int, seq: int, *, pc: int, source_tick: int,
                   pc=pc, source_tick=source_tick)
 
 
-def _pad_poll(scene_kind: int, *, live_owner: bool = True,
-              stage_index: int = 18, stage_kind: int = 3,
+def _pad_poll(scene_kind: int | None, *, live_owner: bool = True,
+              stage_index: int = 18, stage_kind: int | None = 3,
               index_address: int = 0x804D6CAE,
-              kind_address: int | None = None) -> list[dict]:
+              kind_address: int | None = None,
+              routing_address: int = 0x80479D30,
+              routing_flags: int = 0) -> list[dict]:
     values = [
         _slice(1, 0x30), _slice(2, 0xC),
-        _slice(17, 6, data=bytes((2, 0, 0, 0, 0, 0))),
+        _slice(17, 6, data=bytes((2, 0, 0, 0, 0, 0)), address=routing_address,
+               flags=routing_flags),
         _slice(21, 0x358), _slice(27, 4),
-        _slice(40, 1, data=bytes((scene_kind,))),
     ]
+    if scene_kind is not None:
+        values.append(_slice(40, 1, data=bytes((scene_kind,))))
     if scene_kind == 8 and live_owner:
         values.extend([
             _slice(48, 0x148, address=0x80410000),
@@ -153,10 +166,9 @@ def _pad_poll(scene_kind: int, *, live_owner: bool = True,
     elif scene_kind == 9 and live_owner:
         if kind_address is None:
             kind_address = 0x803F06D0 + stage_index * 0x1C + 0x0B
-        values.extend([
-            _slice(41, 1, data=bytes((stage_index,)), address=index_address),
-            _slice(42, 1, data=bytes((stage_kind,)), address=kind_address),
-        ])
+        values.append(_slice(41, 1, data=bytes((stage_index,)), address=index_address))
+        if stage_kind is not None:
+            values.append(_slice(42, 1, data=bytes((stage_kind,)), address=kind_address))
     return values
 
 
@@ -179,6 +191,11 @@ def _fixture(*, route: int = 1, gap_f: bool = False, tail: int = 1,
              draw_between_c_f: bool = False,
              boot_pad: bool = False,
              boot_match: bool = False,
+             boot_unobserved_scene: bool = False,
+             boot_extra_slices: tuple[dict, ...] = (),
+             boot_pad_pc: int = 0x8034DD8C,
+             boot_routing_flags: int = 0,
+             missing_css_scene: bool = False,
              sss_navigation: tuple[tuple[int, int, int | None, int | None], ...] =
              ((0, 4, None, None), (18, 3, None, None))) -> tuple[bytes, dict]:
     receipt = EXPECTED_SETUP_RECEIPT_SHA256
@@ -199,11 +216,13 @@ def _fixture(*, route: int = 1, gap_f: bool = False, tail: int = 1,
         }, separators=(",", ":")).encode()),
     ]
     if boot_pad or boot_match:
-        boot = _pad_poll(1)
+        boot = _pad_poll(None if boot_unobserved_scene else 1,
+                         routing_flags=boot_routing_flags)
         boot += [_slice(45, 0x18, address=0x804A04F0),
                  _slice(46, 8, address=0x804D6BC8)]
+        boot += list(boot_extra_slices)
         records.extend([
-            _boundary(1, 2, pc=0x8034DD8C, source_tick=0, slices=boot),
+            _boundary(1, 2, pc=boot_pad_pc, source_tick=0, slices=boot),
             _boundary(2, 3, pc=0x80377584, source_tick=0, slices=_pad_consume()),
         ])
         if boot_match:
@@ -215,7 +234,9 @@ def _fixture(*, route: int = 1, gap_f: bool = False, tail: int = 1,
         _boundary(1, 3, pc=0x8034DD8C, source_tick=40,
                   slices=_pad_poll(8, live_owner=False)),
         _progress("css_return", 4),
-        _boundary(1, 5, pc=0x8034DD8C, source_tick=40, slices=_pad_poll(8)),
+        _boundary(1, 5, pc=0x8034DD8C, source_tick=40,
+                  slices=([item for item in _pad_poll(8) if item["tag"] != 40]
+                          if missing_css_scene else _pad_poll(8))),
         _boundary(2, 6, pc=0x80377584, source_tick=40, slices=_pad_consume()),
         _progress("sss_entry", 7),
         _boundary(1, 8, pc=0x8034DD8C, source_tick=40,
@@ -287,14 +308,21 @@ def _fixture(*, route: int = 1, gap_f: bool = False, tail: int = 1,
     return b"".join(records), status
 
 
-class StadiumGoPrefixTests(unittest.TestCase):
+class StadiumGoPrefixTests(OwnedWorkspaceTests):
+    @classmethod
+    def setUpClass(cls):
+        cls.scratch = cls.new_workspace(ROOT, "stadium-go-prefix-")
+        cls.validation_serial = 0
+
     def _validate(self, data: bytes, status: dict) -> dict:
-        with tempfile.TemporaryDirectory() as directory:
-            stream = Path(directory) / "prefix.mwro"
-            stream.write_bytes(data)
-            status_path = Path(str(stream) + ".status.json")
-            status_path.write_text(json.dumps(status), encoding="utf-8")
-            return validate_stadium_go_prefix(stream)
+        directory = self.scratch / f"validate-{self.validation_serial:04d}"
+        type(self).validation_serial += 1
+        directory.mkdir()
+        stream = directory / "prefix.mwro"
+        stream.write_bytes(data)
+        status_path = Path(str(stream) + ".status.json")
+        status_path.write_text(json.dumps(status), encoding="utf-8")
+        return validate_stadium_go_prefix(stream)
 
     def test_accepts_c_f_then_first_natural_return_without_one_to_one_draw_assumption(self):
         data, status = _fixture(draw_between_c_f=True)
@@ -312,8 +340,46 @@ class StadiumGoPrefixTests(unittest.TestCase):
         result = self._validate(data, status)
         self.assertEqual(result["decision"], "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY")
         self.assertTrue(result["sss_selected_stadium_at_exit"])
+        data, status = _fixture(boot_pad=True, boot_unobserved_scene=True)
+        result = self._validate(data, status)
+        self.assertEqual(result["decision"], "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY")
         data, status = _fixture(boot_match=True)
         with self.assertRaisesRegex(StadiumGoPrefixError, "pre-CSS source boundary"):
+            self._validate(data, status)
+
+    def test_boot_missing_scene_keeps_base_pad_pc_and_owner_contracts(self):
+        payload = {"boundary": "pad_poll", "slices": _pad_poll(None)}
+        _check_boundary_contract(payload, allow_missing_scene=True)
+        for tag in (1, 2, 17, 21, 27):
+            bad = {"boundary": "pad_poll",
+                   "slices": [item for item in payload["slices"] if item["tag"] != tag]}
+            with self.subTest(missing_tag=tag), self.assertRaisesRegex(
+                    StadiumGoPrefixError, f"required source tag={tag}"):
+                _check_boundary_contract(bad, allow_missing_scene=True)
+
+        for extra in (_slice(4, 0x138),
+                      _slice(41, 1, data=b"\x1e", address=0x804D6CAE)):
+            data, status = _fixture(boot_pad=True, boot_unobserved_scene=True,
+                                    boot_extra_slices=(extra,))
+            with self.subTest(extra_tag=extra["tag"]), self.assertRaisesRegex(
+                    StadiumGoPrefixError, "premature live CSS/SSS owner"):
+                self._validate(data, status)
+
+        data, status = _fixture(boot_pad=True, boot_unobserved_scene=True,
+                                boot_pad_pc=0x8034DD90)
+        with self.assertRaisesRegex(StadiumGoPrefixError, "pinned original HSD poll"):
+            self._validate(data, status)
+
+        data, status = _fixture(boot_pad=True, boot_unobserved_scene=True,
+                                boot_routing_flags=1)
+        with self.assertRaisesRegex(StadiumGoPrefixError,
+                                    "boot PAD routing: expected one tag=17 flags=0"):
+            self._validate(data, status)
+
+    def test_scene_is_still_required_after_css_entry(self):
+        data, status = _fixture(missing_css_scene=True)
+        with self.assertRaisesRegex(StadiumGoPrefixError,
+                                    "pad_poll: required source tag=40 is missing"):
             self._validate(data, status)
 
     def test_rejects_sss_cancel_and_counter_gap(self):
@@ -352,6 +418,105 @@ class StadiumGoPrefixTests(unittest.TestCase):
             with self.assertRaises(StadiumGoPrefixError):
                 self._validate(data, status)
 
+    def test_authored_random_row_is_navigation_and_stadium_qualification_is_exact(self):
+        random = _pad_poll(9, stage_index=30, stage_kind=None)
+        stadium = _pad_poll(9, stage_index=18, stage_kind=3)
+        other_stage = _pad_poll(9, stage_index=18, stage_kind=4)
+        other_kind_three = _pad_poll(9, stage_index=0, stage_kind=3)
+        self.assertEqual(_classify_stadium_sss_owner({"slices": random}),
+                         "sss_navigation")
+        self.assertEqual(_classify_stadium_sss_owner({"slices": stadium}), "sss")
+        self.assertEqual(_classify_stadium_sss_owner({"slices": other_stage}),
+                         "sss_navigation")
+        self.assertEqual(_classify_stadium_sss_owner({"slices": other_kind_three}),
+                         "sss_navigation")
+
+        data, status = _fixture(sss_navigation=((30, None, None, None), (18, 3, None, None)))
+        result = self._validate(data, status)
+        self.assertEqual(result["sss_navigation_poll_rows"], 1)
+        self.assertTrue(result["sss_selected_stadium_at_exit"])
+
+    def test_random_and_stage_owner_descriptors_reject_wrong_counts_sizes_and_addresses(self):
+        cases = [
+            (_pad_poll(9, stage_index=30, stage_kind=3), "random row unexpectedly"),
+            (_pad_poll(9, routing_address=0x80479D31), "routing escaped"),
+            (_pad_poll(9, stage_index=18, stage_kind=3, index_address=0x804D6CAF),
+             "index escaped"),
+            (_pad_poll(9, stage_index=31, stage_kind=3), "index escaped"),
+            (_pad_poll(9, stage_index=18, stage_kind=3, kind_address=0x803F06DC),
+             "kind escaped"),
+            (_pad_poll(9, stage_index=18, stage_kind=None), "expected one tag=42"),
+            (_pad_poll(9, stage_index=18, stage_kind=3) +
+             [_slice(41, 1, data=b"\x12", address=0x804D6CAE)], "duplicate or ambiguous"),
+            (_pad_poll(9, stage_index=18, stage_kind=3) +
+             [_slice(42, 1, data=b"\x03", address=0x803F08FB)], "duplicate or ambiguous"),
+            (_pad_poll(9, stage_index=18, stage_kind=3)[:-1] +
+             [_slice(42, 2, data=b"\x03\x00", address=0x803F08FB)],
+             "unexpected byte length"),
+        ]
+        for slices, message in cases:
+            with self.subTest(message=message), self.assertRaisesRegex(
+                    StadiumGoPrefixError, message):
+                _classify_stadium_sss_owner({"slices": slices})
+
+        kind_without_index = _pad_poll(9, live_owner=False) + [
+            _slice(42, 1, data=b"\x03", address=0x803F08FB)]
+        with self.assertRaisesRegex(StadiumGoPrefixError, "without its owner index"):
+            _classify_stadium_sss_owner({"slices": kind_without_index}, allow_missing=True)
+
+    def test_actual_retained_raw_prefix_reaches_random_navigation_on_receiver(self):
+        configured_path = os.environ.get(RETAINED_RAW_REPLAY_ENV)
+        if configured_path is None:
+            self.skipTest(
+                f"optional retained raw replay not configured; set {RETAINED_RAW_REPLAY_ENV} "
+                "to run this actual-capture control")
+        stream = Path(configured_path).expanduser()
+        self.assertTrue(stream.is_file(),
+                        f"configured {RETAINED_RAW_REPLAY_ENV} is not a file: {stream}")
+        self.assertEqual(stream.stat().st_size, RETAINED_RAW_REPLAY_BYTES,
+                         f"configured {RETAINED_RAW_REPLAY_ENV} has an unexpected byte length")
+        self.assertEqual(hashlib.sha256(stream.read_bytes()).hexdigest(),
+                         RETAINED_RAW_REPLAY_SHA256,
+                         f"configured {RETAINED_RAW_REPLAY_ENV} has an unexpected SHA-256")
+        receiver_type, helper_module = _load_stadium_receiver_class()
+        packet = stadium_go_prefix_packet()
+        found_boot = found_random = False
+        with patch.dict(sys.modules, {"sheik_transform_prefix": helper_module}):
+            receiver = receiver_type(packet)
+            for row in observer_stream.iter_records(stream, max_bytes=8 * 1024 * 1024,
+                                                     max_records=2_000):
+                if row["seq"] == 2:
+                    payload = row["payload"]
+                    tags = {item["tag"] for item in payload["slices"]}
+                    self.assertNotIn(40, tags)
+                    self.assertTrue({1, 2, 17, 21, 22, 23, 27} <= tags)
+                    self.assertFalse({4, 41, 42, 43, 44, 47, 48, 50, 51} & tags)
+                    _check_boundary_contract(payload, allow_missing_scene=True)
+                    routing = _read_source_slice(payload, SCENE_ROUTING_TAG,
+                                                 "boot PAD routing", 6)
+                    self.assertEqual((routing["flags"], routing["address"],
+                                      routing["raw"][0]),
+                                     (0, 0x80479D30, 0x00))
+                    found_boot = True
+                receiver.accept(row)
+                if row["seq"] == 1652:
+                    self.assertEqual(row["event"], "boundary")
+                    self.assertEqual(row["payload"]["boundary"], "pad_poll")
+                    tags = row["payload"]["slices"]
+                    self.assertEqual([(item["tag"], item["address"], item["hex"])
+                                     for item in tags if item["tag"] in (40, 41, 42)],
+                                     [(40, 0x803DD9C4, "09"),
+                                      (41, 0x804D6CAE, "1e")])
+                    found_random = True
+                    break
+        self.assertTrue(found_boot)
+        self.assertTrue(found_random)
+        self.assertEqual(receiver.stage,
+                         {"index": 30, "kind": None, "stable_polls": 1})
+        self.assertIsNotNone(receiver.sss_live_owner_sequence)
+        self.assertIsNone(receiver.stadium_target_sequence)
+        self.assertIsNone(receiver.confirm_sequence)
+
     def test_rejects_non_stadium_start_rules_kind_at_setup(self):
         setup = bytearray(_setup())
         setup[0x0E:0x10] = struct.pack(">H", 4)
@@ -375,11 +540,13 @@ def _load_stadium_receiver_class():
     source_path = ROOT / "scripts/capture_sd_reference_prefix.py"
     tree = ast.parse(source_path.read_text(encoding="utf-8"), filename=str(source_path))
     selected = [node for node in tree.body
-                if isinstance(node, ast.FunctionDef) and node.name == "_transform_slices"
+                if isinstance(node, ast.FunctionDef) and node.name in (
+                    "_transform_slices", "_transform_consumed_ports")
                 or isinstance(node, ast.ClassDef) and node.name in (
                     "SheikTransformPrefixReceiver", "StadiumGoPrefixReceiver")]
     names = {node.name for node in selected}
-    if names != {"_transform_slices", "SheikTransformPrefixReceiver", "StadiumGoPrefixReceiver"}:
+    if names != {"_transform_slices", "_transform_consumed_ports",
+                 "SheikTransformPrefixReceiver", "StadiumGoPrefixReceiver"}:
         raise AssertionError("production Stadium receiver extraction is incomplete")
     module = ast.Module(body=[ast.ImportFrom(module="__future__", names=[
         ast.alias(name="annotations")], level=0), *selected], type_ignores=[])
