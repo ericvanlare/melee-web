@@ -29,6 +29,7 @@ from stadium_go_prefix import (  # noqa: E402
     EXPECTED_SETUP_RECEIPT_SHA256,
     SCENE_ROUTING_TAG,
     StadiumGoPrefixError,
+    SOURCE_TICK_PC,
     FIRST_CSS_CONTEXT_BYTES,
     FIRST_CSS_CONTEXT_ENV,
     FIRST_CSS_CONTEXT_MAGIC,
@@ -43,11 +44,20 @@ from stadium_go_prefix import (  # noqa: E402
     FIRST_CSS_RULES_ADDRESS,
     FIRST_CSS_SAVE_ADDRESS,
     FIRST_CSS_SCENE_ADDRESS,
+    FIRST_CSS_SCENE_FRAME_ADDRESS,
     FIRST_CSS_STREAM_BYTES,
     FIRST_CSS_STREAM_SHA256,
+    FIRST_CSS_CONSUME_SEQUENCE,
+    FIRST_CSS_SOURCE_TICK_SEQUENCE,
+    FIRST_CSS_CONSUMED_PAD_BYTES,
+    FIRST_CSS_CONSUMED_PAD_MAGIC,
+    FIRST_CSS_CONSUMED_PAD_VERSION,
     SCENE_ROUTING_ADDRESS,
+    _extract_first_css_consumed_tick_rows,
     _extract_first_css_context_rows,
+    decode_first_css_consumed_pad_bundle,
     decode_first_css_context_bundle,
+    extract_stadium_first_css_consumed_tick,
     extract_stadium_first_css_context,
     _check_boundary_contract,
     _classify_stadium_sss_owner,
@@ -1020,6 +1030,160 @@ class StadiumFirstCssContextTests(OwnedWorkspaceTests):
                 with self.assertRaises(StadiumGoPrefixError):
                     decode_first_css_context_bundle(changed)
 
+    @classmethod
+    def _consumed_tick_rows(cls):
+        _, returned = cls._rows()
+        returned_slices = returned["payload"]["slices"]
+        pad = next(item for item in returned_slices if item["tag"] == 21)
+        seed = next(item for item in returned_slices if item["tag"] == 20)
+        route = bytes.fromhex("020201000000")
+        queue = bytes.fromhex("05030300000000008046b108")
+        port_statuses = [bytes(11), bytes(11), bytes(10) + b"\xff",
+                         bytes(10) + b"\xff"]
+        slot = bytearray(0x30)
+        for index, status in enumerate(port_statuses):
+            slot[index * 12:index * 12 + 11] = status
+        consume = {
+            "event": "boundary", "seq": FIRST_CSS_CONSUME_SEQUENCE,
+            "payload": {
+                "boundary": "pad_consume", "pc": 0x80377584,
+                "source_tick": 0, "draw_ordinal": 0,
+                "gprs": [0] * 32,
+                "slices": [
+                    dict(cls._source_slice(2, 0xC, queue, 0x804C1F78),
+                         name="pad_queue"),
+                    dict(cls._source_slice(3, 0x30, bytes(slot), 0x8046B168),
+                         name="pad_slot"),
+                ],
+            },
+        }
+        consume["payload"]["gprs"][6] = 2
+        consume["payload"]["gprs"][25] = 0x8046B168
+        tick_slices = [
+            cls._source_slice(2, 0xC, queue, 0x804C1F78),
+            cls._source_slice(17, 6, route, SCENE_ROUTING_ADDRESS),
+            cls._source_slice(20, 4, bytes.fromhex(seed["hex"]),
+                              FIRST_CSS_RNG_VALUE_ADDRESS),
+            cls._source_slice(19, 4, FIRST_CSS_RNG_VALUE_ADDRESS.to_bytes(4, "big"),
+                              FIRST_CSS_RNG_POINTER_ADDRESS),
+            cls._source_slice(21, 0x358, bytes.fromhex(pad["hex"]),
+                              FIRST_CSS_PAD_ADDRESS),
+            cls._source_slice(30, 4, bytes(4), FIRST_CSS_SCENE_FRAME_ADDRESS),
+            cls._source_slice(40, 1, b"\x08", FIRST_CSS_SCENE_ADDRESS),
+        ]
+        tick = {
+            "event": "boundary", "seq": FIRST_CSS_SOURCE_TICK_SEQUENCE,
+            "payload": {
+                "boundary": "source_tick", "pc": SOURCE_TICK_PC,
+                "source_tick": 0, "draw_ordinal": 0, "slices": tick_slices,
+            },
+        }
+        return [consume], [tick]
+
+    def test_first_css_consumed_pad_bundle_is_fixed_and_input_only(self):
+        consume_rows, tick_rows = self._consumed_tick_rows()
+        result = _extract_first_css_consumed_tick_rows(
+            consume_rows, tick_rows, FIRST_CSS_STREAM_SHA256)
+        bundle = result["input_bundle_bytes"]
+        self.assertEqual(len(bundle), FIRST_CSS_CONSUMED_PAD_BYTES)
+        self.assertEqual(result["input_bundle"]["magic_hex"],
+                         FIRST_CSS_CONSUMED_PAD_MAGIC.hex())
+        self.assertEqual(result["input_bundle"]["version"],
+                         FIRST_CSS_CONSUMED_PAD_VERSION)
+        self.assertFalse(result["input_bundle"]["contains_expected_post_tick_state"])
+        decoded = decode_first_css_consumed_pad_bundle(bundle)
+        self.assertFalse(decoded["contains_expected_post_tick_state"])
+        self.assertEqual(decoded["source_stream_sha256"], FIRST_CSS_STREAM_SHA256)
+        self.assertEqual(decoded["consumed_pad_sequence"], FIRST_CSS_CONSUME_SEQUENCE)
+        self.assertEqual(decoded["source_tick_sequence"], FIRST_CSS_SOURCE_TICK_SEQUENCE)
+        self.assertEqual(decoded["port_status_hex"], result["input_bundle"]["port_status_bytes"])
+        expected = result["expected_post_tick"]
+        self.assertEqual((expected["original_source_frame"],
+                          expected["native_post_host_tick_frame"]), (0, 1))
+        self.assertEqual(expected["source_scene_kind"], 8)
+        self.assertEqual(expected["source_routing_raw_hex"], "020201000000")
+        self.assertEqual(expected["scene_routing_getters"], {
+            "current_game_mode": 2,
+            "previous_game_mode": 1,
+            "current_scene_index": 0,
+            "previous_scene_index": 0,
+        })
+        self.assertEqual(expected["routing_raw_fields_excluded"],
+                         ["pending_mode", "next_state_id"])
+        self.assertNotIn("pending_mode", expected["scene_routing_getters"])
+        self.assertNotIn("next_state_id", expected["scene_routing_getters"])
+
+    def test_first_css_consumed_pad_bundle_rejects_bad_header_and_sequences(self):
+        consume_rows, tick_rows = self._consumed_tick_rows()
+        bundle = _extract_first_css_consumed_tick_rows(
+            consume_rows, tick_rows, FIRST_CSS_STREAM_SHA256)["input_bundle_bytes"]
+        for changed in (bundle[:-1], bundle + b"\0",
+                        b"BADMAGIC" + bundle[8:],
+                        bundle[:12] + bytes(32) + bundle[44:],
+                        bundle[:44] + bytes(4) + bundle[48:]):
+            with self.subTest(size=len(changed), header=changed[:52].hex()):
+                with self.assertRaises(StadiumGoPrefixError):
+                    decode_first_css_consumed_pad_bundle(changed)
+
+    def test_first_css_consumed_tick_rejects_wrong_source_row_boundaries(self):
+        cases = []
+        consumes, ticks = self._consumed_tick_rows()
+        cases.append(([], ticks, "one exact consume/tick row"))
+        consumes, ticks = self._consumed_tick_rows()
+        cases.append((consumes + consumes, ticks, "one exact consume/tick row"))
+
+        consumes, ticks = self._consumed_tick_rows()
+        changed = json.loads(json.dumps(consumes))
+        changed[0]["payload"]["pc"] += 4
+        cases.append((changed, ticks, "consume boundary differs"))
+
+        consumes, ticks = self._consumed_tick_rows()
+        changed = json.loads(json.dumps(consumes))
+        changed[0]["payload"]["slices"][1]["address"] += 4
+        cases.append((changed, ticks, "source slot is invalid"))
+
+        consumes, ticks = self._consumed_tick_rows()
+        changed = json.loads(json.dumps(ticks))
+        changed[0]["payload"]["source_tick"] = 1
+        cases.append((consumes, changed, "pre-increment phase"))
+
+        consumes, ticks = self._consumed_tick_rows()
+        changed = json.loads(json.dumps(ticks))
+        route = next(item for item in changed[0]["payload"]["slices"]
+                     if item["tag"] == 17)
+        route["hex"] = "020201000001"
+        cases.append((consumes, changed, "routing differs"))
+
+        consumes, ticks = self._consumed_tick_rows()
+        changed = json.loads(json.dumps(ticks))
+        frame = next(item for item in changed[0]["payload"]["slices"]
+                     if item["tag"] == 30)
+        frame["hex"] = "00000001"
+        cases.append((consumes, changed, "frame zero"))
+
+        consumes, ticks = self._consumed_tick_rows()
+        changed = json.loads(json.dumps(ticks))
+        changed[0]["payload"]["slices"].append(
+            dict(next(item for item in changed[0]["payload"]["slices"]
+                      if item["tag"] == 40)))
+        cases.append((consumes, changed, "expected one tag=40"))
+
+        for bad_consume, bad_tick, message in cases:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(StadiumGoPrefixError, message):
+                    _extract_first_css_consumed_tick_rows(
+                        bad_consume, bad_tick, FIRST_CSS_STREAM_SHA256)
+
+        consumes, ticks = self._consumed_tick_rows()
+        with self.assertRaisesRegex(StadiumGoPrefixError, "retained v6 observer"):
+            _extract_first_css_consumed_tick_rows(consumes, ticks, "c" * 64)
+
+        consumes, ticks = self._consumed_tick_rows()
+        ticks[0]["seq"] += 1
+        with self.assertRaisesRegex(StadiumGoPrefixError, "SourceTick sequence/event"):
+            _extract_first_css_consumed_tick_rows(
+                consumes, ticks, FIRST_CSS_STREAM_SHA256)
+
     def test_retained_first_css_raw_is_optional_but_strict_when_configured(self):
         source_value = os.environ.get(FIRST_CSS_CONTEXT_ENV)
         if source_value is None:
@@ -1046,8 +1210,26 @@ class StadiumFirstCssContextTests(OwnedWorkspaceTests):
                          result["input_bundle"]["sha256"])
         self.assertEqual(json.loads(expected_path.read_text())["expected_return"],
                          result["expected_return"])
+        tick_result = extract_stadium_first_css_consumed_tick(
+            source, source.with_name("observer-status.json"))
+        tick_bundle = tick_result["input_bundle_bytes"]
+        decoded_tick_bundle = decode_first_css_consumed_pad_bundle(tick_bundle)
+        self.assertEqual(len(tick_bundle), FIRST_CSS_CONSUMED_PAD_BYTES)
+        self.assertEqual(decoded_tick_bundle["consumed_pad_sequence"], 834)
+        self.assertEqual(decoded_tick_bundle["source_tick_sequence"], 835)
+        self.assertEqual(tick_result["expected_post_tick"]["source_tick_value"], 0)
+        self.assertEqual(tick_result["expected_post_tick"]["source_draw_ordinal"], 0)
+        tick_input_path = self.scratch / "first-css-consumed-pad.mwst"
+        tick_expected_path = self.scratch / "first-css-consumed-tick-expected.json"
+        tick_input_path.write_bytes(tick_bundle)
+        tick_expected_path.write_text(json.dumps({
+            key: value for key, value in tick_result.items()
+            if key != "input_bundle_bytes"
+        }, indent=2, sort_keys=True) + "\n")
+        self.assertEqual(hashlib.sha256(tick_input_path.read_bytes()).hexdigest(),
+                         tick_result["input_bundle"]["sha256"])
         self.assertFalse((self.scratch / source.name).exists(),
-                         "retained raw source must stay outside candidate scratch")
+                         "retained raw source must stay outside test scratch")
 
 if __name__ == "__main__":
     unittest.main()

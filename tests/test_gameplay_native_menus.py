@@ -522,12 +522,22 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
     def test_stadium_first_css_context_return_one_shot(self):
         if os.environ.get("MELEE_RUN_STADIUM_FIRST_CSS_CONTEXT") != "1":
             self.skipTest("Original immediate first-CSS return comparison requires its reviewed run gate")
+        self._run_stadium_first_css_context(False)
+
+    def test_stadium_first_css_context_one_consumed_tick(self):
+        if os.environ.get("MELEE_RUN_STADIUM_FIRST_CSS_CONSUMED_TICK") != "1":
+            self.skipTest("One consumed first-CSS host tick requires its reviewed run gate")
+        self._run_stadium_first_css_context(True)
+
+    def _run_stadium_first_css_context(self, consumed_tick):
         import hashlib
         from capture_sd_reference_prefix import cleanup_process
         from stadium_go_prefix import (
             FIRST_CSS_CONTEXT_BYTES, FIRST_CSS_STREAM_BYTES,
             FIRST_CSS_STREAM_SHA256, decode_first_css_context_bundle,
             extract_stadium_first_css_context,
+            FIRST_CSS_CONSUMED_PAD_BYTES, decode_first_css_consumed_pad_bundle,
+            extract_stadium_first_css_consumed_tick,
         )
 
         raw_value = os.environ.get("MELEE_WEB_STADIUM_FIRST_CSS_RAW")
@@ -547,13 +557,29 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         self.assertFalse(decoded["contains_expected_return"])
         expected = extraction["expected_return"]
 
-        context_dir = self.scratch / "first-css-context-one-shot"
+        tick = None
+        if consumed_tick:
+            tick = extract_stadium_first_css_consumed_tick(raw_path, status_path)
+            tick_bundle = tick.pop("input_bundle_bytes")
+            self.assertEqual(len(tick_bundle), FIRST_CSS_CONSUMED_PAD_BYTES)
+            self.assertFalse(decode_first_css_consumed_pad_bundle(tick_bundle)[
+                "contains_expected_post_tick_state"])
+        recipe = ("stadium-first-css-consumed-tick-v1" if consumed_tick
+                  else "stadium-first-css-context-v1")
+        context_dir = self.scratch / ("first-css-context-consumed-tick" if consumed_tick
+                                    else "first-css-context-one-shot")
         context_dir.mkdir(exist_ok=False)
         bundle_path = context_dir / "first-css-input.mwsc"
         expected_path = context_dir / "expected-return.json"
         bundle_path.write_bytes(bundle)
         expected_path.write_text(json.dumps(expected, indent=2, sort_keys=True) + "\n",
                                  encoding="utf-8")
+        if consumed_tick:
+            consumed_path = context_dir / "consumed-pad-input.mwst"
+            consumed_path.write_bytes(tick_bundle)
+            consumed_sha = hashlib.sha256(tick_bundle).hexdigest()
+            (context_dir / "expected-post-tick.json").write_text(
+                json.dumps(tick["expected_post_tick"], indent=2, sort_keys=True) + "\n")
         bundle_sha = hashlib.sha256(bundle_path.read_bytes()).hexdigest()
         self.assertFalse((context_dir / "observer.bin").exists(),
                          "Raw observer capture must remain outside native input scratch")
@@ -588,18 +614,22 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         output = context_dir / "node-owner"
         output.mkdir(exist_ok=False)
         command = [str(node_runtime()), str(target), str(menu), str(game), "3",
-                   str(trace), source, "stadium-first-css-context-v1",
+                   str(trace), source, recipe,
                    str(bundle_path)]
+        if consumed_tick:
+            command.append(str(consumed_path))
         self.assertNotIn(str(expected_path), command,
                          "Expected return must not be supplied to the native input reader")
         identity = {
-            "scope": "stadium-first-css-context-v1", "ownership": "direct-Popen",
+            "scope": recipe, "ownership": "direct-Popen",
             "source_revision": source, "argv": command, "cwd": str(ROOT),
             "timeout_seconds": 120, "input_bundle_sha256": bundle_sha,
             "expected_return_sha256": hashlib.sha256(expected_path.read_bytes()).hexdigest(),
             "observer_raw_in_native_scratch": False,
             "fixture_sha256_before": fixture_before,
         }
+        if consumed_tick:
+            identity["consumed_pad_input_bundle_sha256"] = consumed_sha
         stdout_path = context_dir / "native.stdout"
         stderr_path = context_dir / "native.stderr"
         try:
@@ -613,7 +643,7 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
                     process.wait(timeout=120)
                 finally:
                     cleanup_process(process, output,
-                                    scope="stadium-first-css-context-v1")
+                                    scope=recipe)
         finally:
             fixture_after = {name: hashlib.sha256(path.read_bytes()).hexdigest()
                              for name, path in paths.items()}
@@ -626,11 +656,13 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         stdout = stdout_path.read_text(encoding="utf-8")
         stderr = stderr_path.read_text(encoding="utf-8")
         self.assertEqual(hashlib.sha256(bundle_path.read_bytes()).hexdigest(), bundle_sha)
+        if consumed_tick:
+            self.assertEqual(hashlib.sha256(consumed_path.read_bytes()).hexdigest(), consumed_sha)
         self.assertFalse((context_dir / "observer.bin").exists())
         trace_rows = [json.loads(line) for line in trace.read_text().splitlines()]
         self.assertEqual(len(trace_rows), 1, "Context diagnostic must not record a source tick")
         self.assertEqual(trace_rows[0]["record"], "header")
-        self.assertEqual(trace_rows[0]["input_recipe"], "stadium-first-css-context-v1")
+        self.assertEqual(trace_rows[0]["input_recipe"], recipe)
         result_rows = [json.loads(line) for line in stdout.splitlines()
                        if line.startswith('{') and '"record":"stadium_first_css_return_snapshot"' in line]
         self.assertEqual(len(result_rows), 1, stdout)
@@ -665,6 +697,37 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         actual_start["rules"] = actual_rules
         actual_vs["start"] = actual_start
         self.assertEqual(actual_vs, expected_vs, "Typed VsModeData differs")
+
+        if consumed_tick:
+            ticks = [json.loads(line) for line in stdout.splitlines()
+                     if line.startswith('{') and '"record":"stadium_first_css_consumed_tick_snapshot"' in line]
+            self.assertEqual(len(ticks), 1, stdout)
+            actual_tick, expected_tick = ticks[0], tick["expected_post_tick"]
+            self.assertEqual(actual_tick["source_stream_sha256"], FIRST_CSS_STREAM_SHA256)
+            self.assertEqual((actual_tick["consumed_pad_sequence"],
+                              actual_tick["source_tick_sequence"]), (834, 835))
+            self.assertEqual((actual_tick["original_source_frame"],
+                              actual_tick["native_post_host_tick_frame"]), (0, 1))
+            self.assertEqual((actual_tick["scene_frame_before"],
+                              actual_tick["scene_frame_after"]), (0, 1))
+            self.assertEqual(actual_tick["host_tick_calls"], 1)
+            self.assertEqual(actual_tick["host_tick_result"], 1)
+            self.assertEqual(actual_tick["draw_calls"], 0)
+            self.assertTrue(actual_tick["transition_absent"], actual_tick)
+            self.assertTrue(actual_tick["source_scene_stable"], actual_tick)
+            self.assertTrue(actual_tick["world_live"], actual_tick)
+            self.assertTrue(actual_tick["world_generation_stable"], actual_tick)
+            self.assertGreater(actual_tick["world_generation"], 0)
+            self.assertEqual(actual_tick["source_scene_kind"], expected_tick["source_scene_kind"])
+            self.assertTrue(actual_tick["seed_owner_stable"], actual_tick)
+            self.assertEqual((actual_tick["source_scene"], actual_tick["menu_phase"]),
+                             (expected_tick["host_source_scene"],
+                              expected_tick["host_menu_phase"]))
+            for field in ("pad_state_hex", "random_seed_hex", "scene_routing_getters"):
+                self.assertEqual(actual_tick[field], expected_tick[field], field)
+            self.assertEqual(actual_tick["routing_raw_fields_excluded"],
+                             ["pending_mode", "next_state_id"])
+
 
         # Compare the captured OnEnter result before requiring checked teardown
         # and process success; a cleanup refusal must not hide source evidence.

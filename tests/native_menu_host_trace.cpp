@@ -3393,6 +3393,10 @@ constexpr size_t kFirstCssRulesBytes = 0x18;
 constexpr size_t kFirstCssSaveBytes = 0x55E8;
 constexpr uint32_t kFirstCssEntrySequence = 704;
 constexpr uint32_t kFirstCssReturnSequence = 833;
+constexpr size_t kFirstCssConsumedPadHeaderBytes = 52;
+constexpr size_t kFirstCssConsumedPadBytes = kFirstCssConsumedPadHeaderBytes + 4 * 11;
+constexpr uint32_t kFirstCssPadConsumeSequence = 834;
+constexpr uint32_t kFirstCssSourceTickSequence = 835;
 constexpr uint32_t kFirstCssObserverKoAddress = 0x804D6730;
 
 struct FirstCssContextInput {
@@ -3467,6 +3471,53 @@ FirstCssContextInput read_first_css_context_input(const char* path) {
                           [](uint8_t value) { return value == 0; }),
           "Stadium diagnostic input has an invalid initial owner or callback region");
     return result;
+}
+
+struct FirstCssConsumedPadInput {
+    std::array<uint8_t, 4 * 11> ports{};
+    std::string source_sha256;
+};
+
+FirstCssConsumedPadInput read_first_css_consumed_pad_input(
+    const char* path, const std::string& expected_source_sha256) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) throw std::runtime_error(
+        "Cannot open exact first-CSS consumed PAD input bundle");
+    const std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(input)),
+                                     std::istreambuf_iterator<char>());
+    check(bytes.size() == kFirstCssConsumedPadBytes,
+          "First-CSS consumed PAD bundle has an unexpected exact length");
+    check(std::memcmp(bytes.data(), "STC1PAD1", 8) == 0 &&
+              first_css_be32(bytes.data() + 8) == 1,
+          "First-CSS consumed PAD bundle magic/version differs");
+    check(first_css_be32(bytes.data() + 44) == kFirstCssPadConsumeSequence &&
+              first_css_be32(bytes.data() + 48) == kFirstCssSourceTickSequence,
+          "First-CSS consumed PAD source sequence identities differ");
+    FirstCssConsumedPadInput result;
+    result.source_sha256 = first_css_hex(bytes.data() + 12, 32);
+    check(result.source_sha256 == expected_source_sha256,
+          "First-CSS consumed PAD and context bundles name different source streams");
+    std::copy_n(bytes.data() + kFirstCssConsumedPadHeaderBytes,
+                result.ports.size(), result.ports.begin());
+    return result;
+}
+
+void decode_first_css_consumed_pad_input(const FirstCssConsumedPadInput& input,
+                                          PADStatus (&ports)[4]) {
+    for (unsigned index = 0; index < 4; ++index) {
+        const uint8_t* raw = input.ports.data() + index * 11;
+        ports[index].button = static_cast<uint16_t>(
+            (uint16_t(raw[0]) << 8) | uint16_t(raw[1]));
+        ports[index].stickX = static_cast<int8_t>(raw[2]);
+        ports[index].stickY = static_cast<int8_t>(raw[3]);
+        ports[index].substickX = static_cast<int8_t>(raw[4]);
+        ports[index].substickY = static_cast<int8_t>(raw[5]);
+        ports[index].triggerLeft = raw[6];
+        ports[index].triggerRight = raw[7];
+        ports[index].analogA = raw[8];
+        ports[index].analogB = raw[9];
+        ports[index].err = static_cast<int8_t>(raw[10]);
+    }
 }
 
 void write_first_css_player(std::ostream& out, const PlayerInitData& p) {
@@ -3598,10 +3649,16 @@ void write_first_css_cleanup(const FirstCssCleanupResult& result,
 }
 
 void run_stadium_first_css_context(const melee_web::RuntimeFiles& files,
-                                   const char* bundle_path) {
+                                   const char* bundle_path,
+                                   const char* consumed_pad_path = nullptr) {
     FirstCssContextInput source{};
+    std::optional<FirstCssConsumedPadInput> consumed_pad;
     try {
         source = read_first_css_context_input(bundle_path);
+        if (consumed_pad_path != nullptr) {
+            consumed_pad = read_first_css_consumed_pad_input(
+                consumed_pad_path, source.source_sha256);
+        }
     } catch (...) {
         std::cout << "{\"record\":\"stadium_first_css_return_refusal\","
                      "\"stage\":\"read-input-bundle\",\"snapshot_captured\":false}\n"
@@ -3621,6 +3678,7 @@ void run_stadium_first_css_context(const melee_web::RuntimeFiles& files,
     bool host_enter_attempted = false;
     bool host_entered = false;
     bool snapshot_captured = false;
+    bool tick_snapshot_captured = false;
     bool cleanup_attempted = false;
     const char* stage = "host-create";
 
@@ -3751,6 +3809,100 @@ void run_stadium_first_css_context(const melee_web::RuntimeFiles& files,
                   << "\"full_session_comparison\":false,\"cleanup\":\"pending\"}\n"
                   << std::flush;
 
+        if (consumed_pad.has_value()) {
+            stage = "before-consumed-source-tick";
+            check(seed_ptr != nullptr && *seed_ptr == snapshot.random_seed,
+                  "First-CSS tick has no checked live source RNG owner");
+            auto* const seed_owner = seed_ptr;
+            const auto world_generation = melee_web_gameplay_generation();
+            const auto* scene_owner = static_cast<const GameSceneInfo*>(
+                melee_web_current_scene_info());
+            check(world_generation != 0 && melee_web_gameplay_world_exists() &&
+                      melee_web_source_memory_healthy() && scene_owner != nullptr &&
+                      scene_owner->scene_kind == GS_CSS && ground_dispatch_quiet(),
+                  "First-CSS tick requires its idle live CSS/world owner");
+            const unsigned frame_before = gm_801A4BA8();
+            check(frame_before == 0, "First-CSS consumed tick did not start at frame zero");
+            PADStatus raw[4]{};
+            decode_first_css_consumed_pad_input(*consumed_pad, raw);
+            stage = "one-consumed-source-tick";
+            error[0] = '\0';
+            const int tick_result = melee_web_menu_host_tick(
+                host, raw, error, sizeof(error));
+            /* Refuse before reading any possibly replaced owner or live state. */
+            check(tick_result == MELEE_WEB_MENU_RESULT_TICKED, error);
+            check(seed_ptr == seed_owner,
+                  "First-CSS consumed tick replaced its source RNG owner");
+            check(melee_web_gameplay_world_exists() &&
+                      melee_web_gameplay_generation() == world_generation &&
+                      melee_web_source_memory_healthy() && ground_dispatch_quiet(),
+                  "First-CSS consumed tick replaced or faulted its idle world owner");
+            check(melee_web_current_scene_info() == scene_owner,
+                  "First-CSS consumed tick replaced its source scene owner");
+            check(scene_owner->scene_kind == GS_CSS &&
+                      melee_web_menu_host_source_scene(host) == MELEE_WEB_MENU_HOST_SCENE_CSS &&
+                      melee_web_menu_host_phase(host) == MELEE_WEB_MENU_CSS,
+                  "First-CSS consumed tick left its live CSS scene");
+            const int source_scene = melee_web_menu_host_source_scene(host);
+            const int menu_phase = melee_web_menu_host_phase(host);
+            const unsigned source_scene_kind = scene_owner->scene_kind;
+            const unsigned frame_after = gm_801A4BA8();
+            check(frame_after == 1,
+                  "First-CSS consumed tick did not complete exactly one scene frame");
+            const bool seed_owner_stable = true;
+            const uint32_t seed_after = *seed_owner;
+            const bool source_scene_stable = true;
+            const bool world_live = true;
+            std::array<uint8_t, MELEE_WEB_PAD_STATE_BYTES> pad_after{};
+            melee_web_pad_state_capture(pad_after.data());
+            const unsigned current_mode = gm_GetCurrentGameMode();
+            const unsigned previous_mode = gm_GetPreviousGameMode();
+            const unsigned current_scene_index = gm_GetCurrentSceneIndex();
+            const unsigned previous_scene_index = gm_GetPreviousSceneIndex();
+            const bool transition_absent = tick_result == 1 && source_scene_stable &&
+                frame_before == 0 && frame_after == 1;
+            std::cout << "{\"record\":\"stadium_first_css_consumed_tick_snapshot\","
+                      << "\"schema\":\"melee-web-stadium-first-css-consumed-tick-v1\","
+                      << "\"source_stream_sha256\":\"" << source.source_sha256 << "\","
+                      << "\"consumed_pad_sequence\":" << kFirstCssPadConsumeSequence << ','
+                      << "\"source_tick_sequence\":" << kFirstCssSourceTickSequence << ','
+                      << "\"original_source_tick\":0,\"original_draw_ordinal\":0,"
+                      << "\"original_source_frame\":0,\"scene_frame_before\":"
+                      << frame_before << ",\"scene_frame_after\":" << frame_after << ','
+                      << "\"native_post_host_tick_frame\":" << frame_after << ','
+                      << "\"phase_relation\":\"native post-host-tick frame 1 versus "
+                         "original scheduler-end SourceTick 835 pre-increment frame 0\","
+                      << "\"host_tick_calls\":1,\"host_tick_result\":" << tick_result << ','
+                      << "\"draw_calls\":0,\"transition_absent\":"
+                      << (transition_absent ? "true" : "false") << ','
+                      << "\"source_scene\":" << source_scene << ','
+                      << "\"menu_phase\":" << menu_phase << ','
+                      << "\"source_scene_kind\":" << source_scene_kind << ','
+                      << "\"world_generation\":" << world_generation << ','
+                      << "\"world_generation_stable\":true,"
+                      << "\"source_scene_stable\":"
+                      << (source_scene_stable ? "true" : "false") << ','
+                      << "\"world_live\":" << (world_live ? "true" : "false") << ','
+                      << "\"seed_owner_stable\":"
+                      << (seed_owner_stable ? "true" : "false") << ','
+                      << "\"random_seed_hex\":\""
+                      << (seed_ptr != nullptr ? hex32(seed_after) : std::string()) << "\","
+                      << "\"pad_state_hex\":\""
+                      << first_css_hex(pad_after.data(), pad_after.size()) << "\","
+                      << "\"scene_routing_getters\":{\"current_game_mode\":"
+                      << current_mode << ",\"previous_game_mode\":" << previous_mode
+                      << ",\"current_scene_index\":" << current_scene_index
+                      << ",\"previous_scene_index\":" << previous_scene_index << "},"
+                      << "\"routing_raw_fields_excluded\":[\"pending_mode\","
+                         "\"next_state_id\"],\"full_session_comparison\":false,"
+                      << "\"tick_error\":" << first_css_json_quote(error) << "}\n"
+                      << std::flush;
+            tick_snapshot_captured = true;
+            check(tick_result == 1, error);
+            check(transition_absent && world_live && seed_owner_stable,
+                  "First-CSS consumed tick left its source CSS/world/RNG owner");
+        }
+
         stage = "checked-teardown";
         cleanup_attempted = true;
         const FirstCssCleanupResult cleanup = checked_teardown();
@@ -3760,6 +3912,11 @@ void run_stadium_first_css_context(const melee_web::RuntimeFiles& files,
         if (!snapshot_captured) {
             std::cout << "{\"record\":\"stadium_first_css_return_refusal\","
                       << "\"stage\":" << first_css_json_quote(stage)
+                      << ",\"snapshot_captured\":false}\n" << std::flush;
+        }
+        if (consumed_pad.has_value() && !tick_snapshot_captured) {
+            std::cout << "{\"record\":\"stadium_first_css_consumed_tick_refusal\","
+                         "\"stage\":" << first_css_json_quote(stage)
                       << ",\"snapshot_captured\":false}\n" << std::flush;
         }
         if (!cleanup_attempted) {
@@ -9906,12 +10063,13 @@ int main(int argc,char** argv){try{
   run_stadium_yakumono_exchange_control();return 0;
  }
 #endif
- if(argc<3||argc>8)throw std::runtime_error("Expected menu/audio directories, optional stage kind, transition trace path, source revision and input recipe");
+ if(argc<3||argc>9)throw std::runtime_error("Expected menu/audio directories, optional stage kind, transition trace path, source revision and input recipe");
  const int stage_kind=argc>=4?std::stoi(argv[3]):St_Kind_Last;
  const char* trace_path=argc>=5?argv[4]:nullptr;
  const char* source_revision=argc>=6?argv[5]:nullptr;
  const char* input_recipe=argc>=7?argv[6]:nullptr;
- const char* replay_recipe_path=argc==8?argv[7]:nullptr;
+ const char* replay_recipe_path=argc>=8?argv[7]:nullptr;
+ const char* consumed_pad_path=argc==9?argv[8]:nullptr;
  const bool retail_fd_recipe=input_recipe&&std::string(input_recipe)=="retail-stock-fd-v1";
  const bool results_mario_recipe=input_recipe&&std::string(input_recipe)=="results-mario-v1";
  const bool link_css_unload_recipe=input_recipe&&std::string(input_recipe)=="link-css-unload-v1";
@@ -9985,6 +10143,8 @@ int main(int argc,char** argv){try{
      std::string(input_recipe)=="stadium-source-ready-text-membership-v1";
  const bool stadium_first_css_context_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-first-css-context-v1";
+ const bool stadium_first_css_consumed_tick_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-first-css-consumed-tick-v1";
 #else
  const bool stadium_c1a_recipe=false;
  const bool stadium_c1_context_preflight_recipe=false;
@@ -10006,6 +10166,7 @@ int main(int argc,char** argv){try{
  const bool stadium_source_text_lifetime_recipe=false;
  const bool stadium_ready_text_membership_recipe=false;
  const bool stadium_first_css_context_recipe=false;
+ const bool stadium_first_css_consumed_tick_recipe=false;
 #endif
  if(input_recipe&&!css_observer_recipe&&!sparse_css_recipe&&!sparse_pad_recipe&&!ordinary_timeout_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
@@ -10022,6 +10183,7 @@ int main(int argc,char** argv){try{
     !stadium_pad_leave_probe_recipe&&!stadium_source_text_lifetime_recipe&&
     !stadium_ready_text_membership_recipe&&
     !stadium_first_css_context_recipe&&
+    !stadium_first_css_consumed_tick_recipe&&
     !v10_css_replay_start_recipe)
     throw std::runtime_error("Unknown transition input recipe");
  if(v10_css_replay_start_recipe&&
@@ -10030,8 +10192,13 @@ int main(int argc,char** argv){try{
  if(stadium_first_css_context_recipe&&
     (argc!=8||!replay_recipe_path||!trace_path||!source_revision))
    throw std::runtime_error("First-CSS context diagnostic requires trace, source revision and exact input bundle path");
- if(!v10_css_replay_start_recipe&&!stadium_first_css_context_recipe&&argc==8)
+ if(stadium_first_css_consumed_tick_recipe&&
+    (argc!=9||!replay_recipe_path||!consumed_pad_path||!trace_path||!source_revision))
+   throw std::runtime_error("First-CSS consumed-tick diagnostic requires trace, source revision and both exact input bundle paths");
+ if(argc==8&&!v10_css_replay_start_recipe&&!stadium_first_css_context_recipe)
    throw std::runtime_error("Only exact replay/context reducers accept an input path");
+ if(argc==9&&!stadium_first_css_consumed_tick_recipe)
+   throw std::runtime_error("Only the exact first-CSS consumed-tick reducer accepts a second input path");
  if((css_observer_recipe||sparse_css_recipe||sparse_pad_recipe||ordinary_timeout_recipe||retail_fd_recipe||results_mario_recipe||sudden_death_host_recipe||
      sudden_death_world_recipe||sd_menu_setup_recipe||returned_menu_recipe||
      v10_css_replay_start_recipe)&&
@@ -10045,7 +10212,8 @@ int main(int argc,char** argv){try{
      stadium_source_functional_idle_pair_recipe||stadium_grdatfiles_pair_recipe||
      stadium_source_setup_recipe||stadium_pad_leave_probe_recipe||
      stadium_source_text_lifetime_recipe||
-     stadium_ready_text_membership_recipe||stadium_first_css_context_recipe)&&
+     stadium_ready_text_membership_recipe||stadium_first_css_context_recipe||
+     stadium_first_css_consumed_tick_recipe)&&
     stage_kind!=St_Kind_PStadium)
    throw std::runtime_error("C1a recipes require source StKind 3");
  TransitionTrace trace(trace_path,source_revision,input_recipe);
@@ -10061,7 +10229,7 @@ int main(int argc,char** argv){try{
     stadium_source_setup_recipe||stadium_pad_leave_probe_recipe||
     stadium_source_text_lifetime_recipe||
     stadium_ready_text_membership_recipe||
-    stadium_first_css_context_recipe||
+    stadium_first_css_context_recipe||stadium_first_css_consumed_tick_recipe||
     v10_css_replay_start_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
     trophy_baseline_recipe||sound_settings_recipe)
   keys=melee_web::menu_asset_names();
@@ -10101,6 +10269,19 @@ int main(int argc,char** argv){try{
   check(session_ended, session_error);
   std::cout<<"Original first-CSS return context diagnostic completed after one CSS OnEnter; "
               "zero source ticks/draws, no SSS/GO/match/full-session comparison\n";
+  return 0;
+ }
+ if(stadium_first_css_consumed_tick_recipe){
+  run_stadium_first_css_context(files,replay_recipe_path,consumed_pad_path);
+  const int session_ended = melee_web_gameplay_session_end(
+      session_error, sizeof(session_error));
+  std::cout << "{\"record\":\"stadium_first_css_session_cleanup\","
+            << "\"attempted\":true,\"ok\":"
+            << (session_ended ? "true" : "false") << ",\"error\":"
+            << first_css_json_quote(session_error) << "}\n" << std::flush;
+  check(session_ended, session_error);
+  std::cout << "Original first-CSS context diagnostic completed after one consumed PAD host tick; "
+               "no draw, SSS/GO/match/full-session comparison\n";
   return 0;
  }
 #endif

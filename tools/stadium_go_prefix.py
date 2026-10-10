@@ -53,12 +53,21 @@ FIRST_CSS_RNG_VALUE_ADDRESS = 0x804D5F90
 FIRST_CSS_RULES_ADDRESS = 0x8045BF10
 FIRST_CSS_SAVE_ADDRESS = 0x8045BF28
 FIRST_CSS_SCENE_ADDRESS = 0x803DD9AC
+FIRST_CSS_SCENE_FRAME_ADDRESS = 0x80479D58
 FIRST_CSS_CONTEXT_MAGIC = b"STC1INPT"
 FIRST_CSS_CONTEXT_VERSION = 1
 FIRST_CSS_CONTEXT_HEADER_BYTES = 8 + 4 + 32 + 4 + 4
 FIRST_CSS_CONTEXT_PAYLOAD_BYTES = 4 + 822 + 0x148 + 6 + 0x18 + 0x55E8
 FIRST_CSS_CONTEXT_BYTES = (FIRST_CSS_CONTEXT_HEADER_BYTES +
                            FIRST_CSS_CONTEXT_PAYLOAD_BYTES)
+FIRST_CSS_CONSUME_SEQUENCE = 834
+FIRST_CSS_SOURCE_TICK_SEQUENCE = 835
+FIRST_CSS_CONSUMED_PAD_MAGIC = b"STC1PAD1"
+FIRST_CSS_CONSUMED_PAD_VERSION = 1
+FIRST_CSS_CONSUMED_PAD_HEADER_BYTES = 8 + 4 + 32 + 4 + 4
+FIRST_CSS_CONSUMED_PAD_PAYLOAD_BYTES = 4 * 11
+FIRST_CSS_CONSUMED_PAD_BYTES = (FIRST_CSS_CONSUMED_PAD_HEADER_BYTES +
+                                FIRST_CSS_CONSUMED_PAD_PAYLOAD_BYTES)
 
 CSS_ENTRY_PC = 0x8026688C
 CSS_ENTRY_WORD = 0x7C0802A6
@@ -1077,6 +1086,215 @@ def extract_stadium_first_css_context(stream_path: str | Path,
              hashlib.sha256(source.read_bytes()).hexdigest() == digest,
              "first-CSS source stream changed during extraction")
     return result
+
+
+def _extract_first_css_consumed_tick_rows(
+        consume_rows: list[dict[str, Any]], tick_rows: list[dict[str, Any]],
+        stream_sha256: str) -> dict[str, Any]:
+    """Extract the first CSS-consumed PAD sample and following SourceTick only."""
+    _require(stream_sha256 == FIRST_CSS_STREAM_SHA256,
+             "first-CSS consumed sample is not from the retained v6 observer")
+    _require(isinstance(consume_rows, list) and len(consume_rows) == 1 and
+             isinstance(tick_rows, list) and len(tick_rows) == 1,
+             "first-CSS consumed sample requires one exact consume/tick row")
+    consume, tick = consume_rows[0], tick_rows[0]
+    _require(isinstance(consume, dict) and consume.get("event") == "boundary" and
+             consume.get("seq") == FIRST_CSS_CONSUME_SEQUENCE,
+             "first-CSS consumed sample sequence/event differs")
+    _require(isinstance(tick, dict) and tick.get("event") == "boundary" and
+             tick.get("seq") == FIRST_CSS_SOURCE_TICK_SEQUENCE and
+             tick["seq"] == consume["seq"] + 1,
+             "first-CSS SourceTick sequence/event differs")
+
+    consume_payload = consume.get("payload")
+    tick_payload = tick.get("payload")
+    _require(isinstance(consume_payload, dict) and
+             consume_payload.get("boundary") == "pad_consume" and
+             consume_payload.get("pc") == 0x80377584 and
+             consume_payload.get("source_tick") == 0 and
+             consume_payload.get("draw_ordinal") == 0,
+             "first-CSS consume boundary differs from the retained source phase")
+    _require(isinstance(tick_payload, dict) and
+             tick_payload.get("boundary") == "source_tick" and
+             tick_payload.get("pc") == SOURCE_TICK_PC and
+             tick_payload.get("source_tick") == 0 and
+             tick_payload.get("draw_ordinal") == 0,
+             "first-CSS SourceTick differs from the retained pre-increment phase")
+    _check_boundary_contract(consume_payload)
+    _check_boundary_contract(tick_payload)
+
+    from whole_session_replay import (  # noqa: PLC0415
+        WholeSessionReplayError,
+        _consumed_ports,
+    )
+    try:
+        ports = _consumed_ports(consume, FIRST_CSS_CONSUME_SEQUENCE)
+    except (WholeSessionReplayError, KeyError, TypeError, ValueError) as error:
+        raise StadiumGoPrefixError(
+            f"first-CSS consumed PAD source slot is invalid: {error}") from error
+    _require(len(ports) == 4, "first-CSS consumed PAD sample lacks four ports")
+    try:
+        port_bytes = [bytes.fromhex(value) for value in ports]
+    except ValueError as error:
+        raise StadiumGoPrefixError("first-CSS consumed PAD sample is malformed") from error
+    _require(all(len(value) == 11 for value in port_bytes),
+             "first-CSS consumed PAD port has an unexpected byte length")
+    input_bundle = b"".join((
+        FIRST_CSS_CONSUMED_PAD_MAGIC,
+        FIRST_CSS_CONSUMED_PAD_VERSION.to_bytes(4, "big"),
+        bytes.fromhex(stream_sha256),
+        FIRST_CSS_CONSUME_SEQUENCE.to_bytes(4, "big"),
+        FIRST_CSS_SOURCE_TICK_SEQUENCE.to_bytes(4, "big"),
+        b"".join(port_bytes),
+    ))
+    _require(len(input_bundle) == FIRST_CSS_CONSUMED_PAD_BYTES,
+             "first-CSS consumed PAD input has an unexpected fixed length")
+
+    pad_item = _slice(tick_payload, 21, "first-CSS SourceTick PAD", 0x358)
+    _require(pad_item["address"] == FIRST_CSS_PAD_ADDRESS,
+             "first-CSS SourceTick PAD escaped its pinned source address")
+    route_item = _slice(tick_payload, SCENE_ROUTING_TAG,
+                        "first-CSS SourceTick routing", 6)
+    _require(route_item["address"] == SCENE_ROUTING_ADDRESS,
+             "first-CSS SourceTick routing escaped its pinned source address")
+    _require(route_item["raw"] == bytes.fromhex("020201000000"),
+             "first-CSS SourceTick routing differs from the retained authored getters")
+    scene_item = _slice(tick_payload, 40, "first-CSS SourceTick scene", 1)
+    _require(scene_item["address"] == FIRST_CSS_SCENE_ADDRESS and
+             scene_item["raw"] == b"\x08",
+             "first-CSS SourceTick scene kind differs from the live CSS owner")
+    frame_item = _slice(tick_payload, 30, "first-CSS SourceTick frame", 4)
+    _require(frame_item["address"] == FIRST_CSS_SCENE_FRAME_ADDRESS and
+             frame_item["raw"] == b"\0\0\0\0",
+             "first-CSS SourceTick is not the original pre-increment frame zero")
+    rng_pointer = _slice(tick_payload, RNG_POINTER_TAG,
+                         "first-CSS SourceTick RNG pointer", 4)
+    rng_value = _slice(tick_payload, RNG_VALUE_TAG,
+                       "first-CSS SourceTick RNG value", 4)
+    _require(rng_pointer["address"] == FIRST_CSS_RNG_POINTER_ADDRESS and
+             rng_value["address"] == FIRST_CSS_RNG_VALUE_ADDRESS and
+             rng_pointer["raw"] == FIRST_CSS_RNG_VALUE_ADDRESS.to_bytes(4, "big") and
+             rng_value["raw"] == bytes.fromhex("312151c3"),
+             "first-CSS SourceTick RNG owner differs from the pinned source slot")
+    try:
+        from reference_capture_semantics import pad_snapshot_bytes  # noqa: PLC0415
+        expected_pad = bytes.fromhex(pad_snapshot_bytes(pad_item["raw"]))
+    except (ValueError, TypeError) as error:
+        raise StadiumGoPrefixError(
+            f"first-CSS SourceTick PAD snapshot is invalid: {error}") from error
+    _require(len(expected_pad) == 822,
+             "first-CSS SourceTick PAD snapshot has an unexpected semantic length")
+
+    route = route_item["raw"]
+    expected = {
+        "source_stream_sha256": stream_sha256,
+        "consumed_pad_sequence": FIRST_CSS_CONSUME_SEQUENCE,
+        "source_tick_sequence": FIRST_CSS_SOURCE_TICK_SEQUENCE,
+        "source_tick_value": 0,
+        "source_draw_ordinal": 0,
+        "original_source_frame": 0,
+        "native_post_host_tick_frame": 1,
+        "phase_relation": (
+            "native host post-tick sample at frame 1 versus original scheduler-end "
+            "SourceTick 835 before frame increment at frame 0"),
+        "source_scene_kind": scene_item["raw"][0],
+        "pad_state_hex": expected_pad.hex(),
+        "random_seed_hex": rng_value["raw"].hex(),
+        "host_source_scene": 1,
+        "host_menu_phase": 1,
+        "scene_routing_getters": {
+            "current_game_mode": route[0],
+            "previous_game_mode": route[2],
+            "current_scene_index": route[3],
+            "previous_scene_index": route[4],
+        },
+        "source_routing_raw_hex": route.hex(),
+        "routing_raw_fields_excluded": ["pending_mode", "next_state_id"],
+    }
+    return {
+        "schema": "melee-web-stadium-first-css-consumed-tick-diagnostic",
+        "version": FIRST_CSS_CONSUMED_PAD_VERSION,
+        "scope": "one first-CSS consumed PAD sample and following SourceTick only",
+        "provenance": {
+            "stream_sha256": stream_sha256,
+            "consumed_pad_sequence": FIRST_CSS_CONSUME_SEQUENCE,
+            "source_tick_sequence": FIRST_CSS_SOURCE_TICK_SEQUENCE,
+            "source_tick_value": 0,
+            "source_draw_ordinal": 0,
+        },
+        "input_bundle": {
+            "magic_hex": FIRST_CSS_CONSUMED_PAD_MAGIC.hex(),
+            "version": FIRST_CSS_CONSUMED_PAD_VERSION,
+            "bytes": len(input_bundle),
+            "sha256": hashlib.sha256(input_bundle).hexdigest(),
+            "contains_expected_post_tick_state": False,
+            "port_status_bytes": [value.hex() for value in port_bytes],
+        },
+        "expected_post_tick": expected,
+        "input_bundle_bytes": input_bundle,
+    }
+
+
+def extract_stadium_first_css_consumed_tick(
+        stream_path: str | Path, status_path: str | Path) -> dict[str, Any]:
+    """Extract the retained first CSS sample and its exact next source boundary."""
+    source = Path(stream_path)
+    _require(source.is_file(), "configured first-CSS observer stream is missing")
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES,
+             "first-CSS observer stream byte length differs from the retained v6 source")
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    _require(digest == FIRST_CSS_STREAM_SHA256,
+             "first-CSS observer stream hash differs from the retained v6 source")
+    try:
+        summary = validate_stadium_go_prefix(source, status_path=status_path)
+        _require(summary.get("decision") == "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY" and
+                 summary.get("stream_bytes") == FIRST_CSS_STREAM_BYTES and
+                 summary.get("stream_sha256") == digest,
+                 "first-CSS source stream no longer passes full GO-prefix validation")
+        consume_rows = []
+        tick_rows = []
+        for row in iter_records(source, max_bytes=MAX_STREAM_BYTES,
+                                max_records=MAX_STREAM_RECORDS):
+            if row.get("seq") == FIRST_CSS_CONSUME_SEQUENCE:
+                consume_rows.append(row)
+            elif row.get("seq") == FIRST_CSS_SOURCE_TICK_SEQUENCE:
+                tick_rows.append(row)
+        result = _extract_first_css_consumed_tick_rows(
+            consume_rows, tick_rows, digest)
+    except StadiumGoPrefixError:
+        raise
+    except (OSError, ObserverStreamError) as error:
+        raise StadiumGoPrefixError(
+            f"cannot validate first-CSS consumed source rows: {error}") from error
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES and
+             hashlib.sha256(source.read_bytes()).hexdigest() == digest,
+             "first-CSS observer stream changed during consumed-sample extraction")
+    return result
+
+
+def decode_first_css_consumed_pad_bundle(data: bytes) -> dict[str, Any]:
+    """Validate the fixed input-only consumed-PAD record; no expected state is stored."""
+    _require(isinstance(data, bytes) and len(data) == FIRST_CSS_CONSUMED_PAD_BYTES,
+             "first-CSS consumed PAD bundle has an invalid exact length")
+    _require(data[:8] == FIRST_CSS_CONSUMED_PAD_MAGIC and
+             int.from_bytes(data[8:12], "big") == FIRST_CSS_CONSUMED_PAD_VERSION,
+             "first-CSS consumed PAD bundle magic/version differs")
+    stream_sha = data[12:44].hex()
+    _require(stream_sha == FIRST_CSS_STREAM_SHA256,
+             "first-CSS consumed PAD bundle source identity is not retained v6")
+    consume_seq = int.from_bytes(data[44:48], "big")
+    tick_seq = int.from_bytes(data[48:52], "big")
+    _require((consume_seq, tick_seq) ==
+             (FIRST_CSS_CONSUME_SEQUENCE, FIRST_CSS_SOURCE_TICK_SEQUENCE),
+             "first-CSS consumed PAD bundle sequence identities differ")
+    statuses = [data[52 + i * 11:52 + (i + 1) * 11].hex() for i in range(4)]
+    return {
+        "source_stream_sha256": stream_sha,
+        "consumed_pad_sequence": consume_seq,
+        "source_tick_sequence": tick_seq,
+        "port_status_hex": statuses,
+        "contains_expected_post_tick_state": False,
+    }
 
 
 def decode_first_css_context_bundle(data: bytes) -> dict[str, Any]:
