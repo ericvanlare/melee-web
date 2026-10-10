@@ -2626,13 +2626,19 @@ int main(void)
             self.skipTest("Original GO/HUD source canary requires its separately reviewed run gate")
         self._run_stadium_source_ready_session_one_shot(go_alignment_probe=True)
 
+    def test_stadium_source_setup_one_shot(self):
+        if os.environ.get("MELEE_RUN_STADIUM_SOURCE_SETUP") != "1":
+            self.skipTest("Original CSS/SSS setup receipt requires its separately reviewed run gate")
+        self._run_stadium_source_ready_session_one_shot(setup_only=True)
+
     def test_stadium_source_toy_owner_controls_one_shot(self):
         if os.environ.get("MELEE_RUN_STADIUM_SOURCE_TOY_OWNER_CONTROLS") != "1":
             self.skipTest("Toy owner controls require their separately reviewed run gate")
         self._run_stadium_source_ready_session_one_shot(toy_owner_controls=True)
 
     def _run_stadium_source_ready_session_one_shot(
-            self, toy_owner_controls=False, post_ready_tick=False, go_alignment_probe=False):
+            self, toy_owner_controls=False, post_ready_tick=False, go_alignment_probe=False,
+            setup_only=False):
         import hashlib
         from capture_sd_reference_prefix import cleanup_process
 
@@ -2663,10 +2669,12 @@ int main(void)
         scope = ("stadium-source-toy-owner-controls-v1" if toy_owner_controls
                  else "stadium-source-post-ready-tick-v1" if post_ready_tick
                  else "stadium-source-go-alignment-v1" if go_alignment_probe
+                 else "stadium-source-setup-v1" if setup_only
                  else "stadium-source-ready-session-v1")
         prefix = ("stadium-toy-owner" if toy_owner_controls
                   else "stadium-post-ready" if post_ready_tick
                   else "stadium-go-alignment" if go_alignment_probe
+                  else "stadium-source-setup" if setup_only
                   else "stadium-source-ready")
         trace = self.scratch / (prefix + "-session.jsonl")
         command = [str(node_runtime()), str(target), str(menu), str(game), "3",
@@ -2705,6 +2713,124 @@ int main(void)
         stdout, stderr = stdout_path.read_text(), stderr_path.read_text()
         self.assertEqual(process.returncode, 0, (stdout + stderr)[-12000:])
         import re
+        if setup_only:
+            self.assertIn("Stadium source CSS/SSS setup receipt emitted; no OnInit, match construction, Ready/GO, draw or gameplay claim", stdout)
+            self.assertNotIn("STADIUM_READY_SESSION", stderr)
+            self.assertIn("C3_SESSION_CLOSED identity=0 generation=0 bytes=0 world_exists=0", stderr)
+            rows = [json.loads(line) for line in trace.read_text().splitlines()]
+            self.assertEqual([row["record"] for row in rows], ["header", "stadium_source_setup"])
+            self.assertEqual(rows[0]["input_recipe"], "stadium-source-setup-v1")
+            self.assertEqual(rows[0]["schema"], "melee-web-transition-trace")
+            self.assertEqual(rows[0]["producer"], "port")
+            self.assertEqual(rows[0]["game_revision"], "GALE01r2")
+            self.assertEqual(rows[0]["build_configuration"], "browser-release")
+            self.assertEqual(rows[0]["source_revision"], source)
+            receipt = rows[1]
+            self.assertEqual((receipt["schema"], receipt["boundary"], receipt["source_route"]),
+                             ("stadium-c3-source-setup-v1",
+                              "closed_original_sss_after_selection_before_match_entry",
+                              "original_css_to_original_sss"))
+            self.assertEqual(receipt["stage"]["kind"], 3)
+            self.assertIsInstance(receipt["first_css_seed"], int)
+            self.assertIsInstance(receipt["sss_selected_seed"], int)
+            self.assertIn("equality is not assumed", receipt["seed_relationship"])
+            self.assertIn("seed_ptr sampled after original CSS entry", receipt["seed_sources"]["first_css_seed"])
+            self.assertEqual(receipt["seed_sources"]["sss_selected_seed"],
+                             "random_seed from checked original SSS selection")
+            self.assertEqual(receipt["first_css_source_observation"]["source_scene"], 1)
+            self.assertEqual(receipt["sss_source_observation_before_leave"]["source_scene"], 2)
+            self.assertEqual(receipt["save_profile"]["schema"], "melee-web-save-profile-card-v1")
+            self.assertEqual(receipt["save_profile"]["bytes"],
+                             len(receipt["save_profile"]["immutable_pre_css_baseline_hex"]) // 2)
+            for field in ("immutable_pre_css_baseline_hex", "first_css_entry_current_hex",
+                          "post_sss_transition_current_hex"):
+                value = receipt["save_profile"][field]
+                self.assertEqual(len(value), 2 * receipt["save_profile"]["bytes"])
+                self.assertRegex(value, r"^[0-9a-f]+$")
+            payloads = receipt["setup_payloads"]
+            self.assertEqual(payloads["source_calls"], {
+                "raw_sss_start": "melee_web_menu_host_stadium_c1a_raw_selection after original SSS leave",
+                "normalized_selection": "melee_web_menu_host_stadium_c1a_selection after original SSS leave",
+                "post_vs_mode": "melee_web_menu_host_post_vs_mode after original SSS leave"})
+            self.assertEqual(payloads["raw_sss_start"]["rules"]["stage_kind"], 3)
+            normalized = payloads["normalized_selection"]
+            self.assertEqual(normalized["start"]["rules"]["stage_kind"], 3)
+            self.assertGreaterEqual(normalized["player_count"], 0)
+            self.assertLessEqual(normalized["player_count"], 4)
+            self.assertEqual(len(normalized["start"]["players"]), 6)
+            self.assertEqual(len(normalized["players"]), 4)
+            self.assertEqual(payloads["post_vs_mode"]["start"]["rules"]["stage_kind"], 3)
+            self.assertTrue({"loser", "ordered_stage_index", "winner", "unk_0x3", "unk_0x4",
+                             "unk_0x5", "unk_0x6", "unk_0x7", "start"}.issubset(
+                                 payloads["post_vs_mode"]))
+            for payload in (payloads["raw_sss_start"], normalized["start"],
+                            payloads["post_vs_mode"]["start"]):
+                self.assertEqual(len(payload["players"]), 6)
+                for player in payload["players"]:
+                    self.assertTrue({"ckind", "slot_type", "stocks", "color", "slot",
+                                     "spawn", "spawn_direction", "sub_color", "handicap",
+                                     "team", "nametag", "xB", "rumble_enabled", "xC_b1",
+                                     "xC_b2", "xC_b3", "vs_invisible", "xC_b5", "xC_b6",
+                                     "xC_b7", "xD_b0", "xD_b1", "xD_b2", "xD_b3", "xD_b4",
+                                     "xD_b5", "xD_b6", "xD_b7", "cpu_kind", "cpu_level",
+                                     "damage_10", "damage_12", "hp", "attack_ratio_bits",
+                                     "defense_ratio_bits", "model_scale_bits"}.issubset(player))
+                rules = payload["rules"]
+                self.assertTrue({"match_kind", "x0_3", "timer_enabled", "timer_counts_up",
+                                 "x1_0", "x1_1", "x1_2", "x1_3", "x1_4", "x1_5",
+                                 "timer_shows_hours", "friendly_fire", "is_stock", "x2_1",
+                                 "x2_2", "single_button", "disable_pausing", "x2_5", "x2_6",
+                                 "x2_7", "x3_0", "x3_1", "x3_2", "x3_3", "x3_4", "x3_5",
+                                 "x3_6", "x3_7", "x4_0", "is_vs", "x4_2", "x4_3", "x4_4",
+                                 "x4_5", "x4_6", "x4_7", "x5_0", "x5_1", "x5_2", "x5_3",
+                                 "x5_4", "x5_5", "x5_6", "x5_7", "x6", "x7", "is_teams",
+                                 "x9", "xA", "xB", "xC", "xD", "stage_kind", "time_limit",
+                                 "x14", "x18", "x1C_pad", "item_mask", "x28", "x2C_bits",
+                                 "damage_ratio_bits", "game_speed_bits", "on_unpause_override",
+                                 "on_pause_override", "check_for_pauser_override",
+                                 "on_match_start", "on_frame_start", "on_frame_end", "on_match_end",
+                                 "x54_pointer", "x58_pointer", "pad_x5C"}.issubset(rules))
+                for key in ("on_unpause_override", "on_pause_override",
+                            "check_for_pauser_override", "on_match_start",
+                            "on_frame_start", "on_frame_end", "on_match_end",
+                            "x54_pointer", "x58_pointer"):
+                    self.assertIn(rules[key], ("null", "unresolved_nonnull"))
+                self.assertNotIn("raw_start_hex", payload)
+            pad = receipt["pad"]
+            self.assertEqual(pad["wire_bytes"], 822)
+            self.assertEqual(len(pad["wire_hex"]), 2 * pad["wire_bytes"])
+            self.assertRegex(pad["wire_hex"], r"^[0-9a-f]+$")
+            self.assertEqual(len(pad["first_css_entry_sample"]), 4)
+            self.assertEqual(len(pad["sss_confirmation_attempt_sample"]), 4)
+            self.assertEqual(len(pad["sss_completion_sample"]), 4)
+            self.assertEqual(pad["transition_ticks"]["completion_result"], 3)
+            self.assertTrue(pad["transition_ticks"]["first_css_sample_consumed_by_successful_tick"])
+            self.assertTrue(pad["transition_ticks"]["tick_returned_successfully"])
+            ticks = pad["transition_ticks"]
+            self.assertTrue(ticks["queue_count_empty_before_enqueue_checked"])
+            self.assertTrue(ticks["sample_consumed_before_tick_return_checked"])
+            self.assertEqual(ticks["completion_sample_source"],
+                             "neutral_completion_wait_tick" if ticks["neutral_completion_wait_ticks"]
+                             else "confirmation_tick")
+            first_sample = pad["first_css_entry_sample"]
+            self.assertEqual([row["port"] for row in first_sample], [0, 1, 2, 3])
+            for row in first_sample:
+                self.assertEqual((row["button"], row["stick_x"], row["stick_y"],
+                                  row["substick_x"], row["substick_y"],
+                                  row["trigger_left"], row["trigger_right"],
+                                  row["analog_a"], row["analog_b"]), (0,) * 9)
+            self.assertNotEqual(pad["sss_confirmation_attempt_sample"][0]["button"], 0)
+            self.assertTrue(receipt["retained_closed_sss_input_available"])
+            self.assertEqual(receipt["scope"], {"on_init": False, "match_session_constructed": False,
+                                                  "ready_or_go": False, "draw": False,
+                                                  "gameplay_ticks": 0})
+            self.assertIn("full 0x55E8 transient SaveData bytes", receipt["unobserved"])
+            self.assertIn("private PAD queue slots and qcount snapshot", receipt["unobserved"])
+            self.assertIn("full CSS-to-SSS PAD input history; only initial/confirmation/completion samples and final history wire are recorded",
+                          receipt["unobserved"])
+            self.assertIn("raw StartMeleeData ABI padding and native pointer bit patterns",
+                          receipt["unobserved"])
+            return
         phases = re.findall(r"STADIUM_READY_SESSION phase=(\S+) world_exists=(\d+) world=(\d+) ticks=(\d+) heap=(-?\d+) objects=(\d+) processes=(\d+)", stderr)
         self.assertEqual([row[0] for row in phases], ["before-construction",
                          "construction-complete-before-source-ticks", "first-ready-before-close",

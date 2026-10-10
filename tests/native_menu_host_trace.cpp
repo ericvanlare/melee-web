@@ -2904,6 +2904,143 @@ void write_player(std::ostream& out,const PlayerInitData& player){
     <<"\",\"defense_ratio_bits\":\""<<hex32(std::bit_cast<uint32_t>(player.defense_ratio))
     <<"\",\"model_scale_bits\":\""<<hex32(std::bit_cast<uint32_t>(player.model_scale))<<"\"}";
 }
+template <typename Pointer>
+void write_pointer_identity(std::ostream& out, Pointer value) {
+ out << '"' << (value == nullptr ? "null" : "unresolved_nonnull") << '"';
+}
+void write_source_rules(std::ostream& out,const StartMeleeRules& r){
+ out << "{\"match_kind\":" << unsigned(r.match_kind)
+     << ",\"x0_3\":" << unsigned(r.x0_3)
+     << ",\"timer_enabled\":" << unsigned(r.timer_enabled)
+     << ",\"timer_counts_up\":" << unsigned(r.timer_counts_up)
+     << ",\"x1_0\":" << unsigned(r.x1_0) << ",\"x1_1\":" << unsigned(r.x1_1)
+     << ",\"x1_2\":" << unsigned(r.x1_2) << ",\"x1_3\":" << unsigned(r.x1_3)
+     << ",\"x1_4\":" << unsigned(r.x1_4) << ",\"x1_5\":" << unsigned(r.x1_5)
+     << ",\"timer_shows_hours\":" << unsigned(r.timer_shows_hours)
+     << ",\"friendly_fire\":" << unsigned(r.friendly_fire)
+     << ",\"is_stock\":" << unsigned(r.is_stock)
+     << ",\"x2_1\":" << unsigned(r.x2_1) << ",\"x2_2\":" << unsigned(r.x2_2)
+     << ",\"single_button\":" << unsigned(r.single_button)
+     << ",\"disable_pausing\":" << unsigned(r.disable_pausing)
+     << ",\"x2_5\":" << unsigned(r.x2_5) << ",\"x2_6\":" << unsigned(r.x2_6)
+     << ",\"x2_7\":" << unsigned(r.x2_7)
+     << ",\"x3_0\":" << unsigned(r.x3_0) << ",\"x3_1\":" << unsigned(r.x3_1)
+     << ",\"x3_2\":" << unsigned(r.x3_2) << ",\"x3_3\":" << unsigned(r.x3_3)
+     << ",\"x3_4\":" << unsigned(r.x3_4) << ",\"x3_5\":" << unsigned(r.x3_5)
+     << ",\"x3_6\":" << unsigned(r.x3_6) << ",\"x3_7\":" << unsigned(r.x3_7)
+     << ",\"x4_0\":" << unsigned(r.x4_0) << ",\"is_vs\":" << unsigned(r.is_vs)
+     << ",\"x4_2\":" << unsigned(r.x4_2) << ",\"x4_3\":" << unsigned(r.x4_3)
+     << ",\"x4_4\":" << unsigned(r.x4_4) << ",\"x4_5\":" << unsigned(r.x4_5)
+     << ",\"x4_6\":" << unsigned(r.x4_6) << ",\"x4_7\":" << unsigned(r.x4_7)
+     << ",\"x5_0\":" << unsigned(r.x5_0) << ",\"x5_1\":" << unsigned(r.x5_1)
+     << ",\"x5_2\":" << unsigned(r.x5_2) << ",\"x5_3\":" << unsigned(r.x5_3)
+     << ",\"x5_4\":" << unsigned(r.x5_4) << ",\"x5_5\":" << unsigned(r.x5_5)
+     << ",\"x5_6\":" << unsigned(r.x5_6) << ",\"x5_7\":" << unsigned(r.x5_7)
+     << ",\"x6\":" << unsigned(r.x6) << ",\"x7\":" << unsigned(r.x7)
+     << ",\"is_teams\":" << unsigned(r.is_teams) << ",\"x9\":" << unsigned(r.x9)
+     << ",\"xA\":" << unsigned(r.xA) << ",\"xB\":" << int(r.xB)
+     << ",\"xC\":" << int(r.xC) << ",\"xD\":" << unsigned(r.xD)
+     << ",\"stage_kind\":" << r.stkind << ",\"time_limit\":" << r.time_limit
+     << ",\"x14\":" << unsigned(r.x14) << ",\"x18\":" << r.x18
+     << ",\"x1C_pad\":[" << r.x1C_pad[0] << ']'
+     << ",\"item_mask\":\"" << hex64(r.x20) << "\",\"x28\":" << r.x28
+     << ",\"x2C_bits\":\"" << hex32(std::bit_cast<uint32_t>(r.x2C))
+     << "\",\"damage_ratio_bits\":\"" << hex32(std::bit_cast<uint32_t>(r.x30))
+     << "\",\"game_speed_bits\":\"" << hex32(std::bit_cast<uint32_t>(r.game_speed))
+     << "\",\"on_unpause_override\":";
+ write_pointer_identity(out,r.on_unpause_override);
+ out << ",\"on_pause_override\":"; write_pointer_identity(out,r.on_pause_override);
+ out << ",\"check_for_pauser_override\":"; write_pointer_identity(out,r.check_for_pauser_override);
+ out << ",\"on_match_start\":"; write_pointer_identity(out,r.on_match_start);
+ out << ",\"on_frame_start\":"; write_pointer_identity(out,r.on_frame_start);
+ out << ",\"on_frame_end\":"; write_pointer_identity(out,r.on_frame_end);
+ out << ",\"on_match_end\":"; write_pointer_identity(out,r.on_match_end);
+ out << ",\"x54_pointer\":"; write_pointer_identity(out,r.x54);
+ out << ",\"x58_pointer\":"; write_pointer_identity(out,r.x58);
+ out << ",\"pad_x5C\":\"";
+ const char digits[]="0123456789abcdef";
+ for(uint8_t byte:r.pad_x5C)out<<digits[byte>>4]<<digits[byte&15];
+ out << "\"}";
+}
+void write_source_player(std::ostream& out,const PlayerInitData& p){
+ out << "{\"ckind\":" << int(p.ckind) << ",\"slot_type\":" << unsigned(p.slot_type)
+     << ",\"stocks\":" << int(p.stocks) << ",\"color\":" << unsigned(p.color)
+     << ",\"slot\":" << unsigned(p.slot) << ",\"spawn\":" << int(p.x5)
+     << ",\"spawn_direction\":" << int(p.spawn_dir)
+     << ",\"sub_color\":" << unsigned(p.sub_color) << ",\"handicap\":" << int(p.handicap)
+     << ",\"team\":" << unsigned(p.team) << ",\"nametag\":" << unsigned(p.nametag)
+     << ",\"xB\":" << unsigned(p.xB) << ",\"rumble_enabled\":" << unsigned(p.rumble_enabled)
+     << ",\"xC_b1\":" << unsigned(p.xC_b1) << ",\"xC_b2\":" << unsigned(p.xC_b2)
+     << ",\"xC_b3\":" << unsigned(p.xC_b3) << ",\"vs_invisible\":" << unsigned(p.vs_invisible)
+     << ",\"xC_b5\":" << unsigned(p.xC_b5) << ",\"xC_b6\":" << unsigned(p.xC_b6)
+     << ",\"xC_b7\":" << unsigned(p.xC_b7)
+     << ",\"xD_b0\":" << unsigned(p.xD_b0) << ",\"xD_b1\":" << unsigned(p.xD_b1)
+     << ",\"xD_b2\":" << unsigned(p.xD_b2) << ",\"xD_b3\":" << unsigned(p.xD_b3)
+     << ",\"xD_b4\":" << unsigned(p.xD_b4) << ",\"xD_b5\":" << unsigned(p.xD_b5)
+     << ",\"xD_b6\":" << unsigned(p.xD_b6) << ",\"xD_b7\":" << unsigned(p.xD_b7)
+     << ",\"cpu_kind\":" << unsigned(p.cpu_kind) << ",\"cpu_level\":" << unsigned(p.cpu_level)
+     << ",\"damage_10\":" << p.x10 << ",\"damage_12\":" << p.x12 << ",\"hp\":" << p.hp
+     << ",\"attack_ratio_bits\":\"" << hex32(std::bit_cast<uint32_t>(p.attack_ratio))
+     << "\",\"defense_ratio_bits\":\"" << hex32(std::bit_cast<uint32_t>(p.defense_ratio))
+     << "\",\"model_scale_bits\":\"" << hex32(std::bit_cast<uint32_t>(p.model_scale)) << "\"}";
+}
+void write_source_start(std::ostream& out,const StartMeleeData& start){
+ out << "{\"rules\":"; write_source_rules(out,start.rules); out << ",\"players\":[";
+ for(unsigned i=0;i<GM_MAX_PLAYERS;++i){if(i)out<<',';write_source_player(out,start.players[i]);}
+ out << "]}";
+}
+void write_source_selection(std::ostream& out,const MeleeWebMenuMatchSelection& selection){
+ out << "{\"start\":"; write_source_start(out,selection.start);
+ out << ",\"player_count\":" << selection.player_count
+     << ",\"random_seed\":" << selection.random_seed
+     << ",\"hud_layout\":" << selection.hud_layout
+     << ",\"unlocked_characters\":" << selection.unlocked_characters
+     << ",\"unlocked_stages\":" << selection.unlocked_stages
+     << ",\"save_profile_present\":" << unsigned(selection.save_profile_present)
+     << ",\"opening_demo\":" << unsigned(selection.opening_demo)
+     << ",\"sudden_death\":" << unsigned(selection.sudden_death)
+     << ",\"players\":[";
+ for(unsigned i=0;i<4;++i){if(i)out<<',';const auto& p=selection.players[i];
+  out << "{\"controller\":" << p.controller << ",\"stocks\":" << p.stocks
+      << ",\"costume\":" << p.costume << ",\"sub_color\":" << p.sub_color << '}';}
+ out << "]}";
+}
+void write_source_observation(std::ostream& out,const MeleeWebMenuSourceObservation& o){
+ out << "{\"source_scene\":" << o.source_scene << ",\"menu_kind\":" << o.menu_kind
+     << ",\"previous_menu_kind\":" << o.previous_menu_kind
+     << ",\"hovered_selection\":" << o.hovered_selection
+     << ",\"confirmed_selection\":" << o.confirmed_selection
+     << ",\"menu_buttons\":\"" << hex64(o.menu_buttons) << "\",\"item_input_locked\":"
+     << o.item_input_locked << ",\"rule_mode\":" << o.rule_mode
+     << ",\"stock_count\":" << o.stock_count << ",\"time_limit\":" << o.time_limit
+     << ",\"stock_time_limit\":" << o.stock_time_limit << ",\"handicap\":" << o.handicap
+     << ",\"damage_ratio\":" << o.damage_ratio << ",\"friendly_fire\":" << o.friendly_fire
+     << ",\"pause\":" << o.pause << ",\"item_frequency\":" << o.item_frequency
+     << ",\"item_mask\":\"" << hex64(o.item_mask) << "\",\"css_setup_valid\":"
+     << o.css_setup_valid << ",\"css_is_teams\":" << o.css_is_teams << ",\"css_player_teams\":["
+     << o.css_player_teams[0] << ',' << o.css_player_teams[1] << ','
+     << o.css_player_teams[2] << ',' << o.css_player_teams[3] << "]}";
+}
+void write_pad_statuses(std::ostream& out,const PADStatus (&pads)[4]){
+ out << '[';
+ for(unsigned i=0;i<4;++i){if(i)out<<',';const auto& p=pads[i];
+  out << "{\"port\":" << i << ",\"button\":" << p.button
+      << ",\"stick_x\":" << int(p.stickX) << ",\"stick_y\":" << int(p.stickY)
+      << ",\"substick_x\":" << int(p.substickX) << ",\"substick_y\":" << int(p.substickY)
+      << ",\"trigger_left\":" << unsigned(p.triggerLeft)
+      << ",\"trigger_right\":" << unsigned(p.triggerRight)
+      << ",\"analog_a\":" << unsigned(p.analogA) << ",\"analog_b\":" << unsigned(p.analogB)
+      << ",\"err\":" << int(p.err) << '}';}
+ out << ']';
+}
+void write_source_vs_mode(std::ostream& out,const VsModeData& mode){
+ out << "{\"loser\":" << int(mode.loser) << ",\"ordered_stage_index\":"
+     << int(mode.ordered_stage_index) << ",\"winner\":" << int(mode.winner)
+     << ",\"unk_0x3\":" << unsigned(mode.unk_0x3) << ",\"unk_0x4\":" << unsigned(mode.unk_0x4)
+     << ",\"unk_0x5\":" << unsigned(mode.unk_0x5) << ",\"unk_0x6\":" << unsigned(mode.unk_0x6)
+     << ",\"unk_0x7\":" << unsigned(mode.unk_0x7) << ",\"start\":";
+ write_source_start(out,mode.start);out<<'}';
+}
 void write_selection(std::ostream& out,const MeleeWebMenuMatchSelection& selection){
  const auto& rules=selection.start.rules;
  out<<"{\"rules\":{\"match_kind\":"<<unsigned(rules.match_kind)
@@ -3004,6 +3141,89 @@ public:
  }
 #endif
 
+ void stadium_source_setup(
+     uint32_t first_css_seed,
+     const std::array<uint8_t,MELEE_WEB_SAVE_PROFILE_CARD_BYTES>& card_baseline,
+     const std::array<uint8_t,MELEE_WEB_SAVE_PROFILE_CARD_BYTES>& first_css_card,
+     const std::array<uint8_t,MELEE_WEB_SAVE_PROFILE_CARD_BYTES>& sss_card,
+     const MeleeWebMenuSourceObservation& first_css_observation,
+     const MeleeWebMenuSourceObservation& sss_observation,
+     const StartMeleeData& raw_start,
+     const MeleeWebMenuMatchSelection& selected,
+     const VsModeData& post_vs_mode,
+     const std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES>& pad_wire,
+     const PADStatus (&first_css_sample)[4],
+     const PADStatus (&confirmation_sample)[4],
+     const PADStatus (&completion_sample)[4],
+     int confirmation_first_result,unsigned completion_wait_ticks,
+     bool retained_input){
+  check(output.is_open(),"Stadium setup receipt requires retained trace output");
+  auto bytes=[&](const void* data,size_t size){
+   const auto* value=static_cast<const uint8_t*>(data);
+   const char digits[]="0123456789abcdef";
+   output<<'"';for(size_t i=0;i<size;++i)
+    output<<digits[value[i]>>4]<<digits[value[i]&15];output<<'"';
+  };
+  output<<"{\"record\":\"stadium_source_setup\",\"schema\":\"stadium-c3-source-setup-v1\""
+        <<",\"boundary\":\"closed_original_sss_after_selection_before_match_entry\""
+        <<",\"source_route\":\"original_css_to_original_sss\""
+        <<",\"stage\":{\"kind\":"<<selected.start.rules.stkind
+        <<",\"name\":\"Pokemon Stadium\"}"
+        <<",\"first_css_seed\":"<<first_css_seed
+        <<",\"sss_selected_seed\":"<<selected.random_seed
+        <<",\"seed_relationship\":\"separate source observations; equality is not assumed\""
+        <<",\"seed_sources\":{\"first_css_seed\":\"source seed_ptr sampled after original CSS entry and before its first source tick; native address omitted\""
+        <<",\"sss_selected_seed\":\"random_seed from checked original SSS selection\"}"
+        <<",\"first_css_source_observation\":";
+  write_source_observation(output,first_css_observation);
+  output<<",\"sss_source_observation_before_leave\":";
+  write_source_observation(output,sss_observation);
+  output<<",\"save_profile\":{\"schema\":\"melee-web-save-profile-card-v1\""
+        <<",\"bytes\":"<<MELEE_WEB_SAVE_PROFILE_CARD_BYTES
+        <<",\"immutable_pre_css_baseline_hex\":";
+  bytes(card_baseline.data(),card_baseline.size());
+  output<<",\"first_css_entry_current_hex\":";
+  bytes(first_css_card.data(),first_css_card.size());
+  output<<",\"post_sss_transition_current_hex\":";
+  bytes(sss_card.data(),sss_card.size());
+  output<<"}"
+        <<",\"setup_payloads\":{\"pointer_representation\":\"null or unresolved_nonnull; no native pointer values\""
+        <<",\"source_calls\":{\"raw_sss_start\":\"melee_web_menu_host_stadium_c1a_raw_selection after original SSS leave\""
+        <<",\"normalized_selection\":\"melee_web_menu_host_stadium_c1a_selection after original SSS leave\""
+        <<",\"post_vs_mode\":\"melee_web_menu_host_post_vs_mode after original SSS leave\"}"
+        <<",\"raw_sss_start\":";
+  write_source_start(output,raw_start);
+  output<<",\"normalized_selection\":";
+  write_source_selection(output,selected);
+  output<<",\"post_vs_mode\":";
+  write_source_vs_mode(output,post_vs_mode);
+  output<<"}"
+        <<",\"pad\":{\"wire_schema\":\"melee-web-pad-state-v1\""
+        <<",\"wire_bytes\":"<<MELEE_WEB_PAD_STATE_BYTES
+        <<",\"wire_origin\":\"source PAD history immediately after final SSS transition and before host leave\""
+        <<",\"wire_hex\":";
+  bytes(pad_wire.data(),pad_wire.size());
+  output<<",\"first_css_entry_sample\":";
+  write_pad_statuses(output,first_css_sample);
+  output<<",\"sss_confirmation_attempt_sample\":";
+  write_pad_statuses(output,confirmation_sample);
+  output<<",\"sss_completion_sample\":";
+  write_pad_statuses(output,completion_sample);
+  output<<",\"transition_ticks\":{\"first_css_sample_consumed_by_successful_tick\":true"
+        <<",\"confirmation_first_tick_result\":"
+        <<confirmation_first_result<<",\"completion_result\":3,\"neutral_completion_wait_ticks\":"
+        <<completion_wait_ticks<<",\"tick_returned_successfully\":true"
+        <<",\"completion_sample_source\":\""
+        <<(completion_wait_ticks?"neutral_completion_wait_tick":"confirmation_tick")<<'\"'
+        <<",\"queue_count_empty_before_enqueue_checked\":true"
+        <<",\"sample_consumed_before_tick_return_checked\":true}}"
+        <<",\"retained_closed_sss_input_available\":"<<(retained_input?"true":"false")
+        <<",\"scope\":{\"on_init\":false,\"match_session_constructed\":false"
+        <<",\"ready_or_go\":false,\"draw\":false,\"gameplay_ticks\":0}"
+        <<",\"unobserved\":[\"full 0x55E8 transient SaveData bytes\",\"private PAD queue slots and qcount snapshot\",\"full CSS-to-SSS PAD input history; only initial/confirmation/completion samples and final history wire are recorded\",\"raw StartMeleeData ABI padding and native pointer bit patterns\",\"unknown nonnull source callback identities\"]"
+        <<"}\n";
+  output.flush();
+ }
  void event(const char* name,MeleeWebAudio* audio,const char* route=nullptr,
             const MeleeWebMenuMatchSelection* selection=nullptr,const uint32_t* rng=nullptr){
   if(!output)return;const auto stream=stream_name(audio);
@@ -8763,7 +8983,8 @@ void run_stadium_c1a_selection_smoke(
     bool ready_text_membership_probe=false,
     bool toy_owner_controls=false,
     bool post_ready_tick_probe=false,
-    bool go_alignment_probe=false)
+    bool go_alignment_probe=false,
+    bool setup_only_probe=false)
 {
     char error[256]{};
     MeleeWebRetiredSisLease retired_sis{};
@@ -8775,6 +8996,31 @@ void run_stadium_c1a_selection_smoke(
 
     PADStatus raw[4]{};
     melee_web_stage_input_neutral(raw);
+    std::array<uint8_t,MELEE_WEB_SAVE_PROFILE_CARD_BYTES> setup_card_baseline{};
+    std::array<uint8_t,MELEE_WEB_SAVE_PROFILE_CARD_BYTES> setup_first_css_card{};
+    std::array<uint8_t,MELEE_WEB_SAVE_PROFILE_CARD_BYTES> setup_sss_card{};
+    std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> setup_pad_wire{};
+    MeleeWebMenuSourceObservation setup_first_css_observation{};
+    MeleeWebMenuSourceObservation setup_sss_observation{};
+    PADStatus setup_first_css_sample[4]{};
+    PADStatus setup_confirmation_sample[4]{};
+    PADStatus setup_completion_sample[4]{};
+    int setup_confirmation_first_result=-1;
+    unsigned setup_completion_wait_ticks=0;
+    bool setup_retained_input=false;
+    uint32_t first_css_seed=0;
+    if(setup_only_probe){
+        check(seed_ptr!=nullptr,"Stadium setup has no original source RNG owner at first CSS");
+        first_css_seed=*seed_ptr;
+        check(melee_web_menu_host_snapshot_card_data(host,1,setup_card_baseline.data(),
+                  setup_card_baseline.size(),error,sizeof(error)),error);
+        check(melee_web_menu_host_snapshot_card_data(host,0,setup_first_css_card.data(),
+                  setup_first_css_card.size(),error,sizeof(error)),error);
+        check(melee_web_menu_host_source_observe(host,&setup_first_css_observation,
+                  error,sizeof(error)),error);
+        check(setup_first_css_observation.source_scene==MELEE_WEB_MENU_HOST_SCENE_CSS,
+              "Stadium setup first-CSS snapshot came from a different source scene");
+    }
     float pcm[1068]{};
     unsigned audio_phase = 0;
     auto tick = [&]() {
@@ -8790,12 +9036,22 @@ void run_stadium_c1a_selection_smoke(
     auto transition = [&]() {
         const bool capture_sis = source_on_init &&
             melee_web_menu_host_phase(host) == MELEE_WEB_MENU_SSS;
+        const bool capture_setup = setup_only_probe &&
+            melee_web_menu_host_phase(host) == MELEE_WEB_MENU_SSS;
         std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> pad_before_leave{};
         melee_web_stage_input_button(raw, PAD_BUTTON_START);
+        if(capture_setup)std::memcpy(setup_confirmation_sample,raw,sizeof(raw));
         int result = tick();
+        if(capture_setup){
+            setup_confirmation_first_result=result;
+            std::memcpy(setup_completion_sample,setup_confirmation_sample,sizeof(raw));
+        }
         melee_web_stage_input_neutral(raw);
-        for (unsigned wait = 0; result != 3 && wait < 120; ++wait)
+        for (unsigned wait = 0; result != 3 && wait < 120; ++wait){
+            if(capture_setup)std::memcpy(setup_completion_sample,raw,sizeof(raw));
             result = tick();
+            if(capture_setup)++setup_completion_wait_ticks;
+        }
         if (result != 3) {
             std::string detail = "Original menu input did not complete its C1a transition: phase=" +
                 std::to_string(melee_web_menu_host_phase(host)) +
@@ -8812,6 +9068,21 @@ void run_stadium_c1a_selection_smoke(
             }
             check(0, detail.c_str());
         }
+        if(capture_setup){
+            check(setup_confirmation_first_result==1||setup_confirmation_first_result==3,
+                  "Stadium SSS confirmation tick did not return a checked source result");
+            check(melee_web_menu_host_snapshot_card_data(host,0,setup_sss_card.data(),
+                      setup_sss_card.size(),error,sizeof(error)),error);
+            check(melee_web_menu_host_source_observe(host,&setup_sss_observation,
+                      error,sizeof(error)),error);
+            check(setup_sss_observation.source_scene==MELEE_WEB_MENU_HOST_SCENE_SSS,
+                  "Final Stadium setup observation did not belong to the live source SSS");
+            melee_web_pad_state_capture(setup_pad_wire.data());
+            MeleeWebPadState* decoded=melee_web_pad_state_decode(
+                setup_pad_wire.data(),setup_pad_wire.size(),error,sizeof(error));
+            check(decoded!=nullptr,error);
+            melee_web_pad_state_free(decoded);
+        }
         if (capture_sis) {
             check(melee_web_diagnostic_sis_capture(&retired_sis, error, sizeof(error)), error);
             trace.sis_lease("captured_before_menu_leave", &retired_sis);
@@ -8821,6 +9092,11 @@ void run_stadium_c1a_selection_smoke(
             report_pad_snapshot("before-menu-leave",pad_before_leave.data());
         }
         check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
+        if(capture_setup){
+            setup_retained_input=melee_web_menu_host_input(host)!=nullptr;
+            check(setup_retained_input,
+                  "Closed original SSS did not retain its source PAD history owner");
+        }
         if(capture_sis&&pad_leave_probe){
             std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> pad_after_leave{};
             melee_web_pad_state_capture(pad_after_leave.data());
@@ -8842,6 +9118,7 @@ void run_stadium_c1a_selection_smoke(
 
     // The armed SSS still begins on an admitted stage. Its existing validation
     // remains live while the source cursor navigates toward Stadium.
+    if(setup_only_probe)std::memcpy(setup_first_css_sample,raw,sizeof(raw));
     for (unsigned frame = 0; frame < 120; ++frame)
         check(tick() == 1, "C1a SSS navigation rejected its initial admitted stage");
     transition();
@@ -8909,6 +9186,28 @@ void run_stadium_c1a_selection_smoke(
     check(!melee_web_stage_content(St_Kind_PStadium),
           "C1a diagnostic unexpectedly registered Stadium as playable");
 
+    if(setup_only_probe){
+        const auto* prepared=melee_web_menu_host_post_vs_mode(host);
+        check(prepared!=nullptr,"Closed SSS setup has no checked post-VS state");
+        check(raw_selection.rules.stkind==St_Kind_PStadium&&
+                  selected.start.rules.stkind==St_Kind_PStadium&&
+                  prepared->start.rules.stkind==St_Kind_PStadium,
+              "Raw, normalized and post-VS setup do not identify the selected Stadium stage");
+        trace.stadium_source_setup(first_css_seed,setup_card_baseline,setup_first_css_card,
+            setup_sss_card,setup_first_css_observation,setup_sss_observation,raw_selection,
+            selected,*prepared,setup_pad_wire,setup_first_css_sample,
+            setup_confirmation_sample,setup_completion_sample,
+            setup_confirmation_first_result,setup_completion_wait_ticks,setup_retained_input);
+        world->verify_immutable_archives();
+        world->close();
+        world.reset();
+        check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);
+        host=nullptr;
+        check(!melee_web_gameplay_world_exists()&&!melee_web_gameplay_generation(),
+              "Stadium setup-only cleanup retained its source menu world");
+        std::cout<<"Stadium source CSS/SSS setup receipt emitted; no OnInit, match construction, Ready/GO, draw or gameplay claim\n";
+        return;
+    }
     if (reopened_context_preflight) {
         run_stadium_c1_context_preflight(
             files, host, world, selected, names, menu_dir, game_dir,
@@ -9085,6 +9384,8 @@ int main(int argc,char** argv){try{
      std::string(input_recipe)=="stadium-source-ready-session-v1");
  const bool stadium_source_go_alignment_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-source-go-alignment-v1";
+ const bool stadium_source_setup_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-source-setup-v1";
  const bool stadium_source_world_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-source-world-lifecycle-v1";
  const bool stadium_pad_leave_probe_recipe=input_recipe&&
@@ -9104,6 +9405,7 @@ int main(int argc,char** argv){try{
  const bool stadium_source_world_recipe=false;
  const bool stadium_ready_session_recipe=false;
  const bool stadium_source_go_alignment_recipe=false;
+ const bool stadium_source_setup_recipe=false;
  const bool stadium_post_ready_tick_recipe=false;
  const bool stadium_toy_owner_recipe=false;
  const bool stadium_pad_leave_probe_recipe=false;
@@ -9119,7 +9421,7 @@ int main(int argc,char** argv){try{
     !stadium_c1_item_state_preflight_recipe&&!stadium_screen_roots_recipe&&
     !stadium_e8_request_recipe&&!stadium_ground_map1_owner_recipe&&
     !stadium_source_on_init_recipe&&!stadium_source_world_recipe&&!stadium_ready_session_recipe&&
-    !stadium_source_go_alignment_recipe&&
+    !stadium_source_go_alignment_recipe&&!stadium_source_setup_recipe&&
     !stadium_pad_leave_probe_recipe&&!stadium_source_text_lifetime_recipe&&
     !stadium_ready_text_membership_recipe&&
     !v10_css_replay_start_recipe)
@@ -9138,7 +9440,7 @@ int main(int argc,char** argv){try{
      stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
      stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
      stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
-     stadium_source_go_alignment_recipe||
+     stadium_source_go_alignment_recipe||stadium_source_setup_recipe||
      stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
      stadium_ready_text_membership_recipe)&&
     stage_kind!=St_Kind_PStadium)
@@ -9151,7 +9453,7 @@ int main(int argc,char** argv){try{
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
     stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
-     stadium_source_go_alignment_recipe||
+     stadium_source_go_alignment_recipe||stadium_source_setup_recipe||
     stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
     stadium_ready_text_membership_recipe||
     v10_css_replay_start_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
@@ -9186,7 +9488,7 @@ int main(int argc,char** argv){try{
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
     stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
-     stadium_source_go_alignment_recipe||
+     stadium_source_go_alignment_recipe||stadium_source_setup_recipe||
     stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
     stadium_ready_text_membership_recipe){
   run_stadium_c1a_selection_smoke(
@@ -9209,10 +9511,11 @@ int main(int argc,char** argv){try{
       stadium_ready_session_recipe||stadium_source_go_alignment_recipe,
       stadium_pad_leave_probe_recipe,stadium_source_text_lifetime_recipe,
       stadium_ready_text_membership_recipe,stadium_toy_owner_recipe,
-      stadium_post_ready_tick_recipe,stadium_source_go_alignment_recipe);
+      stadium_post_ready_tick_recipe,stadium_source_go_alignment_recipe,
+      stadium_source_setup_recipe);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
   if(stadium_source_world_recipe||stadium_ready_session_recipe||
-     stadium_source_go_alignment_recipe||
+     stadium_source_go_alignment_recipe||stadium_source_setup_recipe||
      stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
      stadium_ready_text_membership_recipe){
    const auto released=melee_web_gameplay_allocation();
