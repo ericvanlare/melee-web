@@ -17,16 +17,28 @@ Session cleanup; its child exited naturally and all 136 bound inputs were unchan
 The earlier `1fad54ff` refusal before snapshot remains retained. Its diagnostic
 expected a private KO array; the correction validates the array installed by the
 authored VS routine under the existing source lease, without changing source state.
-This is first-CSS-return evidence only; SSS/history, VS/GO setup, per-owner RNG,
-a full match and C3 acceptance remain open. The clean `6e46d57c` full suite
-passes 2,409 tests with 162 skips and no failures/errors. The earlier `7d406f63`
-suite and 67 focused feedback controls retain their exact earlier scopes. The separate `8f785fe5` producer retains its two sequential
-3,500-post-GO functional lifetimes and ordinary Results pass. Ordinary public
-Stadium admission stays closed. The next proposed reducer is one source-consumed
-CSS tick, stopping before the first draw. The source phase proof distinguishes
-original scheduler-return frame 0 from native post-tick frame 1 and limits the
-comparison to PAD, seed, scene kind and four routing getters. This next check
-is not yet implemented or run.
+The subsequent native check on exact source `9e4b0bb6` also passes one captured
+CSS input: consume 834 → SourceTick 835. The 822-byte semantic PAD state, RNG seed,
+scene kind and four authored routing getters agree; exact scene/world/RNG owners
+remain stable. Original scheduler-return frame 0 and native post-host-tick frame 1
+are explicitly different observation phases. Pending-mode and next-state raw bytes
+have no paired getter; post-tick CSS/KO state is unobserved in the original row.
+The check makes one host-tick call and zero draws, passes checked teardown and
+Session cleanup, and leaves all 157 bindings unchanged. Both owned processes exited
+naturally and are absent. The first `6dd4e7f5` diagnostic compile failed on a C++
+nested type; its retained log and source-only qualification fix remain bound.
+The corrected build passed before this single runtime attempt.
+
+The clean `9e4b0bb6` full suite passes 2,413 tests with 163 skips and no
+failures/errors. The earlier `6e46d57c` return check and full suite, `7d406f63`
+original feedback capture, and `8f785fe5` two sequential 3,500-post-GO functional
+lifetimes and ordinary Results pass retain their exact producer identities.
+This is a first-CSS scalar prefix comparison. SSS/history, VS/GO setup, per-owner
+RNG, a full match and C3 acceptance remain open; ordinary public Stadium admission
+stays closed. The next prerequisite is exactly one real source draw corresponding
+to original DrawEnter 836 → DrawReturn 837 through the existing headless browser
+renderer, with the available PAD/RNG/scene observations and checked cleanup.
+That draw remains unrun. No pixel, PCM, live timing or foreground gate is established.
 
 **Earlier checkpoint context:** the separately reviewed native source CSS→SSS setup observation
 on `a29f8d69` records the first-CSS seed and the distinct SSS-selected seed,
