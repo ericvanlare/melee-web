@@ -13,6 +13,7 @@ import {parseArgs} from 'node:util';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
+import {firstSssAudioAccounting} from './stadium_first_css_stream_compare.mjs';
 import {createCssSssTransitionCapture, CSS_SSS_TRANSITION_LIMITS,
   cssReadinessEvidence, cssSssOutcome, hasCssMenuReadiness} from './stadium_c1a_css_sss_reducer.mjs';
 
@@ -22,7 +23,8 @@ const {values} = parseArgs({options: Object.fromEntries(
     'first-css-context', 'first-css-consumed-pad', 'first-css-return-expected',
     'first-css-tick-expected', 'first-css-draw-expected',
     'first-css-postdraw-input', 'first-css-postdraw-expected',
-    'first-sss-pair-expected', 'first-sss-tick-expected', 'first-sss-tick-input']
+    'first-sss-pair-expected', 'first-sss-tick-expected', 'first-sss-tick-input',
+    'first-sss-draw-expected', 'first-sss-prefix-expected', 'first-sss-prefix-input']
     .map(name => [name, {type: 'string'}]).concat([
       ['css-sss-reducer', {type: 'boolean', default: false}],
       ['first-css-browser-draw', {type: 'boolean', default: false}],
@@ -30,9 +32,13 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-css-browser-final-draw', {type: 'boolean', default: false}],
       ['first-sss-constructor-pair', {type: 'boolean', default: false}],
       ['first-sss-consumed-pad-tick', {type: 'boolean', default: false}],
+      ['first-sss-draw', {type: 'boolean', default: false}],
+      ['first-sss-prefix', {type: 'boolean', default: false}],
     ])), strict: true});
 const cssSssReducer = values['css-sss-reducer'];
-const firstSssConsumedPadTick = values['first-sss-consumed-pad-tick'];
+const firstSssPrefix = values['first-sss-prefix'];
+const firstSssDraw = values['first-sss-draw'] || firstSssPrefix;
+const firstSssConsumedPadTick = values['first-sss-consumed-pad-tick'] || firstSssDraw || firstSssPrefix;
 const firstSssConstructorPair = values['first-sss-constructor-pair'] || firstSssConsumedPadTick;
 const firstCssBrowserFinalDraw = values['first-css-browser-final-draw'] || firstSssConstructorPair;
 const firstCssBrowserStream = values['first-css-browser-stream'] || firstCssBrowserFinalDraw;
@@ -42,10 +48,19 @@ if ((cssSssReducer && firstCssBrowserDraw) ||
     (values['first-css-browser-stream'] && values['first-css-browser-final-draw']) ||
     (firstSssConstructorPair && !values['first-sss-pair-expected']) ||
     (!firstSssConstructorPair && values['first-sss-pair-expected']) ||
+    (values['first-sss-draw'] && firstSssPrefix) ||
+    ((firstSssDraw || firstSssPrefix) &&
+      (values['first-sss-constructor-pair'] || values['first-sss-consumed-pad-tick'])) ||
     (firstSssConsumedPadTick && (!values['first-sss-tick-expected'] ||
       !values['first-sss-tick-input'])) ||
     (!firstSssConsumedPadTick && (values['first-sss-tick-expected'] ||
-      values['first-sss-tick-input'])))
+      values['first-sss-tick-input'])) ||
+    (firstSssDraw && !values['first-sss-draw-expected']) ||
+    (firstSssPrefix && (!values['first-sss-draw-expected'] ||
+      !values['first-sss-prefix-expected'] || !values['first-sss-prefix-input'])) ||
+    (!firstSssPrefix && (values['first-sss-prefix-expected'] ||
+      values['first-sss-prefix-input'])) ||
+    (!firstSssDraw && values['first-sss-draw-expected']))
   throw Error('Choose one private C1a diagnostic route');
 const LIMITS = Object.freeze({
   serverStartMs: 10000,
@@ -113,7 +128,8 @@ const report = {
   browser: null,
   local_http_artifacts: {count: 0, before: null, after: null, unchanged: false},
   scenario: {
-    route_mode: firstSssConsumedPadTick ? 'first-sss-consumed-pad-tick' :
+    route_mode: firstSssPrefix ? 'first-sss-prefix' : firstSssDraw ? 'first-sss-draw' :
+      firstSssConsumedPadTick ? 'first-sss-consumed-pad-tick' :
       firstSssConstructorPair ? 'first-sss-constructor-pair' :
       firstCssBrowserFinalDraw ? 'first-css-browser-final-pending-draw' :
       firstCssBrowserStream ? 'first-css-browser-postdraw-stream' :
@@ -131,6 +147,8 @@ const report = {
     css_sss_transition: null,
     first_sss_constructor_pair: null,
     first_sss_consumed_tick: null,
+    first_sss_draw: null,
+    first_sss_prefix: null,
     requested_committed_manifest: null,
     native_observation: null,
     final_phase: null,
@@ -148,7 +166,11 @@ const report = {
     context_closed: false, browser_connection_closed: false, browser_process_terminated: false,
     browser_process_pid: null, server_process_terminated: false, server_process_pid: null,
     server_process_exit: null, failures: []},
-  source_request_scope: firstSssConsumedPadTick
+  source_request_scope: firstSssPrefix
+    ? 'Original CSS final draw, SSS constructor and frame-zero consumed PAD prerequisites, first original SSS draw, then a finite 124-record SSS input/tick/draw prefix through passive SSS exit and later selected-stage tuple. Prepared VS output remains unpaired; stops before ordinary VS scene entry/setup.'
+    : firstSssDraw
+    ? 'Original CSS final draw, SSS constructor and frame-zero consumed PAD prerequisites, then exact original first SSS DrawEnter1609/DrawReturn1610. Stops before the finite SSS continuation; no whole-session acceptance.'
+    : firstSssConsumedPadTick
     ? 'Original CSS final draw, original SSS constructor pair, and one consumed SSS PAD/scheduler-end comparison. The run stops before any SSS draw or further input; no whole-session acceptance.'
     : firstSssConstructorPair
     ? 'Original SSS constructor entry1579/return1603 pair after the approved first-CSS boundary. Stops before any SSS host tick/draw; no SSS selection, VS/GO equality or whole-session acceptance.'
@@ -225,6 +247,8 @@ async function waitForServer(baseUrl) {
 let firstCssBrowserDrawInputs = null;
 let firstSssConstructorPairInputs = null;
 let firstSssConsumedPadTickInputs = null;
+let firstSssDrawInputs = null;
+let firstSssPrefixInputs = null;
 async function loadFirstCssBrowserDrawInputs() {
   if (!firstCssBrowserDraw) return null;
   const specs = {
@@ -438,6 +462,78 @@ async function loadFirstSssConsumedPadTickInputs() {
   assert.equal(expected.input_bundle.contains_expected_state, false,
     'SSS tick input must contain only consumed PAD statuses and source bindings');
   return {bytes, expected, identities};
+}
+
+async function loadBoundFirstSssExpected(mode, optionName, expectedSchema) {
+  const fileValue = values[optionName];
+  const file = path.resolve(fileValue);
+  const frozen = preflight[mode];
+  assert.ok(frozen?.expected_json && frozen?.comparator,
+    `${mode} preflight omitted expected JSON or comparator identities`);
+  const identity = frozen.expected_json;
+  assert.equal(path.resolve(identity.path), file, `${mode} expected path differs from preflight`);
+  assert.equal(path.basename(file), identity.basename, `${mode} expected basename differs from preflight`);
+  const bytes = await fs.readFile(file);
+  assert.equal(bytes.byteLength, identity.bytes, `${mode} expected byte count differs from preflight`);
+  assert.equal(digest(bytes), identity.sha256, `${mode} expected hash differs from preflight`);
+  let expected;
+  try { expected = JSON.parse(bytes.toString('utf8')); }
+  catch (error) { throw Error(`${mode} expected JSON is malformed: ${errorText(error)}`); }
+  assert.equal(expected.schema, expectedSchema);
+  const helperPath = path.join(ROOT, 'tests/stadium_first_css_stream_compare.mjs');
+  assert.equal(path.resolve(frozen.comparator.path), helperPath,
+    `${mode} comparator path differs from preflight`);
+  const helperBytes = await fs.readFile(helperPath);
+  assert.equal(helperBytes.byteLength, frozen.comparator.bytes,
+    `${mode} comparator byte count differs from preflight`);
+  assert.equal(digest(helperBytes), frozen.comparator.sha256,
+    `${mode} comparator hash differs from preflight`);
+  const helper = await import(pathToFileURL(helperPath).href);
+  if (mode === 'first_sss_draw') helper.validateFirstSssDrawExpectedSource(expected);
+  return {bytes, expected, helperPath, helperBytes,
+    identity: {path: file, basename: path.basename(file), bytes: bytes.byteLength, sha256: digest(bytes)},
+    comparator: {path: helperPath, bytes: helperBytes.byteLength, sha256: digest(helperBytes)}};
+}
+
+async function loadFirstSssDrawInputs() {
+  if (!firstSssDraw) return null;
+  const result = await loadBoundFirstSssExpected('first_sss_draw',
+    'first-sss-draw-expected', 'melee-web-stadium-first-sss-draw-diagnostic');
+  assert.equal(result.expected.provenance.observer_sha256,
+    firstSssConstructorPairInputs.expected.provenance.observer_sha256);
+  assert.equal(result.expected.provenance.observer_sha256,
+    firstSssConsumedPadTickInputs.expected.provenance.observer_sha256);
+  return result;
+}
+
+async function loadFirstSssPrefixInputs() {
+  if (!firstSssPrefix) return null;
+  const drawInputs = firstSssDrawInputs;
+  const result = await loadBoundFirstSssExpected('first_sss_prefix',
+    'first-sss-prefix-expected', 'melee-web-stadium-first-sss-prefix-diagnostic');
+  const inputFile = path.resolve(values['first-sss-prefix-input']);
+  const binding = preflight.first_sss_prefix.input_bundle;
+  assert.ok(binding && typeof binding === 'object', 'SSS prefix preflight omitted input-bundle identity');
+  assert.equal(path.resolve(binding.path), inputFile, 'SSS prefix input path differs from preflight');
+  assert.equal(path.basename(inputFile), binding.basename, 'SSS prefix input basename differs from preflight');
+  const inputBytes = await fs.readFile(inputFile);
+  assert.equal(inputBytes.byteLength, binding.bytes, 'SSS prefix input length differs from preflight');
+  assert.equal(digest(inputBytes), binding.sha256, 'SSS prefix input hash differs from preflight');
+  assert.equal(inputBytes.byteLength, result.expected.input_bundle.bytes);
+  assert.equal(digest(inputBytes), result.expected.input_bundle.sha256);
+  const inputRows = result.helperBytes.byteLength
+    ? (await import(pathToFileURL(result.helperPath).href))
+      .decodeFirstSssPrefixInputBundle(inputBytes)
+    : null;
+  const helper = await import(pathToFileURL(result.helperPath).href);
+  helper.validateFirstSssPrefixExpectedSource(result.expected, inputRows);
+  assert.equal(result.expected.provenance.observer_sha256,
+    drawInputs.expected.provenance.observer_sha256,
+    'Prefix and first-draw expectations do not bind the same retained observer');
+  assert.equal(result.expected.input_bundle.contains_expected_state, false);
+  return {...result, inputBytes, inputIdentity: {path: inputFile,
+    basename: path.basename(inputFile), bytes: inputBytes.byteLength, sha256: digest(inputBytes)},
+    inputRows};
 }
 
 async function buildArtifactInventory(baseUrl, names) {
@@ -841,6 +937,30 @@ async function readFirstSssConsumedTickObservation() {
   });
 }
 
+async function readFirstSssDrawObservation() {
+  return page.evaluate(() => {
+    const module = globalThis.Module;
+    const pointer = module?._melee_web_native_menu_stadium_first_css_draw_observe?.();
+    const observation = pointer ? JSON.parse(module.UTF8ToString(pointer)) : null;
+    return {native: observation ? {...observation,
+      native_phase: module._melee_web_native_menu_phase(),
+      running: module._melee_web_native_menu_running()} : null,
+      host: globalThis.__meleeWebStadiumFirstSssDrawRead?.() ?? null};
+  });
+}
+
+async function readFirstSssPrefixObservation() {
+  return page.evaluate(() => {
+    const module = globalThis.Module;
+    const pointer = module?._melee_web_native_menu_stadium_first_css_draw_observe?.();
+    const observation = pointer ? JSON.parse(module.UTF8ToString(pointer)) : null;
+    return {native: observation ? {...observation,
+      native_phase: module._melee_web_native_menu_phase(),
+      running: module._melee_web_native_menu_running()} : null,
+      host: globalThis.__meleeWebStadiumFirstSssPrefixRead?.() ?? null};
+  });
+}
+
 async function readFirstSssPairPostUnloadState() {
   return page.evaluate(() => {
     const module = globalThis.Module;
@@ -851,6 +971,8 @@ async function readFirstSssPairPostUnloadState() {
       observation: pointer ? module.UTF8ToString(pointer) : null,
       first_sss_constructor_pair: observation?.first_sss_constructor_pair ?? null,
       first_sss_consumed_tick: observation?.first_sss_consumed_tick ?? null,
+      first_sss_draw: observation?.first_sss_draw ?? null,
+      first_sss_prefix: observation?.first_sss_prefix ?? null,
       error: document.querySelector('#status')?.dataset.runtimeError || null,
       import_enabled: !!document.querySelector('#disc') &&
         !document.querySelector('#disc').disabled};
@@ -1339,6 +1461,301 @@ async function runFirstSssConsumedPadTick(constructorNative) {
   return evidence.native;
 }
 
+function assertSssOldBaselineUnchanged(native, baseline, constructorPair, consumedTick,
+    firstDraw = null) {
+  assert.deepEqual(native.first_sss_constructor_pair, constructorPair,
+    'SSS continuation changed the approved constructor pair');
+  assert.deepEqual(native.first_sss_consumed_tick, consumedTick,
+    'SSS continuation changed the approved consumed-tick observation');
+  assert.deepEqual(native.entry, baseline.entry, 'Original typed CSS entry changed during SSS continuation');
+  assert.deepEqual(native.tick, baseline.tick, 'Original typed CSS tick changed during SSS continuation');
+  assert.deepEqual(native.draw, baseline.draw, 'Original typed CSS draw changed during SSS continuation');
+  assert.deepEqual(native.postdraw_stream, baseline.postdraw_stream,
+    'Original CSS postdraw stream changed during SSS continuation');
+  assert.deepEqual(native.final_pending_css_draw, baseline.final_pending_css_draw,
+    'Original final CSS draw changed during SSS continuation');
+  if (firstDraw) assert.deepEqual(native.first_sss_draw, firstDraw,
+    'SSS prefix changed the approved first SSS draw observation');
+}
+
+async function runFirstSssDraw(constructorNative) {
+  const pair = constructorNative?.first_sss_constructor_pair;
+  const consumedTick = constructorNative?.first_sss_consumed_tick;
+  assert.ok(pair && consumedTick, 'First SSS draw requires completed constructor and consumed-tick observations');
+  const baseline = report.scenario.first_sss_constructor_pair.postcapture_css_baseline.native;
+  const expected = firstSssDrawInputs.expected;
+  const helperSource = firstCssBrowserStreamInputs.helperSource;
+  report.scenario.first_sss_draw = {
+    expected_json: firstSssDrawInputs.identity,
+    arm_snapshot: null, kick_result: null, observation: null,
+    claim: 'First SSS draw attempt retained; actual snapshots and comparison are pending.',
+  };
+  await persistReport();
+  await timeout(page.evaluate(async ({moduleUrl, expectedDraw, pair, tick}) => {
+    if (globalThis.__meleeWebStadiumFirstSssDrawCompare ||
+        globalThis.__meleeWebStadiumFirstSssDrawRead)
+      throw Error('First SSS draw comparator was already registered');
+    const {createFirstSssDrawComparator, requestSynchronousApproval} = await import(moduleUrl);
+    const comparator = createFirstSssDrawComparator(expectedDraw, pair, tick);
+    const rows = [];
+    let hookError = null;
+    globalThis.__meleeWebStadiumFirstSssDrawRead = () => ({
+      status: comparator.status(), rows, hook_error: hookError});
+    globalThis.__meleeWebStadiumFirstSssDrawCompare = (phase, actualJson) => {
+      let actual;
+      try { actual = JSON.parse(actualJson); }
+      catch { actual = {malformed_json: String(actualJson).slice(0, 6000)}; }
+      const row = {phase, actual, approved: null};
+      rows.push(row);
+      if (rows.length > 2) { hookError = 'First SSS draw callback repeated'; return false; }
+      const approved = requestSynchronousApproval(comparator.compare, phase, actualJson);
+      row.approved = approved === true;
+      return approved === true;
+    };
+  }, {moduleUrl: 'data:text/javascript;base64,' + Buffer.from(helperSource).toString('base64'),
+    expectedDraw: expected, pair, tick: consumedTick}), Math.min(5000, remaining()),
+  'Register exact original SSS first-draw comparison');
+
+  const arm = await timeout(page.evaluate(() => {
+    const module = globalThis.Module;
+    const fn = module?._melee_web_native_menu_stadium_first_sss_draw_arm;
+    if (typeof fn !== 'function') throw Error('First SSS draw arm export is absent');
+    if (module._melee_web_native_menu_running() !== 0)
+      throw Error('First SSS draw arm requires the stopped post-tick host');
+    const result = fn();
+    const pointer = result === 1 ? 0 : module._melee_web_native_menu_message?.();
+    return {result, message: pointer ? module.UTF8ToString(pointer) : null};
+  }), Math.min(5000, remaining()), 'Arm one original first SSS draw');
+  const armSnapshot = await timeout(readFirstSssDrawObservation(),
+    Math.min(5000, remaining()), 'Retain first SSS draw arm state');
+  report.scenario.first_sss_draw.arm_snapshot = armSnapshot;
+  await persistReport();
+  const armAudio = firstSssAudioAccounting(armSnapshot.native?.first_sss_draw, 0);
+  report.scenario.first_sss_draw.arm_audio_accounting = armAudio;
+  await persistReport();
+  assert.equal(armAudio.valid, true, armAudio.error || 'First SSS draw arm changed audio carry');
+
+  let kickResult = null;
+  if (arm.result === 1) {
+    kickResult = await timeout(page.evaluate(() => {
+      const module = globalThis.Module;
+      const fn = module?._melee_web_native_menu_stadium_first_sss_draw_kick;
+      if (typeof fn !== 'function') throw Error('First SSS draw kick export is absent');
+      const result = fn();
+      const pointer = result === 1 ? 0 : module._melee_web_native_menu_message?.();
+      return {result, message: pointer ? module.UTF8ToString(pointer) : null};
+    }), Math.min(5000, remaining()), 'Run the single approved first SSS draw');
+  }
+  report.scenario.first_sss_draw.kick_result = kickResult;
+  await persistReport();
+  if (arm.result === 1) {
+    await timeout(page.waitForFunction(() => {
+      const pointer = Module?._melee_web_native_menu_stadium_first_css_draw_observe?.();
+      if (!pointer) return false;
+      const draw = JSON.parse(Module.UTF8ToString(pointer)).first_sss_draw;
+      return draw?.complete === true || draw?.failed === true;
+    }, null, {timeout: Math.min(10000, remaining())}),
+    Math.min(10000, remaining()), 'First SSS draw result or retained mismatch');
+  }
+  const evidence = await timeout(readFirstSssDrawObservation(),
+    Math.min(5000, remaining()), 'Retain first SSS draw snapshots and first mismatch');
+  report.scenario.first_sss_draw.observation = evidence;
+  await persistReport();
+
+  assert.ok(evidence.native, 'First SSS draw native observation is absent');
+  assertSssOldBaselineUnchanged(evidence.native, baseline, pair, consumedTick);
+  assert.equal(evidence.native.running, 0, 'Host time resumed after the first SSS draw');
+  const draw = evidence.native.first_sss_draw;
+  assert.ok(draw, 'Native observation omitted first_sss_draw');
+  const audio = firstSssAudioAccounting(draw, 0);
+  report.scenario.first_sss_draw.audio_accounting = audio;
+  await persistReport();
+  assert.equal(audio.valid, true, audio.error || 'First SSS draw changed audio carry');
+  assert.equal(draw.host_tick_calls, 0, 'First-draw diagnostic ran an extra SSS tick');
+  assert.equal(draw.host_draw_calls, 1, 'First-draw diagnostic did not execute exactly one SSS draw');
+  assert.equal(draw.aurora_begin_calls, 1);
+  assert.equal(draw.aurora_end_calls, 1);
+  assert.equal(draw.frame_end_returned, true);
+  assert.equal(arm.result, 1, arm.message || 'First SSS draw arm refused');
+  assert.equal(kickResult?.result, 1, kickResult?.message || 'First SSS draw kick failed');
+  assert.equal(draw.failed, false, draw.error || 'First SSS draw failed');
+  for (const key of ['armed', 'kicked', 'attempted', 'captured', 'compared', 'complete'])
+    assert.equal(draw[key], true, key);
+  assert.equal(draw.error, null);
+  assert.equal(evidence.host?.hook_error, null);
+  assert.equal(evidence.host?.status?.approved, true);
+  assert.equal(evidence.host?.status?.failed, false);
+  assert.equal(evidence.host?.status?.first_mismatch, null);
+  assert.equal(evidence.host?.rows?.length, 2);
+  assert.deepEqual(evidence.host.rows.map(row => row.phase), ['draw_enter', 'draw_return']);
+  assert.ok(evidence.host.rows.every(row => row.approved === true));
+  assert.deepEqual(draw.draw_enter, evidence.host.rows[0].actual);
+  assert.deepEqual(draw.draw_return, evidence.host.rows[1].actual);
+  report.scenario.first_sss_draw.claim =
+    'Original SSS DrawEnter1609 and DrawReturn1610 matched after the approved constructor and consumed-PAD prerequisites. No additional SSS tick or continuation is included.';
+  await persistReport();
+  await saveScreenshot('stadium-first-sss-draw');
+  return evidence.native;
+}
+
+async function runFirstSssPrefix(constructorNative, firstDrawNative) {
+  const pair = constructorNative?.first_sss_constructor_pair;
+  const consumedTick = constructorNative?.first_sss_consumed_tick;
+  const firstDraw = firstDrawNative?.first_sss_draw;
+  assert.ok(pair && consumedTick && firstDraw,
+    'SSS prefix requires completed constructor, consumed-tick and first-draw prerequisites');
+  const baseline = report.scenario.first_sss_constructor_pair.postcapture_css_baseline.native;
+  const expected = firstSssPrefixInputs.expected;
+  report.scenario.first_sss_prefix = {
+    expected_json: firstSssPrefixInputs.identity,
+    input_bundle: firstSssPrefixInputs.inputIdentity,
+    arm_snapshot: null, kick_result: null, observation: null,
+    claim: 'Bounded SSS prefix attempt retained; per-boundary comparison and final stop checks are pending.',
+  };
+  await persistReport();
+  await timeout(page.evaluate(async ({moduleUrl, expectedPrefix, inputRows, pair, tick, draw}) => {
+    if (globalThis.__meleeWebStadiumFirstSssPrefixCompare ||
+        globalThis.__meleeWebStadiumFirstSssPrefixRead)
+      throw Error('First SSS prefix comparator was already registered');
+    const {createFirstSssPrefixComparator, requestSynchronousApproval} = await import(moduleUrl);
+    const comparator = createFirstSssPrefixComparator(expectedPrefix, inputRows, pair, tick, draw);
+    const rows = [];
+    let hookError = null;
+    globalThis.__meleeWebStadiumFirstSssPrefixRead = () => ({
+      status: comparator.status(), rows, hook_error: hookError});
+    globalThis.__meleeWebStadiumFirstSssPrefixCompare = (phase, actualJson) => {
+      let actual;
+      try { actual = JSON.parse(actualJson); }
+      catch { actual = {malformed_json: String(actualJson).slice(0, 6000)}; }
+      const row = {phase, actual, approved: null};
+      rows.push(row);
+      if (rows.length > 374) { hookError = 'First SSS prefix callback exceeded its fixed sample cap'; return false; }
+      const approved = requestSynchronousApproval(comparator.compare, phase, actualJson);
+      row.approved = approved === true;
+      return approved === true;
+    };
+  }, {moduleUrl: 'data:text/javascript;base64,' + Buffer.from(firstCssBrowserStreamInputs.helperSource).toString('base64'),
+    expectedPrefix: expected, inputRows: firstSssPrefixInputs.inputRows,
+    pair, tick: consumedTick, draw: firstDraw}), Math.min(5000, remaining()),
+  'Register exact 124-record SSS prefix and passive exit comparisons');
+
+  const arm = await timeout(page.evaluate(bundle => {
+    const module = globalThis.Module;
+    const fn = module?._melee_web_native_menu_stadium_first_sss_prefix_arm;
+    if (typeof fn !== 'function') throw Error('First SSS prefix arm export is absent');
+    if (module._melee_web_native_menu_running() !== 0)
+      throw Error('First SSS prefix arm requires the stopped first-draw host');
+    const pointer = module._malloc(bundle.length);
+    if (!pointer) throw Error('First SSS prefix input allocation failed');
+    try {
+      module.HEAPU8.set(bundle, pointer);
+      const result = fn(pointer, bundle.length);
+      const messagePointer = result === 1 ? 0 : module._melee_web_native_menu_message?.();
+      return {result, message: messagePointer ? module.UTF8ToString(messagePointer) : null};
+    } finally { module._free(pointer); }
+  }, Array.from(firstSssPrefixInputs.inputBytes)),
+  Math.min(5000, remaining()), 'Arm the exact input-only 124-record SSS prefix');
+  const armSnapshot = await timeout(readFirstSssPrefixObservation(),
+    Math.min(5000, remaining()), 'Retain armed SSS prefix state');
+  report.scenario.first_sss_prefix.arm_snapshot = armSnapshot;
+  await persistReport();
+  const armAudio = firstSssAudioAccounting(armSnapshot.native?.first_sss_prefix, 0);
+  report.scenario.first_sss_prefix.arm_audio_accounting = armAudio;
+  await persistReport();
+  assert.equal(armAudio.valid, true, armAudio.error || 'SSS prefix arm changed audio carry');
+  assert.equal(arm.result, 1, arm.message || 'First SSS prefix arm refused');
+  assert.equal(armSnapshot.native?.first_sss_prefix?.armed, true);
+  assert.equal(armSnapshot.native?.first_sss_prefix?.kicked, false);
+  assertSssOldBaselineUnchanged(armSnapshot.native, baseline, pair, consumedTick, firstDraw);
+
+  const kickResult = await timeout(page.evaluate(() => {
+    const module = globalThis.Module;
+    const fn = module?._melee_web_native_menu_stadium_first_sss_prefix_kick;
+    if (typeof fn !== 'function') throw Error('First SSS prefix kick export is absent');
+    const result = fn();
+    const messagePointer = result === 1 ? 0 : module._melee_web_native_menu_message?.();
+    return {result, message: messagePointer ? module.UTF8ToString(messagePointer) : null};
+  }), Math.min(10000, remaining()), 'Start the finite SSS input/tick/draw continuation');
+  report.scenario.first_sss_prefix.kick_result = kickResult;
+  await persistReport();
+  await timeout(page.waitForFunction(() => {
+    const pointer = Module?._melee_web_native_menu_stadium_first_css_draw_observe?.();
+    if (!pointer) return false;
+    const prefix = JSON.parse(Module.UTF8ToString(pointer)).first_sss_prefix;
+    return prefix?.complete === true || prefix?.failed === true;
+  }, null, {timeout: remaining()}), remaining(),
+  'Finite SSS prefix complete result or first retained mismatch');
+
+  const evidence = await timeout(readFirstSssPrefixObservation(),
+    Math.min(10000, remaining()), 'Retain all SSS prefix callbacks and passive exit notes');
+  report.scenario.first_sss_prefix.observation = evidence;
+  await persistReport();
+
+  assert.ok(evidence.native, 'SSS prefix native observation is absent');
+  assertSssOldBaselineUnchanged(evidence.native, baseline, pair, consumedTick, firstDraw);
+  assert.equal(evidence.native.running, 0, 'Host time continued beyond bounded SSS prefix');
+  const prefix = evidence.native.first_sss_prefix;
+  assert.ok(prefix, 'Native observation omitted first_sss_prefix');
+  const audio = firstSssAudioAccounting(prefix,
+    Number.isSafeInteger(prefix.matched_ticks) ? prefix.matched_ticks : -1);
+  report.scenario.first_sss_prefix.audio_accounting = audio;
+  await persistReport();
+  assert.equal(prefix.matched_ticks <= prefix.host_tick_calls, true,
+    'Matched SSS tick callbacks exceed consumed host tick attempts');
+  assert.equal(prefix.matched_draw_enters <= prefix.host_draw_calls, true,
+    'Matched SSS draw-enter callbacks exceed consumed host draw attempts');
+  assert.equal(prefix.matched_draw_returns <= prefix.matched_draw_enters, true,
+    'SSS draw-return approvals exceed draw-enter approvals');
+  assert.equal(prefix.host_draw_calls <= prefix.matched_ticks, true,
+    'A draw was attempted without a preceding approved tick');
+  assert.equal(audio.valid, true, audio.error || 'SSS prefix audio carry differs from approved ticks');
+  assert.equal(prefix.host_tick_calls, 124, 'SSS prefix host tick count differs from fixed bound');
+  assert.equal(prefix.host_draw_calls, 124, 'SSS prefix host draw count differs from fixed bound');
+  assert.equal(prefix.matched_ticks, 124);
+  assert.equal(prefix.matched_draw_enters, 124);
+  assert.equal(prefix.matched_draw_returns, 124);
+  assert.equal(prefix.aurora_begin_calls, 124);
+  assert.equal(prefix.aurora_end_calls, 124);
+  assert.equal(prefix.frame_end_returned, true);
+  assert.equal(prefix.last_tick_result, 3);
+  assert.equal(prefix.transition_requested, true,
+    'Final source request must remain pending through its checked draw');
+  assert.equal(arm.result, 1, arm.message || 'First SSS prefix arm refused');
+  assert.equal(kickResult.result, 1, kickResult.message || 'First SSS prefix kick failed');
+  assert.equal(prefix.failed, false, prefix.error || 'SSS prefix failed');
+  assert.equal(prefix.complete, true);
+  assert.equal(prefix.error, null);
+  assert.ok(prefix.exit_note, 'Passive SSS exit note was not retained');
+  assert.equal(prefix.exit_note.phase, 'sss_exit');
+  assert.equal(prefix.selected_stage_captured, true);
+  assert.deepEqual(prefix.selected_stage_note, {index: 18, kind: 3});
+  assert.ok(prefix.prepared_output_unpaired &&
+    typeof prefix.prepared_output_unpaired === 'object',
+    'Native observation must retain the actual prepared VS output');
+  assert.equal(prefix.prepared_output_comparison, 'unpaired',
+    'Prepared VS output must remain outside source comparison');
+  report.scenario.first_sss_prefix.prepared_output_unpaired = {
+    actual: prefix.prepared_output_unpaired, comparison: 'unpaired'};
+  assert.equal(evidence.host?.hook_error, null);
+  assert.equal(evidence.host?.status?.approved, true);
+  assert.equal(evidence.host?.status?.failed, false);
+  assert.equal(evidence.host?.status?.attempted, 374);
+  assert.equal(evidence.host?.status?.first_mismatch, null);
+  assert.equal(evidence.host?.rows?.length, 374);
+  assert.ok(evidence.host.rows.every(row => row.approved === true));
+  assert.equal(evidence.host.rows[0].phase, 'scheduler_end');
+  assert.equal(evidence.host.rows[371].phase, 'draw_return');
+  assert.equal(evidence.host.rows[372].phase, 'sss_exit');
+  assert.equal(evidence.host.rows[373].phase, 'selected_stage');
+  assert.deepEqual(evidence.host.rows[372].actual, prefix.exit_note);
+  assert.deepEqual(evidence.host.rows[373].actual, prefix.selected_stage_note);
+  report.scenario.first_sss_prefix.claim =
+    '124 exact SSS consumed-PAD/tick/draw records matched, including the final retained transition request and checked pending draw; the passive row2426 exit and separate row2427 selected-stage tuple matched. Prepared VS output remains unpaired; no ordinary VS scene entry/setup or whole-session acceptance is claimed.';
+  await persistReport();
+  await saveScreenshot('stadium-first-sss-prefix');
+  return evidence.native;
+}
+
 async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   const prearm = await timeout(page.evaluate(() => {
     const module = globalThis.Module;
@@ -1472,8 +1889,16 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
       observation = await runFirstCssBrowserFinalPendingDraw();
       if (firstSssConstructorPair) {
         observation = await runFirstSssConstructorPair();
-        if (firstSssConsumedPadTick)
-          observation = await runFirstSssConsumedPadTick(observation);
+        if (firstSssConsumedPadTick) {
+          const constructorAndTick = await runFirstSssConsumedPadTick(observation);
+          observation = constructorAndTick;
+          if (firstSssDraw) {
+            const firstDraw = await runFirstSssDraw(constructorAndTick);
+            observation = firstDraw;
+            if (firstSssPrefix)
+              observation = await runFirstSssPrefix(constructorAndTick, firstDraw);
+          }
+        }
       }
     }
   }
@@ -1495,7 +1920,9 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   }), Math.min(10000, remaining()), 'First-CSS browser WebGPU snapshot');
   assert.equal(report.scenario.gpu.cross_origin_isolated, true);
   assert.equal(report.scenario.gpu.adapter_available, true);
-  await saveScreenshot(firstSssConstructorPair ? 'stadium-first-sss-constructor-pair-final' :
+  await saveScreenshot(firstSssPrefix ? 'stadium-first-sss-prefix-final' :
+    firstSssDraw ? 'stadium-first-sss-draw-final' :
+    firstSssConstructorPair ? 'stadium-first-sss-constructor-pair-final' :
     firstCssBrowserFinalDraw ? 'stadium-first-css-browser-final-pending-draw' :
     firstCssBrowserStream ? 'stadium-first-css-browser-postdraw-stream' : 'stadium-first-css-browser-draw');
   report.scenario.page_errors = pageErrors;
@@ -1515,6 +1942,8 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
       observation: pointer ? module.UTF8ToString(pointer) : null,
       first_sss_constructor_pair: observation?.first_sss_constructor_pair ?? null,
       first_sss_consumed_tick: observation?.first_sss_consumed_tick ?? null,
+      first_sss_draw: observation?.first_sss_draw ?? null,
+      first_sss_prefix: observation?.first_sss_prefix ?? null,
       error: document.querySelector('#status')?.dataset.runtimeError || null,
       import_enabled: !!document.querySelector('#disc') && !document.querySelector('#disc').disabled};
   }), Math.min(5000, remaining()), 'First-CSS post-unload snapshot');
@@ -1529,6 +1958,12 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   if (firstSssConsumedPadTick)
     assert.equal(afterUnload.first_sss_consumed_tick, null,
       'SSS consumed-tick diagnostic ownership survived teardown');
+  if (firstSssDraw)
+    assert.equal(afterUnload.first_sss_draw, null,
+      'SSS first-draw diagnostic ownership survived teardown');
+  if (firstSssPrefix)
+    assert.equal(afterUnload.first_sss_prefix, null,
+      'SSS prefix diagnostic ownership survived teardown');
   report.cleanup.native_after_unload = afterUnload;
   report.cleanup.observation_cleared = true;
   await saveScreenshot('stadium-first-css-browser-draw-after-unload');
@@ -1744,7 +2179,13 @@ async function cleanupServer() {
 async function main() {
   assert.equal(build, expectedBuild, 'Only the isolated C1a diagnostic runtime may be served');
   assert.equal(preflight.schema, 'melee-web-stadium-c1a-browser-preflight-v1');
-  if (firstSssConsumedPadTick)
+  if (firstSssPrefix)
+    assert.equal(preflight.route_mode, 'first-sss-prefix',
+      'SSS prefix command requires its exact frozen preflight route');
+  else if (values['first-sss-draw'])
+    assert.equal(preflight.route_mode, 'first-sss-draw',
+      'SSS first-draw command requires its exact frozen preflight route');
+  else if (firstSssConsumedPadTick)
     assert.equal(preflight.route_mode, 'first-sss-consumed-pad-tick',
       'SSS consumed-tick command requires its exact frozen preflight route');
   else if (firstSssConstructorPair)
@@ -1786,6 +2227,8 @@ async function main() {
   firstCssBrowserStreamInputs = await loadFirstCssBrowserStreamInputs();
   firstSssConstructorPairInputs = await loadFirstSssConstructorPairInputs();
   firstSssConsumedPadTickInputs = await loadFirstSssConsumedPadTickInputs();
+  firstSssDrawInputs = await loadFirstSssDrawInputs();
+  firstSssPrefixInputs = await loadFirstSssPrefixInputs();
   assert.deepEqual(preflight.limits_ms, LIMITS, 'Runtime bounds differ from frozen preflight');
   assert.equal(LIMITS.captureWorkMs,
     preflight.owner_deadline.overall_timeout_ms - preflight.owner_deadline.cleanup_reserve_ms,
@@ -1820,6 +2263,10 @@ async function main() {
     'Ordinary default runtime unexpectedly exports the private CSS stream gate');
   assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_first_sss_tick_arm'), false,
     'Ordinary default runtime unexpectedly exports the private SSS tick diagnostic gate');
+  assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_first_sss_draw_arm'), false,
+    'Ordinary default runtime unexpectedly exports the private SSS draw diagnostic gate');
+  assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_first_sss_prefix_arm'), false,
+    'Ordinary default runtime unexpectedly exports the private SSS prefix diagnostic gate');
 
   const artifacts = JSON.parse(await fs.readFile(path.join(ROOT, 'tools/browser_build_artifacts.json'), 'utf8'));
   assert.equal(artifacts.length, 40, 'The checked-in browser artifact inventory changed; review the preflight');
@@ -2172,6 +2619,26 @@ async function cleanupOwnedProcesses() {
         cleanupFailures.push({step: 'sss-tick-failure-snapshot', error: errorText(error)});
       }
     }
+    if (firstSssDraw) {
+      try {
+        report.scenario.first_sss_draw_failure_snapshot =
+          await timeout(readFirstSssDrawObservation(), Math.min(2000, cleanupRemaining()),
+            'First SSS draw actual snapshots and mismatch before unload');
+        await persistReport();
+      } catch (error) {
+        cleanupFailures.push({step: 'sss-draw-failure-snapshot', error: errorText(error)});
+      }
+    }
+    if (firstSssPrefix) {
+      try {
+        report.scenario.first_sss_prefix_failure_snapshot =
+          await timeout(readFirstSssPrefixObservation(), Math.min(3000, cleanupRemaining()),
+            'SSS prefix actual samples and exit notes before unload');
+        await persistReport();
+      } catch (error) {
+        cleanupFailures.push({step: 'sss-prefix-failure-snapshot', error: errorText(error)});
+      }
+    }
     try { report.scenario.failure_snapshot = await timeout(nativeSnapshot(),
       Math.min(2000, cleanupRemaining()), 'Failure-state native snapshot'); }
     catch (error) { cleanupFailures.push({step: 'failure-snapshot', error: errorText(error)}); }
@@ -2198,6 +2665,10 @@ async function cleanupOwnedProcesses() {
       assert.equal(afterUnload.first_sss_constructor_pair, null);
       if (firstSssConsumedPadTick)
         assert.equal(afterUnload.first_sss_consumed_tick, null);
+      if (firstSssDraw)
+        assert.equal(afterUnload.first_sss_draw, null);
+      if (firstSssPrefix)
+        assert.equal(afterUnload.first_sss_prefix, null);
       assert.equal(afterUnload.error, null);
       assert.equal(afterUnload.import_enabled, true);
       report.cleanup.observation_cleared = true;

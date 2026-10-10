@@ -130,11 +130,17 @@ typedef void (*MeleeWebMenuFirstSssPairNote)(
 enum {
     MELEE_WEB_MENU_SSS_PAIR_ENTRY = 1,
     MELEE_WEB_MENU_SSS_PAIR_RETURN = 2,
+    MELEE_WEB_MENU_SSS_PREFIX_EXIT = 3,
 };
 /* Private diagnostic only: arm during the completed CSS scene and retain the
  * same session through its ordinary CSS -> SSS_READY transition. Notes are
  * passive and cannot interrupt either authored SSS constructor boundary. */
 int melee_web_menu_arm_first_sss_tick(MeleeWebMenuSession*, char*, size_t);
+/* Finite diagnostic permit; expected state remains outside the source session. */
+int melee_web_menu_arm_first_sss_prefix(MeleeWebMenuSession*,
+    MeleeWebMenuFirstSssPairNote, char*, size_t);
+int melee_web_menu_authorize_first_sss_prefix_tick(MeleeWebMenuSession*,
+    unsigned index, char*, size_t);
 int melee_web_menu_arm_first_sss_pair(MeleeWebMenuSession*,
     MeleeWebMenuFirstSssPairNote, char*, size_t);
 #endif

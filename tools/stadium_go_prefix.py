@@ -35,6 +35,10 @@ MAX_STREAM_RECORDS = 250_000
 MAX_SOURCE_TICK_BATCH = 5
 MAX_TAIL_AFTER_F = MAX_SOURCE_TICK_BATCH - 1
 EXPECTED_SETUP_RECEIPT_SHA256 = "e6b15cececf103efeb9b7df2dd18908e9a66d37ebde68622ecd304f8eabcfcda"
+FIRST_SSS_SELECTION_STABILITY_REVIEW = {
+    "evidence": "root-sss-selection-stability-review-v1/review.json",
+    "sha256": "f7fefd1627ce7ce2b51dae3ea10628337ace2910541ad83b7fb23e1837856063",
+}
 
 # One diagnostic-only, first-CSS source context from the retained original
 # v6 stream. This is not a replay recipe or whole-session admission boundary.
@@ -146,6 +150,37 @@ FIRST_SSS_TICK_INPUT_MAGIC = b"STC1SSS1"
 FIRST_SSS_TICK_INPUT_VERSION = 1
 FIRST_SSS_TICK_INPUT_HEADER_BYTES = 52
 FIRST_SSS_TICK_INPUT_BYTES = FIRST_SSS_TICK_INPUT_HEADER_BYTES + 4 * 11
+FIRST_SSS_DRAW_ENTER_SEQUENCE = 1609
+FIRST_SSS_DRAW_RETURN_SEQUENCE = 1610
+FIRST_SSS_DRAW_SOURCE_TICK = 1
+FIRST_SSS_DRAW_FRAME = 1
+FIRST_SSS_DRAW_ENTER_PC = 0x80390FC0
+FIRST_SSS_DRAW_RETURN_PC = 0x80391040
+FIRST_SSS_PREFIX_SAMPLE_COUNT = 124
+FIRST_SSS_PREFIX_FIRST_CONSUME_SEQUENCE = 1612
+FIRST_SSS_PREFIX_LAST_CONSUME_SEQUENCE = 2420
+FIRST_SSS_PREFIX_EXIT_SEQUENCE = 2426
+FIRST_SSS_PREFIX_SELECTION_SEQUENCE = 2427
+FIRST_SSS_PREFIX_INPUT_MAGIC = b"STC1SSSP"
+FIRST_SSS_PREFIX_INPUT_VERSION = 1
+FIRST_SSS_PREFIX_INPUT_HEADER_BYTES = 48
+FIRST_SSS_PREFIX_INPUT_RECORD_BYTES = 60
+FIRST_SSS_PREFIX_INPUT_BYTES = (FIRST_SSS_PREFIX_INPUT_HEADER_BYTES +
+                                FIRST_SSS_PREFIX_SAMPLE_COUNT *
+                                FIRST_SSS_PREFIX_INPUT_RECORD_BYTES)
+FIRST_SSS_PREFIX_DRAW_SLICES = FIRST_SSS_TICK_SLICES
+FIRST_SSS_PREFIX_SELECTION_SLICES = {
+    (1, 0): (0x804EE74C, 0x30),
+    (27, 0): (0x804EE724, 4),
+    (2, 0): (0x804C1F78, 0x0C),
+    (21, 0): (FIRST_SSS_PAD_ADDRESS, 0x358),
+    (22, 0): (0x804D7420, 4),
+    (23, 0): (0x804A7F98, 4),
+    (17, 0): (FIRST_SSS_SCENE_ROUTING_ADDRESS, 6),
+    (40, 0): (FIRST_SSS_SCENE_ADDRESS, 1),
+    (41, 0): (0x804D6CAE, 1),
+    (42, 0): (0x803F08D3, 1),
+}
 FIRST_CSS_CONSUMED_PAD_MAGIC = b"STC1PAD1"
 FIRST_CSS_CONSUMED_PAD_VERSION = 1
 FIRST_CSS_CONSUMED_PAD_HEADER_BYTES = 8 + 4 + 32 + 4 + 4
@@ -969,6 +1004,599 @@ def extract_stadium_first_sss_consumed_pad_tick(
              hashlib.sha256(status_file.read_bytes()).hexdigest() == FIRST_SSS_STATUS_SHA256,
              "SSS source observer or status changed during scheduler-end extraction")
     return result
+
+
+def _source_slice_inventory(payload: dict[str, Any]) -> list[dict[str, int]]:
+    return [
+        {"tag": item["tag"], "flags": item["flags"],
+         "address": item["address"], "size": item["size"]}
+        for item in payload["slices"]
+    ]
+
+
+def _source_row_envelope(row: dict[str, Any]) -> dict[str, Any]:
+    payload = row.get("payload")
+    _require(isinstance(payload, dict), "source row has no payload envelope")
+    return {
+        "event": row.get("event"), "sequence": row.get("seq"),
+        "source_tick": row.get("source_tick"),
+        "draw_ordinal": row.get("draw_ordinal"),
+        "boundary": payload.get("boundary"), "phase": payload.get("phase"),
+        "pc": payload.get("pc"), "word": payload.get("word"),
+        "lr": payload.get("lr"), "argument": payload.get("argument"),
+    }
+
+
+def _first_sss_prefix_state_snapshot(row: dict[str, Any], *, phase: str,
+                                     sequence: int, boundary: str, pc: int,
+                                     source_tick: int, draw_ordinal: int,
+                                     scene_frame: int) -> dict[str, Any]:
+    payload = row.get("payload")
+    _require(isinstance(payload, dict) and row.get("event") == "boundary" and
+             row.get("seq") == sequence and payload.get("boundary") == boundary and
+             payload.get("pc") == pc and type(row.get("source_tick")) is int and
+             row.get("source_tick") == source_tick and
+             payload.get("source_tick") == source_tick and
+             type(row.get("draw_ordinal")) is int and
+             row.get("draw_ordinal") == draw_ordinal and
+             payload.get("draw_ordinal") == draw_ordinal,
+             f"SSS prefix {phase} source sequence/phase/counters differ")
+    _check_boundary_contract(payload)
+    _require_exact_slice_inventory(payload, set(FIRST_SSS_PREFIX_DRAW_SLICES),
+                                   f"SSS prefix {phase}")
+    read: dict[int, dict[str, Any]] = {}
+    for (tag, flags), (address, size) in FIRST_SSS_PREFIX_DRAW_SLICES.items():
+        item = _slice(payload, tag, f"SSS prefix {phase}", size, flags)
+        _require(item["address"] == address,
+                 f"SSS prefix {phase} tag={tag} escaped its pinned source address")
+        read[tag] = item
+    _require(read[19]["raw"] == FIRST_SSS_RNG_VALUE_ADDRESS.to_bytes(4, "big") and
+             read[40]["raw"] == bytes([FIRST_SSS_KIND]),
+             f"SSS prefix {phase} lost the retained RNG or SSS owner")
+    actual_frame = int.from_bytes(read[30]["raw"], "big")
+    _require(actual_frame == scene_frame,
+             f"SSS prefix {phase} is not the exact source frame")
+    try:
+        from reference_capture_semantics import pad_snapshot_bytes  # noqa: PLC0415
+        pad_hex = pad_snapshot_bytes(read[21]["raw"])
+    except (ValueError, TypeError) as error:
+        raise StadiumGoPrefixError(
+            f"SSS prefix {phase} PAD snapshot is invalid: {error}") from error
+    pad = bytes.fromhex(pad_hex)
+    _require(len(pad) == 822,
+             f"SSS prefix {phase} semantic PAD has an unexpected length")
+    route = read[17]["raw"]
+    _require(route[0] == 0x02,
+             f"SSS prefix {phase} is outside ordinary VS routing")
+    routing = {
+        "current_game_mode": route[0], "previous_game_mode": route[2],
+        "current_scene_index": route[3], "previous_scene_index": route[4],
+    }
+    return {
+        "expected": {
+            "phase": phase,
+            "scene_frame": actual_frame,
+            "scene_kind": read[40]["raw"][0],
+            "pad_state_hex": pad.hex(),
+            "random_seed_hex": read[20]["raw"].hex(),
+            "scene_routing_getters": routing,
+        },
+        "source": {
+            **_source_row_envelope(row),
+            "source_slice_inventory": _source_slice_inventory(payload),
+            "source_slices_hex": {
+                f"{tag}:0": item["raw"].hex()
+                for tag, item in sorted(read.items())
+            },
+            "scene_routing_raw_hex": route.hex(),
+            "rng_pointer_hex": read[19]["raw"].hex(),
+        },
+    }
+
+
+def _first_sss_draw_snapshot(row: dict[str, Any], *, boundary: str) -> dict[str, Any]:
+    if boundary == "draw_enter":
+        sequence, pc = FIRST_SSS_DRAW_ENTER_SEQUENCE, FIRST_SSS_DRAW_ENTER_PC
+    else:
+        _require(boundary == "draw_return", "SSS first-draw phase is invalid")
+        sequence, pc = FIRST_SSS_DRAW_RETURN_SEQUENCE, FIRST_SSS_DRAW_RETURN_PC
+    return _first_sss_prefix_state_snapshot(
+        row, phase=boundary, sequence=sequence, boundary=boundary, pc=pc,
+        source_tick=FIRST_SSS_DRAW_SOURCE_TICK,
+        draw_ordinal=FIRST_SSS_DRAW_ORDINAL, scene_frame=FIRST_SSS_DRAW_FRAME)
+
+
+def _extract_first_sss_draw_rows(
+        enter_rows: list[dict[str, Any]], return_rows: list[dict[str, Any]],
+        stream_sha256: str) -> dict[str, Any]:
+    _require(stream_sha256 == FIRST_CSS_STREAM_SHA256,
+             "SSS first draw is not from the retained v6 observer")
+    _require(isinstance(enter_rows, list) and len(enter_rows) == 1 and
+             isinstance(return_rows, list) and len(return_rows) == 1,
+             "SSS first draw requires exactly one source enter/return pair")
+    enter = _first_sss_draw_snapshot(enter_rows[0], boundary="draw_enter")
+    returned = _first_sss_draw_snapshot(return_rows[0], boundary="draw_return")
+    fields = ("scene_frame", "scene_kind", "pad_state_hex", "random_seed_hex",
+              "scene_routing_getters")
+    _require(all(enter["expected"][key] == returned["expected"][key]
+                 for key in fields),
+             "SSS first DrawEnter/DrawReturn tracked state changed")
+    return {
+        "schema": "melee-web-stadium-first-sss-draw-diagnostic",
+        "version": 1,
+        "scope": "original first SSS DrawEnter1609 through DrawReturn1610 only",
+        "provenance": {
+            "observer_bytes": FIRST_CSS_STREAM_BYTES,
+            "observer_sha256": stream_sha256,
+            "observer_status_bytes": FIRST_SSS_STATUS_BYTES,
+            "observer_status_sha256": FIRST_SSS_STATUS_SHA256,
+            "draw_enter_sequence": FIRST_SSS_DRAW_ENTER_SEQUENCE,
+            "draw_return_sequence": FIRST_SSS_DRAW_RETURN_SEQUENCE,
+            "source_tick": FIRST_SSS_DRAW_SOURCE_TICK,
+            "draw_ordinal": FIRST_SSS_DRAW_ORDINAL,
+            "scene_frame": FIRST_SSS_DRAW_FRAME,
+            "scene_kind": FIRST_SSS_KIND,
+            "setup_profile_verified_by_observer": False,
+        },
+        "expected_draw_enter": enter["expected"],
+        "expected_draw_return": returned["expected"],
+        "source_draw_enter": enter["source"],
+        "source_draw_return": returned["source"],
+        "comparison_fields": list(fields),
+        "native_protocol_requirements": {
+            "host_draw_calls": 1, "host_tick_calls": 0,
+            "aurora_begin_calls": 1, "aurora_end_calls": 1,
+            "frame_end_returned": True, "all_owners_true": True,
+            "audio_render_calls_delta": 0, "audio_render_frames_delta": 0,
+            "audio_phase_unchanged": True,
+        },
+        "whole_session_equivalent": False,
+        "source_admission": False,
+    }
+
+
+def extract_stadium_first_sss_draw(
+        stream_path: str | Path, status_path: str | Path) -> dict[str, Any]:
+    """Extract only the original first SSS draw after the pinned constructor/tick."""
+    source, status_file = Path(stream_path), Path(status_path)
+    _require(source.is_file() and status_file.is_file(),
+             "configured SSS observer stream or status is missing")
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES,
+             "SSS observer stream byte length differs from retained v6")
+    status_bytes = status_file.read_bytes()
+    _require(len(status_bytes) == FIRST_SSS_STATUS_BYTES and
+             hashlib.sha256(status_bytes).hexdigest() == FIRST_SSS_STATUS_SHA256,
+             "SSS observer status identity differs from retained v6")
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    _require(digest == FIRST_CSS_STREAM_SHA256,
+             "SSS observer stream hash differs from retained v6")
+    try:
+        summary = validate_stadium_go_prefix(source, status_path=status_file)
+        _require(summary.get("decision") == "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY" and
+                 summary.get("stream_bytes") == FIRST_CSS_STREAM_BYTES and
+                 summary.get("stream_sha256") == digest,
+                 "SSS source stream no longer passes full GO-prefix validation")
+        enter_rows, return_rows = [], []
+        for row in iter_records(source, max_bytes=MAX_STREAM_BYTES,
+                                max_records=MAX_STREAM_RECORDS):
+            if row.get("seq") == FIRST_SSS_DRAW_ENTER_SEQUENCE:
+                enter_rows.append(row)
+            elif row.get("seq") == FIRST_SSS_DRAW_RETURN_SEQUENCE:
+                return_rows.append(row)
+        result = _extract_first_sss_draw_rows(enter_rows, return_rows, digest)
+    except StadiumGoPrefixError:
+        raise
+    except (OSError, ObserverStreamError) as error:
+        raise StadiumGoPrefixError(f"cannot validate first SSS draw rows: {error}") from error
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES and
+             hashlib.sha256(source.read_bytes()).hexdigest() == digest and
+             status_file.stat().st_size == FIRST_SSS_STATUS_BYTES and
+             hashlib.sha256(status_file.read_bytes()).hexdigest() == FIRST_SSS_STATUS_SHA256,
+             "SSS observer stream or status changed during first-draw extraction")
+    return result
+
+
+def _first_sss_prefix_consumed_ports(row: dict[str, Any], sequence: int) -> list[bytes]:
+    payload = row.get("payload")
+    _require(isinstance(payload, dict) and row.get("event") == "boundary" and
+             row.get("seq") == sequence and payload.get("boundary") == "pad_consume" and
+             payload.get("pc") == 0x80377584 and
+             type(row.get("source_tick")) is int and
+             row.get("source_tick") == payload.get("source_tick") and
+             type(row.get("draw_ordinal")) is int and
+             row.get("draw_ordinal") == payload.get("draw_ordinal"),
+             "SSS prefix PAD consume sequence/phase/counters differ")
+    _check_boundary_contract(payload)
+    _require_exact_slice_inventory(payload, {(2, 0), (3, 0)},
+                                   "SSS prefix PAD consume")
+    from whole_session_replay import (  # noqa: PLC0415
+        WholeSessionReplayError, _consumed_ports,
+    )
+    try:
+        statuses = [bytes.fromhex(item)
+                    for item in _consumed_ports(row, sequence)]
+    except (WholeSessionReplayError, KeyError, TypeError, ValueError) as error:
+        raise StadiumGoPrefixError(f"SSS prefix consumed PAD is invalid: {error}") from error
+    _require(len(statuses) == 4 and all(len(status) == 11 for status in statuses),
+             "SSS prefix consumed PAD does not contain four exact 11-byte ports")
+    return statuses
+
+
+def _first_sss_prefix_exit_snapshot(row: dict[str, Any]) -> dict[str, Any]:
+    payload = _validate_progress(row, "sss_exit", EXPECTED_SETUP_RECEIPT_SHA256)
+    _require(row.get("seq") == FIRST_SSS_PREFIX_EXIT_SEQUENCE and
+             row.get("source_tick") == 125 and row.get("draw_ordinal") == 274 and
+             payload.get("source_tick") == 125 and payload.get("draw_ordinal") == 274 and
+             payload.get("argument") == "0x00000000",
+             "SSS prefix exit is not the exact retained source row2426")
+    _require_exact_slice_inventory(payload, FIRST_SSS_SOURCE_INVENTORY,
+                                   "SSS prefix exit")
+    read: dict[int, dict[str, Any]] = {}
+    for (tag, flags), (address, size) in FIRST_SSS_SOURCE_SLICES.items():
+        item = _slice(payload, tag, "SSS prefix exit", size, flags)
+        _require(item["address"] == address,
+                 f"SSS prefix exit tag={tag} escaped its pinned source address")
+        read[tag] = item
+    from reference_capture_semantics import pad_snapshot_bytes  # noqa: PLC0415
+    try:
+        pad_hex = pad_snapshot_bytes(read[21]["raw"])
+        from transition_trace_format import decode_start_melee_data  # noqa: PLC0415
+        semantic_start = decode_start_melee_data(read[32]["raw"])
+    except (ValueError, TypeError) as error:
+        raise StadiumGoPrefixError(f"SSS prefix exit source state is invalid: {error}") from error
+    _require(read[35]["raw"] == b"\x01",
+             "SSS prefix exit did not preserve the original start-game request")
+    route = read[17]["raw"]
+    _require(route[0] == 0x02 and read[19]["raw"] ==
+             FIRST_SSS_RNG_VALUE_ADDRESS.to_bytes(4, "big") and
+             read[40]["raw"] == bytes([FIRST_SSS_KIND]) and
+             int.from_bytes(read[30]["raw"], "big") == 125,
+             "SSS prefix exit lost its original route, RNG, scene or frame")
+    expected = {
+        "phase": "sss_exit", "scene_frame": 125, "scene_kind": FIRST_SSS_KIND,
+        "random_seed_hex": read[20]["raw"].hex(),
+        "pad_state_hex": pad_hex,
+        "scene_routing_getters": {
+            "current_game_mode": route[0], "previous_game_mode": route[2],
+            "current_scene_index": route[3], "previous_scene_index": route[4],
+        },
+        "sss": {"header": {"start_game": read[35]["raw"][0]},
+                "vs": {"start": semantic_start}},
+    }
+    return {
+        "expected": expected,
+        "source": {
+            **_source_row_envelope(row),
+            "setup_receipt_sha256": payload["setup_receipt_sha256"],
+            "setup_profile_verified_by_observer": payload["setup_profile_verified_by_observer"],
+            "source_slice_inventory": _source_slice_inventory(payload),
+            "source_slices_hex": {
+                f"{tag}:0": item["raw"].hex()
+                for tag, item in sorted(read.items())
+            },
+            "scene_routing_raw_hex": route.hex(),
+            "rng_pointer_hex": read[19]["raw"].hex(),
+        },
+    }
+
+
+def _first_sss_selection_source_witness(row: dict[str, Any]) -> dict[str, Any]:
+    payload = row.get("payload")
+    _require(isinstance(payload, dict) and row.get("event") == "boundary" and
+             row.get("seq") == FIRST_SSS_PREFIX_SELECTION_SEQUENCE and
+             payload.get("boundary") == "pad_poll" and
+             type(row.get("source_tick")) is int and row.get("source_tick") == 125 and
+             row.get("draw_ordinal") == 274 and
+             payload.get("source_tick") == 125 and payload.get("draw_ordinal") == 274,
+             "SSS selected-stage witness is not the exact later source row2427")
+    _check_boundary_contract(payload)
+    _require_exact_slice_inventory(payload, set(FIRST_SSS_PREFIX_SELECTION_SLICES),
+                                   "SSS selected-stage witness")
+    read: dict[int, dict[str, Any]] = {}
+    for (tag, flags), (address, size) in FIRST_SSS_PREFIX_SELECTION_SLICES.items():
+        item = _slice(payload, tag, "SSS selected-stage witness", size, flags)
+        _require(item["address"] == address,
+                 f"SSS selected-stage tag={tag} escaped its authored source address")
+        read[tag] = item
+    _require(_classify_stadium_sss_owner(payload) == "sss" and
+             read[41]["raw"] == b"\x12" and read[42]["raw"] == b"\x03",
+             "SSS selected-stage witness is not the authored Stadium row18/kind3")
+    route = read[17]["raw"]
+    return {
+        "selected_stage": {"index": read[41]["raw"][0],
+                           "kind": read[42]["raw"][0]},
+        "source": {
+            **_source_row_envelope(row),
+            "scene_kind": read[40]["raw"][0],
+            "scene_routing_raw_hex": route.hex(),
+            "source_slice_inventory": _source_slice_inventory(payload),
+            "source_slices_hex": {
+                f"{tag}:0": item["raw"].hex()
+                for tag, item in sorted(read.items())
+            },
+            "selected_stage_is_a_later_source_witness": True,
+            "not_paired_with_row2426_exit_note": True,
+        },
+    }
+
+
+def _extract_first_sss_prefix_rows(
+        consume_rows: list[dict[str, Any]], tick_rows: list[dict[str, Any]],
+        draw_enter_rows: list[dict[str, Any]], draw_return_rows: list[dict[str, Any]],
+        exit_row: dict[str, Any], selection_row: dict[str, Any],
+        stream_sha256: str) -> dict[str, Any]:
+    _require(stream_sha256 == FIRST_CSS_STREAM_SHA256,
+             "SSS prefix is not from the retained v6 observer")
+    groups = (consume_rows, tick_rows, draw_enter_rows, draw_return_rows)
+    _require(all(isinstance(group, list) and
+                 len(group) == FIRST_SSS_PREFIX_SAMPLE_COUNT for group in groups),
+             "SSS prefix requires exactly 124 ordered consume/tick/draw records")
+    records = []
+    input_payload = []
+    last_sequence = FIRST_SSS_DRAW_RETURN_SEQUENCE
+    for index, (consume, tick, enter, returned) in enumerate(zip(*groups)):
+        consume_sequence = consume.get("seq") if isinstance(consume, dict) else None
+        tick_sequence = tick.get("seq") if isinstance(tick, dict) else None
+        enter_sequence = enter.get("seq") if isinstance(enter, dict) else None
+        return_sequence = returned.get("seq") if isinstance(returned, dict) else None
+        _require(all(type(value) is int for value in
+                     (consume_sequence, tick_sequence, enter_sequence, return_sequence)) and
+                 last_sequence < consume_sequence < tick_sequence < enter_sequence < return_sequence,
+                 "SSS prefix records are duplicate, unordered, or not source-encountered")
+        last_sequence = return_sequence
+        statuses = _first_sss_prefix_consumed_ports(consume, consume_sequence)
+        source_tick = consume.get("source_tick")
+        draw_ordinal = consume.get("draw_ordinal")
+        _require(type(source_tick) is int and type(draw_ordinal) is int and
+                 source_tick == index + 1 and draw_ordinal == 150 + index and
+                 tick.get("source_tick") == source_tick and
+                 tick.get("draw_ordinal") == draw_ordinal,
+                 "SSS prefix consumed input/tick counters are discontinuous")
+        tick_state = _first_sss_prefix_state_snapshot(
+            tick, phase="scheduler_end", sequence=tick_sequence,
+            boundary="source_tick", pc=SOURCE_TICK_PC,
+            source_tick=source_tick, draw_ordinal=draw_ordinal,
+            scene_frame=source_tick)
+        enter_state = _first_sss_prefix_state_snapshot(
+            enter, phase="draw_enter", sequence=enter_sequence,
+            boundary="draw_enter", pc=FIRST_SSS_DRAW_ENTER_PC,
+            source_tick=source_tick + 1, draw_ordinal=draw_ordinal,
+            scene_frame=source_tick + 1)
+        return_state = _first_sss_prefix_state_snapshot(
+            returned, phase="draw_return", sequence=return_sequence,
+            boundary="draw_return", pc=FIRST_SSS_DRAW_RETURN_PC,
+            source_tick=source_tick + 1, draw_ordinal=draw_ordinal,
+            scene_frame=source_tick + 1)
+        fields = ("scene_frame", "scene_kind", "pad_state_hex",
+                  "random_seed_hex", "scene_routing_getters")
+        _require(all(enter_state["expected"][key] == return_state["expected"][key]
+                     for key in fields),
+                 f"SSS prefix sample {index} draw state changed across source draw")
+        _require(tick_state["expected"]["scene_frame"] + 1 ==
+                 enter_state["expected"]["scene_frame"],
+                 f"SSS prefix sample {index} scheduler/draw frames are not adjacent")
+        tick_state["expected"]["consumed_pad_hex"] = b"".join(statuses).hex()
+        record = {
+            "input_index": index, "input_ordinal": index + 1,
+            "consumed_pad_sequence": consume_sequence,
+            "scheduler_end_sequence": tick_sequence,
+            "draw_enter_sequence": enter_sequence,
+            "draw_return_sequence": return_sequence,
+            "consumed_pad_status_hex": [status.hex() for status in statuses],
+            "scheduler_end": tick_state["expected"],
+            "draw_enter": enter_state["expected"],
+            "draw_return": return_state["expected"],
+            "source_rows": {
+                "consumed_pad": _source_row_envelope(consume),
+                "scheduler_end": tick_state["source"],
+                "draw_enter": enter_state["source"],
+                "draw_return": return_state["source"],
+            },
+        }
+        records.append(record)
+        input_payload.append(
+            consume_sequence.to_bytes(4, "big") +
+            tick_sequence.to_bytes(4, "big") +
+            enter_sequence.to_bytes(4, "big") +
+            return_sequence.to_bytes(4, "big") + b"".join(statuses))
+
+    _require(records[0]["consumed_pad_sequence"] ==
+             FIRST_SSS_PREFIX_FIRST_CONSUME_SEQUENCE and
+             records[-1]["consumed_pad_sequence"] ==
+             FIRST_SSS_PREFIX_LAST_CONSUME_SEQUENCE and
+             records[-1]["draw_return_sequence"] == 2424,
+             "SSS prefix does not end at the pinned final draw return")
+    exit_note = _first_sss_prefix_exit_snapshot(exit_row)
+    selection = _first_sss_selection_source_witness(selection_row)
+    bundle = b"".join((
+        FIRST_SSS_PREFIX_INPUT_MAGIC,
+        FIRST_SSS_PREFIX_INPUT_VERSION.to_bytes(4, "big"),
+        bytes.fromhex(stream_sha256),
+        FIRST_SSS_PREFIX_SAMPLE_COUNT.to_bytes(4, "big"),
+        *input_payload,
+    ))
+    _require(len(bundle) == FIRST_SSS_PREFIX_INPUT_BYTES,
+             "SSS prefix input bundle has an unexpected fixed length")
+    return {
+        "schema": "melee-web-stadium-first-sss-prefix-diagnostic",
+        "version": FIRST_SSS_PREFIX_INPUT_VERSION,
+        "scope": "124 exact original SSS consumed-PAD/tick/draw samples through passive SSS exit",
+        "provenance": {
+            "observer_bytes": FIRST_CSS_STREAM_BYTES,
+            "observer_sha256": stream_sha256,
+            "observer_status_bytes": FIRST_SSS_STATUS_BYTES,
+            "observer_status_sha256": FIRST_SSS_STATUS_SHA256,
+            "first_draw_enter_sequence": FIRST_SSS_DRAW_ENTER_SEQUENCE,
+            "first_draw_return_sequence": FIRST_SSS_DRAW_RETURN_SEQUENCE,
+            "first_prefix_consume_sequence": records[0]["consumed_pad_sequence"],
+            "last_prefix_consume_sequence": records[-1]["consumed_pad_sequence"],
+            "sample_count": FIRST_SSS_PREFIX_SAMPLE_COUNT,
+            "exit_note_sequence": FIRST_SSS_PREFIX_EXIT_SEQUENCE,
+            "selected_stage_source_witness_sequence": FIRST_SSS_PREFIX_SELECTION_SEQUENCE,
+            "setup_profile_verified_by_observer": False,
+        },
+        "records": records,
+        "comparison_fields": [
+            "input_index", "input_ordinal", "consumed_pad_sequence",
+            "consumed_pad_status_hex", "scheduler_end", "draw_enter", "draw_return",
+        ],
+        "tick_protocol": {
+            "ticked_sample_count": 123, "transition_requested_sample_count": 1,
+            "last_tick_result": 3, "final_transition_request_retained": True,
+            "host_ticks": 124, "host_draws": 124,
+            "ordinary_draws": 123, "checked_pending_sss_draws": 1,
+            "extra_inputs": 0, "extra_ticks": 0, "automatic_leave": False,
+            "audio_render_calls_per_approved_tick": 1,
+            "audio_frames_per_tick_numerator": 32000,
+            "audio_frames_per_tick_denominator": 60,
+            "audio_phase_modulus": 60,
+            "audio_render_after_approved_tick_before_draw": True,
+            "no_audio_render_after_refused_tick": True,
+        },
+        "exit_note": {
+            "sequence": FIRST_SSS_PREFIX_EXIT_SEQUENCE,
+            "expected": exit_note["expected"],
+            "source": exit_note["source"],
+            "comparison_fields": [
+                "scene_frame", "scene_kind", "pad_state_hex", "random_seed_hex",
+                "scene_routing_getters", "sss.header.start_game",
+                "sss.vs.start.rules", "sss.vs.start.players[0:4]",
+            ],
+            "phase": "actual SSS scene OnExit return before VS SSS mode OnExit",
+        },
+        "selected_stage_source_witness": {
+            "sequence": FIRST_SSS_PREFIX_SELECTION_SEQUENCE,
+            "selected_stage": selection["selected_stage"],
+            "source": selection["source"],
+            "comparison_fields": ["index", "kind"],
+            "native_phase": "after VS SSS mode OnExit and before vs_mode_end",
+            "source_stability_basis": {
+                **FIRST_SSS_SELECTION_STABILITY_REVIEW,
+                "claim": (
+                    "The pinned original scene/mode exit path has no writer to the SSS "
+                    "selected index or authored table-kind before source row2427."
+                ),
+            },
+            "unpaired_source_fields": ["row2427 PAD state", "row2427 routing",
+                                       "row2427 queue and other slices"],
+        },
+        "prepared_output_unpaired": True,
+        "input_bundle": {
+            "magic_hex": FIRST_SSS_PREFIX_INPUT_MAGIC.hex(),
+            "version": FIRST_SSS_PREFIX_INPUT_VERSION,
+            "bytes": len(bundle), "sha256": hashlib.sha256(bundle).hexdigest(),
+            "sample_count": FIRST_SSS_PREFIX_SAMPLE_COUNT,
+            "record_bytes": FIRST_SSS_PREFIX_INPUT_RECORD_BYTES,
+            "contains_expected_state": False,
+        },
+        "input_bundle_bytes": bundle,
+        "whole_session_equivalent": False,
+        "source_admission": False,
+    }
+
+
+def extract_stadium_first_sss_prefix(
+        stream_path: str | Path, status_path: str | Path) -> dict[str, Any]:
+    """Extract the bounded SSS input/tick/draw prefix and passive exit witnesses."""
+    source, status_file = Path(stream_path), Path(status_path)
+    _require(source.is_file() and status_file.is_file(),
+             "configured SSS observer stream or status is missing")
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES,
+             "SSS observer stream byte length differs from retained v6")
+    status_bytes = status_file.read_bytes()
+    _require(len(status_bytes) == FIRST_SSS_STATUS_BYTES and
+             hashlib.sha256(status_bytes).hexdigest() == FIRST_SSS_STATUS_SHA256,
+             "SSS observer status identity differs from retained v6")
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    _require(digest == FIRST_CSS_STREAM_SHA256,
+             "SSS observer stream hash differs from retained v6")
+    try:
+        summary = validate_stadium_go_prefix(source, status_path=status_file)
+        _require(summary.get("decision") == "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY" and
+                 summary.get("stream_bytes") == FIRST_CSS_STREAM_BYTES and
+                 summary.get("stream_sha256") == digest,
+                 "SSS source stream no longer passes full GO-prefix validation")
+        phases: dict[str, list[dict[str, Any]]] = {
+            "pad_consume": [], "source_tick": [], "draw_enter": [], "draw_return": [],
+        }
+        exit_rows, selection_rows = [], []
+        for row in iter_records(source, max_bytes=MAX_STREAM_BYTES,
+                                max_records=MAX_STREAM_RECORDS):
+            sequence = row.get("seq")
+            if sequence == FIRST_SSS_PREFIX_EXIT_SEQUENCE and row.get("event") == "progress":
+                exit_rows.append(row)
+            if sequence == FIRST_SSS_PREFIX_SELECTION_SEQUENCE:
+                selection_rows.append(row)
+            if not (FIRST_SSS_DRAW_RETURN_SEQUENCE < sequence <
+                    FIRST_SSS_PREFIX_EXIT_SEQUENCE):
+                continue
+            payload = row.get("payload")
+            if row.get("event") == "boundary" and isinstance(payload, dict):
+                boundary = payload.get("boundary")
+                if boundary in phases:
+                    phases[boundary].append(row)
+        _require(all(len(rows) == FIRST_SSS_PREFIX_SAMPLE_COUNT
+                     for rows in phases.values()),
+                 "SSS prefix source event counts differ from the exact 124-record bound")
+        _require(len(exit_rows) == 1 and len(selection_rows) == 1,
+                 "SSS prefix source exit/selection witness rows are missing or duplicate")
+        result = _extract_first_sss_prefix_rows(
+            phases["pad_consume"], phases["source_tick"], phases["draw_enter"],
+            phases["draw_return"], exit_rows[0], selection_rows[0], digest)
+    except StadiumGoPrefixError:
+        raise
+    except (OSError, ObserverStreamError) as error:
+        raise StadiumGoPrefixError(f"cannot validate bounded SSS prefix: {error}") from error
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES and
+             hashlib.sha256(source.read_bytes()).hexdigest() == digest and
+             status_file.stat().st_size == FIRST_SSS_STATUS_BYTES and
+             hashlib.sha256(status_file.read_bytes()).hexdigest() == FIRST_SSS_STATUS_SHA256,
+             "SSS observer stream or status changed during prefix extraction")
+    return result
+
+
+def decode_first_sss_prefix_input_bundle(data: bytes) -> dict[str, Any]:
+    """Validate the fixed input-only 124-record SSS bundle."""
+    _require(isinstance(data, bytes) and len(data) == FIRST_SSS_PREFIX_INPUT_BYTES,
+             "SSS prefix input bundle has an invalid exact length")
+    _require(data[:8] == FIRST_SSS_PREFIX_INPUT_MAGIC and
+             int.from_bytes(data[8:12], "big") == FIRST_SSS_PREFIX_INPUT_VERSION,
+             "SSS prefix input bundle magic/version differs")
+    stream_sha = data[12:44].hex()
+    count = int.from_bytes(data[44:48], "big")
+    _require(stream_sha == FIRST_CSS_STREAM_SHA256 and
+             count == FIRST_SSS_PREFIX_SAMPLE_COUNT,
+             "SSS prefix input source identity/count differs")
+    records = []
+    previous_return = FIRST_SSS_DRAW_RETURN_SEQUENCE
+    offset = FIRST_SSS_PREFIX_INPUT_HEADER_BYTES
+    for index in range(FIRST_SSS_PREFIX_SAMPLE_COUNT):
+        chunk = data[offset:offset + FIRST_SSS_PREFIX_INPUT_RECORD_BYTES]
+        sequences = [int.from_bytes(chunk[pos:pos + 4], "big")
+                     for pos in (0, 4, 8, 12)]
+        consume, tick, draw_enter, draw_return = sequences
+        _require(previous_return < consume < tick < draw_enter < draw_return,
+                 f"SSS prefix input record {index} sequence IDs are unordered/duplicate")
+        statuses = [chunk[16 + port * 11:16 + (port + 1) * 11].hex()
+                    for port in range(4)]
+        _require(all(re.fullmatch(r"[0-9a-f]{22}", status) for status in statuses),
+                 f"SSS prefix input record {index} has an invalid PAD port")
+        records.append({
+            "input_index": index, "consumed_pad_sequence": consume,
+            "scheduler_end_sequence": tick, "draw_enter_sequence": draw_enter,
+            "draw_return_sequence": draw_return, "port_status_hex": statuses,
+        })
+        previous_return = draw_return
+        offset += FIRST_SSS_PREFIX_INPUT_RECORD_BYTES
+    _require(records[0]["consumed_pad_sequence"] == FIRST_SSS_PREFIX_FIRST_CONSUME_SEQUENCE and
+             records[-1]["consumed_pad_sequence"] == FIRST_SSS_PREFIX_LAST_CONSUME_SEQUENCE and
+             records[-1]["draw_return_sequence"] == 2424,
+             "SSS prefix input bundle endpoints differ from retained source")
+    return {
+        "source_stream_sha256": stream_sha, "sample_count": count,
+        "record_bytes": FIRST_SSS_PREFIX_INPUT_RECORD_BYTES,
+        "records": records, "contains_expected_state": False,
+    }
 
 
 def _decode_setup(payload: dict[str, Any]) -> dict[str, Any]:

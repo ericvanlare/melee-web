@@ -1,14 +1,75 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
 import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
+import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createFirstCssStreamComparator, createFirstCssFinalDrawComparator,
   createFirstSssConstructorPairComparator, createFirstSssConsumedPadTickComparator,
-  requestSynchronousApproval}
+  createFirstSssDrawComparator, createFirstSssPrefixComparator,
+  decodeFirstSssPrefixInputBundle, firstSssAudioAccounting, requestSynchronousApproval}
   from './stadium_first_css_stream_compare.mjs';
 
 const COUNT = 148;
 const route = Object.freeze({current_game_mode: 2, previous_game_mode: 1,
   current_scene_index: 0, previous_scene_index: 0});
+const candidateRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+function firstSssDrawExpectedFixture() {
+  const inventory = [
+    [17, 0, 0x80479d30, 6], [19, 0, 0x804d5f94, 4],
+    [20, 0, 0x804d5f90, 4], [21, 0, 0x804c1f84, 0x358],
+    [30, 0, 0x80479d58, 4], [36, 0, 0x8045bf28, 2],
+    [37, 0, 0x8045bf2a, 2], [40, 0, 0x803dd9c4, 1],
+    [2, 0, 0x804c1f78, 0x0c],
+  ].map(([tag, flags, address, size]) => ({tag, flags, address, size}));
+  const raw = Object.fromEntries(inventory.map(({tag, flags, size}) =>
+    [`${tag}:${flags}`, '00'.repeat(size)]));
+  raw['17:0'] = '020201010000'; raw['19:0'] = '804d5f90';
+  raw['20:0'] = '3bb84c53'; raw['30:0'] = '00000001'; raw['40:0'] = '09';
+  const note = phase => ({phase, scene_frame: 1, scene_kind: 9,
+    pad_state_hex: '00'.repeat(822), random_seed_hex: '3bb84c53',
+    scene_routing_getters: {current_game_mode: 2, previous_game_mode: 1,
+      current_scene_index: 1, previous_scene_index: 0}});
+  const source = (sequence, boundary, pc) => ({event: 'boundary', sequence,
+    source_tick: 1, draw_ordinal: 149, boundary, phase: null, pc, word: null,
+    lr: 0x801a5048, argument: null, source_slice_inventory: inventory,
+    source_slices_hex: raw, scene_routing_raw_hex: raw['17:0'],
+    rng_pointer_hex: raw['19:0']});
+  return {schema: 'melee-web-stadium-first-sss-draw-diagnostic', version: 1,
+    scope: 'original first SSS DrawEnter1609 through DrawReturn1610 only',
+    source_admission: false, whole_session_equivalent: false,
+    provenance: {observer_bytes: 4397889,
+      observer_sha256: '361e8c1108cc2d02ba94d1f3b3be9612a80d0227672445cd4a2b0e2119917778',
+      observer_status_bytes: 515,
+      observer_status_sha256: '05a08641404bda9f87ac4c20b1a44a982ff0470ff3a9b04861c03ba542866c3f',
+      draw_enter_sequence: 1609, draw_return_sequence: 1610, source_tick: 1,
+      draw_ordinal: 149, scene_frame: 1, scene_kind: 9,
+      setup_profile_verified_by_observer: false},
+    expected_draw_enter: note('draw_enter'), expected_draw_return: note('draw_return'),
+    source_draw_enter: source(1609, 'draw_enter', 0x80390fc0),
+    source_draw_return: source(1610, 'draw_return', 0x80391040),
+    comparison_fields: ['scene_frame', 'scene_kind', 'pad_state_hex',
+      'random_seed_hex', 'scene_routing_getters'],
+    native_protocol_requirements: {host_draw_calls: 1, host_tick_calls: 0,
+      aurora_begin_calls: 1, aurora_end_calls: 1, frame_end_returned: true,
+      all_owners_true: true, audio_render_calls_delta: 0,
+      audio_render_frames_delta: 0, audio_phase_unchanged: true}};
+}
+
+function firstSssPrerequisites() {
+  return {
+    pair: {complete: true, compared: true, failed: false, host_entered: true,
+      session_phase: 3, sss_host_tick_calls: 0, sss_host_draw_calls: 0,
+      world_generation: 7, audio_generation: 3},
+    tick: {complete: true, compared: true, captured: true, failed: false,
+      host_tick_calls: 1, host_draw_calls: 0, clock_post_succeeded: true,
+      tick_result: 1, transition_requested: false, post_host_frame_captured: true,
+      post_host_frame: 1},
+  };
+}
 
 function expectedPairs() {
   return Array.from({length: COUNT}, (_, index) => {
@@ -124,6 +185,237 @@ test('only synchronous boolean true can approve a boundary', () => {
   assert.equal(requestSynchronousApproval(null, 'tick', '{}'), false);
 });
 
+test('SSS audio servicing preserves the existing 32000/60 carry and counts only approved ticks', () => {
+  const firstDraw = firstSssAudioAccounting({audio_render_calls_before: 19,
+    audio_render_calls_after: 19, audio_render_frames_before: 10133,
+    audio_render_frames_after: 10133, audio_phase_before: 17, audio_phase_after: 17}, 0);
+  assert.equal(firstDraw.valid, true, firstDraw.error);
+  assert.equal(firstDraw.calls_delta, 0);
+  assert.equal(firstDraw.frames_delta, 0);
+
+  const beforePhase = 59, ticks = 124;
+  const total = beforePhase + 32000 * ticks;
+  const prefix = firstSssAudioAccounting({audio_render_calls_before: 4,
+    audio_render_calls_after: 4 + ticks, audio_render_frames_before: 7,
+    audio_render_frames_after: 7 + Math.floor(total / 60),
+    audio_phase_before: beforePhase, audio_phase_after: total % 60}, ticks);
+  assert.equal(prefix.valid, true, prefix.error);
+  assert.equal(prefix.calls_delta, 124);
+  assert.equal(prefix.frames_delta, Math.floor(total / 60));
+  assert.equal(prefix.after.phase, total % 60);
+
+  const refusedTick = firstSssAudioAccounting({audio_render_calls_before: 4,
+    audio_render_calls_after: 4 + 7, audio_render_frames_before: 7,
+    audio_render_frames_after: 7 + Math.floor((11 + 32000 * 7) / 60),
+    audio_phase_before: 11, audio_phase_after: (11 + 32000 * 7) % 60}, 7);
+  assert.equal(refusedTick.valid, true,
+    'A refused later tick contributes no audio render beyond seven approved ticks');
+});
+
+test('SSS audio policy rejects render-after-refusal and lost fractional carry', () => {
+  const extraCall = firstSssAudioAccounting({audio_render_calls_before: 0,
+    audio_render_calls_after: 2, audio_render_frames_before: 0,
+    audio_render_frames_after: 1066, audio_phase_before: 0, audio_phase_after: 8}, 1);
+  assert.equal(extraCall.valid, false);
+  assert.match(extraCall.error, /call delta/);
+
+  const resetCarry = firstSssAudioAccounting({audio_render_calls_before: 0,
+    audio_render_calls_after: 1, audio_render_frames_before: 0,
+    audio_render_frames_after: 533, audio_phase_before: 59, audio_phase_after: 20}, 1);
+  assert.equal(resetCarry.valid, false);
+  assert.match(resetCarry.error, /frame delta|preserved carry/);
+});
+
+test('first SSS DrawEnter mismatch is retained and stops the comparator', () => {
+  const expected = firstSssDrawExpectedFixture();
+  const {pair, tick} = firstSssPrerequisites();
+  const comparator = createFirstSssDrawComparator(expected, pair, tick);
+  const wanted = expected.expected_draw_enter;
+  const actual = {phase: 'draw_enter', source_scene: 2, scene_kind: wanted.scene_kind,
+    scene_frame: 0, random_seed_hex: wanted.random_seed_hex,
+    pad_state_hex: wanted.pad_state_hex,
+    scene_routing_getters: {...wanted.scene_routing_getters},
+    owners: {host: true, session: true, world: true, audio: true, vs_mode: true,
+      scene_info: true, payload: true, seed: true},
+    world_generation: pair.world_generation, audio_generation: pair.audio_generation};
+  assert.equal(comparator.compare('draw_enter', JSON.stringify(actual)), false);
+  const status = comparator.status();
+  assert.equal(status.failed, true);
+  assert.equal(status.approved, false);
+  assert.equal(status.first_mismatch.path, 'draw.draw_enter.scene_frame');
+  assert.deepEqual(status.rows[0].actual, actual,
+    'The first actual snapshot is retained on comparison failure');
+  assert.equal(comparator.compare('draw_return', JSON.stringify({...actual,
+    phase: 'draw_return', scene_frame: 1})), false,
+  'A failed first phase cannot advance to DrawReturn');
+});
+
+test('first SSS prefix comparator rejects malformed retained expectations before callbacks', () => {
+  const {pair, tick} = firstSssPrerequisites();
+  const draw = {complete: true, compared: true, failed: false,
+    host_draw_calls: 1, host_tick_calls: 0, aurora_begin_calls: 1,
+    aurora_end_calls: 1, frame_end_returned: true};
+  assert.throws(() => createFirstSssPrefixComparator({}, [], pair, tick, draw),
+    /exact retained rows1609–2427/);
+});
+
+const retainedPrefixExpectedPath = process.env.MELEE_WEB_STADIUM_FIRST_SSS_PREFIX_EXPECTED;
+const retainedPrefixInputPath = process.env.MELEE_WEB_STADIUM_FIRST_SSS_PREFIX_INPUT;
+test('retained first SSS prefix mismatch preserves the actual scheduler sample and first path',
+  {skip: !(retainedPrefixExpectedPath && retainedPrefixInputPath)}, async () => {
+    // These optional files are retained private source extraction outputs. CI
+    // uses the synthetic draw failure above; the external retained-source
+    // control supplies this full 124-record prefix fixture without a new capture.
+    const expected = JSON.parse(await fs.readFile(retainedPrefixExpectedPath, 'utf8'));
+    const input = new Uint8Array(await fs.readFile(retainedPrefixInputPath));
+    const inputRows = decodeFirstSssPrefixInputBundle(input);
+    const {pair, tick} = firstSssPrerequisites();
+    const draw = {complete: true, compared: true, failed: false,
+      host_draw_calls: 1, host_tick_calls: 0, aurora_begin_calls: 1,
+      aurora_end_calls: 1, frame_end_returned: true};
+    const comparator = createFirstSssPrefixComparator(expected, inputRows, pair, tick, draw);
+    const record = expected.records[0];
+    const actual = {phase: 'scheduler_end', source_scene: 2,
+      scene_kind: record.scheduler_end.scene_kind, scene_frame: 99,
+      random_seed_hex: record.scheduler_end.random_seed_hex,
+      pad_state_hex: record.scheduler_end.pad_state_hex,
+      scene_routing_getters: {...record.scheduler_end.scene_routing_getters},
+      owners: {host: true, session: true, world: true, audio: true, vs_mode: true,
+        scene_info: true, payload: true, seed: true},
+      world_generation: pair.world_generation, audio_generation: pair.audio_generation,
+      input_index: record.input_index, input_ordinal: record.input_ordinal,
+      consumed_pad_sequence: record.consumed_pad_sequence,
+      consumed_pad_hex: record.consumed_pad_status_hex.join('')};
+    assert.equal(comparator.compare('scheduler_end', JSON.stringify(actual)), false);
+    const status = comparator.status();
+    assert.equal(status.failed, true);
+    assert.equal(status.approved, false);
+    assert.equal(status.first_mismatch.path, 'prefix[0].scheduler_end.scene_frame');
+    assert.deepEqual(status.rows[0].actual, actual,
+      'The first native-shaped sample remains available after mismatch');
+  });
+
+test('the actual browser runner recognizes SSS modes and rejects conflicting/orphan inputs before startup', () => {
+  const runner = path.join(candidateRoot, 'tests/stadium_c1a_browser_test.mjs');
+  const conflict = spawnSync(process.execPath,
+    [runner, '--first-sss-draw', '--first-sss-prefix'],
+    {encoding: 'utf8', timeout: 10000});
+  assert.notEqual(conflict.status, 0);
+  assert.match(conflict.stderr, /Choose one private C1a diagnostic route/);
+
+  const orphan = spawnSync(process.execPath,
+    [runner, '--first-sss-draw', '--first-sss-draw-expected', 'draw.json',
+      '--first-sss-prefix-expected', 'prefix.json', '--first-sss-prefix-input', 'prefix.mwst'],
+    {encoding: 'utf8', timeout: 10000});
+  assert.notEqual(orphan.status, 0);
+  assert.match(orphan.stderr, /Choose one private C1a diagnostic route/);
+
+  const accepted = spawnSync(process.execPath,
+    [runner, '--first-sss-prefix', '--first-sss-pair-expected', 'pair.json',
+      '--first-sss-tick-expected', 'tick.json', '--first-sss-tick-input', 'tick.mwst',
+      '--first-sss-draw-expected', 'draw.json', '--first-sss-prefix-expected', 'prefix.json',
+      '--first-sss-prefix-input', 'prefix.mwst'],
+    {encoding: 'utf8', timeout: 10000});
+  assert.notEqual(accepted.status, 0);
+  assert.match(accepted.stderr, /Missing --build/,
+    'All SSS options parsed and route validation passed before required runtime setup');
+});
+
+test('the actual first-SSS expected loader checks the exact expected and comparator bindings', async () => {
+  const runnerPath = path.join(candidateRoot, 'tests/stadium_c1a_browser_test.mjs');
+  const runnerSource = await fs.readFile(runnerPath, 'utf8');
+  const match = runnerSource.match(/async function loadBoundFirstSssExpected\([^\n]*\) \{[\s\S]*?\n\}/);
+  assert.ok(match, 'Actual pre-server expected loader is present');
+  const loaderFactory = new Function('assert', 'path', 'fs', 'digest', 'errorText',
+    'pathToFileURL', 'ROOT', `return (values, preflight) => { ${match[0]}; return loadBoundFirstSssExpected; };`)(
+      assert, path, fs,
+      bytes => createHash('sha256').update(bytes).digest('hex'), String,
+      pathToFileURL, candidateRoot);
+  const loadBound = (values, preflight, ...args) =>
+    loaderFactory(values, preflight)(...args);
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'melee-sss-loader-test-'));
+  try {
+    const expected = firstSssDrawExpectedFixture();
+    const expectedBytes = Buffer.from(`${JSON.stringify(expected)}\n`);
+    const expectedPath = path.join(dir, 'first-draw.json');
+    await fs.writeFile(expectedPath, expectedBytes);
+    const comparatorPath = path.join(candidateRoot, 'tests/stadium_first_css_stream_compare.mjs');
+    const comparatorBytes = await fs.readFile(comparatorPath);
+    const digest = bytes => createHash('sha256').update(bytes).digest('hex');
+    const bindings = {
+      first_sss_draw: {expected_json: {path: expectedPath,
+        basename: path.basename(expectedPath), bytes: expectedBytes.byteLength,
+        sha256: digest(expectedBytes)},
+      comparator: {path: comparatorPath, bytes: comparatorBytes.byteLength,
+        sha256: digest(comparatorBytes)}},
+    };
+    const values = {'first-sss-draw-expected': expectedPath};
+    const loaded = await loadBound(values, bindings, 'first_sss_draw',
+      'first-sss-draw-expected', 'melee-web-stadium-first-sss-draw-diagnostic');
+    assert.equal(loaded.identity.sha256, digest(expectedBytes));
+    assert.equal(loaded.comparator.sha256, digest(comparatorBytes));
+
+    const mutatedBindings = structuredClone(bindings);
+    mutatedBindings.first_sss_draw.comparator.sha256 = '00'.repeat(32);
+    await assert.rejects(loadBound(values, mutatedBindings, 'first_sss_draw',
+      'first-sss-draw-expected', 'melee-web-stadium-first-sss-draw-diagnostic'),
+    /comparator hash differs from preflight/);
+  } finally {
+    await fs.rm(dir, {recursive: true, force: true});
+  }
+});
+
+test('the actual prefix loader checks the exact expected, input, and comparator bindings',
+  {skip: !(retainedPrefixExpectedPath && retainedPrefixInputPath)}, async () => {
+    // Full prefix rows are retained private source evidence; this optional
+    // pre-server control validates the real loader without launching a server.
+    const runnerPath = path.join(candidateRoot, 'tests/stadium_c1a_browser_test.mjs');
+    const runnerSource = await fs.readFile(runnerPath, 'utf8');
+    const boundMatch = runnerSource.match(/async function loadBoundFirstSssExpected\([^\n]*\) \{[\s\S]*?\n\}/);
+    const prefixMatch = runnerSource.match(/async function loadFirstSssPrefixInputs\([^\n]*\) \{[\s\S]*?\n\}/);
+    assert.ok(boundMatch && prefixMatch, 'Actual SSS expected and prefix loaders are present');
+    const digest = bytes => createHash('sha256').update(bytes).digest('hex');
+    const boundFactory = new Function('assert', 'path', 'fs', 'digest', 'errorText',
+      'pathToFileURL', 'ROOT', `return (values, preflight) => { ${boundMatch[0]}; return loadBoundFirstSssExpected; };`)(
+        assert, path, fs, digest, String, pathToFileURL, candidateRoot);
+    const expectedBytes = await fs.readFile(retainedPrefixExpectedPath);
+    const inputBytes = await fs.readFile(retainedPrefixInputPath);
+    const expected = JSON.parse(expectedBytes.toString('utf8'));
+    const comparatorPath = path.join(candidateRoot, 'tests/stadium_first_css_stream_compare.mjs');
+    const comparatorBytes = await fs.readFile(comparatorPath);
+    const preflight = {first_sss_prefix: {
+      expected_json: {path: retainedPrefixExpectedPath,
+        basename: path.basename(retainedPrefixExpectedPath), bytes: expectedBytes.byteLength,
+        sha256: digest(expectedBytes)},
+      comparator: {path: comparatorPath, bytes: comparatorBytes.byteLength,
+        sha256: digest(comparatorBytes)},
+      input_bundle: {path: retainedPrefixInputPath,
+        basename: path.basename(retainedPrefixInputPath), bytes: inputBytes.byteLength,
+        sha256: digest(inputBytes)},
+    }};
+    const values = {'first-sss-prefix-expected': retainedPrefixExpectedPath,
+      'first-sss-prefix-input': retainedPrefixInputPath};
+    const loadBound = boundFactory(values, preflight);
+    const prefixFactory = new Function('assert', 'path', 'fs', 'digest',
+      'pathToFileURL', 'ROOT', `return (values, preflight, firstSssPrefix, firstSssDrawInputs, loadBoundFirstSssExpected) => { ${prefixMatch[0]}; return loadFirstSssPrefixInputs; };`)(
+        assert, path, fs, digest, pathToFileURL, candidateRoot);
+    const drawInputs = {expected: {provenance: {observer_sha256:
+      expected.provenance.observer_sha256}}};
+    const loadPrefix = prefixFactory(values, preflight, true, drawInputs,
+      (...args) => loadBound(...args));
+    const loaded = await loadPrefix();
+    assert.equal(loaded.expected.records.length, 124);
+    assert.equal(loaded.inputIdentity.sha256, digest(inputBytes));
+    assert.equal(loaded.inputRows.length, 124);
+    assert.equal(loaded.expected.input_bundle.contains_expected_state, false);
+
+    const changed = structuredClone(preflight);
+    changed.first_sss_prefix.input_bundle.sha256 = '00'.repeat(32);
+    const rejected = prefixFactory(values, changed, true, drawInputs,
+      (...args) => boundFactory(values, changed)(...args));
+    await assert.rejects(rejected(), /SSS prefix input hash differs from preflight/);
+  });
+
 test('malformed callbacks and unexpected routing fields are terminal refusals', () => {
   const malformed = createFirstCssStreamComparator(expectedPairs());
   assert.equal(malformed.compare(null, '{}'), false);
@@ -232,6 +524,10 @@ function expectedSssPlayer(index) {
     defense_ratio_bits: '3f800000', model_scale_bits: '3f800000'};
 }
 
+function nativeSssPlayer(index) {
+  return {...expectedSssPlayer(index), xB: 0};
+}
+
 function expectedSssNote(phase) {
   return {phase, scene_frame: 149, scene_kind: 9, random_seed_hex: '3bb84c53',
     pad_state_hex: '00'.repeat(822),
@@ -315,8 +611,8 @@ function nativeSssNote(expected, phase) {
     sss: {header: {unk_stage: 0, x1: 0, no_lras: 0, force_stage_id: 0,
       start_game: expected.sss.header.start_game},
     vs: {loser: -1, ordered_stage_index: -1, winner: -1, start: {
-      rules, players: [...expected.sss.vs.start.players.map(player => ({...player})),
-        expectedSssPlayer(4), expectedSssPlayer(5)],
+      rules, players: [...expected.sss.vs.start.players.map(player => ({...player, xB: 0})),
+        nativeSssPlayer(4), nativeSssPlayer(5)],
     }}}};
 }
 
@@ -376,6 +672,34 @@ test('SSS pair maps only decoder rules and first four players with strict native
   routeExtra.entry.scene_routing_getters.pending_mode = 1;
   assert.equal(createFirstSssConstructorPairComparator(expected)
     .compare('sss_pair', JSON.stringify(routeExtra)), false);
+});
+
+test('SSS native player xB is byte-validated but remains an explicit unpaired field', () => {
+  const expected = sssExpectedPair();
+  const accepted = actualSssPair(expected);
+  accepted.entry.sss.vs.start.players[0].xB = 255;
+  assert.equal(createFirstSssConstructorPairComparator(expected)
+    .compare('sss_pair', JSON.stringify(accepted)), true);
+
+  for (const mutation of [
+    player => { delete player.xB; },
+    player => { player.xB = -1; },
+    player => { player.xB = 256; },
+    player => { player.xB = '0'; },
+    player => { player.unrecognized = 0; },
+  ]) {
+    const actual = actualSssPair(expected);
+    mutation(actual.entry.sss.vs.start.players[0]);
+    const comparator = createFirstSssConstructorPairComparator(expected);
+    assert.equal(comparator.compare('sss_pair', JSON.stringify(actual)), false);
+    assert.equal(comparator.status().failed, true);
+  }
+
+  const semantic = actualSssPair(expected);
+  semantic.entry.sss.vs.start.players[0].slot += 1;
+  assert.equal(createFirstSssConstructorPairComparator(expected)
+    .compare('sss_pair', JSON.stringify(semantic)), false,
+  'allowing the named native byte does not relax source-backed player comparisons');
 });
 
 test('SSS pair requires retained ownership and zero host SSS ticks/draws', () => {

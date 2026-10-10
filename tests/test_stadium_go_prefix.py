@@ -64,12 +64,28 @@ from stadium_go_prefix import (  # noqa: E402
     FIRST_CSS_DRAW_RETURN_SEQUENCE,
     FIRST_CSS_DRAW_SLICES,
     FIRST_SSS_DATA_ADDRESS,
+    FIRST_SSS_DRAW_ENTER_PC,
+    FIRST_SSS_DRAW_ENTER_SEQUENCE,
+    FIRST_SSS_DRAW_RETURN_PC,
+    FIRST_SSS_DRAW_RETURN_SEQUENCE,
+    FIRST_SSS_KIND,
+    FIRST_SSS_PREFIX_DRAW_SLICES,
+    FIRST_SSS_PREFIX_EXIT_SEQUENCE,
+    FIRST_SSS_PREFIX_FIRST_CONSUME_SEQUENCE,
+    FIRST_SSS_PREFIX_LAST_CONSUME_SEQUENCE,
+    FIRST_SSS_PREFIX_SAMPLE_COUNT,
+    FIRST_SSS_PREFIX_SELECTION_SEQUENCE,
+    FIRST_SSS_PREFIX_SELECTION_SLICES,
+    FIRST_SSS_RNG_VALUE_ADDRESS,
+    FIRST_SSS_TICK_SLICES,
     FIRST_SSS_ENTRY_SEQUENCE,
     FIRST_SSS_RETURN_SEQUENCE,
     FIRST_SSS_SOURCE_INVENTORY,
     FIRST_SSS_SOURCE_SLICES,
     SCENE_ROUTING_ADDRESS,
     _extract_first_sss_constructor_pair_rows,
+    _extract_first_sss_draw_rows,
+    _extract_first_sss_prefix_rows,
     _extract_first_css_first_draw_rows,
     _extract_first_css_consumed_tick_rows,
     _extract_first_css_context_rows,
@@ -1706,6 +1722,159 @@ class StadiumFirstSssConstructorPairTests(unittest.TestCase):
                 with self.assertRaises(StadiumGoPrefixError):
                     _extract_first_sss_constructor_pair_rows(
                         entry, returned, FIRST_CSS_STREAM_SHA256)
+
+
+def _first_sss_state_boundary(sequence: int, *, boundary: str, pc: int,
+                              source_tick: int, draw_ordinal: int,
+                              scene_frame: int, lr: int) -> dict:
+    slices = []
+    for (tag, flags), (address, size) in FIRST_SSS_PREFIX_DRAW_SLICES.items():
+        if tag == 17:
+            raw = bytes.fromhex("020201010000")
+        elif tag == 19:
+            raw = FIRST_SSS_RNG_VALUE_ADDRESS.to_bytes(4, "big")
+        elif tag == 20:
+            raw = bytes.fromhex("3bb84c53")
+        elif tag == 21:
+            raw = _valid_sss_pad_snapshot()
+        elif tag == 30:
+            raw = struct.pack(">I", scene_frame)
+        elif tag == 40:
+            raw = bytes((FIRST_SSS_KIND,))
+        else:
+            raw = bytes(size)
+        slices.append(_slice(tag, size, data=raw, address=address, flags=flags))
+    payload = {"boundary": boundary, "pc": pc, "lr": f"0x{lr:08x}",
+               "source_tick": source_tick, "draw_ordinal": draw_ordinal,
+               "slices": slices}
+    return {"event": "boundary", "seq": sequence,
+            "source_tick": source_tick, "draw_ordinal": draw_ordinal,
+            "payload": payload}
+
+
+def _first_sss_prefix_rows_for_test():
+    consume_rows, tick_rows, draw_enter_rows, draw_return_rows = [], [], [], []
+    for index in range(FIRST_SSS_PREFIX_SAMPLE_COUNT):
+        consume_sequence = (FIRST_SSS_PREFIX_FIRST_CONSUME_SEQUENCE +
+                            (FIRST_SSS_PREFIX_LAST_CONSUME_SEQUENCE -
+                             FIRST_SSS_PREFIX_FIRST_CONSUME_SEQUENCE) * index //
+                            (FIRST_SSS_PREFIX_SAMPLE_COUNT - 1))
+        source_tick, draw_ordinal = index + 1, 150 + index
+        queue = bytearray(0x0C)
+        queue[0] = 1
+        queue[8:12] = (0x804C3000).to_bytes(4, "big")
+        slot = bytes(0x30)
+        consume_payload = {
+            "boundary": "pad_consume", "pc": 0x80377584,
+            "source_tick": source_tick, "draw_ordinal": draw_ordinal,
+            "gprs": [0] * 32, "slices": [
+                {**_slice(2, 0x0C, data=bytes(queue), address=0x804C1F78),
+                 "name": "pad_queue"},
+                {**_slice(3, 0x30, data=slot, address=0x804C3000),
+                 "name": "pad_slot"},
+            ],
+        }
+        consume_payload["gprs"][6] = 0
+        consume_payload["gprs"][25] = 0x804C3000
+        consume_rows.append({"event": "boundary", "seq": consume_sequence,
+            "source_tick": source_tick, "draw_ordinal": draw_ordinal,
+            "payload": consume_payload})
+
+        tick_rows.append(_first_sss_state_boundary(
+            consume_sequence + 1, boundary="source_tick", pc=SOURCE_TICK_PC,
+            source_tick=source_tick, draw_ordinal=draw_ordinal,
+            scene_frame=source_tick, lr=0x801A4FA4))
+        draw_enter_rows.append(_first_sss_state_boundary(
+            consume_sequence + 2, boundary="draw_enter", pc=FIRST_SSS_DRAW_ENTER_PC,
+            source_tick=source_tick + 1, draw_ordinal=draw_ordinal,
+            scene_frame=source_tick + 1, lr=0x801A5048))
+        draw_return_sequence = consume_sequence + (4 if index == FIRST_SSS_PREFIX_SAMPLE_COUNT - 1 else 3)
+        draw_return_rows.append(_first_sss_state_boundary(
+            draw_return_sequence, boundary="draw_return", pc=FIRST_SSS_DRAW_RETURN_PC,
+            source_tick=source_tick + 1, draw_ordinal=draw_ordinal,
+            scene_frame=source_tick + 1, lr=0x801A5048))
+
+    exit_payload = _progress_payload("sss_exit", source_tick=125)
+    exit_payload["draw_ordinal"] = 274
+    exit_payload["slices"] = _first_sss_slices(
+        start_game=1, pad=_valid_sss_pad_snapshot(),
+        route=bytes.fromhex("020201010000"), scene_frame=125, scene_kind=9)
+    exit_row = {"event": "progress", "seq": FIRST_SSS_PREFIX_EXIT_SEQUENCE,
+                "source_tick": 125, "draw_ordinal": 274,
+                "payload": exit_payload}
+    selection_slices = []
+    for (tag, flags), (address, size) in FIRST_SSS_PREFIX_SELECTION_SLICES.items():
+        if tag == 17:
+            raw = bytes.fromhex("020201010000")
+        elif tag == 21:
+            raw = _valid_sss_pad_snapshot()
+        elif tag == 40:
+            raw = bytes((FIRST_SSS_KIND,))
+        elif tag == 41:
+            raw = bytes((18,))
+        elif tag == 42:
+            raw = bytes((3,))
+        else:
+            raw = bytes(size)
+        selection_slices.append(_slice(tag, size, data=raw,
+                                       address=address, flags=flags))
+    selection_row = {"event": "boundary", "seq": FIRST_SSS_PREFIX_SELECTION_SEQUENCE,
+        "source_tick": 125, "draw_ordinal": 274,
+        "payload": {"boundary": "pad_poll", "pc": 0x8034DD8C,
+                    "source_tick": 125, "draw_ordinal": 274,
+                    "slices": selection_slices}}
+    return (consume_rows, tick_rows, draw_enter_rows, draw_return_rows,
+            exit_row, selection_row)
+
+
+class StadiumFirstSssDrawAndPrefixExtractionTests(unittest.TestCase):
+    def _first_draw_rows(self):
+        enter = _first_sss_state_boundary(
+            FIRST_SSS_DRAW_ENTER_SEQUENCE, boundary="draw_enter",
+            pc=FIRST_SSS_DRAW_ENTER_PC, source_tick=1, draw_ordinal=149,
+            scene_frame=1, lr=0x801A5048)
+        returned = _first_sss_state_boundary(
+            FIRST_SSS_DRAW_RETURN_SEQUENCE, boundary="draw_return",
+            pc=FIRST_SSS_DRAW_RETURN_PC, source_tick=1, draw_ordinal=149,
+            scene_frame=1, lr=0x801A5048)
+        return enter, returned
+
+    def test_first_draw_rejects_missing_reordered_and_duplicate_rows(self):
+        enter, returned = self._first_draw_rows()
+        with self.assertRaises(StadiumGoPrefixError):
+            _extract_first_sss_draw_rows([], [returned], FIRST_CSS_STREAM_SHA256)
+        with self.assertRaises(StadiumGoPrefixError):
+            _extract_first_sss_draw_rows([enter, enter], [returned], FIRST_CSS_STREAM_SHA256)
+        enter["seq"], returned["seq"] = returned["seq"], enter["seq"]
+        with self.assertRaises(StadiumGoPrefixError):
+            _extract_first_sss_draw_rows([enter], [returned], FIRST_CSS_STREAM_SHA256)
+
+    def test_prefix_extracts_exact_rows_and_rejects_missing_reordered_or_duplicate_inputs(self):
+        groups = _first_sss_prefix_rows_for_test()
+        result = _extract_first_sss_prefix_rows(*groups, FIRST_CSS_STREAM_SHA256)
+        self.assertEqual(result["input_bundle"]["bytes"], 7488)
+        self.assertEqual(result["provenance"]["sample_count"], 124)
+        self.assertEqual(result["records"][0]["consumed_pad_sequence"], 1612)
+        self.assertEqual(result["records"][-1]["draw_return_sequence"], 2424)
+        self.assertEqual(result["selected_stage_source_witness"]["selected_stage"],
+                         {"index": 18, "kind": 3})
+
+        missing = list(groups)
+        missing[0] = missing[0][:-1]
+        with self.assertRaises(StadiumGoPrefixError):
+            _extract_first_sss_prefix_rows(*missing, FIRST_CSS_STREAM_SHA256)
+
+        duplicate = list(groups)
+        duplicate[0] = list(duplicate[0])
+        duplicate[0][1] = dict(duplicate[0][0])
+        with self.assertRaises(StadiumGoPrefixError):
+            _extract_first_sss_prefix_rows(*duplicate, FIRST_CSS_STREAM_SHA256)
+
+        reordered = list(groups)
+        reordered[2] = list(reordered[2])
+        reordered[2][0], reordered[2][1] = reordered[2][1], reordered[2][0]
+        with self.assertRaises(StadiumGoPrefixError):
+            _extract_first_sss_prefix_rows(*reordered, FIRST_CSS_STREAM_SHA256)
 
 
 if __name__ == "__main__":

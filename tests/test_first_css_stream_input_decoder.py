@@ -147,6 +147,26 @@ int main() {
     auto foreign_sss=sss;foreign_sss[12]^=1;reject_tick(foreign_sss.data(),96,hex(foreign_sss.data()+12,32));
     assert(tick_refused==105&&sss==saved_sss);
     std::cout<<"PASS SSS exact96/4ports;105 envelope refusals;input unchanged\n";
+
+    std::vector<uint8_t> prefix(7488);std::memcpy(prefix.data(),"STC1SSSP",8);
+    prefix[11]=1;std::memcpy(prefix.data()+12,source,32);prefix[47]=124;
+    const auto put=[&](unsigned offset,uint32_t v){for(unsigned b=0;b<4;++b)prefix[offset+b]=uint8_t(v>>(24-8*b));};
+    for(unsigned i=0;i<124;++i){for(unsigned j=0;j<4;++j)put(48+i*60+j*4,1611+i*5+j);
+      for(unsigned j=0;j<44;++j)prefix[48+i*60+16+j]=uint8_t(i*11+j*37);}
+    const auto prefix_saved=prefix;
+    const auto finite=decode_first_sss_prefix_input(prefix.data(),prefix.size(),sha);
+    for(unsigned i=0;i<124;++i){assert(std::equal(finite.records[i].ports.begin(),finite.records[i].ports.end(),prefix.begin()+48+i*60+16));
+      ConsumedPadInput consumed{};consumed.ports=finite.records[i].ports;PADStatus raw[4]{};decode_consumed_pad_statuses(consumed,raw);
+      for(unsigned port=0;port<4;++port){const auto&p=raw[port];const uint8_t bytes[]={uint8_t(p.button>>8),uint8_t(p.button),uint8_t(p.stickX),uint8_t(p.stickY),uint8_t(p.substickX),uint8_t(p.substickY),p.triggerLeft,p.triggerRight,p.analogA,p.analogB,uint8_t(p.err)};assert(std::equal(std::begin(bytes),std::end(bytes),prefix.begin()+48+i*60+16+port*11));}}
+    unsigned prefix_refused=0;const auto reject_prefix=[&](const uint8_t* p,size_t n,const std::string&id){bool caught=false;try{(void)decode_first_sss_prefix_input(p,n,id);}catch(const std::runtime_error&){caught=true;}assert(caught);++prefix_refused;};
+    for(unsigned n=0;n<7488;++n)reject_prefix(prefix.data(),n,sha);
+    reject_prefix(nullptr,7488,sha);auto extra_prefix=prefix;extra_prefix.push_back(0);reject_prefix(extra_prefix.data(),extra_prefix.size(),sha);
+    for(unsigned offset:{0u,11u,12u,47u}){auto bad=prefix;bad[offset]^=1;reject_prefix(bad.data(),bad.size(),sha);}
+    reject_prefix(prefix.data(),prefix.size(),std::string(64,'0'));
+    auto foreign_prefix=prefix;foreign_prefix[12]^=1;reject_prefix(foreign_prefix.data(),foreign_prefix.size(),hex(foreign_prefix.data()+12,32));
+    for(unsigned i=0;i<124;++i){auto bad=prefix;std::fill_n(bad.begin()+48+i*60,4,0);reject_prefix(bad.data(),bad.size(),sha);}
+    assert(prefix_refused==7620&&prefix==prefix_saved);
+    std::cout<<"PASS SSS prefix exact7488/124rows/496ports;7620 envelope/order refusals;input unchanged\n";
     std::cout << "PASS exact decoder 148 batches/592 ports; 6573 envelope refusals; 2 index refusals\n";
 }
 '''

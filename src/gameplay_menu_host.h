@@ -204,6 +204,37 @@ typedef struct MeleeWebMenuFirstSssTickObservation {
     char error[160];
     MeleeWebMenuFirstSssTickSnapshot scheduler_end;
 } MeleeWebMenuFirstSssTickObservation;
+/* Private finite SSS continuation. The callback receives actual source data
+ * only and must synchronously approve. No expected bytes enter this API. */
+enum { MELEE_WEB_SSS_SAMPLE_TICK=1, MELEE_WEB_SSS_SAMPLE_DRAW_ENTER=2,
+       MELEE_WEB_SSS_SAMPLE_DRAW_RETURN=3, MELEE_WEB_SSS_SAMPLE_EXIT=4,
+       MELEE_WEB_SSS_SAMPLE_SELECTED_STAGE=5 };
+typedef int (*MeleeWebMenuSssSampleCallback)(void*, int,
+    const MeleeWebMenuFirstSssTickSnapshot*,
+    const MeleeWebMenuFirstSssPairNoteSnapshot*);
+typedef struct MeleeWebMenuSssSequenceObservation {
+    int state; /* 0 unused, 1 armed, 2 complete, 3 failed */
+    unsigned input_index, consumed_inputs, host_tick_calls, host_draw_calls;
+    unsigned matched_ticks, matched_draw_enters, matched_draw_returns;
+    int last_tick_result, transition_requested, exit_captured;
+    int selected_stage_captured, selected_stage_index, selected_stage_kind;
+    char error[160];
+    MeleeWebMenuFirstSssTickSnapshot scheduler_end, draw_enter, draw_return;
+    MeleeWebMenuFirstSssPairNoteSnapshot exit_note;
+} MeleeWebMenuSssSequenceObservation;
+int melee_web_menu_host_arm_first_sss_draw(MeleeWebMenuHost*,
+    MeleeWebMenuSssSampleCallback, void*, char*, size_t);
+int melee_web_menu_host_draw_first_sss(MeleeWebMenuHost*, char*, size_t);
+int melee_web_menu_host_arm_first_sss_prefix(MeleeWebMenuHost*,
+    MeleeWebMenuSssSampleCallback, void*, char*, size_t);
+int melee_web_menu_host_tick_first_sss_prefix(MeleeWebMenuHost*,
+    const PADStatus[4], unsigned index, char*, size_t);
+int melee_web_menu_host_draw_first_sss_prefix(MeleeWebMenuHost*,
+    unsigned index, char*, size_t);
+int melee_web_menu_host_leave_first_sss_prefix(MeleeWebMenuHost*,char*,size_t);
+int melee_web_menu_host_sss_sequence(const MeleeWebMenuHost*,int prefix,
+    MeleeWebMenuSssSequenceObservation*,char*,size_t);
+
 /* Arm and read one source-only SSS host tick after a JS-approved constructor
  * pair. Input is raw consumed PAD data; no expected state crosses this API. */
 int melee_web_menu_host_arm_first_sss_tick(

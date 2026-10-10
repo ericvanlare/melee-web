@@ -15332,7 +15332,7 @@ index 67c664b238bef265ad585422c4a48e7cd3b57736..196869cfc0a217b52529dc98d96035f9
  static inline u8 mn_8022F538_GetHoveredSelection(void)
  {
 diff --git a/src/melee/mn/mnstagesel.c b/src/melee/mn/mnstagesel.c
-index b110ff19ad600be99ac37edc69f8bf26198ccfac..4531f5d3680a0d2e3b2ce035b974bc83fe55fef9 100644
+index b110ff19ad600be99ac37edc69f8bf26198ccfac..36602fed6ed78b7cd1883708e929a5f3e6b4b0d7 100644
 --- a/src/melee/mn/mnstagesel.c
 +++ b/src/melee/mn/mnstagesel.c
 @@ -1,5 +1,16 @@
@@ -15438,7 +15438,7 @@ index b110ff19ad600be99ac37edc69f8bf26198ccfac..4531f5d3680a0d2e3b2ce035b974bc83
  skip_randomize:
  
      gobj = GObj_Create(HSD_GOBJ_CLASS_FIGHTER, 5, 0x80);
-@@ -851,10 +893,55 @@ void mnStageSel_Scene_OnExit(UNUSED void* exit_data)
+@@ -851,10 +893,69 @@ void mnStageSel_Scene_OnExit(UNUSED void* exit_data)
  
  int mnStageSel_8025BBD4(void)
  {
@@ -15492,6 +15492,20 @@ index b110ff19ad600be99ac37edc69f8bf26198ccfac..4531f5d3680a0d2e3b2ce035b974bc83
 +    geometry[2] = tile.x; geometry[3] = tile.y;
 +    geometry[4] = mnStageSel_803F06D0[target].xC;
 +    geometry[5] = mnStageSel_803F06D0[target].x10;
++    return 1;
++}
++#endif
++
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++/* Pure authored selection observation: no cursor transform or RNG work. */
++int melee_web_sss_selected_stage(int* index, int* kind)
++{
++    unsigned selected = mnStageSel_804D6CAE;
++    if (!index || !kind ||
++        selected >= sizeof(mnStageSel_803F06D0) / sizeof(mnStageSel_803F06D0[0]))
++        return 0;
++    *index = selected;
++    *kind = mnStageSel_803F06D0[selected].xB;
 +    return 1;
 +}
 +#endif

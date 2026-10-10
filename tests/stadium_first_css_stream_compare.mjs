@@ -262,6 +262,10 @@ const SSS_PLAYER_KEYS = Object.freeze([
   'flags_d', 'cpu_kind', 'cpu_level', 'damage_10', 'damage_12', 'hp',
   'attack_ratio_bits', 'defense_ratio_bits', 'model_scale_bits',
 ]);
+// Native PlayerInitData serialization also exposes its defined xB byte. The
+// retained source/player decoder does not assign this byte a semantic name, so
+// it is validated as a native byte but deliberately excluded from equality.
+const SSS_NATIVE_UNPAIRED_PLAYER_KEYS = Object.freeze(['xB']);
 const SSS_PLAYER_SIGNED = new Set(['ckind', 'stocks', 'spawn', 'spawn_direction', 'handicap']);
 const SSS_PLAYER_U8 = new Set([
   'slot_type', 'color', 'slot', 'sub_color', 'team', 'nametag', 'flags_c',
@@ -449,9 +453,16 @@ function actualPlayersMismatch(actual, expected, prefix) {
     return mismatch(`${prefix}.sss.vs.start.players`, 'six native players/four source rows',
       Array.isArray(players) ? players.length : players, 'player array shape differs');
   for (let index = 0; index < 4; index += 1) {
-    if (!plainObject(players[index]))
+    const nativeKeys = [...SSS_PLAYER_KEYS, ...SSS_NATIVE_UNPAIRED_PLAYER_KEYS];
+    if (!exactOwnKeys(players[index], nativeKeys))
       return mismatch(`${prefix}.sss.vs.start.players[${index}]`, 'native player object',
-        players[index], 'missing native player');
+        players[index], 'native player fields differ from the typed source schema');
+    for (const key of SSS_NATIVE_UNPAIRED_PLAYER_KEYS) {
+      const value = players[index][key];
+      if (!Number.isInteger(value) || value < 0 || value > 255)
+        return mismatch(`${prefix}.sss.vs.start.players[${index}].${key}`,
+          'unsigned byte (unpaired)', value, 'native unpaired field is outside byte range');
+    }
     for (const key of SSS_PLAYER_KEYS) {
       const value = players[index][key];
       const path = `${prefix}.sss.vs.start.players[${index}].${key}`;
@@ -822,4 +833,522 @@ export function createFirstSssConsumedPadTickComparator(expectedTick, constructo
   };
   return Object.freeze({compare, status: () => Object.freeze({attempted, approved, failed,
     first_mismatch: firstMismatch, actual, error})});
+}
+
+const FIRST_SSS_DRAW_SOURCE_INVENTORY = Object.freeze([
+  {tag: 17, flags: 0, address: 0x80479d30, size: 6},
+  {tag: 19, flags: 0, address: 0x804d5f94, size: 4},
+  {tag: 20, flags: 0, address: 0x804d5f90, size: 4},
+  {tag: 21, flags: 0, address: 0x804c1f84, size: 0x358},
+  {tag: 30, flags: 0, address: 0x80479d58, size: 4},
+  {tag: 36, flags: 0, address: 0x8045bf28, size: 2},
+  {tag: 37, flags: 0, address: 0x8045bf2a, size: 2},
+  {tag: 40, flags: 0, address: 0x803dd9c4, size: 1},
+  {tag: 2, flags: 0, address: 0x804c1f78, size: 0x0c},
+]);
+const FIRST_SSS_EXIT_SOURCE_INVENTORY = FIRST_SSS_SOURCE_INVENTORY;
+const FIRST_SSS_SELECTION_SOURCE_INVENTORY = Object.freeze([
+  {tag: 1, flags: 0, address: 0x804ee74c, size: 0x30},
+  {tag: 27, flags: 0, address: 0x804ee724, size: 4},
+  {tag: 2, flags: 0, address: 0x804c1f78, size: 0x0c},
+  {tag: 21, flags: 0, address: 0x804c1f84, size: 0x358},
+  {tag: 22, flags: 0, address: 0x804d7420, size: 4},
+  {tag: 23, flags: 0, address: 0x804a7f98, size: 4},
+  {tag: 17, flags: 0, address: 0x80479d30, size: 6},
+  {tag: 40, flags: 0, address: 0x803dd9c4, size: 1},
+  {tag: 41, flags: 0, address: 0x804d6cae, size: 1},
+  {tag: 42, flags: 0, address: 0x803f08d3, size: 1},
+]);
+const FIRST_SSS_SOURCE_STABILITY_BASIS = Object.freeze({
+  evidence: 'root-sss-selection-stability-review-v1/review.json',
+  sha256: 'f7fefd1627ce7ce2b51dae3ea10628337ace2910541ad83b7fb23e1837856063',
+  claim: 'The pinned original scene/mode exit path has no writer to the SSS selected index or authored table-kind before source row2427.',
+});
+const FIRST_SSS_BOUNDARY_SOURCE_KEYS = Object.freeze([
+  'event', 'sequence', 'source_tick', 'draw_ordinal', 'boundary', 'phase',
+  'pc', 'word', 'lr', 'argument', 'source_slice_inventory', 'source_slices_hex',
+  'scene_routing_raw_hex', 'rng_pointer_hex',
+]);
+const FIRST_SSS_EXIT_SOURCE_KEYS = Object.freeze([
+  'event', 'sequence', 'source_tick', 'draw_ordinal', 'boundary', 'phase',
+  'pc', 'word', 'lr', 'argument', 'setup_receipt_sha256',
+  'setup_profile_verified_by_observer', 'source_slice_inventory',
+  'source_slices_hex', 'scene_routing_raw_hex', 'rng_pointer_hex',
+]);
+const FIRST_SSS_SELECTION_SOURCE_KEYS = Object.freeze([
+  'event', 'sequence', 'source_tick', 'draw_ordinal', 'boundary', 'phase',
+  'pc', 'word', 'lr', 'argument', 'scene_kind', 'scene_routing_raw_hex',
+  'source_slice_inventory', 'source_slices_hex',
+  'selected_stage_is_a_later_source_witness', 'not_paired_with_row2426_exit_note',
+]);
+const FIRST_SSS_DRAW_FIELDS = Object.freeze([
+  'scene_frame', 'scene_kind', 'pad_state_hex', 'random_seed_hex',
+  'scene_routing_getters',
+]);
+const FIRST_SSS_PREFIX_OWNER_KEYS = SSS_OWNER_KEYS;
+const FIRST_SSS_PREFIX_ACTUAL_KEYS = Object.freeze([
+  'phase', 'source_scene', 'scene_kind', 'scene_frame', 'random_seed_hex',
+  'pad_state_hex', 'scene_routing_getters', 'owners', 'world_generation',
+  'audio_generation', 'input_index', 'input_ordinal', 'consumed_pad_sequence',
+]);
+const FIRST_SSS_PREFIX_SCHEDULER_KEYS = Object.freeze([
+  ...FIRST_SSS_PREFIX_ACTUAL_KEYS, 'consumed_pad_hex',
+]);
+const FIRST_SSS_PREFIX_EXIT_COMPARISON_FIELDS = Object.freeze([
+  'scene_frame', 'scene_kind', 'pad_state_hex', 'random_seed_hex',
+  'scene_routing_getters', 'sss.header.start_game', 'sss.vs.start.rules',
+  'sss.vs.start.players[0:4]',
+]);
+const FIRST_SSS_DRAW_NATIVE_PROTOCOL = Object.freeze({
+  host_draw_calls: 1, host_tick_calls: 0, aurora_begin_calls: 1,
+  aurora_end_calls: 1, frame_end_returned: true, all_owners_true: true,
+  audio_render_calls_delta: 0, audio_render_frames_delta: 0,
+  audio_phase_unchanged: true,
+});
+const FIRST_SSS_PREFIX_TICK_PROTOCOL = Object.freeze({
+  ticked_sample_count: 123, transition_requested_sample_count: 1,
+  last_tick_result: 3, final_transition_request_retained: true,
+  host_ticks: 124, host_draws: 124, ordinary_draws: 123,
+  checked_pending_sss_draws: 1, extra_inputs: 0, extra_ticks: 0,
+  automatic_leave: false,
+  audio_render_calls_per_approved_tick: 1,
+  audio_frames_per_tick_numerator: 32000,
+  audio_frames_per_tick_denominator: 60,
+  audio_phase_modulus: 60,
+  audio_render_after_approved_tick_before_draw: true,
+  no_audio_render_after_refused_tick: true,
+});
+
+export function firstSssAudioAccounting(actual, renderedTicks) {
+  const result = {valid: false, rendered_ticks: renderedTicks, before: null, after: null,
+    calls_delta: null, frames_delta: null, error: null};
+  const fail = error => { result.error = error; return Object.freeze(result); };
+  if (!plainObject(actual) || !Number.isSafeInteger(renderedTicks) || renderedTicks < 0)
+    return fail('audio snapshot or rendered-tick count is invalid');
+  const keys = ['audio_render_calls_before', 'audio_render_calls_after',
+    'audio_render_frames_before', 'audio_render_frames_after',
+    'audio_phase_before', 'audio_phase_after'];
+  if (keys.some(key => !Number.isSafeInteger(actual[key]) || actual[key] < 0))
+    return fail('audio counters and phase must be nonnegative integers');
+  const [callsBefore, callsAfter, framesBefore, framesAfter, phaseBefore, phaseAfter] =
+    keys.map(key => actual[key]);
+  if (phaseBefore >= 60 || phaseAfter >= 60)
+    return fail('audio_phase is outside its 32000/60 carry range');
+  result.before = {calls: callsBefore, frames: framesBefore, phase: phaseBefore};
+  result.after = {calls: callsAfter, frames: framesAfter, phase: phaseAfter};
+  result.calls_delta = callsAfter - callsBefore;
+  result.frames_delta = framesAfter - framesBefore;
+  if (callsAfter < callsBefore || framesAfter < framesBefore)
+    return fail('audio counters moved backwards');
+  const total = phaseBefore + 32000 * renderedTicks;
+  const expectedFrames = Math.floor(total / 60);
+  const expectedPhase = total % 60;
+  if (result.calls_delta !== renderedTicks)
+    return fail(`audio render-call delta ${result.calls_delta} != approved tick count ${renderedTicks}`);
+  if (result.frames_delta !== expectedFrames)
+    return fail(`audio frame delta ${result.frames_delta} != 32000/60 carry result ${expectedFrames}`);
+  if (phaseAfter !== expectedPhase)
+    return fail(`audio_phase after ${phaseAfter} != preserved carry ${expectedPhase}`);
+  result.valid = true;
+  return Object.freeze(result);
+}
+
+function firstSssSourceRowIsPinned(source, sequence, boundary, pc, word, drawOrdinal,
+    sourceTick, expectedSceneFrame = 1, lr = 0x801a5048) {
+  if (!exactOwnKeys(source, FIRST_SSS_BOUNDARY_SOURCE_KEYS) || source.sequence !== sequence ||
+      source.event !== 'boundary' || source.phase !== null || source.boundary !== boundary ||
+      source.pc !== pc || source.word !== word || source.lr !== lr ||
+      source.draw_ordinal !== drawOrdinal || source.source_tick !== sourceTick ||
+      source.argument !== null ||
+      !Array.isArray(source.source_slice_inventory) || !plainObject(source.source_slices_hex))
+    return false;
+  if (!sourceInventoryMatches(source.source_slice_inventory, FIRST_SSS_DRAW_SOURCE_INVENTORY) ||
+      !sourceSlicesMatch(source.source_slices_hex, FIRST_SSS_DRAW_SOURCE_INVENTORY)) return false;
+  const raw = source.source_slices_hex;
+  return raw['17:0'] === '020201010000' && raw['19:0'] === '804d5f90' &&
+    raw['20:0'] === '3bb84c53' && raw['30:0'] === expectedSceneFrame.toString(16).padStart(8, '0') &&
+    raw['40:0'] === '09' && source.scene_routing_raw_hex === raw['17:0'] &&
+    source.rng_pointer_hex === raw['19:0'];
+}
+
+function sourceInventoryMatches(actual, expected) {
+  if (!Array.isArray(actual) || actual.length !== expected.length) return false;
+  const left = [...actual].sort((a, b) => a.tag - b.tag || a.flags - b.flags);
+  const right = [...expected].sort((a, b) => a.tag - b.tag || a.flags - b.flags);
+  return left.every((item, index) => plainObject(item) &&
+    item.tag === right[index].tag && item.flags === right[index].flags &&
+    item.address === right[index].address && item.size === right[index].size);
+}
+
+function sourceSlicesMatch(actual, expected) {
+  if (!plainObject(actual) || !exactOwnKeys(actual, expected.map(item => `${item.tag}:0`)))
+    return false;
+  return expected.every(item => validHex(actual[`${item.tag}:0`], item.size));
+}
+
+export function validateFirstSssDrawExpectedSource(expected) {
+  const fail = () => { throw new TypeError('first SSS draw requires exact retained rows1609/1610'); };
+  if (!plainObject(expected) || expected.schema !== 'melee-web-stadium-first-sss-draw-diagnostic' ||
+      expected.version !== 1 || expected.scope !== 'original first SSS DrawEnter1609 through DrawReturn1610 only' ||
+      expected.source_admission !== false || expected.whole_session_equivalent !== false ||
+      !plainObject(expected.provenance) || !plainObject(expected.expected_draw_enter) ||
+      !plainObject(expected.expected_draw_return) || !plainObject(expected.source_draw_enter) ||
+      !plainObject(expected.source_draw_return)) fail();
+  const provenance = expected.provenance;
+  if (provenance.observer_bytes !== 4397889 || provenance.observer_sha256 !== FIRST_SSS_STREAM_SHA256 ||
+      provenance.observer_status_bytes !== 515 || provenance.observer_status_sha256 !== FIRST_SSS_STATUS_SHA256 ||
+      provenance.draw_enter_sequence !== 1609 || provenance.draw_return_sequence !== 1610 ||
+      provenance.source_tick !== 1 || provenance.draw_ordinal !== 149 ||
+      provenance.scene_frame !== 1 || provenance.scene_kind !== 9 ||
+      provenance.setup_profile_verified_by_observer !== false ||
+      !sameJsonValue(expected.comparison_fields, FIRST_SSS_DRAW_FIELDS) ||
+      !sameJsonValue(expected.native_protocol_requirements, FIRST_SSS_DRAW_NATIVE_PROTOCOL)) fail();
+  for (const [note, sequence, boundary, pc] of [
+    [expected.expected_draw_enter, 1609, 'draw_enter', 0x80390fc0],
+    [expected.expected_draw_return, 1610, 'draw_return', 0x80391040],
+  ]) {
+    if (!exactOwnKeys(note, ['phase', 'scene_frame', 'scene_kind', 'pad_state_hex',
+        'random_seed_hex', 'scene_routing_getters']) || note.phase !== boundary ||
+        note.scene_frame !== 1 || note.scene_kind !== 9 ||
+        !validHex(note.pad_state_hex, 822) || note.random_seed_hex !== '3bb84c53' ||
+        !exactRoute(note.scene_routing_getters, {current_game_mode: 2,
+          previous_game_mode: 1, current_scene_index: 1, previous_scene_index: 0})) fail();
+    const source = boundary === 'draw_enter' ? expected.source_draw_enter : expected.source_draw_return;
+    if (!firstSssSourceRowIsPinned(source, sequence, boundary, pc, null, 149, 1, 1)) fail();
+  }
+  for (const key of FIRST_SSS_DRAW_FIELDS)
+    if (!sameJsonValue(expected.expected_draw_enter[key], expected.expected_draw_return[key])) fail();
+  return expected;
+}
+
+function approvedFirstSssPrerequisites(pair, tick) {
+  return plainObject(pair) && pair.complete === true && pair.compared === true &&
+    pair.failed === false && pair.host_entered === true &&
+    pair.sss_host_tick_calls === 0 && pair.sss_host_draw_calls === 0 &&
+    Number.isSafeInteger(pair.world_generation) && pair.world_generation > 0 &&
+    Number.isSafeInteger(pair.audio_generation) && pair.audio_generation >= 0 &&
+    plainObject(tick) && tick.complete === true && tick.compared === true &&
+    tick.captured === true && tick.failed === false && tick.host_tick_calls === 1 &&
+    tick.host_draw_calls === 0 && tick.clock_post_succeeded === true &&
+    tick.tick_result === 1 && tick.transition_requested === false &&
+    tick.post_host_frame_captured === true && tick.post_host_frame === 1;
+}
+
+function firstSssActualSnapshotMismatch(actual, expected, phase, pair, prefix, withInput = false) {
+  const wantedKeys = withInput ?
+    (phase === 'scheduler_end' ? FIRST_SSS_PREFIX_SCHEDULER_KEYS : FIRST_SSS_PREFIX_ACTUAL_KEYS) :
+    ['phase', 'source_scene', 'scene_kind', 'scene_frame', 'random_seed_hex', 'pad_state_hex',
+      'scene_routing_getters', 'owners', 'world_generation', 'audio_generation'];
+  if (!exactOwnKeys(actual, wantedKeys))
+    return mismatch(prefix, wantedKeys, actual, 'native snapshot fields differ from the frozen interface');
+  for (const [key, value] of Object.entries({phase, source_scene: 2,
+    scene_kind: expected.scene_kind, scene_frame: expected.scene_frame,
+    random_seed_hex: expected.random_seed_hex, pad_state_hex: expected.pad_state_hex})) {
+    const difference = compareExpectedField(actual[key], value, `${prefix}.${key}`);
+    if (difference) return difference;
+  }
+  if (!exactRoute(actual.scene_routing_getters, expected.scene_routing_getters))
+    return mismatch(`${prefix}.scene_routing_getters`, expected.scene_routing_getters,
+      actual.scene_routing_getters, 'four established source routing getters differ');
+  if (!exactOwnKeys(actual.owners, FIRST_SSS_PREFIX_OWNER_KEYS) ||
+      FIRST_SSS_PREFIX_OWNER_KEYS.some(key => actual.owners[key] !== true))
+    return mismatch(`${prefix}.owners`, Object.fromEntries(FIRST_SSS_PREFIX_OWNER_KEYS.map(k => [k, true])),
+      actual.owners, 'required owner/liveness fields are not all true');
+  if (!Number.isSafeInteger(actual.world_generation) || actual.world_generation !== pair.world_generation ||
+      !Number.isSafeInteger(actual.audio_generation) || actual.audio_generation !== pair.audio_generation)
+    return mismatch(`${prefix}.owner_generation`, [pair.world_generation, pair.audio_generation],
+      [actual.world_generation, actual.audio_generation], 'snapshot crossed the constructor-pair owners');
+  return null;
+}
+
+export function createFirstSssDrawComparator(expectedDraw, constructorPair, consumedTick) {
+  const expected = validateFirstSssDrawExpectedSource(expectedDraw);
+  if (!approvedFirstSssPrerequisites(constructorPair, consumedTick))
+    throw new TypeError('first SSS draw requires approved constructor-pair and consumed-tick prerequisites');
+  const phases = ['draw_enter', 'draw_return'];
+  let index = 0, failed = false, firstMismatch = null;
+  const rows = [];
+  const compare = (phase, actualJson) => {
+    const row = {phase, actual: null, approved: false};
+    rows.push(row);
+    if (failed || phase !== phases[index] || typeof actualJson !== 'string') {
+      failed = true;
+      firstMismatch ||= mismatch('callback.phase', phases[index] ?? 'no further callback', phase,
+        'first SSS draw callback was repeated or out of order');
+      return false;
+    }
+    try { row.actual = JSON.parse(actualJson); }
+    catch (error) {
+      failed = true; firstMismatch = mismatch(`draw.${phase}`, 'valid JSON', null, String(error));
+      return false;
+    }
+    firstMismatch = firstSssActualSnapshotMismatch(row.actual,
+      expected[`expected_${phase}`], phase, constructorPair, `draw.${phase}`);
+    if (firstMismatch) { failed = true; return false; }
+    row.approved = true; index += 1;
+    return true;
+  };
+  return Object.freeze({compare, status: () => Object.freeze({attempted: rows.length,
+    approved: index === 2 && !failed, failed, next_phase: phases[index] ?? null,
+    first_mismatch: firstMismatch, rows})});
+}
+
+function validatePrefixInputRows(expected, inputRows) {
+  if (!Array.isArray(expected.records) || expected.records.length !== 124 ||
+      !Array.isArray(inputRows) || inputRows.length !== 124) return false;
+  let previous = 1610;
+  for (let index = 0; index < 124; index += 1) {
+    const record = expected.records[index], input = inputRows[index];
+    if (!plainObject(record) || !plainObject(input) || record.input_index !== index ||
+        record.input_ordinal !== index + 1 || input.input_index !== index ||
+        record.consumed_pad_sequence !== input.consumed_pad_sequence ||
+        record.scheduler_end_sequence !== input.scheduler_end_sequence ||
+        record.draw_enter_sequence !== input.draw_enter_sequence ||
+        record.draw_return_sequence !== input.draw_return_sequence ||
+        record.consumed_pad_sequence <= previous ||
+        record.consumed_pad_sequence >= record.scheduler_end_sequence ||
+        record.scheduler_end_sequence >= record.draw_enter_sequence ||
+        record.draw_enter_sequence >= record.draw_return_sequence ||
+        record.draw_return_sequence <= previous ||
+        !sameJsonValue(record.consumed_pad_status_hex, input.port_status_hex) ||
+        !exactOwnKeys(record.scheduler_end, ['phase', 'scene_frame', 'scene_kind',
+          'pad_state_hex', 'random_seed_hex', 'scene_routing_getters', 'consumed_pad_hex']) ||
+        !exactOwnKeys(record.draw_enter, ['phase', 'scene_frame', 'scene_kind', 'pad_state_hex',
+          'random_seed_hex', 'scene_routing_getters']) ||
+        !exactOwnKeys(record.draw_return, ['phase', 'scene_frame', 'scene_kind', 'pad_state_hex',
+          'random_seed_hex', 'scene_routing_getters'])) return false;
+    const consumeHex = record.consumed_pad_status_hex.join('');
+    if (record.scheduler_end.consumed_pad_hex !== consumeHex ||
+        record.scheduler_end.phase !== 'scheduler_end' || record.draw_enter.phase !== 'draw_enter' ||
+        record.draw_return.phase !== 'draw_return' || record.scheduler_end.scene_frame !== index + 1 ||
+        record.draw_enter.scene_frame !== index + 2 || record.draw_return.scene_frame !== index + 2 ||
+        record.scheduler_end.scene_kind !== 9 || record.draw_enter.scene_kind !== 9 ||
+        record.draw_return.scene_kind !== 9 || record.scheduler_end.random_seed_hex !== '3bb84c53' ||
+        record.draw_enter.random_seed_hex !== '3bb84c53' || record.draw_return.random_seed_hex !== '3bb84c53' ||
+        !validHex(record.scheduler_end.pad_state_hex, 822) ||
+        !validHex(record.draw_enter.pad_state_hex, 822) || !validHex(record.draw_return.pad_state_hex, 822) ||
+        !exactRoute(record.scheduler_end.scene_routing_getters,
+          {current_game_mode: 2, previous_game_mode: 1, current_scene_index: 1, previous_scene_index: 0}) ||
+        !sameJsonValue(record.scheduler_end.scene_routing_getters, record.draw_enter.scene_routing_getters) ||
+        !sameJsonValue(record.draw_enter.scene_routing_getters, record.draw_return.scene_routing_getters) ||
+        !sameJsonValue(record.draw_enter.pad_state_hex, record.draw_return.pad_state_hex)) return false;
+    if (!plainObject(record.source_rows) ||
+        !firstSssSourceRowIsPinned(record.source_rows.scheduler_end,
+          record.scheduler_end_sequence, 'source_tick', 0x80390eb4, null,
+          150 + index, index + 1, index + 1, 0x801a4fa4) ||
+        !firstSssSourceRowIsPinned(record.source_rows.draw_enter,
+          record.draw_enter_sequence, 'draw_enter', 0x80390fc0, null,
+          150 + index, index + 2, index + 2) ||
+        !firstSssSourceRowIsPinned(record.source_rows.draw_return,
+          record.draw_return_sequence, 'draw_return', 0x80391040, null,
+          150 + index, index + 2, index + 2)) return false;
+    previous = record.draw_return_sequence;
+  }
+  return expected.records[0].consumed_pad_sequence === 1612 &&
+    expected.records[123].consumed_pad_sequence === 2420 &&
+    expected.records[123].draw_return_sequence === 2424;
+}
+
+export function validateFirstSssPrefixExpectedSource(expected, inputRows) {
+  const fail = () => { throw new TypeError('first SSS prefix requires exact retained rows1609–2427'); };
+  if (!plainObject(expected) || expected.schema !== 'melee-web-stadium-first-sss-prefix-diagnostic' ||
+      expected.version !== 1 || expected.scope !== '124 exact original SSS consumed-PAD/tick/draw samples through passive SSS exit' ||
+      expected.source_admission !== false || expected.whole_session_equivalent !== false ||
+      expected.prepared_output_unpaired !== true || !plainObject(expected.provenance) ||
+      !plainObject(expected.input_bundle) || !plainObject(expected.exit_note) ||
+      !plainObject(expected.selected_stage_source_witness)) fail();
+  const p = expected.provenance;
+  if (p.observer_bytes !== 4397889 || p.observer_sha256 !== FIRST_SSS_STREAM_SHA256 ||
+      p.observer_status_bytes !== 515 || p.observer_status_sha256 !== FIRST_SSS_STATUS_SHA256 ||
+      p.first_draw_enter_sequence !== 1609 || p.first_draw_return_sequence !== 1610 ||
+      p.first_prefix_consume_sequence !== 1612 || p.last_prefix_consume_sequence !== 2420 ||
+      p.sample_count !== 124 || p.exit_note_sequence !== 2426 ||
+      p.selected_stage_source_witness_sequence !== 2427 ||
+      p.setup_profile_verified_by_observer !== false ||
+      !sameJsonValue(expected.comparison_fields, ['input_index', 'input_ordinal',
+        'consumed_pad_sequence', 'consumed_pad_status_hex', 'scheduler_end', 'draw_enter', 'draw_return']) ||
+      !sameJsonValue(expected.tick_protocol, FIRST_SSS_PREFIX_TICK_PROTOCOL) ||
+      !validatePrefixInputRows(expected, inputRows)) fail();
+  const bundle = expected.input_bundle;
+  if (!sameJsonValue(bundle, {magic_hex: '5354433153535350', version: 1, bytes: 7488,
+      sha256: bundle.sha256, sample_count: 124, record_bytes: 60, contains_expected_state: false}) ||
+      !/^[0-9a-f]{64}$/.test(bundle.sha256)) fail();
+  const exit = expected.exit_note;
+  if (exit.sequence !== 2426 || exit.phase !== 'actual SSS scene OnExit return before VS SSS mode OnExit' ||
+      !sameJsonValue(exit.comparison_fields, FIRST_SSS_PREFIX_EXIT_COMPARISON_FIELDS) ||
+      !plainObject(exit.expected) || exit.expected.phase !== 'sss_exit' ||
+      exit.expected.scene_frame !== 125 || exit.expected.scene_kind !== 9 ||
+      exit.expected.random_seed_hex !== '3bb84c53' || !validHex(exit.expected.pad_state_hex, 822) ||
+      !exactRoute(exit.expected.scene_routing_getters,
+        {current_game_mode: 2, previous_game_mode: 1, current_scene_index: 1, previous_scene_index: 0}) ||
+      !exactOwnKeys(exit.expected.sss?.header, ['start_game']) || exit.expected.sss.header.start_game !== 1 ||
+      !plainObject(exit.expected.sss?.vs?.start?.rules) ||
+      !exactOwnKeys(exit.expected.sss.vs.start.rules, SSS_RULE_KEYS) ||
+      !Array.isArray(exit.expected.sss?.vs?.start?.players) ||
+      exit.expected.sss.vs.start.players.length !== 4 ||
+      exit.expected.sss.vs.start.players.some(player => !exactOwnKeys(player, SSS_PLAYER_KEYS)) ||
+      !exactOwnKeys(exit.source, FIRST_SSS_EXIT_SOURCE_KEYS) ||
+      exit.source.event !== 'progress' || exit.source.sequence !== 2426 ||
+      exit.source.boundary !== null || exit.source.phase !== 'sss_exit' ||
+      exit.source.pc !== '0x8025bbd0' || exit.source.word !== '0x4e800020' ||
+      exit.source.lr !== '0x801a4124' || exit.source.argument !== '0x00000000' ||
+      exit.source.source_tick !== 125 || exit.source.draw_ordinal !== 274 ||
+      exit.source.setup_receipt_sha256 !== 'e6b15cececf103efeb9b7df2dd18908e9a66d37ebde68622ecd304f8eabcfcda' ||
+      exit.source.setup_profile_verified_by_observer !== false ||
+      !sourceInventoryMatches(exit.source.source_slice_inventory, FIRST_SSS_EXIT_SOURCE_INVENTORY) ||
+      !sourceSlicesMatch(exit.source.source_slices_hex, FIRST_SSS_EXIT_SOURCE_INVENTORY) ||
+      exit.source.source_slices_hex?.['35:0'] !== '01' ||
+      exit.source.source_slices_hex?.['30:0'] !== '0000007d' ||
+      exit.source.source_slices_hex?.['40:0'] !== '09' ||
+      exit.source.source_slices_hex?.['20:0'] !== '3bb84c53' ||
+      exit.source.scene_routing_raw_hex !== '020201010000' ||
+      exit.source.rng_pointer_hex !== '804d5f90') fail();
+  const selection = expected.selected_stage_source_witness;
+  if (selection.sequence !== 2427 || selection.native_phase !== 'after VS SSS mode OnExit and before vs_mode_end' ||
+      !sameJsonValue(selection.comparison_fields, ['index', 'kind']) ||
+      !sameJsonValue(selection.selected_stage, {index: 18, kind: 3}) ||
+      !sameJsonValue(selection.source_stability_basis, FIRST_SSS_SOURCE_STABILITY_BASIS) ||
+      !exactOwnKeys(selection.source, FIRST_SSS_SELECTION_SOURCE_KEYS) ||
+      selection.source.event !== 'boundary' || selection.source.sequence !== 2427 ||
+      selection.source.source_tick !== 125 || selection.source.draw_ordinal !== 274 ||
+      selection.source.boundary !== 'pad_poll' || selection.source.phase !== null ||
+      selection.source.pc !== 0x8034dd8c || selection.source.lr !== 0x8034db8c ||
+      selection.source.word !== null || selection.source.argument !== null ||
+      selection.source.scene_kind !== 9 || selection.source.selected_stage_is_a_later_source_witness !== true ||
+      selection.source.not_paired_with_row2426_exit_note !== true ||
+      !sourceInventoryMatches(selection.source.source_slice_inventory,
+        FIRST_SSS_SELECTION_SOURCE_INVENTORY) ||
+      !sourceSlicesMatch(selection.source.source_slices_hex,
+        FIRST_SSS_SELECTION_SOURCE_INVENTORY) ||
+      selection.source.scene_routing_raw_hex !== selection.source.source_slices_hex?.['17:0'] ||
+      selection.source.source_slices_hex?.['40:0'] !== '09' ||
+      selection.source.source_slices_hex?.['41:0'] !== '12' ||
+      selection.source.source_slices_hex?.['42:0'] !== '03') fail();
+  return expected;
+}
+
+export function decodeFirstSssPrefixInputBundle(bytes) {
+  const fail = () => { throw new TypeError('SSS prefix input must be the exact 7,488-byte STC1SSSP bundle'); };
+  if (!(bytes instanceof Uint8Array) || bytes.byteLength !== 7488) fail();
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const magic = [...bytes.subarray(0, 8)].map(value => String.fromCharCode(value)).join('');
+  if (magic !== 'STC1SSSP' || view.getUint32(8, false) !== 1 ||
+      [...bytes.subarray(12, 44)].map(value => value.toString(16).padStart(2, '0')).join('') !==
+        FIRST_SSS_STREAM_SHA256 || view.getUint32(44, false) !== 124) fail();
+  const records = [];
+  let prior = 1610, offset = 48;
+  for (let index = 0; index < 124; index += 1) {
+    const sequences = [0, 4, 8, 12].map(position => view.getUint32(offset + position, false));
+    const [consumed_pad_sequence, scheduler_end_sequence, draw_enter_sequence,
+      draw_return_sequence] = sequences;
+    if (!(prior < consumed_pad_sequence && consumed_pad_sequence < scheduler_end_sequence &&
+        scheduler_end_sequence < draw_enter_sequence && draw_enter_sequence < draw_return_sequence)) fail();
+    const port_status_hex = [];
+    for (let port = 0; port < 4; port += 1) {
+      const start = offset + 16 + port * 11;
+      port_status_hex.push([...bytes.subarray(start, start + 11)]
+        .map(value => value.toString(16).padStart(2, '0')).join(''));
+    }
+    records.push({input_index: index, input_ordinal: index + 1,
+      consumed_pad_sequence, scheduler_end_sequence, draw_enter_sequence,
+      draw_return_sequence, port_status_hex});
+    prior = draw_return_sequence;
+    offset += 60;
+  }
+  if (offset !== bytes.byteLength || records[0].consumed_pad_sequence !== 1612 ||
+      records.at(-1).consumed_pad_sequence !== 2420 ||
+      records.at(-1).draw_return_sequence !== 2424) fail();
+  return Object.freeze(records);
+}
+
+export function createFirstSssPrefixComparator(expectedPrefix, inputRows,
+    constructorPair, consumedTick, firstDrawObservation) {
+  const expected = validateFirstSssPrefixExpectedSource(expectedPrefix, inputRows);
+  if (!approvedFirstSssPrerequisites(constructorPair, consumedTick) ||
+      firstDrawObservation?.complete !== true || firstDrawObservation?.compared !== true ||
+      firstDrawObservation?.failed !== false || firstDrawObservation?.host_draw_calls !== 1 ||
+      firstDrawObservation?.host_tick_calls !== 0 || firstDrawObservation?.aurora_begin_calls !== 1 ||
+      firstDrawObservation?.aurora_end_calls !== 1 || firstDrawObservation?.frame_end_returned !== true)
+    throw new TypeError('SSS prefix requires approved constructor, tick and first-draw prerequisites');
+  const required = [];
+  for (let index = 0; index < 124; index += 1)
+    required.push(['scheduler_end', index], ['draw_enter', index], ['draw_return', index]);
+  required.push(['sss_exit', null], ['selected_stage', null]);
+  const rows = [];
+  let next = 0, failed = false, firstMismatch = null;
+  const ownerWorld = constructorPair.world_generation;
+  const ownerAudio = constructorPair.audio_generation;
+  const compare = (phase, actualJson) => {
+    const wantedPhase = required[next]?.[0] ?? null;
+    const row = {phase, actual: null, approved: false};
+    rows.push(row);
+    if (failed || phase !== wantedPhase || typeof actualJson !== 'string') {
+      failed = true;
+      firstMismatch ||= mismatch('callback.phase', wantedPhase, phase,
+        'SSS prefix callback was repeated or out of order');
+      return false;
+    }
+    try { row.actual = JSON.parse(actualJson); }
+    catch (error) {
+      failed = true; firstMismatch = mismatch(`prefix.${phase}`, 'valid JSON', null, String(error));
+      return false;
+    }
+    const recordIndex = required[next][1];
+    if (phase === 'selected_stage') {
+      const wanted = expected.selected_stage_source_witness.selected_stage;
+      if (!exactOwnKeys(row.actual, ['index', 'kind']) || row.actual.index !== wanted.index ||
+          row.actual.kind !== wanted.kind)
+        firstMismatch = mismatch('selected_stage', wanted, row.actual,
+          'later row2427 selected-stage tuple differs');
+    } else if (phase === 'sss_exit') {
+      const actual = row.actual, wanted = expected.exit_note.expected;
+      if (!exactOwnKeys(actual, SSS_NOTE_KEYS))
+        firstMismatch = mismatch('sss_exit', [...SSS_NOTE_KEYS], actual,
+          'native exit-note fields differ from the frozen interface');
+      else {
+        const common = firstSssActualSnapshotMismatch({
+          phase: actual.phase, source_scene: actual.source_scene, scene_kind: actual.scene_kind,
+          scene_frame: actual.scene_frame, random_seed_hex: actual.random_seed_hex,
+          pad_state_hex: actual.pad_state_hex, scene_routing_getters: actual.scene_routing_getters,
+          owners: actual.owners, world_generation: actual.world_generation,
+          audio_generation: actual.audio_generation,
+        }, wanted, 'sss_exit', constructorPair, 'sss_exit');
+        firstMismatch = common || compareExpectedField(actual.sss?.header?.start_game,
+          wanted.sss.header.start_game, 'sss_exit.sss.header.start_game') ||
+          actualRulesMismatch(actual, wanted, 'sss_exit') || actualPlayersMismatch(actual, wanted, 'sss_exit');
+        if (!firstMismatch && (actual.host_entered !== true || actual.session_phase !== 3 ||
+            actual.session_ticks !== 125))
+          firstMismatch = mismatch('sss_exit.session', {host_entered: true, session_phase: 3,
+            session_ticks: 125}, {host_entered: actual.host_entered,
+            session_phase: actual.session_phase, session_ticks: actual.session_ticks},
+          'exit note was not captured after the bounded 124-tick prefix');
+      }
+    } else {
+      const record = expected.records[recordIndex];
+      const expectedState = record[phase];
+      firstMismatch = firstSssActualSnapshotMismatch(row.actual, expectedState, phase,
+        constructorPair, `prefix[${recordIndex}].${phase}`, true);
+      if (!firstMismatch && (row.actual.input_index !== record.input_index ||
+          row.actual.input_ordinal !== record.input_ordinal ||
+          row.actual.consumed_pad_sequence !== record.consumed_pad_sequence))
+        firstMismatch = mismatch(`prefix[${recordIndex}].input_identity`,
+          {input_index: record.input_index, input_ordinal: record.input_ordinal,
+            consumed_pad_sequence: record.consumed_pad_sequence},
+          {input_index: row.actual.input_index, input_ordinal: row.actual.input_ordinal,
+            consumed_pad_sequence: row.actual.consumed_pad_sequence},
+          'native sample is not bound to its exact input-only source record');
+      if (!firstMismatch && phase === 'scheduler_end' &&
+          row.actual.consumed_pad_hex !== record.consumed_pad_status_hex.join(''))
+        firstMismatch = mismatch(`prefix[${recordIndex}].consumed_pad_hex`,
+          record.consumed_pad_status_hex.join(''), row.actual.consumed_pad_hex,
+          'consumed PAD bytes differ from the exact source statuses');
+    }
+    if (firstMismatch) { failed = true; return false; }
+    row.approved = true; next += 1;
+    return true;
+  };
+  return Object.freeze({compare, status: () => Object.freeze({attempted: rows.length,
+    approved: next === required.length && !failed, failed, next_phase: required[next]?.[0] ?? null,
+    next_index: required[next]?.[1] ?? null, first_mismatch: firstMismatch, rows,
+    owner_world_generation: ownerWorld, owner_audio_generation: ownerAudio})});
 }

@@ -211,6 +211,43 @@ inline FirstSssTickInput decode_first_sss_tick_input(
     return result;
 }
 
+inline constexpr unsigned kFirstSssPrefixCount = 124;
+struct FirstSssPrefixRecord {
+    std::array<uint32_t,4> sequences{};
+    std::array<uint8_t,44> ports{};
+};
+struct FirstSssPrefixInput {
+    std::string source_sha256;
+    std::array<FirstSssPrefixRecord,kFirstSssPrefixCount> records{};
+};
+inline FirstSssPrefixInput decode_first_sss_prefix_input(
+    const uint8_t* bytes,size_t size,const std::string& expected_source_sha256) {
+    if(!bytes || size!=48+kFirstSssPrefixCount*60)
+        throw std::runtime_error("SSS prefix input exact length differs");
+    if(std::string(reinterpret_cast<const char*>(bytes),8)!="STC1SSSP" ||
+       read_be32(bytes+8)!=1 || read_be32(bytes+44)!=kFirstSssPrefixCount)
+        throw std::runtime_error("SSS prefix input magic/version/count differs");
+    FirstSssPrefixInput result{};
+    result.source_sha256=hex(bytes+12,32);
+    if(result.source_sha256!=expected_source_sha256 ||
+       !std::equal(kSourceSha256.begin(),kSourceSha256.end(),bytes+12))
+        throw std::runtime_error("SSS prefix input source identity differs");
+    uint32_t previous=1610;
+    for(unsigned i=0;i<kFirstSssPrefixCount;++i){
+        auto& row=result.records[i];const auto* p=bytes+48+i*60;
+        for(unsigned j=0;j<4;++j){
+            row.sequences[j]=read_be32(p+j*4);
+            if(row.sequences[j]<=previous)
+                throw std::runtime_error("SSS prefix input sequence order differs");
+            previous=row.sequences[j];
+        }
+        std::copy_n(p+16,44,row.ports.begin());
+        ConsumedPadInput consumed{};consumed.ports=row.ports;
+        PADStatus typed[4]{};decode_consumed_pad_statuses(consumed,typed);
+    }
+    return result;
+}
+
 inline PostdrawInput decode_postdraw_input(
     const uint8_t* bytes, size_t size,
     const std::string& expected_source_sha256) {
