@@ -743,10 +743,9 @@ lifetime, not an original comparison, RNG-equivalence result, or long C3 run.
 
 The typed setup observation and GO canary came from separate runs. The GO run
 itself traversed CSS→SSS, but did not emit the full typed setup row or bind the
-first-CSS seed context to match construction. The separate original-GO observer
-candidate is source-only: it has not been integrated, compiled or captured, and
-its planned capture does not include CSS/SSS steering or setup context; its
-attract-GO guard also remains unresolved. It is not original-result evidence.
+first-CSS seed context to match construction. The original observer work is also
+separate: its compile-only result and first pre-CSS capture failure are recorded
+below. Neither is paired setup or original-match evidence.
 
 A separate functional native run on `ee2f3ab9` continued the reviewed GO path
 through one neutral-input, no-draw lifetime. The GO-containing world tick was
@@ -770,12 +769,22 @@ trigger). The run ended at ordinal 3,500, 102 ticks before that source-derived
 lower bound. It did not read a live countdown or transformation state. Crowd
 events, scratch title/SIS slot, stock-out and standings remain unobserved.
 
-The original GO observer v3 remains source review only. The later same-process
-pair fails during second-lifetime preparation, as recorded below; it supplies
-neither original comparison nor a second completed Match. C3 still requires matched original setup/state, the original
-per-tick, per-owner RNG ledger, two full lifetimes, screen/title/SIS observations,
-stock-out/standings and checked retirement/recreation. Ordinary public Stadium
-admission remains closed.
+Observer v3 compiled from source `2e354aada` with overlay SHA
+`79ee07c6d0350a1759ac917e85307e6a28f3fa8070cd9afcfe25228bedcaf59a`; the
+binary SHA is `a583e684e52fd0112cd532e1ddd731d330fde4ed9b882ab2a95002a4cd9d77f0`
+and it declares `writes_guest_memory=false`. The integrated driver/source controls
+passed 57 focused tests on `fcd0051d`. The first capture attempt stopped before
+CSS: while the observer awaited CSS it suppressed ordinary PAD rows, but the
+driver needed a menu row to navigate from boot to CSS. The retained input stream
+has 28,646 events and is incomplete; the observer trace contains only
+handshake/start/end and zero menu boundaries. The retained early-stop record
+shows SIGINT sent to the directly owned driver before the 180-second cap; the
+driver returned -2 and terminated/reaped its direct Dolphin child (exit 0). All
+23 launch inputs remained unchanged. No CSS, SSS, GO, original match or
+comparison was observed. This is a preparation failure, not original match
+evidence; the pre-CSS observation path needs a reviewed correction before a
+changed attempt. The original per-owner RNG comparison and all C3 gates remain
+open. Ordinary public Stadium admission remains closed.
 
 The `a29f8d69` full suite passed 2,350 tests with 171 skips and zero failures.
 This is the recorded production baseline; final current-head integration
@@ -816,7 +825,7 @@ result review and exact raw receipts are bound in the
 [portable receipt](../evidence/issue251-stadium-profile-oninit-v1.json).
 
 
-## October 10 UTC: same-process Stadium recreation failure
+## October 10 UTC: same-process Stadium recreation failure and reduced slot diagnostic
 
 **Native functional first lifetime / second-lifetime preparation failure**
 
@@ -827,15 +836,34 @@ Its CSS/SSS menu world reaches generation 5 and verifies SIS retirement, then
 preparation stops at `mask=64: ordinary grDatFiles slot occupied`, before the
 second Match is constructed. No second Ready/GO, completed interval or checked
 second Session close is observed. The raw diagnostic does not identify the
-exact occupied slot, value or owner.
+occupied slot, value or owner. This original failure and its exact producer remain
+retained.
 
 Independent review verifies 1,288 packet bindings, 98 fixtures, 17 raw files and
 all first-life step rows. Both owned processes exit naturally with code 1 and
-are reaped without cleanup signals. Their exit is not evidence of second
-Session teardown. The complete failure and exact producer are bound in the
-same portable receipt.
+are reaped without cleanup signals. Their exit is not evidence of second Session
+teardown.
 
-The next experiment is a source ownership reduction and the smallest justified
-control for the slot's original restoration or retirement boundary. No guard
-waiver, blind global clear or unchanged pair rerun follows this failure. The
-original comparison, second completed lifetime and remaining C3 gates stay open.
+A shorter reducer on `9a1909d1` sampled all four authored `grDatFiles` rows at
+eight lifecycle boundaries. All rows were zero at first context preflight and
+immediately before `Stage_802251E8`. Immediately after that original call, slot 0
+held `unk0=0xa6b07e8`, `unk4=0xa6512d8`, `unk8=0`; the tuple remained unchanged
+through Ready 124, checked Match close, Session close and second preflight in
+world generation 5. Slots 1–3 stayed zero. The ordinary table `0x184b80` stayed
+unchanged; the native table was `0xa6ae868` during the first world and its
+published value became zero after close. The effective lookup then reverted to
+the unchanged ordinary table `0x184b80`. The unchanged strict guard still refuses
+with mask 64 before the second Match is constructed.
+
+These are observed pointer bits, not proof of pointee liveness, ownership, alias
+equivalence or safe retirement. Independent raw review checked 157 immutable
+inputs, 98 fixtures, 8 raw files, 32 producer files, 6 generated sources and all
+8 snapshots. The native process exited naturally with code 1 and was reaped; no
+signal was sent. The reducer establishes where the slot first becomes populated
+and that it persists, but not which owner should retire it. Preserve the strict
+refusal and original source order; no blanket clear or unchanged pair rerun follows.
+
+The next step is a source ownership audit and focused owned/foreign/replaced-row
+control before another short lifecycle attempt. No second Match, second completed
+lifetime, original comparison or C3 acceptance is established. Ordinary public
+Stadium admission remains closed.

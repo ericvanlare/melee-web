@@ -319,7 +319,7 @@
   },
   "subsequent_c3_component_2026_10_09": {
     "claim_boundary": "Existing October7 profile receipt remains historical. This update preserves V26 and identifies the exact later producer; componentcontrols do not pass C3.",
-    "current_result": "One native Stadium lifetime and ordinary Mario/FD Results regression pass on their exact recorded sources. A separate same-process pair on 266c9c44 completes and fully releases its first 3500-post-GO lifetime, then fails before second Match construction on the unchanged grDatFiles occupied-slot guard. Failure retained; second Match and C3 remain unverified.",
+    "current_result": "One native Stadium lifetime and the ordinary Mario/FD Results regression pass on their exact recorded sources. The 266c9c44 same-process pair still fails before second Match construction. A reduced 9a1909d1 diagnostic locates first slot-0 population after Stage_802251E8 and observes the tuple persist through second preflight; owner/liveness remains unknown. The original observer compiles and its focused driver controls pass, but the first original capture stops before CSS with zero menu boundaries. No original comparison, second completed Match or C3 acceptance.",
     "prior_v26": {
       "source_commit": "b8c272c44a94bcb03f0371008851e468200d4496",
       "first_failure": "heap_free_bytes",
@@ -487,7 +487,7 @@
         "SDK unittest moduleimport failure beforeNode; fixedexplicit scriptsimport and retainedoutput"
       ]
     },
-    "next_progression": "Reduce the second-life grDatFiles slot owner and original restore/retirement path before a changed runtime experiment; preserve the guard and original state/order. Original GO observer v3 remains source-only; driver reuse/required observations are under review. Original setup/RNG comparison and remaining C3 gates stay open; ordinary Stadium admission closed.",
+    "next_progression": "Audit the grDatFiles row owner and source retirement boundary; preserve the strict guard and original order. Separately correct and review the original observer pre-CSS PAD path before any changed capture. Keep the two prior failures and the pre-CSS failure retained. Original setup/RNG comparison and remaining C3 gates stay open; ordinary Stadium admission closed.",
     "private_evidence": {
       "external_run_id": "stadium-c3-lifetime-20261009-074216-4d7cf7d1",
       "artifact_names_relative_to_run": true,
@@ -963,7 +963,7 @@
       },
       "remaining": "For original comparison/C3 acceptance, bind the typed source CSS/SSS setup and actual match context to GO in one original run, preserving first-CSS and SSS-selected seeds separately, setup rules/player rows, and the per-tick RNG ledger by owner. This pairing is not a prerequisite for the separately scoped one-world functional 3,500-post-GO experiment. Two lifetimes, screen/title/SIS observations, stock-out/standings, and full C3 checks remain outstanding.",
       "c3_original_ledger_requirement": "Reuse existing RNG draw observer; C3 notes604-608 require per-tick/per-owner original comparison, separately from broader C8 transformation comparison.",
-      "claim_boundary": "Native traced ordinary Ready/fullclose and the separate one-post-Ready tick/fullclose remain tied to their exact sources. A later separate port-side GO canary and original CSS\u2192SSS setup-only observation are independently reviewed; they are not a paired original comparison. No original per-owner RNG agreement, two3500postGO lifetimes, C3, browser, physical-input, audible-output or timing acceptance is established.",
+      "claim_boundary": "Native traced setup, port-side GO/Ready, one post-Ready tick, one 3,500-post-GO functional lifetime and ordinary Results regression remain tied to their exact producers. The original observer is compiler-tested and its focused driver controls pass, but its first capture stopped before CSS with zero menu boundaries. No original match/comparison, per-owner RNG agreement, second completed 3,500-post-GO lifetime, C3, browser, physical-input, audible-output or timing acceptance is established.",
       "pad_input_reducer": {
         "caller_source": "8e087161fcc5a62f6f82cb333a812d0f4eff448f",
         "phase_correction_source": "e2ff861b3f290714d4c6aaa1a19158d4e7f8e59a",
@@ -2018,8 +2018,8 @@
         },
         "retirement_scope": "Both failures retain the armed pre-OnStart match, with a 32MiB arena. Process exit/reaping is not checked world or Session retirement. Earlier Ready/postReady close passes retain their separate source identities.",
         "source_reduction": "The first two observer attempts rejected a child-null predicate. Original Ground_GetStageGObj installs Ground_801C1CD0 priority1 then Ground_801C1D38 priority4; Stadium installs grStadium_801D1520 priority4, and SDK SetupProc prepends each through child. The later successful GO canary resolves that child-null predicate operationally for its completed source route. The two child addresses were not captured; no address-identity or child-lifetime claim follows.",
-        "next": "The later ee2f3ab9 one-world functional idle run passed exactly 3,500 post-GO world ticks and checked close; see functional_idle_3500. A later same-process pair on 266c9c44 completed and released its first lifetime, then failed before second Match construction; see same_process_second_lifetime. Next reduce the occupied grDatFiles slot owner and original restoration/retirement boundary before a changed runtime experiment. Original setup/state and per-owner RNG comparison, screen/title/SIS observations, stock-out/standings and C3 retirement/recreation remain open.",
-        "validation_limits": "The first two arm/chain failures remain retained with their original scopes. The later port-side canary observes GO, the immediately following full tick, HUD Ready and checked close. It traversed CSS\u2192SSS but did not emit the typed setup receipt or bind first-CSS seed context to match construction; it is not paired with the separate setup observation. No original observer capture or original per-owner RNG comparison exists. The later ee2f3ab9 functional recipe passed one 3,500-post-GO lifetime with checked close; a later same-process pair failed in second-lifetime preflight before Match construction, with no second full lifetime or checked second Session close observed; see same_process_second_lifetime. No C3 or acceptance is established.",
+        "next": "The reduced grDatFiles diagnostic now locates slot-0 population immediately after Stage_802251E8 and confirms persistence through the second preflight; exact ownership remains unresolved. Preserve the strict refusal and audit the original row owner before a changed short lifecycle. The first original capture attempt also stopped before CSS because its AwaitCss observer suppressed the PAD rows required by the driver; correct and review that path before another capture. Original setup/state and per-owner RNG comparison, screen/title/SIS observations, stock-out/standings and C3 retirement/recreation remain open.",
+        "validation_limits": "The port-side GO canary remains a port-only trace and is not paired with the separate setup observation. The ee2f3ab9 recipe passed one 3,500-post-GO lifetime; the 266c9c44 pair still fails before second Match construction, with no second full lifetime or checked second Session close. The reduced grDatFiles diagnostic narrows the failure to a tuple populated after Stage_802251E8 and retained through second preflight, without proving owner or pointee liveness. The original observer compile-only build and 57 focused controls passed, but the first capture has only handshake/start/end and zero menu boundaries; no original comparison or per-owner RNG result exists. No C3 or acceptance is established.",
         "successful_port_canary": {
           "source": "a92352ea5b3a89de22f615c52e8b08a9a8167dc8",
           "source_tree": "3697bf605a60721a5eab7e4b0a842e41b364fa55",
@@ -2184,23 +2184,104 @@
         ]
       },
       "original_go_observer_candidate": {
-        "artifact": "original-go-prefix-proposal-v1/candidate/freeze.json",
-        "freeze_sha256": "6a8de52d7b7cab3522149f11dddcbb75b3842e1e6fb9176c7d4fc503c7369775",
-        "patch_sha256": "b0c825da67a126088a2b5a40a78d122bfd7beb14dc23e2e8123e0ee57b8bbb66",
-        "status": "SOURCE_ONLY_NOT_INTEGRATED_COMPILED_OR_CAPTURED",
+        "status": "V3_COMPILER_ONLY_AND_FOCUSED_CONTROLS_PASS; FIRST_CAPTURE_FAILED_PRE_CSS",
         "limitations": [
-          "source-only observer plan lacks CSS/SSS steering and same-run setup context",
-          "potential attract-GO guard remains unresolved",
-          "not integrated, compiled or captured; no original result or per-owner RNG ledger"
+          "compile-only observer build; no original runtime result from compilation",
+          "first capture stopped before CSS because ordinary PAD rows are suppressed while the observer awaits CSS and the driver needs a menu row to navigate from boot",
+          "retained observer trace has handshake/start/end only and zero menu boundaries; input stream is incomplete",
+          "no original CSS/SSS/GO/match or comparison; no per-owner RNG ledger"
         ],
-        "v3_source_review": {
+        "compiler_result": {
+          "artifact": "root-original-stadium-observer-compiler-result-v1.json",
+          "sha256": "951b3aabf79106703ca7e7943623bb2c91fc5a4993c84acf366510ef8053a418",
+          "status": "PASS_COMPILER_ONLY",
+          "source_head": "2e354aada093e567f3a2b1a9defb1ce4e863b4b9",
+          "source_tree": "f60fd5765eec3d901549f1d49107f2565cca1f4d",
+          "binary_sha256": "a583e684e52fd0112cd532e1ddd731d330fde4ed9b882ab2a95002a4cd9d77f0",
+          "writes_guest_memory": false,
+          "original_process_or_capture": "not launched during compile result",
+          "observer_version": "v3",
+          "observer_cpp_sha256": "79ee07c6d0350a1759ac917e85307e6a28f3fa8070cd9afcfe25228bedcaf59a",
+          "historical_candidate_scope": "The separate historical v1 proposal is not the compiled observer; this result binds the v3 source and overlay."
+        },
+        "driver_review": {
+          "artifact": "root-original-stadium-go-driver-review-v3.json",
+          "sha256": "87a9b0a1570643ed42d804db917d3b9a772932fd5bf990959ee9db231dd10d88",
+          "decision": "PASS_SOURCE_AND_FOCUSED_CONTROLS",
+          "source_head": "9a1909d16991cd092eac04b0eb6881114da32ed0",
+          "source_tree": "462b023ba52316be876ee3312b55740f1cca0e45"
+        },
+        "integrated_controls": {
+          "artifact": "root-stadium-driver-integrated-controls-v1/result.json",
+          "sha256": "8c72ec01cf5767e87dd94ea193c678f3414bbe32e5c64a1311bb33b1c7254ab6",
+          "source_head": "fcd0051d5d7cd01bf293830c44811cad9a267d4b",
+          "returncode": 0,
+          "focused_tests": 57,
+          "log_sha256": "066b4773e7368a6fdf85275b3c8802453247e26b9749fc4bc47b6d490755d910",
+          "source_tree": "883a64b9d3c3126d26cf01346bb542853b86da9f"
+        },
+        "first_capture_attempt": {
+          "frozen_result": {
+            "artifact": "root-original-stadium-go-failure-v1.json",
+            "sha256": "235135f0d151b77f7809efb2a959decd0ffffa21acc51d00c2c3f11f85fd32aa",
+            "status": "STOPPED_RETAINED_PRE_CSS_OBSERVATION_DEADLOCK"
+          },
+          "decoder": {
+            "artifact": "root-original-stadium-go-failure-decoder-v1.json",
+            "sha256": "687cb6fee97855cdbd588d88e0d1f6d2f003db671388edb905664c73eba0346f",
+            "status": "FAILED_PREFIX_NO_MENU_BOUNDARIES",
+            "decoded_events": [
+              "handshake",
+              "start",
+              "end"
+            ],
+            "boundary_records": 0
+          },
+          "driver_source_head": "fcd0051d5d7cd01bf293830c44811cad9a267d4b",
+          "native_source_head": "2e354aada093e567f3a2b1a9defb1ce4e863b4b9",
+          "binary_sha256": "a583e684e52fd0112cd532e1ddd731d330fde4ed9b882ab2a95002a4cd9d77f0",
+          "input_events": 28646,
+          "input_stream_complete": false,
+          "launch_inputs_unchanged": 23,
+          "stop": "The retained early-stop record shows SIGINT sent to the directly owned driver before the 180-second cap; the driver returned -2 and terminated/reaped its direct Dolphin child (exit 0).",
+          "observed": "No CSS, SSS, GO, original match or comparison. The source observer suppressed PAD rows while AwaitCss; the driver waited for a menu row before navigating boot to CSS.",
+          "next": "Reviewed correction and bounded controls for the pre-CSS observation path before a changed capture.",
+          "launch_packet": {
+            "artifact": "original-stadium-go-launch-v1/packet.json",
+            "sha256": "2d6e05ee37857f157d0b05962926c37a90c8b6d56784913e77b42f1e098b33cd"
+          },
+          "driver_source_tree": "883a64b9d3c3126d26cf01346bb542853b86da9f",
+          "native_source_tree": "f60fd5765eec3d901549f1d49107f2565cca1f4d",
+          "independent_failure_review": {
+            "artifact": "sol-original-stadium-go-failure-review-v1.json",
+            "sha256": "70cb183e615b3a6bae18856b1aea633344b96b9032823af50bc2481f72d33846",
+            "decision": "PASS_RETAINED_PRE_CSS_DEADLOCK_REVIEW",
+            "verified_input_rows": 23,
+            "raw_events": [
+              "handshake",
+              "start",
+              "end"
+            ],
+            "boundary_rows": 0,
+            "input_events": 28646,
+            "input_complete": false
+          }
+        },
+        "historical_v3_source_review": {
           "artifact": "sol-original-go-prefix-source-review-v3.json",
           "sha256": "345ea6a4bb70d73f8dedc4d4b097bf17fdeead346c653813321878511dbf5316",
           "decision": "PASS_SOURCE_REVIEW_ONLY",
           "source_head": "ee2f3ab92c7ae99c76d3d3f2724c7835ce1fb371",
           "source_tree": "147c8bbbf1985bbfc04a4c9a0eba11a2a5abefbf",
-          "status": "NOT_INTEGRATED_BUILT_OR_CAPTURED"
-        }
+          "status": "NOT_INTEGRATED_BUILT_OR_CAPTURED",
+          "note": "Earlier external v3 source review, before the compile-only build and first capture attempt recorded here."
+        },
+        "historical_v1_source_candidate": {
+          "artifact": "original-go-prefix-proposal-v1/candidate/freeze.json",
+          "freeze_sha256": "6a8de52d7b7cab3522149f11dddcbb75b3842e1e6fb9176c7d4fc503c7369775",
+          "patch_sha256": "b0c825da67a126088a2b5a40a78d122bfd7beb14dc23e2e8123e0ee57b8bbb66"
+        },
+        "current_observer_version": "v3"
       },
       "current_regression": {
         "source": "a29f8d6940df1c77d68e39da98068a73cbbc906a",
@@ -2230,7 +2311,11 @@
         "Native traced port-side GO canary",
         "Native traced functional one-world 3,500-post-GO interval",
         "Independent raw-result reviews",
-        "Native functional Results source-route regression"
+        "Native functional Results source-route regression",
+        "Compiler-only original observer build",
+        "Focused original driver controls",
+        "Retained original pre-CSS capture failure",
+        "Reduced grDatFiles slot lifecycle diagnostic"
       ],
       "functional_idle_3500": {
         "status": "PASS_FUNCTIONAL_NATIVE_ONE_LIFETIME",
@@ -2556,8 +2641,59 @@
           ],
           "signals_sent": false
         },
-        "next": "Source-only slot-owner/restore/retirement reduction before changed runtime; preserve guard and original RNG/arithmetic/order.",
-        "scope": "Functional diagnostic native same-process recreation failure. First life completes; no pair success, C3, original RNG, draw/audio comparison or performance claim. Exact grDatFiles slot/value/owner unobserved."
+        "next": "The reduced diagnostic locates first slot-0 population after Stage_802251E8 and confirms it remains through second preflight. Audit exact original ownership/retirement, then run focused owned/foreign/replaced-row controls before another short lifecycle; preserve the strict guard and source order.",
+        "scope": "Functional diagnostic native same-process recreation failure. First life completes; the second-life preflight is refused. The reduced diagnostic observes slot 0 populated after Stage_802251E8 and retained through second preflight, but raw pointer bits do not identify owner, pointee liveness, alias equivalence or safe cleanup. No pair success, C3, original RNG, draw/audio comparison or performance claim.",
+        "reduced_diagnostic": {
+          "status": "FAIL_RETAINED_SECOND_PREFLIGHT_REDUCED",
+          "source_head": "9a1909d16991cd092eac04b0eb6881114da32ed0",
+          "source_tree": "462b023ba52316be876ee3312b55740f1cca0e45",
+          "result": {
+            "artifact": "root-grdatfiles-pair-frozen-result-v1.json",
+            "bytes": 4109,
+            "sha256": "a4e846c0632b09e05a03a9d619ff712c19b0f36ab74407fefcb4e8e9bd36476b"
+          },
+          "independent_result_review": {
+            "artifact": "sol-grdatfiles-pair-result-review-v1.json",
+            "bytes": 3902,
+            "sha256": "8d5fa6ee2a0fac8ef5eddc4b691df17eade7d0da6d4bc28053e321f8cdab7838",
+            "decision": "PASS_RETAINED_FAILURE_REVIEW"
+          },
+          "observed": {
+            "snapshots": 8,
+            "all_four_slots_zero_before_first_context_preflight_and_before_Stage_802251E8": true,
+            "first_populated_boundary": "after-Stage_802251E8",
+            "slot0": {
+              "unk0": "0xa6b07e8",
+              "unk4": "0xa6512d8",
+              "unk8": 0
+            },
+            "slots1_to_3": "zero throughout",
+            "slot0_tuple_unchanged_through": "Ready124, checked Match close, Session close, second preflight in world generation 5",
+            "ordinary_table": "0x184b80 unchanged",
+            "native_table_after_close": "0",
+            "second_preflight": "strict mask64 refusal before second Match construction",
+            "native_table_during_first_world": "0xa6ae868",
+            "effective_lookup_after_close": "ordinary table 0x184b80"
+          },
+          "verification": {
+            "immutable_inputs": 157,
+            "fixtures": 98,
+            "raw_files": 8,
+            "producer_files": 32,
+            "generated_sources": 6,
+            "slot_rows": 32,
+            "snapshots": 8,
+            "native_exit_code": 1,
+            "pid_reaped_absent": true,
+            "signals_sent": false
+          },
+          "limitations": [
+            "Pointer bits do not prove pointee liveness, allocation owner, native map alias equivalence or safe retirement.",
+            "No second Match, second Ready/GO, second checked Session close, 3500 interval, draw, original comparison or C3 acceptance.",
+            "Strict initial-empty refusal and original source order remain unchanged; no blanket clear or guard relaxation."
+          ],
+          "next": "Audit the original grDatFiles row owner and retirement boundary; then use a focused owned/foreign/replaced-row control before another short lifecycle attempt."
+        }
       }
     }
   }
