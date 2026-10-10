@@ -319,7 +319,7 @@
   },
   "subsequent_c3_component_2026_10_09": {
     "claim_boundary": "Existing October7 profile receipt remains historical. This update preserves V26 and identifies the exact later producer; componentcontrols do not pass C3.",
-    "current_result": "Unchanged ordinary Ready/fullclose PASS at dc88442c; subsequent one neutral postReady tick and fullclose PASS at880e5bf6. Historical failures retained. ExactGO alignment, two3500postGO lifetimes and original per-owner RNG comparison remain unverified.",
+    "current_result": "Unchanged ordinary Ready/fullclose and one postReady tick/fullclose pass on their recorded sources. Separate Native traced source CSS→SSS setup observation on a29f8d69 and port-side GO/checked-close canary on a92352ea now pass. The runs are not paired; original per-owner RNG comparison, two3500postGO lifetimes and C3 remain unverified. Current full-suite regression is pending.",
     "prior_v26": {
       "source_commit": "b8c272c44a94bcb03f0371008851e468200d4496",
       "first_failure": "heap_free_bytes",
@@ -487,7 +487,7 @@
         "SDK unittest moduleimport failure beforeNode; fixedexplicit scriptsimport and retainedoutput"
       ]
     },
-    "next_progression": "Within the existing seven C3 prerequisite groups, build a diagnostic-only prepared-stage seam into the existing GameplayMatchSession/GameplayWorld owner path without changing ordinary Stadium admission. Reach original Ready/GO with complete owners; verify screen countdown, GO, mode, timers, scratch title and SIS slot swaps; then run at least 3500 neutral no-draw ticks before first transformation in each of two worlds while retaining a per-tick RNG ledger by owner and required stock-out/standings observations; verify checked retirement, fresh-world baseline and final session closure.",
+    "next_progression": "Use the passing GO alignment as the source boundary for a separately gated one-world functional idle experiment: continue the existing neutral/no-draw/PCM path to exactly 3,500 world ticks after the GO-containing tick and use normal checked close. This experiment does not require original setup pairing to run and is not C3 acceptance. For comparison/acceptance, still bind original setup/state to the match and preserve a per-tick, per-owner RNG ledger; then complete two lifetimes, screen/title/SIS observations, stock-out/standings, and checked retirement/recreation. Keep ordinary Stadium admission closed.",
     "private_evidence": {
       "external_run_id": "stadium-c3-lifetime-20261009-074216-4d7cf7d1",
       "artifact_names_relative_to_run": true,
@@ -961,9 +961,9 @@
         "sixth_ready_bound_files": 531,
         "deferred_control_owned_pid_absent": 19570
       },
-      "remaining": "Exact original GO dispatch/map2gateclear/laterHUDenable source and event alignment; then bounded paired original RNG owner ledger and two3500postGO lifetimes with required screen/stock-out/standings observations. Ordinary public Stadium admission remains closed.",
+      "remaining": "For original comparison/C3 acceptance, bind the typed source CSS/SSS setup and actual match context to GO in one original run, preserving first-CSS and SSS-selected seeds separately, setup rules/player rows, and the per-tick RNG ledger by owner. This pairing is not a prerequisite for the separately scoped one-world functional 3,500-post-GO experiment. Two lifetimes, screen/title/SIS observations, stock-out/standings, and full C3 checks remain outstanding.",
       "c3_original_ledger_requirement": "Reuse existing RNG draw observer; C3 notes604-608 require per-tick/per-owner original comparison, separately from broader C8 transformation comparison.",
-      "claim_boundary": "Native traced ordinary Ready/fullclose atdc88442c and separate onepostReady tick/fullclose at880e5bf6 pass. ExactGO alignment, longidlepair, originalRNGagreement andC3 remain unverified.",
+      "claim_boundary": "Native traced ordinary Ready/fullclose and the separate one-post-Ready tick/fullclose remain tied to their exact sources. A later separate port-side GO canary and original CSS→SSS setup-only observation are independently reviewed; they are not a paired original comparison. No original per-owner RNG agreement, two3500postGO lifetimes, C3, browser, physical-input, audible-output or timing acceptance is established.",
       "pad_input_reducer": {
         "caller_source": "8e087161fcc5a62f6f82cb333a812d0f4eff448f",
         "phase_correction_source": "e2ff861b3f290714d4c6aaa1a19158d4e7f8e59a",
@@ -1943,7 +1943,7 @@
         "next": "Source review exact original GO dispatch/map2gateclear/HUDenable phase and existingowner; bounded observation before counting longpostGO interval."
       },
       "go_alignment": {
-        "runtime_status": "UNOBSERVED_DIAGNOSTIC_ARM_REFUSED_AT_ZERO_TICKS",
+        "runtime_status": "PASS_PORT_SIDE_GO_CANARY_AND_CHECKED_CLOSE; ORIGINAL_COMPARISON_UNRUN",
         "source_design": "Four diagnostic StageLast latches observe original Stage gate-clear bracket, GO and HUD callback; containing tick and immediate next full tick observed independently inside Ready progression. Original fixed construction journal, calls, input, RNG and PCM processing unchanged.",
         "first_attempt": {
           "source": "3f26515abee9428344060eac81c461feb0b73d9a",
@@ -2017,9 +2017,252 @@
           }
         },
         "retirement_scope": "Both failures retain the armed pre-OnStart match, with a 32MiB arena. Process exit/reaping is not checked world or Session retirement. Earlier Ready/postReady close passes retain their separate source identities.",
-        "source_reduction": "Original Ground_GetStageGObj installs Ground_801C1CD0 priority1 then Ground_801C1D38 priority4; Stadium installs grStadium_801D1520 priority4. SDK SetupProc prepends each through child. The new observer child-null expectation contradicts this authored chain. Runtime identities of the two child nodes are not yet observed.",
-        "next": "Smaller checked original-process-chain positive/negative reproducer and source review before another lifetime; preserve exact registry/callback/priority/owner/terminal checks, not arbitrary-child acceptance.",
-        "validation_limits": "Both diagnostic builds and six focused controls per source pass. Full suite and ordinary runtime build remain bound to dc88442c. No GO tick, original RNG comparison, long C3 or acceptance established by these attempts."
+        "source_reduction": "The first two observer attempts rejected a child-null predicate. Original Ground_GetStageGObj installs Ground_801C1CD0 priority1 then Ground_801C1D38 priority4; Stadium installs grStadium_801D1520 priority4, and SDK SetupProc prepends each through child. The later successful GO canary resolves that child-null predicate operationally for its completed source route. The two child addresses were not captured; no address-identity or child-lifetime claim follows.",
+        "next": "Run the separately reviewed one-world functional idle proposal after source review/build: preserve the passing GO/Ready path, then run neutral no-draw ticks with PCM processing to exactly 3,500 world ticks after the GO-containing tick and complete normal checked close. This functional run is not blocked on original setup pairing. For C3 comparison/acceptance, independently bind original setup/state and per-owner RNG observations to the match, then complete two lifetimes, screen/title/SIS observations, stock-out/standings and retirement/recreation.",
+        "validation_limits": "The first two arm/chain failures remain retained with their original scopes. The later port-side canary observes GO, the immediately following full tick, HUD Ready and checked close. It traversed CSS→SSS but did not emit the typed setup receipt or bind first-CSS seed context to match construction; it is not paired with the separate setup observation. No original observer capture or original per-owner RNG comparison exists. The 3,500-tick functional recipe remains source-only and unrun. No C3 or acceptance is established.",
+        "successful_port_canary": {
+          "source": "a92352ea5b3a89de22f615c52e8b08a9a8167dc8",
+          "source_tree": "3697bf605a60721a5eab7e4b0a842e41b364fa55",
+          "frozen_result": {
+            "artifact": "root-go-alignment-frozen-result-v3.json",
+            "sha256": "b1922503964d68232af8bd71cd77969b516f5262821675108247b8f1c708f3a9"
+          },
+          "independent_result_review": {
+            "artifact": "sol-go-alignment-result-review-v3.json",
+            "sha256": "678ced4924dfbe92114906eefaeb2d3522f569ace9e7ddc52ec50513afeaba2e"
+          },
+          "producer": {
+            "artifact": "go-alignment-producer-a92352ea-v1/identity.json",
+            "sha256": "e3f913a014b2e53614a53a32cd96251ba0774e8ccb8d2221b8d968a61548f136"
+          },
+          "packet": {
+            "artifact": "go-alignment-preflight-packet-v3.json",
+            "sha256": "1cd371e2f9af644cc3a6c01252570a401b015fe6020babcb2e019e90d4446493"
+          },
+          "verification": {
+            "bindings": 1189,
+            "fixtures": 98,
+            "raw_files": 17,
+            "producer_files": 32,
+            "generated_sources": 5,
+            "owned_children_natural_exit_reaped_absent": true
+          },
+          "observations": {
+            "events": [
+              {
+                "event": "StageBefore",
+                "world_tick": 84,
+                "source_frame": 0,
+                "gate": 1
+              },
+              {
+                "event": "StageAfter",
+                "world_tick": 84,
+                "source_frame": 0,
+                "gate": 0
+              },
+              {
+                "event": "GoAfter",
+                "world_tick": 84,
+                "source_frame": 0,
+                "mode": 11
+              },
+              {
+                "event": "HudAfter",
+                "world_tick": 123,
+                "source_frame": 0,
+                "mode": 1,
+                "callback_index": 4,
+                "hud_enabled": 1
+              }
+            ],
+            "go_containing_world_session_ticks": [
+              84,
+              85
+            ],
+            "first_full_post_go_world_session_ticks": [
+              85,
+              86
+            ],
+            "ready_ticks": 124,
+            "final_world_objects_processes": [
+              0,
+              0,
+              0
+            ],
+            "source_memory_tracker": "inactive",
+            "final_session_arena_bytes": 0,
+            "draw": false,
+            "pcm_processing": true
+          },
+          "scope": "One native no-draw neutral-input port-side canary that traversed the original CSS→SSS route. It did not emit the full typed setup receipt or bind the first-CSS seed context to match construction; it is not paired with the separate setup observation, not an original comparison, and not a per-owner RNG result.",
+          "limitations": [
+            "source frame stayed0 across GO-containing and next full tick; no increment inferred",
+            "CSS→SSS navigation occurred, but no same-run typed setup receipt/first-CSS-context binding",
+            "no long two-world3500tick C3, original draw/RNG equivalence, browser, physical input, foreground timing, audible output or whole-session acceptance"
+          ]
+        }
+      },
+      "source_setup_observation": {
+        "source": "a29f8d6940df1c77d68e39da98068a73cbbc906a",
+        "source_tree": "c627c00c903fab3bba1b35a285fdd214c2fd51ba",
+        "frozen_result": {
+          "artifact": "root-stadium-source-setup-frozen-result-v1.json",
+          "sha256": "e6b15cececf103efeb9b7df2dd18908e9a66d37ebde68622ecd304f8eabcfcda"
+        },
+        "independent_result_review": {
+          "artifact": "sol-stadium-source-setup-result-review-v1.json",
+          "sha256": "a15b14e10172768602d65d580978bfe77d428a883acd3d4fd1510130b7fdf5af"
+        },
+        "producer": {
+          "artifact": "stadium-source-setup-producer-a29f8d69-v1/identity.json",
+          "sha256": "b5cd48e989eaecf3c7406698ae74ac30a5db5f8f338c7206b6b4219b242fc111"
+        },
+        "trace": {
+          "artifact": "checkout-work/stadium-c1a-native-menu-3n4sm9w2/stadium-source-setup-session.jsonl",
+          "bytes": 390185,
+          "sha256": "7440b9970f9492906c6e02d5a1db9d31b117498233c8e8e8b9cc215d33cf4161"
+        },
+        "verification": {
+          "bindings": 1254,
+          "fixtures": 98,
+          "raw_files": 17,
+          "producer_files": 32,
+          "generated_sources": 5,
+          "owned_children_natural_exit_reaped_absent": true
+        },
+        "observations": {
+          "first_css_seed": 1,
+          "sss_selected_seed": 1425827233,
+          "stage_kind": 3,
+          "source_player_rows": 6,
+          "compatibility_player_rows": 4,
+          "human_mario_slots": [
+            0,
+            1
+          ],
+          "source_colors": [
+            1,
+            0
+          ],
+          "normalized_stocks": 4,
+          "final_pad_wire_bytes": 822,
+          "sss_neutral_completion_wait_ticks": 89,
+          "final_arena_bytes": 0,
+          "raw_to_normalized_rule_differences": {
+            "match_kind": [
+              0,
+              1
+            ],
+            "is_stock": [
+              0,
+              1
+            ],
+            "is_vs": [
+              0,
+              1
+            ],
+            "xB": [
+              2,
+              -1
+            ],
+            "xC": [
+              0,
+              -1
+            ]
+          },
+          "normalized_equals_post_vs": false
+        },
+        "scope": "Original source CSS→SSS Stadium selection and checked menu/world/session retirement only. No OnInit, MatchSession, Ready/GO, draw or gameplay ticks; this is setup provenance, not complete replay context or matched original comparison.",
+        "unobserved": [
+          "full 0x55E8 transient SaveData bytes",
+          "private PAD queue slots and qcount snapshot",
+          "complete CSS-to-SSS PAD input history (only initial/confirmation/completion samples and final PAD history wire recorded)",
+          "raw StartMeleeData ABI padding and native pointer bit patterns",
+          "unknown nonnull source callback identities",
+          "no paired GO/per-owner RNG trace"
+        ]
+      },
+      "original_go_observer_candidate": {
+        "artifact": "original-go-prefix-proposal-v1/candidate/freeze.json",
+        "freeze_sha256": "6a8de52d7b7cab3522149f11dddcbb75b3842e1e6fb9176c7d4fc503c7369775",
+        "patch_sha256": "b0c825da67a126088a2b5a40a78d122bfd7beb14dc23e2e8123e0ee57b8bbb66",
+        "status": "SOURCE_ONLY_NOT_INTEGRATED_COMPILED_OR_CAPTURED",
+        "limitations": [
+          "source-only observer plan lacks CSS/SSS steering and same-run setup context",
+          "potential attract-GO guard remains unresolved",
+          "not integrated, compiled or captured; no original result or per-owner RNG ledger"
+        ]
+      },
+      "current_regression": {
+        "source": "a29f8d6940df1c77d68e39da98068a73cbbc906a",
+        "source_tree": "c627c00c903fab3bba1b35a285fdd214c2fd51ba",
+        "status": "PASS_FULL_SUITE_AND_ORDINARY_RELEASE_BUILD",
+        "full_suite": {
+          "artifact": "root-stadium-regression-a29f8d69-v1/result.json",
+          "sha256": "211d6e87121ad0685efb4d624df18be836a012e6fce500119043a67aaa5bb9ff",
+          "tests": 2350,
+          "skips": 171,
+          "failures": 0,
+          "seconds": 512.582,
+          "log_sha256": "b32eeaa77221c56c111a10bc9ec203de828961a0cb3a96a86d801ab1b24591f8",
+          "owned_pid_natural_exit_reaped_absent": true
+        },
+        "ordinary_build": {
+          "artifact": "stadium-ordinary-build-a29f8d69-v1/result.json",
+          "sha256": "46ec9a7c7f0d1b1142d035ef63d5d0f3c2899477d10fca4e8f48b03fd7f8057f",
+          "status": "PASS",
+          "log_sha256": "9a206d17388118c64e3d8138ded8454a87b11664ae33ff9fbe8b9b947887d39c",
+          "owned_pid_natural_exit_reaped_absent": true
+        },
+        "claim": "This current-source regression/build does not execute the gated 3,500-post-GO functional recipe or establish C3."
+      },
+      "new_observations_evidence_labels": [
+        "Native traced setup observation",
+        "Native traced port-side GO canary",
+        "Independent raw-result reviews"
+      ],
+      "functional_idle_3500": {
+        "status": "EXTERNAL_SOURCE_ONLY_PROPOSAL_NOT_INTEGRATED_BUILT_OR_RUN",
+        "proposal_artifact": "functional-idle-3500-proposal-v2/freeze.json",
+        "recipe": "stadium-source-functional-idle-v1",
+        "python_gate": "MELEE_RUN_STADIUM_SOURCE_FUNCTIONAL_IDLE_3500=1",
+        "target": "One neutral-PAD/no-draw lifetime; exact 3,500 world ticks after the GO-containing tick; existing 32 kHz PCM render cadence; current world/session/source-memory ownership checked per tick; existing checked close and final Session retirement.",
+        "tick_arithmetic": {
+          "go_containing_world_before": 84,
+          "go_containing_world_after": 85,
+          "first_full_post_go_tick": "85->86",
+          "ready_world_tick": 124,
+          "post_go_ticks_already_elapsed_at_ready": 39,
+          "additional_ticks_after_ready": 3461,
+          "target_world_tick": 3585,
+          "post_go_target": 3500
+        },
+        "source_derived_first_transform_bound": {
+          "earliest_post_go_ordinal": 3602,
+          "latest_post_go_ordinal": 3801,
+          "basis": "xD8=3600+HSD_Randi(200), with the original two-tick trigger; source-derived bound, not observed countdown"
+        },
+        "unobserved": [
+          "live Stadium countdown/transform state (no current safe per-tick accessor)",
+          "crowd-event and per-owner RNG ledger",
+          "scratch title/SIS slot transition",
+          "stock-out/standings",
+          "second lifetime and matched original comparison"
+        ],
+        "scope": "Functional single-world interval only. Original setup context is not a run prerequisite; it remains required with the original per-owner RNG ledger for comparison/C3 acceptance. No admission, C3 or full-session acceptance claim.",
+        "proposal_freeze_sha256": "35a6083c5e737176617412710461a7dda5871968eca415e7757b12305c1c4c56",
+        "candidate_sources": [
+          {
+            "path": "functional-idle-3500-proposal-v2/candidate/native_menu_host_trace.cpp",
+            "sha256": "b26b8c90b3f658a3e2790346dd359dccea1246fb0eda0ed20cb5bb0f5f3672d6"
+          },
+          {
+            "path": "functional-idle-3500-proposal-v2/candidate/test_gameplay_native_menus.py",
+            "sha256": "aba73cbb7c0f32de590abf974c2c4c5dfc32669dacca31f314f0b4a2d059598e"
+          }
+        ],
+        "direct_node_timeout_seconds": 120
       }
     }
   }

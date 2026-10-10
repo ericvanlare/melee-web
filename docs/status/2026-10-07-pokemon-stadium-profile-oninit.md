@@ -2,16 +2,19 @@
 
 **Compiled / Synthetic controls / Source identified / Native traced**
 
-**Current boundary:** the [source-session preparation](#october-9-source-session-ready-preparation)
-now passes the unchanged original Ready-and-close test on `dc88442c`.
-It reaches HUD Ready at 124 source ticks, retires the source world and releases
-the Session arena. A subsequent, separate recipe on `880e5bf6` advances exactly
-one neutral tick after Ready and also completes close. Separately, the actual
-Toy ownership controls pass three
-bounded lifetimes, including rejected foreign aliases and a partial-construction
-destructor. These are native no-draw lifecycle results. Exact GO alignment, two 3,500-post-GO
-lifetimes and the original per-owner RNG comparison remain unverified.
-Earlier failures below are retained historical evidence.
+**Current boundary:** the separately reviewed native source CSS→SSS setup observation
+on `a29f8d69` records the first-CSS seed and the distinct SSS-selected seed,
+all six source player rows, four compatibility rows, and checked zero-tick
+retirement. It did not construct a match or reach Ready/GO. A separate native
+no-draw canary on `a92352ea` traversed the original CSS→SSS route and observes
+the source Stage gate clear and GO in world tick 84, the next complete tick 85,
+HUD Ready at tick 124, and checked world/Session close.
+Its trace does not emit the typed setup receipt or bind the first-CSS seed
+context to match construction, so it cannot be paired with the separate setup
+receipt. The original per-owner RNG comparison and two 3,500-post-GO lifetimes
+remain unrun. The `a29f8d69` full suite and ordinary Release build passed; those
+checks do not execute the separately gated long interval. Earlier failures
+below remain historical evidence with their original scopes.
 
 The diagnostic-only Stadium profile and profile-to-`DatNativeMapContract`
 adapter compile in the C1 trace target. Focused profile and borrowed-yakumono
@@ -688,20 +691,77 @@ the first failure also has an independent raw-result review. Original source
 construction installs `Ground_801C1CD0` at priority 1, then `Ground_801C1D38` at
 priority 4, before Stadium adds its priority-4 callback. SDK process insertion
 links these through `child`, contradicting the new observer's child-null
-assumption. The two child identities remain unobserved in these traces. After
-two attempts, the next step is a smaller positive/negative chain reproducer and
-source review before another lifetime. No arbitrary child acceptance, original
-callback change or longer replay is justified by this result.
+assumption. The two child addresses were not captured. The later successful GO canary
+resolves the child-null predicate operationally for its completed source route,
+but does not identify or preserve those node addresses. The two earlier failed
+attempts remain retained at their original scopes; no arbitrary child
+acceptance or original callback change was made.
 
-The existing RNG observer can be reused afterward, but the Stadium notes require
-C3's per-tick, per-owner ledger to be compared with the original. C8's broader
-transformation comparison does not defer that C3 requirement; the roadmap now
-makes this explicit. Original HUD readiness and one complete Ready lifetime
-are now observed; exact GO alignment, the longer post-GO pair and remaining C3
-steps stay unverified. No C3, original equivalence,
-rendering, browser, physical-input, audible-output or timing acceptance follows
-from these checks.
+The earlier zero-tick observer refusals remain retained. A later bounded process-chain correction enabled the separate port-side GO canary below; it does not
+make an original capture or comparison. C3 requires its own per-tick, per-owner
+RNG ledger against the original, in addition to the original setup/state match.
+C8's broader transformation comparison does not replace this C3 requirement.
 
 The same [boundary receipt](../evidence/issue251-stadium-profile-oninit-v1.json)
-records the exact source, build, failed attempts, reducer and retained preparation
-error under `ready_session_boundary`.
+records the source setup, GO canary, earlier failures and remaining limits under
+`ready_session_boundary`.
+
+## October 10 UTC: native setup and GO canaries
+
+**Native traced setup observation / Native traced GO canary / C3 not passed**
+
+The separate source-menu run on `a29f8d69` completed original CSS→SSS selection
+of Stadium and checked menu/world/session retirement without entering a match.
+Its typed setup record distinguishes first-CSS seed `1` from SSS-selected seed
+`1425827233`; it retains six source-player rows, four compatibility rows,
+Human Mario slots `0/1`, source colors `1/0`, normalized four-stock selection,
+and the final 822-byte PAD history wire. The raw, normalized and post-VS rule
+payloads remain distinct; the receipt records where they differ. Independent reviewers
+checked the frozen result and verified the packet bindings,
+fixture inventory, raw trace and producer identities. This is setup provenance,
+not a complete replay context or a matched original comparison. Full transient
+SaveData bytes, PAD queue slots/qcount and complete CSS-to-SSS input history are
+unobserved; unknown callback identities and raw ABI pointer/padding bits are not
+normalized or inferred.
+
+A separate native no-draw run on `a92352ea` observes four ordered events:
+StageBefore and StageAfter at world tick 84 (gate `1→0`), GO at tick 84, and
+HUD enable at tick 123. It records the next full post-GO tick as `85→86`, then
+Ready at 124 and checked close with world, objects, processes and final Session
+arena all zero. PCM processing stayed enabled. The source-frame value remained
+zero across both observed scheduler ticks and is reported as observed; no
+frame-ordinal increment is inferred. This is a single neutral-input diagnostic
+lifetime, not an original comparison, RNG-equivalence result, or long C3 run.
+
+The typed setup observation and GO canary came from separate runs. The GO run
+itself traversed CSS→SSS, but did not emit the full typed setup row or bind the
+first-CSS seed context to match construction. The separate original-GO observer
+candidate is source-only: it has not been integrated, compiled or captured, and
+its planned capture does not include CSS/SSS steering or setup context; its
+attract-GO guard also remains unresolved. It is not original-result evidence.
+
+A separate one-world functional recipe is proposed to reuse the passing GO and
+Ready path and then continue neutral no-draw ticks until exactly 3,500 ticks
+have elapsed from the GO-containing tick, with the existing PCM cadence and
+checked close. Ready at world tick 124 is already 39 ticks after the GO boundary
+at world tick 85, so the remaining 3,461 ticks would end at 3,585. The source
+notes derive the earliest default-form transformation at post-GO ordinal 3,602
+(`xD8 = 3600 + HSD_Randi(200)`, followed by the source's two-tick trigger); the
+3,500-tick endpoint is therefore 102 ticks earlier by source arithmetic. This
+is a derived bound, not an observed live countdown. Current safe APIs do not
+expose the per-tick Stadium countdown, transform state, crowd events, scratch
+title or SIS slot, so this proposal does not claim those observations. Stock-out
+and standings also remain later source-path work.
+
+This one-world functional experiment does not require original-context pairing
+to run, and cannot satisfy C3 acceptance by itself. C3 comparison still requires
+a matched original setup/state context and the original per-tick, per-owner RNG
+ledger, plus two 3,500-post-GO lifetimes, screen/title/SIS observations,
+stock-out/standings, and checked retirement/recreation. Ordinary public Stadium
+admission remains closed.
+
+The `a29f8d69` full suite passed **2,350 tests, 171 skipped, 0 failures** and
+its ordinary Release build passed. The functional recipe remains an external
+source-only proposal and has not been integrated, built or run. The canaries do
+not establish C3, original equivalence, rendering, browser behavior,
+physical-input, audible-output or timing acceptance.
