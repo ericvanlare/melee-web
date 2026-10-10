@@ -5708,7 +5708,7 @@ index 116be3d41cc321eefbd5c71c9de7282e92220bbc..3d5a61476b4327b7f321704dceb7e8d2
  
  void grOldYoshi_8020E79C(void)
 diff --git a/src/melee/gr/ground.c b/src/melee/gr/ground.c
-index 6c26c029432e5a07f6c0a34343d87f9fd3364367..3492cd22f052a658e060a4ab3847a9b45002882a 100644
+index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4026a47bcd95d76e3edfc7ed6a991e1da02f8ee3 100644
 --- a/src/melee/gr/ground.c
 +++ b/src/melee/gr/ground.c
 @@ -1,5 +1,13 @@
@@ -5802,7 +5802,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..3492cd22f052a658e060a4ab3847a9b4
      }* cur;
      void* next;
      stage_datas[pair->grkind]->on_start();
-@@ -705,10 +758,31 @@ void Ground_801C0FB8(StageIdPair* pair)
+@@ -705,10 +758,39 @@ void Ground_801C0FB8(StageIdPair* pair)
          HSD_Free(cur);
      }
      stage_info.x6A4 = NULL;
@@ -5829,12 +5829,20 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..3492cd22f052a658e060a4ab3847a9b4
 +{
 +    return Ground_801C0C2C;
 +}
++/* Read-only diagnostic identity check for the two source-authored base
++ * Ground processes. Callers prove registry membership before reading a proc. */
++int melee_web_stadium_c1_ground_proc_callback_matches(
++    HSD_GObjEvent callback, unsigned priority)
++{
++    return (priority == 4 && callback == Ground_801C1D38) ||
++           (priority == 1 && callback == Ground_801C1CD0);
++}
 +#endif
 +
  void Ground_DemoInit(StageIdPair* pair, s32 arg1)
  {
      stage_datas[pair->grkind]->on_demo_init(arg1);
-@@ -1187,6 +1261,19 @@ static inline bool find_light_override(UnkArchiveStruct* archive,
+@@ -1187,6 +1269,19 @@ static inline bool find_light_override(UnkArchiveStruct* archive,
                                         HSD_LightDesc* desc, bool* b6, bool* b7,
                                         bool* b5)
  {
@@ -5854,7 +5862,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..3492cd22f052a658e060a4ab3847a9b4
      UnkStageDat* dat = archive->unk4;
      s32 count = dat->unk1C;
      s32 i;
-@@ -1210,6 +1297,19 @@ static inline bool find_light_override_in_dat(UnkStageDat* dat,
+@@ -1210,6 +1305,19 @@ static inline bool find_light_override_in_dat(UnkStageDat* dat,
                                                HSD_LightDesc* desc, bool* b6,
                                                bool* b7, bool* b5)
  {
@@ -5874,7 +5882,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..3492cd22f052a658e060a4ab3847a9b4
      s32 count = dat->unk1C;
      s32 i;
  
-@@ -1523,6 +1623,13 @@ void Ground_801C28CC(s32* arg0, StKind stkind)
+@@ -1523,6 +1631,13 @@ void Ground_801C28CC(s32* arg0, StKind stkind)
      panicMissingStageParam(stkind, count);
  }
  
@@ -5888,7 +5896,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..3492cd22f052a658e060a4ab3847a9b4
  s32* Ground_801C2AD8(void)
  {
      return &stage_info.xA0;
-@@ -2646,6 +2753,7 @@ void Ground_801C466C(void)
+@@ -2646,6 +2761,7 @@ void Ground_801C466C(void)
      int i;
      int count;
      HSD_GObj* temp_r3;
@@ -5896,7 +5904,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..3492cd22f052a658e060a4ab3847a9b4
      HSD_LObj* temp_r3_2;
      LightList** var_r27_2;
      HSD_LObj* var_r27;
-@@ -2666,6 +2774,7 @@ void Ground_801C466C(void)
+@@ -2666,6 +2782,7 @@ void Ground_801C466C(void)
          if (callbacks->flags_b0 == 1) {
              archive = grDatFiles_801C6330(i);
              selected = Ground_801C20E0(archive, archive->unk4->unk8[i].x18);
@@ -5904,7 +5912,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..3492cd22f052a658e060a4ab3847a9b4
              goto light_selected;
          }
          callbacks++;
-@@ -2674,7 +2783,18 @@ void Ground_801C466C(void)
+@@ -2674,7 +2791,18 @@ void Ground_801C466C(void)
  light_selected:
      if ((r28_carrier.lights = selected) == NULL) {
          r28_carrier.lights = Ground_803E06C8;
@@ -5923,7 +5931,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..3492cd22f052a658e060a4ab3847a9b4
      temp_r3 = GObj_Create(0xD, 3, 0);
      if (temp_r3 == NULL) {
          OSReport("%s:%d: couldn t get gobj\n", __FILE__, 0xEAF);
-@@ -3356,3 +3476,34 @@ void Ground_801C5AEC(Vec3* v, Vec3* arg1, Vec3* arg2, Vec3* arg3)
+@@ -3356,3 +3484,34 @@ void Ground_801C5AEC(Vec3* v, Vec3* arg1, Vec3* arg2, Vec3* arg3)
  
  /// @todo Is this used by base pointer anywhere? Not stripped by mwcc.
  static int unused_ints[] = { 1, 1, 0, 0, 0, 180, 0, 0, 0 };
@@ -5959,7 +5967,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..3492cd22f052a658e060a4ab3847a9b4
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..2f8f6f6e64c885df558d7c50a87a1af5d113a86b 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..3b89897d31498e8f205697abb5bc6ad12b61bbd4 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,16 @@
@@ -6131,7 +6139,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..2f8f6f6e64c885df558d7c50a87a1af5
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -788,137 +876,4968 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
+@@ -788,137 +876,5002 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
              }
              break;
          }
@@ -8564,22 +8572,55 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..2f8f6f6e64c885df558d7c50a87a1af5
 + * deliberately narrower than retirement preflight: it proves current source
 + * owner/map/root and backing-allocation identity without traversing SIS lists,
 + * allocating retirement snapshots, or changing the display owner. */
-+static int stadium_owner_go_manager_proc_root_contains_once(
-+    const HSD_GObjProc* expected)
++static int stadium_owner_go_proc_root_contains_once(
++    const HSD_GObjProc* expected, unsigned priority)
 +{
 +    HSD_GObjProc* node;
 +    unsigned visited = 0;
 +    unsigned found = 0;
 +    if (expected == NULL || HSD_GObj_804D7840 == NULL ||
-+        HSD_GObjLibInitData.gproc_pri_max < 10)
++        HSD_GObjLibInitData.gproc_pri_max < priority)
 +        return 0;
-+    node = HSD_GObj_804D7840[10];
++    node = HSD_GObj_804D7840[priority];
 +    while (node != NULL) {
 +        if (visited++ == STADIUM_MAP2_SNAPSHOT_TRAVERSAL_LIMIT) return 0;
 +        if (node == expected) ++found;
 +        node = node->next;
 +    }
 +    return found == 1;
++}
++
++extern int melee_web_stadium_c1_ground_proc_callback_matches(
++    HSD_GObjEvent callback, unsigned priority);
++
++/* Ground_GetStageGObj inserts animation(1), then ground callback(4).
++ * Stadium inserts its callback(4) last; child links point to the prior head.
++ * The caller has already proved map2's live stage-root identity. Prove each
++ * process registry before dereferencing that borrowed child identity. */
++static int stadium_owner_go_map2_proc_chain_matches(
++    const HSD_GObj* map2, const HSD_GObjProc* expected_head)
++{
++    const HSD_GObjProc* middle;
++    const HSD_GObjProc* tail;
++    if (map2 == NULL || expected_head == NULL || map2->proc != expected_head ||
++        !stadium_owner_map2_proc_root_contains_once(expected_head))
++        return 0;
++    middle = expected_head->child;
++    if (middle == NULL || middle == expected_head ||
++        !stadium_owner_map2_proc_root_contains_once(middle))
++        return 0;
++    tail = middle->child;
++    if (tail == NULL || tail == expected_head || tail == middle ||
++        !stadium_owner_go_proc_root_contains_once(tail, 1))
++        return 0;
++    return expected_head->gobj == map2 &&
++           expected_head->on_invoke == grStadium_801D1520 &&
++           expected_head->s_link == 4 &&
++           middle->gobj == map2 && middle->s_link == 4 &&
++           melee_web_stadium_c1_ground_proc_callback_matches(middle->on_invoke, 4) &&
++           tail->gobj == map2 && tail->s_link == 1 &&
++           melee_web_stadium_c1_ground_proc_callback_matches(tail->on_invoke, 1) &&
++           tail->child == NULL;
 +}
 +
 +int melee_web_stadium_display_owner_go_alignment_view(
@@ -8675,7 +8716,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..2f8f6f6e64c885df558d7c50a87a1af5
 +    if (!stadium_owner_map2_stage_root_contains_once(map5)) STADIUM_GO_VIEW_REJECT("!stadium_owner_map2_stage_root_contains_once(map5)");
 +    if (source_started) {
 +        if (!stadium_owner_map2_stage_root_contains_once(manager)) STADIUM_GO_VIEW_REJECT("!stadium_owner_map2_stage_root_contains_once(manager)");
-+        if (!stadium_owner_go_manager_proc_root_contains_once(manager_proc)) STADIUM_GO_VIEW_REJECT("!stadium_owner_go_manager_proc_root_contains_once(manager_proc)");
++        if (!stadium_owner_go_proc_root_contains_once(manager_proc, 10)) STADIUM_GO_VIEW_REJECT("!stadium_owner_go_proc_root_contains_once(manager_proc, 10)");
 +    }
 +    if (!stadium_owner_map2_proc_root_contains_once(map2->proc)) STADIUM_GO_VIEW_REJECT("!stadium_owner_map2_proc_root_contains_once(map2->proc)");
 +
@@ -8755,7 +8796,8 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..2f8f6f6e64c885df558d7c50a87a1af5
 +    if (map2->proc->gobj != map2) STADIUM_GO_VIEW_REJECT("map2->proc->gobj != map2");
 +    if (map2->proc->on_invoke != grStadium_801D1520) STADIUM_GO_VIEW_REJECT("map2->proc->on_invoke != grStadium_801D1520");
 +    if (map2->proc->s_link != 4) STADIUM_GO_VIEW_REJECT("map2->proc->s_link != 4");
-+    if (map2->proc->child != NULL) STADIUM_GO_VIEW_REJECT("map2->proc->child != NULL");
++    if (!stadium_owner_go_map2_proc_chain_matches(map2, owner->map2_proc))
++        STADIUM_GO_VIEW_REJECT("!stadium_owner_go_map2_proc_chain_matches(map2, owner->map2_proc)");
 +
 +    if (map2_data->u.stadium.xCC != owner->map2_buffer) STADIUM_GO_VIEW_REJECT("map2_data->u.stadium.xCC != owner->map2_buffer");
 +    if (map2_data->u.stadium.xE4 != map5) STADIUM_GO_VIEW_REJECT("map2_data->u.stadium.xE4 != map5");
@@ -11210,7 +11252,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..2f8f6f6e64c885df558d7c50a87a1af5
  
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
-@@ -1185,22 +6104,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +6138,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -11252,7 +11294,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..2f8f6f6e64c885df558d7c50a87a1af5
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +6152,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +6186,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -11274,7 +11316,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..2f8f6f6e64c885df558d7c50a87a1af5
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +6174,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +6208,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
@@ -11297,7 +11339,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..2f8f6f6e64c885df558d7c50a87a1af5
      wrapper->flag = false;
      return gobj;
  }
-@@ -1896,6 +6854,9 @@ bool grStadium_801D42B8(void)
+@@ -1896,6 +6888,9 @@ bool grStadium_801D42B8(void)
      if (gp->u.stadium.xC4_b1) {
          return false;
      }
@@ -11307,7 +11349,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..2f8f6f6e64c885df558d7c50a87a1af5
      gp->u.stadium.xD0 =
          grDatFiles_801C6478(gp->u.stadium.xCC, gp->u.stadium.xC8);
      return true;
-@@ -2093,6 +7054,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2093,6 +7088,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
              gp = GET_GROUND(map_gobj);
              HSD_ASSERT(0x99B, gp);
              gp->u.stadium.xC4_b1 = true;
@@ -11317,7 +11359,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..2f8f6f6e64c885df558d7c50a87a1af5
              lbFile_80016580(datfiles[var_r29], gp->u.stadium.xCC,
                              &gp->u.stadium.xC8, fn_801D4220, NULL);
              temp_r31->u.stadium.xDC = 1;
-@@ -2221,6 +7185,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2221,6 +7219,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
          if (temp_r31->u.stadium.xDE == 5) {
              temp_r31->u.stadium.xD8 =
                  randi_between_2(yakumono_param->x0, yakumono_param->x4);
