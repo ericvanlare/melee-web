@@ -2,7 +2,23 @@
 
 **Compiled / Synthetic controls / Source identified / Native traced / two same-process functional lifetimes passed**
 
-**Current boundary:** the separately reviewed native source CSS→SSS setup observation
+**Current boundary:** The reviewed `7d406f63` feedback driver completed one original
+CSS→SSS→selected Stadium→VS Setup→GO prefix. The complete streams contain 2,935
+MWRO records and 4,706 MWRI events; all 155 inputs remained unchanged. The strict
+validator accepted the consumed Stadium confirm/release, GO-containing tick C=84,
+first full post-GO tick F=85, and natural DrawReturn at sequence 2,933; both owned
+processes are absent. The native observer producer remains `91fc1fb9`. The
+independent raw review extracted original-only phase-tagged setup/RNG
+observations; matching native phases and owner-to-seed values remain the next
+bounded comparison.
+Stop at the first mismatch. The clean exact `7d406f63` suite passed 2,401 tests
+with 161 skips; 67 focused controls passed on canonical working source after exact
+candidate application before commit. The separate `8f785fe5` producer retains its
+two sequential 3,500-post-GO functional lifetimes and ordinary Results pass. This
+prefix does not establish native setup/RNG equivalence, a full match, or C3;
+ordinary public Stadium admission stays closed.
+
+**Earlier checkpoint context:** the separately reviewed native source CSS→SSS setup observation
 on `a29f8d69` records the first-CSS seed and the distinct SSS-selected seed,
 all six source player rows, four compatibility rows, and checked zero-tick
 retirement. It did not construct a match or reach Ready/GO. A separate native
@@ -881,13 +897,30 @@ input-policy success, or original setup/RNG comparison. The full current
 receipt and scoped evidence identities are in the
 [issue 251 boundary receipt](../evidence/issue251-stadium-profile-oninit-v1.json).
 
-The next proposal is a bounded driver-only feedback loop using a fresh completed
-same-call position tuple and its consumed PAD input, with at most four
-same-direction callbacks after a validated earlier-row hit omits the target tuple. Existing movement,
-ownership, input-consumption, neutral-stability, stage 18/kind 3, CSS→SSS→VS
-and GO guards remain in force. This proposal has not been integrated or
-captured. Original setup/per-owner RNG comparison and C3 remain open; ordinary
-public Stadium admission remains closed.
+The reviewed feedback driver later completed the bounded original Stadium GO
+prefix on the exact `7d406f63` driver source, reusing the native observer built
+from `91fc1fb9`. Its complete MWRO has 2,935 records and its complete MWRI has
+4,706 events; all 155 packet inputs match before and after. The strict validator
+accepted the original CSS→SSS→selected Stadium→VS Setup→GO prefix, including the
+containing tick C=84, first full post-GO tick F=85 and natural DrawReturn at
+sequence 2,933. The consumed Stadium A and neutral release are recorded at
+sequences 1,892 and 1,904. The bounded capture ended with both owned processes
+absent. These results are scoped to the original raw prefix; they do not
+establish profile/setup equality, port RNG equality, a full match, or C3.
+
+The independent raw review also extracted the authored original setup and RNG
+fields by phase. It observed VS Entry at sequence 2,468 with seed value
+`3bb84c53`, VS Setup at sequence 2,503 with `35a455b9`, and GO at sequence
+2,925 with `f228f136`; timer-enabled and time-limit fields are both zero. Those
+are original-only observations, not a native comparison. The next experiment
+initializes native CSS from the captured original first-CSS context through the
+existing replay API, then compares the immediate original OnEnter return before
+any menu tick. Compare the observed return seed, defined CSS/KO/PAD fields and
+source scene, followed by checked teardown. Stop at the first mismatch. Exact
+source-consumed menu replay and corresponding VS Entry/Setup/GO observations
+follow this smaller check. Per-owner RNG and the longer 3,500-tick comparison
+remain pending. The exact result, reviews and first-CSS proposal are
+in the [issue 251 boundary receipt](../evidence/issue251-stadium-profile-oninit-v1.json).
 
 The `a29f8d69` full suite passed 2,350 tests with 171 skips and zero failures.
 This remains the historical production baseline. The later exact `ee159395`
@@ -1005,14 +1038,14 @@ under their historical producer identities.
 This passes two functional source lifetimes only. Timer/transform state,
 screen/title/SIS, stock-out/standings and original setup/per-owner RNG comparison
 remain unobserved or unpaired. No draw/PCM equivalence, browser, physical-input,
-audible-output, timing or C3 acceptance follows. The 91fc source-position
-observer now provides valid, retained SSS cursor/target samples, but the original
-route still fails before VS/GO. Sol's final reduction confirms the missed target
-path and the existing-driver replay reproduces the failure at sequence 2,105
-after 11 actions. The next bounded work is an external driver-feedback proposal
-using fresh same-call observations and consumed input; it is not integrated or
-captured. The full retained evidence and exact scope are recorded in the
-[issue 251 boundary receipt](../evidence/issue251-stadium-profile-oninit-v1.json).
+audible-output, timing or C3 acceptance follows. The earlier `91fc1fb9`
+finite-policy refusal remains a retained historical failure; the later `7d406f63`
+feedback capture advances the original-prefix boundary only. The current next
+step is the first-CSS-only native return check from captured original entry
+context. Only after that agrees will source-consumed menu replay and corresponding
+VS Entry/Setup/GO setup and RNG comparisons proceed. Preserve phase distinctions
+and stop at the first mismatch before a longer ledger. The full evidence and exact scope are recorded
+in the [issue 251 boundary receipt](../evidence/issue251-stadium-profile-oninit-v1.json).
 Ordinary public Stadium admission remains closed.
 
 The ordinary Results regression was also repeated on the exact `8f785fe5`
