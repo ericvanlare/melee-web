@@ -7945,14 +7945,15 @@ void run_stadium_c1_context_preflight(
                 const auto allocation=melee_web_gameplay_allocation();
                 MeleeWebSourceMemoryContext memory{};
                 const auto status=melee_web_source_memory_context_read(&memory);
-                std::fprintf(stderr,"STADIUM_READY_SESSION phase=%s world_exists=%d world=%llu ticks=%llu heap=%d objects=%u processes=%u memory_status=%d memory_world=%llu memory_heap=%d watermark=%llu arena_identity=%llu arena_generation=%llu arena_bytes=%llu current_object=%p current_proc=%p gx=%p\n",
+                std::fprintf(stderr,"STADIUM_READY_SESSION phase=%s world_exists=%d world=%llu ticks=%llu heap=%d objects=%u processes=%u memory_status=%d memory_world=%llu memory_heap=%d watermark=%llu arena_identity=%llu arena_generation=%llu arena_bytes=%llu current_object=%p current_proc=%p gx=%p toy_archive=%p\n",
                     phase,melee_web_gameplay_world_exists(),(unsigned long long)stats.generation,
                     (unsigned long long)stats.ticks,stats.heap_free_bytes,stats.objects,stats.processes,
                     int(status),(unsigned long long)memory.world_generation,memory.source_heap_handle,
                     (unsigned long long)memory.allocation_generation_watermark,
                     (unsigned long long)allocation.identity,(unsigned long long)allocation.generation,
                     (unsigned long long)allocation.bytes,(void*)HSD_GObj_804D781C,
-                    (void*)HSD_GObj_804D7838,(void*)HSD_GObj_804D7814);
+                    (void*)HSD_GObj_804D7838,(void*)HSD_GObj_804D7814,
+                    (void*)_Toy_sbss_804D6ED0);
                 std::fflush(stderr);
             };
             check(ready_input!=nullptr,
@@ -8024,6 +8025,10 @@ void run_stadium_c1_context_preflight(
                 check(seed_ptr==parent_seed_owner && *parent_seed_owner==selected.random_seed,
                       "Stadium Ready failed to restore the exact parent host RNG owner");
                 check_stadium_selection_preserved(host,selected,baseline);
+                std::fprintf(stderr,
+                    "STADIUM_TOY_ALIAS phase=post-session-selection-preserved archive=%p\n",
+                    (void*)_Toy_sbss_804D6ED0);
+                std::fflush(stderr);
                 cleanup();
                 std::cout<<"Stadium original source-session Ready and checked owned-world retirement passed; one lifetime, no draw/post-GO idle/C3 claim\n";
                 return;

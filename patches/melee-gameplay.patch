@@ -15438,10 +15438,20 @@ index 288afe9322af85eb106d3e9703792fb928906925..9bee754820059ec41b6532d8f725f48f
  
  HSD_JObj* Player_80036EA0(s32 slot)
 diff --git a/src/melee/ty/toy.c b/src/melee/ty/toy.c
-index 732fa4f19adf9c82c134bab40d48ceba0f9bc314..3abbe82198ad3dddc315c1356fb7dab2fb95f811 100644
+index 732fa4f19adf9c82c134bab40d48ceba0f9bc314..28e542733427be1e28e9e5fb62359bd61029032a 100644
 --- a/src/melee/ty/toy.c
 +++ b/src/melee/ty/toy.c
-@@ -241,11 +241,19 @@ bool un_80304780(void)
+@@ -8,6 +8,9 @@
+ #include <math.h>
+ #include <placeholder.h>
+ #include <stddef.h>
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++#include <stdio.h>
++#endif
+ #include <string.h>
+ 
+ #include "tylist.h"
+@@ -241,11 +244,19 @@ bool un_80304780(void)
      { 7, 65 }, { 6, 66 }, { 5, 67 }, { 4, 68 }, { 3, 69 },
      { 2, 70 }, { 0, 73 }, { 1, 88 }, { 8, 83 },
  };
@@ -15461,7 +15471,7 @@ index 732fa4f19adf9c82c134bab40d48ceba0f9bc314..3abbe82198ad3dddc315c1356fb7dab2
  /* 4D5A40 */ static GXColor _Toy_color_E2E2E2FF = { 0xE2, 0xE2, 0xE2, 0xFF };
  /* 4D5A44 */ static GXColor _Toy_color_FF8020FF = { 0xFF, 0x80, 0x20, 0xFF };
  
-@@ -302,6 +310,48 @@ ASSERT_SIZE(_Toy_803B8910, 0x48);
+@@ -302,6 +313,48 @@ ASSERT_SIZE(_Toy_803B8910, 0x48);
  ASSERT_SIZE(_Toy_devtext_buf_804A26C4, 0x8C);
  ASSERT_SIZE(_Toy_devtext_buf_804A2750, 0xFC);
  
@@ -15510,7 +15520,7 @@ index 732fa4f19adf9c82c134bab40d48ceba0f9bc314..3abbe82198ad3dddc315c1356fb7dab2
  /// @todo .sdata2 order hack
  #ifdef MUST_MATCH
  static void order_sdata2_0(void)
-@@ -6420,6 +6470,9 @@ void Toy_80311960(void)
+@@ -6420,6 +6473,9 @@ void Toy_80311960(void)
  
  void Toy_Scene_OnEnter(void* arg0)
  {
@@ -15520,16 +15530,106 @@ index 732fa4f19adf9c82c134bab40d48ceba0f9bc314..3abbe82198ad3dddc315c1356fb7dab2
      u8* base;
      s16* selp;
      u32 buttons;
-@@ -6796,6 +6849,9 @@ void Toy_8031263C(void)
+@@ -6713,6 +6769,11 @@ void Toy_803124BC(void)
+     u16* table2;
+     s32 i;
+ 
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    fprintf(stderr, "STADIUM_TOY_ALIAS function=803124BC event=entry archive=%p\n",
++            (void*) _Toy_sbss_804D6ED0);
++    fflush(stderr);
++#endif
+     table1 = gmMainLib_GetTrophyFlags();
+     table2 = gmMainLib_GetTrophyCategoryFlags();
+ 
+@@ -6724,6 +6785,11 @@ void Toy_803124BC(void)
+             &_Toy_sbss_804D6EB4, "tyNoGetUsTbl", &Toy_sbss_804D6EB0,
+             "tyDisplayModelTbl", &Toy_sbss_804D6EAC, "tyDisplayModelUsTbl",
+             NULL);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++        fprintf(stderr, "STADIUM_TOY_ALIAS function=803124BC event=after-acquire archive=%p\n",
++                (void*) _Toy_sbss_804D6ED0);
++        fflush(stderr);
++#endif
+     }
+ 
+     i = 0;
+@@ -6755,6 +6821,11 @@ check:
+ 
+     *table2 |= 4;
+     Toy_804A284C[3] |= 4;
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    fprintf(stderr, "STADIUM_TOY_ALIAS function=803124BC event=exit archive=%p\n",
++            (void*) _Toy_sbss_804D6ED0);
++    fflush(stderr);
++#endif
+ }
+ 
+ void Toy_8031263C(void)
+@@ -6763,6 +6834,11 @@ void Toy_8031263C(void)
+     u16* table1;
+     u16* table2;
+ 
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    fprintf(stderr, "STADIUM_TOY_ALIAS function=8031263C event=entry archive=%p\n",
++            (void*) _Toy_sbss_804D6ED0);
++    fflush(stderr);
++#endif
+     ((TyModeState*) Toy_804A284C)->x4 = 0;
+     table1 = gmMainLib_GetTrophyFlags();
+     table2 = gmMainLib_GetTrophyCategoryFlags();
+@@ -6775,6 +6851,11 @@ void Toy_8031263C(void)
+             &_Toy_sbss_804D6EB4, "tyNoGetUsTbl", &Toy_sbss_804D6EB0,
+             "tyDisplayModelTbl", &Toy_sbss_804D6EAC, "tyDisplayModelUsTbl",
+             NULL);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++        fprintf(stderr, "STADIUM_TOY_ALIAS function=8031263C event=after-acquire archive=%p\n",
++                (void*) _Toy_sbss_804D6ED0);
++        fflush(stderr);
++#endif
+     }
+ 
+     i = 0;
+@@ -6792,10 +6873,23 @@ void Toy_8031263C(void)
+     Toy_804A284C[3] |= 4;
+     Toy_803102D0();
+     Toy_8031234C(0);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    fprintf(stderr, "STADIUM_TOY_ALIAS function=8031263C event=exit archive=%p\n",
++            (void*) _Toy_sbss_804D6ED0);
++    fflush(stderr);
++#endif
+ }
  
  void Toy_803127D4(void)
  {
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    fprintf(stderr, "STADIUM_TOY_ALIAS function=803127D4 event=entry archive=%p\n",
++            (void*) _Toy_sbss_804D6ED0);
++    fflush(stderr);
++#endif
 +#if defined(MELEE_WEB_GAMEPLAY)
 +    melee_web_toy_scene_active = 0;
 +#endif
      _Toy_sbss_804D6ED0 = NULL;
      _Toy_sbss_804D6EC4 = NULL;
      _Toy_sbss_804D6EC0 = NULL;
+@@ -6808,5 +6902,15 @@ void Toy_803127D4(void)
+     _Toy_sbss_804D6EA8 = NULL;
+     _Toy_sbss_804D6EA4 = NULL;
+     Toy_sbss_804D6EC8 = NULL;
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    fprintf(stderr, "STADIUM_TOY_ALIAS function=803127D4 event=after-clear archive=%p\n",
++            (void*) _Toy_sbss_804D6ED0);
++    fflush(stderr);
++#endif
+     memzero(&Toy_804A2AA8, sizeof(Toy_804A2AA8));
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    fprintf(stderr, "STADIUM_TOY_ALIAS function=803127D4 event=exit archive=%p\n",
++            (void*) _Toy_sbss_804D6ED0);
++    fflush(stderr);
++#endif
+ }
 diff --git a/src/melee/ty/toy.h b/src/melee/ty/toy.h
 index eaf465aff6b1236327786f3957e99cb155fc3266..f0dffce8b533392abe2e361e52d7c1fabcb11677 100644
 --- a/src/melee/ty/toy.h
