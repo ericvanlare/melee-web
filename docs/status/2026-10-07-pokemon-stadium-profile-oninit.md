@@ -5,9 +5,11 @@
 **Current boundary:** the [source-session preparation](#october-9-source-session-ready-preparation)
 now passes the unchanged original Ready-and-close test on `dc88442c`.
 It reaches HUD Ready at 124 source ticks, retires the source world and releases
-the Session arena. Separately, the actual Toy ownership controls pass three
+the Session arena. A subsequent, separate recipe on `880e5bf6` advances exactly
+one neutral tick after Ready and also completes close. Separately, the actual
+Toy ownership controls pass three
 bounded lifetimes, including rejected foreign aliases and a partial-construction
-destructor. These are native no-draw lifecycle results. GO, two 3,500-post-GO
+destructor. These are native no-draw lifecycle results. Exact GO alignment, two 3,500-post-GO
 lifetimes and the original per-owner RNG comparison remain unverified.
 Earlier failures below are retained historical evidence.
 
@@ -645,11 +647,28 @@ The earlier full regression on `95cf1f5f` passed 2,345 tests with 167 skips.
 The cleanup source `dc88442c` separately passes 2,346 tests with 168 skips
 and no failures; the exact source remained clean and unchanged. Its ordinary
 `runtime` Release build also passes with Stadium admission still disabled.
-Next, extend the existing source
-Session by one neutral tick after HUD Ready, retaining strict close and
-stopping at the first new failure before longer idle lifetimes. The original
+The subsequent test-only extension below reuses this source Session. The original
 GO callback precedes the HUD-ready flag; exact GO alignment remains to be
 observed before counting the C3 interval.
+
+The separate one-post-Ready recipe on `880e5bf6` passes. With neutral PAD
+and the existing 32 kHz audio-render cadence, source world ticks advance
+124 → 125 and gameplay source frames advance 0 → 1. Current world generation
+and source-memory context remain unchanged, HUD Ready remains true, and the
+match is neither ending nor complete. No draw occurs. The existing checked
+close then retires the world, followed by final Session arena identity,
+generation and bytes all zero.
+
+This result has its own diagnostic build and six passing focused OnInit controls.
+Independent review verifies 1,045 bindings, 98 fixtures and 17 raw files, and
+both exact children naturally exit with code zero and are reaped/absent.
+The full-suite and ordinary-runtime build result above belongs to `dc88442c`;
+those checks have not been rerun on the subsequent two-file test harness
+extension. Current-head integration validation remains required for the final
+milestone. This is one tick after HUD Ready, not a measured first post-GO tick.
+Next, source-review the exact GO dispatch, map-2 gate release and later HUD-enable
+events using the existing lifetime owner before adding a bounded observation.
+Keep the fixed construction journal and original callback order unchanged.
 
 The existing RNG observer can be reused afterward, but the Stadium notes require
 C3's per-tick, per-owner ledger to be compared with the original. C8's broader
