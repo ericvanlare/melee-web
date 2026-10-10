@@ -384,6 +384,77 @@ static int host_commit_vs_css_sss_route(MeleeWebMenuHost* h, CSSData* css,
     h->source_target_mode = -1;
     return ok(e, n);
 }
+static int host_prepare_vs_sss_cancel_css_route(MeleeWebMenuHost* h,
+                                                 SSSData* sss,
+                                                 char* e, size_t n)
+{
+    GameModeState* authored_css;
+    GameModeState* authored_sss;
+
+    if (h == NULL || h != owner || h->session == NULL || sss == NULL ||
+        h->source_mode_kind != GM_VS || !h->vs_mode_owned ||
+        h->source_scene != MELEE_WEB_HOST_SCENE_SSS ||
+        h->source_target_mode != -1 ||
+        melee_web_menu_sss(h->session) != sss || sss->start_game ||
+        h->source_scene_info.scene_kind != GS_SSS ||
+        h->source_scene_info.enter_data != sss ||
+        h->source_scene_info.exit_data != sss ||
+        gm_GetCurrentGameMode() != GM_VS ||
+        gm_GetCurrentSceneIndex() != gmVsMode_State_Sss ||
+        melee_web_vs_mode_pending_mode() != -1 ||
+        melee_web_vs_mode_next_state() != -1)
+        return fail(e, n, "Original VS SSS cancel has no exact live route owner");
+
+    authored_css = &gm_Mode_Vs_States[gmVsMode_State_Css];
+    authored_sss = &gm_Mode_Vs_States[gmVsMode_State_Sss];
+    if (authored_css->id != gmVsMode_State_Css ||
+        authored_css->info.scene_kind != GS_CSS ||
+        authored_sss->id != gmVsMode_State_Sss ||
+        authored_sss->info.scene_kind != GS_SSS ||
+        h->vs_sss_state.id != gmVsMode_State_Sss ||
+        h->vs_sss_state.info.scene_kind != GS_SSS ||
+        h->vs_sss_state.info.exit_data != sss)
+        return fail(e, n, "Original VS SSS cancel has no authored CSS/SSS rows");
+    return ok(e, n);
+}
+
+static int host_commit_vs_sss_cancel_css_route(MeleeWebMenuHost* h,
+                                                SSSData* sss,
+                                                char* e, size_t n)
+{
+    GameModeState* authored_css;
+    GameModeState* authored_sss;
+    int next;
+
+    if (h == NULL || h != owner || h->session == NULL || sss == NULL ||
+        h->source_mode_kind != GM_VS || !h->vs_mode_owned ||
+        h->source_scene != MELEE_WEB_HOST_SCENE_SSS ||
+        h->source_target_mode != -1 || sss->start_game ||
+        melee_web_menu_sss(h->session) != sss ||
+        h->source_scene_info.scene_kind != GS_SSS ||
+        h->source_scene_info.enter_data != sss ||
+        h->source_scene_info.exit_data != sss ||
+        gm_GetCurrentGameMode() != GM_VS ||
+        gm_GetCurrentSceneIndex() != gmVsMode_State_Sss ||
+        melee_web_vs_mode_pending_mode() != -1 ||
+        melee_web_vs_mode_next_state() != gmVsMode_State_Css)
+        return fail(e, n, "Original VS SSS cancel did not queue its authored CSS route");
+
+    authored_css = &gm_Mode_Vs_States[gmVsMode_State_Css];
+    authored_sss = &gm_Mode_Vs_States[gmVsMode_State_Sss];
+    next = melee_web_vs_mode_resolve_next_state(gm_Mode_Vs_States);
+    if (authored_css->id != gmVsMode_State_Css ||
+        authored_css->info.scene_kind != GS_CSS ||
+        authored_sss->id != gmVsMode_State_Sss ||
+        authored_sss->info.scene_kind != GS_SSS ||
+        next != gmVsMode_State_Css)
+        return fail(e, n, "Original VS SSS cancel resolved outside authored CSS");
+    if (!melee_web_vs_mode_select_state(next))
+        return fail(e, n, "Original VS SSS cancel could not commit authored CSS");
+    h->source_target_mode = -1;
+    return ok(e, n);
+}
+
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 static void first_sss_pair_fail(MeleeWebMenuHost* h, const char* text)
 {
@@ -1040,12 +1111,17 @@ static int source_scene_exit(void* data, MeleeWebMenuScene scene,
             }
         } else {
             h->vs_sss_state.info.exit_data = sss;
+            if (!sss->start_game &&
+                !host_prepare_vs_sss_cancel_css_route(h, sss, e, n)) return 0;
             gm_Mode_Vs_States[gmVsMode_State_Sss].on_exit(&h->vs_sss_state);
             if (sss->start_game && h->vs_mode_owned) {
                 if (!melee_web_vs_mode_end()) {
                     return fail(e, n, "Original VS mode lease did not release before match");
                 }
                 h->vs_mode_owned = 0;
+            } else if (!sss->start_game &&
+                       !host_commit_vs_sss_cancel_css_route(h, sss, e, n)) {
+                return 0;
             }
         }
     } else {
