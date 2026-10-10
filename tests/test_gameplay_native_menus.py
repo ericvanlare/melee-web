@@ -2632,6 +2632,11 @@ int main(void)
         self._run_stadium_source_ready_session_one_shot(
             go_alignment_probe=True, functional_idle_probe=True)
 
+    def test_stadium_source_functional_idle_3500_two_lifetimes_one_node(self):
+        if os.environ.get("MELEE_RUN_STADIUM_SOURCE_FUNCTIONAL_IDLE_3500_TWO_LIFETIMES") != "1":
+            self.skipTest("Two same-process 3,500-post-GO lifetimes require their separately reviewed run gate")
+        self._run_stadium_source_ready_session_one_shot(functional_idle_pair_probe=True)
+
     def test_stadium_source_setup_one_shot(self):
         if os.environ.get("MELEE_RUN_STADIUM_SOURCE_SETUP") != "1":
             self.skipTest("Original CSS/SSS setup receipt requires its separately reviewed run gate")
@@ -2644,7 +2649,7 @@ int main(void)
 
     def _run_stadium_source_ready_session_one_shot(
             self, toy_owner_controls=False, post_ready_tick=False, go_alignment_probe=False,
-            setup_only=False, functional_idle_probe=False):
+            setup_only=False, functional_idle_probe=False, functional_idle_pair_probe=False):
         import hashlib
         from capture_sd_reference_prefix import cleanup_process
 
@@ -2672,13 +2677,15 @@ int main(void)
         before = {name: hashlib.sha256(path.read_bytes()).hexdigest()
                   for name, path in paths.items()}
         source = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-        scope = ("stadium-source-functional-idle-v1" if functional_idle_probe
+        scope = ("stadium-source-functional-idle-pair-v1" if functional_idle_pair_probe
+                 else "stadium-source-functional-idle-v1" if functional_idle_probe
                  else "stadium-source-toy-owner-controls-v1" if toy_owner_controls
                  else "stadium-source-post-ready-tick-v1" if post_ready_tick
                  else "stadium-source-go-alignment-v1" if go_alignment_probe
                  else "stadium-source-setup-v1" if setup_only
                  else "stadium-source-ready-session-v1")
-        prefix = ("stadium-functional-idle" if functional_idle_probe
+        prefix = ("stadium-functional-idle-pair" if functional_idle_pair_probe
+                  else "stadium-functional-idle" if functional_idle_probe
                   else "stadium-toy-owner" if toy_owner_controls
                   else "stadium-post-ready" if post_ready_tick
                   else "stadium-go-alignment" if go_alignment_probe
@@ -2840,15 +2847,19 @@ int main(void)
             self.assertIn("raw StartMeleeData ABI padding and native pointer bit patterns",
                           receipt["unobserved"])
             return
-        phases = re.findall(r"STADIUM_READY_SESSION phase=(\S+) world_exists=(\d+) world=(\d+) ticks=(\d+) heap=(-?\d+) objects=(\d+) processes=(\d+)", stderr)
-        self.assertEqual([row[0] for row in phases], ["before-construction",
-                         "construction-complete-before-source-ticks", "first-ready-before-close",
-                         "checked-session-close"])
-        self.assertEqual(int(phases[0][1]), 0)
-        self.assertEqual(int(phases[1][3]), 0)
-        self.assertGreater(int(phases[2][2]), 0)
-        self.assertGreater(int(phases[2][3]), 0)
-        self.assertEqual([int(phases[3][i]) for i in (1, 2, 3, 5, 6)], [0, 0, 0, 0, 0])
+        if functional_idle_pair_probe:
+            self._assert_stadium_source_functional_idle_pair(
+                stdout, stderr, trace, output, source)
+        else:
+            phases = re.findall(r"STADIUM_READY_SESSION phase=(\S+) world_exists=(\d+) world=(\d+) ticks=(\d+) heap=(-?\d+) objects=(\d+) processes=(\d+)", stderr)
+            self.assertEqual([row[0] for row in phases], ["before-construction",
+                             "construction-complete-before-source-ticks", "first-ready-before-close",
+                             "checked-session-close"])
+            self.assertEqual(int(phases[0][1]), 0)
+            self.assertEqual(int(phases[1][3]), 0)
+            self.assertGreater(int(phases[2][2]), 0)
+            self.assertGreater(int(phases[2][3]), 0)
+            self.assertEqual([int(phases[3][i]) for i in (1, 2, 3, 5, 6)], [0, 0, 0, 0, 0])
         if functional_idle_probe:
             self.assertIn(
                 "Stadium one-world neutral no-draw interval reached exactly 3,500 ticks after the GO-containing tick, with PCM processing and checked close; timer/transform state unobserved; no C3 claim",
@@ -2892,6 +2903,10 @@ int main(void)
             go_tick, ready_tick, target_tick, post_go, _session, _frames = map(int, complete[0])
             self.assertEqual((go_tick, ready_tick, target_tick, post_go), (85, 124, 3585, 3500))
             self.assertIn("STADIUM_SOURCE_GO phase=checked-close snapshot_unavailable=1", stderr)
+        elif functional_idle_pair_probe:
+            self.assertIn(
+                "Two same-process Stadium functional-idle lifetimes each reached 3,500 post-GO no-draw PCM ticks and fully retired their owners; no C3 claim",
+                stdout)
         elif toy_owner_controls:
             self.assertIn("Stadium bounded Toy owner controls passed; one Ready plus no-acquisition and unarmed OnInit lifetimes, no C3 claim", stdout)
             self.assertIn("STADIUM_TOY_OWNER phase=entry-null-archive-table-refused unchanged=1", stderr)
@@ -2992,6 +3007,159 @@ int main(void)
             self.assertNotIn("STADIUM_READY_CONSTRUCTION_FIRST_FAILURE", stderr)
         self.assertIn("C3_SESSION_CLOSED identity=0 generation=0 bytes=0 world_exists=0", stderr)
         self.assertNotIn('"probe":"stadium-source-oninit"', stdout)
+
+    def _assert_stadium_source_functional_idle_pair(self, stdout, stderr, trace, owner_dir, source):
+        import re
+
+        self.assertEqual(stdout.count(
+            "Stadium one-world neutral no-draw interval reached exactly 3,500 ticks after the GO-containing tick, with PCM processing and checked close; timer/transform state unobserved; no C3 claim"), 2)
+        self.assertIn(
+            "Two same-process Stadium functional-idle lifetimes each reached 3,500 post-GO no-draw PCM ticks and fully retired their owners; no C3 claim",
+            stdout)
+
+        identity = json.loads((owner_dir / "identity.json").read_text())
+        self.assertEqual(identity["ownership"], "direct-Popen")
+        self.assertEqual(identity["scope"], "stadium-source-functional-idle-pair-v1")
+        self.assertEqual(identity["source_revision"], source)
+        self.assertIsInstance(identity["pid"], int)
+        self.assertGreater(identity["pid"], 0)
+
+        trace_rows = [json.loads(line) for line in trace.read_text().splitlines()]
+        self.assertEqual([row["record"] for row in trace_rows], [
+            "header", "stadium_functional_idle_lifetime", "sis_lease", "sis_lease",
+            "stadium_functional_idle_lifetime", "stadium_functional_idle_lifetime",
+            "sis_lease", "sis_lease", "stadium_functional_idle_lifetime"])
+        self.assertEqual(trace_rows[0]["schema"], "melee-web-transition-trace")
+        self.assertEqual(trace_rows[0]["producer"], "port")
+        self.assertEqual(trace_rows[0]["game_revision"], "GALE01r2")
+        self.assertEqual(trace_rows[0]["build_configuration"], "browser-release")
+        self.assertEqual(trace_rows[0]["input_recipe"], "stadium-source-functional-idle-pair-v1")
+        self.assertEqual(trace_rows[0]["source_revision"], source)
+        sessions = []
+        worlds = []
+        for ordinal in range(2):
+            offset = 1 + ordinal * 4
+            begin, menu_captured, menu_verified, closed = trace_rows[offset:offset + 4]
+            self.assertEqual((begin["run"], begin["ordinal"], begin["phase"]),
+                             (ordinal, ordinal, "begin"))
+            self.assertEqual([menu_captured["boundary"], menu_verified["boundary"]],
+                             ["captured_before_menu_leave", "verified_retired_before_world_shutdown"])
+            self.assertTrue(menu_verified["retirement_verified"])
+            self.assertEqual((closed["run"], closed["ordinal"], closed["phase"]),
+                             (ordinal, ordinal, "closed"))
+            self.assertGreater(begin["session_identity"], 0)
+            self.assertGreater(begin["session_generation"], 0)
+            self.assertEqual(begin["session_bytes"], 32 * 1024 * 1024)
+            self.assertEqual(begin["world_generation"], 0)
+            self.assertEqual(closed["session_identity"], begin["session_identity"])
+            self.assertEqual(closed["session_generation"], begin["session_generation"])
+            self.assertEqual(closed["session_bytes"], begin["session_bytes"])
+            self.assertGreater(closed["world_generation"], 0)
+            self.assertEqual((closed["released_identity"], closed["released_generation"],
+                              closed["released_bytes"]), (0, 0, 0))
+            sessions.append(begin["session_generation"])
+            worlds.append(closed["world_generation"])
+        self.assertGreater(sessions[1], sessions[0])
+        self.assertGreater(worlds[1], worlds[0])
+
+        begin_markers = list(re.finditer(
+            r"STADIUM_FUNCTIONAL_IDLE_LIFETIME phase=begin ordinal=(\d+) session_identity=(\d+) session_generation=(\d+) session_bytes=(\d+) world_generation=0\n",
+            stderr))
+        close_markers = list(re.finditer(
+            r"STADIUM_FUNCTIONAL_IDLE_LIFETIME phase=closed ordinal=(\d+) session_identity=(\d+) session_generation=(\d+) session_bytes=(\d+) world_generation=(\d+) released_identity=(\d+) released_generation=(\d+) released_bytes=(\d+) world_exists=(\d+)\n",
+            stderr))
+        self.assertEqual(len(begin_markers), 2)
+        self.assertEqual(len(close_markers), 2)
+        self.assertEqual(stderr.count("C3_SESSION_CLOSED identity=0 generation=0 bytes=0 world_exists=0"), 2)
+
+        event_pattern = (r"STADIUM_SOURCE_GO_EVENT event=(\S+) sequence=(\d+) generation=(\d+) world_ticks=(\d+) source_frame=(\d+) object=(\d+) proc=(\d+) callback_index=(-?\d+) source_branch=(-?\d+) map2_gate=(-?\d+) display_mode=(-?\d+) remap_branch=(-?\d+) callback_identity=(-?\d+) hud_enabled=(-?\d+)")
+        step_pattern = (r"STADIUM_FUNCTIONAL_IDLE_STEP ordinal=(\d+) world_before=(\d+) world_after=(\d+) session_before=(\d+) session_after=(\d+) source_frame_before=(\d+) source_frame_after=(\d+) generation=(\d+) memory_status_before=(\d+) memory_status_after=(\d+) memory_world_before=(\d+) memory_world_after=(\d+) source_heap_before=(-?\d+) source_heap_after=(-?\d+) ready=(\d+) ending=(\d+) complete=(\d+) draw=0 audio=rendered")
+        phase_pattern = (r"STADIUM_READY_SESSION phase=(\S+) world_exists=(\d+) world=(\d+) ticks=(\d+) heap=(-?\d+) objects=(\d+) processes=(\d+)")
+        begin_pattern = (r"STADIUM_FUNCTIONAL_IDLE phase=begin go_world_after=(\d+) ready_world_tick=(\d+) already_post_go_ticks=(\d+) target_world_tick=(\d+) draw=0 timer=unobserved transform=unobserved")
+        complete_pattern = (r"STADIUM_FUNCTIONAL_IDLE phase=complete go_world_after=(\d+) ready_world_tick=(\d+) target_world_tick=(\d+) observed_post_go_ticks=(\d+) final_session_ticks=(\d+) final_source_frame=(\d+) draw=0 timer=unobserved transform=unobserved")
+
+        for ordinal, (start_marker, close_marker) in enumerate(zip(begin_markers, close_markers)):
+            self.assertEqual(int(start_marker.group(1)), ordinal)
+            self.assertEqual(int(close_marker.group(1)), ordinal)
+            self.assertEqual(start_marker.group(2), close_marker.group(2))
+            self.assertEqual(start_marker.group(3), close_marker.group(3))
+            trace_begin = trace_rows[1 + ordinal * 4]
+            trace_closed = trace_rows[4 + ordinal * 4]
+            self.assertEqual(tuple(map(int, start_marker.groups()[1:])),
+                             (trace_begin["session_identity"], trace_begin["session_generation"],
+                              trace_begin["session_bytes"]))
+            self.assertEqual(tuple(map(int, close_marker.groups()[1:5])),
+                             (trace_closed["session_identity"], trace_closed["session_generation"],
+                              trace_closed["session_bytes"], trace_closed["world_generation"]))
+            self.assertEqual(int(close_marker.group(5)), worlds[ordinal])
+            self.assertEqual(tuple(map(int, close_marker.groups()[5:])), (0, 0, 0, 0))
+            segment = stderr[start_marker.end():close_marker.start()]
+            phases = re.findall(phase_pattern, segment)
+            self.assertEqual([row[0] for row in phases], [
+                "before-construction", "construction-complete-before-source-ticks",
+                "first-ready-before-close", "checked-session-close"])
+            self.assertEqual(int(phases[0][1]), 0)
+            self.assertEqual(int(phases[1][3]), 0)
+            self.assertGreater(int(phases[2][2]), 0)
+            self.assertGreater(int(phases[2][3]), 0)
+            self.assertEqual([int(phases[3][i]) for i in (1, 2, 3, 5, 6)], [0, 0, 0, 0, 0])
+
+            events = re.findall(event_pattern, segment)
+            self.assertEqual([row[0] for row in events], ["StageBefore", "StageAfter", "GoAfter", "HudAfter"])
+            self.assertEqual([int(row[1]) for row in events], [1, 2, 3, 4])
+            world_generation = int(events[0][2])
+            self.assertEqual(world_generation, worlds[ordinal])
+            self.assertEqual(len({int(row[2]) for row in events}), 1)
+            self.assertEqual((int(events[0][9]), int(events[1][9])), (1, 0))
+            self.assertEqual((int(events[2][9]), int(events[2][10])), (0, 0xB))
+            self.assertEqual((int(events[3][10]), int(events[3][12])), (1, 1))
+
+            steps = [tuple(map(int, row)) for row in re.findall(step_pattern, segment)]
+            self.assertEqual(len(steps), 3500)
+            go_world_after = int(events[2][3]) + 1
+            ready_world_tick = int(phases[2][3])
+            ready_span = ready_world_tick - go_world_after
+            self.assertGreater(ready_span, 0)
+            self.assertLessEqual(ready_span, 600)
+            self.assertEqual(steps[0][1], go_world_after)
+            for step_ordinal, row in enumerate(steps, 1):
+                self.assertEqual(row[0], step_ordinal)
+                self.assertEqual(row[2], row[1] + 1)
+                self.assertEqual(row[4], row[3] + 1)
+                if step_ordinal > 1:
+                    previous = steps[step_ordinal - 2]
+                    self.assertEqual((row[1], row[3], row[5]),
+                                     (previous[2], previous[4], previous[6]))
+                self.assertEqual(row[2] - go_world_after, step_ordinal)
+                if row[1] < ready_world_tick:
+                    self.assertEqual(row[6], row[5])
+                    self.assertEqual(row[14], int(row[2] >= ready_world_tick))
+                else:
+                    self.assertEqual(row[6], row[5] + 1)
+                    self.assertEqual(row[14], 1)
+                self.assertEqual(row[7], world_generation)
+                self.assertEqual((row[8], row[9]), (0, 0))
+                self.assertEqual((row[10], row[11]), (world_generation, world_generation))
+                self.assertGreaterEqual(row[12], 0)
+                self.assertEqual(row[13], row[12])
+                self.assertEqual((row[15], row[16]), (0, 0))
+
+            begin = re.findall(begin_pattern, segment)
+            self.assertEqual(len(begin), 1)
+            begin_go, begin_ready, already_post_go, begin_target = map(int, begin[0])
+            self.assertEqual((begin_go, begin_ready, already_post_go, begin_target),
+                             (go_world_after, ready_world_tick, ready_span,
+                              go_world_after + 3500))
+            complete = re.findall(complete_pattern, segment)
+            self.assertEqual(len(complete), 1)
+            go_tick, ready_tick, target_tick, post_go, final_session_ticks, final_source_frame = map(int, complete[0])
+            self.assertEqual((go_tick, ready_tick), (go_world_after, ready_world_tick))
+            self.assertEqual(target_tick - go_tick, 3500)
+            self.assertEqual(post_go, 3500)
+            self.assertEqual((target_tick, final_session_ticks, final_source_frame),
+                             (steps[-1][2], steps[-1][4], steps[-1][6]))
+            self.assertIn("STADIUM_SOURCE_GO phase=checked-close snapshot_unavailable=1", segment)
+        self.assertNotIn("STADIUM_READY_SESSION_FIRST_FAILURE", stderr)
 
     def test_stadium_source_text_lifetime_one_shot(self):
         if os.environ.get("MELEE_RUN_STADIUM_SOURCE_TEXT_LIFETIME") != "1":

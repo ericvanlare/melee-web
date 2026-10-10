@@ -3114,6 +3114,21 @@ public:
  }
  void begin_run(unsigned run){run_=run;index_=0;epochs.clear();}
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ void stadium_functional_idle_lifetime(unsigned ordinal,const char* phase,
+     const MeleeWebGameplayAllocation& session,uint64_t world_generation,
+     const MeleeWebGameplayAllocation& released){
+  check(output.is_open(),"Functional-idle lifetime marker requires retained trace output");
+  output<<"{\"record\":\"stadium_functional_idle_lifetime\",\"run\":"<<run_
+        <<",\"ordinal\":"<<ordinal<<",\"phase\":\""<<phase<<"\""
+        <<",\"session_identity\":"<<session.identity
+        <<",\"session_generation\":"<<session.generation
+        <<",\"session_bytes\":"<<session.bytes
+        <<",\"world_generation\":"<<world_generation
+        <<",\"released_identity\":"<<released.identity
+        <<",\"released_generation\":"<<released.generation
+        <<",\"released_bytes\":"<<released.bytes<<"}\n";
+  output.flush();
+ }
  void sis_lease(const char* boundary, const MeleeWebRetiredSisLease* retired) {
   if(!output)return;
   const void* current_heap=HSD_SisLib_HeapOwner();
@@ -7989,7 +8004,9 @@ void run_stadium_c1_context_preflight(
     bool toy_owner_controls = false,
     bool post_ready_tick_probe = false,
     bool go_alignment_probe = false,
-    bool functional_idle_probe = false)
+    bool functional_idle_probe = false,
+    bool functional_idle_pair_probe = false,
+    uint64_t* functional_idle_world_generation = nullptr)
 {
     const bool go_probe = go_alignment_probe || functional_idle_probe;
     char error[256]{};
@@ -8522,9 +8539,11 @@ void run_stadium_c1_context_preflight(
                 if(functional_idle_probe){
                     const auto ready_world=melee_web_gameplay_stats();
                     const auto already_post_go=ready_world.ticks-go_containing_world_after;
+                    const bool ready_span_in_scope = functional_idle_pair_probe
+                        ? already_post_go>0&&already_post_go<=600 : already_post_go==39;
                     check(go_containing_tick_seen&&go_post_tick_seen&&ready_world.ticks>=go_containing_world_after&&
-                              already_post_go==39&&match->ready()&&!match->ending()&&!match->complete(),
-                          "Functional idle recipe did not retain the reviewed Ready/GO boundary");
+                              ready_span_in_scope&&match->ready()&&!match->ending()&&!match->complete(),
+                          "Functional idle recipe did not retain its checked Ready/GO boundary");
                     const auto target_world=go_containing_world_after+3500;
                     std::fprintf(stderr,
                         "STADIUM_FUNCTIONAL_IDLE phase=begin go_world_after=%llu ready_world_tick=%llu already_post_go_ticks=%llu target_world_tick=%llu draw=0 timer=unobserved transform=unobserved\n",
@@ -8557,10 +8576,12 @@ void run_stadium_c1_context_preflight(
                         const auto memory_status_after=
                             melee_web_source_memory_context_read(&memory_after);
                         const auto ordinal=after_tick.ticks-go_containing_world_after;
+                        const bool ordinal_after_ready = functional_idle_pair_probe
+                            ? ordinal>already_post_go : ordinal>39;
                         check(after_tick.generation==before_tick.generation&&
                                   after_tick.ticks==before_tick.ticks+1&&session_after==session_before+1&&
                                   frames_after==frames_before+1&&
-                                  ordinal>39&&ordinal<=3500&&
+                                  ordinal_after_ready&&ordinal<=3500&&
                                   memory_status_after==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
                                   memory_after.world_generation==memory_before.world_generation&&
                                   memory_after.source_heap_handle==memory_before.source_heap_handle&&
@@ -8598,6 +8619,8 @@ void run_stadium_c1_context_preflight(
                         static_cast<unsigned long long>(match->player_stats(0).ticks),
                         match->source_frames());
                     std::fflush(stderr);
+                    if(functional_idle_world_generation)
+                        *functional_idle_world_generation=final_world.generation;
                 }
                 if(post_ready_tick_probe){
                     const auto before_tick=melee_web_gameplay_stats();
@@ -9106,7 +9129,9 @@ void run_stadium_c1a_selection_smoke(
     bool post_ready_tick_probe=false,
     bool go_alignment_probe=false,
     bool setup_only_probe=false,
-    bool functional_idle_probe=false)
+    bool functional_idle_probe=false,
+    bool functional_idle_pair_probe=false,
+    uint64_t* functional_idle_world_generation=nullptr)
 {
     char error[256]{};
     MeleeWebRetiredSisLease retired_sis{};
@@ -9338,7 +9363,8 @@ void run_stadium_c1a_selection_smoke(
             source_on_init ? &retired_sis : nullptr, trace, full_world_lifecycle, ready_session,
             pad_leave_probe, source_text_lifetime_probe,
             ready_text_membership_probe,toy_owner_controls,post_ready_tick_probe,
-            go_alignment_probe,functional_idle_probe);
+            go_alignment_probe,functional_idle_probe,functional_idle_pair_probe,
+            functional_idle_world_generation);
     } else {
         world->verify_immutable_archives();
         world->close();
@@ -9508,6 +9534,8 @@ int main(int argc,char** argv){try{
      std::string(input_recipe)=="stadium-source-go-alignment-v1";
  const bool stadium_source_functional_idle_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-source-functional-idle-v1";
+ const bool stadium_source_functional_idle_pair_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-source-functional-idle-pair-v1";
  const bool stadium_source_setup_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-source-setup-v1";
  const bool stadium_source_world_recipe=input_recipe&&
@@ -9530,6 +9558,7 @@ int main(int argc,char** argv){try{
  const bool stadium_ready_session_recipe=false;
  const bool stadium_source_go_alignment_recipe=false;
  const bool stadium_source_functional_idle_recipe=false;
+ const bool stadium_source_functional_idle_pair_recipe=false;
  const bool stadium_source_setup_recipe=false;
  const bool stadium_post_ready_tick_recipe=false;
  const bool stadium_toy_owner_recipe=false;
@@ -9546,7 +9575,8 @@ int main(int argc,char** argv){try{
     !stadium_c1_item_state_preflight_recipe&&!stadium_screen_roots_recipe&&
     !stadium_e8_request_recipe&&!stadium_ground_map1_owner_recipe&&
     !stadium_source_on_init_recipe&&!stadium_source_world_recipe&&!stadium_ready_session_recipe&&
-    !stadium_source_go_alignment_recipe&&!stadium_source_functional_idle_recipe&&!stadium_source_setup_recipe&&
+    !stadium_source_go_alignment_recipe&&!stadium_source_functional_idle_recipe&&
+    !stadium_source_functional_idle_pair_recipe&&!stadium_source_setup_recipe&&
     !stadium_pad_leave_probe_recipe&&!stadium_source_text_lifetime_recipe&&
     !stadium_ready_text_membership_recipe&&
     !v10_css_replay_start_recipe)
@@ -9565,7 +9595,8 @@ int main(int argc,char** argv){try{
      stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
      stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
      stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
-     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||stadium_source_setup_recipe||
+     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||
+     stadium_source_functional_idle_pair_recipe||stadium_source_setup_recipe||
      stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
      stadium_ready_text_membership_recipe)&&
     stage_kind!=St_Kind_PStadium)
@@ -9578,7 +9609,8 @@ int main(int argc,char** argv){try{
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
     stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
-     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||stadium_source_setup_recipe||
+     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||
+     stadium_source_functional_idle_pair_recipe||stadium_source_setup_recipe||
     stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
     stadium_ready_text_membership_recipe||
     v10_css_replay_start_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
@@ -9609,11 +9641,72 @@ int main(int argc,char** argv){try{
   return 0;
  }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(stadium_source_functional_idle_pair_recipe){
+  MeleeWebGameplayAllocation prior_session=session_allocation;
+  check(prior_session.identity&&prior_session.generation&&
+            prior_session.bytes==32U*1024U*1024U,
+        "First functional-idle lifetime has no live 32 MiB Session arena");
+  uint64_t world_generations[2]{};
+  for(unsigned lifetime=0;lifetime<2;++lifetime){
+   MeleeWebGameplayAllocation session=prior_session;
+   if(lifetime){
+    check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
+    session=melee_web_gameplay_allocation();
+    check(session.identity&&session.generation>prior_session.generation&&
+              session.bytes==32U*1024U*1024U,
+          "Second functional-idle lifetime did not receive a newer live Session arena");
+   }
+   trace.begin_run(lifetime);
+   const MeleeWebGameplayAllocation no_release{};
+   trace.stadium_functional_idle_lifetime(lifetime,"begin",session,0,no_release);
+   std::fprintf(stderr,
+       "STADIUM_FUNCTIONAL_IDLE_LIFETIME phase=begin ordinal=%u session_identity=%llu session_generation=%llu session_bytes=%llu world_generation=0\n",
+       lifetime,static_cast<unsigned long long>(session.identity),
+       static_cast<unsigned long long>(session.generation),
+       static_cast<unsigned long long>(session.bytes));
+   std::fflush(stderr);
+   uint64_t world_generation=0;
+   run_stadium_c1a_selection_smoke(
+       files,true,false,false,false,false,true,false,argv[1],argv[2],trace,
+       true,false,false,false,false,false,true,false,true,true,&world_generation);
+   check(world_generation!=0,
+         "Functional-idle lifetime completed without returning its world generation");
+   world_generations[lifetime]=world_generation;
+   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
+   const auto released=melee_web_gameplay_allocation();
+   check(!released.identity&&!released.generation&&!released.bytes&&
+             !melee_web_gameplay_world_exists(),
+         "Functional-idle lifetime did not release its Session arena and world");
+   trace.stadium_functional_idle_lifetime(lifetime,"closed",session,world_generation,released);
+   std::fprintf(stderr,
+       "STADIUM_FUNCTIONAL_IDLE_LIFETIME phase=closed ordinal=%u session_identity=%llu session_generation=%llu session_bytes=%llu world_generation=%llu released_identity=%llu released_generation=%llu released_bytes=%llu world_exists=%d\n",
+       lifetime,static_cast<unsigned long long>(session.identity),
+       static_cast<unsigned long long>(session.generation),
+       static_cast<unsigned long long>(session.bytes),
+       static_cast<unsigned long long>(world_generation),
+       static_cast<unsigned long long>(released.identity),
+       static_cast<unsigned long long>(released.generation),
+       static_cast<unsigned long long>(released.bytes),melee_web_gameplay_world_exists());
+   std::fprintf(stderr,"C3_SESSION_CLOSED identity=%llu generation=%llu bytes=%llu world_exists=%d\n",
+       static_cast<unsigned long long>(released.identity),
+       static_cast<unsigned long long>(released.generation),
+       static_cast<unsigned long long>(released.bytes),melee_web_gameplay_world_exists());
+   std::fflush(stderr);
+   prior_session=session;
+  }
+  check(world_generations[1]>world_generations[0],
+        "Second functional-idle lifetime did not receive a newer world generation");
+  std::cout<<"Two same-process Stadium functional-idle lifetimes each reached 3,500 post-GO no-draw PCM ticks and fully retired their owners; no C3 claim\n";
+  return 0;
+ }
+#endif
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  if(stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
     stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
-     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||stadium_source_setup_recipe||
+     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||
+     stadium_source_setup_recipe||
     stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
     stadium_ready_text_membership_recipe){
   run_stadium_c1a_selection_smoke(
@@ -9640,7 +9733,8 @@ int main(int argc,char** argv){try{
       stadium_source_setup_recipe,stadium_source_functional_idle_recipe);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
   if(stadium_source_world_recipe||stadium_ready_session_recipe||
-     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||stadium_source_setup_recipe||
+     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||
+     stadium_source_setup_recipe||
      stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
      stadium_ready_text_membership_recipe){
    const auto released=melee_web_gameplay_allocation();
