@@ -1710,6 +1710,75 @@
         "regression_scope": "Prior full2345/167skip/0failure source is b63dfb45; current source requires full suite before integration. Current diagnostic build and actual focused control pass.",
         "next": "Reduce Toy archive alias acquisition/retirement and post-close selection re-export without dereference, blind clear, reordering or guard waiver; complete Session close before longer C3 experiment.",
         "scope": "World retirement advance after original Ready; full Session arena closure still fails. No second world/3500postGO/original RNG/C3/browser/human acceptance."
+      },
+      "toy_alias_observation": {
+        "source": "3519a152323c486080380533e48b9cc64cde8699",
+        "source_tree": "7a41d78f8cfe7bfd3d81e41516d1e73536a9bebf",
+        "runtime_status": "RETAINED_NATIVE_FAILURE_TOY_ARCHIVE_REACQUIRED_DURING_MATCH_CONSTRUCTION",
+        "source_review": {
+          "artifact": "root-toy-alias-source-review-v1.json",
+          "sha256": "74fa8ba11bd2f348d989016c3c295ca04b7cec38fe8ea30ce7cfc37c08b86589"
+        },
+        "proposal": {
+          "artifact": "toy-alias-observation-proposal-v3/source-freeze-v3.json",
+          "sha256": "f56f927ddbc09ee5b87290554d969fd1880abdafcc7c7f9bada2404ff499c45c"
+        },
+        "diagnostic_build": {
+          "artifact": "toy-alias-build-v1/result.json",
+          "sha256": "da57c9f4181cf1d031c2ea9f51b60b3479814feab7c3e474cb40716819ec2bf9"
+        },
+        "producer": {
+          "artifact": "toy-alias-producer-3519a152-v1/identity.json",
+          "sha256": "88029ca04cca27883e82358126d348419b91e5417a9f44f16470d3fae23578c2"
+        },
+        "focused_controls": {
+          "artifact": "root-toy-alias-controls-v1/result.json",
+          "sha256": "bf092016a54eb284c2463552d73b39b2b5c1a9fbc457ed94e38dafa96f6d47d4"
+        },
+        "independent_control_review": {
+          "artifact": "sol-toy-alias-controls-review-v1.json",
+          "sha256": "253e8531c1fde58be746b492ce0178c9961d7c6afcb54286e0fd647414352fdf"
+        },
+        "packet": {
+          "artifact": "toy-alias-ready-preflight-packet-v1.json",
+          "sha256": "908e9152a67e72a0cabeb854a3dc483eede50bf9d38728c6cb107bdbc478caef"
+        },
+        "frozen_result": {
+          "artifact": "root-toy-alias-ready-frozen-result-v1.json",
+          "sha256": "9c60b060dcbc7e2526782b723e135bb43c5363b714f610a113a9a3ead3a74411"
+        },
+        "independent_result_review": {
+          "artifact": "sol-toy-alias-ready-result-review-v1.json",
+          "sha256": "0c1cd337e5243953720f02947075c02a09acd3fcaab6875319c0142e8d71de9a"
+        },
+        "observations": {
+          "original_menu_reset_clears_alias": true,
+          "before_construction_archive": "0",
+          "construction_loader": "Toy_803124BC lazy archive load",
+          "construction_archive": "0x3ba3de0",
+          "construction_ticks": 0,
+          "ready_ticks": 124,
+          "checked_close_archive": "0x3ba3de0",
+          "post_selection_check_archive": "0x3ba3de0",
+          "reset_during_match_close_observed": false,
+          "world_exists_after_close": 0,
+          "objects_after_close": 0,
+          "processes_after_close": 0,
+          "source_memory_tracker": "inactive",
+          "session_arena_bytes_retained": 33554432,
+          "first_refusal": "C1 context preflight left Toy aliases past MenuWorld close"
+        },
+        "verification": {
+          "bindings": 940,
+          "fixtures": 98,
+          "raw_files": 17,
+          "before_docs_edits": true,
+          "owned_children_natural_exit_reaped_absent": true,
+          "unittest_returncode": 1,
+          "native_returncode": 1
+        },
+        "next": "Identify the construction caller and original archive/scene lifetime reset owner before any correction or another runtime.",
+        "scope": "Pointer-only diagnostic observation identifies the original lazy loader and interval, not its caller, ownership or allocation liveness. No complete Session closure, post-GO pair, original RNG comparison, C3 or acceptance."
       }
     }
   }

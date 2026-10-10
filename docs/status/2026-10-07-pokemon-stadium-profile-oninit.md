@@ -600,8 +600,20 @@ and the checked retirement control flow.
 The canonical diagnostic build and actual focused controls pass at `ec9a38a9`.
 Six boundary tests passed on `a46297cf` before the fixture-only correction.
 The 2,345-test full-suite pass above belongs to `b63dfb45`; the current source
-still needs its full regression run before integration. Next, reduce the exact
-Toy alias predicate and its lifetime owner before retrying Session closure.
+still needs its full regression run before integration.
+
+The pointer-only diagnostic on `3519a152` narrows that failure. Original menu
+reset clears the archive alias before construction. Original `Toy_803124BC`
+then performs its lazy archive load during match construction, before the first
+source tick. The same numeric pointer is present at Ready, after checked world
+retirement and after the preserved-selection check. No original Toy reset event
+occurs during match close. This identifies the acquisition function and interval;
+it does not establish its caller, ownership or allocation liveness. The ordinary
+Ready test still fails the unchanged alias guard and retains the 32 MiB arena.
+Independent review verifies all 940 bindings, 98 fixtures and 17 raw files before
+docs edits; both exact children exit naturally with failure, are reaped and absent.
+The canonical diagnostic build and focused controls pass. Next, identify the
+construction caller and original archive/scene reset owner before a correction.
 Do not clear unknown aliases or weaken the check.
 
 The existing RNG observer can be reused afterward, but the Stadium notes require
