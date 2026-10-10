@@ -14,8 +14,10 @@ context to match construction, so it cannot be paired with the separate setup
 receipt. A separate native functional run on `ee2f3ab9` then completed one
 neutral-input, no-draw lifetime through exactly 3,500 post-GO world ticks and
 checked full close. It is not a second lifetime or an original comparison; the
-per-owner RNG ledger, matched original context, and C3 gates remain open. The
-ordinary Results regression on the same source also passed after a source-audited
+per-owner RNG ledger, matched original context, and C3 gates remain open. A later
+same-process pair on `266c9c44` completes and releases its first lifetime, then
+fails before second Match construction on an occupied `grDatFiles` slot; the
+failed evidence is retained. The ordinary Results regression on `ee2f3ab9` also passed after a source-audited
 fixture correction, including two actual original Results entries and checked
 Session end. The initial missing-`LbRf.dat` preparation failure remains retained. The `a29f8d69` full suite and
 ordinary Release build passed; those checks do not execute the separate long
@@ -768,9 +770,9 @@ trigger). The run ended at ordinal 3,500, 102 ticks before that source-derived
 lower bound. It did not read a live countdown or transformation state. Crowd
 events, scratch title/SIS slot, stock-out and standings remain unobserved.
 
-The original GO observer v3 and same-process second-lifetime path remain source
-review only; they have not supplied original comparison or second-world runtime
-evidence. C3 still requires matched original setup/state, the original
+The original GO observer v3 remains source review only. The later same-process
+pair fails during second-lifetime preparation, as recorded below; it supplies
+neither original comparison nor a second completed Match. C3 still requires matched original setup/state, the original
 per-tick, per-owner RNG ledger, two full lifetimes, screen/title/SIS observations,
 stock-out/standings and checked retirement/recreation. Ordinary public Stadium
 admission remains closed.
@@ -812,3 +814,28 @@ browser behavior, physical-input, uninterrupted audio, PCM equivalence or
 timing. The run did not traverse Prize. It does not pass C3. The independent
 result review and exact raw receipts are bound in the
 [portable receipt](../evidence/issue251-stadium-profile-oninit-v1.json).
+
+
+## October 10 UTC: same-process Stadium recreation failure
+
+**Native functional first lifetime / second-lifetime preparation failure**
+
+The separately gated pair on `266c9c44` completes all 3,500 post-GO ticks in its
+first lifetime and checks world and Session release to zero. The second Session
+receives allocation generation 2; reuse of the same arena address is valid.
+Its CSS/SSS menu world reaches generation 5 and verifies SIS retirement, then
+preparation stops at `mask=64: ordinary grDatFiles slot occupied`, before the
+second Match is constructed. No second Ready/GO, completed interval or checked
+second Session close is observed. The raw diagnostic does not identify the
+exact occupied slot, value or owner.
+
+Independent review verifies 1,288 packet bindings, 98 fixtures, 17 raw files and
+all first-life step rows. Both owned processes exit naturally with code 1 and
+are reaped without cleanup signals. Their exit is not evidence of second
+Session teardown. The complete failure and exact producer are bound in the
+same portable receipt.
+
+The next experiment is a source ownership reduction and the smallest justified
+control for the slot's original restoration or retirement boundary. No guard
+waiver, blind global clear or unchanged pair rerun follows this failure. The
+original comparison, second completed lifetime and remaining C3 gates stay open.
