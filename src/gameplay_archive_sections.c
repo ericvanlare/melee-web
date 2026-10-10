@@ -2,6 +2,7 @@
 #include "gameplay_bootstrap.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 struct MeleeWebArchiveSections { struct MeleeWebArchiveSections* next; size_t count; uint64_t heap_generation; MeleeWebArchiveSymbol entries[]; };
 static MeleeWebArchiveSections* scopes;
@@ -113,6 +114,50 @@ int melee_web_archive_sections_is_source_archive(const void* candidate) {
     for(const ArchiveHandle* h=handles;h;h=h->next)
         if(h->object==candidate)return h->source_archive;
     return 0;
+}
+int melee_web_archive_sections_heap_scope_matches(const MeleeWebArchiveSections* candidate_scope,
+                                                    uint64_t generation) {
+    if(!candidate_scope || !generation)return 0;
+    /* Scope identity is checked before any candidate or scope fields are read. */
+    MeleeWebArchiveSections* scope=scopes;
+    while(scope && scope!=candidate_scope)scope=scope->next;
+    if(!scope)return 0;
+
+    const MeleeWebGameplayStats current=melee_web_gameplay_stats();
+    if(!melee_web_gameplay_world_exists() || current.generation!=generation ||
+       scope->heap_generation!=generation)
+        return 0;
+
+    return 1;
+}
+int melee_web_archive_sections_heap_source_matches(const MeleeWebArchiveSections* candidate_scope,
+                                                       uint64_t generation,
+                                                       const void* candidate_archive,
+                                                       const char* filename) {
+    if(!candidate_scope || !candidate_archive || !generation ||
+       !filename || !filename[0] || strnlen(filename,1025)>1024)
+        return 0;
+
+    if(!melee_web_archive_sections_heap_scope_matches(candidate_scope,generation))return 0;
+    const MeleeWebArchiveSections* scope=candidate_scope;
+
+    size_t own_filename=0;
+    for(size_t i=0;i<scope->count;i++)
+        if(!strcmp(filename,scope->entries[i].filename))own_filename++;
+    if(!own_filename)return 0;
+    for(MeleeWebArchiveSections* other=scopes;other;other=other->next)if(other!=scope)
+        for(size_t i=0;i<other->count;i++)
+            if(!strcmp(filename,other->entries[i].filename))return 0;
+
+    size_t matching_archive=0;
+    for(ArchiveHandle* handle=handles;handle;handle=handle->next)
+        if(handle->object==candidate_archive) {
+            if(!handle->source_archive || handle->preloaded || handle->owner ||
+               strcmp(handle->filename,filename))
+                return 0;
+            matching_archive++;
+        }
+    return matching_archive==1;
 }
 void* melee_web_archive_sections_public(void* candidate,const char* symbol) {
     ArchiveHandle* h=checked_handle(candidate);

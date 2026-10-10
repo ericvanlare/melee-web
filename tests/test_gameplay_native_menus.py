@@ -2614,6 +2614,14 @@ int main(void)
     def test_stadium_source_ready_session_one_shot(self):
         if os.environ.get("MELEE_RUN_STADIUM_SOURCE_READY_SESSION") != "1":
             self.skipTest("Real Stadium source Ready session requires its reviewed run gate")
+        self._run_stadium_source_ready_session_one_shot()
+
+    def test_stadium_source_toy_owner_controls_one_shot(self):
+        if os.environ.get("MELEE_RUN_STADIUM_SOURCE_TOY_OWNER_CONTROLS") != "1":
+            self.skipTest("Toy owner controls require their separately reviewed run gate")
+        self._run_stadium_source_ready_session_one_shot(toy_owner_controls=True)
+
+    def _run_stadium_source_ready_session_one_shot(self, toy_owner_controls=False):
         import hashlib
         from capture_sd_reference_prefix import cleanup_process
 
@@ -2641,13 +2649,16 @@ int main(void)
         before = {name: hashlib.sha256(path.read_bytes()).hexdigest()
                   for name, path in paths.items()}
         source = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-        trace = self.scratch / "stadium-source-ready-session.jsonl"
+        scope = ("stadium-source-toy-owner-controls-v1" if toy_owner_controls
+                 else "stadium-source-ready-session-v1")
+        prefix = "stadium-toy-owner" if toy_owner_controls else "stadium-source-ready"
+        trace = self.scratch / (prefix + "-session.jsonl")
         command = [str(node_runtime()), str(target), str(menu), str(game), "3",
-                   str(trace), source, "stadium-source-ready-session-v1"]
-        output = self.scratch / "stadium-source-ready-node-owner"
+                   str(trace), source, scope]
+        output = self.scratch / (prefix + "-node-owner")
         output.mkdir(exist_ok=False)
         identity = {
-            "scope": "stadium-source-ready-session-v1", "ownership": "direct-Popen",
+            "scope": scope, "ownership": "direct-Popen",
             "source_revision": source,
             "source_tree": subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"],
                                                      cwd=ROOT, text=True).strip(),
@@ -2657,8 +2668,8 @@ int main(void)
                               for path in [Path(command[0]).resolve(), target,
                                            target.with_suffix(".wasm")]},
         }
-        stdout_path = self.scratch / "stadium-source-ready.stdout"
-        stderr_path = self.scratch / "stadium-source-ready.stderr"
+        stdout_path = self.scratch / (prefix + ".stdout")
+        stderr_path = self.scratch / (prefix + ".stderr")
         try:
             with stdout_path.open("xb") as stdout, stderr_path.open("xb") as stderr:
                 process = subprocess.Popen(command, cwd=ROOT, stdout=stdout, stderr=stderr)
@@ -2668,7 +2679,7 @@ int main(void)
                         receipt.write(json.dumps(identity, indent=2) + "\n")
                     process.wait(timeout=120)
                 finally:
-                    cleanup_process(process, output, scope="stadium-source-ready-session-v1")
+                    cleanup_process(process, output, scope=scope)
         finally:
             after = {name: hashlib.sha256(path.read_bytes()).hexdigest()
                      for name, path in paths.items()}
@@ -2687,9 +2698,28 @@ int main(void)
         self.assertGreater(int(phases[2][2]), 0)
         self.assertGreater(int(phases[2][3]), 0)
         self.assertEqual([int(phases[3][i]) for i in (1, 2, 3, 5, 6)], [0, 0, 0, 0, 0])
-        self.assertIn("Stadium original source-session Ready and checked owned-world retirement passed; one lifetime, no draw/post-GO idle/C3 claim", stdout)
+        if toy_owner_controls:
+            self.assertIn("Stadium bounded Toy owner controls passed; one Ready plus no-acquisition and unarmed OnInit lifetimes, no C3 claim", stdout)
+            self.assertIn("STADIUM_TOY_OWNER phase=entry-null-archive-table-refused unchanged=1", stderr)
+            self.assertIn("STADIUM_TOY_OWNER phase=no-acquisition-close null_archive_table_refused=1 foreign_archive_refused=1 reset=1 ticks=0", stderr)
+            self.assertIn("STADIUM_TOY_OWNER phase=source-on-init-destructor-close wrong_locale_refused=1 reset=1 ticks=0", stderr)
+        else:
+            self.assertIn("Stadium original source-session Ready and checked owned-world retirement passed; one lifetime, no draw/post-GO idle/C3 claim", stdout)
         self.assertNotIn("STADIUM_READY_SESSION_FIRST_FAILURE", stderr)
-        self.assertNotIn("STADIUM_READY_CONSTRUCTION_FIRST_FAILURE", stderr)
+        if toy_owner_controls:
+            begin = "STADIUM_TOY_OWNER phase=expected-entry-refusal-begin\n"
+            end = "STADIUM_TOY_OWNER phase=expected-entry-refusal-end\n"
+            expected = ("STADIUM_READY_CONSTRUCTION_FIRST_FAILURE "
+                        "Match world requires a clean original Toy archive/table baseline")
+            self.assertEqual(stderr.count(begin), 1)
+            self.assertEqual(stderr.count(end), 1)
+            before, bracket_and_after = stderr.split(begin)
+            bracket, after = bracket_and_after.split(end)
+            self.assertEqual([line for line in bracket.splitlines()
+                              if "STADIUM_READY_CONSTRUCTION_FIRST_FAILURE" in line], [expected])
+            self.assertNotIn("STADIUM_READY_CONSTRUCTION_FIRST_FAILURE", before + after)
+        else:
+            self.assertNotIn("STADIUM_READY_CONSTRUCTION_FIRST_FAILURE", stderr)
         self.assertIn("C3_SESSION_CLOSED identity=0 generation=0 bytes=0 world_exists=0", stderr)
         self.assertNotIn('"probe":"stadium-source-oninit"', stdout)
 

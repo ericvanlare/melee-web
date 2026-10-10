@@ -2,6 +2,7 @@
 #define MELEE_WEB_GAMEPLAY_ARCHIVE_SECTIONS_H
 #include <stddef.h>
 #include <stdarg.h>
+#include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -42,6 +43,10 @@ int melee_web_archive_sections_attach_source(void* archive,
                                               const char* filename);
 int melee_web_archive_sections_is_handle(const void* handle);
 int melee_web_archive_sections_is_source_archive(const void* archive);
+/* Pure identity/generation check; never reads an unregistered candidate scope. */
+int melee_web_archive_sections_heap_scope_matches(const MeleeWebArchiveSections* scope, uint64_t generation);
+/* True only for the unique currently registered source archive belonging to this live heap scope/file. Compares the opaque archive pointer without dereferencing it. */
+int melee_web_archive_sections_heap_source_matches(const MeleeWebArchiveSections* scope, uint64_t generation, const void* archive, const char* filename);
 void* melee_web_archive_sections_public(void* handle, const char* symbol);
 void melee_web_archive_sections_release(void* handle);
 /* Resolves every requested symbol before publishing any outputs. A non-NULL

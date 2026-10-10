@@ -72,6 +72,11 @@ public:
     bool advance_construction();
     bool construction_complete() const;
     void close();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    // Test-only access to the world's pure Toy owner/scope preflight. It does
+    // not mutate state or execute original cleanup.
+    bool diagnostic_toy_owner_preflight() const;
+#endif
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
     MeleeWebPipelineSourceContext provenance_context() const;
 #endif

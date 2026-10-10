@@ -624,4 +624,9 @@ MeleeWebMatchStats GameplayMatchSession::player_stats(unsigned index)const{
 MeleeWebAudio* GameplayMatchSession::audio()const{return storage_&&storage_->bank?storage_->bank->get():nullptr;}
 bool GameplayMatchSession::advance_construction(){return storage_&&storage_->advance_construction();}
 bool GameplayMatchSession::construction_complete()const{return storage_&&storage_->construction_phase==5;}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+bool GameplayMatchSession::diagnostic_toy_owner_preflight()const{
+    return storage_&&storage_->world&&storage_->world->diagnostic_toy_owner_preflight();
+}
+#endif
 }

@@ -11,6 +11,44 @@ MeleeWebGameplayStats melee_web_gameplay_stats(void){MeleeWebGameplayStats s={0}
 static void load(void* archive,const char* file,void* destination,...) {
     va_list args;va_start(args,destination);melee_web_archive_sections_load(archive,file,destination,args);va_end(args);
 }
+static void heap_source_membership_controls(void) {
+    char error[128];
+    int root=7;
+    MeleeWebArchiveSymbol toy={"TyDatai.usd","tyInitModelTbl",&root};
+    MeleeWebArchiveSymbol other={"TyDatai.dat","tyInitModelTbl",&root};
+    test_generation=41;test_heap_exists=1;
+    MeleeWebArchiveSections* owner=melee_web_archive_sections_register_heap(&toy,1,error,sizeof(error));
+    MeleeWebArchiveSections* foreign=melee_web_archive_sections_register_heap(&other,1,error,sizeof(error));
+    assert(owner&&foreign);
+    assert(melee_web_archive_sections_heap_scope_matches(owner,41));
+    assert(!melee_web_archive_sections_heap_scope_matches(owner,42));
+    assert(!melee_web_archive_sections_heap_scope_matches((const MeleeWebArchiveSections*)(uintptr_t)0x4321,41));
+    /* This address is intentionally opaque; the membership API must compare it only. */
+    void* source=(void*)(uintptr_t)0x1234;
+    assert(melee_web_archive_sections_attach_source(source,"TyDatai.usd"));
+    assert(melee_web_archive_sections_heap_source_matches(owner,41,source,"TyDatai.usd"));
+    assert(!melee_web_archive_sections_heap_source_matches(foreign,41,source,"TyDatai.usd"));
+    assert(!melee_web_archive_sections_heap_source_matches(owner,42,source,"TyDatai.usd"));
+    assert(!melee_web_archive_sections_heap_source_matches(owner,41,source,"TyDatai.dat"));
+    assert(!melee_web_archive_sections_heap_source_matches((const MeleeWebArchiveSections*)(uintptr_t)0x4321,
+                                                            41,source,"TyDatai.usd"));
+    void* copied=melee_web_archive_sections_open("TyDatai.usd");
+    assert(copied&&!melee_web_archive_sections_heap_source_matches(owner,41,copied,"TyDatai.usd"));
+    assert(melee_web_archive_sections_public(copied,"tyInitModelTbl")==&root);
+    test_heap_exists=0;
+    assert(!melee_web_archive_sections_heap_scope_matches(owner,41));
+    assert(!melee_web_archive_sections_heap_source_matches(owner,41,source,"TyDatai.usd"));
+    test_heap_exists=1;
+    assert(melee_web_archive_sections_heap_source_matches(owner,41,source,"TyDatai.usd"));
+    melee_web_archive_sections_release(copied);
+    test_heap_exists=0;
+    assert(melee_web_archive_sections_close(owner,error,sizeof(error)));
+    assert(melee_web_archive_sections_close(foreign,error,sizeof(error)));
+    assert(!melee_web_archive_sections_heap_scope_matches(owner,41));
+    assert(!melee_web_archive_sections_heap_source_matches(owner,41,source,"TyDatai.usd"));
+    test_generation=2;test_heap_exists=1;
+    puts("Synthetic heap-source membership controls rejected stale, foreign, wrong-file and copied handles without reading candidate bytes");
+}
 static void stadium_sis_catalog_controls(void) {
     char error[128];
     int roots[8]={0};
@@ -170,6 +208,7 @@ int main(int argc,char** argv) {
     test_heap_exists=0;
     assert(melee_web_archive_sections_close(source_scope,error,sizeof(error)));
     assert(!melee_web_archive_sections_is_handle(&source_archive_storage));
+    heap_source_membership_controls();
     stadium_sis_catalog_controls();
     puts("Typed archive sections copied names, resolved aliases, rejected duplicates and restarted");
 }

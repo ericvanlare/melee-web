@@ -1,4 +1,5 @@
 #include "gameplay_menu_world.hpp"
+#include "gameplay_archive_sections.h"
 #include "gameplay_asset_manifest.hpp"
 #include "gameplay_content.h"
 #include <algorithm>
@@ -105,6 +106,14 @@ void HSD_SisLib_C1TextProbeSet(int enabled);
 #include <melee/ty/toy.h>
 #include <melee/ty/types.h>
 extern HSD_Archive* _Toy_sbss_804D6ED0;
+extern HSD_Archive* _Toy_sbss_804D6ECC;
+extern TrophyData* _Toy_sbss_804D6EC4;
+extern TrophyData* _Toy_sbss_804D6EC0;
+extern void* _Toy_sbss_804D6EBC;
+extern void* _Toy_sbss_804D6EB8;
+extern s16* _Toy_sbss_804D6EB4;
+extern void* _Toy_sbss_804D6EA8;
+extern void* _Toy_sbss_804D6EA4;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 extern HSD_ObjAllocData gobj_alloc_data;
 extern HSD_ObjAllocData gobjproc_alloc_data;
@@ -162,6 +171,21 @@ extern "C" int melee_web_stage_selection_end(void);
 static void check(int value,const char* error){if(!value){std::cerr<<"Check failed before teardown: "<<error<<"\n";throw std::runtime_error(error);}}
 
 namespace {
+std::array<void*,12> source_toy_alias_snapshot(){
+    return {_Toy_sbss_804D6ED0,_Toy_sbss_804D6ECC,_Toy_sbss_804D6EC4,
+            _Toy_sbss_804D6EC0,_Toy_sbss_804D6EBC,_Toy_sbss_804D6EB8,
+            _Toy_sbss_804D6EB4,Toy_sbss_804D6EB0,Toy_sbss_804D6EAC,
+            _Toy_sbss_804D6EA8,_Toy_sbss_804D6EA4,Toy_sbss_804D6EC8};
+}
+std::array<void*,7> source_toy_table_snapshot(){
+    return {_Toy_sbss_804D6EC4,_Toy_sbss_804D6EC0,_Toy_sbss_804D6EBC,
+            _Toy_sbss_804D6EB8,_Toy_sbss_804D6EB4,Toy_sbss_804D6EB0,
+            Toy_sbss_804D6EAC};
+}
+bool source_toy_aliases_empty(){
+    const auto aliases=source_toy_alias_snapshot();
+    return std::all_of(aliases.begin(),aliases.end(),[](void* alias){return alias==nullptr;});
+}
 void emit_native_bytes(const char* record,const void* data,std::size_t size)
 {
     const auto* bytes=static_cast<const unsigned char*>(data);
@@ -7741,7 +7765,8 @@ void run_stadium_c1_context_preflight(
     bool ready_session = false,
     bool pad_leave_probe = false,
     bool source_text_lifetime_probe = false,
-    bool ready_text_membership_probe = false)
+    bool ready_text_membership_probe = false,
+    bool toy_owner_controls = false)
 {
     char error[256]{};
     const int previous_mode = gm_GetCurrentGameMode();
@@ -7959,6 +7984,93 @@ void run_stadium_c1_context_preflight(
             check(ready_input!=nullptr,
                   "Stadium Ready lost the closed host's retained source PAD input");
             melee_web::RuntimeArchiveCache cache(reopened_files);
+            if(toy_owner_controls){
+                check(source_toy_aliases_empty(),
+                      "Toy owner controls require the original menu reset baseline");
+                const auto empty_world=melee_web_gameplay_stats();
+                const auto* const empty_seed_owner=seed_ptr;
+                check(empty_seed_owner&&*empty_seed_owner==selected.random_seed,
+                      "Toy owner controls lost the selected source RNG owner");
+                auto* const foreign_root=reinterpret_cast<TrophyData*>(uintptr_t{0x7100});
+                _Toy_sbss_804D6EC4=foreign_root;
+                bool entry_refused=false;
+                std::fprintf(stderr,
+                    "STADIUM_TOY_OWNER phase=expected-entry-refusal-begin\n");
+                std::fflush(stderr);
+                try{
+                    auto rejected=std::make_unique<melee_web::GameplayMatchSession>(
+                        reopened_files,selected,cache,melee_web::GameplayMatchConstruction::Deferred,
+                        *ready_input,melee_web::GameplayMatchDiagnostic::StadiumReady);
+                }catch(const std::exception& refusal){
+                    entry_refused=std::string_view(refusal.what())==
+                        "Match world requires a clean original Toy archive/table baseline";
+                }
+                check(entry_refused&&_Toy_sbss_804D6ED0==nullptr&&
+                          _Toy_sbss_804D6EC4==foreign_root&&
+                          !melee_web_gameplay_world_exists()&&
+                          melee_web_gameplay_stats().generation==empty_world.generation&&
+                          seed_ptr==empty_seed_owner&&*empty_seed_owner==selected.random_seed,
+                      "NULL Toy archive plus a foreign table root was not refused unchanged before startup");
+                std::fprintf(stderr,
+                    "STADIUM_TOY_OWNER phase=expected-entry-refusal-end\n");
+                std::fflush(stderr);
+                std::fprintf(stderr,
+                    "STADIUM_TOY_OWNER phase=entry-null-archive-table-refused unchanged=1\n");
+                std::fflush(stderr);
+                _Toy_sbss_804D6EC4=nullptr;
+                check(source_toy_aliases_empty(),
+                      "Toy entry refusal did not restore its synthetic control input");
+
+                auto no_acquisition=std::make_unique<melee_web::GameplayMatchSession>(
+                    reopened_files,selected,cache,melee_web::GameplayMatchConstruction::Deferred,
+                    *ready_input,melee_web::GameplayMatchDiagnostic::StadiumReady);
+                check(!no_acquisition->advance_construction(),
+                      "Toy no-acquisition control advanced beyond its first pre-OnInit boundary");
+                const auto no_acquisition_stats=melee_web_gameplay_stats();
+                const auto no_acquisition_heap=HSD_GetHeap();
+                const auto* const no_acquisition_seed=seed_ptr;
+                check(melee_web_gameplay_world_exists()&&no_acquisition_stats.ticks==0&&
+                          source_toy_aliases_empty()&&no_acquisition_seed&&
+                          *no_acquisition_seed==selected.random_seed,
+                      "Toy no-acquisition control reached source aliases or a match tick unexpectedly");
+                check(no_acquisition->diagnostic_toy_owner_preflight(),
+                      "Toy no-acquisition state failed its actual owner preflight");
+                auto* const foreign_table=reinterpret_cast<TrophyData*>(uintptr_t{0x7200});
+                _Toy_sbss_804D6EC4=foreign_table;
+                const auto null_archive_bad_table=source_toy_alias_snapshot();
+                check(!no_acquisition->diagnostic_toy_owner_preflight()&&
+                          source_toy_alias_snapshot()==null_archive_bad_table&&
+                          !_Toy_sbss_804D6ED0&&_Toy_sbss_804D6EC4==foreign_table&&
+                          melee_web_gameplay_world_exists()&&
+                          melee_web_gameplay_stats().generation==no_acquisition_stats.generation&&
+                          melee_web_gameplay_stats().ticks==0&&
+                          HSD_GetHeap()==no_acquisition_heap&&seed_ptr==no_acquisition_seed&&
+                          *no_acquisition_seed==selected.random_seed,
+                      "Toy owner preflight accepted or changed a table alias without its source archive");
+                _Toy_sbss_804D6EC4=nullptr;
+                _Toy_sbss_804D6ECC=reinterpret_cast<HSD_Archive*>(uintptr_t{0x7300});
+                const auto foreign_alias=source_toy_alias_snapshot();
+                check(!no_acquisition->diagnostic_toy_owner_preflight()&&
+                          source_toy_alias_snapshot()==foreign_alias&&
+                          _Toy_sbss_804D6ECC==reinterpret_cast<HSD_Archive*>(uintptr_t{0x7300})&&
+                          melee_web_gameplay_world_exists()&&
+                          melee_web_gameplay_stats().generation==no_acquisition_stats.generation&&
+                          HSD_GetHeap()==no_acquisition_heap&&seed_ptr==no_acquisition_seed&&
+                          *no_acquisition_seed==selected.random_seed,
+                      "Toy owner preflight accepted or changed a foreign archive alias");
+                _Toy_sbss_804D6ECC=nullptr;
+                check(no_acquisition->diagnostic_toy_owner_preflight(),
+                      "Toy owner preflight did not recover after restoring its exact empty baseline");
+                no_acquisition->close();no_acquisition.reset();
+                check(!melee_web_gameplay_world_exists()&&source_toy_aliases_empty()&&
+                          HSD_GetHeap()==-1&&seed_ptr==empty_seed_owner&&
+                          *empty_seed_owner==selected.random_seed,
+                      "Owned no-acquisition source world did not close through the Toy owner helper");
+                std::fprintf(stderr,
+                    "STADIUM_TOY_OWNER phase=no-acquisition-close null_archive_table_refused=1 foreign_archive_refused=1 reset=1 ticks=%llu\n",
+                    static_cast<unsigned long long>(melee_web_gameplay_stats().ticks));
+                std::fflush(stderr);
+            }
             std::unique_ptr<melee_web::GameplayMatchSession> match;
             try{
                 observe("before-construction");
@@ -8029,8 +8141,75 @@ void run_stadium_c1_context_preflight(
                     "STADIUM_TOY_ALIAS phase=post-session-selection-preserved archive=%p\n",
                     (void*)_Toy_sbss_804D6ED0);
                 std::fflush(stderr);
+                if(toy_owner_controls){
+                    check(source_toy_aliases_empty(),
+                          "Second Toy lifetime did not begin from a clean reset baseline");
+                    const auto* const repeat_parent_seed=seed_ptr;
+                    const auto repeat_parent_value=*repeat_parent_seed;
+                    auto repeat=std::make_unique<melee_web::GameplayMatchSession>(
+                        reopened_files,selected,cache,melee_web::GameplayMatchConstruction::Deferred,
+                        *ready_input,melee_web::GameplayMatchDiagnostic::StadiumReady);
+                    for(unsigned step=0;step<128&&!_Toy_sbss_804D6ED0;++step)
+                        check(!repeat->advance_construction(),
+                              "Toy partial control unexpectedly completed all Session construction");
+                    check(_Toy_sbss_804D6ED0&&melee_web_gameplay_world_exists()&&
+                              melee_web_gameplay_stats().ticks==0,
+                          "Second Toy lifetime did not reach original OnInit before a source tick");
+                    const char* foreign_locale=lbLang_IsSavedLanguageJP()?"TyDatai.usd":"TyDatai.dat";
+                    void* foreign_handle=melee_web_archive_sections_open_preloaded(foreign_locale);
+                    check(foreign_handle!=nullptr,
+                          "Second Toy lifetime could not inspect its registered alternate-locale root");
+                    void* foreign_root=melee_web_archive_sections_public(
+                        foreign_handle,"tyInitModelTbl");
+                    check(foreign_root!=nullptr,
+                          "Second Toy lifetime alternate-locale root was not registered");
+                    check(repeat->diagnostic_toy_owner_preflight(),
+                          "Original Toy loader state failed its actual source owner preflight");
+                    const auto archive_before=_Toy_sbss_804D6ED0;
+                    const auto table_before=source_toy_table_snapshot();
+                    const auto all_before=source_toy_alias_snapshot();
+                    const auto source_before=melee_web_gameplay_stats();
+                    const auto source_heap_before=HSD_GetHeap();
+                    const auto* const source_seed_before=seed_ptr;
+                    check(source_seed_before!=nullptr,
+                          "Second Toy lifetime lost the original source RNG owner");
+                    const auto source_seed_value=*source_seed_before;
+                    check(foreign_root!=table_before[0],
+                          "Alternate-locale table unexpectedly aliases the active locale root");
+                    _Toy_sbss_804D6EC4=static_cast<TrophyData*>(foreign_root);
+                    const bool locale_refused=!repeat->diagnostic_toy_owner_preflight();
+                    auto expected_after=all_before;
+                    expected_after[2]=foreign_root;
+                    const auto source_after=melee_web_gameplay_stats();
+                    check(locale_refused&&source_toy_alias_snapshot()==expected_after&&
+                          _Toy_sbss_804D6ED0==archive_before&&
+                          melee_web_gameplay_world_exists()&&
+                          source_after.generation==source_before.generation&&
+                          source_after.ticks==source_before.ticks&&
+                          HSD_GetHeap()==source_heap_before&&
+                          seed_ptr==source_seed_before&&
+                          *source_seed_before==source_seed_value,
+                          "Wrong-locale Toy root was not refused with source ownership unchanged");
+                    _Toy_sbss_804D6EC4=static_cast<TrophyData*>(table_before[0]);
+                    check(repeat->diagnostic_toy_owner_preflight(),
+                          "Toy owner preflight did not recover after restoring its exact owned root");
+                    // Destroy a partially constructed Session so its existing
+                    // Storage destructor executes the same checked close path.
+                    repeat.reset();
+                    check(!melee_web_gameplay_world_exists()&&source_toy_aliases_empty()&&
+                              HSD_GetHeap()==-1&&melee_web_gameplay_stats().ticks==0&&
+                              seed_ptr==repeat_parent_seed&&
+                              *repeat_parent_seed==repeat_parent_value,
+                          "Partially constructed source Session destructor did not reset Toy aliases before shutdown");
+                    std::fprintf(stderr,
+                        "STADIUM_TOY_OWNER phase=source-on-init-destructor-close wrong_locale_refused=1 reset=1 ticks=0\n");
+                    std::fflush(stderr);
+                }
                 cleanup();
-                std::cout<<"Stadium original source-session Ready and checked owned-world retirement passed; one lifetime, no draw/post-GO idle/C3 claim\n";
+                if(toy_owner_controls)
+                    std::cout<<"Stadium bounded Toy owner controls passed; one Ready plus no-acquisition and unarmed OnInit lifetimes, no C3 claim\n";
+                else
+                    std::cout<<"Stadium original source-session Ready and checked owned-world retirement passed; one lifetime, no draw/post-GO idle/C3 claim\n";
                 return;
             }catch(const std::exception& first){
                 if(ready_text_membership_probe){
@@ -8382,7 +8561,8 @@ void run_stadium_c1a_selection_smoke(
     bool ready_session=false,
     bool pad_leave_probe=false,
     bool source_text_lifetime_probe=false,
-    bool ready_text_membership_probe=false)
+    bool ready_text_membership_probe=false,
+    bool toy_owner_controls=false)
 {
     char error[256]{};
     MeleeWebRetiredSisLease retired_sis{};
@@ -8535,7 +8715,7 @@ void run_stadium_c1a_selection_smoke(
             ground_map1_owner, source_on_init,
             source_on_init ? &retired_sis : nullptr, trace, full_world_lifecycle, ready_session,
             pad_leave_probe, source_text_lifetime_probe,
-            ready_text_membership_probe);
+            ready_text_membership_probe,toy_owner_controls);
     } else {
         world->verify_immutable_archives();
         world->close();
@@ -8695,8 +8875,10 @@ int main(int argc,char** argv){try{
      std::string(input_recipe)=="stadium-ground-map1-owner-v1";
  const bool stadium_source_on_init_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-source-oninit-v1";
- const bool stadium_ready_session_recipe=input_recipe&&
-     std::string(input_recipe)=="stadium-source-ready-session-v1";
+ const bool stadium_toy_owner_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-source-toy-owner-controls-v1";
+ const bool stadium_ready_session_recipe=stadium_toy_owner_recipe||(input_recipe&&
+     std::string(input_recipe)=="stadium-source-ready-session-v1");
  const bool stadium_source_world_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-source-world-lifecycle-v1";
  const bool stadium_pad_leave_probe_recipe=input_recipe&&
@@ -8715,6 +8897,7 @@ int main(int argc,char** argv){try{
  const bool stadium_source_on_init_recipe=false;
  const bool stadium_source_world_recipe=false;
  const bool stadium_ready_session_recipe=false;
+ const bool stadium_toy_owner_recipe=false;
  const bool stadium_pad_leave_probe_recipe=false;
  const bool stadium_source_text_lifetime_recipe=false;
  const bool stadium_ready_text_membership_recipe=false;
@@ -8810,7 +8993,7 @@ int main(int argc,char** argv){try{
       stadium_source_world_recipe,
       argv[1], argv[2], trace,stadium_ready_session_recipe,
       stadium_pad_leave_probe_recipe,stadium_source_text_lifetime_recipe,
-      stadium_ready_text_membership_recipe);
+      stadium_ready_text_membership_recipe,stadium_toy_owner_recipe);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
   if(stadium_source_world_recipe||stadium_ready_session_recipe||
      stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
