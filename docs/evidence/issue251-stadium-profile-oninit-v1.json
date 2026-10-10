@@ -318,8 +318,8 @@
     "no_machine_specific_path_required": true
   },
   "subsequent_c3_component_2026_10_09": {
-    "claim_boundary": "The c44425c6 diagnostic retains both actual SSS constructor notes after unchanged first-CSS/final-draw prerequisites. Strict entry-first comparison fails at scene_frame: original149 versus native0. Both notes also expose current_scene_index0 versus original1. The original pair does not match; no SSS tick/draw, later VS/GO/per-owner RNG or C3 acceptance. Public Stadium admission remains closed.",
-    "current_result": "Actual SSS entry/return capture completed on c44425c6 with world generation2 and retained audio generation1. The first mismatch is retained, constructor and host entry complete, then zero SSS ticks/draws and running0. Prior CSS snapshots and semantic checks remain unchanged. Checked unload/clear succeeds and all12 owned PIDs are absent. Both Release builds and the exact-head full suite pass (2428 tests,163 skips); these do not turn the browser comparison failure into acceptance.",
+    "claim_boundary": "The repaired first-SSS constructor pair matches every declared original field after unchanged CSS prerequisites. The ordinary native cancellation/re-entry and Results regression and browser checked unload pass on53dc776f. Zero SSS ticks/draws; terminal CSS tick1575, original setup/GO/per-owner RNG and C3 acceptance remain open. Historical failures retain their exact producers. Public Stadium admission stays closed.",
+    "current_result": "Exact53dc776f repeats CSS baseline,147 additional tick/draw pairs,final DrawReturn1577 and SSS entry/return comparison. Both constructor notes show frame149,kind9,seed3bb84c53,route2/1/1/0 with declared typed fields matching; world generation2/audio1. Independent retained assertion replay passes. All12 attributed browser processes are absent,40HTTP files unchanged and checked unload clears owners. Three affected Release targets and2431-test fullsuite pass with163skips. Native ordinary Results regression passes after original SSS cancellation route composition.",
     "first_css_browser_draw_4d6c0b37_d949a0b8_v1": {
       "status": "FAIL_BEFORE_ARM; NO_BROWSER_CSS_COMPARISON; NO_TICK; NO_DRAW",
       "scope": "One headless browser attempt with the existing captured first-CSS context and one consumed sample. The diagnostic did not arm; this is not a source draw or Stadium/C3 acceptance result.",
@@ -586,7 +586,7 @@
         "SDK unittest moduleimport failure beforeNode; fixedexplicit scriptsimport and retainedoutput"
       ]
     },
-    "next_progression": "Reduce the confirmed native SSS constructor clock reset with a MENU-only continuation composition: capture actual pointer-free predecessor counters, preserve caller restoration and fresh world capabilities, run constructor before the authored reset/PAD flush/lb sequence exactly once. Fixture controls cannot establish runtime correctness. Keep the additional scene-routing discrepancy explicit, never normalize comparisons or write expected values. Stop on first missing ownership/order proof; source repair and any further passive browser comparison require review. No SSS tick/draw or later VS/GO/per-owner/C3 acceptance yet.",
+    "next_progression": "Exactly one original consumed SSS PAD at1604 and one host tick. Capture after SSS OnFrame/full HSD scheduler and before menu-clock increment, comparing actual frame0 sample only to SourceTick1608. Retain post-host frame1 separately; no draw or normalization. Require the exact-build constructor pair first, stable owners, one consume/tick/sample, TICKED without transition and checked cleanup. Stop on first failure and reduce before another runtime. Draw1609/1610, later SSS/VS/GO and per-owner RNG remain outside this experiment.",
     "first_css_context_return_1fad54ff_v1": {
       "source_head": "1fad54ff964f80b263b91a77cf25a25b0ee08603",
       "source_tree": "adfff70b0f357d4c66bd89f1f1c3a30c9202b2a9",
@@ -5017,6 +5017,361 @@
       ],
       "next": "Reduce the confirmed native SSS constructor clock reset with a MENU-only continuation composition: capture actual pointer-free predecessor counters, preserve caller restoration and fresh world capabilities, run constructor before the authored reset/PAD flush/lb sequence exactly once. Fixture controls cannot establish runtime correctness. Keep the additional scene-routing discrepancy explicit, never normalize comparisons or write expected values. Stop on first missing ownership/order proof; source repair and any further passive browser comparison require review. No SSS tick/draw or later VS/GO/per-owner/C3 acceptance yet.",
       "independent_review": "Unchanged strict comparator replay rejects first entry.scene_frame149 vs0; canonical baseline/final/invariance assertions and all295 stream rows pass. Reviewer verifies113 bound launch rows and40 current local artifacts; cleanup/owner attribution passes. This is review of one retained failed run, not another capture."
+    },
+    "first_sss_counter_route_repair_17d72ec3_v1": {
+      "status": "SSS_CONSTRUCTOR_PAIR_COMPARED; ORDINARY_CANCEL_REENTRY_REGRESSION_FAILED_RETAINED",
+      "source": {
+        "revision": "17d72ec3f0e50121d56ed315ed9c2a23b190417b",
+        "tree": "0ad4395bd484b3de022b502eacabf01fd1dc7e12"
+      },
+      "repair": {
+        "counter_transfer": "Capture the actual predecessor counter triple; restore caller, acquire fresh MENU lease, run SSS constructor before clearing counters exactly once. Early pause/request behavior is not copied or claimed equivalent.",
+        "route": "After original CSS OnExit, resolve and select the original authored SSS route once. Original values and comparator are unchanged.",
+        "historical_failure": "c44425c6 first-entry frame149 versus0 and scene-index1 versus0 remain retained; ccfcf5c9 canonical-patch-index suite failure retained and repaired without changing applied source."
+      },
+      "validation": {
+        "focused_python": 62,
+        "focused_node": 17,
+        "focused_failures": 0,
+        "builds": [
+          "diagnostic Release runtime",
+          "ordinary Release runtime",
+          "ordinary native_menu_host_trace"
+        ],
+        "suite": {
+          "tests": 2430,
+          "skips": 163,
+          "failures": 0,
+          "errors": 0,
+          "seconds": 529.969
+        }
+      },
+      "constructor_comparison": {
+        "scope": "Exact declared original constructor entry1579 and return1603 fields only; independent replay of same retained browser run.",
+        "frame_entry": 149,
+        "frame_return": 149,
+        "route": {
+          "current_game_mode": 2,
+          "previous_game_mode": 1,
+          "current_scene_index": 1,
+          "previous_scene_index": 0
+        },
+        "scene_kind": 9,
+        "seed": "3bb84c53",
+        "world_generation": 2,
+        "audio_generation": 1,
+        "sss_host_ticks": 0,
+        "sss_host_draws": 0,
+        "prior_css": "Unchanged typed baseline,295 retained comparison rows and final CSS DrawReturn1577 all pass.",
+        "original_expected_unchanged": true,
+        "browser_cleanup": "Checked unload clears owners/observations;14 attributed processes absent;40 HTTP artifacts match before/after; no page/console/external HTTP errors.",
+        "gpu": "Metal3 Apple adapter probe passes; no pixel comparison.",
+        "audio_scope": "Counters unchanged across rebuild samples; no continuity or PCM equivalence claim."
+      },
+      "ordinary_regression": {
+        "status": "FAILED_RETAINED",
+        "first_failure": "CSS SSS route has no exact live VS CSS owner",
+        "trace": "CSS exit -> SSS enter -> SSS exit to CSS -> CSS enter; next CSS exit fails before another SSS entry.",
+        "exit_code": 1,
+        "node_pid": 76292,
+        "cleanup": "Natural exit/reaped/absent; immutable input mismatch list empty.",
+        "diagnosis": "Source inspection identifies missing original route resolution/selection on SSS cancellation; reduction and repair pending in same milestone."
+      },
+      "retained_producer": {
+        "files": 44,
+        "scope": "43 files verified against launch or bound producer manifest; ordinary WASM frozen separately at retention time, not a capture-launch binding.",
+        "retention_v1_failure": "Manifest artifact identities were not expanded into direct launch rows; stopped at diagnostic WASM before copying. Partial retention preserved, v2 complete."
+      },
+      "limits": [
+        "No current complete ordinary route pass.",
+        "SSS ticks/draws, terminal CSS tick1575, counter4/8 equality, pause/request/service parity remain unpaired.",
+        "Later VS Setup/GO, per-owner RNG, original full match, C3 acceptance, public Stadium admission, pixels, PCM, live timing and human gates remain open."
+      ],
+      "evidence": {
+        "integration": {
+          "artifact": "sss-counter-routing-integration-17d72ec3-v1/review.json",
+          "bytes": 9370,
+          "sha256": "d59c23a8740304a09ac32b1d1ff313a8f173d331b6694d0fd32e4e4b9aa5e28b"
+        },
+        "focused": {
+          "artifact": "sss-counter-routing-integration-17d72ec3-v1/focused.json",
+          "bytes": 3011,
+          "sha256": "b64526c8175cf8673380425f51dbd077a50060e1f35b63685c57fea05d31cb7f"
+        },
+        "suite": {
+          "artifact": "full-regression-17d72ec3-v1/result.json",
+          "bytes": 882,
+          "sha256": "285ab334ab0b8839c35f80c95b1463cf29d4b7ecf8225d109520eb07f43ecf90"
+        },
+        "suite_log": {
+          "artifact": "full-regression-17d72ec3-v1/suite.log",
+          "bytes": 455279,
+          "sha256": "d551f0503eeac59c5986a50f0f9c6ca24925066ab1d0f41e2144639b830982aa"
+        },
+        "failed_ccfc_suite": {
+          "artifact": "full-regression-ccfcf5c9-v1/result.json",
+          "bytes": 479,
+          "sha256": "8d20c50889184c8f39f26002ea56d81ec8572730cce6a62798ca22e347d66829"
+        },
+        "patch_format_repair": {
+          "artifact": "sss-counter-patch-canonicalization-v1/review.json",
+          "bytes": 2159,
+          "sha256": "628a939d9f5713413e998d9feaa2e555f4cd9906ee1b6be5598fe3095ef4aa6b"
+        },
+        "producer": {
+          "artifact": "first-sss-counter-repair-producer-17d72ec3-v1/identity.json",
+          "bytes": 11199,
+          "sha256": "b631292cb4812e20e7fd2001f93630b3320cd38e843cb9f2293315eb33c9125b"
+        },
+        "retained_producer": {
+          "artifact": "first-sss-counter-repair-producer-17d72ec3-retained-v2/identity.json",
+          "bytes": 25459,
+          "sha256": "318cf3a51f8255f60bd88f3af5bc02fb7f519d1fe2d390010c405eab8a2948db"
+        },
+        "browser_preflight": {
+          "artifact": "first-sss-counter-repair-preflight-17d72ec3-v1/freeze.json",
+          "bytes": 1683,
+          "sha256": "3f22be6b5be790e7e0ac34e1a157eae8bc1dfbdbcfe2b769b1cfba90cf304841"
+        },
+        "browser_result": {
+          "artifact": "first-sss-counter-repair-preflight-17d72ec3-v1/result.json",
+          "bytes": 1851,
+          "sha256": "d496241006d70add1dcd86d7f642a983c2b6565508eaa1facb74d80e24a99cf6"
+        },
+        "browser_report": {
+          "artifact": "first-sss-counter-repair-preflight-17d72ec3-v1/browser-run/report.json",
+          "bytes": 1145500,
+          "sha256": "001be0575a79138318ff790b900e1fff35b9b7d84f82df8d98f360deab8d5d21"
+        },
+        "owner_cleanup": {
+          "artifact": "first-sss-counter-repair-preflight-17d72ec3-v1/owner.json",
+          "bytes": 111469,
+          "sha256": "4bb70714d99dee4bf5fe65d34e341ed380199749b52f8b8531f3966e87ec3f0c"
+        },
+        "root_review": {
+          "artifact": "root-first-sss-counter-repair-result-review-v1.json",
+          "bytes": 3709,
+          "sha256": "66713a012439225dffd0b366191fe84451ead5f49919e46ddb05b271accdc67f"
+        },
+        "independent_review": {
+          "artifact": "sol-first-sss-17d-result-review-v1/review.json",
+          "bytes": 8613,
+          "sha256": "8daab2598fb77662d633150bb75daa6f818398a5fec2df0ab09ec6e7808a724b"
+        },
+        "ordinary_packet": {
+          "artifact": "ordinary-results-preflight-packet-17d72ec3-v1.json",
+          "bytes": 4023,
+          "sha256": "09b99364f863227b9798289034f9518c60213c1b4c2310d1b624e7c20e7ee2a6"
+        },
+        "ordinary_result": {
+          "artifact": "ordinary-results-17d72ec3-v1/result.json",
+          "bytes": 1681,
+          "sha256": "d63794eb10f9e2706c882fa0144bd4d27598c75a1cfbc9a9f59c242431d86e59"
+        },
+        "ordinary_trace": {
+          "artifact": "ordinary-results-17d72ec3-v1/transitions.jsonl",
+          "bytes": 982,
+          "sha256": "44451b6afc0adf7b960e019e99b48db5e2d9c87ed558021b378169b997eefafd"
+        },
+        "ordinary_stderr": {
+          "artifact": "ordinary-results-17d72ec3-v1/stderr.log",
+          "bytes": 1285,
+          "sha256": "7dd13768b0335edc40842ba5c6f028eb351a320f3bb5c5477717c36f142740f1"
+        },
+        "ordinary_cleanup": {
+          "artifact": "ordinary-results-17d72ec3-v1/cleanup.json",
+          "bytes": 137,
+          "sha256": "6214c7ba2fde86d23ae50a26710f6cf1da8eacea5f2eff785adf7094dc794e1a"
+        }
+      }
+    },
+    "sss_cancel_reentry_repair_53dc776f_v1": {
+      "status": "NATIVE_CANCEL_REENTRY_AND_BROWSER_CONSTRUCTOR_UNLOAD_PASS",
+      "source": {
+        "revision": "53dc776f259205aa139e9a4946325ecf489b5944",
+        "tree": "35b315296fd525156119314340aaabc35ef2064d"
+      },
+      "source_change": "Prepare exact live VS SSS cancellation ownership before original mode OnExit; require its queued authored CSS route, resolve and select exactly once. No direct scene-index write or guard waiver.",
+      "scope": "Start-game and Training paths preserved. Pending LRAS mode change remains unsupported. Synthetic services do not establish teardown; the separate actual browser repeat establishes checked unload at this constructor boundary only.",
+      "control": {
+        "actual_run_source_base": "17d72ec3f0e50121d56ed315ed9c2a23b190417b",
+        "candidate_host_sha256": "325bf52c1de267dd33d852cc32c59d66ca9bc307aad62fc7623f6b8ba045cc80",
+        "candidate_test_sha256": "6c022cce365a2e0d880f7437452d88eaab45eb4ae88b432073aa2ef368334333",
+        "result": "Actual original callback/routing-suffix composition reproduces pre-fix stale route and passes two repaired cycles, refusals and start-game caller restoration.",
+        "retained_failures": [
+          "v1 fixture compile error before any C execution",
+          "v2 unexecuted fixture-oracle draft superseded",
+          "v3 unittest1/1OK and C controls0; outer zsh exit-capture tail failed on readonly status variable, no wrapper exit0 claim"
+        ]
+      },
+      "canonical_focused": {
+        "tests": 7,
+        "seconds": 2.832,
+        "failures": 0,
+        "skips": 0
+      },
+      "native_result": {
+        "status": "PASS_NATIVE_ORDINARY_RESULTS_REGRESSION",
+        "checks": "Cancel SSS to CSS, re-enter SSS and match; No Contest and four-stock elimination Results routes return to CSS; checked Session end succeeds.",
+        "immutable_bindings": 171,
+        "fixture_files": 124,
+        "node_pid": 79522,
+        "exit_code": 0,
+        "cleanup": "Natural exit/reaped/independently absent, no signals",
+        "limits": "Native functional only; no post-close numeric allocation snapshot, original-session, pixels, PCM, timing or browser route claim."
+      },
+      "evidence": {
+        "source_review": {
+          "artifact": "root-cancel-reentry-integration-v1/review.json",
+          "bytes": 5457,
+          "sha256": "8ba3986e6ef601d82b0b0a571218ac504c5ded9db82144d23731a889cfc7a3ba"
+        },
+        "control_freeze": {
+          "artifact": "sss-cancel-reentry-v3/freeze.json",
+          "bytes": 7210,
+          "sha256": "695876cc28230873893b7cedbe75dc7d54795e67df9d4a305b7ade078f97a308"
+        },
+        "independent_source_review": {
+          "artifact": "sol-sss-cancel-reentry-source-review-v1/review.json",
+          "bytes": 4422,
+          "sha256": "8318e575451ae49773f3086c214e59669416a394fb14802b5316e0b7f29a238a"
+        },
+        "independent_test_review": {
+          "artifact": "sol-sss-cancel-reentry-test-v3-source-review-v1/review.json",
+          "bytes": 2334,
+          "sha256": "c20a5a90d5891468d640bc7f4bd4072552ec7f8420a953f4a4afb51b01597827"
+        },
+        "canonical_focused": {
+          "artifact": "cancel-reentry-native-53dc776f-v1/focused/result.json",
+          "bytes": 934,
+          "sha256": "f741af53714c9881db1a5b21ef9d536e5c8ed012624b786acc6a8b4445b32462"
+        },
+        "native_build": {
+          "artifact": "stadium-ordinary-trace-build-53dc776f-v1/result.json",
+          "bytes": 643,
+          "sha256": "3c04fffd21b05f74697aef07d441c167bf23c4eb6b06dbc84a379779802d9e7b"
+        },
+        "native_packet": {
+          "artifact": "ordinary-results-preflight-packet-53dc776f-v1.json",
+          "bytes": 4017,
+          "sha256": "5ef132b9e5cb6714b42678bb169f2abde070a078c1fcd9cf6a92e98d09f7e368"
+        },
+        "native_producer": {
+          "artifact": "stadium-ordinary-trace-producer-53dc776f-v1/identity.json",
+          "bytes": 12475,
+          "sha256": "205ed25d4a51ff30f7576011bf36c0f0cd5897aadcb48cb8eb45225bb1000332"
+        },
+        "native_result": {
+          "artifact": "ordinary-results-53dc776f-v1/result.json",
+          "bytes": 2274,
+          "sha256": "75a70c5c3cd809c9384687ebc2c45cb05962facd4c7f7403e3729f06c0d493db"
+        },
+        "native_trace": {
+          "artifact": "ordinary-results-53dc776f-v1/transitions.jsonl",
+          "bytes": 4851,
+          "sha256": "69ed5a918dfbe48ce08f651861e1e6a62cb29da41008074d610ba6e3d00068a2"
+        },
+        "native_stdout": {
+          "artifact": "ordinary-results-53dc776f-v1/stdout.log",
+          "bytes": 3882,
+          "sha256": "bc8faed4e5b8d3a58d67b24796e34343c315085595c1d818298cdb8b4c049408"
+        },
+        "native_cleanup": {
+          "artifact": "ordinary-results-53dc776f-v1/cleanup.json",
+          "bytes": 137,
+          "sha256": "5438638e0b3ebc2e279b380337073fd35758135242a838c5e4c79fda87e8f1d8"
+        },
+        "native_independent_review": {
+          "artifact": "sol-ordinary-results-53dc-result-review-v1/review.json",
+          "bytes": 3301,
+          "sha256": "5d6c46b3cd34eeed157517acd55a094a61e98c5c453a55e9c4c43db7fed5425c"
+        },
+        "fullsuite": {
+          "artifact": "full-regression-53dc776f-v1/result.json",
+          "bytes": 859,
+          "sha256": "4a5beb36b179e1b004192bb1d3a7a398198794c5bc91f580a57e9b0c0f23e958"
+        },
+        "diagnostic_build": {
+          "artifact": "sss-cancel-reentry-builds-53dc776f-v1/diagnostic-runtime/result.json",
+          "bytes": 715,
+          "sha256": "4074bf04dfa367bc12c84ccfe3e8d6f8f0ee731bbb24d4ad51db70ed0f389c7f"
+        },
+        "ordinary_build": {
+          "artifact": "sss-cancel-reentry-builds-53dc776f-v1/ordinary-runtime/result.json",
+          "bytes": 683,
+          "sha256": "af364d08930687650efd62a38cfb91cc42021addaec3d288f9191ecbfdf4c043"
+        },
+        "browser_producer": {
+          "artifact": "first-sss-counter-repair-producer-53dc776f-v1/identity.json",
+          "bytes": 11195,
+          "sha256": "623c19a72fe70372e652d2fece17e78fb511289c3985e546dac415d92eb899d5"
+        },
+        "browser_packet": {
+          "artifact": "first-sss-counter-repair-preflight-53dc776f-v1/freeze.json",
+          "bytes": 1683,
+          "sha256": "4e82ac1eaba621d8de15fa4b00be9d66cda2a19a725aee2b89cb642cd96b6027"
+        },
+        "prelaunch_review": {
+          "artifact": "sss-repair-pre-server-control-53dc776f-v1/gate-review.json",
+          "bytes": 2733,
+          "sha256": "16d18e25657cca1bc67aee85816eb1c1a542188d3b46e004399afee21bef1afa"
+        },
+        "browser_result": {
+          "artifact": "first-sss-counter-repair-preflight-53dc776f-v1/result.json",
+          "bytes": 1850,
+          "sha256": "c2b72beff1f41d2fdc023b9f052055401a5978e3d34e9a9a78f62f1a11bc48af"
+        },
+        "browser_report": {
+          "artifact": "first-sss-counter-repair-preflight-53dc776f-v1/browser-run/report.json",
+          "bytes": 1145501,
+          "sha256": "302b0b386f3f6a74fb0736039765eb40916046e154dcbf997c7a348e876360af"
+        },
+        "browser_owner": {
+          "artifact": "first-sss-counter-repair-preflight-53dc776f-v1/owner.json",
+          "bytes": 95662,
+          "sha256": "4dab032dce3780635aa6c13787a886d8a617f6ba4b77c384998cc3b691eb9a26"
+        },
+        "browser_root_review": {
+          "artifact": "root-first-sss-53dc-result-review-v1.json",
+          "bytes": 3654,
+          "sha256": "f4c569d1ed45ec05cbf41faaeec10ed4582c69fa68de937fbcea7aad34d1336a"
+        },
+        "next_tick_plan": {
+          "artifact": "sss-first-consumed-pad-scheduler-end-plan-v1/plan.json",
+          "bytes": 9284,
+          "sha256": "1cf6736a7b1380de4ced613301cc8980aa5bb6617bea182bf81552236bcafe30"
+        },
+        "phase_review": {
+          "artifact": "sol-first-sss-source-tick-phase-review-v2/review.json",
+          "bytes": 17338,
+          "sha256": "371b51497070aabbdc23afa397f590cdb9718a094d0be8c3eb3220b895e65374"
+        },
+        "browser_independent_review": {
+          "artifact": "sol-first-sss-53dc-result-review-v1/review.json",
+          "bytes": 5561,
+          "sha256": "78b48e0505c62e59d0565052b68c35edc3655da68cfb1c08fa6e7c9595618734"
+        },
+        "retained_browser_producer": {
+          "artifact": "first-sss-counter-repair-producer-53dc776f-retained-v1/identity.json",
+          "bytes": 25460,
+          "sha256": "076a66aedb3bc587329c2a2483f040891618b32f8755b99b607144f2cb5777f5"
+        }
+      },
+      "canonical_fullsuite": {
+        "tests": 2431,
+        "skips": 163,
+        "failures": 0,
+        "seconds": 525.092
+      },
+      "browser_result": {
+        "status": "PASS_DECLARED_CONSTRUCTOR_FIELDS_AND_CHECKED_UNLOAD",
+        "source_revision": "53dc776f259205aa139e9a4946325ecf489b5944",
+        "checks": "Unchanged CSS baseline, 147 additional input/tick/draw pairs and final CSS DrawReturn1577; SSS entry/return frame149,kind9,seed3bb84c53,route2/1/1/0 and declared typed fields. Zero SSS ticks/draws.",
+        "owned_processes_absent": 12,
+        "http_artifacts_before_after_unchanged": 40,
+        "gpu": "Apple Metal3 adapter and640x480 canvas observed",
+        "limits": "Terminal CSS tick1575,counter4/8,pause/service parity,original setup/GO/per-owner RNG,pixels/PCM,timing,C3 remain open. Audio processing counters are observations, not continuity evidence."
+      }
     }
   }
 }
