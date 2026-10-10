@@ -5959,7 +5959,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..3492cd22f052a658e060a4ab3847a9b4
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..639215c6e9e7a85d92ad1f30730c9be4dad18668 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..2f8f6f6e64c885df558d7c50a87a1af5d113a86b 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,16 @@
@@ -6131,7 +6131,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..639215c6e9e7a85d92ad1f30730c9be4
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -788,137 +876,4910 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
+@@ -788,137 +876,4968 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
              }
              break;
          }
@@ -8599,23 +8599,63 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..639215c6e9e7a85d92ad1f30730c9be4
 +    Ground* map5_data;
 +    size_t stage_objects = 0;
 +    unsigned visited = 0;
++    int diagnostic_slot_index = -1;
++    void* diagnostic_object = NULL;
++    void* diagnostic_slot_expected = NULL;
++    void* diagnostic_slot_actual = NULL;
 +
-+    if (owner == NULL || output == NULL || map2_gate == NULL ||
-+        display_mode == NULL || (source_started != 0 && source_started != 1) ||
-+        owner != stadium_display_owner_current ||
-+        owner->state != STADIUM_DISPLAY_OWNER_CAPTURED ||
-+        owner->source_started != source_started ||
-+        owner->manager_bound != source_started ||
-+        owner->manager_events != (source_started ? 1U : 0U) ||
-+        (!source_started && (owner->manager.object != NULL ||
-+                             owner->manager.proc != NULL)) ||
-+        !owner->source_journal_armed || owner->source_journal_failed ||
-+        owner->source_journal_overflowed ||
-+        !owner->map2_buffer_allocation_lease_captured ||
-+        owner->map2_buffer_origin !=
-+            MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK ||
-+        owner->map2_buffer_output != output || output->captured != 1)
-+        return 0;
++    /* Failure-only local diagnostic: guards and short-circuit order below
++     * are unchanged. Read owner operands only for its exact current identity;
++     * never dereference a rejected borrowed map/process pointer for output. */
++#define STADIUM_GO_VIEW_OWNER_SAFE \
++    (owner != NULL && owner == stadium_display_owner_current)
++#define STADIUM_GO_VIEW_REJECT(predicate) do { \
++    fprintf(stderr, "STADIUM_GO_VIEW_REJECT predicate=%s source_started=%d " \
++        "owner=%p current=%p output=%p owner_state=%d owner_started=%d " \
++        "manager_bound=%d manager_events=%u journal_armed=%d journal_failed=%d " \
++        "journal_overflowed=%d journal_count=%u buffer_origin=%d " \
++        "lease_captured=%d owner_output=%p stage_objects=%zu visited=%u " \
++        "slot_index=%d slot_expected=%p slot_actual=%p observed_object=%p\n", \
++        predicate, source_started, (void*) owner, \
++        (void*) stadium_display_owner_current, (void*) output, \
++        STADIUM_GO_VIEW_OWNER_SAFE ? (int) owner->state : -1, \
++        STADIUM_GO_VIEW_OWNER_SAFE ? owner->source_started : -1, \
++        STADIUM_GO_VIEW_OWNER_SAFE ? owner->manager_bound : -1, \
++        STADIUM_GO_VIEW_OWNER_SAFE ? owner->manager_events : 0U, \
++        STADIUM_GO_VIEW_OWNER_SAFE ? owner->source_journal_armed : -1, \
++        STADIUM_GO_VIEW_OWNER_SAFE ? owner->source_journal_failed : -1, \
++        STADIUM_GO_VIEW_OWNER_SAFE ? owner->source_journal_overflowed : -1, \
++        STADIUM_GO_VIEW_OWNER_SAFE ? owner->source_event_count : 0U, \
++        STADIUM_GO_VIEW_OWNER_SAFE ? (int) owner->map2_buffer_origin : -1, \
++        STADIUM_GO_VIEW_OWNER_SAFE ? owner->map2_buffer_allocation_lease_captured : -1, \
++        STADIUM_GO_VIEW_OWNER_SAFE ? (void*) owner->map2_buffer_output : NULL, \
++        stage_objects, visited, diagnostic_slot_index, diagnostic_slot_expected, \
++        diagnostic_slot_actual, diagnostic_object); \
++    return 0; \
++} while (0)
++
++    if (owner == NULL) STADIUM_GO_VIEW_REJECT("owner == NULL");
++    if (output == NULL) STADIUM_GO_VIEW_REJECT("output == NULL");
++    if (map2_gate == NULL) STADIUM_GO_VIEW_REJECT("map2_gate == NULL");
++    if (display_mode == NULL) STADIUM_GO_VIEW_REJECT("display_mode == NULL");
++    if ((source_started != 0 && source_started != 1)) STADIUM_GO_VIEW_REJECT("(source_started != 0 && source_started != 1)");
++    if (owner != stadium_display_owner_current) STADIUM_GO_VIEW_REJECT("owner != stadium_display_owner_current");
++    if (owner->state != STADIUM_DISPLAY_OWNER_CAPTURED) STADIUM_GO_VIEW_REJECT("owner->state != STADIUM_DISPLAY_OWNER_CAPTURED");
++    if (owner->source_started != source_started) STADIUM_GO_VIEW_REJECT("owner->source_started != source_started");
++    if (owner->manager_bound != source_started) STADIUM_GO_VIEW_REJECT("owner->manager_bound != source_started");
++    if (owner->manager_events != (source_started ? 1U : 0U)) STADIUM_GO_VIEW_REJECT("owner->manager_events != (source_started ? 1U : 0U)");
++    if (!source_started) {
++        if (owner->manager.object != NULL) STADIUM_GO_VIEW_REJECT("owner->manager.object != NULL");
++        if (owner->manager.proc != NULL) STADIUM_GO_VIEW_REJECT("owner->manager.proc != NULL");
++    }
++    if (!owner->source_journal_armed) STADIUM_GO_VIEW_REJECT("!owner->source_journal_armed");
++    if (owner->source_journal_failed) STADIUM_GO_VIEW_REJECT("owner->source_journal_failed");
++    if (owner->source_journal_overflowed) STADIUM_GO_VIEW_REJECT("owner->source_journal_overflowed");
++    if (!owner->map2_buffer_allocation_lease_captured) STADIUM_GO_VIEW_REJECT("!owner->map2_buffer_allocation_lease_captured");
++    if (owner->map2_buffer_origin !=
++            MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK) STADIUM_GO_VIEW_REJECT("owner->map2_buffer_origin != MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK");
++    if (owner->map2_buffer_output != output) STADIUM_GO_VIEW_REJECT("owner->map2_buffer_output != output");
++    if (output->captured != 1) STADIUM_GO_VIEW_REJECT("output->captured != 1");
 +
 +    map0 = Ground_GetMapGObj(0);
 +    display = Ground_GetMapGObj(PsType_Display);
@@ -8623,18 +8663,21 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..639215c6e9e7a85d92ad1f30730c9be4
 +    map5 = Ground_GetMapGObj(5);
 +    manager = source_started ? owner->manager.object : NULL;
 +    manager_proc = source_started ? owner->manager.proc : NULL;
-+    if (map0 != output->map0_ground || display != owner->display_ground ||
-+        map2 != owner->map2_ground || map5 != owner->nested_map5_ground ||
-+        owner->map2_ground == NULL || owner->nested_map5_ground == NULL ||
-+        !stadium_owner_map2_stage_root_contains_once(map0) ||
-+        !stadium_owner_map2_stage_root_contains_once(display) ||
-+        !stadium_owner_map2_stage_root_contains_once(map2) ||
-+        !stadium_owner_map2_stage_root_contains_once(map5) ||
-+        (source_started &&
-+         (!stadium_owner_map2_stage_root_contains_once(manager) ||
-+          !stadium_owner_go_manager_proc_root_contains_once(manager_proc))) ||
-+        !stadium_owner_map2_proc_root_contains_once(map2->proc))
-+        return 0;
++    if (map0 != output->map0_ground) STADIUM_GO_VIEW_REJECT("map0 != output->map0_ground");
++    if (display != owner->display_ground) STADIUM_GO_VIEW_REJECT("display != owner->display_ground");
++    if (map2 != owner->map2_ground) STADIUM_GO_VIEW_REJECT("map2 != owner->map2_ground");
++    if (map5 != owner->nested_map5_ground) STADIUM_GO_VIEW_REJECT("map5 != owner->nested_map5_ground");
++    if (owner->map2_ground == NULL) STADIUM_GO_VIEW_REJECT("owner->map2_ground == NULL");
++    if (owner->nested_map5_ground == NULL) STADIUM_GO_VIEW_REJECT("owner->nested_map5_ground == NULL");
++    if (!stadium_owner_map2_stage_root_contains_once(map0)) STADIUM_GO_VIEW_REJECT("!stadium_owner_map2_stage_root_contains_once(map0)");
++    if (!stadium_owner_map2_stage_root_contains_once(display)) STADIUM_GO_VIEW_REJECT("!stadium_owner_map2_stage_root_contains_once(display)");
++    if (!stadium_owner_map2_stage_root_contains_once(map2)) STADIUM_GO_VIEW_REJECT("!stadium_owner_map2_stage_root_contains_once(map2)");
++    if (!stadium_owner_map2_stage_root_contains_once(map5)) STADIUM_GO_VIEW_REJECT("!stadium_owner_map2_stage_root_contains_once(map5)");
++    if (source_started) {
++        if (!stadium_owner_map2_stage_root_contains_once(manager)) STADIUM_GO_VIEW_REJECT("!stadium_owner_map2_stage_root_contains_once(manager)");
++        if (!stadium_owner_go_manager_proc_root_contains_once(manager_proc)) STADIUM_GO_VIEW_REJECT("!stadium_owner_go_manager_proc_root_contains_once(manager_proc)");
++    }
++    if (!stadium_owner_map2_proc_root_contains_once(map2->proc)) STADIUM_GO_VIEW_REJECT("!stadium_owner_map2_proc_root_contains_once(map2->proc)");
 +
 +    for (size_t i = 0; i < ARRAY_SIZE(stage_info.map_gobjs); ++i) {
 +        HSD_GObj* expected = NULL;
@@ -8642,71 +8685,86 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..639215c6e9e7a85d92ad1f30730c9be4
 +        else if (i == (size_t) PsType_Display) expected = display;
 +        else if (i == 2) expected = map2;
 +        else if (i == 5) expected = map5;
-+        if (stage_info.map_gobjs[i] != expected) return 0;
++        diagnostic_slot_index = (int) i;
++        diagnostic_slot_expected = expected;
++        diagnostic_slot_actual = stage_info.map_gobjs[i];
++        if (stage_info.map_gobjs[i] != expected) STADIUM_GO_VIEW_REJECT("stage_info.map_gobjs[i] != expected");
 +    }
++    diagnostic_slot_index = -1;
 +    /* Every stage root is reached through the live source list. Bound the
 +     * walk and require only the exact OnInit set or the started manager too. */
 +    for (HSD_GObj* object = ((HSD_GObj**) HSD_GObj_Entities)[5];
 +         object != NULL; object = object->next) {
-+        if (visited++ == STADIUM_MAP2_SNAPSHOT_TRAVERSAL_LIMIT) return 0;
++        diagnostic_object = object;
++        if (visited++ == STADIUM_MAP2_SNAPSHOT_TRAVERSAL_LIMIT) STADIUM_GO_VIEW_REJECT("visited++ == STADIUM_MAP2_SNAPSHOT_TRAVERSAL_LIMIT");
 +        if (object->classifier != HSD_GOBJ_CLASS_STAGE) continue;
 +        if (object != map0 && object != display && object != map2 &&
-+            object != map5 && object != manager)
-+            return 0;
++            object != map5 && object != manager) STADIUM_GO_VIEW_REJECT("object != map0 && object != display && object != map2 && object != map5 && object != manager");
 +        ++stage_objects;
 +    }
-+    if (stage_objects != (source_started ? 5U : 4U) ||
-+        !stadium_owner_source_journal_matches(
-+            owner, stage_info.map_gobjs, ARRAY_SIZE(stage_info.map_gobjs)) ||
-+        !stadium_owner_map2_buffer_allocation_matches(
-+            owner->map2_buffer, &owner->map2_buffer_allocation_lease) ||
-+        !stadium_owner_map2_output_matches(owner))
-+        return 0;
++    if (stage_objects != (source_started ? 5U : 4U)) STADIUM_GO_VIEW_REJECT("stage_objects != (source_started ? 5U : 4U)");
++    if (!stadium_owner_source_journal_matches(
++            owner, stage_info.map_gobjs, ARRAY_SIZE(stage_info.map_gobjs))) STADIUM_GO_VIEW_REJECT("!stadium_owner_source_journal_matches( owner, stage_info.map_gobjs, ARRAY_SIZE(stage_info.map_gobjs))");
++    if (!stadium_owner_map2_buffer_allocation_matches(
++            owner->map2_buffer, &owner->map2_buffer_allocation_lease)) STADIUM_GO_VIEW_REJECT("!stadium_owner_map2_buffer_allocation_matches( owner->map2_buffer, &owner->map2_buffer_allocation_lease)");
++    if (!stadium_owner_map2_output_matches(owner)) STADIUM_GO_VIEW_REJECT("!stadium_owner_map2_output_matches(owner)");
 +
 +    /* The bounded link-5 roots above are the membership proof for this
 +     * observation. Do not call the retirement matchers here: they rescan all
 +     * GObj links without a traversal budget. */
-+    if (map0->p_link != 5 || display->p_link != 5 || map2->p_link != 5 ||
-+        map5->p_link != 5 || map0->classifier != HSD_GOBJ_CLASS_STAGE ||
-+        display->classifier != HSD_GOBJ_CLASS_STAGE ||
-+        map2->classifier != HSD_GOBJ_CLASS_STAGE ||
-+        map5->classifier != HSD_GOBJ_CLASS_STAGE)
-+        return 0;
++    if (map0->p_link != 5) STADIUM_GO_VIEW_REJECT("map0->p_link != 5");
++    if (display->p_link != 5) STADIUM_GO_VIEW_REJECT("display->p_link != 5");
++    if (map2->p_link != 5) STADIUM_GO_VIEW_REJECT("map2->p_link != 5");
++    if (map5->p_link != 5) STADIUM_GO_VIEW_REJECT("map5->p_link != 5");
++    if (map0->classifier != HSD_GOBJ_CLASS_STAGE) STADIUM_GO_VIEW_REJECT("map0->classifier != HSD_GOBJ_CLASS_STAGE");
++    if (display->classifier != HSD_GOBJ_CLASS_STAGE) STADIUM_GO_VIEW_REJECT("display->classifier != HSD_GOBJ_CLASS_STAGE");
++    if (map2->classifier != HSD_GOBJ_CLASS_STAGE) STADIUM_GO_VIEW_REJECT("map2->classifier != HSD_GOBJ_CLASS_STAGE");
++    if (map5->classifier != HSD_GOBJ_CLASS_STAGE) STADIUM_GO_VIEW_REJECT("map5->classifier != HSD_GOBJ_CLASS_STAGE");
 +    map0_data = HSD_GObjGetUserData(map0);
 +    display_data = HSD_GObjGetUserData(display);
 +    map2_data = HSD_GObjGetUserData(map2);
 +    map5_data = HSD_GObjGetUserData(map5);
-+    if (map0_data == NULL || display_data == NULL || map2_data == NULL ||
-+        map5_data == NULL || map0_data->map_id != 0 ||
-+        display_data->map_id != (enum GrKind) PsType_Display ||
-+        map2_data->map_id != 2 || map5_data->map_id != 5 ||
-+        display_data->u.display.xD4 != owner->children[0] ||
-+        display_data->u.display.xD8 != owner->children[1] ||
-+        display_data->u.display.xDC != owner->children[2])
-+        return 0;
++    if (map0_data == NULL) STADIUM_GO_VIEW_REJECT("map0_data == NULL");
++    if (display_data == NULL) STADIUM_GO_VIEW_REJECT("display_data == NULL");
++    if (map2_data == NULL) STADIUM_GO_VIEW_REJECT("map2_data == NULL");
++    if (map5_data == NULL) STADIUM_GO_VIEW_REJECT("map5_data == NULL");
++    if (map0_data->map_id != 0) STADIUM_GO_VIEW_REJECT("map0_data->map_id != 0");
++    if (display_data->map_id != (enum GrKind) PsType_Display) STADIUM_GO_VIEW_REJECT("display_data->map_id != (enum GrKind) PsType_Display");
++    if (map2_data->map_id != 2) STADIUM_GO_VIEW_REJECT("map2_data->map_id != 2");
++    if (map5_data->map_id != 5) STADIUM_GO_VIEW_REJECT("map5_data->map_id != 5");
++    if (display_data->u.display.xD4 != owner->children[0]) STADIUM_GO_VIEW_REJECT("display_data->u.display.xD4 != owner->children[0]");
++    if (display_data->u.display.xD8 != owner->children[1]) STADIUM_GO_VIEW_REJECT("display_data->u.display.xD8 != owner->children[1]");
++    if (display_data->u.display.xDC != owner->children[2]) STADIUM_GO_VIEW_REJECT("display_data->u.display.xDC != owner->children[2]");
 +
-+    if (source_started &&
-+        (manager->classifier != HSD_GOBJ_CLASS_STAGE || manager->p_link != 5 ||
-+         manager->user_data != NULL || manager->hsd_obj != NULL ||
-+         manager->p_priority != 0 || manager->gx_link != HSD_GOBJ_GXLINK_NONE ||
-+         manager->proc != manager_proc ||
-+         owner->manager.callback != melee_web_stadium_c1_manager_callback_control() ||
-+         manager_proc->gobj != manager ||
-+         manager_proc->on_invoke != owner->manager.callback ||
-+         manager_proc->s_link != 10 || manager_proc->child != NULL))
-+        return 0;
-+    if (map2->proc == NULL || map2->proc != owner->map2_proc ||
-+        map2->proc->gobj != map2 || map2->proc->on_invoke != grStadium_801D1520 ||
-+        map2->proc->s_link != 4 || map2->proc->child != NULL)
-+        return 0;
++    if (source_started) {
++        if (manager->classifier != HSD_GOBJ_CLASS_STAGE) STADIUM_GO_VIEW_REJECT("manager->classifier != HSD_GOBJ_CLASS_STAGE");
++        if (manager->p_link != 5) STADIUM_GO_VIEW_REJECT("manager->p_link != 5");
++        if (manager->user_data != NULL) STADIUM_GO_VIEW_REJECT("manager->user_data != NULL");
++        if (manager->hsd_obj != NULL) STADIUM_GO_VIEW_REJECT("manager->hsd_obj != NULL");
++        if (manager->p_priority != 0) STADIUM_GO_VIEW_REJECT("manager->p_priority != 0");
++        if (manager->gx_link != HSD_GOBJ_GXLINK_NONE) STADIUM_GO_VIEW_REJECT("manager->gx_link != HSD_GOBJ_GXLINK_NONE");
++        if (manager->proc != manager_proc) STADIUM_GO_VIEW_REJECT("manager->proc != manager_proc");
++        if (owner->manager.callback != melee_web_stadium_c1_manager_callback_control()) STADIUM_GO_VIEW_REJECT("owner->manager.callback != melee_web_stadium_c1_manager_callback_control()");
++        if (manager_proc->gobj != manager) STADIUM_GO_VIEW_REJECT("manager_proc->gobj != manager");
++        if (manager_proc->on_invoke != owner->manager.callback) STADIUM_GO_VIEW_REJECT("manager_proc->on_invoke != owner->manager.callback");
++        if (manager_proc->s_link != 10) STADIUM_GO_VIEW_REJECT("manager_proc->s_link != 10");
++        if (manager_proc->child != NULL) STADIUM_GO_VIEW_REJECT("manager_proc->child != NULL");
++    }
++    if (map2->proc == NULL) STADIUM_GO_VIEW_REJECT("map2->proc == NULL");
++    if (map2->proc != owner->map2_proc) STADIUM_GO_VIEW_REJECT("map2->proc != owner->map2_proc");
++    if (map2->proc->gobj != map2) STADIUM_GO_VIEW_REJECT("map2->proc->gobj != map2");
++    if (map2->proc->on_invoke != grStadium_801D1520) STADIUM_GO_VIEW_REJECT("map2->proc->on_invoke != grStadium_801D1520");
++    if (map2->proc->s_link != 4) STADIUM_GO_VIEW_REJECT("map2->proc->s_link != 4");
++    if (map2->proc->child != NULL) STADIUM_GO_VIEW_REJECT("map2->proc->child != NULL");
 +
-+    if (map2_data->u.stadium.xCC != owner->map2_buffer ||
-+        map2_data->u.stadium.xE4 != map5 ||
-+        display_data != owner->display_ground_data)
-+        return 0;
++    if (map2_data->u.stadium.xCC != owner->map2_buffer) STADIUM_GO_VIEW_REJECT("map2_data->u.stadium.xCC != owner->map2_buffer");
++    if (map2_data->u.stadium.xE4 != map5) STADIUM_GO_VIEW_REJECT("map2_data->u.stadium.xE4 != map5");
++    if (display_data != owner->display_ground_data) STADIUM_GO_VIEW_REJECT("display_data != owner->display_ground_data");
 +    *map2_gate = map2_data->u.stadium.xC4_b0;
 +    *display_mode = display_data->u.display.xE4;
 +    return 1;
++#undef STADIUM_GO_VIEW_REJECT
++#undef STADIUM_GO_VIEW_OWNER_SAFE
 +}
 +
 +static int stadium_owner_map2_graph_matches_phase(
@@ -11152,7 +11210,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..639215c6e9e7a85d92ad1f30730c9be4
  
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
-@@ -1185,22 +6046,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +6104,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -11194,7 +11252,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..639215c6e9e7a85d92ad1f30730c9be4
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +6094,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +6152,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -11216,7 +11274,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..639215c6e9e7a85d92ad1f30730c9be4
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +6116,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +6174,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
@@ -11239,7 +11297,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..639215c6e9e7a85d92ad1f30730c9be4
      wrapper->flag = false;
      return gobj;
  }
-@@ -1896,6 +6796,9 @@ bool grStadium_801D42B8(void)
+@@ -1896,6 +6854,9 @@ bool grStadium_801D42B8(void)
      if (gp->u.stadium.xC4_b1) {
          return false;
      }
@@ -11249,7 +11307,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..639215c6e9e7a85d92ad1f30730c9be4
      gp->u.stadium.xD0 =
          grDatFiles_801C6478(gp->u.stadium.xCC, gp->u.stadium.xC8);
      return true;
-@@ -2093,6 +6996,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2093,6 +7054,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
              gp = GET_GROUND(map_gobj);
              HSD_ASSERT(0x99B, gp);
              gp->u.stadium.xC4_b1 = true;
@@ -11259,7 +11317,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..639215c6e9e7a85d92ad1f30730c9be4
              lbFile_80016580(datfiles[var_r29], gp->u.stadium.xCC,
                              &gp->u.stadium.xC8, fn_801D4220, NULL);
              temp_r31->u.stadium.xDC = 1;
-@@ -2221,6 +7127,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2221,6 +7185,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
          if (temp_r31->u.stadium.xDE == 5) {
              temp_r31->u.stadium.xD8 =
                  randi_between_2(yakumono_param->x0, yakumono_param->x4);
