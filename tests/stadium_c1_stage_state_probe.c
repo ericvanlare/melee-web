@@ -604,6 +604,110 @@ static void gobj_pool_phase(const char* phase,unsigned world,
     }
     fflush(stdout);
 }
+
+/* Exact constructor tuple from original grZakoGenerator_801CAE04:
+ * GObj_Create(2, 4, 0), HSD_GObj_SetupProc(..., fn_801CADBC, 0).
+ * These names are fixture-local, not private owner-TU enum dependencies. */
+enum {
+    STADIUM_GENERATOR_FIXTURE_CLASS = 2,
+    STADIUM_GENERATOR_FIXTURE_LINK = 4,
+    STADIUM_GENERATOR_FIXTURE_PROC_LINK = 0
+};
+
+typedef struct StadiumGeneratorPoolFixture {
+    HSD_GObj* objects[2];
+    HSD_GObjProc* proc;
+    MeleeWebSourceMemoryContext context;
+    MeleeWebSourceMemoryAllocation object_leases[2];
+    MeleeWebSourceMemoryAllocation proc_lease;
+} StadiumGeneratorPoolFixture;
+
+/* These checks are limited to the exact two GObj cells and one proc cell that
+ * this test fixture created. Never dereference an unexpected free-list node. */
+static int generator_gobj_free_cells_exact(HSD_GObj* first, HSD_GObj* second)
+{
+    if (!first || !second || first == second || gobj_alloc_data.used != 0 ||
+        gobj_alloc_data.free != 2 || !gobj_alloc_data.freehead) return 0;
+    HSD_ObjAllocLink* head = gobj_alloc_data.freehead;
+    if (head == (HSD_ObjAllocLink*) first) {
+        HSD_ObjAllocLink* tail = head->next;
+        return tail == (HSD_ObjAllocLink*) second && tail->next == NULL;
+    }
+    if (head == (HSD_ObjAllocLink*) second) {
+        HSD_ObjAllocLink* tail = head->next;
+        return tail == (HSD_ObjAllocLink*) first && tail->next == NULL;
+    }
+    return 0;
+}
+
+static int generator_proc_free_cell_exact(HSD_GObjProc* proc)
+{
+    return proc && !gobjproc_alloc_data.used && gobjproc_alloc_data.free == 1 &&
+           gobjproc_alloc_data.freehead == (HSD_ObjAllocLink*) proc &&
+           ((HSD_ObjAllocLink*) proc)->next == NULL;
+}
+
+static int generator_active_gobjs_exact(HSD_GObj* first, HSD_GObj* second)
+{
+    if (!first || !second || first == second || !HSD_GObj_Entities ||
+        HSD_GObjLibInitData.p_link_max < STADIUM_GENERATOR_FIXTURE_LINK) return 0;
+    HSD_GObj* object = ((HSD_GObj**) HSD_GObj_Entities)[STADIUM_GENERATOR_FIXTURE_LINK];
+    unsigned seen = 0;
+    for (size_t i = 0; i < 2; ++i) {
+        if (object == first && !(seen & 1u)) seen |= 1u;
+        else if (object == second && !(seen & 2u)) seen |= 2u;
+        else return 0;
+        if (object->classifier != STADIUM_GENERATOR_FIXTURE_CLASS ||
+            object->p_link != STADIUM_GENERATOR_FIXTURE_LINK) return 0;
+        object = object->next;
+    }
+    return object == NULL && seen == 3u;
+}
+
+static int generator_pool_cell_lease_matches(
+    const void* payload, const MeleeWebSourceMemoryAllocation* expected,
+    const MeleeWebSourceMemoryContext* context, uint32_t requested_bytes)
+{
+    MeleeWebSourceMemoryAllocation actual = {0};
+    return payload && expected && context && expected->live &&
+           expected->requested_bytes == requested_bytes &&
+           expected->world_generation == context->world_generation &&
+           expected->source_heap_handle == context->source_heap_handle &&
+           expected->allocation_generation != 0 &&
+           melee_web_source_memory_allocation_read(payload, &actual) ==
+               MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+           actual.live && actual.requested_bytes == expected->requested_bytes &&
+           actual.world_generation == expected->world_generation &&
+           actual.source_heap_handle == expected->source_heap_handle &&
+           actual.allocation_generation == expected->allocation_generation;
+}
+
+static int generator_pool_cache_matches(const StadiumGeneratorPoolFixture* fixture)
+{
+    if (!fixture || !fixture->objects[0] || !fixture->objects[1] ||
+        fixture->objects[0] == fixture->objects[1] || !fixture->proc ||
+        !melee_web_gameplay_world_exists() || !HSD_GObj_Entities ||
+        HSD_GObjLibInitData.p_link_max < STADIUM_GENERATOR_FIXTURE_LINK ||
+        ((HSD_GObj**) HSD_GObj_Entities)[STADIUM_GENERATOR_FIXTURE_LINK] != NULL) return 0;
+    MeleeWebSourceMemoryContext context = {0};
+    if (melee_web_source_memory_context_read(&context) !=
+            MELEE_WEB_SOURCE_MEMORY_READ_OK ||
+        context.world_generation != fixture->context.world_generation ||
+        context.source_heap_handle != fixture->context.source_heap_handle)
+        return 0;
+    MeleeWebGameplayStats stats = melee_web_gameplay_stats();
+    if (stats.ticks || stats.objects || stats.processes) return 0;
+    for (size_t i = 0; i < 2; ++i)
+        if (!generator_pool_cell_lease_matches(
+                fixture->objects[i], &fixture->object_leases[i], &context,
+                gobj_alloc_data.size)) return 0;
+    if (!generator_pool_cell_lease_matches(
+            fixture->proc, &fixture->proc_lease, &context,
+            gobjproc_alloc_data.size)) return 0;
+    return generator_gobj_free_cells_exact(fixture->objects[0], fixture->objects[1]) &&
+           generator_proc_free_cell_exact(fixture->proc);
+}
+
 int melee_web_stadium_c1_gobj_proc_pool_control(void)
 {
     char error[256]={0};
@@ -683,12 +787,79 @@ int melee_web_stadium_c1_generator_lifetime_control(void)
  char error[256]={0};
  queue_control_require(melee_web_gameplay_startup(8U*1024U*1024U,error,sizeof(error)),error);
  queue_control_require(melee_web_native_world_enable(error,sizeof(error)),error);
- MeleeWebGameplayStats baseline=melee_web_gameplay_stats();
- gobj_pool_phase("generator_baseline",0,NULL,NULL);
+ MeleeWebGameplayStats cold=melee_web_gameplay_stats();
+ gobj_pool_phase("generator_cold",0,NULL,NULL);
+ queue_control_require(!cold.objects&&!cold.processes&&!cold.ticks&&
+                       HSD_GObj_Entities&&
+                       HSD_GObjLibInitData.p_link_max>=STADIUM_GENERATOR_FIXTURE_LINK&&
+                       ((HSD_GObj**)HSD_GObj_Entities)[STADIUM_GENERATOR_FIXTURE_LINK]==NULL&&
+                       !gobj_alloc_data.freehead&&!gobjproc_alloc_data.freehead&&
+                       !gobj_alloc_data.used&&!gobjproc_alloc_data.used&&
+                       !gobj_alloc_data.free&&!gobjproc_alloc_data.free,
+                       "generator cache fixture starts from cold source pool roots");
  size_t size=melee_web_stadium_zako_snapshot_size();
  void* before=malloc(size);void* after=malloc(size);
  queue_control_require(before&&after,"generator snapshot witness allocation");
  queue_control_require(melee_web_stadium_zako_snapshot_read(before,size),"initial private source root snapshot");
+
+ /* Prime only the original GObj/proc cache used by the next control. Both
+  * objects coexist; exactly one original source callback is installed and no
+  * scheduler tick or callback dispatch occurs before original PLink removal. */
+ StadiumGeneratorPoolFixture cache={0};
+ cache.objects[0]=GObj_Create(STADIUM_GENERATOR_FIXTURE_CLASS,STADIUM_GENERATOR_FIXTURE_LINK,0);
+ cache.objects[1]=GObj_Create(STADIUM_GENERATOR_FIXTURE_CLASS,STADIUM_GENERATOR_FIXTURE_LINK,0);
+ queue_control_require(cache.objects[0]&&cache.objects[1]&&
+                       cache.objects[0]!=cache.objects[1],
+                       "two concurrent original GObj cache cells");
+ queue_control_require(generator_active_gobjs_exact(cache.objects[0],cache.objects[1]),
+                       "cache fixture has exactly its two active original GObjs");
+ HSD_GObj_SetupProc(cache.objects[0],fn_801CADBC,STADIUM_GENERATOR_FIXTURE_PROC_LINK);
+ cache.proc=cache.objects[0]->proc;
+ queue_control_require(cache.proc&&cache.proc->gobj==cache.objects[0]&&
+                       cache.proc->on_invoke==fn_801CADBC&&
+                       cache.proc->s_link==STADIUM_GENERATOR_FIXTURE_PROC_LINK&&!cache.proc->child&&
+                       !cache.objects[1]->proc,
+                       "single original installed but undispatched cache proc");
+ MeleeWebGameplayStats constructed=melee_web_gameplay_stats();
+ queue_control_require(!constructed.ticks&&constructed.objects==2&&constructed.processes==1&&
+                       gobj_alloc_data.used==2&&gobj_alloc_data.free==0&&
+                       gobjproc_alloc_data.used==1&&gobjproc_alloc_data.free==0&&
+                       ((HSD_GObj**)HSD_GObj_Entities)[STADIUM_GENERATOR_FIXTURE_LINK]!=NULL,
+                       "cache fixture source counts before original removal");
+ gobj_pool_phase("generator_cache_constructed",0,cache.objects[0],cache.proc);
+ gobj_pool_phase("generator_cache_second_object",0,cache.objects[1],NULL);
+ queue_control_require(melee_web_source_memory_context_read(&cache.context)==
+                           MELEE_WEB_SOURCE_MEMORY_READ_OK,
+                       "cache fixture source context");
+ queue_control_require(melee_web_source_memory_allocation_read(
+                           cache.objects[0],&cache.object_leases[0])==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+                       generator_pool_cell_lease_matches(cache.objects[0],&cache.object_leases[0],
+                           &cache.context,gobj_alloc_data.size),
+                       "first exact GObj cache backing lease");
+ queue_control_require(melee_web_source_memory_allocation_read(
+                           cache.objects[1],&cache.object_leases[1])==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+                       generator_pool_cell_lease_matches(cache.objects[1],&cache.object_leases[1],
+                           &cache.context,gobj_alloc_data.size),
+                       "second exact GObj cache backing lease");
+ queue_control_require(melee_web_source_memory_allocation_read(
+                           cache.proc,&cache.proc_lease)==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+                       generator_pool_cell_lease_matches(cache.proc,&cache.proc_lease,
+                           &cache.context,gobjproc_alloc_data.size),
+                       "exact proc cache backing lease");
+ HSD_GObjPLink_80390228(cache.objects[0]);
+ HSD_GObjPLink_80390228(cache.objects[1]);
+ queue_control_require(generator_pool_cache_matches(&cache),
+                       "original removal returned exactly the primed GObj/proc cells and leases");
+ gobj_pool_phase("generator_cache_primed",0,cache.objects[0],cache.proc);
+ gobj_pool_phase("generator_cache_second_primed",0,cache.objects[1],NULL);
+ queue_control_require(melee_web_stadium_zako_snapshot_read(after,size)&&
+                       memcmp(before,after,size)==0,
+                       "pool fixture leaves original generator roots unchanged");
+ MeleeWebGameplayStats baseline=melee_web_gameplay_stats();
+ gobj_pool_phase("generator_baseline",0,NULL,NULL);
+ queue_control_require(!baseline.objects&&!baseline.processes&&!baseline.ticks&&
+                       generator_pool_cache_matches(&cache),
+                       "measured generator baseline is the exact live warmed pool fixture");
  for(unsigned lifetime=0;lifetime<2;++lifetime){
   MeleeWebStadiumGenerator* owner=melee_web_stadium_generator_prepare(error,sizeof(error));
   queue_control_require(owner!=NULL,error);
@@ -732,6 +903,12 @@ int melee_web_stadium_c1_generator_lifetime_control(void)
          lifetime,baseline.heap_free_bytes,current.heap_free_bytes,baseline.objects,current.objects,
          baseline.processes,current.processes);fflush(stdout);
   gobj_pool_phase("generator_returned",0,NULL,NULL);
+  const int cache_returned=generator_pool_cache_matches(&cache);
+  printf("STADIUM_GENERATOR_CACHE_RETURN lifetime=%u status=%d\n",lifetime,cache_returned);fflush(stdout);
+  queue_control_require(cache_returned,
+                       "original generator and borrower returned the exact primed cells and backing leases");
+  gobj_pool_phase("generator_returned_cells",0,cache.objects[0],cache.proc);
+  gobj_pool_phase("generator_returned_second_cell",0,cache.objects[1],NULL);
   queue_control_require(current.heap_free_bytes==baseline.heap_free_bytes&&
                        current.objects==baseline.objects&&
                        current.processes==baseline.processes,"generator two-lifetime exact heap/object/process return");
@@ -739,6 +916,13 @@ int melee_web_stadium_c1_generator_lifetime_control(void)
  free(before);free(after);
  printf("STADIUM_GENERATOR_CONTROL lifetimes=2 heap_before=%d heap_after=%d borrowed_refusals=2 original_onload_onstart=1 ticks=0\n",baseline.heap_free_bytes,melee_web_gameplay_stats().heap_free_bytes);
  queue_control_require(melee_web_gameplay_shutdown(error,sizeof(error)),error);
+ MeleeWebSourceMemoryContext inactive={0};
+ queue_control_require(melee_web_source_memory_context_read(&inactive)==
+                           MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE&&
+                       !melee_web_gameplay_world_exists()&&!melee_web_gameplay_session_active()&&
+                       !melee_web_gameplay_allocation().identity&&
+                       HSD_GObj_Entities==NULL&&HSD_GetHeap()==-1,
+                       "generator control fully retires its source world/session");
  return 1;
 }
 
