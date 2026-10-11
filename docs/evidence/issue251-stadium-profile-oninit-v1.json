@@ -318,8 +318,8 @@
     "no_machine_specific_path_required": true
   },
   "subsequent_c3_component_2026_10_09": {
-    "claim_boundary": "The exact 9143b4bb source batch (tree 32c3f0ac) passed focused validation, three Release builds, two synthetic prepared-SIS allocator lifetimes, the 2,456-test suite and exact-head CI. Fresh first-SSS-draw and Setup endpoint runs matched their declared fields after same-run prerequisites; first-draw independent review passed, and the Setup run completed checked unload with its ordinary observation cleared (independent Setup replay passed). The Setup text-tail probe retained 6 pre-unload and 11 post-unload records with zero drops, while sis_lease.retirement_verified remained false. Original PAD856/profile, persistent VsModeData, per-owner RNG, Ready/GO, original-matched 3,500-tick sequence and C3 acceptance remain open; the two historical functional 3,500-tick lifetimes and ordinary Results regression remain separate completed evidence. Public Stadium admission stays closed.",
-    "current_result": "On exact source 9143b4bb/tree 32c3f0ac, 60 focused Python and 41 Node tests, diagnostic native-menu plus diagnostic and ordinary Release builds, two synthetic prepared-SIS allocator lifetimes, 2,456 full-suite tests (162 skips) and CI (12 successes/2 expected skips) passed. The first-SSS-draw comparison matched rows 1609/1610 and passed independent review. The fresh Setup run matched its declared original row-2503 Start fields, with no first mismatch; Session source_frames and Setup-continuation tick/draw counters were zero. Checked native unload returned and cleared the ordinary observation. The text-tail log grew from 6 records/476 bytes to 11/811 bytes with zero drops; its observed post-HUD sequence includes two font-1 removals followed by font-2 removal. The SIS lease reports retirement_verified=false, so no OS-free claim is made. Root review records 14 attributed PIDs absent, 40 local HTTP artifacts equal before/after and GPU probe passed; independent Setup replay passed.",
+    "claim_boundary": "The latest native checkpoint is the bounded first-full-post-GO C/F state trace on exact runtime source 59f843fd (tree bbe284bf). It records one native tick with no draw and preserves the display timer only as raw object bytes because initialization was not observed; this is not original-state parity. The 59f suite retained one stale Sheik tag-range assertion failure. Test-only descendant 7fb9ceb8 corrected only the authored tag inventory; its full suite passed 2,471 tests with 167 skips and no failures, while runtime and observer producers remain 59f. Exact-head CI is pending after push. The original observer capture passed its bounded route checks but failed the frozen sequence reproduction criterion; the first consumed-PAD content difference is at sequence 260/index 5. The earlier typed-timer diagnostic on 16bc is superseded as a representation, not erased. Original PAD856/profile, persistent VsModeData, title bytes, per-owner RNG, Ready/GO, an original-matched 3,500-tick sequence and C3 acceptance remain open. The two historical functional 3,500-tick lifetimes and ordinary Results regression remain separate completed evidence; public Stadium admission stays closed.",
+    "current_result": "On runtime source 59f843fd/tree bbe284bf, the native-menu trace build and diagnostic/ordinary Release runtime builds passed. The root-reviewed trace captured GO-containing C exit, pre-F85 and post-F86 in generation 3, all at source_frame 0: map-2 countdown 3646\u21923645 with phase/gate/form 0/0/5; display mode/previous mode 11/10; title entry 19; and no draw. The display timer is raw bytes fffffffe with initialization unobserved, not a typed value. The 59f full suite ran 2,471 tests with 167 skips and one failure in the stale Sheik tag-range test. Test-only descendant 7fb9ceb8 fixed only that expected namespace; its full suite passed 2,471 tests with 167 skips and zero failures. The 7fb9 validation does not change the 59f runtime/observer producers; exact-head CI remains pending. The original observer capture passed C84/F85/zero-tail route validation and shut Dolphin down cleanly, but frozen reproduction failed: 3,050 records versus 2,935 in v6, with DrawReturn sequence IDs 3048 versus 2933. First consumed-PAD content differed at sequence 260/index 5 (port 0), and the cause remains unresolved. The original state companion is valid under its own schema but unpaired to native because inputs/context and draw/no-draw paths differ. No matched original counterpart is claimed.",
     "first_css_browser_draw_4d6c0b37_d949a0b8_v1": {
       "status": "FAIL_BEFORE_ARM; NO_BROWSER_CSS_COMPARISON; NO_TICK; NO_DRAW",
       "scope": "One headless browser attempt with the existing captured first-CSS context and one consumed sample. The diagnostic did not arm; this is not a source draw or Stadium/C3 acceptance result.",
@@ -586,7 +586,7 @@
         "SDK unittest moduleimport failure beforeNode; fixedexplicit scriptsimport and retainedoutput"
       ]
     },
-    "next_progression": "With independent Setup replay complete, prepare a source-only plan for the C3 native idle-state and per-owner RNG observation boundary. Do not infer SIS OS-free status from the checked unload flag or text-tail ordering. No new capture is authorized by this record. Original PAD856/profile, persistent VsModeData, per-owner RNG parity, Ready/GO, an original-matched 3,500-tick sequence and C3 remain separate open gates.",
+    "next_progression": "The next bounded step is read-only reuse of the v6 MWRI input/tick/channel schedule around sequence 260, preserving the original input and draw order while reducing the first recorded consumed-PAD difference. The separate state companion is not paired because the runs used different menu inputs/context and draw/no-draw paths; its scalar differences do not establish a parity failure. Per-owner RNG, title bytes, original PAD856/profile, persistent VsModeData, Ready/GO continuation, an original-matched 3,500-tick sequence and C3 acceptance remain separate gates.",
     "first_css_context_return_1fad54ff_v1": {
       "source_head": "1fad54ff964f80b263b91a77cf25a25b0ee08603",
       "source_tree": "adfff70b0f357d4c66bd89f1f1c3a30c9202b2a9",
@@ -6350,7 +6350,7 @@
         "pixels",
         "PCM"
       ],
-      "status": "The 9143b4bb Setup declared-field comparison passed independent replay, and checked native unload cleared the ordinary observation. sis_lease.retirement_verified remains false; the diagnostic does not independently establish OS-free. Complete original-matched Setup, Ready/GO and C3 acceptance remain open. The two historical functional 3,500-tick lifetimes and ordinary Results regression remain complete evidence."
+      "status": "The root-reviewed 59f843fd native C/F trace preserves the display timer as raw bytes because initialization was not observed. A separate independent source review supports that representation; neither review establishes original-state parity. The prior 9143 first-draw and declared Setup/check-unload results remain bounded evidence. Original-matched Setup/profile, title bytes, per-owner RNG, Ready/GO, an original-matched 3,500-tick sequence and C3 acceptance remain open. The two historical functional 3,500-tick lifetimes and ordinary Results regression remain separate completed evidence."
     },
     "vs_entry_endpoint_551ee723": {
       "source_identity": {
@@ -7735,6 +7735,276 @@
         ],
         "scope": "All 46 copies were hash-verified. Forty diagnostic assets bind HTTP before/after; ordinary JS binds preflight; native SIS artifacts bind the persisted pre-control identity. PAD artifacts retain the actual e12 producer. Ordinary menu WASM alone has a retention-time hash with 9143 build provenance, without an earlier HTTP or hash claim."
       }
-    }
+    },
+    "native_idle_state_59f843fd": {
+      "source_identity": {
+        "commit": "59f843fd3bea4dceffcaee2a5c25a4b3b22b10b8",
+        "tree": "bbe284bf90281260b2ef195b1b54b722269f1c90"
+      },
+      "integration": {
+        "artifact": "root-idle-timer-integration-v1/commit.json",
+        "bytes": 2103,
+        "sha256": "249adfec10dab3c2b4e112fc8ee05d7e7614f56d360260c063af7d523a76c3f2",
+        "source_review_artifact": "root-idle-timer-integration-v1/source-review.json",
+        "source_review_bytes": 3081,
+        "source_review_sha256": "317056f185b6ddf9f3bfe2f4a51307066372c2825bb45b08b7563946b494f7f5",
+        "decision": "SOURCE_REVIEW_PASS_RAW_TIMER_REPRESENTATION_ONLY",
+        "focused_result_artifact": "root-idle-timer-integration-v1/focused-result.json",
+        "focused_result_bytes": 105,
+        "focused_result_sha256": "00def0fa6eaf43df0a3a182f330f0600ed54547228b7dfec6b8d6d5c3c05b30f",
+        "exit_code": 0
+      },
+      "native_trace_build": {
+        "artifact": "native-idle-state-build-59f843fd-v1/result.json",
+        "bytes": 1167,
+        "sha256": "43b022819b25b36d9dd45565763c0377da941739c3d3064e19aaa794a592305e",
+        "exit_code": 0,
+        "js_sha256": "cc0b4e38d930b2910bd666599b55eb0cbc4f1511edaa8674ddbde24408deeba4",
+        "wasm_sha256": "826bdec9f9d35dc5b0587d952e71b4e0540397eae3ad01a1453ea2b326cf992f"
+      },
+      "runtime_capture": {
+        "decision": "PASS_NATIVE_TRACED_FIRST_POST_GO_STATE_WITH_RAW_TIMER_ONLY",
+        "review_artifact": "native-idle-state-preflight-59f843fd-v1/result-review.json",
+        "review_bytes": 7690,
+        "review_sha256": "167adb5e2b21d95914d81a0a35953a01eaed5078d483f34a12006970d3389106",
+        "packet_artifact": "native-idle-state-preflight-59f843fd-v1/packet.json",
+        "packet_bytes": 31427,
+        "packet_sha256": "59650d6c8bda7df3e1e8b17294982cbde576d3158e14398e729294618559727e",
+        "cleanup_artifact": "native-idle-state-preflight-59f843fd-v1/cleanup-review.json",
+        "cleanup_bytes": 286,
+        "cleanup_sha256": "b03ae57d791dff2b35a17fb1703490fc2e251bcc07c66d091f8003aad333ef4b",
+        "samples": [
+          {
+            "phase": "go-containing-exit",
+            "generation": 3,
+            "world_ticks": 85,
+            "session_ticks": 85,
+            "source_frame": 0,
+            "map2_gate": 0,
+            "map2_countdown": 3646,
+            "map2_phase": 0,
+            "map2_form": 5,
+            "display_mode": 11,
+            "display_previous_mode": 10,
+            "sis_title_entry_index": 19,
+            "display_timer_native_hex": "fffffffe",
+            "display_timer_initialization_observed": false,
+            "draw": 0
+          },
+          {
+            "phase": "first-full-post-go-before",
+            "generation": 3,
+            "world_ticks": 85,
+            "session_ticks": 85,
+            "source_frame": 0,
+            "map2_gate": 0,
+            "map2_countdown": 3646,
+            "map2_phase": 0,
+            "map2_form": 5,
+            "display_mode": 11,
+            "display_previous_mode": 10,
+            "sis_title_entry_index": 19,
+            "display_timer_native_hex": "fffffffe",
+            "display_timer_initialization_observed": false,
+            "draw": 0
+          },
+          {
+            "phase": "first-full-post-go-after",
+            "generation": 3,
+            "world_ticks": 86,
+            "session_ticks": 86,
+            "source_frame": 0,
+            "map2_gate": 0,
+            "map2_countdown": 3645,
+            "map2_phase": 0,
+            "map2_form": 5,
+            "display_mode": 11,
+            "display_previous_mode": 10,
+            "sis_title_entry_index": 19,
+            "display_timer_native_hex": "fffffffe",
+            "display_timer_initialization_observed": false,
+            "draw": 0
+          }
+        ],
+        "closed_owner_refusal": {
+          "output_unchanged": true,
+          "draw": 0
+        },
+        "pids_absent": [
+          9047,
+          9054
+        ],
+        "scope": "Native trace only; source_frame 0 is not treated as an ordinal. Timer bytes are not interpreted as an integer or compared to original state."
+      },
+      "timer_definedness_review": {
+        "artifact": "sol-idle-display-timer-definedness-v1/review.json",
+        "bytes": 9651,
+        "sha256": "90a3808725b384b26ced4206cae19fb3c25ec306a94c40df1383aff57b0e0179",
+        "decision": "REQUIRES_RAW_REPRESENTATION_OR_OBSERVED_SOURCE_WRITE_PROOF_BEFORE_TYPED_TIMER_SEMANTICS"
+      },
+      "original_observer_build": {
+        "artifact": "../stadium-sss-position-observer-build-20261010-014502-902455f0/attempt-v3/completion-receipt.json",
+        "bytes": 924,
+        "sha256": "d6a9c1ccd3852d57007534ba08b1113ae7f391efcad01b2df5af4369decf3fb7",
+        "source_head": "16bc21e09d96e7f824e8f32747ee3f38e2985f4f",
+        "scope": "PASS_COMPILER_ONLY_NO_DOLPHIN_LAUNCH",
+        "observer_binary_sha256": "ddb40cfccbb363e90e68dbf27a3f414ab1f00209cbf4652be308059375a3bba0",
+        "prior_retained_binary_sha256": "efbdc78947d8caab43f4b716092688d03144d281f864fcc6d95a09fa3fa924bc",
+        "capture": "This receipt is compiler-only; the separate original run and its frozen sequence-mismatch outcome are bound below."
+      },
+      "superseded_16bc_diagnostic": {
+        "source_identity": {
+          "commit": "16bc21e09d96e7f824e8f32747ee3f38e2985f4f",
+          "tree": "3f0a1a582d7f843ac1c972ec9ac677f7bb0c01bb"
+        },
+        "review_artifact": "native-idle-state-preflight-16bc21e0-v1/result-review.json",
+        "review_bytes": 7241,
+        "review_sha256": "a159aaec3c284d1e3e173caddc0bf7616ac4de8b1c3b4013c20ce02c8f717ea9",
+        "packet_artifact": "native-idle-state-preflight-16bc21e0-v1/packet.json",
+        "packet_bytes": 30575,
+        "packet_sha256": "42699862740291a15213fa9c86f27f9daf12bfeeef76391acba0a839065f0a29",
+        "run_result_artifact": "native-idle-state-preflight-16bc21e0-v1/run/result.json",
+        "run_result_bytes": 521,
+        "run_result_sha256": "5db92ebb47802d629105c1657c142c831cabac3ddfabc9d3826aed3cb92b8139",
+        "build_artifact": "native-idle-state-build-16bc21e0-v1/result.json",
+        "build_sha256": "c78e04185fbc38560cb2b7590db393c3d11f5877ebc71dfea25e876222330867",
+        "scope": "The native assertions passed for the actual 16bc producer, but it read the timer as a typed signed value before source initialization had been established. Preserve this producer/result as historical; it is superseded as a diagnostic representation and is not source-state parity."
+      },
+      "validation": {
+        "focused_source_result": {
+          "artifact": "root-idle-timer-integration-v1/focused-result.json",
+          "bytes": 105,
+          "sha256": "00def0fa6eaf43df0a3a182f330f0600ed54547228b7dfec6b8d6d5c3c05b30f",
+          "exit_code": 0
+        },
+        "diagnostic_runtime_build": {
+          "artifact": "idle-state-validation-59f843fd-v1/diagnostic-runtime/result.json",
+          "bytes": 758,
+          "sha256": "d447aa0f7cdabf7a83751bdecf2e3bc8030f2da5a0ace6b64668971a6d36661d",
+          "exit_code": 0
+        },
+        "ordinary_runtime_build": {
+          "artifact": "idle-state-validation-59f843fd-v1/ordinary-runtime/result.json",
+          "bytes": 726,
+          "sha256": "c958197aef31d407b54b4fa0cede8433dd2c292f9459b277a51cf58042d8779c",
+          "exit_code": 0
+        },
+        "full_suite": {
+          "artifact": "idle-state-validation-59f843fd-v1/full-suite/result.json",
+          "bytes": 829,
+          "sha256": "4c05d09d1ee77b2eb355f709fd4ffb8cbfaefc50cd2b0c70778a6c2cc7384ce5",
+          "log_artifact": "idle-state-validation-59f843fd-v1/full-suite/log.txt",
+          "log_sha256": "0774e4b4336caddf9335d94a1f90a92e113b0163371739672a432022db439cca",
+          "tests_run": 2471,
+          "skipped": 167,
+          "failures": 1,
+          "exit_code": 1,
+          "failed_test": "test_sheik_transform_prefix.TestSheikTransformPrefixTests.test_entity_identity_and_transform_tags_remain_distinct_in_actual_namespace",
+          "failure_scope": "Stale expected tag namespace ends at 66 while current source explicitly includes 67\u201389; no production behavior change is implicated."
+        },
+        "exact_head_ci": {
+          "status": "pending_after_push; no current-head CI result is yet bound"
+        },
+        "fresh_original_capture": {
+          "execution_artifact": "luna-original-idle-state-execution-7fb9ceb-v1/execution-outcome.json",
+          "execution_bytes": 6107,
+          "execution_sha256": "c43d23666dbdeea968f6329e1154085bb265afef50e5854b51293addd6d3cea4",
+          "artifact_hashes_file": "luna-original-idle-state-execution-7fb9ceb-v1/capture-artifact-hashes.json",
+          "artifact_hashes_bytes": 4903,
+          "artifact_hashes_sha256": "c9d322641db53489fc6991bb77b9cde6874be00ef1c756d8b9754f2ae17456dc",
+          "capture_report": "original-stadium-idle-state-59f843fd-ddb40cf-v1/report.json",
+          "report_sha256": "d5ddea5738358146d50b9e3891c78af7c2abc84be3b6bd28d1b7b0f2031eb3a7",
+          "state_companion_report": "original-stadium-idle-state-59f843fd-ddb40cf-v1/state-companion-report.json",
+          "state_companion_sha256": "49f51434c3eb61b707324b4e2c12bb9f88ae9696e6698508de90a95d8dd1acda",
+          "state_companion_scope": "Valid under its own schema; original countdown 3629/3628/3627 and raw timer 00000000 are not paired to native values because inputs/context and draw/no-draw paths differ.",
+          "decision": "STOPPED_PLAN_SEQUENCE_MISMATCH; routevalidator PASS for C84/F85/zero tail and clean Dolphin shutdown does not imply frozen reproduction pass.",
+          "records": {
+            "new": 3050,
+            "frozen_v6": 2935
+          },
+          "draw_return_sequence_ids": {
+            "new": 3048,
+            "frozen_v6": 2933
+          },
+          "first_consumed_pad_difference": {
+            "sequence": 260,
+            "zero_based_index": 5,
+            "fields": [
+              "ports"
+            ],
+            "original_port0": "1000000000000000000000",
+            "new_port0": "0000000000000000000000",
+            "cause": "unresolved; no regression inference"
+          },
+          "root_review": {
+            "artifact": "root-original-idle-state-result-review-7fb9ceb8-v1/review.json",
+            "bytes": 1370,
+            "sha256": "b436baedd4a8130513856c58e6fcc866b6d0e9eddab084a4b6006fa6dcd1057a",
+            "decision": "RETAIN_FAILED_FROZEN_SEQUENCE_REPRODUCTION_WITH_VALID_ORIGINAL_STATE_OBSERVATION",
+            "capture_files_verified": 26,
+            "capture_pid_absent": 19278
+          },
+          "first_input_independent_recheck": {
+            "artifact": "root-original-idle-state-result-review-7fb9ceb8-v1/first-input-independent-recheck.json",
+            "bytes": 916,
+            "sha256": "436391ea0c009f018a6e32081d1213bf3947d96711dc782bc164aa2e689bfce2",
+            "rows_equal_before_difference": 5,
+            "first_difference_index": 5,
+            "sequence": 260,
+            "scope": "Ports differ; no cause or game-code regression inference."
+          },
+          "producer_retention": {
+            "artifact": "root-original-idle-state-result-review-7fb9ceb8-v1/producer-retention.json",
+            "bytes": 619,
+            "sha256": "f8b9d1407c2fa70d4724c0494d261224f8de0d8b4d30c0106b63bc060e1e53fb",
+            "producer_binary_sha256": "ddb40cfccbb363e90e68dbf27a3f414ab1f00209cbf4652be308059375a3bba0",
+            "source_commit": "16bc21e09d96e7f824e8f32747ee3f38e2985f4f",
+            "source_unmodified": true
+          }
+        },
+        "test_only_descendant": {
+          "source_head": "7fb9ceb8765b45dd352065ac63e1dcc5e522dd6e",
+          "source_tree": "85a77c17a0826fcd31def93d6af126be0d063573",
+          "scope": "Test-only observer namespace expectation repair; runtime producer and original observer/decoder identities remain unchanged.",
+          "focused": "16 focused tests passed; exact focused result records exit 0.",
+          "focused_result_artifact": "root-observer-namespace-integration-v1/result.json",
+          "focused_result_bytes": 420,
+          "focused_result_sha256": "62f0c19e09231982b81a5b8370b3f1af0387f654fe285adab522ac15f514521b",
+          "commit_artifact": "root-observer-namespace-integration-v1/commit.json",
+          "commit_sha256": "00252e8ca720136ff1ada5abc306bd9db562a3a6b3d82f4c9ae27917d7ab9975",
+          "full_suite": {
+            "artifact": "idle-state-validation-7fb9ceb8-v1/result.json",
+            "bytes": 1116,
+            "sha256": "899b05649726429cee870597590842a3f70c45e2d42635b7ab640f7a04f3d7c5",
+            "tests_run": 2471,
+            "skipped": 167,
+            "failures": 0,
+            "elapsed_seconds": 515.716,
+            "exit_code": 0,
+            "log_sha256": "8897744252cdd5ea493804de30178ba9046889432a41e8c5006099e2e48b8d0e"
+          },
+          "validation_review": {
+            "artifact": "root-idle-state-validation-review-7fb9ceb8-v1/review.json",
+            "bytes": 2959,
+            "sha256": "5b101c600bc7686051014f5843ff48516819e0c8ce3780e4390faa34b88dc053",
+            "decision": "PASS_REQUIRED_LOCAL_VALIDATION_ON_TEST_ONLY_DESCENDANT",
+            "runtime_producer": "59f843fd3bea4dceffcaee2a5c25a4b3b22b10b8",
+            "ci_status": "pending new head push"
+          }
+        }
+      },
+      "open_gates": [
+        "fresh original C/F counterpart",
+        "title bytes",
+        "original PAD856/profile",
+        "persistent VsModeData",
+        "per-owner RNG ledger",
+        "Ready/GO continuation",
+        "original-matched 3500-tick sequence",
+        "C3 acceptance"
+      ],
+      "historical_functional_evidence": "Two functional 3500-tick lifetimes and the ordinary Results regression remain separate completed evidence."
+    },
+    "current_next_step": "The original observer capture failed the frozen sequence reproduction criterion after a valid bounded C84/F85 route; its first consumed-PAD content difference is sequence 260/index 5. The original state companion is unpaired to native due different inputs/context and draw/no-draw paths. Next is a read-only reuse of the v6 MWRI input/tick/channel schedule around that difference, preserving event order."
   }
 }
