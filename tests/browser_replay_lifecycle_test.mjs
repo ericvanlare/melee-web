@@ -267,7 +267,7 @@ assert(start&&pause&&completion);
  const replayLimits=page.match(/const RETAIL_REPLAY_(?:LEGACY_MAX_FRAMES|WHOLE_SESSION_MAX_FRAMES|STATE_RECORD_OVERHEAD|SESSION_RECORD_OVERHEAD|TIMER_RECORD_OVERHEAD|MAX_BYTES)[^;]*;/g).join('\n');
  const moduleLine=replayLimits+'\nconst hooks={'+logHook+'}; var Module={print:text=>hooks.onLog(text,false),printErr:text=>hooks.onLog(text,true)};';
  const logged=[];
- const scope={$:()=>({}),retailRun:{observe:true,rows:[],timerRows:[]},
+ const scope={window:{},$:()=>({}),retailRun:{observe:true,rows:[],timerRows:[]},
   log:text=>logged.push(text),stop(){}};
  vm.createContext(scope);vm.runInContext(moduleLine,scope);
  const state='{"record":"frame","index":0}';
