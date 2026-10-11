@@ -2856,6 +2856,12 @@ int main(void)
             self.skipTest("Original GO/HUD source canary requires its separately reviewed run gate")
         self._run_stadium_source_ready_session_one_shot(go_alignment_probe=True)
 
+    def test_stadium_source_go_idle_state_snapshot_one_shot(self):
+        if os.environ.get("MELEE_RUN_STADIUM_SOURCE_GO_IDLE_STATE") != "1":
+            self.skipTest("GO/first-post-GO idle snapshot requires its separately reviewed run gate")
+        self._run_stadium_source_ready_session_one_shot(
+            go_alignment_probe=True, idle_state_snapshot_probe=True)
+
     def test_stadium_source_functional_idle_3500_one_shot(self):
         if os.environ.get("MELEE_RUN_STADIUM_SOURCE_FUNCTIONAL_IDLE_3500") != "1":
             self.skipTest("One-world 3,500-post-GO functional interval requires its separately reviewed run gate")
@@ -2879,7 +2885,8 @@ int main(void)
 
     def _run_stadium_source_ready_session_one_shot(
             self, toy_owner_controls=False, post_ready_tick=False, go_alignment_probe=False,
-            setup_only=False, functional_idle_probe=False, functional_idle_pair_probe=False):
+            setup_only=False, functional_idle_probe=False, functional_idle_pair_probe=False,
+            idle_state_snapshot_probe=False):
         import hashlib
         from capture_sd_reference_prefix import cleanup_process
 
@@ -2909,6 +2916,7 @@ int main(void)
         source = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
         scope = ("stadium-source-functional-idle-pair-v1" if functional_idle_pair_probe
                  else "stadium-source-functional-idle-v1" if functional_idle_probe
+                 else "stadium-source-go-idle-state-v1" if idle_state_snapshot_probe
                  else "stadium-source-toy-owner-controls-v1" if toy_owner_controls
                  else "stadium-source-post-ready-tick-v1" if post_ready_tick
                  else "stadium-source-go-alignment-v1" if go_alignment_probe
@@ -2916,6 +2924,7 @@ int main(void)
                  else "stadium-source-ready-session-v1")
         prefix = ("stadium-functional-idle-pair" if functional_idle_pair_probe
                   else "stadium-functional-idle" if functional_idle_probe
+                  else "stadium-go-idle-state" if idle_state_snapshot_probe
                   else "stadium-toy-owner" if toy_owner_controls
                   else "stadium-post-ready" if post_ready_tick
                   else "stadium-go-alignment" if go_alignment_probe
@@ -3192,6 +3201,85 @@ int main(void)
                 self.assertLess(follow_position, phase_position,
                                 "A follow-up that reaches Ready belongs before first-ready")
             self.assertNotIn("STADIUM_POST_READY_TICK", stderr)
+            if idle_state_snapshot_probe:
+                self.assertIn(
+                    "Stadium live typed idle snapshots captured at GO tick exit and around the first full post-GO tick; no extra tick/draw or C3 claim",
+                    stdout)
+                snapshot_lines = [
+                    line for line in stderr.splitlines()
+                    if line.startswith("STADIUM_SOURCE_IDLE phase=") and
+                    "phase=closed-owner-refusal" not in line]
+                snapshots = {}
+                for line in snapshot_lines:
+                    fields = dict(token.split("=", 1) for token in line.split()[1:])
+                    phase = fields.pop("phase")
+                    self.assertNotIn(phase, snapshots, line)
+                    snapshots[phase] = fields
+                self.assertEqual(
+                    set(snapshots),
+                    {"go-containing-exit", "first-full-post-go-before",
+                     "first-full-post-go-after"}, stderr)
+                c_idle = snapshots["go-containing-exit"]
+                pre_idle = snapshots["first-full-post-go-before"]
+                post_idle = snapshots["first-full-post-go-after"]
+                self.assertEqual(c_idle, pre_idle)
+                self.assertEqual(int(c_idle["generation"]), int(event_rows[0][2]))
+                self.assertEqual(int(c_idle["world_ticks"]), c[1])
+                self.assertEqual(int(c_idle["session_ticks"]), c[3])
+                self.assertEqual(int(c_idle["source_frame"]), c[5])
+                self.assertEqual(int(pre_idle["world_ticks"]), f[0])
+                self.assertEqual(int(pre_idle["session_ticks"]), f[2])
+                self.assertEqual(int(pre_idle["source_frame"]), f[4])
+                self.assertEqual(int(post_idle["world_ticks"]), f[1])
+                self.assertEqual(int(post_idle["session_ticks"]), f[3])
+                self.assertEqual(int(post_idle["source_frame"]), f[5])
+                for row in (c_idle, pre_idle, post_idle):
+                    generation = int(row["generation"])
+                    self.assertGreater(generation, 0)
+                    self.assertEqual(int(row["sis_world_generation"]), generation)
+                    self.assertEqual(int(row["map2_world_generation"]), generation)
+                    self.assertEqual(int(row["sis_source_heap_handle"]),
+                                     int(row["map2_source_heap_handle"]))
+                    self.assertGreater(int(row["sis_allocation_generation"]), 0)
+                    self.assertGreater(int(row["map2_allocation_generation"]), 0)
+                    self.assertGreater(int(row["sis_source_epoch"]), 0)
+                    self.assertGreater(int(row["sis_requested_bytes"]), 0)
+                    self.assertGreater(int(row["map2_requested_bytes"]), 0)
+                    self.assertEqual((int(row["sis_font_slot"]),
+                                      int(row["sis_static_text_role"]),
+                                      int(row["sis_dynamic_text_role"]),
+                                      int(row["sis_context_present"])), (1, 0, 1, 1))
+                    self.assertEqual(int(row["title_bytes_captured"]), 0)
+                    self.assertEqual(int(row["draw"]), 0)
+                    self.assertFalse(any("pointer" in key or "address" in key
+                                         for key in row))
+                self.assertEqual(int(post_idle["world_ticks"]),
+                                 int(pre_idle["world_ticks"]) + 1)
+                self.assertEqual(int(post_idle["session_ticks"]),
+                                 int(pre_idle["session_ticks"]) + 1)
+                phase_stable = (
+                    int(pre_idle["map2_phase"]) == 0 and
+                    int(post_idle["map2_phase"]) == 0 and
+                    int(pre_idle["map2_gate"]) == 0 and
+                    int(post_idle["map2_gate"]) == 0 and
+                    int(pre_idle["map2_form"]) == 5 and
+                    int(post_idle["map2_form"]) == 5 and
+                    int(pre_idle["map2_countdown"]) > -(2 ** 31))
+                interval = re.findall(
+                    r"STADIUM_SOURCE_IDLE_INTERVAL phase=first-post-go countdown_step=(\S+) draw=0",
+                    stderr)
+                self.assertEqual(len(interval), 1, stderr)
+                if phase_stable:
+                    self.assertEqual(interval[0], "checked-minus-one")
+                    self.assertEqual(int(post_idle["map2_countdown"]),
+                                     int(pre_idle["map2_countdown"]) - 1)
+                else:
+                    self.assertEqual(interval[0],
+                                     "not-asserted-state-changed-or-edge")
+                self.assertIn(
+                    "STADIUM_SOURCE_IDLE phase=closed-owner-refusal output_unchanged=1 draw=0",
+                    stderr)
+                self.assertNotIn("STADIUM_SOURCE_DRAW", stderr)
         elif post_ready_tick:
             self.assertIn("Stadium original source-session Ready plus one post-Ready source tick and checked owned-world retirement passed; exact GO alignment unobserved; no C3 claim", stdout)
             row = re.findall(

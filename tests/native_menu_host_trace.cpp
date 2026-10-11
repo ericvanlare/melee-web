@@ -8408,6 +8408,79 @@ void run_stadium_screen_roots_preflight(
     std::cout << "C1 original Stadium auxiliary IMAGE constructor/remove passed twice without callback dispatch or stage entry\n";
 }
 
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+bool same_stadium_idle_snapshot(const MeleeWebStadiumIdleSnapshot& a,
+                                const MeleeWebStadiumIdleSnapshot& b)
+{
+#define MELEE_WEB_IDLE_FIELD(field) if(a.field!=b.field)return false
+    MELEE_WEB_IDLE_FIELD(version);
+    MELEE_WEB_IDLE_FIELD(world_generation);
+    MELEE_WEB_IDLE_FIELD(world_ticks);
+    MELEE_WEB_IDLE_FIELD(source_frame);
+    MELEE_WEB_IDLE_FIELD(map2_gate);
+    MELEE_WEB_IDLE_FIELD(map2_countdown);
+    MELEE_WEB_IDLE_FIELD(map2_phase);
+    MELEE_WEB_IDLE_FIELD(map2_form);
+    MELEE_WEB_IDLE_FIELD(map2_history_e0);
+    MELEE_WEB_IDLE_FIELD(map2_history_e2);
+    MELEE_WEB_IDLE_FIELD(display_mode);
+    MELEE_WEB_IDLE_FIELD(display_e6);
+    MELEE_WEB_IDLE_FIELD(display_e8);
+    MELEE_WEB_IDLE_FIELD(display_timer);
+    MELEE_WEB_IDLE_FIELD(display_previous_mode);
+    MELEE_WEB_IDLE_FIELD(display_selected_player);
+    MELEE_WEB_IDLE_FIELD(display_f2);
+    MELEE_WEB_IDLE_FIELD(display_flags);
+    MELEE_WEB_IDLE_FIELD(sis_font_slot);
+    MELEE_WEB_IDLE_FIELD(sis_static_text_role);
+    MELEE_WEB_IDLE_FIELD(sis_dynamic_text_role);
+    MELEE_WEB_IDLE_FIELD(sis_context_present);
+    MELEE_WEB_IDLE_FIELD(sis_title_entry_seen);
+    MELEE_WEB_IDLE_FIELD(sis_title_entry_index);
+    MELEE_WEB_IDLE_FIELD(title_bytes_captured);
+    MELEE_WEB_IDLE_FIELD(sis_source_heap_handle);
+    MELEE_WEB_IDLE_FIELD(sis_world_generation);
+    MELEE_WEB_IDLE_FIELD(sis_allocation_generation);
+    MELEE_WEB_IDLE_FIELD(sis_source_epoch);
+    MELEE_WEB_IDLE_FIELD(sis_requested_bytes);
+    MELEE_WEB_IDLE_FIELD(map2_source_heap_handle);
+    MELEE_WEB_IDLE_FIELD(map2_world_generation);
+    MELEE_WEB_IDLE_FIELD(map2_allocation_generation);
+    MELEE_WEB_IDLE_FIELD(map2_requested_bytes);
+    MELEE_WEB_IDLE_FIELD(map2_buffer_origin);
+#undef MELEE_WEB_IDLE_FIELD
+    return true;
+}
+
+void emit_stadium_idle_snapshot(const char* phase,
+                                const MeleeWebStadiumIdleSnapshot& snapshot,
+                                uint64_t session_ticks)
+{
+    std::fprintf(stderr,
+        "STADIUM_SOURCE_IDLE phase=%s generation=%llu world_ticks=%llu session_ticks=%llu source_frame=%u map2_gate=%d map2_countdown=%d map2_phase=%d map2_form=%d map2_history_e0=%d map2_history_e2=%d display_mode=%d display_e6=%d display_e8=%d display_timer=%d display_previous_mode=%d display_selected_player=%d display_f2=%d display_flags=%u sis_font_slot=%u sis_static_text_role=%u sis_dynamic_text_role=%u sis_context_present=%u sis_title_entry_seen=%u sis_title_entry_index=%d title_bytes_captured=%u sis_source_heap_handle=%d sis_world_generation=%llu sis_allocation_generation=%llu sis_source_epoch=%llu sis_requested_bytes=%u map2_source_heap_handle=%d map2_world_generation=%llu map2_allocation_generation=%llu map2_requested_bytes=%u map2_buffer_origin=%u draw=0\n",
+        phase,static_cast<unsigned long long>(snapshot.world_generation),
+        static_cast<unsigned long long>(snapshot.world_ticks),
+        static_cast<unsigned long long>(session_ticks),snapshot.source_frame,
+        snapshot.map2_gate,snapshot.map2_countdown,snapshot.map2_phase,
+        snapshot.map2_form,snapshot.map2_history_e0,snapshot.map2_history_e2,
+        snapshot.display_mode,snapshot.display_e6,snapshot.display_e8,
+        snapshot.display_timer,snapshot.display_previous_mode,
+        snapshot.display_selected_player,snapshot.display_f2,snapshot.display_flags,
+        snapshot.sis_font_slot,snapshot.sis_static_text_role,
+        snapshot.sis_dynamic_text_role,snapshot.sis_context_present,
+        snapshot.sis_title_entry_seen,snapshot.sis_title_entry_index,
+        snapshot.title_bytes_captured,snapshot.sis_source_heap_handle,
+        static_cast<unsigned long long>(snapshot.sis_world_generation),
+        static_cast<unsigned long long>(snapshot.sis_allocation_generation),
+        static_cast<unsigned long long>(snapshot.sis_source_epoch),
+        snapshot.sis_requested_bytes,snapshot.map2_source_heap_handle,
+        static_cast<unsigned long long>(snapshot.map2_world_generation),
+        static_cast<unsigned long long>(snapshot.map2_allocation_generation),
+        snapshot.map2_requested_bytes,snapshot.map2_buffer_origin);
+    std::fflush(stderr);
+}
+#endif
+
 void run_stadium_c1_context_preflight(
     const melee_web::RuntimeFiles& menu_files,
     MeleeWebMenuHost*& host,
@@ -8433,9 +8506,11 @@ void run_stadium_c1_context_preflight(
     bool go_alignment_probe = false,
     bool functional_idle_probe = false,
     bool functional_idle_pair_probe = false,
-    uint64_t* functional_idle_world_generation = nullptr)
+    uint64_t* functional_idle_world_generation = nullptr,
+    bool idle_state_snapshot_probe = false)
 {
-    const bool go_probe = go_alignment_probe || functional_idle_probe;
+    const bool go_probe = go_alignment_probe || functional_idle_probe ||
+        idle_state_snapshot_probe;
     char error[256]{};
     const int previous_mode = gm_GetCurrentGameMode();
     const int previous_language = lbLang_GetLanguageSetting();
@@ -8807,6 +8882,12 @@ void run_stadium_c1_context_preflight(
                 bool go_containing_tick_seen=false,go_post_tick_seen=false;
                 uint64_t go_containing_world_after=0,go_containing_session_after=0;
                 uint32_t go_containing_frames_after=0,emitted_go_sequence=0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                MeleeWebStadiumIdleSnapshot idle_snapshot_containing{};
+                MeleeWebStadiumIdleSnapshot idle_snapshot_first_post_before{};
+                bool idle_snapshot_containing_seen=false;
+                bool idle_snapshot_first_post_before_seen=false;
+#endif
                 auto emit_go_event=[&](const char* name,const MeleeWebStadiumGoAlignmentEvent& event){
                     if(!event.sequence||event.sequence<=emitted_go_sequence)return;
                     std::fprintf(stderr,
@@ -8834,9 +8915,36 @@ void run_stadium_c1_context_preflight(
                         break;
                     }
                     const bool go_was_seen=go_probe&&go_snapshot.go_after.sequence!=0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                    const bool idle_first_post_go_tick=idle_state_snapshot_probe&&
+                        go_was_seen&&go_containing_tick_seen&&!go_post_tick_seen;
+#endif
                     const auto world_before=melee_web_gameplay_stats();
                     const auto session_before=go_probe?match->player_stats(0).ticks:0;
                     const auto frames_before=go_probe?match->source_frames():0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                    if(idle_first_post_go_tick){
+                        check(idle_snapshot_containing_seen,
+                              "First post-GO idle snapshot has no containing-tick sample");
+                        check(world_before.generation==
+                                  idle_snapshot_containing.world_generation&&
+                                  world_before.ticks==go_containing_world_after&&
+                                  session_before==go_containing_session_after&&
+                                  frames_before==go_containing_frames_after,
+                              "First post-GO idle snapshot is not at the immediately following tick boundary");
+                        check(match->diagnostic_stadium_idle_snapshot(
+                                  &idle_snapshot_first_post_before,error,sizeof(error)),error);
+                        check(idle_snapshot_first_post_before.world_generation==world_before.generation&&
+                                  idle_snapshot_first_post_before.world_ticks==world_before.ticks&&
+                                  idle_snapshot_first_post_before.source_frame==frames_before&&
+                                  same_stadium_idle_snapshot(idle_snapshot_containing,
+                                                             idle_snapshot_first_post_before),
+                              "Read-only idle snapshot changed before the first full post-GO tick");
+                        idle_snapshot_first_post_before_seen=true;
+                        emit_stadium_idle_snapshot("first-full-post-go-before",
+                            idle_snapshot_first_post_before,session_before);
+                    }
+#endif
                     MeleeWebSourceMemoryContext idle_memory_before{};
                     const auto idle_memory_status_before = functional_idle_probe && go_was_seen
                         ? melee_web_source_memory_context_read(&idle_memory_before) :
@@ -8883,6 +8991,24 @@ void run_stadium_c1_context_preflight(
                                 static_cast<unsigned long long>(session_after),frames_before,frames_after,
                                 int(match->ready()));
                             std::fflush(stderr);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                            if(idle_state_snapshot_probe){
+                                check(!idle_snapshot_containing_seen,
+                                      "Stadium idle containing snapshot was captured more than once");
+                                check(match->diagnostic_stadium_idle_snapshot(
+                                          &idle_snapshot_containing,error,sizeof(error)),error);
+                                check(idle_snapshot_containing.world_generation==world_after.generation&&
+                                          idle_snapshot_containing.world_ticks==world_after.ticks&&
+                                          idle_snapshot_containing.source_frame==frames_after&&
+                                          idle_snapshot_containing.world_ticks==go_containing_world_after&&
+                                          session_after==go_containing_session_after&&
+                                          frames_after==go_containing_frames_after,
+                                      "Containing GO idle snapshot does not match the completed source tick");
+                                idle_snapshot_containing_seen=true;
+                                emit_stadium_idle_snapshot("go-containing-exit",
+                                    idle_snapshot_containing,session_after);
+                            }
+#endif
                         }else if(go_was_seen&&!go_post_tick_seen){
                             check(world_before.ticks==go_containing_world_after&&
                                       session_before==go_containing_session_after&&
@@ -8900,6 +9026,41 @@ void run_stadium_c1_context_preflight(
                                 go_containing_frames_after,int(match->ready()));
                             std::fflush(stderr);
                         }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                        if(idle_first_post_go_tick){
+                            check(idle_snapshot_first_post_before_seen,
+                                  "First post-GO tick has no immediate pre-tick idle sample");
+                            MeleeWebStadiumIdleSnapshot after{};
+                            check(match->diagnostic_stadium_idle_snapshot(
+                                      &after,error,sizeof(error)),error);
+                            check(after.world_generation==world_after.generation&&
+                                      after.world_ticks==world_after.ticks&&
+                                      after.source_frame==frames_after&&
+                                      world_after.ticks==world_before.ticks+1&&
+                                      session_after==session_before+1,
+                                  "First post-GO idle sample is not at the completed source tick boundary");
+                            emit_stadium_idle_snapshot("first-full-post-go-after",after,
+                                                       session_after);
+                            if(idle_snapshot_first_post_before.map2_phase==0&&
+                               after.map2_phase==0&&
+                               idle_snapshot_first_post_before.map2_gate==0&&
+                               after.map2_gate==0&&
+                               idle_snapshot_first_post_before.map2_form==5&&
+                               after.map2_form==5&&
+                               idle_snapshot_first_post_before.map2_countdown>
+                                   std::numeric_limits<int32_t>::min()){
+                                check(static_cast<int64_t>(after.map2_countdown)==
+                                          static_cast<int64_t>(idle_snapshot_first_post_before.map2_countdown)-1,
+                                      "Stable phase-0/gate-0/form-5 Stadium countdown did not advance by one source tick");
+                                std::fprintf(stderr,
+                                    "STADIUM_SOURCE_IDLE_INTERVAL phase=first-post-go countdown_step=checked-minus-one draw=0\n");
+                            }else{
+                                std::fprintf(stderr,
+                                    "STADIUM_SOURCE_IDLE_INTERVAL phase=first-post-go countdown_step=not-asserted-state-changed-or-edge draw=0\n");
+                            }
+                            std::fflush(stderr);
+                        }
+#endif
                         go_snapshot=next;
                         if(functional_idle_probe && go_was_seen){
                             MeleeWebSourceMemoryContext idle_memory_after{};
@@ -9115,6 +9276,26 @@ void run_stadium_c1_context_preflight(
                     std::fprintf(stderr,"STADIUM_SOURCE_GO phase=checked-close snapshot_unavailable=1\n");
                     std::fflush(stderr);
                 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                if(idle_state_snapshot_probe){
+                    check(idle_snapshot_containing_seen&&
+                              idle_snapshot_first_post_before_seen&&go_post_tick_seen,
+                          "Stadium idle snapshot interval did not reach its checked post-GO endpoint");
+                    MeleeWebStadiumIdleSnapshot closed_idle;
+                    std::memset(&closed_idle,0xa5,sizeof(closed_idle));
+                    std::array<unsigned char,sizeof(closed_idle)> closed_idle_before{};
+                    std::memcpy(closed_idle_before.data(),&closed_idle,sizeof(closed_idle));
+                    check(!match->diagnostic_stadium_idle_snapshot(
+                              &closed_idle,error,sizeof(error)),
+                          "Closed Stadium Session still exposed its retired idle snapshot");
+                    check(std::memcmp(closed_idle_before.data(),&closed_idle,
+                                      sizeof(closed_idle))==0,
+                          "Refused closed-owner idle snapshot partially changed its output");
+                    std::fprintf(stderr,
+                        "STADIUM_SOURCE_IDLE phase=closed-owner-refusal output_unchanged=1 draw=0\n");
+                    std::fflush(stderr);
+                }
+#endif
                 match.reset();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
                 check(melee_web_stadium_c1_grdatfiles_trace_snapshot(
@@ -9218,6 +9399,8 @@ void run_stadium_c1_context_preflight(
                     std::cout<<"Stadium source GO containing tick and immediately following full tick observed through HUD and checked close; source-frame values retained without ordinal inference; no C3 claim\n";
                 else
                     std::cout<<"Stadium original source-session Ready and checked owned-world retirement passed; one lifetime, no draw/post-GO idle/C3 claim\n";
+                if(idle_state_snapshot_probe)
+                    std::cout<<"Stadium live typed idle snapshots captured at GO tick exit and around the first full post-GO tick; no extra tick/draw or C3 claim\n";
                 return;
             }catch(const std::exception& first){
                 if(ready_text_membership_probe){
@@ -9576,7 +9759,8 @@ void run_stadium_c1a_selection_smoke(
     bool setup_only_probe=false,
     bool functional_idle_probe=false,
     bool functional_idle_pair_probe=false,
-    uint64_t* functional_idle_world_generation=nullptr)
+    uint64_t* functional_idle_world_generation=nullptr,
+    bool idle_state_snapshot_probe=false)
 {
     char error[256]{};
     MeleeWebRetiredSisLease retired_sis{};
@@ -9809,7 +9993,7 @@ void run_stadium_c1a_selection_smoke(
             pad_leave_probe, source_text_lifetime_probe,
             ready_text_membership_probe,toy_owner_controls,post_ready_tick_probe,
             go_alignment_probe,functional_idle_probe,functional_idle_pair_probe,
-            functional_idle_world_generation);
+            functional_idle_world_generation,idle_state_snapshot_probe);
     } else {
         world->verify_immutable_archives();
         world->close();
@@ -9820,7 +10004,8 @@ void run_stadium_c1a_selection_smoke(
     check(!melee_web_menu_stage_explicit_confirm_available(St_Kind_PStadium),
           "C1a explicit-confirm permission survived unload");
     if(ready_session||pad_leave_probe||source_text_lifetime_probe||
-       ready_text_membership_probe||go_alignment_probe||functional_idle_probe)return;
+       ready_text_membership_probe||go_alignment_probe||functional_idle_probe||
+       idle_state_snapshot_probe)return;
     if (full_world_lifecycle) {
         std::cout << "Stadium original OnInit/OnLoad/OnStart two owned-world lifetimes passed; Ready/GO and ticks remain unrun\n";
     } else if (source_on_init) {
@@ -9978,6 +10163,8 @@ int main(int argc,char** argv){try{
      std::string(input_recipe)=="stadium-source-ready-session-v1");
  const bool stadium_source_go_alignment_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-source-go-alignment-v1";
+ const bool stadium_source_go_idle_state_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-source-go-idle-state-v1";
  const bool stadium_source_functional_idle_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-source-functional-idle-v1";
  const bool stadium_source_functional_idle_pair_recipe=input_recipe&&
@@ -10009,6 +10196,7 @@ int main(int argc,char** argv){try{
  const bool stadium_source_world_recipe=false;
  const bool stadium_ready_session_recipe=false;
  const bool stadium_source_go_alignment_recipe=false;
+ const bool stadium_source_go_idle_state_recipe=false;
  const bool stadium_source_functional_idle_recipe=false;
  const bool stadium_source_functional_idle_pair_recipe=false;
  const bool stadium_grdatfiles_pair_recipe=false;
@@ -10030,7 +10218,8 @@ int main(int argc,char** argv){try{
     !stadium_c1_item_state_preflight_recipe&&!stadium_screen_roots_recipe&&
     !stadium_e8_request_recipe&&!stadium_ground_map1_owner_recipe&&
     !stadium_source_on_init_recipe&&!stadium_source_world_recipe&&!stadium_ready_session_recipe&&
-    !stadium_source_go_alignment_recipe&&!stadium_source_functional_idle_recipe&&
+    !stadium_source_go_alignment_recipe&&!stadium_source_go_idle_state_recipe&&
+    !stadium_source_functional_idle_recipe&&
     !stadium_source_functional_idle_pair_recipe&&!stadium_grdatfiles_pair_recipe&&
     !stadium_source_setup_recipe&&
     !stadium_pad_leave_probe_recipe&&!stadium_source_text_lifetime_recipe&&
@@ -10061,7 +10250,8 @@ int main(int argc,char** argv){try{
      stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
      stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
      stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
-     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||
+     stadium_source_go_alignment_recipe||stadium_source_go_idle_state_recipe||
+     stadium_source_functional_idle_recipe||
      stadium_source_functional_idle_pair_recipe||stadium_grdatfiles_pair_recipe||
      stadium_source_setup_recipe||stadium_pad_leave_probe_recipe||
      stadium_source_text_lifetime_recipe||
@@ -10077,7 +10267,8 @@ int main(int argc,char** argv){try{
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
     stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
-     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||
+    stadium_source_go_alignment_recipe||stadium_source_go_idle_state_recipe||
+    stadium_source_functional_idle_recipe||
      stadium_source_functional_idle_pair_recipe||stadium_grdatfiles_pair_recipe||
     stadium_source_setup_recipe||stadium_pad_leave_probe_recipe||
     stadium_source_text_lifetime_recipe||
@@ -10266,7 +10457,8 @@ int main(int argc,char** argv){try{
     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
     stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
     stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
-     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||
+    stadium_source_go_alignment_recipe||stadium_source_go_idle_state_recipe||
+    stadium_source_functional_idle_recipe||
      stadium_source_setup_recipe||
     stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
     stadium_ready_text_membership_recipe){
@@ -10275,26 +10467,32 @@ int main(int argc,char** argv){try{
           stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||
           stadium_e8_request_recipe||stadium_ground_map1_owner_recipe||
           stadium_source_on_init_recipe||stadium_source_world_recipe||stadium_ready_session_recipe||
-     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||
+    stadium_source_go_alignment_recipe||stadium_source_go_idle_state_recipe||
+    stadium_source_functional_idle_recipe||
           stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
               stadium_ready_text_membership_recipe,
       stadium_e8_request_recipe||stadium_ground_map1_owner_recipe,
       stadium_c1_item_state_preflight_recipe, stadium_screen_roots_recipe,
           stadium_ground_map1_owner_recipe, stadium_source_on_init_recipe||stadium_source_world_recipe||
               stadium_ready_session_recipe||stadium_source_go_alignment_recipe||
+              stadium_source_go_idle_state_recipe||
               stadium_source_functional_idle_recipe||stadium_pad_leave_probe_recipe||
                   stadium_source_text_lifetime_recipe||
                   stadium_ready_text_membership_recipe,
       stadium_source_world_recipe,
       argv[1], argv[2], trace,
-      stadium_ready_session_recipe||stadium_source_go_alignment_recipe,
+      stadium_ready_session_recipe||stadium_source_go_alignment_recipe||
+          stadium_source_go_idle_state_recipe,
       stadium_pad_leave_probe_recipe,stadium_source_text_lifetime_recipe,
       stadium_ready_text_membership_recipe,stadium_toy_owner_recipe,
-      stadium_post_ready_tick_recipe,stadium_source_go_alignment_recipe,
-      stadium_source_setup_recipe,stadium_source_functional_idle_recipe);
+      stadium_post_ready_tick_recipe,stadium_source_go_alignment_recipe||
+          stadium_source_go_idle_state_recipe,
+      stadium_source_setup_recipe,stadium_source_functional_idle_recipe,
+      false,nullptr,stadium_source_go_idle_state_recipe);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
   if(stadium_source_world_recipe||stadium_ready_session_recipe||
-     stadium_source_go_alignment_recipe||stadium_source_functional_idle_recipe||
+     stadium_source_go_alignment_recipe||stadium_source_go_idle_state_recipe||
+     stadium_source_functional_idle_recipe||
      stadium_source_setup_recipe||
      stadium_pad_leave_probe_recipe||stadium_source_text_lifetime_recipe||
      stadium_ready_text_membership_recipe){

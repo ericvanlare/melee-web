@@ -46,6 +46,81 @@ typedef enum MeleeWebStadiumMap2BufferOrigin {
 
 #define MELEE_WEB_STADIUM_SOURCE_EVENT_CAPACITY 8
 
+#define MELEE_WEB_STADIUM_IDLE_SNAPSHOT_VERSION 1U
+typedef struct MeleeWebStadiumIdleSnapshot {
+    uint32_t version;
+    uint64_t world_generation;
+    uint64_t world_ticks;
+    uint32_t source_frame;
+    int32_t map2_gate;
+    int32_t map2_countdown;
+    int16_t map2_phase;
+    int16_t map2_form;
+    int16_t map2_history_e0;
+    int16_t map2_history_e2;
+    int16_t display_mode;
+    int16_t display_e6;
+    int16_t display_e8;
+    int32_t display_timer;
+    int16_t display_previous_mode;
+    int16_t display_selected_player;
+    int16_t display_f2;
+    uint32_t display_flags;
+    uint32_t sis_font_slot;
+    uint32_t sis_static_text_role;
+    uint32_t sis_dynamic_text_role;
+    uint32_t sis_context_present;
+    uint32_t sis_title_entry_seen;
+    int32_t sis_title_entry_index;
+    uint32_t title_bytes_captured;
+    int32_t sis_source_heap_handle;
+    uint64_t sis_world_generation;
+    uint64_t sis_allocation_generation;
+    uint64_t sis_source_epoch;
+    uint32_t sis_requested_bytes;
+    int32_t map2_source_heap_handle;
+    uint64_t map2_world_generation;
+    uint64_t map2_allocation_generation;
+    uint32_t map2_requested_bytes;
+    uint32_t map2_buffer_origin;
+} MeleeWebStadiumIdleSnapshot;
+
+/* Publish a fully checked, address-free diagnostic candidate atomically.
+ * The source owner/map/proc/SIS guards run before the caller creates candidate. */
+static inline int melee_web_stadium_idle_snapshot_copy(
+    MeleeWebStadiumIdleSnapshot* out,
+    const MeleeWebStadiumIdleSnapshot* candidate)
+{
+    if (out == NULL || candidate == NULL ||
+        candidate->version != MELEE_WEB_STADIUM_IDLE_SNAPSHOT_VERSION ||
+        candidate->world_generation == 0 ||
+        candidate->map2_gate < 0 || candidate->map2_gate > 1 ||
+        (candidate->display_flags & ~7U) != 0 ||
+        candidate->sis_font_slot != 1 ||
+        candidate->sis_static_text_role != 0 ||
+        candidate->sis_dynamic_text_role != 1 ||
+        candidate->sis_context_present != 1 ||
+        candidate->sis_title_entry_seen > 1 ||
+        (candidate->sis_title_entry_seen &&
+         candidate->sis_title_entry_index < 0) ||
+        (!candidate->sis_title_entry_seen &&
+         candidate->sis_title_entry_index != -1) ||
+        candidate->title_bytes_captured != 0 ||
+        candidate->sis_world_generation != candidate->world_generation ||
+        candidate->map2_world_generation != candidate->world_generation ||
+        candidate->sis_source_heap_handle != candidate->map2_source_heap_handle ||
+        candidate->sis_allocation_generation == 0 ||
+        candidate->map2_allocation_generation == 0 ||
+        candidate->sis_source_epoch == 0 ||
+        candidate->sis_requested_bytes == 0 ||
+        candidate->map2_requested_bytes == 0 ||
+        candidate->map2_buffer_origin !=
+            MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK)
+        return 0;
+    *out = *candidate;
+    return 1;
+}
+
 typedef enum MeleeWebStadiumSourceEventKind {
     MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8 = 1,
     MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_24C = 2,
@@ -134,6 +209,13 @@ int melee_web_stadium_display_owner_go_alignment_view(
     const MeleeWebStadiumDisplayOwner*,
     const MeleeWebStadiumMap2BufferOwner*, int source_started,
     int* map2_gate, int* display_mode);
+int melee_web_stadium_display_owner_idle_snapshot(
+    const MeleeWebStadiumDisplayOwner*,
+    const MeleeWebStadiumMap2BufferOwner*, int source_started,
+    uint64_t world_generation, uint64_t world_ticks, uint32_t source_frame,
+    MeleeWebStadiumIdleSnapshot*);
+void melee_web_stadium_display_owner_note_title_entry(const void* text,
+                                                      int sis_index);
 int melee_web_stadium_display_owner_cancel(
     MeleeWebStadiumDisplayOwner*, char* error, size_t error_size);
 int melee_web_stadium_display_owner_retire(

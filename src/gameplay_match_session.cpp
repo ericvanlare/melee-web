@@ -643,5 +643,10 @@ bool GameplayMatchSession::diagnostic_stadium_go_alignment_snapshot(
     return storage_&&construction_complete()&&storage_->world&&
         storage_->world->diagnostic_stadium_go_alignment_snapshot(out,error,size);
 }
+bool GameplayMatchSession::diagnostic_stadium_idle_snapshot(
+    MeleeWebStadiumIdleSnapshot* out,char* error,size_t size)const{
+    return storage_&&construction_complete()&&storage_->world&&
+        storage_->world->diagnostic_stadium_idle_snapshot(out,error,size);
+}
 #endif
 }

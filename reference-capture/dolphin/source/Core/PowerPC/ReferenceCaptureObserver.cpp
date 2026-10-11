@@ -338,6 +338,29 @@ enum class SliceTag : u16
   SssPositionScheduler = 64,
   SssPositionAxes = 65,
   SssPositionCursorLocal = 66,
+  StadiumMapRoot = 67,
+  StadiumGroundPointer = 68,
+  StadiumMap2Gate = 69,
+  StadiumMap2Countdown = 70,
+  StadiumMap2Phase = 71,
+  StadiumMap2Form = 72,
+  StadiumMap2PreviousForm = 73,
+  StadiumMap2PriorForm = 74,
+  StadiumMap2Map5Root = 75,
+  StadiumDisplayTimer = 76,
+  StadiumDisplayMode = 77,
+  StadiumDisplayFlags = 78,
+  StadiumDisplayPreviousFlags = 79,
+  StadiumDisplayPreviousMode = 80,
+  StadiumDisplayFocusedPlayer = 81,
+  StadiumDisplaySelectionCounter = 82,
+  StadiumDisplayPackedFlags = 83,
+  StadiumTitleScratch = 84,
+  StadiumFont1SlotPointer = 85,
+  StadiumTitleChildGObj = 86,
+  StadiumTitleTextWrapper = 87,
+  StadiumTitleStaticTextPointer = 88,
+  StadiumTitleDynamicTextPointer = 89,
 };
 
 struct SliceRef
@@ -2313,6 +2336,100 @@ struct Observer::Impl
     return true;
   }
 
+  bool AddMem1Slice(Core::System* system, SliceTag tag, u32 address, size_t size,
+                    u16 flags = 0)
+  {
+    return IsMem1Range(address, size) && AddSlice(system, tag, address, size, flags);
+  }
+
+  bool AddStadiumStateSlices(Core::System* system)
+  {
+    // Ground_GetMapGObj uses the authored fixed StageInfo map-root table.
+    // These slots establish map-ID roles and pointer equality only, not a live
+    // GObj type or allocation-lifetime proof. Do not infer a table length.
+    constexpr std::array<u16, 4> map_ids = {0, 1, 2, 5};
+    std::array<u32, map_ids.size()> roots{};
+    std::array<u32, map_ids.size()> grounds{};
+    for (size_t index = 0; index < map_ids.size(); ++index)
+    {
+      const u32 map_id = map_ids[index];
+      const u32 root_address = 0x8049e6c8 + 0x180 + map_id * 4;
+      if (!IsMem1Range(root_address, 4) ||
+          !AddMem1Slice(system, SliceTag::StadiumMapRoot, root_address, 4, map_ids[index]) ||
+          !ReadU32(system, root_address, &roots[index]) ||
+          !IsMem1Range(roots[index], 0x30) || roots[index] > UINT32_MAX - 0x2c ||
+          !AddMem1Slice(system, SliceTag::StadiumGroundPointer, roots[index] + 0x2c, 4,
+                        map_ids[index]) ||
+          !ReadU32(system, roots[index] + 0x2c, &grounds[index]) ||
+          !IsMem1Range(grounds[index], 1))
+        return false;
+      for (size_t previous = 0; previous < index; ++previous)
+      {
+        if (roots[index] == roots[previous] || grounds[index] == grounds[previous])
+          return false;
+      }
+    }
+
+    const u32 map2 = grounds[2];
+    const u32 display = grounds[1];
+    if (map2 > UINT32_MAX - 0xe4 || display > UINT32_MAX - 0xf8 ||
+        !AddMem1Slice(system, SliceTag::StadiumMap2Gate, map2 + 0xc4, 1) ||
+        !AddMem1Slice(system, SliceTag::StadiumMap2Countdown, map2 + 0xd8, 4) ||
+        !AddMem1Slice(system, SliceTag::StadiumMap2Phase, map2 + 0xdc, 2) ||
+        !AddMem1Slice(system, SliceTag::StadiumMap2Form, map2 + 0xde, 2) ||
+        !AddMem1Slice(system, SliceTag::StadiumMap2PreviousForm, map2 + 0xe0, 2) ||
+        !AddMem1Slice(system, SliceTag::StadiumMap2PriorForm, map2 + 0xe2, 2) ||
+        !AddMem1Slice(system, SliceTag::StadiumMap2Map5Root, map2 + 0xe4, 4) ||
+        !AddMem1Slice(system, SliceTag::StadiumDisplayTimer, display + 0xe0, 4) ||
+        !AddMem1Slice(system, SliceTag::StadiumDisplayMode, display + 0xe4, 2) ||
+        !AddMem1Slice(system, SliceTag::StadiumDisplayFlags, display + 0xe6, 2) ||
+        !AddMem1Slice(system, SliceTag::StadiumDisplayPreviousFlags, display + 0xe8, 2) ||
+        !AddMem1Slice(system, SliceTag::StadiumDisplayPreviousMode, display + 0xea, 2) ||
+        !AddMem1Slice(system, SliceTag::StadiumDisplayFocusedPlayer, display + 0xee, 2) ||
+        !AddMem1Slice(system, SliceTag::StadiumDisplaySelectionCounter, display + 0xf2, 2) ||
+        !AddMem1Slice(system, SliceTag::StadiumDisplayPackedFlags, display + 0xf8, 1) ||
+        !AddMem1Slice(system, SliceTag::StadiumTitleScratch, 0x8049f040, 0x100) ||
+        !AddMem1Slice(system, SliceTag::StadiumFont1SlotPointer, 0x804d1128, 4))
+      return false;
+
+    // The title path is observed only as a bounded MEM1 pointer chain. Never
+    // dereference SIS entry contents or dynamic title text in this candidate.
+    u32 font1 = 0;
+    if (!ReadU32(system, 0x804d1128, &font1) || (font1 && !IsMem1Range(font1, 1)))
+      return false;
+
+    if (display > UINT32_MAX - 0xd4 ||
+        !AddMem1Slice(system, SliceTag::StadiumTitleChildGObj, display + 0xd4, 4))
+      return false;
+    u32 title_gobj = 0;
+    if (!ReadU32(system, display + 0xd4, &title_gobj))
+      return false;
+    if (!title_gobj)
+      return true;
+    if (!IsMem1Range(title_gobj, 0x30) || title_gobj > UINT32_MAX - 0x2c ||
+        !AddMem1Slice(system, SliceTag::StadiumTitleTextWrapper, title_gobj + 0x2c, 4))
+      return false;
+    u32 text_wrapper = 0;
+    if (!ReadU32(system, title_gobj + 0x2c, &text_wrapper))
+      return false;
+    if (!text_wrapper)
+      return true;
+    if (!IsMem1Range(text_wrapper, 0x20) ||
+        !AddMem1Slice(system, SliceTag::StadiumTitleStaticTextPointer,
+                      text_wrapper + 0x18, 4) ||
+        !AddMem1Slice(system, SliceTag::StadiumTitleDynamicTextPointer,
+                      text_wrapper + 0x1c, 4))
+      return false;
+    u32 static_text = 0;
+    u32 dynamic_text = 0;
+    if (!ReadU32(system, text_wrapper + 0x18, &static_text) ||
+        !ReadU32(system, text_wrapper + 0x1c, &dynamic_text) ||
+        (static_text && !IsMem1Range(static_text, 1)) ||
+        (dynamic_text && !IsMem1Range(dynamic_text, 1)))
+      return false;
+    return true;
+  }
+
   bool HasSingleSlice(SliceTag tag) const
   {
     size_t matches = 0;
@@ -3537,6 +3654,8 @@ struct Observer::Impl
     }
     if (std::string(phase) == "go_after")
       json += ",\"callsite_pc\":\"0x8016b820\",\"callsite_word\":\"0x48068821\"";
+    if (std::string(phase) == "go_after")
+      json += ",\"state_snapshot_schema\":\"stadium_idle_state_v1\",\"sis_table_entry_relationship_observed\":false,\"dynamic_title_text_bytes_observed\":false";
     json += ",\"source_tick\":" + std::to_string(source_tick) +
             ",\"draw_ordinal\":" + std::to_string(draw_ordinal) + ",\"slices\":[";
     for (size_t index = 0; index < slice_count; ++index)
@@ -3803,8 +3922,9 @@ struct Observer::Impl
     if (!AddSlice(system, SliceTag::MatchSetup, setup_pointer, 0x138) ||
         !AddSlice(system, SliceTag::PadQueue, 0x804c1f78, 0xc) ||
         !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6) ||
-        !AddMatchSlices(system) || !AddSceneKindSlice(system))
-      return SetInvalid("Stadium GO marker did not expose its checked setup/RNG/input slices"), void();
+        !AddMatchSlices(system) || !AddSceneKindSlice(system) ||
+        !AddStadiumStateSlices(system))
+      return SetInvalid("Stadium GO marker did not expose its checked setup/RNG/input/state slices"), void();
 
     PublishStadiumProgress("go_after", pc, word, state->gpr[3], state, source_tick);
     if (invalid.load())
@@ -3967,6 +4087,7 @@ struct Observer::Impl
     bool transform_prefix_grounded_tick_after_publish = false;
     bool transform_prefix_down_b_after_publish = false;
     bool stadium_go_prefix_complete_after_publish = false;
+    bool stadium_state_snapshot_this_tick = false;
     // SourceTick and DrawReturn are not one-to-one: preserve the authored
     // queue count on every row and stop only at the first return after F.
     if (stadium_go_prefix_enabled && boundary == Boundary::SourceTick)
@@ -3983,6 +4104,7 @@ struct Observer::Impl
             stadium_go_prefix_batch_ticks >= EntityPrefixBoundaryProgress::queue_capacity)
           return SetInvalid("Stadium GO containing SourceTick C differs from its checked scene counter"),
                  void();
+        stadium_state_snapshot_this_tick = true;
         stadium_go_prefix_phase = StadiumGoPrefixPhase::AwaitNextTick;
         ++stadium_go_prefix_batch_ticks;
       }
@@ -3992,6 +4114,7 @@ struct Observer::Impl
             stadium_go_prefix_batch_ticks >= EntityPrefixBoundaryProgress::queue_capacity)
           return SetInvalid("Stadium GO prefix did not observe the next contiguous source tick F"),
                  void();
+        stadium_state_snapshot_this_tick = true;
         stadium_go_prefix_phase = StadiumGoPrefixPhase::AwaitDrawReturn;
         ++stadium_go_prefix_batch_ticks;
       }
@@ -4433,6 +4556,10 @@ struct Observer::Impl
       if (stadium_go_prefix_enabled &&
           !AddSlice(system, SliceTag::PadQueue, 0x804c1f78, 0xc))
         return SetInvalid("Stadium GO prefix queue snapshot escaped its checked source range"), void();
+      if (stadium_state_snapshot_this_tick &&
+          !AddStadiumStateSlices(system))
+        return SetInvalid("Stadium C/F boundary did not expose its checked map/display snapshot"),
+               void();
       if (checked_entity_profile)
       {
         u8 qnum = 0;

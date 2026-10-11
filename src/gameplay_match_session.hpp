@@ -79,6 +79,8 @@ public:
     void diagnostic_stadium_go_alignment_arm(int expected_branch,char*,size_t);
     bool diagnostic_stadium_go_alignment_snapshot(
         MeleeWebStadiumGoAlignmentSnapshot*,char*,size_t) const;
+    bool diagnostic_stadium_idle_snapshot(
+        MeleeWebStadiumIdleSnapshot*,char*,size_t) const;
 #endif
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
     MeleeWebPipelineSourceContext provenance_context() const;

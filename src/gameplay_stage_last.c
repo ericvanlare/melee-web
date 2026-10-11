@@ -472,6 +472,32 @@ static int stadium_go_alignment_current_display(const MeleeWebStageLast* h,
  *remap=gm_8018841C()?1:0;
  return 1;
 }
+int melee_web_stage_last_stadium_idle_snapshot(
+        const MeleeWebStageLast* h, MeleeWebStadiumIdleSnapshot* out,
+        char* e, size_t n)
+{
+ MeleeWebStadiumIdleSnapshot candidate;
+ const MeleeWebGameplayStats stats=melee_web_gameplay_stats();
+ if(!h||h!=active||!out||h->generation!=stats.generation||
+    !h->definition||!h->definition->diagnostic_only||
+    h->definition->stage_kind!=St_Kind_PStadium||!h->source_ordered||
+    !h->stadium_ready_route||h->stadium_started!=2||h->stadium_ready_armed!=0||
+    HSD_GObj_804D781C||HSD_GObj_804D7838||HSD_GObj_804D7830||
+    HSD_GObj_804D7814||HSD_GObj_804D7818)
+  return fail(e,n,"Stadium idle snapshot requires its active started source owner");
+ if(!melee_web_gameplay_world_exists()||!melee_web_source_memory_healthy()||
+    !melee_web_stage_selection_preflight(St_Kind_PStadium)||
+    stage_info.grkind!=h->definition->ground_kind||
+    !stadium_go_alignment_source_owner_live(h,1))
+  return fail(e,n,"Stadium idle snapshot lost its exact source world or StageLast owner");
+ memset(&candidate,0,sizeof(candidate));
+ if(!melee_web_stadium_display_owner_idle_snapshot(
+       h->stadium_display_owner,&h->stadium_map2_buffer_owner,1,
+       stats.generation,stats.ticks,melee_web_match_source_frames(),&candidate))
+  return fail(e,n,"Stadium idle snapshot lost its checked display/map/SIS owner");
+ *out=candidate;
+ return ok(e,n);
+}
 int melee_web_stage_last_stadium_go_alignment_arm(
         MeleeWebStageLast* h,int expected_branch,char* e,size_t n)
 {

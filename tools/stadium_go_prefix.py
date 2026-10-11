@@ -3244,3 +3244,326 @@ def decode_first_css_context_bundle(data: bytes) -> dict[str, Any]:
         "save_data_hex": data[-0x55E8:].hex(),
         "contains_expected_return": False,
     }
+
+
+# This companion is intentionally separate from the retained v3 route
+# validator. Existing v6 streams remain valid GO-prefix evidence while failing
+# this stronger state-only request because they lack these source slices.
+STADIUM_IDLE_STATE_SCHEMA = "stadium_idle_state_v1"
+STADIUM_IDLE_STATE_ROOT_IDS = (0, 1, 2, 5)
+STADIUM_IDLE_STATE_TAGS = frozenset(range(67, 90))
+STADIUM_IDLE_STATE_ROOT_TAG = 67
+STADIUM_IDLE_STATE_GROUND_TAG = 68
+STADIUM_IDLE_STATE_ALWAYS_KEYS = frozenset(
+    {(STADIUM_IDLE_STATE_ROOT_TAG, map_id) for map_id in STADIUM_IDLE_STATE_ROOT_IDS} |
+    {(STADIUM_IDLE_STATE_GROUND_TAG, map_id) for map_id in STADIUM_IDLE_STATE_ROOT_IDS} |
+    {(tag, 0) for tag in range(69, 87)})
+STADIUM_IDLE_STATE_POINTER_KEYS = frozenset({(87, 0), (88, 0), (89, 0)})
+
+
+def _state_mem1_range(address: int, size: int) -> bool:
+    if type(address) is not int or type(size) is not int or size <= 0 or size > 0x100000:
+        return False
+    end = address + size
+    return 0x80000000 <= address and end <= 0x81800000
+
+
+def _state_add(base: int, offset: int, size: int, context: str) -> int:
+    _require(type(base) is int and 0 <= base <= 0xFFFFFFFF and
+             type(offset) is int and offset >= 0 and base <= 0xFFFFFFFF - offset,
+             f"{context}: guest member address overflows")
+    address = base + offset
+    _require(_state_mem1_range(address, size),
+             f"{context}: guest member address escaped checked source MEM1")
+    return address
+
+
+def _state_slice(payload: dict[str, Any], tag: int, context: str, size: int,
+                 flags: int = 0) -> dict[str, Any]:
+    slices = payload.get("slices")
+    _require(isinstance(slices, list), f"{context}: missing bounded state slices")
+    matches = [item for item in slices
+               if isinstance(item, dict) and type(item.get("tag")) is int and
+               type(item.get("flags")) is int and item["tag"] == tag and
+               item["flags"] == flags]
+    _require(len(matches) == 1,
+             f"{context}: expected one state tag={tag} flags={flags:#x}")
+    item = matches[0]
+    raw_hex = item.get("hex")
+    _require(isinstance(raw_hex, str) and
+             re.fullmatch(r"(?:[0-9a-f]{2})+", raw_hex) is not None,
+             f"{context}: state tag={tag} has malformed source bytes")
+    raw = bytes.fromhex(raw_hex)
+    address = item.get("address")
+    _require(type(item.get("size")) is int and item["size"] == len(raw) == size and
+             _state_mem1_range(address, size),
+             f"{context}: state tag={tag} has a malformed size or escaped checked source MEM1")
+    return {**item, "raw": raw}
+
+
+def _state_pointer(raw: bytes, context: str, size: int = 1) -> int:
+    pointer = int.from_bytes(raw, "big")
+    _require(pointer == 0 or _state_mem1_range(pointer, size),
+             f"{context}: guest pointer is outside checked source MEM1")
+    return pointer
+
+
+def _validate_stadium_idle_state_record(row: dict[str, Any], label: str,
+                                        expected_tick: int) -> dict[str, Any]:
+    _require(label in ("GO", "C", "F"), "state snapshot label is unknown")
+    _require(type(expected_tick) is int and expected_tick >= 0,
+             f"{label}: expected source tick is malformed")
+    payload = row.get("payload")
+    _require(isinstance(payload, dict), f"{label}: state record payload is missing")
+    if label == "GO":
+        _require(row.get("event") == "progress" and payload.get("phase") == "go_after" and
+                 _hex_address(payload.get("pc"), "GO state PC") == GO_AFTER_PC and
+                 payload.get("word") == "0x881f24c9",
+                 "GO: state snapshot is outside the pinned original post-call marker")
+    else:
+        _require(row.get("event") == "boundary" and
+                 payload.get("boundary") == "source_tick" and
+                 payload.get("pc") == SOURCE_TICK_PC,
+                 f"{label}: state snapshot is not the pinned SourceTick boundary")
+    source_tick = payload.get("source_tick")
+    draw_ordinal = payload.get("draw_ordinal")
+    _require(type(source_tick) is int and source_tick == expected_tick and
+             source_tick >= 0 and type(draw_ordinal) is int and draw_ordinal >= 0 and
+             row.get("source_tick") == source_tick and
+             row.get("draw_ordinal") == draw_ordinal,
+             f"{label}: event identity or source tick differs")
+
+    state_slices = [item for item in payload.get("slices", [])
+                    if isinstance(item, dict) and item.get("tag") in STADIUM_IDLE_STATE_TAGS]
+    _require(all(type(item.get("tag")) is int and
+                 type(item.get("flags")) is int for item in state_slices),
+             f"{label}: typed Stadium state tags or flags are malformed")
+    state_keys = [(item["tag"], item["flags"]) for item in state_slices]
+    _require(len(state_keys) == len(set(state_keys)) and
+             STADIUM_IDLE_STATE_ALWAYS_KEYS.issubset(set(state_keys)) and
+             set(state_keys).issubset(STADIUM_IDLE_STATE_ALWAYS_KEYS |
+                                      STADIUM_IDLE_STATE_POINTER_KEYS),
+             f"{label}: typed Stadium state inventory is incomplete or contains extras")
+    if label == "GO":
+        _require(payload.get("state_snapshot_schema") == STADIUM_IDLE_STATE_SCHEMA and
+                 payload.get("sis_table_entry_relationship_observed") is False and
+                 payload.get("dynamic_title_text_bytes_observed") is False,
+                 "GO: state snapshot metadata is missing or differs from the scoped schema")
+
+    def read(tag: int, size: int, address: int, field: str,
+             flags: int = 0) -> bytes:
+        item = _state_slice(payload, tag, f"{label}.{field}", size, flags)
+        _require(item["address"] == address,
+                 f"{label}.{field}: source member address differs from its authored role")
+        return item["raw"]
+
+    roots: dict[int, int] = {}
+    grounds: dict[int, int] = {}
+    for map_id in STADIUM_IDLE_STATE_ROOT_IDS:
+        root_slot = 0x8049E6C8 + 0x180 + map_id * 4
+        root_raw = read(STADIUM_IDLE_STATE_ROOT_TAG, 4, root_slot,
+                        f"map_root_{map_id}", map_id)
+        root = _state_pointer(root_raw, f"{label}.map_root_{map_id}", 0x30)
+        _require(root != 0, f"{label}.map_root_{map_id}: authored root is null")
+        ground_raw = read(STADIUM_IDLE_STATE_GROUND_TAG, 4,
+                          _state_add(root, 0x2c, 4, f"{label}.map_root_{map_id}"),
+                          f"ground_{map_id}", map_id)
+        ground = _state_pointer(ground_raw, f"{label}.ground_{map_id}")
+        _require(ground != 0, f"{label}.ground_{map_id}: authored member is null")
+        roots[map_id] = root
+        grounds[map_id] = ground
+    _require(len(set(roots.values())) == len(STADIUM_IDLE_STATE_ROOT_IDS) and
+             len(set(grounds.values())) == len(STADIUM_IDLE_STATE_ROOT_IDS),
+             f"{label}: authored map roots or Ground owners alias")
+
+    map2 = grounds[2]
+    display = grounds[1]
+    map2_fields = {
+        69: (0xC4, 1, "gate"), 70: (0xD8, 4, "countdown"),
+        71: (0xDC, 2, "phase"), 72: (0xDE, 2, "form"),
+        73: (0xE0, 2, "previous_form"), 74: (0xE2, 2, "prior_form"),
+    }
+    map2_raw: dict[str, bytes] = {}
+    for tag, (offset, size, name) in map2_fields.items():
+        map2_raw[name] = read(tag, size, _state_add(map2, offset, size,
+                                                   f"{label}.map2.{name}"),
+                              f"map2.{name}")
+    map5_ref = read(75, 4, _state_add(map2, 0xE4, 4, f"{label}.map2.map5_root"),
+                    "map2.map5_root")
+    _require(_state_pointer(map5_ref, f"{label}.map2.map5_root", 0x30) == roots[5],
+             f"{label}: map2 map5 link does not bind authored map root 5")
+
+    display_fields = {
+        76: (0xE0, 4, "timer"), 77: (0xE4, 2, "mode"),
+        78: (0xE6, 2, "flags"), 79: (0xE8, 2, "previous_flags"),
+        80: (0xEA, 2, "previous_mode"), 81: (0xEE, 2, "focused_player"),
+        82: (0xF2, 2, "selection_counter"), 83: (0xF8, 1, "packed_flags"),
+    }
+    display_raw: dict[str, bytes] = {}
+    for tag, (offset, size, name) in display_fields.items():
+        display_raw[name] = read(tag, size, _state_add(display, offset, size,
+                                                       f"{label}.display.{name}"),
+                                 f"display.{name}")
+
+    scratch = read(84, 0x100, 0x8049F040, "title_scratch")
+    font1_raw = read(85, 4, 0x804D1128, "font1_slot_pointer")
+    font1 = _state_pointer(font1_raw, f"{label}.font1_slot_pointer")
+    title_child_raw = read(86, 4, _state_add(display, 0xD4, 4,
+                                             f"{label}.title_child"), "title_child")
+    title_child = _state_pointer(title_child_raw, f"{label}.title_child", 0x30)
+    expected_optional: set[tuple[int, int]] = set()
+    wrapper = static_text = dynamic_text = 0
+    if title_child:
+        expected_optional.add((87, 0))
+        wrapper_raw = read(87, 4, _state_add(title_child, 0x2C, 4,
+                                              f"{label}.title_wrapper"), "title_wrapper")
+        wrapper = _state_pointer(wrapper_raw, f"{label}.title_wrapper", 0x20)
+        if wrapper:
+            expected_optional.update({(88, 0), (89, 0)})
+            static_raw = read(88, 4, _state_add(wrapper, 0x18, 4,
+                                                f"{label}.title_static_text"),
+                              "title_static_text")
+            dynamic_raw = read(89, 4, _state_add(wrapper, 0x1C, 4,
+                                                  f"{label}.title_dynamic_text"),
+                               "title_dynamic_text")
+            static_text = _state_pointer(static_raw, f"{label}.title_static_text")
+            dynamic_text = _state_pointer(dynamic_raw, f"{label}.title_dynamic_text")
+    _require(set(state_keys) == STADIUM_IDLE_STATE_ALWAYS_KEYS | expected_optional,
+             f"{label}: title role slices do not match their observed parent pointers")
+
+    s16 = lambda raw: int.from_bytes(raw, "big", signed=True)
+    s32 = lambda raw: int.from_bytes(raw, "big", signed=True)
+    return {
+        "label": label,
+        "sequence": row.get("seq"),
+        "source_tick": source_tick,
+        "draw_ordinal": draw_ordinal,
+        "map_root_roles": [
+            {"fixed_slot_map_id": map_id, "root_pointer_range_valid": True,
+             "ground_pointer_range_valid": True}
+            for map_id in STADIUM_IDLE_STATE_ROOT_IDS
+        ],
+        "map_root_object_type_observed": False,
+        "map_root_allocation_lifetime_proved": False,
+        "map2": {
+            "gate_raw_hex": map2_raw["gate"].hex(),
+            "gate_mask_80": bool(map2_raw["gate"][0] & 0x80),
+            "gate_mask_40": bool(map2_raw["gate"][0] & 0x40),
+            "countdown_s32": s32(map2_raw["countdown"]),
+            "phase_s16": s16(map2_raw["phase"]),
+            "form_s16": s16(map2_raw["form"]),
+            "previous_form_s16": s16(map2_raw["previous_form"]),
+            "prior_form_s16": s16(map2_raw["prior_form"]),
+            "map5_root_pointer_equals_fixed_map5_slot_value": True,
+        },
+        "display": {
+            "timer_s32": s32(display_raw["timer"]),
+            "mode_s16": s16(display_raw["mode"]),
+            "flags_s16": s16(display_raw["flags"]),
+            "previous_flags_s16": s16(display_raw["previous_flags"]),
+            "previous_mode_s16": s16(display_raw["previous_mode"]),
+            "focused_player_s16": s16(display_raw["focused_player"]),
+            "selection_counter_s16": s16(display_raw["selection_counter"]),
+            "packed_flags_raw_hex": display_raw["packed_flags"].hex(),
+            "xF0_observed": False,
+        },
+        "title": {
+            "scratch_bytes": len(scratch),
+            "scratch_sha256": hashlib.sha256(scratch).hexdigest(),
+            "font1_slot_pointer_present": font1 != 0,
+            "title_child_present": title_child != 0,
+            "text_wrapper_present": wrapper != 0,
+            "static_text_pointer_present": static_text != 0,
+            "dynamic_text_pointer_present": dynamic_text != 0,
+            "sis_table_entry_relationship_observed": False,
+            "static_title_text_bytes_observed": False,
+            "dynamic_title_text_bytes_observed": False,
+        },
+        "guest_pointer_policy": "fixed-slot role and pointer equality only; no object-type or allocation-lifetime proof; numeric guest pointers are not cross-runtime comparison fields",
+    }
+
+
+def validate_stadium_idle_state_snapshot(
+        stream_path: str | Path,
+        expected_setup_receipt_sha256: str = EXPECTED_SETUP_RECEIPT_SHA256,
+        status_path: str | Path | None = None) -> dict[str, Any]:
+    """Require complete checked source-state snapshots at existing GO, C, and F rows."""
+    baseline = validate_stadium_go_prefix(
+        stream_path, expected_setup_receipt_sha256, status_path)
+    source = Path(stream_path)
+    status_file = Path(status_path) if status_path is not None else Path(str(source) + ".status.json")
+    stats = ObserverStreamStats()
+    rows: dict[str, dict[str, Any]] = {}
+    go_seen = False
+    try:
+        for row in iter_records(source, max_bytes=MAX_STREAM_BYTES,
+                                max_records=MAX_STREAM_RECORDS, stats=stats):
+            payload = row.get("payload", {})
+            slices = payload.get("slices", []) if isinstance(payload, dict) else []
+            has_state = any(isinstance(item, dict) and
+                            item.get("tag") in STADIUM_IDLE_STATE_TAGS
+                            for item in slices)
+            label = None
+            if row.get("event") == "progress" and payload.get("phase") == "go_after":
+                _require("GO" not in rows, "state companion found duplicate GO markers")
+                label = "GO"
+                go_seen = True
+            elif go_seen and row.get("event") == "boundary" and \
+                    payload.get("boundary") == "source_tick":
+                tick = payload.get("source_tick")
+                if tick == baseline["go_source_tick_C"] and "C" not in rows:
+                    label = "C"
+                elif tick == baseline["first_full_post_go_source_tick_F"] and "F" not in rows:
+                    label = "F"
+            if has_state:
+                _require(label is not None,
+                         "state companion found typed Stadium fields outside GO/C/F")
+            if label is not None:
+                rows[label] = row
+    except StadiumGoPrefixError:
+        raise
+    except (OSError, ObserverStreamError) as error:
+        raise StadiumGoPrefixError(f"cannot validate Stadium state companion: {error}") from error
+
+    _require(set(rows) == {"GO", "C", "F"},
+             "state companion lacks one or more complete GO/C/F source rows")
+    _require(stats.prefix_sha256 == baseline["stream_sha256"] and
+             stats.bytes_read == baseline["stream_bytes"] and
+             stats.records_read == baseline["stream_records"],
+             "observer stream changed between route and state validation")
+    try:
+        status = read_status(status_file)
+    except ObserverStreamError as error:
+        raise StadiumGoPrefixError(f"state companion status is malformed: {error}") from error
+    _require(status.get("state") == "completed" and status.get("completed") is True and
+             status.get("invalid") is False and status.get("error") is None and
+             status.get("event_count") == stats.records_read,
+             "state companion status does not describe the validated complete stream")
+
+    snapshots = [
+        _validate_stadium_idle_state_record(rows["GO"], "GO",
+                                            baseline["go_source_tick_C"]),
+        _validate_stadium_idle_state_record(rows["C"], "C",
+                                            baseline["go_source_tick_C"]),
+        _validate_stadium_idle_state_record(rows["F"], "F",
+                                            baseline["first_full_post_go_source_tick_F"]),
+    ]
+    setup = _slice(rows["GO"]["payload"], MATCH_SETUP_TAG, "GO state context", 0x138)
+    stage_kind = int.from_bytes(setup["raw"][START_MELEE_RULES_STKIND_OFFSET:
+                                               START_MELEE_RULES_STKIND_OFFSET + 2], "big")
+    _require(stage_kind == STADIUM_KIND,
+             "state companion original match context is not Stadium kind 3")
+    return {
+        "schema": "melee-web-original-stadium-idle-state",
+        "version": 1,
+        "decision": "PASS_ORIGINAL_STATE_ONLY_COUNTERPART",
+        "scope": "GO/C/F raw state observation; no native parity, title-byte, RNG-ledger, or whole-session claim",
+        "source": baseline["source"],
+        "stage_kind": stage_kind,
+        "go_source_tick_C": baseline["go_source_tick_C"],
+        "first_full_post_go_source_tick_F": baseline["first_full_post_go_source_tick_F"],
+        "map_ids": list(STADIUM_IDLE_STATE_ROOT_IDS),
+        "guest_pointer_numeric_comparison": False,
+        "snapshots": snapshots,
+        "stream_sha256": stats.prefix_sha256,
+    }

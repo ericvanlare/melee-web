@@ -1020,6 +1020,12 @@ bool GameplayWorld::diagnostic_stadium_go_alignment_snapshot(
         storage_->stage_last&&melee_web_stage_last_stadium_go_alignment_snapshot(
             storage_->stage_last,out,error,size);
 }
+bool GameplayWorld::diagnostic_stadium_idle_snapshot(
+    MeleeWebStadiumIdleSnapshot* out,char* error,size_t size)const{
+    return storage_&&construction_complete()&&storage_->stadium_diagnostic&&
+        storage_->stage_last&&melee_web_stage_last_stadium_idle_snapshot(
+            storage_->stage_last,out,error,size);
+}
 #endif
 MeleeWebMatchContext* GameplayWorld::take_match_context(){
     if(!storage_||!storage_->match_context)

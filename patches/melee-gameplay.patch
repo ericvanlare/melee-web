@@ -6149,7 +6149,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4758cbb258f22465f300cc543ff49bdd
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..60b15e5a3b9483cf2e51e7999660a72bc6f73311 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..07ca4d0898a1859d7d29bc5f27490006aeb814c2 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,16 @@
@@ -6321,7 +6321,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..60b15e5a3b9483cf2e51e7999660a72b
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -788,137 +876,5626 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
+@@ -788,137 +876,5861 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
              }
              break;
          }
@@ -6511,6 +6511,9 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..60b15e5a3b9483cf2e51e7999660a72b
 +    MeleeWebStadiumImageProvenance images[3];
 +    HSD_Text* texts[2];
 +    HSD_GObj* renderers[2];
++    unsigned title_entry_seen;
++    int title_entry_index;
++    int title_entry_invalid;
 +    sislib_UnkAlloc3* context;
 +    SIS* source_sis;
 +    HSD_GObj* display_ground;
@@ -6559,6 +6562,25 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..60b15e5a3b9483cf2e51e7999660a72b
 +                               const char* message);
 +static int stadium_owner_gobj_address_present(const HSD_GObj* expected);
 +static int stadium_owner_gobj_linked(const HSD_GObj* expected, u8 p_link);
++
++void melee_web_stadium_display_owner_note_title_entry(const void* text,
++                                                      int sis_index)
++{
++    MeleeWebStadiumDisplayOwner* const owner = stadium_display_owner_current;
++    if (owner == NULL ||
++        (owner->state != STADIUM_DISPLAY_OWNER_BOUND &&
++         owner->state != STADIUM_DISPLAY_OWNER_CAPTURED) ||
++        !owner->source_journal_armed || owner->source_journal_failed ||
++        owner->source_journal_overflowed || owner->journal_failed ||
++        text == NULL || text != owner->texts[0])
++        return;
++    if (sis_index < 0) {
++        owner->title_entry_invalid = 1;
++        return;
++    }
++    owner->title_entry_index = sis_index;
++    owner->title_entry_seen = 1;
++}
 +
 +/* Successful original SIS frees are source lifetime events, not new
 + * allocation generations. A retired address cannot become an owned identity
@@ -9602,6 +9624,219 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..60b15e5a3b9483cf2e51e7999660a72b
 +#undef STADIUM_GO_VIEW_OWNER_SAFE
 +}
 +
++static int stadium_owner_idle_gobj_linked_once(const HSD_GObj* expected,
++                                                u8 p_link)
++{
++    unsigned found = 0;
++    unsigned visited = 0;
++    if (expected == NULL || HSD_GObj_Entities == NULL ||
++        p_link > HSD_GObjLibInitData.p_link_max)
++        return 0;
++    for (HSD_GObj* object = ((HSD_GObj**) HSD_GObj_Entities)[p_link];
++         object != NULL; object = object->next) {
++        if (visited++ == STADIUM_MAP2_SNAPSHOT_TRAVERSAL_LIMIT) return 0;
++        if (object == expected) ++found;
++    }
++    return found == 1;
++}
++
++static int stadium_owner_idle_sis_lists_match(
++    const MeleeWebStadiumDisplayOwner* owner,
++    const MeleeWebDiagnosticSisOwner* token, size_t block_count)
++{
++    unsigned seen[2] = { 0, 0 };
++    unsigned context_seen = 0;
++    int last_owned = -1;
++    HSD_Text* text = HSD_SisLib_804D7978;
++    for (size_t i = 0; text != NULL; ++i) {
++        if (i >= block_count ||
++            stadium_sis_control_membership_state_from_head(
++                token, text, (sizeof(*text) + 3) & ~(size_t)3,
++                used_head, NULL, NULL, NULL, NULL, NULL) !=
++                    STADIUM_TEXT_MEMBERSHIP_PRESENT)
++            return 0;
++        const int index = text == owner->texts[0] ? 0 :
++                          text == owner->texts[1] ? 1 : -1;
++        if (index >= 0) {
++            if (seen[index]++ != 0 || index <= last_owned ||
++                text->font_idx != 1)
++                return 0;
++            last_owned = index;
++        } else if (text->font_idx == 1) {
++            return 0;
++        }
++        /* Foreign non-font-1 entities are deliberately never followed. */
++        text = text->next;
++    }
++    if (seen[0] != 1 || seen[1] != 1) return 0;
++    sislib_UnkAlloc3* context = HSD_SisLib_804D797C;
++    for (size_t i = 0; context != NULL; ++i) {
++        if (i >= block_count ||
++            stadium_sis_control_membership_state_from_head(
++                token, context, (sizeof(*context) + 3) & ~(size_t)3,
++                used_head, NULL, NULL, NULL, NULL, NULL) !=
++                    STADIUM_TEXT_MEMBERSHIP_PRESENT)
++            return 0;
++        if (context == owner->context) {
++            if (context_seen++ != 0 || context->xA != 1 ||
++                context->x4 != NULL)
++                return 0;
++        } else if (context->xA == 1) {
++            return 0;
++        }
++        context = context->x0;
++    }
++    return context_seen == 1;
++}
++
++/* This read-only SIS validation runs only after the map/process/lease view
++ * above has proved the exact current Stadium owner. Membership is checked
++ * against the live SIS used-block list before any owned text/context fields
++ * are read. No SIS bytes or native addresses leave this translation unit. */
++static int stadium_owner_idle_sis_matches(
++    const MeleeWebStadiumDisplayOwner* owner)
++{
++    const MeleeWebRetiredSisLease* const lease =
++        owner != NULL ? &owner->sis_backing_lease : NULL;
++    MeleeWebDiagnosticSisOwner token = { 0 };
++    size_t block_count = 0;
++    if (owner == NULL || owner != stadium_display_owner_current ||
++        owner->state != STADIUM_DISPLAY_OWNER_CAPTURED ||
++        !owner->source_started || owner->source_sis == NULL ||
++        HSD_SisLib_804D1124[1] != owner->source_sis ||
++        !owner->sis_backing_lease_captured || lease == NULL ||
++        lease->retirement_verified || lease->requested_bytes !=
++            MELEE_WEB_DIAGNOSTIC_SIS_HEAP_BYTES ||
++        lease->prior.heap == NULL || lease->prior.world_generation == 0 ||
++        lease->prior.allocation_generation == 0 ||
++        lease->prior.source_heap_handle < 0 || lease->prior.source_epoch == 0 ||
++        !owner->sis_payload_watch_armed ||
++        owner->sis_payload_prior_destruction != 0 ||
++        owner->sis_payload_drain_active || owner->sis_payload_drain_seen != 0 ||
++        owner->title_entry_invalid || !owner->title_entry_seen ||
++        owner->title_entry_index < 0)
++        return 0;
++    token.heap = lease->prior.heap;
++    token.world_generation = lease->prior.world_generation;
++    token.allocation_generation = lease->prior.allocation_generation;
++    token.source_heap_handle = lease->prior.source_heap_handle;
++    token.source_epoch = lease->prior.source_epoch;
++    if (!stadium_sis_control_used_head_validate(&token, used_head,
++                                                &block_count) ||
++        block_count == 0 ||
++        !stadium_owner_idle_sis_lists_match(owner, &token, block_count))
++        return 0;
++    for (size_t i = 0; i < 2; ++i) {
++        HSD_Text* const text = owner->texts[i];
++        HSD_GObj* const renderer = owner->renderers[i];
++        if (renderer == NULL || text->font_idx != 1 || text->entity != renderer ||
++            !stadium_owner_idle_gobj_linked_once(renderer, 0xD) ||
++            renderer->classifier != HSD_GOBJ_CLASS_SISLIB_UNK ||
++            renderer->p_link != 0xD || renderer->user_data != text ||
++            renderer->user_data_remove_func != HSD_SisLib_803A5A2C)
++            return 0;
++    }
++    HSD_GObj* const text_child = owner->children[0];
++    if (text_child == NULL || owner->wrappers[0] == NULL ||
++        !stadium_owner_idle_gobj_linked_once(text_child, 0x13) ||
++        text_child->classifier != HSD_GOBJ_CLASS_TEXT ||
++        text_child->p_link != 0x13 ||
++        text_child->user_data != owner->wrappers[0] ||
++        text_child->user_data_remove_func != HSD_Free)
++        return 0;
++    const TextWrapper* const wrapper = (const TextWrapper*) owner->wrappers[0];
++    if (wrapper->win_static_p != owner->texts[0] ||
++        wrapper->win_dynamic_p != owner->texts[1] ||
++        owner->texts[0]->sis_buffer == NULL)
++        return 0;
++    return 1;
++}
++
++int melee_web_stadium_display_owner_idle_snapshot(
++    const MeleeWebStadiumDisplayOwner* owner,
++    const MeleeWebStadiumMap2BufferOwner* output, int source_started,
++    uint64_t world_generation, uint64_t world_ticks, uint32_t source_frame,
++    MeleeWebStadiumIdleSnapshot* out)
++{
++    MeleeWebStadiumIdleSnapshot candidate = { 0 };
++    MeleeWebSourceMemoryContext context = { 0 };
++    MeleeWebSourceMemoryAllocation map2_allocation = { 0 };
++    Ground* map2_data;
++    Ground* display_data;
++    int gate = -1;
++    int mode = -1;
++    if (out == NULL || world_generation == 0 || source_started != 1 ||
++        owner == NULL || owner != stadium_display_owner_current ||
++        !melee_web_stadium_display_owner_go_alignment_view(
++            owner, output, source_started, &gate, &mode) ||
++        !stadium_owner_idle_sis_matches(owner) ||
++        melee_web_source_memory_context_read(&context) !=
++            MELEE_WEB_SOURCE_MEMORY_READ_OK ||
++        context.world_generation != world_generation ||
++        melee_web_source_memory_allocation_read(
++            owner->map2_buffer, &map2_allocation) !=
++            MELEE_WEB_SOURCE_MEMORY_READ_OK || !map2_allocation.live ||
++        map2_allocation.world_generation != world_generation ||
++        !stadium_owner_source_allocation_equal(
++            &map2_allocation, &owner->map2_buffer_allocation_lease))
++        return 0;
++    map2_data = HSD_GObjGetUserData(owner->map2_ground);
++    display_data = owner->display_ground_data;
++    if (map2_data == NULL || display_data == NULL ||
++        map2_data->map_id != 2 ||
++        display_data->map_id != (enum GrKind) PsType_Display ||
++        (map2_data->u.stadium.xC4_b0 != 0 &&
++         map2_data->u.stadium.xC4_b0 != 1))
++        return 0;
++    candidate.version = MELEE_WEB_STADIUM_IDLE_SNAPSHOT_VERSION;
++    candidate.world_generation = world_generation;
++    candidate.world_ticks = world_ticks;
++    candidate.source_frame = source_frame;
++    candidate.map2_gate = map2_data->u.stadium.xC4_b0;
++    candidate.map2_countdown = map2_data->u.stadium.xD8;
++    candidate.map2_phase = map2_data->u.stadium.xDC;
++    candidate.map2_form = map2_data->u.stadium.xDE;
++    candidate.map2_history_e0 = map2_data->u.stadium.xE0;
++    candidate.map2_history_e2 = map2_data->u.stadium.xE2;
++    candidate.display_mode = display_data->u.display.xE4;
++    candidate.display_e6 = display_data->u.display.xE6;
++    candidate.display_e8 = display_data->u.display.xE8;
++    candidate.display_timer = display_data->u.display.xE0;
++    candidate.display_previous_mode = display_data->u.display.xEA;
++    candidate.display_selected_player = display_data->u.display.xEE;
++    candidate.display_f2 = display_data->u.display.xF2;
++    candidate.display_flags =
++        (display_data->u.display.xF8_0 ? 1U : 0U) |
++        (display_data->u.display.xF8_1 ? 2U : 0U) |
++        (display_data->u.display.xF8_2 ? 4U : 0U);
++    candidate.sis_font_slot = 1;
++    candidate.sis_static_text_role = 0;
++    candidate.sis_dynamic_text_role = 1;
++    candidate.sis_context_present = 1;
++    candidate.sis_title_entry_seen = owner->title_entry_seen ? 1U : 0U;
++    candidate.sis_title_entry_index = owner->title_entry_seen
++        ? owner->title_entry_index : -1;
++    candidate.title_bytes_captured = 0;
++    candidate.sis_source_heap_handle =
++        owner->sis_backing_lease.prior.source_heap_handle;
++    candidate.sis_world_generation =
++        owner->sis_backing_lease.prior.world_generation;
++    candidate.sis_allocation_generation =
++        owner->sis_backing_lease.prior.allocation_generation;
++    candidate.sis_source_epoch = owner->sis_backing_lease.prior.source_epoch;
++    candidate.sis_requested_bytes =
++        (uint32_t) owner->sis_backing_lease.requested_bytes;
++    candidate.map2_source_heap_handle = map2_allocation.source_heap_handle;
++    candidate.map2_world_generation = map2_allocation.world_generation;
++    candidate.map2_allocation_generation =
++        map2_allocation.allocation_generation;
++    candidate.map2_requested_bytes = map2_allocation.requested_bytes;
++    candidate.map2_buffer_origin = (uint32_t) owner->map2_buffer_origin;
++    (void) gate;
++    (void) mode;
++    return melee_web_stadium_idle_snapshot_copy(out, &candidate);
++}
++
 +static int stadium_owner_map2_graph_matches_phase(
 +    const MeleeWebStadiumDisplayOwner* owner, HSD_GObj* display_ground,
 +    int started_retirement)
@@ -12058,7 +12293,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..60b15e5a3b9483cf2e51e7999660a72b
  
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
-@@ -1185,22 +6762,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +6997,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -12100,7 +12335,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..60b15e5a3b9483cf2e51e7999660a72b
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +6810,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +7045,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -12122,7 +12357,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..60b15e5a3b9483cf2e51e7999660a72b
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +6832,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +7067,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
@@ -12145,7 +12380,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..60b15e5a3b9483cf2e51e7999660a72b
      wrapper->flag = false;
      return gobj;
  }
-@@ -1896,6 +7512,9 @@ bool grStadium_801D42B8(void)
+@@ -1896,6 +7747,9 @@ bool grStadium_801D42B8(void)
      if (gp->u.stadium.xC4_b1) {
          return false;
      }
@@ -12155,7 +12390,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..60b15e5a3b9483cf2e51e7999660a72b
      gp->u.stadium.xD0 =
          grDatFiles_801C6478(gp->u.stadium.xCC, gp->u.stadium.xC8);
      return true;
-@@ -2093,6 +7712,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2093,6 +7947,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
              gp = GET_GROUND(map_gobj);
              HSD_ASSERT(0x99B, gp);
              gp->u.stadium.xC4_b1 = true;
@@ -12165,7 +12400,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..60b15e5a3b9483cf2e51e7999660a72b
              lbFile_80016580(datfiles[var_r29], gp->u.stadium.xCC,
                              &gp->u.stadium.xC8, fn_801D4220, NULL);
              temp_r31->u.stadium.xDC = 1;
-@@ -2221,6 +7843,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2221,6 +8078,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
          if (temp_r31->u.stadium.xDE == 5) {
              temp_r31->u.stadium.xD8 =
                  randi_between_2(yakumono_param->x0, yakumono_param->x4);
@@ -18060,7 +18295,7 @@ index 9536d2a353ac39e156c8fc17f9a780871229c060..41143790a92d43d934e32627112598ea
              if (a->frame == -2) {
                  return 1;
 diff --git a/src/sysdolphin/baselib/sislib.c b/src/sysdolphin/baselib/sislib.c
-index bc3a9125d905210c360664c5b93a78eb49f43b4d..92cb6f96f76c2ae6cd19071ee1db4aec16135723 100644
+index bc3a9125d905210c360664c5b93a78eb49f43b4d..854f1cb66cb729ddd5c65ab0f286c75a2e10210b 100644
 --- a/src/sysdolphin/baselib/sislib.c
 +++ b/src/sysdolphin/baselib/sislib.c
 @@ -1,6 +1,23 @@
@@ -18193,6 +18428,16 @@ index bc3a9125d905210c360664c5b93a78eb49f43b4d..92cb6f96f76c2ae6cd19071ee1db4aec
  }
  
  /// GObj "remove" function callback
+@@ -575,6 +655,9 @@ void HSD_SisLib_803A6368(HSD_Text* text, s32 sis_idx)
+     sis_table = (SIS**) HSD_SisLib_804D1124[text->font_idx];
+     if (sis_table != NULL) {
+         text->sis_buffer = sis_table[sis_idx];
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++        melee_web_stadium_display_owner_note_title_entry(text, sis_idx);
++#endif
+     }
+     text->x60 = NULL;
+     text->current_height = 0.0F;
 diff --git a/src/sysdolphin/baselib/sislib.h b/src/sysdolphin/baselib/sislib.h
 index 153b907c1b0375796291582008f24380142e3bdc..df88dec26c6bd8944616acbd761b84bf63abff05 100644
 --- a/src/sysdolphin/baselib/sislib.h

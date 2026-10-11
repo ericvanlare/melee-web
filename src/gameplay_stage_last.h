@@ -73,6 +73,10 @@ int melee_web_stage_last_stadium_go_alignment_arm(
     MeleeWebStageLast*,int expected_branch,char*,size_t);
 int melee_web_stage_last_stadium_go_alignment_snapshot(
     const MeleeWebStageLast*,MeleeWebStadiumGoAlignmentSnapshot*,char*,size_t);
+/* Separate live scalar snapshot for a started diagnostic Stadium idle owner.
+ * It does not read or modify the frozen GO event history above. */
+int melee_web_stage_last_stadium_idle_snapshot(
+    const MeleeWebStageLast*,MeleeWebStadiumIdleSnapshot*,char*,size_t);
 void melee_web_stage_last_stadium_go_alignment_note_go(int source_branch);
 void melee_web_stage_last_stadium_go_alignment_note_hud(
     int callback_index,MeleeWebStadiumGoAlignmentHudCallback,int hud_enabled);
