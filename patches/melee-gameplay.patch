@@ -6149,7 +6149,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4758cbb258f22465f300cc543ff49bdd
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..7615009c0e80717fee59cc468cac7888906ff096 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..3d5232739acf2b55757037766ebab990537fc903 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,16 @@
@@ -8354,7 +8354,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..7615009c0e80717fee59cc468cac7888
 +            error, sizeof(error)))
 +        goto cleanup;
 +    saved_event = owner.source_events[7];
-+    owner.source_events[7].gobj = &foreign_owner.children[0];
++    owner.source_events[7].gobj = &fake_map_objects[3];
 +    if (melee_web_stadium_display_owner_consume_cancel_transfer(
 +            &owner, &owner, token->world_generation, receipt,
 +            error, sizeof(error)) ||
