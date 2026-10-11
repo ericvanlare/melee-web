@@ -1,0 +1,50 @@
+{
+  "schema": "a3-first-use-render-wait-observation-v1",
+  "source_report_sha256": "f6ae7022019c04cd7c0df3b0c22bf1f07045f6c6efd319f6f51aa8f29db8aff1",
+  "source": "capture2 full_route.failure_observation.last_rows at the first stock observation refusal",
+  "alpha": {
+    "phase": 7,
+    "running": 1,
+    "source_tick": 1816,
+    "match_frame": 1349
+  },
+  "beta": {
+    "phase": 7,
+    "running": 0,
+    "message": "Preparing first-use rendering...",
+    "error": null,
+    "source_tick": 1816,
+    "native_status": {
+      "active": 1,
+      "blocker": "none",
+      "local_capture_failure": null,
+      "network_wait": {"active": 0},
+      "terminal": {"kind": 0},
+      "indexed": {"duplicates": 0, "conflicts": 0, "gaps": 0, "invalid": 0}
+    },
+    "match": {
+      "leg": "vs",
+      "observer_error": null,
+      "observer_error_reason": null,
+      "observed_player_source_slots": [0, 1],
+      "source_pad_errors": [0, 0, -1, -1],
+      "ready": true,
+      "paused": false,
+      "ending": false,
+      "complete": false,
+      "frame": 1349,
+      "outcome": 0,
+      "rules": {
+        "stage": 32,
+        "is_stock": 1,
+        "is_vs": 1,
+        "is_teams": 0,
+        "player_stocks": [4, 4]
+      },
+      "players": [
+        {"fighter": 0, "source_port": 0, "source_character": 8, "slot_type": 0, "stocks": 3},
+        {"fighter": 0, "source_port": 1, "source_character": 8, "slot_type": 0, "stocks": 4}
+      ]
+    }
+  }
+}

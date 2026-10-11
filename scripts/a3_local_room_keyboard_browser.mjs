@@ -14,12 +14,15 @@ import {openNetInstance, firstFatalBrowserError} from './net_session_instance.mj
 import {startRoomRelayRuntime} from './net_room_relay_runtime_owner.mjs';
 import {parseRoomInvite} from './net_lockstep_room_invite.mjs';
 import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS, parseNetChecksum} from './net_lockstep_core.mjs';
+import {checksumCompareReached, checksumWaitDiagnostic} from './a3_checksum_wait_diagnostics.mjs';
+import {runA3LocalFullRoute} from './a3_local_room_full_route.mjs';
 
-const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000]';
+const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route]';
 const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, out: {type: 'string'},
   playwright: {type: 'string'}, 'min-checksums': {type: 'string', default: '120'},
-  'timeout-ms': {type: 'string', default: '300000'}, help: {type: 'boolean', default: false},
+  'timeout-ms': {type: 'string', default: '300000'}, 'full-route': {type: 'boolean', default: false},
+  help: {type: 'boolean', default: false},
 }, allowPositionals: false});
 if (values.help) {
   process.stdout.write(USAGE + '\n');
@@ -91,7 +94,9 @@ async function cleanupBounded(promise, label) {
 }
 const report = {
   schema: 'melee-web-a3-local-room-keyboard-v1',
-  evidence_scope: 'local functional browser check only; public Worker, full match, human/physical input, Internet, timing, pixel/PCM equivalence and whole-session gates remain pending',
+  evidence_scope: values['full-route']
+    ? 'local functional browser route attempt including one natural original four-stock Mario/Final Destination match; broader original-accuracy, public Worker, human/physical-input, Internet, timing, pixel/PCM-equivalence and whole-session acceptance remain pending'
+    : 'local functional browser check only; public Worker, full match, human/physical input, Internet, timing, pixel/PCM equivalence and whole-session gates remain pending',
   decision: 'FAIL',
   first_error: null,
   source: null,
@@ -101,6 +106,8 @@ const report = {
   profiles: {},
   css_keyboard: {},
   checksum_comparison: null,
+  checksum_wait_failure: null,
+  full_route: null,
   leave_and_cleanup: {},
   exclusions: ['no direct PAD or Gamepad injection', 'no harness-owned peer or checksum pump',
     'no runtime source-tick/checksum-bound changes', 'one local Worker room only'],
@@ -110,14 +117,22 @@ let worker = null;
 const instances = {alpha: null, beta: null};
 let workerPassed = false;
 
-function sourceIdentity() {
+async function sourceIdentity() {
   const status = gitValue(['status', '--porcelain', '--untracked-files=all']);
+  const allowedHarnessFiles = ['scripts/a3_local_room_keyboard_browser.mjs',
+    'scripts/a3_local_room_full_route.mjs', 'scripts/a3_checksum_wait_diagnostics.mjs',
+    'scripts/a3_source_cursor_join.mjs',
+    'tests/test_a3_local_room_full_route_wait.py'];
   const unexpected = status.split('\n').filter(Boolean).filter(row =>
-    !row.endsWith('scripts/a3_local_room_keyboard_browser.mjs'));
+    !allowedHarnessFiles.includes(row.slice(3)));
   requireCondition(unexpected.length === 0,
     'Checkout contains changes outside this harness: ' + JSON.stringify(unexpected));
+  const sourceFiles = allowedHarnessFiles.filter(filename => filename.startsWith('scripts/'));
+  const filesSha256 = Object.fromEntries(await Promise.all(sourceFiles.map(async filename =>
+    [filename, sha256(await fs.readFile(filename))])));
   return {head: gitValue(['rev-parse', 'HEAD']), tree: gitValue(['rev-parse', 'HEAD^{tree}']),
-    status_porcelain: status, allowed_harness_only_change: status.length > 0};
+    status_porcelain: status, allowed_harness_only_change: status.length > 0,
+    files_sha256: filesSha256};
 }
 
 async function setupKeyboard(instance, role) {
@@ -151,8 +166,44 @@ async function readRoomState(instance) {
         ? module._melee_web_native_menu_phase() : null,
       menu_running: typeof module?._melee_web_native_menu_running === 'function'
         ? module._melee_web_native_menu_running() : null,
+      menu_message: typeof module?._melee_web_native_menu_message === 'function' &&
+        typeof module.UTF8ToString === 'function'
+        ? module.UTF8ToString(module._melee_web_native_menu_message()) : null,
       native_status: nativeStatus,
       owner_health: ownerHealth,
+    };
+  });
+}
+
+async function readChecksumWaitFinalState(instance) {
+  return instance.page.evaluate(() => {
+    const module = globalThis.Module;
+    const status = document.querySelector('#status');
+    let matchSummary = null;
+    let matchObservationError = null;
+    try {
+      if (typeof module?._melee_web_native_menu_match_observe !== 'function' ||
+          typeof module.UTF8ToString !== 'function') {
+        matchObservationError = 'native match observer unavailable';
+      } else {
+        matchSummary = JSON.parse(module.UTF8ToString(module._melee_web_native_menu_match_observe()));
+      }
+    } catch (error) {
+      matchObservationError = String(error?.message || error);
+    }
+    return {
+      runtime_error: status?.dataset.runtimeError || null,
+      menu_phase: typeof module?._melee_web_native_menu_phase === 'function'
+        ? module._melee_web_native_menu_phase() : null,
+      menu_running: typeof module?._melee_web_native_menu_running === 'function'
+        ? module._melee_web_native_menu_running() : null,
+      menu_message: typeof module?._melee_web_native_menu_message === 'function' &&
+        typeof module.UTF8ToString === 'function'
+        ? module.UTF8ToString(module._melee_web_native_menu_message()) : null,
+      native_status: globalThis.__net?.status?.() ?? null,
+      owner_health: globalThis.meleeNetRuntimeLockstepHealth?.() ?? null,
+      match_summary: matchSummary,
+      match_observation_error: matchObservationError,
     };
   });
 }
@@ -305,23 +356,57 @@ async function waitForBothCssAndProgress(minimum) {
   throw Error('Both runtime-owned peers did not reach the bounded common CSS checksum prefix');
 }
 
-async function waitForBothChecksumCompare(target) {
+async function waitForBothChecksumCompare(target, phase = 1) {
+  const recent = [];
+  let lastRows = null;
+  let lastObservedAt = null;
+  const retainRows = rows => {
+    lastRows = rows;
+    lastObservedAt = new Date().toISOString();
+    recent.push({observed_at: lastObservedAt, peers: rows.map((row, index) =>
+      checksumWaitDiagnostic(row, index === 0 ? 'alpha' : 'beta'))});
+    if (recent.length > 32) recent.shift();
+  };
+  const failWithObservation = async (errorMessage, reason, finalLabel) => {
+    const fresh = await Promise.all(['alpha', 'beta'].map(async role => {
+      let timer;
+      try {
+        const row = await Promise.race([
+          readChecksumWaitFinalState(instances[role]),
+          new Promise((_, reject) => {
+            timer = setTimeout(() => reject(Error('diagnostic observation exceeded 1500 ms')), 1500);
+          }),
+        ]);
+        return {label: finalLabel, observed_at: new Date().toISOString(),
+          state: checksumWaitDiagnostic(row, role)};
+      } catch (error) {
+        return {label: finalLabel, observed_at: new Date().toISOString(), role,
+          observation_error: errorText(error)};
+      } finally {
+        clearTimeout(timer);
+      }
+    }));
+    const observation = {reason, target, phase, predicate_last_observed_at: lastObservedAt,
+      predicate_last_rows: lastRows?.map((row, index) =>
+        checksumWaitDiagnostic(row, index === 0 ? 'alpha' : 'beta')) ?? null,
+      recent, fresh_final_observation: fresh};
+    report.checksum_wait_failure = observation;
+    return Error(errorMessage);
+  };
   while (Date.now() < operationDeadline) {
     const states = await Promise.all([readRoomState(instances.alpha), readRoomState(instances.beta)]);
+    retainRows(states);
     for (const [index, role] of ['alpha', 'beta'].entries()) {
       const failure = protocolFailure(states[index], role);
-      if (failure) throw Error(failure);
+      if (failure) throw await failWithObservation(failure, failure, 'after-protocol-failure');
     }
-    const reached = states.every(row => {
-      const protocol = row.owner_health?.peer?.protocol;
-      return row.menu_phase === 1 && row.menu_running === 1 &&
-        protocol?.ready === true && protocol.next_checksum_compare >= target &&
-        protocol.checksum_mismatch_count === 0;
-    });
+    const reached = states.every(row => checksumCompareReached(row, target, phase));
     if (reached) return states;
     await sleep(50);
   }
-  throw Error('Both peers did not advance the common checksum boundary after keyboard input');
+  throw await failWithObservation('Both peers did not advance the common checksum boundary after keyboard input',
+    'operation deadline reached before the predicate matched',
+    'fresh-observation-after-operation-deadline');
 }
 
 function recordHex(record) {
@@ -447,7 +532,7 @@ async function writeReport() {
 }
 
 try {
-  report.source = sourceIdentity();
+  report.source = await sourceIdentity();
   report.browser = {node: process.version, url: runtimeUrl.href,
     speaker_output: 'muted through the shared browserLaunchOptions policy; normal audio processing retained',
     profile_model: 'one independent persistent Chrome context per player'};
@@ -627,8 +712,23 @@ try {
     };
   }
 
-  const progress = await waitForBothCssAndProgress(minimumChecksums);
-  const [alphaSnapshot, betaSnapshot] = await waitForChecksumConsumersSettled(minimumChecksums);
+  if (values['full-route']) {
+    report.full_route = await runA3LocalFullRoute({
+      alpha: instances.alpha, beta: instances.beta, report, inputDelay: invite.inputDelay,
+      remaining, readRoomState, readPeerSnapshot, readInputDiagnostics,
+      waitForBothChecksumCompare, captureScreenshot,
+      assertHealthy: (state, role) => {
+        const failure = protocolFailure(state, role);
+        requireCondition(!failure, failure || role + ' runtime owner is unhealthy');
+      },
+    });
+  }
+  const requiredChecksums = Math.max(minimumChecksums,
+    report.full_route?.required_checksum_boundary || 0);
+  requireCondition(requiredChecksums <= invite.sourceTicks,
+    'Required full-route checksum boundary exceeds the Host/Join source-tick limit');
+  const progress = await waitForBothCssAndProgress(requiredChecksums);
+  const [alphaSnapshot, betaSnapshot] = await waitForChecksumConsumersSettled(requiredChecksums);
   for (const [index, role] of ['alpha', 'beta'].entries()) {
     const snapshot = index === 0 ? alphaSnapshot : betaSnapshot;
     const failure = protocolFailure({owner_health: snapshot.health, runtime_error: snapshot.runtime_error}, role);
@@ -646,8 +746,9 @@ try {
       snapshot.snapshot.peer.protocol.native_local_divergences === 0,
       role + ' runtime peer reported a native or checksum mismatch');
   }
-  report.checksum_comparison = compareSnapshotRecords(alphaSnapshot, betaSnapshot, minimumChecksums);
-  report.checksum_comparison.requested_minimum = minimumChecksums;
+  report.checksum_comparison = compareSnapshotRecords(alphaSnapshot, betaSnapshot, requiredChecksums);
+  if (report.full_route) report.full_route.result = 'pass';
+  report.checksum_comparison.requested_minimum = requiredChecksums;
   report.checksum_comparison.freeze_before_leave = true;
   report.checksum_comparison.final_status = {alpha: alphaSnapshot.native_status,
     beta: betaSnapshot.native_status};
@@ -661,6 +762,8 @@ try {
   }));
   workerPassed = true;
 } catch (error) {
+  if (report.full_route && ['running', 'awaiting_final_checksum_validation'].includes(report.full_route.result))
+    report.full_route.result = 'failed';
   firstError(errorText(error));
 } finally {
   const processInfo = {};
@@ -784,6 +887,7 @@ if (report.first_error) {
 } else {
   process.stdout.write(JSON.stringify({decision: report.decision,
     compared_source_ticks: report.checksum_comparison?.compared_source_ticks,
+    full_route: report.full_route?.result ?? null,
     worker_port: report.room_worker?.port,
     output: path.join(output, 'report.json')}) + '\n');
 }

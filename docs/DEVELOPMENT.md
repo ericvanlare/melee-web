@@ -88,6 +88,14 @@ This covers Host/Join, original CSS keyboard input, matching checksums and Leave
 See the [scoped readiness result](status/2026-10-11-local-room-ui-readiness.md);
 it does not exercise the deployed staging Worker or a complete match.
 
+The optional `--full-route` driver extends the same keyboard controls toward
+original SSS, a four-stock Mario/Final Destination match, Results and CSS return.
+Its scoped local functional result passes once; the same receipt retains the
+preceding failed attempts and separate broader acceptance gates.
+Use the supervised five-minute owner budget with cleanup reserve described in
+that receipt. Do not interpret a driver timeout as a desync or extend its budget
+without reducing the observed boundary first.
+
 ## Choose by change boundary
 
 | Change | Start here | Focused command or procedure | Evidence boundary |
