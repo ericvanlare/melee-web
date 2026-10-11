@@ -318,8 +318,8 @@
     "no_machine_specific_path_required": true
   },
   "subsequent_c3_component_2026_10_09": {
-    "claim_boundary": "Exact5d matches declared first-CSS/SSS constructor/firsttick/firstdraw fields and370 continuationcallbacks through scheduler2422. Continuation is incomplete, not a successful selection exit or C3 result. Checked cleanup and local producer identity checks pass. HTTP-after/GPU are unrun for the failed prefix. No pixels/PCM/audio-continuity/physical-input/foreground-timing/whole-session acceptance; public Stadium admission remains closed.",
-    "current_result": "On 5d67d6a2, the relative-counter repair passes firstdraw and all124 remaining SSS scheduler samples plus123draw pairs (370 strict callbacks). The final native tick returns1 with no transition where the diagnostic requires3; it stops before finaldraw/exit. The later audio123-versus124 assertion is secondary. Independent replay and checked cleanup pass. C3 remains open.",
+    "claim_boundary": "Exact1b matches the bounded374-callback SSS prefix, final requested draw, typed exit2426 and separate selection tuple2427; checked unload and40 HTTP identities pass. See admission_and_sss_prefix_boundary_2026_10_11 for exact producer/evidence scopes. Next compare actual match Start/host seed with original Entry before match construction. VS Setup/GO, per-owner RNG and C3 acceptance remain open. Audio baseline149 versus150 calls remains unexplained; no PCM, timing, pixels, physical-input or whole-session acceptance; public Stadium admission remains closed.",
+    "current_result": "On 1b188efb, strict bounded SSS comparison passes all 374 callbacks: 124 scheduler samples, 124 draw pairs, typed exit 2426 and separate selection tuple 2427. Final tick result 3 and the requested final draw complete. Independent replay, checked unload, 13 attributed process exits, 40 HTTP identities and GPU checks pass. Actual VS Entry/Setup and C3 remain open; the 149-versus-150 audio baseline gap remains unexplained. See admission_and_sss_prefix_boundary_2026_10_11.",
     "first_css_browser_draw_4d6c0b37_d949a0b8_v1": {
       "status": "FAIL_BEFORE_ARM; NO_BROWSER_CSS_COMPARISON; NO_TICK; NO_DRAW",
       "scope": "One headless browser attempt with the existing captured first-CSS context and one consumed sample. The diagnostic did not arm; this is not a source draw or Stadium/C3 acceptance result.",
@@ -6008,6 +6008,275 @@
           "bytes": 4181,
           "sha256": "f74970f8fd62eebabe6d1428fc5c562e69cc811d458daf4affd4fa1ef3a222b7"
         }
+      ]
+    }
+  },
+  "admission_and_sss_prefix_boundary_2026_10_11": {
+    "date_utc": "2026-10-11",
+    "source_identity": {
+      "commit": "1b188efbb3041aaa76aeed7a69f4c10134943a7f",
+      "tree": "eaa07d839a180642bb9b273e643ee00bf343e9ba"
+    },
+    "first_css_admission": {
+      "integration_review": {
+        "artifact": "root-sss-admission-integration-v1/review.json",
+        "sha256": "7c8b79fe68bb53b2f6299f98126c03b8bbd0c740f6b82d6f569a5ce89b09f630"
+      },
+      "source_candidate": {
+        "artifact": "sol-first-css-stadium-admission-candidate-review-v1/freeze.json",
+        "sha256": "a73f234f0632b3e0f2ee24764545f9236551484c81ecddb2d8a84d7155864fd5",
+        "change": "One call to melee_web_menu_host_enable_stadium_c1a after context application and before first CSS-return arm; does not set browser stadium_c1a_armed."
+      },
+      "actual_source_control": {
+        "artifact": "sol-first-css-stadium-admission-candidate-review-v1/review.json",
+        "sha256": "716781dc275416aaa772b1442b65ed43cff24ee5f63861bbd05b86e7cd83cfe2",
+        "result_artifact": "sol-first-css-stadium-admission-candidate-review-v1/control-v4/result.json",
+        "result_sha256": "67f82a05e4a4bc2b20608a6e3c47fb0895e8d350591820afbf262763f8f87bd1",
+        "scope": "Actual host/session and patched selector predicates; SSS phase and services fixture-owned."
+      },
+      "retained_fixture_failures": {
+        "artifact": "sss-prefix-admission-repair-v1/freeze.json",
+        "sha256": "298ed7e606062385afcbd1032771e123983b2bbb60cf7174085797f5a5c68b63",
+        "summary": "Three fixture attempts failed before the corrected fourth control passed."
+      }
+    },
+    "terminal_order_source_control": {
+      "v1_failed": {
+        "artifact": "sss-prefix-terminal-transition-control-v1/result.json",
+        "sha256": "b9b14995123315dbab028a992781f50d3fab65e16dd6dc5a4f767ff415e72560",
+        "compile_stderr_sha256": "270b79fa06700a0636f972f5259c29d582a43b0c50d96d36e9b043849d86fef7"
+      },
+      "v2_passed": {
+        "artifact": "sss-prefix-terminal-transition-control-v2/result.json",
+        "sha256": "93d169239520cf952a8bfe6b22fa0d6bfffbf29697ce76077a38db8491894eec",
+        "review_artifact": "sss-prefix-terminal-transition-control-v2/review.json",
+        "review_sha256": "6d02562a88d963f8324acf2d170f14b6f54e02696d1e16d84ba61c395423d509",
+        "scope": "Original source ordering, but synthetic CAF/x4 and fixture-owned runtime services; does not establish native private-state values."
+      }
+    },
+    "original_selector_inventory": {
+      "summary_artifact": "sss-selector-index-plan-v1/original-tag41-index-summary-v1.json",
+      "summary_sha256": "6194670d5e071ff8ccb332b7ad9eb7fcb8899e291a93ed96d8683fbab94728d6",
+      "inventory_artifact": "sss-selector-index-plan-v1/original-tag41-index-inventory.json",
+      "inventory_sha256": "e6b9c71f7c6ee0f781e2a8f2eebff92b5c7ea8966e614baee3b20a972915f5f2",
+      "samples": 166,
+      "sequence_range": [
+        1611,
+        2467
+      ],
+      "unique_preceding_polls_for_124_inputs": 124,
+      "change_points": [
+        [
+          1,
+          30,
+          null
+        ],
+        [
+          18,
+          25,
+          32
+        ],
+        [
+          19,
+          26,
+          28
+        ],
+        [
+          24,
+          19,
+          23
+        ],
+        [
+          33,
+          18,
+          3
+        ]
+      ],
+      "extractor_wip": {
+        "artifact": "sss-selector-index-candidate-v1/evidence/wip-freeze-v2.json",
+        "sha256": "d991196a7fe8fef57ca271def6dfa9fa367c16c8a79feb0a903c2fd6e66d206c",
+        "status": "Paused after retained-data extraction incorrectly constrained the poll count to 124; no selector expected-v2 or STC1SSSP input-v1 was emitted."
+      },
+      "scope": "Original-side inventory only; no full native selector-history comparison."
+    },
+    "first_sss_draw": {
+      "capture_result": {
+        "artifact": "sss-prefix-first-draw-preflight-1b188efb-v3/result.json",
+        "sha256": "b641eaa5da1701462c9e33622946d754dda4da8039b6fc42e14fcbe5ab63c855"
+      },
+      "capture_report": {
+        "artifact": "sss-prefix-first-draw-preflight-1b188efb-v3/browser-run/report.json",
+        "sha256": "7c58c9acf81581824f02d07fb6526f3b09fc000503dc39be0daa21a6349e81ff"
+      },
+      "independent_review": {
+        "artifact": "sol-first-sss-draw-result-review-1b188efb-v1/review.json",
+        "sha256": "fd702ad483a30d089068a7340b6a3cbc5afb796ea3b07db34d2ce0eb4962cdcd",
+        "decision": "PASS_FIRST_SSS_DRAW"
+      },
+      "original_sequences": [
+        1609,
+        1610
+      ]
+    },
+    "bounded_sss_prefix": {
+      "capture_result": {
+        "artifact": "sss-prefix-full-preflight-1b188efb-v1/result.json",
+        "sha256": "5d0cbe670dffbee1aabbbdff1ec4d5bd8ac0162bf36473811498776beba2c020"
+      },
+      "capture_report": {
+        "artifact": "sss-prefix-full-preflight-1b188efb-v1/browser-run/report.json",
+        "sha256": "937fd9ce7c07f83cf4a1f7eb1e2f35d3195ba1c1d75653aaf7437031992b2d80",
+        "result": "pass"
+      },
+      "independent_review": {
+        "artifact": "sol-sss-prefix-result-review-1b188efb-v1/review.json",
+        "sha256": "bff0d0a5b08ff470a10298c212b1e662e6a524362677f4cab4c4534787c381da",
+        "decision": "PASS_BOUNDED_SSS_PREFIX"
+      },
+      "counts": {
+        "callbacks": 374,
+        "inputs": 124,
+        "scheduler_samples": 124,
+        "ticks": 124,
+        "draw_enter_return_pairs": 124
+      },
+      "terminal": {
+        "last_tick_result": 3,
+        "transition_requested": true,
+        "source_exit_sequence": 2426,
+        "selection_sequence": 2427,
+        "selected_stage": {
+          "index": 18,
+          "kind": 3
+        },
+        "source_frame": 125,
+        "cumulative_session_ticks": 274,
+        "prepared_vs_output": "unpaired"
+      },
+      "selection_scope": "Only the separate (index, kind) tuple is paired to row 2427 under the no-intervening-writer proof; other row-2427 fields remain unpaired."
+    },
+    "cleanup": {
+      "artifact": "root-sss-prefix-cleanup-1b188efb-v1/review.json",
+      "sha256": "6a02e4d2994bf91b76e09155d49be468f337f65d5dedfb9e6cabed3852ede078",
+      "observed": "13 attributed PIDs absent; 40 local HTTP artifacts unchanged; checked unload reset phase/running and cleared observations; GPU adapter available."
+    },
+    "validation": {
+      "focused": {
+        "artifact": "sss-admission-focused-1b188efb-v1/result.json",
+        "sha256": "c735579fa37419c868183be6a2b7ec6b5d46d0ada97bda5dd1ddae913c7f1d8c",
+        "python_tests": 19,
+        "node_tests": 31
+      },
+      "release_builds": [
+        {
+          "artifact": "sss-admission-builds-1b188efb-v1/diagnostic-runtime/result.json",
+          "sha256": "a9aea681f8edc57507091ebab49ef154939325bd8fa8cec28359e5219c71ae0d",
+          "exit_code": 0
+        },
+        {
+          "artifact": "sss-admission-builds-1b188efb-v1/ordinary-runtime/result.json",
+          "sha256": "6a193e72e3314f5bb96f1fefbd39a77e43c5d860d26e3884916ea9de150321dc",
+          "exit_code": 0
+        }
+      ],
+      "full_suite": {
+        "artifact": "full-regression-1b188efb-v1/result.json",
+        "sha256": "8e2bfb6c6744213f7c3074c6178125199ad4089f8c98483fd4fa73a1ba4be42d",
+        "skipped": 163,
+        "exit_code": 0,
+        "tests_run": 2438,
+        "tests_passed": 2275
+      },
+      "ci": {
+        "artifact": "ci-1b188efb-complete-v1.json",
+        "sha256": "4842246efbd5435f3a16a2c00c8d67048e03e863ef8cc6a78d855579c6de1506",
+        "successful_jobs": 12,
+        "expected_skips": 2
+      }
+    },
+    "audio": {
+      "prefix_calls": {
+        "before": 150,
+        "after": 274,
+        "delta": 124,
+        "frames_before": 80000,
+        "frames_after": 146133,
+        "phase_before": 0,
+        "phase_after": 20
+      },
+      "cross_run_gap": "Separate first-draw run began at 149 cumulative calls while prefix began at 150; remains unexplained. Within-run accounting is not PCM/continuity/cadence evidence.",
+      "addendum": {
+        "artifact": "sol-sss-prefix-result-review-1b188efb-v1/audio-retention-addendum.json",
+        "sha256": "855b9908c4cd720209deb113ca7c9fa5a60e9bfc8240819ca1cfdb95783dbb91"
+      }
+    },
+    "retained_failures": [
+      {
+        "artifact": "sss-prefix-full-preflight-0abf156d-v1/browser-run/report.json",
+        "sha256": "0f9d14ee83964242504caf1ccc94c40855e56654214e8f100901df8409453b78",
+        "summary": "Earlier arm refusal: the first tick had completed, but the diagnostic incorrectly required lifetime ticks equal one instead of using the relative baseline."
+      },
+      {
+        "artifact": "sss-prefix-full-preflight-5d67d6a2-v1/browser-run/report.json",
+        "sha256": "6ff5237d694d0519c9dd99e6ea2dcce45afcd7f426e3dfb06138945da9591216",
+        "summary": "Historical terminal tick-disposition failure: result1/no transition instead of required result3/request. The guard label also says clock, but no separate actual clock mismatch is inferred. Final draw/exit remained unrun."
+      }
+    ],
+    "prepared_context_precheck": {
+      "precheck": {
+        "artifact": "root-vs-prepared-context-precheck-1b188efb-v1/result.json",
+        "sha256": "e9e24599211f10c6349c290cb9d2ef56f77f49add0392fa643d0c57ef94f9e6c",
+        "decision": "RETAINED_PREPARED_PAYLOAD_DIFFERS_FROM_ORIGINAL_ENTRY"
+      },
+      "source_followup": {
+        "artifact": "root-vs-prepared-context-precheck-1b188efb-v1/source-followup.json",
+        "sha256": "c81d74310391cc7bbdc2e8ea319299552236d40ab3699729541996a21f00f79b",
+        "decision": "SOURCE_EXPLAINS_DISTINCT_PREPARED_MODE_AND_MATCH_START"
+      },
+      "differences_between_distinct_objects": [
+        {
+          "field": ".rules.is_stock",
+          "native_prepared": false,
+          "original": true
+        },
+        {
+          "field": ".rules.is_vs",
+          "native_prepared": false,
+          "original": true
+        },
+        {
+          "field": ".players[0].flags_c",
+          "native_prepared": 64,
+          "original": 192
+        },
+        {
+          "field": ".players[1].flags_c",
+          "native_prepared": 64,
+          "original": 192
+        }
+      ],
+      "interpretation": "Browser serialized persistent prepared_mode, while original rows 2468/2503 hold StartMeleeData. Source-followup confirms the authored preparation stores prepared_mode before mutating separate match Start flags; the active-player flags_c difference is consistent with later rumble setup but has no native selection confirmation.",
+      "next_source_boundary": "Use the reviewed explicit stopped-endpoint observation through the existing diagnostic Stadium selection getter to capture actual checked match Start and host seed. No runtime Entry mismatch is claimed."
+    },
+    "next_step_plan": {
+      "artifact": "sol-vs-entry-endpoint-contract-v1/plan-v3.md",
+      "sha256": "a30d1f6c3a774bb22864c9b8cb0cea89bc556629c101cfffa4a432661f1c8610",
+      "review_artifact": "sol-vs-entry-endpoint-contract-v1/review.json",
+      "review_sha256": "d90952bc077931fbb261d81a0a46e6cf2ee18793d3d4603c225d176297b1d562",
+      "status": "Source contract reviewed. Next implement Entry-only observation/comparison after strict prefix completion; no match construction until it passes."
+    },
+    "acceptance_boundary": {
+      "historical_functional_evidence": "Two functional 3500-tick lifetimes and the ordinary Results regression are completed.",
+      "still_open": [
+        "original-matched Setup",
+        "GO",
+        "original-matched 3500-tick sequence",
+        "per-owner RNG parity",
+        "C3 acceptance",
+        "physical input",
+        "live timing",
+        "pixels",
+        "PCM"
       ]
     }
   }
