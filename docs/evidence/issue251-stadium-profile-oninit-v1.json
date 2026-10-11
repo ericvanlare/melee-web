@@ -318,8 +318,8 @@
     "no_machine_specific_path_required": true
   },
   "subsequent_c3_component_2026_10_09": {
-    "claim_boundary": "Executable0abf156d matches declared first-CSS, SSS constructor/first scheduler and first draw1609/1610 fields. Its same-producer remaining-selection attempt fails at native prefix arm before any continuation comparison. Checked owned cleanup and prerequisite replay pass. Original VS Entry/Setup/GO, per-owner RNG and C3 acceptance remain open; no pixel, PCM, audio-continuity, physical-input, foreground-timing or whole-session acceptance. Public Stadium admission remains closed.",
-    "current_result": "On 0abf156d, first SSS DrawEnter/DrawReturn1609/1610 match after unchanged prerequisites. The same-producer prefix attempt fails at its native session arm before consuming any continuation input. Source inspection identifies an absolute tick guard despite retained CSS history. No prefix comparison ran; both captures and complete owned cleanup are retained. C3 remains open.",
+    "claim_boundary": "Exact5d matches declared first-CSS/SSS constructor/firsttick/firstdraw fields and370 continuationcallbacks through scheduler2422. Continuation is incomplete, not a successful selection exit or C3 result. Checked cleanup and local producer identity checks pass. HTTP-after/GPU are unrun for the failed prefix. No pixels/PCM/audio-continuity/physical-input/foreground-timing/whole-session acceptance; public Stadium admission remains closed.",
+    "current_result": "On 5d67d6a2, the relative-counter repair passes firstdraw and all124 remaining SSS scheduler samples plus123draw pairs (370 strict callbacks). The final native tick returns1 with no transition where the diagnostic requires3; it stops before finaldraw/exit. The later audio123-versus124 assertion is secondary. Independent replay and checked cleanup pass. C3 remains open.",
     "first_css_browser_draw_4d6c0b37_d949a0b8_v1": {
       "status": "FAIL_BEFORE_ARM; NO_BROWSER_CSS_COMPARISON; NO_TICK; NO_DRAW",
       "scope": "One headless browser attempt with the existing captured first-CSS context and one consumed sample. The diagnostic did not arm; this is not a source draw or Stadium/C3 acceptance result.",
@@ -586,7 +586,7 @@
         "SDK unittest moduleimport failure beforeNode; fixedexplicit scriptsimport and retainedoutput"
       ]
     },
-    "next_progression": "Reduce and repair the diagnostic lifetime-versus-relative tick invariant, preserving actual cumulative session history and original scheduling/audio. Repeat only after reviewed correction and exact-head validation. Ordinary VS Entry2468/Setup2503, GO, per-owner RNG and original C3 comparison remain open.",
+    "next_progression": "Reduce actual original terminal SSS OnFrame/scheduler/draw/transition ordering with the existing source fixture; do not force result3, add an input tick or weaken the comparison. Finaldraw2423/2424,exit2426,selection2427,ordinaryVS Entry2468/Setup2503,GO and per-owner RNG remain open.",
     "first_css_context_return_1fad54ff_v1": {
       "source_head": "1fad54ff964f80b263b91a77cf25a25b0ee08603",
       "source_tree": "adfff70b0f357d4c66bd89f1f1c3a30c9202b2a9",
@@ -5814,6 +5814,200 @@
         "Firstdraw declared-state comparison only; prefix arm refusal is not an original-state mismatch.",
         "Terminal CSS1575,counter4/8,pause/service parity,VS Entry/Setup/GO and per-owner RNG remain unpaired.",
         "No pixel,PCM,audio-continuity,physical input,foreground timing,public Stadium admission or whole-session/C3 acceptance."
+      ]
+    },
+    "first_sss_bounded_continuation_5d67d6a2_v1": {
+      "status": "370_CALLBACKS_MATCHED_TERMINAL_DISPOSITION_REFUSED",
+      "source": {
+        "revision": "5d67d6a27e83e2b2126125611352fdf907c5154d",
+        "tree": "7510582ce63ba7ec6bca6ed6712b2ba11ecb0844"
+      },
+      "change": "Diagnostic gates use the captured cumulative session base while preserving source frame125, original scheduling/input/RNG/audio. Independent source fixture covers nonzero149 CSS history, drift and overflow/refusals.",
+      "first_draw": {
+        "matched_phases": 2,
+        "added_ticks": 0,
+        "draws": 1,
+        "added_audio_renders": 0,
+        "owned_pids_absent": 14,
+        "http_before_after_unchanged": 40,
+        "gpu": "PASS Apple Metal3; no pixel comparison"
+      },
+      "prefix": {
+        "inputs_and_scheduler_samples": 124,
+        "draw_pairs": 123,
+        "strict_callbacks_matched": 370,
+        "comparator_approved": false,
+        "comparator_first_mismatch": null,
+        "next_comparator_phase": "draw_enter index123",
+        "first_native_error": "SSS prefix tick disposition/clock mismatch",
+        "actual_last_tick_result": 1,
+        "actual_transition_requested": false,
+        "required_last_tick_result": 3,
+        "last_matched_original_scheduler": 2422,
+        "last_scheduler_frame": 124,
+        "last_scheduler_seed": "3bb84c53",
+        "unrun_sequences": [
+          2423,
+          2424,
+          2426,
+          2427
+        ],
+        "live_postclock": "not separately serialized; no extra clock mismatch is inferred",
+        "serialized_exit_session_ticks": "0 default for absent exit; not live counter",
+        "secondary_audio_assertion": "123 renders !=124 consumed ticks because failed terminal disposition stops before that render/draw",
+        "audio_cumulative_before": {
+          "calls": 149,
+          "frames": 79466,
+          "phase": 40
+        },
+        "audio_cumulative_after": {
+          "calls": 272,
+          "frames": 145066,
+          "phase": 40
+        },
+        "cleanup": {
+          "checked_unload": "PASS all diagnostic observations cleared",
+          "owned_pids_absent": 12,
+          "pid_scope": "Includes CDP-only61560 independently checked; root initial cleanup list had11 and is not complete attribution.",
+          "http_before_unchanged": 40,
+          "postcapture_local_hashes_unchanged": 40,
+          "http_after": "UNRUN",
+          "gpu": "UNRUN"
+        },
+        "scope": "Same-run priorCSS295/constructor/firsttick/firstdraw comparisons PASS; prefix incomplete. PreparedVS unpaired."
+      },
+      "validation": {
+        "focused_python": 19,
+        "focused_node": 31,
+        "release_builds": [
+          "diagnostic runtime",
+          "ordinary runtime"
+        ],
+        "fullsuite": {
+          "tests": 2438,
+          "skips": 163,
+          "failures": 0,
+          "seconds": 514.986
+        },
+        "ci": {
+          "run": 38112942924,
+          "successful_jobs": 12,
+          "expected_skips": 2
+        }
+      },
+      "retained_identity_scope": "44files;43 capture-launch/bound-producer identities;ordinaryWASM retention-time only. Both captures use same5dproducer.",
+      "retained_preparation_failures": "V3 adapter refused stale historicalfixture equality; minimalv4 verifies historicalbefore/currentafter lineage. Failed static path-derivation probe remains retained. No capture ran for those preparation failures.",
+      "evidence": [
+        {
+          "artifact": "root-sss-relative-counter-integration-v1/result.json",
+          "bytes": 6728,
+          "sha256": "b08a12c08d4089e804c011e18a7bdb10876ce8d5d2a89dfddc5d55b3eee1ba4b"
+        },
+        {
+          "artifact": "sol-sss-prefix-lifetime-review-v1/review.json",
+          "bytes": 10776,
+          "sha256": "3b80539d8469f0ce256f47a6951b1013fa727d4cb6f4061f4e715f35acdcea0a"
+        },
+        {
+          "artifact": "sss-prefix-focused-5d67d6a2-v1/result.json",
+          "bytes": 1810,
+          "sha256": "dfd895ef3e094b0ab6c49cf81554fd7b37f7f327e1ee02a0b5e0f3417a1f3aca"
+        },
+        {
+          "artifact": "sss-prefix-builds-5d67d6a2-v1/diagnostic-runtime/result.json",
+          "bytes": 732,
+          "sha256": "c87942f6a749c012e1271c40c1e6edb76f5c5ff9bcca63e9d502aca846180bd7"
+        },
+        {
+          "artifact": "sss-prefix-builds-5d67d6a2-v1/ordinary-runtime/result.json",
+          "bytes": 730,
+          "sha256": "96c0954589f197f206c4320605f1429e053b48269b54f01a58d393ee4cb3cb0b"
+        },
+        {
+          "artifact": "full-regression-5d67d6a2-v1/result.json",
+          "bytes": 755,
+          "sha256": "8494d292d19a463e2035da62d1b8eb266cd5ab22218a709cd3dbc05207a96f13"
+        },
+        {
+          "artifact": "ci-5d67d6a2-complete-v1.json",
+          "bytes": 42125,
+          "sha256": "d88b7c73b9611505599263c341aaa7d76b6b9fb1c14d24efdd81ddc954f8f14c"
+        },
+        {
+          "artifact": "sss-prefix-producer-5d67d6a2-retained-v1/identity.json",
+          "bytes": 24830,
+          "sha256": "9734c13c4c588ad2bc62f35cfc2adbdf5f1f9ed008019c062bf19ef7231d42fe"
+        },
+        {
+          "artifact": "sss-prefix-first-draw-preflight-5d67d6a2-v3/freeze.json",
+          "bytes": 1667,
+          "sha256": "eb1c091ad082259bfcc159e37a09e3c1146fe1b8679e3f53f85b68fbc66ed2b3"
+        },
+        {
+          "artifact": "sss-prefix-first-draw-preflight-5d67d6a2-v3/result.json",
+          "bytes": 1959,
+          "sha256": "4f8a96399255028b699335ab61f717eb38392db894c001cdec03904fe6a1eb84"
+        },
+        {
+          "artifact": "sss-prefix-first-draw-preflight-5d67d6a2-v3/browser-run/report.json",
+          "bytes": 1382220,
+          "sha256": "f62b932c728a6f58e7452f81f2f25f287bfb8610d1dc136395da9c308e0b89d7"
+        },
+        {
+          "artifact": "sol-first-sss-draw-result-review-5d67d6a2-v1/review.json",
+          "bytes": 6069,
+          "sha256": "f9ce693c8009d7b5a1562c9718a4e57e628c3e4dd63e00b27ef47f276be48bd1"
+        },
+        {
+          "artifact": "sss-prefix-full-preflight-5d67d6a2-v1/freeze.json",
+          "bytes": 1639,
+          "sha256": "d16b01eeed6523732ad12097260801f46ed5f438888c17b14d246e205601756c"
+        },
+        {
+          "artifact": "sss-prefix-full-preflight-5d67d6a2-v1/result.json",
+          "bytes": 1952,
+          "sha256": "39187dc9b3504ae1fc7e0482781046f19630682f4f8894dda95b2b52bc5c743e"
+        },
+        {
+          "artifact": "sss-prefix-full-preflight-5d67d6a2-v1/browser-run/report.json",
+          "bytes": 6796251,
+          "sha256": "6ff5237d694d0519c9dd99e6ea2dcce45afcd7f426e3dfb06138945da9591216"
+        },
+        {
+          "artifact": "sss-prefix-full-preflight-5d67d6a2-v1/owner.json",
+          "bytes": 98166,
+          "sha256": "fc7f50d8ca62a498cbf92112a94a0c639bf7e4f0d6e336e8878c0b53503a3a62"
+        },
+        {
+          "artifact": "sol-sss-prefix-failure-review-5d67d6a2-v1/review.json",
+          "bytes": 6111,
+          "sha256": "20f7daa9b7469087d78254975fc4ca8e58c048d043b71dc26dfb68103d5dbc47"
+        },
+        {
+          "artifact": "root-sss-prefix-failure-5d67d6a2-v1/review.json",
+          "bytes": 4688,
+          "sha256": "e7265d0c107c3d09a6a5ed2fc89b0cb31082f6e08afbd8ab82789e0e95ececd6"
+        },
+        {
+          "artifact": "sol-sss-prefix-adapter-v3-review-v1/review.json",
+          "bytes": 3631,
+          "sha256": "cd5f51bda807253efaa304ae5cb44f5181fe5a6c9053c8a098c5f9dada458790"
+        },
+        {
+          "artifact": "sss-prefix-completed-adapter-v4/freeze.json",
+          "bytes": 11500,
+          "sha256": "c30ad74da538cd617c759e359c4a968c8262ff0c54b1afefaf978adf82ebf48b"
+        },
+        {
+          "artifact": "sol-sss-prefix-adapter-v4-review-v1/review.json",
+          "bytes": 4510,
+          "sha256": "ae01cbb80669c01fe04bd159602e66221e78c94ea314593d5ddeaf0a90f77c9c"
+        },
+        {
+          "artifact": "sol-sss-full-prefix-prelaunch-review-5d67d6a2-v1/review.json",
+          "bytes": 4181,
+          "sha256": "f74970f8fd62eebabe6d1428fc5c562e69cc811d458daf4affd4fa1ef3a222b7"
+        }
       ]
     }
   }
