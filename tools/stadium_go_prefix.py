@@ -161,6 +161,17 @@ FIRST_SSS_PREFIX_FIRST_CONSUME_SEQUENCE = 1612
 FIRST_SSS_PREFIX_LAST_CONSUME_SEQUENCE = 2420
 FIRST_SSS_PREFIX_EXIT_SEQUENCE = 2426
 FIRST_SSS_PREFIX_SELECTION_SEQUENCE = 2427
+FIRST_SSS_VS_ENTRY_SEQUENCE = 2468
+FIRST_SSS_VS_ENTRY_SOURCE_TICK = 125
+FIRST_SSS_VS_ENTRY_DRAW_ORDINAL = 0
+FIRST_SSS_VS_ENTRY_SLICES = {
+    (4, 0): (None, 0x138),
+    (19, 0): (0x804D5F94, 4),
+    (20, 0): (0x804D5F90, 4),
+    (21, 0): (FIRST_SSS_PAD_ADDRESS, 0x358),
+    (36, 0): (0x8045BF28, 2),
+    (37, 0): (0x8045BF2A, 2),
+}
 FIRST_SSS_PREFIX_INPUT_MAGIC = b"STC1SSSP"
 FIRST_SSS_PREFIX_INPUT_VERSION = 1
 FIRST_SSS_PREFIX_INPUT_HEADER_BYTES = 48
@@ -1552,6 +1563,132 @@ def extract_stadium_first_sss_prefix(
              status_file.stat().st_size == FIRST_SSS_STATUS_BYTES and
              hashlib.sha256(status_file.read_bytes()).hexdigest() == FIRST_SSS_STATUS_SHA256,
              "SSS observer stream or status changed during prefix extraction")
+    return result
+
+
+def _first_sss_vs_entry_snapshot(row: dict[str, Any]) -> dict[str, Any]:
+    payload = row.get("payload")
+    _require(isinstance(payload, dict) and row.get("event") == "boundary" and
+             row.get("seq") == FIRST_SSS_VS_ENTRY_SEQUENCE and
+             payload.get("boundary") == "entry" and
+             payload.get("pc") == VS_ENTRY_PC and
+             row.get("source_tick") == FIRST_SSS_VS_ENTRY_SOURCE_TICK and
+             row.get("draw_ordinal") == FIRST_SSS_VS_ENTRY_DRAW_ORDINAL,
+             "VS Entry endpoint is not the exact original row2468 boundary")
+    _check_boundary_contract(payload)
+    _require_exact_slice_inventory(payload, set(FIRST_SSS_VS_ENTRY_SLICES),
+                                   "VS Entry endpoint")
+    read: dict[int, dict[str, Any]] = {}
+    for (tag, flags), (address, size) in FIRST_SSS_VS_ENTRY_SLICES.items():
+        item = _slice(payload, tag, "VS Entry endpoint", size, flags)
+        if address is not None:
+            _require(item["address"] == address,
+                     f"VS Entry endpoint tag={tag} escaped its pinned source address")
+        read[tag] = item
+    _validate_mario_roster(read[4]["raw"], "VS Entry endpoint")
+    try:
+        from transition_trace_format import decode_start_melee_data
+        semantic_start = decode_start_melee_data(read[4]["raw"][:0xF0])
+    except ValueError as error:
+        raise StadiumGoPrefixError(
+            f"VS Entry endpoint StartMeleeData is invalid: {error}") from error
+    rng_pointer = int.from_bytes(read[19]["raw"], "big")
+    _require(rng_pointer == read[20]["address"],
+             "VS Entry endpoint RNG pointer does not own the observed seed slice")
+    _require(read[20]["raw"].hex() == "3bb84c53",
+             "VS Entry endpoint seed differs from retained original row2468")
+    source = {
+        **_source_row_envelope(row),
+        "source_slice_inventory": _source_slice_inventory(payload),
+        "source_slices_hex": {
+            f"{tag}:0": item["raw"].hex() for tag, item in sorted(read.items())
+        },
+        "start_slice_address": read[4]["address"],
+        "rng_pointer_hex": read[19]["raw"].hex(),
+        "random_seed_hex": read[20]["raw"].hex(),
+        "setup_profile_verified_by_observer": False,
+    }
+    return {
+        "expected": {
+            "random_seed_hex": read[20]["raw"].hex(),
+            "start": semantic_start,
+        },
+        "source": source,
+    }
+
+
+def _extract_first_sss_vs_entry_rows(
+        entry_rows: list[dict[str, Any]], stream_sha256: str) -> dict[str, Any]:
+    _require(stream_sha256 == FIRST_CSS_STREAM_SHA256,
+             "VS Entry endpoint is not from the retained original v6 observer")
+    _require(isinstance(entry_rows, list) and len(entry_rows) == 1,
+             "VS Entry endpoint requires exactly one original row2468")
+    snapshot = _first_sss_vs_entry_snapshot(entry_rows[0])
+    return {
+        "schema": "melee-web-stadium-first-sss-vs-entry-endpoint",
+        "version": 1,
+        "scope": "original ordinary VS Entry row2468 StartMeleeData and RNG scalar only",
+        "provenance": {
+            "observer_bytes": FIRST_CSS_STREAM_BYTES,
+            "observer_sha256": stream_sha256,
+            "observer_status_bytes": FIRST_SSS_STATUS_BYTES,
+            "observer_status_sha256": FIRST_SSS_STATUS_SHA256,
+            "sequence": FIRST_SSS_VS_ENTRY_SEQUENCE,
+            "pc": f"0x{VS_ENTRY_PC:08x}",
+            "source_tick": FIRST_SSS_VS_ENTRY_SOURCE_TICK,
+            "draw_ordinal": FIRST_SSS_VS_ENTRY_DRAW_ORDINAL,
+            "setup_profile_verified_by_observer": False,
+        },
+        "expected": snapshot["expected"],
+        "source_entry": snapshot["source"],
+        "comparison_fields": [
+            "random_seed_hex", "start.rules", "start.players[0:4]",
+        ],
+        "unpaired_fields": [
+            "source pointer/address", "StartMeleeData ABI padding/unknown bytes",
+            "native player slots4-5", "native player xB",
+            "prepared_output_unpaired persistent VsModeData",
+        ],
+        "source_admission": False,
+        "whole_session_equivalent": False,
+    }
+
+
+def extract_stadium_first_sss_vs_entry(
+        stream_path: str | Path, status_path: str | Path) -> dict[str, Any]:
+    """Extract only original VS Entry row2468 after complete prefix validation."""
+    source, status_file = Path(stream_path), Path(status_path)
+    _require(source.is_file() and status_file.is_file(),
+             "configured SSS observer stream or status is missing")
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES,
+             "VS Entry observer stream byte length differs from retained v6")
+    status_bytes = status_file.read_bytes()
+    _require(len(status_bytes) == FIRST_SSS_STATUS_BYTES and
+             hashlib.sha256(status_bytes).hexdigest() == FIRST_SSS_STATUS_SHA256,
+             "VS Entry observer status identity differs from retained v6")
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    _require(digest == FIRST_CSS_STREAM_SHA256,
+             "VS Entry observer stream hash differs from retained v6")
+    try:
+        summary = validate_stadium_go_prefix(source, status_path=status_file)
+        _require(summary.get("decision") == "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY" and
+                 summary.get("stream_bytes") == FIRST_CSS_STREAM_BYTES and
+                 summary.get("stream_sha256") == digest and
+                 summary.get("setup_profile_verified_by_observer") is False,
+                 "VS Entry source stream no longer passes full GO-prefix validation")
+        rows = [row for row in iter_records(source, max_bytes=MAX_STREAM_BYTES,
+                                            max_records=MAX_STREAM_RECORDS)
+                if row.get("seq") == FIRST_SSS_VS_ENTRY_SEQUENCE]
+        result = _extract_first_sss_vs_entry_rows(rows, digest)
+    except StadiumGoPrefixError:
+        raise
+    except (OSError, ObserverStreamError) as error:
+        raise StadiumGoPrefixError(f"cannot validate original VS Entry: {error}") from error
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES and
+             hashlib.sha256(source.read_bytes()).hexdigest() == digest and
+             status_file.stat().st_size == FIRST_SSS_STATUS_BYTES and
+             hashlib.sha256(status_file.read_bytes()).hexdigest() == FIRST_SSS_STATUS_SHA256,
+             "VS Entry observer stream or status changed during extraction")
     return result
 
 

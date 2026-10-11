@@ -8,7 +8,7 @@ import test from 'node:test';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createFirstCssStreamComparator, createFirstCssFinalDrawComparator,
   createFirstSssConstructorPairComparator, createFirstSssConsumedPadTickComparator,
-  createFirstSssDrawComparator, createFirstSssPrefixComparator,
+  createFirstSssDrawComparator, createFirstSssPrefixComparator, createFirstSssVsEntryComparator,
   decodeFirstSssPrefixInputBundle, firstSssAudioAccounting,
   requestSynchronousApproval}
   from './stadium_first_css_stream_compare.mjs';
@@ -1080,4 +1080,173 @@ test('browser harness persists a semantic tick mismatch before rejecting success
     'Expected mismatch remains a failing browser report');
   assert.equal(scenario.observation.host.status.first_mismatch.path,
     'scheduler_end.scene_frame');
+});
+
+function vsEntryExpectedFixture() {
+  const start = structuredClone(expectedSssNote('sss_entry').sss.vs.start);
+  start.rules.is_stock = true; start.rules.is_vs = true;
+  const inventory = [[4,0x80480530,0x138],[19,0x804d5f94,4],[20,0x804d5f90,4],
+    [21,0x804c1f84,0x358],[36,0x8045bf28,2],[37,0x8045bf2a,2]]
+    .map(([tag,address,size]) => ({tag, flags: 0, address, size}));
+  return {schema: 'melee-web-stadium-first-sss-vs-entry-endpoint', version: 1,
+    scope: 'original ordinary VS Entry row2468 StartMeleeData and RNG scalar only',
+    source_admission: false, whole_session_equivalent: false,
+    provenance: {observer_bytes: 4397889,
+      observer_sha256: '361e8c1108cc2d02ba94d1f3b3be9612a80d0227672445cd4a2b0e2119917778',
+      observer_status_bytes: 515,
+      observer_status_sha256: '05a08641404bda9f87ac4c20b1a44a982ff0470ff3a9b04861c03ba542866c3f',
+      sequence: 2468, pc: '0x8016e934', source_tick: 125, draw_ordinal: 0,
+      setup_profile_verified_by_observer: false},
+    expected: {start, random_seed_hex: '3bb84c53'},
+    comparison_fields: ['random_seed_hex', 'start.rules', 'start.players[0:4]'],
+    source_entry: {sequence: 2468, pc: 0x8016e934, event: 'boundary', boundary: 'entry',
+      source_tick: 125, draw_ordinal: 0, start_slice_address: 0x80480530,
+      setup_profile_verified_by_observer: false, random_seed_hex: '3bb84c53',
+      rng_pointer_hex: '804d5f90', source_slice_inventory: inventory,
+      source_slices_hex: Object.fromEntries(inventory.map(row => [`${row.tag}:0`,
+        row.tag === 19 ? '804d5f90' : row.tag === 20 ? '3bb84c53' : '00'.repeat(row.size)]))}};
+}
+function vsEntryPrefixFixture() {
+  return {complete: true, failed: false, current_host_entered: false,
+    current_source_scene: 0, current_session_phase: 5,
+    host_tick_calls: 124, host_draw_calls: 124, matched_ticks: 124,
+    matched_draw_enters: 124, matched_draw_returns: 124,
+    last_tick_result: 3, transition_requested: true,
+    audio_render_calls_before: 150, audio_render_calls_after: 274,
+    audio_render_frames_before: 80000, audio_render_frames_after: 146133,
+    audio_phase_before: 0, audio_phase_after: 20};
+}
+function vsEntryActualFixture(expected = vsEntryExpectedFixture()) {
+  const start = nativeSssNote({sss: {vs: {start: expected.expected.start}, header: {start_game: 1}}},
+    'vs_entry').sss.vs.start;
+  return {attempted: true, captured: true, complete: true, failed: false, error: null,
+    getter_calls: 1, audio_render_calls_before: 274, audio_render_calls_after: 274,
+    audio_render_frames_before: 146133, audio_render_frames_after: 146133,
+    audio_phase_before: 20, audio_phase_after: 20,
+    actual: {phase: 'vs_entry', start, random_seed_hex: '3bb84c53'}};
+}
+
+test('VS Entry compares the checked match Start mapper once, preserving unpaired native bytes', () => {
+  const expected = vsEntryExpectedFixture(), actual = vsEntryActualFixture(expected);
+  actual.actual.start.players[0].xB = 255;
+  const comparator = createFirstSssVsEntryComparator(expected, vsEntryPrefixFixture());
+  assert.equal(comparator.compare(actual), true);
+  assert.equal(comparator.status().approved, true);
+  assert.equal(comparator.compare(actual), false);
+  assert.equal(comparator.status().first_mismatch.path, 'entry.callback');
+});
+
+test('VS Entry refuses missing/refused capture, seed, declared fields and unexpected audio work', () => {
+  const expected = vsEntryExpectedFixture();
+  for (const change of [a => {a.captured = false;}, a => {a.failed = true; a.error = 'owner refused';},
+    a => {a.actual.random_seed_hex = '3bb84c54';},
+    a => {a.actual.start.rules.is_vs = 0;}, a => {a.actual.start.players[0].stocks += 1;},
+    a => {delete a.actual.start.players[0].flags_c;},
+    a => {a.audio_render_calls_after += 1;}]) {
+    const actual = vsEntryActualFixture(expected);change(actual);
+    const comparator = createFirstSssVsEntryComparator(expected, vsEntryPrefixFixture());
+    assert.equal(comparator.compare(actual), false);
+    assert.equal(comparator.status().failed, true);
+    assert.ok(comparator.status().first_mismatch);
+    assert.equal(comparator.compare(vsEntryActualFixture(expected)), false);
+  }
+});
+
+test('VS Entry refuses incomplete prefix and wrong original provenance', () => {
+  const expected = vsEntryExpectedFixture(), prefix = vsEntryPrefixFixture();
+  for (const key of ['complete', 'transition_requested']) {
+    const changed = structuredClone(prefix);changed[key] = false;
+    assert.throws(() => createFirstSssVsEntryComparator(expected, changed), /completed checked SSS prefix/);
+  }
+  for (const change of [e => {e.provenance.sequence = 2503;},
+    e => {e.expected.random_seed_hex = '35a455b9';},
+    e => {e.source_entry.source_slices_hex['19:0'] = '804d5f94';}]) {
+    const changed = structuredClone(expected);change(changed);
+    assert.throws(() => createFirstSssVsEntryComparator(changed, prefix), /retained row2468/);
+  }
+});
+
+test('VS Entry actual runner invariant catches extra source work outside its sibling', async () => {
+  const source = await fs.readFile(new URL('./stadium_c1a_browser_test.mjs', import.meta.url), 'utf8');
+  const declaration = source.match(/function assertFirstSssVsEntryUnchanged\([^\n]*\) \{[\s\S]*?\n\}/);
+  assert.ok(declaration);
+  const check = new Function('assert', `${declaration[0]}; return assertFirstSssVsEntryUnchanged;`)(assert);
+  const before = {running: 0, native_phase: 0, first_sss_prefix: {host_tick_calls: 124},
+    first_sss_consumed_tick: {post_host_frame: 1}, entry: {random_seed_hex: 'abcddcba'}};
+  const after = {...structuredClone(before), first_sss_vs_entry: vsEntryActualFixture()};
+  check(after, before);
+  for (const mutate of [a => {a.running = 1;}, a => {a.first_sss_prefix.host_tick_calls++;},
+    a => {a.first_sss_consumed_tick.post_host_frame++;}, a => {a.unexpected_source_work = true;}]) {
+    const changed = structuredClone(after);mutate(changed);assert.throws(() => check(changed, before));
+  }
+});
+
+
+test('VS Entry actual loader refuses a different diagnostic export and source binding', async () => {
+  const source = await fs.readFile(new URL('./stadium_c1a_browser_test.mjs', import.meta.url), 'utf8');
+  const declaration = source.match(/async function loadFirstSssVsEntryInputs\(\) \{[\s\S]*?\n\}/);
+  assert.ok(declaration);
+  const expected = vsEntryExpectedFixture();
+  const helperPath = new URL('./stadium_first_css_stream_compare.mjs', import.meta.url).pathname;
+  const {pathToFileURL} = await import('node:url');
+  const run = async (binding, prefixExpected = expected) => {
+    const loader = new Function('assert', 'firstSssVsEntry', 'loadBoundFirstSssExpected',
+      'pathToFileURL', 'preflight', 'firstSssPrefixInputs',
+      `${declaration[0]}; return loadFirstSssVsEntryInputs;`)(assert, true,
+        async () => ({expected, helperPath}), pathToFileURL,
+        {first_sss_vs_entry: binding}, {expected: prefixExpected});
+    return loader();
+  };
+  const binding = {diagnostic_export: '_melee_web_native_menu_stadium_first_sss_vs_entry_kick',
+    expected_state_host_only: true};
+  assert.equal((await run(binding)).expected, expected);
+  await assert.rejects(run({...binding, diagnostic_export: '_wrong_export'}), /diagnostic export/);
+  await assert.rejects(run({...binding, expected_state_host_only: false}), /host-only/);
+  const differentSource = structuredClone(expected); differentSource.provenance.observer_bytes++;
+  await assert.rejects(run(binding, differentSource), /source provenance/);
+});
+
+
+test('VS Entry uses the actual prefix reader live phase/running shape before invariant checking', async () => {
+  const source = await fs.readFile(new URL('./stadium_c1a_browser_test.mjs', import.meta.url), 'utf8');
+  const definitions = ['readFirstSssPrefixObservation', 'readFirstSssVsEntryObservation',
+    'assertFirstSssVsEntryUnchanged'].map(name => {
+      const match = source.match(new RegExp(`(?:async )?function ${name}\\([^\\n]*\\) \\{[\\s\\S]*?\\n\\}`));
+      assert.ok(match, name); return match[0];
+    }).join('\n');
+  let raw = {first_sss_prefix: {host_tick_calls: 124}};
+  const originalModule = globalThis.Module;
+  globalThis.Module = {_melee_web_native_menu_stadium_first_css_draw_observe: () => 1,
+    UTF8ToString: () => JSON.stringify(raw), _melee_web_native_menu_phase: () => 5,
+    _melee_web_native_menu_running: () => 0};
+  try {
+    const {prefix, entry, check} = new Function('assert', 'page', `${definitions}; return {
+      prefix:readFirstSssPrefixObservation,entry:readFirstSssVsEntryObservation,
+      check:assertFirstSssVsEntryUnchanged};`)(assert, {evaluate: async fn => fn()});
+    const before = (await prefix()).native;
+    raw.first_sss_vs_entry = vsEntryActualFixture();
+    const after = await entry();
+    assert.equal(after.native_phase, 5); assert.equal(after.running, 0);
+    check(after, before);
+    raw.first_sss_prefix.host_tick_calls++;
+    assert.throws(() => check({...after, first_sss_prefix: raw.first_sss_prefix}, before));
+  } finally { globalThis.Module = originalModule; }
+});
+
+
+test('VS Entry actual CLI recognizes the new route and rejects missing/orphan/conflicting expected input', () => {
+  const runner = path.join(candidateRoot, 'tests/stadium_c1a_browser_test.mjs');
+  const args = ['--first-sss-vs-entry', '--first-sss-vs-entry-expected', 'entry.json',
+    '--first-sss-pair-expected', 'pair.json', '--first-sss-tick-expected', 'tick.json',
+    '--first-sss-tick-input', 'tick.mwst', '--first-sss-draw-expected', 'draw.json',
+    '--first-sss-prefix-expected', 'prefix.json', '--first-sss-prefix-input', 'prefix.mwst'];
+  const run = values => spawnSync(process.execPath, [runner, ...values],
+    {encoding:'utf8', timeout:10000});
+  const accepted = run(args);
+  assert.notEqual(accepted.status, 0); assert.match(accepted.stderr, /Missing --build/);
+  for (const values of [args.filter(value => !['--first-sss-vs-entry-expected', 'entry.json'].includes(value)),
+    [...args, '--first-sss-prefix'], ['--first-sss-vs-entry-expected', 'entry.json']]) {
+    const refused = run(values); assert.notEqual(refused.status, 0);
+    assert.match(refused.stderr, /Choose one private C1a diagnostic route/);
+  }
 });

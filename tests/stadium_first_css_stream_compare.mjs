@@ -1368,3 +1368,92 @@ export function createFirstSssPrefixComparator(expectedPrefix, inputRows,
     next_index: required[next]?.[1] ?? null, first_mismatch: firstMismatch, rows,
     owner_world_generation: ownerWorld, owner_audio_generation: ownerAudio})});
 }
+
+// The closed-host prepared match Start is distinct from persistent prepared_mode.
+// This endpoint compares only the existing source decoder's declared fields.
+export function validateFirstSssVsEntryExpectedSource(expected) {
+  const fail = () => { throw new TypeError('VS Entry endpoint requires exact retained row2468'); };
+  const p = expected?.provenance, source = expected?.source_entry;
+  const inventory = [
+    {tag: 4, flags: 0, address: 0x80480530, size: 0x138},
+    {tag: 19, flags: 0, address: 0x804d5f94, size: 4},
+    {tag: 20, flags: 0, address: 0x804d5f90, size: 4},
+    {tag: 21, flags: 0, address: 0x804c1f84, size: 0x358},
+    {tag: 36, flags: 0, address: 0x8045bf28, size: 2},
+    {tag: 37, flags: 0, address: 0x8045bf2a, size: 2},
+  ];
+  if (!plainObject(expected) || expected.schema !== 'melee-web-stadium-first-sss-vs-entry-endpoint' ||
+      expected.version !== 1 || expected.source_admission !== false ||
+      expected.whole_session_equivalent !== false ||
+      expected.scope !== 'original ordinary VS Entry row2468 StartMeleeData and RNG scalar only' ||
+      !plainObject(p) || p.observer_bytes !== 4397889 ||
+      p.observer_sha256 !== FIRST_SSS_STREAM_SHA256 || p.observer_status_bytes !== 515 ||
+      p.observer_status_sha256 !== FIRST_SSS_STATUS_SHA256 || p.sequence !== 2468 ||
+      p.pc !== '0x8016e934' || p.source_tick !== 125 || p.draw_ordinal !== 0 ||
+      p.setup_profile_verified_by_observer !== false ||
+      !sameJsonValue(expected.comparison_fields,
+        ['random_seed_hex', 'start.rules', 'start.players[0:4]']) ||
+      !plainObject(source) || source.sequence !== 2468 || source.pc !== 0x8016e934 ||
+      source.event !== 'boundary' || source.boundary !== 'entry' || source.source_tick !== 125 ||
+      source.draw_ordinal !== 0 || source.start_slice_address !== 0x80480530 ||
+      source.setup_profile_verified_by_observer !== false ||
+      !sourceInventoryMatches(source.source_slice_inventory, inventory) ||
+      !sourceSlicesMatch(source.source_slices_hex, inventory) ||
+      source.source_slices_hex['19:0'] !== '804d5f90' ||
+      source.source_slices_hex['20:0'] !== '3bb84c53' ||
+      source.random_seed_hex !== '3bb84c53' || source.rng_pointer_hex !== '804d5f90' ||
+      expected.expected?.random_seed_hex !== '3bb84c53') fail();
+  const start = expected.expected.start;
+  if (!exactOwnKeys(start, ['rules', 'players']) || !exactOwnKeys(start.rules, SSS_RULE_KEYS) ||
+      !Array.isArray(start.players) || start.players.length !== 4) fail();
+  for (const key of SSS_RULE_KEYS) {
+    const value = start.rules[key];
+    if (SSS_BOOLEAN_RULE_KEYS.has(key) ? typeof value !== 'boolean' :
+      SSS_HEX_RULE_LENGTHS[key] ? !validHex(value, SSS_HEX_RULE_LENGTHS[key] / 2) :
+      !Number.isSafeInteger(value)) fail();
+  }
+  if (start.players.some(player => !exactOwnKeys(player, SSS_PLAYER_KEYS) ||
+      SSS_PLAYER_KEYS.some(key => ['attack_ratio_bits', 'defense_ratio_bits', 'model_scale_bits'].includes(key)
+        ? !validHex(player[key], 4) : !Number.isSafeInteger(player[key])))) fail();
+  return expected;
+}
+
+export function createFirstSssVsEntryComparator(expectedEntry, prefix) {
+  const expected = validateFirstSssVsEntryExpectedSource(expectedEntry).expected;
+  if (!plainObject(prefix) || prefix.complete !== true || prefix.failed !== false ||
+      prefix.current_host_entered !== false || prefix.current_source_scene !== 0 ||
+      prefix.current_session_phase !== 5 || prefix.host_tick_calls !== 124 ||
+      prefix.host_draw_calls !== 124 || prefix.matched_ticks !== 124 ||
+      prefix.matched_draw_enters !== 124 || prefix.matched_draw_returns !== 124 ||
+      prefix.last_tick_result !== 3 || prefix.transition_requested !== true ||
+      !firstSssAudioAccounting(prefix, 124).valid)
+    throw new TypeError('VS Entry comparison requires the completed checked SSS prefix');
+  let attempted = false, failed = false, firstMismatch = null, approved = false;
+  const compare = endpoint => {
+    const refuse = difference => {failed = true; approved = false; firstMismatch ||= difference; return false;};
+    if (attempted) return refuse(mismatch('entry.callback', 'one use', 'duplicate'));
+    attempted = true;
+    if (!plainObject(endpoint) || endpoint.attempted !== true || endpoint.captured !== true ||
+        endpoint.complete !== true || endpoint.failed !== false || endpoint.error !== null ||
+        endpoint.getter_calls !== 1 || endpoint.actual?.phase !== 'vs_entry')
+      return refuse(mismatch('entry.capture', 'one successful checked selection read', endpoint));
+    if (!firstSssAudioAccounting(endpoint, 0).valid ||
+        endpoint.audio_render_calls_before !== prefix.audio_render_calls_after ||
+        endpoint.audio_render_frames_before !== prefix.audio_render_frames_after ||
+        endpoint.audio_phase_before !== prefix.audio_phase_after)
+      return refuse(mismatch('entry.audio', 'unchanged stopped-prefix audio', endpoint));
+    const actual = endpoint.actual;
+    if (actual.random_seed_hex !== expected.random_seed_hex)
+      return refuse(mismatch('entry.random_seed_hex', expected.random_seed_hex, actual.random_seed_hex));
+    // Reuse the established Start field mapper, including native bit booleans,
+    // float bits, six native/four original slots and the explicit xB exclusion.
+    const wrap = start => ({sss: {vs: {start}}});
+    const difference = actualRulesMismatch(wrap(actual.start), wrap(expected.start), 'entry') ||
+      actualPlayersMismatch(wrap(actual.start), wrap(expected.start), 'entry');
+    if (difference) return refuse({...difference, path: difference.path.replace('.sss.vs.start', '.start')});
+    approved = true;
+    return true;
+  };
+  return Object.freeze({compare, status: () => Object.freeze({attempted, approved, failed,
+    first_mismatch: firstMismatch})});
+}

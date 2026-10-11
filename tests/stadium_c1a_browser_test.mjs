@@ -24,7 +24,8 @@ const {values} = parseArgs({options: Object.fromEntries(
     'first-css-tick-expected', 'first-css-draw-expected',
     'first-css-postdraw-input', 'first-css-postdraw-expected',
     'first-sss-pair-expected', 'first-sss-tick-expected', 'first-sss-tick-input',
-    'first-sss-draw-expected', 'first-sss-prefix-expected', 'first-sss-prefix-input']
+    'first-sss-draw-expected', 'first-sss-prefix-expected', 'first-sss-prefix-input',
+    'first-sss-vs-entry-expected']
     .map(name => [name, {type: 'string'}]).concat([
       ['css-sss-reducer', {type: 'boolean', default: false}],
       ['first-css-browser-draw', {type: 'boolean', default: false}],
@@ -34,16 +35,23 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-sss-consumed-pad-tick', {type: 'boolean', default: false}],
       ['first-sss-draw', {type: 'boolean', default: false}],
       ['first-sss-prefix', {type: 'boolean', default: false}],
+      ['first-sss-vs-entry', {type: 'boolean', default: false}],
     ])), strict: true});
 const cssSssReducer = values['css-sss-reducer'];
-const firstSssPrefix = values['first-sss-prefix'];
+const firstSssVsEntry = values['first-sss-vs-entry'];
+const firstSssPrefix = values['first-sss-prefix'] || firstSssVsEntry;
 const firstSssDraw = values['first-sss-draw'] || firstSssPrefix;
 const firstSssConsumedPadTick = values['first-sss-consumed-pad-tick'] || firstSssDraw || firstSssPrefix;
 const firstSssConstructorPair = values['first-sss-constructor-pair'] || firstSssConsumedPadTick;
 const firstCssBrowserFinalDraw = values['first-css-browser-final-draw'] || firstSssConstructorPair;
 const firstCssBrowserStream = values['first-css-browser-stream'] || firstCssBrowserFinalDraw;
 const firstCssBrowserDraw = values['first-css-browser-draw'] || firstCssBrowserStream;
-if ((cssSssReducer && firstCssBrowserDraw) ||
+if ((firstSssVsEntry && ['css-sss-reducer', 'first-css-browser-draw',
+      'first-css-browser-stream', 'first-css-browser-final-draw', 'first-sss-constructor-pair',
+      'first-sss-consumed-pad-tick', 'first-sss-draw', 'first-sss-prefix'].some(key => values[key])) ||
+    (firstSssVsEntry && !values['first-sss-vs-entry-expected']) ||
+    (!firstSssVsEntry && values['first-sss-vs-entry-expected']) ||
+    (cssSssReducer && firstCssBrowserDraw) ||
     (values['first-css-browser-draw'] && firstCssBrowserStream) ||
     (values['first-css-browser-stream'] && values['first-css-browser-final-draw']) ||
     (firstSssConstructorPair && !values['first-sss-pair-expected']) ||
@@ -128,7 +136,7 @@ const report = {
   browser: null,
   local_http_artifacts: {count: 0, before: null, after: null, unchanged: false},
   scenario: {
-    route_mode: firstSssPrefix ? 'first-sss-prefix' : firstSssDraw ? 'first-sss-draw' :
+    route_mode: firstSssVsEntry ? 'first-sss-vs-entry' : firstSssPrefix ? 'first-sss-prefix' : firstSssDraw ? 'first-sss-draw' :
       firstSssConsumedPadTick ? 'first-sss-consumed-pad-tick' :
       firstSssConstructorPair ? 'first-sss-constructor-pair' :
       firstCssBrowserFinalDraw ? 'first-css-browser-final-pending-draw' :
@@ -149,6 +157,7 @@ const report = {
     first_sss_consumed_tick: null,
     first_sss_draw: null,
     first_sss_prefix: null,
+    first_sss_vs_entry: null,
     requested_committed_manifest: null,
     native_observation: null,
     final_phase: null,
@@ -166,7 +175,9 @@ const report = {
     context_closed: false, browser_connection_closed: false, browser_process_terminated: false,
     browser_process_pid: null, server_process_terminated: false, server_process_pid: null,
     server_process_exit: null, failures: []},
-  source_request_scope: firstSssPrefix
+  source_request_scope: firstSssVsEntry
+    ? 'Strict SSS prefix then read-only actual match Start/seed Entry endpoint; no match construction'
+    : firstSssPrefix
     ? 'Original CSS final draw, SSS constructor and frame-zero consumed PAD prerequisites, first original SSS draw, then a finite 124-record SSS input/tick/draw prefix through passive SSS exit and later selected-stage tuple. Prepared VS output remains unpaired; stops before ordinary VS scene entry/setup.'
     : firstSssDraw
     ? 'Original CSS final draw, SSS constructor and frame-zero consumed PAD prerequisites, then exact original first SSS DrawEnter1609/DrawReturn1610. Stops before the finite SSS continuation; no whole-session acceptance.'
@@ -249,6 +260,7 @@ let firstSssConstructorPairInputs = null;
 let firstSssConsumedPadTickInputs = null;
 let firstSssDrawInputs = null;
 let firstSssPrefixInputs = null;
+let firstSssVsEntryInputs = null;
 async function loadFirstCssBrowserDrawInputs() {
   if (!firstCssBrowserDraw) return null;
   const specs = {
@@ -534,6 +546,24 @@ async function loadFirstSssPrefixInputs() {
   return {...result, inputBytes, inputIdentity: {path: inputFile,
     basename: path.basename(inputFile), bytes: inputBytes.byteLength, sha256: digest(inputBytes)},
     inputRows};
+}
+
+async function loadFirstSssVsEntryInputs() {
+  if (!firstSssVsEntry) return null;
+  const result = await loadBoundFirstSssExpected('first_sss_vs_entry',
+    'first-sss-vs-entry-expected', 'melee-web-stadium-first-sss-vs-entry-endpoint');
+  assert.equal(preflight.first_sss_vs_entry.diagnostic_export,
+    '_melee_web_native_menu_stadium_first_sss_vs_entry_kick',
+    'VS Entry diagnostic export differs from frozen preflight');
+  assert.equal(preflight.first_sss_vs_entry.expected_state_host_only, true,
+    'VS Entry expected state must remain host-only');
+  const helper = await import(pathToFileURL(result.helperPath).href);
+  helper.validateFirstSssVsEntryExpectedSource(result.expected);
+  for (const key of ['observer_sha256', 'observer_status_sha256',
+    'observer_bytes', 'observer_status_bytes'])
+    assert.equal(result.expected.provenance[key], firstSssPrefixInputs.expected.provenance[key],
+      `VS Entry and prefix source provenance differs at ${key}`);
+  return result;
 }
 
 async function buildArtifactInventory(baseUrl, names) {
@@ -973,6 +1003,7 @@ async function readFirstSssPairPostUnloadState() {
       first_sss_consumed_tick: observation?.first_sss_consumed_tick ?? null,
       first_sss_draw: observation?.first_sss_draw ?? null,
       first_sss_prefix: observation?.first_sss_prefix ?? null,
+      first_sss_vs_entry: observation?.first_sss_vs_entry ?? null,
       error: document.querySelector('#status')?.dataset.runtimeError || null,
       import_enabled: !!document.querySelector('#disc') &&
         !document.querySelector('#disc').disabled};
@@ -1756,6 +1787,66 @@ async function runFirstSssPrefix(constructorNative, firstDrawNative) {
   return evidence.native;
 }
 
+async function readFirstSssVsEntryObservation() {
+  return (await readFirstSssPrefixObservation()).native;
+}
+
+function assertFirstSssVsEntryUnchanged(native, before) {
+  assert.ok(native, 'VS Entry native observation is absent');
+  const actual = structuredClone(native);
+  delete actual.first_sss_vs_entry;
+  assert.deepEqual(actual, before, 'VS Entry read changed the full stopped native observation');
+  assert.equal(native.running, 0, 'VS Entry endpoint advanced source time');
+}
+
+async function runFirstSssVsEntry(prefixNative) {
+  const expected = firstSssVsEntryInputs.expected;
+  const helper = await import(pathToFileURL(firstSssVsEntryInputs.helperPath).href);
+  const comparator = helper.createFirstSssVsEntryComparator(expected, prefixNative.first_sss_prefix);
+  report.scenario.first_sss_vs_entry = {expected_json: firstSssVsEntryInputs.identity,
+    prefix_approved: true, before: structuredClone(prefixNative),
+    result: null, observation: null, comparison: null};
+  await persistReport();
+  // Installed only after runFirstSssPrefix returned from every strict assertion,
+  // including374 callbacks, audio accounting, prerequisites and checked leave.
+  await timeout(page.evaluate(() => {
+    if (globalThis.__meleeWebStadiumFirstSssPrefixApproved)
+      throw Error('VS Entry prefix approval was already installed');
+    globalThis.__meleeWebStadiumFirstSssPrefixApproved = () => {
+      const read = globalThis.__meleeWebStadiumFirstSssPrefixRead;
+      const result = typeof read === 'function' ? read() : null;
+      return result?.hook_error === null && result?.status?.approved === true &&
+        result?.status?.failed === false && result?.status?.attempted === 374 &&
+        result?.status?.first_mismatch === null && result?.rows?.length === 374 &&
+        result.rows.every(row => row.approved === true);
+    };
+  }), Math.min(5000, remaining()), 'Approve only the already compared stopped SSS prefix');
+  const result = await timeout(page.evaluate(() => {
+    const module = globalThis.Module;
+    const fn = module?._melee_web_native_menu_stadium_first_sss_vs_entry_kick;
+    if (typeof fn !== 'function') return {result: 0, message: 'VS Entry endpoint export is absent'};
+    const result = fn();
+    const message = module._melee_web_native_menu_message?.();
+    return {result, message: message ? module.UTF8ToString(message) : null};
+  }), Math.min(5000, remaining()), 'Read the existing checked Stadium match Start/seed');
+  report.scenario.first_sss_vs_entry.result = result;
+  // Persist refusal/actual data before any success-only assertion or unload.
+  const native = await timeout(readFirstSssVsEntryObservation(), Math.min(5000, remaining()),
+    'Retain actual VS Entry endpoint and first refusal');
+  report.scenario.first_sss_vs_entry.observation = native;
+  await persistReport();
+  assertFirstSssVsEntryUnchanged(native, prefixNative);
+  const approved = comparator.compare(native.first_sss_vs_entry);
+  report.scenario.first_sss_vs_entry.comparison = comparator.status();
+  await persistReport();
+  assert.equal(result.result, 1, native.first_sss_vs_entry?.error || result.message || 'VS Entry getter refused');
+  assert.equal(approved, true, JSON.stringify(comparator.status().first_mismatch));
+  report.scenario.first_sss_vs_entry.claim =
+    'Declared actual match Start fields/player0-3 and host seed compared to original Entry2468 after strict prefix completion; no match world construction, Setup/GO or C3 acceptance.';
+  await persistReport();
+  return native;
+}
+
 async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   const prearm = await timeout(page.evaluate(() => {
     const module = globalThis.Module;
@@ -1895,8 +1986,10 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
           if (firstSssDraw) {
             const firstDraw = await runFirstSssDraw(constructorAndTick);
             observation = firstDraw;
-            if (firstSssPrefix)
+            if (firstSssPrefix) {
               observation = await runFirstSssPrefix(constructorAndTick, firstDraw);
+              if (firstSssVsEntry) observation = await runFirstSssVsEntry(observation);
+            }
           }
         }
       }
@@ -1944,6 +2037,7 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
       first_sss_consumed_tick: observation?.first_sss_consumed_tick ?? null,
       first_sss_draw: observation?.first_sss_draw ?? null,
       first_sss_prefix: observation?.first_sss_prefix ?? null,
+      first_sss_vs_entry: observation?.first_sss_vs_entry ?? null,
       error: document.querySelector('#status')?.dataset.runtimeError || null,
       import_enabled: !!document.querySelector('#disc') && !document.querySelector('#disc').disabled};
   }), Math.min(5000, remaining()), 'First-CSS post-unload snapshot');
@@ -1964,6 +2058,8 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   if (firstSssPrefix)
     assert.equal(afterUnload.first_sss_prefix, null,
       'SSS prefix diagnostic ownership survived teardown');
+  if (firstSssVsEntry) assert.equal(afterUnload.first_sss_vs_entry, null,
+    'VS Entry native observation survived teardown');
   report.cleanup.native_after_unload = afterUnload;
   report.cleanup.observation_cleared = true;
   await saveScreenshot('stadium-first-css-browser-draw-after-unload');
@@ -2179,7 +2275,10 @@ async function cleanupServer() {
 async function main() {
   assert.equal(build, expectedBuild, 'Only the isolated C1a diagnostic runtime may be served');
   assert.equal(preflight.schema, 'melee-web-stadium-c1a-browser-preflight-v1');
-  if (firstSssPrefix)
+  if (firstSssVsEntry)
+    assert.equal(preflight.route_mode, 'first-sss-vs-entry',
+      'VS Entry command requires its exact frozen preflight route');
+  else if (firstSssPrefix)
     assert.equal(preflight.route_mode, 'first-sss-prefix',
       'SSS prefix command requires its exact frozen preflight route');
   else if (values['first-sss-draw'])
@@ -2229,6 +2328,7 @@ async function main() {
   firstSssConsumedPadTickInputs = await loadFirstSssConsumedPadTickInputs();
   firstSssDrawInputs = await loadFirstSssDrawInputs();
   firstSssPrefixInputs = await loadFirstSssPrefixInputs();
+  firstSssVsEntryInputs = await loadFirstSssVsEntryInputs();
   assert.deepEqual(preflight.limits_ms, LIMITS, 'Runtime bounds differ from frozen preflight');
   assert.equal(LIMITS.captureWorkMs,
     preflight.owner_deadline.overall_timeout_ms - preflight.owner_deadline.cleanup_reserve_ms,
@@ -2265,6 +2365,8 @@ async function main() {
     'Ordinary default runtime unexpectedly exports the private SSS tick diagnostic gate');
   assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_first_sss_draw_arm'), false,
     'Ordinary default runtime unexpectedly exports the private SSS draw diagnostic gate');
+  assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_first_sss_vs_entry_kick'), false,
+    'VS Entry endpoint export leaked into ordinary runtime');
   assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_first_sss_prefix_arm'), false,
     'Ordinary default runtime unexpectedly exports the private SSS prefix diagnostic gate');
 
@@ -2639,6 +2741,14 @@ async function cleanupOwnedProcesses() {
         cleanupFailures.push({step: 'sss-prefix-failure-snapshot', error: errorText(error)});
       }
     }
+    if (firstSssVsEntry) {
+      try {
+        report.scenario.first_sss_vs_entry_failure_snapshot = await timeout(
+          readFirstSssVsEntryObservation(), Math.min(3000, cleanupRemaining()),
+          'VS Entry actual/error evidence before unload');
+        await persistReport();
+      } catch (error) { cleanupFailures.push({step: 'vs-entry-failure-snapshot', error: errorText(error)}); }
+    }
     try { report.scenario.failure_snapshot = await timeout(nativeSnapshot(),
       Math.min(2000, cleanupRemaining()), 'Failure-state native snapshot'); }
     catch (error) { cleanupFailures.push({step: 'failure-snapshot', error: errorText(error)}); }
@@ -2669,6 +2779,7 @@ async function cleanupOwnedProcesses() {
         assert.equal(afterUnload.first_sss_draw, null);
       if (firstSssPrefix)
         assert.equal(afterUnload.first_sss_prefix, null);
+      if (firstSssVsEntry) assert.equal(afterUnload.first_sss_vs_entry, null);
       assert.equal(afterUnload.error, null);
       assert.equal(afterUnload.import_enabled, true);
       report.cleanup.observation_cleared = true;

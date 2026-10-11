@@ -266,6 +266,30 @@ struct FirstSssSequenceBrowserState {
  melee_web::stadium_first_css_diagnostic::FirstSssPrefixInput input{};
 };
 FirstSssSequenceBrowserState first_sss_draw_sequence,first_sss_prefix_sequence;
+struct FirstSssVsEntryState {
+ bool attempted=false,captured=false,failed=false,complete=false;
+ unsigned getter_calls=0;
+ uint64_t audio_calls_before=0,audio_calls_after=0,audio_frames_before=0,audio_frames_after=0;
+ unsigned audio_phase_before=0,audio_phase_after=0;
+ std::string actual,error;
+};
+FirstSssVsEntryState first_sss_vs_entry;
+std::string first_sss_vs_entry_json(){
+ const auto& s=first_sss_vs_entry;std::ostringstream out;
+ out<<"{\"attempted\":"<<(s.attempted?"true":"false")
+    <<",\"captured\":"<<(s.captured?"true":"false")
+    <<",\"failed\":"<<(s.failed?"true":"false")
+    <<",\"complete\":"<<(s.complete?"true":"false")
+    <<",\"getter_calls\":"<<s.getter_calls
+    <<",\"audio_render_calls_before\":"<<s.audio_calls_before
+    <<",\"audio_render_calls_after\":"<<s.audio_calls_after
+    <<",\"audio_render_frames_before\":"<<s.audio_frames_before
+    <<",\"audio_render_frames_after\":"<<s.audio_frames_after
+    <<",\"audio_phase_before\":"<<s.audio_phase_before
+    <<",\"audio_phase_after\":"<<s.audio_phase_after
+    <<",\"error\":"<<(s.error.empty()?"null":first_css_browser_draw_json_quote(s.error))
+    <<",\"actual\":"<<(s.actual.empty()?"null":s.actual)<<'}';return out.str();
+}
 void first_sss_sequence_sync(bool prefix){
  auto& s=prefix?first_sss_prefix_sequence:first_sss_draw_sequence;
  if(!s.armed||!host)return;
@@ -868,6 +892,8 @@ void first_css_browser_draw_refresh_observation(){
   out<<",\"first_sss_draw\":"<<first_sss_sequence_observation_json(false);
  if(first_sss_prefix_sequence.armed||first_sss_prefix_sequence.failed)
   out<<",\"first_sss_prefix\":"<<first_sss_sequence_observation_json(true);
+ if(first_sss_vs_entry.attempted||first_sss_vs_entry.failed)
+  out<<",\"first_sss_vs_entry\":"<<first_sss_vs_entry_json();
  out<<'}';state.observation=out.str();
 }
 #endif
@@ -1355,6 +1381,7 @@ if(scoped_assets){
  first_sss_consumed_tick=FirstSssConsumedTickState{};
  first_sss_draw_sequence=FirstSssSequenceBrowserState{};
  first_sss_prefix_sequence=FirstSssSequenceBrowserState{};first_sss_frozen_pair_json.clear();
+ first_sss_vs_entry=FirstSssVsEntryState{};
 #endif
  audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;pending_menu_source_scene=0;pending_opening_state=-1;audio_clock.reset();clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();
  css_fighter_release_port=-1;last_css_fighter_observation_valid=false;
@@ -3731,6 +3758,52 @@ int melee_web_native_menu_stadium_first_sss_draw_kick(){try{
  s.kicked=true;menu_clock.reset();first_use_draw_pending=false;
  first_css_browser_draw_refresh_observation();return 1;
 }catch(const std::exception& error){first_sss_sequence_fail(false,error.what());first_css_browser_draw_refresh_observation();return 0;}}
+int melee_web_native_menu_stadium_first_sss_vs_entry_kick(){try{
+ auto& s=first_sss_vs_entry;const auto& prefix=first_sss_prefix_sequence;
+ check(!s.attempted&&!s.failed&&!s.complete,"VS Entry endpoint is one-use");
+ s.attempted=true; // Retain every subsequent gate/getter refusal in this sibling.
+ s.audio_calls_before=s.audio_calls_after=diagnostic_audio_render_calls;
+ s.audio_frames_before=s.audio_frames_after=diagnostic_audio_render_frames;
+ s.audio_phase_before=s.audio_phase_after=audio_phase;
+ const auto eligible=[&](){return !running&&!pending&&!faulted&&host&&!host_entered&&
+   !match&&!results&&!prize&&!replay&&!melee_web_net_active()&&!menu_scene_rebuild_pending&&
+   !preparation.busy()&&preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&
+   asset_destination==AssetDestination::None&&prefix.complete&&!prefix.failed&&
+   prefix.native.state==2&&prefix.native.input_index==124&&prefix.native.consumed_inputs==124&&
+   prefix.native.host_tick_calls==124&&prefix.native.host_draw_calls==124&&
+   prefix.native.matched_ticks==124&&prefix.native.matched_draw_enters==124&&
+   prefix.native.matched_draw_returns==124&&prefix.native.last_tick_result==3&&
+   prefix.native.transition_requested&&prefix.frame_end_returned&&
+   melee_web_menu_host_source_scene(host)==0&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY;};
+ check(eligible(),"VS Entry endpoint requires the stopped completed SSS prefix");
+ check(EM_ASM_INT({try{
+   const f=globalThis.__meleeWebStadiumFirstSssPrefixApproved;
+   return typeof f==='function'&&f()===true?1:0;
+  }catch(_){return 0;}})==1,"VS Entry endpoint requires strict host prefix approval");
+ check(!s.failed&&eligible(),"VS Entry endpoint prefix changed during approval");
+ MeleeWebMenuMatchSelection selection{};char error[256]{};
+ ++s.getter_calls;
+ check(melee_web_menu_host_stadium_c1a_selection(host,&selection,error,sizeof error),error);
+ std::ostringstream out;
+ out<<"{\"phase\":\"vs_entry\",\"random_seed_hex\":\""
+    <<melee_web::stadium_first_css_diagnostic::hex32(selection.random_seed)
+    <<"\",\"start\":";
+ melee_web::stadium_first_css_diagnostic::write_start(out,selection.start);
+ out<<'}';s.actual=out.str();s.captured=true;
+ s.audio_calls_after=diagnostic_audio_render_calls;s.audio_frames_after=diagnostic_audio_render_frames;
+ s.audio_phase_after=audio_phase;
+ check(s.audio_calls_after==s.audio_calls_before&&s.audio_frames_after==s.audio_frames_before&&
+       s.audio_phase_after==s.audio_phase_before,"VS Entry endpoint performed unexpected audio work");
+ check(!s.failed&&eligible(),"VS Entry endpoint changed after checked selection read");
+ s.complete=true;first_css_browser_draw_refresh_observation();return 1;
+}catch(const std::exception& error){
+ auto& s=first_sss_vs_entry;s.failed=true;s.complete=false;
+ s.audio_calls_after=diagnostic_audio_render_calls;s.audio_frames_after=diagnostic_audio_render_frames;
+ s.audio_phase_after=audio_phase;
+ if(s.error.empty())s.error=error.what();
+ first_css_browser_draw_refresh_observation();return 0;
+}}
+
 int melee_web_native_menu_stadium_first_sss_prefix_arm(const uint8_t* bytes,unsigned size){try{
  auto& s=first_sss_prefix_sequence;
  check(!s.armed&&!s.failed&&!s.attempted&&!running&&!pending&&!faulted&&host&&world&&host_entered&&

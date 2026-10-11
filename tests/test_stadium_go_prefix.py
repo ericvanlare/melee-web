@@ -76,6 +76,10 @@ from stadium_go_prefix import (  # noqa: E402
     FIRST_SSS_PREFIX_SAMPLE_COUNT,
     FIRST_SSS_PREFIX_SELECTION_SEQUENCE,
     FIRST_SSS_PREFIX_SELECTION_SLICES,
+    FIRST_SSS_VS_ENTRY_SEQUENCE,
+    FIRST_SSS_VS_ENTRY_SLICES,
+    FIRST_SSS_STATUS_BYTES,
+    FIRST_SSS_STATUS_SHA256,
     FIRST_SSS_RNG_VALUE_ADDRESS,
     FIRST_SSS_TICK_SLICES,
     FIRST_SSS_ENTRY_SEQUENCE,
@@ -86,6 +90,7 @@ from stadium_go_prefix import (  # noqa: E402
     _extract_first_sss_constructor_pair_rows,
     _extract_first_sss_draw_rows,
     _extract_first_sss_prefix_rows,
+    _extract_first_sss_vs_entry_rows,
     _extract_first_css_first_draw_rows,
     _extract_first_css_consumed_tick_rows,
     _extract_first_css_context_rows,
@@ -97,10 +102,12 @@ from stadium_go_prefix import (  # noqa: E402
     extract_stadium_first_css_context,
     extract_stadium_first_css_postdraw_stream,
     extract_stadium_first_sss_constructor_pair,
+    extract_stadium_first_sss_vs_entry,
     _extract_first_css_postdraw_stream_rows,
     _check_boundary_contract,
     _classify_stadium_sss_owner,
     _slice as _read_source_slice,
+    VS_ENTRY_PC,
     validate_stadium_go_prefix,
 )
 from sd_reference_diagnostic import SdDiagnosticError, require  # noqa: E402
@@ -1875,6 +1882,75 @@ class StadiumFirstSssDrawAndPrefixExtractionTests(unittest.TestCase):
         reordered[2][0], reordered[2][1] = reordered[2][1], reordered[2][0]
         with self.assertRaises(StadiumGoPrefixError):
             _extract_first_sss_prefix_rows(*reordered, FIRST_CSS_STREAM_SHA256)
+
+
+class StadiumFirstSssVsEntryExtractionTests(unittest.TestCase):
+    def _row(self, *, sequence=FIRST_SSS_VS_ENTRY_SEQUENCE, source_tick=125,
+             draw_ordinal=0, start=None, seed=b"\x3b\xb8\x4c\x53",
+             rng_pointer=b"\x80\x4d\x5f\x90"):
+        slices = [
+            _slice(4, 0x138, data=_setup() if start is None else start,
+                   address=0x80481234),
+            _slice(19, 4, data=rng_pointer, address=0x804D5F94),
+            _slice(20, 4, data=seed, address=0x804D5F90),
+            _slice(21, 0x358, data=_valid_sss_pad_snapshot(), address=0x804C1F84),
+            _slice(36, 2, data=bytes.fromhex("07ff"), address=0x8045BF28),
+            _slice(37, 2, data=bytes.fromhex("07ff"), address=0x8045BF2A),
+        ]
+        return {"event": "boundary", "seq": sequence,
+                "source_tick": source_tick, "draw_ordinal": draw_ordinal,
+                "payload": {"boundary": "entry", "pc": VS_ENTRY_PC,
+                            "slices": slices}}
+
+    def test_endpoint_extracts_only_typed_start_and_seed_from_exact_entry_row(self):
+        result = _extract_first_sss_vs_entry_rows(
+            [self._row()], FIRST_CSS_STREAM_SHA256)
+        self.assertEqual(result["schema"],
+                         "melee-web-stadium-first-sss-vs-entry-endpoint")
+        self.assertEqual(result["version"], 1)
+        self.assertEqual(result["provenance"], {
+            "observer_bytes": FIRST_CSS_STREAM_BYTES,
+            "observer_sha256": FIRST_CSS_STREAM_SHA256,
+            "observer_status_bytes": FIRST_SSS_STATUS_BYTES,
+            "observer_status_sha256": FIRST_SSS_STATUS_SHA256,
+            "sequence": 2468, "pc": "0x8016e934", "source_tick": 125,
+            "draw_ordinal": 0, "setup_profile_verified_by_observer": False,
+        })
+        self.assertEqual(result["expected"]["random_seed_hex"], "3bb84c53")
+        self.assertEqual(result["expected"]["start"]["rules"]["stage_kind"], 3)
+        self.assertEqual(len(result["expected"]["start"]["players"]), 4)
+        self.assertEqual(result["source_entry"]["sequence"], 2468)
+        self.assertEqual(len(result["source_entry"]["source_slices_hex"]["4:0"]),
+                         0x138 * 2)
+        self.assertEqual(result["comparison_fields"], [
+            "random_seed_hex", "start.rules", "start.players[0:4]"])
+        self.assertEqual(len(FIRST_SSS_VS_ENTRY_SLICES), 6)
+        self.assertFalse(result["source_admission"])
+        self.assertFalse(result["whole_session_equivalent"])
+
+    def test_endpoint_rejects_missing_duplicate_reordered_and_wrong_owner_rows(self):
+        row = self._row()
+        for rows in ([], [row, row]):
+            with self.assertRaises(StadiumGoPrefixError):
+                _extract_first_sss_vs_entry_rows(rows, FIRST_CSS_STREAM_SHA256)
+        for changed in (self._row(sequence=2467), self._row(source_tick=124),
+                        self._row(draw_ordinal=1)):
+            with self.assertRaises(StadiumGoPrefixError):
+                _extract_first_sss_vs_entry_rows([changed], FIRST_CSS_STREAM_SHA256)
+        with self.assertRaises(StadiumGoPrefixError):
+            _extract_first_sss_vs_entry_rows([row], "00" * 32)
+
+    def test_endpoint_rejects_seed_pointer_seed_value_and_unknown_slice_mutations(self):
+        for edit in (
+            lambda row: row["payload"]["slices"][1].update(hex="804d5f94"),
+            lambda row: row["payload"]["slices"][2].update(hex="3bb84c54"),
+            lambda row: row["payload"]["slices"].append(
+                _slice(17, 6, data=bytes.fromhex("020200000000"))),
+        ):
+            row = self._row()
+            edit(row)
+            with self.assertRaises(StadiumGoPrefixError):
+                _extract_first_sss_vs_entry_rows([row], FIRST_CSS_STREAM_SHA256)
 
 
 if __name__ == "__main__":
