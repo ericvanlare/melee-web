@@ -23,20 +23,37 @@ public:
     GameplayMatchSession(const RuntimeFiles&,const MeleeWebMenuMatchSelection&,
                          RuntimeArchiveCache&,GameplayMatchConstruction,
                          const MeleeWebPadState&);
+    // Claims the exact host-owned Sudden Death continuation and borrows its
+    // retained VS mode lease until this source world has fully closed.
+    GameplayMatchSession(const RuntimeFiles&,MeleeWebMenuHost*,
+                         const MeleeWebMenuMatchContinuation&,
+                         RuntimeArchiveCache&,GameplayMatchConstruction,
+                         const MeleeWebPadState&);
     ~GameplayMatchSession();
     GameplayMatchSession(const GameplayMatchSession&)=delete;
     GameplayMatchSession& operator=(const GameplayMatchSession&)=delete;
     void tick(const PADStatus[4]);
     void draw();
+    // Requires source completion; retires flow and publishes original terminal
+    // data before capturing live RNG/PAD, closing the world and handing off.
+    void finish_sudden_death(MeleeWebMenuMatchContinuation& results);
+    // Completed ordinary VS only: canonical publication then live RNG/PAD
+    // capture, then teardown. Typed menu routing belongs to the closed host.
+    void finish_vs(uint32_t& seed, uint8_t input[MELEE_WEB_PAD_STATE_BYTES]);
     int outcome(int& winner) const;
     bool ready() const;
     bool ending() const;
     bool complete() const;
     bool opening_demo() const;
+    bool sudden_death() const;
     bool paused() const;
     uint32_t source_frames() const;
     int hud_damage(unsigned player) const;
     uint32_t random_seed() const;
+    // Capture final source RNG and the complete raw PAD bank before closing a
+    // Sudden Death world and restoring its host-owned global pointers.
+    void capture_handoff(uint32_t& seed,
+                         uint8_t input[MELEE_WEB_PAD_STATE_BYTES]) const;
     int fighter_kind(unsigned index) const;
     const StartMeleeData& start_data() const;
     // Copied menu selection only; safe during deferred construction and never

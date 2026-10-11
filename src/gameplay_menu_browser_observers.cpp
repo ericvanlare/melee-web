@@ -3,7 +3,9 @@
 // std::string append per field) so that adding a field is a one-line change.
 #include "gameplay_menu_browser_state.hpp"
 #include "fixed_format_writer.hpp"
+#include <bit>
 using namespace melee_web_menu_browser;
+extern "C" unsigned char mnItemSw_803ED438[32];
 namespace {
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
 void append_pointer_json(std::string& json,const void* pointer){
@@ -328,17 +330,33 @@ EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_pad_trace(){
 }
 #endif
 const char* melee_web_native_menu_match_observe(){
- static char text[1536];
+ static char text[2048];
  if(!match)return terminal_match_observation.empty()?"{}":terminal_match_observation.c_str();
  if(!match->construction_complete())return "{}";
  try{
  match_observer_error.clear();
  const auto p0=match->player_stats(0),p1=match->player_stats(1);
+ // The context's indices are compact; its stats preserve original source slots.
+ const unsigned slots[2]{p0.player_slot,p1.player_slot};
  const StartMeleeData& start=match->start_data();
  int winner=-1;const int outcome=match->outcome(winner);
  melee_web::FixedFormatWriter out(text,sizeof(text));
  out.add("{");
- out.add("\"ready\":%s",match->ready()?"true":"false");
+ out.add("\"leg\":\"%s\"",match->sudden_death()?"sudden_death":"vs");
+ out.add(",\"prior_vs_source_frames\":%u",prior_vs_source_frames);
+ out.add(",\"observed_player_source_slots\":[%u,%u]",slots[0],slots[1]);
+ out.add(",\"source_pad_errors\":[%d,%d,%d,%d]",
+         (int)HSD_PadCopyStatus[0].err,(int)HSD_PadCopyStatus[1].err,
+         (int)HSD_PadCopyStatus[2].err,(int)HSD_PadCopyStatus[3].err);
+ if(match->sudden_death()){
+  const auto& prior=prior_vs_terminal.match_end;
+  out.add(",\"prior_vs_terminal\":{\"outcome\":%d,\"winners\":[",(int)prior.outcome);
+  for(int i=0;i<prior.n_winners&&i<GM_MAX_PLAYERS;++i){
+   if(i)out.add(",");out.add("%d",(int)prior.winners[i]);
+  }
+  out.add("]}");
+ }
+ out.add(",\"ready\":%s",match->ready()?"true":"false");
  out.add(",\"paused\":%s",match->paused()?"true":"false");
  out.add(",\"ending\":%s",match->ending()?"true":"false");
  out.add(",\"complete\":%s",match->complete()?"true":"false");
@@ -351,18 +369,52 @@ const char* melee_web_native_menu_match_observe(){
  out.add(",\"stage\":%u",(unsigned) start.rules.stkind);
  out.add(",\"timer_enabled\":%u",(unsigned) start.rules.timer_enabled);
  out.add(",\"time_limit\":%u",(unsigned) start.rules.time_limit);
+ out.add(",\"disable_pausing\":%u",(unsigned) start.rules.disable_pausing);
+ out.add(",\"damage_ratio_bits\":\"%08x\"",
+         (unsigned)std::bit_cast<uint32_t>(start.rules.x30));
+ out.add(",\"is_stock\":%u",(unsigned)start.rules.is_stock);
+ out.add(",\"is_vs\":%u",(unsigned)start.rules.is_vs);
+ out.add(",\"source_sudden_death_flag\":%u",(unsigned)start.rules.x6);
  out.add(",\"item_frequency\":%d",(int) (int8_t) start.rules.xB);
  out.add(",\"item_mask_hex\":\"%016llx\"",(unsigned long long) start.rules.x20);
  out.add(",\"is_teams\":%u",(unsigned) start.rules.is_teams);
- out.add(",\"player_teams\":[%d,%d]",(int) start.players[0].team,(int) start.players[1].team);
- out.add(",\"player_stocks\":[%d,%d]",(int) start.players[0].stocks,(int) start.players[1].stocks);
+ out.add(",\"player_teams\":[%d,%d]",(int) start.players[slots[0]].team,(int) start.players[slots[1]].team);
+ out.add(",\"player_stocks\":[%d,%d]",(int) start.players[slots[0]].stocks,(int) start.players[slots[1]].stocks);
  out.add(",\"door_teams\":[%d,%d,%d,%d]",(int) start.players[0].team,(int) start.players[1].team,(int) start.players[2].team,(int) start.players[3].team);
  out.add(",\"friendly_fire\":%u",(unsigned) start.rules.friendly_fire);
+ out.add(",\"player_source_slots\":[%u,%u]",(unsigned) start.players[slots[0]].slot,
+         (unsigned) start.players[slots[1]].slot);
+ out.add(",\"resolved_controller_ports\":[%u,%u]",
+         (unsigned)(start.players[slots[0]].slot ? start.players[slots[0]].slot - 1u : slots[0]),
+         (unsigned)(start.players[slots[1]].slot ? start.players[slots[1]].slot - 1u : slots[1]));
+ out.add(",\"player_slot_types\":[%u,%u]",
+         (unsigned) start.players[slots[0]].slot_type,
+         (unsigned) start.players[slots[1]].slot_type);
+ out.add(",\"player_source_stocks\":[%d,%d]",
+         (int) start.players[slots[0]].stocks,(int) start.players[slots[1]].stocks);
+ out.add(",\"player_source_characters\":[%d,%d]",
+         (int) start.players[slots[0]].ckind,(int) start.players[slots[1]].ckind);
+ out.add(",\"player_attack_ratio_bits\":[\"%08x\",\"%08x\"]",
+         (unsigned)std::bit_cast<uint32_t>(start.players[slots[0]].attack_ratio),
+         (unsigned)std::bit_cast<uint32_t>(start.players[slots[1]].attack_ratio));
+ out.add(",\"player_defense_ratio_bits\":[\"%08x\",\"%08x\"]",
+         (unsigned)std::bit_cast<uint32_t>(start.players[slots[0]].defense_ratio),
+         (unsigned)std::bit_cast<uint32_t>(start.players[slots[1]].defense_ratio));
  out.add("}");
  out.add(",\"players\":[");
  out.add("{");
  out.add("\"fighter\":%d",p0.fighter_kind);
- out.add(",\"human\":%s",start.players[0].slot_type==Gm_PKind_Human?"true":"false");
+ out.add(",\"human\":%s",start.players[slots[0]].slot_type==Gm_PKind_Human?"true":"false");
+ out.add(",\"damage_percent\":%.9g",p0.damage_percent);
+ out.add(",\"source_player_index\":%u",slots[0]);
+ out.add(",\"source_slot\":%u",(unsigned)start.players[slots[0]].slot);
+ out.add(",\"source_port\":%u",(unsigned)(start.players[slots[0]].slot?
+         start.players[slots[0]].slot-1u:slots[0]));
+ out.add(",\"source_character\":%d",(int)start.players[slots[0]].ckind);
+ out.add(",\"source_color\":%u",(unsigned)start.players[slots[0]].color);
+ out.add(",\"source_initial_damage\":%u",(unsigned)start.players[slots[0]].x12);
+ out.add(",\"slot_type\":%u",(unsigned)start.players[slots[0]].slot_type);
+ out.add(",\"source_stocks\":%d",(int)start.players[slots[0]].stocks);
  out.add(",\"stocks\":%d",p0.stocks);
  out.add(",\"motion\":%d",p0.motion_id);
  out.add(",\"groundAir\":%d",p0.ground_or_air);
@@ -371,7 +423,17 @@ const char* melee_web_native_menu_match_observe(){
  out.add("}");
  out.add(",{");
  out.add("\"fighter\":%d",p1.fighter_kind);
- out.add(",\"human\":%s",start.players[1].slot_type==Gm_PKind_Human?"true":"false");
+ out.add(",\"human\":%s",start.players[slots[1]].slot_type==Gm_PKind_Human?"true":"false");
+ out.add(",\"damage_percent\":%.9g",p1.damage_percent);
+ out.add(",\"source_player_index\":%u",slots[1]);
+ out.add(",\"source_slot\":%u",(unsigned)start.players[slots[1]].slot);
+ out.add(",\"source_port\":%u",(unsigned)(start.players[slots[1]].slot?
+         start.players[slots[1]].slot-1u:slots[1]));
+ out.add(",\"source_character\":%d",(int)start.players[slots[1]].ckind);
+ out.add(",\"source_color\":%u",(unsigned)start.players[slots[1]].color);
+ out.add(",\"source_initial_damage\":%u",(unsigned)start.players[slots[1]].x12);
+ out.add(",\"slot_type\":%u",(unsigned)start.players[slots[1]].slot_type);
+ out.add(",\"source_stocks\":%d",(int)start.players[slots[1]].stocks);
  out.add(",\"stocks\":%d",p1.stocks);
  out.add(",\"motion\":%d",p1.motion_id);
  out.add(",\"groundAir\":%d",p1.ground_or_air);
@@ -380,6 +442,10 @@ const char* melee_web_native_menu_match_observe(){
  out.add("}");
  out.add("]");
  out.add("}");
+ if(out.result()<0||out.result()>=static_cast<int>(sizeof(text))){
+  match_observer_error="Match observation overflow";
+  std::snprintf(text,sizeof(text),"{\"ready\":false,\"observer_error\":true,\"observer_error_reason\":\"match observation overflow\"}");
+ }
  return text;
  }catch(const std::exception& e){
   match_observer_error=e.what();
@@ -391,14 +457,20 @@ const char* melee_web_native_menu_source_observe(){
  static char text[3072];
  MeleeWebMenuSourceObservation observed{};
  StartMeleeData start{};
+ StartMeleeData selection{};
+ uint8_t selection_header[6]{};
  int source_valid=0,start_valid=0;
+ int selection_kind=0;
  int live_items_valid=0,live_item_cursor=-1,live_item_enabled=-1,live_item_frequency=-1;
+ int live_item_preference_bit=-1;
  char error[256]{};
  if(host&&host_entered&&melee_web_menu_host_source_observe(
        host,&observed,error,sizeof(error)))source_valid=1;
+ if(host&&host_entered)
+  selection_kind=melee_web_menu_host_selection_state(host,&selection,selection_header);
  if(host&&!host_entered&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY&&
     melee_web_menu_host_raw_selection(host,&start,error,sizeof(error)))start_valid=1;
- if(!source_valid&&!start_valid)return "{}";
+ if(!source_valid&&!start_valid&&!selection_kind)return "{}";
  /* The item mask is copied into global match preferences when the original
   * Items routine commits its private MnItemSwData. Observe that live row
   * separately so a source-confirmed A input is not mistaken for that commit. */
@@ -410,7 +482,10 @@ const char* melee_web_native_menu_source_observe(){
      item_data->cursor==static_cast<uint8_t>(observed.hovered_selection)){
    live_items_valid=1;
    live_item_cursor=item_data->cursor;
-   if(item_data->cursor<0x1f)live_item_enabled=item_data->items[item_data->cursor];
+   if(item_data->cursor<0x1f){
+    live_item_enabled=item_data->items[item_data->cursor];
+    live_item_preference_bit=mnItemSw_803ED438[item_data->cursor];
+   }
    else live_item_frequency=item_data->x21;
   }
  }
@@ -459,6 +534,7 @@ const char* melee_web_native_menu_source_observe(){
  out.add(",\"handicap\":%d",observed.handicap);
  out.add(",\"damage_ratio\":%d",observed.damage_ratio);
  out.add(",\"friendly_fire\":%d",observed.friendly_fire);
+ out.add(",\"pause\":%d",observed.pause);
  out.add("}");
  out.add(",\"items\":{");
  out.add("\"frequency\":%d",observed.item_frequency);
@@ -471,10 +547,32 @@ const char* melee_web_native_menu_source_observe(){
  out.add(",\"door_teams\":[%d,%d,%d,%d]",observed.css_player_teams[0],observed.css_player_teams[1],observed.css_player_teams[2],observed.css_player_teams[3]);
  out.add("}");
  out.add("}");
+ out.add(",\"selection\":{");
+ out.add("\"valid\":%s",selection_kind?"true":"false");
+ out.add(",\"scene\":%d",selection_kind);
+ if(selection_kind)
+  out.add(",\"provenance\":\"%s\"",selection_kind==1?"raw_css_vs_start":"raw_sss_vs_start");
+ if(selection_kind){
+  const auto& rules=selection.rules;
+  out.add(",\"match_kind\":%d",(int)rules.match_kind);
+  out.add(",\"timer_enabled\":%u",(unsigned)rules.timer_enabled);
+  out.add(",\"time_limit_seconds\":%u",(unsigned)rules.time_limit);
+  out.add(",\"friendly_fire\":%u",(unsigned)rules.friendly_fire);
+  out.add(",\"disable_pausing\":%u",(unsigned)rules.disable_pausing);
+  out.add(",\"damage_ratio_bits\":\"%08x\"",
+          (unsigned)std::bit_cast<uint32_t>(rules.x30));
+  out.add(",\"item_frequency\":%d",(int)(int8_t)rules.xB);
+  out.add(",\"item_mask_hex\":\"%016llx\"",
+          (unsigned long long)rules.x20);
+  out.add(",\"player_stocks\":[%d,%d]",
+          (int)selection.players[0].stocks,(int)selection.players[1].stocks);
+ }
+ out.add("}");
  out.add(",\"items_menu\":{");
  out.add("\"valid\":%s",live_items_valid?"true":"false");
  out.add(",\"cursor\":%d",live_item_cursor);
  out.add(",\"selected_item_enabled\":%d",live_item_enabled);
+ out.add(",\"selected_item_preference_bit\":%d",live_item_preference_bit);
  out.add(",\"frequency_selector\":%d",live_item_frequency);
  out.add("}");
  out.add(",\"start\":{");
@@ -487,6 +585,9 @@ const char* melee_web_native_menu_source_observe(){
  out.add(",\"players\":%s",start_players);
  out.add("}");
  out.add("}");
+ const int written=out.result();
+ if(written<0||static_cast<size_t>(written)>=sizeof(text))
+  return "{\"observer_error\":true,\"observer_error_reason\":\"Source observation buffer overflow\"}";
  return text;
 }
 const char* melee_web_native_menu_memory(){
@@ -544,6 +645,9 @@ const auto allocation=melee_web_gameplay_allocation();
  out.add(",\"model\":[%.3f,%.3f]",last_css_fighter_observation.model_x,last_css_fighter_observation.model_y);
  out.add(",\"target_bounds\":[%.3f,%.3f,%.3f,%.3f]",last_css_fighter_observation.target_left,last_css_fighter_observation.target_right,last_css_fighter_observation.target_top,last_css_fighter_observation.target_bottom);
  out.add("}");
+ out.add(",\"source_pad_errors\":[%d,%d,%d,%d]",
+   HSD_PadCopyStatus[0].err,HSD_PadCopyStatus[1].err,
+   HSD_PadCopyStatus[2].err,HSD_PadCopyStatus[3].err);
  out.add(",\"source_pad0\":{");
  out.add("\"err\":%d",HSD_PadCopyStatus[0].err);
  out.add(",\"button\":%u",static_cast<unsigned>(HSD_PadCopyStatus[0].button));

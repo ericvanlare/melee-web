@@ -1,0 +1,10 @@
+{
+  "schema": "original-sparse-initial-profile-reduction-v1",
+  "source_report_sha256": "4924f0a1e167e01407d5455565fd89ce766f9753a0672fa48bce5c02fb7c9126",
+  "source_seq": 563,
+  "profile_gci_sha256": "5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729",
+  "game_rules_hex": "0036000203000a00000001000000080800000800ffffffff",
+  "save_items_offset": 1096,
+  "save_items_hex": "0200000000000000ffffffffffffffff0101010100010100ffffffff00000000",
+  "scope": "Actual loaded profile subset; no sparse route or target-setting observation"
+}

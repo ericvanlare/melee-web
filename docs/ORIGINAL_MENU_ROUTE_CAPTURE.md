@@ -1,5 +1,22 @@
 # Original menu route
 
+The separate `capture_sd_reference_prefix.py` diagnostic accepts an explicit
+recipe-five/menu-five GCI campaign for original Rules → Items → two-human Mario
+CSS → Final Destination → natural one-minute tie → SD initialization. Its fixed
+input plan declares neutral P1/P2 and disconnected P3/P4 through the bounded
+gameplay prefix. Earlier authored recipes and reduced Rules probes remain
+distinct contracts; ordinary replay collectors still reject authored plans.
+
+The route reuses MenuFlow values, generic CSS cursor/door/live-state slices and
+the highlighted stage kind. Its sole added steering field is the original SSS
+acceptance cooldown, read only after the verified constructor return. Every
+menu motion and source-consumed input has a declared cap. Final VS setup and SD
+normalization remain exact byte comparisons. The final SSS A is released after
+observed consumption; any A leaking into gameplay fails the neutral plan.
+An interrupted observer prefix requires independently complete native MWRI.
+Neither portable controls nor a compiled producer establish that this extended
+original route ran, or that it matches native gameplay, pixels, PCM or timing.
+
 ## Observed retail route
 
 The title/main-menu route is now implemented with the recovered title and menu
@@ -382,3 +399,190 @@ The separate allocation-history GDB/Python route remains available for scopes
 that need a stopped scheduler and allocation/RNG sampling. It is not a
 prerequisite for observing this ordinary menu route. Keep future claims scoped
 to the retained capture and build identities above.
+# Reduced Items lock experiment
+
+After the recipe-five original prefix failed at `items-frequency-row:observed`,
+menu packet six retains the same setup actions but stops at Items row31/value3.
+Its separate `items_row` observer scope reads the original one-byte animation
+lock only under actual scene1/MenuFlow kind16. The verified GALE01r2
+`fn_80233E10` instructions at `0x80233ec0` load and test that byte at
+`0x804d6bec` before navigation. Main-menu cooldown zero alone is insufficient.
+The runner waits for the observed lock zero, sends one declared Up pulse, then
+requires the original row/value and neutral release. No CSS, gameplay, timeout
+or SD continuation is admitted. Native input completion remains separate from
+the intentionally interrupted observer. Missing, misplaced or malformed lock
+data and consumed input while locked fail explicitly.
+
+Portable reconstructed positive/negative controls do not establish native
+behavior. The failed original stream has no lock slice, so it establishes
+ignored normalized Up, not the actual runtime lock value. Prior full-prefix
+packets, producer binaries and failure evidence remain preserved.
+
+The reduced lock probe subsequently observed the opening A still held for one
+copied source sample after the Items owner appeared with lock1. Its receiver
+therefore recognizes an entry drain only after exact Rules row5/declared A to
+Items row0/value1/entering1/lock1 ownership. Only the identical held A bank can
+drain while that locked owner persists, within the existing polling/sample
+caps. The first copied neutral permanently closes this allowance. New A,
+unlocked A, another input or owner, and Up before lock0 are fatal. The runner
+still releases after first copied A and waits for copied neutral; no input is
+added or replaced and no queue is flushed. Entry samples remain reported.
+
+Full-prefix menu7 carries that same typed lock and entry drain through the
+existing recipe-five route. Its controller bytes and action order match
+historical menu5; Items frequency actions additionally require lock0. The
+receiver observes one Up to row31/value3, three separate Right pulses with
+source changes 3→2→1→0, then B and the original Rules owner. It rejects a
+frequency change without its declared pulse or leaving Items before commit.
+The original CSS/FD route and strict normalized VS/tied-timeout/SD payload
+checks remain; the stop is still SD setup, without resolution inputs. Tag56
+uses its existing verified byte reader for `sd_prefix` as well as the reduced
+`items_row` probe. The preserved ed97 producer lacks that full-prefix scope;
+source23b9/binaryb6ea compiled it. The actual menu7 attempt observed lock-clear,
+row31/value3, the three Right decrements and B commit back to Rules, then failed
+at first CSS inventory because the driver required Human before moving either
+cursor. Its raw prefix/cleanup is retained in the scoped
+`original-sd-prefix-boundary-failure-v3.json` receipt (SHA14924194…). Both initial
+doors were NA, their cursors were at y=-21.5, and no CSS input was authored.
+
+The corrected menu7 driver admits only that initialized vacant owner or a
+coherent own-Human owner. It reuses the declared move-to-Mario axes: original
+`mnCharSel_CursorThink` joins the own NA door when the cursor enters
+0.2<y<22, as already used by `retail_cpu_menu_prepare.select`. The driver then
+requires observed own-Human before A placement; CPU, foreign ownership and
+unconstructed inventory fail. Historical menu5 retains its immediate Human
+precondition. Menu7, recipe5, action bytes and caps are unchanged. Observer
+overlay/nativeb6ea remain unchanged; the receiver/driver checkpoint is separate.
+The changed a051 campaign actually observed both own-Human joins and the final
+two-Mario colors1/0 lineup, then FD highlighting and consumed confirmation A.
+It failed on the shared SSS counter's accepted-selection value30, not the
+constructor's initial19. The scoped `original-sd-prefix-boundary-failure-v4.json`
+receipt (SHA91125a42…) retains that progression and incomplete MWRI/cleanup.
+
+The receiver now distinguishes constructor countdown<=20 from accepted
+selection: only observed FD/cooldown0 and a new declared P1 A after neutral arm
+the source-authored30-frame counter. It requires first30 and consecutive source
+ticks/decrements, the same selected FD owner, and an observed neutral release;
+another A after neutral or other continuation fails. The FD/cooldown0 selection
+snapshot remains frozen, and VS admission requires observed countdown0 plus
+all existing strict setup checks. The actual fixture retains30→18 only; later
+countdown0/VS/tie/SD controls are explicitly synthetic. No native observer,
+menu7, recipe5, controller bytes or caps change for this decoder correction.
+
+The changed 7d2 campaign observed the exact30→0 countdown, then neutral zero
+progress through source tick239/menu count539. It failed at seq1689: the same
+SSS/FD/zero snapshot and frozen counters remained, while authored routing changed
+from SSS state1 to VS state2 (previous state1). `gm_801A4014` changes routing
+after OnExit; the SceneInfo pointer remains installed until the next
+`gm_801A4B88`. PADRead polls during this interval are observations, not source
+ticks. The receiver correction retains only that exact retiring route and
+unchanged owner/FD/zero/tick/input-count snapshot after observed countdown0 and
+neutral. It forbids any consumed input or return to active routing. Active
+duplicate/gapped ticks still fail, and strict VS entry remains separate. The
+offline actual replay accepts the buffered prefix through seq1698, without
+admitting VS/SD or the interrupted terminal as success. The failed run and
+incomplete MWRI remain preserved; no native observer, inputs or caps changed.
+
+The single changed campaign at receiver5e136/native23b9-b6ea passed the existing
+strict receiver through original normal VS, natural tied timeout and SD setup.
+The scoped `original-sd-prefix-boundary-result-v6.json` receipt (SHAf71945e0…)
+binds the raw streams, complete native MWRI, intentionally interrupted primary
+observer, immutable profile and exact owned cleanup. The predeclared offline
+V11 comparison (`declared-v11-initialization-comparison-v2.json`, SHA1df30ced…)
+passed the retained normalized participant, port, color, stock, damage, rule,
+scene-order and natural-timeout fields. These receipts are under the retained
+`menu-tie-extension-v1/sss-retirement-launch-v1` campaign. This remains an
+initialization comparison: original SD resolution/Results, raw PAD/RNG equality,
+pixels, PCM, physical input and live timing are excluded.
+
+### Separate competitive profile-entry diagnostic
+
+Authored recipe6/menu8 uses the same verified GCI and original menu, CSS,
+SSS and normalized VS ownership boundaries for a separate competitive profile.
+It observes stock4, handicap0, damage10, Rules Plus timer8/FF1/pause0,
+every selectable Items row0..30 off and frequency None. The Items path follows
+the original two-column navigation: Down0..15, Right15->30, Up30..16,
+Up16->32; each conditional A requires an observed on value and unlocked owner.
+The unmapped preference bit28 is retained. Committed preference bytes and
+normalized setup are both checked; a None frequency alone cannot pass.
+
+`MWRC_SD_MENU_PROBE=competitive_entry` stops at the verified normal VS setup
+return with a complete native MWRI footer and interrupted primary observer.
+This scope rejects active gameplay, SD and legacy whole-session completion.
+The prior SD native producer is preserved and rejects this new scope. The
+650caaf1/e4634a74 canonical producer compiled, and its first original attempt
+observed every switch off and the three frequency decrements. It failed at the
+first Items-to-Rules snapshot (seq1127): the receiver required cooldown0,
+while original `fn_80233E10` commits and sets cooldown5. The retained
+`competitive-original-profile-entry-launch-v1/first-items-boundary-reduction-v1.json`
+(SHA2595d314…) binds the actual return, held B release and countdown5→0.
+The receiver correction requires exactly that committed return and consecutive
+source countdown, allowing only the already consumed held B until neutral.
+Readiness remains cooldown0 before any new action. Native producer, recipe,
+menu and inputs are unchanged.
+The second attempt passed the return lifecycle and reached typed CSS seq1299.
+Its exact initialized NA-door/cursor ownership equals the prior SD join
+projection, but menu8 incorrectly selected the historical immediate-Human guard.
+The driver now explicitly reuses the same bounded menu7 join policy for menu8:
+source movement precedes observed own-Human admission and A placement. CPU,
+foreign and unconstructed ownership still fail; final two-Human Mario checks
+remain strict. Native/menu/input identities and caps are unchanged. The third
+attempt passed original profile-entry at receiver8a522536/native650caaf1/e4634a74.
+Both failed streams remain incomplete and cannot establish acceptance.
+The actual `vs_entry`/`vs_setup` slices match every predeclared browserV9
+profile/setup field, including all four door-team bytes; the projection asserts
+exact key coverage. The retained comparison is
+`competitive-original-profile-entry-launch-v3/declared-v9-profile-entry-comparison-v3.json`
+(SHA256 `45c42e55aeee4cd9a7f78bc2a442d7d04f1daca84301b8ac43da348c8f5ffa36`),
+independently replayed in `root-profile-comparison-review-v1.json`
+(SHA256 `c42d62e26c8d51328eb02c4a336be19b90b25262c4f6273543befa6781a91f1f`).
+The superseded partial projection that omitted door teams is retained, not used.
+Original constructor state and browser frame180 establish declared configuration
+agreement only, not equal samples, positions or RNG. Natural non-tied timeout
+comparison remains a separate #292 gate. This prefix
+makes no original Results/CSS lifecycle claim; that continuation is not required
+unless the terminal source fields need it.
+
+### Separate original competitive natural terminal policy
+
+`--ordinary-policy` selects a separate canonical authored policy while reusing
+recipe6/menu8, the exact GCI, bounded source menu/CSS/SSS controller, and native
+MWRI recording. Fixed v4 stays neutral entry/setup provenance; it does not
+describe the adaptive gameplay inputs. Default receivers reject this scope.
+The preserved650caaf1 native binary is stale for this extension. Source controls
+and the API-stub compiler control do not establish an original eight-minute run.
+
+The declared policy waits for source frame180, live4:4/zero damage and original
+positions-60/+60. It then holds only P1 raw x-80 until the first observed3:4,
+releases neutral, permits only that previously held bank to drain until the
+first actual neutral, and never restarts direction. Directional consumption is
+bounded600. The total source budget29523 includes setup (at most123); active
+PAD and scheduled source iterations are counted independently. The source
+counter starts0 and the match clock can repeat or advance one frame, reaching
+28800/seconds0/subframe59 naturally. Those counter/clock lifetime predicates
+are bound to retained original SD V6 observations;480 seconds is the new
+authored setting, not evidence inferred from that60-second capture.
+
+Every active and terminal live snapshot revalidates the source
+StaticPlayer→primary GObj→recorded Fighter relation before reading only its
+head, damage and stock. The pinned VS exit callback publishes without destroying
+fighters. The canonical return must independently publish timeout1/winner[1],
+two Human Mario participants/colors1/0/stocks3:4/zero damage and inactive slots2..5.
+The required final event is VS arena retirement, then a complete native MWRI
+footer and interrupted primary observer. Results confirmations are excluded.
+
+Native-enforced event ceilings include boot/menu/setup and writer endings:
+at most73455 serialized MWRO records/126894356 bytes, beneath73500/128MiB.
+The independent MWRI producer limit includes its header/footer and both PAD
+channels: at most1677721 records/67108856 bytes; no PAD-per-frame ratio is
+assumed. Intent writes are capped16000 records/8192000 bounded bytes; the
+owned native log is hard-capped16MiB. The600-second wall limit,7200 menu limits
+and all existing cursor/action bounds remain. First predicate, field, writer or
+resource failure stops the run and retains evidence; only the exact owned child
+is terminated/reaped, and its log drain is finalized independently. No forced
+outcome, guest write, source-clock acceleration or missing input repair exists.
+
+Older original Rules-route evidence establishes observed No Contest
+Results/CSS lifecycle only. It cannot close this natural timeout comparison.
+Original/browser PAD schedules, RNG, pixels, PCM, physical input and timing
+remain excluded; whole-session acceptance is not claimed.

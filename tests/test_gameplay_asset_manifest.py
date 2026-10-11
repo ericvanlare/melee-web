@@ -3,8 +3,12 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
-import tempfile
 import unittest
+import sys
+from types import SimpleNamespace
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from gameplay_sources import prepare_sources
+from owned_test_workspace import OwnedWorkspaceTests
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -20,20 +24,20 @@ STAGE_ARCHIVES = {
 }
 
 
-class GameplayAssetManifestTests(unittest.TestCase):
+class GameplayAssetManifestTests(OwnedWorkspaceTests):
     @classmethod
     def setUpClass(cls):
         compiler = shutil.which("clang++") or shutil.which("c++")
         if not compiler:
             raise RuntimeError("A C++20 compiler is required")
-        cls.temp = tempfile.TemporaryDirectory(prefix="melee asset manifest ")
-        cls.addClassCleanup(cls.temp.cleanup)
+        cls.temp = SimpleNamespace(name=str(cls.new_workspace(ROOT, "asset-manifest-")))
+        source = prepare_sources(ROOT)
         cls.binary = Path(cls.temp.name) / "gameplay_asset_manifest_test"
         cls.stadium_binary = Path(cls.temp.name) / "gameplay_asset_manifest_stadium_c1a_test"
         command = [compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror", "-O1", "-g",
                    "-DTARGET_PC",
                    "-I", str(ROOT / "src"),
-                   "-I", str(ROOT / ".deps/melee/src"),
+                   "-I", str(source),
                    "-I", str(ROOT / ".deps/aurora/include"),
                    "-include", str(ROOT / "src/hsd_probe_compat.h"),
                    str(ROOT / "src/dat_archive.cpp"),

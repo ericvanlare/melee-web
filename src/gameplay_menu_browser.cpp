@@ -1,4 +1,5 @@
 #include "gameplay_menu_browser_state.hpp"
+extern "C" uint32_t gm_801A4BA8(void);
 #if defined(MELEE_WEB_NET_SESSION)
 extern "C" int melee_web_net_publish_local_input(
     uint32_t source_tick, unsigned local_port, uint64_t poll_serial,
@@ -53,6 +54,14 @@ melee_web::ResultsEntryPacket results_entry_packet;
 uint32_t results_seed=0,prize_seed=0;
 std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)>
     results_input{nullptr,melee_web_pad_state_free};
+// Pending continuation/PAD outlive scoped reads and deferred construction.
+MeleeWebMenuMatchContinuation pending_match_continuation{};
+std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)>
+    sudden_death_input{nullptr,melee_web_pad_state_free};
+const MeleeWebPadState* results_borrowed_input=nullptr;
+bool sudden_death_route_active=false;
+uint32_t prior_vs_source_frames=0,final_sd_source_frames=0;
+MatchExitInfo prior_vs_terminal{};
 std::string terminal_match_observation;
 std::string match_observer_error;
 MeleeWebFighterInputObservation last_css_fighter_observation{};
@@ -65,6 +74,7 @@ std::unique_ptr<melee_web::RetailReplayRecipe> replay;
 size_t replay_cursor=0;
 melee_web::SourceFrameSequence replay_source_frames;
 melee_web::ReplayCompletionState replay_completion;
+melee_web::DiagnosticPrefixProgress replay_prefix_progress;
 bool replay_trace=false,replay_pending=false,replay_started=false,replay_final_draw=false;
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
 std::array<ResultsPadTraceRow,kResultsPadTraceCapacity> results_pad_trace{};
@@ -113,7 +123,7 @@ std::vector<uint8_t> configured_save_profile;
 // The owner that is running right now, expressed in the recipe's scene codes.
 // Zero means the host is between scenes and cannot consume a replay sample.
 int observed_replay_scene(){
- if(match)return melee_web::kRetailReplayMatch;
+ if(match)return match->sudden_death()?-1:melee_web::kRetailReplayMatch;
  if(results)return melee_web::kRetailReplayResults;
  if(prize)return melee_web::kRetailReplayPrize;
  if(host){
@@ -202,13 +212,17 @@ melee_web::GameplayMenuScene pending_menu_scene=melee_web::GameplayMenuScene::Ch
 enum class MenuRouteEntry { Session, Main, Title, ParentCss, TrainingCss };
 MenuRouteEntry pending_menu_entry=MenuRouteEntry::Session;
 const char* source_menu_message(){
- switch(pending_menu_scene){
- case melee_web::GameplayMenuScene::Characters:
-  return host&&melee_web_menu_host_mode_kind(host)==GM_TRAINING?
+ // Construction targets survive teardown. Read the entered source owner so
+ // preparation settling and resume cannot relabel returned CSS as prior SSS.
+ if(!host||!host_entered)return "Original menu";
+ switch(melee_web_menu_host_source_scene(host)){
+ case MELEE_WEB_MENU_HOST_SCENE_CSS:
+  return melee_web_menu_host_mode_kind(host)==GM_TRAINING?
       "Original Training character select":"Original character select";
- case melee_web::GameplayMenuScene::Stages:return "Original stage select";
- case melee_web::GameplayMenuScene::Main:return "Original main menu";
- case melee_web::GameplayMenuScene::Title:return "Original title";
+ case MELEE_WEB_MENU_HOST_SCENE_SSS:return "Original stage select";
+ case MELEE_WEB_MENU_HOST_SCENE_MAIN:return "Original main menu";
+ case MELEE_WEB_MENU_HOST_SCENE_TITLE:return "Original title";
+ case MELEE_WEB_MENU_HOST_SCENE_OPENING:return "Original Opening movie";
  }
  return "Original menu";
 }
@@ -370,7 +384,7 @@ void begin_preparation(){
  }
  transition_audio_continues=preserve_audio;
  if(!preserve_audio)audio_clock.reset();
- message=match?"Preparing original Results...":prize?"Preparing original character select...":"Preparing original next scene...";
+ message=match?"Preparing original match continuation...":prize?"Preparing original character select...":"Preparing original next scene...";
  EM_ASM({if(window.menuPreparation)window.menuPreparation(UTF8ToString($0),!!$1);},
         message.c_str(),preserve_audio?1:0);
 }
@@ -471,14 +485,22 @@ if(scoped_assets){
  }
  results_route_active=false;
  prize_route_active=false;
- results_input.reset();
+ results_input.reset();results_borrowed_input=nullptr;
+ sudden_death_input.reset();pending_match_continuation={};sudden_death_route_active=false;
+ prior_vs_source_frames=final_sd_source_frames=0;prior_vs_terminal={};
  if(source_session_owned){
   check(melee_web_gameplay_session_end(error,sizeof(error)),error);
   source_session_owned=false;
  }
+ // The end record remains after successful checked owner/session retirement.
+ // Diagnostic completion is not a terminal result or whole-session claim.
+ if(replay&&replay->diagnostic_entity_prefix&&replay_final_draw&&!faulted)
+  std::fprintf(stderr,"ENTITY_PREFIX_END observations=%u first_source_tick=%u last_source_tick=%u diagnostic_prefix_complete=true whole_session_equivalent=false\n",
+      replay_prefix_progress.observations,replay_prefix_progress.first_source_tick,
+      replay_prefix_progress.last_source_tick);
  if(replay&&replay_trace&&replay_final_draw&&!faulted)
   melee_web::retail_replay_end(replay->frames.size(),replay->whole_session());
- replay.reset();melee_web_net_reset();replay_completion={};replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
+ replay.reset();melee_web_net_reset();replay_completion={};replay_prefix_progress={};replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
  replay_match_complete=false;replay_outcome=0;replay_winner=-1;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  stadium_c1a_armed=false;stadium_c1a_observation.clear();stadium_c1a_raw_stkind=-1;
@@ -512,6 +534,10 @@ void request_assets(AssetDestination destination,
         "Stadium C1a preparation requires its armed source selection");
   names=melee_web::stadium_c1a_asset_names(*selection);break;
 #endif
+ case AssetDestination::SuddenDeath:
+  check(sudden_death_route_active&&sudden_death_input,
+        "Sudden Death assets require their retained typed continuation and PAD");
+  names=melee_web::sudden_death_asset_names(host,pending_match_continuation);break;
  case AssetDestination::Results:
   check(asset_selection_valid,"Results assets require the completed match selection");
   names=melee_web::results_asset_names(asset_selection);break;
@@ -686,6 +712,101 @@ void begin_menu_scene_rebuild(melee_web::GameplayMenuScene scene,
                      aurora_stats_snapshot());
  menu_scene_rebuild_pending=true;running=false;
 }
+void enter_typed_results_world(){
+ const auto* input=results_input?results_input.get():results_borrowed_input;
+ check(input!=nullptr,"Original Results input was not retained across the asset handoff");
+ const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
+ results=std::make_unique<melee_web::GameplayResultsSession>(files,results_info,results_seed,*input);
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+ results_camera_entry_snapshot=results->camera_entry_snapshot();
+#endif
+ results_input.reset();results_borrowed_input=nullptr;sudden_death_route_active=false;
+ const double constructed=emscripten_get_now();
+ report_construction("results-enter",started,constructed,constructed,before,aurora_stats_snapshot());
+ first_use_draw_pending=true;pending=false;running=true;audio_phase=0;
+ menu_clock.reset();audio_clock.reset();message="Original Results";
+}
+void enter_typed_sudden_death_world(){
+ check(sudden_death_route_active&&sudden_death_input,
+       "Sudden Death construction lost its exact continuation/PAD owner");
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+ char error[256]{};MeleeWebMenuMatchSelection selection{};
+ check(melee_web_menu_host_sudden_death_selection(
+           host,&pending_match_continuation,&selection,error,sizeof(error)),error);
+ melee_web::pipeline_preparation::match(selection);
+#endif
+ match=std::make_unique<melee_web::GameplayMatchSession>(files,host,pending_match_continuation,
+     *archive_cache,melee_web::GameplayMatchConstruction::Deferred,*sudden_death_input);
+ running=false;message="Preparing original Sudden Death...";
+}
+
+void begin_typed_results(const MeleeWebMenuMatchContinuation& continuation,
+                        const MatchExitInfo& terminal,uint32_t seed,
+                        const uint8_t (*final_input)[MELEE_WEB_PAD_STATE_BYTES]){
+ check(continuation.kind==MELEE_WEB_MENU_MATCH_CONTINUATION_RESULTS,
+       "Original match did not supply its typed Results payload");
+ char error[256]{};results_info=continuation.payload.results;
+ results_route_active=true;results_seed=seed;++completed_matches;
+ if(final_input){
+  results_input.reset(melee_web_pad_state_decode(*final_input,MELEE_WEB_PAD_STATE_BYTES,error,sizeof(error)));
+  check(results_input!=nullptr,error);results_borrowed_input=nullptr;
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  results_entry_packet.capture(completed_matches,terminal,results_info,results_seed,*final_input);
+#endif
+ }else{
+  results_borrowed_input=melee_web_menu_host_input(host);
+  check(results_borrowed_input!=nullptr,"Typed SD Results lost its host-owned final PAD bank");
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  results_entry_packet.clear();
+#endif
+ }
+#if defined(MELEE_WEB_PUBLIC_RUNTIME)
+ (void)terminal;
+#endif
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+ results_pad_trace_count=0;results_pad_trace_attempts=0;results_pad_trace_overflow=false;
+ results_camera_entry_snapshot={};
+#endif
+ if(scoped_assets){pending=false;request_assets(AssetDestination::Results);return;}
+ enter_typed_results_world();
+}
+void begin_typed_sudden_death(const MeleeWebMenuMatchContinuation& continuation,
+                             const uint8_t (&final_input)[MELEE_WEB_PAD_STATE_BYTES]){
+ // The original mode callback has already chosen SD. Reject unsupported
+ // timelines now, before any asset request, claim, construction or tick.
+ sudden_death_route_active=true;pending_match_continuation=continuation;
+ check(!replay,"Sudden Death replay timeline is not supported; original continuation was not ticked");
+ check(!melee_web_net_active(),"Sudden Death network timeline is not supported; original continuation was not ticked");
+ char error[256]{};
+ sudden_death_input.reset(melee_web_pad_state_decode(final_input,sizeof(final_input),error,sizeof(error)));
+ check(sudden_death_input!=nullptr,error);
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+ results_entry_packet.clear();
+#endif
+ match_message="Original Sudden Death";
+ if(scoped_assets){pending=false;request_assets(AssetDestination::SuddenDeath);return;}
+ enter_typed_sudden_death_world();
+}
+
+void dispatch_vs_continuation(const MatchExitInfo& terminal,uint32_t seed,
+                              const uint8_t (&final_input)[MELEE_WEB_PAD_STATE_BYTES]){
+ char error[256]{};MeleeWebMenuMatchContinuation continuation{};
+ check(melee_web_menu_host_match_continuation_begin(
+           host,&terminal,seed,&continuation,error,sizeof(error)),error);
+ if(continuation.kind==MELEE_WEB_MENU_MATCH_CONTINUATION_SUDDEN_DEATH){
+  begin_typed_sudden_death(continuation,final_input);return;
+ }
+ check(seed_ptr!=nullptr,"Typed VS Results lost its host RNG owner");
+ begin_typed_results(continuation,terminal,*seed_ptr,&final_input);
+}
+
+void abort_sudden_death_after_failure(const std::string& primary) noexcept {
+ if(!sudden_death_route_active)return;
+ try{close();}catch(const std::exception& cleanup){
+  std::fprintf(stderr,"Sudden Death cleanup after %s: %s\n",primary.c_str(),cleanup.what());
+ }
+}
+
 void advance(){
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
  const melee_web::provenance::Scope provenance(pipeline_context(MELEE_WEB_PIPELINE_PHASE_PREPARATION));
@@ -768,17 +889,22 @@ void advance(){
    const int state=melee_web_menu_host_opening_target_state(host);
    begin_opening_state(state);return;
   }
+  const bool sudden_death=match->sudden_death();
+  if(sudden_death)final_sd_source_frames=match->source_frames();
+  else prior_vs_source_frames=match->source_frames();
   terminal_match_observation=melee_web_native_menu_match_observe();
   report_owner_lifetime("match-before-teardown");
   const bool checking_stock=stock_check==-1;
-  const uint32_t seed=match->random_seed();
-  uint8_t final_input[MELEE_WEB_PAD_STATE_BYTES];melee_web_pad_state_capture(final_input);
+  uint32_t seed=0;uint8_t final_input[MELEE_WEB_PAD_STATE_BYTES]{};
+  MeleeWebMenuMatchContinuation continuation{};
   {
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
    const melee_web::provenance::Scope teardown(pipeline_context(
        MELEE_WEB_PIPELINE_PHASE_TEARDOWN,MELEE_WEB_PIPELINE_SCENE_TEARDOWN));
 #endif
-   match->close();match.reset();
+   if(sudden_death)match->finish_sudden_death(continuation);
+   else match->finish_vs(seed,final_input);
+   match.reset();
    report_owner_lifetime("match-after-teardown");
   }
   // Original MatchEnd computes its ranking during close. Preserve that
@@ -803,32 +929,22 @@ void advance(){
          "Stock diagnostic: source MatchEnd winner or stock accounting was incorrect");
    stock_check=1;
   }
-  ++completed_matches;
   MatchExitInfo terminal{};
-  check(melee_web_match_rules_terminal_data(&terminal),"Original VS exit payload is unavailable");
-  check(melee_web_menu_host_results_begin(host,&terminal,seed,&results_info,error,sizeof(error)),error);
-  results_route_active=true;
-  results_input.reset(melee_web_pad_state_decode(final_input,sizeof(final_input),error,sizeof(error)));
-  check(results_input!=nullptr,error);
-  results_seed=seed;
-#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
-  results_entry_packet.capture(completed_matches,terminal,results_info,results_seed,final_input);
-#endif
-#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
-  results_pad_trace_count=0;results_pad_trace_attempts=0;results_pad_trace_overflow=false;
-  results_camera_entry_snapshot={};
-#endif
-  if(scoped_assets){pending=false;request_assets(AssetDestination::Results);return;}
-  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
-  results=std::make_unique<melee_web::GameplayResultsSession>(files,results_info,seed,*results_input);
-#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
-  results_camera_entry_snapshot=results->camera_entry_snapshot();
-#endif
-  results_input.reset();
-  const double constructed=emscripten_get_now();
-  report_construction("results-enter",started,constructed,constructed,before,aurora_stats_snapshot());
-  first_use_draw_pending=true;pending=false;running=true;audio_phase=0;
-  menu_clock.reset();audio_clock.reset();message="Original Results";return;
+  check(melee_web_match_rules_terminal_data(&terminal),"Original match exit payload is unavailable");
+  if(!terminal_match_observation.empty()&&terminal_match_observation.back()=='}'){
+   terminal_match_observation.pop_back();
+   terminal_match_observation+=",\"sd_source_frames\":"+std::to_string(final_sd_source_frames)+"}";
+  }
+  if(sudden_death){
+   // The public finish captured final SD input internally, after publication.
+   // Results receives the observable exact host bank and entry seed instead.
+   check(seed_ptr!=nullptr,"Typed SD Results lost its host RNG owner");
+   seed=*seed_ptr;
+   pending_match_continuation={};sudden_death_input.reset();
+   begin_typed_results(continuation,terminal,seed,nullptr);return;
+  }
+  prior_vs_terminal=terminal;
+  dispatch_vs_continuation(terminal,seed,final_input);return;
  }
  const int previous_source_scene=pending_menu_source_scene!=0?
      pending_menu_source_scene:melee_web_menu_host_source_scene(host);
@@ -930,6 +1046,8 @@ void advance(){
    melee_web::retail_replay_validate_match_setup(
        *replay,melee_web::retail_replay_next_match_index(*replay,replay_cursor),selection.start);
   match_message=selected_match_message(selection);
+  asset_selection=selection;asset_selection_valid=true;
+  prior_vs_source_frames=final_sd_source_frames=0;prior_vs_terminal={};
   if(scoped_assets){request_assets(AssetDestination::Match,&selection);return;}
   const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
@@ -1000,18 +1118,11 @@ bool finish_asset_handoff(){
   enter_opening_state(pending_opening_state);
   return destination==AssetDestination::OpeningScene;
  }
- if(destination==AssetDestination::Results){
-  check(results_input!=nullptr,"Original Results input was not retained across the asset handoff");
-  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
-  results=std::make_unique<melee_web::GameplayResultsSession>(files,results_info,results_seed,*results_input);
-#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
-  results_camera_entry_snapshot=results->camera_entry_snapshot();
-#endif
-  results_input.reset();
-  const double constructed=emscripten_get_now();
-  report_construction("results-enter",started,constructed,constructed,before,aurora_stats_snapshot());
-  first_use_draw_pending=true;pending=false;running=true;audio_phase=0;menu_clock.reset();audio_clock.reset();
-  message="Original Results";return true;
+ if(destination==AssetDestination::Results){enter_typed_results_world();return true;}
+ if(destination==AssetDestination::SuddenDeath){
+  check(sudden_death_route_active&&sudden_death_input,
+        "Sudden Death asset handoff lost its exact continuation/PAD owner");
+  enter_typed_sudden_death_world();return false;
  }
  if(destination==AssetDestination::Prize){
   const MeleeWebPadState* input=melee_web_menu_host_input(host);
@@ -1052,6 +1163,7 @@ bool advance_match_construction(){
  report_construction(complete?"match-enter":"match-enter-step",started,constructed,constructed,
                      before,aurora_stats_snapshot());
  if(complete){
+  if(match->sudden_death()){sudden_death_input.reset();pending_match_continuation={};}
   if(replay&&replay_trace)melee_web::retail_replay_initial(*replay,true,match->start_data());
   first_use_draw_pending=true;running=true;message=match_message;
  }
@@ -1334,7 +1446,13 @@ void tick(){
     replay_completion.input_consumed=true;
     replay_completion.final_input_drawn=true;
     replay_completion.final_input_owner=static_cast<melee_web::ReplayCompletionOwner>(observed_replay_scene());
-    if(replay->whole_session()){
+    if(replay->diagnostic_entity_prefix){
+     check(replay_prefix_progress.ready(replay->diagnostic_source_observations(),true,true,match!=nullptr,pending,
+           replay_match_complete,replay_outcome,replay->diagnostic_active_entity_prefix),
+           "Diagnostic entity prefix did not consume its bound live source interval and final draw");
+     replay_final_draw=true;replay_completed_now=true;running=false;menu_clock.reset();
+     message="Diagnostic entity prefix complete; whole-session comparison remains incomplete.";
+    }else if(replay->whole_session()){
      check(pending&&(results||prize),
            "Whole-session timeline must end at the final Results or Prize return request");
     }else{
@@ -1540,6 +1658,8 @@ void tick(){
     sample=checked_input;
     --diagnostic_pad_remaining;
    }
+   if(match&&match->sudden_death())
+    check(!replay&&!melee_web_net_active(),"Sudden Death has no admitted replay/network timeline");
    if(melee_web_net_active()){
     // Agreed network input replaces the sample at the replay seam. Without
     // the next frame this is a network wait: no tick and no clock debt.
@@ -1605,7 +1725,14 @@ void tick(){
     else if(replay_whole)
      check(!match->paused(),"Whole-session replay reached an unsupported source pause");
     if(replay_whole)melee_web_cpu_observation_set_event_cursor(replay_cursor);
+    // gm_801A4BA8 is the original scene traversal cursor (MWRO80479d58),
+    // not the gameplay timer returned by source_frames()/gm_GetFrameCount.
+    const auto prefix_tick_before=replay&&replay->diagnostic_entity_prefix?gm_801A4BA8():0;
     match->tick(sample);
+    if(replay&&replay->diagnostic_entity_prefix)
+     check(replay_prefix_progress.observe(prefix_tick_before,gm_801A4BA8(),replay->diagnostic_active_entity_prefix) &&
+           !match->paused()&&!match->complete()&&!match->ending(),
+           "Diagnostic entity prefix lost its original live source boundary");
     if(replay_whole)melee_web_cpu_observation_scheduler_return();
     source_frames.did_step(!replay||replay->closes_draw_batch(replay_cursor));
     int winner=-1;const int outcome=match->outcome(winner);
@@ -1756,7 +1883,7 @@ void tick(){
 #endif
   check(!replay||source_frames.draws()==replay_draw_boundaries,
         "Reference replay source draws disagree with clock batch boundaries");
-  if(replay&&replay->whole_session()&&replay_completion.final_input_drawn){
+  if(replay&&replay->whole_session()&&!replay->diagnostic_entity_prefix&&replay_completion.final_input_drawn){
    replay_completion.live_css_entered=world&&host&&host_entered&&!match&&!results&&!prize&&
        melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CSS;
    replay_completion.preparation_settled=!preparation.busy()&&!pending&&
@@ -1768,7 +1895,10 @@ void tick(){
     message="Whole-session replay complete; final original character select entered.";
    }
   }
- }catch(const std::exception& e){diagnostic_incident(4);running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
+ }catch(const std::exception& e){
+  const std::string primary=e.what();
+  abort_sudden_death_after_failure(primary);
+  diagnostic_incident(4);running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
   const double failed=emscripten_get_now();
   if(input_done<started)input_done=failed;
   if(simulation_done<input_done)simulation_done=failed;
@@ -1874,9 +2004,14 @@ void tick(){
 #else
  ++render_frame;
 #endif
- if(replay_completed_now)EM_ASM({window.menuReplayCompleted?.($0,!!$1,$2,$3,$4);},
+ if(replay_completed_now)EM_ASM({window.menuReplayCompleted?.($0,!!$1,$2,$3,$4,$5,$6,$7,$8,$9);},
                                 replay_cursor,replay_match_complete?1:0,
-                                replay_outcome,replay_winner,observed_replay_scene());
+                                replay_outcome,replay_winner,observed_replay_scene(),
+                                replay&&replay->diagnostic_entity_prefix?(replay->diagnostic_active_entity_prefix?2:1):0,
+                                replay_prefix_progress.observations,
+                                replay_prefix_progress.first_source_tick,
+                                replay_prefix_progress.last_source_tick,
+                                replay?replay->diagnostic_source_observations():0);
  EM_ASM({window.menuFrame?.(!!$0);},running_at_callback_start?1:0);
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
  // Preserve lifecycle records from callbacks that did not draw a source frame.
@@ -1914,7 +2049,7 @@ int melee_web_native_menu_cache_idle(){
  return state==AURORA_PIPELINE_CACHE_READY?1:state==AURORA_PIPELINE_CACHE_ERROR?-1:0;
 }
 int melee_web_native_menu_phase(){
- if(match)return 7;
+ if(match)return match->sudden_death()?14:7;
  if(results)return 8;
  if(prize)return 9;
  if(host&&host_entered){

@@ -51,6 +51,9 @@ typedef struct MeleeWebFighterInputObservation {
  * character. The source hook does not alter cursor, selection, or RNG state. */
 int melee_web_fighter_input_observe(
     int character_kind, MeleeWebFighterInputObservation*);
+/* Same source observation for an explicit original controller/source port. */
+int melee_web_fighter_input_observe_port(
+    unsigned port, int character_kind, MeleeWebFighterInputObservation*);
 
 /* Validate an observation for the requested character kind.  This function
  * only checks caller-supplied data and performs no source reads or writes. */

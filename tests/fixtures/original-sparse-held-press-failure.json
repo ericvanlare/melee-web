@@ -1,0 +1,91 @@
+{
+  "schema": "original-sparse-held-press-failure-v1",
+  "origin": "Actual failed capture, unchanged event/error semantics; no neutral release observed",
+  "observer_sha256": "efea41d2465e331f98bbf92c11d65c424a95efcda23fdf4e6af5d8ee4efcf0df",
+  "rows": [
+    {
+      "seq": 1721,
+      "event": "progress",
+      "timestamp_ns": 2067227714785750,
+      "source_tick": 0,
+      "draw_ordinal": 0,
+      "payload": {
+        "diagnostic": "sd_initialization_prefix",
+        "name": "input",
+        "consumed": 1,
+        "menu_consumed": 527,
+        "pc": 2151118212,
+        "slices": [
+          {
+            "tag": 2,
+            "flags": 0,
+            "address": 2152472440,
+            "hex": "05040400000000008046b108"
+          },
+          {
+            "tag": 3,
+            "flags": 0,
+            "address": 2152116632,
+            "hex": "00000000000000000000009c00000000000000000000ffc000000000000000000000000500000000000000000000ff48"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 1722,
+      "event": "progress",
+      "timestamp_ns": 2067227800860291,
+      "source_tick": 1,
+      "draw_ordinal": 0,
+      "payload": {
+        "diagnostic": "sd_initialization_prefix",
+        "name": "input",
+        "consumed": 2,
+        "menu_consumed": 527,
+        "pc": 2151118212,
+        "slices": [
+          {
+            "tag": 2,
+            "flags": 0,
+            "address": 2152472440,
+            "hex": "05000000000000008046b108"
+          },
+          {
+            "tag": 3,
+            "flags": 0,
+            "address": 2152116680,
+            "hex": "01002300000000000000009c00000000000000000000ff00020000dd000000000000000000000000000000000000ff30"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 1723,
+      "event": "error",
+      "timestamp_ns": 2067227805595125,
+      "source_tick": 2,
+      "draw_ordinal": 0,
+      "payload": {
+        "diagnostic": "sd_initialization_prefix",
+        "name": "input_rejected",
+        "consumed": 3,
+        "menu_consumed": 527,
+        "pc": 2151118212,
+        "slices": [
+          {
+            "tag": 2,
+            "flags": 0,
+            "address": 2152472440,
+            "hex": "05010100000000008046b108"
+          },
+          {
+            "tag": 3,
+            "flags": 0,
+            "address": 2152116488,
+            "hex": "01002300000000000000009c00000000000000000000ff78020000dd000000000000006800000000000000000000ff01"
+          }
+        ]
+      }
+    }
+  ]
+}

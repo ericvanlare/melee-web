@@ -4,21 +4,22 @@
 
 #include <math.h>
 
-extern int melee_web_css_observe(int character_kind, int ids[14],
-                                 float geometry[8]);
+extern int melee_web_css_observe_port(unsigned port, int character_kind,
+                                      int ids[14], float geometry[8]);
 
 static int finite_float(float value)
 {
     return isfinite(value) != 0;
 }
 
-int melee_web_fighter_input_observe(
-    int character_kind, MeleeWebFighterInputObservation* observation)
+int melee_web_fighter_input_observe_port(
+    unsigned port, int character_kind, MeleeWebFighterInputObservation* observation)
 {
     int ids[14];
     float geometry[8];
-    if (!observation ||
-        !melee_web_css_observe(character_kind, ids, geometry))
+    if (port >= PAD_MAX_CONTROLLERS || !observation ||
+        !melee_web_css_observe_port(port, character_kind, ids, geometry) ||
+        ids[0] != (int)port)
         return 0;
     observation->cursor_port = ids[0];
     observation->held_door = ids[1];
@@ -43,6 +44,12 @@ int melee_web_fighter_input_observe(
     observation->target_bottom = geometry[7];
     return melee_web_fighter_input_observe_valid(observation,
                                                  character_kind);
+}
+
+int melee_web_fighter_input_observe(
+    int character_kind, MeleeWebFighterInputObservation* observation)
+{
+    return melee_web_fighter_input_observe_port(0, character_kind, observation);
 }
 
 void melee_web_fighter_input_neutral(PADStatus raw[PAD_MAX_CONTROLLERS])

@@ -13,6 +13,8 @@ from pathlib import Path
 import re
 from typing import Any
 
+from retail_input_plan import AUTHORED_PLAN_VERSION
+
 
 SCHEMA = "melee-web-retail-input-bootstrap-calibration"
 VERSION = 1
@@ -129,6 +131,8 @@ def validate_calibration(value: dict[str, Any], *, plan: dict[str, Any],
                          collector_sha256: str | None = None) -> dict[str, Any]:
     """Validate a calibration against the exact input plan and run identity."""
 
+    _require(plan.get("version") != AUTHORED_PLAN_VERSION,
+             "authored SD declaration has no supported bootstrap capture contract")
     expected_keys = {
         "schema", "version", "mode", "input_plan_sha256", "input_plan_frames",
         "input_plan_source_sha256", "input_plan_policy", "input_plan_first_frame",
@@ -229,6 +233,8 @@ def calibration_record(*, plan: dict[str, Any], plan_sha256: str, provenance: di
                        last_construction_pad_read: dict[str, Any]) -> dict[str, Any]:
     """Create the sidecar emitted by the read-only collector."""
 
+    _require(plan.get("version") != AUTHORED_PLAN_VERSION,
+             "authored SD declaration has no supported bootstrap capture contract")
     return {
         "schema": SCHEMA,
         "version": VERSION,

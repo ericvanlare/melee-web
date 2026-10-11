@@ -83,7 +83,7 @@ static const char kRulesRefusal[] =
     "Menu payload does not match the supported stock/stage rules";
 static const char kTeamRefusal[] =
     "Team Battle payload is outside the supported setups: two to four "
-    "contiguous players, team colours 0-2, and at least two players on "
+    "active source players, team colours 0-2, and at least two players on "
     "different teams";
 
 /* refusal == NULL expects the source preparation/initialization boundary to

@@ -5,6 +5,8 @@
 #include "Core/PowerPC/ReferenceAllocationObserver.h"
 #include "Core/PowerPC/ReferenceAllocationProfile.h"
 #include "Core/PowerPC/ReferenceInputStream.h"
+#include "Core/PowerPC/ReferenceSdInitState.h"
+#include "Core/PowerPC/ReferenceOrdinaryTimeoutState.h"
 
 #include <array>
 #include <algorithm>
@@ -52,6 +54,9 @@ constexpr size_t MAX_SLICES = 64;
 constexpr size_t MAX_RAW = 192 * 1024;
 constexpr u32 PAD_READ_HSD_CALLER = 0x80376A28;
 constexpr u32 CSS_ENTER_RETURN = 0x802669F0;
+constexpr u32 CSS_ENTER = 0x8026688C;
+constexpr u32 SSS_ENTER = 0x8025A998;
+constexpr u32 SSS_ENTER_RETURN = 0x8025B84C;
 // Menu steering sources, as the retail menu owners read them:
 // mnStageSel_803F06D0 is the 30-entry authored stage list (stride 0x1C, stage
 // kind at +0xB), mnStageSel_804D6CAE is the highlighted index, and
@@ -160,6 +165,83 @@ enum class Boundary : u16
   StartupPrizeModeExit = 30,
 };
 
+// gmMain calls HSD_PadInit(5,...). gm_1A45 drains the entire snapshot of
+// that queue before one DrawReturn; never interrupt its authored batch.
+struct EntityPrefixBoundaryProgress
+{
+  static constexpr u32 comparison_ticks = 60;
+  static constexpr u32 queue_capacity = 5;
+  static constexpr u32 maximum_ticks = comparison_ticks + queue_capacity - 1;
+  u32 observations = 0, batch_ticks = 0;
+  bool drawing = false, qualified = false;
+  // -1 rejects, 0 retains, 1 is the first qualifying checked draw.
+  int Observe(Boundary boundary, u32 tick, u8 qnum)
+  {
+    if (qualified || qnum != queue_capacity) return -1;
+    if (boundary == Boundary::SourceTick)
+    {
+      if (drawing || tick != observations || observations >= maximum_ticks ||
+          batch_ticks >= queue_capacity) return -1;
+      ++observations;
+      ++batch_ticks;
+    }
+    else if (boundary == Boundary::DrawEnter)
+    {
+      if (drawing || tick != observations) return -1;
+      drawing = true;
+    }
+    else if (boundary == Boundary::DrawReturn)
+    {
+      if (!drawing || tick != observations) return -1;
+      drawing = false;
+      batch_ticks = 0;
+      if (observations >= comparison_ticks) { qualified = true; return 1; }
+    }
+    else return -1;
+    return 0;
+  }
+};
+
+// Independent named diagnostic: retain Entry/Ready plus sixty observed unit
+// MatchClock advances. At DrawReturn, qualification precedes the diagnostic
+// 600-observation stop: the finishing capacity-five batch may reach 604, and
+// may include the sixtieth advance. This is not an authored Ready duration.
+struct ActiveEntityPrefixBoundaryProgress
+{
+  static constexpr u32 queue_capacity = 5, maximum_ticks = 604;
+  u32 observations = 0, batch_ticks = 0, active_advances = 0, last_clock = 0;
+  bool drawing = false, qualified = false;
+  int Observe(Boundary boundary, u32 tick, u8 qnum, u32 clock = 0)
+  {
+    if (qualified || qnum != queue_capacity) return -1;
+    if (boundary == Boundary::SourceTick)
+    {
+      if (drawing || tick != observations || observations >= maximum_ticks ||
+          batch_ticks >= queue_capacity || (!observations && clock != 0) ||
+          clock < last_clock || clock - last_clock > 1) return -1;
+      active_advances += clock - last_clock;
+      last_clock = clock;
+      ++observations;
+      ++batch_ticks;
+    }
+    else if (boundary == Boundary::DrawEnter)
+    {
+      if (drawing || tick != observations) return -1;
+      drawing = true;
+    }
+    else if (boundary == Boundary::DrawReturn)
+    {
+      if (!drawing || tick != observations) return -1;
+      drawing = false;
+      batch_ticks = 0;
+      if (active_advances >= 60) { qualified = true; return 1; }
+      if (observations >= 600) return -1;
+    }
+    else return -1;
+    return 0;
+  }
+};
+
 enum class SliceTag : u16
 {
   PadStatusAll4 = 1,
@@ -217,6 +299,11 @@ enum class SliceTag : u16
   MenuCssKoCounts = 51,
   PlayerEntities = 52,
   PlayerEntityUserData = 53,
+  SdRumblePorts = 54,  // Opt-in Progress JSON only; never a full save-data slice.
+  SdStageCooldown = 55,  // Recipe-five menu route only; original acceptance gate.
+  SdItemsLock = 56,  // Reduced Items owner only; original u8 animation lock.
+  PlayerIdentity = 57,  // Opt-in entity profile: authored StaticPlayer header.
+  PlayerTransformed = 58,  // Opt-in Zelda/Sheik active-entity indexes.
 };
 
 struct SliceRef
@@ -227,6 +314,18 @@ struct SliceRef
   u32 size;
   u32 offset;
 };
+
+const u8* SparsePadSlotBytes(const u8* raw, size_t raw_size, const SliceRef* slices,
+                             size_t slice_count)
+{
+  if (!raw || !slices || !slice_count)
+    return nullptr;
+  const SliceRef& slot = slices[slice_count - 1];
+  if (slot.tag != SliceTag::PadSlot || slot.size != 0x30 || slot.offset > raw_size ||
+      slot.size > raw_size - slot.offset)
+    return nullptr;
+  return raw + slot.offset;
+}
 
 struct Slot
 {
@@ -435,6 +534,11 @@ constexpr bool IsMem1Range(u32 address, size_t size)
   return address >= 0x80000000U && end <= 0x81800000U;
 }
 
+constexpr u16 ReadBE16(const u8* bytes)
+{
+  return (static_cast<u16>(bytes[0]) << 8) | static_cast<u16>(bytes[1]);
+}
+
 constexpr u32 ReadBE32(const u8* bytes)
 {
   return (static_cast<u32>(bytes[0]) << 24) | (static_cast<u32>(bytes[1]) << 16) |
@@ -491,11 +595,142 @@ std::string Env(const char* name)
   return value ? std::string(value) : std::string();
 }
 
+bool SdInitRequested()
+{
+  static const bool requested = !Env("MWRC_SD_INIT").empty();
+  return requested;
+}
+
+bool OrdinaryTimeoutRequested()
+{
+  return Env("MWRC_SD_MENU_PROBE") == "ordinary_timeout";
+}
+
+bool SparsePairRequested()
+{
+  return Env("MWRC_SD_MENU_PROBE") == "sparse_pair";
+}
+
+bool SparsePadErrorsValid(const u8* pad)
+{
+  return pad[10] == 0 && pad[22] == 0xff && pad[34] == 0 && pad[46] == 0xff;
+}
+
+constexpr u32 SPARSE_SOURCE_SAMPLE_CAP = 8;
+constexpr u32 SPARSE_PREPRESS_NEUTRAL_CAP = 6;
+
+bool SparsePadStatusMatches(const u8* pad, bool pressed)
+{
+  for (u32 port = 0; port < 4; ++port)
+  {
+    // PADStatus defines bytes 0x00..0x0A; byte 0x0B is trailing ABI padding.
+    // Retain all 48 raw bytes in the event, but compare only semantic fields.
+    for (u32 byte = 0; byte < 11; ++byte)
+    {
+      u8 expected = 0;
+      if ((port == 1 || port == 3) && byte == 10)
+        expected = 0xff;
+      if (pressed && port == 0 && byte == 0)
+        expected = 0x01;  // A button, high byte of the original PADStatus buttons.
+      if (pressed && port == 0 && byte == 2)
+        expected = 35;  // Distinct P1 MAIN X.
+      if (pressed && port == 2 && byte == 0)
+        expected = 0x02;  // B button on original source port 2.
+      if (pressed && port == 2 && byte == 3)
+        expected = static_cast<u8>(-35);  // Distinct P3 MAIN Y.
+      if (pad[port * 12 + byte] != expected)
+        return false;
+    }
+  }
+  return true;
+}
+
 bool ActivationRequested()
 {
   return Env("MWRC_ENABLE") == "1" && !Env("MWRC_OUTPUT").empty() &&
          Env("MWRC_DOL_SHA256") == EXPECTED_DOL_SHA256 && Env("MWRC_CPU") == "JITARM64" &&
          Env("MWRC_SOURCE_REV") == "GALE01r2";
+}
+
+bool TransformPrefixPadStatusMatches(const u8* pad, bool down_b)
+{
+  if (!pad)
+    return false;
+  // Each PADStatus occupies 12 ABI bytes, but only bytes 0..10 are fields.
+  // Validate all four source ports and consistently ignore each trailing pad byte.
+  if (down_b)
+  {
+    if (ReadBE16(pad) != 0x0200 || pad[2] != 0 || static_cast<s8>(pad[3]) >= 0 ||
+        !std::all_of(pad + 4, pad + 11, [](u8 value) { return value == 0; }))
+      return false;
+  }
+  else if (!std::all_of(pad, pad + 11, [](u8 value) { return value == 0; }))
+  {
+    return false;
+  }
+  if (!std::all_of(pad + 12, pad + 23, [](u8 value) { return value == 0; }))
+    return false;
+  for (u32 port = 2; port < 4; ++port)
+  {
+    const u8* status = pad + port * 12;
+    if (!std::all_of(status, status + 10, [](u8 value) { return value == 0; }) ||
+        status[10] != 0xff)
+      return false;
+  }
+  return true;
+}
+
+enum class TransformPrefixEntryDisposition
+{
+  IgnoreOpeningAttract,
+  AcceptVsEntry,
+  Reject,
+};
+
+TransformPrefixEntryDisposition ClassifyTransformPrefixEntry(u8 mode, bool vs_entry_seen)
+{
+  if (mode == 0x18 && !vs_entry_seen)
+    return TransformPrefixEntryDisposition::IgnoreOpeningAttract;
+  if (mode == 0x02 && !vs_entry_seen)
+    return TransformPrefixEntryDisposition::AcceptVsEntry;
+  return TransformPrefixEntryDisposition::Reject;
+}
+
+bool TransformPrefixSourceTickIsNext(bool first_seen, u32 previous, u32 current)
+{
+  if (!first_seen)
+    return current == 0;
+  return previous != std::numeric_limits<u32>::max() && current == previous + 1;
+}
+
+bool TransformPrefixReadinessSequencesValid(uint64_t neutral_pad, uint64_t grounded_tick,
+                                            uint64_t down_b_consume)
+{
+  return neutral_pad < grounded_tick && grounded_tick < down_b_consume;
+}
+
+bool TransformPrefixCssOwnerReady(bool source_return_seen, bool mode_two,
+                                  bool live_state_seen, bool doors_seen)
+{
+  return source_return_seen && mode_two && live_state_seen && doors_seen;
+}
+
+bool TransformPrefixSssOwnerReady(bool source_return_seen, bool css_owner_seen,
+                                  bool mode_two, bool stage_index_seen,
+                                  bool stage_kind_seen)
+{
+  return source_return_seen && css_owner_seen && mode_two && stage_index_seen &&
+         stage_kind_seen;
+}
+
+bool TransformPrefixMenuOwnersReady(bool css_owner_seen, bool sss_owner_seen)
+{
+  return css_owner_seen && sss_owner_seen;
+}
+
+bool TransformPrefixTeardownArmed(bool transform_prefix_enabled, bool match_active)
+{
+  return transform_prefix_enabled && match_active;
 }
 
 u32 WholeSessionMatchCount()
@@ -512,7 +747,9 @@ u32 WholeSessionMatchCount()
     if (result > WHOLE_SESSION_MAX_MATCHES)
       return 0;
   }
-  return result >= WHOLE_SESSION_MIN_MATCHES ? result : 0;
+  return result >= WHOLE_SESSION_MIN_MATCHES ||
+         (result == 1 && (Env("MWRC_ENTITY_PROFILE") == "jiggly-ice-mario-fox-v1" ||
+                         Env("MWRC_ENTITY_PROFILE") == "jiggly-ice-mario-fox-active60-v1")) ? result : 0;
 }
 
 bool ValidIdentity(std::string_view value)
@@ -834,8 +1071,20 @@ struct Observer::Impl
       return false;
     }
     whole_session_matches = WholeSessionMatchCount();
+    const std::string entity_profile = Env("MWRC_ENTITY_PROFILE");
+    active_entity_profile = entity_profile == "jiggly-ice-mario-fox-active60-v1";
+    checked_entity_profile = entity_profile == "jiggly-ice-mario-fox-v1" || active_entity_profile;
+    if ((!entity_profile.empty() && !checked_entity_profile) ||
+        (checked_entity_profile && (whole_session_matches != 1 || SdInitRequested() ||
+          !Env("MWRC_CPU_PROBE_OUTPUT").empty() || !Env("MWRC_ITEM_PROBE_OUTPUT").empty() ||
+          !Env("MWRC_ALLOCATION_OUTPUT").empty())))
+      return SetInvalid("Entity profile requires its exact exclusive diagnostic scope"), false;
     capture_id = Env("MWRC_CAPTURE_ID");
     sequence_id = Env("MWRC_SEQUENCE_ID");
+    const std::string transform_prefix_setting = Env("MWRC_TRANSFORM_PREFIX");
+    if (!transform_prefix_setting.empty() && transform_prefix_setting != "1")
+      SetInvalid("MWRC_TRANSFORM_PREFIX must be 1 when set");
+    transform_prefix_enabled = transform_prefix_setting == "1";
     const CpuProbeSettings& cpu_probe = CpuProbeEnvironment();
     cpu_probe_configured = cpu_probe.present;
     cpu_probe_valid = cpu_probe.valid;
@@ -884,9 +1133,63 @@ struct Observer::Impl
     // Dolphin builds with exceptions disabled.  std::thread reports an
     // unavailable worker by terminating; there is no catchable error path.
     writer = std::thread([this] { WriterMain(); });
+    if (!Env("MWRC_SD_MENU_PROBE").empty() && !SdInitRequested())
+    {
+      SetInvalid("SD menu probe requires the opt-in SD diagnostic owner");
+      return false;
+    }
+    if (!Env("MWRC_ORDINARY_POLICY_SHA256").empty() && !SdInitRequested())
+      return SetInvalid("Ordinary policy requires its diagnostic owner"), false;
+    if (!Env("MWRC_SD_PROFILE_GCI_SHA256").empty() &&
+        (!SdInitRequested() || (Env("MWRC_SD_MENU_PROBE") != "rules_ready" &&
+                              Env("MWRC_SD_MENU_PROBE") != "sd_prefix" &&
+                              Env("MWRC_SD_MENU_PROBE") != "competitive_entry" &&
+                              Env("MWRC_SD_MENU_PROBE") != "ordinary_timeout" &&
+                              Env("MWRC_SD_MENU_PROBE") != "items_row" &&
+                              !SparsePairRequested()) ||
+         Env("MWRC_SD_PROFILE_GCI_SHA256") !=
+             "5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729"))
+    {
+      SetInvalid("SD loaded-profile diagnostic identity/scope differs");
+      return false;
+    }
+    if (SdInitRequested())
+    {
+      const std::string hash = Env("MWRC_SD_RECIPE_SHA256");
+      if (Env("MWRC_SD_INIT") != "1" || hash.size() != 64 ||
+          hash.find_first_not_of("0123456789abcdef") != std::string::npos ||
+          hash == std::string(64, '0') || !InputStream::IsRecording() ||
+          !Env("MWRC_WHOLE_SESSION_MATCHES").empty() ||
+          !Env("MWRC_CPU_PROBE_OUTPUT").empty() || !Env("MWRC_ITEM_PROBE_OUTPUT").empty() ||
+          !Env("MWRC_ALLOCATION_OUTPUT").empty() ||
+          (!Env("MWRC_SD_MENU_PROBE").empty() && Env("MWRC_SD_MENU_PROBE") != "rules_ready" &&
+           Env("MWRC_SD_MENU_PROBE") != "sd_prefix" && Env("MWRC_SD_MENU_PROBE") != "items_row" &&
+           Env("MWRC_SD_MENU_PROBE") != "competitive_entry" && !OrdinaryTimeoutRequested() &&
+           !SparsePairRequested()) ||
+          ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "items_row" ||
+            Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() ||
+            SparsePairRequested()) && Env("MWRC_SD_PROFILE_GCI_SHA256").empty()))
+      {
+        SetInvalid("SD prefix requires a recipe hash, native input recording and exclusive scope");
+        return false;
+      }
+      if ((OrdinaryTimeoutRequested() && (Env("MWRC_ORDINARY_POLICY_SHA256") != OrdinaryTimeoutState::policy_hash ||
+           hash != "6cfb538e58ef9692a3ac6c8dac0dcff10129af7e6e14d851dec95583255d5326")) ||
+          (!OrdinaryTimeoutRequested() && !Env("MWRC_ORDINARY_POLICY_SHA256").empty()))
+        return SetInvalid("Ordinary timeout policy requires its exclusive exact identity"), false;
+    }
     if (!Env("MWRC_WHOLE_SESSION_MATCHES").empty() && whole_session_matches == 0)
     {
       SetInvalid("MWRC_WHOLE_SESSION_MATCHES must be a decimal count from 3 through 64");
+      return false;
+    }
+    if (transform_prefix_enabled &&
+        (whole_session_enabled() || !Env("MWRC_WHOLE_SESSION_MATCHES").empty() ||
+         SdInitRequested() || !Env("MWRC_SD_MENU_PROBE").empty() ||
+         !Env("MWRC_ORDINARY_POLICY_SHA256").empty() || cpu_probe_configured ||
+         item_probe_configured || AllocationConfigured() || !InputStream::IsRecording()))
+    {
+      SetInvalid("Sheik transform prefix requires exclusive original input recording scope");
       return false;
     }
     if (whole_session_enabled() && (!ValidIdentity(capture_id) || !ValidIdentity(sequence_id)))
@@ -946,6 +1249,19 @@ struct Observer::Impl
                    std::to_string(whole_session_matches) + ",\"capture_id\":\"" +
                    JsonEscape(capture_id) + "\",\"sequence_id\":\"" +
                    JsonEscape(sequence_id) + "\"";
+    if (transform_prefix_enabled)
+      handshake += ",\"diagnostic\":\"sheik_transform_prefix\",\"max_active_source_ticks\":600"
+                   ",\"completion_boundary\":\"active_sheik_grounded_neutral_source_tick_after_owner_change\"";
+    if (SdInitRequested())
+      handshake += ",\"diagnostic\":\"sd_initialization_prefix\",\"recipe_sha256\":\"" +
+                   Env("MWRC_SD_RECIPE_SHA256") + "\",\"menu_probe\":\"" +
+                   Env("MWRC_SD_MENU_PROBE") + "\"";
+    if (!Env("MWRC_SD_PROFILE_GCI_SHA256").empty())
+      handshake += ",\"profile_gci_sha256\":\"" + Env("MWRC_SD_PROFILE_GCI_SHA256") + "\"";
+    if (OrdinaryTimeoutRequested())
+      handshake += ",\"ordinary_policy_sha256\":\"" + Env("MWRC_ORDINARY_POLICY_SHA256") + "\"";
+    if (checked_entity_profile)
+      handshake += ",\"entity_profile\":\"" + Env("MWRC_ENTITY_PROFILE") + "\"";
     handshake += "}";
     PushJson(Event::Handshake, handshake);
     std::string start =
@@ -958,6 +1274,11 @@ struct Observer::Impl
                JsonEscape(sequence_id) + "\"";
     else
       start += "\"";
+    if (checked_entity_profile)
+      start += ",\"entity_profile\":\"" + Env("MWRC_ENTITY_PROFILE") + "\"";
+    if (transform_prefix_enabled)
+      start += ",\"diagnostic\":\"sheik_transform_prefix\",\"max_active_source_ticks\":600"
+               ",\"completion_boundary\":\"active_sheik_grounded_neutral_source_tick_after_owner_change\"";
     start += "}";
     PushJson(Event::Start, start);
     return !invalid.load();
@@ -1036,6 +1357,93 @@ struct Observer::Impl
     if (!ReadBytes(system, address, bytes.size(), bytes.data()))
       return false;
     *value = ReadBE32(bytes.data());
+    return true;
+  }
+
+  bool TransformPrefixRosterValid(Core::System* system) const
+  {
+    std::array<u8, 0x138> setup{};
+    if (!setup_pointer || active_slot_count != 2 || cpu_slots[0] || cpu_slots[1] ||
+        fighter_entity_count[0] != 2 || fighter_entity_count[1] != 1 ||
+        fighter_entity_count[2] != 0 || fighter_entity_count[3] != 0 ||
+        fighter_entity_kinds[0][0] != 19 || fighter_entity_kinds[0][1] != 7 ||
+        fighter_entity_kinds[1][0] != 0 ||
+        !ReadBytes(system, setup_pointer, setup.size(), setup.data()))
+      return false;
+    // StartMeleeData stores character kind/player type at +0x60/+0x61 and
+    // +0x84/+0x85. This opt-in probe is only the original human Zelda-versus-
+    // Mario setup; a CSS Sheik or an added port is a different experiment.
+    return (setup[4] & 0x40) != 0 && setup[0x60] == 18 && setup[0x61] == 0 &&
+           setup[0x84] == 8 && setup[0x85] == 0 && ReadBE16(setup.data() + 0x0e) == 32 &&
+           (setup[2] & 0x80) != 0 && setup[0x62] == 4 && setup[0x86] == 4;
+  }
+
+  bool AddTransformPrefixOwnerSlices(Core::System* system, u32* active_entity_index,
+                                     u32* active_kind, u32* active_fighter)
+  {
+    if (!active_entity_index || !active_kind || !active_fighter)
+      return false;
+    u8 resolved_kind = 0;
+    u32 resolved_fighter = 0;
+    for (u32 slot = 0; slot < 2; ++slot)
+    {
+      const u32 player = 0x80453080 + slot * 0xe90;
+      const u32 entities = player + 0xb0;
+      std::array<u8, 8> entity_bytes{};
+      const u32 expected_count = slot == 0 ? 2 : 1;
+      if (fighter_entity_count[slot] != expected_count ||
+          !ReadBytes(system, entities, entity_bytes.size(), entity_bytes.data()))
+        return false;
+      const u32 first_gobj = ReadBE32(entity_bytes.data());
+      const u32 second_gobj = ReadBE32(entity_bytes.data() + 4);
+      if (!first_gobj || (slot == 0 ? (!second_gobj || second_gobj == first_gobj) :
+                                      second_gobj != 0))
+        return false;
+      if (slot == 0)
+      {
+        std::array<u8, 2> transformed{};
+        if (!ReadBytes(system, player + 0x0c, transformed.size(), transformed.data()) ||
+            transformed[0] > 1 || transformed[1] > 1 ||
+            transformed[0] == transformed[1] ||
+            !AddSlice(system, SliceTag::PlayerEntities, entities, entity_bytes.size(), 0) ||
+            !AddSlice(system, SliceTag::PlayerTransformed, player + 0x0c,
+                      transformed.size(), 0))
+          return false;
+        *active_entity_index = transformed[0];
+      }
+      else if (!AddSlice(system, SliceTag::PlayerEntities, entities,
+                         entity_bytes.size(), static_cast<u16>(slot)))
+      {
+        return false;
+      }
+
+      for (u32 entity_index = 0; entity_index < expected_count; ++entity_index)
+      {
+        const u32 gobj = entity_index == 0 ? first_gobj : second_gobj;
+        const u32 fighter = fighter_entity_pointers[slot][entity_index];
+        const u32 kind_expected = fighter_entity_kinds[slot][entity_index];
+        const u16 flags = FighterEntitySliceFlags(slot, entity_index);
+        u32 user_data = 0, backlink = 0, kind = 0;
+        u8 source_slot = 0xff;
+        if (!IsMem1Range(gobj, 0x30) || !IsMem1Range(fighter, 0x100) ||
+            !ReadU32(system, gobj + 0x2c, &user_data) || user_data != fighter ||
+            !ReadU32(system, fighter, &backlink) || backlink != gobj ||
+            !ReadFighterSourceSlot(system, fighter, &source_slot) || source_slot != slot ||
+            !ReadU32(system, fighter + 4, &kind) || kind != kind_expected ||
+            !AddSlice(system, SliceTag::PlayerEntityUserData, gobj + 0x2c, 4, flags) ||
+            !AddSlice(system, SliceTag::FighterHead, fighter, 0x100, flags))
+          return false;
+        if (slot == 0 && entity_index == *active_entity_index)
+        {
+          resolved_kind = static_cast<u8>(kind);
+          resolved_fighter = fighter;
+        }
+      }
+    }
+    if (!resolved_fighter)
+      return false;
+    *active_kind = resolved_kind;
+    *active_fighter = resolved_fighter;
     return true;
   }
 
@@ -1809,6 +2217,14 @@ struct Observer::Impl
     return true;
   }
 
+  bool HasSingleSlice(SliceTag tag) const
+  {
+    size_t matches = 0;
+    for (size_t index = 0; index < slice_count; ++index)
+      matches += slices[index].tag == tag;
+    return matches == 1;
+  }
+
   bool AddFighterSlices(Core::System* system, u32 slot, u32 entity_index, u32 pointer)
   {
     const u16 flags = FighterEntitySliceFlags(slot, entity_index);
@@ -1829,8 +2245,90 @@ struct Observer::Impl
     return true;
   }
 
+  // Only the explicit diagnostic profile admits a follower. These source
+  // identities come from player.h/ft/types.h and ftMapping_list in player.c.
+  // No guest pointer is accepted merely because it was seen by Fighter_Create.
+  bool AddCheckedPlayerEntitySlices(Core::System* system, u32 requested_slot)
+  {
+    if (requested_slot >= 4 || active_slot_count != 4)
+      return SetInvalid("Entity profile requires four declared source slots"), false;
+    constexpr std::array<u32, 4> characters{15, 14, 8, 2};
+    constexpr std::array<std::array<u32, 2>, 4> kinds{{{15, 0}, {10, 11}, {0, 0}, {1, 0}}};
+    std::array<u32, 5> seen_gobjs{}, seen_fighters{};
+    size_t seen_count = 0;
+    std::array<std::array<u32, 2>, 4> gobjs{};
+    for (u32 slot = 0; slot < 4; ++slot)
+    {
+      const u32 player = 0x80453080 + slot * 0xe90;
+      std::array<u8, 0x10> identity{};
+      std::array<u8, 8> entities{};
+      if (!ReadBytes(system, player, identity.size(), identity.data()) ||
+          !ReadBytes(system, player + 0xb0, entities.size(), entities.data()))
+        return SetInvalid("Entity profile player ownership escaped its source range"), false;
+      const u32 type = ReadBE32(identity.data() + 8);
+      const u32 count = slot == 1 ? 2 : 1;
+      if (ReadBE32(identity.data() + 4) != characters[slot] || type != 1 ||
+          identity[0xc] != 0 || identity[0xd] != 1 ||
+          !fighter_present[slot] || fighter_entity_count[slot] != count ||
+          fighter_pointers[slot] != fighter_entity_pointers[slot][0])
+        return SetInvalid("Entity profile character/type/form/ordinal inventory differs"), false;
+      for (u32 ordinal = 0; ordinal < 2; ++ordinal)
+      {
+        const u32 gobj = ReadBE32(entities.data() + ordinal * 4);
+        gobjs[slot][ordinal] = gobj;
+        if (ordinal >= count)
+        {
+          if (gobj || fighter_entity_pointers[slot][ordinal])
+            return SetInvalid("Entity profile has an undeclared follower"), false;
+          continue;
+        }
+        u32 fighter = 0;
+        std::array<u8, 0x10> head{};
+        if (!gobj || !IsMem1Range(gobj, 0x30) ||
+            !ReadU32(system, gobj + 0x2c, &fighter) ||
+            !fighter || !IsMem1Range(fighter, 0x100) ||
+            !ReadBytes(system, fighter, head.size(), head.data()) ||
+            fighter == gobj || fighter != fighter_entity_pointers[slot][ordinal] ||
+            ReadBE32(head.data()) != gobj || head[0xc] != slot ||
+            ReadBE32(head.data() + 4) != kinds[slot][ordinal] ||
+            fighter_entity_kinds[slot][ordinal] != kinds[slot][ordinal])
+          return SetInvalid("Entity profile GObj/Fighter/registered owner differs"), false;
+        for (size_t earlier = 0; earlier < seen_count; ++earlier)
+          if (seen_gobjs[earlier] == gobj || seen_fighters[earlier] == fighter ||
+              seen_gobjs[earlier] == fighter || seen_fighters[earlier] == gobj)
+            return SetInvalid("Entity profile aliases another source entity owner"), false;
+        seen_gobjs[seen_count] = gobj;
+        seen_fighters[seen_count++] = fighter;
+      }
+    }
+    for (u32 slot = 4; slot < 6; ++slot)
+    {
+      u32 type = 0;
+      std::array<u8, 8> entities{};
+      const u32 player = 0x80453080 + slot * 0xe90;
+      if (!ReadU32(system, player + 8, &type) || type != 3 ||
+          !ReadBytes(system, player + 0xb0, entities.size(), entities.data()) ||
+          ReadBE32(entities.data()) || ReadBE32(entities.data() + 4))
+        return SetInvalid("Entity profile has an undeclared active source slot"), false;
+    }
+    const u32 player = 0x80453080 + requested_slot * 0xe90;
+    if (!AddSlice(system, SliceTag::PlayerIdentity, player, 0x10,
+                  static_cast<u16>(requested_slot)) ||
+        !AddSlice(system, SliceTag::PlayerEntities, player + 0xb0, 8,
+                  static_cast<u16>(requested_slot)))
+      return SetInvalid("Entity profile relationship slices escaped source ranges"), false;
+    for (u32 ordinal = 0; ordinal < fighter_entity_count[requested_slot]; ++ordinal)
+      if (!AddSlice(system, SliceTag::PlayerEntityUserData,
+                    gobjs[requested_slot][ordinal] + 0x2c, 4,
+                    FighterEntitySliceFlags(requested_slot, ordinal)))
+        return SetInvalid("Entity profile user-data slice escaped source ranges"), false;
+    return true;
+  }
+
   bool AddPlayerEntitySlices(Core::System* system, u32 slot)
   {
+    if (checked_entity_profile)
+      return AddCheckedPlayerEntitySlices(system, slot);
     // StaticPlayer is the pinned GALE01r2 source table at 0x80453080 with
     // 0xe90-byte records. Its two HSD_GObj* player_entity fields begin at
     // +0xb0 (melee/pl/player.h). HSD_GObj::user_data is at +0x2c
@@ -2048,16 +2546,58 @@ struct Observer::Impl
         (!AddSlice(system, SliceTag::MenuMainFlow, 0x804a04f0, 0x18) ||
          !AddSlice(system, SliceTag::MenuMainInput, 0x804d6bc8, 8)))
       return false;
+    if (scene_kind == 1 && (Env("MWRC_SD_MENU_PROBE") == "items_row" ||
+                            Env("MWRC_SD_MENU_PROBE") == "sd_prefix" ||
+                            Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()))
+    {
+      u8 menu_kind = 0;
+      if (!ReadBytes(system, 0x804a04f0, 1, &menu_kind))
+        return false;
+      if (menu_kind == 16)
+      {
+        // fn_80233E10: lbz r0,-0x4ab4(r13), cmpwi, bne.
+        // Verified original r13=0x804db6a0 derives u8 0x804d6bec.
+        const std::array<u32, 3> words = {0x880db54c, 0x28000000, 0x40820180};
+        for (size_t i = 0; i < words.size(); ++i)
+        {
+          u32 word = 0;
+          if (!ReadU32(system, 0x80233ec0 + static_cast<u32>(i * 4), &word) || word != words[i])
+            return false;
+        }
+        if (!AddSlice(system, SliceTag::SdItemsLock, 0x804d6bec, 1))
+          return false;
+      }
+    }
     // Source menu globals survive arena teardown. PAD interrupts can run
     // inside OnEnter while those globals still point into the old arena.
     // Publish CSS steering only after the verified OnEnter return.
-    if (scene_kind == 8 && whole_session_enabled() && !css_steering_ready)
+    if (scene_kind == 8 && (whole_session_enabled() || SdInitRequested()) && !css_steering_ready)
+      return true;
+    if (scene_kind == 8 && transform_prefix_enabled && !transform_prefix_css_ready)
       return true;
     if (scene_kind == 8 && !AddCssCpuSteeringSlices(system))
       return false;
     // Menu globals retain pointers after their scene arena is reclaimed.
     // Observe each steering owner only in its live source menu scene.
     u8 stage_index = 0;
+    if (scene_kind == 9 && transform_prefix_enabled && !transform_prefix_sss_ready)
+      return true;
+    if (scene_kind == 9 && (Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()))
+    {
+      if (!sd_sss_ready)
+        return true;
+      // mnStageSel_80259C28 tests lwz r0,-0x49fc(r13), cmpwi, bne
+      // before accepting confirmation. Original GALE01r2 r13 is 0x804db6a0.
+      const std::array<u32, 3> words = {0x800db604, 0x28000000, 0x40820128};
+      for (size_t i = 0; i < words.size(); ++i)
+      {
+        u32 word = 0;
+        if (!ReadU32(system, 0x80259c3c + static_cast<u32>(i * 4), &word) || word != words[i])
+          return false;
+      }
+      if (!AddSlice(system, SliceTag::SdStageCooldown, 0x804d6ca4, 4))
+        return false;
+    }
     if (scene_kind == 9 && ReadBytes(system, STAGE_SELECT_INDEX, 1, &stage_index))
     {
       if (!AddSlice(system, SliceTag::StageSelectIndex, STAGE_SELECT_INDEX, 1))
@@ -2069,6 +2609,16 @@ struct Observer::Impl
         if (!AddSlice(system, SliceTag::StageSelectKind, kind_address, 1))
           return false;
       }
+    }
+    if (scene_kind == 9 && transform_prefix_enabled)
+    {
+      u8 source_mode = 0;
+      if (!ReadBytes(system, 0x80479d30, 1, &source_mode))
+        return false;
+      transform_prefix_sss_live_owner_seen |= TransformPrefixSssOwnerReady(
+          transform_prefix_sss_ready, transform_prefix_css_live_owner_seen,
+          source_mode == 0x02, HasSingleSlice(SliceTag::StageSelectIndex),
+          HasSingleSlice(SliceTag::StageSelectKind));
     }
     if (scene_kind != 8)
       return true;
@@ -2084,6 +2634,16 @@ struct Observer::Impl
       if (!AddSlice(system, SliceTag::MenuCssCursor, cursor, CSS_CURSOR_BYTES,
                     static_cast<u16>(port)))
         return false;
+    }
+    if (transform_prefix_enabled)
+    {
+      u8 source_mode = 0;
+      if (!ReadBytes(system, 0x80479d30, 1, &source_mode))
+        return false;
+      transform_prefix_css_live_owner_seen |= TransformPrefixCssOwnerReady(
+          transform_prefix_css_ready, source_mode == 0x02,
+          HasSingleSlice(SliceTag::MenuCssLiveState),
+          HasSingleSlice(SliceTag::MenuCssDoors));
     }
     return true;
   }
@@ -2297,6 +2857,486 @@ struct Observer::Impl
     }
   }
 
+  bool AddOrdinaryLive(Core::System* system, std::array<u8, 2>* stocks,
+                       std::array<u32, 2>* positions)
+  {
+    // gm_Scene_Vs_OnExit publishes MatchEnd without destroying fighters.
+    // Nevertheless revalidate each StaticPlayer->GObj->Fighter link at every
+    // scheduled/terminal observation; recorded creation pointers alone do not
+    // attest current ownership. Arena retirement clears them before completion.
+    if (sd_init.phase != SdInitState::Phase::VsActive && sd_init.phase != SdInitState::Phase::VsExited)
+      return false;
+    u32 scene = 0;
+    u8 kind = 0, mode = 0;
+    if (!ReadU32(system, 0x804d6720, &scene) || !scene ||
+        !ReadBytes(system, scene, 1, &kind) || kind != 2 ||
+        !ReadBytes(system, 0x80479d30, 1, &mode) || mode != 2 ||
+        !AddSceneKindSlice(system) || !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6))
+      return false;
+    for (u32 slot = 0; slot < 2; ++slot)
+    {
+      std::array<u8, 0x100> head{};
+      u32 damage = 1;
+      if (!fighter_present[slot] || !AddPlayerEntitySlices(system, slot) ||
+          !ReadBytes(system, fighter_pointers[slot], head.size(), head.data()) ||
+          head[12] != slot || ReadBE32(head.data() + 4) != 0 ||
+          !ReadU32(system, fighter_pointers[slot] + 0x1830, &damage) || damage != 0 ||
+          !ReadBytes(system, 0x80453080 + slot * 0xe90 + 0x8e, 1, &(*stocks)[slot]) ||
+          !AddSlice(system, SliceTag::FighterHead, fighter_pointers[slot], 0x100, slot) ||
+          !AddSlice(system, SliceTag::FighterDamageShield, fighter_pointers[slot] + 0x1830, 4, slot) ||
+          !AddSlice(system, SliceTag::FighterStocks, 0x80453080 + slot * 0xe90 + 0x8e, 1, slot))
+        return false;
+      (*positions)[slot] = ReadBE32(head.data() + 0xb0);
+    }
+    return true;
+  }
+
+  void SdEvent(const char* name, u32 pc, u32 tick, Event event = Event::Progress)
+  {
+    std::string json = "{\"diagnostic\":\"sd_initialization_prefix\",\"name\":\"" +
+                       std::string(name) + "\",\"consumed\":" +
+                       std::to_string(sd_init.consumed) + ",\"menu_consumed\":" +
+                       std::to_string(sd_menu_consumed) + ",\"pc\":" + std::to_string(pc) + ",\"slices\":[";
+    for (size_t index = 0; index < slice_count; ++index)
+    {
+      const auto& slice = slices[index];
+      if (index) json += ",";
+      json += "{\"tag\":" + std::to_string(static_cast<u16>(slice.tag)) +
+              ",\"flags\":" + std::to_string(slice.flags) + ",\"address\":" +
+              std::to_string(slice.address) + ",\"hex\":\"";
+      if (!AppendHexBytes(&json, raw.data() + slice.offset, slice.size))
+        return SetInvalid("SD prefix hex payload exceeds its bound"), void();
+      json += "\"}";
+    }
+    json += "]}";
+    if (OrdinaryTimeoutRequested())
+    {
+      const std::string event_name(name);
+      const size_t cap = event_name == "menu" ? 6144 :
+                         (event_name == "input" || event_name == "menu_input" || event_name == "vs_retired") ? 512 :
+                         event_name == "tick" ? 2048 : event_name == "vs_setup" ? 4096 :
+                         (event_name == "vs_exit" || event_name == "terminal_rejected") ? 8192 : 65536;
+      if (json.size() > cap)
+        return SetInvalid("Ordinary timeout event exceeds its serialized ceiling"), void();
+    }
+    PushJson(event, json, pc, tick);
+  }
+
+  void OrdinaryTerminalFailure(const char* reason, u32 pc, u32 tick)
+  {
+    // Preserve the actual slices already read at this failed publication.
+    // This is an error record, never a successful vs_exit or input completion.
+    SdEvent("terminal_rejected", pc, tick, Event::Error);
+    SetInvalid(reason);
+  }
+
+  void SparseInputFailure(const char* reason, u32 pc, u32 tick)
+  {
+    // Preserve the queue descriptor and consumed full four-port slot already
+    // read at this boundary. Error-only: never a successful input or finish.
+    SdEvent("input_rejected", pc, tick, Event::Error);
+    SetInvalid(reason);
+  }
+
+  void ObserveSdInit(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
+  {
+    u32 tick = 0;
+    if (!ReadU32(system, 0x80479d58, &tick))
+      return SetInvalid("SD prefix source counter is invalid"), void();
+    raw_size = 0;
+    slice_count = 0;
+    if ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()) &&
+        (pc == 0x8025a998 || pc == 0x8025b84c))
+    {
+      u32 word = 0;
+      if (!ReadU32(system, pc, &word) || word != (pc == 0x8025a998 ? 0x7c0802a6 : 0x4e800020))
+        return SetInvalid("SD prefix SSS readiness instruction differs"), void();
+      sd_sss_ready = pc == 0x8025b84c;
+      return;
+    }
+    if (pc == CSS_ENTER_RETURN)
+    {
+      u32 word = 0;
+      if (!ReadU32(system, pc, &word) || word != 0x4e800020)
+        return SetInvalid("SD prefix CSS readiness instruction differs"), void();
+      css_steering_ready = true;
+      return;
+    }
+    if (pc == 0x8026688c) css_steering_ready = false;
+    if (pc == 0x8034dd8c)
+    {
+      u32 caller = 0;
+      if (!ReadU32(system, state->gpr[1] + 0x54, &caller) || caller != PAD_READ_HSD_CALLER)
+        return;
+      if (!BoundaryInstructionMatches(system, pc) || !AddSceneKindSlice(system) ||
+          !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6) ||
+          !AddMenuSteeringSlices(system))
+        return SetInvalid("SD prefix menu polling owner is invalid"), void();
+      if (sd_init.phase == SdInitState::Phase::Menu)
+      {
+        if (++sd_menu_polls > 7200)
+          return SetInvalid("SD prefix menu polling cap exhausted"), void();
+        SdEvent("menu", pc, tick);
+        if (Env("MWRC_SD_MENU_PROBE") == "items_row" && sd_rules_observed && sd_menu_neutral)
+        {
+          std::array<u8, 0x18> flow{};
+          std::array<u8, 8> input{};
+          u8 lock = 1;
+          if (raw[0] == 1 && ReadBytes(system, 0x804a04f0, flow.size(), flow.data()) &&
+              ReadBytes(system, 0x804d6bc8, input.size(), input.data()) &&
+              ReadBytes(system, 0x804d6bec, 1, &lock) && flow[0] == 16 &&
+              flow[2] == 0 && flow[3] == 31 && flow[4] == 3 && flow[0x11] == 1 &&
+              input[0] == 0 && input[1] == 0 && lock == 0)
+          {
+            SdEvent("items_ready", pc, tick);
+            InputStream::RequestFinish(true);
+            natural_completion.store(false);
+            finish_requested.store(true);
+          }
+        }
+        if (!sd_rules_observed && !Env("MWRC_SD_MENU_PROBE").empty() && sd_menu_consumed && sd_menu_neutral)
+        {
+          std::array<u8, 0x18> flow{};
+          std::array<u8, 8> input{};
+          u32 profile = 0;
+          const u8* scene = raw.data();
+          if (scene[0] == 1 && ReadBytes(system, 0x804a04f0, flow.size(), flow.data()) &&
+              ReadBytes(system, 0x804d6bc8, input.size(), input.data()) &&
+              flow[0] == 13 && flow[2] == 0 && flow[3] == 0 && flow[4] == 0 &&
+              // Original Confirm preserves forward-entry direction after
+              // cooldown; only the exact GCI campaign takes this route.
+              flow[0x11] == (Env("MWRC_SD_PROFILE_GCI_SHA256").empty() ? 0 : 1) &&
+              input[0] == 0 && input[1] == 0)
+          {
+            if (!ReadProfileRoot(system, &profile) ||
+                !AddSlice(system, SliceTag::SdRumblePorts, profile + 0x1cc0, 4))
+              return SetInvalid("SD Rules probe profile is invalid"), void();
+            if (!Env("MWRC_SD_PROFILE_GCI_SHA256").empty())
+            {
+              // Existing typed profile ranges, now observed at this reduced
+              // gate. Actual getter words bind both roots before reading them.
+              const std::array<u32, 6> words = {0x806d8840, 0x38631868, 0x4e800020,
+                                               0x806d8840, 0x38632ff8, 0x4e800020};
+              for (size_t i = 0; i < words.size(); ++i)
+              {
+                u32 word = 0;
+                if (!ReadU32(system, 0x8015cc40 + static_cast<u32>(i * 4), &word) || word != words[i])
+                  return SetInvalid("SD loaded-profile getter identity differs"), void();
+              }
+              if (!AddProfileSlices(system) || !AddProfileContextSlices(system))
+                return SetInvalid("SD loaded-profile context is missing"), void();
+            }
+            SdEvent("rules_ready", pc, tick);
+            sd_rules_observed = true;
+            if (Env("MWRC_SD_MENU_PROBE") == "rules_ready")
+            {
+              InputStream::RequestFinish(true);
+              natural_completion.store(false);
+              finish_requested.store(true);
+            }
+          }
+        }
+      }
+      return;
+    }
+    if (pc == 0x80390eb4 && sd_init.phase != SdInitState::Phase::Menu)
+    {
+      if (SparsePairRequested())
+        return;  // This milestone stops at consumed input, before gameplay ticks.
+      if (!BoundaryInstructionMatches(system, pc) ||
+          !AddSlice(system, SliceTag::MatchClock, 0x8046b6a0, 0x2e))
+        return SetInvalid("SD prefix scheduler return instruction differs"), void();
+      if (OrdinaryTimeoutRequested())
+      {
+        std::array<u8, 2> stocks{};
+        std::array<u32, 2> positions{};
+        if (sd_init.phase != SdInitState::Phase::VsActive || !AddOrdinaryLive(system, &stocks, &positions) ||
+            !ordinary_timeout.Tick(tick, ReadBE32(raw.data() + 0x24), ReadBE32(raw.data() + 0x28),
+                                   (raw[0x2c] << 8) | raw[0x2d], stocks[0], stocks[1], positions[0], positions[1]))
+          return SetInvalid("Ordinary timeout source clock/live ownership/policy differs"), void();
+      }
+      SdEvent("tick", pc, tick);
+      return;
+    }
+    if (pc == 0x8016e934 || pc == 0x8016ebc0)
+    {
+      const bool sudden = pc == 0x8016ebc0;
+      if (sudden && (Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested()))
+        return SetInvalid("Competitive profile entry cannot admit SD"), void();
+      u32 word = 0, root = 0, scene = 0;
+      std::array<u8, 6> route{};
+      if (!ReadU32(system, pc, &word) || word != 0x7c0802a6 ||
+          !ReadU32(system, 0x804d6720, &scene) || !scene ||
+          !ReadBytes(system, 0x80479d30, route.size(), route.data()))
+        return SetInvalid("SD prefix entry instruction/routing is invalid"), void();
+      const auto* kind = system->GetMemory().GetPointerForRange(scene, 1);
+      // Opening demos also use the VS initializer. They are outside this recipe.
+      if (!sudden && sd_init.phase == SdInitState::Phase::Menu && route[0] == 0x18) return;
+      if (Env("MWRC_SD_MENU_PROBE") == "rules_ready" || Env("MWRC_SD_MENU_PROBE") == "items_row")
+        return SetInvalid("SD Rules probe entered undeclared gameplay"), void();
+      if (!kind || *kind != (sudden ? 3 : 2) || route[0] != 2 ||
+          !sd_init.Entry(state->gpr[3], sudden))
+        return SetInvalid("SD prefix entry is missing its declared phase"), void();
+      // Actual getter words load gmMainLib_804D3EE0 and add +0x590.
+      const std::array<u32, 3> getter = {0x806d8840, 0x38630590, 0x4e800020};
+      for (size_t i = 0; i < getter.size(); ++i)
+        if (!ReadU32(system, 0x801a5244 + static_cast<u32>(i * 4), &word) || word != getter[i])
+          return SetInvalid("SD prefix VS payload getter differs from verified DOL"), void();
+      if (!ReadProfileRoot(system, &root) || root > UINT32_MAX - 0x1868 ||
+          !AddSlice(system, SliceTag::MatchSetup, sd_init.setup_pointer, 0x138) ||
+          !AddSlice(system, SliceTag::MatchSetup, root + 0x598, 0x138, 1) ||
+          !AddSlice(system, SliceTag::ProfileGameRules, root + 0x1850, 0x18) ||
+          !AddSlice(system, SliceTag::SdRumblePorts, root + 0x1cc0, 4) ||
+          !AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358) || !AddProfileSlices(system) ||
+          !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6) || !AddSceneKindSlice(system))
+        return SetInvalid("SD prefix setup/persistent VS payload is invalid"), void();
+      if ((Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()) &&
+          !AddSlice(system, SliceTag::ProfileSaveData, root + PROFILE_SAVE_DATA_OFFSET, PROFILE_SAVE_DATA_SIZE))
+        return SetInvalid("Original committed profile/save data is missing"), void();
+      u32 rng = 0;
+      if (!ReadU32(system, 0x804d5f94, &rng) || !rng ||
+          !AddSlice(system, SliceTag::RngPointer, 0x804d5f94, 4) ||
+          !AddSlice(system, SliceTag::RngValue, rng, 4))
+        return SetInvalid("SD prefix RNG context is invalid"), void();
+      fighter_present.fill(false);
+      fighter_pointers.fill(0);
+      sparse_setup_seen = false;
+      sparse_setup_consumed = 0;
+      sparse_source_samples = 0;
+      sparse_prepress_neutral_samples = 0;
+      sparse_witness_phase = 0;
+      SdEvent(sudden ? "sd_entry" : "vs_entry", pc, tick);
+      return;
+    }
+    if (pc == 0x800693a8 &&
+        (sd_init.phase == SdInitState::Phase::VsSetup || sd_init.phase == SdInitState::Phase::SdSetup))
+    {
+      u32 pointer = 0;
+      u8 slot = 0xff;
+      if (!BoundaryInstructionMatches(system, pc) ||
+          !ReadU32(system, state->gpr[3] + 0x2c, &pointer) ||
+          !ReadFighterSourceSlot(system, pointer, &slot) ||
+          (SparsePairRequested() ? (slot != 0 && slot != 2) : slot > 1) || fighter_present[slot])
+        return SetInvalid("SD prefix fighter creation is missing, repeated or outside its declared source pair"), void();
+      fighter_present[slot] = true;
+      fighter_pointers[slot] = pointer;
+      return;
+    }
+    if (pc == 0x80377584)
+    {
+      std::array<u8, 0xc> queue{};
+      const bool menu = sd_init.phase == SdInitState::Phase::Menu;
+      const bool sparse_active = SparsePairRequested() && sd_init.phase == SdInitState::Phase::VsActive;
+      const u32 sparse_cap = sparse_setup_consumed + SPARSE_SOURCE_SAMPLE_CAP;
+      if (!BoundaryInstructionMatches(system, pc) ||
+          (!menu && !sd_init.Consume(sparse_active ? sparse_cap :
+                                     OrdinaryTimeoutRequested() ? 29523 : SdInitState::sample_cap)) ||
+          !ReadBytes(system, 0x804c1f78, queue.size(), queue.data()) || !queue[0] ||
+          state->gpr[6] >= queue[0] || ReadBE32(queue.data() + 8) + state->gpr[6] * 0x30 != state->gpr[25] ||
+          (SparsePairRequested() && !AddSlice(system, SliceTag::PadQueue, 0x804c1f78, queue.size())) ||
+          !AddSlice(system, SliceTag::PadSlot, state->gpr[25], 0x30))
+        return SetInvalid("SD prefix input queue or declared sample cap is invalid"), void();
+      const u8* pad = raw.data();
+      if (menu)
+      {
+        if (SparsePairRequested())
+        {
+          pad = SparsePadSlotBytes(raw.data(), raw_size, slices.data(), slice_count);
+          if (!pad)
+            return SetInvalid("Sparse menu input lacks its observed full PadSlot slice"), void();
+        }
+        if (++sd_menu_consumed > 7200)
+          return SetInvalid("SD menu consumed input cap exhausted"), void();
+        sd_menu_neutral = true;
+        for (u32 port = 0; port < 4; ++port)
+          for (u32 byte = 0; byte < 11; ++byte)
+          {
+            const bool inactive = SparsePairRequested() ? (port == 1 || port == 3) : port >= 2;
+            sd_menu_neutral &= pad[port * 12 + byte] == (inactive && byte == 10 ? 0xff : 0);
+          }
+        SdEvent("menu_input", pc, tick);
+        return;
+      }
+      if (SparsePairRequested())
+      {
+        const u8* pad = SparsePadSlotBytes(raw.data(), raw_size, slices.data(), slice_count);
+        if (!pad)
+          return SparseInputFailure("Sparse source input lacks its observed full PadSlot slice", pc, tick), void();
+        if (sd_init.phase == SdInitState::Phase::VsSetup)
+        {
+          if (!SparsePadStatusMatches(pad, false))
+            return SparseInputFailure("Sparse original VS setup consumed non-neutral PAD0/PAD2 or active PAD1/PAD3", pc, tick), void();
+          SdEvent("input", pc, tick);
+          return;
+        }
+        if (!sparse_active || !sparse_setup_seen ||
+            sparse_source_samples >= SPARSE_SOURCE_SAMPLE_CAP ||
+            !SparsePadErrorsValid(pad))
+          return SparseInputFailure("Sparse original consumed PAD lacks its declared four-port source identity", pc, tick), void();
+
+        ++sparse_source_samples;
+        if (sparse_witness_phase == 0)
+        {
+          if (SparsePadStatusMatches(pad, false))
+          {
+            if (++sparse_prepress_neutral_samples > SPARSE_PREPRESS_NEUTRAL_CAP)
+              return SparseInputFailure("Sparse source press exceeded its original neutral-sample cap", pc, tick), void();
+          }
+          else if (SparsePadStatusMatches(pad, true))
+          {
+            sparse_witness_phase = 1;
+          }
+          else
+          {
+            return SparseInputFailure("Sparse original PAD press differs from distinct source0/source2 intent", pc, tick), void();
+          }
+        }
+        else if (sparse_witness_phase == 1)
+        {
+          // Pipe release cannot retract an already queued identical press.
+          // Retain every sample within the existing total cap until neutral.
+          if (SparsePadStatusMatches(pad, false))
+            sparse_witness_phase = 2;
+          else if (!SparsePadStatusMatches(pad, true))
+            return SparseInputFailure("Sparse original PAD release differs from held press or neutral", pc, tick), void();
+        }
+        else
+        {
+          return SparseInputFailure("Sparse original PAD continued after its exact release witness", pc, tick), void();
+        }
+        SdEvent("input", pc, tick);
+        if (sparse_witness_phase == 2)
+        {
+          InputStream::RequestFinish(true);
+          natural_completion.store(false);
+          finish_requested.store(true);
+        }
+        return;
+      }
+      if (OrdinaryTimeoutRequested())
+      {
+        bool neutral = true, direction = true;
+        for (u32 port = 0; port < 4; ++port)
+          for (u32 byte = 0; byte < 11; ++byte)
+          {
+            const u8 expected = port >= 2 && byte == 10 ? 0xff : 0;
+            neutral &= pad[port * 12 + byte] == expected;
+            direction &= pad[port * 12 + byte] == (port == 0 && byte == 2 ? 0xb0 : expected);
+          }
+        if (sd_init.phase == SdInitState::Phase::VsSetup)
+        {
+          if (!neutral || sd_init.consumed > 123)
+            return SetInvalid("Ordinary constructor input/cap differs"), void();
+        }
+        else if (sd_init.phase != SdInitState::Phase::VsActive || !ordinary_timeout.Input(neutral, direction))
+          return SetInvalid("Ordinary actual PAD policy/cap differs"), void();
+        SdEvent("input", pc, tick);
+        return;
+      }
+      for (u32 port = 0; port < 4; ++port)
+        for (u32 byte = 0; byte < 11; ++byte)
+          if (pad[port * 12 + byte] != (port >= 2 && byte == 10 ? 0xff : 0))
+            return SetInvalid("SD prefix consumed undeclared controller input"), void();
+      SdEvent("input", pc, tick);
+      return;
+    }
+    if (pc == 0x8016e9c4 || pc == 0x8016ec24)
+    {
+      const bool sudden = pc == 0x8016ec24;
+      if (!sudden && sd_init.phase == SdInitState::Phase::Menu) return;
+      u32 word = 0;
+      if (!ReadU32(system, pc, &word) || word != 0x4e800020 ||
+          (SparsePairRequested() ? (!fighter_present[0] || !fighter_present[2] ||
+                                    fighter_present[1] || fighter_present[3]) :
+                                   (!fighter_present[0] || !fighter_present[1])) ||
+          !sd_init.Ready(sudden, Env("MWRC_SD_MENU_PROBE") == "competitive_entry") ||
+          !AddSlice(system, SliceTag::MatchSetup, sd_init.setup_pointer, 0x138))
+        return SetInvalid("SD prefix setup return lacks its retained entry owner"), void();
+      for (u32 index = 0; index < 2; ++index)
+      {
+        const u32 slot = SparsePairRequested() ? (index == 0 ? 0 : 2) : index;
+        if (!AddSlice(system, SliceTag::FighterHead, fighter_pointers[slot], 0x100, slot) ||
+            !AddSlice(system, SliceTag::FighterDamageShield, fighter_pointers[slot] + 0x1830, 4, slot) ||
+            !AddSlice(system, SliceTag::FighterStocks, 0x80453080 + slot * 0xe90 + 0x8e, 1, slot))
+          return SetInvalid("SD prefix initialized fighter snapshot is invalid"), void();
+      }
+      SdEvent(sudden ? "sd_setup" : "vs_setup", pc, tick);
+      if (SparsePairRequested())
+      {
+        sparse_setup_seen = true;
+        sparse_setup_consumed = sd_init.consumed;
+      }
+      if (OrdinaryTimeoutRequested()) ordinary_timeout.setup_samples = sd_init.consumed;
+      if (sudden || Env("MWRC_SD_MENU_PROBE") == "competitive_entry")
+      {
+        // The native input footer completes THIS declared prefix. The primary
+        // observer remains interrupted, never a successful match/scene teardown.
+        InputStream::RequestFinish(true);
+        natural_completion.store(false);
+        finish_requested.store(true);
+      }
+      return;
+    }
+    if (pc == 0x8016ebbc && sd_init.phase == SdInitState::Phase::VsActive)
+    {
+      if (SparsePairRequested())
+        return SetInvalid("Sparse setup/input milestone reached a VS terminal before its declared stop"), void();
+      if (!BoundaryInstructionMatches(system, pc) || !sd_init.Exit() ||
+          !AddSlice(system, SliceTag::Result, 0x80479d98 + 0xc, 0x448) ||
+          !AddSlice(system, SliceTag::MatchClock, 0x8046b6a0, 0x2e))
+        return SetInvalid("SD prefix normal timeout exit is invalid"), void();
+      if (OrdinaryTimeoutRequested())
+      {
+        std::array<u8, 2> stocks{};
+        std::array<u32, 2> positions{};
+        const u8* clock = raw.data() + 0x448;
+        if (raw[4] != 1 || raw[5] != 1 || raw[6] != 0 || ReadBE32(raw.data()+8) != 28800 ||
+            raw[13] != 1 || raw[16] != 1 || !AddOrdinaryLive(system, &stocks, &positions) ||
+            !ordinary_timeout.Exit(tick, ReadBE32(clock + 0x24), ReadBE32(clock + 0x28),
+                                   (clock[0x2c] << 8) | clock[0x2d], stocks[0], stocks[1]))
+          return OrdinaryTerminalFailure("Ordinary canonical timeout/live terminal differs", pc, tick);
+        for (u32 slot = 0; slot < 2; ++slot)
+        {
+          const size_t base = 0x58 + slot * 0xa8;
+          // gm_80166378/fn_80165AC0 ranks stock scores3:4 as1:0.
+          // MatchPlayerData+5 is is_big_loser, not a setup/team field.
+          if (raw[base] != 0 || raw[base+1] != 8 || (raw[base+3] >> 2) != (slot == 0 ? 1 : 0) ||
+              raw[base+5] != (slot == 0 ? 1 : 0) || raw[base+8] != (slot == 0 ? 3 : 4) || raw[base+12] || raw[base+13])
+            return OrdinaryTerminalFailure("Ordinary MatchEnd participant/stock/damage differs", pc, tick);
+        }
+        for (u32 slot = 2; slot < 6; ++slot)
+          if (raw[0x58 + slot * 0xa8] != 3)
+            return OrdinaryTerminalFailure("Ordinary MatchEnd inactive roster differs", pc, tick);
+        SdEvent("vs_exit", pc, tick);
+        return;
+      }
+      // Original outcome and participant decision remain outputs, never inputs.
+      if (raw[4] != 1 || raw[5] != 1 || raw[6] != 0 || raw[0xd] != 2 ||
+          raw[0x58] != 0 || raw[0x100] != 0 ||
+          raw[0x60] != 4 || raw[0x108] != 4)
+        return SetInvalid("SD prefix normal match did not produce its declared tied timeout"), void();
+      SdEvent("vs_exit", pc, tick);
+      return;
+    }
+    if (pc == 0x8039157c && sd_init.phase != SdInitState::Phase::Menu)
+    {
+      if (!BoundaryInstructionMatches(system, pc) || !sd_init.Retire())
+        return SetInvalid("SD prefix arena retirement is out of order"), void();
+      fighter_present.fill(false);
+      fighter_pointers.fill(0);
+      SdEvent("vs_retired", pc, tick);
+      if (OrdinaryTimeoutRequested())
+      {
+        if (tick != ordinary_timeout.ticks || !ordinary_timeout.Retire())
+          return SetInvalid("Ordinary retirement precedes terminal publication"), void();
+        sd_init.phase = SdInitState::Phase::Complete;
+        InputStream::RequestFinish(true);
+        natural_completion.store(false);
+        finish_requested.store(true);
+      }
+    }
+  }
+
   enum class SceneResetAction { Ignore, BeginResults, FinishResults, Invalid };
 
   SceneResetAction ClassifyWholeSceneReset() const
@@ -2327,6 +3367,56 @@ struct Observer::Impl
   {
     if (!Start() || invalid.load() || finish_requested.load())
       return;
+    if (SdInitRequested())
+    {
+      ObserveSdInit(system, pc, state);
+      return;
+    }
+    if (transform_prefix_enabled && pc == CSS_ENTER)
+    {
+      if (transform_prefix_css_enter_seen || transform_prefix_vs_entry_seen)
+        return SetInvalid("Sheik transform prefix observed a duplicate or late CSS entry"), void();
+      transform_prefix_css_enter_seen = true;
+      transform_prefix_css_ready = false;
+      transform_prefix_css_live_owner_seen = false;
+      transform_prefix_sss_enter_seen = false;
+      transform_prefix_sss_ready = false;
+      transform_prefix_sss_live_owner_seen = false;
+      return;
+    }
+    if (transform_prefix_enabled && pc == CSS_ENTER_RETURN)
+    {
+      u32 word = 0;
+      if (!transform_prefix_css_enter_seen || transform_prefix_css_ready ||
+          !ReadU32(system, pc, &word) || word != 0x4e800020)
+        return SetInvalid("Sheik transform prefix CSS readiness lacks its verified source return"),
+               void();
+      transform_prefix_css_ready = true;
+      return;
+    }
+    if (transform_prefix_enabled && pc == SSS_ENTER)
+    {
+      u32 word = 0;
+      if (!transform_prefix_css_live_owner_seen ||
+          transform_prefix_sss_enter_seen || transform_prefix_vs_entry_seen ||
+          !ReadU32(system, pc, &word) || word != 0x7c0802a6)
+        return SetInvalid("Sheik transform prefix SSS entry preceded its live CSS owner"), void();
+      transform_prefix_sss_enter_seen = true;
+      transform_prefix_sss_ready = false;
+      transform_prefix_sss_live_owner_seen = false;
+      return;
+    }
+    if (transform_prefix_enabled && pc == SSS_ENTER_RETURN)
+    {
+      u32 word = 0;
+      if (!transform_prefix_sss_enter_seen || transform_prefix_sss_ready ||
+          !transform_prefix_css_live_owner_seen || !ReadU32(system, pc, &word) ||
+          word != 0x4e800020)
+        return SetInvalid("Sheik transform prefix SSS readiness lacks its ordered source return"),
+               void();
+      transform_prefix_sss_ready = true;
+      return;
+    }
     if (pc == cpu_probe_rng_return_pc && cpu_probe_rng_return_pc != 0)
       RecordSelectedRngCallback(system, pc);
     if (const ItemProbePoint* item_probe = FindItemProbePoint(pc))
@@ -2385,6 +3475,11 @@ struct Observer::Impl
       SetInvalid("source scene counter is outside the pinned RAM range");
       return;
     }
+    bool transform_prefix_complete_after_publish = false;
+    bool transform_prefix_cap_after_publish = false;
+    bool transform_prefix_neutral_pad_after_publish = false;
+    bool transform_prefix_grounded_tick_after_publish = false;
+    bool transform_prefix_down_b_after_publish = false;
     if (boundary == Boundary::SourceTick)
       CloseCpuProbeAtSourceTick(pc, source_tick);
     raw_size = 0;
@@ -2479,13 +3574,43 @@ struct Observer::Impl
       if (!ReadBytes(system, 0x804c1f78, queue.size(), queue.data()) || !queue[0] ||
           qread >= queue[0] || ReadBE32(queue.data() + 8) + qread * 0x30 != state->gpr[25])
         return SetInvalid("PAD consume registers escaped the pinned queue"), void();
+      if (transform_prefix_enabled && setup_ready)
+      {
+        std::array<u8, 0x30> consumed{};
+        if (!ReadBytes(system, state->gpr[25], consumed.size(), consumed.data()))
+          return SetInvalid("Sheik transform PAD consumption escaped its checked queue slot"), void();
+        const bool p1_down_b = ReadBE16(consumed.data()) == 0x0200 && consumed[2] == 0 &&
+                               static_cast<s8>(consumed[3]) < 0;
+        if (!TransformPrefixPadStatusMatches(consumed.data(), p1_down_b))
+          return SetInvalid("Sheik transform requires exact four-port source PAD statuses"), void();
+        if (p1_down_b && !transform_prefix_previous_down_b)
+        {
+          if (transform_prefix_down_b_seen)
+            return SetInvalid("Sheik transform input contains more than one down+B episode"), void();
+          if (!transform_prefix_grounded_neutral_seen ||
+              !transform_prefix_neutral_pad_seen ||
+              !TransformPrefixReadinessSequencesValid(
+                  transform_prefix_neutral_pad_sequence,
+                  transform_prefix_grounded_neutral_source_sequence, next_sequence))
+            return SetInvalid("Sheik transform down+B preceded a consumed neutral PAD record and later grounded neutral Zelda tick"), void();
+          transform_prefix_down_b_seen = true;
+          transform_prefix_down_b_after_publish = true;
+        }
+        else if (!p1_down_b && !transform_prefix_previous_down_b &&
+                 !transform_prefix_neutral_pad_seen &&
+                 !transform_prefix_grounded_neutral_seen && !transform_prefix_down_b_seen)
+          transform_prefix_neutral_pad_after_publish = true;
+        if (!p1_down_b && transform_prefix_previous_down_b)
+          transform_prefix_release_seen = true;
+        transform_prefix_previous_down_b = p1_down_b;
+      }
     }
     else if (boundary == Boundary::Entry || boundary == Boundary::Setup)
     {
       if (boundary == Boundary::Entry)
       {
         u8 current_mode = 0;
-        if (whole_session_enabled() &&
+        if ((whole_session_enabled() || transform_prefix_enabled) &&
             !ReadBytes(system, 0x80479d30, 1, &current_mode))
           return SetInvalid("VS entry did not expose source mode routing"), void();
         // Opening movie attract demos reuse the VS constructor and can run
@@ -2493,8 +3618,34 @@ struct Observer::Impl
         // pre-CSS source coverage, not the supported SSS-to-match route.
         if (whole_session_enabled() && current_mode == 0x18 && whole_phase == 0)
           return;
+        // Match the same pre-CSS attract handling for the opt-in prefix, but
+        // only before its one accepted original VS entry. Later Entry callbacks
+        // are errors and cannot erase the in-progress ownership/input witness.
+        if (transform_prefix_enabled)
+        {
+          const TransformPrefixEntryDisposition disposition =
+              ClassifyTransformPrefixEntry(current_mode, transform_prefix_vs_entry_seen);
+          if (disposition == TransformPrefixEntryDisposition::IgnoreOpeningAttract)
+            return;
+          if (disposition == TransformPrefixEntryDisposition::Reject)
+          {
+            if (current_mode != 0x02)
+              return SetInvalid("Sheik transform prefix requires the original SSS-to-VS route"),
+                     void();
+            return SetInvalid(
+                       "Sheik transform prefix encountered a later VS entry before its bounded completion"),
+                   void();
+          }
+        }
         if (whole_session_enabled() && (current_mode != 0x02 || whole_phase != 4))
           return SetInvalid("whole-session VS entry was missing its SSS route"), void();
+        if (transform_prefix_enabled &&
+            !TransformPrefixMenuOwnersReady(transform_prefix_css_live_owner_seen,
+                                            transform_prefix_sss_live_owner_seen))
+          return SetInvalid("Sheik transform prefix VS entry preceded ordered live CSS/SSS owners"),
+                 void();
+        if (transform_prefix_enabled)
+          transform_prefix_vs_entry_seen = true;
         setup_pointer = state->gpr[3];
         if (!setup_pointer || !AddSlice(system, SliceTag::MatchSetup, setup_pointer, 0x138))
           return SetInvalid("VS entry did not expose its source setup"), void();
@@ -2507,6 +3658,20 @@ struct Observer::Impl
         if (!AddProfileSlices(system))
           return SetInvalid("VS entry did not expose its loaded profile masks"), void();
         setup_ready = false;
+        transform_prefix_active_ticks = 0;
+        transform_prefix_down_b_seen = false;
+        transform_prefix_previous_down_b = false;
+        transform_prefix_release_seen = false;
+        transform_prefix_action_seen = false;
+        transform_prefix_swap_seen = false;
+        transform_prefix_neutral_pad_seen = false;
+        transform_prefix_neutral_pad_sequence = 0;
+        transform_prefix_grounded_neutral_seen = false;
+        transform_prefix_grounded_neutral_source_sequence = 0;
+        transform_prefix_down_b_source_sequence = 0;
+        transform_prefix_sheik_neutral_seen = false;
+        transform_prefix_first_source_tick_seen = false;
+        transform_prefix_last_source_tick = 0;
         result_seen = false;
         result_pointer = 0;
         vs_exit_seen = false;
@@ -2536,11 +3701,12 @@ struct Observer::Impl
           return SetInvalid("source setup pointer is invalid"), void();
         // The same entry routine is also used by title-screen attract demos.
         // Their setup can carry the ordinary VS bit, so the source mode is
-        // part of the guard: the whole-session contract arms only the
-        // ordinary GM_VS route reached from SSS. Keep the legacy observer's
-        // setup-only behavior when whole-session capture is disabled.
+        // part of the guard for both the whole-session and Sheik-prefix probes.
         match_active = (setup[4] & 0x40) != 0 &&
-                      (!whole_session_enabled() || current_mode == 0x02);
+                      (!(whole_session_enabled() || transform_prefix_enabled) ||
+                       current_mode == 0x02);
+        if (transform_prefix_enabled && !match_active)
+          return SetInvalid("Sheik transform prefix requires an original VS setup"), void();
         active_slot_count = 0;
         if (match_active)
         {
@@ -2568,10 +3734,26 @@ struct Observer::Impl
             !AddSlice(system, SliceTag::MatchSetup, setup_pointer, 0x138))
           return;
         if (!std::all_of(fighter_present.begin(), fighter_present.begin() + active_slot_count,
-                         [](bool present) { return present; }) ||
-            !AddMatchSlices(system))
+                         [](bool present) { return present; }))
           return SetInvalid("match setup completed before all bounded fighter slices were ready"),
                  void();
+        if (transform_prefix_enabled)
+        {
+          u32 active_entity_index = 0, active_kind = 0, active_fighter = 0;
+          if (!TransformPrefixMenuOwnersReady(transform_prefix_css_live_owner_seen,
+                                              transform_prefix_sss_live_owner_seen) ||
+              !TransformPrefixRosterValid(system) ||
+              !AddTransformPrefixOwnerSlices(system, &active_entity_index, &active_kind,
+                                             &active_fighter) ||
+              active_entity_index != 0 || active_kind != 19)
+            return SetInvalid("Sheik transform setup lacks the authored Zelda/Sheik ownership pair"),
+                 void();
+        }
+        else if (!AddMatchSlices(system))
+        {
+          return SetInvalid("match setup completed before all bounded fighter slices were ready"),
+                 void();
+        }
         setup_ready = true;
       }
     }
@@ -2605,13 +3787,88 @@ struct Observer::Impl
           !std::all_of(fighter_present.begin(), fighter_present.begin() + active_slot_count,
                        [](bool present) { return present; }))
         return;
-      if (!AddMatchSlices(system))
+      if (transform_prefix_enabled)
+      {
+        if (boundary != Boundary::SourceTick)
+          return;
+        if (!TransformPrefixSourceTickIsNext(transform_prefix_first_source_tick_seen,
+                                             transform_prefix_last_source_tick, source_tick))
+          return SetInvalid(
+                     "Sheik transform source-tick stream is missing its initial tick or contains a gap"),
+                 void();
+        transform_prefix_first_source_tick_seen = true;
+        transform_prefix_last_source_tick = source_tick;
+        u32 active_entity_index = 0, active_kind = 0, active_fighter = 0, motion = 0, ground_air = 0;
+        if (!AddTransformPrefixOwnerSlices(system, &active_entity_index, &active_kind,
+                                           &active_fighter) ||
+            !ReadU32(system, active_fighter + 0x10, &motion) ||
+            !ReadU32(system, active_fighter + 0xe0, &ground_air))
+          return SetInvalid("Sheik transform source tick lacks checked entity ownership"), void();
+        ++transform_prefix_active_ticks;
+        if (active_kind == 19)
+        {
+          if (active_entity_index != 0 || transform_prefix_swap_seen)
+            return SetInvalid("Zelda regained active ownership after the Sheik transform transition"), void();
+          if (!transform_prefix_down_b_seen && !transform_prefix_previous_down_b &&
+              transform_prefix_neutral_pad_seen &&
+              transform_prefix_neutral_pad_sequence < next_sequence && motion == 14 &&
+              ground_air == 0 && !transform_prefix_grounded_neutral_seen)
+            transform_prefix_grounded_tick_after_publish = true;
+          if (motion == 355)
+          {
+            if (!transform_prefix_down_b_seen)
+              return SetInvalid("Zelda down-B motion began without consumed P1 down+B"), void();
+            transform_prefix_action_seen = true;
+          }
+        }
+        else if (active_kind == 7)
+        {
+          if (!transform_prefix_action_seen || !transform_prefix_release_seen || active_entity_index != 1)
+            return SetInvalid("Sheik became active without one consumed down+B, neutral release, and Zelda action"), void();
+          if (!transform_prefix_swap_seen)
+          {
+            transform_prefix_swap_seen = true;
+          }
+          else if (motion == 14 && ground_air == 0)
+          {
+            transform_prefix_sheik_neutral_seen = true;
+            transform_prefix_complete_after_publish = true;
+          }
+        }
+        else
+        {
+          return SetInvalid("Sheik transform active owner has an unexpected fighter kind"), void();
+        }
+        if (!transform_prefix_sheik_neutral_seen && transform_prefix_active_ticks >= 600)
+          transform_prefix_cap_after_publish = true;
+      }
+      else if (!AddMatchSlices(system))
+      {
         return SetInvalid("match semantic slice escaped the pinned ranges"), void();
+      }
+      if (checked_entity_profile)
+      {
+        u8 qnum = 0;
+        if (!ReadBytes(system, 0x804c1f78, 1, &qnum))
+          return SetInvalid("entity prefix queue capacity is unreadable"), void();
+        u32 clock = 0;
+        if (active_entity_profile && boundary == Boundary::SourceTick &&
+            !ReadU32(system, 0x8046B6C4, &clock))
+          return SetInvalid("active entity prefix MatchClock is unreadable"), void();
+        const int admission = active_entity_profile ?
+            active_entity_prefix_progress.Observe(boundary, source_tick, qnum, clock) :
+            entity_prefix_progress.Observe(boundary, source_tick, qnum);
+        if (admission < 0)
+          return SetInvalid("entity prefix source/draw batch boundary differs"), void();
+        entity_prefix_final_draw = admission == 1;
+      }
     }
     else if (boundary == Boundary::ResultEnter || boundary == Boundary::ResultReturn)
     {
       if (!match_active)
         return;
+      if (transform_prefix_enabled && !transform_prefix_sheik_neutral_seen)
+        return SetInvalid("original match ended before the completed active Sheik neutral prefix"), void();
       if (boundary == Boundary::ResultEnter)
         result_pointer = state->gpr[3];
       if (!result_pointer || result_pointer != 0x80479d98 ||
@@ -2778,6 +4035,9 @@ struct Observer::Impl
           return SetInvalid("whole-session scene reset is missing an ordered VS/Results hook"),
                  void();
       }
+      else if (TransformPrefixTeardownArmed(transform_prefix_enabled, match_active) &&
+               !transform_prefix_sheik_neutral_seen)
+        return SetInvalid("original match ended before the completed active Sheik neutral prefix"), void();
       else if (!match_active || !result_seen)
         return;
       const u8* count_ptr = system->GetMemory().GetPointerForRange(0x804ce380, 1);
@@ -2849,9 +4109,33 @@ struct Observer::Impl
     }
     slot->payload_size = static_cast<u32>(out - slot->payload.data());
     slot->checksum = CRC32(slot->payload.data(), slot->payload_size);
+    if (transform_prefix_neutral_pad_after_publish)
+    {
+      transform_prefix_neutral_pad_seen = true;
+      transform_prefix_neutral_pad_sequence = slot->sequence;
+    }
+    if (transform_prefix_grounded_tick_after_publish)
+    {
+      transform_prefix_grounded_neutral_seen = true;
+      transform_prefix_grounded_neutral_source_sequence = slot->sequence;
+    }
+    if (transform_prefix_down_b_after_publish)
+      transform_prefix_down_b_source_sequence = slot->sequence;
     Publish(slot);
+    if (transform_prefix_complete_after_publish)
+      RequestComplete();
+    else if (transform_prefix_cap_after_publish)
+      SetInvalid(
+          "active Sheik grounded-neutral source tick did not follow the owner change within 600 source ticks");
     if (boundary == Boundary::DrawReturn)
       ++draw_ordinal;
+    if (checked_entity_profile && entity_prefix_final_draw)
+    {
+      // Publish every tick/PAD/draw row first. This only closes the diagnostic
+      // stream at a passive hook; it never breaks the guest loop or creates Results.
+      RequestComplete();
+      return;
+    }
     if (boundary == Boundary::SceneTeardown && result_seen)
     {
       if (!whole_session_enabled())
@@ -2969,6 +4253,16 @@ struct Observer::Impl
   void PushJson(Event event, const std::string& json, u32 pc = 0, u32 tick = 0,
                 u32 draw = 0)
   {
+    if (OrdinaryTimeoutRequested())
+    {
+      // All JSON records, including handshake/start, are charged. Writer error
+      // and End records reserve two extra 4096+44-byte records in the proof.
+      if (ordinary_records >= 73498 || json.size() > 65536 ||
+          ordinary_bytes + 44 + json.size() > 128ULL * 1024 * 1024 - 8280)
+        return SetInvalid("Ordinary observer aggregate record/byte cap"), void();
+      ++ordinary_records;
+      ordinary_bytes += 44 + json.size();
+    }
     Slot* slot = Reserve(event, pc, tick, draw);
     if (!slot)
       return;
@@ -3520,9 +4814,34 @@ struct Observer::Impl
                   std::chrono::steady_clock::now().time_since_epoch())
                   .count());
           const bool complete = natural_completion.load() && !invalid.load();
-          const std::string json = complete
+          std::string json = complete
                                        ? "{\"status\":\"completed\",\"natural\":true}"
                                        : "{\"status\":\"interrupted\",\"natural\":false}";
+          if (checked_entity_profile)
+            json = "{\"status\":\"" + std::string(complete ? "completed" : "interrupted") +
+                   "\",\"natural\":false,\"diagnostic_prefix_complete\":" +
+                   (complete ? "true" : "false") + ",\"whole_session_equivalent\":false," +
+                   "\"comparison_source_ticks\":60,\"observed_source_ticks\":" +
+                   std::to_string(entity_prefix_progress.observations) + "}";
+          if (active_entity_profile)
+            json = "{\"status\":\"" + std::string(complete ? "completed" : "interrupted") +
+                   "\",\"natural\":false,\"diagnostic_prefix_complete\":" +
+                   (complete ? "true" : "false") + ",\"whole_session_equivalent\":false," +
+                   "\"comparison_source_ticks\":" + std::to_string(active_entity_prefix_progress.observations) +
+                   ",\"observed_source_ticks\":" + std::to_string(active_entity_prefix_progress.observations) +
+                   ",\"comparison_active_clock_ticks\":60,\"observed_active_clock_advances\":" +
+                   std::to_string(active_entity_prefix_progress.active_advances) + "}";
+          if (complete && transform_prefix_enabled)
+          {
+            json = "{\"status\":\"completed\",\"natural\":true,"
+                   "\"completion_boundary\":\"active_sheik_grounded_neutral_source_tick_after_owner_change\","
+                   "\"match_complete\":false,\"readiness_source_sequence\":{\"neutral_pad_consume\":" +
+                   std::to_string(transform_prefix_neutral_pad_sequence) +
+                   ",\"grounded_neutral_source_tick\":" +
+                   std::to_string(transform_prefix_grounded_neutral_source_sequence) +
+                   ",\"down_b_consume\":" +
+                   std::to_string(transform_prefix_down_b_source_sequence) + "}}";
+          }
           end_slot.payload_size = static_cast<u32>(json.size());
           std::memcpy(end_slot.payload.data(), json.data(), json.size());
           end_slot.checksum = CRC32(end_slot.payload.data(), end_slot.payload_size);
@@ -3587,6 +4906,17 @@ struct Observer::Impl
         (completed ? "true" : "false") + ",\"invalid\":" +
         (invalid.load() ? "true" : "false") + ",\"error\":" +
         (error_text.empty() ? "null" : "\"" + error_text + "\"");
+    if (checked_entity_profile && !active_entity_profile && force && state != "starting")
+      json += ",\"diagnostic_prefix_complete\":" + std::string(completed ? "true" : "false") +
+              ",\"whole_session_equivalent\":false,\"comparison_source_ticks\":60," +
+              "\"observed_source_ticks\":" + std::to_string(entity_prefix_progress.observations);
+    if (active_entity_profile && force && state != "starting")
+      json += ",\"diagnostic_prefix_complete\":" + std::string(completed ? "true" : "false") +
+              ",\"whole_session_equivalent\":false,\"comparison_source_ticks\":" +
+              std::to_string(active_entity_prefix_progress.observations) +
+              ",\"observed_source_ticks\":" + std::to_string(active_entity_prefix_progress.observations) +
+              ",\"comparison_active_clock_ticks\":60,\"observed_active_clock_advances\":" +
+              std::to_string(active_entity_prefix_progress.active_advances);
     json += CpuProbeCloseStatusJson();
     json += "}\n";
     if (!status.Write(reinterpret_cast<const u8*>(json.data()), json.size()) || !status.Flush() ||
@@ -3641,6 +4971,19 @@ struct Observer::Impl
   std::array<u8, 4> fighter_entity_count{};
   u32 cpu_probe_samus_effect_palette_address = 0;
   std::array<bool, 4> cpu_slots{};
+  SdInitState sd_init;
+  OrdinaryTimeoutState ordinary_timeout;
+  u64 ordinary_records = 0, ordinary_bytes = 0;
+  bool sd_sss_ready = false;
+  bool sd_rules_observed = false;
+  u32 sd_menu_polls = 0;
+  u32 sd_menu_consumed = 0;
+  bool sd_menu_neutral = false;
+  bool sparse_setup_seen = false;
+  u32 sparse_setup_consumed = 0;
+  u32 sparse_source_samples = 0;
+  u32 sparse_prepress_neutral_samples = 0;
+  u8 sparse_witness_phase = 0;
   u32 setup_pointer = 0;
   u32 active_slot_count = 0;
   bool match_active = false;
@@ -3689,6 +5032,11 @@ struct Observer::Impl
   std::string item_probe_error;
   std::array<bool, 16> item_probe_pair_active{};
   std::array<u32, 16> item_probe_pair_lr{};
+  bool checked_entity_profile = false;
+  bool active_entity_profile = false;
+  ActiveEntityPrefixBoundaryProgress active_entity_prefix_progress;
+  EntityPrefixBoundaryProgress entity_prefix_progress;
+  bool entity_prefix_final_draw = false;
   u32 whole_session_matches = 0;
   u32 audio_owner_epoch = 0;
   u32 match_index = 0;
@@ -3711,6 +5059,28 @@ struct Observer::Impl
   bool prize_mode_exit_seen = false;
   std::string capture_id;
   std::string sequence_id;
+  bool transform_prefix_enabled = false;
+  bool transform_prefix_vs_entry_seen = false;
+  bool transform_prefix_css_enter_seen = false;
+  bool transform_prefix_css_ready = false;
+  bool transform_prefix_css_live_owner_seen = false;
+  bool transform_prefix_sss_enter_seen = false;
+  bool transform_prefix_sss_ready = false;
+  bool transform_prefix_sss_live_owner_seen = false;
+  u32 transform_prefix_active_ticks = 0;
+  bool transform_prefix_first_source_tick_seen = false;
+  u32 transform_prefix_last_source_tick = 0;
+  bool transform_prefix_down_b_seen = false;
+  bool transform_prefix_previous_down_b = false;
+  bool transform_prefix_neutral_pad_seen = false;
+  u64 transform_prefix_neutral_pad_sequence = 0;
+  bool transform_prefix_release_seen = false;
+  bool transform_prefix_action_seen = false;
+  bool transform_prefix_swap_seen = false;
+  bool transform_prefix_grounded_neutral_seen = false;
+  u64 transform_prefix_grounded_neutral_source_sequence = 0;
+  u64 transform_prefix_down_b_source_sequence = 0;
+  bool transform_prefix_sheik_neutral_seen = false;
 
   bool whole_session_enabled() const { return whole_session_matches != 0; }
 };
@@ -3814,7 +5184,10 @@ static bool IsCaptureBoundary(u32 guest_pc)
     // Diagnostic CPU PCs are JIT boundaries only for the fully validated,
     // opt-in companion configuration.  The normal observer boundary set and
     // its disabled path remain unchanged.
-    return (CpuProbeEnabled() && FindCpuProbePoint(guest_pc) != nullptr &&
+    return (Env("MWRC_TRANSFORM_PREFIX") == "1" && guest_pc == SSS_ENTER_RETURN) ||
+           (SdInitRequested() && (guest_pc == 0x8016ebc0 || guest_pc == 0x8016ec24 ||
+            ((Env("MWRC_SD_MENU_PROBE") == "sd_prefix" || Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested()) && guest_pc == 0x8025b84c))) ||
+           (CpuProbeEnabled() && FindCpuProbePoint(guest_pc) != nullptr &&
             (CpuProbeEnvironment().rng_return_pc == 0 ||
              CpuProbeEnvironment().rng_return_pc == guest_pc)) ||
            (ItemProbeEnabled() && FindItemProbePoint(guest_pc) != nullptr);

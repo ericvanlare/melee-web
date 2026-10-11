@@ -1,0 +1,292 @@
+/* Renderer-backed sparse original-menu prefix. All changes are browser input;
+ * no source state or normalized payload is written by this workload. */
+import assert from 'node:assert/strict';
+import {configureSparseControllerSettings} from './sparse_controller_settings_driver.mjs';
+import {standardPad} from './controller-fixtures.mjs';
+import {createCssHumanJoinDriver} from './vs_css_two_human_driver.mjs';
+import {observeRuntimeOwner} from './runtime_owner_observation.mjs';
+import {readRuntimeDiagnosticCounters} from './runtime_callback_recorder.mjs';
+import {confirmTwoHumanResults} from './vs_rules_results_confirmation_driver.mjs';
+import {returnFromCompetitivePrize} from './vs_rules_timeout_route_helpers.mjs';
+import {callbackSteps} from './vs_sudden_death_browser_route.mjs';
+export const SPARSE_PREFIX_LIMITS=Object.freeze({fighterSamples:180,sssSamples:600,
+  readyWallMs:20000,readySteps:1200,prefixFrames:180,prefixWallMs:10000,prefixSteps:600});
+export async function installSparseVirtualController(page){
+  await page.addInitScript(pad=>{
+    window.sparseVirtualPad=pad;
+    Object.defineProperty(navigator,'getGamepads',{value:()=>[window.sparseVirtualPad]});
+  },standardPad(0,'Sparse Mario authored standard Gamepad'));
+}
+// CSS explicitly audits lifecycle once; active sampling uses the cheap match getter.
+// Never infer copied PAD from raw input. Both native reads are synchronous.
+export function readSparsePadVectors({activeMatch=false}={}){
+  const m=globalThis.Module;
+  const input=JSON.parse(m.UTF8ToString(m._melee_web_input_message()));
+  const copied=JSON.parse(m.UTF8ToString(activeMatch?
+    m._melee_web_native_menu_match_observe():m._melee_web_native_menu_memory()));
+  return {input,copied_errors:copied.source_pad_errors};
+}
+export function checkSparsePadVectors(observation){
+  assert(observation.input&&observation.input.active===1&&!observation.input.error);
+  assert.equal(observation.input.pads?.length,4);
+  assert.deepEqual(observation.input.pads.map(p=>p.err),[0,-1,0,-1]);
+  assert.deepEqual(observation.copied_errors,[0,-1,0,-1],
+    'Exact original copied PAD errors must be observed, never inferred');
+}
+export function checkSparseCss(setup){
+  assert.equal(setup?.doors?.length,40);
+  for(let port=0;port<4;port++){
+    const row=setup.doors.slice(port*10,port*10+10),kind=port===0||port===2?0:3;
+    assert.equal(row[0],kind);assert.equal(row[4],kind);
+    assert.equal(row[6],0,'Original raw source slot must stay zero');
+    if(kind===0)assert.equal(row[3],8,'Original active door must select Mario');
+  }
+}
+export function checkSparseMatch(state,match,prior=null){
+  assert(!state.error&&!match.observer_error&&!match.observer_error_reason);
+  assert.equal(state.phase,7);assert.equal(state.running,1);
+  assert.equal(state.pause_present,true);assert.equal(state.pause_disabled,false);
+  assert.equal(match.leg,'vs');assert.equal(match.ready,true);
+  assert.equal(match.complete,false);assert.equal(match.ending,false);assert.equal(match.paused,false);
+  assert.equal(match.outcome,0);assert.deepEqual(match.observed_player_source_slots,[0,2]);
+  checkSparseIdentity(match,prior);
+  match.players.forEach(p=>assert.equal(p.stocks,4));
+}
+export function checkSparseIdentity(match,prior=null){
+  assert(!match.observer_error&&!match.observer_error_reason);
+  assert.equal(match.leg,'vs');assert.deepEqual(match.observed_player_source_slots,[0,2]);
+  const r=match.rules;
+  assert.equal(r.stage,32);assert.equal(r.match_kind,1);assert.equal(r.is_teams,0);
+  assert.equal(r.timer_enabled,0);assert.equal(r.is_stock,1);assert.equal(r.is_vs,1);
+  assert.equal(r.source_sudden_death_flag,0);assert.equal(r.item_frequency,-1);
+  if(prior)assert.equal(r.item_mask_hex,prior.rules.item_mask_hex);
+  assert.deepEqual(r.player_stocks,[4,4]);assert.equal(match.players.length,2);
+  match.players.forEach((p,i)=>{
+    const port=i*2;
+    assert.equal(p.source_player_index,port);assert.equal(p.source_port,port);
+    assert.equal(p.source_slot,0);assert.equal(p.slot_type,0);assert.equal(p.human,true);
+    assert.equal(p.source_character,8);assert.equal(p.fighter,0);
+    assert.equal(p.source_stocks,4);assert(Number.isInteger(p.stocks)&&p.stocks>=0&&p.stocks<=4);
+    assert.equal(p.source_initial_damage,0);assert.equal(p.damage_percent,0);
+    if(prior)assert.equal(p.source_color,prior.players[i].source_color);
+  });
+  assert(Number.isSafeInteger(match.frame)&&match.frame>0);
+  if(prior)assert(match.frame>=prior.frame,'Original source cursor regressed');
+}
+export const SPARSE_ENDING_LIMITS=Object.freeze({wallMs:120000,steps:7200,pulses:400,holdMs:250,releaseMs:25,resultsMs:45000});
+export function checkSparseLoss(before,after){
+  checkSparseIdentity(after,before);
+  assert.equal(after.paused,false);assert.equal(after.players[1].stocks,4);
+  const delta=before.players[0].stocks-after.players[0].stocks;
+  assert(delta===0||delta===1,'Each P1 source loss must be observed; skipped or gained stocks fail');
+  return delta===1;
+}
+export function checkSparseTerminal(match){
+  checkSparseIdentity(match);assert.deepEqual(match.terminal,{outcome:2,winners:[2]});
+  assert.equal(match.players[0].stocks,0);assert.equal(match.players[1].stocks,4);
+}
+// Original CursorThink: type toggle precedes pickup; fresh unselected doors
+// attach automatically on entering the board, without an A edge.
+export function sparseP3FighterDecision(observation,setup){
+ assert.equal(setup?.doors?.length,40);assert.equal(setup?.cursors?.length,16);
+ const row=setup.doors.slice(20,30),cursor=setup.cursors.slice(8,12);
+ const [port,held,selectedKind]=observation.ids;
+ const [x,y,mx,my,left,right,top,bottom]=observation.geometry;
+ assert.equal(port,2);assert.equal(cursor[0],2);assert.equal(row[0],0);assert.equal(row[4],0);
+ assert.equal(row[6],0);assert(observation.geometry.length===8&&observation.geometry.every(Number.isFinite));
+ for(let other=0;other<4;other++)if(other!==2)
+  assert(!(setup.cursors[other*4+1]===1&&setup.cursors[other*4+2]===2),'Foreign cursor owns P3 puck');
+ const icon=row[2],inside=mx>left&&mx<right&&my<top&&my>bottom;
+ const axis=(value,target)=>value<target-.62?80:value>target+.62?-80:0;
+ if(held<0&&icon>=25){
+  assert([0,2].includes(cursor[1]),'Fresh door cursor must be unheld and connected');
+  assert.equal(selectedKind,-1);assert.equal(row[3],26);
+  assert(y<22,'Fresh unselected cursor must enter the source board');
+  return {kind:'fresh-board-entry',button:0,x:0,y:y<=.2?80:0};
+ }
+ assert(icon>=0&&icon<25,'Selected pickup requires a source icon');
+ if(held<0){
+  assert([0,2].includes(cursor[1]),'Pickup cursor must be unheld and connected');assert.equal(row[3],selectedKind);
+  if(row[3]===8&&inside)return {kind:'selected',button:0,x:0,y:0};
+  const tx=mx-3.8,ty=my+2.6;
+  const board=y>=.2&&y<=22,ready=board&&(tx-x)**2+(ty-y)**2<9;
+  // Reach original board eligibility before any valid-puck pickup A edge.
+  return {kind:'placed-puck-pickup',button:ready?1:0,x:ready?0:axis(x,tx),
+   y:ready?0:axis(y,Math.max(.2,Math.min(22,ty)))};
+ }
+ assert.equal(held,2);assert.equal(cursor[1],1);assert.equal(cursor[2],2);
+ return {kind:'owned-puck-placement',button:inside?1:0,
+  x:inside?0:axis(x,(left+right)/2-2.7),y:inside?0:axis(y,(top+bottom)/2+2)};
+}
+export function validateFinalSparseCapture(capture,{cssOnly=false,fullRoute=false}={}){
+  const steps=callbackSteps(capture);
+  assert.equal(capture.dropped_incidents,0,'Incident retention overflow');
+  assert(capture.phase_source_steps[cssOnly?1:7]>0,cssOnly?'No CSS callback steps retained':'No ordinary match callback steps retained');
+  if(fullRoute)assert(capture.phase_source_steps[8]>0,'No original Results callback steps retained');
+  return steps;
+}
+export async function runSparseMarioBrowserPrefix(d){
+  const {page,report,driver,press,chord,observeSource,observeCssSetup,sourcePadSample,sourcePadTap,
+    resumeTimingPause,ensureNoError,waitPhase,waitMenu,enterVsRules,moveMenuCursor,
+    waitItemInputReady,waitItemsCursor,waitItemFrequency,waitMessage,waitForNoQueuedPad,shot,verifyTeardown}=d;
+  report.inputConfiguration={playerOne:'Keyboard P1 with declared original-menu raw diagnostic PAD0 samples',
+    playerThree:'Authored standard Browser Gamepad assigned through Controls to original port2',
+    playerTwo:'off',playerFour:'off',layout:'two',physicalHardware:'unrun'};
+  report.evidenceClaims.physicalInput.reason='Authored virtual Gamepad and keyboard/raw diagnostic inputs; no physical controller capture';
+  const route=report.sparseMario={limits:SPARSE_PREFIX_LIMITS,observations:[],css:[],gamepadPulses:[],
+    claims:d.fullRoute?'Virtual live Browser Gamepad/keyboard functional elimination/Results route only':'Virtual live Browser Gamepad input and rendered functional prefix only',
+    hudObservation:'Rendered screenshots retain original HUD; numeric HUD values are not exported. Prefix V3 screenshot showed magenta FD geometry: rendering gap retained, no pixel-equivalence pass.'};
+  const padVectors=async (label,activeMatch=false)=>{
+    const observation=await page.evaluate(readSparsePadVectors,{activeMatch});
+    route.latestPadObservation={label,...observation};checkSparsePadVectors(observation);
+    route.padObservations??=[];route.padObservations.push({label,...observation});return observation;
+  };
+  const checked=async label=>{
+    await resumeTimingPause(label);await ensureNoError(label);assert.equal(report.errors.length,0);
+    return callbackSteps(await readRuntimeDiagnosticCounters(page));
+  };
+  const sample=async label=>{
+    const snapshot=await observeRuntimeOwner(page,route,label);
+    // The exact coherent failing pair is retained before any assertion.
+    assert(!snapshot.state.error&&!snapshot.match?.observer_error&&!snapshot.match?.observer_error_reason);
+    await checked(label);if(snapshot.state.phase===7&&snapshot.state.running===1)await padVectors(label,true);return snapshot;
+  };
+  await chord(['q','9','7']);await waitPhase(11,'Sparse original Main');
+  let rules=await enterVsRules('sparse');
+  assert.equal(rules.source.rules.stock_count,4);assert.equal(rules.source.rules.stock_time_limit,0);
+  await moveMenuCursor(13,7,5);await press('m');await waitItemInputReady('Sparse original Items');
+  await waitItemsCursor(0,'Sparse original Items row0');await press(']');
+  await waitItemFrequency(0,'Sparse None');await press('o');await waitMenu(13,5,'Sparse Items commit');
+  await press('7');await waitMessage('Original character select','Sparse committed CSS');
+  const inputCss=await observeSource();assert.equal(inputCss.source.rules.stock_time_limit,0);
+  assert.equal(inputCss.source.items.frequency,-1);report.sourceObservations.push({label:'Sparse committed CSS',...inputCss});
+  route.controllerConfiguration={};
+  route.controllerAssignment=await configureSparseControllerSettings({page,retention:route.controllerConfiguration});
+  const cssDriver=createCssHumanJoinDriver({page,report,shot,observeCssSetup,sourcePadSample,
+    sourcePadTap,resumeTimingPause,ensureNoError});
+  const toggle=async port=>{
+    await cssDriver.moveCssCursor(`Sparse door${port} toggle`,
+      (x,y,s)=>{const b=s.geometry.slice(port*12,port*12+12);return x>b[4]+.2&&x<b[5]-.2&&y>-4.4&&y<0;},
+      (x,y,s)=>{const b=s.geometry.slice(port*12,port*12+12),center=(b[4]+b[5])/2;
+        assert(Number.isFinite(center)&&b[5]>b[4]);return [x<center-.5?80:x>center+.5?-80:0,y<-2.2?80:y>-2.2?-80:0];});
+  };
+  let setup=await observeCssSetup();route.css.push({label:'before original sparse join',setup});
+  assert.equal(cssDriver.cssDoor(setup,0).p_kind,0);
+  assert([0,1].includes(cssDriver.cssDoor(setup,1).p_kind));
+  assert.equal(cssDriver.cssDoor(setup,2).p_kind,3);assert.equal(cssDriver.cssDoor(setup,3).p_kind,3);
+  await toggle(1);
+  for(let changes=0;cssDriver.cssDoor(setup,1).p_kind!==3&&changes<2;changes++){
+    const before=cssDriver.cssDoor(setup,1).p_kind,expected=before===0?1:3;
+    await sourcePadTap(0x100,'Sparse P2 original toggle');
+    ({setup}=await cssDriver.waitCssDoor(1,p=>p.p_kind===expected&&p.slot_type===expected,'Sparse P2 toggle observed'));
+    route.css.push({label:'P2 original toggle',setup});
+  }
+  assert.equal(cssDriver.cssDoor(setup,1).p_kind,3);await toggle(2);
+  await sourcePadTap(0x100,'Sparse P3 empty to Human');
+  ({setup}=await cssDriver.waitCssDoor(2,p=>p.p_kind===0&&p.slot_type===0,'Sparse P3 original Human'));
+  // Same source cursor/model/target geometry policy as CPU9 driveFighter,
+  // with original port2 Browser Gamepad pulses instead of native PAD injection.
+  const pulse=async(button,x,y,label)=>{
+    const record={button,x,y,label};route.gamepadPulses.push(record);
+    await checked(label);
+    try{await page.evaluate(({button,x,y})=>{const p=window.sparseVirtualPad;
+      p.buttons[0]={pressed:!!button,value:button?1:0};p.axes[0]=x/80;p.axes[1]=-y/80;},{button,x,y});
+      await page.waitForTimeout(35);
+    }finally{await page.evaluate(()=>{const p=window.sparseVirtualPad;p.buttons[0]={pressed:false,value:0};p.axes=[0,0,0,0];});}
+    await page.waitForTimeout(35);await checked(label+' released');
+  };
+  let selected=false;
+  for(let n=0;n<SPARSE_PREFIX_LIMITS.fighterSamples;n++){
+    const o=await page.evaluate(()=>window.menuObserveFighterPort(2,8));assert(o);
+    route.css.push({label:'P3 original Mario geometry',observation:o});
+    setup=await observeCssSetup();
+    const decision=sparseP3FighterDecision(o,setup);
+    route.css.push({label:'P3 checked source decision',setup,observation:o,decision});
+    if(decision.kind==='selected'){selected=true;break;}
+    await pulse(decision.button,decision.x,decision.y,'P3 original Mario cursor');
+  }
+  assert(selected,'P3 original Mario selection cap');checkSparseCss(setup);
+  await padVectors('Sparse committed CSS raw/copied PAD profile');
+  route.css.push({label:'closed sparse CSS selection',setup});await shot('sparse-css-p1-p3');
+  if(d.cssOnly){
+    await driver.unload();await verifyTeardown('Sparse CSS-only Eject');
+    report.result='pass';report.checks.push('Original sparse CSS selection, exact raw/copied PAD ports0/2 and Eject only; no SSS/world');return;
+  }
+  await press('Enter');await waitPhase(3,'Sparse original SSS');await waitForNoQueuedPad('Sparse CSS Start released');
+  let stage=1;
+  for(let n=0;n<SPARSE_PREFIX_LIMITS.sssSamples;n++){
+    await checked('Sparse FD driver');stage=await page.evaluate(()=>Module._melee_web_native_menu_drive_stage(32));
+    assert(stage===1||stage===2);await waitForNoQueuedPad('Sparse FD PAD released');if(stage===2)break;
+  }
+  assert.equal(stage,2);const sss=await observeSource();
+  assert.equal(sss.source.valid,true);assert.equal(sss.source.scene,2);
+  assert.equal(sss.source.rules.stock_count,4);assert.equal(sss.source.rules.stock_time_limit,0);
+  assert.equal(sss.source.items.frequency,-1);report.sourceObservations.push({label:'Sparse raw SSS before confirmation',...sss});
+  await shot('sparse-original-sss-fd');await press('j');
+  const origin=Date.now(),steps=await checked('Sparse ordinary construction');let first;
+  while(Date.now()-origin<SPARSE_PREFIX_LIMITS.readyWallMs){
+    assert(await checked('Sparse ordinary readiness')-steps<=SPARSE_PREFIX_LIMITS.readySteps);
+    const o=await sample('Sparse ordinary readiness');
+    if(o.state.phase===7&&o.state.running===1&&o.match.ready&&o.match.frame>0){checkSparseMatch(o.state,o.match);first=o;break;}
+    await page.waitForTimeout(50);
+  }
+  assert(first,'Sparse ordinary ready cap');route.observations.push(first);
+  const prefixAt=Date.now(),prefixSteps=await checked('Sparse prefix');let last;
+  while(Date.now()-prefixAt<SPARSE_PREFIX_LIMITS.prefixWallMs){
+    assert(await checked('Sparse prefix')-prefixSteps<=SPARSE_PREFIX_LIMITS.prefixSteps);
+    last=await sample('Sparse ordinary neutral prefix');checkSparseMatch(last.state,last.match,first.match);
+    if(last.match.frame-first.match.frame>=SPARSE_PREFIX_LIMITS.prefixFrames)break;
+    await page.waitForTimeout(50);
+  }
+  assert(last&&last.match.frame-first.match.frame>=SPARSE_PREFIX_LIMITS.prefixFrames,'Sparse source prefix cap');
+  route.observations.push(last);route.actualSourceFramesAdvanced=last.match.frame-first.match.frame;
+  await shot('sparse-ordinary-mario-hud');
+  if(d.fullRoute)await runSparseEnding({page,driver,report,route,first:last,sample,checked,press,observeSource,observeCssSetup,shot});
+  await driver.unload();await verifyTeardown(d.fullRoute?'Sparse full-route Eject':'Sparse prefix Eject');
+  report.result='pass';report.checks.push(d.fullRoute?'Rendered sparse original CSS/SSS, per-loss live P1 elimination, canonical source2 winner, original two-Human Results/CSS and checked Eject':'Rendered original sparse CSS/SSS, normalized source ports0/2, ordinary neutral source prefix and Eject; no ending/Results acceptance');
+}
+
+async function runSparseEnding({page,driver,report,route,first,sample,checked,press,observeSource,observeCssSetup,shot}){
+  const at=Date.now(),startSteps=await checked('Sparse live elimination begins');
+  assert(first.match.players[0].x<0,'Declared P1 spawn must be left of center for outward A');
+  route.losses=[];route.departurePulses=[];let prior=first,ending=false;
+  const budget=async label=>{assert(Date.now()-at<=SPARSE_ENDING_LIMITS.wallMs,'Sparse ending wall cap');
+    assert(await checked(label)-startSteps<=SPARSE_ENDING_LIMITS.steps,'Sparse ending callback-step cap');};
+  for(let i=0;i<SPARSE_ENDING_LIMITS.pulses;i++){
+    await budget('Sparse before live pulse');const before=await sample('Sparse before live pulse');
+    if(checkSparseLoss(prior.match,before.match))route.losses.push(before);prior=before;
+    if(before.state.phase!==7||before.match.ending||before.match.complete){ending=true;break;}
+    assert.equal(before.state.running,1);assert.equal(before.state.pause_disabled,false);
+    const entry={keys:['a'],holdMs:SPARSE_ENDING_LIMITS.holdMs,releaseMs:SPARSE_ENDING_LIMITS.releaseMs,before};
+    route.departurePulses.push(entry);
+    // Existing driver guarantees keyup; SDL_SCANCODE_A maps original P1 negative X.
+    await driver.pressChord(entry.keys,{holdMs:entry.holdMs,releaseMs:entry.releaseMs});
+    await budget('Sparse after live pulse');entry.after=await sample('Sparse after live pulse');
+    if(checkSparseLoss(prior.match,entry.after.match))route.losses.push(entry.after);prior=entry.after;
+    if(prior.state.phase!==7||prior.match.ending||prior.match.complete){ending=true;break;}
+  }
+  assert(ending,'Sparse pulse cap without original ending');assert.equal(route.losses.length,4);
+  route.liveFinalStocks=prior.match.players.map(p=>p.stocks);route.initialStocks=[4,4];
+  route.eliminationSourceFrames=prior.match.frame-first.match.frame;
+  while(Date.now()-at<=SPARSE_ENDING_LIMITS.wallMs){
+    await budget('Sparse canonical Results');const o=await sample('Sparse canonical Results');route.canonicalTerminal=o;
+    if(o.state.phase===8){checkSparseTerminal(o.match);break;}
+    assert(o.state.phase===7||o.state.phase===5,'Unexpected sparse ending destination');await page.waitForTimeout(50);
+  }
+  assert.equal(route.canonicalTerminal.state.phase,8);await shot('sparse-canonical-p3-results');
+  const deadlineAt=Date.now()+SPARSE_ENDING_LIMITS.resultsMs;
+  const observeSample=async label=>{const o=await observeRuntimeOwner(page,route,label,{includeMatch:false,includeResultsTrace:true});
+    route.resultsPadTraceLatest=o.trace;await checked(label);return {host:o.state,trace:o.trace};};
+  const pressSecond=async()=>{
+    const entry={buttonIndex:9,sourcePort:2,holdMs:120,releaseMs:220};route.resultsGamepadStart=entry;
+    try{await page.evaluate(()=>{window.sparseVirtualPad.buttons[9]={pressed:true,value:1};});await page.waitForTimeout(entry.holdMs);}
+    finally{await page.evaluate(()=>{window.sparseVirtualPad.buttons[9]={pressed:false,value:0};});}
+    await page.waitForTimeout(entry.releaseMs);await checked('Sparse P3 Results Start released');
+  };
+  route.resultsConfirmation=await confirmTwoHumanResults({deadlineAt,sourcePorts:[0,2],observeSample,press,pressSecond,
+    wait:ms=>page.waitForTimeout(ms)});
+  route.prizeReturn=await returnFromCompetitivePrize({deadlineAt,sourcePorts:[0,2],observeSample,press,wait:ms=>page.waitForTimeout(ms)});
+  const returned=await observeSource();assert.equal(returned.source.scene,1);assert.equal(returned.source.rules.stock_count,4);
+  assert.equal(returned.source.rules.stock_time_limit,0);checkSparseCss(await observeCssSetup());
+  route.returnedCss=returned;await shot('sparse-returned-css');
+}

@@ -31,7 +31,7 @@ int melee_web_match_timer_supported(const struct StartMeleeRules* rules)
 
 #include MELEE_WEB_PATCHED_VALIDATOR
 
-/* fn_80262F44 (mnCharSel.c) shows Start for contiguous active doors when at
+/* fn_80262F44 (mnCharSel.c) shows Start for active source doors when at
  * least two are active and some pair (i < count - 1, j >= i) differs in team.
  * Transcribed literally as an independent oracle. */
 static int source_css_start_visible(const int teams[4], int count)
@@ -45,7 +45,7 @@ static int source_css_start_visible(const int teams[4], int count)
     return 0;
 }
 
-/* The port admits 2-4 contiguous doors, cycleTeam's three colours, and (for
+/* The port admits 2-4 active source doors, cycleTeam's three colours, and (for
  * the strict boundary) the source Start predicate. */
 static int expected_supported(int is_teams, const int teams[4], int count,
                               int require_opposing)
@@ -89,7 +89,7 @@ static int check_named(const char* name, int is_teams, const int teams[4],
 {
     StartMeleeData start;
     build_start(&start, is_teams, teams, count);
-    if (melee_web_match_validate_source_start(&start, 0) != accepted) {
+    if (melee_web_match_validate_source_start(&start, 0, 0) != accepted) {
         fprintf(stderr, "patched validator %s: expected %s\n", name,
                 accepted ? "accept" : "refuse");
         return 0;
@@ -140,16 +140,39 @@ int main(void)
         !check_named("single player teams", 1, ffa, 1, 0))
         return 1;
 
-    /* A gap between active doors is not a source CSS roster the port owns. */
+    /* The actual patched ordinary validator admits P1/P3 without changing
+     * either the original row or its one-based source controller record. */
+    build_start(&start, 0, ffa, 2);
+    start.players[2] = start.players[1];
+    start.players[2].slot = 3;
+    start.players[1].slot_type = Gm_PKind_NA;
+    start.players[1].rumble_enabled = 0;
+    {
+        const StartMeleeData retained = start;
+        if (!melee_web_match_validate_source_start(&start, 0, 0) ||
+            memcmp(&start, &retained, sizeof(start))) {
+            fprintf(stderr, "validator changed or refused original P1/P3 rows\n");
+            return 7;
+        }
+    }
+    start.players[2].slot = 2;
+    if (melee_web_match_validate_source_start(&start, 0, 0)) {
+        fprintf(stderr, "validator renumbered P3 to controller1\n");
+        return 8;
+    }
+    /* Original source gaps preserve the row and controller identities. */
     build_start(&start, 1, two_v_two, 4);
     start.players[1].slot_type = Gm_PKind_NA;
-    if (melee_web_match_validate_source_start(&start, 0)) {
-        fprintf(stderr, "validator accepted a non-contiguous Team Battle\n");
+    start.players[1].rumble_enabled = 0;
+    if (!melee_web_match_validate_source_start(&start, 0, 0) ||
+        !melee_web_team_setup_supported(&start, 3, 1) ||
+        melee_web_team_setup_supported(&start, 4, 1)) {
+        fprintf(stderr, "validator lost sparse Team Battle source count\n");
         return 2;
     }
     /* Team flag values other than the source boolean are refused. */
     build_start(&start, 2, two_v_two, 4);
-    if (melee_web_match_validate_source_start(&start, 0) ||
+    if (melee_web_match_validate_source_start(&start, 0, 0) ||
         melee_web_team_setup_supported(&start, 4, 1)) {
         fprintf(stderr, "validator accepted an out-of-range team flag\n");
         return 3;
@@ -161,7 +184,7 @@ int main(void)
     start.rules.disable_pausing = 1;
     start.rules.xB = 2;
     start.rules.on_match_start = gm_80183218;
-    if (melee_web_match_validate_source_start(&start, 1)) {
+    if (melee_web_match_validate_source_start(&start, 1, 0)) {
         fprintf(stderr, "opening demo validator accepted a Team Battle\n");
         return 4;
     }
@@ -185,7 +208,7 @@ int main(void)
                 if (count >= 1 && count <= 4) {
                     const int accepted = count >= 2 &&
                         expected_supported(is_teams, teams, count, 1);
-                    if (melee_web_match_validate_source_start(&start, 0) !=
+                    if (melee_web_match_validate_source_start(&start, 0, 0) !=
                         accepted) {
                         fprintf(stderr,
                                 "patched validator: teams=%d count=%d code=%d\n",

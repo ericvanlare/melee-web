@@ -33,7 +33,8 @@ from retail_replay_validation import (
     _validate_scene_continuity,
     _validate_state,
 )
-from retail_input_plan import MULTIPLAYER_CPU_PLAN_VERSION, verify_entry, verify_tick
+from retail_input_plan import (AUTHORED_PLAN_VERSION, MULTIPLAYER_CPU_PLAN_VERSION,
+                               verify_entry, verify_tick)
 
 
 SCHEMA = "melee-web-retail-match-discovery"
@@ -197,6 +198,8 @@ def _validate_rows(rows: Iterable[dict[str, Any]], context: str,
                   *, cpu: str = "Interpreter64", plan: dict[str, Any] | None = None,
                   plan_sha256: str | None = None, sha256: str | None,
                   raw: bytes | None) -> Discovery:
+    if plan is not None and plan.get("version") == AUTHORED_PLAN_VERSION:
+        raise DiscoveryError("authored SD declaration has no supported match discovery contract")
     if not isinstance(rows, (list, tuple)):
         raise DiscoveryError(f"{context}: discovery rows must be a list")
     rows_tuple = tuple(rows)

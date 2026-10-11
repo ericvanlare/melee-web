@@ -103,6 +103,47 @@ void melee_web_retail_entities(void){
     }
     printf("]");
 }
+/* Explicit jiggly-ice-mario-fox-v1 diagnostic only. The source-authored two
+ * player_entity slots retain their ordinals; no active-form remapping occurs.
+ * Validate the entire inventory before emitting any entity fields. */
+void melee_web_retail_entities_checked(void){
+    static const CharacterKind characters[4]={
+        CKIND_PURIN,CKIND_POPONANA,CKIND_MARIO,CKIND_FOX};
+    static const FighterKind kinds[4][2]={
+        {FTKIND_PURIN,FTKIND_MARIO},{FTKIND_POPO,FTKIND_NANA},
+        {FTKIND_MARIO,FTKIND_MARIO},{FTKIND_FOX,FTKIND_MARIO}};
+    const void* identities[10];
+    unsigned identity_count=0;
+    for(unsigned slot=0;slot<4;slot++){
+        const StaticPlayer* player=Player_GetPtrForSlot(slot);
+        if(!player||Player_GetPlayerSlotType(slot)!=Gm_PKind_Cpu||
+           player->player_character!=characters[slot]||
+           player->transformed[0]!=0||player->transformed[1]!=1)abort();
+        _Static_assert(sizeof(player->player_entity)/sizeof(player->player_entity[0])==2,
+                       "Source player entity extent changed");
+        const unsigned count=slot==1?2:1;
+        for(unsigned ordinal=0;ordinal<2;ordinal++){
+            const HSD_GObj* object=player->player_entity[ordinal];
+            if(ordinal>=count){if(object)abort();continue;}
+            if(!object)abort();
+            const Fighter* fighter=object->user_data;
+            if(!fighter||(const void*)fighter==(const void*)object||
+               fighter->gobj!=object||fighter->player_id!=slot||
+               fighter->kind!=kinds[slot][ordinal])abort();
+            for(unsigned earlier=0;earlier<identity_count;earlier++)
+                if(identities[earlier]==(const void*)object||
+                   identities[earlier]==(const void*)fighter)abort();
+            identities[identity_count++]=object;
+            identities[identity_count++]=fighter;
+        }
+    }
+    for(unsigned slot=4;slot<6;slot++){
+        const StaticPlayer* player=Player_GetPtrForSlot(slot);
+        if(!player||Player_GetPlayerSlotType(slot)!=Gm_PKind_NA||
+           player->player_entity[0]||player->player_entity[1])abort();
+    }
+    melee_web_retail_entities();
+}
 void melee_web_retail_entities_reset(void){
     memset(observed_entities,0,sizeof(observed_entities));
     memset(entity_generations,0,sizeof(entity_generations));

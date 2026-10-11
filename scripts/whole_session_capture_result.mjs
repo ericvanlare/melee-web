@@ -184,14 +184,74 @@ export function validateRuntimeDataAbort(evidence) {
     digest(evidence.expectedSha256) && evidence.actualSha256 === evidence.expectedSha256;
 }
 
+// Bind requested mode and its final Match span; native remains the full
+// context/setup/PAD validator. This never derives expectations from a report.
+// Existing tools/whole_session_replay.py / gameplay_retail_recipe.hpp layout:
+// 20-byte envelope + 8-byte v2 context header + context + StartMeleeData (0x138)
+// + full PAD (822) + 44 bytes/input frame + u16 span count + 12 bytes/span.
+export function readRequestedEntityPrefix(bytes, recipeSha256) {
+  if (bytes.length < 24 || ![1, 2].includes(bytes.readUInt16BE(22))) return null;
+  const activeClock = bytes.readUInt16BE(22) === 2;
+  if (bytes.readUInt32BE(4) !== 8 || bytes.length < 28 ||
+      bytes.readUInt16BE(20) !== 2 ||
+      bytes.readUInt32BE(24) !== 0x18 + 0x55e8 + 0x148 + 6 ||
+      !/^[a-f0-9]{64}$/.test(recipeSha256 || ''))
+    throw Error('Invalid requested entity-prefix envelope');
+  const frames = bytes.readUInt32BE(12);
+  const spans = 28 + bytes.readUInt32BE(24) + 0x138 + 822 + frames * 44;
+  if (frames < 1 || frames > 108000 || spans + 2 + 3 * 12 !== bytes.length ||
+      bytes.readUInt16BE(spans) !== 3)
+    throw Error('Entity prefix lacks its bound CSS/SSS/Match interval');
+  let next = 0, observations = 0;
+  for (let index = 0; index < 3; index++) {
+    const offset = spans + 2 + index * 12;
+    const first = bytes.readUInt32BE(offset + 4), last = bytes.readUInt32BE(offset + 8);
+    if (bytes[offset] !== index + 1 || bytes[offset + 1] !== 0 ||
+        bytes.readUInt16BE(offset + 2) !== 0 || first !== next || last < first || last >= frames)
+      throw Error('Entity prefix scene spans differ from the requested interval');
+    next = last + 1;
+    if (index === 2) observations = last - first + 1;
+  }
+  if (next !== frames || observations < (activeClock ? 61 : 60) || observations > (activeClock ? 604 : 64))
+    throw Error('Entity prefix Match interval is outside its observed-source bound');
+  return {name: activeClock ? 'jiggly-ice-mario-fox-active60-v1' : 'jiggly-ice-mario-fox-v1',
+    frames, observations, recipe_sha256: recipeSha256};
+}
+
+export function sessionReplayReportCompleted(value, requestedPrefix = null) {
+  if (value?.pass !== true || !Array.isArray(value.failures) || value.failures.length ||
+      (value.errors !== undefined && (!Array.isArray(value.errors) || value.errors.length))) return false;
+  if (!requestedPrefix)
+    return value.complete === true && ['diagnostic_prefix', 'diagnostic_prefix_complete',
+      'whole_session_equivalent', 'comparison_source_ticks', 'comparison_active_clock_ticks',
+      'source_progress'].every(key => value[key] === undefined);
+  const progress = value.source_progress, metrics = value.metrics;
+  const activeClock = requestedPrefix.name === 'jiggly-ice-mario-fox-active60-v1';
+  return value.schema === 'melee-web-browser-retail-replay' && value.version === 1 &&
+    (requestedPrefix.name === 'jiggly-ice-mario-fox-v1' || activeClock) &&
+    Number.isSafeInteger(requestedPrefix.frames) && requestedPrefix.frames >= 1 &&
+    /^[a-f0-9]{64}$/.test(requestedPrefix.recipe_sha256 || '') &&
+    Number.isInteger(requestedPrefix.observations) && requestedPrefix.observations >= (activeClock ? 61 : 60) &&
+    requestedPrefix.observations <= (activeClock ? 604 : 64) && value.diagnostic_prefix === requestedPrefix.name &&
+    value.diagnostic_prefix_complete === true && value.complete === false &&
+    value.whole_session_equivalent === false &&
+    value.comparison_source_ticks === (activeClock ? requestedPrefix.observations : 60) &&
+    (activeClock ? value.comparison_active_clock_ticks === 60 : value.comparison_active_clock_ticks === undefined) &&
+    value.mode === 'state_capture' && value.final_scene === 3 &&
+    value.recipe_sha256 === requestedPrefix.recipe_sha256 && value.frames === requestedPrefix.frames &&
+    progress?.observations === requestedPrefix.observations &&
+    progress.bound_observations === requestedPrefix.observations &&
+    progress.first_source_tick === 0 && progress.last_source_tick === requestedPrefix.observations - 1 &&
+    metrics?.sourceFrames === requestedPrefix.frames && metrics.sourceSteps === requestedPrefix.frames &&
+    metrics.sourceDraws === requestedPrefix.frames &&
+    value.source_match?.complete === false && value.source_match.outcome === null && value.source_match.winner === null;
+}
+
 export function finalizeSessionCapture(report) {
   const failures = [];
   if (!report.phases?.some(row => row.name === 'whole-session-replay' && row.result === 'pass'))
     failures.push('Whole-session replay did not complete successfully');
-  if (report.browser_report?.complete !== true || report.browser_report?.pass !== true ||
-      !Array.isArray(report.browser_report.failures) || report.browser_report.failures.length ||
-      (report.browser_report.errors !== undefined &&
-       (!Array.isArray(report.browser_report.errors) || report.browser_report.errors.length)))
+  if (!sessionReplayReportCompleted(report.browser_report, report.requested_entity_prefix))
     failures.push('Browser replay report is incomplete or failed');
   if (report.first_error || report.failure || report.first_mismatch)
     failures.push('A fatal harness diagnostic was recorded');

@@ -22,7 +22,7 @@ static inline int melee_web_player_selection_supported(const PlayerInitData* pla
  * CSS Start until at least two active doors belong to different teams; it
  * places no other bound on the roster, so 1v1, 2v1, 1v1v1, 2v2, 3v1 and
  * 2v1v1 all start. The VS CSS owns four doors (mnCharSel_804D6CF5), and the
- * port admits two through four contiguous players. In-progress CSS may show
+ * port admits two through four source players. In-progress CSS may show
  * every active door on one team while the cursor configures colours; only
  * CSS exit and match admission require opposing teams. */
 #define MELEE_WEB_VS_TEAM_COLORS 3
@@ -33,15 +33,20 @@ static inline int melee_web_team_setup_supported(const StartMeleeData* start,
 {
     int i;
     int opposing = 0;
+    int active = 0;
+    int first_team = -1;
 
     if (start == NULL || start->rules.is_teams > 1) return 0;
     if (!start->rules.is_teams) return 1;
     if (count < 2 || count > MELEE_WEB_VS_TEAM_MAX_PLAYERS) return 0;
-    for (i = 0; i < count; ++i) {
+    for (i = 0; i < MELEE_WEB_VS_TEAM_MAX_PLAYERS; ++i) {
+        if (start->players[i].slot_type == Gm_PKind_NA) continue;
         if (start->players[i].team >= MELEE_WEB_VS_TEAM_COLORS) return 0;
-        if (start->players[i].team != start->players[0].team) opposing = 1;
+        if (first_team < 0) first_team = start->players[i].team;
+        else if (start->players[i].team != first_team) opposing = 1;
+        ++active;
     }
-    return opposing || !require_opposing_teams;
+    return active == count && (opposing || !require_opposing_teams);
 }
 
 /* The prepared match must preserve gm_LoadRumbleEnabled's CPU policy.

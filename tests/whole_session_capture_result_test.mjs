@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import vm from 'node:vm';
 import {finalizeSessionCapture, REQUIRED_SESSION_DOWNLOADS,
   validateRuntimeDataAbort, boundedCaptureOperation, retainFirstCaptureError,
   FIRST_REPLAY_BOUNDARY_MARKER_PREFIX, FIRST_REPLAY_BOUNDARY_MARKER_NAMES,
-  parseFirstReplayBoundaryMarker, inspectFirstReplayBoundaryMarkers} from '../scripts/whole_session_capture_result.mjs';
+  parseFirstReplayBoundaryMarker, inspectFirstReplayBoundaryMarkers,
+  readRequestedEntityPrefix, sessionReplayReportCompleted} from '../scripts/whole_session_capture_result.mjs';
 
 const clean = () => ({
   result: 'fail', first_error: null, browser_errors: [], unexpected_requests: [],
@@ -170,3 +173,188 @@ assert.equal(missingReturn.first_unmatched_marker.marker, 'first_replay_callback
 const sequenceGap = markerRows.map(row => ({...row}));sequenceGap[4].sequence++;
 assert(inspectFirstReplayBoundaryMarkers(sequenceGap).errors.some(reason => reason.includes('sequence gap')));
 console.log('First replay callback marker protocol validates source order, paired boundaries, and pause state.');
+
+// Execute the actual production final-collection try/finally with stubbed renderer handles.
+const captureSource = await fs.readFile(new URL('../scripts/capture_whole_session_browser.mjs', import.meta.url), 'utf8');
+function extractBetween(start, end) {
+  const a = captureSource.indexOf(start), b = captureSource.indexOf(end, a);
+  assert(a >= 0 && b > a, `${start} production boundary missing`);
+  return captureSource.slice(a, b);
+}
+const closeSource = extractBetween('async function closeOwnedCaptureBrowser() {', 'const boundaryMarkers = [];');
+const observeSource = extractBetween('async function observePageOperation(label, operation) {', 'async function pauseTraceStatus');
+const collectSource = extractBetween('  try {\n  if (diagnostic) {\n    if (pageObservationTimedOut)', '  for (const candidate of runtimeDataAbortCandidates)');
+async function actualCollection(failure) {
+  const calls = [], primary = {kind: 'existing primary', message: 'keep first failure'};
+  const report = {first_error: primary};
+  const pending = () => new Promise(() => {});
+  const page = {
+    isClosed: () => false,
+    locator: name => ({
+      evaluateAll: () => { calls.push('artifacts'); return failure === 'artifacts stall' ? pending() : Promise.resolve([{name: 'retail-port.jsonl', text: 'raw'}]); },
+      innerText: () => { calls.push('text'); return Promise.resolve('page'); },
+    }),
+    evaluate: fn => {
+      const text = String(fn);
+      if (text.includes('__cpuPrefixRows')) {calls.push('cpu prefix'); return failure === 'CPU prefix stall' ? pending() : Promise.resolve([]);}
+      if (text.includes('TraceTotal')) {calls.push('allocation total'); return Promise.resolve(0);}
+      calls.push('other evaluate'); return Promise.resolve([]);
+    },
+    screenshot: () => {calls.push('screenshot'); return Promise.resolve();},
+  };
+  const scope = vm.createContext({report, page, diagnostic: false, pageObservationTimedOut: false,
+    observationTimeoutMs: 5, currentPhase: 'finally', boundedCaptureOperation,
+    firstError: (kind, message) => {report.first_error ||= {kind, message};},
+    snapshot: async () => ({}), rngDrawProbe: null, hitTransitionProbe: null,
+    write: async () => {calls.push('write'); if (failure === 'write failure') throw Error('owned write failed');},
+    Buffer, createHash: (await import('node:crypto')).createHash, path: (await import('node:path')).default,
+    output: 'unused', driver: {dispose: () => calls.push('dispose')},
+    browser: {close: async () => {calls.push('close'); if (failure === 'close failure') throw Error('owned close failed');}},
+    browserContext: null, diagnosticCdp: null,
+  });
+  vm.runInContext(observeSource + closeSource, scope);
+  await vm.runInContext(`(async () => {${collectSource}})()`, scope);
+  assert.equal(report.first_error, primary, 'later failures must preserve primary');
+  assert.equal(calls.at(-1), 'close', 'actual final collection must close its browser last');
+  if (failure === 'artifacts stall') {
+    assert.deepEqual(calls, ['artifacts', 'dispose', 'close']);
+    assert.equal(scope.pageObservationTimedOut, true);
+  }
+  if (failure === 'CPU prefix stall') {
+    assert.deepEqual(calls, ['artifacts', 'write', 'cpu prefix', 'dispose', 'close']);
+    assert.equal(scope.pageObservationTimedOut, true);
+  }
+  if (failure === 'write failure') assert.match(report.download_error, /owned write failed/);
+  if (failure === 'close failure') assert.match(report.close_error, /owned close failed/);
+  checks++;
+}
+for (const failure of ['artifacts stall', 'CPU prefix stall', 'write failure', 'close failure']) await actualCollection(failure);
+console.log(`Owned capture final collection controls passed: ${checks} total report/ownership controls.`);
+
+// Synthetic transport metadata exercises the production requested-mode parser;
+// it is not a substitute for native context/setup/PAD admission.
+const prefixDigest = 'c'.repeat(64);
+function prefixRecipe(observations = 60) {
+  const contextBytes = 0x18 + 0x55e8 + 0x148 + 6;
+  const frames = 2 + observations, spans = 28 + contextBytes + 0x138 + 822 + frames * 44;
+  const bytes = Buffer.alloc(spans + 2 + 36);
+  bytes.write('MWRC'); bytes.writeUInt32BE(8, 4); bytes.writeUInt32BE(frames, 12);
+  bytes.writeUInt16BE(2, 20); bytes.writeUInt16BE(1, 22);
+  bytes.writeUInt32BE(contextBytes, 24); bytes.writeUInt16BE(3, spans);
+  for (let index = 0; index < 3; index++) {
+    const offset = spans + 2 + index * 12;
+    bytes[offset] = index + 1;
+    bytes.writeUInt32BE(index, offset + 4);
+    bytes.writeUInt32BE(index === 2 ? frames - 1 : index, offset + 8);
+  }
+  return {bytes, spans};
+}
+const requestedPrefix = readRequestedEntityPrefix(prefixRecipe().bytes, prefixDigest);
+assert.deepEqual(requestedPrefix, {name: 'jiggly-ice-mario-fox-v1', frames: 62,
+  observations: 60, recipe_sha256: prefixDigest});
+for (const version of [8, 9, 10]) {
+  const {bytes} = prefixRecipe(); bytes.writeUInt32BE(version, 4); bytes.writeUInt16BE(0, 22);
+  assert.equal(readRequestedEntityPrefix(bytes, prefixDigest), null, 'flag-zero defaults unchanged');
+}
+for (const mutate of [
+  ({bytes}) => bytes.writeUInt32BE(9, 4),
+  ({bytes}) => bytes.writeUInt32BE(10, 4),
+  ({bytes}) => bytes.writeUInt16BE(1, 20),
+  ({bytes}) => bytes.writeUInt32BE(0, 24),
+  ({bytes, spans}) => bytes.writeUInt16BE(2, spans),
+  ({bytes, spans}) => bytes.writeUInt32BE(2, spans + 2 + 12 + 4),
+  ({bytes, spans}) => {bytes[spans + 2 + 24] = 1;},
+  ({bytes, spans}) => bytes.writeUInt16BE(1, spans + 2 + 24 + 2),
+]) {
+  const recipe = prefixRecipe(); mutate(recipe);
+  assert.throws(() => readRequestedEntityPrefix(recipe.bytes, prefixDigest), /prefix/i); checks++;
+}
+for (const observations of [59, 65])
+  assert.throws(() => readRequestedEntityPrefix(prefixRecipe(observations).bytes, prefixDigest), /bound/);
+assert.throws(() => readRequestedEntityPrefix(prefixRecipe().bytes.subarray(0, -1), prefixDigest), /interval/);
+assert.throws(() => readRequestedEntityPrefix(prefixRecipe().bytes, 'invalid'), /envelope/);
+const prefixReport = () => ({schema: 'melee-web-browser-retail-replay', version: 1,
+  pass: true, failures: [], complete: false, diagnostic_prefix: requestedPrefix.name,
+  diagnostic_prefix_complete: true, whole_session_equivalent: false,
+  comparison_source_ticks: 60, mode: 'state_capture', final_scene: 3,
+  recipe_sha256: prefixDigest, frames: requestedPrefix.frames,
+  source_progress: {observations: 60, bound_observations: 60, first_source_tick: 0, last_source_tick: 59},
+  metrics: {sourceFrames: 62, sourceSteps: 62, sourceDraws: 62},
+  source_match: {complete: false, outcome: null, winner: null},
+});
+const prefixCapture = () => ({...clean(), requested_entity_prefix: requestedPrefix,
+  browser_report: prefixReport()});
+assert.equal(sessionReplayReportCompleted(prefixReport(), requestedPrefix), true);
+const prefixSuccess = prefixCapture();
+assert.equal(finalizeSessionCapture(prefixSuccess), 0);
+assert.equal(prefixSuccess.browser_report.complete, false);
+assert.equal(prefixSuccess.browser_report.whole_session_equivalent, false);
+for (const mutate of [
+  r => {delete r.requested_entity_prefix;},
+  r => {r.requested_entity_prefix = {...requestedPrefix, name: 'unsolicited'};},
+  r => {r.requested_entity_prefix = {...requestedPrefix, observations: 59};},
+  r => {r.browser_report.schema = 'foreign';},
+  r => {r.browser_report.version = 2;},
+  r => {r.browser_report.diagnostic_prefix = 'foreign';},
+  r => {r.browser_report.diagnostic_prefix_complete = false;},
+  r => {r.browser_report.complete = true;},
+  r => {r.browser_report.whole_session_equivalent = true;},
+  r => {r.browser_report.comparison_source_ticks = 59;},
+  r => {r.browser_report.mode = 'performance';},
+  r => {r.browser_report.final_scene = 1;},
+  r => {r.browser_report.recipe_sha256 = 'd'.repeat(64);},
+  r => {r.browser_report.frames--;},
+  r => {r.browser_report.source_progress.observations--;},
+  r => {r.browser_report.source_progress.bound_observations++;},
+  r => {r.browser_report.source_progress.first_source_tick = 1;},
+  r => {r.browser_report.source_progress.last_source_tick++;},
+  ...['sourceFrames', 'sourceSteps', 'sourceDraws'].map(key => r => {r.browser_report.metrics[key]--;}),
+  r => {r.browser_report.source_match.complete = true;},
+  r => {r.browser_report.source_match.outcome = 1;},
+  r => {r.browser_report.source_match.winner = 0;},
+  r => {r.browser_report.failures.push('teardown incomplete');},
+  r => {r.browser_report.errors = ['runtime failure'];},
+  r => {r.first_error = {message: 'retained preparation failure'};},
+  r => {r.close_error = 'owned close failed';},
+]) {
+  const report = prefixCapture(); mutate(report);
+  assert.equal(finalizeSessionCapture(report), 1, JSON.stringify(report)); checks++;
+}
+const unsolicited = clean(); unsolicited.browser_report.diagnostic_prefix = requestedPrefix.name;
+assert.equal(finalizeSessionCapture(unsolicited), 1);
+console.log(`Requested entity-prefix production parser/completion/finalization controls passed; ${checks} total controls.`);
+
+// Execute the production header-binding block: a failed request retains its
+// named identity, while an unsolicited completion can never establish it.
+const requestBindingSource = extractBetween('  report.requested_entity_prefix =', '  if (diagnostic && (report.recipe_header.version');
+function actualRequestBinding(overrides = {}) {
+  const scope = vm.createContext({report: {mode: 'state', inputs: {recipe: {sha256: prefixDigest}}},
+    recipeBytes: prefixRecipe().bytes, readRequestedEntityPrefix,
+    diagnostic: false, stopAfter: 0, resumeTimingPauses: false, firstReplayCallbackProbe: false,
+    captureCpuObservations: false, rngDrawProbe: null, hitTransitionProbe: null, ...overrides});
+  let failure;
+  try {vm.runInContext(requestBindingSource, scope);} catch (error) {failure = error;}
+  return {report: scope.report, failure};
+}
+assert.equal(actualRequestBinding().failure, undefined);
+assert.equal(actualRequestBinding().report.requested_entity_prefix.name, requestedPrefix.name);
+for (const overrides of [{diagnostic: true}, {stopAfter: 1}, {resumeTimingPauses: true},
+  {firstReplayCallbackProbe: true}, {captureCpuObservations: true}, {rngDrawProbe: {}}, {hitTransitionProbe: {}}]) {
+  const {report, failure} = actualRequestBinding(overrides);
+  assert.match(failure?.message || '', /unmodified state capture/);
+  assert.equal(report.requested_entity_prefix.name, requestedPrefix.name, 'failure preserves requested mode');
+}
+console.log('Actual harness recipe-binding branch preserves requested mode on incompatible-option failures.');
+
+for (const key of ['diagnostic_prefix_complete', 'whole_session_equivalent', 'comparison_source_ticks', 'source_progress']) {
+  const report = clean(); report.browser_report[key] = key === 'source_progress' ? {} : false;
+  assert.equal(finalizeSessionCapture(report), 1, `unsolicited ${key}`);
+}
+if (process.env.ENTITY_PREFIX_RECIPE) {
+  const raw = await fs.readFile(process.env.ENTITY_PREFIX_RECIPE);
+  const digest = (await import('node:crypto')).createHash('sha256').update(raw).digest('hex');
+  assert.equal(digest, 'b30936fad87fe0b3a90375872dbd10074d535f7edde15987fc17cda6a549811e');
+  assert.deepEqual(readRequestedEntityPrefix(raw, digest), {name: 'jiggly-ice-mario-fox-v1',
+    frames: 1164, observations: 60, recipe_sha256: digest});
+  console.log('Actual original-v2 immutable recipe metadata parsed: 1164 input frames, 60 SourceTick observations.');
+}

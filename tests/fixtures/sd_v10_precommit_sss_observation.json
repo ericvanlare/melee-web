@@ -1,0 +1,170 @@
+{
+  "schema": "melee-web-sd-v10-precommit-sss-observation-v1",
+  "origin": "Actual V10 failure-handler source observation after premature start.valid assertion; latest coherent host/match pair was captured immediately before the source read. Exact assertion source object was not retained separately.",
+  "report_sha256": "ab053a38cfe16b504c857e426d67153639c7a5799473eef07202bdd4d6a5b86a",
+  "source": {
+    "source": {
+      "valid": true,
+      "scene": 2,
+      "menu_kind": 0,
+      "previous_menu_kind": 0,
+      "hovered_selection": 0,
+      "confirmed_selection": 0,
+      "buttons": 0,
+      "item_input_locked": 0,
+      "rules": {
+        "mode": 1,
+        "stock_count": 4,
+        "time_limit": 2,
+        "stock_time_limit": 1,
+        "handicap": 0,
+        "damage_ratio": 10,
+        "friendly_fire": 0
+      },
+      "items": {
+        "frequency": -1,
+        "mask_hex": "ffffffffffffffff"
+      },
+      "css_setup": {
+        "valid": false,
+        "is_teams": 0,
+        "player_teams": [
+          0,
+          0
+        ],
+        "door_teams": [
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "items_menu": {
+      "valid": false,
+      "cursor": -1,
+      "selected_item_enabled": -1,
+      "frequency_selector": -1
+    },
+    "start": {
+      "valid": false,
+      "match_kind": 0,
+      "stage": 0,
+      "item_frequency": 0,
+      "item_mask_hex": "0000000000000000",
+      "player_stocks": [
+        0,
+        0
+      ],
+      "players": []
+    }
+  },
+  "owner": {
+    "label": "Subsequent source SSS entry",
+    "state": {
+      "message": "Original stage select",
+      "phase": 3,
+      "running": 1,
+      "status": "Original stage select",
+      "pause_present": true,
+      "pause_disabled": false,
+      "error": null,
+      "diagnostics": "Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 3 \u00b7 revisits: 0"
+    },
+    "match": {
+      "leg": "sudden_death",
+      "prior_vs_source_frames": 3600,
+      "observed_player_source_slots": [
+        0,
+        1
+      ],
+      "prior_vs_terminal": {
+        "outcome": 1,
+        "winners": [
+          0,
+          1
+        ]
+      },
+      "ready": false,
+      "paused": false,
+      "ending": true,
+      "complete": true,
+      "frame": 277,
+      "rng": 2708186160,
+      "outcome": 2,
+      "winner": -1,
+      "rules": {
+        "match_kind": 1,
+        "stage": 32,
+        "timer_enabled": 0,
+        "time_limit": 60,
+        "is_stock": 0,
+        "is_vs": 0,
+        "source_sudden_death_flag": 1,
+        "item_frequency": -1,
+        "item_mask_hex": "ffffffffffffffff",
+        "is_teams": 0,
+        "player_teams": [
+          0,
+          0
+        ],
+        "player_stocks": [
+          1,
+          1
+        ],
+        "door_teams": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "friendly_fire": 0
+      },
+      "players": [
+        {
+          "fighter": 0,
+          "human": true,
+          "damage_percent": 300,
+          "source_player_index": 0,
+          "source_slot": 0,
+          "source_port": 0,
+          "source_character": 8,
+          "source_color": 1,
+          "source_initial_damage": 300,
+          "slot_type": 0,
+          "source_stocks": 1,
+          "stocks": 0,
+          "motion": 0,
+          "groundAir": 1,
+          "x": 164.652756,
+          "y": -140.334793
+        },
+        {
+          "fighter": 0,
+          "human": true,
+          "damage_percent": 300,
+          "source_player_index": 1,
+          "source_slot": 0,
+          "source_port": 1,
+          "source_character": 8,
+          "source_color": 0,
+          "source_initial_damage": 300,
+          "slot_type": 0,
+          "source_stocks": 1,
+          "stocks": 1,
+          "motion": 14,
+          "groundAir": 0,
+          "x": 66.6000137,
+          "y": 9.99999975e-05
+        }
+      ],
+      "terminal": {
+        "outcome": 2,
+        "winners": [
+          1
+        ]
+      },
+      "sd_source_frames": 277
+    }
+  }
+}

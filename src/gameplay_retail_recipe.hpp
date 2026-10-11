@@ -49,6 +49,8 @@ struct RetailReplayInitialCssContext {
 // Expected game-state observations never enter the runtime.
 struct RetailReplayRecipe {
     uint32_t version = 0, seed = 0;
+    bool diagnostic_entity_prefix = false;
+    bool diagnostic_active_entity_prefix = false;
     std::array<uint8_t, 0x138> setup{};
     std::array<uint8_t, MELEE_WEB_PAD_STATE_BYTES> pad_bytes{};
     MeleeWebMenuMatchSelection selection{};
@@ -65,6 +67,10 @@ struct RetailReplayRecipe {
     // starts from the fresh prepared CSS owner and retains one source arena
     // across the menu chain and matches. A used source heap is rejected.
     bool whole_session() const { return version == 8 || version == 9 || version == 10; }
+    std::uint32_t diagnostic_source_observations() const {
+        return diagnostic_entity_prefix && spans.size() == 3 ?
+            spans.back().last_frame - spans.back().first_frame + 1 : 0;
+    }
     unsigned scheduling_mode() const { return version == 6 ? 2 : version == 5 ? 1 : 0; }
     std::size_t expected_draws() const {
         if (draw_boundaries.empty()) return frames.size();
@@ -84,7 +90,7 @@ struct RetailReplayRecipe {
  * V7 was the provisional whole-session envelope and is intentionally rejected
  * by the reader because it cannot carry first-CSS source context. V8 keeps
  * the v4 envelope, then adds a fixed context header (u16 schema=2, u16
- * flags=0, u32 context_bytes), the source GameRules, SaveData, complete
+ * flags=0 (or named v8 entity-prefix flag=1), u32 context_bytes), the source GameRules, SaveData, complete
  * CSSData entry object and six-byte KO array, and finally the whole-session
  * span table. V9 replaces the one setup payload with a bounded, ordered setup
  * table so each match selection is independently bound. V10 retains that
@@ -94,6 +100,9 @@ constexpr uint32_t kRetailReplayVersion = 9;
 constexpr uint32_t kRetailReplayV8Version = 8;
 constexpr uint32_t kRetailReplayFighterVersion = 10;
 constexpr uint16_t kRetailReplayContextVersion = 2;
+// Named opt-in: jiggly-ice-mario-fox-v1, one bounded diagnostic prefix.
+constexpr uint16_t kRetailReplayEntityPrefixFlag = 1;
+constexpr uint16_t kRetailReplayActiveEntityPrefixFlag = 2;
 constexpr size_t kRetailReplayGameRulesBytes = 0x18;
 constexpr size_t kRetailReplaySaveDataBytes = 0x55E8;
 constexpr size_t kRetailReplayCssDataBytes = 0x148;

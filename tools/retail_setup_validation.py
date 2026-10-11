@@ -189,7 +189,8 @@ def _s8(value: int) -> int:
     return value - 256 if value >= 128 else value
 
 
-def _decode_setup(start_melee_hex: Any) -> dict[str, Any]:
+def _decode_setup(start_melee_hex: Any, *, competitive_profile: bool = False,
+                  source_slots: Any = None) -> dict[str, Any]:
     _require(isinstance(start_melee_hex, str) and
              len(start_melee_hex) == SETUP_BYTES * 2 and
              re.fullmatch(r"[0-9a-fA-F]+", start_melee_hex) is not None,
@@ -202,11 +203,13 @@ def _decode_setup(start_melee_hex: Any) -> dict[str, Any]:
     # native setup decoder's pointer rejection.  Do not accept a capture that
     # would enter a different source profile merely because the declared
     # donor fields happen to match.
+    # The authored competitive profile opt-in exposes (and compares) FF;
+    # historical donor/CPU callers retain the default false-only contract.
     _require(raw[4] & 0x40,
              "capture setup requires the ordinary VS is_vs profile")
     _require((raw[1] & 0x02) == 0,
              "capture setup requires timer_shows_hours to be false")
-    _require((raw[1] & 0x01) == 0,
+    _require(competitive_profile or (raw[1] & 0x01) == 0,
              "capture setup requires friendly_fire to be false")
     _require(raw[0x14] == 0,
              "capture setup requires the ordinary zero timer subframe")
@@ -229,11 +232,22 @@ def _decode_setup(start_melee_hex: Any) -> dict[str, Any]:
         "game_speed_bits": raw[0x34:0x38].hex(),
         "players": [],
     }
+    if competitive_profile:
+        actual["friendly_fire"] = bool(raw[1] & 1)
     _require(raw[8] in (0, 1), "capture setup has an invalid is_teams byte")
+    sparse_slots = None
+    if source_slots is not None:
+        from original_source_ports import declared_source_slots, DEFAULT_SOURCE_SLOTS
+        sparse_slots = declared_source_slots(source_slots)
+        _require(sparse_slots == (0, 2) and sparse_slots != DEFAULT_SOURCE_SLOTS,
+                 "Explicit source_slots is reserved for the declared sparse P1/P3 probe")
     for index in range(6):
         base = 0x60 + index * 0x24
         slot = raw[base + 4]
         port = index + 1
+        if sparse_slots is not None and index < 4 and index not in sparse_slots:
+            _require(raw[base + 1] == 3,
+                     f"capture setup has an active undeclared sparse source slot {index}")
         if index < MAX_ACTIVE_PLAYERS and raw[base + 1] in (0, 1):
             _require(slot in (0, port),
                      f"capture setup has an invalid slot byte at player index {index}")
@@ -245,6 +259,9 @@ def _decode_setup(start_melee_hex: Any) -> dict[str, Any]:
                 "player_type": raw[base + 1],
                 "rumble_enabled": bool((raw[base + 12] >> 7) & 1),
             }
+            if sparse_slots is not None:
+                player.update(source_slot=index,
+                              source_port=index if slot == 0 else slot - 1)
             if raw[base + 1] == 1:
                 _require(not player["rumble_enabled"],
                          f"capture setup requires CPU rumble disabled at player index {index}")
@@ -257,10 +274,15 @@ def _decode_setup(start_melee_hex: Any) -> dict[str, Any]:
                      f"capture setup has an unsupported active player record at index {index}")
     actual["players"].sort(key=lambda player: player["port"])
     active_count = len(actual["players"])
-    _require(2 <= active_count <= MAX_ACTIVE_PLAYERS and
-             [player["port"] for player in actual["players"]] ==
-             list(range(1, active_count + 1)),
-             "capture setup does not contain 2 to 4 contiguous active ports")
+    if sparse_slots is None:
+        _require(2 <= active_count <= MAX_ACTIVE_PLAYERS and
+                 [player["port"] for player in actual["players"]] ==
+                 list(range(1, active_count + 1)),
+                 "capture setup does not contain 2 to 4 contiguous active ports")
+    else:
+        _require([player["port"] for player in actual["players"]] ==
+                 [slot + 1 for slot in sparse_slots],
+                 "capture setup does not contain the exact declared sparse source slots")
     return actual
 
 

@@ -4,6 +4,33 @@
 
 namespace melee_web {
 
+// This diagnostic counts actual original scheduler boundaries, not PAD rows or
+// the gameplay timer (which stays stopped during Entry/Ready).
+// gmMain's authored PAD capacity is five: a passive qualifying draw can
+// retain at most cutoff + capacity - 1 observations. Browser preparation must
+// separately reject batching that its existing per-tick draws cannot replay.
+struct DiagnosticPrefixProgress {
+    static constexpr std::uint32_t comparison_ticks = 60, authored_queue_capacity = 5;
+    static constexpr std::uint32_t maximum_ticks = comparison_ticks + authored_queue_capacity - 1;
+    std::uint32_t observations = 0, first_source_tick = 0, last_source_tick = 0;
+    bool observe(std::uint32_t before, std::uint32_t after, bool active_clock_prefix = false) noexcept {
+        if (observations >= (active_clock_prefix ? 604u : maximum_ticks) || (!observations && before != 0) ||
+            before == UINT32_MAX || after != before + 1 ||
+            (observations && before != last_source_tick + 1)) return false;
+        if (!observations) first_source_tick = before;
+        last_source_tick = before;
+        ++observations;
+        return true;
+    }
+    bool ready(std::uint32_t bound_observations, bool input_consumed, bool final_draw, bool live_match,
+               bool pending, bool complete, int outcome, bool active_clock_prefix = false) const noexcept {
+        return bound_observations >= (active_clock_prefix ? 61u : comparison_ticks) &&
+               bound_observations <= (active_clock_prefix ? 604u : maximum_ticks) &&
+               observations == bound_observations && input_consumed && final_draw && live_match &&
+               !pending && !complete && outcome == 0;
+    }
+};
+
 // The v8 timeline ends at the final Results/Prize input.  Returning to CSS is
 // a native owner transition after that input, so its preparation draw is not a
 // replay PAD step and must not be counted as one.

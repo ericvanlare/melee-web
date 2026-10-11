@@ -1,0 +1,167 @@
+"""Reconstructed Items controls; these do not validate a native capture."""
+from copy import deepcopy
+import unittest
+import hashlib
+import json
+import tempfile
+from pathlib import Path
+from unittest import mock
+
+from test_sd_gci_profile import fixture, ready_rows
+from authored_sd_reference_plan import make_input_plan
+from retail_input_plan import NEUTRAL_PAD, DISCONNECTED_PAD
+from reference_versus_sequence_capture import raw_pad
+from sd_original_menu_plan import gci_items_row_packet, validate_packet
+from sd_reference_diagnostic import (GciRulesMenuReceiver, SdDiagnosticError,
+                                    items_lock_state, slices, SCOPE, PCS)
+from sd_gci_profile import load_profile
+
+
+def menu_row(seq, *, lock=0, row=0, value=1, name="menu", count=1):
+    flow=bytearray(24);flow[0]=16;flow[2:4]=row.to_bytes(2,"big");flow[4]=value;flow[17]=1
+    fields=[(40,0x80001000,b"\1"),(45,0x804a04f0,flow),
+            (46,0x804d6bc8,bytes(8)),(56,0x804d6bec,bytes([lock]))]
+    return {"seq":seq,"event":"progress","source_tick":0,"payload":{
+        "diagnostic":SCOPE,"name":name,"pc":PCS[name],"consumed":0,"menu_consumed":count,
+        "slices":[{"tag":t,"flags":0,"address":a,"hex":bytes(b).hex()} for t,a,b in fields]}}
+
+
+def receiver(profile):
+    plan=make_input_plan(5)
+    result=GciRulesMenuReceiver(plan,profile,full_route=True,items_probe=True)
+    rows=ready_rows(profile)[:-1]
+    rows[0]["payload"].update(recipe_sha256=plan["authored_recipe_sha256"],menu_probe="items_row")
+    for row in rows: result.accept(row)
+    return result
+
+
+class ItemsLockTests(unittest.TestCase):
+    def setUp(self):
+        temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup)
+        raw=fixture();patch=mock.patch('sd_gci_profile.GCI_SHA256',hashlib.sha256(raw).hexdigest())
+        patch.start();self.addCleanup(patch.stop)
+        path=Path(temp.name)/'fixture.gci';path.write_bytes(raw);self.profile=load_profile(path)
+
+    def test_reduced_packet_has_one_up_and_no_continuation(self):
+        packet=gci_items_row_packet();validate_packet(packet)
+        self.assertNotIn("css",packet);self.assertNotIn("sss",packet)
+        self.assertEqual(packet["actions"][-1]["p1"],raw_pad(buttons=["D_UP"]))
+        self.assertEqual(packet["actions"][-1]["before"]["items_locked"],0)
+        self.assertEqual(packet["stop"]["row"],31)
+        bad=deepcopy(packet);bad["actions"][-1]["p1"]=raw_pad(buttons=["D_LEFT"])
+        with self.assertRaises(ValueError):validate_packet(bad)
+
+    def test_missing_wrong_owner_size_address_value_rejected(self):
+        for change in (lambda p:p["slices"].pop(),
+                       lambda p:p["slices"][-1].update(address=0x804d6bed),
+                       lambda p:p["slices"][-1].update(hex="0000"),
+                       lambda p:p["slices"][-1].update(hex="02"),
+                       lambda p:p["slices"][1].update(hex="0d"+p["slices"][1]["hex"][2:])):
+            r=receiver(self.profile);row=menu_row(r.seq);change(row["payload"])
+            with self.assertRaises(SdDiagnosticError):r.accept(row)
+
+    def test_locked_input_rejected_and_reconstructed_unlocked_stop(self):
+        for lock in (1,0):
+            r=receiver(self.profile);r.accept(menu_row(r.seq,lock=lock))
+            pads=[raw_pad(buttons=["D_UP"]),NEUTRAL_PAD,DISCONNECTED_PAD,DISCONNECTED_PAD]
+            raw=b"".join(bytes.fromhex(p)+b"\0" for p in pads)
+            row={"seq":r.seq,"event":"progress","source_tick":0,"payload":{
+                "diagnostic":SCOPE,"name":"menu_input","pc":PCS["menu_input"],
+                "consumed":0,"menu_consumed":2,"slices":[{
+                    "tag":3,"flags":0,"address":0x80001000,"hex":raw.hex()}]}}
+            if lock:
+                with self.assertRaisesRegex(SdDiagnosticError,"while locked"):r.accept(row)
+                continue
+            r.accept(row)
+            row=deepcopy(row);row["seq"]=r.seq;row["payload"]["menu_consumed"]=3
+            row["payload"]["slices"][0]["hex"]=b"".join(bytes.fromhex(p)+b"\0" for p in
+                [NEUTRAL_PAD]*2+[DISCONNECTED_PAD]*2).hex()
+            r.accept(row)
+            r.accept(menu_row(r.seq,row=31,value=3,count=3,name="items_ready"))
+            self.assertTrue(r.items_ready)
+            r.accept({"seq":r.seq,"event":"end","source_tick":0,
+                      "payload":{"status":"interrupted","natural":False}})
+            self.assertTrue(r.ended)
+
+    def test_premature_ready_and_gameplay_rejected(self):
+        r=receiver(self.profile)
+        with self.assertRaises(SdDiagnosticError):r.accept(menu_row(r.seq,name="items_ready"))
+        r=receiver(self.profile);row=menu_row(r.seq);row["payload"].update(name="vs_entry",pc=PCS["vs_entry"])
+        with self.assertRaises(SdDiagnosticError):r.accept(row)
+
+    def test_retained_actual_post_rules_order_with_explicit_injected_lock(self):
+        fixture=json.loads((Path(__file__).parent/'fixtures/sd-items-entry-order.json').read_text())
+        # The portable lead-in/profile above is reconstructed. Preserve every
+        # actual PAD/menu byte and its ordering; rebase seq/count solely to
+        # compose that lead-in. The new lock byte is explicitly injected.
+        r=receiver(self.profile)
+        for actual in fixture['rows']:
+            row=deepcopy(actual);row['seq']=r.seq
+            row['payload']['menu_consumed']-=71
+            if row['payload']['name']=='menu':
+                state=next(s for s in row['payload']['slices'] if s['tag']==45)
+                if bytes.fromhex(state['hex'])[0]==16:
+                    row['payload']['slices'].append({'tag':56,'flags':0,
+                        'address':0x804d6bec,'hex':'00'})
+            r.accept(row)
+        self.assertTrue(r.items_up_seen)
+        self.assertFalse(r.items_ready)  # Actual trace never reached row31.
+        self.assertEqual(r.last_pad[:2],[NEUTRAL_PAD]*2)
+
+    def actual_held_entry(self, change=None):
+        fixture=json.loads((Path(__file__).parent/'fixtures/sd-items-held-entry-order.json').read_text())
+        r=receiver(self.profile)
+        baseline=fixture['initial_rules_ready_menu_consumed']-1
+        # Actual menu/PAD/lock bytes and order are unchanged. Only the portable
+        # profile lead-in and sequence/count rebasing are reconstructed.
+        for actual in fixture['rows']:
+            row=deepcopy(actual);row['seq']=r.seq;row['payload']['menu_consumed']-=baseline
+            if change is not None:change(actual['seq'],row)
+            r.accept(row)
+        return r
+
+    def test_actual_held_opening_a_drains_to_observed_neutral(self):
+        r=self.actual_held_entry()
+        self.assertTrue(r.items_entry_drain_closed)
+        self.assertFalse(r.items_entry_drain)
+        self.assertEqual(r.latest_menu['items_locked'],1)
+        self.assertEqual(r.last_pad[:2],[NEUTRAL_PAD]*2)
+        self.assertFalse(r.items_up_seen)
+        self.assertFalse(r.items_ready)  # No actual lock-clear or row31 occurred.
+        self.assertEqual(len(r.items_entry_drain_samples),1)
+        self.assertEqual(r.items_entry_neutral['menu_consumed'],r.menu_consumed)
+
+    def test_actual_entry_drain_mutations_reject(self):
+        def field(row,tag):return next(s for s in row['payload']['slices'] if s['tag']==tag)
+        def flow(row,offset,value):
+            s=field(row,45);b=bytearray.fromhex(s['hex']);b[offset]=value;s['hex']=b.hex()
+        changes=[
+            lambda seq,row:flow(row,3,4) if seq==654 else None,
+            lambda seq,row:field(row,56).update(hex='00') if seq==656 else None,
+            lambda seq,row:field(row,56).update(hex='00') if seq==658 else None,
+            lambda seq,row:flow(row,3,1) if seq==658 else None,
+            lambda seq,row:row['payload']['slices'].remove(field(row,56)) if seq==656 else None,
+            lambda seq,row:row['payload'].update(menu_consumed=row['payload']['menu_consumed']+1) if seq==657 else None,
+            lambda seq,row:field(row,3).update(hex=raw_pad(buttons=['D_UP'])+field(row,3)['hex'][22:]) if seq==657 else None,
+            lambda seq,row:field(row,3).update(hex=raw_pad(buttons=['D_RIGHT'])+field(row,3)['hex'][22:]) if seq==657 else None,
+            lambda seq,row:field(row,3).update(hex=raw_pad(buttons=['D_UP'])+field(row,3)['hex'][22:]) if seq==655 else None,
+        ]
+        for change in changes:
+            with self.subTest(change=changes.index(change)),self.assertRaises(SdDiagnosticError):
+                self.actual_held_entry(change)
+        r=self.actual_held_entry()
+        row=deepcopy(json.loads((Path(__file__).parent/'fixtures/sd-items-held-entry-order.json').read_text())['rows'][-1])
+        row['seq']=r.seq;row['payload']['menu_consumed']=r.menu_consumed+1
+        field(row,3)['hex']=raw_pad(buttons=['A'])+field(row,3)['hex'][22:]
+        with self.assertRaisesRegex(SdDiagnosticError,'escaped'):r.accept(row)
+
+    def test_actual_drain_then_synthetic_lockclear_one_up_ready(self):
+        r=self.actual_held_entry()
+        r.accept(menu_row(r.seq,lock=0,count=r.menu_consumed))  # Explicitly synthetic.
+        template=deepcopy(json.loads((Path(__file__).parent/'fixtures/sd-items-held-entry-order.json').read_text())['rows'][-1])
+        for pad in (raw_pad(buttons=['D_UP']),NEUTRAL_PAD):
+            row=deepcopy(template);row['seq']=r.seq;row['payload']['menu_consumed']=r.menu_consumed+1
+            row['payload']['slices'][0]['hex']=pad+row['payload']['slices'][0]['hex'][22:]
+            r.accept(row)
+        r.accept(menu_row(r.seq,row=31,value=3,count=r.menu_consumed,name='items_ready'))
+        self.assertTrue(r.items_ready)

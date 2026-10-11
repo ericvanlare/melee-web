@@ -370,6 +370,68 @@ void source_costume_cache_rows()
     check(roots.size() == 5, "Unselected source costume roots were requested");
 }
 
+void sparse_selection_resources()
+{
+    for (bool kirby_after_gap : {false, true}) {
+        MeleeWebMenuMatchSelection dense{};
+        for (auto& row : dense.start.players) row.slot_type = Gm_PKind_NA;
+        dense.start.players[0].slot_type = Gm_PKind_Human;
+        dense.start.players[0].ckind = kirby_after_gap ? CKIND_FALCO : CKIND_KIRBY;
+        dense.start.players[0].color = kirby_after_gap ? 0 : 2;
+        dense.start.players[1].slot_type = Gm_PKind_Cpu;
+        dense.start.players[1].ckind = kirby_after_gap ? CKIND_KIRBY : CKIND_FALCO;
+        dense.start.players[1].color = kirby_after_gap ? 2 : 0;
+        auto sparse = dense;
+        sparse.start.players[2] = sparse.start.players[1];
+        sparse.start.players[1].slot_type = Gm_PKind_NA;
+        const auto original = sparse;
+        check(selection_uses_kirby(sparse), "Kirby after a source gap was omitted");
+        check(selected_kirby_costumes(sparse) == std::vector<unsigned>{2},
+              "Kirby selected color after a source gap was omitted");
+        const auto kinds = selected_copy_kinds(sparse);
+        check(kinds == selected_copy_kinds(dense) && kinds.size() == 2,
+              "Donor source identity/order changed across a gap");
+        const auto roots = kirby_copy_archive_requirements(sparse);
+        const auto dense_roots = kirby_copy_archive_requirements(dense);
+        check(roots.size() == dense_roots.size() && !roots.empty(),
+              "Sparse donor archive roots are incomplete");
+        for (unsigned i = 0; i < roots.size(); ++i)
+            check(roots[i].filename == dense_roots[i].filename &&
+                  roots[i].symbol == dense_roots[i].symbol &&
+                  roots[i].fighter_kind == dense_roots[i].fighter_kind &&
+                  roots[i].costume_root == dense_roots[i].costume_root,
+                  "Sparse copy archive publication order/identity changed");
+        check(std::any_of(roots.begin(), roots.end(), [](const auto& root) {
+            return root.fighter_kind == FTKIND_FALCO;
+        }), "Falco donor after a gap has no copy root");
+        const auto effects = kirby_copy_effect_requirements(sparse);
+        const auto dense_effects = kirby_copy_effect_requirements(dense);
+        check(effects.size() == dense_effects.size(), "Sparse effect banks are incomplete");
+        for (unsigned i = 0; i < effects.size(); ++i)
+            check(effects[i].filename == dense_effects[i].filename &&
+                  effects[i].symbol == dense_effects[i].symbol &&
+                  effects[i].effect_bank == dense_effects[i].effect_bank,
+                  "Sparse effect bank publication order/identity changed");
+        check(std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
+            return effect.effect_bank == 33 && effect.filename == "EfKbFx.dat" &&
+                   effect.symbol == "effKirbyFoxDataTable";
+        }), "Falco authored copy bank 33 identity after a gap was omitted");
+        check(std::memcmp(&original, &sparse, sizeof(sparse)) == 0,
+              "Resource scan rewrote source rows");
+        sparse.sudden_death = true;
+        check(selected_copy_kinds(sparse) == kinds,
+              "Existing Sudden Death sparse resource order changed");
+    }
+    MeleeWebMenuMatchSelection no_kirby{};
+    for (auto& row : no_kirby.start.players) row.slot_type = Gm_PKind_NA;
+    no_kirby.start.players[2].slot_type = Gm_PKind_Human;
+    no_kirby.start.players[2].ckind = CKIND_FALCO;
+    check(!selection_uses_kirby(no_kirby) &&
+          kirby_copy_archive_requirements(no_kirby).empty() &&
+          kirby_copy_effect_requirements(no_kirby).empty(),
+          "Non-Kirby sparse selection requested copy assets");
+}
+
 void borrowed_signed_visibility_tail()
 {
     Fixture fixture(false);
@@ -569,6 +631,7 @@ int main(int argc, char** argv)
             else if (name == "costume_fallback") costume_fallback();
             else if (name == "malformed_consumed_rows") malformed_consumed_rows();
             else if (name == "source_costume_cache_rows") source_costume_cache_rows();
+            else if (name == "sparse_selection_resources") sparse_selection_resources();
             else if (name == "borrowed_signed_visibility_tail") borrowed_signed_visibility_tail();
             else if (name == "ft_parts_desc_owner_is_structural") ft_parts_desc_owner_is_structural();
             else if (name == "native_pobj_fields") native_pobj_fields();

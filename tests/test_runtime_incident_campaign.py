@@ -14,7 +14,7 @@ RUNNER = ROOT / "scripts" / "runtime_incident_campaign.mjs"
 class RuntimeIncidentCampaignTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.harness = HARNESS.read_text(encoding="utf-8")
+        cls.harness = HARNESS.read_text(encoding="utf-8") + (ROOT / "tests/runtime_callback_recorder.mjs").read_text(encoding="utf-8")
         cls.runner = RUNNER.read_text(encoding="utf-8")
 
     def test_cpu_conversion_reselects_every_requested_fighter(self):
@@ -259,7 +259,15 @@ class RuntimeIncidentCampaignTest(unittest.TestCase):
         self.assertIn("cache_reuse:userDataDirectory?'campaign-shared-origin-profile':'temporary-context'", self.harness)
         self.assertIn("driver_cache:'uncontrolled'", self.harness)
         self.assertIn("campaignCondition=controlledContention?'controlled-contention':'shared-host-uncontrolled'", self.harness)
-        self.assertIn("if(browserContext)await browserContext.close();", self.harness)
+        cleanup = self.harness.split("async function closeOwnedBrowserResources(){", 1)[1].split(
+            "const onOwnedInterrupt=", 1)[0]
+        self.assertIn("['context',browserContext,owner=>owner.close()]", cleanup)
+        self.assertIn("if(!resource)continue;", cleanup)
+        self.assertIn("if(!ownedClosePromises.has(resource))", cleanup)
+        self.assertIn("await ownedClosePromises.get(resource);", cleanup)
+        self.assertIn("report.cleanup[name]={status:'failed',error:message};", cleanup)
+        self.assertIn("report.result='fail';process.exitCode=1;", cleanup)
+        self.assertIn("}finally{\n    await closeOwnedBrowserResources();", self.harness)
 
     def test_campaign_wall_watchdog_covers_setup_through_results(self):
         self.assertIn("campaignWallBoundTimer=armCampaignWallWatchdog();", self.harness)

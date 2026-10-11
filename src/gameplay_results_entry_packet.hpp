@@ -45,7 +45,9 @@ class ResultsEntryPacket {
 
 public:
     // Caller supplies the existing match-final semantic PAD buffer captured
-    // BEFORE teardown restores external PAD owners. Never recapture globals.
+    // AFTER terminal publication and BEFORE teardown restores external PAD
+    // owners. Seed is the Results-entry value after original mode callbacks,
+    // distinct from the ordinary match-final seed. Never recapture PAD globals.
     // Only diagnostic storage is written; no allocation at this boundary.
     void capture(uint32_t match_index, const MatchExitInfo& terminal,
                  const ResultsMatchInfo& results, uint32_t seed,
@@ -59,6 +61,10 @@ public:
         available_ = true;
     }
 
+    // A typed SD finish keeps its final bank internal; never expose a stale
+    // previous ordinary entry as if those bytes had been observed.
+    void clear() noexcept { available_ = false; }
+
     // Serialize only on an explicit observer read, never per tick or at entry.
     std::string json() const
     {
@@ -68,6 +74,8 @@ public:
             "{\"schema\":\"melee-web-results-entry-v1\","
             "\"scope\":\"local-debug-only; not a PPC image or exact replay\","
             "\"build_identity\":\"bind-to-served-JS-and-Wasm-hashes-in-harness\","
+            "\"entry_seed_origin\":\"post-mode-callbacks Results entry\","
+            "\"pad_origin\":\"ordinary VS post-publication before teardown\","
             "\"abi\":{\"target\":\"wasm32\",\"byte_order\":\"little-endian\",\"pointer_bytes\":4},"
             "\"match_index\":" + number(match_index_) +
             ",\"entry_seed\":" + number(seed_) +

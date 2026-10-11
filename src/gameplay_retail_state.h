@@ -10,6 +10,10 @@ extern "C" {
 struct Fighter;
 struct HSD_GObj;
 
+/* Full entity fields for the explicit four-CPU Jiggly/Ice/Mario/Fox prefix.
+ * Validates source family, ordinal and ownership; never changes game state. */
+void melee_web_retail_entities_checked(void);
+
 /* Read the existing exported primary-entity identity. Never advance its tracker. */
 int melee_web_retail_primary_identity(unsigned slot, const struct HSD_GObj*,
     uint32_t* match_index, uint32_t* generation);
