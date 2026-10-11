@@ -421,10 +421,19 @@
       "file": "full-suite-result.json",
       "bytes": 4140,
       "sha256": "643ca54d064575f7a3ac2185dfa9a77c9deb768077b41b6e2661b7d3ea8c7521"
+    },
+    {
+      "file": "pr303-premerge.json",
+      "bytes": 5526,
+      "sha256": "ddcb00cc992dc401018f6f7cc8a71a19aa853cc57dcd9f32e9207f2bf98a294a"
+    },
+    {
+      "file": "pr303-integration.json",
+      "bytes": 410,
+      "sha256": "7bd6acc63858d961f68d33eb410fe7288db3a863c5346170f1c4e6e1ec1775a3"
     }
   ],
   "pending": [
-    "Complete current-head CI and integration after final documentation review",
     "Deployed staging Worker route; current provider credentials missing or expired, no auth refresh or deployment performed",
     "Two-sided gameplay/combat coverage, physical input, two-machine, foreground timing, original pixels/PCM and whole-session acceptance"
   ],
@@ -455,6 +464,17 @@
     "runtime_inputs_unchanged_from_producer": true,
     "runtime_inventory_reverified_files": 46,
     "independent_source_and_evidence_review": "PASS",
-    "final_ci": "pending"
+    "final_ci": {
+      "head": "cafec4554877c70439ba05b9945594e87b350030",
+      "run_id": 38175915247,
+      "checks_completed": 14,
+      "success": 12,
+      "expected_skips": 2
+    },
+    "integration": {
+      "pr": 303,
+      "merge_commit": "2a73717682372d440dbad16ef4bcb418e31a948d",
+      "reviewed_and_merged_tree": "f27f9b67df80981873f8d645e7c6c072a3332ea4"
+    }
   }
 }

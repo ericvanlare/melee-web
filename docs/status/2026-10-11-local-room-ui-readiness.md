@@ -136,10 +136,15 @@ The full regression suite on `d67886769f24ad020ebf3e9de0bf2c3d0d1c3026` passed
 wait controls, syntax checks and independent source/evidence review pass. The
 Release runtime was built from `b5797986`; this branch changes only harnesses,
 tests and documentation, and all 46 unchanged runtime hashes were reverified.
-Final metadata edits are documentation-only. Current-head CI and integration
-remain pending at this receipt.
+Final metadata edits were documentation-only. [PR #303](https://github.com/ericvanlare/melee-web/pull/303)
+merged as `2a73717682372d440dbad16ef4bcb418e31a948d` after all 14 checks
+on `cafec4554877c70439ba05b9945594e87b350030` completed: 12 successful and
+two expected skips. The merged tree exactly matches the reviewed tree.
 
 The bounded provider follow-up made zero provider requests because existing
 credentials were missing or expired; it did not refresh authentication. The
 earlier scoped provider receipt remains the only service evidence. Public
 staging, physical input and the other acceptance gates remain open.
+
+The next public-endpoint adapter is a [source-only checkpoint](../handoffs/2026-10-11-public-relay-keyboard-checkpoint.md).
+Its focused refusal checks do not establish a deployed Worker or public browser run.
