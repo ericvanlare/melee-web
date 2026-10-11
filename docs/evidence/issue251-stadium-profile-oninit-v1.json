@@ -8005,7 +8005,7 @@
       ],
       "historical_functional_evidence": "Two functional 3500-tick lifetimes and the ordinary Results regression remain separate completed evidence."
     },
-    "current_next_step": "Implement a diagnostic-only zero-tick completed-Setup read receipt through the existing original-matched Setup service. Reuse its live source seed owner and approved CSS/SSS/Entry/Setup path. Add only a separately reviewed narrow map-2 constructor view for the actual initial xD8, authored x0/x4 parameters and parameter identity; observe exact initializer randi pre/post seed and result only at the existing call, with no additional RNG call. Keep the ordinary idle getter refusal before GO, source frames/ticks/draw at zero, and all inputs/source order unchanged. Stop if owner/parameter/allocation/write proof is absent, any seed/Start mismatch occurs, a tick/draw advances, or cleanup fails. Review the receipt before any single actual Setup run; no native capture/build or C3 claim is authorized by this record.",
+    "current_next_step": "Implement one diagnostic-only continuation from the same approved matched Setup owner. Extract the original 86 consumed PAD bundles (all four source-port statuses per bundle) and exact source tick/draw schedule, then reuse checked GO arm/events and idle getter to observe containing GO tick C and following full tick F. Pair ticks 0-83 with draws 0-83, retain draw84 between C and F, and stop after F before draw85: at most 86 ticks and 85 draws. Keep expected state in the host comparator, preserve original input/RNG/arithmetic/order, and never use a generic unpause or inject expected state. Stop on first missing pairing, ownership, preparation, state, timing or cleanup failure; reduce after two experiments. A separately reviewed capture and C3 acceptance remain pending.",
     "recorded_input_replay_c7a14fd6_v1": {
       "decision": "PASS_RECORDED_ORIGINAL_COMMON_PREFIX_ONLY_NATIVE_ALIGNMENT_UNRESOLVED",
       "scope": "One bounded original Dolphin recorded-input replay of retained v6 Stadium prefix; no native parity or C3 acceptance.",
@@ -8537,6 +8537,194 @@
         "No original recapture",
         "No C3 claim"
       ]
+    },
+    "zero_tick_setup_constructor_b71da6f0_v1": {
+      "result": "PASS_BOUNDED_NATIVE_CONSTRUCTOR_RECEIPT_AND_EXISTING_DECLARED_SETUP_COMPARISON",
+      "source_revision": "b71da6f0a1da101a0c4189c69aaabe1d07bc9104",
+      "source_tree": "8a441931089a0479fd7051710b0e8fe42af49fb6",
+      "scope": "One original-matched CSS/SSS/Entry route to completed stopped Setup, before any match tick/draw or Ready/GO. Constructor companion is native observation only; existing strict Start/player0-3/seed comparisons remain unchanged.",
+      "constructor": {
+        "schema": "melee-web-stadium-zero-tick-setup-state-v1",
+        "world_generation": 3,
+        "world_ticks": 0,
+        "source_frame": 0,
+        "map_id": 2,
+        "initial_countdown": 3629,
+        "current_countdown": 3629,
+        "parameter_x0": 3600,
+        "parameter_x4": 3800,
+        "constructor_callback_count": 1,
+        "constructor_randi_call_count": 1,
+        "constructor_randi_scope": "existing_inline_grStadium_randi_call",
+        "constructor_randi_bound": 200,
+        "constructor_randi_result": 29,
+        "source_seed_before_hex": "3bb84c53",
+        "source_seed_after_hex": "263cc5ca",
+        "ground_source_heap_handle": 0,
+        "ground_requested_bytes": 516,
+        "ground_allocation_generation": 2988,
+        "object_source_heap_handle": 0,
+        "object_requested_bytes": 56,
+        "object_allocation_generation": 2987,
+        "source_parameter_roots_agree": true
+      },
+      "setup": {
+        "construction_steps": 6,
+        "source_frames": 0,
+        "host_tick_calls": 0,
+        "host_draw_calls": 0,
+        "parent_seed_before_retirement": 1001933907,
+        "parent_seed_after_retirement": 1001933907,
+        "parent_seed_owner_value_restored": true,
+        "audio_render_calls_before": 274,
+        "audio_render_calls_after": 274,
+        "audio_render_frames_before": 146133,
+        "audio_render_frames_after": 146133
+      },
+      "setup_seed_hex": "35a455b9",
+      "declared_setup_comparison": {
+        "attempted": true,
+        "approved": true,
+        "failed": false,
+        "first_mismatch": null
+      },
+      "validation": {
+        "focused_tests": 11,
+        "full_suite_tests": 2495,
+        "full_suite_skips": 179,
+        "builds": [
+          "diagnostic Release",
+          "ordinary Release"
+        ],
+        "source_validation_receipt": {
+          "artifact": "zero-tick-setup-validation-b71da6f0-v1/validation-result.json",
+          "bytes": 27164,
+          "sha256": "063ca57459af1da412dc46e448ad0fd0d9ece252714d6c83d71a5bbc74970a0c"
+        },
+        "focused_receipt": {
+          "artifact": "root-zero-tick-setup-focused-v1/result.json",
+          "bytes": 4348,
+          "sha256": "8c4f196dea42387e9c8ecb61e8cb0de4728ef82ce43ff44cacab088d3108af12"
+        },
+        "source_review": {
+          "artifact": "sol-zero-tick-setup-source-review-v1/canonical-integration-addendum.json",
+          "bytes": 2349,
+          "sha256": "6e826a9d94a8da9b1449419b16d908a7fd13dd6734192c0aa27974ad8b734c2d"
+        }
+      },
+      "producer": {
+        "manifest": {
+          "artifact": "zero-tick-setup-validation-b71da6f0-v1/build-artifacts.json",
+          "bytes": 36959,
+          "sha256": "80388e06febc5bb44924e2f95ba36a1c339b3944d41d7e6ae9c15158a46d4eaf"
+        },
+        "retained_manifest": {
+          "artifact": "root-setup-producer-retention-b71da6f0-v1/manifest.json",
+          "bytes": 21578,
+          "sha256": "f3bff7d563429c9643089b7ed69c1d696cfcc086a9f3cacb8819ae7180637080"
+        },
+        "retained_file_count": 42,
+        "http_artifacts": 40,
+        "http_before_after_unchanged": true,
+        "gpu": {
+          "cross_origin_isolated": true,
+          "webgpu_api": true,
+          "adapter_available": true,
+          "adapter_info": {
+            "vendor": "apple",
+            "architecture": "metal-3",
+            "device": null,
+            "description": null
+          },
+          "failure": null,
+          "canvas": [
+            640,
+            480
+          ]
+        },
+        "browser_version": "154.0.8037.99",
+        "headless": true,
+        "speaker_output_muted": true,
+        "audio_processing_disabled": false
+      },
+      "capture": {
+        "report": {
+          "artifact": "zero-tick-setup-constructor-receipt-run1/browser-run/report.json",
+          "bytes": 4092502,
+          "sha256": "3bd8cca1be6fafbd82f695fd0eaf69f58df96ba5919e3f421a0dba2844fb917e"
+        },
+        "owner": {
+          "artifact": "zero-tick-setup-constructor-receipt-run1/owner.json",
+          "bytes": 119974,
+          "sha256": "d5408941c844b77ea6fe5270ed37d7422370b10fa77ddf5530d69fa20750a84e"
+        },
+        "launch": {
+          "artifact": "zero-tick-setup-constructor-receipt-run1/launch.json",
+          "bytes": 9376,
+          "sha256": "d0ca29e1cfb4dced2766ef7f50c542db660e9892263ce542abb9b616b15ceac9"
+        },
+        "result": {
+          "artifact": "zero-tick-setup-constructor-receipt-run1/result.json",
+          "bytes": 4144,
+          "sha256": "fa6ca274962c12676a412f9bde5df844905480598d5d54add9e706d4f491a258"
+        },
+        "preflight": {
+          "artifact": "zero-tick-setup-constructor-receipt-run1/preflight.json",
+          "bytes": 81574,
+          "sha256": "cc50a9d776e112b910d52f4b96fac3e2d38d289c1dc56eb6605daef3f88e33df"
+        },
+        "command": {
+          "artifact": "zero-tick-setup-constructor-receipt-run1/command.json",
+          "bytes": 10738,
+          "sha256": "862da5b47741b1071c3bf5bffbec3cd65d0055aabb6f948a2d0fe3ddda190f88"
+        },
+        "release": {
+          "artifact": "zero-tick-setup-constructor-receipt-run1/root-one-launch-release.json",
+          "bytes": 2368,
+          "sha256": "aae6617dfdce01308da9de1aa8975d49dfd4ddcfae13f679502546738e26cf2b"
+        },
+        "pre_server_controls": {
+          "artifact": "root-zero-tick-setup-prelaunch-control-v1/result.json",
+          "bytes": 1405,
+          "sha256": "01003606a443b140cdf0e867d963938bf35da01ed0e647671c29ba68c0c15866"
+        },
+        "postrun": {
+          "artifact": "zero-tick-setup-constructor-receipt-run1/postrun.json",
+          "bytes": 19396,
+          "sha256": "39831781ae06a87b751402350fa42d42e0fecce4c23b1c11dd125f607fb3f736"
+        }
+      },
+      "cleanup": {
+        "checked_native_unload": true,
+        "observation_cleared": true,
+        "owner_process_observation_passed": true,
+        "owner_cleanup_passed": true,
+        "capture_process_group_absent": true,
+        "server_process_group_absent": true,
+        "sis_retirement_verified": false,
+        "sis_note": "The separate SIS lease retirement_verified field remains false; checked Session unload and process cleanup are not relabeled a direct OSFree receipt.",
+        "independently_verified_absent_pid_count": 13,
+        "owned_success_scratch_cleanup": {
+          "artifact": "zero-tick-setup-validation-b71da6f0-v1/scratch-cleanup.json",
+          "bytes": 6271,
+          "sha256": "a9340835cd5c2ad5144abfd7fc0a18eae8d13021d0e74274db179a65531409b3"
+        }
+      },
+      "limits": [
+        "Original constructor countdown/parameters/randi pre/post state were not observed; no constructor parity claim.",
+        "The native initial countdown numerically equals the retained original GO countdown; these are different boundaries and do not establish native GO/C/F agreement or the cause of the old 18-count difference.",
+        "No complete Ready/GO, original-matched 3500-tick sequence, per-owner RNG ledger, full-session comparison, pixels, PCM, physical input, foreground timing, audible output, public Stadium admission or C3 acceptance.",
+        "Ordinary JS equals the retained 9143 JS, but ordinary WASM differs; no byte-identical ordinary binary claim."
+      ],
+      "retained_preparation_failures": [
+        "root-zero-tick-setup-patch-preparation-v1/failure.json",
+        "luna-stadium-setup-receipt-controls-c7a14fd6-v1/control-v1/first-attempt-compile-failure.txt"
+      ],
+      "independent_result_review": {
+        "artifact": "sol-zero-tick-setup-result-review-b71da6f0-v1/review.json",
+        "bytes": 6929,
+        "sha256": "796756d2691bb3d32f7711d9e7b9542c0482ee53046d8d4d60e8c3d2caf9fe5f"
+      }
     }
   }
 }
