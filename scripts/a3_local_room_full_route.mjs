@@ -139,11 +139,12 @@ export async function runA3LocalFullRoute({
     const phase = module?._melee_web_native_menu_phase?.() ?? null;
     const match = typeof module?._melee_web_native_menu_match_observe === 'function'
       ? JSON.parse(module.UTF8ToString(module._melee_web_native_menu_match_observe())) : null;
+    const nativeStatus = globalThis.__net?.status?.() ?? null;
     const message = typeof module?._melee_web_native_menu_message === 'function'
       ? module.UTF8ToString(module._melee_web_native_menu_message()) : null;
     return {phase, running: module?._melee_web_native_menu_running?.() ?? null, message,
       error: document.querySelector('#status')?.dataset.runtimeError || null,
-      source_tick: globalThis.__net?.status?.()?.cursor ?? null,
+      source_tick: nativeStatus?.cursor ?? null, native_status: nativeStatus,
       css: globalThis.menuObserveCssSetup?.() ?? null,
       stage: globalThis.menuObserveStage?.(0x20) ?? null,
       match};
@@ -159,12 +160,29 @@ export async function runA3LocalFullRoute({
   };
   const waitBoth = async (label, predicate, pollMs = 40) => {
     let last = null;
-    while (remaining() > 0) {
-      last = await observeBoth();
-      if (predicate(last)) return last;
-      await alpha.page.waitForTimeout(Math.min(pollMs, remaining()));
+    const observation = {label, started_at: new Date().toISOString(), polls: 0, recent: []};
+    route.current_observation = observation;
+    try {
+      while (remaining() > 0) {
+        last = await observeBoth();
+        observation.polls++;
+        // Keep the refusal itself and the recent cursor progression. A stopped
+        // owner must remain a failure until its actual message explains why.
+        observation.last_rows = last;
+        observation.recent.push(last.map(row => ({phase: row.phase, running: row.running,
+          source_tick: row.source_tick, match_frame: row.match?.frame ?? null,
+          stocks: row.match?.players?.map(player => player.stocks) ?? null,
+          message: row.message})));
+        if (observation.recent.length > 32) observation.recent.shift();
+        if (predicate(last)) return last;
+        await alpha.page.waitForTimeout(Math.min(pollMs, remaining()));
+      }
+      throw Error(`${label} exceeded the scenario deadline`);
+    } catch (error) {
+      route.failure_observation = {...observation, failed_at: new Date().toISOString(),
+        error: String(error?.stack || error)};
+      throw error;
     }
-    throw Error(`${label} exceeded the scenario deadline: ${JSON.stringify(last)}`);
   };
   const sourceAligned = rows => Number.isSafeInteger(rows[0]?.source_tick) &&
     rows[0].source_tick === rows[1]?.source_tick;
