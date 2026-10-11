@@ -1295,6 +1295,57 @@
           "bytes": 425630,
           "sha256": "14de2045e02cd0ac4a18c82e358d805ee6bd4b2d4c44854ac0c4122b747fed0a"
         }
+      },
+      "ci_fixture_followup": {
+        "first_ci": {
+          "url": "https://github.com/ericvanlare/melee-web/actions/runs/38183544524",
+          "source_head": "016693aa5cfb7e2b46d38ae6cfd598ab0935c30c",
+          "status": "FAIL",
+          "cause": "The unchanged asynchronous native-confirmation fixture asserted local hello after a fixed count of event-loop turns, before the actual WebCrypto digest completed. The aggregate browser-build gate refused the failed unit partition; it was not a second compiler failure.",
+          "checks": {
+            "path": "runs/sheik-original-transform-20261011-145724-75da5333/pr305-ci-at-016693aa-v1.json",
+            "bytes": 28703,
+            "sha256": "63b9319b6f4c2298aae328413122fb80c61ecc354a2332b3f9f59c2d0ce6914d"
+          },
+          "failed_unit_log": {
+            "path": "runs/sheik-original-transform-20261011-145724-75da5333/pr305-ci-unit1-completed-job-v2.plain.log",
+            "bytes": 489479,
+            "sha256": "25d83ce72750a36448676f7597108c7fdf8b243270b8c6551c605ca96fd1da5b"
+          }
+        },
+        "repair_source": "4712e1059ff16c86af926838585f97a74c831b54",
+        "repair": "The fixture waits for the actual local-hello and native-confirmation-entry signals through the existing bounded helper. Production runtime, 250 ms session timeout, protocol assertions and capture producers are unchanged.",
+        "reproducer_and_controls": {
+          "path": "runs/sheik-original-transform-20261011-145724-75da5333/sol-ci-hello-rendezvous-v1/freeze.json",
+          "bytes": 3826,
+          "sha256": "d1ff5b74405286962b837052bf440a3009dd1678f32b3ab02820b59e3d51db18"
+        },
+        "review": {
+          "path": "runs/sheik-original-transform-20261011-145724-75da5333/root-ci-hello-rendezvous-review-v1.json",
+          "bytes": 689,
+          "sha256": "ae349af7d4f2b75117b93ecc3d7224d5abd216f14931b2768623cf1c2e50a3b9"
+        },
+        "final_full_suite": {
+          "status": "PASS",
+          "source_head": "4712e1059ff16c86af926838585f97a74c831b54",
+          "tests": 2324,
+          "skipped": 153,
+          "failures": 0,
+          "errors": 0,
+          "exit_code": 0,
+          "seconds": 505.7398292911239,
+          "source_unchanged": true,
+          "receipt": {
+            "path": "runs/sheik-original-transform-20261011-145724-75da5333/full-suite-result-v2.json",
+            "bytes": 7910,
+            "sha256": "adfc22c8511ca6a59c4aad1f73b62832541b2498f8800481d34e565eb60a34c6"
+          },
+          "log": {
+            "path": "runs/sheik-original-transform-20261011-145724-75da5333/full-suite-v2.log",
+            "bytes": 425631,
+            "sha256": "b00f76d8431816e56543b2d1e638a5a6a8def5acb1cbbdff2e2ad1a02b571f34"
+          }
+        }
       }
     },
     "current_next_boundary": "Keep strict original-versus-candidate comparison as a separate boundary; this original source-owner prefix does not establish browser or full-fighter accuracy.",
