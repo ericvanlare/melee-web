@@ -76,6 +76,15 @@ runtime owners; do only the ownership work this slice needs. WebRTC, complete
 sets, rollback and cross-play follow it. Current prerequisite failures and
 producer identities stay in the issue and scoped receipts.
 
+**Near-term owner-requested readiness step (October 11):** while the public
+staging prerequisite remains unresolved, use the existing local Worker and
+Host/Join UI to demonstrate two headless browsers with live keyboard control in
+original CSS, matching runtime checksums and clean intentional disconnect.
+This bounded #288 step is local functional evidence only; it does not replace
+the public endpoint or complete-match milestone above. Stadium C3 remains
+checkpointed while this step has the capture lane. See the
+[execution update](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6112686789).
+
 ### Track B: competitive-rules Melee before the whole game
 
 **Target.** A player can run a competitive singles or doubles set through the
