@@ -9,7 +9,11 @@ extern "C" int gm_GetPreviousSceneIndex(void);
 #include "stadium_first_css_diagnostic_input.hpp"
 #include "stadium_first_css_diagnostic_snapshot_json.hpp"
 #include "gameplay_source_memory_runtime.h"
+#include "gameplay_vs_sis.h"
+#include "gameplay_stadium_display_owner.h"
 #include <sstream>
+#include <exception>
+extern "C" void HSD_SisLib_C1TextProbeSet(int enabled);
 extern "C" void* melee_web_current_scene_info(void);
 #endif
 #if defined(MELEE_WEB_NET_SESSION)
@@ -307,7 +311,123 @@ struct FirstSssVsSetupState {
  std::string error,actual,history;
 };
 FirstSssVsSetupState first_sss_vs_setup;
+struct FirstSssTextTailProbeState {
+ bool opted_in=false,probe_enabled=false;
+ bool sis_capture_attempted=false,sis_lease_captured=false;
+ bool membership_snapshot_attempted=false,membership_snapshot_started=false;
+ bool membership_snapshot_active=false,membership_snapshot_ended=false;
+ bool cleanup_done=false,unload_refused=false;
+ uint64_t world_generation=0,allocation_generation=0,source_epoch=0;
+ size_t requested_bytes=0;
+ std::string error,unload_error,cleanup_reason;
+};
+FirstSssTextTailProbeState first_sss_text_tail_probe;
+std::string first_sss_text_tail_retained_json;
 std::string first_sss_vs_setup_current_json();
+std::string first_sss_text_tail_probe_json(){
+ const auto& p=first_sss_text_tail_probe;std::ostringstream out;
+ out<<"{\"opted_in\":"<<(p.opted_in?"true":"false")
+    <<",\"probe_enabled\":"<<(p.probe_enabled?"true":"false")
+    <<",\"sis_capture_attempted\":"<<(p.sis_capture_attempted?"true":"false")
+    <<",\"sis_lease_captured\":"<<(p.sis_lease_captured?"true":"false")
+    <<",\"membership_snapshot_attempted\":"<<(p.membership_snapshot_attempted?"true":"false")
+    <<",\"membership_snapshot_started\":"<<(p.membership_snapshot_started?"true":"false")
+    <<",\"membership_snapshot_active\":"<<(p.membership_snapshot_active?"true":"false")
+    <<",\"membership_snapshot_ended\":"<<(p.membership_snapshot_ended?"true":"false")
+    <<",\"cleanup_done\":"<<(p.cleanup_done?"true":"false")
+    <<",\"cleanup_reason\":"<<(p.cleanup_reason.empty()?"null":first_css_browser_draw_json_quote(p.cleanup_reason))
+    <<",\"unload_refused\":"<<(p.unload_refused?"true":"false")
+    <<",\"sis_lease\":{\"world_generation\":"<<p.world_generation
+    <<",\"allocation_generation\":"<<p.allocation_generation
+    <<",\"source_epoch\":"<<p.source_epoch
+    <<",\"requested_bytes\":"<<p.requested_bytes
+    <<",\"retirement_verified\":false}"
+    <<",\"error\":"<<(p.error.empty()?"null":first_css_browser_draw_json_quote(p.error))
+    <<",\"unload_error\":"<<(p.unload_error.empty()?"null":first_css_browser_draw_json_quote(p.unload_error))<<'}';
+ return out.str();
+}
+void first_sss_text_tail_retain(){
+ if(!first_sss_text_tail_probe.opted_in){first_sss_text_tail_retained_json.clear();return;}
+ first_sss_text_tail_retained_json=
+   "{\"schema\":\"melee-web-stadium-first-sss-text-tail-retained-v1\",\"first_sss_vs_setup_text_tail\":"+
+   first_sss_text_tail_probe_json()+"}";
+}
+void first_sss_text_tail_cleanup(const char* reason){
+ auto& p=first_sss_text_tail_probe;
+ if(!p.opted_in||p.cleanup_done)return;
+ if(p.membership_snapshot_active){
+  melee_web_stadium_text_membership_snapshot_end();
+  p.membership_snapshot_active=false;p.membership_snapshot_ended=true;
+ }
+ if(p.probe_enabled){HSD_SisLib_C1TextProbeSet(0);p.probe_enabled=false;}
+ p.cleanup_done=true;
+ if(p.cleanup_reason.empty())p.cleanup_reason=reason?reason:"unspecified";
+}
+void first_sss_text_tail_begin_construction(){
+ auto& p=first_sss_text_tail_probe;
+ if(!p.opted_in||p.probe_enabled||p.cleanup_done)return;
+ HSD_SisLib_C1TextProbeSet(1);p.probe_enabled=true;
+}
+void first_sss_text_tail_capture_membership(){
+ auto& p=first_sss_text_tail_probe;
+ if(!p.opted_in||!p.probe_enabled||p.sis_capture_attempted)return;
+ p.sis_capture_attempted=true;
+ MeleeWebRetiredSisLease lease{};char error[256]{};
+ if(!melee_web_diagnostic_sis_capture(&lease,error,sizeof(error))){
+  if(p.error.empty())p.error=error[0]?error:"Exact SIS diagnostic lease capture refused";
+  return;
+ }
+ p.sis_lease_captured=true;
+ p.world_generation=lease.prior.world_generation;
+ p.allocation_generation=lease.prior.allocation_generation;
+ p.source_epoch=lease.prior.source_epoch;p.requested_bytes=lease.requested_bytes;
+ p.membership_snapshot_attempted=true;
+ if(!melee_web_stadium_text_membership_snapshot_begin(&lease.prior,error,sizeof(error))){
+  if(p.error.empty())p.error=error[0]?error:"Exact SIS text membership snapshot refused";
+  return;
+ }
+ p.membership_snapshot_started=true;p.membership_snapshot_active=true;
+}
+void first_sss_text_tail_close_returned(){
+ if(!first_sss_text_tail_probe.opted_in)return;
+ first_sss_text_tail_cleanup("native-close-returned");
+ first_sss_text_tail_retain();
+}
+void first_sss_text_tail_setup_failed(){
+ if(!first_sss_text_tail_probe.opted_in)return;
+ first_sss_text_tail_cleanup("setup-failure");
+ first_sss_text_tail_retain();
+}
+void first_sss_text_tail_unload_refused(const char* error){
+ auto& p=first_sss_text_tail_probe;
+ if(!p.opted_in)return;
+ p.unload_refused=true;
+ if(p.unload_error.empty())p.unload_error=error?error:"Native unload refused";
+ first_sss_text_tail_cleanup("native-unload-refused");
+ first_sss_text_tail_retain();
+}
+struct FirstSssTextTailCloseGuard {
+ bool active=false;
+ int uncaught_on_entry=std::uncaught_exceptions();
+ ~FirstSssTextTailCloseGuard() noexcept {
+  if(!active)return;
+  try{
+   if(std::uncaught_exceptions()>uncaught_on_entry){
+    first_sss_text_tail_cleanup("native-close-threw");
+    first_sss_text_tail_retain();
+   }else first_sss_text_tail_close_returned();
+  }
+  catch(...){
+   auto& p=first_sss_text_tail_probe;
+   if(p.membership_snapshot_active){
+    melee_web_stadium_text_membership_snapshot_end();
+    p.membership_snapshot_active=false;p.membership_snapshot_ended=true;
+   }
+   if(p.probe_enabled){HSD_SisLib_C1TextProbeSet(0);p.probe_enabled=false;}
+   p.cleanup_done=true;
+  }
+ }
+};
 std::string first_sss_vs_setup_json(){
  const auto& s=first_sss_vs_setup;std::ostringstream out;
  out<<"{\"attempted\":"<<(s.attempted?"true":"false")
@@ -338,7 +458,10 @@ std::string first_sss_vs_setup_json(){
     <<",\"source_frames_scope\":\"actual_match_flow_clock_not_original_scene_frame\""
     <<",\"current_owners\":"<<first_sss_vs_setup_current_json()
     <<",\"actual\":"<<(s.actual.empty()?"null":s.actual)
-    <<",\"error\":"<<(s.error.empty()?"null":first_css_browser_draw_json_quote(s.error))<<'}';
+    <<",\"error\":"<<(s.error.empty()?"null":first_css_browser_draw_json_quote(s.error));
+ if(first_sss_text_tail_probe.opted_in)
+  out<<",\"text_tail_probe\":"<<first_sss_text_tail_probe_json();
+ out<<'}';
  return out.str();
 }
 void first_sss_sequence_sync(bool prefix){
@@ -1365,6 +1488,9 @@ std::string selected_match_message(const MeleeWebMenuMatchSelection& selection){
  return result;
 }
 void close(){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ FirstSssTextTailCloseGuard text_tail_close{first_sss_text_tail_probe.opted_in};
+#endif
  const bool had_lifetime=world||match||results||prize||host;
  if(had_lifetime)report_owner_lifetime("session-before-unload");
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
@@ -2060,6 +2186,7 @@ bool first_sss_vs_setup_asset_pending(unsigned generation){
 void first_sss_vs_setup_fail(const char* error){
  auto& s=first_sss_vs_setup;s.failed=true;s.complete=false;
  if(s.error.empty())s.error=error;
+ first_sss_text_tail_setup_failed();
  s.audio_calls_after=diagnostic_audio_render_calls;s.audio_frames_after=diagnostic_audio_render_frames;
  if(match){s.source_frames=match->source_frames();s.construction_complete=match->construction_complete();}
  running=false;pending=false;first_use_draw_pending=false;menu_clock.reset();audio_clock.reset();
@@ -2424,6 +2551,7 @@ bool first_sss_vs_setup_service(){
     }else{
      check(s.import_committed&&match&&archive_cache,"VS Setup lost deferred construction owners");
      ++s.construction_steps;
+     first_sss_text_tail_begin_construction();
      const bool complete=match->advance_construction();
      s.source_frames=match->source_frames();s.construction_complete=match->construction_complete();
      check(s.source_frames==0,"VS Setup construction advanced gameplay");
@@ -2433,6 +2561,14 @@ bool first_sss_vs_setup_service(){
        <<melee_web::stadium_first_css_diagnostic::hex32(match->random_seed())<<"\",\"start\":";
       melee_web::stadium_first_css_diagnostic::write_start(out,match->start_data());out<<'}';
       s.actual=out.str();s.captured=true;s.complete=true;
+      first_sss_text_tail_capture_membership();
+      if(first_sss_text_tail_probe.opted_in){
+       const auto& probe=first_sss_text_tail_probe;
+       check(probe.error.empty()&&probe.sis_lease_captured&&
+             probe.membership_snapshot_started&&probe.membership_snapshot_active,
+             probe.error.empty()?"Setup text-tail SIS lease/membership acquisition incomplete":
+                                 probe.error.c_str());
+      }
      }
     }
    }
@@ -3716,7 +3852,11 @@ void tick(){
 }
 using namespace melee_web_menu_browser;
 extern "C" {
-int melee_web_native_menu_unload(){try{close();message="Native menus unloaded.";return 1;}catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_menu_unload(){try{close();message="Native menus unloaded.";return 1;}catch(const std::exception& e){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ first_sss_text_tail_unload_refused(e.what());first_css_browser_draw_refresh_observation();
+#endif
+ message=e.what();return 0;}}
 void melee_web_native_menu_pause(int paused){
  if(faulted||replay_final_draw||preparation.busy()||pending||(!host_entered&&!match&&!results&&!prize))return;
  diagnostic_incident(paused?5:6);
@@ -3798,7 +3938,9 @@ int melee_web_native_menu_stadium_first_css_draw_kick(){try{
 }catch(const std::exception& error){first_css_browser_draw_fail(error.what());
  first_css_browser_draw_refresh_observation();return 0;}}
 const char* melee_web_native_menu_stadium_first_css_draw_observe(){
- if(!first_css_browser_draw.armed)return nullptr;
+ if(!first_css_browser_draw.armed)
+  return first_sss_text_tail_retained_json.empty()
+      ?nullptr:first_sss_text_tail_retained_json.c_str();
  first_css_browser_draw_refresh_observation();
  return first_css_browser_draw.observation.c_str();
 }
@@ -3920,9 +4062,13 @@ int melee_web_native_menu_stadium_first_sss_draw_kick(){try{
  s.kicked=true;menu_clock.reset();first_use_draw_pending=false;
  first_css_browser_draw_refresh_observation();return 1;
 }catch(const std::exception& error){first_sss_sequence_fail(false,error.what());first_css_browser_draw_refresh_observation();return 0;}}
-int melee_web_native_menu_stadium_first_sss_vs_setup_begin(){try{
+int melee_web_native_menu_stadium_first_sss_vs_setup_begin(int text_tail_probe){try{
  auto& s=first_sss_vs_setup;
  check(!s.attempted&&!s.failed&&!s.complete,"VS Setup continuation is one-use");
+ check(text_tail_probe==0||text_tail_probe==1,"VS Setup text probe flag must be 0 or 1");
+ first_sss_text_tail_probe=FirstSssTextTailProbeState{};
+ first_sss_text_tail_retained_json.clear();
+ first_sss_text_tail_probe.opted_in=text_tail_probe==1;
  s.attempted=true;
  s.audio_calls_before=s.audio_calls_after=diagnostic_audio_render_calls;
  s.audio_frames_before=s.audio_frames_after=diagnostic_audio_render_frames;

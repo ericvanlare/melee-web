@@ -37,9 +37,11 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-sss-prefix', {type: 'boolean', default: false}],
       ['first-sss-vs-entry', {type: 'boolean', default: false}],
       ['first-sss-vs-setup', {type: 'boolean', default: false}],
+      ['first-sss-vs-setup-text-tail', {type: 'boolean', default: false}],
     ])), strict: true});
 const cssSssReducer = values['css-sss-reducer'];
 const firstSssVsSetup = values['first-sss-vs-setup'];
+const firstSssVsSetupTextTail = values['first-sss-vs-setup-text-tail'];
 const firstSssVsEntry = values['first-sss-vs-entry'] || firstSssVsSetup;
 const firstSssPrefix = values['first-sss-prefix'] || firstSssVsEntry;
 const firstSssDraw = values['first-sss-draw'] || firstSssPrefix;
@@ -49,6 +51,7 @@ const firstCssBrowserFinalDraw = values['first-css-browser-final-draw'] || first
 const firstCssBrowserStream = values['first-css-browser-stream'] || firstCssBrowserFinalDraw;
 const firstCssBrowserDraw = values['first-css-browser-draw'] || firstCssBrowserStream;
 if ((firstSssVsSetup && values['first-sss-vs-entry']) ||
+    (firstSssVsSetupTextTail && !firstSssVsSetup) ||
     (firstSssVsSetup && !values['first-sss-vs-setup-expected']) ||
     (!firstSssVsSetup && values['first-sss-vs-setup-expected']) ||
     (firstSssVsEntry && ['css-sss-reducer', 'first-css-browser-draw',
@@ -182,7 +185,7 @@ const report = {
     browser_process_pid: null, server_process_terminated: false, server_process_pid: null,
     server_process_exit: null, failures: []},
   source_request_scope: firstSssVsSetup
-    ? 'Strict Entry then checked async exact Stadium asset handoff and existing deferred Session Setup endpoint; stop before gameplay tick/draw/GO'
+    ? `Strict Entry then checked async exact Stadium asset handoff and existing deferred Session Setup endpoint; stop before gameplay tick/draw/GO${firstSssVsSetupTextTail?'; opt-in bounded SIS text-tail diagnostics only':''}`
     : firstSssVsEntry
     ? 'Strict SSS prefix then read-only actual match Start/seed Entry endpoint; no match construction'
     : firstSssPrefix
@@ -564,6 +567,11 @@ async function loadFirstSssVsSetupInputs() {
   assert.equal(preflight.first_sss_vs_setup.diagnostic_export,
     '_melee_web_native_menu_stadium_first_sss_vs_setup_begin');
   assert.equal(preflight.first_sss_vs_setup.expected_state_host_only, true);
+  const textTailBinding = preflight.first_sss_vs_setup.text_tail_probe;
+  assert.ok(textTailBinding === undefined || typeof textTailBinding === 'boolean',
+    'Setup text-tail preflight binding must be absent or boolean');
+  assert.equal(textTailBinding ?? false, firstSssVsSetupTextTail,
+    'Setup text-tail opt-in differs from the exact preflight route binding');
   const helper = await import(pathToFileURL(result.helperPath).href);
   helper.validateFirstSssVsSetupExpectedSource(result.expected);
   for (const key of ['observer_sha256', 'observer_status_sha256', 'observer_bytes', 'observer_status_bytes'])
@@ -1816,6 +1824,95 @@ async function readFirstSssVsEntryObservation() {
   return (await readFirstSssPrefixObservation()).native;
 }
 
+async function enableFirstSssTextTailProbe() {
+  return page.evaluate(() => {
+    const probe = globalThis.__meleeWebStadiumTextTailProbe;
+    return probe && typeof probe.enable === 'function' && probe.enable() === true;
+  });
+}
+
+async function snapshotFirstSssTextTailLog() {
+  return page.evaluate(() => globalThis.__meleeWebStadiumTextTailProbe?.snapshot?.() ?? null);
+}
+
+function validateFirstSssTextTailLog(snapshot) {
+  const errors = [];
+  if (!snapshot || typeof snapshot !== 'object')
+    return {state: 'OPEN', complete: false, errors: ['missing log snapshot']};
+  if (snapshot.schema !== 'melee-web-stadium-first-sss-text-tail-log-v1')
+    errors.push('log schema mismatch');
+  if (snapshot.enabled !== true) errors.push('log sink was not enabled at capture');
+  if (!Array.isArray(snapshot.records)) errors.push('log records are unavailable');
+  const nonnegativeInteger = value => Number.isSafeInteger(value) && value >= 0;
+  const counters = ['retained_records', 'retained_bytes', 'total_records', 'total_bytes',
+    'dropped_records', 'dropped_bytes'];
+  for (const key of counters)
+    if (!nonnegativeInteger(snapshot[key])) errors.push(`invalid ${key}`);
+  if (Array.isArray(snapshot.records)) {
+    if (snapshot.retained_records !== snapshot.records.length)
+      errors.push('retained record count mismatch');
+    const bytes = snapshot.records.reduce((sum, record) => {
+      if (typeof record !== 'string' ||
+          !['C1_SIS_TEXT_EVENT ', 'C1_HUD_TEXT_PHASE ', 'C1_NAMETAG_TEXT ',
+            'STADIUM_TEXT_MEMBERSHIP_OBSERVATION '].some(prefix => record.startsWith(prefix))) {
+        errors.push('invalid or unallowlisted event record');
+        return sum;
+      }
+      return sum + Buffer.byteLength(record, 'utf8');
+    }, 0);
+    if (snapshot.retained_bytes !== bytes) errors.push('retained byte count mismatch');
+  }
+  if (counters.every(key => nonnegativeInteger(snapshot[key]))) {
+    if (snapshot.total_records !== snapshot.retained_records + snapshot.dropped_records)
+      errors.push('record accounting mismatch');
+    if (snapshot.total_bytes !== snapshot.retained_bytes + snapshot.dropped_bytes)
+      errors.push('byte accounting mismatch');
+  }
+  const limits = snapshot.limits;
+  if (limits?.records !== 8192 || limits?.bytes !== 1024 * 1024)
+    errors.push('log limits mismatch');
+  if (snapshot.retained_records > 8192 || snapshot.retained_bytes > 1024 * 1024)
+    errors.push('retained log exceeds its declared limits');
+  const overflow = snapshot.overflow === true || snapshot.dropped_records > 0 ||
+    snapshot.dropped_bytes > 0;
+  if (snapshot.overflow !== overflow) errors.push('overflow/drop state mismatch');
+  if (overflow) errors.push('log overflow leaves observation open');
+  return {state: errors.length ? 'OPEN' : 'retained', complete: errors.length === 0, errors,
+    retained_records: snapshot.retained_records ?? null, retained_bytes: snapshot.retained_bytes ?? null,
+    dropped_records: snapshot.dropped_records ?? null, dropped_bytes: snapshot.dropped_bytes ?? null,
+    overflow};
+}
+
+async function harvestFirstSssTextTailAfterUnload() {
+  return page.evaluate(() => {
+    const module = globalThis.Module;
+    const pointer = module?._melee_web_native_menu_stadium_first_css_draw_observe?.();
+    const raw = pointer ? module.UTF8ToString(pointer) : null;
+    const parsed = raw ? JSON.parse(raw) : null;
+    const retainedSchema = 'melee-web-stadium-first-sss-text-tail-retained-v1';
+    const nativeTail = parsed?.schema === retainedSchema
+      ? parsed.first_sss_vs_setup_text_tail
+      : parsed?.first_sss_vs_setup?.text_tail_probe ?? null;
+    const logProbe = globalThis.__meleeWebStadiumTextTailProbe;
+    const textTailLog = logProbe?.snapshot?.() ?? null;
+    logProbe?.disable?.();
+    logProbe?.reset?.();
+    const logProbeAfterReset = logProbe?.snapshot?.() ?? null;
+    return {
+      phase: module?._melee_web_native_menu_phase?.() ?? null,
+      running: module?._melee_web_native_menu_running?.() ?? null,
+      ordinary_observation_present: !!parsed?.first_sss_vs_setup,
+      retained_wrapper_present: parsed?.schema === retainedSchema,
+      text_tail_probe: nativeTail,
+      text_tail_log: textTailLog,
+      log_probe_after_reset: logProbeAfterReset,
+      error: document.querySelector('#status')?.dataset.runtimeError || null,
+      import_enabled: !!document.querySelector('#disc') &&
+        !document.querySelector('#disc').disabled,
+    };
+  });
+}
+
 function assertFirstSssVsEntryUnchanged(native, before) {
   assert.ok(native, 'VS Entry native observation is absent');
   const actual = structuredClone(native);
@@ -1911,7 +2008,9 @@ async function runFirstSssVsSetup(entryNative) {
   const comparator = helper.createFirstSssVsSetupComparator(inputs.expected,
     entryNative.first_sss_prefix, entryStatus);
   report.scenario.first_sss_vs_setup = {expected_json: inputs.identity,
-    before: structuredClone(entryNative), begin: null, observation: null, comparison: null};
+    before: structuredClone(entryNative), begin: null, observation: null, comparison: null,
+    text_tail_probe: firstSssVsSetupTextTail
+      ? {requested: true, log_before_unload: null, after_unload: null} : null};
   await persistReport();
   await page.evaluate(() => {
     if (globalThis.__meleeWebStadiumFirstSssVsEntryApproved)
@@ -1919,12 +2018,17 @@ async function runFirstSssVsSetup(entryNative) {
     // Installed only after Node has completed unchanged strict Entry assertions.
     globalThis.__meleeWebStadiumFirstSssVsEntryApproved = () => true;
   });
-  const begin = await timeout(page.evaluate(() => {
+  if (firstSssVsSetupTextTail)
+    assert.equal(await enableFirstSssTextTailProbe(), true,
+      'Bounded Setup text-tail log probe is unavailable');
+  const begin = await timeout(page.evaluate((textTailProbe) => {
     const m = globalThis.Module, f = m?._melee_web_native_menu_stadium_first_sss_vs_setup_begin;
     if (typeof f !== 'function') return {result: 0, message: 'VS Setup export missing'};
-    const result = f(), p = m._melee_web_native_menu_message?.();
+    const result = f(textTailProbe ? 1 : 0),
+      p = m._melee_web_native_menu_message?.();
     return {result, message: p ? m.UTF8ToString(p) : null};
-  }), Math.min(5000, remaining()), 'Request the checked asynchronous Setup asset handoff');
+  }, firstSssVsSetupTextTail), Math.min(5000, remaining()),
+    'Request the checked asynchronous Setup asset handoff');
   report.scenario.first_sss_vs_setup.begin = begin;
   let native = await readFirstSssVsEntryObservation();
   report.scenario.first_sss_vs_setup.observation = native;
@@ -1947,6 +2051,22 @@ async function runFirstSssVsSetup(entryNative) {
   await persistReport();
   assert.equal(approved, true, JSON.stringify(comparator.status().first_mismatch));
   assertFirstSssVsSetupOwners(native.first_sss_vs_setup);
+  if (firstSssVsSetupTextTail) {
+    const nativeTextTail = native.first_sss_vs_setup.text_tail_probe;
+    assert.equal(nativeTextTail?.opted_in, true);
+    assert.equal(nativeTextTail?.error, null,
+      'Exact SIS lease or Stadium membership acquisition failed');
+    assert.equal(nativeTextTail?.sis_lease_captured, true);
+    assert.equal(nativeTextTail?.membership_snapshot_started, true);
+    assert.equal(nativeTextTail?.membership_snapshot_active, true);
+    const logBeforeUnload = await snapshotFirstSssTextTailLog();
+    const logValidation = validateFirstSssTextTailLog(logBeforeUnload);
+    report.scenario.first_sss_vs_setup.text_tail_probe.log_before_unload = logBeforeUnload;
+    report.scenario.first_sss_vs_setup.text_tail_probe.log_validation_before_unload = logValidation;
+    assert.equal(logValidation.complete, true,
+      `Setup text-tail log is incomplete: ${logValidation.errors.join('; ')}`);
+    await persistReport();
+  }
   report.scenario.first_sss_vs_setup.claim = 'Declared Setup2503 Start/player0-3/seed endpoint only; zero gameplay ticks/draws and stop before Ready/GO. Other setup fields and per-owner RNG remain unpaired.';
   await persistReport();
   return native;
@@ -2136,9 +2256,13 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
   const afterUnload = await timeout(page.evaluate(() => {
     const module = globalThis.Module;
     const pointer = module._melee_web_native_menu_stadium_first_css_draw_observe?.();
-    const observation = pointer ? JSON.parse(module.UTF8ToString(pointer)) : null;
+    const observationText = pointer ? module.UTF8ToString(pointer) : null;
+    const observation = observationText ? JSON.parse(observationText) : null;
+    const retainedTextTail = observation?.schema ===
+      'melee-web-stadium-first-sss-text-tail-retained-v1';
     return {phase: module._melee_web_native_menu_phase(), running: module._melee_web_native_menu_running(),
-      observation: pointer ? module.UTF8ToString(pointer) : null,
+      observation: retainedTextTail ? null : observationText,
+      retained_text_tail_wrapper: retainedTextTail,
       first_sss_constructor_pair: observation?.first_sss_constructor_pair ?? null,
       first_sss_consumed_tick: observation?.first_sss_consumed_tick ?? null,
       first_sss_draw: observation?.first_sss_draw ?? null,
@@ -2166,6 +2290,29 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
     assert.equal(afterUnload.first_sss_prefix, null,
       'SSS prefix diagnostic ownership survived teardown');
   if (firstSssVsSetup) assert.equal(afterUnload.first_sss_vs_setup, null);
+  if (firstSssVsSetupTextTail) {
+    assert.equal(afterUnload.retained_text_tail_wrapper, true,
+      'Native unload did not retain the scalar text-tail outcome');
+    const harvested = await timeout(harvestFirstSssTextTailAfterUnload(),
+      Math.min(5000, remaining()), 'Harvest bounded text-tail logs and native cleanup state');
+    report.scenario.first_sss_vs_setup.text_tail_probe.after_unload = harvested;
+    afterUnload.text_tail_probe = harvested.text_tail_probe;
+    afterUnload.text_tail_log = harvested.text_tail_log;
+    afterUnload.log_probe_after_reset = harvested.log_probe_after_reset;
+    await persistReport();
+    assert.equal(harvested.ordinary_observation_present, false,
+      'Ordinary Setup observation survived checked unload');
+    assert.equal(harvested.text_tail_probe?.cleanup_done, true);
+    assert.equal(harvested.text_tail_probe?.probe_enabled, false);
+    assert.equal(harvested.text_tail_probe?.membership_snapshot_active, false);
+    assert.equal(harvested.text_tail_probe?.membership_snapshot_ended, true);
+    const logValidation = validateFirstSssTextTailLog(harvested.text_tail_log);
+    report.scenario.first_sss_vs_setup.text_tail_probe.log_validation_after_unload = logValidation;
+    assert.equal(logValidation.complete, true,
+      `Setup text-tail log is incomplete: ${logValidation.errors.join('; ')}`);
+    assert.equal(harvested.log_probe_after_reset?.enabled, false);
+    assert.equal(harvested.log_probe_after_reset?.retained_records, 0);
+  }
   if (firstSssVsEntry) assert.equal(afterUnload.first_sss_vs_entry, null,
     'VS Entry native observation survived teardown');
   report.cleanup.native_after_unload = afterUnload;
@@ -2383,7 +2530,14 @@ async function cleanupServer() {
 async function main() {
   assert.equal(build, expectedBuild, 'Only the isolated C1a diagnostic runtime may be served');
   assert.equal(preflight.schema, 'melee-web-stadium-c1a-browser-preflight-v1');
-  if (firstSssVsSetup) assert.equal(preflight.route_mode, 'first-sss-vs-setup');
+  if (firstSssVsSetup) {
+    assert.equal(preflight.route_mode, 'first-sss-vs-setup');
+    const textTailBinding = preflight.first_sss_vs_setup?.text_tail_probe;
+    assert.ok(textTailBinding === undefined || typeof textTailBinding === 'boolean',
+      'Setup text-tail preflight binding must be absent or boolean');
+    assert.equal(textTailBinding ?? false, firstSssVsSetupTextTail,
+      'Setup text-tail CLI flag differs from the exact preflight');
+  }
   else if (firstSssVsEntry)
     assert.equal(preflight.route_mode, 'first-sss-vs-entry',
       'VS Entry command requires its exact frozen preflight route');
@@ -2858,6 +3012,14 @@ async function cleanupOwnedProcesses() {
         report.scenario.first_sss_vs_setup_failure_snapshot = await timeout(
           readFirstSssVsEntryObservation(), Math.min(3000, cleanupRemaining()),
           'VS Setup partial owners/actual/error before unload');
+        if (firstSssVsSetupTextTail && report.scenario.first_sss_vs_setup?.text_tail_probe) {
+          const log = await snapshotFirstSssTextTailLog();
+          const validation = validateFirstSssTextTailLog(log);
+          report.scenario.first_sss_vs_setup.text_tail_probe.log_before_unload = log;
+          report.scenario.first_sss_vs_setup.text_tail_probe.log_validation_before_unload = validation;
+          report.scenario.first_sss_vs_setup.text_tail_probe.observation_status =
+            validation.complete ? 'retained-awaiting-review' : 'OPEN';
+        }
         await persistReport();
       } catch (error) { cleanupFailures.push({step: 'vs-setup-failure-snapshot', error: errorText(error)}); }
     }
@@ -2882,6 +3044,33 @@ async function cleanupOwnedProcesses() {
       await timeout(driver.unload(), Math.min(LIMITS.cleanupMs, cleanupRemaining()), 'Failure-path unload');
       report.cleanup.unload_completed = true;
     } catch (error) { cleanupFailures.push({step: 'unload', error: errorText(error)}); }
+  }
+  if (firstSssVsSetupTextTail && unloadAttempted && page && !page.isClosed() &&
+      report.scenario.first_sss_vs_setup?.text_tail_probe &&
+      !report.scenario.first_sss_vs_setup.text_tail_probe.after_unload) {
+    try {
+      const harvested = await timeout(harvestFirstSssTextTailAfterUnload(),
+        Math.min(5000, cleanupRemaining()), 'Harvest text-tail evidence after unload attempt');
+      const logValidation = validateFirstSssTextTailLog(harvested.text_tail_log);
+      harvested.text_tail_log_validation = logValidation;
+      report.scenario.first_sss_vs_setup.text_tail_probe.after_unload = harvested;
+      report.scenario.first_sss_vs_setup.text_tail_probe.log_validation_after_unload = logValidation;
+      report.scenario.first_sss_vs_setup.text_tail_probe.observation_status =
+        logValidation.complete ? 'retained-awaiting-review' : 'OPEN';
+      report.cleanup.native_after_unload = harvested;
+      report.cleanup.observation_cleared = !harvested.ordinary_observation_present;
+      await persistReport();
+      if (harvested.text_tail_probe?.probe_enabled !== false ||
+          harvested.text_tail_probe?.membership_snapshot_active !== false ||
+          harvested.text_tail_probe?.cleanup_done !== true)
+        cleanupFailures.push({step: 'text-tail-native-reset',
+          error: 'Native text probe or membership token was not cleared after unload attempt'});
+      if (!logValidation.complete)
+        cleanupFailures.push({step: 'text-tail-log-incomplete',
+          error: `Text-tail observation remains OPEN: ${logValidation.errors.join('; ')}`});
+    } catch (error) {
+      cleanupFailures.push({step: 'text-tail-post-unload-harvest', error: errorText(error)});
+    }
   }
   if (firstSssConstructorPair && report.cleanup.unload_completed &&
       !report.cleanup.native_after_unload && page && !page.isClosed()) {
