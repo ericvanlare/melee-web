@@ -6149,7 +6149,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4758cbb258f22465f300cc543ff49bdd
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..07ca4d0898a1859d7d29bc5f27490006aeb814c2 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..743e28ff4d14d33ee35bbaf21ecbb1376a307e1c 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,16 @@
@@ -9801,7 +9801,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..07ca4d0898a1859d7d29bc5f27490006
 +    candidate.display_mode = display_data->u.display.xE4;
 +    candidate.display_e6 = display_data->u.display.xE6;
 +    candidate.display_e8 = display_data->u.display.xE8;
-+    candidate.display_timer = display_data->u.display.xE0;
++    memcpy(candidate.display_timer_native_bytes, &display_data->u.display.xE0, sizeof(candidate.display_timer_native_bytes));
 +    candidate.display_previous_mode = display_data->u.display.xEA;
 +    candidate.display_selected_player = display_data->u.display.xEE;
 +    candidate.display_f2 = display_data->u.display.xF2;

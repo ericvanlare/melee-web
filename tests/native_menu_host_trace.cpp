@@ -8426,7 +8426,9 @@ bool same_stadium_idle_snapshot(const MeleeWebStadiumIdleSnapshot& a,
     MELEE_WEB_IDLE_FIELD(display_mode);
     MELEE_WEB_IDLE_FIELD(display_e6);
     MELEE_WEB_IDLE_FIELD(display_e8);
-    MELEE_WEB_IDLE_FIELD(display_timer);
+    if(std::memcmp(a.display_timer_native_bytes,b.display_timer_native_bytes,
+                   sizeof(a.display_timer_native_bytes))!=0)return false;
+    MELEE_WEB_IDLE_FIELD(display_timer_initialization_observed);
     MELEE_WEB_IDLE_FIELD(display_previous_mode);
     MELEE_WEB_IDLE_FIELD(display_selected_player);
     MELEE_WEB_IDLE_FIELD(display_f2);
@@ -8457,14 +8459,18 @@ void emit_stadium_idle_snapshot(const char* phase,
                                 uint64_t session_ticks)
 {
     std::fprintf(stderr,
-        "STADIUM_SOURCE_IDLE phase=%s generation=%llu world_ticks=%llu session_ticks=%llu source_frame=%u map2_gate=%d map2_countdown=%d map2_phase=%d map2_form=%d map2_history_e0=%d map2_history_e2=%d display_mode=%d display_e6=%d display_e8=%d display_timer=%d display_previous_mode=%d display_selected_player=%d display_f2=%d display_flags=%u sis_font_slot=%u sis_static_text_role=%u sis_dynamic_text_role=%u sis_context_present=%u sis_title_entry_seen=%u sis_title_entry_index=%d title_bytes_captured=%u sis_source_heap_handle=%d sis_world_generation=%llu sis_allocation_generation=%llu sis_source_epoch=%llu sis_requested_bytes=%u map2_source_heap_handle=%d map2_world_generation=%llu map2_allocation_generation=%llu map2_requested_bytes=%u map2_buffer_origin=%u draw=0\n",
+        "STADIUM_SOURCE_IDLE phase=%s generation=%llu world_ticks=%llu session_ticks=%llu source_frame=%u map2_gate=%d map2_countdown=%d map2_phase=%d map2_form=%d map2_history_e0=%d map2_history_e2=%d display_mode=%d display_e6=%d display_e8=%d display_timer_native_hex=%02x%02x%02x%02x display_timer_representation=native-object-bytes display_timer_initialization_observed=%u display_previous_mode=%d display_selected_player=%d display_f2=%d display_flags=%u sis_font_slot=%u sis_static_text_role=%u sis_dynamic_text_role=%u sis_context_present=%u sis_title_entry_seen=%u sis_title_entry_index=%d title_bytes_captured=%u sis_source_heap_handle=%d sis_world_generation=%llu sis_allocation_generation=%llu sis_source_epoch=%llu sis_requested_bytes=%u map2_source_heap_handle=%d map2_world_generation=%llu map2_allocation_generation=%llu map2_requested_bytes=%u map2_buffer_origin=%u draw=0\n",
         phase,static_cast<unsigned long long>(snapshot.world_generation),
         static_cast<unsigned long long>(snapshot.world_ticks),
         static_cast<unsigned long long>(session_ticks),snapshot.source_frame,
         snapshot.map2_gate,snapshot.map2_countdown,snapshot.map2_phase,
         snapshot.map2_form,snapshot.map2_history_e0,snapshot.map2_history_e2,
         snapshot.display_mode,snapshot.display_e6,snapshot.display_e8,
-        snapshot.display_timer,snapshot.display_previous_mode,
+        static_cast<unsigned int>(snapshot.display_timer_native_bytes[0]),
+        static_cast<unsigned int>(snapshot.display_timer_native_bytes[1]),
+        static_cast<unsigned int>(snapshot.display_timer_native_bytes[2]),
+        static_cast<unsigned int>(snapshot.display_timer_native_bytes[3]),
+        snapshot.display_timer_initialization_observed,snapshot.display_previous_mode,
         snapshot.display_selected_player,snapshot.display_f2,snapshot.display_flags,
         snapshot.sis_font_slot,snapshot.sis_static_text_role,
         snapshot.sis_dynamic_text_role,snapshot.sis_context_present,

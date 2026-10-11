@@ -46,7 +46,7 @@ typedef enum MeleeWebStadiumMap2BufferOrigin {
 
 #define MELEE_WEB_STADIUM_SOURCE_EVENT_CAPACITY 8
 
-#define MELEE_WEB_STADIUM_IDLE_SNAPSHOT_VERSION 1U
+#define MELEE_WEB_STADIUM_IDLE_SNAPSHOT_VERSION 2U
 typedef struct MeleeWebStadiumIdleSnapshot {
     uint32_t version;
     uint64_t world_generation;
@@ -61,7 +61,10 @@ typedef struct MeleeWebStadiumIdleSnapshot {
     int16_t display_mode;
     int16_t display_e6;
     int16_t display_e8;
-    int32_t display_timer;
+    /* Object bytes only: no current-object timer write receipt is available.
+     * Zero observed means unknown, not asserted uninitialized. */
+    unsigned char display_timer_native_bytes[sizeof(int32_t)];
+    uint32_t display_timer_initialization_observed;
     int16_t display_previous_mode;
     int16_t display_selected_player;
     int16_t display_f2;
@@ -94,6 +97,7 @@ static inline int melee_web_stadium_idle_snapshot_copy(
     if (out == NULL || candidate == NULL ||
         candidate->version != MELEE_WEB_STADIUM_IDLE_SNAPSHOT_VERSION ||
         candidate->world_generation == 0 ||
+        candidate->display_timer_initialization_observed != 0 ||
         candidate->map2_gate < 0 || candidate->map2_gate > 1 ||
         (candidate->display_flags & ~7U) != 0 ||
         candidate->sis_font_slot != 1 ||

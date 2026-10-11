@@ -182,6 +182,11 @@ class StadiumIdleStateContractTests(unittest.TestCase):
         self.assertFalse(decoded["map_root_object_type_observed"])
         self.assertFalse(decoded["map_root_allocation_lifetime_proved"])
         self.assertFalse(decoded["display"]["xF0_observed"])
+        self.assertEqual(decoded["display"]["timer_raw_hex"], "0000000c")
+        self.assertEqual(decoded["display"]["timer_representation"],
+                         "original-ppc-object-bytes")
+        self.assertFalse(decoded["display"]["timer_initialization_observed"])
+        self.assertNotIn("timer_s32", decoded["display"])
         self.assertFalse(decoded["title"]["sis_table_entry_relationship_observed"])
         self.assertFalse(decoded["title"]["dynamic_title_text_bytes_observed"])
 
@@ -268,6 +273,10 @@ class StadiumIdleStateCompanionTests(OwnedWorkspaceTests):
         data, status = _stateful_route_fixture(self.workspace)
         result = _validate_temp(self.workspace, data, status, validate_stadium_idle_state_snapshot)
         self.assertEqual(result["decision"], "PASS_ORIGINAL_STATE_ONLY_COUNTERPART")
+        self.assertEqual(result["version"], 2)
+        for snapshot in result["snapshots"]:
+            self.assertRegex(snapshot["display"]["timer_raw_hex"], r"^[0-9a-f]{8}$")
+            self.assertFalse(snapshot["display"]["timer_initialization_observed"])
         self.assertEqual([item["label"] for item in result["snapshots"]], ["GO", "C", "F"])
         self.assertEqual([item["source_tick"] for item in result["snapshots"]], [125, 125, 126])
 

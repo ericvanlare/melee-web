@@ -3457,7 +3457,11 @@ def _validate_stadium_idle_state_record(row: dict[str, Any], label: str,
             "map5_root_pointer_equals_fixed_map5_slot_value": True,
         },
         "display": {
-            "timer_s32": s32(display_raw["timer"]),
+            # No current-object source write receipt exists at GO/C/F.
+            # False means unobserved, not asserted uninitialized.
+            "timer_raw_hex": display_raw["timer"].hex(),
+            "timer_representation": "original-ppc-object-bytes",
+            "timer_initialization_observed": False,
             "mode_s16": s16(display_raw["mode"]),
             "flags_s16": s16(display_raw["flags"]),
             "previous_flags_s16": s16(display_raw["previous_flags"]),
@@ -3555,7 +3559,7 @@ def validate_stadium_idle_state_snapshot(
              "state companion original match context is not Stadium kind 3")
     return {
         "schema": "melee-web-original-stadium-idle-state",
-        "version": 1,
+        "version": 2,
         "decision": "PASS_ORIGINAL_STATE_ONLY_COUNTERPART",
         "scope": "GO/C/F raw state observation; no native parity, title-byte, RNG-ledger, or whole-session claim",
         "source": baseline["source"],
