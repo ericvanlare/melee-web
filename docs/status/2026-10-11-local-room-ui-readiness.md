@@ -68,7 +68,7 @@ is `3c475521da3b101a17c384d90659ec2ee00ae1181cabeccf2f6d04abc71b7409`;
 all 46 runtime file hashes matched before each attempt. Only the keyboard
 harness and its tests changed afterward; the runtime and source game did not.
 
-All three retained attempts used actual Host/Join and keyboard input to enter
+The first three retained attempts used actual Host/Join and keyboard input to enter
 original CSS, SSS and four-stock Mario/Final Destination. P1 used ordinary
 outward movement and P2 stayed neutral during gameplay. Their outcomes differ:
 
@@ -88,11 +88,23 @@ outward movement and P2 stayed neutral during gameplay. Their outcomes differ:
   final wait rows were not retained. Cleanup snapshots had already compared
   beyond the requested checksum tick, so neither desync nor the actual blocked
   predicate is established. All 8,220 common 64-byte records match; alpha has
-  no unpaired tail and beta has two. The next step is a smaller checksum-wait
-  diagnostic, without increasing the budget or changing runtime thresholds.
+  no unpaired tail and beta has two. A focused diagnostic change now retains
+  the exact wait predicate rows and separately labelled post-deadline reads,
+  without changing its checks or budget.
+- Attempt 4 reached original stage select in both browsers, but the driver
+  required the live cursor reads to coincide in a single concurrent poll. The retained 32-poll suffix shows both
+  peers progressing with one-to-two-tick offsets; the full 4,929-poll stream
+  was not retained. The operation budget expired. All 13,274 common 64-byte records match, with
+  no alpha tail and one unpaired beta record. This establishes a driver
+  observation-liveness failure. The smaller reducer confirms no exact-key overlap in that suffix. A
+  reviewed observer change starts each acquisition fresh and rereads the
+  lagging peer until actual rows share an identical source cursor. Focused
+  controls pass; synthetic catch-up samples are labelled separately from the
+  retained observations. It does not interpolate, relabel or compare across
+  ticks, and does not guarantee that a bounded live acquisition will overlap.
 
 Each owner stayed within the five-minute wall budget and reserved cleanup time.
-All three cleanups passed normal UI Leave, native quiescence, unload to stopped
+All four cleanups passed normal UI Leave, native quiescence, unload to stopped
 phase zero, Worker disposal without fallback, and owned-process absence.
 Failed profiles and reports remain retained. The observed Final Destination
 geometry still has the known magenta rendering defect; no visual acceptance is

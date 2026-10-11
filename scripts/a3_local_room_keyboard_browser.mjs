@@ -121,6 +121,7 @@ async function sourceIdentity() {
   const status = gitValue(['status', '--porcelain', '--untracked-files=all']);
   const allowedHarnessFiles = ['scripts/a3_local_room_keyboard_browser.mjs',
     'scripts/a3_local_room_full_route.mjs', 'scripts/a3_checksum_wait_diagnostics.mjs',
+    'scripts/a3_source_cursor_join.mjs',
     'tests/test_a3_local_room_full_route_wait.py'];
   const unexpected = status.split('\n').filter(Boolean).filter(row =>
     !allowedHarnessFiles.includes(row.slice(3)));

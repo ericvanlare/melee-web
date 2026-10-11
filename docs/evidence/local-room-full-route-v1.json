@@ -79,6 +79,26 @@
       "cdp_process_count": 16,
       "owned_pids_independently_absent": 22,
       "cause": "Operation deadline expired in checksum waiter. Final waiter native running/message was not retained; actual predicate blocker remains unknown."
+    },
+    {
+      "attempt": 4,
+      "result": "FAIL_RETAINED",
+      "harness_commit": "a9c28108d540a0b1e374e42f32be0e16e0b0e603",
+      "started_at": "2026-10-11T20:49:31.543Z",
+      "finished_at": "2026-10-11T20:53:32.439Z",
+      "first_error": "Error: Local room keyboard scenario exceeded its operation deadline",
+      "recorded_stock_losses": [],
+      "recorded_respawns": 0,
+      "elapsed_ms": 241716,
+      "common_exact_64byte_records": 13274,
+      "unpaired_tails": {
+        "alpha": 0,
+        "beta": 1
+      },
+      "cleanup_passed": true,
+      "cdp_process_count": 16,
+      "owned_pids_independently_absent": 21,
+      "cause": "Both peers reached active original SSS and continued at observed1\u20132tick offsets, but the driver required identical cursors in one concurrent poll.4929polls exhausted the operation budget."
     }
   ],
   "offline_reduction": {
@@ -230,13 +250,88 @@
       "file": "capture3/browser-processes.jsonl",
       "bytes": 137019,
       "sha256": "c0eb16850baf2e561dbd92e8c156dc9788e1ee84c5e76d570a6373bec40e2095"
+    },
+    {
+      "file": "capture4-command.json",
+      "bytes": 3107,
+      "sha256": "558176b5733ec39736ab45d9e1440539aa572cdf08d3df77dd4d64d2ee0e218e"
+    },
+    {
+      "file": "capture4-summary.json",
+      "bytes": 1061,
+      "sha256": "bc62f709c6113a29a98b31816d4a4b1b0c4865968c3326a9c425158b4b820ed8"
+    },
+    {
+      "file": "capture4/browser/report.json",
+      "bytes": 89457695,
+      "sha256": "ee396ffd23cda9d72dd3bd7f7b94d5b4a7c47bfb5a87b004078861406d9e7a0a"
+    },
+    {
+      "file": "capture4/owner.json",
+      "bytes": 165473,
+      "sha256": "9c322bcf6148ec3e8a310e3d1e93e237d49ce2bf760dceff541aba05885a38bd"
+    },
+    {
+      "file": "capture4/capture.log",
+      "bytes": 728,
+      "sha256": "6d6bafa47e9692877e09dd52d73c7b246baed2194158b237d98d876ddc370bae"
+    },
+    {
+      "file": "capture4/browser-processes.jsonl",
+      "bytes": 121977,
+      "sha256": "ebc7ae698b03f846f98a50cefc8739501ef09bbb39976ef253888d33696c8fb4"
+    },
+    {
+      "file": "sol-capture4-review.json",
+      "bytes": 3233,
+      "sha256": "e3fedb5f559db63d96baed82fe2fe0bcac2eb437d9ed50c2b12866f1a3988aec"
+    },
+    {
+      "file": "sol-checksum-wait-diagnostics-review.json",
+      "bytes": 1671,
+      "sha256": "2df9c7f802beba714a835623e415257c196175278230f74efe4457a10121024e"
+    },
+    {
+      "file": "reduction/checksum-wait-focused-result.json",
+      "bytes": 2306,
+      "sha256": "2b27d6081d0609ce85a5168e1c5e350b021bfe89c3238666e2d923f56f7b7466"
+    },
+    {
+      "file": "sol-source-cursor-join-review.json",
+      "bytes": 2324,
+      "sha256": "c4398545c053491fcfd2f61ed2e5aa70695ffc397060b2b5a28b5684aa871dfe"
+    },
+    {
+      "file": "reduction/source-cursor-join-focused-attempt1.json",
+      "bytes": 1174,
+      "sha256": "c7ebf7b086b56cb69e32e06ef7d0a5afda0dccd7df2908e3d61c1cb6e06ee802"
+    },
+    {
+      "file": "reduction/source-cursor-join-focused-result.json",
+      "bytes": 2470,
+      "sha256": "a201f671623e4735689141adcb82b416b969561d87aa39e2c2fcd7f2de8a0f75"
     }
   ],
   "pending": [
-    "Reduced checksum-wait diagnostic and review before any additional capture",
+    "One bounded browser attempt of the reviewed exact-source observation join",
     "Complete local keyboard match route including fourth stock loss, Results and CSS return",
     "Final branch regression, affected target validation, review and CI before integration",
     "Deployed staging Worker route",
     "Physical input, two-machine, foreground timing, original pixels/PCM and whole-session acceptance"
-  ]
+  ],
+  "checksum_wait_diagnostics": {
+    "source": "a9c28108d540a0b1e374e42f32be0e16e0b0e603",
+    "focused_test_result": "PASS",
+    "behavior": "Original predicate/deadline/error unchanged. Retains32 compact predicate observations and separately labelled fresh final observations bounded to1500ms.",
+    "capture4_waiter_exercised_failure_path": false
+  },
+  "source_cursor_join_reduction": {
+    "retained_suffix_pairs": 32,
+    "retained_suffix_has_exact_cursor_intersection": false,
+    "full_poll_stream_retained": false,
+    "focused_checks": "PASS: new join reducer and existing full-route wait reducer; Node syntax",
+    "behavior": "Fresh acquisition-local samples, adaptive lagging-peer reread, exact latest source cursor only, unchanged route predicates and checksum comparison. No fabricated overlap or guaranteed liveness.",
+    "prior_test_expectation_failure_retained": true,
+    "review_result": "Approve one unchanged-budget capture"
+  }
 }

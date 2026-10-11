@@ -1,0 +1,465 @@
+{
+  "schema": "a3-source-cursor-capture4-retained-suffix-v1",
+  "evidence": {
+    "capture": "capture4",
+    "section": "full_route.failure_observation.recent",
+    "retained_poll_pairs": 32,
+    "projection": [
+      "phase",
+      "running",
+      "source_tick",
+      "message"
+    ],
+    "limitation": "This is the retained 32-pair suffix, not the full 4929-poll stream or complete native rows."
+  },
+  "pairs": [
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13187,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13189,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13190,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13191,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13192,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13194,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13195,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13196,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13198,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13199,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13200,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13202,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13203,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13204,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13206,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13207,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13208,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13210,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13211,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13212,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13213,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13215,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13216,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13217,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13219,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13220,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13221,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13223,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13224,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13225,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13226,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13228,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13229,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13231,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13232,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13233,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13234,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13236,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13237,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13238,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13240,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13241,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13242,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13244,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13245,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13246,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13248,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13249,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13250,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13252,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13253,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13254,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13255,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13257,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13258,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13260,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13261,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13262,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13264,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13265,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13266,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13268,
+        "message": "Original stage select"
+      }
+    },
+    {
+      "alpha": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13269,
+        "message": "Original stage select"
+      },
+      "beta": {
+        "phase": 3,
+        "running": 1,
+        "source_tick": 13270,
+        "message": "Original stage select"
+      }
+    }
+  ]
+}

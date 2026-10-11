@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import {observeRuntimeOwner} from '../tests/runtime_owner_observation.mjs';
 import {confirmTwoHumanResults} from '../tests/vs_rules_results_confirmation_driver.mjs';
 import {returnFromCompetitivePrize} from '../tests/vs_rules_timeout_route_helpers.mjs';
+import {createSourceCursorJoin} from './a3_source_cursor_join.mjs';
 
 const FD_SOURCE_ID = 0x20;
 const MARIO_SOURCE_ID = 8;
@@ -196,23 +197,111 @@ export async function runA3LocalFullRoute({
       stage: globalThis.menuObserveStage?.(0x20) ?? null,
       match};
   });
-  const observeBoth = async () => {
-    const rows = await Promise.all([observe(alpha), observe(beta)]);
-    for (const [index, role] of ['alpha', 'beta'].entries()) {
+  const observePeerSample = async role => {
+    let row = null;
+    let observedAt = new Date().toISOString();
+    try {
+      row = await observe(instances[role]);
+      observedAt = new Date().toISOString();
       const room = await readRoomState(instances[role]);
-      assertHealthy(room, role);
-      requireValue(rows[index].error == null, `${role}: native runtime error ${rows[index].error}`);
+      return {role, row, room, observed_at: observedAt, error: null};
+    } catch (error) {
+      return {role, row, room: null, observed_at: observedAt,
+        error: String(error?.stack || error)};
     }
-    return rows;
   };
-  const waitBoth = async (label, predicate, pollMs = 40) => {
+  const assertPeerSampleHealthy = sample => {
+    if (sample.error) throw Error(`${sample.role} observation failed: ${sample.error}`);
+    assertHealthy(sample.room, sample.role);
+    requireValue(sample.row?.error == null,
+      `${sample.role}: native runtime error ${sample.row?.error}`);
+  };
+  const observeBoth = async () => {
+    const samples = await Promise.all(['alpha', 'beta'].map(observePeerSample));
+    samples.forEach(assertPeerSampleHealthy);
+    return samples.map(sample => sample.row);
+  };
+  let lastMatchedSourceCursor = -1;
+  const observeAtCommonSourceCursor = async observation => {
+    // Each acquisition begins from fresh peer samples. This prevents a common
+    // row retained before a keyboard action from satisfying the next wait.
+    const sourceCursorJoin = createSourceCursorJoin({retainedCursorsPerPeer: 8});
+    const cursorHistory = observation.source_cursor_join ??= {
+      samples_by_peer: {alpha: 0, beta: 0}, last_by_peer: {}, recent: [], last_pair: null,
+    };
+    const retain = sample => {
+      const {role, row, observed_at: observedAt} = sample;
+      cursorHistory.samples_by_peer[role]++;
+      cursorHistory.last_by_peer[role] = {observed_at: observedAt,
+        source_tick: row?.source_tick ?? null, phase: row?.phase ?? null,
+        running: row?.running ?? null, message: row?.message ?? null,
+        error: sample.error ?? row?.error ?? null,
+        native_status: row?.native_status ?? null, room: sample.room ?? null};
+      cursorHistory.recent.push({role, observed_at: observedAt,
+        source_tick: row?.source_tick ?? null, phase: row?.phase ?? null,
+        running: row?.running ?? null, message: row?.message ?? null,
+        error: sample.error ?? row?.error ?? null});
+      if (cursorHistory.recent.length > 16) cursorHistory.recent.shift();
+      cursorHistory.join = sourceCursorJoin.status();
+      // Preserve the actual row and any health/read error before the join
+      // validates its source cursor. A malformed row must remain diagnosable.
+      if (row) sourceCursorJoin.observe(role, row, observedAt);
+      cursorHistory.join = sourceCursorJoin.status();
+    };
+    const acceptPair = () => {
+      const pair = sourceCursorJoin.takePair();
+      cursorHistory.join = sourceCursorJoin.status();
+      if (!pair) return null;
+      requireValue(pair.source_tick >= lastMatchedSourceCursor,
+        `Joined source cursor moved backward (${lastMatchedSourceCursor} -> ${pair.source_tick})`);
+      lastMatchedSourceCursor = pair.source_tick;
+      cursorHistory.last_pair = {source_tick: pair.source_tick,
+        observed_at_by_peer: pair.observed_at_by_peer,
+        observation_sequence_by_peer: pair.observation_sequence_by_peer};
+      return pair.rows;
+    };
+    const first = await Promise.all(['alpha', 'beta'].map(observePeerSample));
+    first.forEach(retain);
+    first.forEach(assertPeerSampleHealthy);
+    let rows = acceptPair();
+    if (rows) return rows;
+
+    while (remaining() > 0) {
+      const role = sourceCursorJoin.laggingPeer();
+      if (role) {
+        const sample = await observePeerSample(role);
+        retain(sample);
+        assertPeerSampleHealthy(sample);
+      } else {
+        // Equal latest cursors normally pair immediately. If an unchanged pair
+        // was already emitted, fresh reads at that same cursor may still reveal
+        // a preparation-state update; they remain independently observed rows.
+        const fresh = await Promise.all(['alpha', 'beta'].map(observePeerSample));
+        fresh.forEach(retain);
+        fresh.forEach(assertPeerSampleHealthy);
+      }
+      rows = acceptPair();
+      if (rows) return rows;
+      const nextRole = sourceCursorJoin.laggingPeer() ?? 'alpha';
+      await instances[nextRole].page.waitForTimeout(Math.min(2, remaining()));
+    }
+    return null;
+  };
+  const waitBoth = async (label, predicate, pollMs = 40,
+    {joinSourceCursor = false} = {}) => {
     let last = null;
     const observation = {label, started_at: new Date().toISOString(), polls: 0, recent: []};
     route.current_observation = observation;
     try {
       while (remaining() > 0) {
-        last = await observeBoth();
+        last = joinSourceCursor
+          ? await observeAtCommonSourceCursor(observation)
+          : await observeBoth();
         observation.polls++;
+        if (!last) {
+          observation.last_rows = null;
+          continue;
+        }
         // Keep the refusal itself and the recent cursor progression. A stopped
         // owner must remain a failure until its actual message explains why.
         observation.last_rows = last;
@@ -313,7 +402,8 @@ export async function runA3LocalFullRoute({
   await pulse('alpha', ['Enter'], {expected: {button: 0x1000}, holdMs: 160,
     releaseMs: 150, label: 'P1 keyboard Start from CSS to SSS'});
   let sceneRows = await waitBoth('original SSS entry and active source owner', rows =>
-    rows.every(row => row.phase === 3 && row.running === 1) && sourceAligned(rows));
+    rows.every(row => row.phase === 3 && row.running === 1) && sourceAligned(rows),
+  40, {joinSourceCursor: true});
   route.phases.push({phase: 3, label: 'original SSS'});
   route.screenshots.sss_entry = await screenshotPair('sss-entry');
 
@@ -321,7 +411,8 @@ export async function runA3LocalFullRoute({
   for (let attempt = 0; attempt < MAX_STAGE_KEY_PULSES; attempt++) {
     sceneRows = await waitBoth('active SSS stage observer at a common source tick', rows =>
       rows.every(row => row.phase === 3 && row.running === 1 && row.stage?.ids?.length === 4 &&
-        row.stage?.geometry?.length === 6) && sourceAligned(rows));
+        row.stage?.geometry?.length === 6) && sourceAligned(rows),
+    40, {joinSourceCursor: true});
     const first = sceneRows[0].stage, second = sceneRows[1].stage;
     const atFd = stage => stage.ids[1] === FD_SOURCE_ID &&
       Math.abs(stage.geometry[2] - stage.geometry[0]) <= 1.125 &&
@@ -353,7 +444,7 @@ export async function runA3LocalFullRoute({
     releaseMs: 150, label: 'P1 keyboard A confirms source-selected Final Destination'});
   sceneRows = await waitBoth('original Mario/FD match ready', rows => rows.every(row =>
     row.phase === 7 && row.running === 1 && row.match?.ready === true &&
-    row.match?.frame > 0) && sourceAligned(rows));
+    row.match?.frame > 0) && sourceAligned(rows), 40, {joinSourceCursor: true});
   const initialMatches = sceneRows.map((row, index) => checkMatchIdentity(row,
     `${index === 0 ? 'alpha' : 'beta'} initial Mario/FD match`));
   assert.deepEqual(initialMatches.map(match => match.players.map(player => player.stocks)),
@@ -401,7 +492,7 @@ export async function runA3LocalFullRoute({
         `${label}: P1 stock observation skipped or reversed a boundary (${stocks} -> ${observed[0]})`);
       recordTerminalHandoff(candidates, states, label);
       return true;
-    });
+    }, 40, {joinSourceCursor: true});
     const states = rows.map((row, index) => classifyStockObservation(row,
       `${index === 0 ? 'alpha' : 'beta'} ${label}`));
     const matches = states.map(state => state.match);
@@ -443,7 +534,8 @@ export async function runA3LocalFullRoute({
       candidates => candidates.every(row => row.phase === 7 && row.running === 1 &&
         row.match?.ready === true && row.match?.players?.[0]?.stocks === stocks &&
         row.match.frame > lossFrame && row.match.players[0].motion === 14 &&
-        row.match.players[0].groundAir === 0) && sourceAligned(candidates), 16);
+        row.match.players[0].groundAir === 0) && sourceAligned(candidates),
+    16, {joinSourceCursor: true});
     const respawnMatches = respawnRows.map((row, index) => checkMatchIdentity(row,
       `${index === 0 ? 'alpha' : 'beta'} grounded respawn after stock loss`));
     const respawns = respawnMatches.map((match, index) => ({peer: index === 0 ? 'alpha' : 'beta',
@@ -506,7 +598,7 @@ export async function runA3LocalFullRoute({
           state: state.state, phase: rows[index].phase, running: rows[index].running,
           message: rows[index].message ?? null, match: state.match}))};
     return states.every(state => state.ready);
-  }, 40);
+  }, 40, {joinSourceCursor: true});
   for (const [index, row] of terminalRows.entries()) {
     const label = index === 0 ? 'alpha terminal' : 'beta terminal';
     assert.deepEqual(row.match.terminal, {outcome: 2, winners: [1]},
