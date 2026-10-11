@@ -17,14 +17,14 @@ class FirstSssPrefixHostTests(OwnedWorkspaceTests):
   control=control.replace('unsigned first_sss_prefix_remaining; uint64_t ticks;', 'unsigned first_sss_prefix_remaining; void (*first_sss_prefix_exit_note)(void*,struct MeleeWebMenuSession*,const SSSData*,uint64_t,int); uint64_t ticks;')
   # The old fixture uses an anonymous session typedef, so avoid a separate tag.
   # Keep the typed callback prototype; the session now has its actual tag.
-  control=control.replace('typedef int MeleeWebMenuScene;', '#define MELEE_WEB_MENU_SSS_PREFIX_EXIT 3\ntypedef void (*MeleeWebMenuFirstSssPairNote)();\ntypedef int MeleeWebMenuScene;')
+  control=control.replace('typedef int MeleeWebMenuScene;', '#define MELEE_WEB_MENU_SSS_PREFIX_EXIT 3\nstruct MeleeWebMenuSession;\nstruct SSSData;\ntypedef void (*MeleeWebMenuFirstSssPairNote)(void*,struct MeleeWebMenuSession*,const struct SSSData*,uint64_t,int);\ntypedef int MeleeWebMenuScene;')
   old=_function(control,'static int observe_transition(')
   control=control.replace(old,old.replace('*r=0;', '*r=callbacks==125?1:0;active_host->transition=*r;'))
   old=_function(control,'static int run_scheduler(MeleeWebMenuSession*s,')
   control=control.replace(old,old.replace('(void)s;++steps;', '(void)s;++steps;if(active_host->first_sss_sequence_operation==2){sss_sequence_capture(active_host,1,MELEE_WEB_SSS_SAMPLE_TICK,&active_host->first_sss_prefix.scheduler_end);++active_host->first_sss_prefix.consumed_inputs;return melee_web_menu_clock_tick();}'))
   control=control.replace('typedef struct { CSSData css; SSSData sss;', 'typedef struct MeleeWebMenuSession { CSSData css; SSSData sss;')
-  control=control.replace('typedef struct {Vs vs;} SSSData;', 'typedef struct {Vs vs;int start_game;} SSSData;')
-  control=control.replace('unsigned first_sss_prefix_remaining;', 'int post_vs_mode_valid,stadium_c1a_enabled,stadium_c1a_ready;Vs match_vs,post_vs_mode;struct {void* user;int (*scene_exit)(void*,int,char*,size_t);}runtime;unsigned first_sss_prefix_remaining;')
+  control=control.replace('typedef struct {Vs vs;} SSSData;', 'typedef struct SSSData {Vs vs;int start_game;} SSSData;')
+  control=control.replace('unsigned first_sss_prefix_remaining;', 'int post_vs_mode_valid,stadium_c1a_enabled,stadium_c1a_ready;Vs match_vs,post_vs_mode;struct {void* user;int (*scene_exit)(void*,int,char*,size_t);}runtime;unsigned first_sss_prefix_remaining;MeleeWebMenuFirstSssPairNote first_sss_prefix_exit_note;')
   # Forward declarations keep actual production bodies and original source order.
   marker='static int run_scheduler(MeleeWebMenuSession*s,'
   proto='static int sss_sequence_capture(MeleeWebMenuHost*,int,int,MeleeWebMenuFirstSssTickSnapshot*);\n'
@@ -73,24 +73,27 @@ static int compare(void* data,int phase,const MeleeWebMenuFirstSssTickSnapshot* 
  if(reenter==2)assert(!leave_guard(&h,1,e,sizeof e));
  if(reenter==3)assert(!destroy_guard(&h,e,sizeof e));
  if(reenter==4)assert(!melee_web_menu_host_leave_first_sss_prefix(&h,e,sizeof e));
- if(phase==4){assert(exit_note&&exit_note->captured&&exit_note->phase==3&&exit_note->session_ticks==125);++approvals[phase];return 1;}
+ if(phase==4){assert(exit_note&&exit_note->captured&&exit_note->phase==3&&exit_note->session_ticks==active_host->session->first_sss_tick_session_base+125);++approvals[phase];return 1;}
  if(phase==5){assert(h.first_sss_prefix.selected_stage_captured);++approvals[phase];return 1;}
  assert(sample&&sample->captured);assert(sample->scene_kind==9);for(int i=0;i<8;i++)assert(sample->owners[i]);++approvals[phase];return phase!=reject_phase;
 }
-static void ready(void){char e[160];setup();reject_phase=reenter=retirement_attempts=0;memset(approvals,0,sizeof approvals);assert(melee_web_menu_host_arm_first_sss_tick(&h,raw,e,sizeof e));assert(melee_web_menu_host_tick(&h,raw,e,sizeof e)==1);assert(h.first_sss_tick_state==3);}
-int main(void){char e[160];ready();MeleeWebMenuFirstSssTickSnapshot original=h.first_sss_tick_scheduler_end;
+static void ready_at(uint64_t base){char e[160];setup_at(base);reject_phase=reenter=retirement_attempts=0;memset(approvals,0,sizeof approvals);assert(melee_web_menu_host_arm_first_sss_tick(&h,raw,e,sizeof e));assert(melee_web_menu_host_tick(&h,raw,e,sizeof e)==1);assert(h.first_sss_tick_state==3);assert(s.ticks==base+1);}static void ready(void){ready_at(0);}
+int main(void){char e[160];int before;ready_at(149);MeleeWebMenuFirstSssTickSnapshot original=h.first_sss_tick_scheduler_end;
  assert(melee_web_menu_host_arm_first_sss_draw(&h,compare,NULL,e,sizeof e));assert(melee_web_menu_host_draw_first_sss(&h,e,sizeof e));assert(approvals[2]==1&&approvals[3]==1&&h.first_sss_draw.state==2);
  assert(melee_web_menu_host_arm_first_sss_prefix(&h,compare,NULL,e,sizeof e));
  for(unsigned i=0;i<124;i++){assert(melee_web_menu_host_tick_first_sss_prefix(&h,raw,i,e,sizeof e)==(i==123?3:1));assert(h.first_sss_prefix.scheduler_end.scene_frame==i+1);assert(melee_web_menu_host_draw_first_sss_prefix(&h,i,e,sizeof e));assert(h.first_sss_prefix.draw_enter.scene_frame==i+2&&h.first_sss_prefix.draw_return.scene_frame==i+2);}
- assert(callbacks==125&&steps==125&&s.ticks==125&&frame==125&&h.transition==1);assert(s.first_sss_prefix_remaining==0&&s.first_sss_prefix_token==2);assert(h.first_sss_prefix.input_index==124&&h.first_sss_prefix.consumed_inputs==124&&h.first_sss_prefix.matched_ticks==124&&h.first_sss_prefix.matched_draw_returns==124);assert(!memcmp(&original,&h.first_sss_tick_scheduler_end,sizeof original)&&h.first_sss_tick_host_tick_calls==1&&!h.first_sss_tick_host_draw_calls&&h.first_sss_pair_state==6&&!h.first_sss_pair_host_tick_calls&&!h.first_sss_pair_host_draw_calls);
+ assert(callbacks==125&&steps==125&&s.ticks==274&&frame==125&&h.transition==1);assert(s.first_sss_prefix_remaining==0&&s.first_sss_prefix_token==2);assert(h.first_sss_prefix.input_index==124&&h.first_sss_prefix.consumed_inputs==124&&h.first_sss_prefix.matched_ticks==124&&h.first_sss_prefix.matched_draw_returns==124);assert(!memcmp(&original,&h.first_sss_tick_scheduler_end,sizeof original)&&h.first_sss_tick_host_tick_calls==1&&!h.first_sss_tick_host_draw_calls&&h.first_sss_pair_state==6&&!h.first_sss_pair_host_tick_calls&&!h.first_sss_pair_host_draw_calls);
  // Actual public guard refuses ordinary leave before source teardown and
  // preserves successful old pair/tick snapshots. Abort is allowed only idle.
  int old_pair=h.first_sss_pair_state;assert(!leave_guard(&h,0,e,sizeof e));assert(!retirement_attempts&&h.first_sss_pair_state==old_pair&&!memcmp(&original,&h.first_sss_tick_scheduler_end,sizeof original));
  // Reset only this fixture's failure latch to exercise the distinct exit API.
  h.first_sss_prefix.state=1;h.first_sss_prefix.error[0]=0;
- assert(melee_web_menu_host_leave_first_sss_prefix(&h,e,sizeof e));assert(h.first_sss_prefix.state==2&&approvals[4]==1&&approvals[5]==1&&!h.entered&&!h.source_scene&&h.first_sss_prefix.exit_note.host_entered&&h.first_sss_prefix.exit_note.session_phase==3&&!memcmp(&original,&h.first_sss_tick_scheduler_end,sizeof original));
+ assert(melee_web_menu_host_leave_first_sss_prefix(&h,e,sizeof e));assert(h.first_sss_prefix.exit_note.session_ticks==274);assert(h.first_sss_prefix.state==2&&approvals[4]==1&&approvals[5]==1&&!h.entered&&!h.source_scene&&h.first_sss_prefix.exit_note.host_entered&&h.first_sss_prefix.exit_note.session_phase==3&&!memcmp(&original,&h.first_sss_tick_scheduler_end,sizeof original));
  MeleeWebMenuFirstSssTickSnapshot final=h.first_sss_prefix.draw_return;assert(!melee_web_menu_host_tick_first_sss_prefix(&h,raw,124,e,sizeof e));assert(callbacks==125&&!memcmp(&final,&h.first_sss_prefix.draw_return,sizeof final));
- ready();assert(melee_web_menu_host_arm_first_sss_draw(&h,compare,NULL,e,sizeof e));reject_phase=2;int before=gobj_draws;assert(!melee_web_menu_host_draw_first_sss(&h,e,sizeof e));assert(gobj_draws==before&&h.first_sss_draw.draw_enter.captured&&!h.first_sss_draw.draw_return.captured&&!h.drawing);assert(h.first_sss_tick_state==3&&h.first_sss_pair_state==6);
+ ready_at(UINT64_C(0x100000123));assert(melee_web_menu_host_arm_first_sss_draw(&h,compare,NULL,e,sizeof e));assert(melee_web_menu_host_draw_first_sss(&h,e,sizeof e));assert(melee_web_menu_host_arm_first_sss_prefix(&h,compare,NULL,e,sizeof e));assert(melee_web_menu_host_tick_first_sss_prefix(&h,raw,0,e,sizeof e));assert(melee_web_menu_host_draw_first_sss_prefix(&h,0,e,sizeof e));s.ticks+=1;before=callbacks;assert(!melee_web_menu_host_tick_first_sss_prefix(&h,raw,1,e,sizeof e));assert(callbacks==before&&h.first_sss_prefix.state==3);
+ ready_at(149);assert(melee_web_menu_host_arm_first_sss_draw(&h,compare,NULL,e,sizeof e));assert(melee_web_menu_host_draw_first_sss(&h,e,sizeof e));s.ticks=0;assert(!melee_web_menu_host_arm_first_sss_prefix(&h,compare,NULL,e,sizeof e)&&h.first_sss_prefix.state==3);
+ ready_at(UINT64_MAX-124);assert(melee_web_menu_host_arm_first_sss_draw(&h,compare,NULL,e,sizeof e));assert(melee_web_menu_host_draw_first_sss(&h,e,sizeof e));assert(!melee_web_menu_host_arm_first_sss_prefix(&h,compare,NULL,e,sizeof e)&&h.first_sss_prefix.state==3);
+ ready();assert(melee_web_menu_host_arm_first_sss_draw(&h,compare,NULL,e,sizeof e));reject_phase=2;before=gobj_draws;assert(!melee_web_menu_host_draw_first_sss(&h,e,sizeof e));assert(gobj_draws==before&&h.first_sss_draw.draw_enter.captured&&!h.first_sss_draw.draw_return.captured&&!h.drawing);assert(h.first_sss_tick_state==3&&h.first_sss_pair_state==6);
  ready();assert(melee_web_menu_host_arm_first_sss_draw(&h,compare,NULL,e,sizeof e));reject_phase=3;assert(!melee_web_menu_host_draw_first_sss(&h,e,sizeof e));assert(h.first_sss_draw.draw_return.captured&&!h.drawing);
  ready();assert(melee_web_menu_host_arm_first_sss_draw(&h,compare,NULL,e,sizeof e));assert(melee_web_menu_host_draw_first_sss(&h,e,sizeof e));assert(melee_web_menu_host_arm_first_sss_prefix(&h,compare,NULL,e,sizeof e));audio.generation++;before=callbacks;HSD_PadData saved=h.queue;assert(!melee_web_menu_host_tick_first_sss_prefix(&h,raw,0,e,sizeof e));assert(callbacks==before&&!memcmp(&saved,&h.queue,sizeof saved)&&h.first_sss_tick_state==3&&h.first_sss_pair_state==6);
  ready();assert(!melee_web_menu_host_arm_first_sss_prefix(&h,compare,NULL,e,sizeof e));assert(!callbacks||callbacks==1);assert(h.first_sss_tick_state==3);

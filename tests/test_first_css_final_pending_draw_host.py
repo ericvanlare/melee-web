@@ -119,6 +119,7 @@ struct MeleeWebMenuHost {
   PADStatus first_sss_tick_input[4]; int first_sss_tick_result,first_sss_tick_clock_post_succeeded;
   int first_sss_tick_transition_requested,first_sss_tick_post_host_frame_captured; uint32_t first_sss_tick_post_host_frame;
   struct {int captured;} first_sss_tick_scheduler_end; char first_sss_tick_error[160];
+  struct {uint64_t session_ticks;} first_sss_pair_entry,first_sss_pair_returned;
   /* SSS_TICK_FIXTURE_END */
   int first_sss_pair_state; unsigned first_sss_pair_host_tick_calls,first_sss_pair_host_draw_calls;
   char first_sss_pair_error[160];
@@ -164,6 +165,7 @@ static int source_scene_tick(MeleeWebMenuHost*,char*,size_t);
 static int gm_801A4BA8(void){assert(0);return 0;}
 static void first_sss_tick_fail(MeleeWebMenuHost*h,const char*t){h->first_sss_tick_state=4;snprintf(h->first_sss_tick_error,sizeof h->first_sss_tick_error,"%s",t);}
 static int first_sss_tick_owner_idle(MeleeWebMenuHost*h,int armed,char*e,size_t n){(void)h;(void)armed;(void)e;(void)n;assert(0);return 0;}
+static int melee_web_menu_first_sss_tick_session_base(const MeleeWebMenuSession*s,uint64_t*out){(void)s;(void)out;assert(0);return 0;}
 static int melee_web_menu_arm_first_sss_tick(MeleeWebMenuSession*s,char*e,size_t n){(void)s;(void)e;(void)n;assert(0);return 0;}
 static int melee_web_menu_tick(MeleeWebMenuSession*,char*,size_t);
 static GXRenderModeObj* HSD_VIGetRenderMode(void);

@@ -136,6 +136,7 @@ enum {
  * same session through its ordinary CSS -> SSS_READY transition. Notes are
  * passive and cannot interrupt either authored SSS constructor boundary. */
 int melee_web_menu_arm_first_sss_tick(MeleeWebMenuSession*, char*, size_t);
+int melee_web_menu_first_sss_tick_session_base(const MeleeWebMenuSession*, uint64_t*);
 /* Finite diagnostic permit; expected state remains outside the source session. */
 int melee_web_menu_arm_first_sss_prefix(MeleeWebMenuSession*,
     MeleeWebMenuFirstSssPairNote, char*, size_t);

@@ -880,6 +880,7 @@ int melee_web_menu_host_arm_first_sss_tick(
         h->first_sss_pair_host_draw_calls != 0 ||
         !h->first_sss_pair_entry.captured ||
         !h->first_sss_pair_returned.captured ||
+        h->first_sss_pair_entry.session_ticks != h->first_sss_pair_returned.session_ticks ||
         !h->first_sss_pair_entry.owners[0] ||
         !h->first_sss_pair_entry.owners[1] ||
         !h->first_sss_pair_entry.owners[2] ||
@@ -1065,9 +1066,15 @@ static void first_sss_prefix_exit_note(void* data,MeleeWebMenuSession* session,
     MeleeWebMenuHost* h=data;
     if(!h || h!=owner)return;
     MeleeWebMenuSssSequenceObservation* o=&h->first_sss_prefix;
+    uint64_t session_base = 0;
     if(h->first_sss_sequence_operation!=4 || o->state!=1 || o->exit_captured ||
        boundary!=MELEE_WEB_MENU_SSS_PREFIX_EXIT || session!=h->session ||
-       sss!=h->first_sss_tick_sss || ticks!=125 ||
+       sss!=h->first_sss_tick_sss ||
+       !melee_web_menu_first_sss_tick_session_base(session,&session_base) ||
+       session_base != h->first_sss_pair_entry.session_ticks ||
+       session_base != h->first_sss_pair_returned.session_ticks ||
+       session_base > UINT64_MAX - 125 || ticks < session_base ||
+       ticks - session_base != 125 ||
        !sss_sequence_owner(h,1,o->error,sizeof(o->error))){
         sss_sequence_fail(h,1,"SSS exit note lost its exact passive boundary");return;
     }
@@ -2566,6 +2573,14 @@ int melee_web_menu_host_tick(MeleeWebMenuHost* h,const PADStatus raw[4],char* e,
             }
             if (!melee_web_menu_arm_first_sss_tick(h->session,e,n)) {
                 first_sss_tick_fail(h,e); return 0;
+            }
+            uint64_t session_base = 0;
+            if (!melee_web_menu_first_sss_tick_session_base(h->session,&session_base) ||
+                session_base != h->first_sss_pair_entry.session_ticks ||
+                session_base != h->first_sss_pair_returned.session_ticks) {
+                first_sss_tick_fail(h,
+                    "First SSS live session counter differs from its constructor-pair baseline");
+                return fail(e,n,h->first_sss_tick_error);
             }
         } else {
             if (h->first_sss_tick_state != 0) {

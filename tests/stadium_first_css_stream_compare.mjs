@@ -1021,9 +1021,24 @@ export function validateFirstSssDrawExpectedSource(expected) {
   return expected;
 }
 
+function firstSssPrefixExpectedExitSessionTicks(pair) {
+  if (!plainObject(pair) || !plainObject(pair.entry) || !plainObject(pair.returned)) return null;
+  const entry = pair.entry.session_ticks, returned = pair.returned.session_ticks;
+  if (!Number.isSafeInteger(entry) || entry < 0 || entry !== returned ||
+      entry > Number.MAX_SAFE_INTEGER - 125) return null;
+  return entry + 125;
+}
+
+function firstSssPrefixExitSessionMatches(pair, actualTicks) {
+  const expectedTicks = firstSssPrefixExpectedExitSessionTicks(pair);
+  return expectedTicks !== null && Number.isSafeInteger(actualTicks) &&
+    actualTicks === expectedTicks;
+}
+
 function approvedFirstSssPrerequisites(pair, tick) {
   return plainObject(pair) && pair.complete === true && pair.compared === true &&
     pair.failed === false && pair.host_entered === true &&
+    firstSssPrefixExpectedExitSessionTicks(pair) !== null &&
     pair.sss_host_tick_calls === 0 && pair.sss_host_draw_calls === 0 &&
     Number.isSafeInteger(pair.world_generation) && pair.world_generation > 0 &&
     Number.isSafeInteger(pair.audio_generation) && pair.audio_generation >= 0 &&
@@ -1316,12 +1331,13 @@ export function createFirstSssPrefixComparator(expectedPrefix, inputRows,
         firstMismatch = common || compareExpectedField(actual.sss?.header?.start_game,
           wanted.sss.header.start_game, 'sss_exit.sss.header.start_game') ||
           actualRulesMismatch(actual, wanted, 'sss_exit') || actualPlayersMismatch(actual, wanted, 'sss_exit');
+        const expectedSessionTicks = firstSssPrefixExpectedExitSessionTicks(constructorPair);
         if (!firstMismatch && (actual.host_entered !== true || actual.session_phase !== 3 ||
-            actual.session_ticks !== 125))
+            !firstSssPrefixExitSessionMatches(constructorPair, actual.session_ticks)))
           firstMismatch = mismatch('sss_exit.session', {host_entered: true, session_phase: 3,
-            session_ticks: 125}, {host_entered: actual.host_entered,
+            session_ticks: expectedSessionTicks}, {host_entered: actual.host_entered,
             session_phase: actual.session_phase, session_ticks: actual.session_ticks},
-          'exit note was not captured after the bounded 124-tick prefix');
+          'exit note did not retain the constructor-pair lifetime base plus 125 SSS ticks');
       }
     } else {
       const record = expected.records[recordIndex];

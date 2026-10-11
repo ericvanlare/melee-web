@@ -9,7 +9,8 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createFirstCssStreamComparator, createFirstCssFinalDrawComparator,
   createFirstSssConstructorPairComparator, createFirstSssConsumedPadTickComparator,
   createFirstSssDrawComparator, createFirstSssPrefixComparator,
-  decodeFirstSssPrefixInputBundle, firstSssAudioAccounting, requestSynchronousApproval}
+  decodeFirstSssPrefixInputBundle, firstSssAudioAccounting,
+  requestSynchronousApproval}
   from './stadium_first_css_stream_compare.mjs';
 
 const COUNT = 148;
@@ -59,11 +60,12 @@ function firstSssDrawExpectedFixture() {
       audio_render_frames_delta: 0, audio_phase_unchanged: true}};
 }
 
-function firstSssPrerequisites() {
+function firstSssPrerequisites({worldGeneration = 7, audioGeneration = 3} = {}) {
   return {
     pair: {complete: true, compared: true, failed: false, host_entered: true,
       session_phase: 3, sss_host_tick_calls: 0, sss_host_draw_calls: 0,
-      world_generation: 7, audio_generation: 3},
+      world_generation: worldGeneration, audio_generation: audioGeneration,
+      entry: {session_ticks: 149}, returned: {session_ticks: 149}},
     tick: {complete: true, compared: true, captured: true, failed: false,
       host_tick_calls: 1, host_draw_calls: 0, clock_post_succeeded: true,
       tick_result: 1, transition_requested: false, post_host_frame_captured: true,
@@ -250,6 +252,7 @@ test('first SSS DrawEnter mismatch is retained and stops the comparator', () => 
   'A failed first phase cannot advance to DrawReturn');
 });
 
+
 test('first SSS prefix comparator rejects malformed retained expectations before callbacks', () => {
   const {pair, tick} = firstSssPrerequisites();
   const draw = {complete: true, compared: true, failed: false,
@@ -261,6 +264,113 @@ test('first SSS prefix comparator rejects malformed retained expectations before
 
 const retainedPrefixExpectedPath = process.env.MELEE_WEB_STADIUM_FIRST_SSS_PREFIX_EXPECTED;
 const retainedPrefixInputPath = process.env.MELEE_WEB_STADIUM_FIRST_SSS_PREFIX_INPUT;
+const retainedPrefixSerializerLogPath = process.env.MELEE_WEB_STADIUM_FIRST_SSS_PREFIX_SERIALIZER_LOG;
+function actualPrefixPhase(record, phase, pair) {
+  const expected = record[phase];
+  return {phase, source_scene: 2, scene_kind: expected.scene_kind,
+    scene_frame: expected.scene_frame, random_seed_hex: expected.random_seed_hex,
+    pad_state_hex: expected.pad_state_hex,
+    scene_routing_getters: {...expected.scene_routing_getters},
+    owners: {host: true, session: true, world: true, audio: true, vs_mode: true,
+      scene_info: true, payload: true, seed: true},
+    world_generation: pair.world_generation, audio_generation: pair.audio_generation,
+    input_index: record.input_index, input_ordinal: record.input_ordinal,
+    consumed_pad_sequence: record.consumed_pad_sequence,
+    ...(phase === 'scheduler_end' ? {consumed_pad_hex: expected.consumed_pad_hex} : {})};
+}
+
+function actualPrefixExit(expected, sessionTicks, pair, serializedExit = null) {
+  const note = serializedExit ? structuredClone(serializedExit) :
+    nativeSssNote(expected.exit_note.expected, 'sss_exit');
+  return {...note, world_generation: pair.world_generation,
+    audio_generation: pair.audio_generation, session_ticks: sessionTicks};
+}
+
+async function retainedPrefixFixture() {
+  const expected = JSON.parse(await fs.readFile(retainedPrefixExpectedPath, 'utf8'));
+  const input = new Uint8Array(await fs.readFile(retainedPrefixInputPath));
+  const serializerRows = retainedPrefixSerializerLogPath ?
+    (await fs.readFile(retainedPrefixSerializerLogPath, 'utf8')).trim().split('\n').map(JSON.parse) : null;
+  const prerequisitesPath = retainedPrefixSerializerLogPath ?
+    path.join(path.dirname(retainedPrefixSerializerLogPath), 'prerequisites.json') : null;
+  const prerequisites = prerequisitesPath ? JSON.parse(await fs.readFile(prerequisitesPath, 'utf8')) : null;
+  if (serializerRows) {
+    assert.equal(serializerRows.length, 8);
+    assert.equal(serializerRows[6].phase, 'sss_exit');
+    assert.equal(serializerRows[6].session_ticks, 125,
+      'the retained writer fixture predates the nonzero lifetime base');
+    assert.deepEqual(serializerRows[7].selected_stage_note, {index: 18, kind: 3});
+    assert.equal(prerequisites.first_sss_constructor_pair.entry.session_ticks, 149);
+    assert.equal(prerequisites.first_sss_constructor_pair.returned.session_ticks, 149);
+  }
+  return {expected, inputRows: decodeFirstSssPrefixInputBundle(input),
+    serializedExit: serializerRows?.[6] ?? null,
+    serializedSelection: serializerRows?.[7]?.selected_stage_note ?? null,
+    prerequisites, serializedDrawObservation: serializerRows?.[2] ?? null};
+}
+
+function feedRetainedPrefixSamples(comparator, expected, pair) {
+  for (const record of expected.records) {
+    for (const phase of ['scheduler_end', 'draw_enter', 'draw_return']) {
+      const actual = actualPrefixPhase(record, phase, pair);
+      assert.equal(comparator.compare(phase, JSON.stringify(actual)), true,
+        `retained source-shaped ${phase} sample ${record.input_index} is accepted`);
+    }
+  }
+}
+
+test('retained prefix drives the ordered comparator through lifetime exit ticks 274',
+  {skip: !(retainedPrefixExpectedPath && retainedPrefixInputPath)}, async () => {
+    // This is an actual-comparator control, not a native run: each callback is
+    // shaped from the pinned expected row and input identity. It exercises all
+    // 372 ordered input/tick/draw callbacks before the real exit comparison.
+    const {expected, inputRows, serializedExit, serializedSelection, prerequisites,
+      serializedDrawObservation} = await retainedPrefixFixture();
+    const fallback = firstSssPrerequisites();
+    const pair = prerequisites?.first_sss_constructor_pair ?? fallback.pair;
+    const tick = prerequisites?.first_sss_consumed_tick ?? fallback.tick;
+    const draw = serializedDrawObservation ?? {complete: true, compared: true, failed: false,
+      host_draw_calls: 1, host_tick_calls: 0, aurora_begin_calls: 1,
+      aurora_end_calls: 1, frame_end_returned: true};
+    assert.throws(() => createFirstSssPrefixComparator(expected, inputRows,
+      {...pair, returned: {...pair.returned, session_ticks: 148}}, tick, draw),
+    /approved constructor, tick and first-draw prerequisites/,
+    'unequal constructor-note counters cannot authorize a derived exit count');
+    const unsafeBase = Number.MAX_SAFE_INTEGER - 124;
+    assert.throws(() => createFirstSssPrefixComparator(expected, inputRows,
+      {...pair, entry: {...pair.entry, session_ticks: unsafeBase},
+        returned: {...pair.returned, session_ticks: unsafeBase}}, tick, draw),
+    /approved constructor, tick and first-draw prerequisites/,
+    'overflowing lifetime-counter derivation is refused');
+    const comparator = createFirstSssPrefixComparator(expected, inputRows, pair, tick, draw);
+    feedRetainedPrefixSamples(comparator, expected, pair);
+    const exit = actualPrefixExit(expected, 274, pair, serializedExit);
+    assert.equal(exit.scene_frame, 125, 'source frame remains independent of lifetime ticks');
+    assert.equal(comparator.compare('sss_exit', JSON.stringify(exit)), true);
+    assert.equal(comparator.compare('selected_stage', JSON.stringify(
+      serializedSelection ?? expected.selected_stage_source_witness.selected_stage)), true);
+    const status = comparator.status();
+    assert.deepEqual({attempted: status.attempted, approved: status.approved,
+      failed: status.failed, next_phase: status.next_phase, first_mismatch: status.first_mismatch},
+    {attempted: 374, approved: true, failed: false, next_phase: null, first_mismatch: null});
+
+    for (const rejectedTicks of [125, 273]) {
+      const rejectedComparator = createFirstSssPrefixComparator(expected, inputRows, pair, tick, draw);
+      feedRetainedPrefixSamples(rejectedComparator, expected, pair);
+      const rejectedExit = actualPrefixExit(expected, rejectedTicks, pair, serializedExit);
+      assert.equal(rejectedExit.scene_frame, 125);
+      assert.equal(rejectedComparator.compare('sss_exit', JSON.stringify(rejectedExit)), false,
+        `stale or drifted lifetime counter ${rejectedTicks} is refused`);
+      const rejectedStatus = rejectedComparator.status();
+      assert.equal(rejectedStatus.approved, false);
+      assert.equal(rejectedStatus.first_mismatch.path, 'sss_exit.session');
+      assert.equal(rejectedStatus.rows[372].actual.session_ticks, rejectedTicks,
+        'the rejected actual exit sample remains retained');
+      assert.equal(rejectedStatus.rows[372].actual.scene_frame, 125,
+        'the source frame remains intact in the rejected sample');
+    }
+  });
+
 test('retained first SSS prefix mismatch preserves the actual scheduler sample and first path',
   {skip: !(retainedPrefixExpectedPath && retainedPrefixInputPath)}, async () => {
     // These optional files are retained private source extraction outputs. CI

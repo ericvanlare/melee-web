@@ -43,6 +43,8 @@ struct MeleeWebMenuSession {
     const uint8_t* first_css_return_ko_owner;
     MeleeWebMenuFirstSssPairNote first_sss_pair_note;
     int first_sss_tick_token; /* 0 unused, 1 armed, 2 consumed, 3 invalid */
+    uint64_t first_sss_tick_session_base;
+    int first_sss_tick_session_base_captured;
     int first_sss_prefix_state; /* 0 unused, 1 finite lease, 2 exited, 3 invalid */
     unsigned first_sss_prefix_remaining;
     int first_sss_prefix_token; /* 1 armed, 2 consumed */
@@ -1054,12 +1056,25 @@ int melee_web_menu_arm_first_sss_tick(MeleeWebMenuSession* session,
     if (session->first_sss_tick_token != 0 || session->first_sss_pair_state != 4 ||
         session->phase != MELEE_WEB_MENU_SSS || !session->sss_open ||
         session->transition_failed || session->selection_rejected ||
-        session->transition_requested != 0) {
+        session->transition_requested != 0 || session->ticks == UINT64_MAX) {
         session->first_sss_tick_token = 3;
         return fail(error, error_size, "SSS one-tick session authorization was refused");
     }
+    /* Capture the actual lifetime counter as the one-use tick is authorized.
+     * The host binds it to the retained constructor pair before source work. */
+    session->first_sss_tick_session_base = session->ticks;
+    session->first_sss_tick_session_base_captured = 1;
     session->first_sss_tick_token = 1;
     return ok(error, error_size);
+}
+
+int melee_web_menu_first_sss_tick_session_base(
+    const MeleeWebMenuSession* session, uint64_t* out)
+{
+    if (out == NULL || !session_live(session, NULL, 0) ||
+        !session->first_sss_tick_session_base_captured) return 0;
+    *out = session->first_sss_tick_session_base;
+    return 1;
 }
 
 int melee_web_menu_arm_first_sss_prefix(MeleeWebMenuSession* session,
@@ -1070,7 +1085,10 @@ int melee_web_menu_arm_first_sss_prefix(MeleeWebMenuSession* session,
         session->first_sss_pair_state != 4 || session->first_sss_tick_token != 2 ||
         session->phase != MELEE_WEB_MENU_SSS || !session->sss_open ||
         session->transition_failed || session->selection_rejected ||
-        session->transition_requested || session->ticks != 1) {
+        session->transition_requested || !session->first_sss_tick_session_base_captured ||
+        session->ticks < session->first_sss_tick_session_base ||
+        session->ticks - session->first_sss_tick_session_base != 1 ||
+        session->first_sss_tick_session_base > UINT64_MAX - 125) {
         session->first_sss_prefix_state=3;
         return fail(error,error_size,"SSS prefix requires its completed first tick");
     }
@@ -1090,7 +1108,10 @@ int melee_web_menu_authorize_first_sss_prefix_tick(MeleeWebMenuSession* session,
         session->first_sss_prefix_token == 1 || session->first_sss_pair_state != 4 ||
         session->phase != MELEE_WEB_MENU_SSS || !session->sss_open ||
         session->transition_failed || session->selection_rejected ||
-        session->transition_requested || session->ticks != index+1) {
+        session->transition_requested || !session->first_sss_tick_session_base_captured ||
+        session->ticks < session->first_sss_tick_session_base ||
+        session->ticks - session->first_sss_tick_session_base != (uint64_t) index + 1 ||
+        session->ticks == UINT64_MAX) {
         session->first_sss_prefix_state=3;
         return fail(error,error_size,"SSS finite prefix tick authorization refused");
     }
@@ -1317,6 +1338,9 @@ int melee_web_menu_tick(MeleeWebMenuSession* session, char* error,
     if (session->first_sss_pair_state != 0) {
         if (session->first_sss_pair_state == 4 &&
             session->first_sss_tick_token == 1 &&
+            session->first_sss_tick_session_base_captured &&
+            session->ticks == session->first_sss_tick_session_base &&
+            session->ticks != UINT64_MAX &&
             session->phase == MELEE_WEB_MENU_SSS && session->sss_open) {
             session->first_sss_tick_token = 2; /* Consume before original work. */
         } else if (session->first_sss_prefix_state == 1 &&
