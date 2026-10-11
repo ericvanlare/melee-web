@@ -778,14 +778,17 @@ test('runtime session rejects duplicate starts and incompatible contexts before 
 
 test('actual runtime, native ABI and Room transport await a delayed remote identity hello', async t => {
   for (const delayedConfirmation of [false, true]) await t.test(delayedConfirmation ? 'asynchronous native confirmation' : 'delayed hello', async () => {
-  const confirmationGate = deferred();
+  const confirmationGate = deferred(), localHello = deferred(), confirmationEntered = deferred();
   const prior = Object.getOwnPropertyDescriptor(globalThis, 'WebSocket');
   const roomId = 'e'.repeat(32), events = [], sent = [];
   Object.defineProperty(globalThis, 'WebSocket', {configurable: true, writable: true,
     value: negotiatingSocket('alpha', roomId)});
   const pc = new FakeRoomPeerConnection('alpha'), channel = new NeverOpenDataChannel();
   pc.createDataChannel = () => channel;
-  channel.send = text => { sent.push(JSON.parse(text)); events.push('send-' + JSON.parse(text).type); };
+  channel.send = text => {
+    const packet = JSON.parse(text); sent.push(packet); events.push('send-' + packet.type);
+    if (packet.type === 'hello') localHello.resolve(packet);
+  };
   const state = {active: 1, cursor: 0, ring_pending: 0, blocker: 'start_identity',
     terminal: {kind: 0, tick: 0, channel: 0}, start: {recorded: 1, required: 1, confirmed: 0,
       capture_failed: 0, scene: 1, seed: 305419896, frame: 0, total: 'a8f1925aa316f1e8'}};
@@ -804,7 +807,8 @@ test('actual runtime, native ABI and Room transport await a delayed remote ident
     ...(delayedConfirmation ? {createPeer(options, dependencies) {
       const native = options.native;
       return createBrowserNativePeer({...options, native: {...native, async confirmStart() {
-        events.push('enter-native-confirm'); await confirmationGate.promise; return native.confirmStart();
+        events.push('enter-native-confirm'); confirmationEntered.resolve();
+        await confirmationGate.promise; return native.confirmStart();
       }}}, dependencies);
     }} : {})});
   const started = session.start(nativeStart => ({protocol: 'melee-web-local-lockstep-a2-v1',
@@ -817,7 +821,8 @@ test('actual runtime, native ABI and Room transport await a delayed remote ident
     channel.readyState = 'open'; channel.dispatchEvent(new Event('open'));
     pc.connectionState = 'connected'; pc.iceConnectionState = 'connected';
     pc.dispatchEvent(new Event('connectionstatechange')); pc.dispatchEvent(new Event('iceconnectionstatechange'));
-    for (let count = 0; count < 20 && !sent.some(x => x.type === 'hello'); ++count) await turn();
+    // WebCrypto completion is asynchronous; event-loop turns are not a rendezvous.
+    await evidenceBoundary(localHello.promise, 'actual endpoint local hello', 250);
     assert.ok(sent.some(x => x.type === 'hello'), 'Actual endpoint sends local hello');
     await turn();
     assert.equal(state.start.confirmed, 0); assert.equal(session.snapshot().peer.protocol.ready, false);
@@ -826,7 +831,7 @@ test('actual runtime, native ABI and Room transport await a delayed remote ident
     const event = new Event('message'); Object.defineProperty(event, 'data', {value: JSON.stringify({...local,
       role: 'beta', local_port: 1, remote_port: 0})}); events.push('receive-hello'); channel.dispatchEvent(event);
     if (delayedConfirmation) {
-      for (let count = 0; count < 20 && !events.includes('enter-native-confirm'); ++count) await turn();
+      await evidenceBoundary(confirmationEntered.promise, 'native confirmation entered', 250);
       assert.ok(events.includes('enter-native-confirm'));
       assert.equal(session.snapshot().peer.protocol.ready, true);
       assert.equal(state.start.confirmed, 0); assert.equal(settled, false);
