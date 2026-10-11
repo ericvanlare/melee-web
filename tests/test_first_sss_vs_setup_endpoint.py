@@ -20,6 +20,13 @@ PRELUDE=r"""
 #include <cstring>
 #define MELEE_WEB_PAD_STATE_BYTES 822
 struct MeleeWebPadState {std::array<uint8_t,822> bytes{};};
+// Storage declarations for the adjacent opt-in state; this fixture executes only Setup.
+struct MeleeWebMenuHost;
+struct MeleeWebStadiumIdleSnapshot {};
+struct MeleeWebStadiumGoAlignmentSnapshot {};
+static unsigned continuation_service_calls=0;
+static bool matched_setup_cf_service(){++continuation_service_calls;throw std::runtime_error("default Setup unexpectedly invoked C/F continuation");}
+
 struct MeleeWebDiagnosticSisOwner {void* heap=nullptr;uint64_t world_generation=0,allocation_generation=0;int source_heap_handle=0;uint64_t source_epoch=0;};
 struct MeleeWebRetiredSisLease {MeleeWebDiagnosticSisOwner prior;size_t requested_bytes=0;int retirement_verified=0;};
 static int text_probe_value=0,text_probe_sets=0,sis_capture_calls=0,membership_begin_calls=0,membership_end_calls=0;
@@ -112,6 +119,7 @@ int main(){
  reset();assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin(0)==1);asset_scope.pending=2;assert(first_sss_vs_setup_service()&&first_sss_vs_setup.failed&&!match);assert(melee_web_native_menu_stadium_c1a_asset_scope(1)==0);
  reset();assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin(0)==1);commit();files.erase("stage");assert(first_sss_vs_setup_service()&&first_sss_vs_setup.failed&&!match);
  reset();assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin(0)==1);commit();first_sss_vs_setup_service();match->frames=1;first_sss_vs_setup_service();assert(first_sss_vs_setup.failed&&first_sss_vs_setup.source_frames==1&&!first_sss_vs_setup.captured);
+ assert(continuation_service_calls==0);
  puts("PASS actual Setup begin/classifier/handoff/service: one-use, refusal, seed/PAD/generation, deferred completion and stop controls");
 }
 """

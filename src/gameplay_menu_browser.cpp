@@ -308,9 +308,33 @@ struct FirstSssVsSetupState {
  const uint32_t* parent_seed_owner=nullptr;
  uint32_t parent_seed=0,parent_seed_after_retirement=0;
  bool parent_seed_restored=false;
+ MeleeWebStadiumSetupSnapshot setup_snapshot{};
  std::string error,actual,history,stadium_setup_state;
 };
 FirstSssVsSetupState first_sss_vs_setup;
+struct MatchedSetupCfState {
+ bool opted_in=false,armed=false,queued=false,awaiting_approval=false;
+ bool failed=false,complete=false,last_action_complete=false;
+ uint32_t cursor=0,last_schedule_index=0,last_ordinal=0,last_bundle=UINT32_MAX;
+ int last_action_kind=0;
+ std::array<uint8_t,44> queued_statuses{};
+ const melee_web::GameplayMatchSession* owner=nullptr;
+ const melee_web::RuntimeArchiveCache* cache_owner=nullptr;
+ const MeleeWebMenuHost* host_owner=nullptr;
+ uint32_t seed_at_queue=0,seed_after_action=0;
+ uint64_t world_generation=0;
+ uint32_t asset_generation=0,expected_branch=0;
+ uint64_t audio_calls_before=0,audio_frames_before=0;
+ uint64_t audio_calls_after=0,audio_frames_after=0;
+ unsigned audio_phase_before=0,audio_phase_after=0;
+ unsigned aurora_begin_calls=0,aurora_end_calls=0;
+ MeleeWebStadiumIdleSnapshot idle{};
+ MeleeWebStadiumGoAlignmentSnapshot go{};
+ std::string error,last_action_json;
+};
+MatchedSetupCfState matched_setup_cf;
+std::string matched_setup_cf_json();
+bool matched_setup_cf_service();
 struct FirstSssTextTailProbeState {
  bool opted_in=false,probe_enabled=false;
  bool sis_capture_attempted=false,sis_lease_captured=false;
@@ -460,6 +484,8 @@ std::string first_sss_vs_setup_json(){
     <<",\"actual\":"<<(s.actual.empty()?"null":s.actual)
     <<",\"stadium_setup_state\":"<<(s.stadium_setup_state.empty()?"null":s.stadium_setup_state)
     <<",\"error\":"<<(s.error.empty()?"null":first_css_browser_draw_json_quote(s.error));
+ if(matched_setup_cf.opted_in||matched_setup_cf.armed||matched_setup_cf.failed||matched_setup_cf.complete)
+  out<<",\"matched_setup_cf\":"<<matched_setup_cf_json();
  if(first_sss_text_tail_probe.opted_in)
   out<<",\"text_tail_probe\":"<<first_sss_text_tail_probe_json();
  out<<'}';
@@ -1568,6 +1594,7 @@ if(scoped_assets){
  first_sss_prefix_sequence=FirstSssSequenceBrowserState{};first_sss_frozen_pair_json.clear();
  first_sss_vs_entry=FirstSssVsEntryState{};
  first_sss_vs_setup=FirstSssVsSetupState{};
+ matched_setup_cf=MatchedSetupCfState{};
 #endif
  audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;pending_menu_source_scene=0;pending_opening_state=-1;audio_clock.reset();clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();
  css_fighter_release_port=-1;last_css_fighter_observation_valid=false;
@@ -2536,12 +2563,333 @@ bool first_sss_sequence_service(){
  running=false;pending=false;first_use_draw_pending=false;menu_clock.reset();
  first_css_browser_draw_refresh_observation();return true;
 }
+
+bool matched_setup_cf_setup_equal(const MeleeWebStadiumSetupSnapshot& a,
+                                 const MeleeWebStadiumSetupSnapshot& b){
+ return a.version==b.version&&a.world_generation==b.world_generation&&
+  a.world_ticks==b.world_ticks&&a.source_frame==b.source_frame&&a.map_id==b.map_id&&
+  a.initial_countdown==b.initial_countdown&&a.current_countdown==b.current_countdown&&
+  a.parameter_x0==b.parameter_x0&&a.parameter_x4==b.parameter_x4&&
+  a.constructor_randi_call_count==b.constructor_randi_call_count&&
+  a.constructor_random_bound_valid==b.constructor_random_bound_valid&&
+  a.constructor_random_bound==b.constructor_random_bound&&
+  a.constructor_random_result_valid==b.constructor_random_result_valid&&
+  a.constructor_random_result==b.constructor_random_result&&
+  a.source_seed_before==b.source_seed_before&&a.source_seed_after==b.source_seed_after&&
+  a.ground_source_heap_handle==b.ground_source_heap_handle&&
+  a.ground_requested_bytes==b.ground_requested_bytes&&
+  a.ground_allocation_generation==b.ground_allocation_generation&&
+  a.object_source_heap_handle==b.object_source_heap_handle&&
+  a.object_requested_bytes==b.object_requested_bytes&&
+  a.object_allocation_generation==b.object_allocation_generation&&
+  a.constructor_callback_count==b.constructor_callback_count&&
+  a.source_parameter_roots_agree==b.source_parameter_roots_agree;
+}
+bool matched_setup_cf_go_event_equal(const MeleeWebStadiumGoAlignmentEvent& a,
+                                     const MeleeWebStadiumGoAlignmentEvent& b){
+ return a.generation==b.generation&&a.world_ticks==b.world_ticks&&
+  a.source_frame==b.source_frame&&a.sequence==b.sequence&&
+  a.object_identity==b.object_identity&&a.proc_identity==b.proc_identity&&
+  a.callback_index==b.callback_index&&a.source_branch==b.source_branch&&
+  a.map2_gate==b.map2_gate&&a.display_mode==b.display_mode&&
+  a.remap_branch==b.remap_branch&&a.callback_identity==b.callback_identity&&
+  a.hud_enabled==b.hud_enabled;
+}
+bool matched_setup_cf_go_equal(const MeleeWebStadiumGoAlignmentSnapshot& a,
+                               const MeleeWebStadiumGoAlignmentSnapshot& b){
+ return a.generation==b.generation&&a.armed_world_ticks==b.armed_world_ticks&&
+  a.armed_source_frame==b.armed_source_frame&&a.armed==b.armed&&
+  a.failure==b.failure&&a.expected_branch==b.expected_branch&&
+  a.next_sequence==b.next_sequence&&
+  matched_setup_cf_go_event_equal(a.stage_before,b.stage_before)&&
+  matched_setup_cf_go_event_equal(a.stage_after,b.stage_after)&&
+  matched_setup_cf_go_event_equal(a.go_after,b.go_after)&&
+  matched_setup_cf_go_event_equal(a.hud_after,b.hud_after);
+}
+bool matched_setup_cf_idle_equal(const MeleeWebStadiumIdleSnapshot& a,
+                                 const MeleeWebStadiumIdleSnapshot& b){
+ return a.version==b.version&&a.world_generation==b.world_generation&&
+  a.world_ticks==b.world_ticks&&a.source_frame==b.source_frame&&
+  a.map2_gate==b.map2_gate&&a.map2_countdown==b.map2_countdown&&
+  a.map2_phase==b.map2_phase&&a.map2_form==b.map2_form&&
+  a.map2_history_e0==b.map2_history_e0&&a.map2_history_e2==b.map2_history_e2&&
+  a.display_mode==b.display_mode&&a.display_e6==b.display_e6&&a.display_e8==b.display_e8&&
+  std::equal(std::begin(a.display_timer_native_bytes),std::end(a.display_timer_native_bytes),
+             std::begin(b.display_timer_native_bytes))&&
+  a.display_timer_initialization_observed==b.display_timer_initialization_observed&&
+  a.display_previous_mode==b.display_previous_mode&&
+  a.display_selected_player==b.display_selected_player&&a.display_f2==b.display_f2&&
+  a.display_flags==b.display_flags&&a.sis_font_slot==b.sis_font_slot&&
+  a.sis_static_text_role==b.sis_static_text_role&&a.sis_dynamic_text_role==b.sis_dynamic_text_role&&
+  a.sis_context_present==b.sis_context_present&&a.sis_title_entry_seen==b.sis_title_entry_seen&&
+  a.sis_title_entry_index==b.sis_title_entry_index&&a.title_bytes_captured==b.title_bytes_captured&&
+  a.sis_source_heap_handle==b.sis_source_heap_handle&&
+  a.sis_world_generation==b.sis_world_generation&&
+  a.sis_allocation_generation==b.sis_allocation_generation&&
+  a.sis_source_epoch==b.sis_source_epoch&&a.sis_requested_bytes==b.sis_requested_bytes&&
+  a.map2_source_heap_handle==b.map2_source_heap_handle&&
+  a.map2_world_generation==b.map2_world_generation&&
+  a.map2_allocation_generation==b.map2_allocation_generation&&
+  a.map2_requested_bytes==b.map2_requested_bytes&&a.map2_buffer_origin==b.map2_buffer_origin;
+}
+std::string matched_setup_cf_go_event_json(const MeleeWebStadiumGoAlignmentEvent& event){
+ std::ostringstream out;
+ out<<"{\"generation\":"<<event.generation<<",\"world_ticks\":"<<event.world_ticks
+    <<",\"source_frame\":"<<event.source_frame<<",\"sequence\":"<<event.sequence
+    <<",\"callback_index\":"<<event.callback_index
+    <<",\"source_branch\":"<<event.source_branch<<",\"map2_gate\":"<<event.map2_gate
+    <<",\"display_mode\":"<<event.display_mode<<",\"remap_branch\":"<<event.remap_branch
+    <<",\"callback_identity\":"<<event.callback_identity
+    <<",\"hud_enabled\":"<<event.hud_enabled<<'}';
+ return out.str();
+}
+std::string matched_setup_cf_go_json(const MeleeWebStadiumGoAlignmentSnapshot& go){
+ std::ostringstream out;
+ out<<"{\"generation\":"<<go.generation<<",\"armed_world_ticks\":"<<go.armed_world_ticks
+    <<",\"armed_source_frame\":"<<go.armed_source_frame<<",\"armed\":"<<go.armed
+    <<",\"failure\":"<<go.failure<<",\"expected_branch\":"<<go.expected_branch
+    <<",\"next_sequence\":"<<go.next_sequence
+    <<",\"stage_before\":"<<matched_setup_cf_go_event_json(go.stage_before)
+    <<",\"stage_after\":"<<matched_setup_cf_go_event_json(go.stage_after)
+    <<",\"go_after\":"<<matched_setup_cf_go_event_json(go.go_after)
+    <<",\"hud_after\":"<<matched_setup_cf_go_event_json(go.hud_after)<<'}';
+ return out.str();
+}
+std::string matched_setup_cf_idle_json(const MeleeWebStadiumIdleSnapshot& idle){
+ std::ostringstream out;
+ out<<"{\"version\":"<<idle.version<<",\"world_generation\":"<<idle.world_generation
+    <<",\"world_ticks\":"<<idle.world_ticks<<",\"source_frame\":"<<idle.source_frame
+    <<",\"map2_gate\":"<<idle.map2_gate<<",\"map2_countdown\":"<<idle.map2_countdown
+    <<",\"map2_phase\":"<<idle.map2_phase<<",\"map2_form\":"<<idle.map2_form
+    <<",\"map2_history_e0\":"<<idle.map2_history_e0
+    <<",\"map2_history_e2\":"<<idle.map2_history_e2
+    <<",\"display_mode\":"<<idle.display_mode<<",\"display_e6\":"<<idle.display_e6
+    <<",\"display_e8\":"<<idle.display_e8<<",\"display_timer_native_bytes\":["
+    <<unsigned(idle.display_timer_native_bytes[0])<<','<<unsigned(idle.display_timer_native_bytes[1])<<','
+    <<unsigned(idle.display_timer_native_bytes[2])<<','<<unsigned(idle.display_timer_native_bytes[3])<<']'
+    <<",\"display_timer_initialization_observed\":"<<idle.display_timer_initialization_observed
+    <<",\"display_previous_mode\":"<<idle.display_previous_mode
+    <<",\"display_selected_player\":"<<idle.display_selected_player
+    <<",\"display_f2\":"<<idle.display_f2<<",\"display_flags\":"<<idle.display_flags
+    <<",\"sis_font_slot\":"<<idle.sis_font_slot
+    <<",\"sis_static_text_role\":"<<idle.sis_static_text_role
+    <<",\"sis_dynamic_text_role\":"<<idle.sis_dynamic_text_role
+    <<",\"sis_context_present\":"<<idle.sis_context_present
+    <<",\"sis_title_entry_seen\":"<<idle.sis_title_entry_seen
+    <<",\"sis_title_entry_index\":"<<idle.sis_title_entry_index
+    <<",\"title_bytes_captured\":"<<idle.title_bytes_captured
+    <<",\"sis_source_heap_handle\":"<<idle.sis_source_heap_handle
+    <<",\"sis_world_generation\":"<<idle.sis_world_generation
+    <<",\"sis_allocation_generation\":"<<idle.sis_allocation_generation
+    <<",\"sis_source_epoch\":"<<idle.sis_source_epoch
+    <<",\"sis_requested_bytes\":"<<idle.sis_requested_bytes
+    <<",\"map2_source_heap_handle\":"<<idle.map2_source_heap_handle
+    <<",\"map2_world_generation\":"<<idle.map2_world_generation
+    <<",\"map2_allocation_generation\":"<<idle.map2_allocation_generation
+    <<",\"map2_requested_bytes\":"<<idle.map2_requested_bytes
+    <<",\"map2_buffer_origin\":"<<idle.map2_buffer_origin<<'}';
+ return out.str();
+}
+void matched_setup_cf_fail(const char* error){
+ auto& state=matched_setup_cf;
+ state.failed=true;state.complete=false;state.queued=false;state.awaiting_approval=false;
+ if(state.error.empty())state.error=error?error:"Matched Setup C/F continuation refused";
+ running=false;pending=false;first_use_draw_pending=false;menu_clock.reset();audio_clock.reset();
+ message=state.error;first_css_browser_draw_refresh_observation();
+}
+void matched_setup_cf_check_owner(unsigned expected_ticks){
+ const auto& state=matched_setup_cf;
+ check(state.armed&&!state.failed&&!state.complete&&first_sss_vs_setup.complete&&
+       !first_sss_vs_setup.failed&&match&&match.get()==state.owner&&
+       archive_cache&&archive_cache.get()==state.cache_owner&&
+       host&&host==state.host_owner&&!host_entered&&!running&&!pending&&!faulted&&!first_use_draw_pending&&
+       asset_generation==state.asset_generation&&
+       melee_web_gameplay_world_exists()&&
+       melee_web_gameplay_generation()==state.world_generation&&
+       match->construction_complete()&&melee_web_gameplay_stats().ticks==expected_ticks,
+       "Matched Setup C/F action lost its bound stopped source owner or tick position");
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+ MeleeWebPipelineStatus provenance_status{};char provenance_error[256]{};
+ check(melee_web_pipeline_status(melee_web_provenance_recorder(),&provenance_status,
+                                provenance_error,sizeof(provenance_error))&&
+       provenance_status.capture_active&&!provenance_status.final&&provenance_status.valid&&
+       provenance_status.errors==0&&provenance_status.dropped==0,
+       provenance_error[0]?provenance_error:"Matched Setup C/F source provenance is not active and valid");
+#endif
+ MeleeWebStadiumGoAlignmentSnapshot go{};char error[256]{};
+ check(match->diagnostic_stadium_go_alignment_snapshot(&go,error,sizeof(error)),
+       error[0]?error:"Matched Setup C/F GO owner snapshot refused");
+ check(go.armed==1&&go.failure==0&&go.expected_branch==0&&
+       go.generation==state.world_generation,
+       "Matched Setup C/F GO alignment owner changed");
+ if(state.queued)
+  check(match->random_seed()==state.seed_at_queue,
+        "Matched Setup C/F source RNG changed after its action was queued");
+ if(state.awaiting_approval)
+  check(match->random_seed()==state.seed_after_action&&
+        diagnostic_audio_render_calls==state.audio_calls_after&&
+        diagnostic_audio_render_frames==state.audio_frames_after&&audio_phase==state.audio_phase_after,
+        "Matched Setup C/F source RNG/audio changed while awaiting host approval");
+ if(state.awaiting_approval&&state.last_action_kind==1&&state.last_ordinal>=84){
+  MeleeWebStadiumIdleSnapshot idle{};
+  check(match->diagnostic_stadium_idle_snapshot(&idle,error,sizeof(error)),
+        error[0]?error:"Matched Setup C/F idle owner snapshot refused during host approval");
+  check(matched_setup_cf_idle_equal(idle,state.idle)&&matched_setup_cf_go_equal(go,state.go),
+        "Matched Setup C/F native owner state changed while awaiting host approval");
+ }
+}
+bool matched_setup_cf_service(){
+ auto& state=matched_setup_cf;
+ if(!state.armed||state.failed||state.complete)return true;
+ bool frame_began=false;
+ try{
+  unsigned expected_ticks=0;
+  if(state.awaiting_approval)expected_ticks=state.last_ordinal+1;
+  else if(state.queued)expected_ticks=state.last_ordinal+(state.last_action_kind==2?1U:0U);
+  else if(state.cursor<171){
+   const unsigned ordinal=state.cursor<168?state.cursor/2:
+       state.cursor==168||state.cursor==169?84U:85U;
+   const bool tick_action=state.cursor==168||state.cursor==170||
+       (state.cursor<168&&(state.cursor%2)==0);
+   expected_ticks=ordinal+(tick_action?0U:1U);
+  }else throw std::runtime_error("Matched Setup C/F action cursor exceeded its fixed schedule");
+  matched_setup_cf_check_owner(expected_ticks);
+  if(!state.queued||state.awaiting_approval){
+   first_css_browser_draw_refresh_observation();return true;
+  }
+  const unsigned index=state.last_schedule_index,ordinal=state.last_ordinal;
+  const bool tick_action=state.last_action_kind==1;
+  check(index==state.cursor,"Matched Setup C/F pending action is outside its ordered cursor");
+  const uint64_t calls_before=diagnostic_audio_render_calls;
+  const uint64_t audio_frames_before=diagnostic_audio_render_frames;
+  const unsigned phase_before=audio_phase;
+  char error[256]{};
+  {
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+   const melee_web::provenance::Scope provenance(pipeline_context());
+#endif
+  if(tick_action){
+   melee_web::stadium_first_css_diagnostic::ConsumedPadInput input{};
+   input.ports=state.queued_statuses;
+   PADStatus raw[4]{};
+   melee_web::stadium_first_css_diagnostic::decode_consumed_pad_statuses(input,raw);
+   match->tick(raw);
+   check(melee_web_gameplay_stats().ticks==ordinal+1&&!match->paused()&&!match->ending()&&
+         !match->complete(),"Matched Setup C/F source tick left its exact live sequence");
+   render_audio_tick(match->audio(),error,sizeof(error));
+   check(diagnostic_audio_render_calls==calls_before+1,
+         "Matched Setup C/F tick did not render exactly one original audio block");
+  }else{
+   for(const AuroraEvent* event=aurora_update();event&&event->type!=AURORA_NONE;++event)
+    check(event->type!=AURORA_EXIT,"Matched Setup C/F renderer requested exit");
+   ++state.aurora_begin_calls;
+   frame_began=aurora_begin_frame();
+   check(frame_began,"Matched Setup C/F AuroraBegin refused");
+   GXSetCopyClear(GXColor{0,0,0,255},GX_MAX_Z24);
+   match->draw();
+   aurora_end_frame();++state.aurora_end_calls;frame_began=false;
+  }
+  } // Close source provenance before exporting its ordered records.
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+  melee_web_provenance_frame(0);
+#endif
+  state.queued=false;
+  matched_setup_cf_check_owner(ordinal+1);
+  state.seed_after_action=match->random_seed();
+  state.last_action_complete=true;
+  state.audio_calls_before=calls_before;state.audio_frames_before=audio_frames_before;
+  state.audio_calls_after=diagnostic_audio_render_calls;
+  state.audio_frames_after=diagnostic_audio_render_frames;
+  state.audio_phase_before=phase_before;state.audio_phase_after=audio_phase;
+  std::ostringstream actual;
+  if(tick_action&&(ordinal==84||ordinal==85)){
+   const char* label=ordinal==84?"C":"F";
+   check(state.expected_branch==0,"Matched Setup C/F supports only the approved branch-0 Setup");
+   char owner_error[256]{};
+   check(match->diagnostic_stadium_idle_snapshot(&state.idle,owner_error,sizeof(owner_error)),
+         owner_error[0]?owner_error:"Matched Setup C/F idle snapshot refused");
+   check(match->diagnostic_stadium_go_alignment_snapshot(&state.go,owner_error,sizeof(owner_error)),
+         owner_error[0]?owner_error:"Matched Setup C/F GO snapshot refused");
+   check(state.go.failure==0&&state.go.armed==1&&state.go.expected_branch==0&&
+         state.go.generation==state.world_generation&&state.go.armed_world_ticks==0&&
+         state.go.armed_source_frame==0&&state.go.next_sequence==3&&
+         state.go.stage_before.sequence==1&&state.go.stage_after.sequence==2&&
+         state.go.go_after.sequence==3&&state.go.hud_after.sequence==0&&
+         state.go.stage_before.world_ticks==84&&state.go.stage_after.world_ticks==84&&
+         state.go.go_after.world_ticks==84&&state.go.go_after.source_branch==0&&
+         state.go.stage_before.generation==state.world_generation&&
+         state.go.stage_after.generation==state.world_generation&&
+         state.go.go_after.generation==state.world_generation&&
+         state.idle.world_generation==state.world_generation&&
+         state.idle.world_ticks==ordinal+1,
+         "Matched Setup C/F branch-0 GO events do not match the source tick-84 boundary");
+   actual<<"{\"label\":\""<<label<<"\",\"ordinal\":"<<ordinal
+         <<",\"seed_hex\":\""<<melee_web::stadium_first_css_diagnostic::hex32(state.seed_after_action)
+         <<"\",\"expected_branch\":"<<state.expected_branch
+         <<",\"idle_snapshot\":"<<matched_setup_cf_idle_json(state.idle)
+         <<",\"go_trace\":"<<matched_setup_cf_go_json(state.go)<<'}';
+  }else actual<<"null";
+  state.last_action_json="{\"schedule_index\":"+std::to_string(index)+
+      ",\"action\":"+first_css_browser_draw_json_quote(tick_action?"tick":"draw")+
+      ",\"ordinal\":"+std::to_string(ordinal)+",\"bundle\":"+
+      (tick_action?std::to_string(state.last_bundle):"null")+
+      ",\"complete\":true,\"source_frames\":"+std::to_string(match->source_frames())
+      +",\"world_ticks\":"+std::to_string(melee_web_gameplay_stats().ticks)
+      +",\"audio_render_calls_before\":"+std::to_string(state.audio_calls_before)
+      +",\"audio_render_calls_after\":"+std::to_string(state.audio_calls_after)
+      +",\"audio_render_frames_before\":"+std::to_string(state.audio_frames_before)
+      +",\"audio_render_frames_after\":"+std::to_string(state.audio_frames_after)
+      +",\"audio_phase_before\":"+std::to_string(state.audio_phase_before)
+      +",\"audio_phase_after\":"+std::to_string(state.audio_phase_after)
+      +",\"aurora_begin_calls\":"+std::to_string(state.aurora_begin_calls)
+      +",\"aurora_end_calls\":"+std::to_string(state.aurora_end_calls)
+      +",\"observation\":"+actual.str()+'}';
+  state.awaiting_approval=true;
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+  drain_pipeline_provenance();
+  MeleeWebPipelineStatus provenance_status{};
+  check(melee_web_pipeline_status(melee_web_provenance_recorder(),&provenance_status,error,sizeof(error))&&
+        provenance_status.capture_active&&!provenance_status.final&&provenance_status.valid&&
+        provenance_status.errors==0&&provenance_status.dropped==0,
+        error[0]?error:"Matched Setup C/F source provenance became invalid");
+#endif
+  matched_setup_cf_check_owner(ordinal+1);
+  first_css_browser_draw_refresh_observation();return true;
+ }catch(const std::exception& error){
+  if(frame_began){try{aurora_end_frame();++state.aurora_end_calls;}catch(...){} }
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+  melee_web_provenance_frame(0);
+  try{drain_pipeline_provenance();}catch(...){}
+#endif
+  matched_setup_cf_fail(error.what());return true;
+ }
+}
+std::string matched_setup_cf_json(){
+ const auto& state=matched_setup_cf;
+ const char* phase=state.failed?"failed":state.complete?"complete":
+     state.awaiting_approval?"awaiting-approval":state.queued?"queued":
+     state.armed?"armed":"idle";
+ std::ostringstream out;
+ out<<"{\"schema\":\"melee-web-stadium-matched-setup-cf-native-v1\",\"state\":\""
+    <<phase<<"\",\"opted_in\":"<<(state.opted_in?"true":"false")
+    <<",\"armed\":"<<(state.armed?"true":"false")
+    <<",\"cursor\":"<<state.cursor<<",\"queued\":"<<(state.queued?"true":"false")
+    <<",\"awaiting_approval\":"<<(state.awaiting_approval?"true":"false")
+    <<",\"failed\":"<<(state.failed?"true":"false")
+    <<",\"complete\":"<<(state.complete?"true":"false")
+    <<",\"error\":"<<(state.error.empty()?"null":first_css_browser_draw_json_quote(state.error))
+    <<",\"last_action\":"<<(state.last_action_json.empty()?"null":state.last_action_json)<<'}';
+ return out.str();
+}
 #endif
 
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 bool first_sss_vs_setup_service(){
  if(!first_sss_vs_setup.attempted)return false;
   auto& s=first_sss_vs_setup;
+  if(s.complete&&matched_setup_cf.opted_in){
+   matched_setup_cf_service();return true;
+  }
   try{
    check(!running&&!pending&&!first_use_draw_pending,"VS Setup continuation became runnable");
    if(!s.failed&&!s.complete){
@@ -2566,6 +2914,7 @@ bool first_sss_vs_setup_service(){
           &setup,setup_error,sizeof(setup_error));
       check(setup_captured,setup_error[0]?setup_error:
             "Stadium Setup state receipt refused its exact owner boundary");
+      s.setup_snapshot=setup;
       std::ostringstream setup_json;
       setup_json<<"{\"schema\":\"melee-web-stadium-zero-tick-setup-state-v1\""
         <<",\"world_generation\":"<<setup.world_generation
@@ -2626,6 +2975,8 @@ void tick(){
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
   if(first_sss_vs_setup.attempted&&!first_sss_vs_setup.complete)
    first_sss_vs_setup_fail("VS Setup owner stopped during asynchronous preparation");
+  if(matched_setup_cf.armed&&!matched_setup_cf.complete&&!matched_setup_cf.failed)
+   matched_setup_cf_fail("Matched Setup C/F owner stopped before its acknowledged boundary");
 #endif
   // A terminal JS/audio failure is consumed only at this source-free boundary.
   // Preserve the first owner error and frozen scene for diagnostics; recovery
@@ -4103,6 +4454,7 @@ int melee_web_native_menu_stadium_first_sss_draw_kick(){try{
 int melee_web_native_menu_stadium_first_sss_vs_setup_begin(int text_tail_probe){try{
  auto& s=first_sss_vs_setup;
  check(!s.attempted&&!s.failed&&!s.complete,"VS Setup continuation is one-use");
+ matched_setup_cf=MatchedSetupCfState{};
  check(text_tail_probe==0||text_tail_probe==1,"VS Setup text probe flag must be 0 or 1");
  first_sss_text_tail_probe=FirstSssTextTailProbeState{};
  first_sss_text_tail_retained_json.clear();
@@ -4150,6 +4502,106 @@ int melee_web_native_menu_stadium_first_sss_vs_setup_begin(int text_tail_probe){
  s.requested_generation=asset_generation;s.requested=true;
  first_css_browser_draw_refresh_observation();return 1;
 }catch(const std::exception& error){first_sss_vs_setup_fail(error.what());return 0;}}
+
+int melee_web_native_menu_stadium_first_sss_vs_setup_cf_arm(){try{
+ auto& state=matched_setup_cf;auto& setup=first_sss_vs_setup;
+ check(!state.opted_in&&!state.armed&&!state.failed&&!state.complete,
+       "Matched Setup C/F continuation is one-use");
+ state.opted_in=true;
+ check(setup.attempted&&setup.complete&&!setup.failed&&setup.construction_complete&&
+       setup.source_frames==0&&!running&&!pending&&!faulted&&!host_entered&&
+       host&&match&&archive_cache&&match->construction_complete()&&
+       match->source_frames()==0&&asset_generation==setup.committed_generation&&
+       !first_use_draw_pending&&!replay&&!melee_web_net_active(),
+       "Matched Setup C/F arm requires the completed stopped same-run Setup owner");
+ const auto* const expected_owner=match.get();
+ const auto* const expected_cache=archive_cache.get();
+ const auto* const expected_host=host;
+ const auto expected_asset_generation=asset_generation;
+ const auto expected_world=melee_web_gameplay_stats();
+ const auto expected_setup=setup.setup_snapshot;
+ const uint32_t expected_seed=match->random_seed();
+ check(expected_world.ticks==0,"Matched Setup C/F arm lost its zero-tick world");
+ check(EM_ASM_INT({try{const f=globalThis.__meleeWebStadiumFirstSssVsSetupCfApproved;
+   return typeof f==='function'&&f()===true?1:0;}catch(_){return 0;}})==1,
+   "Matched Setup C/F arm requires strict same-run Setup approval");
+ check(state.opted_in&&!state.armed&&!state.failed&&!state.complete&&
+       setup.complete&&!setup.failed&&match&&match.get()==expected_owner&&
+       archive_cache&&archive_cache.get()==expected_cache&&host==expected_host&&
+       !host_entered&&!running&&!pending&&!faulted&&!first_use_draw_pending&&
+       asset_generation==expected_asset_generation&&melee_web_gameplay_world_exists()&&
+       melee_web_gameplay_generation()==expected_world.generation&&
+       melee_web_gameplay_stats().ticks==0,
+       "Matched Setup C/F host approval changed the stopped source owner");
+ check(match->random_seed()==expected_seed,
+       "Matched Setup C/F host approval changed the source RNG");
+ MeleeWebStadiumSetupSnapshot current{};char error[256]{};
+ check(match->diagnostic_stadium_setup_snapshot(&current,error,sizeof(error)),
+       error[0]?error:"Matched Setup C/F zero-tick owner snapshot refused");
+ check(matched_setup_cf_setup_equal(current,expected_setup)&&
+       matched_setup_cf_setup_equal(setup.setup_snapshot,expected_setup)&&
+       current.world_ticks==0&&current.source_frame==0&&current.world_generation!=0,
+       "Matched Setup C/F zero-tick owner differs from the strict Setup receipt");
+ state.owner=match.get();state.cache_owner=archive_cache.get();state.host_owner=host;
+ state.world_generation=current.world_generation;
+ state.asset_generation=asset_generation;
+ state.expected_branch=match->start_data().rules.x1_3?1U:0U;
+ check(state.expected_branch==0,
+       "Matched Setup C/F bounded continuation supports only the approved branch-0 profile");
+ match->diagnostic_stadium_go_alignment_arm(0,error,sizeof(error));
+ state.audio_calls_before=state.audio_calls_after=diagnostic_audio_render_calls;
+ state.audio_frames_before=state.audio_frames_after=diagnostic_audio_render_frames;
+ state.audio_phase_before=state.audio_phase_after=audio_phase;
+ state.armed=true;
+ matched_setup_cf_check_owner(0);
+ first_css_browser_draw_refresh_observation();return 1;
+}catch(const std::exception& error){
+ matched_setup_cf_fail(error.what());return 0;
+}}
+
+int melee_web_native_menu_stadium_first_sss_vs_setup_cf_queue(
+    unsigned schedule_index,int action_kind,unsigned ordinal,int bundle,
+    const uint8_t* bytes,size_t byte_count){try{
+ auto& state=matched_setup_cf;
+ check(state.armed&&!state.failed&&!state.complete&&!state.queued&&
+       !state.awaiting_approval&&schedule_index==state.cursor&&schedule_index<171,
+       "Matched Setup C/F action queue is not at its one-use cursor");
+ const bool tick_action=schedule_index==168||schedule_index==170||
+       (schedule_index<168&&(schedule_index%2)==0);
+ const unsigned expected_ordinal=schedule_index<168?schedule_index/2:
+       schedule_index==168||schedule_index==169?84U:85U;
+ check(action_kind==(tick_action?1:2)&&ordinal==expected_ordinal&&
+       (tick_action?bundle==static_cast<int>(ordinal)&&bytes&&byte_count==44:
+                    bundle==-1&&bytes==nullptr&&byte_count==0),
+       "Matched Setup C/F action differs from the fixed typed input schedule");
+ const unsigned expected_ticks=ordinal+(tick_action?0U:1U);
+ matched_setup_cf_check_owner(expected_ticks);
+ state.seed_at_queue=match->random_seed();
+ state.last_schedule_index=schedule_index;state.last_action_kind=action_kind;
+ state.last_ordinal=ordinal;state.last_bundle=tick_action?ordinal:UINT32_MAX;
+ state.last_action_complete=false;state.last_action_json.clear();
+ state.queued_statuses.fill(0);
+ if(tick_action)std::copy(bytes,bytes+44,state.queued_statuses.begin());
+ state.queued=true;first_css_browser_draw_refresh_observation();return 1;
+}catch(const std::exception& error){
+ matched_setup_cf_fail(error.what());return 0;
+}}
+
+int melee_web_native_menu_stadium_first_sss_vs_setup_cf_approve(
+    unsigned schedule_index,int accepted){try{
+ auto& state=matched_setup_cf;
+ check((accepted==0||accepted==1)&&state.armed&&!state.failed&&!state.complete&&
+       state.awaiting_approval&&state.last_action_complete&&
+       schedule_index==state.cursor&&schedule_index==state.last_schedule_index,
+       "Matched Setup C/F approval is duplicate, stale, or out of order");
+ matched_setup_cf_check_owner(state.last_ordinal+1);
+ if(!accepted){matched_setup_cf_fail("Host refused the pending matched Setup C/F boundary");return 1;}
+ state.awaiting_approval=false;state.last_action_complete=false;++state.cursor;
+ if(state.cursor==171)state.complete=true;
+ first_css_browser_draw_refresh_observation();return 1;
+}catch(const std::exception& error){
+ matched_setup_cf_fail(error.what());return 0;
+}}
 
 int melee_web_native_menu_stadium_first_sss_vs_entry_kick(){try{
  auto& s=first_sss_vs_entry;const auto& prefix=first_sss_prefix_sequence;

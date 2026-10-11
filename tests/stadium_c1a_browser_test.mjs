@@ -16,6 +16,9 @@ import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.m
 import {firstSssAudioAccounting} from './stadium_first_css_stream_compare.mjs';
 import {createCssSssTransitionCapture, CSS_SSS_TRANSITION_LIMITS,
   cssReadinessEvidence, cssSssOutcome, hasCssMenuReadiness} from './stadium_c1a_css_sss_reducer.mjs';
+import {validateMatchedSetupCfRequest, validateMatchedSetupCfPreflight,
+  validateMatchedSetupCfIdentities, matchedSetupCfRuntimeFailure}
+  from './stadium_matched_setup_cf_runner_gate.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const {values} = parseArgs({options: Object.fromEntries(
@@ -25,7 +28,8 @@ const {values} = parseArgs({options: Object.fromEntries(
     'first-css-postdraw-input', 'first-css-postdraw-expected',
     'first-sss-pair-expected', 'first-sss-tick-expected', 'first-sss-tick-input',
     'first-sss-draw-expected', 'first-sss-prefix-expected', 'first-sss-prefix-input',
-    'first-sss-vs-entry-expected', 'first-sss-vs-setup-expected']
+    'first-sss-vs-entry-expected', 'first-sss-vs-setup-expected',
+    'first-sss-vs-setup-cf-packet', 'first-sss-vs-setup-cf-assembly']
     .map(name => [name, {type: 'string'}]).concat([
       ['css-sss-reducer', {type: 'boolean', default: false}],
       ['first-css-browser-draw', {type: 'boolean', default: false}],
@@ -37,11 +41,18 @@ const {values} = parseArgs({options: Object.fromEntries(
       ['first-sss-prefix', {type: 'boolean', default: false}],
       ['first-sss-vs-entry', {type: 'boolean', default: false}],
       ['first-sss-vs-setup', {type: 'boolean', default: false}],
+      ['first-sss-vs-setup-cf', {type: 'boolean', default: false}],
       ['first-sss-vs-setup-text-tail', {type: 'boolean', default: false}],
     ])), strict: true});
 const cssSssReducer = values['css-sss-reducer'];
 const firstSssVsSetup = values['first-sss-vs-setup'];
 const firstSssVsSetupTextTail = values['first-sss-vs-setup-text-tail'];
+const firstSssVsSetupCf = validateMatchedSetupCfRequest({
+  enabled: values['first-sss-vs-setup-cf'], setup: firstSssVsSetup,
+  textTail: firstSssVsSetupTextTail,
+  packetPath: values['first-sss-vs-setup-cf-packet'] || null,
+  assemblyPath: values['first-sss-vs-setup-cf-assembly'] || null,
+});
 const firstSssVsEntry = values['first-sss-vs-entry'] || firstSssVsSetup;
 const firstSssPrefix = values['first-sss-prefix'] || firstSssVsEntry;
 const firstSssDraw = values['first-sss-draw'] || firstSssPrefix;
@@ -98,12 +109,23 @@ for (const name of ['build', 'disc', 'disc-sha256', 'out', 'playwright', 'prefli
 const preflightPath = path.resolve(values.preflight);
 const preflightBytes = await fs.readFile(preflightPath);
 const preflight = JSON.parse(preflightBytes.toString('utf8'));
+const matchedSetupCfPreflight = validateMatchedSetupCfPreflight(preflight, {
+  enabled: firstSssVsSetupCf,
+  packetPath: values['first-sss-vs-setup-cf-packet']
+    ? path.resolve(values['first-sss-vs-setup-cf-packet']) : null,
+  assemblyPath: values['first-sss-vs-setup-cf-assembly']
+    ? path.resolve(values['first-sss-vs-setup-cf-assembly']) : null,
+  helperPath: path.join(ROOT, 'tests/stadium_matched_setup_cf_consumer.mjs'),
+});
 const output = path.resolve(values.out);
 try { await fs.access(output); throw Error(`Refusing to overwrite existing output directory: ${output}`); }
 catch (error) { if (error.code !== 'ENOENT') throw error; }
 await fs.mkdir(output, {recursive: false});
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
+const sortedJsonValue = value => Array.isArray(value) ? value.map(sortedJsonValue) :
+  value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort()
+    .map(key => [key, sortedJsonValue(value[key])])) : value;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const timeout = (promise, ms, label) => {
   let timer;
@@ -167,6 +189,7 @@ const report = {
     first_sss_prefix: null,
     first_sss_vs_entry: null,
     first_sss_vs_setup: null,
+    matched_setup_cf: null,
     requested_committed_manifest: null,
     native_observation: null,
     final_phase: null,
@@ -177,6 +200,9 @@ const report = {
     screenshots: {},
     page_errors: [],
     console_errors: [],
+    console_warnings: [],
+    console_messages: [],
+    console_message_capture_overflow: false,
     http_requests: [],
     external_http_requests: [],
   },
@@ -184,7 +210,9 @@ const report = {
     context_closed: false, browser_connection_closed: false, browser_process_terminated: false,
     browser_process_pid: null, server_process_terminated: false, server_process_pid: null,
     server_process_exit: null, failures: []},
-  source_request_scope: firstSssVsSetup
+  source_request_scope: firstSssVsSetupCf
+    ? 'Strict same-run Entry and completed Setup comparison, then the exact original 86-tick/85-draw schedule; compare C after tick84 before draw84 and F after tick85 before draw85, then stop.'
+    : firstSssVsSetup
     ? `Strict Entry then checked async exact Stadium asset handoff and existing deferred Session Setup endpoint; stop before gameplay tick/draw/GO${firstSssVsSetupTextTail?'; opt-in bounded SIS text-tail diagnostics only':''}`
     : firstSssVsEntry
     ? 'Strict SSS prefix then read-only actual match Start/seed Entry endpoint; no match construction'
@@ -229,6 +257,14 @@ let responseRows = [];
 let externalRequests = [];
 let pageErrors = [];
 let consoleErrors = [];
+let consoleWarnings = [];
+let consoleMessages = [];
+let consoleMessageCaptureOverflow = false;
+let consoleMessageDropped = 0;
+let consoleMessageBytes = 0;
+const MAX_CONSOLE_MESSAGES = 4096;
+const MAX_CONSOLE_MESSAGE_BYTES = 4096;
+const MAX_CONSOLE_CAPTURE_BYTES = 8 * 1024 * 1024;
 let cleanupDeadline = null;
 
 function cleanupRemaining(cap = LIMITS.cleanupMs) {
@@ -273,6 +309,7 @@ let firstSssDrawInputs = null;
 let firstSssPrefixInputs = null;
 let firstSssVsEntryInputs = null;
 let firstSssVsSetupInputs = null;
+let matchedSetupCfInputs = null;
 async function loadFirstCssBrowserDrawInputs() {
   if (!firstCssBrowserDraw) return null;
   const specs = {
@@ -580,6 +617,44 @@ async function loadFirstSssVsSetupInputs() {
   return result;
 }
 
+async function loadMatchedSetupCfInputs() {
+  if (!firstSssVsSetupCf) return null;
+  const packetPath = path.resolve(values['first-sss-vs-setup-cf-packet']);
+  const assemblyPath = path.resolve(values['first-sss-vs-setup-cf-assembly']);
+  const helperPath = path.join(ROOT, 'tests/stadium_matched_setup_cf_consumer.mjs');
+  const readIdentity = async file => {
+    const bytes = await fs.readFile(file);
+    return {path: path.resolve(file), basename: path.basename(file),
+      bytes: bytes.byteLength, sha256: digest(bytes), content: bytes};
+  };
+  const [packetIdentity, assemblyIdentity, helperIdentity] = await Promise.all([
+    readIdentity(packetPath), readIdentity(assemblyPath), readIdentity(helperPath),
+  ]);
+  validateMatchedSetupCfIdentities(matchedSetupCfPreflight, {
+    packet: Object.fromEntries(Object.entries(packetIdentity).filter(([key]) => key !== 'content')),
+    assembly_manifest: Object.fromEntries(Object.entries(assemblyIdentity).filter(([key]) => key !== 'content')),
+    helper: Object.fromEntries(Object.entries(helperIdentity).filter(([key]) => key !== 'content')),
+  });
+  let packet, assembly;
+  try { packet = JSON.parse(packetIdentity.content.toString('utf8')); }
+  catch (error) { throw Error(`Matched Setup C/F packet is malformed: ${errorText(error)}`); }
+  try { assembly = JSON.parse(assemblyIdentity.content.toString('utf8')); }
+  catch (error) { throw Error(`Matched Setup C/F evidence assembly is malformed: ${errorText(error)}`); }
+  assert.equal(assembly.schema, 'melee-web-stadium-setup-cf-external-evidence-assembly-v1');
+  assert.equal(assembly.scope,
+    'Historical retained evidence basis only; does not admit a future source, producer, fresh Setup or runtime continuation. Never forward into runtime.');
+  const helper = await import(pathToFileURL(helperPath).href);
+  const hostEvidence = helper.hostEvidenceFromPacket(packet);
+  return {helper, hostEvidence, packetIdentity: Object.fromEntries(
+    Object.entries(packetIdentity).filter(([key]) => key !== 'content')),
+    assemblyIdentity: Object.fromEntries(
+      Object.entries(assemblyIdentity).filter(([key]) => key !== 'content')),
+    helperIdentity: Object.fromEntries(
+      Object.entries(helperIdentity).filter(([key]) => key !== 'content')),
+    assemblySchema: assembly.schema, runtimePayloadSha256: digest(Buffer.from(
+      JSON.stringify(sortedJsonValue(packet.runtime_payload), null, 2) + '\n'))};
+}
+
 async function loadFirstSssVsEntryInputs() {
   if (!firstSssVsEntry) return null;
   const result = await loadBoundFirstSssExpected('first_sss_vs_entry',
@@ -655,6 +730,26 @@ function nativeSnapshot() {
 
 async function sourceSnapshot(label) {
   return timeout(nativeSnapshot(), Math.min(5000, remaining()), label);
+}
+
+function captureBrowserConsoleMessage(message) {
+  const type = message.type();
+  const fullText = message.text();
+  const bytes = Buffer.byteLength(fullText, 'utf8');
+  if (type === 'error') consoleErrors.push(fullText.slice(0, 1000));
+  if (type === 'warning') consoleWarnings.push(fullText.slice(0, 1000));
+  const text = fullText.slice(0, MAX_CONSOLE_MESSAGE_BYTES);
+  const storedBytes = Buffer.byteLength(text, 'utf8');
+  if (consoleMessages.length >= MAX_CONSOLE_MESSAGES ||
+      consoleMessageBytes + storedBytes > MAX_CONSOLE_CAPTURE_BYTES) {
+    consoleMessageCaptureOverflow = true;
+    ++consoleMessageDropped;
+    return;
+  }
+  consoleMessages.push({type, text, bytes,
+    truncated: bytes > MAX_CONSOLE_MESSAGE_BYTES});
+  consoleMessageBytes += storedBytes;
+  if (bytes > MAX_CONSOLE_MESSAGE_BYTES) consoleMessageCaptureOverflow = true;
 }
 
 async function observeCssInputFrame(label, operationDeadline = deadline) {
@@ -1037,6 +1132,7 @@ async function readFirstSssPairPostUnloadState() {
       first_sss_prefix: observation?.first_sss_prefix ?? null,
       first_sss_vs_entry: observation?.first_sss_vs_entry ?? null,
       first_sss_vs_setup: observation?.first_sss_vs_setup ?? null,
+      matched_setup_cf: observation?.first_sss_vs_setup?.matched_setup_cf ?? null,
       error: document.querySelector('#status')?.dataset.runtimeError || null,
       import_enabled: !!document.querySelector('#disc') &&
         !document.querySelector('#disc').disabled};
@@ -2069,9 +2165,223 @@ async function runFirstSssVsSetup(entryNative) {
       `Setup text-tail log is incomplete: ${logValidation.errors.join('; ')}`);
     await persistReport();
   }
-  report.scenario.first_sss_vs_setup.claim = 'Declared Setup2503 Start/player0-3/seed endpoint only; zero gameplay ticks/draws and stop before Ready/GO. Other setup fields and per-owner RNG remain unpaired.';
+  if (firstSssVsSetupCf) native = await runMatchedSetupCfContinuation(native);
+  report.scenario.first_sss_vs_setup.claim = firstSssVsSetupCf
+    ? 'Strict same-run Setup2503 Start/player0-3/seed endpoint plus the bounded exact matched original C/F prefix; no later match route, source draw85, or whole-session acceptance.'
+    : 'Declared Setup2503 Start/player0-3/seed endpoint only; zero gameplay ticks/draws and stop before Ready/GO. Other setup fields and per-owner RNG remain unpaired.';
   await persistReport();
   return native;
+}
+
+async function executeMatchedSetupCfNativeCommand(command) {
+  const response = await page.evaluate(({kind, scheduleIndex, action, ordinal, bundle, bytes, accepted}) => {
+    const module = globalThis.Module;
+    const readMessage = () => {
+      const pointer = module?._melee_web_native_menu_message?.();
+      return pointer ? module.UTF8ToString(pointer) : null;
+    };
+    if (!module) return {result: 0, message: 'Native module is absent'};
+    if (kind === 'arm') {
+      const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_arm;
+      if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F arm export is absent'};
+      const result = fn();
+      return {result, message: result === 1 ? null : readMessage()};
+    }
+    if (kind === 'queue') {
+      const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_queue;
+      if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F queue export is absent'};
+      const pointer = bytes.length ? module._malloc(bytes.length) : 0;
+      if (bytes.length && !pointer) return {result: 0, message: 'Matched Setup C/F PAD copy allocation failed'};
+      try {
+        if (bytes.length) module.HEAPU8.set(bytes, pointer);
+        const result = fn(scheduleIndex, action === 'tick' ? 1 : 2,
+          ordinal, bundle, pointer, bytes.length);
+        return {result, message: result === 1 ? null : readMessage()};
+      } finally {
+        if (pointer) module._free(pointer);
+      }
+    }
+    if (kind === 'approve') {
+      const fn = module._melee_web_native_menu_stadium_first_sss_vs_setup_cf_approve;
+      if (typeof fn !== 'function') return {result: 0, message: 'Matched Setup C/F approval export is absent'};
+      const result = fn(scheduleIndex, accepted ? 1 : 0);
+      return {result, message: result === 1 ? null : readMessage()};
+    }
+    return {result: 0, message: `Unknown matched Setup C/F native command ${kind}`};
+  }, command);
+  return response;
+}
+
+function matchedSetupCfNativeAdapter() {
+  const execute = async (command, label) => {
+    const response = await timeout(executeMatchedSetupCfNativeCommand(command),
+      Math.min(5000, remaining()), label);
+    if (response?.result !== 1)
+      throw Error(response?.message || `${label} was refused by the native owner`);
+    return response.result;
+  };
+  return {
+    arm: async () => execute({kind: 'arm'}, 'Arm the one-use matched Setup C/F continuation'),
+    queue: async (scheduleIndex, action, bytes) =>
+      execute({kind: 'queue', scheduleIndex,
+        action: action.action, ordinal: action.ordinal, bundle: action.bundle ?? -1,
+        bytes: Array.from(bytes)}, `Queue matched Setup C/F action ${scheduleIndex}`),
+    approve: async (scheduleIndex, accepted) =>
+      execute({kind: 'approve', scheduleIndex, accepted},
+        `Acknowledge matched Setup C/F action ${scheduleIndex}`),
+  };
+}
+
+async function runMatchedSetupCfContinuation(setupNative) {
+  const inputs = matchedSetupCfInputs;
+  const {helper, hostEvidence} = inputs;
+  const actualSetup = setupNative?.first_sss_vs_setup?.actual;
+  assert.equal(actualSetup?.phase, 'vs_setup');
+  assert.equal(actualSetup?.start?.rules?.x1_3, 0,
+    'Matched Setup C/F supports only the strictly compared source branch-0 Setup');
+  const setupStatus = report.scenario.first_sss_vs_setup.comparison;
+  assert.equal(setupStatus?.approved, true,
+    'Matched Setup C/F arm requires the completed strict Setup comparison');
+  assertFirstSssVsSetupOwners(setupNative.first_sss_vs_setup);
+
+  const cf = report.scenario.matched_setup_cf = {
+    decision: 'RUNNING_BOUNDED_MATCHED_SETUP_CF',
+    packet: inputs.packetIdentity, assembly_manifest: inputs.assemblyIdentity,
+    host_helper: inputs.helperIdentity, assembly_schema: inputs.assemblySchema,
+    runtime_payload_sha256: inputs.runtimePayloadSha256,
+    schedule_actions: hostEvidence.runtimePayload.schedule.length,
+    input_bundles: hostEvidence.runtimePayload.bundles.length,
+    setup_comparison: structuredClone(setupStatus), branch: 0,
+    actions: [], host_comparisons: [], runtime_diagnostics: [], last_native_state: null,
+    unpaired: {raw_timer_initialization: 'unobserved', original_xF0: 'unobserved',
+      original_SIS_title_bytes: 'unobserved', original_map_root_allocation_lifetime: 'unproved',
+      original_object_type: 'unobserved', native_flow_clock: 'reported separately',
+      nested_display_list_provenance: 'not instrumented in the admitted profile; the nested GX_CMD_CALL_DL warning is a stop condition'},
+    claim: 'One matched original input prefix after the fresh strict Setup comparison; state-only C/F checks, no whole-session acceptance.',
+  };
+  await persistReport();
+
+  let setupApproved = true;
+  let observedPageErrors = 0, observedConsoleErrors = 0, observedConsoleWarnings = 0,
+    observedConsoleMessages = 0;
+  const checkRuntimeDiagnostics = async (scheduleIndex, action, nativeObservation) => {
+    const runtime = await sourceSnapshot(
+      `Matched Setup C/F runtime diagnostics after action ${scheduleIndex}`);
+    const sample = {schedule_index: scheduleIndex, action, message: runtime.message,
+      diagnostics: runtime.diagnostics, runtime_error: runtime.error,
+      page_errors: pageErrors.slice(observedPageErrors),
+      console_errors: consoleErrors.slice(observedConsoleErrors),
+      console_warnings: consoleWarnings.slice(observedConsoleWarnings),
+      console_messages: consoleMessages.slice(observedConsoleMessages),
+      console_message_capture_overflow: consoleMessageCaptureOverflow};
+    observedPageErrors = pageErrors.length;
+    observedConsoleErrors = consoleErrors.length;
+    observedConsoleWarnings = consoleWarnings.length;
+    observedConsoleMessages = consoleMessages.length;
+    cf.runtime_diagnostics.push(sample);
+    report.scenario.console_warnings = [...consoleWarnings];
+    report.scenario.console_messages = [...consoleMessages];
+    report.scenario.console_message_capture_overflow = consoleMessageCaptureOverflow;
+    report.scenario.console_message_dropped_count = consoleMessageDropped;
+    await persistReport();
+    const stop = matchedSetupCfRuntimeFailure({native: runtime,
+      pageErrors, consoleErrors, consoleWarnings, consoleMessages,
+      consoleMessageCaptureOverflow});
+    if (stop) {
+      cf.decision = 'STOP_MATCHED_SETUP_CF_RUNTIME_DIAGNOSTIC';
+      cf.stop_reason = stop;
+      cf.last_native_state = structuredClone(nativeObservation);
+      await persistReport();
+      throw Error(stop);
+    }
+  };
+  const hostCallbacks = helper.createHostCallbacks({
+    setupApproved: () => setupApproved,
+    originalSnapshots: hostEvidence.originalSnapshots,
+    originalSeeds: hostEvidence.originalSeeds,
+  });
+  const nativeAdapter = matchedSetupCfNativeAdapter();
+  const driver = new helper.StadiumSetupCfActionDriver({
+    runtimePayload: hostEvidence.runtimePayload, native: nativeAdapter});
+  await page.evaluate(() => {
+    if (globalThis.__meleeWebStadiumFirstSssVsSetupCfApproved)
+      throw Error('Matched Setup C/F approval callback already exists');
+    globalThis.__meleeWebStadiumFirstSssVsSetupCfApproved = () => true;
+  });
+  try {
+    assert.equal(await driver.arm(hostCallbacks.setupApproved()), true,
+      `Matched Setup C/F driver refused its fresh Setup: ${driver.status().first_error}`);
+    let currentNative = await readFirstSssVsEntryObservation();
+    assert.equal(currentNative?.first_sss_vs_setup?.matched_setup_cf?.armed, true,
+      'Native matched Setup C/F arm was not retained');
+    await checkRuntimeDiagnostics(-1, 'arm',
+      currentNative?.first_sss_vs_setup?.matched_setup_cf ?? null);
+    await persistReport();
+
+    const actionStarted = Date.now();
+    for (let scheduleIndex = 0; scheduleIndex < hostEvidence.runtimePayload.schedule.length;
+      ++scheduleIndex) {
+      assert.ok(Date.now() - actionStarted < LIMITS.captureWorkMs,
+        'Matched Setup C/F action schedule exceeded its bounded continuation deadline');
+      const action = hostEvidence.runtimePayload.schedule[scheduleIndex];
+      assert.equal(await driver.submit(action), true,
+        `Matched Setup C/F host action driver refused ${scheduleIndex}: ${driver.status().first_error}`);
+
+      const receiptStarted = Date.now();
+      let cfState = null;
+      for (;;) {
+        currentNative = await timeout(readFirstSssVsEntryObservation(),
+          Math.min(3000, remaining()), `Read matched Setup C/F action ${scheduleIndex}`);
+        cfState = currentNative?.first_sss_vs_setup?.matched_setup_cf ?? null;
+        if (cfState?.failed)
+          throw Error(cfState.error || `Native matched Setup C/F stopped at action ${scheduleIndex}`);
+        if (cfState?.last_action?.complete === true &&
+            cfState.last_action.schedule_index === scheduleIndex) break;
+        assert.ok(Date.now() - receiptStarted < remaining(),
+          `Native matched Setup C/F action ${scheduleIndex} did not complete before deadline`);
+        await timeout(page.waitForTimeout(50), Math.min(1000, remaining()),
+          `Wait for matched Setup C/F action ${scheduleIndex}`);
+      }
+      const actionReceipt = structuredClone(cfState.last_action);
+      const boundary = action.action === 'tick' && (action.ordinal === 84 || action.ordinal === 85);
+      let comparison = null;
+      if (boundary) {
+        const label = action.ordinal === 84 ? 'C' : 'F';
+        const accepted = hostCallbacks.compare(label, JSON.stringify(actionReceipt.observation));
+        comparison = hostCallbacks.receipts().at(-1) ?? null;
+        cf.host_comparisons.push(comparison);
+        assert.equal(accepted, comparison?.decision === 'PASS_EXACT_DECLARED_C_F_FIELDS',
+          `${label} callback acceptance differs from its strict host receipt`);
+      }
+      await checkRuntimeDiagnostics(scheduleIndex, `${action.action}-before-ack`, cfState);
+      const accepted = await driver.accept(cfState, comparison);
+      cf.actions.push({schedule_index: scheduleIndex, action: action.action,
+        ordinal: action.ordinal, bundle: action.bundle ?? null,
+        native: actionReceipt, host_comparison: comparison});
+      cf.last_native_state = structuredClone(cfState);
+      await checkRuntimeDiagnostics(scheduleIndex, `${action.action}-after-ack`, cfState);
+      if (scheduleIndex % 16 === 15 || boundary || !accepted) await persistReport();
+      assert.equal(accepted, true,
+        `Matched Setup C/F stopped at action ${scheduleIndex}: ${driver.status().first_error}`);
+    }
+    assert.equal(driver.status().complete, true);
+    currentNative = await readFirstSssVsEntryObservation();
+    const finalState = currentNative?.first_sss_vs_setup?.matched_setup_cf;
+    assert.equal(finalState?.complete, true, finalState?.error || 'Native matched Setup C/F did not complete');
+    assert.equal(finalState?.failed, false);
+    assert.equal(finalState?.cursor, 171);
+    assert.equal(finalState?.last_action?.schedule_index, 170);
+    assert.equal(finalState?.last_action?.action, 'tick');
+    assert.equal(finalState?.last_action?.ordinal, 85);
+    cf.last_native_state = structuredClone(finalState);
+    cf.decision = 'PASS_MATCHED_SETUP_CF_C_AND_F_STATE_ONLY';
+    cf.actions_completed = cf.actions.length;
+    await persistReport();
+    return currentNative;
+  } finally {
+    setupApproved = false;
+    await page.evaluate(() => { delete globalThis.__meleeWebStadiumFirstSssVsSetupCfApproved; });
+  }
 }
 
 async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
@@ -2248,6 +2558,10 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
     firstCssBrowserStream ? 'stadium-first-css-browser-postdraw-stream' : 'stadium-first-css-browser-draw');
   report.scenario.page_errors = pageErrors;
   report.scenario.console_errors = consoleErrors;
+  report.scenario.console_warnings = consoleWarnings;
+  report.scenario.console_messages = consoleMessages;
+  report.scenario.console_message_capture_overflow = consoleMessageCaptureOverflow;
+  report.scenario.console_message_dropped_count = consoleMessageDropped;
   assert.deepEqual(pageErrors, []);
   assert.deepEqual(externalRequests, []);
 
@@ -2271,6 +2585,7 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
       first_sss_prefix: observation?.first_sss_prefix ?? null,
       first_sss_vs_entry: observation?.first_sss_vs_entry ?? null,
       first_sss_vs_setup: observation?.first_sss_vs_setup ?? null,
+      matched_setup_cf: observation?.first_sss_vs_setup?.matched_setup_cf ?? null,
       error: document.querySelector('#status')?.dataset.runtimeError || null,
       import_enabled: !!document.querySelector('#disc') && !document.querySelector('#disc').disabled};
   }), Math.min(5000, remaining()), 'First-CSS post-unload snapshot');
@@ -2292,6 +2607,8 @@ async function runFirstCssBrowserDraw({baseUrl, artifacts, before}) {
     assert.equal(afterUnload.first_sss_prefix, null,
       'SSS prefix diagnostic ownership survived teardown');
   if (firstSssVsSetup) assert.equal(afterUnload.first_sss_vs_setup, null);
+  if (firstSssVsSetupCf) assert.equal(afterUnload.matched_setup_cf, null,
+    'Matched Setup C/F diagnostic ownership survived checked unload');
   if (firstSssVsSetupTextTail) {
     assert.equal(afterUnload.retained_text_tail_wrapper, true,
       'Native unload did not retain the scalar text-tail outcome');
@@ -2580,6 +2897,7 @@ async function main() {
     'Browser runner path differs from frozen preflight');
   assert.equal(await hashFile(runnerPath), preflight.test_script.sha256,
     'Browser runner bytes differ from frozen preflight');
+  matchedSetupCfInputs = await loadMatchedSetupCfInputs();
   if (values['css-sss-reducer']) {
     const helperPath = path.join(ROOT, 'tests/stadium_c1a_css_sss_reducer.mjs');
     assert.equal(path.resolve(preflight.reducer_helper?.path || ''), helperPath,
@@ -2637,6 +2955,9 @@ async function main() {
     'VS Entry endpoint export leaked into ordinary runtime');
   assert.equal(defaultJs.includes('_melee_web_native_menu_stadium_first_sss_prefix_arm'), false,
     'Ordinary default runtime unexpectedly exports the private SSS prefix diagnostic gate');
+  for (const name of ['arm', 'queue', 'approve'])
+    assert.equal(defaultJs.includes(`_melee_web_native_menu_stadium_first_sss_vs_setup_cf_${name}`), false,
+      `Ordinary default runtime unexpectedly exports matched Setup C/F ${name}`);
 
   const artifacts = JSON.parse(await fs.readFile(path.join(ROOT, 'tools/browser_build_artifacts.json'), 'utf8'));
   assert.equal(artifacts.length, 40, 'The checked-in browser artifact inventory changed; review the preflight');
@@ -2718,7 +3039,7 @@ async function main() {
   page.setDefaultTimeout(10000);
   page.setDefaultNavigationTimeout(30000);
   page.on('pageerror', error => pageErrors.push(errorText(error)));
-  page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text().slice(0, 1000)); });
+  page.on('console', captureBrowserConsoleMessage);
   page.on('request', request => {
     const url = new URL(request.url());
     const row = {event: 'request', method: request.method(), origin: url.origin,
@@ -3014,6 +3335,20 @@ async function cleanupOwnedProcesses() {
         report.scenario.first_sss_vs_setup_failure_snapshot = await timeout(
           readFirstSssVsEntryObservation(), Math.min(3000, cleanupRemaining()),
           'VS Setup partial owners/actual/error before unload');
+        if (firstSssVsSetupCf) {
+          const runtime = await timeout(nativeSnapshot(), Math.min(2000, cleanupRemaining()),
+            'Matched Setup C/F runtime diagnostics at failure');
+          const stop = matchedSetupCfRuntimeFailure({native: runtime, pageErrors,
+            consoleErrors, consoleWarnings, consoleMessages, consoleMessageCaptureOverflow});
+          report.scenario.matched_setup_cf_failure_diagnostics = {
+            native: runtime, stop_reason: stop,
+            console_errors: [...consoleErrors], console_warnings: [...consoleWarnings],
+            console_messages: [...consoleMessages],
+            console_message_capture_overflow: consoleMessageCaptureOverflow,
+            console_message_dropped_count: consoleMessageDropped};
+          if (stop && report.scenario.matched_setup_cf)
+            report.scenario.matched_setup_cf.stop_reason ??= stop;
+        }
         if (firstSssVsSetupTextTail && report.scenario.first_sss_vs_setup?.text_tail_probe) {
           const unloadAttemptedAtFailureSnapshot = unloadAttempted;
           const failureTimeLog = await snapshotFirstSssTextTailLog();
@@ -3141,6 +3476,10 @@ try {
   await cleanupOwnedProcesses();
   report.scenario.page_errors = pageErrors;
   report.scenario.console_errors = consoleErrors;
+  report.scenario.console_warnings = consoleWarnings;
+  report.scenario.console_messages = consoleMessages;
+  report.scenario.console_message_capture_overflow = consoleMessageCaptureOverflow;
+  report.scenario.console_message_dropped_count = consoleMessageDropped;
   report.scenario.http_requests = [...requestRows, ...responseRows];
   report.scenario.external_http_requests = externalRequests;
   if (report.result !== 'pass') report.result = 'fail';
