@@ -183,13 +183,20 @@ def _menu_owner_pad_poll(payload: dict[str, Any]) -> str | None:
              "SSS PadPoll contains duplicate or ambiguous owner slices")
     if kind_count and not index_count:
         raise TransformPrefixError("SSS PadPoll exposes a stage kind without its owner index")
-    if index_count != 1 or kind_count != 1:
+    if index_count != 1:
         return None
     index = _raw_slice(payload, STAGE_SELECT_INDEX_TAG, 0,
                        "SSS live-owner PadPoll", 1)
     stage_index = index["raw"][0]
-    _require(index["address"] == 0x804D6CAE and stage_index < STAGE_SELECT_COUNT,
+    _require(index["address"] == 0x804D6CAE and stage_index <= STAGE_SELECT_COUNT,
              "SSS PadPoll stage owner index is outside its authored table")
+    # OnEnter initializes 30 before the cursor overlaps a concrete stage.
+    # This constructor-owned sentinel has no table entry or stage-kind slice.
+    if stage_index == STAGE_SELECT_COUNT:
+        _require(kind_count == 0, "SSS no-selection sentinel exposes a stage kind")
+        return "sss"
+    if kind_count != 1:
+        return None
     kind = _raw_slice(payload, STAGE_SELECT_KIND_TAG, 0,
                       "SSS live-owner PadPoll", 1)
     expected_kind_address = (STAGE_SELECT_TABLE + stage_index * STAGE_SELECT_STRIDE +

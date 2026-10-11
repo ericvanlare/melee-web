@@ -158,7 +158,7 @@ def _boundary_payload(kind: int, values: list[tuple[int, int, int, bytes]], *,
 
 
 def _menu_owner_poll(scene_kind: int, *, mode=2, css_live=True,
-                     sss_live=True) -> bytes:
+                     sss_live=True, stage_index=4) -> bytes:
     values = [
         (17, 0, 0x80479D30, bytes((mode, 0, 0, 0, 0, 0))),
         (40, 0, 0x803D0000 + scene_kind * 0x100, bytes((scene_kind,))),
@@ -169,14 +169,14 @@ def _menu_owner_poll(scene_kind: int, *, mode=2, css_live=True,
             (44, 0, 0x803F0DFC, bytes(0x90)),
         ])
     if scene_kind == 9 and sss_live:
-        stage_index = 4
         kind_address = 0x803F06D0 + stage_index * 0x1C + 0x0B
         values.extend([
             (41, 0, 0x804D6CAE, bytes((stage_index,))),
             # Readiness proves the live source owner exists; setup remains the
             # authority for the selected Final Destination stage identity.
-            (42, 0, kind_address, bytes((0x91,))),
         ])
+        if stage_index < 30:
+            values.append((42, 0, kind_address, bytes((0x91,))))
     return _boundary_payload(1, values)
 
 
@@ -274,7 +274,8 @@ def _capture(path: Path, *, swap=True, mutations=None, ticks=4) -> Path:
         sequence += 1
     if not mutations.get("sss_before_css") and not mutations.get("missing_sss_owner"):
         records.append(_frame(3, sequence, _menu_owner_poll(
-            9, sss_live=not mutations.get("missing_sss_kind")),
+            9, sss_live=not mutations.get("missing_sss_kind"),
+            stage_index=30 if mutations.get("sss_no_selection") else 4),
             pc=PAD_POLL_PC, source_tick=0))
         sequence += 1
     records.append(_frame(3, sequence, _boundary_payload(5, _sample_slices(
@@ -454,6 +455,14 @@ int main(int argc, char** argv) {
         self.assertEqual([(row["name"], row["hex"]) for row in slices],
                          [("player_identity", identity.hex()),
                           ("player_transformed", transformed.hex())])
+
+    def test_offline_prefix_accepts_authored_sss_constructor_sentinel(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sentinel.mwro"
+            _capture(path, mutations={"sss_no_selection": True})
+            report = validate_transform_prefix(path)
+        self.assertEqual(report["menu_owner_readiness"]["sss_live_owner_pad_poll_sequence"], 8)
+        self.assertEqual(report["completion"]["match_complete"], False)
 
     def test_valid_prefix_requires_ready_action_swap_and_post_swap_neutral_tick(self):
         with tempfile.TemporaryDirectory() as directory:

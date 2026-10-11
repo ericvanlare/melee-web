@@ -496,6 +496,40 @@ class SheikTransformCaptureDriverTests(unittest.TestCase):
         self.assertEqual(receiver.sss_live_owner_sequence, 4)
         self.assertEqual(receiver.menu_polls, 5)
 
+    def test_sss_authored_no_selection_constructor_and_strict_owners(self):
+        from copy import deepcopy
+        from sheik_transform_prefix import _menu_owner_pad_poll, TransformPrefixError
+        row = _sss_poll(2, 2)
+        row["payload"]["slices"] = [x for x in row["payload"]["slices"] if x["tag"] != 42]
+        index = next(x for x in row["payload"]["slices"] if x["tag"] == 41)
+        index["hex"] = "1e"
+        self.assertEqual(_menu_owner_pad_poll(row["payload"]), "sss")
+        receiver = SheikTransformPrefixReceiver(make_input_plan(8), sheik_transform_prefix_packet())
+        receiver._pad_poll(_css_poll(1, 2))
+        receiver._pad_poll(row)
+        self.assertEqual(receiver.stage, {"index": 30, "kind": None, "stable_polls": 1})
+        self.assertNotEqual(receiver.stage["kind"], 32)
+        receiver._pad_poll(_sss_poll(3, 2))
+        self.assertEqual(receiver.stage["kind"], 32)
+        self.assertEqual(receiver.stage["stable_polls"], 1)
+        for label, mutate in [
+            ("index above sentinel", lambda p: next(x for x in p["slices"] if x["tag"] == 41).update(hex="1f")),
+            ("foreign index", lambda p: next(x for x in p["slices"] if x["tag"] == 41).update(address=0x804D6CAF)),
+            ("stray kind", lambda p: p["slices"].append(_sss_poll(0, 2)["payload"]["slices"][-1])),
+            ("duplicate index", lambda p: p["slices"].append(deepcopy(next(x for x in p["slices"] if x["tag"] == 41)))),
+            ("foreign routing", lambda p: next(x for x in p["slices"] if x["tag"] == 17).update(address=0x80479D31)),
+        ]:
+            with self.subTest(label=label):
+                changed = deepcopy(row["payload"]); mutate(changed)
+                with self.assertRaises(TransformPrefixError):
+                    _menu_owner_pad_poll(changed)
+        missing_kind = deepcopy(row["payload"])
+        next(x for x in missing_kind["slices"] if x["tag"] == 41)["hex"] = "04"
+        self.assertIsNone(_menu_owner_pad_poll(missing_kind))
+        mode_one = deepcopy(row["payload"])
+        next(x for x in mode_one["slices"] if x["tag"] == 17)["hex"] = "010000000000"
+        self.assertIsNone(_menu_owner_pad_poll(mode_one))
+
     def test_setup_verifier_requires_zeldamario_four_stock_fd(self):
         plan = make_input_plan(8)
         setup = _setup_bytes()
