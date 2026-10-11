@@ -15,6 +15,7 @@ const MAX_STAGE_KEY_PULSES = 240;
 const MAX_WALKOFF_PULSES_PER_STOCK = 50;
 const WALKOFF_HOLD_MS = 250;
 const WALKOFF_RELEASE_MS = 25;
+const FIRST_USE_RENDERING_MESSAGE = 'Preparing first-use rendering...';
 
 function requireValue(condition, message) {
   if (!condition) throw Error(message);
@@ -111,6 +112,52 @@ function checkAssetTransferredTerminal(observation, label) {
   assert.deepEqual(match.terminal, {outcome: 2, winners: [1]},
     `${label}: cached native terminal winner changed during Results transfer`);
   return match;
+}
+
+function isHealthyFirstUseRenderWait(row) {
+  const status = row?.native_status;
+  const match = row?.match;
+  return row?.phase === 7 && row?.running === 0 &&
+    row?.message === FIRST_USE_RENDERING_MESSAGE && row?.error === null &&
+    status?.active === 1 && status?.blocker === 'none' &&
+    status?.local_capture_failure === null && status?.network_wait?.active === 0 &&
+    status?.terminal?.kind === 0 &&
+    status?.indexed?.duplicates === 0 && status?.indexed?.conflicts === 0 &&
+    status?.indexed?.gaps === 0 && status?.indexed?.invalid === 0 &&
+    match?.ready === true && match?.paused === false && match?.complete === false &&
+    match?.ending === false && match?.outcome === 0;
+}
+
+// This is a pure classification of an already observed native row. A render
+// settle is a bounded wait state; every other stopped state continues through
+// the existing strict terminal/unsupported-state assertions.
+export function classifyStockObservation(row, label = 'stock observation') {
+  if (row?.phase === 7 && row?.running === 1)
+    return {match: checkMatchIdentity(row, label, {
+      allowCompletion: row.match?.players?.[0]?.stocks === 0})};
+  if (row?.phase === 7 && row?.running === 0) {
+    if (isHealthyFirstUseRenderWait(row)) {
+      const match = checkMatchIdentity(row, label, {active: false, phase: 7});
+      assert.equal(match.ready, true, `${label}: first-use render wait is not a ready match`);
+      assert.equal(match.paused, false, `${label}: source match is paused`);
+      assert.equal(match.complete, false, `${label}: source match completed during render wait`);
+      assert.equal(match.ending, false, `${label}: source match began ending during render wait`);
+      assert.equal(match.outcome, 0, `${label}: source match has an outcome during render wait`);
+      return {match, wait: 'first-use-rendering'};
+    }
+    return {match: checkPreparingTerminalTransfer(row, label), handoff: 'preparing-results'};
+  }
+  if (row?.phase === 5 && row?.running === 0)
+    return {match: checkAssetTransferredTerminal(row, label), handoff: 'results-assets-ready'};
+  if (row?.phase === 8) {
+    const match = checkMatchIdentity(row, label, {active: false, phase: 8});
+    assert.deepEqual(match.players.map(player => player.stocks), [0, 4],
+      `${label}: Results appeared before the natural [0,4] elimination`);
+    assert.deepEqual(match.terminal, {outcome: 2, winners: [1]},
+      `${label}: Results terminal winner changed`);
+    return {match, handoff: 'results'};
+  }
+  throw Error(`${label}: unsupported phase/running state ${row?.phase}/${row?.running}`);
 }
 
 /*
@@ -305,7 +352,8 @@ export async function runA3LocalFullRoute({
   await pulse('alpha', ['j'], {expected: {button: 0x0100}, holdMs: 160,
     releaseMs: 150, label: 'P1 keyboard A confirms source-selected Final Destination'});
   sceneRows = await waitBoth('original Mario/FD match ready', rows => rows.every(row =>
-    row.phase === 7 && row.match?.ready === true && row.match?.frame > 0) && sourceAligned(rows));
+    row.phase === 7 && row.running === 1 && row.match?.ready === true &&
+    row.match?.frame > 0) && sourceAligned(rows));
   const initialMatches = sceneRows.map((row, index) => checkMatchIdentity(row,
     `${index === 0 ? 'alpha' : 'beta'} initial Mario/FD match`));
   assert.deepEqual(initialMatches.map(match => match.players.map(player => player.stocks)),
@@ -329,24 +377,6 @@ export async function runA3LocalFullRoute({
   let lastStableRows = sceneRows;
   let lastCompletedAction = null;
   let attemptsForCurrentStock = 0;
-  const stockObservation = (row, label) => {
-    if (row.phase === 7 && row.running === 1)
-      return {match: checkMatchIdentity(row, label, {
-        allowCompletion: row.match?.players?.[0]?.stocks === 0})};
-    if (row.phase === 7 && row.running === 0)
-      return {match: checkPreparingTerminalTransfer(row, label), handoff: 'preparing-results'};
-    if (row.phase === 5 && row.running === 0)
-      return {match: checkAssetTransferredTerminal(row, label), handoff: 'results-assets-ready'};
-    if (row.phase === 8) {
-      const match = checkMatchIdentity(row, label, {active: false, phase: 8});
-      assert.deepEqual(match.players.map(player => player.stocks), [0, 4],
-        `${label}: Results appeared before the natural [0,4] elimination`);
-      assert.deepEqual(match.terminal, {outcome: 2, winners: [1]},
-        `${label}: Results terminal winner changed`);
-      return {match, handoff: 'results'};
-    }
-    throw Error(`${label}: unsupported phase/running state ${row.phase}/${row.running}`);
-  };
   const recordTerminalHandoff = (rows, states, label) => {
     if (!states.some(state => state.handoff)) return;
     route.terminal_handoff = {first_observed_at: label, source_tick: rows[0].source_tick,
@@ -358,8 +388,9 @@ export async function runA3LocalFullRoute({
   const reconcileP1Stock = async label => {
     const rows = await waitBoth(label, candidates => {
       if (!sourceAligned(candidates)) return false;
-      const states = candidates.map((row, index) => stockObservation(row,
+      const states = candidates.map((row, index) => classifyStockObservation(row,
         `${index === 0 ? 'alpha' : 'beta'} ${label}`));
+      if (states.some(state => state.wait === 'first-use-rendering')) return false;
       const matches = states.map(state => state.match);
       assert(matches.every(match => match.players[1].stocks === 4),
         `${label}: P2 lost a stock during P1 walk-off`);
@@ -371,7 +402,7 @@ export async function runA3LocalFullRoute({
       recordTerminalHandoff(candidates, states, label);
       return true;
     });
-    const states = rows.map((row, index) => stockObservation(row,
+    const states = rows.map((row, index) => classifyStockObservation(row,
       `${index === 0 ? 'alpha' : 'beta'} ${label}`));
     const matches = states.map(state => state.match);
     recordTerminalHandoff(rows, states, label);
@@ -458,8 +489,12 @@ export async function runA3LocalFullRoute({
       if (row.phase === 7 && row.running === 1 && row.match?.players?.[0]?.stocks === 0)
         return {state: 'active-match-end',
           match: checkMatchIdentity(row, label, {allowCompletion: true}), ready: false};
-      if (row.phase === 7 && row.running === 0)
-        return {state: 'preparing-results', match: checkPreparingTerminalTransfer(row, label), ready: false};
+      if (row.phase === 7 && row.running === 0) {
+        const stopped = classifyStockObservation(row, label);
+        if (stopped.wait === 'first-use-rendering')
+          return {state: 'first-use-rendering-wait', match: stopped.match, ready: false};
+        return {state: 'preparing-results', match: stopped.match, ready: false};
+      }
       if (row.phase === 5 && row.running === 0)
         return {state: 'results-assets-ready', match: checkAssetTransferredTerminal(row, label), ready: false};
       throw Error(`${label}: unsupported phase/running state ${row.phase}/${row.running}`);
