@@ -148,3 +148,44 @@ staging, physical input and the other acceptance gates remain open.
 
 The next public-endpoint adapter is a [source-only checkpoint](../handoffs/2026-10-11-public-relay-keyboard-checkpoint.md).
 Its focused refusal checks do not establish a deployed Worker or public browser run.
+
+
+## P2 gameplay input extension — local functional checkpoint
+
+The unmerged `codex/public-relay-keyboard` branch adds one short P2 gameplay
+keyboard pulse before the same full route. Execution source
+`9c41b9145ba7b566e68ac450ec65a9d08b2079a1` uses the unchanged `b5797986`
+Release runtime above; all 46 artifact hashes were reverified. The
+[P2 extension receipt](../evidence/local-room-full-route-v1.json) keeps this
+producer separate from #303 and records the complete input window.
+
+At paired source cursor 469 both peers observed P1 at X −60 and P2 at X 60,
+with four stocks each. The second browser's actual ArrowLeft pulse produced
+literal port-1 PAD records at input ticks 470–472, followed by all-zero neutral
+at 473. All four corresponding P1 port-0 records were neutral. Both peers
+crossed release-plus-delay boundary 476; the fresh paired observation at cursor
+491 showed P2 at X 41.159996, P1 still at −60, and stocks still `[4,4]`.
+This establishes one short movement-and-release interval, not combat coverage.
+
+The unchanged route then completed four natural P1 losses, three grounded
+respawns, the original P2 win, both Human Results confirmations and CSS return.
+All 2,938 frozen 64-byte records match at ticks 0–2,937, covering all five
+scene intervals and the required exclusive return boundary 2,938. No paired
+record at tick 2,938 is claimed. Reported unpaired tails
+remain two alpha and three beta records. Input delay was two ticks; observed
+network-wait episodes were six and eight respectively, without an RTT claim.
+
+The owner completed in 64,436 ms. Normal Leave, native unload to stopped phase
+zero, Worker disposal without fallback and all 21 owned process IDs' absence
+passed, including 16 CDP-attributed browser processes. Successful profiles were
+removed. The known magenta FD geometry remains visible; pixels and audio
+fidelity were not compared. Independent raw-result review passed.
+
+Four focused checks pass. The first root test invocation used an unsupported
+module-import path; canonical discovery passed without source changes. An
+initial private audit miscounted the tail object's keys; corrected metadata
+uses its actual counts, and the initial audit remains retained. Full regression,
+affected-build freshness and current-head CI remain required before future
+integration. This checkpoint stays in the existing #288 work branch to preserve
+milestone batching. It exercises the public adapter's default local path only;
+no public endpoint/preflight exists and external mode remains unrun.

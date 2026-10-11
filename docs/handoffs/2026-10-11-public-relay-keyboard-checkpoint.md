@@ -3,10 +3,11 @@
 ## Branch and scope
 
 Branch `codex/public-relay-keyboard` starts from merged local-route milestone
-`2a73717682372d440dbad16ef4bcb418e31a948d` (#303). The executable source
-checkpoint is `b612176a1c73f12e8db4c962be2748c6c61f96bc`; subsequent edits are
-this handoff and the existing local-route status/CI receipt. This branch is
-source-only and is not merged or validated against a deployed Worker.
+`2a73717682372d440dbad16ef4bcb418e31a948d` (#303). The adapter source
+checkpoint is `b612176a1c73f12e8db4c962be2748c6c61f96bc`; the subsequent P2
+gameplay input checkpoint is `9c41b9145ba7b566e68ac450ec65a9d08b2079a1`.
+This branch is unmerged. Its default local route has a new functional witness;
+external mode is not validated against a deployed Worker.
 
 The existing Host/Join keyboard harness now accepts paired `--relay-url` and
 `--relay-preflight` arguments. Omit both to keep the owned local Worker. The
@@ -36,8 +37,12 @@ The initial syntax failure, missing-SDK environment failure, overly strict
 PATH-Node test, and null/undefined CLI regression are retained. The corrected
 Python wrapper uses the existing pinned-runtime lookup and meaningful behavior
 checks; it does not inspect implementation text or hide missing prerequisites.
-No browser, capture, provider request, auth refresh, deployment or build was
-performed for this adapter. Full regression and current-head CI are pending.
+The original adapter checkpoint had no browser run. The subsequent P2 extension
+passes the default local full route with actual gameplay keyboard input on both
+sides; its separate [boundary receipt](../status/2026-10-11-local-room-ui-readiness.md)
+retains the exact scope and producers. No external-mode browser run, provider
+request, auth refresh or deployment was performed. Full regression and
+current-head CI remain pending for this unmerged branch.
 
 Private receipts live in run `public-relay-keyboard-20261011-141954-bcb8e535`;
 find its verified external path in the coordination checkpoint's
@@ -45,7 +50,10 @@ find its verified external path in the coordination checkpoint's
 has SHA-256 `4a03c4df24443da94e5bc6973f97f3af551266d9dd7f652b72856f8785915a12`.
 The final source freeze is `sol-cli-refusal-fix/freeze.json`, SHA-256
 `b55c1e1ef1eeda6e96b04516fc2be6d48c1ba7abf2b08560be2f3a01d9624bae`.
-Earlier local full-route evidence remains in its separate producer receipt;
+The new P2 capture is in run `p2-keyboard-gameplay-20261011-144352-e745225d`,
+located through the coordination checkpoint. Its default local path does not
+validate the external preflight or service. Earlier local full-route evidence
+remains in its separate producer receipt;
 do not relabel that capture with this adapter's source revision.
 
 ## Next experiment and stopping rule
@@ -64,5 +72,8 @@ Do not change budgets, Resume timing pauses, relax comparisons or alter game
 arithmetic to pass. Current provider credentials are missing or expired; no
 new paid infrastructure, account/security changes or production deployment is
 authorized by this source checkpoint. Continue independent engineering while
-that service prerequisite remains unresolved. Physical, two-machine,
+that service prerequisite remains unresolved. The next competitive milestone
+is [original Sheik transformation #304](https://github.com/ericvanlare/melee-web/issues/304),
+starting with the reduced Items-lock readiness boundary. Its source preparation
+does not authorize a capture or reopen Stadium. Physical, two-machine,
 foreground and audible gates remain unrun.

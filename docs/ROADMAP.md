@@ -83,7 +83,13 @@ for actual keyboard control through original CSS → SSS → four-stock Mario/FD
 This bounded #288 step is local functional evidence only; it does not replace
 the public endpoint milestone above. Next reuse the same controls against an
 identified deployed staging Worker; that service prerequisite remains
-unresolved. Stadium C3 stays checkpointed while Track A has priority. See the
+unresolved. The same driver now has a separately scoped P2 gameplay-input
+checkpoint in the unmerged #288 branch. Keep these steps together until the
+public milestone can integrate; do not repeat local captures without a new
+hypothesis. While the service prerequisite is blocked, continue
+[original Sheik transformation #304](https://github.com/ericvanlare/melee-web/issues/304)
+from its reduced Items-readiness failure. Stadium C3 stays checkpointed while
+Track A has priority. See the
 [execution update](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6112686789).
 
 ### Track B: competitive-rules Melee before the whole game

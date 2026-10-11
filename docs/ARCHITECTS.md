@@ -72,6 +72,13 @@ Its preceding failures and reduced checks remain in the same receipt. The
 deployed Worker and human acceptance gates remain open; no physical testing
 is inferred from automated browser keyboard input.
 
+- 2026-10-11, Codex: the P2 gameplay-input extension and optional public-relay
+  interface stay as commits in the existing #288 work branch, avoiding another
+  component PR while the staging prerequisite remains unresolved. The next
+  independent competitive milestone is [#304](https://github.com/ericvanlare/melee-web/issues/304):
+  reduce the original Items lock/readiness boundary before the existing Sheik
+  transformation prefix. No new Stadium capture or human-session gate is implied.
+
 **Links:** [Owner-requested execution change](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6112686789),
 [A3 #288](https://github.com/ericvanlare/melee-web/issues/288),
 [Stadium C3 #251](https://github.com/ericvanlare/melee-web/issues/251).

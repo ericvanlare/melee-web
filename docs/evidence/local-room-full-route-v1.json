@@ -476,5 +476,621 @@
       "merge_commit": "2a73717682372d440dbad16ef4bcb418e31a948d",
       "reviewed_and_merged_tree": "f27f9b67df80981873f8d645e7c6c072a3332ea4"
     }
+  },
+  "p2_gameplay_extension": {
+    "result": "PASS_SCOPED_LOCAL_P2_INPUT_AND_FULL_ROUTE",
+    "run_id": "p2-keyboard-gameplay-20261011-144352-e745225d",
+    "execution_source": "9c41b9145ba7b566e68ac450ec65a9d08b2079a1",
+    "execution_tree": "de754ab77461fb040c98d9d4790d4c91268ce0e9",
+    "source_files_sha256": {
+      "scripts/a3_local_room_keyboard_browser.mjs": "1f4250c6c5252f4ba602844cc34067469311917a1cc8630fc16805244cbf8b94",
+      "scripts/a3_public_relay_preflight.mjs": "51e568899f9ee32626eb63734610cddb9526659fe3df54eedc690209db490d53",
+      "scripts/a3_local_room_full_route.mjs": "2612dd781c301f77a822cb545051e3c3c72dba427c449ade7bbb8f54b2d4bedc",
+      "scripts/a3_checksum_wait_diagnostics.mjs": "ac7c048b1baad22ea0985f17a6c9fe79c590e9106d1c9f9a055175db81673dd5",
+      "scripts/a3_source_cursor_join.mjs": "ffaf9978dd9c32f2917283726305693817a649319c0846dbe166470b273ccb07"
+    },
+    "runtime_producer": "b57979868339faf07394f614320e59b0e7fe9b5d",
+    "runtime_file_count": 46,
+    "identity_by_peer": {
+      "alpha": {
+        "algorithm": "sha256",
+        "wasm": "3c475521da3b101a17c384d90659ec2ee00ae1181cabeccf2f6d04abc71b7409",
+        "disc": {
+          "algorithm": "sha256",
+          "dol": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+          "fst": "ef099ee0edf64189544d36fe8e4be2293282d595eef27715df8aacb95fc6d4d7",
+          "dolSize": 4425184,
+          "fstSize": 29993
+        }
+      },
+      "beta": {
+        "algorithm": "sha256",
+        "wasm": "3c475521da3b101a17c384d90659ec2ee00ae1181cabeccf2f6d04abc71b7409",
+        "disc": {
+          "algorithm": "sha256",
+          "dol": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+          "fst": "ef099ee0edf64189544d36fe8e4be2293282d595eef27715df8aacb95fc6d4d7",
+          "dolSize": 4425184,
+          "fstSize": 29993
+        }
+      }
+    },
+    "p2_gameplay_prefix": {
+      "source_port": 1,
+      "key": "ArrowLeft",
+      "direction_x": -1,
+      "direction_policy": "one short inward step based on the fresh source-aligned P2 position",
+      "before": {
+        "source_tick": 469,
+        "peers": [
+          {
+            "p1_x": -60,
+            "p2_x": 60
+          },
+          {
+            "p1_x": -60,
+            "p2_x": 60
+          }
+        ],
+        "stocks": [
+          [
+            4,
+            4
+          ],
+          [
+            4,
+            4
+          ]
+        ]
+      },
+      "input_window": {
+        "movement": {
+          "source_cursor": 470,
+          "input_tick": 470,
+          "local_port": 1,
+          "poll_serial": 722,
+          "bytes": [
+            0,
+            0,
+            129,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "neutral_release": {
+          "source_cursor": 473,
+          "input_tick": 473,
+          "local_port": 1,
+          "poll_serial": 725,
+          "bytes": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "source_tick_range": [
+          470,
+          473
+        ],
+        "p2_literal_rows": [
+          {
+            "source_cursor": 470,
+            "input_tick": 470,
+            "local_port": 1,
+            "poll_serial": 722,
+            "bytes": [
+              0,
+              0,
+              129,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "source_cursor": 471,
+            "input_tick": 471,
+            "local_port": 1,
+            "poll_serial": 723,
+            "bytes": [
+              0,
+              0,
+              129,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "source_cursor": 472,
+            "input_tick": 472,
+            "local_port": 1,
+            "poll_serial": 724,
+            "bytes": [
+              0,
+              0,
+              129,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "source_cursor": 473,
+            "input_tick": 473,
+            "local_port": 1,
+            "poll_serial": 725,
+            "bytes": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "p1_literal_rows": [
+          {
+            "source_cursor": 470,
+            "input_tick": 470,
+            "local_port": 0,
+            "poll_serial": 916,
+            "bytes": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "source_cursor": 471,
+            "input_tick": 471,
+            "local_port": 0,
+            "poll_serial": 917,
+            "bytes": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "source_cursor": 472,
+            "input_tick": 472,
+            "local_port": 0,
+            "poll_serial": 918,
+            "bytes": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "source_cursor": 473,
+            "input_tick": 473,
+            "local_port": 0,
+            "poll_serial": 919,
+            "bytes": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "observed_capture_end_tick": 482,
+        "p2_literal_capture_count": 4,
+        "p1_neutral_capture_count": 4,
+        "p1_neutral_source_tick_range": [
+          470,
+          473
+        ]
+      },
+      "after": {
+        "source_tick": 491,
+        "checksum_boundary_required": 476,
+        "checksum_boundary_reached": true,
+        "peers": [
+          {
+            "p1_x": -60,
+            "p2_x": 41.159996,
+            "stocks": [
+              4,
+              4
+            ]
+          },
+          {
+            "p1_x": -60,
+            "p2_x": 41.159996,
+            "stocks": [
+              4,
+              4
+            ]
+          }
+        ],
+        "p2_position_delta_by_peer": [
+          {
+            "peer": "alpha",
+            "before_x": 60,
+            "after_x": 41.159996,
+            "delta_x": -18.840004
+          },
+          {
+            "peer": "beta",
+            "before_x": 60,
+            "after_x": 41.159996,
+            "delta_x": -18.840004
+          }
+        ]
+      },
+      "scope": "one short actual P2 keyboard axis pulse toward center plus literal neutral release; no combat-coverage claim"
+    },
+    "route": {
+      "phases": [
+        1,
+        3,
+        7,
+        8,
+        1
+      ],
+      "remaining_p1_stocks": [
+        3,
+        2,
+        1,
+        0
+      ],
+      "respawns": 3,
+      "terminal_stocks": [
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          4
+        ]
+      ],
+      "terminal_outcome": {
+        "outcome": 2,
+        "winners": [
+          1
+        ]
+      },
+      "source_match_frames": 2012,
+      "keyboard_actions": 34,
+      "results_source_rows": 328,
+      "return_cursors": {
+        "alpha": 2934,
+        "beta": 2935
+      }
+    },
+    "checksums": {
+      "checksum_records": 2938,
+      "source_tick_range": [
+        0,
+        2937
+      ],
+      "scene_ranges": [
+        {
+          "scene": 1,
+          "first": 0,
+          "last": 210
+        },
+        {
+          "scene": 2,
+          "first": 211,
+          "last": 335
+        },
+        {
+          "scene": 3,
+          "first": 336,
+          "last": 2585
+        },
+        {
+          "scene": 4,
+          "first": 2586,
+          "last": 2913
+        },
+        {
+          "scene": 1,
+          "first": 2914,
+          "last": 2937
+        }
+      ],
+      "required_checksum_boundary": 2938,
+      "unpaired_tails": {
+        "alpha": 2,
+        "beta": 3
+      },
+      "boundary_semantics": "exclusive record-count boundary2938; paired ticks0..2937 only"
+    },
+    "input_delay": 2,
+    "network_wait_by_peer": {
+      "alpha": {
+        "wait_callbacks": 6,
+        "wait_episodes": 6,
+        "wait_resume_count": 6
+      },
+      "beta": {
+        "wait_callbacks": 8,
+        "wait_episodes": 8,
+        "wait_resume_count": 8
+      }
+    },
+    "cleanup": {
+      "owner_elapsed_ms": 64436,
+      "owned_pid_count": 21,
+      "cdp_count": 16,
+      "all_owned_pids_absent": true,
+      "native_unload_phase": 0,
+      "native_unload_running": 0,
+      "worker_disposed_without_fallback": true,
+      "successful_profiles_removed": true
+    },
+    "validation": {
+      "focused_tests": 4,
+      "focused_failures": 0,
+      "source_review": "PASS",
+      "raw_result_review": "PASS",
+      "full_suite": "not run for this unmerged checkpoint",
+      "current_head_ci": "not run for this unmerged checkpoint",
+      "runtime_build": "existing unchanged Release producer;46 files reverified"
+    },
+    "retained_corrections": [
+      "Initial root focused invocation used module imports instead of canonical discovery; existing sibling import failed. Canonical discovery passes unchanged source.",
+      "Initial root audit counted keys in each tail object. Corrected to the report count:alpha2,beta3; initial metadata retained unchanged."
+    ],
+    "scope": "Same-machine local Worker actual keyboard movement/input release and full route only. No combat, public Worker, Internet RTT, retail, physical-input, foreground timing, pixels, PCM or full acceptance claim.",
+    "artifacts": [
+      {
+        "file": "capture1/browser/report.json",
+        "bytes": 24000052,
+        "sha256": "b38e7209b4cce251a50ef43017cbe725af96775ace10631badd39e30827d102d"
+      },
+      {
+        "file": "capture1/owner.json",
+        "bytes": 162214,
+        "sha256": "ea9548a1e52fcb77bc0434f6cb12e779859fc95ac6e5a1994daa71e135ba8b69"
+      },
+      {
+        "file": "capture1/capture.log",
+        "bytes": 212,
+        "sha256": "7d468ebebe122d8119a122de39b9ba8a8097f9fd0ba92686a946c66a4fb703f7"
+      },
+      {
+        "file": "capture1/server.log",
+        "bytes": 6669,
+        "sha256": "0b05beca0be2770eb33205ed19a06e4a0177947e2748899dd13c91736d925d12"
+      },
+      {
+        "file": "capture1/browser-processes.jsonl",
+        "bytes": 118653,
+        "sha256": "a5d77f681754e1600a50ed73f66663ec3118cde0e44fe5b12f5b7dfcf1604f7c"
+      },
+      {
+        "file": "capture1-command.json",
+        "bytes": 3562,
+        "sha256": "e6357f6fd8ed11b6674c287e49be6a3bab9b084e6c87137eada4510a19cbb5e4"
+      },
+      {
+        "file": "capture1-exit.json",
+        "bytes": 109,
+        "sha256": "eec1a98d1c80e9fbcea57e607804472aa4ccb7454dae63865c0f1f353e792f0e"
+      },
+      {
+        "file": "runtime-preparation.json",
+        "bytes": 8444,
+        "sha256": "9653220d17f6156310380829088ec585688d7c4e267f79396047ef4ad58fb9d8"
+      },
+      {
+        "file": "focused-result.json",
+        "bytes": 755,
+        "sha256": "a3d02eeef996e6da6c0e96748b64b3958fcff0e8ae3b77c51aea2d92607decce"
+      },
+      {
+        "file": "focused.log",
+        "bytes": 1392,
+        "sha256": "e92afde619a77c8faaa7d2ad0e44a9c545e538f509fdd1f1a0db457d97ed7efc"
+      },
+      {
+        "file": "focused-canonical.log",
+        "bytes": 822,
+        "sha256": "31b8dea401d5b17d4fb7be0be515f9f08bec1e73349d0823c873dcbda53a196d"
+      },
+      {
+        "file": "root-capture1-review.json",
+        "bytes": 2088,
+        "sha256": "c9c19903e20bcdd2e34d8c859c86a54fb97416930f814d27f9370bbc4a622eb1"
+      },
+      {
+        "file": "root-capture1-review-initial-tail-count-error.json",
+        "bytes": 2088,
+        "sha256": "8d523a955536fa9a6e0dde8e79a85b59b38c3820ebf878155c46943b07fad0fb"
+      },
+      {
+        "file": "source-review/candidate.patch",
+        "bytes": 20158,
+        "sha256": "44156cac4863c7b786afa76496bb6fe9c003d7231d5ae3f1110d555b509533c5"
+      },
+      {
+        "file": "source-review/review-packet.json",
+        "bytes": 2406,
+        "sha256": "7c3a16442c8de194cc80adcc3a5a4af1fa18f9c87326c06f5c8211b84cbae8a8"
+      },
+      {
+        "file": "source-review/sol-source-review.json",
+        "bytes": 3164,
+        "sha256": "6dcb18744cfeef8cfafb88bbed10cbbd224b6e1eebc1b9af842fb62d332351a2"
+      },
+      {
+        "file": "capture1/browser/alpha-css-alpha-after.png",
+        "bytes": 485651,
+        "sha256": "f4e75b588ce4da391e8e9fb7fa169c642ce2c0044b858ae3ed5cfc49eaf764d0"
+      },
+      {
+        "file": "capture1/browser/alpha-css-alpha-before.png",
+        "bytes": 486780,
+        "sha256": "fff17dc5e59843ff8d68a5d6e9735e5b9f13fb04ed4607ae167f8d37b3aec214"
+      },
+      {
+        "file": "capture1/browser/alpha-css-beta-after.png",
+        "bytes": 487646,
+        "sha256": "0fd5483bc282e6c8a068e34500c31e2a7444047ed23fb3e4c8c289f5ce997bba"
+      },
+      {
+        "file": "capture1/browser/alpha-css-beta-before.png",
+        "bytes": 488802,
+        "sha256": "63316aacfafa5d3117b553208400947f7ca8be8fb2f29758fa16a1051d1c7686"
+      },
+      {
+        "file": "capture1/browser/beta-css-alpha-after.png",
+        "bytes": 482285,
+        "sha256": "ffe29dd646bda2fed18dfaa84ad050ccc92c351acc9289b4a85f8fd7aded29c3"
+      },
+      {
+        "file": "capture1/browser/beta-css-alpha-before.png",
+        "bytes": 485738,
+        "sha256": "dbf0e8bf8c2166b07a72a272245949a9431f09be2875bdb6ff2321775521a470"
+      },
+      {
+        "file": "capture1/browser/beta-css-beta-after.png",
+        "bytes": 484350,
+        "sha256": "f31e0d83d1d43d001630b80a226489760dcbca9e131490523018acd49e9c742d"
+      },
+      {
+        "file": "capture1/browser/beta-css-beta-before.png",
+        "bytes": 486961,
+        "sha256": "6cfabb7c69e8e7110f75c52e8afee1e90bf6b8c561dbf9655840798a67534212"
+      },
+      {
+        "file": "capture1/browser/full-route-css-two-human-alpha.png",
+        "bytes": 482727,
+        "sha256": "bc914646c7f83ca5e13f3a2e4e9507ee7b22041aa244014adfa62a38480e6bf6"
+      },
+      {
+        "file": "capture1/browser/full-route-css-two-human-beta.png",
+        "bytes": 485009,
+        "sha256": "c907f505e3ce040a173504288dd584f3a9662e66321ac1eba397f2c848a96f38"
+      },
+      {
+        "file": "capture1/browser/full-route-fd-selected-alpha.png",
+        "bytes": 613600,
+        "sha256": "3639bc5c5bb477eb2a334b6105058bff2be4b7f6a1aa26403f2c36c8d60c8b95"
+      },
+      {
+        "file": "capture1/browser/full-route-fd-selected-beta.png",
+        "bytes": 616022,
+        "sha256": "54841e47264cb81a6c8dcea98c3a631c9dfe284480ca1f8d5856a083f439f838"
+      },
+      {
+        "file": "capture1/browser/full-route-match-start-alpha.png",
+        "bytes": 501562,
+        "sha256": "36c35ea1882f4dba1202903a17d92c1d8cbcbff787e5e2422e7c7b1753fe9730"
+      },
+      {
+        "file": "capture1/browser/full-route-match-start-beta.png",
+        "bytes": 503620,
+        "sha256": "672b59528c55baf45e524ff1c1853d7aa21d6715557240b8b13a726d8d8c17c4"
+      },
+      {
+        "file": "capture1/browser/full-route-results-alpha.png",
+        "bytes": 110463,
+        "sha256": "4fef9743a8da5db4524039b2a622c96f3e71e5dacf99d67391e21001b825320f"
+      },
+      {
+        "file": "capture1/browser/full-route-results-beta.png",
+        "bytes": 113152,
+        "sha256": "3023c3c3008b25920b67cfc25068e6e77ed7b74a817b12ae6f30c6a50a67c519"
+      },
+      {
+        "file": "capture1/browser/full-route-returned-css-alpha.png",
+        "bytes": 482283,
+        "sha256": "1468ff2f8dcdaff00a48d46c13904d0b129b65688c03b9a56d0bd502e289c25a"
+      },
+      {
+        "file": "capture1/browser/full-route-returned-css-beta.png",
+        "bytes": 485787,
+        "sha256": "5f747c0ab3d68ceed2acc6e823c419e633fc306785e931cd031a380e0d8cd3d1"
+      },
+      {
+        "file": "capture1/browser/full-route-sss-entry-alpha.png",
+        "bytes": 534335,
+        "sha256": "84204c89c814c68f66ed3e84efab4678b3fe66c8c3234d7828fba6b3c373b1db"
+      },
+      {
+        "file": "capture1/browser/full-route-sss-entry-beta.png",
+        "bytes": 541984,
+        "sha256": "24894188305df530f397bb47f15273e5bfa49daae2c7974e15fea91ff1bf71fa"
+      },
+      {
+        "file": "sol-capture1-review.json",
+        "bytes": 14154,
+        "sha256": "cc6d46e374e06d1685d82f43f87570020022efd907497d36f6f5fa48695ee09c"
+      }
+    ]
   }
 }
