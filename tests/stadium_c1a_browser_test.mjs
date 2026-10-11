@@ -2010,7 +2010,9 @@ async function runFirstSssVsSetup(entryNative) {
   report.scenario.first_sss_vs_setup = {expected_json: inputs.identity,
     before: structuredClone(entryNative), begin: null, observation: null, comparison: null,
     text_tail_probe: firstSssVsSetupTextTail
-      ? {requested: true, log_before_unload: null, after_unload: null} : null};
+      ? {requested: true, log_before_unload: null, after_unload: null,
+        failure_time_log: null, failure_time_log_validation: null,
+        failure_time_unload_attempted: null} : null};
   await persistReport();
   await page.evaluate(() => {
     if (globalThis.__meleeWebStadiumFirstSssVsEntryApproved)
@@ -3013,12 +3015,15 @@ async function cleanupOwnedProcesses() {
           readFirstSssVsEntryObservation(), Math.min(3000, cleanupRemaining()),
           'VS Setup partial owners/actual/error before unload');
         if (firstSssVsSetupTextTail && report.scenario.first_sss_vs_setup?.text_tail_probe) {
-          const log = await snapshotFirstSssTextTailLog();
-          const validation = validateFirstSssTextTailLog(log);
-          report.scenario.first_sss_vs_setup.text_tail_probe.log_before_unload = log;
-          report.scenario.first_sss_vs_setup.text_tail_probe.log_validation_before_unload = validation;
-          report.scenario.first_sss_vs_setup.text_tail_probe.observation_status =
-            validation.complete ? 'retained-awaiting-review' : 'OPEN';
+          const unloadAttemptedAtFailureSnapshot = unloadAttempted;
+          const failureTimeLog = await snapshotFirstSssTextTailLog();
+          const failureTimeValidation = validateFirstSssTextTailLog(failureTimeLog);
+          const textTailProbe = report.scenario.first_sss_vs_setup.text_tail_probe;
+          textTailProbe.failure_time_log = failureTimeLog;
+          textTailProbe.failure_time_log_validation = failureTimeValidation;
+          textTailProbe.failure_time_unload_attempted = unloadAttemptedAtFailureSnapshot;
+          textTailProbe.observation_status =
+            failureTimeValidation.complete ? 'retained-awaiting-review' : 'OPEN';
         }
         await persistReport();
       } catch (error) { cleanupFailures.push({step: 'vs-setup-failure-snapshot', error: errorText(error)}); }

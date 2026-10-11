@@ -318,8 +318,8 @@
     "no_machine_specific_path_required": true
   },
   "subsequent_c3_component_2026_10_09": {
-    "claim_boundary": "The latest observed endpoint is a diagnosis-only run on runner 266f3dc7 with the unchanged e12bea88 runtime. The same-run CSS/SSS, consumed-PAD, first-draw, 124-input prefix and VS Entry prerequisites and declared Setup row-2503 Start/player0\u20133/seed fields passed. Overall checked unload failed and the observation remained uncleared. The retained first rejection is text-topology / owned-second-next at index 1: actual non-null, expected null, operand lifetime unverified. This does not prove pointer ownership or a context-topology cause. The next reviewed observation-only probe will retain text source events and exact SIS allocation membership without relaxing owner predicates; establish source/lifetime ownership before any repair. Ready/GO is gated on a fresh Setup run passing checked unload and observation clearing. Original PAD856/profile, prepared/persistent VsModeData, per-owner RNG, original-matched GO/3,500-tick sequence and C3 remain open. Two historical functional 3,500-tick lifetimes and ordinary Results regression are separate completed evidence; the 551 Entry result and cross-run audio-baseline gap remain preserved. Public Stadium admission stays closed.",
-    "current_result": "Independent review of runner 266f3dc7/runtime e12bea88 approved the declared Setup row-2503 fields and seed with first_mismatch null. The overall run failed at unload; native unload did not complete and the observation was not cleared. Review recorded the text-topology / owned-second-next index-1 mismatch with lifetime unverified. Retention review found 12 attributed processes absent, 44 producer files retained, and 40 post-run local files matching prelaunch HTTP bytes; post-run HTTP is unobserved. Focused 4-Python/41-Node checks, browser-driver control and exact-head CI passed. Runtime builds/full suite remain the prior e12 receipts, not 266f results. The prior context-topology reducer is not evidence for this observed clause.",
+    "claim_boundary": "The latest actual Setup result remains the 4070b6bd capture: its declared row-2503 fields matched, but checked unload failed at text-topology / owned-second-next and the ordinary observation remained uncleared. The current PR301 worktree batch now contains the source-reviewed canceled-prepared SIS-transfer implementation and chronology v2; this docs update is prepared to join it. The extracted StageLast close/cancellation test passed with ASan/UBSan and synthetic transfer services, but private SIS controls, runtime builds, the full suite and a fresh Setup capture have not yet validated the combined batch. Chronology v2 does not retroactively repair the capture\u2019s overwritten log_before_unload field. Validate this batch before considering another stopped Setup run. Original PAD856/profile, persistent VsModeData, per-owner RNG, Ready/GO, original-matched 3,500-tick sequence and C3 acceptance remain open; the two historical functional 3,500-tick lifetimes and ordinary Results regression remain separate completed evidence. Public Stadium admission stays closed.",
+    "current_result": "The 4070b6bd runner/runtime review approved the declared Setup row-2503 comparison but classified the overall run as FAIL_NATIVE_UNLOAD_AFTER_SETUP_COMPARISON_PASS. The observed first rejection was text-topology / owned-second-next at index 1, actual non-null versus expected null, with operand lifetime unverified; unload did not complete and the ordinary observation was not cleared. The current PR301 worktree batch contains the reviewed transfer and chronology-v2 source/tests. Its extracted StageLast close/cancellation test passed with ASan/UBSan and synthetic transfer services; the private SIS implementation/controls, runtime builds and full suite remain unvalidated on the combined batch. Chronology v2 does not alter the historical 407 runtime result.",
     "first_css_browser_draw_4d6c0b37_d949a0b8_v1": {
       "status": "FAIL_BEFORE_ARM; NO_BROWSER_CSS_COMPARISON; NO_TICK; NO_DRAW",
       "scope": "One headless browser attempt with the existing captured first-CSS context and one consumed sample. The diagnostic did not arm; this is not a source draw or Stadium/C3 acceptance result.",
@@ -586,7 +586,7 @@
         "SDK unittest moduleimport failure beforeNode; fixedexplicit scriptsimport and retainedoutput"
       ]
     },
-    "next_progression": "Review and validate a default-off stopped-Setup text probe that retains original append/remove/creator events, exact SIS backing-lease membership diagnostics, bounded log/drop accounting and scalar cleanup outcomes. Then run one separately bound diagnostic Setup attempt; missing, dropped or ambiguous evidence stays incomplete. Allocation membership alone does not establish subsystem ownership or authorize deletion. Preserve all owner/teardown predicates and original inputs, tick/draw ordering, arithmetic and RNG. A justified ownership correction, then a fresh Setup run with declared comparison, checked unload and cleared ordinary observations, are required before Ready/GO. Original PAD856/profile/persistent VsModeData, per-owner RNG, original-matched 3500-tick sequence and C3 remain open.",
+    "next_progression": "Run the private SIS allocator controls and required diagnostic/ordinary builds and full suite on the current PR301 batch. Only if those checks pass, consider a fresh stopped Setup attempt; require the declared comparison, checked unload and cleared ordinary observation before proceeding to Ready/GO. Preserve all current ownership predicates and original ordering. Original PAD856/profile, persistent VsModeData, per-owner RNG, an original-matched 3,500-tick sequence and C3 remain separate open gates.",
     "first_css_context_return_1fad54ff_v1": {
       "source_head": "1fad54ff964f80b263b91a77cf25a25b0ee08603",
       "source_tree": "adfff70b0f357d4c66bd89f1f1c3a30c9202b2a9",
@@ -6009,6 +6009,77 @@
           "sha256": "f74970f8fd62eebabe6d1428fc5c562e69cc811d458daf4affd4fa1ef3a222b7"
         }
       ]
+    },
+    "prepared_sis_transfer_candidate_4070": {
+      "status": "EXTERNAL_SOURCE_CANDIDATE_REVIEWED_FOR_INTEGRATION_ONLY",
+      "base_head": "4070b6bd68db696370d2004ba9b5856783951db6",
+      "candidate": {
+        "freeze": {
+          "artifact": "sol-prepared-sis-retirement-candidate-4070-v1/freeze.json",
+          "bytes": 7115,
+          "sha256": "f8a9384bc7c68bbbd49681d0657f960e8c32bf76ec012bb36dce24f9c66267ba"
+        },
+        "patch": {
+          "artifact": "sol-prepared-sis-retirement-candidate-4070-v1/candidate.patch",
+          "bytes": 59532,
+          "sha256": "107e203eace6b036696163f424c3a061858bdad184ac1a0debf248527ae229a3"
+        },
+        "canonicalized_applied_tree": "90ee5260c4fbef6c92fef5bd24c6c07f2a8da023",
+        "review_dispositions": {
+          "artifact": "sol-prepared-sis-retirement-candidate-4070-v1/review-dispositions.json",
+          "bytes": 9208,
+          "sha256": "f5532e95346a2e9acf33a8029369c7a103607bd8207206de5ef6a366845fc95c"
+        },
+        "root_source_review": {
+          "artifact": "root-prepared-sis-final-review-4070-v1/review.json",
+          "bytes": 3152,
+          "sha256": "9aba0ac63812542bdc92cf440406d9ac263974a937dad9af9ed0362a8e5c9b14",
+          "decision": "PASS_SOURCE_REVIEW_FOR_INTEGRATION_NOT_RUNTIME_ACCEPTANCE"
+        },
+        "candidate_validation": {
+          "artifact": "sol-prepared-sis-retirement-candidate-4070-v1/validation.json",
+          "bytes": 986,
+          "sha256": "ff5312be790b8fe927a9638cb784690eb3bed962f444c7c3f93e27f64f3b316a"
+        }
+      },
+      "stage_last_control": {
+        "result": {
+          "artifact": "sol-prepared-sis-retirement-candidate-4070-v1/evidence/focused-stage-cancel/result.json",
+          "bytes": 1009,
+          "sha256": "a8eba39f32272bc94525295b8e4c19f3f225548620c584c2b10476fd99fa577b"
+        },
+        "command": {
+          "artifact": "sol-prepared-sis-retirement-candidate-4070-v1/evidence/focused-stage-cancel/command.json",
+          "bytes": 942,
+          "sha256": "778da31be212d2615815965df7396215375d5e4b2b2d8eae6d6ac545d1ac43cc"
+        },
+        "log": {
+          "artifact": "sol-prepared-sis-retirement-candidate-4070-v1/evidence/focused-stage-cancel/run.log",
+          "bytes": 1767,
+          "sha256": "810617a8603b2e8e1aa36590e591f86aa5168a32d045de5839b65e24a4106dc5"
+        },
+        "scope": "One extracted StageLast close/cancellation test passed under ASan/UBSan using synthetic transfer/services. Actual StageLast and World/Session prefix are composed; candidate private SIS transfer/snapshot implementation is not compiled or executed."
+      },
+      "chronology_v2": {
+        "candidate_manifest": {
+          "artifact": "text-tail-chronology-candidate-4070-v2/manifest.json",
+          "bytes": 3963,
+          "sha256": "05121482c870e91ecd1de1a40fc1e2a9d93118b64d8dc15787a837dd85c348ab"
+        },
+        "source_test_review": {
+          "artifact": "root-text-tail-chronology-v2-review-4070-v1/review.json",
+          "bytes": 1601,
+          "sha256": "ef29e9c97ec1e51ecd2b7ff0a73a8651054f1b538a26815e571c36ec748c2856",
+          "decision": "PASS_MINIMAL_CHRONOLOGY_AND_DISCOVERABLE_REFUSAL_TEST"
+        },
+        "tests_passed": 2,
+        "scope": "Separates genuine pre-unload snapshot from failure-time diagnostics for future reports; no browser rerun and no retroactive repair of the historical 407 report."
+      },
+      "unrun": [
+        "Candidate private SIS transfer/snapshot controls are uncompiled and unrun.",
+        "No current candidate source runtime builds or full-suite validation have run.",
+        "No new browser Setup capture has run; the retained 4070b6bd unload failure remains the latest runtime outcome."
+      ]
     }
   },
   "admission_and_sss_prefix_boundary_2026_10_11": {
@@ -6950,6 +7021,390 @@
         ]
       },
       "next_action": "Reduce the observed text-topology/owned-second-next rejection without relaxing owner or teardown predicates. A later Setup run must complete checked unload and clear observations before any Ready/GO continuation."
+    },
+    "vs_setup_text_tail_4070b6bd": {
+      "source_identity": {
+        "commit": "4070b6bd68db696370d2004ba9b5856783951db6",
+        "tree": "95603ff577d56bc74dd75ca9fcbd879b03e856e1",
+        "runtime_producer_commit": "4070b6bd68db696370d2004ba9b5856783951db6",
+        "retained_pad_helper_producer_commit": "e12bea88b9a98c8ef36cfecac99154d081c222e1"
+      },
+      "overall_result": "FAIL_NATIVE_UNLOAD_AFTER_SETUP_COMPARISON_PASS",
+      "capture": {
+        "artifact": "vs-setup-text-tail-preflight-4070b6bd-v1/result.json",
+        "bytes": 2037,
+        "sha256": "ccff56f9da045e46a3bdb11d5c275bb51a7196220a52a577c03027cfc694256e"
+      },
+      "independent_review": {
+        "artifact": "sol-setup-text-tail-result-review-4070b6bd-v1/review.json",
+        "bytes": 10140,
+        "sha256": "06113f810a8cf56102eae8fa8569fb8b104373cc1b0e2e579e0570cb9b62ecf1"
+      },
+      "report": {
+        "artifact": "vs-setup-text-tail-preflight-4070b6bd-v1/browser-run/report.json",
+        "bytes": 7815674,
+        "sha256": "0e39841270d6cf996cf53e5f16fb0aa9fb3ab92074a25eef261e3835dd6ae91d"
+      },
+      "setup_comparison": {
+        "original_row": 2503,
+        "approved": true,
+        "first_mismatch": null,
+        "compared": "Declared match Start rules and source-semantic fields for players 0\u20133, preserving raw-float fields, plus host seed; not a whole-Start comparison.",
+        "actual_seed": "35a455b9",
+        "expected_seed": "35a455b9",
+        "construction_complete": true,
+        "source_frames": 0,
+        "source_frames_scope": "actual_match_flow_clock_not_original_scene_frame",
+        "setup_tick_calls": 0,
+        "setup_draw_calls": 0,
+        "exclusions": [
+          "whole Start blob",
+          "native xB",
+          "players 4\u20135",
+          "padding",
+          "pointer/callback slots"
+        ]
+      },
+      "same_run_prerequisites": {
+        "passed": [
+          "CSS/SSS constructor",
+          "consumed-PAD tick",
+          "first draw",
+          "124-input SSS prefix",
+          "VS Entry"
+        ],
+        "prefix_callbacks": 374
+      },
+      "audio": {
+        "render_calls_before_after": [
+          273,
+          273
+        ],
+        "render_frames_before_after": [
+          145600,
+          145600
+        ],
+        "scope": "No added Setup render; no PCM or continuity claim; earlier cross-run baseline differences remain unexplained."
+      },
+      "text_tail": {
+        "records": [
+          "C1_SIS_TEXT_EVENT event=append call=5ACC tail=0 text=0x36f74e8 entity=0x376a380 font=1 context=0",
+          "C1_SIS_TEXT_EVENT event=append call=5ACC tail=0x36f74e8 text=0x36f7594 entity=0x376a3e0 font=1 context=0",
+          "C1_HUD_TEXT_PHASE phase=begin-before-ifAll",
+          "C1_SIS_TEXT_EVENT event=append call=5ACC tail=0x36f7594 text=0x36f773c entity=0x38f4f00 font=2 context=0",
+          "C1_NAMETAG_TEXT event=create function=un_802FD4C8 text=0x36f773c context=0 gobj=0x38f4c80",
+          "C1_HUD_TEXT_PHASE phase=begin-after-ifAll",
+          "C1_HUD_TEXT_PHASE phase=end-before-ifAll",
+          "C1_HUD_TEXT_PHASE phase=end-after-ifAll",
+          "STADIUM_TEXT_MEMBERSHIP_OBSERVATION status=present reason=none clause=owned-second-next index=1 actual=0x36f773c expected=0 snapshot_heap=0x36f74c0 snapshot_world=3 snapshot_source_heap=0 snapshot_allocation=2763 snapshot_epoch=5 snapshot_requested=18432 current_heap=0x36f74c0 current_active=1 current_epoch=5 current_context_status=0 current_world=3 current_source_heap=0 current_allocation_status=0 current_allocation=2763 current_requested=18432 current_live=1 payload_size=160 expected_payload_size=160"
+        ],
+        "record_count": 9,
+        "utf8_bytes": 1062,
+        "dropped_records": 0,
+        "dropped_bytes": 0,
+        "overflow": false,
+        "probe_cleanup": {
+          "opted_in": true,
+          "probe_enabled": false,
+          "sis_capture_attempted": true,
+          "sis_lease_captured": true,
+          "membership_snapshot_attempted": true,
+          "membership_snapshot_started": true,
+          "membership_snapshot_active": false,
+          "membership_snapshot_ended": true,
+          "cleanup_done": true,
+          "cleanup_reason": "native-close-threw",
+          "unload_refused": true,
+          "sis_lease": {
+            "world_generation": 3,
+            "allocation_generation": 2763,
+            "source_epoch": 5,
+            "requested_bytes": 18432,
+            "retirement_verified": false
+          },
+          "error": null,
+          "unload_error": "Stadium display teardown refused a mismatched live owner"
+        },
+        "transport_validation": {
+          "state": "retained",
+          "complete": true,
+          "errors": [],
+          "retained_records": 9,
+          "retained_bytes": 1062,
+          "dropped_records": 0,
+          "dropped_bytes": 0,
+          "overflow": false
+        },
+        "chronology": "Ordered source event stream places font2 append/nametag creation before HUD end and membership rejection. log_before_unload was overwritten by runner failure-handler lines3015\u20133020 after attempted unload; it is not exclusively a pre-unload snapshot.",
+        "proven": "Observed un_802FD4C8 creation and current allocated160-byte payload membership in captured SIS backing lease world3/allocation2763/epoch5.",
+        "not_proven": "Numeric GObj/text addresses and allocation membership do not establish subsystem ownership, lifetime authority, safe deletion or correct teardown ordering."
+      },
+      "cleanup": {
+        "native_unload_completed": false,
+        "ordinary_observation_cleared": false,
+        "ordinary_observation_retained": true,
+        "probe_toggle_cleared": true,
+        "membership_token_ended": true,
+        "scalar_outcome_retained": true,
+        "owned_process_ids_checked_absent": [
+          72013,
+          72015,
+          72041,
+          72047,
+          72050,
+          72054,
+          72055,
+          72056,
+          72057,
+          72067,
+          72068,
+          72074,
+          72252
+        ],
+        "timing_marker_absent": true,
+        "http_before_count": 40,
+        "http_after_observed": false,
+        "current_local_files_match_pre_http": true,
+        "owner_elapsed_ms": 55168,
+        "owner_cleanup_elapsed_ms": 92,
+        "pid_scope_note": "Independent browser inventory+CDP+wrapper/server union13 includes transient observed72057; root receipt checks12 and omits72057. All13 independently absent; root12 receipt retained separately."
+      },
+      "producer_retention": {
+        "artifact": "root-setup-text-tail-failure-retention-4070b6bd-v1/review.json",
+        "bytes": 34402,
+        "sha256": "6c1b4c33db52aff1174d744d5a1c7d5f81bc2919097234ab558f9c6d9257b90d"
+      },
+      "process_union_addendum": {
+        "artifact": "root-setup-text-tail-failure-retention-4070b6bd-v1/process-union-addendum.json",
+        "bytes": 967,
+        "sha256": "df3bdfaddc90bb65806ce89f1caec17ae629d9eda4d5d36c0e0cee10a1df5338"
+      },
+      "validation": {
+        "focused": {
+          "artifact": "text-tail-focused-4070b6bd-v1/result.json",
+          "bytes": 4184,
+          "sha256": "d3d8d3bc6c098c1fcfb4b6f2bfb5a422f2fa3fb2033fda1b8f85f9b6a1626522"
+        },
+        "python_tests": 33,
+        "node_tests": 41,
+        "browser_driver_contract": "PASS",
+        "diagnostic_runtime": {
+          "artifact": "text-tail-builds-4070b6bd-v1/diagnostic-runtime/result.json",
+          "bytes": 731,
+          "sha256": "77d890a044690f78bc8cf7335ee992b4861aac69715b8ec3173b70c4932f9bdd"
+        },
+        "ordinary_runtime": {
+          "artifact": "text-tail-builds-4070b6bd-v1/ordinary-runtime/result.json",
+          "bytes": 729,
+          "sha256": "7504bf6f032eee2083060c03a8a1710047e255fa9fc80cc147142a500f60f8e9"
+        },
+        "full_suite": {
+          "artifact": "full-regression-4070b6bd-v1/result.json",
+          "bytes": 755,
+          "sha256": "289dcf8faf3fa45f831e6414981457db9cab884236e0df3901e752e55d922cf2"
+        },
+        "tests": 2455,
+        "skipped": 162,
+        "failures": 0,
+        "ci": {
+          "artifact": "ci-4070b6bd-complete-v1.json",
+          "bytes": 28777,
+          "sha256": "08fe93c4f8e824b1d5950e22c7c1b4863796d5df9edee8a6edb9d2dbfe157deb"
+        },
+        "ci_id": 38134599634,
+        "successful_jobs": 12,
+        "expected_skips": 2,
+        "pre_server_controls": {
+          "artifact": "vs-setup-text-tail-prelaunch-control-4070b6bd-v1/result.json",
+          "bytes": 309,
+          "sha256": "6e4681f6239758b51b4d5ed8b8fb7374709f8795aad5cd445550ccbfff8d3723"
+        },
+        "negative_cases": 19,
+        "positive_cases": 2,
+        "fresh_first_draw_review": {
+          "artifact": "sol-first-sss-draw-result-review-4070b6bd-v1/review.json",
+          "bytes": 11957,
+          "sha256": "766d272a3763e44b204a5a8693222ca895b11420877cfea1601d27c32f4f162a"
+        }
+      },
+      "retained_validation_failure": {
+        "suite": {
+          "artifact": "full-regression-b93e911b-v1/result.json",
+          "bytes": 771,
+          "sha256": "0f4734ff5461a18b9f541f488d0a5088c3c03ca783446c9da8d4d2b4fe600999"
+        },
+        "ci": {
+          "artifact": "ci-b93e911b-complete-v1.json",
+          "bytes": 28777,
+          "sha256": "8bf86f5bfdac243cd1e41c812c283412baf8ed37a07024dcbd34e9daf48eaf08"
+        },
+        "fixture_correction_review": {
+          "artifact": "root-text-tail-fixture-integration-v1/review.json",
+          "bytes": 2099,
+          "sha256": "f2189ba9386aadc2adcb35fdeedb2c7533564a1912698e9468ee7e9bd115d182"
+        },
+        "scope": "Prior b93 full-suite/CI failure was an extracted onLog VM fixture missing window. Exact one-line browser-global fixture repair; production source unchanged in407 child. Failure and44producer files retained."
+      },
+      "next_action": "Trace original nametag ownership and retirement through HUD/session/stage shutdown, then use the smallest actual-source lifetime reproducer before an ownership repair. Preserve original ordering and predicates; allocation membership is not subsystem teardown authority. Preserve the distinct pre-unload diagnostic snapshot in the next code batch. A later checked Setup unload and ordinary observation clearing are prerequisites to Ready/GO.",
+      "unpaired_or_open": {
+        "fields": [
+          "original PAD856",
+          "original profile",
+          "prepared VsModeData",
+          "per-owner RNG"
+        ],
+        "later_boundaries": [
+          "reduced text-topology/owned-second-next rejection with lifetime proof",
+          "fresh Setup attempt with checked unload and observation clearing",
+          "Ready/GO",
+          "complete original-matched Setup acceptance",
+          "original-matched 3,500-tick sequence",
+          "C3 acceptance"
+        ],
+        "other_gates": [
+          "physical input",
+          "live timing",
+          "pixels",
+          "PCM"
+        ]
+      }
+    },
+    "source_composition_checkpoint_4070": {
+      "decision": "PASS_BOUNDED_CAUSAL_REDUCER_WASM32_ONLY",
+      "source_head": "4070b6bd68db696370d2004ba9b5856783951db6",
+      "reducer_freeze": {
+        "artifact": "root-nametag-causal-reducer-wasm32-4070-v2/freeze.json",
+        "bytes": 5179,
+        "sha256": "478e32eb4338e1b6bacc8fe2eb9ea8290a7623ff8515583e53f5b9fe360cdf13",
+        "note": "Bounded reducer decision and complete bindings; not a runtime acceptance claim."
+      },
+      "generated_source": {
+        "artifact": "root-nametag-causal-reducer-wasm32-4070-v2/control.c",
+        "bytes": 33498,
+        "sha256": "02b24d6b75f17b1b6c2c287f61f419b069a7d19c05da0668e59e3247ed724212",
+        "note": "Exact extracted C; byte-identical to the prior generated source, with no C body or oracle changes."
+      },
+      "target_and_layout": {
+        "emscripten": "6.0.9",
+        "node": "24.19.0",
+        "target": "wasm32",
+        "pointer_bytes": 4,
+        "SisBlock_bytes": 12,
+        "SisBlock_offsets": {
+          "data": 4,
+          "size": 8
+        },
+        "authored_allocation_capacity_bytes": 16,
+        "layout_preflight_passed": true,
+        "sanitizers": [
+          "ASan",
+          "UBSan"
+        ],
+        "floating_point_option": "-ffp-contract=off",
+        "case_count": 4,
+        "case_result": "all four bounded actual-source fixture cases passed",
+        "warning_policy": "Only unused-variable, sign-compare and unused-but-set-global warnings were demoted from errors; four warnings remain visible. C body, allocator arithmetic, oracles and sanitizer settings are unchanged."
+      },
+      "retained_attempt_history": [
+        {
+          "artifact": "nametag-teardown-causal-reducer-4070-v1/freeze.json",
+          "bytes": 4516,
+          "sha256": "e3b2df826ca0ab2a4458856ac60d7e6d3d2f51ae709cad77bbda7538a0cf1ba0",
+          "note": "Prior candidate attempts: first failed before test import/compiler invocation; second generated C then failed compile under -Werror."
+        },
+        {
+          "artifact": "nametag-teardown-causal-reducer-4070-v1/evidence/attempt1.json",
+          "bytes": 1858,
+          "sha256": "5b32c10b1ae8bc34fd3d545972dcf480c742d4613748a6b44b2d05351658c39b",
+          "note": "Retained pre-import invocation failure metadata."
+        },
+        {
+          "artifact": "nametag-teardown-causal-reducer-4070-v1/evidence/attempt2/compile.stderr",
+          "bytes": 1102,
+          "sha256": "8c4e3dd0fe97475f4057dc2cb606a79c2c1cdca0bddb80915df8133133a01dc1",
+          "note": "Retained original -Werror errors for unused best_size and two signed comparisons."
+        },
+        {
+          "artifact": "sol-nametag-causal-reducer-4070-v1/freeze.json",
+          "bytes": 7655,
+          "sha256": "8e3ea6d5f5d9d1b676ce97a99df7ec64e0a934f2c5c7070d20021df700bb69a6",
+          "note": "Retained native-64-bit ABI/layout sanitizer failure; not a valid target for the authored SIS metadata allocation."
+        },
+        {
+          "artifact": "sol-nametag-causal-reducer-wasm32-4070-v1/preflight-result.json",
+          "bytes": 2564,
+          "sha256": "2298595e16a6044f1a481f7dc92d5bfaba868a2cc74646eea3081c51aa764cfa",
+          "note": "Retained wasm32 target/layout preflight result."
+        },
+        {
+          "artifact": "sol-nametag-causal-reducer-wasm32-4070-v1/evidence/layout-run.stdout",
+          "bytes": 57,
+          "sha256": "34b6880b485696d68cf25eb3152e7ad3b02a54b7c413e1bc41d501716899b0fa",
+          "note": "Layout control reports pointer=4, SisBlock=12, data=4, size=8, authored_capacity=16."
+        },
+        {
+          "artifact": "sol-nametag-causal-reducer-wasm32-4070-v1/control-result.json",
+          "bytes": 1489,
+          "sha256": "d9070a2161f381e48d9ac73274dd7177a7f6bc2c9c707d1fad495938a8ea2ac1",
+          "note": "Retained first wasm32 control compile failure."
+        },
+        {
+          "artifact": "sol-nametag-causal-reducer-wasm32-4070-v1/evidence/control-compile.stderr",
+          "bytes": 2171,
+          "sha256": "c2e9e25637b790f2f19aac275a4087e7fb63d49a9f3d73af7230c477f4807153",
+          "note": "Retained three visible warnings plus the additional unused-but-set-global -Werror compile failure."
+        }
+      ],
+      "observed": [
+        "Original un_802FD468 leaves shared SIS text/entity after synthetic per-slot/camera cleanup; the unchanged guard refuses owned-second-next before text frees.",
+        "Exact handle 5CC4 invokes the installed actual 5A2C callback, retires name-text allocations, and restores captured StageLast list topology.",
+        "Original whole-world 5FBC drains text/context roots and backing storage; no guard or StageLast payload dereference occurs after drain.",
+        "Repeated absent handle does not retire unrelated live text; an exact unrelated handle affects only its own entry."
+      ],
+      "limits": [
+        "Camera, archive, model, per-slot NameTag_Create, and outer GObj unlink are explicit fixture doubles.",
+        "List/callback/allocation-ledger checks do not prove bytewise preservation of all live subsystem state.",
+        "Not a complete HUD/session or browser execution, original-game comparison, per-text generation proof, production retirement-placement authority, or C3 acceptance."
+      ],
+      "chronology_candidate_review": {
+        "review": {
+          "artifact": "root-text-tail-chronology-v2-review-4070-v1/review.json",
+          "bytes": 1601,
+          "sha256": "ef29e9c97ec1e51ecd2b7ff0a73a8651054f1b538a26815e571c36ec748c2856",
+          "note": "Source/test review passed; pending integration."
+        },
+        "candidate_manifest": {
+          "artifact": "text-tail-chronology-candidate-4070-v2/manifest.json",
+          "bytes": 3963,
+          "sha256": "05121482c870e91ecd1de1a40fc1e2a9d93118b64d8dc15787a837dd85c348ab",
+          "note": "Binds the external source/test candidate and final discovery run."
+        },
+        "decision": "PASS_MINIMAL_CHRONOLOGY_AND_DISCOVERABLE_REFUSAL_TEST",
+        "discovered_tests": 2,
+        "integration_status": "pending next coherent PR301 batch",
+        "historical_capture_scope": "Does not retroactively correct or relabel the 407 log_before_unload failure-time snapshot."
+      },
+      "reviewed_next_source_step": {
+        "design_review": {
+          "artifact": "sol-prepared-sis-retirement-reuse-review-4070-v1/review.json",
+          "bytes": 7820,
+          "sha256": "0dfa9e74875305e92d8298e6e1fa147d17b249fc4c87908e2ff532209e9b8ec5",
+          "note": "Approves bounded design only; not implementation or runtime acceptance."
+        },
+        "source_map_review": {
+          "artifact": "root-prepared-sis-retirement-reuse-map-4070-v1/review.json",
+          "bytes": 4802,
+          "sha256": "2365787947e1ebf840c8c5ad30bff424320c10b0ed37913e615c274d354b2a48",
+          "note": "Records the source-order map and required invariants."
+        },
+        "next_step": "Use a checked one-way receipt for successful canceled-prepared ownership transfer, reusing the existing exact SIS lease/payload-watch snapshot and original font-1 drain plus non-font-1 preservation checks. Preserve source_started and map-graph phase; leave residual font-2 text for the later existing Match-world SIS drain.",
+        "required_scope": [
+          "Capture/validate dependencies before destructive prepared cancellation; publish the receipt only after cancellation succeeds.",
+          "Refused or incomplete cancellation grants no receipt; consume once and independently revalidate the SIS lease, watched payloads, fonts and foreign owners before drain.",
+          "Do not create source_started/manager phase, delete the nametag selectively, reorder the whole-world drain, or claim runtime retirement."
+        ],
+        "status": "Design approved; implementation and adverse no-mutation tests remain open; root review before integration/runtime."
+      }
     }
   }
 }

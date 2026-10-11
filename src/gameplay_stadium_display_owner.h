@@ -2,6 +2,7 @@
 #define MELEE_WEB_GAMEPLAY_STADIUM_DISPLAY_OWNER_H
 
 #include <stddef.h>
+#include <stdint.h>
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include "gameplay_source_memory_runtime.h"
 #endif
@@ -112,6 +113,20 @@ int melee_web_stadium_manager_view_preflight(
     const MeleeWebStadiumManagerView*, char*, size_t);
 int melee_web_stadium_display_owner_preflight(
     MeleeWebStadiumDisplayOwner*, char*, size_t);
+/* A canceled, not-yet-started source StageLast may transfer only the SIS
+ * retirement strategy. The transfer never changes source_started/manager
+ * state and is consumed by the exact StageLast owner before display teardown. */
+int melee_web_stadium_display_owner_prepare_cancel_transfer(
+    MeleeWebStadiumDisplayOwner*, const void* stage_identity, uint64_t world_generation,
+    uint64_t* token, char* error, size_t error_size);
+void melee_web_stadium_display_owner_abort_cancel_transfer(
+    MeleeWebStadiumDisplayOwner*, const void* stage_identity, uint64_t world_generation,
+    uint64_t token);
+void melee_web_stadium_display_owner_publish_cancel_transfer(
+    MeleeWebStadiumDisplayOwner*, uint64_t token);
+int melee_web_stadium_display_owner_consume_cancel_transfer(
+    MeleeWebStadiumDisplayOwner*, const void* stage_identity, uint64_t world_generation,
+    uint64_t token, char* error, size_t error_size);
 /* Allocation-free current source-display observation for the GO canary. This
  * validates exact current owner/map identities and returns scalar gate/mode
  * fields without entering SIS retirement or changing owner state. */

@@ -103,4 +103,10 @@ console.log('PASS actual Setup CLI/route/reader/history/owner controls; no brows
 '''
   w=self.new_workspace(ROOT,'setup-runner-');p=w/'control.mjs';p.write_text(js)
   r=subprocess.run([str(node_runtime()),str(p)],capture_output=True,text=True);(w/'run.log').write_text(r.stdout+r.stderr);self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+class FirstSssVsSetupTextTailChronologyTests(unittest.TestCase):
+ def test_actual_cleanup_text_tail_chronology(self):
+  node_test=Path(__file__).resolve().with_name('stadium_text_tail_chronology.test.mjs')
+  r=subprocess.run([str(node_runtime(ROOT)),str(node_test)],capture_output=True,text=True)
+  self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+  self.assertIn('PASS actual cleanup chronology before/after unload',r.stdout)
 if __name__=='__main__':unittest.main()

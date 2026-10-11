@@ -129,6 +129,7 @@ struct MeleeWebStageLast {
     const void* collision_map;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     MeleeWebStadiumDisplayOwner* stadium_display_owner;
+    uint64_t stadium_cancel_transfer_token;
     MeleeWebStadiumGenerator* stadium_generator;
     MeleeWebMatchContext* stadium_camera_owner;
     CmSubject* stadium_subject;
@@ -682,6 +683,7 @@ int melee_web_stage_last_stadium_prepare_ready(MeleeWebStageLast* h,
 }
 int melee_web_stage_last_stadium_cancel_prepared_ready(MeleeWebStageLast* h,char* e,size_t n)
 {
+ uint64_t sis_transfer_token=0;
  if(!h||h!=active||h->generation!=melee_web_gameplay_generation()||
     !h->definition||!h->definition->diagnostic_only||!h->source_ordered||
     h->definition->stage_kind!=St_Kind_PStadium||HSD_GObj_804D781C||
@@ -737,10 +739,18 @@ int melee_web_stage_last_stadium_cancel_prepared_ready(MeleeWebStageLast* h,char
   node=p->next;
  }
  if(node)return fail(e,n,"Prepared Stadium pending queue has a foreign tail");
+ /* Capture exact live SIS/watch dependencies before cancellation. Pending
+  * transfer state is non-authorizing until the infallible publish below. */
+ if(!melee_web_stadium_display_owner_prepare_cancel_transfer(
+       h->stadium_display_owner,h,h->generation,&sis_transfer_token,e,n))return 0;
  /* No source root or header is released until every prospective owner has
-  * passed. Generator cancellation rechecks only its own untouched lease and
-  * can refuse before mutation; no fallible validation follows its release. */
- if(!melee_web_stadium_generator_cancel_prepared(h->stadium_generator,e,n))return 0;
+  * passed. Generator cancellation may refuse before mutation; abort only the
+  * pending display receipt in that case. No fallible validation follows it. */
+ if(!melee_web_stadium_generator_cancel_prepared(h->stadium_generator,e,n)){
+  melee_web_stadium_display_owner_abort_cancel_transfer(
+      h->stadium_display_owner,h,h->generation,sis_transfer_token);
+  return 0;
+ }
  h->stadium_generator=NULL;stage_info.x6A4=NULL;
  for(size_t i=0;i<ARRAY_SIZE(h->stadium_headers);++i){
   HSD_Free(h->stadium_headers[i]);h->stadium_headers[i]=NULL;
@@ -748,6 +758,9 @@ int melee_web_stage_last_stadium_cancel_prepared_ready(MeleeWebStageLast* h,char
  }
  h->stadium_camera_owner=NULL;h->stadium_started=0;
  h->stadium_ready_route=0;h->stadium_ready_armed=0;
+ h->stadium_cancel_transfer_token=sis_transfer_token;
+ melee_web_stadium_display_owner_publish_cancel_transfer(
+     h->stadium_display_owner,sis_transfer_token);
  return ok(e,n);
 }
 /* Hooks surround only the untouched original Stage OnStart dispatch. Ordinary
@@ -853,9 +866,15 @@ int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
   ((Ground*)h->stadium_map2_buffer_owner.display_ground->user_data)->u.display.xF4=NULL;
   h->stadium_subject=NULL;h->stadium_camera_owner=NULL;h->stadium_started=0;
  }
+ if(h->stadium_cancel_transfer_token&&!h->stadium_display_owner)
+  return fail(e,n,"Prepared Stadium SIS transfer lost its exact display owner");
  if(h->stadium_display_owner){
+  if(h->stadium_cancel_transfer_token&&
+     !melee_web_stadium_display_owner_consume_cancel_transfer(
+         h->stadium_display_owner,h,h->generation,
+         h->stadium_cancel_transfer_token,e,n))return 0;
   if(!melee_web_stadium_display_owner_end(h->stadium_display_owner,e,n))return 0;
-  h->stadium_display_owner=NULL;
+  h->stadium_display_owner=NULL;h->stadium_cancel_transfer_token=0;
  }
 #endif
  /* Ready completion owns creation of this source scheduler. Early unload
