@@ -78,12 +78,12 @@ producer identities stay in the issue and scoped receipts.
 
 **Owner-requested readiness checkpoint (October 11):** the existing local Worker
 and Host/Join UI have a [scoped browser result](status/2026-10-11-local-room-ui-readiness.md)
-for keyboard control in original CSS, matching runtime checksums and clean
-intentional disconnect. This bounded #288 step is local functional evidence only;
-it does not replace the public endpoint or complete-match milestone above.
-Extend the same actual controls through the complete route next; the deployed
-staging prerequisite remains unresolved. Stadium C3 remains
-checkpointed while this step has the capture lane. See the
+for actual keyboard control through original CSS → SSS → four-stock Mario/FD
+→ Results → CSS, matching runtime checksums and clean intentional disconnect.
+This bounded #288 step is local functional evidence only; it does not replace
+the public endpoint milestone above. Next reuse the same controls against an
+identified deployed staging Worker; that service prerequisite remains
+unresolved. Stadium C3 stays checkpointed while Track A has priority. See the
 [execution update](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6112686789).
 
 ### Track B: competitive-rules Melee before the whole game

@@ -58,9 +58,9 @@ equivalence, audible output and whole-session acceptance remain open. The
 broader #288 playable-slice criteria remain unchanged.
 
 
-## Full-route extension — in progress
+## Full-route extension — local functional pass
 
-The follow-on local keyboard route is **not yet complete**. Its
+The follow-on local keyboard route **passed once** in attempt 5. Its
 [separate producer and attempt receipt](../evidence/local-room-full-route-v1.json)
 preserves the readiness result above and binds a fresh Release runtime built
 from merged `b57979868339faf07394f614320e59b0e7fe9b5d`. The fresh Wasm SHA-256
@@ -103,13 +103,41 @@ outward movement and P2 stayed neutral during gameplay. Their outcomes differ:
   retained observations. It does not interpolate, relabel or compare across
   ticks, and does not guarantee that a bounded live acquisition will overlap.
 
+The fifth attempt used the reviewed observer join on clean execution source
+`d67886769f24ad020ebf3e9de0bf2c3d0d1c3026`, with the same runtime, source game
+and deadline. Both browsers followed original CSS → SSS → four-stock Mario/FD
+→ original Results → CSS in the retained functional witness. Four natural P1
+stock losses, three grounded respawns and the original P2 win (`[0,4]`, outcome
+2, winner source port 1) were observed. The original Results trace retained
+329 rows, including each Human port’s Start confirmation and source exit.
+The 32 keyboard actions passed their literal native PAD-record checks.
+P2 stayed neutral during gameplay; this does not establish combat coverage.
+
+Independent byte comparison verified all 2,950 frozen 64-byte checksum records, ticks
+0–2,949, byte for byte. Their scene ranges cover CSS (0–211), SSS (212–347),
+match (348–2,596), Results (2,597–2,925) and returned CSS (2,926–2,949).
+The required return-plus-input-delay boundary 2,945 is covered. Reported
+unpaired tails of two alpha and three beta records remain separately scoped.
+Input delay was two ticks; each peer recorded eight network-wait callbacks
+in eight episodes. This local observation makes no Internet-latency claim.
+
+Attempt 5’s owner finished in 68,264 ms; all 22 owned process IDs were absent
+in fresh independent checks, with 16 CDP-attributed browser processes.
 Each owner stayed within the five-minute wall budget and reserved cleanup time.
-All four cleanups passed normal UI Leave, native quiescence, unload to stopped
+All five cleanups passed normal UI Leave, native quiescence, unload to stopped
 phase zero, Worker disposal without fallback, and owned-process absence.
 Failed profiles and reports remain retained. The observed Final Destination
 geometry still has the known magenta rendering defect; no visual acceptance is
-claimed. Fourth stock loss, Results, CSS return and the complete route remain
-unobserved in this new keyboard harness.
+claimed. The complete local route is functional evidence only. It does not establish
+retail equivalence, reliable sustained performance or broader acceptance.
+
+The full regression suite on `d67886769f24ad020ebf3e9de0bf2c3d0d1c3026` passed
+2,309 tests with 166 skips and no failures or errors. Focused observation and
+wait controls, syntax checks and independent source/evidence review pass. The
+Release runtime was built from `b5797986`; this branch changes only harnesses,
+tests and documentation, and all 46 unchanged runtime hashes were reverified.
+Final metadata edits are documentation-only. Current-head CI and integration
+remain pending at this receipt.
 
 The bounded provider follow-up made zero provider requests because existing
 credentials were missing or expired; it did not refresh authentication. The

@@ -1,9 +1,9 @@
 {
   "schema": "melee-web-local-room-full-route-v1",
   "issue": 288,
-  "result": "INCOMPLETE_FAILED_ATTEMPTS_RETAINED",
+  "result": "PASS_SCOPED_LOCAL_FULL_ROUTE",
   "run_id": "local-room-full-route-20261011-130838-0abaa6ac",
-  "scope": "Same-machine headless local Worker route investigation; no complete match or Internet/acceptance claim",
+  "scope": "Same-machine headless local Worker actual Host/Join and keyboard route through original CSS, SSS, four-stock Mario/FD, Results and CSS; no Internet or acceptance claim",
   "runtime_producer": {
     "commit": "b57979868339faf07394f614320e59b0e7fe9b5d",
     "tree": "e6f86b1287d033094bc00bf85d0981c933f2a075",
@@ -99,6 +99,67 @@
       "cdp_process_count": 16,
       "owned_pids_independently_absent": 21,
       "cause": "Both peers reached active original SSS and continued at observed1\u20132tick offsets, but the driver required identical cursors in one concurrent poll.4929polls exhausted the operation budget."
+    },
+    {
+      "attempt": 5,
+      "result": "PASS",
+      "execution_source": "d67886769f24ad020ebf3e9de0bf2c3d0d1c3026",
+      "phases": [
+        1,
+        3,
+        7,
+        8,
+        1
+      ],
+      "remaining_stock_observations": [
+        3,
+        2,
+        1,
+        0
+      ],
+      "grounded_respawns": 3,
+      "match_frames": 2011,
+      "terminal": {
+        "outcome": 2,
+        "winners": [
+          1
+        ],
+        "stocks": [
+          0,
+          4
+        ]
+      },
+      "results_trace_rows": 329,
+      "results_confirmed_source_ports": [
+        0,
+        1
+      ],
+      "keyboard_actions": 32,
+      "exact_common_records": 2950,
+      "bytes_per_record": 64,
+      "source_tick_range": [
+        0,
+        2949
+      ],
+      "required_returned_css_checksum_boundary": 2945,
+      "unpaired_tails": {
+        "alpha": 2,
+        "beta": 3
+      },
+      "input_delay_ticks": 2,
+      "network_wait_callbacks": {
+        "alpha": 8,
+        "beta": 8
+      },
+      "network_wait_episodes": {
+        "alpha": 8,
+        "beta": 8
+      },
+      "owner_elapsed_ms": 68264,
+      "normal_cleanup_passed": true,
+      "owned_pids_absent": 22,
+      "cdp_attributed_processes": 16,
+      "source_game_or_runtime_changed": false
     }
   ],
   "offline_reduction": {
@@ -310,14 +371,62 @@
       "file": "reduction/source-cursor-join-focused-result.json",
       "bytes": 2470,
       "sha256": "a201f671623e4735689141adcb82b416b969561d87aa39e2c2fcd7f2de8a0f75"
+    },
+    {
+      "file": "capture5-command.json",
+      "bytes": 3201,
+      "sha256": "97efe24023846ff83c9d50274e1a91b039733523082cfd7e34ea3e0b11c73541"
+    },
+    {
+      "file": "capture5-summary.json",
+      "bytes": 2580,
+      "sha256": "74e57d27dce32e3cc357108bc20ec72b2e2d457f71ae09ea4ce73deeebe3186a"
+    },
+    {
+      "file": "capture5/browser/report.json",
+      "bytes": 24077507,
+      "sha256": "5cc9aeee631e2cc8fe76de0ba4b78a000ad8da84f7fa14a1855120cb4ac839b4"
+    },
+    {
+      "file": "capture5/owner.json",
+      "bytes": 180348,
+      "sha256": "9c99db2eefa30363b5c2e56c191f764887fe0e10973da11072ac7c74c462b595"
+    },
+    {
+      "file": "capture5/capture.log",
+      "bytes": 213,
+      "sha256": "2dde809b7850838c3fb947adae943a5e98e369c23275d5fead442764330cd81d"
+    },
+    {
+      "file": "capture5/browser-processes.jsonl",
+      "bytes": 135240,
+      "sha256": "66cac6d517b59217557d049809c7a721d38376a9d181f84da71fccb263082126"
+    },
+    {
+      "file": "sol-capture5-review.json",
+      "bytes": 4031,
+      "sha256": "1e0b8f60fccc35586fa2f88f37ef9adb2ff8fcb01ae8f4f32794be6ae162d1c5"
+    },
+    {
+      "file": "sol-full-milestone-source-review.json",
+      "bytes": 1004,
+      "sha256": "e996be1275e242c1edea4ce40f3e630ab9ee7454f7a19b14f433955eb089ce2f"
+    },
+    {
+      "file": "full-suite.log",
+      "bytes": 423520,
+      "sha256": "51b4c9a8cc4d7018079a641c31f55587a2ef88fdf29fa180c0523503f7541fd2"
+    },
+    {
+      "file": "full-suite-result.json",
+      "bytes": 4140,
+      "sha256": "643ca54d064575f7a3ac2185dfa9a77c9deb768077b41b6e2661b7d3ea8c7521"
     }
   ],
   "pending": [
-    "One bounded browser attempt of the reviewed exact-source observation join",
-    "Complete local keyboard match route including fourth stock loss, Results and CSS return",
-    "Final branch regression, affected target validation, review and CI before integration",
-    "Deployed staging Worker route",
-    "Physical input, two-machine, foreground timing, original pixels/PCM and whole-session acceptance"
+    "Complete current-head CI and integration after final documentation review",
+    "Deployed staging Worker route; current provider credentials missing or expired, no auth refresh or deployment performed",
+    "Two-sided gameplay/combat coverage, physical input, two-machine, foreground timing, original pixels/PCM and whole-session acceptance"
   ],
   "checksum_wait_diagnostics": {
     "source": "a9c28108d540a0b1e374e42f32be0e16e0b0e603",
@@ -333,5 +442,19 @@
     "behavior": "Fresh acquisition-local samples, adaptive lagging-peer reread, exact latest source cursor only, unchanged route predicates and checksum comparison. No fabricated overlap or guaranteed liveness.",
     "prior_test_expectation_failure_retained": true,
     "review_result": "Approve one unchanged-budget capture"
+  },
+  "validation": {
+    "full_suite_source": "d67886769f24ad020ebf3e9de0bf2c3d0d1c3026",
+    "full_suite_tests": 2309,
+    "full_suite_skipped": 166,
+    "full_suite_failures": 0,
+    "full_suite_errors": 0,
+    "full_suite_seconds": 493.809,
+    "runtime_build_source": "b57979868339faf07394f614320e59b0e7fe9b5d",
+    "runtime_build_result": "PASS",
+    "runtime_inputs_unchanged_from_producer": true,
+    "runtime_inventory_reverified_files": 46,
+    "independent_source_and_evidence_review": "PASS",
+    "final_ci": "pending"
   }
 }

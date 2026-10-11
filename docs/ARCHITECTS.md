@@ -62,13 +62,15 @@ testing because they cannot test personally now.
 using the existing room UI and local Worker: two independent
 headless browsers Host/Join, keyboard input moves each original CSS cursor,
 runtime checksums agree, and intentional Leave retires the sessions. This is a
-bounded local readiness step; the public staging Worker and complete-match A3
+bounded local readiness step; the deployed staging complete-match A3
 requirements remain open. No human-session or physical-input result is inferred.
 Stop at the first failure, reduce after two attempts, and avoid another open-ended
 stage or fighter investigation. Evidence belongs in the #288 boundary receipt.
-The autonomous follow-on uses the same controls for a local complete-match
-witness. Its retained driver failures and reduced checks are updated in that
-same receipt; no human testing or complete-route success is inferred.
+The autonomous follow-on now has one local complete-match witness using the
+same actual controls, including original Results confirmation and CSS return.
+Its preceding failures and reduced checks remain in the same receipt. The
+deployed Worker and human acceptance gates remain open; no physical testing
+is inferred from automated browser keyboard input.
 
 **Links:** [Owner-requested execution change](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6112686789),
 [A3 #288](https://github.com/ericvanlare/melee-web/issues/288),
