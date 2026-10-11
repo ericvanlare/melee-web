@@ -22,6 +22,7 @@
 #include <melee/if/if_2F6E.h>
 #include <melee/if/if_2F72.h>
 #include <sysdolphin/baselib/gobjproc.h>
+#include <sysdolphin/baselib/memory.h>
 #endif
 #include <stdlib.h>
 #include <stdio.h>
