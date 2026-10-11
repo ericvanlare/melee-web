@@ -155,6 +155,14 @@ MeleeWebPadState* melee_web_pad_state_decode(const uint8_t* bytes,size_t size,ch
     return state;
 }
 void melee_web_pad_state_free(MeleeWebPadState* state){free(state);}
+int melee_web_pad_state_encode(const MeleeWebPadState* state,uint8_t* out,size_t size)
+{
+    if(!state||!out||size!=MELEE_WEB_PAD_STATE_BYTES)return 0;
+    uint8_t* p=out;write_config(&p,&state->config);
+    for(unsigned bank=0;bank<3;bank++)for(unsigned slot=0;slot<4;slot++)
+        write_history(&p,&state->history[bank][slot]);
+    return 1;
+}
 void melee_web_pad_state_capture(uint8_t out[MELEE_WEB_PAD_STATE_BYTES])
 {
     uint8_t* p=out;write_config(&p,&HSD_PadLibData);

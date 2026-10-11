@@ -290,6 +290,57 @@ std::string first_sss_vs_entry_json(){
     <<",\"error\":"<<(s.error.empty()?"null":first_css_browser_draw_json_quote(s.error))
     <<",\"actual\":"<<(s.actual.empty()?"null":s.actual)<<'}';return out.str();
 }
+struct FirstSssVsSetupState {
+ bool attempted=false,requested=false,import_committed=false,captured=false,complete=false,failed=false;
+ bool construction_complete=false,menu_retired=false;
+ unsigned requested_generation=0,committed_generation=0,construction_steps=0,source_frames=0;
+ unsigned host_tick_calls=0,host_draw_calls=0,getter_calls=0;
+ uint64_t prior_world_generation=0,match_world_generation=0;
+ uint64_t audio_calls_before=0,audio_calls_after=0,audio_frames_before=0,audio_frames_after=0;
+ const MeleeWebPadState* input=nullptr;
+ const MeleeWebPadState* host_input=nullptr;
+ std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)> owned_input{nullptr,melee_web_pad_state_free};
+ std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> input_bytes{};
+ const uint32_t* parent_seed_owner=nullptr;
+ uint32_t parent_seed=0,parent_seed_after_retirement=0;
+ bool parent_seed_restored=false;
+ std::string error,actual,history;
+};
+FirstSssVsSetupState first_sss_vs_setup;
+std::string first_sss_vs_setup_current_json();
+std::string first_sss_vs_setup_json(){
+ const auto& s=first_sss_vs_setup;std::ostringstream out;
+ out<<"{\"attempted\":"<<(s.attempted?"true":"false")
+    <<",\"captured\":"<<(s.captured?"true":"false")
+    <<",\"complete\":"<<(s.complete?"true":"false")
+    <<",\"failed\":"<<(s.failed?"true":"false")
+    <<",\"requested\":"<<(s.requested?"true":"false")
+    <<",\"import_committed\":"<<(s.import_committed?"true":"false")
+    <<",\"getter_calls\":"<<s.getter_calls
+    <<",\"menu_retired\":"<<(s.menu_retired?"true":"false")
+    <<",\"parent_seed_before_retirement\":"<<s.parent_seed
+    <<",\"parent_seed_after_retirement\":"<<s.parent_seed_after_retirement
+    <<",\"parent_seed_owner_value_restored\":"<<(s.parent_seed_restored?"true":"false")
+    <<",\"requested_generation\":"<<s.requested_generation
+    <<",\"committed_generation\":"<<s.committed_generation
+    <<",\"construction_steps\":"<<s.construction_steps
+    <<",\"construction_complete\":"<<(s.construction_complete?"true":"false")
+    <<",\"source_frames\":"<<s.source_frames
+    <<",\"host_tick_calls\":"<<s.host_tick_calls<<",\"host_draw_calls\":"<<s.host_draw_calls
+    <<",\"prior_world_generation\":"<<s.prior_world_generation
+    <<",\"match_world_generation\":"<<s.match_world_generation
+    <<",\"audio_render_calls_before\":"<<s.audio_calls_before
+    <<",\"audio_render_calls_after\":"<<s.audio_calls_after
+    <<",\"audio_render_frames_before\":"<<s.audio_frames_before
+    <<",\"audio_render_frames_after\":"<<s.audio_frames_after
+    <<",\"prior_observations\":\"historical_at_setup_begin_before_menu_retirement\""
+    <<",\"operation_counters_scope\":\"setup_service_only_no_tick_draw_calls\""
+    <<",\"source_frames_scope\":\"actual_match_flow_clock_not_original_scene_frame\""
+    <<",\"current_owners\":"<<first_sss_vs_setup_current_json()
+    <<",\"actual\":"<<(s.actual.empty()?"null":s.actual)
+    <<",\"error\":"<<(s.error.empty()?"null":first_css_browser_draw_json_quote(s.error))<<'}';
+ return out.str();
+}
 void first_sss_sequence_sync(bool prefix){
  auto& s=prefix?first_sss_prefix_sequence:first_sss_draw_sequence;
  if(!s.armed||!host)return;
@@ -735,6 +786,11 @@ bool first_css_browser_postdraw_stream_compare(const char* phase,
 }
 void first_css_browser_draw_refresh_observation(){
  auto& state=first_css_browser_draw;
+ if(!first_sss_vs_setup.history.empty()){
+  state.observation=first_sss_vs_setup.history.substr(0,first_sss_vs_setup.history.size()-1)+
+      ",\"first_sss_vs_setup\":"+first_sss_vs_setup_json()+"}";
+  return;
+ }
  std::ostringstream out;
  const char* status=state.failed?"failed":state.complete?"complete":
      state.draw_captured?"draw-captured":state.tick_captured?"tick-captured":
@@ -894,6 +950,8 @@ void first_css_browser_draw_refresh_observation(){
   out<<",\"first_sss_prefix\":"<<first_sss_sequence_observation_json(true);
  if(first_sss_vs_entry.attempted||first_sss_vs_entry.failed)
   out<<",\"first_sss_vs_entry\":"<<first_sss_vs_entry_json();
+ if(first_sss_vs_setup.attempted||first_sss_vs_setup.failed)
+  out<<",\"first_sss_vs_setup\":"<<first_sss_vs_setup_json();
  out<<'}';state.observation=out.str();
 }
 #endif
@@ -1382,6 +1440,7 @@ if(scoped_assets){
  first_sss_draw_sequence=FirstSssSequenceBrowserState{};
  first_sss_prefix_sequence=FirstSssSequenceBrowserState{};first_sss_frozen_pair_json.clear();
  first_sss_vs_entry=FirstSssVsEntryState{};
+ first_sss_vs_setup=FirstSssVsSetupState{};
 #endif
  audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;pending_menu_source_scene=0;pending_opening_state=-1;audio_clock.reset();clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();
  css_fighter_release_port=-1;last_css_fighter_observation_valid=false;
@@ -1407,6 +1466,10 @@ void request_assets(AssetDestination destination,
   check(selection!=nullptr,"This asset scope requires an original source selection");
   names=melee_web::match_asset_names(*selection);break;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ case AssetDestination::FirstSssVsSetup:
+  check(first_sss_vs_setup.attempted&&!first_sss_vs_setup.failed&&selection,
+        "VS Setup asset scope requires its one-use checked selection");
+  names=melee_web::stadium_c1a_asset_names(*selection);break;
  case AssetDestination::StadiumC1a:
   check(stadium_c1a_armed&&selection!=nullptr,
         "Stadium C1a preparation requires its armed source selection");
@@ -1437,6 +1500,11 @@ void request_assets(AssetDestination destination,
  requested_assets=std::move(names);
  asset_generation=asset_scope.request(requested_assets);
  asset_destination=destination;asset_committed=false;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(destination==AssetDestination::FirstSssVsSetup){
+  first_sss_vs_setup.requested_generation=asset_generation;first_sss_vs_setup.requested=true;
+ }
+#endif
  if(selection){asset_selection=*selection;asset_selection_valid=true;}
  if(opening_preview){asset_opening_preview=*opening_preview;asset_opening_preview_valid=true;}
  if(opening_state>=0)pending_opening_state=opening_state;
@@ -1970,6 +2038,61 @@ void advance(){
  if(phase==6){running=false;message="Original menu closed.";return;}
 }
 
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+std::string first_sss_vs_setup_current_json(){
+ std::ostringstream out;out<<"{\"host\":"<<(host?"true":"false")
+   <<",\"menu_world\":"<<(world?"true":"false")<<",\"match\":"<<(match?"true":"false")
+   <<",\"cache\":"<<(archive_cache?"true":"false")<<",\"host_entered\":"<<(host_entered?"true":"false")
+   <<",\"host_phase\":"<<(host?melee_web_menu_host_phase(host):-1)
+   <<",\"source_world_exists\":"<<(melee_web_gameplay_world_exists()?"true":"false")
+   <<",\"source_world_generation\":"<<melee_web_gameplay_generation()
+   <<",\"pending_scope_generation\":"<<asset_scope.pending_generation()
+   <<",\"asset_generation\":"<<asset_generation<<",\"active_files\":"<<asset_scope.active_file_count()
+   <<",\"running\":"<<(running?"true":"false")<<",\"pending\":"<<(pending?"true":"false")
+   <<",\"first_use_draw_pending\":"<<(first_use_draw_pending?"true":"false")<<'}';return out.str();
+}
+bool first_sss_vs_setup_asset_pending(unsigned generation){
+ const auto& s=first_sss_vs_setup;
+ return s.attempted&&s.requested&&!s.failed&&!s.complete&&!s.import_committed&&
+        s.requested_generation==generation&&generation!=0&&
+        asset_destination==AssetDestination::FirstSssVsSetup;
+}
+void first_sss_vs_setup_fail(const char* error){
+ auto& s=first_sss_vs_setup;s.failed=true;s.complete=false;
+ if(s.error.empty())s.error=error;
+ s.audio_calls_after=diagnostic_audio_render_calls;s.audio_frames_after=diagnostic_audio_render_frames;
+ if(match){s.source_frames=match->source_frames();s.construction_complete=match->construction_complete();}
+ running=false;pending=false;first_use_draw_pending=false;menu_clock.reset();audio_clock.reset();
+ first_css_browser_draw_refresh_observation();
+}
+bool first_sss_vs_setup_finish_handoff(){
+  auto& s=first_sss_vs_setup;
+  check(s.attempted&&s.requested&&!s.failed&&!s.complete&&!s.import_committed&&
+        asset_generation==s.requested_generation&&asset_selection_valid&&host&&!host_entered&&
+        melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY&&
+        s.input&&s.host_input==melee_web_menu_host_input(host),
+        "VS Setup handoff lost its exact stopped host/input/generation");
+  std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> input_now{};
+  check(melee_web_pad_state_encode(s.host_input,input_now.data(),input_now.size())&&
+        input_now==s.input_bytes,"VS Setup retained host PAD changed during asset handoff");
+  const auto names=melee_web::stadium_c1a_asset_names(asset_selection);
+  check(names==requested_assets&&files.size()==names.size()&&
+        asset_scope.active_file_count()==names.size(),"VS Setup manifest differs from its exact selection");
+  for(const auto& name:names){const auto it=files.find(name);
+   check(it!=files.end()&&!it->second.empty(),"VS Setup manifest file is missing");}
+  check(!melee_web_gameplay_world_exists()&&seed_ptr==s.parent_seed_owner&&
+        *s.parent_seed_owner==s.parent_seed,"VS Setup lost the restored parent RNG owner/value");
+  s.import_committed=true;s.committed_generation=asset_generation;
+  archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
+  match=std::make_unique<melee_web::GameplayMatchSession>(files,asset_selection,*archive_cache,
+      melee_web::GameplayMatchConstruction::Deferred,*s.input,
+      melee_web::GameplayMatchDiagnostic::StadiumReady);
+  s.match_world_generation=melee_web_gameplay_generation();
+  check(s.match_world_generation&&s.match_world_generation!=s.prior_world_generation,
+        "VS Setup did not acquire a fresh source world");
+  running=false;pending=false;first_use_draw_pending=false;return false;
+}
+#endif
 bool finish_asset_handoff(){
  if(asset_destination==AssetDestination::None)return true;
  if(!asset_committed)return false;
@@ -1977,6 +2100,7 @@ bool finish_asset_handoff(){
  const auto destination=asset_destination;
  asset_destination=AssetDestination::None;asset_committed=false;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(destination==AssetDestination::FirstSssVsSetup)return first_sss_vs_setup_finish_handoff();
  if(destination==AssetDestination::StadiumC1a){
   check(stadium_c1a_armed&&stadium_c1a_raw_stkind==St_Kind_PStadium&&
         asset_selection_valid&&host&&!host_entered,
@@ -2286,12 +2410,49 @@ bool first_sss_sequence_service(){
 }
 #endif
 
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+bool first_sss_vs_setup_service(){
+ if(!first_sss_vs_setup.attempted)return false;
+  auto& s=first_sss_vs_setup;
+  try{
+   check(!running&&!pending&&!first_use_draw_pending,"VS Setup continuation became runnable");
+   if(!s.failed&&!s.complete){
+    if(asset_destination==AssetDestination::FirstSssVsSetup){
+     if(asset_committed)(void)finish_asset_handoff();
+     else check(asset_scope.pending_generation()==s.requested_generation,
+                "VS Setup pending asset generation was aborted or replaced");
+    }else{
+     check(s.import_committed&&match&&archive_cache,"VS Setup lost deferred construction owners");
+     ++s.construction_steps;
+     const bool complete=match->advance_construction();
+     s.source_frames=match->source_frames();s.construction_complete=match->construction_complete();
+     check(s.source_frames==0,"VS Setup construction advanced gameplay");
+     if(complete){
+      check(s.construction_complete,"VS Setup phase completion disagrees with session");
+      std::ostringstream out;out<<"{\"phase\":\"vs_setup\",\"random_seed_hex\":\""
+       <<melee_web::stadium_first_css_diagnostic::hex32(match->random_seed())<<"\",\"start\":";
+      melee_web::stadium_first_css_diagnostic::write_start(out,match->start_data());out<<'}';
+      s.actual=out.str();s.captured=true;s.complete=true;
+     }
+    }
+   }
+   s.audio_calls_after=diagnostic_audio_render_calls;s.audio_frames_after=diagnostic_audio_render_frames;
+   first_css_browser_draw_refresh_observation();
+  }catch(const std::exception& error){first_sss_vs_setup_fail(error.what());}
+  return true;
+}
+#endif
+
 void tick(){
  // Consume owner failure and lifecycle suspension before source or clock work.
  // A hidden/frozen interval may contain no callback at all; its handoff leaves
  // running/manual pause intent unchanged and excludes only inactive wall time.
  const int owner_action=EM_ASM_INT({return window.menuServiceCommands?.() || 0;});
  if(owner_action<0){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(first_sss_vs_setup.attempted&&!first_sss_vs_setup.complete)
+   first_sss_vs_setup_fail("VS Setup owner stopped during asynchronous preparation");
+#endif
   // A terminal JS/audio failure is consumed only at this source-free boundary.
   // Preserve the first owner error and frozen scene for diagnostics; recovery
   // requires a new document, so no native preparation or source work may follow.
@@ -2304,6 +2465,7 @@ void tick(){
   menu_clock.reset();audio_clock.reset();
  }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(first_sss_vs_setup_service())return;
  if(first_sss_sequence_service())return;
 #endif
  service_render_cache_writes();
@@ -3758,6 +3920,53 @@ int melee_web_native_menu_stadium_first_sss_draw_kick(){try{
  s.kicked=true;menu_clock.reset();first_use_draw_pending=false;
  first_css_browser_draw_refresh_observation();return 1;
 }catch(const std::exception& error){first_sss_sequence_fail(false,error.what());first_css_browser_draw_refresh_observation();return 0;}}
+int melee_web_native_menu_stadium_first_sss_vs_setup_begin(){try{
+ auto& s=first_sss_vs_setup;
+ check(!s.attempted&&!s.failed&&!s.complete,"VS Setup continuation is one-use");
+ s.attempted=true;
+ s.audio_calls_before=s.audio_calls_after=diagnostic_audio_render_calls;
+ s.audio_frames_before=s.audio_frames_after=diagnostic_audio_render_frames;
+ const auto eligible=[&](){return !s.failed&&!running&&!pending&&!faulted&&host&&!host_entered&&
+   world&&!match&&!results&&!prize&&!replay&&!melee_web_net_active()&&!stadium_c1a_armed&&
+   scoped_assets&&scoped_disc_import&&!menu_scene_rebuild_pending&&!preparation.busy()&&
+   preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&
+   asset_destination==AssetDestination::None&&first_sss_vs_entry.complete&&!first_sss_vs_entry.failed&&
+   first_sss_prefix_sequence.complete&&!first_sss_prefix_sequence.failed&&
+   melee_web_menu_host_source_scene(host)==0&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY;};
+ check(eligible(),"VS Setup requires its stopped approved Entry host");
+ check(EM_ASM_INT({try{const f=globalThis.__meleeWebStadiumFirstSssVsEntryApproved;
+   return typeof f==='function'&&f()===true?1:0;}catch(_){return 0;}})==1,
+   "VS Setup requires strict host Entry approval");
+ check(eligible(),"VS Setup eligibility changed during host approval");
+ MeleeWebMenuMatchSelection selection{};char error[256]{};
+ ++s.getter_calls;
+ check(melee_web_menu_host_stadium_c1a_selection(host,&selection,error,sizeof error),error);
+ std::ostringstream selected;selected<<"{\"phase\":\"vs_entry\",\"random_seed_hex\":\""
+   <<melee_web::stadium_first_css_diagnostic::hex32(selection.random_seed)<<"\",\"start\":";
+ melee_web::stadium_first_css_diagnostic::write_start(selected,selection.start);selected<<'}';
+ check(selected.str()==first_sss_vs_entry.actual,"VS Setup selection changed from approved actual Entry");
+ s.host_input=melee_web_menu_host_input(host);
+ check(melee_web_pad_state_encode(s.host_input,s.input_bytes.data(),s.input_bytes.size()),
+       "VS Setup could not serialize retained source PAD history");
+ s.owned_input.reset(melee_web_pad_state_decode(s.input_bytes.data(),s.input_bytes.size(),error,sizeof error));
+ check(s.owned_input!=nullptr,error);s.input=s.owned_input.get();
+ first_css_browser_draw_refresh_observation();s.history=first_css_browser_draw.observation;
+ const auto setup_key=s.history.rfind(",\"first_sss_vs_setup\":");
+ check(setup_key!=std::string::npos,"VS Setup prerequisite snapshot is missing");
+ s.history.resize(setup_key);s.history+='}';
+ s.prior_world_generation=melee_web_gameplay_generation();
+ s.parent_seed_owner=seed_ptr;check(s.parent_seed_owner!=nullptr,"VS Setup parent RNG owner is missing");
+ s.parent_seed=*s.parent_seed_owner;
+ world->close();world.reset();world_exposed=false;s.menu_retired=true;
+ s.parent_seed_after_retirement=seed_ptr?*seed_ptr:0;
+ s.parent_seed_restored=seed_ptr==s.parent_seed_owner&&s.parent_seed_after_retirement==s.parent_seed;
+ check(!melee_web_gameplay_world_exists(),"VS Setup menu world retirement did not complete");
+ check(s.parent_seed_restored,"VS Setup menu retirement changed parent RNG owner/value");
+ request_assets(AssetDestination::FirstSssVsSetup,&selection);
+ s.requested_generation=asset_generation;s.requested=true;
+ first_css_browser_draw_refresh_observation();return 1;
+}catch(const std::exception& error){first_sss_vs_setup_fail(error.what());return 0;}}
+
 int melee_web_native_menu_stadium_first_sss_vs_entry_kick(){try{
  auto& s=first_sss_vs_entry;const auto& prefix=first_sss_prefix_sequence;
  check(!s.attempted&&!s.failed&&!s.complete,"VS Entry endpoint is one-use");

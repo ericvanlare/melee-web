@@ -9,6 +9,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createFirstCssStreamComparator, createFirstCssFinalDrawComparator,
   createFirstSssConstructorPairComparator, createFirstSssConsumedPadTickComparator,
   createFirstSssDrawComparator, createFirstSssPrefixComparator, createFirstSssVsEntryComparator,
+  createFirstSssVsSetupComparator,
   decodeFirstSssPrefixInputBundle, firstSssAudioAccounting,
   requestSynchronousApproval}
   from './stadium_first_css_stream_compare.mjs';
@@ -1126,6 +1127,50 @@ function vsEntryActualFixture(expected = vsEntryExpectedFixture()) {
     actual: {phase: 'vs_entry', start, random_seed_hex: '3bb84c53'}};
 }
 
+function vsSetupExpectedFixture() {
+  const entry = vsEntryExpectedFixture();
+  const inventory = [[4,0x80480530,0x138],[19,0x804d5f94,4],
+    [20,0x804d5f90,4],[21,0x804c1f84,0x358]]
+    .map(([tag,address,size]) => ({tag, flags: 0, address, size}));
+  return {schema: 'melee-web-stadium-first-sss-vs-setup-endpoint', version: 1,
+    scope: 'original ordinary VS Setup row2503 StartMeleeData and RNG scalar only',
+    provenance: {observer_bytes: 4397889,
+      observer_sha256: '361e8c1108cc2d02ba94d1f3b3be9612a80d0227672445cd4a2b0e2119917778',
+      observer_status_bytes: 515,
+      observer_status_sha256: '05a08641404bda9f87ac4c20b1a44a982ff0470ff3a9b04861c03ba542866c3f',
+      sequence: 2503, pc: '0x8016e9c4', source_tick: 125, draw_ordinal: 0,
+      setup_profile_verified_by_observer: false},
+    expected: {phase: 'vs_setup', start: entry.expected.start,
+      random_seed_hex: '35a455b9'},
+    comparison_fields: ['phase', 'random_seed_hex', 'start.rules', 'start.players[0:4]'],
+    unpaired_fields: [
+      'source tick/draw ordinal (provenance only; not native frame equality)',
+      'source pointer/address', 'StartMeleeData ABI padding/unknown bytes',
+      'native player slots4-5', 'native player xB',
+      'original Setup-row PAD snapshot (provenance only)',
+      'prepared_output_unpaired persistent VsModeData',
+      'other Setup-row slices outside the selected typed Start and RNG'],
+    source_setup: {sequence: 2503, pc: 0x8016e9c4, event: 'boundary', boundary: 'setup',
+      source_tick: 125, draw_ordinal: 0, start_slice_address: 0x80480530,
+      start_sha256: '918a23d68a3b5024f94baf1f5e26e6c0db56c5fbbbffdc79c5e620e82af3b728',
+      setup_profile_verified_by_observer: false, random_seed_hex: '35a455b9',
+      rng_pointer_hex: '804d5f90', source_slice_inventory: inventory,
+      source_capture_inventory: inventory,
+      source_slices_hex: Object.fromEntries(inventory.map(row => [`${row.tag}:0`,
+        row.tag === 19 ? '804d5f90' : row.tag === 20 ? '35a455b9' : '00'.repeat(row.size)]))},
+    source_admission: false, whole_session_equivalent: false};
+}
+function vsSetupEntryStatus() {
+  return {attempted: true, approved: true, failed: false, first_mismatch: null};
+}
+function vsSetupActualFixture(expected = vsSetupExpectedFixture()) {
+  const start = nativeSssNote({sss: {vs: {start: expected.expected.start}, header: {start_game: 1}}},
+    'vs_setup').sss.vs.start;
+  return {attempted: true, captured: true, complete: true, failed: false, error: null,
+    construction_complete: true, source_frames: 0, host_tick_calls: 0, host_draw_calls: 0,
+    actual: {phase: 'vs_setup', start, random_seed_hex: '35a455b9'}};
+}
+
 test('VS Entry compares the checked match Start mapper once, preserving unpaired native bytes', () => {
   const expected = vsEntryExpectedFixture(), actual = vsEntryActualFixture(expected);
   actual.actual.start.players[0].xB = 255;
@@ -1248,5 +1293,67 @@ test('VS Entry actual CLI recognizes the new route and rejects missing/orphan/co
     [...args, '--first-sss-prefix'], ['--first-sss-vs-entry-expected', 'entry.json']]) {
     const refused = run(values); assert.notEqual(refused.status, 0);
     assert.match(refused.stderr, /Choose one private C1a diagnostic route/);
+  }
+});
+
+test('VS Setup compares completed deferred Session Start and seed after approved Entry', () => {
+  const expected = vsSetupExpectedFixture(), actual = vsSetupActualFixture(expected);
+  actual.actual.start.players[0].xB = 255;
+  actual.actual.start.players[4] = {ignored_native_player_slot: true};
+  const comparator = createFirstSssVsSetupComparator(
+    expected, vsEntryPrefixFixture(), vsSetupEntryStatus());
+  assert.equal(comparator.compare(actual), true);
+  assert.equal(comparator.status().approved, true);
+  assert.equal(comparator.compare(actual), false);
+  assert.equal(comparator.status().first_mismatch.path, 'setup.callback');
+});
+
+test('VS Setup refuses construction, frame, continuation work and declared Start mismatches', () => {
+  const expected = vsSetupExpectedFixture();
+  for (const change of [
+    a => {a.captured = false;},
+    a => {a.failed = true; a.error = 'deferred owner refused';},
+    a => {a.construction_complete = false;},
+    a => {a.source_frames = 1;},
+    a => {a.host_tick_calls = 1;},
+    a => {a.host_draw_calls = 1;},
+    a => {a.actual.phase = 'vs_entry';},
+    a => {a.actual.random_seed_hex = '35a455ba';},
+    a => {a.actual.start.rules.is_vs = 0;},
+    a => {a.actual.start.players[0].stocks += 1;},
+    a => {delete a.actual.start.players[0].flags_c;},
+  ]) {
+    const actual = vsSetupActualFixture(expected); change(actual);
+    const comparator = createFirstSssVsSetupComparator(
+      expected, vsEntryPrefixFixture(), vsSetupEntryStatus());
+    assert.equal(comparator.compare(actual), false);
+    assert.equal(comparator.status().failed, true);
+    assert.ok(comparator.status().first_mismatch);
+  }
+});
+
+test('VS Setup requires strict prefix, same-run Entry approval and exact source identity', () => {
+  const expected = vsSetupExpectedFixture(), prefix = vsEntryPrefixFixture();
+  for (const key of ['complete', 'transition_requested']) {
+    const changed = structuredClone(prefix); changed[key] = false;
+    assert.throws(() => createFirstSssVsSetupComparator(
+      expected, changed, vsSetupEntryStatus()), /completed checked SSS prefix/);
+  }
+  for (const entry of [
+    {attempted: false, approved: true, failed: false, first_mismatch: null},
+    {attempted: true, approved: false, failed: true, first_mismatch: {path: 'entry'}},
+  ]) assert.throws(() => createFirstSssVsSetupComparator(
+    expected, prefix, entry), /approved same-run VS Entry/);
+  for (const change of [
+    e => {e.provenance.sequence = 2502;},
+    e => {e.provenance.pc = '0x8016e934';},
+    e => {e.expected.phase = 'vs_entry';},
+    e => {e.expected.random_seed_hex = '3bb84c53';},
+    e => {e.source_setup.source_slices_hex['19:0'] = '804d5f94';},
+    e => {e.source_setup.setup_profile_verified_by_observer = true;},
+  ]) {
+    const changed = structuredClone(expected); change(changed);
+    assert.throws(() => createFirstSssVsSetupComparator(
+      changed, prefix, vsSetupEntryStatus()), /exact retained row2503/);
   }
 });

@@ -1,0 +1,106 @@
+"""Actual Setup functions with controlled services; not runtime equivalence."""
+from pathlib import Path
+import os, shlex, subprocess, unittest
+from owned_test_workspace import OwnedWorkspaceTests
+from test_first_css_final_pending_draw_host import _function
+ROOT=Path(__file__).resolve().parents[1]
+PRELUDE=r"""
+#include <cassert>
+#include <cstdint>
+#include <memory>
+#include <array>
+#include <vector>
+#include <map>
+#include <sstream>
+#include <string>
+#include <stdexcept>
+#include <cstdio>
+#include <cstring>
+#define MELEE_WEB_PAD_STATE_BYTES 822
+struct MeleeWebPadState {std::array<uint8_t,822> bytes{};};
+static void melee_web_pad_state_free(MeleeWebPadState* p){delete p;}
+static int melee_web_pad_state_encode(const MeleeWebPadState* p,uint8_t* out,size_t n){if(!p||!out||n!=822)return 0;memcpy(out,p->bytes.data(),n);return 1;}
+static MeleeWebPadState* melee_web_pad_state_decode(const uint8_t* b,size_t n,char*,unsigned){if(n!=822)return nullptr;auto* p=new MeleeWebPadState;memcpy(p->bytes.data(),b,n);return p;}
+static MeleeWebPadState host_pad;
+static uint32_t seed=17,foreign_seed=19,*seed_ptr=&seed;
+static uint64_t generation=7;static bool source_world=true;
+static uint64_t melee_web_gameplay_generation(){return source_world?generation:0;}
+static bool melee_web_gameplay_world_exists(){return source_world;}
+static bool running=false,pending=false,faulted=false,host_entered=false,menu_scene_rebuild_pending=false;
+static bool first_use_draw_pending=false,world_exposed=true,stadium_c1a_armed=false,scoped_assets=true,scoped_disc_import=true;
+static void* host=(void*)1;static void *results=nullptr,*prize=nullptr,*replay=nullptr;
+static bool melee_web_net_active(){return false;}
+static int melee_web_menu_host_source_scene(void*){return 0;}
+static int melee_web_menu_host_phase(void*){return 5;}
+static const MeleeWebPadState* melee_web_menu_host_input(void*){return &host_pad;}
+#define MELEE_WEB_MENU_READY 5
+static void check(int ok,const char* e){if(!ok)throw std::runtime_error(e);}
+struct Clock {void reset(){}} menu_clock,audio_clock;
+namespace melee_web {struct MenuPreparationState{enum class Phase{Idle};};}
+struct Preparation {bool busy(){return false;} auto phase(){return melee_web::MenuPreparationState::Phase::Idle;}} preparation;
+struct Start {int value=7;};struct MeleeWebMenuMatchSelection{uint32_t random_seed=0x3bb84c53;Start start;};
+static bool getter_ok=true;static unsigned getter_calls=0;static int selected_value=7;
+static int melee_web_menu_host_stadium_c1a_selection(void*,MeleeWebMenuMatchSelection* s,char* e,unsigned n){++getter_calls;if(!getter_ok){snprintf(e,n,"get refused");return 0;}s->start.value=selected_value;return 1;}
+namespace melee_web::stadium_first_css_diagnostic {
+static std::string hex32(uint32_t x){char b[9];snprintf(b,sizeof b,"%08x",x);return b;}
+static void write_start(std::ostream& o,const Start& s){o<<"{\"value\":"<<s.value<<'}';}}
+static bool retirement_changes_seed=false;
+struct World {void close(){source_world=false;if(retirement_changes_seed)seed_ptr=&foreign_seed;}};
+static std::unique_ptr<World> world;
+static std::map<std::string,std::vector<uint8_t>> files;
+namespace melee_web {
+static std::vector<std::string> stadium_c1a_asset_names(const MeleeWebMenuMatchSelection&){return {"stage","fighter"};}
+struct RuntimeArchiveCache {explicit RuntimeArchiveCache(const decltype(files)&){}};
+enum class GameplayMatchConstruction{Deferred};enum class GameplayMatchDiagnostic{StadiumReady};
+struct GameplayMatchSession {unsigned steps=0,frames=0;bool done=false;Start data;GameplayMatchSession(const decltype(files)&,const MeleeWebMenuMatchSelection& s,RuntimeArchiveCache&,GameplayMatchConstruction,const MeleeWebPadState&,GameplayMatchDiagnostic):data(s.start){source_world=true;++generation;}bool advance_construction(){++steps;return done=steps==2;}unsigned source_frames(){return frames;}bool construction_complete(){return done;}uint32_t random_seed(){return 0x35a455b9;}const Start& start_data(){return data;}};
+}
+static std::unique_ptr<melee_web::GameplayMatchSession> match;
+static std::unique_ptr<melee_web::RuntimeArchiveCache> archive_cache;
+enum class AssetDestination{None,StadiumC1a,FirstSssVsSetup};
+static AssetDestination asset_destination=AssetDestination::None;static bool asset_committed=false,asset_selection_valid=false;
+static uint32_t asset_generation=0;static MeleeWebMenuMatchSelection asset_selection;
+static std::vector<std::string> requested_assets;
+struct Scope{unsigned pending=0,active=0;unsigned pending_generation(){return pending;}unsigned active_file_count(){return active;}} asset_scope;
+static uint64_t diagnostic_audio_render_calls=274,diagnostic_audio_render_frames=146133;
+struct Entry{bool complete=true,failed=false;std::string actual="{\"phase\":\"vs_entry\",\"random_seed_hex\":\"3bb84c53\",\"start\":{\"value\":7}}";} first_sss_vs_entry;
+struct Prefix{bool complete=true,failed=false;} first_sss_prefix_sequence;
+struct Observation{std::string observation="{\"old\":true,\"first_sss_vs_setup\":{}}";} first_css_browser_draw;
+static void first_css_browser_draw_refresh_observation(){}
+static void request_assets(AssetDestination d,const MeleeWebMenuMatchSelection* s){asset_destination=d;asset_selection=*s;asset_selection_valid=true;requested_assets=melee_web::stadium_c1a_asset_names(*s);++asset_generation;asset_scope.pending=asset_generation;}
+int melee_web_native_menu_stadium_first_sss_vs_setup_begin();
+static int approval=1;static bool reenter=false;
+static int approve(){if(reenter){reenter=false;assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin()==0);}return approval;}
+#define EM_ASM_INT(...) approve()
+"""
+TEST=r"""
+static void reset(){match.reset();archive_cache.reset();first_sss_vs_setup={};first_sss_vs_entry={};first_sss_prefix_sequence={};world=std::make_unique<World>();source_world=true;generation=7;seed=17;seed_ptr=&seed;retirement_changes_seed=false;approval=1;reenter=false;getter_ok=true;getter_calls=0;selected_value=7;asset_destination=AssetDestination::None;asset_generation=0;asset_committed=false;asset_selection_valid=false;asset_scope={};files.clear();host_pad={};running=pending=faulted=host_entered=first_use_draw_pending=false;}
+static void commit(){files={{"stage",{1}},{"fighter",{2}}};asset_scope.active=2;asset_scope.pending=0;asset_committed=true;}
+int main(){
+ reset();assert(!first_sss_vs_setup_service());assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin()==1);assert(!world&&first_sss_vs_setup.parent_seed_restored&&first_sss_vs_setup.getter_calls==1);assert(first_sss_vs_setup.input!=&host_pad&&first_sss_vs_setup.history=="{\"old\":true}");assert(melee_web_native_menu_stadium_c1a_asset_scope(1)==1);assert(melee_web_native_menu_stadium_c1a_asset_scope(2)==0);
+ assert(first_sss_vs_setup_service()&&!match);commit();assert(first_sss_vs_setup_service()&&match&&!first_sss_vs_setup.complete);assert(first_sss_vs_setup_service()&&!first_sss_vs_setup.complete);assert(first_sss_vs_setup_service()&&first_sss_vs_setup.complete&&first_sss_vs_setup.captured);assert(first_sss_vs_setup.source_frames==0&&first_sss_vs_setup.host_tick_calls==0&&first_sss_vs_setup.host_draw_calls==0);assert(first_sss_vs_setup.actual.find("35a455b9")!=std::string::npos);assert(first_sss_vs_setup.match_world_generation!=first_sss_vs_setup.prior_world_generation);auto actual=first_sss_vs_setup.actual;auto steps=match->steps;assert(first_sss_vs_setup_service()&&match->steps==steps);assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin()==0&&first_sss_vs_setup.actual==actual);
+ reset();approval=0;assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin()==0&&world&&getter_calls==0&&first_sss_vs_setup.failed);
+ reset();reenter=true;assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin()==0&&world&&getter_calls==0);
+ reset();selected_value=8;assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin()==0&&world&&getter_calls==1&&first_sss_vs_setup.getter_calls==1);
+ reset();retirement_changes_seed=true;assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin()==0&&!world&&!first_sss_vs_setup.requested&&!first_sss_vs_setup.parent_seed_restored);
+ reset();assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin()==1);host_pad.bytes[81]=1;commit();assert(first_sss_vs_setup_service()&&first_sss_vs_setup.failed&&!match);assert(first_sss_vs_setup.error.find("PAD changed")!=std::string::npos);
+ reset();assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin()==1);asset_scope.pending=2;assert(first_sss_vs_setup_service()&&first_sss_vs_setup.failed&&!match);assert(melee_web_native_menu_stadium_c1a_asset_scope(1)==0);
+ reset();assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin()==1);commit();files.erase("stage");assert(first_sss_vs_setup_service()&&first_sss_vs_setup.failed&&!match);
+ reset();assert(melee_web_native_menu_stadium_first_sss_vs_setup_begin()==1);commit();first_sss_vs_setup_service();match->frames=1;first_sss_vs_setup_service();assert(first_sss_vs_setup.failed&&first_sss_vs_setup.source_frames==1&&!first_sss_vs_setup.captured);
+ puts("PASS actual Setup begin/classifier/handoff/service: one-use, refusal, seed/PAD/generation, deferred completion and stop controls");
+}
+"""
+class FirstSssVsSetupEndpointTests(OwnedWorkspaceTests):
+ def test_actual_setup_service_and_refusals(self):
+  source=(ROOT/'src/gameplay_menu_browser.cpp').read_text();menu=(ROOT/'src/gameplay_menu_browser_menu.cpp').read_text()
+  a=source.index('struct FirstSssVsSetupState {');b=source.index('std::string first_sss_vs_setup_current_json();',a)
+  body=PRELUDE+source[a:b]
+  for name in ['bool first_sss_vs_setup_asset_pending(unsigned generation)','void first_sss_vs_setup_fail(const char* error)','bool first_sss_vs_setup_finish_handoff()']:
+   body+=_function(source,name)
+  body+=_function(menu,'int melee_web_native_menu_stadium_c1a_asset_scope(unsigned generation)')
+  body+='bool finish_asset_handoff(){asset_destination=AssetDestination::None;asset_committed=false;return first_sss_vs_setup_finish_handoff();}'
+  body+=_function(source,'bool first_sss_vs_setup_service()')+_function(source,'int melee_web_native_menu_stadium_first_sss_vs_setup_begin()')+TEST
+  w=self.new_workspace(ROOT,'first-sss-vs-setup-');cpp=w/'control.cpp';exe=w/'control';cpp.write_text(body)
+  argv=shlex.split(os.environ.get('CXX','c++'))+['-std=c++20','-Wall','-Wextra','-Werror',str(cpp),'-o',str(exe)]
+  r=subprocess.run(argv,capture_output=True,text=True);(w/'compile.log').write_text(r.stdout+r.stderr);self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+  r=subprocess.run([str(exe)],capture_output=True,text=True);(w/'run.log').write_text(r.stdout+r.stderr);self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+if __name__=='__main__':unittest.main()

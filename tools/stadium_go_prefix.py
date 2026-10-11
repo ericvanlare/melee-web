@@ -172,6 +172,16 @@ FIRST_SSS_VS_ENTRY_SLICES = {
     (36, 0): (0x8045BF28, 2),
     (37, 0): (0x8045BF2A, 2),
 }
+FIRST_SSS_VS_SETUP_SEQUENCE = 2503
+FIRST_SSS_VS_SETUP_SOURCE_TICK = 125
+FIRST_SSS_VS_SETUP_DRAW_ORDINAL = 0
+FIRST_SSS_VS_SETUP_SEED_HEX = "35a455b9"
+FIRST_SSS_VS_SETUP_SLICES = {
+    (4, 0): (0x80480530, 0x138),
+    (19, 0): (0x804D5F94, 4),
+    (20, 0): (0x804D5F90, 4),
+    (21, 0): (FIRST_SSS_PAD_ADDRESS, 0x358),
+}
 FIRST_SSS_PREFIX_INPUT_MAGIC = b"STC1SSSP"
 FIRST_SSS_PREFIX_INPUT_VERSION = 1
 FIRST_SSS_PREFIX_INPUT_HEADER_BYTES = 48
@@ -1689,6 +1699,148 @@ def extract_stadium_first_sss_vs_entry(
              status_file.stat().st_size == FIRST_SSS_STATUS_BYTES and
              hashlib.sha256(status_file.read_bytes()).hexdigest() == FIRST_SSS_STATUS_SHA256,
              "VS Entry observer stream or status changed during extraction")
+    return result
+
+
+def _first_sss_vs_setup_snapshot(row: dict[str, Any]) -> dict[str, Any]:
+    payload = row.get("payload")
+    _require(isinstance(payload, dict) and row.get("event") == "boundary" and
+             row.get("seq") == FIRST_SSS_VS_SETUP_SEQUENCE and
+             payload.get("boundary") == "setup" and
+             payload.get("pc") == VS_SETUP_PC and
+             row.get("source_tick") == FIRST_SSS_VS_SETUP_SOURCE_TICK and
+             row.get("draw_ordinal") == FIRST_SSS_VS_SETUP_DRAW_ORDINAL and
+             payload.get("source_tick") == FIRST_SSS_VS_SETUP_SOURCE_TICK and
+             payload.get("draw_ordinal") == FIRST_SSS_VS_SETUP_DRAW_ORDINAL,
+             "VS Setup endpoint is not the exact original row2503 boundary")
+    _check_boundary_contract(payload)
+    read: dict[int, dict[str, Any]] = {}
+    for (tag, flags), (address, size) in FIRST_SSS_VS_SETUP_SLICES.items():
+        item = _slice(payload, tag, "VS Setup endpoint", size, flags)
+        _require(item["address"] == address,
+                 f"VS Setup endpoint tag={tag} escaped its pinned source address")
+        read[tag] = item
+    _validate_mario_roster(read[4]["raw"], "VS Setup endpoint")
+    try:
+        from transition_trace_format import decode_start_melee_data
+        semantic_start = decode_start_melee_data(read[4]["raw"][:0xF0])
+    except ValueError as error:
+        raise StadiumGoPrefixError(
+            f"VS Setup endpoint StartMeleeData is invalid: {error}") from error
+    rng_pointer = int.from_bytes(read[19]["raw"], "big")
+    _require(rng_pointer == read[20]["address"],
+             "VS Setup endpoint RNG pointer does not own the observed seed slice")
+    _require(read[20]["raw"].hex() == FIRST_SSS_VS_SETUP_SEED_HEX,
+             "VS Setup endpoint seed differs from retained original row2503")
+    items = payload.get("slices")
+    _require(isinstance(items, list) and all(isinstance(item, dict) for item in items),
+             "VS Setup endpoint has no complete source slice inventory")
+    keys = [(item.get("tag"), item.get("flags")) for item in items]
+    _require(len(keys) == len(set(keys)),
+             "VS Setup endpoint has duplicate source slice identities")
+    selected_inventory = [
+        {"tag": tag, "flags": flags, "address": item["address"], "size": item["size"]}
+        for (tag, flags), item in sorted(
+            ((key, read[key[0]]) for key in FIRST_SSS_VS_SETUP_SLICES))
+    ]
+    source = {
+        **_source_row_envelope(row),
+        "source_slice_inventory": _source_slice_inventory(payload),
+        "source_capture_inventory": selected_inventory,
+        "source_slices_hex": {
+            f"{tag}:0": item["raw"].hex() for tag, item in sorted(read.items())
+        },
+        "start_slice_address": read[4]["address"],
+        "start_sha256": hashlib.sha256(read[4]["raw"]).hexdigest(),
+        "rng_pointer_hex": read[19]["raw"].hex(),
+        "random_seed_hex": read[20]["raw"].hex(),
+        "setup_profile_verified_by_observer": False,
+    }
+    return {
+        "expected": {
+            "phase": "vs_setup",
+            "random_seed_hex": read[20]["raw"].hex(),
+            "start": semantic_start,
+        },
+        "source": source,
+    }
+
+
+def _extract_first_sss_vs_setup_rows(
+        setup_rows: list[dict[str, Any]], stream_sha256: str) -> dict[str, Any]:
+    _require(stream_sha256 == FIRST_CSS_STREAM_SHA256,
+             "VS Setup endpoint is not from the retained original v6 observer")
+    _require(isinstance(setup_rows, list) and len(setup_rows) == 1,
+             "VS Setup endpoint requires exactly one original row2503")
+    snapshot = _first_sss_vs_setup_snapshot(setup_rows[0])
+    return {
+        "schema": "melee-web-stadium-first-sss-vs-setup-endpoint",
+        "version": 1,
+        "scope": "original ordinary VS Setup row2503 StartMeleeData and RNG scalar only",
+        "provenance": {
+            "observer_bytes": FIRST_CSS_STREAM_BYTES,
+            "observer_sha256": stream_sha256,
+            "observer_status_bytes": FIRST_SSS_STATUS_BYTES,
+            "observer_status_sha256": FIRST_SSS_STATUS_SHA256,
+            "sequence": FIRST_SSS_VS_SETUP_SEQUENCE,
+            "pc": f"0x{VS_SETUP_PC:08x}",
+            "source_tick": FIRST_SSS_VS_SETUP_SOURCE_TICK,
+            "draw_ordinal": FIRST_SSS_VS_SETUP_DRAW_ORDINAL,
+            "setup_profile_verified_by_observer": False,
+        },
+        "expected": snapshot["expected"],
+        "source_setup": snapshot["source"],
+        "comparison_fields": [
+            "phase", "random_seed_hex", "start.rules", "start.players[0:4]",
+        ],
+        "unpaired_fields": [
+            "source tick/draw ordinal (provenance only; not native frame equality)",
+            "source pointer/address", "StartMeleeData ABI padding/unknown bytes",
+            "native player slots4-5", "native player xB",
+            "original Setup-row PAD snapshot (provenance only)",
+            "prepared_output_unpaired persistent VsModeData",
+            "other Setup-row slices outside the selected typed Start and RNG",
+        ],
+        "source_admission": False,
+        "whole_session_equivalent": False,
+    }
+
+
+def extract_stadium_first_sss_vs_setup(
+        stream_path: str | Path, status_path: str | Path) -> dict[str, Any]:
+    """Extract only original VS Setup row2503 after full GO-prefix validation."""
+    source, status_file = Path(stream_path), Path(status_path)
+    _require(source.is_file() and status_file.is_file(),
+             "configured SSS observer stream or status is missing")
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES,
+             "VS Setup observer stream byte length differs from retained v6")
+    status_bytes = status_file.read_bytes()
+    _require(len(status_bytes) == FIRST_SSS_STATUS_BYTES and
+             hashlib.sha256(status_bytes).hexdigest() == FIRST_SSS_STATUS_SHA256,
+             "VS Setup observer status identity differs from retained v6")
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    _require(digest == FIRST_CSS_STREAM_SHA256,
+             "VS Setup observer stream hash differs from retained v6")
+    try:
+        summary = validate_stadium_go_prefix(source, status_path=status_file)
+        _require(summary.get("decision") == "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY" and
+                 summary.get("stream_bytes") == FIRST_CSS_STREAM_BYTES and
+                 summary.get("stream_sha256") == digest and
+                 summary.get("setup_profile_verified_by_observer") is False,
+                 "VS Setup source stream no longer passes full GO-prefix validation")
+        rows = [row for row in iter_records(source, max_bytes=MAX_STREAM_BYTES,
+                                            max_records=MAX_STREAM_RECORDS)
+                if row.get("seq") == FIRST_SSS_VS_SETUP_SEQUENCE]
+        result = _extract_first_sss_vs_setup_rows(rows, digest)
+    except StadiumGoPrefixError:
+        raise
+    except (OSError, ObserverStreamError) as error:
+        raise StadiumGoPrefixError(f"cannot validate original VS Setup: {error}") from error
+    _require(source.stat().st_size == FIRST_CSS_STREAM_BYTES and
+             hashlib.sha256(source.read_bytes()).hexdigest() == digest and
+             status_file.stat().st_size == FIRST_SSS_STATUS_BYTES and
+             hashlib.sha256(status_file.read_bytes()).hexdigest() == FIRST_SSS_STATUS_SHA256,
+             "VS Setup observer stream or status changed during extraction")
     return result
 
 

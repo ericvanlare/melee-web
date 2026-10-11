@@ -1457,3 +1457,110 @@ export function createFirstSssVsEntryComparator(expectedEntry, prefix) {
   return Object.freeze({compare, status: () => Object.freeze({attempted, approved, failed,
     first_mismatch: firstMismatch})});
 }
+
+const FIRST_SSS_VS_SETUP_SCOPE =
+  'original ordinary VS Setup row2503 StartMeleeData and RNG scalar only';
+const FIRST_SSS_VS_SETUP_INVENTORY = Object.freeze([
+  {tag: 4, flags: 0, address: 0x80480530, size: 0x138},
+  {tag: 19, flags: 0, address: 0x804d5f94, size: 4},
+  {tag: 20, flags: 0, address: 0x804d5f90, size: 4},
+  {tag: 21, flags: 0, address: 0x804c1f84, size: 0x358},
+]);
+const FIRST_SSS_VS_SETUP_FIELDS = Object.freeze([
+  'phase', 'random_seed_hex', 'start.rules', 'start.players[0:4]',
+]);
+const FIRST_SSS_VS_SETUP_UNPAIRED = Object.freeze([
+  'source tick/draw ordinal (provenance only; not native frame equality)',
+  'source pointer/address', 'StartMeleeData ABI padding/unknown bytes',
+  'native player slots4-5', 'native player xB',
+  'original Setup-row PAD snapshot (provenance only)',
+  'prepared_output_unpaired persistent VsModeData',
+  'other Setup-row slices outside the selected typed Start and RNG',
+]);
+
+function validateExpectedTypedStart(start, fail) {
+  if (!plainObject(start) || !exactOwnKeys(start, ['rules', 'players']) ||
+      !exactOwnKeys(start.rules, SSS_RULE_KEYS) ||
+      !Array.isArray(start.players) || start.players.length !== 4) fail();
+  for (const key of SSS_RULE_KEYS) {
+    const value = start.rules[key];
+    if (SSS_BOOLEAN_RULE_KEYS.has(key) ? typeof value !== 'boolean' :
+      SSS_HEX_RULE_LENGTHS[key] ? !validHex(value, SSS_HEX_RULE_LENGTHS[key] / 2) :
+      !Number.isSafeInteger(value)) fail();
+  }
+  if (start.players.some(player => !exactOwnKeys(player, SSS_PLAYER_KEYS) ||
+      SSS_PLAYER_KEYS.some(key => ['attack_ratio_bits', 'defense_ratio_bits', 'model_scale_bits'].includes(key)
+        ? !validHex(player[key], 4) : !Number.isSafeInteger(player[key])))) fail();
+}
+
+export function validateFirstSssVsSetupExpectedSource(expected) {
+  const fail = () => { throw new TypeError('VS Setup endpoint requires exact retained row2503'); };
+  const p = expected?.provenance, source = expected?.source_setup;
+  if (!plainObject(expected) || expected.schema !== 'melee-web-stadium-first-sss-vs-setup-endpoint' ||
+      expected.version !== 1 || expected.source_admission !== false ||
+      expected.whole_session_equivalent !== false || expected.scope !== FIRST_SSS_VS_SETUP_SCOPE ||
+      !plainObject(p) || p.observer_bytes !== 4397889 ||
+      p.observer_sha256 !== FIRST_SSS_STREAM_SHA256 || p.observer_status_bytes !== 515 ||
+      p.observer_status_sha256 !== FIRST_SSS_STATUS_SHA256 || p.sequence !== 2503 ||
+      p.pc !== '0x8016e9c4' || p.source_tick !== 125 || p.draw_ordinal !== 0 ||
+      p.setup_profile_verified_by_observer !== false ||
+      !sameJsonValue(expected.comparison_fields, FIRST_SSS_VS_SETUP_FIELDS) ||
+      !sameJsonValue(expected.unpaired_fields, FIRST_SSS_VS_SETUP_UNPAIRED) ||
+      !plainObject(source) || source.sequence !== 2503 || source.pc !== 0x8016e9c4 ||
+      source.event !== 'boundary' || source.boundary !== 'setup' || source.source_tick !== 125 ||
+      source.draw_ordinal !== 0 || source.start_slice_address !== 0x80480530 ||
+      source.start_sha256 !== '918a23d68a3b5024f94baf1f5e26e6c0db56c5fbbbffdc79c5e620e82af3b728' ||
+      source.setup_profile_verified_by_observer !== false ||
+      !Array.isArray(source.source_slice_inventory) ||
+      !sourceInventoryMatches(source.source_capture_inventory, FIRST_SSS_VS_SETUP_INVENTORY) ||
+      !sourceSlicesMatch(source.source_slices_hex, FIRST_SSS_VS_SETUP_INVENTORY) ||
+      source.source_slices_hex['19:0'] !== '804d5f90' ||
+      source.source_slices_hex['20:0'] !== '35a455b9' ||
+      source.random_seed_hex !== '35a455b9' || source.rng_pointer_hex !== '804d5f90' ||
+      expected.expected?.phase !== 'vs_setup' ||
+      expected.expected?.random_seed_hex !== '35a455b9') fail();
+  validateExpectedTypedStart(expected.expected.start, fail);
+  return expected;
+}
+
+export function createFirstSssVsSetupComparator(expectedSetup, prefix, entryStatus) {
+  const expected = validateFirstSssVsSetupExpectedSource(expectedSetup).expected;
+  if (!plainObject(prefix) || prefix.complete !== true || prefix.failed !== false ||
+      prefix.current_host_entered !== false || prefix.current_source_scene !== 0 ||
+      prefix.current_session_phase !== 5 || prefix.host_tick_calls !== 124 ||
+      prefix.host_draw_calls !== 124 || prefix.matched_ticks !== 124 ||
+      prefix.matched_draw_enters !== 124 || prefix.matched_draw_returns !== 124 ||
+      prefix.last_tick_result !== 3 || prefix.transition_requested !== true ||
+      !firstSssAudioAccounting(prefix, 124).valid)
+    throw new TypeError('VS Setup comparison requires the completed checked SSS prefix');
+  if (!plainObject(entryStatus) || entryStatus.attempted !== true ||
+      entryStatus.approved !== true || entryStatus.failed !== false ||
+      entryStatus.first_mismatch !== null)
+    throw new TypeError('VS Setup comparison requires the approved same-run VS Entry');
+  let attempted = false, failed = false, firstMismatch = null, approved = false;
+  const compare = endpoint => {
+    const refuse = difference => {failed = true; approved = false; firstMismatch ||= difference; return false;};
+    if (attempted) return refuse(mismatch('setup.callback', 'one use', 'duplicate'));
+    attempted = true;
+    if (!plainObject(endpoint) || endpoint.attempted !== true || endpoint.captured !== true ||
+        endpoint.complete !== true || endpoint.failed !== false || endpoint.error !== null ||
+        endpoint.construction_complete !== true || endpoint.source_frames !== 0 ||
+        endpoint.host_tick_calls !== 0 || endpoint.host_draw_calls !== 0 ||
+        endpoint.actual?.phase !== 'vs_setup')
+      return refuse(mismatch('setup.capture',
+        'completed Setup with zero frames and no continuation ticks/draws', endpoint));
+    const actual = endpoint.actual;
+    if (actual.random_seed_hex !== expected.random_seed_hex)
+      return refuse(mismatch('setup.random_seed_hex', expected.random_seed_hex,
+        actual.random_seed_hex));
+    const wrap = start => ({sss: {vs: {start}}});
+    const difference = actualRulesMismatch(wrap(actual.start), wrap(expected.start), 'setup') ||
+      actualPlayersMismatch(wrap(actual.start), wrap(expected.start), 'setup');
+    if (difference) return refuse({...difference,
+      path: difference.path.replace('.sss.vs.start', '.start')});
+    approved = true;
+    return true;
+  };
+  return Object.freeze({compare, status: () => Object.freeze({attempted, approved, failed,
+    first_mismatch: firstMismatch})});
+}
