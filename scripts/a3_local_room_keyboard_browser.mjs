@@ -14,6 +14,7 @@ import {openNetInstance, firstFatalBrowserError} from './net_session_instance.mj
 import {startRoomRelayRuntime} from './net_room_relay_runtime_owner.mjs';
 import {parseRoomInvite} from './net_lockstep_room_invite.mjs';
 import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS, parseNetChecksum} from './net_lockstep_core.mjs';
+import {checksumCompareReached, checksumWaitDiagnostic} from './a3_checksum_wait_diagnostics.mjs';
 import {runA3LocalFullRoute} from './a3_local_room_full_route.mjs';
 
 const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route]';
@@ -105,6 +106,7 @@ const report = {
   profiles: {},
   css_keyboard: {},
   checksum_comparison: null,
+  checksum_wait_failure: null,
   full_route: null,
   leave_and_cleanup: {},
   exclusions: ['no direct PAD or Gamepad injection', 'no harness-owned peer or checksum pump',
@@ -115,16 +117,21 @@ let worker = null;
 const instances = {alpha: null, beta: null};
 let workerPassed = false;
 
-function sourceIdentity() {
+async function sourceIdentity() {
   const status = gitValue(['status', '--porcelain', '--untracked-files=all']);
   const allowedHarnessFiles = ['scripts/a3_local_room_keyboard_browser.mjs',
-    'scripts/a3_local_room_full_route.mjs'];
+    'scripts/a3_local_room_full_route.mjs', 'scripts/a3_checksum_wait_diagnostics.mjs',
+    'tests/test_a3_local_room_full_route_wait.py'];
   const unexpected = status.split('\n').filter(Boolean).filter(row =>
     !allowedHarnessFiles.includes(row.slice(3)));
   requireCondition(unexpected.length === 0,
     'Checkout contains changes outside this harness: ' + JSON.stringify(unexpected));
+  const sourceFiles = allowedHarnessFiles.filter(filename => filename.startsWith('scripts/'));
+  const filesSha256 = Object.fromEntries(await Promise.all(sourceFiles.map(async filename =>
+    [filename, sha256(await fs.readFile(filename))])));
   return {head: gitValue(['rev-parse', 'HEAD']), tree: gitValue(['rev-parse', 'HEAD^{tree}']),
-    status_porcelain: status, allowed_harness_only_change: status.length > 0};
+    status_porcelain: status, allowed_harness_only_change: status.length > 0,
+    files_sha256: filesSha256};
 }
 
 async function setupKeyboard(instance, role) {
@@ -158,8 +165,44 @@ async function readRoomState(instance) {
         ? module._melee_web_native_menu_phase() : null,
       menu_running: typeof module?._melee_web_native_menu_running === 'function'
         ? module._melee_web_native_menu_running() : null,
+      menu_message: typeof module?._melee_web_native_menu_message === 'function' &&
+        typeof module.UTF8ToString === 'function'
+        ? module.UTF8ToString(module._melee_web_native_menu_message()) : null,
       native_status: nativeStatus,
       owner_health: ownerHealth,
+    };
+  });
+}
+
+async function readChecksumWaitFinalState(instance) {
+  return instance.page.evaluate(() => {
+    const module = globalThis.Module;
+    const status = document.querySelector('#status');
+    let matchSummary = null;
+    let matchObservationError = null;
+    try {
+      if (typeof module?._melee_web_native_menu_match_observe !== 'function' ||
+          typeof module.UTF8ToString !== 'function') {
+        matchObservationError = 'native match observer unavailable';
+      } else {
+        matchSummary = JSON.parse(module.UTF8ToString(module._melee_web_native_menu_match_observe()));
+      }
+    } catch (error) {
+      matchObservationError = String(error?.message || error);
+    }
+    return {
+      runtime_error: status?.dataset.runtimeError || null,
+      menu_phase: typeof module?._melee_web_native_menu_phase === 'function'
+        ? module._melee_web_native_menu_phase() : null,
+      menu_running: typeof module?._melee_web_native_menu_running === 'function'
+        ? module._melee_web_native_menu_running() : null,
+      menu_message: typeof module?._melee_web_native_menu_message === 'function' &&
+        typeof module.UTF8ToString === 'function'
+        ? module.UTF8ToString(module._melee_web_native_menu_message()) : null,
+      native_status: globalThis.__net?.status?.() ?? null,
+      owner_health: globalThis.meleeNetRuntimeLockstepHealth?.() ?? null,
+      match_summary: matchSummary,
+      match_observation_error: matchObservationError,
     };
   });
 }
@@ -313,22 +356,56 @@ async function waitForBothCssAndProgress(minimum) {
 }
 
 async function waitForBothChecksumCompare(target, phase = 1) {
+  const recent = [];
+  let lastRows = null;
+  let lastObservedAt = null;
+  const retainRows = rows => {
+    lastRows = rows;
+    lastObservedAt = new Date().toISOString();
+    recent.push({observed_at: lastObservedAt, peers: rows.map((row, index) =>
+      checksumWaitDiagnostic(row, index === 0 ? 'alpha' : 'beta'))});
+    if (recent.length > 32) recent.shift();
+  };
+  const failWithObservation = async (errorMessage, reason, finalLabel) => {
+    const fresh = await Promise.all(['alpha', 'beta'].map(async role => {
+      let timer;
+      try {
+        const row = await Promise.race([
+          readChecksumWaitFinalState(instances[role]),
+          new Promise((_, reject) => {
+            timer = setTimeout(() => reject(Error('diagnostic observation exceeded 1500 ms')), 1500);
+          }),
+        ]);
+        return {label: finalLabel, observed_at: new Date().toISOString(),
+          state: checksumWaitDiagnostic(row, role)};
+      } catch (error) {
+        return {label: finalLabel, observed_at: new Date().toISOString(), role,
+          observation_error: errorText(error)};
+      } finally {
+        clearTimeout(timer);
+      }
+    }));
+    const observation = {reason, target, phase, predicate_last_observed_at: lastObservedAt,
+      predicate_last_rows: lastRows?.map((row, index) =>
+        checksumWaitDiagnostic(row, index === 0 ? 'alpha' : 'beta')) ?? null,
+      recent, fresh_final_observation: fresh};
+    report.checksum_wait_failure = observation;
+    return Error(errorMessage);
+  };
   while (Date.now() < operationDeadline) {
     const states = await Promise.all([readRoomState(instances.alpha), readRoomState(instances.beta)]);
+    retainRows(states);
     for (const [index, role] of ['alpha', 'beta'].entries()) {
       const failure = protocolFailure(states[index], role);
-      if (failure) throw Error(failure);
+      if (failure) throw await failWithObservation(failure, failure, 'after-protocol-failure');
     }
-    const reached = states.every(row => {
-      const protocol = row.owner_health?.peer?.protocol;
-      return (phase === null || row.menu_phase === phase) && row.menu_running === 1 &&
-        protocol?.ready === true && protocol.next_checksum_compare >= target &&
-        protocol.checksum_mismatch_count === 0;
-    });
+    const reached = states.every(row => checksumCompareReached(row, target, phase));
     if (reached) return states;
     await sleep(50);
   }
-  throw Error('Both peers did not advance the common checksum boundary after keyboard input');
+  throw await failWithObservation('Both peers did not advance the common checksum boundary after keyboard input',
+    'operation deadline reached before the predicate matched',
+    'fresh-observation-after-operation-deadline');
 }
 
 function recordHex(record) {
@@ -454,7 +531,7 @@ async function writeReport() {
 }
 
 try {
-  report.source = sourceIdentity();
+  report.source = await sourceIdentity();
   report.browser = {node: process.version, url: runtimeUrl.href,
     speaker_output: 'muted through the shared browserLaunchOptions policy; normal audio processing retained',
     profile_model: 'one independent persistent Chrome context per player'};

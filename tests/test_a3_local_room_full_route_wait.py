@@ -14,8 +14,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
-const [routePath, fixturePath] = process.argv.slice(1);
+const [routePath, fixturePath, waitDiagnosticsPath] = process.argv.slice(1);
 const { classifyStockObservation } = await import(pathToFileURL(routePath).href);
+const { checksumCompareReached, checksumWaitDiagnostic } = await import(pathToFileURL(waitDiagnosticsPath).href);
 const fixture = JSON.parse(await readFile(fixturePath, 'utf8'));
 assert.equal(fixture.schema, 'a3-first-use-render-wait-observation-v1');
 assert.equal(fixture.alpha.source_tick, fixture.beta.source_tick);
@@ -62,7 +63,53 @@ counterfeitRenderWait.native_status.local_capture_failure = 'capture failed';
 assert.throws(() => classifyStockObservation(counterfeitRenderWait, 'failed native owner'),
   /preparation stopped before the natural \[0,4\] terminal stocks/);
 
-console.log('captured render settle waits; timing/fault/unexpected/invalid terminal states refuse; valid Results handoff remains strict');
+const waitRow = {
+  menu_phase: 7,
+  menu_running: 1,
+  menu_message: 'Original Mario vs Mario match on Final Destination',
+  runtime_error: null,
+  native_status: {
+    active: 1, cursor: 8203, pushed: 8205, blocker: 'none', terminal: {kind: 0},
+    local_capture_failure: null,
+    network_wait: {active: 0, callbacks: 7, episodes: 7, start_tick: 7649, last_tick: 7649, resume_count: 7},
+    indexed: {duplicates: 0, conflicts: 0, gaps: 0, invalid: 0},
+  },
+  owner_health: {failure: null, peer: {failure: null, endpoint_error_count: 0, protocol: {
+    role: 'alpha', local_port: 0, remote_port: 1, ready: true, terminal: null,
+    local_input_ticks: 8203, remote_input_ticks: 8203, remote_contiguous_input: 8202,
+    remote_ack_input: 8203, local_checksum_ticks: 8203, remote_checksum_ticks: 8203,
+    remote_contiguous_checksum: 8202, local_contiguous_input: 8202,
+    local_contiguous_checksum: 8202, next_checksum_compare: 8206,
+    remote_ack_checksum: 8203, acknowledged_inputs: 8203, acknowledged_checksums: 8203,
+    checksum_mismatch_count: 0, native_local_divergences: 0,
+  }}},
+  match_summary: {leg: 'vs', frame: 7558, ready: true, paused: false, ending: false,
+    complete: false, outcome: 0, winner: -1,
+    rules: {stage: 32, is_stock: 1, is_vs: 1, is_teams: 0, player_stocks: [4, 4]},
+    players: [{source_port: 0, source_character: 8, stocks: 2, damage_percent: 0,
+      x: 53.5, y: 0, motion: 14, groundAir: 0},
+    {source_port: 1, source_character: 8, stocks: 4, damage_percent: 0,
+      x: 61.5, y: 0, motion: 14, groundAir: 0}]},
+};
+assert.equal(checksumCompareReached(waitRow, 8206, null), true);
+assert.equal(checksumCompareReached(waitRow, 8207, null), false);
+assert.equal(checksumCompareReached(waitRow, 8206, 1), false);
+assert.equal(checksumCompareReached({...waitRow, menu_running: 0}, 8206, null), false);
+assert.equal(checksumCompareReached({...waitRow, owner_health: {peer: {
+  protocol: {...waitRow.owner_health.peer.protocol, checksum_mismatch_count: 1}}}}, 8206, null), false);
+const diagnostic = checksumWaitDiagnostic({...waitRow,
+  snapshot: {checksums: Array.from({length: 8220}, () => Array(64).fill(0))}}, 'alpha');
+assert.equal(diagnostic.menu_message, waitRow.menu_message);
+assert.equal(diagnostic.phase, 7);
+assert.equal(diagnostic.running, 1);
+assert.equal(diagnostic.source_tick, 8203);
+assert.equal(diagnostic.protocol.next_checksum_compare, 8206);
+assert.equal(diagnostic.match_summary.frame, 7558);
+assert.equal(diagnostic.match_summary.players[0].stocks, 2);
+assert.equal(Object.hasOwn(diagnostic, 'snapshot'), false);
+assert(JSON.stringify(diagnostic).length < 4096, 'wait diagnostic must stay bounded');
+
+console.log('captured render settle waits; terminal checks stay strict; checksum waiter gate and bounded diagnostics retain exact state');
 """
 
 
@@ -77,6 +124,7 @@ class A3LocalRoomFullRouteWaitTests(unittest.TestCase):
                 "--",
                 str(ROOT / "scripts/a3_local_room_full_route.mjs"),
                 str(ROOT / "tests/fixtures/a3_first_use_render_wait_observation.json"),
+                str(ROOT / "scripts/a3_checksum_wait_diagnostics.mjs"),
             ],
             cwd=ROOT,
             capture_output=True,
@@ -84,7 +132,7 @@ class A3LocalRoomFullRouteWaitTests(unittest.TestCase):
             timeout=30,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("valid Results handoff remains strict", result.stdout)
+        self.assertIn("checksum waiter gate and bounded diagnostics retain exact state", result.stdout)
 
 
 if __name__ == "__main__":
