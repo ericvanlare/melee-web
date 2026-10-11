@@ -3581,6 +3581,7 @@ int melee_web_native_menu_stadium_first_css_draw_arm(
  check(melee_web_menu_host_apply_replay_context(
        host,context.seed,context.pad.data(),context.css.data(),context.ko.data(),
        context.rules.data(),context.save.data(),error,sizeof(error)),error);
+ check(melee_web_menu_host_enable_stadium_c1a(host,error,sizeof(error)),error);
  check(melee_web_menu_host_arm_first_css_return(host,error,sizeof(error)),error);
  state.context=std::move(context);
  state.consumed=std::move(consumed);
