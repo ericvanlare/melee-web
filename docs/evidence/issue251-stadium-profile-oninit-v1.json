@@ -8005,7 +8005,270 @@
       ],
       "historical_functional_evidence": "Two functional 3500-tick lifetimes and the ordinary Results regression remain separate completed evidence."
     },
-    "current_next_step": "Implement one diagnostic-only continuation from the same approved matched Setup owner. Extract the original 86 consumed PAD bundles (all four source-port statuses per bundle) and exact source tick/draw schedule, then reuse checked GO arm/events and idle getter to observe containing GO tick C and following full tick F. Pair ticks 0-83 with draws 0-83, retain draw84 between C and F, and stop after F before draw85: at most 86 ticks and 85 draws. Keep expected state in the host comparator, preserve original input/RNG/arithmetic/order, and never use a generic unpause or inject expected state. Stop on first missing pairing, ownership, preparation, state, timing or cleanup failure; reduce after two experiments. A separately reviewed capture and C3 acceptance remain pending.",
+    "completed_next_step": {
+      "completed_plan": "Implement one diagnostic-only continuation from the same approved matched Setup owner. Extract the original 86 consumed PAD bundles (all four source-port statuses per bundle) and exact source tick/draw schedule, then reuse checked GO arm/events and idle getter to observe containing GO tick C and following full tick F. Pair ticks 0-83 with draws 0-83, retain draw84 between C and F, and stop after F before draw85: at most 86 ticks and 85 draws. Keep expected state in the host comparator, preserve original input/RNG/arithmetic/order, and never use a generic unpause or inject expected state. Stop on first missing pairing, ownership, preparation, state, timing or cleanup failure; reduce after two experiments. A separately reviewed capture and C3 acceptance remain pending.",
+      "completed_by": "matched_setup_cf_run2_2026_10_11",
+      "status": "Executed once; its strict C/F declared-state subset passed."
+    },
+    "matched_setup_cf_run2_2026_10_11": {
+      "decision": "PASS_DECLARED_MATCHED_SETUP_C_F_STATE_ONLY_SCOPE",
+      "scope": "One headless run with the existing strict CSS/SSS/Entry/completed-Setup comparisons and 86 source tick bundles; compares only the declared C/F map/display fields and source match seeds; stops before draw85.",
+      "source_identities": {
+        "capture_checkpoint": {
+          "commit": "e0c072cc18c7d942542386468d727c3e5a4657f2",
+          "tree": "3a68e30e257034e1747354455d83aa8f1a54b1fc",
+          "clean": true
+        },
+        "validated_harness": {
+          "commit": "af0e44fe5be5ec9e5b33d28ef93e52a6cc4b61a8",
+          "tree": "618dcade7922f1ec901ac77ec7f7c9a499627153",
+          "full_suite_tests": 2497,
+          "skips": 180,
+          "failures": 0,
+          "exact_source_ci_run": 38165072323
+        },
+        "capture_checkpoint_delta": {
+          "path": "docs/handoffs/2026-10-11-stadium-c3-local-room-checkpoint.md",
+          "change": "Only this 42-line handoff was added between af validation and e0 capture checkpoint."
+        },
+        "runtime_producer": {
+          "commit": "caabbb196fad1beff68cee41607b5debcb1bc4c9",
+          "tree": "475b1513ee6da54da1fe43e26c15a6c8b6fa5955",
+          "build_artifacts": {
+            "artifact": "matched-setup-cf-validation-caabbb19-v1/build-artifacts.json",
+            "bytes": 18839,
+            "sha256": "5ad8b1e83bce5f32d6a2db3c0553939615fefc9a6fd34aa2433c58dd2c05c82b"
+          },
+          "retention_manifest": {
+            "artifact": "root-matched-cf-producer-retention-caabbb19-v1/manifest.json",
+            "bytes": 21896,
+            "sha256": "2a9f641225d6fee1d6f7392afba36d3513691cab9493f55bfcf8f3f41d9f1796"
+          },
+          "diagnostic_js_sha256": "4ec6b7db44bf214ae63652f419535c80fa1df68489e95de3696d0fc78b2b2fe9",
+          "diagnostic_wasm_sha256": "a291fb343d26826501b9d037fa54b0337f29d06d6d9adfab3add3f69ef8bfe45",
+          "ordinary_js_sha256": "3549375773baec1e1454b8b116886e49be171bc45950e2729b9008764ba739f4",
+          "ordinary_wasm_sha256": "3637156dc2a07d1490dd0f08f6faa7fc24ad63e520cda52c3084919677f75525"
+        }
+      },
+      "preconditions": {
+        "strict_css_sss_entry": "pass",
+        "strict_same_run_setup": "pass",
+        "setup_rules_x1_3": 0,
+        "expected_state_injection": false,
+        "inputs_from_original_consumed_pad": true
+      },
+      "recorded_action_plan": {
+        "packet": {
+          "artifact": "sol-matched-setup-cf-extraction-v3/extracted-packet.json",
+          "bytes": 135867,
+          "sha256": "f7b2c2042ef16c18ce35311be19f851104a90f53eaef8477f9ceac8b3e03a4f7"
+        },
+        "assembly_manifest": {
+          "artifact": "sol-matched-setup-cf-extraction-v3/assembly-manifest.json",
+          "bytes": 8529,
+          "sha256": "47a1d455ab2c27d026552a86ed76d6872ba0d5aff6cc4b90ce231f4ecc2416f3"
+        },
+        "source_pad_bundles": 86,
+        "ports_per_bundle": 4,
+        "bytes_per_port_status": 11,
+        "actions_acknowledged": 171,
+        "tick_actions": {
+          "first": 0,
+          "last": 85,
+          "count": 86
+        },
+        "draw_actions": {
+          "first": 0,
+          "last": 84,
+          "count": 85
+        },
+        "boundary_order": [
+          "C: source tick84/world tick85 before draw84",
+          "F: source tick85/world tick86 before draw85"
+        ],
+        "stopped_before": "draw85"
+      },
+      "C_F_comparison": [
+        {
+          "label": "C",
+          "source_tick": 84,
+          "native_world_ticks": 85,
+          "before_draw": 84,
+          "compared_declared_fields": 16,
+          "map2": {
+            "gate_0x80": false,
+            "countdown": 3628,
+            "phase": 0,
+            "form": 5,
+            "history_e0": -1,
+            "history_e2": -1
+          },
+          "display": {
+            "mode": 11,
+            "e6": 64,
+            "e8": 64,
+            "previous_mode": 10,
+            "selected_player": 99,
+            "f2": 0,
+            "normalized_flags": [
+              0,
+              0,
+              0
+            ]
+          },
+          "source_match_seed": "868d77be",
+          "native_match_seed": "868d77be"
+        },
+        {
+          "label": "F",
+          "source_tick": 85,
+          "native_world_ticks": 86,
+          "after_tick_before_draw": 85,
+          "compared_declared_fields": 16,
+          "map2": {
+            "gate_0x80": false,
+            "countdown": 3627,
+            "phase": 0,
+            "form": 5,
+            "history_e0": -1,
+            "history_e2": -1
+          },
+          "display": {
+            "mode": 11,
+            "e6": 64,
+            "e8": 64,
+            "previous_mode": 10,
+            "selected_player": 99,
+            "f2": 0,
+            "normalized_flags": [
+              1,
+              0,
+              0
+            ]
+          },
+          "source_match_seed": "b50f624b",
+          "native_match_seed": "b50f624b"
+        }
+      ],
+      "native_ownership_scope": {
+        "native_world_generation": 3,
+        "map2_allocation_generation": 3033,
+        "sis_allocation_generation": 2763,
+        "stable_across_C_F": true,
+        "scope_limit": "Native run-local identity only; no original pointer/address or type/lifetime comparison."
+      },
+      "diagnostics_and_cleanup": {
+        "capture_elapsed_ms": 103761,
+        "cleanup_elapsed_ms": 88,
+        "headless_chrome": "154.0.8037.99",
+        "speaker_output_muted": true,
+        "audio_processing_disabled": false,
+        "gpu_adapter_available": true,
+        "gpu_failure": null,
+        "runtime_page_console_errors_warnings": 0,
+        "missing_service_warning": false,
+        "http_artifacts": 40,
+        "http_statuses": {
+          "200": 117
+        },
+        "http_hashes_unchanged": true,
+        "owned_pids_absent": [
+          60979,
+          60981,
+          61016,
+          61019,
+          61035,
+          61040,
+          61041,
+          61042,
+          61056,
+          61057,
+          61058,
+          61060,
+          61260
+        ],
+        "owned_process_groups_absent": true,
+        "checked_unload_completed": true,
+        "observation_cleared": true,
+        "all_retained_run_bindings": {
+          "artifact": "sol-matched-setup-cf-capture-run2/sol-execution-result-review.json",
+          "verified_artifact_bindings": 236,
+          "unique_files": 152
+        },
+        "pipeline_provenance": "OFF; no recorder/provenance claim is made."
+      },
+      "independent_reviews": {
+        "root_report_order_review": {
+          "artifact": "root-matched-setup-cf-run2-report-review-v1.json",
+          "bytes": 1314,
+          "sha256": "a819ebf7cce7f6375e8cd604ccd2a32f906874426cb026d95b4ed5af63b11166"
+        },
+        "sol_execution_review": {
+          "artifact": "sol-matched-setup-cf-capture-run2/sol-execution-result-review.json",
+          "bytes": 19063,
+          "sha256": "0ca28622c4b1d5d1d6878ad9e27fa49a2acde315ad1adf68a426f0a6f3c229e1"
+        },
+        "independent_luna_review": {
+          "artifact": "luna-matched-setup-cf-run2-independent-review-v1/review.json",
+          "bytes": 13382,
+          "sha256": "199862fc0ee7d18fbb7d90c7d85b286cc1fd79620d9ffd287f255f5e86bb8028"
+        },
+        "browser_report": {
+          "artifact": "sol-matched-setup-cf-capture-run2/browser-run/report.json",
+          "bytes": 4459632,
+          "sha256": "e566bd7bc53fcde74cd749848bc31da18066bf8fba134c6024082121a9996009"
+        },
+        "owner": {
+          "artifact": "sol-matched-setup-cf-capture-run2/owner.json",
+          "bytes": 123864,
+          "sha256": "9a352ffd0c3a166acbda117bfa21798900a29c2bac39b304ad9d2a6cbb6d1af7"
+        },
+        "runner_result": {
+          "artifact": "sol-matched-setup-cf-capture-run2/result.json",
+          "bytes": 378,
+          "sha256": "f6698022e08d0d394c0a237e3c9cbb541491b61c8843ece9978b18d91b807fda"
+        },
+        "preflight": {
+          "artifact": "sol-matched-setup-cf-capture-run2/preflight.json",
+          "bytes": 106567,
+          "sha256": "44d6ac47e92fa597cccfb6f9f16b0049209aebdbe78c669ca081d8635c012748"
+        },
+        "release": {
+          "artifact": "sol-matched-setup-cf-capture-run2/root-one-launch-release.json",
+          "bytes": 1727,
+          "sha256": "8f1375565e8c0ea5dd7ff2a96f946d5e19c24ac95400fc5c3f19858e363490b9"
+        },
+        "command": {
+          "artifact": "sol-matched-setup-cf-capture-run2/command.json",
+          "bytes": 10135,
+          "sha256": "489c8eef9e1014da5a0bb5901a893ac1410bd97ff8b6a98b86dea739a873d720"
+        }
+      },
+      "retained_preparation_failures": [
+        {
+          "artifact": "sol-matched-setup-cf-result-review-v1/review.json",
+          "decision": "FAIL_PRE_BROWSER_TMPDIR_PREPARATION_NO_NATIVE_STATE_EVIDENCE",
+          "sha256": "27d6108431a12134d89148af732b74ee88ae131d40bee6c748f2dbb5e3d6e6a2",
+          "note": "Run1 failed before Chrome; no C/F sample. owner.cleanup_passed=false is preserved rather than promoted to success."
+        },
+        {
+          "note": "Retained as preparation evidence; it is not relabeled as a browser/runtime failure.",
+          "context": "run1 earlier preflight classification correction"
+        }
+      ],
+      "limits": [
+        "No C3 or whole-session acceptance.",
+        "No original/native map2/SIS object type, pointer, or lifetime parity.",
+        "No complete original GO-state parity.",
+        "Only boundary match-seed values at C and F; no per-owner RNG ledger through a 3,500-tick interval.",
+        "Native timer is raw bytes with source initialization unobserved; timer equality is unpaired.",
+        "Original/native title bytes and SIS table relation are unpaired.",
+        "F0, unselected flag bits, and native flow-clock versus original scene-frame are unobserved/unpaired.",
+        "The first intentionally excluded schedule action is original draw85."
+      ],
+      "c3_next_step": "Extend the original capture/extractor for the actual four-port source-consumed schedule and owner/RNG observations through 3,500 post-GO ticks, keeping this validated C/F prefix and original source services/order. Do not fabricate neutral repetition. Then reuse the existing 3,500-tick functional driver for a matched first lifetime, strict retirement/recreation, and a second matched lifetime; record per-owner RNG through each interval."
+    },
+    "current_next_step": "After current-main integration is reviewed, extend the existing original Stadium capture/extractor to retain the actual four-port consumed-input schedule and source owner/RNG observations through 3,500 post-GO ticks, preserving the validated C/F prefix, source services, arithmetic and order. Do not repeat the 86-bundle prefix or invent neutral rows. Then reuse the existing native 3,500-tick functional stepper and C/F owner readers for two separately compared lifetimes, with strict retirement/recreation between them and per-owner RNG checks across both. Stop at the first missing original row/owner/seed witness, mismatch, unsupported service/GPU error or incomplete teardown. The historic functional 3,500-tick tests do not substitute for original-matched evidence.",
     "recorded_input_replay_c7a14fd6_v1": {
       "decision": "PASS_RECORDED_ORIGINAL_COMMON_PREFIX_ONLY_NATIVE_ALIGNMENT_UNRESOLVED",
       "scope": "One bounded original Dolphin recorded-input replay of retained v6 Stadium prefix; no native parity or C3 acceptance.",
