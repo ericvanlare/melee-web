@@ -318,8 +318,8 @@
     "no_machine_specific_path_required": true
   },
   "subsequent_c3_component_2026_10_09": {
-    "claim_boundary": "Exact1b matches the bounded374-callback SSS prefix, final requested draw, typed exit2426 and separate selection tuple2427; checked unload and40 HTTP identities pass. See admission_and_sss_prefix_boundary_2026_10_11 for exact producer/evidence scopes. Next compare actual match Start/host seed with original Entry before match construction. VS Setup/GO, per-owner RNG and C3 acceptance remain open. Audio baseline149 versus150 calls remains unexplained; no PCM, timing, pixels, physical-input or whole-session acceptance; public Stadium admission remains closed.",
-    "current_result": "On 1b188efb, strict bounded SSS comparison passes all 374 callbacks: 124 scheduler samples, 124 draw pairs, typed exit 2426 and separate selection tuple 2427. Final tick result 3 and the requested final draw complete. Independent replay, checked unload, 13 attributed process exits, 40 HTTP identities and GPU checks pass. Actual VS Entry/Setup and C3 remain open; the 149-versus-150 audio baseline gap remains unexplained. See admission_and_sss_prefix_boundary_2026_10_11.",
+    "claim_boundary": "Exact551 passes the declared bounded SSS prefix and stopped VS Entry Start/player0-3/host-seed comparison. See admission_and_sss_prefix_boundary_2026_10_11.vs_entry_endpoint_551ee723 for exact producer, exclusions and evidence. Next compare the existing deferred Session Setup endpoint, stopping before ticks, draws or GO. Setup/GO, per-owner RNG and C3 acceptance remain open; public Stadium admission stays closed. Audio baseline variation remains unexplained; no PCM, timing, pixels, physical-input or whole-session acceptance.",
+    "current_result": "On 551ee723, independent replay confirms the same-run bounded SSS prefix and actual declared VS Entry fields/seed, with checked unload and exact artifact identities. Historical1b prefix evidence retains its original producer. Fresh551 first-draw audio baseline150 versus earlier1b baseline149 remains unexplained. Setup2503 is next, stopping before tick/draw/GO; Setup/GO/per-owner RNG/C3 remain open. See admission_and_sss_prefix_boundary_2026_10_11.vs_entry_endpoint_551ee723.",
     "first_css_browser_draw_4d6c0b37_d949a0b8_v1": {
       "status": "FAIL_BEFORE_ARM; NO_BROWSER_CSS_COMPARISON; NO_TICK; NO_DRAW",
       "scope": "One headless browser attempt with the existing captured first-CSS context and one consumed sample. The diagnostic did not arm; this is not a source draw or Stadium/C3 acceptance result.",
@@ -6263,7 +6263,7 @@
       "sha256": "a30d1f6c3a774bb22864c9b8cb0cea89bc556629c101cfffa4a432661f1c8610",
       "review_artifact": "sol-vs-entry-endpoint-contract-v1/review.json",
       "review_sha256": "d90952bc077931fbb261d81a0a46e6cf2ee18793d3d4603c225d176297b1d562",
-      "status": "Source contract reviewed. Next implement Entry-only observation/comparison after strict prefix completion; no match construction until it passes."
+      "status": "Entry endpoint comparison passed. Next compare original VS Setup 2503 through the existing deferred Session, stopping before ticks, draws, or GO; C3 remains open."
     },
     "acceptance_boundary": {
       "historical_functional_evidence": "Two functional 3500-tick lifetimes and the ordinary Results regression are completed.",
@@ -6278,6 +6278,149 @@
         "pixels",
         "PCM"
       ]
+    },
+    "vs_entry_endpoint_551ee723": {
+      "source_identity": {
+        "commit": "551ee723207ab5f22fcebf61c14d9074c2d74fb1",
+        "tree": "d16bb66c179610f153066cf7c7e7c015942fd7c1"
+      },
+      "capture_result": {
+        "artifact": "vs-entry-preflight-551ee723-v1/result.json",
+        "sha256": "b1342ce48d745122857921665759bf0a7bb1c7f946f121f8b147c8f05012950d",
+        "report_artifact": "vs-entry-preflight-551ee723-v1/browser-run/report.json",
+        "report_sha256": "28e5c349188eb39c305aa86a607d8e83f7204a22d24176cfc13d56e1584fed4b",
+        "scope": "Same-run approved CSS/SSS constructor, consumed-PAD first tick, first draw, 124-input SSS prefix and stopped VS Entry endpoint. No match/world construction or additional tick/draw/audio work at Entry."
+      },
+      "independent_review": {
+        "artifact": "sol-vs-entry-result-review-551ee723-v1/review.json",
+        "sha256": "5af443b96cd9b049ec240370c254a9b894ced3fb3a99eb2dfd4b97e21be5fa65",
+        "decision": "PASS_BOUNDED_VS_ENTRY",
+        "first_mismatch": null,
+        "replay_artifact": "sol-vs-entry-result-review-551ee723-v1/replay-result.json",
+        "replay_sha256": "e1dfe660974888383787b8c7a967ad2c0b6f9427629f50adfeaf987b49fe4948"
+      },
+      "same_run_prefix": {
+        "callbacks": 374,
+        "inputs": 124,
+        "scheduler_samples": 124,
+        "draw_enter_return_pairs": 124,
+        "final_tick_result": 3,
+        "transition_requested": true,
+        "source_exit_sequence": 2426,
+        "selected_stage_sequence": 2427,
+        "selected_stage": {
+          "index": 18,
+          "kind": 3
+        },
+        "source_frame": 125,
+        "cumulative_session_ticks": 274,
+        "prepared_vs_output": "unpaired"
+      },
+      "entry_comparison": {
+        "original_row": 2468,
+        "expected_bytes": 7500,
+        "expected_sha256": "281f4dea8491c9a2848e087c43453ef987b397f4590d2a764fb2b69d86853bd1",
+        "compared": "Declared match Start rules and source semantic fields for players 0\u20133, preserving raw-float fields, plus host seed; this is not a whole-Start comparison.",
+        "getter_calls": 1,
+        "actual_seed": "3bb84c53",
+        "first_mismatch": null,
+        "persistent_prepared_vs_mode": "Retained as a separate actual object; unpaired.",
+        "exclusions": [
+          "native xB",
+          "players 4\u20135",
+          "padding",
+          "pointer/callback slots"
+        ]
+      },
+      "entry_audio": {
+        "render_calls_before_after": [
+          274,
+          274
+        ],
+        "render_frames_before_after": [
+          146133,
+          146133
+        ],
+        "phase_before_after": [
+          20,
+          20
+        ],
+        "scope": "No added audio render at Entry. This does not establish PCM equality, continuity, or wall-clock cadence."
+      },
+      "cleanup": {
+        "artifact": "root-vs-entry-cleanup-551ee723-v1/review.json",
+        "sha256": "d5fc56d7f965a8cb5608fc3d09c6afaddc57da7719c9b1349801e5e50b20729c",
+        "independent_review_cleanup_complete": true,
+        "attributed_pids_absent": 11,
+        "http_artifacts_unchanged": 40,
+        "checked_unload_cleared_observations": true
+      },
+      "validation": {
+        "focused_artifact": "vs-entry-focused-551ee723-v1/result.json",
+        "focused_sha256": "3cefbd391e1c2555fe22b3d9dbdd77fa805f4b2d948f21ce0a694d311334c814",
+        "python_tests": 23,
+        "node_tests": 38,
+        "release_builds": [
+          {
+            "artifact": "vs-entry-builds-551ee723-v1/diagnostic-runtime/result.json",
+            "sha256": "8243c5aa1a2b6193256c422108cc677cc7927ef4b14cb12d09d6003689e1320e",
+            "exit_code": 0
+          },
+          {
+            "artifact": "vs-entry-builds-551ee723-v1/ordinary-runtime/result.json",
+            "sha256": "b498d02e154b91b9dd9bbc5e42f3cece688e0819b266d298db67d48eabc50766",
+            "exit_code": 0
+          }
+        ],
+        "full_suite_artifact": "full-regression-551ee723-v1/result.json",
+        "full_suite_sha256": "eaf9bb271defa5c504d16acc3a96752e9d67fc9d1d483f414679732be9c68ad6",
+        "full_suite_summary": "Suite reported OK: 2,442 tests, 163 skipped.",
+        "ci_artifact": "ci-551ee723-complete-v1.json",
+        "ci_sha256": "035c16aa3de8f0a63d01f5fc43b0c82262661cfd6d65f228f4942436048a148b",
+        "ci_successes": 12,
+        "ci_expected_skips": 2
+      },
+      "audio_baseline_gap": "The 551 standalone first-draw run and prefix began at 150 calls. The earlier 1b standalone first-draw run began at 149 while that prefix began at 150; that earlier cross-run variation remains unexplained. Counters do not establish PCM, continuity, or cadence.",
+      "next_step": "Compare original VS Setup 2503 through the existing deferred Session and stop before ticks, draws, or GO. GO, per-owner RNG, original-matched 3,500-tick sequence, and C3 acceptance remain open.",
+      "acceptance_boundary": {
+        "historical_functional_evidence": "Two functional 3,500-tick lifetimes and the ordinary Results regression are complete.",
+        "still_open": [
+          "Original-matched Setup",
+          "GO",
+          "original-matched 3,500-tick sequence",
+          "per-owner RNG parity",
+          "C3 acceptance",
+          "physical input",
+          "live timing",
+          "pixels",
+          "PCM"
+        ]
+      },
+      "first_draw_review": {
+        "artifact": "sol-first-sss-draw-result-review-551ee723-v1/review.json",
+        "sha256": "e0890f05c7bdbca26e68e75ae010128d2eccf8373a5da5d7aa1c5bdda80ca150",
+        "decision": "PASS_FIRST_SSS_DRAW",
+        "audio_before_after": {
+          "calls": [
+            150,
+            150
+          ],
+          "frames": [
+            80000,
+            80000
+          ],
+          "phase": [
+            0,
+            0
+          ]
+        }
+      },
+      "retained_producer_identity": {
+        "artifact": "vs-entry-producer-551ee723-retained-v1/identity.json",
+        "sha256": "24a0ee8fdfa48ab192c69b22824f2db803bf1e5394b1c397d98dc159d420f02c",
+        "artifact_count": 44,
+        "identity_scope": "43 capture-launch or producer-manifest bound artifacts; ordinary-runtime WASM is retention-time-only."
+      }
     }
   }
 }
