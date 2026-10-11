@@ -8005,6 +8005,538 @@
       ],
       "historical_functional_evidence": "Two functional 3500-tick lifetimes and the ordinary Results regression remain separate completed evidence."
     },
-    "current_next_step": "The original observer capture failed the frozen sequence reproduction criterion after a valid bounded C84/F85 route; its first consumed-PAD content difference is sequence 260/index 5. The original state companion is unpaired to native due different inputs/context and draw/no-draw paths. Next is a read-only reuse of the v6 MWRI input/tick/channel schedule around that difference, preserving event order."
+    "current_next_step": "Implement a diagnostic-only zero-tick completed-Setup read receipt through the existing original-matched Setup service. Reuse its live source seed owner and approved CSS/SSS/Entry/Setup path. Add only a separately reviewed narrow map-2 constructor view for the actual initial xD8, authored x0/x4 parameters and parameter identity; observe exact initializer randi pre/post seed and result only at the existing call, with no additional RNG call. Keep the ordinary idle getter refusal before GO, source frames/ticks/draw at zero, and all inputs/source order unchanged. Stop if owner/parameter/allocation/write proof is absent, any seed/Start mismatch occurs, a tick/draw advances, or cleanup fails. Review the receipt before any single actual Setup run; no native capture/build or C3 claim is authorized by this record.",
+    "recorded_input_replay_c7a14fd6_v1": {
+      "decision": "PASS_RECORDED_ORIGINAL_COMMON_PREFIX_ONLY_NATIVE_ALIGNMENT_UNRESOLVED",
+      "scope": "One bounded original Dolphin recorded-input replay of retained v6 Stadium prefix; no native parity or C3 acceptance.",
+      "source_identity": {
+        "commit": "c7a14fd695c93cedc6dec6adf5e7018744ec475a",
+        "tree": "97c861a7d171515fe726b0f3abf1464b38d90cb4",
+        "clean_at_admission": true
+      },
+      "validation": {
+        "focused_replay_tests": {
+          "tests_run": 23,
+          "skipped": 0,
+          "exit_code": 0,
+          "artifact": "root-recorded-replay-integration-v1/focused-0.log",
+          "sha256": "8e4f73ffc9213d5bfd23245b6bae8bb5c2688203bd5317d977058679acc3addb"
+        },
+        "focused_related_tests": {
+          "tests_run": 33,
+          "skipped": 1,
+          "exit_code": 0,
+          "artifact": "root-recorded-replay-integration-v1/focused-1.log",
+          "sha256": "c69b3dff2da040a459427cfa3463b9d1d27607e095bd4470f5af38009b08194c"
+        },
+        "full_suite": {
+          "tests_run": 2494,
+          "skipped": 179,
+          "failures": 0,
+          "exit_code": 0,
+          "artifact": "recorded-replay-validation-c7a14fd6-v1/result.json",
+          "bytes": 1116,
+          "sha256": "78c4368f26b5fe80b34271cdec94e21ab7918bb9dba864e545f5eadcc5a672d2",
+          "log_sha256": "e8f13229db336231d00c49ea96312a45ecc77336b1cd1bbc88171c7a168d0b75",
+          "review_artifact": "root-recorded-replay-validation-review-c7a14fd6-v1/review.json",
+          "review_bytes": 1577,
+          "review_sha256": "1810fc7377d6cc9784bf964cb807147e8029f8df570823eb719501febadd39fc",
+          "review_decision": "PASS_C7A14FD6_FULLSUITE_AND_AFFECTED_OBSERVER_BUILD"
+        }
+      },
+      "observer_build": {
+        "build_artifact": "stadium-sss-position-observer-build-20261010-014502-902455f0/attempt-v4/result.json",
+        "build_bytes": 3491,
+        "build_result_sha256": "27234261d8320e20803a8bc9f24543ebc3162df2c8f528a7bc1fd58e1d57603c",
+        "binary_sha256": "a101fa66ea905f9bd4e13383b4320c26341ad7d77127ff465e3a4b77b49c40b2",
+        "binary_bytes": 17158416,
+        "manifest_sha256": "0d9ef3ca46817095bab5db04523a32c22f5a5c70460aa3e6bdd47e5d7a8cd324",
+        "original_manifest_sha256": "4cdd76b038de98480e43b7b54ecbc956c559e0e58ec27fc1267b02685ab45d14",
+        "manifest_changed_key": "binary",
+        "dolphin_commit": "c77bbaa0f372c3f72281602a8b087206706542cb",
+        "target": "dolphin-nogui",
+        "build_cpu": "JITARM64",
+        "build_review_artifact": "root-recorded-replay-producer-build-review-v1/review.json",
+        "build_review_sha256": "a2d0c93802dcd6b0b575ee253b4aec32d5be5e524dcd2f8ca5071ce2bf49d1b4",
+        "observer_overlay_sha256": {
+          "Core/PowerPC/ReferenceCaptureObserver.cpp": "c249d16023350dfa32d45229b3f3ff760039246f495fff916c5ff49e10ef30d1"
+        },
+        "validated_source_file_sha256": {
+          "scripts/capture_sd_reference_prefix.py": "fc20483f87db65b16680b5c97683226dff99134d0164ed9057fe261d64c45ed3",
+          "tools/stadium_recorded_prefix_compare.py": "e814932be8a884273be2376e968e9d892e166c15bf6c64a137670039c1975692",
+          "tests/test_stadium_recorded_prefix_compare.py": "b66e47e8c0b7badccf919d40168ce90d064b6060abba281a7e69cea18f1e7995",
+          "tests/test_stadium_recorded_replay.py": "618ff2a63e71d91c64c43760cb8c4dcea0c18523d8649c75e6f73f0806aea2d5"
+        }
+      },
+      "admission": {
+        "initial_refused_preflight": {
+          "artifact": "root-recorded-replay-admission-c7a14fd6-v1/failure.json",
+          "bytes": 976,
+          "sha256": "1f67a86103fd3fd56d3f5a3e075e2e751cfc40b6bde04bc1368922093cda93c9",
+          "decision": "REFUSE_PRELAUNCH_CONFIG_BYTE_IDENTITY_UNDER_REVIEW",
+          "native_launched": false,
+          "reason": "Fresh prepared INI bytes differed from retained v6 postrun INI bytes; refusal occurred before disc/GCI checks and launch.",
+          "config_hashes": {
+            "Dolphin.ini": {
+              "prepared_sha256": "0c3f10342f81e2acba77cc1e2585c8fdca1e3c18900f186cebf9d866a479a733",
+              "retained_v6_postrun_sha256": "b3fcbec8f030041f591e106d5967ddca9cdf1eaadf9f5d88da1dbf8e199b6dd5"
+            },
+            "GCPadNew.ini": {
+              "prepared_sha256": "8b52a9dbb212fa091ceebf19eedcb83a1ac7bbc1f7a6b9226f4675d45ef086de",
+              "retained_v6_postrun_sha256": "d516d280827992ce92cc8288ece919dbfcb5ef298319a8e09df163443a96b92e"
+            }
+          }
+        },
+        "reviewed_config_basis": {
+          "artifact": "sol-recorded-replay-config-admission-review-v1/review.json",
+          "bytes": 6161,
+          "sha256": "735d8cc422fd6fc93cb936a216b47bfb1b2b31fccc6b1385dacfe066d184c8b4",
+          "prelaunch_hash_provenance": "Reconstructed from unchanged historical source/code and explicitly inferred, not observed retained prelaunch snapshots; postrun INI files remain separate observed identities."
+        },
+        "corrected_admission": {
+          "artifact": "root-recorded-replay-admission-c7a14fd6-v2/admission.json",
+          "bytes": 8722,
+          "sha256": "3434326d4b25574c8004fb1ff7dbe83441d66d1f62548f1876c6bbbc12fb7bd0"
+        },
+        "one_launch_release": {
+          "artifact": "root-recorded-replay-admission-c7a14fd6-v2/one-launch-release.json",
+          "bytes": 2637,
+          "sha256": "71dc4b5597844c5d659c091c6f4a883e58b79da9df6f04c919ba090fd85ef039",
+          "decision": "RELEASE_EXACTLY_ONE_BOUNDED_RECORDED_INPUT_CAPTURE"
+        },
+        "execution_prelaunch_verification": {
+          "artifact": "luna-recorded-replay-execution-c7a14fd6-v1/prelaunch-verification.json",
+          "bytes": 1770,
+          "sha256": "bea81501916a272b1807f3fe051b15f07798c1d2408a79f03ecbcfdc014bac36"
+        }
+      },
+      "recorded_input": {
+        "mode": "replay",
+        "events_consumed": 4706,
+        "complete": true,
+        "invalid": false,
+        "error": null,
+        "source": "original-stadium-go-prefix-7d406f63-feedback-v6/inputs.mwri",
+        "bytes": 188296,
+        "sha256": "57e91222a280f93c861a849c8af404ae4272767ead1debf62312a5be48c473fe",
+        "unchanged_after_run": true,
+        "first_emulated_tick": 123552,
+        "last_emulated_tick": 9527249170,
+        "ports": {
+          "0": 2353,
+          "1": 2353
+        },
+        "operations": {
+          "pad_status": 4706,
+          "adapter_connection": 0
+        },
+        "profile_gci_sha256": "5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729",
+        "menu_recipe_sha256": "85d64433715ba61db429b0c15de70f7c48b6689c877e061c5111f58bd7c2957f",
+        "disc_dol": {
+          "game_revision": "GALE01r2",
+          "sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+          "sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646"
+        },
+        "no_new_input_artifacts": {
+          "inputs.mwri": true,
+          "input-intentions.jsonl": true
+        },
+        "profile_controller_environment": {
+          "reported_profile_config_sha256": {
+            "Config/Dolphin.ini": "b3fcbec8f030041f591e106d5967ddca9cdf1eaadf9f5d88da1dbf8e199b6dd5",
+            "Config/GCPadNew.ini": "8b52a9dbb212fa091ceebf19eedcb83a1ac7bbc1f7a6b9226f4675d45ef086de"
+          },
+          "gci_sha256": "5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729",
+          "menu_recipe_sha256": "85d64433715ba61db429b0c15de70f7c48b6689c877e061c5111f58bd7c2957f",
+          "headless": true,
+          "audio_backend": "No Audio Output",
+          "audio_muted": true,
+          "cpu_core": "JITARM64",
+          "custom_rtc_unix": 1704067200,
+          "wall_timeout_seconds": 180,
+          "config_identity_caveat": "Reported profile hashes identify run profile artifacts; the reviewed reconstructed prelaunch hashes remain inferred, not observed snapshots."
+        }
+      },
+      "route": {
+        "decision": "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY",
+        "records": 2935,
+        "GO_sequence": 2925,
+        "C_sequence": 2926,
+        "C_source_tick": 84,
+        "F_sequence": 2931,
+        "F_source_tick": 85,
+        "DrawReturn_sequence": 2933,
+        "natural_end_sequence": 2934,
+        "tail_ticks_after_F": 0,
+        "css_owner_sequence": 838,
+        "sss_owner_sequence": 2467,
+        "stadium_confirm_sequence": 1892,
+        "stadium_release_sequence": 1904,
+        "setup_sequence": 2503
+      },
+      "common_wire": {
+        "decision": "PASS_EXACT_STADIUM_COMMON_WIRE",
+        "records_compared": 2935,
+        "original_v6": {
+          "stream_sha256": "361e8c1108cc2d02ba94d1f3b3be9612a80d0227672445cd4a2b0e2119917778",
+          "bytes": 4397889,
+          "status_sha256": "05a08641404bda9f87ac4c20b1a44a982ff0470ff3a9b04861c03ba542866c3f"
+        },
+        "candidate": {
+          "stream_sha256": "ba0dc549b8b817dd4c58e8f17afb5760607e0294dc986d8eb29afe0e8d29fece",
+          "bytes": 4402063,
+          "status_sha256": "05a08641404bda9f87ac4c20b1a44a982ff0470ff3a9b04861c03ba542866c3f"
+        },
+        "exact_wire_fields": [
+          "magic",
+          "version",
+          "event_code",
+          "sequence",
+          "pc",
+          "source_tick",
+          "draw_ordinal"
+        ],
+        "payload_policy": "Exact recursive existing payload values, keys, slice order and slice fields; no tolerances.",
+        "per_stream_validated_but_not_cross_compared": [
+          "payload_size",
+          "payload_crc32"
+        ],
+        "host_field_not_cross_compared": "timestamp_ns",
+        "candidate_only_state_projection_after_validation": {
+          "typed_slice_tags": [
+            67,
+            68,
+            69,
+            70,
+            71,
+            72,
+            73,
+            74,
+            75,
+            76,
+            77,
+            78,
+            79,
+            80,
+            81,
+            82,
+            83,
+            84,
+            85,
+            86,
+            87,
+            88,
+            89
+          ],
+          "go_metadata_keys": [
+            "state_snapshot_schema",
+            "sis_table_entry_relationship_observed",
+            "dynamic_title_text_bytes_observed"
+          ],
+          "GO_sequence": 2925,
+          "C_sequence": 2926,
+          "F_sequence": 2931
+        },
+        "interpretation": "All 2935 retained old common-wire records and source payload fields matched. Candidate stream byte-size increase is from added state observation and is not a separate mismatch."
+      },
+      "state_companion": {
+        "decision": "PASS_ORIGINAL_STATE_ONLY_COUNTERPART",
+        "sequences": {
+          "GO": 2925,
+          "C": 2926,
+          "F": 2931
+        },
+        "countdown_s32": {
+          "GO": 3629,
+          "C": 3628,
+          "F": 3627
+        },
+        "display": {
+          "mode": 11,
+          "previous_mode": 10,
+          "flags_s16": 64,
+          "previous_flags_s16": 64,
+          "focused_player_s16": 99,
+          "selection_counter_s16": 0,
+          "packed_flags_raw_hex": {
+            "GO": "01",
+            "C": "01",
+            "F": "81"
+          },
+          "timer_raw_hex": "00000000",
+          "timer_initialization_observed": false,
+          "xF0_observed": false
+        },
+        "scope_limits": [
+          "No native parity",
+          "No title-byte match",
+          "No per-owner RNG comparison",
+          "No whole-session claim",
+          "Map root object type/allocation lifetime unproved",
+          "SIS table-entry relation and dynamic title bytes unobserved"
+        ]
+      },
+      "native_context_review": {
+        "review_artifact": "sol-recorded-replay-result-review-c7a14fd6-v1/review.json",
+        "review_bytes": 15037,
+        "review_sha256": "ffafe8362d9103cfd705aac51e5b4832f85339e25536ae8d75f464b214f48f6b",
+        "decision": "PASS_RECORDED_ORIGINAL_COMMON_PREFIX_ONLY_NATIVE_ALIGNMENT_UNRESOLVED",
+        "native_capture_source_identity": {
+          "commit": "59f843fd3bea4dceffcaee2a5c25a4b3b22b10b8",
+          "tree": "bbe284bf90281260b2ef195b1b54b722269f1c90"
+        },
+        "native_countdown_at_C_and_F": [
+          3646,
+          3645
+        ],
+        "original_countdown_at_C_and_F": [
+          3628,
+          3627
+        ],
+        "countdown_difference": 18,
+        "seed_context": {
+          "native_reopened_selected_seed": "54fc65a1",
+          "original_sss_exit_seed": "3bb84c53",
+          "native_go_seed": "UNOBSERVED",
+          "matched_9143_setup_entry_seed": "3bb84c53",
+          "matched_9143_postconstruction_setup_seed": "35a455b9"
+        },
+        "other_observed_context_differences": {
+          "display_previous_flags_E8": {
+            "native": -1,
+            "original_GO_C_F": [
+              64,
+              64,
+              64
+            ]
+          },
+          "display_timer_bytes": {
+            "native": "fffffffe",
+            "original_GO_C_F": [
+              "00000000",
+              "00000000",
+              "00000000"
+            ],
+            "initialization_observed": false,
+            "semantics_claimed": false
+          },
+          "observation_boundaries": {
+            "native": "Containing exit at world tick 85 and first-full-post-GO after at world tick 86; source_frame 0; draw 0.",
+            "original": "GO post-call source tick 84; C source tick 84; F source tick 85; draw ordinals 84/85."
+          }
+        },
+        "interpretation": "The countdown delta is observed at these labeled boundaries, not a cause. Seed contexts differ and native GO seed is absent; neither native/original parity nor RNG ownership equality is established.",
+        "display_flags_representation": {
+          "native_observation": "Normalized xF8_0/xF8_1/xF8_2 fields (packed-field indices 0/1/2); not a raw object byte.",
+          "original_observation": {
+            "raw_ppc_bytes_GO_C_F": [
+              "01",
+              "01",
+              "81"
+            ],
+            "high_masks": {
+              "0x80": [
+                0,
+                0,
+                1
+              ],
+              "0x40": [
+                0,
+                0,
+                0
+              ],
+              "0x20": [
+                0,
+                0,
+                0
+              ]
+            },
+            "low_bit_0x01": "present in raw bytes; no corresponding native observation"
+          },
+          "comparison": "Compare decoded corresponding fields only; raw lower bits have no native counterpart. The bound source-only alignment packet identifies representation and route differences without proving their cause."
+        },
+        "source_alignment_packet": "Completed source-only review; see source_context_alignment_c7a14fd6_v1 and its bound packet. Runtime alignment and causal proof remain open."
+      },
+      "execution": {
+        "artifact": "luna-recorded-replay-execution-c7a14fd6-v1/result.json",
+        "bytes": 2180,
+        "sha256": "ea809396e3e8848f18538300399f2df12eb7511f27ee0b50ee2e521313191678",
+        "postrun_verification_artifact": "luna-recorded-replay-execution-c7a14fd6-v1/postrun-verification.json",
+        "postrun_verification_bytes": 6824,
+        "postrun_verification_sha256": "2e47604140b6a0368eade37a3fceaaee7166148fd7fe732273ff0a5975705c58",
+        "postrun_capture_artifact_hashes": "22 regular files verified; see postrun-verification.json",
+        "report_artifact": "original-stadium-recorded-prefix-replay-v2-run1/report.json",
+        "report_bytes": 151591,
+        "report_sha256": "ad78fea8fa5740be90b43ce8f40f157ecb47ecbf87360a713e5b45787f8d40f9",
+        "input_status_sha256": "4749c6ec9497a8b043555cc1b4dbfb8942543db4d222cda5d6ae5e5e3341544e",
+        "cleanup_artifact": "original-stadium-recorded-prefix-replay-v2-run1/cleanup.json",
+        "cleanup_sha256": "11c068b51a8a85b479eac24ee276f073d0ad7d8d1fa0fa680c6aa34e42c4a853",
+        "owned_log_cleanup_artifact": "original-stadium-recorded-prefix-replay-v2-run1/owned-log-cleanup.json",
+        "owned_log_cleanup_sha256": "fa8862e277a1c1c397d11840fa002c857a12dd4e7266d644a77290c64b2fd5a2",
+        "direct_child_pid": 40581,
+        "wrapper_pid": 40579,
+        "direct_child_reaped": true,
+        "wrapper_reaped": true,
+        "owned_log_thread_alive": false,
+        "retry_count": 0
+      },
+      "reviews": {
+        "configuration_admission": {
+          "artifact": "sol-recorded-replay-config-admission-review-v1/review.json",
+          "sha256": "735d8cc422fd6fc93cb936a216b47bfb1b2b31fccc6b1385dacfe066d184c8b4"
+        },
+        "full_suite_and_build": {
+          "artifact": "root-recorded-replay-validation-review-c7a14fd6-v1/review.json",
+          "sha256": "1810fc7377d6cc9784bf964cb807147e8029f8df570823eb719501febadd39fc"
+        },
+        "producer_build": {
+          "artifact": "root-recorded-replay-producer-build-review-v1/review.json",
+          "sha256": "a2d0c93802dcd6b0b575ee253b4aec32d5be5e524dcd2f8ca5071ce2bf49d1b4"
+        },
+        "recorded_replay_result": {
+          "artifact": "sol-recorded-replay-result-review-c7a14fd6-v1/review.json",
+          "bytes": 15037,
+          "sha256": "ffafe8362d9103cfd705aac51e5b4832f85339e25536ae8d75f464b214f48f6b",
+          "decision": "PASS_RECORDED_ORIGINAL_COMMON_PREFIX_ONLY_NATIVE_ALIGNMENT_UNRESOLVED"
+        },
+        "independent_validation_artifact": {
+          "artifact": "sol-recorded-replay-result-review-c7a14fd6-v1/independent-validation.json",
+          "bytes": 31920,
+          "sha256": "ef038d48eab48db248ddb9a0c790d8d890b9af735a8b1c4151090f77ae560fd5"
+        },
+        "hash_note": "Final Sol review frozen at the bound ffafe836\u2026f48f6b hash (15037 bytes); root final review separately binds the scoped result.",
+        "root_recorded_result": {
+          "artifact": "root-recorded-replay-result-review-c7a14fd6-v1/review.json",
+          "bytes": 1141,
+          "sha256": "60f949cf9a7efd30fe7126a864c395a4176b9fb093eca87924b8d48ae99563ee",
+          "decision": "APPROVE_SCOPED_RECORDED_ORIGINAL_PREFIX_RESULT",
+          "capture_files_verified": 22,
+          "pids_absent": [
+            40579,
+            40581
+          ],
+          "native_parity": "UNRESOLVED_CONTEXT_MISMATCH",
+          "c3": "INCOMPLETE",
+          "next": "Source-only trace of native selected context 54fc65a1 versus matched Setup Entry context 3bb84c53; no seed injection."
+        }
+      },
+      "prior_fresh_input_attempt_correction": {
+        "frozen_sequence_reproduction": "failed and retained; do not relabel it as this recorded-input replay",
+        "first_common_wire_mismatch": {
+          "sequence": 150,
+          "path": "payload.slices[0].hex"
+        },
+        "first_consumed_pad_difference": {
+          "sequence": 260,
+          "zero_based_index": 5,
+          "port": 0
+        },
+        "interpretation": "The strict common-wire mismatch at 150 precedes the first consumed-PAD difference at 260; neither is assigned a cause."
+      },
+      "open_gates": [
+        "native state alignment and source-defined update/seed context",
+        "title bytes and SIS table relationship",
+        "original PAD856/profile and persistent VsModeData",
+        "per-owner RNG ledger",
+        "Ready/GO continuation and original-matched 3500-tick sequence",
+        "C3 acceptance"
+      ],
+      "ci": {
+        "prior_published_commit": "98696240e6d3723e42cb642fb37efab7a6a03a6d",
+        "prior_run_id": 38151595248,
+        "prior_decision": "complete: 12 successful jobs, 2 expected skips",
+        "prior_receipt_artifact": "ci-98696240-complete-v1.json",
+        "prior_receipt_bytes": 42071,
+        "prior_receipt_sha256": "633de70123fdf8ab8232ea4563ce5d0e8461a79221943602cb41bb387c6612d0",
+        "c7_status": "pending publication; no c7 exact-head CI result is claimed"
+      }
+    },
+    "source_context_alignment_c7a14fd6_v1": {
+      "decision": "PASS_SOURCE_BOUND_CONTEXT_ORIGIN_AND_REDUCER_PLAN_ONLY",
+      "artifact": "sol-stadium-context-alignment-c7a14fd6-v1/packet.json",
+      "bytes": 15248,
+      "sha256": "4417c919118e1ee7ccba155aa1e1031e70ddd02029e80eebfdb3079e49ad442d",
+      "source_head": "c7a14fd695c93cedc6dec6adf5e7018744ec475a",
+      "scope": "Read-only review of retained receipts/source and smallest reducer plan; no wrapper, execution, implementation, build, capture or source mutation.",
+      "context_origin": {
+        "native59f": "Standalone raw menu navigation captures selected-context seed 54fc65a1 before reopening match; its menu start, waits/inputs and no-draw schedule differ from the retained original-prefix browser route.",
+        "original_matched_path": "Existing first-CSS source context plus approved recorded CSS/SSS tick/draw prefix -> Entry sequence 2468 -> Setup sequence 2503; Setup completed after six steps with source_frames 0 and no match tick/draw/GO.",
+        "original_seed_chain": {
+          "SSS_exit_and_Setup_Entry": "3bb84c53",
+          "postconstruction_Setup": "35a455b9"
+        },
+        "native_GO_C_F_seed": "UNOBSERVED",
+        "countdown_context": {
+          "native_C_F": [
+            3646,
+            3645
+          ],
+          "original_C_F": [
+            3628,
+            3627
+          ],
+          "difference": 18,
+          "cause": "unproved"
+        },
+        "boundary_correspondence": {
+          "native_GO": "GoAfter within world_before84; event carries gate/mode/branch but not full idle/seed state",
+          "native_C": "GO-containing exit after world85",
+          "native_F": "first full post-GO exit after world86",
+          "original_GO": "exact post-call marker84",
+          "original_C": "containing source-tick exit84",
+          "original_F": "next full source-tick exit85",
+          "ordinal_policy": "No equality inference from native source_frame/world counter or draw0 to original source tick/draw ordinals84/85."
+        }
+      },
+      "flag_representation": {
+        "native": "Normalized xF8_0/xF8_1/xF8_2 fields (packed-field indices 0/1/2), not a raw object byte.",
+        "original_raw_GO_C_F": [
+          "01",
+          "01",
+          "81"
+        ],
+        "original_high_masks": {
+          "0x80": [
+            0,
+            0,
+            1
+          ],
+          "0x40": [
+            0,
+            0,
+            0
+          ],
+          "0x20": [
+            0,
+            0,
+            0
+          ]
+        },
+        "original_lower_bit": "Raw low bit 0x01 has no native field in the existing receipt.",
+        "limit": "Do not compare an entire original raw PPC byte to native normalized fields. E8/flag cause remains unproved without source writer/callback receipts."
+      },
+      "remaining_source_gaps": [
+        "Exact original constructor randi owner/seed and initial map2 countdown are not retained in GO-only state additions.",
+        "Authored x0/x4 runtime values and parameter bytes were not decoded; no countdown bound may be guessed.",
+        "Existing idle getter deliberately refuses pre-GO or active callbacks; do not weaken it to get the Setup receipt.",
+        "Draw-side E8/packed-flag write path and native callback timing lack retained write receipts."
+      ],
+      "smallest_reviewed_experiment": {
+        "first_boundary": "Reuse actual matched 9143 CSS/SSS prefix -> Entry -> completed Setup; stop at zero ticks and zero draws.",
+        "receipt": "Live seed owner/value plus constructor-owned map2 initial xD8/authored x0/x4 and parameter identity; if needed capture exact pre/post seed and result at the existing initializer call without another RNG call.",
+        "pass": "Actual parent seed 3bb84c53 survives handoff; postconstruction Setup seed 35a455b9 and declared Start pass existing checks; exact constructor view resolves owner/parameters/result without source writes, input/RNG/order change, tick or draw.",
+        "stop": "Missing owner/parameter/allocation/write proof, changed prerequisite, seed/Start mismatch, any nonzero tick/draw, timeout or cleanup failure; retain first difference and request review, no rerun.",
+        "follow_on": "Only after review, consider one actual Setup run; a separate one-use GO/C/F continuation needs its own source-tick/draw pairing review."
+      },
+      "nonactions": [
+        "No forced seed or imported expected state",
+        "No extra RNG call",
+        "No general playable-loop enable",
+        "No timer numeric interpretation",
+        "No additional tick or draw",
+        "No original recapture",
+        "No C3 claim"
+      ]
+    }
   }
 }
