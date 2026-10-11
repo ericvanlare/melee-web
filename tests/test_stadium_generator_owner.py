@@ -61,7 +61,7 @@ struct HSD_GObj {
 typedef struct MeleeWebStadiumGenerator MeleeWebStadiumGenerator;
 static HSD_GObj* entities[8];
 static void* HSD_GObj_Entities=entities;
-static void *HSD_GObj_804D781C,*HSD_GObj_804D7814;
+static void *HSD_GObj_804D781C,*HSD_GObj_804D7814,*HSD_GObj_804D7818,*HSD_GObj_804D7830,*HSD_GObj_804D7838;
 static uint64_t melee_web_gameplay_generation(void){return 1;}
 static void fn_801CADBC(HSD_GObj* g){(void)g;abort();} /* Never dispatch. */
 '''
@@ -110,6 +110,31 @@ int main(void)
 {
  char error[256];unsigned char snapshot[sizeof(lbl_8049F030)];
  memcpy(snapshot,&lbl_8049F030,sizeof(snapshot));
+ for(unsigned repeat=0;repeat<2;++repeat){
+  MeleeWebStadiumGenerator* h=melee_web_stadium_generator_prepare(error,sizeof(error));assert(h);
+  unsigned before_data=data_frees,before_object=object_frees;
+  MeleeWebStadiumGenerator foreign={0};
+  assert(!melee_web_stadium_generator_cancel_prepared(&foreign,error,sizeof(error)));
+  ++h->generation;
+  assert(!melee_web_stadium_generator_cancel_prepared(h,error,sizeof(error)));--h->generation;
+  ++h->context.source_heap_handle;
+  assert(!melee_web_stadium_generator_cancel_prepared(h,error,sizeof(error)));--h->context.source_heap_handle;
+  HSD_GObj_804D7838=(void*)h;
+  assert(!melee_web_stadium_generator_cancel_prepared(h,error,sizeof(error)));HSD_GObj_804D7838=NULL;
+  lbl_8049F030.x0=(void*)h;
+  assert(!melee_web_stadium_generator_cancel_prepared(h,error,sizeof(error)));lbl_8049F030.x0=NULL;
+  h->data=(void*)h;
+  assert(!melee_web_stadium_generator_cancel_prepared(h,error,sizeof(error)));h->data=NULL;
+  HSD_GObj unexpected={0};HSD_GObjProc unexpected_proc={.on_invoke=fn_801CADBC};
+  unexpected.proc=&unexpected_proc;entities[4]=&unexpected;
+  assert(!melee_web_stadium_generator_cancel_prepared(h,error,sizeof(error)));entities[4]=NULL;
+  assert(owner==h&&data_frees==before_data&&object_frees==before_object);
+  assert(melee_web_stadium_generator_prepared_preflight(h,error,sizeof(error)));
+  assert(melee_web_stadium_generator_cancel_prepared(h,error,sizeof(error)));
+  assert(!owner&&!entities[4]&&!allocation.live);
+  assert(data_frees==before_data&&object_frees==before_object);
+  assert(!memcmp(snapshot,&lbl_8049F030,sizeof(snapshot)));
+ }
  for(unsigned repeat=0;repeat<2;++repeat){
   MeleeWebStadiumGenerator* h=melee_web_stadium_generator_prepare(error,sizeof(error));assert(h);
   assert(grZakoGenerator_801CAE04(NULL));

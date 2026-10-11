@@ -679,6 +679,76 @@ int melee_web_stage_last_stadium_prepare_ready(MeleeWebStageLast* h,
  h->stadium_ready_route=1;h->stadium_ready_armed=1;
  return ok(e,n);
 }
+int melee_web_stage_last_stadium_cancel_prepared_ready(MeleeWebStageLast* h,char* e,size_t n)
+{
+ if(!h||h!=active||h->generation!=melee_web_gameplay_generation()||
+    !h->definition||!h->definition->diagnostic_only||!h->source_ordered||
+    h->definition->stage_kind!=St_Kind_PStadium||HSD_GObj_804D781C||
+    HSD_GObj_804D7814||HSD_GObj_804D7818||HSD_GObj_804D7830||HSD_GObj_804D7838)
+  return fail(e,n,"Prepared Stadium cancellation lost its idle source owner");
+ /* Completed starts retain their existing teardown. Unprepared scopes have
+  * no continuation lease to cancel; a partial immediate start is not one. */
+ if(!h->stadium_started&&!h->stadium_ready_route&&!h->stadium_generator)
+  return ok(e,n);
+ if(h->stadium_started==2&&h->stadium_ready_armed==0)
+  return ok(e,n);
+ if(h->stadium_started!=1||h->stadium_ready_route!=1||h->stadium_ready_armed!=1||
+    h->stadium_ready_object||h->stadium_ready_proc||h->stadium_subject||
+    h->stadium_manager.object||h->stadium_manager.proc||
+    h->stadium_manager_lease.live||h->stadium_manager_proc_lease.live||
+    !h->stadium_camera_owner||!h->stadium_generator)
+  return fail(e,n,"Stadium cancellation requires untouched pre-Ready ownership");
+ if(!melee_web_stage_selection_preflight(St_Kind_PStadium)||
+    stage_info.grkind!=h->definition->ground_kind)
+  return fail(e,n,"Prepared Stadium selection/dispatch changed");
+ if(!stadium_maps_live(h,e,n)||
+    !melee_web_match_camera_available(h->stadium_camera_owner,e,n))return 0;
+ int map2_gate,display_mode;
+ if(!melee_web_stadium_display_owner_go_alignment_view(h->stadium_display_owner,
+       &h->stadium_map2_buffer_owner,0,&map2_gate,&display_mode))
+  return fail(e,n,"Prepared Stadium display/map borrower changed");
+ Ground* display=h->stadium_map2_buffer_owner.display_ground->user_data;
+ if(display->u.display.xF4)
+  return fail(e,n,"Prepared Stadium display acquired a camera borrower");
+ MeleeWebSourceMemoryContext context;
+ if(melee_web_source_memory_context_read(&context)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    context.world_generation!=h->stadium_start_context.world_generation||
+    context.source_heap_handle!=h->stadium_start_context.source_heap_handle)
+  return fail(e,n,"Prepared Stadium source heap changed");
+ struct Pending {void* next;HSD_GObj* object;HSD_GObjEvent callback;};
+ const HSD_GObj* objects[]={h->stadium_map2_buffer_owner.map2_ground,
+                          h->stadium_map2_buffer_owner.display_ground};
+ void* node=stage_info.x6A4;
+ for(size_t i=0;i<ARRAY_SIZE(stadium_pending_callbacks);++i){
+  MeleeWebSourceMemoryAllocation lease;
+  if(node!=h->stadium_headers[i]||
+     melee_web_source_memory_allocation_read(node,&lease)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+     !lease.live||lease.requested_bytes!=sizeof(struct Pending)||
+     lease.requested_bytes!=h->stadium_header_leases[i].requested_bytes||
+     lease.world_generation!=h->stadium_header_leases[i].world_generation||
+     lease.source_heap_handle!=h->stadium_header_leases[i].source_heap_handle||
+     lease.allocation_generation!=h->stadium_header_leases[i].allocation_generation||
+     lease.world_generation!=context.world_generation||lease.source_heap_handle!=context.source_heap_handle)
+   return fail(e,n,"Prepared Stadium pending header lease changed");
+  const struct Pending* p=node;
+  if(p->object!=objects[i]||p->callback!=stadium_pending_callbacks[i])
+   return fail(e,n,"Prepared Stadium pending callback borrower changed");
+  node=p->next;
+ }
+ if(node)return fail(e,n,"Prepared Stadium pending queue has a foreign tail");
+ /* No source root or header is released until every prospective owner has
+  * passed. Generator cancellation rechecks only its own untouched lease and
+  * can refuse before mutation; no fallible validation follows its release. */
+ if(!melee_web_stadium_generator_cancel_prepared(h->stadium_generator,e,n))return 0;
+ h->stadium_generator=NULL;stage_info.x6A4=NULL;
+ for(size_t i=0;i<ARRAY_SIZE(h->stadium_headers);++i){
+  HSD_Free(h->stadium_headers[i]);h->stadium_headers[i]=NULL;
+  memset(&h->stadium_header_leases[i],0,sizeof(h->stadium_header_leases[i]));
+ }
+ h->stadium_camera_owner=NULL;h->stadium_started=0;
+ h->stadium_ready_route=0;h->stadium_ready_armed=0;
+ return ok(e,n);
+}
 /* Hooks surround only the untouched original Stage OnStart dispatch. Ordinary
  * stages and the historical immediate diagnostic continuation are unchanged. */
 static int stadium_ready_phase(MeleeWebStageLast* h,int stage_kind,int armed)

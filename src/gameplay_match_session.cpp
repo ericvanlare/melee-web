@@ -359,6 +359,10 @@ struct GameplayMatchSession::Storage {
     }
     void close(){
         char error[256]{};
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        /* Refuse unsupported partial starts before flow/HUD retirement. */
+        if(world&&stadium_diagnostic)world->cancel_prepared_stadium_ready();
+#endif
         end_flow();
         /* The browser's final source draw has completed before close(). Keep
          * the original fighter state resident while publishing MatchEnd, then

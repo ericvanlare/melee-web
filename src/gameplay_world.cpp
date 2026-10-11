@@ -1072,6 +1072,14 @@ void GameplayWorld::verify_immutable_archives()const{storage_->verify();}
 bool GameplayWorld::advance_construction(){return storage_->advance_construction();}
 bool GameplayWorld::construction_complete()const{return storage_->construction_phase==4;}
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+void GameplayWorld::cancel_prepared_stadium_ready()
+{
+    check(storage_ && storage_->stadium_diagnostic,
+          "Prepared Stadium cancellation requires its diagnostic world");
+    if(!storage_->stage_last)return; // Construction has not acquired a stage.
+    char error[256]{};
+    check(melee_web_stage_last_stadium_cancel_prepared_ready(storage_->stage_last,error,sizeof(error)),error);
+}
 void GameplayWorld::prepare_stadium_ready(MeleeWebMatchContext* camera)
 {
     check(storage_ && storage_->stadium_diagnostic && storage_->stage_last,

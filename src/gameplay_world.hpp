@@ -82,6 +82,7 @@ public:
     void end_stage();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     void prepare_stadium_ready(MeleeWebMatchContext*);
+    void cancel_prepared_stadium_ready();
     // Exercises the same read-only Toy owner preflight used immediately before
     // the original reset, without beginning world teardown.
     bool diagnostic_toy_owner_preflight() const;

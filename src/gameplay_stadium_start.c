@@ -10,6 +10,7 @@
 #include <sysdolphin/baselib/memory.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 struct MeleeWebStadiumGenerator {
     void* saved;
@@ -67,6 +68,31 @@ MeleeWebStadiumGenerator* melee_web_stadium_generator_prepare(char* e,size_t n)
     owner=h;
     if(!live(h,0,e,n)){owner=NULL;free(h->saved);free(h);return NULL;}
     ok(e,n);return h;
+}
+int melee_web_stadium_generator_prepared_preflight(MeleeWebStadiumGenerator* h,char* e,size_t n)
+{
+    void *descs,*data;int count;
+    if(!live(h,0,e,n))return 0;
+    if(HSD_GObj_804D7818||HSD_GObj_804D7830||HSD_GObj_804D7838)
+        return fail(e,n,"Prepared Stadium generator requires idle source callbacks");
+    if(h->data||h->scheduler||h->proc||h->lease.live||
+       !melee_web_stadium_zako_view(&descs,&data)||data||
+       (source_scheduler(&count),count)!=0)
+        return fail(e,n,"Prepared Stadium generator acquired source owners");
+    if(h->saved_size!=melee_web_stadium_zako_snapshot_size())
+        return fail(e,n,"Prepared Stadium generator snapshot size changed");
+    void* current=malloc(h->saved_size);
+    if(!current)return fail(e,n,"Cannot inspect prepared Stadium generator snapshot");
+    const int unchanged=melee_web_stadium_zako_snapshot_read(current,h->saved_size)&&
+        memcmp(current,h->saved,h->saved_size)==0;
+    free(current);
+    if(!unchanged)return fail(e,n,"Prepared Stadium generator private state changed");
+    return ok(e,n);
+}
+int melee_web_stadium_generator_cancel_prepared(MeleeWebStadiumGenerator* h,char* e,size_t n)
+{
+    if(!melee_web_stadium_generator_prepared_preflight(h,e,n))return 0;
+    owner=NULL;free(h->saved);free(h);return ok(e,n);
 }
 static int generator_preflight(MeleeWebStadiumGenerator*,int,char*,size_t);
 static int generator_capture(MeleeWebStadiumGenerator* h,int ready,char* e,size_t n)

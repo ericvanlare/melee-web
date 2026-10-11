@@ -14,6 +14,9 @@ int melee_web_stadium_generator_capture(MeleeWebStadiumGenerator*,char*,size_t);
 int melee_web_stadium_generator_capture_ready(MeleeWebStadiumGenerator*,char*,size_t);
 int melee_web_stadium_generator_preflight(MeleeWebStadiumGenerator*,char*,size_t);
 int melee_web_stadium_generator_end(MeleeWebStadiumGenerator*,char*,size_t);
+/* Cancel only the untouched prepared lease, before original OnStart. */
+int melee_web_stadium_generator_prepared_preflight(MeleeWebStadiumGenerator*,char*,size_t);
+int melee_web_stadium_generator_cancel_prepared(MeleeWebStadiumGenerator*,char*,size_t);
 /* Source-local bridge: exact private bytes, never a client-side mirrored ABI. */
 size_t melee_web_stadium_zako_snapshot_size(void);
 int melee_web_stadium_zako_snapshot_read(void*,size_t);

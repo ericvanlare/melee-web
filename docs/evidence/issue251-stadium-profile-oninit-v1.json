@@ -318,8 +318,8 @@
     "no_machine_specific_path_required": true
   },
   "subsequent_c3_component_2026_10_09": {
-    "claim_boundary": "Exact551 passes the declared bounded SSS prefix and stopped VS Entry Start/player0-3/host-seed comparison. See admission_and_sss_prefix_boundary_2026_10_11.vs_entry_endpoint_551ee723 for exact producer, exclusions and evidence. Next compare the existing deferred Session Setup endpoint, stopping before ticks, draws or GO. Setup/GO, per-owner RNG and C3 acceptance remain open; public Stadium admission stays closed. Audio baseline variation remains unexplained; no PCM, timing, pixels, physical-input or whole-session acceptance.",
-    "current_result": "On 551ee723, independent replay confirms the same-run bounded SSS prefix and actual declared VS Entry fields/seed, with checked unload and exact artifact identities. Historical1b prefix evidence retains its original producer. Fresh551 first-draw audio baseline150 versus earlier1b baseline149 remains unexplained. Setup2503 is next, stopping before tick/draw/GO; Setup/GO/per-owner RNG/C3 remain open. See admission_and_sss_prefix_boundary_2026_10_11.vs_entry_endpoint_551ee723.",
+    "claim_boundary": "The latest observed endpoint is the a2c42825 VS Setup 2503 attempt. Same-run CSS/SSS, prefix and VS Entry prerequisites passed; the declared Setup Start rules/source-semantic fields for players 0-3 (raw float bits) plus host seed 35a455b9 matched original row 2503 with no first mismatch. The overall capture failed during native unload and the native observation remained uncleared, so this is not complete Setup acceptance. See admission_and_sss_prefix_boundary_2026_10_11.vs_setup_endpoint_a2c42825. Reduce the actual-source pre-Ready cancellation/unload edge next; Ready/GO is a separate later boundary. Original PAD856/profile, persistent VsModeData and per-owner RNG remain unpaired; original-matched GO/3,500-tick/C3 acceptance remains open. The two historical functional 3,500-tick lifetimes and ordinary Results regression are separate completed evidence. The 551 VS Entry result remains preserved as historical; the earlier 1b versus 551 audio-baseline variation remains unexplained. Public Stadium admission stays closed.",
+    "current_result": "On a2c42825, independent review approved the declared Setup row-2503 Start fields and seed 35a455b9 after the same-run prerequisites, with first_mismatch null. The overall capture failed at native unload; checked unload did not complete and the observation was not cleared. Fourteen attributed process IDs were absent and 44 producer files were retained. Forty post-run local files match prelaunch HTTP bytes; no post-run HTTP fetch completed. Next reduce actual-source pre-Ready cancellation/unload; Ready/GO remains a later boundary and complete Setup acceptance is open. The historical 551 Entry result is retained. Fresh 551 first-draw/prefix audio began at 150 calls; earlier 1b standalone first-draw began at 149 versus prefix 150, an unexplained cross-run variation. No PCM, continuity or cadence claim.",
     "first_css_browser_draw_4d6c0b37_d949a0b8_v1": {
       "status": "FAIL_BEFORE_ARM; NO_BROWSER_CSS_COMPARISON; NO_TICK; NO_DRAW",
       "scope": "One headless browser attempt with the existing captured first-CSS context and one consumed sample. The diagnostic did not arm; this is not a source draw or Stadium/C3 acceptance result.",
@@ -586,7 +586,7 @@
         "SDK unittest moduleimport failure beforeNode; fixedexplicit scriptsimport and retainedoutput"
       ]
     },
-    "next_progression": "Reduce actual original terminal SSS OnFrame/scheduler/draw/transition ordering with the existing source fixture; do not force result3, add an input tick or weaken the comparison. Finaldraw2423/2424,exit2426,selection2427,ordinaryVS Entry2468/Setup2503,GO and per-owner RNG remain open.",
+    "next_progression": "Reduce the actual-source pre-Ready cancellation/unload edge before another capture. Only after that boundary is resolved should the separate Ready/GO boundary be observed. The a2c42825 Setup field match does not complete Setup acceptance. Original PAD856/profile/persistent VsModeData, per-owner RNG, original-matched 3,500-tick sequence and C3 remain open; preserve the two historical functional lifetimes and ordinary Results regression as separate evidence.",
     "first_css_context_return_1fad54ff_v1": {
       "source_head": "1fad54ff964f80b263b91a77cf25a25b0ee08603",
       "source_tree": "adfff70b0f357d4c66bd89f1f1c3a30c9202b2a9",
@@ -6263,13 +6263,14 @@
       "sha256": "a30d1f6c3a774bb22864c9b8cb0cea89bc556629c101cfffa4a432661f1c8610",
       "review_artifact": "sol-vs-entry-endpoint-contract-v1/review.json",
       "review_sha256": "d90952bc077931fbb261d81a0a46e6cf2ee18793d3d4603c225d176297b1d562",
-      "status": "Entry endpoint comparison passed. Next compare original VS Setup 2503 through the existing deferred Session, stopping before ticks, draws, or GO; C3 remains open."
+      "status": "The a2c42825 Setup 2503 attempt followed the 551 Entry pass. Its declared Start/seed fields matched original row 2503, but the overall capture failed during native unload and the native observation was not cleared; see vs_setup_endpoint_a2c42825. Next reduce the actual-source pre-Ready cancellation/unload edge before another capture. Ready/GO is a separate later boundary, and complete original-matched Setup acceptance remains open. C3 remains open."
     },
     "acceptance_boundary": {
       "historical_functional_evidence": "Two functional 3500-tick lifetimes and the ordinary Results regression are completed.",
       "still_open": [
-        "original-matched Setup",
-        "GO",
+        "actual-source pre-Ready cancellation/unload",
+        "Ready/GO",
+        "complete original-matched Setup acceptance and checked unload",
         "original-matched 3500-tick sequence",
         "per-owner RNG parity",
         "C3 acceptance",
@@ -6381,7 +6382,7 @@
         "ci_expected_skips": 2
       },
       "audio_baseline_gap": "The 551 standalone first-draw run and prefix began at 150 calls. The earlier 1b standalone first-draw run began at 149 while that prefix began at 150; that earlier cross-run variation remains unexplained. Counters do not establish PCM, continuity, or cadence.",
-      "next_step": "Compare original VS Setup 2503 through the existing deferred Session and stop before ticks, draws, or GO. GO, per-owner RNG, original-matched 3,500-tick sequence, and C3 acceptance remain open.",
+      "next_step": "The proposed next boundary, VS Setup 2503 through the existing deferred Session, was attempted under a later producer; see vs_setup_endpoint_a2c42825. GO, per-owner RNG, original-matched 3,500-tick sequence, and C3 acceptance remain open.",
       "acceptance_boundary": {
         "historical_functional_evidence": "Two functional 3,500-tick lifetimes and the ordinary Results regression are complete.",
         "still_open": [
@@ -6420,6 +6421,203 @@
         "sha256": "24a0ee8fdfa48ab192c69b22824f2db803bf1e5394b1c397d98dc159d420f02c",
         "artifact_count": 44,
         "identity_scope": "43 capture-launch or producer-manifest bound artifacts; ordinary-runtime WASM is retention-time-only."
+      }
+    },
+    "vs_setup_endpoint_a2c42825": {
+      "source_identity": {
+        "commit": "a2c42825930e20f8b8c612be04804081380de95e",
+        "tree": "2d0d521299284bb7f4d0f8e04de81f37416314ca"
+      },
+      "overall_result": "failed_native_unload_after_setup_comparison_pass",
+      "capture": {
+        "artifact": "vs-setup-preflight-a2c42825-v1/result.json",
+        "sha256": "2831b8ff20275cdd8ee4c5c523a6b0b9309eb0404dd91b15406db780538f89a6",
+        "exit_code": 1,
+        "report_artifact": "vs-setup-preflight-a2c42825-v1/browser-run/report.json",
+        "report_sha256": "3bafa0454dc7b9ba211cb67439969d001480cf10a4810891a1804eb00281456e",
+        "owner_artifact": "vs-setup-preflight-a2c42825-v1/owner.json",
+        "owner_sha256": "b50529a5c1cc32149fa70943d2706a6797d5cc99372e7a520f62fd8f60f08578",
+        "launch_artifact": "vs-setup-preflight-a2c42825-v1/launch.json",
+        "launch_sha256": "b506966772821e24a5cba7b121969c6818469e3b561478d8d37a29d8eebeaf01",
+        "capture_log_artifact": "vs-setup-preflight-a2c42825-v1/capture.log",
+        "capture_log_sha256": "9a0f9d4af983089e275aed8c199f4061a3ed675f5309bbb6c6f18a59361e7df0",
+        "error": "Partial Stadium OnStart ownership must remain reachable"
+      },
+      "setup_comparison": {
+        "original_row": 2503,
+        "approved": true,
+        "first_mismatch": null,
+        "compared": "Declared Setup Start rules and source-semantic fields for players 0-3, preserving raw float bits, plus host seed; this is not a whole-Start comparison.",
+        "actual_seed": "35a455b9",
+        "source_frames": 0,
+        "source_frames_scope": "actual_match_flow_clock_not_original_scene_frame",
+        "construction_complete": true,
+        "setup_service_tick_calls": 0,
+        "setup_service_draw_calls": 0,
+        "getter_calls": 1,
+        "expected_seed": "35a455b9"
+      },
+      "same_run_prerequisites": {
+        "callbacks_reviewed": 374,
+        "prior_checks": "CSS/SSS constructor pair, consumed-PAD tick, first draw, 124-input prefix, and VS Entry",
+        "producer_identity": "vs-setup-preflight-a2c42825-v1"
+      },
+      "audio": {
+        "render_calls_before_after": [
+          273,
+          273
+        ],
+        "render_frames_before_after": [
+          145600,
+          145600
+        ],
+        "scope": "No added audio render during Setup; this is not PCM equality, continuity, or wall-clock cadence evidence."
+      },
+      "gpu_diagnostics": {
+        "observed_before_unload_failure": true,
+        "api": "WebGPU",
+        "adapter_architecture": "metal-3",
+        "canvas": [
+          640,
+          480
+        ],
+        "failure": null,
+        "scope": "Pre-unload diagnostics only; no pixel equivalence or post-unload GPU assertion."
+      },
+      "independent_review": {
+        "artifact": "sol-vs-setup-result-review-a2c42825-v2/review.json",
+        "bytes": 9887,
+        "sha256": "cf9fb97eb462c24396cc9420765a8582ec631176699d9aa49b17046c9234e9e1",
+        "decision": "FAIL_NATIVE_UNLOAD_AFTER_SETUP_COMPARISON_PASS",
+        "first_mismatch": null,
+        "review_scope": "Declared Setup fields and same-run prerequisites approved; overall capture failed at unload."
+      },
+      "superseded_review_v1": {
+        "artifact": "sol-vs-setup-result-review-a2c42825-v1/review.json",
+        "sha256": "b5c4773481f98881f7cca4d1fcfa170a525c657e5e96663b0116e41af201590e",
+        "note": "Retained earlier review; v2 corrects its statement that GPU diagnostics were unrun."
+      },
+      "cleanup": {
+        "retention_review_artifact": "root-vs-setup-failure-retention-a2c42825-v2/review.json",
+        "retention_review_sha256": "84ca2d83d59a9cf09ebd83529870d10956a73bc902a47bbef217f5e447242a44",
+        "decision": "FAILED_NATIVE_UNLOAD; OWNED_PROCESSES_ABSENT",
+        "native_unload_completed": false,
+        "native_observation_cleared": false,
+        "attributed_processes_absent": 14,
+        "producer_files_retained": 44,
+        "post_run_http_comparison": "No post-run HTTP fetch completed; comparison is unobserved.",
+        "ownership_limit": "Flow/HUD end occurred before the stage guard refusal; the full Session ownership graph is not established as surviving the failure.",
+        "post_run_local_files_matching_prelaunch_http_bytes": 40
+      },
+      "unpaired_or_open": {
+        "fields": [
+          "original PAD856",
+          "original profile",
+          "persistent VsModeData",
+          "per-owner RNG"
+        ],
+        "later_boundaries": [
+          "actual-source pre-Ready cancellation/unload",
+          "Ready/GO",
+          "complete original-matched Setup acceptance",
+          "original-matched 3,500-tick sequence",
+          "C3 acceptance"
+        ],
+        "other_gates": [
+          "physical input",
+          "live timing",
+          "pixels",
+          "PCM"
+        ]
+      },
+      "validation": {
+        "focused": {
+          "artifact": "vs-setup-focused-a2c42825-v1/result.json",
+          "sha256": "d13837d3fb3e7c90210528be7ec6e5e6f063f2776d7df419b677432514556653",
+          "python_tests": 30,
+          "node_tests": 41,
+          "decision": "PASS"
+        },
+        "release_builds": [
+          {
+            "artifact": "vs-setup-builds-a2c42825-v1/diagnostic-runtime/result.json",
+            "sha256": "8be1d60064b21187b9c299c003de683e8ca7d365479d531efcd530d34d70f7c6",
+            "exit_code": 0,
+            "configuration": "Release"
+          },
+          {
+            "artifact": "vs-setup-builds-a2c42825-v1/ordinary-runtime/result.json",
+            "sha256": "b43c5e2473781b42d968c52b378f04f6b63a2f971a859a952a121405633df2e8",
+            "exit_code": 0,
+            "configuration": "Release"
+          },
+          {
+            "artifact": "vs-setup-builds-a2c42825-v1/fighter/result.json",
+            "sha256": "d5a719f718ea1e93017f879f88483dea8aa00dda95a400767ce9ed6b23fb5e3e",
+            "exit_code": 0,
+            "configuration": "Release"
+          }
+        ],
+        "pad_trace": {
+          "artifact": "vs-setup-builds-a2c42825-v1/pad-trace/result.json",
+          "sha256": "67b3deb735aea1390a22f8195ce6607baf4c111bda4437955a05e4037702a2b1",
+          "exit_code": 0
+        },
+        "full_suite": {
+          "artifact": "full-regression-a2c42825-v1/result.json",
+          "sha256": "4ff0fbb8111e981c15097c0e8b0798affd92edb126a8e30742f5a4f03f80d1bb",
+          "tests_run": 2454,
+          "skipped": 162,
+          "failures": 0,
+          "elapsed_seconds": 512.334,
+          "exit_code": 0
+        },
+        "ci": {
+          "artifact": "ci-a2c42825-complete-v1.json",
+          "sha256": "81ce8f02bc7f51b28c6c32d306cc1e537d7dcc17b6c5672a322e1f1bf2e5d515",
+          "successful_jobs": 12,
+          "expected_skips": 2,
+          "conclusion": "success",
+          "database_id": 38125289571
+        }
+      },
+      "retained_compiler_history": {
+        "gcc_failure": {
+          "source_commit": "982d381092604c8a33b24f9909a6648e548571d3",
+          "ci_result_artifact": "ci-982d3810-completed-v1.json",
+          "ci_result_sha256": "066bdabf27b486096a02692252d167b1c7abd704e15901aeca5312382e0bd971",
+          "failed_jobs_artifact": "ci-982d3810-failed-jobs-v1.log",
+          "failed_jobs_sha256": "b987d39460768d54b1debf695cb342daa5a266ff7cc9681c93d56701a71632c4",
+          "cause": "GCC misleading-indentation diagnostic in the reused production decoder."
+        },
+        "format_only_repair": {
+          "freeze_artifact": "sol-pad-decoder-gcc-format-v1/freeze.json",
+          "freeze_sha256": "724c574729a58394824aff1af83b88461b34cfdf1821734f9ca2ee91b666fa8e",
+          "review_artifact": "sol-pad-decoder-gcc-format-v1/review.json",
+          "review_sha256": "1e4b5fb6d218fe75185773c1633e323257107a682277a2066f52cc7c8c75750d",
+          "patch_sha256": "d03ebfb5d98a5b8460d542a52d19e15fdb96e0ebae05175bafeab4f917ed7366",
+          "source_file_before_sha256": "5783e4ea0c6652f398a1e9db7f4a0764707d2a8cd8dd35d25dfd1f5be06d9582",
+          "source_file_after_sha256": "e8a81a5239a1e2849d09bdb832abe9dc66da078199e4ab8eb86ac357aa92461b",
+          "scope": "One formatting-only source change; original C token sequence preserved."
+        }
+      },
+      "next_action": "Reduce the actual-source pre-Ready cancellation/unload edge before another capture. Ready/GO is a separate later boundary; no Ready/GO or further gameplay step is included in this Setup result.",
+      "acceptance_boundary": {
+        "historical_functional_evidence": "Two functional 3,500-tick lifetimes and the ordinary Results regression are complete.",
+        "status": "Declared Setup Start/seed fields matched, but the overall Setup route remains unaccepted because checked unload and observation clearing failed.",
+        "still_open": [
+          "actual-source pre-Ready cancellation/unload",
+          "Ready/GO",
+          "complete original-matched Setup acceptance and checked unload",
+          "original PAD856/profile/persistent VsModeData",
+          "original-matched 3,500-tick sequence",
+          "per-owner RNG parity",
+          "C3 acceptance",
+          "physical input",
+          "live timing",
+          "pixels",
+          "PCM"
+        ]
       }
     }
   }
