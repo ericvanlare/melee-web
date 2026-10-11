@@ -2942,6 +2942,7 @@ try {
 } catch (error) {
   failure = errorText(error);
   report.error = failure;
+  if (error.diagnostics) report.driverFailure = {step:error.step, ...error.diagnostics};
 } finally {
   await cleanupOwnedProcesses();
   report.scenario.page_errors = pageErrors;

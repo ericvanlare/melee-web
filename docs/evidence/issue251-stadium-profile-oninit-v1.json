@@ -318,8 +318,8 @@
     "no_machine_specific_path_required": true
   },
   "subsequent_c3_component_2026_10_09": {
-    "claim_boundary": "The latest observed endpoint is the a2c42825 VS Setup 2503 attempt. Same-run CSS/SSS, prefix and VS Entry prerequisites passed; the declared Setup Start rules/source-semantic fields for players 0-3 (raw float bits) plus host seed 35a455b9 matched original row 2503 with no first mismatch. The overall capture failed during native unload and the native observation remained uncleared, so this is not complete Setup acceptance. See admission_and_sss_prefix_boundary_2026_10_11.vs_setup_endpoint_a2c42825. Reduce the actual-source pre-Ready cancellation/unload edge next; Ready/GO is a separate later boundary. Original PAD856/profile, persistent VsModeData and per-owner RNG remain unpaired; original-matched GO/3,500-tick/C3 acceptance remains open. The two historical functional 3,500-tick lifetimes and ordinary Results regression are separate completed evidence. The 551 VS Entry result remains preserved as historical; the earlier 1b versus 551 audio-baseline variation remains unexplained. Public Stadium admission stays closed.",
-    "current_result": "On a2c42825, independent review approved the declared Setup row-2503 Start fields and seed 35a455b9 after the same-run prerequisites, with first_mismatch null. The overall capture failed at native unload; checked unload did not complete and the observation was not cleared. Fourteen attributed process IDs were absent and 44 producer files were retained. Forty post-run local files match prelaunch HTTP bytes; no post-run HTTP fetch completed. Next reduce actual-source pre-Ready cancellation/unload; Ready/GO remains a later boundary and complete Setup acceptance is open. The historical 551 Entry result is retained. Fresh 551 first-draw/prefix audio began at 150 calls; earlier 1b standalone first-draw began at 149 versus prefix 150, an unexplained cross-run variation. No PCM, continuity or cadence claim.",
+    "claim_boundary": "The latest observed endpoint is the e12bea88 VS Setup 2503 attempt. Same-run CSS/SSS, consumed-PAD, first-draw, 124-input prefix and VS Entry prerequisites passed; the declared Setup Start rules/source-semantic fields for players 0\u20133 (raw float bits) plus host seed 35a455b9 matched original row 2503 with no first mismatch. The overall capture failed during native unload with \u201cStadium display teardown refused a mismatched live owner\u201d; checked unload did not complete and the observation remained uncleared. An asset-free actual-source composition control reproduced a context-topology refusal with zero display releases under synthetic owner fixtures; it does not establish that the same clause failed in the browser, and no post-failure Session graph was captured. Next retain the driver\u2019s existing error.diagnostics in one stopped Setup diagnosis before cleanup, preserving owner checks. Ready/GO is later; complete Setup acceptance remains open. Original PAD856/profile, prepared/persistent VsModeData, per-owner RNG, original-matched GO/3,500-tick sequence and C3 acceptance remain open. Two historical functional 3,500-tick lifetimes and ordinary Results regression are separate completed evidence. The 551 VS Entry result remains preserved; the earlier 1b versus 551 audio-baseline variation remains unexplained. Public Stadium admission stays closed.",
+    "current_result": "On e12bea88, independent review approved the declared Setup row-2503 Start fields and seed 35a455b9 after the same-run prerequisites, with first_mismatch null. The overall capture failed at native unload with \u201cStadium display teardown refused a mismatched live owner\u201d; checked unload did not complete and the observation was not cleared. Review found 14 attributed process IDs absent and 44 producer files retained. Forty post-run local files match prelaunch HTTP bytes; no post-run HTTP fetch completed. An asset-free actual-source reducer reproduced a context-topology refusal with zero display releases using synthetic owners, but does not establish that this clause failed in the browser; the actual runtime predicate/topology and post-failure Session graph remain unobserved. Next retain the driver error.diagnostics in one stopped Setup diagnosis before cleanup, preserving owner checks. Ready/GO and complete Setup acceptance remain open. The historical 551 Entry result is retained. Fresh 551 first-draw/prefix audio began at 150 calls; earlier 1b standalone first-draw began at 149 versus prefix 150, an unexplained cross-run variation. No PCM, continuity or cadence claim.",
     "first_css_browser_draw_4d6c0b37_d949a0b8_v1": {
       "status": "FAIL_BEFORE_ARM; NO_BROWSER_CSS_COMPARISON; NO_TICK; NO_DRAW",
       "scope": "One headless browser attempt with the existing captured first-CSS context and one consumed sample. The diagnostic did not arm; this is not a source draw or Stadium/C3 acceptance result.",
@@ -586,7 +586,7 @@
         "SDK unittest moduleimport failure beforeNode; fixedexplicit scriptsimport and retainedoutput"
       ]
     },
-    "next_progression": "Reduce the actual-source pre-Ready cancellation/unload edge before another capture. Only after that boundary is resolved should the separate Ready/GO boundary be observed. The a2c42825 Setup field match does not complete Setup acceptance. Original PAD856/profile/persistent VsModeData, per-owner RNG, original-matched 3,500-tick sequence and C3 remain open; preserve the two historical functional lifetimes and ordinary Results regression as separate evidence.",
+    "next_progression": "A source-reviewed stopped Setup diagnosis should retain the driver\u2019s existing error.diagnostics before cleanup, to expose the actual rejected display-owner clause. Preserve all existing owner and preflight predicates; do not relax ownership. If the exact clause remains absent, keep it unobserved. After that diagnosis, decide from the first retained predicate whether a narrow actual-source correction is justified; do not proceed to Ready/GO until a later Setup attempt completes comparison, checked unload and observation clearing. Original PAD856/profile/persistent VsModeData, per-owner RNG, original-matched 3,500-tick sequence and C3 remain open; preserve the two historical functional lifetimes and ordinary Results regression as separate evidence.",
     "first_css_context_return_1fad54ff_v1": {
       "source_head": "1fad54ff964f80b263b91a77cf25a25b0ee08603",
       "source_tree": "adfff70b0f357d4c66bd89f1f1c3a30c9202b2a9",
@@ -6263,22 +6263,25 @@
       "sha256": "a30d1f6c3a774bb22864c9b8cb0cea89bc556629c101cfffa4a432661f1c8610",
       "review_artifact": "sol-vs-entry-endpoint-contract-v1/review.json",
       "review_sha256": "d90952bc077931fbb261d81a0a46e6cf2ee18793d3d4603c225d176297b1d562",
-      "status": "The a2c42825 Setup 2503 attempt followed the 551 Entry pass. Its declared Start/seed fields matched original row 2503, but the overall capture failed during native unload and the native observation was not cleared; see vs_setup_endpoint_a2c42825. Next reduce the actual-source pre-Ready cancellation/unload edge before another capture. Ready/GO is a separate later boundary, and complete original-matched Setup acceptance remains open. C3 remains open."
+      "status": "The e12bea88 Setup 2503 declared comparison passed, but unload refused a mismatched display owner and the observation remained uncleared. An asset-free actual-source composition control reproduced a context-topology refusal with zero releases under synthetic owner fixtures; it does not identify the exact e12 runtime clause, and no post-failure Session graph was captured. Next retain the driver\u2019s existing error.diagnostics in one stopped Setup diagnosis before cleanup, preserving all owner checks. Do not relax ownership. Ready/GO and complete Setup acceptance remain open."
     },
     "acceptance_boundary": {
       "historical_functional_evidence": "Two functional 3500-tick lifetimes and the ordinary Results regression are completed.",
       "still_open": [
-        "actual-source pre-Ready cancellation/unload",
+        "stopped Setup diagnosis retaining driver error.diagnostics to identify the actual display-owner rejection clause, with owner predicates unchanged",
+        "fresh stopped Setup attempt with checked unload and observation clearing",
         "Ready/GO",
-        "complete original-matched Setup acceptance and checked unload",
-        "original-matched 3500-tick sequence",
+        "complete original-matched Setup acceptance",
+        "original PAD856/profile/persistent VsModeData",
+        "original-matched 3,500-tick sequence",
         "per-owner RNG parity",
         "C3 acceptance",
         "physical input",
         "live timing",
         "pixels",
         "PCM"
-      ]
+      ],
+      "status": "The e12bea88 declared Setup Start/seed fields matched original row 2503, but the overall Setup route remains unaccepted because the display-owner teardown refused during checked unload and the observation was not cleared."
     },
     "vs_entry_endpoint_551ee723": {
       "source_identity": {
@@ -6619,6 +6622,202 @@
           "PCM"
         ]
       }
+    },
+    "vs_setup_endpoint_e12bea88": {
+      "source_identity": {
+        "commit": "e12bea88b9a98c8ef36cfecac99154d081c222e1",
+        "tree": "5b69eff9b92862ef03d6e7867cfda1e377fb928f"
+      },
+      "overall_result": "failed_native_unload_after_setup_comparison_pass",
+      "capture": {
+        "artifact": "vs-setup-preflight-e12bea88-v1/result.json",
+        "sha256": "1d2cd8a0545723f180f737a1412b099645a9e4872d72944ea3306aba6e77bbb5",
+        "exit_code": 1,
+        "report_artifact": "vs-setup-preflight-e12bea88-v1/browser-run/report.json",
+        "report_sha256": "093a6a067d650eb4c7ab1482030daa1734ad468139e0aaab798d70595cb6cbfa",
+        "owner_artifact": "vs-setup-preflight-e12bea88-v1/owner.json",
+        "owner_sha256": "56ff8cf38fca046ee71af48c065bf3ec220c67dddbeed06f09d29c3df6001fea",
+        "launch_artifact": "vs-setup-preflight-e12bea88-v1/launch.json",
+        "launch_sha256": "84eb220976e04a4bf520d54427797b982cecb1953bd2ebc440412a1d34a2f554",
+        "capture_log_artifact": "vs-setup-preflight-e12bea88-v1/capture.log",
+        "capture_log_sha256": "32a7fce2869afeafdb6f5589ae4ba1f3f85ce7fb2d7c858ce641af9384da4814"
+      },
+      "setup_comparison": {
+        "original_row": 2503,
+        "approved": true,
+        "first_mismatch": null,
+        "compared": "Declared match Start rules and source-semantic fields for players 0\u20133, preserving raw-float fields, plus host seed; not a whole-Start comparison.",
+        "actual_seed": "35a455b9",
+        "expected_seed": "35a455b9",
+        "getter_calls": 1,
+        "source_frames": 0,
+        "source_frames_scope": "actual_match_flow_clock_not_original_scene_frame",
+        "construction_complete": true,
+        "setup_service_tick_calls": 0,
+        "setup_service_draw_calls": 0,
+        "exclusions": [
+          "whole Start blob",
+          "native xB",
+          "players 4\u20135",
+          "padding",
+          "pointer/callback slots"
+        ]
+      },
+      "same_run_prerequisites": {
+        "callbacks_reviewed": 374,
+        "prior_checks": "CSS/SSS constructor pair, consumed-PAD tick, first draw, 124-input prefix and VS Entry."
+      },
+      "audio": {
+        "render_calls_before_after": [
+          274,
+          274
+        ],
+        "render_frames_before_after": [
+          146133,
+          146133
+        ],
+        "scope": "No added Setup render; not PCM equality, continuity, or wall-clock cadence. The earlier a2 Setup attempt had a distinct 273-call/145600-frame baseline; do not normalize across runs."
+      },
+      "failure": {
+        "first_failure": "Stadium display teardown refused a mismatched live owner",
+        "native_unload_completed": false,
+        "native_observation_cleared": false,
+        "independent_review_artifact": "sol-vs-setup-result-review-e12bea88-v1/review.json",
+        "independent_review_sha256": "21ba3bd8bebca0f1fbc99728783d030c30f1a7bad8468dc0d47a930c587604de",
+        "decision": "FAIL_NATIVE_UNLOAD_AFTER_SETUP_COMPARISON_PASS",
+        "first_mismatch": null
+      },
+      "source_reduction": {
+        "artifact": "sol-vs-setup-result-review-e12bea88-v1/source-reduction.json",
+        "sha256": "1a72ad001d2e8129575d1c9f0e434190c2c5dfd9590d2b192307111ae504385c",
+        "decision": "SOURCE_REDUCTION_EXACT_REJECTED_PREDICATE_UNOBSERVED",
+        "known": "The observed browser error was the generic display-owner mismatch; source review infers that refusal occurred at the Session/display-owner teardown preflight after flow/HUD end and before destructive display services.",
+        "unobserved": "The exact e12 runtime failed predicate/clause/index, pointers and text/context topology were not retained; no post-failure full Session graph was captured, and the reducer does not reproduce the exact browser owner state.",
+        "next_experiment": "One stopped Setup diagnosis retaining the driver\u2019s already-collected error.diagnostics before cleanup, with all owner/preflight predicates unchanged. Inspect the actual rejected clause; if diagnostics still do not expose it, leave it unobserved. Do not relax ownership or proceed to Ready/GO.",
+        "actual_source_composition_control": {
+          "freeze_artifact": "sol-stadium-display-close-reducer-v1/freeze.json",
+          "freeze_sha256": "7417c744f6647ee05bea60fefc8d5317c30a04c0a7931bf76fbd1eec9d2883b3",
+          "review_artifact": "sol-stadium-display-close-reducer-v1/review.json",
+          "review_sha256": "30c49d45218adbef4ce0a02d3393e90b5cd4b52663887243eb3b09d294855be9",
+          "result_artifact": "sol-stadium-display-close-reducer-v1/result.json",
+          "result_sha256": "97a3213185dc4e1ae757338478640f66e3ab31a8b7c8e6728bbfb48ca2f1248b",
+          "decision": "PASS_ACTUAL_SOURCE_COMPOSITION_HYPOTHESIS_ONLY",
+          "observed": "Actual capture matching and display preflight functions, actual SIS cleanup subservice and exact Session.close prefix were composed with synthetic source/display owners and explicit cancellation/flow/HUD fixtures. The control reproduced context-topology refusal with all display release counters zero.",
+          "limit": "This does not reconstruct the e12 browser owner graph or prove the same predicate failed there. The exact runtime clause/index/topology and post-failure Session graph remain unobserved. No production guard/fix is justified by this control."
+        }
+      },
+      "gpu_diagnostics": {
+        "observed_before_unload_failure": true,
+        "api": "WebGPU",
+        "adapter_architecture": "metal-3",
+        "canvas": [
+          640,
+          480
+        ],
+        "scope": "Pre-unload diagnostics only; no pixel equivalence or post-unload assertion."
+      },
+      "cleanup": {
+        "retention_review_artifact": "root-vs-setup-failure-retention-e12bea88-v1/review.json",
+        "retention_review_sha256": "0979eee36b93b565f721429ebb3cdbff7875ae9516ddff55ddb1762a90a735f8",
+        "attributed_processes_absent": 14,
+        "producer_files_retained": 44,
+        "post_run_local_files_matching_prelaunch_http_bytes": 40,
+        "post_run_http_comparison": "No post-run HTTP fetch completed; comparison is unobserved.",
+        "ownership_limit": "Process absence does not establish native retirement; flow/HUD end occurred before refusal, and the full Session ownership graph is not established as surviving the failure."
+      },
+      "validation": {
+        "focused": {
+          "artifact": "vs-setup-focused-e12bea88-v1/result.json",
+          "sha256": "ab3642c1d23be36173f6bbf5e818b7e3cd5cbfbb4190cc1b0cbc7348061f63fb",
+          "python_tests": 46,
+          "node_tests": 41,
+          "decision": "PASS"
+        },
+        "release_builds": [
+          {
+            "artifact": "vs-setup-builds-e12bea88-v1/diagnostic-runtime/result.json",
+            "sha256": "87daa04f44957a11be5d978c2e5cbe06eda67717790a8247f217ae2ab7245a00",
+            "exit_code": 0
+          },
+          {
+            "artifact": "vs-setup-builds-e12bea88-v1/ordinary-runtime/result.json",
+            "sha256": "5873f431684e9b37ce5a82be116a8c332b3da7977b1fe38b9c2dc11a3542d037",
+            "exit_code": 0
+          },
+          {
+            "artifact": "vs-setup-builds-e12bea88-v1/fighter/result.json",
+            "sha256": "9553164110569d63f675316f67dc12a1cc32ce9faafbab2758b9b67bcaf47c07",
+            "exit_code": 0
+          }
+        ],
+        "pad_trace": {
+          "artifact": "vs-setup-builds-e12bea88-v1/pad-trace/result.json",
+          "sha256": "922edcd2cdff480d032509415211e79ed43bf50f1faacbc8237112d43edc90b1",
+          "exit_code": 0
+        },
+        "full_suite": {
+          "artifact": "full-regression-e12bea88-v1/result.json",
+          "sha256": "691aff4e60ca5e713149756449df1df6adeab2ae019a6ec2fd399a1faeb9eb16",
+          "tests_run": 2455,
+          "skipped": 162,
+          "failures": 0,
+          "elapsed_seconds": 518.0,
+          "exit_code": 0
+        },
+        "ci": {
+          "artifact": "ci-e12bea88-complete-v1.json",
+          "sha256": "2df15376d2703a9c4b984cd9aee181dd782a59b95b7622da27aba140f081d9bc",
+          "successful_jobs": 12,
+          "expected_skips": 2,
+          "conclusion": "success",
+          "database_id": 38127894112
+        }
+      },
+      "retained_history": {
+        "a2_attempt": {
+          "artifact": "vs-setup-preflight-a2c42825-v1/result.json",
+          "sha256": "2831b8ff20275cdd8ee4c5c523a6b0b9309eb0404dd91b15406db780538f89a6",
+          "first_failure": "Partial Stadium OnStart ownership must remain reachable",
+          "note": "Separate historical Setup attempt; not overwritten by e12."
+        },
+        "f629_compiler_failure": {
+          "artifact": "vs-setup-builds-f629df41-v1/diagnostic-runtime/result.json",
+          "sha256": "0f5a09c543005342a290bc8483cdfa51cd797869a82436f4a7cb783985a14183",
+          "log_sha256": "9c54926e2a349e853d4339b1d0eb2b9fb0fbc4b2070c216bb04846e14d0cab08"
+        },
+        "sdk_include_only_repair": {
+          "artifact": "root-pre-ready-sdk-include-repair-v1/result.json",
+          "sha256": "ec3b16ca4fe4959d45dda96e2bb33586f0c511c1e45ed8f66ff519aa7fa35e60",
+          "patch_sha256": "80a431977cf5dbacc218ad4e64d94265059406598e4e49d577971f2b1ebbba6e",
+          "scope": "Include-only SDK allocator declaration repair; current e12 builds passed."
+        },
+        "gcc_982d3810_history": "The earlier 982d3810 GCC failure and format-only repair remain bound in vs_setup_endpoint_a2c42825."
+      },
+      "unpaired_or_open": {
+        "fields": [
+          "original PAD856",
+          "original profile",
+          "persistent VsModeData",
+          "prepared VsModeData",
+          "per-owner RNG"
+        ],
+        "later_boundaries": [
+          "actual Session/display-owner teardown preflight reduction",
+          "fresh stopped Setup attempt with checked unload/observation clearing",
+          "Ready/GO",
+          "complete original-matched Setup acceptance",
+          "original-matched 3,500-tick sequence",
+          "C3 acceptance"
+        ],
+        "other_gates": [
+          "physical input",
+          "live timing",
+          "pixels",
+          "PCM"
+        ]
+      },
+      "next_action": "Reduce the actual Session/display-owner teardown preflight and retain its first failed predicate/counters before any browser retry. A later stopped Setup run must verify comparison, checked unload and observation clearing; do not proceed to Ready/GO until that boundary passes.",
+      "historical_functional_evidence": "Two functional 3,500-tick lifetimes and the ordinary Results regression are completed; they remain distinct from original-matched Setup/GO/3,500-tick/per-owner RNG/C3 acceptance."
     }
   }
 }
