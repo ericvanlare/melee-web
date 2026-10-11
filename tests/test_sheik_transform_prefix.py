@@ -180,6 +180,30 @@ def _menu_owner_poll(scene_kind: int, *, mode=2, css_live=True,
     return _boundary_payload(1, values)
 
 
+def _items_owner_poll(*, locked, kind=16, row=0, value=1,
+                      omit_lock=False, lock_address=0x804D6BEC,
+                      lock_raw=None) -> bytes:
+    flow = bytearray(0x18)
+    flow[0] = kind
+    flow[2:4] = row.to_bytes(2, "big")
+    flow[4] = value
+    flow[0x11] = 1
+    values = [(40, 0, 0x803D0100, b"\x01"),
+              (45, 0, 0x804A04F0, bytes(flow)),
+              (46, 0, 0x804D6BC8, bytes(8))]
+    if not omit_lock:
+        values.append((56, 0, lock_address,
+                       bytes((locked,)) if lock_raw is None else lock_raw))
+    return _boundary_payload(1, values)
+
+
+def _items_frequency_up_slot() -> bytes:
+    from reference_versus_sequence_capture import raw_pad
+    value = bytearray(_pad_slot())
+    value[:11] = bytes.fromhex(raw_pad(buttons=["D_UP"]))
+    return bytes(value)
+
+
 def _pad_slot(*, down_b=False, bad_port=None) -> bytes:
     raw = bytearray(0x30)
     raw[11], raw[23], raw[35], raw[47] = 0xA1, 0xA2, 0xA3, 0xA4
@@ -215,6 +239,29 @@ def _capture(path: Path, *, swap=True, mutations=None, ticks=4) -> Path:
                      "completion_boundary": "active_sheik_grounded_neutral_source_tick_after_owner_change"}),
     ]
     sequence = 2
+    if not mutations.get("missing_items_lock_poll"):
+        records.append(_frame(3, sequence, _items_owner_poll(
+            locked=1, omit_lock=mutations.get("missing_items_lock"),
+            lock_address=0x804D6BED if mutations.get("wrong_items_lock_address") else 0x804D6BEC,
+            lock_raw=b"\x01\x00" if mutations.get("bad_items_lock_size") else
+                     b"\x02" if mutations.get("bad_items_lock_value") else None,
+            kind=13 if mutations.get("wrong_items_lock_owner") else 16),
+            pc=PAD_POLL_PC, source_tick=0))
+        sequence += 1
+        if not mutations.get("items_never_unlocked"):
+            records.append(_frame(3, sequence, _items_owner_poll(locked=0),
+                                  pc=PAD_POLL_PC, source_tick=0))
+            sequence += 1
+            records.append(_frame(3, sequence, _boundary_payload(
+                2, [], pad_slot=_items_frequency_up_slot()),
+                pc=0x80377584, source_tick=0))
+            sequence += 1
+            records.append(_frame(3, sequence, _boundary_payload(
+                2, [], pad_slot=_pad_slot()), pc=0x80377584, source_tick=0))
+            sequence += 1
+            records.append(_frame(3, sequence, _items_owner_poll(locked=0, row=31, value=3),
+                                  pc=PAD_POLL_PC, source_tick=0))
+            sequence += 1
     if mutations.get("sss_before_css"):
         records.append(_frame(3, sequence, _menu_owner_poll(9),
                               pc=PAD_POLL_PC, source_tick=0))
@@ -422,15 +469,23 @@ int main(int argc, char** argv) {
         self.assertEqual(report["completion"]["match_complete"], False)
         self.assertEqual(report["completion"]["post_swap_neutral_source_tick"]["source_tick"], 3)
         self.assertEqual(report["input"]["readiness_source_sequence"], {
-            "neutral_pad_consume": 5,
-            "grounded_neutral_source_tick": 6,
-            "down_b_consume": 7,
+            "neutral_pad_consume": 10,
+            "grounded_neutral_source_tick": 11,
+            "down_b_consume": 12,
         })
         self.assertEqual(report["menu_owner_readiness"], {
-            "css_live_owner_pad_poll_sequence": 2,
-            "sss_live_owner_pad_poll_sequence": 3,
+            "css_live_owner_pad_poll_sequence": 7,
+            "sss_live_owner_pad_poll_sequence": 8,
             "ordered_before_setup": True,
             "meaning": "mode-2 live source-owner slices after the observer's checked menu-return gates; does not compare CSS/SSS scalar state or prove consumed input",
+        })
+        self.assertEqual(report["items_lock_readiness"], {
+            "transitions": [
+                {"sequence": 2, "locked": 1, "row": 0, "value": 1},
+                {"sequence": 3, "locked": 0, "row": 0, "value": 1},
+            ],
+            "first_unlocked_pad_poll": 3,
+            "unlocked_before_css": True,
         })
         self.assertNotEqual(report["initial_owner"]["local_pointer_checks"]["fighter_pointers"][0],
                             report["initial_owner"]["local_pointer_checks"]["fighter_pointers"][1])
@@ -440,14 +495,29 @@ int main(int argc, char** argv) {
             ({"missing_css_owner": True}, "SSS live owner preceded"),
             ({"wrong_css_mode": True}, "SSS live owner preceded"),
             ({"missing_css_live_state": True}, "SSS live owner preceded"),
-            ({"missing_sss_owner": True}, "setup preceded ordered live CSS and SSS"),
-            ({"missing_sss_kind": True}, "setup preceded ordered live CSS and SSS"),
+            ({"missing_sss_owner": True}, "match setup preceded unlocked Items readiness or ordered live CSS/SSS"),
+            ({"missing_sss_kind": True}, "match setup preceded unlocked Items readiness or ordered live CSS/SSS"),
             ({"sss_before_css": True}, "SSS live owner preceded"),
         )
         for mutation, expected in cases:
             with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
                 source = _capture(Path(directory) / "capture.mwro", mutations=mutation)
                 with self.assertRaisesRegex(TransformPrefixError, expected):
+                    validate_transform_prefix(source)
+
+    def test_transform_profile_requires_checked_items_lock_clear_before_css(self):
+        cases = (
+            ({"missing_items_lock": True}, "Items lock owner is missing or unexpected"),
+            ({"wrong_items_lock_address": True}, "Items lock address/size/value differs"),
+            ({"bad_items_lock_size": True}, "size 2, expected 1"),
+            ({"bad_items_lock_value": True}, "Items lock address/size/value differs"),
+            ({"wrong_items_lock_owner": True}, "Items lock owner is missing or unexpected"),
+            ({"items_never_unlocked": True}, "unlocked Items readiness"),
+        )
+        for mutation, message in cases:
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                source = _capture(Path(directory) / "capture.mwro", mutations=mutation)
+                with self.assertRaisesRegex(TransformPrefixError, message):
                     validate_transform_prefix(source)
 
     def test_dormant_sheik_without_owner_swap_is_not_a_pass(self):

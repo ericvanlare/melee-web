@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from authored_sd_reference_plan import make_input_plan, recipe
 from capture_sd_reference_prefix import (SheikTransformPrefixReceiver, drive_sheik_transform_input,
-                                          drive_authored_css_sss)
+                                          drive_authored_css_sss, drive_transform_items_row)
 from reference_versus_sequence_capture import raw_pad
 from retail_input_plan import DISCONNECTED_PAD, NEUTRAL_PAD, verify_entry, verify_tick
 from sd_original_menu_plan import (rules_ready_packet, sheik_transform_prefix_packet,
@@ -21,7 +21,7 @@ from sd_original_menu_plan import (rules_ready_packet, sheik_transform_prefix_pa
 SLICE_NAMES = {2: "pad_queue", 3: "pad_slot", 17: "scene_routing",
                40: "scene_kind", 41: "stage_select_index", 42: "stage_select_kind",
                43: "menu_css_cursor", 44: "menu_css_doors", 47: "menu_css_model",
-               48: "menu_css_live_state"}
+               48: "menu_css_live_state", 56: "sd_items_lock"}
 
 
 def _setup_bytes():
@@ -101,7 +101,7 @@ def _css_poll(sequence, mode, *, include_cursor_models=True):
             slices.append(_slice(43, slot, 0x804A1000 + slot * 0x20, bytes(cursor)))
             slices.append(_slice(47, slot, 0x804A2000 + slot * 0x20, bytes(model)))
     return {"seq": sequence, "event": "boundary", "payload": {
-        "boundary": "pad_poll", "pc": 0x80377584, "source_tick": 0,
+        "boundary": "pad_poll", "pc": 0x8034DD8C, "source_tick": 0,
         "slices": slices}}
 
 
@@ -109,7 +109,7 @@ def _sss_poll(sequence, mode):
     index = 4
     kind_address = 0x803F06D0 + index * 0x1C + 0x0B
     return {"seq": sequence, "event": "boundary", "payload": {
-        "boundary": "pad_poll", "pc": 0x80377584, "source_tick": 0,
+        "boundary": "pad_poll", "pc": 0x8034DD8C, "source_tick": 0,
         "slices": [_slice(40, 0, 0x804D6720, b"\x09"),
                    _slice(17, 0, 0x80479D30, bytes((mode, 0, 0, 0, 0, 0))),
                    _slice(41, 0, 0x804D6CAE, bytes((index,))),
@@ -129,8 +129,10 @@ def _serialized_transform(path, *, mutation=None):
         payload = row["payload"]
         if payload["boundary"] == "pad_poll":
             scene = next(item for item in payload["slices"] if item["tag"] == 40)
-            replacement = _css_poll(row["seq"], 2) if scene["hex"] == "08" else _sss_poll(row["seq"], 2)
-            payload["slices"] = replacement["payload"]["slices"]
+            if scene["hex"] == "08":
+                payload["slices"] = _css_poll(row["seq"], 2)["payload"]["slices"]
+            elif scene["hex"] == "09":
+                payload["slices"] = _sss_poll(row["seq"], 2)["payload"]["slices"]
         if payload["boundary"] == "setup":
             next(item for item in payload["slices"] if item["tag"] == 4)["hex"] = _setup_bytes().hex()
     encoded = []
@@ -148,7 +150,105 @@ def _serialized_transform(path, *, mutation=None):
     return list(stream.iter_records(path))
 
 
+def _serialized_items_rows(path, specs):
+    from test_sheik_transform_prefix import _frame, _boundary_payload
+    import reference_observer_stream as stream
+    encoded = []
+    for sequence, spec in enumerate(specs):
+        if spec.get("boundary") == "pad_consume":
+            slot = bytearray(0x30)
+            slot[:11] = bytes.fromhex(spec.get("p1", NEUTRAL_PAD))
+            slot[12:23] = bytes.fromhex(spec.get("p2", NEUTRAL_PAD))
+            slot[10] = 0
+            slot[22] = 0
+            slot[34] = 0xFF
+            slot[46] = 0xFF
+            encoded.append(_frame(3, sequence, _boundary_payload(2, [], pad_slot=bytes(slot)),
+                                  pc=0x80377584, source_tick=0))
+            continue
+        flow = bytearray(0x18)
+        flow[0] = spec.get("kind", 16)
+        flow[2:4] = spec.get("row", 0).to_bytes(2, "big")
+        flow[4] = spec.get("value", 1)
+        flow[0x11] = 1
+        values = [(40, 0, 0x803D0100, b"\x01"),
+                  (45, 0, 0x804A04F0, bytes(flow)),
+                  (46, 0, 0x804D6BC8, bytes(8))]
+        if not spec.get("missing_lock"):
+            lock_raw = spec.get("lock_raw", bytes((spec.get("locked", 0),)))
+            values.append((56, spec.get("lock_flags", 0),
+                           spec.get("lock_address", 0x804D6BEC), lock_raw))
+        encoded.append(_frame(3, sequence, _boundary_payload(1, values),
+                              pc=spec.get("pc", 0x8034DD8C), source_tick=0))
+    path.write_bytes(b"".join(encoded))
+    return list(stream.iter_records(path))
+
+
 class SheikTransformCaptureDriverTests(unittest.TestCase):
+    def test_transform_items_up_waits_for_serialized_lock_clear(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rows = _serialized_items_rows(Path(tmp) / "items.mwro", [
+                {"locked": 1}, {"locked": 0},
+                {"boundary": "pad_consume", "p1": raw_pad(buttons=["D_UP"])},
+                # A held queue copy remains the same authored rising-edge episode.
+                {"boundary": "pad_consume", "p1": raw_pad(buttons=["D_UP"])},
+                {"boundary": "pad_consume"},
+                {"locked": 0, "row": 31, "value": 3},
+            ])
+            menus = sheik_transform_prefix_packet()
+            receiver = SheikTransformPrefixReceiver(make_input_plan(8), menus)
+            receiver.accept(rows[0])
+            action = next(item for item in menus["actions"]
+                          if item["label"] == "items-frequency-row")
+            self.assertEqual(action["before"]["items_locked"], 0)
+            sent = []
+            pending = iter(rows[1:])
+
+            def next_row():
+                row = next(pending)
+                receiver.accept(row)
+
+            def wait_source(predicate, label, cap):
+                first = receiver.menu_polls
+                while not predicate():
+                    self.assertLess(receiver.menu_polls - first, cap, label)
+                    next_row()
+
+            def tap(action, label, cap):
+                self.assertEqual(receiver.latest_menu["items_locked"], 0)
+                self.assertEqual(receiver.items_unlock_sequence, 1)
+                sent.append((label, action["p1"]))
+                next_row()
+                next_row()
+                next_row()
+
+            drive_transform_items_row(receiver, action, wait_source, tap)
+            self.assertEqual(sent, [("items-frequency-row", action["p1"])])
+            self.assertEqual(receiver.items_lock_transitions,
+                             [{"sequence": 0, "locked": 1, "row": 0, "value": 1},
+                              {"sequence": 1, "locked": 0, "row": 0, "value": 1}])
+            self.assertEqual(receiver.latest_menu["row"], 31)
+            self.assertIsNotNone(receiver.items_row_up_release_sequence)
+            self.assertGreater(receiver.items_row_up_release_sequence,
+                               receiver.items_row_up_consume_sequence)
+
+    def test_transform_items_lock_missing_malformed_or_wrong_owner_refuses(self):
+        cases = (
+            ({"missing_lock": True}, "Items lock owner is missing or unexpected"),
+            ({"lock_address": 0x804D6BED}, "Items lock address/size/value differs"),
+            ({"lock_raw": bytes((0, 0))}, "size 2, expected 1"),
+            ({"lock_raw": bytes((2,))}, "Items lock address/size/value differs"),
+            ({"kind": 13, "locked": 0}, "Items lock owner is missing or unexpected"),
+            ({"pc": 0x80377584, "locked": 0}, "pinned original PadPoll boundary"),
+        )
+        for spec, message in cases:
+            with self.subTest(spec=spec), tempfile.TemporaryDirectory() as tmp:
+                row = _serialized_items_rows(Path(tmp) / "bad-items.mwro", [spec])[0]
+                receiver = SheikTransformPrefixReceiver(make_input_plan(8),
+                                                        sheik_transform_prefix_packet())
+                with self.assertRaisesRegex(ValueError, message):
+                    receiver.accept(row)
+
     def test_serialized_production_decoder_receiver_and_live_input_complete(self):
         from sheik_transform_prefix import validate_transform_prefix
         with tempfile.TemporaryDirectory() as tmp:

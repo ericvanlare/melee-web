@@ -218,13 +218,15 @@ def sheik_transform_prefix_packet():
     value["sss"] = {"stage_kind": 32, "initial_idle_polls": 120,
         "column_x": 40, "column_polls": 18, "scan_y": 40,
         "max_scan_polls": 600, "confirm_requires_cooldown": 0}
-    # Items lock is an SD/GCI observer owner. The transform profile still
-    # observes original MenuFlow values and consumed PADs, so this route does
-    # not make lock-tag presence part of its readiness predicate.
+    # Keep the same checked Items-lock owner used by the reduced Items probe.
+    # Opening Items may still be locked; the unchanged Up/frequency inputs are
+    # eligible only after the source lock clears.
     for action in value["actions"]:
-        for boundary in (action.get("before"), action.get("after")):
-            if isinstance(boundary, dict):
-                boundary.pop("items_locked", None)
+        if action["label"].startswith("items-frequency-"):
+            action["before"]["items_locked"] = 0
+            action["after"]["items_locked"] = 0
+        elif action["label"] == "commit-items-none":
+            action["before"]["items_locked"] = 0
     value["stop"] = (
         "observed exact Zelda/Mario four-stock FD setup and completed grounded neutral Sheik prefix")
     return value
