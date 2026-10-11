@@ -6149,7 +6149,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4758cbb258f22465f300cc543ff49bdd
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..3d5232739acf2b55757037766ebab990537fc903 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..60b15e5a3b9483cf2e51e7999660a72bc6f73311 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,16 @@
@@ -6321,7 +6321,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..3d5232739acf2b55757037766ebab990
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -788,137 +876,5614 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
+@@ -788,137 +876,5626 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
              }
              break;
          }
@@ -8221,6 +8221,8 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..3d5232739acf2b55757037766ebab990
 +{
 +    MeleeWebStadiumDisplayOwner owner;
 +    MeleeWebStadiumDisplayOwner foreign_owner;
++    SIS synthetic_font1_sis = { 0 };
++    SIS* const previous_font1_sis = HSD_SisLib_804D1124[1];
 +    MeleeWebStadiumDisplayOwner* const previous_owner =
 +        stadium_display_owner_current;
 +    HSD_GObj fake_map_objects[6] = { 0 };
@@ -8232,10 +8234,14 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..3d5232739acf2b55757037766ebab990
 +    uint64_t receipt = 0;
 +    char error[160];
 +    int passed = 0;
-+    if (previous_owner != NULL || used_head != NULL ||
++    if (previous_owner != NULL || previous_font1_sis != NULL ||
++        !HSD_SisLib_FontSlotBorrowable(1) || used_head != NULL ||
 +        HSD_SisLib_804D7978 != NULL || HSD_SisLib_804D797C != NULL ||
 +        !stadium_text_control_backing_live(token))
 +        return 0;
++    /* Synthetic borrowed identity only: no font archive is loaded or owned.
++     * Keep the production exact-slot/borrowable checks and restore on exit. */
++    HSD_SisLib_804D1124[1] = &synthetic_font1_sis;
 +    memcpy(saved_map_objects, stage_info.map_gobjs, sizeof(saved_map_objects));
 +    stage_info.map_gobjs[0] = &fake_map_objects[0];
 +    stage_info.map_gobjs[1] = &fake_map_objects[1];
@@ -8464,9 +8470,11 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..3d5232739acf2b55757037766ebab990
 +        goto cleanup;
 +    HSD_SisLib_803A5E70();
 +    if (used_head != NULL || HSD_SisLib_804D7978 != NULL ||
-+        HSD_SisLib_804D797C != NULL || !stadium_text_control_backing_live(token))
++        HSD_SisLib_804D797C != NULL || !stadium_text_control_backing_live(token) ||
++        HSD_SisLib_804D1124[1] != &synthetic_font1_sis ||
++        !HSD_SisLib_FontSlotBorrowable(1))
 +        goto cleanup;
-+    fprintf(stderr,"C1_SIS_PREPARED_TRANSFER pending_non_authorizing=1 pre_cancel_bounded_validation=1 pre_cancel_adverse_unchanged=1 exact_journal_and_lease_required=1 consume_once=1 synthetic_hud_font2_append_after_publish=1 fresh_foreign_snapshot=1 actual_font1_drain=1 foreign_order_and_bytes_preserved=1 actual_5E70_all_text_context_cleanup=1 backing_heap_retained=1 synthetic_stage_map_owner=1\n");
++    fprintf(stderr,"C1_SIS_PREPARED_TRANSFER pending_non_authorizing=1 pre_cancel_bounded_validation=1 pre_cancel_adverse_unchanged=1 exact_journal_and_lease_required=1 consume_once=1 synthetic_hud_font2_append_after_publish=1 fresh_foreign_snapshot=1 actual_font1_drain=1 foreign_order_and_bytes_preserved=1 actual_5E70_all_text_context_cleanup=1 backing_heap_retained=1 synthetic_stage_map_owner=1 synthetic_font1_sis_identity=1\n");
 +    fflush(stderr);
 +    passed = 1;
 +
@@ -8479,6 +8487,10 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..3d5232739acf2b55757037766ebab990
 +        owner.sis_payload_watch_armed = 0;
 +    free(owner.started_texts);
 +    free(owner.started_contexts);
++    if (HSD_SisLib_804D1124[1] != &synthetic_font1_sis ||
++        !HSD_SisLib_FontSlotBorrowable(1))
++        passed = 0;
++    HSD_SisLib_804D1124[1] = previous_font1_sis;
 +    stadium_display_owner_current = previous_owner;
 +    memcpy(stage_info.map_gobjs, saved_map_objects, sizeof(saved_map_objects));
 +    return passed;
@@ -12046,7 +12058,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..3d5232739acf2b55757037766ebab990
  
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
-@@ -1185,22 +6750,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +6762,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -12088,7 +12100,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..3d5232739acf2b55757037766ebab990
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +6798,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +6810,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -12110,7 +12122,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..3d5232739acf2b55757037766ebab990
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +6820,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +6832,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
@@ -12133,7 +12145,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..3d5232739acf2b55757037766ebab990
      wrapper->flag = false;
      return gobj;
  }
-@@ -1896,6 +7500,9 @@ bool grStadium_801D42B8(void)
+@@ -1896,6 +7512,9 @@ bool grStadium_801D42B8(void)
      if (gp->u.stadium.xC4_b1) {
          return false;
      }
@@ -12143,7 +12155,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..3d5232739acf2b55757037766ebab990
      gp->u.stadium.xD0 =
          grDatFiles_801C6478(gp->u.stadium.xCC, gp->u.stadium.xC8);
      return true;
-@@ -2093,6 +7700,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2093,6 +7712,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
              gp = GET_GROUND(map_gobj);
              HSD_ASSERT(0x99B, gp);
              gp->u.stadium.xC4_b1 = true;
@@ -12153,7 +12165,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..3d5232739acf2b55757037766ebab990
              lbFile_80016580(datfiles[var_r29], gp->u.stadium.xCC,
                              &gp->u.stadium.xC8, fn_801D4220, NULL);
              temp_r31->u.stadium.xDC = 1;
-@@ -2221,6 +7831,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2221,6 +7843,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
          if (temp_r31->u.stadium.xDE == 5) {
              temp_r31->u.stadium.xD8 =
                  randi_between_2(yakumono_param->x0, yakumono_param->x4);
