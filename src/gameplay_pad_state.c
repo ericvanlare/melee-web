@@ -126,7 +126,8 @@ static void write_history(uint8_t** p,const HSD_PadStatus* v)
 MeleeWebPadState* melee_web_pad_state_decode(const uint8_t* bytes,size_t size,char* error,size_t capacity)
 {
     if(!bytes||size!=MELEE_WEB_PAD_STATE_BYTES){
-        if(error&&capacity)snprintf(error,capacity,"PAD snapshot size is invalid");return NULL;
+        if(error&&capacity)snprintf(error,capacity,"PAD snapshot size is invalid");
+        return NULL;
     }
     MeleeWebPadState* state=calloc(1,sizeof(*state));
     if(!state){if(error&&capacity)snprintf(error,capacity,"Cannot allocate PAD snapshot");return NULL;}
