@@ -70,6 +70,24 @@ For the remaining offline game scope and its searchable source inventory, use
 [the full-game integration workflow](FULL_GAME_PORT.md). It keeps implementation
 status separate from original-comparison and browser acceptance.
 
+For the bounded local room UI check, serve the ordinary Release runtime on port
+8787 and run the following under the workspace wrapper. It starts and disposes
+the pinned local Worker, uses two independent headless profiles and actual
+keyboard events, and retains evidence in a new output directory. The pinned
+relay tools must already be available under `work/a3-room-relay-tools/node_modules`;
+use Node 22 or newer. Keep the server under the same workspace owner (or use
+`scripts/capture_owner_deadline.py --server-spec` to supervise both together).
+
+```sh
+python3 scripts/agent_workspace.py run -- node scripts/a3_local_room_keyboard_browser.mjs \
+  --url http://127.0.0.1:8787/runtime.html --disc /path/to/owned.gcm \
+  --out work/local-room-keyboard
+```
+
+This covers Host/Join, original CSS keyboard input, matching checksums and Leave.
+See the [scoped readiness result](status/2026-10-11-local-room-ui-readiness.md);
+it does not exercise the deployed staging Worker or a complete match.
+
 ## Choose by change boundary
 
 | Change | Start here | Focused command or procedure | Evidence boundary |

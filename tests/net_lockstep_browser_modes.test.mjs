@@ -90,9 +90,21 @@ test('runtime-owned diagnostic path keeps protocol and live PAD ownership in the
     'peer-transport': undefined, 'source-ticks': '8'});
   assert.deepEqual(validateLockstepBrowserMode(value), {browserOwned: true, runtimeOwned: true,
     peerTransport: 'webrtc', localWebRtc: true, roomWorkerSignaling: true});
-  for (const override of [{scenario: 'positive'}, {'peer-transport': 'relay'},
-    {'webrtc-signaling': 'memory'}])
-    assert.throws(() => validateLockstepBrowserMode({...value, ...override}), /Runtime-owned peers require/);
+  assert.deepEqual(validateLockstepBrowserMode({...value, 'peer-transport': 'relay',
+    'webrtc-signaling': 'memory'}), {browserOwned: true, runtimeOwned: true,
+    peerTransport: 'relay', localWebRtc: false, roomWorkerSignaling: false});
+  assert.deepEqual(validateLockstepBrowserMode({...value, 'peer-transport': undefined,
+    'relay-url': 'wss://rooms.example', 'webrtc-signaling': 'memory'}), {browserOwned: true,
+    runtimeOwned: true, peerTransport: 'relay', localWebRtc: false, roomWorkerSignaling: false});
+  assert.throws(() => validateLockstepBrowserMode({...value, 'peer-transport': 'webrtc',
+    'relay-url': 'wss://rooms.example'}), /cannot be combined with --peer-transport webrtc/);
+  for (const relayUrl of ['https://rooms.example', 'wss://user:pass@rooms.example',
+    'wss://rooms.example/path', 'wss://rooms.example?query=1', 'wss://rooms.example#fragment'])
+    assert.throws(() => validateLockstepBrowserMode({...value, 'peer-transport': undefined,
+      'relay-url': relayUrl, 'webrtc-signaling': 'memory'}), /Runtime-owned --relay-url/);
+  for (const override of [{scenario: 'positive'}, {'peer-transport': 'relay',
+    'webrtc-signaling': 'room-worker'}, {'webrtc-signaling': 'memory'}])
+    assert.throws(() => validateLockstepBrowserMode({...value, ...override}), /Runtime-owned/);
 });
 
 
@@ -101,9 +113,8 @@ test('bounded diagnostic native pump admits only eight-tick page-owned room WebR
   assert.equal(validateLockstepBrowserMode(value).roomWorkerSignaling, true);
   for (const count of ['7', '9', undefined, 'bad'])
     assert.throws(() => validateLockstepBrowserMode({...value, 'source-ticks': count}), /exactly eight/);
-  assert.throws(() => validateLockstepBrowserMode({...value, 'webrtc-signaling': 'memory'}), /room-worker/);
+  assert.throws(() => validateLockstepBrowserMode({...value, 'webrtc-signaling': 'memory'}), /--webrtc-signaling room-worker/);
   assert.throws(() => validateLockstepBrowserMode({...value, 'peer-owner': 'node'}), /browser-owned/);
-  assert.throws(() => validateLockstepBrowserMode({...value, 'peer-transport': 'relay'}), /local WebRTC/);
 });
 
 test('runtime-owned native-pump CLI reaches output creation without a synthetic script', async () => {
@@ -149,7 +160,11 @@ test('runtime CSS-to-SSS mode admits only the explicit 520-tick Room Worker fixt
     {'peer-transport': 'relay'}, {'webrtc-signaling': 'memory'}, {'runtime-input-fixture': undefined},
     {'runtime-input-fixture': 'neutral-a-release'}, {script: undefined}, {'script-manifest': undefined},
   ]) assert.throws(() => validateLockstepBrowserMode(runtimeCssSssOptions(overrides)),
-    /runtime-css-sss|runtime-input-fixture|Runtime-owned peers/);
+    /runtime-css-sss|runtime-input-fixture|Runtime-owned/);
+  assert.deepEqual(validateLockstepBrowserMode(runtimeCssSssOptions({'peer-transport': 'relay',
+    'webrtc-signaling': 'memory'})), {browserOwned: true, runtimeOwned: true,
+    peerTransport: 'relay', localWebRtc: false, roomWorkerSignaling: false,
+    runtimeInputFixture: true, runtimeInputFixtureName: 'css-start-to-sss'});
   assert.throws(() => validateLockstepBrowserMode(options({'script-manifest': 'route.json'})), /only to runtime-css-sss, runtime-css-match or runtime-full-route/);
   assert.throws(() => validateLockstepBrowserMode(runtimeCssSssOptions({scenario: 'positive', 'script-manifest': undefined})), /Runtime-owned peers/);
 });
@@ -167,7 +182,11 @@ test('runtime CSS-to-match mode admits only the explicit 520-tick Room Worker fi
     {'peer-transport': 'relay'}, {'webrtc-signaling': 'memory'}, {'runtime-input-fixture': undefined},
     {'runtime-input-fixture': 'css-start-to-sss'}, {script: undefined}, {'script-manifest': undefined},
   ]) assert.throws(() => validateLockstepBrowserMode(runtimeCssMatchOptions(overrides)),
-    /runtime-css-match|runtime-input-fixture|Runtime-owned peers/);
+    /runtime-css-match|runtime-input-fixture|Runtime-owned/);
+  assert.deepEqual(validateLockstepBrowserMode(runtimeCssMatchOptions({'peer-transport': 'relay',
+    'webrtc-signaling': 'memory'})), {browserOwned: true, runtimeOwned: true,
+    peerTransport: 'relay', localWebRtc: false, roomWorkerSignaling: false,
+    runtimeInputFixture: true, runtimeInputFixtureName: 'css-sss-to-match'});
   assert.throws(() => validateLockstepBrowserMode(options({'script-manifest': 'route.json'})), /only to runtime-css-sss, runtime-css-match or runtime-full-route/);
   assert.throws(() => validateLockstepBrowserMode(runtimeCssMatchOptions({scenario: 'positive', 'script-manifest': undefined})), /Runtime-owned peers/);
 });
@@ -307,12 +326,14 @@ test('runtime full-route admits only the fixed 5082-input/5084-source runtime ow
     runtimeInputFixture: true, runtimeInputFixtureName: 'full-route'});
   for (const overrides of [
     {'source-ticks': '5083'}, {'source-ticks': undefined}, {'peer-owner': 'browser'},
-    {'peer-transport': 'relay'}, {'webrtc-signaling': 'memory'}, {'runtime-input-fixture': undefined},
+    {'webrtc-signaling': 'memory'}, {'runtime-input-fixture': undefined},
     {'runtime-input-fixture': 'css-sss-to-match'}, {script: undefined}, {'script-manifest': undefined},
   ]) assert.throws(() => validateLockstepBrowserMode(runtimeFullRouteOptions(overrides)),
-    /runtime-full-route|runtime-input-fixture|Runtime-owned peers/);
+    /runtime-full-route|runtime-input-fixture|Runtime-owned/);
   assert.throws(() => validateLockstepBrowserMode(runtimeFullRouteOptions({scenario: 'positive',
     'script-manifest': undefined, 'runtime-input-fixture': undefined})), /Runtime-owned peers/);
+  assert.equal(validateLockstepBrowserMode(runtimeFullRouteOptions({'peer-transport': 'relay',
+    'webrtc-signaling': 'memory'})).peerTransport, 'relay');
 });
 
 test('runtime full-route orchestration maps its CLI fixture name to the registered decoder kind', async () => {

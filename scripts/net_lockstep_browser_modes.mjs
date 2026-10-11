@@ -265,38 +265,53 @@ export function validateLockstepBrowserMode(values) {
   const runtimeOwned = values['peer-owner'] === 'runtime';
   const browserOwned = values['peer-owner'] !== 'node';
   const peerTransport = values['peer-transport'] ??
-    (runtimeOwned ? 'webrtc' : browserOwned || values['relay-url'] ? 'relay' : 'tcp-loopback');
+    (runtimeOwned ? values['relay-url'] !== undefined ? 'relay' : 'webrtc' :
+      browserOwned || values['relay-url'] ? 'relay' : 'tcp-loopback');
   if (values['peer-transport'] !== undefined && !['relay', 'webrtc'].includes(peerTransport))
     throw Error('--peer-transport must be relay or webrtc');
   if (!browserOwned && values['peer-transport'] !== undefined)
     throw Error('--peer-transport applies only to browser-owned peers');
+  if (runtimeOwned && values['relay-url'] !== undefined) {
+    if (values['peer-transport'] === 'webrtc')
+      throw Error('--relay-url selects runtime-owned relay and cannot be combined with --peer-transport webrtc');
+    let relayUrl;
+    try { relayUrl = new URL(values['relay-url']); }
+    catch { throw Error('Runtime-owned --relay-url must be a ws:// or wss:// room relay base URL'); }
+    if (!['ws:', 'wss:'].includes(relayUrl.protocol) || relayUrl.pathname !== '/' ||
+        relayUrl.username || relayUrl.password || relayUrl.search || relayUrl.hash)
+      throw Error('Runtime-owned --relay-url must be a ws:// or wss:// room relay base URL without credentials, a path, query, or fragment');
+  }
   const localWebRtc = peerTransport === 'webrtc';
   const roomWorkerSignaling = values['webrtc-signaling'] === 'room-worker';
   if (!['memory', 'room-worker'].includes(values['webrtc-signaling']))
     throw Error('--webrtc-signaling must be memory or room-worker');
-  if (runtimeOwned && (!['native-pump', 'runtime-css-sss', 'runtime-css-match', 'runtime-full-route'].includes(scenario) || !localWebRtc || values['webrtc-signaling'] !== 'room-worker'))
-    throw Error('Runtime-owned peers require native-pump, runtime-css-sss, runtime-css-match or runtime-full-route with WebRTC and Room Worker signaling');
+  if (runtimeOwned && !['native-pump', 'runtime-css-sss', 'runtime-css-match', 'runtime-full-route'].includes(scenario))
+    throw Error('Runtime-owned peers require native-pump, runtime-css-sss, runtime-css-match or runtime-full-route');
+  if (runtimeOwned && localWebRtc && values['webrtc-signaling'] !== 'room-worker')
+    throw Error('Runtime-owned WebRTC peers require Room Worker signaling');
+  if (runtimeOwned && !localWebRtc && values['webrtc-signaling'] !== 'memory')
+    throw Error('Runtime-owned relay peers do not use WebRTC signaling');
   if (!localWebRtc && values['webrtc-signaling'] !== 'memory')
     throw Error('--webrtc-signaling applies only to the local WebRTC transport');
-  if (browserOwned && !localWebRtc && !values['relay-url'])
+  if (browserOwned && !runtimeOwned && !localWebRtc && !values['relay-url'])
     throw Error('Browser-owned relay peers require --relay-url');
   if (localWebRtc && (!browserOwned || !['input-sampling', 'positive', 'disconnect', 'flip', 'native-pump', 'runtime-css-sss', 'runtime-css-match', 'runtime-full-route'].includes(scenario)))
     throw Error('The local WebRTC endpoint requires browser-owned input-sampling, positive, disconnect, flip, native-pump, runtime-css-sss, runtime-css-match, or runtime-full-route mode');
   if (localWebRtc && ['positive', 'disconnect', 'flip', 'native-pump', 'runtime-css-sss', 'runtime-css-match', 'runtime-full-route'].includes(scenario) && !roomWorkerSignaling)
     throw Error(`${scenario[0].toUpperCase() + scenario.slice(1)} WebRTC mode requires --webrtc-signaling room-worker`);
-  if (scenario === 'native-pump' && (!browserOwned || !localWebRtc || !roomWorkerSignaling ||
+  if (scenario === 'native-pump' && (!browserOwned || (!runtimeOwned && (!localWebRtc || !roomWorkerSignaling)) ||
       Number(values['source-ticks']) !== 8))
-    throw Error('Native-pump diagnostic requires browser-owned Room Worker WebRTC and exactly eight source ticks');
+    throw Error('Native-pump diagnostic requires browser-owned Room Worker WebRTC or runtime-owned relay, and exactly eight source ticks');
   if (scenario === 'input-sampling' && !browserOwned)
     throw Error('The input-sampling scenario requires --peer-owner browser');
-  if (runtimeCssRoute && (!runtimeOwned || !localWebRtc || !roomWorkerSignaling ||
+  if (runtimeCssRoute && (!runtimeOwned || (localWebRtc && !roomWorkerSignaling) ||
       Number(values['source-ticks']) !== RUNTIME_CSS_SSS_SOURCE_TICKS ||
       !values.script || !values['script-manifest']))
-    throw Error(`${scenario} requires runtime-owned Room Worker WebRTC, exactly 520 source ticks, --script and --script-manifest`);
-  if (runtimeFullRoute && (!runtimeOwned || !localWebRtc || !roomWorkerSignaling ||
+    throw Error(`${scenario} requires runtime-owned Room Worker WebRTC or relay, exactly 520 source ticks, --script and --script-manifest`);
+  if (runtimeFullRoute && (!runtimeOwned || (localWebRtc && !roomWorkerSignaling) ||
       Number(values['source-ticks']) !== RUNTIME_FULL_ROUTE_SOURCE_TICKS || !values.script ||
       !values['script-manifest']))
-    throw Error('runtime-full-route requires runtime-owned Room Worker WebRTC, exactly 5084 source ticks, --script and --script-manifest');
+    throw Error('runtime-full-route requires runtime-owned Room Worker WebRTC or relay, exactly 5084 source ticks, --script and --script-manifest');
   const runtimeInputFixture = values['runtime-input-fixture'] !== undefined;
   if (runtimeInputFixture && (values['runtime-input-fixture'] === 'neutral-a-release' ?
       (!runtimeOwned || scenario !== 'native-pump') : values['runtime-input-fixture'] === 'css-start-to-sss' ?

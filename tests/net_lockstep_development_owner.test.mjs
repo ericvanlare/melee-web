@@ -58,13 +58,31 @@ test('development entry binds fresh prepared context, identity, adapter session 
   assert.equal(run.events.find(row => row[0] === 'native-begin')[1].sourceTicks, 8);
   const agreement = run.events.find(row => row[0] === 'agreement')[1];
   assert.equal(agreement.protocol, 'melee-web-local-lockstep-a2-v1');
+  assert.equal(agreement.transport, 'webrtc', 'the omitted selector preserves the existing WebRTC route');
   assert.equal(agreement.input_delay, 2);
   assert.equal(agreement.input_source, 'browser-local-native-PADStatus');
   assert.equal(agreement.runtime_wasm_sha256, identity.wasm);
   assert.equal(run.entry.state().used, true);
+  assert.equal(run.events.find(row => row[0] === 'create-session')[1].transportType, 'webrtc');
   const completedEvents = run.events.length;
   await assert.rejects(run.entry.begin(17, 8), /already owns or used/);
   assert.equal(run.events.length, completedEvents, 'Used sessions cannot read identity or reenter native work');
+});
+
+test('development entry binds explicit relay selection into session creation and peer agreement', async () => {
+  const run = fixture();
+  run.entry.configure({...config, transport: 'relay'});
+  await run.entry.begin(17, 8);
+  const options = run.events.find(row => row[0] === 'create-session')[1];
+  const agreement = run.events.find(row => row[0] === 'agreement')[1];
+  assert.equal(options.transportType, 'relay');
+  assert.equal(agreement.transport, 'relay');
+});
+
+test('development entry rejects unsupported transport before identity or native work', () => {
+  const run = fixture();
+  assert.throws(() => run.entry.configure({...config, transport: 'tcp'}), /configuration is invalid/);
+  assert.deepEqual(run.events, []);
 });
 
 test('development entry rejects invalid context before identity or native work', async () => {
@@ -191,7 +209,8 @@ test('development runtime APIs use the guarded owner and only frame callbacks ad
   vm.runInContext(`${source.slice(frameStart, frameEnd)}\n};`, scope,
     {filename: 'runtime-development.mjs'});
 
-  const config = {role: 'alpha', roomId: 's'.repeat(32), timeoutMs: 500, url: 'ws://127.0.0.1:8787'};
+  const config = {role: 'alpha', roomId: 's'.repeat(32), timeoutMs: 500, url: 'ws://127.0.0.1:8787',
+    transport: 'webrtc'};
   assert.throws(() => window.meleeNetConfigureRuntimeLockstep(config), /configuration is unavailable/);
   assert.equal(ownerFactories, 0, 'unready runtime context allocates no lockstep owner');
   scope.ready = true;
@@ -213,10 +232,12 @@ test('development runtime APIs use the guarded owner and only frame callbacks ad
   assert.deepEqual(nativeCalls, [['begin', 17, 8], ['launch']]);
   assert.deepEqual(events.find(row => row[0] === 'create-session')[1], {
     Module, role: 'alpha', sourceTicks: 8, inputTicks: 6, checksumEvidenceRecords: 8, url: config.url,
+    transportType: 'webrtc',
     roomId: config.roomId, timeoutMs: config.timeoutMs,
   });
   const agreement = events.find(row => row[0] === 'agreement')[1];
   assert.equal(agreement.input_delay, 2);
+  assert.equal(agreement.transport, 'webrtc');
   assert.equal(agreement.native_start.recorded, 1);
   assert.equal(agreement.native_start.scene, 1);
   assert.equal(Module.phase, 1, 'Successful entry reaches CSS only after native begin');
