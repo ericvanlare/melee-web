@@ -25,7 +25,7 @@ from sd_original_menu_plan import validate_packet, matches
 from capture_retail_replay import dolphin_command, _copy_tree
 from capture_allocation_history import validate_reference_build_manifest
 from reference_observer_stream import read_status
-from reference_input_stream import validate_status
+from reference_input_stream import validate_status, validate_stream as validate_input_stream
 
 
 class BoundedIntentController(DualPipeController):
@@ -60,6 +60,54 @@ def check_stadium_capture_bounds(raw, native, deadline, records):
     for path, key in ((raw, "observer_bytes"), (native, "input_bytes")):
         require(not path.exists() or path.stat().st_size <= STADIUM_CAPTURE_CAPS[key],
                 "Stadium capture byte cap: " + key)
+
+
+# This first replay experiment accepts exactly the retained v6 source, not an
+# arbitrary stream or a host-input substitute. Footer is not a controller poll.
+STADIUM_REPLAY_INPUT_SHA256 = "57e91222a280f93c861a849c8af404ae4272767ead1debf62312a5be48c473fe"
+STADIUM_REPLAY_OBSERVER_SHA256 = "361e8c1108cc2d02ba94d1f3b3be9612a80d0227672445cd4a2b0e2119917778"
+STADIUM_REPLAY_OBSERVER_STATUS_SHA256 = "05a08641404bda9f87ac4c20b1a44a982ff0470ff3a9b04861c03ba542866c3f"
+
+
+def stadium_replay_preflight(input_replay, output, build_manifest):
+    source = Path(input_replay).resolve()
+    output = Path(output).resolve()
+    manifest = Path(build_manifest).resolve()
+    require(not output.exists(), "Stadium replay output already exists")
+    require(output not in manifest.parents and manifest != output,
+            "Stadium relocated manifest must be prepared outside the absent output")
+    require(output not in source.parents and source != output,
+            "Stadium replay input must be retained outside the absent output")
+    require(not Path(input_replay).is_symlink(), "Stadium replay input must not redirect")
+    require(source.stat().st_size <= STADIUM_CAPTURE_CAPS["input_bytes"],
+            "Stadium replay source input byte cap")
+    summary = validate_input_stream(source)
+    require(summary["bytes"] == 188296 and summary["events"] == 4706 and
+            summary["sha256"] == STADIUM_REPLAY_INPUT_SHA256 and
+            summary["ports"] == {"0": 2353, "1": 2353} and
+            summary["operations"] == {"pad_status": 4706, "adapter_connection": 0},
+            "Stadium replay source differs from the pinned complete v6 MWRI")
+    source_status = source.with_name("input-status.json")
+    validate_status(source_status, mode="record", events=4706, require_complete=True)
+    original = source.with_name("observer.bin")
+    original_status = source.with_name("observer-status.json")
+    for path, expected in ((original, STADIUM_REPLAY_OBSERVER_SHA256),
+                           (original_status, STADIUM_REPLAY_OBSERVER_STATUS_SHA256)):
+        require(path.is_file() and not path.is_symlink() and
+                path.stat().st_size <= STADIUM_CAPTURE_CAPS["observer_bytes"] and
+                hashlib.sha256(path.read_bytes()).hexdigest() == expected,
+                "Stadium replay original observer identity differs")
+    return {"source": str(source), "summary": summary,
+            "source_status_sha256": hashlib.sha256(source_status.read_bytes()).hexdigest(),
+            "original_observer": str(original), "original_status": str(original_status)}
+
+
+def stadium_replay_complete(receipt, status):
+    # Replay has no fresh MWRI writer/footer. Recheck the retained source and
+    # independently require the current process's final replay status.
+    summary = validate_input_stream(receipt["source"])
+    require(summary == receipt["summary"], "Stadium replay input changed during capture")
+    return validate_status(status, mode="replay", events=summary["events"], require_complete=True)
 
 
 class StadiumIntentController(DualPipeController):
@@ -165,13 +213,14 @@ def wait_terminal_statuses(observer, native, deadline):
     raise SdDiagnosticError("SD independent writer finalization deadline expired")
 
 
-def wait_transform_terminal_statuses(observer, native, deadline, wait_check=None):
-    """Wait for independently completed MWRO and MWRI writers."""
+def wait_transform_terminal_statuses(observer, native, deadline, wait_check=None, *, input_mode="record"):
+    """Wait for completed observer and mode-specific native input status."""
+    require(input_mode in ("record", "replay"), "Native input mode is unknown")
     while time.monotonic() < deadline:
         if wait_check is not None:
             wait_check()
         primary = read_status(observer) if Path(observer).is_file() else None
-        inputs = validate_status(native, mode="record", require_complete=False) if Path(native).is_file() else None
+        inputs = validate_status(native, mode=input_mode, require_complete=False) if Path(native).is_file() else None
         if primary:
             require(not primary["invalid"] and primary["error"] is None,
                     "Sheik observer failed during finalization")
@@ -498,8 +547,11 @@ class SheikTransformPrefixReceiver:
 
 class StadiumGoPrefixReceiver(SheikTransformPrefixReceiver):
     """Menu/input adapter; the strict v3 validator owns raw Stadium admission."""
-    def __init__(self, menus):
+    def __init__(self, menus, *, recorded_input=False):
         super().__init__(None, menus)
+        self.recorded_input = recorded_input
+        self.recorded_target_neutral_release_sequence = None
+        self.recorded_confirm_neutral_polls = None
         self.setup_seen = False
         self.setup_sequence = None
         self.source_tick_rows = 0
@@ -583,6 +635,9 @@ class StadiumGoPrefixReceiver(SheikTransformPrefixReceiver):
             return
         target = (self.stage.get("index") == self.menus["sss"]["target_index"] and
                   self.stage.get("kind") == self.menus["sss"]["target_kind"])
+        if self.recorded_input and not target:
+            self.target_neutral_release_sequence = None
+            self.target_neutral_polls = 0
         if target and self.stage.get("stable_polls", 0) >= 2:
             self.stadium_target_sequence = row["seq"]
         if self.target_neutral_release_sequence is not None and row["seq"] > self.target_neutral_release_sequence:
@@ -598,6 +653,24 @@ class StadiumGoPrefixReceiver(SheikTransformPrefixReceiver):
         require((ports[0], ports[1]) in self.allowed_menu_pads,
                 "Original Stadium consumed PAD escaped the predeclared route alphabet")
         pair = ports[:2]
+        if self.recorded_input and not self.setup_seen:
+            target_context = (self.sss_position_route_ready and
+                self.sss_live_owner_sequence is not None and
+                (self.latest_menu or {}).get("scene") == 9 and self.stage is not None and
+                self.stage.get("index") == self.menus["sss"]["target_index"] and
+                self.stage.get("kind") == self.menus["sss"]["target_kind"] and
+                self.stage.get("stable_polls", 0) >= 2)
+            # The release witness is the original's consumed neutral sample,
+            # never an intention or an inferred controller write. Subsequent
+            # owner polls count only while this exact target remains observed.
+            if pair == [NEUTRAL_PAD]*2 and target_context and self.confirm_sequence is None:
+                if self.target_neutral_release_sequence is None:
+                    self.target_neutral_release_sequence = row["seq"]
+                    self.recorded_target_neutral_release_sequence = row["seq"]
+                    self.target_neutral_polls = 0
+            if self.confirm_release_sequence is not None:
+                require(pair != [raw_pad(buttons=["A"]), NEUTRAL_PAD],
+                        "Recorded SSS confirm repeated after its consumed neutral release")
         if self.setup_seen:
             require(pair == [NEUTRAL_PAD, NEUTRAL_PAD],
                     "Non-neutral source PAD was consumed after Stadium VS setup")
@@ -617,10 +690,14 @@ class StadiumGoPrefixReceiver(SheikTransformPrefixReceiver):
             require(self.confirm_sequence is None,
                     "Original SSS confirm was consumed more than once")
             self.confirm_sequence = row["seq"]
+            if self.recorded_input:
+                self.recorded_confirm_neutral_polls = self.target_neutral_polls
         elif self.confirm_sequence is not None and self.confirm_release_sequence is None and pair == [NEUTRAL_PAD]*2:
             self.confirm_release_sequence = row["seq"]
         if pair != [NEUTRAL_PAD]*2:
             self.target_neutral_polls = 0
+            if self.recorded_input:
+                self.target_neutral_release_sequence = None
         return sample
 
     def accept(self, row):
@@ -709,6 +786,10 @@ class StadiumGoPrefixReceiver(SheikTransformPrefixReceiver):
                 "Stadium driver lacks consumed setup/selection/confirm or natural DrawReturn")
         return {
             "scope": "stadium_go_prefix",
+            "recorded_input_observation": ({
+                "target_neutral_release": self.recorded_target_neutral_release_sequence,
+                "target_neutral_polls_before_confirm": self.recorded_confirm_neutral_polls,
+                "driver_intentions_used": False} if self.recorded_input else None),
             "menu_owner_sequences": {"css": self.css_live_owner_sequence,
                                      "sss": self.sss_live_owner_sequence,
                                      "stadium_target": self.stadium_target_sequence,
@@ -777,9 +858,11 @@ def prepare_rules_profile(profile, user, *, source_slots=(0, 1)):
 
 
 def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout=180, gci=None,
-        ordinary_policy=None):
+        ordinary_policy=None, input_replay=None, common_wire_comparator=None):
     """Own fresh output before preparation so failures cannot vanish before launch."""
     output = Path(output)
+    replay_receipt = (stadium_replay_preflight(input_replay, output, build_manifest)
+                      if input_replay is not None else None)
     output.mkdir()  # A collision never overwrites another run or its evidence.
     scope = "rules_ready"
     try:
@@ -788,20 +871,27 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
             scope="ordinary_timeout_gci"
         return _run(dolphin=dolphin, disc=disc, profile=profile, input_plan=input_plan,
                     menu_recipe=menu_recipe, output=output, build_manifest=build_manifest, timeout=timeout, gci=gci,
-                    ordinary_policy=ordinary_policy)
+                    ordinary_policy=ordinary_policy, replay_receipt=replay_receipt,
+                    common_wire_comparator=common_wire_comparator)
     except Exception as error:
         failure = output / "failure.json"
         if not failure.exists():
             failure.write_bytes(canonical({"scope": scope, "stage": "prelaunch",
-                                           "native_launched": False, "error": str(error)}))
+                                           "native_launched": False, "error": str(error),
+                                           "comparison_receipt": getattr(error, "receipt", None)}))
         raise
 
 
 def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout, gci=None,
-         ordinary_policy=None):
+         ordinary_policy=None, replay_receipt=None, common_wire_comparator=None):
     build = validate_reference_build_manifest(Path(build_manifest), Path(dolphin))
     menus, menu_hash = menu_actions(menu_recipe)
     stadium_prefix = menus["scope"] == "stadium_go_prefix"
+    require(replay_receipt is None or stadium_prefix,
+            "Recorded MWRI replay is exclusive to Stadium prefix")
+    if replay_receipt is not None:
+        require(callable(common_wire_comparator),
+                "Stadium replay common-wire comparator is not integrated; capture refused")
     if stadium_prefix:
         require(input_plan is None and ordinary_policy is None,
                 "Stadium GO prefix uses its declared menu recipe, supplied profile and optional exact retained GCI")
@@ -861,7 +951,7 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                 "Sheik transform prefix must use the supplied original profile without GCI injection")
         receiver = SheikTransformPrefixReceiver(plan, menus)
     elif stadium_prefix:
-        receiver = StadiumGoPrefixReceiver(menus)
+        receiver = StadiumGoPrefixReceiver(menus, recorded_input=replay_receipt is not None)
     else:
         receiver = GciRulesMenuReceiver(plan, loaded_profile, full_route=full_route, items_probe=items_probe,
                                        guarded_items=guarded_items, competitive_entry=competitive_entry,
@@ -883,7 +973,12 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
     environment.update(MWRC_ENABLE="1", MWRC_CPU="JITARM64", MWRC_SOURCE_REV="GALE01r2",
                        MWRC_DOL_SHA256="dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
                        MWRC_OUTPUT=str(raw), MWRC_STATUS=str(status),
-                       MWRC_INPUT_RECORD=str(native), MWRC_INPUT_STATUS=str(native_status))
+                       MWRC_INPUT_STATUS=str(native_status))
+    if replay_receipt is None:
+        environment["MWRC_INPUT_RECORD"] = str(native)
+    else:
+        environment["MWRC_INPUT_REPLAY"] = replay_receipt["source"]
+        native = Path(replay_receipt["source"])
     if transform_prefix:
         environment["MWRC_TRANSFORM_PREFIX"] = "1"
     elif stadium_prefix:
@@ -921,11 +1016,15 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
         launch.update(ordinary_policy_sha256=policy_hash,caps=CAPS)
     elif stadium_prefix:
         launch.update(caps=STADIUM_CAPTURE_CAPS, wall_seconds=timeout)
+    if replay_receipt is not None:
+        launch.update(input_mode="replay", input_replay=replay_receipt,
+                      adaptive_controller_enabled=False)
     (output / "launch.json").write_bytes(canonical(launch))
-    controller = DualPipeController(p1, p2, output / "input-intentions.jsonl")
+    controller = (DualPipeController(p1, p2, output / "input-intentions.jsonl")
+                  if replay_receipt is None else None)
     if ordinary:
         controller=BoundedIntentController(p1,p2,output/"input-intentions.jsonl")
-    elif stadium_prefix:
+    elif stadium_prefix and replay_receipt is None:
         controller=StadiumIntentController(p1,p2,output/"input-intentions.jsonl")
     deadline = time.monotonic() + timeout
     with (output / "dolphin.log").open("xb") as log:
@@ -977,34 +1076,35 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                     controller.set_both(NEUTRAL_PAD, NEUTRAL_PAD, action=label + ":release")
                     wait_source(lambda: receiver.menu_consumed > before and receiver.last_pad[:2] ==
                                 [NEUTRAL_PAD] * 2, label + ":neutral-consumed", max_polls)
-                boot_actions = 0
-                while not matches(receiver.latest_menu, menus["actions"][0]["before"]):
-                    require(receiver.menu_polls < menus["boot_max_polls"], "Rules cold startup polling cap")
-                    next_row()
-                    scene = (receiver.latest_menu or {}).get("scene")
-                    for action in menus["boot"]:
-                        if scene == action["scene"]:
-                            boot_actions += 1
-                            require(boot_actions <= menus["boot_max_actions"], "Rules cold startup action cap")
-                            tap(action, "cold-scene-" + str(scene), 600)
-                            # Consume a new poll before considering another boot action.
-                            first = receiver.menu_polls
-                            wait_source(lambda: receiver.menu_polls > first, "cold-source-poll", 600)
-                            break
-                for action in menus["actions"]:
-                    wait_source(lambda: matches(receiver.latest_menu, action["before"]),
-                                action["label"] + ":ready", action["max_polls"])
-                    if "when_value" in action:
-                        require(receiver.latest_menu["value"] in (0,1), "Competitive item is not a observed switch")
-                    if "when_value" not in action or receiver.latest_menu["value"] == action["when_value"]:
-                        tap(action, action["label"], action["max_polls"])
-                    wait_source(lambda: matches(receiver.latest_menu, action["after"]),
-                                action["label"] + ":observed", action["max_polls"])
-                if (full_route and not items_probe) or transform_prefix or stadium_prefix:
-                    drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, tap)
-                if stadium_prefix and not receiver.setup_seen:
-                    wait_source(lambda: receiver.setup_seen, "original Stadium VS setup transition",
-                                menus["sss"]["max_vs_transition_polls"])
+                if replay_receipt is None:
+                    boot_actions = 0
+                    while not matches(receiver.latest_menu, menus["actions"][0]["before"]):
+                        require(receiver.menu_polls < menus["boot_max_polls"], "Rules cold startup polling cap")
+                        next_row()
+                        scene = (receiver.latest_menu or {}).get("scene")
+                        for action in menus["boot"]:
+                            if scene == action["scene"]:
+                                boot_actions += 1
+                                require(boot_actions <= menus["boot_max_actions"], "Rules cold startup action cap")
+                                tap(action, "cold-scene-" + str(scene), 600)
+                                # Consume a new poll before considering another boot action.
+                                first = receiver.menu_polls
+                                wait_source(lambda: receiver.menu_polls > first, "cold-source-poll", 600)
+                                break
+                    for action in menus["actions"]:
+                        wait_source(lambda: matches(receiver.latest_menu, action["before"]),
+                                    action["label"] + ":ready", action["max_polls"])
+                        if "when_value" in action:
+                            require(receiver.latest_menu["value"] in (0,1), "Competitive item is not a observed switch")
+                        if "when_value" not in action or receiver.latest_menu["value"] == action["when_value"]:
+                            tap(action, action["label"], action["max_polls"])
+                        wait_source(lambda: matches(receiver.latest_menu, action["after"]),
+                                    action["label"] + ":observed", action["max_polls"])
+                    if (full_route and not items_probe) or transform_prefix or stadium_prefix:
+                        drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, tap)
+                    if stadium_prefix and not receiver.setup_seen:
+                        wait_source(lambda: receiver.setup_seen, "original Stadium VS setup transition",
+                                    menus["sss"]["max_vs_transition_polls"])
                 if transform_prefix:
                     drive_sheik_transform_input(receiver, plan, controller, next_row)
                 if sparse_pair:
@@ -1039,15 +1139,30 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                 # Do not treat that publication race as native completion.
                 if stadium_prefix:
                     primary_status, _ = wait_transform_terminal_statuses(status, native_status, deadline,
-                        wait_check=lambda: check_stadium_capture_bounds(raw, native, deadline, receiver.seq))
+                        wait_check=lambda: check_stadium_capture_bounds(raw, native, deadline, receiver.seq),
+                        input_mode="replay" if replay_receipt is not None else "record")
                     from reference_input_stream import validate_stream as validate_input_stream
                     from stadium_go_prefix import validate_stadium_go_prefix
                     input_summary = validate_input_stream(native)
-                    input_status = validate_status(native_status, mode="record",
-                                                   events=input_summary["events"], require_complete=True)
+                    input_status = (stadium_replay_complete(replay_receipt, native_status)
+                                    if replay_receipt is not None else
+                                    validate_status(native_status, mode="record",
+                                        events=input_summary["events"], require_complete=True))
                     check_stadium_capture_bounds(raw, native, deadline, receiver.seq)
                     prefix_report = validate_stadium_go_prefix(
                         raw, menus["setup_receipt_sha256"], status_path=status)
+                    state_report = common_report = None
+                    if replay_receipt is not None:
+                        from stadium_go_prefix import validate_stadium_idle_state_snapshot
+                        state_report = validate_stadium_idle_state_snapshot(
+                            raw, menus["setup_receipt_sha256"], status_path=status)
+                        common_report = common_wire_comparator(
+                            replay_receipt["original_observer"], raw,
+                            original_status_path=replay_receipt["original_status"],
+                            candidate_status_path=status)
+                        require(isinstance(common_report, dict) and
+                                common_report.get("decision") == "PASS_EXACT_STADIUM_COMMON_WIRE",
+                                "Stadium replay common-wire comparison did not pass")
                     bounded_log.check()
                     report = {
                         "schema": "melee-web-original-stadium-go-prefix-capture",
@@ -1057,8 +1172,13 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                         "input_plan_sha256": None,
                         "profile_gci_sha256": loaded_profile["sha256"] if loaded_profile else None,
                         "menu_recipe_sha256": menu_hash,
-                        "input_intentions_sha256": hashlib.sha256(
-                            (output / "input-intentions.jsonl").read_bytes()).hexdigest(),
+                        "input_intentions_sha256": (hashlib.sha256(
+                            (output / "input-intentions.jsonl").read_bytes()).hexdigest()
+                            if replay_receipt is None else None),
+                        "input_mode": "replay" if replay_receipt is not None else "record",
+                        "input_replay": replay_receipt,
+                        "stadium_idle_state": state_report,
+                        "common_wire_comparison": common_report,
                         "profile_sha256": source_inventory,
                         "build": build,
                         "observer_status": primary_status,
@@ -1118,7 +1238,8 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                 return report
         except Exception as error:
             (output / "failure.json").write_bytes(canonical({"scope": scope, "stage": "native",
-                "native_launched": True, "pid": process.pid, "error": str(error)}))
+                "native_launched": True, "pid": process.pid, "error": str(error),
+                "comparison_receipt": getattr(error, "receipt", None)}))
             raise
         finally:
             # Cleanup closes the direct child's output; join its owned drain
@@ -1158,7 +1279,8 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                 failure = output / "failure.json"
                 if not failure.exists():
                     failure.write_bytes(canonical({"scope": scope, "stage": "cleanup",
-                        "native_launched": True, "pid": process.pid, "error": str(error)}))
+                        "native_launched": True, "pid": process.pid, "error": str(error),
+                        "comparison_receipt": getattr(error, "receipt", None)}))
                 if primary_error is None or not (ordinary or transform_prefix or stadium_prefix):
                     raise error
 
@@ -1564,10 +1686,16 @@ def main(argv=None):
     parser.add_argument("--gci", type=Path, help="Exact retained re-export; required by GCI campaign, optional for Stadium GO prefix")
     parser.add_argument("--ordinary-policy",type=Path,
                         help="Exact separate adaptive competitive timeout policy; v4 remains entry provenance")
+    parser.add_argument("--input-replay", type=Path,
+                        help="Pinned complete v6 MWRI; Stadium-only, no adaptive input writes")
     parser.add_argument("--timeout", type=float, default=180)
     args = parser.parse_args(argv)
     try:
-        report = run(**vars(args))
+        comparator = None
+        if args.input_replay is not None:
+            from stadium_recorded_prefix_compare import compare_stadium_common_wire
+            comparator = compare_stadium_common_wire
+        report = run(**vars(args), common_wire_comparator=comparator)
     except (OSError, ValueError) as error:
         parser.exit(1, f"Original menu/SD diagnostic failed: {error}\n")
     print(json.dumps(report, sort_keys=True))

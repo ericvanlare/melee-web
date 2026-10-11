@@ -1272,8 +1272,8 @@ struct Observer::Impl
          SparsePairRequested() || !Env("MWRC_SD_MENU_PROBE").empty() ||
          !Env("MWRC_ORDINARY_POLICY_SHA256").empty() ||
          cpu_probe_configured || item_probe_configured || AllocationConfigured() ||
-         !InputStream::IsRecording()))
-      return SetInvalid("Stadium GO prefix requires exclusive native input recording scope"), false;
+         (!InputStream::IsRecording() && !InputStream::IsReplaying())))
+      return SetInvalid("Stadium GO prefix requires exclusive native recorded input scope"), false;
     if (whole_session_enabled() && (!ValidIdentity(capture_id) || !ValidIdentity(sequence_id)))
     {
       SetInvalid("whole-session capture and sequence IDs must be safe non-empty strings");
