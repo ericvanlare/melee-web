@@ -58,7 +58,8 @@ ships with a migration path, and is measured against those PRs before merge.
 testing because they cannot test personally now.
 
 **Status:** Stadium C3 is checkpointed in its existing draft PR. The immediate
-#288 boundary reuses the existing room UI and local Worker: two independent
+#288 boundary has a [scoped readiness result](status/2026-10-11-local-room-ui-readiness.md)
+using the existing room UI and local Worker: two independent
 headless browsers Host/Join, keyboard input moves each original CSS cursor,
 runtime checksums agree, and intentional Leave retires the sessions. This is a
 bounded local readiness step; the public staging Worker and complete-match A3
