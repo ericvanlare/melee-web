@@ -56,3 +56,50 @@ four-stock match, Results and CSS return were outside this run. Physical input,
 two-machine/Internet play, foreground timing, sustained performance, pixel/PCM
 equivalence, audible output and whole-session acceptance remain open. The
 broader #288 playable-slice criteria remain unchanged.
+
+
+## Full-route extension — in progress
+
+The follow-on local keyboard route is **not yet complete**. Its
+[separate producer and attempt receipt](../evidence/local-room-full-route-v1.json)
+preserves the readiness result above and binds a fresh Release runtime built
+from merged `b57979868339faf07394f614320e59b0e7fe9b5d`. The fresh Wasm SHA-256
+is `3c475521da3b101a17c384d90659ec2ee00ae1181cabeccf2f6d04abc71b7409`;
+all 46 runtime file hashes matched before each attempt. Only the keyboard
+harness and its tests changed afterward; the runtime and source game did not.
+
+All three retained attempts used actual Host/Join and keyboard input to enter
+original CSS, SSS and four-stock Mario/Final Destination. P1 used ordinary
+outward movement and P2 stayed neutral during gameplay. Their outcomes differ:
+
+- Attempt 1 recorded three natural P1 stock losses and grounded respawns, then
+  the driver rejected a stopped state. Its native message was not retained, so
+  the cause remains unknown. The exact common checksum prefix contains 4,903
+  records; alpha has no unpaired tail and beta has two.
+- Attempt 2 retained the exact refusal: beta was in normal first-use rendering
+  preparation at source tick 1,816 and match frame 1,349 with stocks `[3,4]`.
+  The driver had treated every stopped match state as terminal preparation.
+  The exact common prefix contains 1,817 records, with alpha one and beta zero
+  unpaired records. A smaller offline reproducer and focused regression now
+  distinguish that exact healthy wait from timing pauses, faults and invalid
+  terminal states. The initial test-only variable typo is retained separately.
+- Attempt 3 passed that reviewed driver change but exhausted the operation
+  budget during a checksum wait after two recorded losses and respawns. Its
+  final wait rows were not retained. Cleanup snapshots had already compared
+  beyond the requested checksum tick, so neither desync nor the actual blocked
+  predicate is established. All 8,220 common 64-byte records match; alpha has
+  no unpaired tail and beta has two. The next step is a smaller checksum-wait
+  diagnostic, without increasing the budget or changing runtime thresholds.
+
+Each owner stayed within the five-minute wall budget and reserved cleanup time.
+All three cleanups passed normal UI Leave, native quiescence, unload to stopped
+phase zero, Worker disposal without fallback, and owned-process absence.
+Failed profiles and reports remain retained. The observed Final Destination
+geometry still has the known magenta rendering defect; no visual acceptance is
+claimed. Fourth stock loss, Results, CSS return and the complete route remain
+unobserved in this new keyboard harness.
+
+The bounded provider follow-up made zero provider requests because existing
+credentials were missing or expired; it did not refresh authentication. The
+earlier scoped provider receipt remains the only service evidence. Public
+staging, physical input and the other acceptance gates remain open.

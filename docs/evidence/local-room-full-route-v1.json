@@ -1,0 +1,242 @@
+{
+  "schema": "melee-web-local-room-full-route-v1",
+  "issue": 288,
+  "result": "INCOMPLETE_FAILED_ATTEMPTS_RETAINED",
+  "run_id": "local-room-full-route-20261011-130838-0abaa6ac",
+  "scope": "Same-machine headless local Worker route investigation; no complete match or Internet/acceptance claim",
+  "runtime_producer": {
+    "commit": "b57979868339faf07394f614320e59b0e7fe9b5d",
+    "tree": "e6f86b1287d033094bc00bf85d0981c933f2a075",
+    "release_build_passed": true,
+    "runtime_inventory_receipt_sha256": "5bf9b4184f3385bbba5f46afcbdec1042afcd6384e8a1e4f23d394fe25764b84",
+    "runtime_file_count": 46,
+    "wasm_sha256": "3c475521da3b101a17c384d90659ec2ee00ae1181cabeccf2f6d04abc71b7409"
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "result": "FAIL_RETAINED",
+      "harness_commit": "9228a00168db460ba3c98075c3a6d0bcc259aac6",
+      "started_at": "2026-10-11T20:19:59.575Z",
+      "finished_at": "2026-10-11T20:21:36.255Z",
+      "first_error": "AssertionError [ERR_ASSERTION]: alpha P1 stock after completed keyboard pulse: preparation stopped before the natural [0,4] terminal stocks",
+      "recorded_stock_losses": [
+        3,
+        2,
+        1
+      ],
+      "recorded_respawns": 3,
+      "elapsed_ms": 97214,
+      "common_exact_64byte_records": 4903,
+      "unpaired_tails": {
+        "alpha": 0,
+        "beta": 2
+      },
+      "cleanup_passed": true,
+      "cdp_process_count": 16,
+      "owned_pids_independently_absent": 23,
+      "cause": "Stopped-state message was not retained. Actual cause remains unknown."
+    },
+    {
+      "attempt": 2,
+      "result": "FAIL_RETAINED",
+      "harness_commit": "f64b75664b416b1fa4b85af40be9f263f979ece3",
+      "started_at": "2026-10-11T20:26:05.545Z",
+      "finished_at": "2026-10-11T20:26:46.903Z",
+      "first_error": "AssertionError [ERR_ASSERTION]: beta P1 stock after completed keyboard pulse: preparation stopped before the natural [0,4] terminal stocks",
+      "recorded_stock_losses": [],
+      "recorded_respawns": 0,
+      "elapsed_ms": 41775,
+      "common_exact_64byte_records": 1817,
+      "unpaired_tails": {
+        "alpha": 1,
+        "beta": 0
+      },
+      "cleanup_passed": true,
+      "cdp_process_count": 16,
+      "owned_pids_independently_absent": 22,
+      "cause": "Exact healthy first-use rendering preparation was misclassified as terminal preparation."
+    },
+    {
+      "attempt": 3,
+      "result": "FAIL_RETAINED",
+      "harness_commit": "aa103743b7ab7fe87276f2fd2715152ca3e1350e",
+      "started_at": "2026-10-11T20:35:31.677Z",
+      "finished_at": "2026-10-11T20:39:28.655Z",
+      "first_error": "Error: Both peers did not advance the common checksum boundary after keyboard input",
+      "recorded_stock_losses": [
+        3,
+        2
+      ],
+      "recorded_respawns": 2,
+      "elapsed_ms": 237642,
+      "common_exact_64byte_records": 8220,
+      "unpaired_tails": {
+        "alpha": 0,
+        "beta": 2
+      },
+      "cleanup_passed": true,
+      "cdp_process_count": 16,
+      "owned_pids_independently_absent": 22,
+      "cause": "Operation deadline expired in checksum waiter. Final waiter native running/message was not retained; actual predicate blocker remains unknown."
+    }
+  ],
+  "offline_reduction": {
+    "source": "aa103743b7ab7fe87276f2fd2715152ca3e1350e",
+    "legacy_guard_reproduced": true,
+    "focused_regression_tests": 1,
+    "focused_regression_result": "PASS",
+    "prior_test_typo_failure_retained": true,
+    "behavior": "Exact healthy native first-use rendering is WAIT only; timing pauses, runtime faults and invalid terminal state still refuse."
+  },
+  "provider_followup": {
+    "result": "credentials-missing-or-expired",
+    "query_count": 0,
+    "auth_refreshed": false,
+    "prior_receipt_remains_only_provider_evidence": true
+  },
+  "artifacts": [
+    {
+      "file": "build-producer.json",
+      "bytes": 8736,
+      "sha256": "5bf9b4184f3385bbba5f46afcbdec1042afcd6384e8a1e4f23d394fe25764b84"
+    },
+    {
+      "file": "build-main.log",
+      "bytes": 12253,
+      "sha256": "8d8b9c1d58741ae0473d380a1f13c34887a590ea6941db7a9fbdd1a4e316d61d"
+    },
+    {
+      "file": "capture-command.json",
+      "bytes": 2823,
+      "sha256": "4d480ccd3505ce1b981b7ccfd04aa4823fbdeefe168a9c6ae797390c256cbf06"
+    },
+    {
+      "file": "capture2-command.json",
+      "bytes": 2970,
+      "sha256": "45fee48947eea7539be839f9f62fecce34dc814059c9efabff55edc42445db55"
+    },
+    {
+      "file": "capture3-command.json",
+      "bytes": 3014,
+      "sha256": "ba5ab775277d1a04fe642f6c49aa7541894943d14216a70891a943e8562ceac1"
+    },
+    {
+      "file": "sol-capture1-review.json",
+      "bytes": 3655,
+      "sha256": "2f83219db1d4bcfa758b42487241e389cdffabd8d320d52a5e2dca2a5f1bc9e3"
+    },
+    {
+      "file": "sol-capture2-review.json",
+      "bytes": 12631,
+      "sha256": "b1856a9335908dee6cc955379663227d4facd63caf49e383c5138be44dbbe157"
+    },
+    {
+      "file": "sol-capture3-review.json",
+      "bytes": 3388,
+      "sha256": "d492cc2a6a59db47726ed92082f09fd3adf91fac6a4419942e31c3bfde227fd9"
+    },
+    {
+      "file": "sol-diagnostic-observation-source-review.json",
+      "bytes": 734,
+      "sha256": "d05a9bad38f6eb79060c6046558c61dde123f1a96661ca977d95921bfe67f97d"
+    },
+    {
+      "file": "sol-render-wait-reduction-review.json",
+      "bytes": 2284,
+      "sha256": "1e430e54497f8bb1a037d11b004184e90f8261a9163f64a4e128186d7671cc3d"
+    },
+    {
+      "file": "reduction/legacy-reducer-result.json",
+      "bytes": 1460,
+      "sha256": "c310d9818f7bdc7468459ce7b90caf668e9b3f8ca762fa976fe84e3201d84cd1"
+    },
+    {
+      "file": "reduction/legacy-stopped-match-reducer.py",
+      "bytes": 3604,
+      "sha256": "72cc1ed6796e714c425b52a05665fc70cf8744b741a717b235bd38228ea557fb"
+    },
+    {
+      "file": "reduction/focused-test-attempt1.json",
+      "bytes": 835,
+      "sha256": "b1fd22e5dfbb1a14a67c614bd29777395d04d0042944ae98d247eed9b8b208fe"
+    },
+    {
+      "file": "reduction/focused-test-result.json",
+      "bytes": 1055,
+      "sha256": "39309038cd9bdf1512c63e82298a375c20ec2b6560d9cf1a71bdaaf37906ec7d"
+    },
+    {
+      "file": "provider-readonly-followup/account-inventory-receipt.json",
+      "bytes": 845,
+      "sha256": "4a763d7045abbbfe7ae692b78dad9463c63b4f8de1fd6210243bad9a01699690"
+    },
+    {
+      "file": "capture1/browser/report.json",
+      "bytes": 33056082,
+      "sha256": "0485ba60819fe2f7791303486d463610a3912070f2cd0b86754353a6ce319710"
+    },
+    {
+      "file": "capture1/owner.json",
+      "bytes": 176883,
+      "sha256": "a19ffe06a57ebba2b67542c659b039bbfa9474af1e2fcac6fbe103c10cd7ce97"
+    },
+    {
+      "file": "capture1/capture.log",
+      "bytes": 1532,
+      "sha256": "9a45beacc965872c65a5ab989c2515e0caaf865ac2f9e816fa25e9230a8e04da"
+    },
+    {
+      "file": "capture1/browser-processes.jsonl",
+      "bytes": 131774,
+      "sha256": "7ea8da3ed66732d9d4b864b0baf3bdac1bcf81481ba9f00f5a110ae40c41e9da"
+    },
+    {
+      "file": "capture2/browser/report.json",
+      "bytes": 12332672,
+      "sha256": "f6ae7022019c04cd7c0df3b0c22bf1f07045f6c6efd319f6f51aa8f29db8aff1"
+    },
+    {
+      "file": "capture2/owner.json",
+      "bytes": 161800,
+      "sha256": "29babd9eda4a6ee887ffe617bde8d65d6ad243c88090d8410dcef95f55b4d0c2"
+    },
+    {
+      "file": "capture2/capture.log",
+      "bytes": 1531,
+      "sha256": "4415b61cae689990c72e8a18e92532d95ba492d1a7ee135bf12089f5c6afb1b1"
+    },
+    {
+      "file": "capture2/browser-processes.jsonl",
+      "bytes": 117767,
+      "sha256": "d17cd48cfe5bd9e2e49bd4560e7c344ed64cc43540969a9759a3cfa2a2641c72"
+    },
+    {
+      "file": "capture3/browser/report.json",
+      "bytes": 55367424,
+      "sha256": "7fdf9a0f1efa0706da651744e805b56fece8fe8040b0d8473c9832bbd2e5d528"
+    },
+    {
+      "file": "capture3/owner.json",
+      "bytes": 183385,
+      "sha256": "c510645a9c101ca8e9981a8591738b68ecabb5128155f7813daa664bf104d5d0"
+    },
+    {
+      "file": "capture3/capture.log",
+      "bytes": 763,
+      "sha256": "02c7ff445f6318deadf0dcfd68fbe9f2baa1f3adb0b564827423750dbc626cce"
+    },
+    {
+      "file": "capture3/browser-processes.jsonl",
+      "bytes": 137019,
+      "sha256": "c0eb16850baf2e561dbd92e8c156dc9788e1ee84c5e76d570a6373bec40e2095"
+    }
+  ],
+  "pending": [
+    "Reduced checksum-wait diagnostic and review before any additional capture",
+    "Complete local keyboard match route including fourth stock loss, Results and CSS return",
+    "Final branch regression, affected target validation, review and CI before integration",
+    "Deployed staging Worker route",
+    "Physical input, two-machine, foreground timing, original pixels/PCM and whole-session acceptance"
+  ]
+}

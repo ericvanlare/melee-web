@@ -66,6 +66,9 @@ bounded local readiness step; the public staging Worker and complete-match A3
 requirements remain open. No human-session or physical-input result is inferred.
 Stop at the first failure, reduce after two attempts, and avoid another open-ended
 stage or fighter investigation. Evidence belongs in the #288 boundary receipt.
+The autonomous follow-on uses the same controls for a local complete-match
+witness. Its retained driver failures and reduced checks are updated in that
+same receipt; no human testing or complete-route success is inferred.
 
 **Links:** [Owner-requested execution change](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6112686789),
 [A3 #288](https://github.com/ericvanlare/melee-web/issues/288),
