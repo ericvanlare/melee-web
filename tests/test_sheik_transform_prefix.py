@@ -412,7 +412,31 @@ int main(int argc, char** argv) {
                       source.index("struct SliceRef")]
         entries = re.findall(r"^\s+(\w+) = (\d+),", enum, re.MULTILINE)
         tags = {name: int(value) for name, value in entries}
-        self.assertEqual(sorted(tags.values()), list(range(1, 67)))
+        # Preserve the shipped namespace and the exact appended Stadium-state inventory.
+        # The fixed contiguous range rejects both duplicate values and gaps.
+        self.assertEqual(sorted(tags.values()), list(range(1, 90)))
+        self.assertEqual({name: tags[name] for name in (
+            "StadiumMapRoot", "StadiumGroundPointer", "StadiumMap2Gate",
+            "StadiumMap2Countdown", "StadiumMap2Phase", "StadiumMap2Form",
+            "StadiumMap2PreviousForm", "StadiumMap2PriorForm", "StadiumMap2Map5Root",
+            "StadiumDisplayTimer", "StadiumDisplayMode", "StadiumDisplayFlags",
+            "StadiumDisplayPreviousFlags", "StadiumDisplayPreviousMode",
+            "StadiumDisplayFocusedPlayer", "StadiumDisplaySelectionCounter",
+            "StadiumDisplayPackedFlags", "StadiumTitleScratch",
+            "StadiumFont1SlotPointer", "StadiumTitleChildGObj",
+            "StadiumTitleTextWrapper", "StadiumTitleStaticTextPointer",
+            "StadiumTitleDynamicTextPointer")}, {
+                "StadiumMapRoot": 67, "StadiumGroundPointer": 68, "StadiumMap2Gate": 69,
+                "StadiumMap2Countdown": 70, "StadiumMap2Phase": 71, "StadiumMap2Form": 72,
+                "StadiumMap2PreviousForm": 73, "StadiumMap2PriorForm": 74,
+                "StadiumMap2Map5Root": 75, "StadiumDisplayTimer": 76,
+                "StadiumDisplayMode": 77, "StadiumDisplayFlags": 78,
+                "StadiumDisplayPreviousFlags": 79, "StadiumDisplayPreviousMode": 80,
+                "StadiumDisplayFocusedPlayer": 81, "StadiumDisplaySelectionCounter": 82,
+                "StadiumDisplayPackedFlags": 83, "StadiumTitleScratch": 84,
+                "StadiumFont1SlotPointer": 85, "StadiumTitleChildGObj": 86,
+                "StadiumTitleTextWrapper": 87, "StadiumTitleStaticTextPointer": 88,
+                "StadiumTitleDynamicTextPointer": 89})
         self.assertEqual({name: tags[name] for name in (
             "SssPositionCursorWorld", "SssPositionTargetWorld", "SssPositionGObj",
             "SssPositionProc", "SssPositionTargetRow", "SssPositionScheduler",
