@@ -13,6 +13,7 @@ class FirstSssVsSetupRunnerTests(OwnedWorkspaceTests):
   cli=cli.replace('parseArgs({options:','parseArgs({args, options:')
   route=source[source.index('  if (firstSssVsSetup) {',source.index('async function main()')):source.index('  assert.equal(preflight.source_revision',source.index('async function main()'))]
   js="import assert from 'node:assert/strict';import {parseArgs} from 'node:util';import {pathToFileURL} from 'node:url';\n"
+  js+="import {validateMatchedSetupCfRequest} from "+repr((ROOT/'tests/stadium_matched_setup_cf_runner_gate.mjs').as_uri())+";\n"
   js+='const cli='+repr(cli)+',route='+repr(route)+';\n'
   js+=_function(source,'function validateFirstSssTextTailLog(snapshot)')
   runtime=(ROOT/'web/runtime-development.mjs').read_text()
@@ -34,9 +35,9 @@ class FirstSssVsSetupRunnerTests(OwnedWorkspaceTests):
   js+=r'''
 const approve=new Function('globalThis',approvalSource);
 assert.equal(approve({}),0);assert.equal(approve({__meleeWebStadiumFirstSssVsEntryApproved:()=>false}),0);assert.equal(approve({__meleeWebStadiumFirstSssVsEntryApproved:()=>{throw Error('refused');}}),0);assert.equal(approve({__meleeWebStadiumFirstSssVsEntryApproved:()=>Promise.resolve(true)}),0);assert.equal(approve({__meleeWebStadiumFirstSssVsEntryApproved:()=>1}),0);assert.equal(approve({__meleeWebStadiumFirstSssVsEntryApproved:()=>true}),1);
-const parse=args=>new Function('parseArgs','args',cli+';return {values,firstSssVsSetup,firstSssVsSetupTextTail,firstSssVsEntry,firstSssPrefix,firstSssConsumedPadTick,firstSssConstructorPair,firstCssBrowserDraw,firstCssBrowserStream,firstCssBrowserFinalDraw};')(parseArgs,args);
+const parse=args=>new Function('parseArgs','args','validateMatchedSetupCfRequest',cli+';return {values,firstSssVsSetup,firstSssVsSetupTextTail,firstSssVsSetupCf,firstSssVsEntry,firstSssPrefix,firstSssConsumedPadTick,firstSssConstructorPair,firstCssBrowserDraw,firstCssBrowserStream,firstCssBrowserFinalDraw};')(parseArgs,args,validateMatchedSetupCfRequest);
 const args=['--first-sss-vs-setup'];for(const name of ['first-sss-vs-setup-expected','first-sss-vs-entry-expected','first-sss-prefix-expected','first-sss-prefix-input','first-sss-draw-expected','first-sss-pair-expected','first-sss-tick-expected','first-sss-tick-input'])args.push('--'+name,'fixture');
-const flags=parse(args);assert.equal(flags.firstSssVsSetup,true);assert.equal(flags.firstSssPrefix,true);
+const flags=parse(args);assert.equal(flags.firstSssVsSetup,true);assert.equal(flags.firstSssVsSetupCf,false);assert.equal(flags.firstSssPrefix,true);
 for(const missing of ['first-sss-vs-setup-expected','first-sss-vs-entry-expected','first-sss-prefix-input']){const bad=[...args],i=bad.indexOf('--'+missing);bad.splice(i,2);assert.throws(()=>parse(bad));}
 assert.throws(()=>parse([...args,'--first-sss-vs-entry']));assert.throws(()=>parse(['--first-sss-vs-setup-expected','orphan']));
 const names=['assert','preflight',...Object.keys(flags)];const routeCheck=new Function(...names,route);

@@ -54,6 +54,7 @@ async function exerciseCleanup({unloadAttemptedInitially, unloadCompletedInitial
     firstSssPrefix: false,
     firstSssVsEntry: false,
     firstSssVsSetup: true,
+    firstSssVsSetupCf: false,
     firstSssVsSetupTextTail: true,
     timeout: async operation => operation,
     errorText: error => String(error),
