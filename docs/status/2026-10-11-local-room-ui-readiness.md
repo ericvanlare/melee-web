@@ -42,6 +42,14 @@ with WebGPU adapters. Speakers were muted through the shared launch policy;
 audio processing remained active. Screenshots show the original CSS, but were
 not compared against retail pixels.
 
+The Release build and 79 focused room/owner tests passed. The final unfiltered
+suite on `0ec7088cfee6fa2f955e6d33b9cb48e5238c40be` completed 2,307 tests
+with 166 skips and no failures. The first full-suite run had one status-link
+failure because this receipt had not yet been written; that failed log is retained.
+The receipt was created, the four status checks passed, and the full suite was
+rerun successfully before integration. The final metadata update changes only
+documentation.
+
 This is **local functional readiness**, not accepted Internet multiplayer. The
 Worker ran locally; no deployed staging endpoint was exercised. SSS, the
 four-stock match, Results and CSS return were outside this run. Physical input,

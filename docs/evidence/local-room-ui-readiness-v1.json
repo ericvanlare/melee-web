@@ -371,7 +371,16 @@
       "failure": "Status entry linked to the not-yet-written portable receipt. No executable test failed. The receipt was then created before rerunning."
     },
     "final_run": {
-      "state": "pending"
+      "state": "PASS",
+      "source": "0ec7088cfee6fa2f955e6d33b9cb48e5238c40be",
+      "tests": 2307,
+      "passed": 2141,
+      "skipped": 166,
+      "failures": 0,
+      "errors": 0,
+      "seconds": 489.032,
+      "exit_code": 0,
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v"
     }
   },
   "cleanup": {
@@ -512,6 +521,16 @@
       "file": "full-suite.log",
       "bytes": 424058,
       "sha256": "3bf59d7dcc576fa0cf4447e792cb7671ff56c7274b1cb84f2298093b7f804665"
+    },
+    {
+      "file": "full-suite-final.log",
+      "bytes": 423222,
+      "sha256": "7291a051fab8da413d8c5367fa33694bd29d9aa47e84b887e64a25da7fe781d0"
+    },
+    {
+      "file": "sol-final-doc-review.json",
+      "bytes": 1914,
+      "sha256": "bb464fa0d2da3ccc3274bd7c31233d1056623821e4c354ff2bb784f66d8b2fc6"
     }
   ]
 }
