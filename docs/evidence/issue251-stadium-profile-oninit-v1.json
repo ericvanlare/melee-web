@@ -318,8 +318,8 @@
     "no_machine_specific_path_required": true
   },
   "subsequent_c3_component_2026_10_09": {
-    "claim_boundary": "The latest actual Setup result remains the 4070b6bd capture: its declared row-2503 fields matched, but checked unload failed at text-topology / owned-second-next and the ordinary observation remained uncleared. The current PR301 worktree batch now contains the source-reviewed canceled-prepared SIS-transfer implementation and chronology v2; this docs update is prepared to join it. The extracted StageLast close/cancellation test passed with ASan/UBSan and synthetic transfer services, but private SIS controls, runtime builds, the full suite and a fresh Setup capture have not yet validated the combined batch. Chronology v2 does not retroactively repair the capture\u2019s overwritten log_before_unload field. Validate this batch before considering another stopped Setup run. Original PAD856/profile, persistent VsModeData, per-owner RNG, Ready/GO, original-matched 3,500-tick sequence and C3 acceptance remain open; the two historical functional 3,500-tick lifetimes and ordinary Results regression remain separate completed evidence. Public Stadium admission stays closed.",
-    "current_result": "The 4070b6bd runner/runtime review approved the declared Setup row-2503 comparison but classified the overall run as FAIL_NATIVE_UNLOAD_AFTER_SETUP_COMPARISON_PASS. The observed first rejection was text-topology / owned-second-next at index 1, actual non-null versus expected null, with operand lifetime unverified; unload did not complete and the ordinary observation was not cleared. The current PR301 worktree batch contains the reviewed transfer and chronology-v2 source/tests. Its extracted StageLast close/cancellation test passed with ASan/UBSan and synthetic transfer services; the private SIS implementation/controls, runtime builds and full suite remain unvalidated on the combined batch. Chronology v2 does not alter the historical 407 runtime result.",
+    "claim_boundary": "The exact 9143b4bb source batch (tree 32c3f0ac) passed focused validation, three Release builds, two synthetic prepared-SIS allocator lifetimes, the 2,456-test suite and exact-head CI. Fresh first-SSS-draw and Setup endpoint runs matched their declared fields after same-run prerequisites; first-draw independent review passed, and the Setup run completed checked unload with its ordinary observation cleared (independent Setup replay passed). The Setup text-tail probe retained 6 pre-unload and 11 post-unload records with zero drops, while sis_lease.retirement_verified remained false. Original PAD856/profile, persistent VsModeData, per-owner RNG, Ready/GO, original-matched 3,500-tick sequence and C3 acceptance remain open; the two historical functional 3,500-tick lifetimes and ordinary Results regression remain separate completed evidence. Public Stadium admission stays closed.",
+    "current_result": "On exact source 9143b4bb/tree 32c3f0ac, 60 focused Python and 41 Node tests, diagnostic native-menu plus diagnostic and ordinary Release builds, two synthetic prepared-SIS allocator lifetimes, 2,456 full-suite tests (162 skips) and CI (12 successes/2 expected skips) passed. The first-SSS-draw comparison matched rows 1609/1610 and passed independent review. The fresh Setup run matched its declared original row-2503 Start fields, with no first mismatch; Session source_frames and Setup-continuation tick/draw counters were zero. Checked native unload returned and cleared the ordinary observation. The text-tail log grew from 6 records/476 bytes to 11/811 bytes with zero drops; its observed post-HUD sequence includes two font-1 removals followed by font-2 removal. The SIS lease reports retirement_verified=false, so no OS-free claim is made. Root review records 14 attributed PIDs absent, 40 local HTTP artifacts equal before/after and GPU probe passed; independent Setup replay passed.",
     "first_css_browser_draw_4d6c0b37_d949a0b8_v1": {
       "status": "FAIL_BEFORE_ARM; NO_BROWSER_CSS_COMPARISON; NO_TICK; NO_DRAW",
       "scope": "One headless browser attempt with the existing captured first-CSS context and one consumed sample. The diagnostic did not arm; this is not a source draw or Stadium/C3 acceptance result.",
@@ -586,7 +586,7 @@
         "SDK unittest moduleimport failure beforeNode; fixedexplicit scriptsimport and retainedoutput"
       ]
     },
-    "next_progression": "Run the private SIS allocator controls and required diagnostic/ordinary builds and full suite on the current PR301 batch. Only if those checks pass, consider a fresh stopped Setup attempt; require the declared comparison, checked unload and cleared ordinary observation before proceeding to Ready/GO. Preserve all current ownership predicates and original ordering. Original PAD856/profile, persistent VsModeData, per-owner RNG, an original-matched 3,500-tick sequence and C3 remain separate open gates.",
+    "next_progression": "With independent Setup replay complete, prepare a source-only plan for the C3 native idle-state and per-owner RNG observation boundary. Do not infer SIS OS-free status from the checked unload flag or text-tail ordering. No new capture is authorized by this record. Original PAD856/profile, persistent VsModeData, per-owner RNG parity, Ready/GO, an original-matched 3,500-tick sequence and C3 remain separate open gates.",
     "first_css_context_return_1fad54ff_v1": {
       "source_head": "1fad54ff964f80b263b91a77cf25a25b0ee08603",
       "source_tree": "adfff70b0f357d4c66bd89f1f1c3a30c9202b2a9",
@@ -6334,13 +6334,11 @@
       "sha256": "a30d1f6c3a774bb22864c9b8cb0cea89bc556629c101cfffa4a432661f1c8610",
       "review_artifact": "sol-vs-entry-endpoint-contract-v1/review.json",
       "review_sha256": "d90952bc077931fbb261d81a0a46e6cf2ee18793d3d4603c225d176297b1d562",
-      "status": "Runner 266f3dc7/runtime e12bea88 retained text-topology / owned-second-next index1: non-null versus null, operand lifetime unverified. The earlier context-topology reducer does not explain it. Next validate and run a reviewed default-off observation-only probe for actual text creation/removal and exact SIS allocation membership; report missing/dropped evidence explicitly and clear the borrowed probe state on every failure. Do not relax predicates or infer subsystem ownership from membership. A justified repair and fresh checked Setup unload remain required before Ready/GO."
+      "status": "The 9143b4bb Setup declared-field comparison and checked unload passed independent replay. Next, prepare a source-only plan for C3 native idle-state/per-owner RNG observation; no new capture is authorized by this record. Do not infer SIS retirement/OS-free status from checked unload."
     },
     "acceptance_boundary": {
       "historical_functional_evidence": "Two functional 3500-tick lifetimes and the ordinary Results regression are completed.",
       "still_open": [
-        "source reduction and ownership/lifetime proof for the observed text-topology owned-second-next operand at index 1",
-        "fresh Setup attempt with checked unload and observation clearing",
         "Ready/GO",
         "complete original-matched Setup acceptance",
         "original PAD856/profile/persistent VsModeData",
@@ -6352,7 +6350,7 @@
         "pixels",
         "PCM"
       ],
-      "status": "The e12 and 266f runs matched the declared Setup fields at original row 2503, but the overall Setup route remains unaccepted: checked unload refused, observation was not cleared, and the 266f diagnostic identified a text-topology operand whose lifetime remains unverified."
+      "status": "The 9143b4bb Setup declared-field comparison passed independent replay, and checked native unload cleared the ordinary observation. sis_lease.retirement_verified remains false; the diagnostic does not independently establish OS-free. Complete original-matched Setup, Ready/GO and C3 acceptance remain open. The two historical functional 3,500-tick lifetimes and ordinary Results regression remain complete evidence."
     },
     "vs_entry_endpoint_551ee723": {
       "source_identity": {
@@ -7404,6 +7402,338 @@
           "Do not create source_started/manager phase, delete the nametag selectively, reorder the whole-world drain, or claim runtime retirement."
         ],
         "status": "Design approved; implementation and adverse no-mutation tests remain open; root review before integration/runtime."
+      }
+    },
+    "prepared_sis_validation_9143b4bb": {
+      "source_identity": {
+        "commit": "9143b4bb519123d75979308ebe23f19132658cd1",
+        "tree": "32c3f0ac32f5b22f29349327d8b3a8642394c27f"
+      },
+      "validation": {
+        "independent_review": {
+          "artifact": "root-prepared-sis-validation-review-9143b4bb-v1/review.json",
+          "bytes": 3271,
+          "sha256": "dc0895306f17b2d68278fee7e58fc36d518aefd287039a280946e59f40a660a7",
+          "decision": "PASS_EXACT_HEAD_COMPONENT_AND_INTEGRATION_VALIDATION"
+        },
+        "focused": {
+          "artifact": "prepared-sis-focused-9143b4bb-v1/result.json",
+          "bytes": 4200,
+          "sha256": "35272c0f5861d8e697140c211711ad764312bbb0e0a9e770d657801c6652afe7",
+          "python_tests": 60,
+          "node_tests": 41,
+          "scope": "Integrated source/component tests; the receipt labels runtime as unrun."
+        },
+        "release_builds": [
+          {
+            "name": "diagnostic native menu trace",
+            "configuration": "Release",
+            "artifact": "prepared-sis-builds-9143b4bb-v1/diagnostic-native-menu/result.json",
+            "bytes": 738,
+            "sha256": "b598440bf193e071e6d74939376be4cc6381210abfde1d7490cfe43c2a713dbc",
+            "exit_code": 0
+          },
+          {
+            "name": "diagnostic runtime",
+            "configuration": "Release",
+            "artifact": "prepared-sis-builds-9143b4bb-v1/diagnostic-runtime/result.json",
+            "bytes": 734,
+            "sha256": "1ffa3b1d6b75b044b2c369b67ee5ca36e06d1815972ae63c2f91f57a9179830b",
+            "exit_code": 0
+          },
+          {
+            "name": "ordinary runtime",
+            "configuration": "Release",
+            "artifact": "prepared-sis-builds-9143b4bb-v1/ordinary-runtime/result.json",
+            "bytes": 732,
+            "sha256": "04c100c2b4554ab1655e0241fda59846eb2da5d83fe9447c9dbf5ebad2e55714",
+            "exit_code": 0
+          }
+        ],
+        "synthetic_sis_allocator_control": {
+          "artifact": "prepared-sis-builds-9143b4bb-v1/sis-allocator-controls/result.json",
+          "bytes": 1825,
+          "sha256": "c0bcb10250a1ced4e2dcd0d36dc4aa7a4c0df484143b0fdf6fe0cf65898d2092",
+          "independent_review_artifact": "luna-prepared-sis-native-result-review-9143b4bb-v1/review.json",
+          "independent_review_sha256": "be6b48a88909549e1f510c767b7b6721aa218c670dc9c5d579d5f299ab0aa2df",
+          "decision": "PASS_SCOPED_COMPILED_SIS_ALLOCATOR_CONTROLS",
+          "prepared_transfer_lifetimes": 2,
+          "synthetic_fixtures": [
+            "map",
+            "font/SIS identity",
+            "HUD"
+          ],
+          "scope": "Compiled original allocator/drain functions with synthetic fixtures; not a real browser Setup, Session ownership, unload, Ready/GO or C3 result."
+        },
+        "full_suite": {
+          "artifact": "full-regression-9143b4bb-v1/result.json",
+          "bytes": 755,
+          "sha256": "0629047a6bfb75fc9089c32367ed1deb9becad4863ed5d53107c717d6bfe2b78",
+          "tests_run": 2456,
+          "skipped": 162,
+          "failures": 0,
+          "elapsed_seconds": 512.134,
+          "exit_code": 0
+        },
+        "ci": {
+          "artifact": "ci-9143b4bb-complete-v1.json",
+          "bytes": 42071,
+          "sha256": "02a012f2bb3f20ba4365c38455ceb6e48a2115674865330feacd287ac4ece3b2",
+          "run_id": 38142329306,
+          "successful_jobs": 12,
+          "expected_skips": 2,
+          "conclusion": "success"
+        }
+      },
+      "first_sss_draw": {
+        "source_identity": {
+          "commit": "9143b4bb519123d75979308ebe23f19132658cd1",
+          "tree": "32c3f0ac32f5b22f29349327d8b3a8642394c27f"
+        },
+        "capture_artifact": "sss-prefix-first-draw-preflight-9143b4bb-v3/result.json",
+        "capture_bytes": 1959,
+        "capture_sha256": "fdfb450b03e92bf0192d1799f5db85454db8c5217f4ce62e5d1e536b57d2724f",
+        "report_artifact": "sss-prefix-first-draw-preflight-9143b4bb-v3/browser-run/report.json",
+        "report_bytes": 1382395,
+        "report_sha256": "d9a5577246a000e5449378328608316e2d711bd8c4a1a4369a68f8cf64ddd232",
+        "root_result_review": {
+          "artifact": "root-first-sss-draw-result-review-9143b4bb-v1/review.json",
+          "bytes": 1522,
+          "sha256": "da2bce2cec71d61107d3ee470bf9fd6a3181e8de51fe92bbdf796c9ae61525db",
+          "decision": "PASS_RUNTIME_RESULT_IDENTITY_AND_CLEANUP_PENDING_INDEPENDENT_REPLAY",
+          "attributed_processes_absent": 14,
+          "local_http_artifacts": 40,
+          "prelaunch_http_hashes_match": true,
+          "checked_unload_and_observation_clear": true,
+          "gpu_probe_passed": true
+        },
+        "independent_review": {
+          "artifact": "sol-first-sss-draw-result-review-9143b4bb-v1/review.json",
+          "bytes": 12153,
+          "sha256": "3d144dbcba91bc57a11086c0178172a17a8060c52d79a529de199ed2539e1773",
+          "decision": "PASS_FIRST_SSS_DRAW",
+          "first_mismatch": null
+        },
+        "compared_original_rows": [
+          1609,
+          1610
+        ],
+        "same_run_prerequisites": "Strict CSS stream, SSS constructor pair and first consumed PAD tick completed before the single first-draw comparison.",
+        "audio_accounting": {
+          "rendered_ticks": 0,
+          "calls_before_after": [
+            148,
+            148
+          ],
+          "frames_before_after": [
+            78933,
+            78933
+          ],
+          "phase_before_after": [
+            20,
+            20
+          ],
+          "scope": "No added render on this draw; not PCM equality or continuity evidence.",
+          "cross_run_variation": "This run began at 148 calls; earlier standalone first-draw runs began at 149 (1b) and 150 (551). The cross-run differences remain unexplained; counters are not PCM or continuity evidence."
+        },
+        "scope": "One first SSS draw only. No SSS prefix continuation, VS Entry/Setup, Ready/GO, match tick/draw, C3, pixel/PCM, live timing or whole-session acceptance."
+      },
+      "retained_failures": [
+        {
+          "source_identity": {
+            "commit": "a767cd7997f01fca124b01062da4675605d05fa0",
+            "tree": "a83a329bbaf52fdb106ed6fd03fd5c28513c0a87"
+          },
+          "artifact": "sol-prepared-sis-packet-adapter-v2/historical-a767-validation.json",
+          "bytes": 4318,
+          "sha256": "a185e7f5fbb797faf126a75a1c3f46a23f292ae1d2de77d984af344ece975a3a",
+          "failed_build_artifact": "prepared-sis-builds-a767cd79-v1/diagnostic-runtime/result.json",
+          "failed_build_sha256": "0cc7adf23ce2f722e99ddbc8564eafa847ab8e99badfe98559f158054e8dce7b",
+          "failed_build_log_sha256": "86479fcffd7812186a1bc138bcf88d772b59557f1ed212c07b52aeacef797eab",
+          "failure": "Diagnostic compile stopped on a typed-pointer error in the source-only adverse fixture: HSD_GObj** assigned to HSD_GObj* at grpstadium.c:2907.",
+          "later_source_fixture_repair_review": {
+            "artifact": "root-prepared-sis-control-pointer-repair-a767-v1/review.json",
+            "sha256": "37d6c92745469f35029ba179617eb706b93d0fd43f53cba46b5750f7204c2220",
+            "scope": "Source-review fixture type correction only; not a replacement compile receipt."
+          },
+          "failed_build_log_artifact": "prepared-sis-builds-a767cd79-v1/diagnostic-runtime/build.log"
+        },
+        {
+          "source_identity": {
+            "commit": "97c12c5b0b8fa117be759c9487a6b0cf4cada2d9",
+            "tree": "4aa1b3428b858f1e919228e81f43744521b96e1d"
+          },
+          "artifact": "sol-prepared-sis-packet-preparation-9143b4bb-v1/retained-97-driver-argument-error.json",
+          "bytes": 1422,
+          "sha256": "303b51bf48df4d8dd6568e6bfc8eff5339eba3cf1b5bb05cd9d7222651a4ea9e",
+          "failed_command_artifact": "prepared-sis-builds-97c12c5b-v1/diagnostic-native-menu/command.json",
+          "failed_command_sha256": "67e89f43101259e82cd70170553c0e55af3720c6e5622161d1de815adef3fde0",
+          "failed_result_sha256": "3777ee181c7744aebdc370cb8091f4c21cfcd4395aa12ddc87cbbc1a71d23fb9",
+          "failed_log_sha256": "11d54ce07006be1bf9f4ca83ce8458713d7f48db0ac61845f0d1028850b98d6e",
+          "failure": "Unsupported --target native_menu_host_trace argument was rejected before compilation; this is distinct from the later native control failure.",
+          "failed_result_artifact": "prepared-sis-builds-97c12c5b-v1/diagnostic-native-menu/result.json",
+          "failed_log_artifact": "prepared-sis-builds-97c12c5b-v1/diagnostic-native-menu/build.log"
+        },
+        {
+          "source_identity": {
+            "commit": "97c12c5b0b8fa117be759c9487a6b0cf4cada2d9",
+            "tree": "4aa1b3428b858f1e919228e81f43744521b96e1d"
+          },
+          "artifact": "root-prepared-sis-native-failure-retention-97c12c5b-v1/retention.json",
+          "bytes": 1874,
+          "sha256": "50fe4c72bdac991e06189a4ce0fc2af4b58cf339fb492eb817b5d6a770a25556",
+          "failed_result_artifact": "prepared-sis-builds-97c12c5b-v1/sis-allocator-controls/result.json",
+          "failed_result_sha256": "50601ce1d68fc23e8b7fa3ce6c9b6d5df4cbbf3791a7e1efa256f8aeb3ea0057",
+          "failed_log_sha256": "37965769855089f46361b800179fc31ef1a2b00a3e7a190f0dafc53a2a68b576",
+          "source_review_artifact": "root-prepared-sis-synthetic-font-review-97c12c5b-v1/review.json",
+          "source_review_sha256": "517aae4aa8709bfafdc0b3a70fcc1d94a2b0666b9ade023ed505739711ed97e7",
+          "failure": "The prepared native control failed before its first snapshot because the prepared synthetic font fixture lacked the required exact non-null SIS identity. Retained producer artifacts are retention-time identities; no Setup/browser run was made.",
+          "failed_log_artifact": "prepared-sis-builds-97c12c5b-v1/sis-allocator-controls/control.log"
+        }
+      ],
+      "acceptance_boundary": {
+        "status": "Source/component and first-draw checks passed. The subsequent same-producer Setup comparison and checked unload also passed; see vs_setup_text_tail_9143b4bb for actual result and remaining original comparison/C3 gates.",
+        "runtime_scope": "Native allocator controls use synthetic fixtures; the separate actual browser capture supports the prepared cancellation boundary only."
+      },
+      "setup_result_reference": "vs_setup_text_tail_9143b4bb"
+    },
+    "vs_setup_text_tail_9143b4bb": {
+      "source_identity": {
+        "commit": "9143b4bb519123d75979308ebe23f19132658cd1",
+        "tree": "32c3f0ac32f5b22f29349327d8b3a8642394c27f"
+      },
+      "capture": {
+        "result": {
+          "artifact": "vs-setup-text-tail-preflight-9143b4bb-v1/result.json",
+          "bytes": 2037,
+          "sha256": "d790936df804d621f7e5961251ad81644bc0f857b22986600a90de6c59cacc29"
+        },
+        "browser_report": {
+          "artifact": "vs-setup-text-tail-preflight-9143b4bb-v1/browser-run/report.json",
+          "bytes": 4090583,
+          "sha256": "5f4ee48522521a08631d512d681eecd83594d3d799c875cbc2af10bbb102a2b5"
+        },
+        "packet": {
+          "artifact": "vs-setup-text-tail-preflight-9143b4bb-v1/freeze.json",
+          "bytes": 1923,
+          "sha256": "e6e45b3f62cb455c5e0dd716d646d7825107f1cb5f33680f1030a5b7018c33d8"
+        }
+      },
+      "root_review": {
+        "artifact": "root-setup-text-tail-result-review-9143b4bb-v1/review.json",
+        "bytes": 2484,
+        "sha256": "bb6adc0fe3dac2a1185cda7834f46c16a5ccf5bec60940dc5d1ec3d300119c65",
+        "decision": "PASS_SETUP_DECLARED_FIELDS_AND_CHECKED_UNLOAD_PENDING_INDEPENDENT_REPLAY",
+        "all_attributed_pids_absent": 14,
+        "local_http_artifact_count": 40,
+        "http_before_after_local_equal": true,
+        "gpu_probe_passed": true
+      },
+      "independent_review": {
+        "artifact": "sol-setup-text-tail-result-review-9143b4bb-v1/review.json",
+        "bytes": 13548,
+        "sha256": "922daff8176368244e635b741e2b93d2a33c0378e8d201919dcfbaf680cd07ba",
+        "decision": "PASS_DECLARED_SETUP_TEXT_TAIL_AND_CHECKED_NATIVE_UNLOAD",
+        "first_mismatch": null,
+        "replay_decisions": [
+          "PASS_RETAINED_ACTUAL_ASSERTIONS",
+          "PASS_CANONICAL_PREFIX_ASSERTIONS_AND_COMPARATOR",
+          "PASS_BOUNDED_VS_ENTRY",
+          "PASS_DECLARED_SETUP_FIELDS",
+          "TEXT_TAIL_CHRONOLOGY_REPLAYED"
+        ]
+      },
+      "setup_endpoint": {
+        "original_sequence": 2503,
+        "comparison": "declared Start fields match; first_mismatch is null; independent replay passed",
+        "seed_hex": "35a455b9",
+        "source_frames": 0,
+        "construction_complete": true,
+        "setup_continuation_host_tick_calls": 0,
+        "setup_continuation_host_draw_calls": 0,
+        "scope": "Typed Start fields only: phase, seed, rules and players 0-3. Endpoint stopped after construction_complete before ordinary match tick/draw or Ready/GO. PAD856/profile, per-owner RNG and other excluded fields remain unpaired."
+      },
+      "text_tail_and_cleanup": {
+        "pre_unload": {
+          "records": 6,
+          "bytes": 476
+        },
+        "post_unload": {
+          "records": 11,
+          "bytes": 811
+        },
+        "dropped_records": 0,
+        "observed_order": "HUD end-before-ifAll; HUD end-after-ifAll; remove original font1 text0; remove original font1 text1; remove foreign font2 nametag",
+        "checked_native_close_returned": true,
+        "ordinary_observation_cleared": true,
+        "borrower_closed_probe_disabled_js_sink_reset": true,
+        "sis_lease_retirement_verified": false,
+        "scope": "Observed diagnostic text-tail ordering and checked unload only; no independent OS-free or ownership proof."
+      },
+      "audio_accounting": {
+        "render_calls_before_after": [
+          272,
+          272
+        ],
+        "render_frames_before_after": [
+          145066,
+          145066
+        ],
+        "scope": "Actual current Setup no-render boundary; not PCM/continuity evidence. The earlier independent first-draw run had its own 148-call baseline."
+      },
+      "historical_context": {
+        "prior_4070_result_remains_unchanged": "vs_setup_text_tail_4070b6bd",
+        "scope": "The earlier 4070b6bd checked-unload failure remains historical and is not overwritten."
+      },
+      "acceptance_boundary": {
+        "still_open": [
+          "original PAD856/profile and persistent VsModeData comparison",
+          "per-owner RNG parity",
+          "Ready/GO",
+          "original-matched 3,500-tick sequence",
+          "C3 acceptance",
+          "physical input",
+          "live timing",
+          "pixels",
+          "PCM"
+        ],
+        "status": "Independent replay passed for the 9143b4bb declared Setup fields and checked native unload; the ordinary observation cleared. The diagnostic sis_lease.retirement_verified remains false and does not independently establish OS-free. Complete original-matched Setup, Ready/GO and C3 acceptance remain open. The two historical functional 3,500-tick lifetimes and ordinary Results regression remain complete evidence."
+      },
+      "next_step": "Prepare a source-only plan for the C3 native idle-state/per-owner RNG observation boundary; no new capture is authorized by this record.",
+      "producer_retention": {
+        "manifest_artifact": "sol-setup-success-producer-retention-9143b4bb-v1/manifest.json",
+        "manifest_bytes": 72778,
+        "manifest_sha256": "a51f534f0c9fd56e87ef55cf58c1c8c28475692f22dfe98dfab70c4370fa3cf6",
+        "result_artifact": "sol-setup-success-producer-retention-9143b4bb-v1/result.json",
+        "result_bytes": 21,
+        "result_sha256": "81868a6e94ffc0178bf833deb1c9013d9fab4ee95ddb876a5e8ec4f1d26376d2",
+        "decision": "RETAINED_46_HASH_VERIFIED_PRODUCER_FILES",
+        "counts": {
+          "total": 46,
+          "diagnostic_http": 40,
+          "ordinary": 2,
+          "pad_actual_e12": 2,
+          "native_sis_9143": 2
+        },
+        "producer_identities": [
+          {
+            "head": "9143b4bb519123d75979308ebe23f19132658cd1",
+            "tree": "32c3f0ac32f5b22f29349327d8b3a8642394c27f",
+            "groups": [
+              "diagnostic-http",
+              "ordinary",
+              "native-sis-9143"
+            ]
+          },
+          {
+            "head": "e12bea88b9a98c8ef36cfecac99154d081c222e1",
+            "tree": "5b69eff9b92862ef03d6e7867cfda1e377fb928f",
+            "groups": [
+              "pad-actual-e12"
+            ]
+          }
+        ],
+        "scope": "All 46 copies were hash-verified. Forty diagnostic assets bind HTTP before/after; ordinary JS binds preflight; native SIS artifacts bind the persisted pre-control identity. PAD artifacts retain the actual e12 producer. Ordinary menu WASM alone has a retention-time hash with 9143 build provenance, without an earlier HTTP or hash claim."
       }
     }
   }
