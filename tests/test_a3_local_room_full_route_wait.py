@@ -15,7 +15,7 @@ import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
 const [routePath, fixturePath, waitDiagnosticsPath] = process.argv.slice(1);
-const { classifyStockObservation } = await import(pathToFileURL(routePath).href);
+const { classifyStockObservation, validateP2GameplayInputWindow } = await import(pathToFileURL(routePath).href);
 const { checksumCompareReached, checksumWaitDiagnostic } = await import(pathToFileURL(waitDiagnosticsPath).href);
 const fixture = JSON.parse(await readFile(fixturePath, 'utf8'));
 assert.equal(fixture.schema, 'a3-first-use-render-wait-observation-v1');
@@ -109,12 +109,34 @@ assert.equal(diagnostic.match_summary.players[0].stocks, 2);
 assert.equal(Object.hasOwn(diagnostic, 'snapshot'), false);
 assert(JSON.stringify(diagnostic).length < 4096, 'wait diagnostic must stay bounded');
 
+const padRow = (tick, port, bytes) => ({input_tick: tick, source_cursor: tick,
+  local_port: port, bytes});
+const neutral = () => Array(11).fill(0);
+const right = () => { const bytes = neutral(); bytes[2] = 64; return bytes; };
+const p2Rows = [padRow(20, 1, right()), padRow(21, 1, right()),
+  padRow(22, 1, right()), padRow(23, 1, neutral())];
+const p1Rows = [20, 21, 22, 23].map(tick => padRow(tick, 0, neutral()));
+assert.deepEqual(validateP2GameplayInputWindow({p2Rows, p1Rows, movementTick: 20,
+  releaseTick: 23, direction: 1}), {movement_input_tick: 20,
+  neutral_release_input_tick: 23, p1_neutral_capture_count: 4, p2_direction: 1});
+assert.throws(() => validateP2GameplayInputWindow({p2Rows: p2Rows.filter(row => row.input_tick !== 21),
+  p1Rows, movementTick: 20, releaseTick: 23, direction: 1}), /missing or duplicate tick/);
+assert.throws(() => validateP2GameplayInputWindow({p2Rows,
+  p1Rows: p1Rows.map((row, index) => index === 2 ? {...row, bytes: right()} : row),
+  movementTick: 20, releaseTick: 23, direction: 1}), /P1 was not literally neutral/);
+assert.throws(() => validateP2GameplayInputWindow({p2Rows: p2Rows.map((row, index) =>
+  index === 3 ? {...row, bytes: [...row.bytes.slice(0, 10)]} : row), p1Rows,
+  movementTick: 20, releaseTick: 23, direction: 1}), /exact 11-byte PAD record/);
+assert.throws(() => validateP2GameplayInputWindow({p2Rows, p1Rows,
+  movementTick: 20, releaseTick: 23, direction: -1}), /requested horizontal direction/);
+
 console.log('captured render settle waits; terminal checks stay strict; checksum waiter gate and bounded diagnostics retain exact state');
+console.log('P2 component controls require contiguous movement, literal neutral release, and P1-neutral PAD rows');
 """
 
 
 class A3LocalRoomFullRouteWaitTests(unittest.TestCase):
-    def test_captured_first_use_render_settle_is_the_only_new_stopped_wait(self):
+    def test_wait_and_p2_literal_input_window_controls(self):
         result = subprocess.run(
             [
                 str(node_runtime(ROOT)),
@@ -133,6 +155,7 @@ class A3LocalRoomFullRouteWaitTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("checksum waiter gate and bounded diagnostics retain exact state", result.stdout)
+        self.assertIn("P2 component controls require contiguous movement", result.stdout)
 
 
 if __name__ == "__main__":

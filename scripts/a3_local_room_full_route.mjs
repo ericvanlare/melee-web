@@ -26,6 +26,59 @@ function signedByte(value) {
   return value > 127 ? value - 256 : value;
 }
 
+function isNeutralPadRow(row) {
+  return Array.isArray(row?.bytes) && row.bytes.length === 11 &&
+    row.bytes.every(value => value === 0);
+}
+
+// Validate only literal local capture rows for the bounded P2 prefix. This
+// does not infer movement from the key press or synthesize a neutral sample.
+export function validateP2GameplayInputWindow({p2Rows, p1Rows, movementTick,
+  releaseTick, direction}) {
+  requireValue(Number.isSafeInteger(movementTick) && Number.isSafeInteger(releaseTick) &&
+    releaseTick > movementTick, 'P2 input window has invalid source ticks');
+  requireValue(direction === -1 || direction === 1,
+    'P2 input window has invalid horizontal direction');
+
+  const exactRows = (rows, port, label) => {
+    const window = rows.filter(row => row?.input_tick >= movementTick &&
+      row.input_tick <= releaseTick);
+    assert.equal(window.length, releaseTick - movementTick + 1,
+      `${label}: literal input capture window has a missing or duplicate tick`);
+    for (let offset = 0; offset < window.length; offset++) {
+      const row = window[offset];
+      const tick = movementTick + offset;
+      assert.equal(row.input_tick, tick, `${label}: input ticks are not in source order`);
+      assert.equal(row.source_cursor, tick, `${label}: input capture is not source-cursor aligned`);
+      assert.equal(row.local_port, port, `${label}: local input port changed`);
+      assert(Array.isArray(row.bytes) && row.bytes.length === 11 &&
+        row.bytes.every(value => Number.isInteger(value) && value >= 0 && value <= 255),
+      `${label}: input row is not an exact 11-byte PAD record`);
+    }
+    return window;
+  };
+
+  const p2 = exactRows(p2Rows, 1, 'P2');
+  const p1 = exactRows(p1Rows, 0, 'P1');
+  const movement = p2[0];
+  assert.equal(Math.sign(signedByte(movement.bytes[2])), direction,
+    'P2 first captured sample does not match the requested horizontal direction');
+  assert(movement.bytes.slice(0, 2).every(value => value === 0) &&
+    movement.bytes.slice(3).every(value => value === 0),
+  'P2 gameplay prefix contains an unexpected non-horizontal PAD input');
+  for (const row of p2.slice(0, -1)) {
+    assert.equal(Math.sign(signedByte(row.bytes[2])), direction,
+      'P2 horizontal input changed before the observed neutral release');
+    assert(row.bytes.slice(0, 2).every(value => value === 0) &&
+      row.bytes.slice(3).every(value => value === 0),
+    'P2 gameplay prefix contains an unexpected non-horizontal PAD input');
+  }
+  assert(isNeutralPadRow(p2.at(-1)), 'P2 release is not a literal all-zero PAD record');
+  assert(p1.every(isNeutralPadRow), 'P1 was not literally neutral across the P2 input window');
+  return {movement_input_tick: movementTick, neutral_release_input_tick: releaseTick,
+    p1_neutral_capture_count: p1.length, p2_direction: direction};
+}
+
 function cssDoor(setup, port) {
   const row = setup?.doors?.slice(port * 10, port * 10 + 10);
   requireValue(row?.length === 10, `Original CSS door ${port} is unavailable`);
@@ -176,8 +229,9 @@ export async function runA3LocalFullRoute({
     phases: [], css_roster: [], stage: null, match_start: [], stock_losses: [],
     respawns: [], input_actions: [], terminal_handoff: null, results: null, returned_css: null,
     required_checksum_boundary: null,
-    exclusions: ['no PAD/Gamepad input injection', 'P2 remains neutral during gameplay',
-      'no combat-coverage claim', 'no forced stock/result or native match-state mutation',
+    exclusions: ['no PAD/Gamepad input injection',
+      'one short P2 gameplay axis pulse and literal neutral release; no combat-coverage claim',
+      'no forced stock/result or native match-state mutation',
       'no retail, public Worker, physical-input, pixel, PCM, or timing-equivalence claim'],
   };
   report.full_route = route;
@@ -334,7 +388,8 @@ export async function runA3LocalFullRoute({
     if (expected?.y && Math.sign(asSignedAxis(row.bytes, 3)) !== expected.y) return false;
     return !!(expected?.x || expected?.y);
   };
-  const pulse = async (role, keys, {expected, holdMs = 160, releaseMs = 100, label}) => {
+  const pulse = async (role, keys, {expected, holdMs = 160, releaseMs = 100,
+    label, retainSample = false}) => {
     requireValue(Array.isArray(keys) && keys.length > 0, `${label}: keyboard chord is empty`);
     const instance = instances[role];
     const port = rolePort(role);
@@ -368,12 +423,62 @@ export async function runA3LocalFullRoute({
       checksum_boundary_required: requiredBoundary, checksum_boundary_reached: false,
       expected_pad_readback: expected, input_diagnostic: input.last_non_neutral,
       keyboard_path: 'browser_driver.pressChord'};
+    if (retainSample) {
+      row.observed_pad_sample = {...sample, bytes: [...sample.bytes]};
+      if (role === 'beta' && route.p2_gameplay_prefix) {
+        route.p2_gameplay_prefix.input_window.movement = row.observed_pad_sample;
+        route.p2_gameplay_prefix.input_window.source_tick_range = [sample.input_tick, null];
+      }
+    }
     route.input_actions.push(row);
     await waitForBothChecksumCompare(requiredBoundary, null);
     row.checksum_boundary_reached = true;
     route.required_checksum_boundary = Math.max(route.required_checksum_boundary || 0,
       requiredBoundary);
     return row;
+  };
+  const waitForP2InputWindow = async movementTick => {
+    const deadline = Date.now() + Math.min(1500, remaining());
+    while (Date.now() < deadline) {
+      const p1State = await readRoomState(alpha);
+      assertHealthy(p1State, 'alpha');
+      const p1CaptureCount = p1State.owner_health?.peer?.localInputCapture?.captured_count;
+      requireValue(Number.isSafeInteger(p1CaptureCount) && p1CaptureCount >= 0,
+        'P1 local input capture count is unavailable during the P2 prefix');
+      const [p2Readback, p1Readback] = await Promise.all([
+        readPeerSnapshot(beta, movementTick),
+        readPeerSnapshot(alpha, Math.min(movementTick, p1CaptureCount)),
+      ]);
+      requireValue(p2Readback.runtime_error == null && p1Readback.runtime_error == null,
+        `P2 input-window capture observed a runtime error (${p2Readback.runtime_error || p1Readback.runtime_error})`);
+      requireValue(p2Readback.health?.failure == null && p1Readback.health?.failure == null &&
+        p2Readback.health?.peer?.failure == null && p1Readback.health?.peer?.failure == null &&
+        p2Readback.native_status?.local_capture_failure == null &&
+        p1Readback.native_status?.local_capture_failure == null,
+      'P2 input-window capture observed a runtime-owner failure');
+      const p2Captures = p2Readback.health?.peer?.localInputCapture?.captures_since;
+      const p1Captures = p1Readback.health?.peer?.localInputCapture?.captures_since;
+      requireValue(Array.isArray(p2Captures) && Array.isArray(p1Captures),
+        'P2 input-window literal local capture suffix is unavailable');
+      const p2FromMovement = p2Captures.filter(row => row.input_tick >= movementTick);
+      const observedEnd = p2FromMovement.at(-1)?.input_tick ?? null;
+      p2Prefix.input_window.p2_literal_rows = p2FromMovement;
+      p2Prefix.input_window.p1_literal_rows = p1Captures.filter(row =>
+        row.input_tick >= movementTick && (observedEnd === null || row.input_tick <= observedEnd));
+      p2Prefix.input_window.observed_capture_end_tick = observedEnd;
+      const release = p2FromMovement.find((row, index) => index > 0 && isNeutralPadRow(row));
+      if (release && p1Captures.some(row => row.input_tick === release.input_tick)) {
+        const p2Window = p2FromMovement.filter(row => row.input_tick <= release.input_tick);
+        const p1Window = p1Captures.filter(row => row.input_tick >= movementTick &&
+          row.input_tick <= release.input_tick);
+        const direction = Math.sign(signedByte(p2Window[0]?.bytes?.[2] ?? 0));
+        const validated = validateP2GameplayInputWindow({p2Rows: p2Window, p1Rows: p1Window,
+          movementTick, releaseTick: release.input_tick, direction});
+        return {validated, p2Window, p1Window};
+      }
+      await beta.page.waitForTimeout(Math.min(20, Math.max(1, deadline - Date.now())));
+    }
+    throw Error('Literal P2 movement and neutral-release capture window did not settle');
   };
   const screenshotPair = async name => {
     const [a, b] = await Promise.all([
@@ -394,7 +499,7 @@ export async function runA3LocalFullRoute({
     connected_setup_by_peer: cssRoster,
     no_roster_changes: 'existing Host/Join CSS state retained; both peers observed two Human Mario slots',
     gameplay_keyboard_ports: {alpha: 0, beta: 1},
-    p2_gameplay_input: 'neutral; P2 only confirms original Results',
+    p2_gameplay_input: 'one short source-port-1 horizontal pulse with literal neutral release; no combat claim',
   };
   route.phases.push({phase: 1, label: 'connected original CSS with two Human Mario doors'});
   route.screenshots = {css_two_human: await screenshotPair('css-two-human')};
@@ -455,17 +560,108 @@ export async function runA3LocalFullRoute({
   route.phases.push({phase: 7, label: 'active two-Human Mario/Final Destination match'});
   route.screenshots.match_start = await screenshotPair('match-start');
 
-  // P2 receives no gameplay key. One reconciler samples both peers at a common
-  // source tick before and after every pulse. A natural stock decrement may
-  // occur between pulses, so observations accept only the tracked count or
+  // Reacquire after the screenshots, then exercise only the existing P2
+  // keyboard axis binding. The literal local capture rows establish both the
+  // movement sample and the later neutral release; paired native positions
+  // establish the same-source peer response without a combat claim.
+  const p2BaselineRows = await waitBoth('fresh same-source 4/4 P2 gameplay baseline', rows =>
+    sourceAligned(rows) && rows.every(row => row.phase === 7 && row.running === 1 &&
+      row.match?.ready === true && row.match?.players?.length === 2 &&
+      row.match.players.every(player => player.stocks === 4)),
+  40, {joinSourceCursor: true});
+  const p2BaselineMatches = p2BaselineRows.map((row, index) => checkMatchIdentity(row,
+    `${index === 0 ? 'alpha' : 'beta'} P2 gameplay baseline`));
+  const p2BaselinePositions = p2BaselineMatches.map(match => ({
+    p1_x: match.players[0].x, p2_x: match.players[1].x,
+  }));
+  requireValue(p2BaselinePositions.every(position => Number.isFinite(position.p1_x) &&
+    Number.isFinite(position.p2_x) && Math.abs(position.p2_x - position.p1_x) > 20),
+  'Fresh P2 gameplay baseline does not expose separated native player positions');
+  requireValue(p2BaselinePositions.every(position =>
+    position.p1_x === p2BaselinePositions[0].p1_x &&
+    position.p2_x === p2BaselinePositions[0].p2_x),
+  'Peers disagree about native player positions at the paired P2 baseline cursor');
+  requireValue(Math.abs(p2BaselinePositions[0].p2_x) > 0.01,
+    'P2 is too close to center to select a source-observed inward direction');
+  const p2Direction = -Math.sign(p2BaselinePositions[0].p2_x);
+  const p2Key = p2Direction > 0 ? 'ArrowRight' : 'ArrowLeft';
+  const p2Prefix = route.p2_gameplay_prefix = {
+    source_port: 1, key: p2Key, direction_x: p2Direction,
+    direction_policy: 'one short inward step based on the fresh source-aligned P2 position',
+    before: {source_tick: p2BaselineRows[0].source_tick,
+      peers: p2BaselinePositions, stocks: p2BaselineMatches.map(match =>
+        match.players.map(player => player.stocks))},
+    input_window: {movement: null, neutral_release: null, source_tick_range: null,
+      p2_literal_rows: [], p1_literal_rows: []},
+    after: null,
+    scope: 'one short actual P2 keyboard axis pulse toward center plus literal neutral release; no combat-coverage claim',
+  };
+  const p2Action = await pulse('beta', [p2Key], {expected: {x: p2Direction},
+    holdMs: 40, releaseMs: 80,
+    label: `P2 ${p2Key} short gameplay axis pulse toward center`, retainSample: true});
+  const p2MovementSample = p2Action.observed_pad_sample;
+  requireValue(p2MovementSample && p2MovementSample.input_tick === p2Action.source_input_tick,
+    'P2 gameplay pulse did not retain its literal source PAD sample');
+  p2Prefix.input_window.movement = p2MovementSample;
+  p2Prefix.input_window.source_tick_range = [p2MovementSample.input_tick, null];
+  const p2Window = await waitForP2InputWindow(p2MovementSample.input_tick);
+  requireValue(JSON.stringify(p2Window.p2Window[0].bytes) === JSON.stringify(p2MovementSample.bytes),
+    'P2 input-window first record differs from the pulse source PAD sample');
+  const p2Release = p2Window.p2Window.at(-1);
+  p2Prefix.input_window.neutral_release = p2Release;
+  p2Prefix.input_window.source_tick_range[1] = p2Release.input_tick;
+  p2Prefix.input_window.p2_literal_rows = p2Window.p2Window;
+  p2Prefix.input_window.p1_literal_rows = p2Window.p1Window;
+  p2Prefix.input_window.p2_literal_capture_count = p2Window.p2Window.length;
+  p2Prefix.input_window.p1_neutral_capture_count = p2Window.validated.p1_neutral_capture_count;
+  p2Prefix.input_window.p1_neutral_source_tick_range = [p2MovementSample.input_tick,
+    p2Release.input_tick];
+  const p2RequiredBoundary = p2Release.input_tick + inputDelay + 1;
+  await waitForBothChecksumCompare(p2RequiredBoundary, null);
+  route.required_checksum_boundary = Math.max(route.required_checksum_boundary || 0,
+    p2RequiredBoundary);
+  const p2AfterRows = await waitBoth('P2 movement observed on both peers after neutral release', rows =>
+    {
+      if (!sourceAligned(rows) || !rows.every(row => row.phase === 7 && row.running === 1 &&
+          row.match?.ready === true && row.match?.players?.length === 2)) return false;
+      assert(rows.every(row => row.match.players.every(player => player.stocks === 4)),
+        'A stock changed during the bounded P2 input prefix');
+      return rows[0].source_tick >= p2RequiredBoundary;
+    },
+  40, {joinSourceCursor: true});
+  const p2AfterMatches = p2AfterRows.map((row, index) => checkMatchIdentity(row,
+    `${index === 0 ? 'alpha' : 'beta'} P2 gameplay response`));
+  const p2PositionDeltas = p2AfterMatches.map((match, index) => ({
+    peer: index === 0 ? 'alpha' : 'beta',
+    before_x: p2BaselineMatches[index].players[1].x,
+    after_x: match.players[1].x,
+    delta_x: match.players[1].x - p2BaselineMatches[index].players[1].x,
+  }));
+  requireValue(p2AfterMatches.every((match, index) =>
+    match.players[0].x === p2AfterMatches[0].players[0].x &&
+    match.players[1].x === p2AfterMatches[0].players[1].x &&
+    Math.abs(match.players[1].x - match.players[0].x) > 20) &&
+    p2PositionDeltas.every(position =>
+      Math.sign(position.delta_x) === p2Direction && Math.abs(position.delta_x) > 0.01),
+  'P2 native position did not move in the captured direction on both peers');
+  p2Prefix.after = {source_tick: p2AfterRows[0].source_tick,
+      checksum_boundary_required: p2RequiredBoundary,
+      checksum_boundary_reached: true,
+      peers: p2AfterMatches.map(match => ({p1_x: match.players[0].x, p2_x: match.players[1].x,
+        stocks: match.players.map(player => player.stocks)})),
+      p2_position_delta_by_peer: p2PositionDeltas};
+
+  // P1 walk-off uses one reconciler at common source ticks before and after
+  // each pulse. A natural stock decrement may occur between pulses, so
+  // observations accept only the tracked count or
   // exactly one fewer; a detected loss is recorded once and must reach the
   // native grounded-respawn observation before another keyboard action.
   let stocks = 4;
-  const firstPlayer = initialMatches[0].players[0];
+  const firstPlayer = p2AfterMatches[0].players[0];
   requireValue(Number.isFinite(firstPlayer.x), 'P1 source position is unavailable at match start');
   let outwardKey = firstPlayer.x <= 0 ? 'a' : 'd';
-  let lastStableMatches = initialMatches;
-  let lastStableRows = sceneRows;
+  let lastStableMatches = p2AfterMatches;
+  let lastStableRows = p2AfterRows;
   let lastCompletedAction = null;
   let attemptsForCurrentStock = 0;
   const recordTerminalHandoff = (rows, states, label) => {
