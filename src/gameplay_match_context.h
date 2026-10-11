@@ -95,6 +95,9 @@ int melee_web_match_camera_subject_preflight(MeleeWebMatchContext*,const void*,c
 int melee_web_match_camera_available_ready(MeleeWebMatchContext*,char*,size_t);
 int melee_web_match_camera_subject_preflight_ready(MeleeWebMatchContext*,const void*,char*,size_t);
 int melee_web_match_camera_subject_return(MeleeWebMatchContext*,void*,char*,size_t);
+/* Read the existing owned source seed without requiring collision attachment.
+ * Used only at the original Stadium constructor callback boundary. */
+int melee_web_match_rng_seed_owner_read(uint32_t* seed);
 #endif
 /* Original GObj disposal invokes registered Fighter_Unload, which clears the
  * player entity through Player_80031FB0, before source globals restore. */

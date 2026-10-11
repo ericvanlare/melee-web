@@ -41,6 +41,42 @@ typedef struct MeleeWebStadiumGoAlignmentSnapshot {
     MeleeWebStadiumGoAlignmentEvent hud_after;
 } MeleeWebStadiumGoAlignmentSnapshot;
 typedef void (*MeleeWebStadiumGoAlignmentHudCallback)(int);
+typedef struct MeleeWebStadiumSetupSnapshot {
+    uint32_t version;
+    uint64_t world_generation;
+    uint64_t world_ticks;
+    uint32_t source_frame;
+    int32_t map_id;
+    int32_t initial_countdown;
+    int32_t current_countdown;
+    int32_t parameter_x0;
+    int32_t parameter_x4;
+    uint32_t constructor_randi_call_count;
+    uint32_t constructor_random_bound_valid;
+    int32_t constructor_random_bound;
+    uint32_t constructor_random_result_valid;
+    int32_t constructor_random_result;
+    uint32_t source_seed_before;
+    uint32_t source_seed_after;
+    int32_t ground_source_heap_handle;
+    uint32_t ground_requested_bytes;
+    uint64_t ground_allocation_generation;
+    int32_t object_source_heap_handle;
+    uint32_t object_requested_bytes;
+    uint64_t object_allocation_generation;
+    uint32_t constructor_callback_count;
+    uint32_t source_parameter_roots_agree;
+} MeleeWebStadiumSetupSnapshot;
+#define MELEE_WEB_STADIUM_SETUP_SNAPSHOT_VERSION 1U
+/* Strict zero-tick snapshot after prepared Ready ownership, before its first
+ * source callback. It does not extend GO/idle snapshots or run source work. */
+int melee_web_stage_last_stadium_setup_snapshot(
+    const MeleeWebStageLast*,const void*,MeleeWebStadiumSetupSnapshot*,char*,size_t);
+/* Called only by the existing original map-2 OnInit callback around its
+ * existing parameter read and optional randi call. */
+int melee_web_stage_last_stadium_setup_constructor_begin(void*);
+void melee_web_stage_last_stadium_setup_constructor_finish(
+    void*,int32_t,int32_t,int32_t,int,int32_t,int32_t,int,uint32_t,int,uint32_t,int);
 #endif
 /* Begin a source-owned stage callback scope for one supported StKind. The
  * caller must have published that stage's GroundParam, native map archive,

@@ -1026,6 +1026,13 @@ bool GameplayWorld::diagnostic_stadium_idle_snapshot(
         storage_->stage_last&&melee_web_stage_last_stadium_idle_snapshot(
             storage_->stage_last,out,error,size);
 }
+bool GameplayWorld::diagnostic_stadium_setup_snapshot(
+        MeleeWebStadiumSetupSnapshot* out,char* error,size_t size)const{
+    return storage_&&construction_complete()&&storage_->stadium_diagnostic&&
+        storage_->full_stage&&storage_->stage_last&&
+        melee_web_stage_last_stadium_setup_snapshot(
+            storage_->stage_last,storage_->full_stage->yakumono(),out,error,size);
+}
 #endif
 MeleeWebMatchContext* GameplayWorld::take_match_context(){
     if(!storage_||!storage_->match_context)

@@ -6149,7 +6149,7 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..4758cbb258f22465f300cc543ff49bdd
 +}
 +#endif
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..743e28ff4d14d33ee35bbaf21ecbb1376a307e1c 100644
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..bf1787ba8e68fee8d24a2d2715b8a6757b8a4bd4 100644
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
 @@ -1,5 +1,16 @@
@@ -6210,7 +6210,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..743e28ff4d14d33ee35bbaf21ecbb137
  static struct grPStadium_YakumonoParam {
      int x0;
      int x4;
-@@ -64,6 +91,16 @@ static struct grPStadium_YakumonoParam {
+@@ -64,6 +91,37 @@ static struct grPStadium_YakumonoParam {
      s16 x50;
  }* yakumono_param;
  
@@ -6224,10 +6224,31 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..743e28ff4d14d33ee35bbaf21ecbb137
 +}
 +#endif
 +
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++extern int melee_web_stage_last_stadium_setup_constructor_begin(void*);
++extern void melee_web_stage_last_stadium_setup_constructor_finish(
++    void*,int32_t,int32_t,int32_t,int,int32_t,int32_t,int,uint32_t,int,uint32_t,int);
++extern int melee_web_match_rng_seed_owner_read(uint32_t*);
++int melee_web_grpstadium_cached_yakumono_matches(const void* expected)
++{
++    return expected && yakumono_param == expected;
++}
++int melee_web_grpstadium_cached_yakumono_snapshot(
++    const void* expected,int32_t* x0,int32_t* x4)
++{
++    if (!melee_web_grpstadium_cached_yakumono_matches(expected) || !x0 || !x4) {
++        return 0;
++    }
++    *x0 = yakumono_param->x0;
++    *x4 = yakumono_param->x4;
++    return 1;
++}
++#endif
++
  GrJoint grPs_803E1248[] = {
      { 1, 3, 0 }, { 2, 3, 0 }, { 3, 4, 0 },
      { 4, 5, 0 }, { 5, 6, 0 }, { 7, 9, 0 },
-@@ -162,6 +199,10 @@ void grStadium_OnDemoInit(int unused) {}
+@@ -162,6 +220,10 @@ void grStadium_OnDemoInit(int unused) {}
  
  void grStadium_OnInit(void)
  {
@@ -6238,7 +6259,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..743e28ff4d14d33ee35bbaf21ecbb137
      yakumono_param = Ground_GetYakumonoParam();
  
      stage_info.unk8C.b4 = false;
-@@ -206,6 +247,10 @@ Ground_GObj* grStadium_801D10F8(StadiumGrType id)
+@@ -206,6 +268,10 @@ Ground_GObj* grStadium_801D10F8(StadiumGrType id)
  
      cb = &grPs_StageCallbacks[id];
      gobj = Ground_GetStageGObj(id);
@@ -6249,7 +6270,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..743e28ff4d14d33ee35bbaf21ecbb137
  
      if (gobj != NULL) {
          Ground* gp = GET_GROUND(gobj);
-@@ -219,7 +264,12 @@ Ground_GObj* grStadium_801D10F8(StadiumGrType id)
+@@ -219,7 +285,12 @@ Ground_GObj* grStadium_801D10F8(StadiumGrType id)
              cb->on_init(gobj);
          }
          if (cb->gobj_proc != NULL) {
@@ -6262,7 +6283,25 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..743e28ff4d14d33ee35bbaf21ecbb137
          }
      } else {
          OSReport("%s:%d: couldn t get gobj(id=%d)\n", __FILE__, 288, id);
-@@ -315,6 +365,9 @@ void grStadium_801D13E0(Ground_GObj* gobj)
+@@ -304,7 +375,16 @@ void grStadium_801D13E0(Ground_GObj* gobj)
+     HSD_MObj* mobj;
+     s32 temp_r28;
+     s32 var_r27;
+-
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    int setup_capture = 0;
++    int32_t setup_observed_x4 = 0;
++    uint32_t setup_seed_before = 0, setup_seed_after = 0;
++    int32_t setup_bound = 0, setup_result = 0;
++    int setup_call_observed = 0, setup_seed_before_valid = 0;
++    int setup_seed_after_valid = 0;
++    /* Owner and allocation proofs precede GET_GROUND and every callback read. */
++    setup_capture = melee_web_stage_last_stadium_setup_constructor_begin(gobj);
++#endif
+     Ground* gr = GET_GROUND(gobj);
+     HSD_JObj* jobj = GET_JOBJ(gobj);
+ 
+@@ -315,6 +395,9 @@ void grStadium_801D13E0(Ground_GObj* gobj)
      if (mobj == NULL) {
          gr->u.stadium.xCC = HSD_MemAlloc(0x50000);
      }
@@ -6272,7 +6311,79 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..743e28ff4d14d33ee35bbaf21ecbb137
      gr->u.stadium.xC4_b1 = false;
      gr->u.stadium.xD0 = NULL;
      gr->u.stadium.xD4 = 0.0F;
-@@ -346,6 +399,9 @@ bool grStadium_801D1518(Ground_GObj* gobj)
+@@ -326,17 +409,69 @@ void grStadium_801D13E0(Ground_GObj* gobj)
+     gr->u.stadium.xE8 = NULL;
+     var_r27 = yakumono_param->x4;
+     temp_r28 = yakumono_param->x0;
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (setup_capture) {
++        setup_observed_x4 = var_r27;
++        if (var_r27 == temp_r28) {
++            setup_seed_before_valid =
++                melee_web_match_rng_seed_owner_read(&setup_seed_before);
++        }
++    }
++#endif
+     if (var_r27 > yakumono_param->x0) {
+-        var_r27 = temp_r28 + randi(var_r27 - temp_r28);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++        if (setup_capture) {
++            setup_bound = var_r27 - temp_r28;
++            setup_seed_before_valid =
++                melee_web_match_rng_seed_owner_read(&setup_seed_before);
++            setup_result = randi(setup_bound);
++            setup_seed_after_valid =
++                melee_web_match_rng_seed_owner_read(&setup_seed_after);
++            setup_call_observed = 1;
++            var_r27 = temp_r28 + setup_result;
++        } else
++#endif
++        {
++            var_r27 = temp_r28 + randi(var_r27 - temp_r28);
++        }
+     } else if (var_r27 < temp_r28) {
+-        var_r27 += randi(temp_r28 - var_r27);
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++        if (setup_capture) {
++            setup_bound = temp_r28 - var_r27;
++            setup_seed_before_valid =
++                melee_web_match_rng_seed_owner_read(&setup_seed_before);
++            setup_result = randi(setup_bound);
++            setup_seed_after_valid =
++                melee_web_match_rng_seed_owner_read(&setup_seed_after);
++            setup_call_observed = 1;
++            var_r27 += setup_result;
++        } else
++#endif
++        {
++            var_r27 += randi(temp_r28 - var_r27);
++        }
++    }
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (setup_capture && !setup_call_observed) {
++        setup_seed_after_valid =
++            melee_web_match_rng_seed_owner_read(&setup_seed_after);
+     }
++#endif
+     gr->u.stadium.xD8 = var_r27;
+     gr->x11_flags.b012 = 1;
+     mpLib_800575B0(0x55);
+     mpLib_800575B0(0x6F);
+     Ground_801C10B8(gobj, fn_801D13C8);
+     gr->u.stadium.xC4_b0 = true;
++#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
++    if (setup_capture) {
++        melee_web_stage_last_stadium_setup_constructor_finish(
++            gobj, temp_r28, setup_observed_x4, var_r27,
++            setup_call_observed, setup_bound, setup_result,
++            setup_call_observed, setup_seed_before, setup_seed_before_valid,
++            setup_seed_after, setup_seed_after_valid);
++    }
++#endif
+ }
+ 
+ bool grStadium_801D1518(Ground_GObj* gobj)
+@@ -346,6 +481,9 @@ bool grStadium_801D1518(Ground_GObj* gobj)
  
  void grStadium_801D1520(Ground_GObj* gobj)
  {
@@ -6282,7 +6393,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..743e28ff4d14d33ee35bbaf21ecbb137
      Ground* gp = GET_GROUND(gobj);
      if (!gp->u.stadium.xC4_b0) {
          grStadium_801D4548(gobj);
-@@ -652,6 +708,38 @@ typedef struct ImageDescWrapper {
+@@ -652,6 +790,38 @@ typedef struct ImageDescWrapper {
      u16 x1A, x1C;
  } ImageDescWrapper;
  
@@ -6321,7 +6432,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..743e28ff4d14d33ee35bbaf21ecbb137
  #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
  
  void grStadium_801D1EF8(Ground_GObj* gobj)
-@@ -788,137 +876,5861 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
+@@ -788,137 +958,5861 @@ void grStadium_801D1EF8(Ground_GObj* gobj)
              }
              break;
          }
@@ -12293,7 +12404,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..743e28ff4d14d33ee35bbaf21ecbb137
  
  /// @todo can these inlines be merged?
  static inline int randi_between_2(int a, int b)
-@@ -1185,22 +6997,41 @@ HSD_GObj* grStadium_801D2BEC(void)
+@@ -1185,22 +7079,41 @@ HSD_GObj* grStadium_801D2BEC(void)
      PAD_STACK(4);
  
      gobj = GObj_Create(0x11, 0x13, 0);
@@ -12335,7 +12446,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..743e28ff4d14d33ee35bbaf21ecbb137
      text->win_dynamic_p->pos_z = 0.0F;
      hsd_text = text->win_dynamic_p;
      hsd_text->box_size_x = 250.0F;
-@@ -1214,11 +7045,21 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1214,11 +7127,21 @@ HSD_GObj* grStadium_801D2D78(void)
      ImageDescWrapper* wrapper;
  
      temp_r3 = GObj_Create(0x11, 0x12, 0);
@@ -12357,7 +12468,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..743e28ff4d14d33ee35bbaf21ecbb137
      wrapper->flag = true;
      return temp_r3;
  }
-@@ -1226,12 +7067,22 @@ HSD_GObj* grStadium_801D2D78(void)
+@@ -1226,12 +7149,22 @@ HSD_GObj* grStadium_801D2D78(void)
  HSD_GObj* grStadium_801D2E24(void)
  {
      HSD_GObj* gobj = GObj_Create(0x11, 0x12, 0);
@@ -12380,7 +12491,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..743e28ff4d14d33ee35bbaf21ecbb137
      wrapper->flag = false;
      return gobj;
  }
-@@ -1896,6 +7747,9 @@ bool grStadium_801D42B8(void)
+@@ -1896,6 +7829,9 @@ bool grStadium_801D42B8(void)
      if (gp->u.stadium.xC4_b1) {
          return false;
      }
@@ -12390,7 +12501,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..743e28ff4d14d33ee35bbaf21ecbb137
      gp->u.stadium.xD0 =
          grDatFiles_801C6478(gp->u.stadium.xCC, gp->u.stadium.xC8);
      return true;
-@@ -2093,6 +7947,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2093,6 +8029,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
              gp = GET_GROUND(map_gobj);
              HSD_ASSERT(0x99B, gp);
              gp->u.stadium.xC4_b1 = true;
@@ -12400,7 +12511,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..743e28ff4d14d33ee35bbaf21ecbb137
              lbFile_80016580(datfiles[var_r29], gp->u.stadium.xCC,
                              &gp->u.stadium.xC8, fn_801D4220, NULL);
              temp_r31->u.stadium.xDC = 1;
-@@ -2221,6 +8078,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
+@@ -2221,6 +8160,9 @@ void grStadium_801D4548(Ground_GObj* gobj)
          if (temp_r31->u.stadium.xDE == 5) {
              temp_r31->u.stadium.xD8 =
                  randi_between_2(yakumono_param->x0, yakumono_param->x4);

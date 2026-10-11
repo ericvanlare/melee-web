@@ -84,6 +84,13 @@ static int owned(MeleeWebMatchContext* h,char* e,size_t n)
 }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include "gameplay_hud.h"
+int melee_web_match_rng_seed_owner_read(uint32_t* seed)
+{
+    char error[96];
+    if(!seed||!owned(owner,error,sizeof(error)))return 0;
+    *seed=owner->seed;
+    return 1;
+}
 static int camera_index(MeleeWebMatchContext* h,const CmSubject* p)
 {
     uintptr_t base=(uintptr_t)h->pool, address=(uintptr_t)p;

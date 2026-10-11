@@ -91,6 +91,8 @@ public:
         MeleeWebStadiumGoAlignmentSnapshot*,char*,size_t) const;
     bool diagnostic_stadium_idle_snapshot(
         MeleeWebStadiumIdleSnapshot*,char*,size_t) const;
+    bool diagnostic_stadium_setup_snapshot(
+        MeleeWebStadiumSetupSnapshot*,char*,size_t) const;
 #endif
     void initialize_match(const StartMeleeData&);
     MeleeWebMatchContext* take_match_context();

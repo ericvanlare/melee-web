@@ -308,7 +308,7 @@ struct FirstSssVsSetupState {
  const uint32_t* parent_seed_owner=nullptr;
  uint32_t parent_seed=0,parent_seed_after_retirement=0;
  bool parent_seed_restored=false;
- std::string error,actual,history;
+ std::string error,actual,history,stadium_setup_state;
 };
 FirstSssVsSetupState first_sss_vs_setup;
 struct FirstSssTextTailProbeState {
@@ -458,6 +458,7 @@ std::string first_sss_vs_setup_json(){
     <<",\"source_frames_scope\":\"actual_match_flow_clock_not_original_scene_frame\""
     <<",\"current_owners\":"<<first_sss_vs_setup_current_json()
     <<",\"actual\":"<<(s.actual.empty()?"null":s.actual)
+    <<",\"stadium_setup_state\":"<<(s.stadium_setup_state.empty()?"null":s.stadium_setup_state)
     <<",\"error\":"<<(s.error.empty()?"null":first_css_browser_draw_json_quote(s.error));
  if(first_sss_text_tail_probe.opted_in)
   out<<",\"text_tail_probe\":"<<first_sss_text_tail_probe_json();
@@ -2560,6 +2561,43 @@ bool first_sss_vs_setup_service(){
       std::ostringstream out;out<<"{\"phase\":\"vs_setup\",\"random_seed_hex\":\""
        <<melee_web::stadium_first_css_diagnostic::hex32(match->random_seed())<<"\",\"start\":";
       melee_web::stadium_first_css_diagnostic::write_start(out,match->start_data());out<<'}';
+      MeleeWebStadiumSetupSnapshot setup{};char setup_error[256]{};
+      const bool setup_captured=match->diagnostic_stadium_setup_snapshot(
+          &setup,setup_error,sizeof(setup_error));
+      check(setup_captured,setup_error[0]?setup_error:
+            "Stadium Setup state receipt refused its exact owner boundary");
+      std::ostringstream setup_json;
+      setup_json<<"{\"schema\":\"melee-web-stadium-zero-tick-setup-state-v1\""
+        <<",\"world_generation\":"<<setup.world_generation
+        <<",\"world_ticks\":"<<setup.world_ticks
+        <<",\"source_frame\":"<<setup.source_frame
+        <<",\"map_id\":"<<setup.map_id
+        <<",\"initial_countdown\":"<<setup.initial_countdown
+        <<",\"current_countdown\":"<<setup.current_countdown
+        <<",\"parameter_x0\":"<<setup.parameter_x0
+        <<",\"parameter_x4\":"<<setup.parameter_x4
+        <<",\"constructor_callback_count\":"
+        <<setup.constructor_callback_count
+        <<",\"constructor_randi_call_count\":"
+        <<setup.constructor_randi_call_count
+        <<",\"constructor_randi_scope\":\"existing_inline_grStadium_randi_call\""
+        <<",\"constructor_randi_bound\":"
+        <<(setup.constructor_random_bound_valid?std::to_string(setup.constructor_random_bound):"null")
+        <<",\"constructor_randi_result\":"
+        <<(setup.constructor_random_result_valid?std::to_string(setup.constructor_random_result):"null")
+        <<",\"source_seed_before_hex\":\""
+        <<melee_web::stadium_first_css_diagnostic::hex32(setup.source_seed_before)
+        <<"\",\"source_seed_after_hex\":\""
+        <<melee_web::stadium_first_css_diagnostic::hex32(setup.source_seed_after)
+        <<"\",\"ground_source_heap_handle\":"<<setup.ground_source_heap_handle
+        <<",\"ground_requested_bytes\":"<<setup.ground_requested_bytes
+        <<",\"ground_allocation_generation\":"<<setup.ground_allocation_generation
+        <<",\"object_source_heap_handle\":"<<setup.object_source_heap_handle
+        <<",\"object_requested_bytes\":"<<setup.object_requested_bytes
+        <<",\"object_allocation_generation\":"<<setup.object_allocation_generation
+        <<",\"source_parameter_roots_agree\":"
+        <<(setup.source_parameter_roots_agree?"true":"false")<<'}';
+      s.stadium_setup_state=setup_json.str();
       s.actual=out.str();s.captured=true;s.complete=true;
       first_sss_text_tail_capture_membership();
       if(first_sss_text_tail_probe.opted_in){
