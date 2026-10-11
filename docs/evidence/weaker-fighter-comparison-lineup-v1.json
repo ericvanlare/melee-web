@@ -105,7 +105,7 @@
   },
   "fighters": {
     "sheik": {
-      "status": "original_items_menu_failure_reduced_transform_unverified",
+      "status": "original_source_transform_prefix_report_raw_review_and_fullsuite_pass",
       "source_checkpoint_commit": "0b3847ee3f69ef031decc3f2ccc9c37227bd4302",
       "checkpoint_tree": "3fe9fc0b8de2300cf7735e477b60605ff3bb2737",
       "plan": {
@@ -114,13 +114,23 @@
       },
       "source_identity": "CSS CKIND Zelda 18 creates distinct FTKIND Zelda 19 and Sheik 7 entities; pass requires transformed-index active-owner transition 19->7, not dormant kind 7",
       "gaps": [
-        "transform mode is not wired to CSS/SSS live-owner readiness barriers",
-        "cold-boot pre-match/attract teardown must not fail before accepted VS entry; in-match teardown must still fail before prefix completion",
-        "no native original capture, browser replay, or comparison"
+        "strict original-versus-candidate comparison preparation and execution remain separate and unrun",
+        "browser replay, full-fighter, full-match, pixels, audio/PCM, physical-input and timing gates remain open"
       ],
-      "current_driver_source": "e7e1ec280b112c4a76a24d80d0e895b694674ee6",
-      "current_native_source": "7d3ce19753ac9aa03159539df20624ef3c18c809",
-      "current_result": "Retained Items-menu first failure before setup; consumed Up and neutral observed, entry-lock cause inferred from source because lock field was not recorded."
+      "current_driver_source": "1759090f2f2ce9e88ced9115a284947f29002e73",
+      "current_native_source": "d4042ea630a7f0a19167f1099b0b8999535c6b8d",
+      "current_result": "Original Zelda-to-Sheik source-owner prefix report, independent raw review and full regression passed. This does not establish browser comparison or full-fighter/match accuracy.",
+      "historical_checkpoint_before_2026_10_11": {
+        "status": "original_items_menu_failure_reduced_transform_unverified",
+        "current_driver_source": "e7e1ec280b112c4a76a24d80d0e895b694674ee6",
+        "current_native_source": "7d3ce19753ac9aa03159539df20624ef3c18c809",
+        "current_result": "Retained Items-menu first failure before setup; consumed Up and neutral observed, entry-lock cause inferred from source because lock field was not recorded.",
+        "gaps": [
+          "transform mode is not wired to CSS/SSS live-owner readiness barriers",
+          "cold-boot pre-match/attract teardown must not fail before accepted VS entry; in-match teardown must still fail before prefix completion",
+          "no native original capture, browser replay, or comparison"
+        ]
+      }
     },
     "jigglypuff": {
       "status": "setup_and_184_source_ticks_through_60_clock_advances_compared",
@@ -348,7 +358,7 @@
     "Historical source inventory and Peach work acquired no new original recording. The later independently captured Jiggly/Ice Ready prefix and paired browser comparison are separately bound in entity_prefix_ready_comparison.",
     "Jigglypuff and Ice Climbers source intervals are not browser comparisons.",
     "Both historical and current Peach results are setup-plus-184-tick incomplete comparisons; neither covers a full fighter, match or session.",
-    "Sheik has no native capture or browser replay.",
+    "At the earlier Sheik checkpoint there was no native capture; the later bounded original source-owner prefix is recorded in latest_sheik_original_transform_2026_10_11. No browser replay or strict candidate comparison is established.",
     "No full-fighter or whole-session acceptance is established."
   ],
   "harness_cleanup": {
@@ -974,5 +984,321 @@
       "result_sha256": "e2f9ddbc2cbe1eaf80ffad301be9ddf8f3a8f2238a09d9500d60fe26c020ae73",
       "post_source_clean": true
     }
+  },
+  "latest_sheik_original_transform_2026_10_11": {
+    "issue": 304,
+    "date": "2026-10-11",
+    "status": "original_source_owner_prefix_and_fullsuite_pass",
+    "collector": {
+      "head": "1759090f2f2ce9e88ced9115a284947f29002e73",
+      "tree": "4cb2af7476dae55fc770a7b8a338094cb7341f82",
+      "source_files": [
+        {
+          "path": "tools/sheik_transform_prefix.py",
+          "bytes": 46785,
+          "sha256": "f2d7d13ba98865098044e95b2ddb833a62ae09f9a648e9f524cd94f8dcce2026"
+        },
+        {
+          "path": "tests/test_sheik_transform_prefix.py",
+          "bytes": 42787,
+          "sha256": "21f07d3514a7bde25844cce3a1165ced1f1152a36348681a55847757b5e15c53"
+        },
+        {
+          "path": "tests/test_sheik_transform_capture_driver.py",
+          "bytes": 31509,
+          "sha256": "a25a4cc989e25ba33fba6a70358e5c98d4f4828014b7443efa6a3db8467ae4df"
+        }
+      ],
+      "note": "Python sentinel decoder/fixture revision; independent of the native producer source."
+    },
+    "native_producer": {
+      "source_head": "d4042ea630a7f0a19167f1099b0b8999535c6b8d",
+      "source_tree": "f2a0afc236646b31f1bfc2e3bcd76d28d5a899f6",
+      "binary": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/native-items-lock-v1/build/Binaries/dolphin-emu-nogui",
+        "bytes": 17124560,
+        "sha256": "971e952ba59d28d7fe257bd8512465b06fc4a10d55141207f9b933dcfe062b31"
+      },
+      "manifest": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/native-items-lock-v1/artifact/build-manifest.json",
+        "bytes": 4418,
+        "sha256": "a1ca454e58f628832e77e4968a4f924fca3d2da4d9322ca65bca6851389f9770"
+      },
+      "note": "Successful d4042 producer retained unchanged; the 1759090 Python collector did not relabel or rebuild it."
+    },
+    "items_readiness_only": {
+      "decision": "PASS_ORIGINAL_ITEMS_READINESS_ONLY",
+      "root_report_cleanup_decision": "REPORT_AND_CLEANUP_PASS_PENDING_INDEPENDENT_RAW_REVIEW",
+      "source_head": "d4042ea630a7f0a19167f1099b0b8999535c6b8d",
+      "report": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/items-lock-coldboot-v1/report.json",
+        "bytes": 44127,
+        "sha256": "3f3f8a93a7abf8c977565dbd768a75a9ab63b9a90455492e8ce262aa17259880"
+      },
+      "observer": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/items-lock-coldboot-v1/observer.bin",
+        "bytes": 800503,
+        "sha256": "67407db75bcb132fb69b5dd2738e366c9f45bb359907f04498c06e40a8071111"
+      },
+      "mwri": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/items-lock-coldboot-v1/inputs.mwri",
+        "bytes": 98696,
+        "sha256": "111e40ed11f50542897bbd3be83fbc2f9b3572c3fe586af07111b6e810ed2524"
+      },
+      "root_review": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/root-items-capture-review-v1.json",
+        "bytes": 2077,
+        "sha256": "93b22aed806aa093dd224059d22115f9f3e15ae43428b18ccc55083ad10697b9"
+      },
+      "sol_raw_review": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/sol-items-capture-review-v1.json",
+        "bytes": 29501,
+        "sha256": "a3e9042bfcb44c17b551910861b38e42c7f00459f8b07a4a65fcba9a7d2adbe6"
+      },
+      "observed_boundaries": {
+        "lock_1": 711,
+        "lock_0": 729,
+        "authored_up": 744,
+        "row_31": 745,
+        "neutral_release": 746,
+        "terminal_poll": 747
+      },
+      "claims": {
+        "active_sheik_grounded_neutral_prefix": false,
+        "consumed_neutral_release": true,
+        "draw_or_browser_equivalence": false,
+        "items_readiness_only": true,
+        "match_complete": false,
+        "original_css_sss_setup": false,
+        "source_consumed_down_b_y_minus_80": false
+      },
+      "scope": "Items entry readiness only; it does not establish CSS/SSS setup or gameplay."
+    },
+    "sss_index30_first_failure_and_reduction": {
+      "capture_failure": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/full-transform-coldboot-v1/failure.json",
+        "bytes": 169,
+        "sha256": "469e306c2b5520cd516f9acf3ae4cde54a9cd2509418c981e9b084bf6d0491e3"
+      },
+      "root_failure_summary": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/root-full-transform-failure-v1.json",
+        "bytes": 2912,
+        "sha256": "5877edfee31024ddd615d36f90f65f683ce6742a1c8036403ddb3662bc36c141"
+      },
+      "failure": "Rules menu source predicate/cap failed: SSS constructor-owned readiness",
+      "raw_reducer": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/full-transform-first-failure-v1/reduce_sentinel_boundary.py",
+        "bytes": 12090,
+        "sha256": "3aa98f75a0b1d5308d18efd41f775f77cfdf5e47dfe080bae593ac11bb613d5c"
+      },
+      "reduction": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/full-transform-first-failure-v1/reduction.json",
+        "bytes": 17212,
+        "sha256": "17aec6d99320d779d9fdca86ca4f5af42057c210b65b65e8ae18d97dde6ac3bd"
+      },
+      "reduction_execution": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/full-transform-first-failure-v1/reduction-execution.json",
+        "bytes": 1279,
+        "sha256": "a1bcff217d640a03d908e549adc552a61fd4b6e363557585acf5acd02114ee34"
+      },
+      "reduced_source_facts": {
+        "first_index_hex": "1e",
+        "first_index_sequence": 1286,
+        "first_index_source_tick": 1,
+        "first_scene_hex": "09",
+        "routing_hex": "020201010000",
+        "stage_kind_observed": false,
+        "old_decoder_result": null,
+        "route_mode2_index30_rows": 609,
+        "scene9_rows_total": 643,
+        "mode2_index30_kind_present_rows": 0
+      },
+      "repair": {
+        "patch_sha256": "e6482719503120350d703790ee13a12215df724927f11d6b92f4b91c74fb5102",
+        "focused_controls": {
+          "tests": 36,
+          "failures": 0,
+          "errors": 0,
+          "exit_code": 0
+        },
+        "scope": "Python constructed-SSS index30/noKind sentinel only; exactrouting/index addresses and selected indexedkind remainstrict; no native/input/cap/FDguard changes.",
+        "sol_freeze": {
+          "path": "runs/sheik-original-transform-20261011-145724-75da5333/sol-sss-sentinel-repair-v1/freeze.json",
+          "bytes": 2841,
+          "sha256": "bcc7cf74df80f32df80ec656c5e32840336ff6a5fcd5cd01eeb9726dcf10591b"
+        },
+        "root_review": {
+          "path": "runs/sheik-original-transform-20261011-145724-75da5333/root-sss-sentinel-review-v1.json",
+          "bytes": 724,
+          "sha256": "b16eae1d8efc9b03f3cef564811a2deef6eb719aaaafe98e87dc210398ef64fd"
+        },
+        "root_decision": "APPROVE_BOUNDED_REPAIR_FOR_ONE_FRESH_CAPTURE",
+        "raw_row_fixture": {
+          "path": "runs/sheik-original-transform-20261011-145724-75da5333/sol-sss-sentinel-repair-v1/actual-row1286.json",
+          "bytes": 4071,
+          "sha256": "53d68ae861275f6c127bda47b5fa99c55b3b8b8386b7c61117769991337c364b"
+        }
+      }
+    },
+    "full_transform_prefix": {
+      "decision": "PASS_ORIGINAL_ZELDA_TO_SHEIK_SOURCE_PREFIX_ONLY",
+      "scope": "Original source-only exact menu/setup/input/entity ownership prefix; no browser/port comparison, pixels/PCM/live timing, full match or fighter breadth acceptance. Full regression subsequently passed; see validation.full_suite for its exact result.",
+      "report": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/full-transform-coldboot-v2/report.json",
+        "bytes": 403897,
+        "sha256": "c1a84d0320b88bb6717eb05e895f457cfc4f91a7333ecf4ceb39ca4616bff021"
+      },
+      "mwro": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/full-transform-coldboot-v2/observer.bin",
+        "bytes": 2593408,
+        "sha256": "9a035d5637739644bb6ec1c501aa1fcb06bebe2987483c6bc697ad9beb238df8"
+      },
+      "mwri": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/full-transform-coldboot-v2/inputs.mwri",
+        "bytes": 238776,
+        "sha256": "4aff3fe20fb592a6e46cad20a4f7b4bfe80ec64a922d211123a19e20034a7b1d"
+      },
+      "input_intentions": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/full-transform-coldboot-v2/input-intentions.jsonl",
+        "bytes": 52454,
+        "sha256": "9585490d53a8dfceb176936fbba9dfe618d9b5e1fd8ae69bbcaba6499ccbc25a"
+      },
+      "observer_status": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/full-transform-coldboot-v2/observer-status.json",
+        "bytes": 138,
+        "sha256": "efbd2ab7b2b2e4f6f31ec86e4b1d6d6495aabd341ad05781c04761f4155c7f2e"
+      },
+      "input_status": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/full-transform-coldboot-v2/input-status.json",
+        "bytes": 89,
+        "sha256": "1b0ad189c82f5afcd36e92165b17cd6fcf4171d53c04c37383ffe1a11950a894"
+      },
+      "cleanup": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/full-transform-coldboot-v2/cleanup.json",
+        "bytes": 142,
+        "sha256": "c2f347efb42bc59c3908c39636afc628ee42f0e4050a7f86e829f3d9fd56bd68"
+      },
+      "log_cleanup": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/full-transform-coldboot-v2/owned-log-cleanup.json",
+        "bytes": 128,
+        "sha256": "b0793d96682c9eac57c77cb0292df9eaca59f5c1be74c04b140bf14da34b2381"
+      },
+      "root_report_cleanup_review": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/root-full-transform-review-v2.json",
+        "bytes": 3006,
+        "sha256": "b9c1d71574ff0aaf1c1f479d8e2e38f920235ad3f7e13efa199268772c8c7849"
+      },
+      "independent_raw_review": {
+        "path": "runs/sheik-original-transform-20261011-145724-75da5333/sol-full-transform-capture-v2-review.json",
+        "bytes": 141182,
+        "sha256": "bda9167087fa6ae53a049fd3bf438f8e3e1ede4df2d252046821ff59ad7641de"
+      },
+      "independent_review_result": {
+        "decision": "PASS_ORIGINAL_ZELDA_TO_SHEIK_SOURCE_PREFIX_ONLY",
+        "independent_validator": "pass",
+        "live_receiver_replayed_equal": true,
+        "frozen_records_equal": 45,
+        "owned_pids_checked_absent": 3
+      },
+      "observed_input_and_owner": {
+        "setup_sequence": 1864,
+        "down_b_consumed_sequence": 2204,
+        "down_b_first_neutral_release_sequence": 2210,
+        "down_b_p1_literal_hex": "020000b000000000000000",
+        "p2_neutral": true,
+        "active_transition": {
+          "before_sequence": 1866,
+          "before_active_kind": 19,
+          "after_sequence": 2334,
+          "after_active_kind": 7,
+          "after_active_entity_index": 1
+        },
+        "grounded_neutral": {
+          "entity_ordinals": [
+            0,
+            1
+          ],
+          "fighter_kinds": [
+            19,
+            7
+          ],
+          "active_entity_index": 1,
+          "active_kind": 7,
+          "active_motion": 14,
+          "active_ground_air": 0
+        },
+        "grounded_neutral_sequence": 2412,
+        "p3_p4_disconnected": true,
+        "source_tick_rows": {
+          "count": 183,
+          "first": 0,
+          "last": 182,
+          "includes_entry_and_ready": true,
+          "meaning": "Source-tick observation rows; not active gameplay-frame count or elapsed 60 Hz time."
+        }
+      },
+      "claims": {
+        "active_sheik_grounded_neutral_prefix": true,
+        "consumed_neutral_release": true,
+        "draw_or_browser_equivalence": false,
+        "items_readiness_only": false,
+        "match_complete": false,
+        "original_css_sss_setup": true,
+        "source_consumed_down_b_y_minus_80": true
+      },
+      "raw_stream_status": {
+        "records": 2414,
+        "observer_completed": true,
+        "mwri_events": 5968,
+        "mwri_complete": true,
+        "root_review_decision_at_report_cleanup": "REPORT_AND_CLEANUP_PASS_PENDING_INDEPENDENT_RAW_REVIEW"
+      },
+      "scope_limits": [
+        "No browser or candidate-port comparison",
+        "No full-fighter or full-match result",
+        "No pixel, audio/PCM, physical-input, foreground timing or performance acceptance"
+      ],
+      "completion_semantics": "Bounded diagnostic writers completed; the report claim match_complete=false."
+    },
+    "validation": {
+      "sentinel_repair_focused_controls": {
+        "tests": 36,
+        "failures": 0,
+        "errors": 0,
+        "exit_code": 0
+      },
+      "independent_full_raw_review": {
+        "status": "PASS",
+        "receipt": {
+          "path": "runs/sheik-original-transform-20261011-145724-75da5333/sol-full-transform-capture-v2-review.json",
+          "bytes": 141182,
+          "sha256": "bda9167087fa6ae53a049fd3bf438f8e3e1ede4df2d252046821ff59ad7641de"
+        }
+      },
+      "full_suite": {
+        "status": "PASS",
+        "source_head": "1759090f2f2ce9e88ced9115a284947f29002e73",
+        "tests": 2324,
+        "skipped": 153,
+        "failures": 0,
+        "errors": 0,
+        "exit_code": 0,
+        "seconds": 501.3159910000395,
+        "source_unchanged": true,
+        "receipt": {
+          "path": "runs/sheik-original-transform-20261011-145724-75da5333/full-suite-result-v1.json",
+          "bytes": 7910,
+          "sha256": "04c00662fa96ca31a5023e37b03073d6db02f24743c44c181b8f875f5f7546d3"
+        },
+        "log": {
+          "path": "runs/sheik-original-transform-20261011-145724-75da5333/full-suite-v1.log",
+          "bytes": 425630,
+          "sha256": "14de2045e02cd0ac4a18c82e358d805ee6bd4b2d4c44854ac0c4122b747fed0a"
+        }
+      }
+    },
+    "current_next_boundary": "Keep strict original-versus-candidate comparison as a separate boundary; this original source-owner prefix does not establish browser or full-fighter accuracy.",
+    "roadmap_reference": "../ROADMAP.md#current-priorities",
+    "issue_reference": "https://github.com/ericvanlare/melee-web/issues/304"
   }
 }
