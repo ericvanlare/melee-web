@@ -7,14 +7,17 @@ import {observeDesiredSourcePad} from '../scripts/a3_local_room_full_route.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 // Component-only source polling fixture. No native input or browser evidence.
 class Page extends EventEmitter {
-  constructor({sampleAfter=100,predicateError=false}={}) {
+  constructor({sampleAfter=100,predicateError=false,localPort=0}={}) {
     super();this.events=[];this.held=new Set();this.captures=[];
-    this.waitDurations=[];this.sampleAfter=sampleAfter;this.predicateError=predicateError;this.pendingObservers=0;
+    this.waitDurations=[];this.sampleAfter=sampleAfter;this.predicateError=predicateError;
+    this.localPort=localPort;this.pendingObservers=0;
     this.keyboard={down:async key=>{
       this.events.push('down:'+key);this.held.add(key);
       if(!this.sourceTimer)this.sourceTimer=setTimeout(()=>{
-        this.captures.push({source_cursor:10,input_tick:10,local_port:0,poll_serial:1,
-          bytes:[this.held.has('Delete')?4:this.held.has('j')?1:0,0,this.held.has('d')?127:0,0,0,0,0,0,0,0,0]});
+        this.captures.push({source_cursor:10,input_tick:10,local_port:this.localPort,poll_serial:1,
+          bytes:[this.held.has('Delete')?4:this.held.has('j')?1:
+            [...this.held].some(key=>key==='Enter'||key==='End')?0x10:0,
+          0,this.held.has('d')?127:0,0,0,0,0,0,0,0,0]});
       },sampleAfter);
     },up:async key=>{this.events.push('up:'+key);this.held.delete(key);}};
   }
@@ -47,6 +50,37 @@ test('fixed40ms press can miss a100ms source polling gap',async()=>{
     assert.equal(page.captures.length,1);assert.equal(page.captures[0].bytes[2],0);
     assert.equal(page.pendingObservers,0);assert.equal(page.held.size,0);
   } finally {driver.dispose();page.dispose();}
+});
+
+test('fixed160ms Results Enter/End can end before the next source sample',async()=>{
+  for(const [key,port] of [['Enter',0],['End',1]]) {
+    const page=new Page({sampleAfter:220,localPort:port}),driver=createBrowserDriver(page,{timeoutMs:1000});
+    try {
+      await driver.pressChord([key],{holdMs:160,releaseMs:0});
+      await pause(80);
+      assert.equal(page.captures.length,1);
+      assert.equal(page.captures[0].local_port,port);
+      assert.equal(page.captures[0].bytes[0],0,
+        `${key} was released before the synthetic source capture boundary`);
+      assert.equal(page.held.size,0);
+    } finally {driver.dispose();page.dispose();}
+  }
+});
+
+test('Results Enter/End remain held through the first actual desired source PAD row',async()=>{
+  for(const [key,port] of [['Enter',0],['End',1]]) {
+    const page=new Page({sampleAfter:220,localPort:port}),driver=createBrowserDriver(page,{timeoutMs:1000});
+    try {
+      const result=await driver.pressChord([key],{holdMs:160,releaseMs:0,
+        observeBeforeRelease:{predicate:observeDesiredSourcePad,
+          arg:{inputFrom:10,port,expected:{button:0x1000}},timeoutMs:500}});
+      assert.deepEqual(result.bytes,[0x10,0,0,0,0,0,0,0,0,0,0]);
+      assert.equal(result.local_port,port);assert.equal(result.source_cursor,result.input_tick);
+      assert(page.events.indexOf('observer-joined')<page.events.indexOf(`up:${key}`));
+      assert(page.events.indexOf('handle-disposed')<page.events.indexOf(`up:${key}`));
+      assert.equal(page.pendingObservers,0);assert.equal(page.held.size,0);
+    } finally {driver.dispose();page.dispose();}
+  }
 });
 
 test('observed press holds to first actual desired readback then disposes observer before release',async()=>{
