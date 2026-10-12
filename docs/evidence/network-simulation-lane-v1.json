@@ -48,6 +48,35 @@
       "first_failure": "Beta UI Leave did not confirm teardown; queued live input177 failed on the closing relay socket and became a sticky protocol error. Native quiescence was separately verified.",
       "owner_cleanup_passed": true,
       "process_observation_passed": true
+    },
+    {
+      "name": "css-moderate-2-suite/css-moderate",
+      "runtime_producer": "25a359b554bf6197ba8951944301aef947b993e7",
+      "capture_source": "25a359b554bf6197ba8951944301aef947b993e7",
+      "wasm_sha256": "ac040da08503744d27d4bc0ed2959ed631dd94ef1289e2efb76f0d1c917998c0",
+      "browser_report_sha256": "c53b6d1013a3bcbf79cf2d0abbced90392339380f536e99a173dedbeedf9e8ce",
+      "owner_report_sha256": "6e70a32f76a5c6e1fca5b74874159e2164980d49e54b9f8b0874b4b01a35a8fa",
+      "independent_review": "sol-css-moderate-2-review.json",
+      "independent_review_sha256": "987b6ef2e4704bf135167958fef51729cf4d105d0b5796ee26827db4b8da96a0",
+      "common_64_byte_checksums": 173,
+      "source_tick_range": [
+        0,
+        172
+      ],
+      "unpaired_tails": {
+        "alpha": 5,
+        "beta": 4
+      },
+      "first_failure": {
+        "kind": "protocol",
+        "reason": "Asynchronous browser-local input 180 failed: Room relay WebSocket is closed",
+        "tick": 180
+      },
+      "cancelled_outbound_sends": [],
+      "cancelled_publications": [],
+      "owner_cleanup_passed": true,
+      "process_observation_passed": true,
+      "disposition": "Retained failure. CLOSING interval requires a smaller reducer before another capture."
     }
   ],
   "profile": {
@@ -71,7 +100,7 @@
   ],
   "retention": "Failed browser profiles, full raw reports, process traces, first proxy controls/reducers and review receipts retained externally; no retroactive pass.",
   "disconnect_repair": {
-    "decision": "COMPONENT_CONTROLS_PASS_BROWSER_PENDING",
+    "decision": "COMPONENT_CONTROLS_PASS_BROWSER_RETRY_FAILED",
     "base_source": "df52969132a0c0ad0bf7664c3cd44192320255ed",
     "receipt": "RUN/disconnect-repair-v1/review.json",
     "receipt_sha256": "c2ba7f038520870d0779c4c81b82512c2647831ca8a1ab5a13593d8a5cb22549",
@@ -92,6 +121,17 @@
     "independent_review": {
       "file": "sol-disconnect-repair-review-v1.json",
       "sha256": "d3797c2ba3082a941a7beeb6fa05d528221a483c6fdd9e43fd976db0f817313a"
+    },
+    "required_validation": {
+      "source": "25a359b554bf6197ba8951944301aef947b993e7",
+      "receipt": "m1-validation.json",
+      "receipt_sha256": "865305b4f550099ae16e29b8c92dd08f0774945a019d9038a8155ae0ab078ffe",
+      "release_runtime_build": "PASS",
+      "full_regression": {
+        "tests": 2336,
+        "skips": 166,
+        "decision": "PASS"
+      }
     }
   },
   "suite_runner": {
@@ -99,6 +139,27 @@
     "review": "sol-suite-runner-review-v2.json",
     "review_sha256": "ff979835e448130663db0572ea5c7b7516b19fdc38f713e590f6f25ad03ff718",
     "policy_tests": 2,
-    "execution": "plan-only; no additional browser result"
+    "execution": "One actual css-moderate scenario; correctly stopped at retained browser failure; no subsequent scenario or automatic retry"
+  },
+  "closing_interval_repair": {
+    "decision": "REVIEWED_COMPONENT_CONTROLS_PASS_BROWSER_PENDING",
+    "base_source": "25a359b554bf6197ba8951944301aef947b993e7",
+    "receipt": "sol-closing-send-repair-v1/shared-wait-v2/freeze.json",
+    "receipt_sha256": "a8cdd322b3f6347ecadfa76c0247c2d8779443a840f1cf54cee89b19feb76f11",
+    "source_files_sha256": {
+      "scripts/net_lockstep_websocket_relay.mjs": "9d0592060a3e385fe6d895bd73c8ec019346a95ce2fb0efa21b6da9be865865f",
+      "tests/net_lockstep_browser_peer_disconnect_race.test.mjs": "bb1682337882cc723fc2464aff6d2e4ac69700a775f202f3059774fb383061b1"
+    },
+    "focused_node_tests": 138,
+    "focused_python_wrappers": 1,
+    "root_review": "root-closing-repair-review.json",
+    "root_review_sha256": "a4ba6edd3b67249b630acf2925020d45b35cb79703d1479eccb751ffb3fb50e5",
+    "behavior": "One existing-timeout physical-close promise shared by all queued CLOSING send refusals; rejection remains cached. Queue capacities remain enforced, no inbound-chain join, typed cancellation only after CLOSED; startup/timeout/error remain strict.",
+    "retention_limitations": [
+      "initial red log inadvertently overwritten, disclosed in pre-fix-failure.json; separate exact-source red replay retained",
+      "new sharedwait fixture nonJSONpreparationfailure retained separately from behavioralred"
+    ],
+    "actual_red_replay": "sol-closing-send-repair-v1/red-replay.log",
+    "actual_red_replay_sha256": "e21bb43a450efa62651dc02f06074554ead9e7389e99191b00ee836fd2153ced"
   }
 }

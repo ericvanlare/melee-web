@@ -24,9 +24,14 @@ Real WebSocket reducers now cover publication before and after the disconnect
 callback, queued input, inbound acknowledgements and native-progress sends.
 The repair retains exact sampled inputs and records cancelled packet attempts;
 another packet may already have carried the same input. Genuine transport and
-input errors remain failures. Focused controls pass, with the full validation
-and repaired browser result still pending. The existing Leave, checksum and
-native cleanup guards stay intact before another bounded browser run.
+input errors remain failures. Focused controls, the Release build and full regression pass, but the repaired
+browser retry still fails at the same Leave boundary. Its cancellation lists
+remain empty. An actual remote close-frame/held-FIN reducer reproduces the omitted
+`CLOSING` interval. The reviewed endpoint repair waits only for physical socket
+closure and shares one existing timeout across queued refusals. Startup, timeout
+and transport errors remain sticky. Focused controls pass; the second repair
+still needs the full validation and a new browser result. Existing Leave,
+checksum and native cleanup guards remain intact.
 
 The receipt retains the earlier proxy half-close/read-buffer failures and the
 independently identified shared-counter bug through the external evidence

@@ -38,11 +38,11 @@ function stateWithRemoteInput() {
     unacknowledged: [{tick: 0, pad: Buffer.alloc(11).toString('base64')}], delayed_checksums: []});
 }
 
-async function startServer({includeRemoteInput = false} = {}) {
+async function startServer({includeRemoteInput = false, omitReady = false, holdRemoteFin = false} = {}) {
   const sockets = new Set();
   const fixtureErrors = [];
   const peers = new Set();
-  const server = createServer((_request, response) => response.writeHead(404).end());
+  const server = createServer({allowHalfOpen: holdRemoteFin}, (_request, response) => response.writeHead(404).end());
   server.on('upgrade', (request, socket) => {
     const key = request.headers['sec-websocket-key'];
     if (typeof key !== 'string') { fixtureErrors.push('missing WebSocket key'); socket.destroy(); return; }
@@ -55,7 +55,7 @@ async function startServer({includeRemoteInput = false} = {}) {
     socket.on('close', () => sockets.delete(socket));
     const hello = JSON.stringify({type: 'hello', version: LOCKSTEP_VERSION, role: 'beta',
       local_port: 1, remote_port: 0, agreement});
-    const packets = [READY, hello, ...(includeRemoteInput ? [stateWithRemoteInput()] : [])];
+    const packets = omitReady ? [] : [READY, hello, ...(includeRemoteInput ? [stateWithRemoteInput()] : [])];
     socket.write(Buffer.concat(packets.map(packet => frame(1, packet))));
     socket.on('error', error => fixtureErrors.push(String(error?.message || error)));
   });
@@ -66,12 +66,13 @@ async function startServer({includeRemoteInput = false} = {}) {
   return {
     url: `ws://127.0.0.1:${server.address().port}`,
     fixtureErrors,
-    closeRemote(code = 4001) {
+    closeRemote(code = 4001, {holdFin = false} = {}) {
       const payload = Buffer.alloc(2);
       payload.writeUInt16BE(code);
       for (const socket of sockets) socket.write(frame(8, payload));
-      for (const socket of sockets) socket.end();
+      if (!holdFin) for (const socket of sockets) socket.end();
     },
+    finishRemoteClose() { for (const socket of sockets) socket.end(); },
     destroyRemote() { for (const socket of peers) socket.destroy(); },
     sendPacket(packet) {
       for (const socket of peers) socket.write(frame(1, packet));
@@ -170,10 +171,10 @@ function createPeer(server, {holdStateSend = false, holdEmptyState = false,
     get endpoint() { return endpoint; }};
 }
 
-async function startCase({includeRemoteInput = false, holdStateSend = false,
+async function startCase({includeRemoteInput = false, holdStateSend = false, holdRemoteFin = false,
   holdEmptyState = false, holdSourceTickTwo = false, failStateSend = false,
   checksumTickZero = false} = {}) {
-  const server = await startServer({includeRemoteInput});
+  const server = await startServer({includeRemoteInput, holdRemoteFin});
   const peer = createPeer(server, {holdStateSend, holdEmptyState, holdSourceTickTwo,
     failStateSend, checksumTickZero});
   await peer.controller.rpc('start', [agreement]);
@@ -505,5 +506,141 @@ test('transport error remains sticky after the real socket also closes', async (
       try { await run.controller.close({mode: 'fatal'}); } catch {}
       await run.server.close();
     }
+  }
+});
+
+
+test('CLOSING state publication waits for physical close, not inbound disconnect settlement', async () => {
+  const OriginalWebSocket = globalThis.WebSocket;
+  let socket;
+  globalThis.WebSocket = class extends OriginalWebSocket {
+    constructor(...args) { super(...args); socket = this; }
+  };
+  let run;
+  try {
+    run = await startCase({holdStateSend: true, holdRemoteFin: true});
+    assert.equal(run.capture(0, 0, 1, pad()), true);
+    await run.stateSendEntered.promise;
+    run.server.closeRemote(4001, {holdFin: true});
+    await waitFor(() => socket.readyState === OriginalWebSocket.CLOSING,
+      'real WebSocket CLOSING interval with remote FIN held');
+    assert.equal(run.endpoint.closed, false);
+    let settled = false;
+    run.stateSendSettled.promise.then(() => { settled = true; });
+    run.releaseStateSend.resolve();
+    await wait(20);
+    console.log('CLOSING_BEFORE_FIN ' + JSON.stringify({readyState: socket.readyState,
+      endpointClosed: run.endpoint.closed, settled}));
+    assert.equal(settled, false, 'send cancellation requires actual physical close proof');
+    run.server.finishRemoteClose();
+    const sendOutcome = await run.stateSendSettled.promise;
+    assert.equal(socket.readyState, OriginalWebSocket.CLOSED);
+    assert.equal(sendOutcome.name, 'RoomRelayClosedSendError');
+    assert.equal(run.disconnectCallbackReleased, false);
+    run.openDisconnect();
+    await run.controller.rpc('snapshot');
+    const result = await run.controller.close({mode: 'normal'});
+    assert.equal(result.failure, null);
+    assert.equal(result.protocol.terminal.kind, 'disconnect');
+    assert.equal(result.cancelledOutboundSends.length, 1);
+    assert.deepEqual(result.localInputCapture.captures[0].bytes, [...pad()]);
+  } finally {
+    if (run) {
+      run.server.finishRemoteClose();
+      run.openDisconnect();
+      run.releaseStateSend.resolve();
+      try { await run.controller.close({mode: 'fatal'}); } catch {}
+      await run.server.close();
+    }
+    globalThis.WebSocket = OriginalWebSocket;
+  }
+});
+
+
+for (const failureMode of ['timeout', 'transport-error']) {
+  test(`CLOSING publication keeps ${failureMode} failure sticky`, async () => {
+    const OriginalWebSocket = globalThis.WebSocket;
+    let socket;
+    globalThis.WebSocket = class extends OriginalWebSocket {
+      constructor(...args) { super(...args); socket = this; }
+    };
+    let run;
+    try {
+      run = await startCase({holdStateSend: true, holdRemoteFin: true});
+      assert.equal(run.capture(0, 0, 1, pad()), true);
+      await run.stateSendEntered.promise;
+      run.server.closeRemote(4001, {holdFin: true});
+      await waitFor(() => socket.readyState === OriginalWebSocket.CLOSING, 'held physical close');
+      const closingWaitStarted = performance.now();
+      run.releaseStateSend.resolve();
+      await wait(10);
+      const additionalOutcome = failureMode === 'timeout'
+        ? run.endpoint.send(JSON.stringify({type: 'state', fixture: 'second pending attempt'})).then(
+          () => ({fulfilled: true}), error => ({name: error.name, message: error.message}))
+        : null;
+      if (failureMode === 'transport-error') {
+        // Inject the endpoint's documented error event on the actual socket.
+        // This tests classification, not a claim about a TCP error's origin.
+        socket.dispatchEvent(new Event('error'));
+        run.server.finishRemoteClose();
+      }
+      const sendOutcome = await run.stateSendSettled.promise;
+      const terminal = await run.nativeTerminalObserved.promise;
+      assert.equal(terminal.kind, TERMINAL.protocol);
+      if (failureMode === 'timeout') {
+        assert.equal(sendOutcome.name, 'Error');
+        assert.match(sendOutcome.message, /did not close within 1200 ms/);
+        const additional = await additionalOutcome;
+        assert.equal(additional.name, 'Error');
+        assert.match(additional.message, /did not close within 1200 ms/);
+        assert(performance.now() - closingWaitStarted < 1500,
+          'queued sends must share one physical-close timeout, not restart it');
+        assert.equal(socket.readyState, OriginalWebSocket.CLOSING);
+        run.server.finishRemoteClose();
+      } else {
+        assert(run.endpoint.errors.length > 0);
+      }
+      run.openDisconnect();
+      await waitFor(() => run.endpoint.closed, 'eventual close after negative control');
+      const observed = run.controller.snapshot();
+      assert(observed.failure);
+      assert.deepEqual(observed.cancelledOutboundSends, []);
+      assert.deepEqual(observed.localInputCapture.cancelled_publications, []);
+      await assert.rejects(run.controller.close({mode: 'normal'}), /Browser native peer close failed/);
+    } finally {
+      if (run) {
+        run.server.finishRemoteClose();
+        run.openDisconnect();
+        run.releaseStateSend.resolve();
+        try { await run.controller.close({mode: 'fatal'}); } catch {}
+        await run.server.close();
+      }
+      globalThis.WebSocket = OriginalWebSocket;
+    }
+  });
+}
+
+test('CLOSING before relay readiness is an ordinary startup failure', async () => {
+  const OriginalWebSocket = globalThis.WebSocket;
+  let socket, server, endpoint;
+  globalThis.WebSocket = class extends OriginalWebSocket {
+    constructor(...args) { super(...args); socket = this; }
+  };
+  try {
+    server = await startServer({omitReady: true, holdRemoteFin: true});
+    endpoint = createRoomRelayPeerEndpoint({url: server.url, roomId: createRoomId(),
+      role: 'alpha', timeoutMs: 1200, onMessage: () => {}});
+    await waitFor(() => socket.readyState === OriginalWebSocket.OPEN, 'socket open before missing READY');
+    server.closeRemote(4001, {holdFin: true});
+    await waitFor(() => socket.readyState === OriginalWebSocket.CLOSING, 'startup CLOSING interval');
+    await assert.rejects(endpoint.send('startup fixture'), error =>
+      error.name === 'Error' && /WebSocket is closed/.test(error.message));
+    server.finishRemoteClose();
+    await assert.rejects(endpoint.ready);
+  } finally {
+    server?.finishRemoteClose();
+    try { await endpoint?.close(); } catch {}
+    await server?.close();
+    globalThis.WebSocket = OriginalWebSocket;
   }
 });
