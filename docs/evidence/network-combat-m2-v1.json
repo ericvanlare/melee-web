@@ -3,7 +3,43 @@
   "issue": 313,
   "scope": "Same-machine simulated-network functional: jabs in both directions, genuine shield hit and full original route pass. Attack-caused KO remains open.",
   "integration": {
-    "state": "unmerged_milestone_in_progress"
+    "state": "draft_milestone_attack_ko_open",
+    "pr": "https://github.com/ericvanlare/melee-web/pull/316",
+    "checkpoint_head": "b2c025b3473d71ab331ac2e84fd2be532e458e75",
+    "assembled_validation": {
+      "tests": 2369,
+      "skips": 165,
+      "elapsed_seconds": 515.067,
+      "full_regression": "pass",
+      "affected_release_build": "pass",
+      "exact_head_ci_run": 38294139269,
+      "exact_head_ci": "pending",
+      "scope": "Before prepared-jab integration; no final-head or KO pass claimed.",
+      "receipts": [
+        {
+          "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-b2c025b3-full-regression.json",
+          "bytes": 558,
+          "sha256": "04fd159517ba10a6b89cf0cf667798a6fb210bbb666027c16ea8452d3f19812d"
+        },
+        {
+          "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-b2c025b3-runtime-producer.json",
+          "bytes": 1655,
+          "sha256": "6c0c81395e4470c54808188e10e5df7002af8ce20f5bc90d12228c0ea7c11dbc"
+        }
+      ]
+    },
+    "assembled_exact_head_ci": {
+      "source": "b2c025b3473d71ab331ac2e84fd2be532e458e75",
+      "run": 38294139269,
+      "passed": 12,
+      "expected_skips": 2,
+      "artifact": {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-b2c025b3-exact-head-ci.json",
+        "bytes": 28728,
+        "sha256": "b3c96f52144ada6496f399cb056b89c9780e44f018ae424428ce5bd21c96af8a"
+      },
+      "scope": "Assembled checkpoint before prepared source; not final candidate CI."
+    }
   },
   "first_jab": {
     "decision": "PASS_SCOPED_SIMULATED_NETWORK_KEYBOARD_JAB_AND_ORIGINAL_ROUTE",
@@ -358,7 +394,7 @@
       "sha256": "5d024dd9fa159ad5d49f61fa9d58bccffc4b0df753e3edce831f7ba23f8a56ed"
     }
   ],
-  "next": "Implement and independently review bounded ordinary-input jab preparation, then fresh uncharged KO baseline. No capture released. Charged input remains checkpointed and unrun; full regression/build/CI pending.",
+  "next": "One reviewed prepared-jab capture; stop at its first failed boundary. Attack-caused KO and M3 remain open.",
   "native_combat_observations": {
     "decision": "COMPILED_AND_BROWSER_EXERCISED_IN_EXCHANGE",
     "runtime_source": "d269334e1243b0568d8bf7caf285053bea8e04a1",
@@ -1025,6 +1061,81 @@
       "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/charged-ko-feasibility-review-v1.json",
       "bytes": 5566,
       "sha256": "301ced733640f6c9adc9327c50560d21e8c25aed528861823b64aafe0c503d94"
+    }
+  },
+  "prepared_source_preparation": {
+    "state": "V3_INDEPENDENT_REVIEW_AND_INTEGRATED_CONTROLS_PASS_BROWSER_UNRUN",
+    "bounds": {
+      "damage_goal_percent": 18,
+      "max_jabs": 8,
+      "max_p2_approach_taps": 16,
+      "preparation_source_span": 480,
+      "unchanged_ko_source_span": 480
+    },
+    "v1_refusals": [
+      "Preparation was not attached to the report until after success.",
+      "Intermediate recovery, approach and pre-start pairs bypassed the preparation guard.",
+      "Declared source origin preceded the actual fresh baseline.",
+      "Runner lacked exact prepared-to-KO baseline and corresponding source-limit binding."
+    ],
+    "artifacts": [
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-prepared-jab-design-v1.json",
+        "bytes": 8700,
+        "sha256": "de52c951011c63eb3045eca1eaf24ab72283a3daf29ed9c14f265104791d3cdc"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-prepared-jab-implementation-release-v1.json",
+        "bytes": 1288,
+        "sha256": "f63c69b180dbdcb5bacaa10fbcf63daafaa7ef5765493a24356cab21ad719b10"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/combat-ko-prepared-candidate-v1/freeze.json",
+        "bytes": 5305,
+        "sha256": "eb1fafeb7ac338c88bfbcbb664078050aee2443d7a8f7eeaae21e7f0ba105e5c"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/combat-ko-prepared-independent-review-v1.json",
+        "bytes": 4768,
+        "sha256": "28e1901b09f91b9bf30df5893093b8746d84c0584c2d47002959ebdbf3a5852d"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/combat-ko-prepared-candidate-v2/freeze.json",
+        "bytes": 6853,
+        "sha256": "9d9dc979278a8565a39db928b385d43bb038a9f7bd60ce1bd3ba23c0223aba91"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/combat-ko-prepared-independent-review-v2.json",
+        "bytes": 2936,
+        "sha256": "72223e812de0826ceba3f9dd6a1e472d2868f3684116a2dfe13dadba5ecf0d5d"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/combat-ko-prepared-candidate-v3/freeze.json",
+        "bytes": 3309,
+        "sha256": "d02dfef6a986586246946c0b75774b60899e805b4e33432c95e5e9f80a30578e"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/combat-ko-prepared-independent-review-v3.json",
+        "bytes": 4873,
+        "sha256": "fb6c4a0b45c7c1e0ebdd60592f7b8ef5666d6f05f6a6b21180a148f41663b7e4"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-prepared-v3-integrated-root-review-v1.json",
+        "bytes": 2309,
+        "sha256": "8cf3be0257d746a5fb5bb8dd40e70262af92ddf31597e127471f7b664479e606"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-prepared-v3-integrated-controls.log",
+        "bytes": 3054,
+        "sha256": "44f8ca55d6be257be5fc253d21854e7d52916eaa9a9d9b8ab801f79fabd441bb"
+      }
+    ],
+    "v2_refusal": "Four v1 gaps repaired, but the new active-only guard rejects the existing source-supported first-use rendering wait. Reuse the existing stock classifier before capture.",
+    "retention_scope": "The latest actual full raw pair is retained before guards; this is not a complete history of every acquisition. Action samples and baselines have their separate receipts.",
+    "integrated_tests": {
+      "cases": 15,
+      "skips": 0,
+      "includes": "combat, action, WAIT and runner wrappers"
     }
   }
 }

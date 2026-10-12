@@ -4,6 +4,7 @@ import {observeDesiredSourcePad, observeCombatKoChargedHoldBeforeRelease}
   from '../scripts/a3_local_room_full_route.mjs';
 import {COMBAT_KO_SOURCE_TICK_BUDGET, COMBAT_KO_CHARGED_HOLD_SOURCE_TICKS,
   COMBAT_KO_CHARGED_PAD_BYTES,
+  COMBAT_KO_PREP_MAX_JABS, COMBAT_KO_PREP_DAMAGE_GOAL, decideCombatKoPreparation,
   captureCombatKoBaseline, createCombatKoRespawnHandoff, advanceCombatKoEvidence,
   validateCombatKoAttackLoss, validateCombatKoChargedAnimation}
   from '../scripts/a3_local_room_combat_ko.mjs';
@@ -13,6 +14,24 @@ const BASE_COUNTERS = [
   {primary_falls: 2, suicides: 1, kos_by_player_slot: [0, 1, 0, 0, 3, 2]},
   {primary_falls: 7, suicides: 2, kos_by_player_slot: [4, 1, 0, 3, 8, 5]},
 ];
+
+test('prepared KO selects only observed damage within the unchanged aggregate source and jab bounds', () => {
+  assert.deepEqual(decideCombatKoPreparation({sourceTick: 110, sourceStartTick: 100,
+    sourceCursorLimit: 100 + COMBAT_KO_SOURCE_TICK_BUDGET, jabCount: 0,
+    actualVictimDamage: 17.999}), {decision: 'jab', next_jab: 1,
+    actual_victim_damage_percent: 17.999});
+  assert.deepEqual(decideCombatKoPreparation({sourceTick: 580, sourceStartTick: 100,
+    sourceCursorLimit: 580, jabCount: 4, actualVictimDamage: COMBAT_KO_PREP_DAMAGE_GOAL}),
+  {decision: 'ready', jab_count: 4, actual_victim_damage_percent: 18});
+  assert.deepEqual(decideCombatKoPreparation({sourceTick: 580, sourceStartTick: 100,
+    sourceCursorLimit: 580, jabCount: COMBAT_KO_PREP_MAX_JABS, actualVictimDamage: 17}),
+  {decision: 'stop', reason: 'eight-jab-damage-goal-unmet', jab_count: 8,
+    actual_victim_damage_percent: 17});
+  assert.throws(() => decideCombatKoPreparation({sourceTick: 581, sourceStartTick: 100,
+    sourceCursorLimit: 580, jabCount: 4, actualVictimDamage: 18}), /aggregate 480/);
+  assert.throws(() => decideCombatKoPreparation({sourceTick: 100, sourceStartTick: 100,
+    sourceCursorLimit: 580, jabCount: 4, actualVictimDamage: Number.NaN}), /invalid jab count or actual damage/);
+});
 
 function clone(value) {
   return structuredClone(value);

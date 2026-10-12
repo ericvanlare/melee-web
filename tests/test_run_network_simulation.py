@@ -411,6 +411,77 @@ class NetworkSimulationSuitePolicyTests(unittest.TestCase):
                 gameplay_combat_probe=True, gameplay_combat_exchange=True,
                 gameplay_combat_ko=True, gameplay_combat_ko_charged=True)
 
+    def test_prepared_ko_requires_bounded_actual_damage_baseline_and_uncharged_handoff(self):
+        self.assertEqual(SCENARIOS["full-moderate-combat-ko-prepared"],
+                         ("moderate", True, False, False, False, False, True, True,
+                          False, False, True))
+        self.assertEqual(scenario_route_flags("full-moderate-combat-ko-prepared"),
+                         ["--full-route", "--gameplay-combat-probe",
+                          "--gameplay-combat-exchange", "--gameplay-combat-ko-prepared"])
+        browser = copy.deepcopy(self.browser)
+        browser.update(gameplay_combat_probe=True, gameplay_combat_exchange=True,
+                       gameplay_combat_ko=False, gameplay_combat_ko_charged=False,
+                       gameplay_combat_ko_prepared=True)
+        route = browser["full_route"]
+        route.update(gameplay_combat_probe=True, gameplay_combat_exchange=True,
+                     gameplay_combat_ko=False, gameplay_combat_ko_charged=False,
+                     gameplay_combat_ko_prepared=True)
+        match = {"frame": 200, "players": [
+            {"source_port": 0, "source_player_index": 4, "motion": 14, "groundAir": 0, "stocks": 4,
+             "damage_percent": 18, "x": -1, "facing_direction": 1},
+            {"source_port": 1, "source_player_index": 1, "motion": 14, "groundAir": 0, "stocks": 4,
+             "damage_percent": 0, "x": 1, "facing_direction": -1}]}
+        baseline = {"source_tick": 200, "stocks_by_port": [4, 4],
+                    "source_player_index_by_port": [4, 1],
+                    "actual_matches": [copy.deepcopy(match), copy.deepcopy(match)]}
+        route["combat_probe"] = {"result": "pass", "combat_exchange": {"result": "pass"},
+            "combat_ko": {"result": "pass", "input_mode": "cstick-left",
+                "baseline": copy.deepcopy(baseline), "source_cursor_limit": 680,
+                "handoff": {"starting_stocks": 3}, "preparation": {
+                    "result": "pass", "literal_input_window": {"status": "validated"},
+                    "jab_count": 4, "max_jabs": 8, "final_p1_damage_percent": 18,
+                    "actual_damage_goal_percent": 18, "max_approach_taps": 16,
+                    "approach": {"steps": []}, "source_cursor_start": 100,
+                    "source_cursor_limit": 580, "source_cursor_end": 200,
+                    "source_cursor_span": 100, "max_source_cursors": 480,
+                    "baseline": {"source_tick": 100},
+                    "prepared_ko_baseline": baseline}}}
+        kwargs = dict(gameplay_combat_probe=True, gameplay_combat_exchange=True,
+                      gameplay_combat_ko_prepared=True)
+        validate_result(0, self.owner, browser, True, **kwargs)
+        mutations = (
+            lambda prep: prep.update(final_p1_damage_percent=17.99),
+            lambda prep: prep.update(source_cursor_span=481),
+            lambda prep: prep.update(source_cursor_span=99),
+            lambda prep: prep.update(source_cursor_limit=581),
+            lambda prep: prep["baseline"].update(source_tick=101),
+            lambda prep: prep.pop("baseline"),
+            lambda prep: prep.update(jab_count=9),
+            lambda prep: prep["prepared_ko_baseline"].update(stocks_by_port=[4, 3]),
+            lambda prep: prep["prepared_ko_baseline"].update(source_tick=201),
+            lambda prep: prep["prepared_ko_baseline"]["actual_matches"][0]["players"][0].update(
+                groundAir=1),
+        )
+        for mutate in mutations:
+            damaged = copy.deepcopy(browser)
+            mutate(damaged["full_route"]["combat_probe"]["combat_ko"]["preparation"])
+            with self.assertRaisesRegex(ValueError, "prepared damage proof"):
+                validate_result(0, self.owner, damaged, True, **kwargs)
+        ko_mutations = (
+            lambda ko: ko.pop("baseline"),
+            lambda ko: ko["baseline"].update(source_tick=201),
+            lambda ko: ko.update(source_cursor_limit=679),
+            lambda ko: ko["preparation"]["prepared_ko_baseline"]["actual_matches"][0]["players"][0].update(
+                damage_percent=17),
+            lambda ko: ko["preparation"]["prepared_ko_baseline"]["actual_matches"][1]["players"][0].update(
+                damage_percent=17),
+        )
+        for mutate in ko_mutations:
+            damaged = copy.deepcopy(browser)
+            mutate(damaged["full_route"]["combat_probe"]["combat_ko"])
+            with self.assertRaisesRegex(ValueError, "prepared damage proof"):
+                validate_result(0, self.owner, damaged, True, **kwargs)
+
 
 if __name__ == "__main__":
     unittest.main()

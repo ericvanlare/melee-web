@@ -8,6 +8,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
 import re
 from pathlib import Path
@@ -26,6 +27,7 @@ SCENARIOS = {
     "full-moderate-combat-exchange": ("moderate", True, False, False, False, False, True, True),
     "full-moderate-combat-ko": ("moderate", True, False, False, False, False, True, True, True),
     "full-moderate-combat-ko-charged": ("moderate", True, False, False, False, False, True, True, False, True),
+    "full-moderate-combat-ko-prepared": ("moderate", True, False, False, False, False, True, True, False, False, True),
     "full-moderate-repeat": ("moderate", True, False, False, False, True, False),
     "full-asymmetric": ("asymmetric", True, False, False, False, False, False),
     "css-constrained": ("constrained", False, False, False, False, False, False),
@@ -42,6 +44,7 @@ def scenario_route_flags(name):
     combat_exchange = len(scenario) > 7 and scenario[7]
     combat_ko = len(scenario) > 8 and scenario[8]
     combat_ko_charged = len(scenario) > 9 and scenario[9]
+    combat_ko_prepared = len(scenario) > 10 and scenario[10]
     flags = []
     if full_route:
         flags.append("--full-route")
@@ -55,6 +58,8 @@ def scenario_route_flags(name):
         flags.append("--gameplay-combat-ko")
     if combat_ko_charged:
         flags.append("--gameplay-combat-ko-charged")
+    if combat_ko_prepared:
+        flags.append("--gameplay-combat-ko-prepared")
     if repeat_route:
         flags.append("--repeat-full-route")
     if controlled_stall:
@@ -89,7 +94,8 @@ def runtime_identity(directory):
 def validate_result(returncode, owner, browser, full_route, gameplay_action_probe=False,
                     repeat_full_route=False, *, controlled_stall=False,
                     gameplay_combat_probe=False, gameplay_combat_exchange=False,
-                    gameplay_combat_ko=False, gameplay_combat_ko_charged=False):
+                    gameplay_combat_ko=False, gameplay_combat_ko_charged=False,
+                    gameplay_combat_ko_prepared=False):
     """Require both independent owners; each opt-in route has its own policy."""
     if gameplay_action_probe and gameplay_combat_probe:
         raise ValueError("gameplay action and combat probes are separate scenarios")
@@ -99,8 +105,11 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
         raise ValueError("combat KO requires verified combat exchange mode")
     if gameplay_combat_ko_charged and not gameplay_combat_exchange:
         raise ValueError("charged combat KO requires verified combat exchange mode")
-    if gameplay_combat_ko and gameplay_combat_ko_charged:
-        raise ValueError("C-stick and charged combat KO are separate scenarios")
+    if gameplay_combat_ko_prepared and not gameplay_combat_exchange:
+        raise ValueError("prepared combat KO requires verified combat exchange mode")
+    if sum((gameplay_combat_ko, gameplay_combat_ko_charged,
+            gameplay_combat_ko_prepared)) > 1:
+        raise ValueError("C-stick, charged, and prepared combat KO are separate scenarios")
     if returncode != 0:
         raise ValueError(f"capture owner exited {returncode}")
     if (owner.get("schema") != "melee-web-capture-process-owner-v3" or
@@ -122,6 +131,10 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
             raise ValueError("requested charged combat KO mode is missing")
         if not gameplay_combat_ko_charged and mode_report.get("gameplay_combat_ko_charged", False) is not False:
             raise ValueError("unexpected charged combat KO mode")
+        if gameplay_combat_ko_prepared and mode_report.get("gameplay_combat_ko_prepared") is not True:
+            raise ValueError("requested prepared combat KO mode is missing")
+        if not gameplay_combat_ko_prepared and mode_report.get("gameplay_combat_ko_prepared", False) is not False:
+            raise ValueError("unexpected prepared combat KO mode")
     network = browser.get("network_simulation") or {}
     if (network.get("proxy_cleanup", {}).get("verified") is not True or
             network.get("proxy_cleanup", {}).get("final") is not True):
@@ -177,6 +190,40 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
                     (ko.get("charge_animation_evidence") or {}).get("kind") !=
                     "observed-s4s60-charge-animation-plateau-and-release-advance-v1"):
                 raise ValueError("requested charged combat KO handoff or animation evidence is incomplete")
+        elif gameplay_combat_ko_prepared:
+            ko = (route.get("combat_probe") or {}).get("combat_ko") or {}
+            prep = ko.get("preparation") or {}
+            prepared_baseline = prep.get("prepared_ko_baseline")
+            ko_baseline = ko.get("baseline")
+            if (ko.get("result") != "pass" or ko.get("input_mode") != "cstick-left" or
+                    (ko.get("handoff") or {}).get("starting_stocks") != 3 or
+                    not isinstance(prepared_baseline, dict) or
+                    ko_baseline != prepared_baseline or
+                    ko.get("source_cursor_limit") != prepared_baseline.get("source_tick", -1) + 480 or
+                    prep.get("result") != "pass" or
+                    prep.get("literal_input_window", {}).get("status") != "validated" or
+                    not _nonnegative_int(prep.get("jab_count")) or prep["jab_count"] > 8 or
+                    isinstance(prep.get("final_p1_damage_percent"), bool) or
+                    not isinstance(prep.get("final_p1_damage_percent"), (int, float)) or
+                    not math.isfinite(prep["final_p1_damage_percent"]) or
+                    prep["final_p1_damage_percent"] < 18 or
+                    prep.get("max_jabs") != 8 or prep.get("actual_damage_goal_percent") != 18 or
+                    prep.get("max_approach_taps") != 16 or
+                    not isinstance((prep.get("approach") or {}).get("steps"), list) or
+                    len(prep["approach"]["steps"]) > 16 or
+                    prep.get("max_source_cursors") != 480 or
+                    not _nonnegative_int(prep.get("source_cursor_start")) or
+                    not _nonnegative_int(prep.get("source_cursor_limit")) or
+                    (prep.get("baseline") or {}).get("source_tick") != prep.get("source_cursor_start") or
+                    prep["source_cursor_limit"] != prep["source_cursor_start"] + 480 or
+                    not _nonnegative_int(prep.get("source_cursor_span")) or
+                    prep["source_cursor_span"] > 480 or
+                    prep.get("source_cursor_end") != (prep.get("prepared_ko_baseline") or {}).get("source_tick") or
+                    not _prepared_ko_baseline_ok(prep) or
+                    prep["source_cursor_span"] !=
+                    prep["prepared_ko_baseline"]["source_tick"] - prep["source_cursor_start"] or
+                    prep["prepared_ko_baseline"]["source_tick"] > prep["source_cursor_limit"]):
+                raise ValueError("prepared damage proof or unchanged uncharged C-stick KO handoff is incomplete")
         elif (route.get("combat_probe") or {}).get("combat_ko") is not None:
             raise ValueError("unexpected combat KO receipt")
         if repeat_full_route:
@@ -184,7 +231,8 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
         elif route.get("repeat_mode") is not None or route.get("repeated_matches") is not None:
             raise ValueError("baseline unexpectedly contains repeated full routes")
     elif (repeat_full_route or gameplay_action_probe or gameplay_combat_probe or
-          gameplay_combat_exchange or gameplay_combat_ko or gameplay_combat_ko_charged):
+          gameplay_combat_exchange or gameplay_combat_ko or gameplay_combat_ko_charged or
+          gameplay_combat_ko_prepared):
         raise ValueError("opt-in route scenario did not request a full route")
 
     if controlled_stall:
@@ -197,6 +245,55 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
 
 def _nonnegative_int(value):
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _prepared_ko_baseline_ok(preparation):
+    baseline = preparation.get("prepared_ko_baseline") or {}
+    expected_damage = preparation.get("final_p1_damage_percent")
+    if (not _nonnegative_int(baseline.get("source_tick")) or
+            isinstance(expected_damage, bool) or
+            not isinstance(expected_damage, (int, float)) or not math.isfinite(expected_damage) or
+            baseline.get("stocks_by_port") != [4, 4] or
+            not isinstance(baseline.get("source_player_index_by_port"), list) or
+            len(baseline["source_player_index_by_port"]) != 2 or
+            not all(_nonnegative_int(slot) and slot < 6
+                    for slot in baseline["source_player_index_by_port"]) or
+            len(set(baseline["source_player_index_by_port"])) != 2):
+        return False
+    peers = baseline.get("actual_matches")
+    if not isinstance(peers, list) or len(peers) != 2:
+        return False
+    projections = []
+    for match in peers:
+        if not isinstance(match, dict) or not _nonnegative_int(match.get("frame")):
+            return False
+        players = match.get("players")
+        if not isinstance(players, list) or len(players) != 2:
+            return False
+        by_port = {player.get("source_port"): player for player in players
+                   if isinstance(player, dict)}
+        if set(by_port) != {0, 1}:
+            return False
+        p1, p2 = by_port[0], by_port[1]
+        numeric = (p1.get("damage_percent"), p1.get("x"), p2.get("x"),
+                   p2.get("damage_percent"))
+        if (not all(isinstance(value, (int, float)) and not isinstance(value, bool) and
+                    math.isfinite(value) for value in numeric) or
+                p1.get("damage_percent") != expected_damage or
+                p1.get("source_player_index") != baseline["source_player_index_by_port"][0] or
+                p2.get("source_player_index") != baseline["source_player_index_by_port"][1] or
+                p1.get("motion") != 14 or p1.get("groundAir") != 0 or p1.get("stocks") != 4 or
+                p1.get("facing_direction") != 1 or p2.get("motion") != 14 or
+                p2.get("groundAir") != 0 or p2.get("stocks") != 4 or
+                p2.get("facing_direction") != -1 or not (p1["x"] < p2["x"]) or
+                not (0 < p2["x"] - p1["x"] <= 20) or p1["damage_percent"] < 18):
+            return False
+        projections.append((match.get("frame"), tuple(
+            (player.get("source_port"), player.get("motion"), player.get("groundAir"),
+             player.get("source_player_index"), player.get("stocks"),
+             player.get("damage_percent"), player.get("x"),
+             player.get("facing_direction")) for player in players)))
+    return projections[0] == projections[1]
 
 
 def _sha256_string(value):
@@ -491,7 +588,8 @@ def main():
         parser.error("duplicate scenarios would repeat captures without a new hypothesis")
     combat_names = [name for name in args.scenarios
                     if name in {"full-moderate-combat-probe", "full-moderate-combat-exchange",
-                                "full-moderate-combat-ko", "full-moderate-combat-ko-charged"}]
+                                "full-moderate-combat-ko", "full-moderate-combat-ko-charged",
+                                "full-moderate-combat-ko-prepared"}]
     if combat_names and len(args.scenarios) != 1:
         parser.error("each bounded combat scenario must run as its own single moderate scenario")
     task13_names = [name for name in args.scenarios
@@ -537,6 +635,7 @@ def main():
             gameplay_combat_exchange = len(scenario) > 7 and scenario[7]
             gameplay_combat_ko = len(scenario) > 8 and scenario[8]
             gameplay_combat_ko_charged = len(scenario) > 9 and scenario[9]
+            gameplay_combat_ko_prepared = len(scenario) > 10 and scenario[10]
             folder = output / name
             folder.mkdir()
             command = [sys.executable, str(ROOT / "scripts/capture_owner_deadline.py"),
@@ -559,12 +658,14 @@ def main():
                    "gameplay_combat_exchange": gameplay_combat_exchange,
                    "gameplay_combat_ko": gameplay_combat_ko,
                    "gameplay_combat_ko_charged": gameplay_combat_ko_charged,
+                   "gameplay_combat_ko_prepared": gameplay_combat_ko_prepared,
                    "controlled_stall_probe": controlled_stall,
                    "controlled_cut_probe": controlled_cut,
                    "result_policy": "expected-fault-cut" if controlled_cut else
                        "controlled-stall-probe" if controlled_stall else
                        "two-match-repeat" if repeat_full_route else
                        "bounded-charged-combat-ko" if gameplay_combat_ko_charged else
+                       "bounded-prepared-combat-ko" if gameplay_combat_ko_prepared else
                        "bounded-combat-ko" if gameplay_combat_ko else
                        "bounded-combat-exchange" if gameplay_combat_exchange else
                        "bounded-combat-probe" if gameplay_combat_probe else "clean-route",
@@ -617,7 +718,8 @@ def main():
                                 gameplay_combat_probe=gameplay_combat_probe,
                                 gameplay_combat_exchange=gameplay_combat_exchange,
                                 gameplay_combat_ko=gameplay_combat_ko,
-                                gameplay_combat_ko_charged=gameplay_combat_ko_charged)
+                                gameplay_combat_ko_charged=gameplay_combat_ko_charged,
+                                gameplay_combat_ko_prepared=gameplay_combat_ko_prepared)
                 if repeat_full_route:
                     validate_repeat_artifacts(folder / "browser", browser["full_route"])
                 if name == "css-moderate-fresh":

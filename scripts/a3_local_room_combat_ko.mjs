@@ -3,6 +3,29 @@ import assert from 'node:assert/strict';
 export const COMBAT_KO_SOURCE_TICK_BUDGET = 480;
 export const COMBAT_KO_CHARGED_HOLD_SOURCE_TICKS = 24;
 export const COMBAT_KO_CHARGED_PAD_BYTES = Object.freeze([1, 0, 129, 0, 0, 0, 0, 0, 0, 0, 0]);
+export const COMBAT_KO_PREP_MAX_JABS = 8;
+export const COMBAT_KO_PREP_DAMAGE_GOAL = 18;
+
+export function decideCombatKoPreparation({sourceTick, sourceStartTick, sourceCursorLimit,
+  jabCount, actualVictimDamage}) {
+  requireValue(Number.isSafeInteger(sourceStartTick) && Number.isSafeInteger(sourceTick) &&
+    Number.isSafeInteger(sourceCursorLimit) && sourceTick >= sourceStartTick &&
+    sourceCursorLimit === sourceStartTick + COMBAT_KO_SOURCE_TICK_BUDGET &&
+    sourceTick <= sourceCursorLimit,
+  'Combat KO preparation exceeded its aggregate 480-source-cursor budget');
+  requireValue(Number.isSafeInteger(jabCount) && jabCount >= 0 &&
+    jabCount <= COMBAT_KO_PREP_MAX_JABS && Number.isFinite(actualVictimDamage) &&
+    actualVictimDamage >= 0,
+  'Combat KO preparation has invalid jab count or actual damage');
+  if (actualVictimDamage >= COMBAT_KO_PREP_DAMAGE_GOAL)
+    return {decision: 'ready', jab_count: jabCount,
+      actual_victim_damage_percent: actualVictimDamage};
+  if (jabCount >= COMBAT_KO_PREP_MAX_JABS)
+    return {decision: 'stop', reason: 'eight-jab-damage-goal-unmet', jab_count: jabCount,
+      actual_victim_damage_percent: actualVictimDamage};
+  return {decision: 'jab', next_jab: jabCount + 1,
+    actual_victim_damage_percent: actualVictimDamage};
+}
 
 const BASELINE_BRAND = Symbol('validated combat KO baseline');
 const LOSS_BRAND = Symbol('validated combat KO loss');

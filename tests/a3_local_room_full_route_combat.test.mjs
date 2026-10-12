@@ -1,14 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {readFileSync} from 'node:fs';
 import {comparePairedCombatPlayers, decideP2ApproachTap,
   comparePairedShieldObservation, inspectCombatPairRetainingRawRows,
   observePairedCombatJab, observePairedShieldJab, retainCombatChecksumCursorPoll,
   assertPairedVictimDamageUnchanged, validateReverseJabSetup,
   retainCombatApproachInputReadback,
   retainCombatApproachState, validateCombatItemsNone,
-  validateP2GameplayInputWindow, validateSingleP2ApproachTapWindow} from '../scripts/a3_local_room_combat_probe.mjs';
+  validateP2GameplayInputWindow, validateSingleP2ApproachTapWindow,
+  validatePreparedCombatInputContinuity} from '../scripts/a3_local_room_combat_probe.mjs';
 import {actionObservationTickDisposition, acquireAndInspectActionPair,
   observeShieldSetOffBeforeRelease, retainPreStartActionPair,
+  retainAndGuardPreparedPair, retainPreparedKoPreparation, classifyPreparedCombatPair,
+  preparedKoSourceCursorLimit,
   observeNativePeerPageSample,
   retainShieldHoldOutcome, validateButtonGameplayInputWindow,
   validateSimultaneousButtonGameplayInputWindows} from '../scripts/a3_local_room_full_route.mjs';
@@ -92,6 +96,35 @@ test('P2 approach window retains one literal axis sample, neutral release, and n
     p1Rows: [padRow(20, 0), padRow(21, 0, 0x0100)],
     movementTick: 20, releaseTick: 21, direction: -1,
   }), /P1 was not literally neutral/);
+});
+
+test('prepared combat requires a complete P1-neutral/P2-verified input history', () => {
+  const p1Rows = Array.from({length: 7}, (_, index) => padRow(20 + index, 0));
+  const p2Rows = [padRow(20, 1), padRow(21, 1, 0, 255), padRow(22, 1),
+    padRow(23, 1), padRow(24, 1), padRow(25, 1, 0x0100), padRow(26, 1)];
+  const result = validatePreparedCombatInputContinuity({p1Rows, p2Rows,
+    inputStartTick: 20, inputEndTick: 26,
+    verifiedP2Rows: [p2Rows[1], p2Rows[2], p2Rows[5], p2Rows[6]]});
+  assert.deepEqual(result, {status: 'validated', input_start_tick: 20,
+    input_end_tick: 26, source_input_rows: 7, verified_p2_non_neutral_rows: 2,
+    p1_neutral: true, p2_neutral_outside_verified_windows: true});
+  assert.throws(() => validatePreparedCombatInputContinuity({p1Rows: p1Rows.slice(0, -1),
+    p2Rows, inputStartTick: 20, inputEndTick: 26,
+    verifiedP2Rows: [p2Rows[1], p2Rows[2], p2Rows[5], p2Rows[6]]}), /missing or duplicate/);
+  assert.throws(() => validatePreparedCombatInputContinuity({p1Rows: [
+    ...p1Rows.slice(0, 2), padRow(22, 0, 0x0100), ...p1Rows.slice(3)],
+    p2Rows, inputStartTick: 20, inputEndTick: 26,
+    verifiedP2Rows: [p2Rows[1], p2Rows[2], p2Rows[5], p2Rows[6]]}), /P1 was not literally neutral/);
+  assert.throws(() => validatePreparedCombatInputContinuity({p1Rows,
+    p2Rows: [...p2Rows.slice(0, 4), padRow(24, 1, 0x0020), ...p2Rows.slice(5)],
+    inputStartTick: 20, inputEndTick: 26,
+    verifiedP2Rows: [p2Rows[1], p2Rows[2], p2Rows[5], p2Rows[6]]}), /unverified or non-neutral/);
+  assert.throws(() => validatePreparedCombatInputContinuity({p1Rows,
+    p2Rows: [...p2Rows].reverse(), inputStartTick: 20, inputEndTick: 26,
+    verifiedP2Rows: [p2Rows[1], p2Rows[2], p2Rows[5], p2Rows[6]]}), /exact, ordered/);
+  assert.throws(() => validatePreparedCombatInputContinuity({p1Rows, p2Rows,
+    inputStartTick: 20, inputEndTick: 26,
+    verifiedP2Rows: [p2Rows[1], p2Rows[1], p2Rows[2], p2Rows[5], p2Rows[6]]}), /overlap/);
 });
 
 test('P2 jab window preserves A press/release rows and neutral P1 rows', () => {
@@ -548,6 +581,95 @@ test('action observer cancellation during acquisition inspects neither buffered 
   assert.deepEqual(pendingBeforeStart.map(entry => entry.rows[0].source_tick), [671, 672]);
 });
 
+test('prepared source-pair guards run once in acquisition order before buffered inspection', async () => {
+  const pair = tick => Array.from({length: 2}, (_, index) => ({source_tick: tick,
+    phase: 7, running: 1, message: 'active', match: {frame: tick},
+    peer: index === 0 ? 'alpha' : 'beta'}));
+  const pendingBeforeStart = [];
+  const record = {};
+  const guardedTicks = [];
+  const inspectedTicks = [];
+  let started = false;
+  const inspectPair = async rows => {
+    if (!started) {
+      retainPreStartActionPair(pendingBeforeStart, rows);
+      return;
+    }
+    inspectedTicks.push(rows[0].source_tick);
+  };
+  const acquire = rows => acquireAndInspectActionPair({
+    acquirePair: async () => rows,
+    pendingBeforeStart,
+    actionStarted: () => started,
+    inspectPair,
+    guardAcquiredPair: pairRows => retainAndGuardPreparedPair(record, pairRows, rawRows => {
+      guardedTicks.push(rawRows[0].source_tick);
+    }),
+  });
+
+  await acquire(pair(671));
+  started = true;
+  await acquire(pair(672));
+  assert.deepEqual(guardedTicks, [671, 672]);
+  assert.deepEqual(inspectedTicks, [671, 672]);
+  assert.equal(record.last_inspected_pair.source_tick, 672);
+
+  const failureRecord = {};
+  const failurePending = [];
+  const attemptedTicks = [];
+  const inspectionsAfterRefusal = [];
+  let failureStarted = false;
+  const invalidThenValid = [pair(700), pair(701), pair(702)];
+  const acquireUntilRefusal = async () => {
+    for (const rows of invalidThenValid) {
+      attemptedTicks.push(rows[0].source_tick);
+      if (rows[0].source_tick === 701) failureStarted = true;
+      await acquireAndInspectActionPair({
+        acquirePair: async () => rows,
+        pendingBeforeStart: failurePending,
+        actionStarted: () => failureStarted,
+        inspectPair: async pairRows => {
+          if (!failureStarted) retainPreStartActionPair(failurePending, pairRows);
+          else inspectionsAfterRefusal.push(pairRows[0].source_tick);
+        },
+        guardAcquiredPair: pairRows => retainAndGuardPreparedPair(
+          failureRecord, pairRows, rawRows => {
+            if (rawRows[0].source_tick === 701) throw Error('transient prep guard refusal');
+          }),
+      });
+    }
+  };
+  await assert.rejects(acquireUntilRefusal, /transient prep guard refusal/);
+  assert.deepEqual(attemptedTicks, [700, 701], 'the later valid pair must not be fetched after refusal');
+  assert.equal(failureRecord.last_inspected_pair.source_tick, 701,
+    'the offending actual pair must be retained before the guard refuses');
+  assert.deepEqual(inspectionsAfterRefusal, [],
+    'no buffered or current pair may be inspected after an acquisition guard refuses');
+});
+
+test('prepared KO running evidence remains reachable when the first acquisition rejects', async () => {
+  const combatProbe = {};
+  const preparation = {result: 'running', jabs: [], last_inspected_pair: null};
+  const attempt = async () => {
+    retainPreparedKoPreparation(combatProbe, preparation);
+    await Promise.reject(Error('fresh baseline acquisition refused'));
+  };
+  await assert.rejects(attempt, /fresh baseline acquisition refused/);
+  assert.strictEqual(combatProbe.prepared_ko_preparation, preparation);
+  preparation.last_inspected_pair = {source_tick: 240, peers: [{source_tick: 240}, {source_tick: 240}]};
+  assert.equal(combatProbe.prepared_ko_preparation.last_inspected_pair.source_tick, 240);
+});
+
+test('prepared KO gives the initial baseline acquisition a finite cap then starts 480 at the fresh baseline', () => {
+  const previousBoundary = 100;
+  const freshBaselineTick = 240;
+  assert.equal(preparedKoSourceCursorLimit(previousBoundary), 580,
+    'initial fresh-baseline acquisition remains bounded from the prior boundary');
+  assert.equal(preparedKoSourceCursorLimit(freshBaselineTick), 720,
+    'declared preparation budget begins at the actual fresh baseline');
+  assert.throws(() => preparedKoSourceCursorLimit(Number.MAX_SAFE_INTEGER), /safe nonnegative/);
+});
+
 test('action observer preserves same-cursor WAIT-to-active transition, skips duplicates, and keeps 60-tick cap', async () => {
   const pair = (tick, message, p2Motion = 179) => Array.from({length: 2}, (_, index) => ({
     source_tick: tick, phase: 7, running: 1, message,
@@ -646,4 +768,49 @@ test('shield hold promise rejection is retained as failure evidence', async () =
   assert.equal(shield.hold_outcome.promise_status, 'rejected');
   assert.match(shield.hold_outcome.error, /shield predicate timed out/);
   assert.equal(shield.hold, null);
+});
+
+// The retained native WAIT fixture has three stocks. Adapt only stocks to the
+// prepared four-stock boundary; this is a classifier control, not new gameplay.
+function preparedRenderWaitPair() {
+  const fixture = JSON.parse(readFileSync(new URL(
+    './fixtures/a3_first_use_render_wait_observation.json', import.meta.url), 'utf8'));
+  const wait = structuredClone(fixture.beta);
+  wait.match.players[0].stocks = 4;
+  return [structuredClone(wait), structuredClone(wait)];
+}
+
+test('actual preparation guard preserves authored WAIT then active at the same cursor', () => {
+  const rows = preparedRenderWaitPair();
+  const record = {};
+  const guard = pair => retainAndGuardPreparedPair(record, pair,
+    actual => classifyPreparedCombatPair(actual, 'prepared WAIT control'));
+  const waiting = guard(rows);
+  assert.deepEqual(waiting.map(match => match.players.map(player => player.stocks)),
+    [[4, 4], [4, 4]]);
+  assert.equal(record.last_inspected_pair.peers[0].running, 0);
+  const active = structuredClone(rows);
+  for (const row of active) {
+    row.running = 1;
+    row.message = 'Original Mario vs Mario match on Final Destination';
+  }
+  assert.equal(active[0].source_tick, rows[0].source_tick);
+  assert.equal(guard(active)[0].ready, true);
+  assert.equal(record.last_inspected_pair.peers[0].running, 1);
+});
+
+test('actual preparation guard refuses unexpected stopped and counterfeit WAIT rows', () => {
+  for (const mutate of [
+    row => { row.message = 'Paused after a timing disruption in the audio clock. Resume to continue.'; },
+    row => { row.native_status.local_capture_failure = 'capture failed'; },
+    row => { row.match.players[0].stocks = 3; },
+  ]) {
+    const pair = preparedRenderWaitPair();
+    mutate(pair[0]);
+    const record = {};
+    assert.throws(() => retainAndGuardPreparedPair(record, pair,
+      rows => classifyPreparedCombatPair(rows, 'prepared negative control')));
+    assert.deepEqual(record.last_inspected_pair.peers[0].match, pair[0].match,
+      'offending actual match remains retained before refusal');
+  }
 });

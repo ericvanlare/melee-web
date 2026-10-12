@@ -23,7 +23,7 @@ import {checksumCompareReached, checksumWaitDiagnostic} from './a3_checksum_wait
 import {runA3LocalFullRoute} from './a3_local_room_full_route.mjs';
 import {retainCombatChecksumCursorPoll} from './a3_local_room_combat_probe.mjs';
 
-const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--post-css-stall-probe] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route] [--controlled-cut-after-css] [--gameplay-action-probe] [--gameplay-combat-probe] [--gameplay-combat-exchange] [--gameplay-combat-ko] [--gameplay-combat-ko-charged] [--repeat-full-route]';
+const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--post-css-stall-probe] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route] [--controlled-cut-after-css] [--gameplay-action-probe] [--gameplay-combat-probe] [--gameplay-combat-exchange] [--gameplay-combat-ko] [--gameplay-combat-ko-charged] [--gameplay-combat-ko-prepared] [--repeat-full-route]';
 const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, out: {type: 'string'},
   'relay-url': {type: 'string'}, 'relay-preflight': {type: 'string'},
@@ -37,6 +37,7 @@ const {values} = parseArgs({options: {
   'gameplay-combat-exchange': {type: 'boolean', default: false},
   'gameplay-combat-ko': {type: 'boolean', default: false},
   'gameplay-combat-ko-charged': {type: 'boolean', default: false},
+  'gameplay-combat-ko-prepared': {type: 'boolean', default: false},
   'repeat-full-route': {type: 'boolean', default: false},
   help: {type: 'boolean', default: false},
 }, allowPositionals: false});
@@ -101,8 +102,11 @@ requireCondition(!values['gameplay-combat-ko'] || values['gameplay-combat-exchan
   '--gameplay-combat-ko requires --gameplay-combat-exchange');
 requireCondition(!values['gameplay-combat-ko-charged'] || values['gameplay-combat-exchange'],
   '--gameplay-combat-ko-charged requires --gameplay-combat-exchange');
-requireCondition(!(values['gameplay-combat-ko'] && values['gameplay-combat-ko-charged']),
-  '--gameplay-combat-ko and --gameplay-combat-ko-charged are separate scenarios');
+requireCondition(!values['gameplay-combat-ko-prepared'] || values['gameplay-combat-exchange'],
+  '--gameplay-combat-ko-prepared requires --gameplay-combat-exchange');
+requireCondition([values['gameplay-combat-ko'], values['gameplay-combat-ko-charged'],
+  values['gameplay-combat-ko-prepared']].filter(Boolean).length <= 1,
+  'C-stick, charged, and prepared combat KO modes are separate scenarios');
 const runtimeUrl = new URL(values.url);
 requireCondition(runtimeUrl.protocol === 'http:' && runtimeUrl.hostname === '127.0.0.1' &&
   runtimeUrl.port === '8787' && runtimeUrl.pathname === '/runtime.html',
@@ -214,6 +218,7 @@ const report = {
   gameplay_combat_exchange: values['gameplay-combat-exchange'],
   gameplay_combat_ko: values['gameplay-combat-ko'],
   gameplay_combat_ko_charged: values['gameplay-combat-ko-charged'],
+  gameplay_combat_ko_prepared: values['gameplay-combat-ko-prepared'],
   leave_and_cleanup: {},
   exclusions: ['no direct PAD or Gamepad injection', 'no harness-owned peer or checksum pump',
     'no runtime source-tick/checksum-bound changes',
@@ -1058,6 +1063,7 @@ try {
       gameplayCombatExchange: values['gameplay-combat-exchange'],
       gameplayCombatKo: values['gameplay-combat-ko'],
       gameplayCombatKoCharged: values['gameplay-combat-ko-charged'],
+      gameplayCombatKoPrepared: values['gameplay-combat-ko-prepared'],
       remaining, readRoomState, readPeerSnapshot, readPeerInputSuffix, readInputDiagnostics,
       waitForBothChecksumCompare, captureScreenshot,
       assertHealthy: (state, role) => {

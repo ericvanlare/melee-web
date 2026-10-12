@@ -161,6 +161,16 @@ ordered animation plateau and later advance; missing sampled frames remain
 explicit and no hidden charge amount is inferred. All KO-credit, neutral-victim,
 respawn and owner limits above still apply. It is an experiment, not a KO claim.
 
+The separate `full-moderate-combat-ko-prepared` scenario selects
+`--gameplay-combat-ko-prepared` after the same verified exchange. It permits
+at most eight actual P2 jabs toward observed 18% damage, with a shared
+480-source-cursor preparation limit and bounded P2 approach taps. Each jab
+requires a paired damage response, grounded recovery, unchanged stocks and
+scorer counters, and literal neutral P1 input. The final grounded-neutral pair
+becomes the baseline for the unchanged uncharged KO proof. Failure stops the
+run; the damage target is a hypothesis, not a guaranteed KO. Existing owner,
+input and action deadlines remain unchanged.
+
 The reliability scenarios use separate result policies. Select one command below
 with a new evidence directory for each invocation:
 

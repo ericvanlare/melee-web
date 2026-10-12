@@ -110,6 +110,58 @@ export function validateSingleP2ApproachTapWindow({p2Rows, p1Rows, movementTick,
   return {validated, p2Window, p1Window};
 }
 
+// Validate every consumed local input tick during preparation. Only literal
+// rows already accepted by the per-action validators may be non-neutral on P2.
+export function validatePreparedCombatInputContinuity({p1Rows, p2Rows,
+  inputStartTick, inputEndTick, verifiedP2Rows}) {
+  if (!Number.isSafeInteger(inputStartTick) || !Number.isSafeInteger(inputEndTick) ||
+      inputStartTick < 0 || inputEndTick < inputStartTick ||
+      !Array.isArray(verifiedP2Rows))
+    throw Error('Prepared combat input continuity has invalid bounds or action rows');
+  const exactRange = (rows, port, label) => {
+    if (!Array.isArray(rows)) throw Error(`${label} literal PAD rows are unavailable`);
+    const selected = rows.filter(row => row?.input_tick >= inputStartTick &&
+      row.input_tick <= inputEndTick);
+    const expectedCount = inputEndTick - inputStartTick + 1;
+    if (selected.length !== expectedCount)
+      throw Error(`${label} literal PAD range has a missing or duplicate source input tick`);
+    for (let index = 0; index < selected.length; ++index) {
+      const row = selected[index];
+      const tick = inputStartTick + index;
+      if (row.input_tick !== tick || row.source_cursor !== tick || row.local_port !== port ||
+          !Array.isArray(row.bytes) || row.bytes.length !== 11 ||
+          !row.bytes.every(value => Number.isInteger(value) && value >= 0 && value <= 255))
+        throw Error(`${label} literal PAD range is not exact, ordered and source-cursor aligned`);
+    }
+    return selected;
+  };
+  const p1 = exactRange(p1Rows, 0, 'P1');
+  const p2 = exactRange(p2Rows, 1, 'P2');
+  if (!p1.every(isNeutralPadRow))
+    throw Error('P1 was not literally neutral throughout combat preparation');
+  const allowed = new Map();
+  for (const row of verifiedP2Rows) {
+    if (!Number.isSafeInteger(row?.input_tick) || row.input_tick < inputStartTick ||
+        row.input_tick > inputEndTick || row.source_cursor !== row.input_tick ||
+        row.local_port !== 1 || !Array.isArray(row.bytes) || row.bytes.length !== 11 ||
+        !row.bytes.every(value => Number.isInteger(value) && value >= 0 && value <= 255))
+      throw Error('Verified P2 preparation action contains an invalid literal PAD row');
+    const prior = allowed.get(row.input_tick);
+    if (prior)
+      throw Error('Verified P2 preparation action windows overlap at one source input tick');
+    allowed.set(row.input_tick, row.bytes);
+  }
+  for (const row of p2) {
+    const expected = allowed.get(row.input_tick) ?? Array(11).fill(0);
+    if (JSON.stringify(row.bytes) !== JSON.stringify(expected))
+      throw Error('P2 had an unverified or non-neutral literal input during preparation');
+  }
+  return {status: 'validated', input_start_tick: inputStartTick,
+    input_end_tick: inputEndTick, source_input_rows: p2.length,
+    verified_p2_non_neutral_rows: [...allowed.values()].filter(bytes => !isNeutralPadRow({bytes})).length,
+    p1_neutral: true, p2_neutral_outside_verified_windows: true};
+}
+
 // Item frequency -1 is the source None setting. Preserve and compare the
 // observed mask, but do not interpret an all-ones mask as disabled items.
 export function validateCombatItemsNone(matches, expectedMaskHex = null) {
