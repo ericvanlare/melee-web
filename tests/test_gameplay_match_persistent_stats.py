@@ -60,12 +60,16 @@ int main(void){
 }
 '''
 class GameplayMatchPersistentStatsTests(OwnedWorkspaceTests):
+ @classmethod
+ def setUpClass(cls):
+  cls.workspace=cls.new_workspace(ROOT,'persistent-match-stats-')
+
  def test_actual_production_stats(self):
   cc=shutil.which('clang') or shutil.which('cc')
   if not cc:self.skipTest('C11 compiler required')
   header=(ROOT/'src/gameplay_match_context.h').read_text();start=header.index('typedef struct MeleeWebMatchEyeStats');end=header.index('} MeleeWebMatchStats;',start)+len('} MeleeWebMatchStats;');decl=header[start:end]
   source=(ROOT/'src/gameplay_match_context.c').read_text();start=source.index('int melee_web_match_player_stats(');end=source.index('int melee_web_match_end(',start);production=source[start:end]
-  w=self.new_workspace(ROOT,'persistent-match-stats-');c=w/'fixture.c';b=w/'fixture';c.write_text(FIXTURE+decl+STUBS+production+MAIN)
+  w=self.workspace;c=w/'fixture.c';b=w/'fixture';c.write_text(FIXTURE+decl+STUBS+production+MAIN)
   r=subprocess.run([cc,'-std=c11','-Wall','-Wextra','-Werror',str(c),'-o',str(b)],capture_output=True,text=True,timeout=30);self.assertEqual(r.returncode,0,r.stdout+r.stderr)
   r=subprocess.run([str(b)],capture_output=True,text=True,timeout=10);self.assertEqual(r.returncode,0,r.stdout+r.stderr);self.assertIn('actual production stats:',r.stdout)
 if __name__=='__main__':unittest.main()
