@@ -70,7 +70,9 @@ The autonomous follow-on now has one local complete-match witness using the
 same actual controls, including original Results confirmation and CSS return.
 Its preceding failures and reduced checks remain in the same receipt. The
 deployed Worker and human acceptance gates remain open; no physical testing
-is inferred from automated browser keyboard input.
+is inferred from automated browser keyboard input. The separate original
+Sheik transform-prefix milestone is tracked under #304; its evidence remains in
+the existing weaker-fighter status entry.
 
 - 2026-10-11, Codex: the P2 gameplay-input extension and optional public-relay
   interface stay as commits in the existing #288 work branch, avoiding another
@@ -81,7 +83,8 @@ is inferred from automated browser keyboard input.
 
 **Links:** [Owner-requested execution change](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6112686789),
 [A3 #288](https://github.com/ericvanlare/melee-web/issues/288),
-[Stadium C3 #251](https://github.com/ericvanlare/melee-web/issues/251).
+[Stadium C3 #251](https://github.com/ericvanlare/melee-web/issues/251),
+[Original Sheik transform prefix #304](https://github.com/ericvanlare/melee-web/issues/304).
 
 ### 2026-10-08 — Claude and Codex: milestone delivery and playable network slice
 

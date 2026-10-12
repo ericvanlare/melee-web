@@ -141,6 +141,8 @@ retain a reduced reproducer and move to the next fighter. Bowser's
 [#274 checkpoint](https://github.com/ericvanlare/melee-web/issues/274) remains
 unresolved and parked after the reconstructed-prefix attempt budget.
 
+**Current #304 boundary.** The original Zelda-to-Sheik owner prefix is now observed for [issue #304](https://github.com/ericvanlare/melee-web/issues/304); the strict two-human browser comparison remains separate ([scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md)). After #304 integration, the next available shared-capture engineering returns to Stadium C3's bounded matched-Setup C/F prerequisite. Public #288 work resumes only when the deployed service facts change.
+
 The next Stadium milestone is [C3 idle in-match lifetime #251](https://github.com/ericvanlare/melee-web/issues/251),
 with its remaining prerequisites counted and tracked inside that issue and PR.
 Use the existing source-ordered stage harness for two sequential native no-draw
