@@ -226,5 +226,29 @@
       "sha256": "32c34b6757b40b735697e3beeb611c500708a25167450c0951d3ff9c8f59e2b8",
       "known_owned_pids_absent": 22
     }
+  },
+  "linux_cut_fixture_repair": {
+    "decision": "PASS_FOCUSED_AND_FULL_REGRESSION",
+    "source": "9c1b2855d36dbd807d06bc09ec2ec12cb65000e7",
+    "test_file_sha256": "37df768850bd6313322b3669eadc52b5e209eb21d20861f6c3e652016196a097",
+    "runtime_producer_unchanged": "b92a36033692dbef756b067175b39cac2d23925e",
+    "retained_failed_ci": {
+      "run": 38209527034,
+      "head": "6172f749d27d8691f39132c31629a7a33f7d0f62",
+      "log_sha256": "c78c267f2d4ebfb00a00cc44757a4e0a546a84b69c9604257d2b862e4583f888",
+      "first_failure": "cut fixture allowHalfOpen echo server failed to finish writable EOF; unsettled final server.close await13"
+    },
+    "repair": "Finish owned fixture writable half on orderly EOF; all proxy cut/failure/byte assertions unchanged. No proxy/runtime implementation change.",
+    "focused": {
+      "count": 9,
+      "log_sha256": "5274d77d0f9c6d7b26d377ba1a0829d06ad1189df78479b89042185801f79b9c"
+    },
+    "full_regression": {
+      "count": 2336,
+      "seconds": 498.845,
+      "skips": 166,
+      "log_sha256": "7ee48a3c71e0de0ac33becda483f2fad617b56bdfc01901550998847e06deb79"
+    },
+    "review_sha256": "573e1ba90c9a73ffb4c4340469445be24a19173f15262f54d95f0e08a5026981"
   }
 }

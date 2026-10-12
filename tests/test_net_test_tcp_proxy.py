@@ -356,6 +356,9 @@ import {startTcpProxy} from './scripts/net_test_tcp_proxy.mjs';
 
 const server = net.createServer({allowHalfOpen: true}, socket => {
   socket.on('data', chunk => socket.write(chunk));
+  // A reset may arrive as orderly EOF on another host; finish the owned
+  // echo socket's writable half as well as handling the explicit reset.
+  socket.on('end', () => socket.end());
   socket.on('error', () => {}); // A deliberate proxy cut can reset the Worker-side TCP socket.
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
