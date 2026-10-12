@@ -2,7 +2,7 @@
   "schema": "melee-web-simulated-network-full-route-m2-v1",
   "milestone": "M2",
   "issue": 308,
-  "decision": "PASS_REVIEWED_TWO_PROFILES_INTEGRATION_PENDING",
+  "decision": "PASS_REVIEWED_TWO_PROFILES_REQUIRED_LOCAL_VALIDATION",
   "evidence_label": "Browser exercised / Same-machine simulated-network full-route",
   "capture": {
     "run_id": "network-simulation-sprint-20261011-210744-b1be023a",
@@ -634,13 +634,88 @@
       "file": "sol-full-asymmetric-baseline-1-review.json",
       "sha256": "5fab311666d71dd6a2add0aaf8e4562c74abc678a4d5b1faa05b9decf8a4e48c",
       "owned_pids_absent": 22
+    },
+    "request_diagnostic_gap": {
+      "observation": "beta GET gameplay_menu_browser.data net::ERR_ABORTED; alpha none. Existing clean-route policy permits requestfailed; strict cut policy does not. Raw game/checksum/cleanup outcome unchanged; no error-free request claim.",
+      "cause": "UNCLASSIFIED; no request IDs/timing in this capture",
+      "review_addendum": {
+        "file": "sol-full-asymmetric-baseline-1-review-addendum-v1.json",
+        "sha256": "e1cdd25fff96d0dfed85ac1cfaf41cb1f13689c7b25da107bcad2190b31fa7c0"
+      }
     }
   },
   "source_reviews": {
     "m2-baseline-split-review.json": "2110b66e6a1e403e168ee2c4da17c2ccd621d948559022d030b7e017e96d41a3",
-    "sol-m2-integration-source-review-v1.json": "c2a88b5eff0bf1b4c30fc86955f84bb787071827554b6c75d086c517c7f85dfa"
+    "sol-m2-integration-source-review-v1.json": "c2a88b5eff0bf1b4c30fc86955f84bb787071827554b6c75d086c517c7f85dfa",
+    "sol-m2-docs-review-v1.json": "eda11b62ce0a9032f174ebdd4e78318273e4a3377ac8730c8968fd4122e90539"
   },
   "integration_validation": {
-    "state": "REQUIRED_FULL_REGRESSION_BUILD_AND_EXACT_HEAD_CI_PENDING"
+    "schema": "melee-web-m2-required-validation-v1",
+    "source": "f5ecc9346ca43e25cf12e593f3d5ce50393b03b8",
+    "tree": "03e91745e5b4efda8c9543c7bd0a46ba1158f6ee",
+    "decision": "PASS",
+    "full_regression": {
+      "exit_code": 0,
+      "tests": 2344,
+      "skips": 165,
+      "seconds": 495.381,
+      "file": "m2-full-regression.log",
+      "sha256": "545a86658db99d42c6b4c1f6d9ed8b375d5a024b4474d61b8f3428386c26a1db"
+    },
+    "affected_runtime_build": {
+      "exit_code": 0,
+      "target": "runtime",
+      "configuration": "Release",
+      "file": "m2-runtime-build.log",
+      "sha256": "77835b18a10f0c63108f868bb846fdcc1ea9daeaca724d0a28eacafcdaf0cc0f"
+    },
+    "after_build_key_files": {
+      "runtime.html": {
+        "bytes": 6237,
+        "sha256": "70ec53d8af576bae9eaacfc42f172b0d6e8d631a92c75d824601849c8577e1a6"
+      },
+      "gameplay_menu_browser.js": {
+        "bytes": 300688,
+        "sha256": "170c03c7ba2a92f6e961e233b0f783099073177de85c44ded16c2a687fefefa5"
+      },
+      "gameplay_menu_browser.wasm": {
+        "bytes": 15819523,
+        "sha256": "624d3a70c5c413d235fdda0887da242e860d75887c1fe5a2091da2162abc3ada"
+      },
+      "gameplay_menu_browser.data": {
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      "net_lockstep_browser_peer.mjs": {
+        "bytes": 37016,
+        "sha256": "a1f1e899037cf6e6641f91fb2f4577980c355c589ca0d64bedb9131bc07a8b83"
+      },
+      "net_lockstep_core.mjs": {
+        "bytes": 30649,
+        "sha256": "624dc31caa8f9c4910b39ec15fcfd31b6728b356c5cf4857a8a8105170d4910f"
+      },
+      "net_lockstep_websocket_relay.mjs": {
+        "bytes": 20621,
+        "sha256": "9d0592060a3e385fe6d895bd73c8ec019346a95ce2fb0efa21b6da9be865865f"
+      }
+    },
+    "capture_key_files_unchanged": {
+      "runtime.html": true,
+      "gameplay_menu_browser.js": true,
+      "gameplay_menu_browser.wasm": false,
+      "gameplay_menu_browser.data": true,
+      "net_lockstep_browser_peer.mjs": true,
+      "net_lockstep_core.mjs": true,
+      "net_lockstep_websocket_relay.mjs": true
+    },
+    "capture_source": "44ef35c4865e557dd593cb4dcb9a4fb92824199d",
+    "historical_capture_runtime_producer": "b92a36033692dbef756b067175b39cac2d23925e",
+    "finished_at": "2026-10-12T07:07:21.200239+00:00",
+    "exact_head_ci": "PENDING",
+    "artifact_identity_review": {
+      "file": "sol-m2-runtime-byte-identity-review-v1/review.json",
+      "sha256": "36580395434b1d5f0be8058491934fb476daf79da3bbba7d368ef02f4c9176f2",
+      "result": "BYTE_EQUALITY_NOT_ESTABLISHED_NEW_BUILD_NEEDS_SCOPED_CAPTURE"
+    }
   }
 }
