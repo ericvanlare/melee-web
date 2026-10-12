@@ -8988,6 +8988,120 @@
         "bytes": 6929,
         "sha256": "796756d2691bb3d32f7711d9e7b9542c0482ee53046d8d4d60e8c3d2caf9fe5f"
       }
+    },
+    "current_main_879a776a_validation": {
+      "source_head": "879a776ae391ace9895d5d13ebb58df41f6718b4",
+      "tree": "262d2b8e65b6de78a86ddb7503c498932b26b114",
+      "main_integrated": "21e4c7bf",
+      "scope": "Current-main integration regression and two Release builds only; no new capture.",
+      "retained_failed_regression": {
+        "tests": 2510,
+        "test_seconds": 531.572,
+        "skips": 180,
+        "failures": 0,
+        "errors": 7,
+        "result": {
+          "artifact": "current-main-243236f5-validation-v1/full-suite.result.json",
+          "bytes": 847,
+          "sha256": "fd654437c5752b13575b7e1708ac9ae2c48142bb4f634a4e69d289935475ddc4"
+        },
+        "log": {
+          "artifact": "current-main-243236f5-validation-v1/full-suite.log",
+          "bytes": 485454,
+          "sha256": "a7fe5f22acf623a8931a87ec206f29b44b2609a5c4018cfada4ea7f182f1c638"
+        }
+      },
+      "repair": {
+        "scope": "Transform-only imports scoped; exact native guard extraction fixture updated.",
+        "reduced_tests": 3,
+        "focused_tests": 122,
+        "focused_skips": 2,
+        "freeze": {
+          "artifact": "sol-postmerge-fixture-repair-v1/freeze.json",
+          "bytes": 2202,
+          "sha256": "dc04403d76498824a728e23b5067b3312b7bfd499a0343439edbefe013c3b9ce"
+        }
+      },
+      "validation": {
+        "full-suite": {
+          "result": {
+            "artifact": "current-main-879a776a-validation-v1/full-suite.result.json",
+            "bytes": 847,
+            "sha256": "0d237c078460aabe81fecb965dcccbe64f59e5155d9c60817fadbdd148e9aeea"
+          },
+          "log": {
+            "artifact": "current-main-879a776a-validation-v1/full-suite.log",
+            "bytes": 474221,
+            "sha256": "0b10c7b0c3180ef569a10bb3aced6f0482b22d08f036a4a91cc7d4715b4a32b6"
+          },
+          "exit_code": 0,
+          "process_group_absent": true,
+          "elapsed_seconds": 525.571,
+          "tests": 2510,
+          "test_seconds": 525.227,
+          "skips": 180,
+          "failures": 0,
+          "errors": 0
+        },
+        "diagnostic": {
+          "result": {
+            "artifact": "current-main-879a776a-validation-v1/diagnostic.result.json",
+            "bytes": 845,
+            "sha256": "79b30eed5c8077d7bd7ec99321b10781959a8c8cd1a516b793739a04e7a0cad5"
+          },
+          "log": {
+            "artifact": "current-main-879a776a-validation-v1/diagnostic.log",
+            "bytes": 12243,
+            "sha256": "21146c7bd2d10f071510db30c08d324454fe1d02c6e737df04d988c242b637e6"
+          },
+          "exit_code": 0,
+          "process_group_absent": true,
+          "elapsed_seconds": 20.79
+        },
+        "ordinary": {
+          "result": {
+            "artifact": "current-main-879a776a-validation-v1/ordinary.result.json",
+            "bytes": 842,
+            "sha256": "c59bc9c22b0c22f0bb6d830f83eb1cc7389dd1b39367023428842288fca9afd6"
+          },
+          "log": {
+            "artifact": "current-main-879a776a-validation-v1/ordinary.log",
+            "bytes": 12220,
+            "sha256": "00b652669e7d114498cd0bdf3633fa594863c1922c34877b4afa39b497273d14"
+          },
+          "exit_code": 0,
+          "process_group_absent": true,
+          "elapsed_seconds": 20.039
+        }
+      },
+      "native_observer_syntax_only": {
+        "result": {
+          "artifact": "merge-focused-v1/sol-native-tu-result.json",
+          "bytes": 6488,
+          "sha256": "ef0e68872f7c4c57d68edd16945b305af93ea29cb7d2c5868a17ca0f4b0b763b"
+        },
+        "scope": "Actual full translation-unit syntax only; not a new Dolphin producer/build."
+      },
+      "next_short_source_prerequisite": {
+        "constructor_rng_proof": {
+          "artifact": "sol-stadium-map2-constructor-rng-proof-v1.json",
+          "bytes": 12722,
+          "sha256": "c0b7117ca7985f5b82d433dcfd90872fbfbd0c3626a0afedbaab94ecaa2658ec"
+        },
+        "owner_lifetime_review": {
+          "artifact": "sol-map2-owner-lifetime-proof-review-v1.json",
+          "bytes": 2511,
+          "sha256": "21721ea65672ee84be60ab247a9a8a5e47525d7be8e23a2c79d519c5a583c737"
+        },
+        "scope": "Short source map2 registration/live-owner and paired constructor RNG observation first. Deferred cleanup, original allocation generation and later idle RNG remain unproved. No long profile, record-cap increase or capture authorization."
+      },
+      "historical_capture_identities": "e0 capture / af tested harness / caab retained producer unchanged.",
+      "build_products": {
+        "artifact": "current-main-879a776a-validation-v1/build-artifacts-v2.json",
+        "bytes": 1122,
+        "sha256": "a53a649ff1271a0670d2c248b9277b08484ef4f59eda83ac970dd0ec54fbdd7e",
+        "scope": "Fresh Release products only; no new original producer or capture."
+      }
     }
   }
 }

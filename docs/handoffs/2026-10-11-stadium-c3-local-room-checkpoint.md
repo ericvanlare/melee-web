@@ -5,8 +5,9 @@ current-main integration is `5f274ed3fc6743937c8ec2ae66e23c1db4094c4e`.
 Current main `21e4c7bf` is integrated in the current source. The shared original
 collector preserves the retained Stadium menu recipe and separate Sheik Items
 and Stadium replay paths. Focused controls, retained raw replays and actual
-native translation-unit syntax pass; fresh full regression and affected builds
-are the next validation step. Prior capture producers below are unchanged.
+native translation-unit syntax pass. Current-main regression and both Release
+builds now pass; exact results and retained failures are linked below.
+Native-observer syntax is not a Dolphin producer build. Prior capture producers are unchanged.
 
 The matched-Setup C/F run passed its declared state/seed comparison and checked
 retirement. Capture checkpoint `e0c072cc` (tree `3a68e30e`), tested harness
@@ -33,3 +34,10 @@ full GO, original object-lifetime parity, stage admission, pixels, PCM or timing
 Tracking: [#251](https://github.com/ericvanlare/melee-web/issues/251),
 [draft #301](https://github.com/ericvanlare/melee-web/pull/301),
 [priorities #158](https://github.com/ericvanlare/melee-web/issues/158).
+
+Before the longer reference interval, use the reviewed static source proof to
+prepare a short map2 live-owner and paired constructor RNG observation. The
+implementation still needs review; constructor-entry ownership does not by
+itself observe the preceding registration event. Deferred cleanup
+and pointer reuse still need original event pairing; static proof is not a
+lifetime receipt. This checkpoint authorizes no capture or cap change.
