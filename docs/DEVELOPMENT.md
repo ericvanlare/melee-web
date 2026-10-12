@@ -180,6 +180,35 @@ becomes the baseline for the unchanged uncharged KO proof. Failure stops the
 run; the damage target is a hypothesis, not a guaranteed KO. Existing owner,
 input and action deadlines remain unchanged.
 
+The separate `full-moderate-combat-ko-prepared-platform-exit` scenario opts
+into the reviewed post-credit platform-exit policy with
+`--gameplay-combat-ko-prepared-platform-exit`. The legacy
+`full-moderate-combat-ko-prepared` scenario remains fully neutral for P1 through
+the KO/respawn proof; its receipts cannot be relabeled as platform-exit evidence.
+The new mode requires the verified exchange and prepared uncharged KO, a branded
+source-credited loss, the paired active airborne RebirthWait/facing gate, and a
+validated fully neutral pre-keydown PAD prefix. Only then does it allow one actual
+P1 horizontal-only input episode of 1–30 literal PAD rows through the existing
+500 ms keyboard callback (`holdMs: 0`, observed press), followed by a literal
+neutral release and tail. Actual paired Fall29 and grounded Wait14 must bind to the
+source-consumed action and complete PAD endpoint. Existing limits remain: at most
+eight observed-damage jabs, 18% actual damage within 480 preparation cursors, at
+most 16 approach taps, and a fresh 480-cursor KO budget; no cap/deadline reset.
+The gate's conservative position range is a scenario-admission policy, not
+authored Final Destination geometry or proof of landing. The observed result
+credited the first stock loss to combat, then used the existing walk-off route for
+the remaining stocks before Results and CSS. Scenario availability is not a
+gameplay acceptance claim.
+
+Example, after reviewing the current evidence and obtaining a separate capture
+release; use a fresh output directory:
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 scripts/run_network_simulation.py \
+  --disc "$MELEE_DISC" --playwright "$PLAYWRIGHT_DIR" --out "$NEW_EVIDENCE_DIR" \
+  --scenarios full-moderate-combat-ko-prepared-platform-exit
+```
+
 The reliability scenarios use separate result policies. Select one command below
 with a new evidence directory for each invocation:
 
