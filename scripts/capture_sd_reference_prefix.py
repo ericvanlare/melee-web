@@ -270,11 +270,12 @@ def _transform_consumed_ports(payload, sequence):
 class SheikTransformPrefixReceiver:
     """Small menu/input adapter over the existing passive transform MWRO stream."""
     def __init__(self, plan, menus, *, items_only=False):
-        from sheik_transform_prefix import TransformItemsProgress
         self.items_only = items_only
         self.transform_route = menus["scope"] == "sheik_transform_prefix"
-        self.items_progress = (TransformItemsProgress(items_only=items_only)
-                               if self.transform_route else None)
+        self.items_progress = None
+        if self.transform_route:
+            from sheik_transform_prefix import TransformItemsProgress
+            self.items_progress = TransformItemsProgress(items_only=items_only)
         from sd_original_menu_plan import route_pads
         self.plan, self.menus = plan, menus
         self.allowed_menu_pads = route_pads(menus)
@@ -327,9 +328,9 @@ class SheikTransformPrefixReceiver:
 
     def _pad_poll(self, row):
         from sd_reference_diagnostic import menu_state, css_state
-        from sheik_transform_prefix import PAD_POLL_PC, _transform_menu_state
         payload = row["payload"]
         if self.transform_route:
+            from sheik_transform_prefix import PAD_POLL_PC, _transform_menu_state
             require(payload.get("pc") == PAD_POLL_PC,
                     "Transform menu owner sample is not at the pinned original PadPoll boundary")
         data, _ = _transform_slices(payload)

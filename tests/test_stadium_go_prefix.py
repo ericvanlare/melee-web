@@ -805,7 +805,7 @@ class StadiumItemsLockSliceControl(OwnedWorkspaceTests):
     def test_stadium_observer_emits_existing_checked_lock_slice_only_for_items(self):
         observer = ROOT / "reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp"
         source = observer.read_text()
-        marker = "    if (scene_kind == 1 && (Env(\"MWRC_SD_MENU_PROBE\")"
+        marker = "    if (scene_kind == 1 && (transform_prefix_enabled ||"
         begin = source.index(marker)
         end = source.index("    // Source menu globals survive arena teardown", begin)
         gate = source[begin:end]
@@ -819,7 +819,7 @@ using u8 = uint8_t; using u16 = uint16_t; using u32 = uint32_t;
 enum class SliceTag { SdItemsLock = 56 };
 struct Probe {
   Core::System system;
-  bool stadium_go_prefix_enabled = false;
+  bool stadium_go_prefix_enabled = false, transform_prefix_enabled = false;
   bool read_bytes_ok = true, read_words_ok = true, add_ok = true;
   u8 menu_kind = 16;
   int byte_reads = 0, word_reads = 0, adds = 0;
@@ -857,6 +857,11 @@ int main() {
   assert(active.byte_reads == 1 && active.word_reads == 3 && active.adds == 1);
   assert(active.added_tag == SliceTag::SdItemsLock && active.added_address == 0x804d6bec &&
          active.added_size == 1 && active.added_flags == 0);
+  Probe transform; transform.transform_prefix_enabled = true; assert(transform.Apply(1));
+  assert(transform.byte_reads == 1 && transform.word_reads == 3 && transform.adds == 1);
+  Probe transform_bad_code; transform_bad_code.transform_prefix_enabled = true;
+  transform_bad_code.read_words_ok = false;
+  assert(!transform_bad_code.Apply(1) && transform_bad_code.adds == 0);
   Probe other_scene; other_scene.stadium_go_prefix_enabled = true; assert(other_scene.Apply(8));
   assert(other_scene.byte_reads == 0 && other_scene.adds == 0);
   Probe other_menu; other_menu.stadium_go_prefix_enabled = true; other_menu.menu_kind = 13;
