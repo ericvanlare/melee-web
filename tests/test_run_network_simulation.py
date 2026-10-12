@@ -358,5 +358,26 @@ class NetworkSimulationSuitePolicyTests(unittest.TestCase):
 
 
 
+    def test_ko_mode_requires_explicit_exchange_and_validated_three_stock_handoff(self):
+        self.assertEqual(scenario_route_flags("full-moderate-combat-ko"),
+                         ["--full-route", "--gameplay-combat-probe", "--gameplay-combat-exchange", "--gameplay-combat-ko"])
+        browser = copy.deepcopy(self.browser)
+        browser.update(gameplay_combat_probe=True, gameplay_combat_exchange=True, gameplay_combat_ko=True)
+        route = browser["full_route"]
+        route.update(gameplay_combat_probe=True, gameplay_combat_exchange=True, gameplay_combat_ko=True)
+        route["combat_probe"] = {"result":"pass", "combat_exchange":{"result":"pass"},
+                                 "combat_ko":{"result":"pass","handoff":{"starting_stocks":3}}}
+        kwargs = dict(gameplay_combat_probe=True,gameplay_combat_exchange=True,gameplay_combat_ko=True)
+        validate_result(0,self.owner,browser,True,**kwargs)
+        for corrupt in (lambda b:b.pop("gameplay_combat_ko"),
+                        lambda b:b["full_route"].pop("gameplay_combat_ko"),
+                        lambda b:b["full_route"]["combat_probe"]["combat_ko"].update(result="fail"),
+                        lambda b:b["full_route"]["combat_probe"]["combat_ko"]["handoff"].update(starting_stocks=4)):
+            bad=copy.deepcopy(browser);corrupt(bad)
+            with self.assertRaises(ValueError): validate_result(0,self.owner,bad,True,**kwargs)
+        with self.assertRaises(ValueError):
+            validate_result(0,self.owner,browser,True,gameplay_combat_probe=True,gameplay_combat_ko=True)
+
+
 if __name__ == "__main__":
     unittest.main()

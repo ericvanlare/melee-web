@@ -150,6 +150,8 @@ Use `--gameplay-combat-exchange` together with `--gameplay-combat-probe` only in
 the moderate full-route scenario. This mode does not attribute a stock loss to
 combat; its scoped result belongs in the combat evidence entry.
 
+The separate full-moderate-combat-ko scenario extends the verified exchange with one actual P2 left C-stick forward smash. Its optional gameplay-combat-ko mode requires the exchange prefix, a fresh four-stock baseline, observed hit/air/death, original source-slot KO credit and natural three-stock respawn within 480 source cursors. Literal inputs must show neutral P1 and one P2 C-stick episode through respawn. Only that validated handoff permits the existing route to continue from three stocks. A ledge grab or safe landing stops the hypothesis. Normal validation reads and checksum waits are source-bounded; diagnostic readbacks after a failure remain unaccepted evidence. Scenario availability is not a KO result.
+
 The reliability scenarios use separate result policies. Select one command below
 with a new evidence directory for each invocation:
 

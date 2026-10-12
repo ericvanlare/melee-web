@@ -1,7 +1,7 @@
 {
   "schema": "melee-web-network-combat-m2-v1",
   "issue": 313,
-  "scope": "Same-machine simulated-network functional; first P2-to-P1 jab plus supported original route. Combat exchange/shield/attack-caused KO remain open.",
+  "scope": "Same-machine simulated-network functional: jabs in both directions, genuine shield hit and full original route pass. Attack-caused KO remains open.",
   "integration": {
     "state": "unmerged_milestone_in_progress"
   },
@@ -358,9 +358,9 @@
       "sha256": "5d024dd9fa159ad5d49f61fa9d58bccffc4b0df753e3edce831f7ba23f8a56ed"
     }
   ],
-  "next": "Repair and review reduced observer ordering/evidence gap, then one bounded shield exchange run. A separately credited combat stock loss follows.",
+  "next": "One reviewed original-input combat stock-loss experiment with per-source-slot credit and strict natural respawn handoff. No unchanged repeat of passed exchange.",
   "native_combat_observations": {
-    "decision": "COMPILED_AND_BROWSER_OBSERVED_IN_FAILED_EXCHANGE_RUN",
+    "decision": "COMPILED_AND_BROWSER_EXERCISED_IN_EXCHANGE",
     "runtime_source": "d269334e1243b0568d8bf7caf285053bea8e04a1",
     "fields": [
       "shield_health",
@@ -398,7 +398,7 @@
       }
     ],
     "test_cleanup_source": "01949966",
-    "scope": "Adds observations only; no shield-hit or attack-caused KO claim."
+    "scope": "Read-only facing/shield fields exercise the passed shield exchange; persistent counters are observed but attack-caused KO remains open."
   },
   "exchange_first_attempt": {
     "decision": "FAIL_PAIRED_SHIELD_RESPONSE_NOT_RETAINED",
@@ -488,5 +488,169 @@
       "integrated_focused_controls": "3 wrappers passed, including20combat checks",
       "root_review_sha256": "a8c4a73663b15049ee78ea94f838af999ee31240fd6e2e21891d7f0486d7bcb1"
     }
+  },
+  "exchange_repaired_attempt": {
+    "schema": "m2-exchange-2-root-result-review-v1",
+    "decision": "PASS_SCOPED_SIMULATED_NETWORK_EXCHANGE_AND_ORIGINAL_ROUTE",
+    "source": "48f2b11acbc10bd7e84911ae1dd607c52e27b559",
+    "runtime_source": "d269334e1243b0568d8bf7caf285053bea8e04a1",
+    "actions": [
+      {
+        "label": "P2 grounded keyboard jab",
+        "press_input_tick": 595,
+        "target_observed_at_source_tick": 598,
+        "defender_damage_response_source_tick": 599,
+        "grounded_return_source_tick": 625
+      },
+      {
+        "label": "P1 grounded reverse keyboard jab",
+        "press_input_tick": 627,
+        "target_observed_at_source_tick": 630,
+        "defender_damage_response_source_tick": 631,
+        "grounded_return_source_tick": 657
+      },
+      {
+        "label": "P1 grounded keyboard jab into P2 R shield",
+        "press_input_tick": 671,
+        "target_observed_at_source_tick": 674,
+        "defender_damage_response_source_tick": 675,
+        "grounded_return_source_tick": 695
+      }
+    ],
+    "shield_inputs": {
+      "p1_press_input_tick": 671,
+      "p1_neutral_release_input_tick": 678,
+      "neutral_release_input_tick": 678,
+      "p2_press_input_tick": 659,
+      "p2_neutral_release_input_tick": 675,
+      "union_start_input_tick": 659,
+      "union_end_input_tick": 678,
+      "p1_active_samples": 7,
+      "p2_active_samples": 16,
+      "simultaneous_held_input_ticks": 4,
+      "p1_expected_button": 256,
+      "p2_expected_button": 32
+    },
+    "shield_response": {
+      "actor_motion_ids": [
+        44,
+        44
+      ],
+      "actor_attack11_observed": true,
+      "victim_motion_ids": [
+        181,
+        181
+      ],
+      "guard_setoff_181_observed": true,
+      "victim_damage_percent": [
+        3,
+        3
+      ],
+      "victim_damage_unchanged": true,
+      "victim_shield_health": [
+        54.9600143,
+        54.9600143
+      ],
+      "guard_entry_shield_health": 57.480011,
+      "victim_shield_decreased_from_guard_entry": true,
+      "hit_response_observed": true,
+      "shield_hit_response_observed": true
+    },
+    "exact_64_byte_common_records": 2993,
+    "common_range": [
+      0,
+      2992
+    ],
+    "recomputed_prefix_sha256": "abb7cbdff09feae522635b122404adaef97b4bc6f8a6d8ba0741c4f7c9921e7b",
+    "unpaired_tail_counts": {
+      "alpha": 4,
+      "beta": 3
+    },
+    "walkoff_losses": [
+      3,
+      2,
+      1,
+      0
+    ],
+    "natural_respawns": 3,
+    "winner": 1,
+    "returned_css_boundary": 2992,
+    "owned_pids_absent": 22,
+    "browser_errors": {
+      "alpha": [],
+      "beta": [
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "url": "http://127.0.0.1:8787/gameplay_menu_browser.data",
+          "failure": "net::ERR_ABORTED"
+        }
+      ]
+    },
+    "scope_limits": [
+      "Attack/shield observations sampled; unobserved frames not reconstructed.",
+      "The later four stock losses are walkoffs, not combat KO proof.",
+      "Same-machine simulation through local Worker; no public Internet, original equivalence, physical input, audible or timing acceptance."
+    ],
+    "artifacts": [
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-exchange-2-suite/full-moderate-combat-exchange/browser/report.json",
+        "bytes": 32290555,
+        "sha256": "0d26649014f951801357f335816e8951bba5221268fc6ae5c979cb89ee49e859"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-exchange-2-suite/full-moderate-combat-exchange/owner.json",
+        "bytes": 186351,
+        "sha256": "5a9abb2503c804c9d3e3f855560d7069d962e9989b98fa3f6e24bacc9e3e98cd"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-exchange-2-suite/suite.json",
+        "bytes": 1551493,
+        "sha256": "a3e26d6262d743e8c8cb635fd2dbd9f77344ce80dd978c353989993896c52d6b"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-exchange-2-root-result-review-v1.json",
+        "bytes": 3661,
+        "sha256": "2e0524b58a4e18b6cccb3ffc75d47d039912fcb677d81d5bb0b9861f0fefa1c3"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-exchange-2-process-retirement.json",
+        "bytes": 747,
+        "sha256": "cf142c00f4fefddbf01f8decfd5d14e33b9ebc5666a6fb7e65383a1f7da09911"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/combat-observer-repair-source-review-v1.json",
+        "bytes": 4237,
+        "sha256": "234b69b0a582c11f47ef0caf2676a80245be332ae5cbc20d4d5b3f3059443c61"
+      }
+    ],
+    "independent_result_review": {
+      "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-exchange-second-result-review-v1.json",
+      "sha256": "2a76be19b9c8515cbc43337be2536fc193052970b4bf226711163d2566d6300d"
+    },
+    "cleanup_inventory_with_worker": 23,
+    "worker_retirement_supplement": {
+      "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-exchange-worker-retirement-supplement-v1.json",
+      "sha256": "1d85f7a7bfe63f72f1a3245dfd41a53b1317deb9732bc3f130ddcc9179d89b49"
+    }
+  },
+  "ko_source_preparation": {
+    "decision": "SOURCE_REVIEW_AND_FOCUSED_CONTROLS_PASS_NO_CAPTURE_YET",
+    "candidate_v2_freeze_sha256": "4a32d6aaaf06168b9c96a7d7ca4ab0c095e442ae2ead19774b232d16e0369844",
+    "independent_review_sha256": "b0c56c22ab3af0a5cca755525139f75aa44a0426427af91802a7fe5f9b518b00",
+    "integrated_files": {
+      "scripts/a3_local_room_full_route.mjs": "548637969b90334012fb8c23a9b86f49a4b1ed1bed0fe9eda27750c848fcbeaa",
+      "scripts/a3_local_room_combat_ko.mjs": "b98cda579e625724aeeb152a9f65463c384ce14f5146c0db05840114394ad71e",
+      "scripts/a3_local_room_keyboard_browser.mjs": "01232ec0cd77e92bc8b6c9a35a5cf6fe845efd368924f80ae71f94c12c385232",
+      "scripts/run_network_simulation.py": "0f03bd4fba2e36cfbe742d3b48f20bb5540356e5fc10ed454004f284f5de8073",
+      "tests/a3_local_room_combat_ko.test.mjs": "fdb3edf4f476fd4cad8129b1dba93f528cceab2967a2df303516276aa7e6734d",
+      "tests/test_a3_local_room_full_route_combat.py": "b5fdfde44118315840953388e5ca69cb5f61775903c1064195bb9129adac4760",
+      "tests/test_run_network_simulation.py": "4a45ee74ffbe3c49212b254543b599e35d6864090a556286241a78cbb2e2c4a4"
+    },
+    "root_review_sha256": "bbfd52c33b5cf684b0a1ea037dcb006568ffae323ddbc4a970de2c8e405c84ca",
+    "scope": "One real C-stick attack, exact observed hit/air/death/source-credit/respawn,480 normal validation source limit; error diagnostics never accepted.",
+    "independent_review_path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/combat-ko-route-source-review-v2.json",
+    "root_review_path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-integrated-root-review-v2.json",
+    "retained_review_binding_correction": "m2-ko-integrated-root-review-v1.json bound an intermediate review digest during author extension; it was never a capture release. Earlier receipt retained, no capture occurred; current final source review is separately copied and frozen."
   }
 }

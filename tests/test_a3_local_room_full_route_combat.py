@@ -15,7 +15,8 @@ RUNTIME_ROOT = Path(os.environ.get("MELEE_TEST_RUNTIME_ROOT", ROOT)).resolve()
 class A3LocalRoomFullRouteCombatTests(unittest.TestCase):
     def test_bounded_combat_probe_policy_controls(self):
         result = subprocess.run(
-            [str(node_runtime(RUNTIME_ROOT)), str(ROOT / "tests/a3_local_room_full_route_combat.test.mjs")],
+            [str(node_runtime(RUNTIME_ROOT)), "--test", str(ROOT / "tests/a3_local_room_full_route_combat.test.mjs"),
+             str(ROOT / "tests/a3_local_room_combat_ko.test.mjs")],
             cwd=ROOT,
             capture_output=True,
             text=True,

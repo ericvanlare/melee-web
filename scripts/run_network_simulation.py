@@ -24,6 +24,7 @@ SCENARIOS = {
     "full-moderate-action-probe": ("moderate", True, False, False, True, False, False),
     "full-moderate-combat-probe": ("moderate", True, False, False, False, False, True),
     "full-moderate-combat-exchange": ("moderate", True, False, False, False, False, True, True),
+    "full-moderate-combat-ko": ("moderate", True, False, False, False, False, True, True, True),
     "full-moderate-repeat": ("moderate", True, False, False, False, True, False),
     "full-asymmetric": ("asymmetric", True, False, False, False, False, False),
     "css-constrained": ("constrained", False, False, False, False, False, False),
@@ -38,6 +39,7 @@ def scenario_route_flags(name):
     scenario = SCENARIOS[name]
     _, full_route, controlled_stall, controlled_cut, action_probe, repeat_route, combat_probe = scenario[:7]
     combat_exchange = len(scenario) > 7 and scenario[7]
+    combat_ko = len(scenario) > 8 and scenario[8]
     flags = []
     if full_route:
         flags.append("--full-route")
@@ -47,6 +49,8 @@ def scenario_route_flags(name):
         flags.append("--gameplay-combat-probe")
     if combat_exchange:
         flags.append("--gameplay-combat-exchange")
+    if combat_ko:
+        flags.append("--gameplay-combat-ko")
     if repeat_route:
         flags.append("--repeat-full-route")
     if controlled_stall:
@@ -80,12 +84,14 @@ def runtime_identity(directory):
 
 def validate_result(returncode, owner, browser, full_route, gameplay_action_probe=False,
                     repeat_full_route=False, *, controlled_stall=False,
-                    gameplay_combat_probe=False, gameplay_combat_exchange=False):
+                    gameplay_combat_probe=False, gameplay_combat_exchange=False, gameplay_combat_ko=False):
     """Require both independent owners; each opt-in route has its own policy."""
     if gameplay_action_probe and gameplay_combat_probe:
         raise ValueError("gameplay action and combat probes are separate scenarios")
     if gameplay_combat_exchange and not gameplay_combat_probe:
         raise ValueError("gameplay combat exchange requires the existing combat probe prefix")
+    if gameplay_combat_ko and not gameplay_combat_exchange:
+        raise ValueError("combat KO requires verified combat exchange mode")
     if returncode != 0:
         raise ValueError(f"capture owner exited {returncode}")
     if (owner.get("schema") != "melee-web-capture-process-owner-v3" or
@@ -98,6 +104,11 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
             browser.get("decision") != expected_decision or browser.get("first_error") is not None or
             browser.get("relay_mode") != "simulated-network"):
         raise ValueError("browser did not pass the requested simulated-network result policy")
+    for mode_report in [browser, browser.get("full_route") or {}]:
+        if gameplay_combat_ko and mode_report.get("gameplay_combat_ko") is not True:
+            raise ValueError("requested combat KO mode is missing")
+        if not gameplay_combat_ko and mode_report.get("gameplay_combat_ko", False) is not False:
+            raise ValueError("unexpected combat KO mode")
     network = browser.get("network_simulation") or {}
     if (network.get("proxy_cleanup", {}).get("verified") is not True or
             network.get("proxy_cleanup", {}).get("final") is not True):
@@ -143,11 +154,17 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
                 raise ValueError("combat scenario unexpectedly contains an action probe")
         elif route.get("combat_probe") is not None:
             raise ValueError("scenario unexpectedly contains a gameplay combat probe")
+        if gameplay_combat_ko:
+            ko = (route.get("combat_probe") or {}).get("combat_ko") or {}
+            if ko.get("result") != "pass" or (ko.get("handoff") or {}).get("starting_stocks") != 3:
+                raise ValueError("requested combat KO handoff is incomplete")
+        elif (route.get("combat_probe") or {}).get("combat_ko") is not None:
+            raise ValueError("unexpected combat KO receipt")
         if repeat_full_route:
             validate_repeat_route(route, browser.get("checksum_comparison"))
         elif route.get("repeat_mode") is not None or route.get("repeated_matches") is not None:
             raise ValueError("baseline unexpectedly contains repeated full routes")
-    elif repeat_full_route or gameplay_action_probe or gameplay_combat_probe or gameplay_combat_exchange:
+    elif repeat_full_route or gameplay_action_probe or gameplay_combat_probe or gameplay_combat_exchange or gameplay_combat_ko:
         raise ValueError("opt-in route scenario did not request a full route")
 
     if controlled_stall:
@@ -453,7 +470,7 @@ def main():
     if len(set(args.scenarios)) != len(args.scenarios):
         parser.error("duplicate scenarios would repeat captures without a new hypothesis")
     combat_names = [name for name in args.scenarios
-                    if name in {"full-moderate-combat-probe", "full-moderate-combat-exchange"}]
+                    if name in {"full-moderate-combat-probe", "full-moderate-combat-exchange", "full-moderate-combat-ko"}]
     if combat_names and len(args.scenarios) != 1:
         parser.error("each bounded combat scenario must run as its own single moderate scenario")
     task13_names = [name for name in args.scenarios
@@ -497,6 +514,7 @@ def main():
             (profile, full_route, controlled_stall, controlled_cut,
              gameplay_action_probe, repeat_full_route, gameplay_combat_probe) = scenario[:7]
             gameplay_combat_exchange = len(scenario) > 7 and scenario[7]
+            gameplay_combat_ko = len(scenario) > 8 and scenario[8]
             folder = output / name
             folder.mkdir()
             command = [sys.executable, str(ROOT / "scripts/capture_owner_deadline.py"),
@@ -517,11 +535,13 @@ def main():
                    "gameplay_action_probe": gameplay_action_probe,
                    "gameplay_combat_probe": gameplay_combat_probe,
                    "gameplay_combat_exchange": gameplay_combat_exchange,
+                   "gameplay_combat_ko": gameplay_combat_ko,
                    "controlled_stall_probe": controlled_stall,
                    "controlled_cut_probe": controlled_cut,
                    "result_policy": "expected-fault-cut" if controlled_cut else
                        "controlled-stall-probe" if controlled_stall else
                        "two-match-repeat" if repeat_full_route else
+                       "bounded-combat-ko" if gameplay_combat_ko else
                        "bounded-combat-exchange" if gameplay_combat_exchange else
                        "bounded-combat-probe" if gameplay_combat_probe else "clean-route",
                    "command": command, "decision": "PLANNED"}
@@ -571,7 +591,8 @@ def main():
                 validate_result(result.returncode, owner, browser, full_route, gameplay_action_probe,
                                 repeat_full_route, controlled_stall=controlled_stall,
                                 gameplay_combat_probe=gameplay_combat_probe,
-                                gameplay_combat_exchange=gameplay_combat_exchange)
+                                gameplay_combat_exchange=gameplay_combat_exchange,
+                                gameplay_combat_ko=gameplay_combat_ko)
                 if repeat_full_route:
                     validate_repeat_artifacts(folder / "browser", browser["full_route"])
                 if name == "css-moderate-fresh":

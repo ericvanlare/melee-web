@@ -4,6 +4,8 @@
  * native lockstep owner remains the only source-progress/checksum pump.
  */
 import assert from 'node:assert/strict';
+import {captureCombatKoBaseline, advanceCombatKoEvidence, createCombatKoRespawnHandoff}
+  from './a3_local_room_combat_ko.mjs';
 import {observeRuntimeOwner} from '../tests/runtime_owner_observation.mjs';
 import {confirmTwoHumanResults} from '../tests/vs_rules_results_confirmation_driver.mjs';
 import {returnFromCompetitivePrize} from '../tests/vs_rules_timeout_route_helpers.mjs';
@@ -38,7 +40,10 @@ export function observeDesiredSourcePad({inputFrom, port, expected, maxSourceCur
        !Array.isArray(bytes)||bytes.length!==11||
        !bytes.every(value=>Number.isInteger(value)&&value>=0&&value<=255))continue;
     const signed=value=>value>=128?value-256:value;
-    const matches=expected?.button!==undefined
+    const matches=expected?.cstickX!==undefined
+      ? bytes[0]===0&&bytes[1]===0&&bytes[2]===0&&bytes[3]===0&&
+        Math.sign(signed(bytes[4]))===expected.cstickX&&bytes.slice(5).every(value=>value===0)
+      : expected?.button!==undefined
       ? bytes[0]===((expected.button>>>8)&255)&&bytes[1]===(expected.button&255)
       : !!(expected?.x||expected?.y)&&
         (!expected.x||Math.sign(signed(bytes[2]))===expected.x)&&
@@ -482,24 +487,28 @@ export async function runA3LocalFullRoute({
   alpha, beta, report, inputDelay, remaining, readRoomState, readPeerSnapshot, readPeerInputSuffix,
   readInputDiagnostics, waitForBothChecksumCompare, captureScreenshot,
   assertHealthy, gameplayActionProbe = false, gameplayCombatProbe = false,
-  gameplayCombatExchange = false,
+  gameplayCombatExchange = false, gameplayCombatKo = false,
 }) {
   requireValue(!(gameplayActionProbe && gameplayCombatProbe),
     'Gameplay action and combat probes are separate route scenarios');
   requireValue(!gameplayCombatExchange || gameplayCombatProbe,
     'Gameplay combat exchange requires the existing combat probe prefix');
+  requireValue(!gameplayCombatKo || gameplayCombatExchange,
+    'Combat KO requires the verified combat exchange prefix');
   const route = {
     result: 'running', scope: 'local keyboard route/lifecycle witness only',
     phases: [], css_roster: [], stage: null, match_start: [], stock_losses: [],
     respawns: [], input_actions: [], terminal_handoff: null, results: null, returned_css: null,
     required_checksum_boundary: null, gameplay_action_probe: gameplayActionProbe,
     gameplay_combat_probe: gameplayCombatProbe,
-    gameplay_combat_exchange: gameplayCombatExchange,
+    gameplay_combat_exchange: gameplayCombatExchange, gameplay_combat_ko: gameplayCombatKo,
     exclusions: ['no PAD/Gamepad input injection',
       gameplayActionProbe
         ? 'one short P2 gameplay axis pulse, one P1 grounded jab, and one P2 jump with source motion evidence; no combat-coverage claim'
         : gameplayCombatProbe
-          ? gameplayCombatExchange
+          ? gameplayCombatKo
+            ? 'bounded one-swing combat KO hypothesis after the verified jab/shield exchange; requires observed hit/air/death, exact original source-slot scorer deltas and natural three-stock respawn; no retail-equivalence claim'
+            : gameplayCombatExchange
             ? 'bounded P2 approach/jab prefix, one reverse P1 jab, and one P2 shield exchange with paired source evidence; no retail-equivalence or KO claim'
             : 'bounded P2 inward keyboard approach and one P2 jab with paired source damage response; no retail-equivalence or KO claim'
           : 'one short P2 gameplay axis pulse; attack/jump probe not requested, no combat-coverage claim',
@@ -664,6 +673,8 @@ export async function runA3LocalFullRoute({
   const asSignedAxis = (bytes, index) => signedByte(bytes[index]);
   const matchesExpected = (row, expected) => {
     if (!Array.isArray(row?.bytes) || row.bytes.length !== 11) return false;
+    if (expected?.cstickX !== undefined) return row.bytes.slice(0,4).every(value => value === 0) &&
+      Math.sign(asSignedAxis(row.bytes,4)) === expected.cstickX && row.bytes.slice(5).every(value => value === 0);
     if (expected?.button !== undefined) {
       const value = expected.button;
       return row.bytes[0] === ((value >>> 8) & 0xff) && row.bytes[1] === (value & 0xff);
@@ -1959,12 +1970,135 @@ export async function runA3LocalFullRoute({
     route.action_prefix.result = 'pass';
   }
 
+  let combatKoHandoff = null;
+  if (gameplayCombatKo) {
+    requireValue(route.combat_probe?.combat_exchange?.result === 'pass',
+      'Combat KO prefix requires a verified shield exchange');
+    const before = await waitForGroundedNeutralBaseline('fresh one-swing KO baseline',
+      route.required_checksum_boundary, {recordSink: route.combat_probe.baselines,
+        includeRules: true, includeShieldObservation: true});
+    validateReverseJabSetup(before.matches, {maxGap: 20});
+    const baseline = captureCombatKoBaseline({pairedRows: before.rows});
+    const limit = baseline.source_tick + 480;
+    const ko = route.combat_probe.combat_ko = {result: 'running', baseline,
+      source_cursor_limit: limit, one_swing: true, action_start_tick: null,
+      observed_pairs: [], sequence: {}, input_window: null, handoff: null};
+    let cancelled = false;
+    let started = null;
+    let press = null;
+    let pending = [];
+    let lastTick = -1;
+    const history = {label: 'one-swing combat KO', source_cursor_join: {
+      samples_by_peer: {alpha: 0, beta: 0}, last_by_peer: {}, recent: [], last_pair: null}};
+    ko.observer = history;
+    const inspect = rows => {
+      inspectCombatPairRetainingRawRows(ko, rows);
+      if (started === null) { retainPreStartActionPair(pending, rows); return; }
+      if (rows[0].source_tick <= lastTick) return;
+      const states = rows.map((row,index) => classifyStockObservation(row,
+        `${index ? 'beta' : 'alpha'} one-swing KO`));
+      const matches = states.map(state => state.match);
+      validateCombatItemsNone(matches, route.combat_probe.item_rules.item_mask_hex);
+      comparePairedShieldObservation(matches);
+      for (const row of rows) requireValue(row.native_status?.active === 1 &&
+        row.native_status?.context_applied === 1 && row.native_status?.terminal?.kind === 0,
+      'Combat KO native owner is inactive or terminal');
+      ko.observed_pairs.push({source_tick: rows[0].source_tick, peers: rows});
+      if (states.some(state => state.wait)) return;
+      lastTick = rows[0].source_tick;
+      advanceCombatKoEvidence({baseline, sequence: ko.sequence, pairedRows: rows,
+        actionStartTick: started});
+    };
+    const drain = () => { if (started !== null && pending.length) {
+      const saved = pending; pending = []; for (const entry of saved) inspect(entry.rows);
+    }};
+    const outcome = (async () => {
+      while (!cancelled && remaining() > 0 && !ko.sequence.respawn_rows) {
+        drain();
+        if (ko.sequence.respawn_rows) break;
+        const rows = await observeAtCommonSourceCursor(history, () => cancelled, limit);
+        // startAt may change during the awaited acquisition: older saved pairs
+        // must be consumed before its newer live pair, never behind a watermark.
+        drain();
+        if (rows && !cancelled && !ko.sequence.respawn_rows) inspect(rows);
+      }
+      requireValue(!cancelled && ko.sequence.respawn_rows,
+        'Combat KO did not reach a validated natural three-stock respawn');
+      return ko.sequence.respawn_rows;
+    })().then(value => ({value}), error => ({error}));
+    try {
+      press = await pulse('beta', ['Numpad4'], {expected: {cstickX: -1},
+        holdMs: 0, releaseMs: 80, observePress: true, retainSample: true,
+        sourceCursorLimit: limit, evidenceSink: ko, label: 'single P2 left C-stick forward smash'});
+      started = press.source_input_tick + inputDelay + 1;
+      ko.action_start_tick = started;
+      ko.press = press;
+      const observed = await outcome;
+      if (observed.error) throw observed.error;
+      const rows = observed.value;
+      const inputStart = baseline.source_tick - inputDelay - 1;
+      const inputEnd = rows[0].source_tick - inputDelay - 1;
+      requireValue(Number.isSafeInteger(inputStart) && inputStart >= 0,
+        'Combat KO baseline lacks a consumed-input boundary');
+      const [a,b] = await Promise.all([readPeerInputSuffix(alpha,inputStart),
+        readPeerInputSuffix(beta,inputStart)]);
+      ko.last_input_readbacks = {alpha:a,beta:b};
+      const p1Rows = a.health?.peer?.localInputCapture?.captures_since;
+      const p2Rows = b.health?.peer?.localInputCapture?.captures_since;
+      requireValue([a,b].every(row => row.runtime_error == null && row.health?.failure == null &&
+        row.health?.peer?.failure == null && row.native_status?.local_capture_failure == null &&
+        Number.isSafeInteger(row.native_status?.cursor) && row.native_status.cursor <= limit),
+      'Combat KO input readback exceeded budget or failed');
+      const release = p2Rows?.find(row => row.input_tick > press.source_input_tick && isNeutralPadRow(row));
+      ko.input_window = {input_start_tick:inputStart,input_end_tick:inputEnd,
+        press_tick:press.source_input_tick,release_tick:release?.input_tick ?? null,p1Rows,p2Rows};
+      combatKoHandoff = createCombatKoRespawnHandoff({baseline,
+        attackLossReceipt:ko.sequence.loss,pairedRows:rows,p1Rows,p2Rows,
+        inputStartTick:inputStart,inputEndTick:inputEnd,pressTick:press.source_input_tick,
+        releaseTick:release?.input_tick});
+      const boundary = inputEnd + inputDelay + 1;
+      await waitForBothChecksumCompare(boundary,null,undefined,{sourceCursorLimit:limit,evidenceSink:ko});
+      ko.handoff = combatKoHandoff;
+      ko.required_checksum_boundary = boundary;
+      route.required_checksum_boundary = Math.max(route.required_checksum_boundary || 0,boundary);
+      ko.result = 'pass';
+      walkoffBaseRows = rows;
+      walkoffBaseMatches = rows.map(row => row.match);
+      route.stock_losses.push({remaining_p1_stocks:3,attribution:'original source-slot KO scorer plus observed one-swing hit/air/death',
+        first_observed_source_tick:ko.sequence.loss.source_tick,validated_loss_receipt:ko.sequence.loss});
+      route.respawns.push({after_loss:1,source_signal:'validated combat KO handoff grounded Wait14/groundAir0',
+        peers:rows.map((row,index) => ({peer:index?'beta':'alpha',source_frame:row.match.frame,
+          stocks:3,x:row.match.players[0].x,motion:14,groundAir:0}))});
+    } catch (error) {
+      ko.failure = String(error?.stack || error);
+      // Stop and join the read-only collector before preserving the failure's
+      // literal suffix. These rows are diagnostic only, never a valid handoff.
+      cancelled = true;
+      await outcome;
+      if (remaining() > 0) {
+        try {
+          const inputFrom = baseline.source_tick - inputDelay - 1;
+          const reads = await Promise.all([readPeerInputSuffix(alpha,inputFrom),
+            readPeerInputSuffix(beta,inputFrom)]);
+          ko.failure_input_readbacks = {alpha:reads[0],beta:reads[1],
+            input_start_tick:inputFrom, accepted:false};
+        } catch (readError) {
+          ko.failure_input_readback_error = String(readError?.stack || readError);
+        }
+      }
+      throw error;
+    } finally { cancelled = true; const joined = await outcome;
+      ko.observer_joined = true;
+      if (joined.error) ko.observer_error = String(joined.error?.stack || joined.error);
+    }
+  }
+
   // P1 walk-off uses one reconciler at common source ticks before and after
   // each pulse. A natural stock decrement may occur between pulses, so
   // observations accept only the tracked count or
   // exactly one fewer; a detected loss is recorded once and must reach the
   // native grounded-respawn observation before another keyboard action.
-  let stocks = 4;
+  let stocks = combatKoHandoff === null ? 4 : combatKoHandoff.starting_stocks;
   const firstPlayer = walkoffBaseMatches[0].players[0];
   requireValue(Number.isFinite(firstPlayer.x), 'P1 source position is unavailable at match start');
   let outwardKey = firstPlayer.x <= 0 ? 'a' : 'd';
