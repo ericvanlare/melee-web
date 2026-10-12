@@ -23,6 +23,7 @@ SCENARIOS = {
     "full-moderate": ("moderate", True, False, False, False, False, False),
     "full-moderate-action-probe": ("moderate", True, False, False, True, False, False),
     "full-moderate-combat-probe": ("moderate", True, False, False, False, False, True),
+    "full-moderate-combat-exchange": ("moderate", True, False, False, False, False, True, True),
     "full-moderate-repeat": ("moderate", True, False, False, False, True, False),
     "full-asymmetric": ("asymmetric", True, False, False, False, False, False),
     "css-constrained": ("constrained", False, False, False, False, False, False),
@@ -34,7 +35,9 @@ SCENARIOS = {
 
 def scenario_route_flags(name):
     """Return only the route flags owned by one named capture scenario."""
-    _, full_route, controlled_stall, controlled_cut, action_probe, repeat_route, combat_probe = SCENARIOS[name]
+    scenario = SCENARIOS[name]
+    _, full_route, controlled_stall, controlled_cut, action_probe, repeat_route, combat_probe = scenario[:7]
+    combat_exchange = len(scenario) > 7 and scenario[7]
     flags = []
     if full_route:
         flags.append("--full-route")
@@ -42,6 +45,8 @@ def scenario_route_flags(name):
         flags.append("--gameplay-action-probe")
     if combat_probe:
         flags.append("--gameplay-combat-probe")
+    if combat_exchange:
+        flags.append("--gameplay-combat-exchange")
     if repeat_route:
         flags.append("--repeat-full-route")
     if controlled_stall:
@@ -75,10 +80,12 @@ def runtime_identity(directory):
 
 def validate_result(returncode, owner, browser, full_route, gameplay_action_probe=False,
                     repeat_full_route=False, *, controlled_stall=False,
-                    gameplay_combat_probe=False):
+                    gameplay_combat_probe=False, gameplay_combat_exchange=False):
     """Require both independent owners; each opt-in route has its own policy."""
     if gameplay_action_probe and gameplay_combat_probe:
         raise ValueError("gameplay action and combat probes are separate scenarios")
+    if gameplay_combat_exchange and not gameplay_combat_probe:
+        raise ValueError("gameplay combat exchange requires the existing combat probe prefix")
     if returncode != 0:
         raise ValueError(f"capture owner exited {returncode}")
     if (owner.get("schema") != "melee-web-capture-process-owner-v3" or
@@ -101,12 +108,22 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
         raise ValueError("browser gameplay action mode differs from the requested scenario")
     if browser.get("gameplay_combat_probe") is not gameplay_combat_probe:
         raise ValueError("browser gameplay combat mode differs from the requested scenario")
+    if gameplay_combat_exchange and browser.get("gameplay_combat_exchange") is not True:
+        raise ValueError("browser gameplay combat exchange mode must be explicitly true")
+    if (not gameplay_combat_exchange and "gameplay_combat_exchange" in browser and
+            browser.get("gameplay_combat_exchange") is not False):
+        raise ValueError("browser gameplay combat exchange mode differs from the requested scenario")
     if full_route:
         route = browser["full_route"]
         if route.get("gameplay_action_probe") is not gameplay_action_probe:
             raise ValueError("full route gameplay action mode differs from the requested scenario")
         if route.get("gameplay_combat_probe") is not gameplay_combat_probe:
             raise ValueError("full route gameplay combat mode differs from the requested scenario")
+        if gameplay_combat_exchange and route.get("gameplay_combat_exchange") is not True:
+            raise ValueError("full route gameplay combat exchange mode must be explicitly true")
+        if (not gameplay_combat_exchange and "gameplay_combat_exchange" in route and
+                route.get("gameplay_combat_exchange") is not False):
+            raise ValueError("full route combat exchange mode differs from the requested scenario")
         if gameplay_action_probe:
             if (route.get("action_prefix") or {}).get("result") != "pass":
                 raise ValueError("requested gameplay action probe is incomplete")
@@ -117,6 +134,11 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
         if gameplay_combat_probe:
             if (route.get("combat_probe") or {}).get("result") != "pass":
                 raise ValueError("requested gameplay combat probe is incomplete")
+            if gameplay_combat_exchange:
+                if ((route.get("combat_probe") or {}).get("combat_exchange") or {}).get("result") != "pass":
+                    raise ValueError("requested gameplay combat exchange is incomplete")
+            elif (route.get("combat_probe") or {}).get("combat_exchange") is not None:
+                raise ValueError("combat-probe scenario unexpectedly contains a shield exchange")
             if route.get("action_prefix") is not None:
                 raise ValueError("combat scenario unexpectedly contains an action probe")
         elif route.get("combat_probe") is not None:
@@ -125,7 +147,7 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
             validate_repeat_route(route, browser.get("checksum_comparison"))
         elif route.get("repeat_mode") is not None or route.get("repeated_matches") is not None:
             raise ValueError("baseline unexpectedly contains repeated full routes")
-    elif repeat_full_route or gameplay_action_probe or gameplay_combat_probe:
+    elif repeat_full_route or gameplay_action_probe or gameplay_combat_probe or gameplay_combat_exchange:
         raise ValueError("opt-in route scenario did not request a full route")
 
     if controlled_stall:
@@ -431,9 +453,9 @@ def main():
     if len(set(args.scenarios)) != len(args.scenarios):
         parser.error("duplicate scenarios would repeat captures without a new hypothesis")
     combat_names = [name for name in args.scenarios
-                    if name == "full-moderate-combat-probe"]
+                    if name in {"full-moderate-combat-probe", "full-moderate-combat-exchange"}]
     if combat_names and len(args.scenarios) != 1:
-        parser.error("the bounded combat probe must run as its own single moderate scenario")
+        parser.error("each bounded combat scenario must run as its own single moderate scenario")
     task13_names = [name for name in args.scenarios
                     if name in {"css-moderate-cut", "css-moderate-fresh"}]
     if task13_names and task13_names not in (["css-moderate-cut"],
@@ -471,8 +493,10 @@ def main():
         "ready_url": f"http://127.0.0.1:{args.port}/runtime.html", "ready_timeout_ms": 10000})
     try:
         for name in args.scenarios:
+            scenario = SCENARIOS[name]
             (profile, full_route, controlled_stall, controlled_cut,
-             gameplay_action_probe, repeat_full_route, gameplay_combat_probe) = SCENARIOS[name]
+             gameplay_action_probe, repeat_full_route, gameplay_combat_probe) = scenario[:7]
+            gameplay_combat_exchange = len(scenario) > 7 and scenario[7]
             folder = output / name
             folder.mkdir()
             command = [sys.executable, str(ROOT / "scripts/capture_owner_deadline.py"),
@@ -492,11 +516,13 @@ def main():
             row = {"name": name, "profile": profile, "full_route": full_route,
                    "gameplay_action_probe": gameplay_action_probe,
                    "gameplay_combat_probe": gameplay_combat_probe,
+                   "gameplay_combat_exchange": gameplay_combat_exchange,
                    "controlled_stall_probe": controlled_stall,
                    "controlled_cut_probe": controlled_cut,
                    "result_policy": "expected-fault-cut" if controlled_cut else
                        "controlled-stall-probe" if controlled_stall else
                        "two-match-repeat" if repeat_full_route else
+                       "bounded-combat-exchange" if gameplay_combat_exchange else
                        "bounded-combat-probe" if gameplay_combat_probe else "clean-route",
                    "command": command, "decision": "PLANNED"}
             if repeat_full_route:
@@ -544,7 +570,8 @@ def main():
             else:
                 validate_result(result.returncode, owner, browser, full_route, gameplay_action_probe,
                                 repeat_full_route, controlled_stall=controlled_stall,
-                                gameplay_combat_probe=gameplay_combat_probe)
+                                gameplay_combat_probe=gameplay_combat_probe,
+                                gameplay_combat_exchange=gameplay_combat_exchange)
                 if repeat_full_route:
                     validate_repeat_artifacts(folder / "browser", browser["full_route"])
                 if name == "css-moderate-fresh":

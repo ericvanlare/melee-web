@@ -23,7 +23,7 @@ import {checksumCompareReached, checksumWaitDiagnostic} from './a3_checksum_wait
 import {runA3LocalFullRoute} from './a3_local_room_full_route.mjs';
 import {retainCombatChecksumCursorPoll} from './a3_local_room_combat_probe.mjs';
 
-const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--post-css-stall-probe] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route] [--controlled-cut-after-css] [--gameplay-action-probe] [--gameplay-combat-probe] [--repeat-full-route]';
+const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--post-css-stall-probe] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route] [--controlled-cut-after-css] [--gameplay-action-probe] [--gameplay-combat-probe] [--gameplay-combat-exchange] [--repeat-full-route]';
 const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, out: {type: 'string'},
   'relay-url': {type: 'string'}, 'relay-preflight': {type: 'string'},
@@ -34,6 +34,7 @@ const {values} = parseArgs({options: {
   'timeout-ms': {type: 'string', default: '300000'}, 'full-route': {type: 'boolean', default: false},
   'gameplay-action-probe': {type: 'boolean', default: false},
   'gameplay-combat-probe': {type: 'boolean', default: false},
+  'gameplay-combat-exchange': {type: 'boolean', default: false},
   'repeat-full-route': {type: 'boolean', default: false},
   help: {type: 'boolean', default: false},
 }, allowPositionals: false});
@@ -78,6 +79,9 @@ requireCondition(!values['gameplay-action-probe'] || values['full-route'],
   '--gameplay-action-probe requires --full-route');
 requireCondition(!values['gameplay-combat-probe'] || values['full-route'],
   '--gameplay-combat-probe requires --full-route');
+requireCondition(!values['gameplay-combat-exchange'] ||
+  (values['full-route'] && values['gameplay-combat-probe']),
+  '--gameplay-combat-exchange requires --full-route and --gameplay-combat-probe');
 requireCondition(!(values['gameplay-combat-probe'] && values['gameplay-action-probe']),
   '--gameplay-combat-probe cannot be combined with --gameplay-action-probe');
 requireCondition(!values['repeat-full-route'] || values['full-route'],
@@ -86,6 +90,8 @@ requireCondition(!(values['repeat-full-route'] && values['gameplay-action-probe'
   '--repeat-full-route cannot be combined with --gameplay-action-probe');
 requireCondition(!(values['repeat-full-route'] && values['gameplay-combat-probe']),
   '--repeat-full-route cannot be combined with --gameplay-combat-probe');
+requireCondition(!(values['repeat-full-route'] && values['gameplay-combat-exchange']),
+  '--repeat-full-route cannot be combined with --gameplay-combat-exchange');
 requireCondition(!(values['repeat-full-route'] &&
     (values['post-css-stall-probe'] || values['controlled-cut-after-css'])),
   '--repeat-full-route cannot be combined with a stall probe or controlled cut');
@@ -121,6 +127,13 @@ if (values['gameplay-combat-probe'] &&
      values['relay-url'] || values['relay-preflight'] ||
      values['post-css-stall-probe'] || values['controlled-cut-after-css']))
   throw Error('--gameplay-combat-probe requires only the simulated moderate full-route scenario');
+if (values['gameplay-combat-exchange'])
+  requireCondition(simulationConfiguration?.mode === 'simulated-network' &&
+    simulationConfiguration?.profile_name === 'moderate' && !values['relay-url'] &&
+    !values['relay-preflight'] && !values['post-css-stall-probe'] &&
+    !values['controlled-cut-after-css'] && !values['gameplay-action-probe'] &&
+    !values['repeat-full-route'],
+  '--gameplay-combat-exchange requires only its simulated moderate combat-probe scenario');
 const discPath = path.resolve(values.disc);
 const discInfo = await fs.stat(discPath);
 requireCondition(discInfo.isFile() && discInfo.size > 0, '--disc must name a nonempty local file');
@@ -155,6 +168,7 @@ const report = {
     ? 'same-machine simulated-network functional browser ' + (values['full-route'] ? 'full-route attempt' : 'CSS check') +
       (postCssStallProbe ? ' with an opt-in bounded post-CSS controlled-stall probe' : '') +
       (values['gameplay-combat-probe'] ? ' with a bounded P2 inward approach and jab probe' : '') +
+      (values['gameplay-combat-exchange'] ? ' plus one reverse jab and bounded shield exchange' : '') +
       ' using actual Host/Join and keyboard input, real TCP proxy sockets and an owned local Worker; public routing, deployed staging, physical input, two-machine, timing, pixel/PCM equivalence and whole-session acceptance remain pending'
     : relayMode.mode === 'external'
     ? (values['full-route']
@@ -189,6 +203,7 @@ const report = {
   full_route: null,
   gameplay_action_probe: values['gameplay-action-probe'],
   gameplay_combat_probe: values['gameplay-combat-probe'],
+  gameplay_combat_exchange: values['gameplay-combat-exchange'],
   leave_and_cleanup: {},
   exclusions: ['no direct PAD or Gamepad injection', 'no harness-owned peer or checksum pump',
     'no runtime source-tick/checksum-bound changes',
@@ -1029,6 +1044,7 @@ try {
       alpha: instances.alpha, beta: instances.beta, report, inputDelay: invite.inputDelay,
       gameplayActionProbe: values['gameplay-action-probe'],
       gameplayCombatProbe: values['gameplay-combat-probe'],
+      gameplayCombatExchange: values['gameplay-combat-exchange'],
       remaining, readRoomState, readPeerSnapshot, readPeerInputSuffix, readInputDiagnostics,
       waitForBothChecksumCompare, captureScreenshot,
       assertHealthy: (state, role) => {

@@ -140,6 +140,16 @@ source cursors; its positive-distance target is an unproved reach hypothesis.
 The existing action and owner deadlines remain fixed. Scenario availability
 does not establish a hit, complete combat coverage or original equivalence.
 
+The separately selected `full-moderate-combat-exchange` scenario keeps that
+prefix, then adds one P1 jab and one P1 jab against P2's actual held shield.
+It requires paired Guard entry before the attack, paired GuardSetOff, unchanged
+defender damage through recovery, and exact A/R input and release windows.
+The R hold is bounded to 30 source input ticks and the existing 500 ms observed
+keyboard callback; each attack retains its 60-source-tick observation limit.
+Use `--gameplay-combat-exchange` together with `--gameplay-combat-probe` only in
+the moderate full-route scenario. This mode does not attribute a stock loss to
+combat; its scoped result belongs in the combat evidence entry.
+
 The reliability scenarios use separate result policies. Select one command below
 with a new evidence directory for each invocation:
 

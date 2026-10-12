@@ -1,0 +1,403 @@
+{
+  "schema": "melee-web-network-combat-m2-v1",
+  "issue": 313,
+  "scope": "Same-machine simulated-network functional; first P2-to-P1 jab plus supported original route. Combat exchange/shield/attack-caused KO remain open.",
+  "integration": {
+    "state": "unmerged_milestone_in_progress"
+  },
+  "first_jab": {
+    "decision": "PASS_SCOPED_SIMULATED_NETWORK_KEYBOARD_JAB_AND_ORIGINAL_ROUTE",
+    "runtime_source": "5f895d3b5ea70811bccc8b9967fde788f6dd8cef",
+    "runtime_key_files": {
+      "runtime.html": {
+        "bytes": 6237,
+        "sha256": "70ec53d8af576bae9eaacfc42f172b0d6e8d631a92c75d824601849c8577e1a6"
+      },
+      "gameplay_menu_browser.js": {
+        "bytes": 300688,
+        "sha256": "170c03c7ba2a92f6e961e233b0f783099073177de85c44ded16c2a687fefefa5"
+      },
+      "gameplay_menu_browser.wasm": {
+        "bytes": 15819667,
+        "sha256": "895afc7a73dd0799122444e0cbcd6860b1d1883fbc4adc06c339c6de3b1c72a0"
+      },
+      "gameplay_menu_browser.data": {
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      "net_lockstep_browser_peer.mjs": {
+        "bytes": 39110,
+        "sha256": "5e5dbf09646c441fbc97c5f46cf7a3c0e4359fc14697adf8a27ab0ab8b6198f6"
+      },
+      "net_lockstep_core.mjs": {
+        "bytes": 30649,
+        "sha256": "624dc31caa8f9c4910b39ec15fcfd31b6728b356c5cf4857a8a8105170d4910f"
+      },
+      "net_lockstep_websocket_relay.mjs": {
+        "bytes": 20621,
+        "sha256": "9d0592060a3e385fe6d895bd73c8ec019346a95ce2fb0efa21b6da9be865865f"
+      }
+    },
+    "harness_source": {
+      "head": "c93824de17c2944125b1afd28f98036f3b0ea29a",
+      "tree": "858226ebfe1594ce47e2c7447c3c7bad3726731d",
+      "status_porcelain": "",
+      "allowed_harness_only_change": false,
+      "files_sha256": {
+        "scripts/a3_local_room_keyboard_browser.mjs": "11a61bd7647b6721719dd766e645914376164da471c8adacdce289c5144390ae",
+        "scripts/net_session_instance.mjs": "019bb5b79322e5f1aff85aa6df9caffc384c35b3d7dbfbe1ecb7d103dde21a30",
+        "scripts/a3_data_package_diagnostics.mjs": "76cf448ef3c7a17137bea7078a03fb67baf5cd4a0990a2e08aab76b370d7aadb",
+        "scripts/a3_expected_fault_auditor.py": "0d7a9d94f348c970671ceb2b55e937ed651fd198e1cf682100b4f43deca48f07",
+        "scripts/a3_public_relay_preflight.mjs": "51e568899f9ee32626eb63734610cddb9526659fe3df54eedc690209db490d53",
+        "scripts/a3_local_room_full_route.mjs": "d84ca5b795fda24f5cb4dc275952a8e8e594e57356d80603ee050666c4ab837b",
+        "scripts/a3_local_room_combat_probe.mjs": "aba008ecbc096fdf243abd4789640fef6d2438de435eec8b5357d345340d785e",
+        "tests/a3_local_room_full_route_combat.test.mjs": "71462c1d0774b8fc5f58f1cc2bdbb336e1350f8e9174f5176d9bfa1e9de56566",
+        "scripts/a3_checksum_wait_diagnostics.mjs": "ac7c048b1baad22ea0985f17a6c9fe79c590e9106d1c9f9a055175db81673dd5",
+        "scripts/a3_source_cursor_join.mjs": "ffaf9978dd9c32f2917283726305693817a649319c0846dbe166470b273ccb07",
+        "scripts/run_network_simulation.py": "23de3c738a1ecac53f3d76524c9690f6dd09a766b0f5de321b6ca4778b7ed933",
+        "tests/test_run_network_simulation.py": "1405112a3afc6239d09daedd60d2e045e8b2efe2ad5c82fe57bd7332cb78217a",
+        "scripts/a3_network_simulation.mjs": "43adc38e8cab7beb46c3a2c37c9dfc58c4b4da22340b745db637955ae86dbcef",
+        "scripts/a3_network_stall_probe.mjs": "79222b3a7f4d0ee2967c248ca960d80169f93fd86c26425e9b4388a810f543da",
+        "scripts/net_test_tcp_proxy.mjs": "eb2da6077accc9716baf465c8e5a6d5334cd9f5a75b971c483852c5f2938f512"
+      }
+    },
+    "source_review": {
+      "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-combat-jab-source-review-v2.json",
+      "bytes": 2544,
+      "sha256": "699d6affde4c5bd1ee79e61f92ebcdb0639252f2c58bca96bdf19b97539474a5"
+    },
+    "result_review": {
+      "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-first-jab-result-review-v1.json",
+      "bytes": 7413,
+      "sha256": "ecc0395f1238f98dd61e39154a4ec7a4d1d616df0e51b009fc0a23b071852661"
+    },
+    "capture_release": {
+      "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-first-jab-capture-release.json",
+      "bytes": 1313,
+      "sha256": "d51082c1d6166354e4aad354d078d9d9f193ae31e906243e5ab85591248d565e"
+    },
+    "focused_controls": {
+      "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-integrated-focused-controls.json",
+      "bytes": 1674,
+      "sha256": "6c528d87e565f5ff6695faf69c6a060b8ca000d7f9fad7eae8687eb33e78be2a"
+    },
+    "artifacts": {
+      "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-first-jab-1-suite/full-moderate-combat-probe/browser/report.json": {
+        "bytes": 30692007,
+        "sha256": "b195bebef3dc0668fa198d1498ec9a210425499ac395abde953302a1d9b7d6fb"
+      },
+      "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-first-jab-1-suite/full-moderate-combat-probe/owner.json": {
+        "bytes": 179027,
+        "sha256": "9455bf5cc6a6bd9a403a41a17d0b1ace01eaeff709121d17abfb84e970b21019"
+      },
+      "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-first-jab-1-suite/suite.json": {
+        "bytes": 1551393,
+        "sha256": "ea5dcb8f2520c575ade57a8955a2ea94127bfb88d7efcabbbf1ca6d0d2badde4"
+      },
+      "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-first-jab-1-suite/full-moderate-combat-probe/browser-processes.jsonl": {
+        "bytes": 133817,
+        "sha256": "f946a71c998c99f86f340e3957119361fb93a4bb63ba904e626db92b6ce391f9"
+      }
+    },
+    "raw_comparison": {
+      "records_each": 2911,
+      "tick_range": [
+        0,
+        2910
+      ],
+      "recomputed_prefix_sha256": "84f51ab23f6587162f249f951246dcaa84ec83a514aff20a730dda501052c446",
+      "all_64_bytes_equal": true,
+      "unpaired_tail_counts": {
+        "alpha": 4,
+        "beta": 3
+      },
+      "required_boundary": 2910,
+      "scene_ids_observed": [
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    "approach": {
+      "taps": 5,
+      "source_cursor_span": 136,
+      "limit": 480,
+      "gap": 12.059959399999997,
+      "axis_windows": [
+        [
+          [
+            472,
+            473
+          ],
+          [
+            0,
+            0,
+            129,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        [
+          [
+            497,
+            498
+          ],
+          [
+            0,
+            0,
+            129,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        [
+          [
+            521,
+            522
+          ],
+          [
+            0,
+            0,
+            129,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        [
+          [
+            546,
+            547
+          ],
+          [
+            0,
+            0,
+            129,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        [
+          [
+            570,
+            571
+          ],
+          [
+            0,
+            0,
+            129,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      ]
+    },
+    "jab": {
+      "press_ticks": [
+        594,
+        601
+      ],
+      "neutral_release": 602,
+      "p1_neutral_rows": 9,
+      "target_source_cursor": 606,
+      "victim_motion": 79,
+      "victim_damage": 3,
+      "grounded_return": 625,
+      "paired_samples": 17,
+      "observed_cursors": [
+        606,
+        608,
+        609,
+        611,
+        612,
+        613,
+        614,
+        615,
+        616,
+        617,
+        618,
+        619,
+        620,
+        621,
+        622,
+        623,
+        625
+      ],
+      "gaps_explicit": [
+        [
+          607,
+          607
+        ],
+        [
+          610,
+          610
+        ],
+        [
+          624,
+          624
+        ]
+      ]
+    },
+    "route": {
+      "phases": [
+        1,
+        3,
+        7,
+        8,
+        1
+      ],
+      "loss_counts": [
+        3,
+        2,
+        1,
+        0
+      ],
+      "respawns": 3,
+      "terminal": {
+        "outcome": 2,
+        "winners": [
+          1
+        ]
+      },
+      "results_confirmed_source_ports": [
+        0,
+        1
+      ],
+      "returned_css_boundary": 2910
+    },
+    "cleanup": {
+      "normal_leave_unload_quiescence_both": true,
+      "proxy_closed_connections": 5,
+      "proxy_exact_bytes_hashes": true,
+      "worker_disposed": true,
+      "owned_pids_absent": [
+        60979,
+        60980,
+        61012,
+        61018,
+        61026,
+        61027,
+        61028,
+        61029,
+        61033,
+        61034,
+        61036,
+        61064,
+        61068,
+        61069,
+        61070,
+        61071,
+        61072,
+        61073,
+        61074,
+        61076,
+        61099,
+        61102
+      ],
+      "owned_pid_count": 22,
+      "elapsed_ms": 88899,
+      "browser_errors": {
+        "alpha": [],
+        "beta": [
+          {
+            "kind": "requestfailed",
+            "method": "GET",
+            "url": "http://127.0.0.1:8787/gameplay_menu_browser.data",
+            "failure": "net::ERR_ABORTED"
+          }
+        ]
+      }
+    },
+    "exclusions": [
+      "Sampled action rows have gaps; no continuous animation or exact transition-frame claim.",
+      "Native/source compiled functional result through local pinned Worker plus simulated moderate TCP, not public Internet/provider or independent original equivalence.",
+      "Four later stock losses are original walkoffs, not attack-caused KOs. Shield/KO/facing observations remain separate gates.",
+      "Retained beta GET .data ERR_ABORTED means not browser-error-free; no new benign classification inferred.",
+      "Runtime source5f895d3b and harnessc938 remain distinct; no new runtime build or capture by reviewer."
+    ]
+  },
+  "retained_source_rejections": [
+    {
+      "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-combat-jab-source-review-v1.json",
+      "bytes": 4316,
+      "sha256": "7fb7fc5058cd77f221fe9c6f4d6153c5212bf57c28051f471804a035044733e0"
+    },
+    {
+      "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/combat-exchange-source-review-v1.json",
+      "bytes": 6412,
+      "sha256": "5d024dd9fa159ad5d49f61fa9d58bccffc4b0df753e3edce831f7ba23f8a56ed"
+    }
+  ],
+  "next": "Fresh reverse-direction jab and genuine shield-hit exchange, then a separately attributed combat stock loss; one status boundary updated in place.",
+  "native_combat_observations": {
+    "decision": "COMPILED_NOT_YET_EXERCISED_IN_BROWSER",
+    "runtime_source": "d269334e1243b0568d8bf7caf285053bea8e04a1",
+    "fields": [
+      "shield_health",
+      "facing_direction",
+      "primary_falls",
+      "suicides",
+      "kos_by_player_slot"
+    ],
+    "source_semantics": "Direct read-only source Player counters; KO vector indexed by all six authored original player slots. Primary falls bound to checked transformed primary; snapshots must precede match reset.",
+    "source_review": {
+      "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-native-observer-source-review-v1.json",
+      "bytes": 1628,
+      "sha256": "e64b9e6afb194b8ca777bd4711e5b0f1ccc7909aee58ef337aa641c9ddf986af"
+    },
+    "runtime_producer": {
+      "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-native-runtime-producer.json",
+      "bytes": 1420,
+      "sha256": "d9110892bf55b15e8b87cd867e8a67a698498a9eb994f4d7892e6cf4854d79a1"
+    },
+    "focused_controls": [
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-native-integrated-stats.log",
+        "bytes": 386,
+        "sha256": "58950866abe767332c04ebda74df26294fab7d86930b6363a79c09dac57e528a"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-native-integrated-observer.log",
+        "bytes": 468,
+        "sha256": "ee4ad5fe7539eef98c225649ff7900b44bce6ee405763dfc26923914da4174d8"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-native-stats-cleanup-control.log",
+        "bytes": 235,
+        "sha256": "29b70fbe347b894bdeb45131ced2f5332d9c8bdbf48e40513eed951e0299c922"
+      }
+    ],
+    "test_cleanup_source": "01949966",
+    "scope": "Adds observations only; no shield-hit or attack-caused KO claim."
+  }
+}

@@ -146,6 +146,88 @@ export function comparePairedCombatPlayers(matches) {
   return true;
 }
 
+// Shield exchange fields are required only by the additive exchange scenario.
+// This leaves the existing approach/jab probe compatible with its frozen
+// observation schema while requiring exact finite same-cursor peer agreement
+// where shield evidence is actually claimed.
+export function comparePairedShieldObservation(matches) {
+  comparePairedCombatPlayers(matches);
+  for (let port = 0; port < 2; ++port) {
+    const left = matches[0].players[port];
+    const right = matches[1].players[port];
+    for (const field of ['shield_health', 'facing_direction']) {
+      if (!Number.isFinite(left?.[field]) || !Number.isFinite(right?.[field]))
+        throw Error(`Combat exchange P${port + 1} ${field} is not finite on both peers`);
+      if (left[field] !== right[field])
+        throw Error(`Combat exchange peers disagree on P${port + 1} ${field} at one source cursor`);
+    }
+  }
+  return true;
+}
+
+// The reverse-jab hypothesis requires P1 to remain left of P2 and face right
+// on both peer snapshots at the retained actual baseline.
+export function validateReverseJabSetup(matches, {maxGap = 20} = {}) {
+  comparePairedShieldObservation(matches);
+  if (!Number.isFinite(maxGap) || maxGap <= 0)
+    throw Error('Reverse-jab setup has an invalid positive-gap bound');
+  const signedGapByPeer = matches.map(match => match.players[1].x - match.players[0].x);
+  const p1FacingByPeer = matches.map(match => match.players[0].facing_direction);
+  if (!signedGapByPeer.every(gap => Number.isFinite(gap) && gap > 0 && gap <= maxGap))
+    throw Error(`Reverse-jab setup requires signed P2x-P1x in (0, ${maxGap}] on both peers`);
+  if (!p1FacingByPeer.every(direction => direction === 1))
+    throw Error('Reverse-jab setup requires P1 facing_direction +1 on both peers');
+  return {p1_x_by_peer: matches.map(match => match.players[0].x),
+    p2_x_by_peer: matches.map(match => match.players[1].x),
+    signed_gap_by_peer: signedGapByPeer,
+    p1_facing_direction_by_peer: p1FacingByPeer};
+}
+
+// Keep the same victim-damage baseline through every paired shield-action
+// sample and the final grounded-neutral recovery snapshot.
+export function assertPairedVictimDamageUnchanged(matches,
+  {initialVictimDamage, victimPort = 1} = {}) {
+  if (!Number.isFinite(initialVictimDamage) || ![0, 1].includes(victimPort))
+    throw Error('Combat victim-damage guard requires a finite baseline and valid port');
+  comparePairedCombatPlayers(matches);
+  const damageByPeer = matches.map(match => match.players[victimPort].damage_percent);
+  if (!damageByPeer.every(Number.isFinite) ||
+      !damageByPeer.every(value => value === initialVictimDamage))
+    throw Error(`P${victimPort + 1} damage changed from ${initialVictimDamage}: ${JSON.stringify(damageByPeer)}`);
+  return {victim_port: victimPort, baseline_damage_percent: initialVictimDamage,
+    damage_percent_by_peer: damageByPeer, unchanged: true};
+}
+
+// A shield hit is supported only by the paired GuardSetOff state, unchanged
+// defender damage, and shield loss measured from the paired guard-entry
+// baseline. Passive decay or guard entry alone cannot satisfy this predicate.
+export function observePairedShieldJab(matches, {initialVictimDamage,
+  guardEntryShieldHealth, actorPort = 0, victimPort = 1} = {}) {
+  if (!Number.isFinite(initialVictimDamage) || !Number.isFinite(guardEntryShieldHealth) ||
+      ![0, 1].includes(actorPort) || ![0, 1].includes(victimPort) || actorPort === victimPort)
+    throw Error('Combat shield-jab observation requires finite paired baselines and distinct ports');
+  comparePairedShieldObservation(matches);
+  const actorMotions = matches.map(match => match.players[actorPort].motion);
+  const victimMotions = matches.map(match => match.players[victimPort].motion);
+  const victimDamage = matches.map(match => match.players[victimPort].damage_percent);
+  const victimShield = matches.map(match => match.players[victimPort].shield_health);
+  if (!victimDamage.every(Number.isFinite) || !victimShield.every(Number.isFinite))
+    throw Error('Combat shield-jab victim fields are not finite');
+  const actorAttackObserved = actorMotions[0] === 44 && actorMotions[1] === 44;
+  const guardSetOffObserved = victimMotions[0] === 181 && victimMotions[1] === 181;
+  const damageUnchanged = victimDamage[0] === initialVictimDamage &&
+    victimDamage[1] === initialVictimDamage;
+  const shieldDecreased = victimShield.every(value => value < guardEntryShieldHealth);
+  return {actor_motion_ids: actorMotions, actor_attack11_observed: actorAttackObserved,
+    victim_motion_ids: victimMotions, guard_setoff_181_observed: guardSetOffObserved,
+    victim_damage_percent: victimDamage, victim_damage_unchanged: damageUnchanged,
+    victim_shield_health: victimShield,
+    guard_entry_shield_health: guardEntryShieldHealth,
+    victim_shield_decreased_from_guard_entry: shieldDecreased,
+    hit_response_observed: guardSetOffObserved && damageUnchanged && shieldDecreased,
+    shield_hit_response_observed: guardSetOffObserved && damageUnchanged && shieldDecreased};
+}
+
 // Validate exact same-cursor actor and defender fields. The action motion and
 // victim reaction are retained at their own observed cursors; the observer does
 // not assume their transition frames coincide.

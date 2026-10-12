@@ -297,6 +297,45 @@ class NetworkSimulationSuitePolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unexpectedly contains a gameplay combat"):
             validate_result(0, self.owner, unexpected, True)
 
+    def test_combat_exchange_has_an_isolated_moderate_scenario_and_result_gate(self):
+        self.assertEqual(SCENARIOS["full-moderate-combat-exchange"],
+                         ("moderate", True, False, False, False, False, True, True))
+        self.assertEqual(scenario_route_flags("full-moderate-combat-exchange"),
+                         ["--full-route", "--gameplay-combat-probe",
+                          "--gameplay-combat-exchange"])
+        exchange = copy.deepcopy(self.browser)
+        exchange["gameplay_combat_probe"] = True
+        exchange["gameplay_combat_exchange"] = True
+        exchange["full_route"]["gameplay_combat_probe"] = True
+        exchange["full_route"]["gameplay_combat_exchange"] = True
+        exchange["full_route"]["combat_probe"] = {
+            "result": "pass", "combat_exchange": {"result": "pass"}}
+        validate_result(0, self.owner, exchange, True, gameplay_combat_probe=True,
+                        gameplay_combat_exchange=True)
+        with self.assertRaisesRegex(ValueError, "combat exchange is incomplete"):
+            incomplete = copy.deepcopy(exchange)
+            incomplete["full_route"]["combat_probe"]["combat_exchange"]["result"] = "running"
+            validate_result(0, self.owner, incomplete, True, gameplay_combat_probe=True,
+                            gameplay_combat_exchange=True)
+        with self.assertRaisesRegex(ValueError, "explicitly true"):
+            wrong_mode = copy.deepcopy(exchange)
+            wrong_mode["gameplay_combat_exchange"] = False
+            validate_result(0, self.owner, wrong_mode, True, gameplay_combat_probe=True,
+                            gameplay_combat_exchange=True)
+        with self.assertRaisesRegex(ValueError, "browser.*explicitly true"):
+            missing_browser_mode = copy.deepcopy(exchange)
+            del missing_browser_mode["gameplay_combat_exchange"]
+            validate_result(0, self.owner, missing_browser_mode, True,
+                            gameplay_combat_probe=True, gameplay_combat_exchange=True)
+        with self.assertRaisesRegex(ValueError, "full route.*explicitly true"):
+            missing_route_mode = copy.deepcopy(exchange)
+            del missing_route_mode["full_route"]["gameplay_combat_exchange"]
+            validate_result(0, self.owner, missing_route_mode, True,
+                            gameplay_combat_probe=True, gameplay_combat_exchange=True)
+        with self.assertRaisesRegex(ValueError, "requires the existing combat probe"):
+            validate_result(0, self.owner, self.browser, True,
+                            gameplay_combat_exchange=True)
+
     def test_action_probe_cannot_be_relabelled_as_baseline(self):
         action = copy.deepcopy(self.browser)
         action["gameplay_action_probe"] = True
