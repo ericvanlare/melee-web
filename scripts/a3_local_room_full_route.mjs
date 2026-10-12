@@ -322,7 +322,7 @@ export function classifyStockObservation(row, label = 'stock observation') {
  * input-delay boundary. `expected` is a PAD-byte readback only, never input.
  */
 export async function runA3LocalFullRoute({
-  alpha, beta, report, inputDelay, remaining, readRoomState, readPeerSnapshot,
+  alpha, beta, report, inputDelay, remaining, readRoomState, readPeerSnapshot, readPeerInputSuffix,
   readInputDiagnostics, waitForBothChecksumCompare, captureScreenshot,
   assertHealthy, gameplayActionProbe = false,
 }) {
@@ -514,7 +514,7 @@ export async function runA3LocalFullRoute({
     let sample = observePress ? observed : null;
     const captureDeadline = Date.now() + Math.min(1500, remaining());
     while (Date.now() < captureDeadline && !sample) {
-      const readback = await readPeerSnapshot(instance, inputCount);
+      const readback = await readPeerInputSuffix(instance, inputCount);
       const captures = readback.health?.peer?.localInputCapture?.captures_since;
       requireValue(Array.isArray(captures), `${label}: native local-input suffix is unavailable`);
       sample = captures.find(row => row.input_tick >= inputCount && row.local_port === port &&
@@ -554,8 +554,8 @@ export async function runA3LocalFullRoute({
       requireValue(Number.isSafeInteger(p1CaptureCount) && p1CaptureCount >= 0,
         'P1 local input capture count is unavailable during the P2 prefix');
       const [p2Readback, p1Readback] = await Promise.all([
-        readPeerSnapshot(beta, movementTick),
-        readPeerSnapshot(alpha, Math.min(movementTick, p1CaptureCount)),
+        readPeerInputSuffix(beta, movementTick),
+        readPeerInputSuffix(alpha, Math.min(movementTick, p1CaptureCount)),
       ]);
       requireValue(p2Readback.runtime_error == null && p1Readback.runtime_error == null,
         `P2 input-window capture observed a runtime error (${p2Readback.runtime_error || p1Readback.runtime_error})`);
@@ -600,7 +600,7 @@ export async function runA3LocalFullRoute({
     const commonTick = Math.min(sourceTick, counts[0] - 1, counts[1] - 1);
     if (commonTick < minimumInputTick || sourceTick - commonTick > 1) return null;
     const snapshots = await Promise.all(['alpha', 'beta'].map(role =>
-      readPeerSnapshot(instances[role], commonTick)));
+      readPeerInputSuffix(instances[role], commonTick)));
     snapshots.forEach((snapshot, index) => {
       const role = index === 0 ? 'alpha' : 'beta';
       requireValue(snapshot.runtime_error == null &&
@@ -801,8 +801,8 @@ export async function runA3LocalFullRoute({
       requireValue(counts.every(Number.isSafeInteger),
         label + ': live input capture counts are unavailable');
       const [actionReadback, otherReadback] = await Promise.all([
-        readPeerSnapshot(instances[role], Math.min(pressTick, counts[0])),
-        readPeerSnapshot(instances[otherRole], Math.min(pressTick, counts[1])),
+        readPeerInputSuffix(instances[role], Math.min(pressTick, counts[0])),
+        readPeerInputSuffix(instances[otherRole], Math.min(pressTick, counts[1])),
       ]);
       requireValue(actionReadback.runtime_error == null && otherReadback.runtime_error == null &&
         actionReadback.health?.failure == null && otherReadback.health?.failure == null &&

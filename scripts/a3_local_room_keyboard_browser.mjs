@@ -379,6 +379,24 @@ async function readPeerSnapshot(instance, inputFrom = null) {
   }, inputFrom);
 }
 
+// Explicit input-suffix reads avoid cloning retained checksum/PAD history. Keep
+// readPeerSnapshot for full route/fault/final checkpoints that need that history.
+async function readPeerInputSuffix(instance, inputFrom) {
+  return instance.page.evaluate(inputFrom => {
+    const health = globalThis.meleeNetRuntimeLockstepHealth?.({inputFrom});
+    const nativeStatus = globalThis.__net?.status?.() ?? null;
+    const module = globalThis.Module;
+    return {
+      snapshot: null,
+      health,
+      native_status: nativeStatus,
+      menu_phase: module?._melee_web_native_menu_phase?.() ?? null,
+      menu_running: module?._melee_web_native_menu_running?.() ?? null,
+      runtime_error: document.querySelector('#status')?.dataset.runtimeError || null,
+    };
+  }, inputFrom);
+}
+
 async function readBrowserProcessInfo(instance, role) {
   const browser = instance.context.browser();
   requireCondition(browser && typeof browser.newBrowserCDPSession === 'function',
@@ -919,7 +937,7 @@ try {
       waitForCursorChange(instances.beta, spec.port, cursorBefore.beta),
     ]);
     const after = {alpha: cursorAfter[0], beta: cursorAfter[1]};
-    const readback = await readPeerSnapshot(instance, inputCount);
+    const readback = await readPeerInputSuffix(instance, inputCount);
     const inputAfter = await readInputDiagnostics(instance);
     const captures = readback.health?.peer?.localInputCapture?.captures_since;
     requireCondition(Array.isArray(captures) && captures.length > 0,
@@ -975,7 +993,7 @@ try {
     report.full_route = await runA3LocalFullRoute({
       alpha: instances.alpha, beta: instances.beta, report, inputDelay: invite.inputDelay,
       gameplayActionProbe: values['gameplay-action-probe'],
-      remaining, readRoomState, readPeerSnapshot, readInputDiagnostics,
+      remaining, readRoomState, readPeerSnapshot, readPeerInputSuffix, readInputDiagnostics,
       waitForBothChecksumCompare, captureScreenshot,
       assertHealthy: (state, role) => {
         const failure = protocolFailure(state, role);
@@ -1079,7 +1097,7 @@ try {
           alpha: initialPages.alpha, beta: initialPages.beta, report: localReport,
           inputDelay: invite.inputDelay, gameplayActionProbe: false,
           remaining: routeRemaining,
-          readRoomState, readPeerSnapshot, readInputDiagnostics,
+          readRoomState, readPeerSnapshot, readPeerInputSuffix, readInputDiagnostics,
           waitForBothChecksumCompare: routeChecksumWait,
           captureScreenshot: (instance, filename) =>
             captureScreenshot(instance, `match-${matchNumber}/${filename}`, routeRemaining),
