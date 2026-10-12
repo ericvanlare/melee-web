@@ -250,5 +250,18 @@
       "log_sha256": "7ee48a3c71e0de0ac33becda483f2fad617b56bdfc01901550998847e06deb79"
     },
     "review_sha256": "573e1ba90c9a73ffb4c4340469445be24a19173f15262f54d95f0e08a5026981"
+  },
+  "integration": {
+    "decision": "MERGED_REVIEWED_EXACT_TREE",
+    "pr": 310,
+    "head": "63ec11cee2546fe5402df62c1cdbc0b596c4ec14",
+    "base": "b6db0aa641d2a7bebb428497fac93b85c7898964",
+    "merge": "47f236f92eb39d292439603eeeb86700cb34c4e5",
+    "reviewed_tree": "be9c7b101438d7dc72bd632b58197c9f715879ea",
+    "merged_tree": "be9c7b101438d7dc72bd632b58197c9f715879ea",
+    "ci_run": 38211282263,
+    "checks_success": 12,
+    "checks_expected_skip": 2,
+    "merge_policy": "Owner-only pull-request update ruleset23976041 requires owner bypass mode; gh --admin used after ordinary merge refused, all reviews/required CI satisfied; no rule changes."
   }
 }

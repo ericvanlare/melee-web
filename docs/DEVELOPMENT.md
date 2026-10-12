@@ -123,6 +123,15 @@ retries automatically. Use `--plan-only` to inspect commands without launching
 anything, or select a single scenario for a reviewed changed hypothesis.
 Scenario availability is tooling, not a claim that its browser gate has passed.
 
+`full-moderate` and `full-asymmetric` use the complete-match baseline, including
+P2's short actual gameplay axis pulse. The separate, non-default
+`full-moderate-action-probe` adds the strict jab/jump observation window. Its
+underlying `--gameplay-action-probe` flag requires `--full-route`; reports and
+suite validation bind the requested mode. A passing baseline cannot satisfy a
+failed action probe. See the [M2 receipt](status/2026-10-11-simulated-network-full-route-m2.md)
+for the current coverage and retained failures.
+
+
 ## Choose by change boundary
 
 | Change | Start here | Focused command or procedure | Evidence boundary |

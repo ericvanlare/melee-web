@@ -36,7 +36,8 @@ Linux CI also exposed an unfinished writable half in the deliberate-cut echo
 fixture. The fixture now retires that half on orderly EOF; proxy/runtime behavior
 and every cut/byte assertion are unchanged. Its focused controls, full regression
 and independent source review pass. The failed CI run is retained in the scoped
-receipt; integration still requires all checks on the final PR head.
+receipt. PR #310 merged after all final-head checks completed; the reviewed and
+merged trees match, as recorded in that receipt.
 
 This boundary does not establish a full match, public routing, TLS/NAT, human
 physical input, audible output, foreground timing, two-machine play or original
