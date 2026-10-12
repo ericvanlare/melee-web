@@ -9,6 +9,32 @@ import {confirmTwoHumanResults} from '../tests/vs_rules_results_confirmation_dri
 import {returnFromCompetitivePrize} from '../tests/vs_rules_timeout_route_helpers.mjs';
 import {createSourceCursorJoin} from './a3_source_cursor_join.mjs';
 
+/** Synchronous read-only browser predicate for an explicitly observed key press. */
+export function observeDesiredSourcePad({inputFrom, port, expected}) {
+  const runtimeError=globalThis.document?.querySelector('#status')?.dataset.runtimeError;
+  if(runtimeError)throw Error(runtimeError);
+  const health=globalThis.meleeNetRuntimeLockstepHealth?.({inputFrom});
+  if(health?.failure||health?.peer?.failure||health?.peer?.protocol?.terminal)
+    throw Error('Source PAD observation encountered a runtime owner failure or terminal');
+  const rows=health?.peer?.localInputCapture?.captures_since;
+  if(!Array.isArray(rows))throw Error('Source PAD observation suffix is unavailable');
+  for(const row of rows) {
+    const bytes=row?.bytes;
+    if(!Number.isSafeInteger(row?.input_tick)||row.input_tick<inputFrom||
+       row.local_port!==port||row.source_cursor!==row.input_tick||
+       !Array.isArray(bytes)||bytes.length!==11||
+       !bytes.every(value=>Number.isInteger(value)&&value>=0&&value<=255))continue;
+    const signed=value=>value>=128?value-256:value;
+    const matches=expected?.button!==undefined
+      ? bytes[0]===((expected.button>>>8)&255)&&bytes[1]===(expected.button&255)
+      : !!(expected?.x||expected?.y)&&
+        (!expected.x||Math.sign(signed(bytes[2]))===expected.x)&&
+        (!expected.y||Math.sign(signed(bytes[3]))===expected.y);
+    if(matches)return row;
+  }
+  return false;
+}
+
 const FD_SOURCE_ID = 0x20;
 const MARIO_SOURCE_ID = 8;
 const MARIO_FIGHTER_ID = 0;
@@ -466,7 +492,7 @@ export async function runA3LocalFullRoute({
     return !!(expected?.x || expected?.y);
   };
   const pulse = async (role, keys, {expected, holdMs = 160, releaseMs = 100,
-    label, retainSample = false}) => {
+    label, retainSample = false, observePress = false}) => {
     requireValue(Array.isArray(keys) && keys.length > 0, `${label}: keyboard chord is empty`);
     const instance = instances[role];
     const port = rolePort(role);
@@ -477,8 +503,13 @@ export async function runA3LocalFullRoute({
     requireValue(Number.isSafeInteger(inputCount) && Number.isSafeInteger(nativeCursor) &&
       (inputCount === nativeCursor || inputCount === nativeCursor + 1),
       `${label}: local-input capture cursor is outside the observed native source boundary`);
-    await instance.driver.pressChord(keys, {holdMs, releaseMs});
-    let sample = null;
+    // Only explicitly opted-in short taps use bounded source-owned readback.
+    const pressObservationCap = observePress ? Math.min(500, Math.floor(remaining() - releaseMs - 1)) : null;
+    const observed = await instance.driver.pressChord(keys, {holdMs, releaseMs,
+      ...(observePress ? {observeBeforeRelease: {predicate: observeDesiredSourcePad,
+        arg: {inputFrom: inputCount, port, expected},
+        timeoutMs: pressObservationCap}} : {})});
+    let sample = observePress ? observed : null;
     const captureDeadline = Date.now() + Math.min(1500, remaining());
     while (Date.now() < captureDeadline && !sample) {
       const readback = await readPeerSnapshot(instance, inputCount);
@@ -499,7 +530,9 @@ export async function runA3LocalFullRoute({
     const row = {label, role, port, keys, source_input_tick: sample.input_tick,
       checksum_boundary_required: requiredBoundary, checksum_boundary_reached: false,
       expected_pad_readback: expected, input_diagnostic: input.last_non_neutral,
-      keyboard_path: 'browser_driver.pressChord'};
+      keyboard_path: 'browser_driver.pressChord',
+      ...(observePress ? {press_release_policy: 'first actual desired source-owned PAD capture',
+        press_observation_cap_ms: pressObservationCap} : {})};
     if (retainSample) {
       row.observed_pad_sample = {...sample, bytes: [...sample.bytes]};
     }
@@ -925,7 +958,7 @@ export async function runA3LocalFullRoute({
     requireValue(keys.length > 0, 'FD SSS cursor did not converge to the authored target center');
     const expected = {...(!xClose ? {x: Math.sign(dx)} : {}),
       ...(!yClose ? {y: Math.sign(dy)} : {})};
-    await pulse('alpha', keys, {expected, holdMs: 40, releaseMs: 80,
+    await pulse('alpha', keys, {expected, holdMs: 40, releaseMs: 80, observePress: true,
       label: `keyboard P1 SSS FD cursor step ${attempt + 1}`});
   }
   requireValue(selectedStage && selectedStage.ids[1] === FD_SOURCE_ID,
@@ -988,7 +1021,7 @@ export async function runA3LocalFullRoute({
     scope: 'one short actual P2 keyboard axis pulse toward center plus literal neutral release; no combat-coverage claim',
   };
   const p2Action = await pulse('beta', [p2Key], {expected: {x: p2Direction},
-    holdMs: 40, releaseMs: 80,
+    holdMs: 40, releaseMs: 80, observePress: true,
     label: `P2 ${p2Key} short gameplay axis pulse toward center`, retainSample: true});
   const p2MovementSample = p2Action.observed_pad_sample;
   requireValue(p2MovementSample && p2MovementSample.input_tick === p2Action.source_input_tick,
