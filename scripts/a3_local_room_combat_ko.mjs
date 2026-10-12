@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 
 export const COMBAT_KO_SOURCE_TICK_BUDGET = 480;
+export const COMBAT_KO_CHARGED_HOLD_SOURCE_TICKS = 24;
+export const COMBAT_KO_CHARGED_PAD_BYTES = Object.freeze([1, 0, 129, 0, 0, 0, 0, 0, 0, 0, 0]);
 
 const BASELINE_BRAND = Symbol('validated combat KO baseline');
 const LOSS_BRAND = Symbol('validated combat KO loss');
 const LOSS_BASELINE = Symbol('combat KO loss baseline');
+const CHARGE_BRAND = Symbol('validated combat KO charge animation');
+const CHARGE_BASELINE = Symbol('combat KO charge baseline');
 const SOURCE_PORTS = [0, 1];
 const SOURCE_SLOT_COUNT = 6;
 
@@ -234,6 +238,11 @@ function isCStickLeftOnly(bytes) {
     bytes[5] === 0 && Array.from(bytes.slice(6)).every(value => value === 0);
 }
 
+function isChargedALeftOnly(bytes) {
+  return Array.isArray(bytes) && bytes.length === COMBAT_KO_CHARGED_PAD_BYTES.length &&
+    bytes.every((value, index) => value === COMBAT_KO_CHARGED_PAD_BYTES[index]);
+}
+
 function exactInputRows(rows, startTick, throughTick, port, label) {
   requireValue(Array.isArray(rows), `${label} literal PAD rows are unavailable`);
   const window = rows.filter(row => row?.input_tick >= startTick && row.input_tick <= throughTick);
@@ -259,7 +268,7 @@ function exactInputRows(rows, startTick, throughTick, port, label) {
 }
 
 function validateLiteralInputWindow({p1Rows, p2Rows, inputStartTick, inputEndTick,
-  pressTick, releaseTick}) {
+  pressTick, releaseTick, inputMode = 'cstick', inputDelay = null}) {
   requireValue(Number.isSafeInteger(inputStartTick) &&
     Number.isSafeInteger(inputEndTick) && inputEndTick >= inputStartTick &&
     Number.isSafeInteger(pressTick) && pressTick > inputStartTick &&
@@ -272,24 +281,126 @@ function validateLiteralInputWindow({p1Rows, p2Rows, inputStartTick, inputEndTic
     assert(isLiteralNeutral(row.bytes),
       'P1 was not literally neutral from the four-stock baseline through respawn');
   }
-  for (let offset = 0; offset < p2.length; ++offset) {
-    const row = p2[offset];
+  if (inputMode === 'cstick') {
+    for (let offset = 0; offset < p2.length; ++offset) {
+      const row = p2[offset];
+      if (row.input_tick < pressTick || row.input_tick >= releaseTick) {
+        assert(isLiteralNeutral(row.bytes),
+          `P2 contains unexpected PAD input at source tick ${row.input_tick}`);
+      } else {
+        assert(isCStickLeftOnly(row.bytes),
+          `P2 C-stick-left row at source tick ${row.input_tick} contains another input`);
+      }
+    }
+    return Object.freeze({start_input_tick: inputStartTick,
+      cstick_left_rise_input_tick: pressTick,
+      neutral_release_input_tick: releaseTick,
+      through_respawn_input_tick: inputEndTick,
+      p1_neutral_row_count: p1.length,
+      p2_cstick_left_held_row_count: releaseTick - pressTick,
+      p1_rows: freezeEvidenceRows(p1),
+      p2_rows: freezeEvidenceRows(p2)});
+  }
+  requireValue(inputMode === 'charged-a-left' && Number.isSafeInteger(inputDelay) && inputDelay >= 0,
+    'Combat KO charged input window has an unsupported mode or input delay');
+  const expectedReleaseTick = pressTick + inputDelay + 1 + COMBAT_KO_CHARGED_HOLD_SOURCE_TICKS;
+  assert(releaseTick >= expectedReleaseTick,
+    'Combat KO charged chord released before the declared source-cursor endpoint');
+  assert(releaseTick - pressTick <= 30,
+    'Combat KO charged chord exceeded the 30-literal-record episode limit');
+  for (const row of p2) {
     if (row.input_tick < pressTick || row.input_tick >= releaseTick) {
       assert(isLiteralNeutral(row.bytes),
         `P2 contains unexpected PAD input at source tick ${row.input_tick}`);
     } else {
-      assert(isCStickLeftOnly(row.bytes),
-        `P2 C-stick-left row at source tick ${row.input_tick} contains another input`);
+      assert(isChargedALeftOnly(row.bytes),
+        `P2 charged A+left row at source tick ${row.input_tick} is partial or contains another input`);
     }
   }
-  return Object.freeze({start_input_tick: inputStartTick,
-    cstick_left_rise_input_tick: pressTick,
+  return Object.freeze({kind: 'literal-a-left-charged-forward-smash-v1',
+    a_left_rise_input_tick: pressTick,
     neutral_release_input_tick: releaseTick,
     through_respawn_input_tick: inputEndTick,
+    declared_hold_source_cursors: COMBAT_KO_CHARGED_HOLD_SOURCE_TICKS,
     p1_neutral_row_count: p1.length,
-    p2_cstick_left_held_row_count: releaseTick - pressTick,
+    p2_a_left_held_row_count: releaseTick - pressTick,
     p1_rows: freezeEvidenceRows(p1),
     p2_rows: freezeEvidenceRows(p2)});
+}
+
+// This accepts only actual common-source rows retained by the live observer.
+// It records a sampled S4S60 animation plateau and a later animation advance;
+// it cannot infer the hidden charge counter or an authored multiplier.
+export function validateCombatKoChargedAnimation({baseline, pairedRows, pressTick,
+  inputDelay, releaseTick}) {
+  requireBaseline(baseline);
+  requireValue(Array.isArray(pairedRows), 'Combat KO charge animation rows are unavailable');
+  requireValue(Number.isSafeInteger(pressTick) && Number.isSafeInteger(inputDelay) && inputDelay >= 0,
+    'Combat KO charge animation input boundary is invalid');
+  const actionStartTick = pressTick + inputDelay + 1;
+  const holdEndSourceTick = actionStartTick + COMBAT_KO_CHARGED_HOLD_SOURCE_TICKS;
+  requireValue(Number.isSafeInteger(releaseTick) && releaseTick >= holdEndSourceTick &&
+    releaseTick - pressTick <= 30,
+    'Combat KO charge animation release row is outside the bounded literal episode');
+  const releaseConsumedSourceTick = releaseTick + inputDelay + 1;
+  const observations = pairedRows.map((rows, index) => {
+    const state = readPairedRows(rows, `Combat KO charged animation pair ${index}`);
+    requireSameMapping(state, baseline, 'Combat KO charged animation');
+    const actors = state.peers.map(peer => peer.match.players.find(player => player.source_port === 1));
+    requireValue(actors.every(player => Number.isFinite(player?.animation_frame)),
+      'Combat KO charged animation lacks a finite native animation_frame');
+    return {source_tick: state.source_tick, source_frame: state.source_frame, actors, rows};
+  });
+  for (let index = 1; index < observations.length; ++index)
+    requireValue(observations[index].source_tick > observations[index - 1].source_tick,
+      'Combat KO charged animation observations repeat or move backward');
+  const held = observations.filter(row => row.source_tick >= actionStartTick &&
+    row.source_tick < holdEndSourceTick);
+  const heldInput = observations.filter(row => row.source_tick >= actionStartTick &&
+    row.source_tick < releaseConsumedSourceTick);
+  let plateau = null;
+  for (let index = 0; index < heldInput.length; ++index) {
+    const row = heldInput[index];
+    if (index > 0)
+      requireValue(row.source_frame > heldInput[index - 1].source_frame,
+        'Combat KO charged animation source frame did not advance while held');
+    requireValue(row.rows.every(peer => {
+      const victim = peer.match.players.find(player => player.source_port === 0);
+      const original = baseline.actual_matches[0].players.find(player => player.source_port === 0);
+      return victim.stocks === 4 && victim.damage_percent === original.damage_percent &&
+        !(victim.motion >= 75 && victim.motion <= 91);
+    }), 'Combat KO charge plateau observation follows a victim hit');
+    requireValue(row.actors.every(player => player.motion === 60 && player.facing_direction === -1),
+      'Combat KO charged actor left paired S4S60/facing-1 before release reached the source');
+    if (row.source_tick < holdEndSourceTick && index > 0 && row.actors.every((player, peer) =>
+        player.animation_frame === heldInput[index - 1].actors[peer].animation_frame))
+      plateau ??= row;
+  }
+  requireValue(plateau !== null,
+    'Combat KO charged animation did not show a source-frame-advancing plateau while A was held');
+  const resumed = observations.find(row => row.source_tick >= releaseConsumedSourceTick &&
+    row.source_frame > plateau.source_frame && row.actors.every((player, peer) => player.motion === 60 &&
+      player.facing_direction === -1 && player.animation_frame > plateau.actors[peer].animation_frame));
+  requireValue(resumed,
+    'Combat KO charged animation did not advance after the released input reached the source');
+  return Object.freeze({[CHARGE_BRAND]: true, [CHARGE_BASELINE]: baseline,
+    kind: 'observed-s4s60-charge-animation-plateau-and-release-advance-v1',
+    action_start_source_tick: actionStartTick,
+    hold_end_source_tick: holdEndSourceTick,
+    release_consumed_source_tick: releaseConsumedSourceTick,
+    plateau_source_tick: plateau.source_tick,
+    plateau_source_frame: plateau.source_frame,
+    plateau_animation_frame_by_peer: Object.freeze(plateau.actors.map(player => player.animation_frame)),
+    resumed_source_tick: resumed.source_tick,
+    resumed_source_frame: resumed.source_frame,
+    resumed_animation_frame_by_peer: Object.freeze(resumed.actors.map(player => player.animation_frame)),
+    observation_scope: 'sampled source-frame-advancing plateau; no continuous or hidden charge-count claim',
+    sampled_source_gaps: Object.freeze(observations.slice(1).flatMap((row, index) =>
+      row.source_tick > observations[index].source_tick + 1
+        ? [Object.freeze({after: observations[index].source_tick, before: row.source_tick,
+          unobserved_cursor_count: row.source_tick - observations[index].source_tick - 1})] : [])),
+    retained_hold_source_cursor_count: held.length,
+    retained_delayed_held_source_cursor_count: heldInput.length - held.length});
 }
 
 // Revalidates the same exact counter deltas at the grounded three-stock
@@ -297,7 +408,8 @@ function validateLiteralInputWindow({p1Rows, p2Rows, inputStartTick, inputEndTic
 // The route still owns hit/air/death evidence and actual match/room continuity.
 export function createCombatKoRespawnHandoff({baseline, attackLossReceipt,
   pairedRows, p1Rows, p2Rows, inputStartTick, inputEndTick,
-  pressTick, releaseTick}) {
+  pressTick, releaseTick, inputMode = 'cstick', inputDelay = null,
+  chargeAnimationEvidence = null}) {
   requireBaseline(baseline);
   requireLossReceipt(attackLossReceipt, baseline);
   const state = readPairedRows(pairedRows, 'Combat KO respawn handoff');
@@ -319,9 +431,15 @@ export function createCombatKoRespawnHandoff({baseline, attackLossReceipt,
   // PAD input_tick and native source_tick are different clocks; this helper
   // never assumes equality or manufactures the conversion.
   const inputWindow = validateLiteralInputWindow({p1Rows, p2Rows,
-    inputStartTick, inputEndTick, pressTick, releaseTick});
+    inputStartTick, inputEndTick, pressTick, releaseTick, inputMode, inputDelay});
+  if (inputMode === 'charged-a-left')
+    requireValue(chargeAnimationEvidence?.[CHARGE_BRAND] === true &&
+      chargeAnimationEvidence[CHARGE_BASELINE] === baseline,
+    'Combat KO charged handoff requires this baseline’s observed charge animation evidence');
+  else requireValue(inputMode === 'cstick', 'Combat KO handoff input mode is unsupported');
   return Object.freeze({starting_stocks: 3,
     validated_loss_receipt: attackLossReceipt,
+    ...(inputMode === 'charged-a-left' ? {charge_animation_evidence: chargeAnimationEvidence} : {}),
     actual_rows: freezeEvidenceRows(pairedRows),
     actual_matches: Object.freeze(pairedRows.map(row => row.match)),
     respawn_source_tick: state.source_tick,
@@ -331,7 +449,8 @@ export function createCombatKoRespawnHandoff({baseline, attackLossReceipt,
 
 // Narrow one-swing observation state. The route supplies already owner/rule-
 // checked common-source rows; this validates observed ordering, never fills gaps.
-export function advanceCombatKoEvidence({baseline, sequence, pairedRows, actionStartTick}) {
+export function advanceCombatKoEvidence({baseline, sequence, pairedRows, actionStartTick,
+  chargeReleaseAcceptedSourceTick = null}) {
   requireBaseline(baseline);
   const state = readPairedRows(pairedRows, 'Combat KO sequence');
   requireSameMapping(state, baseline, 'Combat KO sequence');
@@ -367,8 +486,13 @@ export function advanceCombatKoEvidence({baseline, sequence, pairedRows, actionS
     'Combat KO damage is missing or differs between peers');
   if (attackers.every(player => player.motion === 60 && player.facing_direction === -1))
     sequence.attack ??= state.source_tick;
-  if (sequence.attack !== undefined && victim.motion >= 75 && victim.motion <= 91 &&
-      damage[0] > baseline.actual_matches[0].players.find(player => player.source_port === 0).damage_percent)
+  const hitObserved = sequence.attack !== undefined && victim.motion >= 75 && victim.motion <= 91 &&
+    damage[0] > baseline.actual_matches[0].players.find(player => player.source_port === 0).damage_percent;
+  if (hitObserved && chargeReleaseAcceptedSourceTick !== null)
+    requireValue(Number.isSafeInteger(chargeReleaseAcceptedSourceTick) &&
+      state.source_tick >= chargeReleaseAcceptedSourceTick,
+    'Combat KO strike began before the charged release input reached the source; charged evidence is incomplete');
+  if (hitObserved)
     sequence.hit ??= state.source_tick;
   if (sequence.hit !== undefined && victim.groundAir === 1 &&
       ((victim.motion >= 75 && victim.motion <= 91) || victim.motion === 38 ||

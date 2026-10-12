@@ -358,7 +358,7 @@
       "sha256": "5d024dd9fa159ad5d49f61fa9d58bccffc4b0df753e3edce831f7ba23f8a56ed"
     }
   ],
-  "next": "One reviewed original-input combat stock-loss experiment with per-source-slot credit and strict natural respawn handoff. No unchanged repeat of passed exchange.",
+  "next": "One reviewed changed held-smash KO hypothesis; after a second failed KO experiment, reduce before another capture. No passing KO is claimed yet.",
   "native_combat_observations": {
     "decision": "COMPILED_AND_BROWSER_EXERCISED_IN_EXCHANGE",
     "runtime_source": "d269334e1243b0568d8bf7caf285053bea8e04a1",
@@ -635,7 +635,7 @@
     }
   },
   "ko_source_preparation": {
-    "decision": "SOURCE_REVIEW_AND_FOCUSED_CONTROLS_PASS_NO_CAPTURE_YET",
+    "decision": "SOURCE_REVIEW_AND_FOCUSED_CONTROLS_PASS_BEFORE_FIRST_CAPTURE",
     "candidate_v2_freeze_sha256": "4a32d6aaaf06168b9c96a7d7ca4ab0c095e442ae2ead19774b232d16e0369844",
     "independent_review_sha256": "b0c56c22ab3af0a5cca755525139f75aa44a0426427af91802a7fe5f9b518b00",
     "integrated_files": {
@@ -652,5 +652,186 @@
     "independent_review_path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/combat-ko-route-source-review-v2.json",
     "root_review_path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-integrated-root-review-v2.json",
     "retained_review_binding_correction": "m2-ko-integrated-root-review-v1.json bound an intermediate review digest during author extension; it was never a capture release. Earlier receipt retained, no capture occurred; current final source review is separately copied and frozen."
+  },
+  "ko_first_attempt": {
+    "decision": "CONFIRMED_STRICT_LEDGE_REFUSAL_NO_ATTACK_KO_PASS",
+    "harness_source": "dd8f40be1c776a1863df9443c0e11e9f7e6ad891",
+    "runtime_source": "d269334e1243b0568d8bf7caf285053bea8e04a1",
+    "first_failure": {
+      "source_cursor": 743,
+      "frame": 303,
+      "motion": 252,
+      "damage": 21,
+      "stocks": [
+        4,
+        4
+      ],
+      "baseline": 689,
+      "attack": 693,
+      "hit_and_air": 704,
+      "handoff": null
+    },
+    "observations": {
+      "paired_samples": 49,
+      "cursors": [
+        690,
+        691,
+        692,
+        693,
+        694,
+        695,
+        696,
+        697,
+        698,
+        699,
+        700,
+        701,
+        702,
+        703,
+        704,
+        705,
+        707,
+        708,
+        709,
+        710,
+        711,
+        713,
+        714,
+        715,
+        716,
+        717,
+        718,
+        719,
+        720,
+        721,
+        722,
+        723,
+        724,
+        725,
+        726,
+        727,
+        728,
+        729,
+        731,
+        732,
+        734,
+        735,
+        736,
+        737,
+        738,
+        740,
+        741,
+        742,
+        743
+      ],
+      "last_inspected_pair_retained": true,
+      "exact_original_counters_unchanged": true
+    },
+    "literal_failure_window": {
+      "start": 686,
+      "end_common": 742,
+      "P1_all_neutral": true,
+      "P2_left_cstick_ticks": [
+        690
+      ],
+      "first_neutral_release": 691,
+      "complete_through_respawn": false
+    },
+    "cleanup_raw_prefix": {
+      "records": 744,
+      "ticks": [
+        0,
+        743
+      ],
+      "all64B_equal": true,
+      "sha256": "b45e9f0d9d8ea99f9cde64ba974943a5c57815f6b126f1ec5586538bfcfaf075",
+      "protocol_comparison_counts": {
+        "alpha": 741,
+        "beta": 743
+      },
+      "not_final_route_comparison": true
+    },
+    "cleanup": {
+      "normal_leave_unload_quiescence": true,
+      "proxy_and_worker_retired": true,
+      "inventoried_owned_pids_absent": 22,
+      "inventoried_owned_groups_absent": 5,
+      "package_request_aborts_retained_on_both_roles": true
+    },
+    "limits": [
+      "No death/stock loss/credit/respawn observed; no KO or completed full-route claim.",
+      "CliffCatch refusal is intended policy, not runtime failure. Never wait out ledge or steer victim.",
+      "Failure suffix is diagnostic only; no validated complete input window/handoff.",
+      "Retained paired samples have gaps, no exact transition-time or original-equivalence claim."
+    ],
+    "artifacts": [
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-1-suite/full-moderate-combat-ko/browser/report.json",
+        "bytes": 12605964,
+        "sha256": "287bde48f55a1a3de3ef25a88c1c5b04dd8b2326ce2506ab90a3d66b3d1a868b"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-1-suite/full-moderate-combat-ko/owner.json",
+        "bytes": 175228,
+        "sha256": "8923babb2e76d5fced965c0ca916f855ca9d80fe44e0233147c6fd795363582c"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-1-suite/suite.json",
+        "bytes": 1551494,
+        "sha256": "26bc23fe3e90d407847af7958eebb8e5de141491480583b442723f2cc9d29ff6"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-first-failure-review-v1.json",
+        "bytes": 1552885,
+        "sha256": "0af4a4ae9d0e396933e1b6e10f425675a048c5ae80e9308f9112fe0ef962cf4a"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-first-process-retirement-v1.json",
+        "bytes": 769,
+        "sha256": "06c9c8c169fd849803e06d806d2ec8965b6e1c0bb9728c3bb380488e9b890989"
+      }
+    ]
+  },
+  "ko_charged_source_preparation": {
+    "decision": "REVIEWED_SOURCE_AND_FOCUSED_CONTROLS_READY_FOR_ONE_CHANGED_HYPOTHESIS",
+    "input_recipe": "One actual A+left full chord, release at first observed native cursor reaching target24 within500ms/30 literal rows; actual neutral source input separately verified.",
+    "limits": {
+      "hold_callback_ms": 500,
+      "hold_target_source_cursors": 24,
+      "max_literal_held_rows": 30,
+      "ko_source_cursors": 480
+    },
+    "scope": "Sampled held animation plateau and post-actual-release advance only; no exact authored charge amount or KO claim.",
+    "retained_precapture_refusals": [
+      "v1 demanded contiguous observations, sorted away acquisition order, and required exact polling coincidence; refused before capture.",
+      "v2 lost buffered pre-start full pairs on a hold failure; v3 retains them as bounded diagnostics."
+    ],
+    "artifacts": [
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/combat-ko-charged-candidate-v3/freeze.json",
+        "sha256": "8dd010248e7e6873655ff2c9ebd1a0893e8a8e2451917628a31d131fd479afbb",
+        "bytes": 3082
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/combat-ko-charged-independent-review-v1.json",
+        "sha256": "ba063c21a7075a3a3a585506c4b501378a8775963d66fd24c0c3a0b19939fce3",
+        "bytes": 5243
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/combat-ko-charged-source-review-v2/review.json",
+        "sha256": "0f6fdd45aa15f9de07bb1167edc9252a4fbdcd2a47b24316fdf803f9733bd1ba",
+        "bytes": 2792
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/combat-ko-charged-source-review-v3/review.json",
+        "sha256": "0353acc80fc10d1825084321d3108edeceed389be782989a2f3877446cd5ca50",
+        "bytes": 1931
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-charged-integrated-root-source-review-v1.json",
+        "sha256": "330d73186425795a071d8cfadfae26b72b928fd393fe122bdf811050c1db2bb7",
+        "bytes": 4149
+      }
+    ]
   }
 }

@@ -23,7 +23,7 @@ import {checksumCompareReached, checksumWaitDiagnostic} from './a3_checksum_wait
 import {runA3LocalFullRoute} from './a3_local_room_full_route.mjs';
 import {retainCombatChecksumCursorPoll} from './a3_local_room_combat_probe.mjs';
 
-const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--post-css-stall-probe] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route] [--controlled-cut-after-css] [--gameplay-action-probe] [--gameplay-combat-probe] [--gameplay-combat-exchange] [--gameplay-combat-ko] [--repeat-full-route]';
+const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--post-css-stall-probe] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route] [--controlled-cut-after-css] [--gameplay-action-probe] [--gameplay-combat-probe] [--gameplay-combat-exchange] [--gameplay-combat-ko] [--gameplay-combat-ko-charged] [--repeat-full-route]';
 const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, out: {type: 'string'},
   'relay-url': {type: 'string'}, 'relay-preflight': {type: 'string'},
@@ -36,6 +36,7 @@ const {values} = parseArgs({options: {
   'gameplay-combat-probe': {type: 'boolean', default: false},
   'gameplay-combat-exchange': {type: 'boolean', default: false},
   'gameplay-combat-ko': {type: 'boolean', default: false},
+  'gameplay-combat-ko-charged': {type: 'boolean', default: false},
   'repeat-full-route': {type: 'boolean', default: false},
   help: {type: 'boolean', default: false},
 }, allowPositionals: false});
@@ -98,6 +99,10 @@ requireCondition(!(values['repeat-full-route'] &&
   '--repeat-full-route cannot be combined with a stall probe or controlled cut');
 requireCondition(!values['gameplay-combat-ko'] || values['gameplay-combat-exchange'],
   '--gameplay-combat-ko requires --gameplay-combat-exchange');
+requireCondition(!values['gameplay-combat-ko-charged'] || values['gameplay-combat-exchange'],
+  '--gameplay-combat-ko-charged requires --gameplay-combat-exchange');
+requireCondition(!(values['gameplay-combat-ko'] && values['gameplay-combat-ko-charged']),
+  '--gameplay-combat-ko and --gameplay-combat-ko-charged are separate scenarios');
 const runtimeUrl = new URL(values.url);
 requireCondition(runtimeUrl.protocol === 'http:' && runtimeUrl.hostname === '127.0.0.1' &&
   runtimeUrl.port === '8787' && runtimeUrl.pathname === '/runtime.html',
@@ -208,6 +213,7 @@ const report = {
   gameplay_combat_probe: values['gameplay-combat-probe'],
   gameplay_combat_exchange: values['gameplay-combat-exchange'],
   gameplay_combat_ko: values['gameplay-combat-ko'],
+  gameplay_combat_ko_charged: values['gameplay-combat-ko-charged'],
   leave_and_cleanup: {},
   exclusions: ['no direct PAD or Gamepad injection', 'no harness-owned peer or checksum pump',
     'no runtime source-tick/checksum-bound changes',
@@ -1051,6 +1057,7 @@ try {
       gameplayCombatProbe: values['gameplay-combat-probe'],
       gameplayCombatExchange: values['gameplay-combat-exchange'],
       gameplayCombatKo: values['gameplay-combat-ko'],
+      gameplayCombatKoCharged: values['gameplay-combat-ko-charged'],
       remaining, readRoomState, readPeerSnapshot, readPeerInputSuffix, readInputDiagnostics,
       waitForBothChecksumCompare, captureScreenshot,
       assertHealthy: (state, role) => {

@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {observeDesiredSourcePad} from '../scripts/a3_local_room_full_route.mjs';
-import {COMBAT_KO_SOURCE_TICK_BUDGET,
+import {observeDesiredSourcePad, observeCombatKoChargedHoldBeforeRelease}
+  from '../scripts/a3_local_room_full_route.mjs';
+import {COMBAT_KO_SOURCE_TICK_BUDGET, COMBAT_KO_CHARGED_HOLD_SOURCE_TICKS,
+  COMBAT_KO_CHARGED_PAD_BYTES,
   captureCombatKoBaseline, createCombatKoRespawnHandoff, advanceCombatKoEvidence,
-  validateCombatKoAttackLoss} from '../scripts/a3_local_room_combat_ko.mjs';
+  validateCombatKoAttackLoss, validateCombatKoChargedAnimation}
+  from '../scripts/a3_local_room_combat_ko.mjs';
 
 const SLOT_BY_PORT = [4, 1];
 const BASE_COUNTERS = [
@@ -78,6 +81,7 @@ function cstickLeftBytes(magnitude = -80) {
   bytes[4] = magnitude & 255;
   return bytes;
 }
+function chargedALeftBytes() { return [...COMBAT_KO_CHARGED_PAD_BYTES]; }
 
 function inputRows({start = 96, end = 156, press = 105, release = 108,
   p1Mutate = null, p2Mutate = null} = {}) {
@@ -90,6 +94,37 @@ function inputRows({start = 96, end = 156, press = 105, release = 108,
   if (p1Mutate) p1Mutate(p1);
   if (p2Mutate) p2Mutate(p2);
   return {p1Rows: p1, p2Rows: p2};
+}
+
+function chargedInputRows({start = 96, end = 156, press = 105, release = 132,
+  p1Mutate = null, p2Mutate = null} = {}) {
+  const p1 = [], p2 = [];
+  for (let tick = start; tick <= end; ++tick) {
+    p1.push(padRow(tick, 0));
+    p2.push({input_tick: tick, source_cursor: tick, local_port: 1,
+      bytes: tick >= press && tick < release ? chargedALeftBytes() : Array(11).fill(0)});
+  }
+  if (p1Mutate) p1Mutate(p1);
+  if (p2Mutate) p2Mutate(p2);
+  return {p1Rows: p1, p2Rows: p2};
+}
+
+function chargedAnimationPairs({start = 108, end = 138, plateauFrame = 5,
+  resumedFrame = 6, resumeAt = 135, omitTick = null, motion = 60, facing = -1,
+  varyWhileHeld = false} = {}) {
+  const pairs = [];
+  for (let tick = start; tick <= end; ++tick) {
+    if (tick === omitTick) continue;
+    const rows = combatRows({sourceTick: tick, frame: tick + 100, motion: [14, motion]});
+    for (const row of rows) for (const player of row.match.players) {
+      player.facing_direction = player.source_port === 1 ? facing : 1;
+      if (player.source_port === 1)
+        player.animation_frame = tick >= resumeAt ? resumedFrame :
+          plateauFrame + (varyWhileHeld ? tick - start : 0);
+    }
+    pairs.push(rows);
+  }
+  return pairs;
 }
 
 function validateDefaultHandoff(options = {}) {
@@ -429,4 +464,148 @@ test('actual desired-PAD predicate accepts only literal left C-stick and enforce
     globalThis.document=saved.document;globalThis.__net=saved.net;
     globalThis.meleeNetRuntimeLockstepHealth=saved.health;
   }
+});
+
+test('charged A+left handoff requires the exact bounded episode and paired S4S60 animation evidence', () => {
+  const baseline = captureCombatKoBaseline({pairedRows: combatRows()});
+  const animation = validateCombatKoChargedAnimation({baseline,
+    pairedRows: chargedAnimationPairs(), pressTick: 105, inputDelay: 2, releaseTick: 132});
+  assert.equal(animation.kind, 'observed-s4s60-charge-animation-plateau-and-release-advance-v1');
+  assert.equal(animation.action_start_source_tick, 108);
+  assert.equal(animation.hold_end_source_tick, 132);
+  assert.equal(animation.release_consumed_source_tick, 135);
+  assert.equal(animation.plateau_source_tick, 109);
+  assert.equal(animation.resumed_source_tick, 135);
+  assert.equal(animation.retained_hold_source_cursor_count, COMBAT_KO_CHARGED_HOLD_SOURCE_TICKS);
+  const rows = chargedInputRows();
+  const handoff = createCombatKoRespawnHandoff({baseline,
+    attackLossReceipt: validateCombatKoAttackLoss({baseline, pairedRows: lossPair()}),
+    pairedRows: respawnPair(), ...rows, inputStartTick: 96, inputEndTick: 156,
+    pressTick: 105, releaseTick: 132, inputMode: 'charged-a-left', inputDelay: 2,
+    chargeAnimationEvidence: animation});
+  assert.equal(handoff.input_window.kind, 'literal-a-left-charged-forward-smash-v1');
+  assert.equal(handoff.input_window.p2_a_left_held_row_count, 27);
+  assert.equal(handoff.charge_animation_evidence, animation);
+});
+
+test('charged recipe refuses partial input, extra edges, a 31-record span, missing plateau, and early strike', () => {
+  const baseline = captureCombatKoBaseline({pairedRows: combatRows()});
+  const animation = validateCombatKoChargedAnimation({baseline,
+    pairedRows: chargedAnimationPairs(), pressTick: 105, inputDelay: 2, releaseTick: 132});
+  const handoffOptions = {baseline,
+    attackLossReceipt: validateCombatKoAttackLoss({baseline, pairedRows: lossPair()}),
+    pairedRows: respawnPair(), inputStartTick: 96, inputEndTick: 156,
+    pressTick: 105, releaseTick: 132, inputMode: 'charged-a-left', inputDelay: 2,
+    chargeAnimationEvidence: animation};
+  const assertInputRejected = input => assert.throws(() => createCombatKoRespawnHandoff({
+    ...handoffOptions, ...input}), /charged A\+left row/);
+  assertInputRejected(chargedInputRows({p2Mutate: rows => { rows[9].bytes[1] = 1; }}));
+  assertInputRejected(chargedInputRows({p2Mutate: rows => { rows[9].bytes[2] = 0; }}));
+  assertInputRejected(chargedInputRows({p2Mutate: rows => { rows[9].bytes[4] = 129; }}));
+  const oneRecordSkewAnimation = validateCombatKoChargedAnimation({baseline,
+    pairedRows: chargedAnimationPairs({resumeAt: 136}),
+    pressTick: 105, inputDelay: 2, releaseTick: 133});
+  const oneRecordSkew = createCombatKoRespawnHandoff({...handoffOptions,
+    ...chargedInputRows({release: 133}), releaseTick: 133,
+    chargeAnimationEvidence: oneRecordSkewAnimation});
+  assert.equal(oneRecordSkew.input_window.p2_a_left_held_row_count, 28);
+  assert.throws(() => createCombatKoRespawnHandoff({...handoffOptions,
+    ...chargedInputRows({release: 133,
+      p2Mutate: rows => { rows[36].bytes[2] = 0; }}), releaseTick: 133}),
+  /charged A\+left row/);
+  assert.throws(() => createCombatKoRespawnHandoff({...handoffOptions,
+    ...chargedInputRows({p2Mutate: rows => { rows[37].bytes = chargedALeftBytes(); }})}),
+  /unexpected PAD input/);
+  assert.throws(() => createCombatKoRespawnHandoff({...handoffOptions,
+    ...chargedInputRows({release: 136}), releaseTick: 136, inputDelay: 5}), /30-literal-record/);
+  assert.throws(() => validateCombatKoChargedAnimation({baseline,
+    pairedRows: chargedAnimationPairs({varyWhileHeld: true}),
+    pressTick: 105, inputDelay: 2, releaseTick: 132}), /plateau while A was held/);
+  const sequence = {};
+  advanceCombatKoEvidence({baseline, sequence,
+    pairedRows: combatRows({sourceTick: 110, frame: 210, motion: [14, 60]}),
+    actionStartTick: 108, chargeReleaseAcceptedSourceTick: 135});
+  assert.throws(() => advanceCombatKoEvidence({baseline, sequence,
+    pairedRows: combatRows({sourceTick: 111, frame: 211, motion: [79, 14], damage: 18}),
+    actionStartTick: 108, chargeReleaseAcceptedSourceTick: 135}),
+  /before the charged release input reached the source/);
+});
+
+test('charged hold releases at first observed target crossing and refuses bounds or reordered PAD', () => {
+  const saved = {document:globalThis.document, health:globalThis.meleeNetRuntimeLockstepHealth,
+    net:globalThis.__net, Module:globalThis.Module};
+  const expected = chargedALeftBytes();
+  const captures = [];
+  for (let tick = 100; tick <= 127; ++tick)
+    captures.push({input_tick:tick,source_cursor:tick,local_port:1,
+      bytes:tick >= 101 ? [...expected] : Array(11).fill(0)});
+  let cursor = 127;
+  const match = {players:[
+    {source_port:0, stocks:4, damage_percent:3, motion:14, groundAir:0},
+    {source_port:1, motion:60, facing_direction:-1, animation_frame:4},
+  ]};
+  globalThis.document={querySelector:()=>({dataset:{}})};
+  globalThis.__net={status:()=>({cursor})};
+  globalThis.meleeNetRuntimeLockstepHealth=()=>({peer:{localInputCapture:{captures_since:captures}}});
+  globalThis.Module={_melee_web_native_menu_match_observe:()=>1,UTF8ToString:()=>JSON.stringify(match)};
+  const options={inputFrom:100,port:1,expectedBytes:expected,inputDelay:2,holdSourceTicks:24,
+    maxSourceCursor:500,baselineVictimDamage:3};
+  try {
+    assert.equal(observeCombatKoChargedHoldBeforeRelease(options),false);
+    cursor=128;
+    const released=observeCombatKoChargedHoldBeforeRelease(options);
+    assert.equal(released.press_sample.input_tick,101);
+    assert.equal(released.action_start_source_tick,104);
+    assert.equal(released.hold_end_source_tick,128);
+    assert.equal(released.observed_release_request_source_cursor,128);
+    captures.push(...[128,129].map(tick => ({input_tick:tick,source_cursor:tick,local_port:1,bytes:[...expected]})));
+    cursor=130;
+    assert.equal(observeCombatKoChargedHoldBeforeRelease(options).observed_release_request_source_cursor,130);
+    cursor=132;
+    assert.throws(()=>observeCombatKoChargedHoldBeforeRelease(options),/30-literal-record/);
+    cursor=128;
+    assert.throws(()=>observeCombatKoChargedHoldBeforeRelease({...options,inputDelay:6}),
+      /30-literal-record/);
+    cursor=501;
+    assert.throws(()=>observeCombatKoChargedHoldBeforeRelease(options),/480-source-cursor budget/);
+    cursor=128;
+    [captures[2],captures[3]]=[captures[3],captures[2]];
+    assert.throws(()=>observeCombatKoChargedHoldBeforeRelease(options),/repeats or moves backward/);
+    [captures[2],captures[3]]=[captures[3],captures[2]];
+    captures[2].bytes[2]=0;
+    assert.throws(()=>observeCombatKoChargedHoldBeforeRelease(options),/partial, or early-release/);
+  } finally {
+    globalThis.document=saved.document;globalThis.__net=saved.net;
+    globalThis.meleeNetRuntimeLockstepHealth=saved.health;globalThis.Module=saved.Module;
+  }
+});
+
+
+test('sampled charged animation preserves gaps and rejects acquired row reversal', () => {
+  const baseline = captureCombatKoBaseline({pairedRows: combatRows()});
+  const pairs = chargedAnimationPairs().filter(rows => [108,111,129,135,138].includes(rows[0].source_tick));
+  const result = validateCombatKoChargedAnimation({baseline, pairedRows:pairs,
+    pressTick:105,inputDelay:2,releaseTick:134});
+  assert.equal(result.plateau_source_tick,111);
+  assert.equal(result.release_consumed_source_tick,137);
+  assert.equal(result.resumed_source_tick,138);
+  assert(result.sampled_source_gaps.some(gap => gap.unobserved_cursor_count > 0));
+  const handoff = createCombatKoRespawnHandoff({baseline,
+    attackLossReceipt:validateCombatKoAttackLoss({baseline,pairedRows:lossPair()}),
+    pairedRows:respawnPair(),...chargedInputRows({release:134}),
+    inputStartTick:96,inputEndTick:156,pressTick:105,releaseTick:134,
+    inputMode:'charged-a-left',inputDelay:2,chargeAnimationEvidence:result});
+  assert.equal(handoff.input_window.neutral_release_input_tick,134);
+  assert.equal(handoff.charge_animation_evidence.release_consumed_source_tick,137);
+  assert.throws(() => validateCombatKoChargedAnimation({baseline,pairedRows:pairs.slice(0,-1),
+    pressTick:105,inputDelay:2,releaseTick:134}), /did not advance after/);
+  const hitRows = structuredClone(pairs);
+  hitRows[1].forEach(row => {row.match.players.find(player => player.source_port===0).damage_percent=18;});
+  assert.throws(() => validateCombatKoChargedAnimation({baseline,pairedRows:hitRows,
+    pressTick:105,inputDelay:2,releaseTick:134}), /follows a victim hit/);
+  assert.throws(() => validateCombatKoChargedAnimation({baseline,
+    pairedRows:[pairs[1],pairs[0],...pairs.slice(2)],pressTick:105,inputDelay:2,releaseTick:134}),
+    /repeat or move backward/);
+  assert.throws(() => validateCombatKoChargedAnimation({baseline,pairedRows:pairs,
+    pressTick:105,inputDelay:2,releaseTick:136}), /bounded literal episode/);
 });

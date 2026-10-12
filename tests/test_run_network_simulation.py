@@ -378,6 +378,39 @@ class NetworkSimulationSuitePolicyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_result(0,self.owner,browser,True,gameplay_combat_probe=True,gameplay_combat_ko=True)
 
+    def test_charged_ko_is_a_separate_explicit_mode_with_source_animation_evidence(self):
+        self.assertEqual(scenario_route_flags("full-moderate-combat-ko-charged"),
+                         ["--full-route", "--gameplay-combat-probe", "--gameplay-combat-exchange",
+                          "--gameplay-combat-ko-charged"])
+        browser = copy.deepcopy(self.browser)
+        browser.update(gameplay_combat_probe=True, gameplay_combat_exchange=True,
+                       gameplay_combat_ko=False, gameplay_combat_ko_charged=True)
+        route = browser["full_route"]
+        route.update(gameplay_combat_probe=True, gameplay_combat_exchange=True,
+                     gameplay_combat_ko=False, gameplay_combat_ko_charged=True)
+        route["combat_probe"] = {"result":"pass", "combat_exchange":{"result":"pass"},
+            "combat_ko":{"result":"pass", "handoff":{"starting_stocks":3},
+                "charge_animation_evidence":{"kind":
+                    "observed-s4s60-charge-animation-plateau-and-release-advance-v1"}}}
+        kwargs = dict(gameplay_combat_probe=True, gameplay_combat_exchange=True,
+                      gameplay_combat_ko_charged=True)
+        validate_result(0, self.owner, browser, True, **kwargs)
+        for corrupt in (
+                lambda row: row.pop("gameplay_combat_ko_charged"),
+                lambda row: row["full_route"].update(gameplay_combat_ko_charged=False),
+                lambda row: row["full_route"]["combat_probe"]["combat_ko"].pop(
+                    "charge_animation_evidence"),
+                lambda row: row.update(gameplay_combat_ko=True),
+                lambda row: row["full_route"].update(gameplay_combat_ko=True)):
+            damaged = copy.deepcopy(browser)
+            corrupt(damaged)
+            with self.assertRaises(ValueError):
+                validate_result(0, self.owner, damaged, True, **kwargs)
+        with self.assertRaisesRegex(ValueError, "separate scenarios"):
+            validate_result(0, self.owner, browser, True,
+                gameplay_combat_probe=True, gameplay_combat_exchange=True,
+                gameplay_combat_ko=True, gameplay_combat_ko_charged=True)
+
 
 if __name__ == "__main__":
     unittest.main()

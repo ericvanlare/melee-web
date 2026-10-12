@@ -152,6 +152,15 @@ combat; its scoped result belongs in the combat evidence entry.
 
 The separate full-moderate-combat-ko scenario extends the verified exchange with one actual P2 left C-stick forward smash. Its optional gameplay-combat-ko mode requires the exchange prefix, a fresh four-stock baseline, observed hit/air/death, original source-slot KO credit and natural three-stock respawn within 480 source cursors. Literal inputs must show neutral P1 and one P2 C-stick episode through respawn. Only that validated handoff permits the existing route to continue from three stocks. A ledge grab or safe landing stops the hypothesis. Normal validation reads and checksum waits are source-bounded; diagnostic readbacks after a failure remain unaccepted evidence. Scenario availability is not a KO result.
 
+The mutually exclusive `full-moderate-combat-ko-charged` scenario selects
+`--gameplay-combat-ko-charged` for one held A+left input hypothesis instead.
+The driver requests release at the first observed source cursor reaching the
+24-cursor target, within the existing 500 ms callback and at most 30 literal
+held input records. It separately validates the actual neutral release, sampled
+ordered animation plateau and later advance; missing sampled frames remain
+explicit and no hidden charge amount is inferred. All KO-credit, neutral-victim,
+respawn and owner limits above still apply. It is an experiment, not a KO claim.
+
 The reliability scenarios use separate result policies. Select one command below
 with a new evidence directory for each invocation:
 

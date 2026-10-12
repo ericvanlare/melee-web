@@ -4,7 +4,9 @@
  * native lockstep owner remains the only source-progress/checksum pump.
  */
 import assert from 'node:assert/strict';
-import {captureCombatKoBaseline, advanceCombatKoEvidence, createCombatKoRespawnHandoff}
+import {COMBAT_KO_CHARGED_HOLD_SOURCE_TICKS, COMBAT_KO_CHARGED_PAD_BYTES,
+  captureCombatKoBaseline, advanceCombatKoEvidence, createCombatKoRespawnHandoff,
+  validateCombatKoChargedAnimation}
   from './a3_local_room_combat_ko.mjs';
 import {observeRuntimeOwner} from '../tests/runtime_owner_observation.mjs';
 import {confirmTwoHumanResults} from '../tests/vs_rules_results_confirmation_driver.mjs';
@@ -39,6 +41,10 @@ export function observeDesiredSourcePad({inputFrom, port, expected, maxSourceCur
        row.local_port!==port||row.source_cursor!==row.input_tick||
        !Array.isArray(bytes)||bytes.length!==11||
        !bytes.every(value=>Number.isInteger(value)&&value>=0&&value<=255))continue;
+    if(Array.isArray(expected?.bytes)) {
+      if(expected.bytes.length===11&&bytes.every((value,index)=>value===expected.bytes[index]))return row;
+      continue;
+    }
     const signed=value=>value>=128?value-256:value;
     const matches=expected?.cstickX!==undefined
       ? bytes[0]===0&&bytes[1]===0&&bytes[2]===0&&bytes[3]===0&&
@@ -51,6 +57,80 @@ export function observeDesiredSourcePad({inputFrom, port, expected, maxSourceCur
     if(matches)return row;
   }
   return false;
+}
+
+// Synchronous page predicate for the single charged A+left hypothesis. It
+// releases at the first observed cursor reaching the target; pressChord owns key-up.
+export function observeCombatKoChargedHoldBeforeRelease({inputFrom, port, expectedBytes,
+  inputDelay, holdSourceTicks = 24,
+  maxSourceCursor, baselineVictimDamage}) {
+  const exact = row => row?.local_port === port && row.source_cursor === row.input_tick &&
+    Array.isArray(row?.bytes) && row.bytes.length === 11 &&
+    row.bytes.every((value, index) => Number.isInteger(value) && value >= 0 && value <= 255 &&
+      value === expectedBytes[index]);
+  const runtimeError = globalThis.document?.querySelector('#status')?.dataset.runtimeError;
+  if (runtimeError) throw Error(runtimeError);
+  if (!Number.isSafeInteger(inputFrom) || inputFrom < 0 || port !== 1 ||
+      !Number.isSafeInteger(inputDelay) || inputDelay < 0 ||
+      holdSourceTicks !== 24 ||
+      !Number.isSafeInteger(maxSourceCursor) || !Number.isFinite(baselineVictimDamage) ||
+      !Array.isArray(expectedBytes) || expectedBytes.length !== 11 ||
+      expectedBytes.some((value, index) => value !== [1, 0, 129, 0, 0, 0, 0, 0, 0, 0, 0][index]))
+    throw Error('Charged KO hold predicate requires the fixed A+left recipe and declared bounds');
+  const health = globalThis.meleeNetRuntimeLockstepHealth?.({inputFrom});
+  if (!health || health.failure || health.peer?.failure || health.peer?.protocol?.terminal)
+    throw Error('Charged KO hold observed a runtime-owner failure or terminal');
+  const captures = health.peer?.localInputCapture?.captures_since;
+  if (!Array.isArray(captures)) throw Error('Charged KO hold local PAD suffix is unavailable');
+  const cursor = globalThis.__net?.status?.()?.cursor;
+  if (!Number.isSafeInteger(cursor)) throw Error('Charged KO hold source cursor is unavailable');
+  if (cursor > maxSourceCursor) throw Error('Charged KO hold exceeded its 480-source-cursor budget');
+  const p2Rows = captures.filter(row => Number.isSafeInteger(row?.input_tick) &&
+    row.input_tick >= inputFrom && row.local_port === port);
+  const firstActive = p2Rows.find(row => Array.isArray(row?.bytes) && row.bytes.some(value => value !== 0));
+  if (!firstActive) return false;
+  if (!exact(firstActive)) throw Error('Charged KO first chord PAD row is malformed or partial');
+  const pressTick = firstActive.input_tick;
+  const actionStartTick = pressTick + inputDelay + 1;
+  const releaseInputTick = actionStartTick + holdSourceTicks;
+  if (releaseInputTick - pressTick > 30)
+    throw Error('Charged KO A+left episode would exceed the 30-literal-record limit');
+  for (let index = 1; index < p2Rows.length; ++index)
+    if (p2Rows[index].input_tick <= p2Rows[index - 1].input_tick)
+      throw Error('Charged KO local PAD suffix repeats or moves backward');
+  if (cursor - pressTick > 30)
+    throw Error('Charged KO A+left episode exceeded the 30-literal-record limit');
+  const knownRows = p2Rows.filter(row => row.input_tick >= pressTick);
+  for (let index = 1; index < knownRows.length; ++index)
+    if (knownRows[index].input_tick === knownRows[index - 1].input_tick)
+      throw Error('Charged KO local PAD suffix contains a duplicate source tick');
+  for (let index = 0; index < knownRows.length; ++index) {
+    const row = knownRows[index];
+    if (row.input_tick !== pressTick + index || !exact(row))
+      throw Error('Charged KO A+left chord has a missing, partial, or early-release PAD row');
+  }
+  const nativeMatch = globalThis.Module?._melee_web_native_menu_match_observe;
+  if (typeof nativeMatch !== 'function') throw Error('Charged KO native match observer is unavailable');
+  let match;
+  try { match = JSON.parse(globalThis.Module.UTF8ToString(nativeMatch())); }
+  catch (error) { throw Error('Charged KO native match observation failed: ' + String(error?.message || error)); }
+  if (!Array.isArray(match?.players) || match.players.length !== 2)
+    throw Error('Charged KO native match lacks exactly two players');
+  const actor = match.players.find(player => player.source_port === 1);
+  const victim = match.players.find(player => player.source_port === 0);
+  if (!actor || !victim || !Number.isFinite(victim.damage_percent) || !Number.isFinite(actor.animation_frame))
+    throw Error('Charged KO native match lacks actual actor animation or victim damage');
+  if (victim.stocks !== 4 || victim.damage_percent > baselineVictimDamage ||
+      (victim.motion >= 75 && victim.motion <= 91) || victim.groundAir === 1)
+    throw Error('Charged KO strike or victim response began before the intended hold endpoint');
+  if (cursor < actionStartTick) return false;
+  if (actor.motion !== 60 || actor.facing_direction !== -1)
+    throw Error('Charged KO actor did not enter paired S4S60 facing -1 while A was held');
+  if (cursor < releaseInputTick) return false;
+  return {press_sample: firstActive, action_start_source_tick: actionStartTick,
+    hold_end_source_tick: releaseInputTick, desired_release_source_cursor: releaseInputTick,
+    observed_release_request_source_cursor: cursor, actor_motion: actor.motion,
+    actor_facing_direction: actor.facing_direction, actor_animation_frame: actor.animation_frame};
 }
 
 // Bounded synchronous page predicate used while a real PageUp chord is held.
@@ -488,6 +568,7 @@ export async function runA3LocalFullRoute({
   readInputDiagnostics, waitForBothChecksumCompare, captureScreenshot,
   assertHealthy, gameplayActionProbe = false, gameplayCombatProbe = false,
   gameplayCombatExchange = false, gameplayCombatKo = false,
+  gameplayCombatKoCharged = false,
 }) {
   requireValue(!(gameplayActionProbe && gameplayCombatProbe),
     'Gameplay action and combat probes are separate route scenarios');
@@ -495,6 +576,11 @@ export async function runA3LocalFullRoute({
     'Gameplay combat exchange requires the existing combat probe prefix');
   requireValue(!gameplayCombatKo || gameplayCombatExchange,
     'Combat KO requires the verified combat exchange prefix');
+  requireValue(!gameplayCombatKoCharged || gameplayCombatExchange,
+    'Charged combat KO requires the verified combat exchange prefix');
+  requireValue(!(gameplayCombatKo && gameplayCombatKoCharged),
+    'C-stick and charged combat KO are separate route scenarios');
+  const gameplayCombatKoRequested = gameplayCombatKo || gameplayCombatKoCharged;
   const route = {
     result: 'running', scope: 'local keyboard route/lifecycle witness only',
     phases: [], css_roster: [], stage: null, match_start: [], stock_losses: [],
@@ -502,12 +588,15 @@ export async function runA3LocalFullRoute({
     required_checksum_boundary: null, gameplay_action_probe: gameplayActionProbe,
     gameplay_combat_probe: gameplayCombatProbe,
     gameplay_combat_exchange: gameplayCombatExchange, gameplay_combat_ko: gameplayCombatKo,
+    gameplay_combat_ko_charged: gameplayCombatKoCharged,
     exclusions: ['no PAD/Gamepad input injection',
       gameplayActionProbe
         ? 'one short P2 gameplay axis pulse, one P1 grounded jab, and one P2 jump with source motion evidence; no combat-coverage claim'
         : gameplayCombatProbe
-          ? gameplayCombatKo
-            ? 'bounded one-swing combat KO hypothesis after the verified jab/shield exchange; requires observed hit/air/death, exact original source-slot scorer deltas and natural three-stock respawn; no retail-equivalence claim'
+          ? gameplayCombatKoRequested
+            ? gameplayCombatKoCharged
+              ? 'bounded one-swing charged A+left KO hypothesis after the verified jab/shield exchange; requires exact literal chord, paired S4S60/facing-1, held animation plateau and post-release advance, observed hit/air/death, exact source-slot scorer deltas and natural three-stock respawn; no charge-count or retail-equivalence claim'
+              : 'bounded one-swing C-stick KO hypothesis after the verified jab/shield exchange; requires observed hit/air/death, exact original source-slot scorer deltas and natural three-stock respawn; no retail-equivalence claim'
             : gameplayCombatExchange
             ? 'bounded P2 approach/jab prefix, one reverse P1 jab, and one P2 shield exchange with paired source evidence; no retail-equivalence or KO claim'
             : 'bounded P2 inward keyboard approach and one P2 jab with paired source damage response; no retail-equivalence or KO claim'
@@ -673,6 +762,8 @@ export async function runA3LocalFullRoute({
   const asSignedAxis = (bytes, index) => signedByte(bytes[index]);
   const matchesExpected = (row, expected) => {
     if (!Array.isArray(row?.bytes) || row.bytes.length !== 11) return false;
+    if (Array.isArray(expected?.bytes)) return expected.bytes.length === 11 &&
+      row.bytes.every((value, index) => value === expected.bytes[index]);
     if (expected?.cstickX !== undefined) return row.bytes.slice(0,4).every(value => value === 0) &&
       Math.sign(asSignedAxis(row.bytes,4)) === expected.cstickX && row.bytes.slice(5).every(value => value === 0);
     if (expected?.button !== undefined) {
@@ -685,7 +776,7 @@ export async function runA3LocalFullRoute({
   };
   const pulse = async (role, keys, {expected, holdMs = 160, releaseMs = 100,
     label, retainSample = false, observePress = false, sourceCursorLimit = null,
-    evidenceSink = null}) => {
+    evidenceSink = null, holdObservation = null}) => {
     requireValue(Array.isArray(keys) && keys.length > 0, `${label}: keyboard chord is empty`);
     const instance = instances[role];
     const port = rolePort(role);
@@ -704,9 +795,13 @@ export async function runA3LocalFullRoute({
     let observed;
     try {
       observed = await instance.driver.pressChord(keys, {holdMs, releaseMs,
-        ...(observePress ? {observeBeforeRelease: {predicate: observeDesiredSourcePad,
-          arg: {inputFrom: inputCount, port, expected, maxSourceCursor: sourceCursorLimit},
-          timeoutMs: pressObservationCap}} : {})});
+        ...(observePress ? {observeBeforeRelease: holdObservation
+          ? {predicate: holdObservation.predicate,
+            arg: {...holdObservation.arg, inputFrom: inputCount, port, expectedBytes: expected.bytes,
+              maxSourceCursor: sourceCursorLimit}, timeoutMs: pressObservationCap}
+          : {predicate: observeDesiredSourcePad,
+            arg: {inputFrom: inputCount, port, expected, maxSourceCursor: sourceCursorLimit},
+            timeoutMs: pressObservationCap}} : {})});
     } catch (error) {
       if (evidenceSink) {
         evidenceSink.press_observer_error = String(error?.stack || error);
@@ -727,7 +822,7 @@ export async function runA3LocalFullRoute({
       }
       throw error;
     }
-    let sample = observePress ? observed : null;
+    let sample = observePress ? (holdObservation ? observed?.press_sample : observed) : null;
     if (evidenceSink && sample) evidenceSink.movement = {...sample, bytes: [...sample.bytes]};
     const captureDeadline = Date.now() + Math.min(1500, remaining());
     while (Date.now() < captureDeadline && !sample) {
@@ -759,8 +854,11 @@ export async function runA3LocalFullRoute({
       checksum_boundary_required: requiredBoundary, checksum_boundary_reached: false,
       expected_pad_readback: expected, input_diagnostic: input.last_non_neutral,
       keyboard_path: 'browser_driver.pressChord',
-      ...(observePress ? {press_release_policy: 'first actual desired source-owned PAD capture',
-        press_observation_cap_ms: pressObservationCap} : {})};
+      ...(observePress ? {press_release_policy: holdObservation
+        ? 'exact charged A+left row, then request release at first observed cursor reaching target; actual neutral row validated separately'
+        : 'first actual desired source-owned PAD capture',
+        press_observation_cap_ms: pressObservationCap} : {}),
+      ...(holdObservation ? {hold_observation: observed} : {})};
     if (retainSample) {
       row.observed_pad_sample = {...sample, bytes: [...sample.bytes]};
     }
@@ -1971,7 +2069,8 @@ export async function runA3LocalFullRoute({
   }
 
   let combatKoHandoff = null;
-  if (gameplayCombatKo) {
+  if (gameplayCombatKoRequested) {
+    const charged = gameplayCombatKoCharged;
     requireValue(route.combat_probe?.combat_exchange?.result === 'pass',
       'Combat KO prefix requires a verified shield exchange');
     const before = await waitForGroundedNeutralBaseline('fresh one-swing KO baseline',
@@ -1981,6 +2080,7 @@ export async function runA3LocalFullRoute({
     const baseline = captureCombatKoBaseline({pairedRows: before.rows});
     const limit = baseline.source_tick + 480;
     const ko = route.combat_probe.combat_ko = {result: 'running', baseline,
+      input_mode: charged ? 'charged-a-left' : 'cstick-left',
       source_cursor_limit: limit, one_swing: true, action_start_tick: null,
       observed_pairs: [], sequence: {}, input_window: null, handoff: null};
     let cancelled = false;
@@ -2003,11 +2103,14 @@ export async function runA3LocalFullRoute({
       for (const row of rows) requireValue(row.native_status?.active === 1 &&
         row.native_status?.context_applied === 1 && row.native_status?.terminal?.kind === 0,
       'Combat KO native owner is inactive or terminal');
-      ko.observed_pairs.push({source_tick: rows[0].source_tick, peers: rows});
+      ko.observed_pairs.push({source_tick: rows[0].source_tick, peers: rows,
+        active_match: !states.some(state => state.wait)});
       if (states.some(state => state.wait)) return;
       lastTick = rows[0].source_tick;
       advanceCombatKoEvidence({baseline, sequence: ko.sequence, pairedRows: rows,
-        actionStartTick: started});
+        actionStartTick: started,
+        ...(ko.planned_release_consumed_source_tick !== undefined
+          ? {chargeReleaseAcceptedSourceTick: ko.planned_release_consumed_source_tick} : {})});
     };
     const drain = () => { if (started !== null && pending.length) {
       const saved = pending; pending = []; for (const entry of saved) inspect(entry.rows);
@@ -2027,10 +2130,34 @@ export async function runA3LocalFullRoute({
       return ko.sequence.respawn_rows;
     })().then(value => ({value}), error => ({error}));
     try {
-      press = await pulse('beta', ['Numpad4'], {expected: {cstickX: -1},
-        holdMs: 0, releaseMs: 80, observePress: true, retainSample: true,
-        sourceCursorLimit: limit, evidenceSink: ko, label: 'single P2 left C-stick forward smash'});
+      if (charged) requireValue(Number.isSafeInteger(inputDelay) && inputDelay >= 0 &&
+        inputDelay + 1 + COMBAT_KO_CHARGED_HOLD_SOURCE_TICKS <= 30,
+      'Charged KO declared input delay would exceed the 30-literal-record episode limit');
+      press = charged
+        ? await pulse('beta', ['ArrowLeft', 'ShiftRight'], {
+          expected: {bytes: [...COMBAT_KO_CHARGED_PAD_BYTES]},
+          holdMs: 0, releaseMs: 80, observePress: true, retainSample: true,
+          sourceCursorLimit: limit, evidenceSink: ko,
+          holdObservation: {predicate: observeCombatKoChargedHoldBeforeRelease,
+            arg: {inputDelay, holdSourceTicks: COMBAT_KO_CHARGED_HOLD_SOURCE_TICKS,
+              baselineVictimDamage: baseline.actual_matches[0].players.find(player =>
+                player.source_port === 0).damage_percent}},
+          label: 'single P2 charged A+left forward smash'})
+        : await pulse('beta', ['Numpad4'], {expected: {cstickX: -1},
+          holdMs: 0, releaseMs: 80, observePress: true, retainSample: true,
+          sourceCursorLimit: limit, evidenceSink: ko, label: 'single P2 left C-stick forward smash'});
       started = press.source_input_tick + inputDelay + 1;
+      if (charged) {
+        ko.hold_end_source_tick = started + COMBAT_KO_CHARGED_HOLD_SOURCE_TICKS;
+        requireValue(press.hold_observation?.action_start_source_tick === started &&
+          press.hold_observation?.hold_end_source_tick === ko.hold_end_source_tick &&
+          press.hold_observation?.desired_release_source_cursor === ko.hold_end_source_tick &&
+          press.hold_observation?.observed_release_request_source_cursor >= ko.hold_end_source_tick,
+        'Charged KO hold observer did not retain the declared target and observed release request');
+        ko.planned_release_consumed_source_tick =
+          press.hold_observation.desired_release_source_cursor + inputDelay + 1;
+      }
+      // This lower bound is planned only; final success uses the actual neutral PAD row.
       ko.action_start_tick = started;
       ko.press = press;
       const observed = await outcome;
@@ -2050,12 +2177,29 @@ export async function runA3LocalFullRoute({
         Number.isSafeInteger(row.native_status?.cursor) && row.native_status.cursor <= limit),
       'Combat KO input readback exceeded budget or failed');
       const release = p2Rows?.find(row => row.input_tick > press.source_input_tick && isNeutralPadRow(row));
+      if (charged && release) {
+        ko.actual_neutral_release_input_tick = release.input_tick;
+        ko.actual_release_consumed_source_tick = release.input_tick + inputDelay + 1;
+      }
       ko.input_window = {input_start_tick:inputStart,input_end_tick:inputEnd,
         press_tick:press.source_input_tick,release_tick:release?.input_tick ?? null,p1Rows,p2Rows};
+      const chargeAnimationEvidence = charged
+        ? validateCombatKoChargedAnimation({baseline,
+          pairedRows: ko.observed_pairs.filter(entry => entry.active_match !== false)
+            .map(entry => entry.peers),
+          pressTick: press.source_input_tick, inputDelay, releaseTick: release?.input_tick})
+        : null;
+      if (chargeAnimationEvidence) {
+        requireValue(Number.isSafeInteger(ko.sequence.hit) &&
+          ko.sequence.hit >= chargeAnimationEvidence.release_consumed_source_tick,
+        'Charged KO hit preceded the actual neutral release reaching the source');
+        ko.charge_animation_evidence = chargeAnimationEvidence;
+      }
       combatKoHandoff = createCombatKoRespawnHandoff({baseline,
         attackLossReceipt:ko.sequence.loss,pairedRows:rows,p1Rows,p2Rows,
         inputStartTick:inputStart,inputEndTick:inputEnd,pressTick:press.source_input_tick,
-        releaseTick:release?.input_tick});
+        releaseTick:release?.input_tick, inputMode: charged ? 'charged-a-left' : 'cstick',
+        ...(charged ? {inputDelay, chargeAnimationEvidence} : {})});
       const boundary = inputEnd + inputDelay + 1;
       await waitForBothChecksumCompare(boundary,null,undefined,{sourceCursorLimit:limit,evidenceSink:ko});
       ko.handoff = combatKoHandoff;
@@ -2075,6 +2219,14 @@ export async function runA3LocalFullRoute({
       // literal suffix. These rows are diagnostic only, never a valid handoff.
       cancelled = true;
       await outcome;
+      // A failed hold can precede startAt: preserve its bounded actual pairs
+      // after the collector joins, without feeding them into accepted evidence.
+      ko.pending_prestart_failure_pairs = {
+        accepted: false,
+        scope: 'diagnostic actual pre-start peer pairs only; not replayed into guards or sequence',
+        retention_cap: 128,
+        pairs: pending.map(entry => entry.rows),
+      };
       if (remaining() > 0) {
         try {
           const inputFrom = baseline.source_tick - inputDelay - 1;
