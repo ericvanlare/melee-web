@@ -32,6 +32,12 @@ external evidence inventory. Focused real-socket controls cover small and large
 writes, concurrent connections, byte hashes, delay, bandwidth, stalls, cuts and
 cleanup. The serial runner stops at the first failed scenario and retains it.
 
+Linux CI also exposed an unfinished writable half in the deliberate-cut echo
+fixture. The fixture now retires that half on orderly EOF; proxy/runtime behavior
+and every cut/byte assertion are unchanged. Its focused controls, full regression
+and independent source review pass. The failed CI run is retained in the scoped
+receipt; integration still requires all checks on the final PR head.
+
 This boundary does not establish a full match, public routing, TLS/NAT, human
 physical input, audible output, foreground timing, two-machine play or original
 game comparison. The full match and resilience milestones continue in
