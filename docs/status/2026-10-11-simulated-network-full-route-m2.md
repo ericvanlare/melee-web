@@ -36,3 +36,30 @@ remain distinct in the receipt. This new raw result also has independent
 review. PR #311 merged as `707c4489` with all 14 exact-head checks complete;
 reviewed and merged trees match. The receipt preserves each earlier producer
 and later capture independently.
+
+The October 12 action follow-up at source/runtime `5f895d3b` adds read-only
+per-player animation-frame observations. The strict probe still fails its
+unchanged 60-source-tick jump-to-Wait requirement. P2 supplies one literal X
+sample then neutral; its 48 retained common-source pairs show Jump25 and
+grounded Landing42, with Landing animation progressing from 0 to 22. Every
+retained paired player field agrees, but observations have gaps. The preceding
+jab has nine paired observations and returns to Wait. Independent review verifies all 24 inventoried owned processes absent,
+including the 21 browser processes, and normal Leave/unload/quiescence. This failed run has
+no final full-route checksum comparison, Results or CSS-return result. A separate
+review of cleanup snapshots found 556 matching 64-byte records (tails 0/1);
+that prefix does not turn the failed route into a pass.
+
+A read-only source/asset review found an authored Landing endpoint of 29 in a
+retained Mario archive. That archive is not yet bound to the active capture's
+asset or runtime joint completion; it cannot establish the live return duration.
+The result shows animation progress and leaves the assumed 60-tick completion
+bound unsupported. No gameplay repair or relaxed assertion was introduced.
+The existing strict probe remains open while the combat sprint proceeds with
+grounded actions. Fresh original stock/jab comparison also remains unrun:
+the historical raw recording and provenance were not located by the bounded
+search. The receipt retains the exact candidate, reviews, failed run and gaps.
+
+The additive observer passed independent source/result review, the affected
+Release runtime build and 2,363 regression tests (165 expected skips). Its
+exact-head CI and integration are pending; all historical M2 and M3 producer
+identities remain unchanged.
