@@ -86,8 +86,8 @@ and failure conditions. [Lane #307](https://github.com/ericvanlare/melee-web/iss
 [reliability #309](https://github.com/ericvanlare/melee-web/issues/309) own the
 16 timeboxed work items and their pass criteria. Label results simulated-network
 functional evidence; preserve public staging and two-machine gates separately.
-This sprint has the shared capture lane. Stadium and unchanged provider queries
-remain checkpointed while it runs. Keep the original runtime/input/checksum and
+This sprint established the shared capture lane; Stadium and unchanged provider
+queries stayed checkpointed during it. Keep the original runtime/input/checksum and
 cleanup rules; investigate a failed boundary before another long run.
 
 **Owner-approved combat follow-up (October 12):** use that same network lane
@@ -102,30 +102,38 @@ under moderate and asymmetric simulated conditions. Each milestone owns four
 timeboxed work items, one PR and one scoped status boundary. Grounded combat
 can proceed independently if the landing investigation remains inconclusive.
 Reuse existing original comparisons and preserve their setup/field exclusions;
-paired browser agreement alone is not original equivalence. The combat sprint
-now owns the shared capture lane, with Stadium and unchanged provider queries
-still checkpointed. Public staging and the separate acceptance gates remain open.
+paired browser agreement alone is not original equivalence. Under the owner-adopted October 12 architect check-in, checkpoint the current
+[#316](https://github.com/ericvanlare/melee-web/pull/316) combat step before
+running the owner-cleared public staging slice. Keep the existing incident
+recorder enabled and retain forced timing pauses as H1 evidence. After combat
+#313/#314, Pokémon Stadium C3 #301/#251 is the next Track B milestone.
+Public functional results leave the separate acceptance gates open.
 
 **Owner-requested readiness checkpoint (October 11; updated October 12):** the
 existing local Worker and Host/Join UI have a [scoped browser result](status/2026-10-11-local-room-ui-readiness.md)
 for actual keyboard control through original CSS → SSS → four-stock Mario/FD
 → Results → CSS, matching runtime checksums and clean intentional disconnect.
 The local #288 driver also includes a separately scoped P2 gameplay-input
-interval and the optional supplied-preflight interface. Its reviewed local
-evidence does not replace the public endpoint milestone above. The supplied
-preflight code only checks the receipt structure and does not verify a live Worker. No deployed
-endpoint, remote browser run or RTT result is available, so public #288 remains
-blocked on those service facts. Do not repeat local captures without a new
-hypothesis.
+interval and the supplied-preflight interface. The owner restored staging
+credentials and authorized the isolated Workers Free relay with a $0 spend
+limit, its own SQLite namespace and workers.dev only. The current combat step
+is checkpointed in [#316](https://github.com/ericvanlare/melee-web/pull/316),
+and the public-relay route now takes the capture lane. Deployment, actual
+origin enforcement, network measurements, complete-route results and retained
+failures belong in the [same scoped readiness receipt](status/2026-10-11-local-room-ui-readiness.md).
+The preflight parser alone does not verify a live service. No paid-plan,
+account/security, DNS or production changes are authorized. Keep the
+same-machine public functional result separate from two-machine and broader
+acceptance, and do not repeat successful captures without a new hypothesis.
 
 The bounded original Zelda-to-Sheik owner-prefix milestone for [#304](https://github.com/ericvanlare/melee-web/issues/304)
 is now recorded in the [existing weaker-fighter status](status/2026-10-09-weaker-fighter-comparison-lineup.md);
 the strict two-human browser comparison remains separate. Stadium C3 under
 [#251](https://github.com/ericvanlare/melee-web/issues/251) stays checkpointed in
-its existing draft PR during the owner-authorized simulated-network sprint.
+its existing draft PR while the public-relay and combat milestones own the lane.
 The existing [Stadium CSS/SSS preparation status](status/2026-10-06-pokemon-stadium-c1a-css-sss-preparation.md)
 remains the route evidence; current C3 receipts and prerequisites stay in #251.
-Public #288 work resumes when the deployed service facts change. See the
+Public #288 uses the owner-cleared isolated staging relay. See the
 [execution update](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6112686789).
 
 ### Track B: competitive-rules Melee before the whole game
@@ -177,7 +185,7 @@ retain a reduced reproducer and move to the next fighter. Bowser's
 [#274 checkpoint](https://github.com/ericvanlare/melee-web/issues/274) remains
 unresolved and parked after the reconstructed-prefix attempt budget.
 
-**Current #304 boundary.** The bounded original Zelda-to-Sheik owner-prefix milestone is complete for [issue #304](https://github.com/ericvanlare/melee-web/issues/304), with evidence in the [scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md); strict two-human browser comparison remains separate. Stadium C3 under [#251](https://github.com/ericvanlare/melee-web/issues/251) remains checkpointed while the simulated-network sprint owns the capture lane. Its existing [CSS/SSS preparation status](status/2026-10-06-pokemon-stadium-c1a-css-sss-preparation.md) records the route boundary; current C3 receipts remain in #251. Public #288 work resumes only when the deployed service facts change.
+**Current #304 boundary.** The bounded original Zelda-to-Sheik owner-prefix milestone is complete for [issue #304](https://github.com/ericvanlare/melee-web/issues/304), with evidence in the [scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md); strict two-human browser comparison remains separate. Stadium C3 under [#251](https://github.com/ericvanlare/melee-web/issues/251) remains checkpointed while the public-relay and combat milestones own the capture lane. Its existing [CSS/SSS preparation status](status/2026-10-06-pokemon-stadium-c1a-css-sss-preparation.md) records the route boundary; current C3 receipts remain in #251. Public #288 now uses the owner-cleared isolated staging relay.
 
 The next Stadium milestone is [C3 idle in-match lifetime #251](https://github.com/ericvanlare/melee-web/issues/251),
 with its remaining prerequisites counted and tracked inside that issue and PR.

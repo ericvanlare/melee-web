@@ -1,0 +1,275 @@
+{
+  "schema": "melee-web-public-room-full-route-evidence-v1",
+  "observed_date": "2026-10-12",
+  "scope": "One same-host, two-profile, installed-headless-Chrome functional route through the deployed staging relay. Scoped functional evidence only.",
+  "retained_run_id": "public-relay-functional-20261012-130605-11281871",
+  "producer": {
+    "capture_harness_commit": "c1c2c0f4078f8d5fb250c00f1e8a5578e108d57b",
+    "capture_harness_tree": "d9a594f24c3aa14020f2f1e6e973c0c4e6c7f099",
+    "capture_harness_source_clean_at_run": true,
+    "full_route_script_sha256": "114901b57c3c0ec6b2c3c26ae23c9ad5432cfcb145662a58e6541312776f98d4",
+    "runtime_producer_commit": "acd616ad77dd2586c26726d59b4a7e70236a0032",
+    "captured_wasm_sha256": "5280f23fdaefea7447b94fad86845680d2cdde5115a2fdd24f4f1dacd4bd0a6e",
+    "current_main_port": {
+      "commit": "fe60546d1f38f539af00b8c54d1d001b6fcd2c35",
+      "capture_producer": false,
+      "release_build": {
+        "decision": "AFFECTED_RELEASE_RUNTIME_BUILD_PASS",
+        "receipt": "main-fe60546d-runtime-build.json",
+        "receipt_sha256": "b1fc66ba162f8690ccd3c89772c0e750ecb612d4a21d9213f10018beee1de199",
+        "wasm_sha256": "37a5304c4af217e28d30f176ea5e6840ff32d3407cda1f89746e284683f39872"
+      },
+      "full_regression": {
+        "source": "fe60546d1f38f539af00b8c54d1d001b6fcd2c35",
+        "tests": 2364,
+        "skips": 165,
+        "duration_seconds": 523.122,
+        "exit_code": 0,
+        "receipt": "main-fe60546d-full-regression.json",
+        "receipt_sha256": "01f8a73da60b26ecdd78d6b26118d9d9a1252293ce2d282b9cb94f450c90be59",
+        "log_sha256": "4973eb17676f1832efb58829153dc69e3d19e1dccb42626076882628a8c6bf58"
+      },
+      "ci": "Final-PR-head CI is an integration gate recorded in the PR and priorities tracker, separately from this local validation receipt.",
+      "independent_source_review": {
+        "receipt": "public-main-port-review-v1.json",
+        "sha256": "e6b6934a5cc3a5e72ddaa9d9ea29e78e01e58a758d3e6c34540be52fd58a7ff4",
+        "file": "public-main-port-review-v1.json"
+      },
+      "scope": "Only Results-input repair and failure-evidence plumbing; capture used separate draft #316 H1/cleanup prerequisites, whose integration is not claimed here."
+    }
+  },
+  "deployment": {
+    "environment": "staging",
+    "worker_name": "melee-web-room-relay-staging-288",
+    "endpoint": "wss://melee-web-room-relay-staging-288.mywebcomic.workers.dev",
+    "deployment_id": "824f7e81-9e5b-4ddb-b447-cdaa26e75969",
+    "version_id": "8fb9b640-17d2-484a-a2eb-452d4774681f",
+    "traffic_percentage": 100,
+    "uploaded_source_sha256": "850b0f1dbb5f8c48c997a9d46405644ef2a36b6795e6b7fac5bbacd2005cb709",
+    "source_binding_scope": "Local uploaded source input is bound by the successful pinned deployment; remote bundle bytes were not independently downloaded.",
+    "config_sha256": "0fb42f657c6e31ba9eb259cc5bee0868a92b3ccea603b83888acce1980f08d94",
+    "allowed_origins": [
+      "http://127.0.0.1:8787",
+      "http://localhost:8787"
+    ],
+    "plan": "Workers Free",
+    "spend_limit_usd": 0,
+    "changes": "A staging Worker version was uploaded. No paid plan, billing, DNS, or production changes.",
+    "post_capture": "External Worker remains deployed idle; capture did not own or dispose it.",
+    "receipts": {
+      "endpoint.json": "deeda289df3008e7e53e21a9f4f2bed57df4c6cbdb69e81eb8beccdc6ecde543",
+      "deployed-version.json": "feab528b14bd71f9ea3f58233f60c836912201569028f6336857cc94a2de9969",
+      "deployment-binding.json": "af594ce2a53255b22dc929d00efff14d12a99ee12b1dca7ad9e2682d5a60d9cf",
+      "public-browser-preflight.json": "c64fb403a7f1648c3a9fc46d7bfd2bd57b9a2fa9769a920ca959611c442eb803",
+      "provider-binding-preflight.json": "a3a8e42e81cb3706858e1d82c29671869943af26ab468a96975cf7bead498f4a",
+      "origin-config-binding.json": "1b20809472d39467a1fa7dcf56c151d3d5eb95f5246199db9aeb5924656c1999",
+      "deployment-attempt.json": "e0bd965bd8633cf923d10da7c65f8267c85205c15e98564db0c82ab13fb15918"
+    },
+    "wrangler_version": "4.131.1",
+    "namespace": {
+      "binding_name": "ROOMS",
+      "class_name": "RoomRelay",
+      "type": "durable_object_namespace",
+      "storage": "sqlite",
+      "namespace_id": "6644841b09974b46822753ce5cc49965"
+    },
+    "staging_version_uploaded": true
+  },
+  "origin_and_rtt_prerequisite": {
+    "live_origin_check": "Allowed local origin completed two Chrome-native WSS 101 handshakes and ready/echo exchange; explicit forbidden Origin received HTTP 403 with the Worker JSON denial body.",
+    "probe_scope": "Same-host two-profile peer/public-relay echo round trip only; not two-machine network RTT, game input latency, input-to-photon latency, source-tick duration or performance acceptance.",
+    "measured_echo_rtt_ms": {
+      "alpha_to_beta_to_alpha": {
+        "samples": 20,
+        "p50": 184.78,
+        "p95": 199.925,
+        "max": 231.195
+      },
+      "beta_to_alpha_to_beta": {
+        "samples": 20,
+        "p50": 187.4575,
+        "p95": 194.515,
+        "max": 198.635
+      }
+    },
+    "input_delay_ticks": 2,
+    "delay_policy": "Unchanged fixed value; not selected from RTT.",
+    "probe_report_sha256": "28e33bbb37d023f5fff83049623452099bfdbd7267338c2482ed1e71c31ed273",
+    "independent_review_sha256": "acf15605b6e7d3be34707ce831dd0d0d9ad21dc3c1ad22c9f2d33a944130e049",
+    "retained_initial_failure": {
+      "artifact": "http-first-failure-diagnostic.json",
+      "sha256": "e01dbc1d92ceb1ffba968719eba3861cd57825e8b60bb9bddb9e0cb3873a3b8a",
+      "observation": "Earlier urllib request received HTTP 403 / Cloudflare 1010. This is retained separately and is not the later explicit Worker origin-denial response.",
+      "file": "http-first-failure-diagnostic.json"
+    },
+    "probe_report": "rtt-origin-attempt-1/probe/report.json",
+    "independent_review": "rtt-origin-attempt-1-independent-review-v1.json",
+    "live_origin_check_evidence": {
+      "allowed_origin": "Two installed Chrome native WSS handshakes returned 101 and the ready/echo exchange completed.",
+      "forbidden_origin": "Explicit forbidden Origin returned HTTP 403 with the Worker denial JSON body."
+    }
+  },
+  "route_attempts": [
+    {
+      "attempt": 1,
+      "decision": "FAIL",
+      "report_sha256": "68b88a43660cee455c3ae46c9a67c4140c5bce1af9c5e7082336edc903ee7996",
+      "owner_sha256": "935f4f88d674623f520fa0c87583dc412e97c3889d8bc5b6af01cd4503fc67fd",
+      "independent_review_sha256": "5ce6d10326a6450f0d8619400671b7d3119a7ee7f8244edc0bd39cef55aaf4ce",
+      "observed_boundary": "P2 Results End had no source-aligned PAD row; confirmation stopped before returned CSS.",
+      "limits": "The exact press interval was not retained; the missed source sample does not prove a specific live timing cause.",
+      "report_file": "full-match-1/browser/report.json",
+      "owner_file": "full-match-1/owner.json",
+      "independent_review_file": "full-match-1-independent-review-v1.json"
+    },
+    {
+      "attempt": 2,
+      "decision": "PASS_SCOPED_PUBLIC_STAGING_FUNCTIONAL_FULL_ROUTE",
+      "report_sha256": "bc08659535c3bd1b7b631a3d47f59bb1dd0038e69381aa2aa0c63878ee6ac459",
+      "owner_sha256": "8e00bde949c151f56c4fbb44ac260ae39be62fb2e8819d252b32a4771b0d94a0",
+      "release_sha256": "600adecb3a887b1de2c3234ef0126368d73f2344b7c19c0214e4cbc2b40a99c4",
+      "independent_raw_review_sha256": "49f0e282156df7982e2e000f0054d7071d38e2cdf28c4cfbcd8dc5e15351f52a",
+      "route": "Original CSS \u2192 SSS \u2192 four-stock Mario-versus-Mario Final Destination \u2192 original Results \u2192 returned CSS.",
+      "gameplay": {
+        "p1_losses": [
+          3,
+          2,
+          1,
+          0
+        ],
+        "p1_grounded_respawns": 3,
+        "terminal_stocks_p1_p2": [
+          0,
+          4
+        ],
+        "original_outcome": 2,
+        "winner_source_port": 1,
+        "p2_input": "One short ArrowLeft movement pulse at tick 437 and neutral release at 438; no combat probe or combat claim.",
+        "input_path": "Actual browser keyboard events; no direct PAD/Gamepad injection."
+      },
+      "checksums": {
+        "record_bytes": 64,
+        "exact_common_records": 2789,
+        "source_ticks_inclusive": [
+          0,
+          2788
+        ],
+        "sha256_concatenated": "3a2b10ef44289acc2d8a292c002c8c3f49d9894d03c6c99d3746726b40370bac",
+        "exclusive_return_plus_input_delay_boundary": 2789,
+        "unpaired_tails": {
+          "alpha": 4,
+          "beta": 6
+        },
+        "tails_in_common_prefix": false,
+        "scene_intervals_inclusive": [
+          {
+            "scene": 1,
+            "ticks": [
+              0,
+              161
+            ]
+          },
+          {
+            "scene": 2,
+            "ticks": [
+              162,
+              305
+            ]
+          },
+          {
+            "scene": 3,
+            "ticks": [
+              306,
+              2525
+            ]
+          },
+          {
+            "scene": 4,
+            "ticks": [
+              2526,
+              2774
+            ]
+          },
+          {
+            "scene": 1,
+            "ticks": [
+              2775,
+              2788
+            ]
+          }
+        ]
+      },
+      "results_source_pads": {
+        "p1_enter_ticks": [
+          2732,
+          2750
+        ],
+        "p2_end_tick": 2761,
+        "input_delay_ticks": 2,
+        "input_policy": "Existing bounded first source-aligned PAD observation reused; historical failure cause remains unproven."
+      },
+      "final_network_wait": {
+        "alpha": {
+          "callbacks": 1993,
+          "episodes": 1042,
+          "resumes": 1042,
+          "active": 0
+        },
+        "beta": {
+          "callbacks": 2012,
+          "episodes": 1048,
+          "resumes": 1047,
+          "active": 1
+        },
+        "duration": "unmeasured"
+      },
+      "h1_runtime_diagnostics": {
+        "readiness_exports_available_both_profiles": true,
+        "reported_incidents_both_profiles": 0,
+        "interpretation": "No incidents were reported by this recorder in this run; this is not proof of timing or performance quality."
+      },
+      "cleanup": {
+        "owner_pass": true,
+        "elapsed_ms": 148139,
+        "overall_limit_ms": 300000,
+        "cleanup_reserve_ms": 30000,
+        "normal_leave_both_profiles": true,
+        "native_unload_phase0_running0_both_profiles": true,
+        "native_quiescence_both_profiles": "verified",
+        "recorded_process_identities_absent": 21,
+        "recorded_process_groups_absent": 4,
+        "cleanup_time_ms": 177,
+        "external_worker_disposed": false,
+        "local_data_requests": "One ERR_ABORTED request was recorded in each profile; no error-free-browser claim."
+      },
+      "report_file": "full-match-2/browser/report.json",
+      "owner_file": "full-match-2/owner.json",
+      "release_file": "full-match-2/release.json",
+      "independent_raw_review_file": "full-match-2-independent-review-v1.json"
+    }
+  ],
+  "source_change_under_test": {
+    "candidate_freeze_sha256": "7050fb89c79cefe3a892d64ee66bb5e8b32cc42b5ab8dafdaafab949240933f2",
+    "candidate_patch_sha256": "32ff195a7991e0e8e6db0405e2acf7d77769296332d4c62f84931b056b9327c6",
+    "independent_source_review_sha256": "172011e777219d12c70cb03f53fcbad6173569e9891f71d69a6f38bc07fec6cd",
+    "change": "Use the existing bounded source-PAD observer for Results Enter/End confirmations and retain attempted-pulse/trace evidence on failure. No runtime build inputs, game logic, native guards, delay or deadline changed for the capture.",
+    "independent_source_review_file": "results-confirmation-input-candidate-v1/independent-review-v1.json"
+  },
+  "validation_status": {
+    "public_route_raw_review": "pass",
+    "source_and_reducer_review": "pass",
+    "current_main_release_build": "pass; separate from capture producer",
+    "current_main_full_regression": "pass: 2364 tests, 165 optional-prerequisite skips",
+    "current_head_ci": "Required on the final PR head before merge; recorded separately in the PR and priorities tracker.",
+    "independent_docs_review_sha256": "1eb83ae8d9cd5a315645c8dd4106ff8e8b155496aebfba6264b57edfcaa88b66",
+    "docs_review_scope": "Evidence/docs content reviewed before this local regression metadata update; root verified final counts and log/receipt hashes."
+  },
+  "limitations": [
+    "One same-host two-profile staging run; no two-machine or physical-input evidence.",
+    "No combat coverage; P2 made only a short horizontal movement pulse.",
+    "RTT is a separate same-host echo measurement and did not tune the fixed two-tick input delay.",
+    "Final wait durations were not measured.",
+    "No sustained performance, retail pixel/PCM equivalence, competitive or whole-session acceptance.",
+    "The retained first attempt failed and remains part of the evidence history."
+  ]
+}
