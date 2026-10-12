@@ -1,46 +1,40 @@
 # Simulated-network room test lane
 
-**Browser exercised / Same-machine simulated network / Incomplete functional milestone**
+**Browser exercised / Same-machine simulated-network functional CSS / Not accepted Internet play**
 
-[Milestone #307](https://github.com/ericvanlare/melee-web/issues/307) builds a
-repeatable network test lane for two independent headless Chrome profiles on
-one machine. Both use the existing Host/Join UI and actual keyboard bindings.
-A separate opaque TCP proxy shapes their WebSocket traffic to the pinned local
-Worker. It preserves byte order and records per-connection hashes, bounded
-queues and disposal. This is simulated-network evidence; public staging #288
-and two-machine acceptance remain separate.
+[Milestone #307](https://github.com/ericvanlare/melee-web/issues/307) passes its
+bounded Host/Join, live character-select input and disconnect boundary. Two
+independent headless installed Chrome profiles join through the actual room UI.
+Both original keyboard-controlled cursors move on both peers while an opaque
+TCP proxy shapes their real WebSocket traffic to the pinned local Worker.
+The complete declared raw checksum prefix matches; natural unpaired tails stay
+explicit. Both UI Leave actions, native quiescence, unload, Worker/proxy disposal
+and actual owned-process absence pass.
 
 The [scoped receipt](../evidence/network-simulation-lane-v1.json) binds the
-runtime producer, capture source, raw reports and independent review. The first
-moderate-delay CSS attempt failed at disconnect. Both original CSS keyboard
-paths and the complete declared checksum comparison passed, and every proxy
-connection preserved its bytes. Beta then attempted a queued input publication
-while its relay socket was closing. That rejection became a sticky protocol
-error, and its UI Leave action did not confirm clean teardown. Native
-quiescence and final owned-process absence were verified separately. The run
-remains failed; these component results do not satisfy the milestone.
+runtime producer, capture source, raw reports, validation and independent review.
+Configured delays describe each client/Worker leg. Measured HTTP round trips
+are Node request/response observations, not peer RTT or input latency.
 
-Real WebSocket reducers now cover publication before and after the disconnect
-callback, queued input, inbound acknowledgements and native-progress sends.
-The repair retains exact sampled inputs and records cancelled packet attempts;
-another packet may already have carried the same input. Genuine transport and
-input errors remain failures. Focused controls, the Release build and full regression pass, but the repaired
-browser retry still fails at the same Leave boundary. Its cancellation lists
-remain empty. An actual remote close-frame/held-FIN reducer reproduces the omitted
-`CLOSING` interval. The reviewed endpoint repair waits only for physical socket
-closure and shares one existing timeout across queued refusals. Startup, timeout
-and transport errors remain sticky. Focused controls pass; the second repair
-still needs the full validation and a new browser result. Existing Leave,
-checksum and native cleanup guards remain intact.
+Two earlier browser attempts reached the CSS input/checksum boundary but failed
+beta Leave during queued input publication versus socket closure. Both remain
+failed and retained. Smaller real-WebSocket reducers exposed both publication
+ordering and the physical close-handshake interval. Pending state sends now
+require actual closure proof before packet-scoped cancellation, with one existing
+timeout shared across queued refusals. Captured input is retained separately;
+another packet may already have carried it. Genuine input, protocol and
+transport errors stay sticky. The repaired Release build, full regression,
+focused controls and actual browser run pass without relaxing the Leave,
+checksum or cleanup gates.
 
-The receipt retains the earlier proxy half-close/read-buffer failures and the
-independently identified shared-counter bug through the external evidence
-inventory. Focused real-socket controls now cover small and large writes,
-concurrent connections, byte hashes, delay, bandwidth, stalls, cuts and cleanup.
-Those controls are not a successful complete browser session.
+Earlier proxy half-close/read-buffer and shared-counter failures remain in the
+external evidence inventory. Focused real-socket controls cover small and large
+writes, concurrent connections, byte hashes, delay, bandwidth, stalls, cuts and
+cleanup. The serial runner stops at the first failed scenario and retains it.
 
-No full match, public routing, TLS/NAT, human physical input, audible output,
-foreground timing or original-game comparison was established by this attempt.
-Configured delays describe each client/Worker leg; the measured HTTP round
-trips are not peer RTT or input latency. Failed profiles and reports remain
-retained. Stadium stays checkpointed while this sprint owns the capture lane.
+This boundary does not establish a full match, public routing, TLS/NAT, human
+physical input, audible output, foreground timing, two-machine play or original
+game comparison. The full match and resilience milestones continue in
+[#308](https://github.com/ericvanlare/melee-web/issues/308) and
+[#309](https://github.com/ericvanlare/melee-web/issues/309). Public staging #288
+remains separate, and Stadium stays checkpointed during this sprint.

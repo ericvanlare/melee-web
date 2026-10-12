@@ -1,11 +1,11 @@
 {
   "schema": "melee-web-simulated-network-lane-v1",
   "issue": 307,
-  "decision": "FAIL_DISCONNECT_BOUNDARY",
-  "evidence_label": "Browser exercised / Same-machine simulated network; incomplete functional milestone",
+  "decision": "PASS_SIMULATED_NETWORK_CSS",
+  "evidence_label": "Browser exercised / Same-machine simulated-network functional CSS; not accepted Internet play",
   "retained_run_id": "network-simulation-sprint-20261011-210744-b1be023a",
-  "runtime_producer": "b57979868339faf07394f614320e59b0e7fe9b5d",
-  "capture_source": "df52969132a0c0ad0bf7664c3cd44192320255ed",
+  "runtime_producer": "b92a36033692dbef756b067175b39cac2d23925e",
+  "capture_source": "b92a36033692dbef756b067175b39cac2d23925e",
   "source_review_files": [
     "root-harness-review-v3.json",
     "sol-proxy-repair-v1/freeze.json",
@@ -47,7 +47,9 @@
       "proxy_data_path_pass": true,
       "first_failure": "Beta UI Leave did not confirm teardown; queued live input177 failed on the closing relay socket and became a sticky protocol error. Native quiescence was separately verified.",
       "owner_cleanup_passed": true,
-      "process_observation_passed": true
+      "process_observation_passed": true,
+      "runtime_producer": "b57979868339faf07394f614320e59b0e7fe9b5d",
+      "capture_source": "df52969132a0c0ad0bf7664c3cd44192320255ed"
     },
     {
       "name": "css-moderate-2-suite/css-moderate",
@@ -139,10 +141,10 @@
     "review": "sol-suite-runner-review-v2.json",
     "review_sha256": "ff979835e448130663db0572ea5c7b7516b19fdc38f713e590f6f25ad03ff718",
     "policy_tests": 2,
-    "execution": "One actual css-moderate scenario; correctly stopped at retained browser failure; no subsequent scenario or automatic retry"
+    "execution": "Actual css-moderate repaired run passes; earlier two browser failures retained and no automatic retry"
   },
   "closing_interval_repair": {
-    "decision": "REVIEWED_COMPONENT_CONTROLS_PASS_BROWSER_PENDING",
+    "decision": "REVIEWED_REQUIRED_VALIDATION_AND_BROWSER_PASS",
     "base_source": "25a359b554bf6197ba8951944301aef947b993e7",
     "receipt": "sol-closing-send-repair-v1/shared-wait-v2/freeze.json",
     "receipt_sha256": "a8cdd322b3f6347ecadfa76c0247c2d8779443a840f1cf54cee89b19feb76f11",
@@ -160,6 +162,69 @@
       "new sharedwait fixture nonJSONpreparationfailure retained separately from behavioralred"
     ],
     "actual_red_replay": "sol-closing-send-repair-v1/red-replay.log",
-    "actual_red_replay_sha256": "e21bb43a450efa62651dc02f06074554ead9e7389e99191b00ee836fd2153ced"
+    "actual_red_replay_sha256": "e21bb43a450efa62651dc02f06074554ead9e7389e99191b00ee836fd2153ced",
+    "required_validation": {
+      "source": "b92a36033692dbef756b067175b39cac2d23925e",
+      "receipt": "m1-closing-validation.json",
+      "receipt_sha256": "278574b4f79a3ea5344cb450ade9ef82bb9c2e2f11ae06d6b483cebdcfce60ee",
+      "release_runtime_build": "PASS",
+      "full_regression": {
+        "tests": 2336,
+        "skips": 166,
+        "decision": "PASS"
+      }
+    }
+  },
+  "wasm_sha256": "ee9eefd71e96ec26c0a456e9993d764dc47ca4df719911e88803b221cb191e23",
+  "successful_attempt": {
+    "name": "css-moderate-3-suite/css-moderate",
+    "browser_report_sha256": "97d0905b4b56315c7b2facdb4957ed468f863acb19208bc723ddcaa2fa861ff7",
+    "owner_report_sha256": "02b9c82d84e6c06538701f999b7cbf21f30c9dcd0aa12f56f3bf1def30853a74",
+    "suite_report_sha256": "66d5f5170573fcbe24944278f56395244509d4e351893c09c260d1ae13bbf67f",
+    "common_64_byte_checksums": 170,
+    "source_tick_range": [
+      0,
+      169
+    ],
+    "unpaired_tails": {
+      "alpha": 3,
+      "beta": 4
+    },
+    "both_css_key_witnesses": 2,
+    "both_explicit_ui_leave": true,
+    "both_unloaded_phase_zero": true,
+    "both_normal_native_quiescence_verified": true,
+    "browser_proxy_path_verified": true,
+    "proxy_final_lifecycle": {
+      "stopping": true,
+      "listenerClosed": true,
+      "activeConnections": 0,
+      "acceptedConnections": 5,
+      "rejectedConnections": 0,
+      "closedConnections": 5,
+      "cleanConnections": 5,
+      "failedConnections": 0,
+      "cutConnections": 0,
+      "stopClosedConnections": 0,
+      "activeTimers": 0,
+      "cleanShutdown": true
+    },
+    "proxy_data_path_pass": true,
+    "http_round_trips_ms": [
+      27.192292000000066,
+      31.026792,
+      34.245166999999924
+    ],
+    "http_scope": "measured Node HTTP request/response round trips to the same Worker, including host and Worker processing; not browser peer RTT",
+    "owner_cleanup_passed": true,
+    "process_observation_passed": true,
+    "beta_cancelled_packet_attempts": 1,
+    "beta_cancelled_input_publications": 2,
+    "cancellation_scope": "one packet-scoped cancelled send and separately retained input publications; no assertion those inputs were never carried by another packet",
+    "independent_review": {
+      "file": "sol-css-moderate-3-review.json",
+      "sha256": "32c34b6757b40b735697e3beeb611c500708a25167450c0951d3ff9c8f59e2b8",
+      "known_owned_pids_absent": 22
+    }
   }
 }
