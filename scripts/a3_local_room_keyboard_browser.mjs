@@ -21,7 +21,7 @@ import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS, parseNetChecksum} from './net
 import {checksumCompareReached, checksumWaitDiagnostic} from './a3_checksum_wait_diagnostics.mjs';
 import {runA3LocalFullRoute} from './a3_local_room_full_route.mjs';
 
-const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--post-css-stall-probe] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route] [--controlled-cut-after-css]';
+const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--post-css-stall-probe] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route] [--controlled-cut-after-css] [--gameplay-action-probe]';
 const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, out: {type: 'string'},
   'relay-url': {type: 'string'}, 'relay-preflight': {type: 'string'},
@@ -30,6 +30,7 @@ const {values} = parseArgs({options: {
   'controlled-cut-after-css': {type: 'boolean', default: false},
   playwright: {type: 'string'}, 'min-checksums': {type: 'string', default: '120'},
   'timeout-ms': {type: 'string', default: '300000'}, 'full-route': {type: 'boolean', default: false},
+  'gameplay-action-probe': {type: 'boolean', default: false},
   help: {type: 'boolean', default: false},
 }, allowPositionals: false});
 if (values.help) {
@@ -69,6 +70,8 @@ const minimumChecksums = boundedInteger('min-checksums', values['min-checksums']
 const timeoutMs = boundedInteger('timeout-ms', values['timeout-ms'], 60000, 600000);
 if (!values.url || !values.disc || !values.out)
   throw Error('Required: ' + USAGE);
+requireCondition(!values['gameplay-action-probe'] || values['full-route'],
+  '--gameplay-action-probe requires --full-route');
 const runtimeUrl = new URL(values.url);
 requireCondition(runtimeUrl.protocol === 'http:' && runtimeUrl.hostname === '127.0.0.1' &&
   runtimeUrl.port === '8787' && runtimeUrl.pathname === '/runtime.html',
@@ -158,6 +161,7 @@ const report = {
   checksum_comparison: null,
   checksum_wait_failure: null,
   full_route: null,
+  gameplay_action_probe: values['gameplay-action-probe'],
   leave_and_cleanup: {},
   exclusions: ['no direct PAD or Gamepad injection', 'no harness-owned peer or checksum pump',
     'no runtime source-tick/checksum-bound changes',
@@ -931,6 +935,7 @@ try {
   if (values['full-route']) {
     report.full_route = await runA3LocalFullRoute({
       alpha: instances.alpha, beta: instances.beta, report, inputDelay: invite.inputDelay,
+      gameplayActionProbe: values['gameplay-action-probe'],
       remaining, readRoomState, readPeerSnapshot, readInputDiagnostics,
       waitForBothChecksumCompare, captureScreenshot,
       assertHealthy: (state, role) => {

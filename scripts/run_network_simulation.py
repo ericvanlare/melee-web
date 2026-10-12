@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCENARIOS = {
     "css-moderate": ("moderate", False, False),
     "full-moderate": ("moderate", True, False),
+    "full-moderate-action-probe": ("moderate", True, False),
     "full-asymmetric": ("asymmetric", True, False),
     "css-constrained": ("constrained", False, False),
     "css-constrained-stall": ("constrained", False, True),
@@ -50,7 +51,8 @@ def runtime_identity(directory):
             for path in sorted(directory.rglob("*")) if path.is_file()}
 
 
-def validate_result(returncode, owner, browser, full_route, controlled_stall=False):
+def validate_result(returncode, owner, browser, full_route, gameplay_action_probe=False,
+                    *, controlled_stall=False):
     """Require both independent owners; an expected fault is a different policy."""
     if returncode != 0:
         raise ValueError(f"capture owner exited {returncode}")
@@ -70,6 +72,18 @@ def validate_result(returncode, owner, browser, full_route, controlled_stall=Fal
         raise ValueError("browser did not verify final proxy integrity and retirement")
     if full_route and (browser.get("full_route") or {}).get("result") != "pass":
         raise ValueError("full route is missing or incomplete")
+    if browser.get("gameplay_action_probe") is not gameplay_action_probe:
+        raise ValueError("browser gameplay action mode differs from the requested scenario")
+    if full_route:
+        route = browser["full_route"]
+        if route.get("gameplay_action_probe") is not gameplay_action_probe:
+            raise ValueError("full route gameplay action mode differs from the requested scenario")
+        if gameplay_action_probe:
+            if (route.get("action_prefix") or {}).get("result") != "pass":
+                raise ValueError("requested gameplay action probe is incomplete")
+        elif route.get("action_prefix") is not None:
+            raise ValueError("baseline unexpectedly contains a gameplay action probe")
+
     if controlled_stall:
         probe = network.get("post_css_stall_probe") or {}
         if (probe.get("outcome") != "EXERCISED_AND_RESUMED" or
@@ -181,6 +195,7 @@ def main():
         for name in args.scenarios:
             profile, full_route, controlled_stall = SCENARIOS[name]
             controlled_cut = name == "css-moderate-cut"
+            gameplay_action_probe = name == "full-moderate-action-probe"
             folder = output / name
             folder.mkdir()
             command = [sys.executable, str(ROOT / "scripts/capture_owner_deadline.py"),
@@ -198,11 +213,14 @@ def main():
                        "--timeout-ms", "260000", "--network-profile", profile]
             if full_route:
                 command.append("--full-route")
+            if gameplay_action_probe:
+                command.append("--gameplay-action-probe")
             if controlled_stall:
                 command.append("--post-css-stall-probe")
             if controlled_cut:
                 command.append("--controlled-cut-after-css")
             row = {"name": name, "profile": profile, "full_route": full_route,
+                   "gameplay_action_probe": gameplay_action_probe,
                    "controlled_stall_probe": controlled_stall,
                    "controlled_cut_probe": controlled_cut,
                    "result_policy": "expected-fault-cut" if controlled_cut else
@@ -246,7 +264,8 @@ def main():
                 row["decision"] = "EXPECTED_TRANSPORT_CUT_CONFIRMED"
                 audited_cut = {"owner": owner, "browser": browser, "folder": folder}
             else:
-                validate_result(result.returncode, owner, browser, full_route, controlled_stall)
+                validate_result(result.returncode, owner, browser, full_route, gameplay_action_probe,
+                                controlled_stall=controlled_stall)
                 if name == "css-moderate-fresh":
                     row["fresh_session_evidence"] = validate_fresh_session(
                         audited_cut, owner, browser, folder)

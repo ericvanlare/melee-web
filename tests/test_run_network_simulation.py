@@ -15,7 +15,8 @@ class NetworkSimulationSuitePolicyTests(unittest.TestCase):
         self.browser = {"schema": "melee-web-a3-local-room-keyboard-v1", "decision": "PASS",
                         "first_error": None, "relay_mode": "simulated-network",
                         "network_simulation": {"proxy_cleanup": {"verified": True, "final": True}},
-                        "full_route": {"result": "pass"}}
+                        "gameplay_action_probe": False,
+                        "full_route": {"result": "pass", "gameplay_action_probe": False}}
 
     def test_independent_owner_and_browser_receipts_are_both_required(self):
         validate_result(0, self.owner, self.browser, True)
@@ -64,6 +65,27 @@ class NetworkSimulationSuitePolicyTests(unittest.TestCase):
             corrupt(damaged)
             with self.assertRaises(ValueError):
                 validate_result(0, self.owner, damaged, False, controlled_stall=True)
+
+    def test_action_probe_cannot_be_relabelled_as_baseline(self):
+        action = copy.deepcopy(self.browser)
+        action["gameplay_action_probe"] = True
+        action["full_route"]["gameplay_action_probe"] = True
+        action["full_route"]["action_prefix"] = {"result": "pass"}
+        validate_result(0, self.owner, action, True, True)
+        with self.assertRaisesRegex(ValueError, "mode"):
+            validate_result(0, self.owner, action, True)
+        with self.assertRaisesRegex(ValueError, "mode"):
+            validate_result(0, self.owner, self.browser, True, True)
+        action["full_route"]["action_prefix"]["result"] = "fail"
+        with self.assertRaisesRegex(ValueError, "incomplete"):
+            validate_result(0, self.owner, action, True, True)
+        partial = copy.deepcopy(self.browser)
+        partial["full_route"]["action_prefix"] = {"result": "fail"}
+        with self.assertRaisesRegex(ValueError, "unexpectedly"):
+            validate_result(0, self.owner, partial, True)
+        with self.assertRaisesRegex(ValueError, "mode"):
+            validate_result(0, self.owner, dict(self.browser, gameplay_action_probe=None), True)
+
 
 
 if __name__ == "__main__":

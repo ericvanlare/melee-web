@@ -150,16 +150,22 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
     await enabled(controls.start);await page.locator(controls.start).click({timeout:remaining()});
     await waitForPhase(phase);
   });
-  function pressChord(keys,{holdMs=120,releaseMs=150}={}) {
+  function pressChord(keys,{holdMs=120,releaseMs=150,observeBeforeRelease=null}={}) {
     // Concurrent callers are serialized as complete down/hold/up sequences.
     // A failed sequence stops queued input; the caller must diagnose the failure.
     const next=inputQueue.then(()=>step('keyboard-chord',async()=>{
       if(!Array.isArray(keys)||!keys.length||new Set(keys).size!==keys.length||
         keys.some(key=>typeof key!=='string'||!key))throw Error('Expected distinct keyboard keys');
       if(![holdMs,releaseMs].every(ms=>Number.isFinite(ms)&&ms>=0&&ms<=5000))throw Error('Invalid keyboard hold/release duration');
-      if(holdMs+releaseMs>=remaining())throw Error('Keyboard sequence exceeds remaining wall-time bound');
+      if(observeBeforeRelease!==null &&
+        (typeof observeBeforeRelease!=='object'||typeof observeBeforeRelease.predicate!=='function'||
+         !Number.isSafeInteger(observeBeforeRelease.timeoutMs)||observeBeforeRelease.timeoutMs<1||
+         observeBeforeRelease.timeoutMs>500))throw Error('Invalid bounded keyboard observation');
+      const pressBudget=observeBeforeRelease?.timeoutMs??holdMs;
+      if(pressBudget+releaseMs>=remaining())throw Error('Keyboard sequence exceeds remaining wall-time bound');
       await page.locator('#canvas').focus({timeout:remaining()});
       const held=[...keys];
+      let observed;
       try {
         // A transport rejection can arrive after delivery. Release attempted
         // keys too, so an ambiguous down cannot leave a modifier held. Send a
@@ -168,7 +174,14 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
         const failures=downs.filter(result=>result.status==='rejected');
         if(failures.length)throw new AggregateError(failures.map(result=>result.reason),
           'Keyboard chord down failed');
-        await page.waitForTimeout(holdMs);
+        if(observeBeforeRelease) {
+          // One Playwright-owned synchronous read-only predicate, with its own
+          // bounded polling task. No detached callback or Promise.race remains.
+          const result=await page.waitForFunction(observeBeforeRelease.predicate,
+            observeBeforeRelease.arg,{timeout:Math.min(observeBeforeRelease.timeoutMs,remaining()),polling:10});
+          try { observed=await result.jsonValue(); }
+          finally { await result.dispose(); }
+        } else await page.waitForTimeout(holdMs);
       } finally {
         // Always attempt every release, including after a down/hold failure.
         const releases=[];
@@ -176,6 +189,7 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
         if(releases.length)throw new AggregateError(releases,'Keyboard release failed');
       }
       await page.waitForTimeout(releaseMs);
+      return observed;
     }));
     inputQueue=next;
     return next;
