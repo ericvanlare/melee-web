@@ -126,6 +126,15 @@ function waitForPromise(promise, timeoutMs, description) {
   });
 }
 
+export class RoomRelayClosedSendError extends Error {
+  constructor(role) {
+    super('Room relay WebSocket is closed');
+    this.name = 'RoomRelayClosedSendError';
+    this.code = 'ROOM_RELAY_CLOSED_SEND';
+    this.role = role;
+  }
+}
+
 function endpoint(socket, role, {onMessage, onDisconnect, onEndpointError, readyPromise, timeoutMs}) {
   const listeners = new Set();
   let firstListener = null;
@@ -236,6 +245,21 @@ function endpoint(socket, role, {onMessage, onDisconnect, onEndpointError, ready
     Error('Room relay WebSocket transport failed'), 'WebSocket transport failed'));
 
   let closePromise = null;
+  let readyCompleted = false;
+  Promise.resolve(readyPromise).then(() => { readyCompleted = true; }, () => {});
+  let physicalCloseWait = null;
+  const rejectClosedSend = async () => {
+    // CLOSING is not closure proof. Join only the physical close event; never
+    // join inbound callbacks, which may themselves be awaiting this state send.
+    if (readyCompleted && socket.readyState === WebSocket.CLOSING) {
+      // All queued refusals share the first physical-close budget, including
+      // its rejection. Sequential sends must not restart that timeout.
+      physicalCloseWait ??= waitForSocketClose(socket, timeoutMs, role);
+      await physicalCloseWait;
+    }
+    throw readyCompleted && socket.readyState === WebSocket.CLOSED
+      ? new RoomRelayClosedSendError(role) : Error('Room relay WebSocket is closed');
+  };
   const api = {
     role,
     onMessage(listener) {
@@ -253,8 +277,9 @@ function endpoint(socket, role, {onMessage, onDisconnect, onEndpointError, ready
       const packetBytes = new TextEncoder().encode(text).byteLength;
       if (packetBytes > ROOM_RELAY_MAX_PACKET_BYTES)
         return Promise.reject(Error('A2 relay packet must be non-empty text no larger than 1 MiB'));
-      if (socket.readyState !== WebSocket.OPEN && socket.readyState !== WebSocket.CONNECTING)
-        return Promise.reject(Error('Room relay WebSocket is closed'));
+      if (socket.readyState !== WebSocket.OPEN && socket.readyState !== WebSocket.CONNECTING &&
+          !(readyCompleted && socket.readyState === WebSocket.CLOSING))
+        return rejectClosedSend();
       if (pendingSendMessages >= ROOM_RELAY_MAX_PENDING_SEND_MESSAGES ||
           socket.bufferedAmount + pendingSendBytes + packetBytes > ROOM_RELAY_MAX_PENDING_SEND_BYTES)
         return Promise.reject(Error('Room relay WebSocket queued send bytes would exceed 1 MiB'));
@@ -262,7 +287,7 @@ function endpoint(socket, role, {onMessage, onDisconnect, onEndpointError, ready
       pendingSendBytes += packetBytes;
       const operation = outboundChain.then(async () => {
         await readyPromise;
-        if (socket.readyState !== WebSocket.OPEN) throw Error('Room relay WebSocket is closed');
+        if (socket.readyState !== WebSocket.OPEN) return rejectClosedSend();
         if (socket.bufferedAmount + pendingSendBytes > ROOM_RELAY_MAX_BUFFERED_BYTES)
           throw Error('Room relay WebSocket queued send bytes would exceed 1 MiB');
         try { socket.send(text); }

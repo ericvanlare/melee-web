@@ -96,6 +96,33 @@ Use the supervised five-minute owner budget with cleanup reserve described in
 that receipt. Do not interpret a driver timeout as a desync or extend its budget
 without reducing the observed boundary first.
 
+For owner-authorized same-machine network experiments, add
+`--network-profile moderate` to that same command. The harness starts an owned
+TCP proxy between both browser WebSockets and the local Worker. Named profiles
+are `control`, `moderate`, `asymmetric` and `constrained`; their exact directional
+settings and hashes are recorded in the report. This option cannot be combined
+with public-relay flags. HTTP calibration, actual browser endpoint observations,
+byte-integrity checks and final socket/listener cleanup are required. The
+configured delay is per client/Worker leg; measured HTTP round trips are not
+peer RTT or input latency. These experiments establish simulated-network
+functional evidence only, leaving public staging and two-machine gates open.
+Keep the same supervised owner budget and shared capture-lane policy.
+
+The serial suite packages that owner and its cleanup checks:
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 scripts/run_network_simulation.py \
+  --disc "$MELEE_DISC" --playwright "$PLAYWRIGHT_DIR" --out "$NEW_EVIDENCE_DIR" \
+  --scenarios css-moderate full-moderate full-asymmetric css-constrained
+```
+
+Choose a new evidence directory on the verified external volume. The suite
+requires an existing Release runtime, records every served file's identity,
+and stops on the first failed scenario. It retains failed evidence and never
+retries automatically. Use `--plan-only` to inspect commands without launching
+anything, or select a single scenario for a reviewed changed hypothesis.
+Scenario availability is tooling, not a claim that its browser gate has passed.
+
 ## Choose by change boundary
 
 | Change | Start here | Focused command or procedure | Evidence boundary |

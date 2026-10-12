@@ -1,0 +1,254 @@
+{
+  "schema": "melee-web-simulated-network-lane-v1",
+  "issue": 307,
+  "decision": "PASS_SIMULATED_NETWORK_CSS",
+  "evidence_label": "Browser exercised / Same-machine simulated-network functional CSS; not accepted Internet play",
+  "retained_run_id": "network-simulation-sprint-20261011-210744-b1be023a",
+  "runtime_producer": "b92a36033692dbef756b067175b39cac2d23925e",
+  "capture_source": "b92a36033692dbef756b067175b39cac2d23925e",
+  "source_review_files": [
+    "root-harness-review-v3.json",
+    "sol-proxy-repair-v1/freeze.json",
+    "root-capture-release.json"
+  ],
+  "failed_attempts": [
+    {
+      "name": "css-moderate-1",
+      "browser_report_sha256": "8a074f540f9ed0e7dfc963e424f4c42599f5bb83ae547671c3ffb80ed59e4a3e",
+      "owner_report_sha256": "e61df8e7e081fb3441c64f695a32001569f50431eabb76a226fbaa7a8ca722fa",
+      "independent_review_sha256": "7a6cba156db33e0987cbd64e7ea60d1b86b173dd88ea76cece89815fafabfeb2",
+      "common_64_byte_checksums": 171,
+      "source_tick_range": [
+        0,
+        170
+      ],
+      "both_css_key_witnesses": 2,
+      "browser_proxy_path_verified": true,
+      "http_round_trips_ms": [
+        26.330749999999966,
+        30.759415999999987,
+        34.90004099999999
+      ],
+      "http_scope": "Node HTTP request/response to local Worker through proxy; not browser peer RTT or input latency",
+      "proxy_final_lifecycle": {
+        "stopping": true,
+        "listenerClosed": true,
+        "activeConnections": 0,
+        "acceptedConnections": 5,
+        "rejectedConnections": 0,
+        "closedConnections": 5,
+        "cleanConnections": 5,
+        "failedConnections": 0,
+        "cutConnections": 0,
+        "stopClosedConnections": 0,
+        "activeTimers": 0,
+        "cleanShutdown": true
+      },
+      "proxy_data_path_pass": true,
+      "first_failure": "Beta UI Leave did not confirm teardown; queued live input177 failed on the closing relay socket and became a sticky protocol error. Native quiescence was separately verified.",
+      "owner_cleanup_passed": true,
+      "process_observation_passed": true,
+      "runtime_producer": "b57979868339faf07394f614320e59b0e7fe9b5d",
+      "capture_source": "df52969132a0c0ad0bf7664c3cd44192320255ed"
+    },
+    {
+      "name": "css-moderate-2-suite/css-moderate",
+      "runtime_producer": "25a359b554bf6197ba8951944301aef947b993e7",
+      "capture_source": "25a359b554bf6197ba8951944301aef947b993e7",
+      "wasm_sha256": "ac040da08503744d27d4bc0ed2959ed631dd94ef1289e2efb76f0d1c917998c0",
+      "browser_report_sha256": "c53b6d1013a3bcbf79cf2d0abbced90392339380f536e99a173dedbeedf9e8ce",
+      "owner_report_sha256": "6e70a32f76a5c6e1fca5b74874159e2164980d49e54b9f8b0874b4b01a35a8fa",
+      "independent_review": "sol-css-moderate-2-review.json",
+      "independent_review_sha256": "987b6ef2e4704bf135167958fef51729cf4d105d0b5796ee26827db4b8da96a0",
+      "common_64_byte_checksums": 173,
+      "source_tick_range": [
+        0,
+        172
+      ],
+      "unpaired_tails": {
+        "alpha": 5,
+        "beta": 4
+      },
+      "first_failure": {
+        "kind": "protocol",
+        "reason": "Asynchronous browser-local input 180 failed: Room relay WebSocket is closed",
+        "tick": 180
+      },
+      "cancelled_outbound_sends": [],
+      "cancelled_publications": [],
+      "owner_cleanup_passed": true,
+      "process_observation_passed": true,
+      "disposition": "Retained failure. CLOSING interval requires a smaller reducer before another capture."
+    }
+  ],
+  "profile": {
+    "name": "moderate",
+    "clientToWorker": {
+      "seed": 101,
+      "delayMs": 10,
+      "jitterMs": 5
+    },
+    "workerToClient": {
+      "seed": 202,
+      "delayMs": 10,
+      "jitterMs": 5
+    },
+    "semantics": "per client/Worker leg per connection; nonnegative seeded chunk jitter with OS segmentation dependence"
+  },
+  "scope_exclusions": [
+    "No full match in this attempt",
+    "No public routing, TLS, NAT or two-machine evidence",
+    "No physical-input, foreground-timing, audible-output or retail comparison acceptance"
+  ],
+  "retention": "Failed browser profiles, full raw reports, process traces, first proxy controls/reducers and review receipts retained externally; no retroactive pass.",
+  "disconnect_repair": {
+    "decision": "COMPONENT_CONTROLS_PASS_BROWSER_RETRY_FAILED",
+    "base_source": "df52969132a0c0ad0bf7664c3cd44192320255ed",
+    "receipt": "RUN/disconnect-repair-v1/review.json",
+    "receipt_sha256": "c2ba7f038520870d0779c4c81b82512c2647831ca8a1ab5a13593d8a5cb22549",
+    "source_files_sha256": {
+      "scripts/net_lockstep_websocket_relay.mjs": "5c21feec163044eeecbfdd727e784caa7044426ec80e6909c2b4e96295c00356",
+      "scripts/net_lockstep_browser_peer.mjs": "a1f1e899037cf6e6641f91fb2f4577980c355c589ca0d64bedb9131bc07a8b83",
+      "scripts/net_lockstep_core.mjs": "624dc31caa8f9c4910b39ec15fcfd31b6728b356c5cf4857a8a8105170d4910f",
+      "tests/net_lockstep_browser_peer_disconnect_race.test.mjs": "91126d979c6895d3ddd2212a93f0976b2f8127f1091d2e4fdf5af309be3bf349",
+      "tests/test_net_lockstep_browser_peer_disconnect_race.py": "227c9a369324935f7a1e474a1b2a6c21cd0ab17e9e9b22db34c49c1b8a4ac5fb"
+    },
+    "focused_node_tests": 134,
+    "focused_python_wrappers": 1,
+    "publication_scope": {
+      "typed_send": "this_state_packet_attempt_only; packet_input_ticks names only the packet that failed; no claim about previous or concurrent packets",
+      "pre_send_disconnect": "no_state_packet_attempt; local map and PAD capture remain separate from packet delivery"
+    },
+    "failure_source_binding_limitation": "not bound to exact intermediate reducer bytes; failure was fixture terminal synchronization/numeric-code assertion only",
+    "independent_review": {
+      "file": "sol-disconnect-repair-review-v1.json",
+      "sha256": "d3797c2ba3082a941a7beeb6fa05d528221a483c6fdd9e43fd976db0f817313a"
+    },
+    "required_validation": {
+      "source": "25a359b554bf6197ba8951944301aef947b993e7",
+      "receipt": "m1-validation.json",
+      "receipt_sha256": "865305b4f550099ae16e29b8c92dd08f0774945a019d9038a8155ae0ab078ffe",
+      "release_runtime_build": "PASS",
+      "full_regression": {
+        "tests": 2336,
+        "skips": 166,
+        "decision": "PASS"
+      }
+    }
+  },
+  "suite_runner": {
+    "receipt": "root-suite-runner-v2.json",
+    "review": "sol-suite-runner-review-v2.json",
+    "review_sha256": "ff979835e448130663db0572ea5c7b7516b19fdc38f713e590f6f25ad03ff718",
+    "policy_tests": 2,
+    "execution": "Actual css-moderate repaired run passes; earlier two browser failures retained and no automatic retry"
+  },
+  "closing_interval_repair": {
+    "decision": "REVIEWED_REQUIRED_VALIDATION_AND_BROWSER_PASS",
+    "base_source": "25a359b554bf6197ba8951944301aef947b993e7",
+    "receipt": "sol-closing-send-repair-v1/shared-wait-v2/freeze.json",
+    "receipt_sha256": "a8cdd322b3f6347ecadfa76c0247c2d8779443a840f1cf54cee89b19feb76f11",
+    "source_files_sha256": {
+      "scripts/net_lockstep_websocket_relay.mjs": "9d0592060a3e385fe6d895bd73c8ec019346a95ce2fb0efa21b6da9be865865f",
+      "tests/net_lockstep_browser_peer_disconnect_race.test.mjs": "bb1682337882cc723fc2464aff6d2e4ac69700a775f202f3059774fb383061b1"
+    },
+    "focused_node_tests": 138,
+    "focused_python_wrappers": 1,
+    "root_review": "root-closing-repair-review.json",
+    "root_review_sha256": "a4ba6edd3b67249b630acf2925020d45b35cb79703d1479eccb751ffb3fb50e5",
+    "behavior": "One existing-timeout physical-close promise shared by all queued CLOSING send refusals; rejection remains cached. Queue capacities remain enforced, no inbound-chain join, typed cancellation only after CLOSED; startup/timeout/error remain strict.",
+    "retention_limitations": [
+      "initial red log inadvertently overwritten, disclosed in pre-fix-failure.json; separate exact-source red replay retained",
+      "new sharedwait fixture nonJSONpreparationfailure retained separately from behavioralred"
+    ],
+    "actual_red_replay": "sol-closing-send-repair-v1/red-replay.log",
+    "actual_red_replay_sha256": "e21bb43a450efa62651dc02f06074554ead9e7389e99191b00ee836fd2153ced",
+    "required_validation": {
+      "source": "b92a36033692dbef756b067175b39cac2d23925e",
+      "receipt": "m1-closing-validation.json",
+      "receipt_sha256": "278574b4f79a3ea5344cb450ade9ef82bb9c2e2f11ae06d6b483cebdcfce60ee",
+      "release_runtime_build": "PASS",
+      "full_regression": {
+        "tests": 2336,
+        "skips": 166,
+        "decision": "PASS"
+      }
+    }
+  },
+  "wasm_sha256": "ee9eefd71e96ec26c0a456e9993d764dc47ca4df719911e88803b221cb191e23",
+  "successful_attempt": {
+    "name": "css-moderate-3-suite/css-moderate",
+    "browser_report_sha256": "97d0905b4b56315c7b2facdb4957ed468f863acb19208bc723ddcaa2fa861ff7",
+    "owner_report_sha256": "02b9c82d84e6c06538701f999b7cbf21f30c9dcd0aa12f56f3bf1def30853a74",
+    "suite_report_sha256": "66d5f5170573fcbe24944278f56395244509d4e351893c09c260d1ae13bbf67f",
+    "common_64_byte_checksums": 170,
+    "source_tick_range": [
+      0,
+      169
+    ],
+    "unpaired_tails": {
+      "alpha": 3,
+      "beta": 4
+    },
+    "both_css_key_witnesses": 2,
+    "both_explicit_ui_leave": true,
+    "both_unloaded_phase_zero": true,
+    "both_normal_native_quiescence_verified": true,
+    "browser_proxy_path_verified": true,
+    "proxy_final_lifecycle": {
+      "stopping": true,
+      "listenerClosed": true,
+      "activeConnections": 0,
+      "acceptedConnections": 5,
+      "rejectedConnections": 0,
+      "closedConnections": 5,
+      "cleanConnections": 5,
+      "failedConnections": 0,
+      "cutConnections": 0,
+      "stopClosedConnections": 0,
+      "activeTimers": 0,
+      "cleanShutdown": true
+    },
+    "proxy_data_path_pass": true,
+    "http_round_trips_ms": [
+      27.192292000000066,
+      31.026792,
+      34.245166999999924
+    ],
+    "http_scope": "measured Node HTTP request/response round trips to the same Worker, including host and Worker processing; not browser peer RTT",
+    "owner_cleanup_passed": true,
+    "process_observation_passed": true,
+    "beta_cancelled_packet_attempts": 1,
+    "beta_cancelled_input_publications": 2,
+    "cancellation_scope": "one packet-scoped cancelled send and separately retained input publications; no assertion those inputs were never carried by another packet",
+    "independent_review": {
+      "file": "sol-css-moderate-3-review.json",
+      "sha256": "32c34b6757b40b735697e3beeb611c500708a25167450c0951d3ff9c8f59e2b8",
+      "known_owned_pids_absent": 22
+    }
+  },
+  "linux_cut_fixture_repair": {
+    "decision": "PASS_FOCUSED_AND_FULL_REGRESSION",
+    "source": "9c1b2855d36dbd807d06bc09ec2ec12cb65000e7",
+    "test_file_sha256": "37df768850bd6313322b3669eadc52b5e209eb21d20861f6c3e652016196a097",
+    "runtime_producer_unchanged": "b92a36033692dbef756b067175b39cac2d23925e",
+    "retained_failed_ci": {
+      "run": 38209527034,
+      "head": "6172f749d27d8691f39132c31629a7a33f7d0f62",
+      "log_sha256": "c78c267f2d4ebfb00a00cc44757a4e0a546a84b69c9604257d2b862e4583f888",
+      "first_failure": "cut fixture allowHalfOpen echo server failed to finish writable EOF; unsettled final server.close await13"
+    },
+    "repair": "Finish owned fixture writable half on orderly EOF; all proxy cut/failure/byte assertions unchanged. No proxy/runtime implementation change.",
+    "focused": {
+      "count": 9,
+      "log_sha256": "5274d77d0f9c6d7b26d377ba1a0829d06ad1189df78479b89042185801f79b9c"
+    },
+    "full_regression": {
+      "count": 2336,
+      "seconds": 498.845,
+      "skips": 166,
+      "log_sha256": "7ee48a3c71e0de0ac33becda483f2fad617b56bdfc01901550998847e06deb79"
+    },
+    "review_sha256": "573e1ba90c9a73ffb4c4340469445be24a19173f15262f54d95f0e08a5026981"
+  }
+}
