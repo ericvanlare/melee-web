@@ -379,9 +379,104 @@ def _cut_cleanup_error(value, peer, label):
           f"{label} is not an independently retained exact cut transport cause")
 
 
-def _validate_cleanup(browser, owner, selected_id, receipt):
+# This is the generated loader inspected for the one-file package contract below.
+# A different loader needs a new source review; a matching URL is not authority.
+REVIEWED_PACKAGE_LOADER_SHA256 = "170c03c7ba2a92f6e961e233b0f783099073177de85c44ded16c2a687fefefa5"
+PACKAGE_DIAGNOSTIC_CLASSIFICATION = "PREEXISTING_PACKAGE_REQUEST_ABORT_WITH_VERIFIED_READY_FS_ARTIFACT"
+
+
+def _preexisting_package_diagnostic(browser, role, errors, runtime_files, runtime_url):
+    """Classify immutable pre-cut evidence, without calling the aborted request successful."""
+    _need(runtime_url == "http://127.0.0.1:8787/runtime.html" and
+          browser.get("browser", {}).get("url") == runtime_url,
+          "package diagnostic lacks the runner's admitted runtime URL")
+    expected_url = runtime_url.removesuffix("runtime.html") + "gameplay_menu_browser.data"
+    runtime_files = _object(runtime_files, "trusted served runtime identities")
+    package = _object(runtime_files.get("gameplay_menu_browser.data"), "trusted data package identity")
+    loader = _object(runtime_files.get("gameplay_menu_browser.js"), "trusted loader identity")
+    size = _uint(package.get("bytes"), "trusted package bytes", maximum=8 * 1024 * 1024)
+    _need(size > 0 and isinstance(package.get("sha256"), str) and
+          re.fullmatch(r"[0-9a-f]{64}", package["sha256"]) is not None and
+          loader.get("sha256") == REVIEWED_PACKAGE_LOADER_SHA256 and
+          _uint(loader.get("bytes"), "trusted loader bytes") > 0,
+          "package diagnostic lacks the source-reviewed loader/package identities")
+    before = _object(browser.get("profiles", {}).get(role, {}).get(
+        "data_package_diagnostics_before_cut"), f"{role} pre-cut package diagnostic")
+    _need(set(before) == {"lifecycle", "seed"}, "unknown pre-cut package diagnostic fields")
+    lifecycle = _object(before.get("lifecycle"), "pre-cut package lifecycle")
+    final = _object(browser.get("leave_and_cleanup", {}).get(
+        role + "_data_package_diagnostics_after_context_close"), "retired package lifecycle")
+    lifecycle_keys = {"schema", "expected_url", "requests", "errors", "overflow", "finished",
+                      "pending_response_bodies", "scope"}
+    for row, finished in ((lifecycle, False), (final, True)):
+        _need(set(row) == lifecycle_keys and
+              row.get("schema") == "melee-web-task13-data-package-lifecycle-v1" and
+              row.get("expected_url") == expected_url and row.get("errors") == [] and
+              row.get("overflow") is False and row.get("finished") is finished and
+              type(row.get("pending_response_bodies")) is int and row["pending_response_bodies"] == 0 and
+              row.get("scope") == "passive request identity/timing and response body hash; no abort/fetch behavior change",
+              "package lifecycle is incomplete, malformed or contains unknown diagnostics")
+    requests = _array(lifecycle.get("requests"), "pre-cut package requests")
+    _need(len(requests) == 1 and final.get("requests") == requests,
+          "package request inventory changed after the pre-cut snapshot")
+    request = _object(requests[0], "pre-cut package request")
+    _need(set(request) == {"request_id", "identity_scope", "url", "method", "resource_type",
+                          "requested_at_monotonic_ms", "response", "finished_at_monotonic_ms",
+                          "failure", "failed_at_monotonic_ms", "browser_timing"} and
+          request.get("request_id") == "page-request-1" and
+          request.get("identity_scope") == "actual Playwright Request object within this profile" and
+          request.get("url") == expected_url and request.get("method") == "GET" and
+          request.get("resource_type") == "fetch" and request.get("failure") == "net::ERR_ABORTED" and
+          request.get("finished_at_monotonic_ms") is None,
+          "package request is not the narrowly observed pre-cut abort")
+    response = _object(request.get("response"), "package response diagnostic")
+    _need(set(response) == {"status", "observed_at_monotonic_ms", "content_length", "body", "body_error"} and
+          type(response.get("status")) is int and response["status"] == 200 and
+          response.get("content_length") == str(size), "package response identity differs")
+    stamps = [request.get("requested_at_monotonic_ms"), response.get("observed_at_monotonic_ms"),
+              request.get("failed_at_monotonic_ms")]
+    _need(all(type(value) in (int, float) and math.isfinite(value) and value >= 0 for value in stamps) and
+          stamps[0] <= stamps[1] <= stamps[2], "package request timestamps are invalid or unordered")
+    _object(request.get("browser_timing"), "raw browser request timing")
+    if response.get("body") is None:
+        _need(isinstance(response.get("body_error"), str) and
+              _first_line(response["body_error"]) ==
+              "response.body: Protocol error (Network.getResponseBody): No data found for resource with given identifier",
+              "unavailable package body has an unknown diagnostic")
+        body_observation = "unavailable_with_retained_CDP_NoData_diagnostic"
+    else:
+        _need(response.get("body") == package and response.get("body_error") is None,
+              "observed package response body differs from trusted artifact")
+        body_observation = "observed_exact_trusted_artifact"
+    seed = _object(before.get("seed"), "pre-cut ready FS package observation")
+    _need(set(seed) == {"schema", "path", "bytes", "sha256", "observed_at_page_monotonic_ms",
+                       "called_run", "preload_results", "data_file_downloads",
+                       "expected_data_file_downloads", "native_phase", "runtime_error"} and
+          seed.get("schema") == "melee-web-task13-preloaded-seed-observation-v1" and
+          seed.get("path") == "/initial_pipeline_cache.db" and
+          type(seed.get("bytes")) is int and seed["bytes"] == size and
+          seed.get("sha256") == package["sha256"] and seed.get("runtime_error") is None and
+          type(seed.get("expected_data_file_downloads")) is int and seed["expected_data_file_downloads"] == 1 and
+          seed.get("preload_results") == {"gameplay_menu_browser.data": {"fromCache": False}} and
+          seed.get("data_file_downloads") == {expected_url: {"loaded": size, "total": size}} and
+          type(seed.get("called_run")) is bool and type(seed.get("native_phase")) is int and seed["native_phase"] >= 0 and
+          type(seed.get("observed_at_page_monotonic_ms")) in (int, float) and
+          math.isfinite(seed["observed_at_page_monotonic_ms"]) and seed["observed_at_page_monotonic_ms"] >= 0,
+          "ready FS package or source loader counters differ from trusted artifact")
+    expected_error = {"kind": "requestfailed", "method": "GET", "url": expected_url,
+                      "failure": "net::ERR_ABORTED"}
+    _need(errors == [expected_error], "package browser diagnostic multiplicity or fields differ")
+    return {"classification": PACKAGE_DIAGNOSTIC_CLASSIFICATION, "request_id": request["request_id"],
+            "request": request, "ready_fs_observation": seed,
+            "trusted_runtime_files": {"gameplay_menu_browser.data": package, "gameplay_menu_browser.js": loader},
+            "response_body_observation": body_observation,
+            "scope": "immutable diagnostic already present before cut; exact ready FS artifact independently verified; not requestfinished, benign transport, fallback fetch or solved Chrome cause"}
+
+
+def _validate_cleanup(browser, owner, selected_id, receipt, runtime_files=None, runtime_url=None):
     leave = _object(browser.get("leave_and_cleanup"), "browser cleanup report")
     preserved_errors = {}
+    preexisting_package_diagnostics = {}
     for role in ("alpha", "beta"):
         cleanup = _object(leave.get(role + "_native_network_cleanup"), f"{role} native cleanup")
         runtime = _object(cleanup.get("runtime_lockstep"), f"{role} runtime cleanup")
@@ -424,7 +519,15 @@ def _validate_cleanup(browser, owner, selected_id, receipt):
               f"{role} browser process inventory is missing")
         browser_errors = _array(leave.get(role + "_browser_errors"), f"{role} browser errors")
         expected_ws = f"{browser.get('network_simulation', {}).get('endpoint')}/v1/rooms/{browser.get('invitation', {}).get('room_id')}/socket"
+        package_errors = [error for error in browser_errors if isinstance(error, dict) and
+                          isinstance(error.get("url"), str) and
+                          error["url"].endswith("/gameplay_menu_browser.data")]
+        if package_errors:
+            preexisting_package_diagnostics[role] = _preexisting_package_diagnostic(
+                browser, role, package_errors, runtime_files, runtime_url)
         for error in browser_errors:
+            if error in package_errors:
+                continue
             _object(error, f"{role} browser error")
             allowed_request_failure = (error.get("kind") == "requestfailed" and
                 error.get("method") == "GET" and error.get("url") == expected_ws and
@@ -537,10 +640,12 @@ def _validate_cleanup(browser, owner, selected_id, receipt):
     return {"normal_native_quiescence_and_endpoints_verified": True,
             "proxy_listener_sockets_timers_retired": True,
             "worker_and_owned_processes_absent": True,
-            "preserved_errors": preserved_errors}
+            "preserved_errors": preserved_errors,
+            "preexisting_package_diagnostics": preexisting_package_diagnostics}
 
 
-def audit_expected_cut(owner, browser, expected_source_head=None):
+def audit_expected_cut(owner, browser, expected_source_head=None, *,
+                       expected_runtime_files=None, expected_runtime_url=None):
     """Raise ValueError for any missing/unexpected evidence; otherwise return a receipt."""
     _object(owner, "capture owner report")
     _object(browser, "browser report")
@@ -560,7 +665,8 @@ def audit_expected_cut(owner, browser, expected_source_head=None):
     if expected_source_head is not None:
         _need(browser.get("source", {}).get("head") == expected_source_head,
               "browser report source head differs from the runner's frozen source")
-    cleanup = _validate_cleanup(browser, owner, selected_id, receipt)
+    cleanup = _validate_cleanup(browser, owner, selected_id, receipt,
+                                expected_runtime_files, expected_runtime_url)
     return {"schema": "melee-web-task13-expected-transport-cut-audit-v1",
             "decision": "EXPECTED_TRANSPORT_CUT_CONFIRMED",
             "route_decision": "FAIL",

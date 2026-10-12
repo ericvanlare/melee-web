@@ -459,7 +459,10 @@ def main():
             if controlled_cut:
                 if result.returncode == 0 or owner.get("capture_exit_code") != result.returncode:
                     raise ValueError("expected-cut route did not retain the matching nonzero capture exit")
-                audit = audit_expected_cut(owner, browser, expected_source_head=head)
+                audit = audit_expected_cut(owner, browser, expected_source_head=head,
+                    expected_runtime_files=baseline,
+                    expected_runtime_url=f"http://127.0.0.1:{args.port}/runtime.html")
+                audit["trusted_runtime_files"] = baseline
                 audit["input_reports"] = {
                     "owner": {"file": "owner.json", **file_identity(folder / "owner.json")},
                     "browser": {"file": "browser/report.json",

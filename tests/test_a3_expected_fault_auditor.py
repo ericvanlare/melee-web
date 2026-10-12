@@ -317,5 +317,129 @@ class ExpectedFaultAuditorTests(unittest.TestCase):
                     audit_expected_cut(owner, browser, expected_source_head=HEAD)
 
 
+class PreexistingPackageDiagnosticTests(unittest.TestCase):
+    """Actual import-only observations, explicitly assembled into a synthetic cut fixture."""
+    def fixture(self):
+        import json
+        observation = json.loads((Path(__file__).parent / "fixtures" /
+            "task13_preexisting_package_import_observation.json").read_text())
+        owner, browser = make_fixture()
+        browser["browser"] = {"url": "http://127.0.0.1:8787/runtime.html"}
+        browser["profiles"] = {"alpha": {
+            "data_package_diagnostics_before_cut": observation["ready"]}}
+        leave = browser["leave_and_cleanup"]
+        leave["alpha_data_package_diagnostics_after_context_close"] = observation["final"]
+        leave["alpha_browser_errors"] = observation["browser_errors"]
+        return owner, browser, observation["runtime_files"]
+
+    def audit(self, owner, browser, runtime):
+        return audit_expected_cut(owner, browser, expected_source_head=HEAD,
+            expected_runtime_files=runtime,
+            expected_runtime_url="http://127.0.0.1:8787/runtime.html")
+
+    def test_actual_observation_classifies_only_its_pre_cut_diagnostic(self):
+        owner, browser, runtime = self.fixture()
+        receipt = self.audit(owner, browser, runtime)
+        self.assertEqual(receipt["route_decision"], "FAIL")
+        classification = receipt["cleanup"]["preexisting_package_diagnostics"]["alpha"]
+        self.assertEqual(classification["classification"],
+            "PREEXISTING_PACKAGE_REQUEST_ABORT_WITH_VERIFIED_READY_FS_ARTIFACT")
+        self.assertEqual(classification["request"]["finished_at_monotonic_ms"], None)
+        self.assertEqual(classification["response_body_observation"],
+            "unavailable_with_retained_CDP_NoData_diagnostic")
+        self.assertEqual(classification["ready_fs_observation"]["called_run"], False)
+        self.assertEqual(receipt["preserved_native_and_verifier_errors"]["alpha_browser_errors"],
+            browser["leave_and_cleanup"]["alpha_browser_errors"])
+        with self.assertRaises(ValueError):
+            validate_result(1, owner, browser, False)
+        with self.assertRaises(ValueError):
+            audit_expected_cut(owner, browser, expected_source_head=HEAD)
+
+    def test_missing_or_changed_pre_cut_and_retired_observations_refuse(self):
+        for mutation in ("missing_before", "missing_final", "final_only", "duplicate_request",
+                         "changed_final", "overflow", "pending", "errors", "unknown_field"):
+            with self.subTest(mutation=mutation):
+                owner, browser, runtime = self.fixture()
+                before = browser["profiles"]["alpha"]["data_package_diagnostics_before_cut"]
+                final = browser["leave_and_cleanup"]["alpha_data_package_diagnostics_after_context_close"]
+                if mutation == "missing_before": browser["profiles"].clear()
+                elif mutation == "missing_final": browser["leave_and_cleanup"].pop("alpha_data_package_diagnostics_after_context_close")
+                elif mutation == "final_only": before["lifecycle"]["requests"] = []
+                elif mutation == "duplicate_request":
+                    before["lifecycle"]["requests"].append(deepcopy(before["lifecycle"]["requests"][0]))
+                    final["requests"] = deepcopy(before["lifecycle"]["requests"])
+                elif mutation == "changed_final": final["requests"][0]["failed_at_monotonic_ms"] += 1
+                elif mutation == "overflow": before["lifecycle"]["overflow"] = True
+                elif mutation == "pending": final["pending_response_bodies"] = 1
+                elif mutation == "errors": final["errors"] = ["unrelated response failure"]
+                elif mutation == "unknown_field": final["unknown"] = True
+                with self.assertRaises(ValueError): self.audit(owner, browser, runtime)
+
+    def test_request_identity_timing_and_body_mutations_refuse(self):
+        changes = [
+            ("method", "POST"), ("url", "http://example.invalid/gameplay_menu_browser.data"),
+            ("resource_type", "script"), ("failure", "net::ERR_CONNECTION_RESET"),
+            ("request_id", "page-request-2"), ("requested_at_monotonic_ms", True),
+            ("failed_at_monotonic_ms", 0), ("finished_at_monotonic_ms", 1000),
+            ("unknown", "unreviewed")]
+        response_changes = [("status", 206), ("content_length", "1"),
+                            ("body_error", "Error: unknown body failure"),
+                            ("body", {"bytes": 3674112, "sha256": "f" * 64})]
+        for is_response, key, value in [(False, *row) for row in changes] + [(True, *row) for row in response_changes]:
+            with self.subTest(response=is_response, key=key):
+                owner, browser, runtime = self.fixture()
+                before = browser["profiles"]["alpha"]["data_package_diagnostics_before_cut"]["lifecycle"]
+                request = before["requests"][0]
+                (request["response"] if is_response else request)[key] = value
+                browser["leave_and_cleanup"]["alpha_data_package_diagnostics_after_context_close"]["requests"] = deepcopy(before["requests"])
+                with self.assertRaises(ValueError): self.audit(owner, browser, runtime)
+
+    def test_trusted_artifacts_ready_fs_and_loader_counters_are_required(self):
+        for mutation in ("no_loader", "wrong_loader", "wrong_package", "wrong_size", "fs_hash",
+                         "fs_path", "fs_size", "download", "expected_downloads", "runtime_error"):
+            with self.subTest(mutation=mutation):
+                owner, browser, runtime = self.fixture()
+                seed = browser["profiles"]["alpha"]["data_package_diagnostics_before_cut"]["seed"]
+                if mutation == "no_loader": runtime.pop("gameplay_menu_browser.js")
+                elif mutation == "wrong_loader": runtime["gameplay_menu_browser.js"]["sha256"] = "f" * 64
+                elif mutation == "wrong_package": runtime["gameplay_menu_browser.data"]["sha256"] = "f" * 64
+                elif mutation == "wrong_size": runtime["gameplay_menu_browser.data"]["bytes"] += 1
+                elif mutation == "fs_hash": seed["sha256"] = "f" * 64
+                elif mutation == "fs_path": seed["path"] = "/other.db"
+                elif mutation == "fs_size": seed["bytes"] += 1
+                elif mutation == "download": next(iter(seed["data_file_downloads"].values()))["loaded"] -= 1
+                elif mutation == "expected_downloads": seed["expected_data_file_downloads"] = True
+                elif mutation == "runtime_error": seed["runtime_error"] = "native failure"
+                with self.assertRaises(ValueError): self.audit(owner, browser, runtime)
+
+    def test_unknown_duplicate_and_post_cut_browser_or_cleanup_errors_still_refuse(self):
+        for mutation in ("duplicate", "page", "console", "other_request", "extra_error_field",
+                         "beta_abort", "unload", "context", "native", "wrong_runtime_url"):
+            with self.subTest(mutation=mutation):
+                owner, browser, runtime = self.fixture()
+                leave = browser["leave_and_cleanup"]
+                if mutation == "duplicate": leave["alpha_browser_errors"] *= 2
+                elif mutation in {"page", "console"}: leave["alpha_browser_errors"].append({"kind": mutation, "message": "unrelated"})
+                elif mutation == "other_request": leave["alpha_browser_errors"].append({"kind": "requestfailed", "method": "GET", "url": "http://127.0.0.1:8787/other.data", "failure": "net::ERR_ABORTED"})
+                elif mutation == "extra_error_field": leave["alpha_browser_errors"][0]["unknown"] = True
+                elif mutation == "beta_abort": leave["beta_browser_errors"] = deepcopy(leave["alpha_browser_errors"])
+                elif mutation == "unload": leave["alpha_unload"]["error"] = "Error: unrelated unload"
+                elif mutation == "context": leave["alpha_context_close_error"] = "Error: unrelated context"
+                elif mutation == "native": leave["alpha_native_network_cleanup"]["runtime_lockstep"]["error"] = "Error: unrelated native"
+                elif mutation == "wrong_runtime_url": browser["browser"]["url"] = "http://127.0.0.1:9999/runtime.html"
+                with self.assertRaises(ValueError): self.audit(owner, browser, runtime)
+
+    def test_observed_body_must_match_and_cannot_be_fabricated_success(self):
+        owner, browser, runtime = self.fixture()
+        before = browser["profiles"]["alpha"]["data_package_diagnostics_before_cut"]["lifecycle"]
+        response = before["requests"][0]["response"]
+        response.update(body=deepcopy(runtime["gameplay_menu_browser.data"]), body_error=None)
+        browser["leave_and_cleanup"]["alpha_data_package_diagnostics_after_context_close"]["requests"] = deepcopy(before["requests"])
+        receipt = self.audit(owner, browser, runtime)
+        self.assertEqual(receipt["cleanup"]["preexisting_package_diagnostics"]["alpha"]["response_body_observation"],
+                         "observed_exact_trusted_artifact")
+        self.assertIsNone(receipt["cleanup"]["preexisting_package_diagnostics"]["alpha"]["request"]["finished_at_monotonic_ms"])
+
+
 if __name__ == "__main__":
     unittest.main()

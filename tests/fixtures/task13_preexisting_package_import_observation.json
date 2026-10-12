@@ -1,0 +1,129 @@
+{
+  "scope": "Actual import-only lifecycle/seed/error fields; body_error stack omitted after its literal first line. Cut wrapper and trusted runtime admission are synthetic component fixtures, not an actual cut capture.",
+  "source_report": {
+    "artifact": "data-package-disc-import-1/browser/report.json",
+    "sha256": "e5a2861e83b0ecc6e54d3ef4a0d49c2573ed2eaf4f32a059cb209a3c9983d7e2"
+  },
+  "ready": {
+    "lifecycle": {
+      "schema": "melee-web-task13-data-package-lifecycle-v1",
+      "expected_url": "http://127.0.0.1:8787/gameplay_menu_browser.data",
+      "requests": [
+        {
+          "request_id": "page-request-1",
+          "identity_scope": "actual Playwright Request object within this profile",
+          "url": "http://127.0.0.1:8787/gameplay_menu_browser.data",
+          "method": "GET",
+          "resource_type": "fetch",
+          "requested_at_monotonic_ms": 607.159416,
+          "response": {
+            "status": 200,
+            "observed_at_monotonic_ms": 611.381791,
+            "content_length": "3674112",
+            "body": null,
+            "body_error": "response.body: Protocol error (Network.getResponseBody): No data found for resource with given identifier"
+          },
+          "finished_at_monotonic_ms": null,
+          "failure": "net::ERR_ABORTED",
+          "failed_at_monotonic_ms": 616.523833,
+          "browser_timing": {
+            "startTime": 1791789458782.444,
+            "domainLookupStart": 0.058,
+            "domainLookupEnd": 0.063,
+            "connectStart": 0.063,
+            "secureConnectionStart": -1,
+            "connectEnd": 0.197,
+            "requestStart": 0.222,
+            "responseStart": 0.829,
+            "responseEnd": 8.095
+          }
+        }
+      ],
+      "errors": [],
+      "overflow": false,
+      "finished": false,
+      "pending_response_bodies": 0,
+      "scope": "passive request identity/timing and response body hash; no abort/fetch behavior change"
+    },
+    "seed": {
+      "schema": "melee-web-task13-preloaded-seed-observation-v1",
+      "path": "/initial_pipeline_cache.db",
+      "bytes": 3674112,
+      "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+      "observed_at_page_monotonic_ms": 2811.585000038147,
+      "called_run": false,
+      "preload_results": {
+        "gameplay_menu_browser.data": {
+          "fromCache": false
+        }
+      },
+      "data_file_downloads": {
+        "http://127.0.0.1:8787/gameplay_menu_browser.data": {
+          "loaded": 3674112,
+          "total": 3674112
+        }
+      },
+      "expected_data_file_downloads": 1,
+      "native_phase": 0,
+      "runtime_error": null
+    }
+  },
+  "final": {
+    "schema": "melee-web-task13-data-package-lifecycle-v1",
+    "expected_url": "http://127.0.0.1:8787/gameplay_menu_browser.data",
+    "requests": [
+      {
+        "request_id": "page-request-1",
+        "identity_scope": "actual Playwright Request object within this profile",
+        "url": "http://127.0.0.1:8787/gameplay_menu_browser.data",
+        "method": "GET",
+        "resource_type": "fetch",
+        "requested_at_monotonic_ms": 607.159416,
+        "response": {
+          "status": 200,
+          "observed_at_monotonic_ms": 611.381791,
+          "content_length": "3674112",
+          "body": null,
+          "body_error": "response.body: Protocol error (Network.getResponseBody): No data found for resource with given identifier"
+        },
+        "finished_at_monotonic_ms": null,
+        "failure": "net::ERR_ABORTED",
+        "failed_at_monotonic_ms": 616.523833,
+        "browser_timing": {
+          "startTime": 1791789458782.444,
+          "domainLookupStart": 0.058,
+          "domainLookupEnd": 0.063,
+          "connectStart": 0.063,
+          "secureConnectionStart": -1,
+          "connectEnd": 0.197,
+          "requestStart": 0.222,
+          "responseStart": 0.829,
+          "responseEnd": 8.095
+        }
+      }
+    ],
+    "errors": [],
+    "overflow": false,
+    "finished": true,
+    "pending_response_bodies": 0,
+    "scope": "passive request identity/timing and response body hash; no abort/fetch behavior change"
+  },
+  "browser_errors": [
+    {
+      "kind": "requestfailed",
+      "method": "GET",
+      "url": "http://127.0.0.1:8787/gameplay_menu_browser.data",
+      "failure": "net::ERR_ABORTED"
+    }
+  ],
+  "runtime_files": {
+    "gameplay_menu_browser.data": {
+      "bytes": 3674112,
+      "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+    },
+    "gameplay_menu_browser.js": {
+      "bytes": 300688,
+      "sha256": "170c03c7ba2a92f6e961e233b0f783099073177de85c44ded16c2a687fefefa5"
+    }
+  }
+}
