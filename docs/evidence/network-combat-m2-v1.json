@@ -394,7 +394,7 @@
       "sha256": "5d024dd9fa159ad5d49f61fa9d58bccffc4b0df753e3edce831f7ba23f8a56ed"
     }
   ],
-  "next": "One reviewed prepared-jab capture; stop at its first failed boundary. Attack-caused KO and M3 remain open.",
+  "next": "Reduce the retained approach position refusal against original movement/collision authority before any changed stimulus or guard; no automatic capture retry.",
   "native_combat_observations": {
     "decision": "COMPILED_AND_BROWSER_EXERCISED_IN_EXCHANGE",
     "runtime_source": "d269334e1243b0568d8bf7caf285053bea8e04a1",
@@ -1034,7 +1034,7 @@
     "runtime_changed": false,
     "one_synchronous_evaluation_per_sample": true,
     "all_input_pairing_health_guards_and_caps_unchanged": true,
-    "browser_result_pending": true,
+    "browser_result_pending": false,
     "artifacts": [
       {
         "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko2-single-evaluate-candidate-v1/freeze.json",
@@ -1051,7 +1051,8 @@
         "bytes": 259,
         "sha256": "f419e419898377466d00743096c7fd63677bf61c6b482128056bdb23a198974b"
       }
-    ]
+    ],
+    "browser_scope": "The later prepared run passed the existing exchange; no quantitative timing improvement or historical cause is inferred."
   },
   "charged_recipe_checkpoint": {
     "decision": "PARK_UNRUN_CHARGED_INPUT_AFTER_FEASIBILITY_REVIEW",
@@ -1064,7 +1065,7 @@
     }
   },
   "prepared_source_preparation": {
-    "state": "V3_INDEPENDENT_REVIEW_AND_INTEGRATED_CONTROLS_PASS_BROWSER_UNRUN",
+    "state": "V3_REVIEWED_AND_CAPTURED_PREPARATION_POSITION_GUARD_FAILED",
     "bounds": {
       "damage_goal_percent": 18,
       "max_jabs": 8,
@@ -1136,6 +1137,186 @@
       "cases": 15,
       "skips": 0,
       "includes": "combat, action, WAIT and runner wrappers"
+    }
+  },
+  "prepared_first_attempt": {
+    "decision": "CONFIRMED_PREPARATION_APPROACH_POSITION_GUARD_REFUSAL_KO_UNREACHED",
+    "harness": "9708b07a4b06bf7d8df0e0366b55f3733601a054",
+    "runtime_producer": "b2c025b3473d71ab331ac2e84fd2be532e458e75",
+    "owner_elapsed_ms": 33669,
+    "preparation": {
+      "origin": 699,
+      "limit": 1179,
+      "last_observed_pair": 875,
+      "observed_span": 176,
+      "jabs_completed": 5,
+      "reported_jab_count": 0,
+      "reported_jab_count_note": "success-only finalization remains zero; actual five retained successful jab records authoritative",
+      "jabs": [
+        {
+          "press": 700,
+          "release": 706,
+          "target": 703,
+          "hit": 704,
+          "grounded_return": 729,
+          "damage_before": 3,
+          "damage_after": 5.73000002,
+          "sampled_pairs": 24
+        },
+        {
+          "press": 730,
+          "release": 737,
+          "target": 733,
+          "hit": 734,
+          "grounded_return": 759,
+          "damage_before": 5.73000002,
+          "damage_after": 8.22000027,
+          "sampled_pairs": 24
+        },
+        {
+          "press": 759,
+          "release": 766,
+          "target": 762,
+          "hit": 764,
+          "grounded_return": 788,
+          "damage_before": 8.22000027,
+          "damage_after": 10.5,
+          "sampled_pairs": 23
+        },
+        {
+          "press": 789,
+          "release": 796,
+          "target": 793,
+          "hit": 793,
+          "grounded_return": 818,
+          "damage_before": 10.5,
+          "damage_after": 12.6000004,
+          "sampled_pairs": 24
+        },
+        {
+          "press": 819,
+          "release": 826,
+          "target": 822,
+          "hit": 823,
+          "grounded_return": 848,
+          "damage_before": 12.6000004,
+          "damage_after": 14.5500002,
+          "sampled_pairs": 23
+        }
+      ],
+      "persistent_counter_player_observations_checked": 44,
+      "all_observed_six_slot_KOs_falls_suicides_zero": true,
+      "continuous_literal_diagnostic_window": [
+        698,
+        874
+      ],
+      "P1_all_neutral": true,
+      "P2_only_five_verified_A_episodes_and_one_axis_episode": true,
+      "tap": {
+        "input_tick": 850,
+        "release_tick": 851,
+        "pad": [
+          0,
+          0,
+          129,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "before": {
+          "p1_x": -66.77314,
+          "p2_x": -46.3515167
+        },
+        "after": {
+          "p1_x": -68.8731613,
+          "p2_x": -62.0715294
+        },
+        "P1_delta": -2.1000213000000088,
+        "P2_delta": -15.720012700000005,
+        "after_positive_gap": 6.801631900000004,
+        "crossed": false
+      },
+      "goal18_not_reached": true,
+      "combat_ko_absent": true
+    },
+    "cleanup_prefix": {
+      "records": 876,
+      "ticks": [
+        0,
+        875
+      ],
+      "all_exact64B_equal": true,
+      "sha256": "b29d0f16653fa7be56ebbe5322665f69528314a70004131ef0a65c58d6fa3332",
+      "tails": {
+        "alpha": 0,
+        "beta": 2
+      },
+      "scope": "diagnostic cleanup common prefix; no route acceptance"
+    },
+    "cleanup": {
+      "normal_leave_unload_native_quiescence": true,
+      "proxy_worker_retired": true,
+      "independently_absent_pids": 20,
+      "independently_absent_groups_with_root_supplement": 5,
+      "package_request_abort_retained": true,
+      "failed_profiles_retained": true
+    },
+    "artifacts": [
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-prepared-capture-release-v1.json",
+        "bytes": 1531,
+        "sha256": "10251e96b0103c825351f96e61fe35b6869ea36f6f960b01e1101ee6906f5d20"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-prepared-1-suite/full-moderate-combat-ko-prepared/browser/report.json",
+        "bytes": 14217068,
+        "sha256": "ee0b127c2c2ea8f0084e6270db47df0f2b42a542ab95474f5dcba420b96ba308"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-prepared-1-suite/full-moderate-combat-ko-prepared/owner.json",
+        "bytes": 164968,
+        "sha256": "a0493a373054e75d07a2410476c81d683751ee8264081d21f38767c00ceeb948"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-prepared-first-result-review-v1.json",
+        "bytes": 9030,
+        "sha256": "71a4a681481a4225736c28fe90196f38e8810ad6d0a584e25249f10f323525da"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-prepared-first-process-retirement-v1.json",
+        "bytes": 736,
+        "sha256": "d2419423fc049afe899a5efe9635142d0858448752ed031d18b70456a18c831c"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-prepared-first-process-retirement-supplement-v1.json",
+        "bytes": 609,
+        "sha256": "6c49084e3b4f657704167c0eff0653b519a8eea828fe900e9680391406d3bcb7"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-prepared-approach-reduction-v1.json",
+        "bytes": 12767,
+        "sha256": "a3bef6929ced23522a55740127a9ea956ab037af02fae1f046ed699e0b06130c"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/prepared-approach-stationarity-architecture-note-v1.json",
+        "bytes": 4489,
+        "sha256": "82aea3d886b21b7c9890fcdf78feeed2dd4a75d0216518da41e14edb7195b6e7"
+      }
+    ],
+    "scope": [
+      "No >=18 prepared baseline, KO input, credited loss, respawn or completed full route.",
+      "Last raw pair and selected action/baseline rows retained; not a full per-tick trajectory.",
+      "Neutral PAD does not by itself identify why P1 moved; collision/jostle is a hypothesis, not proven from this report.",
+      "No runtime/desync defect demonstrated and no caps changed."
+    ],
+    "source_reduction": {
+      "finding": "Pinned original grounded body-overlap nudge can change neutral fighter x; retained capture omits nudge velocity, body extents and loaded constant, so exact displacement cause is unproved.",
+      "next": "Replay the retained predicate and an actual-source component counterexample before changing the experimental stationarity premise."
     }
   }
 }
