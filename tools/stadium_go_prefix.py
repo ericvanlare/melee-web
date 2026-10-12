@@ -7,6 +7,7 @@ prefix. It preserves source boundaries and makes no port RNG-equality claim.
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import struct
 import re
@@ -2086,9 +2087,13 @@ def _validate_progress_constructor(row: dict[str, Any]) -> dict[str, Any]:
 def validate_stadium_go_prefix(stream_path: str | Path,
                                expected_setup_receipt_sha256: str = EXPECTED_SETUP_RECEIPT_SHA256,
                                status_path: str | Path | None = None, *,
-                               constructor_observations: bool = False) -> dict[str, Any]:
+                               constructor_observations: bool = False,
+                               original_idle_3500: bool = False) -> dict[str, Any]:
     """Admit one natural C→F→DrawReturn raw prefix and retain source identities."""
 
+    _require(type(original_idle_3500) is bool and
+             (not original_idle_3500 or constructor_observations is True),
+             "idle3500 requires explicit constructor observations")
     _require(type(constructor_observations) is bool, "constructor option must be boolean")
     _require(isinstance(expected_setup_receipt_sha256, str) and
              re.fullmatch(r"[0-9a-f]{64}", expected_setup_receipt_sha256) is not None and
@@ -2138,6 +2143,14 @@ def validate_stadium_go_prefix(stream_path: str | Path,
         for row in iter_records(source, max_bytes=MAX_STREAM_BYTES,
                                 max_records=MAX_STREAM_RECORDS, stats=stats):
             last_sequence = row["seq"]
+            if original_idle_3500:
+                _require(stats.bytes_read <= 64*1024*1024 and last_sequence < 77602,
+                         "idle3500 record/byte cap exceeded")
+                if c_tick is None:
+                    is_c = (go_seen and row.get('event') == 'boundary' and
+                            row.get('payload', {}).get('boundary') == 'source_tick')
+                    _require(last_sequence <= 16384 if is_c else last_sequence < 16384,
+                             "idle3500 pre-C record cap exceeded")
             if final_draw_sequence is not None:
                 _require(row["event"] == "end",
                          "observer emitted rows after the first qualifying DrawReturn")
@@ -2303,7 +2316,8 @@ def validate_stadium_go_prefix(stream_path: str | Path,
                         _require(last_source_tick is not None and tick == last_source_tick + 1,
                                  "source tick after F is not contiguous")
                         last_source_tick = tick
-                        tail_after_f += 1
+                        if not original_idle_3500 or tick > c_tick + 3500:
+                            tail_after_f += 1
                         _require(tail_after_f <= MAX_TAIL_AFTER_F,
                                  "first qualifying DrawReturn exceeded the four-tick tail bound")
                 elif boundary == "draw_return":
@@ -2313,7 +2327,8 @@ def validate_stadium_go_prefix(stream_path: str | Path,
                     _require(not (go_seen and c_tick is None),
                              "DrawReturn preceded containing tick C")
                     previous_draw_sequence = row["seq"]
-                    if go_seen and f_tick is not None:
+                    if go_seen and f_tick is not None and (not original_idle_3500 or
+                                                          last_source_tick >= c_tick + 3500):
                         _require(source_ticks_since_draw <= MAX_SOURCE_TICK_BATCH and
                                  tail_after_f <= MAX_TAIL_AFTER_F,
                                  "qualifying DrawReturn exceeded the authored batch bound")
@@ -2358,6 +2373,10 @@ def validate_stadium_go_prefix(stream_path: str | Path,
              status.get("event_count") == stats.records_read,
              "observer status does not account for the complete checked stream")
     for marker in (header, start, end):
+        _require((type(marker.get("original_idle_post_go_ticks")) is int and
+                  marker["original_idle_post_go_ticks"] == 3500) if original_idle_3500 else
+                 "original_idle_post_go_ticks" not in marker,
+                 "idle3500 declaration differs from explicit validation scope")
         _require(marker.get("constructor_owner_observations", False) is constructor_observations,
                  "constructor adjunct declaration differs from requested scope")
     if constructor_observations:
@@ -2365,6 +2384,14 @@ def validate_stadium_go_prefix(stream_path: str | Path,
         _require(end.get("constructor_observations_complete") is True and
                  all(end.get(key) is False for key in ("registration_event_observed", "allocation_generation_observed", "lifetime_pairing_observed")),
                  "constructor terminal overclaims or is incomplete")
+    if original_idle_3500:
+        _require(all(marker.get('completion_boundary') ==
+                     'relative_post_go_tick_3500_then_first_draw_return' for marker in (start, end)),
+                 'idle3500 completion declaration differs')
+        _require(end.get("comparison_end_tick") == c_tick + 3500 and
+                 type(end.get("comparison_end_tick")) is int and
+                 last_source_tick == c_tick + 3500 + final_tail_after_f,
+                 "idle3500 terminal target accounting differs")
     go_setup = _slice(phase_payloads["go_after"], MATCH_SETUP_TAG, "GO marker", 0x138)
     go_setup_sha256 = hashlib.sha256(go_setup["raw"]).hexdigest()
     rng_snapshots = {}
@@ -2381,7 +2408,10 @@ def validate_stadium_go_prefix(stream_path: str | Path,
         "schema": SCHEMA,
         "version": VERSION,
         **({"constructor_observations": constructor.finish()} if constructor_observations else {}),
-        "decision": "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY",
+        "decision": ("PASS_ORIGINAL_RAW_3500_ROUTE_ONLY" if original_idle_3500 else
+                     "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY"),
+        **({"comparison_end_tick": c_tick + 3500,
+            "tail_ticks_after_comparison_end": final_tail_after_f} if original_idle_3500 else {}),
         "source": {"dolphin_commit": EXPECTED_DOLPHIN_COMMIT,
                    "dol_sha1": EXPECTED_DOL_SHA1,
                    "dol_sha256": EXPECTED_DOL_SHA256},
@@ -3499,7 +3529,7 @@ def _state_pointer(raw: bytes, context: str, size: int = 1) -> int:
 
 def _validate_stadium_idle_state_record(row: dict[str, Any], label: str,
                                         expected_tick: int) -> dict[str, Any]:
-    _require(label in ("GO", "C", "F"), "state snapshot label is unknown")
+    _require(label in ("GO", "C", "F", "IDLE"), "state snapshot label is unknown")
     _require(type(expected_tick) is int and expected_tick >= 0,
              f"{label}: expected source tick is malformed")
     payload = row.get("payload")
@@ -3766,3 +3796,207 @@ def validate_stadium_idle_state_snapshot(
         "snapshots": snapshots,
         "stream_sha256": stats.prefix_sha256,
     }
+
+
+def _validate_idle_3500_boundary_minimum(row):
+    """Prove the binary lower bound used by this profile's record budget."""
+    p = row['payload']; kind = p['boundary']
+    pcs = {'pad_poll':0x8034dd8c, 'pad_consume':0x80377584,
+           'source_tick':SOURCE_TICK_PC, 'draw_enter':0x80390fc0,
+           'draw_return':DRAW_RETURN_PC}
+    g = p.get('gprs')
+    _require(kind in pcs and p.get('pc') == pcs[kind] and
+             isinstance(g, list) and len(g) == 32 and
+             all(type(v) is int and 0 <= v <= 0xffffffff for v in g),
+             'idle3500 boundary PC/GPR inventory differs')
+    if kind == 'pad_consume':
+        return  # _consumed_ports checks its exact queue/slot association.
+    required = ({1:(48,None),27:(4,None),2:(12,0x804c1f78),21:(856,0x804c1f84),
+                 22:(4,0x804d7420),23:(4,0x804a7f98),17:(6,0x80479d30)}
+                if kind == 'pad_poll' else
+                {14:(46,0x8046b6a0),21:(856,0x804c1f84),30:(4,0x80479d58),
+                 19:(4,0x804d5f94),20:(4,None),10:(76,0x80452c68),
+                 28:(4,None),11:(81,None)})
+    items = {tag:_state_slice(p,tag,'idle3500 mandatory boundary',size)
+             for tag,(size,_) in required.items()}
+    for tag,(_,address) in required.items():
+        if address is not None:
+            _require(items[tag]['address'] == address,
+                     'idle3500 mandatory slice source address differs')
+    if kind == 'pad_poll':
+        _require(g[31] >= 48 and items[1]['address'] == g[31]-48 and
+                 g[1] <= 0xffffffff-0x54 and items[27]['address'] == g[1]+0x54 and
+                 items[27]['raw'] == bytes.fromhex('80376a28'),
+                 'idle3500 HSD PAD caller/status association differs')
+    else:
+        rng = int.from_bytes(items[19]['raw'],'big')
+        camera = int.from_bytes(items[10]['raw'][:4],'big')
+        camera_object = int.from_bytes(items[28]['raw'],'big')
+        _require(int.from_bytes(items[30]['raw'],'big') == row['source_tick'] and
+                 rng != 0 and items[20]['address'] == rng and
+                 camera != 0 and _state_mem1_range(camera,0x2c) and
+                 items[28]['address'] == camera+0x28 and camera_object != 0 and
+                 items[11]['address'] == camera_object,
+                 'idle3500 dynamic RNG/camera association differs')
+
+
+class StadiumIdle3500Observations:
+    """One fresh original recording; existing typed state/queue decoders own reads."""
+    def __init__(self):
+        self.setup = False
+        self.go = None
+        self.pending = None
+        self.constructor = None
+        self.owner = None
+        self.c_countdown = None
+        self.last_ordinal = -1
+        self.tick_sequences = []
+        self.bundles = []
+        self.actions = []
+        self.draw_open = None
+        self.expected_draw = None
+        self.state_digest = hashlib.sha256()
+        self.seed_observations = []
+
+    def accept(self, row):
+        from whole_session_replay import _consumed_ports, WholeSessionReplayError
+        p = row.get("payload", {})
+        event, kind = row.get("event"), p.get("boundary")
+        if self.go is not None:
+            _require(event in ('boundary','end'), 'idle3500 unexpected post-GO record class')
+        if event == "progress" and p.get("phase") == "constructor_commit":
+            self.constructor = p
+        if event == "progress" and p.get("phase") == "go_after":
+            _require(self.go is None and self.constructor is not None,
+                     "idle3500 lacks unique GO/constructor origin")
+            self.go = row
+            self.expected_draw = row["draw_ordinal"]
+            _validate_stadium_idle_state_record(row, "GO", p["source_tick"])
+        if event != "boundary":
+            return
+        if self.go is not None:
+            _validate_idle_3500_boundary_minimum(row)
+            _require(type(row.get("draw_ordinal")) is int and
+                     row["draw_ordinal"] == self.expected_draw,
+                     "idle3500 source draw ordinal is missing, duplicated or reordered")
+            _require(self.draw_open is None or kind == "draw_return",
+                     "idle3500 boundary nested in source draw")
+        if kind == "setup":
+            self.setup = True
+        if not self.setup:
+            return
+        if kind == "pad_consume":
+            _require(self.pending is None, "idle3500 duplicate consume before SourceTick")
+            try:
+                ports = _consumed_ports(row, row["seq"])
+            except WholeSessionReplayError as error:
+                raise StadiumGoPrefixError(str(error)) from error
+            _require(ports == ["00"*11, "00"*11, "00"*10+"ff", "00"*10+"ff"],
+                     "idle3500 consumed input is not literal neutral on the two active ports")
+            self.pending = (row, ports)
+        if kind == "source_tick":
+            _require(self.pending is not None, "idle3500 SourceTick lacks paired consume")
+            consume, ports = self.pending
+            self.pending = None
+            _require(consume["source_tick"] == row["source_tick"] and
+                     consume["draw_ordinal"] == row["draw_ordinal"],
+                     "idle3500 consume/tick counters differ")
+            if self.go is None:
+                return
+            _require(self.draw_open is None, 'idle3500 SourceTick nested in source draw')
+            ordinal = row["source_tick"] - self.go["source_tick"]
+            _require(ordinal == self.last_ordinal + 1 and 0 <= ordinal <= 3504,
+                     "idle3500 relative tick membership is missing or excessive")
+            snapshot = _validate_stadium_idle_state_record(row, "IDLE", row["source_tick"])
+            # Preserve exact map root/Ground roles and authored map2 history.
+            owner = tuple((tag, flags, _state_slice(p, tag, 'idle owner', 4, flags)['raw'])
+                          for tag in (67, 68) for flags in STADIUM_IDLE_STATE_ROOT_IDS)
+            map2 = snapshot['map2']
+            if self.owner is None:
+                self.owner = owner
+                self.c_countdown = map2['countdown_s32']
+                ctor = _state_slice(self.constructor, 70, 'constructor countdown', 4)
+                go_timer = _state_slice(self.go['payload'], 70, 'GO countdown', 4)
+                _require(ctor['raw'] == go_timer['raw'] and
+                         int.from_bytes(go_timer['raw'], 'big', signed=True) == self.c_countdown + 1 and
+                         _state_slice(self.constructor, 67, 'constructor map2', 4, 2)['raw'] ==
+                         _state_slice(p, 67, 'C map2', 4, 2)['raw'] and
+                         _state_slice(self.constructor, 68, 'constructor Ground', 4, 2)['raw'] ==
+                         _state_slice(p, 68, 'C Ground', 4, 2)['raw'],
+                         'idle3500 constructor/GO/C countdown or owner origin differs')
+                self.map2_history = {k:v for k,v in map2.items() if k != 'countdown_s32'}
+            _require(owner == self.owner and
+                     {k:v for k,v in map2.items() if k != 'countdown_s32'} == self.map2_history and
+                     map2['phase_s16'] == 0 and not map2['gate_mask_80'] and
+                     map2['countdown_s32'] == self.c_countdown - ordinal and
+                     map2['countdown_s32'] > 0,
+                     'idle3500 owner/phase/countdown recurrence differs')
+            rngp = _slice(p, RNG_POINTER_TAG, 'idle seed pointer', 4)
+            rngv = _slice(p, RNG_VALUE_TAG, 'idle seed bytes', 4)
+            _require(int.from_bytes(rngp['raw'], 'big') == rngv['address'],
+                     'idle3500 dynamic seed address differs')
+            self.seed_observations.append({'ordinal':ordinal,'sequence':row['seq'],
+                'pointer_hex':rngp['raw'].hex(),'seed_hex':rngv['raw'].hex()})
+            self.state_digest.update(json.dumps(snapshot, sort_keys=True).encode())
+            self.bundles.append({'ordinal':ordinal,'consume_sequence':consume['seq'],
+                                 'source_tick':row['source_tick'],
+                                 'ports':[{'port':i,'status_hex':v} for i,v in enumerate(ports)]})
+            self.actions.append({'action':'tick','ordinal':ordinal,'bundle':len(self.bundles)-1,
+                                 'sequence':row['seq'],'draw_ordinal':row['draw_ordinal']})
+            self.tick_sequences.append(row['seq'])
+            self.last_ordinal = ordinal
+        elif self.go is not None and kind in ('draw_enter','draw_return'):
+            _require(self.pending is None, 'idle3500 draw splits consume/tick pair')
+            if kind == 'draw_enter':
+                _require(self.draw_open is None, 'idle3500 duplicate DrawEnter')
+                self.draw_open = row['draw_ordinal']
+            else:
+                _require(self.draw_open is not None and self.draw_open == row['draw_ordinal'],
+                         'idle3500 DrawReturn lacks its same-ordinal DrawEnter')
+                self.draw_open = None
+                self.expected_draw += 1
+            self.actions.append({'action':kind,'ordinal':self.last_ordinal,
+                                 'sequence':row['seq'],'draw_ordinal':row['draw_ordinal']})
+        elif self.go is not None:
+            _require(kind in ('pad_poll','pad_consume'), 'idle3500 unexpected post-GO boundary')
+
+    def finish(self, baseline):
+        _require(self.pending is None and self.draw_open is None and self.last_ordinal ==
+                 3500 + baseline['tail_ticks_after_comparison_end'] and
+                 len(self.bundles) == self.last_ordinal + 1,
+                 'idle3500 interval/terminal consume accounting incomplete')
+        return {'decision':'PASS_ORIGINAL_3500_IDLE_REFERENCE_ONLY',
+                'comparison_post_go_ticks':3500, 'containing_tick_ordinal':0,
+                'natural_tail_ticks':self.last_ordinal-3500,
+                'constructor_initial_countdown':self.c_countdown+1,
+                'containing_tick_countdown':self.c_countdown,
+                'comparison_end_countdown':self.c_countdown-3500,
+                'last_countdown':self.c_countdown-self.last_ordinal,
+                'state_observations_sha256':self.state_digest.hexdigest(),
+                'observed_tick_count':len(self.tick_sequences),
+                'seed_observations':self.seed_observations,
+                'map2_transform_rng_branch_unreachable_in_observed_interval':True,
+                'cross_owner_rng_ledger_complete':False,
+                'registration_event_observed':False,'allocation_generation_observed':False,
+                'lifetime_pairing_observed':False,'native_parity':False}
+
+
+def validate_stadium_idle_3500_reference(stream_path, *, status_path=None,
+                                         extract_inputs=False):
+    """Validate the complete natural recording before exposing its literal schedule."""
+    baseline = validate_stadium_go_prefix(stream_path, status_path=status_path,
+        constructor_observations=True, original_idle_3500=True)
+    observations = StadiumIdle3500Observations()
+    stats = ObserverStreamStats()
+    for row in iter_records(stream_path, max_bytes=64*1024*1024, max_records=77602, stats=stats):
+        observations.accept(row)
+    _require(stats.prefix_sha256 == baseline['stream_sha256'],
+             'idle3500 source changed during validation')
+    result = {'schema':'melee-web-original-stadium-idle-3500','version':1,
+              'route':baseline, **observations.finish(baseline),
+              'extraction_scope':'Actual C ordinal0 through3500 and natural tail; draw entry/return rows retained separately',
+              'fresh_setup_to_go_native_schedule_extraction_remaining':True}
+    if extract_inputs:
+        result['literal_input_bundles'] = observations.bundles
+        result['source_action_schedule'] = observations.actions
+    return result

@@ -9103,5 +9103,80 @@
         "scope": "Fresh Release products only; no new original producer or capture."
       }
     }
+  },
+  "original_constructor_recorded_replay_1f5994_v1": {
+    "result": "PASS_ORIGINAL_CONSTRUCTOR_OBSERVATIONS_ONLY",
+    "scope": "Optional constructor adjunct within the existing recorded original Stadium route, unchanged F/natural DrawReturn terminal; not native parity, registration, generation, retirement,3500 reference or C3 acceptance.",
+    "source": {
+      "commit": "1f5994a822a830ff6ec22c2ff05b50fe5d9f63dd",
+      "tree": "da8eca7aea7bcaaec0ad240e6a3b34c0dc2829d8",
+      "observer_cpp_sha256": "e9bf1f6243917ea88f4c03973b5ff423be74dad5df402374f2d8bb834ce70af6"
+    },
+    "producer": {
+      "binary_sha256": "f4c74cbe2923206ea9a569b77328e2c5b49afecfcbf768c07d3f65601b69f218",
+      "manifest_sha256": "1e946dd3cf9fd5558c5826ea6affb627f5a437a3f88bdb63e9fd239fc48f0b2b",
+      "build_result_sha256": "5134470607549d04203538d4c3785753ed738bb0ca7fbd3c24e792f6563358a6",
+      "note": "Fresh original Dolphin observer producer; distinct from retained browser caabbb19. Official build passed; separately retained post-build receipt finalizer key error did not trigger a rebuild."
+    },
+    "observations": {
+      "constructor_sequences": [
+        2490,
+        2491,
+        2492,
+        2493,
+        2494
+      ],
+      "source_tick": 125,
+      "draw_ordinal": 0,
+      "map2_gobj_hex": "80c35280",
+      "map2_ground_hex": "80c352e0",
+      "membership_prefix_nodes": 3,
+      "full_object_list_observed": false,
+      "parameter_address_hex": "81315448",
+      "x0": 3600,
+      "x4": 3800,
+      "rng_pointer_slot_hex": "804d5f94",
+      "rng_value_address_hex": "804d5f90",
+      "seed_before_hex": "3bb84c53",
+      "seed_after_hex": "263cc5ca",
+      "bound": 200,
+      "result": 29,
+      "stored_countdown": 3629
+    },
+    "comparison": {
+      "decision": "PASS_SEQUENCE_MAPPED_STADIUM_COMMON_WIRE_WITH_CONSTRUCTOR_OBSERVATIONS",
+      "original_records": 2935,
+      "candidate_records": 2940,
+      "added_records": 5,
+      "input_events": 4706,
+      "input_mode": "replay",
+      "source_input_sha256": "57e91222a280f93c861a849c8af404ae4272767ead1debf62312a5be48c473fe",
+      "note": "Every remaining original wire field/payload compared under explicit sequence mapping; added constructor rows strictly validated first. No retrospective source fills."
+    },
+    "artifacts": {
+      "report": {
+        "external_run": "original-stadium-constructor-replay-run1/report.json",
+        "sha256": "13a863d9bc9566aedefc2f420b5ebaff486921bd042585a5bca35515c3fff306"
+      },
+      "owner": {
+        "external_run": "sol-constructor-replay-launch-packet-v1/launch-result.json",
+        "sha256": "7e06a45e047fc09e8e9cc83ea9d5fd42973777844f9da104f4b4a1652292b152"
+      },
+      "raw_review": {
+        "external_run": "sol-constructor-replay-result-v1/review.json",
+        "sha256": "98436694c71181bc46222981030b9c1937240a98b1afec0dc8fd43bc1423588c"
+      },
+      "independent_review": {
+        "external_run": "sol-independent-constructor-result-review.json",
+        "sha256": "bca496e2a87a53fdf2e469fa686570da60635eaed3c892c452b300cee2a07788"
+      }
+    },
+    "cleanup": {
+      "native_and_collector_retired": true,
+      "owned_pids_absent": true,
+      "logger_thread_retired": true,
+      "frozen_inputs_unchanged": true
+    },
+    "next": "Source-only explicit fresh original3500 recording option is under review. Its countdown recurrence must derive from its own actual constructor/C values; the historical3629 value is not injected. No new build or capture is claimed."
   }
 }

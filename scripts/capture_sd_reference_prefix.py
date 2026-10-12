@@ -52,10 +52,10 @@ STADIUM_CAPTURE_CAPS = dict(observer_bytes=64*1024*1024, input_bytes=16*1024*102
                             intent_records=4096, log_bytes=8*1024*1024)
 
 
-def check_stadium_capture_bounds(raw, native, deadline, records):
+def check_stadium_capture_bounds(raw, native, deadline, records, *, original_idle_3500=False):
     """Bound accepted evidence and stop the owned producer on the next check."""
     require(time.monotonic() < deadline, "Stadium capture wall deadline exhausted")
-    require(records <= STADIUM_CAPTURE_CAPS["observer_records"],
+    require(records <= (77602 if original_idle_3500 else STADIUM_CAPTURE_CAPS["observer_records"]),
             "Stadium observer record cap")
     for path, key in ((raw, "observer_bytes"), (native, "input_bytes")):
         require(not path.exists() or path.stat().st_size <= STADIUM_CAPTURE_CAPS[key],
@@ -914,7 +914,7 @@ def prepare_rules_profile(profile, user, *, source_slots=(0, 1)):
 
 
 def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout=180, gci=None,
-        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False):
+        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False):
     """Own fresh output before preparation so failures cannot vanish before launch."""
     output = Path(output)
     replay_receipt = (stadium_replay_preflight(input_replay, output, build_manifest)
@@ -930,7 +930,8 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
                     ordinary_policy=ordinary_policy, replay_receipt=replay_receipt,
                     common_wire_comparator=common_wire_comparator,
                     stop_after_items=stop_after_items,
-                    stadium_constructor_owner=stadium_constructor_owner)
+                    stadium_constructor_owner=stadium_constructor_owner,
+                    stadium_idle_3500=stadium_idle_3500)
     except Exception as error:
         failure = output / "failure.json"
         if not failure.exists():
@@ -941,12 +942,17 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
 
 
 def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout, gci=None,
-         ordinary_policy=None, replay_receipt=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False):
+         ordinary_policy=None, replay_receipt=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False, stadium_idle_3500=False):
     build = validate_reference_build_manifest(Path(build_manifest), Path(dolphin))
     menus, menu_hash = menu_actions(menu_recipe)
     stadium_prefix = menus["scope"] == "stadium_go_prefix"
+    require(type(stadium_idle_3500) is bool and
+            (not stadium_idle_3500 or (stadium_prefix and replay_receipt is None)),
+            "Stadium idle3500 requires fresh recording, never replay or hybrid input")
+    if stadium_idle_3500:
+        stadium_constructor_owner = True
     require(type(stadium_constructor_owner) is bool and
-            (not stadium_constructor_owner or (stadium_prefix and replay_receipt is not None)),
+            (not stadium_constructor_owner or (stadium_prefix and (replay_receipt is not None or stadium_idle_3500))),
             "Stadium constructor adjunct requires explicit recorded Stadium replay")
     require(replay_receipt is None or stadium_prefix,
             "Recorded MWRI replay is exclusive to Stadium prefix")
@@ -1053,6 +1059,8 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                            MWRC_STADIUM_SETUP_RECEIPT_SHA256=menus["setup_receipt_sha256"])
         if stadium_constructor_owner:
             environment["MWRC_STADIUM_CONSTRUCTOR_OWNER"] = "1"
+        if stadium_idle_3500:
+            environment["MWRC_STADIUM_IDLE_3500"] = "1"
     else:
         environment.update(MWRC_SD_INIT="1",
                            MWRC_SD_RECIPE_SHA256=plan["authored_recipe_sha256"],
@@ -1087,7 +1095,11 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
     if ordinary:
         launch.update(ordinary_policy_sha256=policy_hash,caps=CAPS)
     elif stadium_prefix:
-        launch.update(caps=STADIUM_CAPTURE_CAPS, wall_seconds=timeout)
+        launch.update(caps={**STADIUM_CAPTURE_CAPS,
+                            **({"observer_records":77602,"pre_C_records":16384}
+                               if stadium_idle_3500 else {})}, wall_seconds=timeout)
+        if stadium_idle_3500:
+            launch['original_idle_post_go_ticks'] = 3500
     if replay_receipt is not None:
         launch.update(input_mode="replay", input_replay=replay_receipt,
                       adaptive_controller_enabled=False)
@@ -1113,14 +1125,18 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
             # The dedicated receiver expects an interrupted primary ending, so
             # do not use the whole-session Tail's completion-status policy.
             def stadium_wait_check():
-                check_stadium_capture_bounds(raw, native, deadline, receiver.seq)
+                check_stadium_capture_bounds(raw, native, deadline, receiver.seq, original_idle_3500=stadium_idle_3500)
                 check_owned_native_wait(process, bounded_log)
+            idle_observations = None
+            if stadium_idle_3500:
+                from stadium_go_prefix import StadiumIdle3500Observations
+                idle_observations = StadiumIdle3500Observations()
             with ObserverTail(raw, None, wait_check=stadium_wait_check if stadium_prefix else
                               (lambda: check_owned_native_wait(process, bounded_log))
                               if ordinary or transform_prefix else None) as tail:
                 def next_row():
                     if stadium_prefix:
-                        check_stadium_capture_bounds(raw, native, deadline, receiver.seq + 1)
+                        check_stadium_capture_bounds(raw, native, deadline, receiver.seq + 1, original_idle_3500=stadium_idle_3500)
                     if bounded_log is not None:
                         bounded_log.check()
                     if ordinary:
@@ -1132,8 +1148,12 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                     if ordinary:
                         require(tail.offset<=CAPS["observer_bytes"], "Ordinary consumed observer byte cap")
                     if stadium_prefix:
-                        check_stadium_capture_bounds(raw, native, deadline, receiver.seq + 1)
+                        check_stadium_capture_bounds(raw, native, deadline, receiver.seq + 1, original_idle_3500=stadium_idle_3500)
                     receiver.accept(row)
+                    if idle_observations is not None:
+                        idle_observations.accept(row)
+                        if idle_observations.last_ordinal < 0:
+                            require(receiver.seq <= 16384, "Stadium idle3500 pre-C record cap")
                     return row
                 def wait_source(predicate, label, max_polls):
                     first = receiver.menu_polls
@@ -1217,7 +1237,7 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                 # Do not treat that publication race as native completion.
                 if stadium_prefix:
                     primary_status, _ = wait_transform_terminal_statuses(status, native_status, deadline,
-                        wait_check=lambda: check_stadium_capture_bounds(raw, native, deadline, receiver.seq),
+                        wait_check=lambda: check_stadium_capture_bounds(raw, native, deadline, receiver.seq, original_idle_3500=stadium_idle_3500),
                         input_mode="replay" if replay_receipt is not None else "record")
                     from reference_input_stream import validate_stream as validate_input_stream
                     from stadium_go_prefix import validate_stadium_go_prefix
@@ -1226,10 +1246,17 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                                     if replay_receipt is not None else
                                     validate_status(native_status, mode="record",
                                         events=input_summary["events"], require_complete=True))
-                    check_stadium_capture_bounds(raw, native, deadline, receiver.seq)
+                    check_stadium_capture_bounds(raw, native, deadline, receiver.seq, original_idle_3500=stadium_idle_3500)
                     constructor_scope = {"constructor_observations": True} if stadium_constructor_owner else {}
                     prefix_report = validate_stadium_go_prefix(
-                        raw, menus["setup_receipt_sha256"], status_path=status, **constructor_scope)
+                        raw, menus["setup_receipt_sha256"], status_path=status,
+                        **constructor_scope, **({"original_idle_3500":True} if stadium_idle_3500 else {}))
+                    idle_reference = None
+                    if stadium_idle_3500:
+                        from stadium_go_prefix import validate_stadium_idle_3500_reference
+                        idle_reference = validate_stadium_idle_3500_reference(raw, status_path=status,
+                                                                            extract_inputs=True)
+                        (output / 'idle3500-reference.json').write_bytes(canonical(idle_reference))
                     state_report = common_report = None
                     if replay_receipt is not None:
                         from stadium_go_prefix import validate_stadium_idle_state_snapshot
@@ -1258,6 +1285,9 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                         "input_mode": "replay" if replay_receipt is not None else "record",
                         "input_replay": replay_receipt,
                         "stadium_idle_state": state_report,
+                        **({"original_idle_3500":{k:v for k,v in idle_reference.items()
+                             if k not in ('literal_input_bundles','source_action_schedule')}}
+                           if stadium_idle_3500 else {}),
                         "common_wire_comparison": common_report,
                         "profile_sha256": source_inventory,
                         "build": build,
@@ -1803,6 +1833,8 @@ def main(argv=None):
                         help="Pinned complete v6 MWRI; Stadium-only, no adaptive input writes")
     parser.add_argument("--stadium-constructor-owner", action="store_true",
                         help="Observe map2 constructor within exact recorded Stadium replay; F terminal unchanged")
+    parser.add_argument("--stadium-idle-3500", action="store_true",
+                        help="Fresh original recording through3500 relative post-GO ticks and natural batch close")
     parser.add_argument("--stop-after-items", action="store_true",
                         help="Stop the same original transform menu route at observed Items readiness; no setup/transform claim")
     parser.add_argument("--timeout", type=float, default=180)

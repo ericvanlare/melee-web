@@ -87,6 +87,9 @@ constexpr std::array<u32, 7> STADIUM_CONSTRUCTOR_PCS = {
 constexpr std::array<u32, 7> STADIUM_CONSTRUCTOR_WORDS = {
     0x7c0802a6, 0x83630004, 0x481af0ed, 0x48000008,
     0x481af0cd, 0x48000008, 0x3ba00001};
+// Prefix + paired ticks/consumes + byte-bound asynchronous polls/draws + End.
+constexpr u64 STADIUM_IDLE_RECORD_CAP = 16384 + 2 * (3500 + 1 + 4) +
+                                        (64 * 1024 * 1024) / 1238 + 1;
 constexpr size_t STADIUM_CONSTRUCTOR_CHAIN_CAP = MAX_SLICES - 15;  // Observer capacity, not an authored bound.
 // Identity of the observed port CSS->SSS setup record used by this recipe.
 constexpr char STADIUM_SETUP_RECEIPT_SHA256[] =
@@ -1176,6 +1179,12 @@ struct Observer::Impl
         (!constructor_setting.empty() && !stadium_go_prefix_enabled))
       return SetInvalid("Stadium constructor adjunct requires the checked Stadium GO prefix"), false;
     stadium_constructor_enabled = constructor_setting == "1";
+    const std::string idle_setting = Env("MWRC_STADIUM_IDLE_3500");
+    if ((!idle_setting.empty() && idle_setting != "1") ||
+        (!idle_setting.empty() && (!stadium_constructor_enabled ||
+          !InputStream::IsRecording() || InputStream::IsReplaying())))
+      return SetInvalid("Stadium idle3500 requires constructor adjunct and fresh input recording"), false;
+    stadium_idle_3500 = idle_setting == "1";
     // This SHA is an external setup-receipt identity only. The observer emits
     // the selected raw MatchSetup for a separate driver-side semantic check.
     stadium_go_prefix_setup_receipt_sha256 = Env("MWRC_STADIUM_SETUP_RECEIPT_SHA256");
@@ -1401,6 +1410,8 @@ struct Observer::Impl
       handshake += ",\"ordinary_policy_sha256\":\"" + Env("MWRC_ORDINARY_POLICY_SHA256") + "\"";
     if (checked_entity_profile)
       handshake += ",\"entity_profile\":\"" + Env("MWRC_ENTITY_PROFILE") + "\"";
+    if (stadium_idle_3500)
+      handshake += ",\"original_idle_post_go_ticks\":3500";
     handshake += "}";
     PushJson(Event::Handshake, handshake);
     std::string start =
@@ -1423,12 +1434,20 @@ struct Observer::Impl
     if (stadium_go_prefix_enabled)
       start += ",\"diagnostic\":\"stadium_go_prefix_v3\",\"setup_receipt_sha256\":\"" +
                stadium_go_prefix_setup_receipt_sha256 +
-               "\",\"setup_profile_verified_by_observer\":false,\"completion_boundary\":\"source_tick_C_then_source_tick_F_then_first_draw_return\"";
+               "\",\"setup_profile_verified_by_observer\":false,\"completion_boundary\":\"" + std::string(StadiumCompletionBoundary()) + "\"";
     if (stadium_constructor_enabled)
       start += ",\"constructor_owner_observations\":true";
+    if (stadium_idle_3500)
+      start += ",\"original_idle_post_go_ticks\":3500";
     start += "}";
     PushJson(Event::Start, start);
     return !invalid.load();
+  }
+
+  const char* StadiumCompletionBoundary() const
+  {
+    return stadium_idle_3500 ? "relative_post_go_tick_3500_then_first_draw_return" :
+                               "source_tick_C_then_source_tick_F_then_first_draw_return";
   }
 
   void Stop()
@@ -4282,6 +4301,30 @@ struct Observer::Impl
     bool stadium_state_snapshot_this_tick = false;
     // SourceTick and DrawReturn are not one-to-one: preserve the authored
     // queue count on every row and stop only at the first return after F.
+    if (stadium_idle_3500 && setup_ready)
+    {
+      if (boundary == Boundary::PadConsume)
+      {
+        if (stadium_idle_pending_consume)
+          return SetInvalid("Stadium idle3500 duplicate unpaired consume"), void();
+        stadium_idle_pending_consume = true;
+      }
+      if (boundary == Boundary::SourceTick)
+      {
+        if (!stadium_idle_pending_consume)
+          return SetInvalid("Stadium idle3500 SourceTick lacks consumed input"), void();
+        stadium_idle_pending_consume = false;
+        if (stadium_go_prefix_go_seen)
+        {
+          stadium_idle_c_seen = true;
+          stadium_state_snapshot_this_tick = true;
+        }
+      }
+      if (stadium_idle_c_seen && boundary != Boundary::PadPoll &&
+          boundary != Boundary::PadConsume && boundary != Boundary::SourceTick &&
+          boundary != Boundary::DrawEnter && boundary != Boundary::DrawReturn)
+        return SetInvalid("Stadium idle3500 post-C boundary inventory"), void();
+    }
     if (stadium_go_prefix_enabled && boundary == Boundary::SourceTick)
     {
       if (!stadium_go_prefix_go_seen)
@@ -4307,7 +4350,8 @@ struct Observer::Impl
           return SetInvalid("Stadium GO prefix did not observe the next contiguous source tick F"),
                  void();
         stadium_state_snapshot_this_tick = true;
-        stadium_go_prefix_phase = StadiumGoPrefixPhase::AwaitDrawReturn;
+        if (!stadium_idle_3500 || source_tick - stadium_go_prefix_go_tick >= 3500)
+          stadium_go_prefix_phase = StadiumGoPrefixPhase::AwaitDrawReturn;
         ++stadium_go_prefix_batch_ticks;
       }
       else if (stadium_go_prefix_phase == StadiumGoPrefixPhase::AwaitDrawReturn)
@@ -4326,6 +4370,8 @@ struct Observer::Impl
     }
     if (stadium_go_prefix_enabled && boundary == Boundary::DrawReturn)
     {
+      if (stadium_idle_3500 && stadium_idle_pending_consume)
+        return SetInvalid("Stadium idle3500 DrawReturn splits consume/tick pair"), void();
       if (stadium_go_prefix_phase == StadiumGoPrefixPhase::AwaitDrawReturn)
       {
         if (!stadium_go_prefix_batch_ticks || stadium_go_prefix_tail_ticks > 4)
@@ -5168,6 +5214,9 @@ struct Observer::Impl
   {
     if (invalid.load() || finish_requested.load())
       return nullptr;
+    if (stadium_idle_3500 && (next_sequence >= STADIUM_IDLE_RECORD_CAP - 1 ||
+        (!stadium_idle_c_seen && next_sequence >= 16384)))
+      return SetInvalid("Stadium idle3500 checked record inventory cap"), nullptr;
     const u64 head = head_index.load(std::memory_order_relaxed);
     const u64 tail = tail_index.load(std::memory_order_acquire);
     const u64 occupancy = head - tail;
@@ -5816,7 +5865,7 @@ struct Observer::Impl
                    "\",\"natural\":" + (complete ? "true" : "false") +
                    ",\"diagnostic\":\"stadium_go_prefix_v3\",\"diagnostic_prefix_complete\":" +
                    (complete ? "true" : "false") +
-                   ",\"whole_session_equivalent\":false,\"setup_profile_verified_by_observer\":false,\"completion_boundary\":\"source_tick_C_then_source_tick_F_then_first_draw_return\",\"setup_receipt_sha256\":\"" +
+                   ",\"whole_session_equivalent\":false,\"setup_profile_verified_by_observer\":false,\"completion_boundary\":\"" + std::string(StadiumCompletionBoundary()) + "\",\"setup_receipt_sha256\":\"" +
                    stadium_go_prefix_setup_receipt_sha256 +
                    "\",\"go_tick\":" + std::to_string(stadium_go_prefix_go_tick) +
                    ",\"containing_tick_seen\":" +
@@ -5836,6 +5885,12 @@ struct Observer::Impl
             json += ",\"constructor_owner_observations\":true,\"constructor_observations_complete\":" +
                     std::string(stadium_constructor_step == 5 && !invalid.load() ? "true" : "false") +
                     ",\"registration_event_observed\":false,\"allocation_generation_observed\":false,\"lifetime_pairing_observed\":false}";
+          }
+          if (stadium_idle_3500)
+          {
+            json.pop_back();
+            json += ",\"original_idle_post_go_ticks\":3500,\"comparison_end_tick\":" +
+                    std::to_string(stadium_go_prefix_go_tick + 3500) + "}";
           }
           end_slot.payload_size = static_cast<u32>(json.size());
           std::memcpy(end_slot.payload.data(), json.data(), json.size());
@@ -6084,6 +6139,8 @@ struct Observer::Impl
     u32 id = 0, gobj = 0, jobj = 0, proc = 0, frame_sp = 0, target_jobj = 0, entry_cursor_state = 0, scene_pointer = 0;
   } stadium_sss_position;
   u32 stadium_sss_position_calls = 0;
+  bool stadium_idle_3500 = false;
+  bool stadium_idle_c_seen = false, stadium_idle_pending_consume = false;
   bool stadium_constructor_enabled = false;
   size_t stadium_constructor_step = 0, stadium_constructor_call = 0;
   u32 stadium_constructor_gobj = 0, stadium_constructor_ground = 0;
