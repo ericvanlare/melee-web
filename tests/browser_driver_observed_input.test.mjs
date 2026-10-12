@@ -9,17 +9,17 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 class Page extends EventEmitter {
   constructor({sampleAfter=100,predicateError=false}={}) {
     super();this.events=[];this.held=new Set();this.captures=[];
-    this.sampleAfter=sampleAfter;this.predicateError=predicateError;this.pendingObservers=0;
+    this.waitDurations=[];this.sampleAfter=sampleAfter;this.predicateError=predicateError;this.pendingObservers=0;
     this.keyboard={down:async key=>{
       this.events.push('down:'+key);this.held.add(key);
       if(!this.sourceTimer)this.sourceTimer=setTimeout(()=>{
         this.captures.push({source_cursor:10,input_tick:10,local_port:0,poll_serial:1,
-          bytes:[0,0,this.held.has('d')?127:0,0,0,0,0,0,0,0,0]});
+          bytes:[this.held.has('Delete')?4:this.held.has('j')?1:0,0,this.held.has('d')?127:0,0,0,0,0,0,0,0,0]});
       },sampleAfter);
     },up:async key=>{this.events.push('up:'+key);this.held.delete(key);}};
   }
   locator(){return {focus:async()=>this.events.push('focus')};}
-  async waitForTimeout(ms){await pause(ms);}
+  async waitForTimeout(ms){this.waitDurations.push(ms);await pause(ms);}
   async evaluate(){return {phase:3,running:1};}
   async waitForFunction(predicate,arg,{timeout,polling}) {
     ++this.pendingObservers;this.events.push('observer-start');
@@ -100,4 +100,28 @@ test('actual route predicate refuses stale, malformed, other-port and nonaligned
     globalThis.meleeNetRuntimeLockstepHealth=()=>({peer:{protocol:{terminal:{kind:'disconnect'}}}});
     assert.throws(()=>observeDesiredSourcePad(observed.arg),/terminal/);
   }finally{globalThis.meleeNetRuntimeLockstepHealth=previous;}
+});
+
+
+test('P2 jump desired-X observer releases after first captured button rather than fixed full-hop hold',async()=>{
+  const page=new Page(),driver=createBrowserDriver(page,{timeoutMs:1000});
+  try {
+    const result=await driver.pressChord(['Delete'],{holdMs:167,releaseMs:0,
+      observeBeforeRelease:{...observed,arg:{inputFrom:10,port:0,expected:{button:0x0400}}}});
+    assert.deepEqual(result.bytes,[4,0,0,0,0,0,0,0,0,0,0]);
+    assert.equal(result.input_tick,10);
+    assert(!page.waitDurations.includes(167));
+    assert.equal(page.held.size,0);assert.equal(page.pendingObservers,0);
+    assert(page.events.indexOf('handle-disposed')<page.events.indexOf('up:Delete'));
+  }finally{driver.dispose();page.dispose();}
+});
+
+test('P1 jab default remains fixed hold and literal A sample',async()=>{
+  const page=new Page(),driver=createBrowserDriver(page,{timeoutMs:1000});
+  try {
+    await driver.pressChord(['j'],{holdMs:167,releaseMs:0});
+    assert.deepEqual(page.captures[0].bytes,[1,0,0,0,0,0,0,0,0,0,0]);
+    assert(page.waitDurations.includes(167));assert(!page.events.includes('observer-start'));
+    assert.equal(page.held.size,0);
+  }finally{driver.dispose();page.dispose();}
 });

@@ -842,7 +842,7 @@ export async function runA3LocalFullRoute({
     throw Error(label + ': literal 11-byte press/release rows did not settle');
   };
   const runObservedGameplayAction = async ({label, role, key, button,
-    targetMotions, beforeBaseline}) => {
+    targetMotions, beforeBaseline, observePress = false}) => {
     const record = {label, role, local_port: rolePort(role), key, expected_button: button,
       target_motion_ids: targetMotions, target_motion_id: null, max_source_ticks: 60,
       before: beforeBaseline.report,
@@ -858,14 +858,18 @@ export async function runA3LocalFullRoute({
       error => ({error}));
     try {
       // Hold for at least ten source periods, or the declared delay plus four,
-      // whichever is larger. This is a bounded button window, not a guarantee
+      // whichever is larger for the default jab. Jump may instead opt into
+      // first-source-capture release. This is a bounded button window, not a guarantee
       // against an arbitrarily long network wait or an extra action episode.
-      const holdSourceTicks = Math.max(ACTION_HOLD_MIN_SOURCE_TICKS, inputDelay + 4);
-      const holdMs = Math.ceil(holdSourceTicks * 1000 / SOURCE_TICK_RATE_HZ);
+      const holdSourceTicks = observePress ? null : Math.max(ACTION_HOLD_MIN_SOURCE_TICKS, inputDelay + 4);
+      const holdMs = observePress ? 0 : Math.ceil(holdSourceTicks * 1000 / SOURCE_TICK_RATE_HZ);
       record.press_hold_source_tick_budget = holdSourceTicks;
-      record.press_hold_ms = holdMs;
+      record.press_hold_ms = observePress ? null : holdMs;
+      if (observePress) record.press_release_policy =
+        'first captured desired PAD; early-release short-hop input hypothesis, not a native short-hop flag observation';
       const action = await pulse(role, [key], {expected: {button}, holdMs, releaseMs: 80,
-        label, retainSample: true});
+        label, retainSample: true, observePress});
+      if (observePress) record.press_observation_cap_ms = action.press_observation_cap_ms;
       const sample = action.observed_pad_sample;
       requireValue(sample && sample.input_tick === action.source_input_tick &&
         sample.local_port === rolePort(role) && sample.bytes?.length === 11,
@@ -1094,7 +1098,7 @@ export async function runA3LocalFullRoute({
   p1Jab.record.after_grounded_neutral_baseline = p1JabGrounded.report;
   const p2Jump = await runObservedGameplayAction({label: 'P2 keyboard jump',
     role: 'beta', key: 'Delete', button: 0x0400, targetMotions: [25, 26],
-    beforeBaseline: p1JabGrounded});
+    beforeBaseline: p1JabGrounded, observePress: true});
   const postJumpGrounded = await waitForGroundedNeutralBaseline(
     'post-jump grounded neutral [4,4] baseline',
     p2Jump.inputWindow.validated.neutral_release_input_tick + inputDelay + 1);
