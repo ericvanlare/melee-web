@@ -17,6 +17,8 @@ const MAX_WALKOFF_PULSES_PER_STOCK = 50;
 const WALKOFF_HOLD_MS = 250;
 const WALKOFF_RELEASE_MS = 25;
 const FIRST_USE_RENDERING_MESSAGE = 'Preparing first-use rendering...';
+const ACTION_HOLD_MIN_SOURCE_TICKS = 10;
+const SOURCE_TICK_RATE_HZ = 60;
 
 function requireValue(condition, message) {
   if (!condition) throw Error(message);
@@ -77,6 +79,80 @@ export function validateP2GameplayInputWindow({p2Rows, p1Rows, movementTick,
   assert(p1.every(isNeutralPadRow), 'P1 was not literally neutral across the P2 input window');
   return {movement_input_tick: movementTick, neutral_release_input_tick: releaseTick,
     p1_neutral_capture_count: p1.length, p2_direction: direction};
+}
+
+
+// Validate one bounded literal keyboard-button window and the other port's
+// simultaneous neutral records. This only checks captured source PAD rows.
+export function validateButtonGameplayInputWindow({actionRows, otherPortRows,
+  pressTick, releaseTick, port, button}) {
+  requireValue(Number.isSafeInteger(pressTick) && Number.isSafeInteger(releaseTick) &&
+    releaseTick > pressTick, 'Button input window has invalid source ticks');
+  requireValue((port === 0 || port === 1) && Number.isSafeInteger(button) &&
+    button > 0 && button <= 0xffff && (button & (button - 1)) === 0,
+  'Button input window has invalid local port or one-hot button mask');
+  const exactRows = (rows, expectedPort, label) => {
+    const window = rows.filter(row => row?.input_tick >= pressTick &&
+      row.input_tick <= releaseTick);
+    assert.equal(window.length, releaseTick - pressTick + 1,
+      label + ': literal button window has a missing or duplicate source tick');
+    for (let offset = 0; offset < window.length; offset++) {
+      const row = window[offset];
+      const tick = pressTick + offset;
+      assert.equal(row.input_tick, tick, label + ': input ticks are not in source order');
+      assert.equal(row.source_cursor, tick, label + ': input record is not source-cursor aligned');
+      assert.equal(row.local_port, expectedPort, label + ': local input port changed');
+      assert(Array.isArray(row.bytes) && row.bytes.length === 11 &&
+        row.bytes.every(value => Number.isInteger(value) && value >= 0 && value <= 255),
+      label + ': input row is not an exact 11-byte PAD record');
+    }
+    return window;
+  };
+  const active = exactRows(actionRows, port, 'Action port');
+  const other = exactRows(otherPortRows, 1 - port, 'Other port');
+  const buttons = row => (row.bytes[0] << 8) | row.bytes[1];
+  const heldRows = active.slice(0, -1);
+  assert(heldRows.some(row => buttons(row) === button),
+    'Button input window contains no literal held sample');
+  for (const row of heldRows) {
+    assert.equal(buttons(row), button,
+      'Requested button changed before the literal neutral release');
+    assert(row.bytes.slice(2).every(value => value === 0),
+      'Button press row contains an unexpected axis, trigger, or extra PAD value');
+  }
+  assert(isNeutralPadRow(active.at(-1)),
+    'Button release is not a literal all-zero 11-byte PAD row');
+  assert(other.every(isNeutralPadRow),
+    'Other port was not literally neutral across the button input window');
+  return {press_input_tick: pressTick, neutral_release_input_tick: releaseTick,
+    local_port: port, button, action_sample_count: active.length - 1,
+    other_port_neutral_count: other.length};
+}
+
+// Actor motion counts as a matched action only when both peer snapshots at
+// the caller's already-joined source cursor report the exact same source ID.
+export function matchPairedActorMotion(motions, targetMotions) {
+  if (!Array.isArray(motions) || motions.length !== 2 ||
+      !motions.every(Number.isSafeInteger) || !Array.isArray(targetMotions)) return null;
+  return motions[0] === motions[1] && targetMotions.includes(motions[0])
+    ? motions[0] : null;
+}
+
+// Before the press sample identifies its source window, retain distinct
+// gameplay/preparation observations at the same cursor. Network counters are
+// intentionally excluded: a wait poll alone must not evict a short action.
+export function retainPreStartActionPair(buffer, rows) {
+  requireValue(Array.isArray(buffer) && Array.isArray(rows) && rows.length === 2 &&
+    Number.isSafeInteger(rows[0]?.source_tick) &&
+    rows[0].source_tick === rows[1]?.source_tick,
+  'Pre-start action pair requires two actual common-source rows');
+  const key = JSON.stringify({source_tick: rows[0].source_tick,
+    peers: rows.map(row => ({phase: row.phase, running: row.running,
+      message: row.message, match: row.match}))});
+  if (buffer.some(entry => entry.key === key)) return false;
+  buffer.push({key, rows});
+  if (buffer.length > 128) buffer.shift();
+  return true;
 }
 
 function cssDoor(setup, port) {
@@ -230,7 +306,7 @@ export async function runA3LocalFullRoute({
     respawns: [], input_actions: [], terminal_handoff: null, results: null, returned_css: null,
     required_checksum_boundary: null,
     exclusions: ['no PAD/Gamepad input injection',
-      'one short P2 gameplay axis pulse and literal neutral release; no combat-coverage claim',
+      'one short P2 gameplay axis pulse, one P1 grounded jab, and one P2 jump with source motion evidence; no combat-coverage claim',
       'no forced stock/result or native match-state mutation',
       'no retail, public Worker, physical-input, pixel, PCM, or timing-equivalence claim'],
   };
@@ -276,7 +352,7 @@ export async function runA3LocalFullRoute({
     return samples.map(sample => sample.row);
   };
   let lastMatchedSourceCursor = -1;
-  const observeAtCommonSourceCursor = async observation => {
+  const observeAtCommonSourceCursor = async (observation, shouldStop = () => false) => {
     // Each acquisition begins from fresh peer samples. This prevents a common
     // row retained before a keyboard action from satisfying the next wait.
     const sourceCursorJoin = createSourceCursorJoin({retainedCursorsPerPeer: 8});
@@ -317,10 +393,11 @@ export async function runA3LocalFullRoute({
     const first = await Promise.all(['alpha', 'beta'].map(observePeerSample));
     first.forEach(retain);
     first.forEach(assertPeerSampleHealthy);
+    if (shouldStop()) return null;
     let rows = acceptPair();
     if (rows) return rows;
 
-    while (remaining() > 0) {
+    while (remaining() > 0 && !shouldStop()) {
       const role = sourceCursorJoin.laggingPeer();
       if (role) {
         const sample = await observePeerSample(role);
@@ -425,10 +502,6 @@ export async function runA3LocalFullRoute({
       keyboard_path: 'browser_driver.pressChord'};
     if (retainSample) {
       row.observed_pad_sample = {...sample, bytes: [...sample.bytes]};
-      if (role === 'beta' && route.p2_gameplay_prefix) {
-        route.p2_gameplay_prefix.input_window.movement = row.observed_pad_sample;
-        route.p2_gameplay_prefix.input_window.source_tick_range = [sample.input_tick, null];
-      }
     }
     route.input_actions.push(row);
     await waitForBothChecksumCompare(requiredBoundary, null);
@@ -480,6 +553,324 @@ export async function runA3LocalFullRoute({
     }
     throw Error('Literal P2 movement and neutral-release capture window did not settle');
   };
+
+  const readCommonNeutralInputs = async (sourceTick, minimumInputTick) => {
+    requireValue(Number.isSafeInteger(sourceTick) && Number.isSafeInteger(minimumInputTick),
+      'Grounded-neutral baseline is missing a source/input boundary');
+    const states = await Promise.all(['alpha', 'beta'].map(role => readRoomState(instances[role])));
+    states.forEach((state, index) => assertHealthy(state, index === 0 ? 'alpha' : 'beta'));
+    const counts = states.map(state => state.owner_health?.peer?.localInputCapture?.captured_count);
+    requireValue(counts.every(Number.isSafeInteger) && counts.every(count => count > 0),
+      'Grounded-neutral baseline local-input counts are unavailable');
+    const commonTick = Math.min(sourceTick, counts[0] - 1, counts[1] - 1);
+    if (commonTick < minimumInputTick || sourceTick - commonTick > 1) return null;
+    const snapshots = await Promise.all(['alpha', 'beta'].map(role =>
+      readPeerSnapshot(instances[role], commonTick)));
+    snapshots.forEach((snapshot, index) => {
+      const role = index === 0 ? 'alpha' : 'beta';
+      requireValue(snapshot.runtime_error == null &&
+        snapshot.health?.failure == null && snapshot.health?.peer?.failure == null &&
+        snapshot.native_status?.local_capture_failure == null,
+      role + ': grounded-neutral baseline observed a runtime/input-capture failure');
+    });
+    const localRows = snapshots.map((snapshot, index) => {
+      const rows = snapshot.health?.peer?.localInputCapture?.captures_since;
+      requireValue(Array.isArray(rows),
+        (index === 0 ? 'alpha' : 'beta') + ': local PAD suffix is unavailable');
+      const row = rows.find(sample => sample.input_tick === commonTick &&
+        sample.local_port === rolePort(index === 0 ? 'alpha' : 'beta'));
+      requireValue(row && row.source_cursor === commonTick &&
+        Array.isArray(row.bytes) && row.bytes.length === 11,
+      (index === 0 ? 'alpha' : 'beta') + ': common-source neutral PAD row is missing');
+      return {...row, bytes: [...row.bytes]};
+    });
+    if (!localRows.every(isNeutralPadRow)) return null;
+    return {input_tick: commonTick, alpha: localRows[0], beta: localRows[1]};
+  };
+  const compactGroundedBaseline = (rows, matches, localInputs, label) => ({
+    label, source_tick: rows[0].source_tick,
+    peers: matches.map((match, index) => ({peer: index === 0 ? 'alpha' : 'beta',
+      frame: match.frame, players: match.players.map(player => ({
+        source_port: player.source_port, stocks: player.stocks,
+        motion: player.motion, groundAir: player.groundAir,
+        damage_percent: player.damage_percent, x: player.x, y: player.y}))})),
+    local_input_tick: localInputs.input_tick,
+    local_inputs: {alpha: localInputs.alpha, beta: localInputs.beta},
+  });
+  const waitForGroundedNeutralBaseline = async (label, minimumInputTick) => {
+    while (remaining() > 0) {
+      const rows = await waitBoth(label + ' at a common source cursor', candidates =>
+        sourceAligned(candidates) && candidates.every(row => row.phase === 7 &&
+          row.running === 1 && row.match?.ready === true &&
+          row.match?.players?.length === 2 &&
+          row.match.players.every(player => player.stocks === 4 &&
+            player.motion === 14 && player.groundAir === 0)),
+      2, {joinSourceCursor: true});
+      const matches = rows.map((row, index) => checkMatchIdentity(row,
+        (index === 0 ? 'alpha ' : 'beta ') + label));
+      const localInputs = await readCommonNeutralInputs(rows[0].source_tick, minimumInputTick);
+      if (localInputs) {
+        const reportRow = compactGroundedBaseline(rows, matches, localInputs, label);
+        route.action_prefix.baselines.push(reportRow);
+        return {rows, matches, localInputs, report: reportRow};
+      }
+      await alpha.page.waitForTimeout(Math.min(2, remaining()));
+    }
+    throw Error(label + ': grounded neutral [4,4] baseline did not settle before the route deadline');
+  };
+  const createActionObservation = ({label, role, targetMotions, record}) => {
+    const actor = rolePort(role);
+    let pendingBeforeStart = [];
+    let lastRetainedTick = -1;
+    let lastRenderWaitKey = null;
+    let actionStartTick = null;
+    let stopped = false;
+    let cancelled = false;
+    const joinObservation = {label, source_cursor_join: {
+      samples_by_peer: {alpha: 0, beta: 0}, last_by_peer: {}, recent: [], last_pair: null,
+    }};
+    const inspectPair = async rows => {
+      if (!sourceAligned(rows)) throw Error(label + ': action observer lost common source alignment');
+      const tick = rows[0].source_tick;
+      if (actionStartTick === null) {
+        retainPreStartActionPair(pendingBeforeStart, rows);
+        return;
+      }
+      if (tick < actionStartTick || tick <= lastRetainedTick) return;
+      const endExclusive = actionStartTick + 60;
+      if (tick >= endExclusive) {
+        stopped = true;
+        return;
+      }
+      const states = rows.map((row, index) => {
+        const peer = index === 0 ? 'alpha' : 'beta';
+        // Use the route's existing exact first-use render-wait classifier.
+        // It accepts only the healthy authored wait and keeps all other stopped,
+        // paused, terminal, and runtime-error states fail-closed.
+        const classified = classifyStockObservation(row, peer + ' ' + label);
+        assert.deepEqual(classified.match.players.map(player => player.stocks), [4, 4],
+          label + ': source stock count changed inside the bounded action prefix');
+        return {match: classified.match, renderWait: classified.wait === 'first-use-rendering'};
+      });
+      const matches = states.map(state => state.match);
+      const actorMotions = matches.map(match => match.players[actor].motion);
+      const bothActive = states.every(state => !state.renderWait);
+      const renderWaitKey = bothActive ? null : JSON.stringify({source_tick: tick,
+        peers: states.map((state, index) => ({peer: index === 0 ? 'alpha' : 'beta',
+          waiting: state.renderWait, frame: state.match.frame, message: rows[index].message,
+          players: state.match.players.map(player => [player.motion, player.groundAir,
+            player.stocks, player.damage_percent, player.x, player.y])}))});
+      // A first-use render wait does not consume this native source cursor.
+      // Retain each distinct wait state once, but permit the active row at the
+      // same cursor to be observed later instead of losing it to deduplication.
+      if (renderWaitKey !== null && renderWaitKey === lastRenderWaitKey) return;
+      const pair = {source_tick: tick, peers: matches.map((match, index) => ({
+        peer: index === 0 ? 'alpha' : 'beta', frame: match.frame,
+        observation_state: states[index].renderWait ? 'first-use-rendering-wait' : 'active-match',
+        message: rows[index].message ?? null,
+        ready: match.ready, paused: match.paused, ending: match.ending,
+        complete: match.complete, outcome: match.outcome,
+        players: match.players.map(player => ({
+          source_port: player.source_port, stocks: player.stocks,
+          motion: player.motion, groundAir: player.groundAir,
+          damage_percent: player.damage_percent, x: player.x, y: player.y}))})),
+        actor_motion_ids: actorMotions, actor_motion_agreement: actorMotions[0] === actorMotions[1]};
+      record.observed_source_pairs.push(pair);
+      if (!bothActive) {
+        lastRenderWaitKey = renderWaitKey;
+        for (const [index, state] of states.entries()) {
+          if (state.renderWait) record.first_use_render_wait_source_ticks.push({
+            peer: index === 0 ? 'alpha' : 'beta', source_tick: tick});
+        }
+        return;
+      }
+      lastRenderWaitKey = null;
+      lastRetainedTick = tick;
+      const pairedTargetMotion = bothActive
+        ? matchPairedActorMotion(actorMotions, targetMotions) : null;
+      if (record.target_observed_at_source_tick === null && pairedTargetMotion !== null) {
+        record.target_observed_at_source_tick = tick;
+        record.target_motion_id = pairedTargetMotion;
+      }
+      if (bothActive && actorMotions[0] === actorMotions[1] && actorMotions[0] === 24)
+        record.knee_bend_source_ticks.push(tick);
+      const groundedWait = bothActive && matches.every(match => match.players.every(player =>
+        player.motion === 14 && player.groundAir === 0));
+      if (record.target_observed_at_source_tick !== null && groundedWait) {
+        record.grounded_return_source_tick = tick;
+        stopped = true;
+      }
+    };
+    return {
+      startAt(tick) {
+        requireValue(Number.isSafeInteger(tick),
+          label + ': source-aligned press sample is unavailable');
+        actionStartTick = tick;
+        record.action_source_tick_start = tick;
+        record.observation_source_tick_range = [tick, tick + 59];
+      },
+      cancel() {
+        cancelled = true;
+        stopped = true;
+        record.observer_join = joinObservation.source_cursor_join;
+      },
+      async run() {
+        try {
+          while (!stopped && !cancelled && remaining() > 0) {
+            if (actionStartTick !== null && pendingBeforeStart.length) {
+              const buffered = pendingBeforeStart;
+              pendingBeforeStart = [];
+              for (const {rows: pair} of buffered) {
+                await inspectPair(pair);
+                if (stopped) break;
+              }
+              if (stopped) break;
+            }
+            const rows = await observeAtCommonSourceCursor(joinObservation, () => cancelled);
+            if (!rows) break;
+            await inspectPair(rows);
+          }
+          if (cancelled) {
+            record.observer_join = joinObservation.source_cursor_join;
+            return {cancelled: true};
+          }
+          requireValue(actionStartTick !== null,
+            label + ': action input sample did not establish the source-tick window');
+          requireValue(record.target_observed_at_source_tick !== null,
+            label + ': target motion was not observed on both peers within 60 source ticks');
+          requireValue(record.grounded_return_source_tick !== null,
+            label + ': both players did not return to grounded Wait within 60 source ticks');
+          record.observer_join = joinObservation.source_cursor_join;
+          return {target_source_tick: record.target_observed_at_source_tick,
+            grounded_return_source_tick: record.grounded_return_source_tick,
+            observation_source_tick_range: record.observation_source_tick_range};
+        } catch (error) {
+          record.observer_join = joinObservation.source_cursor_join;
+          throw error;
+        }
+      },
+    };
+  };
+  const waitForButtonInputWindow = async ({label, role, pressTick, button, retainEvidence}) => {
+    const port = rolePort(role);
+    const otherRole = role === 'alpha' ? 'beta' : 'alpha';
+    const copyRows = rows => rows.map(row => ({...row,
+      bytes: Array.isArray(row?.bytes) ? [...row.bytes] : row?.bytes ?? null}));
+    const deadline = Date.now() + Math.min(1500, remaining());
+    while (Date.now() < deadline) {
+      const counts = await Promise.all([role, otherRole].map(async currentRole => {
+        const state = await readRoomState(instances[currentRole]);
+        assertHealthy(state, currentRole);
+        return state.owner_health?.peer?.localInputCapture?.captured_count;
+      }));
+      requireValue(counts.every(Number.isSafeInteger),
+        label + ': live input capture counts are unavailable');
+      const [actionReadback, otherReadback] = await Promise.all([
+        readPeerSnapshot(instances[role], Math.min(pressTick, counts[0])),
+        readPeerSnapshot(instances[otherRole], Math.min(pressTick, counts[1])),
+      ]);
+      requireValue(actionReadback.runtime_error == null && otherReadback.runtime_error == null &&
+        actionReadback.health?.failure == null && otherReadback.health?.failure == null &&
+        actionReadback.health?.peer?.failure == null && otherReadback.health?.peer?.failure == null &&
+        actionReadback.native_status?.local_capture_failure == null &&
+        otherReadback.native_status?.local_capture_failure == null,
+      label + ': button-window readback observed a runtime-owner failure');
+      const actionRows = actionReadback.health?.peer?.localInputCapture?.captures_since;
+      const otherRows = otherReadback.health?.peer?.localInputCapture?.captures_since;
+      requireValue(Array.isArray(actionRows) && Array.isArray(otherRows),
+        label + ': literal local input suffix is unavailable');
+      const actionSuffix = actionRows.filter(row => row?.input_tick >= pressTick);
+      const release = actionSuffix.find(row => row?.input_tick > pressTick &&
+        isNeutralPadRow(row));
+      const observedEnd = release?.input_tick ?? actionSuffix.at(-1)?.input_tick ?? pressTick;
+      const partialActionRows = actionSuffix.filter(row => row?.input_tick <= observedEnd);
+      const partialOtherRows = otherRows.filter(row => row?.input_tick >= pressTick &&
+        row?.input_tick <= observedEnd);
+      retainEvidence?.({status: release ? 'release-observed' : 'collecting',
+        press_input_tick: pressTick, neutral_release_input_tick: release?.input_tick ?? null,
+        action_port_literal_rows: copyRows(partialActionRows),
+        other_port_literal_rows: copyRows(partialOtherRows)});
+      if (release && otherRows.some(row => row.input_tick === release.input_tick)) {
+        const actionWindow = actionSuffix.filter(row => row?.input_tick <= release.input_tick);
+        const otherWindow = otherRows.filter(row => row?.input_tick >= pressTick &&
+          row?.input_tick <= release.input_tick);
+        const validated = validateButtonGameplayInputWindow({
+          actionRows: actionWindow, otherPortRows: otherWindow,
+          pressTick, releaseTick: release.input_tick, port, button});
+        const result = {validated, actionRows: copyRows(actionWindow),
+          otherPortRows: copyRows(otherWindow)};
+        retainEvidence?.({status: 'validated', press_input_tick: pressTick,
+          neutral_release_input_tick: release.input_tick, validated,
+          action_port_literal_rows: result.actionRows, other_port_literal_rows: result.otherPortRows});
+        return result;
+      }
+      await instances[role].page.waitForTimeout(Math.min(10, Math.max(1, deadline - Date.now())));
+    }
+    throw Error(label + ': literal 11-byte press/release rows did not settle');
+  };
+  const runObservedGameplayAction = async ({label, role, key, button,
+    targetMotions, beforeBaseline}) => {
+    const record = {label, role, local_port: rolePort(role), key, expected_button: button,
+      target_motion_ids: targetMotions, target_motion_id: null, max_source_ticks: 60,
+      before: beforeBaseline.report,
+      press_input_tick: null, action_source_tick_start: null,
+      action_source_tick_start_basis: 'input_tick + declared inputDelay + 1; native status cursor is next frame after after_step checksum/increment',
+      press_hold_source_tick_budget: null, press_hold_ms: null,
+      observation_source_tick_range: null, target_observed_at_source_tick: null,
+      grounded_return_source_tick: null, knee_bend_source_ticks: [],
+      first_use_render_wait_source_ticks: [], observed_source_pairs: [], input_window: null};
+    route.action_prefix.actions.push(record);
+    const observer = createActionObservation({label, role, targetMotions, record});
+    const observerOutcome = observer.run().then(value => ({value}),
+      error => ({error}));
+    try {
+      // Hold for at least ten source periods, or the declared delay plus four,
+      // whichever is larger. This is a bounded button window, not a guarantee
+      // against an arbitrarily long network wait or an extra action episode.
+      const holdSourceTicks = Math.max(ACTION_HOLD_MIN_SOURCE_TICKS, inputDelay + 4);
+      const holdMs = Math.ceil(holdSourceTicks * 1000 / SOURCE_TICK_RATE_HZ);
+      record.press_hold_source_tick_budget = holdSourceTicks;
+      record.press_hold_ms = holdMs;
+      const action = await pulse(role, [key], {expected: {button}, holdMs, releaseMs: 80,
+        label, retainSample: true});
+      const sample = action.observed_pad_sample;
+      requireValue(sample && sample.input_tick === action.source_input_tick &&
+        sample.local_port === rolePort(role) && sample.bytes?.length === 11,
+      label + ': keyboard action did not retain its literal source PAD row');
+      record.press_input_tick = sample.input_tick;
+      observer.startAt(sample.input_tick + inputDelay + 1);
+      const inputWindow = await waitForButtonInputWindow({label, role,
+        pressTick: sample.input_tick, button,
+        retainEvidence: evidence => { record.input_window = evidence; }});
+      record.input_window = {status: 'validated', validated: inputWindow.validated,
+        action_port_literal_rows: inputWindow.actionRows,
+        other_port_literal_rows: inputWindow.otherPortRows};
+      requireValue(JSON.stringify(inputWindow.actionRows[0].bytes) ===
+        JSON.stringify(sample.bytes),
+      label + ': first literal input-window row differs from the action PAD sample');
+      const observed = await observerOutcome;
+      if (observed.error) {
+        record.observer_error = String(observed.error?.stack || observed.error);
+        throw observed.error;
+      }
+      const releaseBoundary = inputWindow.validated.neutral_release_input_tick + inputDelay + 1;
+      await waitForBothChecksumCompare(releaseBoundary, null);
+      route.required_checksum_boundary = Math.max(route.required_checksum_boundary || 0,
+        releaseBoundary);
+      record.release_checksum_boundary_required = releaseBoundary;
+      record.release_checksum_boundary_reached = true;
+      record.checksum_boundary_required = action.checksum_boundary_required;
+      record.checksum_boundary_reached = action.checksum_boundary_reached;
+      record.after_action = observed.value;
+      return {record, action, observation: observed.value, inputWindow};
+    } finally {
+      // Every error after collector start cancels and joins it. The input window
+      // is retained progressively above before motion-outcome rejection.
+      observer.cancel();
+      await observerOutcome;
+    }
+  };
+
   const screenshotPair = async name => {
     const [a, b] = await Promise.all([
       captureScreenshot(alpha, `full-route-${name}-alpha.png`),
@@ -651,17 +1042,45 @@ export async function runA3LocalFullRoute({
         stocks: match.players.map(player => player.stocks)})),
       p2_position_delta_by_peer: p2PositionDeltas};
 
+
+  // Preserve the P2 horizontal pulse witness above, then add one bounded
+  // grounded P1 jab and one natural P2 jump using the same live keyboard path.
+  route.action_prefix = {scope: 'one grounded P1 jab and one P2 jump with matched source motion evidence; no combat-coverage claim',
+    source_observer: '_melee_web_native_menu_match_observe via fresh common-source peer rows',
+    motion_ids: {ftCo_MS_Wait: 14, ftCo_MS_KneeBend: 24,
+      ftCo_MS_JumpF: 25, ftCo_MS_JumpB: 26, ftCo_MS_Attack11: 44},
+    max_source_ticks_per_action: 60, baselines: [], actions: []};
+  const actionStartBaseline = await waitForGroundedNeutralBaseline(
+    'pre-jab grounded neutral [4,4] baseline', p2RequiredBoundary);
+  const p1Jab = await runObservedGameplayAction({label: 'P1 grounded keyboard jab',
+    role: 'alpha', key: 'j', button: 0x0100, targetMotions: [44],
+    beforeBaseline: actionStartBaseline});
+  const p1JabGrounded = await waitForGroundedNeutralBaseline(
+    'post-jab grounded neutral [4,4] baseline',
+    p1Jab.inputWindow.validated.neutral_release_input_tick + inputDelay + 1);
+  p1Jab.record.after_grounded_neutral_baseline = p1JabGrounded.report;
+  const p2Jump = await runObservedGameplayAction({label: 'P2 keyboard jump',
+    role: 'beta', key: 'Delete', button: 0x0400, targetMotions: [25, 26],
+    beforeBaseline: p1JabGrounded});
+  const postJumpGrounded = await waitForGroundedNeutralBaseline(
+    'post-jump grounded neutral [4,4] baseline',
+    p2Jump.inputWindow.validated.neutral_release_input_tick + inputDelay + 1);
+  p2Jump.record.after_grounded_neutral_baseline = postJumpGrounded.report;
+  route.action_prefix.walkoff_baseline = postJumpGrounded.report;
+  const walkoffBaseRows = postJumpGrounded.rows;
+  const walkoffBaseMatches = postJumpGrounded.matches;
+
   // P1 walk-off uses one reconciler at common source ticks before and after
   // each pulse. A natural stock decrement may occur between pulses, so
   // observations accept only the tracked count or
   // exactly one fewer; a detected loss is recorded once and must reach the
   // native grounded-respawn observation before another keyboard action.
   let stocks = 4;
-  const firstPlayer = p2AfterMatches[0].players[0];
+  const firstPlayer = walkoffBaseMatches[0].players[0];
   requireValue(Number.isFinite(firstPlayer.x), 'P1 source position is unavailable at match start');
   let outwardKey = firstPlayer.x <= 0 ? 'a' : 'd';
-  let lastStableMatches = p2AfterMatches;
-  let lastStableRows = p2AfterRows;
+  let lastStableMatches = walkoffBaseMatches;
+  let lastStableRows = walkoffBaseRows;
   let lastCompletedAction = null;
   let attemptsForCurrentStock = 0;
   const recordTerminalHandoff = (rows, states, label) => {
