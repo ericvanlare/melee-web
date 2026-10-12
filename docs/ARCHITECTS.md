@@ -101,6 +101,15 @@ the existing weaker-fighter status entry.
   resume Track A when service facts change; do not repeat unavailable provider
   queries or request unavailable owner testing.
 
+- **2026-10-11, owner return:** The owner resumed oversight and requested removal
+  of the recurring automation; it is deleted. The next instruction authorized
+  one bounded original Stadium reference attempt, with a first-failure stop.
+  The attempted recording failed and is checkpointed in the
+  [same Stadium boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md)
+  after independent review. No retry or broader autonomous campaign is running.
+  The next proposed step is a small retained-fragment/source-authority reduction,
+  keeping the lifetime reference and C3 acceptance open.
+
 **Links:** [Owner-requested execution change](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6112686789),
 [A3 #288](https://github.com/ericvanlare/melee-web/issues/288),
 [Stadium C3 #251](https://github.com/ericvanlare/melee-web/issues/251),

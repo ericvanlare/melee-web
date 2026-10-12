@@ -90,11 +90,12 @@ hypothesis.
 
 The bounded original Zelda-to-Sheik owner-prefix milestone for [#304](https://github.com/ericvanlare/melee-web/issues/304)
 is now recorded in the [existing weaker-fighter status](status/2026-10-09-weaker-fighter-comparison-lineup.md);
-the strict two-human browser comparison remains separate. After that milestone,
-the next shared-capture work returns to Stadium C3's constructor-owner
-prerequisite under [#251](https://github.com/ericvanlare/melee-web/issues/251).
-The existing [Stadium CSS/SSS preparation status](status/2026-10-06-pokemon-stadium-c1a-css-sss-preparation.md)
-remains the route evidence; current C3 receipts and prerequisites stay in #251.
+the strict two-human browser comparison remains separate. Stadium C3 is now
+checkpointed under [#251](https://github.com/ericvanlare/melee-web/issues/251),
+with its constructor observation and failed longer reference in the
+[existing Stadium boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md).
+Next reduce the retained controller-poll/draw interleave against original source
+authority before repairing the reader or scheduling another capture.
 Public #288 work resumes when the deployed service facts change. See the
 [execution update](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6112686789).
 
@@ -152,10 +153,11 @@ and integrated for [issue #304](https://github.com/ericvanlare/melee-web/issues/
 the strict two-human browser comparison remains separate
 ([scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md)).
 Stadium's matched-Setup C/F prerequisite also has a
-[scoped result](status/2026-10-07-pokemon-stadium-profile-oninit.md). Next extend
-the original reference through the idle lifetime using actual consumed inputs
-and source tick/draw ordering. Public #288 work resumes when the deployed
-service facts change.
+[scoped result](status/2026-10-07-pokemon-stadium-profile-oninit.md). Its longer
+original recording stopped at a reader ordering check. First reduce that
+retained failure, preserving actual consumed inputs and source tick/draw order;
+the original idle reference remains a prerequisite. Public #288 work resumes
+when the deployed service facts change.
 
 The next Stadium milestone is [C3 idle in-match lifetime #251](https://github.com/ericvanlare/melee-web/issues/251),
 with its remaining prerequisites counted and tracked inside that issue and PR.
