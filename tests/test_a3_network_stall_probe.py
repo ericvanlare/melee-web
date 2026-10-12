@@ -19,7 +19,7 @@ class A3NetworkStallProbeTests(unittest.TestCase):
              str(candidate_tests / "net_test_tcp_proxy_controlled_faults.test.mjs")],
             cwd=ROOT, capture_output=True, text=True, timeout=20)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("pass 15", result.stdout)
+        self.assertIn("pass 18", result.stdout)
         self.assertIn("fail 0", result.stdout)
 
 

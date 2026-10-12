@@ -119,6 +119,31 @@ function findReleaseProof(snapshot, connectionId, receipt) {
   } catch {
     return null;
   }
+  // New proxy snapshots retain a bounded fault-specific witness even after
+  // the ordinary diagnostic prefix fills. Do not fall back if it is malformed.
+  if (Array.isArray(snapshot?.controlledStallProofs)) {
+    const matches = snapshot.controlledStallProofs.filter(row =>
+      row?.connectionId === connectionId && row.direction === POST_CSS_STALL_PROBE.direction);
+    if (matches.length !== 1) return null;
+    const proof = matches[0];
+    if (proof.activatedNs !== receipt.activatedNs || proof.nextReleaseNs !== receipt.nextReleaseNs)
+      return null;
+    const enqueue = proof.enqueue, release = proof.release;
+    if (enqueue?.event !== 'enqueue' || release?.event !== 'release' ||
+        enqueue.connectionId !== connectionId || release.connectionId !== connectionId ||
+        enqueue.direction !== POST_CSS_STALL_PROBE.direction ||
+        release.direction !== POST_CSS_STALL_PROBE.direction ||
+        !Number.isSafeInteger(enqueue.sequence) || enqueue.sequence !== release.sequence ||
+        !Number.isSafeInteger(enqueue.bytes) || enqueue.bytes <= 0 || enqueue.bytes !== release.bytes)
+      return null;
+    try {
+      if (BigInt(enqueue.enqueuedNs) < activationNs ||
+          BigInt(enqueue.scheduledReleaseNs) < nextReleaseNs ||
+          BigInt(release.scheduledReleaseNs) < nextReleaseNs ||
+          BigInt(release.writeCallbackNs) < nextReleaseNs) return null;
+    } catch { return null; }
+    return {enqueue, release};
+  }
   const events = snapshot?.diagnostics?.events;
   if (!Array.isArray(events)) return null;
   const enqueues = events.filter(row => row?.event === 'enqueue' &&
@@ -248,6 +273,11 @@ export function validatePostCssStallEvidence(evidence) {
   } catch (error) {
     if (String(error?.message || error).startsWith('Post-CSS stall probe:')) throw error;
     requireValue(false, 'stall release timestamps are malformed');
+  }
+  if (Array.isArray(evidence.proxy_after_stall?.controlledStallProofs)) {
+    const retained = findReleaseProof(evidence.proxy_after_stall, evidence.selected_connection_id, receipt);
+    requireValue(retained !== null && JSON.stringify(retained) === JSON.stringify(evidence.release_proof),
+      'release proof differs from the retained fault-specific proxy witness');
   }
   return {policy: 'controlled-post-css-stall-exercised', held_span_ms: window.span_ms,
     queued_bytes_peak: window.queued_bytes_peak,

@@ -195,3 +195,71 @@ test('a controlled stall does not recall a write whose real callback is held by 
     await run.close();
   }
 });
+
+
+test('late stall retains one real enqueue/release after the diagnostic prefix saturates', async () => {
+  const run = await fixture({eventLimit: 1});
+  try {
+    const a = await run.client();
+    const before = run.proxy.snapshot();
+    assert.equal(before.diagnostics.events.length, 1);
+    assert(before.diagnostics.eventsOmitted > 0);
+    const receipt = run.proxy.stallConnection(a.id, 'clientToWorker', 120);
+    assert.equal(run.proxy.snapshot().controlledStallProofs[0].enqueue, null);
+    a.socket.write('late-held');
+    await until(() => run.proxy.snapshot().controlledStallProofs[0].enqueue !== null, 'retained late enqueue');
+    const pending = run.proxy.snapshot().controlledStallProofs[0];
+    assert.equal(pending.release, null, 'enqueue does not fabricate release');
+    assert.equal(a.bytes().toString(), 'hello');
+    // Caller mutation of a snapshot cannot forge future proxy evidence.
+    pending.enqueue.sequence = -1;
+    await until(() => a.bytes().toString() === 'hellolate-held', 'actual release and echo');
+    a.socket.end(); await a.closed;
+    const final = await run.close();
+    const [proof] = final.controlledStallProofs;
+    assert.equal(final.controlledStallProofs.length, 1);
+    assert.equal(proof.connectionId, a.id);
+    assert.equal(proof.activatedNs, receipt.activatedNs);
+    assert.equal(proof.nextReleaseNs, receipt.nextReleaseNs);
+    assert.equal(proof.enqueue.sequence, proof.release.sequence);
+    assert(proof.enqueue.sequence >= 0);
+    assert.equal(proof.enqueue.bytes, Buffer.byteLength('late-held'));
+    assert.equal(proof.enqueue.bytes, proof.release.bytes);
+    assert(BigInt(proof.enqueue.enqueuedNs) >= BigInt(receipt.activatedNs));
+    assert(BigInt(proof.release.writeCallbackNs) >= BigInt(receipt.nextReleaseNs));
+    assert.equal(final.diagnostics.events.length, 1);
+    assert.equal(final.dataPathPass, true);
+  } finally { await run.close(); }
+});
+
+
+test('early timer callbacks cannot release real socket bytes before monotonic eligibility', async () => {
+  const run = await fixture({eventLimit: 1});
+  const originalSetTimeout = globalThis.setTimeout;
+  let earlyWakeups = 0;
+  try {
+    const a = await run.client();
+    globalThis.setTimeout = (callback, delay, ...args) => {
+      if (delay > 2) {
+        earlyWakeups++;
+        return originalSetTimeout(callback, 1, ...args);
+      }
+      return originalSetTimeout(callback, delay, ...args);
+    };
+    const receipt = run.proxy.stallConnection(a.id, 'clientToWorker', 80);
+    a.socket.write('early-timer-control');
+    await until(() => a.bytes().toString() === 'helloearly-timer-control', 'eligible write echoed');
+    globalThis.setTimeout = originalSetTimeout;
+    a.socket.end(); await a.closed;
+    const final = await run.close();
+    assert(earlyWakeups > 0, 'fixture delivered actual timer callbacks before requested delay');
+    const proof = final.controlledStallProofs[0];
+    assert(BigInt(proof.release.writeCallbackNs) >= BigInt(receipt.nextReleaseNs));
+    assert(BigInt(proof.release.writeCallbackNs) >= BigInt(proof.release.scheduledReleaseNs));
+    assert.equal(final.dataPathPass, true);
+    assert.equal(final.directions.clientToWorker.bytesDroppedOnStop, 0);
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+    await run.close();
+  }
+});

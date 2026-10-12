@@ -194,3 +194,24 @@ test('actual probe loop accepts pre-wait and recovery and actual writeCallbackNs
   assert.equal(evidence.release_proof.release.writeCallbackNs !== undefined, true);
   assert.equal(evidence.release_proof.release.releasedNs, undefined);
 });
+
+
+test('fault-specific witness survives missing event diagnostics and refuses missing/mismatched release', () => {
+  const good = completePolicyFixture();
+  good.proxy_after_stall.controlledStallProofs = [{
+    connectionId: 5, direction: 'clientToWorker',
+    activatedNs: good.stall_receipt.activatedNs, nextReleaseNs: good.stall_receipt.nextReleaseNs,
+    ...structuredClone(good.release_proof)}];
+  good.proxy_after_stall.diagnostics.events = [];
+  assert.equal(validatePostCssStallEvidence(good).held_span_ms, 120);
+  for (const mutate of [
+    evidence => { evidence.proxy_after_stall.controlledStallProofs = []; },
+    evidence => { evidence.proxy_after_stall.controlledStallProofs[0].release = null; },
+    evidence => { evidence.proxy_after_stall.controlledStallProofs[0].release.sequence++; },
+    evidence => { evidence.proxy_after_stall.controlledStallProofs[0].activatedNs = '1'; },
+    evidence => { evidence.proxy_after_stall.controlledStallProofs[0].release.writeCallbackNs = '100'; },
+  ]) {
+    const evidence = structuredClone(good); mutate(evidence);
+    assert.throws(() => validatePostCssStallEvidence(evidence), /fault-specific proxy witness/);
+  }
+});
