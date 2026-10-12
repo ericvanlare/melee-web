@@ -177,6 +177,7 @@ let workerPassed = false;
 async function sourceIdentity() {
   const status = gitValue(['status', '--porcelain', '--untracked-files=all']);
   const allowedHarnessFiles = ['scripts/a3_local_room_keyboard_browser.mjs',
+    'scripts/net_session_instance.mjs', 'scripts/a3_data_package_diagnostics.mjs', 'tests/a3_data_package_diagnostics.test.mjs',
     'scripts/a3_expected_fault_auditor.py', 'scripts/a3_public_relay_preflight.mjs',
     'tests/test_a3_expected_fault_auditor.py', 'tests/test_a3_public_relay_preflight.py',
     'scripts/a3_local_room_full_route.mjs', 'scripts/a3_checksum_wait_diagnostics.mjs',
@@ -629,6 +630,10 @@ async function runControlledCutProbe() {
     proxyBefore.lifecycle?.cutConnections === 0 && proxyBefore.lifecycle?.failedConnections === 0 &&
     proxyBefore.diagnostics?.integrityFailure === false,
     'Controlled cut requires a fault-free proxy before activation');
+  for (const role of ['alpha', 'beta']) {
+    report.profiles[role].data_package_diagnostics_before_cut =
+      await instances[role].readDataPackageDiagnostics();
+  }
   const prePeers = {
     alpha: await readPeerSnapshot(instances.alpha),
     beta: await readPeerSnapshot(instances.beta),
@@ -764,6 +769,7 @@ try {
     timeoutMs: Math.min(120000, remaining()),
     deadline: finalDeadline,
     runtimeOwned: true,
+    dataPackageDiagnostics: values['controlled-cut-after-css'] === true,
     syntheticGamepad: null,
   });
   instances.alpha = await openRole('alpha');
@@ -1057,6 +1063,9 @@ try {
       report.leave_and_cleanup[role + '_context_closed'] = instance.closed === true;
       firstError(role + ' Chrome context cleanup failed: ' + errorText(error));
     } finally {
+      if (values['controlled-cut-after-css'])
+        report.leave_and_cleanup[role + '_data_package_diagnostics_after_context_close'] =
+          instance.dataPackageDiagnostics ?? null;
       const nativeCleanup = instance.nativeNetworkCleanup ?? null;
       report.leave_and_cleanup[role + '_native_network_cleanup'] = nativeCleanup;
       if (workerPassed) {

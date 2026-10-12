@@ -7,6 +7,7 @@
  * (recorded in `timingResumes`).
  */
 import fs from 'node:fs/promises';
+import {observeDataPackageLifecycle, readInitialPipelineSeedInPage} from './a3_data_package_diagnostics.mjs';
 import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {browserLaunchOptions} from './browser_tools.mjs';
@@ -374,13 +375,13 @@ export async function closePageNativeNetworkOwnership() {
 
 export async function openNetInstance({chromium, launchOptions, url, disc, userDataDir, label,
   throttle = 1, arenaFill = -1, timeoutMs = 120000, deadline = Infinity, peerModuleHashes = null,
-  syntheticGamepad = null, runtimeOwned = false}) {
+  syntheticGamepad = null, runtimeOwned = false, dataPackageDiagnostics = false}) {
   await fs.mkdir(path.resolve(userDataDir), {recursive: true});
   const context = await chromium.launchPersistentContext(path.resolve(userDataDir), {
     ...browserLaunchOptions(launchOptions, {timeout: timeoutMs}),
     viewport: {width: 900, height: 700}, deviceScaleFactor: 1,
   });
-  let page, driver, instance, wasmResponses, nativeNetworkCleanup = null,
+  let page, driver, instance, wasmResponses, dataPackages, nativeNetworkCleanup = null,
     closed = false, closeComplete = false, closeOperation = null;
   const close = () => {
     if (closeOperation) return closeOperation;
@@ -410,6 +411,11 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
         } else addFailure(error);
       }
       if (instance) instance.closed = closeComplete;
+      if (dataPackages && instance) {
+        try { instance.dataPackageDiagnostics = await bounded(() => dataPackages.finish()); }
+        catch (error) { instance.dataPackageDiagnostics = {...dataPackages.snapshot(),
+          finish_error: String(error?.stack || error)}; }
+      }
       if (failures.length) throw new AggregateError(failures, 'Network browser instance cleanup failed');
       return closeComplete;
     })();
@@ -438,6 +444,7 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
   try {
     page = context.pages()[0] || await bounded(() => context.newPage());
     const errors = [];
+    if (dataPackageDiagnostics) dataPackages = observeDataPackageLifecycle(page, url);
     const peerModules = peerModuleHashes ? createPeerModuleResponseObserver({url, peerModuleHashes,
       runtimeArtifactNames: JSON.parse(await fs.readFile(new URL('../tools/browser_build_artifacts.json', import.meta.url), 'utf8')),
       onFailure: error => noteError({kind: 'peer-module-identity', message: String(error?.stack || error)}),
@@ -825,6 +832,10 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
     instance.closePeer = intentional => bounded(() => page.evaluate(intentional =>
       window.__netPeer?.close({intentional}), intentional));
     instance.freezeLoadedWasmIdentity = () => bounded(() => wasmResponses.freeze());
+    if (dataPackages) instance.readDataPackageDiagnostics = async () => ({
+      lifecycle: dataPackages.snapshot(),
+      seed: await bounded(() => page.evaluate(readInitialPipelineSeedInPage)),
+    });
     const response = await bounded(() => page.goto(url, {waitUntil: 'domcontentloaded'}));
     if (response?.status() !== 200) throw Error(`runtime.html returned HTTP ${response?.status()}`);
     const headers = response.headers();
