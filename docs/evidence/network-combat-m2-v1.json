@@ -394,7 +394,7 @@
       "sha256": "5d024dd9fa159ad5d49f61fa9d58bccffc4b0df753e3edce831f7ba23f8a56ed"
     }
   ],
-  "next": "Reduce the retained approach position refusal against original movement/collision authority before any changed stimulus or guard; no automatic capture retry.",
+  "next": "Complete cleanup and recorder validation before one reviewed prepared-approach capture; no repeat unchanged run. Public staging and broader acceptance remain open.",
   "native_combat_observations": {
     "decision": "COMPILED_AND_BROWSER_EXERCISED_IN_EXCHANGE",
     "runtime_source": "d269334e1243b0568d8bf7caf285053bea8e04a1",
@@ -1318,5 +1318,35 @@
       "finding": "Pinned original grounded body-overlap nudge can change neutral fighter x; retained capture omits nudge velocity, body extents and loaded constant, so exact displacement cause is unproved.",
       "next": "Replay the retained predicate and an actual-source component counterexample before changing the experimental stationarity premise."
     }
+  },
+  "prepared_approach_repair": {
+    "state": "SOURCE_REVIEWED_INTEGRATED_NOT_CAPTURED",
+    "basis": "Pinned original collision/movement component disproves neutral PAD implies fixed world x; historical displacement cause remains unproven",
+    "component_freeze_sha256": "96a7cd66d1ab106c524f204a4f3163b624c36e7b8d1830cbf807f0946f62e9b7",
+    "component_independent_review_sha256": "490671e7effaa840ccda673e29090931a77f02d2f73530b47bcfebb77503ea6c",
+    "candidate_freeze_sha256": "69b6a73123a1b54a80fd64d4dfd51e5ae63e992d638acce9888c2adf8489a45e",
+    "independent_review_sha256": "53282a77682442fa70964166977c722bd1cbba6c4bb1db48d6a2045b73119c54",
+    "controls": "29 focused route controls pass; actual retained 850/875 geometry replay distinguishes P2 inward15.7200127 from gap reduction13.6199914",
+    "preserved": "Every acquired recovery pair checks both damage values, paired state, scorer/stock guards and positive side order; actual P2 travel drives overshoot history; initial approach, literal neutral P1 and all deadlines unchanged"
+  },
+  "architect_checkin_20261012": {
+    "state": "SOURCE_REVIEWED_FOCUSED_CONTROLS_PASS; NO_NEW_CAPTURE",
+    "cleanup_audit_sha256": "96be796f7b0e2ce7b603a48840a2d4c3ee013796cca911e3ec3fd67de7aa34c9",
+    "browser_inventory_sha256": "ceb5282a9b11109ce578b7b76ab83bf265011b2bbf7f378b19b9342fdf51961f",
+    "scope": "682 script/test files searched; 44 actual browser launch/consumer files use own launch-returned handles. No name-pattern termination found. Worker fallback checks recorded live child, including signal exit; post-exit unproven groups are preserved and cleanup fails. No every-harness executed validation claim.",
+    "h1_source_review_sha256": "db25b24a5eba3e531c85ffce3d055930b4ed1588338a40b175306414f68dd5bb",
+    "h1": "Existing recorder staging opt-in enabled and required by room harness; current/retained exports retained before context close, no new live observer or auto-Resume. Focused helper/runner controls pass; browser validation pending.",
+    "queue": "After #313/#314, Stadium C3 #301/#251 next Track B. Next Track A public Worker full match when real service prerequisites clear.",
+    "cleanup_candidate_freeze_sha256": "0680c9f93b6b2b5f88ec87fa5d0cd4b64f86c82f2254e190120c4252b68b80a5",
+    "cleanup_independent_review_sha256": "3fa0b35d9bf35769bbd6a767f0b9329166b4d0d3685add7f088b5006c9abbab1",
+    "focused_validation": {
+      "tests": 58,
+      "skips": 0,
+      "result": "PASS",
+      "log_sha256": "ca80234b3bb5f9333241ddbc5425c09672664120317d272bed32c45960e0e3d3",
+      "scope": "Python prerequisite/content checks including prepared approach, H1 helper/runner and adversarial ownership Node controls; not final full regression"
+    },
+    "final_source_review_sha256": "6ca4324c5bc616d3be43fc58b859c441aa257e6a2eb351ae89122895f21fce0d",
+    "response": "https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6131503382"
   }
 }

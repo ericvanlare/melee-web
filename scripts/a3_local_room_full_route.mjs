@@ -441,6 +441,56 @@ export function classifyPreparedCombatPair(rows, label) {
   });
 }
 
+// Record actual paired position and damage evidence across one prepared approach
+// action. Neutral PAD is checked by the input-window validator; it does not imply
+// that either fighter's source-owned position remains fixed.
+export function inspectPreparedApproachTransition({beforeMatches, afterMatches, label}) {
+  comparePairedCombatPlayers(beforeMatches);
+  comparePairedCombatPlayers(afterMatches);
+  const snapshot = matches => {
+    const players = matches[0].players;
+    const byPort = new Map(players.map(player => [player.source_port, player]));
+    return {p1: byPort.get(0), p2: byPort.get(1)};
+  };
+  const before = snapshot(beforeMatches);
+  const after = snapshot(afterMatches);
+  const beforeDamage = {0: before.p1?.damage_percent, 1: before.p2?.damage_percent};
+  const afterDamage = {0: after.p1?.damage_percent, 1: after.p2?.damage_percent};
+  const finite = [before.p1?.x, before.p2?.x, after.p1?.x, after.p2?.x,
+    beforeDamage[0], beforeDamage[1], afterDamage[0], afterDamage[1]]
+    .every(Number.isFinite);
+  const beforeGap = before.p2?.x - before.p1?.x;
+  const afterGap = after.p2?.x - after.p1?.x;
+  return {label, before_source_positions: {p1_x: before.p1?.x, p2_x: before.p2?.x},
+    after_source_positions: {p1_x: after.p1?.x, p2_x: after.p2?.x},
+    p1_x_displacement: after.p1?.x - before.p1?.x,
+    p2_inward_displacement: before.p2?.x - after.p2?.x,
+    positive_gap_before: beforeGap, positive_gap_after: afterGap,
+    gap_reduction: beforeGap - afterGap,
+    damage_by_port_before: beforeDamage, damage_by_port_after: afterDamage,
+    damage_unchanged: finite && beforeDamage[0] === afterDamage[0] &&
+      beforeDamage[1] === afterDamage[1], finite_positions_and_damage: finite,
+    positive_side_order: finite && beforeGap > 0 && afterGap > 0};
+}
+
+export function validatePreparedApproachTransition(transition, {requireProgress = false} = {}) {
+  const label = transition?.label || 'Prepared KO approach';
+  requireValue(transition?.finite_positions_and_damage,
+    `${label}: paired source positions or damage are not finite`);
+  requireValue(transition.positive_side_order,
+    `${label}: P1/P2 source positions crossed or lost positive side order`);
+  requireValue(transition.damage_unchanged,
+    `${label}: P1 or P2 damage changed during approach recovery`);
+  if (requireProgress) {
+    requireValue(Number.isFinite(transition.p2_inward_displacement) &&
+      transition.p2_inward_displacement > 0,
+    `${label}: P2 did not make positive measured inward progress`);
+    requireValue(Number.isFinite(transition.gap_reduction) && transition.gap_reduction > 0,
+      `${label}: positive player gap did not reduce`);
+  }
+  return transition;
+}
+
 export function retainPreparedKoPreparation(combatProbe, preparation) {
   requireValue(combatProbe && typeof combatProbe === 'object' &&
     preparation && typeof preparation === 'object',
@@ -2249,13 +2299,34 @@ export async function runA3LocalFullRoute({
     const p2Direction = -1;
     const p2Key = 'ArrowLeft';
     const priorApproach = route.combat_probe.approach;
-    const measuredDisplacements = [
-      priorApproach?.before?.existing_axis_witness_settled_inward_displacement,
-      ...(priorApproach?.steps ?? []).map(step => step.after?.measured_inward_displacement),
-    ].filter(value => Number.isFinite(value) && value > 0);
-    requireValue(measuredDisplacements.length > 0,
-      'Prepared KO has no retained measured P2 approach displacement for overshoot protection');
-    let largestInwardDisplacement = Math.max(...measuredDisplacements);
+    const priorPrefix = route.p2_gameplay_prefix;
+    const measuredP2InwardDisplacements = [];
+    const prefixDirection = priorPrefix?.direction_x;
+    const prefixDeltas = priorPrefix?.after?.p2_position_delta_by_peer;
+    requireValue((prefixDirection === -1 || prefixDirection === 1) &&
+      Array.isArray(prefixDeltas) && prefixDeltas.length === 2,
+    'Prepared KO has no paired source positions for the original P2 inward witness');
+    for (const delta of prefixDeltas) {
+      const measured = delta?.delta_x * prefixDirection;
+      requireValue(Number.isFinite(delta?.before_x) && Number.isFinite(delta?.after_x) &&
+        delta.delta_x === delta.after_x - delta.before_x &&
+        Number.isFinite(measured) && measured > 0,
+      'Prepared KO original P2 inward witness is not a positive actual paired displacement');
+      measuredP2InwardDisplacements.push(measured);
+    }
+    for (const step of priorApproach?.steps ?? []) {
+      const direction = step?.direction_x;
+      const beforeX = step?.before?.p2_x;
+      const afterX = step?.after?.source_positions?.p2_x;
+      const measured = (afterX - beforeX) * direction;
+      requireValue((direction === -1 || direction === 1) && Number.isFinite(beforeX) &&
+        Number.isFinite(afterX) && Number.isFinite(measured) && measured > 0,
+      `Prepared KO prior approach tap ${step?.index} lacks positive actual P2 displacement`);
+      measuredP2InwardDisplacements.push(measured);
+    }
+    requireValue(measuredP2InwardDisplacements.length > 0,
+      'Prepared KO has no retained actual P2 inward displacement for overshoot protection');
+    let largestP2InwardDisplacement = Math.max(...measuredP2InwardDisplacements);
     const pairedPositions = matches => ({p1_x: matches[0].players[0].x,
       p2_x: matches[0].players[1].x});
     const approachToJabGap = async () => {
@@ -2265,7 +2336,7 @@ export async function runA3LocalFullRoute({
         const gap = positions.p2_x - positions.p1_x;
         const decision = decideP2ApproachTap({gap, tapCount: taps,
           sourceTickStart: sourceStart, sourceTick: current.rows[0].source_tick,
-          maxObservedInwardDisplacement: largestInwardDisplacement, maxTaps: 16,
+          maxObservedInwardDisplacement: largestP2InwardDisplacement, maxTaps: 16,
           maxSourceTicks: COMBAT_KO_SOURCE_TICK_BUDGET, targetMaxGap: 20});
         if (decision.decision === 'reached') {
           preparation.approach.reached = {source_tick: current.rows[0].source_tick,
@@ -2276,7 +2347,7 @@ export async function runA3LocalFullRoute({
           `Prepared KO approach stopped (${decision.reason}) at gap ${gap}`);
         const step = {index: taps + 1, source_tick_before: current.rows[0].source_tick,
           gap_before: gap, before: positions, input_window: {status: 'pending',
-            p1_literal_rows: [], p2_literal_rows: []}, after: null};
+            p1_literal_rows: [], p2_literal_rows: []}, acquisition_checks: [], after: null};
         preparation.approach.steps.push(step);
         const action = await pulse('beta', [p2Key], {expected: {x: p2Direction},
           holdMs: 40, releaseMs: 80, observePress: true, retainSample: true,
@@ -2306,19 +2377,22 @@ export async function runA3LocalFullRoute({
           `Prepared KO approach tap ${step.index} settled baseline`, releaseBoundary,
           {recordSink: route.combat_probe.baselines, sourceCursorLimit: sourceLimit,
             includeRules: true, includeShieldObservation: true,
-            pairObserver: rows => requirePreparedRows(rows,
-              `Prepared KO approach tap ${step.index} acquisition`)});
-        const after = pairedPositions(settled.matches);
-        requireValue(after.p1_x === positions.p1_x && after.p2_x > after.p1_x,
-          `Prepared KO approach tap ${step.index} moved P1 or crossed player sides`);
-        const afterGap = after.p2_x - after.p1_x;
-        const displacement = gap - afterGap;
-        requireValue(Number.isFinite(displacement) && displacement > 0,
-          `Prepared KO approach tap ${step.index} did not move inward`);
-        step.after = {source_tick: settled.rows[0].source_tick,
-          p1_x: after.p1_x, p2_x: after.p2_x, positive_gap: afterGap,
-          measured_inward_displacement: displacement};
-        largestInwardDisplacement = Math.max(largestInwardDisplacement, displacement);
+            pairObserver: rows => {
+              const label = `Prepared KO approach tap ${step.index} acquisition`;
+              const matches = requirePreparedRows(rows, label);
+              const transition = inspectPreparedApproachTransition({
+                beforeMatches: current.matches, afterMatches: matches, label});
+              step.acquisition_checks.push({source_tick: rows[0]?.source_tick,
+                running: rows.map(row => row.running), transition});
+              validatePreparedApproachTransition(transition);
+            }});
+        const transition = inspectPreparedApproachTransition({
+          beforeMatches: current.matches, afterMatches: settled.matches,
+          label: `Prepared KO approach tap ${step.index}`});
+        step.after = {source_tick: settled.rows[0].source_tick, ...transition};
+        validatePreparedApproachTransition(transition, {requireProgress: true});
+        largestP2InwardDisplacement = Math.max(largestP2InwardDisplacement,
+          transition.p2_inward_displacement);
         current = settled;
         taps++;
       }

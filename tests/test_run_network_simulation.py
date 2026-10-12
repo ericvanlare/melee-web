@@ -8,6 +8,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from run_network_simulation import SCENARIOS, scenario_route_flags, validate_result
 
 
+def incident_recording():
+    return {"requested": True, "profiles": {role: {
+        "readiness": {"requested": True, "export_available": True, "ring_status": {
+            "selection": {"staging_diagnostics_requested": True,
+                          "staging_diagnostics_enabled": True,
+                          "staging_diagnostics_reason": "explicit_loopback_opt_in"}}},
+        "export": {"current": {"schema": "melee-web-runtime-diagnostics",
+                               "session_id": role, "incidents": []}, "retained": {"records": []}},
+        "before_leave": {"native_running": 1, "native_message": "Running"},
+    } for role in ("alpha", "beta")}}
+
+
 def neutral_input_diagnostic(samples):
     """Synthetic full shape matching browser_input.cpp; actual producer is tested separately."""
     pad = {"source": "keyboard", "err": 0, "buttons": 0, "stick": [0, 0],
@@ -26,11 +38,25 @@ class NetworkSimulationSuitePolicyTests(unittest.TestCase):
                       "capture_exit_code": 0, "cleanup_passed": True,
                       "process_observation_passed": True}
         self.browser = {"schema": "melee-web-a3-local-room-keyboard-v1", "decision": "PASS",
+                        "runtime_incident_recording": incident_recording(),
                         "first_error": None, "relay_mode": "simulated-network",
                         "network_simulation": {"proxy_cleanup": {"verified": True, "final": True}},
                         "gameplay_action_probe": False, "gameplay_combat_probe": False,
                         "full_route": {"result": "pass", "gameplay_action_probe": False,
                                        "gameplay_combat_probe": False}}
+
+    def test_incident_recording_and_unmodified_h1_evidence_are_required(self):
+        for corrupt in (
+            lambda row: row.pop("runtime_incident_recording"),
+            lambda row: row["runtime_incident_recording"]["profiles"].pop("beta"),
+            lambda row: row["runtime_incident_recording"]["profiles"]["alpha"].update(export=None),
+            lambda row: row["runtime_incident_recording"]["profiles"]["alpha"]["export"]["current"]
+                ["incidents"].append({"reason": "simulation_debt", "staging": {"observed": True}}),
+        ):
+            broken = copy.deepcopy(self.browser)
+            corrupt(broken)
+            with self.assertRaisesRegex(ValueError, "incident|H1"):
+                validate_result(0, self.owner, broken, False)
 
     def test_independent_owner_and_browser_receipts_are_both_required(self):
         validate_result(0, self.owner, self.browser, True)

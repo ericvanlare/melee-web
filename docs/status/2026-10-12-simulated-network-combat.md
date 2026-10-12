@@ -2,6 +2,28 @@
 
 **Browser exercised / Same-machine simulated-network functional / Both jab directions, shield hit and original full route pass; attack-caused KO remains open**
 
+The current #316 step is checkpointed after the retained prepared-approach
+failure. A small pinned-source collision/movement component establishes that
+neutral input does not imply a stationary fighter; it does not identify the
+historical displacement's exact cause. The independently reviewed repair records
+both positions, checks unchanged damage on every acquired recovery pair, and
+uses actual P2 travel for overshoot protection. Focused controls pass; it has
+not been captured. The [structured receipt](../evidence/network-combat-m2-v1.json)
+retains the component, candidate and review identities separately.
+
+The owner-adopted October 12 check-in required cleanup safety and incident
+recording before another capture. Repository inventory found no name-pattern
+termination. The reviewed Worker repair checks recorded child exit before each
+fallback signal and preserves an unproven group after leader exit, reporting
+cleanup failure. Adversarial controls cover PID reuse, foreign same-profile
+Chrome, shared groups and CDP-only identities. The existing bounded recorder is now wired
+into both room profiles with staging occupancy and queue-completion callback
+latency enabled. Source review and 58 integrated prerequisite checks pass; browser observation
+is pending. A forced timing pause stays H1 evidence with the original error
+retained, no inferred combat failure and no accepted route. After combat
+#313/#314, Stadium C3 #301/#251 is the next Track B milestone; the public staging
+full match remains Track A's next service-dependent step.
+
 Two independent headless Chrome profiles completed original CSS → SSS → four-stock Mario/Final Destination → Results → CSS under the moderate TCP shaping profile, including an actual keyboard approach and damaging jab. Capture harness `c93824de` used the unchanged Release runtime `5f895d3b`; the [structured receipt](../evidence/network-combat-m2-v1.json) binds both identities, the actual input, raw reports and independent source/result reviews. This is the first direction of [combat milestone #313](https://github.com/ericvanlare/melee-web/issues/313), with a later complete exchange/shield route observed below; attack-caused stock loss remains open.
 
 After the existing P2 movement witness, five additional inward taps reached a positive 12.0599594-unit gap in 136 of the declared 480 source cursors. Every tap retained one literal horizontal PAD row, its neutral release and matching P1-neutral rows. No position was injected. P2's A input at ticks 594–601, followed by neutral at 602, produced paired Attack11 (44), P1 damage reaction (79) and P1 damage rising from 0% to 3% at cursor 606. Both fighters returned to grounded Wait at 625. The 17 retained common-cursor action observations agree on every declared player field; missing sampled cursors remain explicit. These observations do not reconstruct unobserved animation frames.

@@ -104,7 +104,16 @@ can proceed independently if the landing investigation remains inconclusive.
 Reuse existing original comparisons and preserve their setup/field exclusions;
 paired browser agreement alone is not original equivalence. The combat sprint
 now owns the shared capture lane, with Stadium and unchanged provider queries
-still checkpointed. Public staging and the separate acceptance gates remain open.
+still checkpointed. Under the owner-adopted October 12 architect check-in,
+finish or checkpoint the in-flight #316 combat step, verify recorded-process
+cleanup ownership before another capture, and keep the existing staging incident
+recorder enabled for combat and simulated-network runs. Retain forced timing
+pauses as H1 observations without inferring a combat failure or resuming to pass.
+After #313/#314, Pokémon Stadium C3 in [#301](https://github.com/ericvanlare/melee-web/pull/301)
+and [#251](https://github.com/ericvanlare/melee-web/issues/251) is the next Track B
+milestone. Track A next uses the verified deployed staging Worker for one complete
+two-browser match as soon as its concrete service prerequisites are cleared.
+That result is functional, with the separate acceptance gates still open.
 
 **Owner-requested readiness checkpoint (October 11; updated October 12):** the
 existing local Worker and Host/Join UI have a [scoped browser result](status/2026-10-11-local-room-ui-readiness.md)

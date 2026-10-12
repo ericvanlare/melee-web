@@ -22,6 +22,8 @@ import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS, parseNetChecksum} from './net
 import {checksumCompareReached, checksumWaitDiagnostic} from './a3_checksum_wait_diagnostics.mjs';
 import {runA3LocalFullRoute} from './a3_local_room_full_route.mjs';
 import {retainCombatChecksumCursorPoll} from './a3_local_room_combat_probe.mjs';
+import {incidentRecordingUrl, readIncidentRecorderReadiness, requireIncidentRecorderReadiness,
+  summarizeRuntimeIncidents} from './a3_runtime_incidents.mjs';
 
 const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--post-css-stall-probe] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route] [--controlled-cut-after-css] [--gameplay-action-probe] [--gameplay-combat-probe] [--gameplay-combat-exchange] [--gameplay-combat-ko] [--gameplay-combat-ko-charged] [--gameplay-combat-ko-prepared] [--repeat-full-route]';
 const {values} = parseArgs({options: {
@@ -107,7 +109,7 @@ requireCondition(!values['gameplay-combat-ko-prepared'] || values['gameplay-comb
 requireCondition([values['gameplay-combat-ko'], values['gameplay-combat-ko-charged'],
   values['gameplay-combat-ko-prepared']].filter(Boolean).length <= 1,
   'C-stick, charged, and prepared combat KO modes are separate scenarios');
-const runtimeUrl = new URL(values.url);
+const runtimeUrl = incidentRecordingUrl(values.url);
 requireCondition(runtimeUrl.protocol === 'http:' && runtimeUrl.hostname === '127.0.0.1' &&
   runtimeUrl.port === '8787' && runtimeUrl.pathname === '/runtime.html',
   'This harness requires the already-supported client page http://127.0.0.1:8787/runtime.html');
@@ -220,6 +222,8 @@ const report = {
   gameplay_combat_ko_charged: values['gameplay-combat-ko-charged'],
   gameplay_combat_ko_prepared: values['gameplay-combat-ko-prepared'],
   leave_and_cleanup: {},
+  runtime_incident_recording: {requested: true, url: runtimeUrl.href, profiles: {},
+    policy: 'Existing bounded recorder; staging occupancy and queue-completion callback latency. Forced timing pauses are H1 evidence; no automatic resume added.'},
   exclusions: ['no direct PAD or Gamepad injection', 'no harness-owned peer or checksum pump',
     'no runtime source-tick/checksum-bound changes',
     ...(relayMode.mode === 'external'
@@ -240,6 +244,8 @@ let repeatedPrefixDigest = null;
 async function sourceIdentity() {
   const status = gitValue(['status', '--porcelain', '--untracked-files=all']);
   const allowedHarnessFiles = ['scripts/a3_local_room_keyboard_browser.mjs',
+    'scripts/a3_runtime_incidents.mjs', 'tests/a3_runtime_incidents.test.mjs',
+    'tests/test_a3_runtime_incidents.py',
     'scripts/net_session_instance.mjs', 'scripts/a3_data_package_diagnostics.mjs', 'tests/a3_data_package_diagnostics.test.mjs',
     'scripts/a3_expected_fault_auditor.py', 'scripts/a3_public_relay_preflight.mjs',
     'tests/test_a3_expected_fault_auditor.py', 'tests/test_a3_public_relay_preflight.py',
@@ -901,6 +907,11 @@ try {
   });
   instances.alpha = await openRole('alpha');
   instances.beta = await openRole('beta');
+  for (const role of ['alpha', 'beta']) {
+    const readiness = await readIncidentRecorderReadiness(instances[role].page);
+    report.runtime_incident_recording.profiles[role] = {readiness};
+    requireIncidentRecorderReadiness(readiness);
+  }
   if (networkSimulation)
     browserNetworkPaths = observeBrowserNetworkPaths(instances, networkSimulation.relayUrl);
   report.browser = {...report.browser, executable: tools.browserPath,
@@ -1441,6 +1452,20 @@ try {
   }
   firstError(errorText(error));
 } finally {
+  // Read the actual stop before Leave/unload changes it. No live polling, pause,
+  // resume or new recorder is introduced by this evidence boundary.
+  for (const role of ['alpha', 'beta']) {
+    const instance = instances[role];
+    if (!instance) continue;
+    const evidence = report.runtime_incident_recording.profiles[role] ||= {};
+    try {
+      evidence.before_leave = await cleanupBounded(instance.page.evaluate(() =>
+        window.meleeNetTimingPauseEligibilitySnapshot?.() ?? null), role + ' incident stop state');
+    } catch (error) {
+      evidence.before_leave_error = errorText(error);
+      firstError(role + ' incident stop state unavailable: ' + errorText(error));
+    }
+  }
   const processInfo = {};
   for (const role of ['alpha', 'beta']) {
     const instance = instances[role];
@@ -1479,6 +1504,23 @@ try {
     }
     if (report.leave_and_cleanup[role + '_unload'].error)
       firstError(role + ' runtime unload failed: ' + report.leave_and_cleanup[role + '_unload'].error);
+    const evidence = report.runtime_incident_recording.profiles[role] ||= {};
+    try {
+      // The existing export refuses serialization during active gameplay.
+      evidence.export = await cleanupBounded(instance.page.evaluate(async () =>
+        await window.meleeNetRuntimeDiagnosticExport?.() ?? null), role + ' runtime incident export');
+      evidence.summary = summarizeRuntimeIncidents(evidence.export, evidence.before_leave);
+      if (evidence.summary.missing_timing_staging_count > 0)
+        firstError(role + ' H1 incident is missing the requested staging observation');
+      if (evidence.summary.h1_timing_pause_observed) {
+        report.runtime_incident_recording.h1_timing_pause_observed = true;
+        if (!values['post-css-stall-probe'])
+          firstError(role + ' forced timing pause retained as H1 evidence; route incomplete');
+      }
+    } catch (error) {
+      evidence.export_error = errorText(error);
+      firstError(role + ' runtime incident evidence unavailable: ' + errorText(error));
+    }
     try {
       const fatal = firstFatalBrowserError(instance.errors);
       if (fatal) firstError(role + ' browser error: ' + JSON.stringify(fatal));
@@ -1540,6 +1582,11 @@ try {
     report.leave_and_cleanup.worker = {attempted: false,
       reason: 'external Worker is not owned by the browser harness'};
   }
+  if (report.first_error && report.runtime_incident_recording.h1_timing_pause_observed)
+    report.failure_classification = {domain: 'H1', outcome: 'timing_pause_observed',
+      route_accepted: false, combat_failure_inferred: false,
+      first_error_cause: 'not_inferred_from_co_occurring_timing_pause',
+      original_first_error_retained: true};
   if (!report.first_error && workerPassed) {
     for (const role of ['alpha', 'beta']) {
       const profile = path.join(output, 'profiles', role);

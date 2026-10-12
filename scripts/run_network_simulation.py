@@ -91,6 +91,38 @@ def runtime_identity(directory):
             for path in sorted(directory.rglob("*")) if path.is_file()}
 
 
+def validate_incident_recording(browser, *, controlled_stall=False):
+    recording = browser.get("runtime_incident_recording") or {}
+    if recording.get("requested") is not True:
+        raise ValueError("runtime incident recording was not requested")
+    for role in ("alpha", "beta"):
+        evidence = (recording.get("profiles") or {}).get(role) or {}
+        readiness = evidence.get("readiness") or {}
+        selection = (readiness.get("ring_status") or {}).get("selection") or {}
+        current = (evidence.get("export") or {}).get("current") or {}
+        retained = (evidence.get("export") or {}).get("retained") or {}
+        if (readiness.get("requested") is not True or readiness.get("export_available") is not True or
+                selection.get("staging_diagnostics_requested") is not True or
+                selection.get("staging_diagnostics_enabled") is not True or
+                selection.get("staging_diagnostics_reason") != "explicit_loopback_opt_in" or
+                current.get("schema") != "melee-web-runtime-diagnostics" or
+                not isinstance(current.get("session_id"), str) or
+                not isinstance(current.get("incidents"), list) or
+                not isinstance(retained.get("records"), list) or evidence.get("export_error") or
+                evidence.get("before_leave_error")):
+            raise ValueError(f"{role} runtime incident recording evidence is incomplete")
+        timing = [row for row in current["incidents"] if row.get("reason") in
+                  ("simulation_debt", "audio_debt", "nonfinite_clock", "clock_regression")]
+        if any(row.get("staging") is None for row in timing):
+            raise ValueError(f"{role} H1 timing incident lacks staging evidence")
+        stopped = evidence.get("before_leave") or {}
+        message = stopped.get("native_message")
+        timing_stop = (stopped.get("native_running") == 0 and isinstance(message, str) and
+                       message.startswith("Paused after a timing disruption"))
+        if (timing or timing_stop) and not controlled_stall:
+            raise ValueError(f"{role} H1 timing pause retained; clean route is unproven")
+
+
 def validate_result(returncode, owner, browser, full_route, gameplay_action_probe=False,
                     repeat_full_route=False, *, controlled_stall=False,
                     gameplay_combat_probe=False, gameplay_combat_exchange=False,
@@ -122,6 +154,7 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
             browser.get("decision") != expected_decision or browser.get("first_error") is not None or
             browser.get("relay_mode") != "simulated-network"):
         raise ValueError("browser did not pass the requested simulated-network result policy")
+    validate_incident_recording(browser, controlled_stall=controlled_stall)
     for mode_report in [browser, browser.get("full_route") or {}]:
         if gameplay_combat_ko and mode_report.get("gameplay_combat_ko") is not True:
             raise ValueError("requested combat KO mode is missing")
@@ -690,7 +723,10 @@ def main():
                     row[key + "_report"] = {"file": str(path.relative_to(output)), **file_identity(path)}
             owner = json.loads((folder / "owner.json").read_text())
             browser = json.loads((folder / "browser/report.json").read_text())
+            row["failure_classification"] = browser.get("failure_classification")
+            write_json(report_path, report)
             if controlled_cut:
+                validate_incident_recording(browser)
                 if result.returncode == 0 or owner.get("capture_exit_code") != result.returncode:
                     raise ValueError("expected-cut route did not retain the matching nonzero capture exit")
                 audit = audit_expected_cut(owner, browser, expected_source_head=head,

@@ -17,7 +17,7 @@ const DISPOSE_TIMEOUT_MS = 5000;
 const FALLBACK_TERM_TIMEOUT_MS = 3000;
 const FALLBACK_KILL_TIMEOUT_MS = 3000;
 const CLOSE_TIMEOUT_MS = 1000;
-const FINAL_GROUP_KILL_TIMEOUT_MS = 3000;
+const FINAL_GROUP_SETTLE_TIMEOUT_MS = 3000;
 const EVIDENCE_LOG_LIMIT_BYTES = 4 * 1024 * 1024;
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -56,11 +56,61 @@ function groupAlive(pid) {
   catch (error) { return error.code !== 'ESRCH'; }
 }
 
-function sendSignal(pid, signal, record) {
-  try { process.kill(-pid, signal); }
+function sendSignal(pid, signal, record, kill = process.kill) {
+  try { kill(-pid, signal); }
   catch (error) {
     if (error.code !== 'ESRCH') record(`${signal.toLowerCase()}-error`, {error: String(error)});
   }
+}
+
+function currentChildExit(child, recordedExit) {
+  if (recordedExit) return recordedExit;
+  if (child.exitCode !== null || child.signalCode !== null)
+    return {code: child.exitCode, signal: child.signalCode};
+  return null;
+}
+
+export function requestFallbackSignalIfChildLive({child, recordedExit = null, signal,
+  timeoutMs, record = () => {}} = {}) {
+  if (!child || !Number.isSafeInteger(child.pid) || child.pid <= 0 ||
+      !['SIGTERM', 'SIGKILL'].includes(signal))
+    throw Error('Fallback signal requires a recorded child and supported signal');
+  const exit = currentChildExit(child, recordedExit);
+  if (exit) {
+    record('owner-fallback-signal-skipped-after-exit', {
+      pid: child.pid, signal, code: exit.code, exitSignal: exit.signal,
+    });
+    return {exit, signalled: false};
+  }
+  record(`fallback-${signal.toLowerCase()}-request`, {pid: child.pid, timeoutMs});
+  sendSignal(child.pid, signal, record);
+  return {exit: null, signalled: true};
+}
+
+// After the group leader exits, the recorded PGID alone no longer proves which
+// processes still belong to this owner. Observe for natural shutdown, then leave
+// any unproven remainder untouched so cleanup fails safely.
+export async function waitForOwnedProcessGroupToDisappear({pid, leaderExitObserved,
+  groupAliveProbe = groupAlive, pause = wait,
+  timeoutMs = FINAL_GROUP_SETTLE_TIMEOUT_MS, record = () => {}} = {}) {
+  if (!Number.isSafeInteger(pid) || pid <= 0 || typeof groupAliveProbe !== 'function' ||
+      typeof pause !== 'function' || !Number.isSafeInteger(timeoutMs) || timeoutMs < 0 ||
+      timeoutMs > FINAL_GROUP_SETTLE_TIMEOUT_MS)
+    throw Error('Post-leader process-group observation requires a recorded PID and bounded wait');
+  let alive = groupAliveProbe(pid);
+  record('owner-process-group-check', {pid, alive,
+    leaderExitObserved: Boolean(leaderExitObserved)});
+  if (!alive) return {alive: false, verifiedGone: true};
+  record(leaderExitObserved ? 'post-leader-exit-group-preserved-unproven'
+    : 'group-preserved-leader-exit-unobserved', {pid, timeoutMs});
+  const deadline = Date.now() + timeoutMs;
+  while (alive && Date.now() < deadline) {
+    await pause(Math.min(25, Math.max(1, deadline - Date.now())));
+    alive = groupAliveProbe(pid);
+  }
+  record('owner-process-group-settled-check', {pid, alive,
+    leaderExitObserved: Boolean(leaderExitObserved)});
+  return {alive, verifiedGone: !alive};
 }
 
 /** Start the pinned direct Miniflare Worker and return its owned local endpoint.
@@ -140,7 +190,11 @@ export async function startRoomRelayRuntime({diagnostic = () => {}, evidenceDir 
   let stderr = '';
   child.stdout.on('data', chunk => { stdout = appendBounded(stdout, chunk); });
   child.stderr.on('data', chunk => { stderr = appendBounded(stderr, chunk); });
-  const exitPromise = new Promise(resolve => child.once('exit', (code, signal) => resolve({code, signal})));
+  let recordedExit = null;
+  const exitPromise = new Promise(resolve => child.once('exit', (code, signal) => {
+    recordedExit = {code, signal};
+    resolve(recordedExit);
+  }));
   const closePromise = new Promise(resolve => child.once('close', (code, signal) => resolve({code, signal})));
   const base = `http://127.0.0.1:${port}`;
   let cleanupPromise = null;
@@ -152,34 +206,33 @@ export async function startRoomRelayRuntime({diagnostic = () => {}, evidenceDir 
       const record = (event, details = {}) => cleanupEvents.push({
         event, monotonicNs: process.hrtime.bigint().toString(), wallTime: new Date().toISOString(), ...details,
       });
-      let exit = child.exitCode === null ? null : {code: child.exitCode, signal: child.signalCode};
+      let exit = currentChildExit(child, recordedExit);
       if (!exit && child.connected) {
         record('owner-dispose-request');
         await new Promise(resolve => child.send({type: 'dispose'}, error => {
           record('owner-dispose-send-result', {error: error ? String(error.stack || error) : null});
           resolve();
         }));
-        exit = await bounded(exitPromise, DISPOSE_TIMEOUT_MS);
+        exit = currentChildExit(child, recordedExit) || await bounded(exitPromise, DISPOSE_TIMEOUT_MS);
       }
       if (!exit && child.pid) {
-        record('fallback-sigterm-request', {pid: child.pid, timeoutMs: FALLBACK_TERM_TIMEOUT_MS});
-        sendSignal(child.pid, 'SIGTERM', record);
-        exit = await bounded(exitPromise, FALLBACK_TERM_TIMEOUT_MS);
+        const request = requestFallbackSignalIfChildLive({child, recordedExit,
+          signal: 'SIGTERM', timeoutMs: FALLBACK_TERM_TIMEOUT_MS, record});
+        exit = request.exit;
+        if (request.signalled) exit = await bounded(exitPromise, FALLBACK_TERM_TIMEOUT_MS);
       }
       if (!exit && child.pid) {
-        record('fallback-sigkill-request', {pid: child.pid, timeoutMs: FALLBACK_KILL_TIMEOUT_MS});
-        sendSignal(child.pid, 'SIGKILL', record);
-        exit = await bounded(exitPromise, FALLBACK_KILL_TIMEOUT_MS);
+        const request = requestFallbackSignalIfChildLive({child, recordedExit,
+          signal: 'SIGKILL', timeoutMs: FALLBACK_KILL_TIMEOUT_MS, record});
+        exit = request.exit;
+        if (request.signalled) exit = await bounded(exitPromise, FALLBACK_KILL_TIMEOUT_MS);
       }
       const processClose = exit ? await bounded(closePromise, CLOSE_TIMEOUT_MS) : null;
-      let alive = groupAlive(child.pid);
-      record('owner-process-group-check', {pid: child.pid || null, alive});
-      if (alive && child.pid) {
-        record('cleanup-sigkill-request', {pid: child.pid, timeoutMs: FINAL_GROUP_KILL_TIMEOUT_MS});
-        sendSignal(child.pid, 'SIGKILL', record);
-        await bounded(closePromise, FINAL_GROUP_KILL_TIMEOUT_MS);
-        alive = groupAlive(child.pid);
-      }
+      const groupOutcome = child.pid
+        ? await waitForOwnedProcessGroupToDisappear({pid: child.pid,
+          leaderExitObserved: Boolean(exit), timeoutMs: FINAL_GROUP_SETTLE_TIMEOUT_MS, record})
+        : {alive: false, verifiedGone: true};
+      const alive = groupOutcome.alive;
 
       const records = stdout.split(/\r?\n/).flatMap(line => {
         const prefix = 'MELEE_ROOM_RELAY_RUNTIME ';
@@ -201,8 +254,7 @@ export async function startRoomRelayRuntime({diagnostic = () => {}, evidenceDir 
       const disposed = Boolean(disposeRecord);
       const ownedTempPathsClean = disposeRecord?.runtimeTmpEmpty === true &&
         disposeRecord?.resourceTmpEmpty === true;
-      const fallbackUsed = cleanupEvents.some(row => row.event.startsWith('fallback-') ||
-        row.event.startsWith('cleanup-sigkill'));
+      const fallbackUsed = cleanupEvents.some(row => row.event.startsWith('fallback-'));
       const runtimeClean = ready && disposed && exit?.code === 0 && !exit?.signal && processClose && !alive &&
         !fallbackUsed && !runtimeErrors.length && !structuredErrors.length && !stderrErrors &&
         ownedTempPathsClean && !cleanupEvents.some(row => row.error);
@@ -212,7 +264,7 @@ export async function startRoomRelayRuntime({diagnostic = () => {}, evidenceDir 
         ownerProcess: {pid: child.pid || null, processGroupId: child.pid || null},
         deadlinesMs: {startup: STARTUP_TIMEOUT_MS, dispose: DISPOSE_TIMEOUT_MS,
           fallbackSigterm: FALLBACK_TERM_TIMEOUT_MS, fallbackSigkill: FALLBACK_KILL_TIMEOUT_MS,
-          closeEvent: CLOSE_TIMEOUT_MS, finalGroupKill: FINAL_GROUP_KILL_TIMEOUT_MS},
+          closeEvent: CLOSE_TIMEOUT_MS, finalGroupSettle: FINAL_GROUP_SETTLE_TIMEOUT_MS},
         runtimeIdentity: {
           node: process.version, wrangler: wrangler.version, miniflare: miniflare.version, workerd: workerd.version,
         },

@@ -13,7 +13,8 @@ import {actionObservationTickDisposition, acquireAndInspectActionPair,
   observeShieldSetOffBeforeRelease, retainPreStartActionPair,
   retainAndGuardPreparedPair, retainPreparedKoPreparation, classifyPreparedCombatPair,
   preparedKoSourceCursorLimit,
-  observeNativePeerPageSample,
+  observeNativePeerPageSample, inspectPreparedApproachTransition,
+  validatePreparedApproachTransition,
   retainShieldHoldOutcome, validateButtonGameplayInputWindow,
   validateSimultaneousButtonGameplayInputWindows} from '../scripts/a3_local_room_full_route.mjs';
 
@@ -60,6 +61,48 @@ test('P2 approach accepts only bounded positive-gap tap hypotheses', () => {
     maxObservedInwardDisplacement: 10}).reason, 'source-cursor-budget-exhausted');
   assert.throws(() => decideP2ApproachTap({gap: Number.NaN, tapCount: 0,
     sourceTickStart: 100, sourceTick: 100}));
+});
+
+test('prepared approach measures actual P2 inward travel and guards paired recovery damage', () => {
+  const pairAt = (p1x, p2x, p1Damage = 14.55, p2Damage = 3) => {
+    const overrides = {players: {
+      0: {x: p1x, damage_percent: p1Damage}, 1: {x: p2x, damage_percent: p2Damage},
+    }};
+    return paired(overrides, overrides);
+  };
+  const before = pairAt(-66.77314, -46.3515167);
+  const after = pairAt(-68.8731613, -62.0715294);
+  const measured = inspectPreparedApproachTransition({beforeMatches: before,
+    afterMatches: after, label: 'retained source pair 850→875'});
+  validatePreparedApproachTransition(measured, {requireProgress: true});
+  assert.equal(measured.p1_x_displacement.toFixed(7), '-2.1000213');
+  assert.equal(measured.p2_inward_displacement.toFixed(7), '15.7200127');
+  assert.equal(measured.gap_reduction.toFixed(7), '13.6199914');
+  assert.notEqual(measured.p2_inward_displacement, measured.gap_reduction);
+  assert.equal(measured.damage_unchanged, true);
+
+  const noP2Motion = inspectPreparedApproachTransition({beforeMatches: before,
+    afterMatches: pairAt(-67, -46.3515167), label: 'no P2 inward movement'});
+  assert.throws(() => validatePreparedApproachTransition(noP2Motion,
+    {requireProgress: true}), /P2 did not make positive measured inward progress/);
+  const noGapReduction = inspectPreparedApproachTransition({beforeMatches: before,
+    afterMatches: pairAt(-68, -47.5783767), label: 'no positive gap reduction'});
+  assert.throws(() => validatePreparedApproachTransition(noGapReduction,
+    {requireProgress: true}), /positive player gap did not reduce/);
+  const crossed = inspectPreparedApproachTransition({beforeMatches: before,
+    afterMatches: pairAt(-50, -52), label: 'crossed player sides'});
+  assert.throws(() => validatePreparedApproachTransition(crossed), /lost positive side order/);
+  const nonfinite = inspectPreparedApproachTransition({beforeMatches: before,
+    afterMatches: pairAt(-60, Infinity), label: 'nonfinite position'});
+  assert.throws(() => validatePreparedApproachTransition(nonfinite), /not finite/);
+  const changedDamage = inspectPreparedApproachTransition({beforeMatches: before,
+    afterMatches: pairAt(-67, -55, 14.56, 3), label: 'changed damage'});
+  assert.throws(() => validatePreparedApproachTransition(changedDamage), /damage changed/);
+  const peerDisagreement = pairAt(-67, -55);
+  peerDisagreement[1].players[0].x = -66;
+  assert.throws(() => inspectPreparedApproachTransition({beforeMatches: before,
+    afterMatches: peerDisagreement, label: 'peer scorer disagreement'}),
+  /Combat peers disagree on P1 x/);
 });
 
 test('P2 approach window retains one literal axis sample, neutral release, and neutral P1', () => {

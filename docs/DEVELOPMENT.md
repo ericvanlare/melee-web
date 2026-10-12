@@ -108,6 +108,15 @@ peer RTT or input latency. These experiments establish simulated-network
 functional evidence only, leaving public staging and two-machine gates open.
 Keep the same supervised owner budget and shared capture-lane policy.
 
+The room harness opts into the existing bounded staging incident recorder on
+both profiles, verifies the runtime accepted that option, and retains its
+current-session and persisted exports before context close. Staging occupancy
+and queue-completion callback latency accompany a forced timing pause as H1
+evidence. Callback latency includes browser delivery and is not hardware GPU
+duration. Missing evidence fails validation; a timing pause does not become a
+combat failure or a successful route. The explicitly selected controlled-stall
+scenario keeps its separate fault policy. No new automatic recovery is added.
+
 The serial suite packages that owner and its cleanup checks:
 
 ```sh

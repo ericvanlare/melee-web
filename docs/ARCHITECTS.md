@@ -52,6 +52,27 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-12 — Claude / owner: staging, cleanup and Stadium after combat
+
+**Ask:** Checkpoint the current #316 step, make the public staging prerequisite
+actionable, verify that cleanup never terminates unrelated processes, retain
+the existing H1 incident recorder during combat/network runs, and return to
+Pokémon Stadium C3 after #313/#314.
+
+**Status:** Agreed. The current prepared-approach step is checkpointed and its
+source reduction reviewed. The [response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6131503382)
+lists the owner actions for Cloudflare access and existing-plan usage facts,
+and identifies the cleanup fixes and regression controls. Staging's next Track A
+result is one complete match through a verified public Worker, labeled functional.
+Stadium #301/#251 is the next Track B milestone after combat. The roadmap and
+existing combat status entry are updated in this milestone batch; no new
+acceptance or successful public service is inferred.
+
+**Links:** [Priorities response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6131503382),
+[#316](https://github.com/ericvanlare/melee-web/pull/316),
+[#288](https://github.com/ericvanlare/melee-web/issues/288),
+[#301](https://github.com/ericvanlare/melee-web/pull/301).
+
 ### 2026-10-12 — Owner: verified combat through the simulated network
 
 **Ask:** After the network simulation sprint, the owner approved the proposed
