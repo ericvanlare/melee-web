@@ -198,5 +198,51 @@ this receipt records local validation before PR publication.
 
 This checkpoint stays in the existing #288 milestone branch. The supplied
 external-preflight interface validates a provided receipt structurally; it does
-not verify a deployed Worker. No public endpoint, remote run or RTT evidence is
-available, and broader #288 acceptance remains open.
+not verify a deployed Worker. At the time of this earlier checkpoint, no public endpoint, remote run or RTT
+evidence was available. A later public-staging extension is recorded below;
+broader #288 acceptance remains open.
+
+## Public staging extension — one same-host functional pass
+
+A later run on 2026-10-12 reached original CSS → SSS → a four-stock
+Mario-versus-Mario Final Destination match → original Results → returned CSS
+through the deployed staging Worker. Two independent installed headless Chrome
+profiles ran on one host. The first attempt stopped at P2's Results End
+confirmation because no source-aligned PAD row was retained. That failure and its
+independent review remain linked in the [public route receipt](../evidence/public-room-full-route-v1.json). The follow-up used the existing bounded source-PAD observer for Enter/End and
+passed. A synthetic sampling-gap reducer supports that observation policy, but
+the first run did not retain its exact press interval, so the historical failure's
+cause is not established.
+
+The second run recorded four natural P1 stock losses, three grounded respawns,
+P2's original win, both Results confirmations and the CSS return. P2 made one
+short horizontal movement pulse with a literal neutral release; no attack/jump
+probe or combat claim is included. The exact common checksum prefix contains 2,789 matching 64-byte records at
+ticks 0–2,788. The exclusive boundary after return and the two-tick input delay
+is 2,789; four alpha and six beta tail records remain unpaired.
+Input delay stayed at two ticks and was not tuned from RTT. The separately
+measured same-host browser/public-relay echo RTT had median 184.78 ms
+alpha-to-beta-to-alpha and 187.46 ms beta-to-alpha-to-beta. It is not two-machine
+network RTT, game input latency, input-to-photon latency or source-tick duration.
+Final wait durations were not measured.
+
+Readiness exports were available and reported no runtime incidents. Normal Leave,
+native unload to phase zero, native quiescence and owned-process cleanup passed.
+Each profile retained one local `.data` request failure (`ERR_ABORTED`), so this is
+not an error-free-browser claim. The staging Worker was external to the capture
+owner and remains deployed idle; it was not disposed. It was deployed on Workers
+Free with a $0 spend limit and no paid-plan, billing, DNS or production change.
+
+This is one same-host public-staging functional route witness. It does not establish
+two-machine Internet play, physical-input behavior, combat coverage, RTT-tuned
+input delay, sustained timing or performance, retail pixel/PCM equivalence, or
+whole-session acceptance. A separate Release build of the current-main Results
+port passed; the current-main full regression and CI remain pending. The capture
+runtime and current-main port build are separate producers, as detailed in the
+receipt.
+
+The successful capture used the identified draft [#316](https://github.com/ericvanlare/melee-web/pull/316)
+producer with its reviewed H1 recorder and owned-cleanup safeguards. The
+current-main port includes only the Results-input repair and failure-evidence
+plumbing; it does not claim those separate draft prerequisites have merged.
+Future captures must retain those reviewed recorder and cleanup safeguards.

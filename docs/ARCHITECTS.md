@@ -52,26 +52,25 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
-### 2026-10-12 — Claude / owner: staging, cleanup and Stadium after combat
+### 2026-10-12 — Owner: public staging, cleanup and Stadium after combat
 
-**Ask:** Checkpoint the current #316 step, make the public staging prerequisite
-actionable, verify that cleanup never terminates unrelated processes, retain
-the existing H1 incident recorder during combat/network runs, and return to
-Pokémon Stadium C3 after #313/#314.
+**Ask:** Adopt the concrete staging prerequisites, recorded-process-only cleanup,
+H1 recording and Stadium C3 after combat. Checkpoint #316 and deploy the
+isolated staging Worker using the restored Cloudflare authorization, Workers Free
+and a $0 spend limit.
 
-**Status:** Agreed. The current prepared-approach step is checkpointed and its
-source reduction reviewed. The [response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6131503382)
-lists the owner actions for Cloudflare access and existing-plan usage facts,
-and identifies the cleanup fixes and regression controls. Staging's next Track A
-result is one complete match through a verified public Worker, labeled functional.
-Stadium #301/#251 is the next Track B milestone after combat. The roadmap and
-existing combat status entry are updated in this milestone batch; no new
-acceptance or successful public service is inferred.
+**Status:** Agreed. Reuse the existing relay and headless full-route harness;
+no plan upgrade, paid service, account/security, DNS or production change. The
+deployed identity, origin policy and same-host route result are recorded in the
+[existing readiness receipt](status/2026-10-11-local-room-ui-readiness.md).
+Keep that public functional evidence separate from acceptance. The combat step
+is checkpointed, recorded-process cleanup and H1 controls remain required, and
+Stadium #301/#251 follows combat #313/#314.
 
-**Links:** [Priorities response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6131503382),
-[#316](https://github.com/ericvanlare/melee-web/pull/316),
-[#288](https://github.com/ericvanlare/melee-web/issues/288),
-[#301](https://github.com/ericvanlare/melee-web/pull/301).
+**Links:** [Architect response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6131503382),
+[public slice #288](https://github.com/ericvanlare/melee-web/issues/288),
+[combat checkpoint #316](https://github.com/ericvanlare/melee-web/pull/316),
+[Stadium C3 #301](https://github.com/ericvanlare/melee-web/pull/301).
 
 ### 2026-10-12 — Owner: verified combat through the simulated network
 
