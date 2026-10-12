@@ -90,6 +90,22 @@ This sprint has the shared capture lane. Stadium and unchanged provider queries
 remain checkpointed while it runs. Keep the original runtime/input/checksum and
 cleanup rules; investigate a failed boundary before another long run.
 
+**Owner-approved combat follow-up (October 12):** use that same network lane
+to establish actual two-player combat before adding network architecture or
+content breadth. [Action observations #308](https://github.com/ericvanlare/melee-web/issues/308)
+retain and reduce the jump/landing checkpoint with source-owned animation
+observations. [Combat #313](https://github.com/ericvanlare/melee-web/issues/313)
+covers actual keyboard approach, attacks in both directions, shield interaction
+and an attack-caused stock loss. [Complete sessions #314](https://github.com/ericvanlare/melee-web/issues/314)
+then carries the verified combat through the original full route and rematches
+under moderate and asymmetric simulated conditions. Each milestone owns four
+timeboxed work items, one PR and one scoped status boundary. Grounded combat
+can proceed independently if the landing investigation remains inconclusive.
+Reuse existing original comparisons and preserve their setup/field exclusions;
+paired browser agreement alone is not original equivalence. The combat sprint
+now owns the shared capture lane, with Stadium and unchanged provider queries
+still checkpointed. Public staging and the separate acceptance gates remain open.
+
 **Owner-requested readiness checkpoint (October 11; updated October 12):** the
 existing local Worker and Host/Join UI have a [scoped browser result](status/2026-10-11-local-room-ui-readiness.md)
 for actual keyboard control through original CSS → SSS → four-stock Mario/FD

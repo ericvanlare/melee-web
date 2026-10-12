@@ -13,7 +13,8 @@ class FullRouteActionWindowTests(unittest.TestCase):
     def test_literal_jab_and_jump_windows(self):
         result = subprocess.run(
             [str(node_runtime(ROOT)), "--test",
-             str(ROOT / "tests/a3_local_room_full_route_action.test.mjs")],
+             str(ROOT / "tests/a3_local_room_full_route_action.test.mjs"),
+             str(ROOT / "tests/a3_action_animation_observation.test.mjs")],
             cwd=ROOT, capture_output=True, text=True, timeout=20,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

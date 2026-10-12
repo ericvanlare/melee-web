@@ -52,6 +52,24 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-12 — Owner: verified combat through the simulated network
+
+**Ask:** After the network simulation sprint, the owner approved the proposed
+twelve-item combat follow-up and autonomous execution.
+
+**Status:** Proceed in three milestone batches: diagnose the retained action
+observation gap, verify input-only attacks/defense and a combat stock loss,
+then carry that combat through complete original routes and rematches. Reuse
+the existing headless lane and source observers. Close-range component fixtures
+may inform assertions but must not supply manually positioned live fighters.
+Grounded combat may continue independently of the timeboxed landing diagnosis.
+Keep original comparison, public Internet and acceptance claims separate.
+
+**Links:** [Action checkpoint #308](https://github.com/ericvanlare/melee-web/issues/308),
+[Combat #313](https://github.com/ericvanlare/melee-web/issues/313),
+[Complete sessions #314](https://github.com/ericvanlare/melee-web/issues/314),
+[priorities #158](https://github.com/ericvanlare/melee-web/issues/158).
+
 ### 2026-10-11 night — Owner: simulate network play and complete a bounded sprint
 
 **Ask:** The owner explicitly permits a realistic same-computer network
