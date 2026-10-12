@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -18,14 +19,15 @@ from a3_expected_fault_auditor import audit_expected_cut
 
 ROOT = Path(__file__).resolve().parents[1]
 SCENARIOS = {
-    "css-moderate": ("moderate", False, False),
-    "full-moderate": ("moderate", True, False),
-    "full-moderate-action-probe": ("moderate", True, False),
-    "full-asymmetric": ("asymmetric", True, False),
-    "css-constrained": ("constrained", False, False),
-    "css-constrained-stall": ("constrained", False, True),
-    "css-moderate-cut": ("moderate", False, False),
-    "css-moderate-fresh": ("moderate", False, False),
+    "css-moderate": ("moderate", False, False, False, False, False),
+    "full-moderate": ("moderate", True, False, False, False, False),
+    "full-moderate-action-probe": ("moderate", True, False, False, True, False),
+    "full-moderate-repeat": ("moderate", True, False, False, False, True),
+    "full-asymmetric": ("asymmetric", True, False, False, False, False),
+    "css-constrained": ("constrained", False, False, False, False, False),
+    "css-constrained-stall": ("constrained", False, True, False, False, False),
+    "css-moderate-cut": ("moderate", False, False, True, False, False),
+    "css-moderate-fresh": ("moderate", False, False, False, False, False),
 }
 
 
@@ -52,7 +54,7 @@ def runtime_identity(directory):
 
 
 def validate_result(returncode, owner, browser, full_route, gameplay_action_probe=False,
-                    *, controlled_stall=False):
+                    repeat_full_route=False, *, controlled_stall=False):
     """Require both independent owners; an expected fault is a different policy."""
     if returncode != 0:
         raise ValueError(f"capture owner exited {returncode}")
@@ -83,6 +85,12 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
                 raise ValueError("requested gameplay action probe is incomplete")
         elif route.get("action_prefix") is not None:
             raise ValueError("baseline unexpectedly contains a gameplay action probe")
+        if repeat_full_route:
+            validate_repeat_route(route, browser.get("checksum_comparison"))
+        elif route.get("repeat_mode") is not None or route.get("repeated_matches") is not None:
+            raise ValueError("baseline unexpectedly contains repeated full routes")
+    elif repeat_full_route:
+        raise ValueError("repeated route scenario did not request a full route")
 
     if controlled_stall:
         probe = network.get("post_css_stall_probe") or {}
@@ -90,6 +98,206 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
                 probe.get("policy_result", {}).get("policy") != "controlled-post-css-stall-exercised" or
                 probe.get("policy_result", {}).get("result_is_not_clean_route_pass") is not True):
             raise ValueError("controlled-stall probe did not satisfy its separate result policy")
+
+
+def _nonnegative_int(value):
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _sha256_string(value):
+    return isinstance(value, str) and re.fullmatch(r"[a-f0-9]{64}", value) is not None
+
+
+def validate_repeat_route(route, checksum_comparison):
+    """Require two retained same-room routes and a common raw checksum prefix."""
+    def require(condition, message):
+        if not condition:
+            raise ValueError("repeated full route " + message)
+
+    require(route.get("repeat_mode") == "same-room-two-match",
+            "mode is missing or unknown")
+    matches = route.get("repeated_matches")
+    require(isinstance(matches, list) and len(matches) == 2,
+            "must retain exactly two route reports")
+    first, second = matches
+    screenshot_paths = set()
+    for expected, entry in enumerate(matches, 1):
+        require(entry.get("match_number") == expected and entry.get("result") == "pass",
+                f"match {expected} did not pass")
+        require((entry.get("route") or {}).get("result") == "pass",
+                f"match {expected} route report is incomplete")
+        artifact = entry.get("report_artifact") or {}
+        require(artifact.get("file") == f"match-{expected}/report.json" and
+                _nonnegative_int(artifact.get("bytes")) and artifact.get("bytes", 0) > 0 and
+                _sha256_string(artifact.get("sha256")),
+                f"match {expected} report artifact identity is missing")
+        found_screenshots = []
+        def visit_screenshots(value):
+            if isinstance(value, dict):
+                if {"file", "bytes", "sha256"}.issubset(value):
+                    found_screenshots.append(value)
+                for child in value.values():
+                    visit_screenshots(child)
+            elif isinstance(value, list):
+                for child in value:
+                    visit_screenshots(child)
+        visit_screenshots((entry.get("route") or {}).get("screenshots"))
+        require(found_screenshots, f"match {expected} has no retained screenshots")
+        for screenshot in found_screenshots:
+            filename = screenshot.get("file")
+            require(isinstance(filename, str) and filename.startswith(f"match-{expected}/") and
+                    filename not in screenshot_paths and _nonnegative_int(screenshot.get("bytes")) and
+                    screenshot.get("bytes", 0) > 0 and _sha256_string(screenshot.get("sha256")),
+                    f"match {expected} screenshot is not unique and bound")
+            screenshot_paths.add(filename)
+    first_route = first["route"]
+    second_route = second["route"]
+    first_boundary = first_route.get("required_checksum_boundary")
+    second_boundary = second_route.get("required_checksum_boundary")
+    require(_nonnegative_int(first_boundary) and first_boundary > 0 and
+            _nonnegative_int(second_boundary) and second_boundary > first_boundary,
+            "route checksum boundaries are invalid or nonmonotonic")
+    require(route.get("required_checksum_boundary") == second_boundary,
+            "final route boundary does not bind match two")
+
+    first_return = first.get("first_return")
+    second_entry = second.get("entry")
+    second_return = second.get("second_return")
+    require(isinstance(first_return, dict) and first_return.get("result") == "pass",
+            "first-return checkpoint was not validated before match two")
+    require(isinstance(second_entry, dict) and second_entry.get("result") == "pass" and
+            isinstance(second_return, dict) and second_return.get("result") == "pass",
+            "second entry/return checkpoints are incomplete")
+    identity = first_return.get("room_identity")
+    require(isinstance(identity, dict) and identity and
+            second_entry.get("room_identity") == identity and
+            second_return.get("room_identity") == identity,
+            "owner/page/room identity changed across routes")
+    for role, port in (("alpha", 0), ("beta", 1)):
+        observations = [((checkpoint.get("peers") or {}).get(role) or {}).get("peer_identity")
+                        for checkpoint in (first_return, second_entry, second_return)]
+        require(all(isinstance(item, dict) and item.get("role") == role and
+                    item.get("local_port") == port for item in observations),
+                f"{role} owner role/port changed across routes")
+        for checkpoint in (first_return, second_entry, second_return):
+            input_row = ((checkpoint.get("peers") or {}).get(role) or {}).get("input_diagnostics") or {}
+            require(input_row.get("port") == port and _nonnegative_int(input_row.get("sample")),
+                    f"{role} source input snapshot is missing or has the wrong port")
+
+    prefix = first_return.get("common_raw_prefix")
+    require(isinstance(prefix, dict) and prefix.get("result") == "pass" and
+            prefix.get("source_tick_range") == [0, first_boundary - 1] and
+            prefix.get("record_count") == first_boundary and
+            prefix.get("bytes_per_record") == 64 and prefix.get("alpha_equals_beta") is True and
+            isinstance(prefix.get("sha256_concatenated_records"), str) and
+            _sha256_string(prefix["sha256_concatenated_records"]),
+            "first match raw checksum prefix was not compared before match two")
+
+    def peer_value(checkpoint, role, key):
+        peer = (checkpoint.get("peers") or {}).get(role) or {}
+        return peer.get(key)
+
+    for role in ("alpha", "beta"):
+        first_cursor = peer_value(first_return, role, "source_cursor")
+        entry_cursor = peer_value(second_entry, role, "source_cursor")
+        return_cursor = peer_value(second_return, role, "source_cursor")
+        route_return_cursor = (second_route.get("returned_css", {}).get("source_cursor_by_peer", {})
+                               .get(role))
+        require(_nonnegative_int(first_cursor) and _nonnegative_int(entry_cursor) and
+                _nonnegative_int(return_cursor) and _nonnegative_int(route_return_cursor) and
+                entry_cursor >= first_cursor and return_cursor > entry_cursor and
+                return_cursor >= route_return_cursor,
+                f"{role} native source cursors did not advance monotonically through returned CSS")
+        first_counts = peer_value(first_return, role, "checksum_counts") or {}
+        entry_counts = peer_value(second_entry, role, "checksum_counts") or {}
+        return_counts = peer_value(second_return, role, "checksum_counts") or {}
+        for counter in ("retained", "local", "remote", "compared"):
+            before = first_counts.get(counter)
+            at_entry = entry_counts.get(counter)
+            after = return_counts.get(counter)
+            require(_nonnegative_int(before) and _nonnegative_int(at_entry) and
+                    _nonnegative_int(after) and at_entry >= before and after >= at_entry,
+                    f"{role} {counter} checksum counts did not advance monotonically")
+
+    admission = route.get("admission") or {}
+    duration = admission.get("first_route_duration_ms")
+    remaining = admission.get("remaining_before_second_ms")
+    subdeadline = admission.get("second_route_subdeadline_ms")
+    elapsed = admission.get("second_route_elapsed_ms")
+    final_reserve = admission.get("final_reserve_ms_at_second_return")
+    require(_nonnegative_int(duration) and duration > 0 and
+            first.get("route_elapsed_ms") == duration and second.get("route_elapsed_ms") == elapsed and
+            _nonnegative_int(remaining) and remaining >= duration + 30000 and
+            admission.get("required_remaining_ms") == duration + 30000 and
+            _nonnegative_int(subdeadline) and subdeadline <= duration + 10000 and
+            _nonnegative_int(elapsed) and elapsed <= subdeadline and
+            _nonnegative_int(final_reserve) and final_reserve >= 20000,
+            "measured route admission/subdeadline/final reserve failed")
+
+    final_prefix = route.get("final_prefix") or {}
+    require(final_prefix.get("result") == "pass" and
+            final_prefix.get("raw_records_present_in_final_checksum_comparison") is True and
+            _nonnegative_int(final_prefix.get("compared_source_ticks")) and
+            final_prefix["compared_source_ticks"] >= second_boundary and
+            final_prefix.get("first_boundary") == first_boundary and
+            final_prefix.get("first_prefix_sha256") == prefix["sha256_concatenated_records"] and
+            final_prefix.get("second_boundary") == second_boundary and
+            _sha256_string(final_prefix.get("second_prefix_sha256")),
+            "final exact checksum prefix does not bind both route boundaries")
+
+    records = (checksum_comparison or {}).get("records")
+    compared = (checksum_comparison or {}).get("compared_source_ticks")
+    require(isinstance(records, list) and _nonnegative_int(compared) and
+            compared >= second_boundary and len(records) >= second_boundary,
+            "final raw checksum comparison does not cover match two")
+    digest = hashlib.sha256()
+    for tick in range(second_boundary):
+        row = records[tick]
+        left = row.get("alpha_raw_hex") if isinstance(row, dict) else None
+        right = row.get("beta_raw_hex") if isinstance(row, dict) else None
+        require(isinstance(row, dict) and _nonnegative_int(row.get("source_tick")) and
+                row.get("source_tick") == tick and row.get("bytes") == 64 and
+                isinstance(left, str) and re.fullmatch(r"[a-f0-9]{128}", left) is not None and
+                left == right,
+                f"final raw checksum record {tick} is missing, malformed, or differs by peer")
+        digest.update(bytes.fromhex(left))
+        if tick + 1 == first_boundary:
+            require(digest.copy().hexdigest() == prefix["sha256_concatenated_records"] and
+                    digest.copy().hexdigest() == final_prefix["first_prefix_sha256"],
+                    "final raw records do not match the pre-second-match prefix")
+    require(digest.hexdigest() == final_prefix["second_prefix_sha256"],
+            "final raw records do not match the second-match prefix")
+
+
+def validate_repeat_artifacts(browser_directory, route):
+    """Bind per-match report and screenshot receipts to files written by the browser."""
+    root = Path(browser_directory).resolve(strict=True)
+
+    def verify_file(relative, expected):
+        path = Path(relative)
+        if path.is_absolute() or ".." in path.parts:
+            raise ValueError("repeated full route artifact path escapes the browser output")
+        candidate = (root / path).resolve(strict=True)
+        try:
+            candidate.relative_to(root)
+        except ValueError as error:
+            raise ValueError("repeated full route artifact path escapes the browser output") from error
+        actual = file_identity(candidate)
+        if actual != {"bytes": expected.get("bytes"), "sha256": expected.get("sha256")}:
+            raise ValueError("repeated full route artifact hash differs from its receipt")
+
+    for entry in route["repeated_matches"]:
+        verify_file(entry["report_artifact"]["file"], entry["report_artifact"])
+        def visit(value):
+            if isinstance(value, dict):
+                if {"file", "bytes", "sha256"}.issubset(value):
+                    verify_file(value["file"], value)
+                for child in value.values():
+                    visit(child)
+            elif isinstance(value, list):
+                for child in value:
+                    visit(child)
+        visit(entry["route"].get("screenshots"))
 
 
 def process_identities(owner):
@@ -193,9 +401,8 @@ def main():
         "ready_url": f"http://127.0.0.1:{args.port}/runtime.html", "ready_timeout_ms": 10000})
     try:
         for name in args.scenarios:
-            profile, full_route, controlled_stall = SCENARIOS[name]
-            controlled_cut = name == "css-moderate-cut"
-            gameplay_action_probe = name == "full-moderate-action-probe"
+            (profile, full_route, controlled_stall, controlled_cut,
+             gameplay_action_probe, repeat_full_route) = SCENARIOS[name]
             folder = output / name
             folder.mkdir()
             command = [sys.executable, str(ROOT / "scripts/capture_owner_deadline.py"),
@@ -215,6 +422,8 @@ def main():
                 command.append("--full-route")
             if gameplay_action_probe:
                 command.append("--gameplay-action-probe")
+            if repeat_full_route:
+                command.append("--repeat-full-route")
             if controlled_stall:
                 command.append("--post-css-stall-probe")
             if controlled_cut:
@@ -224,8 +433,11 @@ def main():
                    "controlled_stall_probe": controlled_stall,
                    "controlled_cut_probe": controlled_cut,
                    "result_policy": "expected-fault-cut" if controlled_cut else
-                       "controlled-stall-probe" if controlled_stall else "clean-route",
+                       "controlled-stall-probe" if controlled_stall else
+                       "two-match-repeat" if repeat_full_route else "clean-route",
                    "command": command, "decision": "PLANNED"}
+            if repeat_full_route:
+                row["repeat_full_route"] = True
             report["scenarios"].append(row)
             write_json(report_path, report)
             if args.plan_only:
@@ -265,7 +477,9 @@ def main():
                 audited_cut = {"owner": owner, "browser": browser, "folder": folder}
             else:
                 validate_result(result.returncode, owner, browser, full_route, gameplay_action_probe,
-                                controlled_stall=controlled_stall)
+                                repeat_full_route, controlled_stall=controlled_stall)
+                if repeat_full_route:
+                    validate_repeat_artifacts(folder / "browser", browser["full_route"])
                 if name == "css-moderate-fresh":
                     row["fresh_session_evidence"] = validate_fresh_session(
                         audited_cut, owner, browser, folder)
