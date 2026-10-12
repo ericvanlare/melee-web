@@ -914,7 +914,7 @@ def prepare_rules_profile(profile, user, *, source_slots=(0, 1)):
 
 
 def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout=180, gci=None,
-        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False):
+        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False):
     """Own fresh output before preparation so failures cannot vanish before launch."""
     output = Path(output)
     replay_receipt = (stadium_replay_preflight(input_replay, output, build_manifest)
@@ -929,7 +929,8 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
                     menu_recipe=menu_recipe, output=output, build_manifest=build_manifest, timeout=timeout, gci=gci,
                     ordinary_policy=ordinary_policy, replay_receipt=replay_receipt,
                     common_wire_comparator=common_wire_comparator,
-                    stop_after_items=stop_after_items)
+                    stop_after_items=stop_after_items,
+                    stadium_constructor_owner=stadium_constructor_owner)
     except Exception as error:
         failure = output / "failure.json"
         if not failure.exists():
@@ -940,10 +941,13 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
 
 
 def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout, gci=None,
-         ordinary_policy=None, replay_receipt=None, common_wire_comparator=None, stop_after_items=False):
+         ordinary_policy=None, replay_receipt=None, common_wire_comparator=None, stop_after_items=False, stadium_constructor_owner=False):
     build = validate_reference_build_manifest(Path(build_manifest), Path(dolphin))
     menus, menu_hash = menu_actions(menu_recipe)
     stadium_prefix = menus["scope"] == "stadium_go_prefix"
+    require(type(stadium_constructor_owner) is bool and
+            (not stadium_constructor_owner or (stadium_prefix and replay_receipt is not None)),
+            "Stadium constructor adjunct requires explicit recorded Stadium replay")
     require(replay_receipt is None or stadium_prefix,
             "Recorded MWRI replay is exclusive to Stadium prefix")
     if replay_receipt is not None:
@@ -1047,6 +1051,8 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
     elif stadium_prefix:
         environment.update(MWRC_STADIUM_GO_PREFIX="1",
                            MWRC_STADIUM_SETUP_RECEIPT_SHA256=menus["setup_receipt_sha256"])
+        if stadium_constructor_owner:
+            environment["MWRC_STADIUM_CONSTRUCTOR_OWNER"] = "1"
     else:
         environment.update(MWRC_SD_INIT="1",
                            MWRC_SD_RECIPE_SHA256=plan["authored_recipe_sha256"],
@@ -1085,6 +1091,8 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
     if replay_receipt is not None:
         launch.update(input_mode="replay", input_replay=replay_receipt,
                       adaptive_controller_enabled=False)
+    if stadium_constructor_owner:
+        launch["stadium_constructor_owner"] = True
     (output / "launch.json").write_bytes(canonical(launch))
     controller = (DualPipeController(p1, p2, output / "input-intentions.jsonl")
                   if replay_receipt is None else None)
@@ -1219,19 +1227,21 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                                     validate_status(native_status, mode="record",
                                         events=input_summary["events"], require_complete=True))
                     check_stadium_capture_bounds(raw, native, deadline, receiver.seq)
+                    constructor_scope = {"constructor_observations": True} if stadium_constructor_owner else {}
                     prefix_report = validate_stadium_go_prefix(
-                        raw, menus["setup_receipt_sha256"], status_path=status)
+                        raw, menus["setup_receipt_sha256"], status_path=status, **constructor_scope)
                     state_report = common_report = None
                     if replay_receipt is not None:
                         from stadium_go_prefix import validate_stadium_idle_state_snapshot
                         state_report = validate_stadium_idle_state_snapshot(
-                            raw, menus["setup_receipt_sha256"], status_path=status)
+                            raw, menus["setup_receipt_sha256"], status_path=status, **constructor_scope)
                         common_report = common_wire_comparator(
                             replay_receipt["original_observer"], raw,
                             original_status_path=replay_receipt["original_status"],
-                            candidate_status_path=status)
+                            candidate_status_path=status, **constructor_scope)
                         require(isinstance(common_report, dict) and
-                                common_report.get("decision") == "PASS_EXACT_STADIUM_COMMON_WIRE",
+                                common_report.get("decision") == ("PASS_SEQUENCE_MAPPED_STADIUM_COMMON_WIRE_WITH_CONSTRUCTOR_OBSERVATIONS"
+                                    if stadium_constructor_owner else "PASS_EXACT_STADIUM_COMMON_WIRE"),
                                 "Stadium replay common-wire comparison did not pass")
                     bounded_log.check()
                     report = {
@@ -1791,6 +1801,8 @@ def main(argv=None):
                         help="Exact separate adaptive competitive timeout policy; v4 remains entry provenance")
     parser.add_argument("--input-replay", type=Path,
                         help="Pinned complete v6 MWRI; Stadium-only, no adaptive input writes")
+    parser.add_argument("--stadium-constructor-owner", action="store_true",
+                        help="Observe map2 constructor within exact recorded Stadium replay; F terminal unchanged")
     parser.add_argument("--stop-after-items", action="store_true",
                         help="Stop the same original transform menu route at observed Items readiness; no setup/transform claim")
     parser.add_argument("--timeout", type=float, default=180)

@@ -28,6 +28,7 @@ from reference_observer_stream import (
     iter_records,
 )
 from stadium_go_prefix import (
+    CONSTRUCTOR_POINTS,
     EXPECTED_SETUP_RECEIPT_SHA256,
     MAX_STREAM_BYTES,
     MAX_STREAM_RECORDS,
@@ -225,8 +226,9 @@ def _identity(stream_path: Path, status_path: Path,
 
 def _raise_mismatch(original_identity: dict[str, Any],
                     candidate_identity: dict[str, Any], record_index: int,
-                    sequence: int | None, path: str, expected: Any, actual: Any) -> None:
-    raise StadiumCommonWireMismatch({
+                    sequence: int | None, path: str, expected: Any, actual: Any,
+                    sequence_mapping: dict[str, int | None] | None = None) -> None:
+    receipt = {
         "schema": SCHEMA,
         "version": VERSION,
         "decision": "REFUSE_STADIUM_COMMON_WIRE_MISMATCH",
@@ -239,7 +241,12 @@ def _raise_mismatch(original_identity: dict[str, Any],
             "expected": expected,
             "actual": actual,
         },
-    })
+    }
+    if sequence_mapping is not None:
+        receipt["version"] = 2
+        receipt["decision"] = "REFUSE_SEQUENCE_MAPPED_STADIUM_COMMON_WIRE_MISMATCH"
+        receipt["first_difference"].update(sequence_mapping)
+    raise StadiumCommonWireMismatch(receipt)
 
 
 def compare_stadium_common_wire(
@@ -247,8 +254,12 @@ def compare_stadium_common_wire(
         candidate_stream: str | Path,
         *,
         original_status_path: str | Path,
-        candidate_status_path: str | Path) -> dict[str, Any]:
+        candidate_status_path: str | Path,
+        constructor_observations: bool = False) -> dict[str, Any]:
     """Compare exact original common fields for two complete Stadium prefixes.
+
+    Explicit constructor scope validates and accounts for three or five inserted
+    candidate records before comparing the remaining fields with a sequence map.
 
     Both streams must pass the strict GO-prefix route validator. The candidate
     must additionally pass the strict GO/C/F state companion. A mismatch raises
@@ -256,6 +267,9 @@ def compare_stadium_common_wire(
     ``receipt`` with the first differing sequence and field path.
     """
 
+    if type(constructor_observations) is not bool:
+        raise StadiumGoPrefixError("constructor comparison option must be boolean")
+    constructor_scope = {"constructor_observations": True} if constructor_observations else {}
     original_path = Path(original_stream)
     candidate_path = Path(candidate_stream)
     original_status = Path(original_status_path)
@@ -264,9 +278,9 @@ def compare_stadium_common_wire(
     original_route = validate_stadium_go_prefix(
         original_path, EXPECTED_SETUP_RECEIPT_SHA256, original_status)
     candidate_route = validate_stadium_go_prefix(
-        candidate_path, EXPECTED_SETUP_RECEIPT_SHA256, candidate_status)
+        candidate_path, EXPECTED_SETUP_RECEIPT_SHA256, candidate_status, **constructor_scope)
     candidate_state = validate_stadium_idle_state_snapshot(
-        candidate_path, EXPECTED_SETUP_RECEIPT_SHA256, candidate_status)
+        candidate_path, EXPECTED_SETUP_RECEIPT_SHA256, candidate_status, **constructor_scope)
     if candidate_state.get("stream_sha256") != candidate_route.get("stream_sha256"):
         raise StadiumGoPrefixError(
             "candidate state companion and route validator admitted different stream bytes")
@@ -275,7 +289,31 @@ def compare_stadium_common_wire(
     candidate_identity = _identity(candidate_path, candidate_status, candidate_route)
 
     original_rows = _iter_wire_rows(original_path, original_route)
-    candidate_rows = _iter_wire_rows(candidate_path, candidate_route)
+    candidate_wire_rows = _iter_wire_rows(candidate_path, candidate_route)
+    constructor_sequences = (candidate_route["constructor_observations"]["source_sequences"]
+                             if constructor_observations else [])
+    constructor_set = set(constructor_sequences)
+    if constructor_observations and (len(constructor_sequences) not in (3, 5) or
+                                     len(constructor_set) != len(constructor_sequences)):
+        raise StadiumGoPrefixError("constructor row inventory is not bounded and unique")
+    removed = []
+    sequence_ranges = []  # At most six ranges: one per insertion plus final tail.
+
+    def candidate_common_rows():
+        for row, header in candidate_wire_rows:
+            if header[3] in constructor_set:
+                # Route/constructor validation already admitted the entire payload.
+                # Raw JSON PC is not exposed by iter_records; bind it before removal.
+                phase = row["payload"]["phase"]
+                if row["event"] != "progress" or header[5] != CONSTRUCTOR_POINTS[phase][0]:
+                    raise StadiumGoPrefixError("constructor raw header PC/event differs from validated source witness")
+                removed.append({"candidate_sequence": header[3], "phase": phase,
+                                "pc": header[5], "source_tick": header[6],
+                                "draw_ordinal": header[7]})
+                continue
+            yield row, header
+
+    candidate_rows = candidate_common_rows()
     original_index = candidate_index = 0
 
     while True:
@@ -299,40 +337,61 @@ def compare_stadium_common_wire(
                 min(original_index, candidate_index), header[3],
                 "wire.record_count", "<end-of-stream>" if original_record is None
                 else header[3], "<end-of-stream>" if candidate_record is None
-                else header[3])
+                else header[3],
+                sequence_mapping=({"original_sequence": original_record[1][3] if original_record else None,
+                                   "candidate_sequence": candidate_record[1][3] if candidate_record else None}
+                                  if constructor_observations else None))
 
         original_row, original_header = original_record
         candidate_row, candidate_header = candidate_record
         sequence = original_header[3]
-        if candidate_header[3] != sequence:
+        mapping = ({"original_sequence": sequence, "candidate_sequence": candidate_header[3]}
+                   if constructor_observations else None)
+        expected_candidate_sequence = sequence + len(removed)
+        if candidate_header[3] != expected_candidate_sequence:
             _raise_mismatch(original_identity, candidate_identity, original_index,
-                            sequence, "wire.header.sequence", sequence,
-                            candidate_header[3])
+                            sequence, "wire.header.sequence", expected_candidate_sequence,
+                            candidate_header[3], sequence_mapping=mapping)
         for index, name in _WIRE_FIELDS:
+            if constructor_observations and index == 3:
+                continue  # Exact accounted insertion offset checked above.
             if original_header[index] != candidate_header[index]:
                 _raise_mismatch(
                     original_identity, candidate_identity, original_index,
                     sequence, f"wire.header.{name}", original_header[index],
-                    candidate_header[index])
+                    candidate_header[index], sequence_mapping=mapping)
         if original_row["event"] != candidate_row["event"]:
             _raise_mismatch(original_identity, candidate_identity, original_index,
                             sequence, "record.event", original_row["event"],
-                            candidate_row["event"])
+                            candidate_row["event"], sequence_mapping=mapping)
 
         original_payload = original_row.get("payload")
         candidate_payload = candidate_row.get("payload")
         if not isinstance(original_payload, dict) or not isinstance(candidate_payload, dict):
             _raise_mismatch(original_identity, candidate_identity, original_index,
                             sequence, "record.payload", original_payload,
-                            candidate_payload)
+                            candidate_payload, sequence_mapping=mapping)
         projected_candidate = _candidate_common_payload(
-            candidate_payload, sequence, state_sequences)
+            candidate_payload, candidate_header[3], state_sequences)
+        if constructor_observations and candidate_row["event"] in ("handshake", "start", "end"):
+            projected_candidate = dict(projected_candidate)
+            projected_candidate.pop("constructor_owner_observations")
+            if candidate_row["event"] == "end":
+                for key in ("constructor_observations_complete", "registration_event_observed",
+                            "allocation_generation_observed", "lifetime_pairing_observed"):
+                    projected_candidate.pop(key)
         difference = _first_difference(original_payload, projected_candidate, "payload")
         if difference is not None:
             path, expected, actual = difference
             _raise_mismatch(original_identity, candidate_identity, original_index,
-                            sequence, path, expected, actual)
+                            sequence, path, expected, actual, sequence_mapping=mapping)
 
+        if constructor_observations:
+            if sequence_ranges and sequence_ranges[-1][1] + 1 == sequence and sequence_ranges[-1][3] + 1 == candidate_header[3]:
+                sequence_ranges[-1][1] = sequence
+                sequence_ranges[-1][3] = candidate_header[3]
+            else:
+                sequence_ranges.append([sequence, sequence, candidate_header[3], candidate_header[3]])
         original_index += 1
         candidate_index += 1
 
@@ -351,6 +410,12 @@ def compare_stadium_common_wire(
                 "actual": candidate_index,
             },
         })
+
+    if constructor_observations and (
+            [item["candidate_sequence"] for item in removed] != constructor_sequences or
+            candidate_index + len(removed) != candidate_route["stream_records"] or
+            original_index != original_route["stream_records"] or len(sequence_ranges) > 6):
+        raise StadiumGoPrefixError("constructor comparison did not account for every actual source record")
 
     receipt = {
         "schema": SCHEMA,
@@ -379,6 +444,23 @@ def compare_stadium_common_wire(
             },
         },
     }
+    if constructor_observations:
+        receipt["version"] = 2
+        receipt["decision"] = "PASS_SEQUENCE_MAPPED_STADIUM_COMMON_WIRE_WITH_CONSTRUCTOR_OBSERVATIONS"
+        receipt["scope"] = "exact retained common source fields with explicitly accounted constructor record insertions; original wire sequence numbers differ"
+        receipt["comparison"]["exact_wire_fields"] = [name for _, name in _WIRE_FIELDS if name != "sequence"]
+        receipt["comparison"]["sequence_mapping"] = {
+            "range_columns": ["original_first", "original_last", "candidate_first", "candidate_last"],
+            "inclusive_ranges": sequence_ranges,
+            "removed_candidate_constructor_records": removed,
+            "all_original_records_compared": original_index,
+            "all_candidate_records_accounted": candidate_index + len(removed),
+        }
+        receipt["comparison"]["candidate_constructor_metadata_removed_after_validation"] = {
+            "handshake_and_start": ["constructor_owner_observations"],
+            "end": ["constructor_owner_observations", "constructor_observations_complete",
+                    "registration_event_observed", "allocation_generation_observed", "lifetime_pairing_observed"],
+        }
     # Enforce strict JSON output, rejecting accidental NaN or non-JSON values.
     json.dumps(receipt, sort_keys=True, separators=(",", ":"), allow_nan=False)
     return receipt

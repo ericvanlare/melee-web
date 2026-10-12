@@ -80,6 +80,14 @@ constexpr u32 STADIUM_GO_CALL_PC = 0x8016B820;
 constexpr u32 STADIUM_GO_CALL_WORD = 0x48068821;
 constexpr u32 STADIUM_GO_AFTER_PC = 0x8016B824;
 constexpr u32 STADIUM_GO_AFTER_WORD = 0x881F24C9;
+// Opt-in witnesses inside the already checked original Stadium VS constructor.
+constexpr std::array<u32, 7> STADIUM_CONSTRUCTOR_PCS = {
+    0x801d13e0, 0x801d147c, 0x801d1494, 0x801d1498,
+    0x801d14b4, 0x801d14b8, 0x801d14c8};
+constexpr std::array<u32, 7> STADIUM_CONSTRUCTOR_WORDS = {
+    0x7c0802a6, 0x83630004, 0x481af0ed, 0x48000008,
+    0x481af0cd, 0x48000008, 0x3ba00001};
+constexpr size_t STADIUM_CONSTRUCTOR_CHAIN_CAP = MAX_SLICES - 15;  // Observer capacity, not an authored bound.
 // Identity of the observed port CSS->SSS setup record used by this recipe.
 constexpr char STADIUM_SETUP_RECEIPT_SHA256[] =
     "e6b15cececf103efeb9b7df2dd18908e9a66d37ebde68622ecd304f8eabcfcda";
@@ -361,6 +369,15 @@ enum class SliceTag : u16
   StadiumTitleTextWrapper = 87,
   StadiumTitleStaticTextPointer = 88,
   StadiumTitleDynamicTextPointer = 89,
+  StadiumConstructorGObj = 90,
+  StadiumConstructorGround = 91,
+  StadiumConstructorListHead = 92,
+  StadiumConstructorParameterSlot = 93,
+  StadiumConstructorParameters = 94,
+  StadiumConstructorPLinkLimit = 95,
+  StadiumConstructorChainNode = 96,
+  StadiumConstructorStoreWord = 97,
+  StadiumConstructorEntities = 98,
 };
 
 struct SliceRef
@@ -1154,6 +1171,11 @@ struct Observer::Impl
     if (!stadium_go_prefix_setting.empty() && stadium_go_prefix_setting != "1")
       return SetInvalid("MWRC_STADIUM_GO_PREFIX must be 1 when set"), false;
     stadium_go_prefix_enabled = stadium_go_prefix_setting == "1";
+    const std::string constructor_setting = Env("MWRC_STADIUM_CONSTRUCTOR_OWNER");
+    if ((!constructor_setting.empty() && constructor_setting != "1") ||
+        (!constructor_setting.empty() && !stadium_go_prefix_enabled))
+      return SetInvalid("Stadium constructor adjunct requires the checked Stadium GO prefix"), false;
+    stadium_constructor_enabled = constructor_setting == "1";
     // This SHA is an external setup-receipt identity only. The observer emits
     // the selected raw MatchSetup for a separate driver-side semantic check.
     stadium_go_prefix_setup_receipt_sha256 = Env("MWRC_STADIUM_SETUP_RECEIPT_SHA256");
@@ -1367,6 +1389,8 @@ struct Observer::Impl
       handshake += ",\"diagnostic\":\"stadium_go_prefix_v3\",\"setup_receipt_sha256\":\"" +
                    stadium_go_prefix_setup_receipt_sha256 +
                    "\",\"setup_profile_verified_by_observer\":false,\"go_call_pc\":\"0x8016b820\",\"go_after_pc\":\"0x8016b824\"";
+    if (stadium_constructor_enabled)
+      handshake += ",\"constructor_owner_observations\":true";
     if (SdInitRequested())
       handshake += ",\"diagnostic\":\"sd_initialization_prefix\",\"recipe_sha256\":\"" +
                    Env("MWRC_SD_RECIPE_SHA256") + "\",\"menu_probe\":\"" +
@@ -1400,6 +1424,8 @@ struct Observer::Impl
       start += ",\"diagnostic\":\"stadium_go_prefix_v3\",\"setup_receipt_sha256\":\"" +
                stadium_go_prefix_setup_receipt_sha256 +
                "\",\"setup_profile_verified_by_observer\":false,\"completion_boundary\":\"source_tick_C_then_source_tick_F_then_first_draw_return\"";
+    if (stadium_constructor_enabled)
+      start += ",\"constructor_owner_observations\":true";
     start += "}";
     PushJson(Event::Start, start);
     return !invalid.load();
@@ -3643,6 +3669,120 @@ struct Observer::Impl
     return SceneResetAction::Invalid;
   }
 
+  // Entry is within gm_Scene_Vs_OnEnter -> fn_8016E730 -> Stage_8022524C
+  // -> Ground_801C0800 -> grStadium_OnInit. No registration/generation claim.
+  void ObserveStadiumConstructor(Core::System* system, size_t point,
+                                  PowerPC::PowerPCState* state)
+  {
+    if (!stadium_go_prefix_vs_entry_seen)
+      return;  // Attract constructors cannot arm this adjunct.
+    u32 word = 0, tick = 0;
+    u8 mode = 0;
+    if (!stadium_go_prefix_sss_exit_seen ||
+        stadium_go_prefix_phase != StadiumGoPrefixPhase::AwaitSetup ||
+        !ReadBytes(system, 0x80479d30, 1, &mode) || mode != 2 ||
+        !ReadU32(system, STADIUM_CONSTRUCTOR_PCS[point], &word) ||
+        word != STADIUM_CONSTRUCTOR_WORDS[point] ||
+        !ReadU32(system, 0x80479d58, &tick))
+      return SetInvalid("Stadium constructor escaped its accepted ordinary VS setup interval"), void();
+    if (point == 0)
+    {
+      if (stadium_constructor_step != 0)
+        return SetInvalid("Stadium constructor entry duplicated"), void();
+      stadium_constructor_gobj = state->gpr[3];
+      if (!IsMem1Range(stadium_constructor_gobj, 0x38) ||
+          !ReadU32(system, stadium_constructor_gobj + 0x2c, &stadium_constructor_ground))
+        return SetInvalid("Stadium constructor entry lacks Ground user data"), void();
+    }
+    else if (state->gpr[30] != stadium_constructor_gobj ||
+             state->gpr[31] != stadium_constructor_ground)
+      return SetInvalid("Stadium constructor register owner changed"), void();
+    const bool call = point == 2 || point == 4;
+    const bool returned = point == 3 || point == 5;
+    if ((point == 1 && stadium_constructor_step != 1) ||
+        (call && stadium_constructor_step != 2) ||
+        (returned && (stadium_constructor_step != 3 || point != stadium_constructor_call + 1)) ||
+        (point == 6 && stadium_constructor_step != 2 && stadium_constructor_step != 4))
+      return SetInvalid("Stadium constructor witnesses are missing, duplicated or reordered"), void();
+    raw_size = 0;
+    slice_count = 0;
+    u32 root = 0, ground = 0, backlink = 0, map_id = 0, entities = 0, head = 0;
+    std::array<u8, 0x38> header{};
+    u8 limit = 0;
+    if (!IsMem1Range(stadium_constructor_gobj, header.size()) ||
+        !IsMem1Range(stadium_constructor_ground, 0x18) ||
+        stadium_constructor_gobj % 4 || stadium_constructor_ground % 4 ||
+        !ReadU32(system, 0x8049e850, &root) || root != stadium_constructor_gobj ||
+        !ReadU32(system, root + 0x2c, &ground) || ground != stadium_constructor_ground ||
+        !ReadU32(system, ground + 4, &backlink) || backlink != root ||
+        !ReadU32(system, ground + 0x14, &map_id) || map_id != 2 ||
+        !ReadMem1(system, root, header.size(), header.data()) ||
+        ReadBE16(header.data()) != 3 || header[2] != 5 || header[7] != 3 ||
+        !ReadBytes(system, 0x804ce380, 1, &limit) || limit < 5 ||
+        !ReadU32(system, 0x804d782c, &entities) || !IsMem1Range(entities, 24) ||
+        !ReadU32(system, entities + 20, &head) ||
+        !AddMem1Slice(system, SliceTag::StadiumMapRoot, 0x8049e850, 4, 2) ||
+        !AddMem1Slice(system, SliceTag::StadiumGroundPointer, root + 0x2c, 4, 2) ||
+        !AddMem1Slice(system, SliceTag::StadiumConstructorGObj, root, 0x38) ||
+        !AddMem1Slice(system, SliceTag::StadiumConstructorGround, ground, 0x18) ||
+        !AddMem1Slice(system, SliceTag::StadiumConstructorPLinkLimit, 0x804ce380, 1) ||
+        !AddMem1Slice(system, SliceTag::StadiumConstructorListHead, entities + 20, 4) ||
+        !AddMem1Slice(system, SliceTag::StadiumConstructorEntities, 0x804d782c, 4))
+      return SetInvalid("Stadium constructor live map2 owner is not source-linked"), void();
+    std::array<u32, STADIUM_CONSTRUCTOR_CHAIN_CAP> seen{};
+    size_t count = 0;
+    for (u32 node = head;;)
+    {
+      if (!node || count == seen.size() ||
+          std::find(seen.begin(), seen.begin() + count, node) != seen.begin() + count ||
+          !ReadMem1(system, node, header.size(), header.data()) || header[2] != 5 ||
+          !AddMem1Slice(system, SliceTag::StadiumConstructorChainNode, node, 0x38,
+                       static_cast<u16>(count)))
+        return SetInvalid("Stadium constructor membership missing, cyclic or over observer capacity"), void();
+      seen[count++] = node;
+      if (node == root) break;
+      node = ReadBE32(header.data() + 8);
+    }
+    u32 rng = 0;
+    if (state->gpr[13] < 0x570c || state->gpr[13] - 0x570c != 0x804d5f94 ||
+        !ReadU32(system, 0x804d5f94, &rng) || rng % 4 ||
+        !AddMem1Slice(system, SliceTag::RngPointer, 0x804d5f94, 4) ||
+        !AddMem1Slice(system, SliceTag::RngValue, rng, 4) ||
+        !AddMem1Slice(system, SliceTag::SceneRouting, 0x80479d30, 6) ||
+        !AddMem1Slice(system, SliceTag::SceneFrame, 0x80479d58, 4))
+      return SetInvalid("Stadium constructor RNG or routing slices unavailable"), void();
+    if (point == 1)
+    {
+      if (state->gpr[13] < 0x4d28)
+        return SetInvalid("Stadium constructor parameter slot underflow"), void();
+      stadium_constructor_parameter_slot = state->gpr[13] - 0x4d28;
+      if (!ReadU32(system, stadium_constructor_parameter_slot, &stadium_constructor_parameters) ||
+          stadium_constructor_parameters != state->gpr[3])
+        return SetInvalid("Stadium constructor cached parameter pointer differs from r3"), void();
+    }
+    if (point != 0 &&
+        (!AddMem1Slice(system, SliceTag::StadiumConstructorParameterSlot,
+                      stadium_constructor_parameter_slot, 4) ||
+         !AddMem1Slice(system, SliceTag::StadiumConstructorParameters,
+                      stadium_constructor_parameters, 8)))
+      return SetInvalid("Stadium constructor cached parameter bytes unavailable"), void();
+    if (point == 6 &&
+        (!AddMem1Slice(system, SliceTag::StadiumMap2Countdown, ground + 0xd8, 4) ||
+         !AddMem1Slice(system, SliceTag::StadiumConstructorStoreWord, 0x801d14c4, 4)))
+      return SetInvalid("Stadium constructor post-store countdown unavailable"), void();
+    static constexpr std::array<const char*, 7> phases = {
+        "constructor_entry", "constructor_parameters", "constructor_up_call",
+        "constructor_up_return", "constructor_down_call", "constructor_down_return",
+        "constructor_commit"};
+    PublishStadiumProgress(phases[point], STADIUM_CONSTRUCTOR_PCS[point], word,
+                           root, state, tick);
+    if (point == 0) stadium_constructor_step = 1;
+    else if (point == 1) stadium_constructor_step = 2;
+    else if (call) { stadium_constructor_step = 3; stadium_constructor_call = point; }
+    else if (returned) stadium_constructor_step = 4;
+    else stadium_constructor_step = 5;
+  }
+
   void PublishStadiumProgress(const char* phase, u32 pc, u32 word, u32 argument,
                               PowerPC::PowerPCState* state, u32 source_tick)
   {
@@ -3663,6 +3803,17 @@ struct Observer::Impl
     if (!AppendHex(&json, state->spr[8], 8))
       return SetInvalid("Stadium named Progress LR serialization exceeded its bound"), void();
     json += "\"";
+    if (std::string(phase).rfind("constructor_", 0) == 0)
+    {
+      json += ",\"constructor_gprs\":[";
+      const std::array<u32, 6> indices = {3, 13, 27, 28, 30, 31};
+      for (size_t i = 0; i < indices.size(); ++i)
+      {
+        if (i) json += ",";
+        json += std::to_string(state->gpr[indices[i]]);
+      }
+      json += "]";
+    }
     if (std::string(phase).rfind("sss_position_", 0) == 0)
     {
       json += ",\"position_call\":" + std::to_string(stadium_sss_position.id);
@@ -3972,6 +4123,12 @@ struct Observer::Impl
   {
     if (!Start() || invalid.load() || finish_requested.load())
       return;
+    if (stadium_constructor_enabled)
+    {
+      const auto point = std::find(STADIUM_CONSTRUCTOR_PCS.begin(), STADIUM_CONSTRUCTOR_PCS.end(), pc);
+      if (point != STADIUM_CONSTRUCTOR_PCS.end())
+        return ObserveStadiumConstructor(system, static_cast<size_t>(point - STADIUM_CONSTRUCTOR_PCS.begin()), state), void();
+    }
     if (stadium_go_prefix_enabled)
     {
       if (pc == 0x8025a310 || pc == 0x8025a4c0 || pc == 0x8025a4e8 || pc == 0x8025a548)
@@ -4501,6 +4658,8 @@ struct Observer::Impl
             (!stadium_go_prefix_vs_entry_seen ||
              stadium_go_prefix_phase != StadiumGoPrefixPhase::AwaitSetup))
           return SetInvalid("Stadium Setup preceded its accepted ordinary VS Entry"), void();
+        if (stadium_constructor_enabled && stadium_constructor_step != 5)
+          return SetInvalid("Stadium Setup lacks its complete constructor adjunct"), void();
         if (!match_active || !setup_pointer ||
             !AddSlice(system, SliceTag::MatchSetup, setup_pointer, 0x138))
           return;
@@ -5671,6 +5830,13 @@ struct Observer::Impl
                    (stadium_go_prefix_phase == StadiumGoPrefixPhase::Complete ? "true" : "false") +
                    ",\"tail_ticks_before_draw_return\":" +
                    std::to_string(stadium_go_prefix_tail_ticks) + "}";
+          if (stadium_constructor_enabled)
+          {
+            json.pop_back();
+            json += ",\"constructor_owner_observations\":true,\"constructor_observations_complete\":" +
+                    std::string(stadium_constructor_step == 5 && !invalid.load() ? "true" : "false") +
+                    ",\"registration_event_observed\":false,\"allocation_generation_observed\":false,\"lifetime_pairing_observed\":false}";
+          }
           end_slot.payload_size = static_cast<u32>(json.size());
           std::memcpy(end_slot.payload.data(), json.data(), json.size());
           end_slot.checksum = CRC32(end_slot.payload.data(), end_slot.payload_size);
@@ -5918,6 +6084,10 @@ struct Observer::Impl
     u32 id = 0, gobj = 0, jobj = 0, proc = 0, frame_sp = 0, target_jobj = 0, entry_cursor_state = 0, scene_pointer = 0;
   } stadium_sss_position;
   u32 stadium_sss_position_calls = 0;
+  bool stadium_constructor_enabled = false;
+  size_t stadium_constructor_step = 0, stadium_constructor_call = 0;
+  u32 stadium_constructor_gobj = 0, stadium_constructor_ground = 0;
+  u32 stadium_constructor_parameter_slot = 0, stadium_constructor_parameters = 0;
   bool stadium_go_prefix_enabled = false;
   std::string stadium_go_prefix_setup_receipt_sha256;
   StadiumGoPrefixPhase stadium_go_prefix_phase = StadiumGoPrefixPhase::Disabled;
@@ -6058,6 +6228,9 @@ static bool IsCaptureBoundary(u32 guest_pc)
     // opt-in companion configuration.  The normal observer boundary set and
     // its disabled path remain unchanged.
     return (Env("MWRC_STADIUM_GO_PREFIX") == "1" &&
+            Env("MWRC_STADIUM_CONSTRUCTOR_OWNER") == "1" &&
+            std::find(STADIUM_CONSTRUCTOR_PCS.begin(), STADIUM_CONSTRUCTOR_PCS.end(), guest_pc) != STADIUM_CONSTRUCTOR_PCS.end()) ||
+           (Env("MWRC_STADIUM_GO_PREFIX") == "1" &&
             (guest_pc == STADIUM_GO_AFTER_PC || guest_pc == SSS_ENTER_RETURN ||
              guest_pc == 0x8025a310 || guest_pc == 0x8025a4c0 ||
              guest_pc == 0x8025a4e8 || guest_pc == 0x8025a548)) ||

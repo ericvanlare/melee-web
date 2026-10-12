@@ -1912,11 +1912,184 @@ def _validate_mario_roster(raw: bytes, context: str) -> None:
                  f"{context}: source port {slot} is unexpectedly active")
 
 
+# Constructor witnesses are an explicit adjunct; default GO/C/F validation does
+# not admit them. All arithmetic below describes the pinned PPC instruction bits.
+CONSTRUCTOR_POINTS = {
+    'constructor_entry': (0x801D13E0, '0x7c0802a6'),
+    'constructor_parameters': (0x801D147C, '0x83630004'),
+    'constructor_up_call': (0x801D1494, '0x481af0ed'),
+    'constructor_up_return': (0x801D1498, '0x48000008'),
+    'constructor_down_call': (0x801D14B4, '0x481af0cd'),
+    'constructor_down_return': (0x801D14B8, '0x48000008'),
+    'constructor_commit': (0x801D14C8, '0x3ba00001'),
+}
+CONSTRUCTOR_CHAIN_CAP = 49  # 15 fixed slices + 49 nodes <= producer MAX_SLICES64.
+
+
+def _ppc_randi_result(seed_after: int, bound_raw: int) -> int:
+    product = ((seed_after >> 16) * bound_raw) & 0xffffffff
+    signed = product if product < 0x80000000 else product - 0x100000000
+    # srawi + addze: signed division with truncation toward zero.
+    return (signed // 65536 if signed >= 0 else -((-signed) // 65536)) & 0xffffffff
+
+
+class StadiumConstructorObservations:
+    def __init__(self):
+        self.rows = []
+        self.owner = self.parameters = self.rng_pointer = None
+        self.seed = self.call_seed = self.result = self.branch = None
+        self.complete = False
+
+    def accept(self, row: dict[str, Any], *, route_ready: bool) -> None:
+        p = row['payload']
+        phase = p.get('phase')
+        _require(route_ready and not self.complete and phase in CONSTRUCTOR_POINTS,
+                 'constructor witness outside checked VS setup interval')
+        p = _validate_progress_constructor(row)
+        g = p['constructor_gprs']
+        root = _slice(p, 67, phase, 4, 2)
+        obj = _slice(p, 90, phase, 0x38)
+        gr = _slice(p, 91, phase, 0x18)
+        ud = _slice(p, 68, phase, 4, 2)
+        u32 = lambda b: int.from_bytes(b, 'big')
+        _require(root['address'] == 0x8049e850 and u32(root['raw']) == obj['address'] and
+                 ud['address'] == obj['address'] + 0x2c and u32(ud['raw']) == gr['address'] and
+                 obj['raw'][:2] == b'\0\3' and obj['raw'][2] == 5 and obj['raw'][7] == 3 and
+                 u32(obj['raw'][0x2c:0x30]) == gr['address'] and
+                 u32(gr['raw'][4:8]) == obj['address'] and u32(gr['raw'][0x14:0x18]) == 2,
+                 'constructor root/GObj/Ground role mismatch')
+        owner = (obj['address'], gr['address'])
+        _require(all(v % 4 == 0 for v in owner), 'constructor owner alignment')
+        _require(p['argument'] == f'0x{owner[0]:08x}', 'constructor argument owner mismatch')
+        if not self.rows:
+            _require(phase == 'constructor_entry' and g[0] == owner[0], 'constructor entry missing')
+            self.owner = owner
+        else:
+            _require(owner == self.owner and g[4:] == list(owner), 'constructor register/live owner changed')
+        route = _slice(p, 17, phase, 6)
+        clock = _slice(p, 30, phase, 4)
+        _require(route['address'] == 0x80479d30 and route['raw'][0] == 2 and
+                 clock['address'] == 0x80479d58 and u32(clock['raw']) == row['source_tick'],
+                 'constructor routing/source clock mismatch')
+        limit = _slice(p, 95, phase, 1)
+        head = _slice(p, 92, phase, 4)
+        _require(limit['address'] == 0x804ce380 and limit['raw'][0] >= 5 and
+                 0x80000014 <= head['address'] < 0x81800000 and head['address'] % 4 == 0,
+                 'constructor entity-list authority malformed')
+        # The head slice alone cannot bind the entities global: retain it too.
+        entities = _slice(p, 98, phase, 4)
+        _require(entities['address'] == 0x804d782c and u32(entities['raw']) + 20 == head['address'],
+                 'constructor entity-list global mismatch')
+        _require(all(isinstance(s,dict) and set(s) == {'tag','flags','address','size','hex'} and
+                     all(type(s.get(k)) is int for k in ('tag','flags','address','size'))
+                     for s in p['slices']), 'constructor slice key/type inventory malformed')
+        nodes = [s for s in p['slices'] if s.get('tag') == 96]
+        _require(1 <= len(nodes) <= CONSTRUCTOR_CHAIN_CAP, 'constructor membership capacity')
+        current, seen = u32(head['raw']), set()
+        for ordinal in range(len(nodes)):
+            node = _slice(p, 96, phase, 0x38, ordinal)
+            _require(node['address'] == current and current not in seen and node['raw'][2] == 5,
+                     'constructor membership missing/cyclic/out of order')
+            seen.add(current)
+            if ordinal == len(nodes)-1:
+                _require(current == owner[0] and node['raw'] == obj['raw'], 'constructor chain lacks exact owner')
+            else:
+                _require(current != owner[0], 'constructor chain continues beyond owner')
+            current = u32(node['raw'][8:12])
+        rp, rv = _slice(p, 19, phase, 4), _slice(p, 20, phase, 4)
+        _require(rv['address'] % 4 == 0 and rp['address'] == 0x804d5f94 and u32(rp['raw']) == rv['address'] and
+                 g[1] - 0x570c == rp['address'], 'constructor dynamic seed-pointer authority mismatch')
+        seed = u32(rv['raw'])
+        prev = self.rows[-1]['payload']['phase'] if self.rows else None
+        if phase != 'constructor_entry':
+            slot, param = _slice(p, 93, phase, 4), _slice(p, 94, phase, 8)
+            _require(slot['address'] == g[1] - 0x4d28 and u32(slot['raw']) == param['address'],
+                     'constructor cached parameter authority mismatch')
+            value = (slot['address'], param['address'], param['raw'])
+            if phase == 'constructor_parameters':
+                _require(prev == 'constructor_entry' and g[0] == param['address'], 'constructor parameter order/r3 mismatch')
+                self.parameters = value
+                self.rng_pointer, self.seed = rv['address'], seed
+                x0, x4 = struct.unpack('>ii', param['raw'])
+                self.branch = 'up' if x4 > x0 else 'down' if x4 < x0 else 'equal'
+                self.bound = abs(x4-x0) & 0xffffffff
+            else:
+                _require(value == self.parameters and rv['address'] == self.rng_pointer,
+                         'constructor parameter or RNG pointer changed')
+                x0, x4 = struct.unpack('>II', param['raw'])
+                if phase.endswith('_call'):
+                    _require(prev == 'constructor_parameters' and phase == f'constructor_{self.branch}_call' and
+                             g[0] == self.bound and g[2:4] == [x4, x0] and seed == self.seed,
+                             'constructor call branch/operands/seed mismatch')
+                    self.call_seed = seed
+                elif phase.endswith('_return'):
+                    _require(prev == f'constructor_{self.branch}_call' and phase == f'constructor_{self.branch}_return' and
+                             g[2:4] == [x4, x0] and
+                             seed == (self.call_seed * 214013 + 2531011) & 0xffffffff,
+                             'constructor return branch/seed mismatch')
+                    self.result = _ppc_randi_result(seed, self.bound)
+                    _require(g[0] == self.result, 'constructor signed Randi result mismatch')
+                    self.seed = seed
+                else:
+                    _require(phase == 'constructor_commit' and
+                             prev == ('constructor_parameters' if self.branch == 'equal' else f'constructor_{self.branch}_return') and
+                             seed == self.seed, 'constructor commit order/seed mismatch')
+                    store = _slice(p, 97, phase, 4)
+                    final = _slice(p, 70, phase, 4)
+                    expected = x4 if self.branch == 'equal' else ((x0 if self.branch == 'up' else x4) + self.result) & 0xffffffff
+                    _require(store['address'] == 0x801d14c4 and store['raw'] == bytes.fromhex('937f00d8') and
+                             final['address'] == owner[1]+0xd8 and u32(final['raw']) == g[2] == expected,
+                             'constructor final countdown/store mismatch')
+                    self.complete = True
+        allowed = {(67,2),(68,2),(90,0),(91,0),(92,0),(95,0),(98,0),(17,0),(30,0),(19,0),(20,0)}
+        allowed |= {(96,i) for i in range(len(nodes))}
+        if phase != 'constructor_entry': allowed |= {(93,0),(94,0)}
+        if phase == 'constructor_commit': allowed |= {(97,0),(70,0)}
+        keys = [(s.get('tag'),s.get('flags')) for s in p['slices']]
+        _require(len(keys) <= 64 and len(set(keys)) == len(keys) and set(keys) == allowed,
+                 'constructor typed inventory mismatch')
+        _require(not self.rows or row['seq'] > self.rows[-1]['seq'], 'constructor source sequence reordered')
+        self.rows.append(row)
+
+    def finish(self) -> dict[str, Any]:
+        _require(self.complete, 'constructor adjunct incomplete')
+        return {'decision':'PASS_ORIGINAL_CONSTRUCTOR_OBSERVATIONS_ONLY',
+                'source_sequences':[r['seq'] for r in self.rows], 'branch':self.branch,
+                'owner_addresses':list(self.owner), 'rng_pointer':self.rng_pointer,
+                'registration_event_observed':False, 'allocation_generation_observed':False,
+                'lifetime_pairing_observed':False}
+
+
+def _validate_progress_constructor(row: dict[str, Any]) -> dict[str, Any]:
+    p = row['payload']; phase = p.get('phase')
+    pc, word = CONSTRUCTOR_POINTS[phase]
+    _require(row.get('event') == 'progress' and p.get('diagnostic') == DIAGNOSTIC and
+             p.get('setup_receipt_sha256') == EXPECTED_SETUP_RECEIPT_SHA256 and
+             p.get('setup_profile_verified_by_observer') is False and
+             _hex_address(p.get('pc'), phase) == pc and p.get('word') == word and
+             all(type(v) is int and v >= 0 for v in
+                 (row.get('source_tick'), p.get('source_tick'),
+                  row.get('draw_ordinal'), p.get('draw_ordinal'))) and
+             row['source_tick'] == p['source_tick'] and
+             row['draw_ordinal'] == p['draw_ordinal'], 'constructor progress identity mismatch')
+    _require(set(p) == {'diagnostic','phase','setup_receipt_sha256',
+                        'setup_profile_verified_by_observer','pc','word','argument','lr',
+                        'source_tick','draw_ordinal','constructor_gprs','slices'},
+             'constructor progress key inventory mismatch')
+    _hex_address(p.get('lr'), phase + '.lr')
+    g = p.get('constructor_gprs')
+    _require(isinstance(g,list) and len(g)==6 and all(type(v) is int and 0<=v<=0xffffffff for v in g),
+             'constructor GPR inventory malformed')
+    return p
+
+
 def validate_stadium_go_prefix(stream_path: str | Path,
                                expected_setup_receipt_sha256: str = EXPECTED_SETUP_RECEIPT_SHA256,
-                               status_path: str | Path | None = None) -> dict[str, Any]:
+                               status_path: str | Path | None = None, *,
+                               constructor_observations: bool = False) -> dict[str, Any]:
     """Admit one natural C→F→DrawReturn raw prefix and retain source identities."""
 
+    _require(type(constructor_observations) is bool, "constructor option must be boolean")
     _require(isinstance(expected_setup_receipt_sha256, str) and
              re.fullmatch(r"[0-9a-f]{64}", expected_setup_receipt_sha256) is not None and
              expected_setup_receipt_sha256 != "0" * 64,
@@ -1957,6 +2130,7 @@ def validate_stadium_go_prefix(stream_path: str | Path,
     raw_rows = 0
     last_sequence = -1
     sss_positions = StadiumSssPositionObservations()
+    constructor = StadiumConstructorObservations()
     expected_phases = ["css_entry", "css_return", "sss_entry", "sss_return",
                        "sss_exit", "go_after"]
 
@@ -2002,6 +2176,10 @@ def validate_stadium_go_prefix(stream_path: str | Path,
                          "named setup Progress is outside the pre-GO source setup")
                 payload = row["payload"]
                 phase = payload.get("phase")
+                if phase in CONSTRUCTOR_POINTS:
+                    _require(constructor_observations, "constructor adjunct requires explicit validation scope")
+                    constructor.accept(row, route_ready=(vs_entry_count == 1 and setup_count == 0 and phases == expected_phases[:-1]))
+                    continue
                 if phase in SSS_POSITION_PHASES:
                     sss_positions.accept(row, route_ready=phases == expected_phases[:4],
                                          expected_receipt=expected_setup_receipt_sha256)
@@ -2097,6 +2275,8 @@ def validate_stadium_go_prefix(stream_path: str | Path,
                     _require(setup_count == 1 and vs_entry_count == 1 and
                              payload.get("pc") == VS_SETUP_PC,
                              "ordinary VS Setup is missing, duplicated, or out of route order")
+                    if constructor_observations:
+                        constructor.finish()
                     setup_result = _decode_setup(payload)
                 elif boundary == "source_tick":
                     _require(payload.get("pc") == SOURCE_TICK_PC,
@@ -2177,6 +2357,14 @@ def validate_stadium_go_prefix(stream_path: str | Path,
              status.get("last_seq") == last_sequence and
              status.get("event_count") == stats.records_read,
              "observer status does not account for the complete checked stream")
+    for marker in (header, start, end):
+        _require(marker.get("constructor_owner_observations", False) is constructor_observations,
+                 "constructor adjunct declaration differs from requested scope")
+    if constructor_observations:
+        constructor.finish()
+        _require(end.get("constructor_observations_complete") is True and
+                 all(end.get(key) is False for key in ("registration_event_observed", "allocation_generation_observed", "lifetime_pairing_observed")),
+                 "constructor terminal overclaims or is incomplete")
     go_setup = _slice(phase_payloads["go_after"], MATCH_SETUP_TAG, "GO marker", 0x138)
     go_setup_sha256 = hashlib.sha256(go_setup["raw"]).hexdigest()
     rng_snapshots = {}
@@ -2192,6 +2380,7 @@ def validate_stadium_go_prefix(stream_path: str | Path,
     return {
         "schema": SCHEMA,
         "version": VERSION,
+        **({"constructor_observations": constructor.finish()} if constructor_observations else {}),
         "decision": "PASS_ORIGINAL_RAW_GO_PREFIX_ONLY",
         "source": {"dolphin_commit": EXPECTED_DOLPHIN_COMMIT,
                    "dol_sha1": EXPECTED_DOL_SHA1,
@@ -3490,10 +3679,14 @@ def _validate_stadium_idle_state_record(row: dict[str, Any], label: str,
 def validate_stadium_idle_state_snapshot(
         stream_path: str | Path,
         expected_setup_receipt_sha256: str = EXPECTED_SETUP_RECEIPT_SHA256,
-        status_path: str | Path | None = None) -> dict[str, Any]:
+        status_path: str | Path | None = None, *,
+        constructor_observations: bool = False) -> dict[str, Any]:
     """Require complete checked source-state snapshots at existing GO, C, and F rows."""
+    _require(type(constructor_observations) is bool, "constructor option must be boolean")
     baseline = validate_stadium_go_prefix(
-        stream_path, expected_setup_receipt_sha256, status_path)
+        stream_path, expected_setup_receipt_sha256, status_path,
+        **({"constructor_observations": True} if constructor_observations else {}))
+    constructor_sequences = set(baseline["constructor_observations"]["source_sequences"]) if constructor_observations else set()
     source = Path(stream_path)
     status_file = Path(status_path) if status_path is not None else Path(str(source) + ".status.json")
     stats = ObserverStreamStats()
@@ -3502,6 +3695,8 @@ def validate_stadium_idle_state_snapshot(
     try:
         for row in iter_records(source, max_bytes=MAX_STREAM_BYTES,
                                 max_records=MAX_STREAM_RECORDS, stats=stats):
+            if row["seq"] in constructor_sequences:
+                continue  # Exact fully validated adjunct rows only; not phase-name filtering.
             payload = row.get("payload", {})
             slices = payload.get("slices", []) if isinstance(payload, dict) else []
             has_state = any(isinstance(item, dict) and
