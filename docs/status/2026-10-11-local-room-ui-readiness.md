@@ -136,10 +136,67 @@ The full regression suite on `d67886769f24ad020ebf3e9de0bf2c3d0d1c3026` passed
 wait controls, syntax checks and independent source/evidence review pass. The
 Release runtime was built from `b5797986`; this branch changes only harnesses,
 tests and documentation, and all 46 unchanged runtime hashes were reverified.
-Final metadata edits are documentation-only. Current-head CI and integration
-remain pending at this receipt.
+Final metadata edits were documentation-only. [PR #303](https://github.com/ericvanlare/melee-web/pull/303)
+merged as `2a73717682372d440dbad16ef4bcb418e31a948d` after all 14 checks
+on `cafec4554877c70439ba05b9945594e87b350030` completed: 12 successful and
+two expected skips. The merged tree exactly matches the reviewed tree.
 
 The bounded provider follow-up made zero provider requests because existing
 credentials were missing or expired; it did not refresh authentication. The
 earlier scoped provider receipt remains the only service evidence. Public
 staging, physical input and the other acceptance gates remain open.
+
+The next public-endpoint adapter is a [source-only checkpoint](../handoffs/2026-10-11-public-relay-keyboard-checkpoint.md).
+Its focused refusal checks do not establish a deployed Worker or public browser run.
+
+
+## P2 gameplay input extension — local functional checkpoint
+
+The `codex/public-relay-keyboard` branch adds one short P2 gameplay keyboard
+pulse before the same full route. The branch was later merged with current main
+for integration; this capture remains bound to execution source
+`9c41b9145ba7b566e68ac450ec65a9d08b2079a1` and uses the unchanged `b5797986`
+Release runtime above; all 46 artifact hashes were reverified. The
+[P2 extension receipt](../evidence/local-room-full-route-v1.json) keeps this
+producer separate from #303 and records the complete input window.
+
+At paired source cursor 469 both peers observed P1 at X −60 and P2 at X 60,
+with four stocks each. The second browser's actual ArrowLeft pulse produced
+literal port-1 PAD records at input ticks 470–472, followed by all-zero neutral
+at 473. All four corresponding P1 port-0 records were neutral. Both peers
+crossed release-plus-delay boundary 476; the fresh paired observation at cursor
+491 showed P2 at X 41.159996, P1 still at −60, and stocks still `[4,4]`.
+This establishes one short movement-and-release interval, not combat coverage.
+
+The unchanged route then completed four natural P1 losses, three grounded
+respawns, the original P2 win, both Human Results confirmations and CSS return.
+All 2,938 frozen 64-byte records match at ticks 0–2,937, covering all five
+scene intervals and the required exclusive return boundary 2,938. No paired
+record at tick 2,938 is claimed. Reported unpaired tails
+remain two alpha and three beta records. Input delay was two ticks; observed
+network-wait episodes were six and eight respectively, without an RTT claim.
+
+The owner completed in 64,436 ms. Normal Leave, native unload to stopped phase
+zero, Worker disposal without fallback and all 21 owned process IDs' absence
+passed, including 16 CDP-attributed browser processes. Successful profiles were
+removed. The known magenta FD geometry remains visible; pixels and audio
+fidelity were not compared. Independent raw-result review passed.
+
+Four focused checks pass. The first root test invocation used an unsupported
+module-import path; canonical discovery passed without source changes. An
+initial private audit miscounted the tail object's keys; corrected metadata
+uses its actual counts, and the initial audit remains retained. After current
+main was merged, the integrated source at `f5b949d7` passed full unittest
+discovery: 2,321 tests, 166 skips, no failures or errors. All three A3-focused
+modules ran and passed; none was skipped. The skip count reflects optional
+assets, DOL inputs and native/reference trace targets unavailable in that
+checkout. The [integration validation receipt](../evidence/local-room-p2-integration-validation-v1.json)
+binds this suite and focused results to that source. No `src/` or `web/`
+compiled-runtime inputs changed from the `b5797986` producer, so no new runtime
+build or capture is claimed. Current-head CI is a separate integration gate;
+this receipt records local validation before PR publication.
+
+This checkpoint stays in the existing #288 milestone branch. The supplied
+external-preflight interface validates a provided receipt structurally; it does
+not verify a deployed Worker. No public endpoint, remote run or RTT evidence is
+available, and broader #288 acceptance remains open.
