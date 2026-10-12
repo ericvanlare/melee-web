@@ -21,12 +21,13 @@ import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS, parseNetChecksum} from './net
 import {checksumCompareReached, checksumWaitDiagnostic} from './a3_checksum_wait_diagnostics.mjs';
 import {runA3LocalFullRoute} from './a3_local_room_full_route.mjs';
 
-const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--post-css-stall-probe] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route]';
+const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--post-css-stall-probe] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route] [--controlled-cut-after-css]';
 const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, out: {type: 'string'},
   'relay-url': {type: 'string'}, 'relay-preflight': {type: 'string'},
   'network-profile': {type: 'string'},
   'post-css-stall-probe': {type: 'boolean', default: false},
+  'controlled-cut-after-css': {type: 'boolean', default: false},
   playwright: {type: 'string'}, 'min-checksums': {type: 'string', default: '120'},
   'timeout-ms': {type: 'string', default: '300000'}, 'full-route': {type: 'boolean', default: false},
   help: {type: 'boolean', default: false},
@@ -91,6 +92,9 @@ const postCssStallProbe = resolvePostCssStallProbe({
   simulationMode: simulationConfiguration?.mode, relayUrl: values['relay-url'],
   relayPreflight: values['relay-preflight'], fullRoute: values['full-route'],
 });
+if (values['controlled-cut-after-css'] && (simulationConfiguration?.profile_name !== 'moderate' ||
+    values['full-route'] || values['relay-url'] || values['relay-preflight'] || postCssStallProbe))
+  throw Error('--controlled-cut-after-css requires simulated moderate CSS, without stall or public relay');
 const discPath = path.resolve(values.disc);
 const discInfo = await fs.stat(discPath);
 requireCondition(discInfo.isFile() && discInfo.size > 0, '--disc must name a nonempty local file');
@@ -139,7 +143,9 @@ const report = {
   room_worker: null,
   network_simulation: simulationConfiguration ? {configuration: simulationConfiguration,
     ...(postCssStallProbe ? {post_css_stall_probe: {outcome: 'NOT_STARTED',
-      requested: true, policy: postCssStallProbe.resultPolicy}} : {})} : null,
+      requested: true, policy: postCssStallProbe.resultPolicy}} : {}),
+    ...(values['controlled-cut-after-css'] ? {controlled_cut_probe: {outcome: 'NOT_STARTED',
+      requested: true}} : {})} : null,
   external_relay_preflight: relayMode.mode === 'external' ? {
     file: path.basename(path.resolve(values['relay-preflight'])),
     sha256: relayPreflightSha256,
@@ -171,10 +177,15 @@ let workerPassed = false;
 async function sourceIdentity() {
   const status = gitValue(['status', '--porcelain', '--untracked-files=all']);
   const allowedHarnessFiles = ['scripts/a3_local_room_keyboard_browser.mjs',
-    'scripts/a3_public_relay_preflight.mjs', 'tests/test_a3_public_relay_preflight.py',
+    'scripts/a3_expected_fault_auditor.py', 'scripts/a3_public_relay_preflight.mjs',
+    'tests/test_a3_expected_fault_auditor.py', 'tests/test_a3_public_relay_preflight.py',
     'scripts/a3_local_room_full_route.mjs', 'scripts/a3_checksum_wait_diagnostics.mjs',
-    'scripts/a3_source_cursor_join.mjs',
-    'tests/test_a3_local_room_full_route_wait.py', 'scripts/a3_network_simulation.mjs',
+    'scripts/a3_source_cursor_join.mjs', 'scripts/run_network_simulation.py',
+    'tests/test_run_network_simulation.py', 'tests/test_a3_local_room_full_route_wait.py',
+    'scripts/a3_network_simulation.mjs', 'scripts/a3_network_stall_probe.mjs',
+    'tests/a3_network_stall_probe.test.mjs', 'tests/test_a3_network_stall_probe.py',
+    'tests/net_test_tcp_proxy_stall_queue.test.mjs',
+    'tests/net_test_tcp_proxy_controlled_faults.test.mjs',
     'scripts/net_test_tcp_proxy.mjs', 'tests/test_a3_network_simulation.py',
     'tests/test_net_test_tcp_proxy.py'];
   const unexpected = status.split('\n').filter(Boolean).filter(row =>
@@ -587,6 +598,133 @@ async function writeReport() {
   await fs.writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n');
 }
 
+function summarizeCutObservation(row) {
+  const peer = row?.snapshot?.peer;
+  return {
+    native_status: row?.native_status ?? null,
+    menu_phase: row?.menu_phase ?? null,
+    menu_running: row?.menu_running ?? null,
+    protocol_terminal: peer?.protocol?.terminal ?? null,
+    endpoint_errors: peer?.endpointErrors ?? null,
+    endpoint_closed: peer?.endpointClosed ?? null,
+    peer_failure: peer?.failure ?? null,
+    checksum_mismatch_count: row?.health?.peer?.protocol?.checksum_mismatch_count ?? null,
+    checksum_mismatches: peer?.protocol?.checksum_mismatches ?? null,
+    native_local_divergences: peer?.protocol?.native_local_divergences ?? null,
+  };
+}
+
+async function runControlledCutProbe() {
+  requireCondition(values['controlled-cut-after-css'] === true && networkSimulation?.proxy &&
+    typeof networkSimulation.proxy.cutConnection === 'function',
+    'Controlled cut requires the reviewed owned loopback TCP proxy API');
+  const proxyBefore = networkSimulation.proxy.snapshot();
+  const active = proxyBefore?.connections?.active;
+  const faultsBefore = proxyBefore?.controlledFaults;
+  requireCondition(Array.isArray(active) && active.length === 2 &&
+    active.every(row => Number.isSafeInteger(row.connectionId) && row.connectionId > 0) &&
+    new Set(active.map(row => row.connectionId)).size === 2,
+    'Controlled cut requires exactly two active opaque room-path proxy connections');
+  requireCondition(Array.isArray(faultsBefore) && faultsBefore.length === 0 &&
+    proxyBefore.lifecycle?.cutConnections === 0 && proxyBefore.lifecycle?.failedConnections === 0 &&
+    proxyBefore.diagnostics?.integrityFailure === false,
+    'Controlled cut requires a fault-free proxy before activation');
+  const prePeers = {
+    alpha: await readPeerSnapshot(instances.alpha),
+    beta: await readPeerSnapshot(instances.beta),
+  };
+  for (const role of ['alpha', 'beta']) {
+    const row = prePeers[role];
+    requireCondition(row.menu_phase === 1 && row.menu_running === 1 &&
+      row.native_status?.active === 1 && row.native_status?.terminal?.kind === 0 &&
+      row.snapshot?.peer?.protocol?.ready === true &&
+      row.health?.peer?.protocol?.checksum_mismatch_count === 0 &&
+      row.snapshot?.peer?.endpointClosed === false,
+      role + ' was not at a healthy terminal-free live CSS boundary before cut');
+  }
+  const selectedConnectionId = active[0].connectionId;
+  const probe = {
+    schema: 'melee-web-task13-controlled-cut-observation-v1',
+    selection: {active_connection_ids: active.map(row => row.connectionId),
+      selected_connection_id: selectedConnectionId,
+      scope: 'one active opaque room-path TCP connection; no alpha/beta attribution by accept order'},
+    pre_fault: {
+      room_id: report.invitation?.room_id,
+      invite_sha256: report.invitation?.invite_sha256,
+      browser_path: report.network_simulation?.browser_path,
+      checksum_comparison: report.checksum_comparison,
+      peers: prePeers,
+      proxy: proxyBefore,
+      source_cursors: Object.fromEntries(['alpha', 'beta'].map(role =>
+        [role, prePeers[role].native_status?.cursor ?? null])),
+    },
+    activation: null,
+    proxy_immediately_after_activation: null,
+    post_fault: {observations: [], first_terminal_by_role: {}, final_peers: null,
+      terminal_observed: false, elapsed_ms: null, actions_after_cut: [], resume_calls_after_cut: 0,
+      action_scope: 'read-only terminal polling; final UI Stop/Leave and unload occur later as cleanup'},
+  };
+  report.network_simulation.controlled_cut_probe = probe;
+  const started = Date.now();
+  probe.activation = networkSimulation.proxy.cutConnection(selectedConnectionId);
+  probe.proxy_immediately_after_activation = networkSimulation.proxy.snapshot();
+  requireCondition(probe.activation?.kind === 'cut' &&
+    probe.activation.connectionId === selectedConnectionId &&
+    probe.activation.scope === 'one opaque owned TCP connection; no inferred player role' &&
+    probe.proxy_immediately_after_activation?.controlledFaults?.length === 1,
+    'Proxy did not issue the exact one-use opaque cut receipt');
+  let lastSignature = null;
+  let finalRows = null;
+  let unsupportedTerminal = null;
+  while (Date.now() < operationDeadline) {
+    const rows = {
+      alpha: await readPeerSnapshot(instances.alpha),
+      beta: await readPeerSnapshot(instances.beta),
+    };
+    finalRows = rows;
+    const compact = Object.fromEntries(['alpha', 'beta'].map(role =>
+      [role, summarizeCutObservation(rows[role])]));
+    const signature = JSON.stringify(compact);
+    if (signature !== lastSignature) {
+      if (probe.post_fault.observations.length < 128) {
+        probe.post_fault.observations.push({elapsed_ms: Date.now() - started, peers: compact});
+      } else {
+        probe.post_fault.observations[127] = {elapsed_ms: Date.now() - started, peers: compact};
+      }
+      lastSignature = signature;
+    }
+    let bothSupportedTerminals = true;
+    for (const role of ['alpha', 'beta']) {
+      const row = rows[role];
+      const terminal = row.native_status?.blocker === 'terminal'
+        ? row.native_status.terminal : null;
+      if (terminal && !probe.post_fault.first_terminal_by_role[role]) {
+        probe.post_fault.first_terminal_by_role[role] = {
+          elapsed_ms: Date.now() - started,
+          observation: summarizeCutObservation(row),
+        };
+      }
+      if (terminal && ![2, 3].includes(terminal.kind))
+        unsupportedTerminal = {role, terminal};
+      if (!terminal || ![2, 3].includes(terminal.kind) ||
+          row.snapshot?.peer?.endpointClosed !== true) bothSupportedTerminals = false;
+    }
+    if (unsupportedTerminal || bothSupportedTerminals) break;
+    await sleep(Math.min(50, remaining()));
+  }
+  probe.post_fault.elapsed_ms = Date.now() - started;
+  probe.post_fault.final_peers = finalRows;
+  probe.post_fault.terminal_observed = Boolean(finalRows && ['alpha', 'beta'].every(role =>
+    finalRows[role].native_status?.blocker === 'terminal' &&
+    [2, 3].includes(finalRows[role].native_status?.terminal?.kind) &&
+    finalRows[role].snapshot?.peer?.endpointClosed === true));
+  if (unsupportedTerminal)
+    throw Error('Controlled cut produced an unsupported native terminal: ' + JSON.stringify(unsupportedTerminal));
+  requireCondition(probe.post_fault.terminal_observed,
+    'Controlled cut did not reach source-supported native terminal kinds before the existing operation deadline');
+  throw Error('Expected controlled transport cut observed; route remains FAIL');
+}
+
 try {
   report.source = await sourceIdentity();
   report.browser = {node: process.version, url: runtimeUrl.href,
@@ -862,6 +1000,7 @@ try {
         protocol: row.health?.peer?.protocol,
       }]));
   }
+  if (values['controlled-cut-after-css']) await runControlledCutProbe();
   workerPassed = true;
 } catch (error) {
   if (report.full_route && ['running', 'awaiting_final_checksum_validation'].includes(report.full_route.result))
@@ -915,6 +1054,7 @@ try {
       if (instance.closed !== true) firstError(role + ' persistent Chrome context did not close');
     } catch (error) {
       report.leave_and_cleanup[role + '_context_close_error'] = errorText(error);
+      report.leave_and_cleanup[role + '_context_closed'] = instance.closed === true;
       firstError(role + ' Chrome context cleanup failed: ' + errorText(error));
     } finally {
       const nativeCleanup = instance.nativeNetworkCleanup ?? null;

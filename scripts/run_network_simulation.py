@@ -14,6 +14,7 @@ import subprocess
 import sys
 
 from check_gameplay import node_runtime
+from a3_expected_fault_auditor import audit_expected_cut
 
 ROOT = Path(__file__).resolve().parents[1]
 SCENARIOS = {
@@ -22,6 +23,8 @@ SCENARIOS = {
     "full-asymmetric": ("asymmetric", True, False),
     "css-constrained": ("constrained", False, False),
     "css-constrained-stall": ("constrained", False, True),
+    "css-moderate-cut": ("moderate", False, False),
+    "css-moderate-fresh": ("moderate", False, False),
 }
 
 
@@ -75,6 +78,51 @@ def validate_result(returncode, owner, browser, full_route, controlled_stall=Fal
             raise ValueError("controlled-stall probe did not satisfy its separate result policy")
 
 
+def process_identities(owner):
+    result = set()
+    for row in owner.get("browser_process_inventory", []):
+        identity = row.get("identity") if isinstance(row, dict) else None
+        if not isinstance(identity, dict):
+            continue
+        result.add((identity.get("pid"), identity.get("start"), identity.get("command")))
+    return result
+
+
+def validate_fresh_session(previous_cut, current_owner, current_browser, current_folder):
+    """Require a distinct ordinary CSS run after the cut owner has fully retired."""
+    if previous_cut is None:
+        raise ValueError("fresh CSS scenario requires an earlier audited cut in this invocation")
+    prior_browser = previous_cut["browser"]
+    prior_owner = previous_cut["owner"]
+    prior_folder = previous_cut["folder"]
+    if (prior_owner.get("cleanup_passed") is not True or
+            prior_owner.get("capture_process_group_absent") is not True or
+            prior_owner.get("server_process_group_absent") is not True):
+        raise ValueError("cut session did not retire before fresh CSS")
+    old_invite = prior_browser.get("invitation") or {}
+    new_invite = current_browser.get("invitation") or {}
+    if (not old_invite.get("room_id") or not new_invite.get("room_id") or
+            old_invite.get("room_id") == new_invite.get("room_id") or
+            not old_invite.get("invite_sha256") or
+            old_invite.get("invite_sha256") == new_invite.get("invite_sha256")):
+        raise ValueError("fresh CSS run reused the cut room identity or Host invite")
+    if Path(current_folder).resolve() == Path(prior_folder).resolve():
+        raise ValueError("fresh CSS run reused the cut scenario output/profile owner")
+    old_processes = process_identities(prior_owner)
+    new_processes = process_identities(current_owner)
+    if not old_processes or not new_processes or old_processes & new_processes:
+        raise ValueError("fresh CSS run did not establish a distinct observed Chrome process identity set")
+    if current_browser.get("source", {}).get("head") != prior_browser.get("source", {}).get("head"):
+        raise ValueError("fresh CSS run changed source identity after the cut")
+    return {"decision": "FRESH_SESSION_CSS_PASS", "separate_capture_owner_invocation": True,
+            "old_room_id": old_invite["room_id"], "new_room_id": new_invite["room_id"],
+            "old_invite_sha256": old_invite["invite_sha256"],
+            "new_invite_sha256": new_invite["invite_sha256"],
+            "old_chrome_process_identities": len(old_processes),
+            "new_chrome_process_identities": len(new_processes),
+            "same_page_reconnect": False}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--disc", type=Path, required=True)
@@ -94,6 +142,13 @@ def main():
     args = parser.parse_args()
     if len(set(args.scenarios)) != len(args.scenarios):
         parser.error("duplicate scenarios would repeat captures without a new hypothesis")
+    task13_names = [name for name in args.scenarios
+                    if name in {"css-moderate-cut", "css-moderate-fresh"}]
+    if task13_names and task13_names not in (["css-moderate-cut"],
+                                              ["css-moderate-cut", "css-moderate-fresh"]):
+        parser.error("Task13 permits one moderate cut, optionally followed by one fresh CSS scenario")
+    if task13_names and len(args.scenarios) != len(task13_names):
+        parser.error("Task13 cut/recovery runs cannot be mixed with other scenarios")
     for path in (args.disc, args.playwright, args.browser_executable):
         if not path.exists():
             parser.error(f"required local input is unavailable: {path}")
@@ -117,6 +172,7 @@ def main():
     report_path = output / "suite.json"
     node = str(node_runtime(ROOT))
     server_spec = output / "server-spec.json"
+    audited_cut = None
     write_json(server_spec, {
         "command": [sys.executable, str(ROOT / "scripts/serve.py"),
                     "--directory", str(runtime), "--port", str(args.port)],
@@ -124,6 +180,7 @@ def main():
     try:
         for name in args.scenarios:
             profile, full_route, controlled_stall = SCENARIOS[name]
+            controlled_cut = name == "css-moderate-cut"
             folder = output / name
             folder.mkdir()
             command = [sys.executable, str(ROOT / "scripts/capture_owner_deadline.py"),
@@ -143,9 +200,13 @@ def main():
                 command.append("--full-route")
             if controlled_stall:
                 command.append("--post-css-stall-probe")
+            if controlled_cut:
+                command.append("--controlled-cut-after-css")
             row = {"name": name, "profile": profile, "full_route": full_route,
                    "controlled_stall_probe": controlled_stall,
-                   "result_policy": "controlled-stall-probe" if controlled_stall else "clean-route",
+                   "controlled_cut_probe": controlled_cut,
+                   "result_policy": "expected-fault-cut" if controlled_cut else
+                       "controlled-stall-probe" if controlled_stall else "clean-route",
                    "command": command, "decision": "PLANNED"}
             report["scenarios"].append(row)
             write_json(report_path, report)
@@ -165,14 +226,46 @@ def main():
                     row[key + "_report"] = {"file": str(path.relative_to(output)), **file_identity(path)}
             owner = json.loads((folder / "owner.json").read_text())
             browser = json.loads((folder / "browser/report.json").read_text())
-            validate_result(result.returncode, owner, browser, full_route, controlled_stall)
+            if controlled_cut:
+                if result.returncode == 0 or owner.get("capture_exit_code") != result.returncode:
+                    raise ValueError("expected-cut route did not retain the matching nonzero capture exit")
+                audit = audit_expected_cut(owner, browser, expected_source_head=head)
+                audit["input_reports"] = {
+                    "owner": {"file": "owner.json", **file_identity(folder / "owner.json")},
+                    "browser": {"file": "browser/report.json",
+                                **file_identity(folder / "browser/report.json")},
+                }
+                audit["auditor"] = {"file": "scripts/a3_expected_fault_auditor.py",
+                                     **file_identity(Path(__file__).with_name("a3_expected_fault_auditor.py"))}
+                audit["runner"] = report["runner"]
+                audit_path = folder / "expected-fault-audit.json"
+                write_json(audit_path, audit)
+                row["route_decision"] = "FAIL"
+                row["expected_fault_audit"] = {"file": str(audit_path.relative_to(output)),
+                                                **file_identity(audit_path)}
+                row["decision"] = "EXPECTED_TRANSPORT_CUT_CONFIRMED"
+                audited_cut = {"owner": owner, "browser": browser, "folder": folder}
+            else:
+                validate_result(result.returncode, owner, browser, full_route, controlled_stall)
+                if name == "css-moderate-fresh":
+                    row["fresh_session_evidence"] = validate_fresh_session(
+                        audited_cut, owner, browser, folder)
+                    row["decision"] = "FRESH_SESSION_CSS_PASS"
+                else:
+                    row["decision"] = "PASS_POST_CSS_STALL_PROBE" if controlled_stall else "PASS"
             if runtime_identity(runtime) != baseline:
-                raise ValueError("served runtime changed during scenario")
-            row["decision"] = "PASS_POST_CSS_STALL_PROBE" if controlled_stall else "PASS"
+                raise ValueError("served runtime changed between scenarios")
             write_json(report_path, report)
-        report["decision"] = "PLANNED" if args.plan_only else (
-            "PASS_WITH_CONTROLLED_STALL_PROBE" if any(
-                SCENARIOS[name][2] for name in args.scenarios) else "PASS")
+        if args.plan_only:
+            report["decision"] = "PLANNED"
+        elif args.scenarios == ["css-moderate-cut"]:
+            report["decision"] = "EXPECTED_TRANSPORT_CUT_CONFIRMED"
+        elif args.scenarios == ["css-moderate-cut", "css-moderate-fresh"]:
+            report["decision"] = "EXPECTED_TRANSPORT_CUT_CONFIRMED_FRESH_SESSION_CSS_PASS"
+        else:
+            report["decision"] = "PLANNED" if args.plan_only else (
+                "PASS_WITH_CONTROLLED_STALL_PROBE" if any(
+                    SCENARIOS[name][2] for name in args.scenarios) else "PASS")
     except Exception as error:
         report["decision"] = "FAIL"
         report["first_error"] = str(error)
