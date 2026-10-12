@@ -632,9 +632,18 @@ function checkAssetTransferredTerminal(observation, label) {
 function isHealthyFirstUseRenderWait(row) {
   const status = row?.native_status;
   const match = row?.match;
+  const exactQueueEmptyFrontier = status?.blocker === 'network_wait' &&
+    Number.isSafeInteger(row?.source_tick) && row.source_tick >= 0 &&
+    Number.isSafeInteger(status?.cursor) && status.cursor >= 0 &&
+    Number.isSafeInteger(status?.pushed) && status.pushed >= 0 &&
+    status.cursor === row.source_tick && status.pushed === status.cursor &&
+    status.active === 1 && status.context_applied === 1 &&
+    status.start?.required === 1 && status.start?.recorded === 1 &&
+    status.start?.confirmed === 1 && status.start?.capture_failed === 0 &&
+    status.terminal?.kind === 0 && status.network_wait?.active === 0;
   return row?.phase === 7 && row?.running === 0 &&
     row?.message === FIRST_USE_RENDERING_MESSAGE && row?.error === null &&
-    status?.active === 1 && status?.blocker === 'none' &&
+    status?.active === 1 && (status?.blocker === 'none' || exactQueueEmptyFrontier) &&
     status?.local_capture_failure === null && status?.network_wait?.active === 0 &&
     status?.terminal?.kind === 0 &&
     status?.indexed?.duplicates === 0 && status?.indexed?.conflicts === 0 &&
