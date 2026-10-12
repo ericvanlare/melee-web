@@ -28,6 +28,7 @@ SCENARIOS = {
     "full-moderate-combat-ko": ("moderate", True, False, False, False, False, True, True, True),
     "full-moderate-combat-ko-charged": ("moderate", True, False, False, False, False, True, True, False, True),
     "full-moderate-combat-ko-prepared": ("moderate", True, False, False, False, False, True, True, False, False, True),
+    "full-moderate-combat-ko-prepared-platform-exit": ("moderate", True, False, False, False, False, True, True, False, False, True, True),
     "full-moderate-repeat": ("moderate", True, False, False, False, True, False),
     "full-asymmetric": ("asymmetric", True, False, False, False, False, False),
     "css-constrained": ("constrained", False, False, False, False, False, False),
@@ -45,6 +46,7 @@ def scenario_route_flags(name):
     combat_ko = len(scenario) > 8 and scenario[8]
     combat_ko_charged = len(scenario) > 9 and scenario[9]
     combat_ko_prepared = len(scenario) > 10 and scenario[10]
+    combat_ko_prepared_platform_exit = len(scenario) > 11 and scenario[11]
     flags = []
     if full_route:
         flags.append("--full-route")
@@ -60,6 +62,8 @@ def scenario_route_flags(name):
         flags.append("--gameplay-combat-ko-charged")
     if combat_ko_prepared:
         flags.append("--gameplay-combat-ko-prepared")
+    if combat_ko_prepared_platform_exit:
+        flags.append("--gameplay-combat-ko-prepared-platform-exit")
     if repeat_route:
         flags.append("--repeat-full-route")
     if controlled_stall:
@@ -127,7 +131,8 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
                     repeat_full_route=False, *, controlled_stall=False,
                     gameplay_combat_probe=False, gameplay_combat_exchange=False,
                     gameplay_combat_ko=False, gameplay_combat_ko_charged=False,
-                    gameplay_combat_ko_prepared=False):
+                    gameplay_combat_ko_prepared=False,
+                    gameplay_combat_ko_prepared_platform_exit=False):
     """Require both independent owners; each opt-in route has its own policy."""
     if gameplay_action_probe and gameplay_combat_probe:
         raise ValueError("gameplay action and combat probes are separate scenarios")
@@ -139,6 +144,8 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
         raise ValueError("charged combat KO requires verified combat exchange mode")
     if gameplay_combat_ko_prepared and not gameplay_combat_exchange:
         raise ValueError("prepared combat KO requires verified combat exchange mode")
+    if gameplay_combat_ko_prepared_platform_exit and not gameplay_combat_ko_prepared:
+        raise ValueError("prepared platform-exit KO requires prepared combat KO mode")
     if sum((gameplay_combat_ko, gameplay_combat_ko_charged,
             gameplay_combat_ko_prepared)) > 1:
         raise ValueError("C-stick, charged, and prepared combat KO are separate scenarios")
@@ -168,6 +175,9 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
             raise ValueError("requested prepared combat KO mode is missing")
         if not gameplay_combat_ko_prepared and mode_report.get("gameplay_combat_ko_prepared", False) is not False:
             raise ValueError("unexpected prepared combat KO mode")
+        if (mode_report.get("gameplay_combat_ko_prepared_platform_exit", False) is not
+                gameplay_combat_ko_prepared_platform_exit):
+            raise ValueError("prepared platform-exit mode differs from the requested scenario")
     network = browser.get("network_simulation") or {}
     if (network.get("proxy_cleanup", {}).get("verified") is not True or
             network.get("proxy_cleanup", {}).get("final") is not True):
@@ -257,6 +267,11 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
                     prep["prepared_ko_baseline"]["source_tick"] - prep["source_cursor_start"] or
                     prep["prepared_ko_baseline"]["source_tick"] > prep["source_cursor_limit"]):
                 raise ValueError("prepared damage proof or unchanged uncharged C-stick KO handoff is incomplete")
+            if gameplay_combat_ko_prepared_platform_exit:
+                if not _prepared_platform_exit_receipt_ok(ko):
+                    raise ValueError("prepared post-credit platform-exit policy, actual Fall, or grounded PAD handoff is incomplete")
+            elif ko.get("platform_exit") is not None or (ko.get("handoff") or {}).get("input_policy") is not None:
+                raise ValueError("legacy neutral prepared KO cannot be relabeled as platform-exit evidence")
         elif (route.get("combat_probe") or {}).get("combat_ko") is not None:
             raise ValueError("unexpected combat KO receipt")
         if repeat_full_route:
@@ -265,7 +280,7 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
             raise ValueError("baseline unexpectedly contains repeated full routes")
     elif (repeat_full_route or gameplay_action_probe or gameplay_combat_probe or
           gameplay_combat_exchange or gameplay_combat_ko or gameplay_combat_ko_charged or
-          gameplay_combat_ko_prepared):
+          gameplay_combat_ko_prepared or gameplay_combat_ko_prepared_platform_exit):
         raise ValueError("opt-in route scenario did not request a full route")
 
     if controlled_stall:
@@ -278,6 +293,163 @@ def validate_result(returncode, owner, browser, full_route, gameplay_action_prob
 
 def _nonnegative_int(value):
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _prepared_platform_exit_receipt_ok(ko):
+    """Bind the opt-in route label to its actual gate, PAD episode, Fall and landing."""
+    if not isinstance(ko, dict):
+        return False
+    exit_receipt = ko.get("platform_exit")
+    if not isinstance(exit_receipt, dict):
+        return False
+    gate = exit_receipt.get("gate")
+    prefix = exit_receipt.get("pre_keydown_prefix")
+    prefix_readbacks = exit_receipt.get("pre_keydown_readbacks")
+    action = exit_receipt.get("action")
+    action_record = exit_receipt.get("action_record")
+    fall = exit_receipt.get("fall")
+    handoff = ko.get("handoff")
+    sequence = ko.get("sequence")
+    if not isinstance(sequence, dict):
+        return False
+    loss = sequence.get("loss")
+    if not all(isinstance(value, dict) for value in
+               (gate, prefix, prefix_readbacks, action, action_record, fall, handoff, loss)):
+        return False
+    sample = action_record.get("observed_pad_sample")
+    window = handoff.get("input_window")
+    delay = ko.get("input_delay")
+    baseline = ko.get("baseline")
+    if not isinstance(sample, dict) or not isinstance(window, dict) or not isinstance(baseline, dict):
+        return False
+    if (ko.get("input_policy") != "post-credit-platform-exit" or
+            exit_receipt.get("result") != "pass" or
+            prefix_readbacks.get("accepted") is not True or
+            prefix.get("kind") != "validated-pre-keydown-platform-exit-neutral-prefix-v1" or
+            handoff.get("kind") != "validated-post-credit-platform-exit-combat-ko-handoff-v1" or
+            handoff.get("input_policy") != "post-credit-platform-exit" or
+            handoff.get("starting_stocks") != 3 or
+            gate.get("kind") != "validated-source-credited-rebirth-wait-platform-gate-v1" or
+            loss.get("kind") != "validated-source-credited-combat-ko-loss-v1" or
+            gate.get("loss_source_tick") != loss.get("source_tick") or
+            not _nonnegative_int(delay) or
+            not _nonnegative_int(baseline.get("source_tick")) or
+            ko.get("source_cursor_limit") != baseline["source_tick"] + 480 or
+            not _nonnegative_int(gate.get("source_tick")) or
+            not _nonnegative_int(loss.get("source_tick")) or
+            not (loss["source_tick"] < gate["source_tick"] <= ko["source_cursor_limit"])):
+        return False
+
+    facing = gate.get("facing_direction")
+    expected_key = "a" if facing == -1 else "d" if facing == 1 else None
+    position_policy = gate.get("position_admission_policy") or {}
+    positions = gate.get("position_by_peer")
+    if (expected_key is None or gate.get("direction_key") != expected_key or
+            position_policy.get("min_x") != -64 or position_policy.get("max_x") != 64 or
+            position_policy.get("min_y") != 32 or position_policy.get("max_y") != 64 or
+            position_policy.get("policy") !=
+            "conservative scenario admission only; not authored Final Destination geometry or landing proof" or
+            not isinstance(positions, list) or len(positions) != 2 or positions[0] != positions[1]):
+        return False
+    position = positions[0]
+    if not isinstance(position, dict):
+        return False
+    x, y = position.get("x"), position.get("y")
+    if (isinstance(x, bool) or isinstance(y, bool) or
+            not isinstance(x, (int, float)) or not isinstance(y, (int, float)) or
+            not math.isfinite(x) or not math.isfinite(y) or
+            not (-64 <= x <= 64 and 32 <= y <= 64)):
+        return False
+
+    rise = window.get("p1_axis_rise_input_tick")
+    last_held = window.get("p1_axis_last_held_input_tick")
+    release = window.get("p1_neutral_release_input_tick")
+    held_count = window.get("p1_axis_held_row_count")
+    start = window.get("start_input_tick")
+    gate_input = gate["source_tick"] - delay - 1
+    if (window.get("p1_axis") != "left_x" or window.get("facing_direction") != facing or
+            window.get("direction_key") != expected_key or window.get("gate_source_tick") != gate["source_tick"] or
+            window.get("gate_input_tick") != gate_input or not _nonnegative_int(start) or
+            not _nonnegative_int(rise) or
+            not _nonnegative_int(last_held) or not _nonnegative_int(release) or
+            not isinstance(held_count, int) or isinstance(held_count, bool) or
+            not (1 <= held_count <= 30) or last_held - rise + 1 != held_count or
+            release != last_held + 1 or rise <= gate_input or
+            window.get("p1_neutral_prefix_row_count") != gate_input - start + 1):
+        return False
+    end = window.get("through_grounded_wait_input_tick")
+    respawn_tick = handoff.get("respawn_source_tick")
+    fall_tick = fall.get("source_tick")
+    if (not _nonnegative_int(start) or not _nonnegative_int(end) or
+            not _nonnegative_int(respawn_tick) or not _nonnegative_int(fall_tick) or
+            start != baseline["source_tick"] - delay - 1 or
+            not (baseline["source_tick"] < loss["source_tick"] < gate["source_tick"] <=
+                 ko["source_cursor_limit"]) or
+            end + delay + 1 != respawn_tick or
+            not (gate["source_tick"] < fall_tick < respawn_tick) or
+            fall.get("kind") != "validated-post-platform-exit-source-fall-v1" or
+            fall.get("action_input_tick") != rise or
+            fall.get("action_consumed_source_tick") != rise + delay + 1 or
+            fall.get("input_delay") != delay or
+            rise + delay + 1 > fall_tick or
+            window.get("input_delay") != delay):
+        return False
+    bytes_sample = sample.get("bytes")
+    if (action_record.get("source_input_tick") != rise or
+            action.get("policy") != "one-contiguous-horizontal-only-actual-input-episode" or
+            action.get("hold_ms") != 0 or action.get("observe_press") is not True or
+            action.get("callback_limit_ms") != 500 or
+            action.get("maximum_held_pad_rows") != 30 or
+            sample.get("input_tick") != rise or sample.get("local_port") != 0 or
+            not isinstance(bytes_sample, list) or len(bytes_sample) != 11 or
+            any(not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= 255
+                for value in bytes_sample) or
+            any(value != 0 for index, value in enumerate(bytes_sample) if index != 2)):
+        return False
+    signed_axis = bytes_sample[2] - 256 if bytes_sample[2] > 127 else bytes_sample[2]
+    if signed_axis == 0 or (signed_axis > 0) != (facing > 0):
+        return False
+
+    p1_rows = window.get("p1_rows")
+    p2_rows = window.get("p2_rows")
+    if (not isinstance(p1_rows, list) or not isinstance(p2_rows, list) or
+            not all(isinstance(row, dict) for row in p1_rows + p2_rows)):
+        return False
+    for rows, port in ((p1_rows, 0), (p2_rows, 1)):
+        if len(rows) != end - start + 1:
+            return False
+        if any(row.get("input_tick") != start + offset or row.get("source_cursor") != start + offset or
+               row.get("local_port") != port or not isinstance(row.get("bytes"), list) or
+               len(row["bytes"]) != 11 or any(not isinstance(value, int) or isinstance(value, bool) or
+               not 0 <= value <= 255 for value in row["bytes"])
+               for offset, row in enumerate(rows)):
+            return False
+    p1_episode = [row for row in p1_rows if row["input_tick"] >= rise and
+                  any(value != 0 for value in row["bytes"])]
+    if (len(p1_episode) != held_count or
+            any(row["input_tick"] <= gate_input or row["bytes"] != bytes_sample
+                for row in p1_episode) or
+            any(any(value != 0 for value in row["bytes"])
+                for row in p1_rows if row["input_tick"] < rise or
+                row["input_tick"] > last_held)):
+        return False
+    p2_rise = window.get("p2_cstick_left_rise_input_tick")
+    p2_release = window.get("p2_cstick_left_neutral_release_input_tick")
+    p2_held = window.get("p2_cstick_left_held_row_count")
+    if (not _nonnegative_int(p2_rise) or not _nonnegative_int(p2_release) or
+            not isinstance(p2_held, int) or isinstance(p2_held, bool) or
+            p2_release - p2_rise != p2_held or p2_held < 1):
+        return False
+    for row in p2_rows:
+        tick, values = row["input_tick"], row["bytes"]
+        expected_cstick = tick >= p2_rise and tick < p2_release
+        if expected_cstick:
+            signed_cstick = values[4] - 256 if values[4] > 127 else values[4]
+            if signed_cstick >= 0 or any(value != 0 for index, value in enumerate(values) if index != 4):
+                return False
+        elif any(values):
+            return False
+    return True
 
 
 def _prepared_ko_baseline_ok(preparation):
@@ -622,7 +794,8 @@ def main():
     combat_names = [name for name in args.scenarios
                     if name in {"full-moderate-combat-probe", "full-moderate-combat-exchange",
                                 "full-moderate-combat-ko", "full-moderate-combat-ko-charged",
-                                "full-moderate-combat-ko-prepared"}]
+                                "full-moderate-combat-ko-prepared",
+                                "full-moderate-combat-ko-prepared-platform-exit"}]
     if combat_names and len(args.scenarios) != 1:
         parser.error("each bounded combat scenario must run as its own single moderate scenario")
     task13_names = [name for name in args.scenarios
@@ -669,6 +842,7 @@ def main():
             gameplay_combat_ko = len(scenario) > 8 and scenario[8]
             gameplay_combat_ko_charged = len(scenario) > 9 and scenario[9]
             gameplay_combat_ko_prepared = len(scenario) > 10 and scenario[10]
+            gameplay_combat_ko_prepared_platform_exit = len(scenario) > 11 and scenario[11]
             folder = output / name
             folder.mkdir()
             command = [sys.executable, str(ROOT / "scripts/capture_owner_deadline.py"),
@@ -692,12 +866,14 @@ def main():
                    "gameplay_combat_ko": gameplay_combat_ko,
                    "gameplay_combat_ko_charged": gameplay_combat_ko_charged,
                    "gameplay_combat_ko_prepared": gameplay_combat_ko_prepared,
+                   "gameplay_combat_ko_prepared_platform_exit": gameplay_combat_ko_prepared_platform_exit,
                    "controlled_stall_probe": controlled_stall,
                    "controlled_cut_probe": controlled_cut,
                    "result_policy": "expected-fault-cut" if controlled_cut else
                        "controlled-stall-probe" if controlled_stall else
                        "two-match-repeat" if repeat_full_route else
                        "bounded-charged-combat-ko" if gameplay_combat_ko_charged else
+                       "bounded-prepared-platform-exit-combat-ko" if gameplay_combat_ko_prepared_platform_exit else
                        "bounded-prepared-combat-ko" if gameplay_combat_ko_prepared else
                        "bounded-combat-ko" if gameplay_combat_ko else
                        "bounded-combat-exchange" if gameplay_combat_exchange else
@@ -755,7 +931,9 @@ def main():
                                 gameplay_combat_exchange=gameplay_combat_exchange,
                                 gameplay_combat_ko=gameplay_combat_ko,
                                 gameplay_combat_ko_charged=gameplay_combat_ko_charged,
-                                gameplay_combat_ko_prepared=gameplay_combat_ko_prepared)
+                                gameplay_combat_ko_prepared=gameplay_combat_ko_prepared,
+                                gameplay_combat_ko_prepared_platform_exit=
+                                    gameplay_combat_ko_prepared_platform_exit)
                 if repeat_full_route:
                     validate_repeat_artifacts(folder / "browser", browser["full_route"])
                 if name == "css-moderate-fresh":

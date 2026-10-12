@@ -5,6 +5,12 @@ export const COMBAT_KO_CHARGED_HOLD_SOURCE_TICKS = 24;
 export const COMBAT_KO_CHARGED_PAD_BYTES = Object.freeze([1, 0, 129, 0, 0, 0, 0, 0, 0, 0, 0]);
 export const COMBAT_KO_PREP_MAX_JABS = 8;
 export const COMBAT_KO_PREP_DAMAGE_GOAL = 18;
+export const COMBAT_KO_PLATFORM_EXIT_MAX_PAD_ROWS = 30;
+export const COMBAT_KO_PLATFORM_EXIT_FALL_MOTION = 29;
+export const COMBAT_KO_PLATFORM_EXIT_POSITION_ADMISSION = Object.freeze({
+  min_x: -64, max_x: 64, min_y: 32, max_y: 64,
+  policy: 'conservative scenario admission only; not authored Final Destination geometry or landing proof',
+});
 
 export function decideCombatKoPreparation({sourceTick, sourceStartTick, sourceCursorLimit,
   jabCount, actualVictimDamage}) {
@@ -32,6 +38,11 @@ const LOSS_BRAND = Symbol('validated combat KO loss');
 const LOSS_BASELINE = Symbol('combat KO loss baseline');
 const CHARGE_BRAND = Symbol('validated combat KO charge animation');
 const CHARGE_BASELINE = Symbol('combat KO charge baseline');
+const PLATFORM_GATE_BRAND = Symbol('validated combat KO RebirthWait platform gate');
+const PLATFORM_GATE_BASELINE = Symbol('combat KO platform gate baseline');
+const PLATFORM_GATE_LOSS = Symbol('combat KO platform gate loss');
+const PLATFORM_FALL_BRAND = Symbol('validated combat KO platform-exit Fall');
+const PLATFORM_FALL_GATE = Symbol('combat KO platform-exit Fall gate');
 const SOURCE_PORTS = [0, 1];
 const SOURCE_SLOT_COUNT = 6;
 
@@ -349,6 +360,294 @@ function validateLiteralInputWindow({p1Rows, p2Rows, inputStartTick, inputEndTic
     p2_a_left_held_row_count: releaseTick - pressTick,
     p1_rows: freezeEvidenceRows(p1),
     p2_rows: freezeEvidenceRows(p2)});
+}
+
+function requirePlatformGate(gate, baseline, attackLossReceipt) {
+  requireValue(gate?.[PLATFORM_GATE_BRAND] === true &&
+    gate[PLATFORM_GATE_BASELINE] === baseline &&
+    gate[PLATFORM_GATE_LOSS] === attackLossReceipt,
+  'Platform exit requires this baseline’s validated loss and RebirthWait gate');
+}
+
+function stagePeerState(state, baseline, label, sourceCursorLimit) {
+  requireSameMapping(state, baseline, label);
+  requireValue(state.source_tick <= sourceCursorLimit &&
+    state.source_tick - baseline.source_tick <= COMBAT_KO_SOURCE_TICK_BUDGET,
+  `${label} exceeded the aggregate 480-source-cursor budget`);
+  requireStocks(state, [3, 4], label);
+  requireExpectedCounterDeltas(state, baseline, label);
+  for (const peer of state.peers) {
+    const match = peer.match;
+    requireValue(match.rules?.is_stock === 1 && match.rules?.stage === 0x20 &&
+      match.ready === true && match.paused === false && match.complete === false &&
+      match.ending === false && match.outcome === 0,
+    `${label} is not the active, unpaused Final Destination stock match`);
+    const p1 = match.players.find(player => player.source_port === 0);
+    requireValue(Number.isFinite(p1?.x) && Number.isFinite(p1?.y),
+      `${label} P1 position is not finite`);
+  }
+}
+
+// This policy-specific gate is the only authority for the new P1 axis episode.
+// It is based on a branded credited loss plus paired native RebirthWait rows;
+// renderer waits, timers, and an unpaired facing never authorize input.
+export function validateCombatKoPlatformExitGate({baseline, attackLossReceipt,
+  pairedRows, sourceCursorLimit}) {
+  requireBaseline(baseline);
+  requireLossReceipt(attackLossReceipt, baseline);
+  requireValue(Number.isSafeInteger(sourceCursorLimit) &&
+    sourceCursorLimit === baseline.source_tick + COMBAT_KO_SOURCE_TICK_BUDGET,
+  'Platform exit gate changed the original aggregate 480-source-cursor limit');
+  const state = readPairedRows(pairedRows, 'Combat KO platform exit gate');
+  stagePeerState(state, baseline, 'Combat KO platform exit gate', sourceCursorLimit);
+  requireValue(state.source_tick > attackLossReceipt.source_tick &&
+    state.source_frame > attackLossReceipt.source_frame,
+  'Platform exit gate must follow the source-credited loss');
+  for (const row of pairedRows) {
+    requireValue(row.phase === 7 && row.running === 1 && row.error == null &&
+      row.native_status?.active === 1 && row.native_status?.context_applied === 1 &&
+      row.native_status?.terminal?.kind === 0,
+    'Platform exit gate lacks a healthy active source owner');
+  }
+  const victims = state.peers.map(peer => peer.match.players.find(player =>
+    player.source_port === 0));
+  requireValue(victims.every(player => player.motion === 13 && player.groundAir === 1),
+    'Platform exit gate requires paired active P1 RebirthWait motion 13 on the source platform');
+  const facings = victims.map(player => player.facing_direction);
+  requireValue(facings.every(value => value === -1 || value === 1) &&
+    facings[0] === facings[1],
+  'Platform exit gate requires the same exact native P1 facing (+1 or -1) at both peers');
+  const positions = victims.map(player => Object.freeze({x: player.x, y: player.y}));
+  assert.deepEqual(positions[0], positions[1],
+    'Platform exit gate peers disagree on the native P1 platform position');
+  requireValue(positions.every(position =>
+    position.x >= COMBAT_KO_PLATFORM_EXIT_POSITION_ADMISSION.min_x &&
+    position.x <= COMBAT_KO_PLATFORM_EXIT_POSITION_ADMISSION.max_x &&
+    position.y >= COMBAT_KO_PLATFORM_EXIT_POSITION_ADMISSION.min_y &&
+    position.y <= COMBAT_KO_PLATFORM_EXIT_POSITION_ADMISSION.max_y),
+  'Platform exit gate position is outside the declared conservative scenario-admission window');
+  return Object.freeze({[PLATFORM_GATE_BRAND]: true,
+    [PLATFORM_GATE_BASELINE]: baseline, [PLATFORM_GATE_LOSS]: attackLossReceipt,
+    kind: 'validated-source-credited-rebirth-wait-platform-gate-v1',
+    baseline_source_tick: baseline.source_tick,
+    loss_source_tick: attackLossReceipt.source_tick,
+    source_tick: state.source_tick, source_frame: state.source_frame,
+    source_player_index_by_port: state.source_player_index_by_port,
+    facing_direction: facings[0], direction_key: facings[0] === -1 ? 'a' : 'd',
+    position_by_peer: positions,
+    position_admission_policy: COMBAT_KO_PLATFORM_EXIT_POSITION_ADMISSION,
+    position_authority: 'paired finite native Final Destination P1 position while motion 13/groundAir 1 is active; admission window is a conservative policy filter, not authored geometry or landing proof',
+    stocks_by_port: state.stocks_by_port,
+    actual_rows: freezeEvidenceRows(pairedRows),
+    actual_matches: Object.freeze(pairedRows.map(row => row.match))});
+}
+
+function platformGateInputTick(gate, inputDelay) {
+  requireValue(Number.isSafeInteger(inputDelay) && inputDelay >= 0,
+    'Platform exit input delay is not a nonnegative safe integer');
+  const tick = gate.source_tick - inputDelay - 1;
+  requireValue(Number.isSafeInteger(tick) && tick >= 0,
+    'Platform gate has no valid consumed PAD input boundary');
+  return tick;
+}
+
+function validatePlatformP2Rows(rows, inputStartTick, throughTick, pressTick, releaseTick) {
+  const p2 = exactInputRows(rows, inputStartTick, throughTick, 1, 'P2');
+  requireValue(Number.isSafeInteger(pressTick) && pressTick > inputStartTick &&
+    Number.isSafeInteger(releaseTick) && releaseTick > pressTick && releaseTick <= throughTick,
+  'Platform exit P2 C-stick episode has invalid rise or neutral-release ticks');
+  for (const row of p2) {
+    if (row.input_tick < pressTick || row.input_tick >= releaseTick) {
+      assert(isLiteralNeutral(row.bytes),
+        `P2 contains unexpected PAD input at source tick ${row.input_tick}`);
+    } else {
+      assert(isCStickLeftOnly(row.bytes),
+        `P2 C-stick-left row at source tick ${row.input_tick} contains another input`);
+    }
+  }
+  return p2;
+}
+
+// Must run before keydown. A missing or nonneutral raw row through the gate
+// refuses the experiment before the new episode is issued.
+export function validateCombatKoPlatformExitInputPrefix({gate, baseline,
+  attackLossReceipt, p1Rows, p2Rows, inputStartTick, inputDelay,
+  p2PressTick, p2ReleaseTick}) {
+  requirePlatformGate(gate, baseline, attackLossReceipt);
+  requireValue(Number.isSafeInteger(inputStartTick) &&
+    inputStartTick === baseline.source_tick - inputDelay - 1,
+  'Platform exit prefix does not start at the baseline’s declared PAD boundary');
+  const gateInputTick = platformGateInputTick(gate, inputDelay);
+  requireValue(gateInputTick >= inputStartTick,
+    'Platform gate precedes the declared baseline input boundary');
+  const p1 = exactInputRows(p1Rows, inputStartTick, gateInputTick, 0, 'P1 platform prefix');
+  for (const row of p1) assert(isLiteralNeutral(row.bytes),
+    `P1 was not literally neutral before platform-exit keydown at input tick ${row.input_tick}`);
+  const p2 = validatePlatformP2Rows(p2Rows, inputStartTick, gateInputTick,
+    p2PressTick, p2ReleaseTick);
+  return Object.freeze({kind: 'validated-pre-keydown-platform-exit-neutral-prefix-v1',
+    gate_source_tick: gate.source_tick, gate_input_tick: gateInputTick,
+    p1_neutral_through_gate_row_count: p1.length,
+    p2_cstick_left_held_row_count: p2ReleaseTick - p2PressTick,
+    p1_rows: freezeEvidenceRows(p1), p2_rows: freezeEvidenceRows(p2)});
+}
+
+function isPlatformExitAxisRow(bytes, facingDirection) {
+  return Array.isArray(bytes) && bytes.length === 11 &&
+    Number.isInteger(bytes[2]) && signedByte(bytes[2]) !== 0 &&
+    signedByte(bytes[2]) * facingDirection > 0 &&
+    bytes.every((value, index) => index === 2 || value === 0);
+}
+
+function validatePlatformExitInputWindow({gate, baseline, attackLossReceipt,
+  p1Rows, p2Rows, inputStartTick, inputEndTick, p2PressTick, p2ReleaseTick,
+  inputDelay, actionStartTick, movementEndTick, releaseTick}) {
+  requirePlatformGate(gate, baseline, attackLossReceipt);
+  requireValue(Number.isSafeInteger(inputStartTick) &&
+    inputStartTick === baseline.source_tick - inputDelay - 1 &&
+    Number.isSafeInteger(inputEndTick) && inputEndTick >= inputStartTick,
+  'Platform exit final input window has invalid declared baseline/end boundaries');
+  const gateInputTick = platformGateInputTick(gate, inputDelay);
+  requireValue(inputEndTick >= gateInputTick &&
+    Number.isSafeInteger(actionStartTick) && actionStartTick > gateInputTick &&
+    actionStartTick + inputDelay + 1 > gate.source_tick &&
+    actionStartTick + inputDelay + 1 > attackLossReceipt.source_tick,
+  'Platform exit axis episode was not consumed strictly after the credited platform gate');
+  const p1 = exactInputRows(p1Rows, inputStartTick, inputEndTick, 0, 'P1 platform exit');
+  const p2 = validatePlatformP2Rows(p2Rows, inputStartTick, inputEndTick,
+    p2PressTick, p2ReleaseTick);
+  for (let tick = inputStartTick; tick <= gateInputTick; ++tick)
+    assert(isLiteralNeutral(p1[tick - inputStartTick].bytes),
+      `P1 was not literally neutral through platform gate input tick ${tick}`);
+  const episode = [];
+  let sawRelease = false;
+  for (const row of p1) {
+    if (row.input_tick <= gateInputTick) continue;
+    if (isLiteralNeutral(row.bytes)) {
+      if (episode.length) {
+        if (!sawRelease) {
+          assert.equal(row.input_tick, episode.at(-1).input_tick + 1,
+            'P1 platform exit episode lacks its immediate neutral release row');
+          sawRelease = true;
+          assert.equal(row.input_tick, releaseTick,
+            'P1 platform exit neutral release does not match the observed key-up row');
+        }
+      }
+      continue;
+    }
+    assert(!sawRelease, 'P1 began a second or disjoint platform exit PAD episode');
+    assert(isPlatformExitAxisRow(row.bytes, gate.facing_direction),
+      `P1 platform exit row ${row.input_tick} is not the exact facing-directed horizontal-only axis`);
+    if (episode.length) {
+      assert.equal(row.input_tick, episode.at(-1).input_tick + 1,
+        'P1 platform exit axis rows are not one contiguous episode');
+      assert.deepEqual(row.bytes, episode[0].bytes,
+        'P1 platform exit episode changed its literal horizontal PAD axis byte');
+    }
+    episode.push(row);
+  }
+  assert(episode.length >= 1 && episode.length <= COMBAT_KO_PLATFORM_EXIT_MAX_PAD_ROWS,
+    `P1 platform exit episode must contain 1..${COMBAT_KO_PLATFORM_EXIT_MAX_PAD_ROWS} held PAD rows`);
+  assert(sawRelease, 'P1 platform exit episode lacks its immediate literal neutral release');
+  assert.equal(episode[0].input_tick, actionStartTick,
+    'P1 first actual axis row differs from the observed keydown input tick');
+  assert.equal(movementEndTick, episode.at(-1).input_tick,
+    'P1 platform exit final held row differs from the retained movement input');
+  return Object.freeze({kind: 'literal-facing-horizontal-platform-exit-v1',
+    start_input_tick: inputStartTick, input_delay: inputDelay,
+    gate_source_tick: gate.source_tick, gate_input_tick: gateInputTick,
+    p1_axis: 'left_x', p1_axis_byte: episode[0].bytes[2],
+    facing_direction: gate.facing_direction, direction_key: gate.direction_key,
+    p1_axis_rise_input_tick: episode[0].input_tick,
+    p1_axis_last_held_input_tick: movementEndTick,
+    p1_neutral_release_input_tick: releaseTick,
+    p1_axis_held_row_count: episode.length,
+    p1_neutral_prefix_row_count: gateInputTick - inputStartTick + 1,
+    through_grounded_wait_input_tick: inputEndTick,
+    p2_cstick_left_rise_input_tick: p2PressTick,
+    p2_cstick_left_neutral_release_input_tick: p2ReleaseTick,
+    p2_cstick_left_held_row_count: p2ReleaseTick - p2PressTick,
+    p1_rows: freezeEvidenceRows(p1), p2_rows: freezeEvidenceRows(p2)});
+}
+
+export function validateCombatKoPlatformExitFall({baseline, gate,
+  attackLossReceipt, pairedRows, actionInputTick, inputDelay, sourceCursorLimit}) {
+  requireBaseline(baseline);
+  requirePlatformGate(gate, baseline, attackLossReceipt);
+  requireValue(Number.isSafeInteger(sourceCursorLimit) &&
+    sourceCursorLimit === baseline.source_tick + COMBAT_KO_SOURCE_TICK_BUDGET &&
+    Number.isSafeInteger(actionInputTick) && Number.isSafeInteger(inputDelay) && inputDelay >= 0,
+  'Platform exit Fall changed a declared source/input boundary');
+  const state = readPairedRows(pairedRows, 'Combat KO platform exit Fall');
+  stagePeerState(state, baseline, 'Combat KO platform exit Fall', sourceCursorLimit);
+  const consumed = actionInputTick + inputDelay + 1;
+  requireValue(Number.isSafeInteger(consumed) && consumed > gate.source_tick &&
+    consumed > attackLossReceipt.source_tick &&
+    state.source_tick >= consumed && state.source_tick > gate.source_tick &&
+    state.source_frame > gate.source_frame,
+  'Platform exit Fall was not observed after the gate-consumed actual P1 input');
+  const victims = state.peers.map(peer => peer.by_port.get(0));
+  requireValue(victims.every(player => player.motion === COMBAT_KO_PLATFORM_EXIT_FALL_MOTION &&
+    player.groundAir === 1),
+  'Platform exit requires paired actual source Fall motion 29 while P1 is airborne');
+  return Object.freeze({[PLATFORM_FALL_BRAND]: true, [PLATFORM_FALL_GATE]: gate,
+    kind: 'validated-post-platform-exit-source-fall-v1',
+    source_tick: state.source_tick, source_frame: state.source_frame,
+    action_input_tick: actionInputTick, input_delay: inputDelay,
+    action_consumed_source_tick: consumed,
+    actual_rows: freezeEvidenceRows(pairedRows),
+    actual_matches: Object.freeze(pairedRows.map(row => row.match))});
+}
+
+// The new policy has its own final handoff. The legacy neutral-only handoff
+// above remains strict and unchanged for every existing route.
+export function createCombatKoPlatformExitHandoff({baseline, attackLossReceipt,
+  gate, fallReceipt, pairedRows, p1Rows, p2Rows, inputStartTick, inputEndTick,
+  p2PressTick, p2ReleaseTick, inputDelay, actionStartTick, movementEndTick, releaseTick}) {
+  requireBaseline(baseline);
+  requireLossReceipt(attackLossReceipt, baseline);
+  requirePlatformGate(gate, baseline, attackLossReceipt);
+  requireValue(fallReceipt?.[PLATFORM_FALL_BRAND] === true &&
+    fallReceipt[PLATFORM_FALL_GATE] === gate,
+  'Platform exit handoff requires this gate’s validated source Fall receipt');
+  requireValue(Number.isSafeInteger(actionStartTick) &&
+    fallReceipt.action_input_tick === actionStartTick,
+  'Platform exit Fall receipt is not bound to the final actual P1 axis action row');
+  const consumed = actionStartTick + inputDelay + 1;
+  requireValue(Number.isSafeInteger(inputDelay) && inputDelay >= 0 &&
+    Number.isSafeInteger(consumed) && fallReceipt.input_delay === inputDelay &&
+    fallReceipt.action_consumed_source_tick === consumed &&
+    consumed > gate.source_tick && consumed > attackLossReceipt.source_tick &&
+    consumed <= fallReceipt.source_tick,
+  'Platform exit Fall receipt is not bound to the final consumed input boundary');
+  const state = readPairedRows(pairedRows, 'Combat KO platform exit handoff');
+  requireSameMapping(state, baseline, 'Combat KO platform exit handoff');
+  requireOrderedAndBounded(state, baseline, 'Combat KO platform exit handoff', fallReceipt);
+  requireValue(state.source_tick > fallReceipt.source_tick &&
+    state.source_frame > fallReceipt.source_frame,
+  'Grounded platform exit handoff must follow the observed Fall');
+  requireValue(Number.isSafeInteger(inputDelay) && inputDelay >= 0 &&
+    Number.isSafeInteger(inputEndTick) && inputEndTick + inputDelay + 1 === state.source_tick,
+  'Platform exit final PAD endpoint does not map exactly to the grounded source tick');
+  stagePeerState(state, baseline, 'Combat KO platform exit handoff',
+    baseline.source_tick + COMBAT_KO_SOURCE_TICK_BUDGET);
+  for (const peer of state.peers) {
+    const victim = peer.by_port.get(0);
+    assert.equal(victim.motion, 14,
+      'Platform exit handoff P1 is not in grounded Wait motion 14');
+    assert.equal(victim.groundAir, 0,
+      'Platform exit handoff P1 is not grounded');
+  }
+  const inputWindow = validatePlatformExitInputWindow({gate, baseline, attackLossReceipt,
+    p1Rows, p2Rows, inputStartTick, inputEndTick, p2PressTick, p2ReleaseTick,
+    inputDelay, actionStartTick, movementEndTick, releaseTick});
+  return Object.freeze({kind: 'validated-post-credit-platform-exit-combat-ko-handoff-v1',
+    input_policy: 'post-credit-platform-exit', starting_stocks: 3,
+    validated_loss_receipt: attackLossReceipt, platform_gate: gate,
+    platform_exit_fall: fallReceipt, actual_rows: freezeEvidenceRows(pairedRows),
+    actual_matches: Object.freeze(pairedRows.map(row => row.match)),
+    respawn_source_tick: state.source_tick, respawn_source_frame: state.source_frame,
+    input_window: inputWindow});
 }
 
 // This accepts only actual common-source rows retained by the live observer.

@@ -1,7 +1,7 @@
 {
   "schema": "melee-web-network-combat-m2-v1",
   "issue": 313,
-  "scope": "Same-machine simulated-network functional: both jab directions, genuine shield hit and original route pass in the retained exchange run. Later prepared run observes source-credited KO loss, but grounded respawn and continuation remain open.",
+  "scope": "Same-machine simulated-network functional: both jab directions and genuine shield hit pass in the retained exchange run. The third prepared run reaches a source-credited loss but exhausts the unchanged 480-cursor KO budget while P1 remains airborne in RebirthWait; grounded respawn and continuation remain open. Platform-exit is source-only with no capture.",
   "integration": {
     "state": "draft_milestone_attack_ko_open",
     "pr": "https://github.com/ericvanlare/melee-web/pull/316",
@@ -413,7 +413,7 @@
       "sha256": "5d024dd9fa159ad5d49f61fa9d58bccffc4b0df753e3edce831f7ba23f8a56ed"
     }
   ],
-  "next": "Complete cleanup and recorder validation before one reviewed prepared-approach capture; no repeat unchanged run. Public staging and broader acceptance remain open.",
+  "next": "Review of frozen replacement v3 passed source-only. Next: one separately released bounded capture. Full regression and exact-head CI remain required. Public functional route merged #317; acceptance gates remain open.",
   "native_combat_observations": {
     "decision": "COMPILED_AND_BROWSER_EXERCISED_IN_EXCHANGE",
     "runtime_source": "d269334e1243b0568d8bf7caf285053bea8e04a1",
@@ -1447,6 +1447,211 @@
         }
       ],
       "priority": "Owner-authorized isolated public staging deployment and complete functional route now precede resumed combat work."
+    }
+  },
+  "latest_integration_validation": {
+    "source_head": "feaaa27093932400d389d91545f49b21ac79bb24",
+    "tree": "61f0a0e1d487260dd28f6dd33204ae4e90826e80",
+    "merge_commit": "7efd85cb5d023f7d4654773f167c8b290783ac9f",
+    "public_main": "4be9d23fbe06d36b175901adeba81eb99feadeaf",
+    "rebirth_wait_review": {
+      "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-rebirth-integrated-v1/integrated-review-v1.json",
+      "sha256": "e046ca6fb812c04713bebbf5636c022143f5a23ff8ea9e561ca93f580b063403",
+      "decision": "PASS_ONE_BOUNDED_CAPTURE_JUSTIFIED",
+      "prior_independent_review_sha256": "20779366778e0e94dee1c25e5bf56b7ecff4e193d96c2ca41598ad4e1caaa4d3",
+      "candidate_patch_sha256": "82b95ebd80a37f2dfc940ab76eaaa4733b278c96f9527eae207a11e9fec69d0e",
+      "route_sha256": "3c73c5199ac918b85eeb637b9b076542fa1803ce1b8d1c619b05a170da956ee5"
+    },
+    "affected_release_build": {
+      "decision": "AFFECTED_RELEASE_RUNTIME_BUILD_PASS",
+      "source": "feaaa27093932400d389d91545f49b21ac79bb24",
+      "runtime_producer_path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-feaaa270-runtime-producer.json",
+      "runtime_producer_sha256": "5a13d072b248a14109e359b63fe46e84146112c3ae5f39766b426a89e736c427",
+      "build_log_path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-feaaa270-runtime-build.log",
+      "build_log_sha256": "c5e44ea9f170b6bbf6a791d3e9a2f2777c028ef8f0a552c095e3f74b7d9733cb",
+      "scope": "Build of feaaa270 RebirthWait-integrated source/runtime; not a build of the later source-only platform-exit candidate."
+    },
+    "focused_controls": {
+      "rebirth_wait_node": {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-rebirth-integrated-v1/focused-node-tests.log",
+        "sha256": "4feca9241ce7c7edb0a737922009d8186afdffe1af69128c6d81229a70c0a4ea",
+        "tests": 83,
+        "passed": 82,
+        "intentional_skips": 1,
+        "failed": 0
+      },
+      "rebirth_wait_python": {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-rebirth-integrated-v1/focused-python-tests.log",
+        "sha256": "91b763b100b4525fd819d6636b0ff7b3dfdb4658853ec968f7aa1390630241f3",
+        "passed": 5
+      },
+      "results_confirmation_python": {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-rebirth-integrated-v1/results-confirmation-python.log",
+        "sha256": "5c4a5729e5d2dec4191b405676e2fde614b18026a1578eece1bd5f52ac2e4cdb",
+        "passed": 1
+      },
+      "integrated_mode_wrapper_receipts": {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-integrated-focused-controls.json",
+        "sha256": "6c528d87e565f5ff6695faf69c6a060b8ca000d7f9fad7eae8687eb33e78be2a",
+        "passed_commands": 3
+      }
+    },
+    "latest_full_regression": "REQUIRED_NOT_RUN_AFTER_LATEST_INTEGRATION",
+    "latest_exact_head_ci": "REQUIRED_NOT_RUN_AFTER_LATEST_INTEGRATION"
+  },
+  "prepared_third_result": {
+    "decision": "CREDITED_LOSS_AIRBORNE_REBIRTHWAIT_FIXED_BUDGET_EXHAUSTED_NO_GROUNDED_RESPAWN",
+    "scenario": "full-moderate-combat-ko-prepared",
+    "harness_source": "feaaa27093932400d389d91545f49b21ac79bb24",
+    "runtime_source": "feaaa27093932400d389d91545f49b21ac79bb24",
+    "first_error": "source-cursor budget exhausted during observation acquisition",
+    "artifacts": {
+      "browser_report": {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-prepared-3-suite/full-moderate-combat-ko-prepared/browser/report.json",
+        "bytes": 29585545,
+        "sha256": "3dd1b076065b5ead62c54e39586718cc1af1ee8110cf20a4cdf0d1c8178e7010"
+      },
+      "owner_report": {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-prepared-3-suite/full-moderate-combat-ko-prepared/owner.json",
+        "bytes": 180072,
+        "sha256": "17c787e31e15df4c49ed2141940f938c936696258ffcc6c6836174e1bbb0c312"
+      },
+      "suite": {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-prepared-3-suite/suite.json",
+        "bytes": 1551790,
+        "sha256": "00ad5b4dc8e8a63c350dcd6292ad7b09446c64cfb7274b76ef951279e09580f8"
+      },
+      "independent_review": {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-prepared-third-result-review-v1.json",
+        "bytes": 23878,
+        "sha256": "70c10688f2679141316b8ab4a9ec2c219a2ef65ecd02d151800f56438a36b104"
+      },
+      "runtime_producer": {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-feaaa270-runtime-producer.json",
+        "bytes": 1547682,
+        "sha256": "5a13d072b248a14109e359b63fe46e84146112c3ae5f39766b426a89e736c427"
+      }
+    },
+    "preparation": {
+      "origin": 692,
+      "limit": 1172,
+      "end": 929,
+      "span": 237,
+      "verified_jabs": 7,
+      "final_p1_damage_percent": 18.1200008,
+      "p1_neutral_p2_only_verified_windows": true
+    },
+    "ko": {
+      "baseline": 929,
+      "source_cursor_limit": 1409,
+      "p2_cstick_left_input_tick": 930,
+      "p2_neutral_release_input_tick": 931,
+      "p1_neutral_through_retained_window": true,
+      "source_credited_loss_tick": 1072,
+      "p1_stocks_after_loss": 3,
+      "p2_original_credit_slot_delta": 1,
+      "p1_primary_falls_delta": 1,
+      "suicides_delta": 0,
+      "healthy_first_use_wait_cursors": [
+        1145,
+        1146
+      ],
+      "first_rebirth_wait_pair": {
+        "source_tick": 1192,
+        "p1_motion": 13,
+        "p1_groundAir": 1,
+        "p1_position": {
+          "x": 16,
+          "y": 45
+        },
+        "p2_motion": 14,
+        "p2_groundAir": 0
+      },
+      "last_common_pair": {
+        "source_tick": 1408,
+        "p1_motion": 13,
+        "p1_groundAir": 1,
+        "p1_position": {
+          "x": 16,
+          "y": 45
+        }
+      },
+      "acquisition_refusal": {
+        "peer": "alpha",
+        "native_cursor": 1410,
+        "limit": 1409,
+        "exact_1409_pair_retained": false
+      },
+      "grounded_three_stock_row_observed": false,
+      "grounded_respawn_handoff": false,
+      "full_route_continuation": false
+    },
+    "cleanup_diagnostic_prefix": {
+      "records": 1411,
+      "ticks": [
+        0,
+        1410
+      ],
+      "equal_64_byte_records": true,
+      "sha256": "cebb2da9d4062830125a2f1805856a2195130aa86b846f14d7e41126cc6696a4",
+      "alpha_tail": 0,
+      "beta_tail": 2,
+      "scope": "cleanup diagnostic common prefix only; not route acceptance"
+    },
+    "cleanup": {
+      "normal_leave_unload_quiescence_proxy_worker": true,
+      "independently_absent_pids": 22,
+      "independently_absent_groups": 5,
+      "failed_evidence_retained": true,
+      "beta_package_get_abort_retained": true
+    },
+    "H1": {
+      "alpha_timing_incidents": 0,
+      "beta_timing_incidents": 0
+    },
+    "scope": [
+      "The 480-cursor KO cap was not extended; source acquisition stopped at the original limit.",
+      "Alpha cursor 1410 caused the refusal before a paired cursor 1409 row was retained. This does not establish the state at 1409.",
+      "No grounded respawn, finalized PAD handoff, Results/CSS continuation or accepted full route."
+    ]
+  },
+  "platform_exit_source_only": {
+    "scenario": "full-moderate-combat-ko-prepared-platform-exit",
+    "state": "SOURCE_ONLY_V3_REVIEW_PASS_CAPTURE_NOT_RUN",
+    "preserved_contract": "No cap/deadline reset or extension; strict PAD/checksum/KOs/respawn/route guards remain required; no runtime/gameplay source change or actual platform-exit run is claimed.",
+    "next": "The bounded source review passed. One separately released bounded capture is the next experiment; no build or capture is included in this receipt.",
+    "prior_candidate_v2": {
+      "manifest_sha256": "961751f498fdfdb34cf1cf28b00d4946ce9c347145e7dee100c85f0f93f22aef",
+      "patch_sha256": "e98a923711d3e0a337600449f6a5299295976b9ca50e2b49ca0ed5674a7cd06c",
+      "independent_review": {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-platform-exit-candidate-v1/full-review-v2.json",
+        "sha256": "25cf1b486a55efaf52cb3bfde261b12bd131b813160eec7298758c8300e3c0f7",
+        "decision": "REFUSE_TWO_REPRODUCED_BLOCKERS_NO_COMMIT_OR_CAPTURE_RELEASE"
+      },
+      "blockers": [
+        {
+          "issue": "Gate scheduling reads raw rows[0].source_frame, but the actual observer puts the source frame at rows[0].match.frame; the comparison is always false and the gate never resolves.",
+          "required_repair": "Use checked match.frame and add a focused scheduling control with the retained raw RebirthWait row."
+        },
+        {
+          "issue": "Fall receipt action_input_tick equality does not bind action_consumed_source_tick to the final delay. A delay-0 Fall at source 151 for action input 150 was accepted with final delay 3, although the actual consumed tick is 154.",
+          "required_repair": "Bind the receipt consumed tick exactly to actionStartTick + final inputDelay + 1 with safe/post-gate/Fall-order checks."
+        }
+      ]
+    },
+    "replacement_candidate_v3": {
+      "scenario": "full-moderate-combat-ko-prepared-platform-exit",
+      "source_base": "feaaa27093932400d389d91545f49b21ac79bb24",
+      "manifest_path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-platform-exit-candidate-v1/full-candidate-v3/manifest.json",
+      "manifest_sha256": "abdfeb029af615c783fe54afe986e7f866f39848b4d42528382f9dd8bbe5f23d",
+      "candidate_patch_sha256": "5ae8b3776336e17f73d8f9b10df59b388c769785e20ca52471411939d851d45d",
+      "independent_review": {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-platform-exit-candidate-v1/full-review-v3.json",
+        "sha256": "84606d70324c227dfd0c13e54dfb50fe09484219898915f5b42b8a076c712a62",
+        "decision": "PASS_BOUNDED_SOURCE_REVIEW"
+      },
+      "build_run_or_capture": false,
+      "scope_limit": "Source-only review and narrow focused controls; no full suite, build, browser capture, commit, or gameplay acceptance."
     }
   }
 }

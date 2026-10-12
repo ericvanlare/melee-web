@@ -3,10 +3,13 @@ import test from 'node:test';
 import {observeDesiredSourcePad, observeCombatKoChargedHoldBeforeRelease}
   from '../scripts/a3_local_room_full_route.mjs';
 import {COMBAT_KO_SOURCE_TICK_BUDGET, COMBAT_KO_CHARGED_HOLD_SOURCE_TICKS,
-  COMBAT_KO_CHARGED_PAD_BYTES,
+  COMBAT_KO_CHARGED_PAD_BYTES, COMBAT_KO_PLATFORM_EXIT_MAX_PAD_ROWS,
+  COMBAT_KO_PLATFORM_EXIT_POSITION_ADMISSION,
   COMBAT_KO_PREP_MAX_JABS, COMBAT_KO_PREP_DAMAGE_GOAL, decideCombatKoPreparation,
   captureCombatKoBaseline, createCombatKoRespawnHandoff, advanceCombatKoEvidence,
-  validateCombatKoAttackLoss, validateCombatKoChargedAnimation}
+  validateCombatKoAttackLoss, validateCombatKoChargedAnimation,
+  validateCombatKoPlatformExitGate, validateCombatKoPlatformExitInputPrefix,
+  validateCombatKoPlatformExitFall, createCombatKoPlatformExitHandoff}
   from '../scripts/a3_local_room_combat_ko.mjs';
 
 const SLOT_BY_PORT = [4, 1];
@@ -39,7 +42,8 @@ function clone(value) {
 
 function pair({sourceTick = 100, frame = 200, stocks = [4, 4],
   counters = BASE_COUNTERS, mapping = SLOT_BY_PORT, motion = [14, 14],
-  groundAir = [0, 0], second = null} = {}) {
+  groundAir = [0, 0], second = null, facing = [1, 1],
+  positions = [{x: 0, y: 45}, {x: 0, y: 45}], active = true} = {}) {
   const makePeer = (peerIndex, override = {}) => {
     const row = {
       source_tick: sourceTick,
@@ -47,6 +51,7 @@ function pair({sourceTick = 100, frame = 200, stocks = [4, 4],
       match: {
         frame,
         rules: {is_stock: 1, stage: 0x20},
+        ready: true, paused: false, complete: false, ending: false, outcome: 0,
         players: [0, 1].map(port => ({
           source_port: port,
           // Deliberately conflicting decoys: counter indexing must use
@@ -61,8 +66,13 @@ function pair({sourceTick = 100, frame = 200, stocks = [4, 4],
           kos_by_player_slot: [...counters[port].kos_by_player_slot],
           motion: motion[port],
           groundAir: groundAir[port],
+          x: positions[port].x, y: positions[port].y,
+          facing_direction: facing[port],
         })),
       },
+      phase: 7, running: active ? 1 : 0,
+      native_status: {active: active ? 1 : 0, context_applied: 1,
+        terminal: {kind: 0}},
     };
     if (override.players) {
       for (const [index, fields] of Object.entries(override.players))
@@ -90,6 +100,15 @@ function respawnPair({sourceTick = 160, frame = 260, ...overrides} = {}) {
     motion: [14, 44], groundAir: [0, 0], ...overrides});
 }
 
+function platformGatePair({sourceTick = 140, frame = 240, facing = [1, 1],
+  positions = [{x: 16, y: 45}, {x: 16, y: 45}], ...overrides} = {}) {
+  const counters = clone(BASE_COUNTERS);
+  counters[0].primary_falls++;
+  counters[1].kos_by_player_slot[SLOT_BY_PORT[0]]++;
+  return pair({sourceTick, frame, stocks: [3, 4], counters, motion: [13, 44],
+    groundAir: [1, 0], facing, positions, ...overrides});
+}
+
 function padRow(inputTick, localPort, bytes = Array(11).fill(0)) {
   return {input_tick: inputTick, source_cursor: inputTick,
     local_port: localPort, bytes: [...bytes]};
@@ -99,6 +118,38 @@ function cstickLeftBytes(magnitude = -80) {
   const bytes = Array(11).fill(0);
   bytes[4] = magnitude & 255;
   return bytes;
+}
+
+function horizontalBytes(magnitude = 80) {
+  const bytes = Array(11).fill(0);
+  bytes[2] = magnitude & 255;
+  return bytes;
+}
+
+function platformExitRows({start = 96, end = 156, gateInput = 136,
+  action = 137, movementEnd = 139, release = 140, facing = 1,
+  p2Press = 105, p2Release = 108, mutateP1 = null, mutateP2 = null} = {}) {
+  const p1Rows = [], p2Rows = [];
+  for (let tick = start; tick <= end; ++tick) {
+    const moving = tick >= action && tick <= movementEnd;
+    p1Rows.push(padRow(tick, 0, moving
+      ? horizontalBytes((facing < 0 ? -80 : 80)) : Array(11).fill(0)));
+    p2Rows.push(padRow(tick, 1, tick >= p2Press && tick < p2Release
+      ? cstickLeftBytes() : Array(11).fill(0)));
+  }
+  if (mutateP1) mutateP1(p1Rows);
+  if (mutateP2) mutateP2(p2Rows);
+  return {p1Rows, p2Rows, start, end, gateInput, action, movementEnd, release,
+    facing, p2Press, p2Release};
+}
+
+function platformExitReceipts({gateRows = platformGatePair(), facing = 1} = {}) {
+  const baseline = captureCombatKoBaseline({pairedRows: pair()});
+  const attackLossReceipt = validateCombatKoAttackLoss({baseline, pairedRows: lossPair()});
+  const gate = validateCombatKoPlatformExitGate({baseline, attackLossReceipt,
+    pairedRows: gateRows, sourceCursorLimit: baseline.source_tick + COMBAT_KO_SOURCE_TICK_BUDGET});
+  const rows = platformExitRows({facing});
+  return {baseline, attackLossReceipt, gate, rows};
 }
 function chargedALeftBytes() { return [...COMBAT_KO_CHARGED_PAD_BYTES]; }
 
@@ -627,4 +678,171 @@ test('sampled charged animation preserves gaps and rejects acquired row reversal
     /repeat or move backward/);
   assert.throws(() => validateCombatKoChargedAnimation({baseline,pairedRows:pairs,
     pressTick:105,inputDelay:2,releaseTick:136}), /bounded literal episode/);
+});
+
+test('platform-exit gate requires branded credit and paired active RebirthWait position/facing', () => {
+  const baseline = captureCombatKoBaseline({pairedRows: pair()});
+  const attackLossReceipt = validateCombatKoAttackLoss({baseline, pairedRows:lossPair()});
+  const valid = platformGatePair();
+  const gate = validateCombatKoPlatformExitGate({baseline, attackLossReceipt,
+    pairedRows:valid, sourceCursorLimit:baseline.source_tick+COMBAT_KO_SOURCE_TICK_BUDGET});
+  assert.equal(gate.kind, 'validated-source-credited-rebirth-wait-platform-gate-v1');
+  assert.equal(gate.direction_key, 'd');
+  assert.deepEqual(gate.position_by_peer, [{x:16,y:45},{x:16,y:45}]);
+  assert.equal(gate.position_admission_policy.policy,
+    'conservative scenario admission only; not authored Final Destination geometry or landing proof');
+  const leftFacing = validateCombatKoPlatformExitGate({baseline, attackLossReceipt,
+    pairedRows:platformGatePair({facing:[-1,-1]}),
+    sourceCursorLimit:baseline.source_tick+COMBAT_KO_SOURCE_TICK_BUDGET});
+  assert.equal(leftFacing.direction_key, 'a');
+  const otherBaseline = captureCombatKoBaseline({pairedRows:pair({sourceTick:101,frame:201})});
+  const otherLossReceipt = validateCombatKoAttackLoss({baseline:otherBaseline,
+    pairedRows:pair({sourceTick:131,frame:231,stocks:[3,4],
+      counters:(()=>{const value=clone(BASE_COUNTERS);value[0].primary_falls++;
+        value[1].kos_by_player_slot[SLOT_BY_PORT[0]]++;return value;})(),motion:[0,44],groundAir:[1,0]})});
+  assert.throws(() => validateCombatKoPlatformExitGate({baseline,
+    attackLossReceipt:otherLossReceipt, pairedRows:valid,
+    sourceCursorLimit:baseline.source_tick+COMBAT_KO_SOURCE_TICK_BUDGET}), /validated attack-loss receipt/);
+  assert.throws(() => validateCombatKoPlatformExitGate({baseline, attackLossReceipt,
+    pairedRows:platformGatePair({sourceTick:130}),
+    sourceCursorLimit:baseline.source_tick+COMBAT_KO_SOURCE_TICK_BUDGET}), /must follow the source-credited loss/);
+  assert.throws(() => validateCombatKoPlatformExitGate({baseline, attackLossReceipt,
+    pairedRows:platformGatePair({facing:[-1,-1],second:{players:{0:{facing_direction:1}}}}),
+    sourceCursorLimit:baseline.source_tick+COMBAT_KO_SOURCE_TICK_BUDGET}), /same exact native P1 facing/);
+  assert.throws(() => validateCombatKoPlatformExitGate({baseline, attackLossReceipt,
+    pairedRows:platformGatePair({second:{players:{0:{x:17}}}}),
+    sourceCursorLimit:baseline.source_tick+COMBAT_KO_SOURCE_TICK_BUDGET}), /disagree on the native P1 platform position/);
+  assert.throws(() => validateCombatKoPlatformExitGate({baseline, attackLossReceipt,
+    pairedRows:platformGatePair({positions:[{x:Number.NaN,y:45},{x:Number.NaN,y:45}]}),
+    sourceCursorLimit:baseline.source_tick+COMBAT_KO_SOURCE_TICK_BUDGET}), /position is not finite/);
+  assert.throws(() => validateCombatKoPlatformExitGate({baseline, attackLossReceipt,
+    pairedRows:platformGatePair({positions:[{x:1e6,y:-1e6},{x:1e6,y:-1e6}]}),
+    sourceCursorLimit:baseline.source_tick+COMBAT_KO_SOURCE_TICK_BUDGET}), /outside the declared conservative scenario-admission window/);
+  assert.throws(() => validateCombatKoPlatformExitGate({baseline, attackLossReceipt,
+    pairedRows:platformGatePair({active:false}),
+    sourceCursorLimit:baseline.source_tick+COMBAT_KO_SOURCE_TICK_BUDGET}), /healthy active source owner/);
+  assert.throws(() => validateCombatKoPlatformExitGate({baseline, attackLossReceipt,
+    pairedRows:valid, sourceCursorLimit:baseline.source_tick+COMBAT_KO_SOURCE_TICK_BUDGET+1}),
+  /changed the original aggregate/);
+});
+
+test('platform exit validates complete neutral/P2 prefix before a facing-directed one-axis episode', () => {
+  const {baseline, attackLossReceipt, gate, rows} = platformExitReceipts();
+  const prefix = validateCombatKoPlatformExitInputPrefix({gate, baseline, attackLossReceipt,
+    p1Rows:rows.p1Rows, p2Rows:rows.p2Rows, inputStartTick:rows.start, inputDelay:3,
+    p2PressTick:rows.p2Press, p2ReleaseTick:rows.p2Release});
+  assert.equal(prefix.gate_input_tick, 136);
+  assert.equal(prefix.p1_neutral_through_gate_row_count, 41);
+  assert.equal(prefix.p2_cstick_left_held_row_count, 3);
+  const fallPair = pair({sourceTick:145, frame:245, stocks:[3,4],
+    counters: (() => {const value=clone(BASE_COUNTERS);value[0].primary_falls++;
+      value[1].kos_by_player_slot[SLOT_BY_PORT[0]]++;return value;})(),
+    motion:[29,44],groundAir:[1,0]});
+  const fall = validateCombatKoPlatformExitFall({baseline, attackLossReceipt, gate,
+    pairedRows:fallPair, actionInputTick:rows.action, inputDelay:3,
+    sourceCursorLimit:baseline.source_tick+COMBAT_KO_SOURCE_TICK_BUDGET});
+  assert.equal(fall.action_consumed_source_tick, 141);
+  const handoff = createCombatKoPlatformExitHandoff({baseline,attackLossReceipt,gate,
+    fallReceipt:fall,pairedRows:respawnPair(),p1Rows:rows.p1Rows,p2Rows:rows.p2Rows,
+    inputStartTick:rows.start,inputEndTick:rows.end,p2PressTick:rows.p2Press,
+    p2ReleaseTick:rows.p2Release,inputDelay:3,actionStartTick:rows.action,
+    movementEndTick:rows.movementEnd,releaseTick:rows.release});
+  assert.equal(handoff.input_policy,'post-credit-platform-exit');
+  assert.equal(handoff.starting_stocks,3);
+  assert.equal(handoff.input_window.p1_axis,'left_x');
+  assert.equal(handoff.input_window.p1_axis_byte,80);
+  assert.equal(handoff.input_window.p1_axis_held_row_count,3);
+  assert.equal(handoff.input_window.p1_neutral_release_input_tick,140);
+  assert.equal(handoff.input_window.p1_neutral_prefix_row_count,41);
+  assert.equal(handoff.input_window.p2_cstick_left_held_row_count,3);
+  const fallForOtherAction = validateCombatKoPlatformExitFall({baseline,attackLossReceipt,gate,
+    pairedRows:fallPair,actionInputTick:137,inputDelay:3,
+    sourceCursorLimit:baseline.source_tick+COMBAT_KO_SOURCE_TICK_BUDGET});
+  assert.throws(() => createCombatKoPlatformExitHandoff({baseline,attackLossReceipt,gate,
+    fallReceipt:fallForOtherAction,pairedRows:respawnPair(),p1Rows:rows.p1Rows,p2Rows:rows.p2Rows,
+    inputStartTick:rows.start,inputEndTick:rows.end,p2PressTick:rows.p2Press,
+    p2ReleaseTick:rows.p2Release,inputDelay:3,actionStartTick:150,
+    movementEndTick:rows.movementEnd,releaseTick:rows.release}),
+  /Fall receipt is not bound to the final actual P1 axis action row/);
+  assert.throws(() => createCombatKoPlatformExitHandoff({baseline,attackLossReceipt,gate,
+    fallReceipt:fallForOtherAction,pairedRows:respawnPair(),p1Rows:rows.p1Rows,p2Rows:rows.p2Rows,
+    inputStartTick:rows.start,inputEndTick:144,p2PressTick:rows.p2Press,
+    p2ReleaseTick:rows.p2Release,inputDelay:3,actionStartTick:rows.action,
+    movementEndTick:rows.movementEnd,releaseTick:rows.release}),
+  /does not map exactly to the grounded source tick/);
+});
+
+test('platform-exit raw PAD validation rejects pre-gate, wrong-axis, split, overlong and missing-release input', () => {
+  const {baseline, attackLossReceipt, gate} = platformExitReceipts();
+  const good = () => platformExitRows();
+  const prefix = input => validateCombatKoPlatformExitInputPrefix({gate,baseline,attackLossReceipt,
+    p1Rows:input.p1Rows,p2Rows:input.p2Rows,inputStartTick:input.start,inputDelay:3,
+    p2PressTick:input.p2Press,p2ReleaseTick:input.p2Release});
+  const makeFall = input => validateCombatKoPlatformExitFall({baseline,attackLossReceipt,gate,
+    pairedRows:pair({sourceTick:145,frame:245,stocks:[3,4],
+      counters:(()=>{const value=clone(BASE_COUNTERS);value[0].primary_falls++;
+        value[1].kos_by_player_slot[SLOT_BY_PORT[0]]++;return value;})(),
+      motion:[29,44],groundAir:[1,0]}),actionInputTick:input.action,inputDelay:3,
+    sourceCursorLimit:baseline.source_tick+COMBAT_KO_SOURCE_TICK_BUDGET});
+  const handoff = input => createCombatKoPlatformExitHandoff({baseline,attackLossReceipt,gate,
+    fallReceipt:makeFall(input),pairedRows:respawnPair({sourceTick:input.end+4,frame:input.end+104}),
+    p1Rows:input.p1Rows,p2Rows:input.p2Rows,
+    inputStartTick:input.start,inputEndTick:input.end,p2PressTick:input.p2Press,
+    p2ReleaseTick:input.p2Release,inputDelay:3,actionStartTick:input.action,
+    movementEndTick:input.movementEnd,releaseTick:input.release});
+  assert.throws(() => prefix({...good(),mutateP1:undefined,
+    p1Rows:(()=>{const x=good();x.p1Rows.find(row=>row.input_tick===136).bytes[2]=80;return x.p1Rows;})()}), /not literally neutral before platform-exit keydown/);
+  const wrongP2 = good(); wrongP2.p2Rows.find(row=>row.input_tick===106).bytes[0]=1;
+  assert.throws(() => prefix(wrongP2), /contains another input/);
+  assert.throws(() => handoff(good().p1Rows && (()=>{const x=good();x.p1Rows[41].bytes[1]=80;return x;})()), /not the exact facing-directed horizontal-only axis/);
+  const split = good(); split.p1Rows.find(row=>row.input_tick===138).bytes.fill(0);
+  split.p1Rows.find(row=>row.input_tick===140).bytes[2]=80;
+  split.movementEnd=141; split.release=138;
+  split.p1Rows.find(row=>row.input_tick===141).bytes.fill(0);
+  split.p1Rows.find(row=>row.input_tick===142).bytes.fill(0);
+  assert.throws(() => handoff(split), /second or disjoint|one contiguous episode/);
+  const tooLong = platformExitRows({action:137,movementEnd:167,release:168,end:170});
+  assert.throws(() => handoff(tooLong), /must contain 1\.\.30/);
+  const noRelease = good();
+  for (const row of noRelease.p1Rows.filter(row=>row.input_tick>=140)) row.bytes[2]=80;
+  noRelease.movementEnd=156; noRelease.release=157;
+  assert.throws(() => handoff(noRelease), /neutral release/);
+  const wrongFacing = platformExitRows({facing:-1});
+  assert.throws(() => handoff(wrongFacing), /not the exact facing-directed horizontal-only axis/);
+  const missingRaw = good(); missingRaw.p1Rows.splice(15,1);
+  assert.throws(() => prefix(missingRaw), /missing or duplicate source tick/);
+  assert.equal(COMBAT_KO_PLATFORM_EXIT_MAX_PAD_ROWS,30);
+  assert.deepEqual(COMBAT_KO_PLATFORM_EXIT_POSITION_ADMISSION,
+    {min_x:-64,max_x:64,min_y:32,max_y:64,
+      policy:'conservative scenario admission only; not authored Final Destination geometry or landing proof'});
+});
+
+test('platform Fall receipt binds the exact final input delay and post-gate consumed boundary', () => {
+  const {baseline,attackLossReceipt,gate} = platformExitReceipts();
+  const counters=clone(BASE_COUNTERS);
+  counters[0].primary_falls++;
+  counters[1].kos_by_player_slot[SLOT_BY_PORT[0]]++;
+  const fallRows=pair({sourceTick:151,frame:251,stocks:[3,4],counters,
+    motion:[29,44],groundAir:[1,0]});
+  const fall=validateCombatKoPlatformExitFall({baseline,attackLossReceipt,gate,
+    pairedRows:fallRows,actionInputTick:150,inputDelay:0,sourceCursorLimit:580});
+  const rows=platformExitRows({action:150,movementEnd:152,release:153});
+  assert.throws(() => createCombatKoPlatformExitHandoff({baseline,attackLossReceipt,gate,
+    fallReceipt:fall,pairedRows:respawnPair(),p1Rows:rows.p1Rows,p2Rows:rows.p2Rows,
+    inputStartTick:rows.start,inputEndTick:rows.end,p2PressTick:rows.p2Press,
+    p2ReleaseTick:rows.p2Release,inputDelay:3,actionStartTick:rows.action,
+    movementEndTick:rows.movementEnd,releaseTick:rows.release}), /final consumed input boundary/);
+  assert.throws(() => validateCombatKoPlatformExitFall({baseline,attackLossReceipt,gate,
+    pairedRows:fallRows,actionInputTick:136,inputDelay:3,sourceCursorLimit:580}),
+  /gate-consumed actual P1 input/);
+  const validFall=validateCombatKoPlatformExitFall({baseline,attackLossReceipt,gate,
+    pairedRows:pair({sourceTick:154,frame:254,stocks:[3,4],counters,
+      motion:[29,44],groundAir:[1,0]}),actionInputTick:150,inputDelay:3,sourceCursorLimit:580});
+  const handoff=createCombatKoPlatformExitHandoff({baseline,attackLossReceipt,gate,
+    fallReceipt:validFall,pairedRows:respawnPair(),p1Rows:rows.p1Rows,p2Rows:rows.p2Rows,
+    inputStartTick:rows.start,inputEndTick:rows.end,p2PressTick:rows.p2Press,
+    p2ReleaseTick:rows.p2Release,inputDelay:3,actionStartTick:rows.action,
+    movementEndTick:rows.movementEnd,releaseTick:rows.release});
+  assert.equal(handoff.platform_exit_fall.input_delay,3);
+  assert.equal(handoff.platform_exit_fall.action_consumed_source_tick,154);
 });

@@ -1,11 +1,14 @@
 import copy
 import hashlib
+import json
+import subprocess
 import sys
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from run_network_simulation import SCENARIOS, scenario_route_flags, validate_result
+from run_network_simulation import SCENARIOS, scenario_route_flags, validate_result, _prepared_platform_exit_receipt_ok
+from check_gameplay import node_runtime
 
 
 def incident_recording():
@@ -507,6 +510,201 @@ class NetworkSimulationSuitePolicyTests(unittest.TestCase):
             mutate(damaged["full_route"]["combat_probe"]["combat_ko"])
             with self.assertRaisesRegex(ValueError, "prepared damage proof"):
                 validate_result(0, self.owner, damaged, True, **kwargs)
+
+    def test_prepared_platform_exit_is_a_distinct_bounded_policy_and_cannot_relabel_legacy(self):
+        name = "full-moderate-combat-ko-prepared-platform-exit"
+        self.assertEqual(SCENARIOS[name],
+                         ("moderate", True, False, False, False, False, True, True,
+                          False, False, True, True))
+        self.assertEqual(scenario_route_flags(name), ["--full-route", "--gameplay-combat-probe",
+            "--gameplay-combat-exchange", "--gameplay-combat-ko-prepared",
+            "--gameplay-combat-ko-prepared-platform-exit"])
+        browser = copy.deepcopy(self.browser)
+        browser.update(gameplay_combat_probe=True, gameplay_combat_exchange=True,
+                       gameplay_combat_ko=False, gameplay_combat_ko_charged=False,
+                       gameplay_combat_ko_prepared=True,
+                       gameplay_combat_ko_prepared_platform_exit=True)
+        route = browser["full_route"]
+        route.update(gameplay_combat_probe=True, gameplay_combat_exchange=True,
+                     gameplay_combat_ko=False, gameplay_combat_ko_charged=False,
+                     gameplay_combat_ko_prepared=True,
+                     gameplay_combat_ko_prepared_platform_exit=True)
+        match = {"frame": 200, "players": [
+            {"source_port": 0, "source_player_index": 4, "motion": 14, "groundAir": 0,
+             "stocks": 4, "damage_percent": 18, "x": -1, "facing_direction": 1},
+            {"source_port": 1, "source_player_index": 1, "motion": 14, "groundAir": 0,
+             "stocks": 4, "damage_percent": 0, "x": 1, "facing_direction": -1}]}
+        baseline = {"source_tick": 200, "stocks_by_port": [4, 4],
+                    "source_player_index_by_port": [4, 1],
+                    "actual_matches": [copy.deepcopy(match), copy.deepcopy(match)]}
+        p1_rows, p2_rows = [], []
+        for tick in range(196, 297):
+            p1 = [0] * 11
+            if tick in (237, 238):
+                p1[2] = 80
+            p2 = [0] * 11
+            if tick in (197, 198):
+                p2[4] = 176
+            p1_rows.append({"input_tick": tick, "source_cursor": tick,
+                            "local_port": 0, "bytes": p1})
+            p2_rows.append({"input_tick": tick, "source_cursor": tick,
+                            "local_port": 1, "bytes": p2})
+        input_window = {"kind": "literal-facing-horizontal-platform-exit-v1", "input_delay": 3,
+            "start_input_tick": 196, "gate_source_tick": 240, "gate_input_tick": 236,
+            "p1_axis": "left_x", "p1_axis_byte": 80, "facing_direction": 1,
+            "direction_key": "d", "p1_axis_rise_input_tick": 237,
+            "p1_axis_last_held_input_tick": 238,
+            "p1_neutral_release_input_tick": 239, "p1_axis_held_row_count": 2,
+            "p1_neutral_prefix_row_count": 41, "through_grounded_wait_input_tick": 296,
+            "p2_cstick_left_rise_input_tick": 197,
+            "p2_cstick_left_neutral_release_input_tick": 199,
+            "p2_cstick_left_held_row_count": 2, "p1_rows": p1_rows, "p2_rows": p2_rows}
+        position_policy = {"min_x": -64, "max_x": 64, "min_y": 32, "max_y": 64,
+            "policy": "conservative scenario admission only; not authored Final Destination geometry or landing proof"}
+        loss = {"kind": "validated-source-credited-combat-ko-loss-v1", "source_tick": 230}
+        gate = {"kind": "validated-source-credited-rebirth-wait-platform-gate-v1",
+            "source_tick": 240, "loss_source_tick": 230, "facing_direction": 1,
+            "direction_key": "d", "position_by_peer": [{"x": 16, "y": 45},
+                                                               {"x": 16, "y": 45}],
+            "position_admission_policy": position_policy}
+        fall = {"kind": "validated-post-platform-exit-source-fall-v1",
+            "input_delay": 3,
+            "source_tick": 250, "action_input_tick": 237,
+            "action_consumed_source_tick": 241}
+        platform_exit = {"result": "pass", "gate": gate,
+            "pre_keydown_readbacks": {"accepted": True},
+            "pre_keydown_prefix": {"kind": "validated-pre-keydown-platform-exit-neutral-prefix-v1"},
+            "action": {"policy": "one-contiguous-horizontal-only-actual-input-episode",
+                "maximum_held_pad_rows": 30, "callback_limit_ms": 500,
+                "hold_ms": 0, "observe_press": True,
+                "movement": {"input_tick": 237}},
+            "action_record": {"source_input_tick": 237,
+                "observed_pad_sample": {"input_tick": 237, "local_port": 0,
+                                         "bytes": [0, 0, 80, 0, 0, 0, 0, 0, 0, 0, 0]}},
+            "fall": fall}
+        prep = {"result": "pass", "literal_input_window": {"status": "validated"},
+            "jab_count": 4, "max_jabs": 8, "final_p1_damage_percent": 18,
+            "actual_damage_goal_percent": 18, "max_approach_taps": 16,
+            "approach": {"steps": []}, "source_cursor_start": 100,
+            "source_cursor_limit": 580, "source_cursor_end": 200,
+            "source_cursor_span": 100, "max_source_cursors": 480,
+            "baseline": {"source_tick": 100}, "prepared_ko_baseline": baseline}
+        ko = {"result": "pass", "input_mode": "cstick-left",
+            "input_policy": "post-credit-platform-exit", "input_delay": 3,
+            "baseline": copy.deepcopy(baseline), "source_cursor_limit": 680,
+            "sequence": {"loss": loss}, "platform_exit": platform_exit,
+            "handoff": {"kind": "validated-post-credit-platform-exit-combat-ko-handoff-v1",
+                "input_policy": "post-credit-platform-exit", "starting_stocks": 3,
+                "respawn_source_tick": 300, "input_window": input_window},
+            "preparation": prep}
+        route["combat_probe"] = {"result": "pass", "combat_exchange": {"result": "pass"},
+                                  "combat_ko": ko}
+        kwargs = dict(gameplay_combat_probe=True, gameplay_combat_exchange=True,
+                      gameplay_combat_ko_prepared=True,
+                      gameplay_combat_ko_prepared_platform_exit=True)
+        validate_result(0, self.owner, browser, True, **kwargs)
+        mutations = (
+            lambda row: row["full_route"]["combat_probe"]["combat_ko"]["platform_exit"]["gate"]
+                ["position_by_peer"][0].update(x=1e6, y=-1e6),
+            lambda row: row["full_route"]["combat_probe"]["combat_ko"]["handoff"]["input_window"]
+                .update(start_input_tick="invalid"),
+            lambda row: row["full_route"]["combat_probe"]["combat_ko"]["platform_exit"]["fall"]
+                .update(action_input_tick=236),
+            lambda row: row["full_route"]["combat_probe"]["combat_ko"]["handoff"]["input_window"]
+                .update(through_grounded_wait_input_tick=144),
+            lambda row: row["full_route"]["combat_probe"]["combat_ko"]["platform_exit"]["action_record"]
+                ["observed_pad_sample"]["bytes"].__setitem__(0, 1),
+            lambda row: row["full_route"].update(gameplay_combat_ko_prepared_platform_exit=False),
+        )
+        for mutate in mutations:
+            damaged = copy.deepcopy(browser)
+            mutate(damaged)
+            with self.assertRaises(ValueError):
+                validate_result(0, self.owner, damaged, True, **kwargs)
+        legacy = copy.deepcopy(browser)
+        legacy["gameplay_combat_ko_prepared_platform_exit"] = False
+        legacy["full_route"]["gameplay_combat_ko_prepared_platform_exit"] = False
+        legacy["full_route"]["combat_probe"]["combat_ko"].pop("platform_exit")
+        legacy["full_route"]["combat_probe"]["combat_ko"].pop("input_policy")
+        legacy_ko = legacy["full_route"]["combat_probe"]["combat_ko"]
+        legacy_ko["handoff"].pop("input_policy")
+        legacy_ko["handoff"]["kind"] = "validated-combat-ko-respawn-handoff-v1"
+        legacy_window = legacy_ko["handoff"]["input_window"]
+        for row in legacy_window["p1_rows"]:
+            row["bytes"] = [0] * 11
+        for key in list(legacy_window):
+            if key.startswith(("gate_", "direction_key", "facing_direction", "p1_axis",
+                               "p1_neutral_prefix", "p1_neutral_release", "position_admission")):
+                legacy_window.pop(key)
+        validate_result(0, self.owner, legacy, True, gameplay_combat_probe=True,
+            gameplay_combat_exchange=True, gameplay_combat_ko_prepared=True)
+        mislabeled = copy.deepcopy(legacy)
+        mislabeled["full_route"]["combat_probe"]["combat_ko"]["platform_exit"] = platform_exit
+        with self.assertRaisesRegex(ValueError, "cannot be relabeled"):
+            validate_result(0, self.owner, mislabeled, True, gameplay_combat_probe=True,
+                gameplay_combat_exchange=True, gameplay_combat_ko_prepared=True)
+        with self.assertRaisesRegex(ValueError, "requires prepared combat KO"):
+            validate_result(0, self.owner, browser, True, gameplay_combat_probe=True,
+                gameplay_combat_exchange=True, gameplay_combat_ko_prepared_platform_exit=True)
+
+
+    def test_actual_js_platform_handoff_serializes_into_python_policy(self):
+        root = Path(__file__).resolve().parents[1]
+        script = r'''
+import * as H from './scripts/a3_local_room_combat_ko.mjs';
+const pair=(tick,motion,air,afterLoss=false)=>[0,1].map(()=>({
+  source_tick:tick,phase:7,running:1,error:null,
+  native_status:{active:1,context_applied:1,terminal:{kind:0}},
+  match:{frame:tick+100,rules:{is_stock:1,stage:32},ready:true,
+    paused:false,complete:false,ending:false,outcome:0,
+    players:[0,1].map(port=>({source_port:port,source_player_index:port,
+      stocks:afterLoss&&port===0?3:4,motion:port===0?motion:14,
+      groundAir:port===0?air:0,damage_percent:0,x:16,y:45,facing_direction:1,
+      primary_falls:afterLoss&&port===0?1:0,suicides:0,
+      kos_by_player_slot:[afterLoss&&port===1?1:0,0,0,0,0,0]}))}}));
+const baseline=H.captureCombatKoBaseline({pairedRows:pair(100,14,0)});
+const loss=H.validateCombatKoAttackLoss({baseline,pairedRows:pair(130,0,1,true)});
+const gate=H.validateCombatKoPlatformExitGate({baseline,attackLossReceipt:loss,
+  pairedRows:pair(140,13,1,true),sourceCursorLimit:580});
+const p1Rows=[],p2Rows=[];
+for(let tick=96;tick<=156;tick++){
+  const a=Array(11).fill(0),b=Array(11).fill(0);
+  if(tick>=137&&tick<=139)a[2]=80;
+  if(tick>=105&&tick<108)b[4]=176;
+  p1Rows.push({input_tick:tick,source_cursor:tick,local_port:0,bytes:a});
+  p2Rows.push({input_tick:tick,source_cursor:tick,local_port:1,bytes:b});
+}
+const prefix=H.validateCombatKoPlatformExitInputPrefix({baseline,gate,
+  attackLossReceipt:loss,p1Rows,p2Rows,inputStartTick:96,inputDelay:3,
+  p2PressTick:105,p2ReleaseTick:108});
+const fall=H.validateCombatKoPlatformExitFall({baseline,gate,attackLossReceipt:loss,
+  pairedRows:pair(145,29,1,true),actionInputTick:137,inputDelay:3,sourceCursorLimit:580});
+const handoff=H.createCombatKoPlatformExitHandoff({baseline,gate,fallReceipt:fall,
+  attackLossReceipt:loss,pairedRows:pair(160,14,0,true),p1Rows,p2Rows,
+  inputStartTick:96,inputEndTick:156,p2PressTick:105,p2ReleaseTick:108,
+  inputDelay:3,actionStartTick:137,movementEndTick:139,releaseTick:140});
+console.log(JSON.stringify({baseline,input_policy:'post-credit-platform-exit',
+  input_delay:3,source_cursor_limit:580,sequence:{loss},handoff,
+  platform_exit:{result:'pass',gate,pre_keydown_prefix:prefix,
+    pre_keydown_readbacks:{accepted:true},fall,
+    action:{policy:'one-contiguous-horizontal-only-actual-input-episode',hold_ms:0,
+      observe_press:true,callback_limit_ms:500,maximum_held_pad_rows:30},
+    action_record:{source_input_tick:137,observed_pad_sample:p1Rows[137-96]}}}));
+'''
+        result = subprocess.run([str(node_runtime(root)), "--input-type=module", "-e", script],
+                                cwd=root, capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        actual = json.loads(result.stdout)
+        self.assertTrue(_prepared_platform_exit_receipt_ok(actual))
+        for mutate in (
+            lambda value: value["handoff"]["input_window"].pop("start_input_tick"),
+            lambda value: value["handoff"]["input_window"].pop("input_delay"),
+            lambda value: value["platform_exit"]["fall"].update(input_delay=0),
+            lambda value: value["platform_exit"]["fall"].update(source_tick=140),
+        ):
+            broken = copy.deepcopy(actual)
+            mutate(broken)
+            self.assertFalse(_prepared_platform_exit_receipt_ok(broken))
 
 
 if __name__ == "__main__":

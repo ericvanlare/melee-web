@@ -8,7 +8,10 @@ import {COMBAT_KO_SOURCE_TICK_BUDGET, COMBAT_KO_CHARGED_HOLD_SOURCE_TICKS,
   COMBAT_KO_CHARGED_PAD_BYTES,
   COMBAT_KO_PREP_DAMAGE_GOAL, COMBAT_KO_PREP_MAX_JABS, decideCombatKoPreparation,
   captureCombatKoBaseline, advanceCombatKoEvidence, createCombatKoRespawnHandoff,
-  validateCombatKoChargedAnimation}
+  validateCombatKoChargedAnimation, validateCombatKoPlatformExitGate,
+  validateCombatKoPlatformExitInputPrefix, validateCombatKoPlatformExitFall,
+  createCombatKoPlatformExitHandoff, COMBAT_KO_PLATFORM_EXIT_MAX_PAD_ROWS,
+  COMBAT_KO_PLATFORM_EXIT_FALL_MOTION}
   from './a3_local_room_combat_ko.mjs';
 import {observeRuntimeOwner} from '../tests/runtime_owner_observation.mjs';
 import {confirmTwoHumanResults} from '../tests/vs_rules_results_confirmation_driver.mjs';
@@ -400,6 +403,67 @@ export function actionObservationTickDisposition(tick, actionStartTick, lastReta
   return tick >= actionStartTick + 60 ? 'stop' : 'inspect';
 }
 
+export async function waitForCombatKoPlatformExitGate(platformGatePromise, outcomePromise) {
+  const event = await Promise.race([
+    Promise.resolve(platformGatePromise).then(gate => ({gate})),
+    Promise.resolve(outcomePromise).then(outcome => ({outcome}),
+      error => ({outcome:{error}})),
+  ]);
+  if (event.outcome) {
+    if (event.outcome.error) throw event.outcome.error;
+    throw Error('Prepared platform-exit KO reached grounded respawn before an observed RebirthWait gate');
+  }
+  requireValue(event.gate, 'Prepared platform-exit observer resolved without a validated gate');
+  return event.gate;
+}
+
+// The route passes checked matches; raw observations carry frame in match.frame.
+export function isCombatKoPlatformExitGateCandidate(rows, matches, loss) {
+  return !!loss && rows.length === 2 && matches.length === 2 &&
+    rows.every(row => row.source_tick === rows[0].source_tick) &&
+    rows[0].source_tick > loss.source_tick &&
+    matches.every(match => Number.isSafeInteger(match.frame) &&
+      match.frame === matches[0].frame && match.frame > loss.source_frame &&
+      match.players.find(player => player.source_port === 0)?.motion === 13);
+}
+
+export function initializeCombatKoAction(ko, press, inputDelay, charged, drain) {
+  const started = press.source_input_tick + inputDelay + 1;
+  // Preserve the actual action even if charge validation or pending inspection fails.
+  ko.action_start_tick = started;
+  ko.press = press;
+  if (charged) {
+    ko.hold_end_source_tick = started + COMBAT_KO_CHARGED_HOLD_SOURCE_TICKS;
+    requireValue(press.hold_observation?.action_start_source_tick === started &&
+      press.hold_observation?.hold_end_source_tick === ko.hold_end_source_tick &&
+      press.hold_observation?.desired_release_source_cursor === ko.hold_end_source_tick &&
+      press.hold_observation?.observed_release_request_source_cursor >= ko.hold_end_source_tick,
+    'Charged KO hold observer did not retain the declared target and observed release request');
+    ko.planned_release_consumed_source_tick =
+      press.hold_observation.desired_release_source_cursor + inputDelay + 1;
+  }
+  drain(started);
+  return started;
+}
+
+// The source observer retains pairs before a keyboard callback returns. Search
+// that ordered evidence only after the actual PAD sample identifies the action.
+export function findCombatKoPlatformExitFallPair(observedPairs,
+  {gateSourceTick, actionInputTick, inputDelay}) {
+  if (!Array.isArray(observedPairs) || !Number.isSafeInteger(gateSourceTick) ||
+      !Number.isSafeInteger(actionInputTick) || !Number.isSafeInteger(inputDelay) ||
+      inputDelay < 0) return null;
+  const consumedSourceTick = actionInputTick + inputDelay + 1;
+  if (!Number.isSafeInteger(consumedSourceTick)) return null;
+  return observedPairs.find(entry => entry?.active_match !== false &&
+    Number.isSafeInteger(entry?.source_tick) && entry.source_tick >= consumedSourceTick &&
+    entry.source_tick > gateSourceTick && Array.isArray(entry.peers) && entry.peers.length === 2 &&
+    entry.peers.every(peer => {
+      const victim = peer?.match?.players?.find(player => player?.source_port === 0);
+      return victim?.motion === COMBAT_KO_PLATFORM_EXIT_FALL_MOTION && victim.groundAir === 1;
+    })) ?? null;
+}
+
 // Once an acquisition completes, drain any pre-start pairs that accumulated
 // while awaiting it before inspecting the newly acquired live pair. startAt may
 // run during that await, and chronological inspection must preserve short-lived
@@ -695,6 +759,7 @@ export async function runA3LocalFullRoute({
   assertHealthy, gameplayActionProbe = false, gameplayCombatProbe = false,
   gameplayCombatExchange = false, gameplayCombatKo = false,
   gameplayCombatKoCharged = false, gameplayCombatKoPrepared = false,
+  gameplayCombatKoPreparedPlatformExit = false,
 }) {
   requireValue(!(gameplayActionProbe && gameplayCombatProbe),
     'Gameplay action and combat probes are separate route scenarios');
@@ -706,6 +771,11 @@ export async function runA3LocalFullRoute({
     'Charged combat KO requires the verified combat exchange prefix');
   requireValue(!gameplayCombatKoPrepared || gameplayCombatExchange,
     'Prepared combat KO requires the verified combat exchange prefix');
+  requireValue(!gameplayCombatKoPreparedPlatformExit || gameplayCombatKoPrepared,
+    'Platform-exit combat KO requires the prepared combat KO scenario');
+  requireValue(!gameplayCombatKoPreparedPlatformExit ||
+    (!gameplayCombatKoCharged && !gameplayCombatKo),
+  'Platform-exit combat KO is only compatible with the prepared one-swing policy');
   requireValue([gameplayCombatKo, gameplayCombatKoCharged, gameplayCombatKoPrepared]
       .filter(Boolean).length <= 1,
     'C-stick, charged, and prepared combat KO are separate route scenarios');
@@ -720,6 +790,7 @@ export async function runA3LocalFullRoute({
     gameplay_combat_exchange: gameplayCombatExchange, gameplay_combat_ko: gameplayCombatKo,
     gameplay_combat_ko_charged: gameplayCombatKoCharged,
     gameplay_combat_ko_prepared: gameplayCombatKoPrepared,
+    gameplay_combat_ko_prepared_platform_exit: gameplayCombatKoPreparedPlatformExit,
     exclusions: ['no PAD/Gamepad input injection',
       gameplayActionProbe
         ? 'one short P2 gameplay axis pulse, one P1 grounded jab, and one P2 jump with source motion evidence; no combat-coverage claim'
@@ -728,7 +799,9 @@ export async function runA3LocalFullRoute({
             ? gameplayCombatKoCharged
               ? 'bounded one-swing charged A+left KO hypothesis after the verified jab/shield exchange; requires exact literal chord, paired S4S60/facing-1, held animation plateau and post-release advance, observed hit/air/death, exact source-slot scorer deltas and natural three-stock respawn; no charge-count or retail-equivalence claim'
               : gameplayCombatKoPrepared
-                ? 'bounded actual-damage P2 jab preparation followed by the existing one-swing C-stick KO hypothesis; requires continuous verified literal input, a fresh grounded 18% baseline within 480 preparation cursors, then observed hit/air/death, exact source-slot scorer deltas and natural three-stock respawn; no guessed damage formula or retail-equivalence claim'
+                ? gameplayCombatKoPreparedPlatformExit
+                  ? 'bounded prepared one-swing KO with a separately gated post-credit P1 horizontal platform-exit episode; requires branded source-credit, paired active RebirthWait/facing, pre-keydown neutral PAD proof, one contiguous 1..30-row horizontal-only episode, observed Fall and grounded neutral Wait14; no timer or walk-duration inference'
+                  : 'bounded actual-damage P2 jab preparation followed by the existing one-swing C-stick KO hypothesis; requires continuous verified literal input, a fresh grounded 18% baseline within 480 preparation cursors, then observed hit/air/death, exact source-slot scorer deltas and natural three-stock respawn; no guessed damage formula or retail-equivalence claim'
                 : 'bounded one-swing C-stick KO hypothesis after the verified jab/shield exchange; requires observed hit/air/death, exact original source-slot scorer deltas and natural three-stock respawn; no retail-equivalence claim'
             : gameplayCombatExchange
             ? 'bounded P2 approach/jab prefix, one reverse P1 jab, and one P2 shield exchange with paired source evidence; no retail-equivalence or KO claim'
@@ -2515,12 +2588,21 @@ export async function runA3LocalFullRoute({
     const limit = baseline.source_tick + 480;
     const ko = route.combat_probe.combat_ko = {result: 'running', baseline,
       input_mode: charged ? 'charged-a-left' : 'cstick-left',
+      ...(gameplayCombatKoPreparedPlatformExit
+        ? {input_policy: 'post-credit-platform-exit',
+          platform_exit: {result: 'waiting-for-source-gate',
+            maximum_held_pad_rows: COMBAT_KO_PLATFORM_EXIT_MAX_PAD_ROWS,
+            gate: null, pre_keydown_prefix: null, action: null, fall: null}}
+        : {}),
       ...(preparedKoPreparation ? {preparation: preparedKoPreparation} : {}),
-      source_cursor_limit: limit, one_swing: true, action_start_tick: null,
+      source_cursor_limit: limit, input_delay: inputDelay, one_swing: true, action_start_tick: null,
       observed_pairs: [], sequence: {}, input_window: null, handoff: null};
     let cancelled = false;
     let started = null;
     let press = null;
+    let resolvePlatformGate = null;
+    const platformGatePromise = gameplayCombatKoPreparedPlatformExit
+      ? new Promise(resolve => { resolvePlatformGate = resolve; }) : null;
     let pending = [];
     let lastTick = -1;
     const history = {label: 'one-swing combat KO', source_cursor_join: {
@@ -2546,6 +2628,15 @@ export async function runA3LocalFullRoute({
         actionStartTick: started,
         ...(ko.planned_release_consumed_source_tick !== undefined
           ? {chargeReleaseAcceptedSourceTick: ko.planned_release_consumed_source_tick} : {})});
+      if (gameplayCombatKoPreparedPlatformExit && !ko.platform_exit.gate &&
+          isCombatKoPlatformExitGateCandidate(rows, matches, ko.sequence.loss)) {
+        const gate = validateCombatKoPlatformExitGate({baseline,
+          attackLossReceipt: ko.sequence.loss, pairedRows: rows, sourceCursorLimit: limit});
+        ko.platform_exit.gate = gate;
+        ko.platform_exit.result = 'source-gate-validated';
+        resolvePlatformGate?.(gate);
+        resolvePlatformGate = null;
+      }
     };
     const drain = () => { if (started !== null && pending.length) {
       const saved = pending; pending = []; for (const entry of saved) inspect(entry.rows);
@@ -2581,20 +2672,52 @@ export async function runA3LocalFullRoute({
         : await pulse('beta', ['Numpad4'], {expected: {cstickX: -1},
           holdMs: 0, releaseMs: 80, observePress: true, retainSample: true,
           sourceCursorLimit: limit, evidenceSink: ko, label: 'single P2 left C-stick forward smash'});
-      started = press.source_input_tick + inputDelay + 1;
-      if (charged) {
-        ko.hold_end_source_tick = started + COMBAT_KO_CHARGED_HOLD_SOURCE_TICKS;
-        requireValue(press.hold_observation?.action_start_source_tick === started &&
-          press.hold_observation?.hold_end_source_tick === ko.hold_end_source_tick &&
-          press.hold_observation?.desired_release_source_cursor === ko.hold_end_source_tick &&
-          press.hold_observation?.observed_release_request_source_cursor >= ko.hold_end_source_tick,
-        'Charged KO hold observer did not retain the declared target and observed release request');
-        ko.planned_release_consumed_source_tick =
-          press.hold_observation.desired_release_source_cursor + inputDelay + 1;
+      initializeCombatKoAction(ko, press, inputDelay, charged, actionStart => {
+        started = actionStart;
+        drain();
+      });
+      if (gameplayCombatKoPreparedPlatformExit) {
+        const gate = await waitForCombatKoPlatformExitGate(platformGatePromise, outcome);
+        const inputStart = baseline.source_tick - inputDelay - 1;
+        requireValue(Number.isSafeInteger(inputStart) && inputStart >= 0,
+          'Prepared platform-exit baseline lacks its declared PAD input boundary');
+        const [preAlpha,preBeta] = await Promise.all([
+          readPeerInputSuffix(alpha,inputStart), readPeerInputSuffix(beta,inputStart)]);
+        ko.platform_exit.pre_keydown_readbacks = {alpha:preAlpha,beta:preBeta,accepted:false};
+        requireValue([preAlpha,preBeta].every(readback => readback.runtime_error == null &&
+          readback.health?.failure == null && readback.health?.peer?.failure == null &&
+          readback.native_status?.local_capture_failure == null &&
+          Number.isSafeInteger(readback.native_status?.cursor) &&
+          readback.native_status.cursor <= limit),
+        'Prepared platform-exit pre-keydown PAD readback exceeded its original 480-source-cursor limit or failed');
+        const p1PrefixRows = preAlpha.health?.peer?.localInputCapture?.captures_since;
+        const p2PrefixRows = preBeta.health?.peer?.localInputCapture?.captures_since;
+        const p2PrefixRelease = p2PrefixRows?.find(row =>
+          row.input_tick > press.source_input_tick && isNeutralPadRow(row));
+        ko.platform_exit.pre_keydown_prefix = validateCombatKoPlatformExitInputPrefix({
+          gate, baseline, attackLossReceipt:ko.sequence.loss,
+          p1Rows:p1PrefixRows, p2Rows:p2PrefixRows, inputStartTick:inputStart,
+          inputDelay, p2PressTick:press.source_input_tick,
+          p2ReleaseTick:p2PrefixRelease?.input_tick});
+        ko.platform_exit.pre_keydown_readbacks.accepted = true;
+        ko.platform_exit.result = 'pre-keydown-neutral-prefix-validated';
+        ko.platform_exit.action = {policy:'one-contiguous-horizontal-only-actual-input-episode',
+          maximum_held_pad_rows:COMBAT_KO_PLATFORM_EXIT_MAX_PAD_ROWS,
+          gate_source_tick:gate.source_tick, gate_input_tick:gate.source_tick-inputDelay-1,
+          direction_key:gate.direction_key, facing_direction:gate.facing_direction,
+          callback_limit_ms:500, hold_ms:0, observe_press:true, movement:null};
+        ko.platform_exit.action_record = await pulse('alpha', [gate.direction_key], {
+          expected:{x:gate.facing_direction}, holdMs:0, releaseMs:80,
+          observePress:true, retainSample:true, sourceCursorLimit:limit,
+          evidenceSink:ko.platform_exit.action,
+          label:`single P1 ${gate.direction_key.toUpperCase()} horizontal platform-exit episode`});
+        requireValue(ko.platform_exit.action.movement?.input_tick ===
+          ko.platform_exit.action_record.source_input_tick,
+        'Prepared platform-exit pulse did not retain its actual source-owned PAD row');
+        ko.platform_exit.action_source_input_tick =
+          ko.platform_exit.action_record.source_input_tick;
+        ko.platform_exit.result = 'axis-episode-released';
       }
-      // This lower bound is planned only; final success uses the actual neutral PAD row.
-      ko.action_start_tick = started;
-      ko.press = press;
       const observed = await outcome;
       if (observed.error) throw observed.error;
       const rows = observed.value;
@@ -2630,17 +2753,48 @@ export async function runA3LocalFullRoute({
         'Charged KO hit preceded the actual neutral release reaching the source');
         ko.charge_animation_evidence = chargeAnimationEvidence;
       }
-      combatKoHandoff = createCombatKoRespawnHandoff({baseline,
-        attackLossReceipt:ko.sequence.loss,pairedRows:rows,p1Rows,p2Rows,
-        inputStartTick:inputStart,inputEndTick:inputEnd,pressTick:press.source_input_tick,
-        releaseTick:release?.input_tick, inputMode: charged ? 'charged-a-left' : 'cstick',
-        ...(charged ? {inputDelay, chargeAnimationEvidence} : {})});
+      if (gameplayCombatKoPreparedPlatformExit) {
+        const gate = ko.platform_exit.gate;
+        requireValue(gate && ko.platform_exit.pre_keydown_readbacks?.accepted === true &&
+          ko.platform_exit.action_record?.observed_pad_sample,
+        'Prepared platform-exit handoff lacks its validated gate, prefix, or actual action row');
+        const gateInputTick = gate.source_tick - inputDelay - 1;
+        const p1MovementRows = p1Rows?.filter(row => row.input_tick > gateInputTick &&
+          !isNeutralPadRow(row));
+        const movementEndTick = p1MovementRows?.at(-1)?.input_tick;
+        const p1Release = Number.isSafeInteger(movementEndTick)
+          ? p1Rows?.find(row => row.input_tick > movementEndTick && isNeutralPadRow(row)) : null;
+        const actionInputTick = ko.platform_exit.action_record.source_input_tick;
+        const fallEntry = findCombatKoPlatformExitFallPair(ko.observed_pairs, {
+          gateSourceTick:gate.source_tick, actionInputTick, inputDelay});
+        requireValue(fallEntry,
+          'Prepared platform-exit observer did not retain actual paired Fall motion 29 after input reached source');
+        const fallReceipt = validateCombatKoPlatformExitFall({baseline, gate,
+          attackLossReceipt:ko.sequence.loss, pairedRows:fallEntry.peers,
+          actionInputTick, inputDelay, sourceCursorLimit:limit});
+        ko.platform_exit.fall = fallReceipt;
+        ko.platform_exit.actual_p1_neutral_release_input_tick = p1Release?.input_tick ?? null;
+        combatKoHandoff = createCombatKoPlatformExitHandoff({baseline,
+          attackLossReceipt:ko.sequence.loss, gate, fallReceipt, pairedRows:rows,
+          p1Rows, p2Rows, inputStartTick:inputStart, inputEndTick:inputEnd,
+          p2PressTick:press.source_input_tick, p2ReleaseTick:release?.input_tick,
+          inputDelay, actionStartTick:actionInputTick, movementEndTick,
+          releaseTick:p1Release?.input_tick});
+        ko.platform_exit.result = 'fall-and-grounded-wait-validated';
+      } else {
+        combatKoHandoff = createCombatKoRespawnHandoff({baseline,
+          attackLossReceipt:ko.sequence.loss,pairedRows:rows,p1Rows,p2Rows,
+          inputStartTick:inputStart,inputEndTick:inputEnd,pressTick:press.source_input_tick,
+          releaseTick:release?.input_tick, inputMode: charged ? 'charged-a-left' : 'cstick',
+          ...(charged ? {inputDelay, chargeAnimationEvidence} : {})});
+      }
       const boundary = inputEnd + inputDelay + 1;
       await waitForBothChecksumCompare(boundary,null,undefined,{sourceCursorLimit:limit,evidenceSink:ko});
       ko.handoff = combatKoHandoff;
       ko.required_checksum_boundary = boundary;
       route.required_checksum_boundary = Math.max(route.required_checksum_boundary || 0,boundary);
       ko.result = 'pass';
+      if (gameplayCombatKoPreparedPlatformExit) ko.platform_exit.result = 'pass';
       walkoffBaseRows = rows;
       walkoffBaseMatches = rows.map(row => row.match);
       route.stock_losses.push({remaining_p1_stocks:3,attribution:'original source-slot KO scorer plus observed one-swing hit/air/death',

@@ -25,7 +25,7 @@ import {retainCombatChecksumCursorPoll} from './a3_local_room_combat_probe.mjs';
 import {incidentRecordingUrl, readIncidentRecorderReadiness, requireIncidentRecorderReadiness,
   summarizeRuntimeIncidents} from './a3_runtime_incidents.mjs';
 
-const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--post-css-stall-probe] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route] [--controlled-cut-after-css] [--gameplay-action-probe] [--gameplay-combat-probe] [--gameplay-combat-exchange] [--gameplay-combat-ko] [--gameplay-combat-ko-charged] [--gameplay-combat-ko-prepared] [--repeat-full-route]';
+const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--post-css-stall-probe] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route] [--controlled-cut-after-css] [--gameplay-action-probe] [--gameplay-combat-probe] [--gameplay-combat-exchange] [--gameplay-combat-ko] [--gameplay-combat-ko-charged] [--gameplay-combat-ko-prepared] [--gameplay-combat-ko-prepared-platform-exit] [--repeat-full-route]';
 const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, out: {type: 'string'},
   'relay-url': {type: 'string'}, 'relay-preflight': {type: 'string'},
@@ -40,6 +40,7 @@ const {values} = parseArgs({options: {
   'gameplay-combat-ko': {type: 'boolean', default: false},
   'gameplay-combat-ko-charged': {type: 'boolean', default: false},
   'gameplay-combat-ko-prepared': {type: 'boolean', default: false},
+  'gameplay-combat-ko-prepared-platform-exit': {type: 'boolean', default: false},
   'repeat-full-route': {type: 'boolean', default: false},
   help: {type: 'boolean', default: false},
 }, allowPositionals: false});
@@ -106,6 +107,9 @@ requireCondition(!values['gameplay-combat-ko-charged'] || values['gameplay-comba
   '--gameplay-combat-ko-charged requires --gameplay-combat-exchange');
 requireCondition(!values['gameplay-combat-ko-prepared'] || values['gameplay-combat-exchange'],
   '--gameplay-combat-ko-prepared requires --gameplay-combat-exchange');
+requireCondition(!values['gameplay-combat-ko-prepared-platform-exit'] ||
+  values['gameplay-combat-ko-prepared'],
+  '--gameplay-combat-ko-prepared-platform-exit requires --gameplay-combat-ko-prepared');
 requireCondition([values['gameplay-combat-ko'], values['gameplay-combat-ko-charged'],
   values['gameplay-combat-ko-prepared']].filter(Boolean).length <= 1,
   'C-stick, charged, and prepared combat KO modes are separate scenarios');
@@ -221,6 +225,7 @@ const report = {
   gameplay_combat_ko: values['gameplay-combat-ko'],
   gameplay_combat_ko_charged: values['gameplay-combat-ko-charged'],
   gameplay_combat_ko_prepared: values['gameplay-combat-ko-prepared'],
+  gameplay_combat_ko_prepared_platform_exit: values['gameplay-combat-ko-prepared-platform-exit'],
   leave_and_cleanup: {},
   runtime_incident_recording: {requested: true, url: runtimeUrl.href, profiles: {},
     policy: 'Existing bounded recorder; staging occupancy and queue-completion callback latency. Forced timing pauses are H1 evidence; no automatic resume added.'},
@@ -1075,6 +1080,7 @@ try {
       gameplayCombatKo: values['gameplay-combat-ko'],
       gameplayCombatKoCharged: values['gameplay-combat-ko-charged'],
       gameplayCombatKoPrepared: values['gameplay-combat-ko-prepared'],
+      gameplayCombatKoPreparedPlatformExit: values['gameplay-combat-ko-prepared-platform-exit'],
       remaining, readRoomState, readPeerSnapshot, readPeerInputSuffix, readInputDiagnostics,
       waitForBothChecksumCompare, captureScreenshot,
       assertHealthy: (state, role) => {

@@ -12,6 +12,8 @@ import {comparePairedCombatPlayers, decideP2ApproachTap,
 import {actionObservationTickDisposition, acquireAndInspectActionPair,
   observeShieldSetOffBeforeRelease, retainPreStartActionPair,
   retainAndGuardPreparedPair, retainPreparedKoPreparation, classifyPreparedCombatPair,
+  waitForCombatKoPlatformExitGate, findCombatKoPlatformExitFallPair,
+  isCombatKoPlatformExitGateCandidate, initializeCombatKoAction,
   preparedKoSourceCursorLimit,
   observeNativePeerPageSample, inspectPreparedApproachTransition,
   validatePreparedApproachTransition,
@@ -598,6 +600,36 @@ test('action observer drains pre-start pairs before the pair returned by an in-f
     'paired GuardSetOff must reach the observer before later Guard motion');
 });
 
+test('prepared platform gate wait fails promptly on observer error and joins the settled outcome', async () => {
+  const observerError = Error('bounded KO observer failed before RebirthWait');
+  let resolveOutcome;
+  const outcome = new Promise(resolve => { resolveOutcome = resolve; });
+  let joined = false;
+  const joinedOutcome = outcome.then(() => { joined = true; });
+  const gateNeverArrives = new Promise(() => {});
+  const waiting = waitForCombatKoPlatformExitGate(gateNeverArrives, outcome);
+  resolveOutcome({error: observerError});
+  await assert.rejects(waiting, /bounded KO observer failed before RebirthWait/);
+  await joinedOutcome;
+  assert.equal(joined, true);
+  assert.deepEqual(await waitForCombatKoPlatformExitGate(Promise.resolve({source_tick: 12}),
+    new Promise(() => {})), {source_tick: 12});
+});
+
+test('platform Fall lookup retains the brief paired row captured before action receipt resolves', () => {
+  const pair = (source_tick, {fall = true, active = true} = {}) => ({source_tick,
+    active_match: active, peers: [0, 1].map(() => ({match: {players: [{source_port: 0,
+      motion: fall ? 29 : 13, groundAir: fall ? 1 : 0}]}}))});
+  const acquiredWhileReceiptPending = pair(145);
+  const retained = [pair(140), pair(143, {active:false}), acquiredWhileReceiptPending];
+  const found = findCombatKoPlatformExitFallPair(retained, {
+    gateSourceTick:136, actionInputTick:137, inputDelay:3});
+  assert.equal(found, acquiredWhileReceiptPending);
+  assert.equal(findCombatKoPlatformExitFallPair([acquiredWhileReceiptPending], {
+    gateSourceTick:136, actionInputTick:142, inputDelay:3}), null,
+  'a Fall before the actual action reaches source must not satisfy the handoff');
+});
+
 test('action observer cancellation during acquisition inspects neither buffered nor returned pairs', async () => {
   const pair = tick => Array.from({length: 2}, (_, index) => ({source_tick: tick,
     phase: 7, running: 1, message: 'active', match: {frame: tick},
@@ -856,4 +888,48 @@ test('actual preparation guard refuses unexpected stopped and counterfeit WAIT r
     assert.deepEqual(record.last_inspected_pair.peers[0].match, pair[0].match,
       'offending actual match remains retained before refusal');
   }
+});
+
+test('platform gate scheduling reads checked match.frame from retained raw RebirthWait shape', () => {
+  // Exact cursor/frame/motion projection of prepared-3 paired cursor1192.
+  // Raw native observations have no top-level source_frame.
+  const rows = [0, 1].map(() => ({source_tick:1192, phase:7, running:1,
+    match:{frame:751, players:[{source_port:0,motion:13,groundAir:1,
+      stocks:3,x:16,y:45,facing_direction:-1}]}}));
+  const loss = {source_tick:1072,source_frame:631};
+  const matches = rows.map(row => row.match);
+  assert.equal(Object.hasOwn(rows[0], 'source_frame'), false);
+  assert.equal(isCombatKoPlatformExitGateCandidate(rows, matches, loss), true);
+  assert.equal(isCombatKoPlatformExitGateCandidate(rows, matches, null), false);
+  const mismatched = structuredClone(matches); mismatched[1].frame++;
+  assert.equal(isCombatKoPlatformExitGateCandidate(rows, mismatched, loss), false);
+  const beforeLoss = {...loss,source_frame:751};
+  assert.equal(isCombatKoPlatformExitGateCandidate(rows, matches, beforeLoss), false);
+});
+
+test('charged KO pending inspection starts after planned release fields and retains early failure action', () => {
+  const ko = {};
+  const press = {source_input_tick:100,observed_pad_sample:{input_tick:100},
+    hold_observation:{action_start_source_tick:103,hold_end_source_tick:127,
+      desired_release_source_cursor:127,observed_release_request_source_cursor:127}};
+  const failure = Error('pending source pair refused');
+  assert.throws(() => initializeCombatKoAction(ko,press,2,true,started => {
+    assert.equal(started,103);
+    assert.equal(ko.hold_end_source_tick,127);
+    assert.equal(ko.planned_release_consumed_source_tick,130);
+    assert.equal(ko.press,press);
+    assert.equal(ko.action_start_tick,103);
+    throw failure;
+  }), error => error === failure);
+  assert.equal(ko.press.observed_pad_sample.input_tick,100);
+  const neutral = {};
+  assert.equal(initializeCombatKoAction(neutral,press,2,false,started => {
+    assert.equal(started,103);
+    assert.equal(neutral.planned_release_consumed_source_tick,undefined);
+  }),103);
+  const invalid = {};
+  assert.throws(() => initializeCombatKoAction(invalid,
+    {...press,hold_observation:null},2,true,() => assert.fail('must not inspect invalid charge')),
+  /hold observer/);
+  assert.equal(invalid.press.source_input_tick,100);
 });
