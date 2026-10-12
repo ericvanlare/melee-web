@@ -8,7 +8,7 @@ Both browsers supplied actual keyboard input, including the short P2 horizontal
 pulse and neutral release. Every declared common 64-byte checksum record agreed;
 unpaired tails remain explicit. Normal UI Leave, native unload and owned
 process retirement passed. Both raw results have independent review;
-required local regression and Release build pass, with final-head CI still pending in the
+required local regression, Release build and all final-head CI checks passed for the
 [M2 receipt](../evidence/network-simulation-full-route-m2-v1.json).
 
 The baseline does not request the separate jab/jump probe. The three earlier
@@ -33,4 +33,6 @@ and this receipt makes no error-free-request claim. The subsequent Release
 validation build has its own Wasm identity and also passed a complete moderate
 route. Historical captures, that later producer and its separate harness source
 remain distinct in the receipt. This new raw result also has independent
-review; integration still requires final-head CI.
+review. PR #311 merged as `707c4489` with all 14 exact-head checks complete;
+reviewed and merged trees match. The receipt preserves each earlier producer
+and later capture independently.

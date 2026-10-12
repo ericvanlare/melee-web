@@ -711,7 +711,17 @@
     "capture_source": "44ef35c4865e557dd593cb4dcb9a4fb92824199d",
     "historical_capture_runtime_producer": "b92a36033692dbef756b067175b39cac2d23925e",
     "finished_at": "2026-10-12T07:07:21.200239+00:00",
-    "exact_head_ci": "PENDING",
+    "exact_head_ci": {
+      "decision": "ALL_14_COMPLETED",
+      "head": "a4daed0f431e97ecdc2ddb24d869dfeefdae8755",
+      "run_id": 38216775643,
+      "successes": 12,
+      "expected_skips": 2,
+      "receipt": {
+        "path": "m2-exact-head-ci.json",
+        "sha256": "1026f09dd64bb453f984b6f772c19461433166377076b7af15100b3ddddacda9"
+      }
+    },
     "artifact_identity_review": {
       "file": "sol-m2-runtime-byte-identity-review-v1/review.json",
       "sha256": "36580395434b1d5f0be8058491934fb476daf79da3bbba7d368ef02f4c9176f2",
@@ -990,6 +1000,16 @@
       "file": "sol-full-moderate-current-build-1-review.json",
       "sha256": "4a0de86fc0af1173eabe04ba5d35f53587f126bf7ec77bb078c212145dca80c8",
       "owned_pids_absent": 22
+    }
+  },
+  "merged_boundary": {
+    "pull_request": 311,
+    "merge": "707c44899298cf8b1234a9b6d5a4d781beacf3ef",
+    "reviewed_head": "a4daed0f431e97ecdc2ddb24d869dfeefdae8755",
+    "reviewed_and_merged_tree": "e50142ad5d3231c697b18287fdfab5846f98327b",
+    "receipt": {
+      "path": "m2-merge-receipt.json",
+      "sha256": "74a5cc625a453d9c547fea58727f35ae5e1a1c0567def31d2938a7269917a93e"
     }
   }
 }

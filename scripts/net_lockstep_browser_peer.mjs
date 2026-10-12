@@ -122,6 +122,25 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
   const isProvenCommittedDisconnect = () => inputCaptureMode === 'live' &&
     endpoint?.closed === true && endpoint.errors.length === 0 && !failure &&
     peer?.ready === true && peer.terminal?.kind === 'disconnect';
+  // Only onTerminal can mint this batch-local ownership token. Matching text is
+  // never authority to suppress a consumer error or to accept retained records.
+  const isNeverStartedDisconnectBatch = batch => {
+    const cancellation = batch?.disconnectCancellation;
+    return pendingConsumerBatch === batch && Boolean(cancellation) &&
+      cancellation.terminal === peer.terminal && cancellation.error === batch.cancelReason &&
+      batch.invalidated && !batch.callbackStarted && !batch.callbackSettled &&
+      batch.settlementState === 'not-started' && batch.settlementError === null &&
+      !batch.accepted && !batch.unjoined && closeMode !== 'fatal' &&
+      isProvenCommittedDisconnect() &&
+      exports.length >= batch.exportStart + batch.records.length &&
+      batch.records.every((row, index) => exports[batch.exportStart + index] === row);
+  };
+  const retainNeverStartedDisconnectBatch = batch => {
+    batch.disposition = 'cancelled_before_checksum_consumer_callback_by_disconnect';
+    batch.joined = true;
+    // Keep exact records in exports/pending batch, with accepted=false. They may
+    // already have been published to the protocol; no global delivery claim.
+  };
   const recordCancelledLocalInput = (row, disposition, details = {}) => {
     const cancellation = Object.freeze({...row, disposition, ...details});
     cancelledLocalInputs.push(cancellation);
@@ -159,6 +178,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       phase: 'submitting', invalidated: false, callbackStarted: false, callbackSettled: false,
       joined: false, unjoined: false, settlement: Promise.resolve({state: 'not-started'}),
       settlementState: 'not-started', settlementError: null, accepted: false,
+      disconnectCancellation: null, disposition: null,
     };
     exports.push(...rows);
     pendingConsumerBatch = batch;
@@ -171,8 +191,13 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
   async function consumeBatch(batch) {
     if (!batch) return;
     if (!checksumConsumer) throw Error('Browser checksum consumer is not configured');
-    if (!consumerBatchIsCurrent(batch))
+    if (!consumerBatchIsCurrent(batch)) {
+      if (isNeverStartedDisconnectBatch(batch)) {
+        retainNeverStartedDisconnectBatch(batch);
+        return;
+      }
       throw batch.cancelReason ?? Error('Browser checksum consumer batch is no longer current');
+    }
     batch.phase = 'accepting';
     batch.callbackStarted = true;
     batch.callbackSettled = false;
@@ -261,7 +286,12 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     },
     onTerminal: terminal => {
       settleReady(failure ?? Error(terminal.reason ?? `Browser peer identity agreement ended with ${terminal.kind}`));
-      invalidatePendingConsumer(Error(`Browser checksum consumer batch cancelled by ${terminal.kind} terminal`));
+      const cancellation = Error(`Browser checksum consumer batch cancelled by ${terminal.kind} terminal`);
+      const batch = pendingConsumerBatch;
+      if (terminal.kind === 'disconnect' && batch && !batch.invalidated &&
+          !batch.callbackStarted && !batch.callbackSettled && batch.settlementState === 'not-started')
+        batch.disconnectCancellation = {terminal, error: cancellation};
+      invalidatePendingConsumer(cancellation);
       if (closeMode === 'fatal') return;
       return callNative('terminate', TERMINAL[terminal.kind] ?? TERMINAL.protocol,
         Number.isInteger(terminal.tick) ? terminal.tick : 0,
@@ -393,7 +423,9 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       const status = await callNative('status');
       const flushFinal = autonomousPump && status.active === 1 && status.blocker === 'complete' &&
         status.cursor === sourceTicks && status.terminal?.kind === 0;
-      await peer.setNativeProgress(status.cursor, {flushFinal});
+      // The endpoint can commit a terminal while native.status is awaited.
+      // Preserve that status observation, but never publish after the terminal.
+      if (!peer.terminal) await peer.setNativeProgress(status.cursor, {flushFinal});
     }
     // Closing still joins all work and reports sticky errors in finishClose;
     // a rejected startup must not prevent observation of the final native boundary.
@@ -443,6 +475,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
         id: pendingConsumerBatch.id, first_tick: pendingConsumerBatch.firstTick,
         last_tick: pendingConsumerBatch.lastTick, count: pendingConsumerBatch.records.length,
         phase: pendingConsumerBatch.phase, aborted: pendingConsumerBatch.invalidated,
+        disposition: pendingConsumerBatch.disposition,
         abort_reason: pendingConsumerBatch.cancelReason ? String(pendingConsumerBatch.cancelReason) : null,
         callback_started: pendingConsumerBatch.callbackStarted,
         callback_settled: pendingConsumerBatch.callbackSettled,
@@ -571,9 +604,13 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     const recordFailure = error => { failures.push(remember(error)); };
     const consumerAtClose = pendingConsumerBatch;
     if (checksumConsumer && consumerAtClose) {
-      const error = Error('Browser checksum consumer batch cancelled during close');
-      invalidateConsumerBatch(consumerAtClose, error);
-      failures.push(remember(error));
+      if (isNeverStartedDisconnectBatch(consumerAtClose)) {
+        retainNeverStartedDisconnectBatch(consumerAtClose);
+      } else {
+        const error = Error('Browser checksum consumer batch cancelled during close');
+        invalidateConsumerBatch(consumerAtClose, error);
+        failures.push(remember(error));
+      }
       if (!await joinConsumerBatch(consumerAtClose)) {
         consumerAtClose.unjoined = true;
         failures.push(remember(Error(`Browser checksum consumer was not joined within ${timeoutMs}ms`)));

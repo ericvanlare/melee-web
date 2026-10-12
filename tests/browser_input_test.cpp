@@ -307,6 +307,21 @@ void focus_and_visibility()
     check(key_resets == stable_resets, "unchanged focus state does not erase new key presses");
 }
 
+void repeat_checkpoint_neutral()
+{
+    startup();
+    check(melee_web_input_set_keyboard_port(1, 1) == 1, "enable existing P2 keyboard profile");
+    supplied[0].button = PAD_BUTTON_A;
+    (void) melee_web_input_poll();
+    supplied[0] = {};
+    (void) melee_web_input_poll();
+    check(melee_web_input_snapshot()->samples == 2 &&
+          melee_web_input_snapshot()->last_non_neutral.sample == 1,
+          "current sample counter remains distinct from nonneutral history");
+    neutral(melee_web_input_snapshot()->raw[0]);
+    neutral(melee_web_input_snapshot()->raw[1]);
+}
+
 void last_non_neutral()
 {
     startup();
@@ -461,6 +476,7 @@ int main(int argc, char** argv)
         {"raw_and_clamped", raw_and_clamped},
         {"keyboard_preference", keyboard_preference},
         {"last_non_neutral", last_non_neutral},
+        {"repeat_checkpoint_neutral", repeat_checkpoint_neutral},
         {"focus_and_visibility", focus_and_visibility}, {"disconnect_and_errors", disconnect_and_errors},
         {"keyboard_source_changes", keyboard_source_changes},
         {"startup_failure_and_shutdown", startup_failure_and_shutdown},

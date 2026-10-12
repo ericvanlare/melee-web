@@ -8,6 +8,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
+import {performance} from 'node:perf_hooks';
 import {parseArgs} from 'node:util';
 import {loadBrowserTools} from './browser_tools.mjs';
 import {openNetInstance, firstFatalBrowserError} from './net_session_instance.mjs';
@@ -16,18 +17,22 @@ import {parseRoomInvite} from './net_lockstep_room_invite.mjs';
 import {resolveRoomRelayMode} from './a3_public_relay_preflight.mjs';
 import {resolveNetworkSimulation, startNetworkSimulation, calibrateNetworkSimulation,
   observeBrowserNetworkPaths, verifyNetworkProxy, closeNetworkProxy} from './a3_network_simulation.mjs';
+import {resolvePostCssStallProbe, runPostCssStallProbe} from './a3_network_stall_probe.mjs';
 import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS, parseNetChecksum} from './net_lockstep_core.mjs';
 import {checksumCompareReached, checksumWaitDiagnostic} from './a3_checksum_wait_diagnostics.mjs';
 import {runA3LocalFullRoute} from './a3_local_room_full_route.mjs';
 
-const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route] [--gameplay-action-probe]';
+const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--post-css-stall-probe] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route] [--controlled-cut-after-css] [--gameplay-action-probe] [--repeat-full-route]';
 const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, out: {type: 'string'},
   'relay-url': {type: 'string'}, 'relay-preflight': {type: 'string'},
   'network-profile': {type: 'string'},
+  'post-css-stall-probe': {type: 'boolean', default: false},
+  'controlled-cut-after-css': {type: 'boolean', default: false},
   playwright: {type: 'string'}, 'min-checksums': {type: 'string', default: '120'},
   'timeout-ms': {type: 'string', default: '300000'}, 'full-route': {type: 'boolean', default: false},
   'gameplay-action-probe': {type: 'boolean', default: false},
+  'repeat-full-route': {type: 'boolean', default: false},
   help: {type: 'boolean', default: false},
 }, allowPositionals: false});
 if (values.help) {
@@ -69,6 +74,13 @@ if (!values.url || !values.disc || !values.out)
   throw Error('Required: ' + USAGE);
 requireCondition(!values['gameplay-action-probe'] || values['full-route'],
   '--gameplay-action-probe requires --full-route');
+requireCondition(!values['repeat-full-route'] || values['full-route'],
+  '--repeat-full-route requires --full-route');
+requireCondition(!(values['repeat-full-route'] && values['gameplay-action-probe']),
+  '--repeat-full-route cannot be combined with --gameplay-action-probe');
+requireCondition(!(values['repeat-full-route'] &&
+    (values['post-css-stall-probe'] || values['controlled-cut-after-css'])),
+  '--repeat-full-route cannot be combined with a stall probe or controlled cut');
 const runtimeUrl = new URL(values.url);
 requireCondition(runtimeUrl.protocol === 'http:' && runtimeUrl.hostname === '127.0.0.1' &&
   runtimeUrl.port === '8787' && runtimeUrl.pathname === '/runtime.html',
@@ -87,6 +99,14 @@ if (values['relay-preflight'] !== undefined) {
 }
 const relayMode = resolveRoomRelayMode({relayUrl: values['relay-url'], preflight: relayPreflightInput,
   clientOrigin: runtimeUrl.origin});
+const postCssStallProbe = resolvePostCssStallProbe({
+  enabled: values['post-css-stall-probe'], profileName: values['network-profile'],
+  simulationMode: simulationConfiguration?.mode, relayUrl: values['relay-url'],
+  relayPreflight: values['relay-preflight'], fullRoute: values['full-route'],
+});
+if (values['controlled-cut-after-css'] && (simulationConfiguration?.profile_name !== 'moderate' ||
+    values['full-route'] || values['relay-url'] || values['relay-preflight'] || postCssStallProbe))
+  throw Error('--controlled-cut-after-css requires simulated moderate CSS, without stall or public relay');
 const discPath = path.resolve(values.disc);
 const discInfo = await fs.stat(discPath);
 requireCondition(discInfo.isFile() && discInfo.size > 0, '--disc must name a nonempty local file');
@@ -119,20 +139,27 @@ const report = {
   relay_mode: simulationConfiguration?.mode ?? relayMode.mode,
   evidence_scope: simulationConfiguration
     ? 'same-machine simulated-network functional browser ' + (values['full-route'] ? 'full-route attempt' : 'CSS check') +
+      (postCssStallProbe ? ' with an opt-in bounded post-CSS controlled-stall probe' : '') +
       ' using actual Host/Join and keyboard input, real TCP proxy sockets and an owned local Worker; public routing, deployed staging, physical input, two-machine, timing, pixel/PCM equivalence and whole-session acceptance remain pending'
     : relayMode.mode === 'external'
     ? (values['full-route']
       ? 'functional browser route attempt using a supplied public staging Worker preflight and the existing actual Host/Join keyboard path; the harness validates preflight structure/bindings only and does not independently verify the deployed service; RTT, human/physical-input, two-machine/Internet, timing, pixel/PCM-equivalence and whole-session acceptance remain pending'
       : 'functional CSS browser check using a supplied public staging Worker preflight and the existing actual Host/Join keyboard path; the harness validates preflight structure/bindings only and does not independently verify the deployed service; RTT, full match, human/physical-input, two-machine/Internet, timing, pixel/PCM-equivalence and whole-session acceptance remain pending')
     : values['full-route']
-      ? 'local functional browser route attempt including one natural original four-stock Mario/Final Destination match; broader original-accuracy, public Worker, human/physical-input, Internet, timing, pixel/PCM-equivalence and whole-session acceptance remain pending'
+      ? values['repeat-full-route']
+        ? 'local functional browser route attempt including two same-room natural original four-stock Mario/Final Destination matches; broader original-accuracy, public Worker, human/physical-input, Internet, timing, pixel/PCM-equivalence and whole-session acceptance remain pending'
+        : 'local functional browser route attempt including one natural original four-stock Mario/Final Destination match; broader original-accuracy, public Worker, human/physical-input, Internet, timing, pixel/PCM-equivalence and whole-session acceptance remain pending'
       : 'local functional browser check only; public Worker, full match, human/physical input, Internet, timing, pixel/PCM equivalence and whole-session gates remain pending',
   decision: 'FAIL',
   first_error: null,
   source: null,
   browser: null,
   room_worker: null,
-  network_simulation: simulationConfiguration ? {configuration: simulationConfiguration} : null,
+  network_simulation: simulationConfiguration ? {configuration: simulationConfiguration,
+    ...(postCssStallProbe ? {post_css_stall_probe: {outcome: 'NOT_STARTED',
+      requested: true, policy: postCssStallProbe.resultPolicy}} : {}),
+    ...(values['controlled-cut-after-css'] ? {controlled_cut_probe: {outcome: 'NOT_STARTED',
+      requested: true}} : {})} : null,
   external_relay_preflight: relayMode.mode === 'external' ? {
     file: path.basename(path.resolve(values['relay-preflight'])),
     sha256: relayPreflightSha256,
@@ -161,14 +188,22 @@ let networkSimulation = null;
 let browserNetworkPaths = null;
 const instances = {alpha: null, beta: null};
 let workerPassed = false;
+let writeRepeatedMatchArtifact = null;
+let repeatedPrefixDigest = null;
 
 async function sourceIdentity() {
   const status = gitValue(['status', '--porcelain', '--untracked-files=all']);
   const allowedHarnessFiles = ['scripts/a3_local_room_keyboard_browser.mjs',
-    'scripts/a3_public_relay_preflight.mjs', 'tests/test_a3_public_relay_preflight.py',
+    'scripts/net_session_instance.mjs', 'scripts/a3_data_package_diagnostics.mjs', 'tests/a3_data_package_diagnostics.test.mjs',
+    'scripts/a3_expected_fault_auditor.py', 'scripts/a3_public_relay_preflight.mjs',
+    'tests/test_a3_expected_fault_auditor.py', 'tests/test_a3_public_relay_preflight.py',
     'scripts/a3_local_room_full_route.mjs', 'scripts/a3_checksum_wait_diagnostics.mjs',
-    'scripts/a3_source_cursor_join.mjs',
-    'tests/test_a3_local_room_full_route_wait.py', 'scripts/a3_network_simulation.mjs',
+    'scripts/a3_source_cursor_join.mjs', 'scripts/run_network_simulation.py',
+    'tests/test_run_network_simulation.py', 'tests/test_a3_local_room_full_route_wait.py',
+    'scripts/a3_network_simulation.mjs', 'scripts/a3_network_stall_probe.mjs',
+    'tests/a3_network_stall_probe.test.mjs', 'tests/test_a3_network_stall_probe.py',
+    'tests/net_test_tcp_proxy_stall_queue.test.mjs',
+    'tests/net_test_tcp_proxy_controlled_faults.test.mjs',
     'scripts/net_test_tcp_proxy.mjs', 'tests/test_a3_network_simulation.py',
     'tests/test_net_test_tcp_proxy.py'];
   const unexpected = status.split('\n').filter(Boolean).filter(row =>
@@ -295,6 +330,26 @@ async function readRoomCursors(port) {
   return {alpha: rows[0], beta: rows[1]};
 }
 
+function validateRepeatCheckpointInput(input, port, label) {
+  const neutralPair = value => Array.isArray(value) && value.length === 2 &&
+    value.every(component => component === 0);
+  const pad = input?.pads?.[port];
+  requireCondition(input?.ready === 1 && input.focused === 1 && input.visible === 1 &&
+    input.active === 1 && input.error === '' && input.keyboard_layout === 0 &&
+    Number.isSafeInteger(input.samples) && input.samples > 0 &&
+    Number.isSafeInteger(input.keyboard_requested_mask) && input.keyboard_requested_mask >= 0 &&
+    Number.isSafeInteger(input.keyboard_active_mask) && input.keyboard_active_mask >= 0 &&
+    Number.isSafeInteger(input.physical_mask) && input.physical_mask >= 0 &&
+    (input.keyboard_requested_mask & (1 << port)) !== 0 &&
+    (input.keyboard_active_mask & (1 << port)) !== 0 &&
+    (input.physical_mask & (1 << port)) === 0 &&
+    Array.isArray(input.pads) && input.pads.length === 4 && pad?.source === 'keyboard' &&
+    pad.err === 0 && pad.buttons === 0 && neutralPair(pad.stick) && neutralPair(pad.cstick) &&
+    neutralPair(pad.triggers) && neutralPair(pad.analog) && neutralPair(pad.clamped?.stick) &&
+    neutralPair(pad.clamped?.cstick) && neutralPair(pad.clamped?.triggers),
+  label + ': source input snapshot lacks the active neutral keyboard port or sample counter');
+}
+
 async function readInputDiagnostics(instance) {
   return instance.page.evaluate(() => {
     const module = globalThis.Module;
@@ -315,6 +370,24 @@ async function readPeerSnapshot(instance, inputFrom = null) {
     const module = globalThis.Module;
     return {
       snapshot,
+      health,
+      native_status: nativeStatus,
+      menu_phase: module?._melee_web_native_menu_phase?.() ?? null,
+      menu_running: module?._melee_web_native_menu_running?.() ?? null,
+      runtime_error: document.querySelector('#status')?.dataset.runtimeError || null,
+    };
+  }, inputFrom);
+}
+
+// Explicit input-suffix reads avoid cloning retained checksum/PAD history. Keep
+// readPeerSnapshot for full route/fault/final checkpoints that need that history.
+async function readPeerInputSuffix(instance, inputFrom) {
+  return instance.page.evaluate(inputFrom => {
+    const health = globalThis.meleeNetRuntimeLockstepHealth?.({inputFrom});
+    const nativeStatus = globalThis.__net?.status?.() ?? null;
+    const module = globalThis.Module;
+    return {
+      snapshot: null,
       health,
       native_status: nativeStatus,
       menu_phase: module?._melee_web_native_menu_phase?.() ?? null,
@@ -404,7 +477,7 @@ async function waitForBothCssAndProgress(minimum) {
   throw Error('Both runtime-owned peers did not reach the bounded common CSS checksum prefix');
 }
 
-async function waitForBothChecksumCompare(target, phase = 1) {
+async function waitForBothChecksumCompare(target, phase = 1, boundedDeadline = operationDeadline) {
   const recent = [];
   let lastRows = null;
   let lastObservedAt = null;
@@ -416,24 +489,30 @@ async function waitForBothChecksumCompare(target, phase = 1) {
     if (recent.length > 32) recent.shift();
   };
   const failWithObservation = async (errorMessage, reason, finalLabel) => {
-    const fresh = await Promise.all(['alpha', 'beta'].map(async role => {
-      let timer;
-      try {
-        const row = await Promise.race([
-          readChecksumWaitFinalState(instances[role]),
-          new Promise((_, reject) => {
-            timer = setTimeout(() => reject(Error('diagnostic observation exceeded 1500 ms')), 1500);
-          }),
-        ]);
-        return {label: finalLabel, observed_at: new Date().toISOString(),
-          state: checksumWaitDiagnostic(row, role)};
-      } catch (error) {
-        return {label: finalLabel, observed_at: new Date().toISOString(), role,
-          observation_error: errorText(error)};
-      } finally {
-        clearTimeout(timer);
-      }
-    }));
+    const diagnosticBudget = boundedDeadline === operationDeadline ? 1500 :
+      Math.max(0, Math.min(1500, boundedDeadline - Date.now()));
+    const fresh = diagnosticBudget === 0 ? ['alpha', 'beta'].map(role => ({
+      label: finalLabel, observed_at: new Date().toISOString(), role,
+      observation_error: 'bounded route deadline expired before fresh diagnostic read'})) :
+      await Promise.all(['alpha', 'beta'].map(async role => {
+        let timer;
+        try {
+          const row = await Promise.race([
+            readChecksumWaitFinalState(instances[role]),
+            new Promise((_, reject) => {
+              timer = setTimeout(() => reject(Error(`diagnostic observation exceeded ${diagnosticBudget} ms`)),
+                diagnosticBudget);
+            }),
+          ]);
+          return {label: finalLabel, observed_at: new Date().toISOString(),
+            state: checksumWaitDiagnostic(row, role)};
+        } catch (error) {
+          return {label: finalLabel, observed_at: new Date().toISOString(), role,
+            observation_error: errorText(error)};
+        } finally {
+          clearTimeout(timer);
+        }
+      }));
     const observation = {reason, target, phase, predicate_last_observed_at: lastObservedAt,
       predicate_last_rows: lastRows?.map((row, index) =>
         checksumWaitDiagnostic(row, index === 0 ? 'alpha' : 'beta')) ?? null,
@@ -441,7 +520,7 @@ async function waitForBothChecksumCompare(target, phase = 1) {
     report.checksum_wait_failure = observation;
     return Error(errorMessage);
   };
-  while (Date.now() < operationDeadline) {
+  while (Date.now() < boundedDeadline) {
     const states = await Promise.all([readRoomState(instances.alpha), readRoomState(instances.beta)]);
     retainRows(states);
     for (const [index, role] of ['alpha', 'beta'].entries()) {
@@ -515,9 +594,9 @@ function compareSnapshotRecords(alpha, beta, minimum) {
   };
 }
 
-async function captureScreenshot(instance, filename) {
+async function captureScreenshot(instance, filename, operationRemaining = remaining) {
   const pathOnDisk = path.join(output, filename);
-  await instance.page.locator('#canvas').scrollIntoViewIfNeeded({timeout: remaining()});
+  await instance.page.locator('#canvas').scrollIntoViewIfNeeded({timeout: operationRemaining()});
   await instance.screenshot(pathOnDisk);
   const bytes = await fs.readFile(pathOnDisk);
   requireCondition(bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
@@ -575,8 +654,141 @@ function firstError(message) {
 }
 async function writeReport() {
   report.finished_at = new Date().toISOString();
-  report.decision = report.first_error ? 'FAIL' : 'PASS';
+  report.decision = report.first_error ? 'FAIL' :
+    (report.network_simulation?.post_css_stall_probe?.outcome === 'EXERCISED_AND_RESUMED'
+      ? 'PASS_POST_CSS_STALL_PROBE' : 'PASS');
   await fs.writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n');
+}
+
+function summarizeCutObservation(row) {
+  const peer = row?.snapshot?.peer;
+  return {
+    native_status: row?.native_status ?? null,
+    menu_phase: row?.menu_phase ?? null,
+    menu_running: row?.menu_running ?? null,
+    protocol_terminal: peer?.protocol?.terminal ?? null,
+    endpoint_errors: peer?.endpointErrors ?? null,
+    endpoint_closed: peer?.endpointClosed ?? null,
+    peer_failure: peer?.failure ?? null,
+    checksum_mismatch_count: row?.health?.peer?.protocol?.checksum_mismatch_count ?? null,
+    checksum_mismatches: peer?.protocol?.checksum_mismatches ?? null,
+    native_local_divergences: peer?.protocol?.native_local_divergences ?? null,
+  };
+}
+
+async function runControlledCutProbe() {
+  requireCondition(values['controlled-cut-after-css'] === true && networkSimulation?.proxy &&
+    typeof networkSimulation.proxy.cutConnection === 'function',
+    'Controlled cut requires the reviewed owned loopback TCP proxy API');
+  const proxyBefore = networkSimulation.proxy.snapshot();
+  const active = proxyBefore?.connections?.active;
+  const faultsBefore = proxyBefore?.controlledFaults;
+  requireCondition(Array.isArray(active) && active.length === 2 &&
+    active.every(row => Number.isSafeInteger(row.connectionId) && row.connectionId > 0) &&
+    new Set(active.map(row => row.connectionId)).size === 2,
+    'Controlled cut requires exactly two active opaque room-path proxy connections');
+  requireCondition(Array.isArray(faultsBefore) && faultsBefore.length === 0 &&
+    proxyBefore.lifecycle?.cutConnections === 0 && proxyBefore.lifecycle?.failedConnections === 0 &&
+    proxyBefore.diagnostics?.integrityFailure === false,
+    'Controlled cut requires a fault-free proxy before activation');
+  for (const role of ['alpha', 'beta']) {
+    report.profiles[role].data_package_diagnostics_before_cut =
+      await instances[role].readDataPackageDiagnostics();
+  }
+  const prePeers = {
+    alpha: await readPeerSnapshot(instances.alpha),
+    beta: await readPeerSnapshot(instances.beta),
+  };
+  for (const role of ['alpha', 'beta']) {
+    const row = prePeers[role];
+    requireCondition(row.menu_phase === 1 && row.menu_running === 1 &&
+      row.native_status?.active === 1 && row.native_status?.terminal?.kind === 0 &&
+      row.snapshot?.peer?.protocol?.ready === true &&
+      row.health?.peer?.protocol?.checksum_mismatch_count === 0 &&
+      row.snapshot?.peer?.endpointClosed === false,
+      role + ' was not at a healthy terminal-free live CSS boundary before cut');
+  }
+  const selectedConnectionId = active[0].connectionId;
+  const probe = {
+    schema: 'melee-web-task13-controlled-cut-observation-v1',
+    selection: {active_connection_ids: active.map(row => row.connectionId),
+      selected_connection_id: selectedConnectionId,
+      scope: 'one active opaque room-path TCP connection; no alpha/beta attribution by accept order'},
+    pre_fault: {
+      room_id: report.invitation?.room_id,
+      invite_sha256: report.invitation?.invite_sha256,
+      browser_path: report.network_simulation?.browser_path,
+      checksum_comparison: report.checksum_comparison,
+      peers: prePeers,
+      proxy: proxyBefore,
+      source_cursors: Object.fromEntries(['alpha', 'beta'].map(role =>
+        [role, prePeers[role].native_status?.cursor ?? null])),
+    },
+    activation: null,
+    proxy_immediately_after_activation: null,
+    post_fault: {observations: [], first_terminal_by_role: {}, final_peers: null,
+      terminal_observed: false, elapsed_ms: null, actions_after_cut: [], resume_calls_after_cut: 0,
+      action_scope: 'read-only terminal polling; final UI Stop/Leave and unload occur later as cleanup'},
+  };
+  report.network_simulation.controlled_cut_probe = probe;
+  const started = Date.now();
+  probe.activation = networkSimulation.proxy.cutConnection(selectedConnectionId);
+  probe.proxy_immediately_after_activation = networkSimulation.proxy.snapshot();
+  requireCondition(probe.activation?.kind === 'cut' &&
+    probe.activation.connectionId === selectedConnectionId &&
+    probe.activation.scope === 'one opaque owned TCP connection; no inferred player role' &&
+    probe.proxy_immediately_after_activation?.controlledFaults?.length === 1,
+    'Proxy did not issue the exact one-use opaque cut receipt');
+  let lastSignature = null;
+  let finalRows = null;
+  let unsupportedTerminal = null;
+  while (Date.now() < operationDeadline) {
+    const rows = {
+      alpha: await readPeerSnapshot(instances.alpha),
+      beta: await readPeerSnapshot(instances.beta),
+    };
+    finalRows = rows;
+    const compact = Object.fromEntries(['alpha', 'beta'].map(role =>
+      [role, summarizeCutObservation(rows[role])]));
+    const signature = JSON.stringify(compact);
+    if (signature !== lastSignature) {
+      if (probe.post_fault.observations.length < 128) {
+        probe.post_fault.observations.push({elapsed_ms: Date.now() - started, peers: compact});
+      } else {
+        probe.post_fault.observations[127] = {elapsed_ms: Date.now() - started, peers: compact};
+      }
+      lastSignature = signature;
+    }
+    let bothSupportedTerminals = true;
+    for (const role of ['alpha', 'beta']) {
+      const row = rows[role];
+      const terminal = row.native_status?.blocker === 'terminal'
+        ? row.native_status.terminal : null;
+      if (terminal && !probe.post_fault.first_terminal_by_role[role]) {
+        probe.post_fault.first_terminal_by_role[role] = {
+          elapsed_ms: Date.now() - started,
+          observation: summarizeCutObservation(row),
+        };
+      }
+      if (terminal && ![2, 3].includes(terminal.kind))
+        unsupportedTerminal = {role, terminal};
+      if (!terminal || ![2, 3].includes(terminal.kind) ||
+          row.snapshot?.peer?.endpointClosed !== true) bothSupportedTerminals = false;
+    }
+    if (unsupportedTerminal || bothSupportedTerminals) break;
+    await sleep(Math.min(50, remaining()));
+  }
+  probe.post_fault.elapsed_ms = Date.now() - started;
+  probe.post_fault.final_peers = finalRows;
+  probe.post_fault.terminal_observed = Boolean(finalRows && ['alpha', 'beta'].every(role =>
+    finalRows[role].native_status?.blocker === 'terminal' &&
+    [2, 3].includes(finalRows[role].native_status?.terminal?.kind) &&
+    finalRows[role].snapshot?.peer?.endpointClosed === true));
+  if (unsupportedTerminal)
+    throw Error('Controlled cut produced an unsupported native terminal: ' + JSON.stringify(unsupportedTerminal));
+  requireCondition(probe.post_fault.terminal_observed,
+    'Controlled cut did not reach source-supported native terminal kinds before the existing operation deadline');
+  throw Error('Expected controlled transport cut observed; route remains FAIL');
 }
 
 try {
@@ -618,6 +830,7 @@ try {
     timeoutMs: Math.min(120000, remaining()),
     deadline: finalDeadline,
     runtimeOwned: true,
+    dataPackageDiagnostics: values['controlled-cut-after-css'] === true,
     syntheticGamepad: null,
   });
   instances.alpha = await openRole('alpha');
@@ -724,7 +937,7 @@ try {
       waitForCursorChange(instances.beta, spec.port, cursorBefore.beta),
     ]);
     const after = {alpha: cursorAfter[0], beta: cursorAfter[1]};
-    const readback = await readPeerSnapshot(instance, inputCount);
+    const readback = await readPeerInputSuffix(instance, inputCount);
     const inputAfter = await readInputDiagnostics(instance);
     const captures = readback.health?.peer?.localInputCapture?.captures_since;
     requireCondition(Array.isArray(captures) && captures.length > 0,
@@ -776,20 +989,292 @@ try {
     };
   }
 
-  if (values['full-route']) {
+  if (values['full-route'] && !values['repeat-full-route']) {
     report.full_route = await runA3LocalFullRoute({
       alpha: instances.alpha, beta: instances.beta, report, inputDelay: invite.inputDelay,
       gameplayActionProbe: values['gameplay-action-probe'],
-      remaining, readRoomState, readPeerSnapshot, readInputDiagnostics,
+      remaining, readRoomState, readPeerSnapshot, readPeerInputSuffix, readInputDiagnostics,
       waitForBothChecksumCompare, captureScreenshot,
       assertHealthy: (state, role) => {
         const failure = protocolFailure(state, role);
         requireCondition(!failure, failure || role + ' runtime owner is unhealthy');
       },
     });
+  } else if (values['repeat-full-route']) {
+    const initialPages = {alpha: instances.alpha, beta: instances.beta};
+    const repeat = {
+      result: 'running', scope: 'two original full routes in one continuously owned room',
+      repeat_mode: 'same-room-two-match', gameplay_action_probe: false,
+      required_checksum_boundary: 0, active_match_number: null, repeated_matches: [],
+      checkpoint_observations: [],
+      admission: null, final_prefix: null,
+      exclusions: ['same persistent browser pages, Worker, Host/Join room and owner session',
+        'no reconfigure, reseed, reload, close, reconnect or synthetic input between matches',
+        'no truncation or deadline extension; failed or budget-ineligible second match is not a pass'],
+    };
+    report.full_route = repeat;
+    const roomIdentity = {
+      room_id: report.invitation.room_id,
+      relay_url: report.invitation.url,
+      invite_sha256: report.invitation.invite_sha256,
+      network_profile_sha256: report.network_simulation?.configuration?.profile_sha256 ?? null,
+      owner_process_id: report.room_worker?.owner_process?.pid ?? null,
+      owner_process_group_id: report.room_worker?.owner_process?.processGroupId ?? null,
+      worker_hashes: report.room_worker?.hashes ?? null,
+      persistent_pages: ['alpha', 'beta'],
+    };
+    requireCondition(roomIdentity.owner_process_id !== null && roomIdentity.owner_process_group_id !== null &&
+      typeof roomIdentity.worker_hashes?.worker === 'string',
+    'Repeated route requires the same owned local Worker process for both matches');
+    const assertHealthyState = (state, role) => {
+      const failure = protocolFailure(state, role);
+      requireCondition(!failure, failure || role + ' runtime owner is unhealthy');
+      requireCondition(state.menu_phase === 1 && state.menu_running === 1 &&
+        state.native_status?.active === 1,
+      role + ' left the connected original CSS at a repeat-route boundary');
+      const protocol = state.owner_health?.peer?.protocol;
+      requireCondition(protocol?.role === role && protocol?.local_port === (role === 'alpha' ? 0 : 1),
+        role + ' lockstep owner role/port changed at a repeat-route boundary');
+    };
+    const collectCheckpoint = async label => {
+      requireCondition(instances.alpha === initialPages.alpha && instances.beta === initialPages.beta,
+        label + ': persistent browser page instances changed');
+      const states = await Promise.all([readRoomState(initialPages.alpha), readRoomState(initialPages.beta)]);
+      const snapshots = await Promise.all([readPeerSnapshot(initialPages.alpha), readPeerSnapshot(initialPages.beta)]);
+      const inputs = await Promise.all([readInputDiagnostics(initialPages.alpha),
+        readInputDiagnostics(initialPages.beta)]);
+      const peers = {};
+      const checkpoint = {label, observed_at: new Date().toISOString(),
+        result: 'observed_pending_validation', room_identity: roomIdentity,
+        input_observations: {alpha: inputs[0], beta: inputs[1]}, peers};
+      repeat.checkpoint_observations.push(checkpoint);
+      for (const [index, role] of ['alpha', 'beta'].entries()) {
+        const state = states[index];
+        const snapshot = snapshots[index];
+        assertHealthyState(state, role);
+        const protocol = state.owner_health.peer.protocol;
+        const snapshotProtocol = snapshot.health?.peer?.protocol;
+        const retained = snapshot.snapshot?.checksums?.length;
+        requireCondition(Number.isSafeInteger(state.native_status.cursor) && state.native_status.cursor >= 0 &&
+          Number.isSafeInteger(retained) && retained === snapshotProtocol?.local_checksum_ticks &&
+          Number.isSafeInteger(snapshotProtocol?.remote_checksum_ticks) &&
+          Number.isSafeInteger(snapshotProtocol?.next_checksum_compare),
+        label + ': ' + role + ' native cursor/checksum observation is incomplete');
+        requireCondition(protocol.role === snapshotProtocol.role && protocol.local_port === snapshotProtocol.local_port,
+          label + ': ' + role + ' owner role/port differs between status and checksum snapshot');
+        const input = inputs[index];
+        validateRepeatCheckpointInput(input, role === 'alpha' ? 0 : 1, label + ': ' + role);
+        peers[role] = {
+          source_cursor: state.native_status.cursor,
+          input_diagnostics: input,
+          checksum_counts: {retained, local: snapshotProtocol.local_checksum_ticks,
+            remote: snapshotProtocol.remote_checksum_ticks, compared: snapshotProtocol.next_checksum_compare},
+          peer_identity: {role: protocol.role, local_port: protocol.local_port,
+            owner_seed: state.native_status.seed ?? null},
+        };
+      }
+      checkpoint.result = 'validated_observations';
+      return checkpoint;
+    };
+    const samePageObjects = () => instances.alpha === initialPages.alpha && instances.beta === initialPages.beta;
+    let secondRouteRemaining = null;
+    let secondRouteDeadline = null;
+    const runRetainedMatch = async (matchNumber, entryCheckpoint = null) => {
+      requireCondition(samePageObjects(), 'browser page ownership changed before match ' + matchNumber);
+      const matchDirectory = path.join(output, `match-${matchNumber}`);
+      await fs.mkdir(matchDirectory, {recursive: false});
+      const entry = {match_number: matchNumber, result: 'running', route_elapsed_ms: null,
+        route: null, entry: entryCheckpoint, first_return: null, second_return: null, report_artifact: null};
+      repeat.active_match_number = matchNumber;
+      repeat.repeated_matches.push(entry);
+      const localReport = {};
+      const routeStarted = performance.now();
+      const routeRemaining = matchNumber === 1 ? remaining : secondRouteRemaining;
+      const routeChecksumWait = matchNumber === 1 ? waitForBothChecksumCompare :
+        (target, phase = 1) => waitForBothChecksumCompare(target, phase, secondRouteDeadline);
+      try {
+        await runA3LocalFullRoute({
+          alpha: initialPages.alpha, beta: initialPages.beta, report: localReport,
+          inputDelay: invite.inputDelay, gameplayActionProbe: false,
+          remaining: routeRemaining,
+          readRoomState, readPeerSnapshot, readPeerInputSuffix, readInputDiagnostics,
+          waitForBothChecksumCompare: routeChecksumWait,
+          captureScreenshot: (instance, filename) =>
+            captureScreenshot(instance, `match-${matchNumber}/${filename}`, routeRemaining),
+          assertHealthy: (state, role) => {
+            const failure = protocolFailure(state, role);
+            requireCondition(!failure, failure || role + ' runtime owner is unhealthy');
+          },
+        });
+        entry.route = localReport.full_route;
+        entry.route_elapsed_ms = Math.ceil(performance.now() - routeStarted);
+        entry.result = 'awaiting_checksum_validation';
+        return entry;
+      } catch (error) {
+        entry.route = localReport.full_route ?? null;
+        entry.route_elapsed_ms = Math.ceil(performance.now() - routeStarted);
+        entry.result = 'failed';
+        throw error;
+      }
+    };
+    writeRepeatedMatchArtifact = async entry => {
+      const payload = {schema: 'melee-web-a3-local-room-full-route-match-v1',
+        match_number: entry.match_number, result: entry.result,
+        route_elapsed_ms: entry.route_elapsed_ms, room_identity: roomIdentity,
+        entry: entry.entry, route: entry.route,
+        first_return: entry.first_return, second_return: entry.second_return};
+      const bytes = Buffer.from(JSON.stringify(payload, null, 2) + '\n');
+      const filename = `match-${entry.match_number}/report.json`;
+      await fs.mkdir(path.join(output, `match-${entry.match_number}`), {recursive: true});
+      await fs.writeFile(path.join(output, filename), bytes);
+      entry.report_artifact = {file: filename, bytes: bytes.length, sha256: sha256(bytes)};
+    };
+    const prefixDigest = (comparison, count) => {
+      requireCondition(Number.isSafeInteger(count) && count > 0 && comparison.records.length >= count,
+        'Repeated-route checksum prefix is shorter than its CSS boundary');
+      const digest = createHash('sha256');
+      for (let tick = 0; tick < count; ++tick) {
+        const row = comparison.records[tick];
+        requireCondition(row.source_tick === tick && row.bytes === 64 &&
+          row.alpha_raw_hex === row.beta_raw_hex,
+        'Repeated-route raw checksum prefix diverged at source tick ' + tick);
+        digest.update(Buffer.from(row.alpha_raw_hex, 'hex'));
+      }
+      return digest.digest('hex');
+    };
+    repeatedPrefixDigest = prefixDigest;
+    let firstEntry = null;
+    try {
+      firstEntry = await runRetainedMatch(1);
+      requireCondition(firstEntry.route?.result === 'awaiting_final_checksum_validation' &&
+        Number.isSafeInteger(firstEntry.route.required_checksum_boundary),
+      'First full route did not retain its returned-CSS checksum boundary');
+      const firstBoundary = firstEntry.route.required_checksum_boundary;
+      await waitForBothChecksumCompare(firstBoundary, 1);
+      const firstSnapshots = await waitForChecksumConsumersSettled(firstBoundary);
+      const firstComparison = compareSnapshotRecords(firstSnapshots[0], firstSnapshots[1], firstBoundary);
+      requireCondition(firstComparison.compared_source_ticks >= firstBoundary,
+        'First returned-CSS boundary lacks an exact common raw checksum prefix');
+      firstEntry.first_return = await collectCheckpoint('match-1-returned-css');
+      for (const [index, role] of ['alpha', 'beta'].entries()) {
+        const routeCursor = firstEntry.route.returned_css.source_cursor_by_peer[role];
+        requireCondition(firstEntry.first_return.peers[role].source_cursor >= routeCursor,
+          'Match one ' + role + ' source cursor moved behind returned CSS');
+      }
+      firstEntry.first_return.result = 'pass';
+      firstEntry.first_return.common_raw_prefix = {
+        result: 'pass', source_tick_range: [0, firstBoundary - 1], record_count: firstBoundary,
+        bytes_per_record: 64, alpha_equals_beta: true,
+        sha256_concatenated_records: prefixDigest(firstComparison, firstBoundary),
+        compared_source_ticks_at_capture: firstComparison.compared_source_ticks,
+      };
+      firstEntry.route.result = 'pass';
+      firstEntry.result = 'pass';
+      repeat.required_checksum_boundary = firstBoundary;
+      await writeRepeatedMatchArtifact(firstEntry);
+
+      const entryCheckpoint = await collectCheckpoint('match-2-entry');
+      entryCheckpoint.result = 'pass';
+      for (const role of ['alpha', 'beta']) {
+        requireCondition(entryCheckpoint.peers[role].source_cursor >= firstEntry.first_return.peers[role].source_cursor,
+          'Match two ' + role + ' source cursor regressed before entry');
+        requireCondition(entryCheckpoint.peers[role].input_diagnostics.samples >=
+          firstEntry.first_return.peers[role].input_diagnostics.samples,
+        'Match two ' + role + ' input sample counter regressed before entry');
+        for (const counter of ['retained', 'local', 'remote', 'compared'])
+          requireCondition(entryCheckpoint.peers[role].checksum_counts[counter] >=
+            firstEntry.first_return.peers[role].checksum_counts[counter],
+          'Match two ' + role + ' checksum count regressed before entry');
+      }
+      const firstDuration = firstEntry.route_elapsed_ms;
+      const remainingBeforeSecond = remaining();
+      const requiredRemaining = firstDuration + 30000;
+      const secondSubdeadline = Math.max(0, Math.min(firstDuration + 10000, remainingBeforeSecond - 20000));
+      repeat.admission = {first_route_duration_ms: firstDuration,
+        remaining_before_second_ms: remainingBeforeSecond, required_remaining_ms: requiredRemaining,
+        second_route_subdeadline_ms: secondSubdeadline,
+        second_route_elapsed_ms: null, final_reserve_ms_at_second_return: null};
+      if (remainingBeforeSecond < requiredRemaining) {
+        const notAttempted = {match_number: 2, result: 'not_attempted_budget', route_elapsed_ms: 0,
+          route: null, entry: {...entryCheckpoint, result: 'not_attempted'}, first_return: null,
+          second_return: null, report_artifact: null};
+        repeat.repeated_matches.push(notAttempted);
+        repeat.active_match_number = 2;
+        await writeRepeatedMatchArtifact(notAttempted);
+        throw Error(`Second full route not attempted: ${remainingBeforeSecond} ms remains; ${requiredRemaining} ms required`);
+      }
+      secondRouteDeadline = Date.now() + repeat.admission.second_route_subdeadline_ms;
+      secondRouteRemaining = () => {
+        const operationLeft = remaining();
+        const routeLeft = secondRouteDeadline - Date.now();
+        const finalReserveLeft = operationLeft - 20000;
+        if (routeLeft <= 0 || finalReserveLeft <= 0)
+          throw Error('Second full route exhausted its admitted route or final-comparison budget');
+        return Math.max(1, Math.min(routeLeft, finalReserveLeft));
+      };
+      const secondEntry = await runRetainedMatch(2, entryCheckpoint);
+      repeat.admission.second_route_elapsed_ms = secondEntry.route_elapsed_ms;
+      requireCondition(secondEntry.route_elapsed_ms <= repeat.admission.second_route_subdeadline_ms,
+        'Second full route exceeded its measured-duration subdeadline');
+      requireCondition(secondEntry.route?.result === 'awaiting_final_checksum_validation' &&
+        Number.isSafeInteger(secondEntry.route.required_checksum_boundary),
+      'Second full route did not retain its returned-CSS checksum boundary');
+      secondEntry.second_return = await collectCheckpoint('match-2-returned-css');
+      for (const role of ['alpha', 'beta']) {
+        const before = secondEntry.entry.peers[role];
+        const after = secondEntry.second_return.peers[role];
+        const routeCursor = secondEntry.route.returned_css.source_cursor_by_peer[role];
+        requireCondition(after.source_cursor >= routeCursor && after.source_cursor > before.source_cursor,
+          'Match two ' + role + ' source cursor did not advance through returned CSS');
+        requireCondition(after.input_diagnostics.samples >= before.input_diagnostics.samples,
+          'Match two ' + role + ' input sample counter regressed by returned CSS');
+        for (const counter of ['retained', 'local', 'remote', 'compared'])
+          requireCondition(after.checksum_counts[counter] >= before.checksum_counts[counter],
+            'Match two ' + role + ' checksum count regressed by returned CSS');
+      }
+      secondEntry.second_return.result = 'pass';
+      repeat.admission.final_reserve_ms_at_second_return = remaining();
+      requireCondition(repeat.admission.final_reserve_ms_at_second_return >= 20000,
+        'Final comparison reserve was unavailable when match two returned to CSS');
+      repeat.required_checksum_boundary = Math.max(firstBoundary,
+        secondEntry.route.required_checksum_boundary);
+    } catch (error) {
+      if (repeat.admission && repeat.admission.second_route_elapsed_ms === null) {
+        const second = repeat.repeated_matches.find(entry => entry.match_number === 2);
+        if (second && Number.isSafeInteger(second.route_elapsed_ms))
+          repeat.admission.second_route_elapsed_ms = second.route_elapsed_ms;
+      }
+      for (const entry of repeat.repeated_matches) {
+        if (entry.result === 'running' || entry.result === 'awaiting_checksum_validation')
+          entry.result = 'failed';
+        try { await writeRepeatedMatchArtifact(entry); } catch (artifactError) {
+          firstError('Repeated-route match artifact write failed: ' + errorText(artifactError));
+        }
+      }
+      throw error;
+    }
   }
+  if (postCssStallProbe) {
+    await runPostCssStallProbe({
+      proxy: networkSimulation.proxy,
+      readRoomState: role => readRoomState(instances[role]),
+      assertHealthy: (state, role) => {
+        const failure = protocolFailure(state, role);
+        requireCondition(!failure, failure || role + ' runtime owner is unhealthy');
+      },
+      remaining,
+      browserPathVerification: report.network_simulation.browser_path,
+      evidence: report.network_simulation.post_css_stall_probe,
+    });
+  }
+  const resumedStallCursors = postCssStallProbe
+    ? ['alpha', 'beta'].map(role =>
+      report.network_simulation.post_css_stall_probe.resumed.peers[role].source_cursor)
+    : [];
+  requireCondition(resumedStallCursors.every(Number.isSafeInteger),
+    'Post-stall resumed source cursor is unavailable');
   const requiredChecksums = Math.max(minimumChecksums,
-    report.full_route?.required_checksum_boundary || 0);
+    report.full_route?.required_checksum_boundary || 0, ...resumedStallCursors);
   requireCondition(requiredChecksums <= invite.sourceTicks,
     'Required full-route checksum boundary exceeds the Host/Join source-tick limit');
   const progress = await waitForBothCssAndProgress(requiredChecksums);
@@ -812,6 +1297,42 @@ try {
       role + ' runtime peer reported a native or checksum mismatch');
   }
   report.checksum_comparison = compareSnapshotRecords(alphaSnapshot, betaSnapshot, requiredChecksums);
+  if (report.full_route?.repeat_mode === 'same-room-two-match') {
+    try {
+      const repeat = report.full_route;
+      const first = repeat.repeated_matches[0];
+      const second = repeat.repeated_matches[1];
+      requireCondition(first?.result === 'pass' && second?.route?.result === 'awaiting_final_checksum_validation',
+        'Repeated route did not retain a passed first route and complete second route');
+      const firstBoundary = first.route.required_checksum_boundary;
+      const secondBoundary = second.route.required_checksum_boundary;
+      const firstPrefixHash = repeatedPrefixDigest(report.checksum_comparison, firstBoundary);
+      const secondPrefixHash = repeatedPrefixDigest(report.checksum_comparison, secondBoundary);
+      requireCondition(firstPrefixHash === first.first_return.common_raw_prefix.sha256_concatenated_records,
+        'Final common raw checksum prefix changed the pre-second-match records');
+      repeat.final_prefix = {result: 'pass', first_boundary: firstBoundary,
+        first_prefix_sha256: firstPrefixHash, second_boundary: secondBoundary,
+        second_prefix_sha256: secondPrefixHash,
+        compared_source_ticks: report.checksum_comparison.compared_source_ticks,
+        raw_records_present_in_final_checksum_comparison: true};
+      requireCondition(repeat.final_prefix.compared_source_ticks >= secondBoundary &&
+        repeat.admission.final_reserve_ms_at_second_return >= 20000,
+      'Final exact checksum prefix or reserved comparison window was unavailable after match two');
+      second.route.result = 'pass';
+      second.result = 'pass';
+      await writeRepeatedMatchArtifact(second);
+      repeat.active_match_number = null;
+    } catch (error) {
+      for (const entry of report.full_route.repeated_matches) {
+        if (entry.result === 'running' || entry.result === 'awaiting_checksum_validation')
+          entry.result = 'failed';
+        try { await writeRepeatedMatchArtifact(entry); } catch (artifactError) {
+          firstError('Repeated-route match artifact write failed: ' + errorText(artifactError));
+        }
+      }
+      throw error;
+    }
+  }
   if (report.full_route) report.full_route.result = 'pass';
   report.checksum_comparison.requested_minimum = requiredChecksums;
   report.checksum_comparison.freeze_before_leave = true;
@@ -836,6 +1357,7 @@ try {
         protocol: row.health?.peer?.protocol,
       }]));
   }
+  if (values['controlled-cut-after-css']) await runControlledCutProbe();
   workerPassed = true;
 } catch (error) {
   if (report.full_route && ['running', 'awaiting_final_checksum_validation'].includes(report.full_route.result))
@@ -889,8 +1411,12 @@ try {
       if (instance.closed !== true) firstError(role + ' persistent Chrome context did not close');
     } catch (error) {
       report.leave_and_cleanup[role + '_context_close_error'] = errorText(error);
+      report.leave_and_cleanup[role + '_context_closed'] = instance.closed === true;
       firstError(role + ' Chrome context cleanup failed: ' + errorText(error));
     } finally {
+      if (values['controlled-cut-after-css'])
+        report.leave_and_cleanup[role + '_data_package_diagnostics_after_context_close'] =
+          instance.dataPackageDiagnostics ?? null;
       const nativeCleanup = instance.nativeNetworkCleanup ?? null;
       report.leave_and_cleanup[role + '_native_network_cleanup'] = nativeCleanup;
       if (workerPassed) {

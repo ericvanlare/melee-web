@@ -80,12 +80,13 @@ async function startServer({includeRemoteInput = false, omitReady = false, holdR
     async close() {
       for (const socket of sockets) socket.destroy();
       await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+      return {listener_closed: !server.listening, all_sockets_destroyed: [...peers].every(socket => socket.destroyed)};
     },
   };
 }
 
 function createPeer(server, {holdStateSend = false, holdEmptyState = false,
-  holdSourceTickTwo = false, failStateSend = false, checksumTickZero = false} = {}) {
+  holdSourceTickTwo = false, failStateSend = false, checksumTickZero = false, checksumConsumer = null} = {}) {
   const disconnectEntered = deferred();
   const releaseDisconnect = deferred();
   const stateSendEntered = deferred();
@@ -93,7 +94,8 @@ function createPeer(server, {holdStateSend = false, holdEmptyState = false,
   const releaseStateSend = deferred();
   const sourceTickTwoEntered = deferred();
   const releaseSourceTickTwo = deferred();
-  let endpoint;
+  let endpoint, endpointOptions;
+  const injectedEndpointErrors = [];
   const pushed = [];
   const checksums = [];
   if (checksumTickZero) {
@@ -102,6 +104,10 @@ function createPeer(server, {holdStateSend = false, holdEmptyState = false,
     record[4] = 0x5a;
     checksums.push(record);
   }
+  let settlementGate = false;
+  const settlementEntered = deferred(), releaseSettlement = deferred();
+  let statusGate = null;
+  const statusEntered = deferred(), releaseStatus = deferred();
   let nativeTerminal = null;
   const nativeTerminalObserved = deferred();
   let disconnectCallbackReleased = false;
@@ -125,19 +131,31 @@ function createPeer(server, {holdStateSend = false, holdEmptyState = false,
       }
       return true;
     },
-    status() { return {active: 1, cursor: 0,
+    async status() {
+      if (statusGate) { statusGate = null; statusEntered.resolve(); await releaseStatus.promise; }
+      return {active: 1, cursor: 0,
       blocker: nativeTerminal ? 'terminal' : 'wait', terminal: nativeTerminal ?? {kind: 0}}; },
     drain() { return checksums.splice(0); },
     dispose() {},
   };
   const controller = createBrowserNativePeer({role: 'alpha', sourceTicks: 4, inputTicks: 2,
     relayUrl: server.url, roomId: createRoomId(), timeoutMs: 1200, agreement, native,
-    inputCapture: {mode: 'live'}}, {createEndpoint(options) {
-      endpoint = createRoomRelayPeerEndpoint({...options, onDisconnect: async (...args) => {
+    inputCapture: {mode: 'live'}, checksumConsumer}, {createEndpoint(options) {
+      endpointOptions = options;
+    endpoint = createRoomRelayPeerEndpoint({...options, onDisconnect: async (...args) => {
         disconnectEntered.resolve();
         await releaseDisconnect.promise;
       return options.onDisconnect(...args);
     }});
+    const actualErrors = Object.getOwnPropertyDescriptor(endpoint, 'errors').get;
+    Object.defineProperty(endpoint, 'errors', {get() { return [...actualErrors.call(endpoint), ...injectedEndpointErrors]; }});
+    const drainInbound = endpoint.drainInbound.bind(endpoint);
+    endpoint.drainInbound = async (...args) => {
+      if (settlementGate && controller.snapshot().checksumConsumer.pending_batch?.callback_started === false) {
+        settlementGate = false; settlementEntered.resolve(); await releaseSettlement.promise;
+      }
+      return drainInbound(...args);
+    };
     const send = endpoint.send.bind(endpoint);
     endpoint.send = text => {
       const packet = JSON.parse(text);
@@ -165,6 +183,10 @@ function createPeer(server, {holdStateSend = false, holdEmptyState = false,
     return endpoint;
   }});
   return {controller, native, pushed, disconnectEntered, releaseDisconnect, openDisconnect,
+    async injectEndpointError(error) { injectedEndpointErrors.push(error); await endpointOptions.onEndpointError('alpha', error); },
+    statusEntered, releaseStatus, holdNextStatus() { statusGate = true; },
+    settlementEntered, releaseSettlement, holdConsumerSettlement() { settlementGate = true; },
+    enqueueChecksum(tick) { const row = new Uint8Array(64); new DataView(row.buffer).setUint32(0, tick, true); row[4] = 0x5a; checksums.push(row); return Array.from(row); },
     nativeTerminalObserved,
     get disconnectCallbackReleased() { return disconnectCallbackReleased; },
     stateSendEntered, stateSendSettled, releaseStateSend, sourceTickTwoEntered, releaseSourceTickTwo,
@@ -173,10 +195,10 @@ function createPeer(server, {holdStateSend = false, holdEmptyState = false,
 
 async function startCase({includeRemoteInput = false, holdStateSend = false, holdRemoteFin = false,
   holdEmptyState = false, holdSourceTickTwo = false, failStateSend = false,
-  checksumTickZero = false} = {}) {
+  checksumTickZero = false, checksumConsumer = null} = {}) {
   const server = await startServer({includeRemoteInput, holdRemoteFin});
   const peer = createPeer(server, {holdStateSend, holdEmptyState, holdSourceTickTwo,
-    failStateSend, checksumTickZero});
+    failStateSend, checksumTickZero, checksumConsumer});
   await peer.controller.rpc('start', [agreement]);
   return {server, ...peer, capture: globalThis.__meleeWebNetLocalInputCapture};
 }
@@ -643,4 +665,198 @@ test('CLOSING before relay readiness is an ordinary startup failure', async () =
     await server?.close();
     globalThis.WebSocket = OriginalWebSocket;
   }
+});
+
+
+test('never-started consumer batch clean real disconnect reducer', {timeout: 5000}, async () => {
+  let run, calls = 0, operation;
+  try {
+    run = await startCase({checksumConsumer: () => { ++calls; return true; }});
+    run.holdNextStatus();
+    const raw = run.enqueueChecksum(0);
+    operation = run.controller.rpc('snapshot').then(value => ({value}), error => ({error}));
+    await run.statusEntered.promise;
+    const before = run.controller.snapshot().checksumConsumer.pending_batch;
+    assert.equal(before.count, 1);
+    assert.equal(before.callback_started, false);
+    assert.equal(calls, 0);
+    assert.deepEqual(before.records, [raw]);
+    console.log('MILESTONE_BATCH_RETAINED_BEFORE_CALLBACK', JSON.stringify(before));
+    run.server.closeRemote(4001);
+    await waitFor(() => run.endpoint.closed, 'real physical endpoint close');
+    await run.disconnectEntered.promise;
+    run.openDisconnect();
+    await waitFor(() => run.controller.snapshot().protocol.terminal?.kind === 'disconnect',
+      'owned disconnect committed while native status is held');
+    // Native terminate queues after status: do not join it until releasing this gate.
+    run.releaseStatus.resolve();
+    const outcome = await operation;
+    const close = await run.controller.close({mode: 'normal'}).then(value => ({value}), error => ({error}));
+    const state = run.controller.snapshot();
+    console.log('MILESTONE_DISCONNECT_CONSUMER_OUTCOME', JSON.stringify({
+      operation_error: outcome.error?.message ?? null, close_error: close.error?.message ?? null,
+      terminal: state.protocol.terminal, endpoint_errors: state.endpointErrors,
+      endpoint_closed: state.endpointClosed, consumer: state.checksumConsumer, calls}));
+    assert.equal(calls, 0);
+    assert.deepEqual(state.checksumConsumer.retained, [raw]);
+    assert.equal(state.checksumConsumer.accepted_records, 0);
+    assert.equal(state.checksumConsumer.pending_batch.callback_started, false);
+    assert.equal(state.checksumConsumer.pending_batch.accepted, false);
+    assert.equal(state.checksumConsumer.pending_batch.joined, true);
+    assert.equal(state.checksumConsumer.pending_batch.unjoined, false);
+    assert.equal(state.checksumConsumer.pending_batch.disposition,
+      'cancelled_before_checksum_consumer_callback_by_disconnect');
+    assert.equal(state.failure, null);
+    assert.deepEqual(state.endpointErrors, []);
+    assert.equal(state.endpointClosed, true);
+    assert.equal(outcome.error, undefined, 'clean disconnect before any callback must not become a checksum consumer failure');
+    assert.equal(close.error, undefined, 'same proven cancellation must not make normal close fail');
+  } finally {
+    if (run) {
+      run.releaseStatus.resolve(); run.openDisconnect(); run.releaseStateSend.resolve();
+      if (operation) await operation;
+      try { await run.controller.close({mode:'fatal'}); } catch {}
+      const cleanup = await run.server.close();
+      console.log('FIXTURE_CLEANUP', JSON.stringify({...cleanup, endpoint_closed: run.endpoint.closed,
+        fixture_errors: run.server.fixtureErrors}));
+      assert.equal(cleanup.listener_closed, true);
+      assert.equal(cleanup.all_sockets_destroyed, true);
+      assert.equal(run.endpoint.closed, true);
+      assert.deepEqual(run.server.fixtureErrors, []);
+    }
+  }
+});
+
+test('never-started consumer historical settlement disconnect reducer', {timeout: 5000}, async () => {
+  let run, calls = 0, operation;
+  try {
+    run = await startCase({checksumConsumer: () => { ++calls; return true; }});
+    run.holdConsumerSettlement();
+    const raw = run.enqueueChecksum(0);
+    operation = run.controller.rpc('snapshot').then(value => ({value}), error => ({error}));
+    await run.settlementEntered.promise;
+    const before = run.controller.snapshot().checksumConsumer.pending_batch;
+    assert.equal(before.count, 1);
+    assert.equal(before.callback_started, false);
+    assert.equal(calls, 0);
+    assert.deepEqual(before.records, [raw]);
+    console.log('MILESTONE_BATCH_RETAINED_BEFORE_CALLBACK', JSON.stringify(before));
+    run.server.closeRemote(4001);
+    await waitFor(() => run.endpoint.closed, 'real physical endpoint close');
+    await run.disconnectEntered.promise;
+    run.openDisconnect();
+    await waitFor(() => run.controller.snapshot().protocol.terminal?.kind === 'disconnect',
+      'owned disconnect committed while pre-consumer settlement is held');
+    // This gate is outside endpoint inbound ordering; physical close/terminal can settle first.
+    run.releaseSettlement.resolve();
+    const outcome = await operation;
+    assert.equal(outcome.error, undefined, 'historical consumer guard cancellation must be typed before tail drain');
+    const tail = run.enqueueChecksum(1);
+    await run.controller.rpc('snapshot');
+    const close = await run.controller.close({mode: 'normal'}).then(value => ({value}), error => ({error}));
+    const state = run.controller.snapshot();
+    console.log('MILESTONE_DISCONNECT_CONSUMER_OUTCOME', JSON.stringify({
+      operation_error: outcome.error?.message ?? null, close_error: close.error?.message ?? null,
+      terminal: state.protocol.terminal, endpoint_errors: state.endpointErrors,
+      endpoint_closed: state.endpointClosed, consumer: state.checksumConsumer, calls}));
+    assert.equal(calls, 0);
+    assert.deepEqual(state.checksumConsumer.retained, [raw, tail]);
+    assert.deepEqual(state.checksumConsumer.pending_batch.records, [raw]);
+    assert.equal(state.checksumOwnership.post_terminal_native_evidence_records, 1);
+    assert.equal(state.checksumConsumer.accepted_records, 0);
+    assert.equal(state.checksumConsumer.pending_batch.callback_started, false);
+    assert.equal(state.checksumConsumer.pending_batch.accepted, false);
+    assert.equal(state.checksumConsumer.pending_batch.joined, true);
+    assert.equal(state.checksumConsumer.pending_batch.unjoined, false);
+    assert.equal(state.checksumConsumer.pending_batch.disposition,
+      'cancelled_before_checksum_consumer_callback_by_disconnect');
+    assert.equal(state.failure, null);
+    assert.deepEqual(state.endpointErrors, []);
+    assert.equal(state.endpointClosed, true);
+    assert.equal(outcome.error, undefined, 'clean disconnect before any callback must not become a checksum consumer failure');
+    assert.equal(close.error, undefined, 'same proven cancellation must not make normal close fail');
+  } finally {
+    if (run) {
+      run.releaseSettlement.resolve(); run.openDisconnect(); run.releaseStateSend.resolve();
+      if (operation) await operation;
+      try { await run.controller.close({mode:'fatal'}); } catch {}
+      const cleanup = await run.server.close();
+      console.log('FIXTURE_CLEANUP', JSON.stringify({...cleanup, endpoint_closed: run.endpoint.closed,
+        fixture_errors: run.server.fixtureErrors}));
+      assert.equal(cleanup.listener_closed, true);
+      assert.equal(cleanup.all_sockets_destroyed, true);
+      assert.equal(run.endpoint.closed, true);
+      assert.deepEqual(run.server.fixtureErrors, []);
+    }
+  }
+});
+
+
+for (const kind of ['protocol', 'disconnect']) {
+  test(`never-started consumer ${kind} without physical close remains fatal`, {timeout:5000}, async () => {
+    let run, operation, calls=0;
+    try {
+      run=await startCase({checksumConsumer:()=>{++calls;return true;}});
+      run.holdConsumerSettlement();const raw=run.enqueueChecksum(0);
+      operation=run.controller.rpc('snapshot').then(value=>({value}),error=>({error}));
+      await run.settlementEntered.promise;
+      run.server.sendPacket(JSON.stringify({type:'terminal',version:LOCKSTEP_VERSION,role:'beta',
+        kind,details:{reason:'fixture terminal without physical close'}}));
+      await waitFor(()=>run.controller.snapshot().protocol.terminal?.kind===kind,'actual remote terminal packet');
+      assert.equal(run.endpoint.closed,false);
+      run.releaseSettlement.resolve();const outcome=await operation;
+      assert(outcome.error);
+      await assert.rejects(run.controller.close({mode:'normal'}),/close failed/);
+      const state=run.controller.snapshot();assert.equal(calls,0);
+      assert.equal(state.checksumConsumer.accepted_records,0);
+      assert.deepEqual(state.checksumConsumer.retained,[raw]);
+      assert.equal(state.checksumConsumer.pending_batch.disposition,null);
+      assert(state.failure);
+    } finally {
+      if(run){run.releaseSettlement.resolve();run.openDisconnect();run.releaseStateSend.resolve();
+        if(operation)await operation;try{await run.controller.close({mode:'fatal'});}catch{}
+        const clean=await run.server.close();assert(clean.listener_closed&&clean.all_sockets_destroyed);}
+    }
+  });
+}
+
+test('never-started clean disconnect with separate endpoint error remains fatal',{timeout:5000},async()=>{
+  let run,operation;
+  try{
+    run=await startCase({checksumConsumer:()=>true});run.holdConsumerSettlement();const raw=run.enqueueChecksum(0);
+    operation=run.controller.rpc('snapshot').then(value=>({value}),error=>({error}));
+    await run.settlementEntered.promise;run.server.closeRemote();
+    await waitFor(()=>run.endpoint.closed,'physical close');run.openDisconnect();
+    await waitFor(()=>run.controller.snapshot().protocol.terminal?.kind==='disconnect','committed disconnect');
+    await run.injectEndpointError(Error('fixture explicit endpoint error'));
+    run.releaseSettlement.resolve();const outcome=await operation;assert(outcome.error);
+    await assert.rejects(run.controller.close({mode:'normal'}),/close failed/);
+    const state=run.controller.snapshot();assert.equal(state.checksumConsumer.accepted_records,0);
+    assert.deepEqual(state.checksumConsumer.retained,[raw]);
+    assert.equal(state.checksumConsumer.pending_batch.disposition,null);
+    assert.match(state.failure,/fixture explicit endpoint error/);
+  }finally{if(run){run.releaseSettlement.resolve();run.openDisconnect();run.releaseStateSend.resolve();
+    if(operation)await operation;try{await run.controller.close({mode:'fatal'});}catch{}
+    const clean=await run.server.close();assert(clean.listener_closed&&clean.all_sockets_destroyed);}}
+});
+
+test('started checksum consumer disconnect stays fatal even after true acknowledgment',{timeout:5000},async()=>{
+  const entered=deferred();let run,operation,calls=0;
+  try{
+    run=await startCase({checksumConsumer:(_batch,{signal})=>{++calls;entered.resolve();
+      return new Promise(resolve=>signal.addEventListener('abort',()=>resolve(true),{once:true}));}});
+    const raw=run.enqueueChecksum(0);
+    operation=run.controller.rpc('snapshot').then(value=>({value}),error=>({error}));
+    await entered.promise;run.server.closeRemote();await waitFor(()=>run.endpoint.closed,'physical close');
+    run.openDisconnect();const outcome=await operation;assert(outcome.error);
+    await assert.rejects(run.controller.close({mode:'normal'}),/close failed/);
+    const state=run.controller.snapshot();assert.equal(calls,1);
+    assert.equal(state.checksumConsumer.pending_batch.callback_started,true);
+    assert.equal(state.checksumConsumer.pending_batch.accepted,false);
+    assert.equal(state.checksumConsumer.pending_batch.disposition,null);
+    assert.equal(state.checksumConsumer.accepted_records,0);
+    assert.deepEqual(state.checksumConsumer.retained,[raw]);
+  }finally{if(run){run.releaseSettlement.resolve();run.openDisconnect();run.releaseStateSend.resolve();
+    if(operation)await operation;try{await run.controller.close({mode:'fatal'});}catch{}
+    const clean=await run.server.close();assert(clean.listener_closed&&clean.all_sockets_destroyed);}}
 });

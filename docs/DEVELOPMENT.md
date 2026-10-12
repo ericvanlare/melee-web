@@ -132,6 +132,41 @@ failed action probe. See the [M2 receipt](status/2026-10-11-simulated-network-fu
 for the current coverage and retained failures.
 
 
+The reliability scenarios use separate result policies. Select one command below
+with a new evidence directory for each invocation:
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 scripts/run_network_simulation.py \
+  --disc "$MELEE_DISC" --playwright "$PLAYWRIGHT_DIR" --out "$NEW_EVIDENCE_DIR" \
+  --scenarios css-constrained-stall
+```
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 scripts/run_network_simulation.py \
+  --disc "$MELEE_DISC" --playwright "$PLAYWRIGHT_DIR" --out "$NEW_EVIDENCE_DIR" \
+  --scenarios css-moderate-cut css-moderate-fresh
+```
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 scripts/run_network_simulation.py \
+  --disc "$MELEE_DISC" --playwright "$PLAYWRIGHT_DIR" --out "$NEW_EVIDENCE_DIR" \
+  --scenarios full-moderate-repeat
+```
+
+The controlled-cut browser route remains a failure. A separate expected-fault
+auditor checks the declared cut and normal resource retirement before the fresh
+CSS scenario may start with a distinct room and process owner. The repeat
+scenario runs two complete original routes in one continuously owned room,
+retaining separate match artifacts and requiring the final raw checksum prefix
+to contain the unchanged first-return prefix. It keeps a fixed admission rule,
+second-route cap and cleanup reserve; an incomplete route or insufficient budget
+fails. Full snapshots remain at validation boundaries; input-only reads use the
+existing compact health suffix. Mode combinations that confuse these policies
+are rejected. See the [scoped resilience receipt](status/2026-10-12-simulated-network-resilience.md)
+for observed coverage and retained failures. Scenario availability does not
+establish a passing gate; do not repeat a failed capture without a changed,
+reviewed hypothesis.
+
 ## Choose by change boundary
 
 | Change | Start here | Focused command or procedure | Evidence boundary |

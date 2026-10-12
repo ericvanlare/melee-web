@@ -329,12 +329,16 @@ export async function startTcpProxy({targetHost = '127.0.0.1', targetPort,
     direction.metrics.enqueueToWriteCallbackMsMax = Math.max(
       direction.metrics.enqueueToWriteCallbackMsMax, elapsedMs);
     direction.releasedHash.update(item.buffer);
-    record('release', {connectionId: direction.pair.id, direction: direction.name,
+    const releaseEvent = {event: 'release', connectionId: direction.pair.id, direction: direction.name,
       sequence: item.sequence, bytes: item.buffer.length,
       enqueuedNs: item.enqueuedNs.toString(), scheduledReleaseNs: item.scheduledNs.toString(),
       writeCallbackNs: releasedNs.toString(), sampledDelayMs: item.delayMs,
       jitterMs: item.jitterMs, stallMs: item.stallMs,
-      serializationDelayMs: item.serializationMs, enqueueToWriteCallbackMs: elapsedMs});
+      serializationDelayMs: item.serializationMs, enqueueToWriteCallbackMs: elapsedMs};
+    record('release', releaseEvent);
+    const proof = direction.controlledStallProof;
+    if (proof?.enqueue?.sequence === item.sequence && proof.release === null)
+      proof.release = releaseEvent;
     if (direction.profile.cutAfterBytes !== null &&
         direction.metrics.bytesReleased >= direction.profile.cutAfterBytes) {
       closePair(direction.pair, 'cut');
@@ -362,6 +366,12 @@ export async function startTcpProxy({targetHost = '127.0.0.1', targetPort,
       direction.timer = null;
       state.timers--;
       if (direction.pair.closeReason || direction.inFlight || !direction.queue.length) return;
+      // A timer wakeup is not proof of monotonic eligibility. Node may fire
+      // early; retain the FIFO head and reschedule without releasing its bytes.
+      if (direction.queue[0].scheduledNs > nowNs()) {
+        schedule(direction);
+        return;
+      }
       const next = direction.queue.shift();
       direction.inFlight = next;
       next.drainDone = false;
@@ -453,12 +463,16 @@ export async function startTcpProxy({targetHost = '127.0.0.1', targetPort,
     const item = {buffer, sequence: direction.nextSequence++, enqueuedNs,
       scheduledNs, jitterMs, delayMs, stallMs, serializationMs, settled: false};
     direction.queue.push(item);
-    record('enqueue', {connectionId: direction.pair.id, direction: direction.name,
+    const enqueueEvent = {event: 'enqueue', connectionId: direction.pair.id, direction: direction.name,
       sequence: item.sequence, bytes: buffer.length,
       enqueuedNs: enqueuedNs.toString(), scheduledReleaseNs: scheduledNs.toString(),
       sampledDelayMs: delayMs + jitterMs + stallMs, baseDelayMs: delayMs,
       jitterMs, stallMs, serializationDelayMs: serializationMs,
-      pendingBytes: direction.pendingBytes});
+      pendingBytes: direction.pendingBytes};
+    record('enqueue', enqueueEvent);
+    const proof = direction.controlledStallProof;
+    if (proof && proof.enqueue === null && enqueuedNs >= BigInt(proof.activatedNs) &&
+        scheduledNs >= BigInt(proof.nextReleaseNs)) proof.enqueue = enqueueEvent;
     if (direction.pendingBytes >= maxPendingBytesPerDirection && !direction.queuePressure) {
       direction.queuePressure = true;
       direction.metrics.queuePressureEpisodes++;
@@ -651,6 +665,67 @@ export async function startTcpProxy({targetHost = '127.0.0.1', targetPort,
   });
   record('proxy-listening', {address, targetHost, targetPort});
 
+  // Controls can affect only sockets owned by this proxy. Their separate,
+  // bounded receipts survive diagnostic event-ring truncation.
+  const controlledFaults = [];
+  // One post-activation enqueue/release pair per admitted stall, bounded by the
+  // existing controlled-fault capacity; independent of capped diagnostic prefix.
+  const controlledStallProofs = [];
+  const requireControlledPair = connectionId => {
+    requireInteger(connectionId, 'connectionId', 1, Number.MAX_SAFE_INTEGER);
+    const pair = pairs.get(connectionId);
+    if (state.stopping || !pair || !pair.connected || pair.finalized || pair.closeReason)
+      throw Error('Controlled fault requires an active connected owned socket pair');
+    if (controlledFaults.length >= maxConnections * 3)
+      throw Error('Controlled fault receipt capacity is exhausted');
+    return pair;
+  };
+  const cutConnection = connectionId => {
+    const pair = requireControlledPair(connectionId);
+    const receipt = Object.freeze({kind: 'cut', connectionId, activatedNs: nowNs().toString(),
+      scope: 'one opaque owned TCP connection; no inferred player role'});
+    controlledFaults.push(receipt);
+    record('controlled-cut', receipt);
+    closePair(pair, 'cut');
+    return receipt;
+  };
+  const stallConnection = (connectionId, directionName, durationMs) => {
+    if (!DIRECTION_NAMES.includes(directionName)) throw Error('Unknown stall direction');
+    requireInteger(durationMs, 'durationMs', 1, MAX_PROFILE_DELAY_MS);
+    const pair = requireControlledPair(connectionId);
+    const direction = pair.directions[directionName];
+    if (direction.controlledStall) throw Error('Only one controlled stall per connection direction');
+    if (direction.sourceEnded && !direction.queue.length)
+      throw Error('Cannot stall an ended direction without queued bytes');
+    const activatedNs = nowNs();
+    const delayNs = BigInt(durationMs) * 1_000_000n;
+    direction.controlledStall = true;
+    clearTimer(direction);
+    // Shift queued eligibility together so FIFO/bandwidth spacing is preserved.
+    // An already submitted socket write is irrevocable and is not held back.
+    const firstScheduledNs = direction.queue[0]?.scheduledNs ?? activatedNs;
+    const shiftNs = delayNs + (activatedNs > firstScheduledNs ? activatedNs - firstScheduledNs : 0n);
+    for (const item of direction.queue) item.scheduledNs += shiftNs;
+    direction.nextReleaseNs = laterNs(direction.nextReleaseNs + shiftNs, activatedNs + delayNs);
+    direction.metrics.stallEvents++;
+    direction.metrics.stallDurationMsTotal += durationMs;
+    const receipt = Object.freeze({kind: 'stall', connectionId, direction: directionName,
+      durationMs, activatedNs: activatedNs.toString(),
+      nextReleaseNs: direction.nextReleaseNs.toString(), queuedChunks: direction.queue.length,
+      queuedBytes: direction.queue.reduce((sum, item) => sum + item.buffer.length, 0),
+      inFlightBytesNotStalled: direction.inFlight?.buffer.length ?? 0,
+      scope: 'delays queued and subsequent writes in this direction; cannot recall in-flight bytes'});
+    controlledFaults.push(receipt);
+    const proof = {connectionId, direction: directionName,
+      activatedNs: receipt.activatedNs, nextReleaseNs: receipt.nextReleaseNs,
+      enqueue: null, release: null};
+    direction.controlledStallProof = proof;
+    controlledStallProofs.push(proof);
+    record('controlled-stall', receipt);
+    schedule(direction);
+    return receipt;
+  };
+
   const snapshot = () => {
     const aggregateDirections = Object.fromEntries(DIRECTION_NAMES.map(name => {
       const total = {...directions[name]};
@@ -680,6 +755,10 @@ export async function startTcpProxy({targetHost = '127.0.0.1', targetPort,
         activeTimers: state.timers, cleanShutdown: state.stoppedNs !== null &&
           state.listenerClosed && state.activeConnections === 0 && state.timers === 0},
       dataPathPass,
+      controlledFaults: controlledFaults.slice(),
+      controlledStallProofs: controlledStallProofs.map(proof => ({...proof,
+        enqueue: proof.enqueue ? {...proof.enqueue} : null,
+        release: proof.release ? {...proof.release} : null})),
       directions: aggregateDirections,
       connections: {closed: state.connectionResults.slice(),
         closedOmitted: state.connectionResultsOmitted,
@@ -688,6 +767,8 @@ export async function startTcpProxy({targetHost = '127.0.0.1', targetPort,
             Object.entries(pair.directions).map(([name, direction]) => [name, {
               bytesEnqueued: direction.metrics.bytesEnqueued,
               bytesReleased: direction.metrics.bytesReleased,
+              queuedBytes: direction.queue.reduce((sum, item) => sum + item.buffer.length, 0),
+              inFlightBytes: direction.inFlight?.buffer.length ?? 0,
               pendingBytes: direction.pendingBytes,
               enqueuedSha256: hashHex(direction.enqueuedHash),
               releasedSha256: hashHex(direction.releasedHash),
@@ -734,5 +815,5 @@ export async function startTcpProxy({targetHost = '127.0.0.1', targetPort,
     return stopPromise;
   };
 
-  return {address, snapshot, stop};
+  return {address, snapshot, stop, cutConnection, stallConnection};
 }
