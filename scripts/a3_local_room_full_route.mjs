@@ -280,6 +280,47 @@ export function matchPairedActorMotion(motions, targetMotions) {
     ? motions[0] : null;
 }
 
+export function actionObservationTickDisposition(tick, actionStartTick, lastRetainedTick) {
+  if (tick < actionStartTick || tick <= lastRetainedTick) return 'skip';
+  return tick >= actionStartTick + 60 ? 'stop' : 'inspect';
+}
+
+// Once an acquisition completes, drain any pre-start pairs that accumulated
+// while awaiting it before inspecting the newly acquired live pair. startAt may
+// run during that await, and chronological inspection must preserve short-lived
+// source states in the bounded action window.
+export async function acquireAndInspectActionPair({acquirePair, pendingBeforeStart,
+  actionStarted, inspectPair, shouldStop = () => false}) {
+  const rows = await acquirePair();
+  if (!rows || shouldStop()) return null;
+  if (actionStarted() && pendingBeforeStart.length) {
+    const buffered = pendingBeforeStart.splice(0);
+    for (const {rows: pair} of buffered) {
+      await inspectPair(pair);
+      if (shouldStop()) break;
+    }
+  }
+  if (!shouldStop()) await inspectPair(rows);
+  return rows;
+}
+
+export function retainShieldHoldOutcome(holdPromise, shieldEvidence, holdState) {
+  return Promise.resolve(holdPromise).then(value => {
+    const outcome = {value};
+    holdState.settled = true;
+    holdState.outcome = outcome;
+    shieldEvidence.hold_outcome = {promise_status: 'fulfilled', value};
+    return outcome;
+  }, error => {
+    const outcome = {error};
+    holdState.settled = true;
+    holdState.outcome = outcome;
+    shieldEvidence.hold_outcome = {promise_status: 'rejected',
+      error: String(error?.stack || error)};
+    return outcome;
+  });
+}
+
 // Before the press sample identifies its source window, retain distinct
 // gameplay/preparation observations at the same cursor. Network counters are
 // intentionally excluded: a wait poll alone must not evict a short action.
@@ -906,9 +947,10 @@ export async function runA3LocalFullRoute({
         retainPreStartActionPair(pendingBeforeStart, rows);
         return;
       }
-      if (tick < actionStartTick || tick <= lastRetainedTick) return;
-      const endExclusive = actionStartTick + 60;
-      if (tick >= endExclusive) {
+      const tickDisposition = actionObservationTickDisposition(
+        tick, actionStartTick, lastRetainedTick);
+      if (tickDisposition === 'skip') return;
+      if (tickDisposition === 'stop') {
         stopped = true;
         return;
       }
@@ -1013,9 +1055,14 @@ export async function runA3LocalFullRoute({
               }
               if (stopped) break;
             }
-            const rows = await observeAtCommonSourceCursor(joinObservation, () => cancelled);
+            const rows = await acquireAndInspectActionPair({
+              acquirePair: () => observeAtCommonSourceCursor(joinObservation, () => cancelled),
+              pendingBeforeStart,
+              actionStarted: () => actionStartTick !== null,
+              inspectPair,
+              shouldStop: () => stopped,
+            });
             if (!rows) break;
-            await inspectPair(rows);
           }
           if (cancelled) {
             record.observer_join = joinObservation.source_cursor_join;
@@ -1703,18 +1750,11 @@ export async function runA3LocalFullRoute({
       }, 2, {joinSourceCursor: true, isCancelled: () => guardCollector.cancelled})
         .then(value => ({value}), error => ({error}));
       const holdState = {settled: false, outcome: null};
-      const holdOutcome = beta.driver.pressChord(['PageUp'], {holdMs: 0, releaseMs: 80,
-        observeBeforeRelease: {predicate: observeShieldSetOffBeforeRelease,
-          arg: {inputFrom: rInputFrom, inputDelay, maxSourceTicks: 30}, timeoutMs: 500}})
-        .then(value => {
-          holdState.settled = true;
-          holdState.outcome = {value};
-          return holdState.outcome;
-        }, error => {
-          holdState.settled = true;
-          holdState.outcome = {error};
-          return holdState.outcome;
-        });
+      const holdOutcome = retainShieldHoldOutcome(
+        beta.driver.pressChord(['PageUp'], {holdMs: 0, releaseMs: 80,
+          observeBeforeRelease: {predicate: observeShieldSetOffBeforeRelease,
+            arg: {inputFrom: rInputFrom, inputDelay, maxSourceTicks: 30}, timeoutMs: 500}}),
+        exchange.shield, holdState);
       exchange.shield.hold_policy = {keyboard_path: 'browser_driver.pressChord serialized PageUp',
         expected_pad_bytes: [0, 0x20, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         max_source_ticks_from_consumed_input: 30,

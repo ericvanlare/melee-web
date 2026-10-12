@@ -358,9 +358,9 @@
       "sha256": "5d024dd9fa159ad5d49f61fa9d58bccffc4b0df753e3edce831f7ba23f8a56ed"
     }
   ],
-  "next": "Fresh reverse-direction jab and genuine shield-hit exchange, then a separately attributed combat stock loss; one status boundary updated in place.",
+  "next": "Repair and review reduced observer ordering/evidence gap, then one bounded shield exchange run. A separately credited combat stock loss follows.",
   "native_combat_observations": {
-    "decision": "COMPILED_NOT_YET_EXERCISED_IN_BROWSER",
+    "decision": "COMPILED_AND_BROWSER_OBSERVED_IN_FAILED_EXCHANGE_RUN",
     "runtime_source": "d269334e1243b0568d8bf7caf285053bea8e04a1",
     "fields": [
       "shield_health",
@@ -399,5 +399,94 @@
     ],
     "test_cleanup_source": "01949966",
     "scope": "Adds observations only; no shield-hit or attack-caused KO claim."
+  },
+  "exchange_first_attempt": {
+    "decision": "FAIL_PAIRED_SHIELD_RESPONSE_NOT_RETAINED",
+    "harness_source": "33b4e1c12740df3f2ab45926d2440295f18fe7e2",
+    "runtime_source": "d269334e1243b0568d8bf7caf285053bea8e04a1",
+    "artifacts": [
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-exchange-1-suite/full-moderate-combat-exchange/browser/report.json",
+        "bytes": 11505127,
+        "sha256": "dc5b0cf52bf2cc76e520297d7736e5b46968be5b4c56123b1f770f7e17013b48"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-exchange-1-suite/full-moderate-combat-exchange/owner.json",
+        "bytes": 183337,
+        "sha256": "e9ff74803fc29366f142b788824709091ea5b479085d570476747ee64ca0d473"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-exchange-1-suite/suite.json",
+        "bytes": 1551536,
+        "sha256": "69beb0a979ca7097a01a90718e136998ddca299033d8ae18990bbe288a8b97aa"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-exchange-first-failure-review-v1.json",
+        "bytes": 7291,
+        "sha256": "94f9fe44fc3608cb5be418cc1bf7ef0cd0ffb320be84791d910dc4b38eb8c4bf"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-exchange-1-process-retirement.json",
+        "bytes": 720,
+        "sha256": "f054a639248481e488228bae242113a2dadc7d21bb1d1fe6e70e86fb26d1dec1"
+      }
+    ],
+    "reverse_jab": {
+      "p1_a_input_ticks": [
+        625,
+        630
+      ],
+      "p1_release_tick": 631,
+      "paired_p1_attack44_p2_damage79_at": 634,
+      "p2_damage_before_after": [
+        0,
+        3
+      ],
+      "paired_grounded_return": 655
+    },
+    "shield": {
+      "p2_r_input_ticks": [
+        657,
+        671
+      ],
+      "p2_release_tick": 672,
+      "p1_a_input_ticks": [
+        668,
+        673
+      ],
+      "p1_release_tick": 674,
+      "paired_guard179_at": 668,
+      "action_source_range": [
+        671,
+        730
+      ],
+      "first_retained_pair": 678,
+      "first_retained_defender_motion": 180,
+      "sampled_paired_grounded_wait_at": 693,
+      "retained_paired_observations": 45,
+      "paired_guard181_observed": false,
+      "local_hold_callback_outcome_retained": false
+    },
+    "full_route_completed": false,
+    "cleanup": {
+      "all_21_inventoried_pids_independently_absent": true,
+      "failed_profiles_and_evidence_retained": true
+    },
+    "diagnosis": "Source permits newer live observation to precede and suppress older pre-start buffered pairs. Actual discarded rows and local hold outcome were not retained; the race is not retrospective proof of shield success.",
+    "next": "Deterministic async ordering reproducer and immediate local-hold outcome retention before separately reviewed repeat.",
+    "reduced_observer_repair": {
+      "base": "33b4e1c12740df3f2ab45926d2440295f18fe7e2",
+      "files": {
+        "scripts/a3_local_room_full_route.mjs": "6eb33eb52ca8a7a10532a5aca4aa5455761a717909a94b6e3fafcc37b47682e2",
+        "tests/a3_local_room_full_route_combat.test.mjs": "e4e35061747acc80fcd7462901262241dbd0058374304c4419ecb0d4706e489c"
+      },
+      "manifest": {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/combat-observer-repair-v1/manifest.json",
+        "sha256": "fece12495252774f731ea6184696f245c0962577023181a6b1c23af72e1293c6"
+      },
+      "old_order_reproducer": "Expected failure retained; newer678 suppressed synthetic short181 at677. Does not reconstruct missing original run rows.",
+      "integrated_focused_controls": "3 wrappers passed, including20combat checks",
+      "root_review_sha256": "a8c4a73663b15049ee78ea94f838af999ee31240fd6e2e21891d7f0486d7bcb1"
+    }
   }
 }

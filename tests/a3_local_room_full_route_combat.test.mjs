@@ -7,7 +7,9 @@ import {comparePairedCombatPlayers, decideP2ApproachTap,
   retainCombatApproachInputReadback,
   retainCombatApproachState, validateCombatItemsNone,
   validateP2GameplayInputWindow, validateSingleP2ApproachTapWindow} from '../scripts/a3_local_room_combat_probe.mjs';
-import {observeShieldSetOffBeforeRelease, validateButtonGameplayInputWindow,
+import {actionObservationTickDisposition, acquireAndInspectActionPair,
+  observeShieldSetOffBeforeRelease, retainPreStartActionPair,
+  retainShieldHoldOutcome, validateButtonGameplayInputWindow,
   validateSimultaneousButtonGameplayInputWindows} from '../scripts/a3_local_room_full_route.mjs';
 
 function combatMatch(overrides = {}) {
@@ -381,4 +383,177 @@ test('approach budget refusal retains the over-limit state and literal PAD suffi
   assert.deepEqual(readbackEvidence.p2_literal_rows, rows);
   assert.equal(readbackEvidence.observed_capture_end_tick, 21);
   assert.equal(readbackEvidence.last_suffix_readback.p2_native_cursor, 581);
+});
+
+
+test('action observer drains pre-start pairs before the pair returned by an in-flight await', async () => {
+  const pair = (tick, p2Motion, message = 'active') => Array.from({length: 2}, (_, index) => ({
+    source_tick: tick, phase: 7, running: 1, message,
+    match: {players: [{source_port: 0, motion: 44}, {source_port: 1, motion: p2Motion}]},
+    peer: index === 0 ? 'alpha' : 'beta',
+  }));
+  const pendingBeforeStart = [];
+  for (let tick = 671; tick <= 677; tick++)
+    assert.equal(retainPreStartActionPair(pendingBeforeStart,
+      pair(tick, tick === 677 ? 181 : 179)), true);
+
+  let actionStartTick = null;
+  let lastRetainedTick = -1;
+  let stopped = false;
+  const observed = [];
+  const inspectPair = async rows => {
+    const tick = rows[0].source_tick;
+    const disposition = actionObservationTickDisposition(tick,
+      actionStartTick, lastRetainedTick);
+    if (disposition === 'skip') return;
+    if (disposition === 'stop') {
+      stopped = true;
+      return;
+    }
+    observed.push({source_tick: tick, p2_motion: rows[0].match.players[1].motion});
+    lastRetainedTick = tick;
+  };
+  let resolvePair;
+  const acquiredPair = new Promise(resolve => { resolvePair = resolve; });
+  const acquisition = acquireAndInspectActionPair({
+    acquirePair: () => acquiredPair,
+    pendingBeforeStart,
+    actionStarted: () => actionStartTick !== null,
+    inspectPair,
+    shouldStop: () => stopped,
+  });
+  actionStartTick = 671; // startAt lands while observeAtCommonSourceCursor is awaiting
+  resolvePair(pair(678, 180));
+  await acquisition;
+
+  assert.deepEqual(observed.map(row => row.source_tick),
+    [671, 672, 673, 674, 675, 676, 677, 678]);
+  assert.equal(observed.find(row => row.source_tick === 677).p2_motion, 181,
+    'paired GuardSetOff must reach the observer before later Guard motion');
+});
+
+test('action observer cancellation during acquisition inspects neither buffered nor returned pairs', async () => {
+  const pair = tick => Array.from({length: 2}, (_, index) => ({source_tick: tick,
+    phase: 7, running: 1, message: 'active', match: {frame: tick},
+    peer: index === 0 ? 'alpha' : 'beta'}));
+  const pendingBeforeStart = [];
+  retainPreStartActionPair(pendingBeforeStart, pair(671));
+  retainPreStartActionPair(pendingBeforeStart, pair(672));
+  let cancelled = false;
+  const inspected = [];
+  let resolvePair;
+  const acquiredPair = new Promise(resolve => { resolvePair = resolve; });
+  const acquisition = acquireAndInspectActionPair({
+    acquirePair: () => acquiredPair,
+    pendingBeforeStart,
+    actionStarted: () => true,
+    inspectPair: async rows => inspected.push(rows[0].source_tick),
+    shouldStop: () => cancelled,
+  });
+  cancelled = true;
+  resolvePair(pair(678));
+
+  assert.equal(await acquisition, null);
+  assert.deepEqual(inspected, []);
+  assert.deepEqual(pendingBeforeStart.map(entry => entry.rows[0].source_tick), [671, 672]);
+});
+
+test('action observer preserves same-cursor WAIT-to-active transition, skips duplicates, and keeps 60-tick cap', async () => {
+  const pair = (tick, message, p2Motion = 179) => Array.from({length: 2}, (_, index) => ({
+    source_tick: tick, phase: 7, running: 1, message,
+    match: {players: [{source_port: 0, motion: 44}, {source_port: 1, motion: p2Motion}]},
+    peer: index === 0 ? 'alpha' : 'beta',
+  }));
+  const pendingBeforeStart = [];
+  assert.equal(retainPreStartActionPair(pendingBeforeStart, pair(671, 'wait')), true);
+  assert.equal(retainPreStartActionPair(pendingBeforeStart, pair(671, 'wait')), false);
+  assert.equal(retainPreStartActionPair(pendingBeforeStart, pair(671, 'active')), true);
+  assert.equal(retainPreStartActionPair(pendingBeforeStart, pair(671, 'active')), false);
+
+  let lastRetainedTick = -1;
+  let stopped = false;
+  const observed = [];
+  const inspectPair = async rows => {
+    const tick = rows[0].source_tick;
+    const disposition = actionObservationTickDisposition(tick, 671, lastRetainedTick);
+    if (disposition === 'skip') return;
+    if (disposition === 'stop') {
+      stopped = true;
+      return;
+    }
+    observed.push({source_tick: tick, message: rows[0].message});
+    if (rows[0].message === 'active') lastRetainedTick = tick;
+  };
+  const acquire = rows => acquireAndInspectActionPair({
+    acquirePair: async () => rows,
+    pendingBeforeStart,
+    actionStarted: () => true,
+    inspectPair,
+    shouldStop: () => stopped,
+  });
+  await acquire(pair(671, 'active')); // duplicate of the already-drained active row
+  await acquire(pair(730, 'active')); // actionStartTick + 59 remains inside the window
+  await acquire(pair(731, 'active')); // actionStartTick + 60 closes the window
+
+  assert.deepEqual(observed, [
+    {source_tick: 671, message: 'wait'},
+    {source_tick: 671, message: 'active'},
+    {source_tick: 730, message: 'active'},
+  ]);
+  assert.equal(stopped, true);
+  assert.equal(actionObservationTickDisposition(670, 671, -1), 'skip');
+  assert.equal(actionObservationTickDisposition(671, 671, -1), 'inspect');
+  assert.equal(actionObservationTickDisposition(671, 671, 671), 'skip');
+  assert.equal(actionObservationTickDisposition(730, 671, 671), 'inspect');
+  assert.equal(actionObservationTickDisposition(731, 671, 730), 'stop');
+});
+
+test('pre-start pair retention preserves its 128-row bound and exact-duplicate filter', () => {
+  const pair = tick => Array.from({length: 2}, (_, index) => ({source_tick: tick,
+    phase: 7, running: 1, message: 'active', match: {frame: tick},
+    peer: index === 0 ? 'alpha' : 'beta'}));
+  const pendingBeforeStart = [];
+  assert.equal(retainPreStartActionPair(pendingBeforeStart, pair(10)), true);
+  assert.equal(retainPreStartActionPair(pendingBeforeStart, pair(10)), false);
+  for (let tick = 11; tick <= 138; tick++)
+    assert.equal(retainPreStartActionPair(pendingBeforeStart, pair(tick)), true);
+  assert.equal(pendingBeforeStart.length, 128);
+  assert.equal(pendingBeforeStart[0].rows[0].source_tick, 11);
+  assert.equal(pendingBeforeStart.at(-1).rows[0].source_tick, 138);
+});
+
+test('shield hold fulfillment is retained after the action fails without fabricating a valid hold', async () => {
+  const shield = {hold: null};
+  const holdState = {settled: false, outcome: null};
+  let resolveHold;
+  const holdOutcome = retainShieldHoldOutcome(new Promise(resolve => { resolveHold = resolve; }),
+    shield, holdState);
+  const actionError = await Promise.reject(Error('paired defender response not observed'))
+    .catch(error => error);
+  assert.match(actionError.message, /paired defender response/);
+  const holdValue = {status: 'source-budget-exhausted', reason: '30-source-tick-bound',
+    first_r_input_row: {input_tick: 657, local_port: 1},
+    last_native_observation: {source_cursor: 701}};
+  resolveHold(holdValue);
+  const outcome = await holdOutcome;
+
+  assert.equal(holdState.settled, true);
+  assert.deepEqual(outcome, {value: holdValue});
+  assert.deepEqual(shield.hold_outcome,
+    {promise_status: 'fulfilled', value: holdValue});
+  assert.equal(shield.hold, null,
+    'a fulfilled hold promise with a refusal result is not a validated GuardSetOff observation');
+});
+
+test('shield hold promise rejection is retained as failure evidence', async () => {
+  const shield = {hold: null};
+  const holdState = {settled: false, outcome: null};
+  const failure = Error('shield predicate timed out');
+  const outcome = await retainShieldHoldOutcome(Promise.reject(failure), shield, holdState);
+
+  assert.equal(holdState.settled, true);
+  assert.equal(outcome.error, failure);
+  assert.equal(shield.hold_outcome.promise_status, 'rejected');
+  assert.match(shield.hold_outcome.error, /shield predicate timed out/);
+  assert.equal(shield.hold, null);
 });
