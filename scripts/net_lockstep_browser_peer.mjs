@@ -2,7 +2,7 @@
  * Node may publish recipe inputs and export evidence, but never handles packets
  * or submits native checksums to the protocol in this mode. */
 import {LockstepPeer, LOCKSTEP_DELAY, NET_RECORD_BYTES, PAD_BYTES, TERMINAL, readOnlySuffix} from './net_lockstep_core.mjs';
-import {createRoomRelayPeerEndpoint} from './net_lockstep_websocket_relay.mjs';
+import {createRoomRelayPeerEndpoint, RoomRelayClosedSendError} from './net_lockstep_websocket_relay.mjs';
 
 export const BROWSER_CHECKSUM_EXPORT_LIMIT = 512;
 
@@ -90,7 +90,8 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
   let nativeRecordsDrained = 0, consumerAcceptedRecords = 0, pendingConsumerBatch = null;
   let nextConsumerBatchId = 1;
   const exports = [], pending = new Set(), capturedLocalInputs = [];
-  let localInputQueue = Promise.resolve(), lastCapturePollSerial = null, peer = null;
+  const cancelledLocalInputs = [], cancelledOutboundSends = [];
+  let localInputQueue = Promise.resolve(), lastCapturePollSerial = null, peer = null, endpoint = null;
   let inputCaptureRegistered = false;
   const asError = error => error instanceof Error ? error : Error(String(error));
   function invalidateConsumerBatch(batch, reason) {
@@ -110,6 +111,37 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     invalidatePendingConsumer(failure);
     settleReady(failure);
     return error;
+  };
+  const isProvenClosedSendCancellation = error => inputCaptureMode === 'live' &&
+    error instanceof RoomRelayClosedSendError && endpoint?.closed === true &&
+    endpoint.errors.length === 0 && !failure && peer?.ready === true &&
+    (!peer.terminal || peer.terminal.kind === 'disconnect');
+  const isProvenDisconnectFence = () => inputCaptureMode === 'live' &&
+    endpoint?.closed === true && endpoint.errors.length === 0 && !failure &&
+    peer?.ready === true && (!peer.terminal || peer.terminal.kind === 'disconnect');
+  const isProvenCommittedDisconnect = () => inputCaptureMode === 'live' &&
+    endpoint?.closed === true && endpoint.errors.length === 0 && !failure &&
+    peer?.ready === true && peer.terminal?.kind === 'disconnect';
+  const recordCancelledLocalInput = (row, disposition, details = {}) => {
+    const cancellation = Object.freeze({...row, disposition, ...details});
+    cancelledLocalInputs.push(cancellation);
+    return cancellation;
+  };
+  const recordCancelledOutboundSend = outcome => {
+    const retained = Object.freeze({...outcome});
+    cancelledOutboundSends.push(retained);
+    if (outcome.context === 'local_input') {
+      for (const tick of outcome.input_ticks) {
+        const row = capturedLocalInputs[tick];
+        if (row && row.input_tick === tick)
+          recordCancelledLocalInput(row,
+            outcome.reason === 'peer_disconnected_before_state_send'
+              ? 'cancelled_before_publication' : 'cancelled_unpublished', {
+            reason: outcome.reason ?? 'closed_transport_send', packet_sequence: outcome.sequence,
+            publication_scope: outcome.publication_scope,
+            packet_input_ticks: outcome.packet_input_ticks});
+      }
+    }
   };
   const check = () => { if (failure) throw failure; };
   const readonlyRecords = rows => Object.freeze(rows.map(row => Object.freeze(Array.from(row))));
@@ -217,6 +249,9 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     return result;
   };
   peer = new LockstepPeer({role, sourceTicks, inputTicks,
+    isClosedSendCancellation: isProvenClosedSendCancellation,
+    isClosedDisconnect: isProvenCommittedDisconnect,
+    onSendCancellation: recordCancelledOutboundSend,
     pushFrame: async (tick, bytes) => {
       if (!await callNative('pushIndexed', tick, bytes)) throw Error('Native indexed input queue rejected agreed frames');
     },
@@ -233,7 +268,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
         Number.isInteger(terminal.channel) ? terminal.channel : 0);
     },
   });
-  const endpoint = createEndpoint({url: relayUrl, roomId, role, timeoutMs,
+  endpoint = createEndpoint({url: relayUrl, roomId, role, timeoutMs,
     onMessage: text => track(() => closing || closed ? undefined : peer.receive(text)),
     onDisconnect: (_role, reason) => intentionalClose || closed || closeMode === 'fatal'
       ? Promise.resolve() : track(() => closed || closeMode === 'fatal' ? undefined : peer.disconnect(reason)),
@@ -279,20 +314,27 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     capturedLocalInputs.push(row);
     lastCapturePollSerial = pollSerial;
     const deferSend = deferredTicks.has(tick);
-    const operation = localInputQueue.then(() => {
-      if (!inputCaptureRegistered || failure || closing || closed || peer.terminal)
+    const operation = localInputQueue.then(async () => {
+      if (!inputCaptureRegistered || failure || closing || closed || peer.terminal) {
+        if (isProvenDisconnectFence())
+          return recordCancelledLocalInput(row, 'cancelled_before_publication', {
+            reason: 'remote_disconnect_before_queue_execution',
+            publication_scope: 'no_state_packet_attempt'});
         throw Error('Native local input capture stopped before queued publication');
+      }
       return peer.addLocalInput(tick, immutableBytes, {deferSend});
     });
-    localInputQueue = operation.catch(async error => {
+    const handledOperation = operation.catch(async error => {
       const shouldFailPeer = !failure && !peer.terminal && !closing && !closed;
       const cause = remember(Error(`Asynchronous browser-local input ${tick} failed: ${String(error?.message || error)}`));
       if (shouldFailPeer) {
         try { await peer.fail('protocol', {reason: cause.message, tick}); }
         catch (terminalError) { remember(terminalError); }
       }
+      return {status: 'failed', input_tick: tick};
     });
-    void track(() => operation).catch(() => {});
+    localInputQueue = handledOperation;
+    void track(() => handledOperation).catch(() => {});
     if (inputCaptureMode === 'diagnostic' && inputCapture.pattern[tick + 1] !== undefined) {
       try { globalThis.__meleeSyntheticPadTransition(inputCapture.pattern[tick + 1]); }
       catch (error) {
@@ -367,6 +409,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       exportRecords: exports.length,
       localInputCapture: inputCapture ? Object.freeze({enabled: true, mode: inputCaptureMode,
         input_ticks: inputTicks, captured_count: capturedLocalInputs.length,
+        cancelled_publication_count: cancelledLocalInputs.length,
         ...(inputFrom === undefined || inputFrom === null ? {} :
           {captures_since: readOnlySuffix(capturedLocalInputs, inputFrom, 'Browser local input capture')})}) :
         Object.freeze({enabled: false, mode: null, input_ticks: 0, captured_count: 0}),
@@ -380,12 +423,15 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       nativePump: Object.freeze({enabled: autonomousPump, closing, close_mode: closeMode,
         native_quiescence: nativeQuiescence, wake_requested: wakeRequested,
         wake_queued: wakeQueued, completed_wakeups: wakeRuns, rpc_calls: rpcCalls, drain_failure: drainFailure}),
+      cancelledOutboundSends: cancelledOutboundSends.length,
       failure: failure ? String(failure?.stack || failure) : null});
   };
   const snapshot = () => ({protocol: peer.summary(), endpointErrors: endpoint.errors,
     endpointClosed: endpoint.closed, closed, exportRecords: exports.length,
     localInputCapture: inputCapture ? {enabled: true, mode: inputCaptureMode, input_ticks: inputTicks,
-      captures: capturedLocalInputs.slice(0, inputTicks)} : {enabled: false, mode: null},
+      captures: capturedLocalInputs.slice(0, inputTicks),
+      cancelled_publications: cancelledLocalInputs.slice(0, inputTicks)} : {enabled: false, mode: null},
+    cancelledOutboundSends: cancelledOutboundSends.slice(),
     checksumOwnership: {owner: 'browser-page', export_limit_records: BROWSER_CHECKSUM_EXPORT_LIMIT,
       native_records_drained: nativeRecordsDrained,
       active_native_records_submitted_before_export: activeNativeRecords,
