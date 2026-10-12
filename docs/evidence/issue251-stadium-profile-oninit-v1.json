@@ -9177,6 +9177,226 @@
       "logger_thread_retired": true,
       "frozen_inputs_unchanged": true
     },
-    "next": "Source-only explicit fresh original3500 recording option is under review. Its countdown recurrence must derive from its own actual constructor/C values; the historical3629 value is not injected. No new build or capture is claimed."
+    "next": "The original-only constructor pass remains unchanged. The separate fresh3500 recording attempt and its incomplete result are recorded under original_idle3500_fresh_recording_3d4ee3d_v1; its own constructor/C observations must remain authoritative rather than injected historical values."
+  },
+  "original_idle3500_fresh_recording_3d4ee3d_v1": {
+    "result": "FAIL_ORIGINAL_3500_REFERENCE_RETAINED",
+    "source": {
+      "commit": "3d4ee3d388877249b994543d93db788ed542e2a0",
+      "tree": "744a3543e3caf279488e9be6db2f0dcaa5743ffa",
+      "observer_cpp_sha256": "05e0eca25a6cc45701237d82f4f88d5f906885278c9635d52829cd2c38aeb406"
+    },
+    "producer": {
+      "binary_sha256": "c0c51f4f4cd9b2e26bde1c759e0de809a5fb26a42bf146a9652f652861c9f488",
+      "manifest_sha256": "686d8d64ebca6f72ba20953098d55070dc167d875fb901423adf3a60178686f4",
+      "build_result": {
+        "external_run": "native-original-idle3500-v1/result.json",
+        "bytes": 980,
+        "sha256": "15a4a8913811d5ce48363393b66c9dee97904d200111a48e272ec5c740ddb1ec"
+      },
+      "scope": "Fresh compiler-only original observer build; separate from original1f/f4 constructor replay and browsercaab producer."
+    },
+    "capture": {
+      "input_mode": "fresh recording, no replay/hybrid",
+      "elapsed_seconds": 55.519525167066604,
+      "first_refusal": {
+        "error": "idle3500 boundary nested in source draw",
+        "row": {
+          "seq": 13356,
+          "event": "boundary",
+          "source_tick": 2155,
+          "draw_ordinal": 2154,
+          "phase": null,
+          "boundary": "pad_poll",
+          "pc": 2150948236
+        },
+        "preceding_and_current_rows": [
+          {
+            "seq": 13349,
+            "event": "boundary",
+            "source_tick": 2153,
+            "draw_ordinal": 2153,
+            "phase": null,
+            "boundary": "source_tick",
+            "pc": 2151222964
+          },
+          {
+            "seq": 13350,
+            "event": "boundary",
+            "source_tick": 2154,
+            "draw_ordinal": 2153,
+            "phase": null,
+            "boundary": "draw_enter",
+            "pc": 2151223232
+          },
+          {
+            "seq": 13351,
+            "event": "boundary",
+            "source_tick": 2154,
+            "draw_ordinal": 2153,
+            "phase": null,
+            "boundary": "draw_return",
+            "pc": 2151223360
+          },
+          {
+            "seq": 13352,
+            "event": "boundary",
+            "source_tick": 2154,
+            "draw_ordinal": 2154,
+            "phase": null,
+            "boundary": "pad_poll",
+            "pc": 2150948236
+          },
+          {
+            "seq": 13353,
+            "event": "boundary",
+            "source_tick": 2154,
+            "draw_ordinal": 2154,
+            "phase": null,
+            "boundary": "pad_consume",
+            "pc": 2151118212
+          },
+          {
+            "seq": 13354,
+            "event": "boundary",
+            "source_tick": 2154,
+            "draw_ordinal": 2154,
+            "phase": null,
+            "boundary": "source_tick",
+            "pc": 2151222964
+          },
+          {
+            "seq": 13355,
+            "event": "boundary",
+            "source_tick": 2155,
+            "draw_ordinal": 2154,
+            "phase": null,
+            "boundary": "draw_enter",
+            "pc": 2151223232
+          },
+          {
+            "seq": 13356,
+            "event": "boundary",
+            "source_tick": 2155,
+            "draw_ordinal": 2154,
+            "phase": null,
+            "boundary": "pad_poll",
+            "pc": 2150948236
+          }
+        ],
+        "expected_draw": 2154,
+        "draw_open": 2154,
+        "last_relative_tick": 2070
+      },
+      "last_validated_relative_tick": 2070,
+      "observer_records": 13404,
+      "observer_state": "interrupted",
+      "observer_complete": false,
+      "observer_invalid": false,
+      "input_events": 13066,
+      "input_complete": false,
+      "input_invalid": false,
+      "complete_input_validator_refusal": "Input recording lacks a successful completion footer"
+    },
+    "cleanup": {
+      "known_pids_absent": {
+        "59058": true,
+        "59069": true,
+        "59071": true
+      },
+      "collector_group_absent": true,
+      "native_returncode": 0,
+      "native_terminate_sent": true,
+      "native_kill_sent": false,
+      "logger_thread_alive": false,
+      "logger_error": null,
+      "frozen_packet_identities_unchanged": true
+    },
+    "artifacts": {
+      "observer.bin": {
+        "external_run": "original-stadium-idle3500-reference-run1/observer.bin",
+        "bytes": 36642090,
+        "sha256": "4819bd56aa0709479c7877891d5b05899e2998c5e58614537322d4a3ef281a95"
+      },
+      "observer-status.json": {
+        "external_run": "original-stadium-idle3500-reference-run1/observer-status.json",
+        "bytes": 527,
+        "sha256": "58657a6991ccf04e9b629bd2a13bc5c0bc43a021dc798fd8a03b80b6ca6fa5d3"
+      },
+      "inputs.mwri": {
+        "external_run": "original-stadium-idle3500-reference-run1/inputs.mwri",
+        "bytes": 522696,
+        "sha256": "d740fb9053f5cc7ec602ec8b231aa01dd077a5ddeaee222b47dc6f16fa7733c0"
+      },
+      "input-status.json": {
+        "external_run": "original-stadium-idle3500-reference-run1/input-status.json",
+        "bytes": 91,
+        "sha256": "1a19f71fb54117d4356d24b061747e1c79e94d2a7ad55821570564827ed4d180"
+      },
+      "failure.json": {
+        "external_run": "original-stadium-idle3500-reference-run1/failure.json",
+        "bytes": 158,
+        "sha256": "342611381afff51e543568698b47bdffb7397530cacd57775031ebef6ad01d7d"
+      },
+      "cleanup.json": {
+        "external_run": "original-stadium-idle3500-reference-run1/cleanup.json",
+        "bytes": 137,
+        "sha256": "f6fb15d401d1d4c4c5e7d472892e68d279995272b0d96f7edb626c66e6c9778c"
+      },
+      "owned-log-cleanup.json": {
+        "external_run": "original-stadium-idle3500-reference-run1/owned-log-cleanup.json",
+        "bytes": 123,
+        "sha256": "fa8862e277a1c1c397d11840fa002c857a12dd4e7266d644a77290c64b2fd5a2"
+      },
+      "launch.json": {
+        "external_run": "original-stadium-idle3500-reference-run1/launch.json",
+        "bytes": 2521,
+        "sha256": "b4a8fdf9d391ba38e6e8b3055228608304de7751e1b04b71b7210fa525b8eb0b"
+      },
+      "input-intentions.jsonl": {
+        "external_run": "original-stadium-idle3500-reference-run1/input-intentions.jsonl",
+        "bytes": 51888,
+        "sha256": "bfee6ad656869aaba394d59ba7b0e352570148c6273c37be439d7bdd7e8b7e99"
+      },
+      "dolphin.log": {
+        "external_run": "original-stadium-idle3500-reference-run1/dolphin.log",
+        "bytes": 124,
+        "sha256": "792f94acac64c4a4c4c876d153f8cfd379e4d6d434ea24a105b9ae65b18fd1ac"
+      }
+    },
+    "owner": {
+      "external_run": "sol-original-idle3500-launch-packet-v1/launch-result.json",
+      "bytes": 1495,
+      "sha256": "badb7ceea27ffb3401c376412a8a7b977c67793f99c346f2550b71a01f6260af"
+    },
+    "initial_raw_review": {
+      "external_run": "sol-original-idle3500-result-review-v1/review.json",
+      "bytes": 7681,
+      "sha256": "f38bab077bb0c2d7b19855562d1146fd513177486623b37c643c5ef5f44cd389"
+    },
+    "independent_review": {
+      "state": "COMPLETED_FAILED_CAPTURE_CONFIRMED",
+      "artifact": {
+        "external_run": "luna-independent-original3500-result-v1/review.json",
+        "bytes": 10789,
+        "sha256": "18f807559118b4f55808971979f82314fb1c9d6064b26e1898da2e59206dcc06"
+      },
+      "reviewer_script": {
+        "external_run": "luna-independent-original3500-result-v1/review_original3500_failure.py",
+        "bytes": 12540,
+        "sha256": "9d7ee88cf8263f69b5904f8a4fe71725c0a234b6c9365b5039b59652c45f69bb"
+      },
+      "classification": "First reader refusal independently reproduced. DrawEnter13355/PadPoll13356/DrawReturn13357 share source2155/draw2154; PadPoll mandatory typed inventory passes. Reader draw_open rule rejects a producer-admitted boundary. Broader original callback/interrupt/lifecycle semantics remain unproved. No3500 reference pass."
+    },
+    "limits": {
+      "original3500_reference_complete": false,
+      "native_parity": false,
+      "C3_acceptance": false,
+      "registration_generation_retirement": false,
+      "full_owner_rng_ledger": false,
+      "current_head_full_regression": "PENDING",
+      "current_head_ci": "PENDING"
+    },
+    "next": "Reduce exact retained PadPoll13356/source2155/draw2154 afterDrawEnter13355 against original callback/interrupt source authority. Preserve exact draw ordinals, consume/tick pairing and state checks. No new long run, repair or retry authorized by this checkpoint."
   }
 }
