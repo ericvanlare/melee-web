@@ -2,7 +2,7 @@
   "schema": "melee-web-simulated-network-full-route-m2-v1",
   "milestone": "M2",
   "issue": 308,
-  "decision": "PASS_REVIEWED_TWO_PROFILES_REQUIRED_LOCAL_VALIDATION",
+  "decision": "PASS_REVIEWED_FULL_ROUTES_AND_REQUIRED_LOCAL_VALIDATION",
   "evidence_label": "Browser exercised / Same-machine simulated-network full-route",
   "capture": {
     "run_id": "network-simulation-sprint-20261011-210744-b1be023a",
@@ -716,6 +716,280 @@
       "file": "sol-m2-runtime-byte-identity-review-v1/review.json",
       "sha256": "36580395434b1d5f0be8058491934fb476daf79da3bbba7d368ef02f4c9176f2",
       "result": "BYTE_EQUALITY_NOT_ESTABLISHED_NEW_BUILD_NEEDS_SCOPED_CAPTURE"
+    }
+  },
+  "post_build_capture": {
+    "decision": "PASS_SCOPED_SIMULATED_NETWORK_BASELINE",
+    "source_capture": {
+      "head": "df076457a4758fab3aa24cf80efb197ea5107ff5",
+      "tree": "c1d8a8ea175634ba3b758ee5079f925c85dc9d1c",
+      "status_porcelain": "",
+      "allowed_harness_only_change": false,
+      "files_sha256": {
+        "scripts/a3_local_room_keyboard_browser.mjs": "1f34bb56ca0f8fadf9dd0c857b86acf74952d6cb3d186efda40fbdc309606e43",
+        "scripts/a3_public_relay_preflight.mjs": "51e568899f9ee32626eb63734610cddb9526659fe3df54eedc690209db490d53",
+        "scripts/a3_local_room_full_route.mjs": "0acb07557018e34849d7c99d41b09726ed63fc6da8ddf260f03d631d6bb39eff",
+        "scripts/a3_checksum_wait_diagnostics.mjs": "ac7c048b1baad22ea0985f17a6c9fe79c590e9106d1c9f9a055175db81673dd5",
+        "scripts/a3_source_cursor_join.mjs": "ffaf9978dd9c32f2917283726305693817a649319c0846dbe166470b273ccb07",
+        "scripts/a3_network_simulation.mjs": "43adc38e8cab7beb46c3a2c37c9dfc58c4b4da22340b745db637955ae86dbcef",
+        "scripts/net_test_tcp_proxy.mjs": "7025b26d9242f6391a4144efc89e694d73f15813d8529edfa8a5941cabfe91ed"
+      }
+    },
+    "runtime_producer": "f5ecc9346ca43e25cf12e593f3d5ce50393b03b8",
+    "runtime_wasm_sha256": "624d3a70c5c413d235fdda0887da242e860d75887c1fe5a2091da2162abc3ada",
+    "reports": {
+      "full-moderate-current-build-1-suite/suite.json": {
+        "bytes": 1551233,
+        "sha256": "0c11b45f0373d3bca8e4233a64ebf949142a2ec326e34df07aa8afaa3ff320cb"
+      },
+      "full-moderate-current-build-1-suite/full-moderate/browser/report.json": {
+        "bytes": 29480710,
+        "sha256": "3bf46c6396db0be23a29803f6df2b60893d63f2cb1813967d5901def40cf1bc8"
+      },
+      "full-moderate-current-build-1-suite/full-moderate/owner.json": {
+        "bytes": 182971,
+        "sha256": "94c339cfc2e14cebdaa29b3b86b6e0a41163c02aba375b879227e1cd68267b7e"
+      }
+    },
+    "records": 2788,
+    "range": [
+      0,
+      2787
+    ],
+    "required_final_boundary": 2785,
+    "unpaired_tail_counts": {
+      "alpha": 4,
+      "beta": 3
+    },
+    "phases": [
+      1,
+      3,
+      7,
+      8,
+      1
+    ],
+    "natural_stock_sequence": [
+      3,
+      2,
+      1,
+      0
+    ],
+    "p2_axis_witness": {
+      "source_port": 1,
+      "key": "ArrowLeft",
+      "direction_x": -1,
+      "direction_policy": "one short inward step based on the fresh source-aligned P2 position",
+      "before": {
+        "source_tick": 446,
+        "peers": [
+          {
+            "p1_x": -60,
+            "p2_x": 60
+          },
+          {
+            "p1_x": -60,
+            "p2_x": 60
+          }
+        ],
+        "stocks": [
+          [
+            4,
+            4
+          ],
+          [
+            4,
+            4
+          ]
+        ]
+      },
+      "input_window": {
+        "movement": {
+          "source_cursor": 446,
+          "input_tick": 446,
+          "local_port": 1,
+          "poll_serial": 940,
+          "bytes": [
+            0,
+            0,
+            129,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "neutral_release": {
+          "source_cursor": 447,
+          "input_tick": 447,
+          "local_port": 1,
+          "poll_serial": 941,
+          "bytes": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "source_tick_range": [
+          446,
+          447
+        ],
+        "p2_literal_rows": [
+          {
+            "source_cursor": 446,
+            "input_tick": 446,
+            "local_port": 1,
+            "poll_serial": 940,
+            "bytes": [
+              0,
+              0,
+              129,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "source_cursor": 447,
+            "input_tick": 447,
+            "local_port": 1,
+            "poll_serial": 941,
+            "bytes": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "p1_literal_rows": [
+          {
+            "source_cursor": 446,
+            "input_tick": 446,
+            "local_port": 0,
+            "poll_serial": 1133,
+            "bytes": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "source_cursor": 447,
+            "input_tick": 447,
+            "local_port": 0,
+            "poll_serial": 1134,
+            "bytes": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "observed_capture_end_tick": 451,
+        "p2_literal_capture_count": 2,
+        "p1_neutral_capture_count": 2,
+        "p1_neutral_source_tick_range": [
+          446,
+          447
+        ]
+      },
+      "after": {
+        "source_tick": 455,
+        "checksum_boundary_required": 450,
+        "checksum_boundary_reached": true,
+        "peers": [
+          {
+            "p1_x": -60,
+            "p2_x": 52.2600021,
+            "stocks": [
+              4,
+              4
+            ]
+          },
+          {
+            "p1_x": -60,
+            "p2_x": 52.2600021,
+            "stocks": [
+              4,
+              4
+            ]
+          }
+        ],
+        "p2_position_delta_by_peer": [
+          {
+            "peer": "alpha",
+            "before_x": 60,
+            "after_x": 52.2600021,
+            "delta_x": -7.739997899999999
+          },
+          {
+            "peer": "beta",
+            "before_x": 60,
+            "after_x": 52.2600021,
+            "delta_x": -7.739997899999999
+          }
+        ]
+      },
+      "scope": "one short actual P2 keyboard axis pulse toward center plus literal neutral release; no combat-coverage claim"
+    },
+    "owner_cleanup_passed": true,
+    "process_observation_passed": true,
+    "request_failures": {
+      "alpha_browser_errors": [],
+      "beta_browser_errors": [
+        {
+          "kind": "requestfailed",
+          "method": "GET",
+          "url": "http://127.0.0.1:8787/gameplay_menu_browser.data",
+          "failure": "net::ERR_ABORTED"
+        }
+      ]
+    },
+    "request_failure_scope": "Existing clean-route policy; package abort cause remains unclassified and is not admitted by strict cut auditor",
+    "independent_review": {
+      "file": "sol-full-moderate-current-build-1-review.json",
+      "sha256": "4a0de86fc0af1173eabe04ba5d35f53587f126bf7ec77bb078c212145dca80c8",
+      "owned_pids_absent": 22
     }
   }
 }

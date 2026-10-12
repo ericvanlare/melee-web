@@ -30,5 +30,7 @@ The asymmetric run also retained one beta data-package request abort. The
 existing clean-route policy permits request-failure observations; the separate
 controlled-cut auditor rejects this unclassified event. Its cause remains open
 and this receipt makes no error-free-request claim. The subsequent Release
-validation build has its own Wasm identity; historical capture bytes and later
-build provenance remain separate in the receipt.
+validation build has its own Wasm identity and also passed a complete moderate
+route. Historical captures, that later producer and its separate harness source
+remain distinct in the receipt. This new raw result also has independent
+review; integration still requires final-head CI.
