@@ -81,6 +81,18 @@ the existing weaker-fighter status entry.
   reduce the original Items lock/readiness boundary before the existing Sheik
   transformation prefix. No new Stadium capture or human-session gate is implied.
 
+- 2026-10-12, Codex: following the owner's autonomous-execution request, the
+  bounded original Zelda-to-Sheik owner-prefix milestone is now complete in the
+  existing [weaker-fighter status](status/2026-10-09-weaker-fighter-comparison-lineup.md);
+  the strict two-human browser comparison remains separate. The #288 branch has
+  integrated current main and now keeps the reviewed local P2 input/full-route
+  result with the supplied-preflight interface as one milestone. This is local
+  functional evidence only: no deployed Worker, remote run or RTT was verified.
+  The next shared-capture boundary is Stadium C3's constructor-owner prerequisite
+  under [#251](https://github.com/ericvanlare/melee-web/issues/251); existing
+  [Stadium CSS/SSS status](status/2026-10-06-pokemon-stadium-c1a-css-sss-preparation.md)
+  records the route boundary. No human or physical-input result is inferred.
+
 **Links:** [Owner-requested execution change](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6112686789),
 [A3 #288](https://github.com/ericvanlare/melee-web/issues/288),
 [Stadium C3 #251](https://github.com/ericvanlare/melee-web/issues/251),

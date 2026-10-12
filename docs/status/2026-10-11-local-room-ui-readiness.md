@@ -152,9 +152,10 @@ Its focused refusal checks do not establish a deployed Worker or public browser 
 
 ## P2 gameplay input extension — local functional checkpoint
 
-The unmerged `codex/public-relay-keyboard` branch adds one short P2 gameplay
-keyboard pulse before the same full route. Execution source
-`9c41b9145ba7b566e68ac450ec65a9d08b2079a1` uses the unchanged `b5797986`
+The `codex/public-relay-keyboard` branch adds one short P2 gameplay keyboard
+pulse before the same full route. The branch was later merged with current main
+for integration; this capture remains bound to execution source
+`9c41b9145ba7b566e68ac450ec65a9d08b2079a1` and uses the unchanged `b5797986`
 Release runtime above; all 46 artifact hashes were reverified. The
 [P2 extension receipt](../evidence/local-room-full-route-v1.json) keeps this
 producer separate from #303 and records the complete input window.
@@ -184,8 +185,18 @@ fidelity were not compared. Independent raw-result review passed.
 Four focused checks pass. The first root test invocation used an unsupported
 module-import path; canonical discovery passed without source changes. An
 initial private audit miscounted the tail object's keys; corrected metadata
-uses its actual counts, and the initial audit remains retained. Full regression,
-affected-build freshness and current-head CI remain required before future
-integration. This checkpoint stays in the existing #288 work branch to preserve
-milestone batching. It exercises the public adapter's default local path only;
-no public endpoint/preflight exists and external mode remains unrun.
+uses its actual counts, and the initial audit remains retained. After current
+main was merged, the integrated source at `f5b949d7` passed full unittest
+discovery: 2,321 tests, 166 skips, no failures or errors. All three A3-focused
+modules ran and passed; none was skipped. The skip count reflects optional
+assets, DOL inputs and native/reference trace targets unavailable in that
+checkout. The [integration validation receipt](../evidence/local-room-p2-integration-validation-v1.json)
+binds this suite and focused results to that source. No `src/` or `web/`
+compiled-runtime inputs changed from the `b5797986` producer, so no new runtime
+build or capture is claimed. Current-head CI is a separate integration gate;
+this receipt records local validation before PR publication.
+
+This checkpoint stays in the existing #288 milestone branch. The supplied
+external-preflight interface validates a provided receipt structurally; it does
+not verify a deployed Worker. No public endpoint, remote run or RTT evidence is
+available, and broader #288 acceptance remains open.

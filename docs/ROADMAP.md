@@ -76,20 +76,26 @@ runtime owners; do only the ownership work this slice needs. WebRTC, complete
 sets, rollback and cross-play follow it. Current prerequisite failures and
 producer identities stay in the issue and scoped receipts.
 
-**Owner-requested readiness checkpoint (October 11):** the existing local Worker
-and Host/Join UI have a [scoped browser result](status/2026-10-11-local-room-ui-readiness.md)
+**Owner-requested readiness checkpoint (October 11; updated October 12):** the
+existing local Worker and Host/Join UI have a [scoped browser result](status/2026-10-11-local-room-ui-readiness.md)
 for actual keyboard control through original CSS → SSS → four-stock Mario/FD
 → Results → CSS, matching runtime checksums and clean intentional disconnect.
-This bounded #288 step is local functional evidence only; it does not replace
-the public endpoint milestone above. Next reuse the same controls against an
-identified deployed staging Worker; that service prerequisite remains
-unresolved. The same driver now has a separately scoped P2 gameplay-input
-checkpoint in the unmerged #288 branch. Keep these steps together until the
-public milestone can integrate; do not repeat local captures without a new
-hypothesis. While the service prerequisite is blocked, continue
-[original Sheik transformation #304](https://github.com/ericvanlare/melee-web/issues/304)
-from its reduced Items-readiness failure. Stadium C3 stays checkpointed while
-Track A has priority. See the
+The local #288 driver also includes a separately scoped P2 gameplay-input
+interval and the optional supplied-preflight interface. Its reviewed local
+evidence does not replace the public endpoint milestone above. The supplied
+preflight code only checks the receipt structure and does not verify a live Worker. No deployed
+endpoint, remote browser run or RTT result is available, so public #288 remains
+blocked on those service facts. Do not repeat local captures without a new
+hypothesis.
+
+The bounded original Zelda-to-Sheik owner-prefix milestone for [#304](https://github.com/ericvanlare/melee-web/issues/304)
+is now recorded in the [existing weaker-fighter status](status/2026-10-09-weaker-fighter-comparison-lineup.md);
+the strict two-human browser comparison remains separate. After that milestone,
+the next shared-capture work returns to Stadium C3's constructor-owner
+prerequisite under [#251](https://github.com/ericvanlare/melee-web/issues/251).
+The existing [Stadium CSS/SSS preparation status](status/2026-10-06-pokemon-stadium-c1a-css-sss-preparation.md)
+remains the route evidence; current C3 receipts and prerequisites stay in #251.
+Public #288 work resumes when the deployed service facts change. See the
 [execution update](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6112686789).
 
 ### Track B: competitive-rules Melee before the whole game
@@ -141,7 +147,7 @@ retain a reduced reproducer and move to the next fighter. Bowser's
 [#274 checkpoint](https://github.com/ericvanlare/melee-web/issues/274) remains
 unresolved and parked after the reconstructed-prefix attempt budget.
 
-**Current #304 boundary.** The original Zelda-to-Sheik owner prefix is now observed for [issue #304](https://github.com/ericvanlare/melee-web/issues/304); the strict two-human browser comparison remains separate ([scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md)). After #304 integration, the next available shared-capture engineering returns to Stadium C3's bounded matched-Setup C/F prerequisite. Public #288 work resumes only when the deployed service facts change.
+**Current #304 boundary.** The bounded original Zelda-to-Sheik owner-prefix milestone is complete for [issue #304](https://github.com/ericvanlare/melee-web/issues/304), with evidence in the [scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md); strict two-human browser comparison remains separate. The next shared-capture work returns to Stadium C3's constructor-owner prerequisite under [#251](https://github.com/ericvanlare/melee-web/issues/251). Its existing [CSS/SSS preparation status](status/2026-10-06-pokemon-stadium-c1a-css-sss-preparation.md) records the route boundary; current C3 receipts remain in #251. Public #288 work resumes only when the deployed service facts change.
 
 The next Stadium milestone is [C3 idle in-match lifetime #251](https://github.com/ericvanlare/melee-web/issues/251),
 with its remaining prerequisites counted and tracked inside that issue and PR.
