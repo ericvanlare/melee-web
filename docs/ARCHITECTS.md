@@ -52,6 +52,35 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-11 night — Owner: simulate network play and complete a bounded sprint
+
+**Ask:** The owner explicitly permits a realistic same-computer network
+simulation, wants two automated browsers to exchange traffic through it, and
+requests 10–20 work items of 5 minutes to 5 hours each with autonomous oversight
+while they sleep.
+
+**Decision:** Use the existing actual Host/Join and keyboard browser route,
+pinned relay and runtime-owned lockstep behind a separate byte-transparent TCP
+proxy. Keep the traffic real and the simulated conditions explicit. Preserve
+byte order and source checks; model loss effects as bounded stalls and cuts,
+with expected failures assessed separately from successful matches. Keep public
+staging, physical input, real two-machine behavior and broader acceptance open.
+
+**Plan:** Sixteen timeboxed items form three coherent milestones: reusable
+network lane, full original match under delay/jitter, and resilience/repeated
+sessions with a one-command suite. The lane owns shared captures; Stadium and
+unchanged provider polling are parked. Stop each failing experiment, retain its
+evidence and reduce after two attempts. Required validation and independent
+review precede integration under the owner's standing merge approval. The old
+recurring investigation automation remains deleted; this active sprint has its
+own checkpoint and scope.
+
+**Links:** [Lane #307](https://github.com/ericvanlare/melee-web/issues/307),
+[Full match #308](https://github.com/ericvanlare/melee-web/issues/308),
+[Reliability #309](https://github.com/ericvanlare/melee-web/issues/309),
+[priorities #158](https://github.com/ericvanlare/melee-web/issues/158).
+
+
 ### 2026-10-11 — Owner and Codex: local room readiness before further Stadium work
 
 **Ask:** The owner requested a smaller near-term deliverable and fully autonomous

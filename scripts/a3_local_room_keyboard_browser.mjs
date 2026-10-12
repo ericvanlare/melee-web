@@ -14,14 +14,17 @@ import {openNetInstance, firstFatalBrowserError} from './net_session_instance.mj
 import {startRoomRelayRuntime} from './net_room_relay_runtime_owner.mjs';
 import {parseRoomInvite} from './net_lockstep_room_invite.mjs';
 import {resolveRoomRelayMode} from './a3_public_relay_preflight.mjs';
+import {resolveNetworkSimulation, startNetworkSimulation, calibrateNetworkSimulation,
+  observeBrowserNetworkPaths, verifyNetworkProxy, closeNetworkProxy} from './a3_network_simulation.mjs';
 import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS, parseNetChecksum} from './net_lockstep_core.mjs';
 import {checksumCompareReached, checksumWaitDiagnostic} from './a3_checksum_wait_diagnostics.mjs';
 import {runA3LocalFullRoute} from './a3_local_room_full_route.mjs';
 
-const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route]';
+const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route]';
 const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, out: {type: 'string'},
   'relay-url': {type: 'string'}, 'relay-preflight': {type: 'string'},
+  'network-profile': {type: 'string'},
   playwright: {type: 'string'}, 'min-checksums': {type: 'string', default: '120'},
   'timeout-ms': {type: 'string', default: '300000'}, 'full-route': {type: 'boolean', default: false},
   help: {type: 'boolean', default: false},
@@ -67,6 +70,8 @@ const runtimeUrl = new URL(values.url);
 requireCondition(runtimeUrl.protocol === 'http:' && runtimeUrl.hostname === '127.0.0.1' &&
   runtimeUrl.port === '8787' && runtimeUrl.pathname === '/runtime.html',
   'This harness requires the already-supported client page http://127.0.0.1:8787/runtime.html');
+const simulationConfiguration = resolveNetworkSimulation({profileName: values['network-profile'],
+  relayUrl: values['relay-url'], preflight: values['relay-preflight']});
 let relayPreflightInput;
 let relayPreflightSha256 = null;
 if (values['relay-preflight'] !== undefined) {
@@ -108,7 +113,11 @@ async function cleanupBounded(promise, label) {
 }
 const report = {
   schema: 'melee-web-a3-local-room-keyboard-v1',
-  evidence_scope: relayMode.mode === 'external'
+  relay_mode: simulationConfiguration?.mode ?? relayMode.mode,
+  evidence_scope: simulationConfiguration
+    ? 'same-machine simulated-network functional browser ' + (values['full-route'] ? 'full-route attempt' : 'CSS check') +
+      ' using actual Host/Join and keyboard input, real TCP proxy sockets and an owned local Worker; public routing, deployed staging, physical input, two-machine, timing, pixel/PCM equivalence and whole-session acceptance remain pending'
+    : relayMode.mode === 'external'
     ? (values['full-route']
       ? 'functional browser route attempt using a supplied public staging Worker preflight and the existing actual Host/Join keyboard path; the harness validates preflight structure/bindings only and does not independently verify the deployed service; RTT, human/physical-input, two-machine/Internet, timing, pixel/PCM-equivalence and whole-session acceptance remain pending'
       : 'functional CSS browser check using a supplied public staging Worker preflight and the existing actual Host/Join keyboard path; the harness validates preflight structure/bindings only and does not independently verify the deployed service; RTT, full match, human/physical-input, two-machine/Internet, timing, pixel/PCM-equivalence and whole-session acceptance remain pending')
@@ -120,6 +129,7 @@ const report = {
   source: null,
   browser: null,
   room_worker: null,
+  network_simulation: simulationConfiguration ? {configuration: simulationConfiguration} : null,
   external_relay_preflight: relayMode.mode === 'external' ? {
     file: path.basename(path.resolve(values['relay-preflight'])),
     sha256: relayPreflightSha256,
@@ -143,6 +153,8 @@ const report = {
   started_at: new Date().toISOString(),
 };
 let worker = null;
+let networkSimulation = null;
+let browserNetworkPaths = null;
 const instances = {alpha: null, beta: null};
 let workerPassed = false;
 
@@ -152,7 +164,9 @@ async function sourceIdentity() {
     'scripts/a3_public_relay_preflight.mjs', 'tests/test_a3_public_relay_preflight.py',
     'scripts/a3_local_room_full_route.mjs', 'scripts/a3_checksum_wait_diagnostics.mjs',
     'scripts/a3_source_cursor_join.mjs',
-    'tests/test_a3_local_room_full_route_wait.py'];
+    'tests/test_a3_local_room_full_route_wait.py', 'scripts/a3_network_simulation.mjs',
+    'scripts/net_test_tcp_proxy.mjs', 'tests/test_a3_network_simulation.py',
+    'tests/test_net_test_tcp_proxy.py'];
   const unexpected = status.split('\n').filter(Boolean).filter(row =>
     !allowedHarnessFiles.includes(row.slice(3)));
   requireCondition(unexpected.length === 0,
@@ -578,6 +592,15 @@ try {
     report.room_worker = {base: worker.base, port: worker.port, owner_process: worker.ownerProcess,
       runtime_identity: worker.runtimeIdentity, hashes: worker.hashes};
   }
+  if (simulationConfiguration) {
+    networkSimulation = await startNetworkSimulation({worker, configuration: simulationConfiguration});
+    report.network_simulation.endpoint = networkSimulation.relayUrl;
+    report.network_simulation.upstream = worker.base;
+    report.network_simulation.calibration = await calibrateNetworkSimulation({
+      workerBase: worker.base, proxyBase: networkSimulation.httpBase, remaining});
+    report.network_simulation.proxy_after_calibration = networkSimulation.proxy.snapshot();
+    verifyNetworkProxy(report.network_simulation.proxy_after_calibration);
+  }
   const tools = await loadBrowserTools(values.playwright);
   const playwrightPackage = JSON.parse(await fs.readFile(path.join(tools.playwrightPath, 'package.json'), 'utf8'));
   const profileRoot = path.join(output, 'profiles');
@@ -595,6 +618,8 @@ try {
   });
   instances.alpha = await openRole('alpha');
   instances.beta = await openRole('beta');
+  if (networkSimulation)
+    browserNetworkPaths = observeBrowserNetworkPaths(instances, networkSimulation.relayUrl);
   report.browser = {...report.browser, executable: tools.browserPath,
     playwright_path: tools.playwrightPath, playwright_version: playwrightPackage.version,
     headless: true, audio_muted: true, audio_processing_disabled: false,
@@ -623,8 +648,8 @@ try {
       role + ' browser did not retain the isolated 640x480 runtime canvas');
   }
 
-  const relayUrl = relayMode.mode === 'external' ? relayMode.endpoint.url :
-    'ws://127.0.0.1:' + worker.port;
+  const relayUrl = networkSimulation?.relayUrl ?? (relayMode.mode === 'external' ? relayMode.endpoint.url :
+    'ws://127.0.0.1:' + worker.port);
   await instances.alpha.page.locator('#lockstep-relay-url').fill(relayUrl, {timeout: remaining()});
   await instances.alpha.page.locator('#lockstep-host').click({timeout: remaining()});
   await instances.alpha.page.waitForFunction(() =>
@@ -654,6 +679,8 @@ try {
       role + ' canvas did not retain focus after actual Host/Join connection');
   }
   report.canvas_focus_after_connection = {alpha: true, beta: true};
+  if (browserNetworkPaths)
+    report.network_simulation.browser_path = browserNetworkPaths.verify(invite.roomId);
 
   const roleSpecs = [
     {role: 'alpha', port: 0, key: 'd', label: 'P1 D / right'},
@@ -793,6 +820,17 @@ try {
     remote_checksum_ticks: row.owner_health.peer.protocol.remote_checksum_ticks,
     next_checksum_compare: row.owner_health.peer.protocol.next_checksum_compare,
   }));
+  if (networkSimulation) {
+    report.network_simulation.browser_path = browserNetworkPaths.verify(invite.roomId);
+    report.network_simulation.proxy_before_leave = networkSimulation.proxy.snapshot();
+    report.network_simulation.proxy_health = verifyNetworkProxy(report.network_simulation.proxy_before_leave);
+    report.network_simulation.native_network_wait = Object.fromEntries(
+      [['alpha', alphaSnapshot], ['beta', betaSnapshot]].map(([role, row]) => [role, {
+        source_cursor: row.native_status.cursor, counters: row.native_status.network_wait,
+        durations_ms: null, duration_scope: 'native counters only; wall durations are not measured',
+        protocol: row.health?.peer?.protocol,
+      }]));
+  }
   workerPassed = true;
 } catch (error) {
   if (report.full_route && ['running', 'awaiting_final_checksum_validation'].includes(report.full_route.result))
@@ -857,6 +895,21 @@ try {
             nativeCleanup?.runtime_lockstep?.after?.peer?.closed !== true)
           firstError(role + ' native runtime did not confirm quiescent disconnect and closed transport');
       }
+    }
+  }
+  if (networkSimulation) {
+    try {
+      report.network_simulation.browser_websockets = browserNetworkPaths?.snapshot() ?? null;
+      browserNetworkPaths?.close();
+      report.network_simulation.proxy_after_browser_close = networkSimulation.proxy.snapshot();
+      report.leave_and_cleanup.network_proxy = await cleanupBounded(
+        closeNetworkProxy(networkSimulation.proxy), 'Network proxy cleanup');
+      report.network_simulation.proxy_final = networkSimulation.proxy.snapshot();
+      report.network_simulation.proxy_cleanup = verifyNetworkProxy(
+        report.network_simulation.proxy_final, {final: true});
+    } catch (error) {
+      report.leave_and_cleanup.network_proxy_error = errorText(error);
+      firstError('Network proxy cleanup failed: ' + errorText(error));
     }
   }
   if (worker) {
