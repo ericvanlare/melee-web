@@ -59,6 +59,33 @@ export function observeDesiredSourcePad({inputFrom, port, expected, maxSourceCur
   return false;
 }
 
+// Read a native peer row once, optionally pairing it with the room/owner
+// health fields from those same page values. If owner health fails after the
+// row has been read, retain the row and return an explicit sample error.
+export function observeNativePeerPageSample({includeRoom = false} = {}) {
+  const module = globalThis.Module;
+  const phase = module?._melee_web_native_menu_phase?.() ?? null;
+  const match = typeof module?._melee_web_native_menu_match_observe === 'function'
+    ? JSON.parse(module.UTF8ToString(module._melee_web_native_menu_match_observe())) : null;
+  const nativeStatus = globalThis.__net?.status?.() ?? null;
+  const message = typeof module?._melee_web_native_menu_message === 'function'
+    ? module.UTF8ToString(module._melee_web_native_menu_message()) : null;
+  const runtimeError = document.querySelector('#status')?.dataset.runtimeError || null;
+  const row = {phase, running: module?._melee_web_native_menu_running?.() ?? null, message,
+    error: runtimeError, source_tick: nativeStatus?.cursor ?? null, native_status: nativeStatus,
+    css: globalThis.menuObserveCssSetup?.() ?? null,
+    stage: globalThis.menuObserveStage?.(0x20) ?? null, match};
+  if (!includeRoom) return row;
+  try {
+    const ownerHealth = globalThis.meleeNetRuntimeLockstepHealth?.() ?? null;
+    return {row, room: {runtime_error: runtimeError, menu_phase: phase,
+      menu_running: row.running, menu_message: message,
+      native_status: nativeStatus, owner_health: ownerHealth}, error: null};
+  } catch (error) {
+    return {row, room: null, error: String(error?.stack || error)};
+  }
+}
+
 // Synchronous page predicate for the single charged A+left hypothesis. It
 // releases at the first observed cursor reaching the target; pressChord owns key-up.
 export function observeCombatKoChargedHoldBeforeRelease({inputFrom, port, expectedBytes,
@@ -606,29 +633,19 @@ export async function runA3LocalFullRoute({
   };
   report.full_route = route;
   const instances = {alpha, beta};
-  const observe = async instance => instance.page.evaluate(() => {
-    const module = globalThis.Module;
-    const phase = module?._melee_web_native_menu_phase?.() ?? null;
-    const match = typeof module?._melee_web_native_menu_match_observe === 'function'
-      ? JSON.parse(module.UTF8ToString(module._melee_web_native_menu_match_observe())) : null;
-    const nativeStatus = globalThis.__net?.status?.() ?? null;
-    const message = typeof module?._melee_web_native_menu_message === 'function'
-      ? module.UTF8ToString(module._melee_web_native_menu_message()) : null;
-    return {phase, running: module?._melee_web_native_menu_running?.() ?? null, message,
-      error: document.querySelector('#status')?.dataset.runtimeError || null,
-      source_tick: nativeStatus?.cursor ?? null, native_status: nativeStatus,
-      css: globalThis.menuObserveCssSetup?.() ?? null,
-      stage: globalThis.menuObserveStage?.(0x20) ?? null,
-      match};
-  });
+  const observe = async instance => instance.page.evaluate(observeNativePeerPageSample,
+    {includeRoom: false});
   const observePeerSample = async role => {
     let row = null;
+    let room = null;
     let observedAt = new Date().toISOString();
     try {
-      row = await observe(instances[role]);
+      const sample = await instances[role].page.evaluate(observeNativePeerPageSample,
+        {includeRoom: true});
+      row = sample?.row ?? null;
+      room = sample?.room ?? null;
       observedAt = new Date().toISOString();
-      const room = await readRoomState(instances[role]);
-      return {role, row, room, observed_at: observedAt, error: null};
+      return {role, row, room, observed_at: observedAt, error: sample?.error ?? null};
     } catch (error) {
       return {role, row, room: null, observed_at: observedAt,
         error: String(error?.stack || error)};

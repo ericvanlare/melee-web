@@ -358,7 +358,7 @@
       "sha256": "5d024dd9fa159ad5d49f61fa9d58bccffc4b0df753e3edce831f7ba23f8a56ed"
     }
   ],
-  "next": "One reviewed changed held-smash KO hypothesis; after a second failed KO experiment, reduce before another capture. No passing KO is claimed yet.",
+  "next": "Implement and independently review bounded ordinary-input jab preparation, then fresh uncharged KO baseline. No capture released. Charged input remains checkpointed and unrun; full regression/build/CI pending.",
   "native_combat_observations": {
     "decision": "COMPILED_AND_BROWSER_EXERCISED_IN_EXCHANGE",
     "runtime_source": "d269334e1243b0568d8bf7caf285053bea8e04a1",
@@ -833,5 +833,198 @@
         "bytes": 4149
       }
     ]
+  },
+  "ko_charged_first_launch": {
+    "decision": "CONFIRMED_SHIELD_CALLBACK_TIMEOUT_CHARGED_KO_UNREACHED",
+    "harness_source": "bbb682e15df3f1af9e0b26123bdb7e9e8e96d3bd",
+    "runtime_source": "d269334e1243b0568d8bf7caf285053bea8e04a1",
+    "chronology": {
+      "first_jab_pass": true,
+      "reverse_jab_pass": true,
+      "shield_baseline": 656,
+      "paired_guard": 668,
+      "paired_guard_motions": [
+        179,
+        179
+      ],
+      "p1_jab_input": 670,
+      "p1_jab_consumed_boundary": 673,
+      "shield_action_retained_pairs": 0,
+      "shield_target_response_recorded": false,
+      "hold_outcome": {
+        "promise_status": "rejected",
+        "error": "Browser driver development/keyboard-chord: page.waitForFunction: Timeout 500ms exceeded."
+      },
+      "later_beta_only_readback": {
+        "cursor": 678,
+        "frame": 238,
+        "motions": [
+          44,
+          181
+        ],
+        "P2_damage": 3,
+        "P2_shield": 54.6800156
+      },
+      "charged_ko_record_absent": true,
+      "declared_input_delay": 2,
+      "R_actual_neutral_consumed_boundary": 677,
+      "P1_actual_neutral_consumed_boundary": 679
+    },
+    "literal_failure_suffix": {
+      "alpha": {
+        "from": 656,
+        "through": 679,
+        "held": [
+          670,
+          671,
+          672,
+          673,
+          674,
+          675
+        ],
+        "release": 676,
+        "pad": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "beta": {
+        "from": 656,
+        "through": 679,
+        "held": [
+          657,
+          658,
+          659,
+          660,
+          661,
+          662,
+          663,
+          664,
+          665,
+          666,
+          667,
+          668,
+          669,
+          670,
+          671,
+          672,
+          673
+        ],
+        "release": 674,
+        "pad": [
+          0,
+          32,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "cleanup_prefix": {
+      "records": 679,
+      "ticks": [
+        0,
+        678
+      ],
+      "all_64_bytes_equal": true,
+      "sha256": "4ce5d8a70e0b06d555d55421ef73117cfbac3dba8c90dbad1602e3769b5b72a6",
+      "protocol_compared_counts": {
+        "alpha": 676,
+        "beta": 678
+      },
+      "unpaired_cleanup_tail_counts": {
+        "alpha": 1,
+        "beta": 0
+      },
+      "scope": "independent cleanup evidence only, not final route acceptance"
+    },
+    "cleanup": {
+      "normal_leave_unload_native_quiescence": true,
+      "proxy_worker_retired": true,
+      "owned_pids_absent": 22,
+      "owned_groups_absent": 5,
+      "failed_evidence_retained": true
+    },
+    "scope": [
+      "Shield union-window validation was unreached; literal cleanup suffix is diagnostic only.",
+      "Later181 is a single peer readback; no retroactive paired success.",
+      "No charge-count, KO, completed route, retail comparison or Internet claim."
+    ],
+    "artifacts": [
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-2-suite/full-moderate-combat-ko-charged/browser/report.json",
+        "bytes": 10786103,
+        "sha256": "f9b0663f1489b153215518487a7d212f9299a0009c3064d6d5e1eab42c1a8541"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-2-suite/full-moderate-combat-ko-charged/owner.json",
+        "bytes": 178739,
+        "sha256": "a522eec66c2fda2b4147d6861f8dd9ea79115cc3f2dd2388ae6f6bdd006d4645"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-second-failure-review-v1.json",
+        "bytes": 8928,
+        "sha256": "bc6503ef8380b1c5cf146bf3dfe9e4eb03121a7e589b70892304375a3f63ab40"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-second-process-retirement-v1.json",
+        "bytes": 870,
+        "sha256": "36daef3f3a7cb2f7addc3ef8fd7b3936a70d6c8d250d679fff82cff41cb8610a"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko2-shield-reducer-v1/freeze.json",
+        "bytes": 2858,
+        "sha256": "7f6bc364bda50f03cfebeaa78ce9881b79e124d793c210d83c8f4d3ff78a1535"
+      }
+    ]
+  },
+  "shield_observation_coalescing": {
+    "decision": "INDEPENDENT_SOURCE_REVIEW_AND_FOCUSED_CONTROLS_PASS",
+    "runtime_changed": false,
+    "one_synchronous_evaluation_per_sample": true,
+    "all_input_pairing_health_guards_and_caps_unchanged": true,
+    "browser_result_pending": true,
+    "artifacts": [
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko2-single-evaluate-candidate-v1/freeze.json",
+        "bytes": 3527,
+        "sha256": "6faa5de1af2032949c5af329cc591a7832912d23c0f02a43e500868183d8a77b"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko2-single-evaluate-independent-review-v1.json",
+        "bytes": 4523,
+        "sha256": "1e88bea945a36d000fafc30ac4f2fe463a97180b8662a03d947c94a0f0786b7f"
+      },
+      {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-single-evaluate-integrated-controls.log",
+        "bytes": 259,
+        "sha256": "f419e419898377466d00743096c7fd63677bf61c6b482128056bdb23a198974b"
+      }
+    ]
+  },
+  "charged_recipe_checkpoint": {
+    "decision": "PARK_UNRUN_CHARGED_INPUT_AFTER_FEASIBILITY_REVIEW",
+    "reason": "27 source cursors from first literal press leave little of the unchanged500ms cap; no checked strength/trajectory evidence supports a KO from3%. Neither historical failure nor a guaranteed timeout is inferred.",
+    "alternative": "At most8 verified P2 jabs to observed18% within aggregate480 source cursors, then fresh neutral baseline and existing uncharged480 KO proof. Source plan only; no guaranteed threshold reach or KO.",
+    "review": {
+      "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/charged-ko-feasibility-review-v1.json",
+      "bytes": 5566,
+      "sha256": "301ced733640f6c9adc9327c50560d21e8c25aed528861823b64aafe0c503d94"
+    }
   }
 }

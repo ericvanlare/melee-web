@@ -9,6 +9,7 @@ import {comparePairedCombatPlayers, decideP2ApproachTap,
   validateP2GameplayInputWindow, validateSingleP2ApproachTapWindow} from '../scripts/a3_local_room_combat_probe.mjs';
 import {actionObservationTickDisposition, acquireAndInspectActionPair,
   observeShieldSetOffBeforeRelease, retainPreStartActionPair,
+  observeNativePeerPageSample,
   retainShieldHoldOutcome, validateButtonGameplayInputWindow,
   validateSimultaneousButtonGameplayInputWindows} from '../scripts/a3_local_room_full_route.mjs';
 
@@ -246,6 +247,95 @@ test('shield hold page predicate retains first R row and latest native observati
     install([wrong]);
     assert.equal(observeShieldSetOffBeforeRelease({inputFrom: 100, inputDelay: 2,
       maxSourceTicks: 30}).reason, 'unexpected-first-pad-row');
+  } finally {
+    for (const [key, descriptor] of Object.entries(original)) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else delete globalThis[key];
+    }
+  }
+});
+
+test('combined peer sample uses one page evaluation and preserves the row and room mapping', async () => {
+  const names = ['document', 'Module', '__net', 'menuObserveCssSetup',
+    'menuObserveStage', 'meleeNetRuntimeLockstepHealth'];
+  const original = Object.fromEntries(names.map(key => [key,
+    Object.getOwnPropertyDescriptor(globalThis, key)]));
+  let evaluations = 0;
+  let matchReads = 0;
+  let statusReads = 0;
+  let healthReads = 0;
+  const nativeStatus = {cursor: 668, blocker: 'network_wait'};
+  const match = {frame: 228, players: [
+    {source_port: 0, motion: 14}, {source_port: 1, motion: 179}],
+  };
+  const ownerHealth = {failure: null, peer: {failure: null, endpoint_error_count: 0}};
+  globalThis.document = {querySelector: () => ({dataset: {runtimeError: ''}})};
+  globalThis.Module = {
+    _melee_web_native_menu_phase: () => 7,
+    _melee_web_native_menu_running: () => 1,
+    _melee_web_native_menu_message: () => 23,
+    _melee_web_native_menu_match_observe: () => { matchReads++; return 11; },
+    UTF8ToString: pointer => pointer === 23 ? 'Original match' : JSON.stringify(match),
+  };
+  globalThis.__net = {status: () => { statusReads++; return nativeStatus; }};
+  globalThis.menuObserveCssSetup = () => ({doors: [1, 2]});
+  globalThis.menuObserveStage = id => ({stage_id: id});
+  globalThis.meleeNetRuntimeLockstepHealth = () => { healthReads++; return ownerHealth; };
+  const page = {evaluate: async (fn, arg) => { evaluations++; return fn(arg); }};
+  try {
+    const sample = await page.evaluate(observeNativePeerPageSample, {includeRoom: true});
+    assert.equal(evaluations, 1);
+    assert.equal(matchReads, 1);
+    assert.equal(statusReads, 1);
+    assert.equal(healthReads, 1);
+    assert.deepEqual(sample.row, {phase: 7, running: 1, message: 'Original match',
+      error: null, source_tick: 668, native_status: nativeStatus,
+      css: {doors: [1, 2]}, stage: {stage_id: 0x20}, match});
+    assert.deepEqual(sample.room, {runtime_error: null, menu_phase: sample.row.phase,
+      menu_running: sample.row.running, menu_message: sample.row.message,
+      native_status: sample.row.native_status, owner_health: ownerHealth});
+    assert.equal(sample.error, null);
+    const rowOnly = await page.evaluate(observeNativePeerPageSample, {includeRoom: false});
+    assert.deepEqual(rowOnly, sample.row);
+    assert.equal(evaluations, 2);
+    assert.equal(healthReads, 1);
+  } finally {
+    for (const [key, descriptor] of Object.entries(original)) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else delete globalThis[key];
+    }
+  }
+});
+
+test('combined peer sample retains the native row when owner health throws', async () => {
+  const names = ['document', 'Module', '__net', 'menuObserveCssSetup',
+    'menuObserveStage', 'meleeNetRuntimeLockstepHealth'];
+  const original = Object.fromEntries(names.map(key => [key,
+    Object.getOwnPropertyDescriptor(globalThis, key)]));
+  const nativeStatus = {cursor: 679};
+  const match = {frame: 239, players: [{source_port: 0, motion: 44},
+    {source_port: 1, motion: 181}]};
+  globalThis.document = {querySelector: () => ({dataset: {runtimeError: null}})};
+  globalThis.Module = {
+    _melee_web_native_menu_phase: () => 7,
+    _melee_web_native_menu_running: () => 1,
+    _melee_web_native_menu_message: () => 29,
+    _melee_web_native_menu_match_observe: () => 11,
+    UTF8ToString: pointer => pointer === 29 ? 'Original match' : JSON.stringify(match),
+  };
+  globalThis.__net = {status: () => nativeStatus};
+  globalThis.menuObserveCssSetup = () => null;
+  globalThis.menuObserveStage = () => null;
+  globalThis.meleeNetRuntimeLockstepHealth = () => { throw Error('fixture health decode failed'); };
+  let evaluations = 0;
+  const page = {evaluate: async (fn, arg) => { evaluations++; return fn(arg); }};
+  try {
+    const sample = await page.evaluate(observeNativePeerPageSample, {includeRoom: true});
+    assert.equal(evaluations, 1);
+    assert.equal(sample.row.source_tick, 679);
+    assert.equal(sample.row.match.players[1].motion, 181);
+    assert.equal(sample.room, null);
+    assert.match(sample.error, /fixture health decode failed/);
   } finally {
     for (const [key, descriptor] of Object.entries(original)) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);
