@@ -4,7 +4,7 @@
   "checkpoint_date": "2026-10-12",
   "scope": "same-machine simulated-network functional; no public Internet or acceptance claim",
   "evidence_root": "RUN-relative portable retained artifact paths",
-  "decision": "STALL_CUT_FRESH_AND_TWO_MATCH_FUNCTIONAL_PASS_PENDING_FINAL_INTEGRATION",
+  "decision": "STALL_CUT_FRESH_AND_TWO_MATCH_FUNCTIONAL_PASS_MERGED",
   "source_inventory": {
     "latest_harness": {
       "head": "f89880bbcd774dc3d0efe94d2a91973275182288",
@@ -977,8 +977,25 @@
       "path": "RUN/m3-final-integration-review-luna-v1.json",
       "sha256": "88e39da49035e6d13682561f1b663d46f0bbbb596322a88be6050f996fa98a06"
     },
-    "exact_head_ci": "pending",
-    "merge": "pending"
+    "exact_head_ci": {
+      "path": "m3-exact-head-ci.json",
+      "sha256": "9523d169e02f55317ad11e06d29b05c19698bc7ebd7587bbb2e58154437d6a87"
+    },
+    "merge": {
+      "path": "m3-merge-receipt.json",
+      "sha256": "17f5ab5e61452847005adbece8b257e6101543d8d3ba2bde7917f3f757e10d7a"
+    },
+    "integration": {
+      "pr": 312,
+      "head": "c68f2226d4fee2c49281ab116892fed958d498d3",
+      "commit": "759ede7b4554477cd404b9176c5ae7c8d93c7b7f",
+      "tree": "906b0dcc784046aafd1d94e212b57852a088b755",
+      "reviewed_and_merged_trees_match": true,
+      "ci_run": 38225509373,
+      "completed_checks": 14,
+      "successful_checks": 12,
+      "expected_skips": 2
+    }
   },
   "open_boundaries": [
     "Task9 strict optional jab/jump return-to-Wait probe remains failed/timeboxed under#308; baseline and repeated routes do not satisfy it.",

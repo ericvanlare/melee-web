@@ -50,6 +50,37 @@ function requireValue(condition, message) {
   if (!condition) throw Error(message);
 }
 
+// Preserve the source-authored animation cursor in the optional action evidence.
+// This is a diagnostic projection only; it does not add an action pass gate.
+export function projectActionObservationPlayer(player) {
+  requireValue(Number.isFinite(player?.animation_frame),
+    'Action observation lacks a finite native animation_frame');
+  return {source_port: player.source_port, stocks: player.stocks,
+    motion: player.motion, groundAir: player.groundAir,
+    damage_percent: player.damage_percent, x: player.x, y: player.y,
+    animation_frame: player.animation_frame};
+}
+
+// Compare both original source slots at one already-paired common cursor.
+// A disagreement is retained as evidence and does not change the existing
+// motion/grounded-Wait acceptance predicates.
+export function comparePairedActionAnimationFrames(matches) {
+  requireValue(Array.isArray(matches) && matches.length === 2 &&
+    matches.every(match => Array.isArray(match?.players) && match.players.length === 2),
+  'Action animation comparison requires two paired native players');
+  return matches[0].players.map((player, index) => {
+    const paired = matches[1].players[index];
+    requireValue(Number.isSafeInteger(player.source_port) &&
+      paired.source_port === player.source_port,
+    'Action animation comparison changed source player slots');
+    const alphaFrame = projectActionObservationPlayer(player).animation_frame;
+    const betaFrame = projectActionObservationPlayer(paired).animation_frame;
+    return {source_port: player.source_port,
+      alpha_animation_frame: alphaFrame, beta_animation_frame: betaFrame,
+      equal_at_common_source_cursor: alphaFrame === betaFrame};
+  });
+}
+
 function signedByte(value) {
   return value > 127 ? value - 256 : value;
 }
@@ -625,10 +656,7 @@ export async function runA3LocalFullRoute({
   const compactGroundedBaseline = (rows, matches, localInputs, label) => ({
     label, source_tick: rows[0].source_tick,
     peers: matches.map((match, index) => ({peer: index === 0 ? 'alpha' : 'beta',
-      frame: match.frame, players: match.players.map(player => ({
-        source_port: player.source_port, stocks: player.stocks,
-        motion: player.motion, groundAir: player.groundAir,
-        damage_percent: player.damage_percent, x: player.x, y: player.y}))})),
+      frame: match.frame, players: match.players.map(projectActionObservationPlayer)})),
     local_input_tick: localInputs.input_tick,
     local_inputs: {alpha: localInputs.alpha, beta: localInputs.beta},
   });
@@ -688,13 +716,17 @@ export async function runA3LocalFullRoute({
         return {match: classified.match, renderWait: classified.wait === 'first-use-rendering'};
       });
       const matches = states.map(state => state.match);
+      const projectedPlayers = matches.map(match =>
+        match.players.map(projectActionObservationPlayer));
+      const animationFrameComparison = comparePairedActionAnimationFrames(matches);
       const actorMotions = matches.map(match => match.players[actor].motion);
       const bothActive = states.every(state => !state.renderWait);
       const renderWaitKey = bothActive ? null : JSON.stringify({source_tick: tick,
         peers: states.map((state, index) => ({peer: index === 0 ? 'alpha' : 'beta',
           waiting: state.renderWait, frame: state.match.frame, message: rows[index].message,
-          players: state.match.players.map(player => [player.motion, player.groundAir,
-            player.stocks, player.damage_percent, player.x, player.y])}))});
+          players: projectedPlayers[index].map(player => [player.motion, player.groundAir,
+            player.stocks, player.damage_percent, player.x, player.y,
+            player.animation_frame])}))});
       // A first-use render wait does not consume this native source cursor.
       // Retain each distinct wait state once, but permit the active row at the
       // same cursor to be observed later instead of losing it to deduplication.
@@ -705,11 +737,9 @@ export async function runA3LocalFullRoute({
         message: rows[index].message ?? null,
         ready: match.ready, paused: match.paused, ending: match.ending,
         complete: match.complete, outcome: match.outcome,
-        players: match.players.map(player => ({
-          source_port: player.source_port, stocks: player.stocks,
-          motion: player.motion, groundAir: player.groundAir,
-          damage_percent: player.damage_percent, x: player.x, y: player.y}))})),
-        actor_motion_ids: actorMotions, actor_motion_agreement: actorMotions[0] === actorMotions[1]};
+        players: projectedPlayers[index]})),
+        actor_motion_ids: actorMotions, actor_motion_agreement: actorMotions[0] === actorMotions[1],
+        animation_frame_comparison_by_port: animationFrameComparison};
       record.observed_source_pairs.push(pair);
       if (!bothActive) {
         lastRenderWaitKey = renderWaitKey;

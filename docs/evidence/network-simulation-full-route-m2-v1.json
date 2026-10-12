@@ -1011,5 +1011,167 @@
       "path": "m2-merge-receipt.json",
       "sha256": "74a5cc625a453d9c547fea58727f35ae5e1a1c0567def31d2938a7269917a93e"
     }
+  },
+  "action_observation_followup": {
+    "date": "2026-10-12",
+    "decision": "STRICT_ACTION_PROBE_FAIL_WITH_PAIRED_ANIMATION_PROGRESS",
+    "evidence_root": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1",
+    "source_and_runtime": "5f895d3b5ea70811bccc8b9967fde788f6dd8cef",
+    "source_change": "Add existing source-owned animation_frame to both player JSON objects and three action evidence projections; original gameplay, inputs, arithmetic, motion/groundedWait predicates,60tick and wall caps unchanged.",
+    "artifacts": {
+      "candidate": {
+        "path": "action-observation-candidate-v1/candidate-freeze.json",
+        "bytes": 7732,
+        "sha256": "9d469a250af727f008e0636f7a07a1a6ea4f0dba0f552a9ce0c48a58962c9922"
+      },
+      "source_review": {
+        "path": "action-observation-integration-review-v1.json",
+        "bytes": 2187,
+        "sha256": "c2f66bf8e8482600864494d986300aa2cff28cecddfb06e1f0e37e47b8953592"
+      },
+      "runtime": {
+        "path": "m1-runtime-producer.json",
+        "bytes": 1419,
+        "sha256": "e36c7b3a804b95690c0f1314864d30a27f47a02bc511c99cb4bd03caf4aa4e4d"
+      },
+      "capture_release": {
+        "path": "m1-capture-release.json",
+        "bytes": 897,
+        "sha256": "97649ecc9b03323120a3729cac4c5ea1408d2b9729f49af34e7602f4e2b32e42"
+      },
+      "result_review": {
+        "path": "m1-action-result-review-v1.json",
+        "bytes": 10008,
+        "sha256": "d2649fc1859e8e08cf34bf96210f60d45d04947644c9da110d30ff37f672127c"
+      },
+      "root_analysis": {
+        "path": "m1-action-analysis.json",
+        "bytes": 6105,
+        "sha256": "555165d473385a43b0be67fdcc82e45471f504aae904b1693e01347b5e167b52"
+      },
+      "full_regression": {
+        "path": "m1-full-regression-5f895d3b.json",
+        "bytes": 606,
+        "sha256": "e2a4642a3cd175d04340db20f0f5a36871b2e69ecc810ccd050b3f62599593a7"
+      },
+      "original_reference_availability": {
+        "path": "original-reference-availability-v1.json",
+        "bytes": 7621,
+        "sha256": "0b75a6fe348052e53614e52bf0e648b506a1ef22b29229f7aae170150b2391ac"
+      }
+    },
+    "observed": {
+      "jab": {
+        "literal_A_input_ticks": [
+          473,
+          479
+        ],
+        "neutral_input_tick": 480,
+        "paired_samples": 9,
+        "target_tick": 483,
+        "grounded_wait_tick": 491
+      },
+      "jump": {
+        "literal_X_input_tick": 491,
+        "neutral_input_tick": 492,
+        "declared_window": [
+          494,
+          553
+        ],
+        "paired_samples": 48,
+        "jump_target_tick": 500,
+        "landing_first_sample": {
+          "source_tick": 530,
+          "animation_frame": 0
+        },
+        "landing_last_sample": {
+          "source_tick": 552,
+          "animation_frame": 22
+        },
+        "grounded_wait_observed": false
+      },
+      "all_retained_paired_player_fields_agree": true,
+      "sample_gaps_remain": true,
+      "cleanup_checksum_common_records": 556,
+      "cleanup_checksum_tails_by_peer": [
+        0,
+        1
+      ],
+      "final_full_route_checksum_comparison": false,
+      "owned_inventory_processes_absent": 24,
+      "browser_processes_in_cleanup_absent": 21
+    },
+    "authored_asset_inspection": {
+      "scope": "Read-only structural byte inspection following existing DatArchive/DatFighterRuntime/DatAnimation field layouts, not execution of full checked parser or active capture joint oracle.",
+      "asset_files": [
+        {
+          "path": "local-input/snapshot-mario/PlMr.dat",
+          "bytes": 194992,
+          "sha256": "929cdf08c31bc75156ccef05238f2b16dc4d0b187ed1bb4f0a628a2466fb7f7a"
+        },
+        {
+          "path": "local-input/snapshot-mario/PlMrAJ.dat",
+          "bytes": 1259328,
+          "sha256": "4bd9593e6f0d980b4441891b62ea84a08c099471d695a614974c67223ab5872f"
+        }
+      ],
+      "source_motion": "MS_Landing42 selects SM_Landing35",
+      "fighter_public_root": 36324,
+      "action_row_absolute_offset": 29320,
+      "animation_container_offset": 117216,
+      "archive_bytes": 6177,
+      "public_symbol": "PlyMario5K_Share_ACTION_Landing_figatree",
+      "figatree_root_data_offset": 5548,
+      "end_frame_bits": "41e80000",
+      "end_frame": 29.0,
+      "source_rule": "Landing_Anim calls ftAnim_IsFramesRemaining over active part joint/blended joint status; basic Landing starts animation0 speed1. Landing IASA normal_landing_lag permits input checks, not automatic neutral Wait.",
+      "limitations": [
+        "Retained snapshot assets not independently bound to this capture active fighter archive in this task.",
+        "Authored29 endpoint does not prove exact active joint status or original/live duration.",
+        "No captured original matching input interval or joint-end observation; source snapshots are sampled with gaps.",
+        "Observed animation0to22 progressing does not establish runtime defect, frozen animation or future transition time."
+      ],
+      "source_hashes": [
+        {
+          "path": "build/gameplay-source/src/melee/ft/ftmotionstates.c",
+          "sha256": "8785cfcb7091ce29268a8c2172aecd97a60bc6352c545a472aa77e4cbd66141a"
+        },
+        {
+          "path": "build/gameplay-source/src/melee/ft/kinds/ftCommon/forward.h",
+          "sha256": "514cd2e4a2ebf3729255efce6b88bb6b91acd685a519e2b4bb01bcb09f7492ca"
+        },
+        {
+          "path": "build/gameplay-source/src/melee/ft/kinds/ftCommon/ftCo_Landing.c",
+          "sha256": "601e45b75a559ce7937f1547151fbd1987994652e34635abe6b60c76ce631d17"
+        },
+        {
+          "path": "build/gameplay-source/src/melee/ft/ftanim.c",
+          "sha256": "575ad38351d426707246600cd1f4367d45523b7e139382c5cf3c222150d0a25e"
+        },
+        {
+          "path": "src/dat_fighter_runtime.cpp",
+          "sha256": "5f32405154a1a240167854b864a84720d51b42c4e8a9892b9ec069e60c783614"
+        },
+        {
+          "path": "src/dat_animation.cpp",
+          "sha256": "76e1d3e1a988c20a67ec92d9fee41a4c44604bb1ad7a834a98854195c9c52fc9"
+        }
+      ]
+    },
+    "limitations": [
+      "Failed action scenario has no completed match,Results or CSS return.",
+      "Supplemental cleanup checksum prefix is not a final full-route pass.",
+      "Advancing cur_anim_frame does not establish actual joint animation completion or original equivalence.",
+      "Retained Landing asset endpoint29 is not bound to active capture archive or runtime joints.",
+      "Historical stock/jab raw reference and provenance were not located; fresh selected original comparison remains unrun."
+    ],
+    "next": "Keep strict action gate open; no runtime repair demonstrated. Proceed with separately reviewed grounded combat milestone313.",
+    "integration": {
+      "local_regression": "PASS2363tests165skips",
+      "release_runtime_build": "PASS",
+      "exact_head_ci": "pending",
+      "merge": "pending"
+    },
+    "evidence_location_policy": "Logical evidence and input identifiers only; concrete retained locations remain in the external capture and review receipts."
   }
 }

@@ -418,6 +418,7 @@ const char* melee_web_native_menu_match_observe(){
  out.add(",\"stocks\":%d",p0.stocks);
  out.add(",\"motion\":%d",p0.motion_id);
  out.add(",\"groundAir\":%d",p0.ground_or_air);
+ out.add(",\"animation_frame\":%.9g",p0.animation_frame);
  out.add(",\"x\":%.9g",p0.position[0]);
  out.add(",\"y\":%.9g",p0.position[1]);
  out.add("}");
@@ -437,6 +438,7 @@ const char* melee_web_native_menu_match_observe(){
  out.add(",\"stocks\":%d",p1.stocks);
  out.add(",\"motion\":%d",p1.motion_id);
  out.add(",\"groundAir\":%d",p1.ground_or_air);
+ out.add(",\"animation_frame\":%.9g",p1.animation_frame);
  out.add(",\"x\":%.9g",p1.position[0]);
  out.add(",\"y\":%.9g",p1.position[1]);
  out.add("}");

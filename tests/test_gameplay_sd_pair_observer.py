@@ -40,7 +40,7 @@ struct StartMeleeData { Rules rules; Player players[6]; };
 struct Stats {
  unsigned player_slot=0;
  int fighter_kind=0, stocks=1, motion_id=14, ground_or_air=0;
- float damage_percent=300, position[3]={0,0,0};
+ float damage_percent=300, animation_frame=0, position[3]={0,0,0};
 };
 struct Match {
  StartMeleeData start;
@@ -73,6 +73,8 @@ int main(int argc,char**) {
  storage.stats[0].player_slot=0;
  storage.stats[1].player_slot=3;
  storage.stats[1].damage_percent=301.5f;
+ storage.stats[0].animation_frame=7.25f;
+ storage.stats[1].animation_frame=42.5f;
  for(int index : {0,3}) {
   auto& player=storage.start.players[index];
   player.slot_type=0; player.stocks=1; player.ckind=8; player.x12=300;
@@ -127,6 +129,7 @@ class GameplaySdPairObserverTests(OwnedWorkspaceTests):
         self.assertEqual(live["observed_player_source_slots"], [0, 3])
         self.assertEqual(live["prior_vs_terminal"], {"outcome": 1, "winners": [0, 3]})
         self.assertEqual([p["damage_percent"] for p in live["players"]], [300, 301.5])
+        self.assertEqual([p["animation_frame"] for p in live["players"]], [7.25, 42.5])
         self.assertEqual([p["source_initial_damage"] for p in live["players"]], [300, 300])
         self.assertEqual([p["source_character"] for p in live["players"]], [8, 8])
         self.assertEqual([p["source_player_index"] for p in live["players"]], [0, 3])
