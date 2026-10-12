@@ -13,13 +13,15 @@ import {loadBrowserTools} from './browser_tools.mjs';
 import {openNetInstance, firstFatalBrowserError} from './net_session_instance.mjs';
 import {startRoomRelayRuntime} from './net_room_relay_runtime_owner.mjs';
 import {parseRoomInvite} from './net_lockstep_room_invite.mjs';
+import {resolveRoomRelayMode} from './a3_public_relay_preflight.mjs';
 import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS, parseNetChecksum} from './net_lockstep_core.mjs';
 import {checksumCompareReached, checksumWaitDiagnostic} from './a3_checksum_wait_diagnostics.mjs';
 import {runA3LocalFullRoute} from './a3_local_room_full_route.mjs';
 
-const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route]';
+const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route]';
 const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, out: {type: 'string'},
+  'relay-url': {type: 'string'}, 'relay-preflight': {type: 'string'},
   playwright: {type: 'string'}, 'min-checksums': {type: 'string', default: '120'},
   'timeout-ms': {type: 'string', default: '300000'}, 'full-route': {type: 'boolean', default: false},
   help: {type: 'boolean', default: false},
@@ -64,7 +66,19 @@ if (!values.url || !values.disc || !values.out)
 const runtimeUrl = new URL(values.url);
 requireCondition(runtimeUrl.protocol === 'http:' && runtimeUrl.hostname === '127.0.0.1' &&
   runtimeUrl.port === '8787' && runtimeUrl.pathname === '/runtime.html',
-  'The direct Worker allowlist requires the owned runtime page at http://127.0.0.1:8787/runtime.html');
+  'This harness requires the already-supported client page http://127.0.0.1:8787/runtime.html');
+let relayPreflightInput;
+let relayPreflightSha256 = null;
+if (values['relay-preflight'] !== undefined) {
+  const preflightBytes = await fs.readFile(path.resolve(values['relay-preflight']));
+  requireCondition(preflightBytes.length > 0 && preflightBytes.length <= 65536,
+    '--relay-preflight must be a nonempty JSON file no larger than 64 KiB');
+  try { relayPreflightInput = JSON.parse(preflightBytes.toString('utf8')); }
+  catch (error) { throw Error('--relay-preflight is not valid JSON: ' + errorText(error)); }
+  relayPreflightSha256 = sha256(preflightBytes);
+}
+const relayMode = resolveRoomRelayMode({relayUrl: values['relay-url'], preflight: relayPreflightInput,
+  clientOrigin: runtimeUrl.origin});
 const discPath = path.resolve(values.disc);
 const discInfo = await fs.stat(discPath);
 requireCondition(discInfo.isFile() && discInfo.size > 0, '--disc must name a nonempty local file');
@@ -94,14 +108,24 @@ async function cleanupBounded(promise, label) {
 }
 const report = {
   schema: 'melee-web-a3-local-room-keyboard-v1',
-  evidence_scope: values['full-route']
-    ? 'local functional browser route attempt including one natural original four-stock Mario/Final Destination match; broader original-accuracy, public Worker, human/physical-input, Internet, timing, pixel/PCM-equivalence and whole-session acceptance remain pending'
-    : 'local functional browser check only; public Worker, full match, human/physical input, Internet, timing, pixel/PCM equivalence and whole-session gates remain pending',
+  evidence_scope: relayMode.mode === 'external'
+    ? (values['full-route']
+      ? 'functional browser route attempt using a supplied public staging Worker preflight and the existing actual Host/Join keyboard path; the harness validates preflight structure/bindings only and does not independently verify the deployed service; RTT, human/physical-input, two-machine/Internet, timing, pixel/PCM-equivalence and whole-session acceptance remain pending'
+      : 'functional CSS browser check using a supplied public staging Worker preflight and the existing actual Host/Join keyboard path; the harness validates preflight structure/bindings only and does not independently verify the deployed service; RTT, full match, human/physical-input, two-machine/Internet, timing, pixel/PCM-equivalence and whole-session acceptance remain pending')
+    : values['full-route']
+      ? 'local functional browser route attempt including one natural original four-stock Mario/Final Destination match; broader original-accuracy, public Worker, human/physical-input, Internet, timing, pixel/PCM-equivalence and whole-session acceptance remain pending'
+      : 'local functional browser check only; public Worker, full match, human/physical input, Internet, timing, pixel/PCM equivalence and whole-session gates remain pending',
   decision: 'FAIL',
   first_error: null,
   source: null,
   browser: null,
   room_worker: null,
+  external_relay_preflight: relayMode.mode === 'external' ? {
+    file: path.basename(path.resolve(values['relay-preflight'])),
+    sha256: relayPreflightSha256,
+    binding: relayMode,
+    independent_live_provider_verification: false,
+  } : null,
   invitation: null,
   profiles: {},
   css_keyboard: {},
@@ -110,7 +134,12 @@ const report = {
   full_route: null,
   leave_and_cleanup: {},
   exclusions: ['no direct PAD or Gamepad injection', 'no harness-owned peer or checksum pump',
-    'no runtime source-tick/checksum-bound changes', 'one local Worker room only'],
+    'no runtime source-tick/checksum-bound changes',
+    ...(relayMode.mode === 'external'
+      ? ['external Worker is not owned, mutated, or disposed by this harness',
+        'preflight structure/bindings only; no independent live deployment verification',
+        'RTT is not measured by this harness']
+      : ['one local Worker room only'])],
   started_at: new Date().toISOString(),
 };
 let worker = null;
@@ -120,6 +149,7 @@ let workerPassed = false;
 async function sourceIdentity() {
   const status = gitValue(['status', '--porcelain', '--untracked-files=all']);
   const allowedHarnessFiles = ['scripts/a3_local_room_keyboard_browser.mjs',
+    'scripts/a3_public_relay_preflight.mjs', 'tests/test_a3_public_relay_preflight.py',
     'scripts/a3_local_room_full_route.mjs', 'scripts/a3_checksum_wait_diagnostics.mjs',
     'scripts/a3_source_cursor_join.mjs',
     'tests/test_a3_local_room_full_route_wait.py'];
@@ -536,16 +566,18 @@ try {
   report.browser = {node: process.version, url: runtimeUrl.href,
     speaker_output: 'muted through the shared browserLaunchOptions policy; normal audio processing retained',
     profile_model: 'one independent persistent Chrome context per player'};
-  worker = await startRoomRelayRuntime({
-    evidenceDir: path.join(output, 'worker-evidence'),
-    producer: {commit: report.source.head, tree: report.source.tree},
-    diagnostic: message => {
-      if (!report.worker_diagnostics) report.worker_diagnostics = [];
-      report.worker_diagnostics.push(String(message));
-    },
-  });
-  report.room_worker = {base: worker.base, port: worker.port, owner_process: worker.ownerProcess,
-    runtime_identity: worker.runtimeIdentity, hashes: worker.hashes};
+  if (relayMode.mode === 'local') {
+    worker = await startRoomRelayRuntime({
+      evidenceDir: path.join(output, 'worker-evidence'),
+      producer: {commit: report.source.head, tree: report.source.tree},
+      diagnostic: message => {
+        if (!report.worker_diagnostics) report.worker_diagnostics = [];
+        report.worker_diagnostics.push(String(message));
+      },
+    });
+    report.room_worker = {base: worker.base, port: worker.port, owner_process: worker.ownerProcess,
+      runtime_identity: worker.runtimeIdentity, hashes: worker.hashes};
+  }
   const tools = await loadBrowserTools(values.playwright);
   const playwrightPackage = JSON.parse(await fs.readFile(path.join(tools.playwrightPath, 'package.json'), 'utf8'));
   const profileRoot = path.join(output, 'profiles');
@@ -591,7 +623,8 @@ try {
       role + ' browser did not retain the isolated 640x480 runtime canvas');
   }
 
-  const relayUrl = 'ws://127.0.0.1:' + worker.port;
+  const relayUrl = relayMode.mode === 'external' ? relayMode.endpoint.url :
+    'ws://127.0.0.1:' + worker.port;
   await instances.alpha.page.locator('#lockstep-relay-url').fill(relayUrl, {timeout: remaining()});
   await instances.alpha.page.locator('#lockstep-host').click({timeout: remaining()});
   await instances.alpha.page.waitForFunction(() =>
@@ -601,7 +634,7 @@ try {
   const invite = parseRoomInvite(inviteText);
   requireCondition(invite.url === relayUrl && invite.sourceTicks === LOCKSTEP_MAX_SOURCE_TICKS &&
     invite.inputDelay === LOCKSTEP_DELAY,
-    'Actual Host control produced an invite outside the local Worker or current source-tick contract');
+    'Actual Host control produced an invite outside the selected Worker or current source-tick contract');
   await instances.alpha.page.locator('#lockstep-copy').click({timeout: remaining()});
   await instances.beta.page.locator('#lockstep-join-invite').fill(inviteText, {timeout: remaining()});
   requireCondition(await instances.beta.page.locator('#lockstep-join-invite').inputValue() === inviteText,
@@ -842,6 +875,9 @@ try {
       report.leave_and_cleanup.worker_error = errorText(error);
       firstError('Local Worker cleanup failed: ' + errorText(error));
     }
+  } else if (relayMode.mode === 'external') {
+    report.leave_and_cleanup.worker = {attempted: false,
+      reason: 'external Worker is not owned by the browser harness'};
   }
   if (!report.first_error && workerPassed) {
     for (const role of ['alpha', 'beta']) {

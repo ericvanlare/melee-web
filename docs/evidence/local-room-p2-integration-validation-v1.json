@@ -1,0 +1,79 @@
+{
+  "ci": {
+    "status": "PENDING"
+  },
+  "documentation_checks": {
+    "git_diff_check": "PASS",
+    "status_index": "PASS"
+  },
+  "focused_tests": {
+    "a3_tests_skipped": 0,
+    "logs": [
+      {
+        "file": "focused-route.log",
+        "sha256": "cf3060965c6698513b00844ad6ff07f4b493c0e102b9d4b4d1664f025b796880",
+        "tests": 1
+      },
+      {
+        "file": "focused-preflight.log",
+        "sha256": "26a343fbbc3a9358074561a6850c27b5130d92ee33fc83267f2039c350859a27",
+        "tests": 2
+      },
+      {
+        "file": "focused-source-join.log",
+        "sha256": "51c5fe0a57988e3000bc71f9ba2e0f2a4a7b7de325cef31cfc45d67ef0e2f2f1",
+        "tests": 1
+      }
+    ],
+    "result": "PASS",
+    "tests": 4,
+    "wrapper": "python3 scripts/agent_workspace.py run --"
+  },
+  "full_suite": {
+    "a3_controls_skipped": 0,
+    "command": "python3 -m unittest discover -s tests -v",
+    "duration_seconds": 504.889,
+    "errors": 0,
+    "failures": 0,
+    "node": "22.23.2",
+    "private_log_sha256": "0794a64cf398c879a46fe4792d158ddfcdccf910b6e054aef673d5709288ec17",
+    "python": "3.12.13",
+    "result": "PASS",
+    "skip_context": "Three class-level setup skips were caused by unavailable build outputs: gameplay_effect_banks_trace, native HSD gameplay targets, and source_devcom_trace.js. Other skips reflect optional owned assets, DOL inputs, or unbuilt native/reference targets. No A3 tests were skipped. A different #305 checkout had 2324 tests/153 skips; this current result is retained as 2321/166 and is not replaced with those counts.",
+    "skipped": 166,
+    "tests": 2321,
+    "wrapper": "python3 scripts/agent_workspace.py run --"
+  },
+  "issue": 288,
+  "p2_capture_receipt": {
+    "capture_execution_source": "9c41b9145ba7b566e68ac450ec65a9d08b2079a1",
+    "path": "local-room-full-route-v1.json",
+    "runtime_producer": "b57979868339faf07394f614320e59b0e7fe9b5d",
+    "scope": "Previously reviewed same-machine local keyboard movement-and-release prefix and local CSS\u2192SSS\u2192four-stock Mario/FD\u2192Results\u2192CSS route. It does not establish public multiplayer or acceptance.",
+    "sha256": "b55e49ada41ce44997aacbd11dbcbf1e6823e1ce63ee48459b6f20bae3dc4a05"
+  },
+  "private_validation": {
+    "result_file_sha256": "70c0f7904e8e470c6241de61f3ad4ab4e06fa4e1dc1d20ba7a115ab957d6b15d",
+    "review_file": "integration-review-ca08-v2.json",
+    "review_file_sha256": "1671115821b65c4ca477fa95b3021a8133eed6440467c1d035c883b101375dbb"
+  },
+  "public_relay": {
+    "meaning": "The opt-in supplied-preflight validator checks structure and identity fields; it does not prove the live deployment. No remote Worker, provider, or RTT result is established.",
+    "status": "NOT_RUN"
+  },
+  "result": "PASS_TESTED_INTEGRATION_SOURCE",
+  "run_id": "public-relay-keyboard-validation-f5b949d7-20261012-011314",
+  "runtime_build": {
+    "reason": "No compiled browser/WebAssembly runtime inputs changed relative to the reviewed producer. The merged #305 changes are native reference-capture tooling. The retained P2 capture remains bound to b579; no new capture or producer identity is claimed.",
+    "rebuilt": false,
+    "source_paths_changed_under_src_or_web": []
+  },
+  "schema": "melee-web-local-room-p2-integration-validation-v1",
+  "source": {
+    "branch": "codex/public-relay-keyboard",
+    "current_main_merged": "21e4c7bf6ef60f3ea8118ce92ab28d6b3c6fd6d6",
+    "head": "f5b949d7d3018878676b5d9c8067c027dd95786c",
+    "tree": "9b67678d9a6cdb6800866df1f71e0913a69089f3",
+    "worktree_clean_before_documentation_update": true
+  }
+}
