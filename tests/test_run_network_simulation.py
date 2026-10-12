@@ -45,6 +45,26 @@ class NetworkSimulationSuitePolicyTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "proxy"):
                 validate_result(0, self.owner, broken, True)
 
+    def test_controlled_stall_has_a_separate_policy_and_never_claims_clean_route_pass(self):
+        browser = copy.deepcopy(self.browser)
+        browser["decision"] = "PASS_POST_CSS_STALL_PROBE"
+        browser["network_simulation"]["post_css_stall_probe"] = {
+            "outcome": "EXERCISED_AND_RESUMED",
+            "policy_result": {"policy": "controlled-post-css-stall-exercised",
+                              "result_is_not_clean_route_pass": True},
+        }
+        validate_result(0, self.owner, browser, False, controlled_stall=True)
+        for corrupt in (
+                lambda row: row["network_simulation"].pop("post_css_stall_probe"),
+                lambda row: row["network_simulation"]["post_css_stall_probe"].update(outcome="FAIL"),
+                lambda row: row["network_simulation"]["post_css_stall_probe"]["policy_result"].update(
+                    result_is_not_clean_route_pass=False),
+                lambda row: row.update(decision="PASS")):
+            damaged = copy.deepcopy(browser)
+            corrupt(damaged)
+            with self.assertRaises(ValueError):
+                validate_result(0, self.owner, damaged, False, controlled_stall=True)
+
 
 if __name__ == "__main__":
     unittest.main()

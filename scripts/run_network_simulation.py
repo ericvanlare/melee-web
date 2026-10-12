@@ -17,10 +17,11 @@ from check_gameplay import node_runtime
 
 ROOT = Path(__file__).resolve().parents[1]
 SCENARIOS = {
-    "css-moderate": ("moderate", False),
-    "full-moderate": ("moderate", True),
-    "full-asymmetric": ("asymmetric", True),
-    "css-constrained": ("constrained", False),
+    "css-moderate": ("moderate", False, False),
+    "full-moderate": ("moderate", True, False),
+    "full-asymmetric": ("asymmetric", True, False),
+    "css-constrained": ("constrained", False, False),
+    "css-constrained-stall": ("constrained", False, True),
 }
 
 
@@ -46,7 +47,7 @@ def runtime_identity(directory):
             for path in sorted(directory.rglob("*")) if path.is_file()}
 
 
-def validate_result(returncode, owner, browser, full_route):
+def validate_result(returncode, owner, browser, full_route, controlled_stall=False):
     """Require both independent owners; an expected fault is a different policy."""
     if returncode != 0:
         raise ValueError(f"capture owner exited {returncode}")
@@ -55,16 +56,23 @@ def validate_result(returncode, owner, browser, full_route):
             owner.get("cleanup_passed") is not True or
             owner.get("process_observation_passed") is not True):
         raise ValueError("capture owner did not verify successful cleanup and observation")
+    expected_decision = "PASS_POST_CSS_STALL_PROBE" if controlled_stall else "PASS"
     if (browser.get("schema") != "melee-web-a3-local-room-keyboard-v1" or
-            browser.get("decision") != "PASS" or browser.get("first_error") is not None or
+            browser.get("decision") != expected_decision or browser.get("first_error") is not None or
             browser.get("relay_mode") != "simulated-network"):
-        raise ValueError("browser did not pass the simulated-network route")
+        raise ValueError("browser did not pass the requested simulated-network result policy")
     network = browser.get("network_simulation") or {}
     if (network.get("proxy_cleanup", {}).get("verified") is not True or
             network.get("proxy_cleanup", {}).get("final") is not True):
         raise ValueError("browser did not verify final proxy integrity and retirement")
     if full_route and (browser.get("full_route") or {}).get("result") != "pass":
         raise ValueError("full route is missing or incomplete")
+    if controlled_stall:
+        probe = network.get("post_css_stall_probe") or {}
+        if (probe.get("outcome") != "EXERCISED_AND_RESUMED" or
+                probe.get("policy_result", {}).get("policy") != "controlled-post-css-stall-exercised" or
+                probe.get("policy_result", {}).get("result_is_not_clean_route_pass") is not True):
+            raise ValueError("controlled-stall probe did not satisfy its separate result policy")
 
 
 def main():
@@ -115,7 +123,7 @@ def main():
         "ready_url": f"http://127.0.0.1:{args.port}/runtime.html", "ready_timeout_ms": 10000})
     try:
         for name in args.scenarios:
-            profile, full_route = SCENARIOS[name]
+            profile, full_route, controlled_stall = SCENARIOS[name]
             folder = output / name
             folder.mkdir()
             command = [sys.executable, str(ROOT / "scripts/capture_owner_deadline.py"),
@@ -133,7 +141,11 @@ def main():
                        "--timeout-ms", "260000", "--network-profile", profile]
             if full_route:
                 command.append("--full-route")
+            if controlled_stall:
+                command.append("--post-css-stall-probe")
             row = {"name": name, "profile": profile, "full_route": full_route,
+                   "controlled_stall_probe": controlled_stall,
+                   "result_policy": "controlled-stall-probe" if controlled_stall else "clean-route",
                    "command": command, "decision": "PLANNED"}
             report["scenarios"].append(row)
             write_json(report_path, report)
@@ -153,12 +165,14 @@ def main():
                     row[key + "_report"] = {"file": str(path.relative_to(output)), **file_identity(path)}
             owner = json.loads((folder / "owner.json").read_text())
             browser = json.loads((folder / "browser/report.json").read_text())
-            validate_result(result.returncode, owner, browser, full_route)
+            validate_result(result.returncode, owner, browser, full_route, controlled_stall)
             if runtime_identity(runtime) != baseline:
                 raise ValueError("served runtime changed during scenario")
-            row["decision"] = "PASS"
+            row["decision"] = "PASS_POST_CSS_STALL_PROBE" if controlled_stall else "PASS"
             write_json(report_path, report)
-        report["decision"] = "PLANNED" if args.plan_only else "PASS"
+        report["decision"] = "PLANNED" if args.plan_only else (
+            "PASS_WITH_CONTROLLED_STALL_PROBE" if any(
+                SCENARIOS[name][2] for name in args.scenarios) else "PASS")
     except Exception as error:
         report["decision"] = "FAIL"
         report["first_error"] = str(error)

@@ -16,15 +16,17 @@ import {parseRoomInvite} from './net_lockstep_room_invite.mjs';
 import {resolveRoomRelayMode} from './a3_public_relay_preflight.mjs';
 import {resolveNetworkSimulation, startNetworkSimulation, calibrateNetworkSimulation,
   observeBrowserNetworkPaths, verifyNetworkProxy, closeNetworkProxy} from './a3_network_simulation.mjs';
+import {resolvePostCssStallProbe, runPostCssStallProbe} from './a3_network_stall_probe.mjs';
 import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS, parseNetChecksum} from './net_lockstep_core.mjs';
 import {checksumCompareReached, checksumWaitDiagnostic} from './a3_checksum_wait_diagnostics.mjs';
 import {runA3LocalFullRoute} from './a3_local_room_full_route.mjs';
 
-const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route]';
+const USAGE = 'node scripts/a3_local_room_keyboard_browser.mjs --url http://127.0.0.1:8787/runtime.html --disc DISC.ciso --out NEW_DIR [--network-profile control|moderate|asymmetric|constrained] [--post-css-stall-probe] [--relay-url wss://STAGING-WORKER] [--relay-preflight READ_ONLY_PREFLIGHT.json] [--playwright DIR] [--min-checksums 120] [--timeout-ms 300000] [--full-route]';
 const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, out: {type: 'string'},
   'relay-url': {type: 'string'}, 'relay-preflight': {type: 'string'},
   'network-profile': {type: 'string'},
+  'post-css-stall-probe': {type: 'boolean', default: false},
   playwright: {type: 'string'}, 'min-checksums': {type: 'string', default: '120'},
   'timeout-ms': {type: 'string', default: '300000'}, 'full-route': {type: 'boolean', default: false},
   help: {type: 'boolean', default: false},
@@ -84,6 +86,11 @@ if (values['relay-preflight'] !== undefined) {
 }
 const relayMode = resolveRoomRelayMode({relayUrl: values['relay-url'], preflight: relayPreflightInput,
   clientOrigin: runtimeUrl.origin});
+const postCssStallProbe = resolvePostCssStallProbe({
+  enabled: values['post-css-stall-probe'], profileName: values['network-profile'],
+  simulationMode: simulationConfiguration?.mode, relayUrl: values['relay-url'],
+  relayPreflight: values['relay-preflight'], fullRoute: values['full-route'],
+});
 const discPath = path.resolve(values.disc);
 const discInfo = await fs.stat(discPath);
 requireCondition(discInfo.isFile() && discInfo.size > 0, '--disc must name a nonempty local file');
@@ -116,6 +123,7 @@ const report = {
   relay_mode: simulationConfiguration?.mode ?? relayMode.mode,
   evidence_scope: simulationConfiguration
     ? 'same-machine simulated-network functional browser ' + (values['full-route'] ? 'full-route attempt' : 'CSS check') +
+      (postCssStallProbe ? ' with an opt-in bounded post-CSS controlled-stall probe' : '') +
       ' using actual Host/Join and keyboard input, real TCP proxy sockets and an owned local Worker; public routing, deployed staging, physical input, two-machine, timing, pixel/PCM equivalence and whole-session acceptance remain pending'
     : relayMode.mode === 'external'
     ? (values['full-route']
@@ -129,7 +137,9 @@ const report = {
   source: null,
   browser: null,
   room_worker: null,
-  network_simulation: simulationConfiguration ? {configuration: simulationConfiguration} : null,
+  network_simulation: simulationConfiguration ? {configuration: simulationConfiguration,
+    ...(postCssStallProbe ? {post_css_stall_probe: {outcome: 'NOT_STARTED',
+      requested: true, policy: postCssStallProbe.resultPolicy}} : {})} : null,
   external_relay_preflight: relayMode.mode === 'external' ? {
     file: path.basename(path.resolve(values['relay-preflight'])),
     sha256: relayPreflightSha256,
@@ -571,7 +581,9 @@ function firstError(message) {
 }
 async function writeReport() {
   report.finished_at = new Date().toISOString();
-  report.decision = report.first_error ? 'FAIL' : 'PASS';
+  report.decision = report.first_error ? 'FAIL' :
+    (report.network_simulation?.post_css_stall_probe?.outcome === 'EXERCISED_AND_RESUMED'
+      ? 'PASS_POST_CSS_STALL_PROBE' : 'PASS');
   await fs.writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n');
 }
 
@@ -783,8 +795,27 @@ try {
       },
     });
   }
+  if (postCssStallProbe) {
+    await runPostCssStallProbe({
+      proxy: networkSimulation.proxy,
+      readRoomState: role => readRoomState(instances[role]),
+      assertHealthy: (state, role) => {
+        const failure = protocolFailure(state, role);
+        requireCondition(!failure, failure || role + ' runtime owner is unhealthy');
+      },
+      remaining,
+      browserPathVerification: report.network_simulation.browser_path,
+      evidence: report.network_simulation.post_css_stall_probe,
+    });
+  }
+  const resumedStallCursors = postCssStallProbe
+    ? ['alpha', 'beta'].map(role =>
+      report.network_simulation.post_css_stall_probe.resumed.peers[role].source_cursor)
+    : [];
+  requireCondition(resumedStallCursors.every(Number.isSafeInteger),
+    'Post-stall resumed source cursor is unavailable');
   const requiredChecksums = Math.max(minimumChecksums,
-    report.full_route?.required_checksum_boundary || 0);
+    report.full_route?.required_checksum_boundary || 0, ...resumedStallCursors);
   requireCondition(requiredChecksums <= invite.sourceTicks,
     'Required full-route checksum boundary exceeds the Host/Join source-tick limit');
   const progress = await waitForBothCssAndProgress(requiredChecksums);
