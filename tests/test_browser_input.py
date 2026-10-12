@@ -76,6 +76,69 @@ class BrowserInputTests(unittest.TestCase):
     def test_focus_and_visibility_neutralize_without_waiting_for_frame(self):
         self.run_case("focus_and_visibility")
 
+    def test_repeat_checkpoint_uses_actual_producer_schema_and_current_sample_counter(self):
+        import sys
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from run_network_simulation import validate_repeat_checkpoint_input
+        from check_gameplay import node_runtime
+        result = self.run_case("repeat_checkpoint_neutral")
+        self.assertNotIn("port", result)
+        self.assertNotIn("sample", result)
+        self.assertEqual(result["samples"], 2)
+        self.assertEqual(result["last_non_neutral"]["sample"], 1)
+        for port in (0, 1):
+            validate_repeat_checkpoint_input(result, port)
+        source = (ROOT / "scripts/a3_local_room_keyboard_browser.mjs").read_text()
+        helper = source[source.index("function validateRepeatCheckpointInput("):
+                        source.index("async function readInputDiagnostics(")]
+        collector = source[source.index("    const collectCheckpoint = async label => {"):
+                           source.index("    const samePageObjects =", source.index("    const collectCheckpoint = async label => {"))]
+        script = "const input = " + json.dumps(result) + ";\n" + """
+const assert = require('node:assert/strict');
+function requireCondition(condition, message) { if (!condition) throw Error(message); }
+""" + helper + """
+for (const port of [0, 1]) validateRepeatCheckpointInput(input, port, 'native fixture');
+for (const corrupt of [
+  row => { delete row.samples; row.sample = 2; row.port = 0; },
+  row => { row.samples = true; }, row => { row.keyboard_layout = 1; },
+  row => { row.keyboard_active_mask = 0; }, row => { row.focused = 0; },
+  row => { row.pads[0].source = 'gamepad'; }, row => { row.pads[0].buttons = 1; },
+  row => { row.pads[0].stick = [1, 0]; }, row => { row.pads[0].clamped.triggers = [0, 1]; },
+  row => { row.error = 'input error'; }, row => { row.pads.pop(); },
+]) {
+  const damaged = structuredClone(input); corrupt(damaged);
+  assert.throws(() => validateRepeatCheckpointInput(damaged, 0, 'negative native fixture'));
+}
+"""
+        script += """
+const instances = {alpha: {role:'alpha'}, beta: {role:'beta'}};
+const initialPages = instances, repeat = {checkpoint_observations: []}, roomIdentity = {};
+let nextInput = input;
+const readInputDiagnostics = async () => structuredClone(nextInput);
+const protocol = instance => ({role:instance.role,local_port:instance.role==='alpha'?0:1,
+  local_checksum_ticks:2,remote_checksum_ticks:2,next_checksum_compare:2});
+const readRoomState = async instance => ({native_status:{cursor:2},
+  owner_health:{peer:{protocol:protocol(instance)}}});
+const readPeerSnapshot = async instance => ({health:{peer:{protocol:protocol(instance)}},
+  snapshot:{checksums:[[],[]]}});
+const assertHealthyState = () => {};
+""" + collector + """
+(async () => {
+  await collectCheckpoint('positive native producer');
+  assert.equal(repeat.checkpoint_observations.length,1);
+  assert.deepEqual(repeat.checkpoint_observations[0].input_observations.alpha,input);
+  nextInput=structuredClone(input);nextInput.pads[0].buttons=1;
+  await assert.rejects(collectCheckpoint('negative native producer'));
+  const failed=repeat.checkpoint_observations[1];
+  assert.equal(failed.result,'observed_pending_validation');
+  assert.deepEqual(failed.input_observations.alpha,nextInput);
+  assert.deepEqual(failed.input_observations.beta,nextInput);
+})().catch(error=>{console.error(error);process.exitCode=1;});
+"""
+        command = [node_runtime(ROOT), "-e", script]
+        checked = subprocess.run(command, capture_output=True, text=True, timeout=20)
+        self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+
     def test_last_sample_history_survives_release_but_current_input_resets(self):
         result = self.run_case("last_non_neutral")
         self.assertEqual(result["samples"], 3)

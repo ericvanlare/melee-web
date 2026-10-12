@@ -108,6 +108,34 @@ def _sha256_string(value):
     return isinstance(value, str) and re.fullmatch(r"[a-f0-9]{64}", value) is not None
 
 
+def validate_repeat_checkpoint_input(input_row, port):
+    """Validate the existing melee_web_input_message schema, not its history entry."""
+    def neutral_pair(value):
+        return isinstance(value, list) and len(value) == 2 and all(type(v) is int and v == 0 for v in value)
+    def require(condition):
+        if not condition:
+            raise ValueError("repeated full route source input snapshot lacks the active neutral keyboard port or sample counter")
+    require(isinstance(input_row, dict))
+    for field in ("ready", "focused", "visible", "active"):
+        require(type(input_row.get(field)) is int and input_row[field] == 1)
+    require(input_row.get("error") == "" and type(input_row.get("keyboard_layout")) is int and
+            input_row["keyboard_layout"] == 0 and _nonnegative_int(input_row.get("samples")) and
+            input_row["samples"] > 0)
+    for field in ("keyboard_requested_mask", "keyboard_active_mask", "physical_mask"):
+        require(_nonnegative_int(input_row.get(field)))
+    require(input_row["keyboard_requested_mask"] & (1 << port) != 0 and
+            input_row["keyboard_active_mask"] & (1 << port) != 0 and
+            input_row["physical_mask"] & (1 << port) == 0)
+    pads = input_row.get("pads")
+    require(isinstance(pads, list) and len(pads) == 4 and isinstance(pads[port], dict))
+    pad = pads[port]
+    require(pad.get("source") == "keyboard" and type(pad.get("err")) is int and pad["err"] == 0 and
+            type(pad.get("buttons")) is int and pad["buttons"] == 0 and
+            all(neutral_pair(pad.get(field)) for field in ("stick", "cstick", "triggers", "analog")) and
+            isinstance(pad.get("clamped"), dict) and
+            all(neutral_pair(pad["clamped"].get(field)) for field in ("stick", "cstick", "triggers")))
+
+
 def validate_repeat_route(route, checksum_comparison):
     """Require two retained same-room routes and a common raw checksum prefix."""
     def require(condition, message):
@@ -181,8 +209,10 @@ def validate_repeat_route(route, checksum_comparison):
                 f"{role} owner role/port changed across routes")
         for checkpoint in (first_return, second_entry, second_return):
             input_row = ((checkpoint.get("peers") or {}).get(role) or {}).get("input_diagnostics") or {}
-            require(input_row.get("port") == port and _nonnegative_int(input_row.get("sample")),
-                    f"{role} source input snapshot is missing or has the wrong port")
+            validate_repeat_checkpoint_input(input_row, port)
+        samples = [checkpoint["peers"][role]["input_diagnostics"]["samples"]
+                   for checkpoint in (first_return, second_entry, second_return)]
+        require(samples[0] <= samples[1] <= samples[2], f"{role} input sample counter regressed")
 
     prefix = first_return.get("common_raw_prefix")
     require(isinstance(prefix, dict) and prefix.get("result") == "pass" and

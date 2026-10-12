@@ -8,6 +8,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from run_network_simulation import validate_result
 
 
+def neutral_input_diagnostic(samples):
+    """Synthetic full shape matching browser_input.cpp; actual producer is tested separately."""
+    pad = {"source": "keyboard", "err": 0, "buttons": 0, "stick": [0, 0],
+           "cstick": [0, 0], "triggers": [0, 0], "analog": [0, 0],
+           "clamped": {"stick": [0, 0], "cstick": [0, 0], "triggers": [0, 0]}}
+    return {"ready": 1, "focused": 1, "visible": 1, "active": 1,
+            "keyboard_requested": 1, "keyboard_active": 1,
+            "keyboard_requested_mask": 3, "keyboard_active_mask": 3, "physical_mask": 0,
+            "keyboard_layout": 0, "samples": samples, "error": "",
+            "pads": [copy.deepcopy(pad) for _ in range(4)], "last_non_neutral": None}
+
+
 class NetworkSimulationSuitePolicyTests(unittest.TestCase):
     def setUp(self):
         self.owner = {"schema": "melee-web-capture-process-owner-v3", "result": "pass",
@@ -79,8 +91,7 @@ class NetworkSimulationSuitePolicyTests(unittest.TestCase):
                             "remote": count, "compared": count},
                         "peer_identity": {"role": role, "local_port": 0 if role == "alpha" else 1,
                             "owner_seed": 77},
-                        "input_diagnostics": {"port": 0 if role == "alpha" else 1,
-                            "sample": cursor, "source": "keyboard", "buttons": 0}}
+                        "input_diagnostics": neutral_input_diagnostic(cursor)}
                         for role in ("alpha", "beta")}}
         first_boundary, second_boundary = 20, 30
         checksum = self.repeat_checksum_comparison()
@@ -129,6 +140,30 @@ class NetworkSimulationSuitePolicyTests(unittest.TestCase):
                          "alpha_raw_hex": raw.hex(), "beta_raw_hex": raw.hex()})
         return {"compared_source_ticks": 30, "exact_record_count_each": 30,
                 "source_tick_range": [0, 29], "records": rows}
+
+    def test_repeat_input_rejects_wrong_source_non_neutral_or_history_only_shape(self):
+        from run_network_simulation import validate_repeat_checkpoint_input, validate_repeat_route
+        mutations = [
+            lambda row: row.update(samples=True), lambda row: row.pop("samples"),
+            lambda row: row.update(ready=0), lambda row: row.update(keyboard_active_mask=1),
+            lambda row: row.update(physical_mask=2), lambda row: row.update(error="input failed"),
+            lambda row: row["pads"][1].update(source="none"),
+            lambda row: row["pads"][1].update(err=-1),
+            lambda row: row["pads"][1].update(buttons=1),
+            lambda row: row["pads"][1].update(stick=[0, 1]),
+            lambda row: row["pads"][1]["clamped"].update(cstick=[1, 0]),
+        ]
+        for index, corrupt in enumerate(mutations):
+            with self.subTest(index=index):
+                row = neutral_input_diagnostic(100)
+                corrupt(row)
+                with self.assertRaises(ValueError): validate_repeat_checkpoint_input(row, 1)
+        with self.assertRaises(ValueError):
+            validate_repeat_checkpoint_input({"port": 1, "sample": 100}, 1)
+        route = self.repeat_route()
+        route["repeated_matches"][1]["entry"]["peers"]["beta"]["input_diagnostics"]["samples"] = 99
+        with self.assertRaisesRegex(ValueError, "input sample counter regressed"):
+            validate_repeat_route(route, self.repeat_checksum_comparison())
 
     def test_repeat_requires_two_routes_same_room_raw_prefix_and_budget(self):
         from run_network_simulation import validate_repeat_artifacts, validate_repeat_route

@@ -330,6 +330,26 @@ async function readRoomCursors(port) {
   return {alpha: rows[0], beta: rows[1]};
 }
 
+function validateRepeatCheckpointInput(input, port, label) {
+  const neutralPair = value => Array.isArray(value) && value.length === 2 &&
+    value.every(component => component === 0);
+  const pad = input?.pads?.[port];
+  requireCondition(input?.ready === 1 && input.focused === 1 && input.visible === 1 &&
+    input.active === 1 && input.error === '' && input.keyboard_layout === 0 &&
+    Number.isSafeInteger(input.samples) && input.samples > 0 &&
+    Number.isSafeInteger(input.keyboard_requested_mask) && input.keyboard_requested_mask >= 0 &&
+    Number.isSafeInteger(input.keyboard_active_mask) && input.keyboard_active_mask >= 0 &&
+    Number.isSafeInteger(input.physical_mask) && input.physical_mask >= 0 &&
+    (input.keyboard_requested_mask & (1 << port)) !== 0 &&
+    (input.keyboard_active_mask & (1 << port)) !== 0 &&
+    (input.physical_mask & (1 << port)) === 0 &&
+    Array.isArray(input.pads) && input.pads.length === 4 && pad?.source === 'keyboard' &&
+    pad.err === 0 && pad.buttons === 0 && neutralPair(pad.stick) && neutralPair(pad.cstick) &&
+    neutralPair(pad.triggers) && neutralPair(pad.analog) && neutralPair(pad.clamped?.stick) &&
+    neutralPair(pad.clamped?.cstick) && neutralPair(pad.clamped?.triggers),
+  label + ': source input snapshot lacks the active neutral keyboard port or sample counter');
+}
+
 async function readInputDiagnostics(instance) {
   return instance.page.evaluate(() => {
     const module = globalThis.Module;
@@ -968,6 +988,7 @@ try {
       result: 'running', scope: 'two original full routes in one continuously owned room',
       repeat_mode: 'same-room-two-match', gameplay_action_probe: false,
       required_checksum_boundary: 0, active_match_number: null, repeated_matches: [],
+      checkpoint_observations: [],
       admission: null, final_prefix: null,
       exclusions: ['same persistent browser pages, Worker, Host/Join room and owner session',
         'no reconfigure, reseed, reload, close, reconnect or synthetic input between matches',
@@ -1005,6 +1026,10 @@ try {
       const inputs = await Promise.all([readInputDiagnostics(initialPages.alpha),
         readInputDiagnostics(initialPages.beta)]);
       const peers = {};
+      const checkpoint = {label, observed_at: new Date().toISOString(),
+        result: 'observed_pending_validation', room_identity: roomIdentity,
+        input_observations: {alpha: inputs[0], beta: inputs[1]}, peers};
+      repeat.checkpoint_observations.push(checkpoint);
       for (const [index, role] of ['alpha', 'beta'].entries()) {
         const state = states[index];
         const snapshot = snapshots[index];
@@ -1020,9 +1045,7 @@ try {
         requireCondition(protocol.role === snapshotProtocol.role && protocol.local_port === snapshotProtocol.local_port,
           label + ': ' + role + ' owner role/port differs between status and checksum snapshot');
         const input = inputs[index];
-        requireCondition(input.port === (role === 'alpha' ? 0 : 1) &&
-          Number.isSafeInteger(input.sample) && input.sample >= 0,
-        label + ': ' + role + ' source input snapshot is incomplete or on the wrong port');
+        validateRepeatCheckpointInput(input, role === 'alpha' ? 0 : 1, label + ': ' + role);
         peers[role] = {
           source_cursor: state.native_status.cursor,
           input_diagnostics: input,
@@ -1032,7 +1055,8 @@ try {
             owner_seed: state.native_status.seed ?? null},
         };
       }
-      return {label, observed_at: new Date().toISOString(), room_identity: roomIdentity, peers};
+      checkpoint.result = 'validated_observations';
+      return checkpoint;
     };
     const samePageObjects = () => instances.alpha === initialPages.alpha && instances.beta === initialPages.beta;
     let secondRouteRemaining = null;
@@ -1136,6 +1160,9 @@ try {
       for (const role of ['alpha', 'beta']) {
         requireCondition(entryCheckpoint.peers[role].source_cursor >= firstEntry.first_return.peers[role].source_cursor,
           'Match two ' + role + ' source cursor regressed before entry');
+        requireCondition(entryCheckpoint.peers[role].input_diagnostics.samples >=
+          firstEntry.first_return.peers[role].input_diagnostics.samples,
+        'Match two ' + role + ' input sample counter regressed before entry');
         for (const counter of ['retained', 'local', 'remote', 'compared'])
           requireCondition(entryCheckpoint.peers[role].checksum_counts[counter] >=
             firstEntry.first_return.peers[role].checksum_counts[counter],
@@ -1181,6 +1208,8 @@ try {
         const routeCursor = secondEntry.route.returned_css.source_cursor_by_peer[role];
         requireCondition(after.source_cursor >= routeCursor && after.source_cursor > before.source_cursor,
           'Match two ' + role + ' source cursor did not advance through returned CSS');
+        requireCondition(after.input_diagnostics.samples >= before.input_diagnostics.samples,
+          'Match two ' + role + ' input sample counter regressed by returned CSS');
         for (const counter of ['retained', 'local', 'remote', 'compared'])
           requireCondition(after.checksum_counts[counter] >= before.checksum_counts[counter],
             'Match two ' + role + ' checksum count regressed by returned CSS');
