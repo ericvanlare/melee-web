@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCENARIOS = {
     "css-moderate": ("moderate", False),
     "full-moderate": ("moderate", True),
+    "full-moderate-action-probe": ("moderate", True),
     "full-asymmetric": ("asymmetric", True),
     "css-constrained": ("constrained", False),
 }
@@ -46,7 +47,7 @@ def runtime_identity(directory):
             for path in sorted(directory.rglob("*")) if path.is_file()}
 
 
-def validate_result(returncode, owner, browser, full_route):
+def validate_result(returncode, owner, browser, full_route, gameplay_action_probe=False):
     """Require both independent owners; an expected fault is a different policy."""
     if returncode != 0:
         raise ValueError(f"capture owner exited {returncode}")
@@ -65,6 +66,17 @@ def validate_result(returncode, owner, browser, full_route):
         raise ValueError("browser did not verify final proxy integrity and retirement")
     if full_route and (browser.get("full_route") or {}).get("result") != "pass":
         raise ValueError("full route is missing or incomplete")
+    if browser.get("gameplay_action_probe") is not gameplay_action_probe:
+        raise ValueError("browser gameplay action mode differs from the requested scenario")
+    if full_route:
+        route = browser["full_route"]
+        if route.get("gameplay_action_probe") is not gameplay_action_probe:
+            raise ValueError("full route gameplay action mode differs from the requested scenario")
+        if gameplay_action_probe:
+            if (route.get("action_prefix") or {}).get("result") != "pass":
+                raise ValueError("requested gameplay action probe is incomplete")
+        elif route.get("action_prefix") is not None:
+            raise ValueError("baseline unexpectedly contains a gameplay action probe")
 
 
 def main():
@@ -116,6 +128,7 @@ def main():
     try:
         for name in args.scenarios:
             profile, full_route = SCENARIOS[name]
+            gameplay_action_probe = name == "full-moderate-action-probe"
             folder = output / name
             folder.mkdir()
             command = [sys.executable, str(ROOT / "scripts/capture_owner_deadline.py"),
@@ -133,8 +146,10 @@ def main():
                        "--timeout-ms", "260000", "--network-profile", profile]
             if full_route:
                 command.append("--full-route")
+            if gameplay_action_probe:
+                command.append("--gameplay-action-probe")
             row = {"name": name, "profile": profile, "full_route": full_route,
-                   "command": command, "decision": "PLANNED"}
+                   "gameplay_action_probe": gameplay_action_probe, "command": command, "decision": "PLANNED"}
             report["scenarios"].append(row)
             write_json(report_path, report)
             if args.plan_only:
@@ -153,7 +168,7 @@ def main():
                     row[key + "_report"] = {"file": str(path.relative_to(output)), **file_identity(path)}
             owner = json.loads((folder / "owner.json").read_text())
             browser = json.loads((folder / "browser/report.json").read_text())
-            validate_result(result.returncode, owner, browser, full_route)
+            validate_result(result.returncode, owner, browser, full_route, gameplay_action_probe)
             if runtime_identity(runtime) != baseline:
                 raise ValueError("served runtime changed during scenario")
             row["decision"] = "PASS"

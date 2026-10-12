@@ -324,15 +324,17 @@ export function classifyStockObservation(row, label = 'stock observation') {
 export async function runA3LocalFullRoute({
   alpha, beta, report, inputDelay, remaining, readRoomState, readPeerSnapshot,
   readInputDiagnostics, waitForBothChecksumCompare, captureScreenshot,
-  assertHealthy,
+  assertHealthy, gameplayActionProbe = false,
 }) {
   const route = {
     result: 'running', scope: 'local keyboard route/lifecycle witness only',
     phases: [], css_roster: [], stage: null, match_start: [], stock_losses: [],
     respawns: [], input_actions: [], terminal_handoff: null, results: null, returned_css: null,
-    required_checksum_boundary: null,
+    required_checksum_boundary: null, gameplay_action_probe: gameplayActionProbe,
     exclusions: ['no PAD/Gamepad input injection',
-      'one short P2 gameplay axis pulse, one P1 grounded jab, and one P2 jump with source motion evidence; no combat-coverage claim',
+      gameplayActionProbe
+        ? 'one short P2 gameplay axis pulse, one P1 grounded jab, and one P2 jump with source motion evidence; no combat-coverage claim'
+        : 'one short P2 gameplay axis pulse; attack/jump probe not requested, no combat-coverage claim',
       'no forced stock/result or native match-state mutation',
       'no retail, public Worker, physical-input, pixel, PCM, or timing-equivalence claim'],
   };
@@ -1080,32 +1082,37 @@ export async function runA3LocalFullRoute({
       p2_position_delta_by_peer: p2PositionDeltas};
 
 
-  // Preserve the P2 horizontal pulse witness above, then add one bounded
-  // grounded P1 jab and one natural P2 jump using the same live keyboard path.
-  route.action_prefix = {scope: 'one grounded P1 jab and one P2 jump with matched source motion evidence; no combat-coverage claim',
-    source_observer: '_melee_web_native_menu_match_observe via fresh common-source peer rows',
-    motion_ids: {ftCo_MS_Wait: 14, ftCo_MS_KneeBend: 24,
-      ftCo_MS_JumpF: 25, ftCo_MS_JumpB: 26, ftCo_MS_Attack11: 44},
-    max_source_ticks_per_action: 60, baselines: [], actions: []};
-  const actionStartBaseline = await waitForGroundedNeutralBaseline(
-    'pre-jab grounded neutral [4,4] baseline', p2RequiredBoundary);
-  const p1Jab = await runObservedGameplayAction({label: 'P1 grounded keyboard jab',
-    role: 'alpha', key: 'j', button: 0x0100, targetMotions: [44],
-    beforeBaseline: actionStartBaseline});
-  const p1JabGrounded = await waitForGroundedNeutralBaseline(
-    'post-jab grounded neutral [4,4] baseline',
-    p1Jab.inputWindow.validated.neutral_release_input_tick + inputDelay + 1);
-  p1Jab.record.after_grounded_neutral_baseline = p1JabGrounded.report;
-  const p2Jump = await runObservedGameplayAction({label: 'P2 keyboard jump',
-    role: 'beta', key: 'Delete', button: 0x0400, targetMotions: [25, 26],
-    beforeBaseline: p1JabGrounded, observePress: true});
-  const postJumpGrounded = await waitForGroundedNeutralBaseline(
-    'post-jump grounded neutral [4,4] baseline',
-    p2Jump.inputWindow.validated.neutral_release_input_tick + inputDelay + 1);
-  p2Jump.record.after_grounded_neutral_baseline = postJumpGrounded.report;
-  route.action_prefix.walkoff_baseline = postJumpGrounded.report;
-  const walkoffBaseRows = postJumpGrounded.rows;
-  const walkoffBaseMatches = postJumpGrounded.matches;
+  let walkoffBaseRows = p2AfterRows;
+  let walkoffBaseMatches = p2AfterMatches;
+  if (gameplayActionProbe) {
+    // Preserve the P2 horizontal pulse witness above, then add one bounded
+    // grounded P1 jab and one natural P2 jump using the same live keyboard path.
+    route.action_prefix = {scope: 'one grounded P1 jab and one P2 jump with matched source motion evidence; no combat-coverage claim',
+      source_observer: '_melee_web_native_menu_match_observe via fresh common-source peer rows',
+      motion_ids: {ftCo_MS_Wait: 14, ftCo_MS_KneeBend: 24,
+        ftCo_MS_JumpF: 25, ftCo_MS_JumpB: 26, ftCo_MS_Attack11: 44},
+      max_source_ticks_per_action: 60, baselines: [], actions: []};
+    const actionStartBaseline = await waitForGroundedNeutralBaseline(
+      'pre-jab grounded neutral [4,4] baseline', p2RequiredBoundary);
+    const p1Jab = await runObservedGameplayAction({label: 'P1 grounded keyboard jab',
+      role: 'alpha', key: 'j', button: 0x0100, targetMotions: [44],
+      beforeBaseline: actionStartBaseline});
+    const p1JabGrounded = await waitForGroundedNeutralBaseline(
+      'post-jab grounded neutral [4,4] baseline',
+      p1Jab.inputWindow.validated.neutral_release_input_tick + inputDelay + 1);
+    p1Jab.record.after_grounded_neutral_baseline = p1JabGrounded.report;
+    const p2Jump = await runObservedGameplayAction({label: 'P2 keyboard jump',
+      role: 'beta', key: 'Delete', button: 0x0400, targetMotions: [25, 26],
+      beforeBaseline: p1JabGrounded, observePress: true});
+    const postJumpGrounded = await waitForGroundedNeutralBaseline(
+      'post-jump grounded neutral [4,4] baseline',
+      p2Jump.inputWindow.validated.neutral_release_input_tick + inputDelay + 1);
+    p2Jump.record.after_grounded_neutral_baseline = postJumpGrounded.report;
+    route.action_prefix.walkoff_baseline = postJumpGrounded.report;
+    walkoffBaseRows = postJumpGrounded.rows;
+    walkoffBaseMatches = postJumpGrounded.matches;
+    route.action_prefix.result = 'pass';
+  }
 
   // P1 walk-off uses one reconciler at common source ticks before and after
   // each pulse. A natural stock decrement may occur between pulses, so
