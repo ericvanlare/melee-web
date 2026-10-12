@@ -21,15 +21,19 @@ export function createRoomId() {
   return encoded;
 }
 
-function roomEndpointUrl(url, roomId) {
+export function validateRoomRelayBaseUrl(url) {
   if (typeof url !== 'string' || !url) throw Error('A room relay URL is required');
-  if (typeof roomId !== 'string' || !/^[A-Za-z0-9_-]{22,64}$/.test(roomId))
-    throw Error('Room relay ID must be a 22..64 character base64url token');
   const base = new URL(url);
   if (base.protocol !== 'ws:' && base.protocol !== 'wss:') throw Error('Room relay URL must use ws or wss');
-  if (base.username || base.password || base.search || base.hash)
-    throw Error('Room relay URL cannot contain credentials, a query, or a fragment');
-  return `${base.origin}/v1/rooms/${roomId}/socket`;
+  if (base.pathname !== '/' || base.username || base.password || base.search || base.hash)
+    throw Error('Room relay URL must be a ws or wss base URL without credentials, a path, query, or fragment');
+  return base.origin;
+}
+
+function roomEndpointUrl(url, roomId) {
+  if (typeof roomId !== 'string' || !/^[A-Za-z0-9_-]{22,64}$/.test(roomId))
+    throw Error('Room relay ID must be a 22..64 character base64url token');
+  return `${validateRoomRelayBaseUrl(url)}/v1/rooms/${roomId}/socket`;
 }
 
 function waitForOpen(socket, timeoutMs) {

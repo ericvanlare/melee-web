@@ -213,8 +213,9 @@ def wait_terminal_statuses(observer, native, deadline):
     raise SdDiagnosticError("SD independent writer finalization deadline expired")
 
 
-def wait_transform_terminal_statuses(observer, native, deadline, wait_check=None, *, input_mode="record"):
-    """Wait for completed observer and mode-specific native input status."""
+def wait_transform_terminal_statuses(observer, native, deadline, wait_check=None, *,
+                                     input_mode="record", items_only=False):
+    """Wait for the declared observer terminal and mode-specific MWRI status."""
     require(input_mode in ("record", "replay"), "Native input mode is unknown")
     while time.monotonic() < deadline:
         if wait_check is not None:
@@ -227,7 +228,8 @@ def wait_transform_terminal_statuses(observer, native, deadline, wait_check=None
         if inputs:
             require(not inputs["invalid"] and inputs["error"] is None,
                     "Sheik native input writer failed during finalization")
-        if primary and primary["state"] == "completed" and inputs and inputs["complete"]:
+        terminal = "interrupted" if items_only else "completed"
+        if primary and primary["state"] == terminal and inputs and inputs["complete"]:
             return primary, inputs
         time.sleep(0.02)
     raise SdDiagnosticError("Sheik independent writer finalization deadline expired")
@@ -261,34 +263,18 @@ def _transform_slices(payload):
 
 
 def _transform_consumed_ports(payload, sequence):
-    """Read all four source PAD slots and preserve the queue's exact slot identity."""
-    data, metadata = _transform_slices(payload)
-    require([(item["tag"], item["flags"], item["size"])
-             for item in payload["slices"]] == [(2, 0, 0x0C), (3, 0, 0x30)],
-            f"PAD consume {sequence} lacks the full typed queue/slot record")
-    queue, slot = data[(2, 0)], data[(3, 0)]
-    require(metadata[(2, 0)]["address"] == 0x804C1F78 and
-            0x80000000 <= metadata[(3, 0)]["address"] < 0x81800000,
-            f"PAD consume {sequence} escaped the original source queue")
-    registers = payload.get("gprs")
-    require(isinstance(registers, list) and len(registers) == 32,
-            f"PAD consume {sequence} lacks source queue registers")
-    count, base = queue[0], int.from_bytes(queue[8:12], "big")
-    read_index, slot_pointer = registers[6] & 0xFF, registers[25]
-    slot_address = metadata[(3, 0)]["address"]
-    require(count > 0 and read_index < count and base > 0 and
-            base + read_index * 0x30 == slot_pointer == slot_address,
-            f"PAD consume {sequence} queue/read/slot ownership differs")
-    ports = [slot[index * 12:index * 12 + 11].hex() for index in range(4)]
-    errors = [byte if byte < 0x80 else byte - 0x100
-              for byte in (slot[index * 12 + 10] for index in range(4))]
-    return ports, errors, {"queue_base": base, "queue_count": count,
-                           "queue_slot_index": read_index, "queue_slot_address": slot_address}
+    from sheik_transform_prefix import transform_consumed_ports
+    return transform_consumed_ports(payload, sequence)
 
 
 class SheikTransformPrefixReceiver:
     """Small menu/input adapter over the existing passive transform MWRO stream."""
-    def __init__(self, plan, menus):
+    def __init__(self, plan, menus, *, items_only=False):
+        from sheik_transform_prefix import TransformItemsProgress
+        self.items_only = items_only
+        self.transform_route = menus["scope"] == "sheik_transform_prefix"
+        self.items_progress = (TransformItemsProgress(items_only=items_only)
+                               if self.transform_route else None)
         from sd_original_menu_plan import route_pads
         self.plan, self.menus = plan, menus
         self.allowed_menu_pads = route_pads(menus)
@@ -321,6 +307,19 @@ class SheikTransformPrefixReceiver:
         self._stage_stable_polls = 0
         self.css_live_owner_sequence = None
         self.sss_live_owner_sequence = None
+        self.items_lock_transitions = []
+        self.items_unlock_sequence = None
+        self.items_row_up_consume_sequence = None
+        self.items_row_up_release_sequence = None
+        self.items_row_up_held = False
+
+    def _sync_items_progress(self):
+        p = self.items_progress
+        self.items_lock_transitions = p.transitions
+        self.items_unlock_sequence = p.unlock
+        self.items_row_up_consume_sequence = p.up
+        self.items_row_up_release_sequence = p.release
+        self.items_row_up_held = p.held
 
     def _menu_owner_pad_poll(self, payload):
         from sheik_transform_prefix import _menu_owner_pad_poll
@@ -328,11 +327,26 @@ class SheikTransformPrefixReceiver:
 
     def _pad_poll(self, row):
         from sd_reference_diagnostic import menu_state, css_state
+        from sheik_transform_prefix import PAD_POLL_PC, _transform_menu_state
         payload = row["payload"]
+        if self.transform_route:
+            require(payload.get("pc") == PAD_POLL_PC,
+                    "Transform menu owner sample is not at the pinned original PadPoll boundary")
         data, _ = _transform_slices(payload)
         self.menu_polls += 1
+        if self.transform_route:
+            self.items_progress.observe(row)
+            self._sync_items_progress()
+            scene_slices = [item for item in payload["slices"] if item["tag"] == 40]
+            require(len(scene_slices) <= 1 and
+                    (not scene_slices or scene_slices[0]["flags"] == 0),
+                    "Transform PadPoll has a duplicate or ambiguous scene owner")
+            if not scene_slices:
+                require(not any(item["tag"] == 56 for item in payload["slices"]),
+                        "Transform PadPoll exposes the Items lock without a scene owner")
         if (40, 0) in data:
-            self.latest_menu = menu_state(data)
+            self.latest_menu = (_transform_menu_state(payload) if self.transform_route
+                                else menu_state(data))
             menu_owner = self._menu_owner_pad_poll(payload)
             if self.latest_menu.get("scene") == 8:
                 if menu_owner == "css":
@@ -390,6 +404,9 @@ class SheikTransformPrefixReceiver:
                     "Original menu consumed PAD escaped its declared P1/P2 route alphabet")
             self.consumed_samples.append({"sequence": row["seq"], "phase": "menu",
                                           "ports": ports, "errors": errors})
+            if self.transform_route:
+                self.items_progress.observe(row)
+                self._sync_items_progress()
             return
         down_b = _validate_consumed_pad(row["payload"], row["seq"])
         witness = self.plan["authored_recipe"]["input_witness"]
@@ -472,12 +489,25 @@ class SheikTransformPrefixReceiver:
         self.seq += 1
         event, payload = row["event"], row["payload"]
         if event in ("handshake", "start"):
+            from sheik_transform_prefix import ITEMS_COMPLETION_BOUNDARY, COMPLETION_BOUNDARY
             require(payload.get("diagnostic") == "sheik_transform_prefix" and
+                    payload.get("completion_boundary") ==
+                    (ITEMS_COMPLETION_BOUNDARY if self.items_only else COMPLETION_BOUNDARY) and
                     not payload.get("whole_session"),
                     "Observer handshake/start escaped the declared transform-prefix profile")
             return
         if event == "error":
             raise SdDiagnosticError("Transform observer error: " + str(payload.get("error")))
+        if event == "end" and self.items_only:
+            from sheik_transform_prefix import ITEMS_COMPLETION_BOUNDARY
+            proof = self.items_progress.finish()
+            require(payload.get("status") == "interrupted" and payload.get("natural") is False and
+                    payload.get("items_boundary_complete") is True and
+                    payload.get("completion_boundary") == ITEMS_COMPLETION_BOUNDARY and
+                    payload.get("transform_complete") is False and payload.get("match_complete") is False,
+                    "Reduced Items stream lacks its explicit interrupted Items completion")
+            self.ended = True
+            return
         if event == "end":
             require(payload.get("status") == "completed" and payload.get("natural") is True and
                     payload.get("match_complete") is False and self.post_swap_neutral is not None,
@@ -487,6 +517,8 @@ class SheikTransformPrefixReceiver:
         require(event == "boundary" and payload.get("whole_session") is not True,
                 "Unexpected event in passive transform-prefix observer stream")
         boundary = payload.get("boundary")
+        require(not self.items_only or boundary in ("pad_poll", "pad_consume"),
+                "Reduced Items stream continued into setup or transformation")
         if boundary == "pad_poll":
             self._pad_poll(row)
         elif boundary == "setup":
@@ -504,6 +536,13 @@ class SheikTransformPrefixReceiver:
             verify_entry(self.plan, self.setup_hex)
             self.setup_sample = _decode_owner_sample(payload, setup=True,
                                                      sequence=row["seq"], source_tick=payload.get("source_tick"))
+            require(self.items_unlock_sequence is not None and
+                    self.items_row_up_consume_sequence is not None and
+                    self.items_row_up_release_sequence is not None and
+                    self.items_unlock_sequence < self.items_row_up_consume_sequence <
+                    self.items_row_up_release_sequence <
+                    self.css_live_owner_sequence < self.sss_live_owner_sequence < row["seq"],
+                    "VS setup preceded the observed unlocked Items Up/neutral and ordered CSS/SSS owners")
             self.setup_seen = True
         elif boundary == "pad_consume":
             self._pad_consume(row)
@@ -514,6 +553,13 @@ class SheikTransformPrefixReceiver:
             raise SdDiagnosticError("Unexpected boundary inside transform-prefix source interval")
 
     def finish(self):
+        if self.items_only:
+            require(self.ended and not self.setup_seen, "Reduced Items receiver did not end before setup")
+            return {"scope": "sheik_transform_items_readiness",
+                    "items": self.items_progress.finish(),
+                    "consumed_source_pads": self.consumed_samples,
+                    "pad_queue_records": self.pad_queue_records}
+        self.items_progress.finish()
         require(self.ended and self.setup_seen and self.down_b_consumed and self.down_b_released and
                 self.grounded_zelda_sequence is not None and self.after_swap is not None and
                 self.post_swap_neutral is not None and self.active_source_ticks <= 600,
@@ -526,6 +572,15 @@ class SheikTransformPrefixReceiver:
             "menu_owner_sequences": {"css": self.css_live_owner_sequence,
                                      "sss": self.sss_live_owner_sequence,
                                      "setup": self.setup_sample["sequence"]},
+            "items_lock_readiness": {
+                "transitions": self.items_lock_transitions,
+                "first_unlocked_pad_poll": self.items_unlock_sequence,
+                "frequency_row_up_consume": self.items_row_up_consume_sequence,
+                "frequency_row_neutral_release": self.items_row_up_release_sequence,
+                "up_followed_unlock": (self.items_unlock_sequence is not None and
+                                       self.items_row_up_consume_sequence is not None and
+                                       self.items_unlock_sequence < self.items_row_up_consume_sequence),
+            },
             "consumed_source_pads": self.consumed_samples,
             "pad_queue_records": self.pad_queue_records,
             "source_samples": self.source_samples,
@@ -858,7 +913,7 @@ def prepare_rules_profile(profile, user, *, source_slots=(0, 1)):
 
 
 def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout=180, gci=None,
-        ordinary_policy=None, input_replay=None, common_wire_comparator=None):
+        ordinary_policy=None, input_replay=None, common_wire_comparator=None, stop_after_items=False):
     """Own fresh output before preparation so failures cannot vanish before launch."""
     output = Path(output)
     replay_receipt = (stadium_replay_preflight(input_replay, output, build_manifest)
@@ -872,7 +927,8 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
         return _run(dolphin=dolphin, disc=disc, profile=profile, input_plan=input_plan,
                     menu_recipe=menu_recipe, output=output, build_manifest=build_manifest, timeout=timeout, gci=gci,
                     ordinary_policy=ordinary_policy, replay_receipt=replay_receipt,
-                    common_wire_comparator=common_wire_comparator)
+                    common_wire_comparator=common_wire_comparator,
+                    stop_after_items=stop_after_items)
     except Exception as error:
         failure = output / "failure.json"
         if not failure.exists():
@@ -883,7 +939,7 @@ def run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_m
 
 
 def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_manifest, timeout, gci=None,
-         ordinary_policy=None, replay_receipt=None, common_wire_comparator=None):
+         ordinary_policy=None, replay_receipt=None, common_wire_comparator=None, stop_after_items=False):
     build = validate_reference_build_manifest(Path(build_manifest), Path(dolphin))
     menus, menu_hash = menu_actions(menu_recipe)
     stadium_prefix = menus["scope"] == "stadium_go_prefix"
@@ -908,6 +964,10 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
     campaign = menus["scope"] in ("rules_ready_gci", "sd_prefix_gci", "items_row_gci",
                                     "competitive_entry_gci", "sparse_pair_gci")
     scope = menus["scope"]
+    require(type(stop_after_items) is bool and (not stop_after_items or transform_prefix),
+            "Items early stop requires the exact original transform route")
+    if stop_after_items:
+        scope = "sheik_transform_items_readiness"
     ordinary = ordinary_policy is not None
     if ordinary:
         from original_competitive_timeout import load_policy, CAPS
@@ -949,7 +1009,7 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
     if transform_prefix:
         require(gci is None and ordinary_policy is None,
                 "Sheik transform prefix must use the supplied original profile without GCI injection")
-        receiver = SheikTransformPrefixReceiver(plan, menus)
+        receiver = SheikTransformPrefixReceiver(plan, menus, items_only=stop_after_items)
     elif stadium_prefix:
         receiver = StadiumGoPrefixReceiver(menus, recorded_input=replay_receipt is not None)
     else:
@@ -981,6 +1041,8 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
         native = Path(replay_receipt["source"])
     if transform_prefix:
         environment["MWRC_TRANSFORM_PREFIX"] = "1"
+        if stop_after_items:
+            environment["MWRC_TRANSFORM_STOP_AT_ITEMS"] = "1"
     elif stadium_prefix:
         environment.update(MWRC_STADIUM_GO_PREFIX="1",
                            MWRC_STADIUM_SETUP_RECEIPT_SHA256=menus["setup_receipt_sha256"])
@@ -1009,6 +1071,9 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                          for name in ("Dolphin.ini", "GCPadNew.ini")})
     if transform_prefix:
         launch["observer_profile"] = "MWRC_TRANSFORM_PREFIX=1; no SD/GCI probe injection"
+        if stop_after_items:
+            launch["observer_profile"] += "; MWRC_TRANSFORM_STOP_AT_ITEMS=1"
+        launch["stop_after_items"] = stop_after_items
     if stadium_prefix:
         launch["observer_profile"] = ("MWRC_STADIUM_GO_PREFIX=1; exact setup-receipt binding; "
                                        "supplied profile; optional exact retained read-only GCI copy")
@@ -1091,7 +1156,10 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                                 first = receiver.menu_polls
                                 wait_source(lambda: receiver.menu_polls > first, "cold-source-poll", 600)
                                 break
-                    for action in menus["actions"]:
+                    for action in menu_actions_for_capture(menus, stop_after_items):
+                        if transform_prefix and action["label"] == "items-frequency-row":
+                            drive_transform_items_row(receiver, action, wait_source, tap)
+                            continue
                         wait_source(lambda: matches(receiver.latest_menu, action["before"]),
                                     action["label"] + ":ready", action["max_polls"])
                         if "when_value" in action:
@@ -1100,12 +1168,13 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                             tap(action, action["label"], action["max_polls"])
                         wait_source(lambda: matches(receiver.latest_menu, action["after"]),
                                     action["label"] + ":observed", action["max_polls"])
-                    if (full_route and not items_probe) or transform_prefix or stadium_prefix:
+                    if ((full_route and not items_probe) or transform_prefix or stadium_prefix) and not (
+                            transform_prefix and stop_after_items):
                         drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, tap)
                     if stadium_prefix and not receiver.setup_seen:
                         wait_source(lambda: receiver.setup_seen, "original Stadium VS setup transition",
                                     menus["sss"]["max_vs_transition_polls"])
-                if transform_prefix:
+                if transform_prefix and not stop_after_items:
                     drive_sheik_transform_input(receiver, plan, controller, next_row)
                 if sparse_pair:
                     while not receiver.setup_seen:
@@ -1197,16 +1266,17 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                     (output / "report.json").write_bytes(canonical(report))
                     return report
                 if transform_prefix:
-                    primary_status, _ = wait_transform_terminal_statuses(status, native_status, deadline)
+                    primary_status, _ = wait_transform_terminal_statuses(status, native_status, deadline, items_only=stop_after_items)
                     from reference_input_stream import validate_stream as validate_input_stream
                     from sheik_transform_prefix import validate_transform_prefix
                     input_summary = validate_input_stream(native)
                     input_status = validate_status(native_status, mode="record",
                                                    events=input_summary["events"], require_complete=True)
-                    transform_report = validate_transform_prefix(raw, status)
+                    transform_report = validate_transform_prefix(raw, status, items_only=stop_after_items)
                     bounded_log.check()
                     report = {
-                        "schema": "melee-web-original-sheik-transform-prefix-capture",
+                        "schema": ("melee-web-original-sheik-items-readiness-capture" if stop_after_items else
+                                   "melee-web-original-sheik-transform-prefix-capture"),
                         "version": 1,
                         "scope": scope,
                         "status": "pass",
@@ -1220,11 +1290,12 @@ def _run(*, dolphin, disc, profile, input_plan=None, menu_recipe, output, build_
                         "input_status": input_status,
                         "input_stream": input_summary,
                         "driver": receiver.finish(),
-                        "transform_prefix": transform_report,
-                        "claims": {"original_css_sss_setup": True,
-                                   "source_consumed_down_b_y_minus_80": True,
+                        ("items_readiness" if stop_after_items else "transform_prefix"): transform_report,
+                        "claims": {"original_css_sss_setup": not stop_after_items,
+                                   "source_consumed_down_b_y_minus_80": not stop_after_items,
                                    "consumed_neutral_release": True,
-                                   "active_sheik_grounded_neutral_prefix": True,
+                                   "active_sheik_grounded_neutral_prefix": not stop_after_items,
+                                   "items_readiness_only": stop_after_items,
                                    "match_complete": False,
                                    "draw_or_browser_equivalence": False},
                     }
@@ -1336,6 +1407,37 @@ def drive_sheik_transform_input(receiver, plan, controller, next_row):
     require(receiver.down_b_consumed and receiver.down_b_released and
             receiver.action_seen and receiver.post_swap_neutral is not None,
             "Source transform prefix ended before the consumed input and active Sheik owner")
+
+
+def menu_actions_for_capture(menus, stop_after_items=False):
+    if not stop_after_items:
+        return menus["actions"]
+    require(menus.get("scope") == "sheik_transform_prefix",
+            "Reduced Items actions require the unchanged original transform route")
+    indices = [i for i, action in enumerate(menus["actions"])
+               if action["label"] == "items-frequency-row"]
+    require(len(indices) == 1, "Transform route lacks one authored Items Up action")
+    return menus["actions"][:indices[0] + 1]
+
+
+def drive_transform_items_row(receiver, action, wait_source, tap):
+    """Gate the unchanged Items Up pulse on its typed original lock owner."""
+    require(action.get("label") == "items-frequency-row" and
+            action.get("before", {}).get("scene") == 1 and
+            action["before"].get("kind") == 16 and
+            action["before"].get("row") == 0 and
+            action["before"].get("items_locked") == 0 and
+            action.get("after", {}).get("items_locked") == 0,
+            "Transform Items row action lacks the authored unlocked-owner guard")
+    wait_source(lambda: matches(receiver.latest_menu, action["before"]),
+                action["label"] + ":original-items-lock-clear", action["max_polls"])
+    require(receiver.latest_menu.get("items_locked") == 0 and
+            receiver.items_unlock_sequence is not None and
+            receiver.items_unlock_sequence < receiver.seq,
+            "Transform Items row action lacks a checked unlocked source poll")
+    tap(action, action["label"], action["max_polls"])
+    wait_source(lambda: matches(receiver.latest_menu, action["after"]),
+                action["label"] + ":observed", action["max_polls"])
 
 
 def drive_authored_css_sss(receiver, menus, controller, next_row, wait_source, tap):
@@ -1688,6 +1790,8 @@ def main(argv=None):
                         help="Exact separate adaptive competitive timeout policy; v4 remains entry provenance")
     parser.add_argument("--input-replay", type=Path,
                         help="Pinned complete v6 MWRI; Stadium-only, no adaptive input writes")
+    parser.add_argument("--stop-after-items", action="store_true",
+                        help="Stop the same original transform menu route at observed Items readiness; no setup/transform claim")
     parser.add_argument("--timeout", type=float, default=180)
     args = parser.parse_args(argv)
     try:

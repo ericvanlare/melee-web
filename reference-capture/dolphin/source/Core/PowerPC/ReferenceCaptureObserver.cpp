@@ -737,6 +737,28 @@ bool TransformPrefixPadStatusMatches(const u8* pad, bool down_b)
   return true;
 }
 
+// Literal consumed PAD statuses; the queue's per-port padding remains unobserved.
+int TransformItemsPadKind(const u8* consumed)
+{
+  bool neutral = true, up = true;
+  for (size_t port = 0; port < 4; ++port)
+    for (size_t byte = 0; byte < 11; ++byte)
+    {
+      const u8 expected = port >= 2 && byte == 10 ? 0xff : 0;
+      neutral &= consumed[port * 12 + byte] == expected;
+      up &= consumed[port * 12 + byte] == (port == 0 && byte == 1 ? 8 : expected);
+    }
+  return neutral ? 0 : up ? 1 : -1;
+}
+
+bool TransformItemsStopReady(u8 scene, const u8* flow, const u8* input, u8 lock,
+                            bool up_seen, bool release_seen)
+{
+  return up_seen && release_seen && scene == 1 && flow[0] == 16 &&
+         flow[2] == 0 && flow[3] == 31 && flow[4] == 3 && flow[0x11] == 1 &&
+         input[0] == 0 && input[1] == 0 && lock == 0;
+}
+
 enum class TransformPrefixEntryDisposition
 {
   IgnoreOpeningAttract,
@@ -1159,6 +1181,11 @@ struct Observer::Impl
     if (!transform_prefix_setting.empty() && transform_prefix_setting != "1")
       SetInvalid("MWRC_TRANSFORM_PREFIX must be 1 when set");
     transform_prefix_enabled = transform_prefix_setting == "1";
+    const std::string items_stop = Env("MWRC_TRANSFORM_STOP_AT_ITEMS");
+    transform_items_stop = items_stop == "1";
+    if ((!items_stop.empty() && !transform_items_stop) ||
+        (transform_items_stop && !transform_prefix_enabled))
+      return SetInvalid("Items stop requires its exact transform-prefix opt-in"), false;
     const CpuProbeSettings& cpu_probe = CpuProbeEnvironment();
     cpu_probe_configured = cpu_probe.present;
     cpu_probe_valid = cpu_probe.valid;
@@ -1333,7 +1360,9 @@ struct Observer::Impl
                    JsonEscape(sequence_id) + "\"";
     if (transform_prefix_enabled)
       handshake += ",\"diagnostic\":\"sheik_transform_prefix\",\"max_active_source_ticks\":600"
-                   ",\"completion_boundary\":\"active_sheik_grounded_neutral_source_tick_after_owner_change\"";
+                   ",\"completion_boundary\":\"" + std::string(transform_items_stop ?
+                       "original_items_row31_after_consumed_up_and_neutral" :
+                       "active_sheik_grounded_neutral_source_tick_after_owner_change") + "\"";
     if (stadium_go_prefix_enabled)
       handshake += ",\"diagnostic\":\"stadium_go_prefix_v3\",\"setup_receipt_sha256\":\"" +
                    stadium_go_prefix_setup_receipt_sha256 +
@@ -1364,7 +1393,9 @@ struct Observer::Impl
       start += ",\"entity_profile\":\"" + Env("MWRC_ENTITY_PROFILE") + "\"";
     if (transform_prefix_enabled)
       start += ",\"diagnostic\":\"sheik_transform_prefix\",\"max_active_source_ticks\":600"
-               ",\"completion_boundary\":\"active_sheik_grounded_neutral_source_tick_after_owner_change\"";
+               ",\"completion_boundary\":\"" + std::string(transform_items_stop ?
+                       "original_items_row31_after_consumed_up_and_neutral" :
+                       "active_sheik_grounded_neutral_source_tick_after_owner_change") + "\"";
     if (stadium_go_prefix_enabled)
       start += ",\"diagnostic\":\"stadium_go_prefix_v3\",\"setup_receipt_sha256\":\"" +
                stadium_go_prefix_setup_receipt_sha256 +
@@ -2759,7 +2790,8 @@ struct Observer::Impl
         (!AddSlice(system, SliceTag::MenuMainFlow, 0x804a04f0, 0x18) ||
          !AddSlice(system, SliceTag::MenuMainInput, 0x804d6bc8, 8)))
       return false;
-    if (scene_kind == 1 && (Env("MWRC_SD_MENU_PROBE") == "items_row" ||
+    if (scene_kind == 1 && (transform_prefix_enabled ||
+                            Env("MWRC_SD_MENU_PROBE") == "items_row" ||
                             Env("MWRC_SD_MENU_PROBE") == "sd_prefix" ||
                             Env("MWRC_SD_MENU_PROBE") == "competitive_entry" || OrdinaryTimeoutRequested() || SparsePairRequested() ||
                             stadium_go_prefix_enabled))
@@ -3978,6 +4010,8 @@ struct Observer::Impl
       ObserveSdInit(system, pc, state);
       return;
     }
+    if (transform_items_stop && (pc == CSS_ENTER || pc == SSS_ENTER))
+      return SetInvalid("Reduced Items capture entered CSS/SSS before its declared stop"), void();
     if (transform_prefix_enabled && pc == CSS_ENTER)
     {
       if (transform_prefix_css_enter_seen || transform_prefix_vs_entry_seen)
@@ -4081,6 +4115,7 @@ struct Observer::Impl
       SetInvalid("source scene counter is outside the pinned RAM range");
       return;
     }
+    bool transform_items_stop_after_publish = false;
     bool transform_prefix_complete_after_publish = false;
     bool transform_prefix_cap_after_publish = false;
     bool transform_prefix_neutral_pad_after_publish = false;
@@ -4237,6 +4272,22 @@ struct Observer::Impl
           !AddSceneKindSlice(system) ||
           !AddMenuSteeringSlices(system))
         return SetInvalid("PAD poll did not expose its bounded four-port slices"), void();
+      if (transform_items_stop && transform_items_up_seen && transform_items_release_seen)
+      {
+        std::array<u8, 0x18> flow{};
+        std::array<u8, 8> input{};
+        u32 scene_pointer = 0;
+        u8 scene = 0, lock = 1;
+        if (!ReadU32(system, 0x804d6720, &scene_pointer) ||
+            !ReadBytes(system, scene_pointer, 1, &scene) ||
+            !ReadBytes(system, 0x804a04f0, flow.size(), flow.data()) ||
+            !ReadBytes(system, 0x804d6bc8, input.size(), input.data()) ||
+            !ReadBytes(system, 0x804d6bec, 1, &lock))
+          return SetInvalid("Items stop lacks its checked source owner"), void();
+        transform_items_stop_after_publish = TransformItemsStopReady(
+            scene, flow.data(), input.data(), lock,
+            transform_items_up_seen, transform_items_release_seen);
+      }
     }
     else if (boundary == Boundary::PadConsume)
     {
@@ -4248,6 +4299,33 @@ struct Observer::Impl
       if (!ReadBytes(system, 0x804c1f78, queue.size(), queue.data()) || !queue[0] ||
           qread >= queue[0] || ReadBE32(queue.data() + 8) + qread * 0x30 != state->gpr[25])
         return SetInvalid("PAD consume registers escaped the pinned queue"), void();
+      if (transform_items_stop && !setup_ready)
+      {
+        std::array<u8, 0x30> consumed{};
+        std::array<u8, 0x18> flow{};
+        u32 scene_pointer = 0;
+        u8 scene = 0, lock = 1;
+        if (!ReadBytes(system, state->gpr[25], consumed.size(), consumed.data()) ||
+            !ReadU32(system, 0x804d6720, &scene_pointer) ||
+            (scene_pointer && !ReadBytes(system, scene_pointer, 1, &scene)) ||
+            !ReadBytes(system, 0x804a04f0, flow.size(), flow.data()) ||
+            !ReadBytes(system, 0x804d6bec, 1, &lock))
+          return SetInvalid("Items consumed-input owner is unreadable"), void();
+        if (scene == 1 && flow[0] == 16)
+        {
+          const int pad_kind = TransformItemsPadKind(consumed.data());
+          const bool neutral = pad_kind == 0, up = pad_kind == 1;
+          if (up && !transform_items_previous_up)
+          {
+            if (transform_items_up_seen || lock != 0 || ReadBE16(flow.data() + 2) != 0)
+              return SetInvalid("Items Up lacks its unique unlocked row0 owner"), void();
+            transform_items_up_seen = true;
+          }
+          if (transform_items_up_seen && neutral)
+            transform_items_release_seen = true;
+          transform_items_previous_up = up;
+        }
+      }
       if (transform_prefix_enabled && setup_ready)
       {
         std::array<u8, 0x30> consumed{};
@@ -4838,6 +4916,15 @@ struct Observer::Impl
     Publish(slot);
     if (stadium_go_prefix_complete_after_publish)
       RequestComplete();
+    else if (transform_items_stop_after_publish)
+    {
+      // The observed menu boundary closes only this diagnostic; no game write.
+      transform_items_boundary_complete = true;
+      InputStream::RequestFinish(true);
+      natural_completion.store(false);
+      finish_requested.store(true);
+      return;
+    }
     else if (transform_prefix_complete_after_publish)
       RequestComplete();
     else if (transform_prefix_cap_after_publish)
@@ -5548,7 +5635,13 @@ struct Observer::Impl
                    ",\"observed_source_ticks\":" + std::to_string(active_entity_prefix_progress.observations) +
                    ",\"comparison_active_clock_ticks\":60,\"observed_active_clock_advances\":" +
                    std::to_string(active_entity_prefix_progress.active_advances) + "}";
-          if (complete && transform_prefix_enabled)
+          if (transform_items_stop)
+            json = "{\"status\":\"interrupted\",\"natural\":false,"
+                   "\"completion_boundary\":\"original_items_row31_after_consumed_up_and_neutral\","
+                   "\"items_boundary_complete\":" +
+                   std::string(transform_items_boundary_complete && !invalid.load() ? "true" : "false") +
+                   ",\"transform_complete\":false,\"match_complete\":false}";
+          if (complete && transform_prefix_enabled && !transform_items_stop)
           {
             json = "{\"status\":\"completed\",\"natural\":true,"
                    "\"completion_boundary\":\"active_sheik_grounded_neutral_source_tick_after_owner_change\","
@@ -5812,6 +5905,11 @@ struct Observer::Impl
   bool prize_mode_exit_seen = false;
   std::string capture_id;
   std::string sequence_id;
+  bool transform_items_stop = false;
+  bool transform_items_up_seen = false;
+  bool transform_items_release_seen = false;
+  bool transform_items_previous_up = false;
+  bool transform_items_boundary_complete = false;
   struct StadiumSssPositionCall
   {
     bool active = false;

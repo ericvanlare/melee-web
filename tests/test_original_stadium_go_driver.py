@@ -21,6 +21,7 @@ _menu_spec.loader.exec_module(_menu)
 route_pads = _menu.route_pads
 sheik_transform_prefix_packet = _menu.sheik_transform_prefix_packet
 stadium_go_prefix_packet = _menu.stadium_go_prefix_packet
+stadium_go_feedback_packet = _menu.stadium_go_feedback_packet
 validate_packet = _menu.validate_packet
 from reference_versus_sequence_capture import raw_pad  # noqa: E402
 from stadium_go_prefix import EXPECTED_SETUP_RECEIPT_SHA256  # noqa: E402
@@ -87,7 +88,9 @@ class OriginalStadiumGoDriverTests(unittest.TestCase):
 
         import hashlib
         self.assertEqual(hashlib.sha256(canonical(sheik_transform_prefix_packet())).hexdigest(),
-                         "c0fbdad35462f1d769d79fc0e068bc7abb80cc6b39faf825502ed4c1ccbd066c")
+                         "a5898c614bd5a44b62d929a0494247c0a9de1754917248c19afee93df31e1802")
+        self.assertEqual(hashlib.sha256(canonical(stadium_go_feedback_packet())).hexdigest(),
+                         "5f4dd95fb2e00cd35aa9fa42de10758acc4998624c964a1a077d683ebebe95f8")
 
     def test_cardinal_driver_waits_for_consumed_pulse_neutral_stability_and_confirm_release(self):
         packet = stadium_go_prefix_packet()

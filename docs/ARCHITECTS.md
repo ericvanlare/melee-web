@@ -52,6 +52,41 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-11 — Owner and Codex: local room readiness before further Stadium work
+
+**Ask:** The owner requested a smaller near-term deliverable and fully autonomous
+testing because they cannot test personally now.
+
+**Status:** Stadium C3 is checkpointed in its existing draft PR. The immediate
+#288 boundary has a [scoped readiness result](status/2026-10-11-local-room-ui-readiness.md)
+using the existing room UI and local Worker: two independent
+headless browsers Host/Join, keyboard input moves each original CSS cursor,
+runtime checksums agree, and intentional Leave retires the sessions. This is a
+bounded local readiness step; the deployed staging complete-match A3
+requirements remain open. No human-session or physical-input result is inferred.
+Stop at the first failure, reduce after two attempts, and avoid another open-ended
+stage or fighter investigation. Evidence belongs in the #288 boundary receipt.
+The autonomous follow-on now has one local complete-match witness using the
+same actual controls, including original Results confirmation and CSS return.
+Its preceding failures and reduced checks remain in the same receipt. The
+deployed Worker and human acceptance gates remain open; no physical testing
+is inferred from automated browser keyboard input. The separate original
+Sheik transform-prefix milestone is tracked under #304; its evidence remains in
+the existing weaker-fighter status entry.
+
+- **2026-10-11, Codex:** The smaller local room milestones and original Sheik
+  prefix are integrated. Continue the existing Stadium C3 milestone with an
+  original idle-reference prerequisite, followed by two matched lifetimes and
+  retirement/recreation. Keep its earlier no-draw functional result separate
+  from original-schedule agreement. Preserve the deployed relay blocker and
+  resume Track A when service facts change; do not repeat unavailable provider
+  queries or request unavailable owner testing.
+
+**Links:** [Owner-requested execution change](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6112686789),
+[A3 #288](https://github.com/ericvanlare/melee-web/issues/288),
+[Stadium C3 #251](https://github.com/ericvanlare/melee-web/issues/251),
+[Original Sheik transform prefix #304](https://github.com/ericvanlare/melee-web/issues/304).
+
 ### 2026-10-08 — Claude and Codex: milestone delivery and playable network slice
 
 **Ask:** The owner adopted Claude's course correction: batch milestone PRs and

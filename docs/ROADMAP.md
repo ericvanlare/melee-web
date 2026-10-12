@@ -76,6 +76,17 @@ runtime owners; do only the ownership work this slice needs. WebRTC, complete
 sets, rollback and cross-play follow it. Current prerequisite failures and
 producer identities stay in the issue and scoped receipts.
 
+**Owner-requested readiness checkpoint (October 11):** the existing local Worker
+and Host/Join UI have a [scoped browser result](status/2026-10-11-local-room-ui-readiness.md)
+for actual keyboard control through original CSS → SSS → four-stock Mario/FD
+→ Results → CSS, matching runtime checksums and clean intentional disconnect.
+This bounded #288 step is local functional evidence only; it does not replace
+the public endpoint milestone above. Next reuse the same controls against an
+identified deployed staging Worker; that service prerequisite remains
+unresolved. Independent Stadium C3 work can continue while that service
+prerequisite is unchanged; Track A retains shared-resource priority. See the
+[execution update](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6112686789).
+
 ### Track B: competitive-rules Melee before the whole game
 
 **Target.** A player can run a competitive singles or doubles set through the
@@ -125,13 +136,27 @@ retain a reduced reproducer and move to the next fighter. Bowser's
 [#274 checkpoint](https://github.com/ericvanlare/melee-web/issues/274) remains
 unresolved and parked after the reconstructed-prefix attempt budget.
 
+**Current #304 boundary.** The original Zelda-to-Sheik owner prefix is observed
+and integrated for [issue #304](https://github.com/ericvanlare/melee-web/issues/304);
+the strict two-human browser comparison remains separate
+([scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md)).
+Stadium's matched-Setup C/F prerequisite also has a
+[scoped result](status/2026-10-07-pokemon-stadium-profile-oninit.md). Next extend
+the original reference through the idle lifetime using actual consumed inputs
+and source tick/draw ordering. Public #288 work resumes when the deployed
+service facts change.
+
 The next Stadium milestone is [C3 idle in-match lifetime #251](https://github.com/ericvanlare/melee-web/issues/251),
 with its remaining prerequisites counted and tracked inside that issue and PR.
-Use the existing source-ordered stage harness for two sequential native no-draw
-lifetimes through OnInit/OnLoad/OnStart/Ready/GO, each with at least 3,500
-post-GO ticks before the first transformation, checked state/RNG ownership,
-per-tick per-owner RNG ledger comparison with a verified original, and full
-retirement/recreation. Prerequisite fixes are commits within C3, not isolated
+Keep the existing two sequential native no-draw functional lifetimes as their
+own evidence. For original agreement, first retain the actual original input
+and tick/draw schedule through the declared idle interval. Then use the existing
+source-ordered harness for matched lifetime A, complete retirement/recreation,
+and separately identified matched lifetime B, each with at least 3,500 post-GO
+ticks before the first transformation. Require checked state/RNG ownership and
+per-tick per-owner RNG ledger comparison with the verified original; do not
+extrapolate the short C/F prefix into a fabricated neutral schedule.
+Prerequisite fixes are commits within C3, not isolated
 ownership PRs. Transformation, rendering, browser admission and broader
 original-stage comparison gates remain separate. Source-only
 and documentation work may overlap when ownership permits; Track A retains

@@ -2,7 +2,11 @@
 
 Continue `codex/stadium-c3-lifetime` and draft PR #301. The branch base before
 current-main integration is `5f274ed3fc6743937c8ec2ae66e23c1db4094c4e`.
-Review current shared fixes and integrate current main before new executable work.
+Current main `21e4c7bf` is integrated in the current source. The shared original
+collector preserves the retained Stadium menu recipe and separate Sheik Items
+and Stadium replay paths. Focused controls, retained raw replays and actual
+native translation-unit syntax pass; fresh full regression and affected builds
+are the next validation step. Prior capture producers below are unchanged.
 
 The matched-Setup C/F run passed its declared state/seed comparison and checked
 retirement. Capture checkpoint `e0c072cc` (tree `3a68e30e`), tested harness

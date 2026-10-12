@@ -73,6 +73,13 @@ SETUP_PC = 0x8016E9C4
 PAD_CONSUME_PC = 0x80377584
 SOURCE_TICK_PC = 0x80390EB4
 PAD_POLL_PC = 0x8034DD8C
+MENU_SCENE_TAG = 40
+MENU_FLOW_TAG = 45
+MENU_INPUT_TAG = 46
+ITEMS_COMPLETION_BOUNDARY = "original_items_row31_after_consumed_up_and_neutral"
+ITEMS_LOCK_TAG = 56
+MENU_FLOW_ADDRESS = 0x804A04F0
+MENU_INPUT_ADDRESS = 0x804D6BC8
 
 
 class TransformPrefixError(ValueError):
@@ -176,13 +183,20 @@ def _menu_owner_pad_poll(payload: dict[str, Any]) -> str | None:
              "SSS PadPoll contains duplicate or ambiguous owner slices")
     if kind_count and not index_count:
         raise TransformPrefixError("SSS PadPoll exposes a stage kind without its owner index")
-    if index_count != 1 or kind_count != 1:
+    if index_count != 1:
         return None
     index = _raw_slice(payload, STAGE_SELECT_INDEX_TAG, 0,
                        "SSS live-owner PadPoll", 1)
     stage_index = index["raw"][0]
-    _require(index["address"] == 0x804D6CAE and stage_index < STAGE_SELECT_COUNT,
+    _require(index["address"] == 0x804D6CAE and stage_index <= STAGE_SELECT_COUNT,
              "SSS PadPoll stage owner index is outside its authored table")
+    # OnEnter initializes 30 before the cursor overlaps a concrete stage.
+    # This constructor-owned sentinel has no table entry or stage-kind slice.
+    if stage_index == STAGE_SELECT_COUNT:
+        _require(kind_count == 0, "SSS no-selection sentinel exposes a stage kind")
+        return "sss"
+    if kind_count != 1:
+        return None
     kind = _raw_slice(payload, STAGE_SELECT_KIND_TAG, 0,
                       "SSS live-owner PadPoll", 1)
     expected_kind_address = (STAGE_SELECT_TABLE + stage_index * STAGE_SELECT_STRIDE +
@@ -191,6 +205,150 @@ def _menu_owner_pad_poll(payload: dict[str, Any]) -> str | None:
              "SSS PadPoll stage owner kind escaped its authored table entry")
     return "sss"
 
+
+def _transform_menu_state(payload: dict[str, Any]) -> dict[str, Any]:
+    """Decode MenuFlow plus the existing checked Items-lock owner, if live."""
+    from sd_reference_diagnostic import items_lock_state, menu_state
+
+    scene_fields = [item for item in payload.get("slices", [])
+                    if item.get("tag") == MENU_SCENE_TAG]
+    lock_fields = [item for item in payload.get("slices", [])
+                   if item.get("tag") == ITEMS_LOCK_TAG]
+    if not scene_fields:
+        _require(not lock_fields,
+                 "transform menu PadPoll exposes the Items lock without a scene owner")
+        return {"scene": None}
+    scene = _raw_slice(payload, MENU_SCENE_TAG, 0, "transform menu PadPoll", 1)
+    _require(MEM1_BASE <= scene["address"] and scene["address"] + 1 <= MEM1_END,
+             "transform menu PadPoll scene owner escaped source MEM1")
+    data = {(MENU_SCENE_TAG, 0): scene["raw"]}
+    state: dict[str, Any] = {"scene": scene["raw"][0]}
+    if state["scene"] == 1:
+        flow = _raw_slice(payload, MENU_FLOW_TAG, 0, "main menu PadPoll", 0x18)
+        inputs = _raw_slice(payload, MENU_INPUT_TAG, 0, "main menu PadPoll", 8)
+        _require(flow["address"] == MENU_FLOW_ADDRESS and
+                 inputs["address"] == MENU_INPUT_ADDRESS,
+                 "main menu PadPoll fields escaped their pinned source owners")
+        data[(MENU_FLOW_TAG, 0)] = flow["raw"]
+        data[(MENU_INPUT_TAG, 0)] = inputs["raw"]
+        lock_fields = [item for item in payload.get("slices", [])
+                       if item.get("tag") == ITEMS_LOCK_TAG and item.get("flags") == 0]
+        if lock_fields:
+            lock = _raw_slice(payload, ITEMS_LOCK_TAG, 0,
+                              "original Items-lock PadPoll", 1)
+            data[(ITEMS_LOCK_TAG, 0)] = lock["raw"]
+        state = menu_state(data)
+    try:
+        return items_lock_state(data, payload, state)
+    except ValueError as error:
+        raise TransformPrefixError(str(error)) from error
+
+
+
+def transform_consumed_ports(payload, sequence):
+    """Read all four source PAD slots and preserve the queue's exact slot identity."""
+    fields = [_raw_slice(payload, tag, 0, "Items PAD queue", size)
+              for tag, size in ((2, 0x0C), (3, 0x30))]
+    _require(all(MEM1_BASE <= item["address"] <= MEM1_END - item["size"]
+                 for item in fields), "Items PAD queue escaped MEM1")
+    data = {(item["tag"], 0): item["raw"] for item in fields}
+    metadata = {(item["tag"], 0): item for item in fields}
+    _require([(item["tag"], item["flags"], item["size"])
+             for item in payload["slices"]] == [(2, 0, 0x0C), (3, 0, 0x30)],
+            f"PAD consume {sequence} lacks the full typed queue/slot record")
+    queue, slot = data[(2, 0)], data[(3, 0)]
+    _require(metadata[(2, 0)]["address"] == 0x804C1F78 and
+            0x80000000 <= metadata[(3, 0)]["address"] < 0x81800000,
+            f"PAD consume {sequence} escaped the original source queue")
+    registers = payload.get("gprs")
+    _require(isinstance(registers, list) and len(registers) == 32,
+            f"PAD consume {sequence} lacks source queue registers")
+    count, base = queue[0], int.from_bytes(queue[8:12], "big")
+    read_index, slot_pointer = registers[6] & 0xFF, registers[25]
+    slot_address = metadata[(3, 0)]["address"]
+    _require(count > 0 and read_index < count and base > 0 and
+            base + read_index * 0x30 == slot_pointer == slot_address,
+            f"PAD consume {sequence} queue/read/slot ownership differs")
+    ports = [slot[index * 12:index * 12 + 11].hex() for index in range(4)]
+    errors = [byte if byte < 0x80 else byte - 0x100
+              for byte in (slot[index * 12 + 10] for index in range(4))]
+    return ports, errors, {"queue_base": base, "queue_count": count,
+                           "queue_slot_index": read_index, "queue_slot_address": slot_address}
+
+
+class TransformItemsProgress:
+    """One checked Items Up episode, shared by live and retained-stream consumers."""
+    def __init__(self, *, items_only=False):
+        self.items_only = items_only
+        from reference_versus_sequence_capture import raw_pad
+        from retail_input_plan import NEUTRAL_PAD
+        from sd_original_menu_plan import route_pads, sheik_transform_prefix_packet
+        self.allowed_menu_pads = route_pads(sheik_transform_prefix_packet())
+        self.up_pair = [raw_pad(buttons=["D_UP"]), NEUTRAL_PAD]
+        self.neutral_pair = [NEUTRAL_PAD, NEUTRAL_PAD]
+        self.latest = None
+        self.previous = None
+        self.transitions = []
+        self.unlock = self.up = self.release = self.first_row = self.terminal_poll = None
+        self.held = False
+
+    def observe(self, row):
+        payload, seq = row["payload"], row["seq"]
+        if payload["boundary"] == "pad_poll":
+            _require(payload.get("pc") == PAD_POLL_PC, "Items readiness is not at the pinned original PadPoll boundary")
+            self.latest = _transform_menu_state(payload)
+            if self.latest.get("scene") != 1 or self.latest.get("kind") != 16:
+                return
+            state = self.latest
+            if not self.transitions or self.transitions[-1]["locked"] != state["items_locked"]:
+                self.transitions.append({"sequence": seq, "locked": state["items_locked"],
+                                         "row": state["row"], "value": state["value"]})
+            if state["items_locked"] == 0 and self.unlock is None:
+                self.unlock = seq
+            if state["row"] == 31 and self.first_row is None:
+                _require(self.up is not None and self.up < seq and state["value"] == 3 and
+                         state["items_locked"] == 0, "Items row31 lacks its prior unlocked consumed Up")
+                self.first_row = seq
+            if (self.first_row is not None and self.release is not None and self.release < seq and
+                    state == {"scene": 1, "kind": 16, "row": 31, "value": 3,
+                              "entering": 1, "cooldown": 0, "items_locked": 0}):
+                self.terminal_poll = seq
+        elif payload["boundary"] == "pad_consume":
+            _require(payload.get("pc") == PAD_CONSUME_PC, "Items input is not at the pinned source PAD-consume boundary")
+            ports, errors, _ = transform_consumed_ports(payload, seq)
+            pair = ports[:2]
+            from retail_input_plan import DISCONNECTED_PAD
+            _require(errors == [0, 0, -1, -1] and ports[2:] == [DISCONNECTED_PAD] * 2 and
+                     tuple(pair) in self.allowed_menu_pads,
+                     "Items route consumed PAD escaped its exact original menu alphabet")
+            if self.items_only and self.release is not None:
+                _require(pair == self.neutral_pair, "Reduced Items input continued after neutral release")
+            if self.held:
+                _require(pair in (self.up_pair, self.neutral_pair),
+                         "Items Up episode changed before consumed neutral release")
+                if pair == self.neutral_pair:
+                    self.held = False
+                    self.release = seq
+            elif (pair == self.up_pair and self.previous != self.up_pair and
+                  self.latest is not None and self.latest.get("scene") == 1 and
+                  self.latest.get("kind") == 16):
+                _require(self.up is None and self.latest.get("row") == 0,
+                         "Items consumed a second Up episode or Up outside its authored row0")
+                _require(self.latest.get("items_locked") == 0 and self.unlock is not None and
+                         self.unlock < seq, "Items Up preceded the checked original lock clear")
+                self.up, self.held = seq, True
+            self.previous = pair
+
+    def finish(self):
+        _require(all(value is not None for value in
+                     (self.unlock, self.up, self.release, self.first_row, self.terminal_poll)) and
+                 self.unlock < self.up < self.release < self.terminal_poll and
+                 self.up < self.first_row <= self.terminal_poll,
+                 "Items evidence lacks ordered unlock, one Up, neutral and checked row31")
+        return {"transitions": self.transitions, "unlock_sequence": self.unlock,
+                "up_sequence": self.up, "neutral_sequence": self.release,
+                "first_row31_sequence": self.first_row,
+                "terminal_poll_sequence": self.terminal_poll}
 
 def _decode_owner_sample(payload: dict[str, Any], *, setup: bool,
                          sequence: int, source_tick: int) -> dict[str, Any]:
@@ -366,7 +524,7 @@ def _validate_consumed_pad(payload: dict[str, Any], sequence: int) -> bool:
 
 
 def validate_transform_prefix(stream_path: str | Path,
-                              status_path: str | Path | None = None) -> dict[str, Any]:
+                              status_path: str | Path | None = None, *, items_only=False) -> dict[str, Any]:
     """Validate one completed 19→7 ownership prefix and return scoped evidence."""
 
     source = Path(stream_path)
@@ -375,11 +533,16 @@ def validate_transform_prefix(stream_path: str | Path,
         status = read_status(status_file)
     except ObserverStreamError as error:
         raise TransformPrefixError(f"observer status sidecar is malformed: {error}") from error
+    items_progress = TransformItemsProgress(items_only=items_only)
+    expected_completion = ITEMS_COMPLETION_BOUNDARY if items_only else COMPLETION_BOUNDARY
     stats = ObserverStreamStats()
     header = start = end = None
     setup = None
     css_owner_sequence = None
     sss_owner_sequence = None
+    items_lock_transitions: list[dict[str, int]] = []
+    items_last_locked = None
+    items_unlock_sequence = None
     samples: list[dict[str, Any]] = []
     active_ticks = 0
     down_b_edges = 0
@@ -399,7 +562,10 @@ def validate_transform_prefix(stream_path: str | Path,
     try:
         for row in iter_records(source, max_bytes=MAX_STREAM_BYTES,
                                 max_records=MAX_STREAM_RECORDS, stats=stats):
+            _require(end is None, "observer record follows terminal end event")
             last_sequence = row["seq"]
+            if items_only and items_progress.terminal_poll is not None:
+                _require(row["event"] == "end", "Reduced Items stream continued after its terminal poll")
             if post_swap_neutral is not None:
                 _require(row["event"] == "end",
                          "observer continued emitting events after the completed Sheik neutral prefix")
@@ -415,7 +581,7 @@ def validate_transform_prefix(stream_path: str | Path,
                          header.get("cpu") == "JITARM64" and
                          header.get("diagnostic") == "sheik_transform_prefix" and
                          header.get("max_active_source_ticks") == MAX_ACTIVE_SOURCE_TICKS and
-                         header.get("completion_boundary") == COMPLETION_BOUNDARY and
+                         header.get("completion_boundary") == expected_completion and
                          not header.get("whole_session"),
                          "observer handshake does not name the pinned passive Sheik-prefix source scope")
             elif row["event"] == "start":
@@ -427,7 +593,7 @@ def validate_transform_prefix(stream_path: str | Path,
                          not start.get("whole_session") and
                          start.get("diagnostic") == "sheik_transform_prefix" and
                          start.get("max_active_source_ticks") == MAX_ACTIVE_SOURCE_TICKS and
-                         start.get("completion_boundary") == COMPLETION_BOUNDARY,
+                         start.get("completion_boundary") == expected_completion,
                          "observer start does not name the bounded Sheik-prefix scope")
             elif row["event"] == "error":
                 raise TransformPrefixError("observer stream contains an error: " +
@@ -441,9 +607,26 @@ def validate_transform_prefix(stream_path: str | Path,
                          "observer boundary precedes diagnostic handshake/start")
                 _require(not payload.get("whole_session"),
                          "transform-prefix stream unexpectedly entered whole-session mode")
+                if setup is None and payload["boundary"] in ("pad_poll", "pad_consume"):
+                    items_progress.observe(row)
+                if items_only:
+                    _require(payload["boundary"] in ("pad_poll", "pad_consume"),
+                             "Reduced Items stream continued into setup or transformation")
+                    continue
                 if payload["boundary"] == "pad_poll" and setup is None:
                     _require(payload["pc"] == PAD_POLL_PC,
                              "menu owner sample is not at the pinned original PadPoll boundary")
+                    menu = _transform_menu_state(payload)
+                    if menu.get("scene") == 1 and menu.get("kind") == 16:
+                        locked = menu["items_locked"]
+                        if locked != items_last_locked:
+                            items_lock_transitions.append({"sequence": row["seq"],
+                                                           "locked": locked,
+                                                           "row": menu["row"],
+                                                           "value": menu["value"]})
+                            items_last_locked = locked
+                        if locked == 0 and items_unlock_sequence is None:
+                            items_unlock_sequence = row["seq"]
                     menu_owner = _menu_owner_pad_poll(payload)
                     if menu_owner == "css" and css_owner_sequence is None:
                         css_owner_sequence = row["seq"]
@@ -458,8 +641,11 @@ def validate_transform_prefix(stream_path: str | Path,
                              "match setup is missing, duplicated, or not the first owner boundary")
                     _require(css_owner_sequence is not None and
                              sss_owner_sequence is not None and
-                             css_owner_sequence < sss_owner_sequence < row["seq"],
-                             "match setup preceded ordered live CSS and SSS owner PadPolls")
+                             items_unlock_sequence is not None and
+                             items_unlock_sequence < css_owner_sequence <
+                             sss_owner_sequence < row["seq"],
+                             "match setup preceded unlocked Items readiness or ordered live CSS/SSS owner PadPolls")
+                    items_progress.finish()
                     setup = _decode_owner_sample(payload, setup=True,
                                                  sequence=row["seq"], source_tick=row["source_tick"])
                     samples.append(setup)
@@ -550,6 +736,20 @@ def validate_transform_prefix(stream_path: str | Path,
 
     _require(header is not None and start is not None and end is not None,
              "observer stream lacks handshake/start/end records")
+    if items_only:
+        proof = items_progress.finish()
+        _require(end.get("status") == "interrupted" and end.get("natural") is False and
+                 end.get("completion_boundary") == ITEMS_COMPLETION_BOUNDARY and
+                 end.get("items_boundary_complete") is True and
+                 end.get("transform_complete") is False and end.get("match_complete") is False,
+                 "Reduced Items end does not declare its interrupted source boundary")
+        _require(status["state"] == "interrupted" and not status["completed"] and
+                 not status["invalid"] and status["error"] is None and
+                 status["event_count"] == stats.records_read and status["last_seq"] == last_sequence,
+                 "Reduced Items stream/status do not prove clean interrupted retirement")
+        return {"schema": "melee-web-sheik-transform-items-readiness", "version": 1,
+                "status": "pass", "items": proof, "transform_complete": False,
+                "match_complete": False, "stream_sha256": hashlib.sha256(source.read_bytes()).hexdigest()}
     _require(end.get("status") == "completed" and end.get("natural") is True and
              end.get("completion_boundary") == COMPLETION_BOUNDARY and
              end.get("match_complete") is False,
@@ -593,6 +793,11 @@ def validate_transform_prefix(stream_path: str | Path,
             "sss_live_owner_pad_poll_sequence": sss_owner_sequence,
             "ordered_before_setup": True,
             "meaning": "mode-2 live source-owner slices after the observer's checked menu-return gates; does not compare CSS/SSS scalar state or prove consumed input",
+        },
+        "items_lock_readiness": {
+            "transitions": items_lock_transitions,
+            "first_unlocked_pad_poll": items_unlock_sequence,
+            "unlocked_before_css": items_unlock_sequence < css_owner_sequence,
         },
         "completion": {"boundary": COMPLETION_BOUNDARY,
                        "match_complete": False,

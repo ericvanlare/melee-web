@@ -13,7 +13,7 @@ assert(start&&pause&&completion);
   const elements={unload:{},status:{dataset:{}}},events=[];
   let finishExport;
   const exported=new Promise(resolve=>{finishExport=resolve;});
-  const scope={$:id=>elements[id],retailRun:replayActive?{}:null,stockCheckActive:true,
+  const scope={$:id=>elements[id],retailRun:replayActive?{}:null,stockCheckActive:true,lockstepRoomConfigured:false,
    owner:{handle:{unload:async()=>{events.push('ordinary-unload');}}},
    finishRetailReplay:async reason=>{events.push(reason);await exported;events.push('exported');},
    log:error=>{throw Error(error);}};

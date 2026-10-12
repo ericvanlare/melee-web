@@ -1,0 +1,536 @@
+{
+  "schema": "melee-web-local-room-ui-readiness-v1",
+  "result": "PASS_LOCAL_FUNCTIONAL",
+  "issue": 288,
+  "run_id": "local-room-css-milestone-20261011-121208-80555779",
+  "finished_at": "2026-10-11T19:33:33.429Z",
+  "scope": "local functional browser check only; public Worker, full match, human/physical input, Internet, timing, pixel/PCM equivalence and whole-session gates remain pending",
+  "producer": {
+    "runtime_commit": "989e6dbc33b54eaefa3cc73af9064449b85bf716",
+    "runtime_tree": "1ce92b581b1c2384190aa83785c42fdeac5f62d0",
+    "harness_commit": "6cb92c1625cad31622b0e27bafd36d97a4aa7ec3",
+    "harness_tree": "ebb8415e89578288524ecc51085148d39b6246b8",
+    "clean_execution": true,
+    "harness_sha256": "5da7f2358ce292dc90378ad01fda927b9375e704f3b496f134ecb620765e13e3",
+    "wasm": "23849a4e09d38a3f746cb3f24e124f34ea6404a7558469c70250571c4fc5ef9a",
+    "runtime_artifact_inventory": [
+      {
+        "file": "build/browser-release/action-sweep.mjs",
+        "bytes": 18698,
+        "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+      },
+      {
+        "file": "build/browser-release/audio-ring.mjs",
+        "bytes": 2040,
+        "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+      },
+      {
+        "file": "build/browser-release/audio-worklet.js",
+        "bytes": 1517,
+        "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+      },
+      {
+        "file": "build/browser-release/controller-check.html",
+        "bytes": 2136,
+        "sha256": "b490f3bad94b2514c35de7c7ae1feb183afd6ea5a7b784ff883137f764de7bfb"
+      },
+      {
+        "file": "build/browser-release/controller-input.mjs",
+        "bytes": 19263,
+        "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+      },
+      {
+        "file": "build/browser-release/controller-panel.css",
+        "bytes": 5240,
+        "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+      },
+      {
+        "file": "build/browser-release/controller-panel.mjs",
+        "bytes": 36847,
+        "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+      },
+      {
+        "file": "build/browser-release/controller-probe.html",
+        "bytes": 859,
+        "sha256": "e88652c7eb02adba66fd76bf10be70d56d4144da5bdad9511b7aa801349a4483"
+      },
+      {
+        "file": "build/browser-release/controller-settings.css",
+        "bytes": 3482,
+        "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+      },
+      {
+        "file": "build/browser-release/controller-settings.mjs",
+        "bytes": 18680,
+        "sha256": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f"
+      },
+      {
+        "file": "build/browser-release/diagnostics-schema.mjs",
+        "bytes": 18780,
+        "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+      },
+      {
+        "file": "build/browser-release/diagnostics-settings.mjs",
+        "bytes": 2876,
+        "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+      },
+      {
+        "file": "build/browser-release/disc-image.mjs",
+        "bytes": 15255,
+        "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+      },
+      {
+        "file": "build/browser-release/disc-session.mjs",
+        "bytes": 7552,
+        "sha256": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2"
+      },
+      {
+        "file": "build/browser-release/dsp-coefficients.mjs",
+        "bytes": 4043,
+        "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+      },
+      {
+        "file": "build/browser-release/gameplay_menu_browser.data",
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      {
+        "file": "build/browser-release/gameplay_menu_browser.js",
+        "bytes": 300688,
+        "sha256": "170c03c7ba2a92f6e961e233b0f783099073177de85c44ded16c2a687fefefa5"
+      },
+      {
+        "file": "build/browser-release/gameplay_menu_browser.wasm",
+        "bytes": 15819523,
+        "sha256": "23849a4e09d38a3f746cb3f24e124f34ea6404a7558469c70250571c4fc5ef9a"
+      },
+      {
+        "file": "build/browser-release/hitch-capture.mjs",
+        "bytes": 21958,
+        "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+      },
+      {
+        "file": "build/browser-release/index.html",
+        "bytes": 989,
+        "sha256": "17ff1aaaca4b02adf4cbe39a939d9790be10a1548279fb2920ac97fc9451fe63"
+      },
+      {
+        "file": "build/browser-release/match-flow.mjs",
+        "bytes": 10679,
+        "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+      },
+      {
+        "file": "build/browser-release/match-menu.mjs",
+        "bytes": 8566,
+        "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+      },
+      {
+        "file": "build/browser-release/melee-runtime.mjs",
+        "bytes": 54503,
+        "sha256": "f7fa37c65d92e50bf1b445d96e6f98514f688ac02841942f251beaa008c9df3b"
+      },
+      {
+        "file": "build/browser-release/native-menu.html",
+        "bytes": 435,
+        "sha256": "ca8570797b54659376c0a725e78a92e61e65d599265deeec4b6f907ac38ce0c7"
+      },
+      {
+        "file": "build/browser-release/net-timing-pause.mjs",
+        "bytes": 1043,
+        "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"
+      },
+      {
+        "file": "build/browser-release/net_lockstep_browser_peer.mjs",
+        "bytes": 34403,
+        "sha256": "ecf3b39d2d1b96f04a887caa362bd190c8e8cd3ca3ac6a9a683eea1759bc9369"
+      },
+      {
+        "file": "build/browser-release/net_lockstep_core.mjs",
+        "bytes": 27701,
+        "sha256": "c2bf5e6d10f1bdd0fe00b3f1510f3ce6e4b4bd31459a2740fc726f342deeb5fa"
+      },
+      {
+        "file": "build/browser-release/net_lockstep_development_owner.mjs",
+        "bytes": 5332,
+        "sha256": "3ce684fa6bc1d587f7d366993f424cb487028acff95db5daefe76f772025904b"
+      },
+      {
+        "file": "build/browser-release/net_lockstep_native_adapter.mjs",
+        "bytes": 8445,
+        "sha256": "4130dce6c6390506b66bfafebace3fe33ac561ce8a873d06956b619fa5f0686a"
+      },
+      {
+        "file": "build/browser-release/net_lockstep_room_invite.mjs",
+        "bytes": 4128,
+        "sha256": "be92f69c1491ce74a69509a7b4d2b958a4ce139ffec29849689aaab0963ac4fa"
+      },
+      {
+        "file": "build/browser-release/net_lockstep_runtime_owner.mjs",
+        "bytes": 24464,
+        "sha256": "e88c2a560e75a37636cee9037633c24598a8784fd902eb2d52303bfe52736861"
+      },
+      {
+        "file": "build/browser-release/net_lockstep_webrtc.mjs",
+        "bytes": 13621,
+        "sha256": "f7bdc789211d097bae000fa7b966f157a5db72b185fbfea6f1179a140ee3e1fe"
+      },
+      {
+        "file": "build/browser-release/net_lockstep_webrtc_signaling.mjs",
+        "bytes": 7377,
+        "sha256": "4e54cb6b2286c6133efbd9477336553f876d17ae3425794328748580f4157326"
+      },
+      {
+        "file": "build/browser-release/net_lockstep_websocket_relay.mjs",
+        "bytes": 19536,
+        "sha256": "5513cd0ede2127c32cb63762b9441f957cd9589014ad11dfaac6b537f93e10a3"
+      },
+      {
+        "file": "build/browser-release/prototype-keyboard-layouts.mjs",
+        "bytes": 935,
+        "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+      },
+      {
+        "file": "build/browser-release/runtime-assets.mjs",
+        "bytes": 17029,
+        "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190"
+      },
+      {
+        "file": "build/browser-release/runtime-audio-assets.mjs",
+        "bytes": 5451,
+        "sha256": "033bf0bd4caa6c744ebead3dd7091bec8496b5f8d2039d60a3cdf9d398a7f05c"
+      },
+      {
+        "file": "build/browser-release/runtime-audio.mjs",
+        "bytes": 7660,
+        "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+      },
+      {
+        "file": "build/browser-release/runtime-cache.js",
+        "bytes": 16143,
+        "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+      },
+      {
+        "file": "build/browser-release/runtime-development.mjs",
+        "bytes": 72845,
+        "sha256": "7480704cc7b5b114282951a458360d8dc341557449d5be3870f95b30e6008f43"
+      },
+      {
+        "file": "build/browser-release/runtime-diagnostics-delivery.mjs",
+        "bytes": 51514,
+        "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+      },
+      {
+        "file": "build/browser-release/runtime-diagnostics.mjs",
+        "bytes": 85702,
+        "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+      },
+      {
+        "file": "build/browser-release/runtime.html",
+        "bytes": 6237,
+        "sha256": "70ec53d8af576bae9eaacfc42f172b0d6e8d631a92c75d824601849c8577e1a6"
+      },
+      {
+        "file": "build/browser-release/touch-controls.css",
+        "bytes": 6381,
+        "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+      },
+      {
+        "file": "build/browser-release/touch-controls.mjs",
+        "bytes": 13954,
+        "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+      },
+      {
+        "file": "build/browser-release/viewer.html",
+        "bytes": 18231,
+        "sha256": "225275bf9a86380a38318a0bf2de8a4106995e6f7e6663f8ae2a67ae06f1bb93"
+      }
+    ],
+    "source_delta": "Harness execution adds only the harness and planning documentation after the compiled producer."
+  },
+  "host": {
+    "cpu": "Apple M4",
+    "platform": "macOS 26.6 (25G72)",
+    "chrome": "154.0.8037.99",
+    "playwright": "1.62.1",
+    "node": "v22.23.2",
+    "headless": true,
+    "speaker_muted": true,
+    "audio_processing_disabled": false
+  },
+  "functional_observation": {
+    "owner_elapsed_ms": 17238,
+    "actual_host_copy_join_controls": {
+      "host_control_clicked": true,
+      "copy_control_clicked": true,
+      "join_control_clicked": true,
+      "exact_invite_transferred": true,
+      "invite_chars": 246,
+      "invite_sha256": "2b88bca3779257eee3a02f409870f6c070df14df0d57bbf9d4cc6aab73e30fdd",
+      "url": "ws://127.0.0.1:52135",
+      "room_id": "u74Ls4E0fjWGJ7Ba7geir4wwUKtKrLzw",
+      "seed": 2409933553,
+      "source_ticks": 216000,
+      "input_delay": 2
+    },
+    "matching_disc_wasm_identities": true,
+    "wasm_sha256": "23849a4e09d38a3f746cb3f24e124f34ea6404a7558469c70250571c4fc5ef9a",
+    "independent_profiles": true,
+    "headless_muted": true,
+    "webgpu_adapter_both": true,
+    "keyboard": {
+      "alpha": {
+        "port": 0,
+        "input_tick": 132,
+        "consumed_source_tick": 134,
+        "required_comparison_boundary": 135,
+        "literal_PAD_hex": "00007f0000000000000000",
+        "cursor_delta_by_peer": {
+          "alpha": {
+            "x": 18.59999656677246,
+            "y": 0
+          },
+          "beta": {
+            "x": 18.59999656677246,
+            "y": 0
+          }
+        },
+        "native_quiescence": "verified",
+        "unload": {
+          "attempted": true,
+          "phase": 0,
+          "running": 0
+        }
+      },
+      "beta": {
+        "port": 1,
+        "input_tick": 168,
+        "consumed_source_tick": 170,
+        "required_comparison_boundary": 171,
+        "literal_PAD_hex": "00007f0000000000000000",
+        "cursor_delta_by_peer": {
+          "alpha": {
+            "x": 18.599997997283936,
+            "y": 0
+          },
+          "beta": {
+            "x": 18.599997997283936,
+            "y": 0
+          }
+        },
+        "native_quiescence": "verified",
+        "unload": {
+          "attempted": true,
+          "phase": 0,
+          "running": 0
+        }
+      }
+    },
+    "checksum_records": 196,
+    "record_bytes": 64,
+    "exact_byte_and_sha_equality_independently_checked": true,
+    "contiguous_raw_tick_range": [
+      0,
+      195
+    ],
+    "coverage": "Includes alpha source134 and beta source170 after input delay2.",
+    "unpaired_tails": {
+      "alpha": 4,
+      "beta": 2
+    },
+    "cdp_process_count": 16,
+    "cdp_all_attributed_owned_and_absent": true,
+    "browser_inventory_count": 20,
+    "all23_browser_capture_server_worker_pids_independently_absent": true,
+    "browser_capture_server_groups_absent": true,
+    "worker_disposed_without_fallback": true,
+    "owned_profile_parent_and_worker_scratch_absent": true,
+    "screenshots_inspected": [
+      "alpha-css-alpha-after.png",
+      "beta-css-beta-after.png"
+    ]
+  },
+  "clipboard_scope": "Copy control clicked; exact Host invitation transferred into Join field; OS clipboard contents were not asserted.",
+  "retained_diagnostics": "Both browser profiles record a gameplay_menu_browser.data GET net::ERR_ABORTED; existing fatal-error policy treats it nonfatal. No runtime/peer/native cleanup errors recorded.",
+  "build": {
+    "target": "runtime",
+    "configuration": "Release",
+    "exit_code": 0
+  },
+  "focused_tests": {
+    "pass": 79,
+    "fail": 0,
+    "skip": 0
+  },
+  "validation_source": "6cb92c1625cad31622b0e27bafd36d97a4aa7ec3",
+  "full_suite": {
+    "first_run": {
+      "tests": 2307,
+      "failures": 1,
+      "skipped": 166,
+      "seconds": 488.549,
+      "failure": "Status entry linked to the not-yet-written portable receipt. No executable test failed. The receipt was then created before rerunning."
+    },
+    "final_run": {
+      "state": "PASS",
+      "source": "0ec7088cfee6fa2f955e6d33b9cb48e5238c40be",
+      "tests": 2307,
+      "passed": 2141,
+      "skipped": 166,
+      "failures": 0,
+      "errors": 0,
+      "seconds": 489.032,
+      "exit_code": 0,
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v"
+    }
+  },
+  "cleanup": {
+    "capture_owner_passed": true,
+    "process_attribution_passed": true,
+    "worker_dispose_passed": true,
+    "builds_retained_for_active_next_work": true
+  },
+  "exclusions": [
+    "Local functional headless installed-Chrome evidence only; keyboard events are automation, not physical human input.",
+    "Not public-relay/Internet, full-match, timing, pixels/PCM equivalence or whole-session acceptance.",
+    "The196-record prefix is exact; unpaired tails are retained separately and not claimed equal.",
+    "No new launch, source edit, build or test by reviewer.",
+    "No deployed staging Worker, SSS/match/Results/CSS-return route, OS clipboard, physical-input or audible-output acceptance in this capture."
+  ],
+  "artifacts": [
+    {
+      "file": "capture-command.json",
+      "bytes": 2361,
+      "sha256": "ad699a948b6323acb9e2ce3d39957578b6b4030a2494715a321ef0df2e04a129"
+    },
+    {
+      "file": "build-producer.json",
+      "bytes": 8717,
+      "sha256": "573b5a96bf23c173ab6d4f9bb3dd5d22548976c85ffce927447df45ce3621e4a"
+    },
+    {
+      "file": "build.log",
+      "bytes": 1208300,
+      "sha256": "6614739833f74865b690eb05ee241674bacab34b0dd3556b2b29f5f9da032362"
+    },
+    {
+      "file": "room-controls.log",
+      "bytes": 17094,
+      "sha256": "ab409f4425cb8c1af4cec991662fbaca4d2bec714cfd7bbb74a491cdbb7ab171"
+    },
+    {
+      "file": "sol-existing-source-review.json",
+      "bytes": 1808,
+      "sha256": "7da874b48bec484e700b2b58c85e70b181ef7779de725b82317bb259fe7968e2"
+    },
+    {
+      "file": "sol-harness-review-v1.json",
+      "bytes": 2188,
+      "sha256": "751673712c179abf29e91ce1ba3046f064240e94671014397702026d36db6044"
+    },
+    {
+      "file": "sol-harness-review-final.json",
+      "bytes": 2017,
+      "sha256": "4c47ed2d20eff85288ca8cfb2eb1a5acb15dad05c2f458329283e8dc76641f12"
+    },
+    {
+      "file": "sol-capture1-review.json",
+      "bytes": 4132,
+      "sha256": "97a2ccb5abbba03cc13a2dc7ba8ef19544fc8a1881d85df1ba7722a579e42713"
+    },
+    {
+      "file": "capture1/capture.log",
+      "bytes": 195,
+      "sha256": "7ac15e2e5727ff8a76e1308a9cb40e43339f13e8eb05998fed208c5af200c4b6"
+    },
+    {
+      "file": "capture1/owner.json",
+      "bytes": 177275,
+      "sha256": "8ea4d722eac3cf3241cdc2a80afb8cca527e0420f06e336cb1cb2df7a85f7f4f"
+    },
+    {
+      "file": "capture1/browser-processes.jsonl",
+      "bytes": 132561,
+      "sha256": "90c6532393d9cde9ef48eb8330f0974f9d55329568d1ffdb1db7093f80a19e2d"
+    },
+    {
+      "file": "capture1/server.log",
+      "bytes": 6669,
+      "sha256": "082f794eb0fb4fb8253d01ad8c04c6e8f643de05bc0cb7fc6914849629d53c7a"
+    },
+    {
+      "file": "capture1/browser/alpha-css-alpha-before.png",
+      "bytes": 486572,
+      "sha256": "d7bc23eaf4b2ea7926e081245c33df219b1cd64cbc89f2fccea343c0a0c79498"
+    },
+    {
+      "file": "capture1/browser/alpha-css-beta-after.png",
+      "bytes": 487695,
+      "sha256": "c8b0d02ccb1d1950cd0bc12f14687c9c4ab171713694a4433544ecd99189ab7a"
+    },
+    {
+      "file": "capture1/browser/report.json",
+      "bytes": 1628386,
+      "sha256": "e8428063375a140fd75026a15892b42c419b2b54508c07b978c9053222e2a46e"
+    },
+    {
+      "file": "capture1/browser/beta-css-alpha-before.png",
+      "bytes": 485714,
+      "sha256": "a717dcae27f63a0af20be225d89a4dcd8b2cac096b65e0931b13c95f8c452ee7"
+    },
+    {
+      "file": "capture1/browser/alpha-css-beta-before.png",
+      "bytes": 488382,
+      "sha256": "da4bd6c400810b502b5bd8363a6f0fb1644ff3415cb2ada0f1654c67014e562f"
+    },
+    {
+      "file": "capture1/browser/beta-css-alpha-after.png",
+      "bytes": 482190,
+      "sha256": "ef492a52fe84a051b30f495545ee023536dbc28c924c0e242eaf545bf6e18c15"
+    },
+    {
+      "file": "capture1/browser/beta-css-beta-after.png",
+      "bytes": 483989,
+      "sha256": "6ff96e0add7c3e88d2529586c4fbf930ee8d2f45b7323f29257cc66c6b670485"
+    },
+    {
+      "file": "capture1/browser/alpha-css-alpha-after.png",
+      "bytes": 485809,
+      "sha256": "4771199a871d98e917e31d61bb7eb342af8795a11b3ef85030e3cdbccc878600"
+    },
+    {
+      "file": "capture1/browser/beta-css-beta-before.png",
+      "bytes": 487877,
+      "sha256": "911e5751b9c9bd72ef74b36e74896a23bb4a44d13cedbd5c45914e762d9f7446"
+    },
+    {
+      "file": "capture1/browser/worker-evidence/direct-miniflare-a3-room-relay-direct-SphHTV.receipt.json",
+      "bytes": 6969,
+      "sha256": "4fcc12df6eb1e063c1fdda04554e18ea13077fd83ca6c597d7610bf3664e2db1"
+    },
+    {
+      "file": "capture1/browser/worker-evidence/direct-miniflare-a3-room-relay-direct-SphHTV.stdout.log",
+      "bytes": 2192,
+      "sha256": "7dd55c7f0381d50e06c7590168e9e80683fab5c8202a03fe576848c24bb102cc"
+    },
+    {
+      "file": "capture1/browser/worker-evidence/direct-miniflare-a3-room-relay-direct-SphHTV.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "full-suite.log",
+      "bytes": 424058,
+      "sha256": "3bf59d7dcc576fa0cf4447e792cb7671ff56c7274b1cb84f2298093b7f804665"
+    },
+    {
+      "file": "full-suite-final.log",
+      "bytes": 423222,
+      "sha256": "7291a051fab8da413d8c5367fa33694bd29d9aa47e84b887e64a25da7fe781d0"
+    },
+    {
+      "file": "sol-final-doc-review.json",
+      "bytes": 1914,
+      "sha256": "bb464fa0d2da3ccc3274bd7c31233d1056623821e4c354ff2bb784f66d8b2fc6"
+    }
+  ]
+}

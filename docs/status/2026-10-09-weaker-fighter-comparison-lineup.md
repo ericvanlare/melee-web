@@ -4,7 +4,7 @@
 
 Status: bounded campaign evidence. Full-fighter accuracy remains open under #82; this lineup does not establish it. The source scan read the retained v10 MWRO through match 2 tick 59 (155,821 records). Its before/after source stat was stable; the full MWRO SHA-256 was not recomputed. The portable receipt binds the recorded source hash, scan output, parser, producer paths, and scoped comparisons.
 
-- **Sheik — original Items-menu failure reduced; transformation unverified.** The new original probe uses reviewed live menu ownership and consumed-input barriers, but its first run stopped before match setup. The retained failure and smallest follow-up are recorded below. Source creates distinct Zelda 19 and Sheik 7 entities and changes the active owner through `transformed[0]`; dormant Sheik construction is not a transformation pass. Historical source-only checkpoint `0b3847ee` remains retained.
+- **Sheik — bounded original transformation-owner prefix reviewed; broader accuracy remains open.** The latest #304 run reaches the active Sheik owner through the original CSS/SSS path. Its separate Items-readiness result, earlier SSS sentinel refusal, reduction and repair remain documented below; this is not a browser or full-fighter comparison.
 - **Jigglypuff — setup through 60 gameplay-clock advances compared.** The new active profile matches setup and all 184 source observations, including 60 gameplay-clock advances. The earlier Ready-only profile remains separately identified below. Historical context: The v10 source has Jigglypuff (CKIND/FTKIND 15) at match 1, slot 0, ticks 0–59. The retained v10 browser route is blocked earlier by the parked match-0 Bowser RNG divergence at clock 5239; do not bypass or reopen it. The independent prefix below supplies a separately identified setup/Ready route. Historical PR86 producer `2444564b` and comparator `e91cc7e9` provide reusable parts; the full-state writer remains present. The fresh comparison uses checked secondary-entity admission and that explicit four-player profile.
 - **Peach — current setup and 184-tick comparison passed.** The current v10 clock-60 comparison covers setup plus match-0 ticks 0–183 (184 ticks), including Peach at slot 3 (character-select kind 12, physical Fighter kind 9); all declared fields matched at that bounded boundary. It remains incomplete and does not establish whole-session accuracy. Harness `52926e13` and unchanged Release runtime `282fbddb` are identified separately. Requested cursor 1368, observed 1382 and exported 1384 remain distinct; the 16 extra match rows receive shape/order checks only. Root independently replayed the unchanged strict comparator and obtained the identical result. The historical `90289a2` comparison remains in the receipt.
 - **Ice Climbers — separate Popo/Nana states compared through 60 gameplay-clock advances.** The new active profile compares both distinct source entities across all 184 observations. The earlier Ready-only result remains separately identified below. Historical context: The v10 source has Popo 10 at slot 1/entity 0 and Nana 11 at entity 1 through match 2 tick 59. The strict comparator can express both entities, but the retained v10 producer/trace is primary-only. Historical PR86 paired evidence first rejected Nana motion/input at tick 105; after that repair, a Nana position bit differed at tick 609, and the extended A comparison later first differed on Popo screen-KO X at tick 5606. Those older A observations do not validate the current v10 candidate.
@@ -121,15 +121,21 @@ clean native/log retirement.
 Pinned original source gates Items input on its entry-animation lock; the menu
 driver's main cooldown does not establish that readiness. The lock byte was not
 captured, so this is a source-supported explanation, not an observed lock value.
-The existing `gci_items_row_packet` already requires the lock to be clear. The
-smallest follow-up is to reuse that checked observation, wait for original
-readiness, and verify the unchanged Up/neutral sequence reaches row 31/value 3
-within the same caps. No retry or new capture budget is claimed here.
+At that checkpoint, the existing `gci_items_row_packet` already required the
+lock to be clear. The smallest follow-up was to reuse that checked observation,
+wait for original readiness, and verify the unchanged Up/neutral sequence
+reached row 31/value 3 within the same caps. That checkpoint did not claim a
+retry or new capture budget.
 
-The lineup campaign now has declared compared intervals for Peach, Jigglypuff
-and Ice Climbers, plus a retained, reduced first failure for Sheik. The current
-two-human transform probe also lacks the complete state contract needed by the
-existing four-CPU comparator. No strict comparison-preparation command was run
-on this failed setup, and no executed schema-refusal result is claimed.
-Transformation, full-fighter and whole-session accuracy stay open under #82.
-The full suite and affected builds passed. Independent review and complete current-head CI remain required for integration.
+At the earlier checkpoint, the lineup had declared compared intervals for
+Peach, Jigglypuff and Ice Climbers plus a reduced pre-setup failure for Sheik.
+That checkpoint's two-human probe lacked the state contract needed by the
+four-CPU comparator, and no strict comparison-preparation command was run on
+that failed setup. Those historical limits remain in the receipt; the later
+#304 boundary is summarized below. Full-fighter and whole-session accuracy stay
+open under #82.
+
+
+**2026-10-11 #304 update.** The original source-owner transform prefix now has a report and independent raw-review pass: the retained evidence covers original CSS/SSS setup, consumed P1 Down+B and neutral release, the Zelda-to-Sheik active-owner transition, and a later grounded-neutral observation. A separate Items-readiness-only run and the first SSS index-30 sentinel failure/reduction/repair are preserved in the evidence receipt. The report/cleanup review and independent raw review are bound there. Full regression on unchanged collector revision `1759090f` passed: 2,324 tests, 153 skips, no failures. This remains source-prefix evidence only, with no browser comparison, full-fighter/full-match result, pixels, audio/PCM, or timing claim. Any strict original-versus-candidate comparison remains a separate boundary. See [Roadmap current priorities](../ROADMAP.md#current-priorities), [issue #304](https://github.com/ericvanlare/melee-web/issues/304), and the same-day [architects' coordination entry](../ARCHITECTS.md).
+
+The first #305 CI run exposed a scheduling assumption in an existing network-handshake fixture: a fixed number of event-loop turns did not guarantee completion of the asynchronous cryptographic hash. A deterministic delayed-digest reproducer retained the same failure. Test-only repair `4712e105` waits for actual handshake events, with the existing timeout and protocol assertions unchanged; focused and network contract checks pass. Full regression on unchanged `4712e105` passed: 2,324 tests, 153 skips, no failures. This does not change the native or collector identities above, and requires no repeat capture. The receipt retains the failed CI and repair evidence.

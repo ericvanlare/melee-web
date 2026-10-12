@@ -107,6 +107,41 @@ class StadiumSssFeedbackTests(unittest.TestCase):
         for key,value in [('target_kind',15),('max_reacquire_callbacks',5),('max_owner_polls',601)]:
             bad=copy.deepcopy(new);bad['sss'][key]=value
             with self.assertRaises(ValueError):validate_packet(bad)
+
+    def test_transform_items_guards_do_not_change_retained_stadium_recipe_or_receiver(self):
+        import hashlib
+        from authored_sd_reference_plan import canonical
+
+        self.assertEqual(hashlib.sha256(canonical(stadium_go_feedback_packet())).hexdigest(),
+                         "5f4dd95fb2e00cd35aa9fa42de10758acc4998624c964a1a077d683ebebe95f8")
+        packet = stadium_go_prefix_packet()
+        row = next(action for action in packet["actions"]
+                   if action["label"] == "items-frequency-row")
+        self.assertEqual((row["before"]["items_locked"], row["after"]["items_locked"]), (0, 0))
+        self.assertTrue(all("items_locked" not in action["before"] and
+                            "items_locked" not in action["after"]
+                            for action in packet["actions"]
+                            if action["label"].startswith("items-frequency-") and
+                            action["label"] != "items-frequency-row"))
+
+        flow = bytearray(0x18)
+        flow[0] = 16
+        flow[2:4] = (0).to_bytes(2, "big")
+        flow[4] = 1
+        flow[0x11] = 1
+        def source_slice(tag, address, raw):
+            return {"name": SLICE_NAMES[tag], "tag": tag, "flags": 0,
+                    "address": address, "size": len(raw), "hex": raw.hex()}
+        row = {"seq": 0, "event": "boundary", "payload": {
+            "boundary": "pad_poll", "pc": 0x8034DD8C, "source_tick": 0,
+            "slices": [source_slice(40, 0x804D6720, b"\x01"),
+                       source_slice(45, 0x804A04F0, bytes(flow)),
+                       source_slice(46, 0x804D6BC8, bytes(8)),
+                       source_slice(56, 0x804D6BEC, b"\x01")]}}
+        receiver = StadiumGoPrefixReceiver(packet)
+        receiver._pad_poll(row)
+        self.assertEqual(receiver.latest_menu["items_locked"], 1)
+        self.assertIsNone(receiver.items_progress)
     def test_actual_reader_completed_token_is_single_use_and_input_bound(self):
         r=receiver();feed(r,consume_row(0))
         rows=positions(1)
