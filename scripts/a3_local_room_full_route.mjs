@@ -525,11 +525,12 @@ export async function runA3LocalFullRoute({
     return !!(expected?.x || expected?.y);
   };
   const pulse = async (role, keys, {expected, holdMs = 160, releaseMs = 100,
-    label, retainSample = false, observePress = false}) => {
+    label, retainSample = false, observePress = false, evidenceSink = null}) => {
     requireValue(Array.isArray(keys) && keys.length > 0, `${label}: keyboard chord is empty`);
     const instance = instances[role];
     const port = rolePort(role);
     const before = await readRoomState(instance);
+    if (evidenceSink) evidenceSink.pre_input_room_state = before;
     assertHealthy(before, role);
     const inputCount = before.owner_health?.peer?.localInputCapture?.captured_count;
     const nativeCursor = before.native_status?.cursor;
@@ -538,18 +539,46 @@ export async function runA3LocalFullRoute({
       `${label}: local-input capture cursor is outside the observed native source boundary`);
     // Only explicitly opted-in short taps use bounded source-owned readback.
     const pressObservationCap = observePress ? Math.min(500, Math.floor(remaining() - releaseMs - 1)) : null;
-    const observed = await instance.driver.pressChord(keys, {holdMs, releaseMs,
-      ...(observePress ? {observeBeforeRelease: {predicate: observeDesiredSourcePad,
-        arg: {inputFrom: inputCount, port, expected},
-        timeoutMs: pressObservationCap}} : {})});
+    let observed;
+    try {
+      observed = await instance.driver.pressChord(keys, {holdMs, releaseMs,
+        ...(observePress ? {observeBeforeRelease: {predicate: observeDesiredSourcePad,
+          arg: {inputFrom: inputCount, port, expected},
+          timeoutMs: pressObservationCap}} : {})});
+    } catch (error) {
+      if (evidenceSink) {
+        evidenceSink.press_observer_error = String(error?.stack || error);
+        try {
+          const failureReadback = await readPeerInputSuffix(instance, inputCount);
+          const failureCaptures = failureReadback.health?.peer?.localInputCapture?.captures_since;
+          evidenceSink.last_input_suffix_readback = {
+            native_cursor: failureReadback.native_status?.cursor ?? null,
+            runtime_error: failureReadback.runtime_error ?? null,
+            captures_since: failureCaptures ?? null};
+          const failedSample = Array.isArray(failureCaptures) && failureCaptures.find(row =>
+            row.input_tick >= inputCount && row.local_port === port &&
+            matchesExpected(row, expected));
+          if (failedSample) evidenceSink.movement = {...failedSample, bytes: [...failedSample.bytes]};
+        } catch (readbackError) {
+          evidenceSink.press_failure_readback_error = String(readbackError?.stack || readbackError);
+        }
+      }
+      throw error;
+    }
     let sample = observePress ? observed : null;
+    if (evidenceSink && sample) evidenceSink.movement = {...sample, bytes: [...sample.bytes]};
     const captureDeadline = Date.now() + Math.min(1500, remaining());
     while (Date.now() < captureDeadline && !sample) {
       const readback = await readPeerInputSuffix(instance, inputCount);
       const captures = readback.health?.peer?.localInputCapture?.captures_since;
+      if (evidenceSink) evidenceSink.last_input_suffix_readback = {
+        native_cursor: readback.native_status?.cursor ?? null,
+        runtime_error: readback.runtime_error ?? null,
+        captures_since: captures ?? null};
       requireValue(Array.isArray(captures), `${label}: native local-input suffix is unavailable`);
       sample = captures.find(row => row.input_tick >= inputCount && row.local_port === port &&
         matchesExpected(row, expected));
+      if (sample && evidenceSink) evidenceSink.movement = {...sample, bytes: [...sample.bytes]};
       if (!sample) await instance.page.waitForTimeout(20);
     }
     requireValue(sample && sample.source_cursor === sample.input_tick &&
@@ -1302,22 +1331,62 @@ export async function runA3LocalFullRoute({
   route.screenshots.results = await screenshotPair('results');
 
   const resultsRetention = {};
+  const resultsDeadline = Date.now() + Math.max(1, remaining());
+  const resultsAttempt = route.results_confirmation_attempt = {
+    status: 'running', latest_actual_results_trace: null,
+    latest_results_observation: null, pulses: []};
   const observeResults = async label => {
     const row = await observeRuntimeOwner(alpha.page, resultsRetention, label,
       {includeMatch: true, includeResultsTrace: true});
+    resultsAttempt.latest_actual_results_trace = row.trace ?? null;
+    resultsAttempt.latest_results_observation = {label, observed_at: new Date().toISOString(),
+      host_phase: row.state?.phase ?? null, host_running: row.state?.running ?? null,
+      host_message: row.state?.message ?? null};
     requireValue(row.state?.error == null, `${label}: original Results native error ${row.state?.error}`);
     return {host: row.state, trace: row.trace};
   };
-  const p1ResultsPress = async (key, options = {}) => pulse('alpha', [key], {
-    expected: {button: 0x1000}, holdMs: 160, releaseMs: options.releaseMs ?? 150,
-    label: `P1 Results ${key} keyboard confirmation`});
-  const p2ResultsPress = async (key, options = {}) => pulse('beta', [key], {
-    expected: {button: 0x1000}, holdMs: 160, releaseMs: options.releaseMs ?? 150,
-    label: `P2 Results ${key} keyboard confirmation`});
-  const resultsDeadline = Date.now() + Math.max(1, remaining());
-  const confirmation = await confirmTwoHumanResults({deadlineAt: resultsDeadline,
-    sourcePorts: [0, 1], observeSample: observeResults, press: p1ResultsPress,
-    pressSecond: () => p2ResultsPress('End'), wait: ms => alpha.page.waitForTimeout(ms)});
+  const resultsPress = async (role, key, options = {}) => {
+    const label = `P${role === 'alpha' ? 1 : 2} Results ${key} keyboard confirmation`;
+    const evidenceSink = {role, key, expected_pad: {button: 0x1000},
+      input_observation: 'first actual source-aligned PAD sample; existing 500 ms cap',
+      status: 'running'};
+    resultsAttempt.pulses.push(evidenceSink);
+    try {
+      const action = await pulse(role, [key], {expected: {button: 0x1000},
+        holdMs: 160, releaseMs: options.releaseMs ?? 150,
+        observePress: true, retainSample: true,
+        evidenceSink, label});
+      evidenceSink.status = 'source-pad-captured';
+      return action;
+    } catch (error) {
+      evidenceSink.status = 'failed';
+      evidenceSink.error = String(error?.stack || error);
+      if (Date.now() < resultsDeadline) {
+        try {
+          await observeResults(`${label} failure snapshot`);
+          evidenceSink.failure_snapshot = resultsAttempt.latest_results_observation;
+        } catch (snapshotError) {
+          evidenceSink.failure_snapshot_error = String(snapshotError?.stack || snapshotError);
+        }
+      } else {
+        evidenceSink.failure_snapshot = 'shared Results deadline expired; no additional observation attempted';
+      }
+      throw error;
+    }
+  };
+  const p1ResultsPress = async (key, options = {}) => resultsPress('alpha', key, options);
+  const p2ResultsPress = async (key, options = {}) => resultsPress('beta', key, options);
+  let confirmation;
+  try {
+    confirmation = await confirmTwoHumanResults({deadlineAt: resultsDeadline,
+      sourcePorts: [0, 1], observeSample: observeResults, press: p1ResultsPress,
+      pressSecond: () => p2ResultsPress('End'), wait: ms => alpha.page.waitForTimeout(ms)});
+    resultsAttempt.status = 'confirmed';
+  } catch (error) {
+    resultsAttempt.status = 'failed';
+    resultsAttempt.error = String(error?.stack || error);
+    throw error;
+  }
   let prizeReturn = null;
   if (confirmation.original_exit.host_phase === 9) {
     prizeReturn = await returnFromCompetitivePrize({deadlineAt: resultsDeadline,
