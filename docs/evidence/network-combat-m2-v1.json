@@ -1,7 +1,7 @@
 {
   "schema": "melee-web-network-combat-m2-v1",
   "issue": 313,
-  "scope": "Same-machine simulated-network functional: jabs in both directions, genuine shield hit and full original route pass. Attack-caused KO remains open.",
+  "scope": "Same-machine simulated-network functional: both jab directions, genuine shield hit and original route pass in the retained exchange run. Later prepared run observes source-credited KO loss, but grounded respawn and continuation remain open.",
   "integration": {
     "state": "draft_milestone_attack_ko_open",
     "pr": "https://github.com/ericvanlare/melee-web/pull/316",
@@ -39,6 +39,25 @@
         "sha256": "b3c96f52144ada6496f399cb056b89c9780e44f018ae424428ce5bd21c96af8a"
       },
       "scope": "Assembled checkpoint before prepared source; not final candidate CI."
+    },
+    "prepared_safety_checkpoint": {
+      "source": "acd616ad77dd2586c26726d59b4a7e70236a0032",
+      "regression": {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-acd616ad-full-regression.json",
+        "bytes": 442,
+        "sha256": "bdc0f1f4fd1d586220f12496d1983fb8808e76bf407d930e1905824d5cc0d34d"
+      },
+      "runtime_producer": {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-acd616ad-runtime-producer.json",
+        "bytes": 1547695,
+        "sha256": "b31aea8cd4a7d9ae0f7c1ed0b8595da61e407d5481594851e1d59b14d5ee9fe7"
+      },
+      "exact_head_ci": {
+        "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-acd616ad-exact-head-ci.json",
+        "bytes": 5208,
+        "sha256": "1c93258fef51a16d29513b31fee1fb0e2edf26a9844d356c9ed91bf421ee5cc3"
+      },
+      "scope": "Saved checkpoint only; grounded KO respawn and complete prepared route remain open."
     }
   },
   "first_jab": {
@@ -1348,5 +1367,86 @@
     },
     "final_source_review_sha256": "6ca4324c5bc616d3be43fc58b859c441aa257e6a2eb351ae89122895f21fce0d",
     "response": "https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6131503382"
+  },
+  "prepared_second_result": {
+    "decision": "CREDITED_KO_LOSS_OBSERVED_CLASSIFIER_REFUSAL_BEFORE_GROUNDED_RESPAWN",
+    "harness_source": "acd616ad77dd2586c26726d59b4a7e70236a0032",
+    "runtime_source": "acd616ad77dd2586c26726d59b4a7e70236a0032",
+    "report": {
+      "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-prepared-2-suite/full-moderate-combat-ko-prepared/browser/report.json",
+      "bytes": 23329021,
+      "sha256": "73a4d534f4a26c92e65385ba1fb3d0980afb708e34978952a5fb03feebef30fc"
+    },
+    "owner_report": {
+      "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-ko-prepared-2-suite/full-moderate-combat-ko-prepared/owner.json",
+      "bytes": 200834,
+      "sha256": "df5fde28a719991fc6868a09cb9aaaac24129eeec7d1f05761795f23e3520e57"
+    },
+    "independent_review": {
+      "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-prepared-second-result-review-v1.json",
+      "bytes": 14689,
+      "sha256": "c9d9342f8bcfd780b662b11f552457f821620474d62378b0a991e2ec899907d8"
+    },
+    "preparation": {
+      "origin": 695,
+      "limit": 1175,
+      "end": 930,
+      "jabs": 7,
+      "final_damage": 18.1200008
+    },
+    "ko": {
+      "literal_input": 932,
+      "neutral_release": 933,
+      "attack60": 935,
+      "reaction88": 946,
+      "death0_stock_3_4": 1074,
+      "P2_original_credit_delta": 1,
+      "P1_primary_falls_delta": 1,
+      "suicides_delta": 0,
+      "refusal": 1147,
+      "refusal_state": "airborne Rebirth12 during first-use rendering; queue empty but network_wait.active=0",
+      "grounded_respawn": false,
+      "continuation_complete": false
+    },
+    "checksums": {
+      "common_records": 1148,
+      "first": 0,
+      "last": 1147,
+      "record_bytes": 64,
+      "sha256": "e7cc6db35c1e820a6d90bcc383240381b8a3b57d1c069b6d24962c379e3dc9b7",
+      "alpha_tail": 0,
+      "beta_tail": 0,
+      "scope": "cleanup common prefix, not full route"
+    },
+    "cleanup": {
+      "independently_absent_pids": 25,
+      "independently_absent_groups": 5,
+      "failed_evidence_retained": true
+    },
+    "incident_recording": {
+      "alpha_enabled": true,
+      "beta_enabled": true,
+      "actual_exports_retained": true,
+      "timing_incidents": 0,
+      "scope": "instrumentation browser-exercised; no triggered H1 incident, hardware timing acceptance or causation claim"
+    },
+    "next": "Retained-row reducer and independently reviewed narrow first-use-rendering wait classifier repair before any new capture.",
+    "checkpoint": {
+      "current_source_replay": "reproduces alpha rejection and beta valid first-use wait on unchanged raw pair",
+      "external_candidate": "frozen, not integrated; independent implementation review pending",
+      "receipts": [
+        {
+          "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-prepared-rebirth-wait-reducer-v1/current-source-replay-result-v1.json",
+          "bytes": 1696,
+          "sha256": "989681a1f1ad9056c1679ed6d3e6c9f1757d60caeb88479208206f27bef852eb"
+        },
+        {
+          "path": "local-evidence/network-combat-sprint-20261012-081504-ad65c0d1/m2-prepared-rebirth-wait-candidate-v1/freeze.json",
+          "bytes": 5383,
+          "sha256": "99e96a48a1582390a4f33e1f9f90cd66acca01d3aa2d9635586569dedb140b37"
+        }
+      ],
+      "priority": "Owner-authorized isolated public staging deployment and complete functional route now precede resumed combat work."
+    }
   }
 }

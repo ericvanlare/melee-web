@@ -1,28 +1,47 @@
 # Simulated-network keyboard combat
 
-**Browser exercised / Same-machine simulated-network functional / Both jab directions, shield hit and original full route pass; attack-caused KO remains open**
+**Browser exercised / Same-machine simulated-network functional / Both jab directions and shield route pass; credited KO observed, grounded respawn and continuation open**
 
-The current #316 step is checkpointed after the retained prepared-approach
-failure. A small pinned-source collision/movement component establishes that
-neutral input does not imply a stationary fighter; it does not identify the
-historical displacement's exact cause. The independently reviewed repair records
-both positions, checks unchanged damage on every acquired recovery pair, and
-uses actual P2 travel for overshoot protection. Focused controls pass; it has
-not been captured. The [structured receipt](../evidence/network-combat-m2-v1.json)
-retains the component, candidate and review identities separately.
+The latest #316 experiment used harness and Release runtime `acd616ad`. Seven
+actual preparation jabs reached 18.1200008% within 235 of the fixed 480 source
+cursors. The reviewed approach repair retained both players' movement and
+unchanged damage. A literal P2 C-stick-left row at 932, released at 933, produced
+paired smash60 at 935, damage/airborne reaction at 946, and Death0 with stocks
+[3,4] at 1074. P2's original KO-credit slot for P1 and P1's primary falls each
+increased by one; suicides stayed zero. This establishes the observed credited
+loss, not the required grounded respawn or complete prepared route.
 
-The owner-adopted October 12 check-in required cleanup safety and incident
-recording before another capture. Repository inventory found no name-pattern
-termination. The reviewed Worker repair checks recorded child exit before each
-fallback signal and preserves an unproven group after leader exit, reporting
-cleanup failure. Adversarial controls cover PID reuse, foreign same-profile
-Chrome, shared groups and CDP-only identities. The existing bounded recorder is now wired
-into both room profiles with staging occupancy and queue-completion callback
-latency enabled. Source review and 58 integrated prerequisite checks pass; browser observation
-is pending. A forced timing pause stays H1 evidence with the original error
-retained, no inferred combat failure and no accepted route. After combat
-#313/#314, Stadium C3 #301/#251 is the next Track B milestone; the public staging
-full match remains Track A's next service-dependent step.
+The first refusal was at cursor 1147: both peers were stopped for first-use
+rendering with P1 airborne in Rebirth12. Alpha had an empty input queue
+(cursor=pushed=1147), reported blocker `network_wait`, but no active network-wait
+episode. Beta had queued input and blocker `none`. The existing classifier sent
+alpha to the terminal Results guard and refused [3,4] against [0,4]. The retained-row
+reducer reproduces the mismatch. A narrow repair is frozen externally and remains
+unintegrated pending independent review; no stock, source, health or deadline
+guard is relaxed. All 1,148 common 64-byte cleanup records
+0–1147 agree, with no unmatched tails. Independent review verified all 25
+inventoried owned PIDs and five groups absent. Failed profiles, the package-request
+abort and raw evidence remain retained. The [structured receipt](../evidence/network-combat-m2-v1.json)
+binds exact source, runtime, report and independent review identities.
+
+The owner-adopted October 12 check-in is answered on [#158](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6131503382).
+Repository cleanup inventory found no name-pattern termination. The reviewed
+Worker repair checks recorded child exit before each fallback signal and preserves
+an unproven group after leader exit, reporting cleanup failure. Adversarial
+controls cover PID reuse, foreign same-profile Chrome, shared groups and CDP-only
+identities. In the latest capture, both real browser profiles enabled the existing
+bounded recorder and retained its actual exports with staging occupancy and
+queue-completion callback latency instrumentation. Neither reported a timing
+incident; a future forced pause remains H1 evidence, with its original error and
+no inferred combat failure or accepted route. The `acd616ad` checkpoint passed
+2,377 regression cases with 165 skips, the affected Release build and all 14
+exact-head CI checks (12 successes, two expected skips). Those validations do not
+prove the incomplete browser route or cover later source repairs.
+
+After combat #313/#314, Stadium C3 #301/#251 is the next Track B milestone. The
+owner has now cleared the isolated staging deployment on Workers Free with a $0
+spend limit. Combat is checkpointed while that public full-match step proceeds;
+local functional evidence does not clear the public gate.
 
 Two independent headless Chrome profiles completed original CSS → SSS → four-stock Mario/Final Destination → Results → CSS under the moderate TCP shaping profile, including an actual keyboard approach and damaging jab. Capture harness `c93824de` used the unchanged Release runtime `5f895d3b`; the [structured receipt](../evidence/network-combat-m2-v1.json) binds both identities, the actual input, raw reports and independent source/result reviews. This is the first direction of [combat milestone #313](https://github.com/ericvanlare/melee-web/issues/313), with a later complete exchange/shield route observed below; attack-caused stock loss remains open.
 
