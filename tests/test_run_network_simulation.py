@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from run_network_simulation import validate_result
+from run_network_simulation import SCENARIOS, scenario_route_flags, validate_result
 
 
 def neutral_input_diagnostic(samples):
@@ -28,8 +28,9 @@ class NetworkSimulationSuitePolicyTests(unittest.TestCase):
         self.browser = {"schema": "melee-web-a3-local-room-keyboard-v1", "decision": "PASS",
                         "first_error": None, "relay_mode": "simulated-network",
                         "network_simulation": {"proxy_cleanup": {"verified": True, "final": True}},
-                        "gameplay_action_probe": False,
-                        "full_route": {"result": "pass", "gameplay_action_probe": False}}
+                        "gameplay_action_probe": False, "gameplay_combat_probe": False,
+                        "full_route": {"result": "pass", "gameplay_action_probe": False,
+                                       "gameplay_combat_probe": False}}
 
     def test_independent_owner_and_browser_receipts_are_both_required(self):
         validate_result(0, self.owner, self.browser, True)
@@ -107,6 +108,7 @@ class NetworkSimulationSuitePolicyTests(unittest.TestCase):
         second_entry = checkpoint("match-2-entry", 100, 101)
         second_return = checkpoint("match-2-returned-css", 200, 201)
         return {"result": "pass", "gameplay_action_probe": False,
+            "gameplay_combat_probe": False,
             "repeat_mode": "same-room-two-match", "required_checksum_boundary": second_boundary,
             "repeated_matches": [
                 {"match_number": 1, "result": "pass", "route_elapsed_ms": 100000, "report_artifact":
@@ -261,6 +263,39 @@ class NetworkSimulationSuitePolicyTests(unittest.TestCase):
             route["repeated_matches"][1]["route"]["screenshots"]["css"]["alpha"]["sha256"] = "0" * 64
             with self.assertRaisesRegex(ValueError, "hash differs"):
                 validate_repeat_artifacts(root, route)
+
+    def test_combat_probe_has_an_isolated_moderate_full_route_scenario(self):
+        self.assertEqual(SCENARIOS["full-moderate-combat-probe"],
+                         ("moderate", True, False, False, False, False, True))
+        self.assertEqual(scenario_route_flags("full-moderate-combat-probe"),
+                         ["--full-route", "--gameplay-combat-probe"])
+        self.assertEqual(scenario_route_flags("full-moderate"), ["--full-route"])
+        combat = copy.deepcopy(self.browser)
+        combat["gameplay_combat_probe"] = True
+        combat["full_route"]["gameplay_combat_probe"] = True
+        combat["full_route"]["combat_probe"] = {"result": "pass"}
+        validate_result(0, self.owner, combat, True, gameplay_combat_probe=True)
+        with self.assertRaisesRegex(ValueError, "combat mode"):
+            validate_result(0, self.owner, combat, True)
+        with self.assertRaisesRegex(ValueError, "incomplete"):
+            incomplete = copy.deepcopy(combat)
+            incomplete["full_route"]["combat_probe"]["result"] = "running"
+            validate_result(0, self.owner, incomplete, True, gameplay_combat_probe=True)
+        with self.assertRaisesRegex(ValueError, "unexpectedly contains a gameplay action probe"):
+            mixed = copy.deepcopy(combat)
+            mixed["full_route"]["action_prefix"] = {"result": "pass"}
+            validate_result(0, self.owner, mixed, True, gameplay_combat_probe=True)
+        with self.assertRaisesRegex(ValueError, "separate scenarios"):
+            validate_result(0, self.owner, combat, True, True,
+                            gameplay_combat_probe=True)
+        with self.assertRaisesRegex(ValueError, "combat mode"):
+            validate_result(0, self.owner,
+                            dict(combat, gameplay_combat_probe=False), True,
+                            gameplay_combat_probe=True)
+        unexpected = copy.deepcopy(self.browser)
+        unexpected["full_route"]["combat_probe"] = {"result": "pass"}
+        with self.assertRaisesRegex(ValueError, "unexpectedly contains a gameplay combat"):
+            validate_result(0, self.owner, unexpected, True)
 
     def test_action_probe_cannot_be_relabelled_as_baseline(self):
         action = copy.deepcopy(self.browser)

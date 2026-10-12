@@ -61,5 +61,7 @@ search. The receipt retains the exact candidate, reviews, failed run and gaps.
 
 The additive observer passed independent source/result review, the affected
 Release runtime build and 2,363 regression tests (165 expected skips). Its
-exact-head CI and integration are pending; all historical M2 and M3 producer
+14 exact-head CI checks completed (12 successes, two expected skips); PR
+[#315](https://github.com/ericvanlare/melee-web/pull/315) merged as `9e3ec835`
+with identical reviewed and merged trees. All historical M2 and M3 producer
 identities remain unchanged.

@@ -8,12 +8,23 @@ import {observeRuntimeOwner} from '../tests/runtime_owner_observation.mjs';
 import {confirmTwoHumanResults} from '../tests/vs_rules_results_confirmation_driver.mjs';
 import {returnFromCompetitivePrize} from '../tests/vs_rules_timeout_route_helpers.mjs';
 import {createSourceCursorJoin} from './a3_source_cursor_join.mjs';
+import {comparePairedCombatPlayers, decideP2ApproachTap,
+  inspectCombatPairRetainingRawRows, observePairedCombatJab,
+  retainCombatApproachInputReadback, retainCombatApproachState, validateCombatItemsNone,
+  validateP2GameplayInputWindow, validateSingleP2ApproachTapWindow}
+  from './a3_local_room_combat_probe.mjs';
+export {validateP2GameplayInputWindow} from './a3_local_room_combat_probe.mjs';
 
 /** Synchronous read-only browser predicate for an explicitly observed key press. */
-export function observeDesiredSourcePad({inputFrom, port, expected}) {
+export function observeDesiredSourcePad({inputFrom, port, expected, maxSourceCursor = null}) {
   const runtimeError=globalThis.document?.querySelector('#status')?.dataset.runtimeError;
   if(runtimeError)throw Error(runtimeError);
   const health=globalThis.meleeNetRuntimeLockstepHealth?.({inputFrom});
+  if(maxSourceCursor !== null) {
+    const cursor=globalThis.__net?.status?.()?.cursor;
+    if(!Number.isSafeInteger(cursor)||cursor>maxSourceCursor)
+      throw Error('Source PAD observation exceeded its declared source-cursor budget');
+  }
   if(health?.failure||health?.peer?.failure||health?.peer?.protocol?.terminal)
     throw Error('Source PAD observation encountered a runtime owner failure or terminal');
   const rows=health?.peer?.localInputCapture?.captures_since;
@@ -89,55 +100,6 @@ function isNeutralPadRow(row) {
   return Array.isArray(row?.bytes) && row.bytes.length === 11 &&
     row.bytes.every(value => value === 0);
 }
-
-// Validate only literal local capture rows for the bounded P2 prefix. This
-// does not infer movement from the key press or synthesize a neutral sample.
-export function validateP2GameplayInputWindow({p2Rows, p1Rows, movementTick,
-  releaseTick, direction}) {
-  requireValue(Number.isSafeInteger(movementTick) && Number.isSafeInteger(releaseTick) &&
-    releaseTick > movementTick, 'P2 input window has invalid source ticks');
-  requireValue(direction === -1 || direction === 1,
-    'P2 input window has invalid horizontal direction');
-
-  const exactRows = (rows, port, label) => {
-    const window = rows.filter(row => row?.input_tick >= movementTick &&
-      row.input_tick <= releaseTick);
-    assert.equal(window.length, releaseTick - movementTick + 1,
-      `${label}: literal input capture window has a missing or duplicate tick`);
-    for (let offset = 0; offset < window.length; offset++) {
-      const row = window[offset];
-      const tick = movementTick + offset;
-      assert.equal(row.input_tick, tick, `${label}: input ticks are not in source order`);
-      assert.equal(row.source_cursor, tick, `${label}: input capture is not source-cursor aligned`);
-      assert.equal(row.local_port, port, `${label}: local input port changed`);
-      assert(Array.isArray(row.bytes) && row.bytes.length === 11 &&
-        row.bytes.every(value => Number.isInteger(value) && value >= 0 && value <= 255),
-      `${label}: input row is not an exact 11-byte PAD record`);
-    }
-    return window;
-  };
-
-  const p2 = exactRows(p2Rows, 1, 'P2');
-  const p1 = exactRows(p1Rows, 0, 'P1');
-  const movement = p2[0];
-  assert.equal(Math.sign(signedByte(movement.bytes[2])), direction,
-    'P2 first captured sample does not match the requested horizontal direction');
-  assert(movement.bytes.slice(0, 2).every(value => value === 0) &&
-    movement.bytes.slice(3).every(value => value === 0),
-  'P2 gameplay prefix contains an unexpected non-horizontal PAD input');
-  for (const row of p2.slice(0, -1)) {
-    assert.equal(Math.sign(signedByte(row.bytes[2])), direction,
-      'P2 horizontal input changed before the observed neutral release');
-    assert(row.bytes.slice(0, 2).every(value => value === 0) &&
-      row.bytes.slice(3).every(value => value === 0),
-    'P2 gameplay prefix contains an unexpected non-horizontal PAD input');
-  }
-  assert(isNeutralPadRow(p2.at(-1)), 'P2 release is not a literal all-zero PAD record');
-  assert(p1.every(isNeutralPadRow), 'P1 was not literally neutral across the P2 input window');
-  return {movement_input_tick: movementTick, neutral_release_input_tick: releaseTick,
-    p1_neutral_capture_count: p1.length, p2_direction: direction};
-}
-
 
 // Validate one bounded literal keyboard-button window and the other port's
 // simultaneous neutral records. This only checks captured source PAD rows.
@@ -355,17 +317,22 @@ export function classifyStockObservation(row, label = 'stock observation') {
 export async function runA3LocalFullRoute({
   alpha, beta, report, inputDelay, remaining, readRoomState, readPeerSnapshot, readPeerInputSuffix,
   readInputDiagnostics, waitForBothChecksumCompare, captureScreenshot,
-  assertHealthy, gameplayActionProbe = false,
+  assertHealthy, gameplayActionProbe = false, gameplayCombatProbe = false,
 }) {
+  requireValue(!(gameplayActionProbe && gameplayCombatProbe),
+    'Gameplay action and combat probes are separate route scenarios');
   const route = {
     result: 'running', scope: 'local keyboard route/lifecycle witness only',
     phases: [], css_roster: [], stage: null, match_start: [], stock_losses: [],
     respawns: [], input_actions: [], terminal_handoff: null, results: null, returned_css: null,
     required_checksum_boundary: null, gameplay_action_probe: gameplayActionProbe,
+    gameplay_combat_probe: gameplayCombatProbe,
     exclusions: ['no PAD/Gamepad input injection',
       gameplayActionProbe
         ? 'one short P2 gameplay axis pulse, one P1 grounded jab, and one P2 jump with source motion evidence; no combat-coverage claim'
-        : 'one short P2 gameplay axis pulse; attack/jump probe not requested, no combat-coverage claim',
+        : gameplayCombatProbe
+          ? 'bounded P2 inward keyboard approach and one P2 jab with paired source damage response; no retail-equivalence or KO claim'
+          : 'one short P2 gameplay axis pulse; attack/jump probe not requested, no combat-coverage claim',
       'no forced stock/result or native match-state mutation',
       'no retail, public Worker, physical-input, pixel, PCM, or timing-equivalence claim'],
   };
@@ -411,7 +378,8 @@ export async function runA3LocalFullRoute({
     return samples.map(sample => sample.row);
   };
   let lastMatchedSourceCursor = -1;
-  const observeAtCommonSourceCursor = async (observation, shouldStop = () => false) => {
+  const observeAtCommonSourceCursor = async (observation, shouldStop = () => false,
+    sourceCursorLimit = null) => {
     // Each acquisition begins from fresh peer samples. This prevents a common
     // row retained before a keyboard action from satisfying the next wait.
     const sourceCursorJoin = createSourceCursorJoin({retainedCursorsPerPeer: 8});
@@ -420,11 +388,14 @@ export async function runA3LocalFullRoute({
     };
     const retain = sample => {
       const {role, row, observed_at: observedAt} = sample;
+      const overBudget = sourceCursorLimit !== null && Number.isSafeInteger(row?.source_tick) &&
+        row.source_tick > sourceCursorLimit;
       cursorHistory.samples_by_peer[role]++;
       cursorHistory.last_by_peer[role] = {observed_at: observedAt,
         source_tick: row?.source_tick ?? null, phase: row?.phase ?? null,
         running: row?.running ?? null, message: row?.message ?? null,
         error: sample.error ?? row?.error ?? null,
+        ...(sourceCursorLimit !== null ? {match: row?.match ?? null} : {}),
         native_status: row?.native_status ?? null, room: sample.room ?? null};
       cursorHistory.recent.push({role, observed_at: observedAt,
         source_tick: row?.source_tick ?? null, phase: row?.phase ?? null,
@@ -436,6 +407,12 @@ export async function runA3LocalFullRoute({
       // validates its source cursor. A malformed row must remain diagnosable.
       if (row) sourceCursorJoin.observe(role, row, observedAt);
       cursorHistory.join = sourceCursorJoin.status();
+      if (overBudget) {
+        cursorHistory.source_cursor_limit_refusal = {role,
+          source_tick: row.source_tick, source_cursor_limit: sourceCursorLimit,
+          observed_at: observedAt};
+        throw Error(`${observation.label}: source-cursor budget exhausted during observation acquisition`);
+      }
     };
     const acceptPair = () => {
       const pair = sourceCursorJoin.takePair();
@@ -478,14 +455,14 @@ export async function runA3LocalFullRoute({
     return null;
   };
   const waitBoth = async (label, predicate, pollMs = 40,
-    {joinSourceCursor = false} = {}) => {
+    {joinSourceCursor = false, sourceCursorLimit = null} = {}) => {
     let last = null;
     const observation = {label, started_at: new Date().toISOString(), polls: 0, recent: []};
     route.current_observation = observation;
     try {
       while (remaining() > 0) {
         last = joinSourceCursor
-          ? await observeAtCommonSourceCursor(observation)
+          ? await observeAtCommonSourceCursor(observation, () => false, sourceCursorLimit)
           : await observeBoth();
         observation.polls++;
         if (!last) {
@@ -525,7 +502,8 @@ export async function runA3LocalFullRoute({
     return !!(expected?.x || expected?.y);
   };
   const pulse = async (role, keys, {expected, holdMs = 160, releaseMs = 100,
-    label, retainSample = false, observePress = false}) => {
+    label, retainSample = false, observePress = false, sourceCursorLimit = null,
+    evidenceSink = null}) => {
     requireValue(Array.isArray(keys) && keys.length > 0, `${label}: keyboard chord is empty`);
     const instance = instances[role];
     const port = rolePort(role);
@@ -536,20 +514,55 @@ export async function runA3LocalFullRoute({
     requireValue(Number.isSafeInteger(inputCount) && Number.isSafeInteger(nativeCursor) &&
       (inputCount === nativeCursor || inputCount === nativeCursor + 1),
       `${label}: local-input capture cursor is outside the observed native source boundary`);
+    if (sourceCursorLimit !== null)
+      requireValue(nativeCursor <= sourceCursorLimit,
+        `${label}: approach source-cursor budget exhausted before input`);
     // Only explicitly opted-in short taps use bounded source-owned readback.
     const pressObservationCap = observePress ? Math.min(500, Math.floor(remaining() - releaseMs - 1)) : null;
-    const observed = await instance.driver.pressChord(keys, {holdMs, releaseMs,
-      ...(observePress ? {observeBeforeRelease: {predicate: observeDesiredSourcePad,
-        arg: {inputFrom: inputCount, port, expected},
-        timeoutMs: pressObservationCap}} : {})});
+    let observed;
+    try {
+      observed = await instance.driver.pressChord(keys, {holdMs, releaseMs,
+        ...(observePress ? {observeBeforeRelease: {predicate: observeDesiredSourcePad,
+          arg: {inputFrom: inputCount, port, expected, maxSourceCursor: sourceCursorLimit},
+          timeoutMs: pressObservationCap}} : {})});
+    } catch (error) {
+      if (evidenceSink) {
+        evidenceSink.press_observer_error = String(error?.stack || error);
+        try {
+          const failureReadback = await readPeerInputSuffix(instance, inputCount);
+          const failureCaptures = failureReadback.health?.peer?.localInputCapture?.captures_since;
+          evidenceSink.last_input_suffix_readback = {
+            native_cursor: failureReadback.native_status?.cursor ?? null,
+            runtime_error: failureReadback.runtime_error ?? null,
+            captures_since: failureCaptures ?? null};
+          const failedSample = Array.isArray(failureCaptures) && failureCaptures.find(row =>
+            row.input_tick >= inputCount && row.local_port === port &&
+            matchesExpected(row, expected));
+          if (failedSample) evidenceSink.movement = {...failedSample, bytes: [...failedSample.bytes]};
+        } catch (readbackError) {
+          evidenceSink.press_failure_readback_error = String(readbackError?.stack || readbackError);
+        }
+      }
+      throw error;
+    }
     let sample = observePress ? observed : null;
+    if (evidenceSink && sample) evidenceSink.movement = {...sample, bytes: [...sample.bytes]};
     const captureDeadline = Date.now() + Math.min(1500, remaining());
     while (Date.now() < captureDeadline && !sample) {
       const readback = await readPeerInputSuffix(instance, inputCount);
       const captures = readback.health?.peer?.localInputCapture?.captures_since;
+      if (evidenceSink) evidenceSink.last_input_suffix_readback = {
+        native_cursor: readback.native_status?.cursor ?? null,
+        runtime_error: readback.runtime_error ?? null,
+        captures_since: captures ?? null};
+      sample = Array.isArray(captures) ? captures.find(row => row.input_tick >= inputCount &&
+        row.local_port === port && matchesExpected(row, expected)) : null;
+      if (sample && evidenceSink) evidenceSink.movement = {...sample, bytes: [...sample.bytes]};
       requireValue(Array.isArray(captures), `${label}: native local-input suffix is unavailable`);
-      sample = captures.find(row => row.input_tick >= inputCount && row.local_port === port &&
-        matchesExpected(row, expected));
+      if (sourceCursorLimit !== null)
+        requireValue(Number.isSafeInteger(readback.native_status?.cursor) &&
+          readback.native_status.cursor <= sourceCursorLimit,
+          `${label}: approach source-cursor budget exhausted while reading input`);
       if (!sample) await instance.page.waitForTimeout(20);
     }
     requireValue(sample && sample.source_cursor === sample.input_tick &&
@@ -570,24 +583,49 @@ export async function runA3LocalFullRoute({
       row.observed_pad_sample = {...sample, bytes: [...sample.bytes]};
     }
     route.input_actions.push(row);
-    await waitForBothChecksumCompare(requiredBoundary, null);
+    await waitForBothChecksumCompare(requiredBoundary, null, undefined,
+      sourceCursorLimit === null ? null : {sourceCursorLimit, evidenceSink: evidenceSink ?? row});
+    if (sourceCursorLimit !== null) {
+      const settledStates = await Promise.all(['alpha', 'beta'].map(currentRole =>
+        readRoomState(instances[currentRole])));
+      settledStates.forEach((state, index) => assertHealthy(state, index === 0 ? 'alpha' : 'beta'));
+      requireValue(settledStates.every(state => Number.isSafeInteger(state.native_status?.cursor) &&
+        state.native_status.cursor <= sourceCursorLimit),
+      `${label}: approach source-cursor budget exhausted while settling the checksum boundary`);
+    }
     row.checksum_boundary_reached = true;
     route.required_checksum_boundary = Math.max(route.required_checksum_boundary || 0,
       requiredBoundary);
     return row;
   };
-  const waitForP2InputWindow = async movementTick => {
+  const waitForP2InputWindow = async (movementTick,
+    {evidenceSink = p2Prefix.input_window, sourceCursorLimit = null} = {}) => {
     const deadline = Date.now() + Math.min(1500, remaining());
     while (Date.now() < deadline) {
       const p1State = await readRoomState(alpha);
+      const p1CaptureCount = sourceCursorLimit === null
+        ? p1State.owner_health?.peer?.localInputCapture?.captured_count
+        : retainCombatApproachState({evidenceSink, state: p1State, sourceCursorLimit});
       assertHealthy(p1State, 'alpha');
-      const p1CaptureCount = p1State.owner_health?.peer?.localInputCapture?.captured_count;
       requireValue(Number.isSafeInteger(p1CaptureCount) && p1CaptureCount >= 0,
         'P1 local input capture count is unavailable during the P2 prefix');
       const [p2Readback, p1Readback] = await Promise.all([
         readPeerInputSuffix(beta, movementTick),
         readPeerInputSuffix(alpha, Math.min(movementTick, p1CaptureCount)),
       ]);
+      const p2Captures = p2Readback.health?.peer?.localInputCapture?.captures_since;
+      const p1Captures = p1Readback.health?.peer?.localInputCapture?.captures_since;
+      if (sourceCursorLimit !== null) {
+        retainCombatApproachInputReadback({evidenceSink, p2Readback, p1Readback,
+          movementTick, sourceCursorLimit});
+      } else if (Array.isArray(p2Captures) && Array.isArray(p1Captures)) {
+        const p2Rows = p2Captures.filter(row => row.input_tick >= movementTick);
+        const observedEnd = p2Rows.at(-1)?.input_tick ?? null;
+        evidenceSink.p2_literal_rows = p2Rows;
+        evidenceSink.p1_literal_rows = p1Captures.filter(row =>
+          row.input_tick >= movementTick && (observedEnd === null || row.input_tick <= observedEnd));
+        evidenceSink.observed_capture_end_tick = observedEnd;
+      }
       requireValue(p2Readback.runtime_error == null && p1Readback.runtime_error == null,
         `P2 input-window capture observed a runtime error (${p2Readback.runtime_error || p1Readback.runtime_error})`);
       requireValue(p2Readback.health?.failure == null && p1Readback.health?.failure == null &&
@@ -595,16 +633,10 @@ export async function runA3LocalFullRoute({
         p2Readback.native_status?.local_capture_failure == null &&
         p1Readback.native_status?.local_capture_failure == null,
       'P2 input-window capture observed a runtime-owner failure');
-      const p2Captures = p2Readback.health?.peer?.localInputCapture?.captures_since;
-      const p1Captures = p1Readback.health?.peer?.localInputCapture?.captures_since;
       requireValue(Array.isArray(p2Captures) && Array.isArray(p1Captures),
         'P2 input-window literal local capture suffix is unavailable');
       const p2FromMovement = p2Captures.filter(row => row.input_tick >= movementTick);
       const observedEnd = p2FromMovement.at(-1)?.input_tick ?? null;
-      p2Prefix.input_window.p2_literal_rows = p2FromMovement;
-      p2Prefix.input_window.p1_literal_rows = p1Captures.filter(row =>
-        row.input_tick >= movementTick && (observedEnd === null || row.input_tick <= observedEnd));
-      p2Prefix.input_window.observed_capture_end_tick = observedEnd;
       const release = p2FromMovement.find((row, index) => index > 0 && isNeutralPadRow(row));
       if (release && p1Captures.some(row => row.input_tick === release.input_tick)) {
         const p2Window = p2FromMovement.filter(row => row.input_tick <= release.input_tick);
@@ -620,11 +652,22 @@ export async function runA3LocalFullRoute({
     throw Error('Literal P2 movement and neutral-release capture window did not settle');
   };
 
-  const readCommonNeutralInputs = async (sourceTick, minimumInputTick) => {
+  const readCommonNeutralInputs = async (sourceTick, minimumInputTick, sourceCursorLimit = null,
+    evidenceSink = null) => {
     requireValue(Number.isSafeInteger(sourceTick) && Number.isSafeInteger(minimumInputTick),
       'Grounded-neutral baseline is missing a source/input boundary');
     const states = await Promise.all(['alpha', 'beta'].map(role => readRoomState(instances[role])));
+    if (evidenceSink) evidenceSink.room_state_readbacks = states.map(state => ({
+      native_cursor: state.native_status?.cursor ?? null,
+      captured_count: state.owner_health?.peer?.localInputCapture?.captured_count ?? null,
+      runtime_error: state.runtime_error ?? null,
+      owner_failure: state.owner_health?.failure ?? null,
+      peer_failure: state.owner_health?.peer?.failure ?? null,
+      local_capture_failure: state.native_status?.local_capture_failure ?? null}));
     states.forEach((state, index) => assertHealthy(state, index === 0 ? 'alpha' : 'beta'));
+    if (sourceCursorLimit !== null && states.some(state =>
+        !Number.isSafeInteger(state.native_status?.cursor) || state.native_status.cursor > sourceCursorLimit))
+      throw Error('Grounded-neutral baseline exceeded the approach source-cursor budget while acquiring room state');
     const counts = states.map(state => state.owner_health?.peer?.localInputCapture?.captured_count);
     requireValue(counts.every(Number.isSafeInteger) && counts.every(count => count > 0),
       'Grounded-neutral baseline local-input counts are unavailable');
@@ -632,6 +675,16 @@ export async function runA3LocalFullRoute({
     if (commonTick < minimumInputTick || sourceTick - commonTick > 1) return null;
     const snapshots = await Promise.all(['alpha', 'beta'].map(role =>
       readPeerInputSuffix(instances[role], commonTick)));
+    if (evidenceSink) evidenceSink.local_input_readbacks = snapshots.map(snapshot => ({
+      native_cursor: snapshot.native_status?.cursor ?? null,
+      runtime_error: snapshot.runtime_error ?? null,
+      owner_failure: snapshot.health?.failure ?? null,
+      peer_failure: snapshot.health?.peer?.failure ?? null,
+      local_capture_failure: snapshot.native_status?.local_capture_failure ?? null,
+      captures_since: snapshot.health?.peer?.localInputCapture?.captures_since ?? null}));
+    if (sourceCursorLimit !== null && snapshots.some(snapshot =>
+        !Number.isSafeInteger(snapshot.native_status?.cursor) || snapshot.native_status.cursor > sourceCursorLimit))
+      throw Error('Grounded-neutral baseline exceeded the approach source-cursor budget while acquiring input suffixes');
     snapshots.forEach((snapshot, index) => {
       const role = index === 0 ? 'alpha' : 'beta';
       requireValue(snapshot.runtime_error == null &&
@@ -653,35 +706,54 @@ export async function runA3LocalFullRoute({
     if (!localRows.every(isNeutralPadRow)) return null;
     return {input_tick: commonTick, alpha: localRows[0], beta: localRows[1]};
   };
-  const compactGroundedBaseline = (rows, matches, localInputs, label) => ({
+  const compactGroundedBaseline = (rows, matches, localInputs, label,
+    {includeRules = false} = {}) => ({
     label, source_tick: rows[0].source_tick,
     peers: matches.map((match, index) => ({peer: index === 0 ? 'alpha' : 'beta',
-      frame: match.frame, players: match.players.map(projectActionObservationPlayer)})),
+      frame: match.frame, ...(includeRules ? {rules: match.rules} : {}),
+      players: match.players.map(projectActionObservationPlayer)})),
     local_input_tick: localInputs.input_tick,
     local_inputs: {alpha: localInputs.alpha, beta: localInputs.beta},
   });
-  const waitForGroundedNeutralBaseline = async (label, minimumInputTick) => {
+  const waitForGroundedNeutralBaseline = async (label, minimumInputTick,
+    {recordSink = route.action_prefix.baselines, sourceCursorLimit = null,
+      includeRules = false} = {}) => {
+    if (sourceCursorLimit !== null && !Number.isSafeInteger(sourceCursorLimit))
+      throw Error(label + ': source-cursor limit is invalid');
     while (remaining() > 0) {
-      const rows = await waitBoth(label + ' at a common source cursor', candidates =>
-        sourceAligned(candidates) && candidates.every(row => row.phase === 7 &&
+      const rows = await waitBoth(label + ' at a common source cursor', candidates => {
+        if (sourceCursorLimit !== null && sourceAligned(candidates) &&
+            candidates[0].source_tick > sourceCursorLimit)
+          throw Error(label + ': approach source-cursor budget exhausted during baseline acquisition');
+        return sourceAligned(candidates) && candidates.every(row => row.phase === 7 &&
           row.running === 1 && row.match?.ready === true &&
           row.match?.players?.length === 2 &&
           row.match.players.every(player => player.stocks === 4 &&
-            player.motion === 14 && player.groundAir === 0)),
-      2, {joinSourceCursor: true});
+            player.motion === 14 && player.groundAir === 0));
+      }, 2, {joinSourceCursor: true, sourceCursorLimit});
       const matches = rows.map((row, index) => checkMatchIdentity(row,
         (index === 0 ? 'alpha ' : 'beta ') + label));
-      const localInputs = await readCommonNeutralInputs(rows[0].source_tick, minimumInputTick);
+      const acquisitionEvidence = sourceCursorLimit === null ? null : {
+        label, source_tick: rows[0].source_tick,
+        peers: rows.map((row, index) => ({peer: index === 0 ? 'alpha' : 'beta',
+          phase: row.phase, running: row.running, match: row.match})),
+        room_state_readbacks: null, local_input_readbacks: null};
+      if (acquisitionEvidence) route.combat_probe.last_baseline_acquisition = acquisitionEvidence;
+      const localInputs = await readCommonNeutralInputs(rows[0].source_tick, minimumInputTick,
+        sourceCursorLimit, acquisitionEvidence);
       if (localInputs) {
-        const reportRow = compactGroundedBaseline(rows, matches, localInputs, label);
-        route.action_prefix.baselines.push(reportRow);
+        const reportRow = compactGroundedBaseline(rows, matches, localInputs, label,
+          {includeRules});
+        recordSink.push(reportRow);
         return {rows, matches, localInputs, report: reportRow};
       }
       await alpha.page.waitForTimeout(Math.min(2, remaining()));
     }
     throw Error(label + ': grounded neutral [4,4] baseline did not settle before the route deadline');
   };
-  const createActionObservation = ({label, role, targetMotions, record}) => {
+  const createActionObservation = ({label, role, targetMotions, record,
+    pairGuard = null, pairResponse = null, includeRules = false,
+    retainInspectedPair = false}) => {
     const actor = rolePort(role);
     let pendingBeforeStart = [];
     let lastRetainedTick = -1;
@@ -693,6 +765,7 @@ export async function runA3LocalFullRoute({
       samples_by_peer: {alpha: 0, beta: 0}, last_by_peer: {}, recent: [], last_pair: null,
     }};
     const inspectPair = async rows => {
+      if (retainInspectedPair) inspectCombatPairRetainingRawRows(record, rows);
       if (!sourceAligned(rows)) throw Error(label + ': action observer lost common source alignment');
       const tick = rows[0].source_tick;
       if (actionStartTick === null) {
@@ -705,7 +778,7 @@ export async function runA3LocalFullRoute({
         stopped = true;
         return;
       }
-      const states = rows.map((row, index) => {
+      const classifyRows = sourceRows => sourceRows.map((row, index) => {
         const peer = index === 0 ? 'alpha' : 'beta';
         // Use the route's existing exact first-use render-wait classifier.
         // It accepts only the healthy authored wait and keeps all other stopped,
@@ -715,12 +788,15 @@ export async function runA3LocalFullRoute({
           label + ': source stock count changed inside the bounded action prefix');
         return {match: classified.match, renderWait: classified.wait === 'first-use-rendering'};
       });
+      const states = classifyRows(rows);
       const matches = states.map(state => state.match);
+      pairGuard?.(matches, tick);
       const projectedPlayers = matches.map(match =>
         match.players.map(projectActionObservationPlayer));
       const animationFrameComparison = comparePairedActionAnimationFrames(matches);
       const actorMotions = matches.map(match => match.players[actor].motion);
       const bothActive = states.every(state => !state.renderWait);
+      const pairedResponse = bothActive ? pairResponse?.(matches, tick) ?? null : null;
       const renderWaitKey = bothActive ? null : JSON.stringify({source_tick: tick,
         peers: states.map((state, index) => ({peer: index === 0 ? 'alpha' : 'beta',
           waiting: state.renderWait, frame: state.match.frame, message: rows[index].message,
@@ -733,13 +809,15 @@ export async function runA3LocalFullRoute({
       if (renderWaitKey !== null && renderWaitKey === lastRenderWaitKey) return;
       const pair = {source_tick: tick, peers: matches.map((match, index) => ({
         peer: index === 0 ? 'alpha' : 'beta', frame: match.frame,
+        ...(includeRules ? {rules: match.rules} : {}),
         observation_state: states[index].renderWait ? 'first-use-rendering-wait' : 'active-match',
         message: rows[index].message ?? null,
         ready: match.ready, paused: match.paused, ending: match.ending,
         complete: match.complete, outcome: match.outcome,
         players: projectedPlayers[index]})),
         actor_motion_ids: actorMotions, actor_motion_agreement: actorMotions[0] === actorMotions[1],
-        animation_frame_comparison_by_port: animationFrameComparison};
+        animation_frame_comparison_by_port: animationFrameComparison,
+        ...(pairedResponse ? {combat_response: pairedResponse} : {})};
       record.observed_source_pairs.push(pair);
       if (!bothActive) {
         lastRenderWaitKey = renderWaitKey;
@@ -757,11 +835,17 @@ export async function runA3LocalFullRoute({
         record.target_observed_at_source_tick = tick;
         record.target_motion_id = pairedTargetMotion;
       }
+      if (pairedResponse?.hit_response_observed &&
+          record.defender_damage_response_source_tick === null) {
+        record.defender_damage_response_source_tick = tick;
+        record.defender_damage_response = pairedResponse;
+      }
       if (bothActive && actorMotions[0] === actorMotions[1] && actorMotions[0] === 24)
         record.knee_bend_source_ticks.push(tick);
       const groundedWait = bothActive && matches.every(match => match.players.every(player =>
         player.motion === 14 && player.groundAir === 0));
-      if (record.target_observed_at_source_tick !== null && groundedWait) {
+      if (record.target_observed_at_source_tick !== null &&
+          (!pairResponse || record.defender_damage_response_source_tick !== null) && groundedWait) {
         record.grounded_return_source_tick = tick;
         stopped = true;
       }
@@ -803,6 +887,8 @@ export async function runA3LocalFullRoute({
             label + ': action input sample did not establish the source-tick window');
           requireValue(record.target_observed_at_source_tick !== null,
             label + ': target motion was not observed on both peers within 60 source ticks');
+          if (pairResponse) requireValue(record.defender_damage_response_source_tick !== null,
+            label + ': paired defender damage response was not observed within 60 source ticks');
           requireValue(record.grounded_return_source_tick !== null,
             label + ': both players did not return to grounded Wait within 60 source ticks');
           record.observer_join = joinObservation.source_cursor_join;
@@ -874,7 +960,9 @@ export async function runA3LocalFullRoute({
     throw Error(label + ': literal 11-byte press/release rows did not settle');
   };
   const runObservedGameplayAction = async ({label, role, key, button,
-    targetMotions, beforeBaseline, observePress = false}) => {
+    targetMotions, beforeBaseline, observePress = false,
+    recordSink = route.action_prefix.actions, pairGuard = null, pairResponse = null,
+    includeRules = false, retainInspectedPair = false}) => {
     const record = {label, role, local_port: rolePort(role), key, expected_button: button,
       target_motion_ids: targetMotions, target_motion_id: null, max_source_ticks: 60,
       before: beforeBaseline.report,
@@ -883,9 +971,12 @@ export async function runA3LocalFullRoute({
       press_hold_source_tick_budget: null, press_hold_ms: null,
       observation_source_tick_range: null, target_observed_at_source_tick: null,
       grounded_return_source_tick: null, knee_bend_source_ticks: [],
-      first_use_render_wait_source_ticks: [], observed_source_pairs: [], input_window: null};
-    route.action_prefix.actions.push(record);
-    const observer = createActionObservation({label, role, targetMotions, record});
+      first_use_render_wait_source_ticks: [], observed_source_pairs: [], input_window: null,
+      ...(pairResponse ? {defender_damage_response_source_tick: null,
+        defender_damage_response: null} : {})};
+    recordSink.push(record);
+    const observer = createActionObservation({label, role, targetMotions, record,
+      pairGuard, pairResponse, includeRules, retainInspectedPair});
     const observerOutcome = observer.run().then(value => ({value}),
       error => ({error}));
     try {
@@ -1114,7 +1205,156 @@ export async function runA3LocalFullRoute({
 
   let walkoffBaseRows = p2AfterRows;
   let walkoffBaseMatches = p2AfterMatches;
-  if (gameplayActionProbe) {
+  if (gameplayCombatProbe) {
+    const initialItemRules = validateCombatItemsNone(initialMatches);
+    const expectedItemMask = initialItemRules.item_mask_hex;
+    const approachSourceStart = p2AfterRows[0].source_tick;
+    const approachSourceLimit = approachSourceStart + 480;
+    route.combat_probe = {result: 'running', scope: 'one bounded actual P2 inward keyboard approach and jab response; functional route evidence only',
+      source_observer: '_melee_web_native_menu_match_observe via fresh common-source peer rows',
+      motion_ids: {ftCo_MS_Wait: 14, ftCo_MS_Attack11: 44,
+        ftCo_MS_DamageHi1: 75, ftCo_MS_DamageFlyRoll: 91},
+      approach_policy: {maximum_observed_release_taps: 16,
+        maximum_source_cursor_span: 480, target_positive_gap: [0, 20],
+        target_is_unproven_reach_hypothesis: true,
+        overshoot_guard: 'before each tap, remaining positive gap must exceed the largest prior settled inward displacement; crossing is a strict failure'},
+      source_cursor_start: approachSourceStart, source_cursor_limit: approachSourceLimit,
+      item_rules: initialItemRules, approach: {steps: [], before: null, reached: null},
+      baselines: [], actions: []};
+    const combatPairGuard = matches => {
+      validateCombatItemsNone(matches, expectedItemMask);
+      comparePairedCombatPlayers(matches);
+      for (const match of matches)
+        assert.deepEqual(match.players.map(player => player.stocks), [4, 4],
+          'Combat probe stock count changed before the first hit');
+    };
+    const pairedPositions = matches => {
+      combatPairGuard(matches);
+      const positions = {p1_x: matches[0].players[0].x, p2_x: matches[0].players[1].x};
+      requireValue(Number.isFinite(positions.p1_x) && Number.isFinite(positions.p2_x),
+        'Combat approach has a nonfinite source position');
+      return positions;
+    };
+    const initialBaseline = await waitForGroundedNeutralBaseline(
+      'P2 combat approach settled baseline', p2RequiredBoundary,
+      {recordSink: route.combat_probe.baselines, sourceCursorLimit: approachSourceLimit,
+        includeRules: true});
+    combatPairGuard(initialBaseline.matches);
+    const baselinePositions = pairedPositions(initialBaseline.matches);
+    const sourceStartPositions = pairedPositions(p2BaselineMatches);
+    const initialSide = Math.sign(sourceStartPositions.p2_x - sourceStartPositions.p1_x);
+    requireValue(initialSide !== 0 &&
+      Math.sign(baselinePositions.p2_x - baselinePositions.p1_x) === initialSide,
+    'P2 combat approach baseline crossed the initial player side');
+    const gapAtStart = (sourceStartPositions.p2_x - sourceStartPositions.p1_x) * initialSide;
+    const gapAfterWitnessSettle = (baselinePositions.p2_x - baselinePositions.p1_x) * initialSide;
+    const witnessDisplacement = gapAtStart - gapAfterWitnessSettle;
+    requireValue(witnessDisplacement > 0,
+      'Existing P2 axis witness did not produce a settled inward displacement');
+    route.combat_probe.approach.before = {source_tick: initialBaseline.rows[0].source_tick,
+      source_positions: baselinePositions, gap_from_initial_side: gapAfterWitnessSettle,
+      existing_axis_witness_settled_inward_displacement: witnessDisplacement,
+      stocks: initialBaseline.matches[0].players.map(player => player.stocks)};
+    let currentBaseline = initialBaseline;
+    let tapsUsed = 0;
+    let largestObservedInwardDisplacement = witnessDisplacement;
+    const p2ApproachDirection = -initialSide;
+    const p2ApproachKey = p2ApproachDirection < 0 ? 'ArrowLeft' : 'ArrowRight';
+    while (true) {
+      const sourcePositions = pairedPositions(currentBaseline.matches);
+      const signedGap = (sourcePositions.p2_x - sourcePositions.p1_x) * initialSide;
+      const decision = decideP2ApproachTap({gap: signedGap, tapCount: tapsUsed,
+        sourceTickStart: approachSourceStart,
+        sourceTick: currentBaseline.rows[0].source_tick,
+        maxObservedInwardDisplacement: largestObservedInwardDisplacement});
+      if (decision.decision === 'reached') {
+        route.combat_probe.approach.reached = {source_tick: currentBaseline.rows[0].source_tick,
+          source_positions: sourcePositions, positive_gap_from_initial_side: signedGap,
+          target_upper_bound: 20, decision};
+        break;
+      }
+      requireValue(decision.decision === 'tap',
+        `P2 combat approach stopped (${decision.reason}) at gap ${signedGap} after ${tapsUsed} taps`);
+      const step = {index: tapsUsed + 1, decision, before_source_tick: currentBaseline.rows[0].source_tick,
+        before: sourcePositions, gap_before: signedGap, key: p2ApproachKey,
+        direction_x: p2ApproachDirection, input_window: {status: 'pending',
+          p2_literal_rows: [], p1_literal_rows: []}, after: null};
+      route.combat_probe.approach.steps.push(step);
+      const action = await pulse('beta', [p2ApproachKey], {expected: {x: p2ApproachDirection},
+        holdMs: 40, releaseMs: 80, observePress: true, retainSample: true,
+        sourceCursorLimit: approachSourceLimit, evidenceSink: step.input_window,
+        label: `P2 combat approach tap ${step.index}`,});
+      const sample = action.observed_pad_sample;
+      requireValue(sample && sample.input_tick === action.source_input_tick &&
+        sample.local_port === 1 && Array.isArray(sample.bytes) && sample.bytes.length === 11,
+      'P2 combat approach tap did not retain its literal source PAD sample');
+      step.input_window.movement = sample;
+      step.input_window.source_tick_start = sample.input_tick;
+      const capturedInputWindow = await waitForP2InputWindow(sample.input_tick,
+        {evidenceSink: step.input_window, sourceCursorLimit: approachSourceLimit});
+      const inputWindow = validateSingleP2ApproachTapWindow({
+        p2Rows: capturedInputWindow.p2Window, p1Rows: capturedInputWindow.p1Window,
+        movementTick: sample.input_tick,
+        releaseTick: capturedInputWindow.validated.neutral_release_input_tick,
+        direction: p2ApproachDirection, expectedMovementBytes: sample.bytes});
+      step.input_window.status = 'validated';
+      step.input_window.validated = inputWindow.validated;
+      const neutralRelease = inputWindow.p2Window.at(-1);
+      step.input_window.source_tick_range = [sample.input_tick, neutralRelease.input_tick];
+      step.input_window.p2_literal_rows = inputWindow.p2Window;
+      step.input_window.p1_literal_rows = inputWindow.p1Window;
+      const releaseBoundary = neutralRelease.input_tick + inputDelay + 1;
+      await waitForBothChecksumCompare(releaseBoundary, null, undefined,
+        {sourceCursorLimit: approachSourceLimit, evidenceSink: step.input_window});
+      route.required_checksum_boundary = Math.max(route.required_checksum_boundary || 0,
+        releaseBoundary);
+      const settledBaseline = await waitForGroundedNeutralBaseline(
+        `P2 combat approach tap ${step.index} settled baseline`, releaseBoundary,
+        {recordSink: route.combat_probe.baselines, sourceCursorLimit: approachSourceLimit,
+        includeRules: true});
+      combatPairGuard(settledBaseline.matches);
+      const afterPositions = pairedPositions(settledBaseline.matches);
+      requireValue(Math.sign(afterPositions.p2_x - afterPositions.p1_x) === initialSide,
+        `P2 combat approach tap ${step.index} crossed the initial side`);
+      requireValue(afterPositions.p1_x === sourcePositions.p1_x,
+        `P2 combat approach tap ${step.index} unexpectedly displaced neutral P1`);
+      const afterGap = (afterPositions.p2_x - afterPositions.p1_x) * initialSide;
+      const inwardDisplacement = signedGap - afterGap;
+      requireValue(Number.isFinite(inwardDisplacement) && inwardDisplacement > 0,
+        `P2 combat approach tap ${step.index} did not move inward`);
+      step.after = {source_tick: settledBaseline.rows[0].source_tick,
+        source_positions: afterPositions, gap_from_initial_side: afterGap,
+        measured_inward_displacement: inwardDisplacement,
+        source_cursor_delta: settledBaseline.rows[0].source_tick - step.before_source_tick,
+        stocks: settledBaseline.matches[0].players.map(player => player.stocks)};
+      largestObservedInwardDisplacement = Math.max(largestObservedInwardDisplacement,
+        inwardDisplacement);
+      currentBaseline = settledBaseline;
+      tapsUsed++;
+    }
+
+    const combatBeforeJab = currentBaseline;
+    combatPairGuard(combatBeforeJab.matches);
+    const initialVictimDamage = combatBeforeJab.matches[0].players[0].damage_percent;
+    requireValue(Number.isFinite(initialVictimDamage),
+      'P1 pre-jab damage baseline is not finite');
+    const jab = await runObservedGameplayAction({label: 'P2 grounded keyboard jab',
+      role: 'beta', key: 'ShiftRight', button: 0x0100, targetMotions: [44],
+      beforeBaseline: combatBeforeJab, recordSink: route.combat_probe.actions,
+      pairGuard: combatPairGuard, retainInspectedPair: true,
+      pairResponse: matches => observePairedCombatJab(matches, {initialVictimDamage,
+        actorPort: 1, victimPort: 0}), includeRules: true});
+    const postJab = await waitForGroundedNeutralBaseline(
+      'post-jab grounded neutral [4,4] baseline',
+      jab.inputWindow.validated.neutral_release_input_tick + inputDelay + 1,
+      {recordSink: route.combat_probe.baselines, includeRules: true});
+    combatPairGuard(postJab.matches);
+    jab.record.after_grounded_neutral_baseline = postJab.report;
+    route.combat_probe.after = postJab.report;
+    route.combat_probe.result = 'pass';
+    walkoffBaseRows = postJab.rows;
+    walkoffBaseMatches = postJab.matches;
+  } else if (gameplayActionProbe) {
     // Preserve the P2 horizontal pulse witness above, then add one bounded
     // grounded P1 jab and one natural P2 jump using the same live keyboard path.
     route.action_prefix = {scope: 'one grounded P1 jab and one P2 jump with matched source motion evidence; no combat-coverage claim',

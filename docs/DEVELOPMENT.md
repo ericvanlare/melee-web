@@ -131,6 +131,14 @@ suite validation bind the requested mode. A passing baseline cannot satisfy a
 failed action probe. See the [M2 receipt](status/2026-10-11-simulated-network-full-route-m2.md)
 for the current coverage and retained failures.
 
+The separate `full-moderate-combat-probe` scenario adds a bounded actual-keyboard
+P2 approach and jab, requiring paired source observations of the attack and
+P1 damage reaction before continuing the original route. Its
+`--gameplay-combat-probe` flag is exclusive with the action, stall, cut and
+repeat probes. The approach permits at most 16 observed-release taps and 480
+source cursors; its positive-distance target is an unproved reach hypothesis.
+The existing action and owner deadlines remain fixed. Scenario availability
+does not establish a hit, complete combat coverage or original equivalence.
 
 The reliability scenarios use separate result policies. Select one command below
 with a new evidence directory for each invocation:
