@@ -1,0 +1,3911 @@
+{
+  "repositories": [
+    {
+      "name": "project-slippi/slippi-ssbm-asm",
+      "branch": "master",
+      "commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "commit_date": "2026-05-01",
+      "license_metadata": "GPL-3.0",
+      "role": "game-side assembly patch source and generated Gecko profiles",
+      "commit_url": "https://github.com/project-slippi/slippi-ssbm-asm/commit/fcf47f10dc244152c2ebaa3a9dec142ea42243b7"
+    },
+    {
+      "name": "project-slippi/Ishiiruka",
+      "branch": "slippi",
+      "commit": "60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2",
+      "commit_date": "2026-09-22",
+      "license_metadata": "GPL-2.0",
+      "role": "Dolphin-derived client, mode dispatch, runtime rules and settings transport",
+      "commit_url": "https://github.com/project-slippi/Ishiiruka/commit/60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2"
+    }
+  ],
+  "release_relation": {
+    "latest_published_ishiiruka_release_found": "v3.6.4",
+    "release_commit": "e7711b104b339a99385f2bb12b472d46140a7bc7",
+    "release_date": "2026-06-15",
+    "source_head_is_release_binary": false,
+    "asm_release_bundle_pair_verified": false,
+    "note": "Do not infer a supported compatible bundle from independent repository heads. The Ishiiruka source head is later than v3.6.4; the ASM repository HEAD/output hash is not paired here with a Dolphin release artifact.",
+    "latest_published_ishiiruka_release_url": "https://github.com/project-slippi/Ishiiruka/releases/tag/v3.6.4"
+  },
+  "mode_inventory": [
+    {
+      "mode": "ranked",
+      "online": true,
+      "fixed_rules_client_predicate": true,
+      "pause_allowed": false,
+      "stadium": "Always unfrozen; PS is a counterpick, FD is neutral per v3.5.0 release notes.",
+      "shared_patches": "Same configured Netplay ASM profile; UCF 0.84 included.",
+      "unknowns": [
+        "Exact per-player dynamic UCF toggle values were not recovered.",
+        "Exact server-provided allowed-stage values and full backend rules, set/scoring semantics, and server override policy are not fully public; no server-provided character allowlist is evidenced."
+      ],
+      "stage_selection_mode_flag": false,
+      "stage_selection_note": "The internal stage_selection_mode flag is off for fixed mode; Ranked has a separate counterpick UI.",
+      "character_restriction": "Client-side fixed-mode check: local and remote character IDs must be <26; this is not a server-provided character allowlist.",
+      "stage_restriction": "If a stage is selected, client checks membership in allowedStages; the list is loaded from matchmaking response getResp[\"stages\"].",
+      "evidence_source_ids": [
+        "ishiiruka_fixed_mode",
+        "ishiiruka_character_stage_checks",
+        "matchmaking_allowed_stages",
+        "ishiiruka_live_setup",
+        "release_v350",
+        "asm_netplay_config"
+      ]
+    },
+    {
+      "mode": "unranked",
+      "online": true,
+      "fixed_rules_client_predicate": true,
+      "pause_allowed": false,
+      "stadium": "Always unfrozen per v3.5.0 release notes.",
+      "shared_patches": "Same configured Netplay ASM profile; UCF 0.84 included.",
+      "unknowns": [
+        "Exact per-player dynamic UCF toggle values were not recovered.",
+        "Exact server-provided allowed-stage values and full backend rules, set/scoring semantics, and server override policy are not fully public; no server-provided character allowlist is evidenced."
+      ],
+      "stage_selection_mode_flag": false,
+      "stage_selection_note": "The internal stage_selection_mode flag is off for fixed mode; this does not encode a server allowlist.",
+      "character_restriction": "Client-side fixed-mode check: local and remote character IDs must be <26; this is not a server-provided character allowlist.",
+      "stage_restriction": "If a stage is selected, client checks membership in allowedStages; the list is loaded from matchmaking response getResp[\"stages\"].",
+      "evidence_source_ids": [
+        "ishiiruka_fixed_mode",
+        "ishiiruka_character_stage_checks",
+        "matchmaking_allowed_stages",
+        "ishiiruka_live_setup",
+        "release_v350",
+        "asm_netplay_config"
+      ]
+    },
+    {
+      "mode": "direct",
+      "online": true,
+      "fixed_rules_client_predicate": false,
+      "pause_allowed": true,
+      "stadium": "Frozen/unfrozen toggle with Z while hovering over PS per v3.5.0.",
+      "shared_patches": "Same configured Netplay ASM profile; UCF 0.84 included.",
+      "direct_code_semantics": "Connection/matchmaking code, not gameplay code injection.",
+      "unknowns": [
+        "Exact match-specific rules/items can be server-supplied; full server policy unavailable.",
+        "Exact per-player dynamic UCF toggle values were not recovered.",
+        "Live dynamic UCF value/selection by mode or player is not established by inspected online setup source; replay settings transport is separate."
+      ],
+      "stage_selection_mode_flag": true,
+      "evidence_source_ids": [
+        "ishiiruka_mode_enum",
+        "ishiiruka_fixed_mode",
+        "ishiiruka_direct_code",
+        "ishiiruka_live_setup",
+        "release_v350",
+        "asm_netplay_config"
+      ]
+    },
+    {
+      "mode": "teams",
+      "online": true,
+      "fixed_rules_client_predicate": false,
+      "pause_allowed": false,
+      "stadium": "Frozen Stadium allowed/toggle available in Teams per v3.5.2; v3.5.0 first introduced the Direct/Teams toggle.",
+      "shared_patches": "Same configured Netplay ASM profile; doubles FoD restriction is conditional on Teams/doubles.",
+      "unknowns": [
+        "Full server setup for variants is not fully public.",
+        "No distinct Teams-only UCF set established.",
+        "Live dynamic UCF value/selection by mode or player is not established by inspected online setup source; replay settings transport is separate."
+      ],
+      "stage_selection_mode_flag": true,
+      "evidence_source_ids": [
+        "ishiiruka_mode_enum",
+        "ishiiruka_live_setup",
+        "release_v350",
+        "release_v352",
+        "fod_doubles",
+        "asm_netplay_config"
+      ]
+    },
+    {
+      "mode": "party",
+      "online": true,
+      "fixed_rules_client_predicate": true,
+      "pause_allowed": false,
+      "stadium": "Unknown from inspected public evidence.",
+      "shared_patches": "Same configured Netplay ASM profile; client sets 5-minute time mode and score UI; release describes FFA, items, weekly rotating random stages.",
+      "unknowns": [
+        "Current weekly item/stage schedule.",
+        "Exact frozen-Stadium behavior.",
+        "All authoritative backend rules.",
+        "Live dynamic UCF value/selection by mode or player is not established by inspected online setup source; replay settings transport is separate.",
+        "Exact server-provided stage values and complete Party/backend item/scoring/override policy are not fully public."
+      ],
+      "stage_selection_mode_flag": false,
+      "evidence_source_ids": [
+        "ishiiruka_fixed_mode",
+        "ishiiruka_character_stage_checks",
+        "matchmaking_allowed_stages",
+        "ishiiruka_live_setup",
+        "release_v360",
+        "asm_netplay_config"
+      ],
+      "character_restriction": "Fixed-mode client rejects character IDs >=26; no server-provided character allowlist is evidenced.",
+      "stage_restriction": "If a stage is selected, client checks it against allowedStages loaded from the matchmaking response getResp[\"stages\"]."
+    },
+    {
+      "mode": "offline",
+      "online": false,
+      "fixed_rules_client_predicate": false,
+      "pause_allowed": null,
+      "stadium": "Retail behavior unless a modified/configured profile changes it.",
+      "shared_patches": "No Slippi matchmaking mode logic. If user enables generated Netplay INI in Dolphin, shared static Gecko/ASM codes can also affect local/offline play.",
+      "unknowns": [
+        "Runtime behavior depends on user-selected Dolphin game settings/codes.",
+        "Playback uses a separate legacy codelist; not treated as live Netplay profile."
+      ],
+      "stage_selection_mode_flag": null,
+      "evidence_source_ids": [
+        "asm_readme",
+        "asm_generated_ini"
+      ]
+    }
+  ],
+  "shared_asm_configuration": {
+    "config_path": "netplay.json",
+    "output_paths": [
+      "Output/Netplay/GALE01r2.ini",
+      "Output/Netplay/GALJr2.ini"
+    ],
+    "mode_specific_ini_selection_found": false,
+    "selected_categories": [
+      "Required General Codes",
+      "Slippi Recording",
+      "Slippi Online",
+      "Recommended Normal Lag Reduction",
+      "Apply Delay to all In-Game Scenes",
+      "Lagless FoD"
+    ],
+    "default_game_rules_in_generated_ini": [
+      "Stock Mode",
+      "4 stocks",
+      "8 minutes",
+      "No Items",
+      "Singles Stages"
+    ],
+    "ucf": "UCF 0.84 source folder is selected recursively in Required General Codes; generated INI contains dashback, squat reverse, pad buffer/cardinals, SDI, shield-drop/shield-SDI, tumble and indicator hooks. This is static shared-profile evidence only. EXI prepareGameInfo UCF serialization is replay/playback; per-mode live UCF behavior is unknown.",
+    "prevent_wobbling": "External/PreventWobbling included non-recursively; root code has Teams conditional, not a Ranked-only guard. Nested Ranked/ subtree excluded by isRecursive=false; its comments say rank check is not implemented.",
+    "disable_fod_doubles": "Conditional stage-mask patch: when random-stage bitfield equals the checked legal-stage mask or the legal-stage mask with FoD absent, enable FoD for Singles and disable it for Teams. Other masks exit unchanged. Not universal Teams stage enforcement.",
+    "runtime_dynamic_values": "Live EXI online setup is shown at EXI_DeviceSlippi.cpp:2554-2618 and 2739-2745: pause/stage mode, match-block mode/timer/stocks, and item bitfield from recentMmResult.items. EXI lines 642-752 are prepareGameInfo replay/playback settings and serialize replay UCF toggles and frozen-PS state; they do not establish live per-mode/per-player UCF values. Static UCF 0.84 is confirmed from netplay.json and generated INI. Live dynamic UCF values remain unknown."
+  },
+  "license_findings": {
+    "asm_repository_license": "Repository API metadata GPL-3.0; pinned root LICENSE is GPLv3. Inspected ASM files have no per-file SPDX/license headers.",
+    "ishiiruka_repository_metadata": "GitHub repository API metadata reports GPL-2.0.",
+    "ishiiruka_readme_notice": "Pinned Ishiiruka Readme.md: GPL version 2 or later (GPLv2+).",
+    "ishiiruka_exi_source_header": "Pinned EXI_DeviceSlippi.cpp header: GPLv2+.",
+    "ishiiruka_license_text": "Pinned root license.txt is GNU GPL version 2 text.",
+    "m_ex_binary": "The generated m-ex.bin payload is referenced from a separate source project; its exact binary provenance/license was not audited.",
+    "conclusion": "These source/repository notices are distinct across repositories. Do not infer a combined binary redistribution permission. This is not legal advice, a complete contributor-provenance analysis, or permission to reuse. Review exact files, artifacts, contributors and distribution plan before reuse."
+  },
+  "configured_code_categories": [
+    {
+      "category": "Required: General Codes",
+      "default_selected": true,
+      "description": null,
+      "source_entries": [
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/UnlockAll.bin",
+          "recursive": null,
+          "annotation": "Unlock All Characters and Stages [Datel]",
+          "netplay_json_line": 70,
+          "purpose_category": "stage-pool-or-stage-behavior",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "be9429ce31b743bc8b7ab17779c5ea8e9e214462",
+          "pinned_source_sha256": "504cac0951b6bfb63115c96d9ea79ff0b1e987997eecf0e8ee3f3fccb9709ebd"
+        },
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/StockMode.bin",
+          "recursive": null,
+          "annotation": "Stock Mode [Magus]",
+          "netplay_json_line": 75,
+          "purpose_category": "match-rules-and-configuration",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "e353b9f9e93632535a0c0004676c59307e3c33cb",
+          "pinned_source_sha256": "01742ab049c7bebb777406600506910b827326865e62b229f02575eea20f3e59"
+        },
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/4Stocks.bin",
+          "recursive": null,
+          "annotation": "4 Stocks [Magus]",
+          "netplay_json_line": 80,
+          "purpose_category": "match-rules-and-configuration",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "c5f228bfd2619df0886362cf6fbdcbed783b425e",
+          "pinned_source_sha256": "86000b21d81d775e7bd05384a658bc538950ae9a3c3e61ed8d57f76114dcbe39"
+        },
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/8Minutes.bin",
+          "recursive": null,
+          "annotation": "8 Minutes [Magus]",
+          "netplay_json_line": 85,
+          "purpose_category": "match-rules-and-configuration",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "fe1c9782a485f5e449491a62c2251dcf89dc0560",
+          "pinned_source_sha256": "47c40d70d5dc3d475376efd33dc310b04d5761f712f072b23b69b5e3478cfb77"
+        },
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/NoItems.bin",
+          "recursive": null,
+          "annotation": "No Items [Magus]",
+          "netplay_json_line": 90,
+          "purpose_category": "match-rules-and-configuration",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "731ff2f86f8d3f7b043f98244ef8b0d4087c743f",
+          "pinned_source_sha256": "ce4037f378c74b10826934a1ee885f4daeac81dd59052d15e4f3af6fbf489538"
+        },
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/SinglesStages.bin",
+          "recursive": null,
+          "annotation": "Singles Stages [Magus]",
+          "netplay_json_line": 95,
+          "purpose_category": "stage-pool-or-stage-behavior",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "a55d2d36dd98a8b2cc0f2201ef7ebcec69d83880",
+          "pinned_source_sha256": "a3b380f163b33583c12dcfd64c00b235afaebeebe925a0f507018b6780b51bd6"
+        },
+        {
+          "type": "injectFolder",
+          "path": "External/Skip Memcard Prompt",
+          "recursive": true,
+          "annotation": "Skip Memcard Prompt [UnclePunch]",
+          "netplay_json_line": 100,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/DisableSpecialMessages.bin",
+          "recursive": null,
+          "annotation": "Disable Special Messages [Most]",
+          "netplay_json_line": 106,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "55d41cd51ad7d274504162b498e8ec58239e3669",
+          "pinned_source_sha256": "43cce5363b67161c37e5d5e2a4d18e717435b7dab5d110114024f3fbc29e27ff"
+        },
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/DisableTrophyMessages.bin",
+          "recursive": null,
+          "annotation": "Disable Trophy Messages [Achilles]",
+          "netplay_json_line": 111,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "a7b46a1207a8aa7860711abe7ae0a0672b7cf62b",
+          "pinned_source_sha256": "c277d50e892e58caa211bba58ec3808f73522e4f1ccf2bed7d36982cee79b16e"
+        },
+        {
+          "type": "injectFolder",
+          "path": "External/Salty Runback",
+          "recursive": null,
+          "annotation": "Hold A+B For Salty Runback 2.0 [Dan Salvato, UnclePunch]",
+          "netplay_json_line": 116,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": false
+        },
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/CStickSinglePlayer.bin",
+          "recursive": null,
+          "annotation": "C-Stick in Single Player [Zauron]",
+          "netplay_json_line": 121,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "d2cfd95e5999f8be1b11814fa87bbdf45b86e10d",
+          "pinned_source_sha256": "7a5c65c9fc58ae86ebaf87136799117ba8a71bfdded46175f659bbb7fe43191f"
+        },
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/DebugMenu.bin",
+          "recursive": null,
+          "annotation": "Debug Menu [Magus, donny2112]",
+          "netplay_json_line": 126,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "8b4f2d6e8f949d4db0c10368da30b06f6ffa46e1",
+          "pinned_source_sha256": "bcb13b5228a07f43caaaf28165af6967258e65111a398f3852f87d41b949c7ef"
+        },
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/CssFromDebugMenu.bin",
+          "recursive": null,
+          "annotation": "Exiting Debug Menu Returns to CSS [Achilles]",
+          "netplay_json_line": 131,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "b5d20276f2a228b61874e8444bc94002adce1221",
+          "pinned_source_sha256": "a4c9b796717d86efe39dd49039c5eda9a5336ca706c16017544c64cc9042a1b4"
+        },
+        {
+          "type": "injectFolder",
+          "path": "External/NeutralSpawn",
+          "recursive": null,
+          "annotation": "Neutral Spawns [UnclePunch]",
+          "netplay_json_line": 136,
+          "purpose_category": "stage-pool-or-stage-behavior",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": false
+        },
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/FasterCssLoad.bin",
+          "recursive": null,
+          "annotation": "Faster CSS Load [UnclePunch]",
+          "netplay_json_line": 141,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "998d6f5b33b41faa6d817cf423c29faef6bec081",
+          "pinned_source_sha256": "7e8bc806e50039d03b2a57b9ef7c131d8784c5307fd5d2a8f42023fa47526330"
+        },
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/ResetToCssFromStageLoad.bin",
+          "recursive": null,
+          "annotation": "L+R+A Returns to CSS during Stage Load [Jorgasms]",
+          "netplay_json_line": 146,
+          "purpose_category": "stage-pool-or-stage-behavior",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "7adcf3835f523a5adcd44ea7677c75744ef2dae7",
+          "pinned_source_sha256": "819b3cd847942238f6594d296290292d6a705e8298f289e86f8e59bfcdcd3095"
+        },
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/UnrestrictedCamera.bin",
+          "recursive": null,
+          "annotation": "Unrestricted Camera while Paused [strikebowler585]",
+          "netplay_json_line": 151,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "5a9b942f834e3e8a82e70202aaf8d11db8b8a5d0",
+          "pinned_source_sha256": "931931d6ad34be333dd2a64ce9291059067c6d5c47b591b8d650ea07b040171e"
+        },
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/CStickPanWhilePaused.bin",
+          "recursive": null,
+          "annotation": "C-Stick Panning while Paused [Achilles]",
+          "netplay_json_line": 156,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "2f1dca61a64a2cd9032e9711ecac1dbd1775351c",
+          "pinned_source_sha256": "9401be9d3a043c6289ddb9d9f928692768bf168767aa6980da9ff5636b28dc06"
+        },
+        {
+          "type": "injectFolder",
+          "path": "External/UCF 0.84/UCF",
+          "recursive": true,
+          "annotation": "UCF v0.84",
+          "netplay_json_line": 161,
+          "purpose_category": "controller-and-input-rules",
+          "behavior_review_status": "selected_package_and_generated_hooks_verified",
+          "behavior_summary": "Selected shared Netplay UCF 0.84 package; generated Netplay INI contains the documented UCF hook set. Live per-mode/per-player UCF transport remains unknown.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config",
+            "asm_generated_ini",
+            "ucf_dashback"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "injectFolder",
+          "path": "External/UCF 0.84/Indicator",
+          "recursive": true,
+          "annotation": "UCF CSS Indicator",
+          "netplay_json_line": 167,
+          "purpose_category": "controller-and-input-rules",
+          "behavior_review_status": "selected_package_verified",
+          "behavior_summary": "Selected UCF CSS indicator package; all descendant behavior is not independently inventoried here.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config",
+            "asm_generated_ini"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "injectFolder",
+          "path": "External/DPad Down at CSS for Random Stage",
+          "recursive": true,
+          "annotation": "DPad Down at CSS for Random Stage",
+          "netplay_json_line": 173,
+          "purpose_category": "stage-pool-or-stage-behavior",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/RandomStageMusic.bin",
+          "recursive": null,
+          "annotation": "Random Stage Music [UnclePunch]",
+          "netplay_json_line": 179,
+          "purpose_category": "stage-pool-or-stage-behavior",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "3a001af410ce08c2f8951d3e0a946b9c97028db0",
+          "pinned_source_sha256": "7bb78bfcf9d82fe532058282dded9c0f87c8d3ceb504ac80557d979aeac49f35"
+        },
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/RandomCssMusic.bin",
+          "recursive": null,
+          "annotation": "Random CSS Music v3 [UnclePunch]",
+          "netplay_json_line": 184,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "6130e58f6f135161876a18862bc2b52de0b68d0d",
+          "pinned_source_sha256": "dc25e37e551bee94d40104bc84f3bb5866f5e9d139055edfb0adb7709e55e558"
+        },
+        {
+          "type": "injectFolder",
+          "path": "External/CSS Player Hands Default to HMN Button",
+          "recursive": null,
+          "annotation": "CSS Player Hands Default to HMN Button [Achilles1515]",
+          "netplay_json_line": 189,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": false
+        },
+        {
+          "type": "injectFolder",
+          "path": "External/Hide Nametag When Invisible",
+          "recursive": null,
+          "annotation": "Hide Nametag When Invisible [Achilles1515]",
+          "netplay_json_line": 194,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": false
+        },
+        {
+          "type": "injectFolder",
+          "path": "External/Disable FoD During Doubles",
+          "recursive": null,
+          "annotation": "Disable FoD During Doubles [UnclePunch]",
+          "netplay_json_line": 199,
+          "purpose_category": "stage-pool-or-stage-behavior",
+          "behavior_review_status": "conditional_behavior_verified",
+          "behavior_summary": "For the two checked legal-stage masks the patch sets FoD on in Singles and off in Teams; other masks are unchanged.",
+          "behavior_evidence_source_ids": [
+            "fod_doubles"
+          ],
+          "effective_recursive_under_inspected_json_generator": false
+        },
+        {
+          "type": "injectFolder",
+          "path": "Common/Winners Names are Gold on CSS",
+          "recursive": null,
+          "annotation": "Winners Names are Gold on CSS [UnclePunch]",
+          "netplay_json_line": 204,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": false
+        },
+        {
+          "type": "injectFolder",
+          "path": "External/Closing CSS Door Preserves Nametag",
+          "recursive": true,
+          "annotation": "Closing CSS Door Preserves Nametag",
+          "netplay_json_line": 209,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "injectFolder",
+          "path": "External/Unplugging Closes CSS Door",
+          "recursive": true,
+          "annotation": "Unplugging Closes CSS Door [UnclePunch]",
+          "netplay_json_line": 215,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "injectFolder",
+          "path": "External/FreezeGlitchFix",
+          "recursive": true,
+          "annotation": "Prevent freeze glitch [tauKhan]",
+          "netplay_json_line": 221,
+          "purpose_category": "gameplay-mechanics-or-determinism",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "injectFolder",
+          "path": "Common/CostumeBoundCheck",
+          "recursive": true,
+          "annotation": "Correct Costume Conflicts [UnclePunch]",
+          "netplay_json_line": 227,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        }
+      ],
+      "selection_evidence": "Output/Netplay/GALE01r2.ini [Gecko_Enabled] lines 10-16"
+    },
+    {
+      "category": "Required: Slippi Recording",
+      "default_selected": true,
+      "description": [
+        "Saves replays, Slippi device must be in Slot B.",
+        "To disable saving replays, visit the Slippi settings in Config > GameCube"
+      ],
+      "source_entries": [
+        {
+          "type": "injectFolder",
+          "path": "Recording",
+          "recursive": true,
+          "annotation": "Slippi Recording [Fizzi, Achilles, UnclePunch, Nikki, jmlee337]",
+          "netplay_json_line": 250,
+          "purpose_category": "recording-or-game-state-initialization",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "injectFolder",
+          "path": "Common",
+          "recursive": false,
+          "annotation": null,
+          "netplay_json_line": 256,
+          "purpose_category": "purpose-unclassified",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": false
+        },
+        {
+          "type": "injectFolder",
+          "path": "Common/Initialize Stage Data",
+          "recursive": true,
+          "annotation": "Initialize Stage Data [UnclePunch]",
+          "netplay_json_line": 261,
+          "purpose_category": "stage-pool-or-stage-behavior",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "injectFolder",
+          "path": "Common/Initialize Player Data",
+          "recursive": true,
+          "annotation": "Initialize Player Data [UnclePunch]",
+          "netplay_json_line": 267,
+          "purpose_category": "recording-or-game-state-initialization",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "injectFolder",
+          "path": "Common/CSS KO Stars",
+          "recursive": null,
+          "annotation": "Asign KO Stars Upon Exiting Dairantou [UnclePunch]",
+          "netplay_json_line": 273,
+          "purpose_category": "recording-or-game-state-initialization",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": false
+        }
+      ],
+      "selection_evidence": "Output/Netplay/GALE01r2.ini [Gecko_Enabled] lines 10-16"
+    },
+    {
+      "category": "Required: Slippi Online",
+      "default_selected": true,
+      "description": [
+        "Adds online mode, Slippi device must be in Slot B.",
+        "Change settings in Config > GameCube"
+      ],
+      "source_entries": [
+        {
+          "type": "injectFolder",
+          "path": "Online/Core",
+          "recursive": true,
+          "annotation": "Slippi Online [Fizzi]",
+          "netplay_json_line": 291,
+          "purpose_category": "online-runtime-or-compatibility",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "injectFolder",
+          "path": "Online/Menus",
+          "recursive": true,
+          "annotation": "Online Menus [Fizzi]",
+          "netplay_json_line": 297,
+          "purpose_category": "online-runtime-or-compatibility",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "injectFolder",
+          "path": "Online/Slippi Online Scene",
+          "recursive": true,
+          "annotation": "Scene set up [UnclePunch, Fizzi]",
+          "netplay_json_line": 303,
+          "purpose_category": "online-runtime-or-compatibility",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "injectFolder",
+          "path": "Online/Static",
+          "recursive": true,
+          "annotation": "Static Functions [Fizzi]",
+          "netplay_json_line": 309,
+          "purpose_category": "online-runtime-or-compatibility",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "injectFolder",
+          "path": "Online/Debugging",
+          "recursive": true,
+          "annotation": "Log injections [Fizzi]",
+          "netplay_json_line": 315,
+          "purpose_category": "online-runtime-or-compatibility",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "binary",
+          "path": "Binary/LagReduction/PD+VB.bin",
+          "recursive": null,
+          "annotation": "Polling Drift Fix + VB [tauKhan]",
+          "netplay_json_line": 321,
+          "purpose_category": "timing-performance-or-synchronization",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "10a2c67350251fbc38c79f503d5adb83a298ce87",
+          "pinned_source_sha256": "6885d6d34c3aef300cfce531061361bfa9409a36b10ff40622692e3fca9ca56c"
+        },
+        {
+          "type": "injectFolder",
+          "path": "Common/FastForward",
+          "recursive": true,
+          "annotation": "Functions for supporting FFW [Fizzi, Unclepunch]",
+          "netplay_json_line": 326,
+          "purpose_category": "timing-performance-or-synchronization",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "injectFolder",
+          "path": "Common/CompatibilityHooks",
+          "recursive": true,
+          "annotation": "Our m-ex binary does not include these hooks, so we have to",
+          "netplay_json_line": 332,
+          "purpose_category": "gameplay-mechanics-or-determinism",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "binary",
+          "path": "Binary/m-ex.bin",
+          "recursive": null,
+          "annotation": "m-ex codeset generated from https://github.com/JLaferri/m-ex/tree/support%2Fslippi",
+          "netplay_json_line": 338,
+          "purpose_category": "online-runtime-or-compatibility",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "1ae51b97650ae95d5abd93ae8e7e69d2459d8227",
+          "pinned_source_sha256": "780c7f5c675ea5c992da0bc41db5b24932fb32201dd776918b47183b0b1f0f99"
+        },
+        {
+          "type": "injectFolder",
+          "path": "Common/NanaDeterminism",
+          "recursive": true,
+          "annotation": "Makes Nana inputs deterministic [UnclePunch, metaconstruct, Fizzi]",
+          "netplay_json_line": 343,
+          "purpose_category": "gameplay-mechanics-or-determinism",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "injectFolder",
+          "path": "Common/PSCameraIndependentMonitor",
+          "recursive": true,
+          "annotation": "Avoids PS + Widescreen desyncs [Fizzi]",
+          "netplay_json_line": 349,
+          "purpose_category": "timing-performance-or-synchronization",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "injectFolder",
+          "path": "External/PreventWobbling",
+          "recursive": false,
+          "annotation": "Disable wobbling [UnclePunch]",
+          "netplay_json_line": 355,
+          "purpose_category": "gameplay-mechanics-or-determinism",
+          "behavior_review_status": "active_wrapper_behavior_verified",
+          "behavior_summary": "The configured nonrecursive root wrapper calls the shared macro; the macro has a Teams-specific bypass and no active Ranked-only guard. The nested Ranked wrapper is excluded.",
+          "behavior_evidence_source_ids": [
+            "prevent_wobble_root_wrapper",
+            "prevent_wobble_active",
+            "prevent_wobble_ranked_nested"
+          ],
+          "effective_recursive_under_inspected_json_generator": false
+        }
+      ],
+      "selection_evidence": "Output/Netplay/GALE01r2.ini [Gecko_Enabled] lines 10-16"
+    },
+    {
+      "category": "Recommended: Normal Lag Reduction",
+      "default_selected": true,
+      "description": [
+        "Reduces input lag"
+      ],
+      "source_entries": [
+        {
+          "type": "binary",
+          "path": "Binary/NormalLagReduction.bin",
+          "recursive": null,
+          "annotation": null,
+          "netplay_json_line": 372,
+          "purpose_category": "timing-performance-or-synchronization",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "79a8b54faa0bfac4a9aa241c00a8dfa1acc99dfa",
+          "pinned_source_sha256": "8b35051d6805be96d40be8099d04aadba3fce601152606d3a764009e6355efb8"
+        }
+      ],
+      "selection_evidence": "Output/Netplay/GALE01r2.ini [Gecko_Enabled] lines 10-16"
+    },
+    {
+      "category": "Recommended: Apply Delay to all In-Game Scenes",
+      "default_selected": true,
+      "description": [
+        "Applies online delay to all in-game scenes.",
+        "Dolphin netplay is no longer necessary for local practice"
+      ],
+      "source_entries": [
+        {
+          "type": "injectFolder",
+          "path": "Common/UseInGameDelay",
+          "recursive": true,
+          "annotation": "Main codes",
+          "netplay_json_line": 388,
+          "purpose_category": "timing-performance-or-synchronization",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "injectFolder",
+          "path": "Common/GetCommonMinorID",
+          "recursive": true,
+          "annotation": "Static function for obtaining common minor ID",
+          "netplay_json_line": 394,
+          "purpose_category": "purpose-unclassified",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        }
+      ],
+      "selection_evidence": "Output/Netplay/GALE01r2.ini [Gecko_Enabled] lines 10-16"
+    },
+    {
+      "category": "Recommended: Lagless FoD",
+      "default_selected": true,
+      "description": [
+        "Disables particles and reflection on FoD to improve performance"
+      ],
+      "source_entries": [
+        {
+          "type": "binary",
+          "path": "Binary/FasterMeleeSettings/LaglessFod.bin",
+          "recursive": null,
+          "annotation": "Lagless FoD",
+          "netplay_json_line": 413,
+          "purpose_category": "stage-pool-or-stage-behavior",
+          "behavior_review_status": "selected_file_annotation_only",
+          "behavior_summary": "Selected binary; effect is recorded from the config annotation, not independently decoded.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "pinned_git_blob_sha": "61eea9eb5887f79528c96bb8ac7c250fa4718985",
+          "pinned_source_sha256": "16c8ea53ad69cb7f428b1999a1d45f28e6430d7d2b5e0547d4c2daa5de6f9bb7"
+        }
+      ],
+      "selection_evidence": "Output/Netplay/GALE01r2.ini [Gecko_Enabled] lines 10-16"
+    },
+    {
+      "category": "Optional: Freeze Final Destination Background",
+      "default_selected": false,
+      "description": [
+        "Prevents FD background from changing to improve performance"
+      ],
+      "source_entries": [
+        {
+          "type": "injectFolder",
+          "path": "External/FreezeFDSlippi",
+          "recursive": true,
+          "annotation": "Disable FD Background Transitions",
+          "netplay_json_line": 429,
+          "purpose_category": "purpose-unclassified",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        }
+      ],
+      "selection_evidence": "Not in Output/Netplay/GALE01r2.ini [Gecko_Enabled] lines 10-16; user-selectable Optional category."
+    },
+    {
+      "category": "Optional: Widescreen 16:9",
+      "default_selected": false,
+      "description": [
+        "Set Aspect Ratio to \"Force 16:9\" in Graphics for 16:9 monitors ---------------------- ",
+        "Will not cause desyncs when playing online"
+      ],
+      "source_entries": [
+        {
+          "type": "injectFolder",
+          "path": "External/Widescreen",
+          "recursive": true,
+          "annotation": "Widescreen 16:9",
+          "netplay_json_line": 450,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        }
+      ],
+      "selection_evidence": "Not in Output/Netplay/GALE01r2.ini [Gecko_Enabled] lines 10-16; user-selectable Optional category."
+    },
+    {
+      "category": "Optional: Disable Screen Shake",
+      "default_selected": false,
+      "description": [
+        "Will prevent screen from shaking on hits, KOs, collisions, etc ----------------------- ",
+        "Will not cause desyncs when playing online"
+      ],
+      "source_entries": [
+        {
+          "type": "binary",
+          "path": "Binary/DisableScreenShake.bin",
+          "recursive": null,
+          "annotation": null,
+          "netplay_json_line": 468,
+          "purpose_category": "purpose-unclassified",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ]
+        }
+      ],
+      "selection_evidence": "Not in Output/Netplay/GALE01r2.ini [Gecko_Enabled] lines 10-16; user-selectable Optional category."
+    },
+    {
+      "category": "Optional: Center Align 2P HUD",
+      "default_selected": false,
+      "description": [
+        "When playing online, character %'s will always be centered ------------------------- ",
+        "Will not cause desyncs when playing online"
+      ],
+      "source_entries": [
+        {
+          "type": "injectFolder",
+          "path": "External/Force2PCenterHud",
+          "recursive": true,
+          "annotation": null,
+          "netplay_json_line": 485,
+          "purpose_category": "presentation-interface-or-quality-of-life",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        }
+      ],
+      "selection_evidence": "Not in Output/Netplay/GALE01r2.ini [Gecko_Enabled] lines 10-16; user-selectable Optional category."
+    },
+    {
+      "category": "Optional: Flash Red on Failed L-Cancel",
+      "default_selected": false,
+      "description": [
+        "When playing online, this will only affect your character --------------------------- ",
+        "Will not cause desyncs when playing online"
+      ],
+      "source_entries": [
+        {
+          "type": "injectFolder",
+          "path": "External/FlashRedFailedLCancel",
+          "recursive": true,
+          "annotation": null,
+          "netplay_json_line": 503,
+          "purpose_category": "purpose-unclassified",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        }
+      ],
+      "selection_evidence": "Not in Output/Netplay/GALE01r2.ini [Gecko_Enabled] lines 10-16; user-selectable Optional category."
+    },
+    {
+      "category": "Optional: Show Friendly Player Indicators",
+      "default_selected": false,
+      "description": [
+        "When playing online, nametag YOU will show above your character. A heart will always be shown over your teammate. Helpful for colorblind players to keep track of the players.",
+        "Will not cause desyncs when playing online"
+      ],
+      "source_entries": [
+        {
+          "type": "injectFolder",
+          "path": "Online/Optional/IndicateLocalPlayer",
+          "recursive": true,
+          "annotation": null,
+          "netplay_json_line": 521,
+          "purpose_category": "online-runtime-or-compatibility",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        },
+        {
+          "type": "injectFolder",
+          "path": "Online/Optional/ShowAllyIndicator",
+          "recursive": true,
+          "annotation": null,
+          "netplay_json_line": 526,
+          "purpose_category": "online-runtime-or-compatibility",
+          "behavior_review_status": "manifest_and_annotation_only",
+          "behavior_summary": "Configuration selection and annotation verified; payload semantics not independently audited.",
+          "behavior_evidence_source_ids": [
+            "asm_netplay_config"
+          ],
+          "effective_recursive_under_inspected_json_generator": true
+        }
+      ],
+      "selection_evidence": "Not in Output/Netplay/GALE01r2.ini [Gecko_Enabled] lines 10-16; user-selectable Optional category."
+    }
+  ],
+  "netplay_manifest_sha256": "10c06ec0cc824fa412187d30cbd794aa8e79373f78f2fbdd24df9c1a11dc8c0e",
+  "remaining_unknowns": [
+    {
+      "question": "What exact allowed stages and backend rule/scoring/override policy are used for each queue/mode?",
+      "status": "Not completely public from client source; client loads allowedStages from getResp[\"stages\"], and server source is private. Character-ID bound <26 is known.",
+      "evidence_source_ids": [
+        "matchmaking_allowed_stages",
+        "ishiiruka_character_stage_checks",
+        "server_privacy"
+      ]
+    },
+    {
+      "question": "What are the live per-mode/per-player UCF toggle values?",
+      "status": "Unknown from inspected live setup. EXI lines 642-752 are replay/playback prepareGameInfo and cannot establish live UCF transport; static UCF 0.84 inclusion is known.",
+      "evidence_source_ids": [
+        "ishiiruka_replay_settings",
+        "ishiiruka_live_setup",
+        "asm_netplay_config",
+        "asm_generated_ini"
+      ]
+    },
+    {
+      "question": "Does Party allow frozen Stadium, and what is its current weekly stage/item set?",
+      "status": "Not established by inspected public source/release claims.",
+      "evidence_source_ids": [
+        "release_v360",
+        "stadium_hook",
+        "stadium_toggle"
+      ]
+    },
+    {
+      "question": "Which exact Ishiiruka release binary and ASM output form a compatible shipped bundle?",
+      "status": "Unresolved; inspected branch heads are not asserted to be a compatible bundle.",
+      "evidence_source_ids": [
+        "release_v350",
+        "release_v352",
+        "release_v360",
+        "ishiiruka_license_metadata",
+        "asm_netplay_config"
+      ]
+    },
+    {
+      "question": "What are the exact provenance and license terms for configured Binary/m-ex.bin?",
+      "status": "Not audited; referenced from separate JLaferri/m-ex source project.",
+      "evidence_source_ids": [
+        "asm_netplay_config"
+      ]
+    },
+    {
+      "question": "What is the full behavior of every assembly item recursively included under all shared Online/Common roots?",
+      "status": "Activation roots and configured binaries are cataloged exactly, but this inventory does not claim a file-by-file semantic audit of every nested routine. Inspect/review those specific paths before porting any behavior.",
+      "evidence_source_ids": [
+        "asm_netplay_config",
+        "asm_generated_ini"
+      ]
+    }
+  ],
+  "content_level_inventory_status": {
+    "complete": false,
+    "status": "All declared manifest entries and selected active root files/hash/textinclude closure are enumerated. Semantic inventory remains partial: most hook mechanics and binary payloads not fully decoded; sourcepresence/tag is not runtimeexecutionproof.",
+    "selected_default_entry_count": 52,
+    "all_category_entry_count": 59,
+    "selected_default_recursive_root_count": 22,
+    "method": "Manifest selection/type/path/declaredflag plus explicit JSON-effective recursion; selectedroot files authenticated against officialpinnedGitblob IDs; textualincludeclosure tracked. Boundedbehavior summaries separatelydeclared.",
+    "do_not_infer": "Do not infer full gameplay semantics, exact runtime activation of each nested hook, or complete gameplay-change coverage from category names or annotations. Audit recursive descendants and binary payloads before implementing any specific behavior."
+  },
+  "generator_recursion_provenance": {
+    "asm_repository_commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+    "gecko_repository": "JLaferri/gecko",
+    "inspected_gecko_commit": "e3183ba88332ba7f15a1c36664d9e5fc472d4794",
+    "inspected_file": "gecko.go",
+    "inspected_file_sha256": "2cc1b1b7ae1aa193cc2aea132464f317f1876b836006d9193c18b9a92fe2e173",
+    "source_lines": "35-42;249-256;274;396;419-461; list.go:110",
+    "finding": "In JSONconfig mode, omitted IsRecursive bool remains false after json.Unmarshal into zero-valueConfig. Build/list dispatch passes that field to collectFilesFromFolder. CLI-r defaulttrue at109-115 belongs only to standalone foldercommands. Sevenomitted selectedroots are nonrecursive; nonehas nestedfiles, so source counts unchanged.",
+    "caveat": "PinnedsourceJSONbehavior verified; historical executable producing checked-in generatedoutput remainsunknown. No inferred historicalproduceridentity."
+  },
+  "gameplay_effect_inventory": {
+    "coverage": "Source-only partial checkpoint:183uniqueannotated activeASMhookpaths among288generateddefaultrecords;27ASMhooks taggedaffects-gameplay. Of156untaggedASMhooks,6have additionalbounded sourcechecks and150lacksuchcheck;1furtherreview is .sdependency. Neither tagging nor these boundedchecks completes semanticcoverage.",
+    "active_tagged_gameplay_hook_count": 27,
+    "active_tagged_hooks": [
+      {
+        "source_id": "asm_hook_common_initialize_player_data_init_player_data_asm",
+        "path": "Common/Initialize Player Data/Init Player Data.asm",
+        "source_lines": "7-17",
+        "source_sha256": "f8a1f425bbc828b6dc93ceac87da94b4375b05d63c4d429dbf625a77a8729d40",
+        "git_blob_sha": "f0df63d21a856530be783b13de8e71f78255618a",
+        "category": "Required: Slippi Recording",
+        "injection_address": "80068EEC",
+        "annotation": "Common/Initialize Player Data/Init Player Data.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Zeros an existing per-player data region via Zero_AreaLength using length loaded from 0x80458FD0+0x20; this hook contains no allocation call. Downstream field semantics remain unaudited.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Common/Initialize%20Player%20Data/Init%20Player%20Data.asm#L7",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_common_initialize_stage_data_init_stage_data_asm",
+        "path": "Common/Initialize Stage Data/Init Stage Data.asm",
+        "source_lines": "7-12",
+        "source_sha256": "8d859318950d8f30f51cff4ead0516d3bffa1172c9630f9585a761b378e915b7",
+        "git_blob_sha": "966bc5d4dbc199e9dc3b785b603d4c1d8579e018",
+        "category": "Required: Slippi Recording",
+        "injection_address": "801C154C",
+        "annotation": "Common/Initialize Stage Data/Init Stage Data.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Zeros a 516-byte stage-data region. This is a gameplay-tagged initialization hook; downstream field semantics are not fully audited.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Common/Initialize%20Stage%20Data/Init%20Stage%20Data.asm#L7",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_common_nanadeterminism_nanadeterminism_asm",
+        "path": "Common/NanaDeterminism/NanaDeterminism.asm",
+        "source_lines": "8-18",
+        "source_sha256": "73d26bb5c3d7120e4e974392cf47fc34d09ff9b6979a5f61d846d58b71186809",
+        "git_blob_sha": "7cd805cc9d2ba9143b4728ce7062b02add5328ee",
+        "category": "Required: Slippi Online",
+        "injection_address": "800AC5B8",
+        "annotation": "Common/NanaDeterminism/NanaDeterminism.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Sets the relevant stick values to zero for Nana throw-DI handling; comments identify undefined stick values as a desync risk.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Common/NanaDeterminism/NanaDeterminism.asm#L8",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_common_pscameraindependentmonitor_pscameraindependentmonitor_asm",
+        "path": "Common/PSCameraIndependentMonitor/PSCameraIndependentMonitor.asm",
+        "source_lines": "12-24;43-85",
+        "source_sha256": "a05d2964f9219e5b76d8ed667f9df319b0372ec87778c7a5949fce686d7d08ca",
+        "git_blob_sha": "6c95bbba2fb8969492b62cd1af83fb89e63b91c6",
+        "category": "Required: Slippi Online",
+        "injection_address": "801D24FC",
+        "annotation": "Common/PSCameraIndependentMonitor/PSCameraIndependentMonitor.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Uses fixed camera-independent monitor bounds (-120..120 X, -20..80 Y) and replaces the camera-dependent transition test; comments explain the RNG/desync concern across widescreen camera layouts.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Common/PSCameraIndependentMonitor/PSCameraIndependentMonitor.asm#L12",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_external_freezeglitchfix_freezeglitchfix_asm",
+        "path": "External/FreezeGlitchFix/FreezeGlitchFix.asm",
+        "source_lines": "1-5",
+        "source_sha256": "4326925cd2f9f9cec2b9cde02ee19bd09bdf8b5ee9e0c939dff5f8f6f11964f3",
+        "git_blob_sha": "e3e865af83798877a365ec8716fa2e72df70efb6",
+        "category": "Required: General Codes",
+        "injection_address": "801239A8",
+        "annotation": "External/FreezeGlitchFix/FreezeGlitchFix.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Gameplay tag is present; source is a one-instruction NOP hook. The intended/mechanical effect is unknown from this source-only inspection.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/FreezeGlitchFix/FreezeGlitchFix.asm#L1",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_external_neutralspawn_neutralspawn_asm",
+        "path": "External/NeutralSpawn/NeutralSpawn.asm",
+        "source_lines": "13-62;64-159;162-251;277-358",
+        "source_sha256": "44bc25b56bf70520415d66be5d85f14be1c17477d9d7507cf47b2dcd86086a0d",
+        "git_blob_sha": "6c1338a4fcf30c68b5c4f2d0e47f72f363900e6a",
+        "category": "Required: General Codes",
+        "injection_address": "8016E510",
+        "annotation": "External/NeutralSpawn/NeutralSpawn.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Changes spawn assignment except in single-player, Training, Target Test and source slot index >=5. Computes singles order and 2v2 team mapping, with explicit legal-stage coordinates. Unknown stages use original SpawnPoint_GetXYZFromSpawnID with a computed spawn ID or team lookup 0,3,1,2, then recalculate facing from X; no vanilla-order equivalence is claimed.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/NeutralSpawn/NeutralSpawn.asm#L13",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_external_preventwobbling_init_wobble_count_air_asm",
+        "path": "External/PreventWobbling/Init Wobble Count Air.asm",
+        "source_lines": "1-8",
+        "source_sha256": "a5f15ae4ce3e3d39818a56ed18c9914d003e4bc0d50c951ac3093cb06d73744b",
+        "git_blob_sha": "93c5900626fffaa7908467fabd1294e59b11f904",
+        "category": "Required: Slippi Online",
+        "injection_address": "800DB880",
+        "annotation": "External/PreventWobbling/Init Wobble Count Air.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Gameplay-tagged wrapper initializes airborne wobble tracking through the shared macro; exact state logic is in PreventWobbling.s.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/PreventWobbling/Init%20Wobble%20Count%20Air.asm#L1",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_external_preventwobbling_init_wobble_count_ground_asm",
+        "path": "External/PreventWobbling/Init Wobble Count Ground.asm",
+        "source_lines": "1-8",
+        "source_sha256": "a8ff161d31fb7a42e9c50e7846842456d46dc87cec56aac983a8ff68eb64f808",
+        "git_blob_sha": "1bfd4e32e65c4df9fa6a9db9e7c881f9b8db82af",
+        "category": "Required: Slippi Online",
+        "injection_address": "800DBBD4",
+        "annotation": "External/PreventWobbling/Init Wobble Count Ground.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Gameplay-tagged wrapper initializes grounded wobble tracking through the shared macro; exact state logic is in PreventWobbling.s.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/PreventWobbling/Init%20Wobble%20Count%20Ground.asm#L1",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_external_preventwobbling_wobble_check_asm",
+        "path": "External/PreventWobbling/Wobble Check.asm",
+        "source_lines": "1-10",
+        "source_sha256": "4fd97ded37b002d524d1d8463260e27150ef81997e4914fdd02c211329a3a5de",
+        "git_blob_sha": "6b7ebbdbfbaea036982f28afa68db52e9a72105c",
+        "category": "Required: Slippi Online",
+        "injection_address": "8008F090",
+        "annotation": "External/PreventWobbling/Wobble Check.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Active nonrecursive root wrapper invokes PreventWobbling.s. Its nested Ranked subfolder is excluded by explicit nonrecursive configuration.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/PreventWobbling/Wobble%20Check.asm#L1",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_external_ucf_0_84_ucf_ucf_dbooc_squatrv_fix_asm",
+        "path": "External/UCF 0.84/UCF/UCF DBOOC SquatRv Fix.asm",
+        "source_lines": "1-4",
+        "source_sha256": "39a50bcab5c454d9fbf5865ca2ebdb947031959d0c4c8b188abf4d337da29c80",
+        "git_blob_sha": "2b04b682a9653dfd446f51818cc4345a92eafac5",
+        "category": "Required: General Codes",
+        "injection_address": "800D65EC",
+        "annotation": "External/UCF 0.84/UCF/UCF DBOOC SquatRv Fix.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Active UCF 0.84 gameplay-tagged hook; exact source hook address/name is recorded. Its detailed behavior was not independently disassembled in this pass.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/UCF%200.84/UCF/UCF%20DBOOC%20SquatRv%20Fix.asm#L1",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_external_ucf_0_84_ucf_ucf_dashback_asm",
+        "path": "External/UCF 0.84/UCF/UCF Dashback.asm",
+        "source_lines": "1-4",
+        "source_sha256": "a791aff823b54980edac685acdb2c15bba31d5239b34662ab4c831e3526f9037",
+        "git_blob_sha": "dc89a608d191040902fea4adc8ff3defa37535eb",
+        "category": "Required: General Codes",
+        "injection_address": "800C9A44",
+        "annotation": "External/UCF 0.84/UCF/UCF Dashback.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Active UCF 0.84 gameplay-tagged hook; exact source hook address/name is recorded. Its detailed behavior was not independently disassembled in this pass.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/UCF%200.84/UCF/UCF%20Dashback.asm#L1",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_external_ucf_0_84_ucf_ucf_pad_buffer_1_0_cardinals_asm",
+        "path": "External/UCF 0.84/UCF/UCF Pad Buffer + 1.0 Cardinals.asm",
+        "source_lines": "1-4",
+        "source_sha256": "fc1051043a4782a6d52c7599ef07792a83e8098cfe16495458ce0c915fed2174",
+        "git_blob_sha": "98fa94df98acafb9fa0c8fd29ec4610736095ceb",
+        "category": "Required: General Codes",
+        "injection_address": "8006B460",
+        "annotation": "External/UCF 0.84/UCF/UCF Pad Buffer + 1.0 Cardinals.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Active UCF 0.84 gameplay-tagged hook; exact source hook address/name is recorded. Its detailed behavior was not independently disassembled in this pass.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/UCF%200.84/UCF/UCF%20Pad%20Buffer%20+%201.0%20Cardinals.asm#L1",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_external_ucf_0_84_ucf_ucf_sdi_asm",
+        "path": "External/UCF 0.84/UCF/UCF SDI.asm",
+        "source_lines": "1-4",
+        "source_sha256": "bef78a08cb1604a3fd9edaaecc030d919ab983a9e4a58b55237a91814d67dd66",
+        "git_blob_sha": "7b9426a6882f805bca83bb9cb14868a89f7e160f",
+        "category": "Required: General Codes",
+        "injection_address": "8008E54C",
+        "annotation": "External/UCF 0.84/UCF/UCF SDI.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Active UCF 0.84 gameplay-tagged hook; exact source hook address/name is recorded. Its detailed behavior was not independently disassembled in this pass.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/UCF%200.84/UCF/UCF%20SDI.asm#L1",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_external_ucf_0_84_ucf_ucf_shield_drop_extended_asm",
+        "path": "External/UCF 0.84/UCF/UCF Shield Drop Extended.asm",
+        "source_lines": "1-4",
+        "source_sha256": "1513c495eabaed680c4161df836d075177a5b484635c39576e008ae69ca834d4",
+        "git_blob_sha": "39d01b1ed9b5fe6f14fc7fbe770e39cc6d901814",
+        "category": "Required: General Codes",
+        "injection_address": "8009A0B8",
+        "annotation": "External/UCF 0.84/UCF/UCF Shield Drop Extended.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Active UCF 0.84 gameplay-tagged hook; exact source hook address/name is recorded. Its detailed behavior was not independently disassembled in this pass.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/UCF%200.84/UCF/UCF%20Shield%20Drop%20Extended.asm#L1",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_external_ucf_0_84_ucf_ucf_shield_drop_asm",
+        "path": "External/UCF 0.84/UCF/UCF Shield Drop.asm",
+        "source_lines": "1-4",
+        "source_sha256": "5b95d5ae91523453fa8b8cb71349e3d01b2cbb3d4265ebf008351cef9b77b8dd",
+        "git_blob_sha": "9f4f7d591fec8d01c39415aa23f5dfea15f1ef0d",
+        "category": "Required: General Codes",
+        "injection_address": "800998A4",
+        "annotation": "External/UCF 0.84/UCF/UCF Shield Drop.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Active UCF 0.84 gameplay-tagged hook; exact source hook address/name is recorded. Its detailed behavior was not independently disassembled in this pass.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/UCF%200.84/UCF/UCF%20Shield%20Drop.asm#L1",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_external_ucf_0_84_ucf_ucf_shield_sdi_asm",
+        "path": "External/UCF 0.84/UCF/UCF Shield SDI.asm",
+        "source_lines": "1-4",
+        "source_sha256": "89caa0c3ba47ff41a61ab9ad521d1d30edc396c992c1c67c5ee9869a703ff1a1",
+        "git_blob_sha": "b1e15d4e5e30f8c1fa81300e054d7d924e43fc52",
+        "category": "Required: General Codes",
+        "injection_address": "80093294",
+        "annotation": "External/UCF 0.84/UCF/UCF Shield SDI.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Active UCF 0.84 gameplay-tagged hook; exact source hook address/name is recorded. Its detailed behavior was not independently disassembled in this pass.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/UCF%200.84/UCF/UCF%20Shield%20SDI.asm#L1",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_external_ucf_0_84_ucf_ucf_tumble_asm",
+        "path": "External/UCF 0.84/UCF/UCF Tumble.asm",
+        "source_lines": "1-4",
+        "source_sha256": "1a829856a3427dadbc79ab9e3828a0f7922988e5b58fcc86dc6a417b721eae5c",
+        "git_blob_sha": "6b8a154af0b065f9c45caac384ec98a5569678af",
+        "category": "Required: General Codes",
+        "injection_address": "800908F4",
+        "annotation": "External/UCF 0.84/UCF/UCF Tumble.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Active UCF 0.84 gameplay-tagged hook; exact source hook address/name is recorded. Its detailed behavior was not independently disassembled in this pass.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/UCF%200.84/UCF/UCF%20Tumble.asm#L1",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_online_core_brawloffscreendamage_asm",
+        "path": "Online/Core/BrawlOffscreenDamage.asm",
+        "source_lines": "5-64",
+        "source_sha256": "2538d0ecd97eca718a35204680d28cc3c577b53c04e37e6554cf0365f71137a6",
+        "git_blob_sha": "6bf1c31dc832a74cd13c54e6be70acb5edf8d1c1",
+        "category": "Required: Slippi Online",
+        "injection_address": "8006A880",
+        "annotation": "Online/Core/BrawlOffscreenDamage.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Returns an offscreen-damage-zone predicate using stage camera bounds, instead of applying damage directly. Skips the Home Run Contest scene (the comment mentions Sandbag), the dead flag and star/screen KO states. Effect on the caller is not executably validated.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/BrawlOffscreenDamage.asm#L5",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_online_core_freezedeadupfallphysics_inithitvelocity_asm",
+        "path": "Online/Core/FreezeDeadUpFallPhysics/InitHitVelocity.asm",
+        "source_lines": "9-24",
+        "source_sha256": "b1c7ada3d2c6c4fec8cdd07472e597cf586ecf78904be64e5300c23380f1e243",
+        "git_blob_sha": "2fb4115a04606e483ed86f434c32a5e34a681c16",
+        "category": "Required: Slippi Online",
+        "injection_address": "800D4C1C",
+        "annotation": "Online/Core/FreezeDeadUpFallPhysics/InitHitVelocity.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Moves Y/Z velocity into dedicated temporary storage and clears the original velocity fields as part of the online freeze/dead-up-fall physics handling.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/FreezeDeadUpFallPhysics/InitHitVelocity.asm#L9",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_online_core_freezedeadupfallphysics_updatefallvelocity_asm",
+        "path": "Online/Core/FreezeDeadUpFallPhysics/UpdateFallVelocity.asm",
+        "source_lines": "8-46",
+        "source_sha256": "585738bc7b63602f2402533e0cba9e96893f016f7fcaafeb0be213a2675b5f22",
+        "git_blob_sha": "ded2fbdd545021a0ab8d20e9ec8d932e9c9f9bad",
+        "category": "Required: Slippi Online",
+        "injection_address": "800D4D68",
+        "annotation": "Online/Core/FreezeDeadUpFallPhysics/UpdateFallVelocity.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Subtracts gravity and clamps stored Y velocity at negative terminal velocity, then accumulates Y/Z into temporary velocity-vector fields 0x2360/0x2364. Later position/model effects are outside this hook summary.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/FreezeDeadUpFallPhysics/UpdateFallVelocity.asm#L8",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_online_core_freezedeadupfallphysics_updatemodelpos_asm",
+        "path": "Online/Core/FreezeDeadUpFallPhysics/UpdateModelPos.asm",
+        "source_lines": "8-40",
+        "source_sha256": "76415f538e8407b8e60a82f083cbf8e6dd175135b9307e12befcb8f925c8dc85",
+        "git_blob_sha": "f307e9359e07fa261c852ccac5ab8284a20e707e",
+        "category": "Required: Slippi Online",
+        "injection_address": "80080E80",
+        "annotation": "Online/Core/FreezeDeadUpFallPhysics/UpdateModelPos.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Transforms stored position through the camera matrix and updates model coordinates; comments say separating camera centering from physics position avoids shake-dependent desync.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/FreezeDeadUpFallPhysics/UpdateModelPos.asm#L8",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_online_core_hacks_fd_desyncproofbgtransformations_asm",
+        "path": "Online/Core/Hacks/FD/DesyncProofBGTransformations.asm",
+        "source_lines": "5-35",
+        "source_sha256": "e0746b6aaef064bfaa6fd555733756740a959853e686ae09c1e77a7bb6684390",
+        "git_blob_sha": "3c6421729e5ae2de655220e99d84863e124a9972",
+        "category": "Required: Slippi Online",
+        "injection_address": "8021AAE4",
+        "annotation": "Online/Core/Hacks/FD/DesyncProofBGTransformations.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Saves/restores the RNG seed around the original Final Destination background transformation call.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/Hacks/FD/DesyncProofBGTransformations.asm#L5",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_online_core_hacks_stadium_customzerobuffer_asm",
+        "path": "Online/Core/Hacks/Stadium/CustomZeroBuffer.asm",
+        "source_lines": "15-43",
+        "source_sha256": "9bfac52319aed886168212de0f082324868a7919f0439a8d627b8f4a1811619f",
+        "git_blob_sha": "be6829d71e85597ea54d9985dd7b1d924a489a6c",
+        "category": "Required: Slippi Online",
+        "injection_address": "801C65C8",
+        "annotation": "Online/Core/Hacks/Stadium/CustomZeroBuffer.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Conditional 12-byte clear/free in Stadium transformation stage-data bookkeeping; see source for the exact predicate and writes.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/Hacks/Stadium/CustomZeroBuffer.asm#L15",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_online_core_hacks_stadium_grpsxisvalid_asm",
+        "path": "Online/Core/Hacks/Stadium/GrPsxIsValid.asm",
+        "source_lines": "5-39",
+        "source_sha256": "ecd928539bc11f6a110f887109a9744454f08208bd7b4b873c324661d4207223",
+        "git_blob_sha": "98b5f02f081727921ee79a253c1358c59f34b013",
+        "category": "Required: Slippi Online",
+        "injection_address": "801D4760",
+        "annotation": "Online/Core/Hacks/Stadium/GrPsxIsValid.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Reports Stadium archive validity from the map-head archive pointer and nonzero size.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/Hacks/Stadium/GrPsxIsValid.asm#L5",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_online_core_hacks_stadium_ingamecheckiffrozen_asm",
+        "path": "Online/Core/Hacks/Stadium/IngameCheckIfFrozen.asm",
+        "source_lines": "14-28",
+        "source_sha256": "7a6d9ae7a1d8416c14e6a3ced4bb8357b5832b74fa9df92c2b24cd560d73c56e",
+        "git_blob_sha": "9a491d95e2c57e66f16ed4db149d2b0b7c013312",
+        "category": "Required: Slippi Online",
+        "injection_address": "801D457C",
+        "annotation": "Online/Core/Hacks/Stadium/IngameCheckIfFrozen.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Leaves Training behavior intact; outside Training reads the Stadium toggle and makes the game take its frozen-stage branch when enabled.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/Hacks/Stadium/IngameCheckIfFrozen.asm#L14",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_online_core_hacks_stadium_stadiumfileload_asm",
+        "path": "Online/Core/Hacks/Stadium/StadiumFileLoad.asm",
+        "source_lines": "5-86",
+        "source_sha256": "98936dd73f4d94344df8ec5fbeee540658e32eed3bfe672fd4ce14805c34bc64",
+        "git_blob_sha": "0058ee702beae89e14e12c449a865398373d5816",
+        "category": "Required: Slippi Online",
+        "injection_address": "800165AC",
+        "annotation": "Online/Core/Hacks/Stadium/StadiumFileLoad.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Reworks transformation-file loading through File_Read/EXI and initializes archive/pointers; source comments say transformation data is preloaded into Dolphin memory.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/Hacks/Stadium/StadiumFileLoad.asm#L5",
+        "semantic_status": "source_inspected; claims limited to summary"
+      },
+      {
+        "source_id": "asm_hook_online_core_whispyblowdirfix_whispyblowdirfix_asm",
+        "path": "Online/Core/WhispyBlowDirFix/WhispyBlowDirFix.asm",
+        "source_lines": "7-27",
+        "source_sha256": "39f9d2a4b70d0b9be72da3e7fed718d0fd4831e5fa10fcca48ec2294a744ede1",
+        "git_blob_sha": "a34fb63c1e35908560da27491520cf9a69dadf0f",
+        "category": "Required: Slippi Online",
+        "injection_address": "8008653C",
+        "annotation": "Online/Core/WhispyBlowDirFix/WhispyBlowDirFix.asm",
+        "tag": "[affects-gameplay]",
+        "behavior_summary": "Zeros the directional register for fighters in death/camera-KO action states so they are skipped by Whispy\u2019s blow-direction calculation; comments cite FFW bone positions.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/WhispyBlowDirFix/WhispyBlowDirFix.asm#L7",
+        "semantic_status": "source_inspected; claims limited to summary"
+      }
+    ],
+    "additional_inspected_untagged_sources": [
+      {
+        "path": "External/Disable FoD During Doubles/Disable FoD During Doubles.asm",
+        "source_lines": "13-50",
+        "source_sha256": "3caf4956a82468c75a96bd3e816a78811aa4433d469640c6cd474f21b6a83c93",
+        "git_blob_sha": "6dce011f3ba8d96e9d240fb476fc198db39eed83",
+        "summary": "Only acts when the random-stage mask is exactly 0xE70000B0 or differs only by the FoD bit 0x20. For those masks it sets FoD enabled in Singles and disabled in Teams; all other masks exit unchanged. This is conditional stage-pool behavior, not universal doubles enforcement.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/Disable%20FoD%20During%20Doubles/Disable%20FoD%20During%20Doubles.asm#L13",
+        "status": "additional bounded source review; not a complete recursive semantic audit"
+      },
+      {
+        "path": "External/DPad Down at CSS for Random Stage/DPad Down at CSS for Random Stage.asm",
+        "source_lines": "6-25",
+        "source_sha256": "a4725d00f7abf74dd6c4fb39b5cba637cf241be5b861f2d8825955a8c1a7f6f7",
+        "git_blob_sha": "84570a27bc8c9c417ab6f541c7ec8dd319379235",
+        "summary": "At the CSS selector hook, D-pad Down writes 1 to random-stage byte 0x8045BF17; Start writes 0.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/DPad%20Down%20at%20CSS%20for%20Random%20Stage/DPad%20Down%20at%20CSS%20for%20Random%20Stage.asm#L6",
+        "status": "additional bounded source review; not a complete recursive semantic audit"
+      },
+      {
+        "path": "Online/Menus/SSS/FrozenStadiumToggle/CursorOnHoverStadium.asm",
+        "source_lines": "26-45",
+        "source_sha256": "1261c8d93efb61e19022bbe99e7e8a92800a2dba2d9270cad0d952d2965248f1",
+        "git_blob_sha": "b951f5d94ad21ed480dde00aff04412661667dc2",
+        "summary": "At stage select, scans all four controller ports for Z and toggles the frozen-Stadium byte; hover color is presentation-only.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Menus/SSS/FrozenStadiumToggle/CursorOnHoverStadium.asm#L26",
+        "status": "additional bounded source review; not a complete recursive semantic audit"
+      },
+      {
+        "path": "Online/Menus/SSS/FrozenStadiumToggle/CheckForFrozenOnStageName.asm",
+        "source_lines": "13-34",
+        "source_sha256": "1efbfe063d4333c62f2a815c7a1f12cdc8313af1ef043c12dc199295b68c6c23",
+        "git_blob_sha": "a37a9e8159c755c60310ad61566838ebd40de354",
+        "summary": "When the hovered stage is Stadium and the frozen toggle is set, substitutes icon ID 31 for the stage label/icon.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Menus/SSS/FrozenStadiumToggle/CheckForFrozenOnStageName.asm#L13",
+        "status": "additional bounded source review; not a complete recursive semantic audit"
+      },
+      {
+        "path": "Common/UseInGameDelay/ApplyInGameDelay.asm",
+        "source_lines": "8-27;37-93",
+        "source_sha256": "b00b8e2409d8948c254f88ac6d3f526e65ae4cba7c704e2d44049a04d9481423",
+        "git_blob_sha": "b79abffe9f217f4b4bf33967dea0039ff883a2cd",
+        "summary": "Calls PADRead, limits handling to in-game/sudden-death/training common scene IDs, skips online major ID 8, then rotates four pad reports through a delay ring.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Common/UseInGameDelay/ApplyInGameDelay.asm#L8",
+        "status": "additional bounded source review; not a complete recursive semantic audit"
+      },
+      {
+        "path": "Common/UseInGameDelay/InitializeInGameDelay.asm",
+        "source_lines": "64-151",
+        "source_sha256": "81f80504922272221a8bdd0833af3e8f5de2ff04006ffe276e6fc26e1606bdc4",
+        "git_blob_sha": "bd1e69cf603707e4be94d50b5b2c8f930553cfcb",
+        "summary": "Initializes the pad-delay buffer and requests the delay setting through EXI; skips online major ID 8. Offline setting clamp and display code are part of this source.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Common/UseInGameDelay/InitializeInGameDelay.asm#L64",
+        "status": "additional bounded source review; not a complete recursive semantic audit"
+      },
+      {
+        "path": "Common/UseInGameDelay/InGameDelay.s",
+        "source_lines": "11-21",
+        "source_sha256": "f199f995f08ddca1bb48b450ae216f03662b006993548d74b18722c54a3478a4",
+        "git_blob_sha": "cd6aef383d12c9c65228896e1e82551843942e48",
+        "summary": "Defines four 12-byte PAD reports and a maximum offline delay of 15 frames.",
+        "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Common/UseInGameDelay/InGameDelay.s#L11",
+        "status": "additional bounded source review; not a complete recursive semantic audit"
+      }
+    ],
+    "untagged_active_hook_semantics_unreviewed_count": 150,
+    "active_source_file_notes": {
+      "selected_roots_total_files": 198,
+      "asm_hook_sources": 183,
+      "support_or_unannotated_files": 15,
+      "include_closure_total": 196,
+      "include_closure_asm_hook_sources": 183,
+      "include_closure_s_sources_under_selected_roots": 11,
+      "include_closure_s_sources_outside_selected_roots": [
+        "Online/Alarm.s",
+        "Online/Online.s"
+      ],
+      "selected_root_s_sources_not_reached_by_parsed_closure_count": 4,
+      "unresolved_include_references": 0,
+      "caveat": "Parser closure follows textual .include references in these source files; it is a source-closure accounting aid, not proof of assembled-code semantics or runtime reachability."
+    },
+    "static_rule_and_binary_notes": [
+      {
+        "output_lines": "34-38",
+        "writes": [
+          "Stock Mode 0x00340102",
+          "4 Stocks 0x04000A00",
+          "8 Minutes 0x08010100",
+          "No Items 0xFF000000",
+          "Singles Stages 0xE70000B0"
+        ],
+        "status": "exact generated INI values and annotations; runtime mode setup may override effective rules"
+      },
+      {
+        "output_lines": "235-478",
+        "finding": "generated Netplay profile contains UCF 0.84 hooks; this does not establish live per-mode/per-player dynamic UCF values"
+      },
+      {
+        "output_lines": "7279-7281",
+        "finding": "generated profile contains Lagless FoD payload; binary effect not disassembled here"
+      },
+      {
+        "path": "Binary/m-ex.bin",
+        "annotation": "m-ex codeset generated from https://github.com/JLaferri/m-ex/tree/support%2Fslippi",
+        "finding": "The pinned ASM manifest provides this source-project/branch annotation and payload hash; the exact source commit, generator provenance, license/rights and redistribution basis for this generated binary are not established."
+      }
+    ],
+    "untagged_active_hook_total_count": 156,
+    "untagged_active_hook_bounded_review_count": 6,
+    "additional_support_source_bounded_review_count": 1
+  },
+  "schema": "slippi-gameplay-profile-inventory-v1",
+  "evidence_label": "Source identified / Partial semantic inventory / No port or runtime comparison",
+  "snapshot_date": "2026-10-12",
+  "external_packet": {
+    "run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+    "directory": "slippi-gameplay-mode-inventory-v4",
+    "inventory_sha256": "0a2edc85cff4843065f3c5449136ebef1734fedd90f65916f2ef41ed53e65526",
+    "report_sha256": "b72f56c0ac28744f957569436e1b157bb01ffb094b84d71fb95ebf272a654dab",
+    "freeze_sha256": "cd170870e70ce9f72299060928f6d9208617c6750f33e38fe45736cc9fe22db3",
+    "root_review_sha256": "e615cb51a81515b2376b508f54abbac8005505fe6d2bc4d62bb9af80f5eb2296"
+  },
+  "active_source_inventory": {
+    "selected_categories": [
+      "Recommended: Apply Delay to all In-Game Scenes",
+      "Recommended: Lagless FoD",
+      "Recommended: Normal Lag Reduction",
+      "Required: General Codes",
+      "Required: Slippi Online",
+      "Required: Slippi Recording"
+    ],
+    "selected_injectfolder_roots": [
+      {
+        "category": "Required: General Codes",
+        "path": "External/Skip Memcard Prompt",
+        "manifest_line": 100,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Skip Memcard Prompt [UnclePunch]"
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "External/Salty Runback",
+        "manifest_line": 116,
+        "isRecursive_declared": null,
+        "effective_recursive_under_inspected_gecko": false,
+        "annotation": "Hold A+B For Salty Runback 2.0 [Dan Salvato, UnclePunch]"
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "External/NeutralSpawn",
+        "manifest_line": 136,
+        "isRecursive_declared": null,
+        "effective_recursive_under_inspected_gecko": false,
+        "annotation": "Neutral Spawns [UnclePunch]"
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "External/UCF 0.84/UCF",
+        "manifest_line": 161,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "UCF v0.84"
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "External/UCF 0.84/Indicator",
+        "manifest_line": 167,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "UCF CSS Indicator"
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "External/DPad Down at CSS for Random Stage",
+        "manifest_line": 173,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "DPad Down at CSS for Random Stage"
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "External/CSS Player Hands Default to HMN Button",
+        "manifest_line": 189,
+        "isRecursive_declared": null,
+        "effective_recursive_under_inspected_gecko": false,
+        "annotation": "CSS Player Hands Default to HMN Button [Achilles1515]"
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "External/Hide Nametag When Invisible",
+        "manifest_line": 194,
+        "isRecursive_declared": null,
+        "effective_recursive_under_inspected_gecko": false,
+        "annotation": "Hide Nametag When Invisible [Achilles1515]"
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "External/Disable FoD During Doubles",
+        "manifest_line": 199,
+        "isRecursive_declared": null,
+        "effective_recursive_under_inspected_gecko": false,
+        "annotation": "Disable FoD During Doubles [UnclePunch]"
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Common/Winners Names are Gold on CSS",
+        "manifest_line": 204,
+        "isRecursive_declared": null,
+        "effective_recursive_under_inspected_gecko": false,
+        "annotation": "Winners Names are Gold on CSS [UnclePunch]"
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "External/Closing CSS Door Preserves Nametag",
+        "manifest_line": 209,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Closing CSS Door Preserves Nametag"
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "External/Unplugging Closes CSS Door",
+        "manifest_line": 215,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Unplugging Closes CSS Door [UnclePunch]"
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "External/FreezeGlitchFix",
+        "manifest_line": 221,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Prevent freeze glitch [tauKhan]"
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Common/CostumeBoundCheck",
+        "manifest_line": 227,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Correct Costume Conflicts [UnclePunch]"
+      },
+      {
+        "category": "Required: Slippi Recording",
+        "path": "Recording",
+        "manifest_line": 250,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Slippi Recording [Fizzi, Achilles, UnclePunch, Nikki, jmlee337]"
+      },
+      {
+        "category": "Required: Slippi Recording",
+        "path": "Common",
+        "manifest_line": 256,
+        "isRecursive_declared": false,
+        "effective_recursive_under_inspected_gecko": false,
+        "annotation": null
+      },
+      {
+        "category": "Required: Slippi Recording",
+        "path": "Common/Initialize Stage Data",
+        "manifest_line": 261,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Initialize Stage Data [UnclePunch]"
+      },
+      {
+        "category": "Required: Slippi Recording",
+        "path": "Common/Initialize Player Data",
+        "manifest_line": 267,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Initialize Player Data [UnclePunch]"
+      },
+      {
+        "category": "Required: Slippi Recording",
+        "path": "Common/CSS KO Stars",
+        "manifest_line": 273,
+        "isRecursive_declared": null,
+        "effective_recursive_under_inspected_gecko": false,
+        "annotation": "Asign KO Stars Upon Exiting Dairantou [UnclePunch]"
+      },
+      {
+        "category": "Required: Slippi Online",
+        "path": "Online/Core",
+        "manifest_line": 291,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Slippi Online [Fizzi]"
+      },
+      {
+        "category": "Required: Slippi Online",
+        "path": "Online/Menus",
+        "manifest_line": 297,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Online Menus [Fizzi]"
+      },
+      {
+        "category": "Required: Slippi Online",
+        "path": "Online/Slippi Online Scene",
+        "manifest_line": 303,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Scene set up [UnclePunch, Fizzi]"
+      },
+      {
+        "category": "Required: Slippi Online",
+        "path": "Online/Static",
+        "manifest_line": 309,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Static Functions [Fizzi]"
+      },
+      {
+        "category": "Required: Slippi Online",
+        "path": "Online/Debugging",
+        "manifest_line": 315,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Log injections [Fizzi]"
+      },
+      {
+        "category": "Required: Slippi Online",
+        "path": "Common/FastForward",
+        "manifest_line": 326,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Functions for supporting FFW [Fizzi, Unclepunch]"
+      },
+      {
+        "category": "Required: Slippi Online",
+        "path": "Common/CompatibilityHooks",
+        "manifest_line": 332,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Our m-ex binary does not include these hooks, so we have to"
+      },
+      {
+        "category": "Required: Slippi Online",
+        "path": "Common/NanaDeterminism",
+        "manifest_line": 343,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Makes Nana inputs deterministic [UnclePunch, metaconstruct, Fizzi]"
+      },
+      {
+        "category": "Required: Slippi Online",
+        "path": "Common/PSCameraIndependentMonitor",
+        "manifest_line": 349,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Avoids PS + Widescreen desyncs [Fizzi]"
+      },
+      {
+        "category": "Required: Slippi Online",
+        "path": "External/PreventWobbling",
+        "manifest_line": 355,
+        "isRecursive_declared": false,
+        "effective_recursive_under_inspected_gecko": false,
+        "annotation": "Disable wobbling [UnclePunch]"
+      },
+      {
+        "category": "Recommended: Apply Delay to all In-Game Scenes",
+        "path": "Common/UseInGameDelay",
+        "manifest_line": 388,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Main codes"
+      },
+      {
+        "category": "Recommended: Apply Delay to all In-Game Scenes",
+        "path": "Common/GetCommonMinorID",
+        "manifest_line": 394,
+        "isRecursive_declared": true,
+        "effective_recursive_under_inspected_gecko": true,
+        "annotation": "Static function for obtaining common minor ID"
+      }
+    ],
+    "root_counts": {
+      "all_selected_injectfolder_roots": 31,
+      "recursive_explicit_true": 22,
+      "nonrecursive_omitted_effectively_false": 7,
+      "nonrecursive_explicit_false": 2
+    },
+    "selected_root_file_count": 198,
+    "generated_active_injection_record_count": 288,
+    "parsed_active_include_closure_file_count": 196,
+    "selected_binary_count": 21,
+    "interpretation": "This maps the pinned source tree and generated list/configuration. Source presence and injection-list presence prove configuration inclusion, not execution effect or compatibility with a particular release artifact.",
+    "files": [
+      {
+        "path": "Common/AllocSceneBuffer.asm",
+        "git_blob_sha": "2704eeeb6d253c1074b4247691ea2cd60706afe1",
+        "sha256": "97de693872670a70dd81344795a112ee6941fb3911fc1349ffa4c1feed584d44",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/CSS KO Stars/Asign KO Stars Upon Exiting Dairantou.asm",
+        "git_blob_sha": "8e9501d4de3f41154f4f7ae554a3173f839d8846",
+        "sha256": "d11dfe890c28e0f589613a8ebee3ebd90766fd4c31d10f81cd8aac2c3bcfd8b9",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/Common.s",
+        "git_blob_sha": "71d9cfa792e750391a822d43fbbcaeeb5365e6bf",
+        "sha256": "88938bddf09d25521fbcb4b12fa7321eaf3075ac02269acbefb6aef7d48a2b63",
+        "active_annotated_hook": false,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/CompatibilityHooks/GetFighterNum.asm",
+        "git_blob_sha": "6b8f38d6a72ac7f462ab09c318eaf93cff01fe6c",
+        "sha256": "b113428cacf69c4250c03c79b3bc8ec41c5cd8b49307eb1a8980517ce5144948",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/CompatibilityHooks/GetSSMIndex.asm",
+        "git_blob_sha": "bfdb60684c548f8ee639ac42cd1bf4bcf8d2fd25",
+        "sha256": "ff15265447d97b7c2d1592bff98186b6d22f99e4f1fcb50b031aa4344c6b96d4",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/CompatibilityHooks/RequestSSMLoad.asm",
+        "git_blob_sha": "7233cd9c9392aa505f320704ebdcac509bc2dd96",
+        "sha256": "dbda02a60b6ae449b27e796734b92e023a78aa53d5adf87a18bb5890b765a52f",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/CostumeBoundCheck/PuffCostume.asm",
+        "git_blob_sha": "a15c332ea8be8ac5284e1a82dde2d68b0aaa2af4",
+        "sha256": "d6d2b1ccc44e28456f90f79cb38fa182e31ed6175a205fbfa6cedc676966e125",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/CostumeBoundCheck/main.asm",
+        "git_blob_sha": "7b50cacce3d17f0a46dea1eeef699711cd3fee67",
+        "sha256": "af85a07dc02178b8b4649ea6bdc2ad3341bef9510ca60cad9797df631987e8e5",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/FastForward/DynamicsFix.asm",
+        "git_blob_sha": "18e9bff1cf8e56c10a633259228d8df52378c0db",
+        "sha256": "13002603c6f4e89ba546e95798ed33861eefb2abdea777d2c8345d2a00389e55",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/FastForward/FunctionMacros.s",
+        "git_blob_sha": "130c3b05515db2b4f5c0576a463514f1137fc3c1",
+        "sha256": "0cefbfdb6e26a4d245c18818514915230ec65fc2f0cda51e83e0b4a056d673db",
+        "active_annotated_hook": false,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/GetCommonMinorID/GetCommonMinorID.asm",
+        "git_blob_sha": "c6c0da6b8a0d0e9dccca2fbbec9c839aeeb2f67f",
+        "sha256": "1251a0ca2e220c27183788f11cc2519ddec847c1e65544022f745bbdbbc248d5",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/GetIsFollower.asm",
+        "git_blob_sha": "5f2ee3c03d6e2549620a670cf8fa42bc2f526db7",
+        "sha256": "bfde38b1f0dc1a4e1eac29d9c0779ec6567c4eb74cc8e3d039099df5da8a32ab",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/IncrementFrameIndex.asm",
+        "git_blob_sha": "53cf6098a35815b12a3e2c4571588bda232f3c05",
+        "sha256": "24925d8fe80ffeafabdfe6f2cb1fc44e995e66420a3dd36fd984666dded0a578",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/Initialize Player Data/Init Player Data.asm",
+        "git_blob_sha": "f0df63d21a856530be783b13de8e71f78255618a",
+        "sha256": "f8a1f425bbc828b6dc93ceac87da94b4375b05d63c4d429dbf625a77a8729d40",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/Initialize Stage Data/Init Stage Data.asm",
+        "git_blob_sha": "966bc5d4dbc199e9dc3b785b603d4c1d8579e018",
+        "sha256": "8d859318950d8f30f51cff4ead0516d3bffa1172c9630f9585a761b378e915b7",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/NanaDeterminism/NanaDeterminism.asm",
+        "git_blob_sha": "7cd805cc9d2ba9143b4728ce7062b02add5328ee",
+        "sha256": "73d26bb5c3d7120e4e974392cf47fc34d09ff9b6979a5f61d846d58b71186809",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/PSCameraIndependentMonitor/PSCameraIndependentMonitor.asm",
+        "git_blob_sha": "6c95bbba2fb8969492b62cd1af83fb89e63b91c6",
+        "sha256": "a05d2964f9219e5b76d8ed667f9df319b0372ec87778c7a5949fce686d7d08ca",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/UseInGameDelay/ApplyInGameDelay.asm",
+        "git_blob_sha": "b79abffe9f217f4b4bf33967dea0039ff883a2cd",
+        "sha256": "b00b8e2409d8948c254f88ac6d3f526e65ae4cba7c704e2d44049a04d9481423",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/UseInGameDelay/InGameDelay.s",
+        "git_blob_sha": "cd6aef383d12c9c65228896e1e82551843942e48",
+        "sha256": "f199f995f08ddca1bb48b450ae216f03662b006993548d74b18722c54a3478a4",
+        "active_annotated_hook": false,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/UseInGameDelay/InitializeInGameDelay.asm",
+        "git_blob_sha": "bd1e69cf603707e4be94d50b5b2c8f930553cfcb",
+        "sha256": "81f80504922272221a8bdd0833af3e8f5de2ff04006ffe276e6fc26e1606bdc4",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/Winners Names are Gold on CSS/Change Name Color.asm",
+        "git_blob_sha": "57c295d1fbbc849a0d5210b345bbf48db7eccd93",
+        "sha256": "b86df98dfdbeedeae14c7fe09e450b1ac9f74ffd6646f813eab9320595de9b40",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Common/Winners Names are Gold on CSS/Remember Who LRA Started.asm",
+        "git_blob_sha": "724f7f9d28709a705037e692fddaeb9b4f559912",
+        "sha256": "b7b8f29daa1aad36abc888f83e2abaf944acf0295c7baa116f8b3995b897ca29",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/CSS Player Hands Default to HMN Button/Change Default Hand Position.asm",
+        "git_blob_sha": "4a235e7022f97acf78ecef0d4cacdeaf1f3cef35",
+        "sha256": "c302210878c6b7879c4350a581597c6da41a905a767f259450878a193c09425a",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/CSS Player Hands Default to HMN Button/Fix A Button Buffer When Exiting Name Entry.asm",
+        "git_blob_sha": "9e916823d152f9a6fc3eb12226d8b5e12412e2f7",
+        "sha256": "f5705299bbb7c33be91f0e7510c173c878190bb675fe64ec27a7aa65b24c563e",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/Closing CSS Door Preserves Nametag/On Window Close/Skip Nametag ID Reset.asm",
+        "git_blob_sha": "a71773c9600ee34223eaed9fc7f96ab13acfb15d",
+        "sha256": "b27f6590399c416a57f9b1cd2d138cfd4f44173325ae4221d2df4399c80b16ed",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/Closing CSS Door Preserves Nametag/On Window Close/Skip isUsingNametag Bool Reset.asm",
+        "git_blob_sha": "6e24177dfcf9233fb7ff394a454797391377e439",
+        "sha256": "2b4b19f8302acfff1a4d41e9b9ebf49ce3893e8545bb293107ab8300ceb0954b",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/DPad Down at CSS for Random Stage/DPad Down at CSS for Random Stage.asm",
+        "git_blob_sha": "84570a27bc8c9c417ab6f541c7ec8dd319379235",
+        "sha256": "a4725d00f7abf74dd6c4fb39b5cba637cf241be5b861f2d8825955a8c1a7f6f7",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/Disable FoD During Doubles/Disable FoD During Doubles.asm",
+        "git_blob_sha": "6dce011f3ba8d96e9d240fb476fc198db39eed83",
+        "sha256": "3caf4956a82468c75a96bd3e816a78811aa4433d469640c6cd474f21b6a83c93",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/FreezeGlitchFix/FreezeGlitchFix.asm",
+        "git_blob_sha": "e3e865af83798877a365ec8716fa2e72df70efb6",
+        "sha256": "4326925cd2f9f9cec2b9cde02ee19bd09bdf8b5ee9e0c939dff5f8f6f11964f3",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/Hide Nametag When Invisible/Hide Nametag When Invisible.asm",
+        "git_blob_sha": "3e9d14108a0ec0bc0bebc4b0d55b6a7d3e75811e",
+        "sha256": "8467a26728092fd416ae69e5835e4e19f861536256cf39a0119198fcfbdffccd",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/NeutralSpawn/NeutralSpawn.asm",
+        "git_blob_sha": "6c1338a4fcf30c68b5c4f2d0e47f72f363900e6a",
+        "sha256": "44bc25b56bf70520415d66be5d85f14be1c17477d9d7507cf47b2dcd86086a0d",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/PreventWobbling/Init Wobble Count Air.asm",
+        "git_blob_sha": "93c5900626fffaa7908467fabd1294e59b11f904",
+        "sha256": "a5f15ae4ce3e3d39818a56ed18c9914d003e4bc0d50c951ac3093cb06d73744b",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/PreventWobbling/Init Wobble Count Ground.asm",
+        "git_blob_sha": "1bfd4e32e65c4df9fa6a9db9e7c881f9b8db82af",
+        "sha256": "a8ff161d31fb7a42e9c50e7846842456d46dc87cec56aac983a8ff68eb64f808",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/PreventWobbling/PreventWobbling.s",
+        "git_blob_sha": "750e0fdb95fd564ffbf620af84ecd7d4020eb074",
+        "sha256": "70ddf34cd64668c4fe27ab80037a2b4bd9faa29fbb540005e2ef9a9ec5a2671d",
+        "active_annotated_hook": false,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/PreventWobbling/Wobble Check.asm",
+        "git_blob_sha": "6b7ebbdbfbaea036982f28afa68db52e9a72105c",
+        "sha256": "4fd97ded37b002d524d1d8463260e27150ef81997e4914fdd02c211329a3a5de",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/Salty Runback/Salty Runback.asm",
+        "git_blob_sha": "7aa7cfa7ac7102aeb9360d6b0f9c3ac1be395df6",
+        "sha256": "00e5102febf0905d3205fe9f57364fa1dceec158abce98b58124d3e88bb4c9e0",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/Skip Memcard Prompt/Skip Memcard Prompt.asm",
+        "git_blob_sha": "6e4d2d3f0c8dec5677a56fff1297269d96102c50",
+        "sha256": "a915422f796eaf1494df57b98f3aba4b01f6caf17e3e3db94048a9d12d0a9c59",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/UCF 0.84/Indicator/UCF Text.asm",
+        "git_blob_sha": "bef5acdab395514ee1cb0f2860e84c6073ce088e",
+        "sha256": "3b065c8ac7b342e6c8038ceda2732d419c75751a53842478152b056d684343d9",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/UCF 0.84/UCF/UCF DBOOC SquatRv Fix.asm",
+        "git_blob_sha": "2b04b682a9653dfd446f51818cc4345a92eafac5",
+        "sha256": "39a50bcab5c454d9fbf5865ca2ebdb947031959d0c4c8b188abf4d337da29c80",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/UCF 0.84/UCF/UCF Dashback.asm",
+        "git_blob_sha": "dc89a608d191040902fea4adc8ff3defa37535eb",
+        "sha256": "a791aff823b54980edac685acdb2c15bba31d5239b34662ab4c831e3526f9037",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/UCF 0.84/UCF/UCF Pad Buffer + 1.0 Cardinals.asm",
+        "git_blob_sha": "98fa94df98acafb9fa0c8fd29ec4610736095ceb",
+        "sha256": "fc1051043a4782a6d52c7599ef07792a83e8098cfe16495458ce0c915fed2174",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/UCF 0.84/UCF/UCF SDI.asm",
+        "git_blob_sha": "7b9426a6882f805bca83bb9cb14868a89f7e160f",
+        "sha256": "bef78a08cb1604a3fd9edaaecc030d919ab983a9e4a58b55237a91814d67dd66",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/UCF 0.84/UCF/UCF Shield Drop Extended.asm",
+        "git_blob_sha": "39d01b1ed9b5fe6f14fc7fbe770e39cc6d901814",
+        "sha256": "1513c495eabaed680c4161df836d075177a5b484635c39576e008ae69ca834d4",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/UCF 0.84/UCF/UCF Shield Drop.asm",
+        "git_blob_sha": "9f4f7d591fec8d01c39415aa23f5dfea15f1ef0d",
+        "sha256": "5b95d5ae91523453fa8b8cb71349e3d01b2cbb3d4265ebf008351cef9b77b8dd",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/UCF 0.84/UCF/UCF Shield SDI.asm",
+        "git_blob_sha": "b1e15d4e5e30f8c1fa81300e054d7d924e43fc52",
+        "sha256": "89caa0c3ba47ff41a61ab9ad521d1d30edc396c992c1c67c5ee9869a703ff1a1",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/UCF 0.84/UCF/UCF Tumble.asm",
+        "git_blob_sha": "6b8a154af0b065f9c45caac384ec98a5569678af",
+        "sha256": "1a829856a3427dadbc79ab9e3828a0f7922988e5b58fcc86dc6a417b721eae5c",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "External/Unplugging Closes CSS Door/Unplugging Closes CSS Door.asm",
+        "git_blob_sha": "a710d2e657625627ddb8a89c6c8e62818b96d8fe",
+        "sha256": "dec4842281b79454ae9bef52b40e074d50511138c4ee069e300c11dd513f8f0b",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/BrawlOffscreenDamage.asm",
+        "git_blob_sha": "6bf1c31dc832a74cd13c54e6be70acb5edf8d1c1",
+        "sha256": "2538d0ecd97eca718a35204680d28cc3c577b53c04e37e6554cf0365f71137a6",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/CustomizeMessageLRAS.asm",
+        "git_blob_sha": "9ea5c6ebffa6516919ce99cf9cf4a0e5b18ac0f0",
+        "sha256": "fbc75a77f4da7972ee7a9c48cce81b54b14b1f0b7d0b9c6c7ea7fd126f9fe87c",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/EXIFileLoad/GetFileSize.asm",
+        "git_blob_sha": "e7bd295556821390bebcc6ae2cac9fbab82cb1b8",
+        "sha256": "887efc191670b43c58f0ac8aa75764020cad491f0deaae580ba1d04911cfeea2",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/EXIFileLoad/TransferFile.asm",
+        "git_blob_sha": "3a2015ae31ad87c4f9399e9549ed44a03f3c8a2f",
+        "sha256": "77f56edec3142277ee1b8fb1f02e7ee87c916ff187eeeac48947ab5079b5ee9d",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/ForceEngineOnRollback.asm",
+        "git_blob_sha": "4a782535db287beb65be813d3c3daaf3a26cc82f",
+        "sha256": "06d871048a0092516a4de3896d6d454250f5438912e97809862a394183d47830",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/ForceInputRefetchOnAdvance.asm",
+        "git_blob_sha": "a3cd315693adaa9516075b4c78f3e09a4b1fc2f7",
+        "sha256": "503f9bd0e287c3d437adeecf9981a0c40b41e4fb750ea905389bd64291ed74c2",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/FreezeDeadUpFallPhysics/InitHitVelocity.asm",
+        "git_blob_sha": "2fb4115a04606e483ed86f434c32a5e34a681c16",
+        "sha256": "b1c7ada3d2c6c4fec8cdd07472e597cf586ecf78904be64e5300c23380f1e243",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/FreezeDeadUpFallPhysics/UpdateFallVelocity.asm",
+        "git_blob_sha": "ded2fbdd545021a0ab8d20e9ec8d932e9c9f9bad",
+        "sha256": "585738bc7b63602f2402533e0cba9e96893f016f7fcaafeb0be213a2675b5f22",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/FreezeDeadUpFallPhysics/UpdateModelPos.asm",
+        "git_blob_sha": "f307e9359e07fa261c852ccac5ab8284a20e707e",
+        "sha256": "76415f538e8407b8e60a82f083cbf8e6dd175135b9307e12befcb8f925c8dc85",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Hacks/FD/DesyncProofBGTransformations.asm",
+        "git_blob_sha": "3c6421729e5ae2de655220e99d84863e124a9972",
+        "sha256": "e0746b6aaef064bfaa6fd555733756740a959853e686ae09c1e77a7bb6684390",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Hacks/ForceNoDiskCrash.asm",
+        "git_blob_sha": "9a5e22a88b1cec4baf0b26d0bc0d9ffa1071df88",
+        "sha256": "150dbdaa2db6053ec1a844e0d24aa57058fd6355d58f5103e85f7e868cf7a9e7",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Hacks/ForceNoVideoAssert.asm",
+        "git_blob_sha": "860901366506b5122311de88df8f9aa2c2a3123c",
+        "sha256": "c9fb4fc08da230d238c55e8ee8cd22b01159c3ffa0c81936f5c10b8fcc84f97d",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Hacks/LoadPremadeTextDataFromDolphin.asm",
+        "git_blob_sha": "5d7ed3f538c368c288bcef0a27c43a7f1057f540",
+        "sha256": "6a4df0016b24c3f075c054c1d00657f497e4d73b5c98173999036d072462d889",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Hacks/PreventCharacterCrowdChants.asm",
+        "git_blob_sha": "7f11e8846eb59710a20b907e49c403ddca18eefc",
+        "sha256": "781866e16c5cb02b75d6b00e4497b74f4e020e223eef78c46c2c37634867ba2e",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Hacks/PreventPadAlarmDuringRollback.asm",
+        "git_blob_sha": "dab02aff5c8ec830247abe71846b58f9b3567e18",
+        "sha256": "957855e217616d402636d9e316a9acb30d87cc85f3ac79443f7c67d42ddefd7b",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Hacks/Stadium/ChangeJumbotronText.asm",
+        "git_blob_sha": "334329ab5f3805869337c12b7a04700dcbb1a8fc",
+        "sha256": "83414425b0c6338a60d9add10bf68b98049872278ae4fb5fe2911699ab4b1c76",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Hacks/Stadium/CustomZeroBuffer.asm",
+        "git_blob_sha": "be6829d71e85597ea54d9985dd7b1d924a489a6c",
+        "sha256": "9bfac52319aed886168212de0f082324868a7919f0439a8d627b8f4a1811619f",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Hacks/Stadium/GrPsxIsValid.asm",
+        "git_blob_sha": "98b5f02f081727921ee79a253c1358c59f34b013",
+        "sha256": "ecd928539bc11f6a110f887109a9744454f08208bd7b4b873c324661d4207223",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Hacks/Stadium/IngameCheckIfFrozen.asm",
+        "git_blob_sha": "9a491d95e2c57e66f16ed4db149d2b0b7c013312",
+        "sha256": "7a6d9ae7a1d8416c14e6a3ced4bb8357b5832b74fa9df92c2b24cd560d73c56e",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Hacks/Stadium/StadiumFileLoad.asm",
+        "git_blob_sha": "0058ee702beae89e14e12c449a865398373d5816",
+        "sha256": "98936dd73f4d94344df8ec5fbeee540658e32eed3bfe672fd4ce14805c34bc64",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/HandleRumble.asm",
+        "git_blob_sha": "2b00f826f3c26527e0073a3b99fae3fe0eb61cba",
+        "sha256": "a1d9ff94175db7f98c34de6b9a85388c9c13db8570a97e61d5e878286781f753",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/InitOnlinePlay.asm",
+        "git_blob_sha": "c8e75c90be4c0656454e074d7e6c44d6aa46b14a",
+        "sha256": "d0a5df91c9b535b3c711880a4156769c2b3e799e7e72bc9d071be9fd90394067",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/InitPause.asm",
+        "git_blob_sha": "d185591c40e465caefb15aa4ccd00e2726d33742",
+        "sha256": "fdee35e943a759349cdb4f23eaaf6f0d8cb668abe6e539fb93dfbbba89e1a33f",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/LGLExceededGameEnd.asm",
+        "git_blob_sha": "009b95cc1531d0ad31de80ee33c7877a71ce7e4f",
+        "sha256": "88bf629460c3aecd4403cc9f79f39ecf14a719f5662dcd047ab8ea6e9269d9dd",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/LoopEngineForRollback.asm",
+        "git_blob_sha": "33bbc7cc23c08df301c5a3213817712be49bf2ee",
+        "sha256": "3b73ee2323b86160eb9a70a23cf471f51e099ab64b1a7152534cae85a0f94e63",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Music/StartSong.asm",
+        "git_blob_sha": "268cc658088ea65bc884dde7c16b2b362507f286",
+        "sha256": "09d10f983e2e5a32f855f733896d45e32e753e59e879e186ca66c0cdcc66e1e1",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Music/Stop.asm",
+        "git_blob_sha": "fa2268795149fdb32f9080ecf709120ad2894452",
+        "sha256": "b7f72c34f4923dec7c1fdca057a176bcc8b2b8ef0c1966880c567f969b3a0a8d",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Music/VolumeChange.asm",
+        "git_blob_sha": "2726b0f0c82c81c3a900c0b15ee7668402a6640f",
+        "sha256": "5de95fe2d6ce8964e47376f63bed99b83d24adff771a118534962e3e6afa17df",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/PauseCounter.asm",
+        "git_blob_sha": "ab3f438d5b6c1c8e243c74b7694247223b041d70",
+        "sha256": "e7b77aaf32fc27a8c6ebb1ea3eb59d4dd100bfaeec2c51b1b08b4fe43f89ddfd",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/PreventFileAlarms/MuteMusic.asm",
+        "git_blob_sha": "64170d9adeb0e8f9823b3720a11d97c1b3d81964",
+        "sha256": "11cc748b337da602687384882861e87dbc0d10907986539268a05c1a93e143c7",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/PreventFileAlarms/PreventMusicAlarm.asm",
+        "git_blob_sha": "8baf1d2e26f5522e51706d8d6692b4f77f5bb92b",
+        "sha256": "8a95a3c395ce5de570e53e9e3d0730dc4176f6676693029760a416a49d28b0db",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/PreventPauseStranding.asm",
+        "git_blob_sha": "2297e1015c19c8dd4cfb7a81a55d7611af021e21",
+        "sha256": "fe45e0f9cfdfd40f15676c948f50df77ccea0a6e94768eef29b1b0ec76d5b27d",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Remember Who LRA Started.asm",
+        "git_blob_sha": "724f7f9d28709a705037e692fddaeb9b4f559912",
+        "sha256": "b7b8f29daa1aad36abc888f83e2abaf944acf0295c7baa116f8b3995b897ca29",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/ReportNoContestLRAS.asm",
+        "git_blob_sha": "16fe75466c830c607f361865a770db4dec4db722",
+        "sha256": "86885fa2b06c06f13de7753349de50c653ecad92f794629981697b5144a4c5f5",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/SkipNewInputFetchOnRollback.asm",
+        "git_blob_sha": "01b10f9fbebacc869951fec3d06e81de0405fbbf",
+        "sha256": "788b23a10084d54e2bfcb23822dbf6ea57dc95a6e892570699896b8407b44379",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Sound/AssignSoundInstanceId.asm",
+        "git_blob_sha": "8a20e6d519f2ba12e67e874d1ccb43f5ac6a5007",
+        "sha256": "65034717da64707fd1f85c6a78b4d2070ac55676ca04d9152d49e9d0cc1c1683",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Sound/NoDestroyVoice.asm",
+        "git_blob_sha": "0cc6591610b56e1a8621842688168e9e8bc86f40",
+        "sha256": "b53c7d263e079f83efb8322171a63bf68480e48d7274b76dc3675bab19370ee4",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Sound/NoDestroyVoice2.asm",
+        "git_blob_sha": "0319c05294e6f1933f1596786179c4fc3594aa2c",
+        "sha256": "09a6e79a5a4ea6c16b61e508267c6163516bdeacaf8861bd313190508fb35055",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Sound/PreventDuplicateSounds.asm",
+        "git_blob_sha": "b67d8747623731a10a44d7fb4171faac80f4dc62",
+        "sha256": "101244da1c8c5c3829a837a27f34ff78e01bab827dfc5a6f929e93493ed1f6ab",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/StartEngineLoop.asm",
+        "git_blob_sha": "5ef180e443169a884656af4bad70c9b92efbba84",
+        "sha256": "61d0c87a31c98efa40a86ceefd916d43dfd95cd166a4a8a8aea5d16dbe7fe50f",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/Teams/PreventDeadStranding.asm",
+        "git_blob_sha": "4eb98223f7eb49f82a9967168e0320cd8eb62d2c",
+        "sha256": "c420dc7eb24afcaaf955cc1270a76ab500f9b321f803d544f5a5dfeb64a9a18b",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/TriggerSendInput.asm",
+        "git_blob_sha": "52847705f5c7fa3454e6843cc9fbe7efaf6c5ddb",
+        "sha256": "f851335ec34afcbe8f0c193b5f455db7c467b4cac43f8fdce933565a0dd29b4f",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Core/WhispyBlowDirFix/WhispyBlowDirFix.asm",
+        "git_blob_sha": "a34fb63c1e35908560da27491520cf9a69dadf0f",
+        "sha256": "39f9d2a4b70d0b9be72da3e7fed718d0fd4831e5fa10fcca48ec2294a744ede1",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Debugging/ForceDesyncAfterX.s",
+        "git_blob_sha": "82d47c120f686d271d6b5730e2e0ee0a5af76bc7",
+        "sha256": "4546e762b47c3ca88a771408777311aaead8f7c1ac879bf6b41bcde9972934ac",
+        "active_annotated_hook": false
+      },
+      {
+        "path": "Online/Debugging/LogInputOnCopy.asm",
+        "git_blob_sha": "cf6449f4707743360a9c05a9d9d39e1820f9d119",
+        "sha256": "2359730dabc81f16c3f0d35cfc4b414026ffaec89df39dab76d252c79b1d6178",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Debugging/SpeedUpTransformations.s",
+        "git_blob_sha": "bae3e5f90334a641ad92b82ebc1d3a5eba0ca227",
+        "sha256": "0b9415c87403c648b790d8955665cdbb4440c7fdac87f71e35fb11f18bc64d07",
+        "active_annotated_hook": false
+      },
+      {
+        "path": "Online/Menus/CSS/DisableLRSTART.asm",
+        "git_blob_sha": "8464e81686a3ea939e5500121cbf51762c55cff6",
+        "sha256": "8dc2c1a15bc0f53bc5f962f4bb113dca0348c690d9ca3ff3eb960d0a12f3085b",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/DisableNametagBox.asm",
+        "git_blob_sha": "493c0a40ce1a646b55e70381da28fd2291d5fac1",
+        "sha256": "2f884960f495e19a4d4ab0c3cb898aa28a4bc829e60dc58eef680c4f960069e1",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/FetchMatchInfo.asm",
+        "git_blob_sha": "3be7ad7b742040e5e800b6a9bd7d795bc31c177e",
+        "sha256": "48ea009b2eda8ec8fdc26a9ee7099d03790d0c006676d9070fc8f51194f9358c",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/HandleInputsOnCSS.asm",
+        "git_blob_sha": "08699774ef724da8edadfcaafea1818b79793173",
+        "sha256": "7de6e571c5a71236a1a0cef8089ce2b42af28c44141ab104e5934b9ff466ceec",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/IncreaseTextHeap.asm",
+        "git_blob_sha": "1c7504f503578116be3b758613449bcd56373626",
+        "sha256": "ac8b38bba4113aeaed59d6c10a261fd8a0f721cebabd3c0b4da54d70bfcdeda2",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/InitSheikSelector.s",
+        "git_blob_sha": "c7da002bf7fb8d6ef8ea1287f243be7976dc02f3",
+        "sha256": "05a612dd2eca2dfe4d5bf43697892f216d857d28f8b7872d74008f26145adc0c",
+        "active_annotated_hook": false
+      },
+      {
+        "path": "Online/Menus/CSS/LoadCSSText.asm",
+        "git_blob_sha": "73e1a4443b356cf118881a14278d04f8bcd63aa2",
+        "sha256": "288dffd347e1a03995dd0f2eb11a71adb2de186f223091748fc871fcc7f6cf0f",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/PreventAPressCharUnselect.asm",
+        "git_blob_sha": "bfad3acb21253bd6b02cebfea029622807cc06c3",
+        "sha256": "413d62934aacafea7a7e7625698272c891c95fa6cb87c50b4f4cf6cf2e2a878a",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/PreventBPressCharUnselect.asm",
+        "git_blob_sha": "ae4ea300e3b4a1c6b0d7637343d8da1d26b211d0",
+        "sha256": "68a8545716afe54c5bc04d28b93355576d1d49b554ca8937b4e55e5d6d2420f5",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/PreventColorChange.asm",
+        "git_blob_sha": "1a0dc8aff6fca7d6bd9ed0feeb9cfa4a673ffed8",
+        "sha256": "82e32cdc420cf1a185f8602eabff23bef3fcca59166b08d4d7c2ee9b2cd79a36",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/SceneLoadCSS.asm",
+        "git_blob_sha": "c8daee44e3d1bb367ffc89619c9a2d50f2f12778",
+        "sha256": "99f13319fd874c95f8dda854926a3dcf12956835854d647283561c7257eb2f62",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/SkipReturnToCssSound.asm",
+        "git_blob_sha": "a891c8733516c1f2796613a74e88a3bcdfa8c0e2",
+        "sha256": "a940fb1b8abd90bc2e2043818aa8ab83a7e54f6f747c20eae95228583a4ff295",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/Teams/AnimateCursorPort.asm",
+        "git_blob_sha": "2a11612f85442bc457d629e91c35c20ac73e508c",
+        "sha256": "d894decdb6f61521e1a40c36e4fe67ff7ebc46c19f52a672bfa252d65f328a73",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/Teams/AnimateToken.asm",
+        "git_blob_sha": "9433002c5112a997d31d63a32e0346fb6a7887b2",
+        "sha256": "974687b5c09f7320837d4d60d7600819ab9472ccff0740e79f0240ae566091d2",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/Teams/InitTeamToggleButton.asm",
+        "git_blob_sha": "244c11b6ee885b6b7d6f53f86d2f6811689bb239",
+        "sha256": "71e0075fb2a3dac37bfbc43eec2d84aee41592d64f6aa0006828dd4a6f60aafd",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/Teams/PreventColorResetCharHover.asm",
+        "git_blob_sha": "9f14852315269aa8873de6d019b1f62096752fda",
+        "sha256": "7d281eb44a7390ee9585aa81e99c2623ff4aeae86982e591c1243b5be4be2d88",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/Teams/PreventColorResetLastChar.asm",
+        "git_blob_sha": "57ed60ea66f4c9e641692399ae64c9aae6bf5e85",
+        "sha256": "ee0aa1bbe4da6b9746863f05b914072a5075a35bfbf018db6e27837d40a9f79e",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/Teams/PreventColorResetRandomChar.asm",
+        "git_blob_sha": "a6f5004274ab3b4d74cb39010e0eff47e8d1e203",
+        "sha256": "8119e665b9cfaf6ff7d8c41fa36be85cdddd13d011216089910c281255a4ae5a",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/Teams/PreventWrongCSPOnCharSelect.asm",
+        "git_blob_sha": "a49dce1f199acbf22e8eaa20004c8f42c660ea38",
+        "sha256": "40d44874e8516f4a6a47a9670a14f0bfefbc8ead345fc9d8815d5fa36b80f05e",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/Teams/Teams.s",
+        "git_blob_sha": "edd4edb2ada01ed34837610620b323a479d4b15f",
+        "sha256": "e40718bbbf67eb582dc317df22b331ef91f4c7ec010742918987c68d2d77a923",
+        "active_annotated_hook": false,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/Allow8Characters.asm",
+        "git_blob_sha": "edaf59fa0fdecd5e0fc77c30c34ba71702c71201",
+        "sha256": "60393763df8b135d29c5b54baae530e2e32ccec87d423555c0241d89352c1539",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/Allow8CharactersJapanese.asm",
+        "git_blob_sha": "f36c480af6cbaf57c1fa94fb71ec849dcbc32b56",
+        "sha256": "b2f50dfb9e4197f528b829e32d396b54e444cbff045b9f7de5e83dedd3896aa5",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/AlwaysUseEnglishWhenDirect.asm",
+        "git_blob_sha": "94463796014e90450a5fd3585eca34283f9ba1f6",
+        "sha256": "84c8f413f7575be4fe0d6d72da9fc1eb2a03ba6092e186e71f988ff1ad951583",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/AlwaysUseEnglishWhenDirect2.asm",
+        "git_blob_sha": "f254a5594b7710fbe6d7933073522e01542383f7",
+        "sha256": "ee1d02b7a77cbdfb08e5b3226bb1c1fe6ab3eadd0619920d98941574ec37364a",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/AlwaysUseEnglishWhenDirect3.asm",
+        "git_blob_sha": "39e628edf54e05b4a67e9e44112a0349ed74e53e",
+        "sha256": "1ef68c0fb64c25f6d4269d09851cbd7cbf5f3bcca3da12ad5e3ac7bd31ac5aeb",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/AutoComplete.s",
+        "git_blob_sha": "1355363eda150afd3ca8e60378cf2ac57556c232",
+        "sha256": "73500fc36cbf0e7b81eba9ad6d744d7328225ef2407b3618b3abfaf5f6851938",
+        "active_annotated_hook": false,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/CheckTriggersAndZ.asm",
+        "git_blob_sha": "2b6086f553542f7d29dea76df2d4fd84640d641b",
+        "sha256": "130bddc143379371072e04b3183f94286f89cf609b95f2e1b947fea641eaafc4",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/Display8Characters.asm",
+        "git_blob_sha": "52b1ffe2c7dc79d2e668e49468b717460b01c515",
+        "sha256": "0617e903c7d781c396099ff61ca2e16c9f20ee408bf7dcc4bea93a5df719a96a",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/HandleAutocompleteText.asm",
+        "git_blob_sha": "5fa1574e60764e9d3943564daf0bf1e47b740ad0",
+        "sha256": "2659a8fa2a105126ad8dc5c6b3748bfb9dac76baf1bcf0a1b6ff474037550213",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/HandleDescriptionText.asm",
+        "git_blob_sha": "2bc151702220c31e052247f83f1f62522cba1b05",
+        "sha256": "afdbd93b500d818c8d3b31a5025473afb436052d148594fff95b23cc8755988e",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/HandleJpSpace.asm",
+        "git_blob_sha": "ce7758cc7ad53c4b57075550deb7d79c05f60f4a",
+        "sha256": "98f42e000e189fa500007bfe2f41b3913b50472f65158a34154881c66fd8b484",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/InitNameEntry.asm",
+        "git_blob_sha": "feb1baab62b53d800435acfd67d12016837cb9a9",
+        "sha256": "14bfece0148c783e7cc7e8b82070eba20d70b72ff2f02ac5c27923772d157c41",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/NameEntryThinkOneShot.asm",
+        "git_blob_sha": "d5e517b9b31121ce6c0ec6e1a301de0124b810d0",
+        "sha256": "08a08bfe31596cd493bcbfae816087073a9c2c7cb5b42d97e7d2e0b9de761b3e",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/OnBPressAutoComplete.asm",
+        "git_blob_sha": "5e8df2cdb673ebf806360de9b6ff9475c88e6ef7",
+        "sha256": "17bfeb39be05a8896b4a36025059d86fe8d0da502689b6ddc3dd16a5516abe39",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/OnConfirmButtonAPress.asm",
+        "git_blob_sha": "4b88b16eaa419affccdf64e32a4ab129adac220a",
+        "sha256": "ab32da87af6b81815a560a0383988edf64ffec9d2291a71b3cacea5dec5116d6",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/OnConfirmButtonHandler.asm",
+        "git_blob_sha": "afaee39a651aed0f37040e358c20cb1480a52ef6",
+        "sha256": "338b096c52202a95d9031132dc6d086ae85575a9318090b1bfa9d5d475604af7",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/OnEnterJpText.asm",
+        "git_blob_sha": "2a3f58cb8a2abc3fc9a7834265e241dec05dbc4d",
+        "sha256": "a7f4995c78437ff2c538f650c29311145c0fcea6a8cd793deecd797fa672cb18",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/OnEnterText.asm",
+        "git_blob_sha": "3ff0bd19847a914bace98c0e8f2ae0b6ff820653",
+        "sha256": "5c2662d71634647f5ce3c5adfdc1f2614ae5b58d033b47860bbf0803639a1294",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/OnErasePress.asm",
+        "git_blob_sha": "2f30fccadbec371ea5c20fb2fb69ad64a2203b07",
+        "sha256": "d6fd7eb0ccd53a6f11f41b5113ea99cd2a283fdc6e7dcbb1504d86b2d4d0a0f7",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/OnLPress.asm",
+        "git_blob_sha": "795aaca9d727b2ba2dc85e8378cb736522383935",
+        "sha256": "a38b7dc4524e81b8fc490f53f2277862c18744f5f28d6b61f35c25d830e32cfb",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/OnRPress.asm",
+        "git_blob_sha": "8d2f6bd8595a19384475747157fc350f51fbd71f",
+        "sha256": "a98f61350087811c944e89c8e3dd12aebd632d4c85b2bec622c64199430a97d2",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/CSS/TextEntryScreen/OnRandomPress.asm",
+        "git_blob_sha": "e1e49703663cc0df4b5b04f82cae421337c42a89",
+        "sha256": "7283f37064d23362bce0d35c66a3f255df6a7ee9a7e3b421047194332c580e7b",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/Hacks/VsSplashRumbleHack.asm",
+        "git_blob_sha": "703a22cdc6f7fdd658e0ebcafe22d0808ae68371",
+        "sha256": "a4aa21e241df3ad01c7fe67c1a3143a8fccd9b1f9070c984eaee7f9d9f0e4df4",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/InGame/InitInGame.asm",
+        "git_blob_sha": "e9ca1afde94355787f1753ccf2c6b990a1f16ca7",
+        "sha256": "7be6e5e0b541b15136a2b6439e4e82200fe182c5fa339942f90fef107929a5a9",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/InGame/ParseNumbersBetter.asm",
+        "git_blob_sha": "4983d910baca1b8a607a0bfba55f4b90317bb0a2",
+        "sha256": "f782b568e330429cae2d2445e6c15ea5eb25327d7fd23e06d815e125f60c9dbc",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/ResultsScreen/ControlAllPanels.asm",
+        "git_blob_sha": "cfb0bacec11c871b749a6b5816d38485e5d588ea",
+        "sha256": "6c28dfd02b192e35629968dc0fdaa5df185434897809a0053ffe6a8e2678d360",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/ResultsScreen/GrayPanelsForRemotePlayers.asm",
+        "git_blob_sha": "b1194bf4a356eb7e4c27aa8a104aed1f193890ee",
+        "sha256": "e99191dc41d8e02c51e2ee803ac26d1da40a98b70c9736742c42c557b38ef9ae",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/ResultsScreen/MoveScaleTable.asm",
+        "git_blob_sha": "ecea3ad6cc0280f8ceeba57249aad36cebf7424f",
+        "sha256": "356c61d2e4a3c9d45fe4c1b0abc5703555c38be0c59a78235b5b63ebeba3149f",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/SSS/DisableLRSTART.asm",
+        "git_blob_sha": "7c95e4c37559c0aaa713da35a7d6f393549ba7ab",
+        "sha256": "99483e10d52438f1b723ea6c7011e6e843e674b07a212584d0f04c0181af191b",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/SSS/ExitSSSUponStageSelect.asm",
+        "git_blob_sha": "0e2d8c13d3a5378cd78c8fbabae857f7fc2da8ad",
+        "sha256": "21fa92719e2d2ba5faca9882efc1fbd3cc85637c9950f6e7bf98054fe3756004",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/SSS/FrozenStadiumToggle/CheckForFrozenOnStageName.asm",
+        "git_blob_sha": "a37a9e8159c755c60310ad61566838ebd40de354",
+        "sha256": "1efbfe063d4333c62f2a815c7a1f12cdc8313af1ef043c12dc199295b68c6c23",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/SSS/FrozenStadiumToggle/CheckForToggledOnStageName.asm",
+        "git_blob_sha": "1d13db33d29569a6b86a65924462ee7a88c709e9",
+        "sha256": "ed4dafdd89652e93ba590dff20e839cf3691e3d5feb52713fdda0ceb1822bd57",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/SSS/FrozenStadiumToggle/CursorOnHoverStadium.asm",
+        "git_blob_sha": "b951f5d94ad21ed480dde00aff04412661667dc2",
+        "sha256": "1261c8d93efb61e19022bbe99e7e8a92800a2dba2d9270cad0d952d2965248f1",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/SSS/FrozenStadiumToggle/IncMaxNames.asm",
+        "git_blob_sha": "36d7b98b2c7d95dc7e8df1e2b91eed335552665d",
+        "sha256": "474b4842d3e9d22be2afbaa3bb058238fb5500574baf78f606d4dbec80aa5fff",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/SSS/FrozenStadiumToggle/SSSToggles.s",
+        "git_blob_sha": "086ceac04ba1089d24958203f2279ccdcc4e3a88",
+        "sha256": "cc5e820622e22d219113b9c2a551faafb6975c2ff7598f0cfdc5905d915f54cd",
+        "active_annotated_hook": false,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/SSS/FrozenStadiumToggle/StageSelectTextProc.asm",
+        "git_blob_sha": "a0b7e2642c9ee6912b7dcbd2e5661223fcbcd458",
+        "sha256": "72545814d395e71633334d5537d537d3860a6a85deae4cb36afdd66d8c48a9b8",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/SSS/FrozenStadiumToggle/StoreNameId.asm",
+        "git_blob_sha": "fb89bc7ce7d001c7debb89178617d28eb8ee2634",
+        "sha256": "2e794eb236020657d8eedef2c9224ee6fc19906534b23fb63846b60b2f53fc4e",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/SSS/SceneDecideAdditions.s",
+        "git_blob_sha": "bd61ef7f486282d963af216c12dfd5a844887d8b",
+        "sha256": "379c854874b9131c6ffb90d40f46da3349ee07fc153684ecbc1b275ba2a688f0",
+        "active_annotated_hook": false
+      },
+      {
+        "path": "Online/Menus/TitleMenu/AllowSwapToSameSubmenu.asm",
+        "git_blob_sha": "88ea3a0f7676d0a203f9774a8c51c2f8c9a4b423",
+        "sha256": "3ac76711822dc96e5de7c36057f1ae56230e627aa37b1aba0aab7ff4d0b43d8f",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/TitleMenu/HandleOnlineLockedOptions.asm",
+        "git_blob_sha": "dba678b66b84fd40219d15622f612f365098befc",
+        "sha256": "1604e6b5efad02eed579d406c68d906e442a42e6d922bd372984bb4da4a4d1de",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/TitleMenu/OnMenuLoad.asm",
+        "git_blob_sha": "0c857700ca08325e98fcc885c63d40e70a47d413",
+        "sha256": "2c32d7c2cfd3ab12f25803a06d9d82b9d2fcd94118859a1ddb7ccc711844f3a9",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/TitleMenu/OnMenuPrep.asm",
+        "git_blob_sha": "bd586cbc41f13665617fd904947c023654a9619e",
+        "sha256": "b07fddd75d853d4c254ad6ab300781cc232c6bb7ddb6891c93fae74d955140ea",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/TitleMenu/OnlineModeOptionSelected.asm",
+        "git_blob_sha": "61d41d2448e986dd6d2c88b4ab93b1074f56a1e7",
+        "sha256": "71f620d25ef0ff4f1c56969aa98408fd7b4b85f0e612fccd92905d8bf2cec1e1",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/TitleMenu/ShowHidden1pOption.asm",
+        "git_blob_sha": "8e168c1a23a76abd60855618cc223c55f099fa18",
+        "sha256": "6ac10eb8fea7efccbc8ac0a6af49908a0f97a664372780901227cb9a0bd645a5",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/VSScreen/AllowP2ColorDuplicate.asm",
+        "git_blob_sha": "10bc19b10da0c60600e755fa3059b9e31e5e0947",
+        "sha256": "13326227c0f0e158763cc061a873f08bfe3dc668aa434d0a43874a921d347793",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/VSScreen/HideStageDisplay/HideAllJObjs.asm",
+        "git_blob_sha": "820032aa953858f16e4d4be88a088ea1c3791d31",
+        "sha256": "af8da8ad7ae7456f07c120b51cd1a71c01338be419476bae694cea8e0e70df10",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/VSScreen/HideStageDisplay/PreventEarlyR3Overwrite.asm",
+        "git_blob_sha": "b1352de551f57708b7feb9e9c8c6b7eb5131eaa5",
+        "sha256": "00e5ce40c15f187ac77c1e589b6ae467aa417670a02056e8c1457f36d4585a43",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/VSScreen/HideStageText/HideLetterJObjs.asm",
+        "git_blob_sha": "7f655700901262463a4a0ba9529884a13b45d1f0",
+        "sha256": "b0578c57cfece5de82104d43009a55b763c20ad826066f53e8dae2b110fade83",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/VSScreen/HideStageText/SkipStageNumberShow.asm",
+        "git_blob_sha": "17358c9ede4d8ef7ca238e24706fc91aee00abf6",
+        "sha256": "bcbb2b274d962482dc123487ef44f284d2792188fb6a2904224ff808e91c3020",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/VSScreen/InitVsSplash.asm",
+        "git_blob_sha": "e9517ad98a72d43461bd060f60cd3c6b9a062a9c",
+        "sha256": "41e39daec0e23c00446fe051a8a6ca7765052d0a06115a1228c91e1c54c353c0",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/VSScreen/PlayOpponentCharAnnouncer.asm",
+        "git_blob_sha": "e81126bca7336b0b64b173938aba83d90954f59f",
+        "sha256": "9002936ddf1460bcd43d3c2ba83d1f33b89eb418fd0f7c97e1a9420a589ba6cd",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Menus/VSScreen/PreventP2Color.asm",
+        "git_blob_sha": "43f29040d8787732ee7dfd083bc52f61d0bdd013",
+        "sha256": "43f91e173dae846f60cb6669bdf3adc2d52c982c2295207d3385db62ef9923db",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Slippi Online Scene/Header.s",
+        "git_blob_sha": "62f6c7c27dbe2a587e361eda9f3c64f8c65e58f4",
+        "sha256": "758a16b0f455ea76f19e5ba6a6bf605fbceac4d2241d13ed173b58bdc6e90623",
+        "active_annotated_hook": false,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Slippi Online Scene/boot.asm",
+        "git_blob_sha": "1e52aecb73aae020b4e419d6cf8fca83dec10109",
+        "sha256": "3d8b9ebb7813324f5ee8070b824b8ba5d0dbd3c74ebb0de8831c9c40b0af45f0",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Slippi Online Scene/main.asm",
+        "git_blob_sha": "55fa09785e80b21389c520dee5c60b011ea415b3",
+        "sha256": "e27aa60410427bd4a2b8e4b7ab64052eaec77eb93cef111ab4511018f499ca31",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Static/AdjustNullCharID.asm",
+        "git_blob_sha": "c4165036973e43d50ea145ae2c3c910494064e88",
+        "sha256": "621c20776899a22bd2f640f9744e837b45c816e536de56a64f49dc0e45875acf",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Static/CSSUpdateCSP.asm",
+        "git_blob_sha": "cc4ea455ab0b91eda4d1020d4b6bf41d16d9039e",
+        "sha256": "5963b9bf34319569a572a51af376878c9b95af538daed071620a90e42d553d4a",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Static/CheckAltStageName.asm",
+        "git_blob_sha": "721b4ff4b501ddfe1cff15e53d23c51568cf746a",
+        "sha256": "b1865a8cd4a7b9033ee09bb492f28d459578bdd3b3ce1faf3f178c96468da434",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Static/GetCSSIconData.asm",
+        "git_blob_sha": "30b4d9f5fb4afbed5fe55ce40220d2b13d7be65f",
+        "sha256": "3a21eb062ef2cc21bae138056f908eadd85192e947c7568b230b3badd8cdd417",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Static/GetCSSIconNum.asm",
+        "git_blob_sha": "c5732452583379a7f1d0a4ed9ee56491658e3aa0",
+        "sha256": "6c450de9cbb92634a0b2d5f49eea9b503a65aa79cd34d60a59c842045b4f21fa",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Static/GetTeamCostumeIndex.asm",
+        "git_blob_sha": "ed42560882e25927d7d05723c4b5ece6580db756",
+        "sha256": "7b5a40952c1133b0a96259820b23fc4d2067e7cedbe9113b05648a7191d7d6db",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Static/IntToFloat.asm",
+        "git_blob_sha": "ba3e0c55e374128822e21d978817abb4c3da8e7a",
+        "sha256": "aec8cd3c8238afdb2bf9ca9141b700cc27732573bda8f8dc5c749c004f59aaba",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Static/LoadMatchState.asm",
+        "git_blob_sha": "f677070eee5d17b224f8bd6de992d7e44cec61fc",
+        "sha256": "0c3db3325f31e384d0dd9c0d1557a420ecc7e6100038b14ac5c4998cfc2370b1",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Static/LoadPremadeText.asm",
+        "git_blob_sha": "29ef680d88710f309c69a6f42517ce8160ae8bf5",
+        "sha256": "f80a0437eaa03b203f9e62982c05babf78f59db0fcccca1eac40fedd0668a0d0",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Static/LoadState.asm",
+        "git_blob_sha": "f3d53b580e6c91c35f390e5482818fab5f46aca2",
+        "sha256": "5a8c6fc93f6574b60ef72e15769a66968f182259129069a651cdb7bf7da725bc",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Static/MultiplyRWithF.asm",
+        "git_blob_sha": "203072d1bddfac58ccfb4654a08c661004e32bc9",
+        "sha256": "c49a18faeac094ad070f17d013301df4a56f66610c4380fa5576de9f4ce9d024",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Static/SaveState.asm",
+        "git_blob_sha": "9e080e11c1250f921d5559f339e962d9bdba6850",
+        "sha256": "541dc14b20c5acdb97c6f744d70bce3b440c8ba656afcf311fba57b03e1db4d8",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Static/StaticData.asm",
+        "git_blob_sha": "6956076844211fb8e045ad4f567a4c3c6bb3f50f",
+        "sha256": "a219c4896e94a33bae97ccdac443b84b9c95cd6d221e60bae413c33a59f7791f",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Static/SubtextFunctions.asm",
+        "git_blob_sha": "7d46212f3b4f1ef7c7bd0c7a7f9c47a6e42b8683",
+        "sha256": "71f8523c8a83d5cb6d737da752582735fcfbe6a07dbbf37dba1995326efe3a33",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Static/UserDisplayFunctions.asm",
+        "git_blob_sha": "244c4aa37db0462054ea0325593c9995ab982544",
+        "sha256": "5ff9fa52025e3a0379fa60a1d73a5942e0d1be80084262501ba02f6febc9193b",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Recording/ExtendPlayerBlock.asm",
+        "git_blob_sha": "2a82edf41facdcf46f286045150b1ec3c84a3d30",
+        "sha256": "88ecb9159b06bdb085b1b2b711218a29071fedad85d42afb299825a7117a29d5",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Recording/FlushFrameBuffer.asm",
+        "git_blob_sha": "b3aebd5b49cf00b1c636826a049f43610d33e160",
+        "sha256": "7ebc85ebbba832eda804745369af1bab31361feab2cc4182fcbf6aa795daa23c",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Recording/GetLCancelStatus/GetLCancelStatus.asm",
+        "git_blob_sha": "3f400f0141d58f674e284b62fed98941fc885c2d",
+        "sha256": "0120fb4d969c3eb867a0c729bc7f34f43f4db2087ca4f09f503a6e4680d58b14",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Recording/GetLCancelStatus/ResetLCancelStatus.asm",
+        "git_blob_sha": "28de127bee72dddd4fdcee6437f717654b69a804",
+        "sha256": "73a197c263ef95a059fea0d8736723a7037078855fcad8292d17d9535591526d",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Recording/Recording.s",
+        "git_blob_sha": "94962ac9ac27b2b290de0e9fb430deca8e70a55d",
+        "sha256": "19384c7196d0250049c15285f2d5a5724cb47bafbca7d6f67c9a45c13c01086b",
+        "active_annotated_hook": false,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Recording/SendFrameStart.s",
+        "git_blob_sha": "e0eeedb86f02d81d2b4daa53c30767019ec46425",
+        "sha256": "e896f7b3080d0aa47dde29f09e5aafb55aea44a8963370ddefde0218458a21b8",
+        "active_annotated_hook": false,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Recording/SendGameEnd.asm",
+        "git_blob_sha": "64ffaf8847a7f4d9f5e87143ecd47e19000ee6e3",
+        "sha256": "3c1b16b03d246c6c461e63783a59eedebea5645f4550806e67e0b7fb9d4f7f8a",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Recording/SendGameInfo.asm",
+        "git_blob_sha": "3d78b2232b8bb431d30024f938f460beeaffce40",
+        "sha256": "3a18f1b94238093a2a7e34740c3d292408d650292f744b728c74d191aebb285f",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Recording/SendGamePostFrame.asm",
+        "git_blob_sha": "9accd4c97d747fc9672e6dc6fd4d6b837679b386",
+        "sha256": "ccc3bc02c565514d056e7a4956306f1c47e0c04912c8bfe2a3b0932f1e5c634b",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Recording/SendGamePreFrame.asm",
+        "git_blob_sha": "282d1fd0e44df76b1eefe565cfc9f4caf2949a82",
+        "sha256": "88fb17312fa0b02f7294c12c62e58d494bbbd5c270e6a151a3de54cd616eda26",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Recording/SendItemInfo.s",
+        "git_blob_sha": "a3d92fa4584a72ca5ef696d384d147aa9f69bd44",
+        "sha256": "6b6d0f9ca998e58a149f056dcd064ece78cdf0ca10485ebd3b945bf3f35547aa",
+        "active_annotated_hook": false,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Recording/ShouldRecord.asm",
+        "git_blob_sha": "2d36eb1aa0d82ec2a0f58cad417df15e6803233a",
+        "sha256": "a461909c8a72536057fdd39a87c0d8578ca1213e1df4c1d232e9231ad0070be4",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Recording/Stages/SendDreamlandInfo.asm",
+        "git_blob_sha": "80b9a6e3858104b858cdbcaac8ac6156da8928f9",
+        "sha256": "e7eb5a158bb68ce8b33926bd9467fb88c08c16ae21734f1988ccb279cfe3759c",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Recording/Stages/SendFountainInfo.asm",
+        "git_blob_sha": "e39463a94dd365cccef3011bd37f62c8573636f2",
+        "sha256": "80ad56ffd63d18ecf2fa5b208c5bbba9f545a37e1fecc50676f2e8f2ecb41b13",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Recording/Stages/SendStadiumInfo.asm",
+        "git_blob_sha": "df67fc39fb2fc7e0e3328d2a8fb352c8dad67454",
+        "sha256": "93cc24dc64cce1ab77e9fa7c14a3e4e37e8faf79d464ad5e0e132fc3f9884533",
+        "active_annotated_hook": true,
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Alarm.s",
+        "git_blob_sha": "174ab81ab3faf0c0dd54717d45b0229d402b7064",
+        "sha256": "062d6d2216d2842e308cdfb92088bab2bbf046a49522df6f505ae5d24a26633c",
+        "in_textual_include_closure": true
+      },
+      {
+        "path": "Online/Online.s",
+        "git_blob_sha": "5b34ad34960aac710b564f409670bfd53fae49a9",
+        "sha256": "1b5536a902b22c2608e014854945a462dd853a67a7d6810762cf1fceaf648c2a",
+        "in_textual_include_closure": true
+      }
+    ],
+    "binaries": [
+      {
+        "category": "Required: General Codes",
+        "path": "Binary/FasterMeleeSettings/UnlockAll.bin",
+        "annotation": "Unlock All Characters and Stages [Datel]",
+        "git_blob_sha": "be9429ce31b743bc8b7ab17779c5ea8e9e214462",
+        "size": 112,
+        "sha256": "504cac0951b6bfb63115c96d9ea79ff0b1e987997eecf0e8ee3f3fccb9709ebd",
+        "download_bytes": 112
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Binary/FasterMeleeSettings/StockMode.bin",
+        "annotation": "Stock Mode [Magus]",
+        "git_blob_sha": "e353b9f9e93632535a0c0004676c59307e3c33cb",
+        "size": 8,
+        "sha256": "01742ab049c7bebb777406600506910b827326865e62b229f02575eea20f3e59",
+        "download_bytes": 8
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Binary/FasterMeleeSettings/4Stocks.bin",
+        "annotation": "4 Stocks [Magus]",
+        "git_blob_sha": "c5f228bfd2619df0886362cf6fbdcbed783b425e",
+        "size": 8,
+        "sha256": "86000b21d81d775e7bd05384a658bc538950ae9a3c3e61ed8d57f76114dcbe39",
+        "download_bytes": 8
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Binary/FasterMeleeSettings/8Minutes.bin",
+        "annotation": "8 Minutes [Magus]",
+        "git_blob_sha": "fe1c9782a485f5e449491a62c2251dcf89dc0560",
+        "size": 8,
+        "sha256": "47c40d70d5dc3d475376efd33dc310b04d5761f712f072b23b69b5e3478cfb77",
+        "download_bytes": 8
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Binary/FasterMeleeSettings/NoItems.bin",
+        "annotation": "No Items [Magus]",
+        "git_blob_sha": "731ff2f86f8d3f7b043f98244ef8b0d4087c743f",
+        "size": 8,
+        "sha256": "ce4037f378c74b10826934a1ee885f4daeac81dd59052d15e4f3af6fbf489538",
+        "download_bytes": 8
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Binary/FasterMeleeSettings/SinglesStages.bin",
+        "annotation": "Singles Stages [Magus]",
+        "git_blob_sha": "a55d2d36dd98a8b2cc0f2201ef7ebcec69d83880",
+        "size": 8,
+        "sha256": "a3b380f163b33583c12dcfd64c00b235afaebeebe925a0f507018b6780b51bd6",
+        "download_bytes": 8
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Binary/FasterMeleeSettings/DisableSpecialMessages.bin",
+        "annotation": "Disable Special Messages [Most]",
+        "git_blob_sha": "55d41cd51ad7d274504162b498e8ec58239e3669",
+        "size": 8,
+        "sha256": "43cce5363b67161c37e5d5e2a4d18e717435b7dab5d110114024f3fbc29e27ff",
+        "download_bytes": 8
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Binary/FasterMeleeSettings/DisableTrophyMessages.bin",
+        "annotation": "Disable Trophy Messages [Achilles]",
+        "git_blob_sha": "a7b46a1207a8aa7860711abe7ae0a0672b7cf62b",
+        "size": 8,
+        "sha256": "c277d50e892e58caa211bba58ec3808f73522e4f1ccf2bed7d36982cee79b16e",
+        "download_bytes": 8
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Binary/FasterMeleeSettings/CStickSinglePlayer.bin",
+        "annotation": "C-Stick in Single Player [Zauron]",
+        "git_blob_sha": "d2cfd95e5999f8be1b11814fa87bbdf45b86e10d",
+        "size": 8,
+        "sha256": "7a5c65c9fc58ae86ebaf87136799117ba8a71bfdded46175f659bbb7fe43191f",
+        "download_bytes": 8
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Binary/FasterMeleeSettings/DebugMenu.bin",
+        "annotation": "Debug Menu [Magus, donny2112]",
+        "git_blob_sha": "8b4f2d6e8f949d4db0c10368da30b06f6ffa46e1",
+        "size": 8,
+        "sha256": "bcb13b5228a07f43caaaf28165af6967258e65111a398f3852f87d41b949c7ef",
+        "download_bytes": 8
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Binary/FasterMeleeSettings/CssFromDebugMenu.bin",
+        "annotation": "Exiting Debug Menu Returns to CSS [Achilles]",
+        "git_blob_sha": "b5d20276f2a228b61874e8444bc94002adce1221",
+        "size": 8,
+        "sha256": "a4c9b796717d86efe39dd49039c5eda9a5336ca706c16017544c64cc9042a1b4",
+        "download_bytes": 8
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Binary/FasterMeleeSettings/FasterCssLoad.bin",
+        "annotation": "Faster CSS Load [UnclePunch]",
+        "git_blob_sha": "998d6f5b33b41faa6d817cf423c29faef6bec081",
+        "size": 8,
+        "sha256": "7e8bc806e50039d03b2a57b9ef7c131d8784c5307fd5d2a8f42023fa47526330",
+        "download_bytes": 8
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Binary/FasterMeleeSettings/ResetToCssFromStageLoad.bin",
+        "annotation": "L+R+A Returns to CSS during Stage Load [Jorgasms]",
+        "git_blob_sha": "7adcf3835f523a5adcd44ea7677c75744ef2dae7",
+        "size": 8,
+        "sha256": "819b3cd847942238f6594d296290292d6a705e8298f289e86f8e59bfcdcd3095",
+        "download_bytes": 8
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Binary/FasterMeleeSettings/UnrestrictedCamera.bin",
+        "annotation": "Unrestricted Camera while Paused [strikebowler585]",
+        "git_blob_sha": "5a9b942f834e3e8a82e70202aaf8d11db8b8a5d0",
+        "size": 40,
+        "sha256": "931931d6ad34be333dd2a64ce9291059067c6d5c47b591b8d650ea07b040171e",
+        "download_bytes": 40
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Binary/FasterMeleeSettings/CStickPanWhilePaused.bin",
+        "annotation": "C-Stick Panning while Paused [Achilles]",
+        "git_blob_sha": "2f1dca61a64a2cd9032e9711ecac1dbd1775351c",
+        "size": 104,
+        "sha256": "9401be9d3a043c6289ddb9d9f928692768bf168767aa6980da9ff5636b28dc06",
+        "download_bytes": 104
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Binary/FasterMeleeSettings/RandomStageMusic.bin",
+        "annotation": "Random Stage Music [UnclePunch]",
+        "git_blob_sha": "3a001af410ce08c2f8951d3e0a946b9c97028db0",
+        "size": 8,
+        "sha256": "7bb78bfcf9d82fe532058282dded9c0f87c8d3ceb504ac80557d979aeac49f35",
+        "download_bytes": 8
+      },
+      {
+        "category": "Required: General Codes",
+        "path": "Binary/FasterMeleeSettings/RandomCssMusic.bin",
+        "annotation": "Random CSS Music v3 [UnclePunch]",
+        "git_blob_sha": "6130e58f6f135161876a18862bc2b52de0b68d0d",
+        "size": 168,
+        "sha256": "dc25e37e551bee94d40104bc84f3bb5866f5e9d139055edfb0adb7709e55e558",
+        "download_bytes": 168
+      },
+      {
+        "category": "Required: Slippi Online",
+        "path": "Binary/LagReduction/PD+VB.bin",
+        "annotation": "Polling Drift Fix + VB [tauKhan]",
+        "git_blob_sha": "10a2c67350251fbc38c79f503d5adb83a298ce87",
+        "size": 112,
+        "sha256": "6885d6d34c3aef300cfce531061361bfa9409a36b10ff40622692e3fca9ca56c",
+        "download_bytes": 112
+      },
+      {
+        "category": "Required: Slippi Online",
+        "path": "Binary/m-ex.bin",
+        "annotation": "m-ex codeset generated from https://github.com/JLaferri/m-ex/tree/support%2Fslippi",
+        "git_blob_sha": "1ae51b97650ae95d5abd93ae8e7e69d2459d8227",
+        "size": 6992,
+        "sha256": "780c7f5c675ea5c992da0bc41db5b24932fb32201dd776918b47183b0b1f0f99",
+        "download_bytes": 6992
+      },
+      {
+        "category": "Recommended: Normal Lag Reduction",
+        "path": "Binary/NormalLagReduction.bin",
+        "annotation": null,
+        "git_blob_sha": "79a8b54faa0bfac4a9aa241c00a8dfa1acc99dfa",
+        "size": 16,
+        "sha256": "8b35051d6805be96d40be8099d04aadba3fce601152606d3a764009e6355efb8",
+        "download_bytes": 16
+      },
+      {
+        "category": "Recommended: Lagless FoD",
+        "path": "Binary/FasterMeleeSettings/LaglessFod.bin",
+        "annotation": "Lagless FoD",
+        "git_blob_sha": "61eea9eb5887f79528c96bb8ac7c250fa4718985",
+        "size": 104,
+        "sha256": "16c8ea53ad69cb7f428b1999a1d45f28e6430d7d2b5e0547d4c2daa5de6f9bb7",
+        "download_bytes": 104
+      }
+    ],
+    "textual_include_method": "Start with all .asm source files enumerated beneath default-selected injectFolder roots; follow active .include paths using relative-to-includer resolution when that exists, otherwise repository-root resolution. This is a source-text include closure, not proof of identical linker/build behavior.",
+    "unresolved_include_references": [],
+    "projection_note": "File identities deduplicated; selected-root count excludes two external .s dependencies. Include edges and emitted record details retained in hashed external packet. Semantic summaries and manifest entries preserved."
+  },
+  "sources": [
+    {
+      "id": "project_direction",
+      "repo": "ericvanlare/melee-web",
+      "path": "docs/PROJECT_DIRECTION.md",
+      "lines": "67-72",
+      "claim": "Project requires a compatible pinned release bundle and says not to assume independently fetched repository heads form one.",
+      "commit": "be78dc29aa639422447bf51d85d2b80958cac9c7",
+      "worktree_head": "be78dc29aa639422447bf51d85d2b80958cac9c7"
+    },
+    {
+      "id": "mode_identity_issue",
+      "repo": "ericvanlare/melee-web",
+      "path": "issue #9: Define the verified-vanilla and custom-mode boundary",
+      "lines": null,
+      "url": "https://github.com/ericvanlare/melee-web/issues/9",
+      "claim": "Explicit profile/mode identity and separation of vanilla from custom/Slippi mode."
+    },
+    {
+      "id": "asm_readme",
+      "repo": "project-slippi/slippi-ssbm-asm",
+      "commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "path": "README.md",
+      "lines": "196-225",
+      "sha256": "a98b4fc8c6c2afe2958586186eabd810279c360ea5f80f87f7454407690734a2",
+      "url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/README.md#L196-L225",
+      "claim": "Netplay codeset may be used for Slippi or any Dolphin play; distinct codeset builds."
+    },
+    {
+      "id": "asm_netplay_config",
+      "repo": "project-slippi/slippi-ssbm-asm",
+      "commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "path": "netplay.json",
+      "lines": "2-24;49-233;279-358;354-357",
+      "sha256": "10c06ec0cc824fa412187d30cbd794aa8e79373f78f2fbdd24df9c1a11dc8c0e",
+      "url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/netplay.json",
+      "claim": "One static generated Netplay configuration, selected categories, UCF 0.84, static rule defaults and nonrecursive PreventWobbling directory."
+    },
+    {
+      "id": "asm_generated_ini",
+      "repo": "project-slippi/slippi-ssbm-asm",
+      "commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "path": "Output/Netplay/GALE01r2.ini",
+      "lines": "10-38;235-478;558;2464-2523;4295-4353;7046-7054",
+      "sha256": "b30b294df5c0d92deb3129afdfbc894a48aabeb1bce0cf92cce8c4e5408a2587",
+      "url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Output/Netplay/GALE01r2.ini",
+      "claim": "Generated default gameplay settings and active hooks."
+    },
+    {
+      "id": "ucf_dashback",
+      "repo": "project-slippi/slippi-ssbm-asm",
+      "commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "path": "External/UCF 0.84/UCF/UCF Dashback.asm",
+      "lines": null,
+      "sha256": "a791aff823b54980edac685acdb2c15bba31d5239b34662ab4c831e3526f9037",
+      "url": "https://github.com/project-slippi/slippi-ssbm-asm/tree/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/UCF%200.84/UCF",
+      "claim": "UCF 0.84 source package."
+    },
+    {
+      "id": "stadium_hook",
+      "repo": "project-slippi/slippi-ssbm-asm",
+      "commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "path": "Online/Core/Hacks/Stadium/IngameCheckIfFrozen.asm",
+      "lines": "11-25",
+      "sha256": "7a6d9ae7a1d8416c14e6a3ced4bb8357b5832b74fa9df92c2b24cd560d73c56e",
+      "url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Core/Hacks/Stadium/IngameCheckIfFrozen.asm#L11-L25",
+      "claim": "Game-side Stadium frozen setting hook."
+    },
+    {
+      "id": "stadium_toggle",
+      "repo": "project-slippi/slippi-ssbm-asm",
+      "commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "path": "Online/Menus/SSS/FrozenStadiumToggle/CursorOnHoverStadium.asm",
+      "lines": "26-40",
+      "sha256": "1261c8d93efb61e19022bbe99e7e8a92800a2dba2d9270cad0d952d2965248f1",
+      "url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Menus/SSS/FrozenStadiumToggle/CursorOnHoverStadium.asm#L26-L40",
+      "claim": "Z toggle behavior while hovering PS."
+    },
+    {
+      "id": "fod_doubles",
+      "repo": "project-slippi/slippi-ssbm-asm",
+      "commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "path": "External/Disable FoD During Doubles/Disable FoD During Doubles.asm",
+      "lines": "13-46",
+      "sha256": "3caf4956a82468c75a96bd3e816a78811aa4433d469640c6cd474f21b6a83c93",
+      "url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/Disable%20FoD%20During%20Doubles/Disable%20FoD%20During%20Doubles.asm#L13-L46",
+      "claim": "Only edits random-stage field when it matches legal-stage mask or that mask without FoD; then enables FoD in Singles and disables it in Teams. Other masks are unchanged."
+    },
+    {
+      "id": "prevent_wobble_active",
+      "repo": "project-slippi/slippi-ssbm-asm",
+      "commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "path": "External/PreventWobbling/PreventWobbling.s",
+      "lines": "108-115",
+      "sha256": "70ddf34cd64668c4fe27ab80037a2b4bd9faa29fbb540005e2ef9a9ec5a2671d",
+      "url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/PreventWobbling/PreventWobbling.s#L108-L115",
+      "claim": "Shared macro has a Teams-specific branch that bypasses the grab-break path; no active Ranked-only guard."
+    },
+    {
+      "id": "prevent_wobble_ranked_nested",
+      "repo": "project-slippi/slippi-ssbm-asm",
+      "commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "path": "External/PreventWobbling/Ranked/Wobble Check.asm",
+      "lines": "9-20",
+      "sha256": "413bf836b1ebf5557563c21956321c9c6af86ba4ac41a77100930e265ccd91f6",
+      "url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/PreventWobbling/Ranked/Wobble%20Check.asm#L9-L20",
+      "claim": "Nested Ranked wrapper is excluded by netplay.json isRecursive=false; comments say it does not work."
+    },
+    {
+      "id": "ishiiruka_mode_enum",
+      "repo": "project-slippi/Ishiiruka",
+      "commit": "60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2",
+      "path": "Source/Core/Core/Slippi/SlippiMatchmaking.h",
+      "lines": "25-32",
+      "sha256": "aca4557f8748d62373e07c8ba8d891b7e5ff185dd66e41dde9f0b24b0530c2cf",
+      "url": "https://github.com/project-slippi/Ishiiruka/blob/60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2/Source/Core/Core/Slippi/SlippiMatchmaking.h#L25-L32",
+      "claim": "Client mode enum Ranked/Unranked/Direct/Teams/Party."
+    },
+    {
+      "id": "release_v350",
+      "repo": "project-slippi/Ishiiruka",
+      "tag": "v3.5.0",
+      "commit": "d7ddfa934df1310638f8869dbd370e6a33054e9d",
+      "url": "https://github.com/project-slippi/Ishiiruka/releases/tag/v3.5.0",
+      "claim": "Ranked/Unranked PS always unfrozen; Direct and Teams can toggle frozen/unfrozen; PS counterpick and FD neutral in Ranked."
+    },
+    {
+      "id": "release_v352",
+      "repo": "project-slippi/Ishiiruka",
+      "tag": "v3.5.2",
+      "commit": "bffe989d0bd3b83a4be3eaee708cf2755659e01e",
+      "url": "https://github.com/project-slippi/Ishiiruka/releases/tag/v3.5.2",
+      "claim": "Allow Frozen Stadium in Teams."
+    },
+    {
+      "id": "release_v360",
+      "repo": "project-slippi/Ishiiruka",
+      "tag": "v3.6.0",
+      "commit": "25243a2bfb582ad27f0548e5018953f43d4093ba",
+      "url": "https://github.com/project-slippi/Ishiiruka/releases/tag/v3.6.0",
+      "claim": "Party FFA with items and rotating weekly random stages."
+    },
+    {
+      "id": "asm_license",
+      "repo": "project-slippi/slippi-ssbm-asm",
+      "commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "path": "LICENSE",
+      "lines": "1-3",
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/LICENSE#L1-L3",
+      "claim": "Root GPL-3.0 license."
+    },
+    {
+      "id": "server_privacy",
+      "repo": "project-slippi/slippi-wiki",
+      "path": "GETTING_STARTED.md",
+      "lines": null,
+      "url": "https://github.com/project-slippi/slippi-wiki/blob/71c6a395f841ff67f75ab4c0084fd1d6ee22c2db/GETTING_STARTED.md",
+      "claim": "Production matchmaking server source is private.",
+      "commit": "71c6a395f841ff67f75ab4c0084fd1d6ee22c2db"
+    },
+    {
+      "id": "asm_license_metadata",
+      "repo": "project-slippi/slippi-ssbm-asm",
+      "url": "https://api.github.com/repos/project-slippi/slippi-ssbm-asm",
+      "claim": "GitHub repository metadata reports GPL-3.0; root LICENSE file is also pinned above."
+    },
+    {
+      "id": "ishiiruka_license_metadata",
+      "repo": "project-slippi/Ishiiruka",
+      "commit": "60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2",
+      "url": "https://api.github.com/repos/project-slippi/Ishiiruka",
+      "claim": "GitHub repository metadata reports GPL-2.0; pinned README and EXI header say GPLv2+."
+    },
+    {
+      "id": "ishiiruka_fixed_mode",
+      "repo": "project-slippi/Ishiiruka",
+      "commit": "60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2",
+      "path": "Source/Core/Core/Slippi/SlippiMatchmaking.cpp",
+      "lines": "91-95",
+      "sha256": "49655ddb83ab3c595c6917f051a3f2aafc12d30fbd7dd50840d3207779c8b28d",
+      "url": "https://github.com/project-slippi/Ishiiruka/blob/60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2/Source/Core/Core/Slippi/SlippiMatchmaking.cpp#L91-L95",
+      "claim": "Fixed-rules predicate selects Ranked, Unranked, and Party."
+    },
+    {
+      "id": "ishiiruka_character_stage_checks",
+      "repo": "project-slippi/Ishiiruka",
+      "commit": "60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2",
+      "path": "Source/Core/Core/HW/EXI_DeviceSlippi.cpp",
+      "lines": "1946-1965;2374-2382",
+      "sha256": "b762d9bf731b39da01a42dcafbd09c8bc54f2d1a08e096c2f8052fae7ed0f779",
+      "url": "https://github.com/project-slippi/Ishiiruka/blob/60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2/Source/Core/Core/HW/EXI_DeviceSlippi.cpp#L1946-L1965",
+      "claim": "Fixed mode rejects character IDs >=26 locally and in remote-player checks; selected-stage check is against allowedStages. No received character allowlist is shown."
+    },
+    {
+      "id": "matchmaking_allowed_stages",
+      "repo": "project-slippi/Ishiiruka",
+      "commit": "60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2",
+      "path": "Source/Core/Core/Slippi/SlippiMatchmaking.cpp",
+      "lines": "613-623",
+      "sha256": "49655ddb83ab3c595c6917f051a3f2aafc12d30fbd7dd50840d3207779c8b28d",
+      "url": "https://github.com/project-slippi/Ishiiruka/blob/60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2/Source/Core/Core/Slippi/SlippiMatchmaking.cpp#L613-L623",
+      "claim": "allowedStages is loaded from getResp[\"stages\"]."
+    },
+    {
+      "id": "ishiiruka_direct_code",
+      "repo": "project-slippi/Ishiiruka",
+      "commit": "60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2",
+      "path": "Source/Core/Core/HW/EXI_DeviceSlippi.cpp",
+      "lines": "1916-1941",
+      "sha256": "b762d9bf731b39da01a42dcafbd09c8bc54f2d1a08e096c2f8052fae7ed0f779",
+      "url": "https://github.com/project-slippi/Ishiiruka/blob/60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2/Source/Core/Core/HW/EXI_DeviceSlippi.cpp#L1916-L1941",
+      "claim": "Direct code is a matchmaking connection code, not a gameplay patch."
+    },
+    {
+      "id": "ishiiruka_live_setup",
+      "repo": "project-slippi/Ishiiruka",
+      "commit": "60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2",
+      "path": "Source/Core/Core/HW/EXI_DeviceSlippi.cpp",
+      "lines": "2554-2618;2739-2745",
+      "sha256": "b762d9bf731b39da01a42dcafbd09c8bc54f2d1a08e096c2f8052fae7ed0f779",
+      "url": "https://github.com/project-slippi/Ishiiruka/blob/60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2/Source/Core/Core/HW/EXI_DeviceSlippi.cpp#L2554-L2618",
+      "claim": "Live online match setup controls pause bit, stage-selection/alt-stage mode, Party time/score setup, other modes stock/eight-minute setup, and server-result item bitfield override."
+    },
+    {
+      "id": "ishiiruka_replay_settings",
+      "repo": "project-slippi/Ishiiruka",
+      "commit": "60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2",
+      "path": "Source/Core/Core/HW/EXI_DeviceSlippi.cpp",
+      "lines": "642-752",
+      "sha256": "b762d9bf731b39da01a42dcafbd09c8bc54f2d1a08e096c2f8052fae7ed0f779",
+      "url": "https://github.com/project-slippi/Ishiiruka/blob/60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2/Source/Core/Core/HW/EXI_DeviceSlippi.cpp#L642-L752",
+      "claim": "prepareGameInfo replay/playback settings payload serializes UCF toggle and frozen-Stadium settings; not evidence of live online UCF transport."
+    },
+    {
+      "id": "playback_legacy_ucf",
+      "repo": "project-slippi/Ishiiruka",
+      "commit": "60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2",
+      "path": "Source/Core/Core/Slippi/SlippiPlayback.cpp",
+      "lines": "510-536",
+      "sha256": "d5646cfd34dd79864dbce84551ae05f0f158190cedd7160d3f678b1586045cb5",
+      "url": "https://github.com/project-slippi/Ishiiruka/blob/60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2/Source/Core/Core/Slippi/SlippiPlayback.cpp#L510-L536",
+      "claim": "Legacy playback codelist includes UCF 0.74; this is not the live Netplay profile."
+    },
+    {
+      "id": "ishiiruka_readme_license",
+      "repo": "project-slippi/Ishiiruka",
+      "commit": "60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2",
+      "path": "Readme.md",
+      "lines": "5-8",
+      "sha256": "65f9b98bfb128a95ebf340b234d0c1b9d2ff6bd1e6fa7b9be72e798c97fdb6e5",
+      "url": "https://github.com/project-slippi/Ishiiruka/blob/60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2/Readme.md#L5-L8",
+      "claim": "Pinned Ishiiruka README says GPL version 2 or later (GPLv2+)."
+    },
+    {
+      "id": "ishiiruka_exi_license_header",
+      "repo": "project-slippi/Ishiiruka",
+      "commit": "60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2",
+      "path": "Source/Core/Core/HW/EXI_DeviceSlippi.cpp",
+      "lines": "1-3",
+      "sha256": "b762d9bf731b39da01a42dcafbd09c8bc54f2d1a08e096c2f8052fae7ed0f779",
+      "url": "https://github.com/project-slippi/Ishiiruka/blob/60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2/Source/Core/Core/HW/EXI_DeviceSlippi.cpp#L1-L3",
+      "claim": "This source file header says licensed under GPLv2+."
+    },
+    {
+      "id": "ishiiruka_license_text",
+      "repo": "project-slippi/Ishiiruka",
+      "commit": "60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2",
+      "path": "license.txt",
+      "lines": "1-8",
+      "sha256": "ab15fd526bd8dd18a9e77ebc139656bf4d33e97fc7238cd11bf60e2b9b8666c6",
+      "url": "https://github.com/project-slippi/Ishiiruka/blob/60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2/license.txt",
+      "claim": "Pinned root license text is GNU GPL version 2."
+    },
+    {
+      "id": "prevent_wobble_root_wrapper",
+      "repo": "project-slippi/slippi-ssbm-asm",
+      "commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "path": "External/PreventWobbling/Wobble Check.asm",
+      "lines": "1-10",
+      "sha256": "4fd97ded37b002d524d1d8463260e27150ef81997e4914fdd02c211329a3a5de",
+      "url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/PreventWobbling/Wobble%20Check.asm#L1-L10",
+      "claim": "Active nonrecursive root wrapper calls shared PreventWobbling macro."
+    }
+  ]
+}
