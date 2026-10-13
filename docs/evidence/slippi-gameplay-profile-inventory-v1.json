@@ -3907,5 +3907,410 @@
       "url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/External/PreventWobbling/Wobble%20Check.asm#L1-L10",
       "claim": "Active nonrecursive root wrapper calls shared PreventWobbling macro."
     }
-  ]
+  ],
+  "source_provenance_followup": {
+    "schema": "melee-web.slippi-release-provenance.v1",
+    "snapshot_date": "2026-10-12",
+    "scope": {
+      "kind": "bounded primary-source investigation",
+      "actions": "GitHub API/raw metadata and small text sources only; no release/client binary downloaded, installed, built, or executed.",
+      "task": "Identify a source-paired Slippi released client/configuration and trace the selected m-ex.bin artifact to source and license notices."
+    },
+    "selected_reference_identity": {
+      "client": {
+        "repository": "project-slippi/Ishiiruka",
+        "release": "v3.6.4",
+        "release_url": "https://github.com/project-slippi/Ishiiruka/releases/tag/v3.6.4",
+        "release_published_at": "2026-06-15T14:58:40Z",
+        "source_commit": "e7711b104b339a99385f2bb12b472d46140a7bc7",
+        "source_commit_url": "https://github.com/project-slippi/Ishiiruka/commit/e7711b104b339a99385f2bb12b472d46140a7bc7",
+        "latest_release_as_observed": true,
+        "selected_release_asset": {
+          "name": "FM-Slippi-3.6.4-Win.zip",
+          "sha256_from_GitHub_release_asset_metadata": "873ee4c5752c425b02e73e7f6a09b1478b10dce61258bcdf20e14bd69de89e2f",
+          "downloaded_or_inspected": false
+        }
+      },
+      "configuration": {
+        "repository": "project-slippi/slippi-ssbm-asm",
+        "commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+        "commit_url": "https://github.com/project-slippi/slippi-ssbm-asm/commit/fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+        "output_path": "Output/Netplay/GALE01r2.ini",
+        "client_embedded_path": "Data/Sys/GameSettings/GALE01r2.ini",
+        "same_git_blob_sha": "63e077eb6e60fdc5691ba4ea9550d80bcd676776",
+        "size_bytes": 145690,
+        "sha256_from_existing_v4_inventory": "b30b294df5c0d92deb3129afdfbc894a48aabeb1bce0cf92cce8c4e5408a2587",
+        "source_pairing": "The release source tree contains the exact same Git blob as the ASM-generated Netplay profile. The pinned Windows Netplay build workflow copies Data/Sys into the packaged runtime. In the June 12\u201315 release window, successful slippi branch run #1950 had head SHA e7711b...; the v3.6.4 release workflow completed on June 15.",
+        "scope_limit": "Source/configuration pairing is established. Packaged release bytes were not downloaded or inspected, and no executable/runtime/profile acceptance was performed."
+      }
+    },
+    "build_run_evidence": {
+      "latest_successful_slippi_branch_run_in_captured_window": {
+        "id": 27432835725,
+        "run_number": 1950,
+        "conclusion": "success",
+        "head_branch": "slippi",
+        "head_sha": "e7711b104b339a99385f2bb12b472d46140a7bc7",
+        "url": "https://github.com/project-slippi/Ishiiruka/actions/runs/27432835725"
+      },
+      "release_run": {
+        "id": 27555308236,
+        "run_number": 34,
+        "conclusion": "success",
+        "head_branch": "v3.6.4",
+        "head_sha": "e7711b104b339a99385f2bb12b472d46140a7bc7",
+        "url": "https://github.com/project-slippi/Ishiiruka/actions/runs/27555308236"
+      },
+      "workflow_caveat": "The release workflow fetches the latest artifact from branch slippi instead of pinning a run ID. API evidence shows run #1950 at the release source commit as the latest successful branch build in the queried release window. Uploaded artifacts had expired by this review, so this is source/workflow/run-metadata evidence rather than a binary attestation."
+    },
+    "selected_m_ex_binary": {
+      "selected_path": "project-slippi/slippi-ssbm-asm@fcf47f10dc244152c2ebaa3a9dec142ea42243b7:Binary/m-ex.bin",
+      "selected_annotation": "m-ex codeset generated from https://github.com/JLaferri/m-ex/tree/support%2Fslippi",
+      "size_bytes": 6992,
+      "git_blob_sha": "1ae51b97650ae95d5abd93ae8e7e69d2459d8227",
+      "sha256_from_existing_v4_inventory": "780c7f5c675ea5c992da0bc41db5b24932fb32201dd776918b47183b0b1f0f99",
+      "source_repository": "JLaferri/m-ex",
+      "source_branch": "support/slippi",
+      "source_file": "asm/m-ex.bin",
+      "source_file_url_at_last_change": "https://github.com/JLaferri/m-ex/blob/ea6bddf8e288709953dd86f75ba689770d1ffebe/asm/m-ex.bin",
+      "last_artifact_change_commit": "ea6bddf8e288709953dd86f75ba689770d1ffebe",
+      "last_artifact_change_commit_url": "https://github.com/JLaferri/m-ex/commit/ea6bddf8e288709953dd86f75ba689770d1ffebe",
+      "source_commit_message": "remove reliance on MxDt",
+      "source_artifact_git_blob_sha": "1ae51b97650ae95d5abd93ae8e7e69d2459d8227",
+      "asm_repository_copy_last_changed_at": {
+        "commit": "1f28d82c450bda6c3bbea2afb7adbde6e3de508e",
+        "url": "https://github.com/project-slippi/slippi-ssbm-asm/commit/1f28d82c450bda6c3bbea2afb7adbde6e3de508e",
+        "commit_message": "further trim unneeded m-ex codes",
+        "blob_sha": "1ae51b97650ae95d5abd93ae8e7e69d2459d8227"
+      },
+      "branch_head": {
+        "commit": "7232b117bd2f7401969b85e4b74e74d90ef8ad26",
+        "commit_date": "2022-09-14T21:27:14Z",
+        "url": "https://github.com/JLaferri/m-ex/commit/7232b117bd2f7401969b85e4b74e74d90ef8ad26",
+        "current_branch_blob_sha": "1ae51b97650ae95d5abd93ae8e7e69d2459d8227",
+        "source_tree_header_blob_at_last_artifact_change": "8c6905a88b3f06cf27b71b038a4865c4ed324f5a",
+        "source_tree_header_blob_at_branch_head": "6ba13c25624038c7885f59c2efe64e71b68a387a"
+      },
+      "build_recipe": {
+        "url": "https://github.com/JLaferri/m-ex/blob/ea6bddf8e288709953dd86f75ba689770d1ffebe/asm/build-m-ex.bat",
+        "command": "gecko assemble -o \"m-ex.bin\" -p \"m-ex\"",
+        "gecko_tool_version_pinned": false,
+        "build_environment_pinned": false
+      },
+      "artifact_generation_limit": "The matching tracked artifact and its last path-changing commit are identified. That does not prove which exact source/toolchain generated it; no reproducible-build record or pinned Gecko version was found. Current branch Header.s differs while retaining the same binary. Contributor rights remain unresolved."
+    },
+    "license_and_notice_findings": {
+      "slippi_asm": {
+        "repository_metadata": "GPL-3.0",
+        "root_license": "GPLv3",
+        "source": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/LICENSE",
+        "existing_v4_source_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+      },
+      "ishiiruka": {
+        "repository_metadata": "GPL-2.0",
+        "readme_notice": "GPLv2+",
+        "root_license": "GNU GPL version 2",
+        "existing_v4_sources": [
+          "https://github.com/project-slippi/Ishiiruka/blob/60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2/Readme.md#L5-L8",
+          "https://github.com/project-slippi/Ishiiruka/blob/60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2/license.txt"
+        ]
+      },
+      "m_ex": {
+        "repository_metadata": null,
+        "root_license_or_copying_file_at_artifact_commit": null,
+        "license_like_paths_in_asm_m_ex_subtree": [],
+        "spot_checked_source_headers": [
+          "https://github.com/JLaferri/m-ex/blob/ea6bddf8e288709953dd86f75ba689770d1ffebe/asm/m-ex/Header.s",
+          "https://github.com/JLaferri/m-ex/blob/ea6bddf8e288709953dd86f75ba689770d1ffebe/asm/m-ex/Load%20MxScn.asm"
+        ],
+        "source_scope": "The tree search found no license/copying/notice/copyright path in the 72-entry asm/m-ex subtree. The two spot-checked source headers contain no license statement. This is bounded inspection, not a complete per-file contributor/rightsholder audit."
+      },
+      "conclusion": "These are separate repository notices. The m-ex source project has no declared license notice found in the bounded review. No combined redistribution permission or legal clearance is inferred."
+    },
+    "evidence_limits": [
+      "No release binary/archive was downloaded or inspected; asset SHA-256 values are copied from GitHub release metadata.",
+      "No build, install, runtime, online session, or acceptance test was performed.",
+      "The release workflow uses latest branch artifacts rather than a run-ID pin; the run metadata supports but does not provide a cryptographic artifact-to-source attestation.",
+      "The m-ex artifact bytes and last artifact-changing source commit are linked by identical Git blob SHA, but the generator version/environment and complete contributor/rightsholder history remain unresolved.",
+      "No legal determination or permission to reuse is made.",
+      "Prior v4 C++ mode findings remain scoped to Ishiiruka commit 60f7b634; only the identical INI and narrowly inspected mode-selection/setup sections are source-compared with the v3.6.4 source commit. No binary/runtime/profile acceptance follows."
+    ],
+    "prior_v4_evidence": {
+      "freeze_manifest_sha256": "cd170870e70ce9f72299060928f6d9208617c6750f33e38fe45736cc9fe22db3",
+      "report_sha256": "b72f56c0ac28744f957569436e1b157bb01ffb094b84d71fb95ebf272a654dab",
+      "inventory_sha256": "0a2edc85cff4843065f3c5449136ebef1734fedd90f65916f2ef41ed53e65526",
+      "selected_binaries_sha256": "a8db93635baaa4751888889a6655cb239f0e15aa5b7ad6cbfd5df7c190793fba",
+      "preserved_without_modification": true
+    },
+    "cached_source_manifest": "sources.json",
+    "mode_semantics_release_vs_v4_head": {
+      "v4_ishiiruka_source_commit": "60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2",
+      "release_source_commit": "e7711b104b339a99385f2bb12b472d46140a7bc7",
+      "scope": "Targeted source/config pairing comparison only; previous C++ mode findings remain scoped to v4 source pin except for the unchanged/patched paths identified here.",
+      "source_identity": {
+        "SlippiMatchmaking.cpp": {
+          "v4_git_blob_sha": "3cf77d008eec88d0619543e37f6183fa3c8d6d0e",
+          "release_git_blob_sha": "3cf77d008eec88d0619543e37f6183fa3c8d6d0e",
+          "result": "byte-identical Git blob"
+        },
+        "EXI_DeviceSlippi.cpp": {
+          "v4_git_blob_sha": "27c5a5da56a603988fd6c304b3bd16935cdbed2a",
+          "release_git_blob_sha": "4e39919143dd158df2456ff1c23c1ef243a7f69b",
+          "result": "different blob; targeted path history identifies one intervening commit, the v4 pin itself"
+        }
+      },
+      "observed_targeted_delta": "Commit 60f7b634 (fix desync recovery bugs #466) changes desync-recovery timer restoration ordering in prepareOnlineMatchState, moving timer restore after mode default-timer setup. Its EXI patch does not change the mode selection predicate or chosen character/stage setup. The mode-selection source file SlippiMatchmaking.cpp is identical by Git blob.",
+      "implication": "This supports carrying forward only the source/config claims tied to the identical INI and the inspected mode predicate/setup sections. It does not make every v4 C++ finding applicable to e7711, and it does not establish binary identity, runtime behavior, or profile acceptance.",
+      "sources": [
+        "ishiiruka-slippi-dir-e771",
+        "ishiiruka-slippi-dir-60f",
+        "ishiiruka-hw-dir-e771",
+        "ishiiruka-hw-dir-60f",
+        "ishiiruka-exi-history-release-to-60f",
+        "ishiiruka-60f-commit"
+      ]
+    },
+    "external_run_id": "slippi-release-provenance-v1",
+    "report_sha256": "81ea7fb6b91d8315a91060fb85d28f400b6b78cdf0ceb65656a07d632249a8c5",
+    "freeze_sha256": "2d965e56f4767e1ea2d6c0cda7738e5e7f84995cdea85050ecf15e76061d16e3",
+    "root_review_sha256": "991f9957252e871b5437a3d56e4751010eeb1c1fef7a0a216e839099cfe67432",
+    "sources": [
+      {
+        "id": "asm-binary-history",
+        "url": "https://api.github.com/repos/project-slippi/slippi-ssbm-asm/commits?path=Binary/m-ex.bin&per_page=20",
+        "sha256_of_cached_response": "3af1c8193bfae84e0a5512bec22cc3c45f20fa3cda04ef1e8fe94d48a2a43b1e",
+        "claim_scope": "History of selected Binary/m-ex.bin in the pinned ASM repository; its last content change is commit 1f28d82."
+      },
+      {
+        "id": "asm-build-check",
+        "url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/.github/workflows/build_check.yml",
+        "sha256_of_cached_response": "355767b5944848d2fe73ebc8f6957bface4aa4cd59eb7eb9363d237bf725f23c",
+        "claim_scope": "ASM CI build uses an unpinned Docker tag nikhilnarayana/devkitpro-slippi:latest."
+      },
+      {
+        "id": "asm-build-netplay",
+        "url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/build-netplay.sh",
+        "sha256_of_cached_response": "624fdea61def989901a2c13020fcdac7e0b49b2ce5dceb65aec306f34afeb5a2",
+        "claim_scope": "Pinned command used to generate the Netplay INI from netplay.json."
+      },
+      {
+        "id": "asm-commit-fcf47",
+        "url": "https://api.github.com/repos/project-slippi/slippi-ssbm-asm/commits/fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+        "sha256_of_cached_response": "6674f79bc2f912281d9dfe8b67a164623a71dd55b2942c0771b4d3b407954db4",
+        "claim_scope": "Metadata for the exact ASM source/configuration commit."
+      },
+      {
+        "id": "asm-makefile",
+        "url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Makefile",
+        "sha256_of_cached_response": "356a6798069880d1b38d2d0c87bbd18f2dd0d1a85ec2457ec0c7a87d27764c5f",
+        "claim_scope": "ASM Makefile records output target and invokes gecko build."
+      },
+      {
+        "id": "asm-output-netplay-dir",
+        "url": "https://api.github.com/repos/project-slippi/slippi-ssbm-asm/contents/Output/Netplay?ref=fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+        "sha256_of_cached_response": "f5fa5e6c588598001cf2bfb038af0da1fdf745583a0d70801568de8ce100acc5",
+        "claim_scope": "Metadata-only tree entries bind the Netplay GALE01r2.ini to Git blob 63e077... at the ASM commit."
+      },
+      {
+        "id": "asm-readme",
+        "url": "https://raw.githubusercontent.com/project-slippi/slippi-ssbm-asm/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/README.md",
+        "sha256_of_cached_response": "a98b4fc8c6c2afe2958586186eabd810279c360ea5f80f87f7454407690734a2",
+        "claim_scope": "ASM project states its Netplay codeset use and identifies the external Gecko build tool."
+      },
+      {
+        "id": "asm-releases",
+        "url": "https://api.github.com/repos/project-slippi/slippi-ssbm-asm/releases?per_page=10",
+        "sha256_of_cached_response": "2ba33ca0557f1bb5b7ba88d67f9d0093c7185a36ec51fe2b7bd9372d3e001d6d",
+        "claim_scope": "Recent published-release API response for the ASM repository."
+      },
+      {
+        "id": "asm-root-pinned",
+        "url": "https://api.github.com/repos/project-slippi/slippi-ssbm-asm/contents?ref=fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+        "sha256_of_cached_response": "7e45de5405f58702268a442cd920983252731b410714d4f21bd5dbdc1cfe4b93",
+        "claim_scope": "Metadata-only root tree showing the pinned ASM LICENSE path."
+      },
+      {
+        "id": "asm-workflows",
+        "url": "https://api.github.com/repos/project-slippi/slippi-ssbm-asm/contents/.github/workflows?ref=fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+        "sha256_of_cached_response": "942e7617970aaca4737f0c5b07865851bb241d826466b5853ef709a0908e0685",
+        "claim_scope": "Metadata-only listing of build-check workflow at the pinned ASM commit."
+      },
+      {
+        "id": "ishiiruka-commit-e7711",
+        "url": "https://api.github.com/repos/project-slippi/Ishiiruka/commits/e7711b104b339a99385f2bb12b472d46140a7bc7",
+        "sha256_of_cached_response": "e8fae2059c3901835172c0a441fe0da0059dab08b20dd75643ea276d3ac01cc4",
+        "claim_scope": "Tag source commit metadata for Ishiiruka v3.6.4."
+      },
+      {
+        "id": "ishiiruka-gamesettings-dir",
+        "url": "https://api.github.com/repos/project-slippi/Ishiiruka/contents/Data/Sys/GameSettings?ref=e7711b104b339a99385f2bb12b472d46140a7bc7",
+        "sha256_of_cached_response": "4e0f30ae97da1267faf8d7098f33f509d3744fba1e1a9fda7dc900dfe689a6c1",
+        "claim_scope": "Metadata-only game settings tree; GALE01r2.ini has the same blob and byte length as the ASM output."
+      },
+      {
+        "id": "ishiiruka-gitmodules",
+        "url": "https://raw.githubusercontent.com/project-slippi/Ishiiruka/e7711b104b339a99385f2bb12b472d46140a7bc7/.gitmodules",
+        "sha256_of_cached_response": "05b20b140569f1423bd86335ffb8ca4d1ec48ed3add27e46ba836d094013bab1",
+        "claim_scope": "Pinned Ishiiruka submodule manifest; does not list slippi-ssbm-asm."
+      },
+      {
+        "id": "ishiiruka-pr-build-runs",
+        "url": "https://api.github.com/repos/project-slippi/Ishiiruka/actions/workflows/pr-build.yml/runs?branch=slippi&created=2026-06-12T00:00:00Z..2026-06-15T23:59:59Z&per_page=100",
+        "sha256_of_cached_response": "ec2aaf9a07a811ed4396312e00f175fc41818e111c26fd0f14e615af2bdd5804",
+        "claim_scope": "GitHub Actions run metadata for slippi-branch build runs in the release window."
+      },
+      {
+        "id": "ishiiruka-pr-build-workflow",
+        "url": "https://raw.githubusercontent.com/project-slippi/Ishiiruka/e7711b104b339a99385f2bb12b472d46140a7bc7/.github/workflows/pr-build.yml",
+        "sha256_of_cached_response": "bd6aeaec76665774eeb2154cf3659de63bb206b0dde8b75e02edb6b93f91a580",
+        "claim_scope": "Pinned build workflow showing source checkout, Netplay target, Windows Data/Sys copy and artifact packaging."
+      },
+      {
+        "id": "ishiiruka-release-latest",
+        "url": "https://api.github.com/repos/project-slippi/Ishiiruka/releases/latest",
+        "sha256_of_cached_response": "5dab53c1fcdfc3832e5798052366f2b0837dc15c9c21b60ef49cde355eb6fc81",
+        "claim_scope": "Current latest-release pointer as observed on capture date."
+      },
+      {
+        "id": "ishiiruka-release-run-artifacts",
+        "url": "https://api.github.com/repos/project-slippi/Ishiiruka/actions/runs/27432835725/artifacts?per_page=100",
+        "sha256_of_cached_response": "cfd00a1615b82ab7c160002bdf84b7ff009ce8da119b4ec0385a7a382e09e7e3",
+        "claim_scope": "Run artifact listing; zero retained artifacts at review time."
+      },
+      {
+        "id": "ishiiruka-release-runs",
+        "url": "https://api.github.com/repos/project-slippi/Ishiiruka/actions/workflows/release.yml/runs?created=2026-06-12T00:00:00Z..2026-06-15T23:59:59Z&per_page=100",
+        "sha256_of_cached_response": "9d5fcbfaf19ad4ddd9a7c550f0688a049de0d6fa539e1123e9fed79cd3b86799",
+        "claim_scope": "GitHub Actions metadata for release workflow execution in the release window."
+      },
+      {
+        "id": "ishiiruka-release-v3_6_4",
+        "url": "https://api.github.com/repos/project-slippi/Ishiiruka/releases/tags/v3.6.4",
+        "sha256_of_cached_response": "0482aa3fe718e76d642c7703bf6cf46872feddd9de44d844d003a73a54f410d0",
+        "claim_scope": "Pinned release tag metadata, publication date and asset digests."
+      },
+      {
+        "id": "ishiiruka-release-workflow",
+        "url": "https://raw.githubusercontent.com/project-slippi/Ishiiruka/e7711b104b339a99385f2bb12b472d46140a7bc7/.github/workflows/release.yml",
+        "sha256_of_cached_response": "5e2eef79ecd46dd8c631e55a4a8a6747f4ea96cf33ac9ebbe144881b40a2d230",
+        "claim_scope": "Pinned release workflow showing it downloads the latest branch build artifacts and publishes versioned assets."
+      },
+      {
+        "id": "ishiiruka-workflows",
+        "url": "https://api.github.com/repos/project-slippi/Ishiiruka/contents/.github/workflows?ref=e7711b104b339a99385f2bb12b472d46140a7bc7",
+        "sha256_of_cached_response": "bc7f6250c3f408dd340f86d0528b211203253da95350799e26d2c82608e8b4b6",
+        "claim_scope": "Metadata-only listing of workflows at the release source commit."
+      },
+      {
+        "id": "m-ex-asm-at-output-commit",
+        "url": "https://api.github.com/repos/JLaferri/m-ex/contents/asm?ref=ea6bddf8e288709953dd86f75ba689770d1ffebe",
+        "sha256_of_cached_response": "544203e505a4b140fa49b009c111d8e84553e9ca69aff8f82ffdb7155597d17c",
+        "claim_scope": "Metadata-only asm tree at the last-change commit for m-ex.bin; blob and build script hashes are recorded."
+      },
+      {
+        "id": "m-ex-binary-history",
+        "url": "https://api.github.com/repos/JLaferri/m-ex/commits?path=asm/m-ex.bin&sha=support%2Fslippi&per_page=20",
+        "sha256_of_cached_response": "6574b43fa78e6b8e06713d4be7cd4b6154bb72ddfff84ed7afa7155758b9f1b1",
+        "claim_scope": "History of asm/m-ex.bin on support/slippi; last changed in commit ea6bddf."
+      },
+      {
+        "id": "m-ex-branch-support-slippi",
+        "url": "https://api.github.com/repos/JLaferri/m-ex/branches/support/slippi",
+        "sha256_of_cached_response": "4cb6b8018b1d2479b5de5217bffd57b081617905bae71dab543c9f1b21128a5c",
+        "claim_scope": "Branch identity and head commit for support/slippi."
+      },
+      {
+        "id": "m-ex-build-m-ex",
+        "url": "https://raw.githubusercontent.com/JLaferri/m-ex/ea6bddf8e288709953dd86f75ba689770d1ffebe/asm/build-m-ex.bat",
+        "sha256_of_cached_response": "b26e91b3aca60d76cdac2f43fb1c3cf0244713fc1aefcb367b24afe211d4d1f4",
+        "claim_scope": "Pinned source build command is gecko assemble -o m-ex.bin -p m-ex; it does not pin the Gecko executable version."
+      },
+      {
+        "id": "m-ex-commit-history",
+        "url": "https://api.github.com/repos/JLaferri/m-ex/commits?sha=support%2Fslippi&per_page=10",
+        "sha256_of_cached_response": "e5a2a0c525bdbaa0a87ee3dbe3f73ef46b1e8a25d5d125f6e6cbd97db1181067",
+        "claim_scope": "Recent branch commit summary, used to bound the output/source timeline."
+      },
+      {
+        "id": "m-ex-dir",
+        "url": "https://api.github.com/repos/JLaferri/m-ex/contents/asm/m-ex?ref=support%2Fslippi",
+        "sha256_of_cached_response": "b4377d53c40851895a6fdd88b18d8e55afe3a053393d51eda311cf5c3fbeac4b",
+        "claim_scope": "Metadata-only listing of asm/m-ex files at the current branch head."
+      },
+      {
+        "id": "m-ex-output-source-tree",
+        "url": "https://api.github.com/repos/JLaferri/m-ex/git/trees/b0a6437d1a58b0c4019cb894b46a4347f4cb43d9?recursive=1",
+        "sha256_of_cached_response": "27ee4fcdaab68fca470792890ecc28f5f06baa6ae8dcb09a91895d819f06abd7",
+        "claim_scope": "Metadata-only recursive tree of the asm/m-ex source subtree at output commit; no license/copying/notice path appears."
+      },
+      {
+        "id": "m-ex-readme",
+        "url": "https://raw.githubusercontent.com/JLaferri/m-ex/ea6bddf8e288709953dd86f75ba689770d1ffebe/README.md",
+        "sha256_of_cached_response": "f9cb34e243a5e78484438ec3180f642374d5dfb9f5d21d7711dba4a04ac4017e",
+        "claim_scope": "Pinned m-ex README describing its scope as a framework for SSBM v1.02 and recommending submodule use."
+      },
+      {
+        "id": "m-ex-repo",
+        "url": "https://api.github.com/repos/JLaferri/m-ex",
+        "sha256_of_cached_response": "6faa70420c12cd51d0242e2efc8ae16b15ff067dd0b4b40bf057d56870147b7c",
+        "claim_scope": "Repository metadata reports no recognized license."
+      },
+      {
+        "id": "m-ex-root-at-output-commit",
+        "url": "https://api.github.com/repos/JLaferri/m-ex/contents?ref=ea6bddf8e288709953dd86f75ba689770d1ffebe",
+        "sha256_of_cached_response": "d268e13a3e8c0e967ff5e222a3aab0142264eaa888a19ac3f207696f60ad6649",
+        "claim_scope": "Metadata-only root tree at the m-ex artifact/source commit; no root LICENSE or COPYING file appears."
+      },
+      {
+        "id": "m-ex-root-support-slippi",
+        "url": "https://api.github.com/repos/JLaferri/m-ex/contents?ref=support%2Fslippi",
+        "sha256_of_cached_response": "921f00ab689283070df90110629eb2371d0377e24e4e68d39d5e24ff80a6a50c",
+        "claim_scope": "Metadata-only root tree at the current branch head."
+      },
+      {
+        "id": "m-ex-tree-asm",
+        "url": "https://api.github.com/repos/JLaferri/m-ex/contents/asm?ref=support%2Fslippi",
+        "sha256_of_cached_response": "e320b19db33192e156d52de7466de8473f08dfe0eaf3ad87c239a322969e693a",
+        "claim_scope": "Metadata-only asm tree at current branch head; its m-ex.bin Git blob matches the selected payload."
+      },
+      {
+        "id": "ishiiruka-slippi-dir-e771",
+        "url": "https://api.github.com/repos/project-slippi/Ishiiruka/contents/Source/Core/Core/Slippi?ref=e7711b104b339a99385f2bb12b472d46140a7bc7",
+        "sha256_of_cached_response": "ec42b82bf64bd8ca1bda6375916847f22b91fff424480526a285fbb588c0d5fb",
+        "claim_scope": "Metadata-only source tree at release tag; SlippiMatchmaking.cpp Git blob identified for narrow comparison with the v4 source pin."
+      },
+      {
+        "id": "ishiiruka-slippi-dir-60f",
+        "url": "https://api.github.com/repos/project-slippi/Ishiiruka/contents/Source/Core/Core/Slippi?ref=60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2",
+        "sha256_of_cached_response": "400dcae7387d43b9208183680f16b285607a6ecf25f6c7a26435c9ee397f4f78",
+        "claim_scope": "Metadata-only source tree at the v4 Ishiiruka pin; SlippiMatchmaking.cpp Git blob identified for narrow comparison with release source."
+      },
+      {
+        "id": "ishiiruka-hw-dir-e771",
+        "url": "https://api.github.com/repos/project-slippi/Ishiiruka/contents/Source/Core/Core/HW?ref=e7711b104b339a99385f2bb12b472d46140a7bc7",
+        "sha256_of_cached_response": "fed3ec203382e7498ba6df98b8dc244494cdbcae847208b5dc2fb26d4e110fdf",
+        "claim_scope": "Metadata-only source tree at release tag; EXI_DeviceSlippi.cpp Git blob identified for narrow mode-setup source comparison."
+      },
+      {
+        "id": "ishiiruka-hw-dir-60f",
+        "url": "https://api.github.com/repos/project-slippi/Ishiiruka/contents/Source/Core/Core/HW?ref=60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2",
+        "sha256_of_cached_response": "a9528fa879e9a31380c004c5d2a9e1cb9db25d72888f431f39a7e157d45c7377",
+        "claim_scope": "Metadata-only source tree at the v4 Ishiiruka pin; EXI_DeviceSlippi.cpp Git blob identified for narrow mode-setup source comparison."
+      },
+      {
+        "id": "ishiiruka-exi-history-release-to-60f",
+        "url": "https://api.github.com/repos/project-slippi/Ishiiruka/commits?path=Source/Core/Core/HW/EXI_DeviceSlippi.cpp&sha=60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2&since=2026-06-12T17:35:19Z&until=2026-09-22T23:59:59Z&per_page=50",
+        "sha256_of_cached_response": "f36cb18e4b80a3974387b7dfc070c405efcfc2212ebd4e21e9e30c5e951ddf9e",
+        "claim_scope": "Path-history metadata for the single EXI_DeviceSlippi.cpp change between release and v4 pins."
+      },
+      {
+        "id": "ishiiruka-60f-commit",
+        "url": "https://api.github.com/repos/project-slippi/Ishiiruka/commits/60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2",
+        "sha256_of_cached_response": "f199266a2a14db64c0d5c714732789f03fded2411de7677e0c6a427bbb525e1f",
+        "claim_scope": "Commit metadata and targeted patch showing the EXI desync-recovery timer ordering change; used only to scope release-versus-v4 mode-source differences."
+      }
+    ],
+    "portable_projection_review_sha256": "4d3975d8d819b9eb8a23e94f4bbdd22817100e381556a11d1f9eba374384c9e5"
+  },
+  "prior_snapshot_scope": "Fields outside source_provenance_followup retain the original v4 source snapshot. The follow-up supersedes its unknown checked-in m-ex artifact association and adds released-source/config pairing, without resolving actual binary generation, rights, executable validation or full semantics."
 }

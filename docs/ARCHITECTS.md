@@ -77,6 +77,10 @@ ownership. The settings toggle and rollback runtime remain implementation goals.
 [decision 017](ARCHITECTURE.md#017--online-rollback-is-match-scoped-with-explicit-rules-profiles),
 [execution response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6137878567).
 
+- 2026-10-12, Codex: posted the [profile inventory response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6138210180).
+  Source/configuration pairing and license findings are recorded in the same
+  [feasibility boundary](status/2026-10-12-match-only-rollback-feasibility.md);
+  semantic and executable-reference gaps remain open before porting.
 
 ### 2026-10-12 — Owner: public staging, cleanup and Stadium after combat
 

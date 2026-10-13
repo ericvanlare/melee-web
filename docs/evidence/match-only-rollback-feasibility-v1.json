@@ -248,11 +248,621 @@
       "files/bank/stream requests and async readers",
       "persistent card/profile and scene lifecycle outside rollback"
     ],
-    "unknown": "Complete mutable ranges and safe host commit/restore semantics"
+    "unknown": "Complete mutable ranges and safe host commit/restore semantics",
+    "source_inventory": {
+      "schema": "match-rollback-host-owner-inventory-v2",
+      "state": "SOURCE_INVENTORY_AND_PROPOSED_POLICIES_NOT_IMPLEMENTED_ROLLBACK_SAFETY",
+      "source": "92c11c2dee2c398f6098745cfb559509bbe8746e",
+      "source_sha256": {
+        "src/gameplay_match_session.cpp": "a4a6302f69863eb1b2bca39507b0170ef7cba168f0b1599537a5e7f26825bc28",
+        "src/gameplay_menu_browser.cpp": "ac7ba9536113b6641f5a44888fcf05e46b07ffa766a6c37636fd830364d9d3b1",
+        "src/gameplay_audio.c": "29cbc36f9af3f256662bc5aa0142bdc771778b9d6790fb4aa2b4eb7ef979e9af",
+        "src/gameplay_audio_bank_transport.c": "a78d2d3e6edee790e71b6474ebcab5a4260c5d47a13f42bbd397af0d898da816",
+        "src/gameplay_audio_stream.c": "87d1b6be3b6843bf8112cb7c6e2ea5a87e0d8a840817725d84bf4d278ca5de49",
+        "src/gameplay_source_files.c": "f20a2a26067d5582a8a75eeee3743054247b284ba8af291b80734080a05b7731",
+        "web/melee-runtime.mjs": "f7fa37c65d92e50bf1b445d96e6f98514f688ac02841942f251beaa008c9df3b",
+        "web/runtime-audio.mjs": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc",
+        "web/audio-worklet.js": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea",
+        "web/audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+        "tests/shared_page_wasm_snapshot.mjs": "592694e1af7c250d745242d6f94872c59daf81a58b98cfbdff1a67eaf1d3619f"
+      },
+      "renderer_design_sha256": "d9e45fc97c59fd3e783ca0cb0ed1b22b9223683bfccd39d3908041e4472d8306",
+      "owners": [
+        {
+          "owner": "Original match state",
+          "observed_source": "GameplayMatchSession::tick calls raw phased original step; draw runs render_draw then flow_present.",
+          "mutable_or_effect": "PAD histories, RNG, HSD objects/processes, allocator payload/metadata and draw-dependent source state.",
+          "existing_evidence": "Exact full-heap/source-only replay; does not own mutable Wasm globals/tables or browser host state.",
+          "proposed_policy": "Keep original tick/draw order and exact per-tick input. Identify and restore every mutable owner before permitting browser restore. Treat archive bytes as immutable only with exact content/lifetime proof.",
+          "unresolved": "Minimum complete mutable byte size and owner closure; whole-heap size is not simulation-state size."
+        },
+        {
+          "owner": "GPU and renderer",
+          "observed_source": "Reviewed Aurora design: game draw encodes GX work and can create resources or write queue buffers before final Submit; depth/profiler completion owners are distinct.",
+          "mutable_or_effect": "Caches, resource handles, staging leases, encoder/pass state, queued writes, surface/depth/profiler callbacks and completed readbacks.",
+          "existing_evidence": "Source inspection only; one terminal full-draw/zero-submit probe pending.",
+          "proposed_policy": "Preserve full original draw. Hold immutable compiled resources outside snapshots with explicit lifetimes; discard speculative commands and own mutable uploads/handles. Tag completion ownership to a timeline generation. Commit actual GPU work once.",
+          "unresolved": "No browser restore permission until source/host handles and callback retirement agree. Zero Submit does not undo WriteBuffer or resource creation. Terminal instance disposal is not a reusable rollback path."
+        },
+        {
+          "owner": "Native game/audio state",
+          "observed_source": "Browser render_audio_tick calls melee_web_audio_render and advances fractional 32000/60 sample phase. It is driven by audio_clock ticks separately from GameplayMatchSession::tick.",
+          "mutable_or_effect": "Original AX voices/synth requests, resampler history, envelopes/effects, HPS slot decoding and bank-transfer request order.",
+          "existing_evidence": "Source-only fixture PCM replay exact at its own synchronous source step; browser audio schedule is a separate authority.",
+          "proposed_policy": "Capture native audio owner state or journal/replay source requests and exact sample-clock progression under an explicit profile contract. Preserve source ordering and validate PCM against that contract.",
+          "unresolved": "How browser audio_clock progression and native source requests map to confirmed simulation ticks. Do not silently turn one match tick into one arbitrary audio tick."
+        },
+        {
+          "owner": "Web Audio output",
+          "observed_source": "runtime-audio.write transfers PCM buffers over MessagePort; AudioWorklet consumes AudioRing independently and reports counters.",
+          "mutable_or_effect": "Transferred buffers, queued PCM, worklet consumer cursor, currentTime/currentFrame and already played sound.",
+          "existing_evidence": "Source inspection; no rollback-safe output commit implementation.",
+          "proposed_policy": "Keep the physical audio clock/output consumer outside rewind. Commit each confirmed audio event/PCM block once; separately define latency and correction policy for predicted audio.",
+          "unresolved": "Already consumed samples cannot be retracted. Duplicate playback, underrun, latency and artifact behavior require measurements; no audible acceptance claim."
+        },
+        {
+          "owner": "Source files, banks and streams",
+          "observed_source": "SourceFileRequest allocates IDs/callbacks; source_files_pump may invoke JS menuStartSourceRead/status/take/discard and Asyncify. JS sourceReadResults uses Promise completion identity; take allocates and writes Wasm bytes. HPS queues have their own IDs, decoded slots and callbacks; SSM transport has separate IDs/callbacks and bank mappings/relocations.",
+          "mutable_or_effect": "Wasm request lists/counters/destinations, JS pending-result maps/promises, immutable disc bytes, transient buffers, completion ordering, bank mappings and stream positions.",
+          "existing_evidence": "Existing quiescent fixture refuses pending DVD/HPS/SSM transfers; this is not general async snapshot admission.",
+          "proposed_policy": "Retain immutable exact-content results and explicit request/timeline identities; consume original completions in recorded source order. Own cancellation and stale completion behavior; never allow a prior generation callback to write a restored destination.",
+          "unresolved": "Full request/response journal, memory-growth and source latency semantics. Preloading may help ownership but must not hide source callbacks or change RNG/order."
+        },
+        {
+          "owner": "Input, room and clocks",
+          "observed_source": "Host input and transport remain outside same-instance Wasm memory; owner direction exchanges agreed match start context and records per-tick raw PAD.",
+          "mutable_or_effect": "Live devices, inbound queues, prediction/confirmation cursors, wall clocks and session lifecycle.",
+          "existing_evidence": "Existing protocol/checksum/relay functionality; no match rollback runtime yet.",
+          "proposed_policy": "Replay immutable match input history with explicit predicted/confirmed cursors; do not rewind physical devices, transport sockets or wall time. Keep local menus/Results/rematch outside rollback.",
+          "unresolved": "Negotiated actual initial state and correction/confirmed-outcome semantics."
+        },
+        {
+          "owner": "Persistent save/profile and scene outcome",
+          "observed_source": "Owner decision excludes menu/Results/rematch from rollback; existing session close publishes source result and tears down source owners.",
+          "mutable_or_effect": "Persistent profile/card writes, confirmed outcome and transition side effects.",
+          "existing_evidence": "No in-match persistence exclusion/rollback transaction proof.",
+          "proposed_policy": "Commit confirmed outcome/persistent writes exactly once outside speculative replay. Any reachable in-match mutation needs explicit ownership or a diagnosed unsupported boundary.",
+          "unresolved": "Must audit actual reachability; do not assume all persistent mutations are impossible in a match."
+        }
+      ],
+      "measurement_scope": "No new dynamic host counts; this extends the retained source contract with the independently driven browser audio and JS async file boundaries. Candidate policies require validation.",
+      "created_at": "2026-10-13T04:34:27.448522+00:00",
+      "supersedes": "host-owner-inventory-v1.json",
+      "reviewed_source_packet_sha256": "db65ae4d2ef5795d3f2ad680c19b73edf8c08bf449afa0dbef81aacd5a186806",
+      "review_sha256": "afaa78debd6a5b593d37149049adf1de89383927b83c25fedfe46a344ead167f",
+      "correction": "Clarify decoded slots belong to HPS, not SSM; all policies remain proposals."
+    },
+    "inventory_sha256": "5cc08779ba15844401a410279ff6e2b634e7423cb8baf4084487c551003782f2",
+    "inventory_result_review_sha256": "fa3adbc66e012ad030743308a93e598576cc91058faecf110318ba1f18c7dea7"
   },
   "seven_tick_budget": {
     "state": "unmeasured_with_source_draw",
     "budget_ms": "1000/60",
     "requirement": "Combined capture/restore/corrective tick+draw/final presentation; seven corrective plus current separate from seven total, tails/instrumentation and foreground limits explicit."
+  },
+  "shared_page_baseline": {
+    "schema": "melee-web-shared-page-snapshot-experiment-v2",
+    "result": "passed",
+    "boundary": "synchronous source-only exported-call return; shared-page owner binds after init and native quiescence",
+    "scenario": "two human Mario players / Final Destination / four stocks",
+    "sourceDrawing": false,
+    "browserGameplay": false,
+    "rollbackAdmission": false,
+    "machine": {
+      "cpu": "Apple M4",
+      "arch": "arm64",
+      "os": "Darwin",
+      "release": "25.6.0",
+      "node": "v22.23.2"
+    },
+    "sourceSha256": {
+      "tests/gameplay_snapshot_probe.cpp": "5489bff017d0d92bf5345321feab641b222923514218b626e534bcf6f1ef6911",
+      "tests/quiescent_wasm_snapshot.mjs": "4a8250b744ac3d00fd4e6b09168829d4adec8a6ebc043e07121e5f3173836570",
+      "tests/shared_page_wasm_snapshot.mjs": "592694e1af7c250d745242d6f94872c59daf81a58b98cfbdff1a67eaf1d3619f",
+      "scripts/check_shared_page_snapshot.mjs": "b81a8fc161679af15e03e367b59fa617c0e967ef1d3657f6b6cbf6aea105c21a",
+      "scripts/check_source_snapshot.mjs": "418a4adde3c8da4a90478c183ea9980ed21b955d605dddc3ad035479031726d1",
+      "scripts/build.py": "e55abc0dfd1aefede98e9414bc096e2f79c7831a53c04392c0fd2addf1151988",
+      "cmake/FighterRuntime.cmake": "4ca830a1189943dd421886fb4f33a6eaaa9d930b1060b05547778a1aeb9bbd5e",
+      "dependencies.lock.json": "b51fcde84db09641e4936339af970d74e97c71043ce6f6efee0c70e09211b385"
+    },
+    "helperSha256": {
+      "runner": "b81a8fc161679af15e03e367b59fa617c0e967ef1d3657f6b6cbf6aea105c21a",
+      "prototype": "592694e1af7c250d745242d6f94872c59daf81a58b98cfbdff1a67eaf1d3619f"
+    },
+    "factoryHeap": {
+      "capacityBytes": 134217728,
+      "bufferBytes": 134217728,
+      "bufferIdentity": 1
+    },
+    "postInitHeap": {
+      "capacityBytes": 134217728,
+      "bufferBytes": 134217728,
+      "bufferIdentity": 1,
+      "bufferReplaced": false
+    },
+    "ownerHeap": {
+      "scope": "all bytes of every full HEAPU8 page; no excluded ranges",
+      "capacityBytes": 134217728,
+      "pageBytes": 65536,
+      "pageCount": 2048,
+      "maxRetainedPageBytes": 268435456
+    },
+    "entrySamples": 124,
+    "ownerBinding": {
+      "sample": 0,
+      "nativeStepMs": 5.3633330000000115,
+      "nativeQuiescence": "passed",
+      "capacityBytes": 134217728,
+      "bufferIdentity": 1
+    },
+    "selection": {
+      "checkpoints": [
+        300
+      ],
+      "depths": [
+        7
+      ],
+      "requiresGroundedPlayers": true,
+      "requiresFullScenarioCoverage": false,
+      "ringStates": 8,
+      "ringRunsAfterSelectedCycles": true,
+      "depthSampleSemantics": "Depths under a checkpoint label execute sequentially; sample advances by each completed depth."
+    },
+    "readyBoundary": {
+      "nextInputSample": 124,
+      "sourceFrame": 0,
+      "ready": true,
+      "ground_or_air": [
+        0,
+        0
+      ],
+      "bothGrounded": true
+    },
+    "selectedBoundary": {
+      "checkpoint": 300,
+      "nextInputSample": 300,
+      "sourceFrame": 176,
+      "ready": true,
+      "ending": false,
+      "complete": false,
+      "ground_or_air": [
+        0,
+        0
+      ],
+      "bothGrounded": true
+    },
+    "nativeObservation": {
+      "abiVersion": "melee-web-source-snapshot-observation-v2",
+      "expectedBytes": 1280,
+      "bytes": 1280,
+      "abiAccepted": true,
+      "pcmBytes": 4272,
+      "inputBytes": 44,
+      "fields": "source frame/RNG/ready/ending/complete/pause/outcome/winner; stocks/motions/Fireball/object/process counts; both full MeleeWebMatchStats including grounded state; PCM; raw PAD sample bytes"
+    },
+    "cycles": [
+      {
+        "checkpoint": 300,
+        "sample": 300,
+        "depth": 7,
+        "repeats": 3,
+        "result": "passed",
+        "initial": {
+          "frame": 176,
+          "rng": 3719699907
+        },
+        "boundary": {
+          "nextInputSample": 300,
+          "sourceFrame": 176,
+          "ready": true,
+          "ending": false,
+          "complete": false,
+          "ground_or_air": [
+            0,
+            0
+          ],
+          "bothGrounded": true
+        },
+        "captureMs": 57.489374999999995,
+        "baselineMs": 1.8650839999999675,
+        "restoreMs": [
+          7.240250000000003,
+          2.6335000000000264,
+          2.4969169999999394
+        ],
+        "replayMs": [
+          1.766582000000028,
+          1.6238349999999855,
+          1.501041999999984
+        ],
+        "snapshotStats": {
+          "closed": false,
+          "scope": "all bytes of every full HEAPU8 page; no excluded ranges",
+          "capacityBytes": 134217728,
+          "pageBytes": 65536,
+          "pageCount": 2048,
+          "maxSnapshots": 8,
+          "retainedSnapshots": 1,
+          "retainedLogicalBytes": 134217728,
+          "uniquePageCount": 1054,
+          "uniquePageBytes": 69074944,
+          "maxRetainedPageBytes": 268435456,
+          "uniqueOwnedPageBytes": 69074944,
+          "deduplicatedBytes": 65142784,
+          "lastCapture": {
+            "hintedSnapshot": false,
+            "pageCount": 2048,
+            "hintComparisons": 0,
+            "hintHits": 0,
+            "hashedPages": 2048
+          }
+        },
+        "firstDivergence": null,
+        "finalMemoryBytes": 134217728,
+        "finalMemorySha256": "4e227d774f1fd2dadf2242c46fbfedc0806863fa31ad1cfd88eaf253eec819be",
+        "replayEndpointSha256": [
+          "4e227d774f1fd2dadf2242c46fbfedc0806863fa31ad1cfd88eaf253eec819be",
+          "4e227d774f1fd2dadf2242c46fbfedc0806863fa31ad1cfd88eaf253eec819be",
+          "4e227d774f1fd2dadf2242c46fbfedc0806863fa31ad1cfd88eaf253eec819be"
+        ]
+      }
+    ],
+    "sharedRing": {
+      "maxStates": 8,
+      "startSample": 307,
+      "retainedStats": {
+        "closed": false,
+        "scope": "all bytes of every full HEAPU8 page; no excluded ranges",
+        "capacityBytes": 134217728,
+        "pageBytes": 65536,
+        "pageCount": 2048,
+        "maxSnapshots": 8,
+        "retainedSnapshots": 8,
+        "retainedLogicalBytes": 1073741824,
+        "uniquePageCount": 1232,
+        "uniquePageBytes": 80740352,
+        "maxRetainedPageBytes": 268435456,
+        "uniqueOwnedPageBytes": 80740352,
+        "deduplicatedBytes": 993001472,
+        "lastCapture": {
+          "hintedSnapshot": true,
+          "pageCount": 2048,
+          "hintComparisons": 2048,
+          "hintHits": 2015,
+          "hashedPages": 33
+        }
+      },
+      "captureMs": [
+        50.969499999999925,
+        8.432000000000016,
+        4.587167000000022,
+        4.7374999999999545,
+        4.773957999999993,
+        4.85450000000003,
+        4.811541000000034,
+        4.756208999999899
+      ],
+      "captureStats": [
+        {
+          "hintedSnapshot": false,
+          "pageCount": 2048,
+          "hintComparisons": 0,
+          "hintHits": 0,
+          "hashedPages": 2048
+        },
+        {
+          "hintedSnapshot": true,
+          "pageCount": 2048,
+          "hintComparisons": 2048,
+          "hintHits": 2023,
+          "hashedPages": 25
+        },
+        {
+          "hintedSnapshot": true,
+          "pageCount": 2048,
+          "hintComparisons": 2048,
+          "hintHits": 2023,
+          "hashedPages": 25
+        },
+        {
+          "hintedSnapshot": true,
+          "pageCount": 2048,
+          "hintComparisons": 2048,
+          "hintHits": 2015,
+          "hashedPages": 33
+        },
+        {
+          "hintedSnapshot": true,
+          "pageCount": 2048,
+          "hintComparisons": 2048,
+          "hintHits": 2023,
+          "hashedPages": 25
+        },
+        {
+          "hintedSnapshot": true,
+          "pageCount": 2048,
+          "hintComparisons": 2048,
+          "hintHits": 2021,
+          "hashedPages": 27
+        },
+        {
+          "hintedSnapshot": true,
+          "pageCount": 2048,
+          "hintComparisons": 2048,
+          "hintHits": 2023,
+          "hashedPages": 25
+        },
+        {
+          "hintedSnapshot": true,
+          "pageCount": 2048,
+          "hintComparisons": 2048,
+          "hintHits": 2015,
+          "hashedPages": 33
+        }
+      ],
+      "restoreChecks": [
+        {
+          "offset": 0,
+          "sample": 307,
+          "restoreMs": 2.6033749999999145,
+          "sameObservation": true,
+          "samePcm": true,
+          "sameFullHeapSha256": true
+        },
+        {
+          "offset": 1,
+          "sample": 308,
+          "restoreMs": 2.5756249999999454,
+          "sameObservation": true,
+          "samePcm": true,
+          "sameFullHeapSha256": true
+        },
+        {
+          "offset": 2,
+          "sample": 309,
+          "restoreMs": 2.611709000000019,
+          "sameObservation": true,
+          "samePcm": true,
+          "sameFullHeapSha256": true
+        },
+        {
+          "offset": 3,
+          "sample": 310,
+          "restoreMs": 2.5390419999998812,
+          "sameObservation": true,
+          "samePcm": true,
+          "sameFullHeapSha256": true
+        },
+        {
+          "offset": 4,
+          "sample": 311,
+          "restoreMs": 2.634457999999995,
+          "sameObservation": true,
+          "samePcm": true,
+          "sameFullHeapSha256": true
+        },
+        {
+          "offset": 5,
+          "sample": 312,
+          "restoreMs": 2.737875000000031,
+          "sameObservation": true,
+          "samePcm": true,
+          "sameFullHeapSha256": true
+        },
+        {
+          "offset": 6,
+          "sample": 313,
+          "restoreMs": 2.4910419999998794,
+          "sameObservation": true,
+          "samePcm": true,
+          "sameFullHeapSha256": true
+        },
+        {
+          "offset": 7,
+          "sample": 314,
+          "restoreMs": 2.4862500000001546,
+          "sameObservation": true,
+          "samePcm": true,
+          "sameFullHeapSha256": true
+        }
+      ],
+      "releaseInvalidation": {
+        "label": "restore-after-release",
+        "result": "detected",
+        "error": "Shared-page snapshot is invalid or released",
+        "release": {
+          "label": "release-after-release",
+          "result": "detected",
+          "error": "Shared-page snapshot is already released"
+        }
+      },
+      "closeInvalidation": {
+        "restore": {
+          "label": "restore-after-owner-close",
+          "result": "detected",
+          "error": "Shared-page snapshot owner is closed"
+        },
+        "release": {
+          "label": "release-after-owner-close",
+          "result": "detected",
+          "error": "Shared-page snapshot is already released"
+        }
+      },
+      "releasedStats": {
+        "closed": false,
+        "scope": "all bytes of every full HEAPU8 page; no excluded ranges",
+        "capacityBytes": 134217728,
+        "pageBytes": 65536,
+        "pageCount": 2048,
+        "maxSnapshots": 8,
+        "retainedSnapshots": 0,
+        "retainedLogicalBytes": 0,
+        "uniquePageCount": 0,
+        "uniquePageBytes": 0,
+        "maxRetainedPageBytes": 268435456,
+        "uniqueOwnedPageBytes": 0,
+        "deduplicatedBytes": 0,
+        "lastCapture": null
+      },
+      "finalStats": {
+        "closed": true
+      }
+    },
+    "coverage": {
+      "peakFireballs": 1,
+      "minStocks": [
+        4,
+        4
+      ],
+      "motions": [
+        [
+          14,
+          29,
+          42,
+          322,
+          323,
+          324,
+          343
+        ],
+        [
+          14,
+          29,
+          42,
+          60,
+          322,
+          323,
+          324
+        ]
+      ],
+      "objectCounts": [
+        59,
+        60,
+        61,
+        62,
+        63,
+        64
+      ],
+      "processCounts": [
+        88,
+        89,
+        90,
+        91,
+        92,
+        102
+      ],
+      "samples": 315
+    },
+    "negativeControl": {
+      "result": "detected",
+      "sample": 315,
+      "perturbation": "one restored source RNG bit",
+      "firstDivergence": {
+        "offset": 4,
+        "expected": 170,
+        "actual": 69
+      },
+      "recovery": "passed"
+    },
+    "cleanup": "source match/audio/world closed; shared-page owner closed; all retained pages released",
+    "hostPeakRssBytes": 537051136,
+    "timing": "native-step timings cover only the synchronous checked source step; observation copies, hashes, comparisons, and report writes are outside baseline/replay step timings; capture includes native quiescence and shared-page capture",
+    "comparison": "exact observation and PCM bytes at every baseline/replay sample; exact entire-linear-memory Buffer equality at each depth endpoint; full SHA-256 retained for every depth endpoint and retained ring state",
+    "exclusions": [
+      "source draw traversal and hidden draw-dependent simulation",
+      "GPU and JS renderer ownership",
+      "browser input/clock/queue state",
+      "Web Audio and externally committed sound",
+      "persistent saves",
+      "retail or Slippi semantic equivalence",
+      "foreground timing, physical input and Internet connectivity",
+      "Wasm mutable globals and function tables outside linear memory",
+      "imported host state, filesystem state, process state, and external allocator state",
+      "nominal 64 MiB memory or practical rollback performance admission"
+    ],
+    "restoreReplayChecks": 3,
+    "cycleCount": 1,
+    "inputObservationTraceSha256": "f66a4c3ff6d58175403a83eb501113e626e80b704e725015c1b8983c267405ff",
+    "forwardStatesSha256": "e2e2a159f66ce61d1ac1e2feadd8681b0250da4a6b6f17127639142c7919553e",
+    "runtime": {
+      "jsSha256": "ef8e92b41b463a3af2b9a478f08dcf60aa23424d3cd83f0f40aced0b60844608",
+      "wasmSha256": "9fc224e63b1147133369534e142a81d9267e94deb048b6794dfdbc131bfc7044"
+    },
+    "assets": {
+      "EfCoData.dat": "996d78e2c0f4f550f968e2bd8f5e0d18fb8a7525f7e1cb7849a0c836bd7691c0",
+      "EfMrData.dat": "39ccac18137b108b31bb4d832475ba60dc45e381dce9005e14116848e465c669",
+      "GmPause.usd": "3e8490299edf670af0aebb7f27117e0c61297d6b9e2af7ab5c443091e554907f",
+      "GrNLa.dat": "2a295a733414fb65a7061a5c092144fb197570682562b87ba5567ff3f08abb02",
+      "IfAll.usd": "cd957f032b09cf3b80ff725f177525a387efddc264d76cb28581b5da69723929",
+      "IfCoGet.dat": "00f4518c27372eec7a841e20c3adb1ff22041cc5c0257886640954f5c185f599",
+      "ItCo.usd": "5d62efd6437149335b9eef87624ae1253ba7bb260fb08cbae04a3d9215eacd11",
+      "LbBf.dat": "ed0ee6059791bbd7aea4075a039fecdda24698d8baf58052dec91b4d9a364255",
+      "LbRb.dat": "b4d2241deb42f29ffda94dc421641cd58afe290dc49740fcaf5cd7d4c4ce7936",
+      "LbRf.dat": "e8c275128fd0ff3c16f29e672b6df014eefc286c842950e86771175795df5ba8",
+      "MnSlChr.usd": "c9823393ece291429251cb3fc9fd508d59248733ee2667d846d2a5c3434329db",
+      "PdPm.dat": "240fc477461bcc20707be84c9cf82a465ed03cd080c6781cd5de6288102d94ea",
+      "PlCo.dat": "63841336337eb5a7366b06ccc60ea4bd37c3604ab56e19939d78b9aa9cdd234c",
+      "PlMr.dat": "929cdf08c31bc75156ccef05238f2b16dc4d0b187ed1bb4f0a628a2466fb7f7a",
+      "PlMrAJ.dat": "4bd9593e6f0d980b4441891b62ea84a08c099471d695a614974c67223ab5872f",
+      "PlMrBk.dat": "deeb3bc478d720ba432f15c731638629e132269922dd03f05b7f2a9fd07d8c4c",
+      "PlMrBu.dat": "6888f68e434817d336b13d29bbb3d79544941f9748a0aa84355ae22640d9d960",
+      "PlMrGr.dat": "cdb2ea9b7dac639d7aa602e48a4296fdace23ce9c64a4bb35df20fc8a2a019c5",
+      "PlMrNr.dat": "518df5b1d1ce6775a636f4ca8e8e62fb24be65013cd586451c21a181824903ae",
+      "PlMrYe.dat": "c6047de9aaa5f136f72e47cc4e12d2dd606fd1dba36ef773dd3f89007dc669f2",
+      "SdIntro.dat": "21432e0fc6186a67b3522d878846fa46db9171999be93421a88cfc10477a422d",
+      "TyDatai.dat": "1bd632a1f50027f8844e008f4d45e9c20987ce4b8c1e5aa1690a83b3f063c0f4",
+      "TyDatai.usd": "7e0eaf267000c2734d1ef47e718c923995dfb6cf8ab32ec4e4babc0a84fcca11",
+      "dsp_coef.bin": "d7741279c2e8ec5c5fb318f8fbdd6de6bf583520d288e836a5383233a4238179",
+      "end.ssm": "17381aa2d9a04f7c09ac52abf24eee1abc4686cb08f6c9d2733fab0b40b6fd2f",
+      "main.ssm": "949c005709bae3fc72480e76dd1700afa5ec07d0d417fea30cd5524cf55fff20",
+      "mario.ssm": "b9bb209caf8bdc372c077fd877c8bba975f3a8e3ba5062f2c4ec73b7ac1eafa9",
+      "nr_name.ssm": "9190ec1e1aef5e5934151faa6a7b66e44a7ab05de5052048ea60d4bf40dc4bd0",
+      "nr_select.ssm": "94e97f57cd6fbd3ae1b0a7ebc6d9d97648daa16d32386d0f379eebecbbf67a11",
+      "nr_title.ssm": "a055011291f9b7f7f8d30e07ba453d8106735761f1db10d0c789359381326406",
+      "pokemon.ssm": "2f793eee4d05654758bd4a03ec066d9857cb0e549884acf0a72e5fa4be4515de",
+      "sislib_font.bin": "e8d43d10b000e59a64653e8a1b7726bdf95f9102d3ee3307ed56d7c53cde05c1",
+      "smash2.sem": "e844649df8127553f53d2c422375b20f0b814b2f6cc60333028b398dae4854f8",
+      "sp_end.hps": "f0430a9a87ab0c0dae3c4b1644587ff0a92fdb91e21329d429af9f7f0dea6f42"
+    },
+    "source_commit": "92c11c2dee2c398f6098745cfb559509bbe8746e",
+    "harness_commit": "cbe64e8e73a0056cdb7fb81c8ce4a28f9cc36b9c",
+    "build_identity": "Same JS/Wasm as source_only_baseline: built from2f12d0b9 plus reviewed c1ab51a6 patch; no runtime rebuild for runner selection.",
+    "raw_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964/source-baseline-v1/shared-ready-grounded-300-depth-7",
+    "raw_files": {
+      "evidence.json": "c986447f7416c962428af6f1de05e7e5ddaf7faab953f74ad6650ee58c0c7f38",
+      "native-host.log": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "input-samples.json": "f66a4c3ff6d58175403a83eb501113e626e80b704e725015c1b8983c267405ff",
+      "baseline-300-7.json": "96b597792905fb9f97e525f97663a7f3bab254e5628ee0758ea314093d642882",
+      "forward-states.json": "e2e2a159f66ce61d1ac1e2feadd8681b0250da4a6b6f17127639142c7919553e"
+    },
+    "process": {
+      "pid": 89515,
+      "exit_code": 0,
+      "pid_absent": true,
+      "elapsed_seconds": 1.5173887501005083
+    },
+    "reviews": {
+      "shared-ready-grounded-300-depth-7-review-v1.json": "e462418bb2de16fc4bf90f0c1e61b9722c2b74151a3d55622643d7e3406f94e6",
+      "shared-bounded-execution-v1.json": "985ec0c8394bffcef0f3c89de15e59f72c6d48880e618c74f4386d984273cb6e",
+      "root-source-review-v1.json": "a194d4c8d4ee1af03b17d796a48bfd0010b9e0675e30699809353d9c89c1cb62"
+    },
+    "identity_limit": "Shared runner source inventory omits gameplay_match_context.h and gameplay_pad_state.h listed by the first runner; root verified both against initial hashes before execution and result reviewer rechecked. Runtime bytes identical.",
+    "comparison_with_initial": "Same sample300 observation and PCM; one-tick versus seven-tick endpoint hashes differ because final samples differ.",
+    "sample_limit": "One selected seven-tick cycle with3replays;8sequential ring snapshots. Not a distribution/frame budget or minimum complete mutable-state measurement. Hinted/unhinted captures are separately labeled.",
+    "portable_result_review_sha256": "fa3adbc66e012ad030743308a93e598576cc91058faecf110318ba1f18c7dea7"
+  },
+  "checkpoint_validation": {
+    "source": "92c11c2dee2c398f6098745cfb559509bbe8746e",
+    "tests": 2383,
+    "skips": 165,
+    "exit_code": 0,
+    "regression_receipt_sha256": "c4da27baeae6e8cb774448473ff555405df754381c1c890cff99f993d633d9fc",
+    "regression_log_sha256": "ffc1a458cfe23ea7226a820824b1eba6d783bba62c5b36f06bc10722f10fce53",
+    "ci_receipt_sha256": "992773ef98cddaf353e6929bed60db67f3e880d71c0edc7c4abc6eef01cef0ac",
+    "ci_checks": 14,
+    "ci_successes": 12,
+    "ci_expected_skips": 2,
+    "scope": "Snapshot-runner checkpoint. Subsequent executable changes need affected validation; no complete rollback milestone or merge.",
+    "unittest_elapsed_seconds": 519.934,
+    "process_elapsed_seconds": 520.2733840411529
   }
 }
