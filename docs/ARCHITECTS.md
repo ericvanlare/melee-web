@@ -71,6 +71,12 @@ porting. H1 first-use respawn/common-effect preparation follows this measurement
 no timing guards change. Stadium C3 remains next Track B with shared capture
 ownership. The settings toggle and rollback runtime remain implementation goals.
 
+- 2026-10-13, Codex: the H1 first-use boundary and retained failures are recorded
+  in the [scoped status entry](status/2026-10-13-h1-first-use-respawn.md).
+  A separate self-KO prefix now records a source-bound respawn preparation
+  event. Its complete diagnostic remains refused at the input-witness boundary. Continue under [#320](https://github.com/ericvanlare/melee-web/issues/320);
+  current evidence does not justify descriptor prewarming.
+
 **Links:** [Feasibility #318](https://github.com/ericvanlare/melee-web/issues/318),
 [state ownership #115](https://github.com/ericvanlare/melee-web/issues/115),
 [mode identity #9](https://github.com/ericvanlare/melee-web/issues/9),

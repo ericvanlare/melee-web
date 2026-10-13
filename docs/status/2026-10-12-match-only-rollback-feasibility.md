@@ -3,7 +3,7 @@
 **Compiled / Source-only snapshot diagnostic / Terminal browser tick-and-draw diagnostic / Browser rollback and frame-budget feasibility unproven**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
-[draft #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
+[merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
 owner's match-only direction. Original menus, transitions, Results and rematch
 remain local. The planned mode choice is Vanilla offline-only or Slippi rules
 offline/online, with distinct pinned references; the toggle/profile are not yet
@@ -206,13 +206,17 @@ and its strict original assertions remain unchanged.
 
 The [profile inventory](../investigations/SLIPPI_GAMEPLAY_PROFILE_INVENTORY.md)
 and [source receipt](../evidence/slippi-gameplay-profile-inventory-v1.json) map
-the selected patch configuration, mode behavior and license notices. Ranked and
-Unranked Stadium are unfrozen; Direct/Teams offer a selection. UCF 0.84 is selected
-in the shared configuration, while live toggle semantics remain unresolved.
-File/hash closure is reviewed, but 132 untagged ASM hooks still lack bounded semantic
-checks after 24 unique checks across the original inventory and two later batches.
-The latest twelve-hook source review retains corrections to ranked winner-helper
-scope and version-versus-path accounting; it does not complete profile semantics. A source/configuration pairing is now identified for release v3.6.4, and the
-selected m-ex artifact is traced to matching checked-in bytes. Executable reference
-validation, reproducible m-ex generation and reuse rights remain open. No profile
-code was ported, and the source inventory task remains open.
+selected configuration, mode behavior, bounded source checks, and observed
+repository notices. Ranked and Unranked Stadium are unfrozen; Direct and Teams
+offer a selection. UCF 0.84 is selected in the shared configuration, while live
+toggle semantics remain unresolved. Thirty of 156 untagged ASM hooks have
+bounded source checks; 126 lack them. The latest six-hook checkpoint covers
+online SSS Stadium stage-choice display and handoff; peer agreement remains
+unknown. A separate v6 identity check confirms that eight selected tagged UCF
+payloads match their generated INI word prefixes, lengths, and padding. Their
+exact mechanics remain opaque, and this does not establish runtime activation or
+source-to-built-output pairing. The untagged count is unchanged. No release
+archive or executable was inspected; exact m-ex generation and contributor/reuse
+rights remain unresolved. Repository notices are factual observations, not
+legal clearance. No Slippi code or profile was ported, and the source inventory
+remains open.

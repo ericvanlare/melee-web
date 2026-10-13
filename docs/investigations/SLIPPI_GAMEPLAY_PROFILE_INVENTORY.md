@@ -51,13 +51,12 @@ and Singles stages; live setup can override these, including Party's rules.
 All 59 configured entries are mapped (52 default-selected). Selected folders resolve
 to 198 files and 183 annotated ASM hooks; the parsed textual include closure contains
 196 files, and 21 selected binary payloads are hashed. Of 183 hooks, 27 carry an
-`affects-gameplay` tag and 156 do not. Across the original v4 inventory checks, the
-corrected prior six-hook set (v1 and v2 are versions of the same paths), and the
-corrected v4 packet, 24 unique untagged hooks have bounded source checks;
-**132 lack such checks**. The new packet records 12 more exact source identities,
-selected-root membership, observed behavior and unresolved dependencies. This remains
-source-only evidence: no client binary/profile was inspected or accepted. Tag absence
-does not establish non-gameplay behavior.
+`affects-gameplay` tag and 156 do not. Across the original v4 inventory checks, the corrected prior six-hook set (v1 and v2
+are versions of the same paths), the corrected v4 packet, and the v5 packet, 30 unique
+untagged hooks have bounded source checks; **126 lack such checks**. The latest packet
+records six exact source identities, selected-root membership, observed behavior and
+unresolved dependencies. This remains source-only evidence: no client binary/profile
+was inspected or accepted. Tag absence does not establish non-gameplay behavior.
 
 The complete file inventory therefore does **not** establish a complete semantic inventory.
 
@@ -146,6 +145,47 @@ or profile acceptance. The corrected packet is `slippi-untagged-gameplay-review-
 not alter the v3.6.4 source/config pairing, branch-scoped mode findings, repository
 license notices, or separate m-ex generation and contributor/reuse-rights unknowns.
 
+
+## Bounded follow-up: online SSS Stadium choice
+
+A v5 source checkpoint covers six active untagged hooks selected through the
+recursively selected `Required: Slippi Online` → `Online/Menus` root in the
+pinned generated profile. This is static configuration selection, not proof of
+runtime activation. The hooks span stage-choice display and the online SSS
+selection handoff.
+
+| Hook path | Address | Source-only observation |
+| --- | --- | --- |
+| `Online/Menus/SSS/FrozenStadiumToggle/CheckForToggledOnStageName.asm` | `80259E34` | Reads the shared frozen-mode byte and switches the Stadium stage-name display between canonical ID 18 and display ID 31. |
+| `Online/Menus/SSS/FrozenStadiumToggle/IncMaxNames.asm` | `80259FB4` | Changes one compare threshold from 30 to 32; caller continuation and table bounds remain unknown. |
+| `Online/Menus/SSS/FrozenStadiumToggle/StageSelectTextProc.asm` | `8025AC6C` | Creates per-GObj state and animates the Stadium/alternate-stage label. |
+| `Online/Menus/SSS/FrozenStadiumToggle/StoreNameId.asm` | `80259FAC` | Maps display ID 31 back to canonical Stadium ID 18 when storing stage-name GObj data. |
+| `Online/Menus/SSS/ExitSSSUponStageSelect.asm` | `80259CC8` | On online SSS, passes the hovered external stage ID to unnamed `0x8025bc08` and requests a minor-scene change. |
+| `Online/Menus/SSS/DisableLRSTART.asm` | `8025B8A4` | On online SSS, branches past the original LRA sequence. |
+
+The active hooks do not show this stage-selection path serializing the selected
+freeze mode or checking peer agreement. The separate `InitOnlinePlay` check
+observes `MSRB_ALT_STAGE_MODE` copied into the shared mode byte; it does not prove
+that this callback sets or validates that field. Exact hook/source hashes, selected
+records and the disjoint path accounting are in the [machine receipt](../evidence/slippi-gameplay-profile-inventory-v1.json).
+
+The frozen v5 packet is `slippi-untagged-gameplay-review-v5` under run
+`match-rollback-feasibility-20261012-203633-e8f0c964`; its manifest SHA-256 is
+`ace88153a5b652972f61ac6728043f0ba1aef6104df0631f774e1c1e2c754624`, review JSON
+SHA-256 is `2e4af5a8747d8087e205e9bfa91517140fb538276b4cd408583102b04fcfc9bb`, and
+remaining-list SHA-256 is `3ea13df8dd148d7f0b50e26b85de6eee082bc4bc1b80d88dfddbb57da0b243b1`.
+The independent source/accounting review is
+`slippi-untagged-gameplay-review-v5-independent-review-v1.json`, SHA-256
+`a916ea3c39cf69e53544003221d1bd578c3a6aa6a700328b1735ca5572c06143`; it passed
+with a receipt-sync note because the portable files still reported the prior count.
+This candidate syncs those files; independent review of the portable documentation
+remains pending. The v5 source bytes and source/release/license findings are reused
+from the frozen v4 packet. Release-binary validation remains unperformed. The
+selected m-ex artifact's checked-in byte association is identified separately from
+its unresolved exact generation, contributor/reuse rights and license status;
+repository notices do not provide legal clearance. No profile has been ported or
+accepted.
+
 ## Pins and license findings
 
 - [ASM source fcf47f10](https://github.com/project-slippi/slippi-ssbm-asm/tree/fcf47f10dc244152c2ebaa3a9dec142ea42243b7)
@@ -156,8 +196,10 @@ license notices, or separate m-ex generation and contributor/reuse-rights unknow
 - The latest published release found was [v3.6.4](https://github.com/project-slippi/Ishiiruka/releases/tag/v3.6.4)
   at e7711b104b339a99385f2bb12b472d46140a7bc7. The inspected branch is later;
   these independently fetched heads are **not a verified compatible release bundle**.
-- Selected `Binary/m-ex.bin` points to `JLaferri/m-ex` branch `support/slippi`.
-  Its exact source commit, build provenance and license/rights are unresolved.
+- Selected `Binary/m-ex.bin` is annotated as generated from the `JLaferri/m-ex`
+  `support/slippi` branch. The matching tracked artifact blob and last artifact-change
+  commit are identified below; exact generation inputs/toolchain and contributor/reuse
+  rights remain unresolved.
 
 These are separate source notices, not a combined redistribution conclusion. Resolve
 exact artifacts and reuse rights before porting. The project will keep Vanilla as
@@ -191,6 +233,31 @@ found in the bounded source-tree search; two inspected source headers also lacke
 license notices. Reproducible generation and contributor/reuse rights remain open.
 The original source snapshot above is retained; this follow-up narrows its
 provenance unknowns without changing the separate license conclusions.
+
+## Bounded UCF payload identity check
+
+The independent v6 receipt verifies the eight pinned UCF payload identities
+against the cached selected ASM files and generated INI blocks. For each payload,
+the literal word prefix, generated length, complete word count, and exact trailing
+padding match. These checks identify the bytes only: no disassembly or exact
+instruction semantics were verified, and this does not establish activation,
+per-player values, runtime behavior, or source-to-built-output pairing.
+
+The eight files are in the recursively selected External/UCF 0.84/UCF subtree
+under Required: General Codes. They are already among the 27 tagged gameplay
+paths. This identity check adds no untagged semantic checks: the separate count
+remains 30 checked of 156 untagged hooks, with 126 lacking bounded checks. The
+other 19 tagged summaries were not re-audited. The independent review corrected
+the Pad Buffer + 1.0 Cardinals cached reference: its actual path contains a
+literal plus sign; the earlier %2B spelling did not resolve.
+
+The review receipt is
+slippi-gameplay-profile-ucf-v6-independent-review-v1/review.json in run
+match-rollback-feasibility-20261012-203633-e8f0c964
+(SHA-256 7f0492a6175fafd1e4a60656f18df1ab242a8c163536269d45eddf2816712754).
+It passes pinned payload identity only and holds novel author-source claims for
+lack of retained primary source and metadata evidence. No additional author-source
+semantics, tags, or license conclusion is established here.
 
 ## Next bounded source task
 
