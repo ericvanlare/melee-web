@@ -1258,7 +1258,7 @@
     "caveat": "PinnedsourceJSONbehavior verified; historical executable producing checked-in generatedoutput remainsunknown. No inferred historicalproduceridentity."
   },
   "gameplay_effect_inventory": {
-    "coverage": "Source-only partial checkpoint: 183 unique annotated active ASM hook paths among 288 generated default records; 27 ASM hooks are tagged affects-gameplay. Of 156 untagged ASM hooks, 30 unique paths have bounded source checks: six from the original v4 inventory, six in the corrected prior packet (v1 and v2 are versions of that same six-hook set), twelve in the corrected v4 packet, and six in the v5 packet. The sets are disjoint; 126 lack a bounded check. Tagging and bounded checks do not complete semantic coverage, and neither establishes runtime activation, executable identity, or profile acceptance.",
+    "coverage": "Source-only partial checkpoint: 183 unique annotated active ASM hook paths among 288 generated default records; 27 ASM hooks are tagged affects-gameplay. Of 156 untagged ASM hooks, 36 unique paths have bounded source checks: six from the original v4 inventory, six in the corrected prior packet (v1 and v2 are versions of the same six-hook set), twelve in the corrected v4 packet, six in v5, and six in v6. The sets are disjoint; 120 lack a bounded check. Tagging and bounded checks do not complete semantic coverage, and neither establishes runtime activation, executable identity, or profile acceptance.",
     "active_tagged_gameplay_hook_count": 27,
     "active_tagged_hooks": [
       {
@@ -1795,7 +1795,7 @@
         "review_packet": "slippi-untagged-gameplay-review-v2"
       }
     ],
-    "untagged_active_hook_semantics_unreviewed_count": 126,
+    "untagged_active_hook_semantics_unreviewed_count": 120,
     "active_source_file_notes": {
       "selected_roots_total_files": 198,
       "asm_hook_sources": 183,
@@ -1838,7 +1838,7 @@
       }
     ],
     "untagged_active_hook_total_count": 156,
-    "untagged_active_hook_bounded_review_count": 30,
+    "untagged_active_hook_bounded_review_count": 36,
     "additional_support_source_bounded_review_count": 1,
     "untagged_gameplay_hook_review_v2": {
       "packet": "slippi-untagged-gameplay-review-v2",
@@ -2663,6 +2663,157 @@
         "receipt_sync_note": "The review found the then-current portable receipt and summary still at 24 checks / 132 remaining; this candidate syncs them to the reviewed v5 packet. Independent portable-document review is pending."
       },
       "cached_source_reference_base": "References in support_includes are relative to the retained external packet slippi-untagged-gameplay-review-v5, not this repository document."
+    },
+    "untagged_gameplay_hook_review_v6": {
+      "packet": "slippi-remaining-source-inventory-v6-corrected-v1",
+      "run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+      "source_repository": "project-slippi/slippi-ssbm-asm",
+      "source_commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "status": "Independently reviewed bounded source/config observations; static selection only; no runtime activation, release executable correspondence, or profile acceptance.",
+      "packet_directory": "slippi-remaining-source-inventory-v6-corrected-v1",
+      "inventory_artifact": "inventory-v6-corrected.json",
+      "inventory_sha256": "3605b52de2ec868d4a9aa4eca588a9d7a2dc3de79504c7257fbfde78ab60486e",
+      "freeze_manifest_artifact": "freeze-manifest-v1.json",
+      "freeze_manifest_sha256": "da5105fbfcdf294e59a8bd608ad5d5d361aab2f310a7bd85b9af750d0e23b7f6",
+      "report_artifact": "report-v6-corrected.md",
+      "report_sha256": "5290eab1b26b8140078d1efa0b89e26ffcb3d777df5d40ff26a08a395be56f35",
+      "independent_review_artifact": "slippi-remaining-source-inventory-v6-corrected-independent-review-v1.json",
+      "independent_review_sha256": "d32af9bd75b11198cc3d918c0a8b93a3cbf11beec52520eef15f2a431d4cd101",
+      "independent_review_result": "PASS_BOUNDED_SOURCE_CHECKS_PARTIAL_PUBLICATION_ONLY_WITH_LOCATOR_NOTE",
+      "configuration_selection": {
+        "configuration": "Required: Slippi Online, selected-by-default in the captured GALE01r2 profile; pinned recursive roots include Online/Slippi Online Scene, Online/Menus, and Online/Static.",
+        "status": "Static default selection only; no runtime activation or release-binary correspondence.",
+        "exclusions": [
+          "No tagged-hook semantics counted or re-audited.",
+          "The six paths are selected from the exact v5 remaining set; prior checks are not counted twice.",
+          "No executable, binary, runtime, peer-agreement, or source-port claim.",
+          "Source/license findings are inherited from the earlier pinned inventory; no legal clearance."
+        ]
+      },
+      "coverage": {
+        "accounting": "6 original v4 inventory checks + 6 unique corrected prior checks + 12 corrected v4 checks + 6 v5 checks + 6 v6 checks = 36 unique; 156 - 36 = 120 remaining.",
+        "prior_bounded_checks": 30,
+        "this_packet_checked": 6,
+        "bounded_checks_after_this_packet": 36,
+        "untagged_hooks_total": 156,
+        "untagged_hooks_remaining": 120,
+        "tagged_gameplay_hooks_separate": 27,
+        "source_reviewed_intersections_empty": true,
+        "selected_from_v5_remaining_sha256": "3ea13df8dd148d7f0b50e26b85de6eee082bc4bc1b80d88dfddbb57da0b243b1",
+        "paths": [
+          "Online/Slippi Online Scene/boot.asm",
+          "Online/Menus/InGame/InitInGame.asm",
+          "Online/Menus/CSS/FetchMatchInfo.asm",
+          "Online/Menus/CSS/SceneLoadCSS.asm",
+          "Online/Static/AdjustNullCharID.asm",
+          "Online/Static/GetTeamCostumeIndex.asm"
+        ]
+      },
+      "checked_hooks": [
+        {
+          "path": "Online/Slippi Online Scene/boot.asm",
+          "address": "801BFA20",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "configured_root": "Online/Slippi Online Scene",
+          "source_commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+          "source_sha256": "3d8b9ebb7813324f5ee8070b824b8ba5d0dbd3c74ebb0de8831c9c40b0af45f0",
+          "git_blob_sha": "1e52aecb73aae020b4e419d6cf8fca83dec10109",
+          "source_bytes": 2142,
+          "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Slippi%20Online%20Scene/boot.asm",
+          "source_lines": "14-32; 40-74; 79-81",
+          "observed_source_behavior": "Mode-entry/boot boundary; writes first title-menu destination as online submenu 8 and selects first unlocked option; actual online match mode/network activation is not established. The comment says transformations are preloaded, but the observed loop calls File_GetLength for four path pointers; bytes loaded/cached are not proven.",
+          "activation_scope": "Selected by the pinned default Required: Slippi Online injection roots; static selection is not runtime activation or release-binary correspondence.",
+          "disposition": "bounded_source_observation; no runtime validation"
+        },
+        {
+          "path": "Online/Menus/InGame/InitInGame.asm",
+          "address": "802F6694",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "configured_root": "Online/Menus",
+          "source_commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+          "source_sha256": "7be6e5e0b541b15136a2b6439e4e82200fe182c5fa339942f90fef107929a5a9",
+          "git_blob_sha": "e9ca1afde94355787f1753ccf2c6b990a1f16ca7",
+          "source_bytes": 10803,
+          "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Menus/InGame/InitInGame.asm",
+          "source_lines": "8-11; 103-164; 169-197; 243-256; 480-489",
+          "observed_source_behavior": "Explicitly gated to SCENE_ONLINE_IN_GAME. Builds HUD camera/canvas/text and player-name/delay display; invokes FN_LoadMatchState for the displayed names. No gameplay simulation state write is visible in reviewed body.",
+          "activation_scope": "Selected by the pinned default Required: Slippi Online injection roots; static selection is not runtime activation or release-binary correspondence.",
+          "disposition": "bounded_source_observation; no runtime validation"
+        },
+        {
+          "path": "Online/Menus/CSS/FetchMatchInfo.asm",
+          "address": "80260310",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "configured_root": "Online/Menus",
+          "source_commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+          "source_sha256": "48ea009b2eda8ec8fdc26a9ee7099d03790d0c006676d9070fc8f51194f9358c",
+          "git_blob_sha": "3be7ad7b742040e5e800b6a9bd7d795bc31c177e",
+          "source_bytes": 570,
+          "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Menus/CSS/FetchMatchInfo.asm",
+          "source_lines": "8-20",
+          "observed_source_behavior": "Explicitly gated to SCENE_ONLINE_CSS; passes the CSS data table\u2019s MSRB buffer to FN_LoadMatchState. That helper sends GetMatchState through EXI and reads the response; this hook is an online-CSS data-fetch path, not itself a simulation update.",
+          "activation_scope": "Selected by the pinned default Required: Slippi Online injection roots; static selection is not runtime activation or release-binary correspondence.",
+          "disposition": "bounded_source_observation; no runtime validation"
+        },
+        {
+          "path": "Online/Menus/CSS/SceneLoadCSS.asm",
+          "address": "8026699C",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "configured_root": "Online/Menus",
+          "source_commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+          "source_sha256": "99f13319fd874c95f8dda854926a3dcf12956835854d647283561c7257eb2f62",
+          "git_blob_sha": "c8daee44e3d1bb367ffc89619c9a2d50f2f12778",
+          "source_bytes": 3250,
+          "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Menus/CSS/SceneLoadCSS.asm",
+          "source_lines": "32-38; 61-95; 98-113",
+          "observed_source_behavior": "Explicit online-CSS gate. Allocates CSSDT and zeroes CSSDT through Zero_AreaLength (source lines 64-75); allocates MSRB and stores its pointer (lines 77-80), with no MSRB zeroing call shown in this hook. In Teams mode saves the prior team-toggle index; loads slpCSS.dat and stores its symbol pointer. This is menu/setup state and a file-backed chat resource; no in-match simulation update is visible here.",
+          "activation_scope": "Selected by the pinned default Required: Slippi Online injection roots; static selection is not runtime activation or release-binary correspondence.",
+          "disposition": "bounded_source_observation; no runtime validation"
+        },
+        {
+          "path": "Online/Static/AdjustNullCharID.asm",
+          "address": "80005694",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "configured_root": "Online/Static",
+          "source_commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+          "source_sha256": "621c20776899a22bd2f640f9744e837b45c816e536de56a64f49dc0e45875acf",
+          "git_blob_sha": "c4165036973e43d50ea145ae2c3c910494064e88",
+          "source_bytes": 530,
+          "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Static/AdjustNullCharID.asm",
+          "source_lines": "1-15",
+          "observed_source_behavior": "The advertised function body is only `blr`; it does not write the provided buffer in this source. In the online-scene caller (main.asm lines 1141-1161), match information is copied from MSRB into REG_VS_SSS_DATA at lines 1148-1153, then FN_AdjustNullID is called at 1155-1157. The caller comment at 1146-1147 says later In-Game scene preparation will copy this VS_SSS_DATA block into In-Game minor-scene data; this packet does not claim that later copy has already happened. Downstream buffer use and any required sentinel handling remain untraced; do not classify this as safely irrelevant.",
+          "activation_scope": "Selected by the pinned default Required: Slippi Online injection roots; static selection is not runtime activation or release-binary correspondence.",
+          "disposition": "bounded_source_observation; no runtime validation"
+        },
+        {
+          "path": "Online/Static/GetTeamCostumeIndex.asm",
+          "address": "800056B0",
+          "category": "Required: Slippi Online",
+          "tag": "",
+          "configured_root": "Online/Static",
+          "source_commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+          "source_sha256": "7b5a40952c1133b0a96259820b23fc4d2067e7cedbe9113b05648a7191d7d6db",
+          "git_blob_sha": "ed42560882e25927d7d05723c4b5ece6580db756",
+          "source_bytes": 1255,
+          "source_url": "https://github.com/project-slippi/slippi-ssbm-asm/blob/fcf47f10dc244152c2ebaa3a9dec142ea42243b7/Online/Static/GetTeamCostumeIndex.asm",
+          "source_lines": "4-43",
+          "observed_source_behavior": "Returns a color-costume index via vanilla CSS costume getters: team index 3\u2192green, 2\u2192blue, 1\u2192red, all other values fall through to blue. Online scene prep gates the use to Teams and writes the returned byte into each player\u2019s VS splash data (main.asm 903-927). This is game-entry appearance/setup state, not evidence of a simulation-rule change.",
+          "activation_scope": "Selected by the pinned default Required: Slippi Online injection roots; static selection is not runtime activation or release-binary correspondence.",
+          "disposition": "bounded_source_observation; no runtime validation"
+        }
+      ],
+      "limitations": [
+        "The six observations are source/config checks, not a complete semantic inventory.",
+        "The review did not establish online match/network activation, runtime behavior, peer agreement, release executable compatibility, or profile acceptance.",
+        "The no-op AdjustNullCharID helper does not establish whether downstream code requires a sentinel; downstream buffer use remains untraced.",
+        "The v6 source report contains a stale inventory locator; portable references bind inventory-v6-corrected.json and its exact SHA-256 instead.",
+        "Source notices are provenance facts, not legal clearance; no Slippi code/profile was ported."
+      ]
     }
   },
   "schema": "slippi-gameplay-profile-inventory-v1",
@@ -2717,6 +2868,25 @@
       "total_bounded_untagged_hook_count": 30,
       "untagged_hooks_still_without_bounded_check": 126,
       "scope": "The six reviewed paths are statically selected under the recursive Online/Menus root. No runtime activation, release executable correspondence, peer agreement, or profile acceptance is established."
+    },
+    "untagged_gameplay_review_v6": {
+      "run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+      "directory": "slippi-remaining-source-inventory-v6-corrected-v1",
+      "inventory_artifact": "inventory-v6-corrected.json",
+      "inventory_sha256": "3605b52de2ec868d4a9aa4eca588a9d7a2dc3de79504c7257fbfde78ab60486e",
+      "freeze_manifest_artifact": "freeze-manifest-v1.json",
+      "freeze_manifest_sha256": "da5105fbfcdf294e59a8bd608ad5d5d361aab2f310a7bd85b9af750d0e23b7f6",
+      "report_artifact": "report-v6-corrected.md",
+      "report_sha256": "5290eab1b26b8140078d1efa0b89e26ffcb3d777df5d40ff26a08a395be56f35",
+      "independent_review_artifact": "slippi-remaining-source-inventory-v6-corrected-independent-review-v1.json",
+      "independent_review_sha256": "d32af9bd75b11198cc3d918c0a8b93a3cbf11beec52520eef15f2a431d4cd101",
+      "independent_review_result": "PASS_BOUNDED_SOURCE_CHECKS_PARTIAL_PUBLICATION_ONLY_WITH_LOCATOR_NOTE",
+      "checked_hook_count": 6,
+      "prior_bounded_untagged_hook_count": 30,
+      "total_bounded_untagged_hook_count": 36,
+      "untagged_hooks_still_without_bounded_check": 120,
+      "tagged_gameplay_hook_count_separate": 27,
+      "scope": "Six disjoint source/config checks selected from the frozen v5 remaining set. Independent review permits partial source-check publication only; runtime activation, release executable correspondence, complete semantics, peer agreement, profile acceptance, and legal clearance are not established."
     }
   },
   "active_source_inventory": {
@@ -5269,14 +5439,14 @@
     ],
     "portable_projection_review_sha256": "4d3975d8d819b9eb8a23e94f4bbdd22817100e381556a11d1f9eba374384c9e5"
   },
-  "prior_snapshot_scope": "The pinned source/release and license findings retain their v4 scope and identities; v5 did not repeat that investigation. The gameplay_effect_inventory adds six bounded hook checks from slippi-untagged-gameplay-review-v5 to the prior 24 and updates the untagged-check counts. external_packet records the v5 packet and its independent-review identity. Release-binary correspondence, m-ex generation, contributor/reuse rights, executable validation, runtime activation and complete semantics remain unresolved.",
+  "prior_snapshot_scope": "Pinned source/release and license findings retain their earlier scope and identities; v5 did not repeat that investigation. The gameplay_effect_inventory records six v5 checks after the prior 24 and six v6 checks after 30, and updates the current untagged-check counts to 36/156 (120 remaining). external_packet records both source packets and their reviews. Release-binary correspondence, m-ex generation, contributor/reuse rights, executable validation, runtime activation and complete semantics remain unresolved.",
   "ucf_payload_identity_v6": {
     "review_receipt": {
       "path": "slippi-gameplay-profile-ucf-v6-independent-review-v1/review.json",
       "sha256": "7f0492a6175fafd1e4a60656f18df1ab242a8c163536269d45eddf2816712754",
       "result": "PASS_PINNED_PAYLOAD_IDENTITY_ONLY_HOLD_NOVEL_AUTHOR_SOURCE_CLAIMS"
     },
-    "scope": "Identity comparison of eight selected tagged UCF ASM payloads with generated INI blocks; no disassembly, semantic coverage, activation, or source-to-built-output pairing.",
+    "scope": "Identity comparison of eight selected tagged UCF ASM payloads with generated INI blocks; no disassembly, semantic coverage, activation, or source-to-built-output pairing. Its embedded untagged counts are the then-current v5 baseline and predate the six v6 source checks.",
     "generated_ini_selection": "Pinned netplay.json recursively selects External/UCF0.84/UCF under Required: General Codes; generated INI and selected-active-sources identities match the v4 review inputs.",
     "coverage": {
       "tagged_gameplay_paths_total": 27,
@@ -5285,7 +5455,7 @@
       "untagged_paths_checked": 30,
       "untagged_paths_total": 156,
       "untagged_paths_without_bounded_check": 126,
-      "count_effect": "No untagged count change; these eight belong to the distinct tagged set."
+      "count_effect": "No untagged count change in this distinct tagged-payload identity check; its 30/156 baseline predates the separately reviewed six-hook v6 source packet."
     },
     "cached_reference_correction": "Pad Buffer + 1.0 Cardinals uses a literal plus sign in the verified cached path; the former %2B reference did not resolve.",
     "payloads": [

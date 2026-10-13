@@ -77,6 +77,12 @@ ownership. The settings toggle and rollback runtime remain implementation goals.
   event. Its complete diagnostic remains refused at the input-witness boundary. Continue under [#320](https://github.com/ericvanlare/melee-web/issues/320);
   current evidence does not justify descriptor prewarming.
 
+- 2026-10-13, Codex: the preparation component has since merged in
+  [#322](https://github.com/ericvanlare/melee-web/pull/322); the earlier refusal
+  stays historical. The [same H1 boundary](status/2026-10-13-h1-first-use-respawn.md)
+  owns the updated evidence and limits. Work returns to Stadium C3 in draft
+  #301. Broader H1, rollback ownership and the rules profile remain open.
+
 **Links:** [Feasibility #318](https://github.com/ericvanlare/melee-web/issues/318),
 [state ownership #115](https://github.com/ericvanlare/melee-web/issues/115),
 [mode identity #9](https://github.com/ericvanlare/melee-web/issues/9),

@@ -9837,5 +9837,193 @@
       "No HUD clock advancement claim; HUD text remains ticks: 0 while source traversal reports 87 ticks.",
       "Historical e0c072cc/af0e44fe/caabbb19 browser evidence and original 3d4ee3d3/9e721b13 evidence remain unchanged."
     ]
+  },
+  "browser_prefix_host_timing_2026_10_13": {
+    "result": "PASS_BOUNDED_SOURCE_PREFIX_AND_HOST_TIMING",
+    "external_run_id": "match-rollback-feasibility-20261012-203633-e8f0c964",
+    "scope": "Same174actions87ticks87draws; copied match input comparison, not independent downstream PAD poll. C/F declared field comparison and host intervals only. Full3500/C3 open.",
+    "producers": {
+      "main_integrated": "d2cefef85196ba65ad24e79ed27493142d98eb80",
+      "runtime_and_both_release_builds": "172556834809294dcf4e423312f0b39309523767",
+      "capture_harness_and_full_regression": "3376a4d350497262f50cfe4219dcfd2920eb4dbe",
+      "historical_producers_unchanged": true,
+      "build_identity": {
+        "path": "stadium-current-main-build-identity-v1.json",
+        "sha256": "b5908726e5efb7b85af42241fe942d1b6469b4f7847a0e5f7119d9894aec4de9"
+      }
+    },
+    "artifacts": {
+      "browser-run/report.json": {
+        "path": "stadium-run2-timing-capture-v3/browser-run/report.json",
+        "sha256": "08dce1f9a273519d7d4ae4b2a8ee8ad62bceaed240874382a7bddfebc5465bf5"
+      },
+      "owner.json": {
+        "path": "stadium-run2-timing-capture-v3/owner.json",
+        "sha256": "57dab2f09062bf1067e59a74135358001d88675b5730498e25a30e01f3cc0bab"
+      },
+      "root-result-and-cleanup-v1.json": {
+        "path": "stadium-run2-timing-capture-v3/root-result-and-cleanup-v1.json",
+        "sha256": "6382f77ed41587ec2aa197a515944bc15e3920af88d0057166153a6c672a833c"
+      },
+      "preflight.json": {
+        "path": "stadium-run2-timing-capture-v3/preflight.json",
+        "sha256": "058d78efb9791c42c8841c0890601edfa4e7cbd88ce357427c0b9b40fb571c83"
+      },
+      "command.json": {
+        "path": "stadium-run2-timing-capture-v3/command.json",
+        "sha256": "d63ba860809fcafb92ba5fd75b7343ce71ee9d2828abb51644bcb583813e58bc"
+      },
+      "launch-static-bindings.json": {
+        "path": "stadium-run2-timing-capture-v3/launch-static-bindings.json",
+        "sha256": "a072836bbafdb1c2542631513dd1ca9f4cb469d21d3f57cc422eb775a8b18dc8"
+      }
+    },
+    "prelaunch_history": {
+      "v1": "Recursive source-binding audit refused before launch; retained8bindingcorrections.",
+      "v2": "Actual Node attempt exit1 before Chrome at JSON.stringify export-key ordering; rawcleanup_passed=false unchanged. Prior packet reviews missed order-sensitive production gate.",
+      "repair": "Metadata-only derivative restores arm/queue/approve insertion order. Production gate unchanged; actual failed packet refuses, corrected packet passes, changed value/extra key refuse.",
+      "failure": {
+        "path": "stadium-run2-timing-capture-v2/root-first-failure-receipt.json",
+        "sha256": "5a7b759ca2dc62299d818052f6fbd0cd338761a46042a4feda7f6b5e2a9d6246"
+      },
+      "reducer": {
+        "path": "stadium-timing-preflight-reducer-v1.mjs",
+        "sha256": "2ba722a8cbef97dd3a22f22ea9d6ef5e35a3efc1ae3d6cff8aaa221d9db8e5f7"
+      },
+      "reducer_log": {
+        "path": "stadium-run2-timing-capture-v3/preflight-reducer.log",
+        "sha256": "a95064d619a39eb40dee1f99f54d9b830c526965d6eaa96340d6f3f69c4a2e32"
+      },
+      "independent_prelaunch_review": {
+        "path": "stadium-timing-v3-prelaunch-reducer-independent-review-v1.json",
+        "sha256": "41ea4359fe2739463c01cb07432275b8ea6def5df3fbfa0b872cd3beffeb16bf"
+      }
+    },
+    "validation": {
+      "both_release_builds_passed": true,
+      "regression": {
+        "tests": 2604,
+        "skips": 180,
+        "passed": true,
+        "completion": {
+          "path": "stadium-timing-harness-regression-3376a4d3-v1/root-completion.json",
+          "sha256": "706c26de1bcbc9b3250ef664bf5c6647d6b1422c3c8537dd7bd6e12de4b3b041"
+        }
+      },
+      "timing_source_review": {
+        "path": "stadium-c3-timing-v2-independent-review-v1.json",
+        "sha256": "d2b00cf9d98b64f02df72cb7c6f8b644d77080325a734c7b395709d50ea6f439"
+      },
+      "historical_ci": "a61a3f88 all14 complete,12success2expectedskips run38390144335; not timing-source CI."
+    },
+    "observations": {
+      "actions": 174,
+      "source_ticks": 87,
+      "source_draws": 87,
+      "copied_four_port_bundles": 87,
+      "copied_port_states": 348,
+      "cf_declared_fields_each": 16,
+      "C_seed": "868d77be",
+      "F_seed": "b50f624b",
+      "served_artifacts_before_after": 41,
+      "page_console_errors_and_warnings": 0,
+      "native_unload_phase_running": [
+        0,
+        0
+      ],
+      "observation_cleared": true
+    },
+    "host_timing": {
+      "action_loop_ms": 44523.028,
+      "remaining_global_budget_at_loop_entry_ms": 94969,
+      "action_limit_ms": 150000,
+      "global_work_limit_ms": 150000,
+      "owner_ms": 180000,
+      "cleanup_reserve_ms": 30000,
+      "post_submit_receipt_total_ms": 39542.128,
+      "receipt_read_total_ms": 31036.628,
+      "receipt_reads": 336,
+      "existing_poll_waits": 162,
+      "poll_wait_total_ms": 8500.707,
+      "report_persistence": {
+        "attempted_count": 360,
+        "completed_count": 360,
+        "failed_count": 0,
+        "serialized_bytes": 1500826964,
+        "timings_ms": {
+          "serialize": {
+            "count": 360,
+            "total_ms": 2088.077,
+            "mean_ms": 5.8,
+            "p50_ms": 5.787,
+            "p95_ms": 6.536,
+            "max_ms": 11.342
+          },
+          "file_write": {
+            "count": 360,
+            "total_ms": 1667.876,
+            "mean_ms": 4.633,
+            "p50_ms": 4.355,
+            "p95_ms": 5.971,
+            "max_ms": 11.261
+          },
+          "rename": {
+            "count": 360,
+            "total_ms": 75.831,
+            "mean_ms": 0.211,
+            "p50_ms": 0.198,
+            "p95_ms": 0.278,
+            "max_ms": 0.483
+          },
+          "total": {
+            "count": 360,
+            "total_ms": 4278.396,
+            "mean_ms": 11.884,
+            "p50_ms": 11.717,
+            "p95_ms": 13.729,
+            "max_ms": 24.792
+          }
+        }
+      },
+      "interpretation": "Inclusive nested host intervals; do not add them or infer native, source scheduler or GPU time. No full-schedule extrapolation acceptance."
+    },
+    "owned_cleanup": {
+      "pids": [
+        45726,
+        45739,
+        45742,
+        45769,
+        45778,
+        45789,
+        45790,
+        45793,
+        45794,
+        45807,
+        45810,
+        45811,
+        45814,
+        46097
+      ],
+      "groups": [
+        45739,
+        45742,
+        45778
+      ],
+      "live_members": [],
+      "empty_tmp_removed": true,
+      "incrementals": "Retained for active C3 milestone"
+    },
+    "next": "Review actual-source native-only observation transport reduction, preserving getter/callback behavior and all assertions. One changed-hypothesis prefix only after review and validation; no full schedule or cap extension.",
+    "independent_result_review": {
+      "path": "stadium-timing-v3-result-independent-review-v1.json",
+      "sha256": "142a1f9834ff1b8d3cbccb99e681e981b1bfc5bce0509ceb37261d5ea933174b",
+      "decision": "PASS_TIMED_174_ACTION_PROPER_PREFIX_C_F_STATE_COMPONENT_ONLY",
+      "limit": "Individual timing samples are not exported; quantiles cannot independently be recomputed."
+    },
+    "independent_cleanup_addendum": {
+      "path": "stadium-timing-v3-result-independent-cleanup-addendum-v1.json",
+      "sha256": "920361806886ebf9e10df31fc0eeaed8d7cfae555d62b077a6295efd5f63ad7d",
+      "scope": "14recordedownedPIDs and3groups independently absent, including launcher and workspace wrapper."
+    }
   }
 }

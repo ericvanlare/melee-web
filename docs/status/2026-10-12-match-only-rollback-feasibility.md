@@ -209,14 +209,16 @@ and [source receipt](../evidence/slippi-gameplay-profile-inventory-v1.json) map
 selected configuration, mode behavior, bounded source checks, and observed
 repository notices. Ranked and Unranked Stadium are unfrozen; Direct and Teams
 offer a selection. UCF 0.84 is selected in the shared configuration, while live
-toggle semantics remain unresolved. Thirty of 156 untagged ASM hooks have
-bounded source checks; 126 lack them. The latest six-hook checkpoint covers
-online SSS Stadium stage-choice display and handoff; peer agreement remains
-unknown. A separate v6 identity check confirms that eight selected tagged UCF
+toggle semantics remain unresolved. The independently reviewed v6 source packet
+adds six disjoint bounded checks: 36 of 156 untagged ASM hooks now have bounded
+source checks, with 120 remaining. It covers online route entry and CSS/In-Game
+setup; its observations remain source/config-only and do not establish online
+match activation, peer agreement, release executable correspondence, or profile
+acceptance. A separate v6 identity check confirms that eight selected tagged UCF
 payloads match their generated INI word prefixes, lengths, and padding. Their
 exact mechanics remain opaque, and this does not establish runtime activation or
-source-to-built-output pairing. The untagged count is unchanged. No release
-archive or executable was inspected; exact m-ex generation and contributor/reuse
-rights remain unresolved. Repository notices are factual observations, not
-legal clearance. No Slippi code or profile was ported, and the source inventory
-remains open.
+source-to-built-output pairing; that tagged-payload check predates the v6
+untagged source-check update. No release archive or executable was inspected;
+exact m-ex generation and contributor/reuse rights remain unresolved. Repository
+notices are factual observations, not legal clearance. No Slippi code or profile
+was ported, and the source inventory remains open.

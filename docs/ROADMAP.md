@@ -99,8 +99,9 @@ prove useful safe renderer reuse, preserving original draw callbacks. The
 Slippi semantic/license/reference inventory continues under #9; no profile is
 ready to port. Keep component measurements separate from browser acceptance.
 
-After this bounded measurement checkpoint, investigate first-use respawn-platform
-and common-effect pipeline preparation under H1/#116. Preparation must not consume
+The first-use respawn preparation component merged in [#322](https://github.com/ericvanlare/melee-web/pull/322).
+Continue broader common-effect and sustained-play work under H1/#116, using the
+[existing H1 boundary](status/2026-10-13-h1-first-use-respawn.md). Preparation must not consume
 hidden gameplay ticks/RNG, change draw order or relax timing guards. Keep H1
 incident recording on for combat and simulated-network runs; a forced pause is
 retained H1 evidence. The owner identifies the #316 respawn preparation stall as
@@ -167,7 +168,7 @@ retain a reduced reproducer and move to the next fighter. Bowser's
 [#274 checkpoint](https://github.com/ericvanlare/melee-web/issues/274) remains
 unresolved and parked after the reconstructed-prefix attempt budget.
 
-**Current #304 boundary.** The bounded original Zelda-to-Sheik owner-prefix milestone is complete for [issue #304](https://github.com/ericvanlare/melee-web/issues/304), with evidence in the [scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md); strict two-human browser comparison remains separate. Stadium C3 under [#251](https://github.com/ericvanlare/melee-web/issues/251) remains checkpointed while H1 first-use attribution has first claim on the capture lane. Its matched C/F prerequisite, constructor observations, failed first recording and fresh original idle reference are retained in the [existing Stadium boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md). Public #288 now uses the owner-cleared isolated staging relay.
+**Current #304 boundary.** The bounded original Zelda-to-Sheik owner-prefix milestone is complete for [issue #304](https://github.com/ericvanlare/melee-web/issues/304), with evidence in the [scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md); strict two-human browser comparison remains separate. Stadium C3 under [#251](https://github.com/ericvanlare/melee-web/issues/251) is active after the H1 preparation component, with its original-matched browser prefix and host-overhead reduction inside the same milestone. Its matched C/F prerequisite, constructor observations, failed first recording and fresh original idle reference are retained in the [existing Stadium boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md). Public #288 now uses the owner-cleared isolated staging relay.
 
 The next Stadium milestone is [C3 idle in-match lifetime #251](https://github.com/ericvanlare/melee-web/issues/251),
 with its remaining prerequisites counted and tracked inside that issue and PR.
