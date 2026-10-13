@@ -175,6 +175,208 @@
         "test_count_erratum_sha256": "81fe5e5156c80b12914b74cf484dd8cfcb30fc7ffc67674af4a52d75be535d4c",
         "hit_transition_output": "fma-diagnostic-candidate-v1/hit-transition-probe-focused-v2.log",
         "hit_transition_output_sha256": "2cfcdc30eaf19d0276903ba19298544a2a5476c033b13831f8d1c4abeaf21142"
+      },
+      "baseline_capture": {
+        "root_result": {
+          "path": "b4-fma-baseline-capture-v1/root-baseline-result-v1.json",
+          "bytes": 948,
+          "sha256": "4ce42f7f11629f50fd26c472b589470f398ba297be349991590a41701f5d9f42"
+        },
+        "root_admission": {
+          "path": "b4-fma-baseline-capture-v1/root-admission-v1.json",
+          "bytes": 3824,
+          "sha256": "afd6a0c46f6ebb3ea80ed02977f942bc92b3e294e14da067cde741d9c1144d60"
+        },
+        "strict_comparison": {
+          "path": "b4-fma-baseline-capture-v1/strict-prefix-comparison-v2.json",
+          "bytes": 56408,
+          "sha256": "a8cdf90ca1a92bcf0637a3ed4968e3967e58fc23e50ceab30b52fc5ce5076d91"
+        },
+        "capture_report": {
+          "path": "b4-fma-baseline-capture-v1/capture/report.json",
+          "bytes": 4026999,
+          "sha256": "60708205617aed96e050be21e743f29b3c56ae7d30e6bec33d68b3e5c0e335ae"
+        },
+        "browser_report": {
+          "path": "b4-fma-baseline-capture-v1/capture/retail-browser-report.json",
+          "bytes": 18927,
+          "sha256": "617940af12178d331fc63eac617509eb1194ffd111dcece3aa430b686d4ed5fa"
+        },
+        "raw_runtime_incidents": {
+          "path": "b4-fma-baseline-capture-v1/capture/rawruntime-incidents.json",
+          "bytes": 4994,
+          "sha256": "9d16723518d1a2e75589957c86659e6de46be30a6a1b32f3e5fc07dc4c1b3da8"
+        },
+        "owner_cleanup_report": {
+          "path": "b4-fma-baseline-capture-v1/owner-report.json",
+          "bytes": 105219,
+          "sha256": "b7b90e1c1676e36fb17cc33ba09619899660eddb94c533f0a4588e35bc5c577c"
+        },
+        "inventory_pre": {
+          "path": "b4-fma-baseline-capture-v1/inventory-pre.json",
+          "bytes": 19062,
+          "sha256": "e03d9a016ad2a7523d421199c12c5812c4f08ee7cbe3ff013ec12c007d996c39"
+        },
+        "inventory_post": {
+          "path": "b4-fma-baseline-capture-v1/inventory-post.json",
+          "bytes": 19062,
+          "sha256": "c18e7cdc440caef90c4b53fe568be8050b315ceb5ea86a45c23863279c534bd7"
+        },
+        "admission_summary": {
+          "state": "PASS",
+          "capture_result": "incomplete",
+          "cleanup_passed": true,
+          "h1_timing_incidents": 0,
+          "h1_timing_pause_observed": false,
+          "requested_stop_cursor": 5241,
+          "observed_stop_cursor": 5246,
+          "exported_cursor": 5248,
+          "max_exported_cursor": 5273
+        }
+      },
+      "diagnostic_capture": {
+        "root_admission": {
+          "path": "b4-fma-diagnostic-capture-v1/root-admission-v1.json",
+          "bytes": 3850,
+          "sha256": "1501d65a39b1949f34143f7f6431157431076041ec81e3986b97ff7889d5eee2"
+        },
+        "root_diagnostic_result": {
+          "path": "b4-fma-diagnostic-capture-v1/root-diagnostic-result-v1.json",
+          "bytes": 1677,
+          "sha256": "3380e7ecbe3b43b0888c6b18238d53dd007f990f3294d5e4c4c3904f7795e7bf"
+        },
+        "strict_comparison": {
+          "path": "b4-fma-diagnostic-capture-v1/strict-prefix-comparison-v2.json",
+          "bytes": 56410,
+          "sha256": "fcedb7daa95bc501cf663e8e2b62495576d7853997d4ec99e2a99d74ae912089"
+        },
+        "capture_report": {
+          "path": "b4-fma-diagnostic-capture-v1/capture/report.json",
+          "bytes": 4039164,
+          "sha256": "0dcad18bfd3e387d8fc00942de86fc0c50e462d9a8b16e692c4434facbba85ea"
+        },
+        "browser_report": {
+          "path": "b4-fma-diagnostic-capture-v1/capture/retail-browser-report.json",
+          "bytes": 18787,
+          "sha256": "5bc2c664525f61e0db8f1a5d467374ba9c5dc45608eb2ab7c0488bcf5505f199"
+        },
+        "raw_runtime_incidents": {
+          "path": "b4-fma-diagnostic-capture-v1/capture/rawruntime-incidents.json",
+          "bytes": 4991,
+          "sha256": "2e3c57df66055991d837ad4121310a8304ad466a7594c2aa1d5dcc1e89224d4b"
+        },
+        "owner_cleanup_report": {
+          "path": "b4-fma-diagnostic-capture-v1/owner-report.json",
+          "bytes": 101520,
+          "sha256": "88bec7bc0280f964aeabda144471ec21d9da8577374c2b0b9a2992f1fce90d62"
+        },
+        "inventory_pre": {
+          "path": "b4-fma-diagnostic-capture-v1/inventory-pre.json",
+          "bytes": 19061,
+          "sha256": "4112792eeb3b362f694a1b445221e8c6dd20a711079dddf1192e680fef8148e2"
+        },
+        "inventory_post": {
+          "path": "b4-fma-diagnostic-capture-v1/inventory-post.json",
+          "bytes": 19063,
+          "sha256": "f6b04f9cf72da75c31ee127b6a3b62900b20eba756afed110b1cac750c4cfec3"
+        },
+        "producer_binding": {
+          "path": "b4-fma-diagnostic-capture-v1/root-producer-binding-v1.json",
+          "bytes": 1088,
+          "sha256": "7a2d1adb421f340d21d42118284fc62a51298e5ce623fab518c754b833092654"
+        },
+        "artifact_manifest": {
+          "path": "b4-fma-diagnostic-capture-v1/artifact-manifest.json",
+          "bytes": 19334,
+          "sha256": "807e9f01edfa30130c91fdf28b853d685377ead2f801a20365b7b198349aaee9"
+        },
+        "producer_manifest": {
+          "path": "b4-fma-diagnostic-capture-v1/producer-manifest.json",
+          "bytes": 8177,
+          "sha256": "d557b6c2567994c1d64098d1b89a04c722144331e6379967301248ccfe11b070"
+        },
+        "port_trace": {
+          "path": "b4-fma-diagnostic-capture-v1/capture/retail-port.jsonl",
+          "bytes": 21484957,
+          "sha256": "aa6bf47a888b5754e15f9083971fe0ca3cf32bb145ad232ad3580e37a904784c"
+        },
+        "admission_summary": {
+          "state": "PASS",
+          "capture_result": "incomplete",
+          "requested_stop_cursor": 5241,
+          "observed_stop_cursor": 5250,
+          "exported_cursor": 5253,
+          "max_exported_cursor": 5273,
+          "cleanup_passed": true,
+          "h1_timing_incidents": 0,
+          "h1_timing_pause_observed": false,
+          "h1_session_id": "session-f38cf6c1e3d7aefcdc9da17e97a107c2"
+        },
+        "comparison_sha256": "fcedb7daa95bc501cf663e8e2b62495576d7853997d4ec99e2a99d74ae912089",
+        "hit_probe_sha256": "79df4099710d5ccc1c7e750b4298cebd3c279a6deaa2c5ac56cadb6a62ba55c3"
+      },
+      "metadata_recovery": {
+        "recovered_historical_sidecar": {
+          "path": "b4-current-main-prefix-adapter-v1/historical-identity-repair-v1/v10-first-match-results-source-v1.from-ace9f5d.json",
+          "bytes": 29443,
+          "sha256": "b49343e935bf7694de100ce43475b6baf8f4436f09e66187ed57c5650b3954a9"
+        },
+        "historical_source_commit": "ace9f5d2b50d75ce53e35ed5086b147d33cbbe59",
+        "historical_source_tree": "681bc30c75faffacba484e53164be04636a16525",
+        "historical_git_blob": "42f6dc3402b1cf59907216097326e53cf3985a22",
+        "derived_launch_packet": {
+          "path": "b4-current-main-prefix-adapter-v1/historical-identity-repair-v1/diagnostic-launch-packet-v1.with-exact-evidence-alias.json",
+          "bytes": 21130,
+          "sha256": "0247670524127cf6e0a4570b56a53ebfc532352959b5e0f8c8080c05534c5055"
+        },
+        "repair_manifest": {
+          "path": "b4-current-main-prefix-adapter-v1/historical-identity-repair-v1/historical-identity-alias-candidate-manifest-v1.json",
+          "bytes": 3916,
+          "sha256": "e02e02ae4ee803db50e1054db5168594f915cb9f2108fd7b12f9affa409c4d26"
+        },
+        "logical_receipt_alias": {
+          "path": "b4-current-main-prefix-adapter-v1/historical-identity-repair-v1/logical-receipt-alias-v1.json",
+          "bytes": 840,
+          "sha256": "b3b26f55544b897f9c20aa1c0605a6cf7cf9070051eeba74a1e34893f16be776"
+        },
+        "adapter_wrapper": {
+          "path": "b4-current-main-prefix-adapter-v1/historical-identity-repair-v1/compare_b4_copied_prefix_v3.py",
+          "bytes": 15290,
+          "sha256": "86f237e8f88d08663999947fd02908e236511adcc9bf3aba6e5cd9ccaf7a4e95"
+        },
+        "scope": "one exact historical portable-receipt path/context alias; original parser, size checks, expected hash/size verification, and all other reads remain strict"
+      },
+      "final_validation": {
+        "full_regression_receipt": {
+          "path": "fma-final-validation-v2/full-regression.json",
+          "bytes": 579,
+          "sha256": "8f6c2dcefac0a02e19ac87fed8df945852f58d42dae6b7030c6644243d3fe611"
+        },
+        "full_regression_log": {
+          "path": "fma-final-validation-v2/full-regression.log",
+          "bytes": 439309,
+          "sha256": "18fd98ffe21cbdd37c8d6d87a5753c4ef3f5cd99318090f942a787dad8ed0a38"
+        },
+        "velocity_y_release_receipt": {
+          "path": "fma-final-validation-v2/velocity-y-diagnostic-release.json",
+          "bytes": 648,
+          "sha256": "56ddec44e623d96a7e4ea94ac02908a562a49d4ff3b1c8fe72ba1052f233428a"
+        },
+        "velocity_y_release_log": {
+          "path": "fma-final-validation-v2/velocity-y-diagnostic-release.log",
+          "bytes": 2116106,
+          "sha256": "1cf05d807888a1e4c58fb6a82f22c60188ac2c025e75b4621d6dd744aaf7589c"
+        }
+      },
+      "diagnostic_raw_result_review": {
+        "path": "fma-diagnostic-independent-review-v1/diagnostic-result-review-v1.json",
+        "bytes": 12508,
+        "sha256": "fd3bf61b40591f9e135a352f71e13016d7e0d1a75ce01ba34af2469ddc68f1ab"
+      },
+      "baseline_raw_result_review": {
+        "path": "fma-diagnostic-independent-review-v1/baseline-result-review-v1.json",
+        "bytes": 5501,
+        "sha256": "2891a585c92f21b4e6f3142521c3ae9af7cd439f46e662e9dde3b55119fd1495"
       }
     },
     "evidence_run": "match-rollback-feasibility-20261012-203633-e8f0c964",
@@ -205,14 +407,93 @@
         "failure": "Broken relative documentation link into unmerged Stadium branch; corrected to pinned GitHub blob and focused link test passes.",
         "log_sha256": "347b749c0c699a71ad32b1ac616508fc24102ee6c9a9cca7f7c3a5c11a0306f7"
       },
-      "final_regression": "pending"
+      "final_regression": "PASS",
+      "final_regression_harness": "bb0e45d2638bd6438b0f9b2f8f0e52d2aa5bbf46",
+      "final_regression_counts": {
+        "discovered": 2392,
+        "skipped": 165,
+        "failures": 0,
+        "errors": 0
+      },
+      "final_regression_elapsed_seconds": 525.1808852080721,
+      "velocity_y_release": "PASS (separate diagnostic build; site remained disabled during comparison)",
+      "velocity_y_release_harness": "bb0e45d2638bd6438b0f9b2f8f0e52d2aa5bbf46",
+      "harness": "bb0e45d2638bd6438b0f9b2f8f0e52d2aa5bbf46"
     },
     "current_prefix_comparison": {
-      "state": "pending",
+      "state": "target_not_resolved_stop_rule_applied",
       "requested_cursor": 5241,
+      "observed_stop_cursor": 5250,
+      "exported_cursor": 5253,
       "max_exported_cursor": 5273,
+      "all_exported_frames_validated": 5253,
+      "actual_jsonl_rows_validated_before_source_open": 5255,
+      "copied_prefix": {
+        "records": 24393,
+        "bytes": 169679399,
+        "last_source_sequence": 24392,
+        "sha256": "4020995861b7fc6769bba596ad60319813139556bb458f083eb3edbebc08dab5",
+        "scope": "through source tick 4056 only",
+        "path": "../b4-reconstruction-prefix-narrowing-20261008-125657-a944d0c1/original-prefix-inventory-read-v1/source-through-4056.mwro"
+      },
+      "first_difference": {
+        "browser_index": 5239,
+        "source_tick": 4055,
+        "source_sequence": 24387,
+        "field": "rng",
+        "source": 2495929788,
+        "browser": 2352289036
+      },
+      "slot1_observation": {
+        "source": {
+          "fighter": "Bowser",
+          "motion": 90,
+          "damage_bits": "41300000"
+        },
+        "browser": {
+          "motion": 17,
+          "damage_bits": "00000000"
+        }
+      },
+      "fresh_source_gates_reaching_first_difference": 7,
+      "remaining_contract_gates": "stock271 not reached before first divergence; all-eight-gate no-difference EOF contract not satisfied",
+      "actual_fma": [
+        {
+          "cursor": 5238,
+          "active_mapped_sites": 0,
+          "calls": 0,
+          "overflowed": false
+        },
+        {
+          "cursor": 5239,
+          "active_mapped_sites": 31,
+          "calls": 340,
+          "overflowed": false
+        },
+        {
+          "cursor": 5240,
+          "active_mapped_sites": 31,
+          "calls": 340,
+          "overflowed": false
+        }
+      ],
       "velocity_y_enabled": false,
-      "whole_session_accepted": false
+      "arithmetic_adopted": false,
+      "whole_session_accepted": false,
+      "results_equivalent": false,
+      "v8_v9_runs": "not run; unchanged target triggered the frozen stopping rule",
+      "fresh_source_gate_labels": [
+        "clock1",
+        "clock60",
+        "clock300",
+        "clock500",
+        "clock1000",
+        "clock2000",
+        "stock258"
+      ],
+      "forbidden_open_attempts": [],
+      "forbidden_original_full_mwro_or_disc_open_attempts": 0,
+      "original_dynamic_collision_operands_observed": false
     },
     "arithmetic_adopted": false,
     "issue_resolved": false

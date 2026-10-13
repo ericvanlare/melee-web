@@ -111,14 +111,16 @@ results and failures. The unstarted #314 full-route/rematch expansion is
 superseded by the match-only direction. The strict jump/landing observation gap
 under #308 remains open, without an unchanged retry or weaker assertion.
 
-The owner's October 13 research input makes a source-only fused-operation
-investigation the next bounded priority after the current Stadium checkpoint.
-Use the retained first Bowser and Falcon divergences and actual original DOL
-instructions under [#274](https://github.com/ericvanlare/melee-web/issues/274);
-prove a candidate site before proposing an opt-in diagnostic. Preserve exact
-bits and original arithmetic: no blanket contraction, fast-math, widened
-comparisons or deadline changes. Two experiments require a reduction or review;
-an adopted arithmetic change reopens exact-receipt validation. The
+The owner's October 13 fused-operation hypothesis is checkpointed under
+[#274](https://github.com/ericvanlare/melee-web/issues/274). The default-off
+original-site collision diagnostic leaves the retained first Bowser divergence
+unchanged; the [existing B4 boundary](status/2026-10-08-b4-inner-geometry-boundary.md)
+owns the comparison and producer identities. The stopping rule is applied:
+do not repeat this replay or adopt the arithmetic. Further diagnosis needs a
+smaller original/browser operand comparison. The Falcon velocity-Y candidate's
+activation remains unobserved. Preserve exact bits and original arithmetic:
+no blanket contraction, fast-math, widened comparisons or deadline changes.
+Any later adopted arithmetic change reopens exact-receipt validation. The
 [architect response](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6147291073)
 records the parallel Slippi behavior mapping, pending owner licensing decision,
 and deferred A5 gateway/cadence research. Copy no related-project code, and send
@@ -179,8 +181,9 @@ tools. Timebox each first divergence; after two experiments at one boundary,
 retain a reduced reproducer and move to the next fighter. Bowser's
 [#274 checkpoint](https://github.com/ericvanlare/melee-web/issues/274) remains
 unresolved after the reconstructed-prefix attempt budget. The owner-directed
-FMA diagnostic above is a new bounded hypothesis; the failed reconstruction
-and its original stopping rule remain retained.
+FMA diagnostic above also leaves the target unresolved and has reached its
+stopping rule. The failed reconstruction and both bounded investigations remain
+retained; further fighter work follows the breadth-first queue.
 
 **Current #304 boundary.** The bounded original Zelda-to-Sheik owner-prefix milestone is complete for [issue #304](https://github.com/ericvanlare/melee-web/issues/304), with evidence in the [scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md); strict two-human browser comparison remains separate. Stadium C3 under [#251](https://github.com/ericvanlare/melee-web/issues/251) remains checkpointed while #318 rollback feasibility has first claim on the capture lane. Its existing [CSS/SSS preparation status](status/2026-10-06-pokemon-stadium-c1a-css-sss-preparation.md) records the route boundary; current C3 receipts remain in #251. Public #288 now uses the owner-cleared isolated staging relay.
 

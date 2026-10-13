@@ -19,10 +19,13 @@ Native and pinned Emscripten/Wasm controls pass for fused/split values, a
 rounding tie, signed zero and explicit unsupported-domain refusals. Both signs
 of the ambiguous `FLT_MIN` boundary are rejected; this is a conservative
 diagnostic limit, not a finding about original PowerPC flushing. The ordinary
-and collision-only Release builds pass with contraction disabled. The first
-full regression found one broken documentation link among 2,392 tests with
-165 skips; the corrected link passes its focused check. Final regression and
-current-prefix captures remain pending in this checkpoint.
+and collision-only Release builds pass with contraction disabled at runtime
+commit `8d1528043dab9e46cf9a76f0f41e00f92d43b63d`. The final full regression
+passed at harness commit `bb0e45d2638bd6438b0f9b2f8f0e52d2aa5bbf46`: 2,392
+discovered, 165 skipped, zero failures or errors. The separate velocity-Y
+Release diagnostic build also passed; the velocity-Y site remained disabled in
+the collision-only comparison. Exact receipts and log hashes are in the
+linked portable receipt.
 
 The reduced cursor-5239 experiment reuses all 60 retained browser geometry
 inputs. All split and fused collision results remain false. Four contact rows
@@ -30,13 +33,36 @@ and one overlap row change bits; 31 mapped sites execute. This does not explain
 the original hit. The receipt separates the full capture hash from the selected
 line hash and preserves the earlier report's correction.
 
-Independent review permits one collision-only prefix experiment after an
-ordinary-build baseline reproduces the first mismatch. Stop cursor 5241 and the
-export ceiling 5273 are fixed before capture; all exported rows are validated,
-but only indices 0–5240 have a copied-original comparison. Velocity-Y stays off.
-An unchanged/earlier divergence or domain refusal returns to reduction/review.
-A later/removed divergence requires the existing exact recorded-session
-regressions before any arithmetic adoption. No arithmetic has been adopted.
+Independent review permitted one collision-only prefix experiment after an
+ordinary-build baseline reproduced the first mismatch. The default-off baseline
+did reproduce it. The separately admitted diagnostic capture was intentionally
+incomplete after manual unload: requested stop cursor 5241, observed stop 5250,
+exported cursor 5253 under the predeclared ceiling 5273. H1 admission found zero
+timing incidents and no timing pause; owned cleanup passed. The strict adapter
+validated all 5,253 exported browser frames and 5,255 JSONL rows before opening
+the copied source prefix. That prefix matched its frozen identity exactly:
+24,393 records, 169,679,399 bytes, last source sequence 24,392, SHA-256
+`4020995861b7fc6769bba596ad60319813139556bb458f083eb3edbebc08dab5`. The
+available copy ends at source tick 4056; comparison stops at the first
+difference below. It does not cover Results or whole-session acceptance.
+
+The result is `target_not_resolved`. At browser index 5239 / source tick 4055 /
+source sequence 24387, RNG differs (source 2495929788, browser 2352289036).
+Slot 1 is also still divergent: original Bowser is at motion 90 with 11 damage;
+the browser is at motion 17 with zero damage. Seven fresh source gates reached
+the first difference (`clock1`, `clock60`, `clock300`, `clock500`, `clock1000`,
+`clock2000`, and `stock258`). The eighth, `stock271`, was not reached before
+the divergence; the no-difference EOF contract requiring all eight gates was
+not satisfied. Raw FMA tracing observed no calls at cursor 5238, then 31 active mapped
+sites and 340 calls at each of 5239 and 5240, with no overflow. Velocity-Y was
+disabled. This is instrumentation coverage, not evidence that fused arithmetic
+caused or fixed the divergence.
+
+The unchanged first mismatch triggers the frozen stopping rule: no v8/v9 replay,
+no arithmetic adoption, and no correctness or whole-session claim. The original
+dynamic collision operands remain unobserved; any further diagnosis needs
+smaller original/browser operand evidence rather than another blind replay. B4
+remains open.
 
 ## Retained October 8 inner-geometry boundary
 
