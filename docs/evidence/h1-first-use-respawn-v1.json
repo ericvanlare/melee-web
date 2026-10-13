@@ -1,0 +1,186 @@
+{
+  "schema": "melee-web-h1-first-use-checkpoint-v1",
+  "evidence_label": "Browser exercised / private diagnostic prefix; rendering attribution unresolved",
+  "source_head": "6ee4a07a95b0cf760b9e7796d780b21c33b93812",
+  "private_inventory": "match-rollback-feasibility-20261012-203633-e8f0c964",
+  "runtime_build": {
+    "artifact": "h1-provenance-build-identity-v1.json",
+    "bytes": 2151,
+    "sha256": "1fa5f4ec1cdd436bcde6a0d919a7dd9bffc74af774911f3bc1d6445497d822c4"
+  },
+  "served_manifest": {
+    "artifact": "h1-served-runtime-manifest-v1.json",
+    "bytes": 1539786,
+    "sha256": "1e5dd9fb47701a98b705b9d7eab712091fcd2726d5572a1ff2376b88b4bb2e3d"
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "report": {
+        "artifact": "h1-first-use-browser-v1/browser/report.json",
+        "bytes": 135763,
+        "sha256": "5207fe69fde3a36e025e97389c5d0d2fb96d0615975bde90f763c24523fbc94c"
+      },
+      "owner": {
+        "artifact": "h1-first-use-browser-v1/owner.json",
+        "bytes": 90198,
+        "sha256": "3598c3cada7ec9052bf5f0977639d6343a2748904605e919778b16e6e703e9b3"
+      },
+      "first_failure": {
+        "artifact": "h1-first-use-browser-v1/first-failure-receipt.json",
+        "bytes": 2190,
+        "sha256": "df8ca18329adea817745c13d4b06f44347087888c62cf35fe7cc286f4cd5d192"
+      },
+      "outcome": "INCOMPLETE_OR_FAILED",
+      "first_error": "Error: alpha H1 first collector failure: record-context-binding-identity-mismatch",
+      "source": "6ee4a07a95b0cf760b9e7796d780b21c33b93812",
+      "scope": "No rendering target; failed diagnostic only"
+    },
+    {
+      "attempt": 2,
+      "report": {
+        "artifact": "h1-first-use-browser-v2/browser/report.json",
+        "bytes": 8994644,
+        "sha256": "7470d484350a97fa8b378a397b916363b1eb2b39804eda08a1aca24b467706ca"
+      },
+      "owner": {
+        "artifact": "h1-first-use-browser-v2/owner.json",
+        "bytes": 210559,
+        "sha256": "9c74c7910a3e09555f4c42497daf5e1323608dc66454760122dacb6fe0f48e50"
+      },
+      "first_failure": {
+        "artifact": "h1-first-use-browser-v2/first-failure-receipt.json",
+        "bytes": 14559,
+        "sha256": "cb8368f071506f61e6a4028d64ccf6ebb4561122167b78eb55b2faf6413c8063"
+      },
+      "outcome": "INCOMPLETE_OR_FAILED",
+      "first_error": "AssertionError [ERR_ASSERTION]: P2 combat approach tap did not resolve to exactly one captured active source row",
+      "source": "6ee4a07a95b0cf760b9e7796d780b21c33b93812",
+      "scope": "No rendering target; failed diagnostic only"
+    },
+    {
+      "attempt": 3,
+      "report": {
+        "artifact": "h1-first-use-browser-v3/browser/report.json",
+        "bytes": 9520566,
+        "sha256": "89e7372f0c9997935052c95bf180fa322d55ef59758b13d182403319228e9bf2"
+      },
+      "owner": {
+        "artifact": "h1-first-use-browser-v3/owner.json",
+        "bytes": 176586,
+        "sha256": "0d95115fcc869890fb0ca108840d969795bac0ff39a9c44f1a5096e2e018e954"
+      },
+      "first_failure": {
+        "artifact": "h1-first-use-browser-v3/first-failure-receipt.json",
+        "bytes": 7349,
+        "sha256": "5dd416843d4a856a04c2ced89d048562b2e5371e6047ae0a013d8a3a6a5760f9"
+      },
+      "outcome": "INCOMPLETE_OR_FAILED",
+      "first_error": "AssertionError [ERR_ASSERTION]: P2 combat approach tap did not resolve to exactly one captured active source row",
+      "source": "6ee4a07a95b0cf760b9e7796d780b21c33b93812",
+      "scope": "No rendering target; failed diagnostic only",
+      "input_failure": {
+        "tap": 4,
+        "active_rows": [
+          569,
+          570
+        ],
+        "active_poll_serials": [
+          1186,
+          1187
+        ],
+        "neutral_row": 571,
+        "earlier_validated_taps": [
+          1,
+          2,
+          3
+        ]
+      },
+      "native_final_status": {
+        "alpha": {
+          "capture_active": false,
+          "valid": true,
+          "final": true,
+          "invalid_reason": 0,
+          "invalid_reason_name": "none",
+          "capture_generation": 1,
+          "renderer_generation": 1,
+          "device_generation": 1,
+          "next_sequence": 655703,
+          "errors": 0,
+          "dropped": 0,
+          "open_scopes": 0,
+          "total_records": 655702,
+          "drained_records": 655702,
+          "pending_records": 0,
+          "descriptor_count": 890
+        },
+        "beta": {
+          "capture_active": false,
+          "valid": true,
+          "final": true,
+          "invalid_reason": 0,
+          "invalid_reason_name": "none",
+          "capture_generation": 1,
+          "renderer_generation": 1,
+          "device_generation": 1,
+          "next_sequence": 657771,
+          "errors": 0,
+          "dropped": 0,
+          "open_scopes": 0,
+          "total_records": 657770,
+          "drained_records": 657770,
+          "pending_records": 0,
+          "descriptor_count": 890
+        }
+      },
+      "raw_streams": {
+        "alpha": {
+          "file": "h1-pipeline-provenance/alpha.provenance.bin",
+          "bytes": 286287253,
+          "sha256": "9fe014fdf54949dbc1c088d2fcec056fb8cee644cffd12964f23c7922185b8b4"
+        },
+        "beta": {
+          "file": "h1-pipeline-provenance/beta.provenance.bin",
+          "bytes": 286155348,
+          "sha256": "0ae2550eaf4d7629d6dae26368f3ef2674bc11563b238e0c3682e29359080625"
+        }
+      },
+      "historical_pad_first_mismatch": {
+        "alpha": 130,
+        "beta": 153
+      },
+      "owned_process_absence": 21
+    }
+  ],
+  "current_decision": "Checkpoint combat-based diagnostic; no further full capture released. A separately named first-self-KO prefix is source-reviewed for feasibility only.",
+  "candidate_and_review": [
+    {
+      "artifact": "h1-first-use-candidate-v9/freeze-manifest.json",
+      "bytes": 3983,
+      "sha256": "389b527b78bdc822202d97f48f61bd9547c72209261565284236e922757c0acf"
+    },
+    {
+      "artifact": "h1-first-use-candidate-v9-independent-review-v1.json",
+      "bytes": 9722,
+      "sha256": "12a89a3920cb849e7564898e941e222a776c1d68d3c3393a1bd932c5733b5eda"
+    },
+    {
+      "artifact": "h1-first-use-browser-v3-independent-first-failure-review-v1.json",
+      "bytes": 35050,
+      "sha256": "4bb2c8383bc8fce16a2fc2dd1045a6e2e44e057d64cb178234e9e6521e7b7b2e"
+    },
+    {
+      "artifact": "h1-self-ko-respawn-prefix-source-plan-v1.json",
+      "bytes": 10285,
+      "sha256": "d5e1b93abd2824746973225ba198825d0cbe53fbf75c1ca63d5705061e1d9a85"
+    }
+  ],
+  "exclusions": [
+    "No same-input/seed/history equivalence to retained combat failure; recipe hashes are not complete consumed input transcript hashes.",
+    "No rendering target or causal immutable pipeline descriptor identified; no prewarming justified.",
+    "No changed native arithmetic/RNG/source input/draw order/timing guard/deadline.",
+    "No full route, performance, rollback or acceptance claim.",
+    "Native recorder closure is valid in attempt3; H1 timing getters continued twice per peer after finish, so stronger no-native-command quiescence is incomplete."
+  ]
+}

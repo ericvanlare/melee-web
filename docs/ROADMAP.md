@@ -36,7 +36,8 @@ budget, and competitive play cannot tolerate pauses. H1 gates live-play admissio
 bounded functional and feasibility steps A1–A3 can proceed without it. Work starts from the open
 pause classification in [#116](https://github.com/ericvanlare/melee-web/issues/116).
 The fix must come from the runtime, never from a threshold, frame-rate,
-skipped-tick or auto-Resume change.
+skipped-tick or auto-Resume change. The current first-use respawn boundary and
+retained failures are recorded in the [scoped H1 status entry](status/2026-10-13-h1-first-use-respawn.md).
 
 ### Track A: match-only rollback online
 
