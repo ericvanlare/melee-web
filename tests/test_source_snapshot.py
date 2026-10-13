@@ -33,3 +33,40 @@ class SourceSnapshotBoundaryTests(unittest.TestCase):
             self.assertEqual(report["result"], "failed")
             self.assertIn("ENOENT", report["failure"])
             self.assertTrue((output / "native-host.log").is_file())
+            self.assertEqual(report["selection"], {
+                "checkpoints": [300, 318, 420, 438, 500, 540, 558],
+                "depths": [1, 2, 4, 7],
+                "requiresGroundedPlayers": False,
+            })
+
+    def test_runner_bounds_checkpoint_depth_selection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script = ROOT / "scripts/check_source_snapshot.mjs"
+            node = str(node_runtime())
+            common = [node, str(script), "--runtime", str(root / "missing.js"),
+                      "--assets", str(root / "missing-assets")]
+
+            for label, selection, message in (
+                ("checkpoint-without-depth", ["--checkpoint", "300"], "must be selected together"),
+                ("depth-without-checkpoint", ["--depth", "1"], "must be selected together"),
+                ("unsupported-checkpoint", ["--checkpoint", "301", "--depth", "1"], "Unsupported checkpoint"),
+                ("unsupported-depth", ["--checkpoint", "300", "--depth", "3"], "Unsupported depth"),
+            ):
+                output = root / label
+                result = subprocess.run(common + ["--out", str(output)] + selection,
+                                        cwd=ROOT, capture_output=True, text=True, timeout=20)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn(message, result.stderr)
+                self.assertFalse(output.exists(), f"invalid selection created {output}")
+
+            selected_output = root / "selected"
+            selected = subprocess.run(
+                common + ["--out", str(selected_output), "--checkpoint", "300", "--depth", "1"],
+                cwd=ROOT, capture_output=True, text=True, timeout=20)
+            self.assertEqual(selected.returncode, 1, selected.stdout + selected.stderr)
+            report = json.loads((selected_output / "evidence.json").read_text())
+            self.assertEqual(report["selection"], {
+                "checkpoints": [300], "depths": [1], "requiresGroundedPlayers": True,
+            })
+            self.assertIn("ENOENT", report["failure"])
