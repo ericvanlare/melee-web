@@ -130,8 +130,12 @@ test('the matched Setup C/F opt-in and preflight gate fail before server/browser
   assert.ok(callbackStart >= 0 && callbackEnd > callbackStart);
   assert.doesNotMatch(callbackSource, /Module\._melee_web_native_menu_/,
     'the runtime retirement callback must not call a native getter inside the yielding ccall');
-  assert.match(callbackSource, /terminalMatchedSetupCfRetirementConsumed = true[\s\S]*?publish\(\)/,
-    'retirement publishes inactive runtime state using the retained native receipt');
+  assert.match(callbackSource,
+    /terminalMatchedSetupCfRetirementObserved = true[\s\S]*?publish\(\)/,
+    'native retirement is observed before publishing host state');
+  assert.match(callbackSource,
+    /if \(diagnosticActive !== false\) return false;[\s\S]*?terminalMatchedSetupCfRetirementConsumed = true;/,
+    'host retirement is consumed only after the published runtime is inactive');
   assert.match(runnerSource,
     /kind === 'retire-explicit'[\s\S]*?module\.ccall\([\s\S]*?melee_web_native_menu_stadium_first_sss_vs_setup_cf_retire[\s\S]*?\{async: true\}/,
     'terminal retirement must be an awaited generated-runtime ccall');

@@ -96,6 +96,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   let keyboard = [true, true], layout = 'two';
   const commands = [], listeners = [];
   let terminalDrawDiscardRetirementConsumed = false;
+  let terminalMatchedSetupCfRetirementObserved = false;
   let terminalMatchedSetupCfRetirementConsumed = false;
   let diagnostics = null, diagnosticActive = true, longtaskObserver = null, diagnosticPreparationAt = null;
   let diagnosticDelivery = null, diagnosticDeliveryTimer = null, diagnosticRetainedLoaded = false;
@@ -308,7 +309,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       ready = true; publish(); resolveStartup();
     },
   };
-  const status = () => terminalMatchedSetupCfRetirementConsumed ? 'Native diagnostic owner retired.' : ready ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : 'Starting WebGPU…';
+  const status = () => terminalMatchedSetupCfRetirementObserved ? 'Native diagnostic owner retired.' : ready ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : 'Starting WebGPU…';
   const check = result => { if (!result) throw Error(status()); return result; };
   const numericProgress = (value, fallback = 0) => Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : fallback;
   function readNativeCacheIdle() {
@@ -380,9 +381,9 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   }
   function snapshot() {
     refreshCatalogLoading();
-    const phase = ready && !fatal && !destroyed && !terminalMatchedSetupCfRetirementConsumed
+    const phase = ready && !fatal && !destroyed && !terminalMatchedSetupCfRetirementObserved
       ? Module._melee_web_native_menu_phase() : 0;
-    const running = ready && !fatal && !destroyed && !terminalMatchedSetupCfRetirementConsumed &&
+    const running = ready && !fatal && !destroyed && !terminalMatchedSetupCfRetirementObserved &&
       !!Module._melee_web_native_menu_running();
     const scene = SCENES[phase] || 'idle';
     const active = ['css', 'sss', 'title', 'main', 'opening', 'opening-vs',
@@ -653,10 +654,24 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
           !(state.complete === true || state.failed === true ||
             (state.awaiting_approval === true && state.last_action?.complete === true)) ||
           !['complete', 'failed', 'awaiting-approval'].includes(state.state)) return false;
+      const firstRetirementObservation = !terminalMatchedSetupCfRetirementObserved;
+      terminalMatchedSetupCfRetirementObserved = true;
+      if (firstRetirementObservation) diagnosticLifecycle('scene_exit');
+      // Native retirement closes the source owner, but it does not run the
+      // ordinary unload callback that cancels a preparation label. Do not
+      // consume host retirement while a host operation or unrelated loading
+      // phase still owns the player; a later retry can settle it after unwind.
+      const hasActiveOwner = !!busy || !!assetTransfer || commands.length !== 0;
+      if (hasActiveOwner || (loading && loading.phase !== 'native')) {
+        publish();
+        return false;
+      }
+      const canCancelStaleNativePreparation = !!preparationLabel || loading?.phase === 'native';
+      if (canCancelStaleNativePreparation) callbacks.menuPreparationCanceled();
+      else publish();
+      if (diagnosticActive !== false) return false;
       terminalMatchedSetupCfRetirementConsumed = true;
-      diagnosticLifecycle('scene_exit');
-      publish();
-      return diagnosticActive === false;
+      return true;
     },
     menuFrame(wasRunning) {
       if (!ready || fatal || destroyed) return;

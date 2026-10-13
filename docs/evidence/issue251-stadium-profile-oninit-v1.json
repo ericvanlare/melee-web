@@ -10013,7 +10013,7 @@
       "empty_tmp_removed": true,
       "incrementals": "Retained for active C3 milestone"
     },
-    "next": "Source-only reduction of remaining per-action polling and persistence costs, retaining exact source/PAD/draw order, all comparisons and guards; review before any full-schedule protocol or changed capture. C3 remains open.",
+    "next": "Validate the integrated terminal-owner reducer and per-action transfer projection, then review one unchanged 174-action capture. Full 7,167-action protocol and C3 lifetimes remain unimplemented/unadmitted.",
     "independent_result_review": {
       "path": "stadium-timing-v3-result-independent-review-v1.json",
       "sha256": "142a1f9834ff1b8d3cbccb99e681e981b1bfc5bce0509ceb37261d5ea933174b",
@@ -10255,6 +10255,201 @@
         }
       },
       "next": "Reduce and repair early success-route cleanup using existing checked explicit retirement. Then reduce remaining persistence cost before any full7167-action release; unchanged deadlines and comparison rules."
+    },
+    "persistence_repair": {
+      "state": "SCOPED_PREFIX_AND_STORAGE_COMPONENT_PASS_OVERALL_RETIREMENT_NOTIFICATION_FAIL",
+      "harness": "1139dfa59b00a9f9bfd07c9689ffe3f32b043e76",
+      "runtime": "50c1fc95 + v6patch1516c8a5 unchanged",
+      "report_sha256": "9a73a3b3c5908cd5db7261270c57b30c2c90871053bb3fbfc3884aa9ec13a1cf",
+      "actions_completed": 174,
+      "comparisons": [
+        {
+          "phase": "C",
+          "decision": "PASS_EXACT_DECLARED_C_F_FIELDS",
+          "fields": 16
+        },
+        {
+          "phase": "F",
+          "decision": "PASS_EXACT_DECLARED_C_F_FIELDS",
+          "fields": 16
+        }
+      ],
+      "action_loop_ms": 2943.383,
+      "previous_action_loop_ms": 5233.778,
+      "observed_loop_reduction_pct": 43.76,
+      "global_remaining_at_loop_start_ms": 89181,
+      "report_persistence": {
+        "attempted_count": 360,
+        "completed_count": 360,
+        "failed_count": 0,
+        "serialized_bytes": 111572790,
+        "timings_ms": {
+          "serialize": {
+            "count": 360,
+            "total_ms": 164.374,
+            "mean_ms": 0.457,
+            "p50_ms": 0.449,
+            "p95_ms": 0.616,
+            "max_ms": 0.858
+          },
+          "file_write": {
+            "count": 360,
+            "total_ms": 171.593,
+            "mean_ms": 0.477,
+            "p50_ms": 0.437,
+            "p95_ms": 0.593,
+            "max_ms": 10.051
+          },
+          "rename": {
+            "count": 360,
+            "total_ms": 42.54,
+            "mean_ms": 0.118,
+            "p50_ms": 0.116,
+            "p95_ms": 0.159,
+            "max_ms": 0.407
+          },
+          "total": {
+            "count": 360,
+            "total_ms": 414.491,
+            "mean_ms": 1.151,
+            "p50_ms": 1.105,
+            "p95_ms": 1.45,
+            "max_ms": 10.606
+          }
+        }
+      },
+      "previous_serialized_bytes": 1099781306,
+      "sidecar": {
+        "file": "stadium-run2-persistence-capture-v1/browser-run/report.json.stadium-c3-css-sss-history-v1.json",
+        "bytes": 2746416,
+        "sha256": "1d9e89615232f10d98e512870577ace7242b135891006f99a4c807ff9fd187e8"
+      },
+      "native_closed": true,
+      "host_notification_passed": false,
+      "full_7167_admitted": false,
+      "limitations": [
+        "Single host-observed proper prefix, unchanged original174actions; all intervals inclusive/nested",
+        "Serialized-byte counter is recorded persistence calls; separately retained one-time sidecar is not a lifetime cost estimate",
+        "Longer dynamic report growth and full schedule cost unmeasured",
+        "C3 lifetime A/retire/recreate/B not run; cleanup overallfail retained"
+      ],
+      "external_run_id": "rollback-stadium-sprint-20261013-111001-9f8df4a4",
+      "validation": {
+        "head": "1139dfa59b00a9f9bfd07c9689ffe3f32b043e76",
+        "focused_discovery_methods": 4,
+        "node_checkpoint_controls": 6,
+        "full_regression_reused_source": "3e71329e7f3fe03077e6f453897edb5f60929b95",
+        "full_regression_tests": 2609,
+        "full_regression_skips": 180,
+        "integration_full_suite_and_CI": "pending"
+      },
+      "artifacts": {
+        "stadium-run2-persistence-capture-v1/browser-run/report.json": {
+          "artifact": "stadium-run2-persistence-capture-v1/browser-run/report.json",
+          "bytes": 3299482,
+          "sha256": "9a73a3b3c5908cd5db7261270c57b30c2c90871053bb3fbfc3884aa9ec13a1cf"
+        },
+        "stadium-run2-persistence-capture-v1/owner.json": {
+          "artifact": "stadium-run2-persistence-capture-v1/owner.json",
+          "bytes": 134155,
+          "sha256": "9fee19a6c9759a8c1aa3c043ccb1d6a03508becacbe5eb70d5ce9ab0bb59fde1"
+        },
+        "stadium-run2-persistence-capture-v1/completion.json": {
+          "artifact": "stadium-run2-persistence-capture-v1/completion.json",
+          "bytes": 7028,
+          "sha256": "f1ee87f8c2df99e95e68b028173a6b2226a694b2869926977c0e29aedf68b1aa"
+        },
+        "stadium-run2-persistence-capture-v1/first-failure.json": {
+          "artifact": "stadium-run2-persistence-capture-v1/first-failure.json",
+          "bytes": 1890,
+          "sha256": "8a170789c00ded3ee3c0c2349972beb63991a61507a2be3d2cef38bd98933754"
+        },
+        "stadium-persistence-sidecar-independent-review-v2.json": {
+          "artifact": "stadium-persistence-sidecar-independent-review-v2.json",
+          "bytes": 3672,
+          "sha256": "aade3abd022aa0b4486b4a0980a7550d219431de65cb3958dafea98f59083767"
+        },
+        "stadium-persistence-prefix-packet-review-v1.json": {
+          "artifact": "stadium-persistence-prefix-packet-review-v1.json",
+          "bytes": 6789,
+          "sha256": "90a7277ff45f042b4073546e8c00f34f845d76394f32eed041f0786fca4c695f"
+        },
+        "stadium-persistence-integrated-v2/validation.json": {
+          "artifact": "stadium-persistence-integrated-v2/validation.json",
+          "bytes": 1903,
+          "sha256": "a238a8f47e7a783482ec6b198de9ea071ec2c7d931e0fbd556342bea6679b1d8"
+        }
+      },
+      "independent_raw_result_review": {
+        "file": "stadium-persistence-prefix-first-failure-review-v1.json",
+        "bytes": 12776,
+        "sha256": "973d6e7800038fac9b5a847e13a1e8af55ef6bf48eb2ff3744a8372f83b67011",
+        "decision": "SCOPED_COMPONENT_PASS_OVERALL_FAIL_REQUIRES_SMALLER_REPRODUCER"
+      }
+    },
+    "terminal_owner_reducer": {
+      "result": "SOURCE_REVIEW_AND_FOCUSED_CONTROLS_PASS_NO_NEW_CAPTURE",
+      "review": {
+        "file": "stadium-terminal-owner-root-review-v3.json",
+        "sha256": "7d36ecafa6bb52ab7149a6188c1185cd31c250b1e1a43242e47730a6abce4f02",
+        "bytes": 1244
+      },
+      "integration": {
+        "file": "stadium-terminal-owner-integration-v3.json",
+        "sha256": "b0b5b0d2a34c7e5a7e8eb83513abea6a489821a49d794d9f54894b5b4c829637",
+        "bytes": 909
+      },
+      "candidate_manifest": {
+        "file": "stadium-terminal-owner-reducer-v3/manifest.json",
+        "sha256": "2e82300b57cad45edc7f96c32985121509d604b44f87975803f94feb15821fe6",
+        "bytes": 4190
+      },
+      "controls": [
+        {
+          "file": "stadium-terminal-owner-integrated-v3/test_melee_runtime_owner.py.json",
+          "sha256": "78fa1f2024eb6f0128a12c713f3f02d00ffec6995aa8750edb54e6a2d330d692",
+          "bytes": 361
+        },
+        {
+          "file": "stadium-terminal-owner-integrated-v3/test_stadium_matched_setup_cf_runner_gate.py.json",
+          "sha256": "ee531b1121eb813063a302a62edd2dd362a0594e938362b123318b0b36979ec1",
+          "bytes": 378
+        }
+      ],
+      "test_counts": {
+        "runtime_owner": 51,
+        "runner_gate": 3
+      },
+      "boundary": "Separate observed native closure from accepted host retirement. Suppress terminal native getters, preserve active transfer/busy/queued/disc/handoff refusals, and settle only stale native preparation through the existing cancellation callback.",
+      "limits": [
+        "Controlled actual runtime-owner tests, not browser cleanup evidence.",
+        "The raw failed capture did not expose the host flags; stale preparation is a reproduced cause class, not a confirmed sampled flag.",
+        "Native retirement is one-use; component host retry does not add a native retry.",
+        "Fresh builds/full regression and a separately reviewed short capture remain pending."
+      ]
+    },
+    "matched_action_projection": {
+      "result": "SOURCE_REVIEW_AND_FOCUSED_CONTROLS_PASS_NO_NEW_CAPTURE",
+      "candidate_manifest": {
+        "file": "stadium-action-projection-candidate-v1/manifest.json",
+        "sha256": "59be7a4cd720224310c00c8953b84cd1e0cece4c4eab67d154ef17695407f1e7",
+        "bytes": 1484
+      },
+      "review": {
+        "file": "stadium-action-projection-independent-review-v1.json",
+        "sha256": "0a47dc276c9879c2f11b792af84e76ae27704ee59b193f2f6ee7b6b4e321b9bb",
+        "bytes": 3446
+      },
+      "integration_controls": {
+        "file": "stadium-action-projection-integrated-v1/receipt.json",
+        "sha256": "55720d55b7f576f59b7a7ae133a5cd1375b0a32b140a86a5ada722ed88bb2586",
+        "bytes": 2041
+      },
+      "boundary": "Only per-action browser transfer omits unrelated historical data. Full native getter, JSON parse, phase/running getters, host callback, complete C/F record including unknown fields and setup/final/failure reads are preserved.",
+      "limits": [
+        "No native getter or source-order change.",
+        "Synthetic transfer-byte comparison is not measured browser speed."
+      ]
     }
   }
 }

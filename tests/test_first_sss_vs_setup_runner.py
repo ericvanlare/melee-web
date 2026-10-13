@@ -24,7 +24,7 @@ class FirstSssVsSetupRunnerTests(OwnedWorkspaceTests):
 
   js+=_function(source,'function assertFirstSssVsSetupHistory(native, before)')
   js+=_function(source,'function assertFirstSssVsSetupOwners(setup)')
-  js+=_function(source,'async function readFirstSssVsEntryObservation()')
+  js+=_function(source,'async function readFirstSssVsEntryObservation(matchedActionOnly = false)')
   js+='const expectedPath='+repr(os.environ.get('MELEE_WEB_SSS_VS_SETUP_EXPECTED',''))+';\n'
   js+='const helperPath='+repr(os.environ.get('MELEE_WEB_SSS_VS_SETUP_COMPARATOR',''))+';\n'
   js+='const loaderSource='+repr(_function(source,'async function loadFirstSssVsSetupInputs()'))+';\n'

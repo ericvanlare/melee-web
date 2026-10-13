@@ -37,6 +37,32 @@ class SharedRuntimeOwnerTests(unittest.TestCase):
     def test_native_command_audio_and_teardown_boundaries(self):
         self.run_owner([])
 
+    def test_stadium_retirement_clean_owner(self):
+        self.run_owner(['--silent', '--stadium-retirement-case=clean'],
+                       'STADIUM_RETIREMENT_RESULT')
+
+    def test_stadium_retirement_settles_stale_native_preparation(self):
+        self.run_owner(['--silent', '--stadium-retirement-case=stale-native-preparation',
+                        '--stadium-retirement-expect-settled'],
+                       'STADIUM_RETIREMENT_RESULT')
+
+    def test_stadium_retirement_preserves_queued_asset_transfer(self):
+        self.run_owner(['--silent', '--stadium-retirement-case=busy-asset-transfer'],
+                       'STADIUM_RETIREMENT_RESULT')
+
+    def test_stadium_retirement_settles_after_disc_read_unwinds(self):
+        self.run_owner(['--silent', '--stadium-retirement-case=disc-loading',
+                        '--stadium-retirement-expect-settled'],
+                       'STADIUM_RETIREMENT_RESULT')
+
+    def test_stadium_retirement_preserves_handoff_loading(self):
+        self.run_owner(['--silent', '--stadium-retirement-case=handoff-loading'],
+                       'STADIUM_RETIREMENT_RESULT')
+
+    def test_stadium_retirement_preserves_fatal_owner_refusal(self):
+        self.run_owner(['--silent', '--stadium-retirement-case=fatal-owner'],
+                       'STADIUM_RETIREMENT_RESULT')
+
     def test_render_timeout_preserves_prepared_disc_for_retry(self):
         self.run_owner(['--audio-render-timeout'],
                        'renderer timeout leaves prepared disc retryable; stale ack cannot launch retry')

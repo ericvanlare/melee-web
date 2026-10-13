@@ -2096,8 +2096,8 @@ async function runFirstSssPrefix(constructorNative, firstDrawNative) {
   return evidence.native;
 }
 
-async function readFirstSssVsEntryObservation() {
-  const native = await page.evaluate(requireAsyncifyIdle => {
+async function readFirstSssVsEntryObservation(matchedActionOnly = false) {
+  const native = await page.evaluate(({requireAsyncifyIdle, matchedActionOnly} = {}) => {
     const module = globalThis.Module;
     if (requireAsyncifyIdle &&
         (typeof module?.stadiumMatchedSetupNativeIdle !== 'function' ||
@@ -2110,8 +2110,14 @@ async function readFirstSssVsEntryObservation() {
       running: module._melee_web_native_menu_running()} : null;
     // Preserve callback ordering and thrown errors, but keep its unused rows in-page.
     globalThis.__meleeWebStadiumFirstSssPrefixRead?.() ?? null;
+    // The action loop consumes only this complete receipt. Keep the original
+    // getter, parse and callback order; full setup/final/failure reads stay intact.
+    if (matchedActionOnly && native) return {
+      first_sss_vs_setup: {matched_setup_cf: native.first_sss_vs_setup?.matched_setup_cf ?? null},
+      native_phase: native.native_phase, running: native.running,
+    };
     return native;
-  }, firstSssVsSetupCfExplicitStep);
+  }, {requireAsyncifyIdle: firstSssVsSetupCfExplicitStep, matchedActionOnly});
   if (native?.__native_asyncify_idle === false) {
     matchedSetupCfExplicitAsyncifyUnsafe = true;
     throw Error('Asyncify is not idle; VS Entry native observation was suppressed');
@@ -2928,7 +2934,7 @@ async function runMatchedSetupCfContinuation(setupNative) {
         let cfState = null;
         for (;;) {
           const readOrdinal = timingSample?.receipt_reads ?? 0;
-          const readOperation = () => timeout(readFirstSssVsEntryObservation(),
+          const readOperation = () => timeout(readFirstSssVsEntryObservation(true),
             Math.min(3000, remaining()), `Read matched Setup C/F action ${scheduleIndex}`);
           if (timingSample) {
             currentNative = await timedActionAsync(timingSample, 'receipt_read', null,

@@ -11,7 +11,7 @@ const RUNNER = process.env.MELEE_STADIUM_NATIVE_OBSERVATION_RUNNER_SOURCE ||
 const PATCH = process.env.MELEE_STADIUM_NATIVE_OBSERVATION_PATCH || null;
 
 function extractFunction(source, name) {
-  const marker = 'async function ' + name + '() {';
+  const marker = 'async function ' + name + '(';
   const start = source.indexOf(marker);
   assert.notEqual(start, -1, 'missing actual source function: ' + name);
   const end = source.indexOf('\n}', start);
@@ -22,9 +22,9 @@ function extractFunction(source, name) {
 async function extractCandidateFunction(source, name) {
   if (!PATCH) return extractFunction(source, name);
   const patch = await fs.readFile(PATCH, 'utf8');
-  const marker = 'async function ' + name + '() {';
+  const marker = 'async function ' + name + '(';
   const lines = patch.split(/\r?\n/);
-  const start = lines.findIndex(line => line === ' ' + marker || line === '+' + marker || line === marker);
+  const start = lines.findIndex(line => line.startsWith(' ' + marker) || line.startsWith('+' + marker) || line.startsWith(marker));
   assert.notEqual(start, -1, 'candidate patch is missing source function: ' + name);
   const extracted = [];
   for (let index = start; index < lines.length; index += 1) {
@@ -85,15 +85,18 @@ function makeContext({prefixSource, readerSource, mode, spec = {}}) {
       },
     };
   }
+  if (module && spec.explicit) module.stadiumMatchedSetupNativeIdle = () => {
+    events.push('asyncify_idle'); return spec.idle === true;
+  };
   const sandbox = {
     // This VM covers the default-off reader route; explicit Asyncify controls have separate tests.
-    firstSssVsSetupCfExplicitStep: false,
+    firstSssVsSetupCfExplicitStep: spec.explicit === true,
     matchedSetupCfExplicitAsyncifyUnsafe: false,
     Module: module,
     JSON: {parse(text) { events.push('json_parse'); return JSON.parse(text); }},
     page: {
-      async evaluate(callback) {
-        const result = callback();
+      async evaluate(callback, argument) {
+        const result = callback(argument);
         const serialized = JSON.stringify(result);
         transferredBytes = Buffer.byteLength(serialized === undefined ? '' : serialized);
         return serialized === undefined ? undefined : JSON.parse(serialized);
@@ -124,7 +127,7 @@ function makeContext({prefixSource, readerSource, mode, spec = {}}) {
 async function run(mode, sources, spec = {}) {
   const fixture = makeContext({...sources, mode, spec});
   try {
-    const value = await fixture.context.__invoke();
+    const value = await fixture.context.__invoke(spec.matchedActionOnly === true);
     return {ok: true, value: normalize(value), events: fixture.events,
       transferredBytes: fixture.transferredBytes, hostPayload: fixture.hostPayload};
   } catch (error) {
@@ -205,4 +208,50 @@ test('the actual native-only reader retains native semantics and omits unused ho
       else assert.equal(oldPath.value, null);
     });
   }
+});
+
+
+test('the action-only projection retains the entire receipt and all getter/callback failures', async t => {
+  const source = await fs.readFile(RUNNER, 'utf8');
+  const sources = {
+    prefixSource: extractFunction(source, 'readFirstSssPrefixObservation'),
+    readerSource: extractFunction(source, 'readFirstSssVsEntryObservation'),
+  };
+  assert.equal(source.split('readFirstSssVsEntryObservation(true)').length - 1, 1,
+    'Only the per-action loop may request projection; setup/final/failure reads remain full');
+  const cf = {schema: 'synthetic-source-action-v2', armed: true, cursor: 168,
+    queued: false, awaiting_approval: true, failed: false, complete: false, error: null,
+    last_action: {complete: true, schedule_index: 168, action: 'tick', ordinal: 84,
+      source_tick_input_pad_hex: '01'.repeat(64), observation: {seed: 123, nested: [4, 5]},
+      extra_future_field: {keep: ['every', 'field']}}};
+  const native = {schema: 'synthetic-full-native', history: 'h'.repeat(400000),
+    first_sss_vs_setup: {other_setup_history: 's'.repeat(9000), matched_setup_cf: cf}};
+  const normal = await run('candidate', sources, {native});
+  const projected = await run('candidate', sources, {native, matchedActionOnly: true});
+  assert.equal(projected.ok, true);
+  assert.deepEqual(projected.value, {first_sss_vs_setup: {matched_setup_cf: cf}, native_phase: 4, running: 0});
+  assert.deepEqual(projected.value.first_sss_vs_setup.matched_setup_cf,
+    normal.value.first_sss_vs_setup.matched_setup_cf);
+  assert.deepEqual(projected.events, normal.events);
+  assert.ok(normal.transferredBytes > 400000);
+  assert.ok(projected.transferredBytes < 2000);
+  for (const spec of [{module: 'absent'}, {module: 'missing-observer'}, {pointer: 0},
+    {malformed: true}, ...['native', 'utf8', 'phase', 'running', 'host'].map(throwAt => ({throwAt}))]) {
+    await t.test(JSON.stringify(spec), async () => {
+      const full = await run('candidate', sources, {...spec, native});
+      const reduced = await run('candidate', sources, {...spec, native, matchedActionOnly: true});
+      assertSameOutcome(full, reduced, full.events);
+    });
+  }
+  const missing = await run('candidate', sources, {native: {history: 'kept in page'}, matchedActionOnly: true});
+  assert.equal(missing.value.first_sss_vs_setup.matched_setup_cf, null,
+    'Missing receipts remain missing so the unchanged action driver refuses');
+  const unsafe = await run('candidate', sources, {native, explicit: true, idle: false, matchedActionOnly: true});
+  assert.equal(unsafe.ok, false);
+  assert.match(unsafe.errorMessage, /Asyncify is not idle/);
+  assert.deepEqual(unsafe.events, ['asyncify_idle']);
+  const safe = await run('candidate', sources, {native, explicit: true, idle: true, matchedActionOnly: true});
+  assert.equal(safe.ok, true);
+  assert.deepEqual(safe.events, ['asyncify_idle', ...normal.events]);
+  assert.deepEqual(safe.value, projected.value);
 });
