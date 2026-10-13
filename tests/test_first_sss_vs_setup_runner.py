@@ -77,8 +77,17 @@ assert.equal(validateFirstSssTextTailLog({...log,records:['unrelated text'],reta
 assert.equal(validateFirstSssTextTailLog({...log,enabled:false}).state,'OPEN');
 const before={running:0,native_phase:20,first_sss_prefix:{complete:true},first_sss_vs_entry:{complete:true}};
 const native={...structuredClone(before),native_phase:21,first_sss_vs_setup:{attempted:true}};
-let readCalls=0;async function readFirstSssPrefixObservation(){++readCalls;return {native};}
+let readCalls=0;const calls={observe:0,utf8:0,phase:0,running:0,host:0};
+const page={async evaluate(callback){++readCalls;return callback();}};
+globalThis.Module={
+ _melee_web_native_menu_stadium_first_css_draw_observe(){++calls.observe;return 1;},
+ UTF8ToString(pointer){++calls.utf8;assert.equal(pointer,1);return JSON.stringify(native);},
+ _melee_web_native_menu_phase(){++calls.phase;return 21;},
+ _melee_web_native_menu_running(){++calls.running;return 0;},
+};
+globalThis.__meleeWebStadiumFirstSssPrefixRead=()=>{++calls.host;return {rows:[{phase:'complete',actual_json:'host history'}]};};
 assert.deepEqual(await readFirstSssVsEntryObservation(),native);assert.equal(readCalls,1);
+assert.deepEqual(calls,{observe:1,utf8:1,phase:1,running:1,host:1});
 assertFirstSssVsSetupHistory(native,before);assert.throws(()=>assertFirstSssVsSetupHistory({...native,running:1},before));assert.throws(()=>assertFirstSssVsSetupHistory({...native,first_sss_prefix:{complete:false}},before));
 const setup={menu_retired:true,parent_seed_owner_value_restored:true,parent_seed_before_retirement:17,parent_seed_after_retirement:17,requested_generation:8,committed_generation:8,match_world_generation:9,prior_world_generation:7,audio_render_calls_before:274,audio_render_calls_after:274,audio_render_frames_before:146133,audio_render_frames_after:146133,current_owners:{host:true,match:true,cache:true,source_world_exists:true,menu_world:false,host_entered:false,running:false,pending:false,first_use_draw_pending:false,host_phase:5,source_world_generation:9,pending_scope_generation:0,asset_generation:8,active_files:2}};
 assertFirstSssVsSetupOwners(setup);for(const key of ['parent_seed_owner_value_restored','menu_retired'])assert.throws(()=>assertFirstSssVsSetupOwners({...setup,[key]:false}));assert.throws(()=>assertFirstSssVsSetupOwners({...setup,audio_render_calls_after:275}));assert.throws(()=>assertFirstSssVsSetupOwners({...setup,current_owners:{...setup.current_owners,pending:true}}));
