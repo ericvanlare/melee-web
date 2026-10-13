@@ -2068,7 +2068,17 @@ async function runFirstSssPrefix(constructorNative, firstDrawNative) {
 }
 
 async function readFirstSssVsEntryObservation() {
-  return (await readFirstSssPrefixObservation()).native;
+  return page.evaluate(() => {
+    const module = globalThis.Module;
+    const pointer = module?._melee_web_native_menu_stadium_first_css_draw_observe?.();
+    const observation = pointer ? JSON.parse(module.UTF8ToString(pointer)) : null;
+    const native = observation ? {...observation,
+      native_phase: module._melee_web_native_menu_phase(),
+      running: module._melee_web_native_menu_running()} : null;
+    // Preserve callback ordering and thrown errors, but keep its unused rows in-page.
+    globalThis.__meleeWebStadiumFirstSssPrefixRead?.() ?? null;
+    return native;
+  });
 }
 
 async function enableFirstSssTextTailProbe() {
